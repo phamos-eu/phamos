@@ -1,0 +1,18 @@
+include MANIFEST.in
+include requirements.txt
+include *.json
+include *.md
+include *.py
+include *.txt
+recursive-include phamos *.css
+recursive-include phamos *.csv
+recursive-include phamos *.html
+recursive-include phamos *.ico
+recursive-include phamos *.js
+recursive-include phamos *.json
+recursive-include phamos *.md
+recursive-include phamos *.png
+recursive-include phamos *.py
+recursive-include phamos *.svg
+recursive-include phamos *.txt
+recursive-exclude phamos *.pyc
