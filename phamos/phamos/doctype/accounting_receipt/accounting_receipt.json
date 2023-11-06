@@ -1,0 +1,395 @@
+{
+ "actions": [],
+ "allow_rename": 1,
+ "autoname": "format:AR-{MM}-{YYYY}-{#####}",
+ "creation": "2023-03-28 12:35:46.966802",
+ "doctype": "DocType",
+ "editable_grid": 1,
+ "email_append_to": 1,
+ "engine": "InnoDB",
+ "field_order": [
+  "general_section",
+  "title",
+  "posting_date",
+  "workflow_state",
+  "status",
+  "receipt_type",
+  "receipt_attached",
+  "attachment",
+  "supplier_reference",
+  "sum",
+  "currency",
+  "conversion_rate",
+  "column_break_9lcf0",
+  "note",
+  "purchase_section_section",
+  "supplier",
+  "item",
+  "column_break_pvwrj",
+  "supplier_name",
+  "purchase_invoice",
+  "time_sheet_list_section",
+  "timesheets",
+  "section_break_emmu",
+  "total_billing_hours",
+  "column_break_mgwb",
+  "total_billing_amount",
+  "payment_section",
+  "is_paid",
+  "mode_of_payment",
+  "bank_account",
+  "payment_account",
+  "column_break_utryu",
+  "due_date",
+  "payment_entry",
+  "payment_date",
+  "accounting_dimensions_section",
+  "project",
+  "column_break_lzli4",
+  "cost_center",
+  "datev_tab",
+  "datev_mail_recipient",
+  "datev_mail_recipient_2",
+  "sent_to_datev",
+  "admin_tab",
+  "naming_series",
+  "uploaded_by",
+  "company",
+  "amended_from"
+ ],
+ "fields": [
+  {
+   "fieldname": "general_section",
+   "fieldtype": "Section Break",
+   "label": "General Section"
+  },
+  {
+   "description": "This is a human readable name of the receipt. It is auto set when the Accounting Receipt is created by E-Mail-inbox",
+   "fieldname": "title",
+   "fieldtype": "Data",
+   "in_list_view": 1,
+   "label": "Title",
+   "reqd": 1,
+   "unique": 1
+  },
+  {
+   "description": "This is the date of the receipt",
+   "fieldname": "posting_date",
+   "fieldtype": "Date",
+   "in_list_view": 1,
+   "in_standard_filter": 1,
+   "label": "Date"
+  },
+  {
+   "fieldname": "workflow_state",
+   "fieldtype": "Data",
+   "in_filter": 1,
+   "in_preview": 1,
+   "in_standard_filter": 1,
+   "label": "Workflow State"
+  },
+  {
+   "fieldname": "status",
+   "fieldtype": "Data",
+   "hidden": 1,
+   "label": "Status"
+  },
+  {
+   "fieldname": "receipt_type",
+   "fieldtype": "Select",
+   "label": "Receipt Type",
+   "options": "\nPurchase Invoice\nSonstiges\nJournal Entry\nPayment"
+  },
+  {
+   "fieldname": "receipt_attached",
+   "fieldtype": "Select",
+   "label": "Receipt Attached",
+   "options": "Yes\nNo"
+  },
+  {
+   "fieldname": "attachment",
+   "fieldtype": "Attach",
+   "label": "Attachment"
+  },
+  {
+   "fieldname": "supplier_reference",
+   "fieldtype": "Data",
+   "label": "Supplier Reference"
+  },
+  {
+   "description": "This is the amount that needs to be payed. The currency is not specified yet!",
+   "fieldname": "sum",
+   "fieldtype": "Currency",
+   "in_list_view": 1,
+   "label": "Sum"
+  },
+  {
+   "fieldname": "currency",
+   "fieldtype": "Link",
+   "label": "Currency",
+   "options": "Currency",
+   "reqd": 1
+  },
+  {
+   "fieldname": "column_break_9lcf0",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "note",
+   "fieldtype": "Text Editor",
+   "label": "Note"
+  },
+  {
+   "fieldname": "purchase_section_section",
+   "fieldtype": "Section Break",
+   "label": "Purchase Section"
+  },
+  {
+   "description": "Link to the supplier party from who we received this receipt",
+   "fieldname": "supplier",
+   "fieldtype": "Link",
+   "in_standard_filter": 1,
+   "label": "Supplier",
+   "options": "Supplier"
+  },
+  {
+   "fieldname": "column_break_pvwrj",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fetch_from": "supplier.supplier_name",
+   "fieldname": "supplier_name",
+   "fieldtype": "Data",
+   "label": "Supplier Name",
+   "read_only": 1
+  },
+  {
+   "fieldname": "purchase_invoice",
+   "fieldtype": "Link",
+   "label": "Purchase Invoice",
+   "options": "Purchase Invoice"
+  },
+  {
+   "fieldname": "payment_section",
+   "fieldtype": "Section Break",
+   "label": "Payment Section"
+  },
+  {
+   "default": "0",
+   "fieldname": "is_paid",
+   "fieldtype": "Check",
+   "label": "Is Paid"
+  },
+  {
+   "fieldname": "mode_of_payment",
+   "fieldtype": "Link",
+   "label": "Mode of Payment",
+   "options": "Mode of Payment"
+  },
+  {
+   "fieldname": "bank_account",
+   "fieldtype": "Link",
+   "label": "Bank Account",
+   "options": "Bank Account"
+  },
+  {
+   "description": "The Receipt was/will be payed via this account.\n<br>\n<br>\n3610 = Kreditkarte",
+   "fetch_from": "bank_account.account",
+   "fieldname": "payment_account",
+   "fieldtype": "Link",
+   "label": "Payment Account",
+   "options": "Account"
+  },
+  {
+   "fieldname": "column_break_utryu",
+   "fieldtype": "Column Break"
+  },
+  {
+   "description": "Due date to when the receipt should be payed",
+   "fieldname": "due_date",
+   "fieldtype": "Date",
+   "label": "Due Date"
+  },
+  {
+   "fieldname": "payment_entry",
+   "fieldtype": "Link",
+   "label": "Payment Entry",
+   "options": "Payment Entry"
+  },
+  {
+   "fieldname": "payment_date",
+   "fieldtype": "Date",
+   "label": "Payment Date"
+  },
+  {
+   "fieldname": "accounting_dimensions_section",
+   "fieldtype": "Section Break",
+   "label": "Accounting Dimensions"
+  },
+  {
+   "fieldname": "project",
+   "fieldtype": "Link",
+   "label": "Project",
+   "options": "Project"
+  },
+  {
+   "fieldname": "column_break_lzli4",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "cost_center",
+   "fieldtype": "Link",
+   "label": "Cost Center",
+   "options": "Cost Center"
+  },
+  {
+   "fieldname": "datev_tab",
+   "fieldtype": "Tab Break",
+   "label": "DATEV"
+  },
+  {
+   "default": "5ae13779-6eb8-43a1-9292-87d9b30bf1a8@uploadmail.datev.de",
+   "fieldname": "datev_mail_recipient",
+   "fieldtype": "Data",
+   "label": "DATEV Mail Recipient (Eingangsrechnung)",
+   "options": "Mail",
+   "read_only": 1
+  },
+  {
+   "default": "8b013751-c088-48a9-a998-1745463f94a0@uploadmail.datev.de",
+   "depends_on": "eval:doc.receipt_type == \"Sonstiges\"",
+   "fieldname": "datev_mail_recipient_2",
+   "fieldtype": "Data",
+   "label": "DATEV Mail Recipient (Sonstiges)",
+   "options": "Mail",
+   "read_only": 1
+  },
+  {
+   "default": "0",
+   "fieldname": "sent_to_datev",
+   "fieldtype": "Check",
+   "label": "Sent to DATEV"
+  },
+  {
+   "fieldname": "admin_tab",
+   "fieldtype": "Tab Break",
+   "label": "Admin"
+  },
+  {
+   "fieldname": "naming_series",
+   "fieldtype": "Data",
+   "label": "Naming Series"
+  },
+  {
+   "fieldname": "uploaded_by",
+   "fieldtype": "Data",
+   "label": "Uploaded by",
+   "options": "Email"
+  },
+  {
+   "fieldname": "company",
+   "fieldtype": "Link",
+   "label": "Company",
+   "options": "Company"
+  },
+  {
+   "fieldname": "conversion_rate",
+   "fieldtype": "Float",
+   "label": "Exchange Rate",
+   "print_hide": 1,
+   "reqd": 1
+  },
+  {
+   "fieldname": "time_sheet_list_section",
+   "fieldtype": "Section Break",
+   "label": "Time Sheet List"
+  },
+  {
+   "fieldname": "section_break_emmu",
+   "fieldtype": "Section Break"
+  },
+  {
+   "fieldname": "total_billing_hours",
+   "fieldtype": "Float",
+   "label": "Total Billing Hours"
+  },
+  {
+   "fieldname": "total_billing_amount",
+   "fieldtype": "Float",
+   "label": "Total Billing Amount"
+  },
+  {
+   "fieldname": "amended_from",
+   "fieldtype": "Link",
+   "label": "Amended From",
+   "no_copy": 1,
+   "options": "Accounting Receipt",
+   "print_hide": 1,
+   "read_only": 1
+  },
+  {
+   "fieldname": "timesheets",
+   "fieldtype": "Table",
+   "label": "Time Sheets",
+   "options": "Accounting Receipt Timesheet"
+  },
+  {
+   "fieldname": "column_break_mgwb",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "item",
+   "fieldtype": "Link",
+   "label": "Item",
+   "options": "Item"
+  }
+ ],
+ "index_web_pages_for_search": 1,
+ "is_submittable": 1,
+ "links": [
+  {
+   "link_doctype": "Purchase Order",
+   "link_fieldname": "accounting_receipt"
+  },
+  {
+   "link_doctype": "Purchase Invoice",
+   "link_fieldname": "accounting_receipt"
+  },
+  {
+   "link_doctype": "Payment Entry",
+   "link_fieldname": "accounting_receipt"
+  },
+  {
+   "link_doctype": "Journal Entry",
+   "link_fieldname": "accounting_receipt"
+  }
+ ],
+ "modified": "2023-11-06 19:28:28.423884",
+ "modified_by": "Administrator",
+ "module": "Phamos",
+ "name": "Accounting Receipt",
+ "naming_rule": "Expression",
+ "owner": "Administrator",
+ "permissions": [
+  {
+   "create": 1,
+   "delete": 1,
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "System Manager",
+   "share": 1,
+   "write": 1
+  }
+ ],
+ "sender_field": "uploaded_by",
+ "sort_field": "modified",
+ "sort_order": "DESC",
+ "states": [],
+ "subject_field": "title",
+ "title_field": "title",
+ "track_changes": 1,
+ "track_seen": 1
+}
