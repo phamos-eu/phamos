@@ -7,6 +7,8 @@ app_description = "ERPNext Enhancement for Phamos.eu"
 app_email = "furqan.asghar@phamos.eu"
 app_license = "MIT"
 
+required_apps = ["erpnext"]
+
 # Includes in <head>
 # ------------------
 
@@ -29,6 +31,7 @@ app_license = "MIT"
 # page_js = {"page" : "public/js/file.js"}
 
 # include js in doctype views
+doctype_js = {"Project" : "public/js/project.js"}
 # doctype_js = {"doctype" : "public/js/doctype.js"}
 # doctype_list_js = {"doctype" : "public/js/doctype_list.js"}
 # doctype_tree_js = {"doctype" : "public/js/doctype_tree.js"}
