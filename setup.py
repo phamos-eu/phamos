@@ -11,7 +11,7 @@ setup(
 	version=version,
 	description="ERPNext Enhancement for Phamos.eu",
 	author="phamos.eu",
-	author_email="furqan.asghar@phamos.eu",
+	author_email="support@phamos.eu",
 	packages=find_packages(),
 	zip_safe=False,
 	include_package_data=True,
