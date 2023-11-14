@@ -1,0 +1,192 @@
+{
+ "actions": [],
+ "autoname": "TR-.YYYY.-.#####",
+ "creation": "2023-07-08 15:18:38.390031",
+ "doctype": "DocType",
+ "editable_grid": 1,
+ "engine": "InnoDB",
+ "field_order": [
+  "project",
+  "employee",
+  "customer",
+  "activity_type",
+  "task",
+  "column_break_78vsj",
+  "from_time",
+  "expected_time",
+  "to_time",
+  "actual_time",
+  "column_break_zgqwu",
+  "timesheet",
+  "activity_doctype",
+  "activity_docname",
+  "percent_billable",
+  "section_break_hqfwm",
+  "goal",
+  "column_break_8016u",
+  "result",
+  "amended_from"
+ ],
+ "fields": [
+  {
+   "fieldname": "project",
+   "fieldtype": "Link",
+   "in_list_view": 1,
+   "in_standard_filter": 1,
+   "label": "Project",
+   "options": "Project",
+   "reqd": 1
+  },
+  {
+   "fieldname": "customer",
+   "fieldtype": "Link",
+   "in_standard_filter": 1,
+   "label": "Customer",
+   "options": "Customer"
+  },
+  {
+   "fieldname": "activity_type",
+   "fieldtype": "Link",
+   "in_list_view": 1,
+   "label": "Activity Type",
+   "options": "Activity Type",
+   "reqd": 1
+  },
+  {
+   "fieldname": "task",
+   "fieldtype": "Link",
+   "in_standard_filter": 1,
+   "label": "Task",
+   "options": "Task"
+  },
+  {
+   "fieldname": "column_break_78vsj",
+   "fieldtype": "Column Break"
+  },
+  {
+   "default": "Now",
+   "fieldname": "from_time",
+   "fieldtype": "Datetime",
+   "label": "From Time",
+   "no_copy": 1,
+   "reqd": 1
+  },
+  {
+   "fieldname": "expected_time",
+   "fieldtype": "Duration",
+   "in_list_view": 1,
+   "label": "Expected Time",
+   "reqd": 1
+  },
+  {
+   "fieldname": "to_time",
+   "fieldtype": "Datetime",
+   "label": "To Time",
+   "no_copy": 1,
+   "read_only": 1
+  },
+  {
+   "fieldname": "actual_time",
+   "fieldtype": "Duration",
+   "label": "Actual Time",
+   "no_copy": 1,
+   "read_only": 1
+  },
+  {
+   "fieldname": "column_break_zgqwu",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "timesheet",
+   "fieldtype": "Link",
+   "label": "Timesheet",
+   "no_copy": 1,
+   "options": "Timesheet",
+   "read_only": 1
+  },
+  {
+   "fieldname": "activity_doctype",
+   "fieldtype": "Link",
+   "label": "Activity Doctype",
+   "options": "DocType"
+  },
+  {
+   "fieldname": "activity_docname",
+   "fieldtype": "Dynamic Link",
+   "label": "Activity Docname",
+   "options": "activity_doctype"
+  },
+  {
+   "fieldname": "section_break_hqfwm",
+   "fieldtype": "Section Break"
+  },
+  {
+   "fieldname": "goal",
+   "fieldtype": "Small Text",
+   "label": "Goal",
+   "no_copy": 1,
+   "reqd": 1
+  },
+  {
+   "fieldname": "column_break_8016u",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "result",
+   "fieldtype": "Small Text",
+   "label": "Result",
+   "no_copy": 1,
+   "read_only": 1
+  },
+  {
+   "fieldname": "amended_from",
+   "fieldtype": "Link",
+   "label": "Amended From",
+   "no_copy": 1,
+   "options": "Timesheet Record",
+   "print_hide": 1,
+   "read_only": 1
+  },
+  {
+   "default": "100",
+   "fieldname": "percent_billable",
+   "fieldtype": "Select",
+   "label": "Percent Billable",
+   "options": "0\n25\n50\n75\n100"
+  },
+  {
+   "fieldname": "employee",
+   "fieldtype": "Link",
+   "label": "Employee",
+   "options": "Employee"
+  }
+ ],
+ "index_web_pages_for_search": 1,
+ "is_submittable": 1,
+ "links": [],
+ "modified": "2023-11-01 23:15:34.892920",
+ "modified_by": "Administrator",
+ "module": "Phamos",
+ "name": "Timesheet Record",
+ "naming_rule": "Expression (old style)",
+ "owner": "Administrator",
+ "permissions": [
+  {
+   "create": 1,
+   "delete": 1,
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "System Manager",
+   "select": 1,
+   "share": 1,
+   "submit": 1,
+   "write": 1
+  }
+ ],
+ "sort_field": "modified",
+ "sort_order": "DESC",
+ "states": []
+}
