@@ -72,7 +72,7 @@ after_migrate = "phamos.install.after_migrate"
 # ------------
 
 before_uninstall = "phamos.install.before_uninstall"
-# after_uninstall = "simpatec.uninstall.after_uninstall"
+# after_uninstall = "phamos.uninstall.after_uninstall"
 
 # Desk Notifications
 # ------------------
