@@ -67,12 +67,12 @@ doctype_js = {"Issue" : "public/js/issue.js"}
 # Installation
 # ------------
 
-after_migrate = "phamos.install.after_migrate"
+# after_migrate = "phamos.install.after_migrate"
 
 # Uninstallation
 # ------------
 
-before_uninstall = "phamos.install.before_uninstall"
+# before_uninstall = "phamos.install.before_uninstall"
 # after_uninstall = "phamos.uninstall.after_uninstall"
 
 # Desk Notifications
