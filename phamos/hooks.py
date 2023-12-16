@@ -32,6 +32,7 @@ required_apps = ["erpnext"]
 
 # include js in doctype views
 doctype_js = {"Project" : "public/js/project.js"}
+doctype_js = {"Issue" : "public/js/issue.js"}
 # doctype_js = {"doctype" : "public/js/doctype.js"}
 # doctype_list_js = {"doctype" : "public/js/doctype_list.js"}
 # doctype_tree_js = {"doctype" : "public/js/doctype_tree.js"}
@@ -66,12 +67,12 @@ doctype_js = {"Project" : "public/js/project.js"}
 # Installation
 # ------------
 
-after_migrate = "phamos.install.after_migrate"
+# after_migrate = "phamos.install.after_migrate"
 
 # Uninstallation
 # ------------
 
-before_uninstall = "phamos.install.before_uninstall"
+# before_uninstall = "phamos.install.before_uninstall"
 # after_uninstall = "phamos.uninstall.after_uninstall"
 
 # Desk Notifications
