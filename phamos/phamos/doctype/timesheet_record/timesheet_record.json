@@ -16,7 +16,6 @@
   "expected_time",
   "to_time",
   "actual_time",
-  "column_break_zgqwu",
   "timesheet",
   "activity_doctype",
   "activity_docname",
@@ -35,7 +34,8 @@
    "in_standard_filter": 1,
    "label": "Project",
    "options": "Project",
-   "reqd": 1
+   "reqd": 1,
+   "description": "Please double-check the project number with your supervisor."
   },
   {
    "fieldname": "customer",
@@ -93,10 +93,6 @@
    "read_only": 1
   },
   {
-   "fieldname": "column_break_zgqwu",
-   "fieldtype": "Column Break"
-  },
-  {
    "fieldname": "timesheet",
    "fieldtype": "Link",
    "label": "Timesheet",
@@ -107,12 +103,14 @@
   {
    "fieldname": "activity_doctype",
    "fieldtype": "Link",
+   "hidden": 1,
    "label": "Activity Doctype",
    "options": "DocType"
   },
   {
    "fieldname": "activity_docname",
    "fieldtype": "Dynamic Link",
+   "hidden": 1,
    "label": "Activity Docname",
    "options": "activity_doctype"
   },
@@ -165,7 +163,7 @@
  "index_web_pages_for_search": 1,
  "is_submittable": 1,
  "links": [],
- "modified": "2023-11-01 23:15:34.892920",
+ "modified": "2024-02-27 09:15:34.892920",
  "modified_by": "Administrator",
  "module": "Phamos",
  "name": "Timesheet Record",
