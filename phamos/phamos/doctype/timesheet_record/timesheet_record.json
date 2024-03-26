@@ -17,8 +17,6 @@
   "to_time",
   "actual_time",
   "timesheet",
-  "activity_doctype",
-  "activity_docname",
   "percent_billable",
   "section_break_hqfwm",
   "goal",
@@ -99,20 +97,6 @@
    "no_copy": 1,
    "options": "Timesheet",
    "read_only": 1
-  },
-  {
-   "fieldname": "activity_doctype",
-   "fieldtype": "Link",
-   "hidden": 1,
-   "label": "Activity Doctype",
-   "options": "DocType"
-  },
-  {
-   "fieldname": "activity_docname",
-   "fieldtype": "Dynamic Link",
-   "hidden": 1,
-   "label": "Activity Docname",
-   "options": "activity_doctype"
   },
   {
    "fieldname": "section_break_hqfwm",
