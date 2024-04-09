@@ -1,109 +1,6 @@
-/*frappe.pages['project-action-panel'].on_page_load = function(wrapper) {
-    // Ensure wrapper is defined
-    if (!wrapper) {
-        console.error("Wrapper is not defined.");
-        return;
-    }
-
-    // Set the title of the page
-    if (wrapper.page) {
-        wrapper.page.set_title('<span style="font-size: 14px;">Project Action Panel</span>');
-    }
-
-    // Fetch project data from the server
-    frappe.call({
-        method: "phamos.phamos.page.project_action_panel.project_action_panel.fetch_projects",
-        callback: function(r) {
-            if (r.message) {
-                // Render DataTable with the fetched data
-                renderDataTable(wrapper, r.message);
-            } else {
-                // Handle error or empty data
-                console.log("No project data found");
-            }
-        }
-    });
-
-    // Function to render DataTable
-    function renderDataTable(wrapper, projectData) {
-        // Ensure wrapper is defined
-        if (!wrapper) {
-            console.error("Wrapper is not defined.");
-            return;
-        }
-
-        // Define columns for the report view
-        let button_formatter = (value) => `<button style="display: block; margin: 0 auto;" onclick="alert('This is ${value}')">Action!</button>`
-        let columns = [
-            { label: "Project Name", id: "Project", fieldtype: "Data", width: 300 },
-            { label: "Notes", id: "Notes", fieldtype: "Data", width: 300 },
-            { label: "Customer", id: "Customer", fieldtype: "Link", width: 200 },
-            ];
-
-        // Add a header to the report view
-        wrapper.innerHTML = `<h1>Project Action Panel</h1><div id="datatable-wrapper"></div>`;
-
-        // Initialize DataTable with the data and column configuration
-        let datatable = new frappe.DataTable(wrapper.querySelector('#datatable-wrapper'), {
-            columns: columns.map(col => ({ content: col.label, ...col })), // Include the column headers
-            data: projectData,
-            inlineFilters: true,
-            language: frappe.boot.lang,
-            translations: frappe.utils.datatable.get_translations(),
-            layout: "fixed",
-            cellHeight: 33,
-            direction: frappe.utils.is_rtl() ? "rtl" : "ltr",
-            header: true, // Ensure that column headers are shown
-            renderCell: function(row, column, data, index) {
-                // Check if the current column is the Actions column
-                if (column.id === 'Actions') {
-                    // Use a custom formatter function to create the button
-                    return buttonFormatter(data);
-                } else {
-                    // For other columns, just return the data
-                    return data;
-                }
-            }
-        });
-
-        // Move the table to the center and add margin on top
-        $(wrapper.querySelector('#datatable-wrapper')).css({
-            'margin-top': '50px',
-            'text-align': 'center',
-            'margin-left': '50px',
-        });
-    }
-
-    
-};*/
-
-/*frappe.pages['project-action-panel'].on_page_load = function(wrapper) {
-    var page = frappe.ui.make_app_page({
-        parent: wrapper,
-        title: 'project-action-panel',
-        single_column: true
-    });
-
-    //set up our empty datatable
-    let el = document.querySelector('.layout-main-section')
-    let button_formatter = (value) => `<button style="display: block; margin: 0 auto;" onclick="alert('This is ${value}')">Action!</button>`
-    let columns = ['Project Name', 'Notes', 'Customer', 
-        {name: "Action Button", focusable: false, format: button_formatter }]
-    let datatable = new frappe.DataTable(el, { columns: columns, data: [], layout: "fluid" });
-
-    //use regular ajax api methods to fetch document data, then refresh
-    frappe.db.get_list("Project", 
-        {fields: ['project_name','notes' , 'customer']}
-    ).then((r) => { 
-        let data = r.map(Object.values)
-        datatable.refresh(data, columns) 
-    })
-}*/
-
 frappe.pages['project-action-panel'].on_page_load = function(wrapper) {
     // Ensure wrapper is defined
     if (!wrapper) {
-        console.error("Wrapper is not defined.");
         return;
     }
 
@@ -112,7 +9,7 @@ frappe.pages['project-action-panel'].on_page_load = function(wrapper) {
         wrapper.page.set_title('<span style="font-size: 14px;">Project Action Panel</span>');
     }
 
-    // Fetch project data from the server
+    // Fetch project data from the server on page load
     frappe.call({
         method: "phamos.phamos.page.project_action_panel.project_action_panel.fetch_projects",
         callback: function(r) {
@@ -121,32 +18,125 @@ frappe.pages['project-action-panel'].on_page_load = function(wrapper) {
                 renderDataTable(wrapper, r.message);
             } else {
                 // Handle error or empty data
-                console.log("No project data found");
             }
         }
     });
-
+    // Function to create timesheet record
+    function create_timesheet_record(project_name,customer,activity_type,percent_billable,from_time,expected_time,goal){
+        frappe.call({
+            method: "phamos.phamos.page.project_action_panel.project_action_panel.create_timesheet_record",
+            args: {
+                "project_name": project_name,
+                "customer": customer,
+                "activity_type":activity_type,
+                "percent_billable":percent_billable,
+                "from_time":from_time,
+                "expected_time":expected_time,
+                "goal":goal
+            },
+            freeze: true,
+			freeze_message: __("Creating Timesheet Record......"),
+			callback: function(r) {
+				if(r.message) {
+                    var doc = frappe.model.sync(r.message);
+					frappe.msgprint('Timesheet Record: '+doc[0].name+' Created Successfully.');
+					}
+				}
+        })
+    }
+     
     // Function to render DataTable
     function renderDataTable(wrapper, projectData) {
         // Ensure wrapper is defined
         if (!wrapper) {
-            console.error("Wrapper is not defined.");
             return;
         }
-
+        
         // Define columns for the report view
-        //let button_formatter = (value) => `<button style="display: block; margin: 0 auto;" onclick="alert('This is ${value}')">Action!</button>`
-        let button_formatter = (value) => `<button style="width: 80px; height: 23px; background-color: #007bff; color: white; display: block; margin: 0 auto;" onclick="alert('This is ${value}')">Start</button>`;
-
+        // Define the function
+        window.startProject = function(project_name, customer) {
+            var dialog = new frappe.ui.Dialog({
+                title: __("Add Timesheet record."),
+                fields: [
+                    {
+                        fieldtype: "Data",
+                        options: "Project",
+                        label: __("Project Name"),
+                        fieldname: "project_name",
+                        in_list_view: 1,
+                        read_only:1,
+                        default: project_name
+                    },
+                    
+                    {
+                        fieldtype: "Data",
+                        options: "Customer",
+                        label: __("Customer"),
+                        fieldname: "customer",
+                        in_list_view: 1,
+                        read_only:1,
+                        default: customer
+                    },
+                    {
+                        fieldtype: "Link",
+                        options: "Activity Type",
+                        label: __("Activity Type"),
+                        fieldname: "activity_type",
+                        in_list_view: 1,
+                    },
+                    {
+                        fieldtype: "Select",
+                        options: [0,25,50,75,100],
+                        label: __("Percent Billable"),
+                        fieldname: "percent_billable",
+                        in_list_view: 1,
+                    },
+                    {
+                        fieldtype: 'Column Break'
+                    },
+                    {
+                        fieldtype: "Datetime",
+                        label: __("From Time"),
+                        fieldname: "from_time",
+                        in_list_view: 1,
+                    },
+                    {
+                        fieldtype: "Duration",
+                        label: __("Expected Time"),
+                        fieldname: "expected_time",
+                        in_list_view: 1,
+                    },
+                    {
+                        fieldtype: "Small Text",
+                        label: __("Goal"),
+                        fieldname: "goal",
+                        in_list_view: 1,
+                    },
+                    
+                ],
+                primary_action_label: __("Create Timesheet Record."),
+                primary_action(values) {
+                    create_timesheet_record(values.project_name,values.customer,values.activity_type,values.percent_billable,values.from_time,values.expected_time,values.goal)
+                    dialog.hide();
+                }
+            });
+        
+            dialog.show();
+        };
+        // Define the button formatter function with the click event calling the startProject function
+        //let button_formatter = (value, row) => `<button type="button" style="height: 23px; width: 60px; display: block;" class="btn btn-primary btn-sm btn-modal-primary" onclick="startProject('${row.project_name}', '${row.notes}', '${row.customer}')">Start</button>`;
+        let button_formatter = (value, row) => {
+            return `<button type="button" style="height: 23px; width: 60px; display: block;" class="btn btn-primary btn-sm btn-modal-primary" onclick="startProject('${row[1].content}', '${row[3].content}')">Start</button>`;
+        };
         let columns = [
-            { label: "Project Name", id: "Project", fieldtype: "Data", width: 300 },
-            { label: "Notes", id: "Notes", fieldtype: "Data", width: 300 },
-            { label: "Customer", id: "Customer", fieldtype: "Link", width: 200 },
-            {name: "Start", focusable: false, format: button_formatter }];
-
+            { label: "<b>Project Name</b>", id: "project_name", fieldtype: "Data", width: 300 },
+            { label: "<b>Notes</b>", id: "notes", fieldtype: "Data", width: 300 },
+            { label: "<b>Customer</b>", id: "customer", fieldtype: "Link", width: 200 },
+            { label: "<b>Start</b>", focusable: false, format: button_formatter , width: 150}
+        ];
         // Add a header to the report view
         wrapper.innerHTML = `<h1>Project Action Panel</h1><div id="datatable-wrapper"></div>`;
-
+        
         // Initialize DataTable with the data and column configuration
         let datatable = new frappe.DataTable(wrapper.querySelector('#datatable-wrapper'), {
             columns: columns.map(col => ({ content: col.label, ...col })), // Include the column headers
@@ -160,14 +150,18 @@ frappe.pages['project-action-panel'].on_page_load = function(wrapper) {
             header: true, // Ensure that column headers are shown
         
         });
-
         // Move the table to the center and add margin on top
         $(wrapper.querySelector('#datatable-wrapper')).css({
             'margin-top': '50px',
             'text-align': 'center',
             'margin-left': '50px',
         });
+         
     }
-
-    
 };
+
+
+
+
+
+
