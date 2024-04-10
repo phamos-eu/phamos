@@ -1,3 +1,4 @@
+let project_ = ""
 frappe.pages['project-action-panel'].on_page_load = function(wrapper) {
     // Ensure wrapper is defined
     if (!wrapper) {
@@ -124,10 +125,71 @@ frappe.pages['project-action-panel'].on_page_load = function(wrapper) {
             dialog.show();
         };
         // Define the button formatter function with the click event calling the startProject function
-        //let button_formatter = (value, row) => `<button type="button" style="height: 23px; width: 60px; display: block;" class="btn btn-primary btn-sm btn-modal-primary" onclick="startProject('${row.project_name}', '${row.notes}', '${row.customer}')">Start</button>`;
+
+        /*let button_formatter = (value, row) => {
+                // Now that both project and employee values are available, you can render the button
+           
+            if (row[1].content =="Phamos 2"){
+                return `<button type="button" style="height: 23px; width: 60px; display: block; background-color: rgb(144, 238, 144);" class="btn btn-primary btn-sm btn-modal-primary" onclick="startProject('${row[1].content}', '${row[3].content}')">Start</button>`;
+                //return `<button type="button" style="height: 23px; width: 60px; display: block;" class="btn btn-primary btn-sm btn-modal-primary" onclick="startProject('${row[1].content}', '${row[3].content}')">Start</button>`;
+            }
+            else if(row[1].content =="Phamos"){
+                return `<button type="button" style="height: 23px; width: 60px; display: block; background-color: rgb(255, 144, 144);" class="btn btn-primary btn-sm btn-modal-primary" onclick="startProject('${row[1].content}', '${row[3].content}')">Stop</button>`;
+            }
+        };*/
         let button_formatter = (value, row) => {
-            return `<button type="button" style="height: 23px; width: 60px; display: block;" class="btn btn-primary btn-sm btn-modal-primary" onclick="startProject('${row[1].content}', '${row[3].content}')">Start</button>`;
+            let tc = "";
+            // Call getValues and wait for its promise to resolve
+            getValues(value, row).then(values => {
+            // Access values.project, values.employee, values.timesheet_record here
+                console.log(values.project);
+                console.log(values.employee);
+                console.log(values.timesheet_record);
+                tc = values.timesheet_record
+                if (values.timesheet_record){
+                    console.log("i got values");
+                }
+            })
+            .catch(error => {
+                console.error("Error occurred:", error);
+            // Handle error if necessary
+            });
+            if (tc){
+                return `<button type="button" style="height: 23px; width: 60px; display: block;" class="btn btn-primary btn-sm btn-modal-primary" onclick="startProject('${row[1].content}', '${row[3].content}')">Start</button>`;  
+            }
         };
+
+        function getValues(value,row){
+            let project_ = "";
+            let employee_ = "";
+            let timesheet_record = "";
+        
+            return frappe.db.get_value('Project', {"project_name": row[1].content}, 'name')
+                .then(r => {
+                    var doc_project = frappe.model.sync(r.message);
+                    project_ = doc_project[0].name;
+                    console.log(project_);
+        
+                    return frappe.db.get_value('Employee', {"user_id": frappe.session.user}, 'name');
+                })
+                .then(r => {
+                    var doc_emp = frappe.model.sync(r.message);
+                    employee_ = doc_emp[0].name;
+                    console.log(employee_);
+        
+                    return frappe.db.get_value('Timesheet Record', {"project": project_, "employee": employee_, "docstatus": 0}, 'name');
+                })
+                .then(r => {
+                    var doc_tc = frappe.model.sync(r.message);
+                    timesheet_record = doc_tc[0].name;
+                    console.log(timesheet_record);
+                    return { project: project_, employee: employee_, timesheet_record: timesheet_record };
+        
+                    // Conditionally render the button based on the value of timesheet_record
+                    
+                });
+        };
+        
         let columns = [
             { label: "<b>Project Name</b>", id: "project_name", fieldtype: "Data", width: 300 },
             { label: "<b>Notes</b>", id: "notes", fieldtype: "Data", width: 300 },
@@ -159,9 +221,5 @@ frappe.pages['project-action-panel'].on_page_load = function(wrapper) {
          
     }
 };
-
-
-
-
 
 
