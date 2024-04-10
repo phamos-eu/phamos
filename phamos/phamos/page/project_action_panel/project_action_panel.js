@@ -261,5 +261,3 @@ frappe.pages['project-action-panel'].on_page_load = function(wrapper) {
          
     }
 };
-
-

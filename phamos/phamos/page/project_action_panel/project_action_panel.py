@@ -5,21 +5,6 @@ from frappe.utils import cstr, now_datetime, time_diff_in_seconds, get_datetime
 
 
 @frappe.whitelist()
-def fetch_projects():
-    # Custom SQL query to fetch project data
-    employee_name = frappe.db.get_value("Employee", {"user_id": frappe.session.user}, "name")
-    projects = frappe.db.sql("""
-        SELECT p.name AS name, p.status AS status, p.notes AS notes, p.project_name AS project_name,
-            (SELECT customer_name FROM `tabCustomer` c WHERE p.customer = c.name) AS customer,
-            (SELECT max(ts.name) FROM `tabTimesheet Record` ts WHERE ts.project = p.name and ts.employee = %(employee)s and ts.docstatus = 0) AS timesheet_record
-        FROM `tabProject` p
-    """, {"employee": employee_name}, as_dict=True)
-
-    # Return project data
-    return projects
-
-
-@frappe.whitelist()
 def create_timesheet_record(project_name,customer, activity_type,percent_billable, from_time, expected_time, goal):
     employee_name = frappe.db.get_value("Employee", {"user_id": frappe.session.user}, "name")
     customer = frappe.db.get_value("Customer", {"customer_name": customer}, "name")
@@ -89,3 +74,18 @@ def check_draft_timesheet_record():
     except Exception as e:
         frappe.log_error(f"Error in check_draft_timesheet_record: {e}")
         return None
+    
+@frappe.whitelist()
+def fetch_projects():
+    # Custom SQL query to fetch project data
+    employee_name = frappe.db.get_value("Employee", {"user_id": frappe.session.user}, "name")
+    projects = frappe.db.sql("""
+        SELECT p.name AS name, p.status AS status, p.notes AS notes, p.project_name AS project_name,
+            (SELECT customer_name FROM `tabCustomer` c WHERE p.customer = c.name) AS customer,
+            (SELECT max(ts.name) FROM `tabTimesheet Record` ts WHERE ts.project = p.name and ts.employee = %(employee)s and ts.docstatus = 0) AS timesheet_record
+        FROM `tabProject` p
+    """, {"employee": employee_name}, as_dict=True)
+
+    # Return project data
+    return projects
+
