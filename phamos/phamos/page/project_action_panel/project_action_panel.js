@@ -100,7 +100,6 @@ frappe.pages['project-action-panel'].on_page_load = function(wrapper) {
                 update_and_submit_timesheet_record(values.timesheet_record,values.to_time,values.result)
                 dialog.hide();
                 window.location.reload();
-               
             }
         });
     
@@ -221,11 +220,13 @@ frappe.pages['project-action-panel'].on_page_load = function(wrapper) {
         let button_formatter = (value, row) => {
                 // Now that both project and employee values are available, you can render the button
             if (row[4].html == ""){
-                return `<button type="button" style="height: 23px; width: 60px; display: block; background-color: rgb(144, 238, 144);" class="btn btn-primary btn-sm btn-modal-primary" onclick="startProject('${row[1].content}', '${row[3].content}')">Start</button>`;
+                return `<button type="button" style="height: 23px; width: 60px; display: flex; align-items: center; justify-content: center; background-color: rgb(0, 100, 0);" class="btn btn-primary btn-sm btn-modal-primary" onclick="startProject('${row[1].content}', '${row[3].content}')">Start</button>`;
                 //return `<button type="button" style="height: 23px; width: 60px; display: block;" class="btn btn-primary btn-sm btn-modal-primary" onclick="startProject('${row[1].content}', '${row[3].content}')">Start</button>`;
             }
             else {
-                return `<button type="button" style="height: 23px; width: 60px; display: block; background-color: rgb(255, 144, 144);" class="btn btn-primary btn-sm btn-modal-primary" onclick="stopProject('${row[4].content}')">Stop</button>`;
+                //return `<button type="button" style="height: 23px; width: 60px; display: block; background-color: rgb(255, 144, 144);" class="btn btn-primary btn-sm btn-modal-primary" onclick="stopProject('${row[4].content}')">Stop</button>`;
+                return `<button type="button" style="height: 23px; width: 60px; display: flex; align-items: center; justify-content: center; background-color: rgb(139, 0, 0);" class="btn btn-primary btn-sm btn-modal-primary" onclick="stopProject('${row[4].content}')">Stop</button>`;
+
             }
         };
         
@@ -234,7 +235,7 @@ frappe.pages['project-action-panel'].on_page_load = function(wrapper) {
             { label: "<b>Notes</b>", id: "notes", fieldtype: "Data", width: 200 },
             { label: "<b>Customer</b>", id: "customer", fieldtype: "Link", width: 200 },
             { label: "<b>Timesheet Record</b>", id: "timesheet_record", fieldtype: "Link", width: 150 },
-            { label: "<b>Start</b>", focusable: false, format: button_formatter , width: 150}
+            { label: "<b>Action</b>", focusable: false, format: button_formatter , width: 150}
         ];
         // Add a header to the report view
         wrapper.innerHTML = `<h1>Project Action Panel</h1><div id="datatable-wrapper"></div>`;
