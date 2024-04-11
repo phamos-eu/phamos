@@ -101,6 +101,7 @@ frappe.pages['project-action-panel'].on_page_load = function(wrapper) {
                 dialog.hide();
                 window.location.reload();
             }
+            
         });
     
         dialog.show();
@@ -112,11 +113,15 @@ frappe.pages['project-action-panel'].on_page_load = function(wrapper) {
             callback: function(r) {
                 if (r.message) {
                     var timesheetRecordDrafts = r.message;
-    
+                    var doc = frappe.model.sync(r.message);
+                    var draftTimesheets = timesheetRecordDrafts.map(function(record) {
+                        return record.timesheet_record_draft;
+                    }).join(', ');
+                    console.log(r) 
                     // Process the retrieved draft Timesheet Records
                     if (timesheetRecordDrafts && timesheetRecordDrafts.length > 0) {
                         // Show error message that draft Timesheet Records are found
-                        frappe.msgprint(__("Draft Timesheet Records found. Please submit them before creating a new one."));
+                        frappe.msgprint(__("Draft Timesheet Records: "+ draftTimesheets+" found. Please submit them before creating a new one."));
                     } else {
                         // No draft Timesheet Records found, show dialog to create new Timesheet Record
                         var dialog = new frappe.ui.Dialog({
