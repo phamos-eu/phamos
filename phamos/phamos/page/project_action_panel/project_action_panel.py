@@ -7,6 +7,38 @@ from datetime import datetime
 
 @frappe.whitelist()
 def create_timesheet_record(project_name, customer, activity_type, percent_billable, from_time, expected_time, goal):
+<<<<<<< HEAD
+    try:
+        employee_name = frappe.db.get_value("Employee", {"user_id": frappe.session.user}, "name")
+        customer = frappe.db.get_value("Customer", {"customer_name": customer}, "name")
+        project = frappe.db.get_value("Project", {"project_name": project_name}, "name")
+        
+        if employee_name:
+            after_1_minute = add_to_date(from_time, minutes=1, as_string=True)
+            
+            timesheet_record = frappe.new_doc('Timesheet Record')
+            timesheet_record.project = project
+            timesheet_record.customer = customer
+            timesheet_record.activity_type = activity_type
+            timesheet_record.from_time = after_1_minute
+            timesheet_record.expected_time = expected_time
+            timesheet_record.goal = goal
+            timesheet_record.percent_billable = percent_billable
+            timesheet_record.employee = employee_name
+
+            timesheet_record.save()
+            
+            # Return the saved timesheet record
+            return timesheet_record
+        else:
+            frappe.throw("Employee not found for the current user.")
+    except Exception as e:
+        # Handle errors here, you can log the error for further investigation
+        frappe.log_error(frappe.get_traceback(), "Timesheet Record Creation Error")
+        
+        # Return None or an error message to indicate the failure
+        return None
+=======
     employee_name = frappe.db.get_value("Employee", {"user_id": frappe.session.user}, "name")
     customer = frappe.db.get_value("Customer", {"customer_name": customer}, "name")
     project = frappe.db.get_value("Project", {"project_name": project_name}, "name")
@@ -28,26 +60,36 @@ def create_timesheet_record(project_name, customer, activity_type, percent_billa
         return timesheet_record
     else:
         frappe.throw("Employee not found for the current user.")
+>>>>>>> upstream/develop
 
 # In your Python script, within @frappe.whitelist()
 @frappe.whitelist()
 def update_and_submit_timesheet_record(name, to_time, result):
-    # Retrieve the Timesheet Record document
-    doc = frappe.get_doc("Timesheet Record", name)
+    try:
+        # Retrieve the Timesheet Record document
+        doc = frappe.get_doc("Timesheet Record", name)
+        
+        # Update the fields
+        doc.to_time = to_time
+        doc.result = result
+        doc.actual_time = time_diff_in_seconds(doc.to_time, doc.from_time)
+        
+        # Save the changes
+        doc.save()
+        
+        # Submit the document
+        doc.submit()
+        
+        # Return success message if update and submission were successful
+        return "Timesheet Record updated and submitted successfully"
     
-    # Update the fields
-    doc.to_time = to_time
-    doc.result = result
-    doc.actual_time = time_diff_in_seconds(doc.to_time, doc.from_time)
-    
-    # Save the changes
-    doc.save()
-    
-    # Submit the document
-    doc.submit()
-    
-    # Optionally, return any response you need
-    return "Timesheet Record updated and submitted successfully"
+    except Exception as e:
+        # Handle errors here, you can log the error for further investigation
+        frappe.log_error(frappe.get_traceback(), "Timesheet Record Update and Submit Error")
+        
+        # Return error message
+        return "Error: Failed to update and submit Timesheet Record. Please try again or contact your administrator."
+
 
 
 @frappe.whitelist(allow_guest=True)
@@ -91,4 +133,9 @@ def fetch_projects():
 
     # Return project data
     return projects
+
+@frappe.whitelist(allow_guest=True)
+def get_employee_activity_type():
+    activity_type = frappe.db.get_value("Employee", {"user_id": frappe.session.user}, "activity_type")
+    return activity_type
 
