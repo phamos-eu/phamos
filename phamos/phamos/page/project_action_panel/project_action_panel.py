@@ -7,6 +7,7 @@ from datetime import datetime
 
 @frappe.whitelist()
 def create_timesheet_record(project_name, customer, activity_type, percent_billable, from_time, expected_time, goal):
+<<<<<<< HEAD
     try:
         employee_name = frappe.db.get_value("Employee", {"user_id": frappe.session.user}, "name")
         customer = frappe.db.get_value("Customer", {"customer_name": customer}, "name")
@@ -37,6 +38,29 @@ def create_timesheet_record(project_name, customer, activity_type, percent_billa
         
         # Return None or an error message to indicate the failure
         return None
+=======
+    employee_name = frappe.db.get_value("Employee", {"user_id": frappe.session.user}, "name")
+    customer = frappe.db.get_value("Customer", {"customer_name": customer}, "name")
+    project = frappe.db.get_value("Project", {"project_name": project_name}, "name")
+    
+    if employee_name:
+        after_1_minute = add_to_date(from_time, minutes=1, as_string=True)
+        
+        timesheet_record = frappe.new_doc('Timesheet Record')
+        timesheet_record.project = project
+        timesheet_record.customer = customer
+        timesheet_record.activity_type = activity_type
+        timesheet_record.from_time = after_1_minute
+        timesheet_record.expected_time = expected_time
+        timesheet_record.goal = goal
+        timesheet_record.percent_billable = percent_billable
+        timesheet_record.employee = employee_name
+
+        timesheet_record.save()
+        return timesheet_record
+    else:
+        frappe.throw("Employee not found for the current user.")
+>>>>>>> upstream/develop
 
 # In your Python script, within @frappe.whitelist()
 @frappe.whitelist()

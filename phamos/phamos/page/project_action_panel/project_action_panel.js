@@ -125,12 +125,21 @@ frappe.pages['project-action-panel'].on_page_load = function(wrapper) {
             method: "phamos.phamos.page.project_action_panel.project_action_panel.check_draft_timesheet_record",
             callback: function(r) {
                 if (r.message) {
+<<<<<<< HEAD
                     let timesheetRecordDrafts = r.message;
                     let doc = frappe.model.sync(r.message);
                     let draftTimesheets = timesheetRecordDrafts.map(function(record) {
                         return record.timesheet_record_draft;
                     }).join(', ');
                     
+=======
+                    var timesheetRecordDrafts = r.message;
+                    var doc = frappe.model.sync(r.message);
+                    var draftTimesheets = timesheetRecordDrafts.map(function(record) {
+                        return record.timesheet_record_draft;
+                    }).join(', ');
+                    console.log(r) 
+>>>>>>> upstream/develop
                     // Process the retrieved draft Timesheet Records
                     if (timesheetRecordDrafts && timesheetRecordDrafts.length > 0) {
                         // Show error message that draft Timesheet Records are found
