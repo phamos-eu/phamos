@@ -167,7 +167,8 @@ frappe.pages['project-action-panel'].on_page_load = function(wrapper) {
                                         fieldname: "percent_billable",
                                         in_list_view: 1,
                                         reqd: 1,
-                                        default: "100"
+                                        default: "100",
+                                        description:'This is a personal indicator to your own performance on the work you have done. It will influence the billable time of the Timesheet created.'
                                     },
                                     {
                                         fieldtype: 'Column Break'
@@ -178,7 +179,7 @@ frappe.pages['project-action-panel'].on_page_load = function(wrapper) {
                                         fieldname: "from_time",
                                         in_list_view: 1,
                                         reqd: 1,
-                                        read_only:1,
+                                        read_only:0,
                                         default: frappe.datetime.now_datetime()
                                     },
                                     {

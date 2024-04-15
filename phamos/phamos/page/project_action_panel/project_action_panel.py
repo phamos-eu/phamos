@@ -13,7 +13,7 @@ def create_timesheet_record(project_name, customer, activity_type, percent_billa
         project = frappe.db.get_value("Project", {"project_name": project_name}, "name")
         
         if employee_name:
-            after_1_minute = add_to_date(from_time, minutes=1, as_string=True)
+            after_1_minute = add_to_date(from_time, seconds=10, as_string=True)
             
             timesheet_record = frappe.new_doc('Timesheet Record')
             timesheet_record.project = project
@@ -44,9 +44,10 @@ def update_and_submit_timesheet_record(name, to_time, result):
     try:
         # Retrieve the Timesheet Record document
         doc = frappe.get_doc("Timesheet Record", name)
+        to_time_add_seconds = add_to_date(to_time, seconds=20, as_string=True)
         
         # Update the fields
-        doc.to_time = to_time
+        doc.to_time = to_time_add_seconds
         doc.result = result
         doc.actual_time = time_diff_in_seconds(doc.to_time, doc.from_time)
         
@@ -105,7 +106,7 @@ def fetch_projects():
             (SELECT customer_name FROM `tabCustomer` c WHERE p.customer = c.name) AS customer,
             (SELECT max(ts.name) FROM `tabTimesheet Record` ts WHERE ts.project = p.name and ts.employee = %(employee)s and ts.docstatus = 0) AS timesheet_record
         FROM `tabProject` p
-        WHERE (SELECT max(reference_name) FROM `tabToDo` td WHERE td.reference_name = p.name and td.allocated_to = %(user)s) IS NOT NULL
+        WHERE (SELECT max(reference_name) FROM `tabToDo` td WHERE td.status = "Open" and td.reference_name = p.name and td.allocated_to = %(user)s) IS NOT NULL
     """, {"employee": employee_name, "user": frappe.session.user}, as_dict=True)
 
     # Return project data
