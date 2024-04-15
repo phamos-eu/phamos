@@ -116,7 +116,8 @@ frappe.pages['project-action-panel'].on_page_load = function(wrapper) {
                     let timesheetRecordDrafts = r.message;
                     let doc = frappe.model.sync(r.message);
                     let draftTimesheets = timesheetRecordDrafts.map(function(record) {
-                        return record.timesheet_record_draft;
+                        //return record.timesheet_record_draft;
+                        return `<a href="https://phamos.eu/app/timesheet-record/${record.timesheet_record_draft}" target="_blank">${record.timesheet_record_draft}</a>`;
                     }).join(', ');
                     
                     // Process the retrieved draft Timesheet Records
