@@ -168,7 +168,7 @@ frappe.pages['project-action-panel'].on_page_load = function(wrapper) {
                                         in_list_view: 1,
                                         reqd: 1,
                                         default: "100",
-                                        description:'"Percent Billable" to the portion of time billable to the company for a specific task or project, offering selectable options from 0% to 100% for accurate invoicing and financial tracking.'
+                                        description:'This is a personal indicator to your own performance on the work you have done. It will influence the billable time of the Timesheet created.'
                                     },
                                     {
                                         fieldtype: 'Column Break'
