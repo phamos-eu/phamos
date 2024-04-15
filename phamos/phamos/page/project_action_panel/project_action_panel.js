@@ -167,7 +167,8 @@ frappe.pages['project-action-panel'].on_page_load = function(wrapper) {
                                         fieldname: "percent_billable",
                                         in_list_view: 1,
                                         reqd: 1,
-                                        default: "100"
+                                        default: "100",
+                                        description:'"Percent Billable" to the portion of time billable to the company for a specific task or project, offering selectable options from 0% to 100% for accurate invoicing and financial tracking.'
                                     },
                                     {
                                         fieldtype: 'Column Break'
@@ -178,7 +179,7 @@ frappe.pages['project-action-panel'].on_page_load = function(wrapper) {
                                         fieldname: "from_time",
                                         in_list_view: 1,
                                         reqd: 1,
-                                        read_only:1,
+                                        read_only:0,
                                         default: frappe.datetime.now_datetime()
                                     },
                                     {
