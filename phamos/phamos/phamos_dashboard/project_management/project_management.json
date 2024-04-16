@@ -1,0 +1,25 @@
+{
+ "cards": [
+  {
+   "card": "Total Projects"
+  }
+ ],
+ "charts": [
+  {
+   "chart": "Project Summary",
+   "width": "Half"
+  }
+ ],
+ "creation": "2024-04-15 18:27:11.940763",
+ "dashboard_name": "Project Management",
+ "docstatus": 0,
+ "doctype": "Dashboard",
+ "idx": 0,
+ "is_default": 0,
+ "is_standard": 1,
+ "modified": "2024-04-16 11:55:53.442183",
+ "modified_by": "sonalinarkar121@gmail.com",
+ "module": "Phamos",
+ "name": "Project Management",
+ "owner": "Administrator"
+}

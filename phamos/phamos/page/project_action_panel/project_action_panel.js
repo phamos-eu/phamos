@@ -18,6 +18,7 @@ frappe.pages['project-action-panel'].on_page_load = function(wrapper) {
             if (r.message) {
                 // Render DataTable with the fetched data
                 renderDataTable(wrapper, r.message);
+                renderDataTable(wrapper, r.message);
             } else {
                 // Handle error or empty data
             }
@@ -107,6 +108,7 @@ frappe.pages['project-action-panel'].on_page_load = function(wrapper) {
     
         dialog.show();
     };
+     //return record.timesheet_record_draft;
 
     window.startProject = function(project_name, customer) {
         frappe.call({
@@ -116,19 +118,14 @@ frappe.pages['project-action-panel'].on_page_load = function(wrapper) {
                     let timesheetRecordDrafts = r.message;
                     let doc = frappe.model.sync(r.message);
                     let draftTimesheets = timesheetRecordDrafts.map(function(record) {
-                        //return record.timesheet_record_draft;
                         return `<a href="https://phamos.eu/app/timesheet-record/${record.timesheet_record_draft}" target="_blank">${record.timesheet_record_draft}</a>`;
                     }).join(', ');
                     
-                    // Process the retrieved draft Timesheet Records
                     if (timesheetRecordDrafts && timesheetRecordDrafts.length > 0) {
-                        // Show error message that draft Timesheet Records are found
                         frappe.msgprint(__("Draft Timesheet Records: "+ draftTimesheets+" found. Please submit them before creating a new one."));
                     } else {
                         let activity_type = ""
                         frappe.db.get_value("Employee", {"user_id": frappe.session.user}, "activity_type", function(value) {
-                            console.log("test ")
-                            console.log(value.activity_type)
                             var dialog = new frappe.ui.Dialog({
                                 title: __("Add Timesheet record."),
                                 fields: [
@@ -159,7 +156,9 @@ frappe.pages['project-action-panel'].on_page_load = function(wrapper) {
                                         reqd: 1,
                                         default: value.activity_type,
                                         description:'The "Activity Type" allows for categorizing tasks into specific types, such as planning, execution, communication, and proposal writing, streamlining task management and organization within the system.'
-                                        
+                                    },
+                                    {
+                                        fieldtype: 'Column Break'
                                     },
                                     {
                                         fieldtype: "Select",
@@ -172,9 +171,6 @@ frappe.pages['project-action-panel'].on_page_load = function(wrapper) {
                                         description:'This is a personal indicator to your own performance on the work you have done. It will influence the billable time of the Timesheet created.'
                                     },
                                     {
-                                        fieldtype: 'Column Break'
-                                    },
-                                    {
                                         fieldtype: "Datetime",
                                         label: __("From Time"),
                                         fieldname: "from_time",
@@ -182,6 +178,9 @@ frappe.pages['project-action-panel'].on_page_load = function(wrapper) {
                                         reqd: 1,
                                         read_only:0,
                                         default: frappe.datetime.now_datetime()
+                                    },
+                                    {
+                                        fieldtype: 'Column Break'
                                     },
                                     {
                                         fieldtype: "Duration",
@@ -205,19 +204,55 @@ frappe.pages['project-action-panel'].on_page_load = function(wrapper) {
                                     window.location.reload();
                                 }
                             });
-        
+                            
+                            // Set the width using CSS
+                            dialog.$wrapper.find('.modal-dialog').css('max-width', '800px');
+    
                             dialog.show();
                         })
-                        // No draft Timesheet Records found, show dialog to create new Timesheet Record
-                        
                     }
                 } else {
-                    // No response from server
                     frappe.msgprint(__("No response from server. Please try again."));
                 }
             }
         });
     };
+    
+    
+    // Function to render number cards
+    function render_cards(wrapper) {
+        return frappe.call({
+            method: "phamos.phamos.page.project_action_panel.project_action_panel.get_permitted_cards",
+            args: { dashboard_name: "Project Management" }, // Replace "Human Resource" with the actual dashboard name
+            callback: function(response) {
+                console.log(response)
+                var cards = response.message;
+                if (!cards || !cards.length) {
+                    return;
+                }
+
+                var number_cards = cards.map(function(card) {
+                    return {
+                        name: card.card,
+                    };
+                });
+
+                var number_card_group = new frappe.widget.WidgetGroup({
+                    container: wrapper, // Use wrapper instead of this.container
+                    type: "number_card",
+                    columns: 3,
+                    options: {
+                        allow_sorting: false,
+                        allow_create: false,
+                        allow_delete: false,
+                        allow_hiding: false,
+                        allow_edit: false,
+                    },
+                    widgets: number_cards,
+                });
+            }
+        });
+    }
     
     // Function to render DataTable
     function renderDataTable(wrapper, projectData) {
@@ -257,7 +292,7 @@ frappe.pages['project-action-panel'].on_page_load = function(wrapper) {
             { label: "<b>Action</b>", focusable: false, format: button_formatter , width: 150}
         ];
         // Add a header to the report view
-        wrapper.innerHTML = `<h1>Project Action Panel</h1><div id="datatable-wrapper"></div>`;
+        wrapper.innerHTML = `<h1>Project Action Panel</h1><div id="card-wrapper"></div><div id="datatable-wrapper"></div>`;
         
         // Initialize DataTable with the data and column configuration
         let datatable = new frappe.DataTable(wrapper.querySelector('#datatable-wrapper'), {
@@ -278,6 +313,36 @@ frappe.pages['project-action-panel'].on_page_load = function(wrapper) {
             'text-align': 'center',
             'margin-left': '50px',
         });
+
+        //var datatableHTML = render_card();
+
+// Set the inner HTML of the card wrapper with the generated HTML content
+//wrapper.querySelector('#card-wrapper').innerHTML = datatableHTML;
+        /*let card = new frappe.DataTable(wrapper.querySelector('#card-wrapper'), {
+            columns: columns.map(col => ({ content: col.label, ...col })), // Include the column headers
+            data: projectData,
+            inlineFilters: true,
+            language: frappe.boot.lang,
+            translations: frappe.utils.datatable.get_translations(),
+            layout: "fixed",
+            cellHeight: 33,
+            direction: frappe.utils.is_rtl() ? "rtl" : "ltr",
+            header: true, // Ensure that column headers are shown
+        
+        });*/
+        // Set the inner HTML of the card wrapper to the desired text or HTML content
+        wrapper.querySelector('#card-wrapper').innerHTML = "<p></p>";
+
+// Apply styling to the card wrapper
+        $(wrapper.querySelector('#card-wrapper')).css({
+            'margin-top': '50px',
+            'text-align': 'center',
+            'margin-left': '50px',
+        });
+
+// Call the render_cards function to render the number cards
+        render_cards(wrapper.querySelector('#card-wrapper'), /* pass any necessary arguments */);
+
          
     }
 };
