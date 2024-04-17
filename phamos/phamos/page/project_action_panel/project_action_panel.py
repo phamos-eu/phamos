@@ -107,7 +107,34 @@ def fetch_projects():
             (SELECT max(ts.name) FROM `tabTimesheet Record` ts WHERE ts.project = p.name and ts.employee = %(employee)s and ts.docstatus = 0) AS timesheet_record
         FROM `tabProject` p
         WHERE (SELECT max(reference_name) FROM `tabToDo` td WHERE td.status = "Open" and td.reference_name = p.name and td.allocated_to = %(user)s) IS NOT NULL
+        ORDER BY timesheet_record IS NULL, timesheet_record ASC  # Show records with timesheet_record first
     """, {"employee": employee_name, "user": frappe.session.user}, as_dict=True)
 
     # Return project data
     return projects
+
+
+
+@frappe.whitelist()
+def get_permitted_cards(dashboard_name):
+	permitted_cards = []
+	dashboard = frappe.get_doc("Dashboard", dashboard_name)
+	for card in dashboard.cards:
+		if frappe.has_permission("Number Card", doc=card.card):
+			permitted_cards.append(card)
+	return permitted_cards
+
+@frappe.whitelist()
+def get_project_count():
+    total_projects = frappe.db.count("Project")
+    count_projects = frappe.db.sql("""
+        SELECT count(p.name) AS total_projects
+        FROM `tabProject` p
+        WHERE (SELECT max(reference_name) FROM `tabToDo` td WHERE td.status = "Open" and td.reference_name = p.name and td.allocated_to = %(user)s) IS NOT NULL
+    """, {"user": frappe.session.user}, as_dict=True)
+
+    return {
+        "value": count_projects[0].get('total_projects') if count_projects else 0 , # assuming you want to return the count of projects meeting certain conditions,
+        "fieldtype": "Int",
+        #"count_projects": count_projects[0].get('total_projects') if count_projects else 0  # assuming you want to return the count of projects meeting certain conditions
+    }
