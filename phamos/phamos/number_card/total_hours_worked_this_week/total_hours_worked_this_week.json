@@ -1,0 +1,21 @@
+{
+ "creation": "2024-04-17 14:12:14.048061",
+ "docstatus": 0,
+ "doctype": "Number Card",
+ "filters_json": "null",
+ "function": "Count",
+ "idx": 0,
+ "is_public": 1,
+ "is_standard": 1,
+ "label": " Total Hours Worked This Week",
+ "method": "phamos.phamos.page.project_action_panel.project_action_panel.total_hours_worked_in_this_week",
+ "modified": "2024-04-17 14:12:26.648993",
+ "modified_by": "sonalinarkar121@gmail.com",
+ "module": "Phamos",
+ "name": "Total Hours Worked This Week",
+ "owner": "sonalinarkar121@gmail.com",
+ "report_function": "Sum",
+ "show_percentage_stats": 1,
+ "stats_time_interval": "Daily",
+ "type": "Custom"
+}
