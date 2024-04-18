@@ -9,8 +9,6 @@ frappe.pages['project-action-panel'].on_page_load = function(wrapper) {
         wrapper.page.set_title('<span style="font-size: 14px;">Project Action Panel</span>');
     }
 
-   
-    
     // Fetch project data from the server on page load
     frappe.call({
         method: "phamos.phamos.page.project_action_panel.project_action_panel.fetch_projects",
@@ -267,7 +265,20 @@ frappe.pages['project-action-panel'].on_page_load = function(wrapper) {
                         allow_edit: false,
                     },
                     widgets: number_cards,
+                   
                 });
+                $(wrapper).find('.widget.number-widget-box').css({
+                    'width': '250px' // Set the desired width
+                });
+                $(wrapper).find('.widget-group-body.grid-col-3').css({
+                    'display': 'flex',      /* Use flexbox */
+                    'flex-wrap': 'nowrap'   /* Prevent wrapping to the next line */
+                });
+    
+                // Log the wrapper element
+                console.log(wrapper);
+
+                
             }
         });
     }
@@ -280,37 +291,41 @@ frappe.pages['project-action-panel'].on_page_load = function(wrapper) {
         }
         
         // Define columns for the report view
-        // Define the function
         
-
-       
-        // Define the button formatter function with the click event calling the startProject function
-        //let button_formatter = (value, row) => {
-                // Now that both project and employee values are available, you can render the button
-           // return `<button type="button" style="height: 23px; width: 60px; display: block; background-color: rgb(144, 238, 144);" class="btn btn-primary btn-sm btn-modal-primary" onclick="startProject('${row[1].content}', '${row[3].content}')">Start</button>`;  
-        //};
         let button_formatter = (value, row) => {
                 // Now that both project and employee values are available, you can render the button
-            if (row[4].html == ""){
-                return `<button type="button" style="height: 23px; width: 60px; display: flex; align-items: center; justify-content: center; background-color: rgb(0, 100, 0);" class="btn btn-primary btn-sm btn-modal-primary" onclick="startProject('${row[1].content}', '${row[3].content}')">Start</button>`;
+            if (row[5].html == ""){
+                return `<button type="button" style="height: 23px; width: 60px; display: flex; align-items: center; justify-content: center; background-color: rgb(0, 100, 0);" class="btn btn-primary btn-sm btn-modal-primary" onclick="startProject('${row[1].content}', '${row[4].content}')">Start</button>`;
                 //return `<button type="button" style="height: 23px; width: 60px; display: block;" class="btn btn-primary btn-sm btn-modal-primary" onclick="startProject('${row[1].content}', '${row[3].content}')">Start</button>`;
             }
             else {
                 //return `<button type="button" style="height: 23px; width: 60px; display: block; background-color: rgb(255, 144, 144);" class="btn btn-primary btn-sm btn-modal-primary" onclick="stopProject('${row[4].content}')">Stop</button>`;
-                return `<button type="button" style="height: 23px; width: 60px; display: flex; align-items: center; justify-content: center; background-color: rgb(139, 0, 0);" class="btn btn-primary btn-sm btn-modal-primary" onclick="stopProject('${row[4].content}')">Stop</button>`;
+                return `<button type="button" style="height: 23px; width: 60px; display: flex; align-items: center; justify-content: center; background-color: rgb(139, 0, 0);" class="btn btn-primary btn-sm btn-modal-primary" onclick="stopProject('${row[5].content}')">Stop</button>`;
 
             }
         };
         
         let columns = [
-            { label: "<b>Project Name</b>", id: "project_name", fieldtype: "Data", width: 200 },
-            { label: "<b>Notes</b>", id: "notes", fieldtype: "Data", width: 200 },
-            { label: "<b>Customer</b>", id: "customer", fieldtype: "Link", width: 200 },
-            { label: "<b>Timesheet Record</b>", id: "timesheet_record", fieldtype: "Link", width: 150 },
+            { label: "<b>Project Name</b>", id: "project_name", fieldtype: "Data", width: 200 , editable: false,visible: false},
+            { label: "<b>Project</b>", id: "project_desc", fieldtype: "Data", width: 200 , editable: false},
+            { label: "<b>Notes</b>", id: "notes", fieldtype: "Data", width: 200 , editable: false},
+            { label: "<b>Customer</b>", id: "customer", fieldtype: "Link", width: 200 , editable: false},
+            { label: "<b>Timesheet Record</b>", id: "timesheet_record", fieldtype: "Link", width: 150 , editable: false},
             { label: "<b>Action</b>", focusable: false, format: button_formatter , width: 150}
         ];
+
+        // Add a style element to hide the "Project Name" column cells
+        let style = document.createElement('style');
+        style.innerHTML = '.dt-cell__content--col-1 { display: none; }';
+        document.head.appendChild(style);
+
+// Add a style element to hide the "Project Name" column header
+        let styleHeader = document.createElement('style');
+        styleHeader.innerHTML = '.dt-cell__content--header-1 { display: none; }';
+        document.head.appendChild(styleHeader);
+
         // Add a header to the report view
-        wrapper.innerHTML = `<h1>Project Action Panel</h1><div id="card-wrapper"></div><div id="datatable-wrapper"></div>`;
+        wrapper.innerHTML = `<h1>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Project Action Panel</h1><div id="card-wrapper"></div><div id="datatable-wrapper"></div>`;
         
         // Initialize DataTable with the data and column configuration
         let datatable = new frappe.DataTable(wrapper.querySelector('#datatable-wrapper'), {
@@ -325,29 +340,13 @@ frappe.pages['project-action-panel'].on_page_load = function(wrapper) {
             header: true, // Ensure that column headers are shown
         
         });
+       
         // Move the table to the center and add margin on top
         $(wrapper.querySelector('#datatable-wrapper')).css({
             'margin-top': '50px',
             'text-align': 'center',
             'margin-left': '50px',
         });
-
-        //var datatableHTML = render_card();
-
-// Set the inner HTML of the card wrapper with the generated HTML content
-//wrapper.querySelector('#card-wrapper').innerHTML = datatableHTML;
-        /*let card = new frappe.DataTable(wrapper.querySelector('#card-wrapper'), {
-            columns: columns.map(col => ({ content: col.label, ...col })), // Include the column headers
-            data: projectData,
-            inlineFilters: true,
-            language: frappe.boot.lang,
-            translations: frappe.utils.datatable.get_translations(),
-            layout: "fixed",
-            cellHeight: 33,
-            direction: frappe.utils.is_rtl() ? "rtl" : "ltr",
-            header: true, // Ensure that column headers are shown
-        
-        });*/
         // Set the inner HTML of the card wrapper to the desired text or HTML content
         wrapper.querySelector('#card-wrapper').innerHTML = "<p></p>";
 
