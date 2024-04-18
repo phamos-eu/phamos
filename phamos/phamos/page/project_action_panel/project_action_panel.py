@@ -106,7 +106,7 @@ def fetch_projects():
     # Custom SQL query to fetch project data
     employee_name = frappe.db.get_value("Employee", {"user_id": frappe.session.user}, "name")
     projects = frappe.db.sql("""
-        SELECT p.name AS name, p.status AS status, p.notes AS notes, p.project_name AS project_name,
+        SELECT p.name AS name, p.status AS status, p.notes AS notes, p.project_name AS project_name,CONCAT(p.name, " - ", p.project_name) AS project_desc,
             (SELECT customer_name FROM `tabCustomer` c WHERE p.customer = c.name) AS customer,
             (SELECT max(ts.name) FROM `tabTimesheet Record` ts WHERE ts.project = p.name and ts.employee = %(employee)s and ts.docstatus = 0) AS timesheet_record
         FROM `tabProject` p
@@ -165,7 +165,11 @@ def total_hours_worked_today():
             "fieldtype": "Float"
         }
     else:
-        frappe.msgprint("No timesheet records found for today.")
+        actual_time_str = 0
+        return {
+            "value": actual_time_str,
+            "fieldtype": "Float"
+        }
 
 from datetime import datetime, timedelta
 
@@ -193,7 +197,11 @@ def total_hours_worked_in_this_week():
             "fieldtype": "Float"
         }
     else:
-        frappe.msgprint("No timesheet records found for this week.")
+        total_actual_time_str = 0
+        return {
+            "value": total_actual_time_str,
+            "fieldtype": "Float"
+        }
 
 from datetime import datetime, timedelta
 
@@ -224,7 +232,11 @@ def total_hours_worked_in_this_month():
             "fieldtype": "Float"
         }
     else:
-        frappe.msgprint("No timesheet records found for this month.")
+        total_actual_time_str = 0
+        return {
+            "value": total_actual_time_str,
+            "fieldtype": "Float"
+        }
 
    
 
@@ -238,5 +250,3 @@ def format_duration(duration_in_seconds):
 		return f"{minutes} M"
 	else:
 		return f"{seconds} S"
-
-
