@@ -1,16 +1,16 @@
 {
  "cards": [
   {
-   "card": "Total Projects"
+   "card": "Your Total Projects"
   },
   {
-   "card": "Total Hours Worked Today"
+   "card": "Total Hrs Worked Today"
   },
   {
-   "card": "Total Hours Worked This Week"
+   "card": "Total Hrs Worked This Week"
   },
   {
-   "card": "Total Hours Worked This Month"
+   "card": "Total Hrs Worked This Month"
   }
  ],
  "charts": [
@@ -24,10 +24,10 @@
  "docstatus": 0,
  "doctype": "Dashboard",
  "idx": 0,
- "is_default": 1,
+ "is_default": 0,
  "is_standard": 1,
- "modified": "2024-04-17 14:21:28.821455",
- "modified_by": "sonalinarkar121@gmail.com",
+ "modified": "2024-04-27 13:38:08.215863",
+ "modified_by": "Administrator",
  "module": "Phamos",
  "name": "Project Management",
  "owner": "Administrator"
