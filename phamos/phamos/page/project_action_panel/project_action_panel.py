@@ -104,9 +104,10 @@ def fetch_projects():
     # Custom SQL query to fetch project data
     employee_name = frappe.db.get_value("Employee", {"user_id": frappe.session.user}, "name")
     projects = frappe.db.sql("""
-        SELECT p.name AS name, p.status AS status, p.notes AS notes, p.project_name AS project_name,CONCAT(p.name, " - ", p.project_name) AS project_desc,
-            (SELECT customer_name FROM `tabCustomer` c WHERE p.customer = c.name) AS customer,
-            (SELECT max(ts.name) FROM `tabTimesheet Record` ts WHERE ts.project = p.name and ts.employee = %(employee)s and ts.docstatus = 0) AS timesheet_record
+        SELECT p.name AS name, p.status AS status, p.notes AS notes, p.name AS project_name,CONCAT(p.name, " - ", p.project_name) AS project_desc,
+        (SELECT customer_name FROM `tabCustomer` c WHERE p.customer = c.name) AS customer,
+        (SELECT CASE WHEN c.name != c.customer_name THEN CONCAT(c.name, " - ", c.customer_name) ELSE c.customer_name END FROM `tabCustomer` c WHERE p.customer = c.name) AS customer_desc,
+        (SELECT max(ts.name) FROM `tabTimesheet Record` ts WHERE ts.project = p.name and ts.employee = %(employee)s and ts.docstatus = 0) AS timesheet_record
         FROM `tabProject` p
         WHERE (SELECT max(reference_name) FROM `tabToDo` td WHERE td.status = "Open" and td.reference_name = p.name and td.allocated_to = %(user)s) IS NOT NULL
         ORDER BY timesheet_record IS NULL, timesheet_record ASC  # Show records with timesheet_record first
@@ -236,8 +237,8 @@ def format_duration(duration_in_seconds):
 	minutes, seconds = divmod(duration_in_seconds, 60)
 	hours, minutes = divmod(minutes, 60)
 	if hours > 0:
-		return f"{hours} Hours {minutes} Min's"
+		return f"{hours} Hrs {minutes} Mins"
 	elif minutes > 0:
-		return f"{minutes} Min's"
+		return f"{minutes} Mins"
 	else:
-		return f"{seconds} Sec's"
+		return f"{seconds} Secs"

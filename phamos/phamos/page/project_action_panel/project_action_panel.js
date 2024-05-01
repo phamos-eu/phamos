@@ -66,6 +66,29 @@ frappe.pages['project-action-panel'].on_page_load = function(wrapper) {
 				}
         })
     }
+
+    window.handleCustomerClick = function(customer_name) {
+        // Construct the URL for the customer details page
+        let url = `https://phamos.eu/app/customer/${encodeURIComponent(customer_name)}`;
+    
+        // Open the URL in a new window
+        window.open(url, '_blank');
+    
+        // Optionally, return false to prevent the default link behavior (not necessary in this case)
+        return false;
+    };
+    window.handleProjectClick = function(project_name) {
+        // Construct the URL for the customer details page
+        let url = `https://phamos.eu/app/project/${encodeURIComponent(project_name)}`;
+    
+        // Open the URL in a new window
+        window.open(url, '_blank');
+    
+        // Optionally, return false to prevent the default link behavior (not necessary in this case)
+        return false;
+    };
+
+    
     
     window.stopProject = function(timesheet_record) {
         let activity_type = ""
@@ -278,7 +301,7 @@ frappe.pages['project-action-panel'].on_page_load = function(wrapper) {
                 });
     
                 // Log the wrapper element
-                console.log(wrapper);
+                //console.log(wrapper);
 
                 
             }
@@ -296,25 +319,43 @@ frappe.pages['project-action-panel'].on_page_load = function(wrapper) {
         
         let button_formatter = (value, row) => {
                 // Now that both project and employee values are available, you can render the button
-            if (row[5].html == ""){
+            if (row[6].html == ""){
                 return `<button type="button" style="height: 23px; width: 60px; display: flex; align-items: center; justify-content: center; background-color: rgb(0, 100, 0);" class="btn btn-primary btn-sm btn-modal-primary" onclick="startProject('${row[1].content}', '${row[4].content}')">Start</button>`;
                 //return `<button type="button" style="height: 23px; width: 60px; display: block;" class="btn btn-primary btn-sm btn-modal-primary" onclick="startProject('${row[1].content}', '${row[3].content}')">Start</button>`;
             }
             else {
                 //return `<button type="button" style="height: 23px; width: 60px; display: block; background-color: rgb(255, 144, 144);" class="btn btn-primary btn-sm btn-modal-primary" onclick="stopProject('${row[4].content}')">Stop</button>`;
-                return `<button type="button" style="height: 23px; width: 60px; display: flex; align-items: center; justify-content: center; background-color: rgb(139, 0, 0);" class="btn btn-primary btn-sm btn-modal-primary" onclick="stopProject('${row[5].content}')">Stop</button>`;
+                return `<button type="button" style="height: 23px; width: 60px; display: flex; align-items: center; justify-content: center; background-color: rgb(139, 0, 0);" class="btn btn-primary btn-sm btn-modal-primary" onclick="stopProject('${row[6].content}')">Stop</button>`;
 
             }
         };
         
         let columns = [
             { label: "<b>Project Name</b>", id: "project_name", fieldtype: "Data", width: 200 , editable: false,visible: false},
-            { label: "<b>Project</b>", id: "project_desc", fieldtype: "Data", width: 200 , editable: false},
+            { label: "<b>Project</b>", id: "project_desc", fieldtype: "Data", width: 200 , editable: false,format: linkFormatter1},
             { label: "<b>Notes</b>", id: "notes", fieldtype: "Data", width: 200 , editable: false},
-            { label: "<b>Customer</b>", id: "customer", fieldtype: "Link", width: 200,},
+            { label: "<b>Customer Name</b>", id: "customer", fieldtype: "Link", width: 200,editable: false},
+            { label: "<b>Customer</b>", id: "customer_desc", fieldtype: "Data", width: 200,editable: false,format: linkFormatter},
             { label: "<b>Timesheet Record</b>", id: "timesheet_record", fieldtype: "Link", width: 150 , editable: false},
             { label: "<b>Action</b>", focusable: false, format: button_formatter , width: 150}
         ];
+        function linkFormatter1(value, row,columnId) {
+            return `<a href="#" onclick="handleProjectClick('${row[1].content}');">${row[2].content}</a>`;
+        }
+        function linkFormatter(value, row,columnId) {
+            return `<a href="#" onclick="handleCustomerClick('${row[4].content}');">${row[5].content}</a>`;
+        }
+
+         // Add a style element to hide the "Customer Name" column cells
+        let style_c = document.createElement('style');
+        style_c.innerHTML = '.dt-cell__content--col-4 { display: none; }'; // Change dt-cell__content dt-cell__content--col-4 to dt-cell__content--col-3
+        document.head.appendChild(style_c);
+ 
+ // Add a style element to hide the "Customer Name" column header
+        let styleHeader_c = document.createElement('style');
+        styleHeader_c.innerHTML = '.dt-cell__content--header-4 { display: none; }'; // Change dt-cell__content dt-cell__content--header-4 to dt-cell__content--header-3
+        document.head.appendChild(styleHeader_c);
+
 
         // Add a style element to hide the "Project Name" column cells
         let style = document.createElement('style');
