@@ -337,14 +337,26 @@ frappe.pages['project-action-panel'].on_page_load = function(wrapper) {
             { label: "<b>Customer Name</b>", id: "customer", fieldtype: "Link", width: 200,editable: false},
             { label: "<b>Customer</b>", id: "customer_desc", fieldtype: "Data", width: 200,editable: false,format: linkFormatter},
             { label: "<b>Timesheet Record</b>", id: "timesheet_record", fieldtype: "Link", width: 150 , editable: false},
+            { label: "<b>Name</b>", id: "name", fieldtype: "Link", width: 150 , editable: false},
             { label: "<b>Action</b>", focusable: false, format: button_formatter , width: 150}
         ];
         function linkFormatter1(value, row,columnId) {
-            return `<a href="#" onclick="handleProjectClick('${row[1].content}');">${row[2].content}</a>`;
+            return `<a href="#" onclick="handleProjectClick('${row[7].content}');">${row[2].content}</a>`;
         }
         function linkFormatter(value, row,columnId) {
             return `<a href="#" onclick="handleCustomerClick('${row[4].content}');">${row[5].content}</a>`;
         }
+
+        // Add a style element to hide the "Name" column cells
+        let style_n = document.createElement('style');
+        style_n.innerHTML = '.dt-cell__content--col-7 { display: none; }'; // Change dt-cell__content dt-cell__content--col-4 to dt-cell__content--col-3
+        document.head.appendChild(style_n);
+ 
+ // Add a style element to hide the "Name" column header
+        let styleHeader_n = document.createElement('style');
+        styleHeader_n.innerHTML = '.dt-cell__content--header-7 { display: none; }'; // Change dt-cell__content dt-cell__content--header-4 to dt-cell__content--header-3
+        document.head.appendChild(styleHeader_n);
+
 
          // Add a style element to hide the "Customer Name" column cells
         let style_c = document.createElement('style');

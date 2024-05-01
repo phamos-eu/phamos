@@ -104,7 +104,7 @@ def fetch_projects():
     # Custom SQL query to fetch project data
     employee_name = frappe.db.get_value("Employee", {"user_id": frappe.session.user}, "name")
     projects = frappe.db.sql("""
-        SELECT p.name AS name, p.status AS status, p.notes AS notes, p.name AS project_name,CONCAT(p.name, " - ", p.project_name) AS project_desc,
+        SELECT p.name AS name, p.status AS status, p.notes AS notes, p.project_name AS project_name,CONCAT(p.name, " - ", p.project_name) AS project_desc,
         (SELECT customer_name FROM `tabCustomer` c WHERE p.customer = c.name) AS customer,
         (SELECT CASE WHEN c.name != c.customer_name THEN CONCAT(c.name, " - ", c.customer_name) ELSE c.customer_name END FROM `tabCustomer` c WHERE p.customer = c.name) AS customer_desc,
         (SELECT max(ts.name) FROM `tabTimesheet Record` ts WHERE ts.project = p.name and ts.employee = %(employee)s and ts.docstatus = 0) AS timesheet_record
