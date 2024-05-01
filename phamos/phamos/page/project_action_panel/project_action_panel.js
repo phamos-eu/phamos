@@ -24,13 +24,12 @@ frappe.pages['project-action-panel'].on_page_load = function(wrapper) {
     });
    
     // Function to create timesheet record
-    function create_timesheet_record(project_name,customer,activity_type,from_time,expected_time,goal){
+    function create_timesheet_record(project_name,customer,from_time,expected_time,goal){
         frappe.call({
             method: "phamos.phamos.page.project_action_panel.project_action_panel.create_timesheet_record",
             args: {
                 "project_name": project_name,
                 "customer": customer,
-                "activity_type":activity_type,
                 "from_time":from_time,
                 "expected_time":expected_time,
                 "goal":goal
@@ -47,13 +46,14 @@ frappe.pages['project-action-panel'].on_page_load = function(wrapper) {
     }
 
     // Function to create timesheet record
-    function update_and_submit_timesheet_record(timesheet_record,to_time,percent_billable,result){
+    function update_and_submit_timesheet_record(timesheet_record,to_time,percent_billable,activity_type,result){
         frappe.call({
             method: "phamos.phamos.page.project_action_panel.project_action_panel.update_and_submit_timesheet_record",
             args: {
                 "name": timesheet_record,
                 "to_time": to_time,
                 "percent_billable":percent_billable,
+                "activity_type":activity_type,
                 "result":result,
             },
             freeze: true,
@@ -68,6 +68,8 @@ frappe.pages['project-action-panel'].on_page_load = function(wrapper) {
     }
     
     window.stopProject = function(timesheet_record) {
+        let activity_type = ""
+        frappe.db.get_value("Employee", {"user_id": frappe.session.user}, "activity_type", function(value) {
         let dialog = new frappe.ui.Dialog({
             title: __("Mark Complete Timesheet record."),
             fields: [
@@ -80,12 +82,6 @@ frappe.pages['project-action-panel'].on_page_load = function(wrapper) {
                     default: timesheet_record
                 },
                 {
-                    label: 'Time',
-                    fieldname: 'to_time',
-                    fieldtype: 'Datetime',
-                    default: frappe.datetime.now_datetime(), reqd: 1
-                },
-                {
                     fieldtype: "Select",
                     options: [0,25,50,75,100],
                     label: __("Percent Billable"),
@@ -95,7 +91,28 @@ frappe.pages['project-action-panel'].on_page_load = function(wrapper) {
                     default: "100",
                     description:'This is a personal indicator to your own performance on the work you have done. It will influence the billable time of the Timesheet created.'
                 },
+                {
+                    fieldtype: 'Column Break'
+                },
+                {
+                    label: 'Time',
+                    fieldname: 'to_time',
+                    fieldtype: 'Datetime',
+                    default: frappe.datetime.now_datetime(), reqd: 1
+                },
                 
+                
+               
+                {
+                    fieldtype: "Link",
+                    options: "Activity Type",
+                    label: __("Activity Type"),
+                    fieldname: "activity_type",
+                    in_list_view: 1,
+                    reqd: 1,
+                    default: value.activity_type,
+                    description:'The "Activity Type" allows for categorizing tasks into specific types, such as planning, execution, communication, and proposal writing, streamlining task management and organization within the system.'
+                },
                 {
                     fieldtype: 'Column Break'
                 },
@@ -108,14 +125,14 @@ frappe.pages['project-action-panel'].on_page_load = function(wrapper) {
             ],
             primary_action_label: __("Update Timesheet Record."),
             primary_action(values) {
-                update_and_submit_timesheet_record(values.timesheet_record,values.to_time,values.percent_billable,values.result)
+                update_and_submit_timesheet_record(values.timesheet_record,values.to_time,values.percent_billable,values.activity_type,values.result)
                 dialog.hide();
                 window.location.reload();
             }
             
         });
-    
         dialog.show();
+    })
     };
      //return record.timesheet_record_draft;
 
@@ -149,8 +166,6 @@ frappe.pages['project-action-panel'].on_page_load = function(wrapper) {
                             }
                         );
                     } else {
-                        let activity_type = ""
-                        frappe.db.get_value("Employee", {"user_id": frappe.session.user}, "activity_type", function(value) {
                             var dialog = new frappe.ui.Dialog({
                                 title: __("Add Timesheet record."),
                                 fields: [
@@ -173,10 +188,7 @@ frappe.pages['project-action-panel'].on_page_load = function(wrapper) {
                                         default: customer
                                     },
                                     
-                                    {
-                                        fieldtype: 'Column Break'
-                                    },
-                                    
+                                   
                                     {
                                         fieldtype: "Datetime",
                                         label: __("From Time"),
@@ -185,16 +197,6 @@ frappe.pages['project-action-panel'].on_page_load = function(wrapper) {
                                         reqd: 1,
                                         read_only:0,
                                         default: frappe.datetime.now_datetime()
-                                    },
-                                    {
-                                        fieldtype: "Link",
-                                        options: "Activity Type",
-                                        label: __("Activity Type"),
-                                        fieldname: "activity_type",
-                                        in_list_view: 1,
-                                        reqd: 1,
-                                        default: value.activity_type,
-                                        description:'The "Activity Type" allows for categorizing tasks into specific types, such as planning, execution, communication, and proposal writing, streamlining task management and organization within the system.'
                                     },
                                     {
                                         fieldtype: 'Column Break'
@@ -216,7 +218,7 @@ frappe.pages['project-action-panel'].on_page_load = function(wrapper) {
                                 ],
                                 primary_action_label: __("Create Timesheet Record."),
                                 primary_action(values) {
-                                    create_timesheet_record(values.project_name,values.customer,values.activity_type,values.from_time,values.expected_time,values.goal)
+                                    create_timesheet_record(values.project_name,values.customer,values.from_time,values.expected_time,values.goal)
                                     dialog.hide();
                                     window.location.reload();
                                 }
@@ -226,7 +228,7 @@ frappe.pages['project-action-panel'].on_page_load = function(wrapper) {
                             dialog.$wrapper.find('.modal-dialog').css('max-width', '800px');
     
                             dialog.show();
-                        })
+                        
                     }
                 } else {
                     frappe.msgprint(__("No response from server. Please try again."));
@@ -309,7 +311,7 @@ frappe.pages['project-action-panel'].on_page_load = function(wrapper) {
             { label: "<b>Project Name</b>", id: "project_name", fieldtype: "Data", width: 200 , editable: false,visible: false},
             { label: "<b>Project</b>", id: "project_desc", fieldtype: "Data", width: 200 , editable: false},
             { label: "<b>Notes</b>", id: "notes", fieldtype: "Data", width: 200 , editable: false},
-            { label: "<b>Customer</b>", id: "customer", fieldtype: "Link", width: 200 , editable: false},
+            { label: "<b>Customer</b>", id: "customer", fieldtype: "Link", width: 200,},
             { label: "<b>Timesheet Record</b>", id: "timesheet_record", fieldtype: "Link", width: 150 , editable: false},
             { label: "<b>Action</b>", focusable: false, format: button_formatter , width: 150}
         ];
@@ -338,7 +340,6 @@ frappe.pages['project-action-panel'].on_page_load = function(wrapper) {
             cellHeight: 33,
             direction: frappe.utils.is_rtl() ? "rtl" : "ltr",
             header: true, // Ensure that column headers are shown
-        
         });
        
         // Move the table to the center and add margin on top
@@ -359,7 +360,7 @@ frappe.pages['project-action-panel'].on_page_load = function(wrapper) {
 
 // Call the render_cards function to render the number cards
         render_cards(wrapper.querySelector('#card-wrapper'), /* pass any necessary arguments */);
-
+        
          
     }
 };
