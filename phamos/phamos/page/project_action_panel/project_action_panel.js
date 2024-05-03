@@ -16,7 +16,6 @@ frappe.pages['project-action-panel'].on_page_load = function(wrapper) {
             if (r.message) {
                 // Render DataTable with the fetched data
                 renderDataTable(wrapper, r.message);
-                renderDataTable(wrapper, r.message);
             } else {
                 // Handle error or empty data
             }
@@ -40,6 +39,7 @@ frappe.pages['project-action-panel'].on_page_load = function(wrapper) {
 				if(r.message) {
                     let doc = frappe.model.sync(r.message);
 					frappe.msgprint('Timesheet Record: '+doc[0].name+' Created Successfully.');
+                    reloadPage();
 					}
 				}
         })
@@ -62,6 +62,7 @@ frappe.pages['project-action-panel'].on_page_load = function(wrapper) {
 				if(r.message) {
                     let doc = frappe.model.sync(r.message);
 					frappe.msgprint('Timesheet Record: '+doc[0].name+' Updated Successfully.');
+                    reloadPage();
 					}
 				}
         })
@@ -88,7 +89,9 @@ frappe.pages['project-action-panel'].on_page_load = function(wrapper) {
         return false;
     };
 
-    
+    function reloadPage() {
+        window.location.href = window.location.href.split('?')[0]; // Reload the page without parameters
+    }
     
     window.stopProject = function(timesheet_record) {
         let activity_type = ""
@@ -154,6 +157,8 @@ frappe.pages['project-action-panel'].on_page_load = function(wrapper) {
             }
             
         });
+        // Set the width using CSS
+        dialog.$wrapper.find('.modal-dialog').css('max-width', '900px');
         dialog.show();
     })
     };
@@ -319,53 +324,52 @@ frappe.pages['project-action-panel'].on_page_load = function(wrapper) {
         
         let button_formatter = (value, row) => {
                 // Now that both project and employee values are available, you can render the button
-            if (row[6].html == ""){
-                return `<button type="button" style="height: 23px; width: 60px; display: flex; align-items: center; justify-content: center; background-color: rgb(0, 100, 0);" class="btn btn-primary btn-sm btn-modal-primary" onclick="startProject('${row[1].content}', '${row[4].content}')">Start</button>`;
-                //return `<button type="button" style="height: 23px; width: 60px; display: block;" class="btn btn-primary btn-sm btn-modal-primary" onclick="startProject('${row[1].content}', '${row[3].content}')">Start</button>`;
+            if (row[7].html == ""){
+                return `<button type="button" style="height: 23px; width: 60px; display: flex; align-items: center; justify-content: center; background-color: rgb(0, 100, 0);" class="btn btn-primary btn-sm btn-modal-primary" onclick="startProject('${row[1].content}', '${row[3].content}')">Start</button>`;
             }
             else {
-                //return `<button type="button" style="height: 23px; width: 60px; display: block; background-color: rgb(255, 144, 144);" class="btn btn-primary btn-sm btn-modal-primary" onclick="stopProject('${row[4].content}')">Stop</button>`;
-                return `<button type="button" style="height: 23px; width: 60px; display: flex; align-items: center; justify-content: center; background-color: rgb(139, 0, 0);" class="btn btn-primary btn-sm btn-modal-primary" onclick="stopProject('${row[6].content}')">Stop</button>`;
-
+                return `<button type="button" style="height: 23px; width: 60px; display: flex; align-items: center; justify-content: center; background-color: rgb(139, 0, 0);" class="btn btn-primary btn-sm btn-modal-primary" onclick="stopProject('${row[7].content}')">Stop</button>`;
             }
         };
         
         let columns = [
             { label: "<b>Project Name</b>", id: "project_name", fieldtype: "Data", width: 200 , editable: false,visible: false},
-            { label: "<b>Project</b>", id: "project_desc", fieldtype: "Data", width: 200 , editable: false,format: linkFormatter1},
-            { label: "<b>Notes</b>", id: "notes", fieldtype: "Data", width: 200 , editable: false},
+            { label: "<b>Project</b>", id: "project_desc", fieldtype: "Data", width: 300 , editable: false,format: linkFormatter1},
+            //{ label: "<b>Notes</b>", id: "notes", fieldtype: "Data", width: 200 , editable: false},
             { label: "<b>Customer Name</b>", id: "customer", fieldtype: "Link", width: 200,editable: false},
             { label: "<b>Customer</b>", id: "customer_desc", fieldtype: "Data", width: 200,editable: false,format: linkFormatter},
-            { label: "<b>Timesheet Record</b>", id: "timesheet_record", fieldtype: "Link", width: 150 , editable: false},
+            { label: "<b>Planned Hrs</b>", id: "planned_hours", fieldtype: "Data", width: 150,editable: false},
+            { label: "<b>Spent Draft Hrs</b>", id: "spent_hours_draft", fieldtype: "Float", width: 150,editable: false},
+            { label: "<b>Timesheet Record</b>", id: "timesheet_record", fieldtype: "Link", width: 180 , editable: false},
             { label: "<b>Name</b>", id: "name", fieldtype: "Link", width: 150 , editable: false},
             { label: "<b>Action</b>", focusable: false, format: button_formatter , width: 150}
         ];
         function linkFormatter1(value, row,columnId) {
-            return `<a href="#" onclick="handleProjectClick('${row[7].content}');">${row[2].content}</a>`;
+            return `<a href="#" onclick="handleProjectClick('${row[8].content}');">${row[2].content}</a>`;
         }
         function linkFormatter(value, row,columnId) {
-            return `<a href="#" onclick="handleCustomerClick('${row[4].content}');">${row[5].content}</a>`;
+            return `<a href="#" onclick="handleCustomerClick('${row[3].content}');">${row[4].content}</a>`;
         }
 
         // Add a style element to hide the "Name" column cells
         let style_n = document.createElement('style');
-        style_n.innerHTML = '.dt-cell__content--col-7 { display: none; }'; // Change dt-cell__content dt-cell__content--col-4 to dt-cell__content--col-3
+        style_n.innerHTML = '.dt-cell__content--col-8 { display: none; }'; // Change dt-cell__content dt-cell__content--col-4 to dt-cell__content--col-3
         document.head.appendChild(style_n);
  
- // Add a style element to hide the "Name" column header
+        // Add a style element to hide the "Name" column header
         let styleHeader_n = document.createElement('style');
-        styleHeader_n.innerHTML = '.dt-cell__content--header-7 { display: none; }'; // Change dt-cell__content dt-cell__content--header-4 to dt-cell__content--header-3
+        styleHeader_n.innerHTML = '.dt-cell__content--header-8 { display: none; }'; // Change dt-cell__content dt-cell__content--header-4 to dt-cell__content--header-3
         document.head.appendChild(styleHeader_n);
 
 
          // Add a style element to hide the "Customer Name" column cells
         let style_c = document.createElement('style');
-        style_c.innerHTML = '.dt-cell__content--col-4 { display: none; }'; // Change dt-cell__content dt-cell__content--col-4 to dt-cell__content--col-3
+        style_c.innerHTML = '.dt-cell__content--col-3 { display: none; }'; // Change dt-cell__content dt-cell__content--col-4 to dt-cell__content--col-3
         document.head.appendChild(style_c);
  
- // Add a style element to hide the "Customer Name" column header
+        // Add a style element to hide the "Customer Name" column header
         let styleHeader_c = document.createElement('style');
-        styleHeader_c.innerHTML = '.dt-cell__content--header-4 { display: none; }'; // Change dt-cell__content dt-cell__content--header-4 to dt-cell__content--header-3
+        styleHeader_c.innerHTML = '.dt-cell__content--header-3 { display: none; }'; // Change dt-cell__content dt-cell__content--header-4 to dt-cell__content--header-3
         document.head.appendChild(styleHeader_c);
 
 
@@ -374,7 +378,7 @@ frappe.pages['project-action-panel'].on_page_load = function(wrapper) {
         style.innerHTML = '.dt-cell__content--col-1 { display: none; }';
         document.head.appendChild(style);
 
-// Add a style element to hide the "Project Name" column header
+        // Add a style element to hide the "Project Name" column header
         let styleHeader = document.createElement('style');
         styleHeader.innerHTML = '.dt-cell__content--header-1 { display: none; }';
         document.head.appendChild(styleHeader);
@@ -393,6 +397,7 @@ frappe.pages['project-action-panel'].on_page_load = function(wrapper) {
             cellHeight: 33,
             direction: frappe.utils.is_rtl() ? "rtl" : "ltr",
             header: true, // Ensure that column headers are shown
+            width: "100%" 
         });
        
         // Move the table to the center and add margin on top
@@ -400,6 +405,7 @@ frappe.pages['project-action-panel'].on_page_load = function(wrapper) {
             'margin-top': '50px',
             'text-align': 'center',
             'margin-left': '50px',
+            'width': '1170px'
         });
         // Set the inner HTML of the card wrapper to the desired text or HTML content
         wrapper.querySelector('#card-wrapper').innerHTML = "<p></p>";
