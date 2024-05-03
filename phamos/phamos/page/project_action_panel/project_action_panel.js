@@ -95,72 +95,92 @@ frappe.pages['project-action-panel'].on_page_load = function(wrapper) {
     
     window.stopProject = function(timesheet_record) {
         let activity_type = ""
-        frappe.db.get_value("Employee", {"user_id": frappe.session.user}, "activity_type", function(value) {
-        let dialog = new frappe.ui.Dialog({
-            title: __("Mark Complete Timesheet record."),
-            fields: [
-                {
-                    fieldtype: "Data",
-                    label: __("Timesheet Record"),
-                    fieldname: "timesheet_record",
-                    in_list_view: 1,
-                    read_only:1,
-                    default: timesheet_record
-                },
-                {
-                    fieldtype: "Select",
-                    options: [0,25,50,75,100],
-                    label: __("Percent Billable"),
-                    fieldname: "percent_billable",
-                    in_list_view: 1,
-                    reqd: 1,
-                    default: "100",
-                    description:'This is a personal indicator to your own performance on the work you have done. It will influence the billable time of the Timesheet created.'
-                },
-                {
-                    fieldtype: 'Column Break'
-                },
-                {
-                    label: 'Time',
-                    fieldname: 'to_time',
-                    fieldtype: 'Datetime',
-                    default: frappe.datetime.now_datetime(), reqd: 1
-                },
-                
-                
-               
-                {
-                    fieldtype: "Link",
-                    options: "Activity Type",
-                    label: __("Activity Type"),
-                    fieldname: "activity_type",
-                    in_list_view: 1,
-                    reqd: 1,
-                    default: value.activity_type,
-                    description:'The "Activity Type" allows for categorizing tasks into specific types, such as planning, execution, communication, and proposal writing, streamlining task management and organization within the system.'
-                },
-                {
-                    fieldtype: 'Column Break'
-                },
-                {
-                    label: 'What I did ',
-                    fieldname: 'result',
-                    fieldtype: 'Small Text', reqd: 1
-                },
-                
-            ],
-            primary_action_label: __("Update Timesheet Record."),
-            primary_action(values) {
-                update_and_submit_timesheet_record(values.timesheet_record,values.to_time,values.percent_billable,values.activity_type,values.result)
-                dialog.hide();
-                window.location.reload();
-            }
-            
+        let timesheet_record_info = " Info from timesheet record"
+        frappe.db.get_value("Timesheet Record", {"name": timesheet_record}, ["goal", "from_time"], function(value) {
+            // Your code here
+            from_time_formatted = frappe.datetime.str_to_user(value.from_time);
+            timesheet_record_info = "From time: " + from_time_formatted + ",<br>Goal is: " + value.goal;
+
+
+            frappe.db.get_value("Employee", {"user_id": frappe.session.user}, "activity_type", function(value) {
+                let dialog = new frappe.ui.Dialog({
+                    title: __("Mark Complete Timesheet record."),
+                    fields: [
+                        {
+                            fieldtype: "Data",
+                            label: __("Timesheet Record"),
+                            fieldname: "timesheet_record",
+                            in_list_view: 1,
+                            read_only:1,
+                            default: timesheet_record
+                        },
+                        {
+                            fieldtype: "Small Text",
+                            label: __("Timesheet Record Info"),
+                            fieldname: "timesheet_record_info",
+                            in_list_view: 1,
+                            read_only:1,
+                            default: timesheet_record_info
+                        },
+                        {
+                            fieldtype: 'Column Break'
+                        },
+                        {
+                            label: 'Time',
+                            fieldname: 'to_time',
+                            fieldtype: 'Datetime',
+                            default: frappe.datetime.now_datetime(), reqd: 1
+                        },
+                       
+                        {
+                            fieldtype: "Select",
+                            options: [0,25,50,75,100],
+                            label: __("Percent Billable"),
+                            fieldname: "percent_billable",
+                            in_list_view: 1,
+                            reqd: 1,
+                            default: "100",
+                            description:'This is a personal indicator to your own performance on the work you have done. It will influence the billable time of the Timesheet created.'
+                        },
+                        {
+                            fieldtype: 'Column Break'
+                        },
+                        {
+                            fieldtype: "Link",
+                            options: "Activity Type",
+                            label: __("Activity Type"),
+                            fieldname: "activity_type",
+                            in_list_view: 1,
+                            reqd: 1,
+                            default: value.activity_type,
+                            description:'The "Activity Type" allows for categorizing tasks into specific types, such as planning, execution, communication, and proposal writing, streamlining task management and organization within the system.'
+                        },
+                        {
+                            fieldtype: 'Column Break'
+                        },
+                        {
+                            label: 'What I did ',
+                            fieldname: 'result',
+                            fieldtype: 'Small Text', reqd: 1
+                        },
+                        
+                    ],
+                    primary_action_label: __("Update Timesheet Record."),
+                    primary_action(values) {
+                        update_and_submit_timesheet_record(values.timesheet_record,values.to_time,values.percent_billable,values.activity_type,values.result)
+                        dialog.hide();
+                        window.location.reload();
+                    }
+                    
+                });
+                // Set the width using CSS
+                dialog.$wrapper.find('.modal-dialog').css('max-width', '900px');
+                dialog.show();
+            })
+
         });
-        // Set the width using CSS
-        dialog.$wrapper.find('.modal-dialog').css('max-width', '900px');
-        dialog.show();
-    })
+
+      
     };
      //return record.timesheet_record_draft;
 
@@ -324,28 +344,29 @@ frappe.pages['project-action-panel'].on_page_load = function(wrapper) {
         
         let button_formatter = (value, row) => {
                 // Now that both project and employee values are available, you can render the button
-            if (row[7].html == ""){
+            if (row[8].html == ""){
                 return `<button type="button" style="height: 23px; width: 60px; display: flex; align-items: center; justify-content: center; background-color: rgb(0, 100, 0);" class="btn btn-primary btn-sm btn-modal-primary" onclick="startProject('${row[1].content}', '${row[3].content}')">Start</button>`;
             }
             else {
-                return `<button type="button" style="height: 23px; width: 60px; display: flex; align-items: center; justify-content: center; background-color: rgb(139, 0, 0);" class="btn btn-primary btn-sm btn-modal-primary" onclick="stopProject('${row[7].content}')">Stop</button>`;
+                return `<button type="button" style="height: 23px; width: 60px; display: flex; align-items: center; justify-content: center; background-color: rgb(139, 0, 0);" class="btn btn-primary btn-sm btn-modal-primary" onclick="stopProject('${row[8].content}')">Stop</button>`;
             }
         };
         
         let columns = [
             { label: "<b>Project Name</b>", id: "project_name", fieldtype: "Data", width: 200 , editable: false,visible: false},
-            { label: "<b>Project</b>", id: "project_desc", fieldtype: "Data", width: 300 , editable: false,format: linkFormatter1},
+            { label: "<b>Project</b>", id: "project_desc", fieldtype: "Data", width: 230 , editable: false,format: linkFormatter1},
             //{ label: "<b>Notes</b>", id: "notes", fieldtype: "Data", width: 200 , editable: false},
-            { label: "<b>Customer Name</b>", id: "customer", fieldtype: "Link", width: 200,editable: false},
+            { label: "<b>Customer Name</b>", id: "customer", fieldtype: "Link", width: 130,editable: false},
             { label: "<b>Customer</b>", id: "customer_desc", fieldtype: "Data", width: 200,editable: false,format: linkFormatter},
-            { label: "<b>Planned Hrs</b>", id: "planned_hours", fieldtype: "Data", width: 150,editable: false},
-            { label: "<b>Spent Draft Hrs</b>", id: "spent_hours_draft", fieldtype: "Float", width: 150,editable: false},
-            { label: "<b>Timesheet Record</b>", id: "timesheet_record", fieldtype: "Link", width: 180 , editable: false},
+            { label: "<b>Planned Hrs</b>", id: "planned_hours", fieldtype: "Data", width: 120,editable: false},
+            { label: "<b>Spent Draft Hrs</b>", id: "spent_hours_draft", fieldtype: "Float", width: 140,editable: false},
+            { label: "<b>Spent Submmited Hrs</b>", id: "spent_hours_submitted", fieldtype: "Float", width: 180,editable: false},
+            { label: "<b>Timesheet Record</b>", id: "timesheet_record", fieldtype: "Link", width: 160 , editable: false},
             { label: "<b>Name</b>", id: "name", fieldtype: "Link", width: 150 , editable: false},
             { label: "<b>Action</b>", focusable: false, format: button_formatter , width: 150}
         ];
         function linkFormatter1(value, row,columnId) {
-            return `<a href="#" onclick="handleProjectClick('${row[8].content}');">${row[2].content}</a>`;
+            return `<a href="#" onclick="handleProjectClick('${row[9].content}');">${row[2].content}</a>`;
         }
         function linkFormatter(value, row,columnId) {
             return `<a href="#" onclick="handleCustomerClick('${row[3].content}');">${row[4].content}</a>`;
@@ -353,12 +374,12 @@ frappe.pages['project-action-panel'].on_page_load = function(wrapper) {
 
         // Add a style element to hide the "Name" column cells
         let style_n = document.createElement('style');
-        style_n.innerHTML = '.dt-cell__content--col-8 { display: none; }'; // Change dt-cell__content dt-cell__content--col-4 to dt-cell__content--col-3
+        style_n.innerHTML = '.dt-cell__content--col-9 { display: none; }'; // Change dt-cell__content dt-cell__content--col-4 to dt-cell__content--col-3
         document.head.appendChild(style_n);
  
         // Add a style element to hide the "Name" column header
         let styleHeader_n = document.createElement('style');
-        styleHeader_n.innerHTML = '.dt-cell__content--header-8 { display: none; }'; // Change dt-cell__content dt-cell__content--header-4 to dt-cell__content--header-3
+        styleHeader_n.innerHTML = '.dt-cell__content--header-9 { display: none; }'; // Change dt-cell__content dt-cell__content--header-4 to dt-cell__content--header-3
         document.head.appendChild(styleHeader_n);
 
 
@@ -405,7 +426,7 @@ frappe.pages['project-action-panel'].on_page_load = function(wrapper) {
             'margin-top': '50px',
             'text-align': 'center',
             'margin-left': '50px',
-            'width': '1170px'
+            'width': '1240px'
         });
         // Set the inner HTML of the card wrapper to the desired text or HTML content
         wrapper.querySelector('#card-wrapper').innerHTML = "<p></p>";
