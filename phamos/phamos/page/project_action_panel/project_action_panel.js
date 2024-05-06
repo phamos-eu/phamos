@@ -360,7 +360,7 @@ frappe.pages['project-action-panel'].on_page_load = function(wrapper) {
             { label: "<b>Customer</b>", id: "customer_desc", fieldtype: "Data", width: 200,editable: false,format: linkFormatter},
             { label: "<b>Planned Hrs</b>", id: "planned_hours", fieldtype: "Data", width: 120,editable: false},
             { label: "<b>Spent Draft Hrs</b>", id: "spent_hours_draft", fieldtype: "Float", width: 140,editable: false},
-            { label: "<b>Spent Submmited Hrs</b>", id: "spent_hours_submitted", fieldtype: "Float", width: 180,editable: false},
+            { label: "<b>Spent Submitted Hrs</b>", id: "spent_hours_submitted", fieldtype: "Float", width: 180,editable: false},
             { label: "<b>Timesheet Record</b>", id: "timesheet_record", fieldtype: "Link", width: 160 , editable: false},
             { label: "<b>Name</b>", id: "name", fieldtype: "Link", width: 150 , editable: false},
             { label: "<b>Action</b>", focusable: false, format: button_formatter , width: 150}
@@ -425,8 +425,8 @@ frappe.pages['project-action-panel'].on_page_load = function(wrapper) {
         $(wrapper.querySelector('#datatable-wrapper')).css({
             'margin-top': '50px',
             'text-align': 'center',
-            'margin-left': '50px',
-            'width': '1240px'
+            'margin-left': '30px',
+            'width': '1220px'
         });
         // Set the inner HTML of the card wrapper to the desired text or HTML content
         wrapper.querySelector('#card-wrapper').innerHTML = "<p></p>";
