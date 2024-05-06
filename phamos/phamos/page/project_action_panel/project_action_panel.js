@@ -16,6 +16,7 @@ frappe.pages['project-action-panel'].on_page_load = function(wrapper) {
             if (r.message) {
                 // Render DataTable with the fetched data
                 renderDataTable(wrapper, r.message);
+                console.log(window.location.href)
             } else {
                 // Handle error or empty data
             }
@@ -69,25 +70,33 @@ frappe.pages['project-action-panel'].on_page_load = function(wrapper) {
     }
 
     window.handleCustomerClick = function(customer_name) {
+        // Get the base URL of the current page
+        let baseUrl = window.location.href.split('/').slice(0, 3).join('/'); // Extract protocol, hostname, and port
+        
         // Construct the URL for the customer details page
-        let url = `https://phamos.eu/app/customer/${encodeURIComponent(customer_name)}`;
-    
+        let url = `${baseUrl}/app/customer/${encodeURIComponent(customer_name)}`;
+        
         // Open the URL in a new window
         window.open(url, '_blank');
-    
+        
         // Optionally, return false to prevent the default link behavior (not necessary in this case)
         return false;
     };
+    
     window.handleProjectClick = function(project_name) {
-        // Construct the URL for the customer details page
-        let url = `https://phamos.eu/app/project/${encodeURIComponent(project_name)}`;
-    
+        // Get the base URL of the current page
+        let baseUrl = window.location.href.split('/').slice(0, 3).join('/'); // Extract protocol, hostname, and port
+        
+        // Construct the URL for the project details page
+        let url = `${baseUrl}/app/project/${encodeURIComponent(project_name)}`;
+        
         // Open the URL in a new window
         window.open(url, '_blank');
-    
+        
         // Optionally, return false to prevent the default link behavior (not necessary in this case)
         return false;
     };
+    
 
     function reloadPage() {
         window.location.href = window.location.href.split('?')[0]; // Reload the page without parameters
@@ -357,10 +366,10 @@ frappe.pages['project-action-panel'].on_page_load = function(wrapper) {
             { label: "<b>Project</b>", id: "project_desc", fieldtype: "Data", width: 230 , editable: false,format: linkFormatter1},
             //{ label: "<b>Notes</b>", id: "notes", fieldtype: "Data", width: 200 , editable: false},
             { label: "<b>Customer Name</b>", id: "customer", fieldtype: "Link", width: 130,editable: false},
-            { label: "<b>Customer</b>", id: "customer_desc", fieldtype: "Data", width: 200,editable: false,format: linkFormatter},
+            { label: "<b>Customer</b>", id: "customer_desc", fieldtype: "Link", width: 200,editable: false,format: linkFormatter},
             { label: "<b>Planned Hrs</b>", id: "planned_hours", fieldtype: "Data", width: 120,editable: false},
             { label: "<b>Spent Draft Hrs</b>", id: "spent_hours_draft", fieldtype: "Float", width: 140,editable: false},
-            { label: "<b>Spent Submmited Hrs</b>", id: "spent_hours_submitted", fieldtype: "Float", width: 180,editable: false},
+            { label: "<b>Spent Submitted Hrs</b>", id: "spent_hours_submitted", fieldtype: "Float", width: 180,editable: false},
             { label: "<b>Timesheet Record</b>", id: "timesheet_record", fieldtype: "Link", width: 160 , editable: false},
             { label: "<b>Name</b>", id: "name", fieldtype: "Link", width: 150 , editable: false},
             { label: "<b>Action</b>", focusable: false, format: button_formatter , width: 150}
@@ -425,8 +434,8 @@ frappe.pages['project-action-panel'].on_page_load = function(wrapper) {
         $(wrapper.querySelector('#datatable-wrapper')).css({
             'margin-top': '50px',
             'text-align': 'center',
-            'margin-left': '50px',
-            'width': '1240px'
+            'margin-left': '30px',
+            'width': '1220px'
         });
         // Set the inner HTML of the card wrapper to the desired text or HTML content
         wrapper.querySelector('#card-wrapper').innerHTML = "<p></p>";
