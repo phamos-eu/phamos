@@ -109,7 +109,7 @@ def fetch_projects():
         WHERE t.docstatus = 0 AND t.name IN (SELECT td.parent FROM `tabTimesheet Detail` td WHERE td.project = p.name)), 3) AS spent_hours_draft,
         ROUND((SELECT SUM(t.total_hours) FROM `tabTimesheet` t 
         WHERE t.docstatus = 1 AND t.name IN (SELECT td.parent FROM `tabTimesheet Detail` td WHERE td.project = p.name)), 3) AS spent_hours_submitted,
-        (SELECT customer_name FROM `tabCustomer` c WHERE p.customer = c.name) AS customer,
+        (SELECT name FROM `tabCustomer` c WHERE p.customer = c.name) AS customer,
         (SELECT CASE WHEN c.name != c.customer_name THEN CONCAT(c.name, " - ", c.customer_name) ELSE c.customer_name END FROM `tabCustomer` c WHERE p.customer = c.name) AS customer_desc,
         (SELECT max(ts.name) FROM `tabTimesheet Record` ts WHERE ts.project = p.name AND ts.employee = %(employee)s AND ts.docstatus = 0) AS timesheet_record
         FROM `tabProject` p

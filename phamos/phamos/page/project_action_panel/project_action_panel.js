@@ -77,11 +77,12 @@ frappe.pages['project-action-panel'].on_page_load = function(wrapper) {
         let url = `${baseUrl}/app/customer/${encodeURIComponent(customer_name)}`;
         
         // Open the URL in a new window
-        window.open(url, '_blank');
+        window.open(url);
         
         // Optionally, return false to prevent the default link behavior (not necessary in this case)
         return false;
     };
+    
     
     window.handleProjectClick = function(project_name) {
         // Get the base URL of the current page
@@ -91,11 +92,12 @@ frappe.pages['project-action-panel'].on_page_load = function(wrapper) {
         let url = `${baseUrl}/app/project/${encodeURIComponent(project_name)}`;
         
         // Open the URL in a new window
-        window.open(url, '_blank');
+        window.open(url);
         
         // Optionally, return false to prevent the default link behavior (not necessary in this case)
         return false;
     };
+    
     
 
     function reloadPage() {
