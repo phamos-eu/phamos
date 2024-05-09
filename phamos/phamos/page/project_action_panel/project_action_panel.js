@@ -44,6 +44,7 @@ frappe.pages['project-action-panel'].on_page_load = function(wrapper) {
 					}
 				}
         })
+        window.location.reload();
     }
 
     // Function to create timesheet record
@@ -67,6 +68,7 @@ frappe.pages['project-action-panel'].on_page_load = function(wrapper) {
 					}
 				}
         })
+        window.location.reload();
     }
 
     window.handleCustomerClick = function(customer_name) {
@@ -180,7 +182,6 @@ frappe.pages['project-action-panel'].on_page_load = function(wrapper) {
                     primary_action(values) {
                         update_and_submit_timesheet_record(values.timesheet_record,values.to_time,values.percent_billable,values.activity_type,values.result)
                         dialog.hide();
-                        window.location.reload();
                     }
                     
                 });
@@ -278,14 +279,12 @@ frappe.pages['project-action-panel'].on_page_load = function(wrapper) {
                                 primary_action_label: __("Create Timesheet Record."),
                                 primary_action(values) {
                                     create_timesheet_record(values.project_name,values.customer,values.from_time,values.expected_time,values.goal)
-                                    dialog.hide();
-                                    window.location.reload();
+                                    dialog.hide();  
                                 }
                             });
                             
                             // Set the width using CSS
                             dialog.$wrapper.find('.modal-dialog').css('max-width', '800px');
-    
                             dialog.show();
                         
                     }
@@ -415,8 +414,54 @@ frappe.pages['project-action-panel'].on_page_load = function(wrapper) {
         styleHeader.innerHTML = '.dt-cell__content--header-1 { display: none; }';
         document.head.appendChild(styleHeader);
 
+
         // Add a header to the report view
-        wrapper.innerHTML = `<h1>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Project Action Panel</h1><div id="card-wrapper"></div><div id="datatable-wrapper"></div>`;
+        wrapper.innerHTML = `<h1>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Project Action Panel</h1><div id="card-wrapper"></div><div id="button-wrapper"></div><div id="datatable-wrapper"></div>`;
+
+        // Create the button wrapper element
+        let buttonWrapper = document.createElement('div');
+        buttonWrapper.setAttribute('id', 'button-wrapper');
+
+        // Create the button element
+        let buttonElement = document.createElement('button');
+        buttonElement.setAttribute('type', 'button');
+        buttonElement.setAttribute('class', 'btn btn-default btn-sm ellipsis');
+        buttonElement.setAttribute('aria-expanded', 'false');
+        buttonElement.innerHTML = `
+        <span class="hidden-xs">
+        <svg class="icon icon-sm" aria-hidden="true">
+            <use href="#icon-calendar"></use>
+        </svg>
+        <span class="custom-btn-group-label">Timesheet Calendar View</span>
+        </span>
+        <span class="visible-xs">
+        <svg class="icon icon-sm" aria-hidden="true">
+            <use href="#icon-calendar"></use>
+        </svg>
+        </span>
+        `;
+
+        buttonElement.addEventListener('click', function() {
+            // Get the base URL of the current page
+            let baseUrl = window.location.href.split('/').slice(0, 3).join('/'); // Extract protocol, hostname, and port
+    
+            // Construct the URL for the timesheet calendar view
+            let url = `${baseUrl}/app/timesheet-record/view/calendar/Timesheet%20Record`;
+    
+            // Open the URL in a new window
+            window.open(url);
+        });
+       
+
+        buttonElement.style.marginLeft = '50px';
+        // Append the button to the button wrapper
+        buttonWrapper.appendChild(buttonElement);
+
+        // Append the button wrapper above the datatable-wrapper
+        wrapper.insertBefore(buttonWrapper, document.getElementById('datatable-wrapper'));
+
+        // Add a header to the report view
+        //wrapper.innerHTML = `<h1>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Project Action Panel</h1><div id="card-wrapper"></div><div id="datatable-wrapper"></div>`;
         
         // Initialize DataTable with the data and column configuration
         let datatable = new frappe.DataTable(wrapper.querySelector('#datatable-wrapper'), {
