@@ -16,7 +16,7 @@ frappe.pages['project-action-panel'].on_page_load = function(wrapper) {
             if (r.message) {
                 // Render DataTable with the fetched data
                 renderDataTable(wrapper, r.message);
-                console.log(window.location.href)
+                //console.log(window.location.href)
             } else {
                 // Handle error or empty data
             }
@@ -106,7 +106,7 @@ frappe.pages['project-action-panel'].on_page_load = function(wrapper) {
         window.location.href = window.location.href.split('?')[0]; // Reload the page without parameters
     }
     
-    window.stopProject = function(timesheet_record) {
+    window.stopProject = function(timesheet_record,percent_billable) {
         let activity_type = ""
         let timesheet_record_info = " Info from timesheet record"
         frappe.db.get_value("Timesheet Record", {"name": timesheet_record}, ["goal", "from_time"], function(value) {
@@ -152,7 +152,7 @@ frappe.pages['project-action-panel'].on_page_load = function(wrapper) {
                             fieldname: "percent_billable",
                             in_list_view: 1,
                             reqd: 1,
-                            default: "100",
+                            default: percent_billable,
                             description:'This is a personal indicator to your own performance on the work you have done. It will influence the billable time of the Timesheet created.'
                         },
                         {
@@ -214,9 +214,11 @@ frappe.pages['project-action-panel'].on_page_load = function(wrapper) {
                             confirm_msg, 
                             function(){
                                 // If user clicks "Yes"
-                                stopProject(timesheetRecordDrafts[0].timesheet_record_draft)
-                                 
-                               
+                                frappe.db.get_value("Timesheet Record", {"name": timesheetRecordDrafts[0].timesheet_record_draft}, "project", function(value) {
+                                    frappe.db.get_value("Project", {"name": value.project}, "percent_billable", function(value_pb) {
+                                        stopProject(timesheetRecordDrafts[0].timesheet_record_draft,value_pb.percent_billable)
+                                    })
+                                })
                                 // Perform the action here
                             },
                             function(){
@@ -337,8 +339,6 @@ frappe.pages['project-action-panel'].on_page_load = function(wrapper) {
     
                 // Log the wrapper element
                 //console.log(wrapper);
-
-                
             }
         });
     }
@@ -358,7 +358,7 @@ frappe.pages['project-action-panel'].on_page_load = function(wrapper) {
                 return `<button type="button" style="height: 23px; width: 60px; display: flex; align-items: center; justify-content: center; background-color: rgb(0, 100, 0);" class="btn btn-primary btn-sm btn-modal-primary" onclick="startProject('${row[1].content}', '${row[3].content}')">Start</button>`;
             }
             else {
-                return `<button type="button" style="height: 23px; width: 60px; display: flex; align-items: center; justify-content: center; background-color: rgb(139, 0, 0);" class="btn btn-primary btn-sm btn-modal-primary" onclick="stopProject('${row[8].content}')">Stop</button>`;
+                return `<button type="button" style="height: 23px; width: 60px; display: flex; align-items: center; justify-content: center; background-color: rgb(139, 0, 0);" class="btn btn-primary btn-sm btn-modal-primary" onclick="stopProject('${row[8].content}','${row[11].content}')">Stop</button>`;
             }
         };
         
@@ -373,7 +373,8 @@ frappe.pages['project-action-panel'].on_page_load = function(wrapper) {
             { label: "<b>Spent Submitted Hrs</b>", id: "spent_hours_submitted", fieldtype: "Float", width: 180,editable: false},
             { label: "<b>Timesheet Record</b>", id: "timesheet_record", fieldtype: "Link", width: 160 , editable: false},
             { label: "<b>Name</b>", id: "name", fieldtype: "Link", width: 150 , editable: false},
-            { label: "<b>Action</b>", focusable: false, format: button_formatter , width: 150}
+            { label: "<b>Action</b>", focusable: false, format: button_formatter , width: 150},
+            { label: "<b>percent_billable</b>", id: "percent_billable", fieldtype: "Data", width: 0 , editable: false},
         ];
         function linkFormatter1(value, row,columnId) {
             return `<a href="#" onclick="handleProjectClick('${row[9].content}');">${row[2].content}</a>`;
@@ -414,9 +415,25 @@ frappe.pages['project-action-panel'].on_page_load = function(wrapper) {
         styleHeader.innerHTML = '.dt-cell__content--header-1 { display: none; }';
         document.head.appendChild(styleHeader);
 
+        // Add a style element to hide the "percent_billable" column cells
+        let style_pb = document.createElement('style');
+        style_pb.innerHTML = '.dt-cell__content--col-11 { display: none; }';
+        document.head.appendChild(style_pb);
+
+        // Add a style element to hide the "percent_billable" column header
+        let styleHeader_pb = document.createElement('style');
+        styleHeader_pb.innerHTML = '.dt-cell__content--header-11 { display: none; }'; // Change dt-cell__content dt-cell__content--header-4 to dt-cell__content--header-3
+        document.head.appendChild(styleHeader_pb);
 
         // Add a header to the report view
-        wrapper.innerHTML = `<h1>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Project Action Panel</h1><div id="card-wrapper"></div><div id="button-wrapper"></div><div id="datatable-wrapper"></div>`;
+        //wrapper.innerHTML = `<h1>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Project Action Panel </h1></div><div id="card-wrapper"></div><div id="datatable-wrapper"></div>`;
+        wrapper.innerHTML = `
+        <h2 style="display: inline; margin-left: 50px; margin-top: 10px;font-size:30px">Project Action Panel </h2>
+        <div id="button-wrapper" style="display: inline-block; margin-left: 450px;"></div>
+        <div id="card-wrapper"></div>
+        <div id="datatable-wrapper"></div>
+    `;
+    
 
         // Create the button wrapper element
         let buttonWrapper = document.createElement('div');
@@ -457,8 +474,11 @@ frappe.pages['project-action-panel'].on_page_load = function(wrapper) {
         // Append the button to the button wrapper
         buttonWrapper.appendChild(buttonElement);
 
+        // Append the button wrapper next to the "Project Action Panel" header text
+        document.getElementById('button-wrapper').appendChild(buttonWrapper);
+
         // Append the button wrapper above the datatable-wrapper
-        wrapper.insertBefore(buttonWrapper, document.getElementById('datatable-wrapper'));
+        //wrapper.insertBefore(buttonWrapper, document.getElementById('datatable-wrapper'));
 
         // Add a header to the report view
         //wrapper.innerHTML = `<h1>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Project Action Panel</h1><div id="card-wrapper"></div><div id="datatable-wrapper"></div>`;
