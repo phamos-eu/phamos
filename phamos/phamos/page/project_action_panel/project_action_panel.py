@@ -104,7 +104,7 @@ def fetch_projects():
     # Custom SQL query to fetch project data
     employee_name = frappe.db.get_value("Employee", {"user_id": frappe.session.user}, "name")
     projects = frappe.db.sql("""
-        SELECT p.name AS name, p.planned_hours AS planned_hours, p.status AS status, p.notes AS notes, p.project_name AS project_name, CONCAT(p.name, " - ", p.project_name) AS project_desc,
+        SELECT p.percent_billable as percent_billable ,p.name AS name, p.planned_hours AS planned_hours, p.status AS status, p.notes AS notes, p.project_name AS project_name, CONCAT(p.name, " - ", p.project_name) AS project_desc,
         ROUND((SELECT SUM(t.total_hours) FROM `tabTimesheet` t 
         WHERE t.docstatus = 0 AND t.name IN (SELECT td.parent FROM `tabTimesheet Detail` td WHERE td.project = p.name)), 3) AS spent_hours_draft,
         ROUND((SELECT SUM(t.total_hours) FROM `tabTimesheet` t 

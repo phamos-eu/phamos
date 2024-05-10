@@ -14,8 +14,18 @@ def execute():
 		fieldtype="Data",
 		insert_after="phamos_section_break"))
     
-    
+    create_custom_field("project",
+    	dict(fieldname="phamos_columns_break", label="",
+		fieldtype="Column Break", insert_after="planned_hours"
+    ))
+
+    create_custom_field("project",
+        dict(fieldname="percent_billable", label="Percent Billable",
+		fieldtype="Select",
+		options="\n0\n25\n50\n75\n100",insert_after="phamos_columns_break",default = 100
+		))
+
     create_custom_field("project",
 	    dict(fieldname="phamos_section_break_end", label="",
-		fieldtype="Section Break", insert_after="planned_hours"))
+		fieldtype="Section Break", insert_after="percent_billable"))
     
