@@ -4,12 +4,10 @@ from frappe.model.document import Document
 from frappe.utils import cstr, now_datetime, time_diff_in_seconds, get_datetime,time_diff,today
 from frappe.utils.data import add_to_date,format_duration, time_diff_in_seconds
 from datetime import datetime
-
-
-
+from datetime import datetime, timedelta
 
 @frappe.whitelist()
-def create_timesheet_record(project_name, customer, activity_type, from_time, expected_time, goal):
+def create_timesheet_record(project_name, customer, from_time, expected_time, goal):
     try:
         employee_name = frappe.db.get_value("Employee", {"user_id": frappe.session.user}, "name")
         customer = frappe.db.get_value("Customer", {"customer_name": customer}, "name")
@@ -21,7 +19,6 @@ def create_timesheet_record(project_name, customer, activity_type, from_time, ex
             timesheet_record = frappe.new_doc('Timesheet Record')
             timesheet_record.project = project
             timesheet_record.customer = customer
-            timesheet_record.activity_type = activity_type
             timesheet_record.from_time = after_1_minute
             timesheet_record.expected_time = expected_time
             timesheet_record.goal = goal
@@ -42,7 +39,7 @@ def create_timesheet_record(project_name, customer, activity_type, from_time, ex
 
 # In your Python script, within @frappe.whitelist()
 @frappe.whitelist()
-def update_and_submit_timesheet_record(name, to_time,percent_billable, result):
+def update_and_submit_timesheet_record(name, to_time,percent_billable,activity_type, result):
     try:
         # Retrieve the Timesheet Record document
         doc = frappe.get_doc("Timesheet Record", name)
@@ -50,6 +47,7 @@ def update_and_submit_timesheet_record(name, to_time,percent_billable, result):
         
         # Update the fields
         doc.to_time = to_time_add_seconds
+        doc.activity_type = activity_type
         doc.result = result
         doc.actual_time = time_diff_in_seconds(doc.to_time, doc.from_time)
         doc.percent_billable = percent_billable
@@ -106,16 +104,22 @@ def fetch_projects():
     # Custom SQL query to fetch project data
     employee_name = frappe.db.get_value("Employee", {"user_id": frappe.session.user}, "name")
     projects = frappe.db.sql("""
-        SELECT p.name AS name, p.status AS status, p.notes AS notes, p.project_name AS project_name,CONCAT(p.name, " - ", p.project_name) AS project_desc,
-            (SELECT customer_name FROM `tabCustomer` c WHERE p.customer = c.name) AS customer,
-            (SELECT max(ts.name) FROM `tabTimesheet Record` ts WHERE ts.project = p.name and ts.employee = %(employee)s and ts.docstatus = 0) AS timesheet_record
+        SELECT p.percent_billable as percent_billable ,p.name AS name, p.planned_hours AS planned_hours, p.status AS status, p.notes AS notes, p.project_name AS project_name, CONCAT(p.name, " - ", p.project_name) AS project_desc,
+        ROUND((SELECT SUM(t.total_hours) FROM `tabTimesheet` t 
+        WHERE t.docstatus = 0 AND t.name IN (SELECT td.parent FROM `tabTimesheet Detail` td WHERE td.project = p.name)), 3) AS spent_hours_draft,
+        ROUND((SELECT SUM(t.total_hours) FROM `tabTimesheet` t 
+        WHERE t.docstatus = 1 AND t.name IN (SELECT td.parent FROM `tabTimesheet Detail` td WHERE td.project = p.name)), 3) AS spent_hours_submitted,
+        (SELECT name FROM `tabCustomer` c WHERE p.customer = c.name) AS customer,
+        (SELECT CASE WHEN c.name != c.customer_name THEN CONCAT(c.name, " - ", c.customer_name) ELSE c.customer_name END FROM `tabCustomer` c WHERE p.customer = c.name) AS customer_desc,
+        (SELECT max(ts.name) FROM `tabTimesheet Record` ts WHERE ts.project = p.name AND ts.employee = %(employee)s AND ts.docstatus = 0) AS timesheet_record
         FROM `tabProject` p
-        WHERE (SELECT max(reference_name) FROM `tabToDo` td WHERE td.status = "Open" and td.reference_name = p.name and td.allocated_to = %(user)s) IS NOT NULL
+        WHERE (SELECT max(reference_name) FROM `tabToDo` td WHERE td.status = "Open" AND td.reference_name = p.name AND td.allocated_to = %(user)s) IS NOT NULL
         ORDER BY timesheet_record IS NULL, timesheet_record ASC  # Show records with timesheet_record first
     """, {"employee": employee_name, "user": frappe.session.user}, as_dict=True)
 
     # Return project data
     return projects
+
 
 
 
@@ -143,8 +147,6 @@ def get_project_count():
     }
 
 
-import frappe
-
 @frappe.whitelist()
 def total_hours_worked_today():
     employee_name = frappe.db.get_value("Employee", {"user_id": frappe.session.user}, "name")
@@ -171,7 +173,7 @@ def total_hours_worked_today():
             "fieldtype": "Float"
         }
 
-from datetime import datetime, timedelta
+
 
 @frappe.whitelist()
 def total_hours_worked_in_this_week():
@@ -203,9 +205,6 @@ def total_hours_worked_in_this_week():
             "fieldtype": "Float"
         }
 
-from datetime import datetime, timedelta
-
-from datetime import datetime, timedelta
 
 @frappe.whitelist()
 def total_hours_worked_in_this_month():
@@ -221,7 +220,7 @@ def total_hours_worked_in_this_month():
         WHERE ts.employee = %(employee)s 
         AND ts.from_time BETWEEN %(start_of_month)s AND %(end_of_month)s
     """, {"employee": employee_name, "start_of_month": start_of_month, "end_of_month": end_of_month}, as_dict=True)
-    
+     
     if count_time and count_time[0].total_actual_time:
         total_actual_time = format_duration(count_time[0].total_actual_time)
         total_actual_time_str = str(total_actual_time)[:10]
@@ -238,15 +237,13 @@ def total_hours_worked_in_this_month():
             "fieldtype": "Float"
         }
 
-   
-
 
 def format_duration(duration_in_seconds):
 	minutes, seconds = divmod(duration_in_seconds, 60)
 	hours, minutes = divmod(minutes, 60)
 	if hours > 0:
-		return f"{hours} Hours, {minutes} M"
+		return f"{hours} Hrs {minutes} Mins"
 	elif minutes > 0:
-		return f"{minutes} M"
+		return f"{minutes} Mins"
 	else:
-		return f"{seconds} S"
+		return f"{seconds} Secs"

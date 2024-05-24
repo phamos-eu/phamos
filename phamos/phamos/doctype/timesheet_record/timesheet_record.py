@@ -11,6 +11,8 @@ class TimesheetRecord(Document):
 	def before_submit(self):
 		if not self.to_time:
 			frappe.throw(_("Cannot Submit, please mark record as complete"))
+		if not self.activity_type:
+			frappe.throw(_("Please add an activity type to submit the timesheet record."))
 
 	def on_submit(self):
 		self.create_timesheet()
