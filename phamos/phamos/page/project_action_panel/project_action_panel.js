@@ -142,7 +142,7 @@ frappe.pages['project-action-panel'].on_page_load = function(wrapper) {
                             label: 'Time',
                             fieldname: 'to_time',
                             fieldtype: 'Datetime',
-                            default: frappe.datetime.now_datetime(), reqd: 1
+                            reqd: 1
                         },
                        
                         {
@@ -182,6 +182,7 @@ frappe.pages['project-action-panel'].on_page_load = function(wrapper) {
                     primary_action(values) {
                         update_and_submit_timesheet_record(values.timesheet_record,values.to_time,values.percent_billable,values.activity_type,values.result)
                         dialog.hide();
+                        window.location.reload();
                     }
                     
                 });
@@ -192,7 +193,7 @@ frappe.pages['project-action-panel'].on_page_load = function(wrapper) {
 
         });
 
-      
+       
     };
      //return record.timesheet_record_draft;
 
@@ -258,7 +259,6 @@ frappe.pages['project-action-panel'].on_page_load = function(wrapper) {
                                         in_list_view: 1,
                                         reqd: 1,
                                         read_only:0,
-                                        default: frappe.datetime.now_datetime()
                                     },
                                     {
                                         fieldtype: 'Column Break'
