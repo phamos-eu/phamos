@@ -20,6 +20,7 @@
   "currency",
   "conversion_rate",
   "column_break_9lcf0",
+  "pdf_preview",
   "note",
   "purchase_section_section",
   "supplier",
@@ -333,6 +334,11 @@
    "fieldtype": "Link",
    "label": "Item",
    "options": "Item"
+  },
+  {
+   "fieldname": "pdf_preview",
+   "fieldtype": "HTML",
+   "label": "PDF Preview"
   }
  ],
  "index_web_pages_for_search": 1,
@@ -355,7 +361,7 @@
    "link_fieldname": "accounting_receipt"
   }
  ],
- "modified": "2023-11-06 19:28:28.423884",
+ "modified": "2024-05-28 15:05:36.281984",
  "modified_by": "Administrator",
  "module": "Phamos",
  "name": "Accounting Receipt",
