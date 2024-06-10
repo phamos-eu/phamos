@@ -46,7 +46,8 @@ class TimesheetRecord(Document):
 		)
 		timesheet.insert()
 		self.db_set('timesheet', timesheet.name)
-		frappe.msgprint(_('Timesheet {0} Created').format(frappe.get_desk_link("Timesheet", timesheet.name)))
+		
+		frappe.msgprint(_('Make sure to provide the issue number, chat link from Mattermost, and your solution. Note that this information will be shared with the customer via the timesheet record.<br><br>Timesheet {0} Created').format(frappe.get_desk_link("Timesheet", timesheet.name)))
 
 @frappe.whitelist()
 def set_actual_time(from_time, to_time):
