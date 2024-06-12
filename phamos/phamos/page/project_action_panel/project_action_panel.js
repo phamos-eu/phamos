@@ -67,7 +67,7 @@ frappe.pages['project-action-panel'].on_page_load = function(wrapper) {
 			callback: function(r) {
 				if(r.message) {
                     let doc = frappe.model.sync(r.message);
-                    frappe.msgprint('Make sure to provide the issue number, chat link from Mattermost, and your solution. Note that this information will be shared with the customer via the timesheet record.<br><br>Timesheet Record: ' + doc[0].name + ' Updated Successfully.');
+                    frappe.msgprint('Timesheet Record: ' + doc[0].name + ' Updated Successfully.');
                     render_datatable()
 					}
 				}
@@ -177,7 +177,8 @@ frappe.pages['project-action-panel'].on_page_load = function(wrapper) {
                         {
                             label: 'What I did ',
                             fieldname: 'result',
-                            fieldtype: 'Small Text', reqd: 1
+                            fieldtype: 'Small Text', reqd: 1,
+                            description:"⚠️ Important: Make sure to provide the issue number, chat link from Mattermost, and your solution. Note that this information will be shared with the customer via the timesheet record."
                         },
                         
                     ],
@@ -279,14 +280,14 @@ frappe.pages['project-action-panel'].on_page_load = function(wrapper) {
                                         label: __("Goal"),
                                         fieldname: "goal",
                                         in_list_view: 1,
-                                        reqd: 1
+                                        reqd: 1,
+                                        description : "⚠️ Important: Make sure to provide the issue number, chat link from Mattermost, and your Goal. Note that this information will be shared with the customer via the timesheet record."
                                     },
                                 ],
                                 primary_action_label: __("Create Timesheet Record."),
                                 primary_action(values) {
                                     create_timesheet_record(values.project_name,values.customer,values.from_time,values.expected_time,values.goal)
                                     dialog.hide();  
-                                    frappe.msgprint('Make sure to provide the issue number, chat link from Mattermost, and your goal. Note that this information will be shared with the customer via the timesheet record.')
                                 }
                             });
                             
