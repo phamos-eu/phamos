@@ -67,7 +67,7 @@ frappe.pages['project-action-panel'].on_page_load = function(wrapper) {
 			callback: function(r) {
 				if(r.message) {
                     let doc = frappe.model.sync(r.message);
-					frappe.msgprint('Timesheet Record: '+doc[0].name+' Updated Successfully.');
+                    frappe.msgprint('Timesheet Record: ' + doc[0].name + ' Updated Successfully.');
                     render_datatable()
 					}
 				}
@@ -177,7 +177,8 @@ frappe.pages['project-action-panel'].on_page_load = function(wrapper) {
                         {
                             label: 'What I did ',
                             fieldname: 'result',
-                            fieldtype: 'Small Text', reqd: 1
+                            fieldtype: 'Small Text', reqd: 1,
+                            description:"⚠️ This information is sent to the customer next day. Please make sure to wright meaningful text. Adding Issues ID's and or URL is helpful."
                         },
                         
                     ],
@@ -187,6 +188,7 @@ frappe.pages['project-action-panel'].on_page_load = function(wrapper) {
                         dialog.hide();
                         
                     }
+                    
                     
                 });
                 // Set the width using CSS
@@ -278,7 +280,8 @@ frappe.pages['project-action-panel'].on_page_load = function(wrapper) {
                                         label: __("Goal"),
                                         fieldname: "goal",
                                         in_list_view: 1,
-                                        reqd: 1
+                                        reqd: 1,
+                                        description : "⚠️ User this to manifest on what you are working and going to do. This will be shared with the customer next day."
                                     },
                                 ],
                                 primary_action_label: __("Create Timesheet Record."),
@@ -291,6 +294,7 @@ frappe.pages['project-action-panel'].on_page_load = function(wrapper) {
                             // Set the width using CSS
                             dialog.$wrapper.find('.modal-dialog').css('max-width', '800px');
                             dialog.show();
+                            
                         
                     }
                 } else {
