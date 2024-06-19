@@ -178,7 +178,7 @@ frappe.pages['project-action-panel'].on_page_load = function(wrapper) {
                             label: 'What I did ',
                             fieldname: 'result',
                             fieldtype: 'Small Text', reqd: 1,
-                            description:"⚠️ Important: Make sure to provide the issue number, chat link from Mattermost, and your solution. Note that this information will be shared with the customer via the timesheet record."
+                            description:"⚠️ This information is sent to the customer next day. Please make sure to wright meaningful text. Adding Issues ID's and or URL is helpful."
                         },
                         
                     ],
@@ -281,7 +281,7 @@ frappe.pages['project-action-panel'].on_page_load = function(wrapper) {
                                         fieldname: "goal",
                                         in_list_view: 1,
                                         reqd: 1,
-                                        description : "⚠️ Important: Make sure to provide the issue number, chat link from Mattermost, and your Goal. Note that this information will be shared with the customer via the timesheet record."
+                                        description : "⚠️ User this to manifest on what you are working and going to do. This will be shared with the customer next day."
                                     },
                                 ],
                                 primary_action_label: __("Create Timesheet Record."),
