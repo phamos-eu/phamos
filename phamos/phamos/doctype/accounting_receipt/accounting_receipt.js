@@ -54,7 +54,49 @@ frappe.ui.form.on("Accounting Receipt", {
                 );
                 frm.page.set_inner_btn_group_as_primary(__("Create"));
         }
+
+        // Hide PDF Preview if no attachment available or display it onload of document 
+        frm.toggle_display("pdf_preview", false);
+        frm.trigger("attachment");
     },
+
+    attachment: function (frm) {
+        /* on attachment of PDF document in attachment field in doclevel
+            system will generate a preview of the attached document
+        */
+        let $preview = "";
+        let file_extension = frm.events.getFileExtension(frm.doc.attachment);
+
+        if (file_extension === "pdf") {
+            $preview = $(`<div class="img_preview">
+                <h2 style="
+                        font-size: var(--text-lg);   
+                        font-weight: var(--weight-semibold);
+                        letter-spacing: .015em;
+                        color: var(--text-color);
+                        cursor: default;"> PDF Preview</h2>
+				<object style="background:#323639;" width="100%">
+					<embed
+						style="background:#323639;"
+						width="100%"
+						height="600px"
+						src="${frappe.utils.escape_html(frm.doc.attachment)}" type="application/pdf"
+					>
+				</object>
+			</div>`);
+        }
+
+        if ($preview) {
+            frm.toggle_display("pdf_preview", true);
+            frm.get_field("pdf_preview").$wrapper.html($preview);
+        }
+    },
+
+    getFileExtension: function (filename) {
+        // Get extension of the file
+        return filename.split('.').pop();
+    },
+
     make_purchase_invoice: function (frm) {
         return frappe.call({
             method: "make_purchase_invoice",

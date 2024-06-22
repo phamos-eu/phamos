@@ -8,20 +8,23 @@ frappe.pages['project-action-panel'].on_page_load = function(wrapper) {
     if (wrapper.page) {
         wrapper.page.set_title('<span style="font-size: 14px;">Project Action Panel</span>');
     }
-
-    // Fetch project data from the server on page load
-    frappe.call({
-        method: "phamos.phamos.page.project_action_panel.project_action_panel.fetch_projects",
-        callback: function(r) {
-            if (r.message) {
-                // Render DataTable with the fetched data
-                renderDataTable(wrapper, r.message);
-                //console.log(window.location.href)
-            } else {
-                // Handle error or empty data
+    
+    function render_datatable(){
+        frappe.call({
+            method: "phamos.phamos.page.project_action_panel.project_action_panel.fetch_projects",
+            callback: function(r) {
+                if (r.message) {
+                    // Render DataTable with the fetched data
+                    renderDataTable(wrapper, r.message);
+                    //console.log(window.location.href)
+                } else {
+                    // Handle error or empty data
+                }
             }
-        }
-    });
+        });
+    }
+    // Fetch project data from the server on page load
+    render_datatable()
    
     // Function to create timesheet record
     function create_timesheet_record(project_name,customer,from_time,expected_time,goal){
@@ -40,11 +43,12 @@ frappe.pages['project-action-panel'].on_page_load = function(wrapper) {
 				if(r.message) {
                     let doc = frappe.model.sync(r.message);
 					frappe.msgprint('Timesheet Record: '+doc[0].name+' Created Successfully.');
-                    reloadPage();
+                    render_datatable()
 					}
 				}
         })
-        window.location.reload();
+        
+       
     }
 
     // Function to create timesheet record
@@ -63,12 +67,13 @@ frappe.pages['project-action-panel'].on_page_load = function(wrapper) {
 			callback: function(r) {
 				if(r.message) {
                     let doc = frappe.model.sync(r.message);
-					frappe.msgprint('Timesheet Record: '+doc[0].name+' Updated Successfully.');
-                    reloadPage();
+                    frappe.msgprint('Timesheet Record: ' + doc[0].name + ' Updated Successfully.');
+                    render_datatable()
 					}
 				}
         })
-        window.location.reload();
+        
+        
     }
 
     window.handleCustomerClick = function(customer_name) {
@@ -102,9 +107,7 @@ frappe.pages['project-action-panel'].on_page_load = function(wrapper) {
     
     
 
-    function reloadPage() {
-        window.location.href = window.location.href.split('?')[0]; // Reload the page without parameters
-    }
+   
     
     window.stopProject = function(timesheet_record,percent_billable) {
         let activity_type = ""
@@ -142,7 +145,7 @@ frappe.pages['project-action-panel'].on_page_load = function(wrapper) {
                             label: 'Time',
                             fieldname: 'to_time',
                             fieldtype: 'Datetime',
-                            default: frappe.datetime.now_datetime(), reqd: 1
+                            reqd: 1
                         },
                        
                         {
@@ -174,7 +177,8 @@ frappe.pages['project-action-panel'].on_page_load = function(wrapper) {
                         {
                             label: 'What I did ',
                             fieldname: 'result',
-                            fieldtype: 'Small Text', reqd: 1
+                            fieldtype: 'Small Text', reqd: 1,
+                            description:"⚠️ This information is sent to the customer next day. Please make sure to wright meaningful text. Adding Issues ID's and or URL is helpful."
                         },
                         
                     ],
@@ -182,7 +186,9 @@ frappe.pages['project-action-panel'].on_page_load = function(wrapper) {
                     primary_action(values) {
                         update_and_submit_timesheet_record(values.timesheet_record,values.to_time,values.percent_billable,values.activity_type,values.result)
                         dialog.hide();
+                        
                     }
+                    
                     
                 });
                 // Set the width using CSS
@@ -192,7 +198,7 @@ frappe.pages['project-action-panel'].on_page_load = function(wrapper) {
 
         });
 
-      
+       
     };
      //return record.timesheet_record_draft;
 
@@ -258,7 +264,6 @@ frappe.pages['project-action-panel'].on_page_load = function(wrapper) {
                                         in_list_view: 1,
                                         reqd: 1,
                                         read_only:0,
-                                        default: frappe.datetime.now_datetime()
                                     },
                                     {
                                         fieldtype: 'Column Break'
@@ -275,7 +280,8 @@ frappe.pages['project-action-panel'].on_page_load = function(wrapper) {
                                         label: __("Goal"),
                                         fieldname: "goal",
                                         in_list_view: 1,
-                                        reqd: 1
+                                        reqd: 1,
+                                        description : "⚠️ User this to manifest on what you are working and going to do. This will be shared with the customer next day."
                                     },
                                 ],
                                 primary_action_label: __("Create Timesheet Record."),
@@ -288,6 +294,7 @@ frappe.pages['project-action-panel'].on_page_load = function(wrapper) {
                             // Set the width using CSS
                             dialog.$wrapper.find('.modal-dialog').css('max-width', '800px');
                             dialog.show();
+                            
                         
                     }
                 } else {

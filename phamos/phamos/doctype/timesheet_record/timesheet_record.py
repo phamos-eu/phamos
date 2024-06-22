@@ -46,6 +46,7 @@ class TimesheetRecord(Document):
 		)
 		timesheet.insert()
 		self.db_set('timesheet', timesheet.name)
+		
 		frappe.msgprint(_('Timesheet {0} Created').format(frappe.get_desk_link("Timesheet", timesheet.name)))
 
 @frappe.whitelist()
