@@ -39,6 +39,7 @@ class MorningFeedbackDialog {
                                     label: __("Good Morning"),
                                     fieldname: "good_morning",
                                     in_list_view: 1,
+                                    reqd: 1,
                                     description: "Between 8:00 AM and 21 PM, a dialog prompts users to rate their mood and sleep, select daily focuses, and submit, enhancing morning productivity and well-being.",
                                 },
                                 {
@@ -46,6 +47,7 @@ class MorningFeedbackDialog {
                                     label: __("How are you feeling Today?"),
                                     fieldname: "how_are_you",
                                     in_list_view: 1,
+                                    reqd: 1,
                                     description: "(Rate from 'Terrible' (1) to 'Great' (5))",
                                 },
                                 {
@@ -53,6 +55,7 @@ class MorningFeedbackDialog {
                                     label: __("How well did you sleep Today?"),
                                     fieldname: "how_well_did_you_sleep_today",
                                     in_list_view: 1,
+                                    reqd: 1,
                                     description: "(Rate from 'Not at all' (1) to 'Very' (5))",
                                 },
                                 {
