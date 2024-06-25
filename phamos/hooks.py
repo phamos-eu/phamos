@@ -15,7 +15,7 @@ required_apps = ["erpnext"]
 # include js, css files in header of desk.html
 # app_include_css = "/assets/phamos/css/phamos.css"
 # app_include_js = "/assets/phamos/js/phamos.js"
-
+app_include_js = ["phamos.bundle.js"]
 # include js, css files in header of web template
 # web_include_css = "/assets/phamos/css/phamos.css"
 # web_include_js = "/assets/phamos/js/phamos.js"
