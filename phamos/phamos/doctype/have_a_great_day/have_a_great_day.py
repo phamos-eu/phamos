@@ -16,16 +16,16 @@ class HaveaGreatDay(Document):
 		
 
 @frappe.whitelist()
-def create_todays_feedback(good_morning,mood_rating,sleep_rating):
+def create_todays_feedback(lookingForward,todaysChallange):
 		try:
 			employee_name = frappe.db.get_value("Employee", {"user_id": frappe.session.user}, "name")
 			if employee_name:
 				todays_feedback = frappe.new_doc("Have a Great Day")
 				todays_feedback.user = frappe.session.user
-				todays_feedback.good_morning = good_morning
-				todays_feedback.mood_rating = mood_rating
-				todays_feedback.sleep_rating = sleep_rating
+				todays_feedback.what_are_you_most_looking_forward_today = lookingForward
+				todays_feedback.what_challange_will_you_tackle_today = todaysChallange
 				todays_feedback.save()
+				todays_feedback.update()
 				return todays_feedback
 			else:
 				frappe.throw("Employee not found for the current user.")

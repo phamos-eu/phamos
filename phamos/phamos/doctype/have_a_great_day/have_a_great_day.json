@@ -7,10 +7,12 @@
  "engine": "InnoDB",
  "field_order": [
   "user",
-  "good_morning",
-  "mood_rating",
-  "sleep_rating",
-  "feedback_date"
+  "column_break_2v10",
+  "feedback_date",
+  "section_break_heik",
+  "what_are_you_most_looking_forward_today",
+  "column_break_g1pf",
+  "what_challange_will_you_tackle_today"
  ],
  "fields": [
   {
@@ -20,31 +22,37 @@
    "options": "User"
   },
   {
-   "default": "0",
-   "fieldname": "good_morning",
-   "fieldtype": "Check",
-   "label": "Good Morning"
-  },
-  {
-   "fieldname": "mood_rating",
-   "fieldtype": "Rating",
-   "label": "Mood Rating"
-  },
-  {
-   "fieldname": "sleep_rating",
-   "fieldtype": "Rating",
-   "label": "Sleep Rating"
-  },
-  {
    "default": "now",
    "fieldname": "feedback_date",
    "fieldtype": "Datetime",
    "label": "Feedback Date"
+  },
+  {
+   "fieldname": "what_are_you_most_looking_forward_today",
+   "fieldtype": "Small Text",
+   "label": "What are you most looking forward today?"
+  },
+  {
+   "fieldname": "what_challange_will_you_tackle_today",
+   "fieldtype": "Small Text",
+   "label": "What challange will you tackle today?"
+  },
+  {
+   "fieldname": "column_break_2v10",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "section_break_heik",
+   "fieldtype": "Section Break"
+  },
+  {
+   "fieldname": "column_break_g1pf",
+   "fieldtype": "Column Break"
   }
  ],
  "index_web_pages_for_search": 1,
  "links": [],
- "modified": "2024-06-25 11:32:10.385589",
+ "modified": "2024-06-26 13:15:13.615115",
  "modified_by": "Administrator",
  "module": "Phamos",
  "name": "Have a Great Day",
