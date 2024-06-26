@@ -4,6 +4,6 @@
 frappe.ui.form.on("Have a Great Day", {
     refresh(frm) {
         // Condition to save the form
-       
+        
     }
 });
