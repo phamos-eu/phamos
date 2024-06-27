@@ -7,7 +7,11 @@
  "editable_grid": 1,
  "engine": "InnoDB",
  "field_order": [
-  "phamos_team"
+  "phamos_team",
+  "feedback_dialog_box_settings_section",
+  "timeframe",
+  "column_break_szyj",
+  "is_employee_feedback"
  ],
  "fields": [
   {
@@ -15,12 +19,33 @@
    "fieldtype": "Table",
    "label": "Phamos Team",
    "options": "Phamos Team"
+  },
+  {
+   "fieldname": "feedback_dialog_box_settings_section",
+   "fieldtype": "Section Break",
+   "label": "Feedback Dialog Box Settings"
+  },
+  {
+   "fieldname": "timeframe",
+   "fieldtype": "Table MultiSelect",
+   "label": "Timeframe",
+   "options": "Dialog Display Timeframes"
+  },
+  {
+   "fieldname": "column_break_szyj",
+   "fieldtype": "Column Break"
+  },
+  {
+   "default": "0",
+   "fieldname": "is_employee_feedback",
+   "fieldtype": "Check",
+   "label": "Allow Feedback from Employees Only"
   }
  ],
  "index_web_pages_for_search": 1,
  "issingle": 1,
  "links": [],
- "modified": "2023-12-15 15:10:44.395683",
+ "modified": "2024-06-27 09:36:17.760614",
  "modified_by": "Administrator",
  "module": "Phamos",
  "name": "phamos Settings",
