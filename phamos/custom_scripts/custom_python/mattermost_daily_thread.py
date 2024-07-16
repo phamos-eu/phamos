@@ -2,6 +2,34 @@ import requests
 import frappe
 from datetime import datetime
 import random
+import os
+
+import os
+from datetime import datetime
+
+def get_thought_of_the_day():
+    # Get the directory of the current script
+    script_dir = os.path.dirname(os.path.abspath(__file__))
+    # Construct the full file path to thoughtOftheDay.txt
+    file_path = os.path.join(script_dir, 'thoughtOftheDay.txt')
+
+    try:
+        with open(file_path, 'r') as file:
+            thoughts = file.readlines()
+
+        thought_of_the_day = random.choice(thoughts).strip()
+
+        return thought_of_the_day
+    except FileNotFoundError:
+        raise FileNotFoundError(f"File '{file_path}' not found")
+
+# Example usage:
+try:
+    thought = get_thought_of_the_day()
+    print(f"Thought of the day: {thought}")
+except FileNotFoundError as e:
+    print(e)
+
 
 def post_to_mattermost(channel_id, message, bot_username="Jarvis", parent_id=None):
     """
@@ -51,8 +79,12 @@ def create_mattermost_thread():
     """
     Function to create a new thread in Mattermost with an initial message and a reply.
     """
+
+    thought_of_the_day = get_thought_of_the_day()
+
     channel_id = "dgwi7scxd7by5nj6nqyt19b7po"  # Replace with your Mattermost channel ID
-    reply_message = "Good Morning 'phamos'"
+    #reply_message = "Good Morning 'phamos'"
+    reply_message = f"Good Morning 'phamos'💮\n{thought_of_the_day}🌟"
    
 
     # Post the initial message with today's date and "Daily"
