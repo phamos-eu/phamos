@@ -122,17 +122,26 @@ doctype_js = {
 
 # your_app/hooks.py
 
-
-
-
-
-scheduler_events = {
-    "cron": {
-        "0 6 * * 1-5": [
-            "phamos.custom_scripts.custom_python.mattermost_daily_thread.create_mattermost_thread"
+fixtures = [
+    {"dt": "Scheduled Job Type", "filters": [
+        [
+            "name", "in", [
+                "mattermost_daily_thread.create_mattermost_thread",
+            ]
         ]
-    }
-}
+    ]},
+]
+
+
+
+
+#scheduler_events = {
+ #   "cron": {
+  #      "0 6 * * 1-5": [
+   #         "phamos.custom_scripts.custom_python.mattermost_daily_thread.create_mattermost_thread"
+    #    ]
+    #}
+#}
 
 
 # Testing

@@ -11,7 +11,10 @@
   "feedback_dialog_box_settings_section",
   "timeframe",
   "column_break_szyj",
-  "is_employee_feedback"
+  "is_employee_feedback",
+  "mattermost_daily_thread_settings_tab",
+  "enable_daily_thread_creation",
+  "thread_posting_hour"
  ],
  "fields": [
   {
@@ -40,12 +43,30 @@
    "fieldname": "is_employee_feedback",
    "fieldtype": "Check",
    "label": "Allow Feedback from Employees Only"
+  },
+  {
+   "fieldname": "mattermost_daily_thread_settings_tab",
+   "fieldtype": "Tab Break",
+   "label": "Mattermost Daily Thread Settings"
+  },
+  {
+   "default": "0",
+   "fieldname": "enable_daily_thread_creation",
+   "fieldtype": "Check",
+   "label": "Enable Daily Thread Creation"
+  },
+  {
+   "default": "6",
+   "fieldname": "thread_posting_hour",
+   "fieldtype": "Select",
+   "label": "Thread Posting Hour",
+   "options": "\n1\n2\n3\n4\n5\n6\n7\n8\n9\n10\n11\n12\n13\n14\n15\n16\n17\n18\n19\n20\n21\n22\n23"
   }
  ],
  "index_web_pages_for_search": 1,
  "issingle": 1,
  "links": [],
- "modified": "2024-06-27 09:36:17.760614",
+ "modified": "2024-07-16 15:58:39.752336",
  "modified_by": "Administrator",
  "module": "Phamos",
  "name": "phamos Settings",
