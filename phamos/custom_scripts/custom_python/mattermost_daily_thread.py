@@ -84,7 +84,7 @@ def create_mattermost_thread():
 
     channel_id = "dgwi7scxd7by5nj6nqyt19b7po"  # Replace with your Mattermost channel ID
     #reply_message = "Good Morning 'phamos'"
-    reply_message = f"Good Morning 'phamos'💮\n{thought_of_the_day}🌟"
+    reply_message = f"Good Morning 'phamos'💮\n > {thought_of_the_day}🌟"
    
 
     # Post the initial message with today's date and "Daily"
