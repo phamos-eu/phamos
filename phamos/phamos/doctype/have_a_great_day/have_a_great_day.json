@@ -12,7 +12,9 @@
   "section_break_heik",
   "what_are_you_most_looking_forward_today",
   "column_break_g1pf",
-  "what_challange_will_you_tackle_today"
+  "what_challange_will_you_tackle_today",
+  "section_break_bkfb",
+  "creation_date"
  ],
  "fields": [
   {
@@ -48,11 +50,21 @@
   {
    "fieldname": "column_break_g1pf",
    "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "section_break_bkfb",
+   "fieldtype": "Section Break"
+  },
+  {
+   "default": "now",
+   "fieldname": "creation_date",
+   "fieldtype": "Date",
+   "label": "Creation Date"
   }
  ],
  "index_web_pages_for_search": 1,
  "links": [],
- "modified": "2024-06-26 13:15:13.615115",
+ "modified": "2024-07-02 12:00:37.931701",
  "modified_by": "Administrator",
  "module": "Phamos",
  "name": "Have a Great Day",

@@ -16,18 +16,19 @@ class HaveaGreatDay(Document):
 		
 
 @frappe.whitelist()
-def create_todays_feedback(lookingForward,todaysChallange):
+def create_todays_feedback(lookingForward,todaysChallenge):
 		try:
 			employee_name = frappe.db.get_value("Employee", {"user_id": frappe.session.user}, "name")
 			settings = frappe.get_single("phamos Settings")
 			is_employee_feedback = settings.is_employee_feedback
         	
-			
+			todaysChallange = todaysChallenge
 			if employee_name and is_employee_feedback == 1:
 				todays_feedback = frappe.new_doc("Have a Great Day")
 				todays_feedback.user = frappe.session.user
 				todays_feedback.what_are_you_most_looking_forward_today = lookingForward
 				todays_feedback.what_challange_will_you_tackle_today = todaysChallange
+				todays_feedback.creation_date = frappe.utils.today()
 				todays_feedback.save()
 				todays_feedback.update()
 				return todays_feedback
@@ -38,6 +39,7 @@ def create_todays_feedback(lookingForward,todaysChallange):
 				todays_feedback.user = frappe.session.user
 				todays_feedback.what_are_you_most_looking_forward_today = lookingForward
 				todays_feedback.what_challange_will_you_tackle_today = todaysChallange
+				todays_feedback.creation_date = frappe.utils.today()
 				todays_feedback.save()
 				todays_feedback.update()
 		except Exception as e:
