@@ -81,10 +81,17 @@ def create_mattermost_thread():
     """
 
     thought_of_the_day = get_thought_of_the_day()
+    channel_ids = frappe.db.sql("""
+        select channel_id from `tabMattermost Channel` where enable = %s
+    """,{1}, as_dict=True)
 
-    channel_id = "dgwi7scxd7by5nj6nqyt19b7po"  # Replace with your Mattermost channel ID
+    if channel_ids:
+        channel_id = channel_ids[0]['channel_id']  # Replace with your Mattermost channel ID
+    else:
+        return    
+    
     #reply_message = "Good Morning 'phamos'"
-    reply_message = f"Good Morning 'phamos'💮\n > {thought_of_the_day}🌟"
+    reply_message = f"Good Morning 'phamos' 💮 🙏\n > {thought_of_the_day}🌟"
    
 
     # Post the initial message with today's date and "Daily"
