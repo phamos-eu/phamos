@@ -9,7 +9,8 @@
  "field_order": [
   "phamos_team",
   "feedback_dialog_box_settings_section",
-  "timeframe",
+  "from_time",
+  "till_time",
   "column_break_szyj",
   "is_employee_feedback",
   "mattermost_daily_thread_settings_tab",
@@ -29,12 +30,6 @@
    "fieldname": "feedback_dialog_box_settings_section",
    "fieldtype": "Section Break",
    "label": "Feedback Dialog Box Settings"
-  },
-  {
-   "fieldname": "timeframe",
-   "fieldtype": "Table MultiSelect",
-   "label": "Timeframe",
-   "options": "Dialog Display Timeframes"
   },
   {
    "fieldname": "column_break_szyj",
@@ -73,12 +68,22 @@
    "fieldtype": "Table",
    "label": "Select Channel to Create Daily Thread",
    "options": "Mattermost Channel"
+  },
+  {
+   "fieldname": "from_time",
+   "fieldtype": "Time",
+   "label": "From Time"
+  },
+  {
+   "fieldname": "till_time",
+   "fieldtype": "Time",
+   "label": "Till Time"
   }
  ],
  "index_web_pages_for_search": 1,
  "issingle": 1,
  "links": [],
- "modified": "2024-07-26 09:50:48.727495",
+ "modified": "2024-07-29 10:36:49.672814",
  "modified_by": "Administrator",
  "module": "Phamos",
  "name": "phamos Settings",

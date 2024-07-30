@@ -6,7 +6,54 @@ class MorningFeedbackDialog {
 
     init() {
         var self = this;
+        // Function to convert time string "HH:MM:SS" to total seconds
+        function timeToSeconds(timeStr) {
+            var parts = timeStr.split(':');
+            var hours = parseInt(parts[0], 10) || 0;
+            var minutes = parseInt(parts[1], 10) || 0;
+            var seconds = parseInt(parts[2], 10) || 0;
+            return hours * 3600 + minutes * 60 + seconds;
+        }
+    
         // Check if current time is between specific timeframes
+        frappe.call({
+            method: "phamos.phamos.doctype.have_a_great_day.have_a_great_day.get_user_time",
+            args: { user: frappe.session.user },
+            callback: function(response) {
+                if(response.message) {
+                    // Extract time strings
+                    var userTimeStr = response.message.user_time_str || "00:00:00";
+                    var fromTimeStr = response.message.from_time || "00:00:00";
+                    var tillTimeStr = response.message.till_time || "23:59:59";
+                    
+                    // Convert time strings to seconds
+                    var userTimeSeconds = timeToSeconds(userTimeStr);
+                    var fromTimeSeconds = timeToSeconds(fromTimeStr);
+                    var tillTimeSeconds = timeToSeconds(tillTimeStr);
+    
+                    console.log("User time (seconds):", userTimeSeconds);
+                    console.log("From time (seconds):", fromTimeSeconds);
+                    console.log("Till time (seconds):", tillTimeSeconds);
+    
+                    // Compare the total seconds
+                    if (fromTimeSeconds <= userTimeSeconds && userTimeSeconds <= tillTimeSeconds) {
+                        console.log("User time is within range. Showing feedback dialog.");
+                        self.showFeedbackDialog();
+                    } else {
+                        console.log("User time is not within the range.");
+                    }
+                } else {
+                    console.error("Failed to fetch user time.");
+                }
+            },
+            error: function(error) {
+                console.error("Error:", error);
+            }
+        });
+    }
+    
+        
+        /*
         frappe.call({
             method: "phamos.phamos.doctype.have_a_great_day.have_a_great_day.get_timeframes",
             args: {},
@@ -19,8 +66,6 @@ class MorningFeedbackDialog {
                     // Check if current time matches any of the fetched timeframes
                     var currentTime = new Date();
                     var currentHour = currentTime.getHours();
-                    console.log(currentHour)
-                    console.log(timeframes)
                     // Function to check if current hour falls within a specific timeframe
                     function isInTimeframe(tf) {
                         var parts = tf.split(' to ');
@@ -45,14 +90,18 @@ class MorningFeedbackDialog {
                     console.error("No timeframes found.");
                 }
             }
-        });
-    }
+        }); */
+    
 
     showFeedbackDialog() {
-       
+        
         var self = this;
         // Ensure current time is between 8 am to 9 pm
-        
+        const user_date_fmt = frappe.datetime.get_user_date_fmt().toUpperCase();
+        const user_time_fmt = frappe.datetime.get_user_time_fmt();
+        console.log("user_date_fmt")
+        console.log(user_date_fmt)
+        console.log(user_time_fmt)
             frappe.db.get_value("phamos Settings", {}, "is_employee_feedback", function(value) {
                 if (value && value.is_employee_feedback == 1) {
                     frappe.db.get_value("Employee", {"user_id": frappe.session.user}, "name", function(value_user) {
@@ -130,15 +179,14 @@ class MorningFeedbackDialog {
     submit(values) {
         // Handle form submission or call backend method
         this.createRecord(values.lookingForward,values.todaysChallenge);
-        console.log(values.lookingForward,values.todaysChallenge)
+        
         // Hide the dialog after submission
         this.dialog.hide();
     }
 
     createRecord(lookingForward,todaysChallenge) {
         var self = this;
-        console.log("lookingForward, todaysChallenge")
-        console.log(lookingForward,todaysChallenge)
+        
         // Example: Use frappe.call or any backend API to create a record
         frappe.call({
             method: "phamos.phamos.doctype.have_a_great_day.have_a_great_day.create_todays_feedback",

@@ -8,8 +8,9 @@ from frappe.utils import cstr, now_datetime, time_diff_in_seconds, get_datetime,
 from frappe.utils.data import add_to_date,format_duration, time_diff_in_seconds
 from datetime import datetime
 from datetime import datetime, timedelta
-
-
+from frappe.utils import (
+	get_datetime_str,
+)
 
 class HaveaGreatDay(Document):
 	pass
@@ -47,7 +48,7 @@ def create_todays_feedback(lookingForward,todaysChallenge):
 			return None
 
 
-
+"""
 @frappe.whitelist()
 def get_timeframes():
     try:
@@ -57,7 +58,7 @@ def get_timeframes():
                                         fields=["timeframe"],
 										parent_doctype="phamos Settings")
         
-        # Extract timeframes from the fetched records
+        # Extract timeframes from the fetched records frappe.utils.nowtime()
         timeframes = [tf.get("timeframe") for tf in timeframes]
         
         # Join timeframes into a comma-separated string
@@ -68,4 +69,51 @@ def get_timeframes():
     except Exception as e:
         # Handle exceptions gracefully
         frappe.msgprint(f"Error retrieving timeframes: {str(e)}")
+"""
+from frappe.utils import now_datetime, get_datetime_str
+from pytz import timezone
+import frappe
 
+# Define get_user_time_zone function to get user's timezone from User doctype
+def get_user_time_zone(user):
+    user_doc = frappe.get_doc("User", user)
+    return user_doc.time_zone if user_doc.time_zone else 'UTC'
+
+from frappe.utils import now_datetime, get_datetime_str
+from pytz import timezone
+import frappe
+
+# Define get_user_time_zone function to get user's timezone from User doctype
+def get_user_time_zone(user):
+    user_doc = frappe.get_doc("User", user)
+    return user_doc.time_zone if user_doc.time_zone else 'UTC'
+
+@frappe.whitelist()
+def get_user_time(user, to_string=False):
+    try:
+        # Get the user's timezone
+        user_time_zone = get_user_time_zone(user)
+        
+        # Get current datetime in UTC
+        current_datetime_utc = now_datetime()
+        
+        # Convert UTC datetime to user's timezone
+        user_time = current_datetime_utc.astimezone(timezone(user_time_zone))
+
+        if to_string:
+            user_time = get_datetime_str(user_time)
+        
+        user_time_str = user_time.strftime("%H:%M:%S")
+        
+        # Fetching from_time and till_time from 'phamos Settings' single doctype
+        from_time = frappe.db.get_single_value('phamos Settings', 'from_time')
+        till_time = frappe.db.get_single_value('phamos Settings', 'till_time')
+        
+        return {
+            "user_time_str": user_time_str,
+            "from_time": from_time,
+            "till_time": till_time
+        }
+    except Exception as e:
+        frappe.log_error(frappe.get_traceback(), 'get_user_time error')
+        return {'error': str(e)}
