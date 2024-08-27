@@ -108,11 +108,14 @@ def get_user_time(user, to_string=False):
         # Fetching from_time and till_time from 'phamos Settings' single doctype
         from_time = frappe.db.get_single_value('phamos Settings', 'from_time')
         till_time = frappe.db.get_single_value('phamos Settings', 'till_time')
+        enable_feedback_dialog = frappe.db.get_single_value('phamos Settings', 'enable_feedback_dialog')
+		
         
         return {
             "user_time_str": user_time_str,
             "from_time": from_time,
-            "till_time": till_time
+            "till_time": till_time,
+			"enable_feedback_dialog":enable_feedback_dialog
         }
     except Exception as e:
         frappe.log_error(frappe.get_traceback(), 'get_user_time error')
