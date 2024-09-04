@@ -10,6 +10,7 @@ from datetime import datetime, timedelta
 def create_timesheet_record(project_name, customer, from_time, expected_time, goal):
     try:
         employee_name = frappe.db.get_value("Employee", {"user_id": frappe.session.user}, "name")
+        activity_type = frappe.db.get_value("Employee", {"user_id": frappe.session.user}, "activity_type")
         customer = frappe.db.get_value("Customer", {"customer_name": customer}, "name")
         project = frappe.db.get_value("Project", {"project_name": project_name}, "name")
         
@@ -23,6 +24,7 @@ def create_timesheet_record(project_name, customer, from_time, expected_time, go
             timesheet_record.expected_time = expected_time
             timesheet_record.goal = goal
             timesheet_record.employee = employee_name
+            timesheet_record.activity_type = activity_type
 
             timesheet_record.save()
             
