@@ -32,6 +32,7 @@ frappe.pages["project-action-panel"].on_page_load = function (wrapper) {
   // Function to create timesheet record
   function create_timesheet_record(
     project_name,
+    task,
     customer,
     from_time,
     expected_time,
@@ -42,6 +43,7 @@ frappe.pages["project-action-panel"].on_page_load = function (wrapper) {
         "phamos.phamos.page.project_action_panel.project_action_panel.create_timesheet_record",
       args: {
         project_name: project_name,
+        task:task,
         customer: customer,
         from_time: from_time,
         expected_time: expected_time,
@@ -136,7 +138,7 @@ frappe.pages["project-action-panel"].on_page_load = function (wrapper) {
     return false;
   };
 
-  window.stopProject = function (timesheet_record, percent_billable) {
+  window.stopProject = function (timesheet_record, percent_billable,task) {
     let activity_type = "";
     let timesheet_record_info = " Info from timesheet record";
     frappe.db.get_value(
@@ -164,6 +166,14 @@ frappe.pages["project-action-panel"].on_page_load = function (wrapper) {
                   in_list_view: 1,
                   read_only: 1,
                   default: timesheet_record,
+                },
+                {
+                  fieldtype: "Link",
+                  label: __("Task"),
+                  fieldname: "task",
+                  in_list_view: 1,
+                  read_only: 1,
+                  default: task,
                 },
                 {
                   fieldtype: "Small Text",
@@ -242,7 +252,7 @@ frappe.pages["project-action-panel"].on_page_load = function (wrapper) {
   };
   //return record.timesheet_record_draft;
 
-  window.startProject = function (project_name, customer) {
+  window.startProject = function (project_name, customer,project) {
     frappe.call({
       method:
         "phamos.phamos.page.project_action_panel.project_action_panel.check_draft_timesheet_record",
@@ -306,6 +316,24 @@ frappe.pages["project-action-panel"].on_page_load = function (wrapper) {
                   default: project_name,
                 },
                 {
+                  fieldtype: "Link",
+                  options: "Task",
+                  label: __("Task"),
+                  fieldname: "task",
+                  in_list_view: 1,
+                  read_only: 0,
+                  get_query: function() {
+                      if (project) {
+                          return {
+                              filters: {
+                                  project: project
+                              }
+                          };
+                      } else {
+                          return {};
+                      }
+                  }},
+                {
                   fieldtype: "Data",
                   options: "Customer",
                   label: __("Customer"),
@@ -347,6 +375,7 @@ frappe.pages["project-action-panel"].on_page_load = function (wrapper) {
               primary_action(values) {
                 create_timesheet_record(
                   values.project_name,
+                  values.task,
                   values.customer,
                   values.from_time,
                   values.expected_time,
@@ -424,9 +453,9 @@ frappe.pages["project-action-panel"].on_page_load = function (wrapper) {
     let button_formatter = (value, row) => {
       // Now that both project and employee values are available, you can render the button
       if (row[8].html == "") {
-        return `<button type="button" style="height: 23px; width: 60px; display: flex; align-items: center; justify-content: center; background-color: rgb(0, 100, 0);" class="btn btn-primary btn-sm btn-modal-primary" onclick="startProject('${row[1].content}', '${row[3].content}')">Start</button>`;
+        return `<button type="button" style="height: 23px; width: 60px; display: flex; align-items: center; justify-content: center; background-color: rgb(0, 100, 0);" class="btn btn-primary btn-sm btn-modal-primary" onclick="startProject('${row[1].content}', '${row[3].content}', '${row[9].content}')">Start</button>`;
       } else {
-        return `<button type="button" style="height: 23px; width: 60px; display: flex; align-items: center; justify-content: center; background-color: rgb(139, 0, 0);" class="btn btn-primary btn-sm btn-modal-primary" onclick="stopProject('${row[8].content}','${row[11].content}')">Stop</button>`;
+        return `<button type="button" style="height: 23px; width: 60px; display: flex; align-items: center; justify-content: center; background-color: rgb(139, 0, 0);" class="btn btn-primary btn-sm btn-modal-primary" onclick="stopProject('${row[8].content}','${row[11].content}','${row[12].content}')">Stop</button>`;
       }
     };
 
@@ -512,6 +541,13 @@ frappe.pages["project-action-panel"].on_page_load = function (wrapper) {
         width: 0,
         editable: false,
       },
+      {
+        label: "<b>Task</b>",
+        id: "task",
+        fieldtype: "Link",
+        width: 0,
+        editable: false,
+      },
     ];
     function linkFormatter1(value, row, columnId) {
       return `<a href="#" onclick="handleProjectClick('${row[9].content}');">${row[2].content}</a>`;
@@ -570,6 +606,17 @@ frappe.pages["project-action-panel"].on_page_load = function (wrapper) {
     styleHeader_pb.innerHTML =
       ".dt-cell__content--header-11 { display: none; }"; // Change dt-cell__content dt-cell__content--header-4 to dt-cell__content--header-3
     document.head.appendChild(styleHeader_pb);
+
+    // Add a style element to hide the "task" column cells
+    let style_t = document.createElement("style");
+    style_t.innerHTML = ".dt-cell__content--col-12 { display: none; }";
+    document.head.appendChild(style_t);
+
+    // Add a style element to hide the "percent_billable" column header
+    let styleHeader_t = document.createElement("style");
+    styleHeader_t.innerHTML =
+      ".dt-cell__content--header-12 { display: none; }"; // Change dt-cell__content dt-cell__content--header-4 to dt-cell__content--header-3
+    document.head.appendChild(styleHeader_t);
 
     // Add a header to the report view
     //wrapper.innerHTML = `<h1>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Project Action Panel </h1></div><div id="card-wrapper"></div><div id="datatable-wrapper"></div>`;
