@@ -7,7 +7,7 @@ from datetime import datetime
 from datetime import datetime, timedelta
 
 @frappe.whitelist()
-def create_timesheet_record(project_name, customer, from_time, expected_time, goal):
+def create_timesheet_record(project_name, task, customer, from_time, expected_time, goal):
     try:
         employee_name = frappe.db.get_value("Employee", {"user_id": frappe.session.user}, "name")
         activity_type = frappe.db.get_value("Employee", {"user_id": frappe.session.user}, "activity_type")
@@ -19,6 +19,7 @@ def create_timesheet_record(project_name, customer, from_time, expected_time, go
             
             timesheet_record = frappe.new_doc('Timesheet Record')
             timesheet_record.project = project
+            timesheet_record.task=task
             timesheet_record.customer = customer
             timesheet_record.from_time = after_1_minute
             timesheet_record.expected_time = expected_time
@@ -113,7 +114,8 @@ def fetch_projects():
         WHERE t.docstatus = 1 and t.employee = %(employee)s AND t.name IN (SELECT td.parent FROM `tabTimesheet Detail` td WHERE td.project = p.name)), 3) AS spent_hours_submitted,
         (SELECT name FROM `tabCustomer` c WHERE p.customer = c.name) AS customer,
         (SELECT CASE WHEN c.name != c.customer_name THEN CONCAT(c.name, " - ", c.customer_name) ELSE c.customer_name END FROM `tabCustomer` c WHERE p.customer = c.name) AS customer_desc,
-        (SELECT max(ts.name) FROM `tabTimesheet Record` ts WHERE ts.project = p.name AND ts.employee = %(employee)s AND ts.docstatus = 0) AS timesheet_record
+        (SELECT max(ts.name) FROM `tabTimesheet Record` ts WHERE ts.project = p.name AND ts.employee = %(employee)s AND ts.docstatus = 0) AS timesheet_record,
+        (SELECT (ts1.task) FROM `tabTimesheet Record` ts1 WHERE ts1.name = (SELECT max(ts.name) FROM `tabTimesheet Record` ts WHERE ts.project = p.name AND ts.employee = %(employee)s AND ts.docstatus = 0)) AS task
         FROM `tabProject` p
         WHERE (SELECT max(reference_name) FROM `tabToDo` td WHERE td.status = "Open" AND td.reference_name = p.name AND td.allocated_to = %(user)s) IS NOT NULL
         ORDER BY timesheet_record IS NULL, timesheet_record ASC  # Show records with timesheet_record first
