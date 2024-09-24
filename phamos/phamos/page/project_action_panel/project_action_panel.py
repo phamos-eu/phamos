@@ -7,7 +7,7 @@ from datetime import datetime
 from datetime import datetime, timedelta
 
 @frappe.whitelist()
-def create_timesheet_record(project_name, task, customer, from_time, expected_time, goal):
+def create_timesheet_record(project_name,  customer, from_time, expected_time, goal,task=None):
     try:
         employee_name = frappe.db.get_value("Employee", {"user_id": frappe.session.user}, "name")
         activity_type = frappe.db.get_value("Employee", {"user_id": frappe.session.user}, "activity_type")
@@ -42,7 +42,7 @@ def create_timesheet_record(project_name, task, customer, from_time, expected_ti
 
 # In your Python script, within @frappe.whitelist()
 @frappe.whitelist()
-def update_and_submit_timesheet_record(name, to_time,percent_billable,activity_type, result):
+def update_and_submit_timesheet_record(name, to_time,percent_billable,activity_type, result,task=None):
     try:
         # Retrieve the Timesheet Record document
         doc = frappe.get_doc("Timesheet Record", name)
@@ -50,6 +50,7 @@ def update_and_submit_timesheet_record(name, to_time,percent_billable,activity_t
         
         # Update the fields
         doc.to_time = to_time_add_seconds
+        doc.task = task
         doc.activity_type = activity_type
         doc.result = result
         doc.actual_time = time_diff_in_seconds(doc.to_time, doc.from_time)
