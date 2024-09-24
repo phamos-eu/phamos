@@ -15,7 +15,7 @@ required_apps = ["erpnext"]
 # include js, css files in header of desk.html
 # app_include_css = "/assets/phamos/css/phamos.css"
 # app_include_js = "/assets/phamos/js/phamos.js"
-
+app_include_js = ["phamos.bundle.js"]
 # include js, css files in header of web template
 # web_include_css = "/assets/phamos/css/phamos.css"
 # web_include_js = "/assets/phamos/js/phamos.js"
@@ -31,8 +31,11 @@ required_apps = ["erpnext"]
 # page_js = {"page" : "public/js/file.js"}
 
 # include js in doctype views
-doctype_js = {"Project" : "public/js/project.js"}
-doctype_js = {"Issue" : "public/js/issue.js"}
+doctype_js = {
+	"Project" : "public/js/project.js",
+	"Issue" : "public/js/issue.js",
+	"Sales Order": "public/js/sales_order.js"
+}
 # doctype_js = {"doctype" : "public/js/doctype.js"}
 # doctype_list_js = {"doctype" : "public/js/doctype_list.js"}
 # doctype_tree_js = {"doctype" : "public/js/doctype_tree.js"}
@@ -115,24 +118,31 @@ doctype_js = {"Issue" : "public/js/issue.js"}
 
 # Scheduled Tasks
 # ---------------
+# In your_app/hooks.py
 
-# scheduler_events = {
-#	"all": [
-#		"phamos.tasks.all"
-#	],
-#	"daily": [
-#		"phamos.tasks.daily"
-#	],
-#	"hourly": [
-#		"phamos.tasks.hourly"
-#	],
-#	"weekly": [
-#		"phamos.tasks.weekly"
-#	],
-#	"monthly": [
-#		"phamos.tasks.monthly"
-#	],
-# }
+# your_app/hooks.py
+
+fixtures = [
+    {"dt": "Scheduled Job Type", "filters": [
+        [
+            "name", "in", [
+                "mattermost_daily_thread.create_mattermost_thread",
+            ]
+        ]
+    ]},
+]
+
+
+
+
+#scheduler_events = {
+ #   "cron": {
+  #      "0 6 * * 1-5": [
+   #         "phamos.custom_scripts.custom_python.mattermost_daily_thread.create_mattermost_thread"
+    #    ]
+    #}
+#}
+
 
 # Testing
 # -------
