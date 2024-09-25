@@ -66,6 +66,7 @@ frappe.pages["project-action-panel"].on_page_load = function (wrapper) {
   // Function to create timesheet record
   function update_and_submit_timesheet_record(
     timesheet_record,
+    task,
     to_time,
     percent_billable,
     activity_type,
@@ -76,6 +77,7 @@ frappe.pages["project-action-panel"].on_page_load = function (wrapper) {
         "phamos.phamos.page.project_action_panel.project_action_panel.update_and_submit_timesheet_record",
       args: {
         name: timesheet_record,
+        task:task,
         to_time: to_time,
         percent_billable: percent_billable,
         activity_type: activity_type,
@@ -138,7 +140,7 @@ frappe.pages["project-action-panel"].on_page_load = function (wrapper) {
     return false;
   };
 
-  window.stopProject = function (timesheet_record, percent_billable,task) {
+  window.stopProject = function (timesheet_record, percent_billable,project,task) {
     let activity_type = "";
     let timesheet_record_info = " Info from timesheet record";
     frappe.db.get_value(
@@ -169,12 +171,25 @@ frappe.pages["project-action-panel"].on_page_load = function (wrapper) {
                 },
                 {
                   fieldtype: "Link",
+                  options: "Task",
                   label: __("Task"),
                   fieldname: "task",
                   in_list_view: 1,
-                  read_only: 1,
-                  default: task,
-                },
+                  read_only: 0,
+                  default:task,
+                  get_query: function() {
+                      if (project) {
+                          return {
+                              filters: {
+                                  project: project
+                              }
+                          };
+                      } else {
+                          return {};
+                      }
+                  }},
+
+              
                 {
                   fieldtype: "Small Text",
                   label: __("Timesheet Record Info"),
@@ -234,6 +249,7 @@ frappe.pages["project-action-panel"].on_page_load = function (wrapper) {
               primary_action(values) {
                 update_and_submit_timesheet_record(
                   values.timesheet_record,
+                  values.task,
                   values.to_time,
                   values.percent_billable,
                   values.activity_type,
@@ -455,7 +471,7 @@ frappe.pages["project-action-panel"].on_page_load = function (wrapper) {
       if (row[8].html == "") {
         return `<button type="button" style="height: 23px; width: 60px; display: flex; align-items: center; justify-content: center; background-color: rgb(0, 100, 0);" class="btn btn-primary btn-sm btn-modal-primary" onclick="startProject('${row[1].content}', '${row[3].content}', '${row[9].content}')">Start</button>`;
       } else {
-        return `<button type="button" style="height: 23px; width: 60px; display: flex; align-items: center; justify-content: center; background-color: rgb(139, 0, 0);" class="btn btn-primary btn-sm btn-modal-primary" onclick="stopProject('${row[8].content}','${row[11].content}','${row[12].content}')">Stop</button>`;
+        return `<button type="button" style="height: 23px; width: 60px; display: flex; align-items: center; justify-content: center; background-color: rgb(139, 0, 0);" class="btn btn-primary btn-sm btn-modal-primary" onclick="stopProject('${row[8].content}','${row[11].content}', '${row[9].content}','${row[12]?.content || ''}')">Stop</button>`;
       }
     };
 
