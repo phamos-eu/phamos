@@ -125,6 +125,27 @@ def fetch_projects():
     # Return project data
     return projects
 
+@frappe.whitelist()
+def fetch_all_projects():
+    # Custom SQL query to fetch project data
+    employee_name = frappe.db.get_value("Employee", {"user_id": frappe.session.user}, "name")
+    projects = frappe.db.sql("""
+        SELECT p.percent_billable as percent_billable ,p.name AS name, p.planned_hours AS planned_hours, p.status AS status, p.notes AS notes, p.project_name AS project_name, CONCAT(p.name, " - ", p.project_name) AS project_desc,
+        ROUND((SELECT SUM(t.total_hours) FROM `tabTimesheet` t 
+        WHERE t.docstatus = 0 and t.employee = %(employee)s AND t.name IN (SELECT td.parent FROM `tabTimesheet Detail` td WHERE td.project = p.name)), 3) AS spent_hours_draft,
+        ROUND((SELECT SUM(t.total_hours) FROM `tabTimesheet` t 
+        WHERE t.docstatus = 1 and t.employee = %(employee)s AND t.name IN (SELECT td.parent FROM `tabTimesheet Detail` td WHERE td.project = p.name)), 3) AS spent_hours_submitted,
+        (SELECT name FROM `tabCustomer` c WHERE p.customer = c.name) AS customer,
+        (SELECT CASE WHEN c.name != c.customer_name THEN CONCAT(c.name, " - ", c.customer_name) ELSE c.customer_name END FROM `tabCustomer` c WHERE p.customer = c.name) AS customer_desc,
+        (SELECT max(ts.name) FROM `tabTimesheet Record` ts WHERE ts.project = p.name AND ts.employee = %(employee)s AND ts.docstatus = 0) AS timesheet_record,
+        (SELECT (ts1.task) FROM `tabTimesheet Record` ts1 WHERE ts1.name = (SELECT max(ts.name) FROM `tabTimesheet Record` ts WHERE ts.project = p.name AND ts.employee = %(employee)s AND ts.docstatus = 0)) AS task
+        FROM `tabProject` p
+        ORDER BY timesheet_record IS NULL, timesheet_record ASC  # Show records with timesheet_record first
+    """, {"employee": employee_name, "user": frappe.session.user}, as_dict=True)
+
+    # Return project data
+    return projects
+
 
 
 
@@ -144,6 +165,20 @@ def get_project_count():
         FROM `tabProject` p
         WHERE (SELECT max(reference_name) FROM `tabToDo` td WHERE td.status = "Open" and td.reference_name = p.name and td.allocated_to = %(user)s) IS NOT NULL
     """, {"user": frappe.session.user}, as_dict=True)
+
+    return {
+        "value": count_projects[0].get('total_projects') if count_projects else 0 , # assuming you want to return the count of projects meeting certain conditions,
+        "fieldtype": "Int",
+        #"count_projects": count_projects[0].get('total_projects') if count_projects else 0  # assuming you want to return the count of projects meeting certain conditions
+    }
+
+
+@frappe.whitelist()
+def get_project_count_all():
+    count_projects = frappe.db.sql("""
+        SELECT count(p.name) AS total_projects
+        FROM `tabProject` p
+    """, {}, as_dict=True)
 
     return {
         "value": count_projects[0].get('total_projects') if count_projects else 0 , # assuming you want to return the count of projects meeting certain conditions,
@@ -177,7 +212,6 @@ def total_hours_worked_today():
             "value": actual_time_str,
             "fieldtype": "Float"
         }
-
 
 
 @frappe.whitelist()
