@@ -26,6 +26,7 @@ frappe.pages["project-action-panel"].on_page_load = function (wrapper) {
       },
     });
   }
+  
   // Fetch project data from the server on page load
   render_datatable();
 
@@ -413,320 +414,246 @@ frappe.pages["project-action-panel"].on_page_load = function (wrapper) {
   };
 
   // Function to render number cards
-  function render_cards(wrapper) {
-    return frappe.call({
+function render_cards(wrapper, card_names) {
+  return frappe.call({
+    method: "phamos.phamos.page.project_action_panel.project_action_panel.get_permitted_cards",
+    args: { 
+      dashboard_name: "Project Management",
+      
+    },
+    callback: function (response) {
+      var cards = response.message;
+      if (!cards || !cards.length) {
+        return;
+      }
+
+      // Filter the cards based on card_names
+      var filtered_cards = cards.filter(function(card) {
+        return card_names.includes(card.card);
+      });
+
+      var number_cards = filtered_cards.map(function (card) {
+        return {
+          name: card.card,
+        };
+      });
+
+      var number_card_group = new frappe.widget.WidgetGroup({
+        container: wrapper, 
+        type: "number_card",
+        columns: 3,
+        options: {
+          allow_sorting: false,
+          allow_create: false,
+          allow_delete: false,
+          allow_hiding: false,
+          allow_edit: false,
+        },
+        widgets: number_cards,
+      });
+
+      $(wrapper).find(".widget.number-widget-box").css({
+        width: "250px", 
+      });
+
+      $(wrapper).find(".widget-group-body.grid-col-3").css({
+        display: "flex", 
+        "flex-wrap": "nowrap", 
+      });
+    },
+  });
+}
+
+
+
+// Function to render DataTable with tabs
+function renderDataTable(wrapper, projectData) {
+  // Ensure wrapper is defined
+  if (!wrapper) {
+    return;
+  }
+
+  wrapper.innerHTML = `
+  <h2 style="display: inline; margin-left: 50px; margin-top: 10px; font-size:30px">Project Action Panel</h2>
+  <div class="form-tabs-list">
+      <ul class="nav form-tabs" id="form-tabs" role="tablist">
+          <li class="nav-item show">
+              <a class="nav-link" id="DAP-your-project-tab" role="tab" aria-controls="your-projects" aria-selected="false">
+                  Your Projects
+              </a>
+          </li>
+          <li class="nav-item show">
+              <a class="nav-link active" id="DAP-all-project-tab" role="tab" aria-controls="all-projects" aria-selected="true">
+                  All Projects
+              </a>
+          </li>
+      </ul>
+  </div>
+  <div id="content-wrapper" style="margin-top: 20px; margin-left: 30px">
+      <div id="card-wrapper"></div>
+      <div id="datatable-wrapper"></div>
+  </div>
+`;
+// Get references to the tabs
+const your_projectsTab = document.getElementById("DAP-your-project-tab");
+const all_projectsTab = document.getElementById("DAP-all-project-tab");
+
+// Event listener for the Your Projects tab
+your_projectsTab.addEventListener("click", () => {
+  // Remove 'active' class from All Projects tab and set to Your Projects
+  all_projectsTab.classList.remove("active");
+  your_projectsTab.classList.add("active");
+  
+  // Set visual feedback for selection
+  your_projectsTab.setAttribute("aria-selected", "true");
+  all_projectsTab.setAttribute("aria-selected", "false");
+
+  // Show content for the Your Projects tab
+  show_tab("Your Projects", projectData);
+});
+
+// Event listener for the All Projects tab
+all_projectsTab.addEventListener("click", () => {
+  // Remove 'active' class from Your Projects tab and set to All Projects
+  your_projectsTab.classList.remove("active");
+  all_projectsTab.classList.add("active");
+  
+  // Set visual feedback for selection
+  all_projectsTab.setAttribute("aria-selected", "true");
+  your_projectsTab.setAttribute("aria-selected", "false");
+
+  // Show content for the All Projects tab
+  show_tab("All Projects", projectData);
+});
+// Initial tab content setup: Show content for Unassigned Projects by default
+show_tab("All Projects", projectData);
+
+
+}
+
+// Show tab content based on the selected tab
+function show_tab(tab, projectData) {
+  const cardWrapper = document.getElementById("card-wrapper");
+  const datatableWrapper = document.getElementById("datatable-wrapper");
+
+  // Clear previous content of cardWrapper and datatableWrapper
+  cardWrapper.innerHTML = "";  // This will ensure the number cards don't duplicate
+  datatableWrapper.innerHTML = ""; // Clear previous DataTable content
+
+  if (tab === "Your Projects") {
+    // Render the cards for Your Projects
+    card_names = ["Your Total Projects","Total Hrs Worked Today","Total Hrs Worked This Week","Total Hrs Worked This Month"]
+    render_cards(cardWrapper,card_names); // Call the render_cards function here
+
+    // Render the DataTable for Your Projects
+    renderProjectDataTable(datatableWrapper, projectData); // Render the actual DataTable
+  } else if (tab === "All Projects") {
+    
+    // Render the cards or message for All Projects
+    frappe.call({
       method:
-        "phamos.phamos.page.project_action_panel.project_action_panel.get_permitted_cards",
-      args: { dashboard_name: "Project Management" }, // Replace "Human Resource" with the actual dashboard name
-      callback: function (response) {
-        var cards = response.message;
-        if (!cards || !cards.length) {
-          return;
+        "phamos.phamos.page.project_action_panel.project_action_panel.fetch_all_projects",
+      callback: function (r) {
+        if (r.message) {
+          // Render DataTable with the fetched data
+          card_names =["Total Projects","Total Hrs Worked Today","Total Hrs Worked This Week","Total Hrs Worked This Month"]
+          render_cards(cardWrapper,card_names);
+          renderProjectDataTable(datatableWrapper, r.message); 
+          //renderDataTable(wrapper, r.message);
+          //console.log(window.location.href)
+        } else {
+          // Handle error or empty data
         }
-
-        var number_cards = cards.map(function (card) {
-          return {
-            name: card.card,
-          };
-        });
-
-        var number_card_group = new frappe.widget.WidgetGroup({
-          container: wrapper, // Use wrapper instead of this.container
-          type: "number_card",
-          columns: 3,
-          options: {
-            allow_sorting: false,
-            allow_create: false,
-            allow_delete: false,
-            allow_hiding: false,
-            allow_edit: false,
-          },
-          widgets: number_cards,
-        });
-        $(wrapper).find(".widget.number-widget-box").css({
-          width: "250px", // Set the desired width
-        });
-        $(wrapper).find(".widget-group-body.grid-col-3").css({
-          display: "flex" /* Use flexbox */,
-          "flex-wrap": "nowrap" /* Prevent wrapping to the next line */,
-        });
-
-        // Log the wrapper element
-        //console.log(wrapper);
       },
     });
+    //cardWrapper.innerHTML = `<p>No assigned projects.</p>`; // Example message, replace with your logic
   }
+}
 
-  // Function to render DataTable
-  function renderDataTable(wrapper, projectData) {
-    // Ensure wrapper is defined
-    if (!wrapper) {
-      return;
+
+// Function to render DataTable
+function renderProjectDataTable(datatableWrapper, projectData) {
+  // Define columns for the report view
+  let button_formatter = (value, row) => {
+    if (row[8].html == "") {
+      return `<button type="button" style="height: 23px; width: 60px; display: flex; align-items: center; justify-content: center; background-color: rgb(0, 100, 0);" class="btn btn-primary btn-sm btn-modal-primary" onclick="startProject('${row[1].content}', '${row[3].content}', '${row[9].content}')">Start</button>`;
+    } else {
+      return `<button type="button" style="height: 23px; width: 60px; display: flex; align-items: center; justify-content: center; background-color: rgb(139, 0, 0);" class="btn btn-primary btn-sm btn-modal-primary" onclick="stopProject('${row[8].content}','${row[11].content}', '${row[9].content}','${row[12]?.content || ''}')">Stop</button>`;
     }
+  };
 
-    // Define columns for the report view
+  let columns = [
+    { label: "<b>Project Name</b>", id: "project_name", fieldtype: "Data", width: 200, editable: false, visible: false },
+    { label: "<b>Project</b>", id: "project_desc", fieldtype: "Data", width: 230, editable: false, format: linkFormatter1 },
+    { label: "<b>Customer Name</b>", id: "customer", fieldtype: "Link", width: 130, editable: false },
+    { label: "<b>Customer</b>", id: "customer_desc", fieldtype: "Link", width: 200, editable: false, format: linkFormatter },
+    { label: "<b>Planned Hrs</b>", id: "planned_hours", fieldtype: "Data", width: 120, editable: false },
+    { label: "<b>Spent Draft Hrs</b>", id: "spent_hours_draft", fieldtype: "Float", width: 140, editable: false },
+    { label: "<b>Spent Submitted Hrs</b>", id: "spent_hours_submitted", fieldtype: "Float", width: 180, editable: false },
+    { label: "<b>Timesheet Record</b>", id: "timesheet_record", fieldtype: "Link", width: 160, editable: false, format: linkFormatter2 },
+    { label: "<b>Name</b>", id: "name", fieldtype: "Link", width: 150, editable: false },
+    { label: "<b>Action</b>", focusable: false, format: button_formatter, width: 150 },
+    { label: "<b>percent_billable</b>", id: "percent_billable", fieldtype: "Data", width: 0, editable: false },
+    { label: "<b>Task</b>", id: "task", fieldtype: "Link", width: 0, editable: false }
+  ];
+  
 
-    let button_formatter = (value, row) => {
-      // Now that both project and employee values are available, you can render the button
-      if (row[8].html == "") {
-        return `<button type="button" style="height: 23px; width: 60px; display: flex; align-items: center; justify-content: center; background-color: rgb(0, 100, 0);" class="btn btn-primary btn-sm btn-modal-primary" onclick="startProject('${row[1].content}', '${row[3].content}', '${row[9].content}')">Start</button>`;
-      } else {
-        return `<button type="button" style="height: 23px; width: 60px; display: flex; align-items: center; justify-content: center; background-color: rgb(139, 0, 0);" class="btn btn-primary btn-sm btn-modal-primary" onclick="stopProject('${row[8].content}','${row[11].content}', '${row[9].content}','${row[12]?.content || ''}')">Stop</button>`;
-      }
-    };
-
-    let columns = [
-      {
-        label: "<b>Project Name</b>",
-        id: "project_name",
-        fieldtype: "Data",
-        width: 200,
-        editable: false,
-        visible: false,
-      },
-      {
-        label: "<b>Project</b>",
-        id: "project_desc",
-        fieldtype: "Data",
-        width: 230,
-        editable: false,
-        format: linkFormatter1,
-      },
-      //{ label: "<b>Notes</b>", id: "notes", fieldtype: "Data", width: 200 , editable: false},
-      {
-        label: "<b>Customer Name</b>",
-        id: "customer",
-        fieldtype: "Link",
-        width: 130,
-        editable: false,
-      },
-      {
-        label: "<b>Customer</b>",
-        id: "customer_desc",
-        fieldtype: "Link",
-        width: 200,
-        editable: false,
-        format: linkFormatter,
-      },
-      {
-        label: "<b>Planned Hrs</b>",
-        id: "planned_hours",
-        fieldtype: "Data",
-        width: 120,
-        editable: false,
-      },
-      {
-        label: "<b>Spent Draft Hrs</b>",
-        id: "spent_hours_draft",
-        fieldtype: "Float",
-        width: 140,
-        editable: false,
-      },
-      {
-        label: "<b>Spent Submitted Hrs</b>",
-        id: "spent_hours_submitted",
-        fieldtype: "Float",
-        width: 180,
-        editable: false,
-      },
-      {
-        label: "<b>Timesheet Record</b>",
-        id: "timesheet_record",
-        fieldtype: "Link",
-        width: 160,
-        editable: false,
-        format: linkFormatter2,
-      },
-      {
-        label: "<b>Name</b>",
-        id: "name",
-        fieldtype: "Link",
-        width: 150,
-        editable: false,
-      },
-      {
-        label: "<b>Action</b>",
-        focusable: false,
-        format: button_formatter,
-        width: 150,
-      },
-      {
-        label: "<b>percent_billable</b>",
-        id: "percent_billable",
-        fieldtype: "Data",
-        width: 0,
-        editable: false,
-      },
-      {
-        label: "<b>Task</b>",
-        id: "task",
-        fieldtype: "Link",
-        width: 0,
-        editable: false,
-      },
-    ];
-    function linkFormatter1(value, row, columnId) {
-      return `<a href="#" onclick="handleProjectClick('${row[9].content}');">${row[2].content}</a>`;
-    }
-    function linkFormatter(value, row, columnId) {
-      return `<a href="#" onclick="handleCustomerClick('${row[3].content}');">${row[4].content}</a>`;
-    }
-
-    function linkFormatter2(value, row, columnId) {
-      if (row[8] && row[8].content) {
-        console.log(row[8].content.length);
-        return `<a href="#" onclick="handleTimesheetClick('${row[8].content}');">${row[8].content}</a>`;
-      } else {
-        console.warn("Content is null or undefined for row:", row);
-        return ""; // or handle the case where content is null/undefined as needed
-      }
-    }
-
-    // Add a style element to hide the "Name" column cells
-    let style_n = document.createElement("style");
-    style_n.innerHTML = ".dt-cell__content--col-9 { display: none; }"; // Change dt-cell__content dt-cell__content--col-4 to dt-cell__content--col-3
-    document.head.appendChild(style_n);
-
-    // Add a style element to hide the "Name" column header
-    let styleHeader_n = document.createElement("style");
-    styleHeader_n.innerHTML = ".dt-cell__content--header-9 { display: none; }"; // Change dt-cell__content dt-cell__content--header-4 to dt-cell__content--header-3
-    document.head.appendChild(styleHeader_n);
-
-    // Add a style element to hide the "Customer Name" column cells
-    let style_c = document.createElement("style");
-    style_c.innerHTML = ".dt-cell__content--col-3 { display: none; }"; // Change dt-cell__content dt-cell__content--col-4 to dt-cell__content--col-3
-    document.head.appendChild(style_c);
-
-    // Add a style element to hide the "Customer Name" column header
-    let styleHeader_c = document.createElement("style");
-    styleHeader_c.innerHTML = ".dt-cell__content--header-3 { display: none; }"; // Change dt-cell__content dt-cell__content--header-4 to dt-cell__content--header-3
-    document.head.appendChild(styleHeader_c);
-
-    // Add a style element to hide the "Project Name" column cells
-    let style = document.createElement("style");
-    style.innerHTML = ".dt-cell__content--col-1 { display: none; }";
-    document.head.appendChild(style);
-
-    // Add a style element to hide the "Project Name" column header
-    let styleHeader = document.createElement("style");
-    styleHeader.innerHTML = ".dt-cell__content--header-1 { display: none; }";
-    document.head.appendChild(styleHeader);
-
-    // Add a style element to hide the "percent_billable" column cells
-    let style_pb = document.createElement("style");
-    style_pb.innerHTML = ".dt-cell__content--col-11 { display: none; }";
-    document.head.appendChild(style_pb);
-
-    // Add a style element to hide the "percent_billable" column header
-    let styleHeader_pb = document.createElement("style");
-    styleHeader_pb.innerHTML =
-      ".dt-cell__content--header-11 { display: none; }"; // Change dt-cell__content dt-cell__content--header-4 to dt-cell__content--header-3
-    document.head.appendChild(styleHeader_pb);
-
-    // Add a style element to hide the "task" column cells
-    let style_t = document.createElement("style");
-    style_t.innerHTML = ".dt-cell__content--col-12 { display: none; }";
-    document.head.appendChild(style_t);
-
-    // Add a style element to hide the "percent_billable" column header
-    let styleHeader_t = document.createElement("style");
-    styleHeader_t.innerHTML =
-      ".dt-cell__content--header-12 { display: none; }"; // Change dt-cell__content dt-cell__content--header-4 to dt-cell__content--header-3
-    document.head.appendChild(styleHeader_t);
-
-    // Add a header to the report view
-    //wrapper.innerHTML = `<h1>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Project Action Panel </h1></div><div id="card-wrapper"></div><div id="datatable-wrapper"></div>`;
-    wrapper.innerHTML = `
-        <h2 style="display: inline; margin-left: 50px; margin-top: 10px;font-size:30px">Project Action Panel </h2>
-        <div id="button-wrapper" style="display: inline-block; margin-left: 450px;"></div>
-        <div id="card-wrapper"></div>
-        <div id="datatable-wrapper"></div>
-    `;
-
-    // Create the button wrapper element
-    let buttonWrapper = document.createElement("div");
-    buttonWrapper.setAttribute("id", "button-wrapper");
-
-    // Create the button element
-    let buttonElement = document.createElement("button");
-    buttonElement.setAttribute("type", "button");
-    buttonElement.setAttribute("class", "btn btn-default btn-sm ellipsis");
-    buttonElement.setAttribute("aria-expanded", "false");
-    buttonElement.innerHTML = `
-        <span class="hidden-xs">
-        <svg class="icon icon-sm" aria-hidden="true">
-            <use href="#icon-calendar"></use>
-        </svg>
-        <span class="custom-btn-group-label">Timesheet Calendar View</span>
-        </span>
-        <span class="visible-xs">
-        <svg class="icon icon-sm" aria-hidden="true">
-            <use href="#icon-calendar"></use>
-        </svg>
-        </span>
-        `;
-
-    buttonElement.addEventListener("click", function () {
-      // Get the base URL of the current page
-      let baseUrl = window.location.href.split("/").slice(0, 3).join("/"); // Extract protocol, hostname, and port
-
-      // Construct the URL for the timesheet calendar view
-      let url = `${baseUrl}/app/timesheet-record/view/calendar/Timesheet%20Record`;
-
-      // Open the URL in a new window
-      window.open(url);
-    });
-
-    buttonElement.style.marginLeft = "50px";
-    // Append the button to the button wrapper
-    buttonWrapper.appendChild(buttonElement);
-
-    // Append the button wrapper next to the "Project Action Panel" header text
-    document.getElementById("button-wrapper").appendChild(buttonWrapper);
-
-    // Append the button wrapper above the datatable-wrapper
-    //wrapper.insertBefore(buttonWrapper, document.getElementById('datatable-wrapper'));
-
-    // Add a header to the report view
-    //wrapper.innerHTML = `<h1>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Project Action Panel</h1><div id="card-wrapper"></div><div id="datatable-wrapper"></div>`;
-
-    // Initialize DataTable with the data and column configuration
-    let datatable = new frappe.DataTable(
-      wrapper.querySelector("#datatable-wrapper"),
-      {
-        columns: columns.map((col) => ({ content: col.label, ...col })), // Include the column headers
-        data: projectData,
-        inlineFilters: true,
-        language: frappe.boot.lang,
-        translations: frappe.utils.datatable.get_translations(),
-        layout: "fixed",
-        cellHeight: 33,
-        direction: frappe.utils.is_rtl() ? "rtl" : "ltr",
-        header: true, // Ensure that column headers are shown
-        width: "100%",
-      }
-    );
-
-    // Move the table to the center and add margin on top
-    $(wrapper.querySelector("#datatable-wrapper")).css({
-      "margin-top": "50px",
-      "text-align": "center",
-      "margin-left": "30px",
-      width: "1220px",
-    });
-    // Set the inner HTML of the card wrapper to the desired text or HTML content
-    wrapper.querySelector("#card-wrapper").innerHTML = "<p></p>";
-
-    // Apply styling to the card wrapper
-    $(wrapper.querySelector("#card-wrapper")).css({
-      "margin-top": "50px",
-      "text-align": "center",
-      "margin-left": "50px",
-    });
-
-    // Call the render_cards function to render the number cards
-    render_cards(
-      wrapper.querySelector("#card-wrapper") /* pass any necessary arguments */
-    );
+  function linkFormatter1(value, row) {
+    return `<a href="#" onclick="handleProjectClick('${row[9].content}');">${row[2].content}</a>`;
   }
+  function linkFormatter(value, row) {
+    return `<a href="#" onclick="handleCustomerClick('${row[3].content}');">${row[4].content}</a>`;
+  }
+  function linkFormatter2(value, row) {
+    return row[8]?.content ? `<a href="#" onclick="handleTimesheetClick('${row[8].content}');">${row[8].content}</a>` : "";
+  }
+  // Add a combined style element to hide the specified columns and headers
+let style = document.createElement("style");
+style.innerHTML = `
+  /* Hide the "Name" column cells and header */
+  .dt-cell__content--col-9, .dt-cell__content--header-9 { display: none; }
+
+  /* Hide the "Customer Name" column cells and header */
+  .dt-cell__content--col-3, .dt-cell__content--header-3 { display: none; }
+
+  /* Hide the "Project Name" column cells and header */
+  .dt-cell__content--col-1, .dt-cell__content--header-1 { display: none; }
+
+  /* Hide the "percent_billable" column cells and header */
+  .dt-cell__content--col-11, .dt-cell__content--header-11 { display: none; }
+
+  /* Hide the "task" column cells and header */
+  .dt-cell__content--col-12, .dt-cell__content--header-12 { display: none; }
+`;
+document.head.appendChild(style);
+
+  // Initialize DataTable with the data and column configuration
+  let datatable = new frappe.DataTable(
+    datatableWrapper,
+    {
+      columns: columns.map((col) => ({ content: col.label, ...col })), // Include the column headers
+      data: projectData,
+      inlineFilters: true,
+      language: frappe.boot.lang,
+      translations: frappe.utils.datatable.get_translations(),
+      layout: "fixed",
+      cellHeight: 33,
+      direction: frappe.utils.is_rtl() ? "rtl" : "ltr",
+      header: true, // Ensure that column headers are shown
+      width: "100%",
+    }
+  );
+
+  // Move the table to the center and add margin on top
+  $(datatableWrapper).css({
+    "margin-top": "50px",
+    "text-align": "center",
+    "margin-left": "10px",
+    width: "1220px",
+  });
+
+  // Apply styling to the card wrapper
+ 
+}
+
 };
