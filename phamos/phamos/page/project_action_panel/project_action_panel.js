@@ -185,10 +185,10 @@ frappe.pages["project-action-panel"].on_page_load = function (wrapper) {
                 task_field_properties.hidden = 1; // Hide the field
               } else if (task_in_timesheet_record === "Task is optional") {
                 task_field_properties.reqd = 0; // Make it optional (non-mandatory)
-                task_field_properties.description = "Task is optional: Please consult the Project Manager if unsure which task to choose."
+                task_field_properties.description = "Please consult the Project Manager if unsure which task to choose."
               } else if (task_in_timesheet_record === "Task is mandatory") {
                 task_field_properties.reqd = 1; // Make it mandatory
-                task_field_properties.description = "Task is Mandetory: Please consult the Project Manager if unsure which Task to choose."
+                task_field_properties.description = "Please consult the Project Manager if unsure which Task to choose."
               }
 
             let dialog = new frappe.ui.Dialog({
@@ -359,10 +359,10 @@ frappe.pages["project-action-panel"].on_page_load = function (wrapper) {
             task_field_properties.hidden = 1; // Hide the field
           } else if (task_in_timesheet_record === "Task is optional") {
             task_field_properties.reqd = 0; // Make it optional (non-mandatory)
-            task_field_properties.description = "Task is optional: Please consult the Project Manager if unsure which task to choose."
+            task_field_properties.description = "Please consult the Project Manager if unsure which task to choose."
           } else if (task_in_timesheet_record === "Task is mandatory") {
             task_field_properties.reqd = 1; // Make it mandatory
-            task_field_properties.description = "Task is Mandetory: Please consult the Project Manager if unsure which Task to choose."
+            task_field_properties.description = "Please consult the Project Manager if unsure which Task to choose."
           }
             var dialog = new frappe.ui.Dialog({
               title: __("Add Timesheet record."),
