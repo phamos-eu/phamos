@@ -29,3 +29,21 @@ def execute():
 	    dict(fieldname="phamos_section_break_end", label="",
 		fieldtype="Section Break", insert_after="percent_billable"))
     
+    create_custom_field("project",
+	    dict(fieldname="phamos_column_break_end", label="",
+		fieldtype="Column Break", insert_after="percent_billable"))
+    
+    create_custom_field(
+        "Project",
+        dict(
+            fieldname="task_in_timesheet_record",    
+            label="Task in timesheet record",       
+            fieldtype="Select",                     
+            options="\nTask is hidden\nTask is optional\nTask is mandatory",   
+            insert_after="phamos_column_break_end",   
+            default="Task is hidden"   
+        )
+    )
+    
+	
+    

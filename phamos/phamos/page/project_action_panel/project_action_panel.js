@@ -141,7 +141,7 @@ frappe.pages["project-action-panel"].on_page_load = function (wrapper) {
     return false;
   };
 
-  window.stopProject = function (timesheet_record, percent_billable,project,task) {
+  window.stopProject = function (timesheet_record, percent_billable,project,task,task_in_timesheet_record) {
     let activity_type = "";
     let timesheet_record_info = " Info from timesheet record";
     frappe.db.get_value(
@@ -159,6 +159,36 @@ frappe.pages["project-action-panel"].on_page_load = function (wrapper) {
           { user_id: frappe.session.user },
           "activity_type",
           function (value) {
+
+            let task_field_properties = {
+              fieldtype: "Link",
+              options: "Task",
+              label: __("Task"),
+              fieldname: "task",
+              in_list_view: 1,
+              read_only: 0,
+              default:task,
+              get_query: function() {
+                  if (project) {
+                      return {
+                          filters: {
+                              project: project
+                          }
+                      };
+                  } else {
+                      return {};
+                  }
+              }}
+  
+            // Modify visibility/requirement of the task field based on task_in_timesheet_record value
+            if (task_in_timesheet_record === "Task is hidden") {
+              task_field_properties.hidden = 1; // Hide the field
+            } else if (task_in_timesheet_record === "Task is optional") {
+              task_field_properties.reqd = 0; // Make it optional (non-mandatory)
+            } else if (task_in_timesheet_record === "Task is mandatory") {
+              task_field_properties.reqd = 1; // Make it mandatory
+            }
+
             let dialog = new frappe.ui.Dialog({
               title: __("Mark Complete Timesheet record."),
               fields: [
@@ -170,27 +200,8 @@ frappe.pages["project-action-panel"].on_page_load = function (wrapper) {
                   read_only: 1,
                   default: timesheet_record,
                 },
-                {
-                  fieldtype: "Link",
-                  options: "Task",
-                  label: __("Task"),
-                  fieldname: "task",
-                  in_list_view: 1,
-                  read_only: 0,
-                  default:task,
-                  get_query: function() {
-                      if (project) {
-                          return {
-                              filters: {
-                                  project: project
-                              }
-                          };
-                      } else {
-                          return {};
-                      }
-                  }},
+                task_field_properties, 
 
-              
                 {
                   fieldtype: "Small Text",
                   label: __("Timesheet Record Info"),
@@ -269,7 +280,7 @@ frappe.pages["project-action-panel"].on_page_load = function (wrapper) {
   };
   //return record.timesheet_record_draft;
 
-  window.startProject = function (project_name, customer,project) {
+  window.startProject = function (project_name, customer,project,task_in_timesheet_record) {
     frappe.call({
       method:
         "phamos.phamos.page.project_action_panel.project_action_panel.check_draft_timesheet_record",
@@ -320,6 +331,34 @@ frappe.pages["project-action-panel"].on_page_load = function (wrapper) {
               }
             );
           } else {
+            let task_field_properties = {
+              fieldtype: "Link",
+              options: "Task",
+              label: __("Task"),
+              fieldname: "task",
+              in_list_view: 1,
+              read_only: 0,
+              get_query: function () {
+                if (project) {
+                  return {
+                    filters: {
+                      project: project
+                    }
+                  };
+                } else {
+                  return {};
+                }
+              }
+            };
+
+            // Modify visibility/requirement of the task field based on task_in_timesheet_record value
+          if (task_in_timesheet_record === "Task is hidden") {
+            task_field_properties.hidden = 1; // Hide the field
+          } else if (task_in_timesheet_record === "Task is optional") {
+            task_field_properties.reqd = 0; // Make it optional (non-mandatory)
+          } else if (task_in_timesheet_record === "Task is mandatory") {
+            task_field_properties.reqd = 1; // Make it mandatory
+          }
             var dialog = new frappe.ui.Dialog({
               title: __("Add Timesheet record."),
               fields: [
@@ -332,24 +371,7 @@ frappe.pages["project-action-panel"].on_page_load = function (wrapper) {
                   read_only: 1,
                   default: project_name,
                 },
-                {
-                  fieldtype: "Link",
-                  options: "Task",
-                  label: __("Task"),
-                  fieldname: "task",
-                  in_list_view: 1,
-                  read_only: 0,
-                  get_query: function() {
-                      if (project) {
-                          return {
-                              filters: {
-                                  project: project
-                              }
-                          };
-                      } else {
-                          return {};
-                      }
-                  }},
+                task_field_properties,
                 {
                   fieldtype: "Data",
                   options: "Customer",
@@ -468,32 +490,36 @@ function render_cards(wrapper, card_names) {
 
 // Function to render DataTable with tabs
 function renderDataTable(wrapper, projectData) {
-  // Ensure wrapper is defined
-  if (!wrapper) {
-    return;
-  }
+ // Ensure wrapper is defined
+ if (!wrapper) {
+  return;
+}
 
-  wrapper.innerHTML = `
-  <h2 style="display: inline; margin-left: 50px; margin-top: 10px; font-size:30px">Project Action Panel</h2>
-  <div class="form-tabs-list">
-      <ul class="nav form-tabs" id="form-tabs" role="tablist">
-          <li class="nav-item show">
-              <a class="nav-link" id="DAP-your-project-tab" role="tab" aria-controls="your-projects" aria-selected="false">
-                  Your Projects
-              </a>
-          </li>
-          <li class="nav-item show">
-              <a class="nav-link active" id="DAP-all-project-tab" role="tab" aria-controls="all-projects" aria-selected="true">
-                  All Projects
-              </a>
-          </li>
-      </ul>
-  </div>
-  <div id="content-wrapper" style="margin-top: 20px; margin-left: 30px">
-      <div id="card-wrapper"></div>
-      <div id="datatable-wrapper"></div>
-  </div>
+// Set the default active tab to 'Your Projects'
+wrapper.innerHTML = `
+<h2 style="display: inline; margin-left: 50px; margin-top: 10px; font-size:30px">Project Action Panel</h2>
+<div class="form-tabs-list">
+    <ul class="nav form-tabs" id="form-tabs" role="tablist">
+        <li class="nav-item show">
+            <!-- 'Your Projects' tab is the default active tab -->
+            <a class="nav-link active" id="DAP-your-project-tab" role="tab" aria-controls="your-projects" aria-selected="true">
+                Your Projects
+            </a>
+        </li>
+        <li class="nav-item show">
+            <!-- 'All Projects' tab is inactive by default -->
+            <a class="nav-link" id="DAP-all-project-tab" role="tab" aria-controls="all-projects" aria-selected="false">
+                All Projects
+            </a>
+        </li>
+    </ul>
+</div>
+<div id="content-wrapper" style="margin-top: 20px; margin-left: 30px">
+    <div id="card-wrapper"></div>
+    <div id="datatable-wrapper"></div>
+</div>
 `;
+
 // Get references to the tabs
 const your_projectsTab = document.getElementById("DAP-your-project-tab");
 const all_projectsTab = document.getElementById("DAP-all-project-tab");
@@ -503,7 +529,7 @@ your_projectsTab.addEventListener("click", () => {
   // Remove 'active' class from All Projects tab and set to Your Projects
   all_projectsTab.classList.remove("active");
   your_projectsTab.classList.add("active");
-  
+
   // Set visual feedback for selection
   your_projectsTab.setAttribute("aria-selected", "true");
   all_projectsTab.setAttribute("aria-selected", "false");
@@ -517,7 +543,7 @@ all_projectsTab.addEventListener("click", () => {
   // Remove 'active' class from Your Projects tab and set to All Projects
   your_projectsTab.classList.remove("active");
   all_projectsTab.classList.add("active");
-  
+
   // Set visual feedback for selection
   all_projectsTab.setAttribute("aria-selected", "true");
   your_projectsTab.setAttribute("aria-selected", "false");
@@ -525,49 +551,51 @@ all_projectsTab.addEventListener("click", () => {
   // Show content for the All Projects tab
   show_tab("All Projects", projectData);
 });
-// Initial tab content setup: Show content for Unassigned Projects by default
-show_tab("All Projects", projectData);
 
-
+// Initial tab content setup: Show content for 'Your Projects' by default
+show_tab("Your Projects", projectData); // Set 'Your Projects' as default
 }
 
 // Show tab content based on the selected tab
 function show_tab(tab, projectData) {
-  const cardWrapper = document.getElementById("card-wrapper");
-  const datatableWrapper = document.getElementById("datatable-wrapper");
+const cardWrapper = document.getElementById("card-wrapper");
+const datatableWrapper = document.getElementById("datatable-wrapper");
 
-  // Clear previous content of cardWrapper and datatableWrapper
-  cardWrapper.innerHTML = "";  // This will ensure the number cards don't duplicate
-  datatableWrapper.innerHTML = ""; // Clear previous DataTable content
+// Clear previous content of cardWrapper and datatableWrapper
+cardWrapper.innerHTML = "";  // This will ensure the number cards don't duplicate
+datatableWrapper.innerHTML = ""; // Clear previous DataTable content
 
-  if (tab === "Your Projects") {
-    // Render the cards for Your Projects
-    card_names = ["Your Total Projects","Total Hrs Worked Today","Total Hrs Worked This Week","Total Hrs Worked This Month"]
-    render_cards(cardWrapper,card_names); // Call the render_cards function here
+if (tab === "Your Projects") {
+  // Render the cards for Your Projects
+  card_names = ["Your Total Projects", "Total Hrs Worked Today", "Total Hrs Worked This Week", "Total Hrs Worked This Month"];
+  render_cards(cardWrapper, card_names); // Call the render_cards function here
 
-    // Render the DataTable for Your Projects
-    renderProjectDataTable(datatableWrapper, projectData); // Render the actual DataTable
-  } else if (tab === "All Projects") {
-    
-    // Render the cards or message for All Projects
-    frappe.call({
-      method:
-        "phamos.phamos.page.project_action_panel.project_action_panel.fetch_all_projects",
-      callback: function (r) {
-        if (r.message) {
-          // Render DataTable with the fetched data
-          card_names =["Total Projects","Total Hrs Worked Today","Total Hrs Worked This Week","Total Hrs Worked This Month"]
-          render_cards(cardWrapper,card_names);
-          renderProjectDataTable(datatableWrapper, r.message); 
-          //renderDataTable(wrapper, r.message);
-          //console.log(window.location.href)
-        } else {
-          // Handle error or empty data
-        }
-      },
-    });
-    //cardWrapper.innerHTML = `<p>No assigned projects.</p>`; // Example message, replace with your logic
-  }
+  // Render the DataTable for Your Projects
+  renderProjectDataTable(datatableWrapper, projectData); // Render the actual DataTable
+} else if (tab === "All Projects") {
+  // Define the cards to display
+  card_names = ["Total Projects", "Total Hrs Worked Today", "Total Hrs Worked This Week", "Total Hrs Worked This Month"];
+  
+  // Render the cards immediately to improve perceived speed
+  render_cards(cardWrapper, card_names);
+
+  // Make an API call to fetch all projects data asynchronously
+  frappe.call({
+    method: "phamos.phamos.page.project_action_panel.project_action_panel.fetch_all_projects",
+    callback: function (r) {
+      if (r.message) {
+        // Render DataTable with the fetched data once API response is received
+        renderProjectDataTable(datatableWrapper, r.message);
+      } else {
+        // Handle case with no data or error
+        datatableWrapper.innerHTML = `<p>No projects found.</p>`;
+      }
+    },
+    freeze: true,  // Optional: Add a freeze effect to indicate loading
+    freeze_message: "Loading projects...",  // Custom loading message
+  });
+}
+
 }
 
 
@@ -576,9 +604,9 @@ function renderProjectDataTable(datatableWrapper, projectData) {
   // Define columns for the report view
   let button_formatter = (value, row) => {
     if (row[8].html == "") {
-      return `<button type="button" style="height: 23px; width: 60px; display: flex; align-items: center; justify-content: center; background-color: rgb(0, 100, 0);" class="btn btn-primary btn-sm btn-modal-primary" onclick="startProject('${row[1].content}', '${row[3].content}', '${row[9].content}')">Start</button>`;
+      return `<button type="button" style="height: 23px; width: 60px; display: flex; align-items: center; justify-content: center; background-color: rgb(0, 100, 0);" class="btn btn-primary btn-sm btn-modal-primary" onclick="startProject('${row[1].content}', '${row[3].content}', '${row[9].content}','${row[13]?.content}')">Start</button>`;
     } else {
-      return `<button type="button" style="height: 23px; width: 60px; display: flex; align-items: center; justify-content: center; background-color: rgb(139, 0, 0);" class="btn btn-primary btn-sm btn-modal-primary" onclick="stopProject('${row[8].content}','${row[11].content}', '${row[9].content}','${row[12]?.content || ''}')">Stop</button>`;
+      return `<button type="button" style="height: 23px; width: 60px; display: flex; align-items: center; justify-content: center; background-color: rgb(139, 0, 0);" class="btn btn-primary btn-sm btn-modal-primary" onclick="stopProject('${row[8].content}','${row[11].content}', '${row[9].content}','${row[12]?.content || ''}','${row[13]?.content}')">Stop</button>`;
     }
   };
 
@@ -594,7 +622,9 @@ function renderProjectDataTable(datatableWrapper, projectData) {
     { label: "<b>Name</b>", id: "name", fieldtype: "Link", width: 150, editable: false },
     { label: "<b>Action</b>", focusable: false, format: button_formatter, width: 150 },
     { label: "<b>percent_billable</b>", id: "percent_billable", fieldtype: "Data", width: 0, editable: false },
-    { label: "<b>Task</b>", id: "task", fieldtype: "Link", width: 0, editable: false }
+    { label: "<b>Task</b>", id: "task", fieldtype: "Link", width: 0, editable: false },
+    { label: "<b>task_in_timesheet_record</b>", id: "task_in_timesheet_record", fieldtype: "Data", width: 0, editable: false },
+    
   ];
   
 
@@ -624,6 +654,10 @@ style.innerHTML = `
 
   /* Hide the "task" column cells and header */
   .dt-cell__content--col-12, .dt-cell__content--header-12 { display: none; }
+
+  /* Hide the "task_in_timesheet_record" column cells and header */
+  .dt-cell__content--col-13, .dt-cell__content--header-13 { display: none; }
+  
 `;
 document.head.appendChild(style);
 
