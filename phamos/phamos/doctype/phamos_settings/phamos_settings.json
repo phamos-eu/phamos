@@ -17,6 +17,7 @@
   "mattermost_daily_thread_settings_tab",
   "enable_daily_thread_creation",
   "thread_posting_hour",
+  "last_daily_thread_creation_date",
   "section_break_s3bt",
   "mattermost_channel"
  ],
@@ -85,12 +86,17 @@
    "fieldname": "enable_feedback_dialog",
    "fieldtype": "Check",
    "label": "Enable Feedback Dialog"
+  },
+  {
+   "fieldname": "last_daily_thread_creation_date",
+   "fieldtype": "Date",
+   "label": "Last Daily Thread Creation Date"
   }
  ],
  "index_web_pages_for_search": 1,
  "issingle": 1,
  "links": [],
- "modified": "2024-08-27 09:51:53.829234",
+ "modified": "2024-10-04 15:48:25.774179",
  "modified_by": "Administrator",
  "module": "Phamos",
  "name": "phamos Settings",
