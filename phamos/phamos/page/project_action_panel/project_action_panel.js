@@ -168,6 +168,7 @@ frappe.pages["project-action-panel"].on_page_load = function (wrapper) {
               in_list_view: 1,
               read_only: 0,
               default:task,
+              description:"Please consult the Project Manager if unsure which task to choose.",
               get_query: function() {
                   if (project) {
                       return {
@@ -180,14 +181,15 @@ frappe.pages["project-action-panel"].on_page_load = function (wrapper) {
                   }
               }}
   
-            // Modify visibility/requirement of the task field based on task_in_timesheet_record value
-            if (task_in_timesheet_record === "Task is hidden") {
-              task_field_properties.hidden = 1; // Hide the field
-            } else if (task_in_timesheet_record === "Task is optional") {
-              task_field_properties.reqd = 0; // Make it optional (non-mandatory)
-            } else if (task_in_timesheet_record === "Task is mandatory") {
-              task_field_properties.reqd = 1; // Make it mandatory
-            }
+              if (task_in_timesheet_record === "Task is hidden") {
+                task_field_properties.hidden = 1; // Hide the field
+              } else if (task_in_timesheet_record === "Task is optional") {
+                task_field_properties.reqd = 0; // Make it optional (non-mandatory)
+                task_field_properties.description = "Task is optional: Please consult the Project Manager if unsure which task to choose."
+              } else if (task_in_timesheet_record === "Task is mandatory") {
+                task_field_properties.reqd = 1; // Make it mandatory
+                task_field_properties.description = "Task is Mandetory: Please consult the Project Manager if unsure which Task to choose."
+              }
 
             let dialog = new frappe.ui.Dialog({
               title: __("Mark Complete Timesheet record."),
@@ -338,6 +340,7 @@ frappe.pages["project-action-panel"].on_page_load = function (wrapper) {
               fieldname: "task",
               in_list_view: 1,
               read_only: 0,
+              description:"Please consult the Project Manager if unsure which task to choose.",
               get_query: function () {
                 if (project) {
                   return {
@@ -356,8 +359,10 @@ frappe.pages["project-action-panel"].on_page_load = function (wrapper) {
             task_field_properties.hidden = 1; // Hide the field
           } else if (task_in_timesheet_record === "Task is optional") {
             task_field_properties.reqd = 0; // Make it optional (non-mandatory)
+            task_field_properties.description = "Task is optional: Please consult the Project Manager if unsure which task to choose."
           } else if (task_in_timesheet_record === "Task is mandatory") {
             task_field_properties.reqd = 1; // Make it mandatory
+            task_field_properties.description = "Task is Mandetory: Please consult the Project Manager if unsure which Task to choose."
           }
             var dialog = new frappe.ui.Dialog({
               title: __("Add Timesheet record."),
