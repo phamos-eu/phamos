@@ -41,7 +41,8 @@ def execute():
             fieldtype="Select",                     
             options="\nTask is hidden\nTask is optional\nTask is mandatory",   
             insert_after="phamos_column_break_end",   
-            default="Task is hidden"   
+            default="Task is hidden",
+            description="Select the visibility requirement for the task in the timesheet record. Choose 'Task is hidden' to hide the task field, 'Task is optional' to allow the selection of a task, or 'Task is mandatory' to require a task selection."
         )
     )
     
