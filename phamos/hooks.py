@@ -130,8 +130,17 @@ fixtures = [
             ]
         ]
     ]},
+    {"dt": "Custom Field", "filters": [
+        [
+            "module", "=", "Phamos"
+        ]
+    ]},
+    {"dt": "Property Setter", "filters": [
+        [
+            "module", "=", "Phamos"
+        ]
+    ]},
 ]
-
 
 
 

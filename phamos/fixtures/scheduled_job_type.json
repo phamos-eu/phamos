@@ -5,11 +5,11 @@
   "docstatus": 0,
   "doctype": "Scheduled Job Type",
   "frequency": "Cron",
-  "last_execution": "2024-07-18 11:45:50.236014",
+  "last_execution": "2024-10-03 11:27:52.982235",
   "method": "phamos.custom_scripts.custom_python.mattermost_daily_thread.create_mattermost_thread",
   "modified": "2024-07-17 15:04:18.976058",
   "name": "mattermost_daily_thread.create_mattermost_thread",
-  "next_execution": "2024-07-19 06:00:00",
+  "next_execution": "2024-10-04 06:00:00",
   "server_script": null,
   "stopped": 0
  }
