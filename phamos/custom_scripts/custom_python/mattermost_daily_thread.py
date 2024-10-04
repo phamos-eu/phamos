@@ -61,6 +61,7 @@ def post_to_mattermost(channel_id, message, bot_username="Jarvis", parent_id=Non
         message_with_bot = f"{message}"
     else:
         message_with_bot = f"{today_date} - Daily {random_emoji} {message}"
+        
 
     payload = {
         "channel_id": channel_id,
@@ -73,38 +74,57 @@ def post_to_mattermost(channel_id, message, bot_username="Jarvis", parent_id=Non
     response = requests.post(mattermost_url, json=payload, headers=headers)
     return response.json()
 
+
+
 @frappe.whitelist()
 def create_mattermost_thread():
-    frappe.logger().info("Executing create_mattermost_thread function...")
-    """
-    Function to create a new thread in Mattermost with an initial message and a reply.
-    """
-
-    thought_of_the_day = get_thought_of_the_day()
-    channel_ids = frappe.db.sql("""
-        select channel_id from `tabMattermost Channel` where enable = %s
-    """,{1}, as_dict=True)
-
-    if channel_ids:
-        channel_id = channel_ids[0]['channel_id']  # Replace with your Mattermost channel ID
-    else:
-        return    
+    # Get today's date in the desired format (YYYY-MM-DD)
+    today_date = frappe.utils.today()  # Returns a string in YYYY-MM-DD format
     
-    #reply_message = "Good Morning 'phamos'"
-    reply_message = f"Good Morning 'phamos' 💮 🙏\n > {thought_of_the_day}🌟"
-   
+    # Retrieve the last daily thread creation date from the phamos Settings
+    last_daily_thread_creation_date = frappe.db.get_single_value('phamos Settings', 'last_daily_thread_creation_date')
 
-    # Post the initial message with today's date and "Daily"
-    initial_message = ""  # Placeholder message, as initial_message needs to be constructed dynamically
+   
+    # Ensure last_daily_thread_creation_date is in the same format
+    if last_daily_thread_creation_date:
+        # Convert to string if it’s not already
+        last_daily_thread_creation_date_str = str(last_daily_thread_creation_date)
+
+        # Check if the dates match
+        if last_daily_thread_creation_date_str == today_date:
+            frappe.logger().error("Thread already created for today - {}, - {}".format(last_daily_thread_creation_date, today_date))
+            return
+
+    # If dates do not match, proceed to create the thread
+    thought_of_the_day = get_thought_of_the_day()
+
+    # Fetch the enabled Mattermost channel
+    channel_ids = frappe.db.sql("""
+        SELECT channel_id FROM `tabMattermost Channel` WHERE enable = %s
+    """, (1,), as_dict=True)
+
+    if not channel_ids:
+        frappe.throw("No enabled Mattermost channels found.")
+        return
+    
+    channel_id = channel_ids[0]['channel_id']
+
+    # Construct the reply message with the thought of the day
+    reply_message = f"Good Morning 'phamos' 💮 🙏\n > {thought_of_the_day} 🌟"
+   
+    # Post the initial message (empty placeholder for the thread start)
+    initial_message = ""
     initial_response = post_to_mattermost(channel_id, initial_message)
+
     initial_post_id = initial_response.get("id")
 
     if initial_post_id:
-        # Post a reply with the reply_message
-        reply_response = post_to_mattermost(channel_id,reply_message, parent_id=initial_post_id)
+        # Post a reply with the thought of the day
+        reply_response = post_to_mattermost(channel_id, reply_message, parent_id=initial_post_id)
         
         if reply_response.get("id"):
-            frappe.msgprint(f"Thread created in Mattermost with initial post ID: {initial_post_id} and reply post ID: {reply_response.get('id')}")
+            # Update the last_daily_thread_creation_date in phamos Settings
+            frappe.db.set_single_value("phamos Settings", "last_daily_thread_creation_date", today_date)
         else:
             frappe.throw("Failed to post the reply in Mattermost.")
     else:
