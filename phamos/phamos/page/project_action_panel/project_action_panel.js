@@ -603,6 +603,19 @@ cardWrapper.innerHTML = "";  // This will ensure the number cards don't duplicat
 datatableWrapper.innerHTML = ""; // Clear previous DataTable content
 
 if (tab === "Your Projects") {
+  // Logic to hide the specific column when "Your Projects" tab is active
+  
+  let style = document.createElement("style");
+    style.innerHTML = `
+        /* Hide the "Name" column cells and header */
+        .dt-cell__content--col-14, 
+        .dt-cell__content--header-14 { 
+            display: none; 
+            width: 0; 
+        }
+    `;
+    document.head.appendChild(style);
+
   // Render the cards for Your Projects
   card_names = ["Your Total Projects", "Total Hrs Worked Today", "Total Hrs Worked This Week", "Total Hrs Worked This Month"];
   render_cards(cardWrapper, card_names); // Call the render_cards function here
@@ -610,6 +623,13 @@ if (tab === "Your Projects") {
   // Render the DataTable for Your Projects
   renderProjectDataTable(datatableWrapper, projectData); // Render the actual DataTable
 } else if (tab === "All Projects") {
+  let style = document.createElement("style");
+  style.innerHTML = `
+    /* Hide the "Name" column cells and header */
+    .dt-cell__content--col-14, .dt-cell__content--header-14 { display: table-cell; }
+  `;
+  document.head.appendChild(style);
+
   // Define the cards to display
   card_names = ["Total Projects", "Total Hrs Worked Today", "Total Hrs Worked This Week", "Total Hrs Worked This Month"];
   
