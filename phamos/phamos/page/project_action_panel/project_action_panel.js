@@ -281,6 +281,38 @@ frappe.pages["project-action-panel"].on_page_load = function (wrapper) {
     );
   };
   //return record.timesheet_record_draft;
+ 
+  window.assignProject = function(project_name) {
+    // Instantiate AssignToDialog if not already done
+    let assign_to = new frappe.ui.form.AssignToDialog({
+        method: "frappe.desk.form.assign_to.add", // Method for assignment
+        doctype: "Project", // The doctype of the document being assigned
+        docname: project_name, // The document name to be assigned
+        callback: function (r) {
+            // Handle the response from the assignment action
+            console.log(r.message); // This will contain the result of the assignment
+            if (r.message) {
+                // You can add logic here to update the UI or provide user feedback
+                frappe.show_alert({
+                    message: __('Users assigned successfully!'),
+                    indicator: 'green'
+                });
+            }
+        },
+    });
+
+    // Ensure the dialog is ready to show
+    if (assign_to.dialog) {
+        // Check if the show method exists
+        if (typeof assign_to.dialog.show === 'function') {
+            assign_to.dialog.show(); // Show the dialog
+        } else {
+            console.error("Error: show() method is not available on assign_to.dialog");
+        }
+    } else {
+        console.error("Error: AssignToDialog was not instantiated correctly.");
+    }
+};
 
   window.startProject = function (project_name, customer,project,task_in_timesheet_record) {
     frappe.call({
@@ -519,7 +551,7 @@ wrapper.innerHTML = `
         </li>
     </ul>
 </div>
-<div id="content-wrapper" style="margin-top: 20px; margin-left: 30px">
+<div id="content-wrapper" style="margin-top: 20px; margin-left: 30px;">
     <div id="card-wrapper"></div>
     <div id="datatable-wrapper"></div>
 </div>
@@ -571,6 +603,19 @@ cardWrapper.innerHTML = "";  // This will ensure the number cards don't duplicat
 datatableWrapper.innerHTML = ""; // Clear previous DataTable content
 
 if (tab === "Your Projects") {
+  // Logic to hide the specific column when "Your Projects" tab is active
+  
+  let style = document.createElement("style");
+    style.innerHTML = `
+        /* Hide the "Name" column cells and header */
+        .dt-cell__content--col-14, 
+        .dt-cell__content--header-14 { 
+            display: none; 
+            width: 0; 
+        }
+    `;
+    document.head.appendChild(style);
+
   // Render the cards for Your Projects
   card_names = ["Your Total Projects", "Total Hrs Worked Today", "Total Hrs Worked This Week", "Total Hrs Worked This Month"];
   render_cards(cardWrapper, card_names); // Call the render_cards function here
@@ -578,6 +623,13 @@ if (tab === "Your Projects") {
   // Render the DataTable for Your Projects
   renderProjectDataTable(datatableWrapper, projectData); // Render the actual DataTable
 } else if (tab === "All Projects") {
+  let style = document.createElement("style");
+  style.innerHTML = `
+    /* Hide the "Name" column cells and header */
+    .dt-cell__content--col-14, .dt-cell__content--header-14 { display: table-cell; }
+  `;
+  document.head.appendChild(style);
+
   // Define the cards to display
   card_names = ["Total Projects", "Total Hrs Worked Today", "Total Hrs Worked This Week", "Total Hrs Worked This Month"];
   
@@ -607,6 +659,11 @@ if (tab === "Your Projects") {
 // Function to render DataTable
 function renderProjectDataTable(datatableWrapper, projectData) {
   // Define columns for the report view
+  let button_formatter1 = (value, row) => {
+    
+      return `<button type="button" style="height: 23px; width: 60px; display: flex; align-items: center; justify-content: center; background-color: rgb(255, 165, 0);" class="btn btn-primary btn-sm btn-modal-primary" onclick="assignProject('${row[9].content}')">Assign</button>`;
+    
+  };
   let button_formatter = (value, row) => {
     if (row[8].html == "") {
       return `<button type="button" style="height: 23px; width: 60px; display: flex; align-items: center; justify-content: center; background-color: rgb(0, 100, 0);" class="btn btn-primary btn-sm btn-modal-primary" onclick="startProject('${row[1].content}', '${row[3].content}', '${row[9].content}','${row[13]?.content}')">Start</button>`;
@@ -616,20 +673,28 @@ function renderProjectDataTable(datatableWrapper, projectData) {
   };
 
   let columns = [
-    { label: "<b>Project Name</b>", id: "project_name", fieldtype: "Data", width: 200, editable: false, visible: false },
-    { label: "<b>Project</b>", id: "project_desc", fieldtype: "Data", width: 230, editable: false, format: linkFormatter1 },
-    { label: "<b>Customer Name</b>", id: "customer", fieldtype: "Link", width: 130, editable: false },
-    { label: "<b>Customer</b>", id: "customer_desc", fieldtype: "Link", width: 200, editable: false, format: linkFormatter },
-    { label: "<b>Planned Hrs</b>", id: "planned_hours", fieldtype: "Data", width: 120, editable: false },
+    { label: "<b>Project Name</b>", id: "project_name", fieldtype: "Data", width: 180, editable: false, visible: false },
+    { label: "<b>Project</b>", id: "project_desc", fieldtype: "Data", width: 200, editable: false, format: linkFormatter1 },
+    { label: "<b>Customer Name</b>", id: "customer", fieldtype: "Link", width: 120, editable: false },
+    { label: "<b>Customer</b>", id: "customer_desc", fieldtype: "Link", width: 180, editable: false, format: linkFormatter },
+    { label: "<b>Planned Hrs</b>", id: "planned_hours", fieldtype: "Data", width: 110, editable: false },
     { label: "<b>Spent Draft Hrs</b>", id: "spent_hours_draft", fieldtype: "Float", width: 140, editable: false },
     { label: "<b>Spent Submitted Hrs</b>", id: "spent_hours_submitted", fieldtype: "Float", width: 180, editable: false },
     { label: "<b>Timesheet Record</b>", id: "timesheet_record", fieldtype: "Link", width: 160, editable: false, format: linkFormatter2 },
-    { label: "<b>Name</b>", id: "name", fieldtype: "Link", width: 150, editable: false },
-    { label: "<b>Action</b>", focusable: false, format: button_formatter, width: 150 },
+    { label: "<b>Name</b>", id: "name", fieldtype: "Link", width: 140, editable: false },
+    { label: "<b>Action</b>", focusable: false, format: button_formatter, width: 100 },
     { label: "<b>percent_billable</b>", id: "percent_billable", fieldtype: "Data", width: 0, editable: false },
     { label: "<b>Task</b>", id: "task", fieldtype: "Link", width: 0, editable: false },
     { label: "<b>task_in_timesheet_record</b>", id: "task_in_timesheet_record", fieldtype: "Data", width: 0, editable: false },
-    
+    {
+      label: '<svg class="icon icon-sm"><use href="#icon-assign"></use></svg> <b>Assign To</b>', 
+      focusable: false, 
+      format: button_formatter1, 
+      width: 120 
+  }
+  
+
+  
   ];
   
 
