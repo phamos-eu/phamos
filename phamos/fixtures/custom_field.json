@@ -62,7 +62,7 @@
   "collapsible": 0,
   "collapsible_depends_on": null,
   "columns": 0,
-  "default": "<h1> Project Summary/ Background </h1>\n<ul>\n  <li>Who is the customer:</li>\n  <li>What is the customer asking for:</li>\n  <li>Estimated Project Duration:</li>\n  <li>Estimated weekly billable hours:</li>\n</ul>  \n<h1> Project Goals/ Objectives </h1>\n<ul>\n  <li></li>\n  <li></li>\n  <li></li>\n</ul>\n<h1> Project Strategy/ Approach </h1>\n<ul>\n  <li></li>\n  <li></li>\n  <li></li>\n</ul>\n<h1> Major Deliverables/ Milestones </h1>\n<ul>\n  <li></li>\n  <li></li>\n  <li></li>\n</ul>\n<h1> Potential Risks/ Challenges </h1>\n<ul>\n  <li></li>\n  <li></li>\n  <li></li>\n</ul>\n<h1> Project Benefits/ Expected Profit </h1>\n<ul>\n  <li></li>\n  <li></li>\n  <li></li>\n</ul>",
+  "default": "",
   "depends_on": null,
   "description": null,
   "docstatus": 0,
