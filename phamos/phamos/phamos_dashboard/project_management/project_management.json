@@ -4,6 +4,9 @@
    "card": "Your Total Projects"
   },
   {
+   "card": "Total Projects"
+  },
+  {
    "card": "Total Hrs Worked Today"
   },
   {
@@ -26,8 +29,8 @@
  "idx": 0,
  "is_default": 0,
  "is_standard": 1,
- "modified": "2024-04-27 13:38:08.215863",
- "modified_by": "Administrator",
+ "modified": "2024-09-30 10:00:23.148176",
+ "modified_by": "sonali.narkar@phamos.eu",
  "module": "Phamos",
  "name": "Project Management",
  "owner": "Administrator"
