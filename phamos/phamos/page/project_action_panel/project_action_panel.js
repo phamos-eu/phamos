@@ -418,7 +418,16 @@ frappe.pages["project-action-panel"].on_page_load = function (wrapper) {
                   read_only: 1,
                   default: customer,
                 },
-
+                {
+                  fieldtype: "Duration",
+                  label: __("Expected Time"),
+                  fieldname: "expected_time",
+                  in_list_view: 1,
+                  reqd: 1,
+                },
+                {
+                  fieldtype: "Column Break",
+                },
                 {
                   fieldtype: "Datetime",
                   label: __("From Time"),
@@ -426,16 +435,6 @@ frappe.pages["project-action-panel"].on_page_load = function (wrapper) {
                   in_list_view: 1,
                   reqd: 1,
                   read_only: 0,
-                },
-                {
-                  fieldtype: "Column Break",
-                },
-                {
-                  fieldtype: "Duration",
-                  label: __("Expected Time"),
-                  fieldname: "expected_time",
-                  in_list_view: 1,
-                  reqd: 1,
                 },
                 {
                   fieldtype: "Small Text",
