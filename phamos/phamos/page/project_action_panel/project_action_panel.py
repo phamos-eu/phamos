@@ -249,8 +249,13 @@ def total_hours_worked_in_this_week():
 def total_hours_worked_in_this_month():
     employee_name = frappe.db.get_value("Employee", {"user_id": frappe.session.user}, "name")
     today_date = datetime.today().date()  # Get today's date
+
     start_of_month = today_date.replace(day=1)  # Calculate the start of the current month
-    next_month = start_of_month.replace(month=start_of_month.month + 1)  # Calculate the start of the next month
+    
+    if start_of_month.month == 12: 
+        next_month = start_of_month.replace(year=start_of_month.year + 1, month=1)
+    else:    
+        next_month = start_of_month.replace(month=start_of_month.month + 1)  # Calculate the start of the next month
     end_of_month = next_month - timedelta(days=1)  # Calculate the end of the current month
 
     count_time = frappe.db.sql("""
