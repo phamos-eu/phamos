@@ -565,7 +565,7 @@ tooltipStyle.innerHTML = `
   }
 
   #info-icon:hover::after {
-    content: "Label Descriptions:\\A Red Color = Planned Hrs\\A Orange Color = Spent Draft Hrs\\A Green Color = Spent Submitted Hrs";
+    content: "Label Descriptions:\\A blue Color = Planned Hrs(P)\\A Orange Color = Spent Draft Hrs(D)\\A Green Color = Spent Submitted Hrs(S)";
     white-space: pre-wrap;
     position: absolute;
     left: 50%;
@@ -711,13 +711,13 @@ function renderProjectDataTable(datatableWrapper, projectData) {
 
   let columns = [
     { label: "<b>Project Name</b>", id: "project_name", fieldtype: "Data", width: 180, editable: false, visible: false },
-    { label: "<b>Project</b>", id: "project_desc", fieldtype: "Data", width: 362, editable: false, format: linkFormatter1 },
+    { label: "<b>Project</b>", id: "project_desc", fieldtype: "Data", width: 340, editable: false, format: linkFormatter1 },
     { label: "<b>Customer Name</b>", id: "customer", fieldtype: "Link", width: 120, editable: false },
-    { label: "<b>Customer</b>", id: "customer_desc", fieldtype: "Link", width: 362, editable: false, format: linkFormatter },
-    { label: "<b></b>", id: "planned_hours", fieldtype: "Data", width: 70, editable: false },
+    { label: "<b>Customer</b>", id: "customer_desc", fieldtype: "Link", width: 340, editable: false, format: linkFormatter },
+    { label: "<b>Hours Status</b>", id: "planned_hours", fieldtype: "Data", width: 230, editable: false,format: hoursFormatter },
     { label: "<b></b>", id: "spent_hours_draft", fieldtype: "Float", width: 70, editable: false },
     { label: "<b></b>", id: "spent_hours_submitted", fieldtype: "Float", width: 70, editable: false },
-    { label: "<b>Timesheet Record</b>", id: "timesheet_record", fieldtype: "Link", width: 160, editable: false, format: linkFormatter2 },
+    { label: "<b>Timesheet Record</b>", id: "timesheet_record", fieldtype: "Link", width: 180, editable: false, format: linkFormatter2 },
     { label: "<b>Name</b>", id: "name", fieldtype: "Link", width: 140, editable: false },
     { label: "<b>Action</b>", focusable: false, format: button_formatter, width: 100 },
     { label: "<b>percent_billable</b>", id: "percent_billable", fieldtype: "Data", width: 0, editable: false },
@@ -730,6 +730,30 @@ function renderProjectDataTable(datatableWrapper, projectData) {
       width: 120 
     }
   ];
+  function hoursFormatter(value, row) {
+    const plannedHours = row[5]?.content || 0; // Planned hours
+    const spentDraft = row[6]?.content || 0;  // Spent hours (Draft)
+    const spentSubmitted = row[7]?.content || 0; // Spent hours (Submitted)
+  
+    // Combine into a styled display
+    return `
+    <div style="
+      text-align: center;
+      font-size: 10px;
+      border: 1px solid #ccc;
+      border-radius: 5px;
+      padding: 3px 5px;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    ">
+      <span style="color: #4682B4; font-weight: bold;">P: ${plannedHours} hrs</span> | 
+      <span style="color: #FFA500;">D: ${spentDraft} hrs</span> | 
+      <span style="color: #32CD32;">S: ${spentSubmitted} hrs</span>
+    </div>
+  `;
+  }
+  
   
   function linkFormatter1(value, row) {
     return `<a href="#" onclick="handleProjectClick('${row[9].content}');">${row[2].content}</a>`;
@@ -743,45 +767,28 @@ function renderProjectDataTable(datatableWrapper, projectData) {
   // Add a combined style element to hide the specified columns and headers
 let style = document.createElement("style");
 style.innerHTML = `
-  /* Hide the "Name" column cells and header */
-  .dt-cell__content--col-9, .dt-cell__content--header-9 { display: none; }
+/* Hide the "Name" column cells and header */
+.dt-cell__content--col-9, .dt-cell__content--header-9 { display: none; }
 
-  /* Hide the "Customer Name" column cells and header */
-  .dt-cell__content--col-3, .dt-cell__content--header-3 { display: none; }
+/* Hide the "Customer Name" column cells and header */
+.dt-cell__content--col-3, .dt-cell__content--header-3 { display: none; }
 
-  /* Hide the "Project Name" column cells and header */
-  .dt-cell__content--col-1, .dt-cell__content--header-1 { display: none; }
+/* Hide the "Project Name" column cells and header */
+.dt-cell__content--col-1, .dt-cell__content--header-1 { display: none; }
 
-  /* Hide the "percent_billable" column cells and header */
-  .dt-cell__content--col-11, .dt-cell__content--header-11 { display: none; }
+/* Hide the "percent_billable" column cells and header */
+.dt-cell__content--col-11, .dt-cell__content--header-11 { display: none; }
 
-  /* Hide the "task" column cells and header */
-  .dt-cell__content--col-12, .dt-cell__content--header-12 { display: none; }
+/* Hide the "task" column cells and header */
+.dt-cell__content--col-12, .dt-cell__content--header-12 { display: none; }
 
-  /* Hide the "task_in_timesheet_record" column cells and header */
-  .dt-cell__content--col-13, .dt-cell__content--header-13 { display: none; }
+/* Hide the "task_in_timesheet_record" column cells and header */
+.dt-cell__content--col-13, .dt-cell__content--header-13 { display: none; }
 
-  .dt-cell__content--col-5 {
-    color: #f28b82; 
-  }
-  .dt-cell__content--header-5 {
-    background-color: #f28b82 !important;
-    color: white;
-  }
-  .dt-cell__content--col-6 {
-    color: #FFA500; 
-  }
-  .dt-cell__content--header-6 {
-    background-color: #FFA500 !important; 
-    color: white;
-  }
-  .dt-cell__content--col-7 {
-    color: #A4D3B4; /* Light pastel orange for text */
-  }
-  .dt-cell__content--header-7 {
-    background-color: #A4D3B4 !important; 
-    color: white; 
-  }
+/* Hide additional columns */
+.dt-cell__content--col-6, .dt-cell__content--header-6 { display: none; }
+.dt-cell__content--col-7, .dt-cell__content--header-7 { display: none; }
+
 `;
 document.head.appendChild(style);
 
