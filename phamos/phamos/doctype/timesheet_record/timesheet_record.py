@@ -17,6 +17,19 @@ class TimesheetRecord(Document):
 	def on_submit(self):
 		self.create_timesheet()
 
+	def on_cancel(self):
+		self.delete_timesheet()
+	
+	def delete_timesheet(self):
+		docstatus = frappe.db.get_value('Timesheet',self.timesheet,'docstatus')
+		if docstatus == 0:
+			frappe.db.set_value("Timesheet Record", self.name, "timesheet", '')
+			frappe.delete_doc('Timesheet',self.timesheet)
+			frappe.msgprint(_('Timesheet {0} deleted successfully').format(self.timesheet))
+			self.reload()
+		elif docstatus == 1:
+			frappe.throw(_('The timesheet {0} linked to record {1} has already been submitted and cannot be canceled.').format(self.timesheet, self.name))
+
 	def create_timesheet(self):
 		description = "{0} : {1}".format(self.goal, self.result)
 		actual_hours = round(float(self.actual_time) / 3600, 6)

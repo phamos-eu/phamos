@@ -418,7 +418,16 @@ frappe.pages["project-action-panel"].on_page_load = function (wrapper) {
                   read_only: 1,
                   default: customer,
                 },
-
+                {
+                  fieldtype: "Duration",
+                  label: __("Expected Time"),
+                  fieldname: "expected_time",
+                  in_list_view: 1,
+                  reqd: 1,
+                },
+                {
+                  fieldtype: "Column Break",
+                },
                 {
                   fieldtype: "Datetime",
                   label: __("From Time"),
@@ -426,16 +435,6 @@ frappe.pages["project-action-panel"].on_page_load = function (wrapper) {
                   in_list_view: 1,
                   reqd: 1,
                   read_only: 0,
-                },
-                {
-                  fieldtype: "Column Break",
-                },
-                {
-                  fieldtype: "Duration",
-                  label: __("Expected Time"),
-                  fieldname: "expected_time",
-                  in_list_view: 1,
-                  reqd: 1,
                 },
                 {
                   fieldtype: "Small Text",
@@ -523,8 +522,6 @@ function render_cards(wrapper, card_names) {
   });
 }
 
-
-
 // Function to render DataTable with tabs
 function renderDataTable(wrapper, projectData) {
  // Ensure wrapper is defined
@@ -534,7 +531,10 @@ function renderDataTable(wrapper, projectData) {
 
 // Set the default active tab to 'Your Projects'
 wrapper.innerHTML = `
-<h2 style="display: inline; margin-left: 50px; margin-top: 10px; font-size:30px">Project Action Panel</h2>
+<h2 style="display: inline; margin-left: 50px; margin-top: 10px; font-size:30px">
+    Project Action Panel
+    <!-- Info Icon -->
+</h2>
 <div class="form-tabs-list">
     <ul class="nav form-tabs" id="form-tabs" role="tablist">
         <li class="nav-item show">
@@ -556,6 +556,44 @@ wrapper.innerHTML = `
     <div id="datatable-wrapper"></div>
 </div>
 `;
+// Add CSS for the hover-over box
+const tooltipStyle = document.createElement("style");
+tooltipStyle.innerHTML = `
+  #info-icon {
+    position: relative;
+    cursor: pointer;
+  }
+
+  #info-icon:hover::after {
+    content: "Label Descriptions:\\A blue Color = Planned Hrs(P)\\A Orange Color = Spent Draft Hrs(D)\\A Green Color = Spent Submitted Hrs(S)";
+    white-space: pre-wrap;
+    position: absolute;
+    left: 50%;
+    top: 100%;
+    transform: translateX(-50%);
+    padding: 15px;
+    background-color: rgba(0, 0, 0, 0.8);
+    color: white;
+    border-radius: 5px;
+    font-size: 12px;
+    line-height: 1.5;
+    z-index: 1000;
+    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+    width: 250px;
+  }
+`;
+document.head.appendChild(tooltipStyle);
+
+// Add the info icon with hover functionality
+const infoIcon = document.createElement("span");
+infoIcon.id = "info-icon";
+infoIcon.innerHTML = "ℹ️"; // Info icon text or HTML (e.g., an SVG or font icon)
+infoIcon.style.fontSize = "20px";
+infoIcon.style.marginLeft = "10px";
+
+// Append the info icon next to the title
+const header = document.querySelector("h2");
+header.appendChild(infoIcon);
 
 // Get references to the tabs
 const your_projectsTab = document.getElementById("DAP-your-project-tab");
@@ -597,7 +635,6 @@ show_tab("Your Projects", projectData); // Set 'Your Projects' as default
 function show_tab(tab, projectData) {
 const cardWrapper = document.getElementById("card-wrapper");
 const datatableWrapper = document.getElementById("datatable-wrapper");
-
 // Clear previous content of cardWrapper and datatableWrapper
 cardWrapper.innerHTML = "";  // This will ensure the number cards don't duplicate
 datatableWrapper.innerHTML = ""; // Clear previous DataTable content
@@ -674,13 +711,13 @@ function renderProjectDataTable(datatableWrapper, projectData) {
 
   let columns = [
     { label: "<b>Project Name</b>", id: "project_name", fieldtype: "Data", width: 180, editable: false, visible: false },
-    { label: "<b>Project</b>", id: "project_desc", fieldtype: "Data", width: 200, editable: false, format: linkFormatter1 },
+    { label: "<b>Project</b>", id: "project_desc", fieldtype: "Data", width: 340, editable: false, format: linkFormatter1 },
     { label: "<b>Customer Name</b>", id: "customer", fieldtype: "Link", width: 120, editable: false },
-    { label: "<b>Customer</b>", id: "customer_desc", fieldtype: "Link", width: 180, editable: false, format: linkFormatter },
-    { label: "<b>Planned Hrs</b>", id: "planned_hours", fieldtype: "Data", width: 110, editable: false },
-    { label: "<b>Spent Draft Hrs</b>", id: "spent_hours_draft", fieldtype: "Float", width: 140, editable: false },
-    { label: "<b>Spent Submitted Hrs</b>", id: "spent_hours_submitted", fieldtype: "Float", width: 180, editable: false },
-    { label: "<b>Timesheet Record</b>", id: "timesheet_record", fieldtype: "Link", width: 160, editable: false, format: linkFormatter2 },
+    { label: "<b>Customer</b>", id: "customer_desc", fieldtype: "Link", width: 340, editable: false, format: linkFormatter },
+    { label: "<b>Hours Status</b>", id: "planned_hours", fieldtype: "Data", width: 230, editable: false,format: hoursFormatter },
+    { label: "<b></b>", id: "spent_hours_draft", fieldtype: "Float", width: 70, editable: false },
+    { label: "<b></b>", id: "spent_hours_submitted", fieldtype: "Float", width: 70, editable: false },
+    { label: "<b>Timesheet Record</b>", id: "timesheet_record", fieldtype: "Link", width: 180, editable: false, format: linkFormatter2 },
     { label: "<b>Name</b>", id: "name", fieldtype: "Link", width: 140, editable: false },
     { label: "<b>Action</b>", focusable: false, format: button_formatter, width: 100 },
     { label: "<b>percent_billable</b>", id: "percent_billable", fieldtype: "Data", width: 0, editable: false },
@@ -691,13 +728,33 @@ function renderProjectDataTable(datatableWrapper, projectData) {
       focusable: false, 
       format: button_formatter1, 
       width: 120 
+    }
+  ];
+  function hoursFormatter(value, row) {
+    const plannedHours = row[5]?.content || 0; // Planned hours
+    const spentDraft = row[6]?.content || 0;  // Spent hours (Draft)
+    const spentSubmitted = row[7]?.content || 0; // Spent hours (Submitted)
+  
+    // Combine into a styled display
+    return `
+    <div style="
+      text-align: center;
+      font-size: 10px;
+      border: 1px solid #ccc;
+      border-radius: 5px;
+      padding: 3px 5px;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    ">
+      <span style="color: #4682B4; font-weight: bold;">P: ${plannedHours} hrs</span> | 
+      <span style="color: #FFA500;">D: ${spentDraft} hrs</span> | 
+      <span style="color: #32CD32;">S: ${spentSubmitted} hrs</span>
+    </div>
+  `;
   }
   
-
   
-  ];
-  
-
   function linkFormatter1(value, row) {
     return `<a href="#" onclick="handleProjectClick('${row[9].content}');">${row[2].content}</a>`;
   }
@@ -710,24 +767,28 @@ function renderProjectDataTable(datatableWrapper, projectData) {
   // Add a combined style element to hide the specified columns and headers
 let style = document.createElement("style");
 style.innerHTML = `
-  /* Hide the "Name" column cells and header */
-  .dt-cell__content--col-9, .dt-cell__content--header-9 { display: none; }
+/* Hide the "Name" column cells and header */
+.dt-cell__content--col-9, .dt-cell__content--header-9 { display: none; }
 
-  /* Hide the "Customer Name" column cells and header */
-  .dt-cell__content--col-3, .dt-cell__content--header-3 { display: none; }
+/* Hide the "Customer Name" column cells and header */
+.dt-cell__content--col-3, .dt-cell__content--header-3 { display: none; }
 
-  /* Hide the "Project Name" column cells and header */
-  .dt-cell__content--col-1, .dt-cell__content--header-1 { display: none; }
+/* Hide the "Project Name" column cells and header */
+.dt-cell__content--col-1, .dt-cell__content--header-1 { display: none; }
 
-  /* Hide the "percent_billable" column cells and header */
-  .dt-cell__content--col-11, .dt-cell__content--header-11 { display: none; }
+/* Hide the "percent_billable" column cells and header */
+.dt-cell__content--col-11, .dt-cell__content--header-11 { display: none; }
 
-  /* Hide the "task" column cells and header */
-  .dt-cell__content--col-12, .dt-cell__content--header-12 { display: none; }
+/* Hide the "task" column cells and header */
+.dt-cell__content--col-12, .dt-cell__content--header-12 { display: none; }
 
-  /* Hide the "task_in_timesheet_record" column cells and header */
-  .dt-cell__content--col-13, .dt-cell__content--header-13 { display: none; }
-  
+/* Hide the "task_in_timesheet_record" column cells and header */
+.dt-cell__content--col-13, .dt-cell__content--header-13 { display: none; }
+
+/* Hide additional columns */
+.dt-cell__content--col-6, .dt-cell__content--header-6 { display: none; }
+.dt-cell__content--col-7, .dt-cell__content--header-7 { display: none; }
+
 `;
 document.head.appendChild(style);
 
