@@ -281,29 +281,49 @@ frappe.pages["project-action-panel"].on_page_load = function (wrapper) {
                       const minutes = Math.floor((seconds % 3600) / 60);
                       return `${hours} hrs ${minutes} mins`;
                     }
-                    const confirm_msg = 
-                      `Expected time is: ${formatTime(expected_time)} and actual work is: ${formatTime(r.message)}. Please review and confirm.`;
-                    frappe.confirm(
-                      confirm_msg,
-                      function () {
-                        // If user clicks "Yes"
-                        update_and_submit_timesheet_record(
-                          values.timesheet_record,
-                          values.task,
-                          values.to_time,
-                          values.percent_billable,
-                          values.activity_type,
-                          values.result
-                        );
-                        dialog.hide();
-      
-                      },
-                      function () {
-                        // If user clicks "No"
-                        //frappe.msgprint('You clicked No!');
-                        // Cancel the action here or do nothing
-                      }
-                    );
+                    
+                    const expectedHours = expected_time / 3600;
+                    const actualHours = r.message / 3600;
+                    const diffInHours = actualHours - expectedHours;
+                    if (diffInHours > 0.5) { // More than 30 minutes
+                      const message = `Actual work is more than 30 minutes above the expected time. Please review and confirm.`;
+                      const confirm_msg = `
+                        Expected time is: ${formatTime(expected_time)} and actual work is: ${formatTime(r.message)}. 
+                        ${message}
+                      `; 
+                      frappe.confirm(
+                        confirm_msg,
+                        function () {
+                          // If user clicks "Yes"
+                          update_and_submit_timesheet_record(
+                            values.timesheet_record,
+                            values.task,
+                            values.to_time,
+                            values.percent_billable,
+                            values.activity_type,
+                            values.result
+                          );
+                          dialog.hide();
+        
+                        },
+                        function () {
+                          // If user clicks "No"
+                          //frappe.msgprint('You clicked No!');
+                          // Cancel the action here or do nothing
+                        }
+                      );
+                    }
+                    else{
+                      update_and_submit_timesheet_record(
+                        values.timesheet_record,
+                        values.task,
+                        values.to_time,
+                        values.percent_billable,
+                        values.activity_type,
+                        values.result
+                      );
+                      dialog.hide();
+                    }
                   }
                 }
               });
