@@ -143,17 +143,21 @@ frappe.pages["project-action-panel"].on_page_load = function (wrapper) {
 
   window.stopProject = function (timesheet_record, percent_billable,project,task,task_in_timesheet_record) {
     let activity_type = "";
+    let from_time='';
+    let expected_time=''
     let timesheet_record_info = " Info from timesheet record";
     frappe.db.get_value(
       "Timesheet Record",
       { name: timesheet_record },
-      ["goal", "from_time"],
+      ["goal", "from_time","expected_time"],
       function (value) {
         // Your code here
+        from_time = value.from_time
+        expected_time = value.expected_time
         from_time_formatted = frappe.datetime.str_to_user(value.from_time);
         timesheet_record_info =
-          "From time: " + from_time_formatted + ",<br>Goal is: " + value.goal;
-
+          "From time: " + `${from_time_formatted} ` + ",<br>Expected Time : "+ `${(value.expected_time / 3600).toFixed(2)}`+ "hrs" + ",<br>Goal is: " + value.goal;
+         
         frappe.db.get_value(
           "Employee",
           { user_id: frappe.session.user },
@@ -261,15 +265,48 @@ frappe.pages["project-action-panel"].on_page_load = function (wrapper) {
               ],
               primary_action_label: __("Update Timesheet Record."),
               primary_action(values) {
-                update_and_submit_timesheet_record(
-                  values.timesheet_record,
-                  values.task,
-                  values.to_time,
-                  values.percent_billable,
-                  values.activity_type,
-                  values.result
-                );
-                dialog.hide();
+                // add Frappe Confirm Dialog validation on 'update timesheet record' button.
+                //Most of time user adds 'end date and time' wrong. If 'end date and time' is more than expected time, then we will prompt user to recheck and correct it.
+          
+              frappe.call({
+                method:"phamos.phamos.page.project_action_panel.project_action_panel.set_actual_time",
+                args: {
+                  "from_time": from_time,
+                  "to_time": values.to_time
+                },
+                callback: function(r) {
+                  if(!r.exc){
+                    function formatTime(seconds) {
+                      const hours = Math.floor(seconds / 3600);
+                      const minutes = Math.floor((seconds % 3600) / 60);
+                      return `${hours} hrs ${minutes} mins`;
+                    }
+                    const confirm_msg = 
+                      `Expected time is: ${formatTime(expected_time)} and actual work is: ${formatTime(r.message)}. Please review and confirm.`;
+                    frappe.confirm(
+                      confirm_msg,
+                      function () {
+                        // If user clicks "Yes"
+                        update_and_submit_timesheet_record(
+                          values.timesheet_record,
+                          values.task,
+                          values.to_time,
+                          values.percent_billable,
+                          values.activity_type,
+                          values.result
+                        );
+                        dialog.hide();
+      
+                      },
+                      function () {
+                        // If user clicks "No"
+                        //frappe.msgprint('You clicked No!');
+                        // Cancel the action here or do nothing
+                      }
+                    );
+                  }
+                }
+              });
               },
             });
             // Set the width using CSS
