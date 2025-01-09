@@ -285,16 +285,40 @@ frappe.pages["project-action-panel"].on_page_load = function (wrapper) {
                     const expectedHours = expected_time / 3600;
                     const actualHours = r.message / 3600;
                     const diffInHours = actualHours - expectedHours;
-                    if (diffInHours > 0.5) { // More than 30 minutes
-                      const message = `Actual work is more than 30 minutes above the expected time. Please review and confirm.`;
-                      const confirm_msg = `
-                        Expected time is: ${formatTime(expected_time)} and actual work is: ${formatTime(r.message)}. 
-                        ${message}
-                      `; 
-                      frappe.confirm(
-                        confirm_msg,
-                        function () {
-                          // If user clicks "Yes"
+
+                    frappe.db.get_single_value("phamos Settings", "allowed_additional_work_time").then((value) => {
+                      if(value) {
+                        allowed_additional_work_time_mins = value
+                        allowed_additional_work_time_hrs = allowed_additional_work_time_mins/60
+                        if (diffInHours > allowed_additional_work_time_hrs) { // More than 30 minutes
+                          const message = "Actual work is more than "+ allowed_additional_work_time_mins + "minutes above the expected time. Please review and confirm.";
+                          const confirm_msg = `
+                            Expected time is: ${formatTime(expected_time)} and actual work is: ${formatTime(r.message)}. 
+                            ${message}
+                          `; 
+                          frappe.confirm(
+                            confirm_msg,
+                            function () {
+                              // If user clicks "Yes"
+                              update_and_submit_timesheet_record(
+                                values.timesheet_record,
+                                values.task,
+                                values.to_time,
+                                values.percent_billable,
+                                values.activity_type,
+                                values.result
+                              );
+                              dialog.hide();
+            
+                            },
+                            function () {
+                              // If user clicks "No"
+                              //frappe.msgprint('You clicked No!');
+                              // Cancel the action here or do nothing
+                            }
+                          );
+                        }
+                        else{
                           update_and_submit_timesheet_record(
                             values.timesheet_record,
                             values.task,
@@ -304,26 +328,8 @@ frappe.pages["project-action-panel"].on_page_load = function (wrapper) {
                             values.result
                           );
                           dialog.hide();
-        
-                        },
-                        function () {
-                          // If user clicks "No"
-                          //frappe.msgprint('You clicked No!');
-                          // Cancel the action here or do nothing
                         }
-                      );
-                    }
-                    else{
-                      update_and_submit_timesheet_record(
-                        values.timesheet_record,
-                        values.task,
-                        values.to_time,
-                        values.percent_billable,
-                        values.activity_type,
-                        values.result
-                      );
-                      dialog.hide();
-                    }
+                      }})
                   }
                 }
               });
@@ -347,7 +353,7 @@ frappe.pages["project-action-panel"].on_page_load = function (wrapper) {
         docname: project_name, // The document name to be assigned
         callback: function (r) {
             // Handle the response from the assignment action
-            console.log(r.message); // This will contain the result of the assignment
+            
             if (r.message) {
                 // You can add logic here to update the UI or provide user feedback
                 frappe.show_alert({
@@ -875,7 +881,5 @@ document.head.appendChild(style);
   });
 
   // Apply styling to the card wrapper
- 
 }
-
 };

@@ -14,6 +14,8 @@
   "column_break_szyj",
   "enable_feedback_dialog",
   "is_employee_feedback",
+  "timesheet_settings_section",
+  "allowed_additional_work_time",
   "mattermost_daily_thread_settings_tab",
   "enable_daily_thread_creation",
   "thread_posting_hour",
@@ -91,12 +93,24 @@
    "fieldname": "last_daily_thread_creation_date",
    "fieldtype": "Date",
    "label": "Last Daily Thread Creation Date"
+  },
+  {
+   "fieldname": "timesheet_settings_section",
+   "fieldtype": "Section Break",
+   "label": "Timesheet Settings"
+  },
+  {
+   "default": "0",
+   "fieldname": "allowed_additional_work_time",
+   "fieldtype": "Int",
+   "label": "Allowed Additional Work Time (In Mins)",
+   "non_negative": 1
   }
  ],
  "index_web_pages_for_search": 1,
  "issingle": 1,
  "links": [],
- "modified": "2024-10-04 15:48:25.774179",
+ "modified": "2025-01-09 10:18:16.158855",
  "modified_by": "Administrator",
  "module": "Phamos",
  "name": "phamos Settings",
