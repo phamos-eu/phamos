@@ -291,3 +291,9 @@ def format_duration(duration_in_seconds):
 		return f"{minutes} Mins"
 	else:
 		return f"{seconds} Secs"
+
+
+@frappe.whitelist()
+def set_actual_time(from_time, to_time):
+	if from_time and to_time:
+		return time_diff_in_seconds(to_time, from_time)
