@@ -104,13 +104,14 @@
    "fieldname": "allowed_additional_work_time",
    "fieldtype": "Int",
    "label": "Allowed Additional Work Time (In Mins)",
-   "non_negative": 1
+   "non_negative": 1,
+   "print_width": "70"
   }
  ],
  "index_web_pages_for_search": 1,
  "issingle": 1,
  "links": [],
- "modified": "2025-01-09 10:18:16.158855",
+ "modified": "2025-01-09 18:56:24.823304",
  "modified_by": "Administrator",
  "module": "Phamos",
  "name": "phamos Settings",
