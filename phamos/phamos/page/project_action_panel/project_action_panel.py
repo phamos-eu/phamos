@@ -129,71 +129,47 @@ def fetch_projects():
 
 @frappe.whitelist()
 def fetch_all_projects():
-    # Custom SQL query to fetch project data
-    '''project = frappe.qb.DocType("Project")
+    project = frappe.qb.DocType("Project")
     customer = frappe.qb.DocType("Customer")
     todo = frappe.qb.DocType("ToDo")
-    customer_subquery = (
-         frappe.qb.from_(customer)
-         .select(
-              (Case()
-                    .when(customer.name != customer.customer_name,Concat(customer.name, " - ", customer.customer_name))
-                    .else_(customer.customer_name)
-                ).as_("customer_desc"),   
-         )
-         .where(customer.name == project.customer )
-    )
-    todo_subquery = (
-         frappe.qb.from_(todo)
-         .select(Max(todo.reference_name))
-         .where(
-              (todo.status == "Open")&
-              (todo.reference_name == project.name)&
-              (todo.allocated_to != frappe.session.user)
-         )
-    )
-    projects = (
-            frappe.qb.from_(project)
-            .left_join(todo)
-            .on((todo.reference_name == project.name) & (todo.status == "Open"))
-            .select(
-                project.name.as_("name"),
-                project.status.as_("status"),
-                project.project_name.as_("project_name"),
-                Concat(project.name, " - ", project.project_name).as_("project_desc"),
-                project.customer.as_("customer"),
-                (customer_subquery).as_("customer_desc")
-            )
-            .where(
-                (project.status == "Open")&
-                ((todo.allocated_to.isnull()) | todo.allocated_to != frappe.session.user))
-            .run(as_dict=True) ) '''
-    
-    projects = frappe.db.sql("""
-    SELECT 
-        p.name AS name, 
-        p.status AS status, 
-        p.project_name AS project_name, 
-        CONCAT(p.name, " - ", p.project_name) AS project_desc,
-        (SELECT c.name FROM `tabCustomer` c WHERE p.customer = c.name) AS customer,
-        (SELECT 
-            CASE 
-                WHEN c.name != c.customer_name THEN CONCAT(c.name, " - ", c.customer_name) 
-                ELSE c.customer_name 
-            END 
-         FROM `tabCustomer` c WHERE p.customer = c.name) AS customer_desc
-    FROM 
-        `tabProject` p
-    WHERE 
-        NOT EXISTS (
-            SELECT 1 
-            FROM `tabToDo` td 
-            WHERE td.status = "Open" 
-              AND td.reference_name = p.name 
-              AND td.allocated_to = %(user)s
-        )
-    """, {"user": frappe.session.user}, as_dict=True)
 
+    customer_subquery = (
+        frappe.qb.from_(customer)
+        .select(
+            (
+                Case()
+                .when(customer.name != customer.customer_name, Concat(customer.name, " - ", customer.customer_name))
+                .else_(customer.customer_name)
+            ).as_("customer_desc")
+        )
+        .where(customer.name == project.customer)
+        )
+
+    todo_subquery = (
+        frappe.qb.from_(todo)
+        .select(todo.reference_name)
+        .where(
+            (todo.status == "Open") &
+            (todo.allocated_to == frappe.session.user)
+        )
+        )
+
+    projects = (
+        frappe.qb.from_(project)
+        .select(
+            project.name.as_("name"),
+            project.status.as_("status"),
+            project.project_name.as_("project_name"),
+            Concat(project.name, " - ", project.project_name).as_("project_desc"),
+            project.customer.as_("customer"),
+            customer_subquery.as_("customer_desc")
+        )
+        .where(
+            (project.status == "Open") &
+            (project.name.notin(todo_subquery)) 
+        )
+        ).run(as_dict=True)
+ 
     # Return project data
     return projects
 
