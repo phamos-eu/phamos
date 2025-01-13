@@ -5,6 +5,8 @@ from frappe.utils import cstr, now_datetime, time_diff_in_seconds, get_datetime,
 from frappe.utils.data import add_to_date,format_duration, time_diff_in_seconds
 from datetime import datetime
 from datetime import datetime, timedelta
+from frappe.query_builder import Field,Case, Order
+from frappe.query_builder.functions import Concat,Max
 
 @frappe.whitelist()
 def create_timesheet_record(project_name,  customer, from_time, expected_time, goal,task=None):
@@ -128,26 +130,46 @@ def fetch_projects():
 @frappe.whitelist()
 def fetch_all_projects():
     # Custom SQL query to fetch project data
-    employee_name = frappe.db.get_value("Employee", {"user_id": frappe.session.user}, "name")
-    projects = frappe.db.sql("""
-        SELECT p.percent_billable as percent_billable ,p.name AS name, p.planned_hours AS planned_hours,p.task_in_timesheet_record, p.status AS status, p.notes AS notes, p.project_name AS project_name, CONCAT(p.name, " - ", p.project_name) AS project_desc,
-        ROUND((SELECT SUM(t.total_hours) FROM `tabTimesheet` t 
-        WHERE t.docstatus = 0 and t.employee = %(employee)s AND t.name IN (SELECT td.parent FROM `tabTimesheet Detail` td WHERE td.project = p.name)), 3) AS spent_hours_draft,
-        ROUND((SELECT SUM(t.total_hours) FROM `tabTimesheet` t 
-        WHERE t.docstatus = 1 and t.employee = %(employee)s AND t.name IN (SELECT td.parent FROM `tabTimesheet Detail` td WHERE td.project = p.name)), 3) AS spent_hours_submitted,
-        (SELECT name FROM `tabCustomer` c WHERE p.customer = c.name) AS customer,
-        (SELECT CASE WHEN c.name != c.customer_name THEN CONCAT(c.name, " - ", c.customer_name) ELSE c.customer_name END FROM `tabCustomer` c WHERE p.customer = c.name) AS customer_desc,
-        (SELECT max(ts.name) FROM `tabTimesheet Record` ts WHERE ts.project = p.name AND ts.employee = %(employee)s AND ts.docstatus = 0) AS timesheet_record,
-        (SELECT (ts1.task) FROM `tabTimesheet Record` ts1 WHERE ts1.name = (SELECT max(ts.name) FROM `tabTimesheet Record` ts WHERE ts.project = p.name AND ts.employee = %(employee)s AND ts.docstatus = 0)) AS task
-        FROM `tabProject` p
-        ORDER BY timesheet_record IS NULL, timesheet_record ASC  # Show records with timesheet_record first
-    """, {"employee": employee_name, "user": frappe.session.user}, as_dict=True)
-
+    project = frappe.qb.DocType("Project")
+    customer = frappe.qb.DocType("Customer")
+    todo = frappe.qb.DocType("ToDo")
+    customer_subquery = (
+         frappe.qb.from_(customer)
+         .select(
+              (Case()
+                    .when(customer.name != customer.customer_name,Concat(customer.name, " - ", customer.customer_name))
+                    .else_(customer.customer_name)
+                ).as_("customer_desc"),   
+         )
+         .where(customer.name == project.customer )
+    )
+    todo_subquery = (
+         frappe.qb.from_(todo)
+         .select(Max(todo.reference_name))
+         .where(
+              (todo.status == "Open")&
+              (todo.reference_name == project.name)&
+              (todo.allocated_to != frappe.session.user)
+         )
+    )
+    projects = (
+            frappe.qb.from_(project)
+            .left_join(todo)
+            .on((todo.reference_name == project.name) & (todo.status == "Open"))
+            .select(
+                project.name.as_("name"),
+                project.status.as_("status"),
+                project.project_name.as_("project_name"),
+                Concat(project.name, " - ", project.project_name).as_("project_desc"),
+                project.customer.as_("customer"),
+                (customer_subquery).as_("customer_desc")
+            )
+            .where(
+                (project.status == "Open")&
+                ((todo.allocated_to.isnull()) | todo.allocated_to != frappe.session.user))
+            .run(as_dict=True) )
     # Return project data
     return projects
-
-
-
 
 @frappe.whitelist()
 def get_permitted_cards(dashboard_name):
@@ -297,3 +319,31 @@ def format_duration(duration_in_seconds):
 def set_actual_time(from_time, to_time):
 	if from_time and to_time:
 		return time_diff_in_seconds(to_time, from_time)
+     
+@frappe.whitelist()
+def self_assign_project(project_name):
+    try:
+        # Fetch the current employee name linked to the logged-in user
+        employee_name = frappe.get_cached_value("Employee", {"user_id": frappe.session.user}, "employee_name")
+        
+        if not employee_name:
+            frappe.throw(_("Employee not found for the current user."))
+
+        # Create a new ToDo record
+        todo_record = frappe.new_doc("ToDo")
+        todo_record.update({
+            "status": "Open",
+            "allocated_to": frappe.session.user,
+            "description": f"Assignment for Project {project_name}",
+            "reference_type": "Project",
+            "reference_name": project_name,
+            "assigned_by": frappe.session.user,
+            "assigned_by_full_name": employee_name
+        })
+        todo_record.insert()
+
+        return _("Project assignment created successfully.")
+
+    except Exception as e:
+        frappe.log_error(frappe.get_traceback(), _("Project Assignment Error"))
+        frappe.throw(_("An error occurred while assigning the project. Please check the error logs."))
