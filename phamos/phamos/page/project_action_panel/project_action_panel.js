@@ -97,6 +97,32 @@ frappe.pages["project-action-panel"].on_page_load = function (wrapper) {
       },
     });
   }
+  window.toggleDropdown = function (event, dropdownId) {
+    event.stopPropagation(); // Prevent clicks from propagating to the document
+  
+    const dropdown = document.getElementById(dropdownId);
+    if (!dropdown) {
+      console.error(`Dropdown with ID ${dropdownId} not found`); // Debugging log
+      return;
+    }
+  
+    // Close other open dropdowns
+    document.querySelectorAll('.dropdown-menu').forEach((menu) => {
+      if (menu !== dropdown) {
+        menu.style.display = 'none';
+      }
+    });
+  
+    // Toggle visibility of the clicked dropdown
+    dropdown.style.display = dropdown.style.display === 'block' ? 'none' : 'block';
+  };
+  // Close dropdowns when clicking outside
+document.addEventListener('click', () => {
+  document.querySelectorAll('.dropdown-menu').forEach((menu) => {
+    menu.style.display = 'none';
+  });
+});
+  
 
   window.handleCustomerClick = function (customer_name) {
     // Get the base URL of the current page
@@ -143,17 +169,21 @@ frappe.pages["project-action-panel"].on_page_load = function (wrapper) {
 
   window.stopProject = function (timesheet_record, percent_billable,project,task,task_in_timesheet_record) {
     let activity_type = "";
+    let from_time='';
+    let expected_time=''
     let timesheet_record_info = " Info from timesheet record";
     frappe.db.get_value(
       "Timesheet Record",
       { name: timesheet_record },
-      ["goal", "from_time"],
+      ["goal", "from_time","expected_time"],
       function (value) {
         // Your code here
+        from_time = value.from_time
+        expected_time = value.expected_time
         from_time_formatted = frappe.datetime.str_to_user(value.from_time);
         timesheet_record_info =
-          "From time: " + from_time_formatted + ",<br>Goal is: " + value.goal;
-
+          "From time: " + `${from_time_formatted} ` + ",<br>Expected Time : "+ `${(value.expected_time / 3600).toFixed(2)}`+ "hrs" + ",<br>Goal is: " + value.goal;
+         
         frappe.db.get_value(
           "Employee",
           { user_id: frappe.session.user },
@@ -261,15 +291,74 @@ frappe.pages["project-action-panel"].on_page_load = function (wrapper) {
               ],
               primary_action_label: __("Update Timesheet Record."),
               primary_action(values) {
-                update_and_submit_timesheet_record(
-                  values.timesheet_record,
-                  values.task,
-                  values.to_time,
-                  values.percent_billable,
-                  values.activity_type,
-                  values.result
-                );
-                dialog.hide();
+                // add Frappe Confirm Dialog validation on 'update timesheet record' button.
+                //Most of time user adds 'end date and time' wrong. If 'end date and time' is more than expected time, then we will prompt user to recheck and correct it.
+          
+              frappe.call({
+                method:"phamos.phamos.page.project_action_panel.project_action_panel.set_actual_time",
+                args: {
+                  "from_time": from_time,
+                  "to_time": values.to_time
+                },
+                callback: function(r) {
+                  if(!r.exc){
+                    function formatTime(seconds) {
+                      const hours = Math.floor(seconds / 3600);
+                      const minutes = Math.floor((seconds % 3600) / 60);
+                      return `${hours} hrs ${minutes} mins`;
+                    }
+                    
+                    const expectedHours = expected_time / 3600;
+                    const actualHours = r.message / 3600;
+                    const diffInHours = actualHours - expectedHours;
+
+                    frappe.db.get_single_value("phamos Settings", "allowed_additional_work_time").then((value) => {
+                      if(value) {
+                        allowed_additional_work_time_mins = value
+                        allowed_additional_work_time_hrs = allowed_additional_work_time_mins/60
+                        if (diffInHours > allowed_additional_work_time_hrs) { // More than 30 minutes
+                          const message = "Actual work is more than "+ allowed_additional_work_time_mins + "minutes above the expected time. Please review and confirm.";
+                          const confirm_msg = `
+                            Expected time is: ${formatTime(expected_time)} and actual work is: ${formatTime(r.message)}. 
+                            ${message}
+                          `; 
+                          frappe.confirm(
+                            confirm_msg,
+                            function () {
+                              // If user clicks "Yes"
+                              update_and_submit_timesheet_record(
+                                values.timesheet_record,
+                                values.task,
+                                values.to_time,
+                                values.percent_billable,
+                                values.activity_type,
+                                values.result
+                              );
+                              dialog.hide();
+            
+                            },
+                            function () {
+                              // If user clicks "No"
+                              //frappe.msgprint('You clicked No!');
+                              // Cancel the action here or do nothing
+                            }
+                          );
+                        }
+                        else{
+                          update_and_submit_timesheet_record(
+                            values.timesheet_record,
+                            values.task,
+                            values.to_time,
+                            values.percent_billable,
+                            values.activity_type,
+                            values.result
+                          );
+                          dialog.hide();
+                        }
+                      }})
+                  }
+                }
+              });
               },
             });
             // Set the width using CSS
@@ -281,7 +370,30 @@ frappe.pages["project-action-panel"].on_page_load = function (wrapper) {
     );
   };
   //return record.timesheet_record_draft;
- 
+  window.selfAssignProjcet = function(project_name){
+    frappe.call({
+      method:"phamos.phamos.page.project_action_panel.project_action_panel.self_assign_project",
+      args:{
+        project_name :project_name
+      },
+      callback:function(r){
+        if(r.message){
+          frappe.msgprint({
+            title:__("Success"),
+            message:__("Project Assigned Successfully."),
+            indicator:"green"
+          });
+        }
+      },
+      error:function(err){
+        frappe.msgprint({
+          title:__("Error"),
+          message:__("Failed to assign project. Please Check the error logs."),
+          indicator:"red"
+        });
+      }
+    })
+  }
   window.assignProject = function(project_name) {
     // Instantiate AssignToDialog if not already done
     let assign_to = new frappe.ui.form.AssignToDialog({
@@ -290,7 +402,7 @@ frappe.pages["project-action-panel"].on_page_load = function (wrapper) {
         docname: project_name, // The document name to be assigned
         callback: function (r) {
             // Handle the response from the assignment action
-            console.log(r.message); // This will contain the result of the assignment
+            
             if (r.message) {
                 // You can add logic here to update the UI or provide user feedback
                 frappe.show_alert({
@@ -650,6 +762,9 @@ if (tab === "Your Projects") {
             display: none; 
             width: 0; 
         }
+        .dt-cell__content--col-5, .dt-cell__content--header-5 { display: table-cell; }
+        .dt-cell__content--col-8, .dt-cell__content--header-8 { display: table-cell;}
+        .dt-cell__content--col-10, .dt-cell__content--header-10 { display: table-cell; }
     `;
     document.head.appendChild(style);
 
@@ -662,9 +777,12 @@ if (tab === "Your Projects") {
 } else if (tab === "All Projects") {
   let style = document.createElement("style");
   style.innerHTML = `
-    /* Hide the "Name" column cells and header */
+    /* unHide the "Name" column cells and header */
     .dt-cell__content--col-14, .dt-cell__content--header-14 { display: table-cell; }
-  `;
+    .dt-cell__content--col-5, .dt-cell__content--header-5 { display: none; }
+    .dt-cell__content--col-8, .dt-cell__content--header-8 { display: none; }
+    .dt-cell__content--col-10, .dt-cell__content--header-10 { display: none; }
+    `;
   document.head.appendChild(style);
 
   // Define the cards to display
@@ -708,7 +826,35 @@ function renderProjectDataTable(datatableWrapper, projectData) {
       return `<button type="button" style="height: 23px; width: 60px; display: flex; align-items: center; justify-content: center; background-color: rgb(139, 0, 0);" class="btn btn-primary btn-sm btn-modal-primary" onclick="stopProject('${row[8].content}','${row[11].content}', '${row[9].content}','${row[12]?.content || ''}','${row[13]?.content}')">Stop</button>`;
     }
   };
-
+  
+  const button_formatter2 = (value, row, column, rowIndex, columnIndex, data) => {
+    // Extract the actual row index
+    const actualRowIndex = row[0]?.rowIndex;
+    
+    // Fallback for unique ID
+    const uniqueId = actualRowIndex !== undefined ? actualRowIndex : `row-${Math.random().toString(36).substring(7)}`;
+    const dropdownId = `dropdownMenu-${uniqueId}`;
+  
+    return `
+      <div class="custom-dropdown">
+        <button
+          class="btn btn-primary btn-sm btn-modal-primary dropdown-btn"
+          type="button"
+          style="height: 23px; width: 60px; display: flex; align-items: center; justify-content: center; background-color: rgb(255, 140, 0);"
+          onclick="toggleDropdown(event, '${dropdownId}')"
+        >
+          Assign
+        </button>
+        <div class="dropdown-menu" id="${dropdownId}">
+          <a class="dropdown-item" href="#" data-option="Self" onclick="selfAssignProjcet('${row?.[9]?.content || ''}')">Self</a>
+          <a class="dropdown-item" href="#" data-option="Others" onclick="assignProject('${row?.[9]?.content || ''}')">Others</a>
+        </div>
+      </div>
+    `;
+  };
+  
+  
+  
   let columns = [
     { label: "<b>Project Name</b>", id: "project_name", fieldtype: "Data", width: 180, editable: false, visible: false },
     { label: "<b>Project</b>", id: "project_desc", fieldtype: "Data", width: 340, editable: false, format: linkFormatter1 },
@@ -726,7 +872,7 @@ function renderProjectDataTable(datatableWrapper, projectData) {
     {
       label: '<svg class="icon icon-sm"><use href="#icon-assign"></use></svg> <b>Assign To</b>', 
       focusable: false, 
-      format: button_formatter1, 
+      format: button_formatter2, 
       width: 120 
     }
   ];
@@ -818,7 +964,5 @@ document.head.appendChild(style);
   });
 
   // Apply styling to the card wrapper
- 
 }
-
 };
