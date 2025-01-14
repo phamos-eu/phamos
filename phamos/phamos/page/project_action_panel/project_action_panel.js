@@ -26,7 +26,7 @@ frappe.pages["project-action-panel"].on_page_load = function (wrapper) {
       },
     });
   }
-  
+ 
   // Fetch project data from the server on page load
   render_datatable();
 
@@ -97,6 +97,8 @@ frappe.pages["project-action-panel"].on_page_load = function (wrapper) {
       },
     });
   }
+
+
   window.toggleDropdown = function (event, dropdownId) {
     event.stopPropagation(); // Prevent clicks from propagating to the document
   
@@ -116,12 +118,14 @@ frappe.pages["project-action-panel"].on_page_load = function (wrapper) {
     // Toggle visibility of the clicked dropdown
     dropdown.style.display = dropdown.style.display === 'block' ? 'none' : 'block';
   };
+
+
   // Close dropdowns when clicking outside
-document.addEventListener('click', () => {
-  document.querySelectorAll('.dropdown-menu').forEach((menu) => {
-    menu.style.display = 'none';
+  document.addEventListener('click', () => {
+    document.querySelectorAll('.dropdown-menu').forEach((menu) => {
+      menu.style.display = 'none';
+    });
   });
-});
   
 
   window.handleCustomerClick = function (customer_name) {
@@ -138,6 +142,7 @@ document.addEventListener('click', () => {
     return false;
   };
 
+
   window.handleProjectClick = function (project_name) {
     // Get the base URL of the current page
     let baseUrl = window.location.href.split("/").slice(0, 3).join("/"); // Extract protocol, hostname, and port
@@ -151,6 +156,8 @@ document.addEventListener('click', () => {
     // Optionally, return false to prevent the default link behavior (not necessary in this case)
     return false;
   };
+
+
   window.handleTimesheetClick = function (timesheet) {
     // Get the base URL of the current page
     let baseUrl = window.location.href.split("/").slice(0, 3).join("/"); // Extract protocol, hostname, and port
@@ -166,6 +173,7 @@ document.addEventListener('click', () => {
     // Optionally, return false to prevent the default link behavior (not necessary in this case)
     return false;
   };
+
 
   window.stopProject = function (timesheet_record, percent_billable,project,task,task_in_timesheet_record) {
     let activity_type = "";
@@ -370,7 +378,8 @@ document.addEventListener('click', () => {
     );
   };
   //return record.timesheet_record_draft;
-  window.selfAssignProjcet = function(project_name){
+
+  window.selfAssignProject = function(project_name){
     frappe.call({
       method:"phamos.phamos.page.project_action_panel.project_action_panel.self_assign_project",
       args:{
@@ -383,6 +392,7 @@ document.addEventListener('click', () => {
             message:__("Project Assigned Successfully."),
             indicator:"green"
           });
+          render_datatable() 
         }
       },
       error:function(err){
@@ -394,6 +404,7 @@ document.addEventListener('click', () => {
       }
     })
   }
+
   window.assignProject = function(project_name) {
     // Instantiate AssignToDialog if not already done
     let assign_to = new frappe.ui.form.AssignToDialog({
@@ -409,6 +420,7 @@ document.addEventListener('click', () => {
                     message: __('Users assigned successfully!'),
                     indicator: 'green'
                 });
+                render_datatable() 
             }
         },
     });
@@ -424,7 +436,8 @@ document.addEventListener('click', () => {
     } else {
         console.error("Error: AssignToDialog was not instantiated correctly.");
     }
-};
+  };
+
 
   window.startProject = function (project_name, customer,project,task_in_timesheet_record) {
     frappe.call({
@@ -583,230 +596,232 @@ document.addEventListener('click', () => {
     });
   };
 
+
   // Function to render number cards
-function render_cards(wrapper, card_names) {
-  return frappe.call({
-    method: "phamos.phamos.page.project_action_panel.project_action_panel.get_permitted_cards",
-    args: { 
-      dashboard_name: "Project Management",
-      
-    },
-    callback: function (response) {
-      var cards = response.message;
-      if (!cards || !cards.length) {
-        return;
-      }
+  function render_cards(wrapper, card_names) {
+    return frappe.call({
+      method: "phamos.phamos.page.project_action_panel.project_action_panel.get_permitted_cards",
+      args: { 
+        dashboard_name: "Project Management",
+      },
+      callback: function (response) {
+        var cards = response.message;
+        if (!cards || !cards.length) {
+          return;
+        }
 
       // Filter the cards based on card_names
-      var filtered_cards = cards.filter(function(card) {
-        return card_names.includes(card.card);
-      });
+        var filtered_cards = cards.filter(function(card) {
+          return card_names.includes(card.card);
+        });
 
-      var number_cards = filtered_cards.map(function (card) {
-        return {
-          name: card.card,
-        };
-      });
+        var number_cards = filtered_cards.map(function (card) {
+          return {
+            name: card.card,
+          };
+        });
 
-      var number_card_group = new frappe.widget.WidgetGroup({
-        container: wrapper, 
-        type: "number_card",
-        columns: 3,
-        options: {
-          allow_sorting: false,
-          allow_create: false,
-          allow_delete: false,
-          allow_hiding: false,
-          allow_edit: false,
-        },
-        widgets: number_cards,
-      });
+        var number_card_group = new frappe.widget.WidgetGroup({
+          container: wrapper, 
+          type: "number_card",
+          columns: 3,
+          options: {
+            allow_sorting: false,
+            allow_create: false,
+            allow_delete: false,
+            allow_hiding: false,
+            allow_edit: false,
+          },
+          widgets: number_cards,
+        });
 
-      $(wrapper).find(".widget.number-widget-box").css({
-        width: "250px", 
-      });
+        $(wrapper).find(".widget.number-widget-box").css({
+         width: "250px", 
+        });
 
-      $(wrapper).find(".widget-group-body.grid-col-3").css({
-        display: "flex", 
-        "flex-wrap": "nowrap", 
-      });
-    },
-  });
-}
+        $(wrapper).find(".widget-group-body.grid-col-3").css({
+          display: "flex", 
+          "flex-wrap": "nowrap", 
+        });
+      },
+    });
+  }
 
-// Function to render DataTable with tabs
+  
+  // Function to render DataTable with tabs
 function renderDataTable(wrapper, projectData) {
  // Ensure wrapper is defined
- if (!wrapper) {
-  return;
-}
+    if (!wrapper) {
+      return;
+    }
 
-// Set the default active tab to 'Your Projects'
-wrapper.innerHTML = `
-<h2 style="display: inline; margin-left: 50px; margin-top: 10px; font-size:30px">
-    Project Action Panel
-    <!-- Info Icon -->
-</h2>
-<div class="form-tabs-list">
-    <ul class="nav form-tabs" id="form-tabs" role="tablist">
-        <li class="nav-item show">
-            <!-- 'Your Projects' tab is the default active tab -->
-            <a class="nav-link active" id="DAP-your-project-tab" role="tab" aria-controls="your-projects" aria-selected="true">
-                Your Projects
-            </a>
-        </li>
-        <li class="nav-item show">
-            <!-- 'All Projects' tab is inactive by default -->
-            <a class="nav-link" id="DAP-all-project-tab" role="tab" aria-controls="all-projects" aria-selected="false">
-                All Projects
-            </a>
-        </li>
-    </ul>
-</div>
-<div id="content-wrapper" style="margin-top: 20px; margin-left: 30px;">
-    <div id="card-wrapper"></div>
-    <div id="datatable-wrapper"></div>
-</div>
-`;
+    // Set the default active tab to 'Your Projects'
+    wrapper.innerHTML = `
+        <h2 style="display: inline; margin-left: 50px; margin-top: 10px; font-size:30px">
+          Project Action Panel
+          <!-- Info Icon -->
+        </h2>
+        <div class="form-tabs-list">
+          <ul class="nav form-tabs" id="form-tabs" role="tablist">
+            <li class="nav-item show">
+              <!-- 'Your Projects' tab is the default active tab -->
+              <a class="nav-link active" id="DAP-your-project-tab" role="tab" aria-controls="your-projects" aria-selected="true">
+                  Your Projects
+              </a>
+            </li>
+            <li class="nav-item show">
+              <!-- 'All Projects' tab is inactive by default -->
+              <a class="nav-link" id="DAP-all-project-tab" role="tab" aria-controls="all-projects" aria-selected="false">
+                  All Projects
+              </a>
+            </li>
+          </ul>
+        </div>
+        <div id="content-wrapper" style="margin-top: 20px; margin-left: 30px;">
+          <div id="card-wrapper"></div>
+          <div id="datatable-wrapper"></div>
+        </div>
+      `;
 // Add CSS for the hover-over box
-const tooltipStyle = document.createElement("style");
-tooltipStyle.innerHTML = `
-  #info-icon {
-    position: relative;
-    cursor: pointer;
-  }
+    const tooltipStyle = document.createElement("style");
+    tooltipStyle.innerHTML = `
+    #info-icon {
+      position: relative;
+      cursor: pointer;
+    }
 
-  #info-icon:hover::after {
-    content: "Label Descriptions:\\A blue Color = Planned Hrs(P)\\A Orange Color = Spent Draft Hrs(D)\\A Green Color = Spent Submitted Hrs(S)";
-    white-space: pre-wrap;
-    position: absolute;
-    left: 50%;
-    top: 100%;
-    transform: translateX(-50%);
-    padding: 15px;
-    background-color: rgba(0, 0, 0, 0.8);
-    color: white;
-    border-radius: 5px;
-    font-size: 12px;
-    line-height: 1.5;
-    z-index: 1000;
-    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
-    width: 250px;
-  }
-`;
-document.head.appendChild(tooltipStyle);
+    #info-icon:hover::after {
+        content: "Label Descriptions:\\A blue Color = Planned Hrs(P)\\A Orange Color = Spent Draft Hrs(D)\\A Green Color = Spent Submitted Hrs(S)";
+        white-space: pre-wrap;
+        position: absolute;
+        left: 50%;
+        top: 100%;
+        transform: translateX(-50%);
+        padding: 15px;
+        background-color: rgba(0, 0, 0, 0.8);
+        color: white;
+        border-radius: 5px;
+        font-size: 12px;
+        line-height: 1.5;
+        z-index: 1000;
+        box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+        width: 250px;
+      }
+    `;
+    document.head.appendChild(tooltipStyle);
 
-// Add the info icon with hover functionality
-const infoIcon = document.createElement("span");
-infoIcon.id = "info-icon";
-infoIcon.innerHTML = "ℹ️"; // Info icon text or HTML (e.g., an SVG or font icon)
-infoIcon.style.fontSize = "20px";
-infoIcon.style.marginLeft = "10px";
+    // Add the info icon with hover functionality
+    const infoIcon = document.createElement("span");
+    infoIcon.id = "info-icon";
+    infoIcon.innerHTML = "ℹ️"; // Info icon text or HTML (e.g., an SVG or font icon)
+    infoIcon.style.fontSize = "20px";
+    infoIcon.style.marginLeft = "10px";
 
-// Append the info icon next to the title
-const header = document.querySelector("h2");
-header.appendChild(infoIcon);
+    // Append the info icon next to the title
+    const header = document.querySelector("h2");
+    header.appendChild(infoIcon);
 
-// Get references to the tabs
-const your_projectsTab = document.getElementById("DAP-your-project-tab");
-const all_projectsTab = document.getElementById("DAP-all-project-tab");
+    // Get references to the tabs
+    const your_projectsTab = document.getElementById("DAP-your-project-tab");
+    const all_projectsTab = document.getElementById("DAP-all-project-tab");
 
-// Event listener for the Your Projects tab
-your_projectsTab.addEventListener("click", () => {
-  // Remove 'active' class from All Projects tab and set to Your Projects
-  all_projectsTab.classList.remove("active");
-  your_projectsTab.classList.add("active");
+    // Event listener for the Your Projects tab
+    your_projectsTab.addEventListener("click", () => {
+      // Remove 'active' class from All Projects tab and set to Your Projects
+      all_projectsTab.classList.remove("active");
+      your_projectsTab.classList.add("active");
 
-  // Set visual feedback for selection
-  your_projectsTab.setAttribute("aria-selected", "true");
-  all_projectsTab.setAttribute("aria-selected", "false");
+      // Set visual feedback for selection
+      your_projectsTab.setAttribute("aria-selected", "true");
+      all_projectsTab.setAttribute("aria-selected", "false");
 
-  // Show content for the Your Projects tab
-  show_tab("Your Projects", projectData);
-});
+    // Show content for the Your Projects tab
+      show_tab("Your Projects", projectData);
+    });
 
-// Event listener for the All Projects tab
-all_projectsTab.addEventListener("click", () => {
-  // Remove 'active' class from Your Projects tab and set to All Projects
-  your_projectsTab.classList.remove("active");
-  all_projectsTab.classList.add("active");
+    // Event listener for the All Projects tab
+    all_projectsTab.addEventListener("click", () => {
+        // Remove 'active' class from Your Projects tab and set to All Projects
+        your_projectsTab.classList.remove("active");
+        all_projectsTab.classList.add("active");
 
-  // Set visual feedback for selection
-  all_projectsTab.setAttribute("aria-selected", "true");
-  your_projectsTab.setAttribute("aria-selected", "false");
+        // Set visual feedback for selection
+        all_projectsTab.setAttribute("aria-selected", "true");
+        your_projectsTab.setAttribute("aria-selected", "false");
 
-  // Show content for the All Projects tab
-  show_tab("All Projects", projectData);
-});
+        // Show content for the All Projects tab
+      show_tab("All Projects", projectData);
+    });
 
-// Initial tab content setup: Show content for 'Your Projects' by default
-show_tab("Your Projects", projectData); // Set 'Your Projects' as default
+  // Initial tab content setup: Show content for 'Your Projects' by default
+  show_tab("Your Projects", projectData); // Set 'Your Projects' as default
 }
 
 // Show tab content based on the selected tab
 function show_tab(tab, projectData) {
-const cardWrapper = document.getElementById("card-wrapper");
-const datatableWrapper = document.getElementById("datatable-wrapper");
-// Clear previous content of cardWrapper and datatableWrapper
-cardWrapper.innerHTML = "";  // This will ensure the number cards don't duplicate
-datatableWrapper.innerHTML = ""; // Clear previous DataTable content
+    const cardWrapper = document.getElementById("card-wrapper");
+    const datatableWrapper = document.getElementById("datatable-wrapper");
+    // Clear previous content of cardWrapper and datatableWrapper
+    cardWrapper.innerHTML = "";  // This will ensure the number cards don't duplicate
+    datatableWrapper.innerHTML = ""; // Clear previous DataTable content
 
-if (tab === "Your Projects") {
-  // Logic to hide the specific column when "Your Projects" tab is active
+    if (tab === "Your Projects") {
+    // Logic to hide the specific column when "Your Projects" tab is active
   
-  let style = document.createElement("style");
-    style.innerHTML = `
-        /* Hide the "Name" column cells and header */
-        .dt-cell__content--col-14, 
-        .dt-cell__content--header-14 { 
+      let style = document.createElement("style");
+        style.innerHTML = `
+          /* Hide the "Name" column cells and header */
+          .dt-cell__content--col-14, 
+          .dt-cell__content--header-14 { 
             display: none; 
             width: 0; 
-        }
-        .dt-cell__content--col-5, .dt-cell__content--header-5 { display: table-cell; }
-        .dt-cell__content--col-8, .dt-cell__content--header-8 { display: table-cell;}
-        .dt-cell__content--col-10, .dt-cell__content--header-10 { display: table-cell; }
-    `;
-    document.head.appendChild(style);
+          }
+          .dt-cell__content--col-5, .dt-cell__content--header-5 { display: table-cell; }
+          .dt-cell__content--col-8, .dt-cell__content--header-8 { display: table-cell;}
+          .dt-cell__content--col-10, .dt-cell__content--header-10 { display: table-cell; }
+        `;
+      document.head.appendChild(style);
 
-  // Render the cards for Your Projects
-  card_names = ["Your Total Projects", "Total Hrs Worked Today", "Total Hrs Worked This Week", "Total Hrs Worked This Month"];
-  render_cards(cardWrapper, card_names); // Call the render_cards function here
+      // Render the cards for Your Projects
+      card_names = ["Your Total Projects", "Total Hrs Worked Today", "Total Hrs Worked This Week", "Total Hrs Worked This Month"];
+      render_cards(cardWrapper, card_names); // Call the render_cards function here
 
-  // Render the DataTable for Your Projects
-  renderProjectDataTable(datatableWrapper, projectData); // Render the actual DataTable
-} else if (tab === "All Projects") {
-  let style = document.createElement("style");
-  style.innerHTML = `
-    /* unHide the "Name" column cells and header */
-    .dt-cell__content--col-14, .dt-cell__content--header-14 { display: table-cell; }
-    .dt-cell__content--col-5, .dt-cell__content--header-5 { display: none; }
-    .dt-cell__content--col-8, .dt-cell__content--header-8 { display: none; }
-    .dt-cell__content--col-10, .dt-cell__content--header-10 { display: none; }
-    `;
-  document.head.appendChild(style);
+      // Render the DataTable for Your Projects
+      renderProjectDataTable(datatableWrapper, projectData); // Render the actual DataTable
+    } 
+    else if (tab === "All Projects") {
+      let style = document.createElement("style");
+      style.innerHTML = `
+        /* unHide the "Name" column cells and header */
+        .dt-cell__content--col-14, .dt-cell__content--header-14 { display: table-cell; }
+        .dt-cell__content--col-5, .dt-cell__content--header-5 { display: none; }
+        .dt-cell__content--col-8, .dt-cell__content--header-8 { display: none; }
+        .dt-cell__content--col-10, .dt-cell__content--header-10 { display: none; }
+        `;
+      document.head.appendChild(style);
 
-  // Define the cards to display
-  card_names = ["Total Projects", "Total Hrs Worked Today", "Total Hrs Worked This Week", "Total Hrs Worked This Month"];
+      // Define the cards to display
+      card_names = ["Total Projects", "Total Hrs Worked Today", "Total Hrs Worked This Week", "Total Hrs Worked This Month"];
   
-  // Render the cards immediately to improve perceived speed
-  render_cards(cardWrapper, card_names);
+      // Render the cards immediately to improve perceived speed
+      render_cards(cardWrapper, card_names);
 
-  // Make an API call to fetch all projects data asynchronously
-  frappe.call({
-    method: "phamos.phamos.page.project_action_panel.project_action_panel.fetch_all_projects",
-    callback: function (r) {
-      if (r.message) {
-        // Render DataTable with the fetched data once API response is received
-        renderProjectDataTable(datatableWrapper, r.message);
-      } else {
-        // Handle case with no data or error
-        datatableWrapper.innerHTML = `<p>No projects found.</p>`;
-      }
-    },
-    freeze: true,  // Optional: Add a freeze effect to indicate loading
-    freeze_message: "Loading projects...",  // Custom loading message
-  });
-}
+      // Make an API call to fetch all projects data asynchronously
+        frappe.call({
+          method: "phamos.phamos.page.project_action_panel.project_action_panel.fetch_all_projects",
+          callback: function (r) {
+            if (r.message) {
+              // Render DataTable with the fetched data once API response is received
+              renderProjectDataTable(datatableWrapper, r.message);
+            } else {
+              // Handle case with no data or error
+              datatableWrapper.innerHTML = `<p>No projects found.</p>`;
+            }
+          },
+          freeze: true,  // Optional: Add a freeze effect to indicate loading
+          freeze_message: "Loading projects...",  // Custom loading message
+        });
+    }
 
 }
 
@@ -846,7 +861,7 @@ function renderProjectDataTable(datatableWrapper, projectData) {
           Assign
         </button>
         <div class="dropdown-menu" id="${dropdownId}">
-          <a class="dropdown-item" href="#" data-option="Self" onclick="selfAssignProjcet('${row?.[9]?.content || ''}')">Self</a>
+          <a class="dropdown-item" href="#" data-option="Self" onclick="selfAssignProject('${row?.[9]?.content || ''}')">Self</a>
           <a class="dropdown-item" href="#" data-option="Others" onclick="assignProject('${row?.[9]?.content || ''}')">Others</a>
         </div>
       </div>
