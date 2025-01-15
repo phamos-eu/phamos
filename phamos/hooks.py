@@ -172,6 +172,10 @@ fixtures = [
 #	"Task": "phamos.task.get_dashboard_data"
 # }
 
+override_doctype_dashboards = {
+    "Project": "phamos.custom_scripts.custom_python.project_dashboard.get_project_dashboard_data"
+}
+
 # exempt linked doctypes from being automatically cancelled
 #
 # auto_cancel_exempted_doctypes = ["Auto Repeat"]
