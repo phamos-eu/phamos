@@ -9,6 +9,7 @@
   "notes",
   "start_date",
   "column_break_7p95",
+  "department",
   "account_manager",
   "maturity_level",
   "mood",
@@ -93,6 +94,14 @@
    "fieldname": "html_bfhi",
    "fieldtype": "HTML",
    "options": "<h1>Info</h1>On this screen we will want to see a table of all timesheets from this implmentation. Interesting also will be some filters for project, employee, and more"
+  },
+  {
+   "fieldname": "department",
+   "fieldtype": "Link",
+   "in_list_view": 1,
+   "in_standard_filter": 1,
+   "label": "Department",
+   "options": "Department"
   }
  ],
  "index_web_pages_for_search": 1,
@@ -102,7 +111,7 @@
    "link_fieldname": "custom_implementation"
   }
  ],
- "modified": "2025-01-09 18:04:12.431440",
+ "modified": "2025-01-15 11:06:43.735815",
  "modified_by": "Administrator",
  "module": "Phamos",
  "name": "Implementation",
