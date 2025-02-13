@@ -319,9 +319,7 @@ frappe.pages["project-action-panel"].on_page_load = function (wrapper) {
                     const actualHours = r.message / 3600;
                     const diffInHours = actualHours - expectedHours;
 
-                  
-                    value = frappe.db.get_single_value("phamos Settings", "allowed_additional_work_time")
-                    if(value) {
+                    frappe.db.get_single_value("phamos Settings", "allowed_additional_work_time").then((value) => {
                       allowed_additional_work_time_mins = value
                       allowed_additional_work_time_hrs = allowed_additional_work_time_mins/60
                       if (diffInHours > allowed_additional_work_time_hrs) { // More than 30 minutes
@@ -351,7 +349,7 @@ frappe.pages["project-action-panel"].on_page_load = function (wrapper) {
                             // Cancel the action here or do nothing
                           }
                         );
-                      }
+                    }
                       else{
                         update_and_submit_timesheet_record(
                           values.timesheet_record,
@@ -363,7 +361,7 @@ frappe.pages["project-action-panel"].on_page_load = function (wrapper) {
                         );
                         dialog.hide();
                       }
-                    }
+                    });
                   }
                 }
               });
