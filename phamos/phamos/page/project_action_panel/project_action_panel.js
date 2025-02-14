@@ -794,8 +794,8 @@ function show_tab(tab, projectData) {
         /* unHide the "Name" column cells and header */
         .dt-cell__content--col-14, .dt-cell__content--header-14 { display: table-cell; }
         .dt-cell__content--col-6, .dt-cell__content--header-6 { display: table-cell; }
-        .dt-cell__content--col-3, .dt-cell__content--header-9 { display: table-cell; }
-        .dt-cell__content--col-9, .dt-cell__content--header-3 { display: table-cell; }
+        .dt-cell__content--col-3, .dt-cell__content--header-3 { display: table-cell; }
+        .dt-cell__content--col-9, .dt-cell__content--header-9 { display: table-cell; }
         `;
       document.head.appendChild(style);
 
