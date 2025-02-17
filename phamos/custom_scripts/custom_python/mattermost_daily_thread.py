@@ -8,27 +8,23 @@ import os
 from datetime import datetime
 
 def get_thought_of_the_day():
-    # Get the directory of the current script
-    script_dir = os.path.dirname(os.path.abspath(__file__))
-    # Construct the full file path to thoughtOftheDay.txt
-    file_path = os.path.join(script_dir, 'thoughtOftheDay.txt')
-
+    url = "https://zenquotes.io/api/today"
+    
     try:
-        with open(file_path, 'r') as file:
-            thoughts = file.readlines()
+        response = requests.get(url)
+        response.raise_for_status()
 
-        thought_of_the_day = random.choice(thoughts).strip()
+        data = response.json()
 
-        return thought_of_the_day
-    except FileNotFoundError:
-        raise FileNotFoundError(f"File '{file_path}' not found")
+        if data and isinstance(data, list):
+            thought_of_the_day = data[0].get("q","No thought available")
+            author = data[0].get("a","Unknown")
+            return f"{thought_of_the_day} - {author}"
 
-# Example usage:
-try:
-    thought = get_thought_of_the_day()
-    print(f"Thought of the day: {thought}")
-except FileNotFoundError as e:
-    print(e)
+        else:
+            return "No thought available from the API."
+    except requests.exceptions.RequestException as e:
+        raise f"An error occurred while fetching the thought of the day : {e}"
 
 
 def post_to_mattermost(channel_id, message, bot_username="Jarvis", parent_id=None):
@@ -41,8 +37,8 @@ def post_to_mattermost(channel_id, message, bot_username="Jarvis", parent_id=Non
     :param parent_id: The ID of the parent post to create a thread (optional)
     :return: Response from the Mattermost API
     """
-    mattermost_url = "https://chat.phamos.eu/api/v4/posts"  # Replace with your Mattermost server URL
-    token = "xk81d48io3d3igwohegetf7n3w"  # Replace with your Mattermost access token
+    mattermost_url = frappe.db.get_single_value('phamos Settings', 'mattermost_url') 
+    token = frappe.db.get_single_value('phamos Settings', 'token')
 
     headers = {
         "Authorization": f"Bearer {token}",
@@ -50,7 +46,14 @@ def post_to_mattermost(channel_id, message, bot_username="Jarvis", parent_id=Non
     }
 
      # List of emojis
-    emojis = ["😊", "🎉", "👍", "🚀", "🔥", "😎", "🌟", "💪", "💥", "🎈"]
+    emojis = [
+    "😊", "🎉", "👍", "🚀", "🔥", "😎", "🌟", "💪", "💥", "🎈",
+    "😍", "🥳", "🌈", "💖", "✨", "💯", "💫", "🌻", "🦄",  
+    "🙌", "🥰", "💚", "💙", "🧡", "💛", "🌸", "🎊", "🥂", "🎶", 
+    "👑", "🎁", "🎬", "🤩", "💃", "🕺", "🏆", "👻", "🎨", "🌺",
+    "🧚", "🐱", "🐶", "💌", "🌍", "💎", "🍀", "🍓", "🥑", "🍍", 
+    "🥝", "🍉", "🍪", "🍩", "🍪", "🍰", "🍪", "🍒", "🍪"
+    ]
 
     # Select a random emoji
     random_emoji = random.choice(emojis)
@@ -103,6 +106,20 @@ def create_mattermost_thread():
         SELECT channel_id FROM `tabMattermost Channel` WHERE enable = %s
     """, (1,), as_dict=True)
 
+    # List of positive emojis (already defined in your function)
+    emojis = [
+        "😊", "🎉", "👍", "🚀", "🔥", "😎", "🌟", "💪", "💥", "🎈",  
+        "😃", "😍", "🥳", "🌈", "💖", "✨", "💯", "💫", "🌻", "🦄",  
+        "🙌", "🥰", "💚", "💙", "🧡", "💛", "🌸", "🎊", "🥂", "🎶", 
+        "👑", "🎁", "🎬", "🤩", "💃", "🕺", "🏆", "👻", "🎨", "🌺",
+        "🧚", "🐱", "🐶", "💌", "🌍", "💎", "🍀", "🍓", "🥑", "🍍", 
+        "🥝", "🍉", "🍪", "🍩", "🍪", "🍰", "🍪", "🍒", "🍪"
+    ]
+    phamos_emojis = ["🌅", "🌞", "🌿", "🌼", "🌈", "💫", "🌻", "🌟"]
+
+    random_emoji = random.choice(emojis)
+    phamos_random_emoji = random.choice(phamos_emojis)
+
     if not channel_ids:
         frappe.throw("No enabled Mattermost channels found.")
         return
@@ -110,8 +127,8 @@ def create_mattermost_thread():
     channel_id = channel_ids[0]['channel_id']
 
     # Construct the reply message with the thought of the day
-    reply_message = f"Good Morning 'phamos' 💮 🙏\n > {thought_of_the_day} 🌟"
-   
+    #reply_message = f"Good Morning 'phamos' 💮 🙏\n > {thought_of_the_day} 🌟"
+    reply_message = f"Good Morning 'phamos' {phamos_random_emoji} 🙏\n > {thought_of_the_day} {random_emoji}"
     # Post the initial message (empty placeholder for the thread start)
     initial_message = ""
     initial_response = post_to_mattermost(channel_id, initial_message)
