@@ -290,7 +290,6 @@ frappe.pages["project-action-panel"].on_page_load = function (wrapper) {
         docname: project_name, // The document name to be assigned
         callback: function (r) {
             // Handle the response from the assignment action
-            console.log(r.message); // This will contain the result of the assignment
             if (r.message) {
                 // You can add logic here to update the UI or provide user feedback
                 frappe.show_alert({
@@ -702,16 +701,17 @@ function renderProjectDataTable(datatableWrapper, projectData) {
     
   };
   let button_formatter = (value, row) => {
-    if (row[8].html == "") {
-      return `<button type="button" style="height: 23px; width: 60px; display: flex; align-items: center; justify-content: center; background-color: rgb(0, 100, 0);" class="btn btn-primary btn-sm btn-modal-primary" onclick="startProject('${row[1].content}', '${row[3].content}', '${row[9].content}','${row[13]?.content}')">Start</button>`;
+    if (row[9].content == undefined) {
+      return `<button type="button" style="height: 23px; width: 60px; display: flex; align-items: center; justify-content: center; background-color: rgb(0, 100, 0);" class="btn btn-primary btn-sm btn-modal-primary" onclick="startProject('${row[1].content}', '${row[4].content}', '${row[10].content}','${row[13]?.content}')">Start</button>`;
     } else {
-      return `<button type="button" style="height: 23px; width: 60px; display: flex; align-items: center; justify-content: center; background-color: rgb(139, 0, 0);" class="btn btn-primary btn-sm btn-modal-primary" onclick="stopProject('${row[8].content}','${row[11].content}', '${row[9].content}','${row[12]?.content || ''}','${row[13]?.content}')">Stop</button>`;
+      return `<button type="button" style="height: 23px; width: 60px; display: flex; align-items: center; justify-content: center; background-color: rgb(139, 0, 0);" class="btn btn-primary btn-sm btn-modal-primary" onclick="stopProject('${row[9].content}','${row[11].content}', '${row[10].content}','${row[12]?.content || ''}','${row[13]?.content}')">Stop</button>`;
     }
   };
 
   let columns = [
     { label: "<b>Project Name</b>", id: "project_name", fieldtype: "Data", width: 180, editable: false, visible: false },
     { label: "<b>Project</b>", id: "project_desc", fieldtype: "Data", width: 340, editable: false, format: linkFormatter1 },
+    { label: "<b>Action</b>", focusable: false, format: button_formatter, width: 100 },
     { label: "<b>Customer Name</b>", id: "customer", fieldtype: "Link", width: 120, editable: false },
     { label: "<b>Customer</b>", id: "customer_desc", fieldtype: "Link", width: 340, editable: false, format: linkFormatter },
     { label: "<b>Hours Status</b>", id: "planned_hours", fieldtype: "Data", width: 230, editable: false,format: hoursFormatter },
@@ -719,7 +719,6 @@ function renderProjectDataTable(datatableWrapper, projectData) {
     { label: "<b></b>", id: "spent_hours_submitted", fieldtype: "Float", width: 70, editable: false },
     { label: "<b>Timesheet Record</b>", id: "timesheet_record", fieldtype: "Link", width: 180, editable: false, format: linkFormatter2 },
     { label: "<b>Name</b>", id: "name", fieldtype: "Link", width: 140, editable: false },
-    { label: "<b>Action</b>", focusable: false, format: button_formatter, width: 100 },
     { label: "<b>percent_billable</b>", id: "percent_billable", fieldtype: "Data", width: 0, editable: false },
     { label: "<b>Task</b>", id: "task", fieldtype: "Link", width: 0, editable: false },
     { label: "<b>task_in_timesheet_record</b>", id: "task_in_timesheet_record", fieldtype: "Data", width: 0, editable: false },
@@ -756,22 +755,22 @@ function renderProjectDataTable(datatableWrapper, projectData) {
   
   
   function linkFormatter1(value, row) {
-    return `<a href="#" onclick="handleProjectClick('${row[9].content}');">${row[2].content}</a>`;
+    return `<a href="#" onclick="handleProjectClick('${row[10].content}');">${row[2].content}</a>`;
   }
   function linkFormatter(value, row) {
-    return `<a href="#" onclick="handleCustomerClick('${row[3].content}');">${row[4].content}</a>`;
+    return `<a href="#" onclick="handleCustomerClick('${row[5].content}');">${row[5].content}</a>`;
   }
   function linkFormatter2(value, row) {
-    return row[8]?.content ? `<a href="#" onclick="handleTimesheetClick('${row[8].content}');">${row[8].content}</a>` : "";
+    return row[9]?.content ? `<a href="#" onclick="handleTimesheetClick('${row[9].content}');">${row[9].content}</a>` : "";
   }
   // Add a combined style element to hide the specified columns and headers
 let style = document.createElement("style");
 style.innerHTML = `
 /* Hide the "Name" column cells and header */
-.dt-cell__content--col-9, .dt-cell__content--header-9 { display: none; }
+.dt-cell__content--col-10, .dt-cell__content--header-10 { display: none; }
 
 /* Hide the "Customer Name" column cells and header */
-.dt-cell__content--col-3, .dt-cell__content--header-3 { display: none; }
+.dt-cell__content--col-4, .dt-cell__content--header-4 { display: none; }
 
 /* Hide the "Project Name" column cells and header */
 .dt-cell__content--col-1, .dt-cell__content--header-1 { display: none; }
@@ -786,12 +785,11 @@ style.innerHTML = `
 .dt-cell__content--col-13, .dt-cell__content--header-13 { display: none; }
 
 /* Hide additional columns */
-.dt-cell__content--col-6, .dt-cell__content--header-6 { display: none; }
 .dt-cell__content--col-7, .dt-cell__content--header-7 { display: none; }
+.dt-cell__content--col-8, .dt-cell__content--header-8 { display: none; }
 
 `;
 document.head.appendChild(style);
-
   // Initialize DataTable with the data and column configuration
   let datatable = new frappe.DataTable(
     datatableWrapper,
