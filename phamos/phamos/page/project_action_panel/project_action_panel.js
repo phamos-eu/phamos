@@ -176,7 +176,8 @@ frappe.pages["project-action-panel"].on_page_load = function (wrapper) {
 
 
   window.stopProject = function (timesheet_record, percent_billable,project,task,task_in_timesheet_record) {
-    let activity_type = "";
+    let from_time = '';
+    let expected_time = ''
     let timesheet_record_info = " Info from timesheet record";
     frappe.db.get_value(
       "Timesheet Record",
