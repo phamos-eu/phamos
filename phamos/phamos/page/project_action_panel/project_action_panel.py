@@ -349,3 +349,4 @@ def self_assign_project(project_name):
     except Exception as e:
         frappe.log_error(frappe.get_traceback(), _("Project Assignment Error"))
         frappe.throw(_("An error occurred while assigning the project. Please check the error logs."))
+

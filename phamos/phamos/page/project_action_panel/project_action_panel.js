@@ -177,21 +177,17 @@ frappe.pages["project-action-panel"].on_page_load = function (wrapper) {
 
   window.stopProject = function (timesheet_record, percent_billable,project,task,task_in_timesheet_record) {
     let activity_type = "";
-    let from_time='';
-    let expected_time=''
     let timesheet_record_info = " Info from timesheet record";
     frappe.db.get_value(
       "Timesheet Record",
       { name: timesheet_record },
-      ["goal", "from_time","expected_time"],
+      ["goal", "from_time"],
       function (value) {
         // Your code here
-        from_time = value.from_time
-        expected_time = value.expected_time
         from_time_formatted = frappe.datetime.str_to_user(value.from_time);
         timesheet_record_info =
-          "From time: " + `${from_time_formatted} ` + ",<br>Expected Time : "+ `${(value.expected_time / 3600).toFixed(2)}`+ "hrs" + ",<br>Goal is: " + value.goal;
-         
+          "From time: " + from_time_formatted + ",<br>Goal is: " + value.goal;
+
         frappe.db.get_value(
           "Employee",
           { user_id: frappe.session.user },
@@ -413,7 +409,6 @@ frappe.pages["project-action-panel"].on_page_load = function (wrapper) {
         docname: project_name, // The document name to be assigned
         callback: function (r) {
             // Handle the response from the assignment action
-            
             if (r.message) {
                 // You can add logic here to update the UI or provide user feedback
                 frappe.show_alert({
@@ -835,7 +830,7 @@ function renderProjectDataTable(datatableWrapper, projectData) {
     
   };
   let button_formatter = (value, row) => {
-    if (row[9].content == undefined ) {
+    if (row[9].content == undefined) {
       return `<button type="button" style="height: 23px; width: 60px; display: flex; align-items: center; justify-content: center; background-color: rgb(0, 100, 0);" class="btn btn-primary btn-sm btn-modal-primary" onclick="startProject('${row[1].content}', '${row[4].content}', '${row[10].content}','${row[13]?.content}')">Start</button>`;
     } else {
       return `<button type="button" style="height: 23px; width: 60px; display: flex; align-items: center; justify-content: center; background-color: rgb(139, 0, 0);" class="btn btn-primary btn-sm btn-modal-primary" onclick="stopProject('${row[9].content}','${row[11].content}', '${row[10].content}','${row[12]?.content || ''}','${row[13]?.content}')">Stop</button>`;
@@ -916,7 +911,7 @@ function renderProjectDataTable(datatableWrapper, projectData) {
   
   
   function linkFormatter1(value, row) {
-    return `<a href="#" onclick="handleProjectClick('${row[3].content}');">${row[2].content}</a>`;
+    return `<a href="#" onclick="handleProjectClick('${row[10].content}');">${row[2].content}</a>`;
   }
   function linkFormatter(value, row) {
     return `<a href="#" onclick="handleCustomerClick('${row[5].content}');">${row[5].content}</a>`;
@@ -951,7 +946,6 @@ style.innerHTML = `
 
 `;
 document.head.appendChild(style);
-
   // Initialize DataTable with the data and column configuration
   let datatable = new frappe.DataTable(
     datatableWrapper,
@@ -978,5 +972,7 @@ document.head.appendChild(style);
   });
 
   // Apply styling to the card wrapper
+ 
 }
+
 };
