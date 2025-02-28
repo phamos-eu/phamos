@@ -26,7 +26,7 @@ frappe.pages["project-action-panel"].on_page_load = function (wrapper) {
       },
     });
   }
-  
+ 
   // Fetch project data from the server on page load
   render_datatable();
 
@@ -74,7 +74,7 @@ frappe.pages["project-action-panel"].on_page_load = function (wrapper) {
     result
   ) {
     frappe.call({
-      method:
+      method: 
         "phamos.phamos.page.project_action_panel.project_action_panel.update_and_submit_timesheet_record",
       args: {
         name: timesheet_record,
@@ -98,6 +98,36 @@ frappe.pages["project-action-panel"].on_page_load = function (wrapper) {
     });
   }
 
+
+  window.toggleDropdown = function (event, dropdownId) {
+    event.stopPropagation(); // Prevent clicks from propagating to the document
+  
+    const dropdown = document.getElementById(dropdownId);
+    if (!dropdown) {
+      console.error(`Dropdown with ID ${dropdownId} not found`); // Debugging log
+      return;
+    }
+  
+    // Close other open dropdowns
+    document.querySelectorAll('.dropdown-menu').forEach((menu) => {
+      if (menu !== dropdown) {
+        menu.style.display = 'none';
+      }
+    });
+  
+    // Toggle visibility of the clicked dropdown
+    dropdown.style.display = dropdown.style.display === 'block' ? 'none' : 'block';
+  };
+
+
+  // Close dropdowns when clicking outside
+  document.addEventListener('click', () => {
+    document.querySelectorAll('.dropdown-menu').forEach((menu) => {
+      menu.style.display = 'none';
+    });
+  });
+  
+
   window.handleCustomerClick = function (customer_name) {
     // Get the base URL of the current page
     let baseUrl = window.location.href.split("/").slice(0, 3).join("/"); // Extract protocol, hostname, and port
@@ -112,6 +142,7 @@ frappe.pages["project-action-panel"].on_page_load = function (wrapper) {
     return false;
   };
 
+
   window.handleProjectClick = function (project_name) {
     // Get the base URL of the current page
     let baseUrl = window.location.href.split("/").slice(0, 3).join("/"); // Extract protocol, hostname, and port
@@ -125,6 +156,8 @@ frappe.pages["project-action-panel"].on_page_load = function (wrapper) {
     // Optionally, return false to prevent the default link behavior (not necessary in this case)
     return false;
   };
+
+
   window.handleTimesheetClick = function (timesheet) {
     // Get the base URL of the current page
     let baseUrl = window.location.href.split("/").slice(0, 3).join("/"); // Extract protocol, hostname, and port
@@ -141,8 +174,10 @@ frappe.pages["project-action-panel"].on_page_load = function (wrapper) {
     return false;
   };
 
+
   window.stopProject = function (timesheet_record, percent_billable,project,task,task_in_timesheet_record) {
-    let activity_type = "";
+    let from_time = '';
+    let expected_time = ''
     let timesheet_record_info = " Info from timesheet record";
     frappe.db.get_value(
       "Timesheet Record",
@@ -261,15 +296,74 @@ frappe.pages["project-action-panel"].on_page_load = function (wrapper) {
               ],
               primary_action_label: __("Update Timesheet Record."),
               primary_action(values) {
-                update_and_submit_timesheet_record(
-                  values.timesheet_record,
-                  values.task,
-                  values.to_time,
-                  values.percent_billable,
-                  values.activity_type,
-                  values.result
-                );
-                dialog.hide();
+                // add Frappe Confirm Dialog validation on 'update timesheet record' button.
+                //Most of time user adds 'end date and time' wrong. If 'end date and time' is more than expected time, then we will prompt user to recheck and correct it.
+              frappe.call({
+                method:"phamos.phamos.page.project_action_panel.project_action_panel.set_actual_time",
+                args: {
+                  "from_time": from_time,
+                  "to_time": values.to_time
+                },
+                callback: function(r) {
+                  if(!r.exc){
+                    function formatTime(seconds) {
+                      const hours = Math.floor(seconds / 3600);
+                      const minutes = Math.floor((seconds % 3600) / 60);
+                      return `${hours} hrs ${minutes} mins`;
+                    }
+                    
+                    const expectedHours = expected_time / 3600;
+                    const actualHours = r.message / 3600;
+                    const diffInHours = actualHours - expectedHours;
+
+                    frappe.db.get_single_value("phamos Settings", "allowed_additional_work_time").then((value) => {
+                      if(value) {
+                        allowed_additional_work_time_mins = value
+                        allowed_additional_work_time_hrs = allowed_additional_work_time_mins/60
+                        if (diffInHours > allowed_additional_work_time_hrs) { // More than 30 minutes
+                          const message = "Actual work is more than "+ allowed_additional_work_time_mins + "minutes above the expected time. Please review and confirm.";
+                          const confirm_msg = `
+                            Expected time is: ${formatTime(expected_time)} and actual work is: ${formatTime(r.message)}. 
+                            ${message}
+                          `; 
+                          frappe.confirm(
+                            confirm_msg,
+                            function () {
+                              // If user clicks "Yes"
+                              update_and_submit_timesheet_record(
+                                values.timesheet_record,
+                                values.task,
+                                values.to_time,
+                                values.percent_billable,
+                                values.activity_type,
+                                values.result
+                              );
+                              dialog.hide();
+            
+                            },
+                            function () {
+                              // If user clicks "No"
+                              //frappe.msgprint('You clicked No!');
+                              // Cancel the action here or do nothing
+                            }
+                          );
+                        }
+                        else{
+                          update_and_submit_timesheet_record(
+                            values.timesheet_record,
+                            values.task,
+                            values.to_time,
+                            values.percent_billable,
+                            values.activity_type,
+                            values.result
+                          );
+                          dialog.hide();
+                        }
+                      }
+                    })
+                  }
+                }
+              });
               },
             });
             // Set the width using CSS
@@ -281,7 +375,33 @@ frappe.pages["project-action-panel"].on_page_load = function (wrapper) {
     );
   };
   //return record.timesheet_record_draft;
- 
+
+  window.selfAssignProject = function(project_name){
+    frappe.call({
+      method:"phamos.phamos.page.project_action_panel.project_action_panel.self_assign_project",
+      args:{
+        project_name :project_name
+      },
+      callback:function(r){
+        if(r.message){
+          frappe.msgprint({
+            title:__("Success"),
+            message:__("Project Assigned Successfully."),
+            indicator:"green"
+          });
+          render_datatable() 
+        }
+      },
+      error:function(err){
+        frappe.msgprint({
+          title:__("Error"),
+          message:__("Failed to assign project. Please Check the error logs."),
+          indicator:"red"
+        });
+      }
+    })
+  }
+
   window.assignProject = function(project_name) {
     // Instantiate AssignToDialog if not already done
     let assign_to = new frappe.ui.form.AssignToDialog({
@@ -296,6 +416,7 @@ frappe.pages["project-action-panel"].on_page_load = function (wrapper) {
                     message: __('Users assigned successfully!'),
                     indicator: 'green'
                 });
+                render_datatable() 
             }
         },
     });
@@ -311,7 +432,8 @@ frappe.pages["project-action-panel"].on_page_load = function (wrapper) {
     } else {
         console.error("Error: AssignToDialog was not instantiated correctly.");
     }
-};
+  };
+
 
   window.startProject = function (project_name, customer,project,task_in_timesheet_record) {
     frappe.call({
@@ -435,7 +557,7 @@ frappe.pages["project-action-panel"].on_page_load = function (wrapper) {
                   reqd: 1,
                   read_only: 0,
                 },
-                {
+                { 
                   fieldtype: "Small Text",
                   label: __("Goal"),
                   fieldname: "goal",
@@ -470,224 +592,232 @@ frappe.pages["project-action-panel"].on_page_load = function (wrapper) {
     });
   };
 
+
   // Function to render number cards
-function render_cards(wrapper, card_names) {
-  return frappe.call({
-    method: "phamos.phamos.page.project_action_panel.project_action_panel.get_permitted_cards",
-    args: { 
-      dashboard_name: "Project Management",
-      
-    },
-    callback: function (response) {
-      var cards = response.message;
-      if (!cards || !cards.length) {
-        return;
-      }
+  function render_cards(wrapper, card_names) {
+    return frappe.call({
+      method: "phamos.phamos.page.project_action_panel.project_action_panel.get_permitted_cards",
+      args: { 
+        dashboard_name: "Project Management",
+      },
+      callback: function (response) {
+        var cards = response.message;
+        if (!cards || !cards.length) {
+          return;
+        }
 
       // Filter the cards based on card_names
-      var filtered_cards = cards.filter(function(card) {
-        return card_names.includes(card.card);
-      });
+        var filtered_cards = cards.filter(function(card) {
+          return card_names.includes(card.card);
+        });
 
-      var number_cards = filtered_cards.map(function (card) {
-        return {
-          name: card.card,
-        };
-      });
+        var number_cards = filtered_cards.map(function (card) {
+          return {
+            name: card.card,
+          };
+        });
 
-      var number_card_group = new frappe.widget.WidgetGroup({
-        container: wrapper, 
-        type: "number_card",
-        columns: 3,
-        options: {
-          allow_sorting: false,
-          allow_create: false,
-          allow_delete: false,
-          allow_hiding: false,
-          allow_edit: false,
-        },
-        widgets: number_cards,
-      });
+        var number_card_group = new frappe.widget.WidgetGroup({
+          container: wrapper, 
+          type: "number_card",
+          columns: 3,
+          options: {
+            allow_sorting: false,
+            allow_create: false,
+            allow_delete: false,
+            allow_hiding: false,
+            allow_edit: false,
+          },
+          widgets: number_cards,
+        });
 
-      $(wrapper).find(".widget.number-widget-box").css({
-        width: "250px", 
-      });
+        $(wrapper).find(".widget.number-widget-box").css({
+         width: "250px", 
+        });
 
-      $(wrapper).find(".widget-group-body.grid-col-3").css({
-        display: "flex", 
-        "flex-wrap": "nowrap", 
-      });
-    },
-  });
-}
+        $(wrapper).find(".widget-group-body.grid-col-3").css({
+          display: "flex", 
+          "flex-wrap": "nowrap", 
+        });
+      },
+    });
+  }
 
-// Function to render DataTable with tabs
+  
+  // Function to render DataTable with tabs
 function renderDataTable(wrapper, projectData) {
  // Ensure wrapper is defined
- if (!wrapper) {
-  return;
-}
+    if (!wrapper) {
+      return;
+    }
 
-// Set the default active tab to 'Your Projects'
-wrapper.innerHTML = `
-<h2 style="display: inline; margin-left: 50px; margin-top: 10px; font-size:30px">
-    Project Action Panel
-    <!-- Info Icon -->
-</h2>
-<div class="form-tabs-list">
-    <ul class="nav form-tabs" id="form-tabs" role="tablist">
-        <li class="nav-item show">
-            <!-- 'Your Projects' tab is the default active tab -->
-            <a class="nav-link active" id="DAP-your-project-tab" role="tab" aria-controls="your-projects" aria-selected="true">
-                Your Projects
-            </a>
-        </li>
-        <li class="nav-item show">
-            <!-- 'All Projects' tab is inactive by default -->
-            <a class="nav-link" id="DAP-all-project-tab" role="tab" aria-controls="all-projects" aria-selected="false">
-                All Projects
-            </a>
-        </li>
-    </ul>
-</div>
-<div id="content-wrapper" style="margin-top: 20px; margin-left: 30px;">
-    <div id="card-wrapper"></div>
-    <div id="datatable-wrapper"></div>
-</div>
-`;
+    // Set the default active tab to 'Your Projects'
+    wrapper.innerHTML = `
+        <h2 style="display: inline; margin-left: 50px; margin-top: 10px; font-size:30px">
+          Project Action Panel
+          <!-- Info Icon -->
+        </h2>
+        <div class="form-tabs-list">
+          <ul class="nav form-tabs" id="form-tabs" role="tablist">
+            <li class="nav-item show">
+              <!-- 'Your Projects' tab is the default active tab -->
+              <a class="nav-link active" id="DAP-your-project-tab" role="tab" aria-controls="your-projects" aria-selected="true">
+                  Your Projects
+              </a>
+            </li>
+            <li class="nav-item show">
+              <!-- 'All Projects' tab is inactive by default -->
+              <a class="nav-link" id="DAP-all-project-tab" role="tab" aria-controls="all-projects" aria-selected="false">
+                  All Projects
+              </a>
+            </li>
+          </ul>
+        </div>
+        <div id="content-wrapper" style="margin-top: 20px; margin-left: 30px;">
+          <div id="card-wrapper"></div>
+          <div id="datatable-wrapper"></div>
+        </div>
+      `;
 // Add CSS for the hover-over box
-const tooltipStyle = document.createElement("style");
-tooltipStyle.innerHTML = `
-  #info-icon {
-    position: relative;
-    cursor: pointer;
-  }
+    const tooltipStyle = document.createElement("style");
+    tooltipStyle.innerHTML = `
+    #info-icon {
+      position: relative;
+      cursor: pointer;
+    }
 
-  #info-icon:hover::after {
-    content: "Label Descriptions:\\A blue Color = Planned Hrs(P)\\A Orange Color = Spent Draft Hrs(D)\\A Green Color = Spent Submitted Hrs(S)";
-    white-space: pre-wrap;
-    position: absolute;
-    left: 50%;
-    top: 100%;
-    transform: translateX(-50%);
-    padding: 15px;
-    background-color: rgba(0, 0, 0, 0.8);
-    color: white;
-    border-radius: 5px;
-    font-size: 12px;
-    line-height: 1.5;
-    z-index: 1000;
-    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
-    width: 250px;
-  }
-`;
-document.head.appendChild(tooltipStyle);
+    #info-icon:hover::after {
+        content: "Label Descriptions:\\A blue Color = Planned Hrs(P)\\A Orange Color = Spent Draft Hrs(D)\\A Green Color = Spent Submitted Hrs(S)";
+        white-space: pre-wrap;
+        position: absolute;
+        left: 50%;
+        top: 100%;
+        transform: translateX(-50%);
+        padding: 15px;
+        background-color: rgba(0, 0, 0, 0.8);
+        color: white;
+        border-radius: 5px;
+        font-size: 12px;
+        line-height: 1.5;
+        z-index: 1000;
+        box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+        width: 250px;
+      }
+    `;
+    document.head.appendChild(tooltipStyle);
 
-// Add the info icon with hover functionality
-const infoIcon = document.createElement("span");
-infoIcon.id = "info-icon";
-infoIcon.innerHTML = "ℹ️"; // Info icon text or HTML (e.g., an SVG or font icon)
-infoIcon.style.fontSize = "20px";
-infoIcon.style.marginLeft = "10px";
+    // Add the info icon with hover functionality
+    const infoIcon = document.createElement("span");
+    infoIcon.id = "info-icon";
+    infoIcon.innerHTML = "ℹ️"; // Info icon text or HTML (e.g., an SVG or font icon)
+    infoIcon.style.fontSize = "20px";
+    infoIcon.style.marginLeft = "10px";
 
-// Append the info icon next to the title
-const header = document.querySelector("h2");
-header.appendChild(infoIcon);
+    // Append the info icon next to the title
+    const header = document.querySelector("h2");
+    header.appendChild(infoIcon);
 
-// Get references to the tabs
-const your_projectsTab = document.getElementById("DAP-your-project-tab");
-const all_projectsTab = document.getElementById("DAP-all-project-tab");
+    // Get references to the tabs
+    const your_projectsTab = document.getElementById("DAP-your-project-tab");
+    const all_projectsTab = document.getElementById("DAP-all-project-tab");
 
-// Event listener for the Your Projects tab
-your_projectsTab.addEventListener("click", () => {
-  // Remove 'active' class from All Projects tab and set to Your Projects
-  all_projectsTab.classList.remove("active");
-  your_projectsTab.classList.add("active");
+    // Event listener for the Your Projects tab
+    your_projectsTab.addEventListener("click", () => {
+      // Remove 'active' class from All Projects tab and set to Your Projects
+      all_projectsTab.classList.remove("active");
+      your_projectsTab.classList.add("active");
 
-  // Set visual feedback for selection
-  your_projectsTab.setAttribute("aria-selected", "true");
-  all_projectsTab.setAttribute("aria-selected", "false");
+      // Set visual feedback for selection
+      your_projectsTab.setAttribute("aria-selected", "true");
+      all_projectsTab.setAttribute("aria-selected", "false");
 
-  // Show content for the Your Projects tab
-  show_tab("Your Projects", projectData);
-});
+    // Show content for the Your Projects tab
+      show_tab("Your Projects", projectData);
+    });
 
-// Event listener for the All Projects tab
-all_projectsTab.addEventListener("click", () => {
-  // Remove 'active' class from Your Projects tab and set to All Projects
-  your_projectsTab.classList.remove("active");
-  all_projectsTab.classList.add("active");
+    // Event listener for the All Projects tab
+    all_projectsTab.addEventListener("click", () => {
+        // Remove 'active' class from Your Projects tab and set to All Projects
+        your_projectsTab.classList.remove("active");
+        all_projectsTab.classList.add("active");
 
-  // Set visual feedback for selection
-  all_projectsTab.setAttribute("aria-selected", "true");
-  your_projectsTab.setAttribute("aria-selected", "false");
+        // Set visual feedback for selection
+        all_projectsTab.setAttribute("aria-selected", "true");
+        your_projectsTab.setAttribute("aria-selected", "false");
 
-  // Show content for the All Projects tab
-  show_tab("All Projects", projectData);
-});
+        // Show content for the All Projects tab
+      show_tab("All Projects", projectData);
+    });
 
-// Initial tab content setup: Show content for 'Your Projects' by default
-show_tab("Your Projects", projectData); // Set 'Your Projects' as default
+  // Initial tab content setup: Show content for 'Your Projects' by default
+  show_tab("Your Projects", projectData); // Set 'Your Projects' as default
 }
 
 // Show tab content based on the selected tab
 function show_tab(tab, projectData) {
-const cardWrapper = document.getElementById("card-wrapper");
-const datatableWrapper = document.getElementById("datatable-wrapper");
-// Clear previous content of cardWrapper and datatableWrapper
-cardWrapper.innerHTML = "";  // This will ensure the number cards don't duplicate
-datatableWrapper.innerHTML = ""; // Clear previous DataTable content
+    const cardWrapper = document.getElementById("card-wrapper");
+    const datatableWrapper = document.getElementById("datatable-wrapper");
+    // Clear previous content of cardWrapper and datatableWrapper
+    cardWrapper.innerHTML = "";  // This will ensure the number cards don't duplicate
+    datatableWrapper.innerHTML = ""; // Clear previous DataTable content
 
-if (tab === "Your Projects") {
-  // Logic to hide the specific column when "Your Projects" tab is active
+    if (tab === "Your Projects") {
+    // Logic to hide the specific column when "Your Projects" tab is active
   
-  let style = document.createElement("style");
-    style.innerHTML = `
-        /* Hide the "Name" column cells and header */
-        .dt-cell__content--col-14, 
-        .dt-cell__content--header-14 { 
+      let style = document.createElement("style");
+        style.innerHTML = `
+          /* Hide the "Name" column cells and header */
+          .dt-cell__content--col-14, 
+          .dt-cell__content--header-14 { 
             display: none; 
             width: 0; 
-        }
-    `;
-    document.head.appendChild(style);
+          }
+          .dt-cell__content--col-6, .dt-cell__content--header-6 { display: table-cell; }
+          .dt-cell__content--col-9, .dt-cell__content--header-9 { display: table-cell;}
+          .dt-cell__content--col-3, .dt-cell__content--header-3 { display: table-cell; }
+        `;
+      document.head.appendChild(style);
 
-  // Render the cards for Your Projects
-  card_names = ["Your Total Projects", "Total Hrs Worked Today", "Total Hrs Worked This Week", "Total Hrs Worked This Month"];
-  render_cards(cardWrapper, card_names); // Call the render_cards function here
+      // Render the cards for Your Projects
+      card_names = ["Your Total Projects", "Total Hrs Worked Today", "Total Hrs Worked This Week", "Total Hrs Worked This Month"];
+      render_cards(cardWrapper, card_names); // Call the render_cards function here
 
-  // Render the DataTable for Your Projects
-  renderProjectDataTable(datatableWrapper, projectData); // Render the actual DataTable
-} else if (tab === "All Projects") {
-  let style = document.createElement("style");
-  style.innerHTML = `
-    /* Hide the "Name" column cells and header */
-    .dt-cell__content--col-14, .dt-cell__content--header-14 { display: table-cell; }
-  `;
-  document.head.appendChild(style);
+      // Render the DataTable for Your Projects
+      renderProjectDataTable(datatableWrapper, projectData); // Render the actual DataTable
+    } 
+    else if (tab === "All Projects") {
+      let style = document.createElement("style");
+      style.innerHTML = `
+        /* unHide the "Name" column cells and header */
+        .dt-cell__content--col-14, .dt-cell__content--header-14 { display: table-cell; }
+        .dt-cell__content--col-6, .dt-cell__content--header-6 { display: table-cell; }
+        .dt-cell__content--col-3, .dt-cell__content--header-3 { display: table-cell; }
+        .dt-cell__content--col-9, .dt-cell__content--header-9 { display: table-cell; }
+        `;
+      document.head.appendChild(style);
 
-  // Define the cards to display
-  card_names = ["Total Projects", "Total Hrs Worked Today", "Total Hrs Worked This Week", "Total Hrs Worked This Month"];
+      // Define the cards to display
+      card_names = ["Total Projects", "Total Hrs Worked Today", "Total Hrs Worked This Week", "Total Hrs Worked This Month"];
   
-  // Render the cards immediately to improve perceived speed
-  render_cards(cardWrapper, card_names);
+      // Render the cards immediately to improve perceived speed
+      render_cards(cardWrapper, card_names);
 
-  // Make an API call to fetch all projects data asynchronously
-  frappe.call({
-    method: "phamos.phamos.page.project_action_panel.project_action_panel.fetch_all_projects",
-    callback: function (r) {
-      if (r.message) {
-        // Render DataTable with the fetched data once API response is received
-        renderProjectDataTable(datatableWrapper, r.message);
-      } else {
-        // Handle case with no data or error
-        datatableWrapper.innerHTML = `<p>No projects found.</p>`;
-      }
-    },
-    freeze: true,  // Optional: Add a freeze effect to indicate loading
-    freeze_message: "Loading projects...",  // Custom loading message
-  });
-}
+      // Make an API call to fetch all projects data asynchronously
+        frappe.call({
+          method: "phamos.phamos.page.project_action_panel.project_action_panel.fetch_all_projects",
+          callback: function (r) {
+            if (r.message) {
+              // Render DataTable with the fetched data once API response is received
+              renderProjectDataTable(datatableWrapper, r.message);
+            } else {
+              // Handle case with no data or error
+              datatableWrapper.innerHTML = `<p>No projects found.</p>`;
+            }
+          },
+          freeze: true,  // Optional: Add a freeze effect to indicate loading
+          freeze_message: "Loading projects...",  // Custom loading message
+        });
+    }
 
 }
 
@@ -697,7 +827,7 @@ function renderProjectDataTable(datatableWrapper, projectData) {
   // Define columns for the report view
   let button_formatter1 = (value, row) => {
     
-      return `<button type="button" style="height: 23px; width: 60px; display: flex; align-items: center; justify-content: center; background-color: rgb(255, 165, 0);" class="btn btn-primary btn-sm btn-modal-primary" onclick="assignProject('${row[9].content}')">Assign</button>`;
+      return `<button type="button" style="height: 23px; width: 60px; display: flex; align-items: center; justify-content: center; background-color: rgb(255, 165, 0);" class="btn btn-primary btn-sm btn-modal-primary" onclick="assignProject('${row[10].content}')">Assign</button>`;
     
   };
   let button_formatter = (value, row) => {
@@ -707,6 +837,33 @@ function renderProjectDataTable(datatableWrapper, projectData) {
       return `<button type="button" style="height: 23px; width: 60px; display: flex; align-items: center; justify-content: center; background-color: rgb(139, 0, 0);" class="btn btn-primary btn-sm btn-modal-primary" onclick="stopProject('${row[9].content}','${row[11].content}', '${row[10].content}','${row[12]?.content || ''}','${row[13]?.content}')">Stop</button>`;
     }
   };
+  
+  const button_formatter2 = (value, row, column, rowIndex, columnIndex, data) => {
+    // Extract the actual row index
+    const actualRowIndex = row[0]?.rowIndex;
+    
+    // Fallback for unique ID
+    const uniqueId = actualRowIndex !== undefined ? actualRowIndex : `row-${Math.random().toString(36).substring(7)}`;
+    const dropdownId = `dropdownMenu-${uniqueId}`;
+  
+    return `
+      <div class="custom-dropdown">
+        <button
+          class="btn btn-primary btn-sm btn-modal-primary dropdown-btn"
+          type="button"
+          style="height: 23px; width: 60px; display: flex; align-items: center; justify-content: center; background-color: rgb(255, 140, 0);"
+          onclick="toggleDropdown(event, '${dropdownId}')"
+        >
+          Assign
+        </button>
+        <div class="dropdown-menu" id="${dropdownId}">
+          <a class="dropdown-item" href="#" data-option="Self" onclick="selfAssignProject('${row?.[10]?.content || ''}')">Self</a>
+          <a class="dropdown-item" href="#" data-option="Others" onclick="assignProject('${row?.[10]?.content || ''}')">Others</a>
+        </div>
+      </div>
+    `;
+  };
+  
 
   let columns = [
     { label: "<b>Project Name</b>", id: "project_name", fieldtype: "Data", width: 180, editable: false, visible: false },
@@ -725,14 +882,14 @@ function renderProjectDataTable(datatableWrapper, projectData) {
     {
       label: '<svg class="icon icon-sm"><use href="#icon-assign"></use></svg> <b>Assign To</b>', 
       focusable: false, 
-      format: button_formatter1, 
+      format: button_formatter2, 
       width: 120 
     }
   ];
   function hoursFormatter(value, row) {
-    const plannedHours = row[5]?.content || 0; // Planned hours
-    const spentDraft = row[6]?.content || 0;  // Spent hours (Draft)
-    const spentSubmitted = row[7]?.content || 0; // Spent hours (Submitted)
+    const plannedHours = row[6]?.content || 0; // Planned hours
+    const spentDraft = row[7]?.content || 0;  // Spent hours (Draft)
+    const spentSubmitted = row[8]?.content || 0; // Spent hours (Submitted)
   
     // Combine into a styled display
     return `

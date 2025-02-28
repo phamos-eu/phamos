@@ -16,7 +16,12 @@
   "is_employee_feedback",
   "mattermost_daily_thread_settings_tab",
   "enable_daily_thread_creation",
+  "section_break_boza",
+  "mattermost_url",
+  "token",
+  "section_break_avvx",
   "thread_posting_hour",
+  "column_break_pykn",
   "last_daily_thread_creation_date",
   "section_break_s3bt",
   "mattermost_channel"
@@ -91,6 +96,43 @@
    "fieldname": "last_daily_thread_creation_date",
    "fieldtype": "Date",
    "label": "Last Daily Thread Creation Date"
+  },
+  {
+   "fieldname": "timesheet_settings_section",
+   "fieldtype": "Section Break",
+   "label": "Timesheet Settings"
+  },
+  {
+   "default": "30",
+   "fieldname": "allowed_additional_work_time",
+   "fieldtype": "Int",
+   "label": "Allowed Additional Work Time (In Mins)",
+   "non_negative": 1,
+   "print_width": "70"
+  },
+  {
+   "fieldname": "section_break_boza",
+   "fieldtype": "Section Break"
+  },
+  {
+   "fieldname": "column_break_pykn",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "mattermost_url",
+   "fieldtype": "Data",
+   "label": "Mattermost URL",
+   "mandatory_depends_on": "eval:doc.enable_daily_thread_creation == 1"
+  },
+  {
+   "fieldname": "token",
+   "fieldtype": "Data",
+   "label": "Token",
+   "mandatory_depends_on": "eval:doc.enable_daily_thread_creation == 1"
+  },
+  {
+   "fieldname": "section_break_avvx",
+   "fieldtype": "Section Break"
   }
  ],
  "index_web_pages_for_search": 1,
