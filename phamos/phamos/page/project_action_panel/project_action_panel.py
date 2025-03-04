@@ -110,19 +110,90 @@ def fetch_projects():
     # Custom SQL query to fetch project data
     employee_name = frappe.db.get_value("Employee", {"user_id": frappe.session.user}, "name")
     projects = frappe.db.sql("""
-        SELECT p.percent_billable as percent_billable ,p.name AS name, p.planned_hours AS planned_hours,p.task_in_timesheet_record, p.status AS status, p.notes AS notes, p.project_name AS project_name, CONCAT(p.name, " - ", p.project_name) AS project_desc,
-        ROUND((SELECT SUM(t.total_hours) FROM `tabTimesheet` t 
-        WHERE t.docstatus = 0 and t.employee = %(employee)s AND t.name IN (SELECT td.parent FROM `tabTimesheet Detail` td WHERE td.project = p.name)), 3) AS spent_hours_draft,
-        ROUND((SELECT SUM(t.total_hours) FROM `tabTimesheet` t 
-        WHERE t.docstatus = 1 and t.employee = %(employee)s AND t.name IN (SELECT td.parent FROM `tabTimesheet Detail` td WHERE td.project = p.name)), 3) AS spent_hours_submitted,
-        (SELECT name FROM `tabCustomer` c WHERE p.customer = c.name) AS customer,
-        (SELECT CASE WHEN c.name != c.customer_name THEN CONCAT(c.name, " - ", c.customer_name) ELSE c.customer_name END FROM `tabCustomer` c WHERE p.customer = c.name) AS customer_desc,
-        (SELECT max(ts.name) FROM `tabTimesheet Record` ts WHERE ts.project = p.name AND ts.employee = %(employee)s AND ts.docstatus = 0) AS timesheet_record,
-        (SELECT (ts1.task) FROM `tabTimesheet Record` ts1 WHERE ts1.name = (SELECT max(ts.name) FROM `tabTimesheet Record` ts WHERE ts.project = p.name AND ts.employee = %(employee)s AND ts.docstatus = 0)) AS task
+        SELECT 
+            p.percent_billable as percent_billable,
+            p.name AS name, 
+            p.planned_hours AS planned_hours,
+            p.task_in_timesheet_record,
+            p.status AS status,
+            p.notes AS notes,
+            p.project_name AS project_name, 
+            CONCAT(p.name, " - ", p.project_name) AS project_desc,   
+                             
+            ROUND((
+                SELECT SUM(t.total_hours) 
+                FROM `tabTimesheet` t 
+                WHERE t.docstatus = 0 
+                AND t.employee = %(employee)s 
+                AND t.name IN (
+                    SELECT td.parent 
+                    FROM `tabTimesheet Detail` td 
+                    WHERE td.project = p.name
+                )
+            ), 3) AS spent_hours_draft,
+
+            ROUND((
+                SELECT SUM(t.total_hours) 
+                FROM `tabTimesheet` t 
+                WHERE t.docstatus = 1 
+                AND t.employee = %(employee)s 
+                AND t.name IN (
+                    SELECT td.parent 
+                    FROM `tabTimesheet Detail` td 
+                    WHERE td.project = p.name
+                )
+            ), 3) AS spent_hours_submitted,
+            
+            (SELECT name 
+                FROM `tabCustomer` c 
+                WHERE p.customer = c.name) AS customer,
+                             
+            (SELECT 
+                CASE 
+                    WHEN c.name != c.customer_name THEN CONCAT(c.name, " - ", c.customer_name) 
+                    ELSE c.customer_name 
+                END 
+                FROM `tabCustomer` c 
+                WHERE p.customer = c.name) AS customer_desc,
+                             
+            (SELECT max(ts.name) 
+                FROM `tabTimesheet Record` ts 
+                WHERE ts.project = p.name 
+                AND ts.employee = %(employee)s 
+                AND ts.docstatus = 0) AS timesheet_record,
+                             
+            (SELECT (ts1.task) FROM `tabTimesheet Record` ts1 
+                WHERE ts1.name = (SELECT max(ts.name) 
+                    FROM `tabTimesheet Record` ts 
+                        WHERE ts.project = p.name 
+                        AND ts.employee = %(employee)s 
+                        AND ts.docstatus = 0
+                )
+            ) AS task,
+                             
+            (SELECT MAX(tsr.creation) 
+                FROM `tabTimesheet Record` tsr 
+                WHERE tsr.project = p.name 
+                AND tsr.employee = %(employee)s) AS last_timesheet_update
+
         FROM `tabProject` p
-        WHERE (SELECT max(reference_name) FROM `tabToDo` td WHERE td.status = "Open" AND td.reference_name = p.name AND td.allocated_to = %(user)s) IS NOT NULL
-        ORDER BY timesheet_record IS NULL, timesheet_record ASC  # Show records with timesheet_record first
+        WHERE (SELECT MAX(reference_name) 
+            FROM `tabToDo` td 
+            WHERE td.status = "Open" 
+            AND td.reference_name = p.name 
+            AND td.allocated_to = %(user)s) IS NOT NULL
+
+        ORDER BY 
+            CASE 
+                WHEN (SELECT MAX(tsr.creation) 
+                    FROM `tabTimesheet Record` tsr 
+                    WHERE tsr.project = p.name 
+                    AND tsr.employee = %(employee)s) IS NULL THEN 1
+                ELSE 0
+            END ASC,  
+            last_timesheet_update DESC
     """, {"employee": employee_name, "user": frappe.session.user}, as_dict=True)
+
 
     # Return project data
     return projects
