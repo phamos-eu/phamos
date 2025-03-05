@@ -6,6 +6,7 @@
  "doctype": "DocType",
  "engine": "InnoDB",
  "field_order": [
+  "status",
   "notes",
   "start_date",
   "column_break_7p95",
@@ -120,6 +121,11 @@
   {
    "fieldname": "status_history_section",
    "fieldtype": "Section Break"
+  },
+  {
+   "fieldname": "status",
+   "fieldtype": "Data",
+   "label": "Status"
   }
  ],
  "index_web_pages_for_search": 1,
@@ -141,7 +147,7 @@
    "link_fieldname": "custom_implementation"
   }
  ],
- "modified": "2025-03-04 15:38:43.154366",
+ "modified": "2025-03-05 08:34:12.022618",
  "modified_by": "Administrator",
  "module": "Phamos",
  "name": "Implementation",
