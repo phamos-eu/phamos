@@ -7,6 +7,7 @@ from datetime import datetime
 from datetime import datetime, timedelta
 from frappe.query_builder import Field,Case, Order
 from frappe.query_builder.functions import Concat,Max
+from frappe.query_builder import DocType, functions as fn
 
 @frappe.whitelist()
 def create_timesheet_record(project_name,  customer, from_time, expected_time, goal,task=None):
@@ -196,7 +197,6 @@ def get_project_count():
         #"count_projects": count_projects[0].get('total_projects') if count_projects else 0  # assuming you want to return the count of projects meeting certain conditions
     }
 
-
 @frappe.whitelist()
 def get_project_count_all():
     count_projects = frappe.db.sql("""
@@ -210,33 +210,47 @@ def get_project_count_all():
         #"count_projects": count_projects[0].get('total_projects') if count_projects else 0  # assuming you want to return the count of projects meeting certain conditions
     }
 
-
 @frappe.whitelist()
 def total_hours_worked_today():
     employee_name = frappe.db.get_value("Employee", {"user_id": frappe.session.user}, "name")
     today_date = datetime.today().date()  # Get today's date
-    count_time = frappe.db.sql("""
-        SELECT sum(ts.actual_time) AS actual_time
-        FROM `tabTimesheet Record` ts
-        WHERE ts.employee = %(employee)s AND DATE(ts.from_time) = %(today_date)s
-    """, {"employee": employee_name, "today_date": today_date}, as_dict=True)
-    
+    TimesheetRecord = DocType("Timesheet Record")
+    count_time = (
+        frappe.qb.from_(TimesheetRecord)
+        .select(
+            fn.Sum(TimesheetRecord.actual_time).as_("actual_time"),
+            fn.Sum(TimesheetRecord.actual_time * TimesheetRecord.percent_billable / 100).as_("total_billable_time")
+        )
+        .where(
+            (TimesheetRecord.employee == employee_name)
+            & (fn.Date(TimesheetRecord.from_time) == today_date)
+        )
+        .run(as_dict=True)
+    )
+
     if count_time and count_time[0].actual_time:
+        # Format actual time
         actual_time = format_duration(count_time[0].actual_time)
         actual_time_str = str(actual_time)[:9]
-        #frappe.msgprint(f"Total hours worked today: {actual_time_str}")
+
+        # Format billable time if it exists
+        total_billable_time = count_time[0].total_billable_time
+        if total_billable_time:
+            total_billable_time = format_duration(total_billable_time)
+            total_billable_time_str = str(total_billable_time)[:10]
         
         return {
             "value": actual_time_str,
-            "fieldtype": "Float"
+            "fieldtype": "Float",
+            "billable": total_billable_time_str or 0
         }
     else:
-        actual_time_str = 0
+        # If no time was worked, return zero
         return {
-            "value": actual_time_str,
-            "fieldtype": "Float"
+            "value": 0,
+            "fieldtype": "Float",
+            "billable": 0
         }
-
 
 @frappe.whitelist()
 def total_hours_worked_in_this_week():
@@ -245,29 +259,41 @@ def total_hours_worked_in_this_week():
     start_of_week = today_date - timedelta(days=today_date.weekday())  # Calculate the start of the current week
     end_of_week = start_of_week + timedelta(days=6)  # Calculate the end of the current week
 
-    count_time = frappe.db.sql("""
-        SELECT SUM(ts.actual_time) AS total_actual_time
-        FROM `tabTimesheet Record` ts
-        WHERE ts.employee = %(employee)s 
-        AND ts.from_time BETWEEN %(start_of_week)s AND %(end_of_week)s
-    """, {"employee": employee_name, "start_of_week": start_of_week, "end_of_week": end_of_week}, as_dict=True)
-    
+    TimesheetRecord = DocType("Timesheet Record")
+    count_time = (
+        frappe.qb.from_(TimesheetRecord)
+        .select(
+            fn.Sum(TimesheetRecord.actual_time).as_("total_actual_time"),
+            fn.Sum(TimesheetRecord.actual_time * TimesheetRecord.percent_billable / 100).as_("total_billable_time")
+        )
+        .where(
+            (TimesheetRecord.employee == employee_name)
+            & (TimesheetRecord.from_time.between(start_of_week, end_of_week))
+        )
+        .run(as_dict=True)
+    )
+
     if count_time and count_time[0].total_actual_time:
         total_actual_time = format_duration(count_time[0].total_actual_time)
         total_actual_time_str = str(total_actual_time)[:10]
-        #frappe.msgprint(f"Total hours worked this week: {total_actual_time_str}")
+
+        # Format billable time
+        total_billable_time = count_time[0].total_billable_time
+        if total_billable_time:
+            total_billable_time = format_duration(total_billable_time)
+            total_billable_time_str = str(total_billable_time)[:10]
         
         return {
             "value": total_actual_time_str,
-            "fieldtype": "Float"
+            "fieldtype": "Float",
+            "billable": total_billable_time_str or 0
         }
     else:
-        total_actual_time_str = 0
         return {
-            "value": total_actual_time_str,
-            "fieldtype": "Float"
+            "value": 0,
+            "fieldtype": "Float",
+            "billable": 0
         }
-
 
 @frappe.whitelist()
 def total_hours_worked_in_this_month():
@@ -282,39 +308,51 @@ def total_hours_worked_in_this_month():
         next_month = start_of_month.replace(month=start_of_month.month + 1)  # Calculate the start of the next month
     end_of_month = next_month - timedelta(days=1)  # Calculate the end of the current month
 
-    count_time = frappe.db.sql("""
-        SELECT SUM(ts.actual_time) AS total_actual_time
-        FROM `tabTimesheet Record` ts
-        WHERE ts.employee = %(employee)s 
-        AND ts.from_time BETWEEN %(start_of_month)s AND %(end_of_month)s
-    """, {"employee": employee_name, "start_of_month": start_of_month, "end_of_month": end_of_month}, as_dict=True)
-     
+    TimesheetRecord = DocType("Timesheet Record")
+    count_time = (
+        frappe.qb.from_(TimesheetRecord)
+        .select(
+            fn.Sum(TimesheetRecord.actual_time).as_("total_actual_time"),
+            fn.Sum(TimesheetRecord.actual_time * TimesheetRecord.percent_billable / 100).as_("total_billable_time")
+        )
+        .where(
+            (TimesheetRecord.employee == employee_name)
+            & (TimesheetRecord.from_time.between(start_of_month, end_of_month))
+        )
+        .run(as_dict=True)
+    )
+
     if count_time and count_time[0].total_actual_time:
         total_actual_time = format_duration(count_time[0].total_actual_time)
         total_actual_time_str = str(total_actual_time)[:10]
-        #frappe.msgprint(f"Total hours worked this month: {total_actual_time_str}")
+
+        # Format billable time
+        total_billable_time = count_time[0].total_billable_time
+        if total_billable_time:
+            total_billable_time = format_duration(total_billable_time)
+            total_billable_time_str = str(total_billable_time)[:10]
         
         return {
             "value": total_actual_time_str,
-            "fieldtype": "Float"
+            "fieldtype": "Float",
+            "billable": total_billable_time_str or 0
         }
     else:
-        total_actual_time_str = 0
         return {
-            "value": total_actual_time_str,
-            "fieldtype": "Float"
+            "value": 0,
+            "fieldtype": "Float",
+            "billable": 0
         }
 
-
 def format_duration(duration_in_seconds):
-	minutes, seconds = divmod(duration_in_seconds, 60)
-	hours, minutes = divmod(minutes, 60)
-	if hours > 0:
-		return f"{hours} Hrs {minutes} Mins"
-	elif minutes > 0:
-		return f"{minutes} Mins"
-	else:
-		return f"{seconds} Secs"
+    minutes, seconds = divmod(duration_in_seconds, 60)
+    hours, minutes = divmod(minutes, 60)
+    if hours > 0:
+        return f"{int(hours)} Hrs"
+    elif minutes > 0:
+        return f"{int(minutes)} Mins"
+    else:
+        return f"{int(seconds)} Secs"
 
 
 @frappe.whitelist()
