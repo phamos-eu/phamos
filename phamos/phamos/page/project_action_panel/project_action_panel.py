@@ -5,8 +5,9 @@ from frappe.utils import cstr, now_datetime, time_diff_in_seconds, get_datetime,
 from frappe.utils.data import add_to_date,format_duration, time_diff_in_seconds
 from datetime import datetime
 from datetime import datetime, timedelta
-from frappe.query_builder import Field,Case, Order
-from frappe.query_builder.functions import Concat,Max
+from frappe.query_builder import Field,Case, Order, DocType
+from frappe.query_builder.functions import Concat, Max, Sum, Round, Coalesce, IfNull
+
 
 @frappe.whitelist()
 def create_timesheet_record(project_name,  customer, from_time, expected_time, goal,task=None):
@@ -103,99 +104,112 @@ def check_draft_timesheet_record():
         frappe.log_error(f"Error in check_draft_timesheet_record: {e}")
         return None
     
-
-    
 @frappe.whitelist()
 def fetch_projects():
-    # Custom SQL query to fetch project data
+    # Get Employee linked to current user
     employee_name = frappe.db.get_value("Employee", {"user_id": frappe.session.user}, "name")
-    projects = frappe.db.sql("""
-        SELECT 
-            p.percent_billable as percent_billable,
-            p.name AS name, 
-            p.planned_hours AS planned_hours,
-            p.task_in_timesheet_record,
-            p.status AS status,
-            p.notes AS notes,
-            p.project_name AS project_name, 
-            CONCAT(p.name, " - ", p.project_name) AS project_desc,   
-                             
-            ROUND((
-                SELECT SUM(t.total_hours) 
-                FROM `tabTimesheet` t 
-                WHERE t.docstatus = 0 
-                AND t.employee = %(employee)s 
-                AND t.name IN (
-                    SELECT td.parent 
-                    FROM `tabTimesheet Detail` td 
-                    WHERE td.project = p.name
-                )
-            ), 3) AS spent_hours_draft,
+    if not employee_name:
+        frappe.throw("Employee not found for the current user.")
 
-            ROUND((
-                SELECT SUM(t.total_hours) 
-                FROM `tabTimesheet` t 
-                WHERE t.docstatus = 1 
-                AND t.employee = %(employee)s 
-                AND t.name IN (
-                    SELECT td.parent 
-                    FROM `tabTimesheet Detail` td 
-                    WHERE td.project = p.name
-                )
-            ), 3) AS spent_hours_submitted,
-            
-            (SELECT name 
-                FROM `tabCustomer` c 
-                WHERE p.customer = c.name) AS customer,
-                             
-            (SELECT 
-                CASE 
-                    WHEN c.name != c.customer_name THEN CONCAT(c.name, " - ", c.customer_name) 
-                    ELSE c.customer_name 
-                END 
-                FROM `tabCustomer` c 
-                WHERE p.customer = c.name) AS customer_desc,
-                             
-            (SELECT max(ts.name) 
-                FROM `tabTimesheet Record` ts 
-                WHERE ts.project = p.name 
-                AND ts.employee = %(employee)s 
-                AND ts.docstatus = 0) AS timesheet_record,
-                             
-            (SELECT (ts1.task) FROM `tabTimesheet Record` ts1 
-                WHERE ts1.name = (SELECT max(ts.name) 
-                    FROM `tabTimesheet Record` ts 
-                        WHERE ts.project = p.name 
-                        AND ts.employee = %(employee)s 
-                        AND ts.docstatus = 0
-                )
-            ) AS task,
-                             
-            (SELECT MAX(tsr.creation) 
-                FROM `tabTimesheet Record` tsr 
-                WHERE tsr.project = p.name 
-                AND tsr.employee = %(employee)s) AS last_timesheet_update
+    # Define DocTypes
+    Project = DocType("Project")
+    Timesheet = DocType("Timesheet")
+    TimesheetDetail = DocType("Timesheet Detail")
+    Customer = DocType("Customer")
+    TimesheetRecord = DocType("Timesheet Record")
+    ToDo = DocType("ToDo")
 
-        FROM `tabProject` p
-        WHERE (SELECT MAX(reference_name) 
-            FROM `tabToDo` td 
-            WHERE td.status = "Open" 
-            AND td.reference_name = p.name 
-            AND td.allocated_to = %(user)s) IS NOT NULL
+    # Subqueries for calculations
+    spent_hours_draft = (
+        frappe.qb.from_(Timesheet)
+        .select(Coalesce(Sum(Timesheet.total_hours), 0))
+        .where(
+            (Timesheet.docstatus == 0)
+            & (Timesheet.employee == employee_name)
+            & (Timesheet.name.isin(
+                frappe.qb.from_(TimesheetDetail)
+                .select(TimesheetDetail.parent)
+                .where(TimesheetDetail.project == Project.name)
+            ))
+        )
+    )
 
-        ORDER BY 
-            CASE 
-                WHEN (SELECT MAX(tsr.creation) 
-                    FROM `tabTimesheet Record` tsr 
-                    WHERE tsr.project = p.name 
-                    AND tsr.employee = %(employee)s) IS NULL THEN 1
-                ELSE 0
-            END ASC,  
-            last_timesheet_update DESC
-    """, {"employee": employee_name, "user": frappe.session.user}, as_dict=True)
+    spent_hours_submitted = (
+        frappe.qb.from_(Timesheet)
+        .select(Coalesce(Sum(Timesheet.total_hours), 0))
+        .where(
+            (Timesheet.docstatus == 1)
+            & (Timesheet.employee == employee_name)
+            & (Timesheet.name.isin(
+                frappe.qb.from_(TimesheetDetail)
+                .select(TimesheetDetail.parent)
+                .where(TimesheetDetail.project == Project.name)
+            ))
+        )
+    )
 
+    latest_timesheet_record = (
+        frappe.qb.from_(TimesheetRecord)
+        .select(Max(TimesheetRecord.name))
+        .where(
+            (TimesheetRecord.project == Project.name)
+            & (TimesheetRecord.employee == employee_name)
+            & (TimesheetRecord.docstatus == 0)
+        )
+    )
 
-    # Return project data
+    latest_task = (
+        frappe.qb.from_(TimesheetRecord)
+        .select(TimesheetRecord.task)
+        .where(TimesheetRecord.name == latest_timesheet_record)
+    )
+
+    last_timesheet_update = (
+        frappe.qb.from_(TimesheetRecord)
+        .select(Max(TimesheetRecord.creation))
+        .where(
+            (TimesheetRecord.project == Project.name)
+            & (TimesheetRecord.employee == employee_name)
+        )
+    )
+
+    # Handling Customer Description (Replacing CASE)
+    customer_desc_query = IfNull(Customer.customer_name, Customer.name)
+
+    # Main Query
+    query = (
+        frappe.qb.from_(Project)
+        .left_join(Customer).on(Customer.name == Project.customer)
+        .select(
+            Project.percent_billable,
+            Project.name.as_("name"),
+            Project.planned_hours,
+            Project.task_in_timesheet_record,
+            Project.status,
+            Project.notes,
+            Project.project_name,
+            Concat(Project.name, " - ", Project.project_name).as_("project_desc"),
+            Round(spent_hours_draft, 3).as_("spent_hours_draft"),
+            Round(spent_hours_submitted, 3).as_("spent_hours_submitted"),
+            Customer.name.as_("customer"),
+            customer_desc_query.as_("customer_desc"),
+            latest_timesheet_record.as_("timesheet_record"),
+            latest_task.as_("task"),
+            last_timesheet_update.as_("last_timesheet_update"),
+        )
+        .where(
+            frappe.qb.from_(ToDo)
+            .select(Max(ToDo.reference_name))
+            .where(
+                (ToDo.status == "Open")
+                & (ToDo.reference_name == Project.name)
+                & (ToDo.allocated_to == frappe.session.user)
+            ).isnotnull()
+        )
+        .orderby(Coalesce(last_timesheet_update, frappe.utils.now()), order=Order.desc)
+    )
+    # Execute query
+    projects = query.run(as_dict=True)
     return projects
 
 @frappe.whitelist()
