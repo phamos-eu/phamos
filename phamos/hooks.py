@@ -8,14 +8,13 @@ app_email = "support@phamos.eu"
 app_license = "MIT"
 
 required_apps = ["erpnext", "hrms"]
-
 # Includes in <head>
 # ------------------
 
 # include js, css files in header of desk.html
 # app_include_css = "/assets/phamos/css/phamos.css"
 # app_include_js = "/assets/phamos/js/phamos.js"
-
+app_include_js = ["phamos.bundle.js"]
 # include js, css files in header of web template
 # web_include_css = "/assets/phamos/css/phamos.css"
 # web_include_js = "/assets/phamos/js/phamos.js"
@@ -32,14 +31,11 @@ required_apps = ["erpnext", "hrms"]
 
 # include js in doctype views
 doctype_js = {
-    "Project" : "public/js/project.js", 
-    "Issue" : "public/js/issue.js",
+	"Project" : "public/js/project.js",
+	"Issue" : "public/js/issue.js",
+	"Sales Order": "public/js/sales_order.js",
     "Job Applicant": "public/js/job_applicant.js"
 }
-
-# DocType Class
-# ---------------
-# Override standard doctype classes
 
 override_doctype_class = {
 	"Job Applicant": "phamos.events.job_applicant.CustomJobApplicant"
@@ -48,6 +44,7 @@ override_doctype_class = {
 website_route_rules = [
     {"from_route": "/schedule_interview/<name>", "to_route": "schedule_interview"}
 ]
+
 # doctype_js = {"doctype" : "public/js/doctype.js"}
 # doctype_list_js = {"doctype" : "public/js/doctype_list.js"}
 # doctype_tree_js = {"doctype" : "public/js/doctype_tree.js"}
@@ -108,6 +105,13 @@ website_route_rules = [
 #	"Event": "frappe.desk.doctype.event.event.has_permission",
 # }
 
+# DocType Class
+# ---------------
+# Override standard doctype classes
+
+# override_doctype_class = {
+#	"ToDo": "custom_app.overrides.CustomToDo"
+# }
 
 # Document Events
 # ---------------
@@ -123,24 +127,38 @@ website_route_rules = [
 
 # Scheduled Tasks
 # ---------------
+# In your_app/hooks.py
 
-# scheduler_events = {
-#	"all": [
-#		"phamos.tasks.all"
-#	],
-#	"daily": [
-#		"phamos.tasks.daily"
-#	],
-#	"hourly": [
-#		"phamos.tasks.hourly"
-#	],
-#	"weekly": [
-#		"phamos.tasks.weekly"
-#	],
-#	"monthly": [
-#		"phamos.tasks.monthly"
-#	],
-# }
+# your_app/hooks.py
+
+fixtures = [
+    {"dt": "Scheduled Job Type", "filters": [
+        [
+            "name", "in", [
+                "mattermost_daily_thread.create_mattermost_thread",
+            ]
+        ]
+    ]},
+    {"dt": "Custom Field", "filters": [
+        [
+            "module", "=", "Phamos"
+        ]
+    ]},
+    {"dt": "Property Setter", "filters": [
+        [
+            "module", "=", "Phamos"
+        ]
+    ]},
+]
+
+#scheduler_events = {
+ #   "cron": {
+  #      "0 6 * * 1-5": [
+   #         "phamos.custom_scripts.custom_python.mattermost_daily_thread.create_mattermost_thread"
+    #    ]
+    #}
+#}
+
 
 # Testing
 # -------
@@ -160,6 +178,10 @@ website_route_rules = [
 # override_doctype_dashboards = {
 #	"Task": "phamos.task.get_dashboard_data"
 # }
+
+override_doctype_dashboards = {
+    "Project": "phamos.custom_scripts.custom_python.project_dashboard.get_project_dashboard_data"
+}
 
 # exempt linked doctypes from being automatically cancelled
 #
