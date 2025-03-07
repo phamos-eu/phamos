@@ -7,7 +7,7 @@ app_description = "ERPNext Enhancement for phamos.eu"
 app_email = "support@phamos.eu"
 app_license = "MIT"
 
-required_apps = ["erpnext"]
+required_apps = ["erpnext", "hrms"]
 
 # Includes in <head>
 # ------------------
@@ -31,8 +31,23 @@ required_apps = ["erpnext"]
 # page_js = {"page" : "public/js/file.js"}
 
 # include js in doctype views
-doctype_js = {"Project" : "public/js/project.js"}
-doctype_js = {"Issue" : "public/js/issue.js"}
+doctype_js = {
+    "Project" : "public/js/project.js", 
+    "Issue" : "public/js/issue.js",
+    "Job Applicant": "public/js/job_applicant.js"
+}
+
+# DocType Class
+# ---------------
+# Override standard doctype classes
+
+override_doctype_class = {
+	"Job Applicant": "phamos.events.job_applicant.CustomJobApplicant"
+}
+
+website_route_rules = [
+    {"from_route": "/schedule_interview/<name>", "to_route": "schedule_interview"}
+]
 # doctype_js = {"doctype" : "public/js/doctype.js"}
 # doctype_list_js = {"doctype" : "public/js/doctype_list.js"}
 # doctype_tree_js = {"doctype" : "public/js/doctype_tree.js"}
@@ -93,13 +108,6 @@ doctype_js = {"Issue" : "public/js/issue.js"}
 #	"Event": "frappe.desk.doctype.event.event.has_permission",
 # }
 
-# DocType Class
-# ---------------
-# Override standard doctype classes
-
-# override_doctype_class = {
-#	"ToDo": "custom_app.overrides.CustomToDo"
-# }
 
 # Document Events
 # ---------------
