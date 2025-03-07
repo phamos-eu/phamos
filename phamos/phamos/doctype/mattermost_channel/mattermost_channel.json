@@ -1,0 +1,46 @@
+{
+ "actions": [],
+ "allow_rename": 1,
+ "creation": "2024-07-26 09:49:11.926407",
+ "doctype": "DocType",
+ "editable_grid": 1,
+ "engine": "InnoDB",
+ "field_order": [
+  "channel",
+  "channel_id",
+  "enable"
+ ],
+ "fields": [
+  {
+   "fieldname": "channel",
+   "fieldtype": "Data",
+   "in_list_view": 1,
+   "label": "Channel"
+  },
+  {
+   "fieldname": "channel_id",
+   "fieldtype": "Data",
+   "in_list_view": 1,
+   "label": "Channel ID"
+  },
+  {
+   "default": "0",
+   "fieldname": "enable",
+   "fieldtype": "Check",
+   "in_list_view": 1,
+   "label": "Enable"
+  }
+ ],
+ "index_web_pages_for_search": 1,
+ "istable": 1,
+ "links": [],
+ "modified": "2024-07-26 09:53:29.254403",
+ "modified_by": "Administrator",
+ "module": "Phamos",
+ "name": "Mattermost Channel",
+ "owner": "Administrator",
+ "permissions": [],
+ "sort_field": "modified",
+ "sort_order": "DESC",
+ "states": []
+}

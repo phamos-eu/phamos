@@ -34,7 +34,7 @@ doctype_js = {
 	"Project" : "public/js/project.js",
 	"Issue" : "public/js/issue.js",
 	"Sales Order": "public/js/sales_order.js",
-    "Job Applicant": "public/js/job_applicant.js"
+  "Job Applicant": "public/js/job_applicant.js"
 }
 
 override_doctype_class = {

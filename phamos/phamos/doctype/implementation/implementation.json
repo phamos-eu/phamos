@@ -1,0 +1,139 @@
+{
+ "actions": [],
+ "allow_rename": 1,
+ "autoname": "prompt",
+ "creation": "2025-01-08 18:25:12.851586",
+ "doctype": "DocType",
+ "engine": "InnoDB",
+ "field_order": [
+  "notes",
+  "start_date",
+  "column_break_7p95",
+  "department",
+  "account_manager",
+  "maturity_level",
+  "mood",
+  "forecast",
+  "section_break_ky9b",
+  "customer",
+  "contact_person",
+  "timesheets_tab",
+  "html_bfhi"
+ ],
+ "fields": [
+  {
+   "fieldname": "notes",
+   "fieldtype": "Text Editor",
+   "label": "Notes"
+  },
+  {
+   "fieldname": "start_date",
+   "fieldtype": "Date",
+   "label": "Start Date"
+  },
+  {
+   "fieldname": "column_break_7p95",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "account_manager",
+   "fieldtype": "Link",
+   "in_list_view": 1,
+   "in_preview": 1,
+   "in_standard_filter": 1,
+   "label": "Account Manager",
+   "link_filters": "[[\"User\",\"role\",\"=\",\"Accounts Manager\"]]",
+   "options": "User"
+  },
+  {
+   "fieldname": "maturity_level",
+   "fieldtype": "Select",
+   "in_list_view": 1,
+   "in_preview": 1,
+   "in_standard_filter": 1,
+   "label": "Maturity Level",
+   "options": "1 - Start der Implementierung, keine Vorerfahrung, noch kein\n2 - Poweruser kann sich orientieren,\n3 - Live-Betrieb, Erste Module sind im Einsatz,\n4 - Erste Module abgeschlossen, Entwicklungsprozesse in der Tiefe verstanden,\n5 - Quasi-abgeschlossen, System ist implementiert, Viele geschulte Anwender, hoher Automatisierungsgrad,"
+  },
+  {
+   "fieldname": "mood",
+   "fieldtype": "Select",
+   "label": "Mood",
+   "options": "1\n2\n3\n4\n5"
+  },
+  {
+   "fieldname": "forecast",
+   "fieldtype": "Select",
+   "in_list_view": 1,
+   "in_preview": 1,
+   "in_standard_filter": 1,
+   "label": "Forecast",
+   "options": "1 \u2600\ufe0f - alles gut. Kunde happy, keine Gefahren (deadlines, Erwartung an Stunden etc) in sicht\n2 \ud83c\udf24\ufe0f - zu viele neue Issues, feedback langsam\n3 \u2601\ufe0f - weekly findet nicht jede Woche statt, Kundenprojektmanager schwer zu erreichen,\n4 \ud83c\udf27\ufe0f - Anforderungen \u00e4ndern sich sehr h\u00e4ufig, Weeklies werden nicht wahrgenommen, kunde antwortet auf Mails nicht\n5 \u26c8\ufe0f - Kunde zahlt Rechnungen nicht, Kunde hat keine Gedult"
+  },
+  {
+   "fieldname": "section_break_ky9b",
+   "fieldtype": "Section Break",
+   "label": "Customer Information"
+  },
+  {
+   "fieldname": "customer",
+   "fieldtype": "Link",
+   "label": "Customer",
+   "options": "Customer"
+  },
+  {
+   "fieldname": "contact_person",
+   "fieldtype": "Data",
+   "label": "Contact Person"
+  },
+  {
+   "fieldname": "timesheets_tab",
+   "fieldtype": "Tab Break",
+   "label": "Timesheets"
+  },
+  {
+   "fieldname": "html_bfhi",
+   "fieldtype": "HTML",
+   "options": "<h1>Info</h1>On this screen we will want to see a table of all timesheets from this implmentation. Interesting also will be some filters for project, employee, and more"
+  },
+  {
+   "fieldname": "department",
+   "fieldtype": "Link",
+   "in_list_view": 1,
+   "in_standard_filter": 1,
+   "label": "Department",
+   "options": "Department"
+  }
+ ],
+ "index_web_pages_for_search": 1,
+ "links": [
+  {
+   "link_doctype": "Project",
+   "link_fieldname": "custom_implementation"
+  }
+ ],
+ "modified": "2025-01-15 11:06:43.735815",
+ "modified_by": "Administrator",
+ "module": "Phamos",
+ "name": "Implementation",
+ "naming_rule": "Set by user",
+ "owner": "Administrator",
+ "permissions": [
+  {
+   "create": 1,
+   "delete": 1,
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "System Manager",
+   "share": 1,
+   "write": 1
+  }
+ ],
+ "search_fields": "account_manager",
+ "sort_field": "modified",
+ "sort_order": "DESC",
+ "states": [],
+ "track_changes": 1
+}

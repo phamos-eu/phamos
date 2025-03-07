@@ -1,0 +1,90 @@
+{
+ "actions": [],
+ "allow_rename": 1,
+ "autoname": "format:{user}-{feedback_date}",
+ "creation": "2024-06-24 16:19:14.661853",
+ "doctype": "DocType",
+ "engine": "InnoDB",
+ "field_order": [
+  "user",
+  "column_break_2v10",
+  "feedback_date",
+  "section_break_heik",
+  "what_are_you_most_looking_forward_today",
+  "column_break_g1pf",
+  "what_challange_will_you_tackle_today",
+  "section_break_bkfb",
+  "creation_date"
+ ],
+ "fields": [
+  {
+   "fieldname": "user",
+   "fieldtype": "Link",
+   "label": "User",
+   "options": "User"
+  },
+  {
+   "default": "now",
+   "fieldname": "feedback_date",
+   "fieldtype": "Datetime",
+   "label": "Feedback Date"
+  },
+  {
+   "fieldname": "what_are_you_most_looking_forward_today",
+   "fieldtype": "Small Text",
+   "label": "What are you most looking forward today?"
+  },
+  {
+   "fieldname": "what_challange_will_you_tackle_today",
+   "fieldtype": "Small Text",
+   "label": "What challange will you tackle today?"
+  },
+  {
+   "fieldname": "column_break_2v10",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "section_break_heik",
+   "fieldtype": "Section Break"
+  },
+  {
+   "fieldname": "column_break_g1pf",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "section_break_bkfb",
+   "fieldtype": "Section Break"
+  },
+  {
+   "default": "now",
+   "fieldname": "creation_date",
+   "fieldtype": "Date",
+   "label": "Creation Date"
+  }
+ ],
+ "index_web_pages_for_search": 1,
+ "links": [],
+ "modified": "2024-07-02 12:00:37.931701",
+ "modified_by": "Administrator",
+ "module": "Phamos",
+ "name": "Have a Great Day",
+ "naming_rule": "Expression",
+ "owner": "Administrator",
+ "permissions": [
+  {
+   "create": 1,
+   "delete": 1,
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "System Manager",
+   "share": 1,
+   "write": 1
+  }
+ ],
+ "sort_field": "modified",
+ "sort_order": "DESC",
+ "states": []
+}
