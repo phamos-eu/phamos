@@ -12,4 +12,3 @@ class CustomJobApplicant(JobApplicant):
 		if self.status != "Accepted":
 			self.db_set("status", "Accepted")
 			return {"status": "Accepted"}
-		

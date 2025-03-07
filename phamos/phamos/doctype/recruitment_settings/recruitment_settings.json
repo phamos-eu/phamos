@@ -7,7 +7,8 @@
  "field_order": [
   "section_break_4dmp",
   "available_slots",
-  "interviewers"
+  "interviewers",
+  "interview_round"
  ],
  "fields": [
   {
@@ -24,13 +25,22 @@
    "fieldname": "interviewers",
    "fieldtype": "Table MultiSelect",
    "label": "Interviewers",
-   "options": "Assignment Rule User"
+   "options": "Assignment Rule User",
+   "reqd": 1
+  },
+  {
+   "fieldname": "interview_round",
+   "fieldtype": "Link",
+   "in_list_view": 1,
+   "label": "Interview Round",
+   "options": "Interview Round",
+   "reqd": 1
   }
  ],
  "index_web_pages_for_search": 1,
  "issingle": 1,
  "links": [],
- "modified": "2025-03-06 11:40:29.944056",
+ "modified": "2025-03-07 16:59:17.546250",
  "modified_by": "Administrator",
  "module": "Phamos",
  "name": "Recruitment Settings",

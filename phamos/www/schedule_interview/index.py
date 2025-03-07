@@ -11,11 +11,6 @@ def get_context(context):
 	if not frappe.db.exists("Job Applicant", applicant_id):
 		return {"status": "error", "message": "Job Applicant not found"}
 
-	context.interview_booking_slots = frappe.get_all(
-		"Interview Booking Slot",
-		filters={"disabled": 0},
-		fields=["name"])
-
 	context.job_applicant = frappe.db.get_value("Job Applicant", applicant_id, ["applicant_name", "custom_interview_booking_slot"], as_dict=1)
 	return context
 
@@ -33,11 +28,22 @@ def schedule_interview(applicant_id, interview_date, interview_slot):
 
 		interview_slot_doc = frappe.get_doc("Interview Booking Slot", interview_slot)
 
-		interview_round = "Round 1"
+		interview_round = frappe.get_single("Recruitment Settings").interview_round
+		if not interview_round:
+			raise Exception(_("Interview Round is not set in Recruitment Settings"))
+
+		interviewers = frappe.get_all("Assignment Rule User", filters={"parent": "Recruitment Settings"}, fields=["user"])
+
 		interview = create_interview(applicant_doc, interview_round)
 		interview.scheduled_on = interview_date
 		interview.from_time = interview_slot_doc.from_time
 		interview.to_time = interview_slot_doc.to_time
+		if interviewers:
+			interview.interview_details = []
+			interview.append("interview_details", {
+				"interviewer": interviewers[0].user,
+			})
+
 		interview.save(ignore_permissions=True)
 		return {"status": "success"}
 
