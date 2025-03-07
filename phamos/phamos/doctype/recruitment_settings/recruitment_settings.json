@@ -1,0 +1,53 @@
+{
+ "actions": [],
+ "allow_rename": 1,
+ "creation": "2025-03-06 11:04:57.488353",
+ "doctype": "DocType",
+ "engine": "InnoDB",
+ "field_order": [
+  "section_break_4dmp",
+  "available_slots",
+  "interviewers"
+ ],
+ "fields": [
+  {
+   "fieldname": "section_break_4dmp",
+   "fieldtype": "Section Break"
+  },
+  {
+   "fieldname": "available_slots",
+   "fieldtype": "Table",
+   "label": "Available Slots",
+   "options": "Interview Booking Slots"
+  },
+  {
+   "fieldname": "interviewers",
+   "fieldtype": "Table MultiSelect",
+   "label": "Interviewers",
+   "options": "Assignment Rule User"
+  }
+ ],
+ "index_web_pages_for_search": 1,
+ "issingle": 1,
+ "links": [],
+ "modified": "2025-03-06 11:40:29.944056",
+ "modified_by": "Administrator",
+ "module": "Phamos",
+ "name": "Recruitment Settings",
+ "owner": "Administrator",
+ "permissions": [
+  {
+   "create": 1,
+   "delete": 1,
+   "email": 1,
+   "print": 1,
+   "read": 1,
+   "role": "System Manager",
+   "share": 1,
+   "write": 1
+  }
+ ],
+ "sort_field": "modified",
+ "sort_order": "DESC",
+ "states": []
+}
