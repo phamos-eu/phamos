@@ -1,0 +1,18 @@
+<p>Dear {{ doc.applicant_name }},</p>
+
+{% if doc.designation %}
+<p>I hope you are doing well. We would like to invite you to an interview for the {{ doc.designation }} position at phamos GmbH.</p>
+{% else %}
+<p>I hope you are doing well. We would like to invite you to an interview for the job at phamos GmbH.</p>
+{% endif %}
+
+<p>Please follow link below and Pick a slot for Interview.The interview will take place online on selected timeslot.</p>
+
+<p>{{frappe.utils.get_url()}}/schedule_interview/{{doc.name}}</p>
+
+<p>Looking forward to speaking with you!</p>
+
+<p>Best regards,</p>
+
+<p>Philipp Gutstein
+Head of HR</p>
