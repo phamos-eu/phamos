@@ -1,0 +1,32 @@
+{
+ "attach_print": 0,
+ "channel": "Email",
+ "condition": "doc.status==\"Accepted\"",
+ "creation": "2025-03-06 16:26:08.644053",
+ "days_in_advance": 0,
+ "docstatus": 0,
+ "doctype": "Notification",
+ "document_type": "Job Applicant",
+ "enabled": 1,
+ "event": "Value Change",
+ "idx": 0,
+ "is_standard": 1,
+ "message": "<p>Dear {{ doc.applicant_name }},</p>\n\n{% if doc.designation %}\n<p>I hope you are doing well. We would like to invite you to an interview for the {{ doc.designation }} position at phamos GmbH.</p>\n{% else %}\n<p>I hope you are doing well. We would like to invite you to an interview for the job at phamos GmbH.</p>\n{% endif %}\n\n<p>Please follow link below and Pick a slot for Interview.The interview will take place online on selected timeslot.</p>\n\n<p>{{frappe.utils.get_url()}}/schedule_interview/{{doc.name}}</p>\n\n<p>Looking forward to speaking with you!</p>\n\n<p>Best regards,</p>\n\n<p>Philipp Gutstein\nHead of HR</p>\n",
+ "message_type": "HTML",
+ "modified": "2025-03-06 16:41:15.162544",
+ "modified_by": "Administrator",
+ "module": "Phamos",
+ "name": "Job interview Slot Booking",
+ "owner": "Administrator",
+ "recipients": [
+  {
+   "receiver_by_document_field": "email_id"
+  }
+ ],
+ "send_system_notification": 0,
+ "send_to_all_assignees": 0,
+ "sender": "Jobs",
+ "sender_email": "jobs@example.com",
+ "subject": "Job interview slot booking",
+ "value_changed": "status"
+}
