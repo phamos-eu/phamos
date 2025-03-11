@@ -46,7 +46,6 @@
    "in_preview": 1,
    "in_standard_filter": 1,
    "label": "Account Manager",
-   "link_filters": "[[\"User\",\"role\",\"=\",\"Accounts Manager\"]]",
    "options": "User"
   },
   {
@@ -147,7 +146,7 @@
    "link_fieldname": "custom_implementation"
   }
  ],
- "modified": "2025-03-05 08:34:12.022618",
+ "modified": "2025-03-11 18:29:01.105256",
  "modified_by": "Administrator",
  "module": "Phamos",
  "name": "Implementation",
