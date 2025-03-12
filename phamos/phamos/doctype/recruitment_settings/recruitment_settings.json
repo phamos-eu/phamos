@@ -6,8 +6,13 @@
  "engine": "InnoDB",
  "field_order": [
   "section_break_4dmp",
+  "interview_round",
+  "interview_link",
+  "interview_confirmation",
+  "column_break_owkz",
   "interviewers",
-  "interview_round"
+  "sender",
+  "sender_email"
  ],
  "fields": [
   {
@@ -28,12 +33,45 @@
    "label": "Interview Round",
    "options": "Interview Round",
    "reqd": 1
+  },
+  {
+   "fieldname": "interview_link",
+   "fieldtype": "Data",
+   "label": "Interview Link",
+   "options": "URL",
+   "reqd": 1
+  },
+  {
+   "fieldname": "sender",
+   "fieldtype": "Link",
+   "label": "Sender",
+   "link_filters": "[[\"Email Account\",\"enable_outgoing\",\"=\",1]]",
+   "options": "Email Account",
+   "reqd": 1
+  },
+  {
+   "fieldname": "column_break_owkz",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fetch_from": "sender.email_id",
+   "fieldname": "sender_email",
+   "fieldtype": "Data",
+   "label": "Sender Email",
+   "options": "Email"
+  },
+  {
+   "fieldname": "interview_confirmation",
+   "fieldtype": "Link",
+   "label": "Interview Confirmation",
+   "options": "Email Template",
+   "reqd": 1
   }
  ],
  "index_web_pages_for_search": 1,
  "issingle": 1,
  "links": [],
- "modified": "2025-03-12 17:19:22.758920",
+ "modified": "2025-03-12 23:11:38.855326",
  "modified_by": "Administrator",
  "module": "Phamos",
  "name": "Recruitment Settings",
