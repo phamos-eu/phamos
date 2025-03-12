@@ -23,7 +23,7 @@
 							<div style="height: 3rem"></div>
 
 							{% if job_applicant and job_applicant.applicant_name %}
-								{% if job_applicant.custom_shortlisted == "Yes" %}
+								{% if job_applicant.custom_interview_slot_booked %}
 									<!-- Success Page -->
 									<div class="success-page">
 										<div class="success-header">
@@ -197,8 +197,10 @@ document.addEventListener('DOMContentLoaded', async function() {
 	let calendarEl = document.getElementById('calendar');
 	let interviewDateField = document.getElementById('interview_date');
 	let interviewSlotField = document.getElementById('interview_slot');
+	let urlSegments = window.location.pathname.split("/");
+	let applicantId = urlSegments[urlSegments.length - 1];
 
-	let  response = await fetch("/api/method/phamos.www.schedule_interview.index.get_available_slots");
+	let response = await fetch("/api/method/phamos.www.schedule_interview.index.get_available_slots?applicant_id=" + applicantId);
 	let availableSlots = await response.json();
 	let slotsData = availableSlots.message;
 	let highlightedDates = extractAvailableDates(slotsData);
@@ -210,11 +212,10 @@ document.addEventListener('DOMContentLoaded', async function() {
 			interviewDateField.value = info.dateStr;
 			document.querySelectorAll('.fc-day').forEach(el => el.style.border = '');
 			info.dayEl.style.border = '2px solid #007bff';
-			updateInterviewSlots(new Date(info.date).toLocaleDateString('en-US', { weekday: 'long' }));
+			updateInterviewSlots(info.date, slotsData);
 		},
 		dayCellDidMount: function(info) {
-			let formattedDate = new Date(info.date).toLocaleDateString('en-US', { weekday: 'long' });
-
+			let formattedDate = new Date(info.date).toLocaleDateString();
 			if (highlightedDates.includes(formattedDate)) {
 				info.el.style.backgroundColor = '#90EE90';
 				info.el.style.color = '#000'; 
@@ -229,39 +230,47 @@ document.addEventListener('DOMContentLoaded', async function() {
 
 	calendar.render();
 
-	function extractAvailableDates(slots) {
-		return slots.map(slot => Object.keys(slot)[0]); 
-	}
-
-	function updateInterviewSlots(selectedDay) {
+	function updateInterviewSlots(selectedDay, slotsData) {
 		let slotField = document.getElementById('interview_slot');
 		let previousValue = slotField.value;
-
-		let daySlots = availableSlots.message.find(slot => Object.keys(slot)[0] === selectedDay);
 		slotField.innerHTML = '';
+
+		let formattedDay = new Date(selectedDay).toLocaleDateString();
+
+		let availableSlots = getSlotsForDay(formattedDay, slotsData);
 
 		let defaultOption = document.createElement('option');
 		defaultOption.value = "";
 		defaultOption.textContent = "Select a Slot";
 		slotField.appendChild(defaultOption);
 
-		if (daySlots) {
-			let slots = daySlots[selectedDay];
-
-			slots.forEach(slot => {
+		if (availableSlots.length > 0) {
+			availableSlots.forEach(slot => {
 				let option = document.createElement('option');
 				option.value = slot;
 				option.textContent = slot;
 				slotField.appendChild(option);
 			});
 
-			if (slots.includes(previousValue)) {
+			if (availableSlots.includes(previousValue)) {
 				slotField.value = previousValue;
 			}
 		} else {
 			defaultOption.textContent = "No slots available";
 		}
 	}
+
+	function extractAvailableDates(slots) {
+		return slots.map(slot => {
+			let date = Object.keys(slot)[0];
+			return new Date(date).toLocaleDateString();
+		});
+	}
+
+	function getSlotsForDay(day, slots) {
+		return (slots.find(slot => Object.keys(slot)[0] === day) || {})[day] || [];
+	}
+
 });
 </script>
 

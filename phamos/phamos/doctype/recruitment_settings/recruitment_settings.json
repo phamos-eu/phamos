@@ -6,7 +6,6 @@
  "engine": "InnoDB",
  "field_order": [
   "section_break_4dmp",
-  "available_slots",
   "interviewers",
   "interview_round"
  ],
@@ -14,12 +13,6 @@
   {
    "fieldname": "section_break_4dmp",
    "fieldtype": "Section Break"
-  },
-  {
-   "fieldname": "available_slots",
-   "fieldtype": "Table",
-   "label": "Available Slots",
-   "options": "Interview Booking Slots"
   },
   {
    "fieldname": "interviewers",
@@ -40,7 +33,7 @@
  "index_web_pages_for_search": 1,
  "issingle": 1,
  "links": [],
- "modified": "2025-03-07 16:59:17.546250",
+ "modified": "2025-03-12 17:19:22.758920",
  "modified_by": "Administrator",
  "module": "Phamos",
  "name": "Recruitment Settings",
