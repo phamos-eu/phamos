@@ -23,7 +23,7 @@ def schedule_interview(applicant_id, interview_date, interview_slot):
 			return {"status": "error", "message": "Job Applicant not found"}
 
 		applicant_doc = frappe.get_doc("Job Applicant", applicant_id)
-		applicant_doc.custom_interview_booking_slot = interview_slot
+		applicant_doc.custom_shortlisted = "Yes"
 		applicant_doc.save(ignore_permissions=True)
 
 		interview_slot_doc = frappe.get_doc("Interview Booking Slot", interview_slot)

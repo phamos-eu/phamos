@@ -23,7 +23,7 @@
 							<div style="height: 3rem"></div>
 
 							{% if job_applicant and job_applicant.applicant_name %}
-								{% if job_applicant.custom_interview_booking_slot %}
+								{% if job_applicant.custom_shortlisted == "Yes" %}
 									<!-- Success Page -->
 									<div class="success-page">
 										<div class="success-header">
