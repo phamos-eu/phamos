@@ -1,278 +1,227 @@
 {% extends "templates/web.html" %}
-
+				
 {% block page_content %}
 
-<div class="container">
-	<div class="row" id="page-job-application" data-path="job_application/new" source-type="Generator" data-doctype="Web Form">
-		<div class="sidebar-column col-sm-2">
-			<div class="web-sidebar">
-				<div class="sidebar-items"></div>
+{% if job_applicant and job_applicant.applicant_name %}
+	{% if job_applicant.custom_interview_slot_booked %}
+	<div class="d-flex justify-content-center align-items-center vh-50">
+		<div class="response-page">
+			<div class="response-header">
+				<svg class="success-icon icon">
+					<use href="#icon-solid-success"></use>
+				</svg>
+				<h2 class="title text-success">Submitted</h2>
 			</div>
-		</div>
-		<div class="main-column col-sm-10">
-			<div class="page-content-wrapper">
-				<!-- Breadcrumbs -->
-				<div class="page-breadcrumbs"></div>
-				<main class="container my-4">
-					<div class="page-header-wrapper">
-						<div class="page-header"></div>
-					</div>
-					<div class="page_content">
-						<!-- Web Form Container -->
-						<div class="web-form-container">
-							<div style="height: 3rem"></div>
-
-							{% if job_applicant and job_applicant.applicant_name %}
-								{% if job_applicant.custom_interview_slot_booked %}
-									<!-- Success Page -->
-									<div class="success-page">
-										<div class="success-header">
-											<svg class="success-icon icon">
-												<use href="#icon-solid-success"></use>
-											</svg>
-											<h2 class="success-title">Submitted</h2>
-										</div>
-										<div class="success-body">
-											<p class="success-message">Thank you for applying.</p>
-										</div>
-										<div class="success-footer">
-											<div class="success_url_message">
-												<p>
-													<a href="/jobs">Click here</a> if you are not redirected within <span class="time">5</span> seconds.
-												</p>
-											</div>
-										</div>
-									</div>
-								{% else %}
-								<div class="web-form-header">
-									<div class="web-form-head">
-										<div class="title">
-											<div class="web-form-title ellipsis">
-												<h1 class="ellipsis">Schedule Interview for {{ job_applicant.applicant_name }}</h1>
-											</div>
-										</div>
-									</div>
-								</div>
-									<!-- Main Form -->
-									<form role="form" class="web-form" id="interview-form">
-										<div class="web-form-body">
-											<div class="web-form-wrapper">
-												<div class="form-layout">
-													<div class="form-page">
-														<div class="row form-section visible-section" data-fieldname="__section_1">
-															<div class="section-body">
-																<div class="form-column col-sm-12">
-																	<!-- Applicant Name (Read-Only) -->
-																	<div class="form-group">
-																		<label class="control-label reqd">Applicant Name</label>
-																		<div class="control-input-wrapper">
-																			<input type="text" class="form-control bold" value="{{ job_applicant.applicant_name }}" readonly>
-																		</div>
-																	</div>
-																</div>
-
-																<div class="form-column col-sm-12">
-																	<!-- Interview Date Picker -->
-																	<div class="form-group">
-																		<label class="control-label reqd">Interview Date</label>
-																		<div class="control-input-wrapper">
-																			<input type="date" id="interview_date" class="form-control" readonly>
-																		</div>
-																	</div>
-																</div>
-
-																<div class="form-column col-sm-12">
-																	<!-- Interview Slot Dropdown -->
-																	<div class="form-group">
-																		<label class="control-label reqd">Interview Slot</label>
-																		<div class="control-input-wrapper">
-																			<select id="interview_slot" class="form-control">
-																				<option value="">Select a Slot</option>
-																			</select>
-																		</div>
-																	</div>
-																</div>
-
-																<div class="form-column col-sm-12">
-																	<!-- Calendar -->
-																	<div class="form-group">
-																		<div id='calendar'></div>
-																	</div>
-																</div>
-															</div>
-														</div>
-													</div>
-												</div>
-											</div>
-										</div>
-
-										<!-- Form Footer -->
-										<div class="web-form-footer">
-											<div class="web-form-actions">
-												<div class="right-area">
-													<button type="submit" class="submit-btn btn btn-primary btn-sm ml-2">Submit</button>
-												</div>
-											</div>
-										</div>
-									</form>
-								{% endif %}
-							{% else %}
-								<!-- Invalid Job Applicant -->
-								<div class="invalid-applicant">
-									<div class="success-page">
-										<div class="success-header">
-											<svg class="success-icon icon">
-												<use href="#icon-solid-error"></use>
-											</svg>
-											<h2 class="success-title">Invalid Link</h2>
-										</div>
-										<div class="success-body">
-											<p>Missing or Invalid Job Applicant</p>
-										</div>
-									</div>
-								</div>
-							{% endif %}
-						</div>
-					</div>
-					<div class="page-footer"></div>
-				</main>
+			<div class="response-body">
+				<p class="message">Thank you for applying.</p>
 			</div>
 		</div>
 	</div>
-</div>
+	{% else %}
+	<div class="container custom-container shadow-lg p-4 mt-4">
 
-<script>
-document.addEventListener("DOMContentLoaded", function() {
-	let form = document.getElementById("interview-form");
-	if (!form) {
-		return;
-	}
+		<div class="row">
+			<div class="col-12 col-lg-4 mb-3 ">
+				<div class="meeting-card">
+					<div class="company-logo">
+						<img src="https://phamos.eu/files/phamos-sun.png" alt="phamos GmbH">
+						<span style="font-weight: 600;">phamos GmbH</span>
+					</div>
+					<hr>
+					<h6 class="mt-2">{{ job_applicant.applicant_name }}</h6>
+					<p class="meeting-title">Schedule Interview</p>
+					<div class="meeting-info">
+						Meeting Venue: Jitsi
+					</div>
+					<div class="meeting-info">
+						Timezone: Europe/Berlin
+					</div>
+					{% if job_applicant.designation %}
+					<div class="meeting-info">
+						<i class="fa fa-briefcase"></i> Position: {{ job_applicant.designation }}
+					</div>
+					{% endif %}
 
-	form.onsubmit = async function(event) {
-		event.preventDefault();
-		
-		let interviewDate = document.getElementById("interview_date").value;
-		let slot = document.getElementById("interview_slot").value;
-		let urlSegments = window.location.pathname.split("/");
-		let applicantId = urlSegments[urlSegments.length - 1];
+					<div class="company-message">
+						<span>🚀 Looking forward to meeting you!</span>
+					</div>
+				</div>
+				
+			</div>
+			<div class="col-12 col-lg-4 mb-3">
+				<div class="form-group">
+					<div id='calendar'></div>
+				</div>
+			</div>
+			<div class="col-12 col-lg-4 mb-3">
+				<form role="form" class="web-form" id="interview-form-1">			
+					<div class="form-column col-sm-12">
+						<div class="form-group">
+							<label class="control-label reqd">Interview Date</label>
+							<div class="control-input-wrapper">
+								<input type="date" id="interview_date" class="form-control" readonly>
+							</div>
+						</div>
+					</div>
+					<div  class="form-column col-sm-12">
+						<div class="form-group">
+							<label class="control-label reqd">Interview Slot</label>
+							<div id="interview_slots_container" class="slots-container"></div>
+						</div>
+					</div>
+					<div id="confirm-container" style="display: none; text-align: center; margin-top: 10px;">
+						<button id="confirm-btn" class="confirm-btn">Confirm</button>
+					</div>
+				</form>
+			</div>
+		</div>
+	</div>
 
-		if (!interviewDate) {
-			frappe.msgprint("Please pick an interview date from the calendar.");
-			return;
-		}
-
-		if (!slot) {
-			frappe.msgprint("Please select an interview slot.");
-			return;
-		}
-
-		try {
-			let response = await frappe.call({
-				method: "phamos.www.schedule_interview.index.schedule_interview",
-				args: {
-					applicant_id: applicantId,
-					interview_date: interviewDate,
-					interview_slot: slot
-				}
-			});
-
-			if (response.message.status === "success") {
-				frappe.msgprint("Interview scheduled successfully!");
-				setTimeout(() => window.location.reload(), 1500);
-			} else {
-				frappe.msgprint(`Error: ${response.message.message}`);
-			}
-		} catch (error) {
-			frappe.msgprint("An unexpected error occurred.");
-			console.error("Interview Scheduling Error:", error);
-		}
-	};
-});
-
-</script>
+	{% endif %}
+	{% else %}
+	<div class="d-flex justify-content-center align-items-center vh-50">
+		<div class="response-page">
+			<div class="response-header">
+				<svg class="success-icon icon">
+					<use href="#icon-solid-error"></use>
+				</svg>
+				<h2 class="title text-danger">Invalid Link</h2>
+			</div>
+			<div class="response-body">
+				<p class="message">Missing or Invalid Job Applicant.</p>
+			</div>
+		</div>
+	</div>
+{% endif %}
 
 <script src="https://cdn.jsdelivr.net/npm/fullcalendar/index.global.min.js"></script>
 <script>
-document.addEventListener('DOMContentLoaded', async function() {
-	let calendarEl = document.getElementById('calendar');
-	let interviewDateField = document.getElementById('interview_date');
-	let interviewSlotField = document.getElementById('interview_slot');
-	let urlSegments = window.location.pathname.split("/");
-	let applicantId = urlSegments[urlSegments.length - 1];
-
-	let response = await fetch("/api/method/phamos.www.schedule_interview.index.get_available_slots?applicant_id=" + applicantId);
-	let availableSlots = await response.json();
-	let slotsData = availableSlots.message;
-	let highlightedDates = extractAvailableDates(slotsData);
-
-	let calendar = new FullCalendar.Calendar(calendarEl, {
-		initialView: 'dayGridMonth',
-		selectable: true,
-		dateClick: function(info) {
-			interviewDateField.value = info.dateStr;
-			document.querySelectorAll('.fc-day').forEach(el => el.style.border = '');
-			info.dayEl.style.border = '2px solid #007bff';
-			updateInterviewSlots(info.date, slotsData);
-		},
-		dayCellDidMount: function(info) {
-			let formattedDate = new Date(info.date).toLocaleDateString();
-			if (highlightedDates.includes(formattedDate)) {
-				info.el.style.backgroundColor = '#90EE90';
-				info.el.style.color = '#000'; 
-			} else {
-				info.el.style.backgroundColor = '#f8d7da';
-				info.el.style.color = '#6c757d'; 
-				info.el.style.pointerEvents = 'none';
-				info.el.style.opacity = '0.5'; 
-			}
+	document.addEventListener("DOMContentLoaded", function() {
+		let form = document.getElementById("interview-form-1");
+		if (!form) {
+			return;
 		}
+	
+		form.onsubmit = async function(event) {
+			event.preventDefault();
+			
+			let interviewDate = document.getElementById("interview_date").value;
+			let selectedSlot = document.querySelector(".slot-btn.selected");
+			let urlSegments = window.location.pathname.split("/");
+			let applicantId = urlSegments[urlSegments.length - 1];
+	
+			if (!interviewDate) {
+				frappe.msgprint("Please pick an interview date from the calendar.");
+				return;
+			}
+	
+			if (!selectedSlot) {
+				frappe.msgprint("Please select an interview slot.");
+				return;
+			}
+
+			let slot = selectedSlot.dataset.slot;
+	
+			try {
+				let response = await frappe.call({
+					method: "phamos.www.schedule_interview.index.schedule_interview",
+					args: {
+						applicant_id: applicantId,
+						interview_date: interviewDate,
+						interview_slot: slot
+					}
+				});
+	
+				if (response.message.status === "success") {
+					frappe.msgprint("Interview scheduled successfully!");
+					setTimeout(() => window.location.reload(), 1500);
+				} else {
+					frappe.msgprint(`Error: ${response.message.message}`);
+				}
+			} catch (error) {
+				frappe.msgprint("An unexpected error occurred.");
+				console.error("Interview Scheduling Error:", error);
+			}
+		};
 	});
-
-	calendar.render();
-
-	function updateInterviewSlots(selectedDay, slotsData) {
-		let slotField = document.getElementById('interview_slot');
-		let previousValue = slotField.value;
-		slotField.innerHTML = '';
-
-		let formattedDay = new Date(selectedDay).toLocaleDateString();
-
-		let availableSlots = getSlotsForDay(formattedDay, slotsData);
-
-		let defaultOption = document.createElement('option');
-		defaultOption.value = "";
-		defaultOption.textContent = "Select a Slot";
-		slotField.appendChild(defaultOption);
-
-		if (availableSlots.length > 0) {
-			availableSlots.forEach(slot => {
-				let option = document.createElement('option');
-				option.value = slot;
-				option.textContent = slot;
-				slotField.appendChild(option);
-			});
-
-			if (availableSlots.includes(previousValue)) {
-				slotField.value = previousValue;
-			}
-		} else {
-			defaultOption.textContent = "No slots available";
-		}
-	}
-
-	function extractAvailableDates(slots) {
-		return slots.map(slot => {
-			let date = Object.keys(slot)[0];
-			return new Date(date).toLocaleDateString();
-		});
-	}
-
-	function getSlotsForDay(day, slots) {
-		return (slots.find(slot => Object.keys(slot)[0] === day) || {})[day] || [];
-	}
-
-});
+	
 </script>
+<script>
+	document.addEventListener('DOMContentLoaded', async function() {
+		let calendarEl = document.getElementById('calendar');
+		let interviewDateField = document.getElementById('interview_date');
+		let urlSegments = window.location.pathname.split("/");
+		let applicantId = urlSegments[urlSegments.length - 1];
+	
+		let response = await fetch("/api/method/phamos.www.schedule_interview.index.get_available_slots?applicant_id=" + applicantId);
+		let availableSlots = await response.json();
+		let slotsData = availableSlots.message;
+		let highlightedDates = extractAvailableDates(slotsData);
+	
+		let calendar = new FullCalendar.Calendar(calendarEl, {
+			initialView: 'dayGridMonth',
+			aspectRatio: 1.35,
+			selectable: true,
+			dateClick: function(info) {
+				interviewDateField.value = info.dateStr;
+				document.querySelectorAll('.fc-day').forEach(el => el.style.border = '');
+				info.dayEl.style.border = '2px solid #007bff';
+				updateInterviewSlots(info.date, slotsData);
+			},
+			dayCellDidMount: function(info) {
+				let formattedDate = new Date(info.date).toLocaleDateString();
+				if (highlightedDates.includes(formattedDate)) {
+					info.el.style.backgroundColor = '#90EE90';
+					info.el.style.color = '#000'; 
+				} else {
+					info.el.style.backgroundColor = '#f8d7da';
+					info.el.style.color = '#6c757d'; 
+					info.el.style.pointerEvents = 'none';
+					info.el.style.opacity = '0.5'; 
+				}
+			}
+		});
+	
+		calendar.render();
+	
+		function updateInterviewSlots(selectedDay, slotsData) {
+			let container = document.getElementById('interview_slots_container');
+			let confirmContainer = document.getElementById("confirm-container");
+			container.innerHTML = ''; 
+			confirmContainer.style.display = "none"
 
+			let formattedDay = new Date(selectedDay).toLocaleDateString();
+			let availableSlots = getSlotsForDay(formattedDay, slotsData);
 
+			if (availableSlots.length === 0) {
+				container.innerHTML = "<p>No slots available</p>";
+				return;
+			}
+
+			availableSlots.forEach(slot => {
+				let slotBtn = document.createElement("div");
+				slotBtn.className = "slot-btn";
+				slotBtn.dataset.slot = slot;
+				slotBtn.textContent = slot.replace(":00", "");
+
+				slotBtn.addEventListener("click", function () {
+					document.querySelectorAll(".slot-btn.selected").forEach(btn => btn.classList.remove("selected"));
+					slotBtn.classList.add("selected");
+					confirmContainer.style.display = "block";
+				});
+
+				container.appendChild(slotBtn);
+			});
+		}
+	
+		function extractAvailableDates(slots) {
+			return slots.map(slot => Object.keys(slot)[0]);
+		}
+	
+		function getSlotsForDay(day, slots) {
+			return (slots.find(slot => Object.keys(slot)[0] === day) || {})[day] || [];
+		}
+	
+	});
+</script>
 {% endblock %}
