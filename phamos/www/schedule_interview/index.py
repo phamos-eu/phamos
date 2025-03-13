@@ -6,6 +6,9 @@ from email.utils import formataddr
 from frappe.rate_limiter import rate_limit
 from datetime import datetime, timedelta
 from ics import Calendar, Event, Attendee
+import pytz
+import hashlib
+
 no_cache = 1
 
 
@@ -107,7 +110,11 @@ def send_interview_schedule_email(applicant_doc, interview_date, interview_slot,
 	email_template = frappe.get_doc("Email Template", recruitement_settings.interview_confirmation)
 	subject = email_template.subject
 
-	ics_filename, ics_data = create_interview_ics(applicant_doc, interview_date, interview_slot, recruitement_settings.interview_link, cc=cc)
+	key = f"For-{applicant_doc.designation}-Candidate-{applicant_doc.applicant_name}"
+	hashed_value = hashlib.sha256(key.encode()).hexdigest()
+	short_hash = str(int(hashed_value, 16))[:7] 
+	interview_link = f"https://meet.jit.si/JobInterviewPhamos-{short_hash}"
+	ics_filename, ics_data = create_interview_ics(applicant_doc, interview_date, interview_slot, interview_link, cc=cc)
 	attachments = [{"fname": ics_filename, "fcontent": ics_data}]
 
 	message = frappe.render_template(email_template.response_html, {
@@ -115,7 +122,7 @@ def send_interview_schedule_email(applicant_doc, interview_date, interview_slot,
 		"job_title": job_title,
 		"interview_date": interview_date,
 		"interview_slot": interview_slot,
-		"interview_link": recruitement_settings.interview_link
+		"interview_link": interview_link
 	})
 
 	communication = make_communication(
