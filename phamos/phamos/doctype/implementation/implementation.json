@@ -6,6 +6,7 @@
  "doctype": "DocType",
  "engine": "InnoDB",
  "field_order": [
+  "status",
   "notes",
   "start_date",
   "column_break_7p95",
@@ -14,22 +15,9 @@
   "maturity_level",
   "mood",
   "forecast",
-  "status",
-  "section_break_uiri",
-  "sales_order_total_hrs",
-  "total_hrs_timesheet",
-  "preliminary_hours",
-  "column_break_qajo",
-  "delivered_total_hrs",
-  "remaining_hrs",
-  "open_so",
-  "section_break_xfgb",
-  "sales_order_status_information",
   "section_break_ky9b",
   "customer",
   "contact_person",
-  "section_break_izec",
-  "status_information",
   "timesheets_tab",
   "html_bfhi"
  ],
@@ -116,68 +104,9 @@
    "options": "Department"
   },
   {
-   "fieldname": "section_break_izec",
-   "fieldtype": "Section Break"
-  },
-  {
-   "fieldname": "status_information",
-   "fieldtype": "Table",
-   "label": "Status Information",
-   "options": "Status Information"
-  },
-  {
    "fieldname": "status",
    "fieldtype": "Small Text",
    "label": "Status"
-  },
-  {
-   "fieldname": "section_break_xfgb",
-   "fieldtype": "Section Break"
-  },
-  {
-   "fieldname": "sales_order_status_information",
-   "fieldtype": "Table",
-   "label": "Sales Order Status Information",
-   "options": "Sales Order Status"
-  },
-  {
-   "fieldname": "section_break_uiri",
-   "fieldtype": "Section Break"
-  },
-  {
-   "fieldname": "sales_order_total_hrs",
-   "fieldtype": "Int",
-   "label": "Sales Order Total Hrs"
-  },
-  {
-   "fieldname": "column_break_qajo",
-   "fieldtype": "Column Break"
-  },
-  {
-   "fieldname": "delivered_total_hrs",
-   "fieldtype": "Int",
-   "label": "Delivered Total Hrs"
-  },
-  {
-   "fieldname": "total_hrs_timesheet",
-   "fieldtype": "Int",
-   "label": "Total Hrs (Timesheet)"
-  },
-  {
-   "fieldname": "preliminary_hours",
-   "fieldtype": "Data",
-   "label": "Preliminary hours"
-  },
-  {
-   "fieldname": "open_so",
-   "fieldtype": "Select",
-   "label": "Open SO",
-   "options": "\nYes\nNo"
-  },
-  {
-   "fieldname": "remaining_hrs",
-   "fieldtype": "Data",
-   "label": "Remaining Hrs"
   }
  ],
  "index_web_pages_for_search": 1,
@@ -199,7 +128,7 @@
    "link_fieldname": "custom_implementation"
   }
  ],
- "modified": "2025-03-12 11:26:42.799830",
+ "modified": "2025-03-12 19:29:23.687008",
  "modified_by": "Administrator",
  "module": "Phamos",
  "name": "Implementation",
