@@ -7,7 +7,6 @@
  "field_order": [
   "section_break_4dmp",
   "interview_round",
-  "interview_link",
   "interview_confirmation",
   "column_break_owkz",
   "interviewers",
@@ -32,13 +31,6 @@
    "in_list_view": 1,
    "label": "Interview Round",
    "options": "Interview Round",
-   "reqd": 1
-  },
-  {
-   "fieldname": "interview_link",
-   "fieldtype": "Data",
-   "label": "Interview Link",
-   "options": "URL",
    "reqd": 1
   },
   {
@@ -71,7 +63,7 @@
  "index_web_pages_for_search": 1,
  "issingle": 1,
  "links": [],
- "modified": "2025-03-12 23:11:38.855326",
+ "modified": "2025-03-13 16:30:21.931776",
  "modified_by": "Administrator",
  "module": "Phamos",
  "name": "Recruitment Settings",
