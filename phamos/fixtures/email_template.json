@@ -1,0 +1,12 @@
+[
+ {
+  "docstatus": 0,
+  "doctype": "Email Template",
+  "modified": "2025-03-13 04:22:42.783682",
+  "name": "Interview Confirmation",
+  "response": "<div class=\"ql-editor read-mode\"><p><br></p></div>",
+  "response_html": "<p><b>Dear {{ applicant_name }},</b></p>\n\n<p>Thank you for scheduling your interview! We are pleased to confirm your interview for the <b>{{ job_title }}</b> at <b>phamos GmbH</b>.</p>\n\n<p>📅 <b>Date:</b> {{ interview_date }} </p>\n\n<p>⏰ <b>Time:</b>{{ interview_slot }} (German time, GMT+1)</p>\n\n<p>📍 <b>Location:</b> Online</p>  \n\n<p>The interview will take place via the following link:  🔗 <b>Join the Interview</b>({{ interview_link }})</p>  \n\n<p>Please ensure you have a <b>stable internet connection</b>, a <b>good headset</b>, and a <b>working camera</b>, and join the meeting on time.</p>  \n\n<p>We look forward to speaking with you!</p>\n\n<p><b>Best regards,</b></p>\n<p>Philipp Gutstein</p>\n<p>Head of HR</p>",
+  "subject": "Interview Confirmation – phamos GmbH",
+  "use_html": 1
+ }
+]

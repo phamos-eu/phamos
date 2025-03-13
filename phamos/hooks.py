@@ -149,6 +149,11 @@ fixtures = [
             "module", "=", "Phamos"
         ]
     ]},
+    {"dt": "Email Template", "filters": [
+        [
+            "name", "in", ["Interview Confirmation"]
+        ]
+    ]}
 ]
 
 #scheduler_events = {
