@@ -34,7 +34,7 @@ doctype_js = {
 	"Project" : "public/js/project.js",
 	"Issue" : "public/js/issue.js",
 	"Sales Order": "public/js/sales_order.js",
-  "Job Applicant": "public/js/job_applicant.js"
+	"Job Applicant": "public/js/job_applicant.js"
 }
 
 override_doctype_class = {
@@ -149,6 +149,11 @@ fixtures = [
             "module", "=", "Phamos"
         ]
     ]},
+    {"dt": "Email Template", "filters": [
+        [
+            "name", "in", ["Interview Confirmation"]
+        ]
+    ]}
 ]
 
 #scheduler_events = {

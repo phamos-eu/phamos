@@ -6,20 +6,17 @@
  "engine": "InnoDB",
  "field_order": [
   "section_break_4dmp",
-  "available_slots",
+  "interview_round",
+  "interview_confirmation",
+  "column_break_owkz",
   "interviewers",
-  "interview_round"
+  "sender",
+  "sender_email"
  ],
  "fields": [
   {
    "fieldname": "section_break_4dmp",
    "fieldtype": "Section Break"
-  },
-  {
-   "fieldname": "available_slots",
-   "fieldtype": "Table",
-   "label": "Available Slots",
-   "options": "Interview Booking Slots"
   },
   {
    "fieldname": "interviewers",
@@ -35,12 +32,38 @@
    "label": "Interview Round",
    "options": "Interview Round",
    "reqd": 1
+  },
+  {
+   "fieldname": "sender",
+   "fieldtype": "Link",
+   "label": "Sender",
+   "link_filters": "[[\"Email Account\",\"enable_outgoing\",\"=\",1]]",
+   "options": "Email Account",
+   "reqd": 1
+  },
+  {
+   "fieldname": "column_break_owkz",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fetch_from": "sender.email_id",
+   "fieldname": "sender_email",
+   "fieldtype": "Data",
+   "label": "Sender Email",
+   "options": "Email"
+  },
+  {
+   "fieldname": "interview_confirmation",
+   "fieldtype": "Link",
+   "label": "Interview Confirmation",
+   "options": "Email Template",
+   "reqd": 1
   }
  ],
  "index_web_pages_for_search": 1,
  "issingle": 1,
  "links": [],
- "modified": "2025-03-07 16:59:17.546250",
+ "modified": "2025-03-13 16:30:21.931776",
  "modified_by": "Administrator",
  "module": "Phamos",
  "name": "Recruitment Settings",
