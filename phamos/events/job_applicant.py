@@ -9,6 +9,6 @@ class CustomJobApplicant(JobApplicant):
 	def invite_for_interview(self):
 		notification = "Job interview Slot Booking"
 		evaluate_alert(self, notification, "Custom")
-		if self.status != "Accepted":
-			self.db_set("status", "Accepted")
-			return {"status": "Accepted"}
+		if not self.custom_shortlisted or self.custom_shortlisted == "No":
+			self.db_set("custom_shortlisted", "Yes")
+			return {"custom_shortlisted": "Yes"}
