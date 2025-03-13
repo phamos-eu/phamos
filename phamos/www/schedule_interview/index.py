@@ -18,7 +18,7 @@ def get_context(context):
 	if not frappe.db.exists("Job Applicant", applicant_id):
 		return {"status": "error", "message": "Job Applicant not found"}
 
-	context.job_applicant = frappe.db.get_value("Job Applicant", applicant_id, ["applicant_name", "custom_interview_slot_booked"], as_dict=1)
+	context.job_applicant = frappe.db.get_value("Job Applicant", applicant_id, ["applicant_name", "designation", "custom_interview_slot_booked"], as_dict=1)
 	return context
 
 
@@ -153,10 +153,11 @@ def send_interview_schedule_email(applicant_doc, interview_date, interview_slot,
 	)
 
 
-def create_interview_ics(applicant_doc, interview_date, interview_slot, meeting_link, cc=[]):
+def create_interview_ics(applicant_doc, interview_date, interview_slot, meeting_link, timezone_str="Europe/Berlin", cc=[]):
 	start_time_str, end_time_str = interview_slot.split(" - ")
 	start_datetime = datetime.strptime(f"{interview_date} {start_time_str}", "%Y-%m-%d %H:%M:%S")
 	end_datetime = datetime.strptime(f"{interview_date} {end_time_str}", "%Y-%m-%d %H:%M:%S")
+	timezone = pytz.timezone(timezone_str)
 	
 	cal = Calendar()
 	event = Event()
@@ -166,7 +167,8 @@ def create_interview_ics(applicant_doc, interview_date, interview_slot, meeting_
 	event.description = f"Interview for {applicant_doc.applicant_name}\nMeeting Link: {meeting_link}"
 	event.location = meeting_link if meeting_link else "Office"
 	event.duration = timedelta(hours=1)
-	event.alarm = timedelta(minutes=-15)  # Reminder 15 minutes before
+	event.alarm = timedelta(minutes=-30)
+	event.tz = timezone
 
 	attendees = [Attendee(applicant_doc.email_id, applicant_doc.applicant_name)]
 	for interviewer in cc:
