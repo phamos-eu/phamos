@@ -19,10 +19,7 @@
   "customer",
   "contact_person",
   "timesheets_tab",
-  "html_bfhi",
-  "tab_3_tab",
-  "status_history_section",
-  "status_information"
+  "html_bfhi"
  ],
  "fields": [
   {
@@ -107,23 +104,8 @@
    "options": "Department"
   },
   {
-   "fieldname": "tab_3_tab",
-   "fieldtype": "Tab Break",
-   "label": "Status History"
-  },
-  {
-   "fieldname": "status_information",
-   "fieldtype": "Table",
-   "label": "Status Information",
-   "options": "Status Information"
-  },
-  {
-   "fieldname": "status_history_section",
-   "fieldtype": "Section Break"
-  },
-  {
    "fieldname": "status",
-   "fieldtype": "Data",
+   "fieldtype": "Small Text",
    "label": "Status"
   }
  ],
@@ -146,7 +128,7 @@
    "link_fieldname": "custom_implementation"
   }
  ],
- "modified": "2025-03-11 18:29:01.105256",
+ "modified": "2025-03-12 19:29:23.687008",
  "modified_by": "Administrator",
  "module": "Phamos",
  "name": "Implementation",
