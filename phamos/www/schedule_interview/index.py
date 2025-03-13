@@ -5,7 +5,7 @@ from frappe.core.doctype.communication.email import _make as make_communication
 from email.utils import formataddr
 from frappe.rate_limiter import rate_limit
 from datetime import datetime, timedelta
-from ics import Calendar, Event, Attendee
+from ics import Calendar, Event, Attendee, DisplayAlarm
 import pytz
 import hashlib
 
@@ -158,17 +158,28 @@ def create_interview_ics(applicant_doc, interview_date, interview_slot, meeting_
 	start_datetime = datetime.strptime(f"{interview_date} {start_time_str}", "%Y-%m-%d %H:%M:%S")
 	end_datetime = datetime.strptime(f"{interview_date} {end_time_str}", "%Y-%m-%d %H:%M:%S")
 	timezone = pytz.timezone(timezone_str)
+
+	start_naive = datetime.strptime(f"{interview_date} {start_time_str}", "%Y-%m-%d %H:%M:%S")
+	end_naive = datetime.strptime(f"{interview_date} {end_time_str}", "%Y-%m-%d %H:%M:%S")
+	
+	start_datetime = timezone.localize(start_naive)
+	end_datetime = timezone.localize(end_naive)
+	
+	duration = end_datetime - start_datetime
 	
 	cal = Calendar()
 	event = Event()
 	event.name = f"Interview: {applicant_doc.applicant_name}"
-	event.begin = start_datetime
-	event.end = end_datetime
+	event.begin = start_datetime.isoformat()
+	event.end = end_datetime.isoformat()
 	event.description = f"Interview for {applicant_doc.applicant_name}\nMeeting Link: {meeting_link}"
 	event.location = meeting_link if meeting_link else "Office"
-	event.duration = timedelta(hours=1)
-	event.alarm = timedelta(minutes=-30)
-	event.tz = timezone
+	event.duration = duration
+	
+	alarm = DisplayAlarm(trigger=timedelta(minutes=-30))
+	alarm.description = "Reminder: Interview in 30 minutes."
+	event.alarms.append(alarm)
+
 
 	attendees = [Attendee(applicant_doc.email_id, applicant_doc.applicant_name)]
 	for interviewer in cc:
