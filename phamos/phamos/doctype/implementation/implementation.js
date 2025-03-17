@@ -1,6 +1,7 @@
 // Copyright (c) 2025, phamos.eu and contributors
 // For license information, please see license.txt
 
+<<<<<<< HEAD
 frappe.ui.form.on("Implementation", {
 	setup:function(frm){
 		if(!frm.is_new()){
@@ -106,3 +107,10 @@ frappe.ui.form.on("Sales Order Status Information", {
         datasets: [{ name: "Total Sales", values: values }]
     }
 });*/
+=======
+// frappe.ui.form.on("Implementation", {
+// 	refresh(frm) {
+
+// 	},
+// });
+>>>>>>> 250ef5c4fa6b888e08874909c04625ee2c1c4bd7

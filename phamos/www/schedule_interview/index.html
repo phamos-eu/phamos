@@ -1,0 +1,236 @@
+{% extends "templates/web.html" %}
+				
+{% block page_content %}
+
+{% if job_applicant and job_applicant.applicant_name %}
+	{% if job_applicant.custom_interview_slot_booked %}
+	<div class="d-flex justify-content-center align-items-center vh-50">
+		<div class="response-page">
+			<div class="response-header">
+				<svg class="success-icon icon">
+					<use href="#icon-solid-success"></use>
+				</svg>
+				<h2 class="title text-success">Submitted</h2>
+			</div>
+			<div class="response-body">
+				<p class="message">Thank you for applying.</p>
+			</div>
+		</div>
+	</div>
+	{% else %}
+	<div class="container custom-container shadow-lg p-4 mt-4">
+
+		<div class="row">
+			<div class="col-12 col-lg-4 mb-3 ">
+				<div class="meeting-card">
+					<div class="company-logo">
+						<img src="https://phamos.eu/files/phamos-sun.png" alt="phamos GmbH">
+						<span style="font-weight: 600;">phamos GmbH</span>
+					</div>
+					<hr>
+					<h6 class="mt-2">{{ job_applicant.applicant_name }}</h6>
+					<p class="meeting-title">Schedule Interview</p>
+					<div class="meeting-info">
+						Meeting Venue: Jitsi
+					</div>
+					<div class="meeting-info">
+						Timezone: Europe/Berlin
+					</div>
+					{% if job_applicant.job_title %}
+					<div class="meeting-info">
+						<i class="fa fa-briefcase"></i> Position: {{ job_applicant.job_title }}
+					</div>
+					{% endif %}
+
+					<div class="company-message">
+						<span>🚀 Looking forward to meeting you!</span>
+					</div>
+				</div>
+				
+			</div>
+			<div class="col-12 col-lg-4 mb-3">
+				<div class="form-group">
+					<div id='calendar'></div>
+				</div>
+			</div>
+			<div class="col-12 col-lg-4 mb-3">
+				<form role="form" class="web-form" id="interview-form-1">			
+					<div class="form-column col-sm-12">
+						<div class="form-group">
+							<label class="control-label reqd">Interview Date</label>
+							<div class="control-input-wrapper">
+								<input type="date" id="interview_date" class="form-control" readonly>
+							</div>
+						</div>
+					</div>
+					<div  class="form-column col-sm-12">
+						<div class="form-group">
+							<label class="control-label reqd">Interview Slot</label>
+							<div id="interview_slots_container" class="slots-container"></div>
+						</div>
+					</div>
+					<div id="confirm-container" style="display: none; text-align: center; margin-top: 10px;">
+						<button class="confirm-btn btn">Confirm</button>
+					</div>
+				</form>
+			</div>
+		</div>
+	</div>
+
+	{% endif %}
+	{% else %}
+	<div class="d-flex justify-content-center align-items-center vh-50">
+		<div class="response-page">
+			<div class="response-header">
+				<svg class="success-icon icon">
+					<use href="#icon-solid-error"></use>
+				</svg>
+				<h2 class="title text-danger">Invalid Link</h2>
+			</div>
+			<div class="response-body">
+				<p class="message">Missing or Invalid Job Applicant.</p>
+			</div>
+		</div>
+	</div>
+{% endif %}
+
+<script src="https://cdn.jsdelivr.net/npm/fullcalendar/index.global.min.js"></script>
+<script>
+	document.addEventListener("DOMContentLoaded", function() {
+		let form = document.getElementById("interview-form-1");
+		if (!form) {
+			return;
+		}
+	
+		form.onsubmit = async function(event) {
+			event.preventDefault();
+			
+			let interviewDate = document.getElementById("interview_date").value;
+			let selectedSlot = document.querySelector(".slot-btn.selected");
+			let urlSegments = window.location.pathname.split("/");
+			let applicantId = urlSegments[urlSegments.length - 1];
+	
+			if (!interviewDate) {
+				frappe.msgprint("Please pick an interview date from the calendar.");
+				return;
+			}
+	
+			if (!selectedSlot) {
+				frappe.msgprint("Please select an interview slot.");
+				return;
+			}
+
+			let slot = selectedSlot.dataset.slot;
+	
+			try {
+				let response = await frappe.call({
+					method: "phamos.www.schedule_interview.index.schedule_interview",
+					args: {
+						applicant_id: applicantId,
+						interview_date: interviewDate,
+						interview_slot: slot
+					}
+				});
+	
+				if (response.message.status === "success") {
+					frappe.msgprint("Interview scheduled successfully!");
+					setTimeout(() => window.location.reload(), 1500);
+				} else {
+					frappe.msgprint(`Error: ${response.message.message}`);
+				}
+			} catch (error) {
+				frappe.msgprint("An unexpected error occurred.");
+				console.error("Interview Scheduling Error:", error);
+			}
+		};
+	});
+	
+</script>
+<script>
+	document.addEventListener('DOMContentLoaded', async function() {
+		let calendarEl = document.getElementById('calendar');
+		let interviewDateField = document.getElementById('interview_date');
+		let urlSegments = window.location.pathname.split("/");
+		let applicantId = urlSegments[urlSegments.length - 1];
+	
+		let response = await fetch("/api/method/phamos.www.schedule_interview.index.get_available_slots?applicant_id=" + applicantId);
+		let availableSlots = await response.json();
+		let slotsData = availableSlots.message;
+		let highlightedDates = extractAvailableDates(slotsData);
+	
+		let calendar = new FullCalendar.Calendar(calendarEl, {
+			initialView: 'dayGridMonth',
+			aspectRatio: 1.35,
+			selectable: true,
+			dateClick: function(info) {
+				interviewDateField.value = info.dateStr;
+				document.querySelectorAll('.fc-day').forEach(el => el.style.border = '');
+				info.dayEl.style.border = '2px solid #2c3e50';
+				updateInterviewSlots(info.date, slotsData);
+			},
+			dayCellDidMount: function(info) {
+				let formattedDate = new Date(info.date).toLocaleDateString();
+				if (highlightedDates.includes(formattedDate)) {
+					info.el.style.backgroundColor = '#90EE90';
+					info.el.style.color = '#000'; 
+				} else {
+					info.el.style.backgroundColor = '#f8d7da';
+					info.el.style.color = '#6c757d'; 
+					info.el.style.pointerEvents = 'none';
+					info.el.style.opacity = '0.5'; 
+				}
+			}
+		});
+	
+		calendar.render();
+	
+		function updateInterviewSlots(selectedDay, slotsData) {
+			let container = document.getElementById('interview_slots_container');
+			let confirmContainer = document.getElementById("confirm-container");
+			container.innerHTML = ''; 
+			confirmContainer.style.display = "none"
+
+			let formattedDay = new Date(selectedDay).toLocaleDateString();
+			let availableSlots = getSlotsForDay(formattedDay, slotsData);
+
+			if (availableSlots.length === 0) {
+				container.innerHTML = "<p>No slots available</p>";
+				return;
+			}
+
+			availableSlots.forEach(slot => {
+				slot = formatTimeSlot(slot);
+				let slotBtn = document.createElement("div");
+				slotBtn.className = "slot-btn";
+				slotBtn.dataset.slot = slot;
+				slotBtn.textContent = slot
+				slotBtn.addEventListener("click", function () {
+					document.querySelectorAll(".slot-btn.selected").forEach(btn => btn.classList.remove("selected"));
+					slotBtn.classList.add("selected");
+					confirmContainer.style.display = "block";
+				});
+
+				container.appendChild(slotBtn);
+			});
+		}
+	
+		function extractAvailableDates(slots) {
+			return slots.map(slot => Object.keys(slot)[0]);
+		}
+	
+		function getSlotsForDay(day, slots) {
+			return (slots.find(slot => Object.keys(slot)[0] === day) || {})[day] || [];
+		}
+
+		function formatTimeSlot(slot) {
+			const times = slot.split(' - ');
+
+			const startTime = times[0].substring(0, 5); 
+			const endTime = times[1].substring(0, 5);
+
+			return `${startTime} - ${endTime}`;
+		}
+	
+	});
+</script>
+{% endblock %}

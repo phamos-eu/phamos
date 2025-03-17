@@ -1,0 +1,110 @@
+body {
+	font-family: Arial, sans-serif;
+}
+
+.custom-container {
+	background: #f8f9fa; 
+	border-radius: 20px;
+	border: 1px solid #ddd;
+}
+.response-page {
+	max-width: 500px;
+	width: 100%;
+	background: #fff;
+	border: 1px solid #ddd;
+	border-radius: 12px;
+	padding: 30px;
+	box-shadow: 0px 4px 12px rgba(0, 0, 0, 0.1);
+	text-align: center;
+}
+.icon {
+	width: 45px;
+	height: 45px;
+}
+.title {
+	font-size: 24px;
+	font-weight: bold;
+	margin-top: 10px;
+}
+.message {
+	font-size: 16px;
+	color: #555;
+}
+
+.meeting-card {
+	width: 300px;
+	padding: 20px;
+	text-align: center;
+}
+.company-logo {
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	margin-bottom: 10px;
+}
+.company-logo img {
+	width: 50px;
+	height: 50px;
+	margin-right: 8px;
+}
+.profile-img {
+	width: 60px;
+	height: 60px;
+	border-radius: 50%;
+	object-fit: cover;
+	border: 3px solid white;
+	margin-top: -30px;
+	box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
+}
+.meeting-title {
+	font-weight: bold;
+	font-size: 18px;
+}
+.meeting-info {
+	font-size: 14px;
+	color: gray;
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	margin-top: 8px;
+}
+.meeting-info i {
+	margin-right: 6px;
+}
+
+.slots-container {
+	display: flex;
+	justify-content: center;
+	flex-wrap: wrap;
+	gap: 10px;
+}
+.slot-btn {
+	flex: 1;
+	max-width: 45%;
+	background-color: white;
+	color: #171717;
+	border: 2px solid #171717;
+	padding: 10px;
+	font-size: 16px;
+	cursor: pointer;
+	text-align: center;
+	border-radius: 5px;
+	transition: background 0.3s, color 0.3s;
+}
+
+.slot-btn:hover,
+.slot-btn.selected {
+	background-color: #171717;
+	color: white;
+}
+
+.confirm-btn {
+	background-color: #171717;
+	color: #ffffff;
+	border: none;
+	padding: 12px 20px;
+	font-size: 16px;
+	border-radius: 5px;
+	width: 80%;
+	transition: 0.3s;
+}

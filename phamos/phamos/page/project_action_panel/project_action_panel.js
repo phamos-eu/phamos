@@ -592,9 +592,8 @@ frappe.pages["project-action-panel"].on_page_load = function (wrapper) {
     });
   };
 
-
   // Function to render number cards
-  function render_cards(wrapper, card_names) {
+  function render_cards(wrapper, card_names, tab='') {
     return frappe.call({
       method: "phamos.phamos.page.project_action_panel.project_action_panel.get_permitted_cards",
       args: { 
@@ -605,18 +604,19 @@ frappe.pages["project-action-panel"].on_page_load = function (wrapper) {
         if (!cards || !cards.length) {
           return;
         }
-
-      // Filter the cards based on card_names
+    
+        // Filter the cards based on card_names
         var filtered_cards = cards.filter(function(card) {
           return card_names.includes(card.card);
         });
-
+    
         var number_cards = filtered_cards.map(function (card) {
           return {
             name: card.card,
           };
         });
-
+    
+        // Create a widget group for number cards
         var number_card_group = new frappe.widget.WidgetGroup({
           container: wrapper, 
           type: "number_card",
@@ -630,18 +630,90 @@ frappe.pages["project-action-panel"].on_page_load = function (wrapper) {
           },
           widgets: number_cards,
         });
-
+    
+        // Style the number card widgets
         $(wrapper).find(".widget.number-widget-box").css({
-         width: "250px", 
+          width: "250px", 
         });
-
+    
         $(wrapper).find(".widget-group-body.grid-col-3").css({
           display: "flex", 
           "flex-wrap": "nowrap", 
         });
+    
+        // Custom widget logic to dynamically inject data
+        let widgetGroupBody = $(wrapper).find(".widget-group-body");
+        widgetGroupBody.empty(); // Clear existing widgets before appending new ones
+    
+        // Fetch data for the cards using API calls
+        let fetch_projects = "phamos.phamos.page.project_action_panel.project_action_panel.get_project_count"
+        if(tab == "All Projects"){
+          fetch_projects = "phamos.phamos.page.project_action_panel.project_action_panel.get_project_count_all"
+        }
+        Promise.all([
+          frappe.call({ method:  fetch_projects}),
+          frappe.call({ method: "phamos.phamos.page.project_action_panel.project_action_panel.total_hours_worked_today" }),
+          frappe.call({ method: "phamos.phamos.page.project_action_panel.project_action_panel.total_hours_worked_in_this_week" }),
+          frappe.call({ method: "phamos.phamos.page.project_action_panel.project_action_panel.total_hours_worked_in_this_month" })
+        ])
+        .then(function (results) {
+          // Assuming the results are in the same order as the requests
+          const [projectCountResult, totalTodayResult, totalWeekResult, totalMonthResult] = results;
+          
+          // Handle the result for each card type
+          let projectCount = projectCountResult.message;
+          let monthly_working = totalMonthResult.message;
+          let weekly_working = totalWeekResult.message;
+          let today_working = totalTodayResult.message;
+
+          
+          // Add custom widgets to the page based on the fetched data
+          let customCards = [
+            { name: "Total Projects", labels: ["Projects"], values: [projectCount.value || 0] },
+            { name: "Total Hours Worked Today", labels: ["Working", "Billable"], values: [today_working.value || 0, today_working.billable || 0] },
+            { name: "Total Hours Worked This Week", labels: ["Working", "Billable"], values: [weekly_working.value || 0, weekly_working.billable || 0]},
+            { name: "Total Hours Worked This Month", labels: ["Working", "Billable"], values: [monthly_working.value || 0, monthly_working.billable || 0]}
+          ];
+  
+          customCards.forEach(card => {
+            let widgetTitle = card.name;
+            let labels = card.labels;
+            let values = card.values;
+  
+            // Create the custom HTML for each card/widget
+            let customWidgetHTML = `
+              <div class="widget number-widget-box" style="width: 250px; padding: 12px; border-radius: 8px; border: 1px solid #ddd; background: white;">
+                <div class="widget-head" style="display: flex; justify-content: space-between; align-items: center; font-size: 12px; font-weight: 600; color: #666;">
+                  <span>${widgetTitle}</span>
+                </div>
+                <div class="widget-body">
+                  <div class="widget-content" style="padding-top:0px !important">
+                    <div style="display: flex; justify-content: space-between; font-size: 12px; font-weight: 600; color: #444; margin-top: 8px;">
+                      <span>${labels[0]}</span>
+                      ${labels[1] != undefined ? `<span>${labels[1]}</span>` : ''}
+                    </div>
+                    <div style="display: flex; justify-content: space-between; font-size: 18px; font-weight: bold; margin-top: 3px;">
+                      <span class="text-dark">${values[0]}</span>
+                      ${values[1] != undefined ? `<span class="text-dark">${values[1]}</span>` : ''}
+                    </div>
+                  </div>
+                </div>
+              </div>
+            `;
+  
+            // Append the custom widget HTML to the widget group body
+            widgetGroupBody.append(customWidgetHTML);
+          });
+        })
+        .catch(function (error) {
+          console.error("Error fetching data:", error);
+        });
       },
     });
   }
+  
+  
+  
 
   
   // Function to render DataTable with tabs
@@ -800,7 +872,7 @@ function show_tab(tab, projectData) {
       card_names = ["Total Projects", "Total Hrs Worked Today", "Total Hrs Worked This Week", "Total Hrs Worked This Month"];
   
       // Render the cards immediately to improve perceived speed
-      render_cards(cardWrapper, card_names);
+      render_cards(cardWrapper, card_names, tab);
 
       // Make an API call to fetch all projects data asynchronously
         frappe.call({
