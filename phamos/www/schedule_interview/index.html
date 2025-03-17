@@ -199,11 +199,11 @@
 			}
 
 			availableSlots.forEach(slot => {
+				slot = formatTimeSlot(slot);
 				let slotBtn = document.createElement("div");
 				slotBtn.className = "slot-btn";
 				slotBtn.dataset.slot = slot;
-				slotBtn.textContent = slot.replace(":00", "");
-
+				slotBtn.textContent = slot
 				slotBtn.addEventListener("click", function () {
 					document.querySelectorAll(".slot-btn.selected").forEach(btn => btn.classList.remove("selected"));
 					slotBtn.classList.add("selected");
@@ -220,6 +220,15 @@
 	
 		function getSlotsForDay(day, slots) {
 			return (slots.find(slot => Object.keys(slot)[0] === day) || {})[day] || [];
+		}
+
+		function formatTimeSlot(slot) {
+			const times = slot.split(' - ');
+
+			const startTime = times[0].substring(0, 5); 
+			const endTime = times[1].substring(0, 5);
+
+			return `${startTime} - ${endTime}`;
 		}
 	
 	});
