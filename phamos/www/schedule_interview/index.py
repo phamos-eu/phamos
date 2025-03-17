@@ -5,7 +5,7 @@ from frappe.core.doctype.communication.email import _make as make_communication
 from email.utils import formataddr
 from frappe.rate_limiter import rate_limit
 from datetime import datetime, timedelta
-from ics import Calendar, Event, Attendee, DisplayAlarm
+from icalendar import Calendar, Event, Alarm
 import pytz
 import hashlib
 
@@ -38,8 +38,8 @@ def schedule_interview(applicant_id, interview_date, interview_slot):
 
 		interviewers = frappe.get_all("Assignment Rule User", filters={"parent": "Recruitment Settings"}, fields=["user"])
 		start_time_str, end_time_str = interview_slot.split(" - ")
-		from_time = datetime.strptime(start_time_str, "%H:%M:%S").time()
-		to_time = datetime.strptime(end_time_str, "%H:%M:%S").time()
+		from_time = datetime.strptime(start_time_str, "%H:%M").time()
+		to_time = datetime.strptime(end_time_str, "%H:%M").time()
 		interview = create_interview(applicant_doc, interview_round)
 		interview.scheduled_on = interview_date
 		interview.from_time = from_time
@@ -158,40 +158,42 @@ def send_interview_schedule_email(applicant_doc, interview_date, interview_slot,
 
 def create_interview_ics(applicant_doc, interview_date, interview_slot, meeting_link, timezone_str="Europe/Berlin", cc=[]):
 	start_time_str, end_time_str = interview_slot.split(" - ")
-	start_datetime = datetime.strptime(f"{interview_date} {start_time_str}", "%Y-%m-%d %H:%M:%S")
-	end_datetime = datetime.strptime(f"{interview_date} {end_time_str}", "%Y-%m-%d %H:%M:%S")
 	timezone = pytz.timezone(timezone_str)
 
-	start_naive = datetime.strptime(f"{interview_date} {start_time_str}", "%Y-%m-%d %H:%M:%S")
-	end_naive = datetime.strptime(f"{interview_date} {end_time_str}", "%Y-%m-%d %H:%M:%S")
-	
-	start_datetime = timezone.localize(start_naive)
-	end_datetime = timezone.localize(end_naive)
-	
-	duration = end_datetime - start_datetime
-	
+	start_naive = datetime.strptime(f"{interview_date} {start_time_str}", "%Y-%m-%d %H:%M")
+	end_naive = datetime.strptime(f"{interview_date} {end_time_str}", "%Y-%m-%d %H:%M")
+
+	start_local = timezone.localize(start_naive)
+	end_local = timezone.localize(end_naive)
+
 	cal = Calendar()
+	cal.add('prodid', '-//Interview Scheduler//phamos.eu//')
+	cal.add('version', '2.0')
+
 	event = Event()
-	event.name = f"Interview: {applicant_doc.applicant_name}"
-	event.begin = start_datetime.isoformat()
-	event.end = end_datetime.isoformat()
-	event.description = f"Interview for {applicant_doc.applicant_name}\nMeeting Link: {meeting_link}"
-	event.location = meeting_link if meeting_link else "Office"
-	event.duration = duration
-	
-	alarm = DisplayAlarm(trigger=timedelta(minutes=-30))
-	alarm.description = "Reminder: Interview in 30 minutes."
-	event.alarms.append(alarm)
+	event.add('summary', f"Interview: {applicant_doc.applicant_name}")
+	event.add('dtstart', start_local)
+	event.add('dtend', end_local)
+	event.add('description', f"Interview for {applicant_doc.applicant_name}\nMeeting Link: {meeting_link}")
+	event.add('location', meeting_link if meeting_link else "Office")
+	event.add('uid', f"{applicant_doc.applicant_name}-{interview_date}")
 
+	alarm = Alarm()
+	alarm.add('action', 'DISPLAY')
+	alarm.add('description', "Reminder: Interview in 30 minutes.")
+	alarm.add('trigger', timedelta(minutes=-30))
+	event.add_component(alarm)
 
-	attendees = [Attendee(applicant_doc.email_id, applicant_doc.applicant_name)]
+	attendee = f"mailto:{applicant_doc.email_id}"
+	event.add('attendee', attendee)
 	for interviewer in cc:
-		interviewer_name = frappe.db.get_value("User", interviewer, "full_name")
-		attendees.append(Attendee(interviewer, interviewer_name))
-	event.attendees = attendees
+		interviewer_email = f"mailto:{interviewer}"
+		event.add('attendee', interviewer_email)
 
-	cal.events.add(event)
+	cal.add_component(event)
 
 	ics_filename = f"{applicant_doc.applicant_name}_interview.ics".replace(" ", "_")
 
-	return ics_filename, cal.serialize()
+	ics_content = cal.to_ical().decode('utf-8')
+
+	return ics_filename, ics_content
