@@ -18,7 +18,9 @@ def get_context(context):
 	if not frappe.db.exists("Job Applicant", applicant_id):
 		return {"status": "error", "message": "Job Applicant not found"}
 
-	context.job_applicant = frappe.db.get_value("Job Applicant", applicant_id, ["applicant_name", "designation", "custom_interview_slot_booked"], as_dict=1)
+	context.job_applicant = frappe.db.get_value("Job Applicant", applicant_id, ["applicant_name", "job_title", "custom_interview_slot_booked"], as_dict=1)
+	if context.job_applicant.get("job_title"):
+		context.job_applicant["job_title"] = frappe.db.get_value("Job Opening", context.job_applicant.get("job_title"), "job_title")
 	return context
 
 
@@ -93,8 +95,9 @@ def get_available_slots(applicant_id):
 
 def send_interview_schedule_email(applicant_doc, interview_date, interview_slot, recipients, cc=[]):
 	recruitement_settings = frappe.get_doc("Recruitment Settings")
-	if applicant_doc.designation:
-		job_title = "<b>{0}</b> position".format(applicant_doc.designation)
+	if applicant_doc.job_title:
+		job_title = frappe.db.get_value("Job Opening", applicant_doc.job_title, "job_title")
+		job_title = "<b>{0}</b> position".format(applicant_doc.job_title)
 	else:
 		job_title = "job"
 
@@ -110,7 +113,7 @@ def send_interview_schedule_email(applicant_doc, interview_date, interview_slot,
 	email_template = frappe.get_doc("Email Template", recruitement_settings.interview_confirmation)
 	subject = email_template.subject
 
-	key = f"For-{applicant_doc.designation}-Candidate-{applicant_doc.applicant_name}"
+	key = f"For-{applicant_doc.job_title}-Candidate-{applicant_doc.applicant_name}"
 	hashed_value = hashlib.sha256(key.encode()).hexdigest()
 	short_hash = str(int(hashed_value, 16))[:7] 
 	interview_link = f"https://meet.jit.si/JobInterviewPhamos-{short_hash}"
