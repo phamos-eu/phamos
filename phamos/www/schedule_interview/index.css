@@ -74,16 +74,16 @@ body {
 
 .slots-container {
 	display: flex;
-    justify-content: center;
-    flex-wrap: wrap;
+	justify-content: center;
+	flex-wrap: wrap;
 	gap: 10px;
 }
 .slot-btn {
 	flex: 1;
 	max-width: 45%;
 	background-color: white;
-	color: #007bff;
-	border: 2px solid #007bff;
+	color: #171717;
+	border: 2px solid #171717;
 	padding: 10px;
 	font-size: 16px;
 	cursor: pointer;
@@ -94,22 +94,17 @@ body {
 
 .slot-btn:hover,
 .slot-btn.selected {
-	background-color: #0056b3;
+	background-color: #171717;
 	color: white;
 }
 
 .confirm-btn {
-	background-color: #007bff;
-	color: white;
+	background-color: #171717;
+	color: #ffffff;
 	border: none;
 	padding: 12px 20px;
 	font-size: 16px;
-	cursor: pointer;
 	border-radius: 5px;
 	width: 80%;
 	transition: 0.3s;
-}
-
-.confirm-btn:hover {
-	background-color: #0056b3;
 }

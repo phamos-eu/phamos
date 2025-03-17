@@ -36,9 +36,9 @@
 					<div class="meeting-info">
 						Timezone: Europe/Berlin
 					</div>
-					{% if job_applicant.designation %}
+					{% if job_applicant.job_title %}
 					<div class="meeting-info">
-						<i class="fa fa-briefcase"></i> Position: {{ job_applicant.designation }}
+						<i class="fa fa-briefcase"></i> Position: {{ job_applicant.job_title }}
 					</div>
 					{% endif %}
 
@@ -70,7 +70,7 @@
 						</div>
 					</div>
 					<div id="confirm-container" style="display: none; text-align: center; margin-top: 10px;">
-						<button id="confirm-btn" class="confirm-btn">Confirm</button>
+						<button class="confirm-btn btn">Confirm</button>
 					</div>
 				</form>
 			</div>
@@ -165,7 +165,7 @@
 			dateClick: function(info) {
 				interviewDateField.value = info.dateStr;
 				document.querySelectorAll('.fc-day').forEach(el => el.style.border = '');
-				info.dayEl.style.border = '2px solid #007bff';
+				info.dayEl.style.border = '2px solid #2c3e50';
 				updateInterviewSlots(info.date, slotsData);
 			},
 			dayCellDidMount: function(info) {
@@ -199,11 +199,11 @@
 			}
 
 			availableSlots.forEach(slot => {
+				slot = formatTimeSlot(slot);
 				let slotBtn = document.createElement("div");
 				slotBtn.className = "slot-btn";
 				slotBtn.dataset.slot = slot;
-				slotBtn.textContent = slot.replace(":00", "");
-
+				slotBtn.textContent = slot
 				slotBtn.addEventListener("click", function () {
 					document.querySelectorAll(".slot-btn.selected").forEach(btn => btn.classList.remove("selected"));
 					slotBtn.classList.add("selected");
@@ -220,6 +220,15 @@
 	
 		function getSlotsForDay(day, slots) {
 			return (slots.find(slot => Object.keys(slot)[0] === day) || {})[day] || [];
+		}
+
+		function formatTimeSlot(slot) {
+			const times = slot.split(' - ');
+
+			const startTime = times[0].substring(0, 5); 
+			const endTime = times[1].substring(0, 5);
+
+			return `${startTime} - ${endTime}`;
 		}
 	
 	});
