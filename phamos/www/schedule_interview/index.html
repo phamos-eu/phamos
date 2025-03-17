@@ -70,7 +70,7 @@
 						</div>
 					</div>
 					<div id="confirm-container" style="display: none; text-align: center; margin-top: 10px;">
-						<button id="confirm-btn" class="confirm-btn">Confirm</button>
+						<button class="confirm-btn btn">Confirm</button>
 					</div>
 				</form>
 			</div>
@@ -165,7 +165,7 @@
 			dateClick: function(info) {
 				interviewDateField.value = info.dateStr;
 				document.querySelectorAll('.fc-day').forEach(el => el.style.border = '');
-				info.dayEl.style.border = '2px solid #007bff';
+				info.dayEl.style.border = '2px solid #2c3e50';
 				updateInterviewSlots(info.date, slotsData);
 			},
 			dayCellDidMount: function(info) {
