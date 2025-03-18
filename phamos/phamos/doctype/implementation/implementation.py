@@ -43,14 +43,22 @@ class Implementation(Document):
 
 @frappe.whitelist()
 def get_financial_history(name):
-	get_so_hrs = frappe.db.get_value('Sales Order', {'custom_implementation':"Test","status":["in",["To Deliver and Bill","To Bill"]]},'sum(total_qty) as sales_order_qty', as_dict=1)
-	print('))))))))))))))))', get_so_hrs)
+	get_so_hrs = frappe.db.get_value('Sales Order', {'custom_implementation':name,"status":["in",["To Deliver and Bill","To Bill"]]},'sum(total_qty) as sales_order_qty', as_dict=1)
+	
+	get_so_names = frappe.db.sql("""SELECT name from `tabSales Order` where status in ("To Bill", "To Deliver and Bill") and custom_implementation = '{0}' """.format(name), as_dict=1)
+
+	
+	get_so_list = [item.name for item in get_so_names]
+	print('lllllllllllllll', get_so_list)
 	if get_so_hrs['sales_order_qty'] == None:
 		get_so_hrs['sales_order_qty'] = 0
 	else:
 		pass
 
-	get_dn_hrs = frappe.db.get_value('Delivery Note', {'custom_implementation':"Test","status":"Completed"},'sum(total_qty) as dn_qty', as_dict=1)
+	if len(get_so_list) == 1:
+		print('111111111111111111133333333333')
+		get_dn_hrs = frappe.db.sql("""SELECT count(dni.qty) from `tabDelivery Note` dn join `tabDelivery Note Item` dni on dn.name = dni.parent where dni.against_sales_order = '{0}' and dn.custom_implementation = '{1}' and status = 'Completed' """.format(get_so_list[0], name), as_dict=1)
+		print('111111111111111', get_dn_hrs)
 
 	get_so_hrs['dn_qty'] = get_dn_hrs['dn_qty']
 	get_so_hrs['remaining_hrs'] = abs(int(get_so_hrs['sales_order_qty']) - int(get_so_hrs['dn_qty']))
@@ -59,6 +67,8 @@ def get_financial_history(name):
 	timesheet_hrs = frappe.db.sql("""SELECT sum(td.hours) as timesheet_hrs from `tabTimesheet` t join `tabTimesheet Detail` td on t.name = td.parent where td.is_billable = 1 and t.docstatus = 1 and td.custom_implementation = '{0}' """.format(name), as_list=1)
 	if len(timesheet_hrs) != 0:
 		get_so_hrs['timesheet_hrs'] = timesheet_hrs[0][0]
+	else:
+		get_so_hrs['timesheet_hrs'] = 0
 
 	get_open_sales_orders = frappe.db.get_value('Sales Order', {'status': ["in", ["To Deliver and Bill", "To Bill"]]}, 'count(name) as open_so')
 
@@ -73,14 +83,22 @@ def get_financial_history(name):
 
 @frappe.whitelist()
 def graphical_representation(customer, name):
-	get_so_hrs = frappe.db.get_value('Sales Order', {'custom_implementation':"Test","status":["in",["To Deliver and Bill","To Bill"]]},'sum(total_qty) as sales_order_qty', as_dict=1)
-	print('))))))))))))))))', get_so_hrs)
+	get_so_hrs = frappe.db.get_value('Sales Order', {'custom_implementation':name,"status":["in",["To Deliver and Bill","To Bill"]]},'sum(total_qty) as sales_order_qty', as_dict=1)
+	
+	get_so_names = frappe.db.sql("""SELECT name from `tabSales Order` where status in ("To Bill", "To Deliver and Bill") and custom_implementation = '{0}' """.format(name), as_dict=1)
+
+	
+	get_so_list = [item.name for item in get_so_names]
+	print('lllllllllllllll', get_so_list)
 	if get_so_hrs['sales_order_qty'] == None:
 		get_so_hrs['sales_order_qty'] = 0
 	else:
 		pass
 
-	get_dn_hrs = frappe.db.get_value('Delivery Note', {'custom_implementation':"Test","status":"Completed"},'sum(total_qty) as dn_qty', as_dict=1)
+	if len(get_so_list) == 1:
+		print('111111111111111111133333333333')
+		get_dn_hrs = frappe.db.sql("""SELECT count(dni.qty) from `tabDelivery Note` dn join `tabDelivery Note Item` dni on dn.name = dni.parent where dni.against_sales_order = '{0}' and dn.custom_implementation = '{1}' and status = 'Completed' """.format(get_so_list[0], name), as_dict=1)
+		print('111111111111111', get_dn_hrs)
 
 	get_so_hrs['dn_qty'] = get_dn_hrs['dn_qty']
 	get_so_hrs['remaining_hrs'] = abs(int(get_so_hrs['sales_order_qty']) - int(get_so_hrs['dn_qty']))

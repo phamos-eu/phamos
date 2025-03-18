@@ -24,6 +24,7 @@
   "remaining_hrs",
   "open_so",
   "section_break_eynb",
+  "total_sales",
   "order_chart",
   "section_break_xfgb",
   "sales_order_status_information",
@@ -65,6 +66,7 @@
    "in_preview": 1,
    "in_standard_filter": 1,
    "label": "Account Manager",
+   "link_filters": "[[\"User\",\"role\",\"=\",\"Employee\"]]",
    "options": "User"
   },
   {
@@ -160,7 +162,8 @@
    "fieldname": "customer",
    "fieldtype": "Link",
    "label": "Customer",
-   "options": "Customer"
+   "options": "Customer",
+   "reqd": 1
   },
   {
    "fieldname": "contact_person",
@@ -191,6 +194,12 @@
    "fieldname": "section_break_eynb",
    "fieldtype": "Section Break",
    "label": "Open Sales Order Delivery Status"
+  },
+  {
+   "fieldname": "total_sales",
+   "fieldtype": "HTML",
+   "label": "Total Sales",
+   "options": "<div id=\"total-sales\"></div>"
   }
  ],
  "index_web_pages_for_search": 1,
@@ -212,7 +221,7 @@
    "link_fieldname": "custom_implementation"
   }
  ],
- "modified": "2025-03-17 18:37:49.386060",
+ "modified": "2025-03-18 17:49:21.045409",
  "modified_by": "Administrator",
  "module": "Phamos",
  "name": "Implementation",

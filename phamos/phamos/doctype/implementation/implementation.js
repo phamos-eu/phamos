@@ -13,6 +13,22 @@ frappe.ui.form.on("Implementation", {
 						frm.set_value('delivered_total_hrs', r.message['dn_qty'])
 						frm.set_value('total_hrs_timesheet', r.message['timesheet_hrs'])
 						frm.set_value('remaining_hrs',r.message['remaining_hrs'])
+						let label1= ['Sales Order Hrs']
+		                let value1 = [r.message['sales_order_qty']]
+
+		                $(frm.fields_dict.total_sales.wrapper).html('<div id="total-sales"></div>');
+
+		                let chart = new frappe.Chart("#total-sales", {
+		                    type: 'percentage',
+		                    data: {
+		                        labels:label1,
+		                        datasets: [
+				                    {values: value1}]},
+		                    colors: ['#7cd6fd'],
+		                    height: 250,
+		                    width:250
+		                });
+		                console.log('1111111111111111111')
 						if(r.message['open_so'] == 1){
 							frm.set_value('open_so', 'Yes')
 						}
@@ -32,9 +48,11 @@ frappe.ui.form.on("Implementation", {
 				args: {'customer':frm.doc.customer, 'name':frm.doc.name},
 				callback: function (r) {
 					if(r.message){
-						let labels = ['Sales Order Hrs', 'Delivered Hrs', 'Remaining Hrs', 'Timesheet Hrs'];
-		                let values = [r.message['sales_order_qty'], r.message['dn_qty'], r.message['remaining_hrs'], r.message['timesheet_hrs']];
+						let labels = ['Delivered Hrs', 'Remaining Hrs', 'Timesheet Hrs'];
+		                let values = [r.message['dn_qty'], r.message['remaining_hrs'], r.message['timesheet_hrs']];
+		                
 		                $(frm.fields_dict.order_chart.wrapper).html('<div id="delivered-qty-chart"></div>');
+		                
 
 		                let chart = new frappe.Chart("#delivered-qty-chart", {
 		                    type: 'percentage',
