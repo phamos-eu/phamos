@@ -163,35 +163,40 @@
 			aspectRatio: 1.35,
 			selectable: true,
 			dateClick: function(info) {
-				interviewDateField.value = info.dateStr;
+				const isoDate = formatDateLocal(info.date);
+				interviewDateField.value = isoDate;
 				document.querySelectorAll('.fc-day').forEach(el => el.style.border = '');
 				info.dayEl.style.border = '2px solid #2c3e50';
-				updateInterviewSlots(info.date, slotsData);
+				updateInterviewSlots(isoDate, slotsData);
 			},
 			dayCellDidMount: function(info) {
-				let formattedDate = new Date(info.date).toLocaleDateString();
-				if (highlightedDates.includes(formattedDate)) {
+				const isoDate = formatDateLocal(info.date);
+				if (highlightedDates.includes(isoDate)) {
 					info.el.style.backgroundColor = '#90EE90';
-					info.el.style.color = '#000'; 
+					info.el.style.color = '#000';
 				} else {
 					info.el.style.backgroundColor = '#f8d7da';
-					info.el.style.color = '#6c757d'; 
+					info.el.style.color = '#6c757d';
 					info.el.style.pointerEvents = 'none';
-					info.el.style.opacity = '0.5'; 
+					info.el.style.opacity = '0.5';
 				}
+
 			}
 		});
 	
 		calendar.render();
+
+		function formatDateLocal(date) {
+			return date.toLocaleDateString('en-CA');
+		}
 	
-		function updateInterviewSlots(selectedDay, slotsData) {
+		function updateInterviewSlots(selectedDateISO, slotsData) {
 			let container = document.getElementById('interview_slots_container');
 			let confirmContainer = document.getElementById("confirm-container");
 			container.innerHTML = ''; 
 			confirmContainer.style.display = "none"
 
-			let formattedDay = new Date(selectedDay).toLocaleDateString();
-			let availableSlots = getSlotsForDay(formattedDay, slotsData);
+			let availableSlots = getSlotsForDay(selectedDateISO, slotsData);
 
 			if (availableSlots.length === 0) {
 				container.innerHTML = "<p>No slots available</p>";
@@ -213,13 +218,13 @@
 				container.appendChild(slotBtn);
 			});
 		}
-	
+
 		function extractAvailableDates(slots) {
 			return slots.map(slot => Object.keys(slot)[0]);
 		}
-	
-		function getSlotsForDay(day, slots) {
-			return (slots.find(slot => Object.keys(slot)[0] === day) || {})[day] || [];
+
+		function getSlotsForDay(isoDate, slots) {
+			return (slots.find(slot => Object.keys(slot)[0] === isoDate) || {})[isoDate] || [];
 		}
 
 		function formatTimeSlot(slot) {
