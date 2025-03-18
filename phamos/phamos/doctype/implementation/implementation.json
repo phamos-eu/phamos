@@ -65,6 +65,7 @@
    "in_preview": 1,
    "in_standard_filter": 1,
    "label": "Account Manager",
+   "link_filters": "[[\"User\",\"role\",\"=\",\"Employee\"]]",
    "options": "User"
   },
   {
@@ -160,7 +161,8 @@
    "fieldname": "customer",
    "fieldtype": "Link",
    "label": "Customer",
-   "options": "Customer"
+   "options": "Customer",
+   "reqd": 1
   },
   {
    "fieldname": "contact_person",
@@ -212,7 +214,7 @@
    "link_fieldname": "custom_implementation"
   }
  ],
- "modified": "2025-03-17 18:37:49.386060",
+ "modified": "2025-03-18 15:29:52.852005",
  "modified_by": "Administrator",
  "module": "Phamos",
  "name": "Implementation",
