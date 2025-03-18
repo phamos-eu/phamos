@@ -8,4 +8,3 @@ from frappe.query_builder import DocType, get_query_builder
 
 class Implementation(Document):
 	pass
-	
