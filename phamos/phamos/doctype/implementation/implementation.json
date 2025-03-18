@@ -6,6 +6,7 @@
  "doctype": "DocType",
  "engine": "InnoDB",
  "field_order": [
+  "status",
   "notes",
   "start_date",
   "column_break_7p95",
@@ -30,8 +31,6 @@
   "section_break_ky9b",
   "customer",
   "contact_person",
-  "section_break_izec",
-  "status_information",
   "timesheets_tab",
   "html_bfhi"
  ],
