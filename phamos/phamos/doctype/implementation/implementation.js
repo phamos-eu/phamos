@@ -1,7 +1,5 @@
 // Copyright (c) 2025, phamos.eu and contributors
 // For license information, please see license.txt
-
-<<<<<<< HEAD
 frappe.ui.form.on("Implementation", {
 	setup:function(frm){
 		if(!frm.is_new()){
@@ -26,22 +24,33 @@ frappe.ui.form.on("Implementation", {
 				},
 			});
 		}
-	}, 
-	refresh:function(frm){
-		frm.doc.sales_order_status_information.forEach(row => {
-            let data1= (row.delivered_total_hrs/row.total_hrs).toFixed(2)
-            console.log(')))))))))))))))))))))',data)
-            let data = response.message;
-            let values = data.map(d => data);
-            new frappe.Chart("#chart", {
-			    type: "bar",
-			    data: {
-			        datasets: [{ name: "Total Sales", values:values}]
-			    }
+	},
+	refresh: function(frm) {
+		if(!frm.is_new()){
+			frappe.call({
+				method: "phamos.phamos.doctype.implementation.implementation.graphical_representation",
+				args: {'customer':frm.doc.customer, 'name':frm.doc.name},
+				callback: function (r) {
+					if(r.message){
+						let labels = ['Sales Order Hrs', 'Delivered Hrs', 'Remaining Hrs', 'Timesheet Hrs'];
+		                let values = [r.message['sales_order_qty'], r.message['dn_qty'], r.message['remaining_hrs'], r.message['timesheet_hrs']];
+		                $(frm.fields_dict.order_chart.wrapper).html('<div id="delivered-qty-chart"></div>');
+
+		                let chart = new frappe.Chart("#delivered-qty-chart", {
+		                    type: 'percentage',
+		                    data: {
+		                        labels: labels,
+		                        datasets: [
+				                    {name:"Financial Information",values: values}]},
+		                    colors: ['#7cd6fd'],
+		                    height: 250,
+		                    width:250
+		                });
+					}
+				},
 			});
-        });
-        //m.refresh_field("items");  
-	}
+		}
+    }
 });
 
 
@@ -100,17 +109,3 @@ frappe.ui.form.on("Sales Order Status Information", {
 	}
 });
 
-/*new frappe.Chart("#chart", {
-    type: "bar",
-    data: {
-        labels: labels,
-        datasets: [{ name: "Total Sales", values: values }]
-    }
-});*/
-=======
-// frappe.ui.form.on("Implementation", {
-// 	refresh(frm) {
-
-// 	},
-// });
->>>>>>> 250ef5c4fa6b888e08874909c04625ee2c1c4bd7

@@ -43,17 +43,54 @@ class Implementation(Document):
 
 @frappe.whitelist()
 def get_financial_history(name):
-	get_so_hrs = frappe.db.get_value('Sales Order', {'custom_implementation':"Test","status":["!=", "Cancelled"]},'sum(total_qty) as sales_order_qty', as_dict=1)
+	get_so_hrs = frappe.db.get_value('Sales Order', {'custom_implementation':"Test","status":["in",["To Deliver and Bill","To Bill"]]},'sum(total_qty) as sales_order_qty', as_dict=1)
+	print('))))))))))))))))', get_so_hrs)
+	if get_so_hrs['sales_order_qty'] == None:
+		get_so_hrs['sales_order_qty'] = 0
+	else:
+		pass
 
 	get_dn_hrs = frappe.db.get_value('Delivery Note', {'custom_implementation':"Test","status":"Completed"},'sum(total_qty) as dn_qty', as_dict=1)
 
 	get_so_hrs['dn_qty'] = get_dn_hrs['dn_qty']
-	get_so_hrs['remaining_hrs'] = int(get_so_hrs['sales_order_qty']) - int(get_so_hrs['dn_qty'])
+	get_so_hrs['remaining_hrs'] = abs(int(get_so_hrs['sales_order_qty']) - int(get_so_hrs['dn_qty']))
 	
 
 	timesheet_hrs = frappe.db.sql("""SELECT sum(td.hours) as timesheet_hrs from `tabTimesheet` t join `tabTimesheet Detail` td on t.name = td.parent where td.is_billable = 1 and t.docstatus = 1 and td.custom_implementation = '{0}' """.format(name), as_list=1)
 	if len(timesheet_hrs) != 0:
 		get_so_hrs['timesheet_hrs'] = timesheet_hrs[0][0]
+
+	get_open_sales_orders = frappe.db.get_value('Sales Order', {'status': ["in", ["To Deliver and Bill", "To Bill"]]}, 'count(name) as open_so')
+
+	if get_open_sales_orders > 0:
+		get_so_hrs['open_so'] = 1
+	else:
+		get_so_hrs['open_so'] = 0
+
+	return get_so_hrs
+
+
+
+@frappe.whitelist()
+def graphical_representation(customer, name):
+	get_so_hrs = frappe.db.get_value('Sales Order', {'custom_implementation':"Test","status":["in",["To Deliver and Bill","To Bill"]]},'sum(total_qty) as sales_order_qty', as_dict=1)
+	print('))))))))))))))))', get_so_hrs)
+	if get_so_hrs['sales_order_qty'] == None:
+		get_so_hrs['sales_order_qty'] = 0
+	else:
+		pass
+
+	get_dn_hrs = frappe.db.get_value('Delivery Note', {'custom_implementation':"Test","status":"Completed"},'sum(total_qty) as dn_qty', as_dict=1)
+
+	get_so_hrs['dn_qty'] = get_dn_hrs['dn_qty']
+	get_so_hrs['remaining_hrs'] = abs(int(get_so_hrs['sales_order_qty']) - int(get_so_hrs['dn_qty']))
+	
+
+	timesheet_hrs = frappe.db.sql("""SELECT sum(td.hours) as timesheet_hrs from `tabTimesheet` t join `tabTimesheet Detail` td on t.name = td.parent where td.is_billable = 1 and t.docstatus = 1 and td.custom_implementation = '{0}' """.format(name), as_list=1)
+	if len(timesheet_hrs) != 0:
+		get_so_hrs['timesheet_hrs'] = timesheet_hrs[0][0]
+	else:
+		get_so_hrs['timesheet_hrs'] = 0
 
 	get_open_sales_orders = frappe.db.get_value('Sales Order', {'status': ["in", ["To Deliver and Bill", "To Bill"]]}, 'count(name) as open_so')
 

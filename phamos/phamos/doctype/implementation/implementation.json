@@ -23,6 +23,8 @@
   "delivered_total_hrs",
   "remaining_hrs",
   "open_so",
+  "section_break_eynb",
+  "order_chart",
   "section_break_xfgb",
   "sales_order_status_information",
   "section_break_ky9b",
@@ -47,6 +49,14 @@
   {
    "fieldname": "column_break_7p95",
    "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "department",
+   "fieldtype": "Link",
+   "in_list_view": 1,
+   "in_standard_filter": 1,
+   "label": "Department",
+   "options": "Department"
   },
   {
    "fieldname": "account_manager",
@@ -82,6 +92,66 @@
    "options": "1 \u2600\ufe0f - alles gut. Kunde happy, keine Gefahren (deadlines, Erwartung an Stunden etc) in sicht\n2 \ud83c\udf24\ufe0f - zu viele neue Issues, feedback langsam\n3 \u2601\ufe0f - weekly findet nicht jede Woche statt, Kundenprojektmanager schwer zu erreichen,\n4 \ud83c\udf27\ufe0f - Anforderungen \u00e4ndern sich sehr h\u00e4ufig, Weeklies werden nicht wahrgenommen, kunde antwortet auf Mails nicht\n5 \u26c8\ufe0f - Kunde zahlt Rechnungen nicht, Kunde hat keine Gedult"
   },
   {
+   "fieldname": "status",
+   "fieldtype": "Small Text",
+   "label": "Status"
+  },
+  {
+   "fieldname": "section_break_uiri",
+   "fieldtype": "Section Break"
+  },
+  {
+   "fieldname": "sales_order_total_hrs",
+   "fieldtype": "Int",
+   "label": "Sales Order Total Hrs"
+  },
+  {
+   "fieldname": "total_hrs_timesheet",
+   "fieldtype": "Int",
+   "label": "Total Hrs (Timesheet)"
+  },
+  {
+   "fieldname": "preliminary_hours",
+   "fieldtype": "Data",
+   "label": "Preliminary hours"
+  },
+  {
+   "fieldname": "order_chart",
+   "fieldtype": "HTML",
+   "label": "Order Chart",
+   "options": "<div id=\"delivered-qty-chart\"></div>"
+  },
+  {
+   "fieldname": "column_break_qajo",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "delivered_total_hrs",
+   "fieldtype": "Int",
+   "label": "Delivered Total Hrs"
+  },
+  {
+   "fieldname": "remaining_hrs",
+   "fieldtype": "Data",
+   "label": "Remaining Hrs"
+  },
+  {
+   "fieldname": "open_so",
+   "fieldtype": "Select",
+   "label": "Open SO",
+   "options": "\nYes\nNo"
+  },
+  {
+   "fieldname": "section_break_xfgb",
+   "fieldtype": "Section Break"
+  },
+  {
+   "fieldname": "sales_order_status_information",
+   "fieldtype": "Table",
+   "label": "Sales Order Status Information",
+   "options": "Sales Order Status"
+  },
+  {
    "fieldname": "section_break_ky9b",
    "fieldtype": "Section Break",
    "label": "Customer Information"
@@ -98,25 +168,6 @@
    "label": "Contact Person"
   },
   {
-   "fieldname": "timesheets_tab",
-   "fieldtype": "Tab Break",
-   "label": "Timesheets"
-  },
-  {
-   "fieldname": "html_bfhi",
-   "fieldtype": "HTML",
-   "options": "<h1>Info</h1>On this screen we will want to see a table of all timesheets from this implmentation. Interesting also will be some filters for project, employee, and more"
-  },
-  {
-   "fieldname": "department",
-   "fieldtype": "Link",
-   "in_list_view": 1,
-   "in_standard_filter": 1,
-   "label": "Department",
-   "options": "Department"
-  },
-  {
-<<<<<<< HEAD
    "fieldname": "section_break_izec",
    "fieldtype": "Section Break"
   },
@@ -127,63 +178,19 @@
    "options": "Status Information"
   },
   {
-   "fieldname": "status",
-   "fieldtype": "Small Text",
-   "label": "Status"
+   "fieldname": "timesheets_tab",
+   "fieldtype": "Tab Break",
+   "label": "Timesheets"
   },
   {
-   "fieldname": "section_break_xfgb",
-   "fieldtype": "Section Break"
+   "fieldname": "html_bfhi",
+   "fieldtype": "HTML",
+   "options": "<h1>Info</h1>On this screen we will want to see a table of all timesheets from this implmentation. Interesting also will be some filters for project, employee, and more"
   },
   {
-   "fieldname": "sales_order_status_information",
-   "fieldtype": "Table",
-   "label": "Sales Order Status Information",
-   "options": "Sales Order Status"
-  },
-  {
-   "fieldname": "section_break_uiri",
-   "fieldtype": "Section Break"
-  },
-  {
-   "fieldname": "sales_order_total_hrs",
-   "fieldtype": "Int",
-   "label": "Sales Order Total Hrs"
-  },
-  {
-   "fieldname": "column_break_qajo",
-   "fieldtype": "Column Break"
-  },
-  {
-   "fieldname": "delivered_total_hrs",
-   "fieldtype": "Int",
-   "label": "Delivered Total Hrs"
-  },
-  {
-   "fieldname": "total_hrs_timesheet",
-   "fieldtype": "Int",
-   "label": "Total Hrs (Timesheet)"
-  },
-  {
-   "fieldname": "preliminary_hours",
-   "fieldtype": "Data",
-   "label": "Preliminary hours"
-  },
-  {
-   "fieldname": "open_so",
-   "fieldtype": "Select",
-   "label": "Open SO",
-   "options": "\nYes\nNo"
-  },
-  {
-   "fieldname": "remaining_hrs",
-   "fieldtype": "Data",
-   "label": "Remaining Hrs"
-=======
-   "fieldname": "status",
-   "fieldtype": "Small Text",
-   "label": "Status"
->>>>>>> 250ef5c4fa6b888e08874909c04625ee2c1c4bd7
+   "fieldname": "section_break_eynb",
+   "fieldtype": "Section Break",
+   "label": "Open Sales Order Delivery Status"
   }
  ],
  "index_web_pages_for_search": 1,
@@ -205,11 +212,7 @@
    "link_fieldname": "custom_implementation"
   }
  ],
-<<<<<<< HEAD
- "modified": "2025-03-12 11:26:42.799830",
-=======
- "modified": "2025-03-12 19:29:23.687008",
->>>>>>> 250ef5c4fa6b888e08874909c04625ee2c1c4bd7
+ "modified": "2025-03-17 18:37:49.386060",
  "modified_by": "Administrator",
  "module": "Phamos",
  "name": "Implementation",
