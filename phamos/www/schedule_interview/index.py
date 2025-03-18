@@ -80,7 +80,7 @@ def get_available_slots(applicant_id):
 	)
 
 	for slot in interview_slots:
-		date_str = slot.get("date").strftime("%-m/%-d/%Y")
+		date_str = slot.get("date").strftime("%Y-%m-%d")
 		time_slot = f"{slot.get('from_time')} - {slot.get('to_time')}" 
 
 		if date_str in slots_dict:
