@@ -6,7 +6,7 @@ frappe.ui.form.on("Implementation", {
 			add_row_to_sales_order(frm)
 			frappe.call({
 				method: "phamos.phamos.doctype.implementation.implementation.get_financial_history",
-				args: {'name':frm.doc.name},
+				args: {'name':frm.doc.name,'customer':frm.doc.customer},
 				callback: function (r) {
 					if(r.message){
 						frm.set_value('sales_order_total_hrs', r.message['sales_order_qty'])
@@ -16,19 +16,20 @@ frappe.ui.form.on("Implementation", {
 						let label1= ['Sales Order Hrs']
 		                let value1 = [r.message['sales_order_qty']]
 
-		                $(frm.fields_dict.total_sales.wrapper).html('<div id="total-sales"></div>');
-
+		                
+		                $(frm.fields_dict.total_sales.wrapper).html('<div id="total-sales"><h1>hiiii</h1></div>');
+		                
 		                let chart = new frappe.Chart("#total-sales", {
 		                    type: 'percentage',
 		                    data: {
-		                        labels:label1,
+		                        labels: label1,
 		                        datasets: [
-				                    {values: value1}]},
+				                    {name:"Financial Information",values: value1}]},
 		                    colors: ['#7cd6fd'],
 		                    height: 250,
 		                    width:250
 		                });
-		                console.log('1111111111111111111')
+		                
 						if(r.message['open_so'] == 1){
 							frm.set_value('open_so', 'Yes')
 						}
@@ -44,31 +45,49 @@ frappe.ui.form.on("Implementation", {
 	refresh: function(frm) {
 		if(!frm.is_new()){
 			frappe.call({
-				method: "phamos.phamos.doctype.implementation.implementation.graphical_representation",
+				method: "phamos.phamos.doctype.implementation.implementation.get_financial_history",
 				args: {'customer':frm.doc.customer, 'name':frm.doc.name},
 				callback: function (r) {
 					if(r.message){
-						let labels = ['Delivered Hrs', 'Remaining Hrs', 'Timesheet Hrs'];
-		                let values = [r.message['dn_qty'], r.message['remaining_hrs'], r.message['timesheet_hrs']];
-		                
-		                $(frm.fields_dict.order_chart.wrapper).html('<div id="delivered-qty-chart"></div>');
-		                
-
+						let warning_label = r.message['sales_order_qty'] < r.message['timesheet_hrs'] ? '⚠️ TH exceeded!' : '';
+						
+						let labels = ['Delivered Hrs', 'Timesheet Hrs','Remaining Hrs',  warning_label];
+		                let values = [r.message['dn_qty'], r.message['timesheet_hrs'],r.message['remaining_hrs'], 0];
+ 	                
+		                $(frm.fields_dict.order_chart.wrapper).html('<div id="delivered-qty-chart"><h1></h1></div>');
+		               
 		                let chart = new frappe.Chart("#delivered-qty-chart", {
 		                    type: 'percentage',
 		                    data: {
 		                        labels: labels,
 		                        datasets: [
 				                    {name:"Financial Information",values: values}]},
+		                    colors: ['green','pink','blue','red'],
+		                    height: 250,
+		                    width:500
+		                });
+
+		                let label1= ['Sales Order Hrs']
+		                let value1 = [r.message['sales_order_qty']]
+
+		                
+		                $(frm.fields_dict.total_sales.wrapper).html('<div id="total-sales"></div>');
+						
+						let chart1 = new frappe.Chart("#total-sales", {
+		                    type: 'percentage',
+		                    data: {
+		                        labels: label1,
+		                        datasets: [
+				                    {name:"Financial Information",values: value1}]},
 		                    colors: ['#7cd6fd'],
 		                    height: 250,
 		                    width:250
 		                });
-					}
+		           	}
 				},
 			});
 		}
-    }
+    },
 });
 
 
@@ -80,6 +99,7 @@ function add_row_to_sales_order(frm){
             doctype: "Sales Order",
             filters: {
                 customer: frm.doc.customer,
+                custom_implementation:frm.doc.name,
                 status: ["in", ["To Deliver", "To Bill", "To Deliver and Bill"]]
             },
             fields: ["name", "status", "total_qty"],
@@ -88,6 +108,7 @@ function add_row_to_sales_order(frm){
         callback: function(response) {
             if (response.message.length > 0) {
                 frm.clear_table("sales_order_status_information"); // Clear existing data
+                
                 response.message.forEach(order => {
                     let row = frm.add_child("sales_order_status_information");
                     row.sales_order = order.name;

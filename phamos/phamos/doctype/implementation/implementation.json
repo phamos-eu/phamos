@@ -6,6 +6,7 @@
  "doctype": "DocType",
  "engine": "InnoDB",
  "field_order": [
+  "status",
   "notes",
   "start_date",
   "column_break_7p95",
@@ -14,7 +15,6 @@
   "maturity_level",
   "mood",
   "forecast",
-  "status",
   "section_break_uiri",
   "sales_order_total_hrs",
   "total_hrs_timesheet",
@@ -31,10 +31,10 @@
   "section_break_ky9b",
   "customer",
   "contact_person",
-  "section_break_izec",
-  "status_information",
   "timesheets_tab",
-  "html_bfhi"
+  "html_bfhi",
+  "section_break_izec",
+  "status_information"
  ],
  "fields": [
   {
@@ -221,7 +221,7 @@
    "link_fieldname": "custom_implementation"
   }
  ],
- "modified": "2025-03-18 17:49:21.045409",
+ "modified": "2025-03-19 19:10:38.199216",
  "modified_by": "Administrator",
  "module": "Phamos",
  "name": "Implementation",
@@ -244,6 +244,11 @@
  "search_fields": "account_manager",
  "sort_field": "modified",
  "sort_order": "DESC",
- "states": [],
+ "states": [
+  {
+   "color": "Red",
+   "title": "Timesheet Hrs Exceeded"
+  }
+ ],
  "track_changes": 1
 }
