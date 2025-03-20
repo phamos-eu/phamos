@@ -7,7 +7,7 @@
 {% endif %}
 
 {% if doc.custom_available_slots%}
-<p>Following slots are available (consider checking Europe/Berlin): </p>
+<p>Following slots are available as per Europe/Berlin Timezone: </p>
 {% for d in doc.custom_available_slots %}
 <p>Date: {{ d.date }}, between time {{ d.from_time }}-{{ d.to_time}}</p>
 {% endfor %}
