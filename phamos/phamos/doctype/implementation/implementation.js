@@ -30,12 +30,6 @@ frappe.ui.form.on("Implementation", {
 		                    width:250
 		                });
 		                
-						if(r.message['open_so'] == 1){
-							frm.set_value('open_so', 'Yes')
-						}
-						else{
-							frm.set_value('open_so', 'No')
-						}
 						frm.save()
 					}
 				},
@@ -43,46 +37,75 @@ frappe.ui.form.on("Implementation", {
 		}
 	},
 	refresh: function(frm) {
-		if(!frm.is_new()){
+		if(!frm.is_new()){ 
 			frappe.call({
 				method: "phamos.phamos.doctype.implementation.implementation.get_financial_history",
 				args: {'customer':frm.doc.customer, 'name':frm.doc.name},
 				callback: function (r) {
 					if(r.message){
-						let warning_label = r.message['sales_order_qty'] < r.message['timesheet_hrs'] ? '⚠️ TH exceeded!' : '';
-						
-						let labels = ['Delivered Hrs', 'Timesheet Hrs','Remaining Hrs',  warning_label];
-		                let values = [r.message['dn_qty'], r.message['timesheet_hrs'],r.message['remaining_hrs'], 0];
- 	                
-		                $(frm.fields_dict.order_chart.wrapper).html('<div id="delivered-qty-chart"><h1></h1></div>');
-		               
-		                let chart = new frappe.Chart("#delivered-qty-chart", {
-		                    type: 'percentage',
-		                    data: {
-		                        labels: labels,
-		                        datasets: [
-				                    {name:"Financial Information",values: values}]},
-		                    colors: ['green','pink','blue','red'],
-		                    height: 250,
-		                    width:500
-		                });
+						if( r.message['sales_order_qty'] < r.message['timesheet_hrs']){
+							let string1 ="TS Hrs exceeding Open SO Hrs"
+							let remaining_hrs = Math.abs(r.message['remaining_hrs']).toString();
+							let string2 = "TH"
+							let warning_label = r.message['sales_order_qty'] < r.message['timesheet_hrs'] ? '⚠️'+ string1: '';
+							
+							let labels = ['DN Hrs', 'TS Hrs', warning_label];
+			                let values = [r.message['dn_qty'], r.message['timesheet_hrs'], 0];
+	 	                
+			                $(frm.fields_dict.order_chart.wrapper).html('<div id="delivered-qty-chart"><h1></h1></div>');
+			               
+			                let chart = new frappe.Chart("#delivered-qty-chart", {
+			                    type: 'percentage',
+			                    data: {
+			                        labels: labels,
+			                        datasets: [
+					                    {name:"Financial Information",values: values}]},
+				                    colors: ['green','yellow','red'],
+				                    height: 250,
+				                    width:550,
+				                    maxLegendLines: 2,
+				                    truncateLegends: 10, 
+		                	});
+		                }
+		                else if(r.message['sales_order_qty'] > r.message['timesheet_hrs']){
+							let labels = ['DN Hrs', 'TS Hrs','Rm Hrs'];
+			                let values = [r.message['dn_qty'], r.message['timesheet_hrs'],r.message['remaining_hrs']];
+	 	                
+			                $(frm.fields_dict.order_chart.wrapper).html('<div id="delivered-qty-chart"><h1></h1></div>');
+			               
+			                let chart = new frappe.Chart("#delivered-qty-chart", {
+			                    type: 'percentage',
+			                    data: {
+			                        labels: labels,
+			                        datasets: [
+					                    {name:"Financial Information",values: values}]},
+				                    colors: ['green','yellow','blue'],
+				                    height: 250,
+				                    width:500,
+				                    maxLegendLines: 2,
+				                    truncateLegends: 10, 
+		                	});
+		           		}
+		           		else if(r.message['sales_order_qty'] ==r.message['timesheet_hrs']){
+		           			let labels = ['DN Hrs', 'TS Hrs','Rm Hrs'];
+			                let values = [r.message['dn_qty'], r.message['timesheet_hrs'],r.message['remaining_hrs']];
+	 	                
+			                $(frm.fields_dict.order_chart.wrapper).html('<div id="delivered-qty-chart"><h1></h1></div>');
+			               
+			                let chart = new frappe.Chart("#delivered-qty-chart", {
+			                    type: 'percentage',
+			                    data: {
+			                        labels: labels,
+			                        datasets: [
+					                    {name:"Financial Information",values: values}]},
+				                    colors: ['green','yellow','blue'],
+				                    height: 250,
+				                    width:500,
+				                    maxLegendLines: 2,
+				                    truncateLegends: 10, 
+		                	});
 
-		                let label1= ['Sales Order Hrs']
-		                let value1 = [r.message['sales_order_qty']]
-
-		                
-		                $(frm.fields_dict.total_sales.wrapper).html('<div id="total-sales"></div>');
-						
-						let chart1 = new frappe.Chart("#total-sales", {
-		                    type: 'percentage',
-		                    data: {
-		                        labels: label1,
-		                        datasets: [
-				                    {name:"Financial Information",values: value1}]},
-		                    colors: ['#7cd6fd'],
-		                    height: 250,
-		                    width:250
-		                });
+		           		}
 		           	}
 				},
 			});
@@ -134,13 +157,6 @@ frappe.ui.form.on("Sales Order Status Information", {
 						frm.set_value('delivered_total_hrs', r.message['dn_qty'])
 						frm.set_value('total_hrs_timesheet', r.message['timesheet_hrs'])
 						frm.set_value('remaining_hrs',r.message['remaining_hrs'])
-						if(r.message['open_so'] == 1){
-							frm.set_value('open_so', 'Yes')
-						}
-						else{
-							frm.set_value('open_so', 'No')
-						}
-						frm.save()
 					}
 				},
 			});

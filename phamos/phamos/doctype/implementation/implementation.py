@@ -84,7 +84,7 @@ def get_financial_history(name, customer):
 
 	if len(timesheet_hrs) != 0:
 		get_so_hrs['timesheet_hrs'] = timesheet_hrs[0][0]
-		get_so_hrs['remaining_hrs'] = abs(int(get_so_hrs['sales_order_qty']) - int(get_so_hrs['dn_qty']) - int(timesheet_hrs[0][0]))
+		get_so_hrs['remaining_hrs'] = int(get_so_hrs['sales_order_qty']) - int(get_so_hrs['dn_qty']) - int(timesheet_hrs[0][0])
 	else:
 		get_so_hrs['timesheet_hrs'] = 0
 		get_so_hrs['remaining_hrs'] = int(get_so_hrs['sales_order_qty']) - int(get_so_hrs['dn_qty'])

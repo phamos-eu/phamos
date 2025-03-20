@@ -18,11 +18,9 @@
   "section_break_uiri",
   "sales_order_total_hrs",
   "total_hrs_timesheet",
-  "preliminary_hours",
   "column_break_qajo",
   "delivered_total_hrs",
   "remaining_hrs",
-  "open_so",
   "section_break_eynb",
   "total_sales",
   "order_chart",
@@ -105,17 +103,12 @@
   {
    "fieldname": "sales_order_total_hrs",
    "fieldtype": "Int",
-   "label": "Sales Order Total Hrs"
+   "label": "Total Open Sales Order Hours"
   },
   {
    "fieldname": "total_hrs_timesheet",
    "fieldtype": "Int",
-   "label": "Total Hrs (Timesheet)"
-  },
-  {
-   "fieldname": "preliminary_hours",
-   "fieldtype": "Data",
-   "label": "Preliminary hours"
+   "label": "Billable Timesheet Hours(Not on Delivery Note)"
   },
   {
    "fieldname": "order_chart",
@@ -130,18 +123,12 @@
   {
    "fieldname": "delivered_total_hrs",
    "fieldtype": "Int",
-   "label": "Delivered Total Hrs"
+   "label": "Total Billable Hours on Delivery Note"
   },
   {
    "fieldname": "remaining_hrs",
    "fieldtype": "Data",
-   "label": "Remaining Hrs"
-  },
-  {
-   "fieldname": "open_so",
-   "fieldtype": "Select",
-   "label": "Open SO",
-   "options": "\nYes\nNo"
+   "label": "Remaining Sales Order Hours"
   },
   {
    "fieldname": "section_break_xfgb",
@@ -198,6 +185,7 @@
   {
    "fieldname": "total_sales",
    "fieldtype": "HTML",
+   "hidden": 1,
    "label": "Total Sales",
    "options": "<div id=\"total-sales\"></div>"
   }
@@ -221,7 +209,7 @@
    "link_fieldname": "custom_implementation"
   }
  ],
- "modified": "2025-03-19 19:10:38.199216",
+ "modified": "2025-03-20 17:47:37.932987",
  "modified_by": "Administrator",
  "module": "Phamos",
  "name": "Implementation",
