@@ -6,6 +6,13 @@
 <p>I hope you are doing well. We would like to invite you to an interview for the job at phamos GmbH.</p>
 {% endif %}
 
+{% if doc.custom_available_slots%}
+<p>Following slots are available as per Europe/Berlin Timezone: </p>
+{% for d in doc.custom_available_slots %}
+<p>Date: {{ d.date }}, between time {{ d.from_time }}-{{ d.to_time}}</p>
+{% endfor %}
+{% endif %}
+
 <p>Please follow link below and Pick a slot for Interview.The interview will take place online on selected timeslot.</p>
 
 <p>{{frappe.utils.get_url()}}/schedule_interview/{{doc.name}}</p>

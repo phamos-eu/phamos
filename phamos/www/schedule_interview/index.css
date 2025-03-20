@@ -108,3 +108,6 @@ body {
 	width: 80%;
 	transition: 0.3s;
 }
+.fc .fc-daygrid-body-unbalanced .fc-daygrid-day-events {
+    min-height: 0px !important;
+}
