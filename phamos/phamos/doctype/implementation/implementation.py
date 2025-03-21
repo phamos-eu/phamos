@@ -38,11 +38,26 @@ class Implementation(Document):
 				elif row.date in get_dates:
 					self.status_information.remove(row)
 					frappe.db.commit()
-					self.append('status_information', {'maturity_level':self.maturity_level, 'mood':self.mood, 'forecast':self.forecast, 'status':self.status, 'date':today()})
+					self.append('status_information', {
+						'maturity_level':self.maturity_level, 
+						'mood':self.mood, 
+						'forecast':self.forecast, 
+						'status':self.status, 
+						'date':today()})
 				else:
-					self.append('status_information', {'maturity_level':self.maturity_level, 'mood':self.mood, 'forecast':self.forecast, 'status':self.status, 'date':today()})
+					self.append('status_information', {
+						'maturity_level':self.maturity_level, 
+						'mood':self.mood, 
+						'forecast':self.forecast, 
+						'status':self.status, 
+						'date':today()})
 		else:
-			self.append('status_information', {'maturity_level':self.maturity_level, 'mood':self.mood, 'forecast':self.forecast, 'status':self.status, 'date':today()})
+			self.append('status_information', {
+				'maturity_level':self.maturity_level, 
+				'mood':self.mood, 
+				'forecast':self.forecast, 
+				'status':self.status, 
+				'date':today()})
 
 
 
@@ -50,8 +65,10 @@ class Implementation(Document):
 def get_financial_history(name, customer):
 	get_so_hrs = frappe.db.get_value('Sales Order', {'custom_implementation':name,"status":["in",["To Deliver and Bill","To Bill"]]},'sum(total_qty) as sales_order_qty', as_dict=1)
 
-	get_so_names = frappe.db.sql("""SELECT name from `tabSales Order` where status in ("To Bill", "To Deliver and Bill") and customer = '{0}' """.format(customer), as_dict=1)
-	
+	get_so_names = frappe.db.get_all("Sales Order",
+		filters={"customer":customer, 'status':['in',["To Bill", "To Deliver and Bill"]]},
+		fields=["name"])
+
 	get_so_list = [item.name for item in get_so_names]
 	
 	if get_so_hrs['sales_order_qty'] == None:

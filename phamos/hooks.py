@@ -46,7 +46,7 @@ website_route_rules = [
     {"from_route": "/schedule_interview/<name>", "to_route": "schedule_interview"}
 ]
 
-#doctype_js = {"doctype" : "phamos/phamos/custom_scripts/timesheet/timesheet.js"}
+
 # doctype_list_js = {"doctype" : "public/js/doctype_list.js"}
 # doctype_tree_js = {"doctype" : "public/js/doctype_tree.js"}
 # doctype_calendar_js = {"doctype" : "public/js/doctype_calendar.js"}
