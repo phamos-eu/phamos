@@ -10,7 +10,6 @@ from frappe.utils import today
 class Implementation(Document):
 	def before_save(self):
 		self.add_delivered_hrs()
-		self.update_status_information()
 
 	def add_delivered_hrs(self):
 		if self.sales_order_status_information:
@@ -26,40 +25,6 @@ class Implementation(Document):
 						row.delivered_total_hrs = total_hours
 						row.remaining_hrs = row.total_hrs - row.delivered_total_hrs
 						
-
-	def update_status_information(self):
-		if self.status_information:
-			for row in self.status_information:
-				get_dates = [row.date for row in self.status_information]
-				if row.date == today():
-					self.status_information.remove(row)
-					frappe.db.commit()
-					self.append('status_information', {'maturity_level':self.maturity_level, 'mood':self.mood, 'forecast':self.forecast, 'status':self.status, 'date':today()})
-				elif row.date in get_dates:
-					self.status_information.remove(row)
-					frappe.db.commit()
-					self.append('status_information', {
-						'maturity_level':self.maturity_level, 
-						'mood':self.mood, 
-						'forecast':self.forecast, 
-						'status':self.status, 
-						'date':today()})
-				else:
-					self.append('status_information', {
-						'maturity_level':self.maturity_level, 
-						'mood':self.mood, 
-						'forecast':self.forecast, 
-						'status':self.status, 
-						'date':today()})
-		else:
-			self.append('status_information', {
-				'maturity_level':self.maturity_level, 
-				'mood':self.mood, 
-				'forecast':self.forecast, 
-				'status':self.status, 
-				'date':today()})
-
-
 
 @frappe.whitelist()
 def get_financial_history(name, customer):
