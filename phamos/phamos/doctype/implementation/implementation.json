@@ -99,7 +99,8 @@
   },
   {
    "fieldname": "section_break_uiri",
-   "fieldtype": "Section Break"
+   "fieldtype": "Section Break",
+   "label": "Open Sales Order Delivery Status"
   },
   {
    "fieldname": "sales_order_total_hrs",
@@ -180,8 +181,7 @@
   },
   {
    "fieldname": "section_break_eynb",
-   "fieldtype": "Section Break",
-   "label": "Open Sales Order Delivery Status"
+   "fieldtype": "Section Break"
   },
   {
    "fieldname": "total_sales",
@@ -216,7 +216,7 @@
    "link_fieldname": "custom_implementation"
   }
  ],
- "modified": "2025-03-21 17:07:45.686104",
+ "modified": "2025-03-21 19:08:21.526912",
  "modified_by": "Administrator",
  "module": "Phamos",
  "name": "Implementation",
