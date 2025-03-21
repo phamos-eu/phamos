@@ -15,16 +15,14 @@
   "maturity_level",
   "mood",
   "forecast",
-  "status",
   "section_break_uiri",
   "sales_order_total_hrs",
   "total_hrs_timesheet",
-  "preliminary_hours",
   "column_break_qajo",
   "delivered_total_hrs",
   "remaining_hrs",
-  "open_so",
   "section_break_eynb",
+  "total_sales",
   "order_chart",
   "section_break_xfgb",
   "sales_order_status_information",
@@ -32,7 +30,9 @@
   "customer",
   "contact_person",
   "timesheets_tab",
-  "html_bfhi"
+  "html_bfhi",
+  "section_break_izec",
+  "status_information"
  ],
  "fields": [
   {
@@ -103,17 +103,12 @@
   {
    "fieldname": "sales_order_total_hrs",
    "fieldtype": "Int",
-   "label": "Sales Order Total Hrs"
+   "label": "Total Open Sales Order Hours"
   },
   {
    "fieldname": "total_hrs_timesheet",
    "fieldtype": "Int",
-   "label": "Total Hrs (Timesheet)"
-  },
-  {
-   "fieldname": "preliminary_hours",
-   "fieldtype": "Data",
-   "label": "Preliminary hours"
+   "label": "Billable Timesheet Hours(Not on Delivery Note)"
   },
   {
    "fieldname": "order_chart",
@@ -128,18 +123,12 @@
   {
    "fieldname": "delivered_total_hrs",
    "fieldtype": "Int",
-   "label": "Delivered Total Hrs"
+   "label": "Total Billable Hours on Delivery Note"
   },
   {
    "fieldname": "remaining_hrs",
    "fieldtype": "Data",
-   "label": "Remaining Hrs"
-  },
-  {
-   "fieldname": "open_so",
-   "fieldtype": "Select",
-   "label": "Open SO",
-   "options": "\nYes\nNo"
+   "label": "Remaining Sales Order Hours"
   },
   {
    "fieldname": "section_break_xfgb",
@@ -192,6 +181,13 @@
    "fieldname": "section_break_eynb",
    "fieldtype": "Section Break",
    "label": "Open Sales Order Delivery Status"
+  },
+  {
+   "fieldname": "total_sales",
+   "fieldtype": "HTML",
+   "hidden": 1,
+   "label": "Total Sales",
+   "options": "<div id=\"total-sales\"></div>"
   }
  ],
  "index_web_pages_for_search": 1,
@@ -213,7 +209,7 @@
    "link_fieldname": "custom_implementation"
   }
  ],
- "modified": "2025-03-18 15:29:52.852005",
+ "modified": "2025-03-20 17:47:37.932987",
  "modified_by": "Administrator",
  "module": "Phamos",
  "name": "Implementation",
@@ -236,6 +232,11 @@
  "search_fields": "account_manager",
  "sort_field": "modified",
  "sort_order": "DESC",
- "states": [],
+ "states": [
+  {
+   "color": "Red",
+   "title": "Timesheet Hrs Exceeded"
+  }
+ ],
  "track_changes": 1
 }
