@@ -7,6 +7,9 @@ from frappe.email.doctype.notification.notification import evaluate_alert
 class CustomJobApplicant(JobApplicant):
 	@frappe.whitelist()
 	def invite_for_interview(self):
+		if not self.custom_available_slots:
+			frappe.throw(_("Please select a slot in Available Slots table"))
+
 		notification = "Job interview Slot Booking"
 		evaluate_alert(self, notification, "Custom")
 		if not self.custom_shortlisted or self.custom_shortlisted == "No":

@@ -160,7 +160,7 @@
 	
 		let calendar = new FullCalendar.Calendar(calendarEl, {
 			initialView: 'dayGridMonth',
-			aspectRatio: 1.35,
+			aspectRatio: 1,
 			selectable: true,
 			dateClick: function(info) {
 				const isoDate = formatDateLocal(info.date);
@@ -229,10 +229,12 @@
 
 		function formatTimeSlot(slot) {
 			const times = slot.split(' - ');
-
-			const startTime = times[0].substring(0, 5); 
-			const endTime = times[1].substring(0, 5);
-
+			const formatTime = (time) => {
+				const [hour, minute] = time.split(':');
+				return `${hour}:${minute}`;
+			};
+			const startTime = formatTime(times[0]);
+			const endTime = formatTime(times[1]);
 			return `${startTime} - ${endTime}`;
 		}
 	

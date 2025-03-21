@@ -46,13 +46,11 @@ def schedule_interview(applicant_id, interview_date, interview_slot):
 		interview.to_time = to_time
 
 		cc = []
-		if interviewers:
-			for d in interviewers:
-				interview.interview_details = []
-				interview.append("interview_details", {
-					"interviewer": d.user,
-				})
-				cc.append(d.user)
+		for d in interviewers:
+			interview.append("interview_details", {
+				"interviewer": d.user,
+			})
+			cc.append(d.user)
 
 		interview.save(ignore_permissions=True)
 
