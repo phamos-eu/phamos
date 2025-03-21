@@ -1,0 +1,50 @@
+{
+ "actions": [],
+ "allow_rename": 1,
+ "creation": "2025-03-21 14:02:34.902523",
+ "doctype": "DocType",
+ "editable_grid": 1,
+ "engine": "InnoDB",
+ "field_order": [
+  "billable_time_spent",
+  "total_time",
+  "column_break_engq",
+  "non_billable_time_spent"
+ ],
+ "fields": [
+  {
+   "fieldname": "billable_time_spent",
+   "fieldtype": "Data",
+   "in_list_view": 1,
+   "label": "Billable Time spent"
+  },
+  {
+   "fieldname": "total_time",
+   "fieldtype": "Data",
+   "in_list_view": 1,
+   "label": "Total Time"
+  },
+  {
+   "fieldname": "column_break_engq",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "non_billable_time_spent",
+   "fieldtype": "Data",
+   "in_list_view": 1,
+   "label": "Non Billable Time spent"
+  }
+ ],
+ "index_web_pages_for_search": 1,
+ "istable": 1,
+ "links": [],
+ "modified": "2025-03-21 14:06:36.797918",
+ "modified_by": "Administrator",
+ "module": "Phamos",
+ "name": "Resource planning",
+ "owner": "Administrator",
+ "permissions": [],
+ "sort_field": "modified",
+ "sort_order": "DESC",
+ "states": []
+}

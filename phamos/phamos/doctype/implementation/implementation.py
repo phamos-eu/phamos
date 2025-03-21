@@ -9,7 +9,7 @@ from frappe.utils import today
 
 class Implementation(Document):
 	def before_save(self):
-		self.add_delivered_hrs()
+		#self.add_delivered_hrs()
 		self.update_status_information()
 
 	def add_delivered_hrs(self):

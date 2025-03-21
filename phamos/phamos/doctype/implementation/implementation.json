@@ -32,7 +32,9 @@
   "timesheets_tab",
   "html_bfhi",
   "section_break_izec",
-  "status_information"
+  "status_information",
+  "resource_planning_tab",
+  "resource_planning"
  ],
  "fields": [
   {
@@ -188,6 +190,17 @@
    "hidden": 1,
    "label": "Total Sales",
    "options": "<div id=\"total-sales\"></div>"
+  },
+  {
+   "fieldname": "resource_planning_tab",
+   "fieldtype": "Tab Break",
+   "label": "Resource Planning"
+  },
+  {
+   "fieldname": "resource_planning",
+   "fieldtype": "Table",
+   "label": "Resource Planning",
+   "options": "Resource planning"
   }
  ],
  "index_web_pages_for_search": 1,
@@ -209,7 +222,7 @@
    "link_fieldname": "custom_implementation"
   }
  ],
- "modified": "2025-03-20 17:47:37.932987",
+ "modified": "2025-03-21 14:06:17.664083",
  "modified_by": "Administrator",
  "module": "Phamos",
  "name": "Implementation",
