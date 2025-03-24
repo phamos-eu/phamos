@@ -205,7 +205,8 @@ def fetch_projects():
                 & (ToDo.allocated_to == frappe.session.user)
             ).isnotnull()
         )
-        .orderby(Coalesce(last_timesheet_update, frappe.utils.now()), order=Order.desc)
+        .orderby(Coalesce(last_timesheet_update, "1970, 1, 1"), order=Order.desc)
+        
     )
     # Execute query
     projects = query.run(as_dict=True)
