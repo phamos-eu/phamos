@@ -15,7 +15,6 @@
   "maturity_level",
   "mood",
   "forecast",
-  "test",
   "section_break_uiri",
   "sales_order_total_hrs",
   "total_hrs_timesheet",
@@ -33,7 +32,9 @@
   "timesheets_tab",
   "html_bfhi",
   "section_break_izec",
-  "status_information"
+  "status_information",
+  "resource_planning_tab",
+  "resource_planning"
  ],
  "fields": [
   {
@@ -191,10 +192,14 @@
    "options": "<div id=\"total-sales\"></div>"
   },
   {
-   "fieldname": "test",
-   "fieldtype": "Data",
-   "hidden": 1,
-   "label": "Test"
+   "fieldname": "resource_planning_tab",
+   "fieldtype": "Tab Break",
+   "label": "Resource Planning"
+  },
+  {
+   "fieldname": "resource_planning",
+   "fieldtype": "Table",
+   "options": "Resource Planning"
   }
  ],
  "index_web_pages_for_search": 1,
@@ -216,7 +221,7 @@
    "link_fieldname": "custom_implementation"
   }
  ],
- "modified": "2025-03-21 19:08:21.526912",
+ "modified": "2025-03-24 19:41:20.944840",
  "modified_by": "Administrator",
  "module": "Phamos",
  "name": "Implementation",
