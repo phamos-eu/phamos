@@ -15,6 +15,7 @@
   "maturity_level",
   "mood",
   "forecast",
+  "test",
   "section_break_uiri",
   "sales_order_total_hrs",
   "total_hrs_timesheet",
@@ -98,7 +99,8 @@
   },
   {
    "fieldname": "section_break_uiri",
-   "fieldtype": "Section Break"
+   "fieldtype": "Section Break",
+   "label": "Open Sales Order Delivery Status"
   },
   {
    "fieldname": "sales_order_total_hrs",
@@ -179,8 +181,7 @@
   },
   {
    "fieldname": "section_break_eynb",
-   "fieldtype": "Section Break",
-   "label": "Open Sales Order Delivery Status"
+   "fieldtype": "Section Break"
   },
   {
    "fieldname": "total_sales",
@@ -188,6 +189,12 @@
    "hidden": 1,
    "label": "Total Sales",
    "options": "<div id=\"total-sales\"></div>"
+  },
+  {
+   "fieldname": "test",
+   "fieldtype": "Data",
+   "hidden": 1,
+   "label": "Test"
   }
  ],
  "index_web_pages_for_search": 1,
@@ -209,7 +216,7 @@
    "link_fieldname": "custom_implementation"
   }
  ],
- "modified": "2025-03-20 17:47:37.932987",
+ "modified": "2025-03-21 19:08:21.526912",
  "modified_by": "Administrator",
  "module": "Phamos",
  "name": "Implementation",

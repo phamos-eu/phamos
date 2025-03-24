@@ -1,0 +1,89 @@
+{
+ "actions": [],
+ "allow_rename": 1,
+ "creation": "2025-03-10 18:12:35.104179",
+ "doctype": "DocType",
+ "editable_grid": 1,
+ "engine": "InnoDB",
+ "field_order": [
+  "sales_order",
+  "total_hrs",
+  "so_title",
+  "html",
+  "column_break_fvyw",
+  "status",
+  "delivered_total_hrs",
+  "remaining_hrs",
+  "test"
+ ],
+ "fields": [
+  {
+   "fieldname": "sales_order",
+   "fieldtype": "Link",
+   "in_list_view": 1,
+   "label": "Sales Order",
+   "link_filters": "[[\"Sales Order\",\"status\",\"in\",[\"To Bill\",\"To Deliver and Bill\",null]]]",
+   "options": "Sales Order"
+  },
+  {
+   "fetch_from": "sales_order.total_qty",
+   "fieldname": "total_hrs",
+   "fieldtype": "Data",
+   "in_list_view": 1,
+   "label": "Total Hrs",
+   "non_negative": 1
+  },
+  {
+   "fetch_from": "sales_order.title",
+   "fieldname": "so_title",
+   "fieldtype": "Data",
+   "in_list_view": 1,
+   "label": "SO Title"
+  },
+  {
+   "fieldname": "html",
+   "fieldtype": "HTML",
+   "label": "HTML"
+  },
+  {
+   "fieldname": "column_break_fvyw",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fetch_from": "sales_order.status",
+   "fieldname": "status",
+   "fieldtype": "Data",
+   "in_list_view": 1,
+   "label": "Status"
+  },
+  {
+   "fieldname": "delivered_total_hrs",
+   "fieldtype": "Data",
+   "in_list_view": 1,
+   "label": "Delivered Total Hrs"
+  },
+  {
+   "fieldname": "remaining_hrs",
+   "fieldtype": "Data",
+   "label": "Remaining Hrs"
+  },
+  {
+   "fieldname": "test",
+   "fieldtype": "Data",
+   "hidden": 1,
+   "label": "Test"
+  }
+ ],
+ "index_web_pages_for_search": 1,
+ "istable": 1,
+ "links": [],
+ "modified": "2025-03-21 17:28:20.875363",
+ "modified_by": "Administrator",
+ "module": "Phamos",
+ "name": "Sales Order Status",
+ "owner": "Administrator",
+ "permissions": [],
+ "sort_field": "modified",
+ "sort_order": "DESC",
+ "states": []
+}
