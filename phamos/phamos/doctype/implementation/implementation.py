@@ -33,7 +33,7 @@ def get_financial_history(name, customer):
 	get_project_list = [item.name for item in get_projects]
 	
 	if len(get_project_list) == 1:
-		get_so_hrs = frappe.db.get_value('Sales Order', {'custom_implementation':name,"status":["in",["To Deliver and Bill","To Bill"]]},'sum(total_qty) as sales_order_qty', as_dict=1)
+		get_so_hrs = frappe.db.get_value('Sales Order', {'customer':customer,"status":["in",["To Deliver and Bill","To Bill"]]},'sum(total_qty) as sales_order_qty', as_dict=1)
 
 		get_so_names = frappe.db.get_all("Sales Order",
 			filters={"customer":customer, 'status':['in',["To Bill", "To Deliver and Bill"]]},
@@ -85,7 +85,7 @@ def get_financial_history(name, customer):
 
 		return get_so_hrs
 	elif len(get_project_list) > 1:
-		get_so_hrs = frappe.db.get_value('Sales Order', {'custom_implementation':name,"status":["in",["To Deliver and Bill","To Bill"]]},'sum(total_qty) as sales_order_qty', as_dict=1)
+		get_so_hrs = frappe.db.get_value('Sales Order', {'customer':customer,"status":["in",["To Deliver and Bill","To Bill"]]},'sum(total_qty) as sales_order_qty', as_dict=1)
 
 		get_so_names = frappe.db.get_all("Sales Order",
 			filters={"customer":customer, 'status':['in',["To Bill", "To Deliver and Bill"]]},
