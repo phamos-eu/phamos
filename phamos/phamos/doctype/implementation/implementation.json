@@ -100,7 +100,8 @@
   },
   {
    "fieldname": "section_break_uiri",
-   "fieldtype": "Section Break"
+   "fieldtype": "Section Break",
+   "label": "Open Sales Order Delivery Status"
   },
   {
    "fieldname": "sales_order_total_hrs",
@@ -181,8 +182,7 @@
   },
   {
    "fieldname": "section_break_eynb",
-   "fieldtype": "Section Break",
-   "label": "Open Sales Order Delivery Status"
+   "fieldtype": "Section Break"
   },
   {
    "fieldname": "total_sales",

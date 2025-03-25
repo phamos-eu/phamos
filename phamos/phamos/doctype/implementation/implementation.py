@@ -9,7 +9,7 @@ from frappe.utils import today
 
 class Implementation(Document):
 	def before_save(self):
-		#self.add_delivered_hrs()
+		self.add_delivered_hrs()
 		self.update_status_information()
 
 	def add_delivered_hrs(self):
@@ -26,40 +26,6 @@ class Implementation(Document):
 						row.delivered_total_hrs = total_hours
 						row.remaining_hrs = row.total_hrs - row.delivered_total_hrs
 						
-
-	def update_status_information(self):
-		if self.status_information:
-			for row in self.status_information:
-				get_dates = [row.date for row in self.status_information]
-				if row.date == today():
-					self.status_information.remove(row)
-					frappe.db.commit()
-					self.append('status_information', {'maturity_level':self.maturity_level, 'mood':self.mood, 'forecast':self.forecast, 'status':self.status, 'date':today()})
-				elif row.date in get_dates:
-					self.status_information.remove(row)
-					frappe.db.commit()
-					self.append('status_information', {
-						'maturity_level':self.maturity_level, 
-						'mood':self.mood, 
-						'forecast':self.forecast, 
-						'status':self.status, 
-						'date':today()})
-				else:
-					self.append('status_information', {
-						'maturity_level':self.maturity_level, 
-						'mood':self.mood, 
-						'forecast':self.forecast, 
-						'status':self.status, 
-						'date':today()})
-		else:
-			self.append('status_information', {
-				'maturity_level':self.maturity_level, 
-				'mood':self.mood, 
-				'forecast':self.forecast, 
-				'status':self.status, 
-				'date':today()})
-
-
 
 @frappe.whitelist()
 def get_financial_history(name, customer):
@@ -99,7 +65,7 @@ def get_financial_history(name, customer):
 
 	timesheet_hrs = frappe.db.sql("""SELECT sum(td.hours) as timesheet_hrs from `tabTimesheet` t join `tabTimesheet Detail` td on t.name = td.parent where td.is_billable = 1 and t.docstatus = 0 and td.custom_implementation = '{0}'  """.format(name), as_list=1, debug=1)
 
-	if len(timesheet_hrs) != 0:
+	if timesheet_hrs[0][0] != None:
 		get_so_hrs['timesheet_hrs'] = timesheet_hrs[0][0]
 		get_so_hrs['remaining_hrs'] = int(get_so_hrs['sales_order_qty']) - int(get_so_hrs['dn_qty']) - int(timesheet_hrs[0][0])
 	else:
