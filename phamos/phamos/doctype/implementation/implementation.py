@@ -64,7 +64,7 @@ def get_financial_history(name, customer):
 
 	timesheet_hrs = frappe.db.sql("""SELECT sum(td.hours) as timesheet_hrs from `tabTimesheet` t join `tabTimesheet Detail` td on t.name = td.parent where td.is_billable = 1 and t.docstatus = 0 and td.custom_implementation = '{0}'  """.format(name), as_list=1, debug=1)
 
-	if len(timesheet_hrs) != 0:
+	if timesheet_hrs[0][0] != None:
 		get_so_hrs['timesheet_hrs'] = timesheet_hrs[0][0]
 		get_so_hrs['remaining_hrs'] = int(get_so_hrs['sales_order_qty']) - int(get_so_hrs['dn_qty']) - int(timesheet_hrs[0][0])
 	else:
