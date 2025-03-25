@@ -9,6 +9,7 @@
   "billable_time_spent",
   "total_time",
   "column_break_engq",
+  "month_and_year",
   "non_billable_time_spent"
  ],
  "fields": [
@@ -33,12 +34,18 @@
    "fieldtype": "Data",
    "in_list_view": 1,
    "label": "Non Billable Time spent"
+  },
+  {
+   "fieldname": "month_and_year",
+   "fieldtype": "Data",
+   "in_list_view": 1,
+   "label": "Month and year"
   }
  ],
  "index_web_pages_for_search": 1,
  "istable": 1,
  "links": [],
- "modified": "2025-03-21 14:06:36.797918",
+ "modified": "2025-03-25 13:43:52.506571",
  "modified_by": "Administrator",
  "module": "Phamos",
  "name": "Resource planning",
