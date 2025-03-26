@@ -28,57 +28,118 @@ class Implementation(Document):
 
 @frappe.whitelist()
 def get_financial_history(name, customer):
-	get_so_hrs = frappe.db.get_value('Sales Order', {'custom_implementation':name,"status":["in",["To Deliver and Bill","To Bill"]]},'sum(total_qty) as sales_order_qty', as_dict=1)
-
-	get_so_names = frappe.db.get_all("Sales Order",
-		filters={"customer":customer, 'status':['in',["To Bill", "To Deliver and Bill"]]},
-		fields=["name"])
-
-	get_so_list = [item.name for item in get_so_names]
+	get_projects = frappe.db.get_all('Project', {'custom_implementation':name}, 'name')
 	
-	if get_so_hrs['sales_order_qty'] == None:
-		get_so_hrs['sales_order_qty'] = 0
-	else:
-		pass
-
+	get_project_list = [item.name for item in get_projects]
 	
-	if len(get_so_list) == 1:
-		get_dn_hrs = frappe.db.sql("""SELECT sum(dni.qty) as dn_qty from `tabDelivery Note` dn join `tabDelivery Note Item` dni on dn.name = dni.parent where dni.against_sales_order = '{0}' and dn.custom_implementation = '{1}' and status != 'Cancelled' """.format(get_so_list[0], name), as_list=1)
-		if get_dn_hrs[0][0] != None:
-			get_so_hrs['dn_qty'] = get_dn_hrs[0][0]
-		else:
-			get_so_hrs['dn_qty'] = 0
-	elif len(get_so_list) > 1:
-		get_dn_hrs = frappe.db.sql("""SELECT sum(dni.qty) as dn_qty from `tabDelivery Note` dn join `tabDelivery Note Item` dni on dn.name = dni.parent where dni.against_sales_order in {0} and dn.custom_implementation = '{1}' and status != 'Cancelled' """.format(tuple(get_so_list), name), as_list=1)
+	if len(get_project_list) == 1:
+		get_so_hrs = frappe.db.get_value('Sales Order', {'customer':customer,"status":["in",["To Deliver and Bill","To Bill"]]},'sum(total_qty) as sales_order_qty', as_dict=1)
+
+		get_so_names = frappe.db.get_all("Sales Order",
+			filters={"customer":customer, 'status':['in',["To Bill", "To Deliver and Bill"]]},
+			fields=["name"])
+
+		get_so_list = [item.name for item in get_so_names]
 		
-		if get_dn_hrs[0][0] != None:
-			get_so_hrs['dn_qty'] = get_dn_hrs[0][0]
+		if get_so_hrs['sales_order_qty'] == None:
+			get_so_hrs['sales_order_qty'] = 0
+		else:
+			pass
+
+		
+		if len(get_so_list) == 1:
+			get_dn_hrs = frappe.db.sql("""SELECT sum(dni.qty) as dn_qty from `tabDelivery Note` dn join `tabDelivery Note Item` dni on dn.name = dni.parent where dni.against_sales_order = '{0}' and status != 'Cancelled' """.format(get_so_list[0]), as_list=1)
+			if get_dn_hrs[0][0] != None:
+				get_so_hrs['dn_qty'] = get_dn_hrs[0][0]
+			else:
+				get_so_hrs['dn_qty'] = 0
+		elif len(get_so_list) > 1:
+			get_dn_hrs = frappe.db.sql("""SELECT sum(dni.qty) as dn_qty from `tabDelivery Note` dn join `tabDelivery Note Item` dni on dn.name = dni.parent where dni.against_sales_order in {0} and status != 'Cancelled' """.format(tuple(get_so_list), get_project_list[0]), as_list=1)
+			
+			if get_dn_hrs[0][0] != None:
+				get_so_hrs['dn_qty'] = get_dn_hrs[0][0]
+			else:
+				get_so_hrs['dn_qty'] = 0
 		else:
 			get_so_hrs['dn_qty'] = 0
-	else:
-		get_so_hrs['dn_qty'] = 0
 
-	
-	get_so_hrs['remaining_hrs'] = int(get_so_hrs['sales_order_qty']) - int(get_so_hrs['dn_qty'])
-	
-
-	timesheet_hrs = frappe.db.sql("""SELECT sum(td.hours) as timesheet_hrs from `tabTimesheet` t join `tabTimesheet Detail` td on t.name = td.parent where td.is_billable = 1 and t.docstatus = 0 and td.custom_implementation = '{0}'  """.format(name), as_list=1, debug=1)
-
-	if timesheet_hrs[0][0] != None:
-		get_so_hrs['timesheet_hrs'] = timesheet_hrs[0][0]
-		get_so_hrs['remaining_hrs'] = int(get_so_hrs['sales_order_qty']) - int(get_so_hrs['dn_qty']) - int(timesheet_hrs[0][0])
-	else:
-		get_so_hrs['timesheet_hrs'] = 0
+		
 		get_so_hrs['remaining_hrs'] = int(get_so_hrs['sales_order_qty']) - int(get_so_hrs['dn_qty'])
+		
 
-	get_open_sales_orders = frappe.db.get_value('Sales Order', {'status': ["in", ["To Deliver and Bill", "To Bill"]]}, 'count(name) as open_so')
+		timesheet_hrs = frappe.db.sql("""SELECT sum(td.hours) as timesheet_hrs from `tabTimesheet` t join `tabTimesheet Detail` td on t.name = td.parent where td.is_billable = 1 and t.docstatus = 0 and td.project = '{0}'  """.format(get_project_list[0]), as_list=1, debug=1)
 
-	if get_open_sales_orders > 0:
-		get_so_hrs['open_so'] = 1
+		if timesheet_hrs[0][0] != None:
+			get_so_hrs['timesheet_hrs'] = timesheet_hrs[0][0]
+			get_so_hrs['remaining_hrs'] = int(get_so_hrs['sales_order_qty']) - int(get_so_hrs['dn_qty']) - int(timesheet_hrs[0][0])
+		else:
+			get_so_hrs['timesheet_hrs'] = 0
+			get_so_hrs['remaining_hrs'] = int(get_so_hrs['sales_order_qty']) - int(get_so_hrs['dn_qty'])
+
+		get_open_sales_orders = frappe.db.get_value('Sales Order', {'status': ["in", ["To Deliver and Bill", "To Bill"]]}, 'count(name) as open_so')
+
+		if get_open_sales_orders > 0:
+			get_so_hrs['open_so'] = 1
+		else:
+			get_so_hrs['open_so'] = 0
+
+		
+		return get_so_hrs
+	elif len(get_project_list) > 1:
+		get_so_hrs = frappe.db.get_value('Sales Order', {'customer':customer,"status":["in",["To Deliver and Bill","To Bill"]]},'sum(total_qty) as sales_order_qty', as_dict=1)
+
+		get_so_names = frappe.db.get_all("Sales Order",
+			filters={"customer":customer, 'status':['in',["To Bill", "To Deliver and Bill"]]},
+			fields=["name"])
+
+		get_so_list = [item.name for item in get_so_names]
+		
+		if get_so_hrs['sales_order_qty'] == None:
+			get_so_hrs['sales_order_qty'] = 0
+		else:
+			pass
+
+		if len(get_so_list) == 1:
+			get_dn_hrs = frappe.db.sql("""SELECT sum(dni.qty) as dn_qty from `tabDelivery Note` dn join `tabDelivery Note Item` dni on dn.name = dni.parent where dni.against_sales_order = '{0}' and status != 'Cancelled' """.format(get_so_list[0], tuple(get_project_list)), as_list=1)
+			if get_dn_hrs[0][0] != None:
+				get_so_hrs['dn_qty'] = get_dn_hrs[0][0]
+			else:
+				get_so_hrs['dn_qty'] = 0
+		elif len(get_so_list) > 1:
+			get_dn_hrs = frappe.db.sql("""SELECT sum(dni.qty) as dn_qty from `tabDelivery Note` dn join `tabDelivery Note Item` dni on dn.name = dni.parent where dni.against_sales_order in {0} and status != 'Cancelled' """.format(tuple(get_so_list), tuple(get_project_list)), as_list=1)
+			
+			if get_dn_hrs[0][0] != None:
+				get_so_hrs['dn_qty'] = get_dn_hrs[0][0]
+			else:
+				get_so_hrs['dn_qty'] = 0
+		else:
+			get_so_hrs['dn_qty'] = 0
+
+		get_so_hrs['remaining_hrs'] = int(get_so_hrs['sales_order_qty']) - int(get_so_hrs['dn_qty'])
+		
+
+		timesheet_hrs = frappe.db.sql("""SELECT sum(td.hours) as timesheet_hrs from `tabTimesheet` t join `tabTimesheet Detail` td on t.name = td.parent where td.is_billable = 1 and t.docstatus = 0 and td.project in {0}  """.format(tuple(get_project_list)), as_list=1, debug=1)
+
+		if timesheet_hrs[0][0] != None:
+			get_so_hrs['timesheet_hrs'] = timesheet_hrs[0][0]
+			get_so_hrs['remaining_hrs'] = int(get_so_hrs['sales_order_qty']) - int(get_so_hrs['dn_qty']) - int(timesheet_hrs[0][0])
+		else:
+			get_so_hrs['timesheet_hrs'] = 0
+			get_so_hrs['remaining_hrs'] = int(get_so_hrs['sales_order_qty']) - int(get_so_hrs['dn_qty'])
+
+		get_open_sales_orders = frappe.db.get_value('Sales Order', {'status': ["in", ["To Deliver and Bill", "To Bill"]]}, 'count(name) as open_so')
+
+		if get_open_sales_orders > 0:
+			get_so_hrs['open_so'] = 1
+		else:
+			get_so_hrs['open_so'] = 0
+
+
+		return get_so_hrs
 	else:
-		get_so_hrs['open_so'] = 0
+		get_so_hrs =  {'sales_order_qty': 0, 'dn_qty': 0, 'remaining_hrs': 0, 'timesheet_hrs': 0, 'open_so': 0}
+		return get_so_hrs
 
-	return get_so_hrs
 
 
 
