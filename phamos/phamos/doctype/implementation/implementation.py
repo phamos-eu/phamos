@@ -11,7 +11,6 @@ class Implementation(Document):
 	def before_save(self):
 		self.add_delivered_hrs()
 		self.add_resource_planning()
-		#self.update_status_information()
 
 	def add_delivered_hrs(self):
 		if self.sales_order_status_information:
