@@ -188,6 +188,17 @@
    "hidden": 1,
    "label": "Total Sales",
    "options": "<div id=\"total-sales\"></div>"
+  },
+  {
+   "fieldname": "resource_planning_tab",
+   "fieldtype": "Tab Break",
+   "label": "Resource Planning"
+  },
+  {
+   "fieldname": "resource_planning",
+   "fieldtype": "Table",
+   "label": "Resource Planning",
+   "options": "Resource planning"
   }
  ],
  "index_web_pages_for_search": 1,

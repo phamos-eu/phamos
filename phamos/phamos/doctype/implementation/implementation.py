@@ -10,6 +10,7 @@ from frappe.utils import today
 class Implementation(Document):
 	def before_save(self):
 		self.add_delivered_hrs()
+		self.add_resource_planning()
 
 	def add_delivered_hrs(self):
 		if self.sales_order_status_information:
@@ -24,6 +25,70 @@ class Implementation(Document):
 						total_hours += dn.get("qty", 0)
 						row.delivered_total_hrs = total_hours
 						row.remaining_hrs = row.total_hrs - row.delivered_total_hrs
+
+	def add_resource_planning(self):
+		if self.name:
+			get_projects = frappe.db.get_all('Project', {'custom_implementation':self.name}, 'name')
+
+			get_project_list = [item.name for item in get_projects]
+
+			if len(get_project_list) == 1:
+				total_time_spent = """SELECT DATE_FORMAT(start_date, '%Y-%m') AS month, SUM(tsd.hours) AS total_working_hours FROM  `tabTimesheet` ts JOIN `tabTimesheet Detail` tsd ON ts.name = tsd.parent WHERE ts.docstatus != 2 and tsd.project = '{0}' GROUP BY month ORDER BY month""".format(get_project_list[0])
+
+				total_time = frappe.db.sql(total_time_spent, as_dict=True)
+
+				total_billable_time = """SELECT DATE_FORMAT(start_date, '%Y-%m') AS month, SUM(tsd.hours) AS billable_time FROM  `tabTimesheet` ts JOIN `tabTimesheet Detail` tsd ON ts.name = tsd.parent WHERE ts.docstatus != 2 and tsd.project = '{0}' and tsd.is_billable = 1 GROUP BY month ORDER BY month""".format(get_project_list[0])
+				
+				billable_time = frappe.db.sql(total_billable_time, as_dict =1)
+			elif len(get_project_list) > 1:
+				total_time_spent = """SELECT DATE_FORMAT(start_date, '%Y-%m') AS month, SUM(tsd.hours) AS total_working_hours FROM  `tabTimesheet` ts JOIN `tabTimesheet Detail` tsd ON ts.name = tsd.parent WHERE ts.docstatus != 2 and tsd.project in {0} GROUP BY month ORDER BY month""".format(tuple(get_project_list))
+
+				total_time = frappe.db.sql(total_time_spent, as_dict=True)
+
+				total_billable_time = """SELECT DATE_FORMAT(start_date, '%Y-%m') AS month, SUM(tsd.hours) AS billable_time FROM  `tabTimesheet` ts JOIN `tabTimesheet Detail` tsd ON ts.name = tsd.parent WHERE ts.docstatus != 2 and tsd.project in {0} and tsd.is_billable = 1 GROUP BY month ORDER BY month""".format(tuple(get_project_list))
+				
+				billable_time = frappe.db.sql(total_billable_time, as_dict =1)
+			else:
+				total_time = [{'month':None, 'total_working_hours':0}]
+				billable_time = [{'month':None, 'billable_time':0}]
+
+
+			if self.resource_planning:
+				(self.resource_planning).clear()
+				for row in total_time:
+					for row1 in billable_time:
+						if row['month'] == row1['month']:
+							non_billable = int(row.get('total_working_hours')) - int(row1.get('billable_time'))
+							if non_billable >0:
+								ratio = int(row1.get('billable_time'))/int(non_billable)
+							else:
+								ratio = 0
+
+							self.append('resource_planning',{
+								'month_and_year':row.get('month'),
+								'total_time':row.get('total_working_hours'),
+								'billable_time_spent':row1.get('billable_time'),
+								'non_billable_time_spent':int(row.get('total_working_hours')) - int(row1.get('billable_time')),
+								'ratio_of_billable_to_non_billable_time_spent':ratio
+								})
+			else:
+				(self.resource_planning).clear()
+				for row in total_time:
+					for row1 in billable_time:
+						if row['month'] == row1['month']:
+							non_billable = int(row.get('total_working_hours')) - int(row1.get('billable_time'))
+							if non_billable >0:
+								ratio = int(row1.get('billable_time'))/int(non_billable)
+							else:
+								ratio = 0
+							
+							self.append('resource_planning',{
+								'month_and_year':row.get('month'),
+								'total_time':row.get('total_working_hours'),
+								'non_billable_time_spent':int(row.get('total_working_hours')) - int(row1.get('billable_time')),
+								'billable_time_spent':row1.get('billable_time'),
+								'ratio_of_billable_to_non_billable_time_spent':ratio
+								})
 						
 
 @frappe.whitelist()
