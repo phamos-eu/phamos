@@ -98,10 +98,10 @@ def get_financial_history(name, customer):
 	get_project_list = [item.name for item in get_projects]
 	
 	if len(get_project_list) == 1:
-		get_so_hrs = frappe.db.get_value('Sales Order', {'customer':customer,"status":["in",["To Deliver and Bill", "To Deliver"]]},'sum(total_qty) as sales_order_qty', as_dict=1)
+		get_so_hrs = frappe.db.get_value('Sales Order', {'custom_implementation':name,"status":["in",["To Deliver and Bill", "To Deliver","To Bill"]]},'sum(total_qty) as sales_order_qty', as_dict=1)
 
 		get_so_names = frappe.db.get_all("Sales Order",
-			filters={"customer":customer, 'status':['in',["To Bill", "To Deliver and Bill"]]},
+			filters={"custom_implementation":name, 'status':['in',["To Bill", "To Deliver" ,"To Deliver and Bill"]]},
 			fields=["name"])
 
 		get_so_list = [item.name for item in get_so_names]
@@ -132,7 +132,7 @@ def get_financial_history(name, customer):
 		get_so_hrs['remaining_hrs'] = int(get_so_hrs['sales_order_qty']) - int(get_so_hrs['dn_qty'])
 		
 
-		timesheet_hrs = frappe.db.sql("""SELECT sum(td.hours) as timesheet_hrs from `tabTimesheet` t join `tabTimesheet Detail` td on t.name = td.parent where td.is_billable = 1 and t.docstatus = 0 and td.project = '{0}'  """.format(get_project_list[0]), as_list=1, debug=1)
+		timesheet_hrs = frappe.db.sql("""SELECT sum(td.hours) as timesheet_hrs from `tabTimesheet` t join `tabTimesheet Detail` td on t.name = td.parent where td.is_billable = 1 and t.docstatus = 0 and td.project = '{0}' and td.custom_implementation = '{1}' """.format(get_project_list[0], name), as_list=1, debug=1)
 
 		if timesheet_hrs[0][0] != None:
 			get_so_hrs['timesheet_hrs'] = timesheet_hrs[0][0]
@@ -151,10 +151,10 @@ def get_financial_history(name, customer):
 		
 		return get_so_hrs
 	elif len(get_project_list) > 1:
-		get_so_hrs = frappe.db.get_value('Sales Order', {'customer':customer,"status":["in",["To Deliver and Bill","To Deliver"]]},'sum(total_qty) as sales_order_qty', as_dict=1)
+		get_so_hrs = frappe.db.get_value('Sales Order', {'custom_implementation':name,"status":["in",["To Deliver and Bill","To Deliver", "To Bill"]]},'sum(total_qty) as sales_order_qty', as_dict=1)
 
 		get_so_names = frappe.db.get_all("Sales Order",
-			filters={"customer":customer, 'status':['in',["To Bill", "To Deliver and Bill"]]},
+			filters={"custom_implementation":name, 'status':['in',["To Bill","To Deliver","To Deliver and Bill"]]},
 			fields=["name"])
 
 		get_so_list = [item.name for item in get_so_names]
@@ -183,7 +183,7 @@ def get_financial_history(name, customer):
 		get_so_hrs['remaining_hrs'] = int(get_so_hrs['sales_order_qty']) - int(get_so_hrs['dn_qty'])
 		
 
-		timesheet_hrs = frappe.db.sql("""SELECT sum(td.hours) as timesheet_hrs from `tabTimesheet` t join `tabTimesheet Detail` td on t.name = td.parent where td.is_billable = 1 and t.docstatus = 0 and td.project in {0}  """.format(tuple(get_project_list)), as_list=1, debug=1)
+		timesheet_hrs = frappe.db.sql("""SELECT sum(td.hours) as timesheet_hrs from `tabTimesheet` t join `tabTimesheet Detail` td on t.name = td.parent where td.is_billable = 1 and t.docstatus = 0 and td.project in {0} and custom_implementation = '{1}'  """.format(tuple(get_project_list), name), as_list=1, debug=1)
 
 		if timesheet_hrs[0][0] != None:
 			get_so_hrs['timesheet_hrs'] = timesheet_hrs[0][0]
