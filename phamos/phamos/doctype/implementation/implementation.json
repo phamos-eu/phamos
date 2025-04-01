@@ -32,7 +32,9 @@
   "timesheets_tab",
   "html_bfhi",
   "section_break_izec",
-  "status_information"
+  "status_information",
+  "resource_planning_tab",
+  "resource_planning"
  ],
  "fields": [
   {
@@ -218,9 +220,13 @@
   {
    "link_doctype": "Sales Invoice",
    "link_fieldname": "custom_implementation"
+  },
+  {
+   "link_doctype": "Timesheet",
+   "link_fieldname": "custom_implementation"
   }
  ],
- "modified": "2025-03-25 10:54:48.687122",
+ "modified": "2025-04-01 13:04:41.177049",
  "modified_by": "Administrator",
  "module": "Phamos",
  "name": "Implementation",
