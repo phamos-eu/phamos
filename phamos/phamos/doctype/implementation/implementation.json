@@ -220,6 +220,10 @@
   {
    "link_doctype": "Sales Invoice",
    "link_fieldname": "custom_implementation"
+  },
+  {
+   "link_doctype": "Timesheet",
+   "link_fieldname": "custom_implementation"
   }
  ],
  "modified": "2025-04-02 12:17:43.990598",
