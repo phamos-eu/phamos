@@ -111,7 +111,7 @@
   {
    "fieldname": "total_hrs_timesheet",
    "fieldtype": "Int",
-   "label": "Billable Timesheet Hours(Not on Delivery Note)"
+   "label": "Billable Timesheet Hours (Not on Delivery Note)"
   },
   {
    "fieldname": "order_chart",
@@ -226,7 +226,7 @@
    "link_fieldname": "custom_implementation"
   }
  ],
- "modified": "2025-04-01 13:04:41.177049",
+ "modified": "2025-04-02 12:17:43.990598",
  "modified_by": "Administrator",
  "module": "Phamos",
  "name": "Implementation",
