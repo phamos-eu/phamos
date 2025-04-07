@@ -205,7 +205,8 @@ def fetch_projects():
                 & (ToDo.allocated_to == frappe.session.user)
             ).isnotnull()
         )
-        .orderby(Coalesce(last_timesheet_update, frappe.utils.now()), order=Order.desc)
+        .orderby(Coalesce(last_timesheet_update, "1970, 1, 1"), order=Order.desc)
+        
     )
     # Execute query
     projects = query.run(as_dict=True)
@@ -318,6 +319,7 @@ def total_hours_worked_today():
 
         # Format billable time if it exists
         total_billable_time = count_time[0].total_billable_time
+        total_billable_time_str = 0
         if total_billable_time:
             total_billable_time = format_duration(total_billable_time)
             total_billable_time_str = str(total_billable_time)[:10]
@@ -325,7 +327,7 @@ def total_hours_worked_today():
         return {
             "value": actual_time_str,
             "fieldtype": "Float",
-            "billable": total_billable_time_str or 0
+            "billable": total_billable_time_str
         }
     else:
         # If no time was worked, return zero
@@ -362,6 +364,7 @@ def total_hours_worked_in_this_week():
 
         # Format billable time
         total_billable_time = count_time[0].total_billable_time
+        total_billable_time_str = 0
         if total_billable_time:
             total_billable_time = format_duration(total_billable_time)
             total_billable_time_str = str(total_billable_time)[:10]
@@ -369,7 +372,7 @@ def total_hours_worked_in_this_week():
         return {
             "value": total_actual_time_str,
             "fieldtype": "Float",
-            "billable": total_billable_time_str or 0
+            "billable": total_billable_time_str
         }
     else:
         return {
@@ -411,6 +414,7 @@ def total_hours_worked_in_this_month():
 
         # Format billable time
         total_billable_time = count_time[0].total_billable_time
+        total_billable_time_str = 0
         if total_billable_time:
             total_billable_time = format_duration(total_billable_time)
             total_billable_time_str = str(total_billable_time)[:10]
@@ -418,7 +422,7 @@ def total_hours_worked_in_this_month():
         return {
             "value": total_actual_time_str,
             "fieldtype": "Float",
-            "billable": total_billable_time_str or 0
+            "billable": total_billable_time_str
         }
     else:
         return {

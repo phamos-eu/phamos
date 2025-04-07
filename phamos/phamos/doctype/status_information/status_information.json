@@ -1,0 +1,78 @@
+{
+ "actions": [],
+ "allow_rename": 1,
+ "creation": "2025-03-04 15:04:21.036104",
+ "doctype": "DocType",
+ "editable_grid": 1,
+ "engine": "InnoDB",
+ "field_order": [
+  "date",
+  "mood",
+  "status",
+  "column_break_vlth",
+  "maturity_level",
+  "forecast",
+  "test"
+ ],
+ "fields": [
+  {
+   "fieldname": "date",
+   "fieldtype": "Date",
+   "in_list_view": 1,
+   "label": "Date",
+   "max_height": "150px",
+   "width": "20%"
+  },
+  {
+   "fieldname": "mood",
+   "fieldtype": "Select",
+   "in_list_view": 1,
+   "label": "Mood",
+   "options": "1\n2\n3\n4\n5",
+   "width": "10%"
+  },
+  {
+   "fieldname": "status",
+   "fieldtype": "Small Text",
+   "in_list_view": 1,
+   "label": "Status",
+   "max_height": "200px",
+   "width": "50%"
+  },
+  {
+   "fieldname": "column_break_vlth",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "maturity_level",
+   "fieldtype": "Select",
+   "label": "Maturity Level",
+   "options": "\n1 - Start der Implementierung, keine Vorerfahrung, noch kein\n2 - Poweruser kann sich orientieren,\n3 - Live-Betrieb, Erste Module sind im Einsatz,\n4 - Erste Module abgeschlossen, Entwicklungsprozesse in der Tiefe verstanden,\n5 - Quasi-abgeschlossen, System ist implementiert, Viele geschulte Anwender, hoher Automatisierungsgrad,",
+   "width": "10%"
+  },
+  {
+   "fieldname": "forecast",
+   "fieldtype": "Select",
+   "label": "Forecast",
+   "options": "1 \u2600\ufe0f - alles gut. Kunde happy, keine Gefahren (deadlines, Erwartung an Stunden etc) in sicht\n2 \ud83c\udf24\ufe0f - zu viele neue Issues, feedback langsam\n3 \u2601\ufe0f - weekly findet nicht jede Woche statt, Kundenprojektmanager schwer zu erreichen,\n4 \ud83c\udf27\ufe0f - Anforderungen \u00e4ndern sich sehr h\u00e4ufig, Weeklies werden nicht wahrgenommen, kunde antwortet auf Mails nicht\n5 \u26c8\ufe0f - Kunde zahlt Rechnungen nicht, Kunde hat keine Gedult",
+   "width": "10%"
+  },
+  {
+   "fieldname": "test",
+   "fieldtype": "Data",
+   "label": "Test"
+  }
+ ],
+ "index_web_pages_for_search": 1,
+ "istable": 1,
+ "links": [],
+ "modified": "2025-03-21 17:26:49.560058",
+ "modified_by": "Administrator",
+ "module": "Phamos",
+ "name": "Status Information",
+ "owner": "Administrator",
+ "permissions": [],
+ "sort_field": "modified",
+ "sort_order": "DESC",
+ "states": []
+}
