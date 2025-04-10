@@ -190,7 +190,7 @@ def create_interview_ics(applicant_doc, interview_date, interview_slot, meeting_
 
 	cal.add_component(event)
 
-	ics_filename = f"{applicant_doc.applicant_name}_interview.ics".replace(" ", "_")
+	ics_filename = "interview.ics"
 
 	ics_content = cal.to_ical().decode('utf-8')
 
