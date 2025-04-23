@@ -6,6 +6,7 @@
  "doctype": "DocType",
  "engine": "InnoDB",
  "field_order": [
+  "status",
   "notes",
   "start_date",
   "column_break_7p95",
@@ -18,7 +19,10 @@
   "customer",
   "contact_person",
   "timesheets_tab",
-  "html_bfhi"
+  "html_bfhi",
+  "tab_3_tab",
+  "status_history_section",
+  "status_information"
  ],
  "fields": [
   {
@@ -102,6 +106,26 @@
    "in_standard_filter": 1,
    "label": "Department",
    "options": "Department"
+  },
+  {
+   "fieldname": "tab_3_tab",
+   "fieldtype": "Tab Break",
+   "label": "Status History"
+  },
+  {
+   "fieldname": "status_information",
+   "fieldtype": "Table",
+   "label": "Status Information",
+   "options": "Status Information"
+  },
+  {
+   "fieldname": "status_history_section",
+   "fieldtype": "Section Break"
+  },
+  {
+   "fieldname": "status",
+   "fieldtype": "Data",
+   "label": "Status"
   }
  ],
  "index_web_pages_for_search": 1,
@@ -109,9 +133,21 @@
   {
    "link_doctype": "Project",
    "link_fieldname": "custom_implementation"
+  },
+  {
+   "link_doctype": "Sales Order",
+   "link_fieldname": "custom_implementation"
+  },
+  {
+   "link_doctype": "Delivery Note",
+   "link_fieldname": "custom_implementation"
+  },
+  {
+   "link_doctype": "Sales Invoice",
+   "link_fieldname": "custom_implementation"
   }
  ],
- "modified": "2025-01-15 11:06:43.735815",
+ "modified": "2025-03-05 08:34:12.022618",
  "modified_by": "Administrator",
  "module": "Phamos",
  "name": "Implementation",
