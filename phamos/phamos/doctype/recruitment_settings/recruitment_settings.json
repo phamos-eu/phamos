@@ -1,0 +1,86 @@
+{
+ "actions": [],
+ "allow_rename": 1,
+ "creation": "2025-03-06 11:04:57.488353",
+ "doctype": "DocType",
+ "engine": "InnoDB",
+ "field_order": [
+  "section_break_4dmp",
+  "interview_round",
+  "interview_confirmation",
+  "column_break_owkz",
+  "interviewers",
+  "sender",
+  "sender_email"
+ ],
+ "fields": [
+  {
+   "fieldname": "section_break_4dmp",
+   "fieldtype": "Section Break"
+  },
+  {
+   "fieldname": "interviewers",
+   "fieldtype": "Table MultiSelect",
+   "label": "Interviewers",
+   "options": "Assignment Rule User",
+   "reqd": 1
+  },
+  {
+   "fieldname": "interview_round",
+   "fieldtype": "Link",
+   "in_list_view": 1,
+   "label": "Interview Round",
+   "options": "Interview Round",
+   "reqd": 1
+  },
+  {
+   "fieldname": "sender",
+   "fieldtype": "Link",
+   "label": "Sender",
+   "link_filters": "[[\"Email Account\",\"enable_outgoing\",\"=\",1]]",
+   "options": "Email Account",
+   "reqd": 1
+  },
+  {
+   "fieldname": "column_break_owkz",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fetch_from": "sender.email_id",
+   "fieldname": "sender_email",
+   "fieldtype": "Data",
+   "label": "Sender Email",
+   "options": "Email"
+  },
+  {
+   "fieldname": "interview_confirmation",
+   "fieldtype": "Link",
+   "label": "Interview Confirmation",
+   "options": "Email Template",
+   "reqd": 1
+  }
+ ],
+ "index_web_pages_for_search": 1,
+ "issingle": 1,
+ "links": [],
+ "modified": "2025-03-13 16:30:21.931776",
+ "modified_by": "Administrator",
+ "module": "Phamos",
+ "name": "Recruitment Settings",
+ "owner": "Administrator",
+ "permissions": [
+  {
+   "create": 1,
+   "delete": 1,
+   "email": 1,
+   "print": 1,
+   "read": 1,
+   "role": "System Manager",
+   "share": 1,
+   "write": 1
+  }
+ ],
+ "sort_field": "modified",
+ "sort_order": "DESC",
+ "states": []
+}
