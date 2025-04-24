@@ -27,6 +27,7 @@
   "section_break_xfgb",
   "sales_order_status_information",
   "section_break_ky9b",
+  "internal_implementation",
   "customer",
   "contact_person",
   "timesheets_tab",
@@ -149,9 +150,11 @@
    "label": "Customer Information"
   },
   {
+   "depends_on": "eval:doc.internal_implementation == 0",
    "fieldname": "customer",
    "fieldtype": "Link",
    "label": "Customer",
+   "mandatory_depends_on": "eval:doc.internal_implementation == 0",
    "options": "Customer",
    "reqd": 1
   },
@@ -201,6 +204,12 @@
    "fieldtype": "Table",
    "label": "Resource Planning",
    "options": "Resource planning"
+  },
+  {
+   "default": "0",
+   "fieldname": "internal_implementation",
+   "fieldtype": "Check",
+   "label": "Internal Implementation"
   }
  ],
  "index_web_pages_for_search": 1,
@@ -226,7 +235,7 @@
    "link_fieldname": "custom_implementation"
   }
  ],
- "modified": "2025-04-02 12:17:43.990598",
+ "modified": "2025-04-24 13:45:26.310799",
  "modified_by": "Administrator",
  "module": "Phamos",
  "name": "Implementation",
@@ -246,6 +255,7 @@
    "write": 1
   }
  ],
+ "row_format": "Dynamic",
  "search_fields": "account_manager",
  "sort_field": "modified",
  "sort_order": "DESC",
