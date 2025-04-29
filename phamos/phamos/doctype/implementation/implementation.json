@@ -35,7 +35,9 @@
   "section_break_izec",
   "status_information",
   "resource_planning_tab",
-  "resource_planning"
+  "resource_planning",
+  "modules_tab",
+  "modules"
  ],
  "fields": [
   {
@@ -155,8 +157,7 @@
    "fieldtype": "Link",
    "label": "Customer",
    "mandatory_depends_on": "eval:doc.internal_implementation == 0",
-   "options": "Customer",
-   "reqd": 1
+   "options": "Customer"
   },
   {
    "fieldname": "contact_person",
@@ -206,10 +207,21 @@
    "options": "Resource planning"
   },
   {
-   "default": "0",
+   "default": "1",
    "fieldname": "internal_implementation",
    "fieldtype": "Check",
    "label": "Internal Implementation"
+  },
+  {
+   "fieldname": "modules_tab",
+   "fieldtype": "Tab Break",
+   "label": "Modules"
+  },
+  {
+   "fieldname": "modules",
+   "fieldtype": "Table",
+   "label": "Modules",
+   "options": "Implementation Item"
   }
  ],
  "index_web_pages_for_search": 1,
@@ -235,7 +247,7 @@
    "link_fieldname": "custom_implementation"
   }
  ],
- "modified": "2025-04-24 13:45:26.310799",
+ "modified": "2025-04-25 16:16:00.103448",
  "modified_by": "Administrator",
  "module": "Phamos",
  "name": "Implementation",

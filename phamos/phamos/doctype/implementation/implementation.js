@@ -111,6 +111,27 @@ frappe.ui.form.on("Implementation", {
 			});
 		}
     },
+	onload: function(frm) {
+        if (frm.is_new()) {
+            frappe.call({
+                method: 'frappe.client.get_list',
+                args: {
+                    doctype: 'Implementation Module',
+                    fields: ['name'],
+                    limit_page_length: 1000 
+                },
+                callback: function(r) {
+                    if (r.message) {
+                        r.message.forEach(module => {
+                            let child = frm.add_child('modules');
+                            child.module = module.name;
+                        });
+                        frm.refresh_field('modules');
+                    }
+                }
+            });
+        }
+    }
 });
 
 
