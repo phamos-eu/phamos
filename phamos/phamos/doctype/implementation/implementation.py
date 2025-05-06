@@ -92,7 +92,9 @@ class Implementation(Document):
 						
 
 @frappe.whitelist()
-def get_financial_history(name, customer):
+def get_financial_history(name, customer = None):
+	if not customer:
+		return {}
 	get_projects = frappe.db.get_all('Project', {'custom_implementation':name}, 'name')
 	
 	get_project_list = [item.name for item in get_projects]
