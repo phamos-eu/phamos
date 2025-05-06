@@ -37,6 +37,8 @@
   "resource_planning_tab",
   "resource_planning",
   "modules_tab",
+  "target_level",
+  "module_chart",
   "modules"
  ],
  "fields": [
@@ -222,6 +224,17 @@
    "fieldtype": "Table",
    "label": "Modules",
    "options": "Implementation Item"
+  },
+  {
+   "fieldname": "target_level",
+   "fieldtype": "HTML",
+   "label": "Target Level",
+   "options": "<div><h6>Target Level 0-10 (0= not implementing, 10 = full implementation , 5 = basic implementation )</h6></div>\n\n"
+  },
+  {
+   "fieldname": "module_chart",
+   "fieldtype": "HTML",
+   "label": "Module Chart"
   }
  ],
  "index_web_pages_for_search": 1,
@@ -247,7 +260,7 @@
    "link_fieldname": "custom_implementation"
   }
  ],
- "modified": "2025-04-25 16:16:00.103448",
+ "modified": "2025-05-02 15:39:06.094274",
  "modified_by": "Administrator",
  "module": "Phamos",
  "name": "Implementation",

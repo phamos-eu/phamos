@@ -4,39 +4,50 @@ frappe.ui.form.on("Implementation", {
 	setup:function(frm){
 		if(!frm.is_new()){
 			add_row_to_sales_order(frm)
-			frappe.call({
-				method: "phamos.phamos.doctype.implementation.implementation.get_financial_history",
-				args: {'name':frm.doc.name,'customer':frm.doc.customer},
-				callback: function (r) {
-					if(r.message){
-						frm.set_value('sales_order_total_hrs', r.message['sales_order_qty'])
-						frm.set_value('delivered_total_hrs', r.message['dn_qty'])
-						frm.set_value('total_hrs_timesheet', r.message['timesheet_hrs'])
-						frm.set_value('remaining_hrs',r.message['remaining_hrs'])
-						let label1= ['Sales Order Hrs']
-		                let value1 = [r.message['sales_order_qty']]
+			if (frm.doc.internal_implementation == 0) {
+				frappe.call({
+					method: "phamos.phamos.doctype.implementation.implementation.get_financial_history",
+					args: {'name':frm.doc.name,'customer':frm.doc.customer},
+					callback: function (r) {
+						if(r.message){
+							frm.set_value('sales_order_total_hrs', r.message['sales_order_qty'])
+							frm.set_value('delivered_total_hrs', r.message['dn_qty'])
+							frm.set_value('total_hrs_timesheet', r.message['timesheet_hrs'])
+							frm.set_value('remaining_hrs',r.message['remaining_hrs'])
+							let label1= ['Sales Order Hrs']
+							let value1 = [r.message['sales_order_qty']]
 
-		                
-		                $(frm.fields_dict.total_sales.wrapper).html('<div id="total-sales"><h1>hiiii</h1></div>');
-		                
-		                let chart = new frappe.Chart("#total-sales", {
-		                    type: 'percentage',
-		                    data: {
-		                        labels: label1,
-		                        datasets: [
-				                    {name:"Financial Information",values: value1}]},
-		                    colors: ['#7cd6fd'],
-		                    height: 250,
-		                    width:250
-		                });
-		                
-						frm.save()
-					}
-				},
-			});
+							
+							$(frm.fields_dict.total_sales.wrapper).html('<div id="total-sales"><h1>hiiii</h1></div>');
+							
+							let chart = new frappe.Chart("#total-sales", {
+								type: 'percentage',
+								data: {
+									labels: label1,
+									datasets: [
+										{name:"Financial Information",values: value1}]},
+								colors: ['#7cd6fd'],
+								height: 250,
+								width:250
+							});
+							
+							frm.save()
+						}
+					},
+				});
+			}
 		}
 	},
 	refresh: function(frm) {
+		// radar chart
+		if (!frm.fields_dict.module_chart.$wrapper.find('canvas').length) {
+            frm.fields_dict.module_chart.$wrapper.html('<canvas id="radar-chart" style="height: 500px;width: 500px;"></canvas>');
+        }
+
+        frappe.require("https://cdn.jsdelivr.net/npm/chart.js", function () {
+            render_module_chart(frm);
+        });
+		// radar chart ends
 		if(!frm.is_new()){ 
 			frappe.call({
 				method: "phamos.phamos.doctype.implementation.implementation.get_financial_history",
@@ -133,8 +144,65 @@ frappe.ui.form.on("Implementation", {
         }
     }
 });
+function render_module_chart(frm) {
+    const labels = [];
+    const currentLevels = [];
+    const targetLevels = [];
 
+    (frm.doc.modules || []).forEach(row => {
+        if (row.is_required) {
+            labels.push(row.module);
+            currentLevels.push(row.current_level || 0);
+            targetLevels.push(row.target_level || 0);
+        }
+    });
 
+    const ctx = document.getElementById('radar-chart');
+    if (!ctx) return;
+
+    if (window.moduleRadarChart) {
+        window.moduleRadarChart.destroy();
+    }
+
+    window.moduleRadarChart = new Chart(ctx, {
+        type: 'radar',
+        data: {
+            labels: labels,
+            datasets: [
+                {
+                    label: 'Current Level',
+                    data: currentLevels,
+                    backgroundColor: 'rgba(75, 202, 234, 0.3)',
+                    borderColor: '#00bcd4',
+                    borderWidth: 2
+                },
+                {
+                    label: 'Target Level',
+                    data: targetLevels,
+                    backgroundColor: 'rgba(192, 5, 5, 0.2)',
+                    borderColor: 'red',
+                    borderWidth: 2
+                }
+            ]
+        },
+        options: {
+            responsive: true,
+			maintainAspectRatio: false,
+
+            scales: {
+                r: {
+                    suggestedMin: 0,
+                    suggestedMax: 10,
+                    pointLabels: {
+                        font: {
+                            size: 12
+                        }
+                    }
+                }
+            }
+        }
+    });
+}
 
 function add_row_to_sales_order(frm){
 	frappe.call({
