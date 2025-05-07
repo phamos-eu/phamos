@@ -208,6 +208,14 @@ def get_financial_history(name, customer = None):
 		return get_so_hrs
 
 
+@frappe.whitelist()
+def are_all_projects_closed(implementation_name):
+    linked_projects = frappe.get_all('Project', filters={'custom_implementation': implementation_name}, fields=['status'])
+    
+    for proj in linked_projects:
+        if proj.status not in ['Completed', 'Cancelled']:
+            return False
+    return True
 
 
 @frappe.whitelist()
