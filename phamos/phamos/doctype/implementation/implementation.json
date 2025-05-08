@@ -39,7 +39,9 @@
   "modules_tab",
   "target_level",
   "module_chart",
-  "modules"
+  "modules",
+  "status_history_tab",
+  "status_updates"
  ],
  "fields": [
   {
@@ -235,6 +237,17 @@
    "fieldname": "module_chart",
    "fieldtype": "HTML",
    "label": "Module Chart"
+  },
+  {
+   "fieldname": "status_history_tab",
+   "fieldtype": "Tab Break",
+   "label": "Status History"
+  },
+  {
+   "fieldname": "status_updates",
+   "fieldtype": "Table",
+   "label": "Status Updates",
+   "options": "Status Information"
   }
  ],
  "index_web_pages_for_search": 1,
@@ -260,7 +273,7 @@
    "link_fieldname": "custom_implementation"
   }
  ],
- "modified": "2025-05-02 15:39:06.094274",
+ "modified": "2025-05-08 07:01:56.819372",
  "modified_by": "Administrator",
  "module": "Phamos",
  "name": "Implementation",
@@ -280,7 +293,6 @@
    "write": 1
   }
  ],
- "row_format": "Dynamic",
  "search_fields": "account_manager",
  "sort_field": "modified",
  "sort_order": "DESC",
