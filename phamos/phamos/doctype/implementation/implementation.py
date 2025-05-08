@@ -89,6 +89,8 @@ class Implementation(Document):
 								'billable_time_spent':row1.get('billable_time'),
 								'ratio_of_billable_to_non_billable_time_spent':ratio
 								})
+
+
 						
 
 @frappe.whitelist()
