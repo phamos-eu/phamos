@@ -8,9 +8,12 @@ from frappe.utils import today
 
 
 class Implementation(Document):
+	print('))))))))))))))))))))))')
 	def before_save(self):
 		self.add_delivered_hrs()
 		self.add_resource_planning()
+		self.add_status_history()
+
 
 	def add_delivered_hrs(self):
 		if self.sales_order_status_information:
@@ -89,6 +92,32 @@ class Implementation(Document):
 								'billable_time_spent':row1.get('billable_time'),
 								'ratio_of_billable_to_non_billable_time_spent':ratio
 								})
+	def add_status_history(self):
+		print('********************')
+		date = today()
+		if self.status_updates:
+			for d in self.status_updates:
+				print('11111111111111')
+				if d.date == today():
+					d.maturity_level = self.maturity_level
+					d.mood = self.mood
+					d.forecast = self.forecast
+				else:
+					print('22222222222222')
+					self.append("status_updates", {
+						"date": today,
+						"maturity_level": self.maturity_level,
+						"mood": self.mood,
+						"forecast": self.forecast
+					})
+		else:
+			print('3333333333333333333')
+			self.append("status_updates", {
+				"date": today,
+				"maturity_level": self.maturity_level,
+				"mood": self.mood,
+				"forecast": self.forecast
+			})
 
 
 						
