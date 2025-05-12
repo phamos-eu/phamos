@@ -14,19 +14,19 @@
  "fields": [
   {
    "fieldname": "billable_time_spent",
-   "fieldtype": "Data",
+   "fieldtype": "Int",
    "in_list_view": 1,
    "label": "Billable Time spent"
   },
   {
    "fieldname": "total_time",
-   "fieldtype": "Data",
+   "fieldtype": "Int",
    "in_list_view": 1,
    "label": "Total Time"
   },
   {
    "fieldname": "non_billable_time_spent",
-   "fieldtype": "Data",
+   "fieldtype": "Int",
    "in_list_view": 1,
    "label": "Non Billable Time spent"
   },
@@ -40,12 +40,13 @@
  "index_web_pages_for_search": 1,
  "istable": 1,
  "links": [],
- "modified": "2025-03-26 11:32:16.257431",
+ "modified": "2025-05-05 14:37:01.645159",
  "modified_by": "Administrator",
  "module": "Phamos",
  "name": "Resource planning",
  "owner": "Administrator",
  "permissions": [],
+ "row_format": "Dynamic",
  "sort_field": "modified",
  "sort_order": "DESC",
  "states": []
