@@ -13,8 +13,9 @@
   "department",
   "account_manager",
   "maturity_level",
-  "mood",
   "forecast",
+  "trend",
+  "status_statement",
   "section_break_uiri",
   "sales_order_total_hrs",
   "total_hrs_timesheet",
@@ -35,6 +36,7 @@
   "section_break_izec",
   "status_information",
   "resource_planning_tab",
+  "resource_chart",
   "resource_planning",
   "modules_tab",
   "target_level",
@@ -83,13 +85,7 @@
    "in_preview": 1,
    "in_standard_filter": 1,
    "label": "Maturity Level",
-   "options": "1 - Start der Implementierung, keine Vorerfahrung, noch kein\n2 - Poweruser kann sich orientieren,\n3 - Live-Betrieb, Erste Module sind im Einsatz,\n4 - Erste Module abgeschlossen, Entwicklungsprozesse in der Tiefe verstanden,\n5 - Quasi-abgeschlossen, System ist implementiert, Viele geschulte Anwender, hoher Automatisierungsgrad,"
-  },
-  {
-   "fieldname": "mood",
-   "fieldtype": "Select",
-   "label": "Mood",
-   "options": "1\n2\n3\n4\n5"
+   "options": "1 - Early Implementation, no previous Frappe experience\n2 - Initial development work, Poweruser can navigate system\n3 - Development process understood, first modules customized\n4 - Go Live, first modules in use with real life data\n5 - Ongoing development in parallel to system in daily use with live data\n6 - System in daily use, development work limited to customer support"
   },
   {
    "fieldname": "forecast",
@@ -97,13 +93,8 @@
    "in_list_view": 1,
    "in_preview": 1,
    "in_standard_filter": 1,
-   "label": "Forecast",
+   "label": "Implementation Status",
    "options": "1 \u2600\ufe0f - alles gut. Kunde happy, keine Gefahren (deadlines, Erwartung an Stunden etc) in sicht\n2 \ud83c\udf24\ufe0f - zu viele neue Issues, feedback langsam\n3 \u2601\ufe0f - weekly findet nicht jede Woche statt, Kundenprojektmanager schwer zu erreichen,\n4 \ud83c\udf27\ufe0f - Anforderungen \u00e4ndern sich sehr h\u00e4ufig, Weeklies werden nicht wahrgenommen, kunde antwortet auf Mails nicht\n5 \u26c8\ufe0f - Kunde zahlt Rechnungen nicht, Kunde hat keine Gedult"
-  },
-  {
-   "fieldname": "status",
-   "fieldtype": "Small Text",
-   "label": "Status"
   },
   {
    "fieldname": "section_break_uiri",
