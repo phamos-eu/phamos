@@ -39,6 +39,7 @@ frappe.ui.form.on("Implementation", {
 		}
 	},
 	refresh: function(frm) {
+		
 		if (!frm.is_new()) {
 			frm.add_custom_button('Set Implementation Status', () => {
 				frappe.call({
@@ -82,75 +83,147 @@ frappe.ui.form.on("Implementation", {
 			});
 		}
 		
-		if (!frm.doc.resource_planning || frm.doc.resource_planning.length === 0) {
-            return;
-        }
+		//////////////////////////////////////////////Resource Planning graph////////////////////////////////////////
 
-        const categories = [];
-        const billable = [];
-        const nonBillable = [];
+        const planningData = frm.doc.resource_planning || [];
+        const predictionData = frm.doc.resource_planning_prediction || [];
 
-        frm.doc.resource_planning.forEach(row => {
-            categories.push(row.month_and_year);
-            billable.push(row.billable_time_spent || 0);
-            nonBillable.push(row.non_billable_time_spent || 0);
+        const categorySet = new Set();
+        planningData.forEach(row => categorySet.add(row.month_and_year));
+        predictionData.forEach(row => categorySet.add(row.month_and_year));
+
+        const categories = Array.from(categorySet).sort((a, b) => new Date(a) - new Date(b));
+
+        const categoryIndexMap = {};
+        categories.forEach((month, idx) => {
+            categoryIndexMap[month] = idx;
+        });
+
+        const billable = new Array(categories.length).fill(0);
+        const nonBillable = new Array(categories.length).fill(0);
+
+        planningData.forEach(row => {
+            const idx = categoryIndexMap[row.month_and_year];
+            billable[idx] += row.billable_time_spent || 0;
+            nonBillable[idx] += row.non_billable_time_spent || 0;
+        });
+
+        const predictionPoints = predictionData
+            .map(row => ({
+                x: categoryIndexMap[row.month_and_year],
+                y: row.prediction || 0
+            }))
+            .sort((a, b) => a.x - b.x); 
+
+        // Calculate monthly average prediction
+        const monthlyPredictionSum = {};
+        const monthlyPredictionCount = {};
+
+        predictionData.forEach(row => {
+            const month = row.month_and_year;
+            const prediction = row.prediction || 0;
+
+            if (!monthlyPredictionSum[month]) {
+                monthlyPredictionSum[month] = 0;
+                monthlyPredictionCount[month] = 0;
+            }
+
+            monthlyPredictionSum[month] += prediction;
+            monthlyPredictionCount[month] += 1;
+        });
+
+        const averagePredictions = categories.map(month => {
+            const sum = monthlyPredictionSum[month] || 0;
+            const count = monthlyPredictionCount[month] || 0;
+            return count > 0 ? sum / count : null;
         });
 
         const wrapper = frm.fields_dict.resource_chart.$wrapper;
         wrapper.empty();
         wrapper.append('<div id="resource-planning-highchart" style="height:400px;"></div>');
 
-        // Render Highchart
         Highcharts.chart('resource-planning-highchart', {
             chart: {
-                type: 'area'
+                zoomType: 'xy'
             },
             title: {
-                text: 'Billable vs Non-Billable Time'
+                text: 'Billable vs Non-Billable Time with Prediction'
             },
             xAxis: {
                 categories: categories,
-                tickmarkPlacement: 'on',
                 title: {
-                    enabled: false
+                    text: 'Month'
                 }
             },
             yAxis: {
                 title: {
-                    text: ''
-                },
-                labels: {
-                    formatter: function () {
-                        return this.value;
-                    }
+                    text: 'Time (hrs)'
                 }
             },
             tooltip: {
                 shared: true,
-                valueSuffix: 'hrs'
+                valueSuffix: ' hrs'
             },
             plotOptions: {
                 area: {
                     stacking: 'normal',
-                    lineColor: '#666666',
-                    lineWidth: 1,
                     marker: {
                         enabled: false
+                    }
+                },
+                line: {
+                    marker: {
+                        enabled: true,
+                        radius: 4
                     }
                 }
             },
             series: [
-				{
-					name: 'Non-Billable Time',
-					data: nonBillable,
-					color: '#ff9933'
-				},
-				{
-                name: 'Billable Time',
-                data: billable,
-                color: '#3399ff'
-            },]
+                {
+                    name: 'Non-Billable Time',
+                    type: 'area',
+                    data: nonBillable,
+                    color: '#ff9933'
+                },
+                {
+                    name: 'Billable Time',
+                    type: 'area',
+                    data: billable,
+                    color: '#3399ff'
+                },
+                {
+                    name: 'Prediction',
+                    type: 'scatter',
+                    data: predictionPoints,
+                    color: '#28a745',
+                    marker: {
+                        symbol: 'circle',
+                        radius: 5
+                    },
+                    tooltip: {
+                        pointFormat: '<span style="color:{series.color}">\u25CF</span> {series.name}: <b>{point.y} hrs</b><br/>'
+                    }
+                },
+                {
+                    name: 'Average Prediction',
+                    type: 'line',
+                    data: averagePredictions,
+                    color: 'red',
+                    dashStyle: 'ShortDash',
+                    marker: {
+                        enabled: true,
+                        symbol: 'diamond',
+                        radius: 4
+                    },
+                    tooltip: {
+                        pointFormat: '<span style="color:{series.color}">\u25CF</span> {series.name}: <b>{point.y:.2f} hrs</b><br/>'
+                    }
+                }
+            ]
         });
+
+
+		//////////////////////////////////////////////////////////////////////////////////////////////////////
     
 		// radar chart
 		if (!frm.fields_dict.module_chart.$wrapper.find('canvas').length) {

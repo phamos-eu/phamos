@@ -38,6 +38,7 @@
   "resource_planning_tab",
   "resource_chart",
   "resource_planning",
+  "resource_planning_prediction",
   "modules_tab",
   "target_level",
   "module_chart",
@@ -248,6 +249,12 @@
    "options": "Improving\nStable\nDeclining"
   },
   {
+   "fieldname": "resource_planning_prediction",
+   "fieldtype": "Table",
+   "label": "Resource Planning Prediction",
+   "options": "Prediction"
+  },
+  {
    "fieldname": "resource_chart",
    "fieldtype": "HTML",
    "label": "Time spent"
@@ -276,7 +283,7 @@
    "link_fieldname": "custom_implementation"
   }
  ],
- "modified": "2025-05-07 10:27:08.246141",
+ "modified": "2025-05-12 19:53:15.683376",
  "modified_by": "Administrator",
  "module": "Phamos",
  "name": "Implementation",
