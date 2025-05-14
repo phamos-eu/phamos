@@ -39,6 +39,119 @@ frappe.ui.form.on("Implementation", {
 		}
 	},
 	refresh: function(frm) {
+		if (!frm.is_new()) {
+			frm.add_custom_button('Set Implementation Status', () => {
+				frappe.call({
+					method: 'phamos.phamos.doctype.implementation.implementation.are_all_projects_closed',
+					args: {
+						implementation_name: frm.doc.name
+					},
+					callback: function (r) {
+						if (r.message === true) {
+							let d = new frappe.ui.Dialog({
+								title: 'Set Implementation Status',
+								fields: [
+									{
+										label: 'Status',
+										fieldname: 'status',
+										fieldtype: 'Select',
+										options: ['Completed', 'Cancelled'],
+										reqd: 1
+									},
+									{
+										label: 'Reason',
+										fieldname: 'reason',
+										fieldtype: 'Small Text',
+										reqd: 1
+									}
+								],
+								primary_action_label: 'Submit',
+								primary_action(values) {
+									frm.set_value('status', values.status);
+									frm.set_value('status_statement', values.reason);
+									frm.save();
+									d.hide();
+								}
+							});
+							d.show();
+						} else {
+							frappe.throw(__('All projects must be closed before setting implementation status.'));
+						}
+					}
+				});
+			});
+		}
+		
+		if (!frm.doc.resource_planning || frm.doc.resource_planning.length === 0) {
+            return;
+        }
+
+        const categories = [];
+        const billable = [];
+        const nonBillable = [];
+
+        frm.doc.resource_planning.forEach(row => {
+            categories.push(row.month_and_year);
+            billable.push(row.billable_time_spent || 0);
+            nonBillable.push(row.non_billable_time_spent || 0);
+        });
+
+        const wrapper = frm.fields_dict.resource_chart.$wrapper;
+        wrapper.empty();
+        wrapper.append('<div id="resource-planning-highchart" style="height:400px;"></div>');
+
+        // Render Highchart
+        Highcharts.chart('resource-planning-highchart', {
+            chart: {
+                type: 'area'
+            },
+            title: {
+                text: 'Billable vs Non-Billable Time'
+            },
+            xAxis: {
+                categories: categories,
+                tickmarkPlacement: 'on',
+                title: {
+                    enabled: false
+                }
+            },
+            yAxis: {
+                title: {
+                    text: ''
+                },
+                labels: {
+                    formatter: function () {
+                        return this.value;
+                    }
+                }
+            },
+            tooltip: {
+                shared: true,
+                valueSuffix: 'hrs'
+            },
+            plotOptions: {
+                area: {
+                    stacking: 'normal',
+                    lineColor: '#666666',
+                    lineWidth: 1,
+                    marker: {
+                        enabled: false
+                    }
+                }
+            },
+            series: [
+				{
+					name: 'Non-Billable Time',
+					data: nonBillable,
+					color: '#ff9933'
+				},
+				{
+                name: 'Billable Time',
+                data: billable,
+                color: '#3399ff'
+            },]
+        });
+    
 		// radar chart
 		if (!frm.fields_dict.module_chart.$wrapper.find('canvas').length) {
             frm.fields_dict.module_chart.$wrapper.html('<canvas id="radar-chart" style="height: 500px;width: 500px;"></canvas>');
