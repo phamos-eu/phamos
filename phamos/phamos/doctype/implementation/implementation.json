@@ -38,6 +38,7 @@
   "resource_planning_tab",
   "resource_chart",
   "resource_planning",
+  "resource_planning_prediction",
   "modules_tab",
   "target_level",
   "module_chart",
@@ -239,6 +240,29 @@
    "fieldtype": "Table",
    "label": "Status Updates",
    "options": "Status Information"
+  },
+  {
+   "fieldname": "status_statement",
+   "fieldtype": "Small Text",
+   "label": "Status Statement"
+  },
+  {
+   "fieldname": "trend",
+   "fieldtype": "Select",
+   "in_standard_filter": 1,
+   "label": "Trend",
+   "options": "Improving\nStable\nDeclining"
+  },
+  {
+   "fieldname": "resource_planning_prediction",
+   "fieldtype": "Table",
+   "label": "Resource Planning Prediction",
+   "options": "Prediction"
+  },
+  {
+   "fieldname": "resource_chart",
+   "fieldtype": "HTML",
+   "label": "Time spent"
   }
  ],
  "index_web_pages_for_search": 1,
@@ -264,7 +288,7 @@
    "link_fieldname": "custom_implementation"
   }
  ],
- "modified": "2025-05-08 07:01:56.819372",
+ "modified": "2025-05-12 19:53:15.683376",
  "modified_by": "Administrator",
  "module": "Phamos",
  "name": "Implementation",
