@@ -1,0 +1,21 @@
+.filters{
+    padding: 5px;
+}
+#downloadDropdown{
+    background: black;
+    color: white;
+}
+.page-limit.active {
+    background-color: black !important;
+    color: white;
+    border-color: black;
+}
+
+.dropdown-menu {
+    z-index: 2000;
+}
+  
+.data-table{
+    margin-top: 30px;
+}
+
