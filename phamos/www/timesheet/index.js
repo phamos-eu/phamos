@@ -73,6 +73,18 @@ frappe.ready(() => {
     $('#project_filter').val('');
     reset_and_load();
   });
+
+  $(document).on('click', function (event) {
+    const $dropdown = $('#downloadDropdown');
+    const $menu = $('.dropdown-menu');
+  
+    // If the click is outside the dropdown button and the menu
+    if (!$dropdown.is(event.target) && $dropdown.has(event.target).length === 0 &&
+        !$menu.is(event.target) && $menu.has(event.target).length === 0) {
+      $menu.removeClass('show');
+    }
+  });
+  
 });
 
 function reset_and_load() {
@@ -84,6 +96,9 @@ function reset_and_load() {
 
   $('#no_data_row').hide();
   $('#load_more').show();
+
+  update_summary_cards();
+
   load_timesheets();
 }
 
@@ -289,7 +304,7 @@ function format_hours(decimal_hours) {
   const totalMinutes = Math.round(parseFloat(decimal_hours || 0) * 60);
   const hours = Math.floor(totalMinutes / 60);
   const minutes = totalMinutes % 60;
-  return `${hours}h ${minutes}m`;
+  return `${hours} hr ${minutes} min`;
 }
 
 function formatShortRelative(dateStr) {
@@ -317,3 +332,18 @@ function formatShortRelative(dateStr) {
   return "Today";
 }
 
+function update_summary_cards() {
+  const from_date = $('#from_date').val();
+  const to_date = $('#to_date').val();
+  const project = $('#project_filter').val();
+
+  frappe.call({
+    method: "phamos.api.get_timesheet_totals",
+    args: { from_date, to_date, project },
+    callback: function (r) {
+      const total = r.message || {};
+      $('#total_working').text(format_hours(total.total_hours));
+      $('#total_billable').text(format_hours(total.billable_hours));
+    }
+  });
+}

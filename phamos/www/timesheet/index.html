@@ -10,6 +10,7 @@
 <!-- Subtract ERPNext navbar height -->
 <div class="d-flex flex-column px-3 py-3" style="height: calc(100vh - 56px);">
 
+  {% include "phamos/www/timesheet/summary_cards.html" %}
   <!-- Header Bar -->
   <div class="mb-3">
     <div class="d-flex justify-content-between align-items-center mb-2">
@@ -49,6 +50,8 @@
       
     </div>
   </div>
+
+
 
   <!-- Scrollable Table Container -->
   <div class="border rounded overflow-auto" style="min-height: 0; max-width: 100%;">
