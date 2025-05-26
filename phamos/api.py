@@ -87,3 +87,35 @@ def get_customer_for_user(user):
 def validate_guest_user():
     if frappe.session.user == "Guest":
         frappe.throw(_("Login required"), frappe.PermissionError)
+
+
+@frappe.whitelist()
+def get_timesheet_totals(from_date=None, to_date=None, project=None):
+    user = frappe.session.user
+    validate_guest_user()
+    customer = get_customer_for_user(user)
+
+    if not customer:
+        frappe.throw("No Customer linked to user.", frappe.PermissionError)
+
+    filters = {"docstatus": 1, "customer": customer}
+    if from_date:
+        filters["start_date"] = [">=", getdate(from_date)]
+    if to_date:
+        filters["end_date"] = ["<=", getdate(to_date)]
+    if project:
+        filters["parent_project"] = project
+
+    data = frappe.get_list(
+        "Timesheet",
+        filters=filters,
+        fields=["total_hours", "total_billable_hours"]
+    )
+
+    total_hours = sum([float(d.total_hours or 0) for d in data])
+    billable_hours = sum([float(d.total_billable_hours or 0) for d in data])
+
+    return {
+        "total_hours": total_hours,
+        "billable_hours": billable_hours
+    }
