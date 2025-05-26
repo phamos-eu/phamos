@@ -26,7 +26,7 @@ def get_timesheets(from_date=None, to_date=None, project=None, offset=0, limit=2
 
     total = frappe.db.count("Timesheet", filters)
 
-    timesheets = frappe.get_all("Timesheet",
+    timesheets = frappe.get_list("Timesheet",
         filters=filters,
         fields=[
             "name", "employee", "employee_name", "custom_billing_status", "project_owner",
@@ -35,8 +35,7 @@ def get_timesheets(from_date=None, to_date=None, project=None, offset=0, limit=2
         ],
         order_by="creation desc",
         start=int(offset),
-        page_length=int(limit),
-        ignore_permissions=True
+        page_length=int(limit)
     )
 
     return {"timesheets": timesheets, "total": total}
@@ -53,7 +52,7 @@ def get_projects_for_logged_in_customer():
     if not customer:
         return []
 
-    return frappe.get_all(
+    return frappe.get_list(
         "Project",
         filters={"customer": customer},
         fields=["name", "project_name"]
@@ -61,7 +60,7 @@ def get_projects_for_logged_in_customer():
 
 def get_customer_for_user(user):
     # Get all Contact names linked to this User
-    contacts = frappe.get_all(
+    contacts = frappe.get_list(
         "Contact", filters={"user": user}, fields=["name"]
     )
 
