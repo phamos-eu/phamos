@@ -1,0 +1,113 @@
+{% extends "templates/web.html" %}
+
+{% block style %}
+  <link rel="stylesheet" href="/assets/phamos/css/timesheet.css" />
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+
+{% endblock %}
+
+{% block page_content %}
+<!-- Subtract ERPNext navbar height -->
+<div class="d-flex flex-column px-3 py-3" style="height: calc(100vh - 56px);">
+
+  {% include "phamos/www/timesheet/summary_cards.html" %}
+  <!-- Header Bar -->
+  <div class="mb-3">
+    <div class="d-flex justify-content-between align-items-center mb-2">
+      <h5 class="mb-0">Timesheet Records</h5>
+
+      <!-- Download Dropdown Button -->
+      <div class="dropdown" style="position: relative; z-index: 1050;">
+        <button class="btn btn-sm btn-outline-primary dropdown-toggle" type="button"
+          id="downloadDropdown" data-bs-toggle="dropdown" aria-expanded="false">
+          <i class="fa fa-download me-1"></i> Download CSV
+        </button>
+        <ul class="dropdown-menu dropdown-menu-end" aria-labelledby="downloadDropdown">
+          <li><a class="dropdown-item" href="#" id="download_all">Download All Records</a></li>
+          <li><a class="dropdown-item" href="#" id="download_selected">Download Selected Records</a></li>
+        </ul>
+      </div>
+    </div>
+
+    <!-- Filters -->
+    <div class="row g-2">
+      <div class="col-12 col-sm-4 col-md-2">
+        <input type="date" id="from_date" class="form-control form-control-sm" />
+      </div>
+      <div class="col-12 col-sm-4 col-md-2">
+        <input type="date" id="to_date" class="form-control form-control-sm" />
+      </div>
+      <div class="col-12 col-sm-4 col-md-3">
+        <select id="project_filter" class="form-control form-control-sm rounded">
+          <option value="">All Projects</option>
+        </select>
+      </div>
+      <div class="col-12 col-sm-4 col-md-2">
+        <button id="clear_filters" class="btn btn-sm btn-outline-secondary w-80">
+          <i class="fa fa-times me-1"></i> Clear Filters
+        </button>
+      </div>
+      
+    </div>
+  </div>
+
+
+
+  <!-- Scrollable Table Container -->
+  <div class="border rounded overflow-auto" style="min-height: 0; max-width: 100%;">
+    <table class="table table-hover align-middle mb-0 w-auto"
+          id="timesheet_table"
+          style="min-width: 1300px; table-layout: fixed;">
+      <thead class="table-light sticky-top small">
+        <tr>
+          <th style="width: 40px;"><input type="checkbox" id="select_all" /></th>
+          <th style="width: 120px;">Timesheet</th>
+          <th style="width: 100px;">Status</th>
+          <th style="width: 180px;">Employee ID</th>
+          <th style="width: 180px; white-space: nowrap;">Employee Name</th>
+          <th style="width: 130px; white-space: nowrap;">Start Date</th>
+          <th style="width: 130px; white-space: nowrap;">End Date</th>
+          <th style="width: 130px;">Billing Status</th>
+          <th style="width: 120px;">Total Hours</th>
+          <th style="width: 140px;">Billable Hours</th>
+          <th style="width: 200px;">Creation</th>
+        </tr>
+      </thead>
+
+     <tbody id="timesheet_body">
+      <!-- JS will inject rows here -->
+      <tr id="no_data_row" style="display: none;">
+        <td colspan="11" class="text-center text-muted">
+          <i class="fa fa-info-circle me-1"></i> No timesheet records found for the selected filters.
+        </td>
+      </tr>
+    </tbody>
+
+    </table>
+  </div>
+
+  <!-- Footer Controls -->
+  <div class="pt-3">
+    <div class="d-flex justify-content-between align-items-center mb-2">
+      <div class="d-flex gap-2 align-items-center small">
+        <div class="btn-group btn-group-sm">
+          <button class="btn btn-outline-secondary page-limit active" data-limit="20">20</button>
+          <button class="btn btn-outline-secondary page-limit" data-limit="50">50</button>
+          <button class="btn btn-outline-secondary page-limit" data-limit="100">100</button>
+        </div>
+      </div>
+      <div class="text-center">
+        <button id="load_more" class="btn btn-outline-primary btn-sm">Load More</button>
+      </div>
+      <div id="pagination_info" class="text-muted small">0 of 0</div>
+    </div>
+
+    <!-- Progress Bar -->
+    <div class="progress mb-2" style="height: 6px;">
+      <div class="progress-bar bg-secondary" id="pagination_progress" style="width: 0%;"></div>
+    </div>
+  </div>
+</div>
+
+<script src="/timesheets/index.js"></script>
+{% endblock %}
