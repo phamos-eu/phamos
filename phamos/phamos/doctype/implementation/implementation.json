@@ -46,9 +46,19 @@
   "modules_tab",
   "target_level",
   "module_chart",
-  "modules"
+  "modules",
+  "status_history_tab",
+  "status_updates"
  ],
  "fields": [
+  {
+   "default": "Open",
+   "fieldname": "status",
+   "fieldtype": "Select",
+   "label": "Status",
+   "options": "Open\nCancelled\nCompleted",
+   "read_only": 1
+  },
   {
    "fieldname": "notes",
    "fieldtype": "Text Editor",
@@ -233,12 +243,15 @@
    "label": "Module Chart"
   },
   {
-   "default": "Open",
-   "fieldname": "status",
-   "fieldtype": "Select",
-   "label": "Status",
-   "options": "Open\nCancelled\nCompleted",
-   "read_only": 1
+   "fieldname": "status_history_tab",
+   "fieldtype": "Tab Break",
+   "label": "Status History"
+  },
+  {
+   "fieldname": "status_updates",
+   "fieldtype": "Table",
+   "label": "Status Updates",
+   "options": "Status Information"
   },
   {
    "fieldname": "status_statement",
@@ -327,7 +340,6 @@
    "write": 1
   }
  ],
- "row_format": "Dynamic",
  "search_fields": "account_manager",
  "sort_field": "modified",
  "sort_order": "DESC",
