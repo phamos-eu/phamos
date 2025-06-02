@@ -36,6 +36,10 @@
   "section_break_izec",
   "status_information",
   "resource_planning_tab",
+  "from_date",
+  "column_break_wufw",
+  "to_date",
+  "section_break_5rmv",
   "resource_chart",
   "resource_planning",
   "resource_planning_prediction",
@@ -258,6 +262,26 @@
    "fieldname": "resource_chart",
    "fieldtype": "HTML",
    "label": "Time spent"
+  },
+  {
+   "fieldname": "from_date",
+   "fieldtype": "Select",
+   "label": "From Date",
+   "options": "2025-01\n2025-02\n2025-03\n2025-04\n2025-05\n2025-06"
+  },
+  {
+   "fieldname": "column_break_wufw",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "to_date",
+   "fieldtype": "Select",
+   "label": "To Date",
+   "options": "2025-06\n2025-07\n2025-08\n2025-09\n2025-10\n2025-11\n2025-12"
+  },
+  {
+   "fieldname": "section_break_5rmv",
+   "fieldtype": "Section Break"
   }
  ],
  "index_web_pages_for_search": 1,
@@ -283,7 +307,7 @@
    "link_fieldname": "custom_implementation"
   }
  ],
- "modified": "2025-05-12 19:53:15.683376",
+ "modified": "2025-05-29 15:58:52.889513",
  "modified_by": "Administrator",
  "module": "Phamos",
  "name": "Implementation",
