@@ -251,22 +251,12 @@ frappe.pages["project-action-panel"].on_page_load = function (wrapper) {
                   fieldtype: "Column Break",
                 },
                 {
-                  label: "Time",
-                  fieldname: "to_time",
-                  fieldtype: "Datetime",
+                  label: "What I did ",
+                  fieldname: "result",
+                  fieldtype: "Small Text",
                   reqd: 1,
-                },
-
-                {
-                  fieldtype: "Select",
-                  options: [0, 25, 50, 75, 100],
-                  label: __("Percent Billable"),
-                  fieldname: "percent_billable",
-                  in_list_view: 1,
-                  reqd: 1,
-                  default: percent_billable,
                   description:
-                    "This is a personal indicator to your own performance on the work you have done. It will influence the billable time of the Timesheet created.",
+                    "⚠️ This information is sent to the customer next day. Please make sure to wright meaningful text. Adding Issues ID's and or URL is helpful.",
                 },
                 {
                   fieldtype: "Column Break",
@@ -286,12 +276,21 @@ frappe.pages["project-action-panel"].on_page_load = function (wrapper) {
                   fieldtype: "Column Break",
                 },
                 {
-                  label: "What I did ",
-                  fieldname: "result",
-                  fieldtype: "Small Text",
+                  label: "Time",
+                  fieldname: "to_time",
+                  fieldtype: "Datetime",
                   reqd: 1,
+                },
+                {
+                  fieldtype: "Select",
+                  options: [0, 25, 50, 75, 100],
+                  label: __("Percent Billable"),
+                  fieldname: "percent_billable",
+                  in_list_view: 1,
+                  reqd: 1,
+                  default: percent_billable,
                   description:
-                    "⚠️ This information is sent to the customer next day. Please make sure to wright meaningful text. Adding Issues ID's and or URL is helpful.",
+                    "This is a personal indicator to your own performance on the work you have done. It will influence the billable time of the Timesheet created.",
                 },
               ],
               primary_action_label: __("Update Timesheet Record."),
