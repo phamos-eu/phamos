@@ -8,7 +8,12 @@ from frappe.utils import today
 
 
 class Implementation(Document):
+		
 	def before_save(self):
+		if self.resource_planning_prediction:
+			self.resource_planning_prediction.sort(
+				key=lambda x: x.month_and_year or ""
+			)
 		self.add_delivered_hrs()
 		self.add_resource_planning()
 

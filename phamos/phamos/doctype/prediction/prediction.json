@@ -7,12 +7,13 @@
  "engine": "InnoDB",
  "field_order": [
   "month_and_year",
-  "prediction"
+  "prediction",
+  "date"
  ],
  "fields": [
   {
    "fieldname": "month_and_year",
-   "fieldtype": "Data",
+   "fieldtype": "Select",
    "in_list_view": 1,
    "label": "Month And Year"
   },
@@ -21,13 +22,21 @@
    "fieldtype": "Int",
    "in_list_view": 1,
    "label": "Prediction"
+  },
+  {
+   "default": "Today",
+   "fieldname": "date",
+   "fieldtype": "Date",
+   "in_list_view": 1,
+   "label": "Date",
+   "read_only": 1
   }
  ],
  "grid_page_length": 50,
  "index_web_pages_for_search": 1,
  "istable": 1,
  "links": [],
- "modified": "2025-05-13 17:25:20.670010",
+ "modified": "2025-06-02 11:53:13.702129",
  "modified_by": "Administrator",
  "module": "Phamos",
  "name": "Prediction",
