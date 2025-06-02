@@ -39,54 +39,91 @@ frappe.ui.form.on("Implementation", {
 		}
 	},
 	refresh: function(frm) {
-		
-		if (!frm.is_new()) {
-			frm.add_custom_button('Set Implementation Status', () => {
-				frappe.call({
-					method: 'phamos.phamos.doctype.implementation.implementation.are_all_projects_closed',
-					args: {
-						implementation_name: frm.doc.name
-					},
-					callback: function (r) {
-						if (r.message === true) {
-							let d = new frappe.ui.Dialog({
-								title: 'Set Implementation Status',
-								fields: [
-									{
-										label: 'Status',
-										fieldname: 'status',
-										fieldtype: 'Select',
-										options: ['Completed', 'Cancelled'],
-										reqd: 1
-									},
-									{
-										label: 'Reason',
-										fieldname: 'reason',
-										fieldtype: 'Small Text',
-										reqd: 1
-									}
-								],
-								primary_action_label: 'Submit',
-								primary_action(values) {
-									frm.set_value('status', values.status);
-									frm.set_value('status_statement', values.reason);
-									frm.save();
-									d.hide();
-								}
-							});
-							d.show();
-						} else {
-							frappe.throw(__('All projects must be closed before setting implementation status.'));
-						}
-					}
-				});
-			});
-		}
+        let options = [];
+        let today = new Date();
+        let currentMonth = today.getMonth(); // 0-based (0 = Jan)
+        let currentYear = today.getFullYear();
+
+        for (let i = 0; i < 12; i++) {
+            let date = new Date(currentYear, currentMonth + i, 1); // add i months
+            let year = date.getFullYear();
+            let month = String(date.getMonth() + 1).padStart(2, '0'); // 1-based month
+            options.push(`${year}-${month}`);
+        }
+
+        console.log("Setting options for month_and_year:", options);
+
+        if (frm.fields_dict['resource_planning_prediction']) {
+            frm.fields_dict['resource_planning_prediction'].grid.update_docfield_property(
+                'month_and_year',
+                'options',
+                options.join('\n')
+            );
+        } else {
+            console.warn("Child table field not available yet.");
+        }
+    
+        frm.add_custom_button('Set Implementation Status', () => {
+            frappe.call({
+                method: 'phamos.phamos.doctype.implementation.implementation.are_all_projects_closed',
+                args: {
+                    implementation_name: frm.doc.name
+                },
+                callback: function (r) {
+                    if (r.message === true) {
+                        let d = new frappe.ui.Dialog({
+                            title: 'Set Implementation Status',
+                            fields: [
+                                {
+                                    label: 'Status',
+                                    fieldname: 'status',
+                                    fieldtype: 'Select',
+                                    options: ['Completed', 'Cancelled'],
+                                    reqd: 1
+                                },
+                                {
+                                    label: 'Reason',
+                                    fieldname: 'reason',
+                                    fieldtype: 'Small Text',
+                                    reqd: 1
+                                }
+                            ],
+                            primary_action_label: 'Submit',
+                            primary_action(values) {
+                                frm.set_value('status', values.status);
+                                frm.set_value('status_statement', values.reason);
+                                frm.save();
+                                d.hide();
+                            }
+                        });
+                        d.show();
+                    } else {
+                        frappe.throw(__('All projects must be closed before setting implementation status.'));
+                    }
+                }
+            });
+        });
+		// }
 		
 		//////////////////////////////////////////////Resource Planning graph////////////////////////////////////////
+        const fromMonth = frm.doc.from_date ? frm.doc.from_date.slice(0, 7) : null;
+        const toMonth = frm.doc.to_date ? frm.doc.to_date.slice(0, 7) : null;
 
-        const planningData = frm.doc.resource_planning || [];
-        const predictionData = frm.doc.resource_planning_prediction || [];
+        function isWithinRange(monthYear, fromMonth, toMonth) {
+            return (!fromMonth || monthYear >= fromMonth) &&
+                (!toMonth || monthYear <= toMonth);
+        }
+
+
+
+        const planningData = (frm.doc.resource_planning || []).filter(row =>
+            row.month_and_year && isWithinRange(row.month_and_year, fromMonth, toMonth)
+        );
+
+        const predictionData = (frm.doc.resource_planning_prediction || []).filter(row =>
+            row.month_and_year && isWithinRange(row.month_and_year, fromMonth, toMonth)
+        );
+
 
         const categorySet = new Set();
         planningData.forEach(row => categorySet.add(row.month_and_year));
@@ -328,6 +365,9 @@ frappe.ui.form.on("Implementation", {
                 }
             });
         }
+        
+
+    
     }
 });
 function render_module_chart(frm) {
@@ -438,4 +478,9 @@ frappe.ui.form.on("Sales Order Status Information", {
 		}
 	}
 });
+
+
+
+
+
 
