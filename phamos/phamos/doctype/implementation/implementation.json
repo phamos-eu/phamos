@@ -48,6 +48,14 @@
  ],
  "fields": [
   {
+   "default": "Open",
+   "fieldname": "status",
+   "fieldtype": "Select",
+   "label": "Status",
+   "options": "Open\nCancelled\nCompleted",
+   "read_only": 1
+  },
+  {
    "fieldname": "notes",
    "fieldtype": "Text Editor",
    "label": "Notes"
