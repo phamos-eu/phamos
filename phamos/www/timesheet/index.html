@@ -3,14 +3,22 @@
 {% block style %}
   <link rel="stylesheet" href="/assets/phamos/css/timesheet.css" />
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+  <script src="https://code.highcharts.com/highcharts.js"></script>
 
 {% endblock %}
 
 {% block page_content %}
 <!-- Subtract ERPNext navbar height -->
-<div class="d-flex flex-column px-3 py-3" style="height: calc(100vh - 56px);">
+<div class="d-flex flex-column px-3 py-3" style="height: calc(130vh - 56px);">
 
   {% include "phamos/www/timesheet/summary_cards.html" %}
+  <!-- Timesheet graph -->
+<div class="card my-3 p-3">
+  <h5>Billable vs Non-Billable vs Total Hours</h5>
+  <div id="timesheet-graph-container" style="height: 400px;"></div>
+</div>
+<!-- Timesheet graph ends -->
+
   <!-- Header Bar -->
   <div class="mb-3">
     <div class="d-flex justify-content-between align-items-center mb-2">

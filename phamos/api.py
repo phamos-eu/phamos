@@ -118,3 +118,28 @@ def get_timesheet_totals(from_date=None, to_date=None, project=None):
         "total_hours": total_hours,
         "billable_hours": billable_hours
     }
+
+
+@frappe.whitelist()
+def get_graph_data(from_date=None, to_date=None, project=None):
+    filters = ""
+    if from_date:
+        filters += f" AND start_date >= '{from_date}'"
+    if to_date:
+        filters += f" AND end_date <= '{to_date}'"
+    if project:
+        filters += f" AND project = '{project}'"
+
+    data = frappe.db.sql(f"""
+        SELECT name, start_date, total_hours, total_billable_hours
+        FROM `tabTimesheet`
+        WHERE docstatus < 2 {filters}
+        ORDER BY start_date
+    """, as_dict=True)
+
+    return {"timesheets": data}
+
+
+
+
+
