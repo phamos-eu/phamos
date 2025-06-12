@@ -4,39 +4,273 @@ frappe.ui.form.on("Implementation", {
 	setup:function(frm){
 		if(!frm.is_new()){
 			add_row_to_sales_order(frm)
-			frappe.call({
-				method: "phamos.phamos.doctype.implementation.implementation.get_financial_history",
-				args: {'name':frm.doc.name,'customer':frm.doc.customer},
-				callback: function (r) {
-					if(r.message){
-						frm.set_value('sales_order_total_hrs', r.message['sales_order_qty'])
-						frm.set_value('delivered_total_hrs', r.message['dn_qty'])
-						frm.set_value('total_hrs_timesheet', r.message['timesheet_hrs'])
-						frm.set_value('remaining_hrs',r.message['remaining_hrs'])
-						let label1= ['Sales Order Hrs']
-		                let value1 = [r.message['sales_order_qty']]
+			if (frm.doc.internal_implementation == 0) {
+				frappe.call({
+					method: "phamos.phamos.doctype.implementation.implementation.get_financial_history",
+					args: {'name':frm.doc.name,'customer':frm.doc.customer},
+					callback: function (r) {
+						if(r.message){
+							frm.set_value('sales_order_total_hrs', r.message['sales_order_qty'])
+							frm.set_value('delivered_total_hrs', r.message['dn_qty'])
+							frm.set_value('total_hrs_timesheet', r.message['timesheet_hrs'])
+							frm.set_value('remaining_hrs',r.message['remaining_hrs'])
+							let label1= ['Sales Order Hrs']
+							let value1 = [r.message['sales_order_qty']]
 
-		                
-		                $(frm.fields_dict.total_sales.wrapper).html('<div id="total-sales"><h1>hiiii</h1></div>');
-		                
-		                let chart = new frappe.Chart("#total-sales", {
-		                    type: 'percentage',
-		                    data: {
-		                        labels: label1,
-		                        datasets: [
-				                    {name:"Financial Information",values: value1}]},
-		                    colors: ['#7cd6fd'],
-		                    height: 250,
-		                    width:250
-		                });
-		                
-						frm.save()
-					}
-				},
-			});
+							
+							$(frm.fields_dict.total_sales.wrapper).html('<div id="total-sales"><h1>hiiii</h1></div>');
+							
+							let chart = new frappe.Chart("#total-sales", {
+								type: 'percentage',
+								data: {
+									labels: label1,
+									datasets: [
+										{name:"Financial Information",values: value1}]},
+								colors: ['#7cd6fd'],
+								height: 250,
+								width:250
+							});
+							
+							frm.save()
+						}
+					},
+				});
+			}
 		}
 	},
 	refresh: function(frm) {
+        let options = [];
+        let today = new Date();
+        let currentMonth = today.getMonth(); // 0-based (0 = Jan)
+        let currentYear = today.getFullYear();
+
+        for (let i = 0; i < 12; i++) {
+            let date = new Date(currentYear, currentMonth + i, 1); // add i months
+            let year = date.getFullYear();
+            let month = String(date.getMonth() + 1).padStart(2, '0'); // 1-based month
+            options.push(`${year}-${month}`);
+        }
+
+        console.log("Setting options for month_and_year:", options);
+
+        if (frm.fields_dict['resource_planning_prediction']) {
+            frm.fields_dict['resource_planning_prediction'].grid.update_docfield_property(
+                'month_and_year',
+                'options',
+                options.join('\n')
+            );
+        } else {
+            console.warn("Child table field not available yet.");
+        }
+    
+        frm.add_custom_button('Set Implementation Status', () => {
+            frappe.call({
+                method: 'phamos.phamos.doctype.implementation.implementation.are_all_projects_closed',
+                args: {
+                    implementation_name: frm.doc.name
+                },
+                callback: function (r) {
+                    if (r.message === true) {
+                        let d = new frappe.ui.Dialog({
+                            title: 'Set Implementation Status',
+                            fields: [
+                                {
+                                    label: 'Status',
+                                    fieldname: 'status',
+                                    fieldtype: 'Select',
+                                    options: ['Completed', 'Cancelled'],
+                                    reqd: 1
+                                },
+                                {
+                                    label: 'Reason',
+                                    fieldname: 'reason',
+                                    fieldtype: 'Small Text',
+                                    reqd: 1
+                                }
+                            ],
+                            primary_action_label: 'Submit',
+                            primary_action(values) {
+                                frm.set_value('status', values.status);
+                                frm.set_value('status_statement', values.reason);
+                                frm.save();
+                                d.hide();
+                            }
+                        });
+                        d.show();
+                    } else {
+                        frappe.throw(__('All projects must be closed before setting implementation status.'));
+                    }
+                }
+            });
+        });
+		// }
+		
+		//////////////////////////////////////////////Resource Planning graph////////////////////////////////////////
+        const fromMonth = frm.doc.from_date ? frm.doc.from_date.slice(0, 7) : null;
+        const toMonth = frm.doc.to_date ? frm.doc.to_date.slice(0, 7) : null;
+
+        function isWithinRange(monthYear, fromMonth, toMonth) {
+            return (!fromMonth || monthYear >= fromMonth) &&
+                (!toMonth || monthYear <= toMonth);
+        }
+
+
+
+        const planningData = (frm.doc.resource_planning || []).filter(row =>
+            row.month_and_year && isWithinRange(row.month_and_year, fromMonth, toMonth)
+        );
+
+        const predictionData = (frm.doc.resource_planning_prediction || []).filter(row =>
+            row.month_and_year && isWithinRange(row.month_and_year, fromMonth, toMonth)
+        );
+
+
+        const categorySet = new Set();
+        planningData.forEach(row => categorySet.add(row.month_and_year));
+        predictionData.forEach(row => categorySet.add(row.month_and_year));
+
+        const categories = Array.from(categorySet).sort((a, b) => new Date(a) - new Date(b));
+
+        const categoryIndexMap = {};
+        categories.forEach((month, idx) => {
+            categoryIndexMap[month] = idx;
+        });
+
+        const billable = new Array(categories.length).fill(0);
+        const nonBillable = new Array(categories.length).fill(0);
+
+        planningData.forEach(row => {
+            const idx = categoryIndexMap[row.month_and_year];
+            billable[idx] += row.billable_time_spent || 0;
+            nonBillable[idx] += row.non_billable_time_spent || 0;
+        });
+
+        const predictionPoints = predictionData
+            .map(row => ({
+                x: categoryIndexMap[row.month_and_year],
+                y: row.prediction || 0
+            }))
+            .sort((a, b) => a.x - b.x); 
+
+        // Calculate monthly average prediction
+        const monthlyPredictionSum = {};
+        const monthlyPredictionCount = {};
+
+        predictionData.forEach(row => {
+            const month = row.month_and_year;
+            const prediction = row.prediction || 0;
+
+            if (!monthlyPredictionSum[month]) {
+                monthlyPredictionSum[month] = 0;
+                monthlyPredictionCount[month] = 0;
+            }
+
+            monthlyPredictionSum[month] += prediction;
+            monthlyPredictionCount[month] += 1;
+        });
+
+        const averagePredictions = categories.map(month => {
+            const sum = monthlyPredictionSum[month] || 0;
+            const count = monthlyPredictionCount[month] || 0;
+            return count > 0 ? sum / count : null;
+        });
+
+        const wrapper = frm.fields_dict.resource_chart.$wrapper;
+        wrapper.empty();
+        wrapper.append('<div id="resource-planning-highchart" style="height:400px;"></div>');
+
+        Highcharts.chart('resource-planning-highchart', {
+            chart: {
+                zoomType: 'xy'
+            },
+            title: {
+                text: 'Billable vs Non-Billable Time with Prediction'
+            },
+            xAxis: {
+                categories: categories,
+                title: {
+                    text: 'Month'
+                }
+            },
+            yAxis: {
+                title: {
+                    text: 'Time (hrs)'
+                }
+            },
+            tooltip: {
+                shared: true,
+                valueSuffix: ' hrs'
+            },
+            plotOptions: {
+                area: {
+                    stacking: 'normal',
+                    marker: {
+                        enabled: false
+                    }
+                },
+                line: {
+                    marker: {
+                        enabled: true,
+                        radius: 4
+                    }
+                }
+            },
+            series: [
+                {
+                    name: 'Non-Billable Time',
+                    type: 'area',
+                    data: nonBillable,
+                    color: '#ff9933'
+                },
+                {
+                    name: 'Billable Time',
+                    type: 'area',
+                    data: billable,
+                    color: '#3399ff'
+                },
+                {
+                    name: 'Prediction',
+                    type: 'scatter',
+                    data: predictionPoints,
+                    color: '#28a745',
+                    marker: {
+                        symbol: 'circle',
+                        radius: 5
+                    },
+                    tooltip: {
+                        pointFormat: '<span style="color:{series.color}">\u25CF</span> {series.name}: <b>{point.y} hrs</b><br/>'
+                    }
+                },
+                {
+                    name: 'Average Prediction',
+                    type: 'line',
+                    data: averagePredictions,
+                    color: 'red',
+                    dashStyle: 'ShortDash',
+                    marker: {
+                        enabled: true,
+                        symbol: 'diamond',
+                        radius: 4
+                    },
+                    tooltip: {
+                        pointFormat: '<span style="color:{series.color}">\u25CF</span> {series.name}: <b>{point.y:.2f} hrs</b><br/>'
+                    }
+                }
+            ]
+        });
+
+
+		//////////////////////////////////////////////////////////////////////////////////////////////////////
+    
+		// radar chart
+		if (!frm.fields_dict.module_chart.$wrapper.find('canvas').length) {
+            frm.fields_dict.module_chart.$wrapper.html('<canvas id="radar-chart" style="height: 500px;width: 500px;"></canvas>');
+        }
+
+        frappe.require("https://cdn.jsdelivr.net/npm/chart.js", function () {
+            render_module_chart(frm);
+        });
+		// radar chart ends
 		if(!frm.is_new()){ 
 			frappe.call({
 				method: "phamos.phamos.doctype.implementation.implementation.get_financial_history",
@@ -111,9 +345,90 @@ frappe.ui.form.on("Implementation", {
 			});
 		}
     },
+	onload: function(frm) {
+        if (frm.is_new()) {
+            frappe.call({
+                method: 'frappe.client.get_list',
+                args: {
+                    doctype: 'Implementation Module',
+                    fields: ['name'],
+                    limit_page_length: 1000 
+                },
+                callback: function(r) {
+                    if (r.message) {
+                        r.message.forEach(module => {
+                            let child = frm.add_child('modules');
+                            child.module = module.name;
+                        });
+                        frm.refresh_field('modules');
+                    }
+                }
+            });
+        }
+        
+
+    
+    }
 });
+function render_module_chart(frm) {
+    const labels = [];
+    const currentLevels = [];
+    const targetLevels = [];
 
+    (frm.doc.modules || []).forEach(row => {
+        if (row.is_required) {
+            labels.push(row.module);
+            currentLevels.push(row.current_level || 0);
+            targetLevels.push(row.target_level || 0);
+        }
+    });
 
+    const ctx = document.getElementById('radar-chart');
+    if (!ctx) return;
+
+    if (window.moduleRadarChart) {
+        window.moduleRadarChart.destroy();
+    }
+
+    window.moduleRadarChart = new Chart(ctx, {
+        type: 'radar',
+        data: {
+            labels: labels,
+            datasets: [
+                {
+                    label: 'Current Level',
+                    data: currentLevels,
+                    backgroundColor: 'rgba(75, 202, 234, 0.3)',
+                    borderColor: '#00bcd4',
+                    borderWidth: 2
+                },
+                {
+                    label: 'Target Level',
+                    data: targetLevels,
+                    backgroundColor: 'rgba(192, 5, 5, 0.2)',
+                    borderColor: 'red',
+                    borderWidth: 2
+                }
+            ]
+        },
+        options: {
+            responsive: true,
+			maintainAspectRatio: false,
+
+            scales: {
+                r: {
+                    suggestedMin: 0,
+                    suggestedMax: 10,
+                    pointLabels: {
+                        font: {
+                            size: 12
+                        }
+                    }
+                }
+            }
+        }
+    });
+}
 
 function add_row_to_sales_order(frm){
 	frappe.call({
@@ -163,4 +478,9 @@ frappe.ui.form.on("Sales Order Status Information", {
 		}
 	}
 });
+
+
+
+
+
 
