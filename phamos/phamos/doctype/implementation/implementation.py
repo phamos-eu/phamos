@@ -104,14 +104,12 @@ class Implementation(Document):
 				if d.date == today():
 					d.status = self.status
 					d.maturity_level = self.maturity_level
-					d.mood = self.mood
 					d.forecast = self.forecast
 				else:
 					self.append("status_updates", {
 						"date": today(),
 						"status":self.status,
 						"maturity_level": self.maturity_level,
-						"mood": self.mood,
 						"forecast": self.forecast
 					})
 		else:
@@ -119,7 +117,6 @@ class Implementation(Document):
 				"date": today(),
 				"status":self.status,
 				"maturity_level": self.maturity_level,
-				"mood": self.mood,
 				"forecast": self.forecast
 			})
 
