@@ -72,6 +72,7 @@ frappe.ready(() => {
     $('#to_date').val('');
     $('#project_filter').val('');
     reset_and_load();
+    load_graph_data(); /// load graph data//
   });
 
   $(document).on('click', function (event) {
@@ -100,6 +101,7 @@ function reset_and_load() {
   update_summary_cards();
 
   load_timesheets();
+  load_graph_data(); /////////added to load graph
 }
 
 
@@ -347,3 +349,116 @@ function update_summary_cards() {
     }
   });
 }
+//////////////////////////process your timesheets data////////////////////
+function processDataForGraph(timesheets) {
+  const weekData = {};
+
+  timesheets.forEach(row => {
+    const date = new Date(row.start_date);
+    const day = date.getDay(); // 0 (Sun) to 6 (Sat)
+    const diff = date.getDate() - day + (day === 0 ? -6 : 1); // Adjust to Monday
+    const monday = new Date(date.setDate(diff));
+    const weekStart = monday.toISOString().split('T')[0]; // format YYYY-MM-DD
+
+    if (!weekData[weekStart]) {
+      weekData[weekStart] = { total: 0, billable: 0 };
+    }
+
+    weekData[weekStart].total += parseFloat(row.total_hours || 0);
+    weekData[weekStart].billable += parseFloat(row.total_billable_hours || 0);
+  });
+
+  const dataForChart = Object.entries(weekData).map(([week, values]) => ({
+    week,
+    total: values.total,
+    billable: values.billable,
+    non_billable: values.total - values.billable,
+  }));
+
+  dataForChart.sort((a, b) => a.week.localeCompare(b.week));
+
+  renderTimesheetChart(dataForChart);
+}
+
+
+/////////////////////graph//////////////////////
+function renderTimesheetChart(data) {
+  const categories = data.map(row => row.week);
+  const billable = data.map(row => row.billable);
+  const nonBillable = data.map(row => row.non_billable);
+  const total = data.map(row => row.total);
+
+  Highcharts.chart('timesheet-graph-container', {
+    chart: { type: 'area' },
+    title: { text: 'Billable vs Non-Billable vs Total Hours' },
+    xAxis: {
+      categories,
+      title: { text: 'week' }
+    },
+    yAxis: {
+      min: 0,
+      title: { text: 'Hours' }
+    },
+    tooltip: {
+      shared: true,
+      formatter: function () {
+        let s = `<b></b><br/>`;
+        this.points.forEach(point => {
+          s += `<span style="color:${point.color}">\u25CF</span> ${point.series.name}: <b>${point.y.toFixed(2)} hrs</b><br/>`;
+        });
+        return s;
+      }
+    },
+    plotOptions: {
+      area: { stacking: 'normal', marker: { enabled: false } }
+    },
+    series: [
+      { name: 'Non-Billable', data: nonBillable, color: '#ff9933' },
+      { name: 'Billable', data: billable, color: '#3399ff' },
+      { name: 'Total', type: 'spline', data: total, color: '#2ECC71', marker: { enabled: true } }
+    ]
+  });
+}
+/////////////////////////function to fetch all timesheets and trigger the graph/////////////////////
+function loadAndRenderGraph() {
+  const from_date = $('#from_date').val();
+  const to_date = $('#to_date').val();
+  const project = $('#project_filter').val();
+
+  frappe.call({
+    method: "phamos.api.get_timesheets",
+    args: {
+      from_date,
+      to_date,
+      project,
+      offset: 0,
+      limit: 10000  // high limit to get all data
+    },
+    callback: function (r) {
+      if (r.message && r.message.timesheets) {
+        processDataForGraph(r.message.timesheets);
+      }
+    }
+  });
+}
+/////////////////////////////
+function load_graph_data() {
+  const from_date = $('#from_date').val();
+  const to_date = $('#to_date').val();
+  const project = $('#project_filter').val();
+
+  frappe.call({
+    method: "phamos.api.get_graph_data",
+    args: { from_date, to_date, project },
+    callback: function (r) {
+      if (r.message) {
+        loadAndRenderGraph(r.message);
+      }
+    }
+  });
+}
+
+/////////////////////////////////////
+loadAndRenderGraph();
+
+
