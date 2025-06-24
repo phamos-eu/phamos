@@ -4,3 +4,5 @@ phamos.patches.v1_0.add_custom_fields_for_project #1234567890
 phamos.patches.v1_0.add_nav_bar_item
 phamos.patches.v1_0.set_implementation_status
 phamos.patches.v1_0.updated_maturity_levels
+phamos.patches.v1_0.add_activity_types
+
