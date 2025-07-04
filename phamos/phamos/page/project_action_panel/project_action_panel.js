@@ -99,25 +99,50 @@ frappe.pages["project-action-panel"].on_page_load = function (wrapper) {
   }
 
 
-  window.toggleDropdown = function (event, dropdownId) {
-    event.stopPropagation(); // Prevent clicks from propagating to the document
-  
-    const dropdown = document.getElementById(dropdownId);
-    if (!dropdown) {
-      console.error(`Dropdown with ID ${dropdownId} not found`); // Debugging log
-      return;
+ window.toggleDropdown = function (event, dropdownId) {
+  event.stopPropagation(); // Prevent click from bubbling
+
+  const dropdown = document.getElementById(dropdownId);
+  const button = event.currentTarget;
+
+  if (!dropdown) {
+    console.error(`Dropdown with ID ${dropdownId} not found`);
+    return;
+  }
+
+  // Close other dropdowns
+  document.querySelectorAll('.dropdown-menu').forEach((menu) => {
+    if (menu !== dropdown) {
+      menu.style.display = 'none';
     }
-  
-    // Close other open dropdowns
-    document.querySelectorAll('.dropdown-menu').forEach((menu) => {
-      if (menu !== dropdown) {
-        menu.style.display = 'none';
+  });
+
+  // Toggle the dropdown visibility
+  const isVisible = dropdown.style.display === 'block';
+  dropdown.style.display = isVisible ? 'none' : 'block';
+
+  if (!isVisible) {
+    // Wait for dropdown to render before measuring
+    setTimeout(() => {
+      const buttonRect = button.getBoundingClientRect();
+      const dropdownHeight = dropdown.offsetHeight || 100;
+      const spaceBelow = window.innerHeight - buttonRect.bottom;
+      const spaceAbove = buttonRect.top;
+
+      dropdown.style.position = 'absolute';
+      dropdown.style.left = '0px';
+
+      if (spaceBelow < dropdownHeight && spaceAbove > dropdownHeight) {
+        // Open upward
+        dropdown.style.top = `-${dropdownHeight + 5}px`;
+      } else {
+        // Open downward (default)
+        dropdown.style.top = `${button.offsetHeight + 5}px`;
       }
-    });
-  
-    // Toggle visibility of the clicked dropdown
-    dropdown.style.display = dropdown.style.display === 'block' ? 'none' : 'block';
-  };
+    }, 0);
+  }
+};
+
 
 
   // Close dropdowns when clicking outside
@@ -994,6 +1019,7 @@ function renderProjectDataTable(datatableWrapper, projectData) {
   // Add a combined style element to hide the specified columns and headers
 let style = document.createElement("style");
 style.innerHTML = `
+
 /* Hide the "Name" column cells and header */
 .dt-cell__content--col-10, .dt-cell__content--header-10 { display: none; }
 
