@@ -308,6 +308,7 @@ def total_hours_worked_today():
         .where(
             (TimesheetRecord.employee == employee_name)
             & (fn.Date(TimesheetRecord.from_time) == today_date)
+            & (TimesheetRecord.docstatus != 2)
         )
         .run(as_dict=True)
     )
@@ -354,6 +355,7 @@ def total_hours_worked_in_this_week():
         .where(
             (TimesheetRecord.employee == employee_name)
             & (TimesheetRecord.from_time.between(start_of_week, end_of_week))
+            & (TimesheetRecord.docstatus != 2)
         )
         .run(as_dict=True)
     )
@@ -404,6 +406,8 @@ def total_hours_worked_in_this_month():
         .where(
             (TimesheetRecord.employee == employee_name)
             & (TimesheetRecord.from_time.between(start_of_month, end_of_month))
+            & (TimesheetRecord.docstatus != 2)
+
         )
         .run(as_dict=True)
     )
@@ -432,14 +436,16 @@ def total_hours_worked_in_this_month():
         }
 
 def format_duration(duration_in_seconds):
-    minutes, seconds = divmod(duration_in_seconds, 60)
-    hours, minutes = divmod(minutes, 60)
-    if hours > 0:
-        return f"{int(hours)} Hrs"
-    elif minutes > 0:
-        return f"{int(minutes)} Mins"
-    else:
-        return f"{int(seconds)} Secs"
+    total_minutes = int(duration_in_seconds) // 60
+    hours, minutes = divmod(total_minutes, 60)
+
+    result = []
+    if hours:
+        result.append(f"{hours} h")
+    if minutes or not result:
+        result.append(f"{minutes} m")
+
+    return " ".join(result)
 
 
 @frappe.whitelist()
