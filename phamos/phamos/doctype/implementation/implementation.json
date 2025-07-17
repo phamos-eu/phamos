@@ -16,6 +16,7 @@
   "forecast",
   "trend",
   "status_statement",
+  "team",
   "section_break_uiri",
   "sales_order_total_hrs",
   "total_hrs_timesheet",
@@ -295,6 +296,12 @@
   {
    "fieldname": "section_break_5rmv",
    "fieldtype": "Section Break"
+  },
+  {
+   "fieldname": "team",
+   "fieldtype": "Link",
+   "label": "Team",
+   "options": "Team"
   }
  ],
  "index_web_pages_for_search": 1,
@@ -320,7 +327,7 @@
    "link_fieldname": "custom_implementation"
   }
  ],
- "modified": "2025-05-29 15:58:52.889513",
+ "modified": "2025-07-14 11:01:17.737898",
  "modified_by": "Administrator",
  "module": "Phamos",
  "name": "Implementation",
