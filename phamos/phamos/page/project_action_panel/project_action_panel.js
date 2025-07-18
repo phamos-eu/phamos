@@ -368,6 +368,27 @@ frappe.pages["project-action-panel"].on_page_load = function (wrapper) {
             // Set the width using CSS
             dialog.$wrapper.find(".modal-dialog").css("max-width", "900px");
             dialog.show();
+            // Auto-focus "What I did" field after slight delay
+            let userHasTyped = false;
+            const textarea = dialog.fields_dict.result.$wrapper.find("textarea")[0];
+
+            // Focus initially
+            textarea.focus();
+
+            // Re-focus if user hasn't typed yet and focus is lost
+            textarea.addEventListener("blur", function () {
+              if (!userHasTyped) {
+                setTimeout(() => textarea.focus(), 200);
+              }
+            });
+
+            // Detect if user types anything
+            textarea.addEventListener("input", function () {
+              if (textarea.value.trim()) {
+                userHasTyped = true;
+              }
+            });
+
           }
         );
       }
