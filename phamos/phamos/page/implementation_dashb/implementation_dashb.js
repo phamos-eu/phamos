@@ -78,13 +78,10 @@ frappe.pages['implementation-dashb'].on_page_load = function (wrapper) {
 
                 const planningData = r.message.planning || [];
                 const predictionData = r.message.prediction || [];
-                const addonData = r.message.addon || [];
-
 
                 const categorySet = new Set();
                 planningData.forEach(row => categorySet.add(row.month_and_year));
                 predictionData.forEach(row => categorySet.add(row.month_and_year));
-                addonData.forEach(row => categorySet.add(row.month_and_year));
 
                 const categories = Array.from(categorySet).sort();
                 const categoryIndexMap = {};
@@ -151,33 +148,6 @@ frappe.pages['implementation-dashb'].on_page_load = function (wrapper) {
                 });
                 const isFiltered = filters.implementation.get_value() || filters.team.get_value();
 
-                const addonSeries = categories.map(month => {
-                    const found = addonData.find(row => row.month_and_year === month);
-                    return found ? found.total_hours : 0;
-                });
-
-                series.push({
-                    name: "Internal project hrs",
-                    type: "line",
-                    data: addonSeries,
-                    color: "orange",
-                    dashStyle: "ShortDot",
-                    marker: { enabled: true, radius: 4 },
-                    tooltip: {
-                        pointFormat: '<span style="color:{point.color}">\u25CF</span> Internal Hrs: <b>{point.y}</b><br/>'
-                    },
-                    events: {
-                        click: function (e) {
-                            frappe.msgprint({
-                                title: "Internal project hrs",
-                                message: `Month: <b>${e.point.category}</b><br>Total Hours: <b>${e.point.y}</b>`,
-                                indicator: "orange"
-                            });
-                        }
-                    }
-                });
-
-
     if (isFiltered) {
         // 1. Individual Prediction Dots (scatter)
         const predictionDots = predictionData.map(row => ({
@@ -236,7 +206,13 @@ frappe.pages['implementation-dashb'].on_page_load = function (wrapper) {
                 pointFormat: '<span style="color:{point.color}">\u25CF</span> Cumulative: <b>{point.y}</b><br/>'
             }
         });
+
+
             }
+
+
+
+
                 const predictionPoints = predictionData.map(row => ({
                     x: categoryIndexMap[row.month_and_year],
                     y: row.prediction || 0
@@ -248,47 +224,34 @@ frappe.pages['implementation-dashb'].on_page_load = function (wrapper) {
                     return filtered.length ? total / filtered.length : null;
                 });
 
-                $('#chart-container').html('<div id="implementation-chart" style="height:600px;"></div>');
+                $('#chart-container').html('<div id="implementation-chart" style="height:400px;"></div>');
+
                 Highcharts.chart('implementation-chart', {
-                chart: { zoomType: 'xy' },
-                title: { text: 'Billable vs Non-Billable Time with Prediction' },
-                xAxis: {
-                    categories: categories,
-                    title: { text: 'Month' }
-                },
-                yAxis: {
-                    title: { text: 'Time (hrs)' }
-                },
-                tooltip: {
-                    shared: true,
-                    formatter: function () {
-                        let total = 0;
-                        let s = `<b>${this.x}</b><br/>`;
-
-                        this.points.forEach(point => {
-                            s += `<span style="color:${point.color}">\u25CF</span> 
-                                ${point.series.name}: <b>${point.y} hrs</b><br/>`;
-
-                            if (!point.series.name.includes('Prediction')) {
-                                total += point.y;
-                            }
-                        });
-
-                        s += `<hr/><b>Total Worked Hrs: ${total} hrs</b>`;
-                        return s;
-                    }
-                },
-                plotOptions: {
-                    area: {
-                        stacking: 'normal',
-                        marker: { enabled: false }
+                    chart: { zoomType: 'xy' },
+                    title: { text: 'Billable vs Non-Billable Time with Prediction' },
+                    xAxis: {
+                        categories: categories,
+                        title: { text: 'Month' }
                     },
-                    line: {
-                        marker: { enabled: true, radius: 3 }
-                    }
-                },
-                series: series 
-            });
+                    yAxis: {
+                        title: { text: 'Time (hrs)' }
+                    },
+                    tooltip: { shared: true, valueSuffix: ' hrs' },
+                    plotOptions: {
+                        area: {
+                            stacking: 'normal',
+                            marker: { enabled: false }
+                        },
+                        line: {
+                            marker: {
+                                enabled: true,
+                                radius: 4
+                            }
+                        }
+                    },
+                    series: series
+
+                });
             }
         });
     }
