@@ -347,6 +347,7 @@
    "write": 1
   }
  ],
+ "row_format": "Dynamic",
  "search_fields": "account_manager",
  "sort_field": "modified",
  "sort_order": "DESC",

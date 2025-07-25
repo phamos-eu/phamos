@@ -10,7 +10,8 @@
   "is_required",
   "project",
   "target_level",
-  "current_level"
+  "current_level",
+  "comments"
  ],
  "fields": [
   {
