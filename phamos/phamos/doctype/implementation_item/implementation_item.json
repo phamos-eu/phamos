@@ -15,6 +15,7 @@
  ],
  "fields": [
   {
+   "columns": 2,
    "fieldname": "module",
    "fieldtype": "Link",
    "in_list_view": 1,
@@ -22,6 +23,7 @@
    "options": "Implementation Module"
   },
   {
+   "columns": 1,
    "default": "0",
    "fieldname": "is_required",
    "fieldtype": "Check",
@@ -29,6 +31,7 @@
    "label": "Is Required?"
   },
   {
+   "columns": 2,
    "fieldname": "project",
    "fieldtype": "Link",
    "in_list_view": 1,
@@ -36,18 +39,21 @@
    "options": "Project"
   },
   {
+   "columns": 1,
    "fieldname": "target_level",
    "fieldtype": "Int",
    "in_list_view": 1,
    "label": "Target Level"
   },
   {
+   "columns": 1,
    "fieldname": "current_level",
    "fieldtype": "Int",
    "in_list_view": 1,
    "label": "Current Level"
   },
   {
+   "columns": 3,
    "fieldname": "comments",
    "fieldtype": "Small Text",
    "in_list_view": 1,
@@ -58,7 +64,7 @@
  "index_web_pages_for_search": 1,
  "istable": 1,
  "links": [],
- "modified": "2025-06-12 17:20:08.143673",
+ "modified": "2025-07-16 09:15:20.008027",
  "modified_by": "Administrator",
  "module": "Phamos",
  "name": "Implementation Item",
