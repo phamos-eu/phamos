@@ -26,14 +26,14 @@
  ],
  "fields": [
   {
+   "description": "Please double-check the project number with your supervisor.",
    "fieldname": "project",
    "fieldtype": "Link",
    "in_list_view": 1,
    "in_standard_filter": 1,
    "label": "Project",
    "options": "Project",
-   "reqd": 1,
-   "description": "Please double-check the project number with your supervisor."
+   "reqd": 1
   },
   {
    "fieldname": "customer",
@@ -47,8 +47,7 @@
    "fieldtype": "Link",
    "in_list_view": 1,
    "label": "Activity Type",
-   "options": "Activity Type",
-   "reqd": 1
+   "options": "Activity Type"
   },
   {
    "fieldname": "task",
@@ -131,11 +130,11 @@
   },
   {
    "default": "100",
+   "description": "This is a personal indicator to your own performance on the work you have done. It will influence the billable time of the Timesheet created",
    "fieldname": "percent_billable",
    "fieldtype": "Select",
    "label": "Percent Billable",
-   "options": "0\n25\n50\n75\n100",
-   "description": "This is a personal indicator to your own performance on the work you have done. It will influence the billable time of the Timesheet created"
+   "options": "0\n25\n50\n75\n100"
   },
   {
    "fieldname": "employee",
@@ -144,10 +143,11 @@
    "options": "Employee"
   }
  ],
+ "grid_page_length": 50,
  "index_web_pages_for_search": 1,
  "is_submittable": 1,
  "links": [],
- "modified": "2024-02-27 09:15:34.892920",
+ "modified": "2025-06-18 13:54:06.766022",
  "modified_by": "Administrator",
  "module": "Phamos",
  "name": "Timesheet Record",
@@ -169,6 +169,7 @@
    "write": 1
   }
  ],
+ "row_format": "Dynamic",
  "sort_field": "modified",
  "sort_order": "DESC",
  "states": []

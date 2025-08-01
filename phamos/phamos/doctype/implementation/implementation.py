@@ -99,29 +99,27 @@ class Implementation(Document):
 
 	def add_status_history(self):
 		date = today()
+		found_today = False
+
 		if self.status_updates:
 			for d in self.status_updates:
-				if d.date == today():
-					d.status = self.status
+				if d.date == date:
+					d.status_statement = self.status_statement
 					d.maturity_level = self.maturity_level
-					d.mood = self.mood
 					d.forecast = self.forecast
-				else:
-					self.append("status_updates", {
-						"date": today(),
-						"status":self.status,
-						"maturity_level": self.maturity_level,
-						"mood": self.mood,
-						"forecast": self.forecast
-					})
-		else:
+					d.trend = self.trend
+					found_today = True
+					break 
+
+		if not found_today:
 			self.append("status_updates", {
-				"date": today(),
-				"status":self.status,
+				"date": date,
+				"status_statement": self.status_statement,
 				"maturity_level": self.maturity_level,
-				"mood": self.mood,
-				"forecast": self.forecast
+				"forecast": self.forecast,
+				"trend" : self.trend
 			})
+
 
 
 						

@@ -22,3 +22,16 @@
 .card{
     background: #e4e4e4 ;
 }
+.pl-3, .px-3 {
+    padding-left: 0rem !important;
+}
+.pr-3, .px-3 {
+    padding-right: 0rem !important;
+}
+
+@media (min-width: 1440px) {
+    .container {
+        padding-left: 0rem;
+        padding-right: 0rem;
+    }
+}
