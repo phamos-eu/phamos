@@ -38,6 +38,7 @@
   {
    "fieldname": "last_synced",
    "fieldtype": "Datetime",
+   "in_list_view": 1,
    "label": "Last Synced"
   },
   {
@@ -55,7 +56,7 @@
    "link_fieldname": "gitlab_project"
   }
  ],
- "modified": "2025-07-03 14:30:15.357905",
+ "modified": "2025-08-04 08:52:16.606692",
  "modified_by": "Administrator",
  "module": "GitLab Integration",
  "name": "GitLab Project",
