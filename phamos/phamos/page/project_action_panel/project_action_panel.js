@@ -126,8 +126,13 @@ frappe.pages["project-action-panel"].on_page_load = function (wrapper) {
     setTimeout(() => {
       const buttonRect = button.getBoundingClientRect();
       const dropdownHeight = dropdown.offsetHeight || 100;
-      const spaceBelow = window.innerHeight - buttonRect.bottom;
-      const spaceAbove = buttonRect.top;
+
+      // Instead of window.innerHeight, get the nearest scrollable parent height
+      let scrollContainer = button.closest(".datatable") || document.documentElement;
+      const containerRect = scrollContainer.getBoundingClientRect();
+
+      const spaceBelow = containerRect.bottom - buttonRect.bottom;
+      const spaceAbove = buttonRect.top - containerRect.top;
 
       dropdown.style.position = 'absolute';
       dropdown.style.left = '0px';
