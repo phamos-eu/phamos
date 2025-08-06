@@ -12,7 +12,8 @@
 }
 
 .dropdown-menu {
-    z-index: 2000;
+    position: absolute;
+    z-index: 10000 !important;
 }
   
 .data-table{
@@ -31,6 +32,7 @@
 
 @media (min-width: 1440px) {
     .container {
+        overflow: visible !important;
         padding-left: 0rem;
         padding-right: 0rem;
     }
