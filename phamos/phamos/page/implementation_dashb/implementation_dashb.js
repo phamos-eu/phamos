@@ -46,6 +46,20 @@ frappe.pages['implementation-dashb'].on_page_load = function (wrapper) {
 
     // Chart rendering
     function load_chart() {
+        let from_date = filters.from_date.get_value();
+        let to_date = filters.to_date.get_value();
+
+        if (!from_date && !to_date) {
+            const today = frappe.datetime.get_today(); 
+            const past6 = frappe.datetime.add_months(today, -6); 
+            const future6 = frappe.datetime.add_months(today, 6);
+
+            from_date = past6;
+            to_date = future6;
+
+            filters.from_date.set_value(from_date);
+            filters.to_date.set_value(to_date);
+        }
         const args = {
             from_date: filters.from_date.get_value(),
             to_date: filters.to_date.get_value(),
@@ -132,48 +146,68 @@ frappe.pages['implementation-dashb'].on_page_load = function (wrapper) {
 
 
                 });
-                if (filters.implementation.get_value() || filters.team.get_value()) {
-                // 1. Prediction as dots (scatter)
-                const predictionDots = predictionData.map(row => ({
-                    x: categoryIndexMap[row.month_and_year],
-                    y: row.prediction || 0
-                }));
+                const isFiltered = filters.implementation.get_value() || filters.team.get_value();
 
-                series.push({
-                    name: 'Prediction',
-                    type: 'scatter',
-                    data: predictionDots,
-                    color: '#ff0000',
-                    marker: {
-                        symbol: 'circle',
-                        radius: 4
-                    },
-                    tooltip: {
-                        pointFormat: '<span style="color:{point.color}">\u25CF</span> Prediction: <b>{point.y}</b><br/>'
-                    }
-                });
+    if (isFiltered) {
+        // 1. Individual Prediction Dots (scatter)
+        const predictionDots = predictionData.map(row => ({
+            x: categoryIndexMap[row.month_and_year],
+            y: row.prediction || 0
+        }));
 
-                // 2. Average Prediction per month
-                const averagePredictions = categories.map(month => {
-                    const filtered = predictionData.filter(row => row.month_and_year === month);
-                    const total = filtered.reduce((sum, r) => sum + (r.prediction || 0), 0);
-                    return filtered.length ? total / filtered.length : null;
-                });
+        series.push({
+            name: 'Prediction',
+            type: 'scatter',
+            data: predictionDots,
+            color: '#ff0000',
+            marker: {
+                symbol: 'circle',
+                radius: 4
+            },
+            tooltip: {
+                pointFormat: '<span style="color:{point.color}">\u25CF</span> Prediction: <b>{point.y}</b><br/>'
+            }
+        });
 
-                series.push({
-                    name: 'Average Prediction',
-                    type: 'line',
-                    data: averagePredictions,
-                    color: '#000000',
-                    dashStyle: 'Dot',
-                    marker: {
-                        enabled: true,
-                        radius: 3
-                    },
-                    tooltip: {
-                        pointFormat: '<span style="color:{point.color}">\u25CF</span> Avg Prediction: <b>{point.y:.2f}</b><br/>'
-                    }
-                });
+        // 2. Average Prediction Line (filtered)
+        const averagePredictions = categories.map(month => {
+            const filtered = predictionData.filter(row => row.month_and_year === month);
+            const total = filtered.reduce((sum, r) => sum + (r.prediction || 0), 0);
+            return filtered.length ? total / filtered.length : null;
+        });
+
+        series.push({
+            name: 'Average Prediction',
+            type: 'line',
+            data: averagePredictions,
+            color: '#000000',
+            dashStyle: 'Dot',
+            marker: { enabled: true, radius: 3 },
+            tooltip: {
+                pointFormat: '<span style="color:{point.color}">\u25CF</span> Avg Prediction: <b>{point.y:.2f}</b><br/>'
+            }
+        });
+
+    } else {
+        // Cumulative Prediction Line (all implementations)
+        const cumulativePredictions = categories.map(month => {
+            const monthRows = predictionData.filter(row => row.month_and_year === month);
+            return monthRows.reduce((sum, r) => sum + (r.prediction || 0), 0);
+        });
+
+        series.push({
+            name: 'Cumulative Prediction',
+            type: 'line',
+            data: cumulativePredictions,
+            color: '#000000',
+            dashStyle: 'Solid',
+            marker: { enabled: true, radius: 3 },
+            tooltip: {
+                pointFormat: '<span style="color:{point.color}">\u25CF</span> Cumulative: <b>{point.y}</b><br/>'
+            }
+        });
+
+
             }
 
 
