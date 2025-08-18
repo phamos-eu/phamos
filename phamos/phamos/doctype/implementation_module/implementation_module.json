@@ -6,7 +6,10 @@
  "doctype": "DocType",
  "engine": "InnoDB",
  "field_order": [
-  "module_name"
+  "module_name",
+  "column_break_uevl",
+  "is_standard",
+  "is_required"
  ],
  "fields": [
   {
@@ -14,12 +17,28 @@
    "fieldtype": "Data",
    "label": "Module Name",
    "unique": 1
+  },
+  {
+   "default": "0",
+   "fieldname": "is_required",
+   "fieldtype": "Check",
+   "label": "Is Required"
+  },
+  {
+   "default": "1",
+   "fieldname": "is_standard",
+   "fieldtype": "Check",
+   "label": "Is Standard"
+  },
+  {
+   "fieldname": "column_break_uevl",
+   "fieldtype": "Column Break"
   }
  ],
  "grid_page_length": 50,
  "index_web_pages_for_search": 1,
  "links": [],
- "modified": "2025-04-25 13:52:02.153404",
+ "modified": "2025-08-11 14:39:19.878721",
  "modified_by": "Administrator",
  "module": "Phamos",
  "name": "Implementation Module",
