@@ -351,73 +351,88 @@ function update_summary_cards() {
 }
 //////////////////////////process your timesheets data////////////////////
 function processDataForGraph(timesheets) {
-  const weekData = {};
+    const weekCategories = new Set();
+    const projectData = {};
 
-  timesheets.forEach(row => {
-    const date = new Date(row.start_date);
-    const day = date.getDay(); // 0 (Sun) to 6 (Sat)
-    const diff = date.getDate() - day + (day === 0 ? -6 : 1); // Adjust to Monday
-    const monday = new Date(date.setDate(diff));
-    const weekStart = monday.toISOString().split('T')[0]; // format YYYY-MM-DD
+    timesheets.forEach(row => {
+        const date = new Date(row.start_date);
+        const day = date.getDay();
+        const diff = date.getDate() - day + (day === 0 ? -6 : 1);
+        const monday = new Date(date.setDate(diff));
+        const weekStart = monday.toISOString().split('T')[0];
 
-    if (!weekData[weekStart]) {
-      weekData[weekStart] = { total: 0, billable: 0 };
-    }
+        weekCategories.add(weekStart);
 
-    weekData[weekStart].total += parseFloat(row.total_hours || 0);
-    weekData[weekStart].billable += parseFloat(row.total_billable_hours || 0);
-  });
+        if (!projectData[row.project_name]) {
+            projectData[row.project_name] = {};
+        }
+        if (!projectData[row.project_name][weekStart]) {
+            projectData[row.project_name][weekStart] = { total: 0, billable: 0 };
+        }
 
-  const dataForChart = Object.entries(weekData).map(([week, values]) => ({
-    week,
-    total: values.total,
-    billable: values.billable,
-    non_billable: values.total - values.billable,
-  }));
+        projectData[row.project_name][weekStart].total += parseFloat(row.total_hours || 0);
+        projectData[row.project_name][weekStart].billable += parseFloat(row.total_billable_hours || 0);
+    });
 
-  dataForChart.sort((a, b) => a.week.localeCompare(b.week));
+    const categories = Array.from(weekCategories).sort();
+    const series = [];
+    const colorPairs = [
+        ['#3399ff', '#99ccff'], // Blue pair
+        ['#28a745', '#90ee90'], // Green pair
+        ['#ff9933', '#ffcc99'], // Orange pair
+        ['#800080', '#d1b3ff'], // Purple pair
+        ['#cc0000', '#ff6666']  // Red pair
+    ];
 
-  renderTimesheetChart(dataForChart);
-}
+    let colorIndex = 0;
+    Object.keys(projectData).forEach(projectName => {
+        const billableData = [];
+        const nonBillableData = [];
 
-
-/////////////////////graph//////////////////////
-function renderTimesheetChart(data) {
-  const categories = data.map(row => row.week);
-  const billable = data.map(row => row.billable);
-  const nonBillable = data.map(row => row.non_billable);
-  const total = data.map(row => row.total);
-
-  Highcharts.chart('timesheet-graph-container', {
-    chart: { type: 'area' },
-    title: { text: 'Billable vs Non-Billable vs Total Hours' },
-    xAxis: {
-      categories,
-      title: { text: 'week' }
-    },
-    yAxis: {
-      min: 0,
-      title: { text: 'Hours' }
-    },
-    tooltip: {
-      shared: true,
-      formatter: function () {
-        let s = `<b></b><br/>`;
-        this.points.forEach(point => {
-          s += `<span style="color:${point.color}">\u25CF</span> ${point.series.name}: <b>${point.y.toFixed(2)} hrs</b><br/>`;
+        categories.forEach(week => {
+            const data = projectData[projectName][week] || { total: 0, billable: 0 };
+            billableData.push(data.billable);
+            nonBillableData.push(data.total - data.billable);
         });
-        return s;
-      }
-    },
-    plotOptions: {
-      area: { stacking: 'normal', marker: { enabled: false } }
-    },
-    series: [
-      { name: 'Non-Billable', data: nonBillable, color: '#ff9933' },
-      { name: 'Billable', data: billable, color: '#3399ff' },
-      { name: 'Total', type: 'spline', data: total, color: '#2ECC71', marker: { enabled: true } }
-    ]
-  });
+
+        const colors = colorPairs[colorIndex % colorPairs.length];
+        series.push({
+            name: `${projectName} - Non-Billable`,
+            data: nonBillableData,
+            color: colors[1],
+            stack: projectName
+        });
+        series.push({
+            name: `${projectName} - Billable`,
+            data: billableData,
+            color: colors[0],
+            stack: projectName
+        });
+        
+
+        colorIndex++;
+    });
+
+    Highcharts.chart('timesheet-graph-container', {
+        chart: { type: 'area' },
+        title: { text: 'Billable vs Non-Billable by Project' },
+        xAxis: { categories, title: { text: 'Week' } },
+        yAxis: { min: 0, title: { text: 'Hours' } },
+        tooltip: {
+            shared: true,
+            formatter: function () {
+                let s = `<b>${this.x}</b><br/>`;
+                this.points.forEach(point => {
+                    s += `<span style="color:${point.color}">\u25CF</span> ${point.series.name}: <b>${point.y.toFixed(2)} hrs</b><br/>`;
+                });
+                return s;
+            }
+        },
+        plotOptions: {
+            area: { stacking: 'normal', marker: { enabled: false } }
+        },
+        series
+    });
 }
 /////////////////////////function to fetch all timesheets and trigger the graph/////////////////////
 function loadAndRenderGraph() {

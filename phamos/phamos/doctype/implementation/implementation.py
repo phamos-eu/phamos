@@ -105,6 +105,7 @@ class Implementation(Document):
 			for d in self.status_updates:
 				if d.date == date:
 					d.status_statement = self.status_statement
+					d.status = self.status
 					d.maturity_level = self.maturity_level
 					d.forecast = self.forecast
 					d.trend = self.trend
@@ -115,6 +116,7 @@ class Implementation(Document):
 			self.append("status_updates", {
 				"date": date,
 				"status_statement": self.status_statement,
+				"status": self.status,
 				"maturity_level": self.maturity_level,
 				"forecast": self.forecast,
 				"trend" : self.trend
