@@ -53,7 +53,7 @@
    "fieldname": "status",
    "fieldtype": "Select",
    "label": "Status",
-   "options": "Open\nCancelled\nCompleted",
+   "options": "Open\nCancelled\nCompleted\nReactivated",
    "read_only": 1
   },
   {

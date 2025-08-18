@@ -7,6 +7,7 @@
  "engine": "InnoDB",
  "field_order": [
   "date",
+  "status",
   "status_statement",
   "column_break_vlth",
   "maturity_level",
@@ -54,17 +55,24 @@
    "options": "Improving\nStable\nDeclining"
   },
   {
-   "columns": 3,
+   "columns": 2,
    "fieldname": "status_statement",
    "fieldtype": "Small Text",
    "in_list_view": 1,
    "label": "Status Statement"
+  },
+  {
+   "columns": 1,
+   "fieldname": "status",
+   "fieldtype": "Data",
+   "in_list_view": 1,
+   "label": "Status"
   }
  ],
  "index_web_pages_for_search": 1,
  "istable": 1,
  "links": [],
- "modified": "2025-08-08 15:11:29.279512",
+ "modified": "2025-08-12 10:55:24.618457",
  "modified_by": "Administrator",
  "module": "Phamos",
  "name": "Status Information",
