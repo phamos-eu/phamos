@@ -6,6 +6,11 @@
  "doctype": "DocType",
  "engine": "InnoDB",
  "field_order": [
+  "graph_overview_section",
+  "total_time_spend",
+  "column_break_vsmt",
+  "modules_overview",
+  "section_break_ukuc",
   "status",
   "notes",
   "start_date",
@@ -36,6 +41,13 @@
   "from_date",
   "column_break_wufw",
   "to_date",
+  "section_break_olox",
+  "prediction_from_date",
+  "column_break_jswh",
+  "prediction_to_date",
+  "column_break_jypz",
+  "update",
+  "reset",
   "section_break_5rmv",
   "resource_chart",
   "resource_planning",
@@ -255,9 +267,8 @@
   },
   {
    "fieldname": "from_date",
-   "fieldtype": "Select",
-   "label": "From Date",
-   "options": "2025-01\n2025-02\n2025-03\n2025-04\n2025-05\n2025-06"
+   "fieldtype": "Date",
+   "label": "From Dates"
   },
   {
    "fieldname": "column_break_wufw",
@@ -265,9 +276,8 @@
   },
   {
    "fieldname": "to_date",
-   "fieldtype": "Select",
-   "label": "To Date",
-   "options": "2025-06\n2025-07\n2025-08\n2025-09\n2025-10\n2025-11\n2025-12"
+   "fieldtype": "Date",
+   "label": "To Date"
   },
   {
    "fieldname": "section_break_5rmv",
@@ -278,6 +288,63 @@
    "fieldtype": "Link",
    "label": "Team",
    "options": "Team"
+  },
+  {
+   "collapsible": 1,
+   "fieldname": "graph_overview_section",
+   "fieldtype": "Section Break",
+   "label": "Graph Overview"
+  },
+  {
+   "fieldname": "total_time_spend",
+   "fieldtype": "HTML",
+   "label": "Total Time spend",
+   "options": "<div id=\"resource-planning-highchart-2\" style=\"width:300px; height:300px;\"></div>\n"
+  },
+  {
+   "fieldname": "column_break_vsmt",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "modules_overview",
+   "fieldtype": "HTML",
+   "label": "Modules Overview"
+  },
+  {
+   "fieldname": "section_break_ukuc",
+   "fieldtype": "Section Break"
+  },
+  {
+   "fieldname": "section_break_olox",
+   "fieldtype": "Section Break"
+  },
+  {
+   "fieldname": "prediction_from_date",
+   "fieldtype": "Date",
+   "label": "Prediction From Date "
+  },
+  {
+   "fieldname": "column_break_jswh",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "prediction_to_date",
+   "fieldtype": "Date",
+   "label": "Prediction To Date"
+  },
+  {
+   "fieldname": "column_break_jypz",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "update",
+   "fieldtype": "Button",
+   "label": "Update"
+  },
+  {
+   "fieldname": "reset",
+   "fieldtype": "Button",
+   "label": "Reset"
   }
  ],
  "index_web_pages_for_search": 1,
@@ -303,7 +370,7 @@
    "link_fieldname": "custom_implementation"
   }
  ],
- "modified": "2025-08-11 08:08:20.248657",
+ "modified": "2025-08-18 15:03:47.707783",
  "modified_by": "Administrator",
  "module": "Phamos",
  "name": "Implementation",
