@@ -5,8 +5,12 @@ from frappe.utils import cstr, now_datetime, time_diff_in_seconds, get_datetime,
 from frappe.utils.data import add_to_date,format_duration, time_diff_in_seconds
 from datetime import datetime
 from datetime import datetime, timedelta
+from collections import defaultdict
+from frappe.utils import strip_html
 from frappe.query_builder import Field, Case, Order, DocType, functions as fn
 from frappe.query_builder.functions import Concat, Max, Sum, Round, Coalesce, IfNull
+from frappe.utils import getdate, nowdate, get_first_day, get_last_day, add_days, add_months
+
 
 @frappe.whitelist()
 def create_timesheet_record(project_name,  customer, from_time, expected_time, goal,task=None):
@@ -44,7 +48,277 @@ def create_timesheet_record(project_name,  customer, from_time, expected_time, g
 
 # In your Python script, within @frappe.whitelist()
 @frappe.whitelist()
-def update_and_submit_timesheet_record(name, to_time,percent_billable,activity_type, result,task=None):
+def update_to_time(name):
+    try:
+        doc = frappe.get_doc("Timesheet Record", name)
+
+        for row in doc.item:
+            if not row.to_time:
+                row.to_time = now_datetime()
+                new_row = doc.append("item", {})
+                new_row.from_time = now_datetime()
+                break 
+
+        doc.save()
+        frappe.db.commit()
+
+        return {
+            "status": "success",
+            "message": "to_time updated",
+            "timesheet": name
+        }
+
+    except Exception as e:
+        frappe.log_error(frappe.get_traceback(), "Timesheet Record Update Error")
+        return {
+            "status": "error",
+            "message": "Error updating Timesheet Record"
+        }
+
+@frappe.whitelist()
+def close_open_row_and_add_break(name):
+    try:
+        doc = frappe.get_doc("Timesheet Record", name)
+        current_time = now_datetime()
+        new_row = None
+        previous_from_time = None
+        previous_to_time = None
+
+        if len(doc.item) >= 1:
+            previous_from_time = doc.item[-1].from_time
+
+
+        for idx, row in enumerate(doc.item):
+            if not row.to_time:
+                row.to_time = current_time
+                previous_to_time = row.to_time
+                new_row = doc.append("item", {})
+                new_row.from_time = current_time
+                break
+
+        if not new_row:
+            return {
+                "status": "error",
+                "message": "No open row found to close."
+            }
+
+        doc.save()
+        frappe.db.commit()
+
+        return {
+            "status": "success",
+            "message": "Break row created",
+            "new_row_name": new_row.name,
+            "previous_from_time": previous_from_time,
+            "previous_to_time": previous_to_time,
+        }
+
+    except Exception as e:
+        frappe.log_error(frappe.get_traceback(), "Timesheet Record Break Creation Error")
+        return {
+            "status": "error",
+            "message": f"Error creating break row: {str(e)}"
+        }
+
+@frappe.whitelist()
+def get_assigned_projects(doctype, txt, searchfield, start, page_len, filters):
+    user = frappe.session.user
+    
+    projects = frappe.db.sql("""
+        SELECT DISTINCT p.name, p.project_name
+        FROM `tabProject` p
+        JOIN `tabToDo` t ON t.reference_name = p.name
+        WHERE t.owner = %s
+        AND t.reference_type = 'Project'
+        AND (p.name LIKE %s OR p.project_name LIKE %s)
+        ORDER BY p.project_name ASC
+        LIMIT %s OFFSET %s
+    """, (user, f"%{txt}%", f"%{txt}%", page_len, start))
+    
+    return projects
+
+    
+@frappe.whitelist()
+def is_task_running(name):
+    try:
+        doc = frappe.get_doc("Timesheet Record", name)
+        for row in reversed(doc.item):
+            if not row.to_time:
+                return {"is_running": True}
+        return {"is_running": False}
+    except:
+        return {"is_running": False}
+
+
+@frappe.whitelist()
+def get_employee_leaves():
+    today = getdate(nowdate())
+
+    # current month first & last day
+    current_start = get_first_day(today)
+    current_end = get_last_day(today)
+
+    # previous month  first day
+    prev_month_start = get_first_day(add_months(today, -1))
+    # next month last day
+    next_month_end = get_last_day(add_months(today, 1))
+
+    # final range
+    start = prev_month_start
+    end = next_month_end
+
+    leaves = frappe.get_all(
+        "Leave Application",
+        filters={
+            "status": "Approved",
+            "from_date": ("<=", end),
+            "to_date": (">=", start),
+        },
+        fields=[
+            "employee_name",
+            "from_date",
+            "to_date",
+            "leave_type",
+            "half_day",
+            "half_day_date",
+            "available_from_time",
+            "available_to_time"
+        ]
+    )
+
+    events = []
+    for l in leaves:
+        color = "#6b9eeb"  # default blue
+        description = f"{l.employee_name} ({l.leave_type})"
+
+        if l.half_day:  # if half day selected
+            color = "#ff69b4"  # pink
+            if l.available_from_time and l.available_to_time:
+                description += f" [{l.available_from_time} - {l.available_to_time}]"
+
+        events.append({
+            "title": description,
+            "start": l.from_date if not l.half_day else l.half_day_date or l.from_date,
+            "end": add_days(l.to_date, 1),
+            "color": color
+        })
+
+    return events
+
+
+
+@frappe.whitelist()
+def get_team_holidays():
+    today = getdate(nowdate())
+
+    # current month first & last day
+    current_start = get_first_day(today)
+    current_end = get_last_day(today)
+
+    # previous month first day
+    prev_month_start = get_first_day(add_months(today, -1))
+    # next month last day
+    next_month_end = get_last_day(add_months(today, 1))
+
+    # final range set
+    from_date = prev_month_start
+    to_date = next_month_end
+
+    grouped = defaultdict(list)
+
+    employees = frappe.get_all("Employee", fields=["name", "employee_name", "holiday_list"])
+    
+    for emp in employees:
+        if not emp.holiday_list:
+            continue
+
+        holidays = frappe.get_all(
+            "Holiday",
+            filters={
+                "parent": emp.holiday_list,
+                "holiday_date": ["between", [from_date, to_date]]
+            },
+            fields=["holiday_date", "description"]
+        )
+
+        for h in holidays:
+            clean_desc = strip_html(h.description or "Holiday")
+            grouped[(h.holiday_date, clean_desc)].append(emp.employee_name)
+
+    events = []
+    for (holiday_date, desc), emps in grouped.items():
+        events.append({
+            "title": f"{desc}: <br> {', '.join(emps)}",
+            "start": holiday_date,
+            "allDay": True,
+            "color": "#28a745",
+            "description": desc
+        })
+
+    return events
+
+
+@frappe.whitelist()
+def create_and_submit_timesheet( project_name=None, 
+    percent_billable=None, 
+    result=None, 
+    activity_type=None, 
+    from_time=None, 
+    expected_time=None, 
+    goal=None, 
+    to_time=None):
+    try:
+        ts = frappe.new_doc("Timesheet Record")
+        ts.project = project_name
+        ts.activity_type = activity_type
+        ts.percent_billable = percent_billable
+        ts.goal = goal
+        ts.expected_time = expected_time
+        ts.result = result
+
+        # Parent field set
+        ts.from_time = from_time
+        ts.to_time = to_time
+
+        # Add child row
+        ts.append("item", {
+            "from_time": from_time,
+            "to_time": ts.to_time
+        })
+
+        # ✅ Calculate duration for each row and sum it up
+        total_duration = 0
+        for row in ts.item:
+            if row.from_time and row.to_time:
+                duration_seconds = time_diff_in_seconds(row.to_time, row.from_time)
+                row.duration = duration_seconds
+                total_duration += duration_seconds
+
+        # ✅ Set total duration in parent actual_time
+        ts.actual_time = total_duration
+
+        # ✅ Mark as complete before submit
+        ts.status = "Complete"
+
+        ts.insert(ignore_permissions=True)
+        ts.save()
+        ts.submit()
+
+        return {
+            "status": "success",
+            "message": f"Timesheet Record {ts.name} created and submitted successfully",
+            "name": ts.name
+        }
+
+    except Exception as e:
+        frappe.log_error(frappe.get_traceback(), "Create Timesheet Record Error")
+        return {
+            "status": "error",
+            "message": str(e)
+        }
+
+@frappe.whitelist()
+def update_and_submit_timesheet_record(name, to_time, percent_billable, activity_type, result, task=None):
     try:
         # Retrieve the Timesheet Record document
         doc = frappe.get_doc("Timesheet Record", name)
