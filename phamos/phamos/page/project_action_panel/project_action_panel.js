@@ -755,6 +755,12 @@ function renderDataTable(wrapper, projectData) {
                   All Projects
               </a>
             </li>
+            <li class="nav-item show">
+              <!-- 'Team Calender' tab is inactive by default -->
+              <a class="nav-link" id="team-calender" role="tab" aria-controls="team-calender" aria-selected="false">
+                  Team Calender
+              </a>
+            </li>
           </ul>
         </div>
         <div id="content-wrapper" style="margin-top: 20px; margin-left: 30px;">
@@ -804,12 +810,16 @@ function renderDataTable(wrapper, projectData) {
     // Get references to the tabs
     const your_projectsTab = document.getElementById("DAP-your-project-tab");
     const all_projectsTab = document.getElementById("DAP-all-project-tab");
+    const team_calenderTab = document.getElementById("team-calender");
+
 
     // Event listener for the Your Projects tab
     your_projectsTab.addEventListener("click", () => {
       // Remove 'active' class from All Projects tab and set to Your Projects
       all_projectsTab.classList.remove("active");
       your_projectsTab.classList.add("active");
+      team_calenderTab.classList.remove("active");
+
 
       // Set visual feedback for selection
       your_projectsTab.setAttribute("aria-selected", "true");
@@ -818,12 +828,23 @@ function renderDataTable(wrapper, projectData) {
     // Show content for the Your Projects tab
       show_tab("Your Projects", projectData);
     });
+    // Event listener for the team calender tab
+    team_calenderTab.addEventListener("click", () => {
+        // Remove 'active' class from Your Projects tab and set to All Projects
+        your_projectsTab.classList.remove("active");
+        team_calenderTab.classList.add("active");
+        all_projectsTab.classList.remove("active");
+        // Show content for the Your Projects tab
+      show_tab("Team Calender", projectData);
+    });
 
     // Event listener for the All Projects tab
     all_projectsTab.addEventListener("click", () => {
         // Remove 'active' class from Your Projects tab and set to All Projects
         your_projectsTab.classList.remove("active");
         all_projectsTab.classList.add("active");
+        team_calenderTab.classList.remove("active");
+
 
         // Set visual feedback for selection
         all_projectsTab.setAttribute("aria-selected", "true");
@@ -902,6 +923,130 @@ function show_tab(tab, projectData) {
           freeze_message: "Loading projects...",  // Custom loading message
         });
     }
+    else if (tab === "Team Calender") {
+        cardWrapper.innerHTML = "";
+        datatableWrapper.innerHTML = "";
+
+        const topBar = document.createElement("div");
+        topBar.style.display = "flex";
+        topBar.style.justifyContent = "space-between";
+        topBar.style.alignItems = "center";
+        topBar.style.marginBottom = "10px";
+
+        // legend (color codes)
+        const legend = document.createElement("div");
+        legend.innerHTML = `
+            <div style="font-size:14px;">
+                <span style="display:inline-block; width:15px; height:15px; background:#28a745; margin-right:5px;"></span>
+                Public Holidays
+                <span style="display:inline-block; width:15px; height:15px; background:#ff69b4; margin-left:15px; margin-right:5px;"></span>
+                Half Day Leaves
+                <span style="display:inline-block; width:15px; height:15px; background:#6b9eeb; margin-left:15px; margin-right:5px;"></span>
+                Full Day Leaves
+            </div>
+        `;
+
+        // filters (checkboxes)
+        const filterDiv = document.createElement("div");
+        filterDiv.innerHTML = `
+            <label style="margin-right:15px;">
+                <input type="checkbox" id="filter-holidays"> Show Only Holidays
+            </label>
+            <label>
+                <input type="checkbox" id="filter-leaves"> Show Only Leaves
+            </label>
+        `;
+
+        // add both in topBar
+        topBar.appendChild(legend);
+        topBar.appendChild(filterDiv);
+
+        // prepend topBar to datatableWrapper
+        datatableWrapper.prepend(topBar);
+
+        const calendarContainer = document.createElement("div");
+        calendarContainer.id = "team-calendar";
+        calendarContainer.style.minHeight = "650px";
+        calendarContainer.style.width = "1300px";
+        datatableWrapper.appendChild(calendarContainer);
+
+        frappe.require([
+            "/assets/frappe/js/lib/moment/moment.min.js",
+            "/assets/frappe/js/lib/fullcalendar/fullcalendar.min.js"
+        ], function () {
+            frappe.require("/assets/frappe/js/lib/fullcalendar/fullcalendar.min.css");
+
+            const $el = $("#team-calendar");
+
+            if ($el.data("fullCalendar")) {
+                $el.fullCalendar("destroy");
+            }
+
+            // holidays fetch
+            frappe.call({
+                method: "phamos.phamos.page.project_action_panel.project_action_panel.get_team_holidays",
+                args: {
+                    from_date: frappe.datetime.month_start(),
+                    to_date: frappe.datetime.month_end()
+                },
+                callback: function (r) {
+                    let holidays = r.message || [];
+
+                    // leaves fetch
+                    frappe.call({
+                        method: "phamos.phamos.page.project_action_panel.project_action_panel.get_employee_leaves",
+                        args: {},
+                        callback: function (res) {
+                            let leaves = res.message || [];
+                            let allEvents = holidays.concat(leaves);
+
+                            $el.fullCalendar({
+                                header: {
+                                    left: "prev,next today",
+                                    center: "title",
+                                    right: "month,agendaWeek,agendaDay"
+                                },
+                                defaultView: "month",
+                                height: "auto",
+                                contentHeight: "auto",
+                                fixedWeekCount: false, 
+                                editable: false,
+                                eventLimit: false,  
+                                events: allEvents,
+                                eventClick: function (calEvent) {
+                                    frappe.msgprint(calEvent.title);
+                                },
+                                eventRender: function(event, element) {
+                                    element.find('.fc-title').html(event.title);
+                                }
+                            });
+
+                            // filter function
+                            function applyFilter() {
+                                let showHolidays = document.getElementById("filter-holidays").checked;
+                                let showLeaves = document.getElementById("filter-leaves").checked;
+
+                                $el.fullCalendar("removeEvents");
+
+                                if (showHolidays && !showLeaves) {
+                                    $el.fullCalendar("addEventSource", holidays);
+                                } else if (showLeaves && !showHolidays) {
+                                    $el.fullCalendar("addEventSource", leaves);
+                                } else {
+                                    $el.fullCalendar("addEventSource", allEvents); // default
+                                }
+                            }
+
+                            // checkbox event listeners
+                            document.getElementById("filter-holidays").addEventListener("change", applyFilter);
+                            document.getElementById("filter-leaves").addEventListener("change", applyFilter);
+                        }
+                    });
+                }
+            });
+        });
+    }
+
 
 }
 
