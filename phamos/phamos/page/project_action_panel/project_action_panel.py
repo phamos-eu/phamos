@@ -5,8 +5,12 @@ from frappe.utils import cstr, now_datetime, time_diff_in_seconds, get_datetime,
 from frappe.utils.data import add_to_date,format_duration, time_diff_in_seconds
 from datetime import datetime
 from datetime import datetime, timedelta
+from collections import defaultdict
+from frappe.utils import strip_html
 from frappe.query_builder import Field, Case, Order, DocType, functions as fn
 from frappe.query_builder.functions import Concat, Max, Sum, Round, Coalesce, IfNull
+from frappe.utils import getdate, nowdate, get_first_day, get_last_day, add_days, add_months
+
 
 @frappe.whitelist()
 def create_timesheet_record(project_name,  customer, from_time, expected_time, goal,task=None):
@@ -147,6 +151,114 @@ def is_task_running(name):
         return {"is_running": False}
     except:
         return {"is_running": False}
+
+
+@frappe.whitelist()
+def get_employee_leaves():
+    today = getdate(nowdate())
+
+    # current month first & last day
+    current_start = get_first_day(today)
+    current_end = get_last_day(today)
+
+    # previous month  first day
+    prev_month_start = get_first_day(add_months(today, -1))
+    # next month last day
+    next_month_end = get_last_day(add_months(today, 1))
+
+    # final range
+    start = prev_month_start
+    end = next_month_end
+
+    leaves = frappe.get_all(
+        "Leave Application",
+        filters={
+            "status": "Approved",
+            "from_date": ("<=", end),
+            "to_date": (">=", start),
+        },
+        fields=[
+            "employee_name",
+            "from_date",
+            "to_date",
+            "leave_type",
+            "half_day",
+            "half_day_date",
+            "available_from_time",
+            "available_to_time"
+        ]
+    )
+
+    events = []
+    for l in leaves:
+        color = "#6b9eeb"  # default blue
+        description = f"{l.employee_name} ({l.leave_type})"
+
+        if l.half_day:  # if half day selected
+            color = "#ff69b4"  # pink
+            if l.available_from_time and l.available_to_time:
+                description += f" [{l.available_from_time} - {l.available_to_time}]"
+
+        events.append({
+            "title": description,
+            "start": l.from_date if not l.half_day else l.half_day_date or l.from_date,
+            "end": add_days(l.to_date, 1),
+            "color": color
+        })
+
+    return events
+
+
+
+@frappe.whitelist()
+def get_team_holidays():
+    today = getdate(nowdate())
+
+    # current month first & last day
+    current_start = get_first_day(today)
+    current_end = get_last_day(today)
+
+    # previous month first day
+    prev_month_start = get_first_day(add_months(today, -1))
+    # next month last day
+    next_month_end = get_last_day(add_months(today, 1))
+
+    # final range set
+    from_date = prev_month_start
+    to_date = next_month_end
+
+    grouped = defaultdict(list)
+
+    employees = frappe.get_all("Employee", fields=["name", "employee_name", "holiday_list"])
+    
+    for emp in employees:
+        if not emp.holiday_list:
+            continue
+
+        holidays = frappe.get_all(
+            "Holiday",
+            filters={
+                "parent": emp.holiday_list,
+                "holiday_date": ["between", [from_date, to_date]]
+            },
+            fields=["holiday_date", "description"]
+        )
+
+        for h in holidays:
+            clean_desc = strip_html(h.description or "Holiday")
+            grouped[(h.holiday_date, clean_desc)].append(emp.employee_name)
+
+    events = []
+    for (holiday_date, desc), emps in grouped.items():
+        events.append({
+            "title": f"{desc}: <br> {', '.join(emps)}",
+            "start": holiday_date,
+            "allDay": True,
+            "color": "#28a745",
+            "description": desc
+        })
+
+    return events
 
 
 @frappe.whitelist()
