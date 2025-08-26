@@ -26,3 +26,5 @@ def execute():
                     color = "Amber"
 
             frappe.db.set_value("Timesheet Record", record.name, "timesheet_record_color", color)
+
+    frappe.db.commit()
