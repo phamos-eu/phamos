@@ -330,7 +330,7 @@ def update_and_submit_timesheet_record(name, to_time, percent_billable, activity
         if doc.item:
             for row in reversed(doc.item):
                 if row.from_time and not row.to_time:
-                    row.to_time = now_datetime()
+                    row.to_time = to_time
                     break
 
         # Calculate durations for all rows
