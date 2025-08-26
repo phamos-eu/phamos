@@ -98,14 +98,13 @@ function update_and_submit_timesheet_record(
         return;
       }
 
-      let currentTime = frappe.datetime.now_datetime();
 
       frappe.call({
         method: "phamos.phamos.page.project_action_panel.project_action_panel.update_and_submit_timesheet_record",
         args: {
           name: timesheet_record,
           task: task,
-          to_time: currentTime,
+          to_time: to_time,
           percent_billable: percent_billable,
           activity_type: activity_type,
           result: result,
