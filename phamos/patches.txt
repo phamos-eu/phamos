@@ -9,6 +9,4 @@ phamos.patches.v1_0.add_activity_types_update
 phamos.patches.v1_0.implementation_fix
 
 [post_model_sync]
-
-[post_model_sync]
 phamos.patches.v1_0.set_timesheet_record_colors
