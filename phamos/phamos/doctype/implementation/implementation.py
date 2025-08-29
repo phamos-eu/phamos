@@ -9,8 +9,14 @@ from frappe.utils import today
 
 class Implementation(Document):
 	def before_save(self):
+		if self.resource_planning_prediction:
+			self.resource_planning_prediction.sort(
+				key=lambda x: x.month_and_year or ""
+			)
 		self.add_delivered_hrs()
 		self.add_resource_planning()
+		self.add_status_history()
+
 
 	def add_delivered_hrs(self):
 		if self.sales_order_status_information:
@@ -89,10 +95,41 @@ class Implementation(Document):
 								'billable_time_spent':row1.get('billable_time'),
 								'ratio_of_billable_to_non_billable_time_spent':ratio
 								})
+	
+
+	def add_status_history(self):
+		date = today()
+		found_today = False
+
+		if self.status_updates:
+			for d in self.status_updates:
+				if d.date == date:
+					d.status_statement = self.status_statement
+					d.status = self.status
+					d.maturity_level = self.maturity_level
+					d.forecast = self.forecast
+					d.trend = self.trend
+					found_today = True
+					break 
+
+		if not found_today:
+			self.append("status_updates", {
+				"date": date,
+				"status_statement": self.status_statement,
+				"status": self.status,
+				"maturity_level": self.maturity_level,
+				"forecast": self.forecast,
+				"trend" : self.trend
+			})
+
+
+
 						
 
 @frappe.whitelist()
-def get_financial_history(name, customer):
+def get_financial_history(name, customer = None):
+	if not customer:
+		return {}
 	get_projects = frappe.db.get_all('Project', {'custom_implementation':name}, 'name')
 	
 	get_project_list = [item.name for item in get_projects]
@@ -206,6 +243,14 @@ def get_financial_history(name, customer):
 		return get_so_hrs
 
 
+@frappe.whitelist()
+def are_all_projects_closed(implementation_name):
+    linked_projects = frappe.get_all('Project', filters={'custom_implementation': implementation_name}, fields=['status'])
+    
+    for proj in linked_projects:
+        if proj.status not in ['Completed', 'Cancelled']:
+            return False
+    return True
 
 
 @frappe.whitelist()

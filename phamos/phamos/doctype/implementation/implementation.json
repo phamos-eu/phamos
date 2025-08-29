@@ -6,6 +6,11 @@
  "doctype": "DocType",
  "engine": "InnoDB",
  "field_order": [
+  "graph_overview_section",
+  "total_time_spend",
+  "column_break_vsmt",
+  "modules_overview",
+  "section_break_ukuc",
   "status",
   "notes",
   "start_date",
@@ -13,8 +18,10 @@
   "department",
   "account_manager",
   "maturity_level",
-  "mood",
   "forecast",
+  "trend",
+  "status_statement",
+  "team",
   "section_break_uiri",
   "sales_order_total_hrs",
   "total_hrs_timesheet",
@@ -27,16 +34,40 @@
   "section_break_xfgb",
   "sales_order_status_information",
   "section_break_ky9b",
+  "internal_implementation",
   "customer",
   "contact_person",
-  "timesheets_tab",
-  "html_bfhi",
-  "section_break_izec",
-  "status_information",
   "resource_planning_tab",
-  "resource_planning"
+  "from_date",
+  "column_break_wufw",
+  "to_date",
+  "section_break_olox",
+  "prediction_from_date",
+  "column_break_jswh",
+  "prediction_to_date",
+  "column_break_jypz",
+  "update",
+  "reset",
+  "section_break_5rmv",
+  "resource_chart",
+  "resource_planning",
+  "resource_planning_prediction",
+  "modules_tab",
+  "target_level",
+  "module_chart",
+  "modules",
+  "status_history_tab",
+  "status_updates"
  ],
  "fields": [
+  {
+   "default": "Open",
+   "fieldname": "status",
+   "fieldtype": "Select",
+   "label": "Status",
+   "options": "Open\nCancelled\nCompleted\nReactivated",
+   "read_only": 1
+  },
   {
    "fieldname": "notes",
    "fieldtype": "Text Editor",
@@ -76,13 +107,7 @@
    "in_preview": 1,
    "in_standard_filter": 1,
    "label": "Maturity Level",
-   "options": "1 - Start der Implementierung, keine Vorerfahrung, noch kein\n2 - Poweruser kann sich orientieren,\n3 - Live-Betrieb, Erste Module sind im Einsatz,\n4 - Erste Module abgeschlossen, Entwicklungsprozesse in der Tiefe verstanden,\n5 - Quasi-abgeschlossen, System ist implementiert, Viele geschulte Anwender, hoher Automatisierungsgrad,"
-  },
-  {
-   "fieldname": "mood",
-   "fieldtype": "Select",
-   "label": "Mood",
-   "options": "1\n2\n3\n4\n5"
+   "options": "1 - Inception Phase. Early Implementation, no previous Frappe experience\n2 - Initial Development Phase. Initial development work, Power user can navigate system\n3 - Development Phase. Development process understood, first modules customized\n4 - Go Live Phase. Go Live, first modules in use with real life data\n5 - Live Development Phase. Ongoing development in parallel to system in daily use with live data\n6 - Support Phase. System in daily use, development work limited to customer support"
   },
   {
    "fieldname": "forecast",
@@ -90,13 +115,8 @@
    "in_list_view": 1,
    "in_preview": 1,
    "in_standard_filter": 1,
-   "label": "Forecast",
+   "label": "Implementation Status",
    "options": "1 \u2600\ufe0f - alles gut. Kunde happy, keine Gefahren (deadlines, Erwartung an Stunden etc) in sicht\n2 \ud83c\udf24\ufe0f - zu viele neue Issues, feedback langsam\n3 \u2601\ufe0f - weekly findet nicht jede Woche statt, Kundenprojektmanager schwer zu erreichen,\n4 \ud83c\udf27\ufe0f - Anforderungen \u00e4ndern sich sehr h\u00e4ufig, Weeklies werden nicht wahrgenommen, kunde antwortet auf Mails nicht\n5 \u26c8\ufe0f - Kunde zahlt Rechnungen nicht, Kunde hat keine Gedult"
-  },
-  {
-   "fieldname": "status",
-   "fieldtype": "Small Text",
-   "label": "Status"
   },
   {
    "fieldname": "section_break_uiri",
@@ -149,36 +169,17 @@
    "label": "Customer Information"
   },
   {
+   "depends_on": "eval:doc.internal_implementation == 0",
    "fieldname": "customer",
    "fieldtype": "Link",
    "label": "Customer",
-   "options": "Customer",
-   "reqd": 1
+   "mandatory_depends_on": "eval:doc.internal_implementation == 0",
+   "options": "Customer"
   },
   {
    "fieldname": "contact_person",
    "fieldtype": "Data",
    "label": "Contact Person"
-  },
-  {
-   "fieldname": "section_break_izec",
-   "fieldtype": "Section Break"
-  },
-  {
-   "fieldname": "status_information",
-   "fieldtype": "Table",
-   "label": "Status Information",
-   "options": "Status Information"
-  },
-  {
-   "fieldname": "timesheets_tab",
-   "fieldtype": "Tab Break",
-   "label": "Timesheets"
-  },
-  {
-   "fieldname": "html_bfhi",
-   "fieldtype": "HTML",
-   "options": "<h1>Info</h1>On this screen we will want to see a table of all timesheets from this implmentation. Interesting also will be some filters for project, employee, and more"
   },
   {
    "fieldname": "section_break_eynb",
@@ -201,6 +202,149 @@
    "fieldtype": "Table",
    "label": "Resource Planning",
    "options": "Resource planning"
+  },
+  {
+   "default": "1",
+   "fieldname": "internal_implementation",
+   "fieldtype": "Check",
+   "label": "Internal Implementation"
+  },
+  {
+   "fieldname": "modules_tab",
+   "fieldtype": "Tab Break",
+   "label": "Modules"
+  },
+  {
+   "fieldname": "modules",
+   "fieldtype": "Table",
+   "label": "Modules",
+   "options": "Implementation Item"
+  },
+  {
+   "fieldname": "target_level",
+   "fieldtype": "HTML",
+   "label": "Target Level",
+   "options": "<div><h6>Target Level 0-10 (0= not implementing, 10 = full implementation , 5 = basic implementation )</h6></div>\n\n"
+  },
+  {
+   "fieldname": "module_chart",
+   "fieldtype": "HTML",
+   "label": "Module Chart"
+  },
+  {
+   "fieldname": "status_history_tab",
+   "fieldtype": "Tab Break",
+   "label": "Status History"
+  },
+  {
+   "fieldname": "status_updates",
+   "fieldtype": "Table",
+   "label": "Status Updates",
+   "options": "Status Information"
+  },
+  {
+   "fieldname": "status_statement",
+   "fieldtype": "Small Text",
+   "label": "Status Statement"
+  },
+  {
+   "fieldname": "trend",
+   "fieldtype": "Select",
+   "in_standard_filter": 1,
+   "label": "Trend",
+   "options": "Improving\nStable\nDeclining"
+  },
+  {
+   "fieldname": "resource_planning_prediction",
+   "fieldtype": "Table",
+   "label": "Resource Planning Prediction",
+   "options": "Prediction"
+  },
+  {
+   "fieldname": "resource_chart",
+   "fieldtype": "HTML",
+   "label": "Time spent"
+  },
+  {
+   "fieldname": "from_date",
+   "fieldtype": "Date",
+   "label": "From Dates"
+  },
+  {
+   "fieldname": "column_break_wufw",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "to_date",
+   "fieldtype": "Date",
+   "label": "To Date"
+  },
+  {
+   "fieldname": "section_break_5rmv",
+   "fieldtype": "Section Break"
+  },
+  {
+   "fieldname": "team",
+   "fieldtype": "Link",
+   "label": "Team",
+   "options": "Team"
+  },
+  {
+   "collapsible": 1,
+   "fieldname": "graph_overview_section",
+   "fieldtype": "Section Break",
+   "label": "Graph Overview"
+  },
+  {
+   "fieldname": "total_time_spend",
+   "fieldtype": "HTML",
+   "label": "Total Time spend",
+   "options": "<div id=\"resource-planning-highchart-2\" style=\"width:300px; height:300px;\"></div>\n"
+  },
+  {
+   "fieldname": "column_break_vsmt",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "modules_overview",
+   "fieldtype": "HTML",
+   "label": "Modules Overview"
+  },
+  {
+   "fieldname": "section_break_ukuc",
+   "fieldtype": "Section Break"
+  },
+  {
+   "fieldname": "section_break_olox",
+   "fieldtype": "Section Break"
+  },
+  {
+   "fieldname": "prediction_from_date",
+   "fieldtype": "Date",
+   "label": "Prediction From Date "
+  },
+  {
+   "fieldname": "column_break_jswh",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "prediction_to_date",
+   "fieldtype": "Date",
+   "label": "Prediction To Date"
+  },
+  {
+   "fieldname": "column_break_jypz",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "update",
+   "fieldtype": "Button",
+   "label": "Update"
+  },
+  {
+   "fieldname": "reset",
+   "fieldtype": "Button",
+   "label": "Reset"
   }
  ],
  "index_web_pages_for_search": 1,
@@ -226,7 +370,7 @@
    "link_fieldname": "custom_implementation"
   }
  ],
- "modified": "2025-04-02 12:17:43.990598",
+ "modified": "2025-08-18 15:03:47.707783",
  "modified_by": "Administrator",
  "module": "Phamos",
  "name": "Implementation",
@@ -246,6 +390,7 @@
    "write": 1
   }
  ],
+ "row_format": "Dynamic",
  "search_fields": "account_manager",
  "sort_field": "modified",
  "sort_order": "DESC",
