@@ -1292,7 +1292,18 @@ window.togglePausePlay = function(taskId, timesheetName) {
           });
       },
       function() {
-          console.log("Break record creation cancelled.");
+          // ❌ NO → create new row but don't show popup
+          frappe.call({
+              method: "phamos.phamos.page.project_action_panel.project_action_panel.close_open_row_and_add_break",
+              args: { name: timesheetName },
+              callback: function(r) {
+                  if (r.message && r.message.status === "success") {
+                      frappe.msgprint("Break Time noted");
+                  } else {
+                      frappe.msgprint("Error: " + (r.message.message || "Something went wrong."));
+                  }
+              }
+          });
       }
   );
 
