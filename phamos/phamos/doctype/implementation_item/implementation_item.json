@@ -10,7 +10,8 @@
   "is_required",
   "project",
   "target_level",
-  "current_level"
+  "current_level",
+  "comments"
  ],
  "fields": [
   {
@@ -45,13 +46,19 @@
    "fieldtype": "Int",
    "in_list_view": 1,
    "label": "Current Level"
+  },
+  {
+   "fieldname": "comments",
+   "fieldtype": "Small Text",
+   "in_list_view": 1,
+   "label": "Comments"
   }
  ],
  "grid_page_length": 50,
  "index_web_pages_for_search": 1,
  "istable": 1,
  "links": [],
- "modified": "2025-04-29 15:52:30.246643",
+ "modified": "2025-06-12 17:20:08.143673",
  "modified_by": "Administrator",
  "module": "Phamos",
  "name": "Implementation Item",
