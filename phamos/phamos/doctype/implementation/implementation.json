@@ -13,8 +13,9 @@
   "department",
   "account_manager",
   "maturity_level",
-  "mood",
   "forecast",
+  "trend",
+  "status_statement",
   "section_break_uiri",
   "sales_order_total_hrs",
   "total_hrs_timesheet",
@@ -27,6 +28,7 @@
   "section_break_xfgb",
   "sales_order_status_information",
   "section_break_ky9b",
+  "internal_implementation",
   "customer",
   "contact_person",
   "timesheets_tab",
@@ -34,9 +36,29 @@
   "section_break_izec",
   "status_information",
   "resource_planning_tab",
-  "resource_planning"
+  "from_date",
+  "column_break_wufw",
+  "to_date",
+  "section_break_5rmv",
+  "resource_chart",
+  "resource_planning",
+  "resource_planning_prediction",
+  "modules_tab",
+  "target_level",
+  "module_chart",
+  "modules",
+  "status_history_tab",
+  "status_updates"
  ],
  "fields": [
+  {
+   "default": "Open",
+   "fieldname": "status",
+   "fieldtype": "Select",
+   "label": "Status",
+   "options": "Open\nCancelled\nCompleted",
+   "read_only": 1
+  },
   {
    "fieldname": "notes",
    "fieldtype": "Text Editor",
@@ -76,13 +98,7 @@
    "in_preview": 1,
    "in_standard_filter": 1,
    "label": "Maturity Level",
-   "options": "1 - Start der Implementierung, keine Vorerfahrung, noch kein\n2 - Poweruser kann sich orientieren,\n3 - Live-Betrieb, Erste Module sind im Einsatz,\n4 - Erste Module abgeschlossen, Entwicklungsprozesse in der Tiefe verstanden,\n5 - Quasi-abgeschlossen, System ist implementiert, Viele geschulte Anwender, hoher Automatisierungsgrad,"
-  },
-  {
-   "fieldname": "mood",
-   "fieldtype": "Select",
-   "label": "Mood",
-   "options": "1\n2\n3\n4\n5"
+   "options": "1 - Early Implementation, no previous Frappe experience\n2 - Initial development work, Poweruser can navigate system\n3 - Development process understood, first modules customized\n4 - Go Live, first modules in use with real life data\n5 - Ongoing development in parallel to system in daily use with live data\n6 - System in daily use, development work limited to customer support"
   },
   {
    "fieldname": "forecast",
@@ -90,13 +106,8 @@
    "in_list_view": 1,
    "in_preview": 1,
    "in_standard_filter": 1,
-   "label": "Forecast",
+   "label": "Implementation Status",
    "options": "1 \u2600\ufe0f - alles gut. Kunde happy, keine Gefahren (deadlines, Erwartung an Stunden etc) in sicht\n2 \ud83c\udf24\ufe0f - zu viele neue Issues, feedback langsam\n3 \u2601\ufe0f - weekly findet nicht jede Woche statt, Kundenprojektmanager schwer zu erreichen,\n4 \ud83c\udf27\ufe0f - Anforderungen \u00e4ndern sich sehr h\u00e4ufig, Weeklies werden nicht wahrgenommen, kunde antwortet auf Mails nicht\n5 \u26c8\ufe0f - Kunde zahlt Rechnungen nicht, Kunde hat keine Gedult"
-  },
-  {
-   "fieldname": "status",
-   "fieldtype": "Small Text",
-   "label": "Status"
   },
   {
    "fieldname": "section_break_uiri",
@@ -149,11 +160,12 @@
    "label": "Customer Information"
   },
   {
+   "depends_on": "eval:doc.internal_implementation == 0",
    "fieldname": "customer",
    "fieldtype": "Link",
    "label": "Customer",
-   "options": "Customer",
-   "reqd": 1
+   "mandatory_depends_on": "eval:doc.internal_implementation == 0",
+   "options": "Customer"
   },
   {
    "fieldname": "contact_person",
@@ -201,6 +213,88 @@
    "fieldtype": "Table",
    "label": "Resource Planning",
    "options": "Resource planning"
+  },
+  {
+   "default": "1",
+   "fieldname": "internal_implementation",
+   "fieldtype": "Check",
+   "label": "Internal Implementation"
+  },
+  {
+   "fieldname": "modules_tab",
+   "fieldtype": "Tab Break",
+   "label": "Modules"
+  },
+  {
+   "fieldname": "modules",
+   "fieldtype": "Table",
+   "label": "Modules",
+   "options": "Implementation Item"
+  },
+  {
+   "fieldname": "target_level",
+   "fieldtype": "HTML",
+   "label": "Target Level",
+   "options": "<div><h6>Target Level 0-10 (0= not implementing, 10 = full implementation , 5 = basic implementation )</h6></div>\n\n"
+  },
+  {
+   "fieldname": "module_chart",
+   "fieldtype": "HTML",
+   "label": "Module Chart"
+  },
+  {
+   "fieldname": "status_history_tab",
+   "fieldtype": "Tab Break",
+   "label": "Status History"
+  },
+  {
+   "fieldname": "status_updates",
+   "fieldtype": "Table",
+   "label": "Status Updates",
+   "options": "Status Information"
+  },
+  {
+   "fieldname": "status_statement",
+   "fieldtype": "Small Text",
+   "label": "Status Statement"
+  },
+  {
+   "fieldname": "trend",
+   "fieldtype": "Select",
+   "in_standard_filter": 1,
+   "label": "Trend",
+   "options": "Improving\nStable\nDeclining"
+  },
+  {
+   "fieldname": "resource_planning_prediction",
+   "fieldtype": "Table",
+   "label": "Resource Planning Prediction",
+   "options": "Prediction"
+  },
+  {
+   "fieldname": "resource_chart",
+   "fieldtype": "HTML",
+   "label": "Time spent"
+  },
+  {
+   "fieldname": "from_date",
+   "fieldtype": "Select",
+   "label": "From Date",
+   "options": "2025-01\n2025-02\n2025-03\n2025-04\n2025-05\n2025-06"
+  },
+  {
+   "fieldname": "column_break_wufw",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "to_date",
+   "fieldtype": "Select",
+   "label": "To Date",
+   "options": "2025-06\n2025-07\n2025-08\n2025-09\n2025-10\n2025-11\n2025-12"
+  },
+  {
+   "fieldname": "section_break_5rmv",
+   "fieldtype": "Section Break"
   }
  ],
  "index_web_pages_for_search": 1,
@@ -226,7 +320,7 @@
    "link_fieldname": "custom_implementation"
   }
  ],
- "modified": "2025-04-02 12:17:43.990598",
+ "modified": "2025-05-29 15:58:52.889513",
  "modified_by": "Administrator",
  "module": "Phamos",
  "name": "Implementation",
