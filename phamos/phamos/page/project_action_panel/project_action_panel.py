@@ -188,20 +188,53 @@ def get_employee_leaves():
 
     events = []
     for l in leaves:
-        color = "#6b9eeb"  # default blue
         description = f"{l.employee_name} ({l.leave_type})"
 
-        if l.half_day:  # if half day selected
-            color = "#ff69b4"  # pink
-            if l.available_from_time and l.available_to_time:
-                description += f" [{l.available_from_time} - {l.available_to_time}]"
+        if l.half_day and l.from_date != l.to_date:
+            # LEFT SIDE: from_date → (half_day_date - 1)
+            if l.from_date < l.half_day_date:
+                events.append({
+                    "title": description,
+                    "start": l.from_date,
+                    "end": l.half_day_date,  # exclude half_day_date
+                    "color": "#6b9eeb"  # blue
+                })
 
-        events.append({
-            "title": description,
-            "start": l.from_date if not l.half_day else l.half_day_date or l.from_date,
-            "end": add_days(l.to_date, 1),
-            "color": color
-        })
+            # HALF-DAY: only half_day_date
+            hd_desc = description
+            if l.available_from_time and l.available_to_time:
+                hd_desc += f" [{l.available_from_time} - {l.available_to_time}]"
+
+            events.append({
+                "title": hd_desc,
+                "start": l.half_day_date,
+                "end": add_days(l.half_day_date, 1),
+                "color": "#ff69b4"  # pink
+            })
+
+            # RIGHT SIDE: (half_day_date + 1) → to_date
+            if l.half_day_date < l.to_date:
+                events.append({
+                    "title": description,
+                    "start": add_days(l.half_day_date, 1),
+                    "end": add_days(l.to_date, 1),
+                    "color": "#6b9eeb"  # blue
+                })
+
+        else:
+            # normal case (full day or single day half-day)
+            color = "#6b9eeb"  # blue by default
+            if l.half_day:
+                color = "#ff69b4"
+                if l.available_from_time and l.available_to_time:
+                    description += f" [{l.available_from_time} - {l.available_to_time}]"
+
+            events.append({
+                "title": description,
+                "start": l.from_date if not l.half_day else l.half_day_date or l.from_date,
+                "end": add_days(l.to_date, 1),
+                "color": color
+            })
 
     return events
 

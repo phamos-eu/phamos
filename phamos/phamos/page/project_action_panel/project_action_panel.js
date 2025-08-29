@@ -1005,7 +1005,6 @@ function show_tab(tab, projectData) {
         const calendarContainer = document.createElement("div");
         calendarContainer.id = "team-calendar";
         calendarContainer.style.minHeight = "650px";
-        calendarContainer.style.width = "1300px";
         datatableWrapper.appendChild(calendarContainer);
 
         frappe.require([
@@ -1039,26 +1038,49 @@ function show_tab(tab, projectData) {
                             let allEvents = holidays.concat(leaves);
 
                             $el.fullCalendar({
-                                header: {
-                                    left: "prev,next today",
-                                    center: "title",
-                                    right: "month,agendaWeek,agendaDay"
-                                },
-                                defaultView: "month",
-                                height: "auto",
-                                contentHeight: "auto",
-                                fixedWeekCount: false, 
-                                editable: false,
-                                eventLimit: false,  
-                                events: allEvents,
-                                eventClick: function (calEvent) {
-                                    frappe.msgprint(calEvent.title);
-                                },
-                                eventRender: function(event, element) {
-                                    element.find('.fc-title').html(event.title);
-                                }
+                              header: {
+                                left: "prev,next today",
+                                center: "title",
+                                right: "month,agendaWeek,agendaDay"
+                              },
+
+                              // 🔧 Use text instead of icon fonts (avoids the split/duplicate issue)
+                              buttonIcons: false,
+                              buttonText: {
+                                prev: '‹',
+                                next: '›',
+                                today: 'Today',
+                                month: 'Month',
+                                week: 'Week',
+                                day: 'Day'
+                              },
+
+                              defaultView: "month",
+                              height: "auto",
+                              contentHeight: "auto",
+                              fixedWeekCount: false,
+                              editable: false,
+                              eventLimit: false,
+                              events: allEvents,
+                              eventClick: function (calEvent) {
+                                frappe.msgprint(calEvent.title);
+                              },
+                              eventRender: function(event, element) {
+                                element.find('.fc-title').html(event.title);
+                              }
                             });
 
+                            // ⬇️ After init, style the buttons the way you like
+                            const $tb = $el.find('.fc-toolbar');
+                            $tb.find('.fc-prev-button, .fc-next-button').css({
+                              "font-size": "20px",
+                              "line-height": "1",
+                              "padding": "0 10px"
+                            });
+                            $tb.find('.fc-button').css({
+                              "text-transform": "none",
+                              "letter-spacing": "0"
+                            });
                             // filter function
                             function applyFilter() {
                                 let showHolidays = document.getElementById("filter-holidays").checked;
