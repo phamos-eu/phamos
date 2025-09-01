@@ -157,15 +157,20 @@ function load_timesheets() {
           <tr>
             <td><input type="checkbox" class="row-select" /></td>
             <td>${row.name}</td>
-            <td class="${row.timesheet_status === 'Billed' ? 'text-success fw-bold' : 'text-primary fw-bold'}">${row.timesheet_status}</td>
             <td>${row.employee}</td>
-            <td>${row.employee_name}</td>
             <td>${frappe.datetime.str_to_user(row.start_date)}</td>
             <td>${frappe.datetime.str_to_user(row.end_date)}</td>
             <td>${row.custom_billing_status || ''}</td>
             <td>${format_hours(row.total_hours)}</td>
             <td>${format_hours(row.total_billable_hours)}</td>
             <td title="${frappe.datetime.str_to_user(row.creation)}">${formatShortRelative(row.creation)}</td>
+            <td>
+              <input type="text" 
+                    class="form-control form-control-sm comment-input" 
+                    value="${row.customer_comment || ''}" 
+                    data-name="${row.name}" 
+                    placeholder="Add comment..." />
+            </td>
           </tr>
         `);
       });
@@ -181,6 +186,28 @@ function load_timesheets() {
     }
   });
 }
+$(document).on("change", ".comment-input", function() {
+  const ts_name = $(this).data("name");
+  const comment = $(this).val();
+
+  frappe.call({
+    method: "frappe.client.set_value",
+    args: {
+      doctype: "Timesheet",
+      name: ts_name,
+      fieldname: "customer_comment",
+      value: comment
+    },
+    callback: function(r) {
+      if (!r.exc) {
+        frappe.show_alert({message: "Comment updated", indicator: "green"});
+      } else {
+        frappe.show_alert({message: "Failed to update comment", indicator: "red"});
+      }
+    }
+  });
+});
+
 
 function update_footer() {
   $('#pagination_info').text(`Showing ${loadedCount} of ${totalCount}`);
@@ -228,7 +255,7 @@ function download_visible_csv() {
     return;
   }
 
-  const headers = ['Timesheet', 'Status', 'Employee ID', 'Employee Name', 'Start Date', 'End Date', 'Billing Status', 'Total Hours', 'Billable Hours'];
+  const headers = ['Timesheet', 'Employee ID', 'Start Date', 'End Date', 'Billing Status', 'Total Hours', 'Billable Hours'];
   const csv = [headers.join(",")].concat(rows.map(r => r.join(","))).join("\n");
 
   const blob = new Blob([csv], { type: 'text/csv' });
@@ -267,7 +294,7 @@ function download_all_csv() {
         row.total_billable_hours
       ]);
 
-      const headers = ['Timesheet', 'Status', 'Employee ID', 'Employee Name', 'Start Date', 'End Date', 'Billing Status', 'Total Hours', 'Billable Hours'];
+      const headers = ['Timesheet', 'Employee ID', 'Start Date', 'End Date', 'Billing Status', 'Total Hours', 'Billable Hours'];
       const csv = [headers.join(",")].concat(rows.map(r => r.join(","))).join("\n");
 
       const blob = new Blob([csv], { type: 'text/csv' });
