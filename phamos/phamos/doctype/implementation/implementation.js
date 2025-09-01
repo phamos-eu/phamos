@@ -2,10 +2,16 @@
 // For license information, please see license.txt
 frappe.ui.form.on("Implementation", {
     from_date(frm) {
-        render_resource_planning_graph(frm); // From date change par chale
+        render_resource_planning_graph(frm); // From date change
     },
     to_date(frm) {
-        render_resource_planning_graph(frm); // To date change par chale
+        render_resource_planning_graph(frm); // To date change
+    },
+    prediction_from_date(frm) {
+        render_resource_planning_graph(frm, true); // Prediction date change
+    },
+    prediction_to_date(frm) {
+        render_resource_planning_graph(frm, true); // Prediction date change
     },
     setup: function (frm) {
         if (!frm.is_new()) {
@@ -53,13 +59,13 @@ frappe.ui.form.on("Implementation", {
         });
 
         // Update button
-        frm.fields_dict.update.$input.on('click', function () {
-            render_resource_planning_graph(frm, true); // use prediction filter
-        });
+        // frm.fields_dict.update.$input.on('click', function () {
+        //     render_resource_planning_graph(frm, true); // use prediction filter
+        // });
         if (!frm.doc.prediction_from_date && !frm.doc.prediction_to_date) {
-            render_resource_planning_graph(frm, false);
+            render_resource_planning_graph(frm, false);  // normal graph
         } else {
-            render_resource_planning_graph(frm, true);
+            render_resource_planning_graph(frm, true);   // prediction filter ke sath
         }
         let options = [];
         let today = new Date();
