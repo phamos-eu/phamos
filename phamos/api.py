@@ -31,7 +31,7 @@ def get_timesheets(from_date=None, to_date=None, project=None, offset=0, limit=2
         fields=[
             "name", "employee", "employee_name", "custom_billing_status", "project_owner",
             "timesheet_status", "total_hours", "total_billable_hours", "project_name",
-            "start_date", "end_date", "creation"
+            "start_date", "end_date", "creation", "customer_comment"
         ],
         order_by="creation desc",
         start=int(offset),
