@@ -43,11 +43,9 @@
   "to_date",
   "section_break_olox",
   "prediction_from_date",
+  "reset",
   "column_break_jswh",
   "prediction_to_date",
-  "column_break_jypz",
-  "update",
-  "reset",
   "section_break_5rmv",
   "resource_chart",
   "resource_planning",
@@ -331,15 +329,6 @@
    "fieldname": "prediction_to_date",
    "fieldtype": "Date",
    "label": "Prediction To Date"
-  },
-  {
-   "fieldname": "column_break_jypz",
-   "fieldtype": "Column Break"
-  },
-  {
-   "fieldname": "update",
-   "fieldtype": "Button",
-   "label": "Update"
   },
   {
    "fieldname": "reset",
