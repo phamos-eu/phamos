@@ -2,10 +2,16 @@
 // For license information, please see license.txt
 frappe.ui.form.on("Implementation", {
     from_date(frm) {
-        render_resource_planning_graph(frm); // From date change par chale
+        render_resource_planning_graph(frm); // From date change
     },
     to_date(frm) {
-        render_resource_planning_graph(frm); // To date change par chale
+        render_resource_planning_graph(frm); // To date change
+    },
+    prediction_from_date(frm) {
+        render_resource_planning_graph(frm, true); // Prediction date change
+    },
+    prediction_to_date(frm) {
+        render_resource_planning_graph(frm, true); // Prediction date change
     },
     setup: function (frm) {
         if (!frm.is_new()) {
@@ -53,13 +59,13 @@ frappe.ui.form.on("Implementation", {
         });
 
         // Update button
-        frm.fields_dict.update.$input.on('click', function () {
-            render_resource_planning_graph(frm, true); // use prediction filter
-        });
+        // frm.fields_dict.update.$input.on('click', function () {
+        //     render_resource_planning_graph(frm, true); // use prediction filter
+        // });
         if (!frm.doc.prediction_from_date && !frm.doc.prediction_to_date) {
-            render_resource_planning_graph(frm, false);
+            render_resource_planning_graph(frm, false);  // normal graph
         } else {
-            render_resource_planning_graph(frm, true);
+            render_resource_planning_graph(frm, true);   // prediction filter ke sath
         }
         let options = [];
         let today = new Date();
@@ -353,11 +359,10 @@ function render_resource_planning_graph(frm, usePredictionFilter = false) {
     const fromMonth = frm.doc.from_date ? frm.doc.from_date.slice(0, 7) : null;
     const toMonth = frm.doc.to_date ? frm.doc.to_date.slice(0, 7) : null;
 
-    // Prediction filter ke liye alag date range
-    const predictionFrom = usePredictionFilter && frm.doc.prediction_from_date
+    const predictionFrom = frm.doc.prediction_from_date
         ? frm.doc.prediction_from_date
         : null;
-    const predictionTo = usePredictionFilter && frm.doc.prediction_to_date
+    const predictionTo = frm.doc.prediction_to_date
         ? frm.doc.prediction_to_date
         : null;
 
@@ -365,19 +370,29 @@ function render_resource_planning_graph(frm, usePredictionFilter = false) {
         return (!from || monthYear >= from) && (!to || monthYear <= to);
     }
 
-    // Planning data ka filter normal from/to date se
+    // Planning data normal filter (month_and_year)
     const planningData = (frm.doc.resource_planning || []).filter(row =>
         row.month_and_year && isWithinRange(row.month_and_year, fromMonth, toMonth)
     );
 
-    // Prediction data ka filter alag range se (date field par)
-    const predictionData = (frm.doc.resource_planning_prediction || []).filter(row => {
-        let rowDate = row.date ? frappe.datetime.obj_to_str(row.date) : null; // ensure string in YYYY-MM-DD
-        return rowDate && (
-            (!predictionFrom || rowDate >= predictionFrom) &&
-            (!predictionTo || rowDate <= predictionTo)
-        );
-    });
+    // Prediction data filter
+    let predictionData = (frm.doc.resource_planning_prediction || []).filter(row =>
+        row.month_and_year && isWithinRange(row.month_and_year, fromMonth, toMonth)
+    );
+
+    // if prediction_from_date ya prediction_to_date is set then override it
+    if (predictionFrom || predictionTo) {
+        predictionData = predictionData.filter(row => {
+            let creationDate = row.date ? row.date.slice(0, 10) : null; // YYYY-MM-DD
+            return creationDate && (
+                (!predictionFrom || creationDate >= predictionFrom) &&
+                (!predictionTo || creationDate <= predictionTo)
+            );
+        });
+    }
+
+    console.log("Planning Data:", planningData);
+    console.log("Prediction Data:", predictionData);
 
 
     const categorySet = new Set();
