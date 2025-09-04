@@ -43,7 +43,7 @@ class Implementation(Document):
 
 				total_time = frappe.db.sql(total_time_spent, as_dict=True)
 
-				total_billable_time = """SELECT DATE_FORMAT(start_date, '%Y-%m') AS month, SUM(tsd.hours) AS billable_time FROM  `tabTimesheet` ts JOIN `tabTimesheet Detail` tsd ON ts.name = tsd.parent WHERE ts.docstatus != 2 and tsd.project = '{0}' and tsd.is_billable = 1 GROUP BY month ORDER BY month""".format(get_project_list[0])
+				total_billable_time = """SELECT DATE_FORMAT(start_date, '%Y-%m') AS month, SUM(tsd.billing_hours) AS billable_time FROM  `tabTimesheet` ts JOIN `tabTimesheet Detail` tsd ON ts.name = tsd.parent WHERE ts.docstatus != 2 and tsd.project = '{0}' and tsd.is_billable = 1 GROUP BY month ORDER BY month""".format(get_project_list[0])
 				
 				billable_time = frappe.db.sql(total_billable_time, as_dict =1)
 			elif len(get_project_list) > 1:
@@ -51,7 +51,7 @@ class Implementation(Document):
 
 				total_time = frappe.db.sql(total_time_spent, as_dict=True)
 
-				total_billable_time = """SELECT DATE_FORMAT(start_date, '%Y-%m') AS month, SUM(tsd.hours) AS billable_time FROM  `tabTimesheet` ts JOIN `tabTimesheet Detail` tsd ON ts.name = tsd.parent WHERE ts.docstatus != 2 and tsd.project in {0} and tsd.is_billable = 1 GROUP BY month ORDER BY month""".format(tuple(get_project_list))
+				total_billable_time = """SELECT DATE_FORMAT(start_date, '%Y-%m') AS month, SUM(tsd.billing_hours) AS billable_time FROM  `tabTimesheet` ts JOIN `tabTimesheet Detail` tsd ON ts.name = tsd.parent WHERE ts.docstatus != 2 and tsd.project in {0} and tsd.is_billable = 1 GROUP BY month ORDER BY month""".format(tuple(get_project_list))
 				
 				billable_time = frappe.db.sql(total_billable_time, as_dict =1)
 			else:
@@ -64,9 +64,9 @@ class Implementation(Document):
 				for row in total_time:
 					for row1 in billable_time:
 						if row['month'] == row1['month']:
-							non_billable = int(row.get('total_working_hours')) - int(row1.get('billable_time'))
+							non_billable = float(row.get('total_working_hours')) - float(row1.get('billable_time'))
 							if non_billable >0:
-								ratio = int(row1.get('billable_time'))/int(non_billable)
+								ratio = float(row1.get('billable_time'))/float(non_billable)
 							else:
 								ratio = 0
 
@@ -74,7 +74,7 @@ class Implementation(Document):
 								'month_and_year':row.get('month'),
 								'total_time':row.get('total_working_hours'),
 								'billable_time_spent':row1.get('billable_time'),
-								'non_billable_time_spent':int(row.get('total_working_hours')) - int(row1.get('billable_time')),
+								'non_billable_time_spent':float(row.get('total_working_hours')) - float(row1.get('billable_time')),
 								'ratio_of_billable_to_non_billable_time_spent':ratio
 								})
 			else:
@@ -82,16 +82,16 @@ class Implementation(Document):
 				for row in total_time:
 					for row1 in billable_time:
 						if row['month'] == row1['month']:
-							non_billable = int(row.get('total_working_hours')) - int(row1.get('billable_time'))
+							non_billable = float(row.get('total_working_hours')) - float(row1.get('billable_time'))
 							if non_billable >0:
-								ratio = int(row1.get('billable_time'))/int(non_billable)
+								ratio = float(row1.get('billable_time'))/float(non_billable)
 							else:
 								ratio = 0
 							
 							self.append('resource_planning',{
 								'month_and_year':row.get('month'),
 								'total_time':row.get('total_working_hours'),
-								'non_billable_time_spent':int(row.get('total_working_hours')) - int(row1.get('billable_time')),
+								'non_billable_time_spent':float(row.get('total_working_hours')) - float(row1.get('billable_time')),
 								'billable_time_spent':row1.get('billable_time'),
 								'ratio_of_billable_to_non_billable_time_spent':ratio
 								})
@@ -166,17 +166,17 @@ def get_financial_history(name, customer = None):
 			get_so_hrs['dn_qty'] = 0
 
 		
-		get_so_hrs['remaining_hrs'] = int(get_so_hrs['sales_order_qty']) - int(get_so_hrs['dn_qty'])
+		get_so_hrs['remaining_hrs'] = float(get_so_hrs['sales_order_qty']) - float(get_so_hrs['dn_qty'])
 		
 
 		timesheet_hrs = frappe.db.sql("""SELECT sum(td.hours) as timesheet_hrs from `tabTimesheet` t join `tabTimesheet Detail` td on t.name = td.parent where td.is_billable = 1 and t.docstatus = 0 and td.project = '{0}' and td.custom_implementation = '{1}' and t.custom_delivery_note is null """.format(get_project_list[0], name), as_list=1, debug=1)
 
 		if timesheet_hrs[0][0] != None:
 			get_so_hrs['timesheet_hrs'] = timesheet_hrs[0][0]
-			get_so_hrs['remaining_hrs'] = int(get_so_hrs['sales_order_qty']) - int(get_so_hrs['dn_qty']) - int(timesheet_hrs[0][0])
+			get_so_hrs['remaining_hrs'] = float(get_so_hrs['sales_order_qty']) - float(get_so_hrs['dn_qty']) - float(timesheet_hrs[0][0])
 		else:
 			get_so_hrs['timesheet_hrs'] = 0
-			get_so_hrs['remaining_hrs'] = int(get_so_hrs['sales_order_qty']) - int(get_so_hrs['dn_qty'])
+			get_so_hrs['remaining_hrs'] = float(get_so_hrs['sales_order_qty']) - float(get_so_hrs['dn_qty'])
 
 		get_open_sales_orders = frappe.db.get_value('Sales Order', {'status': ["in", ["To Deliver and Bill", "To Bill"]]}, 'count(name) as open_so')
 
@@ -217,17 +217,17 @@ def get_financial_history(name, customer = None):
 		else:
 			get_so_hrs['dn_qty'] = 0
 
-		get_so_hrs['remaining_hrs'] = int(get_so_hrs['sales_order_qty']) - int(get_so_hrs['dn_qty'])
+		get_so_hrs['remaining_hrs'] = float(get_so_hrs['sales_order_qty']) - float(get_so_hrs['dn_qty'])
 		
 
 		timesheet_hrs = frappe.db.sql("""SELECT sum(td.hours) as timesheet_hrs from `tabTimesheet` t join `tabTimesheet Detail` td on t.name = td.parent where td.is_billable = 1 and t.docstatus = 0 and td.project in {0} and td.custom_implementation = '{1}' and t.custom_delivery_note is NULL """.format(tuple(get_project_list), name), as_list=1, debug=1)
 
 		if timesheet_hrs[0][0] != None:
 			get_so_hrs['timesheet_hrs'] = timesheet_hrs[0][0]
-			get_so_hrs['remaining_hrs'] = int(get_so_hrs['sales_order_qty']) - int(get_so_hrs['dn_qty']) - int(timesheet_hrs[0][0])
+			get_so_hrs['remaining_hrs'] = float(get_so_hrs['sales_order_qty']) - float(get_so_hrs['dn_qty']) - float(timesheet_hrs[0][0])
 		else:
 			get_so_hrs['timesheet_hrs'] = 0
-			get_so_hrs['remaining_hrs'] = int(get_so_hrs['sales_order_qty']) - int(get_so_hrs['dn_qty'])
+			get_so_hrs['remaining_hrs'] = float(get_so_hrs['sales_order_qty']) - float(get_so_hrs['dn_qty'])
 
 		get_open_sales_orders = frappe.db.get_value('Sales Order', {'status': ["in", ["To Deliver and Bill", "To Bill"]]}, 'count(name) as open_so')
 
