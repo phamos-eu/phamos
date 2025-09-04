@@ -92,44 +92,53 @@ frappe.ui.form.on("Implementation", {
         }
 
         frm.add_custom_button('Set Implementation Status', () => {
-            frappe.call({
-                method: 'phamos.phamos.doctype.implementation.implementation.are_all_projects_closed',
-                args: {
-                    implementation_name: frm.doc.name
-                },
-                callback: function (r) {
-                    if (r.message === true) {
-                        let d = new frappe.ui.Dialog({
-                            title: 'Set Implementation Status',
-                            fields: [
-                                {
-                                    label: 'Status',
-                                    fieldname: 'status',
-                                    fieldtype: 'Select',
-                                    options: ['Completed', 'Cancelled', 'Reactivated'],
-                                    reqd: 1
-                                },
-                                {
-                                    label: 'Reason',
-                                    fieldname: 'reason',
-                                    fieldtype: 'Small Text',
-                                    reqd: 1
+            let d = new frappe.ui.Dialog({
+                title: 'Set Implementation Status',
+                fields: [
+                    {
+                        label: 'Status',
+                        fieldname: 'status',
+                        fieldtype: 'Select',
+                        options: ['Completed', 'Cancelled', 'Reactivated', 'Hold', 'Escalated'],
+                        reqd: 1
+                    },
+                    {
+                        label: 'Reason',
+                        fieldname: 'reason',
+                        fieldtype: 'Small Text',
+                        reqd: 1
+                    }
+                ],
+                primary_action_label: 'Submit',
+                primary_action(values) {
+                    if (['Completed', 'Cancelled', 'Reactivated'].includes(values.status)) {
+                        // ✅ Backend check only for these 3
+                        frappe.call({
+                            method: 'phamos.phamos.doctype.implementation.implementation.are_all_projects_closed',
+                            args: {
+                                implementation_name: frm.doc.name
+                            },
+                            callback: function (r) {
+                                if (r.message === true) {
+                                    frm.set_value('status', values.status);
+                                    frm.set_value('status_statement', values.reason);
+                                    frm.save();
+                                    d.hide();
+                                } else {
+                                    frappe.throw(__('All projects must be closed before setting this status.'));
                                 }
-                            ],
-                            primary_action_label: 'Submit',
-                            primary_action(values) {
-                                frm.set_value('status', values.status);
-                                frm.set_value('status_statement', values.reason);
-                                frm.save();
-                                d.hide();
                             }
                         });
-                        d.show();
                     } else {
-                        frappe.throw(__('All projects must be closed before setting implementation status.'));
+                        // ✅ Hold & Escalated bypass condition
+                        frm.set_value('status', values.status);
+                        frm.set_value('status_statement', values.reason);
+                        frm.save();
+                        d.hide();
                     }
                 }
             });
+            d.show();
         });
 
         //////////////////////////////////////////////////////////////////////////////////////////////////////
