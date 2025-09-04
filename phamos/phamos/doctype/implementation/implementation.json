@@ -63,7 +63,7 @@
    "fieldname": "status",
    "fieldtype": "Select",
    "label": "Status",
-   "options": "Open\nCancelled\nCompleted\nReactivated",
+   "options": "Open\nCancelled\nCompleted\nReactivated\nHold\nEscalated",
    "read_only": 1
   },
   {
@@ -359,7 +359,7 @@
    "link_fieldname": "custom_implementation"
   }
  ],
- "modified": "2025-09-01 08:53:24.616813",
+ "modified": "2025-09-03 11:04:48.538065",
  "modified_by": "Administrator",
  "module": "Phamos",
  "name": "Implementation",
