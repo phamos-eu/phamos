@@ -218,47 +218,66 @@ frappe.pages['implementation-dashb'].on_page_load = function (wrapper) {
                     return filtered.length ? total / filtered.length : null;
                 });
 
-                $('#chart-container').html('<div id="implementation-chart" style="height:600px;"></div>');
-                Highcharts.chart('implementation-chart', {
-                chart: { zoomType: 'xy' },
-                title: { text: 'Billable vs Non-Billable Time with Prediction' },
-                xAxis: {
-                    categories: categories,
-                    title: { text: 'Month' }
-                },
-                yAxis: {
-                    title: { text: 'Time (hrs)' }
-                },
-                tooltip: {
-                    shared: true,
-                    formatter: function () {
-                        let total = 0;
-                        let s = `<b>${this.x}</b><br/>`;
+                $('#chart-container').html(`
+                    <div class="d-flex justify-content-start mb-2">
+                        <button id="toggle-legend" class="btn btn-sm btn-outline-secondary">
+                            Show Legend
+                        </button>
+                    </div>
+                    <div id="implementation-chart" style="height:600px;"></div>
+                `);
 
-                        this.points.forEach(point => {
-                            s += `<span style="color:${point.color}">\u25CF</span> 
-                                ${point.series.name}: <b>${point.y} hrs</b><br/>`;
-
-                            if (!point.series.name.includes('Prediction')) {
-                                total += point.y;
-                            }
-                        });
-
-                        s += `<hr/><b>Total Worked Hrs: ${total} hrs</b>`;
-                        return s;
-                    }
-                },
-                plotOptions: {
-                    area: {
-                        stacking: 'normal',
-                        marker: { enabled: false }
+                // chart variable me save karo
+                let chart = Highcharts.chart('implementation-chart', {
+                    chart: { zoomType: 'xy' },
+                    legend: { enabled: false },   // 🔹 initially hidden
+                    title: { text: 'Billable vs Non-Billable Time with Prediction' },
+                    xAxis: {
+                        categories: categories,
+                        title: { text: 'Month' }
                     },
-                    line: {
-                        marker: { enabled: true, radius: 3 }
-                    }
-                },
-                series: series 
-            });
+                    yAxis: {
+                        title: { text: 'Time (hrs)' }
+                    },
+                    tooltip: {
+                        shared: true,
+                        formatter: function () {
+                            let total = 0;
+                            let s = `<b>${this.x}</b><br/>`;
+
+                            this.points.forEach(point => {
+                                s += `<span style="color:${point.color}">\u25CF</span> 
+                                    ${point.series.name}: <b>${point.y} hrs</b><br/>`;
+
+                                if (!point.series.name.includes('Prediction')) {
+                                    total += point.y;
+                                }
+                            });
+
+                            s += `<hr/><b>Total Worked Hrs: ${total} hrs</b>`;
+                            return s;
+                        }
+                    },
+                    plotOptions: {
+                        area: {
+                            stacking: 'normal',
+                            marker: { enabled: false }
+                        },
+                        line: {
+                            marker: { enabled: true, radius: 3 }
+                        }
+                    },
+                    series: series
+                });
+
+                // toggle button logic
+                let legendVisible = false;
+                $(document).off('click', '#toggle-legend').on('click', '#toggle-legend', function () {
+                    legendVisible = !legendVisible;
+                    chart.update({ legend: { enabled: legendVisible } });
+                    $(this).text(legendVisible ? "Hide Legend" : "Show Legend");
+                });
+
             }
         });
     }
