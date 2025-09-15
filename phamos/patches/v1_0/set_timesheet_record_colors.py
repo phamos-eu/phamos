@@ -19,7 +19,7 @@ def execute():
             if creation_dt.date() != to_dt.date():
                 color = "Red"
             else:
-                duration = (to_dt - creation_dt).total_seconds() / 3600
+                duration = (creation_dt - to_dt).total_seconds() / 3600
                 if duration < 1:
                     color = "Green"
                 else:
