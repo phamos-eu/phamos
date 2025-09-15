@@ -191,22 +191,21 @@ $(document).on("change", ".comment-input", function() {
   const comment = $(this).val();
 
   frappe.call({
-    method: "frappe.client.set_value",
+    method: "phamos.api.update_customer_comment",
     args: {
-      doctype: "Timesheet",
-      name: ts_name,
-      fieldname: "customer_comment",
-      value: comment
+      ts_name: ts_name,
+      comment: comment
     },
     callback: function(r) {
       if (!r.exc) {
-        frappe.show_alert({message: "Comment updated", indicator: "green"});
+        frappe.show_alert({message: r.message, indicator: "green"});
       } else {
         frappe.show_alert({message: "Failed to update comment", indicator: "red"});
       }
     }
   });
 });
+
 
 
 function update_footer() {
