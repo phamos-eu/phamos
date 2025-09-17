@@ -58,6 +58,18 @@ def get_projects_for_logged_in_customer():
         fields=["name", "project_name"]
     )
 
+@frappe.whitelist()
+def update_customer_comment(ts_name, comment):
+    frappe.db.set_value(
+        "Timesheet", 
+        ts_name, 
+        "customer_comment", 
+        comment, 
+        update_modified=True
+    )
+    frappe.db.commit()
+    return "Comment updated successfully"
+
 def get_customer_for_user(user):
     # Get all Contact names linked to this User
     contacts = frappe.get_list(
