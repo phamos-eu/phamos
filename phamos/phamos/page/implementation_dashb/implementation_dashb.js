@@ -78,10 +78,13 @@ frappe.pages['implementation-dashb'].on_page_load = function (wrapper) {
 
                 const planningData = r.message.planning || [];
                 const predictionData = r.message.prediction || [];
+                const addonData = r.message.addon || [];
+
 
                 const categorySet = new Set();
                 planningData.forEach(row => categorySet.add(row.month_and_year));
                 predictionData.forEach(row => categorySet.add(row.month_and_year));
+                addonData.forEach(row => categorySet.add(row.month_and_year));
 
                 const categories = Array.from(categorySet).sort();
                 const categoryIndexMap = {};
@@ -147,6 +150,33 @@ frappe.pages['implementation-dashb'].on_page_load = function (wrapper) {
 
                 });
                 const isFiltered = filters.implementation.get_value() || filters.team.get_value();
+
+                const addonSeries = categories.map(month => {
+                    const found = addonData.find(row => row.month_and_year === month);
+                    return found ? found.total_hours : 0;
+                });
+
+                series.push({
+                    name: "Internal project hrs",
+                    type: "line",
+                    data: addonSeries,
+                    color: "orange",
+                    dashStyle: "ShortDot",
+                    marker: { enabled: true, radius: 4 },
+                    tooltip: {
+                        pointFormat: '<span style="color:{point.color}">\u25CF</span> Internal Hrs: <b>{point.y}</b><br/>'
+                    },
+                    events: {
+                        click: function (e) {
+                            frappe.msgprint({
+                                title: "Internal project hrs",
+                                message: `Month: <b>${e.point.category}</b><br>Total Hours: <b>${e.point.y}</b>`,
+                                indicator: "orange"
+                            });
+                        }
+                    }
+                });
+
 
     if (isFiltered) {
         // 1. Individual Prediction Dots (scatter)
