@@ -60,36 +60,34 @@
   </div>
 
 
-
-  <!-- Scrollable Table Container -->
-  <div class="border rounded overflow-auto" style="min-height: 0; max-width: 100%;">
-    <table class="table table-hover align-middle mb-0 w-auto"
+  <!-- Table Container -->
+  <div class="border rounded" style="min-height: 0; width: 100%;">
+    <table class="table table-hover align-middle mb-0 w-100"
           id="timesheet_table"
-          style="min-width: 1345px; table-layout: fixed;">
+          style="table-layout: auto;">
       <thead class="table-light sticky-top small">
         <tr>
           <th style="width: 40px;"><input type="checkbox" id="select_all" /></th>
-          <th style="width: 120px;">Timesheet</th>
-          <th style="width: 180px;">Employee ID</th>
-          <th style="width: 130px; white-space: nowrap;">Start Date</th>
-          <th style="width: 130px; white-space: nowrap;">End Date</th>
-          <th style="width: 130px;">Billing Status</th>
-          <th style="width: 120px;">Total Hours</th>
-          <th style="width: 140px;">Billable Hours</th>
-          <th style="width: 100px;">Creation</th>
-          <th style="width: 100px;">Customer Comment</th>
+          <th>Timesheet</th>
+          <th>Employee ID</th>
+          <th>Start Date</th>
+          <th>End Date</th>
+          <th>Billing Status</th>
+          <th>Total Hours</th>
+          <th>Billable Hours</th>
+          <th>Creation</th>
+          <th>Customer Comment</th>
         </tr>
       </thead>
 
-     <tbody id="timesheet_body">
-      <!-- JS will inject rows here -->
-      <tr id="no_data_row" style="display: none;">
-        <td colspan="11" class="text-center text-muted">
-          <i class="fa fa-info-circle me-1"></i> No timesheet records found for the selected filters.
-        </td>
-      </tr>
-    </tbody>
-
+      <tbody id="timesheet_body">
+        <!-- JS will inject rows here -->
+        <tr id="no_data_row" style="display: none;">
+          <td colspan="11" class="text-center text-muted">
+            <i class="fa fa-info-circle me-1"></i> No timesheet records found for the selected filters.
+          </td>
+        </tr>
+      </tbody>
     </table>
   </div>
 
