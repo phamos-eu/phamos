@@ -16,7 +16,6 @@ frappe.ui.form.on("Implementation", {
     setup: function (frm) {
         if (!frm.is_new()) {
             add_row_to_sales_order(frm)
-            if (frm.doc.internal_implementation == 0) {
                 frappe.call({
                     method: "phamos.phamos.doctype.implementation.implementation.get_financial_history",
                     args: { 'name': frm.doc.name, 'customer': frm.doc.customer },
@@ -49,7 +48,6 @@ frappe.ui.form.on("Implementation", {
                     },
                 });
             }
-        }
     },
     refresh: function (frm) {
         frm.fields_dict.reset.$input.on('click', function () {
