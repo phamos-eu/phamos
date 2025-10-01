@@ -371,10 +371,34 @@ def update_and_submit_timesheet_record(name, to_time, percent_billable, activity
         
         # Submit the document
         doc.submit()
-        
-        # Return success message if update and submission were successful
-        return "Timesheet Record updated and submitted successfully"
-    
+
+        # --- Create alternative records from 3rd, 5th, 7th, ... rows ---
+        for i in range(2, len(doc.item), 2):  # start from 3rd row (index 2), step 2
+            alt_row = doc.item[i]
+            new_doc = frappe.new_doc("Timesheet Record")
+
+            # Copy parent fields from original
+            for field in ["project", "customer", "task", "goal", "expected_time", "activity_type", "result", "percent_billable"]:
+                new_doc.set(field, doc.get(field))
+
+            # Parent times from selected row
+            new_doc.from_time = alt_row.from_time
+            new_doc.to_time = alt_row.to_time
+            new_doc.actual_time = alt_row.duration or 0
+
+            # Copy all item rows
+            for original_row in doc.item:
+                new_doc.append("item", {
+                    "from_time": original_row.from_time,
+                    "to_time": original_row.to_time,
+                    "duration": original_row.duration or 0
+                })
+
+            new_doc.insert(ignore_permissions=True)
+            new_doc.submit()
+
+        return {"timesheet_name": doc.name}
+
     except Exception as e:
         # Handle errors here, you can log the error for further investigation
         frappe.log_error(frappe.get_traceback(), "Timesheet Record Update and Submit Error")
