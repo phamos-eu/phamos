@@ -113,8 +113,12 @@ function update_and_submit_timesheet_record(
         freeze_message: __("Updating Timesheet Record......"),
         callback: function (r) {
           if (r.message) {
-            frappe.show_alert("Timesheet Record Updated Successfully.");
-            render_datatable();
+            let timesheet_name = r.message.timesheet_name;
+            frappe.show_alert({
+              message: `Timesheet <a href="${frappe.utils.get_form_link("Timesheet-Record", timesheet_name)}" target="_blank">${timesheet_name}</a> Updated Successfully.`,
+              indicator: 'green'
+            });            
+          render_datatable();
           }
         },
       });
