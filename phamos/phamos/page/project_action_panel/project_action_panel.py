@@ -480,7 +480,7 @@ def update_and_submit_timesheet_record(name, to_time, percent_billable, activity
             new_doc.insert(ignore_permissions=True)
             new_doc.submit()
 
-        return "Timesheet Record updated, and alternative records created"
+        return {"timesheet_name": doc.name}
 
     except Exception as e:
         frappe.log_error(frappe.get_traceback(), "Timesheet Record Update and Submit Error")
