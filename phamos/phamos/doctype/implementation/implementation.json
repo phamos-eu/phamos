@@ -123,7 +123,7 @@
   {
    "fieldname": "sales_order_total_hrs",
    "fieldtype": "Int",
-   "label": "Total Open Sales Order Hours"
+   "label": "Total Hours of Open Sales Order"
   },
   {
    "fieldname": "total_hrs_timesheet",

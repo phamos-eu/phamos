@@ -109,7 +109,7 @@ frappe.ui.form.on("Implementation", {
                 ],
                 primary_action_label: 'Submit',
                 primary_action(values) {
-                    if (['Completed', 'Cancelled', 'Reactivated'].includes(values.status)) {
+                    if (['Completed', 'Cancelled'].includes(values.status)) {
                         // ✅ Backend check only for these 3
                         frappe.call({
                             method: 'phamos.phamos.doctype.implementation.implementation.are_all_projects_closed',
@@ -127,7 +127,12 @@ frappe.ui.form.on("Implementation", {
                                 }
                             }
                         });
-                    } else {
+                    } else if (values.status === 'Reactivated') {
+                        frm.set_value('status', 'Open');
+                        frm.set_value('status_statement', values.reason);
+                        frm.save();
+                        d.hide();
+                    }else {
                         // ✅ Hold & Escalated bypass condition
                         frm.set_value('status', values.status);
                         frm.set_value('status_statement', values.reason);
