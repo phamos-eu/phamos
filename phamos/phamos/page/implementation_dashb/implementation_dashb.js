@@ -179,42 +179,21 @@ frappe.pages['implementation-dashb'].on_page_load = function (wrapper) {
 
 
     if (isFiltered) {
-        // 1. Individual Prediction Dots (scatter)
-        const predictionDots = predictionData.map(row => ({
-            x: categoryIndexMap[row.month_and_year],
-            y: row.prediction || 0
-        }));
 
-        series.push({
-            name: 'Prediction',
-            type: 'scatter',
-            data: predictionDots,
-            color: '#ff0000',
-            marker: {
-                symbol: 'circle',
-                radius: 4
-            },
-            tooltip: {
-                pointFormat: '<span style="color:{point.color}">\u25CF</span> Prediction: <b>{point.y}</b><br/>'
-            }
-        });
-
-        // 2. Average Prediction Line (filtered)
-        const averagePredictions = categories.map(month => {
+        const sumPredictions = categories.map(month => {
             const filtered = predictionData.filter(row => row.month_and_year === month);
-            const total = filtered.reduce((sum, r) => sum + (r.prediction || 0), 0);
-            return filtered.length ? total / filtered.length : null;
+            return filtered.reduce((sum, r) => sum + (r.prediction || 0), 0);
         });
 
         series.push({
-            name: 'Average Prediction',
+            name: 'Prediction (Sum)',
             type: 'line',
-            data: averagePredictions,
+            data: sumPredictions,
             color: '#000000',
             dashStyle: 'Dot',
             marker: { enabled: true, radius: 3 },
             tooltip: {
-                pointFormat: '<span style="color:{point.color}">\u25CF</span> Avg Prediction: <b>{point.y:.2f}</b><br/>'
+                pointFormat: '<span style="color:{point.color}">\u25CF</span> Sum Prediction: <b>{point.y}</b><br/>'
             }
         });
 
@@ -230,7 +209,7 @@ frappe.pages['implementation-dashb'].on_page_load = function (wrapper) {
             type: 'line',
             data: cumulativePredictions,
             color: '#000000',
-            dashStyle: 'Solid',
+            dashStyle: 'Dot',
             marker: { enabled: true, radius: 3 },
             tooltip: {
                 pointFormat: '<span style="color:{point.color}">\u25CF</span> Cumulative: <b>{point.y}</b><br/>'
