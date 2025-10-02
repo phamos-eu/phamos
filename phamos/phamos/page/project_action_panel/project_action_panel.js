@@ -1172,102 +1172,129 @@ function show_tab(tab, projectData) {
 function renderTimesheetCalendar(container) {
   const rowHeight = 40;
 
-  frappe.call({
-    method: "phamos.phamos.page.project_action_panel.project_action_panel.get_today_timesheet_records",
-    callback: function(r) {
-      if (r.message) {
-        const userTZ = r.message.user_timezone || "User";
+  // 🔹 Date picker container
+  const dateWrapper = document.createElement("div");
+  dateWrapper.className = "mb-2";
 
-        const tbl = document.createElement("table");
-        tbl.className = "timezone-table";
+  const dateInput = document.createElement("input");
+  dateInput.type = "date";
+  dateInput.value = new Date().toISOString().split("T")[0]; // default today
+  dateInput.className = "border px-2 py-1 rounded";
 
-        // Header
-        const thead = document.createElement("thead");
-        const headRow = document.createElement("tr");
-        headRow.innerHTML = `<th>${userTZ}</th><th>Germany</th>`;
-        thead.appendChild(headRow);
-        tbl.appendChild(thead);
+  dateWrapper.appendChild(dateInput);
+  container.innerHTML = "";
+  container.appendChild(dateWrapper);
 
-        // Body (slots from backend)
-        const tbody = document.createElement("tbody");
-        r.message.slots.forEach(slot => {
-          const tr = document.createElement("tr");
-          tr.innerHTML = `<td>${slot.user}</td><td>${slot.germany}</td>`;
-          tbody.appendChild(tr);
-        });
-        tbl.appendChild(tbody);
+  // 🔹 function to load calendar for a given date
+  function loadCalendar(selectedDate) {
+    frappe.call({
+      method: "phamos.phamos.page.project_action_panel.project_action_panel.get_timesheet_records_by_date",
+      args: { selected_date: selectedDate },
+      callback: function(r) {
+        if (r.message) {
+          const userTZ = r.message.user_timezone || "User";
 
-        // Left side table
-        const tableDiv = document.createElement("div");
-        tableDiv.className = "calendar-left";
-        tableDiv.appendChild(tbl);
+          const tbl = document.createElement("table");
+          tbl.className = "timezone-table";
 
-        // Right side boxes
-        const calendarRight = document.createElement("div");
-        calendarRight.className = "calendar-right relative flex-1 border";
-        calendarRight.style.height = r.message.slots.length * rowHeight + "px";
+          // Header
+          const thead = document.createElement("thead");
+          const headRow = document.createElement("tr");
+          headRow.innerHTML = `<th>${userTZ}</th><th>Germany</th>`;
+          thead.appendChild(headRow);
+          tbl.appendChild(thead);
 
-        r.message.records.forEach(rec => {
-          const from_user = rec.from_time_user;
-          const to_user   = rec.to_time_user;
+          // Body (slots)
+          const tbody = document.createElement("tbody");
+          r.message.slots.forEach(slot => {
+            const tr = document.createElement("tr");
+            tr.innerHTML = `<td>${slot.user}</td><td>${slot.germany}</td>`;
+            tbody.appendChild(tr);
+          });
+          tbl.appendChild(tbody);
 
-          const [fh, fm] = from_user.split(":").map(Number);
-          const [th, tm] = to_user.split(":").map(Number);
+          // Left side table
+          const tableDiv = document.createElement("div");
+          tableDiv.className = "calendar-left";
+          tableDiv.appendChild(tbl);
 
-          const startMins = (fh * 60 + fm) - (8 * 60);
-          const endMins   = (th * 60 + tm) - (8 * 60);
-          const offset = 50;
-          const top = (startMins / 60) * rowHeight + offset;
-          const height = ((endMins - startMins) / 60) * rowHeight;
+          // Right side (records)
+          const calendarRight = document.createElement("div");
+          calendarRight.className = "calendar-right relative flex-1 border";
+          calendarRight.style.height = r.message.slots.length * rowHeight + "px";
 
-          const box = document.createElement("div");
-          box.className = "timesheet-box absolute left-2 right-2 bg-blue-200 border rounded p-1 text-xs";
-          box.innerText = `${rec.project || "Work"} (${from_user.substring(0,5)} - ${to_user.substring(0,5)})`;
+          r.message.records.forEach(rec => {
+            const from_user = rec.from_time_user;
+            const to_user   = rec.to_time_user;
 
-          box.style.top = top + "px";
-          box.style.height = height + "px";
+            const [fh, fm] = from_user.split(":").map(Number);
+            const [th, tm] = to_user.split(":").map(Number);
 
-           // ===== Background logic =====
-          if (rec.creation && rec.to_time) {
-            const creationDate = new Date(rec.creation.replace(" ", "T"));
-            const toDate       = new Date(rec.to_time.replace(" ", "T"));
+            const startMins = (fh * 60 + fm) - (8 * 60);
+            const endMins   = (th * 60 + tm) - (8 * 60);
+            const offset = 90;
+            const top = (startMins / 60) * rowHeight + offset;
+            const height = ((endMins - startMins) / 60) * rowHeight;
 
-            if (!isNaN(creationDate) && !isNaN(toDate)) {
-              const creationDay = creationDate.toISOString().split("T")[0];
-              const toDay       = toDate.toISOString().split("T")[0];
+            const box = document.createElement("div");
+            box.className = "timesheet-box absolute left-2 right-2 border rounded p-1 text-xs";
+            box.innerText = `${rec.project || "Work"} (${from_user.substring(0,5)} - ${to_user.substring(0,5)})`;
 
-              if (creationDay !== toDay) {
-                box.style.backgroundColor = "rgba(255, 0, 0, 0.3)";   // red
-                box.style.borderColor = "red";
-              } else {
-                const diffHours = (creationDate - toDate) / (1000 * 60 * 60);
-                if (diffHours < 1) {
-                  box.style.backgroundColor = "rgba(0, 128, 0, 0.3)"; // green
-                  box.style.borderColor = "green";
+            box.style.top = top + "px";
+            box.style.height = height + "px";
+
+            // ===== Background logic =====
+            if (rec.creation && rec.to_time) {
+              const creationDate = new Date(rec.creation.replace(" ", "T"));
+              const toDate       = new Date(rec.to_time.replace(" ", "T"));
+
+              if (!isNaN(creationDate) && !isNaN(toDate)) {
+                const creationDay = creationDate.toISOString().split("T")[0];
+                const toDay       = toDate.toISOString().split("T")[0];
+
+                if (creationDay !== toDay) {
+                  box.style.backgroundColor = "rgba(255, 0, 0, 0.3)";   // red
+                  box.style.borderColor = "red";
                 } else {
-                  box.style.backgroundColor = "rgba(255, 165, 0, 0.3)"; // amber
-                  box.style.borderColor = "orange";
+                  const diffHours = (creationDate - toDate) / (1000 * 60 * 60);
+                  if (diffHours < 1) {
+                    box.style.backgroundColor = "rgba(0, 128, 0, 0.3)"; // green
+                    box.style.borderColor = "green";
+                  } else {
+                    box.style.backgroundColor = "rgba(255, 165, 0, 0.3)"; // amber
+                    box.style.borderColor = "orange";
+                  }
                 }
               }
             }
-          }
-          console.log("Creation:", rec.creation, "To:", rec.to_time);
 
-          calendarRight.appendChild(box);
-        });
+            calendarRight.appendChild(box);
+          });
 
-        // Final wrapper
-        const calendarWrapper = document.createElement("div");
-        calendarWrapper.className = "calendar-wrapper flex gap-4";
-        calendarWrapper.appendChild(tableDiv);
-        calendarWrapper.appendChild(calendarRight);
+          // Final wrapper
+          const calendarWrapper = document.createElement("div");
+          calendarWrapper.className = "calendar-wrapper flex gap-4";
+          calendarWrapper.appendChild(tableDiv);
+          calendarWrapper.appendChild(calendarRight);
 
-        container.innerHTML = "";
-        container.appendChild(calendarWrapper);
+          // Replace old content
+          const oldCalendar = container.querySelector(".calendar-wrapper");
+          if (oldCalendar) oldCalendar.remove();
+          container.appendChild(calendarWrapper);
+        }
       }
-    }
+    });
+  }
+
+  // 🔹 Load first time with today's date
+  loadCalendar(dateInput.value);
+
+  // 🔹 Reload on date change
+  dateInput.addEventListener("change", function() {
+    loadCalendar(this.value);
   });
 }
+
 
 
 
