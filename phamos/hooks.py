@@ -14,9 +14,9 @@ required_apps = ["erpnext", "hrms"]
 # include js, css files in header of desk.html
 # app_include_css = "/assets/phamos/css/phamos.css"
 # app_include_js = "/assets/phamos/js/phamos.js"
+
 app_include_js = [
-    "phamos.bundle.js",
-    "https://code.highcharts.com/highcharts.js"
+    "/assets/phamos/js/custom_crm_activities.js"
 ]
 
 
