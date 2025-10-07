@@ -22,6 +22,13 @@ frappe.pages['implementation-dashb'].on_page_load = function (wrapper) {
     function create_filter(label, fieldtype, fieldname, parentSelector, options = null, link_to = null) {
         const df = { label, fieldname, fieldtype, options };
         if (link_to) df.options = link_to;
+
+        if (fieldtype === "MultiSelectList" && link_to) {
+            df.get_data = function(txt) {
+                return frappe.db.get_link_options(link_to, txt);
+            };
+        }
+
         const control = frappe.ui.form.make_control({
             parent: $('<div class="col mb-2"></div>').appendTo(parentSelector),
             df: df,
@@ -35,7 +42,7 @@ frappe.pages['implementation-dashb'].on_page_load = function (wrapper) {
     filters.from_date = create_filter('From Date', 'Date', 'from_date', '#filter-section');
     filters.to_date = create_filter('To Date', 'Date', 'to_date', '#filter-section');
     filters.team = create_filter('Team', 'Link', 'team', '#filter-section', null, 'Team');
-    filters.implementation = create_filter('Implementation', 'Link', 'implementation', '#filter-section', null, 'Implementation');
+    filters.implementation = create_filter('Implementation', 'MultiSelectList', 'implementation', '#filter-section', null, 'Implementation');
     // Clear Filters Button Handler
     $('#clear-filters-btn').on('click', () => {
         Object.values(filters).forEach(ctrl => {
@@ -64,7 +71,7 @@ frappe.pages['implementation-dashb'].on_page_load = function (wrapper) {
             from_date: filters.from_date.get_value(),
             to_date: filters.to_date.get_value(),
             team: filters.team.get_value(),
-            implementation: filters.implementation.get_value()
+            implementation: filters.implementation.get_value() ? filters.implementation.get_value().join(',') : ''
         };
 
         frappe.call({
@@ -106,9 +113,6 @@ frappe.pages['implementation-dashb'].on_page_load = function (wrapper) {
                 planningData.forEach(row => {
                     let impl = row.implementation_name || 'Unknown';
 
-                    if (filters.implementation.get_value()) {
-                        impl = filters.implementation.get_value();
-                    }
                     if (!groupedData[impl]) {
                         groupedData[impl] = {
                             billable: new Array(categories.length).fill(0),
@@ -156,26 +160,28 @@ frappe.pages['implementation-dashb'].on_page_load = function (wrapper) {
                     return found ? found.total_hours : 0;
                 });
 
-                series.push({
-                    name: "Internal project hrs",
-                    type: "line",
-                    data: addonSeries,
-                    color: "orange",
-                    dashStyle: "ShortDot",
-                    marker: { enabled: true, radius: 4 },
-                    tooltip: {
-                        pointFormat: '<span style="color:{point.color}">\u25CF</span> Internal Hrs: <b>{point.y}</b><br/>'
-                    },
-                    events: {
-                        click: function (e) {
-                            frappe.msgprint({
-                                title: "Internal project hrs",
-                                message: `Month: <b>${e.point.category}</b><br>Total Hours: <b>${e.point.y}</b>`,
-                                indicator: "orange"
-                            });
+                if (!filters.implementation.get_value() || filters.implementation.get_value().length === 0) {
+                    series.push({
+                        name: "Internal project hrs",
+                        type: "line",
+                        data: addonSeries,
+                        color: "orange",
+                        dashStyle: "ShortDot",
+                        marker: { enabled: true, radius: 4 },
+                        tooltip: {
+                            pointFormat: '<span style="color:{point.color}">\u25CF</span> Internal Hrs: <b>{point.y}</b><br/>'
+                        },
+                        events: {
+                            click: function (e) {
+                                frappe.msgprint({
+                                    title: "Internal project hrs",
+                                    message: `Month: <b>${e.point.category}</b><br>Total Hours: <b>${e.point.y}</b>`,
+                                    indicator: "orange"
+                                });
+                            }
                         }
-                    }
-                });
+                    });
+                }
 
 
     if (isFiltered) {
