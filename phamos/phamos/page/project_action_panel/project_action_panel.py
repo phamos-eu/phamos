@@ -6,7 +6,7 @@ from frappe import _
 from frappe.model.document import Document
 from frappe.utils import cstr, now_datetime, time_diff_in_seconds, get_datetime,time_diff,today
 from frappe.utils.data import add_to_date,format_duration, time_diff_in_seconds
-from datetime import datetime
+import datetime
 from datetime import datetime, timedelta
 from collections import defaultdict
 from frappe.utils import strip_html
@@ -419,11 +419,11 @@ def get_timesheet_records_by_date(selected_date=None):
     user_zone = pytz.timezone(user_tz)
     germany_zone = pytz.timezone(germany_tz)
 
-    # 🔹 Agar selected_date na ho to today le lo
+    # 🔹 if not selected date then get today date
     if not selected_date:
         selected_date = frappe.utils.now_datetime().date()
     else:
-        selected_date = datetime.datetime.strptime(selected_date, "%Y-%m-%d").date()
+        selected_date = datetime.strptime(selected_date, "%Y-%m-%d").date()
 
     # Records fetch
     records = frappe.db.sql("""
