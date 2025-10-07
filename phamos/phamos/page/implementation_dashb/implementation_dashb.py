@@ -13,9 +13,18 @@ def get_chart_data(from_date=None, to_date=None, team=None, implementation=None)
     prediction = []
 
     if implementation:
-        full_doc = frappe.get_doc("Implementation", implementation)
-        planning = full_doc.resource_planning or []
-        prediction = full_doc.resource_planning_prediction or []
+        impl_list = [i.strip() for i in implementation.split(',') if i.strip()]
+        for impl_name in impl_list:
+            full_doc = frappe.get_doc("Implementation", impl_name)
+            for row in (full_doc.resource_planning or []):
+                row_dict = row.as_dict()
+                row_dict["implementation_name"] = impl_name
+                planning.append(row_dict)
+
+            for row in (full_doc.resource_planning_prediction or []):
+                row_dict = row.as_dict()
+                row_dict["implementation_name"] = impl_name
+                prediction.append(row_dict)
     else:
         filters = {}
         if team:
