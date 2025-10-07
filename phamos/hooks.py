@@ -16,7 +16,8 @@ required_apps = ["erpnext", "hrms"]
 # app_include_js = "/assets/phamos/js/phamos.js"
 
 app_include_js = [
-    "/assets/phamos/js/custom_crm_activities.js"
+    "/assets/phamos/js/custom_crm_activities.js",
+    "/assets/phamos/js/hybrid_meeting_composer.js",
 ]
 
 
