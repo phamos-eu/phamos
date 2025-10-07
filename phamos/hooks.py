@@ -40,7 +40,13 @@ doctype_js = {
 	"Issue" : "public/js/issue.js",
 	"Sales Order": "public/js/sales_order.js",
 	"Job Applicant": "public/js/job_applicant.js",
-    "Timesheet":"public/js/timesheet.js"
+    "Timesheet":"public/js/timesheet.js",
+    "User": "public/js/mailcow_user.js",
+    "Event": "public/js/event.js",
+}
+
+doctype_list_js = {
+    "Event": "public/js/event_list.js",
 }
 
 override_doctype_class = {
@@ -130,6 +136,15 @@ website_route_rules = [
 #		"on_trash": "method"
 #	}
 # }
+
+doc_events = {
+	"Event": {
+		"after_insert": "phamos.mailcow_integration.caldav.sync_event.on_upsert",
+        "on_update": "phamos.mailcow_integration.caldav.sync_event.on_upsert",
+		"on_trash": "phamos.mailcow_integration.caldav.sync_event.on_delete",
+	},
+}
+
 
 # Scheduled Tasks
 # ---------------
