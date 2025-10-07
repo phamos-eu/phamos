@@ -22,7 +22,7 @@ class TimesheetRecord(Document):
 				if to_dt.date() != creation_dt.date():
 					self.timesheet_record_color = "Red"
 				else:
-					duration = (to_dt - creation_dt).total_seconds() / 3600
+					duration = (creation_dt - to_dt).total_seconds() / 3600
 					if duration < 1:
 						self.timesheet_record_color = "Green"
 					else:
