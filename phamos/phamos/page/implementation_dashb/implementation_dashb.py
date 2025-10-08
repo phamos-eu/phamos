@@ -50,7 +50,7 @@ def get_chart_data(from_date=None, to_date=None, team=None, implementation=None)
             SUM(tl.hours) as total_hours
         FROM `tabTimesheet` t
         JOIN `tabTimesheet Detail` tl ON tl.parent = t.name
-        WHERE t.project_name = 'HR-Addon'
+        WHERE t.project_name IN ('HR-Addon', '2025 HR Internal')
         AND t.docstatus = 1
         GROUP BY DATE_FORMAT(tl.from_time, '%Y-%m')
         ORDER BY month_and_year
