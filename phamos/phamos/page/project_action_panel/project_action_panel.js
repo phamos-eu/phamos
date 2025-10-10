@@ -674,14 +674,27 @@ function openStopProjectDialog(timesheet_record, percent_billable, project, task
               const amberStop = greenPercent + amberPercent;
               const redStop = amberStop + redPercent;
 
-              gradientStyle = `background: linear-gradient(to right,
-                green 0%, green ${greenPercent}%,
-                orange ${greenPercent}%, orange ${amberStop}%,
-                red ${amberStop}%, red 100%);
-                background-size: 100% 6px;
-                background-repeat: no-repeat;
-                background-position: bottom;
-                padding-bottom: 16px;`;
+                // ✅ If no records, make background white
+                if (greenPercent === 0 && amberPercent === 0 && redPercent === 0) {
+                  gradientStyle = `
+                    background: white;
+                    background-size: 100% 6px;
+                    background-repeat: no-repeat;
+                    background-position: bottom;
+                    padding-bottom: 16px;
+                  `;
+                } else {
+                  gradientStyle = `
+                    background: linear-gradient(to right,
+                      green 0%, green ${greenPercent}%,
+                      orange ${greenPercent}%, orange ${amberStop}%,
+                      red ${amberStop}%, red 100%);
+                    background-size: 100% 6px;
+                    background-repeat: no-repeat;
+                    background-position: bottom;
+                    padding-bottom: 16px;
+                  `;
+                }
 
               tooltip = `Green: ${greenPercent}% | Amber: ${amberPercent}% | Red: ${redPercent}%`;
             }
@@ -1004,13 +1017,28 @@ function show_tab(tab, projectData) {
         .calendar-left {
           flex: 1;
           border-right: 1px solid #ccc;
-          padding: 10px;
+          // padding: 10px;
         }
         .calendar-right {
           flex: 1;
           padding: 10px;
           background: #fff;
           position: relative;
+        }
+        .calendar-right::before {
+          content: "";
+          position: absolute;
+          top: 0;
+          left: 0;
+          right: 0;
+          bottom: 0;
+          background: repeating-linear-gradient(
+            to bottom,
+            transparent,
+            transparent 39px,
+            #ddd 40px
+          );
+          pointer-events: none;
         }
       `;
       document.head.appendChild(style);
@@ -1186,8 +1214,26 @@ function renderTimesheetCalendar(container) {
   dateInput.className = "border px-2 py-1 rounded";
 
   dateWrapper.appendChild(dateInput);
-  container.innerHTML = "";
-  container.appendChild(dateWrapper);
+
+    // Day name span
+    const dayName = document.createElement("span");
+    dayName.className = "font-bold";
+    dayName.style.fontSize = "14px";
+    dayName.style.marginLeft = "150px";
+    dayName.style.verticalAlign = "middle";
+    dateWrapper.appendChild(dayName);
+
+    container.innerHTML = "";
+    container.appendChild(dateWrapper);
+
+    // Function to show day name
+    function updateDayName(selectedDate) {
+      const dateObj = new Date(selectedDate);
+      const options = { weekday: 'long' };
+      const day = dateObj.toLocaleDateString('en-US', options);
+      dayName.innerText = day;
+    }
+
 
   // 🔹 function to load calendar for a given date
   function loadCalendar(selectedDate) {
@@ -1236,7 +1282,7 @@ function renderTimesheetCalendar(container) {
 
             const startMins = (fh * 60 + fm) - (8 * 60);
             const endMins   = (th * 60 + tm) - (8 * 60);
-            const offset = 90;
+            const offset = 78;
             const top = (startMins / 60) * rowHeight + offset;
             const height = ((endMins - startMins) / 60) * rowHeight;
 
@@ -1292,10 +1338,14 @@ function renderTimesheetCalendar(container) {
 
   // 🔹 Load first time with today's date
   loadCalendar(dateInput.value);
+  updateDayName(dateInput.value);
+
 
   // 🔹 Reload on date change
   dateInput.addEventListener("change", function() {
     loadCalendar(this.value);
+    updateDayName(this.value);
+
   });
 }
 
