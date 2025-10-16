@@ -17,8 +17,6 @@ frappe.provide('erpnext.utils');
             this.proposals = [];
             this._proposalKeys = new Set();
 
-            const default_subject = this._derive_default_subject();
-
             this.dialog = new frappe.ui.Dialog({
                 title: __('Schedule Meeting & Email'),
                 size: 'large',
@@ -64,7 +62,7 @@ frappe.provide('erpnext.utils');
 
                     // EVENT RIGHT COLUMN
                     { fieldtype: 'HTML', fieldname: 'event_heading', options: '<div style="font-weight:600; margin-bottom:8px;">'+__('Event')+'</div>' },
-                    { label: __('Meeting Subject'), fieldtype: 'Small Text', fieldname: 'subject', reqd: 1, max_height: 70, default: default_subject },
+                    { label: __('Meeting Subject'), fieldtype: 'Small Text', fieldname: 'subject', reqd: 1, max_height: 70 },
                     { label: __('Event Type'), fieldtype: 'Select', fieldname: 'event_type', options: ['Public', 'Private'], default: 'Private', reqd: 1, hidden: 1 },
                     { label: __('Day to Fetch Slots'), fieldtype: 'Date', fieldname: 'day', default: frappe.datetime.get_today() },
                     { label: __('Duration (minutes)'), fieldtype: 'Select', fieldname: 'duration_minutes', options: ['15', '30', '60', '90', '120'], default: '60' },
@@ -107,7 +105,6 @@ frappe.provide('erpnext.utils');
             this._init_email_template_actions();
             this._init_email_multiselect_queries();
             this.bind_field_events();
-            this._prefill_email_subject();
             this._prefill_to_from_lead();
             this._init_attachments_uploader();
         }
@@ -408,21 +405,6 @@ frappe.provide('erpnext.utils');
                     d.set_value('email_body', `${current}${sep}${tableHtml}`);
                 }
             });
-        }
-
-        _derive_default_subject() {
-            if (!this.doc) return __('New Meeting');
-            return __('Meeting with {0}', [
-                this.doc.lead_name || this.doc.customer_name || this.doc.company_name || this.doc.name
-            ]);
-        }
-
-        _prefill_email_subject() {
-            const subj = this.dialog.get_value('subject') || this._derive_default_subject();
-            this.dialog.set_value('email_subject', subj);
-            if (!this.dialog.get_value('email_body')) {
-                this.dialog.set_value('email_body', this._default_email_body());
-            }
         }
 
         _default_email_body() {
