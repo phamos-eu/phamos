@@ -16,8 +16,10 @@ def organizer_email() -> str | None:
         return frappe.session.user
 
 def dav_password(email: str) -> str | None:
-    dav_doc = frappe.db.get_all("Mailcow DAV Password", filters={"user": email}, pluck="name")[0]
-    
+    rows = frappe.db.get_all("Mailcow DAV Password", filters={"user": email}, pluck="name")
+    if not rows:
+        return None
+    dav_doc = rows[0]
     return get_decrypted_password(
         doctype="Mailcow DAV Password",
         name=dav_doc,
