@@ -44,17 +44,27 @@ def get_chart_data(from_date=None, to_date=None, team=None, implementation=None)
                 row_dict["implementation_name"] = impl.name
                 prediction.append(row_dict)
 
-    # 🔹 HR-Addon Timesheet hours
-    addon_data = frappe.db.sql("""
-        SELECT DATE_FORMAT(tl.from_time, '%Y-%m') as month_and_year,
-            SUM(tl.hours) as total_hours
-        FROM `tabTimesheet` t
-        JOIN `tabTimesheet Detail` tl ON tl.parent = t.name
-        WHERE t.project_name IN ('HR-Addon', '2025 HR Internal')
-        AND t.docstatus = 1
-        GROUP BY DATE_FORMAT(tl.from_time, '%Y-%m')
-        ORDER BY month_and_year
-    """, as_dict=True)
+    # 🔹 HR-Addon Timesheet hours (Dynamic internal projects)
+    internal_projects = frappe.get_all(
+        "Project",
+        filters={"custom_is_internal_project": 1},
+        pluck="name"
+    )
+
+    if internal_projects:
+        placeholders = ', '.join(['%s'] * len(internal_projects))
+        addon_data = frappe.db.sql(f"""
+            SELECT DATE_FORMAT(tl.from_time, '%%Y-%%m') as month_and_year,
+                   SUM(tl.hours) as total_hours
+            FROM `tabTimesheet` t
+            JOIN `tabTimesheet Detail` tl ON tl.parent = t.name
+            WHERE t.parent_project IN ({placeholders})
+              AND t.docstatus = 1
+            GROUP BY DATE_FORMAT(tl.from_time, '%%Y-%%m')
+            ORDER BY month_and_year
+        """, internal_projects, as_dict=True)
+    else:
+        addon_data = []
 
 
     # Filter by date
