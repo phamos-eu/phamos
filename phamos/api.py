@@ -34,7 +34,7 @@ def get_timesheets(from_date=None, to_date=None, project=None, offset=0, limit=2
     total = frappe.db.sql(f"""
         SELECT COUNT(*)
         FROM `tabTimesheet`
-        WHERE docstatus = 1 {conditions}
+        WHERE docstatus IN (0, 1) {conditions}
     """, values)[0][0]
 
     # Timesheet rows with filters
@@ -42,7 +42,7 @@ def get_timesheets(from_date=None, to_date=None, project=None, offset=0, limit=2
         SELECT name, employee, custom_billing_status, project_owner, total_hours,
                total_billable_hours, project_name, start_date, end_date, creation, customer_comment
         FROM `tabTimesheet`
-        WHERE docstatus = 1 {conditions}
+        WHERE docstatus IN (0, 1) {conditions}
         ORDER BY creation DESC
         LIMIT {limit} OFFSET {offset}
     """, values, as_dict=True)
@@ -138,7 +138,7 @@ def get_timesheet_totals(from_date=None, to_date=None, project=None):
     data = frappe.db.sql(f"""
         SELECT total_hours, total_billable_hours
         FROM `tabTimesheet`
-        WHERE docstatus = 1 {conditions}
+        WHERE docstatus IN (0, 1) {conditions}
     """, values, as_dict=True)
 
     total_hours = sum([float(d.total_hours or 0) for d in data])
@@ -177,7 +177,7 @@ def get_graph_data(from_date=None, to_date=None, project=None):
             COALESCE(NULLIF(project_name, ''), parent_project) as project_label,
             employee
         FROM `tabTimesheet`
-        WHERE docstatus = 1 {filters}
+        WHERE docstatus IN (0, 1) {filters}
         ORDER BY start_date
     """, as_dict=True)
 
