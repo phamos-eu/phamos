@@ -64,67 +64,40 @@ frappe.pages["project-action-panel"].on_page_load = function (wrapper) {
     });
   }
 
-function update_and_submit_timesheet_record(
-  timesheet_record,
-  task,
-  to_time,
-  percent_billable,
-  activity_type,
-  result
-) {
-  frappe.call({
-    method: "frappe.client.get",
-    args: {
-      doctype: "Timesheet Record",
-      name: timesheet_record
-    },
-    callback: function (res) {
-      if (!res.message) {
-        frappe.show_alert("Timesheet Record not found.");
-        return;
-      }
-
-      let doc = res.message;
-
-      if (!doc.item || doc.item.length === 0) {
-        frappe.show_alert("No time logs found.");
-        return;
-      }
-
-      let lastRow = doc.item[doc.item.length - 1];
-
-      if (lastRow.to_time) {
-        frappe.show_alert("Please Pause it first (▶️)");
-        return;
-      }
-
-
-      frappe.call({
-        method: "phamos.phamos.page.project_action_panel.project_action_panel.update_and_submit_timesheet_record",
-        args: {
-          name: timesheet_record,
-          task: task,
-          to_time: to_time,
-          percent_billable: percent_billable,
-          activity_type: activity_type,
-          result: result,
-        },
-        freeze: true,
-        freeze_message: __("Updating Timesheet Record......"),
-        callback: function (r) {
-          if (r.message) {
-            let timesheet_name = r.message.timesheet_name;
-            frappe.show_alert({
-              message: `Timesheet <a href="${frappe.utils.get_form_link("Timesheet-Record", timesheet_name)}" target="_blank">${timesheet_name}</a> Updated Successfully.`,
-              indicator: 'green'
-            });            
+  // Function to create timesheet record
+  function update_and_submit_timesheet_record(
+    timesheet_record,
+    task,
+    to_time,
+    percent_billable,
+    activity_type,
+    result
+  ) {
+    frappe.call({
+      method: 
+        "phamos.phamos.page.project_action_panel.project_action_panel.update_and_submit_timesheet_record",
+      args: {
+        name: timesheet_record,
+        task:task,
+        to_time: to_time,
+        percent_billable: percent_billable,
+        activity_type: activity_type,
+        result: result,
+      },
+      freeze: true,
+      freeze_message: __("Updating Timesheet Record......"),
+      callback: function (r) {
+        if (r.message) {
+          let doc = frappe.model.sync(r.message);
+          frappe.msgprint(
+            "Timesheet Record: " + doc[0].name + " Updated Successfully."
+          );
           render_datatable();
-          }
-        },
-      });
-    }
-  });
-}
+        }
+      },
+    });
+  }
+
 
  window.toggleDropdown = function (event, dropdownId) {
   event.stopPropagation(); // Prevent click from bubbling
