@@ -14,6 +14,23 @@ class TimesheetRecord(Document):
 		if not self.activity_type:
 			frappe.throw(_("Please add an activity type to submit the timesheet record."))
 
+		try:
+			if self.to_time:
+				to_dt = get_datetime(self.to_time)
+				creation_dt = get_datetime(self.creation)
+
+				if to_dt.date() != creation_dt.date():
+					self.timesheet_record_color = "Red"
+				else:
+					duration = (creation_dt - to_dt).total_seconds() / 3600
+					if duration < 1:
+						self.timesheet_record_color = "Green"
+					else:
+						self.timesheet_record_color = "Amber"
+		except Exception as e:
+			frappe.msgprint(f"Color coding failed: {e}")
+
+
 	def on_submit(self):
 		self.create_timesheet()
 
