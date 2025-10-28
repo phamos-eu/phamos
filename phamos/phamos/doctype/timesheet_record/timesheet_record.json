@@ -11,6 +11,7 @@
   "customer",
   "activity_type",
   "task",
+  "timesheet_record_color",
   "column_break_78vsj",
   "from_time",
   "expected_time",
@@ -18,6 +19,8 @@
   "actual_time",
   "timesheet",
   "percent_billable",
+  "section_break_ovpv",
+  "item",
   "section_break_hqfwm",
   "goal",
   "column_break_8016u",
@@ -141,13 +144,29 @@
    "fieldtype": "Link",
    "label": "Employee",
    "options": "Employee"
+  },
+  {
+   "fieldname": "section_break_ovpv",
+   "fieldtype": "Section Break"
+  },
+  {
+   "fieldname": "item",
+   "fieldtype": "Table",
+   "label": "Item",
+   "options": "Timesheet Record Item"
+  },
+  {
+   "fieldname": "timesheet_record_color",
+   "fieldtype": "Select",
+   "label": "Timesheet Record Color",
+   "options": "\nRed\nGreen\nAmber"
   }
  ],
  "grid_page_length": 50,
  "index_web_pages_for_search": 1,
  "is_submittable": 1,
  "links": [],
- "modified": "2025-06-18 13:54:06.766022",
+ "modified": "2025-08-25 15:48:40.153947",
  "modified_by": "Administrator",
  "module": "Phamos",
  "name": "Timesheet Record",
