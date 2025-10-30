@@ -45,11 +45,11 @@
   {
    "default": "Team",
    "fieldname": "okr_type",
-   "fieldtype": "Select",
+   "fieldtype": "Link",
    "in_list_view": 1,
    "in_standard_filter": 1,
    "label": "OKR Type",
-   "options": "Company\nTeam\nIndividual",
+   "options": "OKR Type",
    "reqd": 1
   },
   {
@@ -192,7 +192,6 @@
    "options": "OKR Team"
   },
   {
-   "depends_on": "eval:doc.okr_type != 'Company'",
    "fieldname": "parent_okr",
    "fieldtype": "Link",
    "label": "Parent OKR",
@@ -208,14 +207,14 @@
  "links": [
   {
    "link_doctype": "OKR",
-   "link_fieldname": "parent_company_okr"
+   "link_fieldname": "parent_okr"
   },
   {
    "link_doctype": "OKR Check In",
    "link_fieldname": "okr"
   }
  ],
- "modified": "2025-10-28 08:04:08.914005",
+ "modified": "2025-10-30 06:52:06.668601",
  "modified_by": "Administrator",
  "module": "OKR Addon",
  "name": "OKR",

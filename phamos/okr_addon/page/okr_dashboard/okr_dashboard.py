@@ -119,7 +119,7 @@ def get_filtered_okrs(filters, page=1, items_per_page=50):
         filters=filter_conditions,
         fields=[
             "name", "title", "progress", "responsible_person", "target_date", 
-            "last_check_in", "okr_type", "parent_objective", "parent_okr", "creation", "modified",
+            "last_check_in", "okr_type", "parent_okr", "creation", "modified",
             "owner", "docstatus", "idx", "okr_score", "confidence_level"
         ],
         order_by="creation desc",

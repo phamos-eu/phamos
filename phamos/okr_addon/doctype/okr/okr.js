@@ -91,7 +91,7 @@ function render_measurable_summary_form(frm) {
 			</div>
 		`;
 		frm.dashboard.add_section(
-			__('📊 Measurable Summary'),
+			__('📊 Measurable Summary (KR)'),
 			empty_html,
 			'measurable_summary'
 		);
@@ -100,7 +100,7 @@ function render_measurable_summary_form(frm) {
 	
 	// Get enhanced summary from backend
 	frappe.call({
-		method: 'okr_addon.okr_addon.doctype.okr.okr.get_measurable_summary_for_frontend',
+		method: 'phamos.okr_addon.doctype.okr.okr.get_measurable_summary_for_frontend',
 		args: { okr_name: frm.doc.name },
 		callback: function(r) {
 			if (r.message) {
@@ -261,7 +261,7 @@ function renderEnhancedSummary(frm, summary) {
 	// Add the enhanced summary to form dashboard
 	frm.dashboard.add_section(
 		card_html,
-		__('📊 Measurable Summary')
+		__('📊 Measurable Summary (KR)')
 	);
 }
 
@@ -378,11 +378,9 @@ function renderBasicSummary(frm, measurables) {
 	// Add the basic summary to form dashboard
 	frm.dashboard.add_section(
 		card_html,
-		__('📊 Measurable Summary')
+		__('📊 Measurable Summary (KR)')
 	);
 }
-
-
 
 // Helper functions for enhanced UI
 function get_progress_color(percentage) {
