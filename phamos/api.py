@@ -50,7 +50,7 @@ def get_timesheets(from_date=None, to_date=None, project=None, offset=0, limit=2
 
     timesheets = frappe.db.sql(f"""
         SELECT name, employee, custom_billing_status, project_owner, total_hours,
-               total_billable_hours, project_name, start_date, end_date, creation, customer_comment
+               total_billable_hours, project_name, start_date, end_date, creation, customer_comment, custom_approval
         FROM `tabTimesheet`
         WHERE docstatus IN (0, 1) {conditions}
         ORDER BY creation DESC
@@ -78,23 +78,48 @@ def get_projects_for_logged_in_customer():
     )
 
 @frappe.whitelist()
-def update_customer_comment(ts_name, comment=None, custom_rating=None):
+def update_customer_comment(ts_name, comment=None, custom_discount_request=None, custom_rating=None):
     ts = frappe.get_doc("Timesheet", ts_name)
 
     # Update fields in Timesheet
     if comment is not None:
         ts.db_set("customer_comment", comment)
+    if custom_discount_request is not None:
+        ts.db_set("custom_discount_request", custom_discount_request)
     if custom_rating is not None:
         ts.db_set("custom_rating", custom_rating)
 
-    ts.db_set("custom_customer_comment_timestamp", frappe.utils.now_datetime())
-    ts.db_set("custom_daily_comment_report_sent", 0)
+    # Always treat it as Pending unless PM later updates approval
+    approval_status = ts.get("custom_approval") or "Pending"
+
+    # Send email notification to Project Owner/Deputy
+    if ts.parent_project:
+        project = frappe.get_doc("Project", ts.parent_project)
+        recipients = [r for r in [project.get("project_owner"), project.get("project_deputy")] if r]
+        if recipients:
+            frappe.sendmail(
+                recipients=recipients,
+                subject=f"New Discount/Comment Request for Timesheet: {ts.name}",
+                message=f"""
+                    <p>Hello,</p>
+                    <p>A new request has been submitted by a customer on Timesheet <b>{ts.name}</b>.</p>
+                    <p><b>Comment:</b> {comment or '-'}<br>
+                    <b>Discount Request:</b> {custom_discount_request or '-'}<br>
+                    <b>Rating:</b> {custom_rating or '-'}</p>
+                    <p>Please review this Timesheet and set <b>Approval</b> to either <b>Accept</b> or <b>Reject</b>.</p>
+                    <p>Status: <b>Pending</b></p>
+                    <p>Regards,<br>ERPNext System</p>
+                """,
+                now=True
+            )
 
     frappe.db.commit()
 
     return {
-        "message": "Comment sent for Review successfully.",
+        "message": "Comment sent for approval successfully.",
+        "approval": approval_status
     }
+
 
 
 def get_customer_for_user(user):

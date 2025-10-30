@@ -171,16 +171,16 @@ function load_timesheets() {
         let btnText = "Request Adjustments";
         let btnColor = "#5198e3"; // default blue
 
-        
-        if (row.customer_comment) {
+        if (row.custom_approval === "Accept") {
+          btnText = "Accepted";
+          btnColor = "green";
+        } else if (row.custom_approval === "Reject") {
+          btnText = "Rejected";
+          btnColor = "red";
+        } else if (row.customer_comment) {
           btnText = "Under Review";
           btnColor = "#ffc107";
         }
-
-        const relatedIssues = row.related_issue || '';
-        const relatedPreview = truncateText(relatedIssues, 80);
-        const relatedTooltip = escapeHtml(relatedIssues);
-        const relatedDisplay = relatedPreview ? escapeHtml(relatedPreview) : '-';
 
         $tbody.append(`
           <tr>
@@ -221,49 +221,6 @@ function load_timesheets() {
   });
 }
 
-function apply_column_filters() {
-  const filters = {};
-  $('.column-filter').each(function () {
-    const value = ($(this).val() || '').trim().toLowerCase();
-    const index = $(this).data('column-index');
-    if (value) {
-      filters[index] = value;
-    }
-  });
-
-  const activeColumns = Object.keys(filters);
-  let visibleCount = 0;
-
-  $('#timesheet_body tr').each(function () {
-    if (this.id === 'no_data_row') {
-      return;
-    }
-
-    let visible = true;
-    if (activeColumns.length) {
-      const $cells = $(this).find('td');
-      for (let i = 0; i < activeColumns.length; i++) {
-        const colIndex = parseInt(activeColumns[i], 10);
-        const filterValue = filters[colIndex];
-        const cellText = ($cells.eq(colIndex).text() || '').trim().toLowerCase();
-        if (!cellText.includes(filterValue)) {
-          visible = false;
-          break;
-        }
-      }
-    }
-
-    $(this).toggle(visible);
-    if (visible) {
-      visibleCount++;
-    }
-  });
-
-  if (loadedCount > 0) {
-    $('#no_data_row').toggle(visibleCount === 0);
-  }
-}
-
 let currentTsName = null; // store which timesheet is being edited
 
 // When user clicks the "Add/Edit Comment" button
@@ -276,30 +233,11 @@ $(document).on('click', '.comment-btn', function () {
 });
 
 // When user clicks Save in the modal
-let selectedRating = 0;
-
-// Handle click on stars
-$(document).on('click', '#starRating .star', function () {
-  selectedRating = parseInt($(this).data('value'));
-  $('#starRating .star').each(function (index) {
-    $(this).html(index < selectedRating ? '&#9733;' : '&#9734;');
-  });
-  $('#ratingError').hide(); // hide error after selection
-});
-
-// Intercept Save button
-$('#saveComment').on('click', function (e) {
-  e.preventDefault();
-
+$('#saveComment').on('click', function () {
   const comment = $('#commentInput').val().trim();
+  const discount = $('#discountSelect').val();
+  const rating = $('#starRating .star.selected').length;
 
-  // 🟥 Check if rating is selected
-  if (selectedRating === 0) {
-    $('#ratingError').show();
-    return;
-  }
-
-  // 🟩 Proceed if rating is selected
   if (!currentTsName) return;
 
   frappe.call({
@@ -307,20 +245,26 @@ $('#saveComment').on('click', function (e) {
     args: {
       ts_name: currentTsName,
       comment: comment,
-      custom_rating: selectedRating
+      custom_discount_request: discount,
+      custom_rating: rating
     },
     callback: function (r) {
       if (!r.exc) {
         frappe.show_alert({ message: r.message.message, indicator: "green" });
 
+        const approvalStatus = r.message.approval; // Pending
         const btn = $(`.comment-btn[data-name="${currentTsName}"]`);
-        btn.text("Under Review")
-          .css("background-color", "#ffc107")
-          .data('comment', comment)
-          .data('rating', selectedRating);
+
+        // Show “Under Review” after sending
+        btn.text("Under Review");
+        btn.css("background-color", "#ffc107");
+        btn.data('comment', comment);
+        btn.data('discount', discount);
+        btn.data('rating', rating);
 
         $('#commentModal').modal('hide');
         reset_and_load();
+        console.log("Timesheet data:", data);
       } else {
         frappe.show_alert({ message: "Failed to send request", indicator: "red" });
       }
@@ -696,59 +640,14 @@ $(document).on('click', '.comment-btn', function () {
     $('#starRating .star').eq(i).addClass('selected');
   }
 
-  // Disable editing if "Under Review"
-  const isLocked = statusText === "Under Review";
+  // Disable editing if already accepted/rejected
+  const isLocked = statusText === "Accepted" || statusText === "Rejected";
   $('#commentInput').prop('disabled', isLocked);
+  $('#discountSelect').prop('disabled', isLocked);
   $('#starRating .star').css('pointer-events', isLocked ? 'none' : 'auto');
   $('#saveComment').prop('disabled', isLocked);
 
   $('#commentModal').modal('show');
 });
 
-/* Sorting Handler  */
-document.addEventListener("click", function (event) {
-    const icon = event.target.closest(".sort-icon");
-    const menuItem = event.target.closest(".menu-item");
 
-    if (icon) {
-        event.stopPropagation();
-
-        const th = icon.closest("th");
-        const menu = th.querySelector(".th-menu");
-
-        window.currentSortColumn = Array.from(th.parentNode.children).indexOf(th);
-
-        document.querySelectorAll(".th-menu").forEach(m => {
-            if (m !== menu) m.style.display = "none";
-        });
-
-        menu.style.display = menu.style.display === "block" ? "none" : "block";
-        return;
-    }
-
-    if (menuItem) {
-        const action = menuItem.dataset.action;
-
-        document.querySelectorAll(".th-menu").forEach(m => m.style.display = "none");
-
-        currentSortBy = sortFieldMap[window.currentSortColumn] || null;
-
-        if (action === "asc") {
-            currentSortOrder = "asc";
-        }
-        else if (action === "desc") {
-            currentSortOrder = "desc";
-        }
-        else if (action === "reset") {
-            currentSortBy = null;
-            currentSortOrder = null;
-        }
-
-        reset_and_load();
-        return;
-    }
-
-    document.querySelectorAll(".th-menu").forEach(menu => {
-        menu.style.display = "none";
-    });
-});
