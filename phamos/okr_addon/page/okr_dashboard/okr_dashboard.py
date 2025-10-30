@@ -106,6 +106,12 @@ def get_filtered_okrs(filters, page=1, items_per_page=50):
     # Responsible person filtering
     if filters.get('responsible_person'):
         filter_conditions['responsible_person'] = filters['responsible_person']
+
+    # OKR (and descendants) filtering
+    if filters.get('okr'):
+        names = get_descendant_okrs(filters['okr'])
+        names.add(filters['okr'])
+        filter_conditions['name'] = ['in', list(names)]
     
     # Get total count first
     total_count = frappe.db.count("OKR", filters=filter_conditions)
@@ -140,6 +146,24 @@ def get_filtered_okrs(filters, page=1, items_per_page=50):
         okr['child_objectives'] = get_child_objectives(okr['name'])
     
     return okrs, total_count
+
+def get_descendant_okrs(root_name):
+    """Return a set of OKR names containing all descendants of the given OKR."""
+    visited = set()
+    stack = [root_name]
+    while stack:
+        current = stack.pop()
+        if current in visited:
+            continue
+        visited.add(current)
+        children = frappe.get_all(
+            "OKR",
+            filters={"parent_okr": current},
+            pluck="name"
+        )
+        stack.extend(children)
+    visited.discard(root_name)
+    return visited
 
 def calculate_comprehensive_stats(okrs):
     """Calculate comprehensive dashboard statistics"""

@@ -208,6 +208,7 @@ const FilterManager = {
     init() {
         this.bindFilterEvents();
         this.setupResponsiblePersonField();
+        this.setupOkrLinkField();
     },
     
     cleanup() {
@@ -270,11 +271,16 @@ const FilterManager = {
         if (this.responsibleField) {
             responsiblePerson = this.responsibleField.get_value() || '';
         }
+        let selectedOkr = '';
+        if (this.okrLinkField) {
+            selectedOkr = this.okrLinkField.get_value() || '';
+        }
         
         return {
             date_range: $('#date-filter').val() || '',
             okr_type: $('#okr-type-filter').val() || '',
             responsible_person: responsiblePerson,
+            okr: selectedOkr,
             from_date: $('#from-date').val() || '',
             to_date: $('#to-date').val() || ''
         };
@@ -285,6 +291,9 @@ const FilterManager = {
         $('#okr-type-filter').val('');
         if (this.responsibleField) {
             this.responsibleField.set_value('');
+        }
+        if (this.okrLinkField) {
+            this.okrLinkField.set_value('');
         }
         $('.custom-date-group').hide();
         $('#from-date').val('');
@@ -341,6 +350,32 @@ const FilterManager = {
         this.responsibleField = linkField;
         this.lastResponsiblePersonValue = '';
     },
+
+    setupOkrLinkField() {
+        const container = $('<div class="link-field-container"></div>');
+        $('.okr-link-wrapper').append(container);
+        const okrLinkField = frappe.ui.form.make_control({
+            parent: container,
+            df: {
+                fieldname: 'okr',
+                fieldtype: 'Link',
+                options: 'OKR',
+                placeholder: 'Search OKR...',
+                label: ''
+            },
+            render_input: true
+        });
+        okrLinkField.refresh();
+        okrLinkField.df.onchange = () => {
+            const value = okrLinkField.get_value();
+            if (value !== this.lastOkrValue) {
+                this.lastOkrValue = value;
+                this.handleResponsibleFilterChange();
+            }
+        };
+        this.okrLinkField = okrLinkField;
+        this.lastOkrValue = '';
+    }
 
 };
 
