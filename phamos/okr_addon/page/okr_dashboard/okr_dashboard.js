@@ -375,6 +375,7 @@ const DataManager = {
                 items_per_page: DashboardState.pagination.itemsPerPage
             },
             callback: (r) => {
+                console.log('Dashboard data loaded:', r.message);
                 this.hideLoading();
                 if (r.message) {
                     // Always replace data to maintain hierarchy structure
