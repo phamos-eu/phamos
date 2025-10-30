@@ -1,0 +1,207 @@
+<!-- OKR Dashboard Template -->
+<div class="okr-dashboard-container">
+    <!-- Sidebar Filters -->
+    <div class="dashboard-sidebar">
+        <div class="sidebar-header">
+            <h4><i class="fa fa-filter"></i> Filters</h4>
+            <button class="btn btn-secondary btn-sm clear-filter-btn" onclick="FilterManager.clearFilters()">
+                <i class="fa fa-times"></i> Clear
+            </button>
+        </div>
+        <div class="sidebar-content">
+            <div class="filter-group">
+                <label>Date Range:</label>
+                <div class="custom-select-wrapper">
+                    <select id="date-filter" class="custom-select">
+                        <option value="all">All Time</option>
+                        <option value="this_month">This Month</option>
+                        <option value="this_quarter">This Quarter</option>
+                        <option value="custom">Custom Range</option>
+                    </select>
+                </div>
+            </div>
+            <div class="filter-group custom-date-group" style="display: none;">
+                <label>From Date:</label>
+                <input type="date" id="from-date" class="form-control">
+            </div>
+            <div class="filter-group custom-date-group" style="display: none;">
+                <label>To Date:</label>
+                <input type="date" id="to-date" class="form-control">
+            </div>
+
+            <div class="filter-group">
+                <label>OKR Type:</label>
+                <div class="custom-select-wrapper">
+                    <select id="okr-type-filter" class="custom-select">
+                        <option value="">All Types</option>
+                        <option value="Company">Company</option>
+                        <option value="Team">Team</option>
+                        <option value="Individual">Individual</option>
+                    </select>
+                </div>
+            </div>
+            <div class="filter-group">
+                <label>Responsible Person:</label>
+                <div class="link-field-wrapper"></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Main Content Area -->
+    <div class="dashboard-main">
+        <!-- Loading Spinner -->
+        <div class="loading-spinner" style="display: none;">
+            <div class="spinner-border text-primary" role="status">
+                <span class="sr-only">Loading...</span>
+            </div>
+            <p>Loading dashboard data...</p>
+        </div>
+        <!-- Key Metrics Section -->
+        <div class="metrics-section">
+            <div class="metrics-grid">
+                <div class="metric-card">
+                    <div class="metric-icon">
+                        <i class="fa fa-bullseye"></i>
+                    </div>
+                    <div class="metric-content">
+                        <div class="metric-value" id="total-objectives">0</div>
+                        <div class="metric-label">Total OKRs</div>
+                    </div>
+                </div>
+                <div class="metric-card">
+                    <div class="metric-icon">
+                        <i class="fa fa-check"></i>
+                    </div>
+                    <div class="metric-content">
+                        <div class="metric-value" id="completed-objectives">0</div>
+                        <div class="metric-label">Completed</div>
+                    </div>
+                </div>
+                <div class="metric-card">
+                    <div class="metric-icon">
+                        <i class="fa fa-clock-o"></i>
+                    </div>
+                    <div class="metric-content">
+                        <div class="metric-value" id="in-progress-objectives">0</div>
+                        <div class="metric-label">In Progress</div>
+                    </div>
+                </div>
+                <div class="metric-card">
+                    <div class="metric-icon">
+                        <i class="fa fa-exclamation-triangle"></i>
+                    </div>
+                    <div class="metric-content">
+                        <div class="metric-value" id="at-risk-objectives">0</div>
+                        <div class="metric-label">At Risk</div>
+                    </div>
+                </div>
+                <div class="metric-card">
+                    <div class="metric-icon">
+                        <i class="fa fa-bar-chart"></i>
+                    </div>
+                    <div class="metric-content">
+                        <div class="metric-value" id="overall-progress">0%</div>
+                        <div class="metric-label">Overall Progress</div>
+                    </div>
+                </div>
+                <div class="metric-card">
+                    <div class="metric-icon">
+                        <i class="fa fa-heartbeat"></i>
+                    </div>
+                    <div class="metric-content">
+                        <div class="metric-value" id="health-score">0</div>
+                        <div class="metric-label">Health Score</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Charts Section -->
+        <div class="charts-section">
+            <div class="chart-row">
+                <div class="chart-container">
+                    <div class="chart-header">
+                        <h4>Progress Distribution</h4>
+                        <div class="chart-actions">
+                            <button class="btn btn-sm btn-outline-secondary" onclick="UIControls.toggleChart('progress-chart')">
+                                <i class="fa fa-expand"></i>
+                            </button>
+                        </div>
+                    </div>
+                    <div class="chart-body" id="progress-chart"></div>
+                </div>
+                <div class="chart-container">
+                    <div class="chart-header">
+                        <h4>Timeline Analysis</h4>
+                        <div class="chart-actions">
+                            <button class="btn btn-sm btn-outline-secondary" onclick="UIControls.toggleChart('timeline-chart')">
+                                <i class="fa fa-expand"></i>
+                            </button>
+                        </div>
+                    </div>
+                    <div class="chart-body" id="timeline-chart"></div>
+                </div>
+            </div>
+            <div class="chart-row">
+                <div class="chart-container">
+                    <div class="chart-header">
+                        <h4>Risk Analysis</h4>
+                        <div class="chart-actions">
+                            <button class="btn btn-sm btn-outline-secondary" onclick="UIControls.toggleChart('risk-chart')">
+                                <i class="fa fa-expand"></i>
+                            </button>
+                        </div>
+                    </div>
+                    <div class="chart-body" id="risk-chart"></div>
+                </div>
+                <div class="chart-container">
+                    <div class="chart-header">
+                        <h4>Performance Trends</h4>
+                        <div class="chart-actions">
+                            <button class="btn btn-sm btn-outline-secondary" onclick="UIControls.toggleChart('trends-chart')">
+                                <i class="fa fa-expand"></i>
+                            </button>
+                        </div>
+                    </div>
+                    <div class="chart-body" id="trends-chart"></div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Hierarchical Table Section -->
+        <div class="objectives-section">
+            <div class="hierarchical-table">
+                <div class="table-header">
+                    <h3>OKRs and Key Results</h3>
+                    <div class="table-actions">
+                        <button class="btn btn-sm btn-outline-primary" onclick="HierarchyManager.expandAll()">
+                            <i class="fa fa-expand"></i> Expand All
+                        </button>
+                        <button class="btn btn-sm btn-outline-secondary" onclick="HierarchyManager.collapseAll()">
+                            <i class="fa fa-compress"></i> Collapse All
+                        </button>
+                    </div>
+                </div>
+                <div class="table-responsive">
+                    <table class="hierarchy-table" id="hierarchy-table">
+                        <thead>
+                            <tr>
+                                <th>ID</th>
+                                <th>Description</th>
+                                <th>OKR Type</th>
+                                <th>Progress</th>
+                                <th>OKR Score</th>
+                                <th>Target Date</th>
+                                <th>Last Check-In</th>
+                                <th>Owner</th>
+                            </tr>
+                        </thead>
+                        <tbody id="hierarchy-tbody">
+                            <!-- Data will be populated here -->
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+</div> 
