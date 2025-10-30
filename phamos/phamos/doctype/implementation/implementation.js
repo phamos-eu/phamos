@@ -109,7 +109,7 @@ frappe.ui.form.on("Implementation", {
                 ],
                 primary_action_label: 'Submit',
                 primary_action(values) {
-                    if (['Completed', 'Cancelled', 'Reactivated'].includes(values.status)) {
+                    if (['Completed', 'Cancelled'].includes(values.status)) {
                         // ✅ Backend check only for these 3
                         frappe.call({
                             method: 'phamos.phamos.doctype.implementation.implementation.are_all_projects_closed',
@@ -127,7 +127,12 @@ frappe.ui.form.on("Implementation", {
                                 }
                             }
                         });
-                    } else {
+                    } else if (values.status === 'Reactivated') {
+                        frm.set_value('status', 'Open');
+                        frm.set_value('status_statement', values.reason);
+                        frm.save();
+                        d.hide();
+                    }else {
                         // ✅ Hold & Escalated bypass condition
                         frm.set_value('status', values.status);
                         frm.set_value('status_statement', values.reason);
@@ -281,7 +286,17 @@ function render_module_chart(frm, canvasId) {
 
     (frm.doc.modules || []).forEach(row => {
         if (row.is_required) {
-            labels.push(row.module);
+            let label = row.module;
+
+            const duplicateCount = labels.filter(l => l.startsWith(row.module)).length;
+
+            if (duplicateCount > 0 && row.stage) {
+                label = `${row.module} (${row.stage})`;
+            } else if (duplicateCount > 0) {
+                label = `${row.module} (${duplicateCount + 1})`;
+            }
+
+            labels.push(label);
             currentLevels.push(row.current_level || 0);
             targetLevels.push(row.target_level || 0);
         }
@@ -504,6 +519,27 @@ frappe.ui.form.on("Sales Order Status Information", {
         }
     }
 });
+
+frappe.ui.form.on('Implementation Item', {
+    module: function(frm, cdt, cdn) {
+        let child = locals[cdt][cdn];
+
+        if (!child.module) {
+            frappe.model.set_value(cdt, cdn, 'current_level', '');
+            return;
+        }
+        let rows = frm.doc.modules.filter(r => r.module === child.module);
+        if (rows.length > 1) {
+            let previous_row = rows[0];
+
+            if (previous_row.current_level) {
+                frappe.model.set_value(cdt, cdn, 'current_level', previous_row.current_level);
+            }
+        }
+    }
+});
+
+
 
 
 
