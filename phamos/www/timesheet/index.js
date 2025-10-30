@@ -153,6 +153,20 @@ function load_timesheets() {
       $noData.hide();
 
       data.forEach(row => {
+        let btnText = "Request Adjustments";
+        let btnColor = "#5198e3"; // default blue
+
+        if (row.custom_approval === "Accept") {
+          btnText = "Accepted";
+          btnColor = "green";
+        } else if (row.custom_approval === "Reject") {
+          btnText = "Rejected";
+          btnColor = "red";
+        } else if (row.customer_comment) {
+          btnText = "Under Review";
+          btnColor = "#ffc107";
+        }
+
         $tbody.append(`
           <tr>
             <td><input type="checkbox" class="row-select" /></td>
@@ -165,11 +179,13 @@ function load_timesheets() {
             <td>${format_hours(row.total_billable_hours)}</td>
             <td title="${frappe.datetime.str_to_user(row.creation)}">${formatShortRelative(row.creation)}</td>
             <td>
-              <input type="text" 
-                    class="form-control form-control-sm comment-input" 
-                    value="${row.customer_comment || ''}" 
-                    data-name="${row.name}" 
-                    placeholder="Add comment..." />
+              <button 
+                class="btn btn-sm comment-btn"
+                style="background-color: ${btnColor}; color: white;"
+                data-name="${row.name}" 
+                data-comment="${row.customer_comment || ''}">
+                ${btnText}
+              </button>
             </td>
           </tr>
         `);
@@ -186,26 +202,90 @@ function load_timesheets() {
     }
   });
 }
-$(document).on("change", ".comment-input", function() {
-  const ts_name = $(this).data("name");
-  const comment = $(this).val();
+
+let currentTsName = null; // store which timesheet is being edited
+
+// When user clicks the "Add/Edit Comment" button
+$(document).on('click', '.comment-btn', function () {
+  currentTsName = $(this).data('name');
+  const currentComment = $(this).data('comment') || '';
+  
+  $('#commentInput').val(currentComment);
+  $('#commentModal').modal('show');
+});
+
+// When user clicks Save in the modal
+$('#saveComment').on('click', function () {
+  const comment = $('#commentInput').val().trim();
+  const discount = $('#discountSelect').val();
+  const rating = $('#starRating .star.selected').length;
+
+  if (!currentTsName) return;
 
   frappe.call({
     method: "phamos.api.update_customer_comment",
     args: {
-      ts_name: ts_name,
-      comment: comment
+      ts_name: currentTsName,
+      comment: comment,
+      custom_discount_request: discount,
+      custom_rating: rating
     },
-    callback: function(r) {
+    callback: function (r) {
       if (!r.exc) {
-        frappe.show_alert({message: r.message, indicator: "green"});
+        frappe.show_alert({ message: r.message.message, indicator: "green" });
+
+        const approvalStatus = r.message.approval; // Pending
+        const btn = $(`.comment-btn[data-name="${currentTsName}"]`);
+
+        // Show “Under Review” after sending
+        btn.text("Under Review");
+        btn.css("background-color", "#ffc107");
+        btn.data('comment', comment);
+        btn.data('discount', discount);
+        btn.data('rating', rating);
+
+        $('#commentModal').modal('hide');
+        reset_and_load();
+        console.log("Timesheet data:", data);
       } else {
-        frappe.show_alert({message: "Failed to update comment", indicator: "red"});
+        frappe.show_alert({ message: "Failed to send request", indicator: "red" });
       }
     }
   });
 });
 
+
+
+document.addEventListener('DOMContentLoaded', function() {
+  const stars = document.querySelectorAll('#starRating .star');
+  let selectedRating = 0;
+
+  stars.forEach(star => {
+    // Handle hover
+    star.addEventListener('mouseover', () => {
+      stars.forEach(s => s.classList.remove('hovered'));
+      const value = parseInt(star.getAttribute('data-value'));
+      stars.forEach((s, i) => {
+        if (i < value) s.classList.add('hovered');
+      });
+    });
+
+    // Remove hover when leaving
+    star.addEventListener('mouseleave', () => {
+      stars.forEach(s => s.classList.remove('hovered'));
+    });
+
+    // Handle click (select rating)
+    star.addEventListener('click', () => {
+      selectedRating = parseInt(star.getAttribute('data-value'));
+      stars.forEach((s, i) => {
+        if (i < selectedRating) s.classList.add('selected');
+        else s.classList.remove('selected');
+      });
+      console.log("Selected rating:", selectedRating);
+    });
+  });
+});
 
 
 function update_footer() {
@@ -505,5 +585,34 @@ function load_graph_data() {
 
 /////////////////////////////////////
 loadAndRenderGraph();
+
+// Handle "Request Adjustments" button click dynamically
+$(document).on('click', '.comment-btn', function () {
+  const tsName = $(this).data('name');
+  currentTsName = tsName;
+
+  const comment = $(this).data('comment');
+  const discount = $(this).data('discount');
+  const rating = $(this).data('rating');
+  const statusText = $(this).text().trim();
+
+  $('#commentInput').val(comment);
+  $('#discountSelect').val(discount);
+
+  // Reset stars
+  $('#starRating .star').removeClass('selected');
+  for (let i = 0; i < rating; i++) {
+    $('#starRating .star').eq(i).addClass('selected');
+  }
+
+  // Disable editing if already accepted/rejected
+  const isLocked = statusText === "Accepted" || statusText === "Rejected";
+  $('#commentInput').prop('disabled', isLocked);
+  $('#discountSelect').prop('disabled', isLocked);
+  $('#starRating .star').css('pointer-events', isLocked ? 'none' : 'auto');
+  $('#saveComment').prop('disabled', isLocked);
+
+  $('#commentModal').modal('show');
+});
 
 
