@@ -706,7 +706,7 @@ frappe.provide('erpnext.utils');
             if (!frm.custom_hybrid_button_added) {
                 frm.add_custom_button(__('Schedule Meeting & Email'), () => {
                     erpnext.utils.launch_hybrid_meeting_composer({ doc: frm.doc, frm: frm });
-                }, __('Action'));
+                });
                 frm.custom_hybrid_button_added = true;
             }
         }
@@ -719,7 +719,7 @@ frappe.provide('erpnext.utils');
             if (!frm.custom_hybrid_button_added) {
                 frm.add_custom_button(__('Schedule Meeting & Email'), () => {
                     erpnext.utils.launch_hybrid_meeting_composer({ doc: frm.doc, frm: frm });
-                }, __('Action'));
+                });
                 frm.custom_hybrid_button_added = true;
             }
         }
