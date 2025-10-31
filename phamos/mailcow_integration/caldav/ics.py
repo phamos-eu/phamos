@@ -19,34 +19,68 @@ def _fmt(dt: datetime) -> str:
 
 
 def vevent(uid: str, seq: int, subject: str, starts_on, ends_on,
-           description: str = "", location: str = "Online") -> str:
+           description: str = "", location: str = "Online", 
+           attendees_to: str = "", attendees_cc: str = "", attendees_bcc: str = "") -> str:
     tz = get_site_timezone()
     summary = (subject or "").replace("\n", " ")
     desc = strip_html(description or "")
     loc = (location or "").replace("\n", " ")
 
-    ics =  (
-        "BEGIN:VCALENDAR\r\n"
-        "PRODID:-//ERPNext//phamos//EN\r\n"
-        "VERSION:2.0\r\n"
-        "CALSCALE:GREGORIAN\r\n"
-        "METHOD:REQUEST\r\n"
-        "BEGIN:VEVENT\r\n"
-        f"UID:{uid}\r\n"
-        f"DTSTAMP:{datetime.now(timezone.utc).strftime('%Y%m%dT%H%M%SZ')}\r\n"
-        f"DTSTART;TZID={tz}:{_fmt(starts_on)}\r\n"
-        f"DTEND;TZID={tz}:{_fmt(ends_on)}\r\n"
-        f"SUMMARY:{summary}\r\n"
-        f"DESCRIPTION:{desc}\r\n"
-        f"LOCATION:{loc}\r\n"
-        f"ORGANIZER;CN={frappe.session.user}:mailto:{frappe.session.user}\r\n"
-        f"ATTENDEE;CN={frappe.session.user};ROLE=REQ-PARTICIPANT;RSVP=TRUE:mailto:{frappe.session.user}\r\n"
-        f"STATUS:CONFIRMED\r\n"
-        f"SEQUENCE:{seq}\r\n"
-        "END:VEVENT\r\n"
-        "END:VCALENDAR\r\n"
-    )
-    return ics.strip()
+    # Build base ICS
+    ics_lines = [
+        "BEGIN:VCALENDAR",
+        "PRODID:-//ERPNext//phamos//EN",
+        "VERSION:2.0",
+        "CALSCALE:GREGORIAN",
+        "METHOD:REQUEST",
+        "BEGIN:VEVENT",
+        f"UID:{uid}",
+        f"DTSTAMP:{datetime.now(timezone.utc).strftime('%Y%m%dT%H%M%SZ')}",
+        f"DTSTART;TZID={tz}:{_fmt(starts_on)}",
+        f"DTEND;TZID={tz}:{_fmt(ends_on)}",
+        f"SUMMARY:{summary}",
+        f"DESCRIPTION:{desc}",
+        f"LOCATION:{loc}",
+        f"ORGANIZER;CN={frappe.session.user}:mailto:{frappe.session.user}",
+    ]
+
+    # Parse and add attendees
+    from email.utils import getaddresses
+    
+    # Add TO recipients as optional participants (all attendees are optional)
+    if attendees_to:
+        to_list = [email.strip() for email in attendees_to.split(",") if email.strip()]
+        for email_addr in to_list:
+            # Extract email from "Name <email>" format if present
+            _, addr = getaddresses([email_addr])[0] if getaddresses([email_addr]) else ("", email_addr)
+            if addr:
+                ics_lines.append(f"ATTENDEE;ROLE=OPT-PARTICIPANT;PARTSTAT=NEEDS-ACTION;RSVP=FALSE:mailto:{addr}")
+    
+    # Add CC recipients as optional participants
+    if attendees_cc:
+        cc_list = [email.strip() for email in attendees_cc.split(",") if email.strip()]
+        for email_addr in cc_list:
+            _, addr = getaddresses([email_addr])[0] if getaddresses([email_addr]) else ("", email_addr)
+            if addr:
+                ics_lines.append(f"ATTENDEE;ROLE=OPT-PARTICIPANT;PARTSTAT=NEEDS-ACTION;RSVP=FALSE:mailto:{addr}")
+    
+    # Add BCC recipients as optional participants (still visible in ICS but not in email headers)
+    if attendees_bcc:
+        bcc_list = [email.strip() for email in attendees_bcc.split(",") if email.strip()]
+        for email_addr in bcc_list:
+            _, addr = getaddresses([email_addr])[0] if getaddresses([email_addr]) else ("", email_addr)
+            if addr:
+                ics_lines.append(f"ATTENDEE;ROLE=OPT-PARTICIPANT;PARTSTAT=NEEDS-ACTION;RSVP=FALSE:mailto:{addr}")
+
+    # Close the event
+    ics_lines.extend([
+        "STATUS:CONFIRMED",
+        f"SEQUENCE:{seq}",
+        "END:VEVENT",
+        "END:VCALENDAR"
+    ])
+
+    return "\r\n".join(ics_lines) + "\r\n"
 
 
 def vtodo(uid: str, seq: int, title: str, due=None, status=None,
