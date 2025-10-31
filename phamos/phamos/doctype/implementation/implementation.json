@@ -54,7 +54,11 @@
   "module_chart",
   "modules",
   "status_history_tab",
-  "status_updates"
+  "status_updates",
+  "report_tab",
+  "user_with_permission",
+  "auto_email_report_record",
+  "generate_auto_email"
  ],
  "fields": [
   {
@@ -326,6 +330,34 @@
    "fieldname": "reset",
    "fieldtype": "Button",
    "label": "Reset"
+  },
+  {
+   "default": "1",
+   "fieldname": "internal_implementation",
+   "fieldtype": "Check",
+   "label": "Internal Implementation"
+  },
+  {
+   "fieldname": "report_tab",
+   "fieldtype": "Tab Break",
+   "label": "Report"
+  },
+  {
+   "fieldname": "user_with_permission",
+   "fieldtype": "Link",
+   "label": "User With Permission",
+   "options": "User"
+  },
+  {
+   "fieldname": "auto_email_report_record",
+   "fieldtype": "Table",
+   "label": "Auto Email Report record",
+   "options": "Auto Email Report Record"
+  },
+  {
+   "fieldname": "generate_auto_email",
+   "fieldtype": "Button",
+   "label": "Generate Auto Email"
   }
  ],
  "index_web_pages_for_search": 1,
@@ -351,7 +383,7 @@
    "link_fieldname": "custom_implementation"
   }
  ],
- "modified": "2025-09-30 15:40:17.001995",
+ "modified": "2025-10-31 11:36:08.263301",
  "modified_by": "Administrator",
  "module": "Phamos",
  "name": "Implementation",
