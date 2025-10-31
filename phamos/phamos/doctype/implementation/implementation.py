@@ -256,3 +256,67 @@ def are_all_projects_closed(implementation_name):
 @frappe.whitelist()
 def graphical_representation(customer, name):
 	pass
+
+@frappe.whitelist()
+def generate_auto_email_reports(docname):
+    # Get Implementation document
+    implementation = frappe.get_doc("Implementation", docname)
+
+    user = implementation.user_with_permission
+    sender = "Phamos no-reply"
+    format_type = "HTML"
+
+    # Dictionary to group by (template, frequency)
+    grouped_reports = {}
+
+    # Group recipients by template and frequency
+    for row in implementation.auto_email_report_record:
+        key = (row.templates, row.frequency)
+        if key not in grouped_reports:
+            grouped_reports[key] = {
+                "templates": row.templates,
+                "frequency": row.frequency,
+                "recipients": set(),  # avoid duplicates
+            }
+        if row.recipients:
+            # Split multiple recipients if present
+            for r in row.recipients.replace(" ", "").split(","):
+                grouped_reports[key]["recipients"].add(r)
+
+    # Create one Auto Email Report per group
+    for (template, frequency), data in grouped_reports.items():
+        auto_email = frappe.new_doc("Auto Email Report")
+        auto_email.user = user
+        auto_email.report = template
+        # Join recipients with newline instead of commas
+        auto_email.email_to = "\n".join(sorted(data["recipients"]))
+        auto_email.frequency = frequency
+        auto_email.sender = sender
+        auto_email.format = format_type
+
+        # Add description based on frequency
+        if frequency == "Daily":
+            auto_email.description = (
+                "<b><i>phamos wünscht einen wunderschönen guten Morgen!</i></b><br><br>"
+                "Anbei erhalten Sie eine Übersicht der gestrigen Zeiteinträge, "
+                "die auf Ihre Projekte gebucht wurden. Am Montagmorgen erhalten Sie zudem "
+                "eine Zusammenfassung der vergangenen Woche.<br><br>"
+                "Bei Fragen zu den Zeiteinträgen wenden Sie sich bitte an Ihren Projektleiter. Vielen Dank.<br><br>"
+                "Wir wünschen Ihnen einen angenehmen Tag!<br>"
+                "<b>Ihr team phamos</b>"
+            )
+        elif frequency == "Weekly":
+            auto_email.description = (
+                "<b><i>phamos wünscht einen wunderschönen guten Morgen!</i></b><br><br>"
+                "Anbei die Übersicht aller Zeiterfassungen der vergangenen Woche.<br><br>"
+                "Bei Fragen zu den Zeiteinträgen wenden Sie sich bitte an Ihren Projektleiter. Vielen Dank.<br><br>"
+                "Wir wünschen eine gute Woche!<br>"
+                "<b>Ihr team phamos</b>"
+            )
+
+        auto_email.insert(ignore_permissions=True)
+
+    frappe.db.commit()
+    return "Auto Email Reports created successfully"
+
+
