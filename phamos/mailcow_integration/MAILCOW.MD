@@ -1,6 +1,80 @@
 # Mailcow Integration — User & Admin Guide (Accurate to Code)
 
-This guide explains how the Mailcow Integration in the phamos app is configured and used. It focuses on what the code actually does: DocTypes, settings, hooks, and the public JS that wires up the UI. Most of it is non-technical, with concrete pointers so admins and users can find the right places in the system.
+This guide explains how the Mailcow Integration in the phamos app is configured a---
+
+## 9) Attendees & Location Implementation
+
+### Overview
+Calendar events properly track attendees and location (Jitsi links) so that recipients from hybrid meeting emails are listed as attendees in SOGo calendar events, and meeting links are clickable.
+
+### Event Custom Fields
+The following hidden custom fields are added to Event doctype via migrations:
+
+- **`custom_attendees_to`** (Small Text) - TO recipients marked as optional participants
+- **`custom_attendees_cc`** (Small Text) - CC recipients marked as optional participants
+- **`custom_attendees_bcc`** (Small Text) - BCC recipients marked as optional participants (hidden)
+- **`custom_location`** (Data) - Meeting location or URL (e.g., Jitsi link)
+
+**Migrations:**
+- `phamos/patches/v1_0/add_event_attendee_fields.py`
+- `phamos/patches/v1_0/add_event_location_field.py`
+
+### How Attendees Work
+
+1. **Compose Meeting:** User fills hybrid meeting composer with TO, CC, BCC recipients and the system auto-generates a Jitsi link
+2. **Store Metadata:** Event is created with attendees and location stored in custom fields
+3. **Generate ICS:** When syncing to CalDAV, `caldav/ics.vevent()` extracts custom fields and generates:
+   - `LOCATION:` line with the Jitsi URL (auto-clickable in SOGo)
+   - `ATTENDEE:` lines for all recipients with proper roles
+4. **Sync to SOGo:** Event hooks call `caldav/sync_event.on_upsert()` which passes attendees and location to ICS generator
+
+### Attendee Roles in ICS
+
+All attendees are marked as **optional participants**:
+- **TO/CC/BCC recipients:** `ROLE=OPT-PARTICIPANT;PARTSTAT=NEEDS-ACTION;RSVP=FALSE`
+
+This means:
+- Calendar clients display all attendees in the event details
+- No auto-invites are sent (RSVP=FALSE prevents automatic email invitations)
+- Attendees appear as "optional" rather than "required"
+
+### Location Field (Jitsi Links)
+
+- Auto-generated when creating hybrid meetings: `https://meet.jit.si/{15-char-random-id}`
+- Stored in `custom_location` field on Event
+- Included in ICS as `LOCATION:` field
+- SOGo and other calendar apps automatically render URLs as clickable links
+
+### Implementation Files
+
+**Backend:**
+- `phamos/mailcow_integration/hybrid_meeting.py` - Stores attendees and location when creating Events
+- `phamos/mailcow_integration/caldav/ics.py` - Extended `vevent()` to generate ATTENDEE and LOCATION lines
+- `phamos/mailcow_integration/caldav/sync_event.py` - Extracts attendees/location and passes to ICS generator
+- `phamos/public/js/hybrid_meeting_composer.js` - Auto-generates Jitsi links via `_generate_jitsi_link()`
+
+### Email Parsing
+
+Handles both plain emails and "Name <email@example.com>" format using Python's `email.utils.getaddresses()`.
+
+### Notes
+
+- Attendees are stored as comma-separated email strings in custom fields
+- BCC attendees are visible in the ICS (not truly "blind" in calendar context)
+- Custom fields are hidden from Event form UI but accessible programmatically
+- Location field syncs bidirectionally: ERPNext → SOGo and SOGo → ERPNext (via pull_events)
+
+---
+
+## 10) Diagram (based on sketch)
+
+- User opens Hybrid Dialog → composes Email + selects Slots → submits
+- App creates Tentative SOGo events + ERPNext Events with markers (stores attendees + Jitsi link)
+- App sends email with proposals and "Select" links
+- Recipient clicks "Select" → App confirms one, deletes others → Event hooks sync final state to SOGo with all attendees
+- Optional: App sends final ICS with attendees and clickable location
+
+This is the actual flow reflected in `hybrid_meeting.py`, `caldav/client.py`, and `hooks.py`. focuses on what the code actually does: DocTypes, settings, hooks, and the public JS that wires up the UI. Most of it is non-technical, with concrete pointers so admins and users can find the right places in the system.
 
 ---
 

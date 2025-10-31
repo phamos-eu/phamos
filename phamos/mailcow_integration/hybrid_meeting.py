@@ -70,6 +70,7 @@ def _ics(
             if addr and addr not in uniq:
                 uniq.append(addr)
         for a in uniq:
+            # All attendees in this context are required participants
             att_lines_list.append(f"ATTENDEE;ROLE=REQ-PARTICIPANT;PARTSTAT=NEEDS-ACTION;RSVP=TRUE:mailto:{a}")
 
     # Build lines without indentation; METHOD belongs to VCALENDAR level
@@ -248,7 +249,8 @@ def create_proposals_and_send_email(payload: str):
         uid = frappe.generate_hash(length=16)
         _sogo_put(uid, event_subject, start_iso, end_iso, description, location, seq=1, status="TENTATIVE", organizer_user=organizer_user)
 
-        # Create ERPNext Event
+        # Create ERPNext Event with attendee metadata
+        # Store attendees in custom fields for later ICS generation
         ev = frappe.get_doc({
             "doctype": "Event",
             "subject": event_subject,
@@ -259,6 +261,10 @@ def create_proposals_and_send_email(payload: str):
             "event_participants": [
                 {"reference_doctype": reference_doctype, "reference_docname": reference_name},
             ],
+            "custom_attendees_to": recipients,  # Optional attendees
+            "custom_attendees_cc": data.get("cc") or "",  # Optional attendees
+            "custom_attendees_bcc": data.get("bcc") or "",  # Optional attendees (hidden)
+            "custom_location": location,  # Store location (Jitsi link)
         }).insert(ignore_permissions=True)
         created_events.append(ev.name)
 
