@@ -62,7 +62,7 @@ frappe.provide('erpnext.utils');
 
                     // EVENT RIGHT COLUMN
                     { fieldtype: 'HTML', fieldname: 'event_heading', options: '<div style="font-weight:600; margin-bottom:8px;">'+__('Event')+'</div>' },
-                    { label: __('Meeting Subject'), fieldtype: 'Small Text', fieldname: 'subject', reqd: 1, max_height: 70 },
+                    { label: __('Meeting Subject'), fieldtype: 'Data', fieldname: 'subject', reqd: 1 },
                     { label: __('Event Type'), fieldtype: 'Select', fieldname: 'event_type', options: ['Public', 'Private'], default: 'Private', reqd: 1, hidden: 1 },
                     { label: __('Day to Fetch Slots'), fieldtype: 'Date', fieldname: 'day', default: frappe.datetime.get_today() },
                     { label: __('Duration (minutes)'), fieldtype: 'Select', fieldname: 'duration_minutes', options: ['15', '30', '60', '90', '120'], default: '60' },
@@ -89,8 +89,8 @@ frappe.provide('erpnext.utils');
                         </div>
                     ` },
                     { label: __('Include proposals in email'), fieldtype: 'Check', fieldname: 'include_proposals_in_email', default: 0, hidden: 1 },
-                    { label: __('Location'), fieldtype: 'Data', fieldname: 'location' },
-                    { label: __('Description'), fieldtype: 'Text Editor', fieldname: 'description', max_height: 150 }
+                    { label: __('Location'), fieldtype: 'Data', fieldname: 'location', default: this._generate_jitsi_link() },
+                    { label: __('Description'), fieldtype: 'Data', fieldname: 'description'}
                 ],
                 primary_action_label: __('Create Event & Send Email'),
                 primary_action: () => this._submit()
@@ -696,6 +696,16 @@ frappe.provide('erpnext.utils');
                 `);
                 tbody.append(tr);
             });
+        }
+
+        _generate_jitsi_link() {
+            // Generate a random 15-character alphanumeric ID
+            const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
+            let randomId = '';
+            for (let i = 0; i < 15; i++) {
+                randomId += chars.charAt(Math.floor(Math.random() * chars.length));
+            }
+            return `https://meet.jit.si/${randomId}`;
         }
     };
 
