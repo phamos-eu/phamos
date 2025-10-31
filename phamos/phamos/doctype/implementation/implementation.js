@@ -274,6 +274,20 @@ frappe.ui.form.on("Implementation", {
                 }
             });
         }
+    },
+    generate_auto_email: function (frm) {
+        frappe.call({
+                    method: "phamos.phamos.doctype.implementation.implementation.generate_auto_email_reports",
+                    args: {
+                        docname: frm.doc.name
+                    },
+                    callback: function (r) {
+                        if (!r.exc) {
+                            frappe.msgprint("Auto Email Reports generated successfully!");
+                            frm.reload_doc();
+                        }
+                    }
+                });
     }
 
 
