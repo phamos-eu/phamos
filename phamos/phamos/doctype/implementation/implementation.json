@@ -34,7 +34,6 @@
   "section_break_xfgb",
   "sales_order_status_information",
   "section_break_ky9b",
-  "internal_implementation",
   "customer",
   "contact_person",
   "resource_planning_tab",
@@ -124,7 +123,7 @@
   {
    "fieldname": "sales_order_total_hrs",
    "fieldtype": "Int",
-   "label": "Total Open Sales Order Hours"
+   "label": "Total Hours of Open Sales Order"
   },
   {
    "fieldname": "total_hrs_timesheet",
@@ -167,12 +166,11 @@
    "label": "Customer Information"
   },
   {
-   "depends_on": "eval:doc.internal_implementation == 0",
    "fieldname": "customer",
    "fieldtype": "Link",
    "label": "Customer",
-   "mandatory_depends_on": "eval:doc.internal_implementation == 0",
-   "options": "Customer"
+   "options": "Customer",
+   "reqd": 1
   },
   {
    "fieldname": "contact_person",
@@ -200,12 +198,6 @@
    "fieldtype": "Table",
    "label": "Resource Planning",
    "options": "Resource planning"
-  },
-  {
-   "default": "1",
-   "fieldname": "internal_implementation",
-   "fieldtype": "Check",
-   "label": "Internal Implementation"
   },
   {
    "fieldname": "modules_tab",
@@ -359,7 +351,7 @@
    "link_fieldname": "custom_implementation"
   }
  ],
- "modified": "2025-09-03 11:04:48.538065",
+ "modified": "2025-09-30 15:40:17.001995",
  "modified_by": "Administrator",
  "module": "Phamos",
  "name": "Implementation",
