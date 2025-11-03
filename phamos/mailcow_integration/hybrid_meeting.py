@@ -20,6 +20,14 @@ def _get_mailcow_domain() -> str:
 		return ""
 
 
+def _should_attach_ics() -> bool:
+	"""Check if ICS files should be attached to emails based on settings."""
+	try:
+		return bool(frappe.db.get_single_value("Mailcow Settings", "attach_ics_to_email"))
+	except Exception:
+		return True  # Default to True if setting not found
+
+
 def _separate_internal_external(email_list: str) -> Tuple[List[str], List[str]]:
 	"""
 	Separate email addresses into internal (Mailcow) and external recipients.
@@ -354,13 +362,15 @@ def create_proposals_and_send_email(payload: str):
             except Exception:
                 pass
 
-    # Optimize: Only generate ICS attachments if there are external recipients
-    # Internal Mailcow users get events via CalDAV directly
+    # Optimize: Only generate ICS attachments if:
+    # 1. Setting is enabled in Mailcow Settings
+    # 2. There are external recipients (internal users get events via CalDAV directly)
+    should_attach = _should_attach_ics()
     has_external = _has_external_recipients(recipients, data.get("cc") or "", data.get("bcc") or "")
     
     ics_attachments = []
     
-    if has_external:
+    if should_attach and has_external:
         # Build attendees list (combine TO, CC, BCC)
         all_attendees = []
         if recipients:
@@ -485,7 +495,8 @@ def confirm_proposal(gid: str, uid: str, exp: str, sig: str):
         organizer_user = chosen.owner
         organizer_email = _user_email(organizer_user)
         
-        # Check if there are external recipients
+        # Check if ICS attachment is enabled and if there are external recipients
+        should_attach = _should_attach_ics()
         has_external = _has_external_recipients(
             chosen.get("custom_attendees_to") or "",
             chosen.get("custom_attendees_cc") or "",
@@ -494,7 +505,7 @@ def confirm_proposal(gid: str, uid: str, exp: str, sig: str):
         
         ics_attachment = []
         
-        if has_external:
+        if should_attach and has_external:
             # Extract attendees from custom fields
             all_attendees = []
             if chosen.get("custom_attendees_to"):
