@@ -81,7 +81,38 @@ Handles both plain emails and "Name <email@example.com>" format using Python's `
 
 ---
 
-## 10) Diagram (based on sketch)
+## 10) Free Slot Detection
+
+### How Free/Busy Works
+
+The system uses CalDAV REPORT queries to fetch actual calendar availability:
+
+1. **Query SOGo Calendar**: `caldav_read.fetch_busy_intervals_from_sogo()` sends a REPORT request to the user's SOGo calendar
+2. **Get Busy Times**: CalDAV returns all events (including recurring events) within the time window
+3. **Calculate Free Blocks**: Busy intervals are subtracted from the work window to get available time slots
+4. **15-Minute Intervals**: All times are rounded to 15-minute divisions (07:00, 07:15, 07:30, 07:45, etc.)
+5. **Return Slots**: Up to 5 free slots are returned, each respecting the requested duration
+
+### Technical Details
+
+- Uses CalDAV `calendar-query` with `time-range` filter
+- Handles recurring events via `<c:expand>` directive
+- Merges overlapping busy intervals automatically
+- Respects user/site timezone for display
+- All calculations done in UTC internally for accuracy
+
+### Time Rounding Rules
+
+- **Start times**: Always rounded UP to the next 15-minute mark
+- **Examples**:
+  - 08:13 → 08:15
+  - 09:47 → 10:00
+  - 14:00 → 14:00 (already aligned)
+- **Result**: Clean, professional time slots like "08:15 - 09:15" instead of "08:13 - 09:13"
+
+---
+
+## 11) Diagram (based on sketch)
 
 - User opens Hybrid Dialog → composes Email + selects Slots → submits
 - App creates Tentative SOGo events + ERPNext Events with markers (stores attendees + Jitsi link)
@@ -181,9 +212,12 @@ Confirmation flow:
 
 ## 4) Event helpers (User)
 
-- Event form button “Fetch Free Slots”
+- Event form button "Fetch Free Slots"
 	- Provided by `public/js/event.js`.
 	- Opens a dialog with a tabbed list of free slots (horizontally scrollable). Pick a slot to fill `starts_on` and `ends_on`.
+	- **Fetches actual free/busy data** from SOGo calendar via CalDAV REPORT
+	- **All times are rounded to 15-minute intervals** (e.g., 07:15, 07:30, 07:45, 08:00)
+	- No awkward times like 08:13 or 09:47 - only clean 15-minute divisions
 
 - Event list “Pull Events”
 	- Provided by `public/js/event_list.js`.
