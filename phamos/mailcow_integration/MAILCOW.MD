@@ -23,20 +23,27 @@ The following hidden custom fields are added to Event doctype via migrations:
 
 1. **Compose Meeting:** User fills hybrid meeting composer with TO, CC, BCC recipients and the system auto-generates a Jitsi link
 2. **Store Metadata:** Event is created with attendees and location stored in custom fields
-3. **Generate ICS:** When syncing to CalDAV, `caldav/ics.vevent()` extracts custom fields and generates:
+3. **Recipient Separation:** System automatically separates internal Mailcow users from external recipients based on domain
+4. **Optimized Delivery:**
+   - **Internal Mailcow users:** Events created directly in their SOGo calendar via CalDAV (no ICS attachment needed)
+   - **External recipients:** Receive ICS file attachments in email for importing to their calendars
+   - **Mixed (internal + external):** ICS files attached for all recipients (internal users can ignore, external can import)
+5. **ICS Generation (for external recipients only):** `caldav/ics.vevent()` extracts custom fields and generates:
    - `LOCATION:` line with the Jitsi URL (auto-clickable in SOGo)
-   - `ATTENDEE:` lines for all recipients with proper roles
-4. **Sync to SOGo:** Event hooks call `caldav/sync_event.on_upsert()` which passes attendees and location to ICS generator
+   - `ATTENDEE:` lines for all recipients with RSVP=TRUE (enables auto-invites)
+   - `METHOD:REQUEST` to indicate this is a meeting invitation
+6. **Sync to SOGo:** Event hooks call `caldav/sync_event.on_upsert()` which syncs events for internal users
 
 ### Attendee Roles in ICS
 
-All attendees are marked as **optional participants**:
-- **TO/CC/BCC recipients:** `ROLE=OPT-PARTICIPANT;PARTSTAT=NEEDS-ACTION;RSVP=FALSE`
+All attendees are marked as **optional participants** with **RSVP enabled**:
+- **TO/CC/BCC recipients:** `ROLE=OPT-PARTICIPANT;PARTSTAT=NEEDS-ACTION;RSVP=TRUE`
 
 This means:
 - Calendar clients display all attendees in the event details
-- No auto-invites are sent (RSVP=FALSE prevents automatic email invitations)
+- **Auto-invites ARE sent** (RSVP=TRUE triggers automatic calendar invitation emails)
 - Attendees appear as "optional" rather than "required"
+- Recipients receive calendar invitations they can accept/decline in their email clients
 
 ### Location Field (Jitsi Links)
 
@@ -70,11 +77,17 @@ Handles both plain emails and "Name <email@example.com>" format using Python's `
 
 - User opens Hybrid Dialog → composes Email + selects Slots → submits
 - App creates Tentative SOGo events + ERPNext Events with markers (stores attendees + Jitsi link)
-- App sends email with proposals and "Select" links
-- Recipient clicks "Select" → App confirms one, deletes others → Event hooks sync final state to SOGo with all attendees
-- Optional: App sends final ICS with attendees and clickable location
+- App checks recipient domains to separate internal (Mailcow) vs external recipients
+- **If external recipients exist**: App generates ICS files (one per proposal) with METHOD:REQUEST and RSVP=TRUE
+- App sends email with proposals table, "Select" links, and ICS files attached (if external recipients)
+- **Internal Mailcow users:** Already have events in SOGo calendar (no ICS needed)
+- **External recipients:** Receive calendar invitations in their email clients (can accept/decline)
+- Recipient clicks "Select" → App confirms one, deletes others → Event hooks sync final state to SOGo
+- App sends confirmation email with final CONFIRMED ICS (only if external recipients exist)
 
-This is the actual flow reflected in `hybrid_meeting.py`, `caldav/client.py`, and `hooks.py`. focuses on what the code actually does: DocTypes, settings, hooks, and the public JS that wires up the UI. Most of it is non-technical, with concrete pointers so admins and users can find the right places in the system.
+This optimized flow avoids redundancy for internal users while ensuring external recipients get proper calendar invitations.
+
+This is the actual flow reflected in `hybrid_meeting.py`, `caldav/client.py`, `caldav/ics.py`, and `hooks.py`. focuses on what the code actually does: DocTypes, settings, hooks, and the public JS that wires up the UI. Most of it is non-technical, with concrete pointers so admins and users can find the right places in the system.
 
 ---
 
@@ -147,13 +160,13 @@ What you do:
 
 What happens in the backend:
 - For each proposal, `hybrid_meeting.create_proposals_and_send_email` creates a Tentative SOGo entry (via `caldav.client.put_ics`) and an ERPNext Event with markers so they can be managed as a set.
-- The email sent to recipients contains a proposals table with per‑row “Select” links. These links are signed and expire.
-- If there is exactly one proposal, the app also attaches a Tentative ICS to the outgoing email.
+- **Optimized ICS attachment**: The system checks recipient domains and only generates/attaches ICS files if there are external (non-Mailcow) recipients. Internal users already have the events in their SOGo calendar via CalDAV.
+- The email sent to recipients contains a proposals table with per‑row "Select" links. These links are signed and expire.
 
 Confirmation flow:
-- When a recipient clicks a “Select” link, `hybrid_meeting.confirm_proposal`
+- When a recipient clicks a "Select" link, `hybrid_meeting.confirm_proposal`
 	- Keeps the chosen Event (sets status Open), deletes the others (ERPNext + SOGo), and relies on Event hooks to ensure SOGo is in sync.
-	- Optionally sends a confirmation email with a final ICS.
+	- **Sends a confirmation email** with the final confirmed ICS attached (only if external recipients exist) with updated status (CONFIRMED) and incremented sequence number.
 
 ---
 

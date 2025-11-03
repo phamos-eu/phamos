@@ -90,7 +90,7 @@ frappe.provide('erpnext.utils');
                     ` },
                     { label: __('Include proposals in email'), fieldtype: 'Check', fieldname: 'include_proposals_in_email', default: 0, hidden: 1 },
                     { label: __('Location'), fieldtype: 'Data', fieldname: 'location', default: this._generate_jitsi_link() },
-                    { label: __('Description'), fieldtype: 'Data', fieldname: 'description'}
+                    { label: __('Description'), fieldtype: 'Text', fieldname: 'description', max_height: 150 }
                 ],
                 primary_action_label: __('Create Event & Send Email'),
                 primary_action: () => this._submit()

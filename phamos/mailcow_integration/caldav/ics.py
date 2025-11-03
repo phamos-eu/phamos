@@ -47,30 +47,30 @@ def vevent(uid: str, seq: int, subject: str, starts_on, ends_on,
     # Parse and add attendees
     from email.utils import getaddresses
     
-    # Add TO recipients as optional participants (all attendees are optional)
+    # Add TO recipients as optional participants with RSVP enabled (sends auto-invites)
     if attendees_to:
         to_list = [email.strip() for email in attendees_to.split(",") if email.strip()]
         for email_addr in to_list:
             # Extract email from "Name <email>" format if present
             _, addr = getaddresses([email_addr])[0] if getaddresses([email_addr]) else ("", email_addr)
             if addr:
-                ics_lines.append(f"ATTENDEE;ROLE=OPT-PARTICIPANT;PARTSTAT=NEEDS-ACTION;RSVP=FALSE:mailto:{addr}")
+                ics_lines.append(f"ATTENDEE;ROLE=OPT-PARTICIPANT;PARTSTAT=NEEDS-ACTION;RSVP=TRUE:mailto:{addr}")
     
-    # Add CC recipients as optional participants
+    # Add CC recipients as optional participants with RSVP enabled
     if attendees_cc:
         cc_list = [email.strip() for email in attendees_cc.split(",") if email.strip()]
         for email_addr in cc_list:
             _, addr = getaddresses([email_addr])[0] if getaddresses([email_addr]) else ("", email_addr)
             if addr:
-                ics_lines.append(f"ATTENDEE;ROLE=OPT-PARTICIPANT;PARTSTAT=NEEDS-ACTION;RSVP=FALSE:mailto:{addr}")
+                ics_lines.append(f"ATTENDEE;ROLE=OPT-PARTICIPANT;PARTSTAT=NEEDS-ACTION;RSVP=TRUE:mailto:{addr}")
     
-    # Add BCC recipients as optional participants (still visible in ICS but not in email headers)
+    # Add BCC recipients as optional participants with RSVP enabled (still visible in ICS but not in email headers)
     if attendees_bcc:
         bcc_list = [email.strip() for email in attendees_bcc.split(",") if email.strip()]
         for email_addr in bcc_list:
             _, addr = getaddresses([email_addr])[0] if getaddresses([email_addr]) else ("", email_addr)
             if addr:
-                ics_lines.append(f"ATTENDEE;ROLE=OPT-PARTICIPANT;PARTSTAT=NEEDS-ACTION;RSVP=FALSE:mailto:{addr}")
+                ics_lines.append(f"ATTENDEE;ROLE=OPT-PARTICIPANT;PARTSTAT=NEEDS-ACTION;RSVP=TRUE:mailto:{addr}")
 
     # Close the event
     ics_lines.extend([
