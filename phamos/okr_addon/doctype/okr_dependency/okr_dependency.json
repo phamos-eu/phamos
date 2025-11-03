@@ -1,0 +1,77 @@
+{
+ "actions": [],
+ "creation": "2025-01-27 10:00:00.000000",
+ "doctype": "DocType",
+ "editable_grid": 1,
+ "engine": "InnoDB",
+ "field_order": [
+  "dependency_description",
+  "dependency_type",
+  "dependency_owner",
+  "status",
+  "expected_completion",
+  "impact_level",
+  "notes"
+ ],
+ "fields": [
+  {
+   "fieldname": "dependency_description",
+   "fieldtype": "Text",
+   "in_list_view": 1,
+   "label": "Dependency Description",
+   "reqd": 1
+  },
+  {
+   "default": "Internal",
+   "fieldname": "dependency_type",
+   "fieldtype": "Select",
+   "in_list_view": 1,
+   "label": "Dependency Type",
+   "options": "Internal\nExternal\nTechnical\nProcess\nResource"
+  },
+  {
+   "fieldname": "dependency_owner",
+   "fieldtype": "Link",
+   "label": "Dependency Owner",
+   "options": "User"
+  },
+  {
+   "default": "Pending",
+   "fieldname": "status",
+   "fieldtype": "Select",
+   "in_list_view": 1,
+   "label": "Status",
+   "options": "Pending\nIn Progress\nCompleted\nBlocked"
+  },
+  {
+   "fieldname": "expected_completion",
+   "fieldtype": "Date",
+   "in_list_view": 1,
+   "label": "Expected Completion"
+  },
+  {
+   "default": "Medium",
+   "fieldname": "impact_level",
+   "fieldtype": "Select",
+   "in_list_view": 1,
+   "label": "Impact Level",
+   "options": "Low\nMedium\nHigh\nCritical"
+  },
+  {
+   "fieldname": "notes",
+   "fieldtype": "Text",
+   "label": "Notes"
+  }
+ ],
+ "istable": 1,
+ "links": [],
+ "modified": "2025-01-27 10:00:00.000000",
+ "modified_by": "Administrator",
+ "module": "OKR Addon",
+ "name": "OKR Dependency",
+ "owner": "Administrator",
+ "permissions": [],
+ "sort_field": "modified",
+ "sort_order": "DESC",
+ "track_changes": 1
+} 
