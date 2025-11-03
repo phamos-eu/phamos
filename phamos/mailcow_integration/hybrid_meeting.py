@@ -2,7 +2,7 @@ from __future__ import annotations
 import hmac, hashlib, json, base64
 from datetime import datetime, timedelta, timezone
 from email.utils import getaddresses
-from typing import List, Dict
+from typing import List, Dict, Tuple
 import frappe
 
 # Reuse SOGo helpers from availability.create_event, but get DAV password via caldav.client (decrypt)
@@ -10,6 +10,56 @@ from .availability.create_event import _settings, _email as _user_email
 from .caldav.client import calendar_item_url as _calendar_url
 from .caldav.client import dav_password as _dav_pw
 from .caldav.client import put_ics as _put_ics, delete_ics as _delete_ics
+
+
+def _get_mailcow_domain() -> str:
+	"""Get the internal Mailcow domain from settings."""
+	try:
+		return frappe.db.get_single_value("Mailcow Settings", "domain") or ""
+	except Exception:
+		return ""
+
+
+def _separate_internal_external(email_list: str) -> Tuple[List[str], List[str]]:
+	"""
+	Separate email addresses into internal (Mailcow) and external recipients.
+	
+	Returns:
+		(internal_emails, external_emails)
+	"""
+	if not email_list:
+		return ([], [])
+	
+	mailcow_domain = _get_mailcow_domain()
+	if not mailcow_domain:
+		# If no domain configured, treat all as external (send ICS to all)
+		return ([], [addr.strip() for addr in email_list.split(",") if addr.strip()])
+	
+	internal = []
+	external = []
+	
+	for email_addr in email_list.split(","):
+		email_addr = email_addr.strip()
+		if not email_addr:
+			continue
+		
+		# Extract email from "Name <email>" format if present
+		_, addr = getaddresses([email_addr])[0] if getaddresses([email_addr]) else ("", email_addr)
+		
+		if addr.endswith(f"@{mailcow_domain}"):
+			internal.append(email_addr)  # Keep original format with name if present
+		else:
+			external.append(email_addr)
+	
+	return (internal, external)
+
+
+def _has_external_recipients(recipients: str = "", cc: str = "", bcc: str = "") -> bool:
+	"""Check if there are any external recipients in the email list."""
+	_, ext_to = _separate_internal_external(recipients)
+	_, ext_cc = _separate_internal_external(cc)
+	_, ext_bcc = _separate_internal_external(bcc)
+	return bool(ext_to or ext_cc or ext_bcc)
 
 
 def _site_key() -> str:
@@ -70,8 +120,8 @@ def _ics(
             if addr and addr not in uniq:
                 uniq.append(addr)
         for a in uniq:
-            # All attendees in this context are required participants
-            att_lines_list.append(f"ATTENDEE;ROLE=REQ-PARTICIPANT;PARTSTAT=NEEDS-ACTION;RSVP=TRUE:mailto:{a}")
+            # All attendees are optional participants with RSVP enabled for auto-invites
+            att_lines_list.append(f"ATTENDEE;ROLE=OPT-PARTICIPANT;PARTSTAT=NEEDS-ACTION;RSVP=TRUE:mailto:{a}")
 
     # Build lines without indentation; METHOD belongs to VCALENDAR level
     lines: List[str] = [
@@ -304,6 +354,48 @@ def create_proposals_and_send_email(payload: str):
             except Exception:
                 pass
 
+    # Optimize: Only generate ICS attachments if there are external recipients
+    # Internal Mailcow users get events via CalDAV directly
+    has_external = _has_external_recipients(recipients, data.get("cc") or "", data.get("bcc") or "")
+    
+    ics_attachments = []
+    
+    if has_external:
+        # Build attendees list (combine TO, CC, BCC)
+        all_attendees = []
+        if recipients:
+            all_attendees.append(recipients)
+        if data.get("cc"):
+            all_attendees.append(data.get("cc"))
+        if data.get("bcc"):
+            all_attendees.append(data.get("bcc"))
+        
+        for idx, p in enumerate(proposals):
+            start_iso = p["start"]
+            end_iso = p["end"]
+            uid = formatted_rows[idx]["uid"]
+            
+            # Generate ICS with attendees for this proposal
+            ics_content = _ics(
+                uid=uid,
+                subject=event_subject,
+                start_iso=start_iso,
+                end_iso=end_iso,
+                description=description,
+                location=location,
+                seq=1,
+                status="TENTATIVE",
+                organizer=organizer_email,
+                attendees=all_attendees if all_attendees else None,
+                method="REQUEST"
+            )
+            
+            # Add as inline attachment (content, not file)
+            ics_attachments.append({
+            "fname": f"proposal_{idx + 1}.ics",
+            "fcontent": ics_content
+        })
+
     # Send email via frappe.sendmail
     # Convert attachments to file_url dicts for sendmail compatibility
     attach_dicts = []
@@ -314,7 +406,9 @@ def create_proposals_and_send_email(payload: str):
                 attach_dicts.append({"file_url": fdoc.file_url})
         except Exception:
             pass
-    # Do not attach ICS on submit; invites are not sent at compose time
+    
+    # Add ICS attachments
+    attach_dicts.extend(ics_attachments)
 
     frappe.sendmail(
         recipients=recipients,
@@ -385,6 +479,69 @@ def confirm_proposal(gid: str, uid: str, exp: str, sig: str):
         # non-fatal; at minimum we keep the selected Event
         pass
 
-    # Do not send confirmation ICS via email automatically
+    # Send confirmation email with final ICS (only if there are external recipients)
+    try:
+        # Extract organizer and attendees from chosen event
+        organizer_user = chosen.owner
+        organizer_email = _user_email(organizer_user)
+        
+        # Check if there are external recipients
+        has_external = _has_external_recipients(
+            chosen.get("custom_attendees_to") or "",
+            chosen.get("custom_attendees_cc") or "",
+            chosen.get("custom_attendees_bcc") or ""
+        )
+        
+        ics_attachment = []
+        
+        if has_external:
+            # Extract attendees from custom fields
+            all_attendees = []
+            if chosen.get("custom_attendees_to"):
+                all_attendees.append(chosen.get("custom_attendees_to"))
+            if chosen.get("custom_attendees_cc"):
+                all_attendees.append(chosen.get("custom_attendees_cc"))
+            if chosen.get("custom_attendees_bcc"):
+                all_attendees.append(chosen.get("custom_attendees_bcc"))
+            
+            # Generate confirmed ICS
+            desc_marker = chosen.description or ""
+            marker_start = desc_marker.find("[MAILCOW-UID: ")
+            marker_uid = uid
+            if marker_start >= 0:
+                marker_uid = desc_marker[marker_start + len("[MAILCOW-UID: "):].split("]")[0].strip()
+            
+            confirmed_ics = _ics(
+                uid=marker_uid,
+                subject=chosen.subject,
+                start_iso=chosen.starts_on.isoformat() if hasattr(chosen.starts_on, 'isoformat') else str(chosen.starts_on),
+                end_iso=chosen.ends_on.isoformat() if hasattr(chosen.ends_on, 'isoformat') else str(chosen.ends_on),
+                description=chosen.description or "",
+                location=chosen.get("custom_location") or "",
+                seq=2,  # Increment sequence for update
+                status="CONFIRMED",
+                organizer=organizer_email,
+                attendees=all_attendees if all_attendees else None,
+                method="REQUEST"
+            )
+            
+            ics_attachment = [{
+                "fname": "meeting.ics",
+                "fcontent": confirmed_ics
+            }]
+        
+        # Send confirmation email (with or without ICS depending on recipient type)
+        frappe.sendmail(
+            recipients=chosen.get("custom_attendees_to"),
+            cc=chosen.get("custom_attendees_cc"),
+            bcc=chosen.get("custom_attendees_bcc"),
+            subject=f"Confirmed: {chosen.subject}",
+            message=f"Your meeting has been confirmed.<br><br><strong>Subject:</strong> {chosen.subject}<br><strong>Time:</strong> {chosen.starts_on} - {chosen.ends_on}<br><strong>Location:</strong> {chosen.get('custom_location') or 'Not specified'}",
+            sender=organizer_user,
+            attachments=ics_attachment or None
+        )
+    except Exception as e:
+        # Non-fatal - meeting is confirmed even if email fails
+        frappe.log_error(frappe.get_traceback(), "Confirmation Email Error")
 
     return {"ok": True, "message": "Your meeting has been confirmed."}
