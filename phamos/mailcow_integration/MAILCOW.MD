@@ -26,8 +26,9 @@ The following hidden custom fields are added to Event doctype via migrations:
 3. **Recipient Separation:** System automatically separates internal Mailcow users from external recipients based on domain
 4. **Optimized Delivery:**
    - **Internal Mailcow users:** Events created directly in their SOGo calendar via CalDAV (no ICS attachment needed)
-   - **External recipients:** Receive ICS file attachments in email for importing to their calendars
-   - **Mixed (internal + external):** ICS files attached for all recipients (internal users can ignore, external can import)
+   - **External recipients (if "Attach ICS to Email" is enabled):** Receive ICS file attachments in email for importing to their calendars
+   - **External recipients (if "Attach ICS to Email" is disabled):** Receive email notification only, no calendar file
+   - **Mixed (internal + external):** ICS files attached for all recipients when enabled (internal users can ignore, external can import)
 5. **ICS Generation (for external recipients only):** `caldav/ics.vevent()` extracts custom fields and generates:
    - `LOCATION:` line with the Jitsi URL (auto-clickable in SOGo)
    - `ATTENDEE:` lines for all recipients with RSVP=TRUE (enables auto-invites)
@@ -127,11 +128,12 @@ This is the actual flow reflected in `hybrid_meeting.py`, `caldav/client.py`, `c
 
 ## 2) Setup (Admin)
 
-1. Open “Mailcow Settings” (single doctype)
+1. Open "Mailcow Settings" (single doctype)
 	 - Base URL: your Mailcow base, e.g., `https://mail.example.com`
 	 - Domain: your primary Mailcow domain (informational, used by some flows)
 	 - API Key: the Mailcow API key (stored encrypted). Used by code via `utils._headers()` to call Mailcow REST endpoints.
 	 - Auto Sync Events (optional): the code supports auto ICS sync via Event hooks regardless of this flag; treat it as a feature switch if used in your policies.
+	 - **Attach ICS to Email** (default: enabled): Controls whether ICS calendar files are attached to meeting emails. When enabled, external recipients receive ICS files they can import. Internal Mailcow users always get events via CalDAV regardless of this setting.
 
 2. Generate a DAV password for each user (in User form)
 	 - Go to: User > open a user > “Mailcow” group > click “Generate DAV Password”.
