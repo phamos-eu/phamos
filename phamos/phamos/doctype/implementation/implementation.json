@@ -34,7 +34,6 @@
   "section_break_xfgb",
   "sales_order_status_information",
   "section_break_ky9b",
-  "internal_implementation",
   "customer",
   "contact_person",
   "resource_planning_tab",
@@ -55,7 +54,11 @@
   "module_chart",
   "modules",
   "status_history_tab",
-  "status_updates"
+  "status_updates",
+  "report_tab",
+  "user_with_permission",
+  "auto_email_report_record",
+  "generate_auto_email"
  ],
  "fields": [
   {
@@ -124,7 +127,7 @@
   {
    "fieldname": "sales_order_total_hrs",
    "fieldtype": "Int",
-   "label": "Total Open Sales Order Hours"
+   "label": "Total Hours of Open Sales Order"
   },
   {
    "fieldname": "total_hrs_timesheet",
@@ -167,12 +170,11 @@
    "label": "Customer Information"
   },
   {
-   "depends_on": "eval:doc.internal_implementation == 0",
    "fieldname": "customer",
    "fieldtype": "Link",
    "label": "Customer",
-   "mandatory_depends_on": "eval:doc.internal_implementation == 0",
-   "options": "Customer"
+   "options": "Customer",
+   "reqd": 1
   },
   {
    "fieldname": "contact_person",
@@ -200,12 +202,6 @@
    "fieldtype": "Table",
    "label": "Resource Planning",
    "options": "Resource planning"
-  },
-  {
-   "default": "1",
-   "fieldname": "internal_implementation",
-   "fieldtype": "Check",
-   "label": "Internal Implementation"
   },
   {
    "fieldname": "modules_tab",
@@ -334,6 +330,34 @@
    "fieldname": "reset",
    "fieldtype": "Button",
    "label": "Reset"
+  },
+  {
+   "default": "1",
+   "fieldname": "internal_implementation",
+   "fieldtype": "Check",
+   "label": "Internal Implementation"
+  },
+  {
+   "fieldname": "report_tab",
+   "fieldtype": "Tab Break",
+   "label": "Report"
+  },
+  {
+   "fieldname": "user_with_permission",
+   "fieldtype": "Link",
+   "label": "User With Permission",
+   "options": "User"
+  },
+  {
+   "fieldname": "auto_email_report_record",
+   "fieldtype": "Table",
+   "label": "Auto Email Report record",
+   "options": "Auto Email Report Record"
+  },
+  {
+   "fieldname": "generate_auto_email",
+   "fieldtype": "Button",
+   "label": "Generate Auto Email"
   }
  ],
  "index_web_pages_for_search": 1,
@@ -359,7 +383,7 @@
    "link_fieldname": "custom_implementation"
   }
  ],
- "modified": "2025-09-03 11:04:48.538065",
+ "modified": "2025-10-31 11:36:08.263301",
  "modified_by": "Administrator",
  "module": "Phamos",
  "name": "Implementation",
