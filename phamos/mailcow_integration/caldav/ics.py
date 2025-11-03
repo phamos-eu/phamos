@@ -64,13 +64,8 @@ def vevent(uid: str, seq: int, subject: str, starts_on, ends_on,
             if addr:
                 ics_lines.append(f"ATTENDEE;ROLE=OPT-PARTICIPANT;PARTSTAT=NEEDS-ACTION;RSVP=TRUE:mailto:{addr}")
     
-    # Add BCC recipients as optional participants with RSVP enabled (still visible in ICS but not in email headers)
-    if attendees_bcc:
-        bcc_list = [email.strip() for email in attendees_bcc.split(",") if email.strip()]
-        for email_addr in bcc_list:
-            _, addr = getaddresses([email_addr])[0] if getaddresses([email_addr]) else ("", email_addr)
-            if addr:
-                ics_lines.append(f"ATTENDEE;ROLE=OPT-PARTICIPANT;PARTSTAT=NEEDS-ACTION;RSVP=TRUE:mailto:{addr}")
+    # BCC recipients are NOT added as attendees (they receive the email but not the calendar invite)
+    # This maintains the "blind" nature of BCC - they get the email notification only
 
     # Close the event
     ics_lines.extend([

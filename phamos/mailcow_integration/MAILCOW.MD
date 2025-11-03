@@ -10,9 +10,9 @@ Calendar events properly track attendees and location (Jitsi links) so that reci
 ### Event Custom Fields
 The following hidden custom fields are added to Event doctype via migrations:
 
-- **`custom_attendees_to`** (Small Text) - TO recipients marked as optional participants
-- **`custom_attendees_cc`** (Small Text) - CC recipients marked as optional participants
-- **`custom_attendees_bcc`** (Small Text) - BCC recipients marked as optional participants (hidden)
+- **`custom_attendees_to`** (Small Text) - TO recipients who receive calendar invites
+- **`custom_attendees_cc`** (Small Text) - CC recipients who receive calendar invites
+- **`custom_attendees_bcc`** (Small Text) - BCC recipients who receive email only (no calendar invite)
 - **`custom_location`** (Data) - Meeting location or URL (e.g., Jitsi link)
 
 **Migrations:**
@@ -37,14 +37,19 @@ The following hidden custom fields are added to Event doctype via migrations:
 
 ### Attendee Roles in ICS
 
-All attendees are marked as **optional participants** with **RSVP enabled**:
-- **TO/CC/BCC recipients:** `ROLE=OPT-PARTICIPANT;PARTSTAT=NEEDS-ACTION;RSVP=TRUE`
+**TO and CC recipients** are marked as **optional participants** with **RSVP enabled**:
+- **TO/CC recipients:** `ROLE=OPT-PARTICIPANT;PARTSTAT=NEEDS-ACTION;RSVP=TRUE`
+
+**BCC recipients** are **NOT included as attendees** in the calendar invite:
+- BCC recipients receive the email notification but are not added to the ICS file
+- This maintains the "blind" nature of BCC - they get the email but not a calendar invitation
 
 This means:
-- Calendar clients display all attendees in the event details
-- **Auto-invites ARE sent** (RSVP=TRUE triggers automatic calendar invitation emails)
-- Attendees appear as "optional" rather than "required"
-- Recipients receive calendar invitations they can accept/decline in their email clients
+- Calendar clients display TO and CC attendees in the event details
+- **Auto-invites ARE sent** to TO and CC recipients (RSVP=TRUE triggers automatic calendar invitation emails)
+- TO and CC attendees appear as "optional" rather than "required"
+- TO and CC recipients receive calendar invitations they can accept/decline in their email clients
+- **BCC recipients only receive the email**, without calendar invite or attendee visibility
 
 ### Location Field (Jitsi Links)
 
@@ -67,8 +72,10 @@ Handles both plain emails and "Name <email@example.com>" format using Python's `
 
 ### Notes
 
-- Attendees are stored as comma-separated email strings in custom fields
-- BCC attendees are visible in the ICS (not truly "blind" in calendar context)
+- Attendees (TO/CC) are stored as comma-separated email strings in custom fields
+- BCC recipients are stored but not included in ICS ATTENDEE lines
+- Email parsing handles "Name <email@example.com>" format
+- BCC recipients receive the email but are truly "blind" - not listed as attendees in calendar
 - Custom fields are hidden from Event form UI but accessible programmatically
 - Location field syncs bidirectionally: ERPNext → SOGo and SOGo → ERPNext (via pull_events)
 
