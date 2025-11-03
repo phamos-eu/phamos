@@ -371,14 +371,13 @@ def create_proposals_and_send_email(payload: str):
     ics_attachments = []
     
     if should_attach and has_external:
-        # Build attendees list (combine TO, CC, BCC)
+        # Build attendees list (combine TO and CC only - BCC should not get calendar invites)
         all_attendees = []
         if recipients:
             all_attendees.append(recipients)
         if data.get("cc"):
             all_attendees.append(data.get("cc"))
-        if data.get("bcc"):
-            all_attendees.append(data.get("bcc"))
+        # BCC is intentionally excluded - they receive the email but not the calendar invite
         
         for idx, p in enumerate(proposals):
             start_iso = p["start"]
@@ -506,14 +505,13 @@ def confirm_proposal(gid: str, uid: str, exp: str, sig: str):
         ics_attachment = []
         
         if should_attach and has_external:
-            # Extract attendees from custom fields
+            # Extract attendees from custom fields (TO and CC only - BCC should not get calendar invites)
             all_attendees = []
             if chosen.get("custom_attendees_to"):
                 all_attendees.append(chosen.get("custom_attendees_to"))
             if chosen.get("custom_attendees_cc"):
                 all_attendees.append(chosen.get("custom_attendees_cc"))
-            if chosen.get("custom_attendees_bcc"):
-                all_attendees.append(chosen.get("custom_attendees_bcc"))
+            # BCC is intentionally excluded - they receive the email but not the calendar invite
             
             # Generate confirmed ICS
             desc_marker = chosen.description or ""
