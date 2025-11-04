@@ -37,3 +37,15 @@
         padding-right: 0rem;
     }
 }
+ #starRating .star {
+    font-size: 24px;
+    color: #ccc; /* default grey */
+    cursor: pointer;
+    transition: color 0.2s ease;
+    user-select: none;
+  }
+
+  #starRating .star.hovered,
+  #starRating .star.selected {
+    color: #FFD700; /* golden color for hover and selected */
+  }

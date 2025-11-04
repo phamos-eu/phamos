@@ -16,7 +16,6 @@ frappe.ui.form.on("Implementation", {
     setup: function (frm) {
         if (!frm.is_new()) {
             add_row_to_sales_order(frm)
-            if (frm.doc.internal_implementation == 0) {
                 frappe.call({
                     method: "phamos.phamos.doctype.implementation.implementation.get_financial_history",
                     args: { 'name': frm.doc.name, 'customer': frm.doc.customer },
@@ -49,7 +48,6 @@ frappe.ui.form.on("Implementation", {
                     },
                 });
             }
-        }
     },
     refresh: function (frm) {
         frm.fields_dict.reset.$input.on('click', function () {
@@ -92,44 +90,58 @@ frappe.ui.form.on("Implementation", {
         }
 
         frm.add_custom_button('Set Implementation Status', () => {
-            frappe.call({
-                method: 'phamos.phamos.doctype.implementation.implementation.are_all_projects_closed',
-                args: {
-                    implementation_name: frm.doc.name
-                },
-                callback: function (r) {
-                    if (r.message === true) {
-                        let d = new frappe.ui.Dialog({
-                            title: 'Set Implementation Status',
-                            fields: [
-                                {
-                                    label: 'Status',
-                                    fieldname: 'status',
-                                    fieldtype: 'Select',
-                                    options: ['Completed', 'Cancelled', 'Reactivated'],
-                                    reqd: 1
-                                },
-                                {
-                                    label: 'Reason',
-                                    fieldname: 'reason',
-                                    fieldtype: 'Small Text',
-                                    reqd: 1
+            let d = new frappe.ui.Dialog({
+                title: 'Set Implementation Status',
+                fields: [
+                    {
+                        label: 'Status',
+                        fieldname: 'status',
+                        fieldtype: 'Select',
+                        options: ['Completed', 'Cancelled', 'Reactivated', 'Hold', 'Escalated'],
+                        reqd: 1
+                    },
+                    {
+                        label: 'Reason',
+                        fieldname: 'reason',
+                        fieldtype: 'Small Text',
+                        reqd: 1
+                    }
+                ],
+                primary_action_label: 'Submit',
+                primary_action(values) {
+                    if (['Completed', 'Cancelled'].includes(values.status)) {
+                        // ✅ Backend check only for these 3
+                        frappe.call({
+                            method: 'phamos.phamos.doctype.implementation.implementation.are_all_projects_closed',
+                            args: {
+                                implementation_name: frm.doc.name
+                            },
+                            callback: function (r) {
+                                if (r.message === true) {
+                                    frm.set_value('status', values.status);
+                                    frm.set_value('status_statement', values.reason);
+                                    frm.save();
+                                    d.hide();
+                                } else {
+                                    frappe.throw(__('All projects must be closed before setting this status.'));
                                 }
-                            ],
-                            primary_action_label: 'Submit',
-                            primary_action(values) {
-                                frm.set_value('status', values.status);
-                                frm.set_value('status_statement', values.reason);
-                                frm.save();
-                                d.hide();
                             }
                         });
-                        d.show();
-                    } else {
-                        frappe.throw(__('All projects must be closed before setting implementation status.'));
+                    } else if (values.status === 'Reactivated') {
+                        frm.set_value('status', 'Open');
+                        frm.set_value('status_statement', values.reason);
+                        frm.save();
+                        d.hide();
+                    }else {
+                        // ✅ Hold & Escalated bypass condition
+                        frm.set_value('status', values.status);
+                        frm.set_value('status_statement', values.reason);
+                        frm.save();
+                        d.hide();
                     }
                 }
             });
+            d.show();
         });
 
         //////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -262,6 +274,20 @@ frappe.ui.form.on("Implementation", {
                 }
             });
         }
+    },
+    generate_auto_email: function (frm) {
+        frappe.call({
+                    method: "phamos.phamos.doctype.implementation.implementation.generate_auto_email_reports",
+                    args: {
+                        docname: frm.doc.name
+                    },
+                    callback: function (r) {
+                        if (!r.exc) {
+                            frappe.msgprint("Auto Email Reports generated successfully!");
+                            frm.reload_doc();
+                        }
+                    }
+                });
     }
 
 
@@ -274,7 +300,17 @@ function render_module_chart(frm, canvasId) {
 
     (frm.doc.modules || []).forEach(row => {
         if (row.is_required) {
-            labels.push(row.module);
+            let label = row.module;
+
+            const duplicateCount = labels.filter(l => l.startsWith(row.module)).length;
+
+            if (duplicateCount > 0 && row.stage) {
+                label = `${row.module} (${row.stage})`;
+            } else if (duplicateCount > 0) {
+                label = `${row.module} (${duplicateCount + 1})`;
+            }
+
+            labels.push(label);
             currentLevels.push(row.current_level || 0);
             targetLevels.push(row.target_level || 0);
         }
@@ -497,6 +533,27 @@ frappe.ui.form.on("Sales Order Status Information", {
         }
     }
 });
+
+frappe.ui.form.on('Implementation Item', {
+    module: function(frm, cdt, cdn) {
+        let child = locals[cdt][cdn];
+
+        if (!child.module) {
+            frappe.model.set_value(cdt, cdn, 'current_level', '');
+            return;
+        }
+        let rows = frm.doc.modules.filter(r => r.module === child.module);
+        if (rows.length > 1) {
+            let previous_row = rows[0];
+
+            if (previous_row.current_level) {
+                frappe.model.set_value(cdt, cdn, 'current_level', previous_row.current_level);
+            }
+        }
+    }
+});
+
+
 
 
 
