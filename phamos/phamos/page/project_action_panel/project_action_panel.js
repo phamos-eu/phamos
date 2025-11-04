@@ -55,7 +55,7 @@ frappe.pages["project-action-panel"].on_page_load = function (wrapper) {
       callback: function (r) {
         if (r.message) {
           let doc = frappe.model.sync(r.message);
-          frappe.msgprint(
+          frappe.show_alert(
             "Timesheet Record: " + doc[0].name + " Created Successfully."
           );
           render_datatable();
@@ -80,21 +80,21 @@ function update_and_submit_timesheet_record(
     },
     callback: function (res) {
       if (!res.message) {
-        frappe.msgprint("Timesheet Record not found.");
+        frappe.show_alert("Timesheet Record not found.");
         return;
       }
 
       let doc = res.message;
 
       if (!doc.item || doc.item.length === 0) {
-        frappe.msgprint("No time logs found.");
+        frappe.show_alert("No time logs found.");
         return;
       }
 
       let lastRow = doc.item[doc.item.length - 1];
 
       if (lastRow.to_time) {
-        frappe.msgprint("Please Pause it first (▶️)");
+        frappe.show_alert("Please Pause it first (▶️)");
         return;
       }
 
@@ -113,18 +113,18 @@ function update_and_submit_timesheet_record(
         freeze_message: __("Updating Timesheet Record......"),
         callback: function (r) {
           if (r.message) {
-            frappe.msgprint("Timesheet Record Updated Successfully.");
-            render_datatable();
+            let timesheet_name = r.message.timesheet_name;
+            frappe.show_alert({
+              message: `Timesheet <a href="${frappe.utils.get_form_link("Timesheet-Record", timesheet_name)}" target="_blank">${timesheet_name}</a> Updated Successfully.`,
+              indicator: 'green'
+            });            
+          render_datatable();
           }
         },
       });
     }
   });
 }
-
-
-
-
 
  window.toggleDropdown = function (event, dropdownId) {
   event.stopPropagation(); // Prevent click from bubbling
@@ -174,8 +174,6 @@ function update_and_submit_timesheet_record(
     }, 0);
   }
 };
-
-
 
   // Close dropdowns when clicking outside
   document.addEventListener('click', () => {
@@ -243,7 +241,7 @@ function update_and_submit_timesheet_record(
     },
     callback: function (res) {
       if (!res.message) {
-        frappe.msgprint("Timesheet Record not found.");
+        frappe.show_alert("Timesheet Record not found.");
         return;
       }
 
@@ -251,7 +249,7 @@ function update_and_submit_timesheet_record(
 
       // 🔹 Check: Child table 'item' exist karta hai?
       if (!doc.item || doc.item.length === 0) {
-        frappe.msgprint("No time logs found.");
+        frappe.show_alert("No time logs found.");
         return;
       }
 
@@ -259,7 +257,7 @@ function update_and_submit_timesheet_record(
 
       // 🔹 Agar last row ka to_time filled hai → error
       if (lastRow.to_time) {
-        frappe.msgprint("Please Pause it first (▶️)");
+        frappe.show_alert("Please Pause it first (▶️)");
         return;
       }
 
@@ -395,7 +393,7 @@ function openStopProjectDialog(timesheet_record, percent_billable, project, task
       },
       callback:function(r){
         if(r.message){
-          frappe.msgprint({
+          frappe.show_alert({
             title:__("Success"),
             message:__("Project Assigned Successfully."),
             indicator:"green"
@@ -404,7 +402,7 @@ function openStopProjectDialog(timesheet_record, percent_billable, project, task
         }
       },
       error:function(err){
-        frappe.msgprint({
+        frappe.show_alert({
           title:__("Error"),
           message:__("Failed to assign project. Please Check the error logs."),
           indicator:"red"
@@ -459,43 +457,6 @@ function openStopProjectDialog(timesheet_record, percent_billable, project, task
               return `<a href="https://phamos.eu/app/timesheet-record/${record.timesheet_record_draft}" target="_blank">${record.timesheet_record_draft}</a>`;
             })
             .join(", ");
-
-          // if (timesheetRecordDrafts && timesheetRecordDrafts.length > 0) {
-          //   //frappe.msgprint(__("Draft Timesheet Records: "+ draftTimesheets+" found. Please submit them before creating a new one."));
-          //   let confirm_msg =
-          //     "Draft Timesheet Records: " +
-          //     draftTimesheets +
-          //     " found. If you want to submit before creating a new one, Click Yes?";
-          //   frappe.confirm(
-          //     confirm_msg,
-          //     function () {
-          //       // If user clicks "Yes"
-          //       frappe.db.get_value(
-          //         "Timesheet Record",
-          //         { name: timesheetRecordDrafts[0].timesheet_record_draft },
-          //         "project",
-          //         function (value) {
-          //           frappe.db.get_value(
-          //             "Project",
-          //             { name: value.project },
-          //             "percent_billable",
-          //             function (value_pb) {
-          //               stopProject(
-          //                 timesheetRecordDrafts[0].timesheet_record_draft,
-          //                 value_pb.percent_billable
-          //               );
-          //             }
-          //           );
-          //         }
-          //       );
-          //       // Perform the action here
-          //     },
-          //     function () {
-          //       // If user clicks "No"
-          //       //frappe.msgprint('You clicked No!');
-          //       // Cancel the action here or do nothing
-          //     }
-          //   );
           {
             let task_field_properties = {
               fieldtype: "Link",
@@ -597,7 +558,7 @@ function openStopProjectDialog(timesheet_record, percent_billable, project, task
             dialog.show();
           }
         } else {
-          frappe.msgprint(__("No response from server. Please try again."));
+          frappe.show_alert(__("No response from server. Please try again."));
         }
       },
     });
@@ -691,13 +652,59 @@ function openStopProjectDialog(timesheet_record, percent_billable, project, task
             let labels = card.labels;
             let values = card.values;
   
-            // Create the custom HTML for each card/widget
+            let gradientStyle = "";
+            let tooltip = "";
+
+            if (
+              widgetTitle === "Total Hours Worked Today" ||
+              widgetTitle === "Total Hours Worked This Week" ||
+              widgetTitle === "Total Hours Worked This Month"
+            ) {
+              let workingData =
+                widgetTitle === "Total Hours Worked Today"
+                  ? today_working
+                  : widgetTitle === "Total Hours Worked This Week"
+                  ? weekly_working
+                  : monthly_working;
+
+              const greenPercent = workingData.green || 0;
+              const amberPercent = workingData.amber || 0;
+              const redPercent = workingData.red || 0;
+
+              const amberStop = greenPercent + amberPercent;
+              const redStop = amberStop + redPercent;
+
+                // ✅ If no records, make background white
+                if (greenPercent === 0 && amberPercent === 0 && redPercent === 0) {
+                  gradientStyle = `
+                    background: white;
+                    background-size: 100% 6px;
+                    background-repeat: no-repeat;
+                    background-position: bottom;
+                    padding-bottom: 16px;
+                  `;
+                } else {
+                  gradientStyle = `
+                    background: linear-gradient(to right,
+                      green 0%, green ${greenPercent}%,
+                      orange ${greenPercent}%, orange ${amberStop}%,
+                      red ${amberStop}%, red 100%);
+                    background-size: 100% 6px;
+                    background-repeat: no-repeat;
+                    background-position: bottom;
+                    padding-bottom: 16px;
+                  `;
+                }
+
+              tooltip = `Green: ${greenPercent}% | Amber: ${amberPercent}% | Red: ${redPercent}%`;
+            }
+
             let customWidgetHTML = `
               <div class="widget number-widget-box" style="width: 250px; padding: 12px; border-radius: 8px; border: 1px solid #ddd; background: white;">
                 <div class="widget-head" style="display: flex; justify-content: space-between; align-items: center; font-size: 12px; font-weight: 600; color: #666;">
                   <span>${widgetTitle}</span>
                 </div>
-                <div class="widget-body">
+                <div class="widget-body" style="${gradientStyle}" title="${tooltip}">
                   <div class="widget-content" style="padding-top:0px !important">
                     <div style="display: flex; justify-content: space-between; font-size: 12px; font-weight: 600; color: #444; margin-top: 8px;">
                       <span>${labels[0]}</span>
@@ -711,6 +718,7 @@ function openStopProjectDialog(timesheet_record, percent_billable, project, task
                 </div>
               </div>
             `;
+
   
             // Append the custom widget HTML to the widget group body
             widgetGroupBody.append(customWidgetHTML);
@@ -722,11 +730,7 @@ function openStopProjectDialog(timesheet_record, percent_billable, project, task
       },
     });
   }
-  
-  
-  
 
-  
   // Function to render DataTable with tabs
 function renderDataTable(wrapper, projectData) {
  // Ensure wrapper is defined
@@ -752,6 +756,12 @@ function renderDataTable(wrapper, projectData) {
               <!-- 'All Projects' tab is inactive by default -->
               <a class="nav-link" id="DAP-all-project-tab" role="tab" aria-controls="all-projects" aria-selected="false">
                   All Projects
+              </a>
+            </li>
+            <li class="nav-item show">
+              <!-- 'MY Calender' tab is inactive by default -->
+              <a class="nav-link" id="my-calender" role="tab" aria-controls="my-calender" aria-selected="false">
+                  My Calender
               </a>
             </li>
             <li class="nav-item show">
@@ -809,6 +819,7 @@ function renderDataTable(wrapper, projectData) {
     // Get references to the tabs
     const your_projectsTab = document.getElementById("DAP-your-project-tab");
     const all_projectsTab = document.getElementById("DAP-all-project-tab");
+    const my_calenderTab = document.getElementById("my-calender");
     const team_calenderTab = document.getElementById("team-calender");
 
 
@@ -818,6 +829,7 @@ function renderDataTable(wrapper, projectData) {
       all_projectsTab.classList.remove("active");
       your_projectsTab.classList.add("active");
       team_calenderTab.classList.remove("active");
+      my_calenderTab.classList.remove("active");
 
 
       // Set visual feedback for selection
@@ -827,13 +839,24 @@ function renderDataTable(wrapper, projectData) {
     // Show content for the Your Projects tab
       show_tab("Your Projects", projectData);
     });
+    // Event listener for the my calender tab
+    my_calenderTab.addEventListener("click", () => {
+        // Remove 'active' class from Your Projects tab and set to All Projects
+        your_projectsTab.classList.remove("active");
+        my_calenderTab.classList.add("active");
+        team_calenderTab.classList.remove("active");
+        all_projectsTab.classList.remove("active");
+        // Show content for the my Calender tab
+      show_tab("My Calender", projectData);
+    });
     // Event listener for the team calender tab
     team_calenderTab.addEventListener("click", () => {
         // Remove 'active' class from Your Projects tab and set to All Projects
         your_projectsTab.classList.remove("active");
         team_calenderTab.classList.add("active");
+        my_calenderTab.classList.remove("active");
         all_projectsTab.classList.remove("active");
-        // Show content for the Your Projects tab
+        // Show content for the Team Calender tab
       show_tab("Team Calender", projectData);
     });
 
@@ -842,7 +865,9 @@ function renderDataTable(wrapper, projectData) {
         // Remove 'active' class from Your Projects tab and set to All Projects
         your_projectsTab.classList.remove("active");
         all_projectsTab.classList.add("active");
+        my_calenderTab.classList.remove("active");
         team_calenderTab.classList.remove("active");
+
 
 
         // Set visual feedback for selection
@@ -866,29 +891,37 @@ function show_tab(tab, projectData) {
     datatableWrapper.innerHTML = ""; // Clear previous DataTable content
 
     if (tab === "Your Projects") {
-    // Logic to hide the specific column when "Your Projects" tab is active
-  
+      // style inject (sirf table aur cards ke liye zaroori CSS)
       let style = document.createElement("style");
-        style.innerHTML = `
-          /* Hide the "Name" column cells and header */
-          .dt-cell__content--col-14, 
-          .dt-cell__content--header-14 { 
-            display: none; 
-            width: 0; 
-          }
-          .dt-cell__content--col-6, .dt-cell__content--header-6 { display: table-cell; }
-          .dt-cell__content--col-9, .dt-cell__content--header-9 { display: table-cell;}
-          .dt-cell__content--col-3, .dt-cell__content--header-3 { display: table-cell; }
-        `;
+      style.innerHTML = `
+        .dt-cell__content--col-14, .dt-cell__content--header-14 { display: none; width: 0; }
+        .dt-cell__content--col-6, .dt-cell__content--header-6 { display: table-cell; }
+        .dt-cell__content--col-9, .dt-cell__content--header-9 { display: table-cell;}
+        .dt-cell__content--col-3, .dt-cell__content--header-3 { display: table-cell; }
+      `;
       document.head.appendChild(style);
 
-      // Render the cards for Your Projects
-      card_names = ["Your Total Projects", "Total Hrs Worked Today", "Total Hrs Worked This Week", "Total Hrs Worked This Month"];
-      render_cards(cardWrapper, card_names); // Call the render_cards function here
+      // Render cards
+      card_names = [
+        "Your Total Projects", 
+        "Total Hrs Worked Today", 
+        "Total Hrs Worked This Week", 
+        "Total Hrs Worked This Month"
+      ];
+      render_cards(cardWrapper, card_names);
 
-      // Render the DataTable for Your Projects
-      renderProjectDataTable(datatableWrapper, projectData); // Render the actual DataTable
-    } 
+      // LEFT: Projects table container
+      const tableDiv = document.createElement("div");
+      tableDiv.id = "datatable-inner";
+      tableDiv.style.flex = "2"; 
+
+      datatableWrapper.appendChild(tableDiv);
+
+      // Render projects table
+      renderProjectDataTable(tableDiv, projectData);
+
+    }
+
     else if (tab === "All Projects") {
       let style = document.createElement("style");
       style.innerHTML = `
@@ -921,6 +954,105 @@ function show_tab(tab, projectData) {
           freeze: true,  // Optional: Add a freeze effect to indicate loading
           freeze_message: "Loading projects...",  // Custom loading message
         });
+    }
+    else if (tab === "My Calender") {
+      // style inject (calendar styles)
+      let style = document.createElement("style");
+      style.innerHTML = `
+        table.timezone-table { 
+          border-collapse: collapse; 
+          width: 100%; 
+          text-align: center; 
+          font-size: 12px; 
+        }
+        table.timezone-table th, 
+        table.timezone-table td { 
+          border: 1px solid #999; 
+          padding: 6px 4px 14px 4px;  
+          position: relative; 
+          vertical-align: top;       
+          height: 40px;
+        }
+        table.timezone-table th { background: #ddd; }
+
+        table.timezone-table td::after {
+          content: "";
+          position: absolute;
+          left: 0;
+          right: 0;
+          top: 50%;               
+          border-top: 1px dotted #aaa; 
+          z-index: 0; 
+        }
+
+        table.timezone-table td span {
+          position: relative;
+          z-index: 1; 
+          background: #f9f9f9;
+          padding: 2px 4px;
+        }
+
+        /* Timesheet record box */
+        .timesheet-box {
+          // background: rgba(0, 123, 255, 0.2);
+          // border: 1px solid #007bff;
+          border-radius: 4px;
+          font-size: 11px;
+          padding: 4px;
+          text-align: center;
+          position: absolute;
+          left: 10px;
+          right: 10px;
+          overflow: hidden;
+        }
+
+        /* parent container for calendar + records */
+        .calendar-wrapper {
+          flex-direction: row;
+          border: 1px solid #ccc;
+          border-radius: 8px;
+          overflow: hidden;
+          background: #f9f9f9;
+        }
+        .calendar-left {
+          flex: 1;
+          border-right: 1px solid #ccc;
+          // padding: 10px;
+        }
+        .calendar-right {
+          flex: 1;
+          padding: 10px;
+          background: #fff;
+          position: relative;
+        }
+        .calendar-right::before {
+          content: "";
+          position: absolute;
+          top: 0;
+          left: 0;
+          right: 0;
+          bottom: 0;
+          background: repeating-linear-gradient(
+            to bottom,
+            transparent,
+            transparent 39px,
+            #ddd 40px
+          );
+          pointer-events: none;
+        }
+      `;
+      document.head.appendChild(style);
+
+      // Container for calendar
+      const calendarWrapper = document.createElement("div");
+      calendarWrapper.className = "calendar-wrapper";
+      calendarWrapper.style.flex = "1"; 
+      calendarWrapper.style.width = "440px";
+
+      datatableWrapper.appendChild(calendarWrapper);
+
+      // Render calendar view
+      renderTimesheetCalendar(calendarWrapper);
     }
     else if (tab === "Team Calender") {
         cardWrapper.innerHTML = "";
@@ -1024,7 +1156,7 @@ function show_tab(tab, projectData) {
                               eventLimit: false,
                               events: allEvents,
                               eventClick: function (calEvent) {
-                                frappe.msgprint(calEvent.title);
+                                frappe.show_alert(calEvent.title);
                               },
                               eventRender: function(event, element) {
                                 element.find('.fc-title').html(event.title);
@@ -1068,8 +1200,157 @@ function show_tab(tab, projectData) {
         });
     }
 
-
 }
+function renderTimesheetCalendar(container) {
+  const rowHeight = 40;
+
+  // 🔹 Date picker container
+  const dateWrapper = document.createElement("div");
+  dateWrapper.className = "mb-2";
+
+  const dateInput = document.createElement("input");
+  dateInput.type = "date";
+  dateInput.value = new Date().toISOString().split("T")[0]; // default today
+  dateInput.className = "border px-2 py-1 rounded";
+
+  dateWrapper.appendChild(dateInput);
+
+    // Day name span
+    const dayName = document.createElement("span");
+    dayName.className = "font-bold";
+    dayName.style.fontSize = "14px";
+    dayName.style.marginLeft = "150px";
+    dayName.style.verticalAlign = "middle";
+    dateWrapper.appendChild(dayName);
+
+    container.innerHTML = "";
+    container.appendChild(dateWrapper);
+
+    // Function to show day name
+    function updateDayName(selectedDate) {
+      const dateObj = new Date(selectedDate);
+      const options = { weekday: 'long' };
+      const day = dateObj.toLocaleDateString('en-US', options);
+      dayName.innerText = day;
+    }
+
+
+  // 🔹 function to load calendar for a given date
+  function loadCalendar(selectedDate) {
+    frappe.call({
+      method: "phamos.phamos.page.project_action_panel.project_action_panel.get_timesheet_records_by_date",
+      args: { selected_date: selectedDate },
+      callback: function(r) {
+        if (r.message) {
+          const userTZ = r.message.user_timezone || "User";
+
+          const tbl = document.createElement("table");
+          tbl.className = "timezone-table";
+
+          // Header
+          const thead = document.createElement("thead");
+          const headRow = document.createElement("tr");
+          headRow.innerHTML = `<th>${userTZ}</th><th>Germany</th>`;
+          thead.appendChild(headRow);
+          tbl.appendChild(thead);
+
+          // Body (slots)
+          const tbody = document.createElement("tbody");
+          r.message.slots.forEach(slot => {
+            const tr = document.createElement("tr");
+            tr.innerHTML = `<td>${slot.user}</td><td>${slot.germany}</td>`;
+            tbody.appendChild(tr);
+          });
+          tbl.appendChild(tbody);
+
+          // Left side table
+          const tableDiv = document.createElement("div");
+          tableDiv.className = "calendar-left";
+          tableDiv.appendChild(tbl);
+
+          // Right side (records)
+          const calendarRight = document.createElement("div");
+          calendarRight.className = "calendar-right relative flex-1 border";
+          calendarRight.style.height = r.message.slots.length * rowHeight + "px";
+
+          r.message.records.forEach(rec => {
+            const from_user = rec.from_time_user;
+            const to_user   = rec.to_time_user;
+
+            const [fh, fm] = from_user.split(":").map(Number);
+            const [th, tm] = to_user.split(":").map(Number);
+
+            const startMins = (fh * 60 + fm) - (8 * 60);
+            const endMins   = (th * 60 + tm) - (8 * 60);
+            const offset = 78;
+            const top = (startMins / 60) * rowHeight + offset;
+            const height = ((endMins - startMins) / 60) * rowHeight;
+
+            const box = document.createElement("div");
+            box.className = "timesheet-box absolute left-2 right-2 border rounded p-1 text-xs";
+            box.innerText = `${rec.project || "Work"} (${from_user.substring(0,5)} - ${to_user.substring(0,5)})`;
+
+            box.style.top = top + "px";
+            box.style.height = height + "px";
+
+            // ===== Background logic =====
+            if (rec.creation && rec.to_time) {
+              const creationDate = new Date(rec.creation.replace(" ", "T"));
+              const toDate       = new Date(rec.to_time.replace(" ", "T"));
+
+              if (!isNaN(creationDate) && !isNaN(toDate)) {
+                const creationDay = creationDate.toISOString().split("T")[0];
+                const toDay       = toDate.toISOString().split("T")[0];
+
+                if (creationDay !== toDay) {
+                  box.style.backgroundColor = "rgba(255, 0, 0, 0.3)";   // red
+                  box.style.borderColor = "red";
+                } else {
+                  const diffHours = (creationDate - toDate) / (1000 * 60 * 60);
+                  if (diffHours < 1) {
+                    box.style.backgroundColor = "rgba(0, 128, 0, 0.3)"; // green
+                    box.style.borderColor = "green";
+                  } else {
+                    box.style.backgroundColor = "rgba(255, 165, 0, 0.3)"; // amber
+                    box.style.borderColor = "orange";
+                  }
+                }
+              }
+            }
+
+            calendarRight.appendChild(box);
+          });
+
+          // Final wrapper
+          const calendarWrapper = document.createElement("div");
+          calendarWrapper.className = "calendar-wrapper flex gap-4";
+          calendarWrapper.appendChild(tableDiv);
+          calendarWrapper.appendChild(calendarRight);
+
+          // Replace old content
+          const oldCalendar = container.querySelector(".calendar-wrapper");
+          if (oldCalendar) oldCalendar.remove();
+          container.appendChild(calendarWrapper);
+        }
+      }
+    });
+  }
+
+  // 🔹 Load first time with today's date
+  loadCalendar(dateInput.value);
+  updateDayName(dateInput.value);
+
+
+  // 🔹 Reload on date change
+  dateInput.addEventListener("change", function() {
+    loadCalendar(this.value);
+    updateDayName(this.value);
+
+  });
+}
+
+
+
 
 
 // Function to render DataTable
@@ -1286,7 +1567,7 @@ window.togglePausePlay = function(taskId, timesheetName) {
                   if (r.message && r.message.status === "success") {
                       show_break_task_dialog(r.message.new_row_name, r.message.previous_from_time, r.message.previous_to_time, );
                   } else {
-                      frappe.msgprint("Error: " + (r.message.message || "Something went wrong."));
+                      frappe.show_alert("Error: " + (r.message.message || "Something went wrong."));
                   }
               }
           });
@@ -1298,9 +1579,9 @@ window.togglePausePlay = function(taskId, timesheetName) {
               args: { name: timesheetName },
               callback: function(r) {
                   if (r.message && r.message.status === "success") {
-                      frappe.msgprint("Break Time noted");
+                      frappe.show_alert("Break Time noted");
                   } else {
-                      frappe.msgprint("Error: " + (r.message.message || "Something went wrong."));
+                      frappe.show_alert("Error: " + (r.message.message || "Something went wrong."));
                   }
               }
           });
@@ -1321,9 +1602,9 @@ window.togglePausePlay = function(taskId, timesheetName) {
       },
       callback: function(r) {
         if (r.message && r.message.status === "success") {
-          frappe.msgprint("First Task paused. Time updated successfully.");
+          frappe.show_alert("First Task paused. Time updated successfully.");
         } else {
-          frappe.msgprint("Error: " + (r.message.message || "Something went wrong."));
+          frappe.show_alert("Error: " + (r.message.message || "Something went wrong."));
         }
       }
     });
@@ -1360,11 +1641,6 @@ frappe.after_ajax(() => {
     });
   });
 });
-
-
-
-
-
 };
 
 function show_break_task_dialog(new_row_name, previous_from_time, previous_to_time) {
@@ -1477,9 +1753,9 @@ function show_break_task_dialog(new_row_name, previous_from_time, previous_to_ti
                 },
                 callback: function(r) {
                     if (r.message && r.message.status === "success") {
-                        frappe.msgprint(__("Timesheet Record {0} created and submitted", [r.message.name]));
+                        frappe.show_alert(__("Timesheet Record {0} created and submitted", [r.message.name]));
                     } else {
-                        frappe.msgprint(__("Error: {0}", [r.message.message]));
+                        frappe.show_alert(__("Error: {0}", [r.message.message]));
                     }
                 }
             });

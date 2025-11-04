@@ -1,9 +1,12 @@
 import frappe
+import frappe
+import pytz
+from frappe.utils import get_datetime
 from frappe import _
 from frappe.model.document import Document
 from frappe.utils import cstr, now_datetime, time_diff_in_seconds, get_datetime,time_diff,today
 from frappe.utils.data import add_to_date,format_duration, time_diff_in_seconds
-from datetime import datetime
+import datetime
 from datetime import datetime, timedelta
 from collections import defaultdict
 from frappe.utils import strip_html
@@ -157,18 +160,13 @@ def is_task_running(name):
 def get_employee_leaves():
     today = getdate(nowdate())
 
-    # current month first & last day
-    current_start = get_first_day(today)
-    current_end = get_last_day(today)
+    # Get first and last day of the current year
+    year_start = get_first_day(today.replace(month=1, day=1))
+    year_end = get_last_day(today.replace(month=12, day=31))
 
-    # previous month  first day
-    prev_month_start = get_first_day(add_months(today, -1))
-    # next month last day
-    next_month_end = get_last_day(add_months(today, 1))
-
-    # final range
-    start = prev_month_start
-    end = next_month_end
+    # final range (whole year)
+    start = year_start
+    end = year_end
 
     leaves = frappe.get_all(
         "Leave Application",
@@ -242,23 +240,77 @@ def get_employee_leaves():
     return events
 
 
+@frappe.whitelist()
+def get_timesheet_records_by_date(selected_date=None):
+    user = frappe.session.user
+
+    user_tz = frappe.db.get_value("User", user, "time_zone") \
+        or frappe.utils.get_system_settings("time_zone") \
+        or "Asia/Karachi"
+
+    germany_tz = "Europe/Berlin"
+    user_zone = pytz.timezone(user_tz)
+    germany_zone = pytz.timezone(germany_tz)
+
+    # 🔹 if not selected date then get today date
+    if not selected_date:
+        selected_date = frappe.utils.now_datetime().date()
+    else:
+        selected_date = datetime.strptime(selected_date, "%Y-%m-%d").date()
+
+    # Records fetch
+    records = frappe.db.sql("""
+        SELECT 
+            td.name, td.from_time, td.to_time, td.hours, td.task, td.project, t.creation
+        FROM `tabTimesheet Detail` td
+        INNER JOIN `tabTimesheet` t ON td.parent = t.name
+        WHERE t.employee = (
+            SELECT employee FROM `tabEmployee` WHERE user_id = %s LIMIT 1
+        )
+    """, (user,), as_dict=True)
+
+    date_records = []
+    for rec in records:
+        from_dt = germany_zone.localize(get_datetime(rec["from_time"]))
+        to_dt   = germany_zone.localize(get_datetime(rec["to_time"]))
+
+        rec["from_time_user"] = from_dt.astimezone(user_zone).strftime("%H:%M")
+        rec["to_time_user"]   = to_dt.astimezone(user_zone).strftime("%H:%M")
+
+        rec["from_time_germany"] = from_dt.strftime("%H:%M")
+        rec["to_time_germany"]   = to_dt.strftime("%H:%M")
+
+        # ✅ Filter records for selected date
+        if (from_dt.astimezone(user_zone).date() == selected_date
+            or from_dt.date() == selected_date):
+            date_records.append(rec)
+
+    # Slots (07:00–22:00) in user timezone
+    slots = []
+    for h in range(7, 22):
+        dt_user = user_zone.localize(get_datetime(f"{selected_date} {h:02d}:00:00"))
+        dt_germ = dt_user.astimezone(germany_zone)
+
+        slots.append({
+            "user": dt_user.strftime("%H:%M"),
+            "germany": dt_germ.strftime("%H:%M")
+        })
+
+    return {
+        "user_timezone": user_tz,
+        "records": date_records,
+        "slots": slots
+    }
+
+
 
 @frappe.whitelist()
 def get_team_holidays():
     today = getdate(nowdate())
 
-    # current month first & last day
-    current_start = get_first_day(today)
-    current_end = get_last_day(today)
-
-    # previous month first day
-    prev_month_start = get_first_day(add_months(today, -1))
-    # next month last day
-    next_month_end = get_last_day(add_months(today, 1))
-
-    # final range set
-    from_date = prev_month_start
-    to_date = next_month_end
+    # ✅ Get first and last day of the current year
+    from_date = get_first_day(today.replace(month=1, day=1))
+    to_date = get_last_day(today.replace(month=12, day=31))
 
     grouped = defaultdict(list)
 
@@ -292,6 +344,7 @@ def get_team_holidays():
         })
 
     return events
+
 
 
 @frappe.whitelist()
@@ -412,7 +465,7 @@ def update_and_submit_timesheet_record(name, to_time, percent_billable, activity
             new_doc.insert(ignore_permissions=True)
             new_doc.submit()
 
-        return "Timesheet Record updated, and alternative records created"
+        return {"timesheet_name": doc.name}
 
     except Exception as e:
         frappe.log_error(frappe.get_traceback(), "Timesheet Record Update and Submit Error")
@@ -655,8 +708,13 @@ def get_project_count_all():
 
 @frappe.whitelist()
 def total_hours_worked_today():
+    from datetime import datetime
+
+    # --- Get employee ---
     employee_name = frappe.db.get_value("Employee", {"user_id": frappe.session.user}, "name")
-    today_date = datetime.today().date()  # Get today's date
+    today_date = datetime.today().date()
+
+    # --- Total actual & billable time (for value display) ---
     TimesheetRecord = DocType("Timesheet Record")
     count_time = (
         frappe.qb.from_(TimesheetRecord)
@@ -666,43 +724,68 @@ def total_hours_worked_today():
         )
         .where(
             (TimesheetRecord.employee == employee_name)
-            & (fn.Date(TimesheetRecord.from_time) == today_date)
+            & (fn.Date(TimesheetRecord.creation) == today_date)
             & (TimesheetRecord.docstatus != 2)
         )
         .run(as_dict=True)
     )
 
-    if count_time and count_time[0].actual_time:
-        # Format actual time
-        actual_time = format_duration(count_time[0].actual_time)
-        actual_time_str = str(actual_time)[:9]
+    # --- Color counts from timesheet_record_color field ---
+    records = frappe.get_all(
+        "Timesheet Record",
+        filters={
+            "employee": employee_name,
+            "docstatus": ["!=", 2],
+            "creation": ["between", [
+                datetime.combine(today_date, datetime.min.time()),
+                datetime.combine(today_date, datetime.max.time())
+            ]]
+        },
+        fields=["timesheet_record_color"]
+    )
 
-        # Format billable time if it exists
-        total_billable_time = count_time[0].total_billable_time
-        total_billable_time_str = 0
-        if total_billable_time:
-            total_billable_time = format_duration(total_billable_time)
-            total_billable_time_str = str(total_billable_time)[:10]
-        
+    green = amber = red = 0
+    for rec in records:
+        if rec.timesheet_record_color == "Green":
+            green += 1
+        elif rec.timesheet_record_color == "Amber":
+            amber += 1
+        elif rec.timesheet_record_color == "Red":
+            red += 1
+
+    total = green + amber + red
+
+    green_pct = round((green / total) * 100, 2) if total else 0
+    amber_pct = round((amber / total) * 100, 2) if total else 0
+    red_pct = round((red / total) * 100, 2) if total else 0
+
+    # --- Format actual + billable time ---
+    if count_time and count_time[0].actual_time:
+        actual_time_str = str(format_duration(count_time[0].actual_time))[:9]
+        total_billable_time = count_time[0].total_billable_time or 0
+        total_billable_time_str = (
+            str(format_duration(total_billable_time))[:10] if total_billable_time else 0
+        )
+
         return {
             "value": actual_time_str,
             "fieldtype": "Float",
-            "billable": total_billable_time_str
+            "billable": total_billable_time_str,
+            "green": green_pct,
+            "amber": amber_pct,
+            "red": red_pct
         }
-    else:
-        # If no time was worked, return zero
-        return {
-            "value": 0,
-            "fieldtype": "Float",
-            "billable": 0
-        }
+
+    return {"value": 0, "fieldtype": "Float", "billable": 0, "green": 0, "amber": 0, "red": 0}
+
+
 
 @frappe.whitelist()
 def total_hours_worked_in_this_week():
     employee_name = frappe.db.get_value("Employee", {"user_id": frappe.session.user}, "name")
-    today_date = datetime.today().date()  # Get today's date
-    start_of_week = today_date - timedelta(days=today_date.weekday())  # Calculate the start of the current week
-    end_of_week = start_of_week + timedelta(days=6)  # Calculate the end of the current week
+    today_date = datetime.today().date()
+    start_of_week = today_date - timedelta(days=today_date.weekday())
+    end_of_week = start_of_week + timedelta(days=6)
 
     TimesheetRecord = DocType("Timesheet Record")
     count_time = (
@@ -713,47 +796,67 @@ def total_hours_worked_in_this_week():
         )
         .where(
             (TimesheetRecord.employee == employee_name)
-            & (TimesheetRecord.from_time.between(start_of_week, end_of_week))
+            & (fn.Date(TimesheetRecord.creation).between(start_of_week, end_of_week))
             & (TimesheetRecord.docstatus != 2)
         )
         .run(as_dict=True)
     )
 
-    if count_time and count_time[0].total_actual_time:
-        total_actual_time = format_duration(count_time[0].total_actual_time)
-        total_actual_time_str = str(total_actual_time)[:10]
+    # --- Color counts from timesheet_record_color field ---
+    records = frappe.get_all(
+        "Timesheet Record",
+        filters={
+            "employee": employee_name,
+            "docstatus": ["!=", 2],
+            "creation": ["between", [
+                datetime.combine(start_of_week, datetime.min.time()),
+                datetime.combine(end_of_week, datetime.max.time())
+            ]]
+        },
+        fields=["timesheet_record_color"]
+    )
 
-        # Format billable time
-        total_billable_time = count_time[0].total_billable_time
-        total_billable_time_str = 0
-        if total_billable_time:
-            total_billable_time = format_duration(total_billable_time)
-            total_billable_time_str = str(total_billable_time)[:10]
-        
+    green = amber = red = 0
+    for rec in records:
+        if rec.timesheet_record_color == "Green":
+            green += 1
+        elif rec.timesheet_record_color == "Amber":
+            amber += 1
+        elif rec.timesheet_record_color == "Red":
+            red += 1
+
+    total = green + amber + red
+    green_pct = round((green / total) * 100, 2) if total else 0
+    amber_pct = round((amber / total) * 100, 2) if total else 0
+    red_pct = round((red / total) * 100, 2) if total else 0
+
+    if count_time and count_time[0].total_actual_time:
+        total_actual_time_str = str(format_duration(count_time[0].total_actual_time))[:10]
+        total_billable_time = count_time[0].total_billable_time or 0
+        total_billable_time_str = str(format_duration(total_billable_time))[:10] if total_billable_time else 0
         return {
             "value": total_actual_time_str,
             "fieldtype": "Float",
-            "billable": total_billable_time_str
+            "billable": total_billable_time_str,
+            "green": green_pct,
+            "amber": amber_pct,
+            "red": red_pct
         }
-    else:
-        return {
-            "value": 0,
-            "fieldtype": "Float",
-            "billable": 0
-        }
+    return {"value": 0, "fieldtype": "Float", "billable": 0, "green": 0, "amber": 0, "red": 0}
+
 
 @frappe.whitelist()
 def total_hours_worked_in_this_month():
     employee_name = frappe.db.get_value("Employee", {"user_id": frappe.session.user}, "name")
-    today_date = datetime.today().date()  # Get today's date
+    today_date = datetime.today().date()
 
-    start_of_month = today_date.replace(day=1)  # Calculate the start of the current month
-    
-    if start_of_month.month == 12: 
+    # Start & end of current month
+    start_of_month = today_date.replace(day=1)
+    if start_of_month.month == 12:
         next_month = start_of_month.replace(year=start_of_month.year + 1, month=1)
-    else:    
-        next_month = start_of_month.replace(month=start_of_month.month + 1)  # Calculate the start of the next month
-    end_of_month = next_month - timedelta(days=1)  # Calculate the end of the current month
+    else:
+        next_month = start_of_month.replace(month=start_of_month.month + 1)
+    end_of_month = next_month - timedelta(days=1)
 
     TimesheetRecord = DocType("Timesheet Record")
     count_time = (
@@ -764,35 +867,55 @@ def total_hours_worked_in_this_month():
         )
         .where(
             (TimesheetRecord.employee == employee_name)
-            & (TimesheetRecord.from_time.between(start_of_month, end_of_month))
+            & (fn.Date(TimesheetRecord.creation).between(start_of_month, end_of_month))
             & (TimesheetRecord.docstatus != 2)
-
         )
         .run(as_dict=True)
     )
 
-    if count_time and count_time[0].total_actual_time:
-        total_actual_time = format_duration(count_time[0].total_actual_time)
-        total_actual_time_str = str(total_actual_time)[:10]
+    # --- Color counts from timesheet_record_color field ---
+    records = frappe.get_all(
+        "Timesheet Record",
+        filters={
+            "employee": employee_name,
+            "docstatus": ["!=", 2],
+            "creation": ["between", [
+                datetime.combine(start_of_month, datetime.min.time()),
+                datetime.combine(end_of_month, datetime.max.time())
+            ]]
+        },
+        fields=["timesheet_record_color"]
+    )
 
-        # Format billable time
-        total_billable_time = count_time[0].total_billable_time
-        total_billable_time_str = 0
-        if total_billable_time:
-            total_billable_time = format_duration(total_billable_time)
-            total_billable_time_str = str(total_billable_time)[:10]
-        
+    green = amber = red = 0
+    for rec in records:
+        if rec.timesheet_record_color == "Green":
+            green += 1
+        elif rec.timesheet_record_color == "Amber":
+            amber += 1
+        elif rec.timesheet_record_color == "Red":
+            red += 1
+
+    total = green + amber + red
+    green_pct = round((green / total) * 100, 2) if total else 0
+    amber_pct = round((amber / total) * 100, 2) if total else 0
+    red_pct = round((red / total) * 100, 2) if total else 0
+
+    if count_time and count_time[0].total_actual_time:
+        total_actual_time_str = str(format_duration(count_time[0].total_actual_time))[:10]
+        total_billable_time = count_time[0].total_billable_time or 0
+        total_billable_time_str = str(format_duration(total_billable_time))[:10] if total_billable_time else 0
+
         return {
             "value": total_actual_time_str,
             "fieldtype": "Float",
-            "billable": total_billable_time_str
+            "billable": total_billable_time_str,
+            "green": green_pct,
+            "amber": amber_pct,
+            "red": red_pct
         }
-    else:
-        return {
-            "value": 0,
-            "fieldtype": "Float",
-            "billable": 0
-        }
+    return {"value": 0, "fieldtype": "Float", "billable": 0, "green": 0, "amber": 0, "red": 0}
+
 
 def format_duration(duration_in_seconds):
     total_minutes = int(duration_in_seconds) // 60

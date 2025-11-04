@@ -22,6 +22,13 @@ frappe.pages['implementation-dashb'].on_page_load = function (wrapper) {
     function create_filter(label, fieldtype, fieldname, parentSelector, options = null, link_to = null) {
         const df = { label, fieldname, fieldtype, options };
         if (link_to) df.options = link_to;
+
+        if (fieldtype === "MultiSelectList" && link_to) {
+            df.get_data = function(txt) {
+                return frappe.db.get_link_options(link_to, txt);
+            };
+        }
+
         const control = frappe.ui.form.make_control({
             parent: $('<div class="col mb-2"></div>').appendTo(parentSelector),
             df: df,
@@ -35,7 +42,7 @@ frappe.pages['implementation-dashb'].on_page_load = function (wrapper) {
     filters.from_date = create_filter('From Date', 'Date', 'from_date', '#filter-section');
     filters.to_date = create_filter('To Date', 'Date', 'to_date', '#filter-section');
     filters.team = create_filter('Team', 'Link', 'team', '#filter-section', null, 'Team');
-    filters.implementation = create_filter('Implementation', 'Link', 'implementation', '#filter-section', null, 'Implementation');
+    filters.implementation = create_filter('Implementation', 'MultiSelectList', 'implementation', '#filter-section', null, 'Implementation');
     // Clear Filters Button Handler
     $('#clear-filters-btn').on('click', () => {
         Object.values(filters).forEach(ctrl => {
@@ -64,7 +71,7 @@ frappe.pages['implementation-dashb'].on_page_load = function (wrapper) {
             from_date: filters.from_date.get_value(),
             to_date: filters.to_date.get_value(),
             team: filters.team.get_value(),
-            implementation: filters.implementation.get_value()
+            implementation: filters.implementation.get_value() ? filters.implementation.get_value().join(',') : ''
         };
 
         frappe.call({
@@ -78,10 +85,13 @@ frappe.pages['implementation-dashb'].on_page_load = function (wrapper) {
 
                 const planningData = r.message.planning || [];
                 const predictionData = r.message.prediction || [];
+                const addonData = r.message.addon || [];
+
 
                 const categorySet = new Set();
                 planningData.forEach(row => categorySet.add(row.month_and_year));
                 predictionData.forEach(row => categorySet.add(row.month_and_year));
+                addonData.forEach(row => categorySet.add(row.month_and_year));
 
                 const categories = Array.from(categorySet).sort();
                 const categoryIndexMap = {};
@@ -103,9 +113,6 @@ frappe.pages['implementation-dashb'].on_page_load = function (wrapper) {
                 planningData.forEach(row => {
                     let impl = row.implementation_name || 'Unknown';
 
-                    if (filters.implementation.get_value()) {
-                        impl = filters.implementation.get_value();
-                    }
                     if (!groupedData[impl]) {
                         groupedData[impl] = {
                             billable: new Array(categories.length).fill(0),
@@ -148,43 +155,51 @@ frappe.pages['implementation-dashb'].on_page_load = function (wrapper) {
                 });
                 const isFiltered = filters.implementation.get_value() || filters.team.get_value();
 
+                const addonSeries = categories.map(month => {
+                    const found = addonData.find(row => row.month_and_year === month);
+                    return found ? found.total_hours : 0;
+                });
+
+                if (!filters.implementation.get_value() || filters.implementation.get_value().length === 0) {
+                    series.push({
+                        name: "Internal project hrs",
+                        type: "line",
+                        data: addonSeries,
+                        color: "orange",
+                        dashStyle: "ShortDot",
+                        marker: { enabled: true, radius: 4 },
+                        tooltip: {
+                            pointFormat: '<span style="color:{point.color}">\u25CF</span> Internal Hrs: <b>{point.y}</b><br/>'
+                        },
+                        events: {
+                            click: function (e) {
+                                frappe.msgprint({
+                                    title: "Internal project hrs",
+                                    message: `Month: <b>${e.point.category}</b><br>Total Hours: <b>${e.point.y}</b>`,
+                                    indicator: "orange"
+                                });
+                            }
+                        }
+                    });
+                }
+
+
     if (isFiltered) {
-        // 1. Individual Prediction Dots (scatter)
-        const predictionDots = predictionData.map(row => ({
-            x: categoryIndexMap[row.month_and_year],
-            y: row.prediction || 0
-        }));
 
-        series.push({
-            name: 'Prediction',
-            type: 'scatter',
-            data: predictionDots,
-            color: '#ff0000',
-            marker: {
-                symbol: 'circle',
-                radius: 4
-            },
-            tooltip: {
-                pointFormat: '<span style="color:{point.color}">\u25CF</span> Prediction: <b>{point.y}</b><br/>'
-            }
-        });
-
-        // 2. Average Prediction Line (filtered)
-        const averagePredictions = categories.map(month => {
+        const sumPredictions = categories.map(month => {
             const filtered = predictionData.filter(row => row.month_and_year === month);
-            const total = filtered.reduce((sum, r) => sum + (r.prediction || 0), 0);
-            return filtered.length ? total / filtered.length : null;
+            return filtered.reduce((sum, r) => sum + (r.prediction || 0), 0);
         });
 
         series.push({
-            name: 'Average Prediction',
+            name: 'Prediction (Sum)',
             type: 'line',
-            data: averagePredictions,
+            data: sumPredictions,
             color: '#000000',
             dashStyle: 'Dot',
             marker: { enabled: true, radius: 3 },
             tooltip: {
-                pointFormat: '<span style="color:{point.color}">\u25CF</span> Avg Prediction: <b>{point.y:.2f}</b><br/>'
+                pointFormat: '<span style="color:{point.color}">\u25CF</span> Sum Prediction: <b>{point.y}</b><br/>'
             }
         });
 
@@ -200,7 +215,7 @@ frappe.pages['implementation-dashb'].on_page_load = function (wrapper) {
             type: 'line',
             data: cumulativePredictions,
             color: '#000000',
-            dashStyle: 'Solid',
+            dashStyle: 'Dot',
             marker: { enabled: true, radius: 3 },
             tooltip: {
                 pointFormat: '<span style="color:{point.color}">\u25CF</span> Cumulative: <b>{point.y}</b><br/>'
@@ -218,47 +233,66 @@ frappe.pages['implementation-dashb'].on_page_load = function (wrapper) {
                     return filtered.length ? total / filtered.length : null;
                 });
 
-                $('#chart-container').html('<div id="implementation-chart" style="height:600px;"></div>');
-                Highcharts.chart('implementation-chart', {
-                chart: { zoomType: 'xy' },
-                title: { text: 'Billable vs Non-Billable Time with Prediction' },
-                xAxis: {
-                    categories: categories,
-                    title: { text: 'Month' }
-                },
-                yAxis: {
-                    title: { text: 'Time (hrs)' }
-                },
-                tooltip: {
-                    shared: true,
-                    formatter: function () {
-                        let total = 0;
-                        let s = `<b>${this.x}</b><br/>`;
+                $('#chart-container').html(`
+                    <div class="d-flex justify-content-start mb-2">
+                        <button id="toggle-legend" class="btn btn-sm btn-outline-secondary">
+                            Show Legend
+                        </button>
+                    </div>
+                    <div id="implementation-chart" style="height:600px;"></div>
+                `);
 
-                        this.points.forEach(point => {
-                            s += `<span style="color:${point.color}">\u25CF</span> 
-                                ${point.series.name}: <b>${point.y} hrs</b><br/>`;
-
-                            if (!point.series.name.includes('Prediction')) {
-                                total += point.y;
-                            }
-                        });
-
-                        s += `<hr/><b>Total Worked Hrs: ${total} hrs</b>`;
-                        return s;
-                    }
-                },
-                plotOptions: {
-                    area: {
-                        stacking: 'normal',
-                        marker: { enabled: false }
+                // chart variable me save karo
+                let chart = Highcharts.chart('implementation-chart', {
+                    chart: { zoomType: 'xy' },
+                    legend: { enabled: false },   // 🔹 initially hidden
+                    title: { text: 'Billable vs Non-Billable Time with Prediction' },
+                    xAxis: {
+                        categories: categories,
+                        title: { text: 'Month' }
                     },
-                    line: {
-                        marker: { enabled: true, radius: 3 }
-                    }
-                },
-                series: series 
-            });
+                    yAxis: {
+                        title: { text: 'Time (hrs)' }
+                    },
+                    tooltip: {
+                        shared: true,
+                        formatter: function () {
+                            let total = 0;
+                            let s = `<b>${this.x}</b><br/>`;
+
+                            this.points.forEach(point => {
+                                s += `<span style="color:${point.color}">\u25CF</span> 
+                                    ${point.series.name}: <b>${point.y} hrs</b><br/>`;
+
+                                if (!point.series.name.includes('Prediction')) {
+                                    total += point.y;
+                                }
+                            });
+
+                            s += `<hr/><b>Total Worked Hrs: ${total} hrs</b>`;
+                            return s;
+                        }
+                    },
+                    plotOptions: {
+                        area: {
+                            stacking: 'normal',
+                            marker: { enabled: false }
+                        },
+                        line: {
+                            marker: { enabled: true, radius: 3 }
+                        }
+                    },
+                    series: series
+                });
+
+                // toggle button logic
+                let legendVisible = false;
+                $(document).off('click', '#toggle-legend').on('click', '#toggle-legend', function () {
+                    legendVisible = !legendVisible;
+                    chart.update({ legend: { enabled: legendVisible } });
+                    $(this).text(legendVisible ? "Hide Legend" : "Show Legend");
+                });
+
             }
         });
     }

@@ -22,7 +22,7 @@ class TimesheetRecord(Document):
 				if to_dt.date() != creation_dt.date():
 					self.timesheet_record_color = "Red"
 				else:
-					duration = (to_dt - creation_dt).total_seconds() / 3600
+					duration = (creation_dt - to_dt).total_seconds() / 3600
 					if duration < 1:
 						self.timesheet_record_color = "Green"
 					else:
@@ -76,8 +76,8 @@ class TimesheetRecord(Document):
 		)
 		timesheet.insert()
 		self.db_set('timesheet', timesheet.name)
-		
-		frappe.msgprint(_('Timesheet {0} Created').format(frappe.get_desk_link("Timesheet", timesheet.name)))
+
+		# frappe.msgprint(_('Timesheet {0} Created').format(frappe.get_desk_link("Timesheet", timesheet.name)))
 
 @frappe.whitelist()
 def set_actual_time(from_time, to_time):
