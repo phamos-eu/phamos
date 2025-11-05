@@ -11,7 +11,8 @@
   "api_key",
   "default_quota",
   "events_section",
-  "auto_sync_events"
+  "auto_sync_events",
+  "attach_ics_to_email"
  ],
  "fields": [
   {
@@ -54,6 +55,13 @@
    "fieldname": "auto_sync_events",
    "fieldtype": "Check",
    "label": "Auto Sync Events"
+  },
+  {
+   "default": "1",
+   "description": "Attach ICS calendar files to meeting emails for external recipients. Internal Mailcow users always get events via CalDAV regardless of this setting.",
+   "fieldname": "attach_ics_to_email",
+   "fieldtype": "Check",
+   "label": "Attach ICS to Email"
   }
  ],
  "grid_page_length": 50,

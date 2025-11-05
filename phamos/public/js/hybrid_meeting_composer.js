@@ -62,7 +62,7 @@ frappe.provide('erpnext.utils');
 
                     // EVENT RIGHT COLUMN
                     { fieldtype: 'HTML', fieldname: 'event_heading', options: '<div style="font-weight:600; margin-bottom:8px;">'+__('Event')+'</div>' },
-                    { label: __('Meeting Subject'), fieldtype: 'Small Text', fieldname: 'subject', reqd: 1, max_height: 70 },
+                    { label: __('Meeting Subject'), fieldtype: 'Data', fieldname: 'subject', reqd: 1 },
                     { label: __('Event Type'), fieldtype: 'Select', fieldname: 'event_type', options: ['Public', 'Private'], default: 'Private', reqd: 1, hidden: 1 },
                     { label: __('Day to Fetch Slots'), fieldtype: 'Date', fieldname: 'day', default: frappe.datetime.get_today() },
                     { label: __('Duration (minutes)'), fieldtype: 'Select', fieldname: 'duration_minutes', options: ['15', '30', '60', '90', '120'], default: '60' },
@@ -89,8 +89,8 @@ frappe.provide('erpnext.utils');
                         </div>
                     ` },
                     { label: __('Include proposals in email'), fieldtype: 'Check', fieldname: 'include_proposals_in_email', default: 0, hidden: 1 },
-                    { label: __('Location'), fieldtype: 'Data', fieldname: 'location' },
-                    { label: __('Description'), fieldtype: 'Text Editor', fieldname: 'description', max_height: 150 }
+                    { label: __('Location'), fieldtype: 'Data', fieldname: 'location', default: this._generate_jitsi_link() },
+                    { label: __('Description'), fieldtype: 'Text', fieldname: 'description', max_height: 150 }
                 ],
                 primary_action_label: __('Create Event & Send Email'),
                 primary_action: () => this._submit()
@@ -579,50 +579,204 @@ frappe.provide('erpnext.utils');
                 return;
             }
 
-            const slotHtml = slots.map((slot, idx) => {
-                // prefer local strings from backend
+            // Build a timeline from 7am to 7pm with 15-minute intervals
+            const duration = d.get_value('duration_minutes') || 60;
+            const startHour = 7;
+            const endHour = 19;
+            const totalMinutes = (endHour - startHour) * 60;
+            const intervalMinutes = 15;
+            const totalIntervals = totalMinutes / intervalMinutes;
+            
+            // Create a map of busy/free slots
+            const slotMap = new Map();
+            
+            // Parse first slot to get the date
+            let selectedDate = null;
+            if (slots.length > 0) {
+                const firstSlot = slots[0];
+                let mStart = window.moment ? moment(firstSlot.start_local, 'YYYY-MM-DD HH:mm:ss', true) : null;
+                if (!mStart || !mStart.isValid()) mStart = window.moment ? moment(firstSlot.start_local) : null;
+                if (mStart && mStart.isValid()) {
+                    selectedDate = mStart.format('YYYY-MM-DD');
+                }
+            }
+            
+            // Mark all slots as free initially and track available slots
+            const availableSlots = [];
+            slots.forEach((slot, idx) => {
                 let mStart = window.moment ? moment(slot.start_local, 'YYYY-MM-DD HH:mm:ss', true) : null;
                 let mEnd = window.moment ? moment(slot.end_local, 'YYYY-MM-DD HH:mm:ss', true) : null;
                 if (!mStart || !mStart.isValid()) mStart = window.moment ? moment(slot.start_local) : null;
                 if (!mEnd || !mEnd.isValid()) mEnd = window.moment ? moment(slot.end_local) : null;
-                const start_db = mStart && mStart.isValid() ? mStart.format('YYYY-MM-DD HH:mm:ss') : (slot.start_local || slot.start);
-                const end_db = mEnd && mEnd.isValid() ? mEnd.format('YYYY-MM-DD HH:mm:ss') : (slot.end_local || slot.end);
-                const dateDisp = mStart && mStart.isValid() ? mStart.format('ddd DD') : '';
-                const rangeDisp = mStart && mEnd && mStart.isValid() && mEnd.isValid()
-                    ? `${mStart.format('HH:mm')} - ${mEnd.format('HH:mm')}`
-                    : `${frappe.utils.escape_html(start_db)} → ${frappe.utils.escape_html(end_db)}`;
-                return `
-                    <div class="slot-chip" data-index="${idx}" data-start="${start_db}" data-end="${end_db}"
-                        style="display:inline-block; margin:6px; padding:10px 14px; background:#f0f7ff; border:1px solid #c2d9ff; border-radius:6px; white-space:nowrap; cursor:pointer; text-align:center; min-width:120px;">
-                        <div style="font-size:12px; color:#666; margin-bottom:2px;">${dateDisp}</div>
-                        <strong style="font-size:13px; display:block;">${rangeDisp}</strong>
-                    </div>`;
-            }).join('');
-
-            $container.html(`
-                <div class="slots-scroll" style="width:100%; overflow-x:auto; white-space:nowrap; padding:6px 0; text-align:center;">
-                    <div style="display:inline-block;">${slotHtml}</div>
+                
+                if (mStart && mStart.isValid() && mEnd && mEnd.isValid()) {
+                    const start_db = mStart.format('YYYY-MM-DD HH:mm:ss');
+                    const end_db = mEnd.format('YYYY-MM-DD HH:mm:ss');
+                    const key = `${start_db}__${end_db}`;
+                    
+                    availableSlots.push({
+                        start: mStart,
+                        end: mEnd,
+                        start_db,
+                        end_db,
+                        key,
+                        idx
+                    });
+                }
+            });
+            
+            // Build timeline HTML with time markers
+            const timelineHtml = [];
+            
+            // Get current time for filtering past slots
+            const now = moment();
+            const isToday = selectedDate === now.format('YYYY-MM-DD');
+            
+            timelineHtml.push(`
+                <div class="timeline-container" style="position: relative; border: 1px solid #d1d8dd; border-radius: 8px; background: white; padding: 16px; margin: 10px 0;">
+                    <div class="timeline-header" style="margin-bottom: 12px; color: #6c7680; font-size: 13px; font-weight: 600;">
+                        ${__('Available Time Slots')} ${selectedDate ? '— ' + moment(selectedDate).format('dddd, MMM D, YYYY') : ''}
+                    </div>
+                    <div class="timeline-scroll" style="overflow-x: auto; overflow-y: hidden;">
+                        <div class="timeline-track" style="display: flex; min-width: ${totalIntervals * 80}px; position: relative; height: 90px;">
+            `);
+            
+            // Generate time slots (only 7am to 7pm)
+            for (let i = 0; i < totalIntervals; i++) {
+                const currentMinutes = startHour * 60 + i * intervalMinutes;
+                const hour = Math.floor(currentMinutes / 60);
+                const minute = currentMinutes % 60;
+                
+                // Stop if we've reached 7pm
+                if (hour >= endHour) break;
+                
+                const timeStr = `${hour.toString().padStart(2, '0')}:${minute.toString().padStart(2, '0')}`;
+                
+                // Create moment for this slot
+                const slotStart = moment(selectedDate).hour(hour).minute(minute).second(0);
+                
+                // Skip past slots if this is today
+                if (isToday && slotStart.isBefore(now)) {
+                    continue;
+                }
+                
+                const slotEnd = moment(slotStart).add(duration, 'minutes');
+                const slotKey = `${slotStart.format('YYYY-MM-DD HH:mm:ss')}__${slotEnd.format('YYYY-MM-DD HH:mm:ss')}`;
+                
+                // Check if this is an available slot
+                const matchingSlot = availableSlots.find(s => s.key === slotKey);
+                const isAvailable = !!matchingSlot;
+                const isSelected = this._proposalKeys.has(slotKey);
+                
+                // Determine colors
+                let bgColor = '#f5f7fa';  // Busy/unavailable (gray)
+                let borderColor = '#e4e7eb';
+                let textColor = '#8a94a6';
+                let cursor = 'not-allowed';
+                let opacity = '0.6';
+                
+                if (isAvailable) {
+                    if (isSelected) {
+                        bgColor = '#d4edda';  // Selected (green)
+                        borderColor = '#4CAF50';
+                        textColor = '#2e7d32';
+                        opacity = '1';
+                    } else {
+                        bgColor = '#e8f4fd';  // Available (light blue)
+                        borderColor = '#90caf9';
+                        textColor = '#1976d2';
+                        opacity = '1';
+                    }
+                    cursor = 'pointer';
+                }
+                
+                // Show time marker every hour
+                const showTimeMarker = minute === 0;
+                
+                // Format time display
+                const endTimeStr = slotEnd.format('HH:mm');
+                
+                timelineHtml.push(`
+                    <div class="timeline-slot ${isAvailable ? 'slot-available' : 'slot-busy'}" 
+                         data-time="${timeStr}"
+                         data-start="${slotStart.format('YYYY-MM-DD HH:mm:ss')}"
+                         data-end="${slotEnd.format('YYYY-MM-DD HH:mm:ss')}"
+                         data-key="${slotKey}"
+                         data-available="${isAvailable ? '1' : '0'}"
+                         style="flex: 0 0 80px; height: 70px; background: ${bgColor}; border: 1px solid ${borderColor}; 
+                                border-radius: 4px; margin: 0 2px; cursor: ${cursor}; opacity: ${opacity}; 
+                                transition: all 0.2s; position: relative; display: flex; flex-direction: column; 
+                                align-items: center; justify-content: center; padding: 4px;">
+                        ${showTimeMarker ? `<div style="position: absolute; top: -20px; left: 0; font-size: 11px; color: #6c7680; font-weight: 600; white-space: nowrap;">${timeStr}</div>` : ''}
+                        <div style="font-size: 11px; font-weight: 600; color: ${textColor}; line-height: 1.2;">${timeStr}</div>
+                        <div style="font-size: 9px; color: ${textColor}; margin-top: 2px; opacity: 0.8;">to</div>
+                        <div style="font-size: 11px; font-weight: 600; color: ${textColor}; line-height: 1.2;">${endTimeStr}</div>
+                        <div class="slot-tooltip" style="display: none; position: absolute; bottom: 100%; left: 50%; transform: translateX(-50%); 
+                                                          background: rgba(0,0,0,0.85); color: white; padding: 6px 10px; border-radius: 4px; 
+                                                          font-size: 12px; white-space: nowrap; z-index: 1000; margin-bottom: 8px;">
+                            ${timeStr} - ${endTimeStr} (${duration} min)
+                            <div style="font-size: 11px; margin-top: 2px; opacity: 0.9;">${isAvailable ? __('Click to select') : __('Busy')}</div>
+                            <div style="position: absolute; bottom: -4px; left: 50%; transform: translateX(-50%); width: 0; height: 0; 
+                                        border-left: 4px solid transparent; border-right: 4px solid transparent; border-top: 4px solid rgba(0,0,0,0.85);"></div>
+                        </div>
+                    </div>
+                `);
+            }
+            
+            timelineHtml.push(`
+                        </div>
+                    </div>
+                    <div class="timeline-legend" style="display: flex; gap: 20px; margin-top: 16px; font-size: 12px; color: #6c7680; justify-content: center;">
+                        <div style="display: flex; align-items: center; gap: 6px;">
+                            <div style="width: 16px; height: 16px; background: #e8f4fd; border: 1px solid #90caf9; border-radius: 3px;"></div>
+                            <span>${__('Available')}</span>
+                        </div>
+                        <div style="display: flex; align-items: center; gap: 6px;">
+                            <div style="width: 16px; height: 16px; background: #d4edda; border: 1px solid #4CAF50; border-radius: 3px;"></div>
+                            <span>${__('Selected')}</span>
+                        </div>
+                        <div style="display: flex; align-items: center; gap: 6px;">
+                            <div style="width: 16px; height: 16px; background: #f5f7fa; border: 1px solid #e4e7eb; border-radius: 3px; opacity: 0.6;"></div>
+                            <span>${__('Busy')}</span>
+                        </div>
+                    </div>
                 </div>
-                <div class="text-center" style="margin-top:6px;"><small class="text-muted">${__('Click to add/remove from proposals')}</small></div>
             `);
 
-            const toggleSelected = ($el, add) => {
-                $el.css({ background: add ? '#e8f5e8' : '#f0f7ff', borderColor: add ? '#4CAF50' : '#c2d9ff' });
-            };
+            $container.html(timelineHtml.join(''));
 
-            $container.find('.slot-chip').on('click', (e) => {
+            // Add hover and click handlers
+            $container.find('.timeline-slot').hover(
+                function() {
+                    $(this).find('.slot-tooltip').fadeIn(150);
+                    if ($(this).data('available') === '1') {
+                        $(this).css('transform', 'translateY(-2px)');
+                        $(this).css('box-shadow', '0 4px 8px rgba(0,0,0,0.1)');
+                    }
+                },
+                function() {
+                    $(this).find('.slot-tooltip').fadeOut(150);
+                    $(this).css('transform', 'translateY(0)');
+                    $(this).css('box-shadow', 'none');
+                }
+            );
+
+            $container.find('.timeline-slot.slot-available').on('click', (e) => {
                 const $el = $(e.currentTarget);
                 const start = $el.attr('data-start');
                 const end = $el.attr('data-end');
-                const key = `${start}__${end}`;
+                const key = $el.attr('data-key');
+                
                 if (this._proposalKeys.has(key)) {
                     // remove
                     this._remove_proposal(start, end);
-                    toggleSelected($el, false);
+                    $el.css({ background: '#e8f4fd', borderColor: '#90caf9' });
+                    $el.find('div[style*="color"]').css('color', '#1976d2');
                 } else {
                     // add
                     this._add_proposal(start, end);
-                    toggleSelected($el, true);
+                    $el.css({ background: '#d4edda', borderColor: '#4CAF50' });
+                    $el.find('div[style*="color"]').css('color', '#2e7d32');
                 }
             });
         }
@@ -697,6 +851,16 @@ frappe.provide('erpnext.utils');
                 tbody.append(tr);
             });
         }
+
+        _generate_jitsi_link() {
+            // Generate a random 15-character alphanumeric ID
+            const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
+            let randomId = '';
+            for (let i = 0; i < 15; i++) {
+                randomId += chars.charAt(Math.floor(Math.random() * chars.length));
+            }
+            return `https://meet.jit.si/${randomId}`;
+        }
     };
 
     // Lead button injection (basic)
@@ -706,7 +870,7 @@ frappe.provide('erpnext.utils');
             if (!frm.custom_hybrid_button_added) {
                 frm.add_custom_button(__('Schedule Meeting & Email'), () => {
                     erpnext.utils.launch_hybrid_meeting_composer({ doc: frm.doc, frm: frm });
-                }, __('Action'));
+                });
                 frm.custom_hybrid_button_added = true;
             }
         }
@@ -719,7 +883,7 @@ frappe.provide('erpnext.utils');
             if (!frm.custom_hybrid_button_added) {
                 frm.add_custom_button(__('Schedule Meeting & Email'), () => {
                     erpnext.utils.launch_hybrid_meeting_composer({ doc: frm.doc, frm: frm });
-                }, __('Action'));
+                });
                 frm.custom_hybrid_button_added = true;
             }
         }
