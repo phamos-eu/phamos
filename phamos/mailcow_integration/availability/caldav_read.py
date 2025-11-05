@@ -2,6 +2,7 @@ from __future__ import annotations
 import base64, requests, re
 from datetime import datetime, timezone, timedelta
 from typing import List, Tuple, Dict
+from ..caldav.client import dav_password as _dav_pw
 import frappe
 
 RFC3339Z = "%Y%m%dT%H%M%SZ"  # UTC timestamps for REPORT time-range
@@ -16,9 +17,6 @@ def _settings():
 
 def _get_user_email(user_id: str) -> str | None:
     return frappe.db.get_value("User", user_id, "email")
-
-def _dav_pw(email: str) -> str | None:
-    return frappe.db.get_value("Mailcow DAV Password", email, "dav_password")
 
 def _auth(email: str, pw: str) -> Dict[str, str]:
     tok = base64.b64encode(f"{email}:{pw}".encode()).decode()
