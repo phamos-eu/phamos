@@ -1748,7 +1748,7 @@
         "name": "Timesheet-custom_approval",
         "no_copy": 0,
         "non_negative": 0,
-        "options": "Reject\nAccept",
+        "options": " \nReject\nAccept",
         "permlevel": 0,
         "placeholder": null,
         "precision": "",
