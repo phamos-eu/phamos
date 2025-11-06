@@ -146,14 +146,27 @@ def get_assigned_projects(doctype, txt, searchfield, start, page_len, filters):
     
 @frappe.whitelist()
 def is_task_running(name):
-    try:
-        doc = frappe.get_doc("Timesheet Record", name)
-        for row in reversed(doc.item):
-            if not row.to_time:
-                return {"is_running": True}
+    # Get all child rows in correct order
+    rows = frappe.db.sql("""
+        SELECT name, to_time
+        FROM `tabTimesheet Record Item`
+        WHERE parent = %s
+        ORDER BY creation ASC
+    """, name, as_dict=True)
+
+    if not rows:
         return {"is_running": False}
-    except:
-        return {"is_running": False}
+
+    # Find last open (missing to_time)
+    for idx, row in enumerate(rows, start=1):
+        if not row.to_time:
+            # Odd index (1, 3, 5...) → task running ⏸️
+            # Even index (2, 4, 6...) → task paused ▶️
+            is_running = (idx % 2 != 0)
+            return {"is_running": is_running}
+
+    # If no missing to_time → considered paused
+    return {"is_running": False}
 
 
 @frappe.whitelist()
