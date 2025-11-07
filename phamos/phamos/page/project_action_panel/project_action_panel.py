@@ -335,18 +335,16 @@ def is_task_running(name):
 def get_employee_leaves():
     today = getdate(nowdate())
 
-    # current month first & last day
-    current_start = get_first_day(today)
-    current_end = get_last_day(today)
+    # ✅ Current year start
+    year_start = get_first_day(today.replace(month=1, day=1))
 
-    # previous month  first day
-    prev_month_start = get_first_day(add_months(today, -1))
-    # next month last day
-    next_month_end = get_last_day(add_months(today, 1))
+    # ✅ Next year  end
+    next_year = today.year + 1
+    year_end = get_last_day(getdate(f"{next_year}-12-31"))
 
-    # final range
-    start = prev_month_start
-    end = next_month_end
+    # Final range (current + next year)
+    start = year_start
+    end = year_end
 
     leaves = frappe.get_all(
         "Leave Application",
@@ -488,18 +486,12 @@ def get_timesheet_records_by_date(selected_date=None):
 def get_team_holidays():
     today = getdate(nowdate())
 
-    # current month first & last day
-    current_start = get_first_day(today)
-    current_end = get_last_day(today)
+    # ✅ Current year ka start
+    from_date = get_first_day(today.replace(month=1, day=1))
 
-    # previous month first day
-    prev_month_start = get_first_day(add_months(today, -1))
-    # next month last day
-    next_month_end = get_last_day(add_months(today, 1))
-
-    # final range set
-    from_date = prev_month_start
-    to_date = next_month_end
+    # ✅ Next year ka end
+    next_year = today.year + 1
+    to_date = get_last_day(getdate(f"{next_year}-12-31"))
 
     grouped = defaultdict(list)
 
