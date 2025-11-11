@@ -173,11 +173,14 @@ def is_task_running(name):
 def get_employee_leaves():
     today = getdate(nowdate())
 
-    # Get first and last day of the current year
+    # ✅ Current year start
     year_start = get_first_day(today.replace(month=1, day=1))
-    year_end = get_last_day(today.replace(month=12, day=31))
 
-    # final range (whole year)
+    # ✅ Next year  end
+    next_year = today.year + 1
+    year_end = get_last_day(getdate(f"{next_year}-12-31"))
+
+    # Final range (current + next year)
     start = year_start
     end = year_end
 
@@ -321,9 +324,12 @@ def get_timesheet_records_by_date(selected_date=None):
 def get_team_holidays():
     today = getdate(nowdate())
 
-    # ✅ Get first and last day of the current year
+    # ✅ Current year ka start
     from_date = get_first_day(today.replace(month=1, day=1))
-    to_date = get_last_day(today.replace(month=12, day=31))
+
+    # ✅ Next year ka end
+    next_year = today.year + 1
+    to_date = get_last_day(getdate(f"{next_year}-12-31"))
 
     grouped = defaultdict(list)
 
