@@ -58,6 +58,43 @@ def get_projects_for_logged_in_customer():
         fields=["name", "project_name"]
     )
 
+@frappe.whitelist()
+def update_customer_comment(ts_name, comment=None, custom_rating=None):
+    ts = frappe.get_doc("Timesheet", ts_name)
+
+    # Update fields in Timesheet
+    if comment is not None:
+        ts.db_set("customer_comment", comment)
+    if custom_rating is not None:
+        ts.db_set("custom_rating", custom_rating)
+
+    # Send email notification to Project Owner/Deputy
+    if ts.parent_project:
+        project = frappe.get_doc("Project", ts.parent_project)
+        recipients = [r for r in [project.get("project_owner"), project.get("project_deputy")] if r]
+        if recipients:
+            frappe.sendmail(
+                recipients=recipients,
+                subject=f"New Discount/Comment Request for Timesheet: {ts.name}",
+                message=f"""
+                    <p>Hello,</p>
+                    <p>A new request has been submitted by a customer on Timesheet <b>{ts.name}</b>.</p>
+                    <p><b>Comment:</b> {comment or '-'}<br>
+                    <b>Rating:</b> {custom_rating or '-'}</p>
+                    <p>Status: <b>Pending</b></p>
+                    <p>Regards,<br>ERPNext System</p>
+                """,
+                now=True
+            )
+
+    frappe.db.commit()
+
+    return {
+        "message": "Comment sent for Review successfully.",
+    }
+
+
+
 def get_customer_for_user(user):
     # Get all Contact names linked to this User
     contacts = frappe.get_list(
