@@ -156,13 +156,8 @@ function load_timesheets() {
         let btnText = "Request Adjustments";
         let btnColor = "#5198e3"; // default blue
 
-        if (row.custom_approval === "Accept") {
-          btnText = "Accepted";
-          btnColor = "green";
-        } else if (row.custom_approval === "Reject") {
-          btnText = "Rejected";
-          btnColor = "red";
-        } else if (row.customer_comment) {
+        
+        if (row.customer_comment) {
           btnText = "Under Review";
           btnColor = "#ffc107";
         }
@@ -215,11 +210,30 @@ $(document).on('click', '.comment-btn', function () {
 });
 
 // When user clicks Save in the modal
-$('#saveComment').on('click', function () {
-  const comment = $('#commentInput').val().trim();
-  const discount = $('#discountSelect').val();
-  const rating = $('#starRating .star.selected').length;
+let selectedRating = 0;
 
+// Handle click on stars
+$(document).on('click', '#starRating .star', function () {
+  selectedRating = parseInt($(this).data('value'));
+  $('#starRating .star').each(function (index) {
+    $(this).html(index < selectedRating ? '&#9733;' : '&#9734;');
+  });
+  $('#ratingError').hide(); // hide error after selection
+});
+
+// Intercept Save button
+$('#saveComment').on('click', function (e) {
+  e.preventDefault();
+
+  const comment = $('#commentInput').val().trim();
+
+  // 🟥 Check if rating is selected
+  if (selectedRating === 0) {
+    $('#ratingError').show();
+    return;
+  }
+
+  // 🟩 Proceed if rating is selected
   if (!currentTsName) return;
 
   frappe.call({
@@ -227,26 +241,20 @@ $('#saveComment').on('click', function () {
     args: {
       ts_name: currentTsName,
       comment: comment,
-      custom_discount_request: discount,
-      custom_rating: rating
+      custom_rating: selectedRating
     },
     callback: function (r) {
       if (!r.exc) {
         frappe.show_alert({ message: r.message.message, indicator: "green" });
 
-        const approvalStatus = r.message.approval; // Pending
         const btn = $(`.comment-btn[data-name="${currentTsName}"]`);
-
-        // Show “Under Review” after sending
-        btn.text("Under Review");
-        btn.css("background-color", "#ffc107");
-        btn.data('comment', comment);
-        btn.data('discount', discount);
-        btn.data('rating', rating);
+        btn.text("Under Review")
+          .css("background-color", "#ffc107")
+          .data('comment', comment)
+          .data('rating', selectedRating);
 
         $('#commentModal').modal('hide');
         reset_and_load();
-        console.log("Timesheet data:", data);
       } else {
         frappe.show_alert({ message: "Failed to send request", indicator: "red" });
       }
@@ -605,14 +613,12 @@ $(document).on('click', '.comment-btn', function () {
     $('#starRating .star').eq(i).addClass('selected');
   }
 
-  // Disable editing if already accepted/rejected
-  const isLocked = statusText === "Accepted" || statusText === "Rejected";
+  // Disable editing if "Under Review"
+  const isLocked = statusText === "Under Review";
   $('#commentInput').prop('disabled', isLocked);
-  $('#discountSelect').prop('disabled', isLocked);
   $('#starRating .star').css('pointer-events', isLocked ? 'none' : 'auto');
   $('#saveComment').prop('disabled', isLocked);
 
   $('#commentModal').modal('show');
 });
-
 

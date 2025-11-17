@@ -68,19 +68,14 @@ def get_projects_for_logged_in_customer():
     )
 
 @frappe.whitelist()
-def update_customer_comment(ts_name, comment=None, custom_discount_request=None, custom_rating=None):
+def update_customer_comment(ts_name, comment=None, custom_rating=None):
     ts = frappe.get_doc("Timesheet", ts_name)
 
     # Update fields in Timesheet
     if comment is not None:
         ts.db_set("customer_comment", comment)
-    if custom_discount_request is not None:
-        ts.db_set("custom_discount_request", custom_discount_request)
     if custom_rating is not None:
         ts.db_set("custom_rating", custom_rating)
-
-    # Always treat it as Pending unless PM later updates approval
-    approval_status = ts.get("custom_approval") or "Pending"
 
     # Send email notification to Project Owner/Deputy
     if ts.parent_project:
@@ -94,9 +89,7 @@ def update_customer_comment(ts_name, comment=None, custom_discount_request=None,
                     <p>Hello,</p>
                     <p>A new request has been submitted by a customer on Timesheet <b>{ts.name}</b>.</p>
                     <p><b>Comment:</b> {comment or '-'}<br>
-                    <b>Discount Request:</b> {custom_discount_request or '-'}<br>
                     <b>Rating:</b> {custom_rating or '-'}</p>
-                    <p>Please review this Timesheet and set <b>Approval</b> to either <b>Accept</b> or <b>Reject</b>.</p>
                     <p>Status: <b>Pending</b></p>
                     <p>Regards,<br>ERPNext System</p>
                 """,
@@ -106,8 +99,7 @@ def update_customer_comment(ts_name, comment=None, custom_discount_request=None,
     frappe.db.commit()
 
     return {
-        "message": "Comment sent for approval successfully.",
-        "approval": approval_status
+        "message": "Comment sent for Review successfully.",
     }
 
 
