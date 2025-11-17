@@ -14,7 +14,6 @@ frappe.ui.form.on("Implementation", {
         render_resource_planning_graph(frm, true); // Prediction date change
     },
     setup: function (frm) {
-        if (!frm.is_new()) {
             add_row_to_sales_order(frm)
                 frappe.call({
                     method: "phamos.phamos.doctype.implementation.implementation.get_financial_history",
@@ -47,7 +46,6 @@ frappe.ui.form.on("Implementation", {
                         }
                     },
                 });
-            }
     },
     refresh: function (frm) {
         frm.fields_dict.reset.$input.on('click', function () {
@@ -163,7 +161,6 @@ frappe.ui.form.on("Implementation", {
             render_module_chart(frm, 'radar-chart-2');
         });
         // radar chart ends
-        if (!frm.is_new()) {
             frappe.call({
                 method: "phamos.phamos.doctype.implementation.implementation.get_financial_history",
                 args: { 'customer': frm.doc.customer, 'name': frm.doc.name },
@@ -238,7 +235,6 @@ frappe.ui.form.on("Implementation", {
                     }
                 },
             });
-        }
     },
     onload: function (frm) {
         frm.set_df_property("graph_overview_section", "collapsible", 0);
