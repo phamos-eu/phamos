@@ -153,6 +153,15 @@ function load_timesheets() {
       $noData.hide();
 
       data.forEach(row => {
+        let btnText = "Request Adjustments";
+        let btnColor = "#5198e3"; // default blue
+
+        
+        if (row.customer_comment) {
+          btnText = "Under Review";
+          btnColor = "#ffc107";
+        }
+
         $tbody.append(`
           <tr>
             <td><input type="checkbox" class="row-select" /></td>
@@ -181,6 +190,104 @@ function load_timesheets() {
     }
   });
 }
+
+let currentTsName = null; // store which timesheet is being edited
+
+// When user clicks the "Add/Edit Comment" button
+$(document).on('click', '.comment-btn', function () {
+  currentTsName = $(this).data('name');
+  const currentComment = $(this).data('comment') || '';
+  
+  $('#commentInput').val(currentComment);
+  $('#commentModal').modal('show');
+});
+
+// When user clicks Save in the modal
+let selectedRating = 0;
+
+// Handle click on stars
+$(document).on('click', '#starRating .star', function () {
+  selectedRating = parseInt($(this).data('value'));
+  $('#starRating .star').each(function (index) {
+    $(this).html(index < selectedRating ? '&#9733;' : '&#9734;');
+  });
+  $('#ratingError').hide(); // hide error after selection
+});
+
+// Intercept Save button
+$('#saveComment').on('click', function (e) {
+  e.preventDefault();
+
+  const comment = $('#commentInput').val().trim();
+
+  // 🟥 Check if rating is selected
+  if (selectedRating === 0) {
+    $('#ratingError').show();
+    return;
+  }
+
+  // 🟩 Proceed if rating is selected
+  if (!currentTsName) return;
+
+  frappe.call({
+    method: "phamos.api.update_customer_comment",
+    args: {
+      ts_name: currentTsName,
+      comment: comment,
+      custom_rating: selectedRating
+    },
+    callback: function (r) {
+      if (!r.exc) {
+        frappe.show_alert({ message: r.message.message, indicator: "green" });
+
+        const btn = $(`.comment-btn[data-name="${currentTsName}"]`);
+        btn.text("Under Review")
+          .css("background-color", "#ffc107")
+          .data('comment', comment)
+          .data('rating', selectedRating);
+
+        $('#commentModal').modal('hide');
+        reset_and_load();
+      } else {
+        frappe.show_alert({ message: "Failed to send request", indicator: "red" });
+      }
+    }
+  });
+});
+
+
+
+document.addEventListener('DOMContentLoaded', function() {
+  const stars = document.querySelectorAll('#starRating .star');
+  let selectedRating = 0;
+
+  stars.forEach(star => {
+    // Handle hover
+    star.addEventListener('mouseover', () => {
+      stars.forEach(s => s.classList.remove('hovered'));
+      const value = parseInt(star.getAttribute('data-value'));
+      stars.forEach((s, i) => {
+        if (i < value) s.classList.add('hovered');
+      });
+    });
+
+    // Remove hover when leaving
+    star.addEventListener('mouseleave', () => {
+      stars.forEach(s => s.classList.remove('hovered'));
+    });
+
+    // Handle click (select rating)
+    star.addEventListener('click', () => {
+      selectedRating = parseInt(star.getAttribute('data-value'));
+      stars.forEach((s, i) => {
+        if (i < selectedRating) s.classList.add('selected');
+        else s.classList.remove('selected');
+      });
+      console.log("Selected rating:", selectedRating);
+    });
+  });
+});
+
 
 function update_footer() {
   $('#pagination_info').text(`Showing ${loadedCount} of ${totalCount}`);
@@ -476,4 +583,31 @@ function load_graph_data() {
 /////////////////////////////////////
 loadAndRenderGraph();
 
+// Handle "Request Adjustments" button click dynamically
+$(document).on('click', '.comment-btn', function () {
+  const tsName = $(this).data('name');
+  currentTsName = tsName;
+
+  const comment = $(this).data('comment');
+  const discount = $(this).data('discount');
+  const rating = $(this).data('rating');
+  const statusText = $(this).text().trim();
+
+  $('#commentInput').val(comment);
+  $('#discountSelect').val(discount);
+
+  // Reset stars
+  $('#starRating .star').removeClass('selected');
+  for (let i = 0; i < rating; i++) {
+    $('#starRating .star').eq(i).addClass('selected');
+  }
+
+  // Disable editing if "Under Review"
+  const isLocked = statusText === "Under Review";
+  $('#commentInput').prop('disabled', isLocked);
+  $('#starRating .star').css('pointer-events', isLocked ? 'none' : 'auto');
+  $('#saveComment').prop('disabled', isLocked);
+
+  $('#commentModal').modal('show');
+});
 
