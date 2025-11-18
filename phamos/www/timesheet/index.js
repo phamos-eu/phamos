@@ -166,6 +166,11 @@ function load_timesheets() {
           btnColor = "#ffc107";
         }
 
+        const relatedIssues = row.related_issue || '';
+        const relatedPreview = truncateText(relatedIssues, 80);
+        const relatedTooltip = escapeHtml(relatedIssues);
+        const relatedDisplay = relatedPreview ? escapeHtml(relatedPreview) : '-';
+
         $tbody.append(`
           <tr>
             <td><input type="checkbox" class="row-select" /></td>
@@ -174,6 +179,11 @@ function load_timesheets() {
             <td>${row.custom_billing_status || ''}</td>
             <td>${format_hours(row.total_hours)}</td>
             <td>${format_hours(row.total_billable_hours)}</td>
+            <td>
+              <span class="d-inline-block text-truncate" style="max-width: 220px;" title="${relatedTooltip}">
+                ${relatedDisplay}
+              </span>
+            </td>
             <td>
               <button 
                 class="btn btn-sm comment-btn"
@@ -491,6 +501,23 @@ function formatShortRelative(dateStr) {
   if (days > 0) return `${days} day${days > 1 ? 's' : ''} ago`;
 
   return "Today";
+}
+
+function truncateText(text = '', limit = 80) {
+  const str = String(text);
+  if (str.length <= limit) {
+    return str;
+  }
+  return `${str.slice(0, limit).trim()}…`;
+}
+
+function escapeHtml(text = '') {
+  return String(text)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
 }
 
 function update_summary_cards() {
