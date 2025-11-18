@@ -120,32 +120,34 @@
   <div class="modal-dialog modal-dialog-centered">
     <div class="modal-content">
       <div class="modal-header">
-        <h5 class="modal-title">Request on the Adjustments of the Timesheet</h5>
-        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+        <h5 class="modal-title">Request Timesheet Adjustments</h5>
+        <button type="button" class="btn" data-bs-dismiss="modal" aria-label="Close">
+          <i class="fa fa-times"></i>
+        </button>
       </div>
 
       <div class="modal-body">
-      <!-- Comment Section -->
-      <label class="form-label fw-semibold mb-2">Comment on the booked time</label>
-      <textarea id="commentInput" class="form-control mb-3" rows="4" placeholder="Enter your comment here..."></textarea>
-
-      <!-- Star Rating -->
-      <div>
-        <label class="form-label fw-semibold mb-2">Star rating for timesheet <span style="color:red;">*</span></label>
-        <div id="starRating" class="d-flex align-items-center">
-          <span class="star" data-value="1">&#9734;</span>
-          <span class="star" data-value="2">&#9734;</span>
-          <span class="star" data-value="3">&#9734;</span>
-          <span class="star" data-value="4">&#9734;</span>
-          <span class="star" data-value="5">&#9734;</span>
+        <!-- Star Rating -->
+        <div>
+          <label class="form-label fw-semibold mb-2">Star rating for timesheet <span style="color:red;">*</span></label>
+          <div id="starRating" class="d-flex align-items-center">
+            <span class="star" data-value="1">&#9734;</span>
+            <span class="star" data-value="2">&#9734;</span>
+            <span class="star" data-value="3">&#9734;</span>
+            <span class="star" data-value="4">&#9734;</span>
+            <span class="star" data-value="5">&#9734;</span>
+          </div>
+          <div id="ratingError" style="color: red; display: none;">Please select a star rating.</div>
         </div>
-        <div id="ratingError" style="color: red; display: none;">Please select a star rating.</div>
-      </div>
 
-      <div class="modal-footer">
-        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
-        <button type="button" class="btn btn-primary" id="saveComment">Save Comment</button>
-      </div>
+        <!-- Comment Section -->
+        <label class="form-label fw-semibold mb-2">Comment on the booked time (optional)</label>
+        <textarea id="commentInput" class="form-control mb-3" rows="4" placeholder="Enter your comment here..."></textarea>
+
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+          <button type="button" class="btn btn-primary" id="saveComment">Save Comment</button>
+        </div>
     </div>
   </div>
 </div>
