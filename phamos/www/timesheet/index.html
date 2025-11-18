@@ -10,7 +10,7 @@
 
 {% block page_content %}
 <!-- Subtract ERPNext navbar height -->
-<div class="d-flex flex-column px-3 py-3" style="height: calc(130vh - 56px);">
+<div class="d-flex flex-column px-3 py-3" style="min-height: calc(100vh - 56px); padding-bottom: 80px;">
 
   {% include "phamos/www/timesheet/summary_cards.html" %}
   <!-- Timesheet graph -->
@@ -62,20 +62,20 @@
 
 
   <!-- Table Container -->
-  <div class="border rounded" style="min-height: 0; width: 100%; overflow-x: hidden; overflow-y: auto;">
+  <div class="border rounded" style="flex: 1 1 auto; min-height: 320px; width: 100%; overflow-x: hidden; overflow-y: auto;">
     <table class="table table-hover align-middle mb-0 w-100"
           id="timesheet_table"
           style="table-layout: auto;">
       <thead class="table-light sticky-top small">
         <tr>
-          <th style="width: 40px;"><input type="checkbox" id="select_all" /></th>
-          <th>Timesheet</th>
-          <th>Start Date</th>
-          <th>Billing Status</th>
-          <th>Total Hours</th>
-          <th>Billable Hours</th>
-          <th>Related Issues</th>
-          <th>Comment</th>
+          <th style="width: 2%;"><input type="checkbox" id="select_all" /></th>
+          <th style="width: 16%;">Timesheet</th>
+          <th style="width: 11%;">Start Date</th>
+          <th style="width: 12%;">Billing Status</th>
+          <th style="width: 11%;">Total Hours</th>
+          <th style="width: 12%;">Billable Hours</th>
+          <th style="width: 18%;">Related Issues</th>
+          <th style="width: 18%;">Comment</th>
         </tr>
         <tr class="bg-white">
           <th></th>
