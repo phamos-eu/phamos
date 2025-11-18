@@ -166,15 +166,19 @@ function load_timesheets() {
           <tr>
             <td><input type="checkbox" class="row-select" /></td>
             <td>${row.name}</td>
-            <td class="${row.timesheet_status === 'Billed' ? 'text-success fw-bold' : 'text-primary fw-bold'}">${row.timesheet_status}</td>
-            <td>${row.employee}</td>
-            <td>${row.employee_name}</td>
             <td>${frappe.datetime.str_to_user(row.start_date)}</td>
-            <td>${frappe.datetime.str_to_user(row.end_date)}</td>
             <td>${row.custom_billing_status || ''}</td>
             <td>${format_hours(row.total_hours)}</td>
             <td>${format_hours(row.total_billable_hours)}</td>
-            <td title="${frappe.datetime.str_to_user(row.creation)}">${formatShortRelative(row.creation)}</td>
+            <td>
+              <button 
+                class="btn btn-sm comment-btn"
+                style="background-color: ${btnColor}; color: white;"
+                data-name="${row.name}" 
+                data-comment="${row.customer_comment || ''}">
+                ${btnText}
+              </button>
+            </td>
           </tr>
         `);
       });
@@ -610,4 +614,3 @@ $(document).on('click', '.comment-btn', function () {
 
   $('#commentModal').modal('show');
 });
-
