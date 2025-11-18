@@ -166,13 +166,10 @@ function load_timesheets() {
           <tr>
             <td><input type="checkbox" class="row-select" /></td>
             <td>${row.name}</td>
-            <td>${row.employee}</td>
             <td>${frappe.datetime.str_to_user(row.start_date)}</td>
-            <td>${frappe.datetime.str_to_user(row.end_date)}</td>
             <td>${row.custom_billing_status || ''}</td>
             <td>${format_hours(row.total_hours)}</td>
             <td>${format_hours(row.total_billable_hours)}</td>
-            <td title="${frappe.datetime.str_to_user(row.creation)}">${formatShortRelative(row.creation)}</td>
             <td>
               <button 
                 class="btn btn-sm comment-btn"
@@ -621,4 +618,3 @@ $(document).on('click', '.comment-btn', function () {
 
   $('#commentModal').modal('show');
 });
-
