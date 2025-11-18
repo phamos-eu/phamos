@@ -39,6 +39,10 @@ frappe.ready(() => {
     e.preventDefault();
     download_visible_csv();
   });
+
+  $(document).on('input', '.column-filter', function () {
+    apply_column_filters();
+  });
   
   $('#select_all').on('change', function () {
     const checked = $(this).is(':checked');
@@ -184,6 +188,7 @@ function load_timesheets() {
       });
 
       loadedCount += data.length;
+      apply_column_filters();
       update_footer();
 
       if (loadedCount >= totalCount || data.length < pageSize) {
@@ -193,6 +198,49 @@ function load_timesheets() {
       }
     }
   });
+}
+
+function apply_column_filters() {
+  const filters = {};
+  $('.column-filter').each(function () {
+    const value = ($(this).val() || '').trim().toLowerCase();
+    const index = $(this).data('column-index');
+    if (value) {
+      filters[index] = value;
+    }
+  });
+
+  const activeColumns = Object.keys(filters);
+  let visibleCount = 0;
+
+  $('#timesheet_body tr').each(function () {
+    if (this.id === 'no_data_row') {
+      return;
+    }
+
+    let visible = true;
+    if (activeColumns.length) {
+      const $cells = $(this).find('td');
+      for (let i = 0; i < activeColumns.length; i++) {
+        const colIndex = parseInt(activeColumns[i], 10);
+        const filterValue = filters[colIndex];
+        const cellText = ($cells.eq(colIndex).text() || '').trim().toLowerCase();
+        if (!cellText.includes(filterValue)) {
+          visible = false;
+          break;
+        }
+      }
+    }
+
+    $(this).toggle(visible);
+    if (visible) {
+      visibleCount++;
+    }
+  });
+
+  if (loadedCount > 0) {
+    $('#no_data_row').toggle(visibleCount === 0);
+  }
 }
 
 let currentTsName = null; // store which timesheet is being edited
