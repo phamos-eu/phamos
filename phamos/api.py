@@ -39,11 +39,29 @@ def get_timesheets(from_date=None, to_date=None, project=None, offset=0, limit=2
 
     # Timesheet rows with filters
     timesheets = frappe.db.sql(f"""
-        SELECT name, employee, custom_billing_status, project_owner, total_hours,
-               total_billable_hours, project_name, start_date, end_date, creation, customer_comment, custom_approval
-        FROM `tabTimesheet`
-        WHERE docstatus IN (0, 1) {conditions}
-        ORDER BY creation DESC
+        SELECT 
+            ts.name,
+            ts.employee,
+            ts.custom_billing_status,
+            ts.project_owner,
+            ts.total_hours,
+            ts.total_billable_hours,
+            ts.project_name,
+            ts.start_date,
+            ts.end_date,
+            ts.creation,
+            ts.customer_comment,
+            ts.custom_approval,
+            (
+                SELECT description
+                FROM `tabTimesheet Detail` td
+                WHERE td.parent = ts.name
+                ORDER BY td.idx
+                LIMIT 1
+            ) AS related_issue
+        FROM `tabTimesheet` ts
+        WHERE ts.docstatus IN (0, 1) {conditions}
+        ORDER BY ts.creation DESC
         LIMIT {limit} OFFSET {offset}
     """, values, as_dict=True)
 
@@ -207,7 +225,6 @@ def get_graph_data(from_date=None, to_date=None, project=None):
     """, as_dict=True)
 
     return {"timesheets": data}
-
 
 
 
