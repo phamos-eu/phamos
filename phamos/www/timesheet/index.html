@@ -74,7 +74,8 @@
           <th>Billing Status</th>
           <th>Total Hours</th>
           <th>Billable Hours</th>
-          <th>Customer Comment</th>
+          <th>Related Issues</th>
+          <th>Comment</th>
         </tr>
         <tr class="bg-white">
           <th></th>
@@ -84,13 +85,14 @@
           <th><input type="text" class="form-control form-control-sm column-filter" placeholder="" data-column-index="4" /></th>
           <th><input type="text" class="form-control form-control-sm column-filter" placeholder="" data-column-index="5" /></th>
           <th><input type="text" class="form-control form-control-sm column-filter" placeholder="" data-column-index="6" /></th>
+          <th><input type="text" class="form-control form-control-sm column-filter" placeholder="" data-column-index="7" /></th>
         </tr>
       </thead>
 
       <tbody id="timesheet_body">
         <!-- JS will inject rows here -->
         <tr id="no_data_row" style="display: none;">
-          <td colspan="7" class="text-center text-muted">
+          <td colspan="8" class="text-center text-muted">
             <i class="fa fa-info-circle me-1"></i> No timesheet records found for the selected filters.
           </td>
         </tr>

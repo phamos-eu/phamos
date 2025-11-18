@@ -22,21 +22,43 @@ def get_timesheets(from_date=None, to_date=None, project=None, offset=0, limit=2
     if to_date:
         filters["end_date"] = ["<=", getdate(to_date)]
     if project:
-        filters["parent_project"] = project
+        conditions += " AND parent_project = %s"
+        values.append(project)
 
-    total = frappe.db.count("Timesheet", filters)
+    # Total count with filters
+    total = frappe.db.sql(f"""
+        SELECT COUNT(*)
+        FROM `tabTimesheet`
+        WHERE docstatus IN (0, 1) {conditions}
+    """, values)[0][0]
 
-    timesheets = frappe.get_list("Timesheet",
-        filters=filters,
-        fields=[
-            "name", "employee", "employee_name", "custom_billing_status", "project_owner",
-            "timesheet_status", "total_hours", "total_billable_hours", "project_name",
-            "start_date", "end_date", "creation"
-        ],
-        order_by="creation desc",
-        start=int(offset),
-        page_length=int(limit)
-    )
+    # Timesheet rows with filters
+    timesheets = frappe.db.sql(f"""
+        SELECT 
+            ts.name,
+            ts.employee,
+            ts.custom_billing_status,
+            ts.project_owner,
+            ts.total_hours,
+            ts.total_billable_hours,
+            ts.project_name,
+            ts.start_date,
+            ts.end_date,
+            ts.creation,
+            ts.customer_comment,
+            ts.custom_approval,
+            (
+                SELECT description
+                FROM `tabTimesheet Detail` td
+                WHERE td.parent = ts.name
+                ORDER BY td.idx
+                LIMIT 1
+            ) AS related_issue
+        FROM `tabTimesheet` ts
+        WHERE ts.docstatus IN (0, 1) {conditions}
+        ORDER BY ts.creation DESC
+        LIMIT {limit} OFFSET {offset}
+    """, values, as_dict=True)
 
     return {"timesheets": timesheets, "total": total}
 
@@ -175,7 +197,6 @@ def get_graph_data(from_date=None, to_date=None, project=None):
     """, as_dict=True)
 
     return {"timesheets": data}
-
 
 
 
