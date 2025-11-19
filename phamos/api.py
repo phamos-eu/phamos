@@ -4,16 +4,14 @@ from frappe.utils import getdate
 from frappe import _
 
 @frappe.whitelist()
-def get_timesheets(from_date=None, to_date=None, project=None, offset=0, limit=20):
+def get_timesheets(from_date=None, to_date=None, project=None, offset=0, limit=20, sort_by=None, sort_order=None):
     user = frappe.session.user
 
-    #validate user
     validate_guest_user()
-    
     customer = get_customer_for_user(user)
-    
     if not customer:
         frappe.throw("No Customer linked to user.", frappe.PermissionError)
+
     # Build dynamic filters
     conditions = " AND customer = %s"
     values = [customer]
@@ -30,14 +28,27 @@ def get_timesheets(from_date=None, to_date=None, project=None, offset=0, limit=2
         conditions += " AND parent_project = %s"
         values.append(project)
 
-    # Total count with filters
+    valid_sort_fields = {
+        "timesheet": "ts.name",
+        "start_date": "ts.start_date",
+        "billing_status": "ts.custom_billing_status",
+        "total_hours": "ts.total_hours",
+        "billable_hours": "ts.total_billable_hours",
+        "related_issue": "related_issue",
+        "comment": "ts.customer_comment",
+        "creation": "ts.creation"
+    }
+
+    order_field = valid_sort_fields.get(sort_by, "ts.creation")  
+    order_direction = "ASC" if sort_order == "asc" else "DESC"
+
+    # Total count
     total = frappe.db.sql(f"""
         SELECT COUNT(*)
         FROM `tabTimesheet`
         WHERE docstatus IN (0, 1) {conditions}
     """, values)[0][0]
 
-    # Timesheet rows with filters
     timesheets = frappe.db.sql(f"""
         SELECT 
             ts.name,
@@ -61,7 +72,7 @@ def get_timesheets(from_date=None, to_date=None, project=None, offset=0, limit=2
             ) AS related_issue
         FROM `tabTimesheet` ts
         WHERE ts.docstatus IN (0, 1) {conditions}
-        ORDER BY ts.creation DESC
+        ORDER BY {order_field} {order_direction}
         LIMIT {limit} OFFSET {offset}
     """, values, as_dict=True)
 

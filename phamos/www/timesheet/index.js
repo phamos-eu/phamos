@@ -1,6 +1,17 @@
 let pageSize = 20;
 let totalCount = 0;
 let loadedCount = 0;
+let currentSortBy = null;
+let currentSortOrder = null;
+const sortFieldMap = {
+    1: "timesheet",
+    2: "start_date",
+    3: "billing_status",
+    4: "total_hours",
+    5: "billable_hours",
+    6: "related_issue",
+    7: "comment"
+};
 
 frappe.ready(() => {
 
@@ -139,7 +150,7 @@ function load_timesheets() {
 
   frappe.call({
     method: "phamos.api.get_timesheets",
-    args: { from_date, to_date, project, offset, limit: pageSize },
+    args: { from_date, to_date, project, offset, limit: pageSize, sort_by: currentSortBy, sort_order: currentSortOrder },
     callback: function (r) {
       const data = r.message.timesheets || [];
       totalCount = r.message.total || 0;
@@ -692,4 +703,52 @@ $(document).on('click', '.comment-btn', function () {
   $('#saveComment').prop('disabled', isLocked);
 
   $('#commentModal').modal('show');
+});
+
+/* Sorting Handler  */
+document.addEventListener("click", function (event) {
+    const icon = event.target.closest(".sort-icon");
+    const menuItem = event.target.closest(".menu-item");
+
+    if (icon) {
+        event.stopPropagation();
+
+        const th = icon.closest("th");
+        const menu = th.querySelector(".th-menu");
+
+        window.currentSortColumn = Array.from(th.parentNode.children).indexOf(th);
+
+        document.querySelectorAll(".th-menu").forEach(m => {
+            if (m !== menu) m.style.display = "none";
+        });
+
+        menu.style.display = menu.style.display === "block" ? "none" : "block";
+        return;
+    }
+
+    if (menuItem) {
+        const action = menuItem.dataset.action;
+
+        document.querySelectorAll(".th-menu").forEach(m => m.style.display = "none");
+
+        currentSortBy = sortFieldMap[window.currentSortColumn] || null;
+
+        if (action === "asc") {
+            currentSortOrder = "asc";
+        }
+        else if (action === "desc") {
+            currentSortOrder = "desc";
+        }
+        else if (action === "reset") {
+            currentSortBy = null;
+            currentSortOrder = null;
+        }
+
+        reset_and_load();
+        return;
+    }
+
+    document.querySelectorAll(".th-menu").forEach(menu => {
+        menu.style.display = "none";
+    });
 });
