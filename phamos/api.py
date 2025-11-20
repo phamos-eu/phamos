@@ -1,6 +1,5 @@
 import frappe
-from frappe.apps import _
-from frappe.utils import getdate
+from frappe.utils import getdate, get_url, format_datetime, strip_html
 from frappe import _
 
 @frappe.whitelist()
@@ -102,31 +101,14 @@ def update_customer_comment(ts_name, comment=None, custom_rating=None):
     if custom_rating is not None:
         ts.db_set("custom_rating", custom_rating)
 
-    # Send email notification to Project Owner/Deputy
-    if ts.parent_project:
-        project = frappe.get_doc("Project", ts.parent_project)
-        recipients = [r for r in [project.get("project_owner"), project.get("project_deputy")] if r]
-        if recipients:
-            frappe.sendmail(
-                recipients=recipients,
-                subject=f"New Discount/Comment Request for Timesheet: {ts.name}",
-                message=f"""
-                    <p>Hello,</p>
-                    <p>A new request has been submitted by a customer on Timesheet <b>{ts.name}</b>.</p>
-                    <p><b>Comment:</b> {comment or '-'}<br>
-                    <b>Rating:</b> {custom_rating or '-'}</p>
-                    <p>Status: <b>Pending</b></p>
-                    <p>Regards,<br>ERPNext System</p>
-                """,
-                now=True
-            )
+    ts.db_set("custom_customer_comment_timestamp", frappe.utils.now_datetime())
+    ts.db_set("custom_daily_comment_report_sent", 0)
 
     frappe.db.commit()
 
     return {
         "message": "Comment sent for Review successfully.",
     }
-
 
 
 def get_customer_for_user(user):
@@ -211,4 +193,137 @@ def get_graph_data(from_date=None, to_date=None, project=None):
     return {"timesheets": data}
 
 
+def send_daily_timesheet_comment_summary():
+    rows = frappe.db.sql(
+        """
+        SELECT
+            ts.name AS timesheet,
+            ts.customer_comment AS comment,
+            ts.custom_customer_comment_timestamp AS comment_timestamp,
+            ts.custom_rating AS rating,
+            ts.employee AS employee,
+            ts.customer AS customer,
+            ts.parent_project AS parent_project,
+            pr.project_owner AS project_owner
+        FROM `tabTimesheet` ts
+        LEFT JOIN `tabProject` pr ON pr.name = ts.parent_project
+        WHERE
+            ts.docstatus IN (0, 1)
+            AND ts.customer_comment IS NOT NULL
+            AND ts.customer_comment != ''
+            AND (ts.custom_daily_comment_report_sent IS NULL
+                 OR ts.custom_daily_comment_report_sent = 0)
+            AND pr.project_owner IS NOT NULL
+        """,
+        as_dict=True,
+    )
 
+    if not rows:
+        return
+
+    owner_map = {}
+    for row in rows:
+        owner = row.project_owner
+        if not owner:
+            continue
+        owner_map.setdefault(owner, []).append(row)
+
+    for owner, items in owner_map.items():
+        if not items:
+            continue
+
+        customers = sorted({r.customer for r in items})
+        if not customers:
+            subject = _("Daily Summary: New Timesheet Comments")
+        elif len(customers) == 1:
+            subject = _("Daily Summary: New Timesheet Comments for Customer {0}").format(customers[0])
+        else:
+            subject = _("Daily Summary: New Timesheet Comments for Customers {0}").format(", ".join(customers))
+
+        html_rows = []
+        for r in items:
+            ts_link = get_url(f"/app/timesheet/{r.timesheet}")
+            preview = truncate(strip_html(r.comment))
+
+            full_name = frappe.db.get_value("Customer", r.customer, "customer_name")
+            commented_by_label = full_name or r.customer
+
+            comment_dt = r.comment_timestamp
+            if comment_dt:
+                comment_date_str = format_datetime(comment_dt, "yyyy-MM-dd HH:mm")
+            else:
+                comment_date_str = ""
+
+            rating_value = int(r.rating or 0)
+            stars = "★" * rating_value + "☆" * (5 - rating_value)
+
+            html_rows.append(
+                f"""
+                <tr>
+                    <td><a href="{ts_link}">{frappe.utils.escape_html(r.timesheet)}</a></td>
+                    <td>{frappe.utils.escape_html(preview)}</td>
+                    <td>{stars}</td>
+                    <td>{frappe.utils.escape_html(commented_by_label)}</td>
+                    <td>{frappe.utils.escape_html(comment_date_str)}</td>
+                </tr>
+                """
+            )
+
+        if not html_rows:
+            continue
+
+        table_html = f"""
+            <p>{_('Hello')},</p>
+            <p>{_('Here is your daily summary of new timesheet comments from the customer portal:')}</p>
+            <table border="1" cellpadding="6" cellspacing="0" style="border-collapse: collapse; font-size: 12px;">
+                <thead style="background-color: #f5f5f5;">
+                    <tr>
+                        <th style="text-align:left;">{_('Timesheet')}</th>
+                        <th style="text-align:left;">{_('Comment Preview')}</th>
+                        <th style="text-align:left;">{_('Rating')}</th>
+                        <th style="text-align:left;">{_('Commented By')}</th>
+                        <th style="text-align:left;">{_('Comment Date')}</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {''.join(html_rows)}
+                </tbody>
+            </table>
+            <p style="margin-top: 12px;">
+                {_('This email contains only new comments that have not been reported in a previous daily summary.')}</p>
+            <p>{_('Best regards')}<br>{_('ERPNext System')}</p>
+        """
+
+        recipients = [owner]
+        try:
+            frappe.sendmail(
+                recipients=recipients,
+                subject=subject,
+                message=table_html,
+                now=True,
+            )
+
+            ts_names = [r.timesheet for r in items]
+            if ts_names:
+                frappe.db.sql(
+                    """
+                    UPDATE `tabTimesheet`
+                    SET custom_daily_comment_report_sent = 1
+                    WHERE name IN ({placeholders})
+                    """.format(
+                        placeholders=", ".join(["%s"] * len(ts_names))
+                    ),
+                    ts_names,
+                )
+                frappe.db.commit()
+
+        except Exception:
+            frappe.log_error(
+                title="Daily Timesheet Comment Summary: Email Send Failed",
+                message=frappe.get_traceback(),
+            )
+
+
+def truncate(text, length=100):
+    text = (text or "").strip()
+    return text if len(text) <= length else text[:length].rstrip() + "…"
