@@ -180,13 +180,11 @@ fixtures = [
     ]}
 ]
 
-#scheduler_events = {
- #   "cron": {
-  #      "0 6 * * 1-5": [
-   #         "phamos.custom_scripts.custom_python.mattermost_daily_thread.create_mattermost_thread"
-    #    ]
-    #}
-#}
+scheduler_events = {
+    "daily": [
+        "phamos.api.send_daily_timesheet_comment_summary"
+    ]
+}
 
 
 # Testing

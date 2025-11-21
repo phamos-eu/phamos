@@ -1,6 +1,17 @@
 let pageSize = 20;
 let totalCount = 0;
 let loadedCount = 0;
+let currentSortBy = null;
+let currentSortOrder = null;
+const sortFieldMap = {
+    1: "timesheet",
+    2: "start_date",
+    3: "billing_status",
+    4: "total_hours",
+    5: "billable_hours",
+    6: "related_issue",
+    7: "comment"
+};
 
 frappe.ready(() => {
 
@@ -38,6 +49,10 @@ frappe.ready(() => {
   $('#download_selected').on('click', function (e) {
     e.preventDefault();
     download_visible_csv();
+  });
+
+  $(document).on('input', '.column-filter', function () {
+    apply_column_filters();
   });
   
   $('#select_all').on('change', function () {
@@ -135,7 +150,7 @@ function load_timesheets() {
 
   frappe.call({
     method: "phamos.api.get_timesheets",
-    args: { from_date, to_date, project, offset, limit: pageSize },
+    args: { from_date, to_date, project, offset, limit: pageSize, sort_by: currentSortBy, sort_order: currentSortOrder },
     callback: function (r) {
       const data = r.message.timesheets || [];
       totalCount = r.message.total || 0;
@@ -162,17 +177,24 @@ function load_timesheets() {
           btnColor = "#ffc107";
         }
 
+        const relatedIssues = row.related_issue || '';
+        const relatedPreview = truncateText(relatedIssues, 80);
+        const relatedTooltip = escapeHtml(relatedIssues);
+        const relatedDisplay = relatedPreview ? escapeHtml(relatedPreview) : '-';
+
         $tbody.append(`
           <tr>
             <td><input type="checkbox" class="row-select" /></td>
             <td>${row.name}</td>
-            <td>${row.employee}</td>
             <td>${frappe.datetime.str_to_user(row.start_date)}</td>
-            <td>${frappe.datetime.str_to_user(row.end_date)}</td>
             <td>${row.custom_billing_status || ''}</td>
             <td>${format_hours(row.total_hours)}</td>
             <td>${format_hours(row.total_billable_hours)}</td>
-            <td title="${frappe.datetime.str_to_user(row.creation)}">${formatShortRelative(row.creation)}</td>
+            <td>
+              <span class="d-inline-block text-truncate" style="max-width: 220px;" title="${relatedTooltip}">
+                ${relatedDisplay}
+              </span>
+            </td>
             <td>
               <button 
                 class="btn btn-sm comment-btn"
@@ -187,6 +209,7 @@ function load_timesheets() {
       });
 
       loadedCount += data.length;
+      apply_column_filters();
       update_footer();
 
       if (loadedCount >= totalCount || data.length < pageSize) {
@@ -196,6 +219,49 @@ function load_timesheets() {
       }
     }
   });
+}
+
+function apply_column_filters() {
+  const filters = {};
+  $('.column-filter').each(function () {
+    const value = ($(this).val() || '').trim().toLowerCase();
+    const index = $(this).data('column-index');
+    if (value) {
+      filters[index] = value;
+    }
+  });
+
+  const activeColumns = Object.keys(filters);
+  let visibleCount = 0;
+
+  $('#timesheet_body tr').each(function () {
+    if (this.id === 'no_data_row') {
+      return;
+    }
+
+    let visible = true;
+    if (activeColumns.length) {
+      const $cells = $(this).find('td');
+      for (let i = 0; i < activeColumns.length; i++) {
+        const colIndex = parseInt(activeColumns[i], 10);
+        const filterValue = filters[colIndex];
+        const cellText = ($cells.eq(colIndex).text() || '').trim().toLowerCase();
+        if (!cellText.includes(filterValue)) {
+          visible = false;
+          break;
+        }
+      }
+    }
+
+    $(this).toggle(visible);
+    if (visible) {
+      visibleCount++;
+    }
+  });
+
+  if (loadedCount > 0) {
+    $('#no_data_row').toggle(visibleCount === 0);
+  }
 }
 
 let currentTsName = null; // store which timesheet is being edited
@@ -448,6 +514,23 @@ function formatShortRelative(dateStr) {
   return "Today";
 }
 
+function truncateText(text = '', limit = 80) {
+  const str = String(text);
+  if (str.length <= limit) {
+    return str;
+  }
+  return `${str.slice(0, limit).trim()}…`;
+}
+
+function escapeHtml(text = '') {
+  return String(text)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
+
 function update_summary_cards() {
   const from_date = $('#from_date').val();
   const to_date = $('#to_date').val();
@@ -622,3 +705,50 @@ $(document).on('click', '.comment-btn', function () {
   $('#commentModal').modal('show');
 });
 
+/* Sorting Handler  */
+document.addEventListener("click", function (event) {
+    const icon = event.target.closest(".sort-icon");
+    const menuItem = event.target.closest(".menu-item");
+
+    if (icon) {
+        event.stopPropagation();
+
+        const th = icon.closest("th");
+        const menu = th.querySelector(".th-menu");
+
+        window.currentSortColumn = Array.from(th.parentNode.children).indexOf(th);
+
+        document.querySelectorAll(".th-menu").forEach(m => {
+            if (m !== menu) m.style.display = "none";
+        });
+
+        menu.style.display = menu.style.display === "block" ? "none" : "block";
+        return;
+    }
+
+    if (menuItem) {
+        const action = menuItem.dataset.action;
+
+        document.querySelectorAll(".th-menu").forEach(m => m.style.display = "none");
+
+        currentSortBy = sortFieldMap[window.currentSortColumn] || null;
+
+        if (action === "asc") {
+            currentSortOrder = "asc";
+        }
+        else if (action === "desc") {
+            currentSortOrder = "desc";
+        }
+        else if (action === "reset") {
+            currentSortBy = null;
+            currentSortOrder = null;
+        }
+
+        reset_and_load();
+        return;
+    }
+
+    document.querySelectorAll(".th-menu").forEach(menu => {
+        menu.style.display = "none";
+    });
+});
