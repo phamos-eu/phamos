@@ -923,7 +923,7 @@ function show_tab(tab, projectData) {
 
       // Render projects table
       renderProjectDataTable(tableDiv, projectData);
-
+      persistButtonStates();
     }
 
     else if (tab === "All Projects") {
@@ -1561,7 +1561,7 @@ window.togglePausePlay = function(taskId, timesheetName) {
     btn.textContent = '⏸️';
     btn.setAttribute('data-paused', 'false');
 
-    frappe.confirm(
+    confirm_strict(
       "Do you want to create a timesheet record for this Break?",
       function() {
           frappe.call({
@@ -1569,7 +1569,11 @@ window.togglePausePlay = function(taskId, timesheetName) {
               args: { name: timesheetName },
               callback: function(r) {
                   if (r.message && r.message.status === "success") {
-                      show_break_task_dialog(r.message.new_row_name, r.message.previous_from_time, r.message.previous_to_time, );
+                      show_break_task_dialog(
+                          r.message.new_row_name, 
+                          r.message.previous_from_time, 
+                          r.message.previous_to_time
+                      );
                   } else {
                       frappe.show_alert("Error: " + (r.message.message || "Something went wrong."));
                   }
@@ -1577,7 +1581,6 @@ window.togglePausePlay = function(taskId, timesheetName) {
           });
       },
       function() {
-          // ❌ NO → create new row but don't show popup
           frappe.call({
               method: "phamos.phamos.page.project_action_panel.project_action_panel.close_open_row_and_add_break",
               args: { name: timesheetName },
@@ -1590,8 +1593,7 @@ window.togglePausePlay = function(taskId, timesheetName) {
               }
           });
       }
-  );
-
+    );
 
   } else {
     // ⏸️ Pause clicked → Close current row
@@ -1614,37 +1616,73 @@ window.togglePausePlay = function(taskId, timesheetName) {
     });
   }
 };
-frappe.after_ajax(() => {
-  console.log("frappe.after_ajax started");
-  const taskButtons = document.querySelectorAll("[id^='toggle-']");
-  console.log("Buttons found:", taskButtons.length);
 
-  taskButtons.forEach(btn => {
-    const taskId = btn.id.split("toggle-")[1];
-    const timesheetName = btn.getAttribute("data-timesheet");
-
-    console.log("Checking task:", taskId, "timesheet:", timesheetName);
-
-    frappe.call({
-      method: "phamos.phamos.page.project_action_panel.project_action_panel.is_task_running",
-      args: {
-        name: timesheetName
-      },
-      callback: function (r) {
-        if (r.message && r.message.is_running) {
-          btn.textContent = '⏸️';
-          btn.setAttribute('data-paused', 'false');
-          btn.setAttribute('title', 'Pause ⏸️');
-        } else {
-          btn.textContent = '▶️';
-          btn.setAttribute('data-paused', 'true');
-          btn.setAttribute('title', 'Resume ▶️');
+function confirm_strict(message, yes_callback, no_callback) {
+    let d = new frappe.ui.Dialog({
+        title: "Confirm",
+        fields: [
+            {
+                fieldtype: "HTML",
+                fieldname: "msg_html",
+                options: `<p>${message}</p>`
+            }
+        ],
+        primary_action_label: "Yes",
+        primary_action() {
+            d.hide();
+            yes_callback();
         }
-
-      }
     });
-  });
-});
+
+    d.set_secondary_action_label("No");
+    d.set_secondary_action(() => {
+        d.hide();
+        if (no_callback) no_callback();
+    });
+
+    d.$wrapper.modal({
+        backdrop: "static",
+        keyboard: false
+    });
+
+    d.show();
+    return d;
+}
+
+
+function persistButtonStates() {
+    frappe.after_ajax(() => {
+      console.log("frappe.after_ajax started");
+      const taskButtons = document.querySelectorAll("[id^='toggle-']");
+      console.log("Buttons found:", taskButtons.length);
+
+      taskButtons.forEach(btn => {
+        const taskId = btn.id.split("toggle-")[1];
+        const timesheetName = btn.getAttribute("data-timesheet");
+
+        console.log("Checking task:", taskId, "timesheet:", timesheetName);
+
+        frappe.call({
+          method: "phamos.phamos.page.project_action_panel.project_action_panel.is_task_running",
+          args: {
+            name: timesheetName
+          },
+          callback: function (r) {
+            if (r.message && r.message.is_running) {
+              btn.textContent = '⏸️';
+              btn.setAttribute('data-paused', 'false');
+              btn.setAttribute('title', 'Pause ⏸️');
+            } else {
+              btn.textContent = '▶️';
+              btn.setAttribute('data-paused', 'true');
+              btn.setAttribute('title', 'Resume ▶️');
+            }
+
+          }
+        });
+     });
+    });
+  }
 };
 
 function show_break_task_dialog(new_row_name, previous_from_time, previous_to_time) {
