@@ -57,7 +57,6 @@ class TimesheetRecord(Document):
 				"customer": self.customer,
 				"note": description,
 				"employee": self.employee,
-				"custom_approval": ""
 			}
 		)
 		timesheet.append(

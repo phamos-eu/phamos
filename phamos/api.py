@@ -61,7 +61,6 @@ def get_timesheets(from_date=None, to_date=None, project=None, offset=0, limit=2
             ts.end_date,
             ts.creation,
             ts.customer_comment,
-            ts.custom_approval,
             (
                 SELECT description
                 FROM `tabTimesheet Detail` td
