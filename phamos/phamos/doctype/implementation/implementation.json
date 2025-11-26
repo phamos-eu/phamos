@@ -332,12 +332,6 @@
    "label": "Reset"
   },
   {
-   "default": "1",
-   "fieldname": "internal_implementation",
-   "fieldtype": "Check",
-   "label": "Internal Implementation"
-  },
-  {
    "fieldname": "report_tab",
    "fieldtype": "Tab Break",
    "label": "Report"
@@ -383,7 +377,7 @@
    "link_fieldname": "custom_implementation"
   }
  ],
- "modified": "2025-10-31 11:36:08.263301",
+ "modified": "2025-11-26 07:45:02.091002",
  "modified_by": "Administrator",
  "module": "Phamos",
  "name": "Implementation",
