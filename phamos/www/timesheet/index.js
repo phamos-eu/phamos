@@ -172,8 +172,8 @@ function load_timesheets() {
         let btnColor = "#5198e3"; // default blue
 
         
-        if (row.customer_comment) {
-          btnText = "Under Review";
+        if (Number(row.custom_rating) > 0) {
+            btnText = "Under Review";
           btnColor = "#ffc107";
         }
 
