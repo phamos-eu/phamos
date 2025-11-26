@@ -257,8 +257,8 @@ function update_and_submit_timesheet_record(
       let rowCount = items.length;
       let lastRow = items[rowCount - 1];
 
-      // 🔹 Check 1st, 3rd, or 5th row only
-      if (![1, 3, 5].includes(rowCount)) {
+      // 🔹 Check 1st, 3rd, or 5th .. row
+      if (rowCount % 2 === 0) {
         frappe.show_alert({
           message: "⏸️ Please Pause it first (▶️)",
           indicator: "orange"
