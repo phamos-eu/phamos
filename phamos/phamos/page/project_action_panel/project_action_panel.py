@@ -532,6 +532,10 @@ def create_and_submit_timesheet( project_name=None,
     goal=None, 
     to_time=None):
     try:
+        # ✅ Validate before creating record
+        if from_time and to_time and get_datetime(to_time) < get_datetime(from_time):
+            frappe.throw(_("To Time cannot be earlier than From Time. Record not saved."))
+
         ts = frappe.new_doc("Timesheet Record")
         ts.project = project_name
         ts.activity_type = activity_type
@@ -547,25 +551,22 @@ def create_and_submit_timesheet( project_name=None,
         # Add child row
         ts.append("item", {
             "from_time": from_time,
-            "to_time": ts.to_time
+            "to_time": to_time
         })
 
-        # ✅ Calculate duration for each row and sum it up
+        # ✅ Calculate total duration
         total_duration = 0
         for row in ts.item:
             if row.from_time and row.to_time:
-                duration_seconds = time_diff_in_seconds(row.to_time, row.from_time)
-                row.duration = duration_seconds
-                total_duration += duration_seconds
+                if get_datetime(row.to_time) < get_datetime(row.from_time):
+                    frappe.throw(_("Row #{0}: To Time cannot be earlier than From Time. Record not saved.").format(row.idx))
+                row.duration = time_diff_in_seconds(row.to_time, row.from_time)
+                total_duration += row.duration
 
-        # ✅ Set total duration in parent actual_time
         ts.actual_time = total_duration
-
-        # ✅ Mark as complete before submit
         ts.status = "Complete"
 
         ts.insert(ignore_permissions=True)
-        ts.save()
         ts.submit()
 
         return {
@@ -591,15 +592,20 @@ def update_and_submit_timesheet_record(name, to_time, percent_billable, activity
         if doc.item:
             for row in reversed(doc.item):
                 if row.from_time and not row.to_time:
+                    # ✅ Validate before assigning
+                    if get_datetime(to_time) < get_datetime(row.from_time):
+                        frappe.throw(_("To Time cannot be earlier than From Time. Update aborted."))
                     row.to_time = to_time
                     break
 
-        # Calculate durations for all rows
+        # Calculate durations & validate
         for row in doc.item:
             if row.from_time and row.to_time:
+                if get_datetime(row.to_time) < get_datetime(row.from_time):
+                    frappe.throw(_("Row #{0}: To Time cannot be earlier than From Time. Update aborted.").format(row.idx))
                 row.duration = time_diff_in_seconds(row.to_time, row.from_time)
 
-        # Update parent fields of original with first row data
+        # Update parent fields
         if doc.item:
             first_row = doc.item[0]
             doc.from_time = first_row.from_time
@@ -611,13 +617,21 @@ def update_and_submit_timesheet_record(name, to_time, percent_billable, activity
         doc.result = result
         doc.percent_billable = percent_billable
 
-        # Save & submit original document
+        # ✅ Final validation before any save or submit
+        if doc.from_time and doc.to_time and get_datetime(doc.to_time) < get_datetime(doc.from_time):
+            frappe.throw(_("To Time cannot be earlier than From Time. Update aborted."))
+
         doc.save()
         doc.submit()
 
-        # --- Create alternative records from 3rd, 5th, 7th, ... rows ---
-        for i in range(2, len(doc.item), 2):  # start from 3rd row (index 2), step 2
+        # --- Create alternative records (3rd, 5th, etc.) ---
+        for i in range(2, len(doc.item), 2):  # start from 3rd row (index 2)
             alt_row = doc.item[i]
+
+            # ✅ Skip invalid alternate rows
+            if alt_row.from_time and alt_row.to_time and get_datetime(alt_row.to_time) < get_datetime(alt_row.from_time):
+                continue
+
             new_doc = frappe.new_doc("Timesheet Record")
 
             # Copy parent fields from original
@@ -883,7 +897,7 @@ def get_project_count_all():
 
 @frappe.whitelist()
 def total_hours_worked_today():
-    from datetime import datetime
+    from datetime import datetime, timedelta
 
     # --- Get employee ---
     employee_name = frappe.db.get_value("Employee", {"user_id": frappe.session.user}, "name")
@@ -891,6 +905,8 @@ def total_hours_worked_today():
 
     # --- Total actual & billable time (for value display) ---
     TimesheetRecord = DocType("Timesheet Record")
+
+    # ✅ Use from_time and to_time date instead of creation
     count_time = (
         frappe.qb.from_(TimesheetRecord)
         .select(
@@ -899,8 +915,11 @@ def total_hours_worked_today():
         )
         .where(
             (TimesheetRecord.employee == employee_name)
-            & (fn.Date(TimesheetRecord.creation) == today_date)
             & (TimesheetRecord.docstatus != 2)
+            & (
+                (fn.Date(TimesheetRecord.from_time) == today_date)
+                | (fn.Date(TimesheetRecord.to_time) == today_date)
+            )
         )
         .run(as_dict=True)
     )
@@ -911,7 +930,7 @@ def total_hours_worked_today():
         filters={
             "employee": employee_name,
             "docstatus": ["!=", 2],
-            "creation": ["between", [
+            "from_time": ["between", [
                 datetime.combine(today_date, datetime.min.time()),
                 datetime.combine(today_date, datetime.max.time())
             ]]
