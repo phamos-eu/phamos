@@ -247,21 +247,25 @@ function update_and_submit_timesheet_record(
 
       let doc = res.message;
 
-      // 🔹 Check: Child table 'item' exist karta hai?
+      // 🔹 Check: Child table 'item' exist
       if (!doc.item || doc.item.length === 0) {
         frappe.show_alert("No time logs found.");
         return;
       }
 
-      let lastRow = doc.item[doc.item.length - 1];
+      let items = doc.item || [];
+      let rowCount = items.length;
+      let lastRow = items[rowCount - 1];
 
-      // 🔹 Agar last row ka to_time filled hai → error
-      if (lastRow.to_time) {
-        frappe.show_alert("Please Pause it first (▶️)");
+      // 🔹 Check 1st, 3rd, or 5th .. row
+      if (rowCount % 2 === 0) {
+        frappe.show_alert({
+          message: "⏸️ Please Pause it first (▶️)",
+          indicator: "orange"
+        });
         return;
       }
 
-      // ✅ Agar check pass ho gaya → ab popup open karo
       openStopProjectDialog(timesheet_record, percent_billable, project, task, task_in_timesheet_record);
     }
   });
