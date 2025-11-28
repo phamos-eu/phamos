@@ -156,6 +156,16 @@ def is_task_running(name):
 
     if not rows:
         return {"is_running": False}
+    # Get all child rows in correct order
+    rows = frappe.db.sql("""
+        SELECT name, to_time
+        FROM `tabTimesheet Record Item`
+        WHERE parent = %s
+        ORDER BY creation ASC
+    """, name, as_dict=True)
+
+    if not rows:
+        return {"is_running": False}
 
     # Find last open (missing to_time)
     for idx, row in enumerate(rows, start=1):
@@ -167,6 +177,168 @@ def is_task_running(name):
 
     # If no missing to_time → considered paused
     return {"is_running": False}
+
+
+@frappe.whitelist()
+def create_and_submit_timesheet( project_name=None, 
+    percent_billable=None, 
+    result=None, 
+    activity_type=None, 
+    from_time=None, 
+    expected_time=None, 
+    goal=None, 
+    to_time=None):
+    try:
+        ts = frappe.new_doc("Timesheet Record")
+        ts.project = project_name
+        ts.activity_type = activity_type
+        ts.percent_billable = percent_billable
+        ts.goal = goal
+        ts.expected_time = expected_time
+        ts.result = result
+
+        # Parent field set
+        ts.from_time = from_time
+        ts.to_time = to_time
+
+        # Add child row
+        ts.append("item", {
+            "from_time": from_time,
+            "to_time": ts.to_time
+        })
+
+        # ✅ Calculate duration for each row and sum it up
+        total_duration = 0
+        for row in ts.item:
+            if row.from_time and row.to_time:
+                duration_seconds = time_diff_in_seconds(row.to_time, row.from_time)
+                row.duration = duration_seconds
+                total_duration += duration_seconds
+
+        # ✅ Set total duration in parent actual_time
+        ts.actual_time = total_duration
+
+        # ✅ Mark as complete before submit
+        ts.status = "Complete"
+
+        ts.insert(ignore_permissions=True)
+        ts.save()
+        ts.submit()
+
+        return {
+            "status": "success",
+            "message": f"Timesheet Record {ts.name} created and submitted successfully",
+            "name": ts.name
+        }
+
+    except Exception as e:
+        frappe.log_error(frappe.get_traceback(), "Create Timesheet Record Error")
+        return {
+            "status": "error",
+            "message": str(e)
+        }
+
+@frappe.whitelist()
+def update_to_time(name):
+    try:
+        doc = frappe.get_doc("Timesheet Record", name)
+
+        for row in doc.item:
+            if not row.to_time:
+                row.to_time = now_datetime()
+                new_row = doc.append("item", {})
+                new_row.from_time = now_datetime()
+                break 
+
+        doc.save()
+        frappe.db.commit()
+
+        return {
+            "status": "success",
+            "message": "to_time updated",
+            "timesheet": name
+        }
+
+    except Exception as e:
+        frappe.log_error(frappe.get_traceback(), "Timesheet Record Update Error")
+        return {
+            "status": "error",
+            "message": "Error updating Timesheet Record"
+        }
+
+@frappe.whitelist()
+def close_open_row_and_add_break(name):
+    try:
+        doc = frappe.get_doc("Timesheet Record", name)
+        current_time = now_datetime()
+        new_row = None
+        previous_from_time = None
+        previous_to_time = None
+
+        if len(doc.item) >= 1:
+            previous_from_time = doc.item[-1].from_time
+
+
+        for idx, row in enumerate(doc.item):
+            if not row.to_time:
+                row.to_time = current_time
+                previous_to_time = row.to_time
+                new_row = doc.append("item", {})
+                new_row.from_time = current_time
+                break
+
+        if not new_row:
+            return {
+                "status": "error",
+                "message": "No open row found to close."
+            }
+
+        doc.save()
+        frappe.db.commit()
+
+        return {
+            "status": "success",
+            "message": "Break row created",
+            "new_row_name": new_row.name,
+            "previous_from_time": previous_from_time,
+            "previous_to_time": previous_to_time,
+        }
+
+    except Exception as e:
+        frappe.log_error(frappe.get_traceback(), "Timesheet Record Break Creation Error")
+        return {
+            "status": "error",
+            "message": f"Error creating break row: {str(e)}"
+        }
+
+@frappe.whitelist()
+def get_assigned_projects(doctype, txt, searchfield, start, page_len, filters):
+    user = frappe.session.user
+    
+    projects = frappe.db.sql("""
+        SELECT DISTINCT p.name, p.project_name
+        FROM `tabProject` p
+        JOIN `tabToDo` t ON t.reference_name = p.name
+        WHERE t.owner = %s
+        AND t.reference_type = 'Project'
+        AND (p.name LIKE %s OR p.project_name LIKE %s)
+        ORDER BY p.project_name ASC
+        LIMIT %s OFFSET %s
+    """, (user, f"%{txt}%", f"%{txt}%", page_len, start))
+    
+    return projects
+
+    
+@frappe.whitelist()
+def is_task_running(name):
+    try:
+        doc = frappe.get_doc("Timesheet Record", name)
+        for row in reversed(doc.item):
+            if not row.to_time:
+                return {"is_running": True}
+        return {"is_running": False}
+    except:
+        return {"is_running": False}
 
 
 @frappe.whitelist()
