@@ -934,6 +934,13 @@ function show_tab(tab, projectData) {
         .dt-cell__content--col-6, .dt-cell__content--header-6 { display: table-cell; }
         .dt-cell__content--col-3, .dt-cell__content--header-3 { display: table-cell; }
         .dt-cell__content--col-9, .dt-cell__content--header-9 { display: table-cell; }
+
+        /* 🌟 Add width to the scrollable DataTable only for All Projects */
+        #datatable-wrapper .dt-scrollable {
+            width: 1225px !important;
+            max-width: 1225px !important;
+            overflow: auto !important;
+         }
         `;
       document.head.appendChild(style);
 
