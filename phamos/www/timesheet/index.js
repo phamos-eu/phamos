@@ -1,6 +1,17 @@
 let pageSize = 20;
 let totalCount = 0;
 let loadedCount = 0;
+let currentSortBy = null;
+let currentSortOrder = null;
+const sortFieldMap = {
+    1: "timesheet",
+    2: "start_date",
+    3: "billing_status",
+    4: "total_hours",
+    5: "billable_hours",
+    6: "related_issue",
+    7: "comment"
+};
 
 frappe.ready(() => {
 
@@ -38,6 +49,10 @@ frappe.ready(() => {
   $('#download_selected').on('click', function (e) {
     e.preventDefault();
     download_visible_csv();
+  });
+
+  $(document).on('input', '.column-filter', function () {
+    apply_column_filters();
   });
   
   $('#select_all').on('change', function () {
@@ -135,7 +150,7 @@ function load_timesheets() {
 
   frappe.call({
     method: "phamos.api.get_timesheets",
-    args: { from_date, to_date, project, offset, limit: pageSize },
+    args: { from_date, to_date, project, offset, limit: pageSize, sort_by: currentSortBy, sort_order: currentSortOrder },
     callback: function (r) {
       const data = r.message.timesheets || [];
       totalCount = r.message.total || 0;
@@ -156,30 +171,30 @@ function load_timesheets() {
         let btnText = "Request Adjustments";
         let btnColor = "#5198e3"; // default blue
 
-        if (row.custom_approval === "Accept") {
-          btnText = "Accepted";
-          btnColor = "green";
-        } else if (row.custom_approval === "Reject") {
-          btnText = "Rejected";
-          btnColor = "red";
-        } else if (row.customer_comment) {
-          btnText = "Under Review";
+        
+        if (Number(row.custom_rating) > 0) {
+            btnText = "Under Review";
           btnColor = "#ffc107";
         }
+
+        const relatedIssues = row.related_issue || '';
+        const relatedPreview = truncateText(relatedIssues, 80);
+        const relatedTooltip = escapeHtml(relatedIssues);
+        const relatedDisplay = relatedPreview ? escapeHtml(relatedPreview) : '-';
 
         $tbody.append(`
           <tr>
             <td><input type="checkbox" class="row-select" /></td>
             <td>${row.name}</td>
-            <td class="${row.timesheet_status === 'Billed' ? 'text-success fw-bold' : 'text-primary fw-bold'}">${row.timesheet_status}</td>
-            <td>${row.employee}</td>
-            <td>${row.employee_name}</td>
             <td>${frappe.datetime.str_to_user(row.start_date)}</td>
-            <td>${frappe.datetime.str_to_user(row.end_date)}</td>
             <td>${row.custom_billing_status || ''}</td>
             <td>${format_hours(row.total_hours)}</td>
             <td>${format_hours(row.total_billable_hours)}</td>
-            <td title="${frappe.datetime.str_to_user(row.creation)}">${formatShortRelative(row.creation)}</td>
+            <td>
+              <span class="d-inline-block text-truncate" style="max-width: 220px;" title="${relatedTooltip}">
+                ${relatedDisplay}
+              </span>
+            </td>
             <td>
               <button 
                 class="btn btn-sm comment-btn"
@@ -194,6 +209,7 @@ function load_timesheets() {
       });
 
       loadedCount += data.length;
+      apply_column_filters();
       update_footer();
 
       if (loadedCount >= totalCount || data.length < pageSize) {
@@ -203,6 +219,49 @@ function load_timesheets() {
       }
     }
   });
+}
+
+function apply_column_filters() {
+  const filters = {};
+  $('.column-filter').each(function () {
+    const value = ($(this).val() || '').trim().toLowerCase();
+    const index = $(this).data('column-index');
+    if (value) {
+      filters[index] = value;
+    }
+  });
+
+  const activeColumns = Object.keys(filters);
+  let visibleCount = 0;
+
+  $('#timesheet_body tr').each(function () {
+    if (this.id === 'no_data_row') {
+      return;
+    }
+
+    let visible = true;
+    if (activeColumns.length) {
+      const $cells = $(this).find('td');
+      for (let i = 0; i < activeColumns.length; i++) {
+        const colIndex = parseInt(activeColumns[i], 10);
+        const filterValue = filters[colIndex];
+        const cellText = ($cells.eq(colIndex).text() || '').trim().toLowerCase();
+        if (!cellText.includes(filterValue)) {
+          visible = false;
+          break;
+        }
+      }
+    }
+
+    $(this).toggle(visible);
+    if (visible) {
+      visibleCount++;
+    }
+  });
+
+  if (loadedCount > 0) {
+    $('#no_data_row').toggle(visibleCount === 0);
+  }
 }
 
 let currentTsName = null; // store which timesheet is being edited
@@ -217,11 +276,30 @@ $(document).on('click', '.comment-btn', function () {
 });
 
 // When user clicks Save in the modal
-$('#saveComment').on('click', function () {
-  const comment = $('#commentInput').val().trim();
-  const discount = $('#discountSelect').val();
-  const rating = $('#starRating .star.selected').length;
+let selectedRating = 0;
 
+// Handle click on stars
+$(document).on('click', '#starRating .star', function () {
+  selectedRating = parseInt($(this).data('value'));
+  $('#starRating .star').each(function (index) {
+    $(this).html(index < selectedRating ? '&#9733;' : '&#9734;');
+  });
+  $('#ratingError').hide(); // hide error after selection
+});
+
+// Intercept Save button
+$('#saveComment').on('click', function (e) {
+  e.preventDefault();
+
+  const comment = $('#commentInput').val().trim();
+
+  // 🟥 Check if rating is selected
+  if (selectedRating === 0) {
+    $('#ratingError').show();
+    return;
+  }
+
+  // 🟩 Proceed if rating is selected
   if (!currentTsName) return;
 
   frappe.call({
@@ -229,26 +307,20 @@ $('#saveComment').on('click', function () {
     args: {
       ts_name: currentTsName,
       comment: comment,
-      custom_discount_request: discount,
-      custom_rating: rating
+      custom_rating: selectedRating
     },
     callback: function (r) {
       if (!r.exc) {
         frappe.show_alert({ message: r.message.message, indicator: "green" });
 
-        const approvalStatus = r.message.approval; // Pending
         const btn = $(`.comment-btn[data-name="${currentTsName}"]`);
-
-        // Show “Under Review” after sending
-        btn.text("Under Review");
-        btn.css("background-color", "#ffc107");
-        btn.data('comment', comment);
-        btn.data('discount', discount);
-        btn.data('rating', rating);
+        btn.text("Under Review")
+          .css("background-color", "#ffc107")
+          .data('comment', comment)
+          .data('rating', selectedRating);
 
         $('#commentModal').modal('hide');
         reset_and_load();
-        console.log("Timesheet data:", data);
       } else {
         frappe.show_alert({ message: "Failed to send request", indicator: "red" });
       }
@@ -442,6 +514,23 @@ function formatShortRelative(dateStr) {
   return "Today";
 }
 
+function truncateText(text = '', limit = 80) {
+  const str = String(text);
+  if (str.length <= limit) {
+    return str;
+  }
+  return `${str.slice(0, limit).trim()}…`;
+}
+
+function escapeHtml(text = '') {
+  return String(text)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
+
 function update_summary_cards() {
   const from_date = $('#from_date').val();
   const to_date = $('#to_date').val();
@@ -603,14 +692,59 @@ $(document).on('click', '.comment-btn', function () {
     $('#starRating .star').eq(i).addClass('selected');
   }
 
-  // Disable editing if already accepted/rejected
-  const isLocked = statusText === "Accepted" || statusText === "Rejected";
+  // Disable editing if "Under Review"
+  const isLocked = statusText === "Under Review";
   $('#commentInput').prop('disabled', isLocked);
-  $('#discountSelect').prop('disabled', isLocked);
   $('#starRating .star').css('pointer-events', isLocked ? 'none' : 'auto');
   $('#saveComment').prop('disabled', isLocked);
 
   $('#commentModal').modal('show');
 });
 
+/* Sorting Handler  */
+document.addEventListener("click", function (event) {
+    const icon = event.target.closest(".sort-icon");
+    const menuItem = event.target.closest(".menu-item");
 
+    if (icon) {
+        event.stopPropagation();
+
+        const th = icon.closest("th");
+        const menu = th.querySelector(".th-menu");
+
+        window.currentSortColumn = Array.from(th.parentNode.children).indexOf(th);
+
+        document.querySelectorAll(".th-menu").forEach(m => {
+            if (m !== menu) m.style.display = "none";
+        });
+
+        menu.style.display = menu.style.display === "block" ? "none" : "block";
+        return;
+    }
+
+    if (menuItem) {
+        const action = menuItem.dataset.action;
+
+        document.querySelectorAll(".th-menu").forEach(m => m.style.display = "none");
+
+        currentSortBy = sortFieldMap[window.currentSortColumn] || null;
+
+        if (action === "asc") {
+            currentSortOrder = "asc";
+        }
+        else if (action === "desc") {
+            currentSortOrder = "desc";
+        }
+        else if (action === "reset") {
+            currentSortBy = null;
+            currentSortOrder = null;
+        }
+
+        reset_and_load();
+        return;
+    }
+
+    document.querySelectorAll(".th-menu").forEach(menu => {
+        menu.style.display = "none";
+    });
+});
