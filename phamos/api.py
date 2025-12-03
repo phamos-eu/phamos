@@ -156,13 +156,15 @@ def get_timesheet_totals(from_date=None, to_date=None, project=None):
     if to_date:
         filters["end_date"] = ["<=", getdate(to_date)]
     if project:
-        filters["parent_project"] = project
+        conditions += " AND parent_project = %s"
+        values.append(project)
 
-    data = frappe.get_list(
-        "Timesheet",
-        filters=filters,
-        fields=["total_hours", "total_billable_hours"]
-    )
+    # apply filters here
+    data = frappe.db.sql(f"""
+        SELECT total_hours, total_billable_hours
+        FROM `tabTimesheet`
+        WHERE docstatus IN (0, 1) {conditions}
+    """, values, as_dict=True)
 
     total_hours = sum([float(d.total_hours or 0) for d in data])
     billable_hours = sum([float(d.total_billable_hours or 0) for d in data])
@@ -186,7 +188,7 @@ def get_graph_data(from_date=None, to_date=None, project=None):
     data = frappe.db.sql(f"""
         SELECT name, start_date, total_hours, total_billable_hours, project_name
         FROM `tabTimesheet`
-        WHERE docstatus < 2 {filters}
+        WHERE docstatus IN (0, 1) {filters}
         ORDER BY start_date
     """, as_dict=True)
 
