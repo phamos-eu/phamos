@@ -47,6 +47,7 @@
   "prediction_to_date",
   "section_break_5rmv",
   "resource_chart",
+  "quick_add_button_html",
   "resource_planning",
   "resource_planning_prediction",
   "modules_tab",
@@ -258,6 +259,11 @@
    "fieldname": "resource_chart",
    "fieldtype": "HTML",
    "label": "Time spent"
+  },
+  {
+   "fieldname": "quick_add_button_html",
+   "fieldtype": "HTML",
+   "label": "Quick Add"
   },
   {
    "fieldname": "from_date",
