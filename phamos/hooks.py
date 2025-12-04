@@ -139,6 +139,11 @@ website_route_rules = [
 #		"on_trash": "method"
 #	}
 # }
+doc_events = {
+    "Team": {
+        "after_save": "phamos.phamos.doctype.team.team.create_team_capacity_ledger_entry"
+    }
+}
 
 doc_events = {
 	"Event": {
