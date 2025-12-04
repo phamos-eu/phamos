@@ -66,7 +66,7 @@ frappe.ui.form.on("Implementation", {
         }
 
         // Quick Add Predictions Button - Render in HTML field
-        
+    
         if (frm.fields_dict.quick_add_button_html && frm.fields_dict.quick_add_button_html.$wrapper) {
             let button_html = `
                 <div style="margin: 15px 0; padding: 10px; background-color: #f8f9fa; border-radius: 5px; text-align: center;">
@@ -143,53 +143,35 @@ frappe.ui.form.on("Implementation", {
             ],
             primary_action_label: __('Add Predictions'),
             primary_action(values) {
-                // Add predictions to child table
+                // Get predictions from dialog (only data, no indexes)
                 let tableData = values.predictions_table || [];
                 
+                // Filter and add valid predictions to the child table
                 tableData.forEach(row => {
                     if (row.prediction && row.prediction > 0 && row.month_and_year) {
                         let child_row = frm.add_child('resource_planning_prediction');
                         child_row.month_and_year = row.month_and_year;
                         child_row.prediction = row.prediction;
-                        child_row.date = row.date || frappe.datetime.nowdate();
-                        // Don't set idx - let the framework handle it
-                    }
+                        child_row.date = frappe.datetime.nowdate();                    }
                 });
                 
-                // Sort the child table by month_and_year in ascending order before saving
-                if (frm.doc.resource_planning_prediction) {
-                    frm.doc.resource_planning_prediction.sort((a, b) => {
-                        let dateA = a.month_and_year || '';
-                        let dateB = b.month_and_year || '';
-                        return dateA.localeCompare(dateB);
-                    });
-                    
-                    // Re-index the sorted rows
-                    frm.doc.resource_planning_prediction.forEach((row, index) => {
-                        row.idx = index + 1;
-                    });
-                }
+                // Refresh the grid to show new rows
+                frm.refresh_field('resource_planning_prediction');
                 
-                // Clear and refresh the child table field to force UI update
-                frm.fields_dict['resource_planning_prediction'].grid.grid_rows = [];
-                frm.fields_dict['resource_planning_prediction'].grid.refresh();
+                d.hide();
                 
                 frm.save().then(() => {
-                    frm.refresh_field('resource_planning_prediction');
                     frappe.show_alert({
                         message: __('Predictions added successfully'),
                         indicator: 'green'
                     });
                 });
-                
-                d.hide();
             }
         });
         
         d.show();
             });
         }
-        
 
         let options = [];
         let today = new Date();
