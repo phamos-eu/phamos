@@ -11,7 +11,11 @@ class Implementation(Document):
 	def before_save(self):
 		if self.resource_planning_prediction:
 			self.resource_planning_prediction.sort(
-				key=lambda x: x.month_and_year or ""
+				key=lambda x: x.month_and_year or "", reverse=True
+			)
+		if self.resource_planning:
+			self.resource_planning.sort(
+				key=lambda x: x.month_and_year or "", reverse=True
 			)
 		self.add_delivered_hrs()
 		self.add_resource_planning()
