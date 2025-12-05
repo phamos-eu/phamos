@@ -11,7 +11,7 @@ class Implementation(Document):
 	def before_save(self):
 		if self.resource_planning_prediction:
 			self.resource_planning_prediction.sort(
-				key=lambda x: x.month_and_year or "",
+				key=lambda x: (x.date or "", x.name or ""), reverse=True
 			)
 			# Re-index after sorting
 			for idx, row in enumerate(self.resource_planning_prediction, start=1):
