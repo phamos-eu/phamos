@@ -60,20 +60,26 @@ def get_team_capacity(filters=None):
         entries_by_team[team].append((entry_date, e.total_team_capacity or 0))
 
     for team, week_data in teams_dict.items():
-        last_capacity = week_data[0]  # start with Team doctype value
+        last_capacity = week_data[0]  # start with default team capacity
+
         if team in entries_by_team:
             ledger_entries = sorted(entries_by_team[team], key=lambda x: x[0])
+
             for idx, w in enumerate(week_buckets):
                 week_start = w["start"].date() if isinstance(w["start"], datetime) else w["start"]
                 week_end = w["end"].date() if isinstance(w["end"], datetime) else w["end"]
 
-                # Check if any ledger entry falls in this week
-                updated = False
-                for d, cap in ledger_entries:
-                    if week_start <= d <= week_end:
-                        last_capacity = cap
-                        updated = True
-                week_data[idx] = last_capacity 
+                # Collect all entries for this week
+                week_caps = [cap for (d, cap) in ledger_entries if week_start <= d <= week_end]
+
+                if week_caps:
+                    # Average for this week
+                    avg_cap = sum(week_caps) / len(week_caps)
+                    week_data[idx] = round(avg_cap, 2)
+                    last_capacity = week_data[idx]
+                else:
+                    # No entries → use last known capacity
+                    week_data[idx] = last_capacity
         else:
             continue
 
