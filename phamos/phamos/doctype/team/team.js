@@ -4,24 +4,7 @@
 frappe.ui.form.on("Team", {
     refresh(frm) {
         calculate_capacity(frm);
-    },
-    after_save: function(frm) {
-        frappe.call({
-            method: "frappe.client.insert",
-            args: {
-                doc: {
-                    doctype: "Team Capacity Ledger",
-                    team: frm.doc.team_name,
-                    total_team_capacity: frm.doc.total_team_capacity,
-                    date: frappe.datetime.nowdate()
-                }
-            },
-            callback: function(r) {
-                if (!r.exc) {
-                    frappe.show_alert("Team Capacity Ledger updated successfully!");
-                }
-            }
-        });
+        calculate_leave_and_holiday(frm);
     }
 });
 
@@ -35,12 +18,29 @@ frappe.ui.form.on("Team Members", {
     }
 });
 
+frappe.ui.form.on("Team Member Leaves and Holiday", {
+    team_members_remove(frm) {
+        calculate_leave_and_holiday(frm);
+    }
+});
+
 function calculate_capacity(frm) {
     let total = 0;
     (frm.doc.team_members || []).forEach(row => {
         total += row.weekly_capacity || 0;
     });
 
-    frm.set_value("total_team_capacity", total);
+    frm.set_value("team_members_capacity", total);
+
 }
 
+function calculate_leave_and_holiday(frm) {
+    let total = 0;
+    (frm.doc.team_member_leaves_and_holiday || []).forEach(row => {
+        total += row.hrs || 0;
+    });
+
+    frm.set_value("team_members_leaves_and_holidays", total);
+    console.log(total)
+
+}
