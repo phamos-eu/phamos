@@ -271,7 +271,11 @@ frappe.pages['implementation-dashb'].on_page_load = function (wrapper) {
                     xAxis: { categories: categories },
                     yAxis: { title: { text: 'Time (hrs)' } },
                     tooltip: {
-                        shared: true,
+                        shared: false,
+                        useHTML: true,
+                        backgroundColor: 'rgba(255, 255, 255, 0.95)',
+                        borderRadius: 8,
+                        padding: 12,
                         formatter: function () {
                             const point = this.point;
                             const seriesName = this.series.name;
