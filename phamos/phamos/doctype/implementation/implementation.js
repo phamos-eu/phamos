@@ -48,6 +48,7 @@ frappe.ui.form.on("Implementation", {
                 });
     },
     refresh: function (frm) {
+        // add_row_to_sales_order(frm);
         frm.fields_dict.reset.$input.on('click', function () {
             frm.set_value("prediction_from_date", "");
             frm.set_value("prediction_to_date", "");
@@ -355,7 +356,7 @@ function add_row_to_sales_order(frm) {
                 custom_implementation: frm.doc.name,
                 status: ["in", ["To Deliver", "To Bill", "To Deliver and Bill"]]
             },
-            fields: ["name", "status", "total_qty"],
+            fields: ["name", "status", "total_qty", "title"],
             order_by: "transaction_date desc",
         },
         callback: function (response) {
@@ -365,6 +366,7 @@ function add_row_to_sales_order(frm) {
                 response.message.forEach(order => {
                     let row = frm.add_child("sales_order_status_information");
                     row.sales_order = order.name;
+                    row.so_title = order.title;
                     row.total_hrs = order.total_qty;
                     row.status = order.status;
                 });
@@ -499,7 +501,6 @@ function render_resource_planning_graph(frm, usePredictionFilter = false) {
 
 frappe.ui.form.on("Sales Order Status Information", {
     setup: function (frm) {
-        if (!frm.is_new()) {
             frappe.call({
                 method: "phamos.phamos.doctype.implementation.implementation.get_financial_history",
                 args: { 'name': frm.doc.name },
@@ -512,7 +513,6 @@ frappe.ui.form.on("Sales Order Status Information", {
                     }
                 },
             });
-        }
     }
 });
 
