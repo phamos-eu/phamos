@@ -58,6 +58,7 @@ frappe.pages['implementation-dashb'].on_page_load = function (wrapper) {
         ['#cc0000', '#ff6666']
     ];
     let globalColorIndex = 0;
+    let currentDisplayMode = 'split'; // Default display mode: 'billable', 'nonBillable', 'split', 'combined'
 
     function load_chart() {
         let from_date = filters.from_date.get_value();
@@ -127,23 +128,53 @@ frappe.pages['implementation-dashb'].on_page_load = function (wrapper) {
                     }
 
                     const colors = implementationColorMap[impl];
-                    series.push({
-                        name: `${impl} - Non-Billable`,
-                        type: 'area',
-                        data: data.nonBillable,
-                        color: colors[1],
-                        stack: 'time_spent' 
-                    });
-
-                    series.push({
-                        name: `${impl} - Billable`,
-                        type: 'area',
-                        data: data.billable,
-                        color: colors[0],
-                        stack: 'time_spent' 
-                    });
-
-
+                    
+                    // Generate series based on display mode
+                    if (currentDisplayMode === 'billable') {
+                        // Only Billable
+                        series.push({
+                            name: `${impl} - Billable`,
+                            type: 'area',
+                            data: data.billable,
+                            color: colors[0],
+                            stack: 'time_spent'
+                        });
+                    } else if (currentDisplayMode === 'nonBillable') {
+                        // Only Non-Billable
+                        series.push({
+                            name: `${impl} - Non-Billable`,
+                            type: 'area',
+                            data: data.nonBillable,
+                            color: colors[1],
+                            stack: 'time_spent'
+                        });
+                    } else if (currentDisplayMode === 'combined') {
+                        // Combined (billable + non-billable as single color)
+                        const combinedData = data.billable.map((val, idx) => val + (data.nonBillable[idx] || 0));
+                        series.push({
+                            name: `${impl} - Total`,
+                            type: 'area',
+                            data: combinedData,
+                            color: colors[0],
+                            stack: 'time_spent'
+                        });
+                    } else {
+                        // Split mode (default) - show both billable and non-billable separately
+                        series.push({
+                            name: `${impl} - Non-Billable`,
+                            type: 'area',
+                            data: data.nonBillable,
+                            color: colors[1],
+                            stack: 'time_spent'
+                        });
+                        series.push({
+                            name: `${impl} - Billable`,
+                            type: 'area',
+                            data: data.billable,
+                            color: colors[0],
+                            stack: 'time_spent'
+                        });
+                    }
                 });
 
                 const addonSeries = categories.map(month => {
@@ -196,33 +227,161 @@ frappe.pages['implementation-dashb'].on_page_load = function (wrapper) {
                     marker: { enabled: true, radius: 3 }
                 });
 
+                // Determine chart title based on display mode
+                const chartTitles = {
+                    'billable': 'Billable Time with Prediction',
+                    'nonBillable': 'Non-Billable Time with Prediction',
+                    'split': 'Billable vs Non-Billable Time with Prediction',
+                    'combined': 'Total Time (Billable + Non-Billable) with Prediction'
+                };
+
                 // Chart rendering
                 $('#chart-container').html(`
-                    <div class="d-flex justify-content-start mb-2">
-                        <button id="toggle-legend" class="btn btn-sm btn-outline-secondary">Show Legend</button>
+                    <div class="d-flex justify-content-between align-items-center mb-2 flex-wrap">
+                        <div class="btn-group me-2 mb-1" role="group" aria-label="Display Mode">
+                            <button type="button" class="btn btn-sm display-mode-btn ${currentDisplayMode === 'split' ? 'btn-primary' : 'btn-outline-primary'}" data-mode="split">
+                                Split View
+                            </button>
+                            <button type="button" class="btn btn-sm display-mode-btn ${currentDisplayMode === 'billable' ? 'btn-primary' : 'btn-outline-primary'}" data-mode="billable">
+                                Billable Only
+                            </button>
+                            <button type="button" class="btn btn-sm display-mode-btn ${currentDisplayMode === 'nonBillable' ? 'btn-primary' : 'btn-outline-primary'}" data-mode="nonBillable">
+                                Non-Billable Only
+                            </button>
+                            <button type="button" class="btn btn-sm display-mode-btn ${currentDisplayMode === 'combined' ? 'btn-primary' : 'btn-outline-primary'}" data-mode="combined">
+                                Combined
+                            </button>
+                        </div>
+                        <button id="toggle-legend" class="btn btn-sm btn-outline-secondary mb-1">Show Legend</button>
                     </div>
                     <div id="implementation-chart" style="height:600px;"></div>
                     <div id="custom-legend-container" style="display: none;"></div>
                 `);
 
+                // Display mode button click handlers
+                $(document).off('click', '.display-mode-btn').on('click', '.display-mode-btn', function() {
+                    currentDisplayMode = $(this).data('mode');
+                    load_chart(); // Reload chart with new display mode
+                });
+
                 const chart = Highcharts.chart('implementation-chart', {
                     chart: { zoomType: 'xy' },
                     legend: { enabled: false },
-                    title: { text: 'Billable vs Non-Billable Time with Prediction' },
+                    title: { text: chartTitles[currentDisplayMode] || 'Time with Prediction' },
                     xAxis: { categories: categories },
                     yAxis: { title: { text: 'Time (hrs)' } },
                     tooltip: {
                         shared: true,
                         formatter: function () {
-                            let total = 0;
-                            let s = `<b>${this.x}</b><br/>`;
-                            this.points.forEach(point => {
-                                s += `<span style="color:${point.color}">\u25CF</span> 
-                                    ${point.series.name}: <b>${point.y} hrs</b><br/>`;
-                                if (!point.series.name.includes('Prediction')) total += point.y;
+                            const point = this.point;
+                            const seriesName = this.series.name;
+                            const month = this.x;
+                            const pointIndex = this.point.index;
+                            
+                            // Extract implementation name from series name
+                            let implName = seriesName;
+                            let dataType = '';
+                            if (seriesName.includes(' - Billable')) {
+                                implName = seriesName.replace(' - Billable', '');
+                                dataType = 'Billable';
+                            } else if (seriesName.includes(' - Non-Billable')) {
+                                implName = seriesName.replace(' - Non-Billable', '');
+                                dataType = 'Non-Billable';
+                            } else if (seriesName.includes(' - Total')) {
+                                implName = seriesName.replace(' - Total', '');
+                                dataType = 'Total';
+                            }
+                            
+                            // For prediction lines, show simple tooltip
+                            if (seriesName.includes('Prediction') || seriesName.includes('Internal project')) {
+                                return `<div style="padding: 5px;">
+                                    <strong>${month}</strong><br/>
+                                    <span style="color:${this.color}">●</span> ${seriesName}: <b>${this.y.toFixed(1)} hrs</b>
+                                </div>`;
+                            }
+                            
+                            // Find the matching billable/non-billable data for this implementation
+                            const implData = groupedData[implName];
+                            if (!implData) {
+                                return `<div style="padding: 5px;">
+                                    <strong>${month}</strong><br/>
+                                    <span style="color:${this.color}">●</span> ${seriesName}: <b>${this.y.toFixed(1)} hrs</b>
+                                </div>`;
+                            }
+                            
+                            const billableHrs = implData.billable[pointIndex] || 0;
+                            const nonBillableHrs = implData.nonBillable[pointIndex] || 0;
+                            const totalHrs = billableHrs + nonBillableHrs;
+                            
+                            // Calculate total across all months for this implementation
+                            const implGrandTotal = implData.billable.reduce((sum, val, idx) => sum + val + (implData.nonBillable[idx] || 0), 0);
+                            const percentOfImplTotal = implGrandTotal > 0 ? ((totalHrs / implGrandTotal) * 100).toFixed(1) : 0;
+                            
+                            // Calculate grand total across ALL implementations
+                            let grandTotal = 0;
+                            Object.values(groupedData).forEach(data => {
+                                grandTotal += data.billable.reduce((sum, val, idx) => sum + val + (data.nonBillable[idx] || 0), 0);
                             });
-                            s += `<hr/><b>Total Worked Hrs: ${total} hrs</b>`;
-                            return s;
+                            const percentOfGrandTotal = grandTotal > 0 ? ((totalHrs / grandTotal) * 100).toFixed(1) : 0;
+                            
+                            // Get implementation color
+                            const implColors = implementationColorMap[implName] || ['#3399ff', '#ff9933'];
+                            
+                            let tooltip = `<div style="min-width: 220px;">`;
+                            tooltip += `<div style="font-size: 13px; font-weight: bold; color: #333; margin-bottom: 8px; border-bottom: 2px solid ${implColors[0]}; padding-bottom: 5px;">${implName}</div>`;
+                            tooltip += `<div style="font-size: 12px; color: #666; margin-bottom: 8px;">${month}</div>`;
+                            
+                            tooltip += `<div style="padding: 8px; background: #f8f9fa; border-radius: 4px; margin-bottom: 8px;">`;
+                            
+                            // Mode-aware tooltip content
+                            if (currentDisplayMode === 'billable') {
+                                // Billable Only mode - emphasize billable, show non-billable as context
+                                tooltip += `<div style="margin-bottom: 4px; font-size: 14px;"><span style="color: ${implColors[0]};">●</span> <strong>Billable: ${billableHrs.toFixed(1)} hrs</strong></div>`;
+                                if (nonBillableHrs > 0) {
+                                    tooltip += `<div style="margin-bottom: 4px; color: #888; font-size: 11px;"><span style="color: ${implColors[1]};">○</span> (Non-Billable: ${nonBillableHrs.toFixed(1)} hrs - not shown)</div>`;
+                                }
+                                const billablePercent = totalHrs > 0 ? ((billableHrs / totalHrs) * 100).toFixed(0) : 0;
+                                tooltip += `<div style="border-top: 1px solid #ddd; padding-top: 4px; margin-top: 4px; font-size: 11px; color: #666;">Billable is <strong>${billablePercent}%</strong> of this month's total</div>`;
+                            } else if (currentDisplayMode === 'nonBillable') {
+                                // Non-Billable Only mode - emphasize non-billable, show billable as context
+                                tooltip += `<div style="margin-bottom: 4px; font-size: 14px;"><span style="color: ${implColors[1]};">●</span> <strong>Non-Billable: ${nonBillableHrs.toFixed(1)} hrs</strong></div>`;
+                                if (billableHrs > 0) {
+                                    tooltip += `<div style="margin-bottom: 4px; color: #888; font-size: 11px;"><span style="color: ${implColors[0]};">○</span> (Billable: ${billableHrs.toFixed(1)} hrs - not shown)</div>`;
+                                }
+                                const nonBillablePercent = totalHrs > 0 ? ((nonBillableHrs / totalHrs) * 100).toFixed(0) : 0;
+                                tooltip += `<div style="border-top: 1px solid #ddd; padding-top: 4px; margin-top: 4px; font-size: 11px; color: #666;">Non-Billable is <strong>${nonBillablePercent}%</strong> of this month's total</div>`;
+                            } else if (currentDisplayMode === 'combined') {
+                                // Combined mode - emphasize total, show breakdown as context
+                                const billablePercent = totalHrs > 0 ? ((billableHrs / totalHrs) * 100).toFixed(0) : 0;
+                                const nonBillablePercent = totalHrs > 0 ? ((nonBillableHrs / totalHrs) * 100).toFixed(0) : 0;
+                                tooltip += `<div style="margin-bottom: 8px; font-size: 16px; text-align: center;"><span style="color: ${implColors[0]};">●</span> <strong>Total: ${totalHrs.toFixed(1)} hrs</strong></div>`;
+                                tooltip += `<div style="border-top: 1px solid #ddd; padding-top: 6px; margin-top: 4px;">`;
+                                tooltip += `<div style="display: flex; justify-content: space-between; margin-bottom: 3px; font-size: 11px;">`;
+                                tooltip += `<span><span style="color: ${implColors[0]};">▪</span> Billable</span>`;
+                                tooltip += `<span><strong>${billableHrs.toFixed(1)} hrs</strong> (${billablePercent}%)</span>`;
+                                tooltip += `</div>`;
+                                tooltip += `<div style="display: flex; justify-content: space-between; font-size: 11px;">`;
+                                tooltip += `<span><span style="color: ${implColors[1]};">▪</span> Non-Billable</span>`;
+                                tooltip += `<span><strong>${nonBillableHrs.toFixed(1)} hrs</strong> (${nonBillablePercent}%)</span>`;
+                                tooltip += `</div>`;
+                                tooltip += `</div>`;
+                            } else {
+                                // Split mode - show full breakdown equally
+                                tooltip += `<div style="margin-bottom: 4px;"><span style="color: ${implColors[0]};">●</span> Billable: <strong>${billableHrs.toFixed(1)} hrs</strong></div>`;
+                                tooltip += `<div style="margin-bottom: 4px;"><span style="color: ${implColors[1]};">●</span> Non-Billable: <strong>${nonBillableHrs.toFixed(1)} hrs</strong></div>`;
+                                tooltip += `<div style="border-top: 1px solid #ddd; padding-top: 4px; margin-top: 4px;">Month Total: <strong>${totalHrs.toFixed(1)} hrs</strong></div>`;
+                            }
+                            tooltip += `</div>`;
+                            
+                            tooltip += `<div style="padding: 6px; background: #e3f2fd; border-radius: 4px; font-size: 11px;">`;
+                            tooltip += `<div style="color: #555;">Implementation Total: <strong>${implGrandTotal.toFixed(1)} hrs</strong></div>`;
+                            tooltip += `<div style="color: #555;">This month: <strong>${percentOfImplTotal}%</strong> of implementation</div>`;
+                            tooltip += `<div style="color: #555; margin-top: 4px;">All Implementations: <strong>${grandTotal.toFixed(1)} hrs</strong></div>`;
+                            tooltip += `<div style="color: #555;">This implementation: <strong>${percentOfGrandTotal}%</strong> of total</div>`;
+                            tooltip += `</div>`;
+                            
+                            tooltip += `</div>`;
+                            return tooltip;
                         }
                     },
                     plotOptions: {
