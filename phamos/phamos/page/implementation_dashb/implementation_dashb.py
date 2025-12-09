@@ -11,11 +11,14 @@ def get_chart_data(from_date=None, to_date=None, team=None, implementation=None)
 
     planning = []
     prediction = []
+    implementation_teams = {}  # Map implementation name to team
 
     if implementation:
         impl_list = [i.strip() for i in implementation.split(',') if i.strip()]
         for impl_name in impl_list:
             full_doc = frappe.get_doc("Implementation", impl_name)
+            implementation_teams[impl_name] = full_doc.team or "Unassigned"
+            
             for row in (full_doc.resource_planning or []):
                 row_dict = row.as_dict()
                 row_dict["implementation_name"] = impl_name
@@ -30,8 +33,9 @@ def get_chart_data(from_date=None, to_date=None, team=None, implementation=None)
         if team:
             filters["team"] = team
 
-        all_impls = frappe.get_all("Implementation", filters=filters, fields=["name"])
+        all_impls = frappe.get_all("Implementation", filters=filters, fields=["name", "team"])
         for impl in all_impls:
+            implementation_teams[impl.name] = impl.team or "Unassigned"
             full_doc = frappe.get_doc("Implementation", impl.name)
             
             for row in (full_doc.resource_planning or []):
@@ -75,7 +79,8 @@ def get_chart_data(from_date=None, to_date=None, team=None, implementation=None)
     return {
         "planning": planning_filtered,
         "prediction": prediction_filtered,
-        "addon": addon_filtered  # 🔸 Extra addon data
+        "addon": addon_filtered,
+        "implementation_teams": implementation_teams  # Map of implementation -> team
     }
 
 
