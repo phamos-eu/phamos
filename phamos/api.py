@@ -16,9 +16,13 @@ def get_timesheets(from_date=None, to_date=None, project=None, offset=0, limit=2
     values = [customer]
 
     if from_date:
-        filters["start_date"] = [">=", getdate(from_date)]
+        conditions += " AND start_date >= %s"
+        values.append(getdate(from_date))
+
     if to_date:
-        filters["end_date"] = ["<=", getdate(to_date)]
+        conditions += " AND end_date <= %s"
+        values.append(getdate(to_date))
+
     if project:
         conditions += " AND parent_project = %s"
         values.append(project)
@@ -150,11 +154,18 @@ def get_timesheet_totals(from_date=None, to_date=None, project=None):
     if not customer:
         frappe.throw("No Customer linked to user.", frappe.PermissionError)
 
-    filters = {"docstatus": 1, "customer": customer}
+    # build conditions dynamically
+    conditions = " AND customer = %s"
+    values = [customer]
+
     if from_date:
-        filters["start_date"] = [">=", getdate(from_date)]
+        conditions += " AND start_date >= %s"
+        values.append(getdate(from_date))
+
     if to_date:
-        filters["end_date"] = ["<=", getdate(to_date)]
+        conditions += " AND end_date <= %s"
+        values.append(getdate(to_date))
+
     if project:
         conditions += " AND parent_project = %s"
         values.append(project)
@@ -177,16 +188,30 @@ def get_timesheet_totals(from_date=None, to_date=None, project=None):
 
 @frappe.whitelist()
 def get_graph_data(from_date=None, to_date=None, project=None):
-    filters = ""
+    user = frappe.session.user
+    validate_guest_user()
+    
+    customer = get_customer_for_user(user)
+    if not customer:
+        frappe.throw("No Customer linked to user.", frappe.PermissionError)
+
+    filters = f" AND customer = '{customer}'"
     if from_date:
         filters += f" AND start_date >= '{from_date}'"
     if to_date:
         filters += f" AND end_date <= '{to_date}'"
     if project:
-        filters += f" AND project = '{project}'"
+        filters += f" AND parent_project = '{project}'"
 
     data = frappe.db.sql(f"""
-        SELECT name, start_date, total_hours, total_billable_hours, project_name
+        SELECT 
+            name,
+            start_date,
+            total_hours,
+            total_billable_hours,
+            parent_project,
+            COALESCE(NULLIF(project_name, ''), parent_project) as project_label,
+            employee
         FROM `tabTimesheet`
         WHERE docstatus IN (0, 1) {filters}
         ORDER BY start_date
