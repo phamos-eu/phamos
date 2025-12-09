@@ -209,17 +209,82 @@ frappe.pages['implementation-dashb'].on_page_load = function (wrapper) {
                     xAxis: { categories: categories },
                     yAxis: { title: { text: 'Time (hrs)' } },
                     tooltip: {
-                        shared: true,
+                        shared: false,
+                        useHTML: true,
+                        backgroundColor: 'rgba(255, 255, 255, 0.95)',
+                        borderRadius: 8,
+                        padding: 12,
                         formatter: function () {
-                            let total = 0;
-                            let s = `<b>${this.x}</b><br/>`;
-                            this.points.forEach(point => {
-                                s += `<span style="color:${point.color}">\u25CF</span> 
-                                    ${point.series.name}: <b>${point.y} hrs</b><br/>`;
-                                if (!point.series.name.includes('Prediction')) total += point.y;
+                            const point = this.point;
+                            const seriesName = this.series.name;
+                            const month = this.x;
+                            const pointIndex = this.point.index;
+                            
+                            // Extract implementation name from series name
+                            let implName = seriesName;
+                            let dataType = '';
+                            if (seriesName.includes(' - Billable')) {
+                                implName = seriesName.replace(' - Billable', '');
+                                dataType = 'Billable';
+                            } else if (seriesName.includes(' - Non-Billable')) {
+                                implName = seriesName.replace(' - Non-Billable', '');
+                                dataType = 'Non-Billable';
+                            }
+                            
+                            // For prediction lines, show simple tooltip
+                            if (seriesName.includes('Prediction') || seriesName.includes('Internal project')) {
+                                return `<div style="padding: 5px;">
+                                    <strong>${month}</strong><br/>
+                                    <span style="color:${this.color}">●</span> ${seriesName}: <b>${this.y.toFixed(1)} hrs</b>
+                                </div>`;
+                            }
+                            
+                            // Find the matching billable/non-billable data for this implementation
+                            const implData = groupedData[implName];
+                            if (!implData) {
+                                return `<div style="padding: 5px;">
+                                    <strong>${month}</strong><br/>
+                                    <span style="color:${this.color}">●</span> ${seriesName}: <b>${this.y.toFixed(1)} hrs</b>
+                                </div>`;
+                            }
+                            
+                            const billableHrs = implData.billable[pointIndex] || 0;
+                            const nonBillableHrs = implData.nonBillable[pointIndex] || 0;
+                            const totalHrs = billableHrs + nonBillableHrs;
+                            
+                            // Calculate total across all months for this implementation
+                            const implGrandTotal = implData.billable.reduce((sum, val, idx) => sum + val + (implData.nonBillable[idx] || 0), 0);
+                            const percentOfImplTotal = implGrandTotal > 0 ? ((totalHrs / implGrandTotal) * 100).toFixed(1) : 0;
+                            
+                            // Calculate grand total across ALL implementations
+                            let grandTotal = 0;
+                            Object.values(groupedData).forEach(data => {
+                                grandTotal += data.billable.reduce((sum, val, idx) => sum + val + (data.nonBillable[idx] || 0), 0);
                             });
-                            s += `<hr/><b>Total Worked Hrs: ${total} hrs</b>`;
-                            return s;
+                            const percentOfGrandTotal = grandTotal > 0 ? ((totalHrs / grandTotal) * 100).toFixed(1) : 0;
+                            
+                            // Get implementation color
+                            const implColors = implementationColorMap[implName] || ['#3399ff', '#ff9933'];
+                            
+                            let tooltip = `<div style="min-width: 220px;">`;
+                            tooltip += `<div style="font-size: 13px; font-weight: bold; color: #333; margin-bottom: 8px; border-bottom: 2px solid ${implColors[0]}; padding-bottom: 5px;">${implName}</div>`;
+                            tooltip += `<div style="font-size: 12px; color: #666; margin-bottom: 8px;">${month}</div>`;
+                            
+                            tooltip += `<div style="padding: 8px; background: #f8f9fa; border-radius: 4px; margin-bottom: 8px;">`;
+                            tooltip += `<div style="margin-bottom: 4px;"><span style="color: ${implColors[0]};">●</span> Billable: <strong>${billableHrs.toFixed(1)} hrs</strong></div>`;
+                            tooltip += `<div style="margin-bottom: 4px;"><span style="color: ${implColors[1]};">●</span> Non-Billable: <strong>${nonBillableHrs.toFixed(1)} hrs</strong></div>`;
+                            tooltip += `<div style="border-top: 1px solid #ddd; padding-top: 4px; margin-top: 4px;">Month Total: <strong>${totalHrs.toFixed(1)} hrs</strong></div>`;
+                            tooltip += `</div>`;
+                            
+                            tooltip += `<div style="padding: 6px; background: #e3f2fd; border-radius: 4px; font-size: 11px;">`;
+                            tooltip += `<div style="color: #555;">Implementation Total: <strong>${implGrandTotal.toFixed(1)} hrs</strong></div>`;
+                            tooltip += `<div style="color: #555;">This month: <strong>${percentOfImplTotal}%</strong> of implementation</div>`;
+                            tooltip += `<div style="color: #555; margin-top: 4px;">All Implementations: <strong>${grandTotal.toFixed(1)} hrs</strong></div>`;
+                            tooltip += `<div style="color: #555;">This implementation: <strong>${percentOfGrandTotal}%</strong> of total</div>`;
+                            tooltip += `</div>`;
+                            
+                            tooltip += `</div>`;
+                            return tooltip;
                         }
                     },
                     plotOptions: {
