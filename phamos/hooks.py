@@ -187,8 +187,9 @@ fixtures = [
 
 scheduler_events = {
     "daily": [
-        "phamos.api.send_daily_timesheet_comment_summary"
-    ]
+        "phamos.api.send_daily_timesheet_comment_summary",
+        "phamos.phamos.doctype.team.team.update_all_teams_weekly_holidays"
+    ],
 }
 
 
