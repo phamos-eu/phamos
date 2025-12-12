@@ -1,5 +1,4 @@
 import frappe
-import frappe
 import pytz
 from frappe.utils import get_datetime
 from frappe import _
@@ -719,46 +718,54 @@ def get_project_count_all():
         #"count_projects": count_projects[0].get('total_projects') if count_projects else 0  # assuming you want to return the count of projects meeting certain conditions
     }
 
+
 @frappe.whitelist()
 def total_hours_worked_today():
-    from datetime import datetime
-
     # --- Get employee ---
     employee_name = frappe.db.get_value("Employee", {"user_id": frappe.session.user}, "name")
-    today_date = datetime.today().date()
 
-    # --- Total actual & billable time (for value display) ---
-    TimesheetRecord = DocType("Timesheet Record")
-    count_time = (
-        frappe.qb.from_(TimesheetRecord)
-        .select(
-            fn.Sum(TimesheetRecord.actual_time).as_("actual_time"),
-            fn.Sum(TimesheetRecord.actual_time * TimesheetRecord.percent_billable / 100).as_("total_billable_time")
-        )
-        .where(
-            (TimesheetRecord.employee == employee_name)
-            & (fn.Date(TimesheetRecord.creation) == today_date)
-            & (TimesheetRecord.docstatus != 2)
-        )
-        .run(as_dict=True)
-    )
+    # --- User timezone ---
+    user_tz = frappe.db.get_value("User", frappe.session.user, "time_zone") or "UTC"
+    tz = pytz.timezone(user_tz)
 
-    # --- Color counts from timesheet_record_color field ---
+    # --- Today in user timezone ---
+    now = now_datetime().astimezone(tz)
+    today_date = now.date()
+    today_start = tz.localize(datetime.combine(today_date, datetime.min.time()))
+    today_end = tz.localize(datetime.combine(today_date, datetime.max.time()))
+
+    # --- Fetch timesheet records that could overlap today ---
     records = frappe.get_all(
         "Timesheet Record",
         filters={
             "employee": employee_name,
             "docstatus": ["!=", 2],
-            "creation": ["between", [
-                datetime.combine(today_date, datetime.min.time()),
-                datetime.combine(today_date, datetime.max.time())
-            ]]
+            "from_time": ["<=", today_end],
+            "to_time": [">=", today_start]
         },
-        fields=["timesheet_record_color"]
+        fields=["from_time", "to_time", "actual_time", "percent_billable", "timesheet_record_color"]
     )
 
+    total_actual_seconds = 0
+    total_billable_seconds = 0
     green = amber = red = 0
+
     for rec in records:
+        rec_start = get_datetime(rec.from_time).astimezone(tz)
+        rec_end = get_datetime(rec.to_time).astimezone(tz)
+
+        # Calculate overlap with today
+        overlap_start = max(rec_start, today_start)
+        overlap_end = min(rec_end, today_end)
+
+        if overlap_start < overlap_end:
+            duration_seconds = time_diff_in_seconds(overlap_end, overlap_start)
+            total_actual_seconds += duration_seconds
+
+            percent = float(rec.percent_billable or 0)
+            total_billable_seconds += duration_seconds * percent / 100
+
+        # Count color
         if rec.timesheet_record_color == "Green":
             green += 1
         elif rec.timesheet_record_color == "Amber":
@@ -772,26 +779,18 @@ def total_hours_worked_today():
     amber_pct = round((amber / total) * 100, 2) if total else 0
     red_pct = round((red / total) * 100, 2) if total else 0
 
-    # --- Format actual + billable time ---
-    if count_time and count_time[0].actual_time:
-        actual_time_str = str(format_duration(count_time[0].actual_time))[:9]
-        total_billable_time = count_time[0].total_billable_time or 0
-        total_billable_time_str = (
-            str(format_duration(total_billable_time))[:10] if total_billable_time else 0
-        )
+    # Format durations
+    actual_time_str = str(format_duration(total_actual_seconds))[:9] if total_actual_seconds else 0
+    total_billable_time_str = str(format_duration(total_billable_seconds))[:10] if total_billable_seconds else 0
 
-        return {
-            "value": actual_time_str,
-            "fieldtype": "Float",
-            "billable": total_billable_time_str,
-            "green": green_pct,
-            "amber": amber_pct,
-            "red": red_pct
-        }
-
-    return {"value": 0, "fieldtype": "Float", "billable": 0, "green": 0, "amber": 0, "red": 0}
-
-
+    return {
+        "value": actual_time_str,
+        "fieldtype": "Float",
+        "billable": total_billable_time_str,
+        "green": green_pct,
+        "amber": amber_pct,
+        "red": red_pct
+    }
 
 @frappe.whitelist()
 def total_hours_worked_in_this_week():
