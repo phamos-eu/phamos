@@ -130,6 +130,11 @@ website_route_rules = [
 #		"on_trash": "method"
 #	}
 # }
+doc_events = {
+    "Team": {
+        "after_save": "phamos.phamos.doctype.team.team.create_team_capacity_ledger_entry"
+    }
+}
 
 # Scheduled Tasks
 # ---------------
@@ -164,8 +169,9 @@ fixtures = [
 
 scheduler_events = {
     "daily": [
-        "phamos.api.send_daily_timesheet_comment_summary"
-    ]
+        "phamos.api.send_daily_timesheet_comment_summary",
+        "phamos.phamos.doctype.team.team.update_all_teams_weekly_holidays"
+    ],
 }
 
 
