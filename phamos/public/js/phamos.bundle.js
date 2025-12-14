@@ -1,2 +1,2 @@
-import "./have_a_great_day.js"
+console.log('Phamos bundle loaded');
 
