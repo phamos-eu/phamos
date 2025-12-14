@@ -7,6 +7,9 @@ phamos.patches.v1_0.updated_maturity_levels
 phamos.patches.v1_0.set_implementation_status
 phamos.patches.v1_0.add_activity_types_update
 phamos.patches.v1_0.implementation_fix
+phamos.patches.v1_0.set_project_name_in_timesheet
+phamos.patches.v1_0.add_event_attendee_fields
+phamos.patches.v1_0.add_event_location_field
 
 [post_model_sync]
 phamos.patches.v1_0.set_timesheet_record_colors #123
