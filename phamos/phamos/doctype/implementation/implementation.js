@@ -151,7 +151,8 @@ frappe.ui.form.on("Implementation", {
                         let child_row = frm.add_child('resource_planning_prediction');
                         child_row.month_and_year = row.month_and_year;
                         child_row.prediction = row.prediction;
-                        child_row.date = frappe.datetime.nowdate();                    }
+                        child_row.date = frappe.datetime.nowdate();
+                    }
                 });
                 
                 // Refresh the grid to show new rows
