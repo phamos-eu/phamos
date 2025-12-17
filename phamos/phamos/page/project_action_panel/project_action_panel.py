@@ -146,25 +146,41 @@ def get_assigned_projects(doctype, txt, searchfield, start, page_len, filters):
     
 @frappe.whitelist()
 def is_task_running(name):
-    try:
-        doc = frappe.get_doc("Timesheet Record", name)
-        for row in reversed(doc.item):
-            if not row.to_time:
-                return {"is_running": True}
+    # Get all child rows in correct order
+    rows = frappe.db.sql("""
+        SELECT name, to_time
+        FROM `tabTimesheet Record Item`
+        WHERE parent = %s
+        ORDER BY creation ASC
+    """, name, as_dict=True)
+
+    if not rows:
         return {"is_running": False}
-    except:
-        return {"is_running": False}
+
+    # Find last open (missing to_time)
+    for idx, row in enumerate(rows, start=1):
+        if not row.to_time:
+            # Odd index (1, 3, 5...) → task running ⏸️
+            # Even index (2, 4, 6...) → task paused ▶️
+            is_running = (idx % 2 != 0)
+            return {"is_running": is_running}
+
+    # If no missing to_time → considered paused
+    return {"is_running": False}
 
 
 @frappe.whitelist()
 def get_employee_leaves():
     today = getdate(nowdate())
 
-    # Get first and last day of the current year
+    # ✅ Current year start
     year_start = get_first_day(today.replace(month=1, day=1))
-    year_end = get_last_day(today.replace(month=12, day=31))
 
-    # final range (whole year)
+    # ✅ Next year  end
+    next_year = today.year + 1
+    year_end = get_last_day(getdate(f"{next_year}-12-31"))
+
+    # Final range (current + next year)
     start = year_start
     end = year_end
 
@@ -308,9 +324,12 @@ def get_timesheet_records_by_date(selected_date=None):
 def get_team_holidays():
     today = getdate(nowdate())
 
-    # ✅ Get first and last day of the current year
+    # ✅ Current year ka start
     from_date = get_first_day(today.replace(month=1, day=1))
-    to_date = get_last_day(today.replace(month=12, day=31))
+
+    # ✅ Next year ka end
+    next_year = today.year + 1
+    to_date = get_last_day(getdate(f"{next_year}-12-31"))
 
     grouped = defaultdict(list)
 
@@ -357,6 +376,10 @@ def create_and_submit_timesheet( project_name=None,
     goal=None, 
     to_time=None):
     try:
+        # ✅ Validate before creating record
+        if from_time and to_time and get_datetime(to_time) < get_datetime(from_time):
+            frappe.throw(_("To Time cannot be earlier than From Time. Record not saved."))
+
         ts = frappe.new_doc("Timesheet Record")
         ts.project = project_name
         ts.activity_type = activity_type
@@ -372,25 +395,22 @@ def create_and_submit_timesheet( project_name=None,
         # Add child row
         ts.append("item", {
             "from_time": from_time,
-            "to_time": ts.to_time
+            "to_time": to_time
         })
 
-        # ✅ Calculate duration for each row and sum it up
+        # ✅ Calculate total duration
         total_duration = 0
         for row in ts.item:
             if row.from_time and row.to_time:
-                duration_seconds = time_diff_in_seconds(row.to_time, row.from_time)
-                row.duration = duration_seconds
-                total_duration += duration_seconds
+                if get_datetime(row.to_time) < get_datetime(row.from_time):
+                    frappe.throw(_("Row #{0}: To Time cannot be earlier than From Time. Record not saved.").format(row.idx))
+                row.duration = time_diff_in_seconds(row.to_time, row.from_time)
+                total_duration += row.duration
 
-        # ✅ Set total duration in parent actual_time
         ts.actual_time = total_duration
-
-        # ✅ Mark as complete before submit
         ts.status = "Complete"
 
         ts.insert(ignore_permissions=True)
-        ts.save()
         ts.submit()
 
         return {
@@ -416,15 +436,20 @@ def update_and_submit_timesheet_record(name, to_time, percent_billable, activity
         if doc.item:
             for row in reversed(doc.item):
                 if row.from_time and not row.to_time:
+                    # ✅ Validate before assigning
+                    if get_datetime(to_time) < get_datetime(row.from_time):
+                        frappe.throw(_("To Time cannot be earlier than From Time. Update aborted."))
                     row.to_time = to_time
                     break
 
-        # Calculate durations for all rows
+        # Calculate durations & validate
         for row in doc.item:
             if row.from_time and row.to_time:
+                if get_datetime(row.to_time) < get_datetime(row.from_time):
+                    frappe.throw(_("Row #{0}: To Time cannot be earlier than From Time. Update aborted.").format(row.idx))
                 row.duration = time_diff_in_seconds(row.to_time, row.from_time)
 
-        # Update parent fields of original with first row data
+        # Update parent fields
         if doc.item:
             first_row = doc.item[0]
             doc.from_time = first_row.from_time
@@ -436,13 +461,21 @@ def update_and_submit_timesheet_record(name, to_time, percent_billable, activity
         doc.result = result
         doc.percent_billable = percent_billable
 
-        # Save & submit original document
+        # ✅ Final validation before any save or submit
+        if doc.from_time and doc.to_time and get_datetime(doc.to_time) < get_datetime(doc.from_time):
+            frappe.throw(_("To Time cannot be earlier than From Time. Update aborted."))
+
         doc.save()
         doc.submit()
 
-        # --- Create alternative records from 3rd, 5th, 7th, ... rows ---
-        for i in range(2, len(doc.item), 2):  # start from 3rd row (index 2), step 2
+        # --- Create alternative records (3rd, 5th, etc.) ---
+        for i in range(2, len(doc.item), 2):  # start from 3rd row (index 2)
             alt_row = doc.item[i]
+
+            # ✅ Skip invalid alternate rows
+            if alt_row.from_time and alt_row.to_time and get_datetime(alt_row.to_time) < get_datetime(alt_row.from_time):
+                continue
+
             new_doc = frappe.new_doc("Timesheet Record")
 
             # Copy parent fields from original
@@ -708,7 +741,7 @@ def get_project_count_all():
 
 @frappe.whitelist()
 def total_hours_worked_today():
-    from datetime import datetime
+    from datetime import datetime, timedelta
 
     # --- Get employee ---
     employee_name = frappe.db.get_value("Employee", {"user_id": frappe.session.user}, "name")
@@ -716,6 +749,8 @@ def total_hours_worked_today():
 
     # --- Total actual & billable time (for value display) ---
     TimesheetRecord = DocType("Timesheet Record")
+
+    # ✅ Use from_time and to_time date instead of creation
     count_time = (
         frappe.qb.from_(TimesheetRecord)
         .select(
@@ -724,8 +759,11 @@ def total_hours_worked_today():
         )
         .where(
             (TimesheetRecord.employee == employee_name)
-            & (fn.Date(TimesheetRecord.creation) == today_date)
             & (TimesheetRecord.docstatus != 2)
+            & (
+                (fn.Date(TimesheetRecord.from_time) == today_date)
+                | (fn.Date(TimesheetRecord.to_time) == today_date)
+            )
         )
         .run(as_dict=True)
     )
@@ -736,7 +774,7 @@ def total_hours_worked_today():
         filters={
             "employee": employee_name,
             "docstatus": ["!=", 2],
-            "creation": ["between", [
+            "from_time": ["between", [
                 datetime.combine(today_date, datetime.min.time()),
                 datetime.combine(today_date, datetime.max.time())
             ]]

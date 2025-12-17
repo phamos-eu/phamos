@@ -13,10 +13,9 @@
  "fields": [
   {
    "fieldname": "recipients",
-   "fieldtype": "Link",
+   "fieldtype": "Data",
    "in_list_view": 1,
-   "label": "Recipients",
-   "options": "User"
+   "label": "Recipients"
   },
   {
    "fieldname": "templates",
@@ -37,7 +36,7 @@
  "index_web_pages_for_search": 1,
  "istable": 1,
  "links": [],
- "modified": "2025-10-31 08:27:13.251803",
+ "modified": "2025-11-26 08:37:22.892031",
  "modified_by": "Administrator",
  "module": "Phamos",
  "name": "Auto Email Report Record",

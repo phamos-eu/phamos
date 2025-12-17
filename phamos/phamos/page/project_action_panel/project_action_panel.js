@@ -247,21 +247,25 @@ function update_and_submit_timesheet_record(
 
       let doc = res.message;
 
-      // 🔹 Check: Child table 'item' exist karta hai?
+      // 🔹 Check: Child table 'item' exist
       if (!doc.item || doc.item.length === 0) {
         frappe.show_alert("No time logs found.");
         return;
       }
 
-      let lastRow = doc.item[doc.item.length - 1];
+      let items = doc.item || [];
+      let rowCount = items.length;
+      let lastRow = items[rowCount - 1];
 
-      // 🔹 Agar last row ka to_time filled hai → error
-      if (lastRow.to_time) {
-        frappe.show_alert("Please Pause it first (▶️)");
+      // 🔹 Check 1st, 3rd, or 5th .. row
+      if (rowCount % 2 === 0) {
+        frappe.show_alert({
+          message: "⏸️ Please Pause it first (▶️)",
+          indicator: "orange"
+        });
         return;
       }
 
-      // ✅ Agar check pass ho gaya → ab popup open karo
       openStopProjectDialog(timesheet_record, percent_billable, project, task, task_in_timesheet_record);
     }
   });
@@ -919,7 +923,7 @@ function show_tab(tab, projectData) {
 
       // Render projects table
       renderProjectDataTable(tableDiv, projectData);
-
+      persistButtonStates();
     }
 
     else if (tab === "All Projects") {
@@ -930,6 +934,13 @@ function show_tab(tab, projectData) {
         .dt-cell__content--col-6, .dt-cell__content--header-6 { display: table-cell; }
         .dt-cell__content--col-3, .dt-cell__content--header-3 { display: table-cell; }
         .dt-cell__content--col-9, .dt-cell__content--header-9 { display: table-cell; }
+
+        /* 🌟 Add width to the scrollable DataTable only for All Projects */
+        #datatable-wrapper .dt-scrollable {
+            width: 1225px !important;
+            max-width: 1225px !important;
+            overflow: auto !important;
+         }
         `;
       document.head.appendChild(style);
 
@@ -1557,7 +1568,7 @@ window.togglePausePlay = function(taskId, timesheetName) {
     btn.textContent = '⏸️';
     btn.setAttribute('data-paused', 'false');
 
-    frappe.confirm(
+    confirm_strict(
       "Do you want to create a timesheet record for this Break?",
       function() {
           frappe.call({
@@ -1565,7 +1576,11 @@ window.togglePausePlay = function(taskId, timesheetName) {
               args: { name: timesheetName },
               callback: function(r) {
                   if (r.message && r.message.status === "success") {
-                      show_break_task_dialog(r.message.new_row_name, r.message.previous_from_time, r.message.previous_to_time, );
+                      show_break_task_dialog(
+                          r.message.new_row_name, 
+                          r.message.previous_from_time, 
+                          r.message.previous_to_time
+                      );
                   } else {
                       frappe.show_alert("Error: " + (r.message.message || "Something went wrong."));
                   }
@@ -1573,7 +1588,6 @@ window.togglePausePlay = function(taskId, timesheetName) {
           });
       },
       function() {
-          // ❌ NO → create new row but don't show popup
           frappe.call({
               method: "phamos.phamos.page.project_action_panel.project_action_panel.close_open_row_and_add_break",
               args: { name: timesheetName },
@@ -1586,8 +1600,7 @@ window.togglePausePlay = function(taskId, timesheetName) {
               }
           });
       }
-  );
-
+    );
 
   } else {
     // ⏸️ Pause clicked → Close current row
@@ -1610,37 +1623,73 @@ window.togglePausePlay = function(taskId, timesheetName) {
     });
   }
 };
-frappe.after_ajax(() => {
-  console.log("frappe.after_ajax started");
-  const taskButtons = document.querySelectorAll("[id^='toggle-']");
-  console.log("Buttons found:", taskButtons.length);
 
-  taskButtons.forEach(btn => {
-    const taskId = btn.id.split("toggle-")[1];
-    const timesheetName = btn.getAttribute("data-timesheet");
-
-    console.log("Checking task:", taskId, "timesheet:", timesheetName);
-
-    frappe.call({
-      method: "phamos.phamos.page.project_action_panel.project_action_panel.is_task_running",
-      args: {
-        name: timesheetName
-      },
-      callback: function (r) {
-        if (r.message && r.message.is_running) {
-          btn.textContent = '⏸️';
-          btn.setAttribute('data-paused', 'false');
-          btn.setAttribute('title', 'Pause ⏸️');
-        } else {
-          btn.textContent = '▶️';
-          btn.setAttribute('data-paused', 'true');
-          btn.setAttribute('title', 'Resume ▶️');
+function confirm_strict(message, yes_callback, no_callback) {
+    let d = new frappe.ui.Dialog({
+        title: "Confirm",
+        fields: [
+            {
+                fieldtype: "HTML",
+                fieldname: "msg_html",
+                options: `<p>${message}</p>`
+            }
+        ],
+        primary_action_label: "Yes",
+        primary_action() {
+            d.hide();
+            yes_callback();
         }
-
-      }
     });
-  });
-});
+
+    d.set_secondary_action_label("No");
+    d.set_secondary_action(() => {
+        d.hide();
+        if (no_callback) no_callback();
+    });
+
+    d.$wrapper.modal({
+        backdrop: "static",
+        keyboard: false
+    });
+
+    d.show();
+    return d;
+}
+
+
+function persistButtonStates() {
+    frappe.after_ajax(() => {
+      console.log("frappe.after_ajax started");
+      const taskButtons = document.querySelectorAll("[id^='toggle-']");
+      console.log("Buttons found:", taskButtons.length);
+
+      taskButtons.forEach(btn => {
+        const taskId = btn.id.split("toggle-")[1];
+        const timesheetName = btn.getAttribute("data-timesheet");
+
+        console.log("Checking task:", taskId, "timesheet:", timesheetName);
+
+        frappe.call({
+          method: "phamos.phamos.page.project_action_panel.project_action_panel.is_task_running",
+          args: {
+            name: timesheetName
+          },
+          callback: function (r) {
+            if (r.message && r.message.is_running) {
+              btn.textContent = '⏸️';
+              btn.setAttribute('data-paused', 'false');
+              btn.setAttribute('title', 'Pause ⏸️');
+            } else {
+              btn.textContent = '▶️';
+              btn.setAttribute('data-paused', 'true');
+              btn.setAttribute('title', 'Resume ▶️');
+            }
+
+          }
+        });
+     });
+    });
+  }
 };
 
 function show_break_task_dialog(new_row_name, previous_from_time, previous_to_time) {

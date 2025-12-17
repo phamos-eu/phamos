@@ -8,6 +8,39 @@ from ..utils import get_site_timezone
 def _now_utc() -> datetime:
     return datetime.now(timezone.utc)
 
+def _round_to_15min(dt: datetime, direction: str = "up") -> datetime:
+    """Round datetime to nearest 15-minute interval.
+    
+    Args:
+        dt: datetime to round
+        direction: "up" to round up, "down" to round down, "nearest" for nearest
+    """
+    # Get minutes and seconds
+    minutes = dt.minute
+    seconds = dt.second
+    microseconds = dt.microsecond
+    
+    # Calculate remainder when divided by 15
+    remainder = minutes % 15
+    
+    if direction == "up":
+        # Round up to next 15-minute mark
+        if remainder > 0 or seconds > 0 or microseconds > 0:
+            add_minutes = 15 - remainder
+            return dt.replace(second=0, microsecond=0) + timedelta(minutes=add_minutes)
+        else:
+            return dt.replace(second=0, microsecond=0)
+    elif direction == "down":
+        # Round down to previous 15-minute mark
+        return dt.replace(second=0, microsecond=0) - timedelta(minutes=remainder)
+    else:  # nearest
+        # Round to nearest 15-minute mark
+        if remainder < 8:
+            return dt.replace(second=0, microsecond=0) - timedelta(minutes=remainder)
+        else:
+            add_minutes = 15 - remainder
+            return dt.replace(second=0, microsecond=0) + timedelta(minutes=add_minutes)
+
 def _work_window_utc(day_utc: datetime, start_hhmm="08:00", end_hhmm="18:00", tz_name=None) -> Tuple[datetime, datetime]:
     import pytz
     tz = pytz.timezone(tz_name or get_site_timezone())
@@ -68,6 +101,10 @@ def free_slots_for_day(day: str,
         time_to = "18:00"
     sh, sm = map(int, time_from.split(":"))
     eh, em = map(int, time_to.split(":"))
+    
+    # Round minutes to 15-minute intervals
+    sm = (sm // 15) * 15
+    em = (em // 15) * 15
 
     start_local = tz.localize(datetime(d.year, d.month, d.day, sh, sm, 0))
     end_local = tz.localize(datetime(d.year, d.month, d.day, eh, em, 0))
@@ -88,6 +125,10 @@ def free_slots_for_day(day: str,
     for s, e in free_blocks:
         # If looking at today (in user's/site TZ), don't offer past times
         t = max(s, now_utc) if is_today_local else s
+        
+        # Round start time UP to next 15-minute interval
+        t = _round_to_15min(t, direction="up")
+        
         while t + duration <= e:
             local_start = t.astimezone(tz)
             local_end = (t + duration).astimezone(tz)
@@ -129,8 +170,12 @@ def next_three_free_slots_me(duration_minutes: int = 60,
         free_blocks = _subtract_busy_from_window(busy, (day_start_utc, day_end_utc))
 
         for s, e in free_blocks:
-            # don’t offer times already passed today
+            # don't offer times already passed today
             t = max(s, now_utc) if day_offset == 0 else s
+            
+            # Round start time UP to next 15-minute interval
+            t = _round_to_15min(t, direction="up")
+            
             while t + duration <= e:
                 results.append({"start": t.isoformat(), "end": (t + duration).isoformat()})
                 if len(results) >= 3:
