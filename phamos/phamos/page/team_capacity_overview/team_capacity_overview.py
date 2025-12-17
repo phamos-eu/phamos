@@ -10,6 +10,8 @@ def get_team_capacity(filters=None):
     from_date = filters.get("from_date")
     to_date = filters.get("to_date")
     selected_team = filters.get("team") or []
+    enable_comparison = filters.get("enable_comparison")
+    comparison_type = filters.get("comparison_type")
 
     if not from_date or not to_date:
         frappe.throw("Please select both From Date and To Date.")
@@ -110,10 +112,36 @@ def get_team_capacity(filters=None):
 
         actual_line.append(round(total_actual / 3600, 2))
 
+    historical_actual_line = None
+
+    if enable_comparison:
+        hist_start, hist_end = shift_period(from_dt, to_dt, comparison_type)
+
+        hist_weeks = generate_weeks(hist_start, hist_end)
+        historical_actual_line = []
+
+        for w in hist_weeks:
+            week_start = w["start"]
+            week_end = w["end"]
+
+            s = week_start.strftime("%Y-%m-%d") + " 00:00:00"
+            e = week_end.strftime("%Y-%m-%d") + " 23:59:59"
+
+            total_actual = frappe.db.sql("""
+                SELECT SUM(actual_time)
+                FROM `tabTimesheet Record`
+                WHERE from_time <= %s AND to_time >= %s
+            """, (e, s))[0][0] or 0
+
+            historical_actual_line.append(round(total_actual / 3600, 2))
+
+
     return {
         "weeks": week_labels,
         "teams": teams,
-        "actual_line": actual_line
+        "actual_line": actual_line,
+        "historical_actual_line": historical_actual_line
+
     }
 
 def generate_weeks(start_date, end_date):
@@ -125,3 +153,16 @@ def generate_weeks(start_date, end_date):
         weeks.append({"start": week_start, "end": week_end})
         current = week_end + timedelta(days=1)
     return weeks
+
+def shift_period(start, end, comparison_type):
+    if comparison_type == "last_year":
+        return (
+            start.replace(year=start.year - 1),
+            end.replace(year=end.year - 1)
+        )
+    elif comparison_type == "last_month":
+        return (
+            start - timedelta(days=30),
+            end - timedelta(days=30)
+        )
+    return None, None

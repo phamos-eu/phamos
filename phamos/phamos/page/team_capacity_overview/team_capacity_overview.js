@@ -1,11 +1,77 @@
-frappe.pages['team-capacity-overview'].on_page_load = function(wrapper) {
+frappe.pages['team-capacity-overview'].on_page_load = function (wrapper) {
+
     var page = frappe.ui.make_app_page({
         parent: wrapper,
         title: 'Team Capacity Overview',
         single_column: true
     });
+    $("<style>")
+    .prop("type", "text/css")
+    .html(`
+    /* Toggle wrapper spacing */
+    .comparison-toggle-wrapper {
+        margin-top: -5px;
+        display: flex;
+        align-items: center;
+        gap: 20px;
+    }
 
-    // Filters
+    /* Hide the checkbox */
+    .comparison-toggle-wrapper input[type="checkbox"] {
+        opacity: 0;
+        width: 0;
+        height: 0;
+        position: absolute;
+    }
+
+    /* Slider track */
+    .comparison-toggle-wrapper .slider {
+        position: relative;
+        width: 42px;
+        height: 22px;
+        background-color: #d1d5db;
+        border-radius: 20px;
+        transition: background 0.25s ease;
+        display: inline-block;
+    }
+
+    /* Knob */
+    .comparison-toggle-wrapper .slider:before {
+        content: "";
+        position: absolute;
+        width: 16px;
+        height: 16px;
+        left: 3px;
+        top: 50%;
+        transform: translateY(-50%);
+        background-color: #fff;
+        border-radius: 50%;
+        box-shadow: 0 1px 4px rgba(0,0,0,0.25);
+        transition: transform 0.25s ease;
+    }
+
+    /* Checked state */
+    .comparison-toggle-wrapper input:checked + .slider {
+        background-color: #5463ecff;
+    }
+
+    .comparison-toggle-wrapper input:checked + .slider:before {
+        transform: translate(20px, -50%);
+    }
+
+    /* Label text */
+    .comparison-toggle-wrapper .toggle-label {
+        font-weight: 500;
+        color: #444;
+    }
+    `)
+    .appendTo("head");
+
+
+
+
+    /* ---------------- FILTERS ---------------- */
+
     page.from_date = page.add_field({
         fieldname: 'from_date',
         label: 'From Date',
@@ -22,47 +88,80 @@ frappe.pages['team-capacity-overview'].on_page_load = function(wrapper) {
         fieldname: "team",
         label: "Team",
         fieldtype: "MultiSelectList",
-        get_data: function(txt) {
+        get_data: function (txt) {
             return frappe.db.get_link_options("Team", txt);
         }
     });
+    /* ---------------- CUSTOM TOGGLE (ONLY ONCE) ---------------- */
+
+    const comparison_wrapper = $(`
+        <div class="comparison-toggle-wrapper">
+            <label class="switch">
+                <input type="checkbox" id="enable_comparison_toggle">
+                <span class="slider"></span>
+            </label>
+            <span class="toggle-label">Enable Historical Comparison</span>
+        </div>
+    `);
+
+    page.page_form.append(comparison_wrapper);
+
+    $("#enable_comparison_toggle").on("change", function () {
+        let enabled = $(this).is(":checked");
+        page.comparison_type.toggle(enabled);
+        load_chart();
+    });
+
+    page.comparison_type = page.add_field({
+        fieldname: 'comparison_type',
+        label: 'Comparison Period',
+        fieldtype: 'Select',
+        options: [
+            { label: "Same period last year", value: "last_year" },
+            { label: "Same period last month (30 days back)", value: "last_month" }
+        ],
+        default: "last_year",
+        hidden: true
+    });
+    page.comparison_type.df.onchange = function() {
+        load_chart();
+    };
 
     page.add_field({
         fieldname: 'clear',
         label: 'Clear',
         fieldtype: 'Button',
-        click: function() {
+        click() {
             let d = get_month_weeks();
             page.from_date.set_value(d.start_date);
             page.to_date.set_value(d.end_date);
             page.team.set_value([]);
+            $("#enable_comparison_toggle").prop("checked", false);
+            page.comparison_type.toggle(false);
             load_chart();
         }
     });
 
-    // Chart container
+    /* ---------------- CHART CONTAINER ---------------- */
+
     $(wrapper).find('.layout-main').append(`
-        <div id="team_chart" style="height:650px; width:100%; margin-top:20px;"></div>
+        <div id="team_chart" style="height:650px;width:100%;margin-top:20px;"></div>
     `);
 
-    // Set default dates
+    /* ---------------- DEFAULT DATES ---------------- */
+
     let d = get_month_weeks();
     page.from_date.set_value(d.start_date);
     page.to_date.set_value(d.end_date);
 
-    // Event listeners
     page.from_date.$input.on("change", load_chart);
     page.to_date.$input.on("change", load_chart);
-    page.team.df.onchange = () => {
-    console.log("Team selected:", page.team.get_value());
-    load_chart();
-};
+    page.team.df.onchange = load_chart;
 
-
-    // Initial load
     load_chart();
 
-    // Load chart function
+    /* ---------------- LOAD CHART ---------------- */
+
     function load_chart() {
         let from_date = page.from_date.get_value();
         let to_date = page.to_date.get_value();
@@ -71,90 +170,98 @@ frappe.pages['team-capacity-overview'].on_page_load = function(wrapper) {
             let d = get_month_weeks();
             from_date = d.start_date;
             to_date = d.end_date;
-            page.from_date.set_value(from_date);
-            page.to_date.set_value(to_date);
         }
 
-        let filters = { 
-            from_date, 
-            to_date, 
-            team: page.team.get_value() || [] 
+        let filters = {
+            from_date,
+            to_date,
+            team: page.team.get_value() || [],
+            enable_comparison: $("#enable_comparison_toggle").is(":checked"),
+            comparison_type: page.comparison_type.get_value()
         };
-        console.log("Team selected:", page.team.get_value());
-
-        console.log("Filters:", filters);
 
         frappe.call({
             method: "phamos.phamos.page.team_capacity_overview.team_capacity_overview.get_team_capacity",
-            args: { filters: filters },
-            callback: function(r) {
+            args: { filters },
+            callback(r) {
                 if (r.message) {
-                    render_chart(r.message.weeks, r.message.teams, r.message.actual_line);
+                    render_chart(
+                        r.message.weeks,
+                        r.message.teams,
+                        r.message.actual_line,
+                        r.message.historical_actual_line
+                    );
                 }
             }
         });
     }
 
-    // Helper: get start/end dates of current month
+    /* ---------------- HELPERS ---------------- */
+
     function get_month_weeks() {
         let today = new Date();
-        let year = today.getFullYear();
-        let month = today.getMonth();
-
-        let start = new Date(year, month, 1);
-        let end = new Date(year, month + 1, 0);
-
-        let start_with_prev = new Date(start);
-        start_with_prev.setDate(start_with_prev.getDate() - 14);
+        let start = new Date(today.getFullYear(), today.getMonth(), 1);
+        let end = new Date(today.getFullYear(), today.getMonth() + 1, 0);
+        start.setDate(start.getDate() - 14);
 
         return {
-            start_date: frappe.datetime.obj_to_str(start_with_prev),
+            start_date: frappe.datetime.obj_to_str(start),
             end_date: frappe.datetime.obj_to_str(end)
         };
     }
 
-    // Render Highcharts function remains same
-    function render_chart(weeks, teams, actual_line) {
-        teams.sort((a, b) => a.data.reduce((x,y)=>x+y,0) - b.data.reduce((x,y)=>x+y,0));
-        let chart_series = [];
+    function render_chart(weeks, teams, actual_line, historical_actual_line) {
 
-        if (teams.length > 0) {
-            chart_series.push({ name: teams[0].name, type: "area", data: teams[0].data, color: teams[0].color });
+        let series = [];
+
+        teams.sort((a, b) =>
+            a.data.reduce((x, y) => x + y, 0) -
+            b.data.reduce((x, y) => x + y, 0)
+        );
+
+        if (teams.length) {
+            series.push({
+                name: teams[0].name,
+                type: "area",
+                data: teams[0].data,
+                color: teams[0].color
+            });
         }
 
         for (let i = 1; i < teams.length; i++) {
-            let lower = teams[i - 1].data;
-            let upper = teams[i].data;
-            let range = upper.map((val, idx) => [lower[idx], val]);
-            chart_series.push({
+            series.push({
                 name: teams[i].name,
                 type: "arearange",
-                data: range,
+                data: teams[i].data.map((v, idx) => [teams[i - 1].data[idx], v]),
                 color: teams[i].color,
-                fillOpacity: 0.6,
-                lineWidth: 0,
-                tooltip: { pointFormatter: function () { return `<span style="color:${this.color}">●</span> ${this.series.name}: <b>${this.high}</b><br/>`; } }
+                lineWidth: 0
             });
         }
 
-        chart_series.push({
+        series.push({
             name: "Actual Time Spent",
-            data: actual_line,
             type: "line",
+            data: actual_line,
             dashStyle: "ShortDash",
-            lineWidth: 2,
-            color: "#000",
-            marker: { enabled: true }
+            color: "#000"
         });
 
-        frappe.require(["https://code.highcharts.com/highcharts-more.js"], () => {
-            Highcharts.chart("team_chart", {
-                chart: { type: "area" },
-                title: { text: "Team Weekly Capacity" },
-                xAxis: { categories: weeks },
-                yAxis: { min: 0, title: { text: "Hours" } },
-                series: chart_series
+        if (historical_actual_line) {
+            series.push({
+                name: "Historical Actual Time",
+                type: "line",
+                data: historical_actual_line,
+                dashStyle: "Dot",
+                color: "#666"
             });
+        }
+
+        Highcharts.chart("team_chart", {
+            chart: { type: "area" },
+            title: { text: "Team Weekly Capacity" },
+            xAxis: { categories: weeks },
+            yAxis: { min: 0, title: { text: "Hours" } },
+            series
         });
     }
 
