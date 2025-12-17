@@ -22,6 +22,14 @@ def on_upsert(doc, method=None):
 		seq = int(doc.get("custom_mailcow_seq") or 0) + 1
 		doc.db_set("custom_mailcow_seq", seq, notify=False)
 
+		# Extract attendees from custom fields if available
+		attendees_to = doc.get("custom_attendees_to") or ""
+		attendees_cc = doc.get("custom_attendees_cc") or ""
+		attendees_bcc = doc.get("custom_attendees_bcc") or ""
+		
+		# Get location from custom field (Jitsi link for hybrid meetings)
+		location = doc.get("custom_location") or ""
+
 		ics = vevent(
 			uid=doc.name,
 			seq=seq,
@@ -29,7 +37,10 @@ def on_upsert(doc, method=None):
 			starts_on=doc.starts_on,
 			ends_on=doc.ends_on,
 			description=doc.description or "",
-			# location=doc.location or "",
+			location=location,
+			attendees_to=attendees_to,
+			attendees_cc=attendees_cc,
+			attendees_bcc=attendees_bcc,
 		)
 		put_ics(doc.name, ics, acting_user_id=doc.owner)
 		doc.db_set("custom_mailcow_uid", doc.name, notify=False)
@@ -151,7 +162,7 @@ def pull_events(start: str, end: str) -> list[dict]:
 				doc.starts_on = dtstart_db
 				doc.ends_on = dtend_db
 				doc.description = desc
-				# doc.location = loc
+				doc.custom_location = loc
 				doc.custom_mailcow_etag = etag
 				doc.save()
 			else:
@@ -161,7 +172,7 @@ def pull_events(start: str, end: str) -> list[dict]:
 					"starts_on": dtstart_db,
 					"ends_on": dtend_db,
 					"description": desc,
-					# "location": loc,
+					"custom_location": loc,
 					"custom_mailcow_uid": uid,
 					"custom_mailcow_etag": etag,
 					"owner": owner,
@@ -176,7 +187,7 @@ def pull_events(start: str, end: str) -> list[dict]:
 				"starts_on": dtstart.isoformat(),
 				"ends_on": dtend.isoformat(),
 				"description": desc,
-				# "location": loc,
+				"location": loc,
 			})
 
 	return events
