@@ -1,6 +1,6 @@
 {
  "charts": [],
- "content": "[{\"id\":\"5VC2djLqsU\",\"type\":\"header\",\"data\":{\"text\":\"<span class=\\\"h4\\\">OKR Addon</span>\",\"col\":12}},{\"id\":\"Au4bOp8HSy\",\"type\":\"shortcut\",\"data\":{\"shortcut_name\":\"OKR Dashboard\",\"col\":3}},{\"id\":\"WVBMbWAeIV\",\"type\":\"shortcut\",\"data\":{\"shortcut_name\":\"OKR Check In\",\"col\":3}},{\"id\":\"TZ02mMeVZY\",\"type\":\"shortcut\",\"data\":{\"shortcut_name\":\"OKR\",\"col\":3}},{\"id\":\"0CuoHYDmH9\",\"type\":\"shortcut\",\"data\":{\"shortcut_name\":\"OKR Type\",\"col\":3}}]",
+ "content": "[{\"id\":\"5VC2djLqsU\",\"type\":\"header\",\"data\":{\"text\":\"<span class=\\\"h4\\\">OKR Addon</span>\",\"col\":12}},{\"id\":\"Au4bOp8HSy\",\"type\":\"shortcut\",\"data\":{\"shortcut_name\":\"OKR Dashboard\",\"col\":3}},{\"id\":\"WVBMbWAeIV\",\"type\":\"shortcut\",\"data\":{\"shortcut_name\":\"OKR Check In\",\"col\":3}},{\"id\":\"TZ02mMeVZY\",\"type\":\"shortcut\",\"data\":{\"shortcut_name\":\"OKR\",\"col\":3}},{\"id\":\"0CuoHYDmH9\",\"type\":\"shortcut\",\"data\":{\"shortcut_name\":\"OKR Type\",\"col\":3}},{\"id\":\"EOBM1C-Mly\",\"type\":\"shortcut\",\"data\":{\"shortcut_name\":\"OKR Setting\",\"col\":3}}]",
  "creation": "2025-10-08 12:08:41.124634",
  "custom_blocks": [],
  "docstatus": 0,
@@ -13,7 +13,7 @@
  "is_hidden": 0,
  "label": "OKR Addon",
  "links": [],
- "modified": "2025-10-30 06:55:02.387853",
+ "modified": "2025-12-17 09:33:05.711141",
  "modified_by": "Administrator",
  "module": "OKR Addon",
  "name": "OKR Addon",
@@ -25,6 +25,13 @@
  "roles": [],
  "sequence_id": 41.0,
  "shortcuts": [
+  {
+   "color": "Grey",
+   "doc_view": "List",
+   "label": "OKR Setting",
+   "link_to": "OKR Setting",
+   "type": "DocType"
+  },
   {
    "color": "Grey",
    "doc_view": "List",
