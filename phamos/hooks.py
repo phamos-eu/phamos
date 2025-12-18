@@ -172,6 +172,11 @@ scheduler_events = {
         "phamos.api.send_daily_timesheet_comment_summary",
         "phamos.phamos.doctype.team.team.update_all_teams_weekly_holidays"
     ],
+    "monthly": [
+        "phamos.api.send_monthly_comment_summary"
+    ]
+
+
 }
 
 
