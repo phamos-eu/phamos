@@ -2,6 +2,17 @@
 // For license information, please see license.txt
 
 frappe.ui.form.on("OKR", {
+	onload: function(frm) {
+		// Populate OKR Type from backend's allowed doctypes (in setting)
+		frappe.call({
+			method: "phamos.okr_addon.doctype.okr.okr.get_okr_type_options",
+			callback: function(r) {
+				if(r.message) {
+					frm.set_df_property('okr_type', 'options', r.message ? r.message.join('\n') : '');
+				}
+			}
+		});
+	},
 	refresh(frm) {
 		// Render measurable summary in the form
 		render_measurable_summary_form(frm);

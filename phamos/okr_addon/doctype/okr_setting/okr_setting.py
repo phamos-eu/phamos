@@ -3,6 +3,6 @@
 
 from frappe.model.document import Document
 
-class OKRType(Document):
+class OKRSetting(Document):
     pass
 
