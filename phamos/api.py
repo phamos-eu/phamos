@@ -436,7 +436,7 @@ def send_monthly_comment_summary():
             continue
 
         table_html = f"""
-            <p>Dear {frappe.utils.escape_html(customer)},</p>
+            <p>Dear {frappe.utils.escape_html(cust_name)},</p>
             <p>This is a monthly summary of the latest comments on your timesheets.</p>
             <p>
                 Feel free to use the comment function in your Customer Portal to ask questions
