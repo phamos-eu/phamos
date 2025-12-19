@@ -354,3 +354,125 @@ def send_daily_timesheet_comment_summary():
 def truncate(text, length=100):
     text = (text or "").strip()
     return text if len(text) <= length else text[:length].rstrip() + "…"
+
+
+def send_monthly_comment_summary():
+    # Fetch current month's customer comments
+    timesheets = frappe.db.sql("""
+        SELECT
+            ts.name AS timesheet,
+            ts.customer AS customer,
+            ts.customer_comment AS comment,
+            ts.custom_rating AS rating,
+            ts.modified AS comment_timestamp
+        FROM `tabTimesheet` ts
+        WHERE ts.customer_comment IS NOT NULL
+          AND ts.customer_comment != ''
+          AND MONTH(ts.modified) = MONTH(CURDATE())
+          AND YEAR(ts.modified) = YEAR(CURDATE())
+        ORDER BY ts.customer, ts.modified
+    """, as_dict=True)
+
+    if not timesheets:
+        return
+
+    # Group by customer
+    customers_map = {}
+    for r in timesheets:
+        customers_map.setdefault(r.customer, []).append(r)
+
+    for customer, items in customers_map.items():
+
+        if not items:
+            continue
+
+        # Customer email
+        email = frappe.db.get_value("Customer", customer, "email_id")
+
+        # If customer email not found, fetch from primary Contact
+        if not email:
+            email = frappe.db.sql("""
+                SELECT ce.email_id
+                FROM `tabContact` c
+                JOIN `tabDynamic Link` dl ON dl.parent = c.name
+                JOIN `tabContact Email` ce ON ce.parent = c.name
+                WHERE dl.link_doctype = 'Customer'
+                AND dl.link_name = %s
+                ORDER BY c.is_primary_contact DESC
+                LIMIT 1
+            """, (customer,), as_dict=True)
+
+            email = email[0].email_id if email else None
+
+        if not email:
+            frappe.logger().info(f"No email found for customer {customer}, skipping...")
+            continue
+
+
+        subject = _("Monthly Summary: Timesheet Comments for {0}").format(customer)
+
+        html_rows = []
+        for r in items:
+            ts_link = get_url(f"/app/timesheet/{r.timesheet}")
+            preview = (strip_html(r.comment) or "")[:200]
+
+            cust_name = frappe.db.get_value("Customer", r.customer, "customer_name") or r.customer
+            comment_date_str = format_datetime(r.comment_timestamp, "yyyy-MM-dd HH:mm") if r.comment_timestamp else ""
+
+            rating_value = int(r.rating or 0)
+            stars = "★" * rating_value + "☆" * (5 - rating_value)
+
+            html_rows.append(f"""
+                <tr>
+                    <td><a href="{ts_link}">{frappe.utils.escape_html(r.timesheet)}</a></td>
+                    <td>{frappe.utils.escape_html(preview)}</td>
+                    <td>{stars}</td>
+                    <td>{frappe.utils.escape_html(cust_name)}</td>
+                    <td>{frappe.utils.escape_html(comment_date_str)}</td>
+                </tr>
+            """)
+
+        if not html_rows:
+            continue
+
+        table_html = f"""
+            <p>Dear {frappe.utils.escape_html(cust_name)},</p>
+            <p>This is a monthly summary of the latest comments on your timesheets.</p>
+            <p>
+                Feel free to use the comment function in your Customer Portal to ask questions
+                or share feedback. Your input helps us improve transparency and align our work
+                even more closely with your needs. We look forward to your contributions!
+            </p>
+
+            <table border="1" cellpadding="6" cellspacing="0" 
+                   style="border-collapse: collapse; font-size: 12px;">
+                <thead style="background-color: #f5f5f5;">
+                    <tr>
+                        <th>Timesheet</th>
+                        <th>Comment Preview</th>
+                        <th>Rating</th>
+                        <th>Commented By</th>
+                        <th>Comment Date</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {''.join(html_rows)}
+                </tbody>
+            </table>
+
+            <p style="margin-top: 12px;">Your Phamos Team</p>
+        """
+
+        try:
+            frappe.sendmail(
+                recipients=[email],
+                subject=subject,
+                message=table_html,
+                now=True,
+            )
+
+        except Exception:
+            frappe.log_error(
+                title="Monthly Timesheet Comment Summary: Email Send Failed",
+                message=frappe.get_traceback()
+            )
