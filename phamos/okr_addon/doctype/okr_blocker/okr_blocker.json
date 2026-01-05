@@ -1,0 +1,76 @@
+{
+ "actions": [],
+ "creation": "2025-01-27 10:00:00.000000",
+ "doctype": "DocType",
+ "editable_grid": 1,
+ "engine": "InnoDB",
+ "field_order": [
+  "blocker_description",
+  "blocker_type",
+  "priority",
+  "status",
+  "assigned_to",
+  "resolution_plan",
+  "target_resolution_date"
+ ],
+ "fields": [
+  {
+   "fieldname": "blocker_description",
+   "fieldtype": "Text",
+   "in_list_view": 1,
+   "label": "Blocker Description",
+   "reqd": 1
+  },
+  {
+   "default": "Resource",
+   "fieldname": "blocker_type",
+   "fieldtype": "Select",
+   "in_list_view": 1,
+   "label": "Blocker Type",
+   "options": "Resource\nTechnical\nProcess\nExternal\nOther"
+  },
+  {
+   "default": "Medium",
+   "fieldname": "priority",
+   "fieldtype": "Select",
+   "in_list_view": 1,
+   "label": "Priority",
+   "options": "Low\nMedium\nHigh\nCritical"
+  },
+  {
+   "default": "Open",
+   "fieldname": "status",
+   "fieldtype": "Select",
+   "in_list_view": 1,
+   "label": "Status",
+   "options": "Open\nIn Progress\nResolved\nClosed"
+  },
+  {
+   "fieldname": "assigned_to",
+   "fieldtype": "Link",
+   "label": "Assigned To",
+   "options": "User"
+  },
+  {
+   "fieldname": "resolution_plan",
+   "fieldtype": "Text",
+   "label": "Resolution Plan"
+  },
+  {
+   "fieldname": "target_resolution_date",
+   "fieldtype": "Date",
+   "label": "Target Resolution Date"
+  }
+ ],
+ "istable": 1,
+ "links": [],
+ "modified": "2025-01-27 10:00:00.000000",
+ "modified_by": "Administrator",
+ "module": "OKR Addon",
+ "name": "OKR Blocker",
+ "owner": "Administrator",
+ "permissions": [],
+ "sort_field": "modified",
+ "sort_order": "DESC",
+ "track_changes": 1
+} 
