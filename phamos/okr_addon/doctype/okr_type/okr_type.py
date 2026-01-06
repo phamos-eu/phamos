@@ -1,8 +1,9 @@
-# Copyright (c) 2025, Phamos and contributors
+# Copyright (c) 2025, phamos.eu and contributors
 # For license information, please see license.txt
 
+# import frappe
 from frappe.model.document import Document
 
-class OKRType(Document):
-    pass
 
+class OKRType(Document):
+	pass
