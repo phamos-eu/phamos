@@ -220,6 +220,93 @@ def get_graph_data(from_date=None, to_date=None, project=None):
     return {"timesheets": data}
 
 
+# Sales Order KPI Display Preferences API
+@frappe.whitelist()
+def get_sales_order_kpi_preference():
+    """Get user's preferred KPI display mode for Sales Orders"""
+    user = frappe.session.user
+    
+    # Check if preference exists in user defaults
+    preference = frappe.db.get_value(
+        "DefaultValue",
+        {"parent": user, "defkey": "sales_order_kpi_display_mode"},
+        "defvalue"
+    )
+    
+    return preference or "all"
+
+
+@frappe.whitelist()
+def set_sales_order_kpi_preference(mode):
+    """Set user's preferred KPI display mode for Sales Orders
+    
+    Args:
+        mode: One of 'all', 'indicators', 'progress_bars', 'cards', 'html_section'
+    """
+    valid_modes = ['all', 'indicators', 'progress_bars', 'cards', 'html_section']
+    
+    if mode not in valid_modes:
+        frappe.throw(_("Invalid display mode. Choose from: {0}").format(", ".join(valid_modes)))
+    
+    user = frappe.session.user
+    
+    # Set user default
+    frappe.db.set_default("sales_order_kpi_display_mode", mode, user)
+    frappe.db.commit()
+    
+    return {"success": True, "mode": mode, "message": _("Display preference saved successfully")}
+
+
+@frappe.whitelist()
+def get_sales_order_kpi_stats(sales_order):
+    """Get detailed KPI statistics for a Sales Order
+    
+    Returns delivery and billing details including related documents
+    """
+    if not frappe.has_permission("Sales Order", "read", sales_order):
+        frappe.throw(_("Not permitted"), frappe.PermissionError)
+    
+    so = frappe.get_doc("Sales Order", sales_order)
+    
+    # Get related documents
+    delivery_notes = frappe.get_all(
+        "Delivery Note Item",
+        filters={"against_sales_order": sales_order, "docstatus": 1},
+        fields=["parent", "qty", "item_code"],
+        group_by="parent"
+    )
+    
+    sales_invoices = frappe.get_all(
+        "Sales Invoice Item",
+        filters={"sales_order": sales_order, "docstatus": 1},
+        fields=["parent", "qty", "amount", "item_code"],
+        group_by="parent"
+    )
+    
+    # Calculate totals
+    total_qty = sum([item.qty for item in so.items])
+    delivered_qty = sum([item.delivered_qty for item in so.items])
+    billed_qty = sum([item.billed_qty if hasattr(item, 'billed_qty') else 0 for item in so.items])
+    
+    return {
+        "per_delivered": so.per_delivered,
+        "per_billed": so.per_billed,
+        "total_qty": total_qty,
+        "delivered_qty": delivered_qty,
+        "pending_qty": total_qty - delivered_qty,
+        "billed_qty": billed_qty,
+        "total_amount": so.grand_total,
+        "billed_amount": so.grand_total * (so.per_billed / 100),
+        "pending_amount": so.grand_total * ((100 - so.per_billed) / 100),
+        "delivery_notes": [dn.parent for dn in delivery_notes],
+        "sales_invoices": [si.parent for si in sales_invoices],
+        "status": so.status,
+        "delivery_status": so.delivery_status,
+        "billing_status": so.billing_status
+    }
+
+
+
 def send_daily_timesheet_comment_summary():
     rows = frappe.db.sql(
         """

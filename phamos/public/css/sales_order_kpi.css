@@ -1,0 +1,254 @@
+/* Sales Order KPI Enhancements */
+/* Custom CSS for all visualization options */
+
+/* Card hover effects */
+.so-kpi-cards [style*="box-shadow"]:hover {
+    box-shadow: 0 4px 16px rgba(0,0,0,0.15) !important;
+}
+
+/* Smooth transitions for progress bars */
+.so-progress-bars [style*="background"] {
+    transition: all 0.3s ease-in-out;
+}
+
+/* Animation for progress bar fill */
+@keyframes fillProgress {
+    from {
+        width: 0%;
+    }
+}
+
+.so-progress-bars [style*="width"] {
+    animation: fillProgress 1s ease-out;
+}
+
+/* Pulse animation for urgent status */
+@keyframes pulse-red {
+    0%, 100% {
+        box-shadow: 0 0 0 0 rgba(220, 38, 38, 0.4);
+    }
+    50% {
+        box-shadow: 0 0 0 8px rgba(220, 38, 38, 0);
+    }
+}
+
+.so-kpi-urgent {
+    animation: pulse-red 2s infinite;
+}
+
+/* Mobile responsive */
+@media (max-width: 768px) {
+    .so-kpi-cards > div[style*="grid-template-columns"] {
+        grid-template-columns: 1fr !important;
+    }
+    
+    .so-kpi-container > div[style*="flex"] {
+        flex-direction: column !important;
+    }
+}
+
+/* Print styles - hide KPI visualizations in print */
+@media print {
+    .so-kpi-cards,
+    .so-progress-bars,
+    .so-kpi-container {
+        display: none !important;
+    }
+}
+
+/* Enhanced tooltip styles */
+.kpi-tooltip {
+    position: relative;
+    cursor: help;
+}
+
+.kpi-tooltip:hover::after {
+    content: attr(data-tooltip);
+    position: absolute;
+    bottom: 100%;
+    left: 50%;
+    transform: translateX(-50%);
+    padding: 8px 12px;
+    background: #1f2937;
+    color: white;
+    border-radius: 6px;
+    font-size: 12px;
+    white-space: nowrap;
+    z-index: 1000;
+    margin-bottom: 8px;
+}
+
+/* Fade in animation for KPI sections */
+@keyframes fadeIn {
+    from {
+        opacity: 0;
+        transform: translateY(-10px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+.so-kpi-cards,
+.so-progress-bars,
+.so-kpi-container {
+    animation: fadeIn 0.5s ease-out;
+}
+
+/* Status badge styles */
+.kpi-status-badge {
+    display: inline-block;
+    padding: 4px 8px;
+    border-radius: 4px;
+    font-size: 11px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+.kpi-status-badge.urgent {
+    background: #fef2f2;
+    color: #dc2626;
+}
+
+.kpi-status-badge.warning {
+    background: #fff7ed;
+    color: #ea580c;
+}
+
+.kpi-status-badge.progress {
+    background: #fef9c3;
+    color: #ca8a04;
+}
+
+.kpi-status-badge.good {
+    background: #eff6ff;
+    color: #2563eb;
+}
+
+.kpi-status-badge.complete {
+    background: #f0fdf4;
+    color: #16a34a;
+}
+
+/* Dashboard indicator enhancements */
+.indicator-pill {
+    font-weight: 600;
+    padding: 6px 12px;
+    border-radius: 12px;
+}
+
+/* Loading skeleton for KPIs */
+.kpi-skeleton {
+    background: linear-gradient(90deg, #f0f0f0 25%, #e0e0e0 50%, #f0f0f0 75%);
+    background-size: 200% 100%;
+    animation: loading 1.5s infinite;
+}
+
+@keyframes loading {
+    0% {
+        background-position: 200% 0;
+    }
+    100% {
+        background-position: -200% 0;
+    }
+}
+
+/* Gauge-style circular progress (optional alternative) */
+.kpi-gauge {
+    width: 120px;
+    height: 120px;
+    border-radius: 50%;
+    background: conic-gradient(
+        var(--gauge-color) var(--gauge-percent),
+        #e5e7eb var(--gauge-percent)
+    );
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    position: relative;
+}
+
+.kpi-gauge::before {
+    content: '';
+    width: 90px;
+    height: 90px;
+    border-radius: 50%;
+    background: white;
+    position: absolute;
+}
+
+.kpi-gauge-value {
+    position: relative;
+    z-index: 1;
+    font-size: 24px;
+    font-weight: bold;
+}
+
+/* Sparkline-style mini charts */
+.kpi-sparkline {
+    height: 30px;
+    width: 100%;
+    margin-top: 8px;
+}
+
+/* Icon pulse animation for status */
+@keyframes iconPulse {
+    0%, 100% {
+        transform: scale(1);
+    }
+    50% {
+        transform: scale(1.1);
+    }
+}
+
+.kpi-icon-animated {
+    animation: iconPulse 2s ease-in-out infinite;
+}
+
+/* Gradient backgrounds for sections */
+.kpi-gradient-red {
+    background: linear-gradient(135deg, #fee2e2 0%, #fecaca 100%);
+}
+
+.kpi-gradient-orange {
+    background: linear-gradient(135deg, #ffedd5 0%, #fed7aa 100%);
+}
+
+.kpi-gradient-yellow {
+    background: linear-gradient(135deg, #fef3c7 0%, #fde68a 100%);
+}
+
+.kpi-gradient-blue {
+    background: linear-gradient(135deg, #dbeafe 0%, #bfdbfe 100%);
+}
+
+.kpi-gradient-green {
+    background: linear-gradient(135deg, #dcfce7 0%, #bbf7d0 100%);
+}
+
+/* Compact mode for smaller screens */
+.kpi-compact .kpi-item {
+    padding: 10px !important;
+}
+
+.kpi-compact .kpi-item > div:first-child {
+    font-size: 10px !important;
+}
+
+.kpi-compact .kpi-item > div:nth-child(2) {
+    font-size: 24px !important;
+}
+
+/* Dark mode support (if ERPNext theme supports it) */
+@media (prefers-color-scheme: dark) {
+    .so-kpi-container {
+        background: linear-gradient(135deg, #4c1d95 0%, #5b21b6 100%) !important;
+    }
+    
+    .kpi-item {
+        background: #1f2937 !important;
+        color: #f9fafb !important;
+    }
+}
