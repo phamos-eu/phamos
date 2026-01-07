@@ -6,3 +6,4 @@ tags
 phamos/docs/current
 node_modules/
 phamos/public/dist/js
+phamos/public/node_modules

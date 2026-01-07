@@ -1,7 +1,7 @@
 // Copyright (c) 2025, phamos.eu and contributors
 // For license information, please see license.txt
 
-// frappe.ui.form.on("OKR Type", {
+// frappe.ui.form.on("Team Capacity Ledger", {
 // 	refresh(frm) {
 
 // 	},

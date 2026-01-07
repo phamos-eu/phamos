@@ -1,48 +1,55 @@
 {
  "actions": [],
  "allow_rename": 1,
- "creation": "2025-05-07 12:08:36.660998",
+ "creation": "2025-12-04 14:59:18.196393",
  "doctype": "DocType",
  "editable_grid": 1,
  "engine": "InnoDB",
  "field_order": [
-  "month_and_year",
-  "prediction",
-  "date"
+  "employee",
+  "leave_type",
+  "date",
+  "hrs"
  ],
  "fields": [
   {
-   "fieldname": "month_and_year",
-   "fieldtype": "Select",
+   "fieldname": "employee",
+   "fieldtype": "Link",
    "in_list_view": 1,
-   "label": "Month And Year"
+   "label": "Employee",
+   "options": "Employee"
   },
   {
-   "fieldname": "prediction",
+   "fieldname": "leave_type",
+   "fieldtype": "Data",
+   "in_list_view": 1,
+   "label": "Leave Type"
+  },
+  {
+   "fieldname": "hrs",
    "fieldtype": "Int",
    "in_list_view": 1,
-   "label": "Prediction"
+   "label": "Hrs"
   },
   {
-   "default": "Today",
    "fieldname": "date",
    "fieldtype": "Date",
    "in_list_view": 1,
-   "label": "Date",
-   "read_only": 1
+   "label": "Date"
   }
  ],
- "grid_page_length": 10,
+ "grid_page_length": 50,
  "index_web_pages_for_search": 1,
  "istable": 1,
  "links": [],
- "modified": "2025-06-02 11:53:13.702129",
+ "modified": "2025-12-04 15:10:42.594884",
  "modified_by": "Administrator",
  "module": "Phamos",
- "name": "Prediction",
+ "name": "Team Member Leaves and Holiday",
  "owner": "Administrator",
  "permissions": [],
  "row_format": "Dynamic",
+ "rows_threshold_for_grid_search": 20,
  "sort_field": "modified",
  "sort_order": "DESC",
  "states": []

@@ -47,6 +47,7 @@
   "prediction_to_date",
   "section_break_5rmv",
   "resource_chart",
+  "quick_add_button_html",
   "resource_planning",
   "resource_planning_prediction",
   "modules_tab",
@@ -260,6 +261,11 @@
    "label": "Time spent"
   },
   {
+   "fieldname": "quick_add_button_html",
+   "fieldtype": "HTML",
+   "label": "Quick Add"
+  },
+  {
    "fieldname": "from_date",
    "fieldtype": "Date",
    "label": "From Dates"
@@ -332,12 +338,6 @@
    "label": "Reset"
   },
   {
-   "default": "1",
-   "fieldname": "internal_implementation",
-   "fieldtype": "Check",
-   "label": "Internal Implementation"
-  },
-  {
    "fieldname": "report_tab",
    "fieldtype": "Tab Break",
    "label": "Report"
@@ -383,7 +383,7 @@
    "link_fieldname": "custom_implementation"
   }
  ],
- "modified": "2025-10-31 11:36:08.263301",
+ "modified": "2025-11-26 07:45:02.091002",
  "modified_by": "Administrator",
  "module": "Phamos",
  "name": "Implementation",

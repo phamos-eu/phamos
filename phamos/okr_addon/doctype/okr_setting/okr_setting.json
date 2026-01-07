@@ -1,0 +1,30 @@
+{
+  "doctype": "DocType",
+  "name": "OKR Setting",
+  "module": "OKR Addon",
+  "editable_grid": 1,
+  "issingle": 1,
+  "track_changes": 1,
+  "engine": "InnoDB",
+  "autoname": "",
+  "field_order": ["okr_types"],
+  "fields": [
+    {
+      "fieldname": "okr_types",
+      "label": "OKR Types",
+      "fieldtype": "Table",
+      "options": "OKR Type"
+    }
+  ],
+  "permissions": [
+    {
+      "role": "System Manager",
+      "read": 1,
+      "write": 1,
+      "create": 1,
+      "delete": 1
+    }
+  ],
+  "sort_field": "modified",
+  "sort_order": "DESC"
+}

@@ -364,4 +364,10 @@ def get_measurable_summary_for_frontend(okr_name):
     doc = frappe.get_doc("OKR", okr_name)
     return doc.get_measurable_summary()
 
+@frappe.whitelist()
+def get_okr_type_options():
+    """Fetch okr_type options from OKR Setting's child table."""
+    setting = frappe.get_single("OKR Setting")
+    return [row.okr_type for row in setting.okr_types]
+
 

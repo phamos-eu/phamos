@@ -2,12 +2,28 @@
 // For license information, please see license.txt
 
 frappe.ui.form.on("OKR", {
+	onload: function(frm) {
+		// Populate OKR Type from backend's allowed doctypes (in setting)
+		frappe.call({
+			method: "phamos.okr_addon.doctype.okr.okr.get_okr_type_options",
+			callback: function(r) {
+				if(r.message) {
+					frm.set_df_property('okr_type', 'options', r.message ? r.message.join('\n') : '');
+				}
+			}
+		});
+	},
 	refresh(frm) {
 		// Render measurable summary in the form
 		render_measurable_summary_form(frm);
 		
 		// Add market-standard features
 		addMarketStandardFeatures(frm);
+		
+		// Add Parent OKR link to Connections
+		if (frm.doc.parent_okr) {
+			setTimeout(() => addParentOKRLink(frm), 500);
+		}
 	},
 	
 	measurables_add(frm, cdt, cdn) {
@@ -596,3 +612,48 @@ function addComment() {
 		indicator: 'green'
 	});
 }
+
+// Add Parent OKR link to Connections section (optimized)
+function addParentOKRLink(frm) {
+	if (!frm.dashboard || !frm.dashboard.transactions_area) return;
+	
+	let $area = frm.dashboard.transactions_area;
+	$area.find('.parent-okr-link').remove(); // Remove existing
+	
+	let $firstCol = $area.find('.col-md-4').first();
+	if ($firstCol.length) {
+		// Find the container for document links (after form-link-title)
+		let $linkContainer = $firstCol.find('.form-link-title').next();
+		if (!$linkContainer.length || !$linkContainer.hasClass('document-link')) {
+			// If no container exists, create one or use the column itself
+			$linkContainer = $firstCol;
+		}
+		
+		// Create Parent OKR link matching exact Frappe structure
+		let $link = $(`
+			<div class="document-link parent-okr-link" data-doctype="OKR" data-names='["${frm.doc.parent_okr}"]'>
+				<div class="document-link-badge" data-doctype="OKR">
+					<span class="count">1</span>
+					<a class="badge-link">${__('Parent OKR')}</a>
+				</div>
+			</div>
+		`);
+		
+		// Insert at the beginning - after form-link-title if exists, otherwise at start
+		let $title = $firstCol.find('.form-link-title');
+		if ($title.length) {
+			// Insert after title, before other document links
+			$link.insertAfter($title);
+		} else {
+			// No title, prepend to column
+			$firstCol.prepend($link);
+		}
+		
+		// Make clickable
+		$link.find('.badge-link').on('click', (e) => {
+			e.preventDefault();
+			frappe.set_route('Form', 'OKR', frm.doc.parent_okr);
+		});
+	}
+}
+
