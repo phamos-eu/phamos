@@ -38,18 +38,14 @@ frappe.ui.form.on('Lead', {
     },
     
     status: function(frm) {
-        // Make status_comment mandatory when status is "Do Not Contact"
+        // When status is changed to "Do Not Contact", prompt for a reason.
         if (frm.doc.status === 'Do Not Contact') {
             frm.set_df_property('custom_status_comment', 'reqd', 1);
             frm.set_df_property('custom_status_comment', 'hidden', 0);
             
-            // Show message if comment is empty
+            // If the comment is not already set, prompt the user for it.
             if (!frm.doc.custom_status_comment) {
-                frappe.msgprint({
-                    title: __('Status Comment Required'),
-                    indicator: 'orange',
-                    message: __('Please provide a reason for setting this Lead to "Do Not Contact"')
-                });
+                prompt_for_do_not_contact_reason(frm);
             }
         } else {
             // Not mandatory for other statuses - clear the fields
@@ -90,6 +86,43 @@ frappe.ui.form.on('Lead', {
         }
     }
 });
+
+function prompt_for_do_not_contact_reason(frm) {
+    const dialog = new frappe.ui.Dialog({
+        title: __('Reason for "Do Not Contact"'),
+        indicator: 'orange',
+        fields: [
+            {
+                label: __('Please provide a reason for setting this Lead to "Do Not Contact". This is mandatory.'),
+                fieldname: 'reason',
+                fieldtype: 'Text',
+                reqd: 1
+            }
+        ],
+        primary_action_label: __('Save Reason'),
+        primary_action: function(values) {
+            frm.set_value('custom_status_comment', values.reason);
+            dialog.hide();
+            frm.save()
+                .then(() => {
+                    frappe.show_alert({
+                        message: __('Lead status updated and reason saved.'),
+                        indicator: 'green'
+                    });
+                    // After saving, show the display dialog
+                    show_do_not_contact_dialog(frm);
+                })
+                .catch(() => {
+                    frappe.show_alert({
+                        message: __('Could not save the Lead. Please try again.'),
+                        indicator: 'red'
+                    });
+                });
+        }
+    });
+    dialog.show();
+    dialog.get_field('reason').$wrapper.find('textarea').css('height', '80px');
+}
 
 function show_do_not_contact_dialog(frm) {
     // Only show once per form load (but allow re-showing after certain events)
