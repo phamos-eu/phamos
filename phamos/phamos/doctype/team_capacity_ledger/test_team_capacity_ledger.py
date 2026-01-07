@@ -5,5 +5,5 @@
 from frappe.tests.utils import FrappeTestCase
 
 
-class TestOKRType(FrappeTestCase):
+class TestTeamCapacityLedger(FrappeTestCase):
 	pass

@@ -1,5 +1,40 @@
+import json
 import frappe
 from frappe.utils import formatdate
+
+def get_team_capacity_avg(from_month=None, to_month=None, team=None):
+    conditions = []
+    values = []
+
+    if team:
+        conditions.append("team = %s")
+        values.append(str(team))
+
+    if from_month:
+        conditions.append("date >= %s")
+        values.append(from_month + "-01")
+
+    if to_month:
+        conditions.append("date <= LAST_DAY(%s)")
+        values.append(to_month + "-01")
+
+    where_clause = " AND ".join(conditions)
+    if where_clause:
+        where_clause = "WHERE " + where_clause
+
+    result = frappe.db.sql(f"""
+        SELECT
+            DATE_FORMAT(date, '%%Y-%%m') AS month_and_year,
+            COALESCE(AVG(total_team_capacity), 0) AS avg_capacity
+        FROM `tabTeam Capacity Ledger`
+        {where_clause}
+        GROUP BY DATE_FORMAT(date, '%%Y-%%m')
+        ORDER BY month_and_year
+    """, values, as_dict=True)
+
+    return result
+
+
 
 @frappe.whitelist()
 def get_chart_data(from_date=None, to_date=None, team=None, implementation=None):
@@ -11,11 +46,14 @@ def get_chart_data(from_date=None, to_date=None, team=None, implementation=None)
 
     planning = []
     prediction = []
+    implementation_teams = {}  # Map implementation name to team
 
     if implementation:
         impl_list = [i.strip() for i in implementation.split(',') if i.strip()]
         for impl_name in impl_list:
             full_doc = frappe.get_doc("Implementation", impl_name)
+            implementation_teams[impl_name] = full_doc.team or "Unassigned"
+            
             for row in (full_doc.resource_planning or []):
                 row_dict = row.as_dict()
                 row_dict["implementation_name"] = impl_name
@@ -30,8 +68,9 @@ def get_chart_data(from_date=None, to_date=None, team=None, implementation=None)
         if team:
             filters["team"] = team
 
-        all_impls = frappe.get_all("Implementation", filters=filters, fields=["name"])
+        all_impls = frappe.get_all("Implementation", filters=filters, fields=["name", "team"])
         for impl in all_impls:
+            implementation_teams[impl.name] = impl.team or "Unassigned"
             full_doc = frappe.get_doc("Implementation", impl.name)
             
             for row in (full_doc.resource_planning or []):
@@ -72,10 +111,17 @@ def get_chart_data(from_date=None, to_date=None, team=None, implementation=None)
     prediction_filtered = [row for row in prediction if row.month_and_year and is_within_range(row.month_and_year)]
     addon_filtered = [row for row in addon_data if row.month_and_year and is_within_range(row.month_and_year)]
 
+    team_capacity_avg = get_team_capacity_avg(
+        from_month=from_month,
+        to_month=to_month,
+        team=team
+    )
     return {
         "planning": planning_filtered,
         "prediction": prediction_filtered,
-        "addon": addon_filtered  # 🔸 Extra addon data
+        "addon": addon_filtered,
+        "implementation_teams": implementation_teams,
+        "team_capacity_avg": team_capacity_avg 
     }
 
 

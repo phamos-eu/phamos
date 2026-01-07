@@ -149,6 +149,9 @@ doc_events = {
         "on_update": "phamos.mailcow_integration.caldav.sync_event.on_upsert",
 		"on_trash": "phamos.mailcow_integration.caldav.sync_event.on_delete",
 	},
+    "Team": {
+        "after_save": "phamos.phamos.doctype.team.team.create_team_capacity_ledger_entry"
+    }
 }
 
 
@@ -183,13 +186,17 @@ fixtures = [
     ]}
 ]
 
-#scheduler_events = {
- #   "cron": {
-  #      "0 6 * * 1-5": [
-   #         "phamos.custom_scripts.custom_python.mattermost_daily_thread.create_mattermost_thread"
-    #    ]
-    #}
-#}
+scheduler_events = {
+    "daily": [
+        "phamos.api.send_daily_timesheet_comment_summary",
+        "phamos.phamos.doctype.team.team.update_all_teams_weekly_holidays"
+    ],
+    "monthly": [
+        "phamos.api.send_monthly_comment_summary"
+    ]
+
+
+}
 
 
 # Testing
