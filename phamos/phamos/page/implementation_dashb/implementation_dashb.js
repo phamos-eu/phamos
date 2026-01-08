@@ -281,6 +281,46 @@ frappe.pages['implementation-dashb'].on_page_load = function (wrapper) {
 
                 // Chart rendering
                 $('#chart-container').html(`
+                    <style>
+                        .display-mode-btn:not(.btn-primary) {
+                            background-color: var(--fg-color, #fff);
+                            color: var(--text-color, #000);
+                            border-color: var(--border-color, #d1d8dd);
+                        }
+                        .display-mode-btn:not(.btn-primary):hover {
+                            background-color: var(--control-bg-on-gray, #f5f5f5);
+                            color: var(--text-color, #000);
+                            border-color: var(--border-color, #d1d8dd);
+                        }
+                        html[data-theme="dark"] .display-mode-btn:not(.btn-primary) {
+                            background-color: var(--control-bg, #2e3338);
+                            color: var(--text-on-gray, #d2d6da);
+                            border-color: var(--dark-border-color, #4a5258);
+                        }
+                        html[data-theme="dark"] .display-mode-btn:not(.btn-primary):hover {
+                            background-color: var(--control-bg-on-gray, #3a4048);
+                            color: var(--text-on-gray, #fff);
+                            border-color: var(--dark-border-color, #5a6268);
+                        }
+                        #toggle-legend {
+                            background-color: var(--fg-color, #fff);
+                            color: var(--text-color, #000);
+                            border-color: var(--border-color, #d1d8dd);
+                        }
+                        #toggle-legend:hover {
+                            background-color: var(--control-bg-on-gray, #f5f5f5);
+                            color: var(--text-color, #000);
+                        }
+                        html[data-theme="dark"] #toggle-legend {
+                            background-color: var(--control-bg, #2e3338);
+                            color: var(--text-on-gray, #d2d6da);
+                            border-color: var(--dark-border-color, #4a5258);
+                        }
+                        html[data-theme="dark"] #toggle-legend:hover {
+                            background-color: var(--control-bg-on-gray, #3a4048);
+                            color: var(--text-on-gray, #fff);
+                        }
+                    </style>
                     <div class="d-flex justify-content-between align-items-center mb-2 flex-wrap">
                         <div class="btn-group me-2 mb-1" role="group" aria-label="Display Mode">
                             <button type="button" class="btn btn-sm display-mode-btn ${currentDisplayMode === 'split' ? 'btn-primary' : 'btn-outline-primary'}" data-mode="split">
@@ -377,7 +417,8 @@ frappe.pages['implementation-dashb'].on_page_load = function (wrapper) {
                             
                             let tooltip = `<div style="min-width: 220px;">`;
                             tooltip += `<div style="font-size: 13px; font-weight: bold; color: #333; margin-bottom: 8px; border-bottom: 2px solid ${implColors[0]}; padding-bottom: 5px;">${implName}</div>`;
-                            tooltip += `<div style="font-size: 12px; color: #666; margin-bottom: 8px;">${month}</div>`;
+                            tooltip += `<div style="font-size: 12px; color: #666; margin-bottom: 4px;">${month}</div>`;
+                            tooltip += `<div style="font-size: 14px; font-weight: bold; color: #1976d2; margin-bottom: 8px; padding: 6px; background: #e3f2fd; border-radius: 4px; text-align: center;">Monthly Hours: ${totalHrs.toFixed(1)} hrs</div>`;
                             
                             tooltip += `<div style="padding: 8px; background: #f8f9fa; border-radius: 4px; margin-bottom: 8px;">`;
                             
