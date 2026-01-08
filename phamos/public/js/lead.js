@@ -10,33 +10,6 @@ frappe.ui.form.on('Lead', {
         }
     },
     
-    refresh: function(frm) {
-        // Also check on refresh in case onload didn't trigger
-        if (frm.doc.status === 'Do Not Contact' && frm.doc.custom_status_comment && !frm.is_new() && frm.doctype === 'Lead' && cur_frm) {
-            // Use setTimeout to ensure form is fully loaded
-            setTimeout(() => {
-                show_do_not_contact_dialog(frm);
-            }, 300);
-        }
-        
-        // Add button to view the comment history if needed
-        if (frm.doc.status === 'Do Not Contact' && frm.doc.custom_status_comment && !frm.is_new()) {
-            frm.add_custom_button(__('View Do Not Contact Reason'), function() {
-                show_do_not_contact_dialog(frm);
-                frm._do_not_contact_dialog_shown = false; // Allow showing again
-            }, __('Actions'));
-        }
-    },
-    
-    after_save: function(frm) {
-        // Show dialog immediately after saving if status is "Do Not Contact" - only in form view
-        if (frm.doc.status === 'Do Not Contact' && frm.doc.custom_status_comment && cur_frm) {
-            // Reset the flag to allow showing after save
-            frm._do_not_contact_dialog_shown = false;
-            show_do_not_contact_dialog(frm);
-        }
-    },
-    
     status: function(frm) {
         // When status is changed to "Do Not Contact", prompt for a reason.
         if (frm.doc.status === 'Do Not Contact') {
@@ -54,8 +27,6 @@ frappe.ui.form.on('Lead', {
             // Clear the comment and tracking fields when status changes away from "Do Not Contact"
             if (frm.doc.custom_status_comment) {
                 frm.set_value('custom_status_comment', '');
-                // frm.set_value('custom_status_comment_modified_by', '');
-                // frm.set_value('custom_status_comment_modified_date', '');
             }
         }
     },
@@ -67,24 +38,6 @@ frappe.ui.form.on('Lead', {
             frm.set_value('custom_status_comment_modified_date', frappe.datetime.now_datetime());
         }
     },
-    
-    before_save: function(frm) {
-        // Validate before saving
-        if (frm.doc.status === 'Do Not Contact' && !frm.doc.custom_status_comment) {
-            frappe.validated = false;
-            frappe.throw(__('Status Comment is mandatory when setting status to "Do Not Contact"'));
-        }
-        
-        // Update tracking fields
-        if (frm.doc.custom_status_comment && frm.doc.status === 'Do Not Contact') {
-            if (!frm.doc.custom_status_comment_modified_by) {
-                frm.set_value('custom_status_comment_modified_by', frappe.session.user);
-            }
-            if (!frm.doc.custom_status_comment_modified_date) {
-                frm.set_value('custom_status_comment_modified_date', frappe.datetime.now_datetime());
-            }
-        }
-    }
 });
 
 function prompt_for_do_not_contact_reason(frm) {
@@ -109,8 +62,7 @@ function prompt_for_do_not_contact_reason(frm) {
                         message: __('Lead status updated and reason saved.'),
                         indicator: 'green'
                     });
-                    // After saving, show the display dialog
-                    show_do_not_contact_dialog(frm);
+                    // After saving, the dialog will appear on next load, not immediately.
                 })
                 .catch(() => {
                     frappe.show_alert({
