@@ -63,7 +63,7 @@ def get_chart_data(from_date=None, to_date=None, team=None, implementation=None)
             FROM `tabTimesheet` t
             JOIN `tabTimesheet Detail` tl ON tl.parent = t.name
             WHERE t.parent_project IN ({placeholders})
-              AND t.docstatus = 1
+              AND t.docstatus IN (1,0)
             GROUP BY DATE_FORMAT(tl.from_time, '%%Y-%%m')
             ORDER BY month_and_year
         """, internal_projects, as_dict=True)
