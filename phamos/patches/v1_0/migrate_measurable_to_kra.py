@@ -57,8 +57,14 @@ def execute():
 			kra_mapping[metric_name] = metric_name
 			continue
 		
-		# Check if KRA already exists by title
+		# Generate a short title for KRA (max 140 chars for name field, but keep title shorter for safety)
+		# Truncate to 100 chars to ensure the auto-generated name doesn't exceed limits
+		short_title = metric_name[:100] if len(metric_name) <= 100 else metric_name[:97] + "..."
+		
+		# Check if KRA already exists by title (check both full and truncated)
 		existing_kra = frappe.db.get_value("KRA", {"title": metric_name}, "name")
+		if not existing_kra:
+			existing_kra = frappe.db.get_value("KRA", {"title": short_title}, "name")
 		
 		if existing_kra:
 			kra_mapping[metric_name] = existing_kra
@@ -68,15 +74,15 @@ def execute():
 			try:
 				kra_doc = frappe.get_doc({
 					"doctype": "KRA",
-					"title": metric_name,
-					"description": f"Migrated from Measurable metric_name: {metric_name}"
+					"title": short_title,  # Short title for the KRA record (max 100 chars)
+					"description": f"Original metric_name: {metric_name}"  # Full metric_name in description
 				})
 				kra_doc.insert(ignore_permissions=True)
 				kra_mapping[metric_name] = kra_doc.name
-				frappe.log_error("KRA Migration: Created", f"Created KRA: {metric_name} -> {kra_doc.name}")
+				frappe.log_error("KRA Migration: Created", f"Created KRA: {metric_name} -> {kra_doc.name} (title: {short_title})")
 			except frappe.DuplicateEntryError:
 				# If duplicate, get the existing one
-				existing_kra = frappe.db.get_value("KRA", {"title": metric_name}, "name")
+				existing_kra = frappe.db.get_value("KRA", {"title": short_title}, "name")
 				if existing_kra:
 					kra_mapping[metric_name] = existing_kra
 					frappe.log_error("KRA Migration: Duplicate", f"Duplicate KRA found: {metric_name} -> {existing_kra}")
