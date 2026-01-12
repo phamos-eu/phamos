@@ -68,7 +68,10 @@ def execute():
 		
 		if existing_kra:
 			kra_mapping[metric_name] = existing_kra
-			frappe.log_error("KRA Migration: Existing KRA", f"KRA already exists: {metric_name} -> {existing_kra}")
+			# Truncate long metric_name in log message
+			metric_short = metric_name[:50] if len(metric_name) > 50 else metric_name
+			kra_short = existing_kra[:50] if len(existing_kra) > 50 else existing_kra
+			frappe.log_error("KRA Migration: Existing", f"KRA exists: {metric_short} -> {kra_short}")
 		else:
 			# Create new KRA record
 			try:
@@ -79,15 +82,27 @@ def execute():
 				})
 				kra_doc.insert(ignore_permissions=True)
 				kra_mapping[metric_name] = kra_doc.name
-				frappe.log_error("KRA Migration: Created", f"Created KRA: {metric_name} -> {kra_doc.name} (title: {short_title})")
+				# Truncate long values in log message
+				metric_short = metric_name[:40] if len(metric_name) > 40 else metric_name
+				kra_short = kra_doc.name[:40] if len(kra_doc.name) > 40 else kra_doc.name
+				title_short = short_title[:30] if len(short_title) > 30 else short_title
+				frappe.log_error("KRA Migration: Created", f"Created: {metric_short} -> {kra_short} (title: {title_short})")
 			except frappe.DuplicateEntryError:
 				# If duplicate, get the existing one
 				existing_kra = frappe.db.get_value("KRA", {"title": short_title}, "name")
 				if existing_kra:
 					kra_mapping[metric_name] = existing_kra
-					frappe.log_error("KRA Migration: Duplicate", f"Duplicate KRA found: {metric_name} -> {existing_kra}")
+					metric_short = metric_name[:50] if len(metric_name) > 50 else metric_name
+					kra_short = existing_kra[:50] if len(existing_kra) > 50 else existing_kra
+					frappe.log_error("KRA Migration: Duplicate", f"Duplicate: {metric_short} -> {kra_short}")
 			except Exception as e:
-				frappe.log_error("KRA Migration: Create Error", f"Error creating KRA for {metric_name}: {str(e)}")
+				# Truncate all values to prevent nested error log issues
+				metric_short = metric_name[:40] if len(metric_name) > 40 else metric_name
+				error_msg = str(e)[:60] if len(str(e)) > 60 else str(e)
+				# Remove any nested error log references that might cause issues
+				if "Error Log" in error_msg:
+					error_msg = "Previous error occurred (see details in description)"
+				frappe.log_error("KRA Migration: Error", f"Error for {metric_short}: {error_msg}")
 				continue
 	
 	# Step 4: Update all Measurable records to use KRA link
@@ -108,7 +123,8 @@ def execute():
 		kra_name = kra_mapping.get(metric_name)
 		
 		if not kra_name:
-			frappe.log_error("KRA Migration: Missing Mapping", f"No KRA mapping found for metric_name: {metric_name}")
+			metric_short = metric_name[:60] if len(metric_name) > 60 else metric_name
+			frappe.log_error("KRA Migration: No Mapping", f"No mapping for: {metric_short}")
 			failed_count += 1
 			continue
 		
@@ -118,10 +134,14 @@ def execute():
 			frappe.db.set_value("Measurable", measurable.name, "metric_name", kra_name)
 			updated_count += 1
 		except Exception as e:
-			frappe.log_error("KRA Migration: Update Error", f"Error updating Measurable {measurable.name}: {str(e)}")
+			measurable_short = measurable.name[:40] if len(measurable.name) > 40 else measurable.name
+			error_msg = str(e)[:60] if len(str(e)) > 60 else str(e)
+			# Remove any nested error log references
+			if "Error Log" in error_msg:
+				error_msg = "Update failed (see details in description)"
+			frappe.log_error("KRA Migration: Update Failed", f"Error updating {measurable_short}: {error_msg}")
 			failed_count += 1
 	
 	frappe.log_error("KRA Migration: Complete", f"Migration completed: {updated_count} updated, {failed_count} failed, {len(kra_mapping)} KRAs created")
 	
 	frappe.db.commit()
-
