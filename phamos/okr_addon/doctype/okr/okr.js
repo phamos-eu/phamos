@@ -28,30 +28,6 @@ frappe.ui.form.on("OKR", {
 		// Render child OKRs in HTML field (with delay to ensure field is ready)
 		setTimeout(() => renderChildOKRsInField(frm), 200);
 		
-		// Auto-set parent_type for existing records (if not set)
-		// Note: parent_type is mandatory, so we try to infer it from existing data
-		if (!frm.doc.parent_type || frm.doc.parent_type === '') {
-			if (frm.doc.parent_okr) {
-				frm.set_value('parent_type', 'OKR');
-			} else if (frm.doc.parent_kra) {
-				frm.set_value('parent_type', 'KRA');
-			}
-			// If neither parent exists, user must select parent_type (mandatory field)
-		}
-	},
-	
-	parent_type(frm) {
-		// Clear parent fields when parent_type changes
-		if (!frm.doc.parent_type || frm.doc.parent_type === '') {
-			frm.set_value('parent_kra', '');
-			frm.set_value('parent_okr', '');
-		} else if (frm.doc.parent_type === 'KRA') {
-			frm.set_value('parent_okr', '');
-		} else if (frm.doc.parent_type === 'OKR') {
-			frm.set_value('parent_kra', '');
-		}
-		frm.refresh_field('parent_kra');
-		frm.refresh_field('parent_okr');
 	},
 	
 	measurables_add(frm, cdt, cdn) {
@@ -773,12 +749,12 @@ function renderChildOKRsHTML(frm, childOKRs) {
 				<table style="width: 100%; border-collapse: collapse; font-size: 12px;">
 					<thead>
 						<tr style="background: #f8f9fa; border-bottom: 1px solid #e0e0e0;">
-							<th style="padding: 6px 8px; text-align: left; font-weight: 600; color: #8d99a6; font-size: 11px; width: 35%;">Title</th>
+							<th style="padding: 6px 8px; text-align: left; font-weight: 600; color: #8d99a6; font-size: 11px; width: 32%;">Title</th>
 							<th style="padding: 6px 8px; text-align: left; font-weight: 600; color: #8d99a6; font-size: 11px; width: 12%;">Progress</th>
 							<th style="padding: 6px 8px; text-align: center; font-weight: 600; color: #8d99a6; font-size: 11px; width: 10%;">Score</th>
-							<th style="padding: 6px 8px; text-align: left; font-weight: 600; color: #8d99a6; font-size: 11px; width: 12%;">Parent Type</th>
-							<th style="padding: 6px 8px; text-align: left; font-weight: 600; color: #8d99a6; font-size: 11px; width: 16%;">Responsible</th>
-							<th style="padding: 6px 8px; text-align: left; font-weight: 600; color: #8d99a6; font-size: 11px; width: 15%;">Target Date</th>
+							<th style="padding: 6px 8px; text-align: left; font-weight: 600; color: #8d99a6; font-size: 11px; width: 12%;">OKR Type</th>
+							<th style="padding: 6px 8px; text-align: left; font-weight: 600; color: #8d99a6; font-size: 11px; width: 17%;">Responsible</th>
+							<th style="padding: 6px 8px; text-align: left; font-weight: 600; color: #8d99a6; font-size: 11px; width: 17%;">Target Date</th>
 						</tr>
 					</thead>
 					<tbody>
@@ -819,7 +795,7 @@ function renderChildOKRsHTML(frm, childOKRs) {
 				</td>
 				<td style="padding: 6px 8px;">
 					<span style="color: #8d99a6; font-size: 11px; font-weight: 500;">
-						${child.parent_type || '-'}
+						${child.okr_type || '-'}
 					</span>
 				</td>
 				<td style="padding: 6px 8px;">

@@ -8,7 +8,6 @@ from frappe.model.document import Document
 class OKR(Document):
     def validate(self):
         self.validate_measurables()
-        self.validate_parent_selection()
         # self.validate_okr_structure()
     
     def before_save(self):
@@ -78,32 +77,9 @@ class OKR(Document):
             if measurable.stretch_target and measurable.stretch_target <= measurable.committed_target:
                 frappe.throw(f"Stretch target must be higher than committed target for KR: {measurable.metric_name}")
     
-    def validate_parent_selection(self):
-        """Validate parent type and parent field selection"""
-        # Ensure parent_type is set and not blank (mandatory field)
-        if not self.parent_type or self.parent_type == "":
-            frappe.throw("Parent Type is mandatory. Please select either KRA or OKR as the parent type.")
-        
-        # If parent_type is set, ensure corresponding parent field is also set
-        if self.parent_type == "KRA":
-            if not self.parent_kra:
-                frappe.throw("Please select a Parent KRA when Parent Type is set to KRA")
-            # Clear parent_okr if it was set
-            if self.parent_okr:
-                self.parent_okr = None
-        elif self.parent_type == "OKR":
-            if not self.parent_okr:
-                frappe.throw("Please select a Parent OKR when Parent Type is set to OKR")
-            # Clear parent_kra if it was set
-            if self.parent_kra:
-                self.parent_kra = None
-        else:
-            # Invalid parent_type value
-            frappe.throw(f"Invalid Parent Type: {self.parent_type}. Please select either KRA or OKR.")
-    
     def get_parent_info(self):
         """Get parent information (KRA or OKR)"""
-        if self.parent_type == "KRA" and self.parent_kra:
+        if self.parent_kra:
             try:
                 return {
                     "type": "KRA",
@@ -113,7 +89,7 @@ class OKR(Document):
                 }
             except frappe.DoesNotExistError:
                 return None
-        elif self.parent_type == "OKR" and self.parent_okr:
+        elif self.parent_okr:
             try:
                 return {
                     "type": "OKR",
@@ -200,7 +176,7 @@ class OKR(Document):
     def update_parent_okr_progress(self):
         """Update parent progress if this is a child (OKR parent only, KRA is read-only)"""
         # Only update if parent is OKR (KRA is a standard doctype, we can't update it)
-        if self.parent_type == "OKR" and self.parent_okr:
+        if self.parent_okr:
             try:
                 parent = frappe.get_doc("OKR", self.parent_okr)
                 parent.progress = parent.calculate_progress()
@@ -457,9 +433,9 @@ def get_child_okrs(okr_name):
     # Get OKRs that have this OKR as parent (parent_okr = this OKR's name)
     child_okrs = frappe.get_all(
         "OKR",
-        filters={"parent_okr": okr_name, "parent_type": "OKR"},
+        filters={"parent_okr": okr_name},
         fields=["name", "title", "progress", "okr_score", "responsible_person", 
-               "target_date", "risk_status", "confidence_level", "okr_type", "parent_type"],
+               "target_date", "risk_status", "confidence_level", "okr_type"],
         order_by="creation desc"
     )
     
