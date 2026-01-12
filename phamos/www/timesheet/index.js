@@ -168,7 +168,7 @@ function load_timesheets() {
       $noData.hide();
 
       data.forEach(row => {
-        let btnText = "Request Adjustments";
+        let btnText = "Give Feedback";
         let btnColor = "#5198e3"; // default blue
 
         
@@ -408,7 +408,7 @@ function download_visible_csv() {
     return;
   }
 
-  const headers = ['Timesheet', 'Status', 'Employee ID', 'Employee Name', 'Start Date', 'End Date', 'Billing Status', 'Total Hours', 'Billable Hours'];
+  const headers = ['Timesheet', 'Employee ID', 'Start Date', 'End Date', 'Billing Status', 'Total Hours', 'Billable Hours'];
   const csv = [headers.join(",")].concat(rows.map(r => r.join(","))).join("\n");
 
   const blob = new Blob([csv], { type: 'text/csv' });
@@ -447,7 +447,7 @@ function download_all_csv() {
         row.total_billable_hours
       ]);
 
-      const headers = ['Timesheet', 'Status', 'Employee ID', 'Employee Name', 'Start Date', 'End Date', 'Billing Status', 'Total Hours', 'Billable Hours'];
+      const headers = ['Timesheet', 'Employee ID', 'Start Date', 'End Date', 'Billing Status', 'Total Hours', 'Billable Hours'];
       const csv = [headers.join(",")].concat(rows.map(r => r.join(","))).join("\n");
 
       const blob = new Blob([csv], { type: 'text/csv' });
@@ -560,15 +560,17 @@ function processDataForGraph(timesheets) {
 
         weekCategories.add(weekStart);
 
-        if (!projectData[row.project_name]) {
-            projectData[row.project_name] = {};
+        const projectKey = row.project_label; // 👈 use label instead of project_name
+
+        if (!projectData[projectKey]) {
+            projectData[projectKey] = {};
         }
-        if (!projectData[row.project_name][weekStart]) {
-            projectData[row.project_name][weekStart] = { total: 0, billable: 0 };
+        if (!projectData[projectKey][weekStart]) {
+            projectData[projectKey][weekStart] = { total: 0, billable: 0 };
         }
 
-        projectData[row.project_name][weekStart].total += parseFloat(row.total_hours || 0);
-        projectData[row.project_name][weekStart].billable += parseFloat(row.total_billable_hours || 0);
+        projectData[projectKey][weekStart].total += parseFloat(row.total_hours || 0);
+        projectData[projectKey][weekStart].billable += parseFloat(row.total_billable_hours || 0);
     });
 
     const categories = Array.from(weekCategories).sort();
@@ -664,7 +666,9 @@ function load_graph_data() {
     args: { from_date, to_date, project },
     callback: function (r) {
       if (r.message) {
-        loadAndRenderGraph(r.message);
+        // loadAndRenderGraph(r.message);
+        processDataForGraph(r.message.timesheets);
+
       }
     }
   });
@@ -673,7 +677,7 @@ function load_graph_data() {
 /////////////////////////////////////
 loadAndRenderGraph();
 
-// Handle "Request Adjustments" button click dynamically
+// Handle "Give Feedback" button click dynamically
 $(document).on('click', '.comment-btn', function () {
   const tsName = $(this).data('name');
   currentTsName = tsName;

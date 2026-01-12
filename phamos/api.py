@@ -220,6 +220,93 @@ def get_graph_data(from_date=None, to_date=None, project=None):
     return {"timesheets": data}
 
 
+# Sales Order KPI Display Preferences API
+@frappe.whitelist()
+def get_sales_order_kpi_preference():
+    """Get user's preferred KPI display mode for Sales Orders"""
+    user = frappe.session.user
+    
+    # Check if preference exists in user defaults
+    preference = frappe.db.get_value(
+        "DefaultValue",
+        {"parent": user, "defkey": "sales_order_kpi_display_mode"},
+        "defvalue"
+    )
+    
+    return preference or "all"
+
+
+@frappe.whitelist()
+def set_sales_order_kpi_preference(mode):
+    """Set user's preferred KPI display mode for Sales Orders
+    
+    Args:
+        mode: One of 'all', 'indicators', 'progress_bars', 'cards', 'html_section'
+    """
+    valid_modes = ['all', 'indicators', 'progress_bars', 'cards', 'html_section']
+    
+    if mode not in valid_modes:
+        frappe.throw(_("Invalid display mode. Choose from: {0}").format(", ".join(valid_modes)))
+    
+    user = frappe.session.user
+    
+    # Set user default
+    frappe.db.set_default("sales_order_kpi_display_mode", mode, user)
+    frappe.db.commit()
+    
+    return {"success": True, "mode": mode, "message": _("Display preference saved successfully")}
+
+
+@frappe.whitelist()
+def get_sales_order_kpi_stats(sales_order):
+    """Get detailed KPI statistics for a Sales Order
+    
+    Returns delivery and billing details including related documents
+    """
+    if not frappe.has_permission("Sales Order", "read", sales_order):
+        frappe.throw(_("Not permitted"), frappe.PermissionError)
+    
+    so = frappe.get_doc("Sales Order", sales_order)
+    
+    # Get related documents
+    delivery_notes = frappe.get_all(
+        "Delivery Note Item",
+        filters={"against_sales_order": sales_order, "docstatus": 1},
+        fields=["parent", "qty", "item_code"],
+        group_by="parent"
+    )
+    
+    sales_invoices = frappe.get_all(
+        "Sales Invoice Item",
+        filters={"sales_order": sales_order, "docstatus": 1},
+        fields=["parent", "qty", "amount", "item_code"],
+        group_by="parent"
+    )
+    
+    # Calculate totals
+    total_qty = sum([item.qty for item in so.items])
+    delivered_qty = sum([item.delivered_qty for item in so.items])
+    billed_qty = sum([item.billed_qty if hasattr(item, 'billed_qty') else 0 for item in so.items])
+    
+    return {
+        "per_delivered": so.per_delivered,
+        "per_billed": so.per_billed,
+        "total_qty": total_qty,
+        "delivered_qty": delivered_qty,
+        "pending_qty": total_qty - delivered_qty,
+        "billed_qty": billed_qty,
+        "total_amount": so.grand_total,
+        "billed_amount": so.grand_total * (so.per_billed / 100),
+        "pending_amount": so.grand_total * ((100 - so.per_billed) / 100),
+        "delivery_notes": [dn.parent for dn in delivery_notes],
+        "sales_invoices": [si.parent for si in sales_invoices],
+        "status": so.status,
+        "delivery_status": so.delivery_status,
+        "billing_status": so.billing_status
+    }
+
+
+
 def send_daily_timesheet_comment_summary():
     rows = frappe.db.sql(
         """
@@ -354,3 +441,125 @@ def send_daily_timesheet_comment_summary():
 def truncate(text, length=100):
     text = (text or "").strip()
     return text if len(text) <= length else text[:length].rstrip() + "…"
+
+
+def send_monthly_comment_summary():
+    # Fetch current month's customer comments
+    timesheets = frappe.db.sql("""
+        SELECT
+            ts.name AS timesheet,
+            ts.customer AS customer,
+            ts.customer_comment AS comment,
+            ts.custom_rating AS rating,
+            ts.modified AS comment_timestamp
+        FROM `tabTimesheet` ts
+        WHERE ts.customer_comment IS NOT NULL
+          AND ts.customer_comment != ''
+          AND MONTH(ts.modified) = MONTH(CURDATE())
+          AND YEAR(ts.modified) = YEAR(CURDATE())
+        ORDER BY ts.customer, ts.modified
+    """, as_dict=True)
+
+    if not timesheets:
+        return
+
+    # Group by customer
+    customers_map = {}
+    for r in timesheets:
+        customers_map.setdefault(r.customer, []).append(r)
+
+    for customer, items in customers_map.items():
+
+        if not items:
+            continue
+
+        # Customer email
+        email = frappe.db.get_value("Customer", customer, "email_id")
+
+        # If customer email not found, fetch from primary Contact
+        if not email:
+            email = frappe.db.sql("""
+                SELECT ce.email_id
+                FROM `tabContact` c
+                JOIN `tabDynamic Link` dl ON dl.parent = c.name
+                JOIN `tabContact Email` ce ON ce.parent = c.name
+                WHERE dl.link_doctype = 'Customer'
+                AND dl.link_name = %s
+                ORDER BY c.is_primary_contact DESC
+                LIMIT 1
+            """, (customer,), as_dict=True)
+
+            email = email[0].email_id if email else None
+
+        if not email:
+            frappe.logger().info(f"No email found for customer {customer}, skipping...")
+            continue
+
+
+        subject = _("Monthly Summary: Timesheet Comments for {0}").format(customer)
+
+        html_rows = []
+        for r in items:
+            ts_link = get_url(f"/app/timesheet/{r.timesheet}")
+            preview = (strip_html(r.comment) or "")[:200]
+
+            cust_name = frappe.db.get_value("Customer", r.customer, "customer_name") or r.customer
+            comment_date_str = format_datetime(r.comment_timestamp, "yyyy-MM-dd HH:mm") if r.comment_timestamp else ""
+
+            rating_value = int(r.rating or 0)
+            stars = "★" * rating_value + "☆" * (5 - rating_value)
+
+            html_rows.append(f"""
+                <tr>
+                    <td><a href="{ts_link}">{frappe.utils.escape_html(r.timesheet)}</a></td>
+                    <td>{frappe.utils.escape_html(preview)}</td>
+                    <td>{stars}</td>
+                    <td>{frappe.utils.escape_html(cust_name)}</td>
+                    <td>{frappe.utils.escape_html(comment_date_str)}</td>
+                </tr>
+            """)
+
+        if not html_rows:
+            continue
+
+        table_html = f"""
+            <p>Dear {frappe.utils.escape_html(cust_name)},</p>
+            <p>This is a monthly summary of the latest comments on your timesheets.</p>
+            <p>
+                Feel free to use the comment function in your Customer Portal to ask questions
+                or share feedback. Your input helps us improve transparency and align our work
+                even more closely with your needs. We look forward to your contributions!
+            </p>
+
+            <table border="1" cellpadding="6" cellspacing="0" 
+                   style="border-collapse: collapse; font-size: 12px;">
+                <thead style="background-color: #f5f5f5;">
+                    <tr>
+                        <th>Timesheet</th>
+                        <th>Comment Preview</th>
+                        <th>Rating</th>
+                        <th>Commented By</th>
+                        <th>Comment Date</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {''.join(html_rows)}
+                </tbody>
+            </table>
+
+            <p style="margin-top: 12px;">Your Phamos Team</p>
+        """
+
+        try:
+            frappe.sendmail(
+                recipients=[email],
+                subject=subject,
+                message=table_html,
+                now=True,
+            )
+
+        except Exception:
+            frappe.log_error(
+                title="Monthly Timesheet Comment Summary: Email Send Failed",
+                message=frappe.get_traceback()
+            )

@@ -482,5 +482,3 @@ def get_okr_type_options():
     """Fetch okr_type options from OKR Setting's child table."""
     setting = frappe.get_single("OKR Setting")
     return [row.okr_type for row in setting.okr_types]
-
-
