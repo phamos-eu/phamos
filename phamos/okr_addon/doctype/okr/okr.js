@@ -267,7 +267,7 @@ function renderEnhancedSummary(frm, summary) {
 				<div style="padding: 25px; background: #f8f9fa;">
 					<div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
 						<div style="font-weight: 600; color: #2c3e50; font-size: 1.1em;">📈 Progress Overview</div>
-						<div style="display: flex; gap: 20px;">
+						<div style="display: flex; gap: 15px;">
 							<div style="text-align: center; background: white; padding: 10px 15px; border-radius: 8px; box-shadow: 0 1px 3px rgba(0,0,0,0.1);">
 								<div style="font-weight: bold; color: #27ae60; font-size: 1.2em;">${summary.average_progress}%</div>
 								<div style="font-size: 0.8em; color: #7f8c8d;">Avg Progress</div>
@@ -276,24 +276,20 @@ function renderEnhancedSummary(frm, summary) {
 								<div style="font-weight: bold; color: #3498db; font-size: 1.2em;">${summary.overall_health}</div>
 								<div style="font-size: 0.8em; color: #7f8c8d;">Health Score</div>
 							</div>
+							<div style="text-align: center; background: white; padding: 10px 15px; border-radius: 8px; box-shadow: 0 1px 3px rgba(0,0,0,0.1);">
+								<div style="font-weight: bold; color: #27ae60; font-size: 1.2em;">${summary.completion_rate}%</div>
+								<div style="font-size: 0.8em; color: #7f8c8d;">Completion Rate</div>
+							</div>
+							<div style="text-align: center; background: white; padding: 10px 15px; border-radius: 8px; box-shadow: 0 1px 3px rgba(0,0,0,0.1);">
+								<div style="font-weight: bold; color: #e74c3c; font-size: 1.2em;">${summary.risk_score}%</div>
+								<div style="font-size: 0.8em; color: #7f8c8d;">Risk Score</div>
+							</div>
 						</div>
 					</div>
 					
 					<!-- Progress Bar -->
-					<div style="background: #e9ecef; border-radius: 10px; height: 12px; overflow: hidden; margin-bottom: 20px; box-shadow: inset 0 1px 3px rgba(0,0,0,0.1);">
+					<div style="background: #e9ecef; border-radius: 10px; height: 12px; overflow: hidden; box-shadow: inset 0 1px 3px rgba(0,0,0,0.1);">
 						<div style="background: linear-gradient(90deg, #27ae60, #2ecc71); height: 100%; width: ${summary.average_progress}%; transition: width 0.5s ease; border-radius: 10px;"></div>
-					</div>
-					
-					<!-- Additional Metrics -->
-					<div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 15px;">
-						<div style="text-align: center; background: white; padding: 15px; border-radius: 8px; box-shadow: 0 1px 3px rgba(0,0,0,0.1); border-left: 4px solid #27ae60;">
-							<div style="font-weight: 600; color: #2c3e50; font-size: 1.3em;">${summary.completion_rate}%</div>
-							<div style="font-size: 0.85em; color: #7f8c8d; font-weight: 500;">Completion Rate</div>
-						</div>
-						<div style="text-align: center; background: white; padding: 15px; border-radius: 8px; box-shadow: 0 1px 3px rgba(0,0,0,0.1); border-left: 4px solid #e74c3c;">
-							<div style="font-weight: 600; color: #2c3e50; font-size: 1.3em;">${summary.risk_score}%</div>
-							<div style="font-size: 0.85em; color: #7f8c8d; font-weight: 500;">Risk Score</div>
-						</div>
 					</div>
 				</div>
 				
