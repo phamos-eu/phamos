@@ -12,13 +12,12 @@
   "okr_type",
   "specific_okr_type",
   "team",
-  "parent_type",
-  "parent_kra",
   "parent_okr",
-  "target_date",
+  "parent_kra",
   "responsible_person",
   "column_break_auao",
   "description",
+  "target_date",
   "timeline_cadence_section",
   "okr_cadence",
   "check_in_frequency",
@@ -216,15 +215,6 @@
    "options": "OKR Team"
   },
   {
-   "description": "Select the type of parent for this OKR",
-   "fieldname": "parent_type",
-   "fieldtype": "Select",
-   "label": "Parent Type",
-   "options": "\nKRA\nOKR",
-   "reqd": 1
-  },
-  {
-   "depends_on": "eval:doc.parent_type == \"KRA\"",
    "description": "Link this OKR to a KRA (Key Result Area)",
    "fieldname": "parent_kra",
    "fieldtype": "Link",
@@ -232,7 +222,6 @@
    "options": "KRA"
   },
   {
-   "depends_on": "eval:doc.parent_type == \"OKR\"",
    "description": "Link this OKR to another OKR",
    "fieldname": "parent_okr",
    "fieldtype": "Link",
@@ -260,7 +249,7 @@
    "link_fieldname": "okr"
   }
  ],
- "modified": "2026-01-12 08:47:44.011023",
+ "modified": "2026-01-12 09:49:30.149378",
  "modified_by": "Administrator",
  "module": "OKR Addon",
  "name": "OKR",
