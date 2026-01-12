@@ -125,6 +125,36 @@ class OKR(Document):
                 return None
         return None
     
+    def _get_status_category(self, okr):
+        """Get status category for an OKR based on progress and target date"""
+        progress = okr.get('progress', 0) or 0
+        target_date = okr.get('target_date')
+        
+        if not target_date:
+            if progress >= 100:
+                return 'completed'
+            elif progress >= 70:
+                return 'on_track'
+            else:
+                return 'at_risk'
+        
+        from frappe.utils import getdate, nowdate
+        days_remaining = (getdate(target_date) - getdate(nowdate())).days
+        
+        if progress >= 100:
+            return 'completed'
+        elif days_remaining < 0:
+            return 'overdue'
+        elif days_remaining <= 7:
+            if progress < 80:
+                return 'at_risk'
+            else:
+                return 'on_track'
+        elif progress < 60:
+            return 'at_risk'
+        else:
+            return 'on_track'
+    
     def validate_okr_structure(self):
         """Validate OKR structure and hierarchy"""
         if self.okr_type == "Company" and self.parent_okr:
@@ -415,6 +445,61 @@ def get_measurable_summary_for_frontend(okr_name):
     """Get measurable summary for frontend display"""
     doc = frappe.get_doc("OKR", okr_name)
     return doc.get_measurable_summary()
+
+@frappe.whitelist()
+def get_child_okrs(okr_name):
+    """Get child OKRs for an OKR (OKRs that have this OKR as their parent_okr)"""
+    child_okrs = []
+    
+    if not okr_name:
+        return child_okrs
+    
+    # Get OKRs that have this OKR as parent (parent_okr = this OKR's name)
+    child_okrs = frappe.get_all(
+        "OKR",
+        filters={"parent_okr": okr_name, "parent_type": "OKR"},
+        fields=["name", "title", "progress", "okr_score", "responsible_person", 
+               "target_date", "risk_status", "confidence_level", "okr_type", "parent_type"],
+        order_by="creation desc"
+    )
+    
+    # Add status category and format data
+    for child in child_okrs:
+        child['status_category'] = _get_status_category_for_okr(child)
+        child['progress_display'] = f"{child.get('progress', 0):.1f}%"
+        child['score_display'] = f"{child.get('okr_score', 0):.2f}"
+    
+    return child_okrs
+
+def _get_status_category_for_okr(okr):
+    """Get status category for an OKR based on progress and target date"""
+    progress = okr.get('progress', 0) or 0
+    target_date = okr.get('target_date')
+    
+    if not target_date:
+        if progress >= 100:
+            return 'completed'
+        elif progress >= 70:
+            return 'on_track'
+        else:
+            return 'at_risk'
+    
+    from frappe.utils import getdate, nowdate
+    days_remaining = (getdate(target_date) - getdate(nowdate())).days
+    
+    if progress >= 100:
+        return 'completed'
+    elif days_remaining < 0:
+        return 'overdue'
+    elif days_remaining <= 7:
+        if progress < 80:
+            return 'at_risk'
+        else:
+            return 'on_track'
+    elif progress < 60:
+        return 'at_risk'
+    else:
+        return 'on_track'
 
 @frappe.whitelist()
 def get_okr_type_options():

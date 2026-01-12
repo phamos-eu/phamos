@@ -25,6 +25,9 @@ frappe.ui.form.on("OKR", {
 			setTimeout(() => addParentLink(frm), 500);
 		}
 		
+		// Render child OKRs in HTML field (with delay to ensure field is ready)
+		setTimeout(() => renderChildOKRsInField(frm), 200);
+		
 		// Auto-set parent_type for existing records (if not set)
 		// Note: parent_type is mandatory, so we try to infer it from existing data
 		if (!frm.doc.parent_type || frm.doc.parent_type === '') {
@@ -699,5 +702,193 @@ function addParentLink(frm) {
 			frappe.set_route('Form', parentInfo.doctype, parentInfo.name);
 		});
 	}
+}
+
+// Render Child OKRs in HTML Field
+function renderChildOKRsInField(frm) {
+	// Check if field exists
+	if (!frm.fields_dict.child_okrs_html) {
+		console.warn('child_okrs_html field not found');
+		return;
+	}
+	
+	// Only show if this OKR can have children (has a name and is saved)
+	if (!frm.doc.name || frm.is_new()) {
+		const emptyHtml = '<div style="text-align: center; padding: 20px; color: #8d99a6; font-size: 12px;">No child OKRs available. Save this OKR first.</div>';
+		frm.fields_dict.child_okrs_html.set_value(emptyHtml);
+		return;
+	}
+	
+	// Fetch child OKRs
+	frappe.call({
+		method: 'phamos.okr_addon.doctype.okr.okr.get_child_okrs',
+		args: {
+			okr_name: frm.doc.name
+		},
+		callback: function(r) {
+			if (r.message && r.message.length > 0) {
+				const html = renderChildOKRsHTML(frm, r.message);
+				frm.fields_dict.child_okrs_html.set_value(html);
+			} else {
+				const emptyHtml = '<div style="text-align: center; padding: 20px; color: #8d99a6; font-size: 12px;">No child OKRs found</div>';
+				frm.fields_dict.child_okrs_html.set_value(emptyHtml);
+			}
+		},
+		error: function(r) {
+			console.error('Error fetching child OKRs:', r);
+			const errorHtml = '<div style="text-align: center; padding: 20px; color: #e74c3c; font-size: 12px;">Error loading child OKRs</div>';
+			if (frm.fields_dict.child_okrs_html) {
+				frm.fields_dict.child_okrs_html.set_value(errorHtml);
+			}
+		}
+	});
+}
+
+function renderChildOKRsHTML(frm, childOKRs) {
+	// Calculate average progress
+	const totalProgress = childOKRs.reduce((sum, child) => sum + (child.progress || 0), 0);
+	const avgProgress = childOKRs.length > 0 ? (totalProgress / childOKRs.length).toFixed(1) : 0;
+	const avgProgressColor = getProgressColor(avgProgress);
+	
+	let html = `
+		<div class="child-okrs-section" style="margin-bottom: 15px;">
+			<div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; padding: 8px 0;">
+				<div style="display: flex; align-items: center; gap: 8px;">
+					<span style="font-size: 12px; color: #8d99a6; background: #f0f4f7; padding: 2px 8px; border-radius: 10px;">
+						${childOKRs.length} OKR${childOKRs.length !== 1 ? 's' : ''}
+					</span>
+				</div>
+				<div style="display: flex; align-items: center; gap: 12px;">
+					<div style="display: flex; align-items: center; gap: 6px;">
+						<span style="font-size: 12px; color: #8d99a6;">Avg Progress:</span>
+						<span style="font-size: 14px; font-weight: 600; color: ${avgProgressColor};">${avgProgress}%</span>
+					</div>
+					<div style="width: 80px; height: 5px; background: #e9ecef; border-radius: 3px; overflow: hidden;">
+						<div style="width: ${avgProgress}%; height: 100%; background: ${avgProgressColor}; transition: width 0.3s;"></div>
+					</div>
+				</div>
+			</div>
+			<div class="child-okrs-table" style="
+				background: #fff;
+				border: 1px solid #e0e0e0;
+				border-radius: 4px;
+				overflow: hidden;
+			">
+				<table style="width: 100%; border-collapse: collapse; font-size: 12px;">
+					<thead>
+						<tr style="background: #f8f9fa; border-bottom: 1px solid #e0e0e0;">
+							<th style="padding: 6px 8px; text-align: left; font-weight: 600; color: #8d99a6; font-size: 11px; width: 35%;">Title</th>
+							<th style="padding: 6px 8px; text-align: left; font-weight: 600; color: #8d99a6; font-size: 11px; width: 12%;">Progress</th>
+							<th style="padding: 6px 8px; text-align: center; font-weight: 600; color: #8d99a6; font-size: 11px; width: 10%;">Score</th>
+							<th style="padding: 6px 8px; text-align: left; font-weight: 600; color: #8d99a6; font-size: 11px; width: 12%;">Parent Type</th>
+							<th style="padding: 6px 8px; text-align: left; font-weight: 600; color: #8d99a6; font-size: 11px; width: 16%;">Responsible</th>
+							<th style="padding: 6px 8px; text-align: left; font-weight: 600; color: #8d99a6; font-size: 11px; width: 15%;">Target Date</th>
+						</tr>
+					</thead>
+					<tbody>
+	`;
+	
+	childOKRs.forEach((child, index) => {
+		const progress = child.progress || 0;
+		const progressColor = getProgressColor(progress);
+		const rowBg = index % 2 === 0 ? '#fff' : '#fafbfc';
+		
+		html += `
+			<tr class="child-okr-row" style="
+				background: ${rowBg};
+				border-bottom: 1px solid #f0f0f0;
+				cursor: pointer;
+				transition: background 0.15s;
+			" data-okr-name="${child.name}" 
+			onclick="frappe.set_route('Form', 'OKR', '${child.name}')"
+			onmouseover="this.style.background='#f0f7ff'; this.style.borderLeft='3px solid ${progressColor}';"
+			onmouseout="this.style.background='${rowBg}'; this.style.borderLeft='none';">
+				<td style="padding: 6px 8px;">
+					<div style="font-weight: 600; color: #36414c; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 200px; font-size: 12px;" title="${child.title}">
+						${child.title}
+					</div>
+				</td>
+				<td style="padding: 6px 8px;">
+					<div style="display: flex; align-items: center; gap: 6px;">
+						<div style="flex: 1; min-width: 50px; height: 3px; background: #e9ecef; border-radius: 2px; overflow: hidden;">
+							<div style="width: ${progress}%; height: 100%; background: ${progressColor}; transition: width 0.3s;"></div>
+						</div>
+						<span style="font-weight: 600; color: #36414c; font-size: 11px; min-width: 35px; text-align: right;">${child.progress_display || '0%'}</span>
+					</div>
+				</td>
+				<td style="padding: 6px 8px; text-align: center;">
+					<span style="color: #36414c; font-weight: 600; font-size: 11px;">
+						<i class="fa fa-star" style="color: #f39c12; font-size: 10px; margin-right: 2px;"></i>${child.score_display || '0.00'}
+					</span>
+				</td>
+				<td style="padding: 6px 8px;">
+					<span style="color: #8d99a6; font-size: 11px; font-weight: 500;">
+						${child.parent_type || '-'}
+					</span>
+				</td>
+				<td style="padding: 6px 8px;">
+					${child.responsible_person ? `
+						<div style="color: #8d99a6; font-size: 11px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 120px;" title="${child.responsible_person}">
+							<i class="fa fa-user" style="font-size: 10px; margin-right: 3px;"></i>${child.responsible_person}
+						</div>
+					` : '<span style="color: #d1d8dd;">-</span>'}
+				</td>
+				<td style="padding: 6px 8px;">
+					${child.target_date ? `
+						<div style="color: #8d99a6; font-size: 11px;">
+							<i class="fa fa-calendar" style="font-size: 10px; margin-right: 3px;"></i>${frappe.datetime.str_to_user(child.target_date)}
+						</div>
+					` : '<span style="color: #d1d8dd;">-</span>'}
+				</td>
+			</tr>
+		`;
+	});
+	
+	html += `
+					</tbody>
+				</table>
+			</div>
+		</div>
+	`;
+	
+	return html;
+}
+
+
+function getStatusClass(status) {
+	const classes = {
+		'completed': 'badge-success',
+		'on_track': 'badge-info',
+		'at_risk': 'badge-warning',
+		'overdue': 'badge-danger'
+	};
+	return classes[status] || 'badge-secondary';
+}
+
+function getStatusIcon(status) {
+	const icons = {
+		'completed': '✓',
+		'on_track': '→',
+		'at_risk': '⚠',
+		'overdue': '⚠'
+	};
+	return icons[status] || '•';
+}
+
+function getStatusColor(status) {
+	const colors = {
+		'completed': '#27ae60',
+		'on_track': '#3498db',
+		'at_risk': '#f39c12',
+		'overdue': '#e74c3c'
+	};
+	return colors[status] || '#95a5a6';
+}
+
+function getProgressColor(progress) {
+	if (progress >= 100) return '#27ae60';
+	if (progress >= 70) return '#3498db';
+	if (progress >= 40) return '#f39c12';
+	return '#e74c3c';
 }
 
