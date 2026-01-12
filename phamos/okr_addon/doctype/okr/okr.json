@@ -9,6 +9,8 @@
   "okr_type",
   "specific_okr_type",
   "team",
+  "parent_type",
+  "parent_kra",
   "parent_okr",
   "target_date",
   "responsible_person",
@@ -199,6 +201,24 @@
    "options": "OKR Team"
   },
   {
+   "description": "Select the type of parent for this OKR",
+   "fieldname": "parent_type",
+   "fieldtype": "Select",
+   "label": "Parent Type",
+   "options": "\nKRA\nOKR",
+   "reqd": 1
+  },
+  {
+   "depends_on": "eval:doc.parent_type == \"KRA\"",
+   "description": "Link this OKR to a KRA (Key Result Area)",
+   "fieldname": "parent_kra",
+   "fieldtype": "Link",
+   "label": "Parent KRA",
+   "options": "KRA"
+  },
+  {
+   "depends_on": "eval:doc.parent_type == \"OKR\"",
+   "description": "Link this OKR to another OKR",
    "fieldname": "parent_okr",
    "fieldtype": "Link",
    "label": "Parent OKR",

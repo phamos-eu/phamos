@@ -8,6 +8,7 @@ from frappe.model.document import Document
 class OKR(Document):
     def validate(self):
         self.validate_measurables()
+        self.validate_parent_selection()
         # self.validate_okr_structure()
     
     def before_save(self):
@@ -77,6 +78,53 @@ class OKR(Document):
             if measurable.stretch_target and measurable.stretch_target <= measurable.committed_target:
                 frappe.throw(f"Stretch target must be higher than committed target for KR: {measurable.metric_name}")
     
+    def validate_parent_selection(self):
+        """Validate parent type and parent field selection"""
+        # Ensure parent_type is set and not blank (mandatory field)
+        if not self.parent_type or self.parent_type == "":
+            frappe.throw("Parent Type is mandatory. Please select either KRA or OKR as the parent type.")
+        
+        # If parent_type is set, ensure corresponding parent field is also set
+        if self.parent_type == "KRA":
+            if not self.parent_kra:
+                frappe.throw("Please select a Parent KRA when Parent Type is set to KRA")
+            # Clear parent_okr if it was set
+            if self.parent_okr:
+                self.parent_okr = None
+        elif self.parent_type == "OKR":
+            if not self.parent_okr:
+                frappe.throw("Please select a Parent OKR when Parent Type is set to OKR")
+            # Clear parent_kra if it was set
+            if self.parent_kra:
+                self.parent_kra = None
+        else:
+            # Invalid parent_type value
+            frappe.throw(f"Invalid Parent Type: {self.parent_type}. Please select either KRA or OKR.")
+    
+    def get_parent_info(self):
+        """Get parent information (KRA or OKR)"""
+        if self.parent_type == "KRA" and self.parent_kra:
+            try:
+                return {
+                    "type": "KRA",
+                    "name": self.parent_kra,
+                    "doctype": "KRA",
+                    "doc": frappe.get_doc("KRA", self.parent_kra)
+                }
+            except frappe.DoesNotExistError:
+                return None
+        elif self.parent_type == "OKR" and self.parent_okr:
+            try:
+                return {
+                    "type": "OKR",
+                    "name": self.parent_okr,
+                    "doctype": "OKR",
+                    "doc": frappe.get_doc("OKR", self.parent_okr)
+                }
+            except frappe.DoesNotExistError:
+                return None
+        return None
+    
     def validate_okr_structure(self):
         """Validate OKR structure and hierarchy"""
         if self.okr_type == "Company" and self.parent_okr:
@@ -120,12 +168,16 @@ class OKR(Document):
         self.next_check_in = add_days(self.last_check_in, days_to_add)
     
     def update_parent_okr_progress(self):
-        """Update parent okr progress if this is a child okr"""
-        if self.parent_company_okr:
-            parent = frappe.get_doc("OKR", self.parent_company_okr)
-            parent.progress = parent.calculate_progress()
-            parent.okr_score = parent.calculate_okr_score()
-            parent.save()
+        """Update parent progress if this is a child (OKR parent only, KRA is read-only)"""
+        # Only update if parent is OKR (KRA is a standard doctype, we can't update it)
+        if self.parent_type == "OKR" and self.parent_okr:
+            try:
+                parent = frappe.get_doc("OKR", self.parent_okr)
+                parent.progress = parent.calculate_progress()
+                parent.okr_score = parent.calculate_okr_score()
+                parent.save()
+            except Exception as e:
+                frappe.log_error(f"Error updating parent OKR progress: {str(e)}")
     
     def get_measurable_summary(self):
         """Get comprehensive summary of measurables with market-standard metrics"""

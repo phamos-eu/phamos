@@ -20,10 +20,35 @@ frappe.ui.form.on("OKR", {
 		// Add market-standard features
 		addMarketStandardFeatures(frm);
 		
-		// Add Parent OKR link to Connections
-		if (frm.doc.parent_okr) {
-			setTimeout(() => addParentOKRLink(frm), 500);
+		// Add Parent link to Connections (KRA or OKR)
+		if (frm.doc.parent_kra || frm.doc.parent_okr) {
+			setTimeout(() => addParentLink(frm), 500);
 		}
+		
+		// Auto-set parent_type for existing records (if not set)
+		// Note: parent_type is mandatory, so we try to infer it from existing data
+		if (!frm.doc.parent_type || frm.doc.parent_type === '') {
+			if (frm.doc.parent_okr) {
+				frm.set_value('parent_type', 'OKR');
+			} else if (frm.doc.parent_kra) {
+				frm.set_value('parent_type', 'KRA');
+			}
+			// If neither parent exists, user must select parent_type (mandatory field)
+		}
+	},
+	
+	parent_type(frm) {
+		// Clear parent fields when parent_type changes
+		if (!frm.doc.parent_type || frm.doc.parent_type === '') {
+			frm.set_value('parent_kra', '');
+			frm.set_value('parent_okr', '');
+		} else if (frm.doc.parent_type === 'KRA') {
+			frm.set_value('parent_okr', '');
+		} else if (frm.doc.parent_type === 'OKR') {
+			frm.set_value('parent_kra', '');
+		}
+		frm.refresh_field('parent_kra');
+		frm.refresh_field('parent_okr');
 	},
 	
 	measurables_add(frm, cdt, cdn) {
@@ -613,12 +638,31 @@ function addComment() {
 	});
 }
 
-// Add Parent OKR link to Connections section (optimized)
-function addParentOKRLink(frm) {
+// Add Parent link (KRA or OKR) to Connections section
+function addParentLink(frm) {
 	if (!frm.dashboard || !frm.dashboard.transactions_area) return;
 	
 	let $area = frm.dashboard.transactions_area;
-	$area.find('.parent-okr-link').remove(); // Remove existing
+	$area.find('.parent-link').remove(); // Remove existing parent links
+	
+	let parentInfo = null;
+	if (frm.doc.parent_kra) {
+		parentInfo = {
+			doctype: 'KRA',
+			name: frm.doc.parent_kra,
+			label: 'Parent KRA',
+			type: 'KRA'
+		};
+	} else if (frm.doc.parent_okr) {
+		parentInfo = {
+			doctype: 'OKR',
+			name: frm.doc.parent_okr,
+			label: 'Parent OKR',
+			type: 'OKR'
+		};
+	}
+	
+	if (!parentInfo) return;
 	
 	let $firstCol = $area.find('.col-md-4').first();
 	if ($firstCol.length) {
@@ -629,12 +673,12 @@ function addParentOKRLink(frm) {
 			$linkContainer = $firstCol;
 		}
 		
-		// Create Parent OKR link matching exact Frappe structure
+		// Create Parent link matching exact Frappe structure
 		let $link = $(`
-			<div class="document-link parent-okr-link" data-doctype="OKR" data-names='["${frm.doc.parent_okr}"]'>
-				<div class="document-link-badge" data-doctype="OKR">
+			<div class="document-link parent-link" data-doctype="${parentInfo.doctype}" data-names='["${parentInfo.name}"]'>
+				<div class="document-link-badge" data-doctype="${parentInfo.doctype}">
 					<span class="count">1</span>
-					<a class="badge-link">${__('Parent OKR')}</a>
+					<a class="badge-link">${__(parentInfo.label)}</a>
 				</div>
 			</div>
 		`);
@@ -652,7 +696,7 @@ function addParentOKRLink(frm) {
 		// Make clickable
 		$link.find('.badge-link').on('click', (e) => {
 			e.preventDefault();
-			frappe.set_route('Form', 'OKR', frm.doc.parent_okr);
+			frappe.set_route('Form', parentInfo.doctype, parentInfo.name);
 		});
 	}
 }
