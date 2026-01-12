@@ -19,14 +19,14 @@ import frappe
 def execute():
 	# Step 1: Verify KRA doctype exists (standard doctype from HR module)
 	if not frappe.db.exists("DocType", "KRA"):
-		frappe.log_error("KRA doctype does not exist. Please ensure HRMS app is installed.", "KRA Migration")
+		frappe.log_error("KRA Migration: DocType Missing", "KRA doctype does not exist. Please ensure HRMS app is installed.")
 		return
 	
 	# Reload KRA doctype to ensure it's up to date
 	try:
 		frappe.reload_doc("HR", "doctype", "KRA")
 	except Exception as e:
-		frappe.log_error(f"Error reloading KRA doctype: {str(e)}", "KRA Migration")
+		frappe.log_error("KRA Migration: Reload Error", f"Error reloading KRA doctype: {str(e)}")
 		# Continue anyway, KRA might already exist
 	
 	# Step 2: Get all unique metric_name values from Measurable child table
@@ -38,10 +38,10 @@ def execute():
 	""", as_dict=True)
 	
 	if not measurables:
-		frappe.log_error("No Measurable records found to migrate", "KRA Migration")
+		frappe.log_error("KRA Migration: No Records", "No Measurable records found to migrate")
 		return
 	
-	frappe.log_error(f"Found {len(measurables)} unique metric names to migrate", "KRA Migration")
+	frappe.log_error("KRA Migration: Starting", f"Found {len(measurables)} unique metric names to migrate")
 	
 	# Step 3: Create KRA records for each unique metric_name
 	kra_mapping = {}  # Maps old metric_name to new KRA name
@@ -62,7 +62,7 @@ def execute():
 		
 		if existing_kra:
 			kra_mapping[metric_name] = existing_kra
-			frappe.log_error(f"KRA already exists: {metric_name} -> {existing_kra}", "KRA Migration")
+			frappe.log_error("KRA Migration: Existing KRA", f"KRA already exists: {metric_name} -> {existing_kra}")
 		else:
 			# Create new KRA record
 			try:
@@ -73,15 +73,15 @@ def execute():
 				})
 				kra_doc.insert(ignore_permissions=True)
 				kra_mapping[metric_name] = kra_doc.name
-				frappe.log_error(f"Created KRA: {metric_name} -> {kra_doc.name}", "KRA Migration")
+				frappe.log_error("KRA Migration: Created", f"Created KRA: {metric_name} -> {kra_doc.name}")
 			except frappe.DuplicateEntryError:
 				# If duplicate, get the existing one
 				existing_kra = frappe.db.get_value("KRA", {"title": metric_name}, "name")
 				if existing_kra:
 					kra_mapping[metric_name] = existing_kra
-					frappe.log_error(f"Duplicate KRA found: {metric_name} -> {existing_kra}", "KRA Migration")
+					frappe.log_error("KRA Migration: Duplicate", f"Duplicate KRA found: {metric_name} -> {existing_kra}")
 			except Exception as e:
-				frappe.log_error(f"Error creating KRA for {metric_name}: {str(e)}", "KRA Migration")
+				frappe.log_error("KRA Migration: Create Error", f"Error creating KRA for {metric_name}: {str(e)}")
 				continue
 	
 	# Step 4: Update all Measurable records to use KRA link
@@ -102,7 +102,7 @@ def execute():
 		kra_name = kra_mapping.get(metric_name)
 		
 		if not kra_name:
-			frappe.log_error(f"No KRA mapping found for metric_name: {metric_name}", "KRA Migration")
+			frappe.log_error("KRA Migration: Missing Mapping", f"No KRA mapping found for metric_name: {metric_name}")
 			failed_count += 1
 			continue
 		
@@ -112,13 +112,10 @@ def execute():
 			frappe.db.set_value("Measurable", measurable.name, "metric_name", kra_name)
 			updated_count += 1
 		except Exception as e:
-			frappe.log_error(f"Error updating Measurable {measurable.name}: {str(e)}", "KRA Migration")
+			frappe.log_error("KRA Migration: Update Error", f"Error updating Measurable {measurable.name}: {str(e)}")
 			failed_count += 1
 	
-	frappe.log_error(
-		f"KRA migration completed: {updated_count} updated, {failed_count} failed, {len(kra_mapping)} KRAs created",
-		"KRA Migration"
-	)
+	frappe.log_error("KRA Migration: Complete", f"Migration completed: {updated_count} updated, {failed_count} failed, {len(kra_mapping)} KRAs created")
 	
 	frappe.db.commit()
 
