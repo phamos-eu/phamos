@@ -48,6 +48,16 @@ frappe.ui.form.on("Implementation", {
                 });
     },
     refresh: function (frm) {
+        // Sort resource_planning_prediction by date (descending - newest first)
+        if (frm.doc.resource_planning_prediction && frm.doc.resource_planning_prediction.length > 0) {
+            frm.doc.resource_planning_prediction.sort((a, b) => {
+                let dateA = a.date ? new Date(a.date) : new Date(0);
+                let dateB = b.date ? new Date(b.date) : new Date(0);
+                return dateB - dateA; // Descending order (newest first)
+            });
+            frm.refresh_field('resource_planning_prediction');
+        }
+        
         // add_row_to_sales_order(frm);
         frm.fields_dict.reset.$input.on('click', function () {
             frm.set_value("prediction_from_date", "");
@@ -155,6 +165,15 @@ frappe.ui.form.on("Implementation", {
                         child_row.date = frappe.datetime.nowdate();
                     }
                 });
+                
+                // Sort by date descending (newest first) after adding new rows
+                if (frm.doc.resource_planning_prediction && frm.doc.resource_planning_prediction.length > 0) {
+                    frm.doc.resource_planning_prediction.sort((a, b) => {
+                        let dateA = a.date ? new Date(a.date) : new Date(0);
+                        let dateB = b.date ? new Date(b.date) : new Date(0);
+                        return dateB - dateA; // Descending order (newest first)
+                    });
+                }
                 
                 // Refresh the grid to show new rows
                 frm.refresh_field('resource_planning_prediction');
