@@ -653,7 +653,7 @@ const HierarchyManager = {
         const hasChildren = item.children && item.children.length > 0;
         
         const row = `
-            <tr class="hierarchy-row level-${level}" data-level="${level}" data-id="${item.name}" data-parent="${item.parent_kra || item.parent_okr || ''}" data-parent-type="${item.parent_type || ''}">
+            <tr class="hierarchy-row level-${level}" data-level="${level}" data-id="${item.name}" data-parent="${item.parent_kra || item.parent_okr || ''}" data-parent-type="${item.parent_kra ? 'KRA' : (item.parent_okr ? 'OKR' : '')}">
                 <td>
                     <div style="display: flex; align-items: center;">
                         <span class="hierarchy-indicator expanded" onclick="HierarchyManager.toggleHierarchy(this)" style="display: ${hasChildren ? 'inline-block' : 'none'}">

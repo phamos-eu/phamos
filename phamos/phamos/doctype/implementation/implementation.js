@@ -48,6 +48,17 @@ frappe.ui.form.on("Implementation", {
                 });
     },
     refresh: function (frm) {
+        // Sort resource_planning_prediction by date (descending - newest first)
+        if (frm.doc.resource_planning_prediction && frm.doc.resource_planning_prediction.length > 0) {
+            frm.doc.resource_planning_prediction.sort((a, b) => {
+                let dateA = a.date ? new Date(a.date) : new Date(0);
+                let dateB = b.date ? new Date(b.date) : new Date(0);
+                return dateB - dateA; // Descending order (newest first)
+            });
+            frm.refresh_field('resource_planning_prediction');
+        }
+        
+        // add_row_to_sales_order(frm);
         frm.fields_dict.reset.$input.on('click', function () {
             frm.set_value("prediction_from_date", "");
             frm.set_value("prediction_to_date", "");
@@ -63,6 +74,125 @@ frappe.ui.form.on("Implementation", {
         } else {
             render_resource_planning_graph(frm, true);   // prediction filter ke sath
         }
+
+        // Quick Add Predictions Button - Render in HTML field
+    
+        if (frm.fields_dict.quick_add_button_html && frm.fields_dict.quick_add_button_html.$wrapper) {
+            let button_html = `
+                <div style="margin: 15px 0; padding: 10px; background-color: #f8f9fa; border-radius: 5px; text-align: center;">
+                    <button class="btn btn-primary" id="quick-add-predictions-btn" style="font-size: 14px;">
+                        <svg class="icon icon-sm" style="margin-right: 5px;">
+                            <use href="#icon-add"></use>
+                        </svg>
+                        Quick Add Predictions
+                    </button>
+                </div>
+            `;
+            frm.fields_dict.quick_add_button_html.$wrapper.html(button_html);
+            
+            frm.fields_dict.quick_add_button_html.$wrapper.find('#quick-add-predictions-btn').on('click', function() {
+        let today = new Date();
+        let months = [];
+        
+        // Generate current month + next 3 months
+        for (let i = 0; i < 4; i++) {
+            let date = new Date(today.getFullYear(), today.getMonth() + i, 1);
+            let year = date.getFullYear();
+            let month = String(date.getMonth() + 1).padStart(2, '0');
+            let monthYear = `${year}-${month}`;
+            months.push({ month_and_year: monthYear, prediction: 0, date: frappe.datetime.nowdate() });
+        }
+        
+        // Generate month options for next 12 months
+        let monthOptions = [];
+        for (let i = 0; i < 12; i++) {
+            let date = new Date(today.getFullYear(), today.getMonth() + i, 1);
+            let year = date.getFullYear();
+            let month = String(date.getMonth() + 1).padStart(2, '0');
+            monthOptions.push(`${year}-${month}`);
+        }
+        
+        let d = new frappe.ui.Dialog({
+            title: __('Quick Add Predictions'),
+            fields: [
+                {
+                    fieldname: 'predictions_table',
+                    fieldtype: 'Table',
+                    label: 'Predictions',
+                    cannot_add_rows: false,
+                    cannot_delete_rows: false,
+                    in_place_edit: true,
+                    data: months,
+                    fields: [
+                        {
+                            fieldname: 'month_and_year',
+                            fieldtype: 'Select',
+                            in_list_view: 1,
+                            label: 'Month And Year',
+                            options: monthOptions.join('\n'),
+                            columns: 2
+                        },
+                        {
+                            fieldname: 'prediction',
+                            fieldtype: 'Int',
+                            in_list_view: 1,
+                            label: 'Prediction',
+                            columns: 2
+                        },
+                        {
+                            fieldname: 'date',
+                            fieldtype: 'Date',
+                            in_list_view: 1,
+                            default: frappe.datetime.nowdate(),
+                            read_only: 1,
+                            label: 'Date',
+                            columns: 2
+                        }
+                    ]
+                }
+            ],
+            primary_action_label: __('Add Predictions'),
+            primary_action(values) {
+                // Get predictions from dialog (only data, no indexes)
+                let tableData = values.predictions_table || [];
+                
+                // Filter and add valid predictions to the child table
+                tableData.forEach(row => {
+                    if (row.prediction && row.prediction > 0 && row.month_and_year) {
+                        let child_row = frm.add_child('resource_planning_prediction');
+                        child_row.month_and_year = row.month_and_year;
+                        child_row.prediction = row.prediction;
+                        child_row.date = frappe.datetime.nowdate();
+                    }
+                });
+                
+                // Sort by date descending (newest first) after adding new rows
+                if (frm.doc.resource_planning_prediction && frm.doc.resource_planning_prediction.length > 0) {
+                    frm.doc.resource_planning_prediction.sort((a, b) => {
+                        let dateA = a.date ? new Date(a.date) : new Date(0);
+                        let dateB = b.date ? new Date(b.date) : new Date(0);
+                        return dateB - dateA; // Descending order (newest first)
+                    });
+                }
+                
+                // Refresh the grid to show new rows
+                frm.refresh_field('resource_planning_prediction');
+                
+                d.hide();
+                
+                frm.save().then(() => {
+                    frappe.show_alert({
+                        message: __('Predictions added successfully'),
+                        indicator: 'green'
+                    });
+                });
+            }
+        });
+        
+        d.show();
+            });
+        }
+
         let options = [];
         let today = new Date();
         let currentMonth = today.getMonth(); // 0-based (0 = Jan)
@@ -369,7 +499,7 @@ function add_row_to_sales_order(frm) {
                 custom_implementation: frm.doc.name,
                 status: ["in", ["To Deliver", "To Bill", "To Deliver and Bill"]]
             },
-            fields: ["name", "status", "total_qty"],
+            fields: ["name", "status", "total_qty", "title"],
             order_by: "transaction_date desc",
         },
         callback: function (response) {
@@ -379,6 +509,7 @@ function add_row_to_sales_order(frm) {
                 response.message.forEach(order => {
                     let row = frm.add_child("sales_order_status_information");
                     row.sales_order = order.name;
+                    row.so_title = order.title;
                     row.total_hrs = order.total_qty;
                     row.status = order.status;
                 });
@@ -513,7 +644,6 @@ function render_resource_planning_graph(frm, usePredictionFilter = false) {
 
 frappe.ui.form.on("Sales Order Status Information", {
     setup: function (frm) {
-        if (!frm.is_new()) {
             frappe.call({
                 method: "phamos.phamos.doctype.implementation.implementation.get_financial_history",
                 args: { 'name': frm.doc.name },
@@ -526,7 +656,6 @@ frappe.ui.form.on("Sales Order Status Information", {
                     }
                 },
             });
-        }
     }
 });
 
