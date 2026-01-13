@@ -25,7 +25,7 @@ def get_team_capacity_avg(from_month=None, to_month=None, team=None):
     result = frappe.db.sql(f"""
         SELECT
             DATE_FORMAT(date, '%%Y-%%m') AS month_and_year,
-            COALESCE(AVG(total_team_capacity), 0) AS avg_capacity
+            COALESCE(AVG(total_team_capacity_daily), 0) AS avg_capacity
         FROM `tabTeam Capacity Ledger`
         {where_clause}
         GROUP BY DATE_FORMAT(date, '%%Y-%%m')
