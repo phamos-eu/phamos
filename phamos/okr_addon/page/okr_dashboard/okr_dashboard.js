@@ -625,11 +625,23 @@ const HierarchyManager = {
             lookup[obj.name] = { ...obj, children: [] };
         });
         
-        // Build hierarchy
+        // Build hierarchy (supports both KRA and OKR parents)
         okrs.forEach(obj => {
-            if (obj.parent_okr && lookup[obj.parent_okr]) {
+            let parentFound = false;
+            
+            // Check for KRA parent first
+            if (obj.parent_kra && lookup[obj.parent_kra]) {
+                lookup[obj.parent_kra].children.push(lookup[obj.name]);
+                parentFound = true;
+            }
+            // Check for OKR parent
+            else if (obj.parent_okr && lookup[obj.parent_okr]) {
                 lookup[obj.parent_okr].children.push(lookup[obj.name]);
-            } else {
+                parentFound = true;
+            }
+            
+            // If no parent found, add to root hierarchy
+            if (!parentFound) {
                 hierarchy.push(lookup[obj.name]);
             }
         });
@@ -641,7 +653,7 @@ const HierarchyManager = {
         const hasChildren = item.children && item.children.length > 0;
         
         const row = `
-            <tr class="hierarchy-row level-${level}" data-level="${level}" data-id="${item.name}" data-parent="${item.parent_okr || ''}">
+            <tr class="hierarchy-row level-${level}" data-level="${level}" data-id="${item.name}" data-parent="${item.parent_kra || item.parent_okr || ''}" data-parent-type="${item.parent_kra ? 'KRA' : (item.parent_okr ? 'OKR' : '')}">
                 <td>
                     <div style="display: flex; align-items: center;">
                         <span class="hierarchy-indicator expanded" onclick="HierarchyManager.toggleHierarchy(this)" style="display: ${hasChildren ? 'inline-block' : 'none'}">
