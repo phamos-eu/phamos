@@ -10,6 +10,11 @@ class Team(Document):
 
 def update_all_teams_weekly_holidays():
     today = date.today()
+
+    # ❌ Skip Saturday & Sunday
+    if today.weekday() in (5, 6):
+        return
+
     teams = frappe.get_all("Team", fields=["name"])
 
     for t in teams:
@@ -56,7 +61,12 @@ def update_all_teams_weekly_holidays():
 
                 day = from_d
                 while day <= to_d:
-                    if day == today: 
+                    # ❌ Skip weekends inside leave loop also
+                    if day.weekday() in (5, 6):
+                        day += timedelta(days=1)
+                        continue
+
+                    if day == today:
                         hours = 4 if leave.half_day else 8
                         doc.append("team_member_leaves_and_holiday", {
                             "employee": employee,
@@ -72,8 +82,13 @@ def update_all_teams_weekly_holidays():
         #  TOTAL LEAVE + HOLIDAY HOURS ---
         total_hrs = sum([x.hrs for x in doc.team_member_leaves_and_holiday])
         doc.team_members_leaves_and_holidays = total_hrs
+        team_members_capacitydaily = sum([m.daily_capacityhrs or 0 for m in doc.team_members])
+
 
         doc.total_team_capacity = team_members_capacity - total_hrs
+        doc.total_team_capacity_daily = (
+            team_members_capacitydaily - doc.team_members_leaves_and_holidays
+)
 
         doc.save(ignore_permissions=True)
 
@@ -82,6 +97,7 @@ def update_all_teams_weekly_holidays():
             "doctype": "Team Capacity Ledger",
             "team": doc.team_name,
             "total_team_capacity": doc.total_team_capacity,
+            "total_team_capacity_daily": doc.total_team_capacity_daily,
             "date": nowdate()
         }).insert(ignore_permissions=True)
 
