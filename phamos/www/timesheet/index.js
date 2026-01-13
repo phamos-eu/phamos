@@ -168,7 +168,7 @@ function load_timesheets() {
       $noData.hide();
 
       data.forEach(row => {
-        let btnText = "Request Adjustments";
+        let btnText = "Give Feedback";
         let btnColor = "#5198e3"; // default blue
 
         
@@ -673,7 +673,7 @@ function load_graph_data() {
 /////////////////////////////////////
 loadAndRenderGraph();
 
-// Handle "Request Adjustments" button click dynamically
+// Handle "Give Feedback" button click dynamically
 $(document).on('click', '.comment-btn', function () {
   const tsName = $(this).data('name');
   currentTsName = tsName;
