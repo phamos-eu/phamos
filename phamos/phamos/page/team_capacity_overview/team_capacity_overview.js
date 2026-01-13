@@ -255,13 +255,15 @@ frappe.pages['team-capacity-overview'].on_page_load = function (wrapper) {
                 color: "#666"
             });
         }
+        frappe.require(["https://code.highcharts.com/highcharts-more.js"], () => {
 
-        Highcharts.chart("team_chart", {
-            chart: { type: "area" },
-            title: { text: "Team Weekly Capacity" },
-            xAxis: { categories: weeks },
-            yAxis: { min: 0, title: { text: "Hours" } },
-            series
+            Highcharts.chart("team_chart", {
+                chart: { type: "area" },
+                title: { text: "Team Weekly Capacity" },
+                xAxis: { categories: weeks },
+                yAxis: { min: 0, title: { text: "Hours" } },
+                series
+            });
         });
     }
 
