@@ -143,7 +143,7 @@ def get_filtered_okrs(filters, page=1, items_per_page=50):
         okr['health_score'] = calculate_health_score(okr)
         okr['days_remaining'] = calculate_days_remaining(okr)
         okr['status_category'] = get_status_category(okr)
-        okr['child_objectives'] = get_child_objectives(okr['name'], parent_type="OKR")
+        okr['child_objectives'] = get_child_objectives_by_okr(okr['name'])
     
     return okrs, total_count
 
@@ -231,31 +231,24 @@ def get_hierarchy_data(okrs):
     }
     
     for okr in okrs:
-        # Get parent info
-        has_parent = False
-        parent_type = None
-        
         # Check if OKR has a parent (KRA or OKR)
-        if okr.get('parent_kra'):
-            has_parent = True
-            parent_type = "KRA"
-        elif okr.get('parent_okr'):
-            has_parent = True
-            parent_type = "OKR"
+        has_parent_kra = bool(okr.get('parent_kra'))
+        has_parent_okr = bool(okr.get('parent_okr'))
+        has_parent = has_parent_kra or has_parent_okr
         
         if okr.okr_type == 'Company':
             # Company OKRs can have children
-            okr['children'] = get_child_objectives(okr.name, parent_type="OKR")
+            okr['children'] = get_child_objectives_by_okr(okr.name)
             hierarchy['company_okrs'].append(okr)
         elif okr.okr_type == 'Team':
-            if parent_type == "KRA":
+            if has_parent_kra:
                 hierarchy['kra_okrs'].append(okr)
             elif has_parent:
                 hierarchy['team_okrs'].append(okr)
             else:
                 hierarchy['orphaned_okrs'].append(okr)
         elif okr.okr_type == 'Individual':
-            if parent_type == "KRA":
+            if has_parent_kra:
                 hierarchy['kra_okrs'].append(okr)
             elif has_parent:
                 hierarchy['individual_okrs'].append(okr)
@@ -263,7 +256,7 @@ def get_hierarchy_data(okrs):
                 hierarchy['orphaned_okrs'].append(okr)
         else:
             # Handle other OKR types
-            if parent_type == "KRA":
+            if has_parent_kra:
                 hierarchy['kra_okrs'].append(okr)
             elif has_parent:
                 hierarchy['orphaned_okrs'].append(okr)
@@ -544,16 +537,26 @@ def is_at_risk(okr):
     """Check if OKR is at risk"""
     return get_status_category(okr) == 'at_risk'
 
-def get_child_objectives(parent_name, parent_type="OKR"):
-    """Get child OKRs for a parent (OKR or KRA)"""
-    if parent_type == "KRA":
-        filter_field = "parent_kra"
-    else:
-        filter_field = "parent_okr"
-    
+def get_child_objectives_by_okr(okr_name):
+    """Get child OKRs for a parent OKR"""
     children = frappe.get_all(
         "OKR",
-        filters={filter_field: parent_name},
+        filters={"parent_okr": okr_name},
+        fields=["name", "title", "progress", "okr_type", "responsible_person", "parent_kra", "parent_okr"],
+        order_by="creation desc"
+    )
+    
+    for child in children:
+        child['measurables_summary'] = get_measurables_summary(child.name)
+        child['status_category'] = get_status_category(child)
+    
+    return children
+
+def get_child_objectives_by_kra(kra_name):
+    """Get all OKRs linked to a specific KRA"""
+    children = frappe.get_all(
+        "OKR",
+        filters={"parent_kra": kra_name},
         fields=["name", "title", "progress", "okr_type", "responsible_person", "parent_kra", "parent_okr"],
         order_by="creation desc"
     )
@@ -565,8 +568,8 @@ def get_child_objectives(parent_name, parent_type="OKR"):
     return children
 
 def get_okrs_by_kra(kra_name):
-    """Get all OKRs linked to a specific KRA"""
-    return get_child_objectives(kra_name, parent_type="KRA")
+    """Get all OKRs linked to a specific KRA (alias for backward compatibility)"""
+    return get_child_objectives_by_kra(kra_name)
 
 def count_risk_factors(okr):
     """Count risk factors for an OKR"""
