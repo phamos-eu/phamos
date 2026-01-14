@@ -8,7 +8,6 @@ phamos.patches.v1_0.set_implementation_status
 phamos.patches.v1_0.add_activity_types_update
 phamos.patches.v1_0.implementation_fix
 phamos.patches.v1_0.migrate_measurable_to_kra
-phamos.patches.v1_0.migrate_okr_parent_type
 phamos.patches.v1_0.set_project_name_in_timesheet
 phamos.patches.v1_0.add_event_attendee_fields
 phamos.patches.v1_0.add_event_location_field
