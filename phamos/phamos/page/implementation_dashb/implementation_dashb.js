@@ -279,14 +279,6 @@ frappe.pages['implementation-dashb'].on_page_load = function (wrapper) {
                     'combined': 'Total Time (Billable + Non-Billable) with Prediction'
                 };
 
-                // Determine chart title based on display mode
-                const chartTitles = {
-                    'billable': 'Billable Time with Prediction',
-                    'nonBillable': 'Non-Billable Time with Prediction',
-                    'split': 'Billable vs Non-Billable Time with Prediction',
-                    'combined': 'Total Time (Billable + Non-Billable) with Prediction'
-                };
-
                 // Chart rendering
                 $('#chart-container').html(`
                     <style>
@@ -371,12 +363,9 @@ frappe.pages['implementation-dashb'].on_page_load = function (wrapper) {
                         formatter: function () {
                             const point = this.point;
                             const seriesName = this.series.name;
-                            const month = this.x;
                             const pointIndex = this.point.index;
                             
-                            const monthRaw = categories[this.point.index]; // Get actual month from categories array
-                            const pointIndex = this.point.index;
-                            
+                            const monthRaw = categories[this.point.index]; // Get actual month from categories array                            
                             // Format month to readable format (e.g., "2025-04" -> "Apr 2025")
                             let month = monthRaw;
                             if (monthRaw && monthRaw.match(/^\d{4}-\d{2}$/)) {
