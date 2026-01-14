@@ -25,7 +25,7 @@ def get_team_capacity_avg(from_month=None, to_month=None, team=None):
     result = frappe.db.sql(f"""
         SELECT
             DATE_FORMAT(date, '%%Y-%%m') AS month_and_year,
-            COALESCE(AVG(total_team_capacity), 0) AS avg_capacity
+            COALESCE(AVG(total_team_capacity_daily), 0) AS avg_capacity
         FROM `tabTeam Capacity Ledger`
         {where_clause}
         GROUP BY DATE_FORMAT(date, '%%Y-%%m')
@@ -98,7 +98,7 @@ def get_chart_data(from_date=None, to_date=None, team=None, implementation=None)
             FROM `tabTimesheet` t
             JOIN `tabTimesheet Detail` tl ON tl.parent = t.name
             WHERE t.parent_project IN ({placeholders})
-              AND t.docstatus = 1
+              AND t.docstatus IN (1,0)
             GROUP BY DATE_FORMAT(tl.from_time, '%%Y-%%m')
             ORDER BY month_and_year
         """, internal_projects, as_dict=True)

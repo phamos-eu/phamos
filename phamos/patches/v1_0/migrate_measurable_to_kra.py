@@ -145,4 +145,3 @@ def execute():
 	frappe.log_error("KRA Migration: Complete", f"Migration completed: {updated_count} updated, {failed_count} failed, {len(kra_mapping)} KRAs created")
 	
 	frappe.db.commit()
-
