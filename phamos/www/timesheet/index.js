@@ -25,7 +25,7 @@ frappe.ready(() => {
   }
 
   //set default date range
-  set_default_month_range();
+  // set_default_month_range();
   load_projects();
   attach_filter_events();
   reset_and_load();
@@ -61,33 +61,34 @@ frappe.ready(() => {
   });
 
   //set end date to last day of month
-  $('#from_date').on('change', function () {
-    const startDateStr = $(this).val();
-    if (!startDateStr) return;
-  
-    const startDate = new Date(startDateStr);
-    const year = startDate.getFullYear();
-    const month = startDate.getMonth();
-  
-    // ✅ Get last day of the selected month
-    const lastDay = new Date(year, month + 1, 0);
-  
-    // ✅ Format manually as yyyy-mm-dd (timezone-safe)
-    const yyyy = lastDay.getFullYear();
-    const mm = String(lastDay.getMonth() + 1).padStart(2, '0');
-    const dd = String(lastDay.getDate()).padStart(2, '0');
-    const formattedEndDate = `${yyyy}-${mm}-${dd}`;
-  
-    $('#to_date').val(formattedEndDate);
-  });
+$('#from_date').on('change', function () {
+  const startDateStr = $(this).val();
+  if (!startDateStr) return;
+
+  const startDate = new Date(startDateStr);
+  const year = startDate.getFullYear();
+  const month = startDate.getMonth();
+
+  const lastDay = new Date(year, month + 1, 0);
+
+  const yyyy = lastDay.getFullYear();
+  const mm = String(lastDay.getMonth() + 1).padStart(2, '0');
+  const dd = String(lastDay.getDate()).padStart(2, '0');
+
+  $('#to_date')
+      .val(`${yyyy}-${mm}-${dd}`)
+      .trigger('change');
+});
+
   
   //reset filters
   $('#clear_filters').on('click', function () {
     $('#from_date').val('');
     $('#to_date').val('');
     $('#project_filter').val('');
+    // reset_and_load();
+    // load_graph_data(); /// load graph data//
     reset_and_load();
-    load_graph_data(); /// load graph data//
   });
 
   $(document).on('click', function (event) {
@@ -121,7 +122,7 @@ function reset_and_load() {
 
 
 function attach_filter_events() {
-  ['#from_date', '#to_date', '#project_filter'].forEach(selector => {
+  ['#to_date', '#project_filter'].forEach(selector => {
     $(selector).on('change', reset_and_load);
   });
 }
@@ -178,9 +179,8 @@ function load_timesheets() {
         }
 
         const relatedIssues = row.related_issue || '';
-        const relatedPreview = truncateText(relatedIssues, 80);
-        const relatedTooltip = escapeHtml(relatedIssues);
-        const relatedDisplay = relatedPreview ? escapeHtml(relatedPreview) : '-';
+        const escapedText = escapeHtml(relatedIssues);
+        const isLong = relatedIssues.length > 180;
 
         $tbody.append(`
           <tr>
@@ -191,9 +191,11 @@ function load_timesheets() {
             <td>${format_hours(row.total_hours)}</td>
             <td>${format_hours(row.total_billable_hours)}</td>
             <td>
-              <span class="d-inline-block text-truncate" style="max-width: 220px;" title="${relatedTooltip}">
-                ${relatedDisplay}
-              </span>
+              <div 
+                class="related-issue ${isLong ? 'long-text' : 'short-text'}"
+                title="${escapedText}">
+                ${escapedText || '-'}
+              </div>
             </td>
             <td>
               <button 
@@ -206,6 +208,7 @@ function load_timesheets() {
             </td>
           </tr>
         `);
+
       });
 
       loadedCount += data.length;
