@@ -20,7 +20,7 @@ frappe.ui.form.on("OKR", {
 		// Add market-standard features
 		addMarketStandardFeatures(frm);
 		
-		// Add Parent link to Connections (KRA or OKR)
+		// Add Parent link to Connections (KR or OKR)
 		if (frm.doc.parent_kra || frm.doc.parent_okr) {
 			setTimeout(() => addParentLink(frm), 500);
 		}
@@ -613,7 +613,7 @@ function addComment() {
 	});
 }
 
-// Add Parent link (KRA or OKR) to Connections section
+// Add Parent link (KR or OKR) to Connections section
 function addParentLink(frm) {
 	if (!frm.dashboard || !frm.dashboard.transactions_area) return;
 	
@@ -623,10 +623,10 @@ function addParentLink(frm) {
 	let parentInfo = null;
 	if (frm.doc.parent_kra) {
 		parentInfo = {
-			doctype: 'KRA',
+			doctype: 'KR',
 			name: frm.doc.parent_kra,
-			label: 'Parent KRA',
-			type: 'KRA'
+			label: 'Parent KR',
+			type: 'KR'
 		};
 	} else if (frm.doc.parent_okr) {
 		parentInfo = {
