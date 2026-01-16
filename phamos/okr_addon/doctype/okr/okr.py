@@ -78,14 +78,14 @@ class OKR(Document):
                 frappe.throw(f"Stretch target must be higher than committed target for KR: {measurable.metric_name}")
     
     def get_parent_info(self):
-        """Get parent information (KRA or OKR)"""
+        """Get parent information (KR or OKR)"""
         if self.parent_kra:
             try:
                 return {
-                    "type": "KRA",
+                    "type": "KR",
                     "name": self.parent_kra,
-                    "doctype": "KRA",
-                    "doc": frappe.get_doc("KRA", self.parent_kra)
+                    "doctype": "KR",
+                    "doc": frappe.get_doc("KR", self.parent_kra)
                 }
             except frappe.DoesNotExistError:
                 return None
@@ -174,8 +174,8 @@ class OKR(Document):
         self.next_check_in = add_days(self.last_check_in, days_to_add)
     
     def update_parent_okr_progress(self):
-        """Update parent progress if this is a child (OKR parent only, KRA is read-only)"""
-        # Only update if parent is OKR (KRA is a standard doctype, we can't update it)
+        """Update parent progress if this is a child (OKR parent only, KR is read-only)"""
+        # Only update if parent is OKR (KR is a standard doctype, we can't update it)
         if self.parent_okr:
             try:
                 parent = frappe.get_doc("OKR", self.parent_okr)

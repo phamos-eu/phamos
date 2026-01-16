@@ -221,17 +221,17 @@ def calculate_comprehensive_stats(okrs):
     }
 
 def get_hierarchy_data(okrs):
-    """Get parent-child relationship data (supports both KRA and OKR parents)"""
+    """Get parent-child relationship data (supports both KR and OKR parents)"""
     hierarchy = {
         "company_okrs": [],
         "team_okrs": [],
         "individual_okrs": [],
         "orphaned_okrs": [],
-        "kra_okrs": []  # OKRs linked to KRAs
+        "kra_okrs": []  # OKRs linked to KRs
     }
     
     for okr in okrs:
-        # Check if OKR has a parent (KRA or OKR)
+        # Check if OKR has a parent (KR or OKR)
         has_parent_kra = bool(okr.get('parent_kra'))
         has_parent_okr = bool(okr.get('parent_okr'))
         has_parent = has_parent_kra or has_parent_okr
@@ -553,7 +553,7 @@ def get_child_objectives_by_okr(okr_name):
     return children
 
 def get_child_objectives_by_kra(kra_name):
-    """Get all OKRs linked to a specific KRA"""
+    """Get all OKRs linked to a specific KR"""
     children = frappe.get_all(
         "OKR",
         filters={"parent_kra": kra_name},
@@ -568,7 +568,7 @@ def get_child_objectives_by_kra(kra_name):
     return children
 
 def get_okrs_by_kra(kra_name):
-    """Get all OKRs linked to a specific KRA (alias for backward compatibility)"""
+    """Get all OKRs linked to a specific KR (alias for backward compatibility)"""
     return get_child_objectives_by_kra(kra_name)
 
 def count_risk_factors(okr):
