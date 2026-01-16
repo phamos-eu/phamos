@@ -215,11 +215,11 @@
    "options": "OKR Team"
   },
   {
-   "description": "Link this OKR to a KRA (Key Result Area)",
+   "description": "Link this OKR to a KR (Key Result)",
    "fieldname": "parent_kra",
    "fieldtype": "Link",
-   "label": "Parent KRA",
-   "options": "KRA"
+   "label": "Parent KR",
+   "options": "KR"
   },
   {
    "description": "Link this OKR to another OKR",
