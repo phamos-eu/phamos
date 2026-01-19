@@ -25,6 +25,9 @@ def update_all_teams_weekly_holidays():
         for member in doc.team_members:
             employee = member.employee
 
+            if today.weekday() == 4 and member.is_friday_off:
+                continue
+
             holiday_list = frappe.db.get_value("Employee", employee, "holiday_list")
             if holiday_list:
                 holidays = frappe.db.get_all(
@@ -67,7 +70,7 @@ def update_all_teams_weekly_holidays():
                         continue
 
                     if day == today:
-                        hours = 4 if leave.half_day else 8
+                        hours = (member.daily_capacityhrs / 2) if leave.half_day else member.daily_capacityhrs
                         doc.append("team_member_leaves_and_holiday", {
                             "employee": employee,
                             "date": day,
@@ -82,7 +85,11 @@ def update_all_teams_weekly_holidays():
         #  TOTAL LEAVE + HOLIDAY HOURS ---
         total_hrs = sum([x.hrs for x in doc.team_member_leaves_and_holiday])
         doc.team_members_leaves_and_holidays = total_hrs
-        team_members_capacitydaily = sum([m.daily_capacityhrs or 0 for m in doc.team_members])
+        team_members_capacitydaily = sum([
+            0 if (today.weekday() == 4 and m.is_friday_off)
+            else (m.daily_capacityhrs or 0)
+            for m in doc.team_members
+        ])
 
 
         doc.total_team_capacity = team_members_capacity - total_hrs
