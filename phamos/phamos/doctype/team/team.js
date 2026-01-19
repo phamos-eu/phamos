@@ -3,7 +3,6 @@
 
 frappe.ui.form.on("Team", {
     refresh(frm) {
-        set_daily_from_weekly(frm);
         calculate_capacity(frm);
         calculate_leave_and_holiday(frm);
         calculate_capacity_daily(frm);
@@ -13,7 +12,6 @@ frappe.ui.form.on("Team", {
 
 frappe.ui.form.on("Team Members", {
     weekly_capacity(frm, cdt, cdn) {
-        set_daily_from_weekly(frm);
         calculate_capacity(frm);
         calculate_capacity_daily(frm);
     },
@@ -31,16 +29,6 @@ frappe.ui.form.on("Team Member Leaves and Holiday", {
         calculate_leave_and_holiday(frm);
     }
 });
-
-function set_daily_from_weekly(frm) {
-    (frm.doc.team_members || []).forEach(row => {
-        row.daily_capacityhrs = row.weekly_capacity
-            ? row.weekly_capacity / 5
-            : 0;
-    });
-
-    frm.refresh_field("team_members");
-}
 
 
 function calculate_capacity(frm) {
