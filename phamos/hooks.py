@@ -13,7 +13,9 @@ required_apps = ["erpnext", "hrms"]
 
 # include js, css files in header of desk.html
 app_include_css = [
-    "/assets/phamos/css/sales_order_kpi.css"
+    "/assets/phamos/css/sales_order_kpi.css",
+    "/assets/phamos/css/dark_mode_fix.css"
+
 ]
 # app_include_js = "/assets/phamos/js/phamos.js"
 
