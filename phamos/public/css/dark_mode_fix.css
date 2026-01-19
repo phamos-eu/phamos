@@ -1,0 +1,21 @@
+
+/* Override incorrectly set CSS variables that break dark mode */
+
+html[data-theme="dark"] body {
+    --navbar-bg: var(--gray-900) !important;
+    --bg-color: var(--gray-900) !important;
+}
+
+/* Ensure all main containers respect dark mode */
+html[data-theme="dark"] .page-container,
+html[data-theme="dark"] .container,
+html[data-theme="dark"] .main-section {
+    background-color: var(--bg-color) !important;
+}
+
+/* Fix any hardcoded white/light backgrounds in dark mode */
+html[data-theme="dark"] .frappe-card,
+html[data-theme="dark"] .card {
+    background-color: var(--fg-color) !important;
+    color: var(--text-color) !important;
+}
