@@ -257,8 +257,8 @@ frappe.pages['implementation-dashb'].on_page_load = function (wrapper) {
 
                 series.push({
                     name: filters.team.get_value()
-                        ? `Team Capacity Avg (${filters.team.get_value()})`
-                        : "Overall Team Capacity Avg",
+                        ? `Team Capacity (${filters.team.get_value()})`
+                        : "Overall Team Capacity",
                     type: "line",
                     data: teamCapacitySeries,
                     color: "#2c3e50",
