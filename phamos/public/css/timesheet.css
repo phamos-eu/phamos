@@ -49,3 +49,18 @@
   #starRating .star.selected {
     color: #FFD700; /* golden color for hover and selected */
   }
+
+  .related-issue {
+    max-width: 380px;
+    white-space: normal;      /* multiline allow */
+    word-break: break-word;  /* long words wrap */
+    line-height: 1.3;
+    }
+
+   .related-issue.long-text {
+    font-size: 11px;      /* smaller font */
+    }
+
+   .related-issue.short-text {
+    font-size: 13px;         /* normal font */
+    }
