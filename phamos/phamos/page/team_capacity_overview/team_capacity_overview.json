@@ -4,7 +4,7 @@
  "docstatus": 0,
  "doctype": "Page",
  "idx": 0,
- "modified": "2025-12-02 11:40:55.162822",
+ "modified": "2026-01-19 08:50:30.045824",
  "modified_by": "Administrator",
  "module": "Phamos",
  "name": "team-capacity-overview",
@@ -14,5 +14,6 @@
  "script": null,
  "standard": "Yes",
  "style": null,
- "system_page": 0
+ "system_page": 0,
+ "title": "Team Capacity Overview"
 }
