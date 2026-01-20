@@ -15,7 +15,7 @@
   "team_members",
   "section_break_ytzv",
   "team_members_capacity",
-  "column_break_zmky",
+  "column_break_pomp",
   "team_members_capacitydaily",
   "section_break_nkej",
   "team_member_leaves_and_holiday",
@@ -96,15 +96,6 @@
    "fieldtype": "Section Break"
   },
   {
-   "fieldname": "column_break_zmky",
-   "fieldtype": "Column Break"
-  },
-  {
-   "fieldname": "team_members_capacitydaily",
-   "fieldtype": "Int",
-   "label": "Team Members Capacity(Daily)"
-  },
-  {
    "fieldname": "column_break_ywhn",
    "fieldtype": "Column Break"
   },
@@ -112,12 +103,21 @@
    "fieldname": "total_team_capacity_daily",
    "fieldtype": "Int",
    "label": "Total Team Capacity Daily"
+  },
+  {
+   "fieldname": "column_break_pomp",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "team_members_capacitydaily",
+   "fieldtype": "Int",
+   "label": "Team Members Capacity(Daily)"
   }
  ],
  "grid_page_length": 50,
  "index_web_pages_for_search": 1,
  "links": [],
- "modified": "2026-01-12 12:01:25.694416",
+ "modified": "2026-01-20 14:47:47.689471",
  "modified_by": "Administrator",
  "module": "Phamos",
  "name": "Team",
