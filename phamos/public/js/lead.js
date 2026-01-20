@@ -2,11 +2,24 @@
 
 frappe.ui.form.on('Lead', {
     onload: function(frm) {
+        // Initialize flag on fresh form load
+        frm._do_not_contact_dialog_shown = false;
+        
         // Show dialog when form loads if status is "Do Not Contact"
         if (frm.doc.status === 'Do Not Contact' && frm.doc.custom_status_comment && !frm.is_new()) {
             setTimeout(() => {
                 show_do_not_contact_dialog(frm);
             }, 300);
+        }
+    },
+    
+    refresh: function(frm) {
+        // Also check on refresh to handle cached page loads and navigation
+        if (frm.doc.status === 'Do Not Contact' && frm.doc.custom_status_comment && !frm.is_new()) {
+            // Use a slight delay to ensure form is fully rendered
+            setTimeout(() => {
+                show_do_not_contact_dialog(frm);
+            }, 500);
         }
     },
     
@@ -28,6 +41,11 @@ frappe.ui.form.on('Lead', {
             if (frm.doc.custom_status_comment) {
                 frm.set_value('custom_status_comment', '');
             }
+            
+            // Clear session storage flag when status changes away from "Do Not Contact"
+            const session_key = `do_not_contact_dialog_shown_${frm.doc.name}`;
+            sessionStorage.removeItem(session_key);
+            frm._do_not_contact_dialog_shown = false;
         }
     },
     
@@ -77,12 +95,22 @@ function prompt_for_do_not_contact_reason(frm) {
 }
 
 function show_do_not_contact_dialog(frm) {
-    // Only show once per form load (but allow re-showing after certain events)
+    // Use session storage to track if dialog was shown for this specific Lead during this session
+    const session_key = `do_not_contact_dialog_shown_${frm.doc.name}`;
+    
+    // Check if already shown in this session
+    if (sessionStorage.getItem(session_key)) {
+        return;
+    }
+    
+    // Also check in-memory flag for same form instance
     if (frm._do_not_contact_dialog_shown) {
         return;
     }
     
+    // Mark as shown in both memory and session
     frm._do_not_contact_dialog_shown = true;
+    sessionStorage.setItem(session_key, 'true');
     
     const modified_by = frm.doc.custom_status_comment_modified_by || frm.doc.modified_by;
     const modified_date = frm.doc.custom_status_comment_modified_date || frm.doc.modified;
