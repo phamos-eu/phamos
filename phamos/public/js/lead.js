@@ -2,24 +2,27 @@
 
 frappe.ui.form.on('Lead', {
     onload: function(frm) {
-        // Initialize flag on fresh form load
-        frm._do_not_contact_dialog_shown = false;
-        
-        // Show dialog when form loads if status is "Do Not Contact"
-        if (frm.doc.status === 'Do Not Contact' && frm.doc.custom_status_comment && !frm.is_new()) {
-            setTimeout(() => {
-                show_do_not_contact_dialog(frm);
-            }, 300);
-        }
+        // onload initialization if needed
     },
     
     refresh: function(frm) {
-        // Also check on refresh to handle cached page loads and navigation
+        // Check on refresh to handle both fresh loads and cached page loads
+        // This is more reliable than onload for production/cached environments
+        // If a save just happened from the reason dialog, skip showing once
+        if (frm._suppress_dnc_dialog_once) {
+            frm._suppress_dnc_dialog_once = false;
+            return;
+        }
         if (frm.doc.status === 'Do Not Contact' && frm.doc.custom_status_comment && !frm.is_new()) {
-            // Use a slight delay to ensure form is fully rendered
-            setTimeout(() => {
-                show_do_not_contact_dialog(frm);
-            }, 500);
+            // Use requestAnimationFrame to ensure DOM is fully ready, then add delay
+            requestAnimationFrame(() => {
+                setTimeout(() => {
+                    // Double-check the form is still in the right state
+                    if (frm.doc.status === 'Do Not Contact' && frm.doc.custom_status_comment) {
+                        show_do_not_contact_dialog(frm);
+                    }
+                }, 500);
+            });
         }
     },
     
@@ -41,11 +44,6 @@ frappe.ui.form.on('Lead', {
             if (frm.doc.custom_status_comment) {
                 frm.set_value('custom_status_comment', '');
             }
-            
-            // Clear session storage flag when status changes away from "Do Not Contact"
-            const session_key = `do_not_contact_dialog_shown_${frm.doc.name}`;
-            sessionStorage.removeItem(session_key);
-            frm._do_not_contact_dialog_shown = false;
         }
     },
     
@@ -74,6 +72,8 @@ function prompt_for_do_not_contact_reason(frm) {
         primary_action: function(values) {
             frm.set_value('custom_status_comment', values.reason);
             dialog.hide();
+            // Suppress the Do Not Contact info dialog once right after saving the reason
+            frm._suppress_dnc_dialog_once = true;
             frm.save()
                 .then(() => {
                     frappe.show_alert({
@@ -95,22 +95,7 @@ function prompt_for_do_not_contact_reason(frm) {
 }
 
 function show_do_not_contact_dialog(frm) {
-    // Use session storage to track if dialog was shown for this specific Lead during this session
-    const session_key = `do_not_contact_dialog_shown_${frm.doc.name}`;
-    
-    // Check if already shown in this session
-    if (sessionStorage.getItem(session_key)) {
-        return;
-    }
-    
-    // Also check in-memory flag for same form instance
-    if (frm._do_not_contact_dialog_shown) {
-        return;
-    }
-    
-    // Mark as shown in both memory and session
-    frm._do_not_contact_dialog_shown = true;
-    sessionStorage.setItem(session_key, 'true');
+    console.log('Showing Do Not Contact dialog for:', frm.doc.name);
     
     const modified_by = frm.doc.custom_status_comment_modified_by || frm.doc.modified_by;
     const modified_date = frm.doc.custom_status_comment_modified_date || frm.doc.modified;
@@ -130,7 +115,18 @@ function show_do_not_contact_dialog(frm) {
         callback: function(r) {
             const full_name = r.message ? r.message.full_name : modified_by;
             
-            const dialog = new frappe.ui.Dialog({
+            show_dialog_with_content(frm, full_name, formatted_date, relative_date);
+        },
+        error: function(err) {
+            console.error('Error fetching user name:', err);
+            // Show dialog anyway with modified_by as fallback
+            show_dialog_with_content(frm, modified_by, formatted_date, relative_date);
+        }
+    });
+}
+
+function show_dialog_with_content(frm, full_name, formatted_date, relative_date) {
+    const dialog = new frappe.ui.Dialog({
                 title: __('⚠️ Do Not Contact - Status Comment'),
                 indicator: 'red',
                 fields: [
@@ -187,6 +183,7 @@ function show_do_not_contact_dialog(frm) {
             });
             
             dialog.show();
+            console.log('Dialog shown successfully for:', frm.doc.name);
             
             // Auto-hide after 30 seconds
             setTimeout(() => {
@@ -194,6 +191,4 @@ function show_do_not_contact_dialog(frm) {
                     dialog.hide();
                 }
             }, 30000);
-        }
-    });
 }
