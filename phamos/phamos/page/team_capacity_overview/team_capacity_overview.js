@@ -267,58 +267,58 @@ frappe.pages['team-capacity-overview'].on_page_load = function (wrapper) {
             shared: true,
             formatter: function () {
 
-                let idx = this.points[0].point.index;
+            let idx = this.points[0].point.index;
 
-                let from = new Date(page.from_date.get_value());
-                let to = new Date(page.to_date.get_value());
+            // Current week start & end
+            let weekStart = new Date(page.from_date.get_value());
+            weekStart.setDate(weekStart.getDate() + (idx * 7));
 
-                // week offset
-                from.setDate(from.getDate() + (idx * 7));
-                to.setDate(from.getDate() + 6);
+            let weekEnd = new Date(weekStart);
+            weekEnd.setDate(weekEnd.getDate() + 6);
 
-                let actualRange =
-                    frappe.datetime.obj_to_str(from) +
-                    " - " +
-                    frappe.datetime.obj_to_str(to);
+            let actualRange =
+                frappe.datetime.obj_to_str(weekStart) +
+                " - " +
+                frappe.datetime.obj_to_str(weekEnd);
 
-                let html = `<b>${actualRange}</b><br/>`;
+            let html = `<b>${actualRange}</b><br/>`;
 
-                this.points.forEach(p => {
+            this.points.forEach(p => {
 
-                    if (p.series.name === "Historical Actual Time") {
+                if (p.series.name === "Historical Actual Time") {
 
-                        let hFrom = new Date(from);
-                        let hTo = new Date(to);
+                    let hFrom = new Date(weekStart);
+                    let hTo = new Date(weekEnd);
 
-                        if (page.comparison_type.get_value() === "last_year") {
-                            hFrom.setFullYear(hFrom.getFullYear() - 1);
-                            hTo.setFullYear(hTo.getFullYear() - 1);
-                        } else {
-                            hFrom.setMonth(hFrom.getMonth() - 1);
-                            hTo.setMonth(hTo.getMonth() - 1);
-                        }
-
-                        let histRange =
-                            frappe.datetime.obj_to_str(hFrom) +
-                            " - " +
-                            frappe.datetime.obj_to_str(hTo);
-
-                        html += `
-                            <span style="color:${p.color}">●</span>
-                            ${p.series.name} (${histRange}):
-                            <b>${p.y}</b><br/>
-                        `;
-                    } else {
-                        html += `
-                            <span style="color:${p.color}">●</span>
-                            ${p.series.name}:
-                            <b>${p.y}</b><br/>
-                        `;
+                    if (page.comparison_type.get_value() === "last_year") {
+                        hFrom.setFullYear(hFrom.getFullYear() - 1);
+                        hTo.setFullYear(hTo.getFullYear() - 1);
+                    } else if (page.comparison_type.get_value() === "last_month") {
+                        hFrom.setMonth(hFrom.getMonth() - 1);
+                        hTo.setMonth(hTo.getMonth() - 1);
                     }
-                });
 
-                return html;
-            }
+                    let histRange =
+                        frappe.datetime.obj_to_str(hFrom) +
+                        " - " +
+                        frappe.datetime.obj_to_str(hTo);
+
+                    html += `
+                        <span style="color:${p.color}">●</span>
+                        ${p.series.name} (${histRange}):
+                        <b>${p.y}</b><br/>
+                    `;
+                } else {
+                    html += `
+                        <span style="color:${p.color}">●</span>
+                        ${p.series.name}:
+                        <b>${p.y}</b><br/>
+                    `;
+                }
+            });
+
+            return html;
+        }
         },
             series
         });
