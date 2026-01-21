@@ -1,5 +1,6 @@
 {
  "actions": [],
+ "allow_import": 1,
  "allow_rename": 1,
  "autoname": "field:title",
  "creation": "2026-01-16 07:20:23.413007",
@@ -29,7 +30,7 @@
  "grid_page_length": 50,
  "index_web_pages_for_search": 1,
  "links": [],
- "modified": "2026-01-16 07:20:23.413007",
+ "modified": "2026-01-16 16:21:30.233854",
  "modified_by": "Administrator",
  "module": "OKR Addon",
  "name": "KR",

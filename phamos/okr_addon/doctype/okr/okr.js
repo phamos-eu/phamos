@@ -20,7 +20,7 @@ frappe.ui.form.on("OKR", {
 		// Add market-standard features
 		addMarketStandardFeatures(frm);
 		
-		// Add Parent link to Connections (KR or OKR)
+		// Add Parent links to Connections (Parent KR and/or Parent OKR)
 		if (frm.doc.parent_kra || frm.doc.parent_okr) {
 			setTimeout(() => addParentLink(frm), 500);
 		}
@@ -613,31 +613,36 @@ function addComment() {
 	});
 }
 
-// Add Parent link (KR or OKR) to Connections section
+// Add Parent links (KR and/or OKR) to Connections section
 function addParentLink(frm) {
 	if (!frm.dashboard || !frm.dashboard.transactions_area) return;
 	
 	let $area = frm.dashboard.transactions_area;
 	$area.find('.parent-link').remove(); // Remove existing parent links
 	
-	let parentInfo = null;
+	let parentLinks = [];
+	
+	// Add Parent KR if exists
 	if (frm.doc.parent_kra) {
-		parentInfo = {
+		parentLinks.push({
 			doctype: 'KR',
 			name: frm.doc.parent_kra,
 			label: 'Parent KR',
 			type: 'KR'
-		};
-	} else if (frm.doc.parent_okr) {
-		parentInfo = {
+		});
+	}
+	
+	// Add Parent OKR if exists
+	if (frm.doc.parent_okr) {
+		parentLinks.push({
 			doctype: 'OKR',
 			name: frm.doc.parent_okr,
 			label: 'Parent OKR',
 			type: 'OKR'
-		};
+		});
 	}
 	
-	if (!parentInfo) return;
+	if (parentLinks.length === 0) return;
 	
 	let $firstCol = $area.find('.col-md-4').first();
 	if ($firstCol.length) {
@@ -648,30 +653,30 @@ function addParentLink(frm) {
 			$linkContainer = $firstCol;
 		}
 		
-		// Create Parent link matching exact Frappe structure
-		let $link = $(`
-			<div class="document-link parent-link" data-doctype="${parentInfo.doctype}" data-names='["${parentInfo.name}"]'>
-				<div class="document-link-badge" data-doctype="${parentInfo.doctype}">
-					<span class="count">1</span>
-					<a class="badge-link">${__(parentInfo.label)}</a>
-				</div>
-			</div>
-		`);
-		
 		// Insert at the beginning - after form-link-title if exists, otherwise at start
 		let $title = $firstCol.find('.form-link-title');
-		if ($title.length) {
-			// Insert after title, before other document links
-			$link.insertAfter($title);
-		} else {
-			// No title, prepend to column
-			$firstCol.prepend($link);
-		}
+		let $insertAfter = $title.length ? $title : $firstCol;
 		
-		// Make clickable
-		$link.find('.badge-link').on('click', (e) => {
-			e.preventDefault();
-			frappe.set_route('Form', parentInfo.doctype, parentInfo.name);
+		// Create Parent links for both KR and OKR
+		parentLinks.forEach((parentInfo) => {
+			let $link = $(`
+				<div class="document-link parent-link" data-doctype="${parentInfo.doctype}" data-names='["${parentInfo.name}"]'>
+					<div class="document-link-badge" data-doctype="${parentInfo.doctype}">
+						<span class="count">1</span>
+						<a class="badge-link">${__(parentInfo.label)}</a>
+					</div>
+				</div>
+			`);
+			
+			// Insert after the reference point
+			$link.insertAfter($insertAfter);
+			$insertAfter = $link; // Next link goes after this one
+			
+			// Make clickable
+			$link.find('.badge-link').on('click', (e) => {
+				e.preventDefault();
+				frappe.set_route('Form', parentInfo.doctype, parentInfo.name);
+			});
 		});
 	}
 }
