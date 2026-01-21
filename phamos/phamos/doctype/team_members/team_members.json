@@ -8,8 +8,7 @@
  "field_order": [
   "employee",
   "designation",
-  "weekly_capacity",
-  "daily_capacityhrs"
+  "weekly_capacity"
  ],
  "fields": [
   {
@@ -32,19 +31,13 @@
    "fieldtype": "Int",
    "in_list_view": 1,
    "label": "Weekly Capacity(hrs)"
-  },
-  {
-   "fieldname": "daily_capacityhrs",
-   "fieldtype": "Int",
-   "in_list_view": 1,
-   "label": "Daily Capacity(hrs)"
   }
  ],
  "grid_page_length": 50,
  "index_web_pages_for_search": 1,
  "istable": 1,
  "links": [],
- "modified": "2026-01-12 09:30:04.571938",
+ "modified": "2026-01-20 12:46:09.032743",
  "modified_by": "Administrator",
  "module": "Phamos",
  "name": "Team Members",

@@ -189,6 +189,25 @@ frappe.ui.form.on("Accounting Receipt", {
             frm.doc.timesheets.reduce((a, b) => a + (b["billing_amount"] || 0.0), 0.0));
         frm.set_value("total_billing_hours",
             frm.doc.timesheets.reduce((a, b) => a + (b["billing_hours"] || 0.0), 0.0));
+    },
+
+    supplier: function(frm) {
+        // Auto-fetch currency from supplier when supplier is selected or changed
+        if (frm.doc.supplier) {
+            frappe.call({
+                method: "frappe.client.get_value",
+                args: {
+                    doctype: "Supplier",
+                    filters: { name: frm.doc.supplier },
+                    fieldname: ["default_currency"]
+                },
+                callback: function(r) {
+                    if (r.message && r.message.default_currency) {
+                        frm.set_value("currency", r.message.default_currency);
+                    }
+                }
+            });
+        }
     }
 });
 
