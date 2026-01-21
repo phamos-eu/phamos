@@ -15,12 +15,16 @@ def get_timesheets(from_date=None, to_date=None, project=None, offset=0, limit=2
     conditions = " AND customer = %s"
     values = [customer]
 
-    if from_date:
-        conditions += " AND start_date >= %s"
+    if from_date and to_date:
+        conditions += " AND start_date <= %s AND end_date >= %s"
+        values.extend([getdate(to_date), getdate(from_date)])
+
+    elif from_date:
+        conditions += " AND end_date >= %s"
         values.append(getdate(from_date))
 
-    if to_date:
-        conditions += " AND end_date <= %s"
+    elif to_date:
+        conditions += " AND start_date <= %s"
         values.append(getdate(to_date))
 
     if project:
