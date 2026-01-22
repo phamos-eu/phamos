@@ -51,6 +51,8 @@ doctype_js = {
     "Timesheet":"public/js/timesheet.js",
     "User": "public/js/mailcow_user.js",
     "Event": "public/js/event.js",
+    "Sales Invoice": "public/js/sales_invoice.js",
+
 }
 
 doctype_list_js = {
