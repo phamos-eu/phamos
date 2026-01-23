@@ -2,18 +2,31 @@
 
 frappe.ui.form.on('Lead', {
     onload: function(frm) {
-        // onload initialization if needed
+        // Track if dialog was shown during this form load
+        frm._dnc_dialog_shown_on_load = false;
+        // Store initial status comment to detect changes
+        frm._initial_status_comment = frm.doc.custom_status_comment;
     },
     
     refresh: function(frm) {
-        // Check on refresh to handle both fresh loads and cached page loads
-        // This is more reliable than onload for production/cached environments
-        // If a save just happened from the reason dialog, skip showing once
-        if (frm._suppress_dnc_dialog_once) {
-            frm._suppress_dnc_dialog_once = false;
-            return;
+        // Set field visibility and mandatory state
+        if (frm.doc.status === 'Do Not Contact') {
+            frm.set_df_property('custom_status_comment', 'reqd', 1);
+        } else {
+            frm.set_df_property('custom_status_comment', 'reqd', 0);
         }
-        if (frm.doc.status === 'Do Not Contact' && frm.doc.custom_status_comment && !frm.is_new()) {
+        
+        // Show dialog only once per load and only if comment exists
+        // Don't show after saves (user is editing)
+        if (frm.doc.status === 'Do Not Contact' && 
+            frm.doc.custom_status_comment && 
+            !frm.is_new() && 
+            !frm._dnc_dialog_shown_on_load && 
+            !frm._suppress_dnc_dialog_after_save) {
+            
+            // Mark as shown for this load
+            frm._dnc_dialog_shown_on_load = true;
+            
             // Use requestAnimationFrame to ensure DOM is fully ready, then add delay
             requestAnimationFrame(() => {
                 setTimeout(() => {
@@ -24,26 +37,28 @@ frappe.ui.form.on('Lead', {
                 }, 500);
             });
         }
+        
+        // Clear the suppress flag after save (it's only for one refresh cycle)
+        if (frm._suppress_dnc_dialog_after_save) {
+            frm._suppress_dnc_dialog_after_save = false;
+        }
     },
     
     status: function(frm) {
+        // Clear the status comment whenever status changes
+        if (frm.doc.custom_status_comment) {
+            frm.set_value('custom_status_comment', '');
+        }
+        
         // When status is changed to "Do Not Contact", prompt for a reason.
         if (frm.doc.status === 'Do Not Contact') {
             frm.set_df_property('custom_status_comment', 'reqd', 1);
-            frm.set_df_property('custom_status_comment', 'hidden', 0);
             
-            // If the comment is not already set, prompt the user for it.
-            if (!frm.doc.custom_status_comment) {
-                prompt_for_do_not_contact_reason(frm);
-            }
+            // Always prompt for a reason since we just cleared it
+            prompt_for_do_not_contact_reason(frm);
         } else {
-            // Not mandatory for other statuses - clear the fields
+            // Not mandatory for other statuses
             frm.set_df_property('custom_status_comment', 'reqd', 0);
-            
-            // Clear the comment and tracking fields when status changes away from "Do Not Contact"
-            if (frm.doc.custom_status_comment) {
-                frm.set_value('custom_status_comment', '');
-            }
         }
     },
     
@@ -52,6 +67,13 @@ frappe.ui.form.on('Lead', {
         if (frm.doc.custom_status_comment && frm.doc.status === 'Do Not Contact') {
             frm.set_value('custom_status_comment_modified_by', frappe.session.user);
             frm.set_value('custom_status_comment_modified_date', frappe.datetime.now_datetime());
+        }
+    },
+    
+    before_save: function(frm) {
+        // Suppress dialog after any save operation
+        if (frm.doc.status === 'Do Not Contact' && frm.doc.custom_status_comment) {
+            frm._suppress_dnc_dialog_after_save = true;
         }
     },
 });
@@ -72,15 +94,14 @@ function prompt_for_do_not_contact_reason(frm) {
         primary_action: function(values) {
             frm.set_value('custom_status_comment', values.reason);
             dialog.hide();
-            // Suppress the Do Not Contact info dialog once right after saving the reason
-            frm._suppress_dnc_dialog_once = true;
+            // Suppress the Do Not Contact info dialog after saving
+            frm._suppress_dnc_dialog_after_save = true;
             frm.save()
                 .then(() => {
                     frappe.show_alert({
                         message: __('Lead status updated and reason saved.'),
                         indicator: 'green'
                     });
-                    // After saving, the dialog will appear on next load, not immediately.
                 })
                 .catch(() => {
                     frappe.show_alert({
@@ -178,7 +199,6 @@ function show_dialog_with_content(frm, full_name, formatted_date, relative_date)
                 secondary_action: function() {
                     dialog.hide();
                     frm.scroll_to_field('custom_status_comment');
-                    frm.set_df_property('custom_status_comment', 'hidden', 0);
                 }
             });
             
