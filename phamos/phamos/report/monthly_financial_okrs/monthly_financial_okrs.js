@@ -2,6 +2,27 @@
 // For license information, please see license.txt
 
 frappe.query_reports["Monthly Financial OKRs"] = {
+        formatter: function (value, row, column, data, default_formatter) {
+        value = default_formatter(value, row, column, data);
+
+        if (!data) return value;
+
+        // Quarter totals
+        if (data.month && data.month.includes("Total")) {
+            value = `<div style="
+                font-weight:bold;
+            ">${value}</div>`;
+        }
+
+        // Grand total
+        if (data.month && data.month.includes("Grand Total")) {
+            value = `<div style="
+                font-weight:bold;
+            ">${value}</div>`;
+        }
+
+        return value;
+    },
     "filters": [
         {
             fieldname: "year",
