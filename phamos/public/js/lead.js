@@ -27,14 +27,14 @@ frappe.ui.form.on('Lead', {
             // Mark as shown for this load
             frm._dnc_dialog_shown_on_load = true;
             
-            // Use requestAnimationFrame to ensure DOM is fully ready, then add delay
+            // Use requestAnimationFrame to ensure DOM is fully ready, then add minimal delay
             requestAnimationFrame(() => {
                 setTimeout(() => {
                     // Double-check the form is still in the right state
                     if (frm.doc.status === 'Do Not Contact' && frm.doc.custom_status_comment) {
                         show_do_not_contact_dialog(frm);
                     }
-                }, 500);
+                }, 100);
             });
         }
         
@@ -116,7 +116,6 @@ function prompt_for_do_not_contact_reason(frm) {
 }
 
 function show_do_not_contact_dialog(frm) {
-    console.log('Showing Do Not Contact dialog for:', frm.doc.name);
     
     const modified_by = frm.doc.custom_status_comment_modified_by || frm.doc.modified_by;
     const modified_date = frm.doc.custom_status_comment_modified_date || frm.doc.modified;
@@ -203,12 +202,4 @@ function show_dialog_with_content(frm, full_name, formatted_date, relative_date)
             });
             
             dialog.show();
-            console.log('Dialog shown successfully for:', frm.doc.name);
-            
-            // Auto-hide after 30 seconds
-            setTimeout(() => {
-                if (dialog && dialog.$wrapper.is(':visible')) {
-                    dialog.hide();
-                }
-            }, 30000);
 }
