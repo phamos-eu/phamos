@@ -397,7 +397,13 @@ def create_and_submit_timesheet( project_name=None,
             "from_time": from_time,
             "to_time": to_time
         })
+        employee = frappe.db.get_value(
+    "Employee",
+            {"user_id": frappe.session.user},
+            "name"
+        )
 
+        ts.employee = employee 
         # ✅ Calculate total duration
         total_duration = 0
         for row in ts.item:
@@ -477,6 +483,7 @@ def update_and_submit_timesheet_record(name, to_time, percent_billable, activity
                 continue
 
             new_doc = frappe.new_doc("Timesheet Record")
+            new_doc.employee = doc.employee
 
             # Copy parent fields from original
             for field in ["project", "customer", "task", "goal", "expected_time", "activity_type", "result", "percent_billable"]:
