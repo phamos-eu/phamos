@@ -58,15 +58,25 @@ class Implementation(Document):
 		if self.sales_order_status_information:
 			for row in self.sales_order_status_information:
 				total_hours = 0
-				delivery_notes = frappe.get_all("Delivery Note Item",filters={"against_sales_order": row.sales_order},fields=["parent", "qty"])
-				if len(delivery_notes) == 0:
+
+				delivery_notes = frappe.db.sql("""
+					SELECT dni.qty
+					FROM `tabDelivery Note Item` dni
+					JOIN `tabDelivery Note` dn ON dn.name = dni.parent
+					WHERE
+						dni.against_sales_order = %s
+						AND dn.docstatus = 1
+						AND dn.status NOT IN ('Cancelled', 'Closed')
+				""", row.sales_order, as_dict=True)
+
+				if not delivery_notes:
 					row.delivered_total_hrs = 0
-					row.remaining_hrs = row.total_hrs - row.delivered_total_hrs 
 				else:
 					for dn in delivery_notes:
 						total_hours += dn.get("qty", 0)
-						row.delivered_total_hrs = total_hours
-						row.remaining_hrs = row.total_hrs - row.delivered_total_hrs
+					row.delivered_total_hrs = total_hours
+
+				row.remaining_hrs = row.total_hrs - row.delivered_total_hrs
 
 	def add_resource_planning(self):
 		if self.name:
