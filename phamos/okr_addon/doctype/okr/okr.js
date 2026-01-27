@@ -20,10 +20,14 @@ frappe.ui.form.on("OKR", {
 		// Add market-standard features
 		addMarketStandardFeatures(frm);
 		
-		// Add Parent OKR link to Connections
-		if (frm.doc.parent_okr) {
-			setTimeout(() => addParentOKRLink(frm), 500);
+		// Add Parent links to Connections (Parent KR and/or Parent OKR)
+		if (frm.doc.parent_kra || frm.doc.parent_okr) {
+			setTimeout(() => addParentLink(frm), 500);
 		}
+		
+		// Render child OKRs in HTML field (with delay to ensure field is ready)
+		setTimeout(() => renderChildOKRsInField(frm), 200);
+		
 	},
 	
 	measurables_add(frm, cdt, cdn) {
@@ -239,7 +243,7 @@ function renderEnhancedSummary(frm, summary) {
 				<div style="padding: 25px; background: #f8f9fa;">
 					<div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
 						<div style="font-weight: 600; color: #2c3e50; font-size: 1.1em;">📈 Progress Overview</div>
-						<div style="display: flex; gap: 20px;">
+						<div style="display: flex; gap: 15px;">
 							<div style="text-align: center; background: white; padding: 10px 15px; border-radius: 8px; box-shadow: 0 1px 3px rgba(0,0,0,0.1);">
 								<div style="font-weight: bold; color: #27ae60; font-size: 1.2em;">${summary.average_progress}%</div>
 								<div style="font-size: 0.8em; color: #7f8c8d;">Avg Progress</div>
@@ -248,24 +252,20 @@ function renderEnhancedSummary(frm, summary) {
 								<div style="font-weight: bold; color: #3498db; font-size: 1.2em;">${summary.overall_health}</div>
 								<div style="font-size: 0.8em; color: #7f8c8d;">Health Score</div>
 							</div>
+							<div style="text-align: center; background: white; padding: 10px 15px; border-radius: 8px; box-shadow: 0 1px 3px rgba(0,0,0,0.1);">
+								<div style="font-weight: bold; color: #27ae60; font-size: 1.2em;">${summary.completion_rate}%</div>
+								<div style="font-size: 0.8em; color: #7f8c8d;">Completion Rate</div>
+							</div>
+							<div style="text-align: center; background: white; padding: 10px 15px; border-radius: 8px; box-shadow: 0 1px 3px rgba(0,0,0,0.1);">
+								<div style="font-weight: bold; color: #e74c3c; font-size: 1.2em;">${summary.risk_score}%</div>
+								<div style="font-size: 0.8em; color: #7f8c8d;">Risk Score</div>
+							</div>
 						</div>
 					</div>
 					
 					<!-- Progress Bar -->
-					<div style="background: #e9ecef; border-radius: 10px; height: 12px; overflow: hidden; margin-bottom: 20px; box-shadow: inset 0 1px 3px rgba(0,0,0,0.1);">
+					<div style="background: #e9ecef; border-radius: 10px; height: 12px; overflow: hidden; box-shadow: inset 0 1px 3px rgba(0,0,0,0.1);">
 						<div style="background: linear-gradient(90deg, #27ae60, #2ecc71); height: 100%; width: ${summary.average_progress}%; transition: width 0.5s ease; border-radius: 10px;"></div>
-					</div>
-					
-					<!-- Additional Metrics -->
-					<div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 15px;">
-						<div style="text-align: center; background: white; padding: 15px; border-radius: 8px; box-shadow: 0 1px 3px rgba(0,0,0,0.1); border-left: 4px solid #27ae60;">
-							<div style="font-weight: 600; color: #2c3e50; font-size: 1.3em;">${summary.completion_rate}%</div>
-							<div style="font-size: 0.85em; color: #7f8c8d; font-weight: 500;">Completion Rate</div>
-						</div>
-						<div style="text-align: center; background: white; padding: 15px; border-radius: 8px; box-shadow: 0 1px 3px rgba(0,0,0,0.1); border-left: 4px solid #e74c3c;">
-							<div style="font-weight: 600; color: #2c3e50; font-size: 1.3em;">${summary.risk_score}%</div>
-							<div style="font-size: 0.85em; color: #7f8c8d; font-weight: 500;">Risk Score</div>
-						</div>
 					</div>
 				</div>
 				
@@ -613,12 +613,36 @@ function addComment() {
 	});
 }
 
-// Add Parent OKR link to Connections section (optimized)
-function addParentOKRLink(frm) {
+// Add Parent links (KR and/or OKR) to Connections section
+function addParentLink(frm) {
 	if (!frm.dashboard || !frm.dashboard.transactions_area) return;
 	
 	let $area = frm.dashboard.transactions_area;
-	$area.find('.parent-okr-link').remove(); // Remove existing
+	$area.find('.parent-link').remove(); // Remove existing parent links
+	
+	let parentLinks = [];
+	
+	// Add Parent KR if exists
+	if (frm.doc.parent_kra) {
+		parentLinks.push({
+			doctype: 'KR',
+			name: frm.doc.parent_kra,
+			label: 'Parent KR',
+			type: 'KR'
+		});
+	}
+	
+	// Add Parent OKR if exists
+	if (frm.doc.parent_okr) {
+		parentLinks.push({
+			doctype: 'OKR',
+			name: frm.doc.parent_okr,
+			label: 'Parent OKR',
+			type: 'OKR'
+		});
+	}
+	
+	if (parentLinks.length === 0) return;
 	
 	let $firstCol = $area.find('.col-md-4').first();
 	if ($firstCol.length) {
@@ -629,31 +653,219 @@ function addParentOKRLink(frm) {
 			$linkContainer = $firstCol;
 		}
 		
-		// Create Parent OKR link matching exact Frappe structure
-		let $link = $(`
-			<div class="document-link parent-okr-link" data-doctype="OKR" data-names='["${frm.doc.parent_okr}"]'>
-				<div class="document-link-badge" data-doctype="OKR">
-					<span class="count">1</span>
-					<a class="badge-link">${__('Parent OKR')}</a>
-				</div>
-			</div>
-		`);
-		
 		// Insert at the beginning - after form-link-title if exists, otherwise at start
 		let $title = $firstCol.find('.form-link-title');
-		if ($title.length) {
-			// Insert after title, before other document links
-			$link.insertAfter($title);
-		} else {
-			// No title, prepend to column
-			$firstCol.prepend($link);
-		}
+		let $insertAfter = $title.length ? $title : $firstCol;
 		
-		// Make clickable
-		$link.find('.badge-link').on('click', (e) => {
-			e.preventDefault();
-			frappe.set_route('Form', 'OKR', frm.doc.parent_okr);
+		// Create Parent links for both KR and OKR
+		parentLinks.forEach((parentInfo) => {
+			let $link = $(`
+				<div class="document-link parent-link" data-doctype="${parentInfo.doctype}" data-names='["${parentInfo.name}"]'>
+					<div class="document-link-badge" data-doctype="${parentInfo.doctype}">
+						<span class="count">1</span>
+						<a class="badge-link">${__(parentInfo.label)}</a>
+					</div>
+				</div>
+			`);
+			
+			// Insert after the reference point
+			$link.insertAfter($insertAfter);
+			$insertAfter = $link; // Next link goes after this one
+			
+			// Make clickable
+			$link.find('.badge-link').on('click', (e) => {
+				e.preventDefault();
+				frappe.set_route('Form', parentInfo.doctype, parentInfo.name);
+			});
 		});
 	}
+}
+
+// Render Child OKRs in HTML Field
+function renderChildOKRsInField(frm) {
+	// Check if field exists
+	if (!frm.fields_dict.child_okrs_html) {
+		console.warn('child_okrs_html field not found');
+		return;
+	}
+	
+	// Only show if this OKR can have children (has a name and is saved)
+	if (!frm.doc.name || frm.is_new()) {
+		const emptyHtml = '<div style="text-align: center; padding: 20px; color: #8d99a6; font-size: 12px;">No child OKRs available. Save this OKR first.</div>';
+		frm.fields_dict.child_okrs_html.set_value(emptyHtml);
+		return;
+	}
+	
+	// Fetch child OKRs
+	frappe.call({
+		method: 'phamos.okr_addon.doctype.okr.okr.get_child_okrs',
+		args: {
+			okr_name: frm.doc.name
+		},
+		callback: function(r) {
+			if (r.message && r.message.length > 0) {
+				const html = renderChildOKRsHTML(frm, r.message);
+				frm.fields_dict.child_okrs_html.set_value(html);
+			} else {
+				const emptyHtml = '<div style="text-align: center; padding: 20px; color: #8d99a6; font-size: 12px;">No child OKRs found</div>';
+				frm.fields_dict.child_okrs_html.set_value(emptyHtml);
+			}
+		},
+		error: function(r) {
+			console.error('Error fetching child OKRs:', r);
+			const errorHtml = '<div style="text-align: center; padding: 20px; color: #e74c3c; font-size: 12px;">Error loading child OKRs</div>';
+			if (frm.fields_dict.child_okrs_html) {
+				frm.fields_dict.child_okrs_html.set_value(errorHtml);
+			}
+		}
+	});
+}
+
+function renderChildOKRsHTML(frm, childOKRs) {
+	// Calculate average progress
+	const totalProgress = childOKRs.reduce((sum, child) => sum + (child.progress || 0), 0);
+	const avgProgress = childOKRs.length > 0 ? (totalProgress / childOKRs.length).toFixed(1) : 0;
+	const avgProgressColor = getProgressColor(avgProgress);
+	
+	let html = `
+		<div class="child-okrs-section" style="margin-bottom: 15px;">
+			<div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; padding: 8px 0;">
+				<div style="display: flex; align-items: center; gap: 8px;">
+					<span style="font-size: 12px; color: #8d99a6; background: #f0f4f7; padding: 2px 8px; border-radius: 10px;">
+						${childOKRs.length} OKR${childOKRs.length !== 1 ? 's' : ''}
+					</span>
+				</div>
+				<div style="display: flex; align-items: center; gap: 12px;">
+					<div style="display: flex; align-items: center; gap: 6px;">
+						<span style="font-size: 12px; color: #8d99a6;">Avg Progress:</span>
+						<span style="font-size: 14px; font-weight: 600; color: ${avgProgressColor};">${avgProgress}%</span>
+					</div>
+					<div style="width: 80px; height: 5px; background: #e9ecef; border-radius: 3px; overflow: hidden;">
+						<div style="width: ${avgProgress}%; height: 100%; background: ${avgProgressColor}; transition: width 0.3s;"></div>
+					</div>
+				</div>
+			</div>
+			<div class="child-okrs-table" style="
+				background: #fff;
+				border: 1px solid #e0e0e0;
+				border-radius: 4px;
+				overflow: hidden;
+			">
+				<table style="width: 100%; border-collapse: collapse; font-size: 12px;">
+					<thead>
+						<tr style="background: #f8f9fa; border-bottom: 1px solid #e0e0e0;">
+							<th style="padding: 6px 8px; text-align: left; font-weight: 600; color: #8d99a6; font-size: 11px; width: 32%;">Title</th>
+							<th style="padding: 6px 8px; text-align: left; font-weight: 600; color: #8d99a6; font-size: 11px; width: 12%;">Progress</th>
+							<th style="padding: 6px 8px; text-align: center; font-weight: 600; color: #8d99a6; font-size: 11px; width: 10%;">Score</th>
+							<th style="padding: 6px 8px; text-align: left; font-weight: 600; color: #8d99a6; font-size: 11px; width: 12%;">OKR Type</th>
+							<th style="padding: 6px 8px; text-align: left; font-weight: 600; color: #8d99a6; font-size: 11px; width: 17%;">Responsible</th>
+							<th style="padding: 6px 8px; text-align: left; font-weight: 600; color: #8d99a6; font-size: 11px; width: 17%;">Target Date</th>
+						</tr>
+					</thead>
+					<tbody>
+	`;
+	
+	childOKRs.forEach((child, index) => {
+		const progress = child.progress || 0;
+		const progressColor = getProgressColor(progress);
+		const rowBg = index % 2 === 0 ? '#fff' : '#fafbfc';
+		
+		html += `
+			<tr class="child-okr-row" style="
+				background: ${rowBg};
+				border-bottom: 1px solid #f0f0f0;
+				cursor: pointer;
+				transition: background 0.15s;
+			" data-okr-name="${child.name}" 
+			onclick="frappe.set_route('Form', 'OKR', '${child.name}')"
+			onmouseover="this.style.background='#f0f7ff'; this.style.borderLeft='3px solid ${progressColor}';"
+			onmouseout="this.style.background='${rowBg}'; this.style.borderLeft='none';">
+				<td style="padding: 6px 8px;">
+					<div style="font-weight: 600; color: #36414c; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 200px; font-size: 12px;" title="${child.title}">
+						${child.title}
+					</div>
+				</td>
+				<td style="padding: 6px 8px;">
+					<div style="display: flex; align-items: center; gap: 6px;">
+						<div style="flex: 1; min-width: 50px; height: 3px; background: #e9ecef; border-radius: 2px; overflow: hidden;">
+							<div style="width: ${progress}%; height: 100%; background: ${progressColor}; transition: width 0.3s;"></div>
+						</div>
+						<span style="font-weight: 600; color: #36414c; font-size: 11px; min-width: 35px; text-align: right;">${child.progress_display || '0%'}</span>
+					</div>
+				</td>
+				<td style="padding: 6px 8px; text-align: center;">
+					<span style="color: #36414c; font-weight: 600; font-size: 11px;">
+						<i class="fa fa-star" style="color: #f39c12; font-size: 10px; margin-right: 2px;"></i>${child.score_display || '0.00'}
+					</span>
+				</td>
+				<td style="padding: 6px 8px;">
+					<span style="color: #8d99a6; font-size: 11px; font-weight: 500;">
+						${child.okr_type || '-'}
+					</span>
+				</td>
+				<td style="padding: 6px 8px;">
+					${child.responsible_person ? `
+						<div style="color: #8d99a6; font-size: 11px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 120px;" title="${child.responsible_person}">
+							<i class="fa fa-user" style="font-size: 10px; margin-right: 3px;"></i>${child.responsible_person}
+						</div>
+					` : '<span style="color: #d1d8dd;">-</span>'}
+				</td>
+				<td style="padding: 6px 8px;">
+					${child.target_date ? `
+						<div style="color: #8d99a6; font-size: 11px;">
+							<i class="fa fa-calendar" style="font-size: 10px; margin-right: 3px;"></i>${frappe.datetime.str_to_user(child.target_date)}
+						</div>
+					` : '<span style="color: #d1d8dd;">-</span>'}
+				</td>
+			</tr>
+		`;
+	});
+	
+	html += `
+					</tbody>
+				</table>
+			</div>
+		</div>
+	`;
+	
+	return html;
+}
+
+
+function getStatusClass(status) {
+	const classes = {
+		'completed': 'badge-success',
+		'on_track': 'badge-info',
+		'at_risk': 'badge-warning',
+		'overdue': 'badge-danger'
+	};
+	return classes[status] || 'badge-secondary';
+}
+
+function getStatusIcon(status) {
+	const icons = {
+		'completed': '✓',
+		'on_track': '→',
+		'at_risk': '⚠',
+		'overdue': '⚠'
+	};
+	return icons[status] || '•';
+}
+
+function getStatusColor(status) {
+	const colors = {
+		'completed': '#27ae60',
+		'on_track': '#3498db',
+		'at_risk': '#f39c12',
+		'overdue': '#e74c3c'
+	};
+	return colors[status] || '#95a5a6';
+}
+
+function getProgressColor(progress) {
+	if (progress >= 100) return '#27ae60';
+	if (progress >= 70) return '#3498db';
+	if (progress >= 40) return '#f39c12';
+	return '#e74c3c';
 }
 

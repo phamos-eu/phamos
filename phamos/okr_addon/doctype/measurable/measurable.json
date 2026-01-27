@@ -28,9 +28,10 @@
   {
    "columns": 2,
    "fieldname": "metric_name",
-   "fieldtype": "Data",
+   "fieldtype": "Link",
    "in_list_view": 1,
    "label": "Key Result",
+   "options": "KR",
    "reqd": 1
   },
   {
