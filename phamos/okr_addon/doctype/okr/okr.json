@@ -5,15 +5,19 @@
  "doctype": "DocType",
  "engine": "InnoDB",
  "field_order": [
+  "child_okrs_section",
+  "child_okrs_html",
+  "section_break_gxwn",
   "title",
   "okr_type",
   "specific_okr_type",
   "team",
   "parent_okr",
-  "target_date",
+  "parent_kra",
   "responsible_person",
   "column_break_auao",
   "description",
+  "target_date",
   "timeline_cadence_section",
   "okr_cadence",
   "check_in_frequency",
@@ -151,6 +155,18 @@
    "options": "Measurable"
   },
   {
+   "collapsible": 1,
+   "fieldname": "child_okrs_section",
+   "fieldtype": "Section Break",
+   "label": "Child OKR"
+  },
+  {
+   "fieldname": "child_okrs_html",
+   "fieldtype": "HTML",
+   "label": "Child OKRs Progress",
+   "read_only": 1
+  },
+  {
    "fieldname": "section_break_2",
    "fieldtype": "Section Break",
    "label": "Risk & Dependencies"
@@ -199,6 +215,14 @@
    "options": "OKR Team"
   },
   {
+   "description": "Link this OKR to a KR (Key Result)",
+   "fieldname": "parent_kra",
+   "fieldtype": "Link",
+   "label": "Parent KR",
+   "options": "KR"
+  },
+  {
+   "description": "Link this OKR to another OKR",
    "fieldname": "parent_okr",
    "fieldtype": "Link",
    "label": "Parent OKR",
@@ -209,6 +233,10 @@
    "fieldname": "progress_source",
    "fieldtype": "Data",
    "label": "Progress Source (External)"
+  },
+  {
+   "fieldname": "section_break_gxwn",
+   "fieldtype": "Section Break"
   }
  ],
  "links": [
@@ -221,7 +249,7 @@
    "link_fieldname": "okr"
   }
  ],
- "modified": "2025-12-17 09:31:02.261042",
+ "modified": "2026-01-12 09:49:30.149378",
  "modified_by": "Administrator",
  "module": "OKR Addon",
  "name": "OKR",
