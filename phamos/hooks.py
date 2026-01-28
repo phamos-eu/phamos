@@ -12,11 +12,18 @@ required_apps = ["erpnext", "hrms"]
 # ------------------
 
 # include js, css files in header of desk.html
-# app_include_css = "/assets/phamos/css/phamos.css"
+app_include_css = [
+    "/assets/phamos/css/sales_order_kpi.css",
+    "/assets/phamos/css/dark_mode_fix.css"
+
+]
 # app_include_js = "/assets/phamos/js/phamos.js"
+
 app_include_js = [
-    "phamos.bundle.js",
-    "https://code.highcharts.com/highcharts.js"
+    "https://code.highcharts.com/highcharts.js",
+    "/assets/phamos/js/have_a_great_day.js",
+    "/assets/phamos/js/custom_crm_activities.js",
+    "/assets/phamos/js/hybrid_meeting_composer.js",
 ]
 
 
@@ -39,6 +46,7 @@ doctype_js = {
 	"Project" : "public/js/project.js",
 	"Issue" : "public/js/issue.js",
 	"Sales Order": "public/js/sales_order.js",
+	"Lead": "public/js/lead.js",
 	"Job Applicant": "public/js/job_applicant.js",
     "Timesheet":"public/js/timesheet.js",
     "User": "public/js/mailcow_user.js",
@@ -138,11 +146,18 @@ website_route_rules = [
 #		"on_trash": "method"
 #	}
 # }
+
 doc_events = {
+	"Event": {
+		"after_insert": "phamos.mailcow_integration.caldav.sync_event.on_upsert",
+        "on_update": "phamos.mailcow_integration.caldav.sync_event.on_upsert",
+		"on_trash": "phamos.mailcow_integration.caldav.sync_event.on_delete",
+	},
     "Team": {
         "after_save": "phamos.phamos.doctype.team.team.create_team_capacity_ledger_entry"
     }
 }
+
 
 # Scheduled Tasks
 # ---------------
