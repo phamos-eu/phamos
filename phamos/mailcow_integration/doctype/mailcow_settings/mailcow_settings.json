@@ -1,0 +1,92 @@
+{
+ "actions": [],
+ "allow_rename": 1,
+ "creation": "2025-09-04 08:40:49.414086",
+ "doctype": "DocType",
+ "engine": "InnoDB",
+ "field_order": [
+  "base_url",
+  "domain",
+  "column_break_grha",
+  "api_key",
+  "default_quota",
+  "events_section",
+  "auto_sync_events",
+  "attach_ics_to_email"
+ ],
+ "fields": [
+  {
+   "fieldname": "base_url",
+   "fieldtype": "Data",
+   "in_list_view": 1,
+   "label": "Base URL",
+   "reqd": 1
+  },
+  {
+   "fieldname": "domain",
+   "fieldtype": "Data",
+   "in_list_view": 1,
+   "label": "Domain",
+   "reqd": 1
+  },
+  {
+   "fieldname": "column_break_grha",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "api_key",
+   "fieldtype": "Password",
+   "in_list_view": 1,
+   "label": "API Key",
+   "reqd": 1
+  },
+  {
+   "fieldname": "default_quota",
+   "fieldtype": "Int",
+   "label": "Default Quota"
+  },
+  {
+   "fieldname": "events_section",
+   "fieldtype": "Section Break",
+   "label": "Events"
+  },
+  {
+   "default": "0",
+   "fieldname": "auto_sync_events",
+   "fieldtype": "Check",
+   "label": "Auto Sync Events"
+  },
+  {
+   "default": "1",
+   "description": "Attach ICS calendar files to meeting emails for external recipients. Internal Mailcow users always get events via CalDAV regardless of this setting.",
+   "fieldname": "attach_ics_to_email",
+   "fieldtype": "Check",
+   "label": "Attach ICS to Email"
+  }
+ ],
+ "grid_page_length": 50,
+ "index_web_pages_for_search": 1,
+ "issingle": 1,
+ "links": [],
+ "modified": "2025-09-16 06:41:05.608177",
+ "modified_by": "Administrator",
+ "module": "Mailcow Integration",
+ "name": "Mailcow Settings",
+ "owner": "Administrator",
+ "permissions": [
+  {
+   "create": 1,
+   "delete": 1,
+   "email": 1,
+   "print": 1,
+   "read": 1,
+   "role": "System Manager",
+   "share": 1,
+   "write": 1
+  }
+ ],
+ "row_format": "Dynamic",
+ "sort_field": "modified",
+ "sort_order": "DESC",
+ "states": []
+}
