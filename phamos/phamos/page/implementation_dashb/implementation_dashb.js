@@ -476,10 +476,6 @@ frappe.pages['implementation-dashb'].on_page_load = function (wrapper) {
                             tooltip += `</div>`;
                             
                             tooltip += `<div style="padding: 6px; background: #e3f2fd; border-radius: 4px; font-size: 11px;">`;
-                            tooltip += `<div style="color: #555;">Implementation Total: <strong>${implGrandTotal.toFixed(1)} hrs</strong></div>`;
-                            tooltip += `<div style="color: #555;">This month: <strong>${percentOfImplTotal}%</strong> of implementation</div>`;
-                            tooltip += `<div style="color: #555; margin-top: 4px;">All Implementations: <strong>${grandTotal.toFixed(1)} hrs</strong></div>`;
-                            tooltip += `<div style="color: #555;">This implementation: <strong>${percentOfGrandTotal}%</strong> of total</div>`;
                             tooltip += `<div style="color: #555; font-weight: 600; margin-bottom: 4px;">This Implementation:</div>`;
                             tooltip += `<div style="color: #555; margin-left: 8px;">All Time Total: <strong>${implGrandTotal.toFixed(1)} hrs</strong></div>`;
                             tooltip += `<div style="color: #555; margin-left: 8px; margin-bottom: 8px;">This Month is <strong>${percentOfImplTotal}%</strong></div>`;
