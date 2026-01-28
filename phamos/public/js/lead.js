@@ -45,17 +45,12 @@ frappe.ui.form.on('Lead', {
     },
     
     status: function(frm) {
-        // Clear the status comment whenever status changes
-        if (frm.doc.custom_status_comment) {
-            frm.set_value('custom_status_comment', '');
-        }
-        
         // When status is changed to "Do Not Contact", prompt for a reason.
         if (frm.doc.status === 'Do Not Contact') {
             frm.set_df_property('custom_status_comment', 'reqd', 1);
             
-            // Always prompt for a reason since we just cleared it
-            prompt_for_do_not_contact_reason(frm);
+            // Always prompt for a reason, pre-filling with existing comment if any
+            prompt_for_do_not_contact_reason(frm, frm.doc.custom_status_comment);
         } else {
             // Not mandatory for other statuses
             frm.set_df_property('custom_status_comment', 'reqd', 0);
@@ -78,7 +73,7 @@ frappe.ui.form.on('Lead', {
     },
 });
 
-function prompt_for_do_not_contact_reason(frm) {
+function prompt_for_do_not_contact_reason(frm, existing_reason) {
     const dialog = new frappe.ui.Dialog({
         title: __('Reason for "Do Not Contact"'),
         indicator: 'orange',
@@ -87,7 +82,8 @@ function prompt_for_do_not_contact_reason(frm) {
                 label: __('Please provide a reason for setting this Lead to "Do Not Contact". This is mandatory.'),
                 fieldname: 'reason',
                 fieldtype: 'Text',
-                reqd: 1
+                reqd: 1,
+                default: existing_reason || ''
             }
         ],
         primary_action_label: __('Save Reason'),
