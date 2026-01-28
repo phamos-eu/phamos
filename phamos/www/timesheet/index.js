@@ -3,6 +3,8 @@ let totalCount = 0;
 let loadedCount = 0;
 let currentSortBy = null;
 let currentSortOrder = null;
+let currentChartView = 'week'; // 'week' or 'month'
+let cachedTimesheetData = null; // Cache the timesheet data
 const sortFieldMap = {
     1: "timesheet",
     2: "start_date",
@@ -24,11 +26,38 @@ frappe.ready(() => {
     return; // Stop further execution
   }
 
+  // Initialize chart view from localStorage or default to 'week'
+  currentChartView = localStorage.getItem('timesheetChartView') || 'week';
+  updateChartViewButtons();
+
   //set default date range
   // set_default_month_range();
   load_projects();
   attach_filter_events();
   reset_and_load();
+
+  // Toggle buttons for chart view
+  $('#weekViewBtn').on('click', function() {
+    if (currentChartView !== 'week') {
+      currentChartView = 'week';
+      localStorage.setItem('timesheetChartView', 'week');
+      updateChartViewButtons();
+      if (cachedTimesheetData) {
+        processDataForGraph(cachedTimesheetData);
+      }
+    }
+  });
+
+  $('#monthViewBtn').on('click', function() {
+    if (currentChartView !== 'month') {
+      currentChartView = 'month';
+      localStorage.setItem('timesheetChartView', 'month');
+      updateChartViewButtons();
+      if (cachedTimesheetData) {
+        processDataForGraph(cachedTimesheetData);
+      }
+    }
+  });
 
   $('#load_more').on('click', () => {
     load_timesheets();
@@ -534,6 +563,17 @@ function escapeHtml(text = '') {
     .replace(/'/g, '&#39;');
 }
 
+// Update chart view button states
+function updateChartViewButtons() {
+  if (currentChartView === 'week') {
+    $('#weekViewBtn').addClass('active').removeClass('btn-outline-primary').addClass('btn-primary');
+    $('#monthViewBtn').removeClass('active btn-primary').addClass('btn-outline-primary');
+  } else {
+    $('#monthViewBtn').addClass('active').removeClass('btn-outline-primary').addClass('btn-primary');
+    $('#weekViewBtn').removeClass('active btn-primary').addClass('btn-outline-primary');
+  }
+}
+
 function update_summary_cards() {
   const from_date = $('#from_date').val();
   const to_date = $('#to_date').val();
@@ -551,30 +591,45 @@ function update_summary_cards() {
 }
 //////////////////////////process your timesheets data////////////////////
 function processDataForGraph(timesheets) {
-    const weekCategories = new Set();
+    // Cache the data for later use when toggling
+    cachedTimesheetData = timesheets;
+    
+    const categories = new Set();
     const projectData = {};
 
     timesheets.forEach(row => {
         const date = new Date(row.start_date);
-        const day = date.getDay();
-        const diff = date.getDate() - day + (day === 0 ? -6 : 1);
-        const monday = new Date(date.setDate(diff));
-        const weekStart = monday.toISOString().split('T')[0];
+        let periodKey;
 
-        weekCategories.add(weekStart);
-
-        if (!projectData[row.project_name]) {
-            projectData[row.project_name] = {};
+        if (currentChartView === 'week') {
+            // Weekly aggregation
+            const day = date.getDay();
+            const diff = date.getDate() - day + (day === 0 ? -6 : 1);
+            const monday = new Date(date.setDate(diff));
+            periodKey = monday.toISOString().split('T')[0];
+        } else {
+            // Monthly aggregation
+            const year = date.getFullYear();
+            const month = String(date.getMonth() + 1).padStart(2, '0');
+            periodKey = `${year}-${month}`;
         }
-        if (!projectData[row.project_name][weekStart]) {
-            projectData[row.project_name][weekStart] = { total: 0, billable: 0 };
+
+        categories.add(periodKey);
+
+        const projectKey = row.project_label; // use label instead of project_name
+
+        if (!projectData[projectKey]) {
+            projectData[projectKey] = {};
+        }
+        if (!projectData[projectKey][periodKey]) {
+            projectData[projectKey][periodKey] = { total: 0, billable: 0 };
         }
 
-        projectData[row.project_name][weekStart].total += parseFloat(row.total_hours || 0);
-        projectData[row.project_name][weekStart].billable += parseFloat(row.total_billable_hours || 0);
+        projectData[projectKey][periodKey].total += parseFloat(row.total_hours || 0);
+        projectData[projectKey][periodKey].billable += parseFloat(row.total_billable_hours || 0);
     });
 
-    const categories = Array.from(weekCategories).sort();
+    const sortedCategories = Array.from(categories).sort();
     const series = [];
     const colorPairs = [
         ['#3399ff', '#99ccff'], // Blue pair
@@ -589,8 +644,8 @@ function processDataForGraph(timesheets) {
         const billableData = [];
         const nonBillableData = [];
 
-        categories.forEach(week => {
-            const data = projectData[projectName][week] || { total: 0, billable: 0 };
+        sortedCategories.forEach(period => {
+            const data = projectData[projectName][period] || { total: 0, billable: 0 };
             billableData.push(data.billable);
             nonBillableData.push(data.total - data.billable);
         });
@@ -608,15 +663,30 @@ function processDataForGraph(timesheets) {
             color: colors[0],
             stack: projectName
         });
-        
 
         colorIndex++;
+    });
+
+    // Format categories for display
+    const displayCategories = sortedCategories.map(period => {
+        if (currentChartView === 'week') {
+            return period; // Show as YYYY-MM-DD for weeks
+        } else {
+            // Format as "MMM YYYY" for months
+            const [year, month] = period.split('-');
+            const monthNames = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 
+                                'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+            return `${monthNames[parseInt(month) - 1]} ${year}`;
+        }
     });
 
     Highcharts.chart('timesheet-graph-container', {
         chart: { type: 'area' },
         title: { text: 'Billable vs Non-Billable by Project' },
-        xAxis: { categories, title: { text: 'Week' } },
+        xAxis: { 
+            categories: displayCategories, 
+            title: { text: currentChartView === 'week' ? 'Week' : 'Month' } 
+        },
         yAxis: { min: 0, title: { text: 'Hours' } },
         tooltip: {
             shared: true,
