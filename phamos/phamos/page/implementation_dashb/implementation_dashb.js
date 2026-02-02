@@ -476,13 +476,13 @@ frappe.pages['implementation-dashb'].on_page_load = function (wrapper) {
                             tooltip += `</div>`;
                             
                             tooltip += `<div style="padding: 6px; background: #e3f2fd; border-radius: 4px; font-size: 11px;">`;
-                            tooltip += `<div style="color: #555; font-weight: 600; margin-bottom: 4px;">This Implementation:</div>`;
-                            tooltip += `<div style="color: #555; margin-left: 8px;">All Time Total: <strong>${implGrandTotal.toFixed(1)} hrs</strong></div>`;
-                            tooltip += `<div style="color: #555; margin-left: 8px; margin-bottom: 8px;">This Month is <strong>${percentOfImplTotal}%</strong></div>`;
-                            
-                            tooltip += `<div style="color: #555; font-weight: 600; margin-bottom: 4px; padding-top: 6px; border-top: 1px solid #b3d9f2;">${month} (All Implementations):</div>`;
+                            tooltip += `<div style="color: #555; font-weight: 600; margin-bottom: 4px;">${month} (All Implementations):</div>`;
                             tooltip += `<div style="color: #555; margin-left: 8px;">Month Total: <strong>${monthTotalAllImplementations.toFixed(1)} hrs</strong></div>`;
                             tooltip += `<div style="color: #555; margin-left: 8px; margin-bottom: 8px;">This Month is <strong>${percentOfMonthTotal}%</strong> of ${month} total</div>`;
+                            
+                            tooltip += `<div style="color: #555; font-weight: 600; margin-bottom: 4px; padding-top: 6px; border-top: 1px solid #b3d9f2;">This Implementation:</div>`;
+                            tooltip += `<div style="color: #555; margin-left: 8px;">All Time Total: <strong>${implGrandTotal.toFixed(1)} hrs</strong></div>`;
+                            tooltip += `<div style="color: #555; margin-left: 8px; margin-bottom: 8px;">This Month is <strong>${percentOfImplTotal}%</strong></div>`;
                             
                             tooltip += `<div style="color: #555; font-weight: 600; margin-bottom: 4px; padding-top: 6px; border-top: 1px solid #b3d9f2;">All Implementations (All Time):</div>`;
                             tooltip += `<div style="color: #555; margin-left: 8px;">Portfolio Total: <strong>${grandTotal.toFixed(1)} hrs</strong></div>`;
