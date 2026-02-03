@@ -281,6 +281,46 @@ frappe.pages['implementation-dashb'].on_page_load = function (wrapper) {
 
                 // Chart rendering
                 $('#chart-container').html(`
+                    <style>
+                        .display-mode-btn:not(.btn-primary) {
+                            background-color: var(--fg-color, #fff);
+                            color: var(--text-color, #000);
+                            border-color: var(--border-color, #d1d8dd);
+                        }
+                        .display-mode-btn:not(.btn-primary):hover {
+                            background-color: var(--control-bg-on-gray, #f5f5f5);
+                            color: var(--text-color, #000);
+                            border-color: var(--border-color, #d1d8dd);
+                        }
+                        html[data-theme="dark"] .display-mode-btn:not(.btn-primary) {
+                            background-color: var(--control-bg, #2e3338);
+                            color: var(--text-on-gray, #d2d6da);
+                            border-color: var(--dark-border-color, #4a5258);
+                        }
+                        html[data-theme="dark"] .display-mode-btn:not(.btn-primary):hover {
+                            background-color: var(--control-bg-on-gray, #3a4048);
+                            color: var(--text-on-gray, #fff);
+                            border-color: var(--dark-border-color, #5a6268);
+                        }
+                        #toggle-legend {
+                            background-color: var(--fg-color, #fff);
+                            color: var(--text-color, #000);
+                            border-color: var(--border-color, #d1d8dd);
+                        }
+                        #toggle-legend:hover {
+                            background-color: var(--control-bg-on-gray, #f5f5f5);
+                            color: var(--text-color, #000);
+                        }
+                        html[data-theme="dark"] #toggle-legend {
+                            background-color: var(--control-bg, #2e3338);
+                            color: var(--text-on-gray, #d2d6da);
+                            border-color: var(--dark-border-color, #4a5258);
+                        }
+                        html[data-theme="dark"] #toggle-legend:hover {
+                            background-color: var(--control-bg-on-gray, #3a4048);
+                            color: var(--text-on-gray, #fff);
+                        }
+                    </style>
                     <div class="d-flex justify-content-between align-items-center mb-2 flex-wrap">
                         <div class="btn-group me-2 mb-1" role="group" aria-label="Display Mode">
                             <button type="button" class="btn btn-sm display-mode-btn ${currentDisplayMode === 'split' ? 'btn-primary' : 'btn-outline-primary'}" data-mode="split">
@@ -323,8 +363,15 @@ frappe.pages['implementation-dashb'].on_page_load = function (wrapper) {
                         formatter: function () {
                             const point = this.point;
                             const seriesName = this.series.name;
-                            const month = this.x;
+                            const monthRaw = categories[this.point.index]; // Get actual month from categories array
                             const pointIndex = this.point.index;
+                            
+                            // Format month to readable format (e.g., "2025-04" -> "Apr 2025")
+                            let month = monthRaw;
+                            if (monthRaw && monthRaw.match(/^\d{4}-\d{2}$/)) {
+                                const momentMonth = moment(monthRaw, 'YYYY-MM');
+                                month = momentMonth.format('MMM YYYY'); // e.g., "Apr 2025"
+                            }
                             
                             // Extract implementation name from series name
                             let implName = seriesName;
@@ -371,6 +418,13 @@ frappe.pages['implementation-dashb'].on_page_load = function (wrapper) {
                                 grandTotal += data.billable.reduce((sum, val, idx) => sum + val + (data.nonBillable[idx] || 0), 0);
                             });
                             const percentOfGrandTotal = grandTotal > 0 ? ((totalHrs / grandTotal) * 100).toFixed(1) : 0;
+                            
+                            // Calculate month total for ALL implementations (for this specific month)
+                            let monthTotalAllImplementations = 0;
+                            Object.values(groupedData).forEach(data => {
+                                monthTotalAllImplementations += (data.billable[pointIndex] || 0) + (data.nonBillable[pointIndex] || 0);
+                            });
+                            const percentOfMonthTotal = monthTotalAllImplementations > 0 ? ((totalHrs / monthTotalAllImplementations) * 100).toFixed(1) : 0;
                             
                             // Get implementation color
                             const implColors = implementationColorMap[implName] || ['#3399ff', '#ff9933'];
@@ -422,10 +476,17 @@ frappe.pages['implementation-dashb'].on_page_load = function (wrapper) {
                             tooltip += `</div>`;
                             
                             tooltip += `<div style="padding: 6px; background: #e3f2fd; border-radius: 4px; font-size: 11px;">`;
-                            tooltip += `<div style="color: #555;">Implementation Total: <strong>${implGrandTotal.toFixed(1)} hrs</strong></div>`;
-                            tooltip += `<div style="color: #555;">This month: <strong>${percentOfImplTotal}%</strong> of implementation</div>`;
-                            tooltip += `<div style="color: #555; margin-top: 4px;">All Implementations: <strong>${grandTotal.toFixed(1)} hrs</strong></div>`;
-                            tooltip += `<div style="color: #555;">This implementation: <strong>${percentOfGrandTotal}%</strong> of total</div>`;
+                            tooltip += `<div style="color: #555; font-weight: 600; margin-bottom: 4px;">${month} (All Implementations):</div>`;
+                            tooltip += `<div style="color: #555; margin-left: 8px;">Month Total: <strong>${monthTotalAllImplementations.toFixed(1)} hrs</strong></div>`;
+                            tooltip += `<div style="color: #555; margin-left: 8px; margin-bottom: 8px;">This Month is <strong>${percentOfMonthTotal}%</strong> of ${month} total</div>`;
+                            
+                            tooltip += `<div style="color: #555; font-weight: 600; margin-bottom: 4px; padding-top: 6px; border-top: 1px solid #b3d9f2;">This Implementation:</div>`;
+                            tooltip += `<div style="color: #555; margin-left: 8px;">All Time Total: <strong>${implGrandTotal.toFixed(1)} hrs</strong></div>`;
+                            tooltip += `<div style="color: #555; margin-left: 8px; margin-bottom: 8px;">This Month is <strong>${percentOfImplTotal}%</strong></div>`;
+                            
+                            tooltip += `<div style="color: #555; font-weight: 600; margin-bottom: 4px; padding-top: 6px; border-top: 1px solid #b3d9f2;">All Implementations (All Time):</div>`;
+                            tooltip += `<div style="color: #555; margin-left: 8px;">Portfolio Total: <strong>${grandTotal.toFixed(1)} hrs</strong></div>`;
+                            tooltip += `<div style="color: #555; margin-left: 8px;">This Month (${month}) is <strong>${percentOfGrandTotal}%</strong> of portfolio</div>`;
                             tooltip += `</div>`;
                             
                             tooltip += `</div>`;
