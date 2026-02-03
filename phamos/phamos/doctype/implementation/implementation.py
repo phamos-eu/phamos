@@ -315,32 +315,64 @@ def generate_auto_email_reports(docname):
     # Dictionary to group by (template, frequency)
     grouped_reports = {}
 
-    # Group recipients by template and frequency
+    # 🔹 Group child table records
     for row in implementation.auto_email_report_record:
         key = (row.templates, row.frequency)
         if key not in grouped_reports:
             grouped_reports[key] = {
                 "templates": row.templates,
                 "frequency": row.frequency,
-                "recipients": set(),  # avoid duplicates
+                "recipients": set()
             }
-        if row.recipients:
-            # Split multiple recipients if present
-            for r in row.recipients.replace(" ", "").split(","):
-                grouped_reports[key]["recipients"].add(r)
 
-    # Create one Auto Email Report per group
+        if row.recipients:
+            for r in row.recipients.replace(" ", "").split(","):
+                grouped_reports[key]["recipients"].add(r.lower())
+
+    # 🔹 Create / Update Auto Email Report
     for (template, frequency), data in grouped_reports.items():
+        email_to = "\n".join(sorted(data["recipients"]))
+
+        # 🔍 Check existing record (WITHOUT email_to)
+        existing_name = frappe.db.get_value(
+            "Auto Email Report",
+            {
+                "user": user,
+                "report": template,
+                "frequency": frequency
+            },
+            "name"
+        )
+
+        # ✅ Case 1: Record exists → update email if changed
+        if existing_name:
+            existing_doc = frappe.get_doc("Auto Email Report", existing_name)
+
+            if existing_doc.email_to.strip() != email_to.strip():
+                existing_doc.email_to = email_to
+                existing_doc.save(ignore_permissions=True)
+
+                frappe.msgprint(
+                    f"✏️ Email updated successfully for <b>{template}</b> ({frequency}).",
+                    alert=True
+                )
+            else:
+                frappe.msgprint(
+                    f"⚠️ Auto Email Report already exists for <b>{template}</b> ({frequency}).",
+                    alert=True
+                )
+
+            continue # Skip to next iteration
+
+        # ✅ Case 2: No record exists → create new
         auto_email = frappe.new_doc("Auto Email Report")
         auto_email.user = user
         auto_email.report = template
-        # Join recipients with newline instead of commas
-        auto_email.email_to = "\n".join(sorted(data["recipients"]))
+        auto_email.email_to = email_to
         auto_email.frequency = frequency
         auto_email.sender = sender
         auto_email.format = format_type
 
-        # Add description based on frequency
         if frequency == "Daily":
             auto_email.description = (
                 "<b><i>phamos wünscht einen wunderschönen guten Morgen!</i></b><br><br>"
@@ -361,8 +393,14 @@ def generate_auto_email_reports(docname):
             )
 
         auto_email.insert(ignore_permissions=True)
+        frappe.publish_realtime(
+			event="show_alert",
+			message=f"✅ New Auto Email Report created for {template} ({frequency})",
+			user=frappe.session.user
+		)
 
     frappe.db.commit()
-    return "Auto Email Reports created successfully"
+
+
 
 
