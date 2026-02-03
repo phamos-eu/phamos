@@ -10,9 +10,45 @@ from frappe.utils import today
 class Implementation(Document):
 	def before_save(self):
 		if self.resource_planning_prediction:
-			self.resource_planning_prediction.sort(
-				key=lambda x: x.month_and_year or ""
+			# Get existing row names from database to identify truly new rows
+			existing_names = set()
+			if not self.is_new():
+				existing_names = set(
+					frappe.get_all(
+						"Prediction",
+						filters={"parent": self.name},
+						pluck="name"
+					)
+				)
+			
+			# Separate new rows from existing rows
+			new_rows = []
+			existing_rows = []
+			for row in self.resource_planning_prediction:
+				# Row is new if its name is not in the database
+				if not row.name or row.name not in existing_names:
+					new_rows.append(row)
+				else:
+					existing_rows.append(row)
+			
+			# Sort only new rows by date descending (newest first)
+			new_rows.sort(key=lambda x: x.date or "", reverse=True)
+			
+			# Prepend new rows to existing rows (new rows at top, existing rows keep their order)
+			self.resource_planning_prediction = new_rows + existing_rows
+			
+			# Re-index all rows
+			for idx, row in enumerate(self.resource_planning_prediction, start=1):
+				row.idx = idx
+		
+		if self.resource_planning:
+			self.resource_planning.sort(
+				key=lambda x: x.month_and_year or "", reverse=True
 			)
+			# Re-index after sorting
+			for idx, row in enumerate(self.resource_planning, start=1):
+				row.idx = idx
+		
 		self.add_delivered_hrs()
 		self.add_resource_planning()
 		self.add_status_history()
