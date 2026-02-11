@@ -8,6 +8,9 @@ frappe.ui.form.on('Sales Order', {
     refresh: function(frm) {
         console.log('Sales Order refresh event triggered', frm.doc.name, 'docstatus:', frm.doc.docstatus);
         
+        // Always cleanup first to handle duplicated records
+        cleanup_kpi_displays();
+        
         if (frm.doc.docstatus === 1 && !frm.doc.__islocal) {
             console.log('Loading KPI preferences for', frm.doc.name);
             // Load user preference and display KPIs
@@ -29,6 +32,13 @@ frappe.ui.form.on('Sales Order', {
         }
     }
 });
+
+// Cleanup function to remove all KPI visualizations
+function cleanup_kpi_displays() {
+    $('.so-progress-bars').remove();
+    $('.so-kpi-cards').remove();
+    $('.so-kpi-container').remove();
+}
 
 function render_kpi_display(frm, display_mode) {
     // Get the KPI values
@@ -108,38 +118,38 @@ function get_html_kpi_content(per_delivered, per_billed) {
             <div style="display: flex; justify-content: space-around; gap: 20px;">
                 <div class="kpi-item" style="
                     flex: 1;
-                    background: white;
+                    background: var(--card-bg);
                     padding: 15px;
                     border-radius: 6px;
                     text-align: center;
                     box-shadow: 0 2px 4px rgba(0,0,0,0.1);
                 ">
-                    <div style="font-size: 12px; color: #666; text-transform: uppercase; margin-bottom: 8px;">
+                    <div style="font-size: 12px; color: var(--text-muted); text-transform: uppercase; margin-bottom: 8px;">
                         Delivery Status
                     </div>
                     <div style="font-size: 32px; font-weight: bold; color: ${get_hex_color(delivery_color)}; margin-bottom: 5px;">
                         ${per_delivered.toFixed(1)}%
                     </div>
-                    <div style="font-size: 11px; color: #999;">
+                    <div style="font-size: 11px; color: var(--text-light);">
                         ${get_status_text(per_delivered)}
                     </div>
                 </div>
                 
                 <div class="kpi-item" style="
                     flex: 1;
-                    background: white;
+                    background: var(--card-bg);
                     padding: 15px;
                     border-radius: 6px;
                     text-align: center;
                     box-shadow: 0 2px 4px rgba(0,0,0,0.1);
                 ">
-                    <div style="font-size: 12px; color: #666; text-transform: uppercase; margin-bottom: 8px;">
+                    <div style="font-size: 12px; color: var(--text-muted); text-transform: uppercase; margin-bottom: 8px;">
                         Billing Status
                     </div>
                     <div style="font-size: 32px; font-weight: bold; color: ${get_hex_color(billing_color)}; margin-bottom: 5px;">
                         ${per_billed.toFixed(1)}%
                     </div>
-                    <div style="font-size: 11px; color: #999;">
+                    <div style="font-size: 11px; color: var(--text-light);">
                         ${get_status_text(per_billed)}
                     </div>
                 </div>
@@ -191,16 +201,16 @@ function get_progress_bar_html(per_delivered, per_billed) {
     const billing_color = get_billing_color(per_billed);
     
     return `
-        <div style="background: #f9fafb; padding: 12px 16px; border-radius: 6px; border: 1px solid #e5e7eb;">
+        <div style="background: var(--control-bg); padding: 12px 16px; border-radius: 6px; border: 1px solid var(--border-color);">
             <div style="display: flex; gap: 20px; align-items: center;">
                 <!-- Delivery Progress -->
                 <div style="flex: 1; display: flex; align-items: center; gap: 10px;">
-                    <span style="font-size: 13px; font-weight: 600; color: #374151; white-space: nowrap; min-width: 85px;">
+                    <span style="font-size: 13px; font-weight: 600; color: var(--text-color); white-space: nowrap; min-width: 85px;">
                         <i class="fa fa-truck"></i> Delivery
                     </span>
                     <div style="flex: 1; position: relative;">
                         <div style="
-                            background: #e5e7eb;
+                            background: var(--subtle-fg);
                             border-radius: 9999px;
                             height: 12px;
                             overflow: hidden;
@@ -220,16 +230,16 @@ function get_progress_bar_html(per_delivered, per_billed) {
                 </div>
                 
                 <!-- Separator -->
-                <div style="width: 1px; height: 24px; background: #d1d5db;"></div>
+                <div style="width: 1px; height: 24px; background: var(--border-color);"></div>
                 
                 <!-- Billing Progress -->
                 <div style="flex: 1; display: flex; align-items: center; gap: 10px;">
-                    <span style="font-size: 13px; font-weight: 600; color: #374151; white-space: nowrap; min-width: 75px;">
+                    <span style="font-size: 13px; font-weight: 600; color: var(--text-color); white-space: nowrap; min-width: 75px;">
                         <i class="fa fa-money"></i> Billing
                     </span>
                     <div style="flex: 1; position: relative;">
                         <div style="
-                            background: #e5e7eb;
+                            background: var(--subtle-fg);
                             border-radius: 9999px;
                             height: 12px;
                             overflow: hidden;
@@ -276,16 +286,16 @@ function get_kpi_cards_html(per_delivered, per_billed) {
         <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px;">
             <!-- Delivery Card -->
             <div style="
-                background: white;
+                background: var(--card-bg);
                 border-left: 4px solid ${get_hex_color(delivery_color)};
                 border-radius: 8px;
                 padding: 20px;
-                box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+                box-shadow: 0 2px 8px var(--shadow-base);
                 transition: transform 0.2s;
             " onmouseover="this.style.transform='translateY(-4px)'" onmouseout="this.style.transform='translateY(0)'">
                 <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 15px;">
                     <div>
-                        <div style="color: #6b7280; font-size: 13px; text-transform: uppercase; letter-spacing: 0.5px;">
+                        <div style="color: var(--text-muted); font-size: 13px; text-transform: uppercase; letter-spacing: 0.5px;">
                             Delivery Status
                         </div>
                         <div style="font-size: 36px; font-weight: bold; color: ${get_hex_color(delivery_color)}; margin-top: 8px;">
@@ -320,16 +330,16 @@ function get_kpi_cards_html(per_delivered, per_billed) {
             
             <!-- Billing Card -->
             <div style="
-                background: white;
+                background: var(--card-bg);
                 border-left: 4px solid ${get_hex_color(billing_color)};
                 border-radius: 8px;
                 padding: 20px;
-                box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+                box-shadow: 0 2px 8px var(--shadow-base);
                 transition: transform 0.2s;
             " onmouseover="this.style.transform='translateY(-4px)'" onmouseout="this.style.transform='translateY(0)'">
                 <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 15px;">
                     <div>
-                        <div style="color: #6b7280; font-size: 13px; text-transform: uppercase; letter-spacing: 0.5px;">
+                        <div style="color: var(--text-muted); font-size: 13px; text-transform: uppercase; letter-spacing: 0.5px;">
                             Billing Status
                         </div>
                         <div style="font-size: 36px; font-weight: bold; color: ${get_hex_color(billing_color)}; margin-top: 8px;">
@@ -436,9 +446,9 @@ function add_style_selector_button(frm) {
                     fieldname: 'preview',
                     fieldtype: 'HTML',
                     options: `
-                        <div style="margin-top: 15px; padding: 15px; background: #f9fafb; border-radius: 6px;">
-                            <h4>Preview Options:</h4>
-                            <ul style="margin-left: 20px; line-height: 1.8;">
+                        <div style="margin-top: 15px; padding: 15px; background: var(--control-bg); border-radius: 6px; border: 1px solid var(--border-color);">
+                            <h4 style="color: var(--text-color);">Preview Options:</h4>
+                            <ul style="margin-left: 20px; line-height: 1.8; color: var(--text-color);">
                                 <li><strong>All Styles:</strong> Shows all visualization options at once</li>
                                 <li><strong>Dashboard Indicators:</strong> Colored badges at the top</li>
                                 <li><strong>Progress Bars:</strong> Animated progress bars with gradients</li>
