@@ -72,6 +72,10 @@ frappe.pages['implementation-dashb'].on_page_load = function (wrapper) {
     ];
     let globalColorIndex = 0;
     let currentDisplayMode = 'split'; // Default display mode: 'billable', 'nonBillable', 'split', 'combined'
+    let internalProjectsVisible = true; // Toggle for internal projects visibility
+    
+    // Set dedicated color for Internal Projects
+    implementationColorMap['Internal Projects'] = ['#ff9933', '#ffcc99']; // Orange theme
 
     function load_chart() {
         let from_date = filters.from_date.get_value();
@@ -102,7 +106,7 @@ frappe.pages['implementation-dashb'].on_page_load = function (wrapper) {
 
                 const planningData = r.message.planning || [];
                 const predictionData = r.message.prediction || [];
-                const addonData = r.message.addon || [];
+                const internalProjectsData = r.message.internal_projects || [];
                 const teamCapacityAvg = r.message.team_capacity_avg || [];
                 const implementationTeams = r.message.implementation_teams || {};
 
@@ -137,8 +141,30 @@ frappe.pages['implementation-dashb'].on_page_load = function (wrapper) {
                     groupedData[impl].nonBillable[idx] += row.non_billable_time_spent || 0;
                 });
 
+                // Add Internal Projects to groupedData (treat same as regular implementations)
+                internalProjectsData.forEach(row => {
+                    const impl = 'Internal Projects';
+                    
+                    if (!groupedData[impl]) {
+                        groupedData[impl] = {
+                            billable: new Array(categories.length).fill(0),
+                            nonBillable: new Array(categories.length).fill(0),
+                            team: 'Internal Projects'
+                        };
+                    }
+
+                    const idx = categoryIndexMap[row.month_and_year];
+                    groupedData[impl].billable[idx] += row.billable_time_spent || 0;
+                    groupedData[impl].nonBillable[idx] += row.non_billable_time_spent || 0;
+                });
+
                 const series = [];
                 Object.entries(groupedData).forEach(([impl, data]) => {
+                    // Skip Internal Projects if hidden
+                    if (impl === 'Internal Projects' && !internalProjectsVisible) {
+                        return;
+                    }
+                    
                     if (!implementationColorMap[impl]) {
                         implementationColorMap[impl] = colorPairs[globalColorIndex % colorPairs.length];
                         globalColorIndex++;
@@ -192,20 +218,6 @@ frappe.pages['implementation-dashb'].on_page_load = function (wrapper) {
                             stack: 'time_spent'
                         });
                     }
-                });
-
-                const addonSeries = categories.map(month => {
-                    const found = addonData.find(row => row.month_and_year === month);
-                    return found ? found.total_hours : 0;
-                });
-
-                series.push({
-                    name: "Internal project hrs",
-                    type: "line",
-                    data: addonSeries,
-                    color: "orange",
-                    dashStyle: "ShortDot",
-                    marker: { enabled: true, radius: 4 }
                 });
 
                 // ✅ Calculate total prediction line
@@ -302,21 +314,21 @@ frappe.pages['implementation-dashb'].on_page_load = function (wrapper) {
                             color: var(--text-on-gray, #fff);
                             border-color: var(--dark-border-color, #5a6268);
                         }
-                        #toggle-legend {
+                        .toggle-btn {
                             background-color: var(--fg-color, #fff);
                             color: var(--text-color, #000);
                             border-color: var(--border-color, #d1d8dd);
                         }
-                        #toggle-legend:hover {
+                        .toggle-btn:hover {
                             background-color: var(--control-bg-on-gray, #f5f5f5);
                             color: var(--text-color, #000);
                         }
-                        html[data-theme="dark"] #toggle-legend {
+                        html[data-theme="dark"] .toggle-btn {
                             background-color: var(--control-bg, #2e3338);
                             color: var(--text-on-gray, #d2d6da);
                             border-color: var(--dark-border-color, #4a5258);
                         }
-                        html[data-theme="dark"] #toggle-legend:hover {
+                        html[data-theme="dark"] .toggle-btn:hover {
                             background-color: var(--control-bg-on-gray, #3a4048);
                             color: var(--text-on-gray, #fff);
                         }
@@ -336,7 +348,12 @@ frappe.pages['implementation-dashb'].on_page_load = function (wrapper) {
                                 Combined
                             </button>
                         </div>
-                        <button id="toggle-legend" class="btn btn-sm btn-outline-secondary mb-1">Show Legend</button>
+                        <div>
+                            <button id="toggle-internal-projects" class="btn btn-sm toggle-btn mb-1 me-2">
+                                ${internalProjectsVisible ? '🟠 Hide' : '⚪ Show'} Internal Projects
+                            </button>
+                            <button id="toggle-legend" class="btn btn-sm toggle-btn mb-1">Show Legend</button>
+                        </div>
                     </div>
                     <div id="implementation-chart" style="height:600px;"></div>
                     <div id="custom-legend-container" style="display: none;"></div>
@@ -346,6 +363,12 @@ frappe.pages['implementation-dashb'].on_page_load = function (wrapper) {
                 $(document).off('click', '.display-mode-btn').on('click', '.display-mode-btn', function() {
                     currentDisplayMode = $(this).data('mode');
                     load_chart(); // Reload chart with new display mode
+                });
+
+                // Internal projects toggle handler
+                $(document).off('click', '#toggle-internal-projects').on('click', '#toggle-internal-projects', function() {
+                    internalProjectsVisible = !internalProjectsVisible;
+                    load_chart(); // Reload chart
                 });
 
                 const chart = Highcharts.chart('implementation-chart', {
@@ -388,7 +411,7 @@ frappe.pages['implementation-dashb'].on_page_load = function (wrapper) {
                             }
                             
                             // For prediction lines, show simple tooltip
-                            if (seriesName.includes('Prediction') || seriesName.includes('Internal project')) {
+                            if (seriesName.includes('Prediction') || seriesName.includes('Capacity')) {
                                 return `<div style="padding: 5px;">
                                     <strong>${month}</strong><br/>
                                     <span style="color:${this.color}">●</span> ${seriesName}: <b>${this.y.toFixed(1)} hrs</b>
@@ -788,7 +811,7 @@ frappe.pages['implementation-dashb'].on_page_load = function (wrapper) {
         function highlightSeries(implName, highlight) {
             chart.series.forEach(s => {
                 const isTargetSeries = s.name.startsWith(implName + ' -');
-                const isSpecialSeries = s.name.includes('Prediction') || s.name.includes('Internal');
+                const isSpecialSeries = s.name.includes('Prediction') || s.name.includes('Capacity');
                 
                 if (highlight) {
                     if (isTargetSeries) {
