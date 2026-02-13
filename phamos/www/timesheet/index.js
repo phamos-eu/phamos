@@ -589,16 +589,67 @@ function update_summary_cards() {
     }
   });
 }
+
+// Helper function to generate all weeks or months between two dates
+function generateCompletePeriods(minDate, maxDate, viewType) {
+    const periods = [];
+    const current = new Date(minDate);
+    
+    if (viewType === 'week') {
+        // Align to Monday of the start week
+        const day = current.getDay();
+        const diff = current.getDate() - day + (day === 0 ? -6 : 1);
+        current.setDate(diff);
+        
+        // Generate all Mondays between min and max
+        while (current <= maxDate) {
+            periods.push(current.toISOString().split('T')[0]);
+            current.setDate(current.getDate() + 7); // Next Monday
+        }
+    } else {
+        // Monthly view - align to first of month
+        current.setDate(1);
+        
+        // Generate all months between min and max
+        while (current <= maxDate) {
+            const year = current.getFullYear();
+            const month = String(current.getMonth() + 1).padStart(2, '0');
+            periods.push(`${year}-${month}`);
+            current.setMonth(current.getMonth() + 1);
+        }
+    }
+    
+    return periods;
+}
+
 //////////////////////////process your timesheets data////////////////////
 function processDataForGraph(timesheets) {
     // Cache the data for later use when toggling
     cachedTimesheetData = timesheets;
     
-    const categories = new Set();
+    if (!timesheets || timesheets.length === 0) {
+        // No data to display
+        Highcharts.chart('timesheet-graph-container', {
+            chart: { type: 'area' },
+            title: { text: 'Billable vs Non-Billable by Project' },
+            xAxis: { categories: [], title: { text: currentChartView === 'week' ? 'Week' : 'Month' } },
+            yAxis: { min: 0, title: { text: 'Hours' } },
+            series: []
+        });
+        return;
+    }
+    
     const projectData = {};
+    let minDate = null;
+    let maxDate = null;
 
+    // First pass: collect data and find date range
     timesheets.forEach(row => {
         const date = new Date(row.start_date);
+        
+        if (!minDate || date < minDate) minDate = new Date(date);
+        if (!maxDate || date > maxDate) maxDate = new Date(date);
+        
         let periodKey;
 
         if (currentChartView === 'week') {
@@ -614,8 +665,6 @@ function processDataForGraph(timesheets) {
             periodKey = `${year}-${month}`;
         }
 
-        categories.add(periodKey);
-
         const projectKey = row.project_label; // use label instead of project_name
 
         if (!projectData[projectKey]) {
@@ -629,7 +678,8 @@ function processDataForGraph(timesheets) {
         projectData[projectKey][periodKey].billable += parseFloat(row.total_billable_hours || 0);
     });
 
-    const sortedCategories = Array.from(categories).sort();
+    // Generate complete list of periods (weeks or months) between min and max dates
+    const sortedCategories = generateCompletePeriods(minDate, maxDate, currentChartView);
     const series = [];
     const colorPairs = [
         ['#3399ff', '#99ccff'], // Blue pair
@@ -670,7 +720,24 @@ function processDataForGraph(timesheets) {
     // Format categories for display
     const displayCategories = sortedCategories.map(period => {
         if (currentChartView === 'week') {
-            return period; // Show as YYYY-MM-DD for weeks
+            // Show week range: "Sep 15-21" instead of just "2025-09-15"
+            const weekStart = new Date(period);
+            const weekEnd = new Date(weekStart);
+            weekEnd.setDate(weekStart.getDate() + 6);
+            
+            const monthNames = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 
+                                'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+            const startMonth = monthNames[weekStart.getMonth()];
+            const endMonth = monthNames[weekEnd.getMonth()];
+            const startDay = weekStart.getDate();
+            const endDay = weekEnd.getDate();
+            
+            // Check if week spans two months
+            if (startMonth === endMonth) {
+                return `${startMonth} ${startDay}-${endDay}`;
+            } else {
+                return `${startMonth} ${startDay}-${endMonth} ${endDay}`;
+            }
         } else {
             // Format as "MMM YYYY" for months
             const [year, month] = period.split('-');
@@ -685,17 +752,58 @@ function processDataForGraph(timesheets) {
         title: { text: 'Billable vs Non-Billable by Project' },
         xAxis: { 
             categories: displayCategories, 
-            title: { text: currentChartView === 'week' ? 'Week' : 'Month' } 
+            title: { text: currentChartView === 'week' ? 'Week' : 'Month' },
+            labels: {
+                rotation: currentChartView === 'week' ? -45 : 0,
+                style: {
+                    fontSize: '11px'
+                }
+            }
         },
         yAxis: { min: 0, title: { text: 'Hours' } },
         tooltip: {
             shared: true,
+            useHTML: true,
             formatter: function () {
-                let s = `<b>${this.x}</b><br/>`;
+                const pointIndex = this.points[0].point.index;
+                const period = sortedCategories[pointIndex];
+                const displayLabel = displayCategories[pointIndex];
+                
+                let tooltipHTML = `<div style="padding: 5px;">`;
+                
+                // Header with week/month info
+                if (currentChartView === 'week') {
+                    tooltipHTML += `<div style="font-weight: bold; margin-bottom: 5px; font-size: 13px;">${displayLabel}</div>`;
+                    tooltipHTML += `<div style="color: #666; font-size: 11px; margin-bottom: 8px;">Week starting: ${period}</div>`;
+                } else {
+                    tooltipHTML += `<div style="font-weight: bold; margin-bottom: 8px; font-size: 13px;">${displayLabel}</div>`;
+                }
+                
+                // Calculate total hours for this period
+                let totalHours = 0;
                 this.points.forEach(point => {
-                    s += `<span style="color:${point.color}">\u25CF</span> ${point.series.name}: <b>${point.y.toFixed(2)} hrs</b><br/>`;
+                    totalHours += point.y;
                 });
-                return s;
+                
+                // Show breakdown by project and type
+                this.points.forEach(point => {
+                    if (point.y > 0) {
+                        tooltipHTML += `<div style="margin: 3px 0;">
+                            <span style="color:${point.color}; font-size: 16px;">●</span> 
+                            <span style="font-size: 12px;">${point.series.name}: <strong>${point.y.toFixed(2)} hrs</strong></span>
+                        </div>`;
+                    }
+                });
+                
+                // Show total
+                if (totalHours > 0) {
+                    tooltipHTML += `<div style="margin-top: 8px; padding-top: 5px; border-top: 1px solid #ddd; font-weight: bold;">
+                        Total: ${totalHours.toFixed(2)} hrs
+                    </div>`;
+                }
+                
+                tooltipHTML += `</div>`;
+                return tooltipHTML;
             }
         },
         plotOptions: {
