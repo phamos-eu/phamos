@@ -5,6 +5,7 @@ let currentSortBy = null;
 let currentSortOrder = null;
 let currentChartView = 'week'; // 'week' or 'month'
 let cachedTimesheetData = null; // Cache the timesheet data
+let currentTsName = null; // Store which timesheet is being edited
 const sortFieldMap = {
     1: "timesheet",
     2: "start_date",
@@ -129,6 +130,78 @@ $('#from_date').on('change', function () {
         !$menu.is(event.target) && $menu.has(event.target).length === 0) {
       $menu.removeClass('show');
     }
+  });
+  
+  // Comment modal event handlers
+  let selectedRating = 0;
+  
+  // When user clicks the "Add/Edit Comment" button
+  $(document).on('click', '.comment-btn', function () {
+    currentTsName = $(this).data('name');
+    const currentComment = $(this).data('comment') || '';
+    const rating = $(this).data('rating') || 0;
+    
+    $('#commentInput').val(currentComment);
+    $('#starRating .star').each(function (index) {
+      $(this).html(index < rating ? '&#9733;' : '&#9734;');
+    });
+    selectedRating = rating;
+    $('#commentModal').modal('show');
+  });
+
+  // Handle click on stars
+  $(document).on('click', '#starRating .star', function () {
+    selectedRating = parseInt($(this).data('value'));
+    $('#starRating .star').each(function (index) {
+      $(this).html(index < selectedRating ? '&#9733;' : '&#9734;');
+    });
+    $('#ratingError').hide(); // hide error after selection
+  });
+
+  // Intercept Save button
+  $('#saveComment').on('click', function (e) {
+    e.preventDefault();
+
+    const comment = $('#commentInput').val().trim();
+
+    // Check if rating is selected
+    if (selectedRating === 0) {
+      $('#ratingError').show();
+      return;
+    }
+
+    // Proceed if rating is selected
+    if (!currentTsName) return;
+
+    frappe.call({
+      method: "phamos.api.update_customer_comment",
+      args: {
+        ts_name: currentTsName,
+        comment: comment,
+        custom_rating: selectedRating
+      },
+      callback: function (r) {
+        if (!r.exc) {
+          frappe.show_alert({ message: r.message.message, indicator: "green" });
+
+          const btn = $(`.comment-btn[data-name="${currentTsName}"]`);
+          btn.text("Under Review")
+            .css("background-color", "#ffc107")
+            .data('comment', comment)
+            .data('rating', selectedRating);
+
+          $('#commentModal').modal('hide');
+          reset_and_load();
+        } else {
+          frappe.show_alert({ message: "Failed to send request", indicator: "red" });
+        }
+      }
+    });
+  });
+  
+  // Sales Orders tab event handler
+  $('#sales-orders-tab').on('shown.bs.tab', function (e) {
+    loadSalesOrderData();
   });
   
 });
@@ -296,72 +369,9 @@ function apply_column_filters() {
   }
 }
 
-let currentTsName = null; // store which timesheet is being edited
+// currentTsName is declared in frappe.ready() block above
 
-// When user clicks the "Add/Edit Comment" button
-$(document).on('click', '.comment-btn', function () {
-  currentTsName = $(this).data('name');
-  const currentComment = $(this).data('comment') || '';
-  
-  $('#commentInput').val(currentComment);
-  $('#commentModal').modal('show');
-});
-
-// When user clicks Save in the modal
-let selectedRating = 0;
-
-// Handle click on stars
-$(document).on('click', '#starRating .star', function () {
-  selectedRating = parseInt($(this).data('value'));
-  $('#starRating .star').each(function (index) {
-    $(this).html(index < selectedRating ? '&#9733;' : '&#9734;');
-  });
-  $('#ratingError').hide(); // hide error after selection
-});
-
-// Intercept Save button
-$('#saveComment').on('click', function (e) {
-  e.preventDefault();
-
-  const comment = $('#commentInput').val().trim();
-
-  // 🟥 Check if rating is selected
-  if (selectedRating === 0) {
-    $('#ratingError').show();
-    return;
-  }
-
-  // 🟩 Proceed if rating is selected
-  if (!currentTsName) return;
-
-  frappe.call({
-    method: "phamos.api.update_customer_comment",
-    args: {
-      ts_name: currentTsName,
-      comment: comment,
-      custom_rating: selectedRating
-    },
-    callback: function (r) {
-      if (!r.exc) {
-        frappe.show_alert({ message: r.message.message, indicator: "green" });
-
-        const btn = $(`.comment-btn[data-name="${currentTsName}"]`);
-        btn.text("Under Review")
-          .css("background-color", "#ffc107")
-          .data('comment', comment)
-          .data('rating', selectedRating);
-
-        $('#commentModal').modal('hide');
-        reset_and_load();
-      } else {
-        frappe.show_alert({ message: "Failed to send request", indicator: "red" });
-      }
-    }
-  });
-});
-
-
-
+// Native DOM event listener for star rating (kept for backward compatibility)
 document.addEventListener('DOMContentLoaded', function() {
   const stars = document.querySelectorAll('#starRating .star');
   let selectedRating = 0;
@@ -854,35 +864,8 @@ function load_graph_data() {
 }
 
 /////////////////////////////////////
-loadAndRenderGraph();
-
-// Handle "Give Feedback" button click dynamically
-$(document).on('click', '.comment-btn', function () {
-  const tsName = $(this).data('name');
-  currentTsName = tsName;
-
-  const comment = $(this).data('comment');
-  const discount = $(this).data('discount');
-  const rating = $(this).data('rating');
-  const statusText = $(this).text().trim();
-
-  $('#commentInput').val(comment);
-  $('#discountSelect').val(discount);
-
-  // Reset stars
-  $('#starRating .star').removeClass('selected');
-  for (let i = 0; i < rating; i++) {
-    $('#starRating .star').eq(i).addClass('selected');
-  }
-
-  // Disable editing if "Under Review"
-  const isLocked = statusText === "Under Review";
-  $('#commentInput').prop('disabled', isLocked);
-  $('#starRating .star').css('pointer-events', isLocked ? 'none' : 'auto');
-  $('#saveComment').prop('disabled', isLocked);
-
-  $('#commentModal').modal('show');
-});
+// Removed duplicate jQuery event handlers - they are in frappe.ready() block
+// loadAndRenderGraph(); // Called from frappe.ready() if needed
 
 /* Sorting Handler  */
 document.addEventListener("click", function (event) {
@@ -931,3 +914,250 @@ document.addEventListener("click", function (event) {
         menu.style.display = "none";
     });
 });
+
+
+// ========================================
+// Sales Orders Tab Functionality
+// ========================================
+
+let salesOrderDataLoaded = false;
+let salesOrderData = null;
+
+// Listen for Sales Orders tab activation
+document.getElementById('sales-orders-tab').addEventListener('shown.bs.tab', function (event) {
+  if (!salesOrderDataLoaded) {
+    loadSalesOrderData();
+  }
+});
+
+function loadSalesOrderData() {
+  console.log('Loading sales order data...');
+  console.log('Current user:', frappe.session.user);
+  
+  frappe.call({
+    method: "phamos.api.get_customer_sales_order_status",
+    callback: function(response) {
+      console.log('Sales Order Response:', response);
+      console.log('Response message:', response.message);
+      console.log('Response exc:', response.exc);
+      
+      if (response.exc) {
+        console.error('API Exception:', response.exc);
+        frappe.msgprint({
+          title: 'Error',
+          message: 'Failed to load sales order data. Check console for details.',
+          indicator: 'red'
+        });
+        showSalesOrderError();
+        return;
+      }
+      
+      if (response.message) {
+        salesOrderData = response.message;
+        salesOrderDataLoaded = true;
+        console.log('Sales Orders loaded:', salesOrderData);
+        console.log('Summary:', salesOrderData.summary);
+        console.log('Sales Orders count:', salesOrderData.sales_orders.length);
+        renderSalesOrderData(salesOrderData);
+      } else {
+        console.log('No data returned from API');
+        showSalesOrderError();
+      }
+    },
+    error: function(err) {
+      console.error("Error loading sales order data:", err);
+      frappe.msgprint({
+        title: 'Error',
+        message: 'Failed to load sales order data. Check console for details.',
+        indicator: 'red'
+      });
+      showSalesOrderError();
+    }
+  });
+}
+
+function renderSalesOrderData(data) {
+  console.log('Rendering sales order data...');
+  console.log('Data received:', data);
+  
+  // Render summary cards
+  $('#total-so-hrs').text(formatNumber(data.summary.total_so_hrs));
+  $('#delivered-hrs').text(formatNumber(data.summary.delivered_hrs));
+  $('#remaining-hrs').text(formatNumber(data.summary.remaining_hrs));
+  $('#open-so-count').text(data.summary.open_so_count);
+  
+  console.log('Summary cards updated');
+  
+  // Render chart
+  try {
+    renderSalesOrderChart(data.chart_data);
+    console.log('Chart rendered');
+  } catch (e) {
+    console.error('Error rendering chart:', e);
+  }
+  
+  // Render table
+  try {
+    renderSalesOrderTable(data.sales_orders);
+    console.log('Table rendered');
+  } catch (e) {
+    console.error('Error rendering table:', e);
+  }
+}
+
+function renderSalesOrderChart(chartData) {
+  console.log('Rendering chart with data:', chartData);
+  
+  const chartContainer = document.getElementById('so-delivery-chart');
+  
+  if (!chartContainer) {
+    console.error('Chart container not found!');
+    return;
+  }
+  
+  if (chartData.values.every(v => v === 0)) {
+    console.log('All chart values are zero');
+    chartContainer.innerHTML = '<div class="text-center text-muted" style="padding: 50px 0;"><p>No delivery data available</p></div>';
+    return;
+  }
+  
+  // Create horizontal percentage bar chart (like Implementation doctype)
+  const total = chartData.values.reduce((a, b) => a + b, 0);
+  const percentages = chartData.values.map(v => (v / total * 100).toFixed(1));
+  const colors = ['#28a745', '#ffc107', '#2490ef']; // green, yellow, blue
+  
+  let chartHTML = '<div style="padding: 20px;">';
+  
+  // Horizontal bar
+  chartHTML += '<div style="display: flex; height: 14px; border-radius: 4px; overflow: hidden; margin-bottom: 20px;">';
+  chartData.values.forEach((val, idx) => {
+    if (val > 0) {
+      chartHTML += `<div style="background-color: ${colors[idx]}; width: ${percentages[idx]}%;"></div>`;
+    }
+  });
+  chartHTML += '</div>';
+  
+  // Legend with values
+  chartHTML += '<div style="display: flex; flex-wrap: wrap; gap: 25px; justify-content: center;">';
+  chartData.labels.forEach((label, idx) => {
+    chartHTML += `
+      <div style="display: flex; align-items: center; gap: 8px;">
+        <div style="width: 16px; height: 16px; background-color: ${colors[idx]}; border-radius: 3px;"></div>
+        <div style="font-size: 14px; color: #6c757d;">
+          <strong style="color: #212529;">${label}:</strong> 
+          ${chartData.values[idx].toFixed(1)} hrs (${percentages[idx]}%)
+        </div>
+      </div>
+    `;
+  });
+  chartHTML += '</div></div>';
+  
+  chartContainer.innerHTML = chartHTML;
+  console.log('Chart rendered successfully');
+}
+
+// Map Sales Order status to Frappe indicator colors
+function getStatusColor(status) {
+  const statusColors = {
+    'Draft': { bg: '#d1d8dd', text: '#364a59' },
+    'On Hold': { bg: '#ffeab6', text: '#7f5c00' },
+    'To Deliver and Bill': { bg: '#ffe6cc', text: '#7f4200' },
+    'To Bill': { bg: '#d4f5d4', text: '#1a731a' },
+    'To Deliver': { bg: '#d4e7f7', text: '#16537a' },
+    'Completed': { bg: '#d4f5d4', text: '#0a5e0a' },
+    'Cancelled': { bg: '#ffe6e6', text: '#a10000' },
+    'Closed': { bg: '#e8e8e8', text: '#4d4d4d' }
+  };
+  
+  return statusColors[status] || { bg: '#e8f4f8', text: '#2e5f75' };
+}
+
+function renderSalesOrderTable(salesOrders) {
+  const tbody = $('#so-table-body');
+  tbody.empty();
+  
+  if (salesOrders.length === 0) {
+    tbody.append(`
+      <tr>
+        <td colspan="7" class="text-center text-muted" style="padding: 40px;">
+          <i class="fa fa-inbox fa-2x mb-3" style="opacity: 0.3;"></i>
+          <p class="mb-0"><strong>No Sales Orders Found</strong></p>
+          <p class="small">There are no sales orders linked to implementations for your account yet.</p>
+        </td>
+      </tr>
+    `);
+    return;
+  }
+  
+  salesOrders.forEach(so => {
+    const statusBadge = getStatusBadge(so.status);
+    const progressPercent = so.total_hrs > 0 ? (so.delivered_hrs / so.total_hrs * 100).toFixed(1) : 0;
+    const progressColor = getProgressColor(progressPercent);
+    
+    const row = `
+      <tr>
+        <td>
+          <a href="/app/sales-order/${so.name}" target="_blank">
+            ${so.name}
+          </a>
+        </td>
+        <td>${escapeHtml(so.title || '-')}</td>
+        <td>${statusBadge}</td>
+        <td>${formatNumber(so.total_hrs)}</td>
+        <td>${formatNumber(so.delivered_hrs)}</td>
+        <td>${formatNumber(so.remaining_hrs)}</td>
+        <td>
+          <div class="d-flex align-items-center gap-2">
+            <div class="progress flex-grow-1">
+              <div class="progress-bar ${progressColor}" 
+                   style="width: ${progressPercent}%">
+              </div>
+            </div>
+            <span class="small text-nowrap" style="min-width: 40px;">${progressPercent}%</span>
+          </div>
+        </td>
+      </tr>
+    `;
+    
+    tbody.append(row);
+  });
+}
+
+function getStatusBadge(status) {
+  const colors = getStatusColor(status);
+  return `<span class="badge" style="background-color: ${colors.bg}; color: ${colors.text}; font-weight: 500; padding: 5px 12px; border-radius: 4px;">${status}</span>`;
+}
+
+function getProgressColor(percent) {
+  if (percent >= 100) return 'bg-success';
+  if (percent >= 50) return 'bg-info';
+  if (percent >= 25) return 'bg-warning';
+  return 'bg-danger';
+}
+
+function formatNumber(num) {
+  if (num === null || num === undefined) return '0';
+  return parseFloat(num).toFixed(2);
+}
+
+function escapeHtml(text) {
+  if (!text) return '';
+  const map = {
+    '&': '&amp;',
+    '<': '&lt;',
+    '>': '&gt;',
+    '"': '&quot;',
+    "'": '&#039;'
+  };
+  return text.replace(/[&<>"']/g, function(m) { return map[m]; });
+}
+
+function showSalesOrderError() {
+  $('#so-table-body').html(`
+    <tr>
+      <td colspan="7" class="text-center text-danger py-4">
+        <i class="fa fa-exclamation-triangle me-2"></i> Error loading sales orders. Please try again.
+      </td>
+    </tr>
+  `);
+}
