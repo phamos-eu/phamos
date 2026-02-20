@@ -93,17 +93,11 @@
  ],
  "index_web_pages_for_search": 1,
  "is_submittable": 1,
- "links": [
-  {
-   "link_doctype": "Delivery Note",
-   "link_fieldname": "custom_against_monthly_implementation_summery"
-  }
- ],
- "modified": "2026-02-20 15:33:42.168411",
+ "links": [],
+ "modified": "2026-02-20 15:11:38.992784",
  "modified_by": "Administrator",
  "module": "Phamos",
  "name": "Monthly Implementation Summery",
- "naming_rule": "By \"Naming Series\" field",
  "owner": "Administrator",
  "permissions": [
   {
