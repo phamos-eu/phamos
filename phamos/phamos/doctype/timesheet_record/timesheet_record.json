@@ -23,8 +23,10 @@
   "item",
   "section_break_hqfwm",
   "goal",
+  "issues",
   "column_break_8016u",
   "result",
+  "parent_issues_url",
   "amended_from"
  ],
  "fields": [
@@ -160,14 +162,26 @@
    "fieldtype": "Select",
    "label": "Timesheet Record Color",
    "options": "\nRed\nGreen\nAmber"
+  },
+  {
+   "fieldname": "issues",
+   "fieldtype": "Data",
+   "label": "Issues"
+  },
+  {
+   "fieldname": "parent_issues_url",
+   "fieldtype": "Small Text",
+   "label": "Issues URL",
+   "no_copy": 1,
+   "read_only": 1
   }
  ],
  "grid_page_length": 50,
  "index_web_pages_for_search": 1,
  "is_submittable": 1,
  "links": [],
- "modified": "2025-08-25 15:48:40.153947",
- "modified_by": "Administrator",
+ "modified": "2026-02-16 06:59:11.141655",
+ "modified_by": "kalsoom.akhtar@phamos.eu",
  "module": "Phamos",
  "name": "Timesheet Record",
  "naming_rule": "Expression (old style)",
@@ -189,6 +203,7 @@
   }
  ],
  "row_format": "Dynamic",
+ "rows_threshold_for_grid_search": 20,
  "sort_field": "modified",
  "sort_order": "DESC",
  "states": []
