@@ -15,24 +15,20 @@ def create_monthly_implementation_summaries():
 	"""
 	today_date = getdate(today())
 	
-	# Only execute on the 1st of the month
-	if today_date.day != 1:
+	# Only execute on the configured day of the month
+	day = 1
+	day = int(day)  # ensure integer (DB may return string)
+	if today_date.day != day:
 		return
 	
-	# Calculate previous month
-	if today_date.month == 1:
-		prev_month_num = 12
-		prev_year = today_date.year - 1
-	else:
-		prev_month_num = today_date.month - 1
-		prev_year = today_date.year
-	
-	# Month names
+	# Use current year and current month for the document
+	# (Timesheets will be fetched for previous months by the doctype logic)
 	month_names = [
 		"January", "February", "March", "April", "May", "June",
 		"July", "August", "September", "October", "November", "December"
 	]
-	prev_month_name = month_names[prev_month_num - 1]
+	current_year = today_date.year
+	current_month_name = month_names[today_date.month - 1]
 	
 	# Get all active Implementations
 	implementations = frappe.get_all(
@@ -47,13 +43,14 @@ def create_monthly_implementation_summaries():
 	
 	for impl in implementations:
 		try:
-			# Check if Monthly Implementation Summary already exists
+			# Check if Monthly Implementation Summary already exists for current year + current month
 			existing = frappe.db.exists(
 				"Monthly Implementation Summery",
 				{
 					"implementation": impl.name,
-					"year": str(prev_year),
-					"month": prev_month_name
+					"year": str(current_year),
+					"month": current_month_name,
+					"docstatus": ["in", [0, 1]]
 				}
 			)
 			
@@ -61,33 +58,21 @@ def create_monthly_implementation_summaries():
 				skipped_count += 1
 				continue
 			
-			# Create new Monthly Implementation Summary
+			# Create new Monthly Implementation Summary (year=current year, month=current month)
+			# Doctype validate() will fetch timesheets for the previous month(s)
 			doc = frappe.get_doc({
 				"doctype": "Monthly Implementation Summery",
 				"implementation": impl.name,
-				"year": str(prev_year),
-				"month": prev_month_name,
+				"year": str(current_year),
+				"month": current_month_name,
 				"discount": 0
 			})
 			doc.insert()
 			
-			# Refresh timesheets (this will auto-populate via validate method)
-			doc.refresh_timesheets()
-			doc.save()
-			
 			created_count += 1
 			frappe.db.commit()
 			
-		except Exception as e:
+		except Exception:
 			error_count += 1
-			frappe.log_error(
-				f"Error creating Monthly Implementation Summary for {impl.name}: {str(e)}",
-				"create_monthly_implementation_summaries"
-			)
 			frappe.db.rollback()
 	
-	# Log results
-	frappe.logger().info(
-		f"Monthly Implementation Summary creation completed: "
-		f"Created: {created_count}, Skipped: {skipped_count}, Errors: {error_count}"
-	)
