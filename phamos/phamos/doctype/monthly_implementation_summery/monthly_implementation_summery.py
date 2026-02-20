@@ -47,9 +47,11 @@ class MonthlyImplementationSummery(Document):
 		except ValueError:
 			frappe.throw(f"Invalid month: {self.month}")
 		
-		# Get date range for the month
+		# Get date range: from January 1st of the year to the last day of selected month
 		year_int = int(self.year)
-		first_day = datetime(year_int, month_num, 1).date()
+		# Start from January 1st of the selected year
+		first_day = datetime(year_int, 1, 1).date()
+		# End at the last day of the selected month
 		last_day_num = monthrange(year_int, month_num)[1]
 		last_day = datetime(year_int, month_num, last_day_num).date()
 		
