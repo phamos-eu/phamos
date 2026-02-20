@@ -24,24 +24,31 @@ def create_timesheet_record(project_name,  customer, from_time, expected_time, g
         project = frappe.db.get_value("Project", {"project_name": project_name}, "name")
         
         if employee_name:
-            after_1_minute = add_to_date(from_time, seconds=10, as_string=True)
-            
+            # Get user timezone, fallback to Europe/Berlin if not set
+            user_tz = frappe.db.get_value("User", frappe.session.user, "time_zone") or "Europe/Berlin"
+            tz = pytz.timezone(user_tz)
+            # Convert from_time from user local time to UTC
+            from_time_local = get_datetime(from_time)
+            if from_time_local.tzinfo is None:
+                from_time_local = tz.localize(from_time_local)
+            from_time_utc = from_time_local.astimezone(pytz.UTC)
+            after_1_minute_utc = (from_time_local + timedelta(seconds=10)).astimezone(pytz.UTC)
+
             timesheet_record = frappe.new_doc('Timesheet Record')
             timesheet_record.project = project
-            timesheet_record.task=task
+            timesheet_record.task = task
             timesheet_record.customer = customer
-            timesheet_record.from_time = after_1_minute
+            timesheet_record.from_time = after_1_minute_utc.strftime("%Y-%m-%d %H:%M:%S")
             timesheet_record.expected_time = expected_time
             timesheet_record.goal = goal
             timesheet_record.employee = employee_name
             timesheet_record.activity_type = activity_type
             timesheet_record.append("item", {
-                "from_time": from_time
+                "from_time": from_time_utc.strftime("%Y-%m-%d %H:%M:%S")
             })
 
             timesheet_record.save()
             frappe.db.commit()
-            
             # Return the saved timesheet record
             return timesheet_record
         else:
@@ -58,11 +65,16 @@ def update_to_time(name):
     try:
         doc = frappe.get_doc("Timesheet Record", name)
 
+        # Get user timezone, fallback to Europe/Berlin if not set
+        user_tz = frappe.db.get_value("User", frappe.session.user, "time_zone") or "Europe/Berlin"
+        tz = pytz.timezone(user_tz)
+        now_local = datetime.now(tz)
+        now_utc = now_local.astimezone(pytz.UTC)
         for row in doc.item:
             if not row.to_time:
-                row.to_time = now_datetime()
+                row.to_time = now_utc.strftime("%Y-%m-%d %H:%M:%S")
                 new_row = doc.append("item", {})
-                new_row.from_time = now_datetime()
+                new_row.from_time = now_utc.strftime("%Y-%m-%d %H:%M:%S")
                 break 
 
         doc.save()
@@ -85,7 +97,12 @@ def update_to_time(name):
 def close_open_row_and_add_break(name):
     try:
         doc = frappe.get_doc("Timesheet Record", name)
-        current_time = now_datetime()
+        # Get user timezone and convert current time to UTC
+        user_tz = frappe.db.get_value("User", frappe.session.user, "time_zone") or "Europe/Berlin"
+        tz = pytz.timezone(user_tz)
+        now_local = datetime.now(tz)
+        current_time_utc = now_local.astimezone(pytz.UTC).strftime("%Y-%m-%d %H:%M:%S")
+        
         new_row = None
         previous_from_time = None
         previous_to_time = None
@@ -96,10 +113,10 @@ def close_open_row_and_add_break(name):
 
         for idx, row in enumerate(doc.item):
             if not row.to_time:
-                row.to_time = current_time
+                row.to_time = current_time_utc
                 previous_to_time = row.to_time
                 new_row = doc.append("item", {})
-                new_row.from_time = current_time
+                new_row.from_time = current_time_utc
                 break
 
         if not new_row:
@@ -376,8 +393,24 @@ def create_and_submit_timesheet( project_name=None,
     goal=None, 
     to_time=None):
     try:
-        # ✅ Validate before creating record
-        if from_time and to_time and get_datetime(to_time) < get_datetime(from_time):
+        # Convert times from user local time to UTC for consistent storage
+        user_tz = frappe.db.get_value("User", frappe.session.user, "time_zone") or "Europe/Berlin"
+        tz = pytz.timezone(user_tz)
+        
+        # Convert from_time to UTC
+        from_time_local = get_datetime(from_time)
+        if from_time_local.tzinfo is None:
+            from_time_local = tz.localize(from_time_local)
+        from_time_utc = from_time_local.astimezone(pytz.UTC).strftime("%Y-%m-%d %H:%M:%S")
+        
+        # Convert to_time to UTC
+        to_time_local = get_datetime(to_time)
+        if to_time_local.tzinfo is None:
+            to_time_local = tz.localize(to_time_local)
+        to_time_utc = to_time_local.astimezone(pytz.UTC).strftime("%Y-%m-%d %H:%M:%S")
+
+        # ✅ Validate before creating record (compare in UTC)
+        if from_time and to_time and get_datetime(to_time_utc) < get_datetime(from_time_utc):
             frappe.throw(_("To Time cannot be earlier than From Time. Record not saved."))
 
         ts = frappe.new_doc("Timesheet Record")
@@ -388,14 +421,14 @@ def create_and_submit_timesheet( project_name=None,
         ts.expected_time = expected_time
         ts.result = result
 
-        # Parent field set
-        ts.from_time = from_time
-        ts.to_time = to_time
+        # Parent field set (use UTC times)
+        ts.from_time = from_time_utc
+        ts.to_time = to_time_utc
 
-        # Add child row
+        # Add child row (use UTC times)
         ts.append("item", {
-            "from_time": from_time,
-            "to_time": to_time
+            "from_time": from_time_utc,
+            "to_time": to_time_utc
         })
         employee = frappe.db.get_value(
     "Employee",
@@ -438,14 +471,22 @@ def update_and_submit_timesheet_record(name, to_time, percent_billable, activity
         # Retrieve the Timesheet Record document
         doc = frappe.get_doc("Timesheet Record", name)
 
+        # Convert to_time from user local time to UTC for consistent storage
+        user_tz = frappe.db.get_value("User", frappe.session.user, "time_zone") or "Europe/Berlin"
+        tz = pytz.timezone(user_tz)
+        to_time_local = get_datetime(to_time)
+        if to_time_local.tzinfo is None:
+            to_time_local = tz.localize(to_time_local)
+        to_time_utc = to_time_local.astimezone(pytz.UTC).strftime("%Y-%m-%d %H:%M:%S")
+
         # Close last open row if exists
         if doc.item:
             for row in reversed(doc.item):
                 if row.from_time and not row.to_time:
-                    # ✅ Validate before assigning
-                    if get_datetime(to_time) < get_datetime(row.from_time):
+                    # ✅ Validate before assigning (compare in UTC)
+                    if get_datetime(to_time_utc) < get_datetime(row.from_time):
                         frappe.throw(_("To Time cannot be earlier than From Time. Update aborted."))
-                    row.to_time = to_time
+                    row.to_time = to_time_utc
                     break
 
         # Calculate durations & validate
