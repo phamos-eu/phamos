@@ -225,14 +225,25 @@ class MonthlyImplementationSummery(Document):
 		if not (self.implementation and self.year and self.month):
 			return None
 		
-		prev_year, prev_month_name = _get_previous_month_year_and_name(self.year, self.month)
-		if not prev_year or not prev_month_name:
-			return None
+		# Convert month name to number
+		month_names = [
+			"January", "February", "March", "April", "May", "June",
+			"July", "August", "September", "October", "November", "December"
+		]
+		try:
+			month_num = month_names.index(self.month) + 1
+		except ValueError:
+			frappe.throw(f"Invalid month: {self.month}")
 		
-		from_date, to_date = _get_month_date_range(prev_year, prev_month_name)
-		if not from_date or not to_date:
-			return None
-
+		# Get date range: from January 1st of the year to the last day of selected month
+		year_int = int(self.year)
+		# Start from January 1st of the selected year
+		first_day = datetime(year_int, 1, 1).date()
+		# End at the last day of the selected month
+		last_day_num = monthrange(year_int, month_num)[1]
+		last_day = datetime(year_int, month_num, last_day_num).date()
+		
+		# Get all projects linked to this implementation
 		projects = frappe.get_all(
 			"Project",
 			filters={"custom_implementation": self.implementation},
