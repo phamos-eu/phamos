@@ -1,0 +1,120 @@
+{
+ "actions": [],
+ "allow_rename": 1,
+ "autoname": "naming_series:",
+ "creation": "2026-02-20 15:02:36.902750",
+ "doctype": "DocType",
+ "engine": "InnoDB",
+ "field_order": [
+  "naming_series",
+  "implementation",
+  "year",
+  "month",
+  "timesheets",
+  "total_hours",
+  "billable_hours",
+  "discount",
+  "total_hours_after_discount",
+  "section_break_xunv",
+  "amended_from"
+ ],
+ "fields": [
+  {
+   "fieldname": "section_break_xunv",
+   "fieldtype": "Section Break"
+  },
+  {
+   "fieldname": "amended_from",
+   "fieldtype": "Link",
+   "label": "Amended From",
+   "no_copy": 1,
+   "options": "Monthly Implementation Summery",
+   "print_hide": 1,
+   "read_only": 1,
+   "search_index": 1
+  },
+  {
+   "fieldname": "naming_series",
+   "fieldtype": "Select",
+   "hidden": 1,
+   "label": "Naming Series"
+  },
+  {
+   "fieldname": "implementation",
+   "fieldtype": "Link",
+   "in_list_view": 1,
+   "label": "Implementation",
+   "options": "Implementation",
+   "reqd": 1
+  },
+  {
+   "description": "Enter a 4-digit year (e.g. 2024). Valid range: 2000\\u20132100.",
+   "fieldname": "year",
+   "fieldtype": "Data",
+   "in_list_view": 1,
+   "label": "Year",
+   "reqd": 1
+  },
+  {
+   "fieldname": "month",
+   "fieldtype": "Select",
+   "label": "Month",
+   "options": "January\nFebruary\nMarch\nApril\nMay\nJune\nJuly\nAugust\nSeptember\nOctober\nNovember\nDecember"
+  },
+  {
+   "fieldname": "timesheets",
+   "fieldtype": "Text Editor",
+   "label": "Timesheets",
+   "no_copy": 1,
+   "read_only": 1
+  },
+  {
+   "fieldname": "total_hours",
+   "fieldtype": "Float",
+   "label": "Total Hours"
+  },
+  {
+   "fieldname": "billable_hours",
+   "fieldtype": "Float",
+   "label": "Billable Hours"
+  },
+  {
+   "description": "Enter discount percentage (0-100%)",
+   "fieldname": "discount",
+   "fieldtype": "Float",
+   "label": "Discount"
+  },
+  {
+   "fieldname": "total_hours_after_discount",
+   "fieldtype": "Float",
+   "label": "Total Hours after discount",
+   "read_only": 1
+  }
+ ],
+ "index_web_pages_for_search": 1,
+ "is_submittable": 1,
+ "links": [],
+ "modified": "2026-02-20 15:11:38.992784",
+ "modified_by": "Administrator",
+ "module": "Phamos",
+ "name": "Monthly Implementation Summery",
+ "owner": "Administrator",
+ "permissions": [
+  {
+   "create": 1,
+   "delete": 1,
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "System Manager",
+   "share": 1,
+   "submit": 1,
+   "write": 1
+  }
+ ],
+ "sort_field": "modified",
+ "sort_order": "DESC",
+ "states": []
+}
