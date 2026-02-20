@@ -3,89 +3,43 @@
 
 frappe.ui.form.on("Monthly Implementation Summery", {
 	refresh(frm) {
-		// Add refresh button if all required fields are set
-		if (frm.doc.implementation && frm.doc.year && frm.doc.month) {
-			frm.add_custom_button(__("Refresh Timesheets"), function() {
-				frm.call({
-					method: "refresh_timesheets_api",
-					doc: frm.doc,
-					freeze: true,
-					freeze_message: __("Refreshing timesheets..."),
-					callback: function(r) {
-						if (r.message) {
-							frappe.show_alert({
-								message: __("Timesheets refreshed: {0} timesheets found. Total Hours: {1}, Billable Hours: {2}", 
-									[r.message.timesheets_count || 0, 
-									 frappe.format(r.message.total_hours || 0, {fieldtype: "Float"}), 
-									 frappe.format(r.message.billable_hours || 0, {fieldtype: "Float"})]),
-								indicator: "green"
-							}, 5);
-							frm.reload_doc();
-						}
-					}
-				});
-			});
-		}
 	},
-	
-	implementation(frm) {
-		// Auto-refresh when implementation changes
-		if (frm.doc.implementation && frm.doc.year && frm.doc.month && !frm.is_new()) {
-			frm.call({
-				method: "refresh_timesheets_api",
-				doc: frm.doc,
-				callback: function() {
-					frm.refresh_field("timesheets");
-					frm.refresh_field("total_hours");
-					frm.refresh_field("billable_hours");
-					frm.refresh_field("total_hours_after_discount");
-				}
-			});
-		}
-	},
-	
 	year(frm) {
-		// Auto-refresh when year changes
-		if (frm.doc.implementation && frm.doc.year && frm.doc.month && !frm.is_new()) {
-			frm.call({
-				method: "refresh_timesheets_api",
-				doc: frm.doc,
-				callback: function() {
-					frm.refresh_field("timesheets");
-					frm.refresh_field("total_hours");
-					frm.refresh_field("billable_hours");
-					frm.refresh_field("total_hours_after_discount");
-				}
-			});
+		// Client-side validation: 4-digit year format
+		const year = (frm.doc.year || "").toString().trim();
+		if (!year) return;
+		if (year.length !== 4 || !/^\d{4}$/.test(year)) {
+			frm.set_intro(__("Year must be exactly 4 digits (e.g. 2024)."), "red");
+			return;
 		}
-	},
-	
-	month(frm) {
-		// Auto-refresh when month changes
-		if (frm.doc.implementation && frm.doc.year && frm.doc.month && !frm.is_new()) {
-			frm.call({
-				method: "refresh_timesheets_api",
-				doc: frm.doc,
-				callback: function() {
-					frm.refresh_field("timesheets");
-					frm.refresh_field("total_hours");
-					frm.refresh_field("billable_hours");
-					frm.refresh_field("total_hours_after_discount");
-				}
-			});
+		const y = parseInt(year, 10);
+		if (y < 2000 || y > 2100) {
+			frm.set_intro(__("Year must be between 2000 and 2100."), "red");
+			return;
 		}
+		frm.set_intro("");
 	},
-	
 	discount(frm) {
-		// Recalculate total hours after discount when discount changes
-		if (frm.doc.billable_hours !== undefined) {
-			frm.call({
-				method: "calculate_totals",
-				doc: frm.doc,
-				callback: function() {
-					frm.refresh_field("total_hours_after_discount");
-				}
-			});
+		// Validate discount is between 0 and 100
+		if (frm.doc.discount !== undefined && frm.doc.discount !== null) {
+			const discount = parseFloat(frm.doc.discount);
+			if (isNaN(discount)) {
+				frappe.msgprint(__("Discount must be a valid number."));
+				frm.set_value("discount", null);
+				return;
+			}
+			if (discount < 0) {
+				frappe.msgprint(__("Discount cannot be negative. Please enter a value between 0 and 100."));
+				frm.set_value("discount", 0);
+				return;
+			}
+			if (discount > 100) {
+				frappe.msgprint(__("Discount cannot exceed 100%. Please enter a value between 0 and 100."));
+				frm.set_value("discount", 100);
+				return;
+			}
 		}
-	}
+		// Discount will be applied to billable_hours by server-side validate() method
+		// The updated billable_hours will be shown after save/validation
+	},
 });
