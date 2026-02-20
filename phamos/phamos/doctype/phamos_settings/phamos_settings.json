@@ -27,12 +27,19 @@
   "last_daily_thread_creation_date",
   "section_break_s3bt",
   "mattermost_channel",
+<<<<<<< HEAD
   "data_extract_tab",
   "data_extract_section",
   "mistral_api_key",
   "column_break_de",
   "mistral_model",
   "mistral_base_url"
+=======
+  "timesheet_settings_section",
+  "allowed_additional_work_time",
+  "monthly_implementation_summery_tab",
+  "item"
+>>>>>>> 9c7fd81 (add doctype monthly implementation summery)
  ],
  "fields": [
   {
@@ -143,6 +150,7 @@
    "fieldtype": "Section Break"
   },
   {
+<<<<<<< HEAD
    "fieldname": "data_extract_tab",
    "fieldtype": "Tab Break",
    "label": "Data Extract"
@@ -174,12 +182,24 @@
    "fieldname": "mistral_base_url",
    "fieldtype": "Data",
    "label": "Base URL (optional)"
+=======
+   "fieldname": "monthly_implementation_summery_tab",
+   "fieldtype": "Tab Break",
+   "label": "Monthly Implementation Summery"
+  },
+  {
+   "description": "Select the default service item to be used when generating Delivery Note and Sales Invoice for Monthly Implementation Summary.",
+   "fieldname": "item",
+   "fieldtype": "Link",
+   "label": "Item",
+   "options": "Item"
+>>>>>>> 9c7fd81 (add doctype monthly implementation summery)
   }
  ],
  "index_web_pages_for_search": 1,
  "issingle": 1,
  "links": [],
- "modified": "2024-10-04 15:48:25.774179",
+ "modified": "2026-02-20 15:32:51.417147",
  "modified_by": "Administrator",
  "module": "Phamos",
  "name": "phamos Settings",
