@@ -2,6 +2,7 @@ import frappe
 from frappe.utils import getdate, get_url, format_datetime, strip_html
 from frappe import _
 
+
 @frappe.whitelist()
 def get_timesheets(from_date=None, to_date=None, project=None, offset=0, limit=20, sort_by=None, sort_order=None):
     user = frappe.session.user
