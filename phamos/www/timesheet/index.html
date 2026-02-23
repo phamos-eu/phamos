@@ -44,19 +44,42 @@
     }
   </style>
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
-  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
-  <script src="https://code.highcharts.com/highcharts.js"></script>
-
 {% endblock %}
 
 {% block page_content %}
 <!-- Subtract ERPNext navbar height -->
 <div class="d-flex flex-column px-3 py-3" style="min-height: calc(100vh - 56px); padding-bottom: 80px;">
 
-  {% include "phamos/www/timesheet/summary_cards.html" %}
-  <!-- Timesheet graph -->
+  <!-- Tab Navigation -->
+  <ul class="nav nav-tabs mb-3" id="portalTabs" role="tablist">
+    <li class="nav-item" role="presentation">
+      <button class="nav-link active" id="timesheets-tab" data-bs-toggle="tab" data-bs-target="#timesheets-content" type="button" role="tab" aria-controls="timesheets-content" aria-selected="true">
+        <i class="fa fa-clock me-1"></i> Timesheets
+      </button>
+    </li>
+    <li class="nav-item" role="presentation">
+      <button class="nav-link" id="sales-orders-tab" data-bs-toggle="tab" data-bs-target="#sales-orders-content" type="button" role="tab" aria-controls="sales-orders-content" aria-selected="false">
+        <i class="fa fa-box me-1"></i> Sales Orders
+      </button>
+    </li>
+  </ul>
+
+  <!-- Tab Content -->
+  <div class="tab-content" id="portalTabContent">
+    
+    <!-- Timesheets Tab -->
+    <div class="tab-pane fade show active" id="timesheets-content" role="tabpanel" aria-labelledby="timesheets-tab">
+      {% include "phamos/www/timesheet/summary_cards.html" %}
+      <!-- Timesheet graph -->
 <div class="card my-3 p-3">
-  <h5>Billable vs Non-Billable vs Total Hours</h5>
+  <div class="d-flex justify-content-between align-items-center mb-3">
+    <h5 class="mb-0">Billable vs Non-Billable vs Total Hours</h5>
+    <!-- Toggle for Weeks/Months -->
+    <div class="btn-group btn-group-sm" role="group" aria-label="Chart view toggle">
+      <button type="button" class="btn btn-outline-primary" id="weekViewBtn">Weeks</button>
+      <button type="button" class="btn btn-outline-primary" id="monthViewBtn">Months</button>
+    </div>
+  </div>
   <div id="timesheet-graph-container" style="height: 400px;"></div>
 </div>
 <!-- Timesheet graph ends -->
@@ -106,7 +129,7 @@
   <div class="border rounded" style="flex: 1 1 auto; min-height: 320px; width: 100%; overflow-x: hidden; overflow-y: auto;">
     <table class="table table-hover align-middle mb-0 w-100"
           id="timesheet_table"
-          style="min-width: 1300px; table-layout: fixed;">
+          style="table-layout: auto;">
       <thead class="table-light sticky-top small">
         <tr>
           <th style="width: 2%;"><input type="checkbox" id="select_all" /></th>
@@ -219,6 +242,96 @@
       <div class="progress-bar bg-secondary" id="pagination_progress" style="width: 0%;"></div>
     </div>
   </div>
+    </div>
+    <!-- End Timesheets Tab -->
+
+    <!-- Sales Orders Tab -->
+    <div class="tab-pane fade" id="sales-orders-content" role="tabpanel" aria-labelledby="sales-orders-tab">
+      
+      <!-- Summary Cards -->
+      <div class="row mb-3" id="so-summary-cards">
+        <div class="col-6 col-md-3">
+          <div class="card border shadow-sm">
+            <div class="card-body text-center">
+              <div class="text-muted small">Total SO Hours</div>
+              <div class="fw-bold fs-5" id="total-so-hrs">--</div>
+            </div>
+          </div>
+        </div>
+        
+        <div class="col-6 col-md-3">
+          <div class="card border shadow-sm">
+            <div class="card-body text-center">
+              <div class="text-muted small">Delivered Hours</div>
+              <div class="fw-bold fs-5" id="delivered-hrs">--</div>
+            </div>
+          </div>
+        </div>
+
+        <div class="col-6 col-md-3">
+          <div class="card border shadow-sm">
+            <div class="card-body text-center">
+              <div class="text-muted small">Remaining Hours</div>
+              <div class="fw-bold fs-5" id="remaining-hrs">--</div>
+            </div>
+          </div>
+        </div>
+
+        <div class="col-6 col-md-3">
+          <div class="card border shadow-sm">
+            <div class="card-body text-center">
+              <div class="text-muted small">Open Sales Orders</div>
+              <div class="fw-bold fs-5" id="open-so-count">--</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Delivery Status Chart -->
+      <div class="card my-3 p-3">
+        <div class="d-flex justify-content-between align-items-center mb-3">
+          <h5 class="mb-0">Delivery Status Overview</h5>
+        </div>
+        <div id="so-delivery-chart"></div>
+      </div>
+
+      <!-- Sales Orders Table -->
+      <div class="mb-3">
+        <div class="d-flex justify-content-between align-items-center mb-2">
+          <h5 class="mb-0">Sales Orders</h5>
+        </div>
+      </div>
+
+      <!-- Table Container -->
+      <div class="border rounded" style="flex: 1 1 auto; min-height: 320px; width: 100%; overflow-x: hidden; overflow-y: auto;">
+        <table class="table table-hover align-middle mb-0 w-100"
+              id="so_table"
+              style="table-layout: auto;">
+          <thead class="table-light sticky-top small">
+            <tr>
+              <th style="width: 15%;">Sales Order</th>
+              <th style="width: 25%;">Title</th>
+              <th style="width: 12%;">Status</th>
+              <th style="width: 12%;">Total Hrs</th>
+              <th style="width: 12%;">Delivered</th>
+              <th style="width: 12%;">Remaining</th>
+              <th style="width: 12%;">Progress</th>
+            </tr>
+          </thead>
+          <tbody id="so-table-body">
+            <tr id="so-loading-row">
+              <td colspan="7" class="text-center text-muted">
+                <i class="fa fa-spinner fa-spin me-1"></i> Loading sales orders...
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+    <!-- End Sales Orders Tab -->
+
+  </div>
+  <!-- End Tab Content -->
 </div>
 
 <!-- Comment Modal -->
@@ -258,5 +371,13 @@
   </div>
 </div>
 
-<script src="/timesheets/index.js"></script>
-{% endblock %}
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+<script src="https://code.highcharts.com/highcharts.js"></script>
+<script src="/assets/phamos/js/timesheet_portal.js"></script>
+<script>
+  frappe.ready(function() {
+    console.log('Customer Portal loaded');
+    console.log('Current user:', frappe?.session?.user || 'unknown');
+    console.log('Highcharts available:', typeof Highcharts !== 'undefined');
+  });
+</script>{% endblock %}

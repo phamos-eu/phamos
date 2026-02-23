@@ -31,7 +31,6 @@ def execute():
 			parent_okr = parent_okr_tuple[0] if parent_okr_tuple else None
 			if not parent_okr:
 				continue
-
 			# Check if parent OKR exists
 			if not frappe.db.exists("OKR", parent_okr):
 				not_found.append(parent_okr)
@@ -53,13 +52,11 @@ def execute():
 				f"Updated {updated_count} parent OKRs to is_group = 1",
 				"OKR parent is_group update: Success"
 			)
-
 		if not_found:
 			frappe.log_error(
 				f"Parent OKRs not found: {', '.join(not_found)}",
 				"OKR parent is_group update: Missing parents"
 			)
-
 	except Exception as e:
 		frappe.log_error(
 			"Error updating parent OKRs is_group",

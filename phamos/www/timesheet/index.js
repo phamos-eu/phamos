@@ -3,6 +3,8 @@ let totalCount = 0;
 let loadedCount = 0;
 let currentSortBy = null;
 let currentSortOrder = null;
+let currentChartView = 'week'; // 'week' or 'month'
+let cachedTimesheetData = null; // Cache the timesheet data
 const sortFieldMap = {
     1: "timesheet",
     2: "start_date",
@@ -24,11 +26,38 @@ frappe.ready(() => {
     return; // Stop further execution
   }
 
+  // Initialize chart view from localStorage or default to 'week'
+  currentChartView = localStorage.getItem('timesheetChartView') || 'week';
+  updateChartViewButtons();
+
   //set default date range
   // set_default_month_range();
   load_projects();
   attach_filter_events();
   reset_and_load();
+
+  // Toggle buttons for chart view
+  $('#weekViewBtn').on('click', function() {
+    if (currentChartView !== 'week') {
+      currentChartView = 'week';
+      localStorage.setItem('timesheetChartView', 'week');
+      updateChartViewButtons();
+      if (cachedTimesheetData) {
+        processDataForGraph(cachedTimesheetData);
+      }
+    }
+  });
+
+  $('#monthViewBtn').on('click', function() {
+    if (currentChartView !== 'month') {
+      currentChartView = 'month';
+      localStorage.setItem('timesheetChartView', 'month');
+      updateChartViewButtons();
+      if (cachedTimesheetData) {
+        processDataForGraph(cachedTimesheetData);
+      }
+    }
+  });
 
   $('#load_more').on('click', () => {
     load_timesheets();
@@ -411,7 +440,7 @@ function download_visible_csv() {
     return;
   }
 
-  const headers = ['Timesheet', 'Status', 'Employee ID', 'Employee Name', 'Start Date', 'End Date', 'Billing Status', 'Total Hours', 'Billable Hours'];
+  const headers = ['Timesheet', 'Employee ID', 'Start Date', 'End Date', 'Billing Status', 'Total Hours', 'Billable Hours'];
   const csv = [headers.join(",")].concat(rows.map(r => r.join(","))).join("\n");
 
   const blob = new Blob([csv], { type: 'text/csv' });
@@ -450,7 +479,7 @@ function download_all_csv() {
         row.total_billable_hours
       ]);
 
-      const headers = ['Timesheet', 'Status', 'Employee ID', 'Employee Name', 'Start Date', 'End Date', 'Billing Status', 'Total Hours', 'Billable Hours'];
+      const headers = ['Timesheet', 'Employee ID', 'Start Date', 'End Date', 'Billing Status', 'Total Hours', 'Billable Hours'];
       const csv = [headers.join(",")].concat(rows.map(r => r.join(","))).join("\n");
 
       const blob = new Blob([csv], { type: 'text/csv' });
@@ -534,6 +563,17 @@ function escapeHtml(text = '') {
     .replace(/'/g, '&#39;');
 }
 
+// Update chart view button states
+function updateChartViewButtons() {
+  if (currentChartView === 'week') {
+    $('#weekViewBtn').addClass('active').removeClass('btn-outline-primary').addClass('btn-primary');
+    $('#monthViewBtn').removeClass('active btn-primary').addClass('btn-outline-primary');
+  } else {
+    $('#monthViewBtn').addClass('active').removeClass('btn-outline-primary').addClass('btn-primary');
+    $('#weekViewBtn').removeClass('active btn-primary').addClass('btn-outline-primary');
+  }
+}
+
 function update_summary_cards() {
   const from_date = $('#from_date').val();
   const to_date = $('#to_date').val();
@@ -549,32 +589,97 @@ function update_summary_cards() {
     }
   });
 }
+
+// Helper function to generate all weeks or months between two dates
+function generateCompletePeriods(minDate, maxDate, viewType) {
+    const periods = [];
+    const current = new Date(minDate);
+    
+    if (viewType === 'week') {
+        // Align to Monday of the start week
+        const day = current.getDay();
+        const diff = current.getDate() - day + (day === 0 ? -6 : 1);
+        current.setDate(diff);
+        
+        // Generate all Mondays between min and max
+        while (current <= maxDate) {
+            periods.push(current.toISOString().split('T')[0]);
+            current.setDate(current.getDate() + 7); // Next Monday
+        }
+    } else {
+        // Monthly view - align to first of month
+        current.setDate(1);
+        
+        // Generate all months between min and max
+        while (current <= maxDate) {
+            const year = current.getFullYear();
+            const month = String(current.getMonth() + 1).padStart(2, '0');
+            periods.push(`${year}-${month}`);
+            current.setMonth(current.getMonth() + 1);
+        }
+    }
+    
+    return periods;
+}
+
 //////////////////////////process your timesheets data////////////////////
 function processDataForGraph(timesheets) {
-    const weekCategories = new Set();
+    // Cache the data for later use when toggling
+    cachedTimesheetData = timesheets;
+    
+    if (!timesheets || timesheets.length === 0) {
+        // No data to display
+        Highcharts.chart('timesheet-graph-container', {
+            chart: { type: 'area' },
+            title: { text: 'Billable vs Non-Billable by Project' },
+            xAxis: { categories: [], title: { text: currentChartView === 'week' ? 'Week' : 'Month' } },
+            yAxis: { min: 0, title: { text: 'Hours' } },
+            series: []
+        });
+        return;
+    }
+    
     const projectData = {};
+    let minDate = null;
+    let maxDate = null;
 
+    // First pass: collect data and find date range
     timesheets.forEach(row => {
         const date = new Date(row.start_date);
-        const day = date.getDay();
-        const diff = date.getDate() - day + (day === 0 ? -6 : 1);
-        const monday = new Date(date.setDate(diff));
-        const weekStart = monday.toISOString().split('T')[0];
+        
+        if (!minDate || date < minDate) minDate = new Date(date);
+        if (!maxDate || date > maxDate) maxDate = new Date(date);
+        
+        let periodKey;
 
-        weekCategories.add(weekStart);
-
-        if (!projectData[row.project_name]) {
-            projectData[row.project_name] = {};
+        if (currentChartView === 'week') {
+            // Weekly aggregation
+            const day = date.getDay();
+            const diff = date.getDate() - day + (day === 0 ? -6 : 1);
+            const monday = new Date(date.setDate(diff));
+            periodKey = monday.toISOString().split('T')[0];
+        } else {
+            // Monthly aggregation
+            const year = date.getFullYear();
+            const month = String(date.getMonth() + 1).padStart(2, '0');
+            periodKey = `${year}-${month}`;
         }
-        if (!projectData[row.project_name][weekStart]) {
-            projectData[row.project_name][weekStart] = { total: 0, billable: 0 };
+
+        const projectKey = row.project_label; // use label instead of project_name
+
+        if (!projectData[projectKey]) {
+            projectData[projectKey] = {};
+        }
+        if (!projectData[projectKey][periodKey]) {
+            projectData[projectKey][periodKey] = { total: 0, billable: 0 };
         }
 
-        projectData[row.project_name][weekStart].total += parseFloat(row.total_hours || 0);
-        projectData[row.project_name][weekStart].billable += parseFloat(row.total_billable_hours || 0);
+        projectData[projectKey][periodKey].total += parseFloat(row.total_hours || 0);
+        projectData[projectKey][periodKey].billable += parseFloat(row.total_billable_hours || 0);
     });
 
-    const categories = Array.from(weekCategories).sort();
+    // Generate complete list of periods (weeks or months) between min and max dates
+    const sortedCategories = generateCompletePeriods(minDate, maxDate, currentChartView);
     const series = [];
     const colorPairs = [
         ['#3399ff', '#99ccff'], // Blue pair
@@ -589,8 +694,8 @@ function processDataForGraph(timesheets) {
         const billableData = [];
         const nonBillableData = [];
 
-        categories.forEach(week => {
-            const data = projectData[projectName][week] || { total: 0, billable: 0 };
+        sortedCategories.forEach(period => {
+            const data = projectData[projectName][period] || { total: 0, billable: 0 };
             billableData.push(data.billable);
             nonBillableData.push(data.total - data.billable);
         });
@@ -608,24 +713,97 @@ function processDataForGraph(timesheets) {
             color: colors[0],
             stack: projectName
         });
-        
 
         colorIndex++;
+    });
+
+    // Format categories for display
+    const displayCategories = sortedCategories.map(period => {
+        if (currentChartView === 'week') {
+            // Show week range: "Sep 15-21" instead of just "2025-09-15"
+            const weekStart = new Date(period);
+            const weekEnd = new Date(weekStart);
+            weekEnd.setDate(weekStart.getDate() + 6);
+            
+            const monthNames = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 
+                                'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+            const startMonth = monthNames[weekStart.getMonth()];
+            const endMonth = monthNames[weekEnd.getMonth()];
+            const startDay = weekStart.getDate();
+            const endDay = weekEnd.getDate();
+            
+            // Check if week spans two months
+            if (startMonth === endMonth) {
+                return `${startMonth} ${startDay}-${endDay}`;
+            } else {
+                return `${startMonth} ${startDay}-${endMonth} ${endDay}`;
+            }
+        } else {
+            // Format as "MMM YYYY" for months
+            const [year, month] = period.split('-');
+            const monthNames = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 
+                                'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+            return `${monthNames[parseInt(month) - 1]} ${year}`;
+        }
     });
 
     Highcharts.chart('timesheet-graph-container', {
         chart: { type: 'area' },
         title: { text: 'Billable vs Non-Billable by Project' },
-        xAxis: { categories, title: { text: 'Week' } },
+        xAxis: { 
+            categories: displayCategories, 
+            title: { text: currentChartView === 'week' ? 'Week' : 'Month' },
+            labels: {
+                rotation: currentChartView === 'week' ? -45 : 0,
+                style: {
+                    fontSize: '11px'
+                }
+            }
+        },
         yAxis: { min: 0, title: { text: 'Hours' } },
         tooltip: {
             shared: true,
+            useHTML: true,
             formatter: function () {
-                let s = `<b>${this.x}</b><br/>`;
+                const pointIndex = this.points[0].point.index;
+                const period = sortedCategories[pointIndex];
+                const displayLabel = displayCategories[pointIndex];
+                
+                let tooltipHTML = `<div style="padding: 5px;">`;
+                
+                // Header with week/month info
+                if (currentChartView === 'week') {
+                    tooltipHTML += `<div style="font-weight: bold; margin-bottom: 5px; font-size: 13px;">${displayLabel}</div>`;
+                    tooltipHTML += `<div style="color: #666; font-size: 11px; margin-bottom: 8px;">Week starting: ${period}</div>`;
+                } else {
+                    tooltipHTML += `<div style="font-weight: bold; margin-bottom: 8px; font-size: 13px;">${displayLabel}</div>`;
+                }
+                
+                // Calculate total hours for this period
+                let totalHours = 0;
                 this.points.forEach(point => {
-                    s += `<span style="color:${point.color}">\u25CF</span> ${point.series.name}: <b>${point.y.toFixed(2)} hrs</b><br/>`;
+                    totalHours += point.y;
                 });
-                return s;
+                
+                // Show breakdown by project and type
+                this.points.forEach(point => {
+                    if (point.y > 0) {
+                        tooltipHTML += `<div style="margin: 3px 0;">
+                            <span style="color:${point.color}; font-size: 16px;">●</span> 
+                            <span style="font-size: 12px;">${point.series.name}: <strong>${point.y.toFixed(2)} hrs</strong></span>
+                        </div>`;
+                    }
+                });
+                
+                // Show total
+                if (totalHours > 0) {
+                    tooltipHTML += `<div style="margin-top: 8px; padding-top: 5px; border-top: 1px solid #ddd; font-weight: bold;">
+                        Total: ${totalHours.toFixed(2)} hrs
+                    </div>`;
+                }
+                
+                tooltipHTML += `</div>`;
+                return tooltipHTML;
             }
         },
         plotOptions: {
@@ -667,7 +845,9 @@ function load_graph_data() {
     args: { from_date, to_date, project },
     callback: function (r) {
       if (r.message) {
-        loadAndRenderGraph(r.message);
+        // loadAndRenderGraph(r.message);
+        processDataForGraph(r.message.timesheets);
+
       }
     }
   });
@@ -751,3 +931,250 @@ document.addEventListener("click", function (event) {
         menu.style.display = "none";
     });
 });
+
+
+// ========================================
+// Sales Orders Tab Functionality
+// ========================================
+
+let salesOrderDataLoaded = false;
+let salesOrderData = null;
+
+// Listen for Sales Orders tab activation
+document.getElementById('sales-orders-tab').addEventListener('shown.bs.tab', function (event) {
+  if (!salesOrderDataLoaded) {
+    loadSalesOrderData();
+  }
+});
+
+function loadSalesOrderData() {
+  console.log('Loading sales order data...');
+  console.log('Current user:', frappe.session.user);
+  
+  frappe.call({
+    method: "phamos.api.get_customer_sales_order_status",
+    callback: function(response) {
+      console.log('Sales Order Response:', response);
+      console.log('Response message:', response.message);
+      console.log('Response exc:', response.exc);
+      
+      if (response.exc) {
+        console.error('API Exception:', response.exc);
+        frappe.msgprint({
+          title: 'Error',
+          message: 'Failed to load sales order data. Check console for details.',
+          indicator: 'red'
+        });
+        showSalesOrderError();
+        return;
+      }
+      
+      if (response.message) {
+        salesOrderData = response.message;
+        salesOrderDataLoaded = true;
+        console.log('Sales Orders loaded:', salesOrderData);
+        console.log('Summary:', salesOrderData.summary);
+        console.log('Sales Orders count:', salesOrderData.sales_orders.length);
+        renderSalesOrderData(salesOrderData);
+      } else {
+        console.log('No data returned from API');
+        showSalesOrderError();
+      }
+    },
+    error: function(err) {
+      console.error("Error loading sales order data:", err);
+      frappe.msgprint({
+        title: 'Error',
+        message: 'Failed to load sales order data. Check console for details.',
+        indicator: 'red'
+      });
+      showSalesOrderError();
+    }
+  });
+}
+
+function renderSalesOrderData(data) {
+  console.log('Rendering sales order data...');
+  console.log('Data received:', data);
+  
+  // Render summary cards
+  $('#total-so-hrs').text(formatNumber(data.summary.total_so_hrs));
+  $('#delivered-hrs').text(formatNumber(data.summary.delivered_hrs));
+  $('#remaining-hrs').text(formatNumber(data.summary.remaining_hrs));
+  $('#open-so-count').text(data.summary.open_so_count);
+  
+  console.log('Summary cards updated');
+  
+  // Render chart
+  try {
+    renderSalesOrderChart(data.chart_data);
+    console.log('Chart rendered');
+  } catch (e) {
+    console.error('Error rendering chart:', e);
+  }
+  
+  // Render table
+  try {
+    renderSalesOrderTable(data.sales_orders);
+    console.log('Table rendered');
+  } catch (e) {
+    console.error('Error rendering table:', e);
+  }
+}
+
+function renderSalesOrderChart(chartData) {
+  console.log('Rendering chart with data:', chartData);
+  
+  // Use Frappe Charts (exactly like Implementation doctype)
+  const chartContainer = document.getElementById('so-delivery-chart');
+  
+  if (!chartContainer) {
+    console.error('Chart container not found!');
+    return;
+  }
+  
+  if (chartData.values.every(v => v === 0)) {
+    console.log('All chart values are zero');
+    chartContainer.innerHTML = '<div class="text-center text-muted" style="padding: 50px 0;"><p>No delivery data available</p></div>';
+    return;
+  }
+  
+  chartContainer.innerHTML = '<div id="delivered-qty-chart"></div>';
+  
+  // Wait for DOM update
+  setTimeout(() => {
+    try {
+      // Check if frappe.Chart is available - if not, use global Chart from frappe-charts library
+      const ChartConstructor = (typeof frappe !== 'undefined' && frappe.Chart) ? frappe.Chart : (typeof Chart !== 'undefined' ? Chart : null);
+      
+      if (!ChartConstructor) {
+        console.error('Chart library not available');
+        chartContainer.innerHTML = '<div class="text-center text-danger" style="padding: 50px 0;"><p>Chart library not loaded</p></div>';
+        return;
+      }
+      
+      console.log('Using chart constructor:', ChartConstructor.name || 'Chart');
+      
+      // Create chart using Frappe Charts (same config as Implementation)
+      new ChartConstructor("#delivered-qty-chart", {
+        type: 'percentage',
+        data: {
+          labels: chartData.labels,
+          datasets: [{
+            name: "Financial Information",
+            values: chartData.values
+          }]
+        },
+        colors: ['green', 'yellow', 'blue'],
+        height: 250,
+        maxLegendLines: 2,
+        truncateLegends: 10,
+      });
+      console.log('Chart created successfully');
+    } catch (e) {
+      console.error('Error creating chart:', e);
+      chartContainer.innerHTML = '<div class="text-center text-danger" style="padding: 50px 0;"><p>Error rendering chart: ' + e.message + '</p></div>';
+    }
+  }, 100);
+}
+
+function renderSalesOrderTable(salesOrders) {
+  const tbody = $('#so-table-body');
+  tbody.empty();
+  
+  if (salesOrders.length === 0) {
+    tbody.append(`
+      <tr>
+        <td colspan="7" class="text-center text-muted" style="padding: 40px;">
+          <i class="fa fa-inbox fa-2x mb-3" style="opacity: 0.3;"></i>
+          <p class="mb-0"><strong>No Sales Orders Found</strong></p>
+          <p class="small">There are no sales orders linked to implementations for your account yet.</p>
+        </td>
+      </tr>
+    `);
+    return;
+  }
+  
+  salesOrders.forEach(so => {
+    const statusBadge = getStatusBadge(so.status);
+    const progressPercent = so.total_hrs > 0 ? (so.delivered_hrs / so.total_hrs * 100).toFixed(1) : 0;
+    const progressColor = getProgressColor(progressPercent);
+    
+    const row = `
+      <tr>
+        <td>
+          <a href="/app/sales-order/${so.name}" target="_blank">
+            ${so.name}
+          </a>
+        </td>
+        <td>${escapeHtml(so.title || '-')}</td>
+        <td>${statusBadge}</td>
+        <td>${formatNumber(so.total_hrs)}</td>
+        <td>${formatNumber(so.delivered_hrs)}</td>
+        <td>${formatNumber(so.remaining_hrs)}</td>
+        <td>
+          <div class="d-flex align-items-center gap-2">
+            <div class="progress flex-grow-1">
+              <div class="progress-bar ${progressColor}" 
+                   style="width: ${progressPercent}%">
+              </div>
+            </div>
+            <span class="small text-nowrap" style="min-width: 40px;">${progressPercent}%</span>
+          </div>
+        </td>
+      </tr>
+    `;
+    
+    tbody.append(row);
+  });
+}
+
+function getStatusBadge(status) {
+  const statusMap = {
+    'Draft': 'secondary',
+    'To Deliver and Bill': 'primary',
+    'To Bill': 'info',
+    'To Deliver': 'warning',
+    'Completed': 'success',
+    'Cancelled': 'danger',
+    'Closed': 'dark',
+    'On Hold': 'secondary'
+  };
+  
+  const badgeClass = statusMap[status] || 'secondary';
+  return `<span class="badge bg-${badgeClass}">${status}</span>`;
+}
+
+function getProgressColor(percent) {
+  if (percent >= 100) return 'bg-success';
+  if (percent >= 50) return 'bg-info';
+  if (percent >= 25) return 'bg-warning';
+  return 'bg-danger';
+}
+
+function formatNumber(num) {
+  if (num === null || num === undefined) return '0';
+  return parseFloat(num).toFixed(2);
+}
+
+function escapeHtml(text) {
+  if (!text) return '';
+  const map = {
+    '&': '&amp;',
+    '<': '&lt;',
+    '>': '&gt;',
+    '"': '&quot;',
+    "'": '&#039;'
+  };
+  return text.replace(/[&<>"']/g, function(m) { return map[m]; });
+}
+
+function showSalesOrderError() {
+  $('#so-table-body').html(`
+    <tr>
+      <td colspan="7" class="text-center text-danger py-4">
+        <i class="fa fa-exclamation-triangle me-2"></i> Error loading sales orders. Please try again.
+      </td>
+    </tr>
+  `);
+}
