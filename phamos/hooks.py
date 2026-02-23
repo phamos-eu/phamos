@@ -15,7 +15,6 @@ required_apps = ["erpnext", "hrms"]
 app_include_css = [
     "/assets/phamos/css/sales_order_kpi.css",
     "/assets/phamos/css/dark_mode_fix.css"
-
 ]
 # app_include_js = "/assets/phamos/js/phamos.js"
 
