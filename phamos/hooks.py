@@ -145,6 +145,18 @@ website_route_rules = [
 doc_events = {
     "Team": {
         "after_save": "phamos.phamos.doctype.team.team.create_team_capacity_ledger_entry"
+    },
+    "Communication": {
+        "on_update": "phamos.events.communication.copy_attachments_to_reference_doc"
+    },
+    "Accounting Receipt": {
+        "after_insert": [
+            "phamos.phamos.doctype.accounting_receipt.accounting_receipt.sync_attachment_from_files",
+            "phamos.phamos.doctype.accounting_receipt.mistral_pdf.run_auto_extract_if_attachment",
+        ],
+        "on_update": [
+            "phamos.phamos.doctype.accounting_receipt.mistral_pdf.run_auto_extract_if_attachment",
+        ],
     }
 }
 
