@@ -56,20 +56,52 @@ def make_accounting_receipt(issue):
 	issue_doc.db_set("accounting_receipt", ar.name)
 
 	""" Get the email data and attachments """
-	communication_data = get_communications("Issue",issue)
+	communication_data = get_communications("Issue", issue)
 	for data in communication_data:
 		content = data.content
-		attachments = frappe.get_all(
-		"File",
-		fields=["name"],
-		filters={"attached_to_name": "Communication", "attached_to_doctype": data.name},
-		)
 		""" Transfer the attachments """
-		if attachments := [d.name for d in get_attachments("Communication",data.name)]:
+		if attachments := [d.name for d in get_attachments("Communication", data.name)]:
 			for attachment in attachments:
-				file_doc = frappe.get_doc("File",attachment)
+				file_doc = frappe.get_doc("File", attachment)
 				file_doc.db_set("attached_to_doctype", "Accounting Receipt")
 				file_doc.db_set("attached_to_name", ar.name)
-		"""" Add email as Comment """		
+		""" Add email as Comment """
 		ar.add_comment("Comment", content)
+
+	""" Set doc-level attachment field from first attached file if any """
+	_sync_attachment_field(ar.name)
 	return ar.name
+
+
+def _sync_attachment_field(accounting_receipt_name):
+	"""Set Accounting Receipt's attachment field from first File attached to it, if field is empty."""
+	first = frappe.db.get_value(
+		"File",
+		filters={
+			"attached_to_doctype": "Accounting Receipt",
+			"attached_to_name": accounting_receipt_name,
+		},
+		fieldname="file_url",
+		order_by="creation asc",
+	)
+	if first:
+		frappe.db.set_value("Accounting Receipt", accounting_receipt_name, "attachment", first)
+		# Auto-extract from PDF (runs in background; no on_update when we only db_set)
+		try:
+			from phamos.phamos.doctype.accounting_receipt.mistral_pdf import extract_from_pdf_and_update_ar
+			frappe.enqueue(
+				extract_from_pdf_and_update_ar,
+				queue="default",
+				timeout=300,
+				accounting_receipt_name=accounting_receipt_name,
+				enqueue_after_commit=True,
+			)
+		except Exception:
+			pass
+
+
+def sync_attachment_from_files(doc, event=None):
+	"""Doc event: when Accounting Receipt has no attachment but has attached Files, set attachment from first file."""
+	if doc.get("attachment"):
+		return
+	_sync_attachment_field(doc.name)
