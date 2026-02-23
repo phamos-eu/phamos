@@ -170,6 +170,18 @@
    "read_only": 1
   },
   {
+   "collapsible": 1,
+   "fieldname": "child_kra_progress_section",
+   "fieldtype": "Section Break",
+   "label": "Child KRA Progress"
+  },
+  {
+   "fieldname": "child_kra_progress_html",
+   "fieldtype": "HTML",
+   "label": "Child KRA Progress",
+   "read_only": 1
+  },
+  {
    "fieldname": "section_break_2",
    "fieldtype": "Section Break",
    "label": "Risk & Dependencies"
