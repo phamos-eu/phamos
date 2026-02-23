@@ -21,14 +21,13 @@ def execute():
 	if not frappe.db.exists("DocType", "KR"):
 		frappe.log_error("KR Migration: DocType Missing", "KR doctype does not exist. Please ensure OKR Addon module is installed.")
 		return
-	
+
 	# Reload KR doctype to ensure it's up to date
 	try:
 		frappe.reload_doc("OKR Addon", "doctype", "KR")
 	except Exception as e:
 		frappe.log_error("KR Migration: Reload Error", f"Error reloading KR doctype: {str(e)}")
 		# Continue anyway, KR might already exist
-	
 	# Step 2: Get all unique metric_name values from Measurable child table
 	measurables = frappe.db.sql("""
 		SELECT DISTINCT metric_name
@@ -36,36 +35,35 @@ def execute():
 		WHERE metric_name IS NOT NULL AND metric_name != ''
 		AND metric_name NOT LIKE '%-%'  -- Exclude already migrated KR names (they contain hyphens)
 	""", as_dict=True)
-	
+
 	if not measurables:
 		frappe.log_error("KR Migration: No Records", "No Measurable records found to migrate")
 		return
-	
+
 	frappe.log_error("KR Migration: Starting", f"Found {len(measurables)} unique metric names to migrate")
-	
+
 	# Step 3: Create KR records for each unique metric_name
 	kra_mapping = {}  # Maps old metric_name to new KR name
-	
+
 	for measurable in measurables:
 		metric_name = measurable.metric_name.strip()
-		
+
 		if not metric_name:
 			continue
-		
+
 		# Skip if it's already a KR name (contains hyphen, which is Frappe's naming pattern)
 		if '-' in metric_name and frappe.db.exists("KR", metric_name):
 			kra_mapping[metric_name] = metric_name
 			continue
-		
+
 		# Generate a short title for KR (max 140 chars for name field, but keep title shorter for safety)
 		# Truncate to 100 chars to ensure the auto-generated name doesn't exceed limits
 		short_title = metric_name[:100] if len(metric_name) <= 100 else metric_name[:97] + "..."
-		
+
 		# Check if KR already exists by title (check both full and truncated)
 		existing_kra = frappe.db.get_value("KR", {"title": metric_name}, "name")
 		if not existing_kra:
 			existing_kra = frappe.db.get_value("KR", {"title": short_title}, "name")
-		
 		if existing_kra:
 			kra_mapping[metric_name] = existing_kra
 			# Truncate long metric_name in log message
@@ -104,30 +102,28 @@ def execute():
 					error_msg = "Previous error occurred (see details in description)"
 				frappe.log_error("KR Migration: Error", f"Error for {metric_short}: {error_msg}")
 				continue
-	
 	# Step 4: Update all Measurable records to use KR link
 	# Get all Measurable records that need updating
 	all_measurables = frappe.db.sql("""
 		SELECT name, parent, parenttype, metric_name
 		FROM `tabMeasurable`
-		WHERE metric_name IS NOT NULL 
+		WHERE metric_name IS NOT NULL
 		AND metric_name != ''
 		AND metric_name NOT LIKE '%-%'  -- Exclude already migrated records
 	""", as_dict=True)
-	
+
 	updated_count = 0
 	failed_count = 0
-	
+
 	for measurable in all_measurables:
 		metric_name = measurable.metric_name.strip()
 		kra_name = kra_mapping.get(metric_name)
-		
+
 		if not kra_name:
 			metric_short = metric_name[:60] if len(metric_name) > 60 else metric_name
 			frappe.log_error("KR Migration: No Mapping", f"No mapping for: {metric_short}")
 			failed_count += 1
 			continue
-		
 		try:
 			# Update the metric_name field to store KR name
 			# This will work when the field type changes to Link
@@ -141,7 +137,7 @@ def execute():
 				error_msg = "Update failed (see details in description)"
 			frappe.log_error("KR Migration: Update Failed", f"Error updating {measurable_short}: {error_msg}")
 			failed_count += 1
-	
+
 	frappe.log_error("KR Migration: Complete", f"Migration completed: {updated_count} updated, {failed_count} failed, {len(kra_mapping)} KRs created")
-	
+
 	frappe.db.commit()

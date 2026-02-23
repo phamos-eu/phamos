@@ -55,7 +55,7 @@ frappe.ui.form.on("Accounting Receipt", {
                 frm.page.set_inner_btn_group_as_primary(__("Create"));
         }
 
-        // Hide PDF Preview if no attachment available or display it onload of document 
+        // Hide PDF Preview if no attachment available or display it onload of document
         frm.toggle_display("pdf_preview", false);
         frm.trigger("attachment");
 
@@ -73,7 +73,7 @@ frappe.ui.form.on("Accounting Receipt", {
         if (file_extension === "pdf") {
             $preview = $(`<div class="img_preview">
                 <h2 style="
-                        font-size: var(--text-lg);   
+                        font-size: var(--text-lg);
                         font-weight: var(--weight-semibold);
                         letter-spacing: .015em;
                         color: var(--text-color);
@@ -303,4 +303,3 @@ var set_timesheet_detail_rate = function(cdt, cdn, currency, timelog) {
         }
     });
 }
-

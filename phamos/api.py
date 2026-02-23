@@ -42,7 +42,7 @@ def get_timesheets(from_date=None, to_date=None, project=None, offset=0, limit=2
         "creation": "ts.creation"
     }
 
-    order_field = valid_sort_fields.get(sort_by, "ts.creation")  
+    order_field = valid_sort_fields.get(sort_by, "ts.creation")
     order_direction = "ASC" if sort_order == "asc" else "DESC"
 
     # Total count
@@ -53,7 +53,7 @@ def get_timesheets(from_date=None, to_date=None, project=None, offset=0, limit=2
     """, values)[0][0]
 
     timesheets = frappe.db.sql(f"""
-        SELECT 
+        SELECT
             ts.name,
             ts.employee,
             ts.custom_billing_status,
@@ -194,7 +194,7 @@ def get_timesheet_totals(from_date=None, to_date=None, project=None):
 def get_graph_data(from_date=None, to_date=None, project=None):
     user = frappe.session.user
     validate_guest_user()
-    
+
     customer = get_customer_for_user(user)
     if not customer:
         frappe.throw("No Customer linked to user.", frappe.PermissionError)
@@ -208,7 +208,7 @@ def get_graph_data(from_date=None, to_date=None, project=None):
         filters += f" AND parent_project = '{project}'"
 
     data = frappe.db.sql(f"""
-        SELECT 
+        SELECT
             name,
             start_date,
             total_hours,
@@ -229,49 +229,49 @@ def get_graph_data(from_date=None, to_date=None, project=None):
 def get_sales_order_kpi_preference():
     """Get user's preferred KPI display mode for Sales Orders"""
     user = frappe.session.user
-    
+
     # Check if preference exists in user defaults
     preference = frappe.db.get_value(
         "DefaultValue",
         {"parent": user, "defkey": "sales_order_kpi_display_mode"},
         "defvalue"
     )
-    
+
     return preference or "all"
 
 
 @frappe.whitelist()
 def set_sales_order_kpi_preference(mode):
     """Set user's preferred KPI display mode for Sales Orders
-    
+
     Args:
         mode: One of 'all', 'indicators', 'progress_bars', 'cards', 'html_section'
     """
     valid_modes = ['all', 'indicators', 'progress_bars', 'cards', 'html_section']
-    
+
     if mode not in valid_modes:
         frappe.throw(_("Invalid display mode. Choose from: {0}").format(", ".join(valid_modes)))
-    
+
     user = frappe.session.user
-    
+
     # Set user default
     frappe.db.set_default("sales_order_kpi_display_mode", mode, user)
     frappe.db.commit()
-    
+
     return {"success": True, "mode": mode, "message": _("Display preference saved successfully")}
 
 
 @frappe.whitelist()
 def get_sales_order_kpi_stats(sales_order):
     """Get detailed KPI statistics for a Sales Order
-    
+
     Returns delivery and billing details including related documents
     """
     if not frappe.has_permission("Sales Order", "read", sales_order):
         frappe.throw(_("Not permitted"), frappe.PermissionError)
-    
+
     so = frappe.get_doc("Sales Order", sales_order)
-    
+
     # Get related documents
     delivery_notes = frappe.get_all(
         "Delivery Note Item",
@@ -279,19 +279,19 @@ def get_sales_order_kpi_stats(sales_order):
         fields=["parent", "qty", "item_code"],
         group_by="parent"
     )
-    
+
     sales_invoices = frappe.get_all(
         "Sales Invoice Item",
         filters={"sales_order": sales_order, "docstatus": 1},
         fields=["parent", "qty", "amount", "item_code"],
         group_by="parent"
     )
-    
+
     # Calculate totals
     total_qty = sum([item.qty for item in so.items])
     delivered_qty = sum([item.delivered_qty for item in so.items])
     billed_qty = sum([item.billed_qty if hasattr(item, 'billed_qty') else 0 for item in so.items])
-    
+
     return {
         "per_delivered": so.per_delivered,
         "per_billed": so.per_billed,
@@ -309,32 +309,31 @@ def get_sales_order_kpi_stats(sales_order):
         "billing_status": so.billing_status
     }
 
-
 @frappe.whitelist()
 def get_customer_sales_order_status():
     """Get sales order delivery status for customer portal
-    
+
     Returns all sales orders linked to implementations for the logged-in customer
     with delivery status information, summary metrics, and chart data
     """
     user = frappe.session.user
-    
+
     validate_guest_user()
     customer = get_customer_for_user(user)
     if not customer:
         frappe.throw("No Customer linked to user.", frappe.PermissionError)
-    
+
     frappe.log_error(f"Customer Portal - User: {user}, Customer: {customer}", "SO Status Debug")
-    
+
     # Get all implementations for this customer using SQL (bypasses permission check)
     implementations = frappe.db.sql("""
         SELECT name, status, department
         FROM `tabImplementation`
         WHERE customer = %s
     """, customer, as_dict=True)
-    
+
     frappe.log_error(f"Found {len(implementations)} implementations: {[i.name for i in implementations]}", "SO Status Debug")
-    
+
     if not implementations:
         return {
             "sales_orders": [],
@@ -351,12 +350,12 @@ def get_customer_sales_order_status():
                 "values": [0, 0, 0]
             }
         }
-    
+
     implementation_names = [impl.name for impl in implementations]
-    
+
     # Get all sales orders for these implementations (ALL statuses)
     sales_orders = frappe.db.sql("""
-        SELECT 
+        SELECT
             so.name,
             so.title,
             so.status,
@@ -368,20 +367,20 @@ def get_customer_sales_order_status():
             so.grand_total,
             so.custom_implementation as implementation
         FROM `tabSales Order` so
-        WHERE 
+        WHERE
             so.custom_implementation IN %(implementations)s
             AND so.docstatus = 1
             AND so.status NOT IN ('Cancelled', 'Closed')
         ORDER BY so.transaction_date DESC
     """, {"implementations": implementation_names}, as_dict=True)
-    
+
     frappe.log_error(f"Found {len(sales_orders)} sales orders", "SO Status Debug")
-    
+
     total_so_hrs = 0
     total_delivered_hrs = 0
     total_timesheet_hrs = 0
     open_so_count = 0
-    
+
     # Process each sales order
     for so in sales_orders:
         # Calculate delivered hours from delivery notes
@@ -389,26 +388,26 @@ def get_customer_sales_order_status():
             SELECT SUM(dni.qty) as delivered_qty
             FROM `tabDelivery Note Item` dni
             JOIN `tabDelivery Note` dn ON dn.name = dni.parent
-            WHERE 
+            WHERE
                 dni.against_sales_order = %s
                 AND dn.docstatus = 1
                 AND dn.status NOT IN ('Cancelled', 'Closed')
         """, so.name, as_dict=True)
-        
+
         so.delivered_hrs = delivered_hrs[0].delivered_qty if delivered_hrs[0].delivered_qty else 0
         so.remaining_hrs = so.total_hrs - so.delivered_hrs
-        
+
         # Add to totals
         total_so_hrs += so.total_hrs or 0
         total_delivered_hrs += so.delivered_hrs or 0
-        
+
         # Count open sales orders
         if so.status in ["To Deliver", "To Bill", "To Deliver and Bill"]:
             open_so_count += 1
-    
+
     # Calculate billable timesheet hours (not on delivery note) for open SOs
     open_so_names = [so.name for so in sales_orders if so.status in ["To Deliver", "To Bill", "To Deliver and Bill"]]
-    
+
     if open_so_names:
         # Get projects for these implementations using SQL
         projects = frappe.db.sql("""
@@ -416,26 +415,26 @@ def get_customer_sales_order_status():
             FROM `tabProject`
             WHERE custom_implementation IN %(implementations)s
         """, {"implementations": implementation_names}, as_dict=True)
-        
+
         project_names = [p.name for p in projects]
-        
+
         if project_names:
             timesheet_hrs_result = frappe.db.sql("""
                 SELECT SUM(td.hours) as timesheet_hrs
                 FROM `tabTimesheet` t
                 JOIN `tabTimesheet Detail` td ON t.name = td.parent
-                WHERE 
+                WHERE
                     td.is_billable = 1
                     AND t.docstatus = 0
                     AND td.project IN %(projects)s
                     AND td.custom_implementation IN %(implementations)s
                     AND t.custom_delivery_note IS NULL
             """, {"projects": project_names, "implementations": implementation_names}, as_dict=True)
-            
+
             total_timesheet_hrs = timesheet_hrs_result[0].timesheet_hrs if timesheet_hrs_result and timesheet_hrs_result[0].timesheet_hrs else 0
-    
+
     total_remaining_hrs = total_so_hrs - total_delivered_hrs
-    
+
     # Prepare chart data (same as Implementation doctype - percentage chart)
     chart_data = {
         "labels": ["Delivered Hrs", "Timesheet Hrs", "Remaining Hrs"],
@@ -445,7 +444,7 @@ def get_customer_sales_order_status():
             float(total_remaining_hrs)
         ]
     }
-    
+
     result = {
         "sales_orders": sales_orders,
         "summary": {
@@ -458,7 +457,7 @@ def get_customer_sales_order_status():
         },
         "chart_data": chart_data
     }
-    
+
     frappe.log_error(f"Returning result with {len(sales_orders)} orders", "SO Status Debug")
     return result
 
@@ -687,7 +686,7 @@ def send_monthly_comment_summary():
                 even more closely with your needs. We look forward to your contributions!
             </p>
 
-            <table border="1" cellpadding="6" cellspacing="0" 
+            <table border="1" cellpadding="6" cellspacing="0"
                    style="border-collapse: collapse; font-size: 12px;">
                 <thead style="background-color: #f5f5f5;">
                     <tr>
