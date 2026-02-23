@@ -970,43 +970,47 @@ function show_tab(tab, projectData) {
       // style inject (calendar styles)
       let style = document.createElement("style");
       style.innerHTML = `
-        table.timezone-table { 
-          border-collapse: collapse; 
-          width: 100%; 
-          text-align: center; 
-          font-size: 12px; 
+        table.timezone-table {
+          border-collapse: collapse;
+          width: 100%;
+          text-align: center;
+          font-size: 12px;
+          background: var(--bg-color, #fff);
+          color: var(--text-color, #222);
         }
-        table.timezone-table th, 
-        table.timezone-table td { 
-          border: 1px solid #999; 
-          padding: 6px 4px 14px 4px;  
-          position: relative; 
-          vertical-align: top;       
+        table.timezone-table th,
+        table.timezone-table td {
+          border: 1px solid var(--border-color, #999);
+          padding: 6px 4px 14px 4px;
+          position: relative;
+          vertical-align: top;
           height: 40px;
         }
-        table.timezone-table th { background: #ddd; }
+        table.timezone-table th {
+          background: var(--control-bg, #ddd);
+          color: var(--text-color, #222);
+        }
 
         table.timezone-table td::after {
           content: "";
           position: absolute;
           left: 0;
           right: 0;
-          top: 50%;               
-          border-top: 1px dotted #aaa; 
-          z-index: 0; 
+          top: 50%;
+          border-top: 1px dotted var(--border-color, #aaa);
+          z-index: 0;
         }
 
         table.timezone-table td span {
           position: relative;
-          z-index: 1; 
-          background: #f9f9f9;
+          z-index: 1;
+          background: var(--bg-light, #f9f9f9);
+          color: var(--text-color, #222);
           padding: 2px 4px;
         }
 
         /* Timesheet record box */
         .timesheet-box {
-          // background: rgba(0, 123, 255, 0.2);
-          // border: 1px solid #007bff;
           border-radius: 4px;
           font-size: 11px;
           padding: 4px;
@@ -1015,25 +1019,26 @@ function show_tab(tab, projectData) {
           left: 10px;
           right: 10px;
           overflow: hidden;
+          color: var(--text-color, #222);
         }
 
         /* parent container for calendar + records */
         .calendar-wrapper {
           flex-direction: row;
-          border: 1px solid #ccc;
+          border: 1px solid var(--border-color, #ccc);
           border-radius: 8px;
           overflow: hidden;
-          background: #f9f9f9;
+          background: var(--bg-color, #181c32);
         }
         .calendar-left {
           flex: 1;
-          border-right: 1px solid #ccc;
-          // padding: 10px;
+          border-right: 1px solid var(--border-color, #ccc);
         }
         .calendar-right {
           flex: 1;
           padding: 10px;
-          background: #fff;
+          background: var(--bg-color, #fff);
+          color: var(--text-color, #222);
           position: relative;
         }
         .calendar-right::before {
@@ -1047,7 +1052,7 @@ function show_tab(tab, projectData) {
             to bottom,
             transparent,
             transparent 39px,
-            #ddd 40px
+            var(--border-color, #ddd) 40px
           );
           pointer-events: none;
         }
@@ -1218,8 +1223,11 @@ function renderTimesheetCalendar(container) {
   // 🔹 Date picker container
   const dateWrapper = document.createElement("div");
   dateWrapper.className = "mb-2";
+  dateWrapper.style.background = "var(--bg-color, #fff)";
+  dateWrapper.style.borderRadius = "8px";
+  dateWrapper.style.padding = "10px 0";                                                                                                                                                                                                                                                                                                                                                                                                                   
 
-  const dateInput = document.createElement("input");
+  const dateInput = document.createElement("input");                                                                                                                                                                                                                                                                                                                                      
   dateInput.type = "date";
   dateInput.value = new Date().toISOString().split("T")[0]; // default today
   dateInput.className = "border px-2 py-1 rounded";
