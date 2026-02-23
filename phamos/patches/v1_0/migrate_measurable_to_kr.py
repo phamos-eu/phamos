@@ -28,7 +28,6 @@ def execute():
 	except Exception as e:
 		frappe.log_error("KR Migration: Reload Error", f"Error reloading KR doctype: {str(e)}")
 		# Continue anyway, KR might already exist
-
 	# Step 2: Get all unique metric_name values from Measurable child table
 	measurables = frappe.db.sql("""
 		SELECT DISTINCT metric_name
@@ -65,7 +64,6 @@ def execute():
 		existing_kra = frappe.db.get_value("KR", {"title": metric_name}, "name")
 		if not existing_kra:
 			existing_kra = frappe.db.get_value("KR", {"title": short_title}, "name")
-
 		if existing_kra:
 			kra_mapping[metric_name] = existing_kra
 			# Truncate long metric_name in log message
@@ -104,7 +102,6 @@ def execute():
 					error_msg = "Previous error occurred (see details in description)"
 				frappe.log_error("KR Migration: Error", f"Error for {metric_short}: {error_msg}")
 				continue
-
 	# Step 4: Update all Measurable records to use KR link
 	# Get all Measurable records that need updating
 	all_measurables = frappe.db.sql("""
@@ -127,7 +124,6 @@ def execute():
 			frappe.log_error("KR Migration: No Mapping", f"No mapping for: {metric_short}")
 			failed_count += 1
 			continue
-
 		try:
 			# Update the metric_name field to store KR name
 			# This will work when the field type changes to Link

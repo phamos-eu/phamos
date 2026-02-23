@@ -310,6 +310,8 @@ frappe.ui.form.on("Accounting Receipt", {
             var v = extracted[k];
             return v != null && String(v).trim() !== "";
         });
+        // Update exchange rate and EUR sum on refresh
+        frm.events.update_exchange_and_base_sum(frm);
     },
 
     attachment: function (frm) {
@@ -456,9 +458,76 @@ frappe.ui.form.on("Accounting Receipt", {
                 callback: function(r) {
                     if (r.message && r.message.default_currency) {
                         frm.set_value("currency", r.message.default_currency);
+                        // When currency changes due to supplier, update exchange rate and base sum
+                        frm.events.update_exchange_and_base_sum(frm);
                     }
                 }
             });
+        }
+    },
+
+    posting_date: function(frm) {
+        // Recompute exchange rate and base sum when transaction date changes
+        frm.events.update_exchange_and_base_sum(frm);
+    },
+
+    currency: function(frm) {
+        // Recompute when currency changes manually
+        frm.events.update_exchange_and_base_sum(frm);
+    },
+
+    sum: function(frm) {
+        // Recompute base sum when original sum changes
+        frm.events.update_exchange_and_base_sum(frm);
+    },
+
+    async update_exchange_and_base_sum(frm) {
+        // Determine company currency
+        const company = frm.doc.company || frappe.defaults.get_user_default("company");
+        if (!company || !frm.doc.currency) {
+            return;
+        }
+
+        const company_currency = await frappe.call({
+            method: "frappe.client.get_value",
+            args: {
+                doctype: "Company",
+                filters: { name: company },
+                fieldname: ["default_currency"]
+            }
+        }).then(r => (r.message && r.message.default_currency) ? r.message.default_currency : null);
+
+        if (!company_currency) {
+            return;
+        }
+
+        // If same currency, conversion rate is 1 and base sum equals sum
+        if (company_currency === frm.doc.currency) {
+            if (frm.doc.conversion_rate !== 1) {
+                frm.set_value("conversion_rate", 1);
+            }
+            if (frm.doc.sum) {
+                frm.set_value("sum_in_company_currency", frm.doc.sum);
+            }
+            return;
+        }
+
+        // Fetch exchange rate for the posting date
+        const rate = await frappe.call({
+            method: "erpnext.setup.utils.get_exchange_rate",
+            args: {
+                from_currency: frm.doc.currency,
+                to_currency: company_currency,
+                transaction_date: frm.doc.posting_date || frappe.datetime.get_today()
+            }
+        }).then(r => r.message || null);
+
+        if (rate) {
+            // Update conversion_rate and computed base sum (EUR)
+            frm.set_value("conversion_rate", rate);
+            if (frm.doc.sum) {
+                frm.set_value("sum_in_company_currency", flt(frm.doc.sum) * flt(rate));
+            }
         }
     }
 });
@@ -485,4 +554,3 @@ var set_timesheet_detail_rate = function(cdt, cdn, currency, timelog) {
         }
     });
 }
-

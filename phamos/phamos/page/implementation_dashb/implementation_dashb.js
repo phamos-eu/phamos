@@ -73,7 +73,7 @@ frappe.pages['implementation-dashb'].on_page_load = function (wrapper) {
     let globalColorIndex = 0;
     let currentDisplayMode = 'split'; // Default display mode: 'billable', 'nonBillable', 'split', 'combined'
     let internalProjectsVisible = true; // Toggle for internal projects visibility
-    
+
     // Set dedicated color for Internal Projects
     implementationColorMap['Internal Projects'] = ['#ff9933', '#ffcc99']; // Orange theme
 
@@ -82,8 +82,8 @@ frappe.pages['implementation-dashb'].on_page_load = function (wrapper) {
         let to_date = filters.to_date.get_value();
 
         if (!from_date && !to_date) {
-            const today = frappe.datetime.get_today(); 
-            const past6 = frappe.datetime.add_months(today, -6); 
+            const today = frappe.datetime.get_today();
+            const past6 = frappe.datetime.add_months(today, -6);
             const future6 = frappe.datetime.add_months(today, 6);
             filters.from_date.set_value(past6);
             filters.to_date.set_value(future6);
@@ -144,7 +144,7 @@ frappe.pages['implementation-dashb'].on_page_load = function (wrapper) {
                 // Add Internal Projects to groupedData (treat same as regular implementations)
                 internalProjectsData.forEach(row => {
                     const impl = 'Internal Projects';
-                    
+
                     if (!groupedData[impl]) {
                         groupedData[impl] = {
                             billable: new Array(categories.length).fill(0),
@@ -164,14 +164,14 @@ frappe.pages['implementation-dashb'].on_page_load = function (wrapper) {
                     if (impl === 'Internal Projects' && !internalProjectsVisible) {
                         return;
                     }
-                    
+
                     if (!implementationColorMap[impl]) {
                         implementationColorMap[impl] = colorPairs[globalColorIndex % colorPairs.length];
                         globalColorIndex++;
                     }
 
                     const colors = implementationColorMap[impl];
-                    
+
                     // Generate series based on display mode
                     if (currentDisplayMode === 'billable') {
                         // Only Billable
@@ -259,7 +259,7 @@ frappe.pages['implementation-dashb'].on_page_load = function (wrapper) {
 
                 const teamCapacitySeries = categories.map(month => {
                     if (capacityMap.hasOwnProperty(month)) {
-                        lastCapacity = capacityMap[month]; 
+                        lastCapacity = capacityMap[month];
                         return lastCapacity;
                     }
                     // carry forward
@@ -386,16 +386,16 @@ frappe.pages['implementation-dashb'].on_page_load = function (wrapper) {
                         formatter: function () {
                             const point = this.point;
                             const seriesName = this.series.name;
-                            const monthRaw = categories[this.point.index]; // Get actual month from categories array
                             const pointIndex = this.point.index;
-                            
+
+                            const monthRaw = categories[this.point.index]; // Get actual month from categories array
                             // Format month to readable format (e.g., "2025-04" -> "Apr 2025")
                             let month = monthRaw;
                             if (monthRaw && monthRaw.match(/^\d{4}-\d{2}$/)) {
                                 const momentMonth = moment(monthRaw, 'YYYY-MM');
                                 month = momentMonth.format('MMM YYYY'); // e.g., "Apr 2025"
                             }
-                            
+
                             // Extract implementation name from series name
                             let implName = seriesName;
                             let dataType = '';
@@ -409,7 +409,7 @@ frappe.pages['implementation-dashb'].on_page_load = function (wrapper) {
                                 implName = seriesName.replace(' - Total', '');
                                 dataType = 'Total';
                             }
-                            
+
                             // For prediction lines, show simple tooltip
                             if (seriesName.includes('Prediction') || seriesName.includes('Capacity')) {
                                 return `<div style="padding: 5px;">
@@ -417,7 +417,7 @@ frappe.pages['implementation-dashb'].on_page_load = function (wrapper) {
                                     <span style="color:${this.color}">●</span> ${seriesName}: <b>${this.y.toFixed(1)} hrs</b>
                                 </div>`;
                             }
-                            
+
                             // Find the matching billable/non-billable data for this implementation
                             const implData = groupedData[implName];
                             if (!implData) {
@@ -426,38 +426,38 @@ frappe.pages['implementation-dashb'].on_page_load = function (wrapper) {
                                     <span style="color:${this.color}">●</span> ${seriesName}: <b>${this.y.toFixed(1)} hrs</b>
                                 </div>`;
                             }
-                            
+
                             const billableHrs = implData.billable[pointIndex] || 0;
                             const nonBillableHrs = implData.nonBillable[pointIndex] || 0;
                             const totalHrs = billableHrs + nonBillableHrs;
-                            
+
                             // Calculate total across all months for this implementation
                             const implGrandTotal = implData.billable.reduce((sum, val, idx) => sum + val + (implData.nonBillable[idx] || 0), 0);
                             const percentOfImplTotal = implGrandTotal > 0 ? ((totalHrs / implGrandTotal) * 100).toFixed(1) : 0;
-                            
+
                             // Calculate grand total across ALL implementations
                             let grandTotal = 0;
                             Object.values(groupedData).forEach(data => {
                                 grandTotal += data.billable.reduce((sum, val, idx) => sum + val + (data.nonBillable[idx] || 0), 0);
                             });
                             const percentOfGrandTotal = grandTotal > 0 ? ((totalHrs / grandTotal) * 100).toFixed(1) : 0;
-                            
+
                             // Calculate month total for ALL implementations (for this specific month)
                             let monthTotalAllImplementations = 0;
                             Object.values(groupedData).forEach(data => {
                                 monthTotalAllImplementations += (data.billable[pointIndex] || 0) + (data.nonBillable[pointIndex] || 0);
                             });
                             const percentOfMonthTotal = monthTotalAllImplementations > 0 ? ((totalHrs / monthTotalAllImplementations) * 100).toFixed(1) : 0;
-                            
+
                             // Get implementation color
                             const implColors = implementationColorMap[implName] || ['#3399ff', '#ff9933'];
-                            
+
                             let tooltip = `<div style="min-width: 220px;">`;
                             tooltip += `<div style="font-size: 13px; font-weight: bold; color: #333; margin-bottom: 8px; border-bottom: 2px solid ${implColors[0]}; padding-bottom: 5px;">${implName}</div>`;
                             tooltip += `<div style="font-size: 12px; color: #666; margin-bottom: 8px;">${month}</div>`;
-                            
+
                             tooltip += `<div style="padding: 8px; background: #f8f9fa; border-radius: 4px; margin-bottom: 8px;">`;
-                            
+
                             // Mode-aware tooltip content
                             if (currentDisplayMode === 'billable') {
                                 // Billable Only mode - emphasize billable, show non-billable as context
@@ -497,21 +497,21 @@ frappe.pages['implementation-dashb'].on_page_load = function (wrapper) {
                                 tooltip += `<div style="border-top: 1px solid #ddd; padding-top: 4px; margin-top: 4px;">Month Total: <strong>${totalHrs.toFixed(1)} hrs</strong></div>`;
                             }
                             tooltip += `</div>`;
-                            
+
                             tooltip += `<div style="padding: 6px; background: #e3f2fd; border-radius: 4px; font-size: 11px;">`;
                             tooltip += `<div style="color: #555; font-weight: 600; margin-bottom: 4px;">${month} (All Implementations):</div>`;
                             tooltip += `<div style="color: #555; margin-left: 8px;">Month Total: <strong>${monthTotalAllImplementations.toFixed(1)} hrs</strong></div>`;
                             tooltip += `<div style="color: #555; margin-left: 8px; margin-bottom: 8px;">This Month is <strong>${percentOfMonthTotal}%</strong> of ${month} total</div>`;
-                            
+
                             tooltip += `<div style="color: #555; font-weight: 600; margin-bottom: 4px; padding-top: 6px; border-top: 1px solid #b3d9f2;">This Implementation:</div>`;
                             tooltip += `<div style="color: #555; margin-left: 8px;">All Time Total: <strong>${implGrandTotal.toFixed(1)} hrs</strong></div>`;
                             tooltip += `<div style="color: #555; margin-left: 8px; margin-bottom: 8px;">This Month is <strong>${percentOfImplTotal}%</strong></div>`;
-                            
+
                             tooltip += `<div style="color: #555; font-weight: 600; margin-bottom: 4px; padding-top: 6px; border-top: 1px solid #b3d9f2;">All Implementations (All Time):</div>`;
                             tooltip += `<div style="color: #555; margin-left: 8px;">Portfolio Total: <strong>${grandTotal.toFixed(1)} hrs</strong></div>`;
                             tooltip += `<div style="color: #555; margin-left: 8px;">This Month (${month}) is <strong>${percentOfGrandTotal}%</strong> of portfolio</div>`;
                             tooltip += `</div>`;
-                            
+
                             tooltip += `</div>`;
                             return tooltip;
                         }
@@ -632,19 +632,19 @@ frappe.pages['implementation-dashb'].on_page_load = function (wrapper) {
             let legendHTML = `
                 <div class="custom-legend" style="background: #f8f9fa; border-radius: 6px; padding: 12px; margin-top: 8px; border: 1px solid #dee2e6;">
                     <style>
-                        .legend-grid { 
-                            display: grid; 
-                            grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); 
+                        .legend-grid {
+                            display: grid;
+                            grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
                             gap: 6px;
                             opacity: ${animate ? '0' : '1'};
                             transition: opacity 0.25s ease-in-out;
                         }
-                        .legend-card { 
+                        .legend-card {
                             display: flex;
                             flex-direction: column;
-                            padding: 8px 12px; 
-                            border-radius: 6px; 
-                            cursor: pointer; 
+                            padding: 8px 12px;
+                            border-radius: 6px;
+                            cursor: pointer;
                             transition: all 0.15s;
                             font-size: 11px;
                             background: white;
@@ -654,11 +654,11 @@ frappe.pages['implementation-dashb'].on_page_load = function (wrapper) {
                         .legend-card:hover { background: #e3f2fd; border-color: #90caf9; border-left-width: 4px; transform: translateY(-1px); box-shadow: 0 2px 6px rgba(0,0,0,0.08); }
                         .legend-card.highlighted { background: #bbdefb; border-color: #64b5f6; }
                         .legend-card.dimmed { opacity: 0.35; }
-                        .legend-card-name { 
-                            font-weight: 600; 
-                            color: #333; 
-                            overflow: hidden; 
-                            text-overflow: ellipsis; 
+                        .legend-card-name {
+                            font-weight: 600;
+                            color: #333;
+                            overflow: hidden;
+                            text-overflow: ellipsis;
                             white-space: nowrap;
                             margin-bottom: 6px;
                             padding-bottom: 6px;
@@ -680,16 +680,16 @@ frappe.pages['implementation-dashb'].on_page_load = function (wrapper) {
                         .legend-card-dot { width: 8px; height: 8px; border-radius: 50%; margin-right: 5px; flex-shrink: 0; }
                         .legend-card-type { margin-right: 4px; }
                         .legend-card-hours { font-weight: 600; }
-                        .legend-team-header { 
+                        .legend-team-header {
                             grid-column: 1 / -1;
-                            display: flex; 
-                            align-items: center; 
+                            display: flex;
+                            align-items: center;
                             justify-content: space-between;
-                            padding: 8px 12px; 
-                            border-radius: 4px; 
-                            font-size: 11px; 
-                            font-weight: 600; 
-                            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); 
+                            padding: 8px 12px;
+                            border-radius: 4px;
+                            font-size: 11px;
+                            font-weight: 600;
+                            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
                             color: white;
                             margin-top: 6px;
                         }
@@ -720,7 +720,7 @@ frappe.pages['implementation-dashb'].on_page_load = function (wrapper) {
                     const impl = item.impl;
                     const totalHrs = impl.billable + impl.nonBillable;
                     legendHTML += `
-                        <div class="legend-card" 
+                        <div class="legend-card"
                              style="border-left-color: ${impl.colors[0]};"
                              data-impl="${impl.name}"
                              title="${impl.name}&#10;Total: ${totalHrs.toFixed(1)} hrs&#10;Billable: ${impl.billable.toFixed(1)} hrs&#10;Non-Billable: ${impl.nonBillable.toFixed(1)} hrs">
@@ -765,7 +765,7 @@ frappe.pages['implementation-dashb'].on_page_load = function (wrapper) {
             `;
 
             legendHTML += `</div>`;
-            
+
             if (animate) {
                 $('#custom-legend-container').html(legendHTML);
                 setTimeout(() => {
@@ -812,7 +812,7 @@ frappe.pages['implementation-dashb'].on_page_load = function (wrapper) {
             chart.series.forEach(s => {
                 const isTargetSeries = s.name.startsWith(implName + ' -');
                 const isSpecialSeries = s.name.includes('Prediction') || s.name.includes('Capacity');
-                
+
                 if (highlight) {
                     if (isTargetSeries) {
                         s.setState('hover');
@@ -833,7 +833,7 @@ frappe.pages['implementation-dashb'].on_page_load = function (wrapper) {
                     anyVisible = anyVisible || s.visible;
                 }
             });
-            
+
             chart.series.forEach(s => {
                 if (s.name.startsWith(implName + ' -')) {
                     if (anyVisible) {

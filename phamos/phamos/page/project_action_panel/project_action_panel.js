@@ -137,8 +137,8 @@ function update_and_submit_timesheet_record(
     return;
   }
 
-  // Close other dropdowns
-  document.querySelectorAll('.dropdown-menu').forEach((menu) => {
+  // Close other custom dropdowns only (not global Frappe dropdowns)
+  document.querySelectorAll('.custom-dropdown .dropdown-menu').forEach((menu) => {
     if (menu !== dropdown) {
       menu.style.display = 'none';
     }
@@ -175,10 +175,15 @@ function update_and_submit_timesheet_record(
   }
 };
 
-  // Close dropdowns when clicking outside
-  document.addEventListener('click', () => {
-    document.querySelectorAll('.dropdown-menu').forEach((menu) => {
-      menu.style.display = 'none';
+  // Close custom dropdowns when clicking outside (only on this page)
+  document.addEventListener('click', (e) => {
+    // Only close dropdowns that are part of the custom-dropdown component
+    document.querySelectorAll('.custom-dropdown .dropdown-menu').forEach((menu) => {
+      // Check if the click was outside this dropdown
+      const dropdown = menu.closest('.custom-dropdown');
+      if (dropdown && !dropdown.contains(e.target)) {
+        menu.style.display = 'none';
+      }
     });
   });
   
@@ -923,7 +928,7 @@ function show_tab(tab, projectData) {
 
       // Render projects table
       renderProjectDataTable(tableDiv, projectData);
-
+      persistButtonStates();
     }
 
     else if (tab === "All Projects") {
@@ -970,43 +975,47 @@ function show_tab(tab, projectData) {
       // style inject (calendar styles)
       let style = document.createElement("style");
       style.innerHTML = `
-        table.timezone-table { 
-          border-collapse: collapse; 
-          width: 100%; 
-          text-align: center; 
-          font-size: 12px; 
+        table.timezone-table {
+          border-collapse: collapse;
+          width: 100%;
+          text-align: center;
+          font-size: 12px;
+          background: var(--bg-color, #fff);
+          color: var(--text-color, #222);
         }
-        table.timezone-table th, 
-        table.timezone-table td { 
-          border: 1px solid #999; 
-          padding: 6px 4px 14px 4px;  
-          position: relative; 
-          vertical-align: top;       
+        table.timezone-table th,
+        table.timezone-table td {
+          border: 1px solid var(--border-color, #999);
+          padding: 6px 4px 14px 4px;
+          position: relative;
+          vertical-align: top;
           height: 40px;
         }
-        table.timezone-table th { background: #ddd; }
+        table.timezone-table th {
+          background: var(--control-bg, #ddd);
+          color: var(--text-color, #222);
+        }
 
         table.timezone-table td::after {
           content: "";
           position: absolute;
           left: 0;
           right: 0;
-          top: 50%;               
-          border-top: 1px dotted #aaa; 
-          z-index: 0; 
+          top: 50%;
+          border-top: 1px dotted var(--border-color, #aaa);
+          z-index: 0;
         }
 
         table.timezone-table td span {
           position: relative;
-          z-index: 1; 
-          background: #f9f9f9;
+          z-index: 1;
+          background: var(--bg-light, #f9f9f9);
+          color: var(--text-color, #222);
           padding: 2px 4px;
         }
 
         /* Timesheet record box */
         .timesheet-box {
-          // background: rgba(0, 123, 255, 0.2);
-          // border: 1px solid #007bff;
           border-radius: 4px;
           font-size: 11px;
           padding: 4px;
@@ -1015,25 +1024,26 @@ function show_tab(tab, projectData) {
           left: 10px;
           right: 10px;
           overflow: hidden;
+          color: var(--text-color, #222);
         }
 
         /* parent container for calendar + records */
         .calendar-wrapper {
           flex-direction: row;
-          border: 1px solid #ccc;
+          border: 1px solid var(--border-color, #ccc);
           border-radius: 8px;
           overflow: hidden;
-          background: #f9f9f9;
+          background: var(--bg-color, #181c32);
         }
         .calendar-left {
           flex: 1;
-          border-right: 1px solid #ccc;
-          // padding: 10px;
+          border-right: 1px solid var(--border-color, #ccc);
         }
         .calendar-right {
           flex: 1;
           padding: 10px;
-          background: #fff;
+          background: var(--bg-color, #fff);
+          color: var(--text-color, #222);
           position: relative;
         }
         .calendar-right::before {
@@ -1047,7 +1057,7 @@ function show_tab(tab, projectData) {
             to bottom,
             transparent,
             transparent 39px,
-            #ddd 40px
+            var(--border-color, #ddd) 40px
           );
           pointer-events: none;
         }
@@ -1218,8 +1228,11 @@ function renderTimesheetCalendar(container) {
   // 🔹 Date picker container
   const dateWrapper = document.createElement("div");
   dateWrapper.className = "mb-2";
+  dateWrapper.style.background = "var(--bg-color, #fff)";
+  dateWrapper.style.borderRadius = "8px";
+  dateWrapper.style.padding = "10px 0";                                                                                                                                                                                                                                                                                                                                                                                                                   
 
-  const dateInput = document.createElement("input");
+  const dateInput = document.createElement("input");                                                                                                                                                                                                                                                                                                                                      
   dateInput.type = "date";
   dateInput.value = new Date().toISOString().split("T")[0]; // default today
   dateInput.className = "border px-2 py-1 rounded";
@@ -1568,7 +1581,7 @@ window.togglePausePlay = function(taskId, timesheetName) {
     btn.textContent = '⏸️';
     btn.setAttribute('data-paused', 'false');
 
-    frappe.confirm(
+    confirm_strict(
       "Do you want to create a timesheet record for this Break?",
       function() {
           frappe.call({
@@ -1576,7 +1589,11 @@ window.togglePausePlay = function(taskId, timesheetName) {
               args: { name: timesheetName },
               callback: function(r) {
                   if (r.message && r.message.status === "success") {
-                      show_break_task_dialog(r.message.new_row_name, r.message.previous_from_time, r.message.previous_to_time, );
+                      show_break_task_dialog(
+                          r.message.new_row_name, 
+                          r.message.previous_from_time, 
+                          r.message.previous_to_time
+                      );
                   } else {
                       frappe.show_alert("Error: " + (r.message.message || "Something went wrong."));
                   }
@@ -1584,7 +1601,6 @@ window.togglePausePlay = function(taskId, timesheetName) {
           });
       },
       function() {
-          // ❌ NO → create new row but don't show popup
           frappe.call({
               method: "phamos.phamos.page.project_action_panel.project_action_panel.close_open_row_and_add_break",
               args: { name: timesheetName },
@@ -1597,8 +1613,7 @@ window.togglePausePlay = function(taskId, timesheetName) {
               }
           });
       }
-  );
-
+    );
 
   } else {
     // ⏸️ Pause clicked → Close current row
@@ -1621,37 +1636,73 @@ window.togglePausePlay = function(taskId, timesheetName) {
     });
   }
 };
-frappe.after_ajax(() => {
-  console.log("frappe.after_ajax started");
-  const taskButtons = document.querySelectorAll("[id^='toggle-']");
-  console.log("Buttons found:", taskButtons.length);
 
-  taskButtons.forEach(btn => {
-    const taskId = btn.id.split("toggle-")[1];
-    const timesheetName = btn.getAttribute("data-timesheet");
-
-    console.log("Checking task:", taskId, "timesheet:", timesheetName);
-
-    frappe.call({
-      method: "phamos.phamos.page.project_action_panel.project_action_panel.is_task_running",
-      args: {
-        name: timesheetName
-      },
-      callback: function (r) {
-        if (r.message && r.message.is_running) {
-          btn.textContent = '⏸️';
-          btn.setAttribute('data-paused', 'false');
-          btn.setAttribute('title', 'Pause ⏸️');
-        } else {
-          btn.textContent = '▶️';
-          btn.setAttribute('data-paused', 'true');
-          btn.setAttribute('title', 'Resume ▶️');
+function confirm_strict(message, yes_callback, no_callback) {
+    let d = new frappe.ui.Dialog({
+        title: "Confirm",
+        fields: [
+            {
+                fieldtype: "HTML",
+                fieldname: "msg_html",
+                options: `<p>${message}</p>`
+            }
+        ],
+        primary_action_label: "Yes",
+        primary_action() {
+            d.hide();
+            yes_callback();
         }
-
-      }
     });
-  });
-});
+
+    d.set_secondary_action_label("No");
+    d.set_secondary_action(() => {
+        d.hide();
+        if (no_callback) no_callback();
+    });
+
+    d.$wrapper.modal({
+        backdrop: "static",
+        keyboard: false
+    });
+
+    d.show();
+    return d;
+}
+
+
+function persistButtonStates() {
+    frappe.after_ajax(() => {
+      console.log("frappe.after_ajax started");
+      const taskButtons = document.querySelectorAll("[id^='toggle-']");
+      console.log("Buttons found:", taskButtons.length);
+
+      taskButtons.forEach(btn => {
+        const taskId = btn.id.split("toggle-")[1];
+        const timesheetName = btn.getAttribute("data-timesheet");
+
+        console.log("Checking task:", taskId, "timesheet:", timesheetName);
+
+        frappe.call({
+          method: "phamos.phamos.page.project_action_panel.project_action_panel.is_task_running",
+          args: {
+            name: timesheetName
+          },
+          callback: function (r) {
+            if (r.message && r.message.is_running) {
+              btn.textContent = '⏸️';
+              btn.setAttribute('data-paused', 'false');
+              btn.setAttribute('title', 'Pause ⏸️');
+            } else {
+              btn.textContent = '▶️';
+              btn.setAttribute('data-paused', 'true');
+              btn.setAttribute('title', 'Resume ▶️');
+            }
+
+          }
+        });
+     });
+    });
+  }
 };
 
 function show_break_task_dialog(new_row_name, previous_from_time, previous_to_time) {
