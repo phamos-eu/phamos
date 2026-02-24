@@ -354,7 +354,7 @@ def get_customer_sales_order_status():
 
     implementation_names = [impl.name for impl in implementations]
 
-    # Get all sales orders for these implementations (ALL statuses)
+    # Get all OPEN sales orders for these implementations (matching Implementation doctype logic)
     sales_orders = frappe.db.sql("""
         SELECT
             so.name,
@@ -371,7 +371,7 @@ def get_customer_sales_order_status():
         WHERE
             so.custom_implementation IN %(implementations)s
             AND so.docstatus = 1
-            AND so.status NOT IN ('Cancelled', 'Closed')
+            AND so.status IN ('To Deliver and Bill', 'To Deliver', 'To Bill')
         ORDER BY so.transaction_date DESC
     """, {"implementations": implementation_names}, as_dict=True)
 
@@ -384,7 +384,7 @@ def get_customer_sales_order_status():
 
     # Process each sales order
     for so in sales_orders:
-        # Calculate delivered hours from delivery notes
+        # Calculate delivered hours from delivery notes (matching Implementation doctype logic)
         delivered_hrs = frappe.db.sql("""
             SELECT SUM(dni.qty) as delivered_qty
             FROM `tabDelivery Note Item` dni
@@ -392,7 +392,7 @@ def get_customer_sales_order_status():
             WHERE
                 dni.against_sales_order = %s
                 AND dn.docstatus = 1
-                AND dn.status NOT IN ('Cancelled', 'Closed')
+                AND dn.status IN ('Completed', 'To Bill')
         """, so.name, as_dict=True)
 
         so.delivered_hrs = delivered_hrs[0].delivered_qty if delivered_hrs[0].delivered_qty else 0
@@ -402,39 +402,36 @@ def get_customer_sales_order_status():
         total_so_hrs += so.total_hrs or 0
         total_delivered_hrs += so.delivered_hrs or 0
 
-        # Count open sales orders
-        if so.status in ["To Deliver", "To Bill", "To Deliver and Bill"]:
-            open_so_count += 1
+        # Count open sales orders (all fetched orders are open based on our query)
+        open_so_count += 1
 
-    # Calculate billable timesheet hours (not on delivery note) for open SOs
-    open_so_names = [so.name for so in sales_orders if so.status in ["To Deliver", "To Bill", "To Deliver and Bill"]]
+    # Calculate billable timesheet hours (not on delivery note) - matching Implementation doctype logic
+    # Get projects for these implementations using SQL
+    projects = frappe.db.sql("""
+        SELECT name
+        FROM `tabProject`
+        WHERE custom_implementation IN %(implementations)s
+    """, {"implementations": implementation_names}, as_dict=True)
 
-    if open_so_names:
-        # Get projects for these implementations using SQL
-        projects = frappe.db.sql("""
-            SELECT name
-            FROM `tabProject`
-            WHERE custom_implementation IN %(implementations)s
-        """, {"implementations": implementation_names}, as_dict=True)
+    project_names = [p.name for p in projects]
 
-        project_names = [p.name for p in projects]
+    if project_names:
+        timesheet_hrs_result = frappe.db.sql("""
+            SELECT SUM(td.hours) as timesheet_hrs
+            FROM `tabTimesheet` t
+            JOIN `tabTimesheet Detail` td ON t.name = td.parent
+            WHERE
+                td.is_billable = 1
+                AND t.docstatus = 0
+                AND td.project IN %(projects)s
+                AND td.custom_implementation IN %(implementations)s
+                AND t.custom_delivery_note IS NULL
+        """, {"projects": project_names, "implementations": implementation_names}, as_dict=True)
 
-        if project_names:
-            timesheet_hrs_result = frappe.db.sql("""
-                SELECT SUM(td.hours) as timesheet_hrs
-                FROM `tabTimesheet` t
-                JOIN `tabTimesheet Detail` td ON t.name = td.parent
-                WHERE
-                    td.is_billable = 1
-                    AND t.docstatus = 0
-                    AND td.project IN %(projects)s
-                    AND td.custom_implementation IN %(implementations)s
-                    AND t.custom_delivery_note IS NULL
-            """, {"projects": project_names, "implementations": implementation_names}, as_dict=True)
+        total_timesheet_hrs = timesheet_hrs_result[0].timesheet_hrs if timesheet_hrs_result and timesheet_hrs_result[0].timesheet_hrs else 0
 
-            total_timesheet_hrs = timesheet_hrs_result[0].timesheet_hrs if timesheet_hrs_result and timesheet_hrs_result[0].timesheet_hrs else 0
-
-    total_remaining_hrs = total_so_hrs - total_delivered_hrs
+    # Calculate remaining hours: Total SO Hours - (Delivered Hours + Timesheet Hours)
+    total_remaining_hrs = total_so_hrs - (total_delivered_hrs + total_timesheet_hrs)
 
     # Prepare chart data (same as Implementation doctype - percentage chart)
     chart_data = {
