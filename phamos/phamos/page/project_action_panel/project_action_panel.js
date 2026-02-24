@@ -359,6 +359,8 @@ function openStopProjectDialog(timesheet_record, percent_billable, project, task
             fieldname: "to_time",
             fieldtype: "Datetime",
             reqd: 1,
+            default: frappe.datetime.now_datetime(),
+            description: "Time updates live. Edit manually to stop auto-update.",
           },
           {
             fieldtype: "Select",
@@ -388,6 +390,34 @@ function openStopProjectDialog(timesheet_record, percent_billable, project, task
 
       dialog.$wrapper.find(".modal-dialog").css("max-width", "800px");
       dialog.show();
+      
+      // Implement live time update for to_time field
+      let liveTimeInterval = null;
+      let manuallyChanged = false;
+      
+      // Start live time updates
+      liveTimeInterval = setInterval(function() {
+        if (!manuallyChanged && dialog.fields_dict.to_time) {
+          dialog.set_value('to_time', frappe.datetime.now_datetime());
+        }
+      }, 1000); // Update every second
+      
+      // Stop live updates when user manually changes the time
+      dialog.fields_dict.to_time.$input.on('change', function() {
+        manuallyChanged = true;
+        if (liveTimeInterval) {
+          clearInterval(liveTimeInterval);
+          liveTimeInterval = null;
+        }
+      });
+      
+      // Clean up interval when dialog is hidden
+      dialog.onhide = function() {
+        if (liveTimeInterval) {
+          clearInterval(liveTimeInterval);
+          liveTimeInterval = null;
+        }
+      };
     });
   });
 }
@@ -537,6 +567,8 @@ function openStopProjectDialog(timesheet_record, percent_billable, project, task
                   in_list_view: 1,
                   reqd: 1,
                   read_only: 0,
+                  default: frappe.datetime.now_datetime(),
+                  description: "Auto-filled with current time. Adjust if needed.",
                 },
                 { 
                   fieldtype: "Small Text",
