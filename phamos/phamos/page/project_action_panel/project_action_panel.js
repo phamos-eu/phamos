@@ -137,8 +137,8 @@ function update_and_submit_timesheet_record(
     return;
   }
 
-  // Close other dropdowns
-  document.querySelectorAll('.dropdown-menu').forEach((menu) => {
+  // Close other custom dropdowns only (not global Frappe dropdowns)
+  document.querySelectorAll('.custom-dropdown .dropdown-menu').forEach((menu) => {
     if (menu !== dropdown) {
       menu.style.display = 'none';
     }
@@ -175,10 +175,15 @@ function update_and_submit_timesheet_record(
   }
 };
 
-  // Close dropdowns when clicking outside
-  document.addEventListener('click', () => {
-    document.querySelectorAll('.dropdown-menu').forEach((menu) => {
-      menu.style.display = 'none';
+  // Close custom dropdowns when clicking outside (only on this page)
+  document.addEventListener('click', (e) => {
+    // Only close dropdowns that are part of the custom-dropdown component
+    document.querySelectorAll('.custom-dropdown .dropdown-menu').forEach((menu) => {
+      // Check if the click was outside this dropdown
+      const dropdown = menu.closest('.custom-dropdown');
+      if (dropdown && !dropdown.contains(e.target)) {
+        menu.style.display = 'none';
+      }
     });
   });
   
