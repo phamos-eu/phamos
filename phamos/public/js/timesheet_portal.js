@@ -983,8 +983,8 @@ function renderSalesOrderData(data) {
   // Render summary cards
   $('#total-so-hrs').text(formatNumber(data.summary.total_so_hrs));
   $('#delivered-hrs').text(formatNumber(data.summary.delivered_hrs));
+  $('#timesheet-hrs').text(formatNumber(data.summary.timesheet_hrs));
   $('#remaining-hrs').text(formatNumber(data.summary.remaining_hrs));
-  $('#open-so-count').text(data.summary.open_so_count);
   
   console.log('Summary cards updated');
   
