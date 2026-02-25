@@ -359,6 +359,8 @@ function openStopProjectDialog(timesheet_record, percent_billable, project, task
             fieldname: "to_time",
             fieldtype: "Datetime",
             reqd: 1,
+            default: frappe.datetime.now_datetime(),
+            description: "Time updates live. Edit manually to stop auto-update.",
           },
           {
             fieldtype: "Select",
@@ -388,6 +390,67 @@ function openStopProjectDialog(timesheet_record, percent_billable, project, task
 
       dialog.$wrapper.find(".modal-dialog").css("max-width", "800px");
       dialog.show();
+      
+      // Implement live time update for to_time field
+      var time_update_interval = null;
+      var user_interacted = false;
+      
+      setTimeout(function() {
+        var to_time_field = dialog.fields_dict.to_time;
+        
+        if (to_time_field && to_time_field.$input && to_time_field.$input.length > 0) {
+          // Mark as user-interacted on focus or manual typing
+          to_time_field.$input.on('focus mousedown keydown', function() {
+            if (!user_interacted) {
+              user_interacted = true;
+              if (time_update_interval) {
+                clearInterval(time_update_interval);
+                time_update_interval = null;
+              }
+            }
+          });
+          
+          // Function to update the time field
+          var update_time = function() {
+            if (!user_interacted) {
+              var current_time = frappe.datetime.now_datetime();
+              
+              // Update field using multiple approaches to ensure sync
+              to_time_field.$input.val(current_time);
+              
+              try {
+                dialog.set_value('to_time', current_time);
+              } catch(e) {}
+              
+              if (to_time_field.set_model_value) {
+                to_time_field.set_model_value(current_time);
+              }
+            }
+          };
+          
+          // Sync to system clock - wait until next full second
+          var now = new Date();
+          var ms_until_next_second = 1000 - now.getMilliseconds();
+          
+          setTimeout(function() {
+            // Update immediately at the second boundary
+            update_time();
+            
+            // Then continue updating every second, now synced
+            time_update_interval = setInterval(update_time, 1000);
+          }, ms_until_next_second);
+        }
+      }, 500);
+      
+      // Cleanup interval when dialog closes
+      var original_hide = dialog.hide;
+      dialog.hide = function() {
+        if (time_update_interval) {
+          clearInterval(time_update_interval);
+          time_update_interval = null;
+        }
+        original_hide.call(this);
+      };
     });
   });
 }
@@ -537,6 +600,8 @@ function openStopProjectDialog(timesheet_record, percent_billable, project, task
                   in_list_view: 1,
                   reqd: 1,
                   read_only: 0,
+                  default: frappe.datetime.now_datetime(),
+                  description: "Auto-filled with current time. Adjust if needed.",
                 },
                 { 
                   fieldtype: "Small Text",
