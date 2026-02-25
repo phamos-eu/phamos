@@ -222,11 +222,10 @@
    "fieldtype": "Column Break"
   },
   {
-   "description": "Link this OKR to a KR (Key Result). Note: This is a reference field only, not part of tree structure.",
+   "description": "Key Result from parent OKR measurables (KR + title). Stores KR name or \"KR||row\" when same KR has different titles.",
    "fieldname": "parent_kra",
-   "fieldtype": "Link",
-   "label": "Parent KR",
-   "options": "KR"
+   "fieldtype": "Data",
+   "label": "Parent KR"
   },
   {
    "description": "Link this OKR to another OKR. This field is used for tree view hierarchy.",
