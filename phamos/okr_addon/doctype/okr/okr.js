@@ -13,63 +13,13 @@ frappe.ui.form.on("OKR", {
 			}
 		});
 
-		// Set query for parent_kra to filter based on parent_okr
-		frm.set_query("parent_kra", function() {
-			return {
-				filters: {}
-			};
-		});
 	},
 
 	parent_okr: function(frm) {
-		// When parent_okr changes, update parent_kra filter
-		if (frm.doc.parent_okr) {
-			// Get KRs from parent OKR's measurables
-			frappe.call({
-				method: "phamos.okr_addon.doctype.okr.okr.get_krs_from_parent_okr",
-				args: {
-					parent_okr: frm.doc.parent_okr
-				},
-				callback: function(r) {
-					if (r.message && r.message.length > 0) {
-						// Update parent_kra query to only show KRs from parent OKR
-						frm.set_query("parent_kra", function() {
-							return {
-								filters: {
-									"name": ["in", r.message]
-								}
-							};
-						});
-
-						// Clear parent_kra if current value is not in the filtered list
-						if (frm.doc.parent_kra && !r.message.includes(frm.doc.parent_kra)) {
-							frm.set_value("parent_kra", "");
-						}
-					} else {
-						// No KRs found in parent OKR, disable parent_kra
-						frm.set_query("parent_kra", function() {
-							return {
-								filters: {
-									"name": ["in", []]  // Empty list - no options
-								}
-							};
-						});
-						if (frm.doc.parent_kra) {
-							frm.set_value("parent_kra", "");
-						}
-					}
-					frm.refresh_field("parent_kra");
-				}
-			});
-		} else {
-			// No parent_okr selected, show all KRs
-			frm.set_query("parent_kra", function() {
-				return {
-					filters: {}
-				};
-			});
-			frm.refresh_field("parent_kra");
+		if (!frm.doc.parent_okr) {
+			frm.set_value("parent_kra", "");
 		}
+		setTimeout(function() { render_parent_kr_dropdown(frm); }, 200);
 	},
 	refresh(frm) {
 		// Render measurable summary in the form
@@ -83,34 +33,7 @@ frappe.ui.form.on("OKR", {
 			setTimeout(() => addParentLink(frm), 500);
 		}
 
-		// Set parent_kra filter if parent_okr exists
-		if (frm.doc.parent_okr) {
-			frappe.call({
-				method: "phamos.okr_addon.doctype.okr.okr.get_krs_from_parent_okr",
-				args: {
-					parent_okr: frm.doc.parent_okr
-				},
-				callback: function(r) {
-					if (r.message && r.message.length > 0) {
-						frm.set_query("parent_kra", function() {
-							return {
-								filters: {
-									"name": ["in", r.message]
-								}
-							};
-						});
-					} else {
-						frm.set_query("parent_kra", function() {
-							return {
-								filters: {
-									"name": ["in", []]
-								}
-							};
-						});
-					}
-				}
-			});
-		}
+		setTimeout(function() { render_parent_kr_dropdown(frm); }, 250);
 
 		// Refresh measurables field to ensure percent_complete is visible
 		if (!frm.is_new() && frm.doc.name) {
@@ -797,6 +720,63 @@ function addComment() {
 	});
 }
 
+// Parent KR: dropdown with all measurables (KR + title); duplicate KRs get unique value so each shows
+function render_parent_kr_dropdown(frm) {
+	const field = frm.fields_dict.parent_kra;
+	if (!field || !field.$wrapper || !field.$wrapper.length) return;
+
+	field.$wrapper.find('.parent-kr-select-wrap').remove();
+	field.$wrapper.find('.parent-kr-open-link').remove();
+	field.$wrapper.find('.control-input, .control-input-wrapper, input').show();
+
+	if (!frm.doc.parent_okr) return;
+
+	frappe.call({
+		method: 'phamos.okr_addon.doctype.okr.okr.get_parent_kr_options',
+		args: { parent_okr: frm.doc.parent_okr },
+		callback: function(r) {
+			if (!r.message || !r.message.length) return;
+			const options = r.message;
+			const $inputArea = field.$wrapper.find('.control-input').length ? field.$wrapper.find('.control-input') : field.$wrapper.find('.control-input-wrapper').first();
+			if (!$inputArea.length) return;
+			field.$wrapper.find('.control-input, .control-input-wrapper, input').hide();
+
+			const values = options.map(function(o) { return o.value; });
+			let current = (frm.doc.parent_kra || '').toString().trim();
+			if (current && values.indexOf(current) === -1) {
+				frm.set_value('parent_kra', '');
+				current = '';
+			}
+			const $wrap = $('<div class="parent-kr-select-wrap" style="margin-top: 0;"></div>');
+			const $select = $('<select class="form-control input-sm"></select>');
+			$select.append($('<option value="">' + (__('Select Parent KR') || 'Select Parent KR') + '</option>'));
+			options.forEach(function(opt) {
+				$select.append($('<option></option>').attr('value', opt.value).text(opt.label || opt.value));
+			});
+			$select.val(current);
+			$wrap.append($select);
+			const $link = $('<a class="parent-kr-open-link btn btn-default btn-sm" style="margin-left: 6px; margin-top: 4px; margin-bottom: 10px; display: inline-block;" href="#"><i class="fa fa-external-link-alt"></i> ' + __('Open KR') + '</a>');
+			function update_open_link() {
+				const val = $select.val();
+				const kr_name = val ? String(val).split('||')[0].trim() : '';
+				$link.toggle(!!kr_name);
+				$link.off('click').on('click', function(e) {
+					e.preventDefault();
+					if (kr_name) frappe.set_route('Form', 'KR', kr_name);
+				});
+			}
+			update_open_link();
+			$wrap.append($link);
+			field.$wrapper.append($wrap);
+			$select.on('change', function() {
+				const val = $(this).val();
+				frm.set_value('parent_kra', val || '');
+				update_open_link();
+			});
+		}
+	});
+}
+
 // Add Parent links (KR and/or OKR) to Connections section
 function addParentLink(frm) {
 	if (!frm.dashboard || !frm.dashboard.transactions_area) return;
@@ -806,14 +786,17 @@ function addParentLink(frm) {
 
 	let parentLinks = [];
 
-	// Add Parent KR if exists
+	// Add Parent KR if exists (parent_kra may be "metric_name" or "metric_name||idx")
 	if (frm.doc.parent_kra) {
-		parentLinks.push({
-			doctype: 'KR',
-			name: frm.doc.parent_kra,
-			label: 'Parent KR',
-			type: 'KR'
-		});
+		const kr_name = String(frm.doc.parent_kra).split('||')[0].trim();
+		if (kr_name) {
+			parentLinks.push({
+				doctype: 'KR',
+				name: kr_name,
+				label: 'Parent KR',
+				type: 'KR'
+			});
+		}
 	}
 
 	// Add Parent OKR if exists
@@ -1046,6 +1029,15 @@ function getStatusColor(status) {
 	return colors[status] || '#95a5a6';
 }
 
+// Compute stored parent_kra value for a measurable row (matches backend _stored_parent_kra_for_measurable)
+function getStoredParentKraForRow(measurables, rowIndex) {
+	if (!measurables || rowIndex < 0 || rowIndex >= measurables.length) return null;
+	const metric_name = measurables[rowIndex] && (measurables[rowIndex].metric_name || measurables[rowIndex].name);
+	if (!metric_name) return null;
+	const count = measurables.filter(m => (m.metric_name || m.name) === metric_name).length;
+	return count > 1 ? metric_name + '||' + rowIndex : metric_name;
+}
+
 // Add child KRA progress to a specific measurable row
 function addChildKRAProgressToSpecificRow(frm, cdt, cdn) {
 	if (!frm.doc.name || frm.is_new()) {
@@ -1061,6 +1053,10 @@ function addChildKRAProgressToSpecificRow(frm, cdt, cdn) {
 		return;
 	}
 
+	const grid = frm.fields_dict.measurables && frm.fields_dict.measurables.grid;
+	const rowIndex = grid && grid.grid_rows ? grid.grid_rows.findIndex(r => r.docname === cdn) : -1;
+	const stored_parent_kra = rowIndex >= 0 ? getStoredParentKraForRow(frm.doc.measurables || [], rowIndex) : metric_name;
+
 	// Get child KRA progress data
 	frappe.call({
 		method: 'phamos.okr_addon.doctype.okr.okr.get_child_kra_progress',
@@ -1069,8 +1065,8 @@ function addChildKRAProgressToSpecificRow(frm, cdt, cdn) {
 		},
 		callback: function(r) {
 			if (r.message && r.message.length > 0) {
-				// Find progress data for this specific measurable
-				const kraData = r.message.find(kra => kra.parent_kr_name === metric_name);
+				// Find progress data for this measurable row by stored_parent_kra (so duplicate KRs get correct row)
+				const kraData = r.message.find(kra => (kra.stored_parent_kra !== undefined ? kra.stored_parent_kra === stored_parent_kra : kra.parent_kr_name === metric_name));
 
 				if (kraData) {
 					// Group child measurables by OKR
@@ -1188,16 +1184,18 @@ function addChildKRAProgressToMeasurables(frm) {
 		},
 		callback: function(r) {
 			if (r.message && r.message.length > 0) {
-				// Create a map of KR name to progress data
+				// Map by stored_parent_kra so duplicate KRs (same name, different title) get correct progress
 				const kraProgressMap = {};
 				r.message.forEach(kraData => {
-					kraProgressMap[kraData.parent_kr_name] = kraData;
+					const key = kraData.stored_parent_kra != null ? kraData.stored_parent_kra : kraData.parent_kr_name;
+					kraProgressMap[key] = kraData;
 				});
 
 				// Wait for grid to be ready, then add progress info to each row
 				setTimeout(() => {
 					if (frm.fields_dict.measurables && frm.fields_dict.measurables.grid) {
 						const grid = frm.fields_dict.measurables.grid;
+						const measurables = frm.doc.measurables || [];
 
 						// Function to add progress to a specific row
 						const addProgressToRow = (row) => {
@@ -1226,9 +1224,11 @@ function addChildKRAProgressToMeasurables(frm) {
 							const rowDoc = row.doc;
 							// Use stored progress data if available, otherwise use current map
 							const progressMap = grid._childKRAProgressData || kraProgressMap;
+							const rowIndex = grid.grid_rows ? grid.grid_rows.indexOf(row) : -1;
+							const storedKey = rowIndex >= 0 ? getStoredParentKraForRow(measurables, rowIndex) : (rowDoc && rowDoc.metric_name);
 
-							if (rowDoc && rowDoc.metric_name && progressMap[rowDoc.metric_name]) {
-								const progressData = progressMap[rowDoc.metric_name];
+							if (rowDoc && storedKey && progressMap[storedKey]) {
+								const progressData = progressMap[storedKey];
 
 								// Find the percent_complete field control - try multiple methods
 								let formGroup = null;
@@ -1441,7 +1441,9 @@ function addChildKRAProgressToMeasurables(frm) {
 						// Function to check and add progress to open rows
 						const checkAndAddProgressToOpenRows = () => {
 							grid.grid_rows.forEach((row) => {
-								if (row.doc && row.doc.metric_name && kraProgressMap[row.doc.metric_name]) {
+								const rowIndex = grid.grid_rows ? grid.grid_rows.indexOf(row) : -1;
+								const storedKey = rowIndex >= 0 ? getStoredParentKraForRow(measurables, rowIndex) : (row.doc && row.doc.metric_name);
+								if (row.doc && storedKey && kraProgressMap[storedKey]) {
 									// Find row element
 									let $rowEl = null;
 									if (row.row) {
@@ -1551,16 +1553,18 @@ function addChildKRAProgressToMeasurables(frm) {
 		},
 		callback: function(r) {
 			if (r.message && r.message.length > 0) {
-				// Create a map of KR name to progress data
+				// Map by stored_parent_kra so duplicate KRs (same name, different title) get correct progress
 				const kraProgressMap = {};
 				r.message.forEach(kraData => {
-					kraProgressMap[kraData.parent_kr_name] = kraData;
+					const key = kraData.stored_parent_kra != null ? kraData.stored_parent_kra : kraData.parent_kr_name;
+					kraProgressMap[key] = kraData;
 				});
 
 				// Wait for grid to be ready, then add progress info to each row
 				setTimeout(() => {
 					if (frm.fields_dict.measurables && frm.fields_dict.measurables.grid) {
 						const grid = frm.fields_dict.measurables.grid;
+						const measurables = frm.doc.measurables || [];
 
 						// Function to add progress to a specific row
 						const addProgressToRow = (row) => {
@@ -1589,9 +1593,11 @@ function addChildKRAProgressToMeasurables(frm) {
 							const rowDoc = row.doc;
 							// Use stored progress data if available, otherwise use current map
 							const progressMap = grid._childKRAProgressData || kraProgressMap;
+							const rowIndex = grid.grid_rows ? grid.grid_rows.indexOf(row) : -1;
+							const storedKey = rowIndex >= 0 ? getStoredParentKraForRow(measurables, rowIndex) : (rowDoc && rowDoc.metric_name);
 
-							if (rowDoc && rowDoc.metric_name && progressMap[rowDoc.metric_name]) {
-								const progressData = progressMap[rowDoc.metric_name];
+							if (rowDoc && storedKey && progressMap[storedKey]) {
+								const progressData = progressMap[storedKey];
 
 								// Find the percent_complete field control - try multiple methods
 								let formGroup = null;
@@ -1804,7 +1810,9 @@ function addChildKRAProgressToMeasurables(frm) {
 						// Function to check and add progress to open rows
 						const checkAndAddProgressToOpenRows = () => {
 							grid.grid_rows.forEach((row) => {
-								if (row.doc && row.doc.metric_name && kraProgressMap[row.doc.metric_name]) {
+								const rowIndex = grid.grid_rows ? grid.grid_rows.indexOf(row) : -1;
+								const storedKey = rowIndex >= 0 ? getStoredParentKraForRow(measurables, rowIndex) : (row.doc && row.doc.metric_name);
+								if (row.doc && storedKey && kraProgressMap[storedKey]) {
 									// Find row element
 									let $rowEl = null;
 									if (row.row) {
