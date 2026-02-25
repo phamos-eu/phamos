@@ -4,21 +4,6 @@
 frappe.ui.form.on("Monthly Implementation Summery", {
 	refresh(frm) {
 	},
-	year(frm) {
-		// Client-side validation: 4-digit year format
-		const year = (frm.doc.year || "").toString().trim();
-		if (!year) return;
-		if (year.length !== 4 || !/^\d{4}$/.test(year)) {
-			frm.set_intro(__("Year must be exactly 4 digits (e.g. 2024)."), "red");
-			return;
-		}
-		const y = parseInt(year, 10);
-		if (y < 2000 || y > 2100) {
-			frm.set_intro(__("Year must be between 2000 and 2100."), "red");
-			return;
-		}
-		frm.set_intro("");
-	},
 	discount(frm) {
 		// Validate discount is between 0 and 100
 		if (frm.doc.discount !== undefined && frm.doc.discount !== null) {
