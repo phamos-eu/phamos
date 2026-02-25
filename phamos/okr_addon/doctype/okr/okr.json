@@ -1,5 +1,6 @@
 {
  "actions": [],
+ "allow_rename": 1,
  "autoname": "field:title",
  "creation": "2025-07-28 08:23:59.019164",
  "doctype": "DocType",
@@ -39,7 +40,9 @@
   "mitigation_plan",
   "lft",
   "rgt",
-  "old_parent"
+  "old_parent",
+  "child_kra_progress_section",
+  "child_kra_progress_html"
  ],
  "fields": [
   {
@@ -222,10 +225,11 @@
    "fieldtype": "Column Break"
   },
   {
-   "description": "Key Result from parent OKR measurables (KR + title). Stores KR name or \"KR||row\" when same KR has different titles.",
+   "description": "Link this OKR to a KR (Key Result). Note: This is a reference field only, not part of tree structure.",
    "fieldname": "parent_kra",
-   "fieldtype": "Data",
-   "label": "Parent KR"
+   "fieldtype": "Link",
+   "label": "Parent KR",
+   "options": "KR"
   },
   {
    "description": "Link this OKR to another OKR. This field is used for tree view hierarchy.",
@@ -288,7 +292,7 @@
    "link_fieldname": "okr"
   }
  ],
- "modified": "2026-01-23 11:04:55.855108",
+ "modified": "2026-02-25 08:22:28.430708",
  "modified_by": "Administrator",
  "module": "OKR Addon",
  "name": "OKR",
