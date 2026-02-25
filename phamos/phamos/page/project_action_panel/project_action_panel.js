@@ -392,31 +392,64 @@ function openStopProjectDialog(timesheet_record, percent_billable, project, task
       dialog.show();
       
       // Implement live time update for to_time field
-      let liveTimeInterval = null;
-      let manuallyChanged = false;
+      var time_update_interval = null;
+      var user_interacted = false;
       
-      // Start live time updates
-      liveTimeInterval = setInterval(function() {
-        if (!manuallyChanged && dialog.fields_dict.to_time) {
-          dialog.set_value('to_time', frappe.datetime.now_datetime());
+      setTimeout(function() {
+        var to_time_field = dialog.fields_dict.to_time;
+        
+        if (to_time_field && to_time_field.$input && to_time_field.$input.length > 0) {
+          // Mark as user-interacted on focus or manual typing
+          to_time_field.$input.on('focus mousedown keydown', function() {
+            if (!user_interacted) {
+              user_interacted = true;
+              if (time_update_interval) {
+                clearInterval(time_update_interval);
+                time_update_interval = null;
+              }
+            }
+          });
+          
+          // Function to update the time field
+          var update_time = function() {
+            if (!user_interacted) {
+              var current_time = frappe.datetime.now_datetime();
+              
+              // Update field using multiple approaches to ensure sync
+              to_time_field.$input.val(current_time);
+              
+              try {
+                dialog.set_value('to_time', current_time);
+              } catch(e) {}
+              
+              if (to_time_field.set_model_value) {
+                to_time_field.set_model_value(current_time);
+              }
+            }
+          };
+          
+          // Sync to system clock - wait until next full second
+          var now = new Date();
+          var ms_until_next_second = 1000 - now.getMilliseconds();
+          
+          setTimeout(function() {
+            // Update immediately at the second boundary
+            update_time();
+            
+            // Then continue updating every second, now synced
+            time_update_interval = setInterval(update_time, 1000);
+          }, ms_until_next_second);
         }
-      }, 1000); // Update every second
+      }, 500);
       
-      // Stop live updates when user manually changes the time
-      dialog.fields_dict.to_time.$input.on('change', function() {
-        manuallyChanged = true;
-        if (liveTimeInterval) {
-          clearInterval(liveTimeInterval);
-          liveTimeInterval = null;
+      // Cleanup interval when dialog closes
+      var original_hide = dialog.hide;
+      dialog.hide = function() {
+        if (time_update_interval) {
+          clearInterval(time_update_interval);
+          time_update_interval = null;
         }
-      });
-      
-      // Clean up interval when dialog is hidden
-      dialog.onhide = function() {
-        if (liveTimeInterval) {
-          clearInterval(liveTimeInterval);
-          liveTimeInterval = null;
-        }
+        original_hide.call(this);
       };
     });
   });
