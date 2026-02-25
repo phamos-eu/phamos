@@ -84,14 +84,15 @@ frappe.ui.form.on("Accounting Receipt", {
                             frappe.msgprint({ title: __("No data"), indicator: "blue", message: __("No extractable data found in the PDF.") });
                             return;
                         }
-                        frm.events.show_extract_review_dialog(frm, res.fields, res.extracted);
+                        frm.events.show_extract_review_dialog(frm, res.fields, res.extracted, frm.doc.attachment);
                     },
                 });
             });
         }
     },
 
-    show_extract_review_dialog: function (frm, fields, extracted) {
+    show_extract_review_dialog: function (frm, fields, extracted, pdf_url) {
+        pdf_url = pdf_url || (frm && frm.doc && frm.doc.attachment) || "";
         // Resolve link values (by doc name or by supplier_name/company_name/cost_center_name) for auto-select
         var link_list = [];
         fields.forEach(function (f) {
@@ -122,20 +123,83 @@ frappe.ui.form.on("Accounting Receipt", {
                         };
                     }
                 });
-                frm.events._build_and_show_review_dialog(frm, fields, missing_by_fieldname, resolved_name_by_fieldname, extracted || {});
+                frm.events._build_and_show_review_dialog(frm, fields, missing_by_fieldname, resolved_name_by_fieldname, extracted || {}, pdf_url);
             }
         });
     },
 
-    _build_and_show_review_dialog: function (frm, fields, missing_by_fieldname, resolved_name_by_fieldname, extracted) {
+    _apply_review_dialog_layout: function (d) {
+        if (!d.$wrapper || !d.$wrapper.hasClass("review-ar-dialog")) return;
+        var $body = d.$wrapper.find(".modal-body");
+        var $formLayout = $body.find(".form-layout");
+        if (!$formLayout.length) return;
+        var $formPage = $formLayout.find(".form-page");
+        var $sectionBody = $formPage.find(".section-body");
+        var $columns = $formPage.find(".form-column");
+        if ($sectionBody.length === 0 || $columns.length < 2) return;
+        var $content = d.$wrapper.find(".modal-content");
+        var $bodyInner = $body.children().first();
+        // Tall popup (88vh) so left column scrolls and PDF gets full height
+        $content.css({ "height": "88vh", "max-height": "88vh", "min-height": "520px", "display": "flex", "flex-direction": "column" });
+        $body.css({ "flex": "1 1 0", "min-height": "0", "overflow": "hidden", "display": "flex", "flex-direction": "column" });
+        $bodyInner.css({ "flex": "1 1 0", "min-height": "0", "overflow": "hidden", "display": "flex", "flex-direction": "column" });
+        $formLayout.css({ "flex": "1 1 0", "min-height": "0", "overflow": "hidden", "display": "flex", "flex-direction": "column" });
+        $formPage.css({ "flex": "1 1 0", "min-height": "0", "overflow": "hidden", "display": "flex", "flex-direction": "column" });
+        $formPage.find(".form-section, .row").css({ "flex": "1 1 0", "min-height": "0", "overflow": "hidden", "display": "flex", "flex-direction": "column" });
+        // Force row height so both columns get a fixed height (left scrolls, right fills)
+        var bodyHeight = "calc(88vh - 130px)";
+        $sectionBody.css({
+            "flex": "1 1 0",
+            "min-height": "0",
+            "height": bodyHeight,
+            "max-height": bodyHeight,
+            "overflow": "hidden",
+            "display": "flex",
+            "align-items": "stretch"
+        });
+        // Left: explicit max-height so overflow-y: auto always shows scrollbar when needed
+        $columns.eq(0).css({
+            "flex": "1 1 0",
+            "min-height": "0",
+            "max-height": bodyHeight,
+            "min-width": "0",
+            "overflow-y": "auto",
+            "overflow-x": "hidden",
+            "padding-right": "8px",
+            "padding-bottom": "20px",
+            "WebkitOverflowScrolling": "touch"
+        });
+        // Right: full height for PDF preview
+        $columns.eq(1).css({
+            "flex": "1 1 0",
+            "min-height": "0",
+            "height": bodyHeight,
+            "min-width": "0",
+            "overflow": "hidden",
+            "display": "flex",
+            "flex-direction": "column",
+            "padding-bottom": "16px"
+        });
+        $columns.eq(1).find(".review-pdf-column").css({ "flex": "1", "min-height": "0", "display": "flex", "flex-direction": "column" });
+        $columns.eq(1).find(".review-pdf-iframe").css({ "flex": "1", "min-height": "72vh", "height": "100%" });
+    },
+
+    _build_and_show_review_dialog: function (frm, fields, missing_by_fieldname, resolved_name_by_fieldname, extracted, pdf_url) {
         extracted = extracted || {};
         resolved_name_by_fieldname = resolved_name_by_fieldname || {};
+        pdf_url = pdf_url || (frm && frm.doc && frm.doc.attachment) || "";
         // Hide from popup: Sent to DATEV, Uploaded by, Company, Payment Date; Project and Cost Center optional (no Create UI).
         fields = fields.filter(function (f) {
             if (f.fieldname === "sent_to_datev" || f.fieldname === "uploaded_by" || f.fieldname === "company" || f.fieldname === "payment_date") return false;
             return !(f.fieldtype === "Link" && (f.options === "Project" || f.options === "Cost Center"));
         });
         var dialog_fields = [];
+        // Left column: section header + all extracted fields (single column, structured)
+        dialog_fields.push({
+            fieldtype: "HTML",
+            fieldname: "extracted_header",
+            options: "<div class=\"control-label\" style=\"font-weight: 600; margin-bottom: 10px; font-size: 12px; color: var(--text-color);\">" + __("Extracted content") + "</div>"
+        });
         fields.forEach(function (f, idx) {
             var default_val = "";
             if (f.fieldtype === "Link" && f.options && missing_by_fieldname[f.fieldname]) {
@@ -153,7 +217,6 @@ frappe.ui.form.on("Accounting Receipt", {
             };
             if (f.options) df.options = f.options;
             dialog_fields.push(df);
-            // If this Link field's value does not exist, show extracted name + "Create" button only for required/supported types (Project, Cost Center are optional — no Create UI)
             var link_doctypes_with_create = ["Supplier", "Company"];
             if (f.fieldtype === "Link" && f.options && missing_by_fieldname[f.fieldname] && link_doctypes_with_create.indexOf(f.options) !== -1) {
                 var lf = missing_by_fieldname[f.fieldname];
@@ -166,16 +229,21 @@ frappe.ui.form.on("Accounting Receipt", {
                     "</div>";
                 dialog_fields.push({ fieldtype: "HTML", fieldname: "create_btn_" + f.fieldname, options: html });
             }
-            // Exactly two fields per row: Column Break after 1st, Section Break after 2nd
-            if (idx % 2 === 0 && idx < fields.length - 1) {
-                dialog_fields.push({ fieldtype: "Column Break", fieldname: "col_break_" + idx });
-            } else if (idx % 2 === 1 && idx < fields.length - 1) {
-                dialog_fields.push({ fieldtype: "Section Break", fieldname: "section_break_" + idx });
-            }
         });
+        // Column break: then right column = PDF preview
+        dialog_fields.push({ fieldtype: "Column Break", fieldname: "pdf_review_col_break" });
+        if (pdf_url && String(pdf_url).toLowerCase().endsWith(".pdf")) {
+            var pdf_src = pdf_url.indexOf("/") === 0 ? (window.location.origin + pdf_url) : pdf_url;
+            var pdf_html = "<div class=\"review-pdf-column\" style=\"display:flex;flex-direction:column;height:100%;min-height:72vh;\">" +
+                "<label class=\"control-label\" style=\"font-weight: 600; margin-bottom: 8px; display: block; font-size: 12px; flex-shrink: 0;\">" + __("Attached PDF") + "</label>" +
+                "<iframe src=\"" + frappe.utils.escape_html(pdf_src) + "\" type=\"application/pdf\" class=\"review-pdf-iframe\" " +
+                "style=\"width:100%;flex:1;min-height:72vh;border:1px solid var(--border-color);border-radius: 6px;background:#f5f5f5;\"></iframe>" +
+                "</div>";
+            dialog_fields.push({ fieldtype: "HTML", fieldname: "pdf_preview_review", options: pdf_html });
+        }
         var d = new frappe.ui.Dialog({
             title: __("Review Accounting Receipt"),
-            size: "large",
+            size: "extra-large",
             fields: dialog_fields,
             primary_action_label: __("Proceed"),
             primary_action: function () {
@@ -209,7 +277,12 @@ frappe.ui.form.on("Accounting Receipt", {
             }
         });
         d.extracted = extracted;
+        d.$wrapper.addClass("review-ar-dialog");
         d.show();
+        // Apply layout after form is rendered (delay so DOM is ready)
+        setTimeout(function () {
+            frm.events._apply_review_dialog_layout(d);
+        }, 350);
         d.$wrapper.find(".link-create-below button[data-doctype]").on("click", function () {
             var doctype = $(this).attr("data-doctype");
             var fieldname = $(this).attr("data-fieldname");
