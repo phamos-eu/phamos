@@ -359,7 +359,34 @@ function openStopProjectDialog(timesheet_record, percent_billable, project, task
             fieldname: "to_time",
             fieldtype: "Datetime",
             reqd: 1,
-            default: frappe.datetime.now_datetime(),
+            default: (function() {
+              var now = new Date();
+              console.log('[Time Init] Stop dialog - Browser time:', now.toString());
+              console.log('[Time Init] Timezone offset:', now.getTimezoneOffset());
+              console.log('[Time Init] frappe.boot.sysdefaults:', frappe.boot.sysdefaults);
+              console.log('[Time Init] frappe.boot.time_zone:', frappe.boot.time_zone);
+              console.log('[Time Init] frappe.sys_defaults:', frappe.sys_defaults);
+              
+              var pad = function(n) { return (n < 10 ? '0' : '') + n; };
+              var formatted = now.getFullYear() + '-' + 
+                     pad(now.getMonth() + 1) + '-' + 
+                     pad(now.getDate()) + ' ' + 
+                     pad(now.getHours()) + ':' + 
+                     pad(now.getMinutes()) + ':' + 
+                     pad(now.getSeconds());
+              console.log('[Time Init] Initial to_time (before conversion):', formatted);
+              
+              // Convert to system timezone (Berlin)
+              try {
+                var system_time = frappe.datetime.convert_to_system_tz(formatted);
+                console.log('[Time Init] Converted:', formatted, '→', system_time);
+                formatted = system_time; // It's already a string!
+              } catch(e) {
+                console.error('[Time Init] Conversion error:', e);
+              }
+              
+              return formatted;
+            })(),
             description: "Time updates live. Edit manually to stop auto-update.",
           },
           {
@@ -413,7 +440,29 @@ function openStopProjectDialog(timesheet_record, percent_billable, project, task
           // Function to update the time field
           var update_time = function() {
             if (!user_interacted) {
-              var current_time = frappe.datetime.now_datetime();
+              // Get current time from browser
+              var now = new Date();
+              console.log('[Time] Browser local time:', now.toString());
+              
+              var pad = function(n) { return (n < 10 ? '0' : '') + n; };
+              var local_time = now.getFullYear() + '-' + 
+                               pad(now.getMonth() + 1) + '-' + 
+                               pad(now.getDate()) + ' ' + 
+                               pad(now.getHours()) + ':' + 
+                               pad(now.getMinutes()) + ':' + 
+                               pad(now.getSeconds());
+              
+              console.log('[Time] Local time formatted:', local_time);
+              
+              // Convert to system timezone (Berlin)
+              var current_time = local_time;
+              try {
+                var system_time = frappe.datetime.convert_to_system_tz(local_time);
+                console.log('[Time] Converted:', local_time, '→', system_time);
+                current_time = system_time; // It's already a string!
+              } catch(e) {
+                console.error('[Time] Conversion error:', e);
+              }
               
               // Update field using multiple approaches to ensure sync
               to_time_field.$input.val(current_time);
@@ -425,6 +474,8 @@ function openStopProjectDialog(timesheet_record, percent_billable, project, task
               if (to_time_field.set_model_value) {
                 to_time_field.set_model_value(current_time);
               }
+              
+              console.log('[Time] Field shows:', to_time_field.$input.val());
             }
           };
           
@@ -600,7 +651,26 @@ function openStopProjectDialog(timesheet_record, percent_billable, project, task
                   in_list_view: 1,
                   reqd: 1,
                   read_only: 0,
-                  default: frappe.datetime.now_datetime(),
+                  default: (function() {
+                    var now = new Date();
+                    console.log('[Time Init] Start dialog - Browser time:', now.toString());
+                    var pad = function(n) { return (n < 10 ? '0' : '') + n; };
+                    var formatted = now.getFullYear() + '-' + 
+                           pad(now.getMonth() + 1) + '-' + 
+                           pad(now.getDate()) + ' ' + 
+                           pad(now.getHours()) + ':' + 
+                           pad(now.getMinutes()) + ':' + 
+                           pad(now.getSeconds());
+                    // Convert to system timezone
+                    try {
+                      var system_time = frappe.datetime.convert_to_system_tz(formatted);
+                      console.log('[Time Init] from_time:', formatted, '→', system_time);
+                      formatted = system_time; // It's already a string!
+                    } catch(e) {
+                      console.error('[Time Init] Conversion error:', e);
+                    }
+                    return formatted;
+                  })(),
                   description: "Auto-filled with current time. Adjust if needed.",
                 },
                 { 
