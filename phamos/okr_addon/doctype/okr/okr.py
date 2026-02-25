@@ -10,6 +10,26 @@ class OKR(Document):
         self.validate_measurables()
         self.validate_and_update_is_group()
 
+    def get_invalid_links(self, is_submittable=False):
+        """Allow parent_kra with value 'metric_name||idx': don't let base validation overwrite it."""
+        saved_parent_kra = None
+        if self.get("parent_kra") and "||" in str(self.parent_kra):
+            saved_parent_kra = self.parent_kra
+        invalid_links, cancelled_links = super().get_invalid_links(is_submittable=is_submittable)
+        if saved_parent_kra is not None:
+            setattr(self, "parent_kra", saved_parent_kra)
+        if not invalid_links:
+            return invalid_links, cancelled_links
+        filtered = []
+        for item in invalid_links:
+            fieldname, docname, msg = item
+            if fieldname == "parent_kra" and docname and "||" in str(docname):
+                kr_name, _ = parse_parent_kra(docname)
+                if kr_name and frappe.db.exists("KR", kr_name):
+                    continue
+            filtered.append(item)
+        return filtered, cancelled_links
+
     def before_save(self):
         self.update_measurable_targets()
         # Calculate and update progress based on measurables
@@ -42,56 +62,53 @@ class OKR(Document):
         if self.parent_okr and self.parent_kra:
             try:
                 parent = frappe.get_doc("OKR", self.parent_okr)
-                # Find the measurable in parent that matches this parent_kra
-                for measurable in parent.measurables:
-                    if measurable.metric_name == self.parent_kra:
-                        # Recalculate progress for this measurable based on remaining child OKRs
-                        child_okrs_with_kra = frappe.get_all(
-                            "OKR",
-                            filters={
-                                "parent_okr": self.parent_okr,
-                                "parent_kra": measurable.metric_name,
-                                "name": ["!=", self.name]  # Exclude this OKR being deleted
-                            },
-                            fields=["name", "progress"]
-                        )
+                metric_name, idx = parse_parent_kra(self.parent_kra)
+                if not metric_name:
+                    metric_name = self.parent_kra
+                for i, measurable in enumerate(parent.measurables or []):
+                    if measurable.metric_name != metric_name:
+                        continue
+                    if idx is not None and i != idx:
+                        continue
+                    stored_kra = _stored_parent_kra_for_measurable(parent, measurable, i)
+                    child_okrs_with_kra = frappe.get_all(
+                        "OKR",
+                        filters={
+                            "parent_okr": self.parent_okr,
+                            "parent_kra": stored_kra,
+                            "name": ["!=", self.name]
+                        },
+                        fields=["name", "progress"]
+                    )
 
-                        if child_okrs_with_kra:
-                            # Calculate average progress from remaining child OKRs' measurables
-                            total_measurable_progress = 0
-                            valid_measurable_count = 0
-
-                            for child_okr in child_okrs_with_kra:
-                                # Get the child OKR document to access its measurables
-                                try:
-                                    child_doc = frappe.get_doc("OKR", child_okr.name)
-                                    if child_doc.measurables:
-                                        for child_measurable in child_doc.measurables:
-                                            if child_measurable.percent_complete is not None:
-                                                total_measurable_progress += child_measurable.percent_complete
-                                                valid_measurable_count += 1
-                                except Exception as e:
-                                    frappe.log_error(f"Error getting child OKR measurables on delete: {str(e)}")
-
-                            if valid_measurable_count > 0:
-                                measurable.percent_complete = total_measurable_progress / valid_measurable_count
-                            else:
-                                measurable.percent_complete = 0
+                    if child_okrs_with_kra:
+                        total_measurable_progress = 0
+                        valid_measurable_count = 0
+                        for child_okr in child_okrs_with_kra:
+                            try:
+                                child_doc = frappe.get_doc("OKR", child_okr.name)
+                                if child_doc.measurables:
+                                    for child_measurable in child_doc.measurables:
+                                        if child_measurable.percent_complete is not None:
+                                            total_measurable_progress += child_measurable.percent_complete
+                                            valid_measurable_count += 1
+                            except Exception as e:
+                                frappe.log_error(f"Error getting child OKR measurables on delete: {str(e)}")
+                        if valid_measurable_count > 0:
+                            measurable.percent_complete = total_measurable_progress / valid_measurable_count
                         else:
-                            # No more child OKRs linked, reset to 0 or calculate from current_value
-                            if measurable.current_value is not None:
-                                if measurable.committed_target is not None and measurable.baseline_value is not None:
-                                    baseline_to_target = measurable.committed_target - measurable.baseline_value
-                                    if baseline_to_target != 0:
-                                        progress = (measurable.current_value - measurable.baseline_value) / baseline_to_target
-                                        measurable.percent_complete = min(max(progress * 100, 0), 100)
-                                    else:
-                                        measurable.percent_complete = 100 if measurable.current_value >= measurable.committed_target else 0
-                                else:
-                                    measurable.percent_complete = 0
+                            measurable.percent_complete = 0
+                    else:
+                        if measurable.current_value is not None and measurable.committed_target is not None and measurable.baseline_value is not None:
+                            baseline_to_target = measurable.committed_target - measurable.baseline_value
+                            if baseline_to_target != 0:
+                                progress = (measurable.current_value - measurable.baseline_value) / baseline_to_target
+                                measurable.percent_complete = min(max(progress * 100, 0), 100)
                             else:
-                                measurable.percent_complete = 0
-                        break
+                                measurable.percent_complete = 100 if measurable.current_value >= measurable.committed_target else 0
+                        else:
+                            measurable.percent_complete = 0
+                    break
 
                 # Save parent to persist the measurable progress update
                 parent.save()
@@ -156,12 +173,15 @@ class OKR(Document):
     def get_parent_info(self):
         """Get parent information (KR or OKR)"""
         if self.parent_kra:
+            metric_name, _ = parse_parent_kra(self.parent_kra)
+            if not metric_name:
+                return None
             try:
                 return {
                     "type": "KR",
-                    "name": self.parent_kra,
+                    "name": metric_name,
                     "doctype": "KR",
-                    "doc": frappe.get_doc("KR", self.parent_kra)
+                    "doc": frappe.get_doc("KR", metric_name)
                 }
             except frappe.DoesNotExistError:
                 return None
@@ -264,66 +284,50 @@ class OKR(Document):
 
     def update_measurable_targets(self):
         """Update measurable percent complete for all measurables"""
-        for measurable in self.measurables:
-            # Only check for child OKRs if this OKR is already saved (has a name)
-            # and if the measurable has a metric_name (KR) set
-            if self.name and measurable.metric_name:
-                # Check if any child OKRs are linked to this measurable's KR via parent_kra
-                child_okrs_with_kra = frappe.get_all(
-                    "OKR",
-                    filters={
-                        "parent_okr": self.name,
-                        "parent_kra": measurable.metric_name
-                    },
-                    fields=["name"]
-                )
+        for i, measurable in enumerate(self.measurables or []):
+            if not self.name or not measurable.metric_name:
+                continue
+            stored_kra = _stored_parent_kra_for_measurable(self, measurable, i)
+            child_okrs_with_kra = frappe.get_all(
+                "OKR",
+                filters={
+                    "parent_okr": self.name,
+                    "parent_kra": stored_kra
+                },
+                fields=["name"]
+            )
 
-                # If child OKRs are linked to this KR, use their measurables' progress
-                if child_okrs_with_kra:
-                    # Get all measurables from all child OKRs linked to this KR
-                    total_measurable_progress = 0
-                    valid_measurable_count = 0
-                    for child_okr in child_okrs_with_kra:
-                        # Get the child OKR document to access its measurables
-                        try:
-                            child_doc = frappe.get_doc("OKR", child_okr.name)
-                            # Ensure child OKR's measurables have percent_complete calculated
-                            # This is important because measurables might not have percent_complete set
-                            if child_doc.measurables:
-                                for child_measurable in child_doc.measurables:
-                                    # Calculate percent_complete if not already set
-                                    if child_measurable.percent_complete is None:
-                                        if child_measurable.current_value is not None:
-                                            if child_measurable.committed_target is not None and child_measurable.baseline_value is not None:
-                                                baseline_to_target = child_measurable.committed_target - child_measurable.baseline_value
-                                                if baseline_to_target != 0:
-                                                    progress = (child_measurable.current_value - child_measurable.baseline_value) / baseline_to_target
-                                                    child_measurable.percent_complete = min(max(progress * 100, 0), 100)
-                                                else:
-                                                    child_measurable.percent_complete = 100 if child_measurable.current_value >= child_measurable.committed_target else 0
-                                            else:
-                                                child_measurable.percent_complete = 0
+            if child_okrs_with_kra:
+                total_measurable_progress = 0
+                valid_measurable_count = 0
+                for child_okr in child_okrs_with_kra:
+                    try:
+                        child_doc = frappe.get_doc("OKR", child_okr.name)
+                        if child_doc.measurables:
+                            for child_measurable in child_doc.measurables:
+                                if child_measurable.percent_complete is None:
+                                    if child_measurable.current_value is not None and child_measurable.committed_target is not None and child_measurable.baseline_value is not None:
+                                        baseline_to_target = child_measurable.committed_target - child_measurable.baseline_value
+                                        if baseline_to_target != 0:
+                                            progress = (child_measurable.current_value - child_measurable.baseline_value) / baseline_to_target
+                                            child_measurable.percent_complete = min(max(progress * 100, 0), 100)
                                         else:
-                                            child_measurable.percent_complete = 0
+                                            child_measurable.percent_complete = 100 if child_measurable.current_value >= child_measurable.committed_target else 0
+                                    else:
+                                        child_measurable.percent_complete = 0
+                                if child_measurable.percent_complete is not None:
+                                    total_measurable_progress += child_measurable.percent_complete
+                                    valid_measurable_count += 1
+                    except Exception as e:
+                        frappe.log_error(f"Error getting child OKR measurables for {child_okr.name}: {str(e)}")
 
-                                    # Add to total if percent_complete is set
-                                    if child_measurable.percent_complete is not None:
-                                        total_measurable_progress += child_measurable.percent_complete
-                                        valid_measurable_count += 1
-                        except Exception as e:
-                            frappe.log_error(f"Error getting child OKR measurables for {child_okr.name}: {str(e)}")
-
-                    if valid_measurable_count > 0:
-                        # Use average progress from child OKRs' measurables
-                        calculated_progress = round(total_measurable_progress / valid_measurable_count, 2)
-                        measurable.percent_complete = calculated_progress
-                        continue  # Skip the current_value calculation below
-                    else:
-                        # No valid measurables found in child OKRs, but child OKRs exist
-                        # Set to 0 or keep existing value
-                        if measurable.percent_complete is None:
-                            measurable.percent_complete = 0
-                        continue
+                if valid_measurable_count > 0:
+                    calculated_progress = round(total_measurable_progress / valid_measurable_count, 2)
+                    measurable.percent_complete = calculated_progress
+                    continue
+                if measurable.percent_complete is None:
+                    measurable.percent_complete = 0
+                continue
 
             # No child OKRs linked (or OKR not saved yet), calculate from current_value as before
             if measurable.current_value is not None:
@@ -402,76 +406,66 @@ class OKR(Document):
         except Exception as e:
             frappe.log_error(f"Error updating parent measurable progress: {str(e)}")
 
-    def _update_measurable_for_kra(self, parent, kra_name):
-        """Helper method to update parent measurable progress for a specific KR"""
-        # Find the measurable in parent that matches this KR
-        for measurable in parent.measurables:
-            if measurable.metric_name == kra_name:
-                # Recalculate progress for this measurable based on all child OKRs' measurables
-                child_okrs_with_kra = frappe.get_all(
-                    "OKR",
-                    filters={
-                        "parent_okr": self.parent_okr,
-                        "parent_kra": measurable.metric_name
-                    },
-                    fields=["name"]
-                )
+    def _update_measurable_for_kra(self, parent, kra_value):
+        """Update parent measurable progress for this stored parent_kra (metric_name or metric_name||idx)."""
+        metric_name, idx = parse_parent_kra(kra_value)
+        if not metric_name:
+            return
+        for i, measurable in enumerate(parent.measurables or []):
+            if measurable.metric_name != metric_name:
+                continue
+            if idx is not None and i != idx:
+                continue
+            stored_kra = _stored_parent_kra_for_measurable(parent, measurable, i)
+            child_okrs_with_kra = frappe.get_all(
+                "OKR",
+                filters={
+                    "parent_okr": self.parent_okr,
+                    "parent_kra": stored_kra
+                },
+                fields=["name"]
+            )
 
-                if child_okrs_with_kra:
-                    # Get all measurables from all child OKRs linked to this KR
-                    total_measurable_progress = 0
-                    valid_measurable_count = 0
-
+            if child_okrs_with_kra:
+                total_measurable_progress = 0
+                valid_measurable_count = 0
                 for child_okr in child_okrs_with_kra:
-                    # Get the child OKR document to access its measurables
                     try:
                         child_doc = frappe.get_doc("OKR", child_okr.name)
-                        # Ensure child OKR's measurables have percent_complete calculated
                         child_doc.update_measurable_targets()
-
                         if child_doc.measurables:
                             for child_measurable in child_doc.measurables:
-                                # Calculate percent_complete if not set
                                 if child_measurable.percent_complete is None:
-                                    if child_measurable.current_value is not None:
-                                        if child_measurable.committed_target is not None and child_measurable.baseline_value is not None:
-                                            baseline_to_target = child_measurable.committed_target - child_measurable.baseline_value
-                                            if baseline_to_target != 0:
-                                                progress = (child_measurable.current_value - child_measurable.baseline_value) / baseline_to_target
-                                                child_measurable.percent_complete = min(max(progress * 100, 0), 100)
-                                            else:
-                                                child_measurable.percent_complete = 100 if child_measurable.current_value >= child_measurable.committed_target else 0
+                                    if child_measurable.current_value is not None and child_measurable.committed_target is not None and child_measurable.baseline_value is not None:
+                                        baseline_to_target = child_measurable.committed_target - child_measurable.baseline_value
+                                        if baseline_to_target != 0:
+                                            progress = (child_measurable.current_value - child_measurable.baseline_value) / baseline_to_target
+                                            child_measurable.percent_complete = min(max(progress * 100, 0), 100)
                                         else:
-                                            child_measurable.percent_complete = 0
+                                            child_measurable.percent_complete = 100 if child_measurable.current_value >= child_measurable.committed_target else 0
                                     else:
                                         child_measurable.percent_complete = 0
-
                                 if child_measurable.percent_complete is not None:
                                     total_measurable_progress += child_measurable.percent_complete
                                     valid_measurable_count += 1
                     except Exception as e:
                         frappe.log_error(f"Error getting child OKR measurables for {child_okr.name}: {str(e)}")
 
-                    if valid_measurable_count > 0:
-                        # Use average progress from child OKRs' measurables
-                        measurable.percent_complete = round(total_measurable_progress / valid_measurable_count, 2)
-                    else:
-                        measurable.percent_complete = 0
+                if valid_measurable_count > 0:
+                    measurable.percent_complete = round(total_measurable_progress / valid_measurable_count, 2)
                 else:
-                    # No child OKRs linked, calculate from current_value
-                    if measurable.current_value is not None:
-                        if measurable.committed_target is not None and measurable.baseline_value is not None:
-                            baseline_to_target = measurable.committed_target - measurable.baseline_value
-                            if baseline_to_target != 0:
-                                progress = (measurable.current_value - measurable.baseline_value) / baseline_to_target
-                                measurable.percent_complete = min(max(progress * 100, 0), 100)
-                            else:
-                                measurable.percent_complete = 100 if measurable.current_value >= measurable.committed_target else 0
-                        else:
-                            measurable.percent_complete = 0
+                    measurable.percent_complete = 0
+            else:
+                if measurable.current_value is not None and measurable.committed_target is not None and measurable.baseline_value is not None:
+                    baseline_to_target = measurable.committed_target - measurable.baseline_value
+                    if baseline_to_target != 0:
+                        progress = (measurable.current_value - measurable.baseline_value) / baseline_to_target
+                        measurable.percent_complete = min(max(progress * 100, 0), 100)
                     else:
-                        measurable.percent_complete = 0
-                break
+                        measurable.percent_complete = 100 if measurable.current_value >= measurable.committed_target else 0
+                else:
+                    measurable.percent_complete = 0
+            break
 
     def get_measurable_summary(self):
         """Get comprehensive summary of measurables with market-standard metrics"""
@@ -715,29 +709,94 @@ def get_measurable_summary_for_frontend(okr_name):
     doc = frappe.get_doc("OKR", okr_name)
     return doc.get_measurable_summary()
 
-@frappe.whitelist()
-def get_krs_from_parent_okr(parent_okr):
-    """Get list of KR names from parent OKR's measurables"""
+def parse_parent_kra(value):
+    """
+    Parse parent_kra stored value: "metric_name" or "metric_name||idx" for duplicate KRs.
+    Returns (metric_name, idx or None).
+    """
+    if not value or not isinstance(value, str):
+        return (None, None)
+    parts = value.strip().split("||", 1)
+    metric_name = parts[0].strip() if parts[0] else None
+    idx = int(parts[1]) if len(parts) > 1 and parts[1].strip().isdigit() else None
+    return (metric_name, idx)
+
+
+def _stored_parent_kra_for_measurable(parent_doc, measurable, row_idx):
+    """Value to store in parent_kra for this measurable row (unique when same KR has multiple titles)."""
+    from collections import Counter
+    names = [m.metric_name for m in (parent_doc.measurables or []) if m.metric_name]
+    if Counter(names)[measurable.metric_name] > 1:
+        return f"{measurable.metric_name}||{row_idx}"
+    return measurable.metric_name
+
+
+def _get_parent_kra_options_with_title(parent_okr):
+    """
+    Return all measurables from parent OKR. Each option: [value, description].
+    When same KR appears multiple times (different titles), value = "metric_name||idx" so each is visible.
+    """
     if not parent_okr:
         return []
-
     try:
-        # Get the parent OKR document
         parent_doc = frappe.get_doc("OKR", parent_okr)
-
-        # Extract unique KR names from measurables
-        kr_names = []
-        if parent_doc.measurables:
-            for measurable in parent_doc.measurables:
-                if measurable.metric_name and measurable.metric_name not in kr_names:
-                    kr_names.append(measurable.metric_name)
-
-        return kr_names
+        from collections import Counter
+        names = [m.metric_name for m in (parent_doc.measurables or []) if m.metric_name]
+        counts = Counter(names)
+        out = []
+        for idx, measurable in enumerate(parent_doc.measurables or []):
+            if not measurable.metric_name:
+                continue
+            metric_name = measurable.metric_name
+            kr_title = (getattr(measurable, "kr_title", None) or "").strip()
+            description = f"{metric_name} — {kr_title}" if kr_title else metric_name
+            # Unique value when same KR has multiple titles so duplicates show as separate options
+            value = f"{metric_name}||{idx}" if counts[metric_name] > 1 else metric_name
+            out.append([value, description])
+        return out
     except frappe.DoesNotExistError:
         return []
     except Exception as e:
-        frappe.log_error(f"Error getting KRs from parent OKR: {str(e)}")
+        frappe.log_error(f"Error getting parent KRA options: {str(e)}")
         return []
+
+
+@frappe.whitelist()
+def get_krs_from_parent_okr(parent_okr):
+    """Get list of unique KR names from parent OKR's measurables (for filters)."""
+    options = _get_parent_kra_options_with_title(parent_okr)
+    seen = set()
+    out = []
+    for opt in options:
+        name, _ = parse_parent_kra(opt[0])
+        if name and name not in seen:
+            seen.add(name)
+            out.append(name)
+    return out
+
+
+@frappe.whitelist()
+def get_parent_kr_options(parent_okr):
+    """Options for Parent KR: all measurables with title; value is unique (metric_name or metric_name||idx)."""
+    options = _get_parent_kra_options_with_title(parent_okr)
+    return [{"value": o[0], "label": o[1]} for o in options]
+
+
+@frappe.whitelist()
+@frappe.validate_and_sanitize_search_inputs
+def parent_kra_link_query(doctype, txt, searchfield, start, page_len, filters):
+    """
+    Custom Link query for Parent KR: all measurables from parent OKR, with title.
+    Uses unique value (metric_name||idx) when same KR has different titles so duplicates are visible.
+    """
+    parent_okr = (filters or {}).get("parent_okr")
+    options = _get_parent_kra_options_with_title(parent_okr)
+    if not options:
+        return []
+    txt = (txt or "").strip().lower()
+    if txt:
+        options = [o for o in options if txt in (o[0] + " " + (o[1] or "")).lower()]
+    return options[start : start + page_len]
 
 @frappe.whitelist()
 def get_child_kra_progress(okr_name):
@@ -749,17 +808,15 @@ def get_child_kra_progress(okr_name):
         parent_doc = frappe.get_doc("OKR", okr_name)
         result = []
 
-        # For each measurable in parent OKR
-        for measurable in parent_doc.measurables:
+        for i, measurable in enumerate(parent_doc.measurables or []):
             if not measurable.metric_name:
                 continue
-
-            # Find child OKRs linked to this KR via parent_kra
+            stored_kra = _stored_parent_kra_for_measurable(parent_doc, measurable, i)
             child_okrs = frappe.get_all(
                 "OKR",
                 filters={
                     "parent_okr": okr_name,
-                    "parent_kra": measurable.metric_name
+                    "parent_kra": stored_kra
                 },
                 fields=["name", "title", "progress"]
             )
@@ -811,6 +868,7 @@ def get_child_kra_progress(okr_name):
                     result.append({
                         "parent_kr_name": measurable.metric_name,
                         "parent_kr_title": getattr(measurable, 'kr_title', None) or measurable.metric_name,
+                        "stored_parent_kra": stored_kra,
                         "child_okr_count": len(child_okrs),
                         "child_measurable_count": len(child_measurables),
                         "average_progress": avg_progress,
