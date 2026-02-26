@@ -1,14 +1,72 @@
 # Copyright (c) 2025, Phamos and contributors
 # For license information, please see license.txt
 
+import re
 import frappe
 from frappe.utils import nowdate, add_days, getdate
 from frappe.model.document import Document
 
+# ID format: YYYY-Qx-#### (e.g. 2026-Q1-0001)
+OKR_ID_PATTERN = re.compile(r"^\d{4}-Q[1-4]-\d{4}$")
+
+
+def get_next_okr_id(target_date=None):
+	"""
+	Generate next OKR ID based on target_date: YYYY-Qx-####.
+	Quarter from target_date (or today if None). Counter is per (year, quarter).
+	"""
+	from datetime import datetime
+	dt = getdate(target_date) if target_date else getdate(nowdate())
+	year = dt.year
+	month = dt.month
+	quarter = (month - 1) // 3 + 1
+	prefix = f"{year}-Q{quarter}-"
+	# Find max existing counter for this year-quarter
+	existing = frappe.get_all(
+		"OKR",
+		filters={"name": ["like", prefix + "%"]},
+		fields=["name"],
+		order_by="name desc",
+		limit=1,
+	)
+	if existing:
+		try:
+			# name is e.g. 2026-Q1-0003
+			last_part = existing[0].name.split("-")[-1]
+			next_num = int(last_part, 10) + 1
+		except (IndexError, ValueError):
+			next_num = 1
+	else:
+		next_num = 1
+	return f"{prefix}{next_num:04d}"
+
+
 class OKR(Document):
+    def autoname(self):
+        """Set name to YYYY-Qx-#### from target_date (only for new docs)."""
+        if self.is_new() and not self.get("name"):
+            self.name = get_next_okr_id(self.target_date)
+
     def validate(self):
+        self.validate_okr_id_format()
         self.validate_measurables()
         self.validate_and_update_is_group()
+
+    def validate_okr_id_format(self):
+        """Ensure ID (name) is in format yyyy-Q#-####. Allow legacy title-as-name for existing docs."""
+        if not self.name:
+            return
+        if OKR_ID_PATTERN.match(self.name):
+            return
+        # Legacy: name that does not look like YYYY-Qx-... is old title-based; allow until migration
+        if not self.is_new() and not re.match(r"^\d{4}-Q[1-4]-", self.name):
+            return
+        frappe.throw(frappe._("OKR ID must be in format YYYY-Q#-#### (e.g. 2026-Q1-0001)."))
+
+    def validate_and_update_is_group(self):
+        """Ensure parent OKR has is_group=1 when this OKR is linked as child."""
+        if self.parent_okr:
+            frappe.db.set_value("OKR", self.parent_okr, "is_group", 1, update_modified=False)
 
     def get_invalid_links(self, is_submittable=False):
         """Allow parent_kra with value 'metric_name||idx': don't let base validation overwrite it."""
@@ -196,10 +254,12 @@ class OKR(Document):
             except frappe.DoesNotExistError:
                 return None
         return None
+
     def _get_status_category(self, okr):
         """Get status category for an OKR based on progress and target date"""
         progress = okr.get('progress', 0) or 0
         target_date = okr.get('target_date')
+
         if not target_date:
             if progress >= 100:
                 return 'completed'
@@ -498,7 +558,7 @@ class OKR(Document):
                 }
             }
 
-        from frappe.utils import getdate, nowdate
+        from frappe.utils import getdate, add_days, nowdate
 
         total = len(self.measurables)
         completed = 0
@@ -514,6 +574,7 @@ class OKR(Document):
         overdue_count = 0
         due_soon_count = 0
 
+        # Distribution counters
         progress_dist = {"excellent": 0, "good": 0, "fair": 0, "poor": 0, "critical": 0}
         confidence_dist = {"high": 0, "medium": 0, "low": 0}
 
@@ -529,9 +590,11 @@ class OKR(Document):
             else:
                 not_started += 1
 
+            # Progress tracking
             if measurable.percent_complete is not None:
                 total_progress += measurable.percent_complete
 
+                # Progress distribution
                 if measurable.percent_complete >= 90:
                     progress_dist["excellent"] += 1
                 elif measurable.percent_complete >= 70:
@@ -611,10 +674,12 @@ class OKR(Document):
                 return round((progress_score + confidence_score) / 2, 1)
             return 0
 
+        # Weight factors
         progress_weight = 0.4
         confidence_weight = 0.3
         timeline_weight = 0.3
 
+        # Progress score (0-100)
         progress_score = (
             progress_dist["excellent"] * 100 +
             progress_dist["good"] * 80 +
@@ -623,6 +688,7 @@ class OKR(Document):
             progress_dist["critical"] * 20
         ) / total
 
+        # Confidence score (0-100) - handle case where no confidence data
         confidence_score = 0
         if sum(confidence_dist.values()) > 0:
             confidence_score = (
@@ -902,12 +968,14 @@ def get_child_okrs(okr_name):
         child['status_category'] = _get_status_category_for_okr(child)
         child['progress_display'] = f"{child.get('progress', 0):.1f}%"
         child['score_display'] = f"{child.get('okr_score', 0):.2f}"
+
     return child_okrs
 
 def _get_status_category_for_okr(okr):
     """Get status category for an OKR based on progress and target date"""
     progress = okr.get('progress', 0) or 0
     target_date = okr.get('target_date')
+
     if not target_date:
         if progress >= 100:
             return 'completed'

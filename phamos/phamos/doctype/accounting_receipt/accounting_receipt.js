@@ -383,8 +383,6 @@ frappe.ui.form.on("Accounting Receipt", {
             var v = extracted[k];
             return v != null && String(v).trim() !== "";
         });
-        // Update exchange rate and EUR sum on refresh
-        frm.events.update_exchange_and_base_sum(frm);
     },
 
     attachment: function (frm) {

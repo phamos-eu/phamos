@@ -162,10 +162,7 @@ doc_events = {
         "after_insert": [
             "phamos.phamos.doctype.accounting_receipt.accounting_receipt.sync_attachment_from_files",
             "phamos.phamos.doctype.accounting_receipt.mistral_pdf.run_auto_extract_if_attachment",
-        ],
-        "on_update": [
-            "phamos.phamos.doctype.accounting_receipt.mistral_pdf.run_auto_extract_if_attachment",
-        ],
+        ]
     }
 }
 

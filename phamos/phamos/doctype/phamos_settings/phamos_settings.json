@@ -14,6 +14,8 @@
   "column_break_szyj",
   "enable_feedback_dialog",
   "is_employee_feedback",
+  "timesheet_settings_section",
+  "allowed_additional_work_time",
   "mattermost_daily_thread_settings_tab",
   "enable_daily_thread_creation",
   "section_break_boza",
