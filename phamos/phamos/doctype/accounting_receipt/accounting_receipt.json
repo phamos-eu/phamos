@@ -51,6 +51,10 @@
   "datev_mail_recipient",
   "datev_mail_recipient_2",
   "sent_to_datev",
+  "column_break_datev_audit",
+  "datev_sent_by",
+  "datev_sent_at",
+  "datev_email_queue_ref",
   "admin_tab",
   "naming_series",
   "uploaded_by",
@@ -260,7 +264,30 @@
    "default": "0",
    "fieldname": "sent_to_datev",
    "fieldtype": "Check",
-   "label": "Sent to DATEV"
+   "label": "Sent to DATEV",
+   "read_only": 1
+  },
+  {
+   "fieldname": "column_break_datev_audit",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "datev_sent_by",
+   "fieldtype": "Data",
+   "label": "Sent By",
+   "read_only": 1
+  },
+  {
+   "fieldname": "datev_sent_at",
+   "fieldtype": "Datetime",
+   "label": "Sent At",
+   "read_only": 1
+  },
+  {
+   "fieldname": "datev_email_queue_ref",
+   "fieldtype": "Data",
+   "label": "Email Queue Reference",
+   "read_only": 1
   },
   {
    "fieldname": "admin_tab",
@@ -344,7 +371,7 @@
  "index_web_pages_for_search": 1,
  "is_submittable": 1,
  "links": [],
- "modified": "2024-05-28 15:05:36.281984",
+ "modified": "2026-03-02 15:05:36.281984",
  "modified_by": "Administrator",
  "module": "Phamos",
  "name": "Accounting Receipt",

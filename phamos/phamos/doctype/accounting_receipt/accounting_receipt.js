@@ -53,6 +53,9 @@ frappe.ui.form.on("Accounting Receipt", {
                     }, __("Create")
                 );
                 frm.page.set_inner_btn_group_as_primary(__("Create"));
+                
+                // Add DATEV Send button
+                frm.events.add_datev_send_button(frm);
         }
 
         // Hide PDF Preview if no attachment available or display it onload of document
@@ -533,7 +536,137 @@ frappe.ui.form.on("Accounting Receipt", {
                 }
             });
         }
+    },
+
+    add_datev_send_button: function(frm) {
+        // Only show button if document is submitted
+        if (frm.doc.docstatus !== 1) {
+            return;
+        }
+        
+        // Determine button label based on whether already sent
+        const button_label = frm.doc.sent_to_datev ? __("Resend to DATEV") : __("Send to DATEV");
+        
+        frm.add_custom_button(button_label, function() {
+            frm.events.show_datev_send_dialog(frm);
+        });
+    },
+
+    show_datev_send_dialog: function(frm) {
+        // Fetch info needed for confirmation dialog
+        frappe.call({
+            method: "phamos.phamos.doctype.accounting_receipt.accounting_receipt.get_datev_send_info",
+            args: { accounting_receipt_name: frm.doc.name },
+            callback: function(r) {
+                if (!r.message || !r.message.ok) {
+                    frappe.msgprint({
+                        title: __("Error"),
+                        indicator: "red",
+                        message: r.message ? r.message.message : __("Failed to get DATEV send information")
+                    });
+                    return;
+                }
+                
+                const info = r.message;
+                
+                // Validate recipient
+                if (!info.recipient) {
+                    frappe.msgprint({
+                        title: __("Configuration Error"),
+                        indicator: "red",
+                        message: __("DATEV recipient email is not configured. Please contact system administrator.")
+                    });
+                    return;
+                }
+                
+                // Validate PDF
+                if (!info.pdf_name || !info.pdf_url) {
+                    frappe.msgprint({
+                        title: __("Missing PDF"),
+                        indicator: "red",
+                        message: __("PDF attachment is missing. Please attach a PDF file using:<br><br>• The <strong>Attachment</strong> field in the form, OR<br>• The <strong>Attachments</strong> sidebar (📎 icon)<br><br>Then try again.")
+                    });
+                    return;
+                }
+                
+                // Build dialog message
+                let dialog_message = `
+                    <div style="margin-bottom: 15px;">
+                        <p><strong>${__("Recipient")}:</strong> ${info.recipient}</p>
+                        <p><strong>${__("PDF File")}:</strong> ${info.pdf_name}</p>
+                    </div>
+                `;
+                
+                if (info.already_sent) {
+                    dialog_message += `
+                        <div style="padding: 10px; background-color: #fff3cd; border: 1px solid #ffc107; border-radius: 4px; margin-bottom: 15px;">
+                            <p style="margin: 0; color: #856404;">
+                                <strong>${__("Warning")}:</strong> ${__("This document was already sent on")} 
+                                ${frappe.datetime.str_to_user(info.sent_at)} ${__("by")} ${info.sent_by}.
+                            </p>
+                            ${info.email_queue_ref ? `<p style="margin: 5px 0 0 0; font-size: 12px; color: #856404;">
+                                ${__("Email Queue")}: ${info.email_queue_ref}
+                            </p>` : ''}
+                        </div>
+                    `;
+                }
+                
+                dialog_message += `<p>${__("Are you sure you want to send this document to DATEV?")}</p>`;
+                
+                // Show confirmation dialog
+                frappe.confirm(
+                    dialog_message,
+                    function() {
+                        // User confirmed - send email
+                        frm.events.send_to_datev_now(frm);
+                    },
+                    function() {
+                        // User cancelled
+                    }
+                );
+            }
+        });
+    },
+
+    send_to_datev_now: function(frm) {
+        frappe.call({
+            method: "phamos.phamos.doctype.accounting_receipt.accounting_receipt.send_to_datev",
+            args: { accounting_receipt_name: frm.doc.name },
+            freeze: true,
+            freeze_message: __("Sending to DATEV..."),
+            callback: function(r) {
+                if (!r.message) {
+                    frappe.msgprint({
+                        title: __("Error"),
+                        indicator: "red",
+                        message: __("No response from server")
+                    });
+                    return;
+                }
+                
+                const result = r.message;
+                
+                if (result.ok) {
+                    // Success
+                    frappe.show_alert({
+                        message: result.message || __("Email sent successfully"),
+                        indicator: "green"
+                    }, 5);
+                    
+                    // Reload form to show updated fields
+                    frm.reload_doc();
+                } else {
+                    // Error
+                    frappe.msgprint({
+                        title: __("Failed to Send"),
+                        indicator: "red",
+                        message: result.message || __("Unknown error occurred")
+                    });
+                }
+            }
+        });
     }
+
 });
 
 frappe.ui.form.on("Accounting Receipt Timesheet", {
