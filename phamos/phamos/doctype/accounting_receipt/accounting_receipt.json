@@ -52,6 +52,10 @@
   "datev_mail_recipient",
   "datev_mail_recipient_2",
   "sent_to_datev",
+  "column_break_datev_audit",
+  "datev_sent_by",
+  "datev_sent_at",
+  "datev_email_queue_ref",
   "admin_tab",
   "naming_series",
   "uploaded_by",
@@ -261,7 +265,30 @@
    "default": "0",
    "fieldname": "sent_to_datev",
    "fieldtype": "Check",
-   "label": "Sent to DATEV"
+   "label": "Sent to DATEV",
+   "read_only": 1
+  },
+  {
+   "fieldname": "column_break_datev_audit",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "datev_sent_by",
+   "fieldtype": "Data",
+   "label": "Sent By",
+   "read_only": 1
+  },
+  {
+   "fieldname": "datev_sent_at",
+   "fieldtype": "Datetime",
+   "label": "Sent At",
+   "read_only": 1
+  },
+  {
+   "fieldname": "datev_email_queue_ref",
+   "fieldtype": "Data",
+   "label": "Email Queue Reference",
+   "read_only": 1
   },
   {
    "fieldname": "admin_tab",
