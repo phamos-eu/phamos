@@ -55,15 +55,17 @@
    "options": "Email Account"
   },
   {
+   "fetch_from": "sender.email_id",
    "fieldname": "sender_email",
    "fieldtype": "Data",
-   "label": "Sender Email"
+   "label": "Sender Email",
+   "read_only": 1
   }
  ],
  "index_web_pages_for_search": 1,
  "issingle": 1,
  "links": [],
- "modified": "2026-02-26 14:09:13.602901",
+ "modified": "2026-02-26 14:18:17.237582",
  "modified_by": "Administrator",
  "module": "Phamos",
  "name": "Recruitment Settings",
