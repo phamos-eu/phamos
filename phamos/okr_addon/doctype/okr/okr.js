@@ -72,6 +72,12 @@ frappe.ui.form.on("OKR", {
 		// Render child OKRs in HTML field (with delay to ensure field is ready)
 		setTimeout(() => renderChildOKRsInField(frm), 200);
 
+		// Create Child OKR button (only when saved, so this OKR can be set as parent)
+		if (!frm.is_new() && frm.doc.name) {
+			frm.add_custom_button(__('Create Child OKR'), function() {
+				frappe.new_doc('OKR', { parent_okr: frm.doc.name }).run();
+			}, __('Create'));
+		}
 	},
 
 	measurables_add(frm, cdt, cdn) {
@@ -675,6 +681,7 @@ function addCollaborationFeatures(frm) {
 
 // Add export/share features
 function addExportShareFeatures(frm) {
+	// Create Child OKR is added in refresh (so it only shows when doc has name)
 	// Add export button
 	frm.add_custom_button(__('📊 Export Report'), function() {
 		exportOKRReport(frm);
