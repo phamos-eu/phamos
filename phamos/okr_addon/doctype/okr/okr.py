@@ -285,6 +285,55 @@ class OKR(Document):
         else:
             return 'on_track'
 
+    def validate_and_update_is_group(self):
+        """Validate and auto-manage is_group field based on children and parent relationships"""
+        # Step 1: Update parent OKR's is_group when this OKR is selected as child
+        if self.parent_okr:
+            parent_is_group = frappe.db.get_value("OKR", self.parent_okr, "is_group")
+
+            if parent_is_group is None:
+                frappe.throw(f"Parent OKR '{self.parent_okr}' does not exist")
+
+            # Automatically set is_group = 1 on parent if not already set
+            if not parent_is_group:
+                frappe.db.set_value("OKR", self.parent_okr, "is_group", 1, update_modified=False)
+                frappe.db.commit()
+
+        # Step 2: Update old parent's is_group if parent_okr was changed/removed
+        if not self.is_new():
+            doc_before_save = self.get_doc_before_save()
+            if doc_before_save:
+                old_parent_okr = doc_before_save.get("parent_okr") or ""
+                current_parent_okr = self.get("parent_okr") or ""
+
+                # If parent_okr was changed or removed (old had value, current is empty/None)
+                if old_parent_okr and old_parent_okr != current_parent_okr:
+                    # Count remaining children for old parent (excluding this record)
+                    remaining_children = frappe.db.count(
+                        "OKR",
+                        filters={"parent_okr": old_parent_okr, "name": ["!=", self.name]}
+                    )
+
+                    # If old parent has no children left, uncheck is_group
+                    if remaining_children == 0:
+                        frappe.db.set_value("OKR", old_parent_okr, "is_group", 0, update_modified=False)
+                        frappe.db.commit()
+
+        # Step 3: Ensure this OKR's is_group is correct based on its children
+        # Check if this OKR has any children (excluding self for new records)
+        if self.is_new():
+            child_count = 0  # New OKR can't have children yet
+        else:
+            child_count = frappe.db.count("OKR", filters={"parent_okr": self.name})
+
+        # If OKR has children, ensure is_group = 1
+        if child_count > 0:
+            if not self.is_group:
+                self.is_group = 1
+        # If OKR has no children, is_group can be 0 (unchecked)
+        # Since is_group is read-only, users can't manually change it
+
+
     def validate_okr_structure(self):
         """Validate OKR structure and hierarchy"""
         if self.okr_type == "Company" and self.parent_okr:
@@ -353,7 +402,9 @@ class OKR(Document):
                 else:
                     measurable.percent_complete = 0
             else:
-                measurable.percent_complete = 0
+                # If no current_value and no child OKRs, keep existing percent_complete or set to 0
+                if measurable.percent_complete is None:
+                    measurable.percent_complete = 0
 
     def set_next_check_in(self):
         """Set next check-in date based on frequency"""
@@ -494,16 +545,16 @@ class OKR(Document):
                 "overdue_count": 0,
                 "due_soon_count": 0,
                 "progress_distribution": {
-                    "excellent": 0,  # 90-100%
-                    "good": 0,       # 70-89%
-                    "fair": 0,       # 50-69%
-                    "poor": 0,       # 30-49%
-                    "critical": 0    # 0-29%
+                    "excellent": 0,
+                    "good": 0,
+                    "fair": 0,
+                    "poor": 0,
+                    "critical": 0
                 },
                 "confidence_distribution": {
-                    "high": 0,       # 80-100%
-                    "medium": 0,     # 60-79%
-                    "low": 0         # 0-59%
+                    "high": 0,
+                    "medium": 0,
+                    "low": 0
                 }
             }
 
@@ -530,7 +581,6 @@ class OKR(Document):
         today = getdate(nowdate())
 
         for measurable in self.measurables:
-            # Basic status counting
             if measurable.percent_complete is None:
                 not_started += 1
             elif measurable.percent_complete >= 100:
@@ -556,14 +606,13 @@ class OKR(Document):
                 else:
                     progress_dist["critical"] += 1
 
-                # Risk assessment based on progress vs time
-                if measurable.time_bound:
+                if hasattr(measurable, 'time_bound') and measurable.time_bound:
                     days_remaining = (getdate(measurable.time_bound) - today).days
                     progress_ratio = measurable.percent_complete / 100
-                    if days_remaining < 0:  # Overdue
+                    if days_remaining < 0:
                         overdue_count += 1
                         at_risk += 1
-                    elif days_remaining <= 7:  # Due soon
+                    elif days_remaining <= 7:
                         due_soon_count += 1
                         if progress_ratio < 0.8:
                             at_risk += 1
@@ -571,7 +620,7 @@ class OKR(Document):
                             ahead_of_schedule += 1
                         else:
                             on_track += 1
-                    else:  # Normal timeline
+                    else:
                         if progress_ratio < 0.6:
                             at_risk += 1
                         elif progress_ratio >= 1.0:
@@ -579,11 +628,9 @@ class OKR(Document):
                         else:
                             on_track += 1
 
-            # Confidence tracking
-            if measurable.confidence_level is not None:
+            if hasattr(measurable, 'confidence_level') and measurable.confidence_level is not None:
                 total_confidence += measurable.confidence_level
 
-                # Confidence distribution
                 if measurable.confidence_level >= 80:
                     confidence_dist["high"] += 1
                 elif measurable.confidence_level >= 60:
@@ -591,11 +638,11 @@ class OKR(Document):
                 else:
                     confidence_dist["low"] += 1
 
-            # KR Type counting
-            if measurable.kr_type == "Leading":
-                leading_indicators += 1
-            elif measurable.kr_type == "Lagging":
-                lagging_indicators += 1
+            if hasattr(measurable, 'kr_type'):
+                if measurable.kr_type == "Leading":
+                    leading_indicators += 1
+                elif measurable.kr_type == "Lagging":
+                    lagging_indicators += 1
 
         return {
             "total": total,
@@ -615,13 +662,12 @@ class OKR(Document):
             "confidence_distribution": confidence_dist,
             "completion_rate": round((completed / total) * 100, 1) if total > 0 else 0,
             "risk_score": round((at_risk / total) * 100, 1) if total > 0 else 0,
-            "overall_health": self._calculate_overall_health(progress_dist, confidence_dist, overdue_count, total)
+            "overall_health": self._calculate_overall_health(progress_dist, confidence_dist, overdue_count, total) if hasattr(self, '_calculate_overall_health') else 0
         }
 
     def _calculate_overall_health(self, progress_dist, confidence_dist, overdue_count, total):
         """Calculate overall health score (0-100)"""
         if total == 0:
-            # If no measurables, calculate health based on okr progress and confidence
             if hasattr(self, 'progress') and hasattr(self, 'confidence_level'):
                 progress_score = self.progress or 0
                 confidence_score = self.confidence_level or 50
@@ -651,12 +697,10 @@ class OKR(Document):
                 confidence_dist["low"] * 40
             ) / sum(confidence_dist.values())
         else:
-            confidence_score = 50  # Default to neutral if no confidence data
+            confidence_score = 50
 
-        # Timeline score (0-100) - penalize overdue items
         timeline_score = max(0, 100 - (overdue_count / total) * 50)
 
-        # Calculate weighted average
         overall_health = (
             progress_score * progress_weight +
             confidence_score * confidence_weight +
@@ -664,8 +708,6 @@ class OKR(Document):
         )
 
         return round(overall_health, 1)
-
-
 
     def get_risk_summary(self):
         """Get summary of risks and blockers"""
@@ -677,8 +719,8 @@ class OKR(Document):
             }
 
         total_blockers = len(self.blockers)
-        critical_blockers = len([b for b in self.blockers if b.priority == "Critical"])
-        resolved_blockers = len([b for b in self.blockers if b.status == "Resolved"])
+        critical_blockers = sum(1 for b in self.blockers if b.severity == "Critical")
+        resolved_blockers = sum(1 for b in self.blockers if b.status == "Resolved")
 
         return {
             "total_blockers": total_blockers,
@@ -689,22 +731,42 @@ class OKR(Document):
     def get_okr_grade(self):
         """Get OKR grade based on score"""
         score = self.okr_score or 0.0
-
-        if score >= 0.7:
+        if score >= 0.9:
             return "A"
-        elif score >= 0.4:
+        elif score >= 0.8:
             return "B"
-        elif score >= 0.1:
+        elif score >= 0.7:
             return "C"
-        else:
+        elif score >= 0.6:
             return "D"
+        else:
+            return "F"
 
-    @staticmethod
-    @frappe.whitelist()
-    def get_measurable_summary_static(okr_name):
-        """Static method to get measurable summary for frontend"""
-        doc = frappe.get_doc("OKR", okr_name)
-        return doc.get_measurable_summary()
+@frappe.whitelist()
+def ensure_parent_is_group(parent_okr):
+    """Ensure parent OKR has is_group = 1, update if needed"""
+    if not parent_okr:
+        return {"updated": False}
+
+    parent_is_group = frappe.db.get_value("OKR", parent_okr, "is_group")
+
+    if parent_is_group is None:
+        frappe.throw(f"Parent OKR '{parent_okr}' does not exist")
+
+    if not parent_is_group:
+        frappe.db.set_value("OKR", parent_okr, "is_group", 1, update_modified=False)
+        frappe.db.commit()
+        return {"updated": True, "parent_okr": parent_okr}
+
+    return {"updated": False}
+
+# Standalone functions below (not part of OKR class)
+
+@frappe.whitelist()
+def get_measurable_summary_static(okr_name):
+    """Static method to get measurable summary for frontend"""
+    doc = frappe.get_doc("OKR", okr_name)
+    return doc.get_measurable_summary()
 
 # Server-side functions for frontend calls
 @frappe.whitelist()
@@ -938,6 +1000,21 @@ def _get_status_category_for_okr(okr):
         return 'at_risk'
     else:
         return 'on_track'
+
+@frappe.whitelist()
+def recalculate_measurable_progress(okr_name):
+    """Recalculate measurable progress for an OKR (useful for refreshing on form load)"""
+    try:
+        if not okr_name:
+            return False
+
+        doc = frappe.get_doc("OKR", okr_name)
+        doc.update_measurable_targets()
+        doc.save()
+        return True
+    except Exception as e:
+        frappe.log_error(f"Error recalculating measurable progress: {str(e)}")
+        return False
 
 @frappe.whitelist()
 def get_okr_type_options():

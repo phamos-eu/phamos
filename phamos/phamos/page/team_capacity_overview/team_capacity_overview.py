@@ -107,8 +107,8 @@ def get_team_capacity(filters=None):
         total_actual = frappe.db.sql("""
             SELECT SUM(actual_time)
             FROM `tabTimesheet Record`
-            WHERE from_time <= %s AND to_time >= %s
-        """, (e, s))[0][0] or 0
+            WHERE from_time BETWEEN %s AND %s
+        """, (s, e))[0][0] or 0
 
         actual_line.append(round(total_actual / 3600, 2))
 

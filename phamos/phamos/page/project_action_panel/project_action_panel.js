@@ -359,6 +359,27 @@ function openStopProjectDialog(timesheet_record, percent_billable, project, task
             fieldname: "to_time",
             fieldtype: "Datetime",
             reqd: 1,
+            default: (function() {
+              var now = new Date();
+              var pad = function(n) { return (n < 10 ? '0' : '') + n; };
+              var formatted = now.getFullYear() + '-' + 
+                     pad(now.getMonth() + 1) + '-' + 
+                     pad(now.getDate()) + ' ' + 
+                     pad(now.getHours()) + ':' + 
+                     pad(now.getMinutes()) + ':' + 
+                     pad(now.getSeconds());
+              
+              // Convert to system timezone
+              try {
+                var system_time = frappe.datetime.convert_to_system_tz(formatted);
+                formatted = system_time;
+              } catch(e) {
+                // Fallback to unconverted time if conversion fails
+              }
+              
+              return formatted;
+            })(),
+            description: "Time updates live. Edit manually to stop auto-update.",
           },
           {
             fieldtype: "Select",
@@ -388,6 +409,84 @@ function openStopProjectDialog(timesheet_record, percent_billable, project, task
 
       dialog.$wrapper.find(".modal-dialog").css("max-width", "800px");
       dialog.show();
+      
+      // Implement live time update for to_time field
+      var time_update_interval = null;
+      var user_interacted = false;
+      
+      setTimeout(function() {
+        var to_time_field = dialog.fields_dict.to_time;
+        
+        if (to_time_field && to_time_field.$input && to_time_field.$input.length > 0) {
+          // Mark as user-interacted on focus or manual typing
+          to_time_field.$input.on('focus mousedown keydown', function() {
+            if (!user_interacted) {
+              user_interacted = true;
+              if (time_update_interval) {
+                clearInterval(time_update_interval);
+                time_update_interval = null;
+              }
+            }
+          });
+          
+          // Function to update the time field
+          var update_time = function() {
+            if (!user_interacted) {
+              // Get current time from browser
+              var now = new Date();
+              var pad = function(n) { return (n < 10 ? '0' : '') + n; };
+              var local_time = now.getFullYear() + '-' + 
+                               pad(now.getMonth() + 1) + '-' + 
+                               pad(now.getDate()) + ' ' + 
+                               pad(now.getHours()) + ':' + 
+                               pad(now.getMinutes()) + ':' + 
+                               pad(now.getSeconds());
+              
+              // Convert to system timezone
+              var current_time = local_time;
+              try {
+                var system_time = frappe.datetime.convert_to_system_tz(local_time);
+                current_time = system_time;
+              } catch(e) {
+                // Fallback to unconverted time if conversion fails
+              }
+              
+              // Update field using multiple approaches to ensure sync
+              to_time_field.$input.val(current_time);
+              
+              try {
+                dialog.set_value('to_time', current_time);
+              } catch(e) {}
+              
+              if (to_time_field.set_model_value) {
+                to_time_field.set_model_value(current_time);
+              }
+            }
+          };
+          
+          // Sync to system clock - wait until next full second
+          var now = new Date();
+          var ms_until_next_second = 1000 - now.getMilliseconds();
+          
+          setTimeout(function() {
+            // Update immediately at the second boundary
+            update_time();
+            
+            // Then continue updating every second, now synced
+            time_update_interval = setInterval(update_time, 1000);
+          }, ms_until_next_second);
+        }
+      }, 500);
+      
+      // Cleanup interval when dialog closes
+      var original_hide = dialog.hide;
+      dialog.hide = function() {
+        if (time_update_interval) {
+          clearInterval(time_update_interval);
+          time_update_interval = null;
+        }
+        original_hide.call(this);
+      };
     });
   });
 }
@@ -537,6 +636,25 @@ function openStopProjectDialog(timesheet_record, percent_billable, project, task
                   in_list_view: 1,
                   reqd: 1,
                   read_only: 0,
+                  default: (function() {
+                    var now = new Date();
+                    var pad = function(n) { return (n < 10 ? '0' : '') + n; };
+                    var formatted = now.getFullYear() + '-' + 
+                           pad(now.getMonth() + 1) + '-' + 
+                           pad(now.getDate()) + ' ' + 
+                           pad(now.getHours()) + ':' + 
+                           pad(now.getMinutes()) + ':' + 
+                           pad(now.getSeconds());
+                    // Convert to system timezone
+                    try {
+                      var system_time = frappe.datetime.convert_to_system_tz(formatted);
+                      formatted = system_time;
+                    } catch(e) {
+                      // Fallback to unconverted time if conversion fails
+                    }
+                    return formatted;
+                  })(),
+                  description: "Auto-filled with current time. Adjust if needed.",
                 },
                 { 
                   fieldtype: "Small Text",
@@ -928,7 +1046,7 @@ function show_tab(tab, projectData) {
 
       // Render projects table
       renderProjectDataTable(tableDiv, projectData);
-
+      persistButtonStates();
     }
 
     else if (tab === "All Projects") {
@@ -1581,7 +1699,7 @@ window.togglePausePlay = function(taskId, timesheetName) {
     btn.textContent = '⏸️';
     btn.setAttribute('data-paused', 'false');
 
-    frappe.confirm(
+    confirm_strict(
       "Do you want to create a timesheet record for this Break?",
       function() {
           frappe.call({
@@ -1589,7 +1707,11 @@ window.togglePausePlay = function(taskId, timesheetName) {
               args: { name: timesheetName },
               callback: function(r) {
                   if (r.message && r.message.status === "success") {
-                      show_break_task_dialog(r.message.new_row_name, r.message.previous_from_time, r.message.previous_to_time, );
+                      show_break_task_dialog(
+                          r.message.new_row_name, 
+                          r.message.previous_from_time, 
+                          r.message.previous_to_time
+                      );
                   } else {
                       frappe.show_alert("Error: " + (r.message.message || "Something went wrong."));
                   }
@@ -1597,7 +1719,6 @@ window.togglePausePlay = function(taskId, timesheetName) {
           });
       },
       function() {
-          // ❌ NO → create new row but don't show popup
           frappe.call({
               method: "phamos.phamos.page.project_action_panel.project_action_panel.close_open_row_and_add_break",
               args: { name: timesheetName },
@@ -1610,8 +1731,7 @@ window.togglePausePlay = function(taskId, timesheetName) {
               }
           });
       }
-  );
-
+    );
 
   } else {
     // ⏸️ Pause clicked → Close current row
@@ -1634,37 +1754,73 @@ window.togglePausePlay = function(taskId, timesheetName) {
     });
   }
 };
-frappe.after_ajax(() => {
-  console.log("frappe.after_ajax started");
-  const taskButtons = document.querySelectorAll("[id^='toggle-']");
-  console.log("Buttons found:", taskButtons.length);
 
-  taskButtons.forEach(btn => {
-    const taskId = btn.id.split("toggle-")[1];
-    const timesheetName = btn.getAttribute("data-timesheet");
-
-    console.log("Checking task:", taskId, "timesheet:", timesheetName);
-
-    frappe.call({
-      method: "phamos.phamos.page.project_action_panel.project_action_panel.is_task_running",
-      args: {
-        name: timesheetName
-      },
-      callback: function (r) {
-        if (r.message && r.message.is_running) {
-          btn.textContent = '⏸️';
-          btn.setAttribute('data-paused', 'false');
-          btn.setAttribute('title', 'Pause ⏸️');
-        } else {
-          btn.textContent = '▶️';
-          btn.setAttribute('data-paused', 'true');
-          btn.setAttribute('title', 'Resume ▶️');
+function confirm_strict(message, yes_callback, no_callback) {
+    let d = new frappe.ui.Dialog({
+        title: "Confirm",
+        fields: [
+            {
+                fieldtype: "HTML",
+                fieldname: "msg_html",
+                options: `<p>${message}</p>`
+            }
+        ],
+        primary_action_label: "Yes",
+        primary_action() {
+            d.hide();
+            yes_callback();
         }
-
-      }
     });
-  });
-});
+
+    d.set_secondary_action_label("No");
+    d.set_secondary_action(() => {
+        d.hide();
+        if (no_callback) no_callback();
+    });
+
+    d.$wrapper.modal({
+        backdrop: "static",
+        keyboard: false
+    });
+
+    d.show();
+    return d;
+}
+
+
+function persistButtonStates() {
+    frappe.after_ajax(() => {
+      console.log("frappe.after_ajax started");
+      const taskButtons = document.querySelectorAll("[id^='toggle-']");
+      console.log("Buttons found:", taskButtons.length);
+
+      taskButtons.forEach(btn => {
+        const taskId = btn.id.split("toggle-")[1];
+        const timesheetName = btn.getAttribute("data-timesheet");
+
+        console.log("Checking task:", taskId, "timesheet:", timesheetName);
+
+        frappe.call({
+          method: "phamos.phamos.page.project_action_panel.project_action_panel.is_task_running",
+          args: {
+            name: timesheetName
+          },
+          callback: function (r) {
+            if (r.message && r.message.is_running) {
+              btn.textContent = '⏸️';
+              btn.setAttribute('data-paused', 'false');
+              btn.setAttribute('title', 'Pause ⏸️');
+            } else {
+              btn.textContent = '▶️';
+              btn.setAttribute('data-paused', 'true');
+              btn.setAttribute('title', 'Resume ▶️');
+            }
+
+          }
+        });
+     });
+    });
+  }
 };
 
 function show_break_task_dialog(new_row_name, previous_from_time, previous_to_time) {
