@@ -2,6 +2,7 @@ import frappe
 from frappe.utils import getdate, get_url, format_datetime, strip_html
 from frappe import _
 
+
 @frappe.whitelist()
 def get_timesheets(from_date=None, to_date=None, project=None, offset=0, limit=20, sort_by=None, sort_order=None):
     user = frappe.session.user
@@ -42,7 +43,7 @@ def get_timesheets(from_date=None, to_date=None, project=None, offset=0, limit=2
         "creation": "ts.creation"
     }
 
-    order_field = valid_sort_fields.get(sort_by, "ts.creation")  
+    order_field = valid_sort_fields.get(sort_by, "ts.creation")
     order_direction = "ASC" if sort_order == "asc" else "DESC"
 
     # Total count
@@ -53,7 +54,7 @@ def get_timesheets(from_date=None, to_date=None, project=None, offset=0, limit=2
     """, values)[0][0]
 
     timesheets = frappe.db.sql(f"""
-        SELECT 
+        SELECT
             ts.name,
             ts.employee,
             ts.custom_billing_status,
@@ -194,7 +195,7 @@ def get_timesheet_totals(from_date=None, to_date=None, project=None):
 def get_graph_data(from_date=None, to_date=None, project=None):
     user = frappe.session.user
     validate_guest_user()
-    
+
     customer = get_customer_for_user(user)
     if not customer:
         frappe.throw("No Customer linked to user.", frappe.PermissionError)
@@ -208,7 +209,7 @@ def get_graph_data(from_date=None, to_date=None, project=None):
         filters += f" AND parent_project = '{project}'"
 
     data = frappe.db.sql(f"""
-        SELECT 
+        SELECT
             name,
             start_date,
             total_hours,
@@ -229,49 +230,49 @@ def get_graph_data(from_date=None, to_date=None, project=None):
 def get_sales_order_kpi_preference():
     """Get user's preferred KPI display mode for Sales Orders"""
     user = frappe.session.user
-    
+
     # Check if preference exists in user defaults
     preference = frappe.db.get_value(
         "DefaultValue",
         {"parent": user, "defkey": "sales_order_kpi_display_mode"},
         "defvalue"
     )
-    
+
     return preference or "all"
 
 
 @frappe.whitelist()
 def set_sales_order_kpi_preference(mode):
     """Set user's preferred KPI display mode for Sales Orders
-    
+
     Args:
         mode: One of 'all', 'indicators', 'progress_bars', 'cards', 'html_section'
     """
     valid_modes = ['all', 'indicators', 'progress_bars', 'cards', 'html_section']
-    
+
     if mode not in valid_modes:
         frappe.throw(_("Invalid display mode. Choose from: {0}").format(", ".join(valid_modes)))
-    
+
     user = frappe.session.user
-    
+
     # Set user default
     frappe.db.set_default("sales_order_kpi_display_mode", mode, user)
     frappe.db.commit()
-    
+
     return {"success": True, "mode": mode, "message": _("Display preference saved successfully")}
 
 
 @frappe.whitelist()
 def get_sales_order_kpi_stats(sales_order):
     """Get detailed KPI statistics for a Sales Order
-    
+
     Returns delivery and billing details including related documents
     """
     if not frappe.has_permission("Sales Order", "read", sales_order):
         frappe.throw(_("Not permitted"), frappe.PermissionError)
-    
+
     so = frappe.get_doc("Sales Order", sales_order)
-    
+
     # Get related documents
     delivery_notes = frappe.get_all(
         "Delivery Note Item",
@@ -279,19 +280,19 @@ def get_sales_order_kpi_stats(sales_order):
         fields=["parent", "qty", "item_code"],
         group_by="parent"
     )
-    
+
     sales_invoices = frappe.get_all(
         "Sales Invoice Item",
         filters={"sales_order": sales_order, "docstatus": 1},
         fields=["parent", "qty", "amount", "item_code"],
         group_by="parent"
     )
-    
+
     # Calculate totals
     total_qty = sum([item.qty for item in so.items])
     delivered_qty = sum([item.delivered_qty for item in so.items])
     billed_qty = sum([item.billed_qty if hasattr(item, 'billed_qty') else 0 for item in so.items])
-    
+
     return {
         "per_delivered": so.per_delivered,
         "per_billed": so.per_billed,
@@ -535,7 +536,7 @@ def send_monthly_comment_summary():
                 even more closely with your needs. We look forward to your contributions!
             </p>
 
-            <table border="1" cellpadding="6" cellspacing="0" 
+            <table border="1" cellpadding="6" cellspacing="0"
                    style="border-collapse: collapse; font-size: 12px;">
                 <thead style="background-color: #f5f5f5;">
                     <tr>
