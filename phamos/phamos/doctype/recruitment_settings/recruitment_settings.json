@@ -5,65 +5,65 @@
  "doctype": "DocType",
  "engine": "InnoDB",
  "field_order": [
-  "section_break_4dmp",
-  "interview_round",
+  "common_configuration_section",
   "interview_confirmation",
-  "column_break_owkz",
+  "column_break_xxjb",
   "interviewers",
   "sender",
-  "sender_email"
+  "sender_email",
+  "section_break_per_job_opening",
+  "job_opening_configs"
  ],
  "fields": [
   {
-   "fieldname": "section_break_4dmp",
-   "fieldtype": "Section Break"
+   "fieldname": "section_break_per_job_opening",
+   "fieldtype": "Section Break",
+   "label": "Per Job Opening Configuration"
+  },
+  {
+   "fieldname": "job_opening_configs",
+   "fieldtype": "Table",
+   "label": "Job Opening Interview Configurations",
+   "options": "Job Opening Interview Config"
   },
   {
    "fieldname": "interviewers",
    "fieldtype": "Table MultiSelect",
    "label": "Interviewers",
-   "options": "Assignment Rule User",
-   "reqd": 1
+   "options": "Interviewer"
   },
   {
-   "fieldname": "interview_round",
+   "fieldname": "common_configuration_section",
+   "fieldtype": "Section Break",
+   "label": "Common Configuration"
+  },
+  {
+   "fieldname": "column_break_xxjb",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "interview_confirmation",
    "fieldtype": "Link",
-   "in_list_view": 1,
-   "label": "Interview Round",
-   "options": "Interview Round",
-   "reqd": 1
+   "label": "Interview Confirmation",
+   "options": "Email Template"
   },
   {
    "fieldname": "sender",
    "fieldtype": "Link",
    "label": "Sender",
    "link_filters": "[[\"Email Account\",\"enable_outgoing\",\"=\",1]]",
-   "options": "Email Account",
-   "reqd": 1
+   "options": "Email Account"
   },
   {
-   "fieldname": "column_break_owkz",
-   "fieldtype": "Column Break"
-  },
-  {
-   "fetch_from": "sender.email_id",
    "fieldname": "sender_email",
    "fieldtype": "Data",
-   "label": "Sender Email",
-   "options": "Email"
-  },
-  {
-   "fieldname": "interview_confirmation",
-   "fieldtype": "Link",
-   "label": "Interview Confirmation",
-   "options": "Email Template",
-   "reqd": 1
+   "label": "Sender Email"
   }
  ],
  "index_web_pages_for_search": 1,
  "issingle": 1,
  "links": [],
- "modified": "2025-03-13 16:30:21.931776",
+ "modified": "2026-02-26 14:09:13.602901",
  "modified_by": "Administrator",
  "module": "Phamos",
  "name": "Recruitment Settings",
@@ -80,6 +80,7 @@
    "write": 1
   }
  ],
+ "row_format": "Dynamic",
  "sort_field": "modified",
  "sort_order": "DESC",
  "states": []
