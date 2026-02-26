@@ -14,6 +14,8 @@
   "column_break_szyj",
   "enable_feedback_dialog",
   "is_employee_feedback",
+  "timesheet_settings_section",
+  "allowed_additional_work_time",
   "mattermost_daily_thread_settings_tab",
   "enable_daily_thread_creation",
   "section_break_boza",
@@ -24,7 +26,13 @@
   "column_break_pykn",
   "last_daily_thread_creation_date",
   "section_break_s3bt",
-  "mattermost_channel"
+  "mattermost_channel",
+  "data_extract_tab",
+  "data_extract_section",
+  "mistral_api_key",
+  "column_break_de",
+  "mistral_model",
+  "mistral_base_url"
  ],
  "fields": [
   {
@@ -133,6 +141,39 @@
   {
    "fieldname": "section_break_avvx",
    "fieldtype": "Section Break"
+  },
+  {
+   "fieldname": "data_extract_tab",
+   "fieldtype": "Tab Break",
+   "label": "Data Extract"
+  },
+  {
+   "fieldname": "data_extract_section",
+   "fieldtype": "Section Break",
+   "label": "Mistral AI"
+  },
+  {
+   "description": "Get your API key from https://console.mistral.ai/home",
+   "fieldname": "mistral_api_key",
+   "fieldtype": "Password",
+   "label": "Mistral API Key"
+  },
+  {
+   "fieldname": "column_break_de",
+   "fieldtype": "Column Break"
+  },
+  {
+   "default": "mistral-small-latest",
+   "description": "e.g. mistral-small-latest, mistral-large-latest",
+   "fieldname": "mistral_model",
+   "fieldtype": "Data",
+   "label": "Model"
+  },
+  {
+   "description": "Leave blank to use default Mistral API endpoint",
+   "fieldname": "mistral_base_url",
+   "fieldtype": "Data",
+   "label": "Base URL (optional)"
   }
  ],
  "index_web_pages_for_search": 1,
