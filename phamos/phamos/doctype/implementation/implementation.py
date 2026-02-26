@@ -401,6 +401,14 @@ def generate_auto_email_reports(docname):
 
     frappe.db.commit()
 
-
+@frappe.whitelist()
+def get_auto_email_reports(user_email: str):
+    """Return count of Auto Email Reports where user matches Implementation.user_with_permission."""
+    if not user_email:
+        return 0
+    return frappe.db.count(
+        "Auto Email Report",
+        filters={"user": user_email, "enabled": 1},
+    )
 
 
