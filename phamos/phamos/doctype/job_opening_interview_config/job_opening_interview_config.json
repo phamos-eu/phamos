@@ -1,0 +1,88 @@
+{
+ "actions": [],
+ "creation": "2025-02-24 11:00:00",
+ "doctype": "DocType",
+ "editable_grid": 1,
+ "engine": "InnoDB",
+ "field_order": [
+  "job_opening",
+  "column_break_owkz",
+  "interview_round",
+  "section_break_email",
+  "sender",
+  "sender_email",
+  "column_break_template",
+  "interview_confirmation"
+ ],
+ "fields": [
+  {
+   "fieldname": "job_opening",
+   "fieldtype": "Link",
+   "in_list_view": 1,
+   "label": "Job Opening",
+   "options": "Job Opening",
+   "reqd": 1,
+   "unique": 1
+  },
+  {
+   "fieldname": "interview_round",
+   "fieldtype": "Link",
+   "in_list_view": 1,
+   "label": "Interview Round",
+   "options": "Interview Round",
+   "reqd": 1
+  },
+  {
+   "fieldname": "column_break_owkz",
+   "fieldtype": "Column Break"
+  },
+  {
+   "collapsible": 1,
+   "fieldname": "section_break_email",
+   "fieldtype": "Section Break",
+   "label": "Email Settings"
+  },
+  {
+   "fieldname": "sender",
+   "fieldtype": "Link",
+   "in_list_view": 1,
+   "label": "Sender",
+   "link_filters": "[[\"Email Account\",\"enable_outgoing\",\"=\",1]]",
+   "options": "Email Account",
+   "reqd": 1
+  },
+  {
+   "fetch_from": "sender.email_id",
+   "fieldname": "sender_email",
+   "fieldtype": "Data",
+   "label": "Sender Email",
+   "options": "Email",
+   "read_only": 1
+  },
+  {
+   "fieldname": "column_break_template",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "interview_confirmation",
+   "fieldtype": "Link",
+   "in_list_view": 1,
+   "label": "Confirmation Template",
+   "options": "Email Template",
+   "reqd": 1
+  }
+ ],
+ "index_web_pages_for_search": 1,
+ "istable": 1,
+ "links": [],
+ "modified": "2026-02-26 10:35:51.471012",
+ "modified_by": "Administrator",
+ "module": "Phamos",
+ "name": "Job Opening Interview Config",
+ "owner": "Administrator",
+ "permissions": [],
+ "row_format": "Dynamic",
+ "sort_field": "modified",
+ "sort_order": "DESC",
+ "states": []
+}
