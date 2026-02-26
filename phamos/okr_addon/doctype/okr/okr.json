@@ -1,7 +1,7 @@
 {
  "actions": [],
- "allow_rename": 1,
- "autoname": "field:title",
+ "allow_rename": 0,
+ "autoname": "",
  "creation": "2025-07-28 08:23:59.019164",
  "doctype": "DocType",
  "engine": "InnoDB",
@@ -50,8 +50,7 @@
    "fieldtype": "Data",
    "in_list_view": 1,
    "label": "Title",
-   "reqd": 1,
-   "unique": 1
+   "reqd": 1
   },
   {
    "fieldname": "okr_type",

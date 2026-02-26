@@ -1,14 +1,72 @@
 # Copyright (c) 2025, Phamos and contributors
 # For license information, please see license.txt
 
+import re
 import frappe
 from frappe.utils import nowdate, add_days, getdate
 from frappe.model.document import Document
 
+# ID format: YYYY-Qx-#### (e.g. 2026-Q1-0001)
+OKR_ID_PATTERN = re.compile(r"^\d{4}-Q[1-4]-\d{4}$")
+
+
+def get_next_okr_id(target_date=None):
+	"""
+	Generate next OKR ID based on target_date: YYYY-Qx-####.
+	Quarter from target_date (or today if None). Counter is per (year, quarter).
+	"""
+	from datetime import datetime
+	dt = getdate(target_date) if target_date else getdate(nowdate())
+	year = dt.year
+	month = dt.month
+	quarter = (month - 1) // 3 + 1
+	prefix = f"{year}-Q{quarter}-"
+	# Find max existing counter for this year-quarter
+	existing = frappe.get_all(
+		"OKR",
+		filters={"name": ["like", prefix + "%"]},
+		fields=["name"],
+		order_by="name desc",
+		limit=1,
+	)
+	if existing:
+		try:
+			# name is e.g. 2026-Q1-0003
+			last_part = existing[0].name.split("-")[-1]
+			next_num = int(last_part, 10) + 1
+		except (IndexError, ValueError):
+			next_num = 1
+	else:
+		next_num = 1
+	return f"{prefix}{next_num:04d}"
+
+
 class OKR(Document):
+    def autoname(self):
+        """Set name to YYYY-Qx-#### from target_date (only for new docs)."""
+        if self.is_new() and not self.get("name"):
+            self.name = get_next_okr_id(self.target_date)
+
     def validate(self):
+        self.validate_okr_id_format()
         self.validate_measurables()
         self.validate_and_update_is_group()
+
+    def validate_okr_id_format(self):
+        """Ensure ID (name) is in format yyyy-Q#-####. Allow legacy title-as-name for existing docs."""
+        if not self.name:
+            return
+        if OKR_ID_PATTERN.match(self.name):
+            return
+        # Legacy: name that does not look like YYYY-Qx-... is old title-based; allow until migration
+        if not self.is_new() and not re.match(r"^\d{4}-Q[1-4]-", self.name):
+            return
+        frappe.throw(frappe._("OKR ID must be in format YYYY-Q#-#### (e.g. 2026-Q1-0001)."))
+
+    def validate_and_update_is_group(self):
+        """Ensure parent OKR has is_group=1 when this OKR is linked as child."""
+        if self.parent_okr:
+            frappe.db.set_value("OKR", self.parent_okr, "is_group", 1, update_modified=False)
 
     def get_invalid_links(self, is_submittable=False):
         """Allow parent_kra with value 'metric_name||idx': don't let base validation overwrite it."""
