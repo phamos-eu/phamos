@@ -72,6 +72,12 @@ frappe.ui.form.on("OKR", {
 		// Render child OKRs in HTML field (with delay to ensure field is ready)
 		setTimeout(() => renderChildOKRsInField(frm), 200);
 
+		// Create Child OKR button (only when saved, so this OKR can be set as parent)
+		if (!frm.is_new() && frm.doc.name) {
+			frm.add_custom_button(__('Create Child OKR'), function() {
+				frappe.new_doc('OKR', { parent_okr: frm.doc.name }).run();
+			}, __('Create'));
+		}
 	},
 
 	measurables_add(frm, cdt, cdn) {
@@ -86,6 +92,21 @@ frappe.ui.form.on("OKR", {
 		frm.refresh_field('measurables');
 		update_progress(frm);
 		render_measurable_summary_form(frm);
+	},
+
+	measurables_form_render(frm, cdt, cdn) {
+		// Triggered when a measurable row is opened in form view
+		// Add child KRA progress when row is opened
+		if (!frm.is_new() && frm.doc.name) {
+			const measurable = locals[cdt][cdn];
+
+			if (measurable && measurable.metric_name) {
+				// Wait for form to be fully rendered
+				setTimeout(() => {
+					addChildKRAProgressToSpecificRow(frm, cdt, cdn);
+				}, 800);
+			}
+		}
 	},
 
 	measurables_remove(frm, cdt, cdn) {
@@ -103,7 +124,7 @@ frappe.ui.form.on("OKR", {
 
 	measurables_baseline_value(frm, cdt, cdn) {
 		// Handle baseline value changes
-		let measurable = frm.get_doc(cdt, cdn);
+		let measurable = locals[cdt][cdn];
 		if (measurable && measurable.baseline_value && measurable.target_value) {
 			validate_measurable_values(measurable);
 		}
@@ -111,10 +132,58 @@ frappe.ui.form.on("OKR", {
 
 	measurables_target_value(frm, cdt, cdn) {
 		// Handle target value changes
-		let measurable = frm.get_doc(cdt, cdn);
+		let measurable = locals[cdt][cdn];
 		if (measurable && measurable.baseline_value && measurable.target_value) {
 			validate_measurable_values(measurable);
 		}
+	}
+});
+
+// Add form handler for Measurable child table to ensure progress section is visible
+frappe.ui.form.on('Measurable', {
+	form_render(frm, cdt, cdn) {
+		// Ensure progress_tracking_section is visible when the row is opened
+		const measurable = locals[cdt][cdn];
+
+		// Wait for form to be fully rendered
+		setTimeout(() => {
+			// Find the grid row wrapper
+			const grid_row = frm.fields_dict.measurables.grid.grid_rows_by_docname[cdn];
+
+			if (grid_row && grid_row.wrapper) {
+				// Show the progress tracking section
+				const progress_section = grid_row.wrapper.find('[data-fieldname="progress_tracking_section"]');
+				if (progress_section && progress_section.length > 0) {
+					progress_section.removeClass('hide-control');
+					progress_section.show();
+				}
+
+				// Ensure all fields in progress section are visible
+				const current_value_field = grid_row.wrapper.find('[data-fieldname="current_value"]');
+				const percent_complete_field = grid_row.wrapper.find('[data-fieldname="percent_complete"]');
+				const ref_link_field = grid_row.wrapper.find('[data-fieldname="ref_link"]');
+
+				if (current_value_field && current_value_field.length > 0) {
+					current_value_field.closest('.frappe-control').removeClass('hide-control');
+					current_value_field.closest('.frappe-control').show();
+				}
+				if (percent_complete_field && percent_complete_field.length > 0) {
+					percent_complete_field.closest('.frappe-control').removeClass('hide-control');
+					percent_complete_field.closest('.frappe-control').show();
+				}
+				if (ref_link_field && ref_link_field.length > 0) {
+					ref_link_field.closest('.frappe-control').removeClass('hide-control');
+					ref_link_field.closest('.frappe-control').show();
+				}
+			}
+
+			// Also call the child KRA progress function if applicable
+			if (!frm.is_new() && frm.doc.name && measurable.metric_name) {
+				setTimeout(() => {
+					addChildKRAProgressToSpecificRow(frm, cdt, cdn);
+				}, 300);
+			}
+		}, 100);
 	}
 });
 
@@ -612,6 +681,7 @@ function addCollaborationFeatures(frm) {
 
 // Add export/share features
 function addExportShareFeatures(frm) {
+	// Create Child OKR is added in refresh (so it only shows when doc has name)
 	// Add export button
 	frm.add_custom_button(__('📊 Export Report'), function() {
 		exportOKRReport(frm);
@@ -1851,4 +1921,3 @@ function getProgressColor(progress) {
 	if (progress >= 40) return '#f39c12';
 	return '#e74c3c';
 }
-

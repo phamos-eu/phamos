@@ -15,15 +15,17 @@
   "stretch_target",
   "progress_tracking_section",
   "current_value",
+  "percent_complete",
   "ref_link",
   "column_break_grvw",
-  "percent_complete",
+  "child_progress_html",
   "confidence_and_time_management_section",
   "confidence_level",
   "column_break_zmlr",
   "time_bound",
   "documentation_section",
-  "notes"
+  "notes",
+  "child_progress_info"
  ],
  "fields": [
   {
@@ -34,14 +36,6 @@
    "label": "Key Result",
    "options": "KR",
    "reqd": 1
-  },
-  {
-   "columns": 2,
-   "fieldname": "kr_title",
-   "fieldtype": "Data",
-   "in_list_view": 1,
-   "label": "KR Title",
-   "read_only": 1
   },
   {
    "default": "Lagging",
@@ -160,11 +154,29 @@
    "fieldname": "ref_link",
    "fieldtype": "Small Text",
    "label": "Ref Link (Optional)"
+  },
+  {
+   "fieldname": "kr_title",
+   "fieldtype": "Data",
+   "in_list_view": 1,
+   "label": "KR Title"
+  },
+  {
+   "fieldname": "child_progress_info",
+   "fieldtype": "Small Text",
+   "hidden": 1,
+   "label": "Child Progress Info",
+   "read_only": 1
+  },
+  {
+   "fieldname": "child_progress_html",
+   "fieldtype": "HTML",
+   "label": "Child Progress"
   }
  ],
  "istable": 1,
  "links": [],
- "modified": "2025-10-08 16:17:35.787871",
+ "modified": "2026-01-27 09:22:00.050250",
  "modified_by": "Administrator",
  "module": "OKR Addon",
  "name": "Measurable",
