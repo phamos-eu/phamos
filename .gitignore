@@ -4,5 +4,9 @@
 *.swp
 tags
 phamos/docs/current
-node_modules/
+# Keep empty node_modules so Frappe Cloud "Initialize Bench" (New Bench) does not fail
+node_modules/*
+!node_modules/.gitkeep
+**/node_modules/
 phamos/public/dist/js
+phamos/public/node_modules
