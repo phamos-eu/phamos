@@ -1,7 +1,5 @@
 {
  "actions": [],
- "allow_rename": 1,
- "autoname": "field:title",
  "creation": "2025-07-28 08:23:59.019164",
  "doctype": "DocType",
  "engine": "InnoDB",
@@ -40,9 +38,7 @@
   "mitigation_plan",
   "lft",
   "rgt",
-  "old_parent",
-  "child_kra_progress_section",
-  "child_kra_progress_html"
+  "old_parent"
  ],
  "fields": [
   {
@@ -50,8 +46,7 @@
    "fieldtype": "Data",
    "in_list_view": 1,
    "label": "Title",
-   "reqd": 1,
-   "unique": 1
+   "reqd": 1
   },
   {
    "fieldname": "okr_type",
@@ -173,18 +168,6 @@
    "read_only": 1
   },
   {
-   "collapsible": 1,
-   "fieldname": "child_kra_progress_section",
-   "fieldtype": "Section Break",
-   "label": "Child KRA Progress"
-  },
-  {
-   "fieldname": "child_kra_progress_html",
-   "fieldtype": "HTML",
-   "label": "Child KRA Progress",
-   "read_only": 1
-  },
-  {
    "fieldname": "section_break_2",
    "fieldtype": "Section Break",
    "label": "Risk & Dependencies"
@@ -277,6 +260,7 @@
   {
    "fieldname": "old_parent",
    "fieldtype": "Link",
+   "hidden": 1,
    "label": "Old Parent",
    "options": "OKR"
   }
@@ -292,7 +276,7 @@
    "link_fieldname": "okr"
   }
  ],
- "modified": "2026-02-25 08:22:28.430708",
+ "modified": "2026-02-26 11:14:31.587793",
  "modified_by": "Administrator",
  "module": "OKR Addon",
  "name": "OKR",
