@@ -16,7 +16,7 @@ from frappe.utils import getdate, nowdate, get_first_day, get_last_day, add_days
 
 
 @frappe.whitelist()
-def create_timesheet_record(project_name,  customer, from_time, expected_time, goal,task=None):
+def create_timesheet_record(project_name,  customer, from_time, expected_time, goal,task=None, issues=None, parent_issues_url=None):
     try:
         employee_name = frappe.db.get_value("Employee", {"user_id": frappe.session.user}, "name")
         activity_type = frappe.db.get_value("Employee", {"user_id": frappe.session.user}, "activity_type")
@@ -33,6 +33,8 @@ def create_timesheet_record(project_name,  customer, from_time, expected_time, g
             timesheet_record.from_time = after_1_minute
             timesheet_record.expected_time = expected_time
             timesheet_record.goal = goal
+            timesheet_record.issues = issues
+            timesheet_record.parent_issues_url = parent_issues_url
             timesheet_record.employee = employee_name
             timesheet_record.activity_type = activity_type
             timesheet_record.append("item", {
@@ -167,6 +169,278 @@ def is_task_running(name):
 
     # If no missing to_time → considered paused
     return {"is_running": False}
+
+
+@frappe.whitelist()
+def create_and_submit_timesheet(
+    project_name,
+    goal,
+    from_time,
+    to_time,
+    expected_time,
+    percent_billable,
+    activity_type,
+    result,
+    issues=None,
+    parent_issues_url=None
+):
+    try:
+        # 🔍 DEBUG 0 – function entry
+        frappe.log_error(
+            title="TS DEBUG 0 – Function Entry",
+            message=f"""
+project_name={project_name}
+percent_billable={percent_billable}
+activity_type={activity_type}
+from_time={from_time}
+to_time={to_time}
+issues={issues}
+parent_issues_url={parent_issues_url}
+"""
+        )
+
+        # --------------------------------------------------
+        # 1️⃣ Basic time validation
+        # --------------------------------------------------
+        if from_time and to_time:
+            if get_datetime(to_time) < get_datetime(from_time):
+                frappe.throw(_("To Time cannot be earlier than From Time."))
+
+        # --------------------------------------------------
+        # 2️⃣ Resolve employee
+        # --------------------------------------------------
+        employee = frappe.db.get_value(
+            "Employee",
+            {"user_id": frappe.session.user},
+            "name"
+        )
+
+        # 🔍 DEBUG 1 – employee resolve
+        frappe.log_error(
+            title="TS DEBUG 1 – Employee",
+            message=f"Resolved employee = {employee}"
+        )
+
+        if not employee:
+            frappe.throw(_("No Employee linked with current user."))
+
+        # --------------------------------------------------
+        # 3️⃣ Create Timesheet Record
+        # --------------------------------------------------
+        ts = frappe.new_doc("Timesheet Record")
+
+        ts.project = project_name
+        ts.activity_type = activity_type
+        ts.percent_billable = percent_billable
+        ts.goal = goal
+        ts.issues = issues
+        ts.expected_time = expected_time
+        ts.result = result
+        ts.parent_issues_url = parent_issues_url
+
+        ts.employee = employee
+        ts.from_time = from_time
+        ts.to_time = to_time
+
+        # 🔍 DEBUG 2 – after field assignment
+        frappe.log_error(
+            title="TS DEBUG 2 – After Assign",
+            message=f"""
+parent_issues_url in doc = {ts.parent_issues_url}
+from_time={ts.from_time}
+to_time={ts.to_time}
+"""
+        )
+
+        # --------------------------------------------------
+        # 4️⃣ Add child row
+        # --------------------------------------------------
+        ts.append("item", {
+            "from_time": from_time,
+            "to_time": to_time
+        })
+
+        # --------------------------------------------------
+        # 5️⃣ Calculate duration
+        # --------------------------------------------------
+        total_duration = 0
+        for row in ts.item:
+            if row.from_time and row.to_time:
+                if get_datetime(row.to_time) < get_datetime(row.from_time):
+                    frappe.throw(
+                        _("Row #{0}: To Time cannot be earlier than From Time.")
+                        .format(row.idx)
+                    )
+
+                row.duration = time_diff_in_seconds(
+                    row.to_time, row.from_time
+                )
+                total_duration += row.duration
+
+        ts.actual_time = total_duration
+        ts.status = "Complete"
+
+        # 🔍 DEBUG 3 – before insert
+        frappe.log_error(
+            title="TS DEBUG 3 – Before Insert",
+            message=f"""
+parent_issues_url={ts.parent_issues_url}
+actual_time={ts.actual_time}
+"""
+        )
+
+        # --------------------------------------------------
+        # 6️⃣ Insert
+        # --------------------------------------------------
+        ts.insert(ignore_permissions=True)
+
+        # 🔍 DEBUG 4 – after insert
+        frappe.log_error(
+            title="TS DEBUG 4 – After Insert",
+            message=f"""
+name={ts.name}
+parent_issues_url={ts.parent_issues_url}
+"""
+        )
+
+        # --------------------------------------------------
+        # 7️⃣ Submit
+        # --------------------------------------------------
+        ts.submit()
+
+        # 🔍 DEBUG 5 – after submit (doc object)
+        frappe.log_error(
+            title="TS DEBUG 5 – After Submit (Doc)",
+            message=f"""
+parent_issues_url={ts.parent_issues_url}
+"""
+        )
+
+        # 🔍 DEBUG 6 – after submit (DB read)
+        db_value = frappe.db.get_value(
+            "Timesheet Record",
+            ts.name,
+            "parent_issues_url"
+        )
+        frappe.log_error(
+            title="TS DEBUG 6 – After Submit (DB)",
+            message=f"DB parent_issues_url={db_value}"
+        )
+
+        # --------------------------------------------------
+        # 8️⃣ FORCE persist (submit-safe)
+        # --------------------------------------------------
+        if parent_issues_url:
+            frappe.db.set_value(
+                "Timesheet Record",
+                ts.name,
+                "parent_issues_url",
+                parent_issues_url,
+                update_modified=False
+            )
+
+            # 🔍 DEBUG 7 – after force set
+            db_value_2 = frappe.db.get_value(
+                "Timesheet Record",
+                ts.name,
+                "parent_issues_url"
+            )
+            frappe.log_error(
+                title="TS DEBUG 7 – After Force Set",
+                message=f"DB parent_issues_url={db_value_2}"
+            )
+
+        return {
+            "status": "success",
+            "name": ts.name
+        }
+
+    except Exception as e:
+        frappe.log_error(
+            frappe.get_traceback(),
+            "Create & Submit Timesheet Record ERROR"
+        )
+        return {
+            "status": "error",
+            "message": str(e)
+        }
+
+
+
+
+@frappe.whitelist()
+def close_open_row_and_add_break(name):
+    try:
+        doc = frappe.get_doc("Timesheet Record", name)
+        current_time = now_datetime()
+        new_row = None
+        previous_from_time = None
+        previous_to_time = None
+
+        if len(doc.item) >= 1:
+            previous_from_time = doc.item[-1].from_time
+
+
+        for idx, row in enumerate(doc.item):
+            if not row.to_time:
+                row.to_time = current_time
+                previous_to_time = row.to_time
+                new_row = doc.append("item", {})
+                new_row.from_time = current_time
+                break
+
+        if not new_row:
+            return {
+                "status": "error",
+                "message": "No open row found to close."
+            }
+
+        doc.save()
+        frappe.db.commit()
+
+        return {
+            "status": "success",
+            "message": "Break row created",
+            "new_row_name": new_row.name,
+            "previous_from_time": previous_from_time,
+            "previous_to_time": previous_to_time,
+        }
+
+    except Exception as e:
+        frappe.log_error(frappe.get_traceback(), "Timesheet Record Break Creation Error")
+        return {
+            "status": "error",
+            "message": f"Error creating break row: {str(e)}"
+        }
+
+@frappe.whitelist()
+def get_assigned_projects(doctype, txt, searchfield, start, page_len, filters):
+    user = frappe.session.user
+    
+    projects = frappe.db.sql("""
+        SELECT DISTINCT p.name, p.project_name
+        FROM `tabProject` p
+        JOIN `tabToDo` t ON t.reference_name = p.name
+        WHERE t.owner = %s
+        AND t.reference_type = 'Project'
+        AND (p.name LIKE %s OR p.project_name LIKE %s)
+        ORDER BY p.project_name ASC
+        LIMIT %s OFFSET %s
+    """, (user, f"%{txt}%", f"%{txt}%", page_len, start))
+    
+    return projects
+
+    
+@frappe.whitelist()
+def is_task_running(name):
+    try:
+        doc = frappe.get_doc("Timesheet Record", name)
+        for row in reversed(doc.item):
+            if not row.to_time:
+                return {"is_running": True}
+        return {"is_running": False}
+    except:
+        return {"is_running": False}
 
 
 @frappe.whitelist()
@@ -367,73 +641,7 @@ def get_team_holidays():
 
 
 @frappe.whitelist()
-def create_and_submit_timesheet( project_name=None, 
-    percent_billable=None, 
-    result=None, 
-    activity_type=None, 
-    from_time=None, 
-    expected_time=None, 
-    goal=None, 
-    to_time=None):
-    try:
-        # ✅ Validate before creating record
-        if from_time and to_time and get_datetime(to_time) < get_datetime(from_time):
-            frappe.throw(_("To Time cannot be earlier than From Time. Record not saved."))
-
-        ts = frappe.new_doc("Timesheet Record")
-        ts.project = project_name
-        ts.activity_type = activity_type
-        ts.percent_billable = percent_billable
-        ts.goal = goal
-        ts.expected_time = expected_time
-        ts.result = result
-
-        # Parent field set
-        ts.from_time = from_time
-        ts.to_time = to_time
-
-        # Add child row
-        ts.append("item", {
-            "from_time": from_time,
-            "to_time": to_time
-        })
-        employee = frappe.db.get_value(
-    "Employee",
-            {"user_id": frappe.session.user},
-            "name"
-        )
-
-        ts.employee = employee 
-        # ✅ Calculate total duration
-        total_duration = 0
-        for row in ts.item:
-            if row.from_time and row.to_time:
-                if get_datetime(row.to_time) < get_datetime(row.from_time):
-                    frappe.throw(_("Row #{0}: To Time cannot be earlier than From Time. Record not saved.").format(row.idx))
-                row.duration = time_diff_in_seconds(row.to_time, row.from_time)
-                total_duration += row.duration
-
-        ts.actual_time = total_duration
-        ts.status = "Complete"
-
-        ts.insert(ignore_permissions=True)
-        ts.submit()
-
-        return {
-            "status": "success",
-            "message": f"Timesheet Record {ts.name} created and submitted successfully",
-            "name": ts.name
-        }
-
-    except Exception as e:
-        frappe.log_error(frappe.get_traceback(), "Create Timesheet Record Error")
-        return {
-            "status": "error",
-            "message": str(e)
-        }
-
-@frappe.whitelist()
-def update_and_submit_timesheet_record(name, to_time, percent_billable, activity_type, result, task=None):
+def update_and_submit_timesheet_record(name, to_time, percent_billable, activity_type, result, task=None, issues=None, parent_issues_url=None):
     try:
         # Retrieve the Timesheet Record document
         doc = frappe.get_doc("Timesheet Record", name)
@@ -465,6 +673,8 @@ def update_and_submit_timesheet_record(name, to_time, percent_billable, activity
         doc.task = task
         doc.activity_type = activity_type
         doc.result = result
+        if parent_issues_url:
+            doc.parent_issues_url = parent_issues_url
         doc.percent_billable = percent_billable
 
         # ✅ Final validation before any save or submit
@@ -486,7 +696,7 @@ def update_and_submit_timesheet_record(name, to_time, percent_billable, activity
             new_doc.employee = doc.employee
 
             # Copy parent fields from original
-            for field in ["project", "customer", "task", "goal", "expected_time", "activity_type", "result", "percent_billable"]:
+            for field in ["project", "customer", "task", "goal","issues", "expected_time", "activity_type", "result", "percent_billable", "parent_issues_url"]:
                 new_doc.set(field, doc.get(field))
 
             # Parent times from selected row

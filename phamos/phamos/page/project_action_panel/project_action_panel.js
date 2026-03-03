@@ -37,6 +37,8 @@ frappe.pages["project-action-panel"].on_page_load = function (wrapper) {
     customer,
     from_time,
     expected_time,
+    issues,
+    parent_issues_url,
     goal
   ) {
     frappe.call({
@@ -48,6 +50,8 @@ frappe.pages["project-action-panel"].on_page_load = function (wrapper) {
         customer: customer,
         from_time: from_time,
         expected_time: expected_time,
+        issues: issues,
+        parent_issues_url: parent_issues_url,
         goal: goal,
       },
       freeze: true,
@@ -280,11 +284,34 @@ function update_and_submit_timesheet_record(
 function openStopProjectDialog(timesheet_record, percent_billable, project, task, task_in_timesheet_record) {
   let from_time = '';
   let expected_time = '';
+  let issues = '';
   let timesheet_record_info = " Info from timesheet record";
+  let parsed_issues = [];
 
-  frappe.db.get_value("Timesheet Record", { name: timesheet_record }, ["goal", "from_time"], function (value) {
+
+  frappe.db.get_value("Timesheet Record", { name: timesheet_record }, ["goal", "from_time", "issues"], function (value) {
+
+    let parsed_issues = [];
+
+    if (value.issues) {
+      if (typeof value.issues === "string") {
+        try {
+          parsed_issues = JSON.parse(value.issues);
+
+          // 🔒 safety: force array
+          if (!Array.isArray(parsed_issues)) {
+            parsed_issues = [];
+          }
+        } catch (e) {
+          parsed_issues = [];
+        }
+      } else if (Array.isArray(value.issues)) {
+        parsed_issues = value.issues;
+      }
+    }
     from_time_formatted = frappe.datetime.str_to_user(value.from_time);
     timesheet_record_info = "From time: " + from_time_formatted + ",<br>Goal is: " + value.goal;
+    issues = value.issues || '';
 
     frappe.db.get_value("Employee", { user_id: frappe.session.user }, "activity_type", function (value) {
 
@@ -326,13 +353,37 @@ function openStopProjectDialog(timesheet_record, percent_billable, project, task
           },
           task_field_properties,
           {
+            fieldtype: "MultiSelectPills",
+            label: __("Issues"),
+            fieldname: "issues",
+            default: parsed_issues,
+            get_data: function (txt) {
+              return frappe.db.get_link_options(
+                "GitLab Issue",
+                txt,
+                {
+                  assignee: frappe.session.user_fullname
+                }
+              );
+            },
+            onchange: function () {
+              let issues = dialog.get_value("issues") || [];
+              sync_issue_urls(dialog, issues);
+            }
+          },
+          {
+            label: "Issues URL's",
+            fieldname: "parent_issues_url",
+            fieldtype: "Small Text",
+          },
+          { fieldtype: "Column Break" },
+          {
             fieldtype: "Small Text",
             label: __("Timesheet Record Info"),
             fieldname: "timesheet_record_info",
             read_only: 1,
             default: timesheet_record_info,
           },
-          { fieldtype: "Column Break" },
           {
             label: "What I did ",
             fieldname: "result",
@@ -401,14 +452,20 @@ function openStopProjectDialog(timesheet_record, percent_billable, project, task
             values.to_time,
             values.percent_billable,
             values.activity_type,
-            values.result
+            values.result,
+            values.parent_issues_url
           );
           dialog.hide();
         }
       });
 
-      dialog.$wrapper.find(".modal-dialog").css("max-width", "800px");
+      dialog.$wrapper.find(".modal-dialog").css("max-width", "1000px");
       dialog.show();
+
+      let initial_issues = dialog.get_value("issues") || [];
+      if (initial_issues.length) {
+        sync_issue_urls(dialog, initial_issues);
+      }
       
       // Implement live time update for to_time field
       var time_update_interval = null;
@@ -553,6 +610,7 @@ function openStopProjectDialog(timesheet_record, percent_billable, project, task
 
 
   window.startProject = function (project_name, customer,project,task_in_timesheet_record) {
+    let parsed_issues = [];
     frappe.call({
       method:
         "phamos.phamos.page.project_action_panel.project_action_panel.check_draft_timesheet_record",
@@ -627,6 +685,30 @@ function openStopProjectDialog(timesheet_record, percent_billable, project, task
                   reqd: 1,
                 },
                 {
+                  fieldtype: "MultiSelectPills",
+                  label: __("Issues"),
+                  fieldname: "issues",
+                  default: parsed_issues,
+                  get_data: function (txt) {
+                    return frappe.db.get_link_options(
+                      "GitLab Issue",
+                      txt,
+                      {
+                        assignee: frappe.session.user_fullname
+                      }
+                    );
+                  },
+                  onchange: function () {
+                    let issues = dialog.get_value("issues") || [];
+                    sync_issue_urls(dialog, issues);
+                  }
+                },
+                {
+                  label: "Issues URL's",
+                  fieldname: "parent_issues_url",
+                  fieldtype: "Small Text",
+                },
+                {
                   fieldtype: "Column Break",
                 },
                 {
@@ -674,6 +756,8 @@ function openStopProjectDialog(timesheet_record, percent_billable, project, task
                   values.customer,
                   values.from_time,
                   values.expected_time,
+                  values.issues,
+                  values.parent_issues_url,
                   values.goal
                 );
                 dialog.hide();
@@ -683,6 +767,12 @@ function openStopProjectDialog(timesheet_record, percent_billable, project, task
             // Set the width using CSS
             dialog.$wrapper.find(".modal-dialog").css("max-width", "800px");
             dialog.show();
+
+            let initial_issues = dialog.get_value("issues") || [];
+            if (initial_issues.length) {
+              sync_issue_urls(dialog, initial_issues);
+            }
+
           }
         } else {
           frappe.show_alert(__("No response from server. Please try again."));
@@ -690,6 +780,108 @@ function openStopProjectDialog(timesheet_record, percent_billable, project, task
       },
     });
   };
+function sync_issue_urls(dialog, issue_names) {
+  let marker_start = "--- GitLab Issues ---";
+  let marker_end = "--- End GitLab Issues ---";
+
+  // 🔹 Remove old block
+  let result_text = dialog.get_value("parent_issues_url") || "";
+  let regex = new RegExp(marker_start + "[\\s\\S]*?" + marker_end, "g");
+  result_text = result_text.replace(regex, "").trim();
+
+  if (!issue_names || !issue_names.length) {
+    dialog.set_value("parent_issues_url", result_text);
+    return;
+  }
+
+  let parents = {}; // parent_name -> { title, issue_id, children: [] }
+  let links = new Set();
+
+  let promises = issue_names.map(issue_name => {
+    return frappe.db
+      .get_value(
+        "GitLab Issue",
+        issue_name,
+        ["title", "issue_id", "issue_url", "parent_issue"]
+      )
+      .then(r => {
+        if (!r || !r.message) return;
+
+        let child = r.message;
+
+        // 🔗 child link
+        if (child.issue_url) links.add(child.issue_url);
+
+        if (child.parent_issue) {
+          return frappe.db
+            .get_value(
+              "GitLab Issue",
+              child.parent_issue,
+              ["title", "issue_id", "issue_url"]
+            )
+            .then(pr => {
+              if (!pr || !pr.message) return;
+
+              let parent = pr.message;
+
+              if (!parents[child.parent_issue]) {
+                parents[child.parent_issue] = {
+                  title: parent.title,
+                  issue_id: parent.issue_id,
+                  children: []
+                };
+              }
+
+              parents[child.parent_issue].children.push(
+                `${child.title} #${child.issue_id}`
+              );
+
+              if (parent.issue_url) links.add(parent.issue_url);
+            });
+        }
+      });
+  });
+
+  Promise.all(promises).then(() => {
+    let lines = [];
+
+    Object.values(parents).forEach(parent => {
+      lines.push(`<h3>Parent: ${parent.title} #${parent.issue_id}</h3>`);
+
+      parent.children.forEach(child_line => {
+        lines.push(`<h5> - ${child_line}</h5>`);
+      });
+      lines.push(""); // spacing
+    });
+
+    if (links.size) {
+      lines.push("<strong>Links:</strong>");
+      [...links].forEach(url => {
+        lines.push(
+          `<a href="${url}" target="_blank">${url}</a>`
+        );
+      });
+    }
+
+    if (!lines.length) {
+      dialog.set_value("parent_issues_url", result_text);
+      return;
+    }
+
+    let block =
+      marker_start +
+      "\n\n" +
+      lines.join("\n") +
+      "\n\n" +
+      marker_end;
+
+    dialog.set_value(
+      "parent_issues_url",
+      result_text ? result_text + "\n\n" + block : block
+    );
+  });
+}
+
 
   // Function to render number cards
   function render_cards(wrapper, card_names, tab='') {
@@ -1824,6 +2016,7 @@ function persistButtonStates() {
 };
 
 function show_break_task_dialog(new_row_name, previous_from_time, previous_to_time) {
+  let parsed_issues = [];
     let task_field_properties = {
         fieldtype: "Link",
         options: "Task",
@@ -1850,15 +2043,6 @@ function show_break_task_dialog(new_row_name, previous_from_time, previous_to_ti
                         query: "phamos.phamos.page.project_action_panel.project_action_panel.get_assigned_projects"
                     };
                 }
-                },
-                {
-                  fieldtype: "Link",
-                  options: "Activity Type",
-                  label: __("Activity Type"),
-                  fieldname: "activity_type",
-                  reqd: 1,
-                  description:
-                          'The "Activity Type" allows for categorizing tasks into specific types, such as planning, execution, communication, and proposal writing, streamlining task management and organization within the system.',
                 },
                 {
                   fieldtype: "Duration",
@@ -1888,6 +2072,40 @@ function show_break_task_dialog(new_row_name, previous_from_time, previous_to_ti
                 {
                   fieldtype: "Column Break",
                 },
+                {
+                  fieldtype: "Link",
+                  options: "Activity Type",
+                  label: __("Activity Type"),
+                  fieldname: "activity_type",
+                  reqd: 1,
+                  description:
+                          'The "Activity Type" allows for categorizing tasks into specific types, such as planning, execution, communication, and proposal writing, streamlining task management and organization within the system.',
+                },
+                {
+                  fieldtype: "MultiSelectPills",
+                  label: __("Issues"),
+                  fieldname: "issues",
+                  default: parsed_issues,
+                  get_data: function (txt) {
+                    return frappe.db.get_link_options(
+                      "GitLab Issue",
+                      txt,
+                      {
+                        assignee: frappe.session.user_fullname
+                      }
+                    );
+                  },
+                  onchange: function () {
+                    let issues = dialog.get_value("issues") || [];
+                    sync_issue_urls(dialog, issues);
+                  }
+              },
+              {
+                label: "Issues URL's",
+                fieldname: "parent_issues_url",
+                fieldtype: "Small Text",
+              },
+              { fieldtype: "Column Break" },
                 {
                   fieldtype: "Datetime",
                   label: __("To Time"),
@@ -1922,14 +2140,17 @@ function show_break_task_dialog(new_row_name, previous_from_time, previous_to_ti
                 frappe.call({
                 method: "phamos.phamos.page.project_action_panel.project_action_panel.create_and_submit_timesheet",
                 args: {
-                    project_name: values.project_name,
-                    percent_billable: values.percent_billable,
-                    result : values.result,
-                    activity_type: values.activity_type,
-                    from_time: values.from_time,
-                    to_time: values.to_time,
-                    expected_time: values.expected_time,
-                    goal: values.goal
+                    project_name: values.project_name,          // 1
+                    goal: values.goal,                          // 2
+                    from_time: values.from_time,                // 3
+                    to_time: values.to_time,                    // 4
+                    expected_time: values.expected_time,        // 5
+                    percent_billable: values.percent_billable,  // 6
+                    activity_type: values.activity_type,        // 7
+                    result: values.result,                      // 8
+                    issues: values.issues,                      // 9
+                    parent_issues_url: values.parent_issues_url // 10
+
                 },
                 callback: function(r) {
                     if (r.message && r.message.status === "success") {
