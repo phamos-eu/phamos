@@ -1,0 +1,250 @@
+from frappe.auth import get_decrypted_password
+import requests
+import frappe
+from frappe.utils import now_datetime
+
+def get_gitlab_headers():
+    settings = frappe.get_single("GitLab Settings")
+    return {
+        "PRIVATE-TOKEN": get_decrypted_password("GitLab Settings", "GitLab Settings", "access_token")
+    }
+
+def get_all_projects():
+    settings = frappe.get_single("GitLab Settings")
+    url = f"{settings.gitlab_url}/api/v4/projects?membership=true"
+    
+    response = requests.request("GET", url, headers=get_gitlab_headers())
+
+    response.raise_for_status()
+    return response.json()
+
+def get_issues_for_project(project_id, updated_after=None):
+    settings = frappe.get_single("GitLab Settings")
+    base_url = f"{settings.gitlab_url}/api/v4/projects/{project_id}/issues"
+
+    all_issues = []
+    page = 1
+    per_page = 100
+
+    while True:
+        params = {
+            "state": "opened",
+            "per_page": per_page,
+            "page": page
+        }
+
+        if updated_after:
+            params["updated_after"] = updated_after
+
+        response = requests.get(base_url, headers=get_gitlab_headers(), params=params)
+        response.raise_for_status()
+
+        issues = response.json()
+        if not issues:
+            break
+
+        all_issues.extend(issues)
+        page += 1
+
+    return all_issues
+
+
+def get_issue_parent(project_path, issue_iid):
+    """
+    Fetch parent issue for a given issue using GraphQL
+    """
+    settings = frappe.get_single("GitLab Settings")
+    graphql_url = f"{settings.gitlab_url}/api/graphql"
+    
+    query = """
+    query GetWorkItemWithParent($projectPath: ID!, $iid: String!) {
+      namespace(fullPath: $projectPath) {
+        workItem(iid: $iid) {
+          id
+          widgets {
+            __typename
+            ... on WorkItemWidgetHierarchy {
+              parent {
+                id
+                title
+                iid
+                webUrl
+              }
+            }
+          }
+        }
+      }
+    }
+    """
+    
+    payload = {
+        "query": query,
+        "variables": {
+            "projectPath": project_path,
+            "iid": str(issue_iid)
+        }
+    }
+    
+    headers = {
+        "Content-Type": "application/json",
+        "PRIVATE-TOKEN": get_decrypted_password("GitLab Settings", "GitLab Settings", "access_token")
+    }
+    
+    try:
+        response = requests.post(graphql_url, json=payload, headers=headers)
+        response.raise_for_status()
+        data = response.json()
+        
+        # Check for GraphQL errors
+        if "errors" in data:
+            frappe.log_error(
+                title="GitLab GraphQL Error",
+                message=f"Issue IID: {issue_iid}, Errors: {data['errors']}"
+            )
+            return None
+        
+        # Extract work item data
+        work_item = data.get("data", {}).get("namespace", {}).get("workItem")
+        if not work_item:
+            return None
+        
+        # Find hierarchy widget and extract parent
+        for widget in work_item.get("widgets", []):
+            if widget.get("__typename") == "WorkItemWidgetHierarchy":
+                parent = widget.get("parent")
+                if parent:
+                    return {
+                        "title": parent.get("title"),
+                        "iid": parent.get("iid"),
+                        "web_url": parent.get("webUrl")
+                    }
+                break
+        
+        return None
+        
+    except Exception as e:
+        frappe.log_error(
+            title="GitLab Parent Fetch Error",
+            message=f"Project: {project_path}, Issue IID: {issue_iid}, Error: {str(e)}"
+        )
+        return None
+
+
+@frappe.whitelist()
+def sync_gitlab_data():
+    projects = get_all_projects()
+
+    for project in projects:
+        # 1. Create / Update GitLab Project
+        existing = frappe.db.exists("GitLab Project", {"project_id": project["id"]})
+        if existing:
+            doc = frappe.get_doc("GitLab Project", existing)
+        else:
+            doc = frappe.new_doc("GitLab Project")
+            doc.project_id = project["id"]
+
+        doc.title = project["name"]
+        doc.namespace = project["name_with_namespace"]
+        doc.web_url = project["web_url"]
+        doc.save(ignore_permissions=True)
+
+        # 2. READ last_synced FIRST
+        last_sync = doc.get("last_synced")
+
+
+        # 3. Fetch issues (incremental)
+        issues = get_issues_for_project(project["id"], last_sync)
+
+        # GitLab GraphQL needs path_with_namespace
+        project_path = project.get("path_with_namespace")
+
+        issue_map = {}
+
+        for issue in issues:
+            try:
+                existing_issue = frappe.db.exists(
+                    "GitLab Issue",
+                    {
+                        "issue_id": issue["iid"],
+                        "gitlab_project": doc.name
+                    }
+                )
+
+                if existing_issue:
+                    issue_map[str(issue["iid"])] = existing_issue
+                    continue
+
+                gitlab_issue_doc = frappe.new_doc("GitLab Issue")
+                gitlab_issue_doc.update({
+                    "issue_id": issue["iid"],
+                    "title": issue["title"],
+                    "description": issue.get("description", ""),
+                    "state": issue["state"],
+                    "assignee": issue["assignee"]["name"] if issue.get("assignee") else "",
+                    "issue_url": issue["web_url"],
+                    "gitlab_project": doc.name
+                })
+                gitlab_issue_doc.save(ignore_permissions=True)
+
+                issue_map[str(issue["iid"])] = gitlab_issue_doc.name
+
+            except Exception as ex:
+                frappe.log_error(
+                    title="GitLab Issue Sync Error (First Pass)",
+                    message=(
+                        f"Project: {project.get('name')}, "
+                        f"Issue IID: {issue.get('iid')}, "
+                        f"Error: {str(ex)}"
+                    )
+                )
+
+        # 5. Second pass: link parent issues
+        for issue in issues:
+            try:
+                issue_doc_name = issue_map.get(str(issue["iid"]))
+                if not issue_doc_name:
+                    continue
+
+                parent_info = None
+                if project_path:
+                    parent_info = get_issue_parent(project_path, issue["iid"])
+
+                if parent_info and parent_info.get("iid"):
+                    parent_iid = str(parent_info["iid"])
+                    parent_doc_name = issue_map.get(parent_iid)
+
+                    if parent_doc_name:
+                        gitlab_issue_doc = frappe.get_doc("GitLab Issue", issue_doc_name)
+                        gitlab_issue_doc.parent_issue = parent_doc_name
+                        gitlab_issue_doc.save(ignore_permissions=True)
+
+            except Exception as ex:
+                frappe.log_error(
+                    title="GitLab Parent Link Error",
+                    message=(
+                        f"Project: {project.get('name')}, "
+                        f"Issue IID: {issue.get('iid')}, "
+                        f"Error: {str(ex)}"
+                    )
+                )
+
+        # 6. UPDATE last_synced AFTER successful sync
+        doc.last_synced = now_datetime()
+        doc.save(ignore_permissions=True)
+
+    frappe.db.commit()
+
+
+@frappe.whitelist()
+def sync_gitlab_data_background():
+    frappe.enqueue(
+        method="phamos.gitlab_integration.gitlab_utils.sync_gitlab_data",
+        queue="long",          # 👈 long running jobs
+        timeout=60 * 60,       # 1 hour
+        is_async=True
+    )
+
+    return {
+        "status": "queued",
+        "message": "GitLab sync go into background job"
+    }
