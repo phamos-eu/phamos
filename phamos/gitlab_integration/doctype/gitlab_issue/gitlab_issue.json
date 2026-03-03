@@ -1,0 +1,95 @@
+{
+ "actions": [],
+ "allow_rename": 1,
+ "creation": "2025-07-01 12:54:19.850652",
+ "doctype": "DocType",
+ "engine": "InnoDB",
+ "field_order": [
+  "issue_id",
+  "title",
+  "description",
+  "state",
+  "due_date",
+  "assignee",
+  "issue_url",
+  "parent_issue",
+  "gitlab_project"
+ ],
+ "fields": [
+  {
+   "fieldname": "issue_id",
+   "fieldtype": "Data",
+   "label": "Issue ID"
+  },
+  {
+   "fieldname": "title",
+   "fieldtype": "Long Text",
+   "label": "Title"
+  },
+  {
+   "fieldname": "description",
+   "fieldtype": "Markdown Editor",
+   "label": "Description"
+  },
+  {
+   "fieldname": "state",
+   "fieldtype": "Data",
+   "label": "State"
+  },
+  {
+   "fieldname": "assignee",
+   "fieldtype": "Data",
+   "label": "Assignee"
+  },
+  {
+   "fieldname": "issue_url",
+   "fieldtype": "Data",
+   "label": "Issue Url"
+  },
+  {
+   "fieldname": "parent_issue",
+   "fieldtype": "Link",
+   "label": "Parent Issue",
+   "options": "GitLab Issue"
+  },
+  {
+   "fieldname": "gitlab_project",
+   "fieldtype": "Link",
+   "in_list_view": 1,
+   "in_standard_filter": 1,
+   "label": "GitLab Project",
+   "options": "GitLab Project"
+  },
+  {
+   "fieldname": "due_date",
+   "fieldtype": "Date",
+   "label": "Due Date"
+  }
+ ],
+ "grid_page_length": 50,
+ "index_web_pages_for_search": 1,
+ "links": [],
+ "modified": "2025-07-03 16:23:25.423284",
+ "modified_by": "Administrator",
+ "module": "GitLab Integration",
+ "name": "GitLab Issue",
+ "owner": "Administrator",
+ "permissions": [
+  {
+   "create": 1,
+   "delete": 1,
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "System Manager",
+   "share": 1,
+   "write": 1
+  }
+ ],
+ "row_format": "Dynamic",
+ "sort_field": "modified",
+ "sort_order": "DESC",
+ "states": []
+}
