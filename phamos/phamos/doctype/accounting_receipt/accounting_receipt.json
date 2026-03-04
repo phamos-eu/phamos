@@ -59,8 +59,7 @@
   "admin_tab",
   "naming_series",
   "uploaded_by",
-  "company",
-  "amended_from"
+  "company"
  ],
  "fields": [
   {
@@ -347,15 +346,6 @@
    "label": "Total Billing Amount"
   },
   {
-   "fieldname": "amended_from",
-   "fieldtype": "Link",
-   "label": "Amended From",
-   "no_copy": 1,
-   "options": "Accounting Receipt",
-   "print_hide": 1,
-   "read_only": 1
-  },
-  {
    "fieldname": "timesheets",
    "fieldtype": "Table",
    "label": "Time Sheets",
@@ -378,7 +368,7 @@
   }
  ],
  "index_web_pages_for_search": 1,
- "is_submittable": 1,
+ "is_submittable": 0,
  "links": [],
  "modified": "2024-05-28 15:05:36.281984",
  "modified_by": "Administrator",
