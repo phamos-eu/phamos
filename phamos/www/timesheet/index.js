@@ -998,18 +998,8 @@ function renderSalesOrderData(data) {
   // Render summary cards
   $('#total-so-hrs').text(formatNumber(data.summary.total_so_hrs));
   $('#delivered-hrs').text(formatNumber(data.summary.delivered_hrs));
-  $('#timesheet-hrs').text(formatNumber(data.summary.timesheet_hrs));
-  $('#remaining-hrs').text(formatNumber(data.summary.remaining_hrs));
   
   console.log('Summary cards updated');
-  
-  // Render chart
-  try {
-    renderSalesOrderChart(data.chart_data);
-    console.log('Chart rendered');
-  } catch (e) {
-    console.error('Error rendering chart:', e);
-  }
   
   // Render table
   try {
@@ -1020,61 +1010,7 @@ function renderSalesOrderData(data) {
   }
 }
 
-function renderSalesOrderChart(chartData) {
-  console.log('Rendering chart with data:', chartData);
-  
-  // Use Frappe Charts (exactly like Implementation doctype)
-  const chartContainer = document.getElementById('so-delivery-chart');
-  
-  if (!chartContainer) {
-    console.error('Chart container not found!');
-    return;
-  }
-  
-  if (chartData.values.every(v => v === 0)) {
-    console.log('All chart values are zero');
-    chartContainer.innerHTML = '<div class="text-center text-muted" style="padding: 50px 0;"><p>No delivery data available</p></div>';
-    return;
-  }
-  
-  chartContainer.innerHTML = '<div id="delivered-qty-chart"></div>';
-  
-  // Wait for DOM update
-  setTimeout(() => {
-    try {
-      // Check if frappe.Chart is available - if not, use global Chart from frappe-charts library
-      const ChartConstructor = (typeof frappe !== 'undefined' && frappe.Chart) ? frappe.Chart : (typeof Chart !== 'undefined' ? Chart : null);
-      
-      if (!ChartConstructor) {
-        console.error('Chart library not available');
-        chartContainer.innerHTML = '<div class="text-center text-danger" style="padding: 50px 0;"><p>Chart library not loaded</p></div>';
-        return;
-      }
-      
-      console.log('Using chart constructor:', ChartConstructor.name || 'Chart');
-      
-      // Create chart using Frappe Charts (same config as Implementation)
-      new ChartConstructor("#delivered-qty-chart", {
-        type: 'percentage',
-        data: {
-          labels: chartData.labels,
-          datasets: [{
-            name: "Financial Information",
-            values: chartData.values
-          }]
-        },
-        colors: ['green', 'yellow', 'blue'],
-        height: 250,
-        maxLegendLines: 2,
-        truncateLegends: 10,
-      });
-      console.log('Chart created successfully');
-    } catch (e) {
-      console.error('Error creating chart:', e);
-      chartContainer.innerHTML = '<div class="text-center text-danger" style="padding: 50px 0;"><p>Error rendering chart: ' + e.message + '</p></div>';
-    }
-  }, 100);
-}
+
 
 function renderSalesOrderTable(salesOrders) {
   const tbody = $('#so-table-body');
