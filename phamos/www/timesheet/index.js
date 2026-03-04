@@ -1000,18 +1000,8 @@ function renderSalesOrderData(data) {
   // Render summary cards
   $('#total-so-hrs').text(formatNumber(data.summary.total_so_hrs));
   $('#delivered-hrs').text(formatNumber(data.summary.delivered_hrs));
-  $('#timesheet-hrs').text(formatNumber(data.summary.timesheet_hrs));
-  $('#remaining-hrs').text(formatNumber(data.summary.remaining_hrs));
   
   console.log('Summary cards updated');
-  
-  // Render chart
-  try {
-    renderSalesOrderChart(data.chart_data);
-    console.log('Chart rendered');
-  } catch (e) {
-    console.error('Error rendering chart:', e);
-  }
   
   // Render table
   try {
@@ -1022,61 +1012,7 @@ function renderSalesOrderData(data) {
   }
 }
 
-function renderSalesOrderChart(chartData) {
-  console.log('Rendering chart with data:', chartData);
-  
-  // Use Frappe Charts (exactly like Implementation doctype)
-  const chartContainer = document.getElementById('so-delivery-chart');
-  
-  if (!chartContainer) {
-    console.error('Chart container not found!');
-    return;
-  }
-  
-  if (chartData.values.every(v => v === 0)) {
-    console.log('All chart values are zero');
-    chartContainer.innerHTML = '<div class="text-center text-muted" style="padding: 50px 0;"><p>No delivery data available</p></div>';
-    return;
-  }
-  
-  chartContainer.innerHTML = '<div id="delivered-qty-chart"></div>';
-  
-  // Wait for DOM update
-  setTimeout(() => {
-    try {
-      // Check if frappe.Chart is available - if not, use global Chart from frappe-charts library
-      const ChartConstructor = (typeof frappe !== 'undefined' && frappe.Chart) ? frappe.Chart : (typeof Chart !== 'undefined' ? Chart : null);
-      
-      if (!ChartConstructor) {
-        console.error('Chart library not available');
-        chartContainer.innerHTML = '<div class="text-center text-danger" style="padding: 50px 0;"><p>Chart library not loaded</p></div>';
-        return;
-      }
-      
-      console.log('Using chart constructor:', ChartConstructor.name || 'Chart');
-      
-      // Create chart using Frappe Charts (same config as Implementation)
-      new ChartConstructor("#delivered-qty-chart", {
-        type: 'percentage',
-        data: {
-          labels: chartData.labels,
-          datasets: [{
-            name: "Financial Information",
-            values: chartData.values
-          }]
-        },
-        colors: ['green', 'yellow', 'blue'],
-        height: 250,
-        maxLegendLines: 2,
-        truncateLegends: 10,
-      });
-      console.log('Chart created successfully');
-    } catch (e) {
-      console.error('Error creating chart:', e);
-      chartContainer.innerHTML = '<div class="text-center text-danger" style="padding: 50px 0;"><p>Error rendering chart: ' + e.message + '</p></div>';
-    }
-  }, 100);
-}
+
 
 function renderSalesOrderTable(salesOrders) {
   const tbody = $('#so-table-body');
@@ -1085,7 +1021,7 @@ function renderSalesOrderTable(salesOrders) {
   if (salesOrders.length === 0) {
     tbody.append(`
       <tr>
-        <td colspan="7" class="text-center text-muted" style="padding: 40px;">
+        <td colspan="8" class="text-center text-muted" style="padding: 40px;">
           <i class="fa fa-inbox fa-2x mb-3" style="opacity: 0.3;"></i>
           <p class="mb-0"><strong>No Sales Orders Found</strong></p>
           <p class="small">There are no sales orders linked to implementations for your account yet.</p>
@@ -1099,6 +1035,7 @@ function renderSalesOrderTable(salesOrders) {
     const statusBadge = getStatusBadge(so.status);
     const progressPercent = so.total_hrs > 0 ? (so.delivered_hrs / so.total_hrs * 100).toFixed(1) : 0;
     const progressColor = getProgressColor(progressPercent);
+    const formattedDate = so.transaction_date ? frappe.datetime.str_to_user(so.transaction_date) : '-';
     
     const row = `
       <tr>
@@ -1108,6 +1045,7 @@ function renderSalesOrderTable(salesOrders) {
           </a>
         </td>
         <td>${escapeHtml(so.title || '-')}</td>
+        <td>${formattedDate}</td>
         <td>${statusBadge}</td>
         <td>${formatNumber(so.total_hrs)}</td>
         <td>${formatNumber(so.delivered_hrs)}</td>
