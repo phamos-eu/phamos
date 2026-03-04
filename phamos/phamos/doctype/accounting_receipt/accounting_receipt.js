@@ -3,7 +3,7 @@
 
 frappe.ui.form.on("Accounting Receipt", {
     refresh(frm) {
-        if (frm.doc.docstatus===0 && !frm.doc.__islocal) {
+        if (!frm.doc.__islocal) {
             frm.add_custom_button(__("Fetch Timesheet"), function() {
                 let d = new frappe.ui.Dialog({
                     title: __("Fetch Timesheet"),
@@ -45,17 +45,19 @@ frappe.ui.form.on("Accounting Receipt", {
                 d.show();
             });
         }
-        if (frm.doc.docstatus === 1) {
-                frm.add_custom_button(
-                    __("Purchase Invoice"),
-                    function () {
-                        frm.events.make_purchase_invoice(frm);
-                    }, __("Create")
-                );
-                frm.page.set_inner_btn_group_as_primary(__("Create"));
-                
-                // Add DATEV Send button
-                frm.events.add_datev_send_button(frm);
+        
+        // Add DATEV Send button (for saved documents)
+        if (!frm.doc.__islocal) {
+            frm.events.add_datev_send_button(frm);
+            
+            // Purchase Invoice button
+            frm.add_custom_button(
+                __("Purchase Invoice"),
+                function () {
+                    frm.events.make_purchase_invoice(frm);
+                }, __("Create")
+            );
+            frm.page.set_inner_btn_group_as_primary(__("Create"));
         }
 
         // Hide PDF Preview if no attachment available or display it onload of document
@@ -606,11 +608,6 @@ frappe.ui.form.on("Accounting Receipt", {
     },
 
     add_datev_send_button: function(frm) {
-        // Only show button if document is submitted
-        if (frm.doc.docstatus !== 1) {
-            return;
-        }
-        
         // Determine button label based on whether already sent
         const button_label = frm.doc.sent_to_datev ? __("Resend to DATEV") : __("Send to DATEV");
         

@@ -141,14 +141,11 @@ def send_to_datev(accounting_receipt_name):
 	Send Accounting Receipt PDF to DATEV via Email Queue.
 	Returns: dict with ok=True/False, message, and optionally email_queue_name
 	"""
-	# Validate document exists and is submitted
+	# Validate document exists
 	if not frappe.db.exists("Accounting Receipt", accounting_receipt_name):
 		return {"ok": False, "message": _("Accounting Receipt not found")}
 	
 	doc = frappe.get_doc("Accounting Receipt", accounting_receipt_name)
-	
-	if doc.docstatus != 1:
-		return {"ok": False, "message": _("Document must be Submitted before sending to DATEV")}
 	
 	# Determine recipient based on receipt_type
 	recipient = None
@@ -311,6 +308,5 @@ def get_datev_send_info(accounting_receipt_name):
 		"already_sent": doc.sent_to_datev,
 		"sent_at": doc.datev_sent_at,
 		"sent_by": doc.datev_sent_by,
-		"email_queue_ref": doc.datev_email_queue_ref,
-		"docstatus": doc.docstatus
+		"email_queue_ref": doc.datev_email_queue_ref
 	}
