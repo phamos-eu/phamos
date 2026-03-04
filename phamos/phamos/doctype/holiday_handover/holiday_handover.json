@@ -11,8 +11,6 @@
   "acting_project_manager",
   "section_break_2",
   "overview",
-  "section_break_3",
-  "critical_tasks",
   "section_break_4",
   "issues"
  ],
@@ -51,17 +49,6 @@
    "reqd": 1
   },
   {
-   "fieldname": "section_break_3",
-   "fieldtype": "Section Break",
-   "label": "Critical Tasks / Notes"
-  },
-  {
-   "fieldname": "critical_tasks",
-   "fieldtype": "Text Editor",
-   "label": "Critical Tasks / Notes",
-   "reqd": 1
-  },
-  {
    "fieldname": "section_break_4",
    "fieldtype": "Section Break",
    "label": "GitLab Issues"
@@ -75,7 +62,7 @@
  ],
  "index_web_pages_for_search": 1,
  "links": [],
- "modified": "2026-03-03 10:00:00.000000",
+ "modified": "2026-03-04 10:00:00.000000",
  "modified_by": "Administrator",
  "module": "Phamos",
  "name": "Holiday Handover",
