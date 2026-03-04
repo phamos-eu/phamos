@@ -983,18 +983,8 @@ function renderSalesOrderData(data) {
   // Render summary cards
   $('#total-so-hrs').text(formatNumber(data.summary.total_so_hrs));
   $('#delivered-hrs').text(formatNumber(data.summary.delivered_hrs));
-  $('#timesheet-hrs').text(formatNumber(data.summary.timesheet_hrs));
-  $('#remaining-hrs').text(formatNumber(data.summary.remaining_hrs));
   
   console.log('Summary cards updated');
-  
-  // Render chart
-  try {
-    renderSalesOrderChart(data.chart_data);
-    console.log('Chart rendered');
-  } catch (e) {
-    console.error('Error rendering chart:', e);
-  }
   
   // Render table
   try {
@@ -1003,57 +993,6 @@ function renderSalesOrderData(data) {
   } catch (e) {
     console.error('Error rendering table:', e);
   }
-}
-
-function renderSalesOrderChart(chartData) {
-  console.log('Rendering chart with data:', chartData);
-  
-  const chartContainer = document.getElementById('so-delivery-chart');
-  
-  if (!chartContainer) {
-    console.error('Chart container not found!');
-    return;
-  }
-  
-  if (chartData.values.every(v => v === 0)) {
-    console.log('All chart values are zero');
-    chartContainer.innerHTML = '<div class="text-center text-muted" style="padding: 50px 0;"><p>No delivery data available</p></div>';
-    return;
-  }
-  
-  // Create horizontal percentage bar chart (like Implementation doctype)
-  const total = chartData.values.reduce((a, b) => a + b, 0);
-  const percentages = chartData.values.map(v => (v / total * 100).toFixed(1));
-  const colors = ['#28a745', '#ffc107', '#2490ef']; // green, yellow, blue
-  
-  let chartHTML = '<div style="padding: 20px;">';
-  
-  // Horizontal bar
-  chartHTML += '<div style="display: flex; height: 14px; border-radius: 4px; overflow: hidden; margin-bottom: 20px;">';
-  chartData.values.forEach((val, idx) => {
-    if (val > 0) {
-      chartHTML += `<div style="background-color: ${colors[idx]}; width: ${percentages[idx]}%;"></div>`;
-    }
-  });
-  chartHTML += '</div>';
-  
-  // Legend with values
-  chartHTML += '<div style="display: flex; flex-wrap: wrap; gap: 25px; justify-content: center;">';
-  chartData.labels.forEach((label, idx) => {
-    chartHTML += `
-      <div style="display: flex; align-items: center; gap: 8px;">
-        <div style="width: 16px; height: 16px; background-color: ${colors[idx]}; border-radius: 3px;"></div>
-        <div style="font-size: 14px; color: #6c757d;">
-          <strong style="color: #212529;">${label}:</strong> 
-          ${chartData.values[idx].toFixed(1)} hrs (${percentages[idx]}%)
-        </div>
-      </div>
-    `;
-  });
-  chartHTML += '</div></div>';
-  
-  chartContainer.innerHTML = chartHTML;
-  console.log('Chart rendered successfully');
 }
 
 // Map Sales Order status to Frappe indicator colors
