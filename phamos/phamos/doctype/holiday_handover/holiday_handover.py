@@ -21,9 +21,6 @@ class HolidayHandover(Document):
 		
 		if not self.overview or not self.overview.strip():
 			frappe.throw(_("Overview / Implementation Status is mandatory"))
-		
-		if not self.critical_tasks or not self.critical_tasks.strip():
-			frappe.throw(_("Critical Tasks / Notes is mandatory"))
 	
 
 
