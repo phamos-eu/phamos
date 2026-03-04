@@ -1085,7 +1085,7 @@ function renderSalesOrderTable(salesOrders) {
   if (salesOrders.length === 0) {
     tbody.append(`
       <tr>
-        <td colspan="7" class="text-center text-muted" style="padding: 40px;">
+        <td colspan="8" class="text-center text-muted" style="padding: 40px;">
           <i class="fa fa-inbox fa-2x mb-3" style="opacity: 0.3;"></i>
           <p class="mb-0"><strong>No Sales Orders Found</strong></p>
           <p class="small">There are no sales orders linked to implementations for your account yet.</p>
@@ -1099,6 +1099,7 @@ function renderSalesOrderTable(salesOrders) {
     const statusBadge = getStatusBadge(so.status);
     const progressPercent = so.total_hrs > 0 ? (so.delivered_hrs / so.total_hrs * 100).toFixed(1) : 0;
     const progressColor = getProgressColor(progressPercent);
+    const formattedDate = so.transaction_date ? frappe.datetime.str_to_user(so.transaction_date) : '-';
     
     const row = `
       <tr>
@@ -1108,6 +1109,7 @@ function renderSalesOrderTable(salesOrders) {
           </a>
         </td>
         <td>${escapeHtml(so.title || '-')}</td>
+        <td>${formattedDate}</td>
         <td>${statusBadge}</td>
         <td>${formatNumber(so.total_hrs)}</td>
         <td>${formatNumber(so.delivered_hrs)}</td>
