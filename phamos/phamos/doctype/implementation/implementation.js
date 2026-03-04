@@ -498,7 +498,7 @@ function add_row_to_sales_order(frm) {
                 custom_implementation: frm.doc.name,
                 status: ["in", ["To Deliver", "To Bill", "To Deliver and Bill"]]
             },
-            fields: ["name", "status", "total_qty", "title"],
+            fields: ["name", "status", "total_qty", "customer_name"],
             order_by: "transaction_date desc",
         },
         callback: function (response) {
@@ -508,7 +508,7 @@ function add_row_to_sales_order(frm) {
                 response.message.forEach(order => {
                     let row = frm.add_child("sales_order_status_information");
                     row.sales_order = order.name;
-                    row.so_title = order.title;
+                    row.so_title = order.customer_name;
                     row.total_hrs = order.total_qty;
                     row.status = order.status;
                 });

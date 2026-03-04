@@ -359,7 +359,7 @@ def get_customer_sales_order_status():
     sales_orders = frappe.db.sql("""
         SELECT 
             so.name,
-            so.title,
+            so.customer_name as title,
             so.status,
             so.total_qty as total_hrs,
             so.transaction_date,
