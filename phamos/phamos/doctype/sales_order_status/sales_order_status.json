@@ -23,7 +23,8 @@
    "in_list_view": 1,
    "label": "Sales Order",
    "link_filters": "[[\"Sales Order\", \"status\", \"not in\", [\"Closed\", \"Cancelled\"]]]",
-   "options": "Sales Order"
+   "options": "Sales Order",
+   "read_only": 1
   },
   {
    "fetch_from": "sales_order.total_qty",
@@ -31,14 +32,16 @@
    "fieldtype": "Data",
    "in_list_view": 1,
    "label": "Total Hrs",
-   "non_negative": 1
+   "non_negative": 1,
+   "read_only": 1
   },
   {
    "fetch_from": "sales_order.customer_name",
    "fieldname": "so_title",
    "fieldtype": "Data",
    "in_list_view": 1,
-   "label": "SO Title"
+   "label": "SO Title",
+   "read_only": 1
   },
   {
    "fieldname": "html",
@@ -54,18 +57,21 @@
    "fieldname": "status",
    "fieldtype": "Data",
    "in_list_view": 1,
-   "label": "Status"
+   "label": "Status",
+   "read_only": 1
   },
   {
    "fieldname": "delivered_total_hrs",
    "fieldtype": "Data",
    "in_list_view": 1,
-   "label": "Delivered Total Hrs"
+   "label": "Delivered Total Hrs",
+   "read_only": 1
   },
   {
    "fieldname": "remaining_hrs",
    "fieldtype": "Data",
-   "label": "Remaining Hrs"
+   "label": "Remaining Hrs",
+   "read_only": 1
   },
   {
    "fieldname": "test",
