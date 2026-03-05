@@ -128,12 +128,14 @@
   {
    "fieldname": "sales_order_total_hrs",
    "fieldtype": "Int",
-   "label": "Total Hours of Open Sales Order"
+   "label": "Total Hours of Open Sales Order",
+   "read_only": 1
   },
   {
    "fieldname": "total_hrs_timesheet",
    "fieldtype": "Int",
-   "label": "Billable Timesheet Hours (Not on Delivery Note)"
+   "label": "Billable Timesheet Hours (Not on Delivery Note)",
+   "read_only": 1
   },
   {
    "fieldname": "order_chart",
@@ -148,12 +150,14 @@
   {
    "fieldname": "delivered_total_hrs",
    "fieldtype": "Int",
-   "label": "Total Billable Hours on Delivery Note"
+   "label": "Total Billable Hours on Delivery Note",
+   "read_only": 1
   },
   {
    "fieldname": "remaining_hrs",
    "fieldtype": "Data",
-   "label": "Remaining Sales Order Hours"
+   "label": "Remaining Sales Order Hours",
+   "read_only": 1
   },
   {
    "fieldname": "section_break_xfgb",
