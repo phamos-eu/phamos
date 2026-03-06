@@ -922,6 +922,9 @@ document.addEventListener("click", function (event) {
 
 let salesOrderDataLoaded = false;
 let salesOrderData = null;
+let soCurrentPage = 1;
+let soPageSize = 20;
+let allSalesOrders = [];
 
 // Listen for Sales Orders tab activation
 document.getElementById('sales-orders-tab').addEventListener('shown.bs.tab', function (event) {
@@ -986,9 +989,14 @@ function renderSalesOrderData(data) {
   
   console.log('Summary cards updated');
   
-  // Render table
+  // Store all sales orders
+  allSalesOrders = data.sales_orders;
+  soCurrentPage = 1;
+  
+  // Render table with pagination
   try {
-    renderSalesOrderTable(data.sales_orders);
+    renderSalesOrderTable();
+    renderSalesOrderPagination();
     console.log('Table rendered');
   } catch (e) {
     console.error('Error rendering table:', e);
@@ -1011,11 +1019,11 @@ function getStatusColor(status) {
   return statusColors[status] || { bg: '#e8f4f8', text: '#2e5f75' };
 }
 
-function renderSalesOrderTable(salesOrders) {
+function renderSalesOrderTable() {
   const tbody = $('#so-table-body');
   tbody.empty();
   
-  if (salesOrders.length === 0) {
+  if (!allSalesOrders || allSalesOrders.length === 0) {
     tbody.append(`
       <tr>
         <td colspan="8" class="text-center text-muted" style="padding: 40px;">
@@ -1025,14 +1033,20 @@ function renderSalesOrderTable(salesOrders) {
         </td>
       </tr>
     `);
+    document.getElementById('so-page-info').textContent = 'Showing 0 - 0 of 0';
     return;
   }
   
-  salesOrders.forEach(so => {
+  // Calculate pagination
+  const startIndex = (soCurrentPage - 1) * soPageSize;
+  const endIndex = Math.min(startIndex + soPageSize, allSalesOrders.length);
+  const salesOrdersPage = allSalesOrders.slice(startIndex, endIndex);
+  
+  salesOrdersPage.forEach(so => {
     const statusBadge = getStatusBadge(so.status);
     const progressPercent = so.total_hrs > 0 ? (so.delivered_hrs / so.total_hrs * 100).toFixed(1) : 0;
     const progressColor = getProgressColor(progressPercent);
-    const formattedDate = so.transaction_date ? frappe.datetime.str_to_user(so.transaction_date) : '-';
+    const formattedDate = so.delivery_date ? frappe.datetime.str_to_user(so.delivery_date) : '-';
     
     const row = `
       <tr>
@@ -1062,6 +1076,10 @@ function renderSalesOrderTable(salesOrders) {
     
     tbody.append(row);
   });
+  
+  // Update page info
+  const pageInfoText = `Showing ${startIndex + 1} - ${endIndex} of ${allSalesOrders.length}`;
+  document.getElementById('so-page-info').textContent = pageInfoText;
 }
 
 function getStatusBadge(status) {
@@ -1101,4 +1119,89 @@ function showSalesOrderError() {
       </td>
     </tr>
   `);
+}
+
+function renderSalesOrderPagination() {
+  const totalPages = Math.ceil(allSalesOrders.length / soPageSize);
+  const pagination = $('#so-pagination');
+  pagination.empty();
+  
+  if (totalPages <= 1) {
+    return; // No pagination needed
+  }
+  
+  // Previous button
+  const prevDisabled = soCurrentPage === 1 ? 'disabled' : '';
+  pagination.append(`
+    <li class="page-item ${prevDisabled}">
+      <a class="page-link" href="#" data-page="${soCurrentPage - 1}">
+        <i class="fa fa-chevron-left"></i>
+      </a>
+    </li>
+  `);
+  
+  // Page numbers
+  const maxPagesToShow = 5;
+  let startPage = Math.max(1, soCurrentPage - Math.floor(maxPagesToShow / 2));
+  let endPage = Math.min(totalPages, startPage + maxPagesToShow - 1);
+  
+  // Adjust start if we're near the end
+  if (endPage - startPage < maxPagesToShow - 1) {
+    startPage = Math.max(1, endPage - maxPagesToShow + 1);
+  }
+  
+  // First page
+  if (startPage > 1) {
+    pagination.append(`
+      <li class="page-item">
+        <a class="page-link" href="#" data-page="1">1</a>
+      </li>
+    `);
+    if (startPage > 2) {
+      pagination.append(`<li class="page-item disabled"><span class="page-link">...</span></li>`);
+    }
+  }
+  
+  // Page numbers
+  for (let i = startPage; i <= endPage; i++) {
+    const active = i === soCurrentPage ? 'active' : '';
+    pagination.append(`
+      <li class="page-item ${active}">
+        <a class="page-link" href="#" data-page="${i}">${i}</a>
+      </li>
+    `);
+  }
+  
+  // Last page
+  if (endPage < totalPages) {
+    if (endPage < totalPages - 1) {
+      pagination.append(`<li class="page-item disabled"><span class="page-link">...</span></li>`);
+    }
+    pagination.append(`
+      <li class="page-item">
+        <a class="page-link" href="#" data-page="${totalPages}">${totalPages}</a>
+      </li>
+    `);
+  }
+  
+  // Next button
+  const nextDisabled = soCurrentPage === totalPages ? 'disabled' : '';
+  pagination.append(`
+    <li class="page-item ${nextDisabled}">
+      <a class="page-link" href="#" data-page="${soCurrentPage + 1}">
+        <i class="fa fa-chevron-right"></i>
+      </a>
+    </li>
+  `);
+  
+  // Attach click handlers
+  pagination.find('a.page-link').on('click', function(e) {
+    e.preventDefault();
+    const page = parseInt($(this).data('page'));
+    if (!isNaN(page) && page !== soCurrentPage) {
+      soCurrentPage = page;
+      renderSalesOrderTable();
+      renderSalesOrderPagination();
+    }
+  });
 }
