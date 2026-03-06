@@ -12,14 +12,22 @@
   "priority",
   "assigned_to",
   "due_date",
+  "column_break_1",
+  "issue_url",
+  "parent_issue",
+  "gitlab_project",
+  "section_break_2",
+  "description",
+  "section_break_3",
   "pm_comments"
  ],
  "fields": [
   {
    "fieldname": "gitlab_issue_id",
-   "fieldtype": "Data",
+   "fieldtype": "Link",
    "in_list_view": 1,
-   "label": "GitLab Issue ID",
+   "label": "GitLab Issue",
+   "options": "GitLab Issue",
    "reqd": 1
   },
   {
@@ -47,6 +55,7 @@
   {
    "fieldname": "assigned_to",
    "fieldtype": "Data",
+   "in_list_view": 1,
    "label": "Assigned To",
    "read_only": 1
   },
@@ -55,6 +64,46 @@
    "fieldtype": "Date",
    "label": "Due Date",
    "read_only": 1
+  },
+  {
+   "fieldname": "column_break_1",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "issue_url",
+   "fieldtype": "Data",
+   "label": "Issue URL",
+   "read_only": 1
+  },
+  {
+   "fieldname": "parent_issue",
+   "fieldtype": "Link",
+   "label": "Parent Issue",
+   "options": "GitLab Issue",
+   "read_only": 1
+  },
+  {
+   "fieldname": "gitlab_project",
+   "fieldtype": "Link",
+   "label": "GitLab Project",
+   "options": "GitLab Project",
+   "read_only": 1
+  },
+  {
+   "fieldname": "section_break_2",
+   "fieldtype": "Section Break",
+   "label": "Description"
+  },
+  {
+   "fieldname": "description",
+   "fieldtype": "Markdown Editor",
+   "label": "Description",
+   "read_only": 1
+  },
+  {
+   "fieldname": "section_break_3",
+   "fieldtype": "Section Break",
+   "label": "Project Manager Comments"
   },
   {
    "fieldname": "pm_comments",
