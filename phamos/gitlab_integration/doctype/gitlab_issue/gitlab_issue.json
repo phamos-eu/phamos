@@ -19,7 +19,9 @@
   {
    "fieldname": "issue_id",
    "fieldtype": "Data",
-   "label": "Issue ID"
+   "in_list_view": 1,
+   "label": "Issue ID",
+   "unique": 1
   },
   {
    "fieldname": "title",
@@ -39,11 +41,13 @@
   {
    "fieldname": "assignee",
    "fieldtype": "Data",
+   "in_list_view": 1,
    "label": "Assignee"
   },
   {
    "fieldname": "issue_url",
    "fieldtype": "Data",
+   "in_list_view": 1,
    "label": "Issue Url"
   },
   {
@@ -89,7 +93,9 @@
   }
  ],
  "row_format": "Dynamic",
+ "search_fields": "assignee,issue_url",
  "sort_field": "modified",
  "sort_order": "DESC",
- "states": []
+ "states": [],
+ "title_field": "issue_id"
 }
