@@ -942,6 +942,7 @@ let salesOrderData = null;
 let soCurrentPage = 1;
 let soPageSize = 20;
 let allSalesOrders = [];
+let originalSalesOrders = [];
 
 // Listen for Sales Orders tab activation
 document.getElementById('sales-orders-tab').addEventListener('shown.bs.tab', function (event) {
@@ -951,16 +952,9 @@ document.getElementById('sales-orders-tab').addEventListener('shown.bs.tab', fun
 });
 
 function loadSalesOrderData() {
-  console.log('Loading sales order data...');
-  console.log('Current user:', frappe.session.user);
-  
   frappe.call({
     method: "phamos.api.get_customer_sales_order_status",
     callback: function(response) {
-      console.log('Sales Order Response:', response);
-      console.log('Response message:', response.message);
-      console.log('Response exc:', response.exc);
-      
       if (response.exc) {
         console.error('API Exception:', response.exc);
         frappe.msgprint({
@@ -975,12 +969,8 @@ function loadSalesOrderData() {
       if (response.message) {
         salesOrderData = response.message;
         salesOrderDataLoaded = true;
-        console.log('Sales Orders loaded:', salesOrderData);
-        console.log('Summary:', salesOrderData.summary);
-        console.log('Sales Orders count:', salesOrderData.sales_orders.length);
         renderSalesOrderData(salesOrderData);
       } else {
-        console.log('No data returned from API');
         showSalesOrderError();
       }
     },
@@ -997,24 +987,19 @@ function loadSalesOrderData() {
 }
 
 function renderSalesOrderData(data) {
-  console.log('Rendering sales order data...');
-  console.log('Data received:', data);
-  
   // Render summary cards
   $('#total-so-hrs').text(formatNumber(data.summary.total_so_hrs));
   $('#delivered-hrs').text(formatNumber(data.summary.delivered_hrs));
   
-  console.log('Summary cards updated');
-  
   // Store all sales orders
-  allSalesOrders = data.sales_orders;
+  originalSalesOrders = data.sales_orders || [];
+  allSalesOrders = [...originalSalesOrders];
   soCurrentPage = 1;
   
   // Render table with pagination
   try {
     renderSalesOrderTable();
     renderSalesOrderPagination();
-    console.log('Table rendered');
   } catch (e) {
     console.error('Error rendering table:', e);
   }
@@ -1049,7 +1034,7 @@ function renderSalesOrderTable() {
     const statusBadge = getStatusBadge(so.status);
     const progressPercent = so.total_hrs > 0 ? (so.delivered_hrs / so.total_hrs * 100).toFixed(1) : 0;
     const progressColor = getProgressColor(progressPercent);
-    const formattedDate = so.delivery_date ? frappe.datetime.str_to_user(so.delivery_date) : '-';
+    const formattedDate = so.transaction_date ? frappe.datetime.str_to_user(so.transaction_date) : '-';
     
     const row = `
       <tr>
@@ -1085,22 +1070,26 @@ function renderSalesOrderTable() {
   document.getElementById('so-page-info').textContent = pageInfoText;
   $('#so-page-info').text(pageInfoText);
 }
-}
+
 
 function getStatusBadge(status) {
-  const statusMap = {
-    'Draft': 'secondary',
-    'To Deliver and Bill': 'primary',
-    'To Bill': 'info',
-    'To Deliver': 'warning',
-    'Completed': 'success',
-    'Cancelled': 'danger',
-    'Closed': 'dark',
-    'On Hold': 'secondary'
+  const colors = getStatusColor(status);
+  return `<span class="badge" style="background-color: ${colors.bg}; color: ${colors.text}; font-weight: 500; padding: 5px 12px; border-radius: 4px;">${status}</span>`;
+}
+
+function getStatusColor(status) {
+  const statusColors = {
+    'Draft': { bg: '#d1d8dd', text: '#364a59' },
+    'On Hold': { bg: '#ffeab6', text: '#7f5c00' },
+    'To Deliver and Bill': { bg: '#ffe6cc', text: '#7f4200' },
+    'To Bill': { bg: '#d4f5d4', text: '#1a731a' },
+    'To Deliver': { bg: '#d4e7f7', text: '#16537a' },
+    'Completed': { bg: '#d4f5d4', text: '#0a5e0a' },
+    'Cancelled': { bg: '#ffe6e6', text: '#a10000' },
+    'Closed': { bg: '#e8e8e8', text: '#4d4d4d' }
   };
   
-  const badgeClass = statusMap[status] || 'secondary';
-  return `<span class="badge bg-${badgeClass}">${status}</span>`;
+  return statusColors[status] || { bg: '#e8f4f8', text: '#2e5f75' };
 }
 
 function getProgressColor(percent) {
@@ -1224,4 +1213,169 @@ function renderSalesOrderPagination() {
 
 function updateSalesOrderPageInfo(start, end, total) {
   $('#so-page-info').text(`Showing ${start} - ${end} of ${total}`);
+}
+
+// ========================================
+// Sales Orders Tab - Filters, Sort, and Search
+// ========================================
+
+let soCurrentSortColumn = null;
+let soCurrentSortOrder = null;
+
+// Status filter - use delegated event handler
+$(document).on('change', '#so_status_filter', function() {
+  applySalesOrderFilters();
+});
+
+// Clear filters - use delegated event handler
+$(document).on('click', '#so_clear_filters', function() {
+  $('#so_status_filter').val('');
+  $('.so-column-filter').val('');
+  applySalesOrderFilters();
+});
+
+// In-table search
+$(document).on('input', '.so-column-filter', function() {
+  applySalesOrderFilters();
+});
+
+// Sort functionality
+$(document).on('click', '.sort-icon[data-so-column]', function(e) {
+  e.stopPropagation();
+  const column = $(this).data('so-column');
+  const menu = $(this).siblings('.so-menu');
+  
+  // Hide all other menus
+  $('.so-menu').not(menu).hide();
+  
+  // Toggle current menu
+  menu.toggle();
+});
+
+$(document).on('click', '.so-menu .menu-item', function(e) {
+  e.stopPropagation();
+  const action = $(this).data('action');
+  const menu = $(this).closest('.so-menu');
+  const column = menu.siblings('.sort-icon').data('so-column');
+  
+  if (action === 'asc') {
+    soCurrentSortColumn = column;
+    soCurrentSortOrder = 'asc';
+  } else if (action === 'desc') {
+    soCurrentSortColumn = column;
+    soCurrentSortOrder = 'desc';
+  } else if (action === 'reset') {
+    soCurrentSortColumn = null;
+    soCurrentSortOrder = null;
+  }
+  
+  applySalesOrderFilters();
+  menu.hide();
+});
+
+// Hide menus when clicking outside
+$(document).on('click', function() {
+  $('.so-menu').hide();
+});
+
+function applySalesOrderFilters() {
+  if (!originalSalesOrders || originalSalesOrders.length === 0) {
+    return;
+  }
+  
+  // Start with original data
+  let filtered = [...originalSalesOrders];
+  
+  // Apply status filter
+  const statusFilter = $('#so_status_filter').val();
+  if (statusFilter) {
+    filtered = filtered.filter(so => so.status === statusFilter);
+  }
+  
+  // Apply column filters
+  const columnFilterElements = $('.so-column-filter');
+  
+  columnFilterElements.each(function() {
+    const column = $(this).data('so-column');
+    const value = ($(this).val() || '').trim().toLowerCase();
+    
+    if (value) {
+      filtered = filtered.filter(so => {
+        let fieldValue = '';
+        
+        if (column === 'name') {
+          fieldValue = (so.name || '').toString().toLowerCase();
+        } else if (column === 'title') {
+          fieldValue = (so.title || '').toString().toLowerCase();
+        } else if (column === 'transaction_date') {
+          fieldValue = (so.transaction_date || '').toString().toLowerCase();
+        } else if (column === 'status') {
+          fieldValue = (so.status || '').toString().toLowerCase();
+        } else if (column === 'total_hrs') {
+          fieldValue = (so.total_hrs || 0).toString();
+        } else if (column === 'delivered_hrs') {
+          fieldValue = (so.delivered_hrs || 0).toString();
+        } else if (column === 'remaining_hrs') {
+          fieldValue = (so.remaining_hrs || 0).toString();
+        } else if (column === 'progress') {
+          const progress = so.total_hrs > 0 ? ((so.delivered_hrs / so.total_hrs * 100).toFixed(1)) : '0';
+          fieldValue = progress.toString();
+        }
+        
+        return fieldValue.includes(value);
+      });
+    }
+  });
+  
+  // Apply sorting
+  if (soCurrentSortColumn && soCurrentSortOrder) {
+    filtered.sort((a, b) => {
+      let aVal, bVal;
+      
+      if (soCurrentSortColumn === 'name') {
+        aVal = a.name || '';
+        bVal = b.name || '';
+      } else if (soCurrentSortColumn === 'title') {
+        aVal = a.title || '';
+        bVal = b.title || '';
+      } else if (soCurrentSortColumn === 'transaction_date') {
+        aVal = a.transaction_date || '';
+        bVal = b.transaction_date || '';
+      } else if (soCurrentSortColumn === 'status') {
+        aVal = a.status || '';
+        bVal = b.status || '';
+      } else if (soCurrentSortColumn === 'total_hrs') {
+        aVal = parseFloat(a.total_hrs) || 0;
+        bVal = parseFloat(b.total_hrs) || 0;
+      } else if (soCurrentSortColumn === 'delivered_hrs') {
+        aVal = parseFloat(a.delivered_hrs) || 0;
+        bVal = parseFloat(b.delivered_hrs) || 0;
+      } else if (soCurrentSortColumn === 'remaining_hrs') {
+        aVal = parseFloat(a.remaining_hrs) || 0;
+        bVal = parseFloat(b.remaining_hrs) || 0;
+      } else if (soCurrentSortColumn === 'progress') {
+        aVal = a.total_hrs > 0 ? (a.delivered_hrs / a.total_hrs * 100) : 0;
+        bVal = b.total_hrs > 0 ? (b.delivered_hrs / b.total_hrs * 100) : 0;
+      }
+      
+      if (typeof aVal === 'string') {
+        aVal = aVal.toLowerCase();
+        bVal = bVal.toLowerCase();
+      }
+      
+      if (soCurrentSortOrder === 'asc') {
+        return aVal > bVal ? 1 : aVal < bVal ? -1 : 0;
+      } else {
+        return aVal < bVal ? 1 : aVal > bVal ? -1 : 0;
+      }
+    });
+  }
+  
+  // Update filtered list and reset to first page
+  allSalesOrders = filtered;
+  soCurrentPage = 1;
+  
+  // Re-render table
+  renderSalesOrderTable();
+  renderSalesOrderPagination();
 }
