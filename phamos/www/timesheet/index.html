@@ -274,6 +274,24 @@
         <div class="d-flex justify-content-between align-items-center mb-2">
           <h6 class="mb-0 text-muted">Sales Order Status Information</h6>
         </div>
+        
+        <!-- Filters -->
+        <div class="row g-2 mt-2">
+          <div class="col-12 col-sm-4 col-md-3">
+            <select id="so_status_filter" class="form-control form-control-sm rounded">
+              <option value="">All Statuses</option>
+              <option value="To Deliver and Bill">To Deliver and Bill</option>
+              <option value="To Bill">To Bill</option>
+              <option value="To Deliver">To Deliver</option>
+              <option value="Completed">Completed</option>
+            </select>
+          </div>
+          <div class="col-12 col-sm-4 col-md-2">
+            <button id="so_clear_filters" class="btn btn-sm btn-outline-secondary w-100">
+              <i class="fa fa-times me-1"></i> Clear Filters
+            </button>
+          </div>
+        </div>
       </div>
 
       <!-- Table Container -->
@@ -283,14 +301,88 @@
               style="table-layout: auto;">
           <thead class="table-light sticky-top small">
             <tr>
-              <th style="width: 18%;">Sales Order</th>
-              <th style="width: 20%;">Title</th>
-              <th style="width: 10%;">Delivery Date</th>
-              <th style="width: 10%;">Status</th>
-              <th style="width: 10%;">Total Hrs</th>
-              <th style="width: 10%;">Delivered</th>
-              <th style="width: 10%;">Remaining</th>
-              <th style="width: 12%;">Progress</th>
+              <th style="width: 18%; position:relative;">
+                Sales Order 
+                <i class="fa-solid fa-chevron-down sort-icon" data-so-column="name"></i>
+                <div class="th-menu so-menu">
+                  <div class="menu-item" data-action="asc">Sort Ascending</div>
+                  <div class="menu-item" data-action="desc">Sort Descending</div>
+                  <div class="menu-item" data-action="reset">Reset Sorting</div>
+                </div>
+              </th>
+              <th style="width: 20%; position:relative;">
+                Title 
+                <i class="fa-solid fa-chevron-down sort-icon" data-so-column="title"></i>
+                <div class="th-menu so-menu">
+                  <div class="menu-item" data-action="asc">Sort Ascending</div>
+                  <div class="menu-item" data-action="desc">Sort Descending</div>
+                  <div class="menu-item" data-action="reset">Reset Sorting</div>
+                </div>
+              </th>
+              <th style="width: 10%; position:relative;">
+                Date 
+                <i class="fa-solid fa-chevron-down sort-icon" data-so-column="transaction_date"></i>
+                <div class="th-menu so-menu">
+                  <div class="menu-item" data-action="asc">Sort Ascending</div>
+                  <div class="menu-item" data-action="desc">Sort Descending</div>
+                  <div class="menu-item" data-action="reset">Reset Sorting</div>
+                </div>
+              </th>
+              <th style="width: 10%; position:relative;">
+                Status 
+                <i class="fa-solid fa-chevron-down sort-icon" data-so-column="status"></i>
+                <div class="th-menu so-menu">
+                  <div class="menu-item" data-action="asc">Sort Ascending</div>
+                  <div class="menu-item" data-action="desc">Sort Descending</div>
+                  <div class="menu-item" data-action="reset">Reset Sorting</div>
+                </div>
+              </th>
+              <th style="width: 10%; position:relative;">
+                Total Hrs 
+                <i class="fa-solid fa-chevron-down sort-icon" data-so-column="total_hrs"></i>
+                <div class="th-menu so-menu">
+                  <div class="menu-item" data-action="asc">Sort Ascending</div>
+                  <div class="menu-item" data-action="desc">Sort Descending</div>
+                  <div class="menu-item" data-action="reset">Reset Sorting</div>
+                </div>
+              </th>
+              <th style="width: 10%; position:relative;">
+                Delivered 
+                <i class="fa-solid fa-chevron-down sort-icon" data-so-column="delivered_hrs"></i>
+                <div class="th-menu so-menu">
+                  <div class="menu-item" data-action="asc">Sort Ascending</div>
+                  <div class="menu-item" data-action="desc">Sort Descending</div>
+                  <div class="menu-item" data-action="reset">Reset Sorting</div>
+                </div>
+              </th>
+              <th style="width: 10%; position:relative;">
+                Remaining 
+                <i class="fa-solid fa-chevron-down sort-icon" data-so-column="remaining_hrs"></i>
+                <div class="th-menu so-menu">
+                  <div class="menu-item" data-action="asc">Sort Ascending</div>
+                  <div class="menu-item" data-action="desc">Sort Descending</div>
+                  <div class="menu-item" data-action="reset">Reset Sorting</div>
+                </div>
+              </th>
+              <th style="width: 12%; position:relative;">
+                Progress 
+                <i class="fa-solid fa-chevron-down sort-icon" data-so-column="progress"></i>
+                <div class="th-menu so-menu">
+                  <div class="menu-item" data-action="asc">Sort Ascending</div>
+                  <div class="menu-item" data-action="desc">Sort Descending</div>
+                  <div class="menu-item" data-action="reset">Reset Sorting</div>
+                </div>
+              </th>
+            </tr>
+            <tr class="bg-white">
+              <th><input type="text" class="form-control form-control-sm so-column-filter" placeholder="" data-so-column="name" /></th>
+              <th><input type="text" class="form-control form-control-sm so-column-filter" placeholder="" data-so-column="title" /></th>
+              <th><input type="text" class="form-control form-control-sm so-column-filter" placeholder="" data-so-column="transaction_date" /></th>
+              <th><input type="text" class="form-control form-control-sm so-column-filter" placeholder="" data-so-column="status" /></th>
+              <th><input type="text" class="form-control form-control-sm so-column-filter" placeholder="" data-so-column="total_hrs" /></th>
+              <th><input type="text" class="form-control form-control-sm so-column-filter" placeholder="" data-so-column="delivered_hrs" /></th>
+              <th><input type="text" class="form-control form-control-sm so-column-filter" placeholder="" data-so-column="remaining_hrs" /></th>
+              <th><input type="text" class="form-control form-control-sm so-column-filter" placeholder="" data-so-column="progress" /></th>
             </tr>
           </thead>
           <tbody id="so-table-body" style="border-bottom: 1px solid #dee2e6;">
@@ -360,7 +452,6 @@
 
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
 <script src="https://code.highcharts.com/highcharts.js"></script>
-<script src="/assets/phamos/js/timesheet_portal.js"></script>
 <script>
   frappe.ready(function() {
     console.log('Customer Portal loaded');
