@@ -44,6 +44,7 @@ doctype_js = {
 	"Sales Order": "public/js/sales_order.js",
 	"Lead": "public/js/lead.js",
 	"Job Applicant": "public/js/job_applicant.js",
+	"Job Opening": "public/js/job_opening.js",
     "Timesheet":"public/js/timesheet.js",
     "User": "public/js/mailcow_user.js",
     "Event": "public/js/event.js",

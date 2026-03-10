@@ -32,11 +32,13 @@ def schedule_interview(applicant_id, interview_date, interview_slot):
 			return {"status": "error", "message": "Job Applicant not found"}
 
 		applicant_doc = frappe.get_doc("Job Applicant", applicant_id)
-		interview_round = frappe.get_single("Recruitment Settings").interview_round
-		if not interview_round:
-			raise Exception(_("Interview Round is not set in Recruitment Settings"))
-
-		interviewers = frappe.get_all("Assignment Rule User", filters={"parent": "Recruitment Settings"}, fields=["user"])
+		
+		settings = frappe.get_single("Recruitment Settings")
+		config = settings.get_interview_config(applicant_doc.job_title)
+		
+		interview_round = config["interview_round"]
+		interviewers = config["interviewers"]
+		
 		start_time_str, end_time_str = interview_slot.split(" - ")
 		from_time = datetime.strptime(start_time_str, "%H:%M").time()
 		to_time = datetime.strptime(end_time_str, "%H:%M").time()
@@ -92,23 +94,27 @@ def get_available_slots(applicant_id):
 
 
 def send_interview_schedule_email(applicant_doc, interview_date, interview_slot, recipients, cc=[]):
-	recruitement_settings = frappe.get_doc("Recruitment Settings")
+	# Get interview configuration from Recruitment Settings
+	# This will throw ValidationError if config is not found
+	settings = frappe.get_single("Recruitment Settings")
+	config = settings.get_interview_config(applicant_doc.job_title)
+	
 	if applicant_doc.job_title:
 		job_title = frappe.db.get_value("Job Opening", applicant_doc.job_title, "job_title")
-		job_title = "<b>{0}</b> position".format(applicant_doc.job_title)
+		job_title = "<b>{0}</b> position".format(job_title)
 	else:
 		job_title = "job"
 
 	sender = None
-	if recruitement_settings.sender and recruitement_settings.sender_email:
-		sender = formataddr((recruitement_settings.sender, recruitement_settings.sender_email))
+	if config.get("sender") and config.get("sender_email"):
+		sender = formataddr((config["sender"], config["sender_email"]))
 	else:
-		raise Exception(_("Sender Email is not set in Recruitment Settings"))
+		raise Exception(_("Sender Email is not configured in Recruitment Settings"))
 	
-	if not recruitement_settings.interview_confirmation:
-		raise Exception(_("Interview Confirmation Email Template is not set in Recruitment Settings"))
+	if not config.get("interview_confirmation"):
+		raise Exception(_("Interview Confirmation Email Template is not configured in Recruitment Settings"))
 
-	email_template = frappe.get_doc("Email Template", recruitement_settings.interview_confirmation)
+	email_template = frappe.get_doc("Email Template", config["interview_confirmation"])
 	subject = email_template.subject
 
 	key = f"For-{applicant_doc.job_title}-Candidate-{applicant_doc.applicant_name}"
