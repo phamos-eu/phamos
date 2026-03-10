@@ -8,9 +8,14 @@
  "field_order": [
   "naming_series",
   "implementation",
+  "sales_order",
+  "create_delivery_note",
+  "delivery_note",
+  "section_break_1_section",
   "year",
   "month",
   "timesheets",
+  "timesheets_table",
   "total_hours",
   "billable_hours",
   "discount",
@@ -48,9 +53,8 @@
    "reqd": 1
   },
   {
-   "description": "Enter a 4-digit year (e.g. 2024). Valid range: 2000\\u20132100.",
    "fieldname": "year",
-   "fieldtype": "Data",
+   "fieldtype": "Select",
    "in_list_view": 1,
    "label": "Year",
    "reqd": 1
@@ -89,6 +93,34 @@
    "fieldtype": "Float",
    "label": "Total Hours after discount",
    "read_only": 1
+  },
+  {
+   "fieldname": "timesheets_table",
+   "fieldtype": "Table",
+   "label": "Timesheets",
+   "options": "Timesheets"
+  },
+  {
+   "fieldname": "sales_order",
+   "fieldtype": "Link",
+   "label": "Sales Order",
+   "options": "Sales Order"
+  },
+  {
+   "fieldname": "section_break_1_section",
+   "fieldtype": "Section Break"
+  },
+  {
+   "fieldname": "create_delivery_note",
+   "fieldtype": "Button",
+   "label": "Create Delivery Note"
+  },
+  {
+   "fieldname": "delivery_note",
+   "fieldtype": "Link",
+   "label": "Delivery Note",
+   "options": "Delivery Note",
+   "read_only": 1
   }
  ],
  "index_web_pages_for_search": 1,
@@ -99,7 +131,7 @@
    "link_fieldname": "custom_against_monthly_implementation_summery"
   }
  ],
- "modified": "2026-02-20 15:33:42.168411",
+ "modified": "2026-03-10 14:06:17.615219",
  "modified_by": "Administrator",
  "module": "Phamos",
  "name": "Monthly Implementation Summery",

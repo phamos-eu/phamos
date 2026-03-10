@@ -51,50 +51,54 @@ class MonthlyImplementationSummery(Document):
 			)
 
 	def on_submit(self):
-		self.validate_phamos_settings_item()
-		self.validate_timesheet_hours_for_delivery_note()
-		# Create Delivery Note when Monthly Implementation Summary is submitted
-		if self.implementation and self.year and self.month:
-			try:
-				item = frappe.db.get_single_value("phamos Settings", "item")
-				if not item:
-					frappe.throw("No item configured in Phamos Settings. Please set an item to create Delivery Note.")
-				# Use total_hours_after_discount if discount is applied, otherwise use billable_hours
-				if self.total_hours_after_discount is not None and self.total_hours_after_discount > 0:
-					total_billing_hours = flt(self.total_hours_after_discount)
-				else:
-					total_billing_hours = flt(self.billable_hours or 0)
-				if total_billing_hours <= 0:
-					frappe.throw("Total billing hours is zero or empty. Delivery Note cannot be created.")
-				impl = frappe.get_cached_doc("Implementation", self.implementation)
-				customer = impl.get("customer")
-				if not customer:
-					frappe.throw("Implementation has no Customer. Set Customer on Implementation to create Delivery Note.")
-				company = frappe.db.get_default("company") or frappe.db.get_value("Customer", customer, "customer_primary_company")
-				if not company:
-					company = frappe.db.get_single_value("Global Defaults", "default_company")
-				if not company:
-					frappe.throw("No Company set. Set default Company in Global Defaults or for the Customer.")
-				dn = frappe.get_doc({
-					"doctype": "Delivery Note",
-					"customer": customer,	
-					"company": company,
-					"custom_implementation": self.implementation,
-					"docstatus": 0,  # Insert as submitted
-				})
-				dn.append("items", {
+		"""Create Delivery Note on submit."""
+		try:
+			self.validate_phamos_settings_item()
+			self.validate_timesheet_hours_for_delivery_note()
+			
+			# Get billing hours
+			total_billing_hours = flt(self.total_hours_after_discount or self.billable_hours)
+			if total_billing_hours <= 0:
+				frappe.throw("Total billing hours is zero. Delivery Note cannot be created.")
+			
+			# Get item from settings
+			item = frappe.db.get_single_value("phamos Settings", "item")
+			if not item:
+				frappe.throw("No item configured in Phamos Settings.")
+			
+			# Get customer from implementation
+			customer = frappe.db.get_value("Implementation", self.implementation, "customer")
+			if not customer:
+				frappe.throw("Implementation has no Customer.")
+			
+			# Get company
+			company = (frappe.db.get_default("company") or 
+					  frappe.db.get_value("Customer", customer, "customer_primary_company") or
+					  frappe.db.get_single_value("Global Defaults", "default_company"))
+			if not company:
+				frappe.throw("No Company found. Set default Company in Global Defaults.")
+			
+			# Create Delivery Note
+			dn = frappe.get_doc({
+				"doctype": "Delivery Note",
+				"customer": customer,
+				"company": company,
+				"custom_implementation": self.implementation,
+				"items": [{
 					"item_code": item,
 					"qty": total_billing_hours,
 					"uom": "Hour",
 					"allow_zero_valuation_rate": 1,
-					"custom_against_monthly_implementation_summery": self.name,
-				})
-				dn.insert()
-				formatted_hours = frappe.format_value(total_billing_hours, {"fieldtype": "Float"}, doc=None)
-				frappe.msgprint(f"Delivery Note {dn.name} created successfully with {formatted_hours} Hour(s).")
-
-			except Exception as e:
-				frappe.msgprint(f"Error creating Delivery Note : {str(e)}")		
+					"custom_against_monthly_implementation_summery": self.name
+				}]
+			})
+			dn.insert()
+			frappe.msgprint(f"Delivery Note {dn.name} created with {total_billing_hours:.2f} Hour(s).")
+			
+			
+		except Exception as e:
+			frappe.log_error(f"Error creating Delivery Note for {self.name}: {str(e)}")
+			frappe.throw(f"Error creating Delivery Note: {str(e)}")		
 
 	def validate_year(self):
 		"""Validate that year is a valid 4-digit year in allowed range."""
@@ -143,25 +147,24 @@ class MonthlyImplementationSummery(Document):
 				)
 
 	def set_timesheets_table(self):
-		"""Fetch timesheets for the previous month of the selected year and month and set HTML table."""
-		# Calculate previous month from selected year and month
+		"""Fetch timesheets for the previous month and populate child table."""
 		prev_year, prev_month_name = _get_previous_month_year_and_name(self.year, self.month)
 		if not prev_year or not prev_month_name:
-			self.timesheets = ""
+			self.timesheets_table = []
 			return
 		
 		from_date, to_date = _get_month_date_range(prev_year, prev_month_name)
 		if not from_date or not to_date:
-			self.timesheets = ""
+			self.timesheets_table = []
 			return
 
 		projects = frappe.get_all(
 			"Project",
 			filters={"custom_implementation": self.implementation},
-			pluck="name",
+			pluck="name"
 		)
 		if not projects:
-			self.timesheets = ""
+			self.timesheets_table = []
 			return
 
 		timesheet_list = frappe.db.sql("""
@@ -170,7 +173,9 @@ class MonthlyImplementationSummery(Document):
 				ts.total_hours AS total_hours,
 				ts.total_billable_hours AS billable_hours,
 				ts.custom_rating AS rating,
-				tsd.project AS project
+				tsd.project AS project,
+				ts.employee AS employee,
+				ts.note AS description
 			FROM `tabTimesheet` ts
 			INNER JOIN `tabTimesheet Detail` tsd ON tsd.parent = ts.name
 			WHERE tsd.project IN %(projects)s
@@ -180,182 +185,83 @@ class MonthlyImplementationSummery(Document):
 		""", {
 			"projects": projects,
 			"from_date": from_date,
-			"to_date": to_date,
+			"to_date": to_date
 		}, as_dict=True)
 
-		# Calculate sums - since we use DISTINCT on ts.name, each timesheet appears only once
-		# So we can safely sum the total_hours and billable_hours
-		total_hours_sum = sum(flt(row.total_hours or 0) for row in timesheet_list)
-		billable_hours_sum = sum(flt(row.billable_hours or 0) for row in timesheet_list)
-		self.total_hours = flt(total_hours_sum, precision=2)
-		# Store original billable hours (before discount) - will be used by apply_discount_to_billing_hours
-		self.billable_hours = flt(billable_hours_sum, precision=2)
-		self.timesheets = _build_timesheets_html(timesheet_list)
+		# Calculate totals
+		self.total_hours = flt(sum(flt(row.total_hours) for row in timesheet_list), precision=2)
+		self.billable_hours = flt(sum(flt(row.billable_hours) for row in timesheet_list), precision=2)
+		
+		# Populate child table
+		self.timesheets_table = []
+		for row in timesheet_list:
+			self.append("timesheets_table", {
+			"timesheet": row.ts_name or None,
+			"date": row.date,
+			"total_hours": flt(row.total_hours),
+			"billable_hours": flt(row.billable_hours),
+			"rating": row.rating or "",
+			"project": row.project or None,
+			"employee": row.employee or None,
+			"description": row.description or ""
+		})
 
 	def apply_discount_to_billing_hours(self):
-		"""Apply discount percentage to billable hours if discount is set."""
-		# Use the billable_hours field value (which was set in set_timesheets_table)
-		# This ensures we always apply discount to the original value
-		original_billable_hours = flt(self.billable_hours or 0)
+		"""Apply discount percentage to billable hours."""
+		original_billable_hours = flt(self.billable_hours)
+		discount_percent = flt(self.discount)
 		
-		if original_billable_hours > 0:
-			if self.discount:
-				discount_percent = flt(self.discount)
-				# Validate discount is between 0 and 100
-				if discount_percent < 0:
-					frappe.throw("Discount cannot be negative.")
-				if discount_percent > 100:
-					frappe.throw("Discount cannot exceed 100%.")
-				if discount_percent > 0:
-					# Apply discount: discounted_hours = original_billable_hours * (1 - discount/100)
-					discounted_hours = original_billable_hours * (1 - discount_percent / 100)
-					self.total_hours_after_discount = flt(discounted_hours, precision=2)
-				else:
-					# No discount, use original value
-					self.total_hours_after_discount = original_billable_hours
-			else:
-				# No discount set, use original value
-				self.total_hours_after_discount = original_billable_hours
+		# Validate discount
+		if discount_percent < 0:
+			frappe.throw("Discount cannot be negative.")
+		if discount_percent > 100:
+			frappe.throw("Discount cannot exceed 100%.")
+		
+		# Calculate discounted hours
+		if discount_percent > 0 and original_billable_hours > 0:
+			self.total_hours_after_discount = flt(
+				original_billable_hours * (1 - discount_percent / 100), 
+				precision=2
+			)
 		else:
-			# No billable hours, set to 0
-			self.total_hours_after_discount = 0
-
-	def _get_original_billable_hours(self):
-		"""Get original billable hours from timesheets (before discount)."""
-		if not (self.implementation and self.year and self.month):
-			return None
-		
-		prev_year, prev_month_name = _get_previous_month_year_and_name(self.year, self.month)
-		if not prev_year or not prev_month_name:
-			return None
-		
-		from_date, to_date = _get_month_date_range(prev_year, prev_month_name)
-		if not from_date or not to_date:
-			return None
-
-		projects = frappe.get_all(
-			"Project",
-			filters={"custom_implementation": self.implementation},
-			pluck="name",
-		)
-		if not projects:
-			return None
-
-		# Use DISTINCT on timesheet name to avoid double-counting when a timesheet has multiple projects
-		# Then sum the total_billable_hours (which is already the total for each timesheet)
-		timesheet_list = frappe.db.sql("""
-			SELECT DISTINCT ts.name AS ts_name,
-				ts.total_billable_hours AS billable_hours
-			FROM `tabTimesheet` ts
-			INNER JOIN `tabTimesheet Detail` tsd ON tsd.parent = ts.name
-			WHERE tsd.project IN %(projects)s
-				AND ts.docstatus != 2
-				AND ts.start_date BETWEEN %(from_date)s AND %(to_date)s
-		""", {
-			"projects": projects,
-			"from_date": from_date,
-			"to_date": to_date,
-		}, as_dict=True)
-
-		billable_hours_sum = sum(flt(row.billable_hours or 0) for row in timesheet_list)
-		return billable_hours_sum
-
+			self.total_hours_after_discount = original_billable_hours
 
 def _get_previous_month_year_and_name(year_str, month_name):
-	"""Given year (YYYY string) and month name (e.g. January), return (prev_year_str, prev_month_name) for the previous month.
-	Returns (None, None) if invalid.
-	Example: (2026, "January") -> (2025, "December")
-	Example: (2026, "March") -> (2026, "February")
-	"""
+	"""Return (year, month_name) for previous month. Returns (None, None) if invalid."""
 	if not year_str or not month_name:
 		return None, None
+	
 	month_num = MONTH_NAME_TO_NUM.get(month_name)
 	if not month_num:
 		return None, None
+	
 	try:
 		year_int = int(str(year_str).strip())
 	except (ValueError, TypeError):
 		return None, None
 	
-	# Calculate previous month
 	if month_num == 1:
-		# January -> December of previous year
-		prev_year_int = year_int - 1
-		prev_month_name = "December"
+		return str(year_int - 1), "December"
 	else:
-		# Other months -> previous month of same year
-		prev_year_int = year_int
 		month_names = list(MONTH_NAME_TO_NUM.keys())
-		prev_month_name = month_names[month_num - 2]  # month_num - 2 because list is 0-indexed
-	
-	return str(prev_year_int), prev_month_name
+		return str(year_int), month_names[month_num - 2]
 
 
 def _get_month_date_range(year_str, month_name):
-	"""Given year (YYYY string) and month name (e.g. January), return (first_day, last_day) of that month. Returns (None, None) if invalid."""
+	"""Return (first_day, last_day) of month. Returns (None, None) if invalid."""
 	if not year_str or not month_name:
 		return None, None
+	
 	month_num = MONTH_NAME_TO_NUM.get(month_name)
 	if not month_num:
 		return None, None
+	
 	try:
 		year_int = int(str(year_str).strip())
+		first_day = get_first_day(f"{year_int}-{month_num:02d}-01")
+		return first_day, get_last_day(first_day)
 	except (ValueError, TypeError):
 		return None, None
-	first_day = get_first_day(f"{year_int}-{month_num:02d}-01")
-	last_day = get_last_day(first_day)
-	return first_day, last_day
-
-
-def _build_timesheets_html(timesheet_list):
-	"""Build HTML table: TS name, Date, Total Hours, Billable Hours, Rating (no Action)."""
-	if not timesheet_list:
-		return "<p>No timesheets found for the previous month.</p>"
-
-	rows = []
-	for row in timesheet_list:
-		date_str = formatdate(row.date) if row.date else ""
-		total_hrs = frappe.format_value(row.total_hours, df={"fieldtype": "Float"}, doc=None) if row.total_hours is not None else "0"
-		billable_hrs = frappe.format_value(row.billable_hours, df={"fieldtype": "Float"}, doc=None) if row.billable_hours is not None else "0"
-		rating = row.rating or ""
-		project = str(row.project or "") if row.project else ""
-		
-		# Make timesheet name clickable
-		ts_name = str(row.ts_name or "")
-		ts_link = ""
-		if ts_name:
-			ts_url = get_url_to_form("Timesheet", ts_name)
-			ts_link = f'<a href="{escape_html(ts_url)}" target="_blank">{escape_html(ts_name)}</a>'
-		
-		# Make project name clickable
-		project_link = ""
-		if project:
-			project_url = get_url_to_form("Project", project)
-			project_link = f'<a href="{escape_html(project_url)}" target="_blank">{escape_html(project)}</a>'
-		
-		rows.append(
-			f"<tr><td>{ts_link}</td>"
-			f"<td>{escape_html(date_str)}</td>"
-			f"<td>{escape_html(str(total_hrs))}</td>"
-			f"<td>{escape_html(str(billable_hrs))}</td>"
-			f"<td>{escape_html(str(rating))}</td>"
-			f"<td>{project_link}</td></tr>"
-		)
-
-	table_body = "\n".join(rows)
-	html = f"""<div class="overflow-auto">
-<table class="table table-bordered table-condensed table-hover">
-<thead><tr>
-<th>Timesheet</th><th>Date</th><th>Total Hours</th><th>Billable Hours</th><th>Rating</th><th>Project</th>
-</tr></thead>
-<tbody>
-{table_body}
-</tbody>
-</table>
-</div>"""
-	return html
-
-
 
 
 """
@@ -443,3 +349,62 @@ def create_monthly_deliveries():
 		'year': previous_year,
 		'month': previous_month_name,
 	}
+
+def get_items_for_delivery_note(docname,so):
+        items = []
+        dn_items = []
+        if so:
+            so_doc = frappe.get_doc("Sales Order", so).load_from_db()
+            for so_item in so_doc.items:
+                dn_item = frappe.get_doc({
+                    "doctype": "Delivery Note Item",
+                    "item_code": so_item.item_code,
+                    "delivery_date": so_item.delivery_date.strftime("%Y-%m-%d") if so_item.delivery_date else "",
+                    "conversion_factor": so_item.conversion_factor,
+                    "qty": so_item.qty,
+                    "rate": so_item.rate,
+                    "uom": so_item.uom,
+                    "idx": so_item.idx,
+                    "warehouse": so_item.warehouse,
+                    "against_sales_order": so_doc.name,
+                    "so_detail": so_item.name,
+					"custom_against_monthly_implementation_summery": docname
+                })
+                dn_items.append(dn_item)
+
+        return dn_items
+
+@frappe.whitelist()
+def create_delivery_note(docname, sales_order):
+	"""Create Delivery Note from Sales Order."""
+	try:
+		if not sales_order:
+			return {"error": "No Sales Order found."}
+		
+		items = get_items_for_delivery_note(docname, sales_order)
+		if not items:
+			return None
+		
+		so_doc = frappe.get_doc("Sales Order", sales_order)
+		selling_price_list = so_doc.selling_price_list
+		
+		dn = frappe.get_doc({
+			"doctype": "Delivery Note",
+			"customer": so_doc.customer,
+			"project": so_doc.project,
+			"palette": 0,
+			"paket": 0,
+			"items": items,
+			"custom_proma_checklist_data": docname,
+			"docstatus": 0,
+			"posting_date": frappe.utils.nowdate(),
+			"selling_price_list": selling_price_list,
+		})
+		dn.insert()
+		frappe.db.set_value("Monthly Implementation Summery", docname, "delivery_note", dn.name)
+		frappe.db.commit()
+		return dn.name
+	except Exception as e:
+		frappe.log_error(f"Error creating DN for {docname}: {str(e)}")
+		return None
+		
