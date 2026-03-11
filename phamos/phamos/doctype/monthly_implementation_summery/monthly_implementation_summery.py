@@ -50,7 +50,7 @@ class MonthlyImplementationSummery(Document):
 				"Total billable hours (after discount) is zero or empty. Please ensure there are billable hours before submitting, as a Delivery Note will be created."
 			)
 
-	def on_submit(self):
+	def create_delivery_note(self):
 		"""Create Delivery Note on submit."""
 		try:
 			self.validate_phamos_settings_item()
@@ -93,12 +93,67 @@ class MonthlyImplementationSummery(Document):
 				}]
 			})
 			dn.insert()
+			# Link back to this Monthly Implementation Summery
+			self.delivery_note = dn.name
+			self.db_set("delivery_note", dn.name)
+
 			frappe.msgprint(f"Delivery Note {dn.name} created with {total_billing_hours:.2f} Hour(s).")
 			
 			
 		except Exception as e:
 			frappe.log_error(f"Error creating Delivery Note for {self.name}: {str(e)}")
 			frappe.throw(f"Error creating Delivery Note: {str(e)}")		
+
+	def update_delivery_note(self):	
+		"""Update existing Delivery Note on submit if it already exists."""
+		try:
+			self.validate_phamos_settings_item()
+			self.validate_timesheet_hours_for_delivery_note()
+			# Prefer explicit link; if missing, try to find by custom_against_monthly_implementation_summery
+			dn_name = self.delivery_note
+			if not dn_name:
+				dn_name = frappe.db.get_value(
+					"Delivery Note",
+					{
+						"custom_against_monthly_implementation_summery": self.name,
+						"docstatus": ["!=", 2],
+					},
+					"name",
+				)
+				if not dn_name:
+					frappe.throw("No Delivery Note linked to this Monthly Implementation Summery.")
+				# Keep the link field in sync for future calls
+				self.delivery_note = dn_name
+				self.db_set("delivery_note", dn_name)
+
+			dn = frappe.get_doc("Delivery Note", dn_name)
+			if dn.docstatus == 2:
+				frappe.throw("Cannot update Delivery Note as it is cancelled.")
+			
+			# Update item quantity based on total billing hours
+			total_billing_hours = flt(self.total_hours_after_discount or self.billable_hours)
+			if total_billing_hours <= 0:
+				frappe.throw("Total billing hours is zero. Delivery Note cannot be updated.")
+			
+			item = frappe.db.get_single_value("phamos Settings", "item")
+			if not item:
+				frappe.throw("No item configured in Phamos Settings.")
+
+			# Replace items table with a single row reflecting the new total hours
+			
+			dn.append("items", {
+				"item_code": item,
+				"qty": total_billing_hours,
+				"uom": "Hour",
+				"allow_zero_valuation_rate": 1,
+				"custom_against_monthly_implementation_summery": self.name,
+			})
+			dn.save()
+			frappe.msgprint(f"Delivery Note {dn.name} updated with {total_billing_hours:.2f} Hour(s).")
+			
+		except Exception as e:
+			frappe.log_error(f"Error updating Delivery Note for {self.name}: {str(e)}")
+			frappe.throw(f"Error updating Delivery Note: {str(e)}")		
 
 	def validate_year(self):
 		"""Validate that year is a valid 4-digit year in allowed range."""
@@ -262,6 +317,39 @@ def _get_month_date_range(year_str, month_name):
 		return first_day, get_last_day(first_day)
 	except (ValueError, TypeError):
 		return None, None
+
+
+@frappe.whitelist()
+def create_delivery_note_from_summary(docname: str):
+	"""Create a Delivery Note based on the Monthly Implementation Summery's timesheet hours.
+
+	This is a thin RPC wrapper that loads the document and calls its existing
+	`create_delivery_note` document method.
+	"""
+	if not docname:
+		raise frappe.ValidationError("docname is required")
+
+	doc = frappe.get_doc("Monthly Implementation Summery", docname)
+	doc.create_delivery_note()
+
+	# We don't rely on the return value on the client; status is enough.
+	return {"status": "ok"}
+
+
+@frappe.whitelist()
+def update_delivery_note_from_summary(docname: str):
+	"""Update the existing Delivery Note linked to the Monthly Implementation Summery.
+
+	This is a thin RPC wrapper that loads the document and calls its existing
+	`update_delivery_note` document method.
+	"""
+	if not docname:
+		raise frappe.ValidationError("docname is required")
+
+	doc = frappe.get_doc("Monthly Implementation Summery", docname)
+	doc.update_delivery_note()
+
+	return {"status": "ok"}
 
 
 """
