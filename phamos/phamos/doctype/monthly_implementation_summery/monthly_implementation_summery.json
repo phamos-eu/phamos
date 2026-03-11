@@ -104,6 +104,7 @@
    "fieldname": "sales_order",
    "fieldtype": "Link",
    "label": "Sales Order",
+   "no_copy": 1,
    "options": "Sales Order"
   },
   {
@@ -119,6 +120,7 @@
    "fieldname": "delivery_note",
    "fieldtype": "Link",
    "label": "Delivery Note",
+   "no_copy": 1,
    "options": "Delivery Note",
    "read_only": 1
   }
@@ -131,7 +133,7 @@
    "link_fieldname": "custom_against_monthly_implementation_summery"
   }
  ],
- "modified": "2026-03-10 14:06:17.615219",
+ "modified": "2026-03-11 16:11:58.666057",
  "modified_by": "Administrator",
  "module": "Phamos",
  "name": "Monthly Implementation Summery",
