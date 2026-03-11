@@ -45,9 +45,6 @@ function render_kpi_display(frm, display_mode) {
     const per_delivered = flt(frm.doc.per_delivered, 2);
     const per_billed = flt(frm.doc.per_billed, 2);
     
-    if (display_mode === 'all' || display_mode === 'indicators') {
-        add_dashboard_indicators(frm, per_delivered, per_billed);
-    }
     
     if (display_mode === 'all' || display_mode === 'html_section') {
         add_html_kpi_section(frm, per_delivered, per_billed);
@@ -65,31 +62,6 @@ function render_kpi_display(frm, display_mode) {
     if (display_mode !== 'all') {
         add_display_mode_toggle(frm, display_mode);
     }
-}
-
-// OPTION 1: Dashboard Indicators (Top of form, badge style)
-function add_dashboard_indicators(frm, per_delivered, per_billed) {
-    const delivery_color = get_delivery_color(per_delivered);
-    const billing_color = get_billing_color(per_billed);
-    
-    frm.dashboard.add_indicator(
-        __('Delivered: {0}%', [per_delivered.toFixed(1)]), 
-        delivery_color
-    );
-    
-    frm.dashboard.add_indicator(
-        __('Billed: {0}%', [per_billed.toFixed(1)]), 
-        billing_color
-    );
-    
-    // Add status summary
-    const delivery_status = get_status_text(per_delivered);
-    const billing_status = get_status_text(per_billed);
-    
-    frm.dashboard.add_indicator(
-        __('Status: {0} / {1}', [delivery_status, billing_status]), 
-        'blue'
-    );
 }
 
 // OPTION 2: HTML Section with custom styling
@@ -435,7 +407,6 @@ function add_style_selector_button(frm) {
                     label: __('Display Mode'),
                     options: [
                         'All Styles',
-                        'Dashboard Indicators Only',
                         'Progress Bars Only',
                         'Cards Only',
                         'HTML Section Only'
@@ -450,7 +421,6 @@ function add_style_selector_button(frm) {
                             <h4 style="color: var(--text-color);">Preview Options:</h4>
                             <ul style="margin-left: 20px; line-height: 1.8; color: var(--text-color);">
                                 <li><strong>All Styles:</strong> Shows all visualization options at once</li>
-                                <li><strong>Dashboard Indicators:</strong> Colored badges at the top</li>
                                 <li><strong>Progress Bars:</strong> Animated progress bars with gradients</li>
                                 <li><strong>Cards:</strong> Modern card-based design with icons</li>
                                 <li><strong>HTML Section:</strong> Compact inline display</li>
@@ -463,7 +433,6 @@ function add_style_selector_button(frm) {
             primary_action: function(values) {
                 const mode_map = {
                     'All Styles': 'all',
-                    'Dashboard Indicators Only': 'indicators',
                     'Progress Bars Only': 'progress_bars',
                     'Cards Only': 'cards',
                     'HTML Section Only': 'html_section'
@@ -497,7 +466,6 @@ function add_style_selector_button(frm) {
 function add_display_mode_toggle(frm, current_mode) {
     // Show current mode
     const mode_names = {
-        'indicators': 'Dashboard Indicators',
         'progress_bars': 'Progress Bars',
         'cards': 'Cards',
         'html_section': 'HTML Section'
