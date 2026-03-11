@@ -93,16 +93,7 @@ frappe.ui.form.on("Monthly Implementation Summery", {
 			});
 		}
 	},
-	sales_order: function(frm) {
-        frm.set_query("sales_order", function() {
-            return {
-                filters: {
-                   "docstatus": 1, // Only show submitted sales orders
-					"custom_implementation": frm.doc.implementation, // Only show sales orders with implementation
-                }
-            };
-        });
-    },
+	
 	discount(frm) {
 		// Validate discount is between 0 and 100
 		if (frm.doc.discount !== undefined && frm.doc.discount !== null) {

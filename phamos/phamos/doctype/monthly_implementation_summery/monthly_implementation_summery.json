@@ -104,6 +104,7 @@
    "fieldname": "sales_order",
    "fieldtype": "Link",
    "label": "Sales Order",
+   "link_filters": "[\n  [\"Sales Order\", \"docstatus\", \"=\", 1],\n  [\"Sales Order\", \"custom_implementation\", \"=\", \"eval:doc.implementation\"]\n]",
    "no_copy": 1,
    "options": "Sales Order"
   },
@@ -133,7 +134,7 @@
    "link_fieldname": "custom_against_monthly_implementation_summery"
   }
  ],
- "modified": "2026-03-11 16:11:58.666057",
+ "modified": "2026-03-11 17:41:14.798822",
  "modified_by": "Administrator",
  "module": "Phamos",
  "name": "Monthly Implementation Summery",
