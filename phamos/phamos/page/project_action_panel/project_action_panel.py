@@ -60,9 +60,10 @@ def update_to_time(name):
 
         for row in doc.item:
             if not row.to_time:
-                row.to_time = now_datetime()
+                current_time = now_datetime()
+                row.to_time = current_time
                 new_row = doc.append("item", {})
-                new_row.from_time = now_datetime()
+                new_row.from_time = current_time
                 break 
 
         doc.save()
@@ -99,6 +100,7 @@ def close_open_row_and_add_break(name):
                 row.to_time = current_time
                 previous_to_time = row.to_time
                 new_row = doc.append("item", {})
+
                 new_row.from_time = current_time
                 break
 
@@ -226,79 +228,6 @@ def create_and_submit_timesheet( project_name=None,
         return {
             "status": "error",
             "message": str(e)
-        }
-
-@frappe.whitelist()
-def update_to_time(name):
-    try:
-        doc = frappe.get_doc("Timesheet Record", name)
-
-        for row in doc.item:
-            if not row.to_time:
-                row.to_time = now_datetime()
-                new_row = doc.append("item", {})
-                new_row.from_time = now_datetime()
-                break 
-
-        doc.save()
-        frappe.db.commit()
-
-        return {
-            "status": "success",
-            "message": "to_time updated",
-            "timesheet": name
-        }
-
-    except Exception as e:
-        frappe.log_error(frappe.get_traceback(), "Timesheet Record Update Error")
-        return {
-            "status": "error",
-            "message": "Error updating Timesheet Record"
-        }
-
-@frappe.whitelist()
-def close_open_row_and_add_break(name):
-    try:
-        doc = frappe.get_doc("Timesheet Record", name)
-        current_time = now_datetime()
-        new_row = None
-        previous_from_time = None
-        previous_to_time = None
-
-        if len(doc.item) >= 1:
-            previous_from_time = doc.item[-1].from_time
-
-
-        for idx, row in enumerate(doc.item):
-            if not row.to_time:
-                row.to_time = current_time
-                previous_to_time = row.to_time
-                new_row = doc.append("item", {})
-                new_row.from_time = current_time
-                break
-
-        if not new_row:
-            return {
-                "status": "error",
-                "message": "No open row found to close."
-            }
-
-        doc.save()
-        frappe.db.commit()
-
-        return {
-            "status": "success",
-            "message": "Break row created",
-            "new_row_name": new_row.name,
-            "previous_from_time": previous_from_time,
-            "previous_to_time": previous_to_time,
-        }
-
-    except Exception as e:
-        frappe.log_error(frappe.get_traceback(), "Timesheet Record Break Creation Error")
-        return {
-            "status": "error",
-            "message": f"Error creating break row: {str(e)}"
         }
 
 @frappe.whitelist()
@@ -601,7 +530,7 @@ def update_and_submit_timesheet_record(name, to_time, percent_billable, activity
 
         # Close last open row if exists
         if doc.item:
-            for row in reversed(doc.item):
+            for idx, row in enumerate(reversed(doc.item)):
                 if row.from_time and not row.to_time:
                     # ✅ Validate before assigning
                     if get_datetime(to_time) < get_datetime(row.from_time):
