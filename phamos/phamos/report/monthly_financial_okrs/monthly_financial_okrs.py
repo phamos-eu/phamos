@@ -38,7 +38,11 @@ def execute(filters=None):
         """, (month_start, month_end, "PROJ-0055", "P-0230"))[0][0] or 0
 
         customer_billable_hours = frappe.db.sql("""
-            SELECT SUM((actual_time * percent_billable / 100) / 3600)
+            SELECT SUM((actual_time * 
+                CASE 
+                    WHEN percent_billable = 'Internal' THEN 0
+                    ELSE percent_billable
+                END / 100) / 3600)
             FROM `tabTimesheet Record`
             WHERE from_time >= %s AND to_time <= %s
             AND project NOT IN (%s, %s)

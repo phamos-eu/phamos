@@ -20,6 +20,7 @@ def get_columns():
         {"label": "Timesheet Record", "fieldname": "name", "fieldtype": "Link", "options": "Timesheet Record", "width": 150},
         {"label": "Customer", "fieldname": "customer", "fieldtype": "Link", "options": "Customer", "width": 150},
         {"label": "Employee", "fieldname": "employee", "fieldtype": "Link", "options": "Employee", "width": 150},
+        {"label": "Percent Billable", "fieldname": "percent_billable", "fieldtype": "Data", "width": 120},
         {"label": "Timesheet Record Color", "fieldname": "timesheet_record_color", "fieldtype": "Data", "width": 100},
     ]
 
@@ -47,6 +48,7 @@ def get_data(filters):
             name,
             customer,
             employee,
+            percent_billable,
             timesheet_record_color
         FROM `tabTimesheet Record`
         WHERE docstatus = 1
