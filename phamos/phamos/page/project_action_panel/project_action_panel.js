@@ -397,10 +397,10 @@ function openStopProjectDialog(timesheet_record, percent_billable, project, task
             get_data: function (txt) {
               return frappe.db.get_link_options(
                 "GitLab Issue",
-                txt,
-                {
-                  assignee: frappe.session.user_fullname
-                }
+                txt
+                // {
+                //   assignee: frappe.session.user_fullname
+                // }
               );
             },
             onchange: function () {
@@ -737,10 +737,10 @@ function openStopProjectDialog(timesheet_record, percent_billable, project, task
                   get_data: function (txt) {
                     return frappe.db.get_link_options(
                       "GitLab Issue",
-                      txt,
-                      {
-                        assignee: frappe.session.user_fullname
-                      }
+                      txt
+                      // {
+                      //   assignee: frappe.session.user_fullname
+                      // }
                     );
                   },
                   onchange: function () {
@@ -2160,10 +2160,10 @@ function show_break_task_dialog(new_row_name, previous_from_time, previous_to_ti
                   get_data: function (txt) {
                     return frappe.db.get_link_options(
                       "GitLab Issue",
-                      txt,
-                      {
-                        assignee: frappe.session.user_fullname
-                      }
+                      txt
+                      // {
+                      //   assignee: frappe.session.user_fullname
+                      // }
                     );
                   },
                   onchange: function () {
