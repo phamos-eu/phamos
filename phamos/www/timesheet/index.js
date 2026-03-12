@@ -1032,7 +1032,7 @@ function renderSalesOrderTable() {
     const statusBadge = getStatusBadge(so.status);
     const progressPercent = so.total_hrs > 0 ? (so.delivered_hrs / so.total_hrs * 100).toFixed(1) : 0;
     const progressColor = getProgressColor(progressPercent);
-    const formattedDate = so.transaction_date ? frappe.datetime.str_to_user(so.transaction_date) : '-';
+    const formattedDate = so.delivery_date ? frappe.datetime.str_to_user(so.delivery_date) : '-';
     
     const row = `
       <tr>
@@ -1305,8 +1305,8 @@ function applySalesOrderFilters() {
           fieldValue = (so.name || '').toString().toLowerCase();
         } else if (column === 'title') {
           fieldValue = (so.title || '').toString().toLowerCase();
-        } else if (column === 'transaction_date') {
-          fieldValue = (so.transaction_date || '').toString().toLowerCase();
+        } else if (column === 'delivery_date') {
+          fieldValue = (so.delivery_date || '').toString().toLowerCase();
         } else if (column === 'status') {
           fieldValue = (so.status || '').toString().toLowerCase();
         } else if (column === 'total_hrs') {
@@ -1336,9 +1336,9 @@ function applySalesOrderFilters() {
       } else if (soCurrentSortColumn === 'title') {
         aVal = a.title || '';
         bVal = b.title || '';
-      } else if (soCurrentSortColumn === 'transaction_date') {
-        aVal = a.transaction_date || '';
-        bVal = b.transaction_date || '';
+      } else if (soCurrentSortColumn === 'delivery_date') {
+        aVal = a.delivery_date || '';
+        bVal = b.delivery_date || '';
       } else if (soCurrentSortColumn === 'status') {
         aVal = a.status || '';
         bVal = b.status || '';
