@@ -326,7 +326,23 @@ function openStopProjectDialog(timesheet_record, percent_billable, project, task
   let timesheet_record_info = " Info from timesheet record";
   let parsed_issues = [];
 
+  // Check if project is internal and override percent_billable
+  if (project) {
+    frappe.db.get_value("Project", project, ["custom_is_internal_project", "percent_billable"], function(proj_data) {
+      if (proj_data && proj_data.custom_is_internal_project === 1) {
+        percent_billable = "Internal";
+      } else if (proj_data && proj_data.percent_billable) {
+        percent_billable = proj_data.percent_billable;
+      }
+      
+      // Continue with dialog after getting project data
+      continueOpenDialog();
+    });
+  } else {
+    continueOpenDialog();
+  }
 
+  function continueOpenDialog() {
   frappe.db.get_value("Timesheet Record", { name: timesheet_record }, ["goal", "from_time", "issues"], function (value) {
 
     let parsed_issues = [];
@@ -461,7 +477,7 @@ function openStopProjectDialog(timesheet_record, percent_billable, project, task
           },
           {
             fieldtype: "Select",
-            options: [0, 25, 50, 75, 100],
+            options: ["Internal", 0, 25, 50, 75, 100],
             label: __("Percent Billable"),
             fieldname: "percent_billable",
             reqd: 1,
@@ -583,6 +599,7 @@ function openStopProjectDialog(timesheet_record, percent_billable, project, task
       };
     });
   });
+  } // End of continueOpenDialog
 }
 
   //return record.timesheet_record_draft;
@@ -2088,7 +2105,19 @@ function show_break_task_dialog(new_row_name, previous_from_time, previous_to_ti
                     return {
                         query: "phamos.phamos.page.project_action_panel.project_action_panel.get_assigned_projects"
                     };
-                }
+                  },
+                  onchange: function() {
+                    const project_name = dialog.get_value("project_name");
+                    if (project_name) {
+                      frappe.db.get_value("Project", project_name, ["custom_is_internal_project", "percent_billable"], function(r) {
+                        if (r && r.custom_is_internal_project === 1) {
+                          dialog.set_value("percent_billable", "Internal");
+                        } else if (r && r.percent_billable) {
+                          dialog.set_value("percent_billable", r.percent_billable);
+                        }
+                      });
+                    }
+                  }
                 },
                 {
                   fieldtype: "Data",
@@ -2171,7 +2200,7 @@ function show_break_task_dialog(new_row_name, previous_from_time, previous_to_ti
                 },
                 {
                   fieldtype: "Select",
-                  options: [0, 25, 50, 75, 100],
+                  options: ["Internal", 0, 25, 50, 75, 100],
                   label: __("Percent Billable"),
                   fieldname: "percent_billable",
                   reqd: 1,

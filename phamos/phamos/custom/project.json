@@ -1773,7 +1773,7 @@
    "name": "Project-percent_billable",
    "no_copy": 0,
    "non_negative": 0,
-   "options": "\n0\n25\n50\n75\n100",
+   "options": "\nInternal\n0\n25\n50\n75\n100",
    "owner": "Administrator",
    "permlevel": 0,
    "placeholder": null,
