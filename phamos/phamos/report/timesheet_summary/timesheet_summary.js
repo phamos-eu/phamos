@@ -4,6 +4,17 @@
 frappe.query_reports["Timesheet Summary"] = {
     "filters": [
         {
+            "fieldname": "range_type",
+            "label": __("Range Type"),
+            "fieldtype": "Select",
+            "options": ["Timespan", "Between"],
+            "default": "Timespan",
+            "reqd": 1,
+            "on_change": function() {
+                frappe.query_report.refresh();
+            }
+        },
+        {
             "fieldname": "time_period",
             "label": __("Time Period"),
             "fieldtype": "Select",
@@ -15,11 +26,22 @@ frappe.query_reports["Timesheet Summary"] = {
                 "Last 6 Months"
             ],
             "default": "Last Month",
-            "reqd": 1, // Makes the filter mandatory
-            "on_change": function() {
-                // Automatically refreshes the report when the selection changes
-                frappe.query_report.refresh();
-            }
+            "depends_on": "eval:doc.range_type == 'Timespan'",
+            "reqd": 1
+        },
+        {
+            "fieldname": "start_date",
+            "label": __("Start Date"),
+            "fieldtype": "Date",
+            "depends_on": "eval:doc.range_type == 'Between'",
+            "reqd": 1
+        },
+        {
+            "fieldname": "end_date",
+            "label": __("End Date"),
+            "fieldtype": "Date",
+            "depends_on": "eval:doc.range_type == 'Between'",
+            "reqd": 1
         }
     ]
 };
