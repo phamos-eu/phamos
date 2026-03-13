@@ -25,23 +25,26 @@ frappe.query_reports["Timesheet Summary"] = {
                 "Last 3 Months",
                 "Last 6 Months"
             ],
-            "default": "Last Month",
+            "default": "Last Week",
             "depends_on": "eval:doc.range_type == 'Timespan'",
-            "reqd": 1
+            "reqd": 0,
+            "mandatory_depends_on": "eval:doc.range_type == 'Timespan'"
         },
         {
             "fieldname": "start_date",
             "label": __("Start Date"),
             "fieldtype": "Date",
             "depends_on": "eval:doc.range_type == 'Between'",
-            "reqd": 1
+            "reqd": 0,
+            "mandatory_depends_on": "eval:doc.range_type == 'Between'"
         },
         {
             "fieldname": "end_date",
             "label": __("End Date"),
             "fieldtype": "Date",
             "depends_on": "eval:doc.range_type == 'Between'",
-            "reqd": 1
+            "reqd": 0,
+            "mandatory_depends_on": "eval:doc.range_type == 'Between'"
         }
     ]
 };
