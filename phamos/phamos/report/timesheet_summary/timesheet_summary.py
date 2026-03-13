@@ -12,7 +12,7 @@ def execute(filters=None):
         filters["time_period"] = "Last 6 Months"
 
     columns = [
-        {"label": "Employee", "fieldname": "employee", "fieldtype": "Link", "options": "Employee", "width": 200},
+        {"label": "Employee", "fieldname": "employee", "fieldtype": "Data", "width": 200},
         {"label": "Employee Name", "fieldname": "employee_name", "fieldtype": "Data", "width": 200},
         {"label": "Total Hours", "fieldname": "total_hours", "fieldtype": "Float", "width": 120},
         {"label": "Total Billable Hours", "fieldname": "total_billable_hours", "fieldtype": "Float", "width": 150}
