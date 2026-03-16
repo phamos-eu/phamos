@@ -737,6 +737,7 @@ function openStopProjectDialog(timesheet_record, percent_billable, project, task
                   fieldname: "expected_time_quick",
                   description: __("Type the expected duration as minutes (20) or as hours and minutes (1:20, 1.20, or 1,20) or as hours, minutes, and seconds (1:20:30) and it will auto-fill Expected Time."),
                   in_list_view: 1,
+                  reqd: 1,
                 },
                 {
                   fieldtype: "Duration",
