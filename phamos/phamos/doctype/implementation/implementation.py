@@ -412,3 +412,28 @@ def get_auto_email_reports(user_email: str):
     )
 
 
+
+@frappe.whitelist()
+def get_auto_email_reports_for_users(user_list):
+    if isinstance(user_list, str):
+        user_list = [user_list]
+
+    reports = frappe.get_all(
+        "Auto Email Report",
+        filters={"user": ["in", user_list]},
+        fields=["email_to", "report", "frequency"]
+    )
+
+    result = []
+
+    for r in reports:
+        # split by comma, semicolon or new line
+        emails = [e.strip() for e in r.email_to.replace("\n",",").replace(";",",").split(",") if e.strip()]
+        for email in emails:
+            if email not in [x.get("recipient") for x in result]:
+                result.append({
+                    "recipient": email,
+                    "template": r.report,
+                    "frequency": r.frequency
+                })
+    return result
