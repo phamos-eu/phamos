@@ -371,6 +371,7 @@ frappe.ui.form.on("Implementation", {
             });
     },
     onload: function (frm) {
+        populate_auto_email_reports(frm);
         frm.set_df_property("graph_overview_section", "collapsible", 0);
         if (frm.is_new()) {
             frappe.call({
@@ -493,6 +494,39 @@ frappe.ui.form.on("Implementation", {
     }
     
 });
+
+function populate_auto_email_reports(frm) {
+    if (!frm.doc.user_with_permission) return;
+
+    // safety check for child table
+    if (!frm.fields_dict.auto_email_report_record) {
+        frappe.msgprint("Child Table 'auto_email_report_record' not found!");
+        return;
+    }
+
+    frappe.call({
+        method: "phamos.phamos.doctype.implementation.implementation.get_auto_email_reports_for_users",
+        args: {
+            user_list: frm.doc.user_with_permission
+        },
+        callback: function(r) {
+            if (r.message) {
+                // clear existing child table
+                frm.clear_table("auto_email_report_record");
+
+                r.message.forEach(function(row) {
+                    let child = frm.add_child("auto_email_report_record");
+                    child.recipients = row.recipient;
+                    child.templates = row.template;
+                    child.frequency = row.frequency;
+                });
+
+                frm.refresh_field("auto_email_report_record");
+
+            }
+        }
+    });
+}
 function render_module_chart(frm, canvasId) {
     const labels = [];
     const currentLevels = [];
