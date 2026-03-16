@@ -1,3 +1,40 @@
+function parse_duration_to_seconds(input) {
+  if (!input || typeof input !== "string") return null;
+  const str = input.trim();
+  if (!str) return null;
+
+  // Normalize full-width separator to ASCII
+  const normalized = str.replace(/\uFF0E/g, ".").replace(/\uFF0C/g, ",");
+
+  // Split by separator
+  const hasDotOrComma = /[.,]/.test(normalized) && !normalized.includes(":");
+  const rawParts = hasDotOrComma ? normalized.split(/[.,]/) : normalized.split(":");
+  const parts = rawParts.map((p) => parseInt(String(p).trim(), 10));
+
+  if (parts.some((n) => isNaN(n))) return null;
+
+  // Only hours, minutes and seconds
+  const SEC_PER_MIN = 60;
+  const SEC_PER_HOUR = 3600;
+  const MAX_SECONDS = 23 * SEC_PER_HOUR + 59 * SEC_PER_MIN + 59;
+
+  let seconds;
+  switch (parts.length) {
+    case 1:
+      seconds = parts[0] * SEC_PER_MIN;
+      break;
+    case 2:
+      seconds = parts[0] * SEC_PER_HOUR + parts[1] * SEC_PER_MIN;
+      break;
+    case 3:
+      seconds = parts[0] * SEC_PER_HOUR + parts[1] * SEC_PER_MIN + parts[2];
+      break;
+    default:
+      return null;
+  }
+  return Math.min(seconds, MAX_SECONDS);
+}
+
 frappe.pages["project-action-panel"].on_page_load = function (wrapper) {
   // Ensure wrapper is defined
   if (!wrapper) {
@@ -521,11 +558,20 @@ function openStopProjectDialog(timesheet_record, percent_billable, project, task
                   default: customer,
                 },
                 {
+                  fieldtype: "Data",
+                  label: __("Expected Time (quick input)"),
+                  fieldname: "expected_time_quick",
+                  description: __("Type the expected duration as minutes (20) or as hours and minutes (1:20, 1.20, or 1,20) or as hours, minutes, and seconds (1:20:30) and it will auto-fill Expected Time."),
+                  in_list_view: 1,
+                  reqd: 1,
+                },
+                {
                   fieldtype: "Duration",
                   label: __("Expected Time"),
                   fieldname: "expected_time",
                   in_list_view: 1,
                   reqd: 1,
+                  read_only: 1,
                 },
                 {
                   fieldtype: "Column Break",
@@ -565,6 +611,29 @@ function openStopProjectDialog(timesheet_record, percent_billable, project, task
             // Set the width using CSS
             dialog.$wrapper.find(".modal-dialog").css("max-width", "800px");
             dialog.show();
+
+            setTimeout(function () {
+              const $quick = dialog.$wrapper.find('[data-fieldname="expected_time_quick"]').find("input");
+              if ($quick.length) {
+                $quick.on("input change", function () {
+                  const val = $(this).val();
+                  if (!val || !val.trim()) {
+                    dialog.set_value("expected_time", 0);
+                  } else {
+                    const seconds = parse_duration_to_seconds(val);
+                    if (seconds !== null && seconds >= 0) {
+                      dialog.set_value("expected_time", seconds);
+                    }
+                  }
+                });
+              }
+            }, 0);
+
+            let initial_issues = dialog.get_value("issues") || [];
+            if (initial_issues.length) {
+              sync_issue_urls(dialog, initial_issues);
+            }
+
           }
         } else {
           frappe.show_alert(__("No response from server. Please try again."));
@@ -1705,11 +1774,19 @@ function show_break_task_dialog(new_row_name, previous_from_time, previous_to_ti
                           'The "Activity Type" allows for categorizing tasks into specific types, such as planning, execution, communication, and proposal writing, streamlining task management and organization within the system.',
                 },
                 {
+                  fieldtype: "Data",
+                  label: __("Expected Time (quick input)"),
+                  fieldname: "expected_time_quick",
+                  description: __("Type the expected duration as minutes (20) or as hours and minutes (1:20, 1.20, or 1,20) or as hours, minutes, and seconds (1:20:30) and it will auto-fill Expected Time."),
+                  in_list_view: 1,
+                },
+                {
                   fieldtype: "Duration",
                   label: __("Expected Time"),
                   fieldname: "expected_time",
                   in_list_view: 1,
                   reqd: 1,
+                  read_only: 1,
                 },
                 {
                   fieldtype: "Datetime",
@@ -1789,6 +1866,23 @@ function show_break_task_dialog(new_row_name, previous_from_time, previous_to_ti
             // Set the width using CSS
     dialog.$wrapper.find(".modal-dialog").css("max-width", "800px");
     dialog.show();
+
+    setTimeout(function () {
+      const $quick = dialog.$wrapper.find('[data-fieldname="expected_time_quick"]').find("input");
+      if ($quick.length) {
+        $quick.on("input change", function () {
+          const val = $(this).val();
+          if (!val || !val.trim()) {
+            dialog.set_value("expected_time", 0);
+          } else {
+            const seconds = parse_duration_to_seconds(val);
+            if (seconds !== null && seconds >= 0) {
+              dialog.set_value("expected_time", seconds);
+            }
+          }
+        });
+      }
+    }, 0);
 }
 
 
