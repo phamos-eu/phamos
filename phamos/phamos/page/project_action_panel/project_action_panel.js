@@ -3,20 +3,20 @@ function parse_duration_to_seconds(input) {
   const str = input.trim();
   if (!str) return null;
 
-  // Normalize full-width period/comma to ASCII so copy-paste works
+  // Normalize full-width separator to ASCII
   const normalized = str.replace(/\uFF0E/g, ".").replace(/\uFF0C/g, ",");
 
-  // Split by colon, or by dot/comma (same rules for both)
+  // Split by separator
   const hasDotOrComma = /[.,]/.test(normalized) && !normalized.includes(":");
   const rawParts = hasDotOrComma ? normalized.split(/[.,]/) : normalized.split(":");
   const parts = rawParts.map((p) => parseInt(String(p).trim(), 10));
 
   if (parts.some((n) => isNaN(n))) return null;
 
-  // Only hours, minutes, seconds (max 2 separators). No days.
+  // Only hours, minutes and seconds
   const SEC_PER_MIN = 60;
   const SEC_PER_HOUR = 3600;
-  const MAX_SECONDS = 23 * SEC_PER_HOUR + 59 * SEC_PER_MIN + 59; // 23h 59m 59s — cap so display never shows days
+  const MAX_SECONDS = 23 * SEC_PER_HOUR + 59 * SEC_PER_MIN + 59;
 
   let seconds;
   switch (parts.length) {
@@ -814,7 +814,6 @@ function openStopProjectDialog(timesheet_record, percent_billable, project, task
             dialog.$wrapper.find(".modal-dialog").css("max-width", "800px");
             dialog.show();
 
-            // Bind quick input to populate readonly Expected Time (colon format: 20, 1:20, 1:20:30)
             setTimeout(function () {
               const $quick = dialog.$wrapper.find('[data-fieldname="expected_time_quick"]').find("input");
               if ($quick.length) {
@@ -2239,7 +2238,6 @@ function show_break_task_dialog(new_row_name, previous_from_time, previous_to_ti
     dialog.$wrapper.find(".modal-dialog").css("max-width", "800px");
     dialog.show();
 
-    // Bind quick input to populate readonly Expected Time (colon format: 20, 1:20, 1:20:30)
     setTimeout(function () {
       const $quick = dialog.$wrapper.find('[data-fieldname="expected_time_quick"]').find("input");
       if ($quick.length) {
