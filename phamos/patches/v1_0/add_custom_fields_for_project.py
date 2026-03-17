@@ -22,7 +22,7 @@ def execute():
     create_custom_field("project",
         dict(fieldname="percent_billable", label="Percent Billable",
 		fieldtype="Select",
-		options="\nInternal\n0\n25\n50\n75\n100",insert_after="phamos_columns_break",default = 100
+		options="\n0\n25\n50\n75\n100",insert_after="phamos_columns_break",default = 100
 		))
 
     create_custom_field("project",

@@ -62,8 +62,8 @@ class TimesheetRecord(Document):
 		timesheet.append(
 			"time_logs",
 			{
-				"is_billable": 1 if self.percent_billable not in ["0", "Internal"] else 0,
-				"billing_hours": actual_hours * (float(self.percent_billable) / 100) if self.percent_billable not in ["0", "Internal"] else 0,
+				"is_billable": 1 if self.percent_billable!="0" else 0,
+				"billing_hours": actual_hours * (float(self.percent_billable) / 100) if self.percent_billable!="0" else 0,
 				"activity_type": self.activity_type,
 				"from_time": self.from_time,
 				"to_time": self.to_time,
