@@ -139,7 +139,7 @@
    "fieldname": "percent_billable",
    "fieldtype": "Select",
    "label": "Percent Billable",
-   "options": "Internal\n0\n25\n50\n75\n100"
+   "options": "0\n25\n50\n75\n100"
   },
   {
    "fieldname": "employee",
@@ -180,7 +180,7 @@
  "index_web_pages_for_search": 1,
  "is_submittable": 1,
  "links": [],
- "modified": "2026-02-16 07:59:11.141655",
+ "modified": "2026-02-16 06:59:11.141655",
  "modified_by": "kalsoom.akhtar@phamos.eu",
  "module": "Phamos",
  "name": "Timesheet Record",

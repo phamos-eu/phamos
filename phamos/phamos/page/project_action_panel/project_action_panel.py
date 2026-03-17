@@ -15,19 +15,6 @@ from frappe.query_builder.functions import Concat, Max, Sum, Round, Coalesce, If
 from frappe.utils import getdate, nowdate, get_first_day, get_last_day, add_days, add_months
 
 
-def normalize_percent_billable(percent_billable):
-    """
-    Convert percent_billable to numeric value for calculations.
-    'Internal' is treated as 0.
-    """
-    if isinstance(percent_billable, str) and percent_billable.lower() == "internal":
-        return 0
-    try:
-        return float(percent_billable) if percent_billable is not None else 0
-    except (ValueError, TypeError):
-        return 0
-
-
 @frappe.whitelist()
 def create_timesheet_record(project_name,  customer, from_time, expected_time, goal,task=None, issues=None, parent_issues_url=None):
     try:
@@ -966,7 +953,7 @@ def total_hours_worked_today():
             duration_seconds = time_diff_in_seconds(overlap_end, overlap_start)
             total_actual_seconds += duration_seconds
 
-            percent = normalize_percent_billable(rec.percent_billable)
+            percent = float(rec.percent_billable or 0)
             total_billable_seconds += duration_seconds * percent / 100
 
         # Count color
@@ -1008,13 +995,7 @@ def total_hours_worked_in_this_week():
         frappe.qb.from_(TimesheetRecord)
         .select(
             fn.Sum(TimesheetRecord.actual_time).as_("total_actual_time"),
-            fn.Sum(
-                TimesheetRecord.actual_time * 
-                Case()
-                    .when(TimesheetRecord.percent_billable == "Internal", 0)
-                    .else_(TimesheetRecord.percent_billable)
-                / 100
-            ).as_("total_billable_time")
+            fn.Sum(TimesheetRecord.actual_time * TimesheetRecord.percent_billable / 100).as_("total_billable_time")
         )
         .where(
             (TimesheetRecord.employee == employee_name)
@@ -1085,13 +1066,7 @@ def total_hours_worked_in_this_month():
         frappe.qb.from_(TimesheetRecord)
         .select(
             fn.Sum(TimesheetRecord.actual_time).as_("total_actual_time"),
-            fn.Sum(
-                TimesheetRecord.actual_time * 
-                Case()
-                    .when(TimesheetRecord.percent_billable == "Internal", 0)
-                    .else_(TimesheetRecord.percent_billable)
-                / 100
-            ).as_("total_billable_time")
+            fn.Sum(TimesheetRecord.actual_time * TimesheetRecord.percent_billable / 100).as_("total_billable_time")
         )
         .where(
             (TimesheetRecord.employee == employee_name)
