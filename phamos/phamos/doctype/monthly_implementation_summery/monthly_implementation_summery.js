@@ -122,104 +122,31 @@ frappe.ui.form.on("Monthly Implementation Summery", {
 
 		frappe.dom.unfreeze();
 
-		// If delivery_note is not filled, create delivery note automatically from summary (timesheet-based)
-		if (!frm.doc.delivery_note) {
-			return new Promise(function (resolve) {
-				frappe.call({
-					method: 'phamos.phamos.doctype.monthly_implementation_summery.monthly_implementation_summery.create_delivery_note_from_summary',
-					args: { docname: frm.doc.name },
-					freeze: true,
-					freeze_message: __('Creating delivery note...'),
-					callback: function (r) {
-						if (r.exc) {
-							frappe.msgprint({
-								title: __('Error'),
-								message: (r.exc[0] || __('Failed to create delivery note.')),
-								indicator: 'red'
-							});
-							// Allow workflow to proceed even if DN creation failed
-							resolve();
-							return;
-						}
-						frm.reload_doc().then(resolve);
-					}
-				});
-			});
-		}
-
-		// If a delivery_note already exists, ask the user how to proceed
-		let message = '';
-		if (frm.doc.delivery_note) {
-			message += __('A Delivery Note {0} is already linked to this Monthly Implementation Summery.', [frm.doc.delivery_note]) + '<br><br>';
-		}
-
-		// Add final action choices with bold labels
-		message += '<br>' + __('How would you like to proceed?') + '<br>'
-			+ '<b>' + __('Yes') + '</b> → ' + __('Update the existing Delivery Note with current timesheets hours.') + '<br>'
-			+ '<b>' + __('No') + '</b> → ' + __('Create another Delivery Note.') + '<br>'
-			+ '<b>' + __('Close') + '</b> → ' + __('Only submit the record, without creating or updating any Delivery Note.') + '<br>';
+		const has_delivery_note = !!frm.doc.delivery_note;
+		const method = has_delivery_note
+			? "phamos.phamos.doctype.monthly_implementation_summery.monthly_implementation_summery.update_delivery_note_from_summary"
+			: "phamos.phamos.doctype.monthly_implementation_summery.monthly_implementation_summery.create_delivery_note_from_summary";
 
 		return new Promise(function (resolve) {
-			var d = new frappe.ui.Dialog({
-				title: __('Confirm'),
-				primary_action_label: __('Yes'),
-				primary_action: function () {
-					d.hide();
-					// Yes: update existing delivery note, then resolve so workflow proceeds
-					frappe.call({
-						method: 'phamos.phamos.doctype.monthly_implementation_summery.monthly_implementation_summery.update_delivery_note_from_summary',
-						args: { docname: frm.doc.name },
-						freeze: true,
-						freeze_message: __('Updating delivery note...'),
-						callback: function (r) {
-							if (r.exc) {
-								frappe.msgprint({
-									title: __('Error'),
-									message: (r.exc[0] || __('Failed to update delivery note.')),
-									indicator: 'red'
-								});
-								resolve();
-								return;
-							}
-							frm.reload_doc().then(resolve);
-						}
-					});
-				},
-				secondary_action_label: __('No'),
-				secondary_action: function () {
-					d.hide();
-					// No: create another delivery note from summary, then submit
-					frappe.call({
-						method: 'phamos.phamos.doctype.monthly_implementation_summery.monthly_implementation_summery.create_delivery_note_from_summary',
-						args: { docname: frm.doc.name },
-						freeze: true,
-						freeze_message: __('Creating delivery note...'),
-						callback: function (r) {
-							if (r.exc) {
-								frappe.msgprint({
-									title: __('Error'),
-									message: (r.exc[0] || __('Failed to create delivery note.')),
-									indicator: 'red'
-								});
-								resolve();
-								return;
-							}
-							frm.reload_doc().then(resolve);
-						}
-					});
+			frappe.call({
+				method,
+				args: { docname: frm.doc.name },
+				freeze: true,
+				freeze_message: has_delivery_note ? __("Updating delivery note...") : __("Creating delivery note..."),
+				callback: function (r) {
+					if (r.exc) {
+						frappe.msgprint({
+							title: __("Error"),
+							message: (r.exc[0] || (has_delivery_note ? __("Failed to update delivery note.") : __("Failed to create delivery note."))),
+							indicator: "red"
+						});
+						// Allow workflow to proceed even if DN action failed
+						resolve();
+						return;
+					}
+					frm.reload_doc().then(resolve);
 				}
 			});
-
-			d.$body.append(
-				$('<p class="frappe-confirm-message" style="white-space: pre-wrap;"></p>').html(message)
-			);
-
-			// Treat dialog X (close icon) as: submit without DN changes
-			d.get_close_btn().on('click', function () {
-				resolve();
-			});
-
-			d.show();
 		});
 	},
 		
