@@ -65,7 +65,6 @@ def create_monthly_implementation_summaries():
 				"implementation": impl.name,
 				"year": str(current_year),
 				"month": current_month_name,
-				"discount": 0
 			})
 			doc.insert()
 			
