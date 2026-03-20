@@ -19,7 +19,8 @@ app_include_css = [
 # app_include_js = "/assets/phamos/js/phamos.js"
 app_include_js = [
     "phamos.bundle.js",
-    "https://code.highcharts.com/highcharts.js"
+    "https://code.highcharts.com/highcharts.js",
+    "/assets/phamos/js/frappe_list_bulk_edit_override.js",
 ]
 
 
