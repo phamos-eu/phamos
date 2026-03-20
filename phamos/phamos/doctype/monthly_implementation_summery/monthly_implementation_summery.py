@@ -410,7 +410,7 @@ class MonthlyImplementationSummery(Document):
 			"timesheet": row.ts_name or None,
 			"date": row.date,
 			"total_hours": flt(row.total_hours),
-			"billable_hours": flt(row.billable_hours),
+			"billable_hours": flt(row.total_billable_hours),
 			"rating": row.rating or "",
 			"project": row.project or None,
 			"employee": row.employee or None,
