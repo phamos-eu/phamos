@@ -1,0 +1,255 @@
+{
+ "actions": [],
+ "allow_guest_to_view": 1,
+ "allow_rename": 1,
+ "autoname": "DANCE-EVENT-.YYYY.-.#####",
+ "creation": "2026-03-24 00:00:00.000000",
+ "doctype": "DocType",
+ "document_type": "Document",
+ "engine": "InnoDB",
+ "field_order": [
+  "title",
+  "subtitle",
+  "event_type",
+  "column_break_top",
+  "status",
+  "published",
+  "section_datetime",
+  "starts_on",
+  "ends_on",
+  "column_break_location",
+  "location",
+  "city",
+  "section_media",
+  "image",
+  "column_break_media",
+  "intro",
+  "section_description",
+  "description",
+  "section_organizer",
+  "organizer_name",
+  "column_break_organizer",
+  "organizer_email",
+  "section_interest",
+  "going_count",
+  "maybe_count",
+  "column_break_interest",
+  "not_going_count",
+  "section_web",
+  "route"
+ ],
+ "fields": [
+  {
+   "fieldname": "title",
+   "fieldtype": "Data",
+   "in_global_search": 1,
+   "in_list_view": 1,
+   "label": "Title",
+   "reqd": 1
+  },
+  {
+   "fieldname": "subtitle",
+   "fieldtype": "Data",
+   "label": "Subtitle"
+  },
+  {
+   "fieldname": "event_type",
+   "fieldtype": "Select",
+   "in_list_view": 1,
+   "in_standard_filter": 1,
+   "label": "Event Type",
+   "options": "\nMilonga\nPractica\nClass\nWorkshop\nSocial Dance"
+  },
+  {
+   "fieldname": "column_break_top",
+   "fieldtype": "Column Break"
+  },
+  {
+   "default": "Upcoming",
+   "fieldname": "status",
+   "fieldtype": "Select",
+   "in_list_view": 1,
+   "in_standard_filter": 1,
+   "label": "Status",
+   "options": "Upcoming\nOngoing\nCancelled\nPast"
+  },
+  {
+   "default": "0",
+   "fieldname": "published",
+   "fieldtype": "Check",
+   "label": "Published"
+  },
+  {
+   "fieldname": "section_datetime",
+   "fieldtype": "Section Break",
+   "label": "Date & Location"
+  },
+  {
+   "fieldname": "starts_on",
+   "fieldtype": "Datetime",
+   "in_list_view": 1,
+   "label": "Starts On",
+   "reqd": 1
+  },
+  {
+   "fieldname": "ends_on",
+   "fieldtype": "Datetime",
+   "label": "Ends On"
+  },
+  {
+   "fieldname": "column_break_location",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "location",
+   "fieldtype": "Data",
+   "in_list_view": 1,
+   "label": "Venue"
+  },
+  {
+   "fieldname": "city",
+   "fieldtype": "Data",
+   "in_standard_filter": 1,
+   "label": "City"
+  },
+  {
+   "fieldname": "section_media",
+   "fieldtype": "Section Break",
+   "label": "Media & Intro"
+  },
+  {
+   "fieldname": "image",
+   "fieldtype": "Attach Image",
+   "label": "Cover Image"
+  },
+  {
+   "fieldname": "column_break_media",
+   "fieldtype": "Column Break"
+  },
+  {
+   "description": "Short description shown on the events listing page (max 300 characters).",
+   "fieldname": "intro",
+   "fieldtype": "Small Text",
+   "label": "Intro"
+  },
+  {
+   "fieldname": "section_description",
+   "fieldtype": "Section Break",
+   "label": "Description"
+  },
+  {
+   "fieldname": "description",
+   "fieldtype": "Text Editor",
+   "label": "Description"
+  },
+  {
+   "fieldname": "section_organizer",
+   "fieldtype": "Section Break",
+   "label": "Organizer"
+  },
+  {
+   "fieldname": "organizer_name",
+   "fieldtype": "Data",
+   "label": "Organizer Name"
+  },
+  {
+   "fieldname": "column_break_organizer",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "organizer_email",
+   "fieldtype": "Data",
+   "label": "Organizer Email",
+   "options": "Email"
+  },
+  {
+   "fieldname": "section_interest",
+   "fieldtype": "Section Break",
+   "label": "Interest"
+  },
+  {
+   "default": "0",
+   "fieldname": "going_count",
+   "fieldtype": "Int",
+   "label": "Going",
+   "read_only": 1
+  },
+  {
+   "default": "0",
+   "fieldname": "maybe_count",
+   "fieldtype": "Int",
+   "label": "Maybe",
+   "read_only": 1
+  },
+  {
+   "fieldname": "column_break_interest",
+   "fieldtype": "Column Break"
+  },
+  {
+   "default": "0",
+   "fieldname": "not_going_count",
+   "fieldtype": "Int",
+   "label": "Not Going",
+   "read_only": 1
+  },
+  {
+   "fieldname": "section_web",
+   "fieldtype": "Section Break",
+   "label": "Web"
+  },
+  {
+   "fieldname": "route",
+   "fieldtype": "Data",
+   "label": "Route",
+   "unique": 1
+  }
+ ],
+ "has_web_view": 1,
+ "index_web_pages_for_search": 1,
+ "links": [],
+ "modified": "2026-03-24 00:00:00.000000",
+ "modified_by": "Administrator",
+ "module": "Phamos",
+ "name": "Dance Event",
+ "naming_rule": "Expression (old style)",
+ "owner": "Administrator",
+ "permissions": [
+  {
+   "create": 1,
+   "delete": 1,
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "System Manager",
+   "select": 1,
+   "share": 1,
+   "write": 1
+  },
+  {
+   "create": 1,
+   "delete": 1,
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "Website Manager",
+   "share": 1,
+   "write": 1
+  },
+  {
+   "read": 1,
+   "role": "Guest"
+  },
+  {
+   "read": 1,
+   "role": "All"
+  }
+ ],
+ "sort_field": "starts_on",
+ "sort_order": "ASC",
+ "states": [],
+ "title_field": "title"
+}

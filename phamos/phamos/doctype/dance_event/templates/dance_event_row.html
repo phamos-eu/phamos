@@ -1,0 +1,35 @@
+<div class="dance-event-card card h-100">
+  {% if doc.image %}
+    <img src="{{ doc.image }}" class="card-img-top dance-event-card-img" alt="{{ doc.title }}">
+  {% else %}
+    <div class="dance-event-card-img-placeholder card-img-top d-flex align-items-center justify-content-center bg-light text-muted">
+      <i class="fa fa-music fa-3x"></i>
+    </div>
+  {% endif %}
+  <div class="card-body d-flex flex-column">
+    {% if doc.event_type %}
+      <span class="badge badge-secondary mb-2 align-self-start">{{ doc.event_type }}</span>
+    {% endif %}
+    <h5 class="card-title">
+      <a href="/{{ doc.route }}">{{ doc.title }}</a>
+    </h5>
+    {% if doc.intro %}
+      <p class="card-text text-muted small">{{ doc.intro }}</p>
+    {% endif %}
+    <div class="mt-auto pt-2 text-muted small">
+      {% if doc.starts_on %}
+        <div><i class="fa fa-calendar"></i> {{ frappe.format(doc.starts_on, {"fieldtype": "Datetime"}) }}</div>
+      {% endif %}
+      {% if doc.location or doc.city %}
+        <div><i class="fa fa-map-marker"></i> {{ doc.location }}{% if doc.location and doc.city %}, {% endif %}{{ doc.city }}</div>
+      {% endif %}
+    </div>
+  </div>
+  <div class="card-footer text-muted small">
+    <span title="Going"><i class="fa fa-check text-success"></i> {{ doc.going_count or 0 }}</span>
+    &nbsp;
+    <span title="Maybe"><i class="fa fa-question text-warning"></i> {{ doc.maybe_count or 0 }}</span>
+    &nbsp;
+    <a href="/{{ doc.route }}" class="btn btn-sm btn-outline-primary float-right">Details</a>
+  </div>
+</div>

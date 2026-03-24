@@ -65,7 +65,8 @@ override_doctype_class = {
 }
 
 website_route_rules = [
-    {"from_route": "/schedule_interview/<name>", "to_route": "schedule_interview"}
+    {"from_route": "/schedule_interview/<name>", "to_route": "schedule_interview"},
+    {"from_route": "/dance-events", "to_route": "dance_events"},
 ]
 
 
