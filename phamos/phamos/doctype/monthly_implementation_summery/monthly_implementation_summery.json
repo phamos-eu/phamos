@@ -22,22 +22,21 @@
   "delivery_note_details",
   "update_current_timesheets_hours",
   "delivery_note_item",
+  "financial_history_section",
+  "sales_order_qty",
+  "dn_qty",
+  "timesheet_hrs",
+  "column_break_w99l",
+  "remaining_hrs",
+  "open_so",
+  "section_break_ntan",
   "amended_from"
  ],
  "fields": [
   {
    "fieldname": "section_break_xunv",
-   "fieldtype": "Section Break"
-  },
-  {
-   "fieldname": "amended_from",
-   "fieldtype": "Link",
-   "label": "Amended From",
-   "no_copy": 1,
-   "options": "Monthly Implementation Summery",
-   "print_hide": 1,
-   "read_only": 1,
-   "search_index": 1
+   "fieldtype": "Section Break",
+   "label": "section_break_xunv"
   },
   {
    "fieldname": "naming_series",
@@ -99,7 +98,8 @@
   },
   {
    "fieldname": "section_break_1_section",
-   "fieldtype": "Section Break"
+   "fieldtype": "Section Break",
+   "label": "section_break_1_section"
   },
   {
    "fieldname": "create_delivery_note",
@@ -128,6 +128,70 @@
    "fieldname": "update_current_timesheets_hours",
    "fieldtype": "Button",
    "label": "Update current timesheets hours"
+  },
+  {
+   "fieldname": "financial_history_section",
+   "fieldtype": "Section Break",
+   "label": "Financial History"
+  },
+  {
+   "description": "Sum of total_qty on open Sales Orders linked to this Implementation (status To Deliver / To Deliver and Bill / To Bill). Same as sales_order_qty from get_financial_history.\n",
+   "fieldname": "sales_order_qty",
+   "fieldtype": "Float",
+   "label": "Total open SO hours",
+   "no_copy": 1,
+   "read_only": 1
+  },
+  {
+   "description": "Sum of Delivery Note item quantities against those Sales Orders where DN status is Completed or To Bill. Same as dn_qty.\n",
+   "fieldname": "dn_qty",
+   "fieldtype": "Float",
+   "label": "Delivered on DN",
+   "no_copy": 1,
+   "read_only": 1
+  },
+  {
+   "description": "Sum of billable Timesheet Detail hours on draft timesheets for this Implementation\u2019s projects, with no custom_delivery_note. Same as timesheet_hrs.\n",
+   "fieldname": "timesheet_hrs",
+   "fieldtype": "Float",
+   "label": "Draft billable TS hours",
+   "no_copy": 1,
+   "read_only": 1
+  },
+  {
+   "description": "Open SO hours minus delivered-on-DN hours minus draft timesheet hours not yet on a DN. Same as remaining_hrs.\n",
+   "fieldname": "remaining_hrs",
+   "fieldtype": "Float",
+   "label": "Remaining sales hours",
+   "no_copy": 1,
+   "read_only": 1
+  },
+  {
+   "default": "0",
+   "description": "Global indicator: 1 if any Sales Order is still To Deliver/Bill (not scoped to this Implementation).",
+   "fieldname": "open_so",
+   "fieldtype": "Check",
+   "label": "Open SO?",
+   "no_copy": 1,
+   "read_only": 1
+  },
+  {
+   "fieldname": "section_break_ntan",
+   "fieldtype": "Section Break"
+  },
+  {
+   "fieldname": "column_break_w99l",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "amended_from",
+   "fieldtype": "Link",
+   "label": "Amended From",
+   "no_copy": 1,
+   "options": "Monthly Implementation Summery",
+   "print_hide": 1,
+   "read_only": 1,
+   "search_index": 1
   }
  ],
  "index_web_pages_for_search": 1,
@@ -138,7 +202,7 @@
    "link_fieldname": "custom_against_monthly_implementation_summery"
   }
  ],
- "modified": "2026-03-19 15:41:29.542084",
+ "modified": "2026-03-24 12:15:37.196846",
  "modified_by": "Administrator",
  "module": "Phamos",
  "name": "Monthly Implementation Summery",

@@ -8,6 +8,9 @@ from frappe.query_builder import DocType, Order
 from datetime import datetime
 
 from erpnext.stock.doctype.delivery_note.delivery_note import make_sales_invoice
+from phamos.phamos.doctype.implementation.implementation import (
+	get_financial_history as get_implementation_financial_history,
+)
 
 # Map month name (as in Select options) to month number 1-12
 MONTH_NAME_TO_NUM = {
@@ -27,8 +30,35 @@ class MonthlyImplementationSummery(Document):
 		if self.implementation and self.year and self.month and not self.timesheets_table:
 			self.set_timesheets_table()
 		self._recalculate_totals_from_timesheets_table()
+		self.populate_financial_history_fields()
 
+	def populate_financial_history_fields(self):
+		"""Fill sales_order_qty, dn_qty, timesheet_hrs, remaining_hrs, open_so from Implementation KPIs.
 
+		Wraps get_financial_history; requires Implementation.customer (same as desk form).
+		"""
+		if not self.implementation:
+			self._clear_financial_history_fields()
+			return
+
+		customer = frappe.db.get_value("Implementation", self.implementation, "customer")
+		if not customer:
+			self._clear_financial_history_fields()
+			return
+
+		data = get_implementation_financial_history(self.implementation, customer) or {}
+		self.sales_order_qty = flt(data.get("sales_order_qty"), 2)
+		self.dn_qty = flt(data.get("dn_qty"), 2)
+		self.timesheet_hrs = flt(data.get("timesheet_hrs"), 2)
+		self.remaining_hrs = flt(data.get("remaining_hrs"), 2)
+		self.open_so = 1 if data.get("open_so") else 0
+
+	def _clear_financial_history_fields(self):
+		self.sales_order_qty = 0
+		self.dn_qty = 0
+		self.timesheet_hrs = 0
+		self.remaining_hrs = 0
+		self.open_so = 0
 
 	def validate_phamos_settings_item(self):
 		"""Block save/submit if Phamos Settings has no default item (required for Delivery Note)."""
