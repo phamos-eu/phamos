@@ -19,6 +19,7 @@
   "actual_time",
   "timesheet",
   "percent_billable",
+  "productivity",
   "section_break_ovpv",
   "item",
   "section_break_hqfwm",
@@ -63,7 +64,8 @@
   },
   {
    "fieldname": "column_break_78vsj",
-   "fieldtype": "Column Break"
+   "fieldtype": "Column Break",
+   "label": "column_break_78vsj"
   },
   {
    "default": "Now",
@@ -104,7 +106,8 @@
   },
   {
    "fieldname": "section_break_hqfwm",
-   "fieldtype": "Section Break"
+   "fieldtype": "Section Break",
+   "label": "section_break_hqfwm"
   },
   {
    "fieldname": "goal",
@@ -115,7 +118,8 @@
   },
   {
    "fieldname": "column_break_8016u",
-   "fieldtype": "Column Break"
+   "fieldtype": "Column Break",
+   "label": "column_break_8016u"
   },
   {
    "fieldname": "result",
@@ -149,7 +153,8 @@
   },
   {
    "fieldname": "section_break_ovpv",
-   "fieldtype": "Section Break"
+   "fieldtype": "Section Break",
+   "label": "section_break_ovpv"
   },
   {
    "fieldname": "item",
@@ -174,14 +179,21 @@
    "label": "Issues URL",
    "no_copy": 1,
    "read_only": 1
+  },
+  {
+   "description": "It is used to indicate your productivity level on internal (non-billable) project work. It helps measure performance and effort for internal activities.",
+   "fieldname": "productivity",
+   "fieldtype": "Select",
+   "label": "Productivity",
+   "options": "\n0\n25\n50\n75\n100"
   }
  ],
  "grid_page_length": 50,
  "index_web_pages_for_search": 1,
  "is_submittable": 1,
  "links": [],
- "modified": "2026-02-16 06:59:11.141655",
- "modified_by": "kalsoom.akhtar@phamos.eu",
+ "modified": "2026-03-25 12:24:40.408154",
+ "modified_by": "kalsoom.akhtar@pahmos.eu",
  "module": "Phamos",
  "name": "Timesheet Record",
  "naming_rule": "Expression (old style)",
