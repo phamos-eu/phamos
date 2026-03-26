@@ -1,0 +1,271 @@
+{
+ "actions": [],
+ "allow_guest_to_view": 1,
+ "autoname": "PHAMOS-EVENT-.YYYY.-.#####",
+ "creation": "2026-03-25 00:00:00.000000",
+ "doctype": "DocType",
+ "engine": "InnoDB",
+ "field_order": [
+  "title",
+  "subtitle",
+  "event_type",
+  "status",
+  "column_break_1",
+  "date_note",
+  "starts_on",
+  "ends_on",
+  "published",
+  "route",
+  "section_location",
+  "location",
+  "city",
+  "map_link",
+  "section_media",
+  "image",
+  "intro",
+  "description",
+  "section_organizer",
+  "organizer_name",
+  "organizer_email",
+  "section_counts",
+  "going_count",
+  "maybe_count",
+  "not_going_count",
+  "section_registration",
+  "registration_open",
+  "max_attendees",
+  "section_responses",
+  "responses"
+ ],
+ "fields": [
+  {
+   "fieldname": "title",
+   "fieldtype": "Data",
+   "in_list_view": 1,
+   "label": "Title",
+   "reqd": 1,
+   "unique": 1,
+   "no_copy": 1
+  },
+  {
+   "fieldname": "subtitle",
+   "fieldtype": "Data",
+   "label": "Subtitle"
+  },
+  {
+   "fieldname": "event_type",
+   "fieldtype": "Select",
+   "in_list_view": 1,
+   "label": "Event Type",
+   "options": "\nWorkshop\nConference\nWebinar\nTraining\nMeetup\nHackathon\nTeam Building\nSeminar\nNetworking\nProduct Launch\nTown Hall\nSocial Event"
+  },
+  {
+   "fieldname": "status",
+   "fieldtype": "Select",
+   "in_list_view": 1,
+   "label": "Status",
+   "options": "Upcoming\nOngoing\nCompleted\nCancelled",
+   "default": "Upcoming"
+  },
+  {
+   "fieldname": "column_break_1",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "date_note",
+   "fieldtype": "Data",
+   "label": "Date Note",
+   "description": "Shown when no exact date is set, e.g. 'Expected: July 2026'"
+  },
+  {
+   "fieldname": "starts_on",
+   "fieldtype": "Datetime",
+   "in_list_view": 1,
+   "label": "Starts On"
+  },
+  {
+   "fieldname": "ends_on",
+   "fieldtype": "Datetime",
+   "label": "Ends On"
+  },
+  {
+   "fieldname": "published",
+   "fieldtype": "Check",
+   "label": "Published",
+   "default": 0,
+   "no_copy": 1
+  },
+  {
+   "fieldname": "route",
+   "fieldtype": "Data",
+   "label": "Route",
+   "read_only": 1,
+   "unique": 1,
+   "no_copy": 1
+  },
+  {
+   "fieldname": "section_location",
+   "fieldtype": "Section Break",
+   "label": "Location"
+  },
+  {
+   "fieldname": "location",
+   "fieldtype": "Data",
+   "label": "Venue / Location"
+  },
+  {
+   "fieldname": "city",
+   "fieldtype": "Data",
+   "label": "City"
+  },
+  {
+   "fieldname": "map_link",
+   "fieldtype": "Data",
+   "label": "Map Link",
+   "description": "Google Maps or OpenStreetMap share URL"
+  },
+  {
+   "fieldname": "section_media",
+   "fieldtype": "Section Break",
+   "label": "Media & Content"
+  },
+  {
+   "fieldname": "image",
+   "fieldtype": "Attach Image",
+   "label": "Cover Image"
+  },
+  {
+   "fieldname": "intro",
+   "fieldtype": "Small Text",
+   "label": "Intro / Tagline"
+  },
+  {
+   "fieldname": "description",
+   "fieldtype": "Text Editor",
+   "label": "Description"
+  },
+  {
+   "fieldname": "section_organizer",
+   "fieldtype": "Section Break",
+   "label": "Organizer"
+  },
+  {
+   "fieldname": "organizer_name",
+   "fieldtype": "Data",
+   "label": "Organizer Name"
+  },
+  {
+   "fieldname": "organizer_email",
+   "fieldtype": "Data",
+   "options": "Email",
+   "label": "Organizer Email"
+  },
+  {
+   "fieldname": "section_counts",
+   "fieldtype": "Section Break",
+   "label": "Interest Counts"
+  },
+  {
+   "fieldname": "going_count",
+   "fieldtype": "Int",
+   "label": "Interested (Yes)",
+   "default": 0,
+   "read_only": 1,
+   "no_copy": 1
+  },
+  {
+   "fieldname": "maybe_count",
+   "fieldtype": "Int",
+   "label": "Maybe",
+   "default": 0,
+   "read_only": 1,
+   "no_copy": 1
+  },
+  {
+   "fieldname": "not_going_count",
+   "fieldtype": "Int",
+   "label": "Not Interested (No)",
+   "default": 0,
+   "read_only": 1,
+   "no_copy": 1
+  },
+  {
+   "fieldname": "section_registration",
+   "fieldtype": "Section Break",
+   "label": "Registration"
+  },
+  {
+   "fieldname": "registration_open",
+   "fieldtype": "Check",
+   "label": "Registration Open",
+   "default": 0,
+   "no_copy": 1
+  },
+  {
+   "fieldname": "max_attendees",
+   "fieldtype": "Int",
+   "label": "Max Attendees",
+   "description": "Leave 0 for unlimited",
+   "no_copy": 1
+  },
+  {
+   "fieldname": "section_responses",
+   "fieldtype": "Section Break",
+   "label": "Email Subscriptions"
+  },
+  {
+   "fieldname": "responses",
+   "fieldtype": "Table",
+   "label": "Responses",
+   "options": "Phamos Event Response",
+   "no_copy": 1
+  }
+ ],
+ "has_web_view": 1,
+ "is_published_field": "published",
+ "modified": "2026-03-25 00:00:00.000000",
+ "modified_by": "Administrator",
+ "module": "Phamos",
+ "name": "Phamos Event",
+ "naming_rule": "Expression (old style)",
+ "owner": "Administrator",
+ "page_title_field": "title",
+ "permissions": [
+  {
+   "create": 1,
+   "delete": 1,
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "System Manager",
+   "share": 1,
+   "submit": 0,
+   "write": 1
+  },
+  {
+   "create": 1,
+   "delete": 1,
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "Website Manager",
+   "share": 1,
+   "write": 1
+  },
+  {
+   "read": 1,
+   "role": "Guest"
+  },
+  {
+   "read": 1,
+   "role": "All"
+  }
+ ],
+ "sort_field": "starts_on",
+ "sort_order": "ASC",
+ "track_changes": 0
+}
