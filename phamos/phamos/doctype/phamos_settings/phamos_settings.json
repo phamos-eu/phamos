@@ -32,7 +32,9 @@
   "mistral_api_key",
   "column_break_de",
   "mistral_model",
-  "mistral_base_url"
+  "mistral_base_url",
+  "monthly_implementation_summery_tab",
+  "item"
  ],
  "fields": [
   {
@@ -174,12 +176,24 @@
    "fieldname": "mistral_base_url",
    "fieldtype": "Data",
    "label": "Base URL (optional)"
+  },
+  {
+   "fieldname": "monthly_implementation_summery_tab",
+   "fieldtype": "Tab Break",
+   "label": "Monthly Implementation Summery"
+  },
+  {
+   "description": "Select the default service item to be used when generating Delivery Note and Sales Invoice for Monthly Implementation Summary.",
+   "fieldname": "item",
+   "fieldtype": "Link",
+   "label": "Item",
+   "options": "Item"
   }
  ],
  "index_web_pages_for_search": 1,
  "issingle": 1,
  "links": [],
- "modified": "2024-10-04 15:48:25.774179",
+ "modified": "2026-02-21 15:32:51.417147",
  "modified_by": "Administrator",
  "module": "Phamos",
  "name": "phamos Settings",
