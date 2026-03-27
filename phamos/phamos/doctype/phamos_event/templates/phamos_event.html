@@ -1,0 +1,596 @@
+{% extends "templates/web.html" %}
+
+{% block page_content %}
+<style>
+  :root {
+    --pe-accent:  #8b1a2e;
+    --pe-border:  #e8e2d9;
+    --pe-muted:   #78716c;
+    --pe-surface: #ffffff;
+    --pe-bg:      #faf8f5;
+    --pe-radius:  10px;
+  }
+
+  /* ── Badge ───────────────────────────────────── */
+  .pe-badge {
+    display: inline-block;
+    font-size: .7rem; font-weight: 700; letter-spacing: .07em;
+    text-transform: uppercase; padding: .25em .85em;
+    border-radius: 50px; color: #fff;
+  }
+  .pe-badge--workshop       { background: #1e40af; }
+  .pe-badge--conference     { background: #8b1a2e; }
+  .pe-badge--webinar        { background: #065f46; }
+  .pe-badge--training       { background: #92400e; }
+  .pe-badge--meetup         { background: #5b21b6; }
+  .pe-badge--hackathon      { background: #7c2d12; }
+  .pe-badge--team-building  { background: #6d28d9; }
+  .pe-badge--seminar        { background: #047857; }
+  .pe-badge--networking     { background: #be123c; }
+  .pe-badge--product-launch { background: #a21caf; }
+  .pe-badge--town-hall      { background: #0e7490; }
+  .pe-badge--social-event   { background: #b91c1c; }
+  .pe-badge--default        { background: #44403c; }
+
+  /* ── Hero ────────────────────────────────────── */
+  .pe-hero {
+    width: 100%; height: 380px;
+    border-radius: var(--pe-radius);
+    overflow: hidden; background: #f0ede8;
+    margin-bottom: 1.8rem;
+  }
+  .pe-hero img {
+    width: 100%; height: 100%;
+    object-fit: cover; object-position: center; display: block;
+  }
+  .pe-hero-placeholder {
+    width: 100%; height: 100%;
+    display: flex; align-items: center; justify-content: center; color: #c7bfb5;
+  }
+
+  /* ── Title area ──────────────────────────────── */
+  .pe-title-area { margin-bottom: 1.2rem; }
+  .pe-title-area h1 {
+    font-size: 1.8rem; font-weight: 800;
+    letter-spacing: -.03em; line-height: 1.15;
+    margin: .4rem 0 .3rem; color: #1c1917;
+  }
+  .pe-subtitle { font-size: 1rem; color: var(--pe-muted); margin: 0; }
+
+  /* ── Description ─────────────────────────────── */
+  .pe-description {
+    font-size: .95rem; line-height: 1.8; color: #1c1917;
+    margin-bottom: 1.8rem;
+  }
+  .pe-description h1, .pe-description h2, .pe-description h3 {
+    font-size: 1.05rem; font-weight: 700; margin: 1.2rem 0 .4rem;
+  }
+
+  /* ── Bottom cards: RSVP + Organizer ─────────── */
+  .pe-bottom-cards {
+    display: grid;
+    grid-template-columns: 260px 1fr;
+    gap: 1rem;
+    margin-bottom: 2rem;
+  }
+  @media (max-width: 560px) {
+    .pe-bottom-cards { grid-template-columns: 1fr; }
+  }
+  .pe-card {
+    border: 1.5px solid var(--pe-border);
+    border-radius: var(--pe-radius);
+    overflow: hidden;
+  }
+  .pe-card-header {
+    padding: .35rem .75rem;
+    background: var(--pe-bg);
+    border-bottom: 1px solid var(--pe-border);
+    font-size: .64rem; font-weight: 700;
+    text-transform: uppercase; letter-spacing: .09em; color: var(--pe-muted);
+  }
+  .pe-card-body { padding: .65rem .75rem; }
+
+  /* Interest tracking — horizontal buttons */
+  .pe-rsvp-btns { display: flex; gap: .4rem; margin-bottom: .4rem; }
+  .pe-rsvp-btn {
+    flex: 1;
+    display: flex; flex-direction: column; align-items: center;
+    gap: .2rem; padding: .45rem .35rem;
+    border: 1.5px solid var(--pe-border); border-radius: 7px;
+    background: var(--pe-surface); font-size: .75rem; font-weight: 500;
+    cursor: pointer; color: #1c1917;
+    transition: border-color .14s, background .14s, color .14s;
+    text-align: center; white-space: nowrap;
+  }
+  .pe-rsvp-btn:hover:not(.active-yes):not(.active-maybe):not(.active-no) {
+    border-color: #9ca3af; background: #f9fafb;
+  }
+  .pe-rsvp-btn.active-yes   { background: #ecfdf5; border-color: #065f46; color: #065f46; }
+  .pe-rsvp-btn.active-maybe { background: #fffbeb; border-color: #92400e; color: #92400e; }
+  .pe-rsvp-btn.active-no    { background: #f5f5f4; border-color: #44403c; color: #44403c; }
+  .pe-rsvp-count {
+    font-size: .65rem; font-weight: 700;
+    background: rgba(0,0,0,.07); border-radius: 50px;
+    padding: .05em .45em; min-width: 1.6em; text-align: center;
+  }
+  .pe-rsvp-hint { font-size: .68rem; color: var(--pe-muted); margin: 0; text-align: center; }
+
+  /* Email subscription */
+  .pe-email-subscribe {
+    margin-top: .8rem; padding-top: .8rem;
+    border-top: 1px solid var(--pe-border);
+  }
+  .pe-email-title {
+    font-size: .7rem; font-weight: 700; text-transform: uppercase;
+    letter-spacing: .08em; color: var(--pe-muted); margin-bottom: .5rem;
+  }
+  .pe-email-input {
+    width: 100%; padding: .5rem .65rem;
+    border: 1.5px solid var(--pe-border); border-radius: 6px;
+    font-size: .82rem; margin-bottom: .4rem;
+    outline: none; transition: border-color .15s;
+  }
+  .pe-email-input:focus { border-color: var(--pe-accent); }
+  .pe-gdpr-label {
+    display: flex; align-items: flex-start; gap: .45rem;
+    font-size: .7rem; color: var(--pe-muted); margin-bottom: .5rem;
+    cursor: pointer; user-select: none;
+  }
+  .pe-gdpr-label input[type="checkbox"] {
+    margin-top: .15rem; flex-shrink: 0;
+    width: 14px; height: 14px; cursor: pointer;
+    accent-color: var(--pe-accent);
+  }
+  .pe-subscribe-btn {
+    width: 100%; padding: .5rem;
+    background: var(--pe-accent); color: #fff;
+    border: none; border-radius: 6px;
+    font-size: .8rem; font-weight: 600; cursor: pointer;
+    transition: opacity .15s;
+  }
+  .pe-subscribe-btn:hover { opacity: .9; }
+  .pe-subscribe-btn:disabled {
+    opacity: .5; cursor: not-allowed;
+  }
+  .pe-subscribe-msg {
+    font-size: .72rem; margin-top: .4rem; text-align: center;
+  }
+  .pe-subscribe-msg.success { color: #065f46; }
+  .pe-subscribe-msg.error { color: #991b1b; }
+
+  /* Organizer */
+  .pe-organizer { display: flex; align-items: center; gap: .55rem; }
+  .pe-org-avatar {
+    width: 30px; height: 30px; border-radius: 50%;
+    background: #f0ede8; flex-shrink: 0;
+    display: flex; align-items: center; justify-content: center;
+    color: var(--pe-muted);
+  }
+  .pe-org-name  { font-size: .82rem; font-weight: 600; margin: 0 0 .1rem; color: #1c1917; }
+  .pe-org-email { font-size: .74rem; margin: 0; }
+  .pe-org-email a { color: var(--pe-accent); text-decoration: none; }
+  .pe-org-email a:hover { text-decoration: underline; }
+
+  /* ── Sidebar info card ───────────────────────── */
+  .pe-sidebar-card {
+    border: 1.5px solid var(--pe-border);
+    border-radius: var(--pe-radius);
+    background: var(--pe-surface);
+    overflow: hidden;
+    position: sticky;
+    top: 80px;
+  }
+  .pe-sidebar-card-header {
+    background: var(--pe-accent);
+    color: #fff;
+    padding: .5rem .9rem;
+    font-size: .65rem; font-weight: 700;
+    text-transform: uppercase; letter-spacing: .09em;
+  }
+  .pe-sidebar-card-body { padding: 1rem; }
+
+  /* Date display (calendar widget or date note) */
+  .pe-date-note {
+    text-align: center;
+    padding: 1rem .9rem;
+    margin-bottom: .9rem;
+    padding-bottom: .9rem;
+    border-bottom: 1px solid var(--pe-border);
+  }
+  .pe-date-note-icon {
+    color: var(--pe-accent);
+    margin-bottom: .4rem;
+  }
+  .pe-date-note-text {
+    font-size: .88rem; font-weight: 600;
+    color: var(--pe-muted); line-height: 1.4;
+  }
+  .pe-cal-widget {
+    display: flex; align-items: center; gap: .85rem;
+    margin-bottom: .9rem;
+    padding-bottom: .9rem;
+    border-bottom: 1px solid var(--pe-border);
+  }
+  .pe-cal {
+    text-align: center; line-height: 1;
+    border: 1.5px solid var(--pe-border);
+    border-radius: 8px; overflow: hidden;
+    min-width: 54px; flex-shrink: 0;
+  }
+  .pe-cal-month {
+    background: var(--pe-accent); color: #fff;
+    font-size: .58rem; font-weight: 800; letter-spacing: .07em;
+    padding: .28rem .2rem;
+  }
+  .pe-cal-day {
+    font-size: 1.6rem; font-weight: 800;
+    color: #1c1917; padding: .1rem .2rem .05rem;
+  }
+  .pe-cal-wd {
+    font-size: .57rem; font-weight: 600; color: var(--pe-muted);
+    letter-spacing: .05em; padding: .05rem .2rem .3rem;
+  }
+  .pe-cal-info { }
+  .pe-cal-year { font-size: .72rem; color: var(--pe-muted); margin-bottom: .2rem; }
+  .pe-cal-time {
+    font-size: 1.1rem; font-weight: 700; color: #1c1917;
+    display: flex; align-items: center; gap: .3rem;
+    margin-bottom: .1rem;
+  }
+  .pe-cal-time svg { color: var(--pe-muted); flex-shrink: 0; }
+  .pe-cal-until {
+    font-size: .75rem; color: var(--pe-muted);
+    display: flex; align-items: center; gap: .3rem;
+  }
+
+  /* Venue row */
+  .pe-sidebar-row {
+    display: flex; align-items: flex-start; gap: .6rem;
+    margin-bottom: .7rem;
+  }
+  .pe-sidebar-row:last-child { margin-bottom: 0; }
+  .pe-sidebar-row svg { color: var(--pe-muted); flex-shrink: 0; margin-top: .1rem; }
+  .pe-sidebar-row-label {
+    font-size: .62rem; font-weight: 700; text-transform: uppercase;
+    letter-spacing: .07em; color: var(--pe-muted); margin-bottom: .1rem;
+  }
+  .pe-sidebar-row-value { font-size: .88rem; font-weight: 600; color: #1c1917; }
+  .pe-sidebar-row-sub   { font-size: .78rem; color: var(--pe-muted); }
+
+  /* Map link */
+  .pe-map-link {
+    display: inline-flex; align-items: center; gap: .25rem;
+    font-size: .72rem; color: var(--pe-accent); text-decoration: none;
+    margin-top: .25rem;
+  }
+  .pe-map-link:hover { text-decoration: underline; }
+
+  /* Register button */
+  .pe-register-wrap { margin-top: .9rem; padding-top: .9rem; border-top: 1px solid var(--pe-border); }
+  .pe-register-btn {
+    display: block; width: 100%; text-align: center;
+    padding: .65rem 1rem;
+    background: var(--pe-accent); color: #fff;
+    border-radius: 7px; font-size: .88rem; font-weight: 700;
+    text-decoration: none; letter-spacing: .02em;
+    transition: opacity .15s;
+  }
+  .pe-register-btn:hover { opacity: .88; color: #fff; text-decoration: none; }
+  .pe-spots {
+    font-size: .72rem; text-align: center;
+    margin-bottom: .45rem; font-weight: 600;
+  }
+  .pe-spots.ok   { color: #065f46; }
+  .pe-spots.low  { color: #92400e; }
+  .pe-spots.full { color: #9f1239; }
+  .pe-register-full {
+    display: block; width: 100%; text-align: center;
+    padding: .6rem 1rem;
+    background: #f5f5f4; color: var(--pe-muted);
+    border-radius: 7px; font-size: .82rem; font-weight: 600;
+    border: 1.5px solid var(--pe-border);
+  }
+
+  /* Status pill */
+  .pe-status-pill {
+    display: inline-block;
+    font-size: .68rem; font-weight: 700; text-transform: uppercase;
+    letter-spacing: .06em; padding: .28em .8em;
+    border-radius: 50px; border: 1.5px solid var(--pe-border);
+    color: var(--pe-muted); margin-top: .5rem;
+  }
+  .pe-status-pill.upcoming  { border-color: #065f46; color: #065f46; background: #ecfdf5; }
+  .pe-status-pill.ongoing   { border-color: #1e40af; color: #1e40af; background: #eff6ff; }
+  .pe-status-pill.cancelled { border-color: #9f1239; color: #9f1239; background: #fff1f2; }
+
+  /* ── Responsive ──────────────────────────────── */
+  @media (max-width: 767px) {
+    .pe-hero { height: 220px; }
+    .pe-title-area h1 { font-size: 1.4rem; }
+    .pe-sidebar-card { position: static; margin-top: 1.5rem; }
+  }
+</style>
+
+{%- set et_slug = (event_type or "default") | lower | replace(" ", "-") -%}
+{%- set status_cls = (status or "") | lower -%}
+
+<div class="pe-detail">
+
+  {# ── Full-width hero ───────────────────────────── #}
+  <div class="pe-hero">
+    {% if image %}
+      <img src="{{ image }}" alt="{{ title }}">
+    {% else %}
+      <div class="pe-hero-placeholder">
+        <svg width="52" height="52" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/></svg>
+      </div>
+    {% endif %}
+  </div>
+
+  <div class="row">
+
+    {# ── Left: main content ────────────────────── #}
+    <div class="col-md-8">
+
+      <div class="pe-title-area">
+        {% if event_type %}
+          <span class="pe-badge pe-badge--{{ et_slug }}">{{ event_type }}</span>
+        {% endif %}
+        <h1>{{ title }}</h1>
+        {% if subtitle %}<p class="pe-subtitle">{{ subtitle }}</p>{% endif %}
+      </div>
+
+      {% if description %}
+        <div class="pe-description from-markdown">{{ description }}</div>
+      {% endif %}
+
+      {# ── RSVP + Organizer ────────────────────── #}
+      <div class="pe-bottom-cards">
+
+        {% if organizer_name or organizer_email %}
+        <div class="pe-card">
+          <div class="pe-card-header">Organizer</div>
+          <div class="pe-card-body">
+            <div class="pe-organizer">
+              <div class="pe-org-avatar">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+              </div>
+              <div>
+                {% if organizer_name %}<p class="pe-org-name">{{ organizer_name }}</p>{% endif %}
+                {% if organizer_email %}
+                  <p class="pe-org-email"><a href="mailto:{{ organizer_email }}">{{ organizer_email }}</a></p>
+                {% endif %}
+              </div>
+            </div>
+          </div>
+        </div>
+        {% endif %}
+
+        <div class="pe-card">
+          <div class="pe-card-header">Are you interested?</div>
+          <div class="pe-card-body">
+            <div class="pe-rsvp-btns">
+              <button class="pe-rsvp-btn" id="btn-yes" data-response="Yes">
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+                Yes
+                <span class="pe-rsvp-count" id="count-yes">{{ going_count }}</span>
+              </button>
+              <button class="pe-rsvp-btn" id="btn-maybe" data-response="Maybe">
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+                Maybe
+                <span class="pe-rsvp-count" id="count-maybe">{{ maybe_count }}</span>
+              </button>
+              <button class="pe-rsvp-btn" id="btn-no" data-response="No">
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+                No
+                <span class="pe-rsvp-count" id="count-no">{{ not_going_count }}</span>
+              </button>
+            </div>
+            <p class="pe-rsvp-hint">No account needed · Change anytime</p>
+
+            {# Email subscription #}
+            <div class="pe-email-subscribe">
+              <div class="pe-email-title">Stay Updated</div>
+              <input type="email" id="subscribe-email" class="pe-email-input" placeholder="your.email@example.com">
+              <label class="pe-gdpr-label">
+                <input type="checkbox" id="gdpr-consent">
+                <span>I agree to receive event updates and accept the data privacy policy</span>
+              </label>
+              <button id="subscribe-btn" class="pe-subscribe-btn">Subscribe</button>
+              <div id="subscribe-msg" class="pe-subscribe-msg"></div>
+            </div>
+          </div>
+        </div>
+
+      </div>
+    </div>
+
+    {# ── Right: sticky info sidebar ────────────── #}
+    <div class="col-md-4">
+      <div class="pe-sidebar-card">
+        <div class="pe-sidebar-card-header">Event Details</div>
+        <div class="pe-sidebar-card-body">
+
+          {% if date_note and not starts_on %}
+          {# Show date note when no fixed date is set #}
+          <div class="pe-date-note">
+            <div class="pe-date-note-icon">
+              <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+                <rect x="3" y="4" width="18" height="18" rx="2" ry="2"/>
+                <line x1="16" y1="2" x2="16" y2="6"/>
+                <line x1="8" y1="2" x2="8" y2="6"/>
+                <line x1="3" y1="10" x2="21" y2="10"/>
+                <line x1="10" y1="16" x2="14" y2="16"/>
+              </svg>
+            </div>
+            <div class="pe-date-note-text">{{ date_note }}</div>
+          </div>
+          {% elif starts_day_num %}
+          {# Show calendar widget when fixed date is set #}
+          <div class="pe-cal-widget">
+            <div class="pe-cal">
+              <div class="pe-cal-month">{{ starts_month }}</div>
+              <div class="pe-cal-day">{{ starts_day_num }}</div>
+              <div class="pe-cal-wd">{{ starts_day_name }}</div>
+            </div>
+            <div class="pe-cal-info">
+              <div class="pe-cal-year">{{ starts_year }}</div>
+              <div class="pe-cal-time">
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+                {{ starts_time }}
+              </div>
+              {% if ends_time %}
+              <div class="pe-cal-until">
+                <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="5 12 12 5 19 12"/></svg>
+                ends {{ ends_time }}
+              </div>
+              {% endif %}
+            </div>
+          </div>
+          {% endif %}
+
+          {% if location or city %}
+          <div class="pe-sidebar-row">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>
+            <div>
+              <div class="pe-sidebar-row-label">Venue</div>
+              {% if location %}<div class="pe-sidebar-row-value">{{ location }}</div>{% endif %}
+              {% if city %}<div class="pe-sidebar-row-sub">{{ city }}</div>{% endif %}
+              {% if map_link %}
+                <a href="{{ map_link }}" target="_blank" rel="noopener" class="pe-map-link">
+                  <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>
+                  View on Maps
+                </a>
+              {% endif %}
+            </div>
+          </div>
+          {% endif %}
+
+          {% if status %}
+          <div class="pe-sidebar-row">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+            <div>
+              <div class="pe-sidebar-row-label">Status</div>
+              <span class="pe-status-pill {{ status_cls }}">{{ status }}</span>
+            </div>
+          </div>
+          {% endif %}
+
+          {% if registration_open %}
+          <div class="pe-register-wrap">
+            {% if spots_left is not none %}
+              {% if spots_left == 0 %}
+                <p class="pe-spots full">Registration full</p>
+                <span class="pe-register-full">No spots available</span>
+              {% elif spots_left <= 10 %}
+                <p class="pe-spots low">Only {{ spots_left }} spot{{ 's' if spots_left != 1 }} left</p>
+                <a href="/event-registration/new?event={{ doc.name }}" class="pe-register-btn">Register Now</a>
+              {% else %}
+                <p class="pe-spots ok">{{ spots_left }} spots available</p>
+                <a href="/event-registration/new?event={{ doc.name }}" class="pe-register-btn">Register Now</a>
+              {% endif %}
+            {% else %}
+              <a href="/event-registration/new?event={{ doc.name }}" class="pe-register-btn">Register Now</a>
+            {% endif %}
+          </div>
+          {% endif %}
+
+        </div>
+      </div>
+    </div>
+
+  </div>{# end row #}
+</div>
+
+<script>
+frappe.ready(function () {
+  var eventName   = {{ doc.name | tojson }};
+  var storageKey  = "pe_voted_" + eventName;
+  var currentVote = sessionStorage.getItem(storageKey);
+
+  var btnMap = {
+    "Yes":   { btn: document.getElementById("btn-yes"),   count: document.getElementById("count-yes"),   cls: "active-yes"   },
+    "Maybe": { btn: document.getElementById("btn-maybe"), count: document.getElementById("count-maybe"), cls: "active-maybe" },
+    "No":    { btn: document.getElementById("btn-no"),    count: document.getElementById("count-no"),    cls: "active-no"    }
+  };
+
+  function applyActiveState(chosen) {
+    Object.keys(btnMap).forEach(function (r) {
+      btnMap[r].btn.classList.toggle(btnMap[r].cls, r === chosen);
+    });
+  }
+
+  function updateCounts(counts) {
+    document.getElementById("count-yes").textContent   = counts.going_count    || 0;
+    document.getElementById("count-maybe").textContent = counts.maybe_count    || 0;
+    document.getElementById("count-no").textContent    = counts.not_going_count || 0;
+  }
+
+  if (currentVote) applyActiveState(currentVote);
+
+  Object.keys(btnMap).forEach(function (response) {
+    btnMap[response].btn.addEventListener("click", function () {
+      if (response === currentVote) return;
+      var prev = currentVote;
+      currentVote = response;
+      sessionStorage.setItem(storageKey, response);
+      applyActiveState(response);
+      frappe.call({
+        method: "phamos.phamos.doctype.phamos_event.phamos_event.submit_interest",
+        args: { event_name: eventName, response: response, previous_response: prev },
+        callback: function (r) {
+          if (r.message && r.message.status === "ok") updateCounts(r.message.counts);
+        }
+      });
+    });
+  });
+
+  // Email subscription
+  var subscribeBtn   = document.getElementById("subscribe-btn");
+  var subscribeEmail = document.getElementById("subscribe-email");
+  var gdprConsent    = document.getElementById("gdpr-consent");
+  var subscribeMsg   = document.getElementById("subscribe-msg");
+
+  subscribeBtn.addEventListener("click", function () {
+    var email = subscribeEmail.value.trim();
+    if (!email) {
+      subscribeMsg.textContent = "Please enter your email address";
+      subscribeMsg.className = "pe-subscribe-msg error";
+      return;
+    }
+    if (!gdprConsent.checked) {
+      subscribeMsg.textContent = "Please accept the data privacy policy";
+      subscribeMsg.className = "pe-subscribe-msg error";
+      return;
+    }
+    subscribeBtn.disabled = true;
+    subscribeMsg.textContent = "Subscribing...";
+    subscribeMsg.className = "pe-subscribe-msg";
+    frappe.call({
+      method: "phamos.phamos.doctype.phamos_event.phamos_event.subscribe_to_event",
+      args: { event_name: eventName, email: email },
+      callback: function (r) {
+        subscribeBtn.disabled = false;
+        if (r.message && r.message.status === "ok") {
+          subscribeMsg.textContent = "✓ Successfully subscribed!";
+          subscribeMsg.className = "pe-subscribe-msg success";
+          subscribeEmail.value = "";
+          gdprConsent.checked = false;
+        } else if (r.message && r.message.status === "already_subscribed") {
+          subscribeMsg.textContent = "You're already subscribed";
+          subscribeMsg.className = "pe-subscribe-msg";
+        } else {
+          subscribeMsg.textContent = "Error: " + (r.message || "Please try again");
+          subscribeMsg.className = "pe-subscribe-msg error";
+        }
+      },
+      error: function (r) {
+        subscribeBtn.disabled = false;
+        subscribeMsg.textContent = "Error: Please try again";
+        subscribeMsg.className = "pe-subscribe-msg error";
+      }
+    });
+  });
+});
+</script>
+{% endblock %}
