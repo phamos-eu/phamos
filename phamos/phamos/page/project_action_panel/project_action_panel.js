@@ -481,7 +481,6 @@ function openStopProjectDialog(timesheet_record, percent_billable, project, task
             label: __("Activity Log"),
             options: "Timesheet Activity Item",
             reqd: 1,
-            description: __("⚠️ Sent to the customer next day. Add one row per issue/task worked on."),
             fields: [
               { fieldname: "issue",      fieldtype: "Data", label: __("Issue"),      in_list_view: 1, columns: 3 },
               { fieldname: "what_i_did", fieldtype: "Data", label: __("What I Did"), reqd: 1, in_list_view: 1, columns: 7 },
