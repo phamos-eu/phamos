@@ -201,6 +201,21 @@ frappe.ui.form.on("Timesheets", {
 	rows_removed: function(frm, cdt, cdn) { recalculate_totals_from_timesheets(frm); },
 });
 
+// Delivery Note Item embedded in MIS does not load ERPNext TransactionController, so qty/rate do not
+// recalculate amount. Mirror standard behaviour: amount = qty * rate; stock_qty = qty * conversion_factor.
+function mis_recalculate_dn_item_row(frm, cdt, cdn) {
+	if (frm.doc.doctype !== "Monthly Implementation Summery") return;
+	var row = locals[cdt][cdn];
+	if (!row) return;
+	frappe.model.round_floats_in(row, ["qty", "rate", "conversion_factor"]);
+	var cf = flt(row.conversion_factor) || 1;
+	if (frappe.meta.get_docfield(cdt, "stock_qty")) {
+		frappe.model.set_value(cdt, cdn, "stock_qty", flt(flt(row.qty) * cf, precision("stock_qty", row)));
+	}
+	var amount = flt(flt(row.qty) * flt(row.rate), precision("amount", row));
+	frappe.model.set_value(cdt, cdn, "amount", amount);
+}
+
 // Fetch Item Name, UOM, UOM Conversion Factor when item_code is selected in MIS delivery_note_item
 frappe.ui.form.on("Delivery Note Item", {
 	item_code: function(frm, cdt, cdn) {
@@ -213,8 +228,18 @@ frappe.ui.form.on("Delivery Note Item", {
 				frappe.model.set_value(cdt, cdn, "stock_uom", r.stock_uom);
 				frappe.model.set_value(cdt, cdn, "uom", r.stock_uom);
 				frappe.model.set_value(cdt, cdn, "conversion_factor", 1);
+				mis_recalculate_dn_item_row(frm, cdt, cdn);
 			}
 		});
+	},
+	qty: function(frm, cdt, cdn) {
+		mis_recalculate_dn_item_row(frm, cdt, cdn);
+	},
+	rate: function(frm, cdt, cdn) {
+		mis_recalculate_dn_item_row(frm, cdt, cdn);
+	},
+	conversion_factor: function(frm, cdt, cdn) {
+		mis_recalculate_dn_item_row(frm, cdt, cdn);
 	},
 });
 
