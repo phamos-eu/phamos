@@ -24,9 +24,8 @@
   {
    "doctype": "Web Form Field",
    "fieldname": "event",
-   "fieldtype": "Link",
+   "fieldtype": "Data",
    "label": "Event",
-   "options": "Phamos Event",
    "read_only": 1,
    "reqd": 1
   },

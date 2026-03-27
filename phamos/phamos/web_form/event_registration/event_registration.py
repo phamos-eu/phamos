@@ -17,6 +17,12 @@ def get_context(context):
 
     context.title = f"Register — {event.title}"
 
+    # Pre-set the event field default so it's populated before JS runs
+    for field in context.web_form_doc.get("web_form_fields", []):
+        if field.get("fieldname") == "event":
+            field["default"] = event_name
+            break
+
     # Date line
     date_text = ""
     if event.starts_on:
