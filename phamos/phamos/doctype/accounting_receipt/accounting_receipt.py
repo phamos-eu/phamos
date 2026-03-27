@@ -4,7 +4,7 @@
 import frappe
 from frappe import _
 from frappe.model.document import Document
-from frappe.utils import today
+from frappe.utils import today, now
 from erpnext import get_default_company
 from frappe.desk.form.load import get_attachments, get_communications
 from frappe.desk.form.utils import add_comment
@@ -105,3 +105,180 @@ def sync_attachment_from_files(doc, event=None):
 	if doc.get("attachment"):
 		return
 	_sync_attachment_field(doc.name)
+
+
+@frappe.whitelist()
+def send_to_datev(accounting_receipt_name):
+	"""
+	Send Accounting Receipt PDF to DATEV via Email Queue.
+	Returns: dict with ok=True/False, message, and optionally email_queue_name
+	"""
+	# Validate document exists
+	if not frappe.db.exists("Accounting Receipt", accounting_receipt_name):
+		return {"ok": False, "message": _("Accounting Receipt not found")}
+	
+	doc = frappe.get_doc("Accounting Receipt", accounting_receipt_name)
+	
+	# Determine recipient based on receipt_type
+	recipient = None
+	if doc.receipt_type == "Sonstiges" and doc.datev_mail_recipient_2:
+		recipient = doc.datev_mail_recipient_2
+	elif doc.datev_mail_recipient:
+		recipient = doc.datev_mail_recipient
+	
+	if not recipient:
+		return {"ok": False, "message": _("DATEV recipient email is not configured. Please contact system administrator.")}
+	
+	# Check if PDF attachment exists in the attachment field or in attached files
+	pdf_file_url = doc.attachment
+	
+	# If attachment field is empty, try to find a PDF in attached files
+	if not pdf_file_url:
+		attached_files = frappe.get_all(
+			"File",
+			filters={
+				"attached_to_doctype": "Accounting Receipt",
+				"attached_to_name": doc.name,
+				"file_url": ["like", "%.pdf"]
+			},
+			fields=["file_url"],
+			order_by="creation desc",
+			limit=1
+		)
+		if attached_files:
+			pdf_file_url = attached_files[0].file_url
+			# Auto-sync to attachment field for future reference
+			doc.db_set("attachment", pdf_file_url, update_modified=False)
+	
+	# Final check
+	if not pdf_file_url or not pdf_file_url.lower().endswith(".pdf"):
+		return {
+			"ok": False, 
+			"message": _("PDF attachment is missing. Please attach a PDF file using the 'Attachment' field or the Attachments sidebar (📎).")
+		}
+	
+	# Check for duplicate sends - warn if already sent to same recipient
+	if doc.sent_to_datev and doc.datev_email_queue_ref:
+		# Check if there's a successful email in queue
+		existing_email = frappe.db.get_value(
+			"Email Queue",
+			doc.datev_email_queue_ref,
+			["name", "status"],
+			as_dict=True
+		)
+		if existing_email and existing_email.status in ["Sent", "Not Sent", "Sending"]:
+			return {
+				"ok": False,
+				"message": _("This document was already sent to DATEV on {0} by {1}. Email Queue: {2}").format(
+					frappe.format(doc.datev_sent_at, {"fieldtype": "Datetime"}),
+					doc.datev_sent_by,
+					doc.datev_email_queue_ref
+				),
+				"is_duplicate": True
+			}
+	
+	# Use the PDF file URL we found/validated earlier
+	file_url = pdf_file_url
+	
+	# Prepare email subject and message
+	subject = _("Accounting Receipt: {0}").format(doc.name)
+	message = _("<p>Please find attached the accounting receipt for: <strong>{0}</strong></p>").format(doc.title or doc.name)
+	
+	# Send email via Frappe Email Queue
+	try:
+		email_args = {
+			"recipients": [recipient],
+			"subject": subject,
+			"message": message,
+			"attachments": [{
+				"file_url": file_url
+			}],
+			"reference_doctype": "Accounting Receipt",
+			"reference_name": doc.name,
+			"send_after": None,
+		}
+		
+		# Queue the email
+		frappe.sendmail(**email_args)
+		
+		# Get the email queue name (last created for this doc)
+		email_queue_name = frappe.db.get_value(
+			"Email Queue",
+			filters={
+				"reference_doctype": "Accounting Receipt",
+				"reference_name": doc.name
+			},
+			fieldname="name",
+			order_by="creation desc"
+		)
+		
+		# Update Accounting Receipt with sent status and audit trail
+		doc.db_set("sent_to_datev", 1, update_modified=False)
+		doc.db_set("datev_sent_by", frappe.session.user, update_modified=False)
+		doc.db_set("datev_sent_at", now(), update_modified=False)
+		if email_queue_name:
+			doc.db_set("datev_email_queue_ref", email_queue_name, update_modified=False)
+		
+		return {
+			"ok": True,
+			"message": _("Email queued successfully to {0}").format(recipient),
+			"email_queue_name": email_queue_name,
+			"recipient": recipient
+		}
+		
+	except Exception as e:
+		frappe.log_error(title=_("DATEV Email Send Failed"), message=frappe.get_traceback())
+		return {
+			"ok": False,
+			"message": _("Failed to queue email: {0}").format(str(e))
+		}
+
+
+@frappe.whitelist()
+def get_datev_send_info(accounting_receipt_name):
+	"""
+	Get information needed for the DATEV send confirmation dialog.
+	Returns: dict with recipient, pdf_name, already_sent, etc.
+	"""
+	if not frappe.db.exists("Accounting Receipt", accounting_receipt_name):
+		return {"ok": False, "message": _("Accounting Receipt not found")}
+	
+	doc = frappe.get_doc("Accounting Receipt", accounting_receipt_name)
+	
+	# Determine recipient
+	recipient = None
+	if doc.receipt_type == "Sonstiges" and doc.datev_mail_recipient_2:
+		recipient = doc.datev_mail_recipient_2
+	elif doc.datev_mail_recipient:
+		recipient = doc.datev_mail_recipient
+	
+	# Get PDF - check attachment field first, then attached files
+	pdf_url = doc.attachment
+	if not pdf_url:
+		# Try to find PDF in attached files
+		attached_files = frappe.get_all(
+			"File",
+			filters={
+				"attached_to_doctype": "Accounting Receipt",
+				"attached_to_name": doc.name,
+				"file_url": ["like", "%.pdf"]
+			},
+			fields=["file_url"],
+			order_by="creation desc",
+			limit=1
+		)
+		if attached_files:
+			pdf_url = attached_files[0].file_url
+	
+	pdf_name = pdf_url.split("/")[-1] if pdf_url else None
+	
+	return {
+		"ok": True,
+		"recipient": recipient,
+		"pdf_name": pdf_name,
+		"pdf_url": pdf_url,
+		"already_sent": doc.sent_to_datev,
+		"sent_at": doc.datev_sent_at,
+		"sent_by": doc.datev_sent_by,
+		"email_queue_ref": doc.datev_email_queue_ref
+	}
