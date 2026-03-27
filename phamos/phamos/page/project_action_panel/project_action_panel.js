@@ -135,7 +135,6 @@ function update_and_submit_timesheet_record(
         return;
       }
 
-
       frappe.call({
         method: "phamos.phamos.page.project_action_panel.project_action_panel.update_and_submit_timesheet_record",
         args: {
@@ -308,13 +307,15 @@ function update_and_submit_timesheet_record(
         return;
       }
 
-      openStopProjectDialog(timesheet_record, percent_billable, project, task, task_in_timesheet_record);
+      // Get the minimum valid to_time (current row's from_time)
+      let min_to_time = lastRow.from_time || null;
+      openStopProjectDialog(timesheet_record, percent_billable, project, task, task_in_timesheet_record, min_to_time);
     }
   });
 };
 
 // 🔹 Separate function for dialog
-function openStopProjectDialog(timesheet_record, percent_billable, project, task, task_in_timesheet_record) {
+function openStopProjectDialog(timesheet_record, percent_billable, project, task, task_in_timesheet_record, min_to_time) {
   let from_time = '';
   let expected_time = '';
   let timesheet_record_info = " Info from timesheet record";
@@ -396,6 +397,16 @@ function openStopProjectDialog(timesheet_record, percent_billable, project, task
             fieldname: "to_time",
             fieldtype: "Datetime",
             reqd: 1,
+            default: (function() {
+              // Get current server time
+              var current = frappe.datetime.system_datetime();
+              // Ensure it's not earlier than the row's from_time
+              if (min_to_time && frappe.datetime.get_diff(current, min_to_time) < 0) {
+                return min_to_time;
+              }
+              return current;
+            })(),
+            description: "Time updates live. Edit manually to stop auto-update.",
           },
           {
             fieldtype: "Select",
@@ -411,10 +422,24 @@ function openStopProjectDialog(timesheet_record, percent_billable, project, task
         ],
         primary_action_label: __("Update Timesheet Record."),
         primary_action(values) {
+          // Use actual_to_time if available (from auto-updater), otherwise use form value
+          // This prevents the datetime field from stripping seconds
+          let final_to_time = actual_to_time || values.to_time;
+          
+          // Validate using Date comparison for better precision
+          if (min_to_time) {
+            let to_date = frappe.datetime.str_to_obj(final_to_time);
+            let min_date = frappe.datetime.str_to_obj(min_to_time);
+            
+            if (to_date < min_date) {
+              final_to_time = min_to_time;
+            }
+          }
+          
           update_and_submit_timesheet_record(
             values.timesheet_record,
             values.task,
-            values.to_time,
+            final_to_time,
             values.percent_billable,
             values.activity_type,
             values.result
@@ -425,6 +450,80 @@ function openStopProjectDialog(timesheet_record, percent_billable, project, task
 
       dialog.$wrapper.find(".modal-dialog").css("max-width", "800px");
       dialog.show();
+      
+      // Implement live time update for to_time field
+      var time_update_interval = null;
+      var user_interacted = false;
+      // Store the actual full datetime with seconds (initialize with current or min)
+      var actual_to_time = min_to_time && frappe.datetime.get_diff(frappe.datetime.system_datetime(), min_to_time) < 0
+        ? min_to_time
+        : frappe.datetime.system_datetime();
+      
+      setTimeout(function() {
+        var to_time_field = dialog.fields_dict.to_time;
+        
+        if (to_time_field && to_time_field.$input && to_time_field.$input.length > 0) {
+          // Mark as user-interacted on focus or manual typing
+          to_time_field.$input.on('focus mousedown keydown', function() {
+            if (!user_interacted) {
+              user_interacted = true;
+              if (time_update_interval) {
+                clearInterval(time_update_interval);
+                time_update_interval = null;
+              }
+            }
+          });
+          
+          // Function to update the time field
+          var update_time = function() {
+            if (!user_interacted) {
+              // Get current time from server (in system timezone)
+              var current_time = frappe.datetime.system_datetime();
+              
+              // Ensure it's not earlier than the row's from_time
+              if (min_to_time && frappe.datetime.get_diff(current_time, min_to_time) < 0) {
+                current_time = min_to_time;
+              }
+              
+              // Store the actual full datetime
+              actual_to_time = current_time;
+              
+              // Update field using multiple approaches to ensure sync
+              to_time_field.$input.val(current_time);
+              
+              try {
+                dialog.set_value('to_time', current_time);
+              } catch(e) {}
+              
+              if (to_time_field.set_model_value) {
+                to_time_field.set_model_value(current_time);
+              }
+            }
+          };
+          
+          // Sync to system clock - wait until next full second
+          var now = new Date();
+          var ms_until_next_second = 1000 - now.getMilliseconds();
+          
+          setTimeout(function() {
+            // Update immediately at the second boundary
+            update_time();
+            
+            // Then continue updating every second, now synced
+            time_update_interval = setInterval(update_time, 1000);
+          }, ms_until_next_second);
+        }
+      }, 500);
+      
+      // Cleanup interval when dialog closes
+      var original_hide = dialog.hide;
+      dialog.hide = function() {
+        if (time_update_interval) {
+          clearInterval(time_update_interval);
+          time_update_interval = null;
+        }
+        original_hide.call(this);
+      };
     });
   });
 }
@@ -583,6 +682,8 @@ function openStopProjectDialog(timesheet_record, percent_billable, project, task
                   in_list_view: 1,
                   reqd: 1,
                   read_only: 0,
+                  default: frappe.datetime.system_datetime(),
+                  description: "Auto-filled with current time. Adjust if needed.",
                 },
                 { 
                   fieldtype: "Small Text",
