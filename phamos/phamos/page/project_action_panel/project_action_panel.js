@@ -426,15 +426,6 @@ function openStopProjectDialog(timesheet_record, percent_billable, project, task
             read_only: 1,
             default: timesheet_record_info,
           },
-          {
-            label: "What I did ",
-            fieldname: "result",
-            fieldtype: "Small Text",
-            reqd: 1,
-            description:
-                    "⚠️ This information is sent to the customer next day. Please make sure to wright meaningful text. Adding Issues ID's and or URL is helpful.",
-
-          },
           { fieldtype: "Column Break" },
           {
             fieldtype: "Link",
@@ -483,6 +474,19 @@ function openStopProjectDialog(timesheet_record, percent_billable, project, task
             hidden: 1,
             description: "This field is used to indicate your productivity level on internal (non-billable) project work. It helps measure performance and effort for internal activities.",
           },
+          { fieldtype: "Section Break", label: __("What I Did") },
+          {
+            fieldname: "activity_log",
+            fieldtype: "Table",
+            label: __("Activity Log"),
+            options: "Timesheet Activity Item",
+            reqd: 1,
+            description: __("⚠️ Sent to the customer next day. Add one row per issue/task worked on."),
+            fields: [
+              { fieldname: "issue",      fieldtype: "Data", label: __("Issue"),      in_list_view: 1, columns: 3 },
+              { fieldname: "what_i_did", fieldtype: "Data", label: __("What I Did"), reqd: 1, in_list_view: 1, columns: 7 },
+            ],
+          },
         ],
         primary_action_label: __("Update Timesheet Record."),
         primary_action(values) {
@@ -500,13 +504,31 @@ function openStopProjectDialog(timesheet_record, percent_billable, project, task
             }
           }
           
+          // Validate activity log rows
+          let activity_rows = values.activity_log || [];
+          if (!activity_rows.length) {
+            frappe.msgprint(__("Please add at least one entry in 'What I Did'."));
+            return;
+          }
+          for (let i = 0; i < activity_rows.length; i++) {
+            if (!activity_rows[i].what_i_did) {
+              frappe.msgprint(__("Row {0}: 'What I Did' is required.", [i + 1]));
+              return;
+            }
+          }
+
+          // Format rows into result string: "[Issue] What I did" or just "What I did"
+          let result = activity_rows.map(function(row) {
+            return row.issue ? "[" + row.issue + "]: " + row.what_i_did : row.what_i_did;
+          }).join("\n");
+
           update_and_submit_timesheet_record(
             values.timesheet_record,
             values.task,
             final_to_time,
             values.percent_billable,
             values.activity_type,
-            values.result,
+            result,
             values.parent_issues_url,
             values.productivity
           );
