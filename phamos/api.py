@@ -311,6 +311,155 @@ def get_sales_order_kpi_stats(sales_order):
     }
 
 
+@frappe.whitelist()
+def get_customer_sales_order_status():
+    """Get sales order delivery status for customer portal
+    
+    Returns all sales orders linked to implementations for the logged-in customer
+    with delivery status information, summary metrics, and chart data
+    """
+    user = frappe.session.user
+    
+    validate_guest_user()
+    customer = get_customer_for_user(user)
+    if not customer:
+        frappe.throw("No Customer linked to user.", frappe.PermissionError)
+    
+    frappe.log_error(f"Customer Portal - User: {user}, Customer: {customer}", "SO Status Debug")
+    
+    # Get all implementations for this customer using SQL (bypasses permission check)
+    implementations = frappe.db.sql("""
+        SELECT name, status, department
+        FROM `tabImplementation`
+        WHERE customer = %s
+    """, customer, as_dict=True)
+    
+    frappe.log_error(f"Found {len(implementations)} implementations: {[i.name for i in implementations]}", "SO Status Debug")
+    
+    if not implementations:
+        return {
+            "sales_orders": [],
+            "summary": {
+                "total_so_hrs": 0,
+                "delivered_hrs": 0,
+                "timesheet_hrs": 0,
+                "remaining_hrs": 0,
+                "open_so_count": 0,
+                "total_so_count": 0
+            },
+            "chart_data": {
+                "labels": ["Delivered Hrs", "Timesheet Hrs", "Remaining Hrs"],
+                "values": [0, 0, 0]
+            }
+        }
+    
+    implementation_names = [impl.name for impl in implementations]
+
+    # Get all OPEN sales orders for these implementations (matching Implementation doctype logic)
+    sales_orders = frappe.db.sql("""
+        SELECT 
+            so.name,
+            so.customer_name as title,
+            so.status,
+            so.total_qty as total_hrs,
+            so.transaction_date,
+            so.delivery_date,
+            so.per_delivered,
+            so.per_billed,
+            so.grand_total,
+            so.custom_implementation as implementation
+        FROM `tabSales Order` so
+        WHERE 
+            so.custom_implementation IN %(implementations)s
+            AND so.docstatus = 1
+            AND so.status IN ('To Deliver and Bill', 'To Deliver', 'To Bill')
+        ORDER BY so.transaction_date DESC
+    """, {"implementations": implementation_names}, as_dict=True)
+    
+    frappe.log_error(f"Found {len(sales_orders)} sales orders", "SO Status Debug")
+    
+    total_so_hrs = 0
+    total_delivered_hrs = 0
+    total_timesheet_hrs = 0
+    open_so_count = 0
+    
+    # Process each sales order
+    for so in sales_orders:
+        # Calculate delivered hours from delivery notes (matching Implementation doctype logic)
+        delivered_hrs = frappe.db.sql("""
+            SELECT SUM(dni.qty) as delivered_qty
+            FROM `tabDelivery Note Item` dni
+            JOIN `tabDelivery Note` dn ON dn.name = dni.parent
+            WHERE 
+                dni.against_sales_order = %s
+                AND dn.docstatus = 1
+                AND dn.status IN ('Completed', 'To Bill')
+        """, so.name, as_dict=True)
+        
+        so.delivered_hrs = delivered_hrs[0].delivered_qty if delivered_hrs[0].delivered_qty else 0
+        so.remaining_hrs = so.total_hrs - so.delivered_hrs
+        
+        # Add to totals
+        total_so_hrs += so.total_hrs or 0
+        total_delivered_hrs += so.delivered_hrs or 0
+
+        # Count open sales orders (all fetched orders are open based on our query)
+        open_so_count += 1
+
+    # Calculate billable timesheet hours (not on delivery note) - matching Implementation doctype logic
+    # Get projects for these implementations using SQL
+    projects = frappe.db.sql("""
+        SELECT name
+        FROM `tabProject`
+        WHERE custom_implementation IN %(implementations)s
+    """, {"implementations": implementation_names}, as_dict=True)
+
+    project_names = [p.name for p in projects]
+
+    if project_names:
+        timesheet_hrs_result = frappe.db.sql("""
+            SELECT SUM(td.hours) as timesheet_hrs
+            FROM `tabTimesheet` t
+            JOIN `tabTimesheet Detail` td ON t.name = td.parent
+            WHERE
+                td.is_billable = 1
+                AND t.docstatus = 0
+                AND td.project IN %(projects)s
+                AND td.custom_implementation IN %(implementations)s
+                AND t.custom_delivery_note IS NULL
+        """, {"projects": project_names, "implementations": implementation_names}, as_dict=True)
+
+        total_timesheet_hrs = timesheet_hrs_result[0].timesheet_hrs if timesheet_hrs_result and timesheet_hrs_result[0].timesheet_hrs else 0
+
+    # Calculate remaining hours: Total SO Hours - (Delivered Hours + Timesheet Hours)
+    total_remaining_hrs = total_so_hrs - (total_delivered_hrs + total_timesheet_hrs)
+
+    # Prepare chart data (same as Implementation doctype - percentage chart)
+    chart_data = {
+        "labels": ["Delivered Hrs", "Timesheet Hrs", "Remaining Hrs"],
+        "values": [
+            float(total_delivered_hrs),
+            float(total_timesheet_hrs),
+            float(total_remaining_hrs)
+        ]
+    }
+    
+    result = {
+        "sales_orders": sales_orders,
+        "summary": {
+            "total_so_hrs": total_so_hrs,
+            "delivered_hrs": total_delivered_hrs,
+            "timesheet_hrs": total_timesheet_hrs,
+            "remaining_hrs": total_remaining_hrs,
+            "open_so_count": open_so_count,
+            "total_so_count": len(sales_orders)
+        },
+        "chart_data": chart_data
+    }
+    
+    frappe.log_error(f"Returning result with {len(sales_orders)} orders", "SO Status Debug")
+    return result
+
 
 def send_daily_timesheet_comment_summary():
     rows = frappe.db.sql(

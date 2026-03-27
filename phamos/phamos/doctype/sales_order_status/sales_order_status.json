@@ -36,7 +36,7 @@
    "read_only": 1
   },
   {
-   "fetch_from": "sales_order.title",
+   "fetch_from": "sales_order.customer_name",
    "fieldname": "so_title",
    "fieldtype": "Data",
    "in_list_view": 1,

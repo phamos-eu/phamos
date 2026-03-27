@@ -5,6 +5,7 @@ let currentSortBy = null;
 let currentSortOrder = null;
 let currentChartView = 'week'; // 'week' or 'month'
 let cachedTimesheetData = null; // Cache the timesheet data
+let currentTsName = null; // Store which timesheet is being edited
 const sortFieldMap = {
     1: "timesheet",
     2: "start_date",
@@ -129,6 +130,78 @@ $('#from_date').on('change', function () {
         !$menu.is(event.target) && $menu.has(event.target).length === 0) {
       $menu.removeClass('show');
     }
+  });
+  
+  // Comment modal event handlers
+  let selectedRating = 0;
+  
+  // When user clicks the "Add/Edit Comment" button
+  $(document).on('click', '.comment-btn', function () {
+    currentTsName = $(this).data('name');
+    const currentComment = $(this).data('comment') || '';
+    const rating = $(this).data('rating') || 0;
+    
+    $('#commentInput').val(currentComment);
+    $('#starRating .star').each(function (index) {
+      $(this).html(index < rating ? '&#9733;' : '&#9734;');
+    });
+    selectedRating = rating;
+    $('#commentModal').modal('show');
+  });
+
+  // Handle click on stars
+  $(document).on('click', '#starRating .star', function () {
+    selectedRating = parseInt($(this).data('value'));
+    $('#starRating .star').each(function (index) {
+      $(this).html(index < selectedRating ? '&#9733;' : '&#9734;');
+    });
+    $('#ratingError').hide(); // hide error after selection
+  });
+
+  // Intercept Save button
+  $('#saveComment').on('click', function (e) {
+    e.preventDefault();
+
+    const comment = $('#commentInput').val().trim();
+
+    // Check if rating is selected
+    if (selectedRating === 0) {
+      $('#ratingError').show();
+      return;
+    }
+
+    // Proceed if rating is selected
+    if (!currentTsName) return;
+
+    frappe.call({
+      method: "phamos.api.update_customer_comment",
+      args: {
+        ts_name: currentTsName,
+        comment: comment,
+        custom_rating: selectedRating
+      },
+      callback: function (r) {
+        if (!r.exc) {
+          frappe.show_alert({ message: r.message.message, indicator: "green" });
+
+          const btn = $(`.comment-btn[data-name="${currentTsName}"]`);
+          btn.text("Under Review")
+            .css("background-color", "#ffc107")
+            .data('comment', comment)
+            .data('rating', selectedRating);
+
+          $('#commentModal').modal('hide');
+          reset_and_load();
+        } else {
+          frappe.show_alert({ message: "Failed to send request", indicator: "red" });
+        }
+      }
+    });
+  });
+  
+  // Sales Orders tab event handler
+  $('#sales-orders-tab').on('shown.bs.tab', function (e) {
+    loadSalesOrderData();
   });
   
 });
@@ -296,72 +369,9 @@ function apply_column_filters() {
   }
 }
 
-let currentTsName = null; // store which timesheet is being edited
+// currentTsName is declared in frappe.ready() block above
 
-// When user clicks the "Add/Edit Comment" button
-$(document).on('click', '.comment-btn', function () {
-  currentTsName = $(this).data('name');
-  const currentComment = $(this).data('comment') || '';
-  
-  $('#commentInput').val(currentComment);
-  $('#commentModal').modal('show');
-});
-
-// When user clicks Save in the modal
-let selectedRating = 0;
-
-// Handle click on stars
-$(document).on('click', '#starRating .star', function () {
-  selectedRating = parseInt($(this).data('value'));
-  $('#starRating .star').each(function (index) {
-    $(this).html(index < selectedRating ? '&#9733;' : '&#9734;');
-  });
-  $('#ratingError').hide(); // hide error after selection
-});
-
-// Intercept Save button
-$('#saveComment').on('click', function (e) {
-  e.preventDefault();
-
-  const comment = $('#commentInput').val().trim();
-
-  // 🟥 Check if rating is selected
-  if (selectedRating === 0) {
-    $('#ratingError').show();
-    return;
-  }
-
-  // 🟩 Proceed if rating is selected
-  if (!currentTsName) return;
-
-  frappe.call({
-    method: "phamos.api.update_customer_comment",
-    args: {
-      ts_name: currentTsName,
-      comment: comment,
-      custom_rating: selectedRating
-    },
-    callback: function (r) {
-      if (!r.exc) {
-        frappe.show_alert({ message: r.message.message, indicator: "green" });
-
-        const btn = $(`.comment-btn[data-name="${currentTsName}"]`);
-        btn.text("Under Review")
-          .css("background-color", "#ffc107")
-          .data('comment', comment)
-          .data('rating', selectedRating);
-
-        $('#commentModal').modal('hide');
-        reset_and_load();
-      } else {
-        frappe.show_alert({ message: "Failed to send request", indicator: "red" });
-      }
-    }
-  });
-});
-
-
-
+// Native DOM event listener for star rating (kept for backward compatibility)
 document.addEventListener('DOMContentLoaded', function() {
   const stars = document.querySelectorAll('#starRating .star');
   let selectedRating = 0;
@@ -440,7 +450,7 @@ function download_visible_csv() {
     return;
   }
 
-  const headers = ['Timesheet', 'Status', 'Employee ID', 'Employee Name', 'Start Date', 'End Date', 'Billing Status', 'Total Hours', 'Billable Hours'];
+  const headers = ['Timesheet', 'Employee ID', 'Start Date', 'End Date', 'Billing Status', 'Total Hours', 'Billable Hours'];
   const csv = [headers.join(",")].concat(rows.map(r => r.join(","))).join("\n");
 
   const blob = new Blob([csv], { type: 'text/csv' });
@@ -479,7 +489,7 @@ function download_all_csv() {
         row.total_billable_hours
       ]);
 
-      const headers = ['Timesheet', 'Status', 'Employee ID', 'Employee Name', 'Start Date', 'End Date', 'Billing Status', 'Total Hours', 'Billable Hours'];
+      const headers = ['Timesheet', 'Employee ID', 'Start Date', 'End Date', 'Billing Status', 'Total Hours', 'Billable Hours'];
       const csv = [headers.join(",")].concat(rows.map(r => r.join(","))).join("\n");
 
       const blob = new Blob([csv], { type: 'text/csv' });
@@ -845,42 +855,17 @@ function load_graph_data() {
     args: { from_date, to_date, project },
     callback: function (r) {
       if (r.message) {
-        loadAndRenderGraph(r.message);
+        // loadAndRenderGraph(r.message);
+        processDataForGraph(r.message.timesheets);
+
       }
     }
   });
 }
 
 /////////////////////////////////////
-loadAndRenderGraph();
-
-// Handle "Give Feedback" button click dynamically
-$(document).on('click', '.comment-btn', function () {
-  const tsName = $(this).data('name');
-  currentTsName = tsName;
-
-  const comment = $(this).data('comment');
-  const discount = $(this).data('discount');
-  const rating = $(this).data('rating');
-  const statusText = $(this).text().trim();
-
-  $('#commentInput').val(comment);
-  $('#discountSelect').val(discount);
-
-  // Reset stars
-  $('#starRating .star').removeClass('selected');
-  for (let i = 0; i < rating; i++) {
-    $('#starRating .star').eq(i).addClass('selected');
-  }
-
-  // Disable editing if "Under Review"
-  const isLocked = statusText === "Under Review";
-  $('#commentInput').prop('disabled', isLocked);
-  $('#starRating .star').css('pointer-events', isLocked ? 'none' : 'auto');
-  $('#saveComment').prop('disabled', isLocked);
-
-  $('#commentModal').modal('show');
-});
+// Removed duplicate jQuery event handlers - they are in frappe.ready() block
+// loadAndRenderGraph(); // Called from frappe.ready() if needed
 
 /* Sorting Handler  */
 document.addEventListener("click", function (event) {
@@ -940,7 +925,6 @@ let salesOrderData = null;
 let soCurrentPage = 1;
 let soPageSize = 20;
 let allSalesOrders = [];
-let originalSalesOrders = [];
 
 // Listen for Sales Orders tab activation
 document.getElementById('sales-orders-tab').addEventListener('shown.bs.tab', function (event) {
@@ -950,9 +934,16 @@ document.getElementById('sales-orders-tab').addEventListener('shown.bs.tab', fun
 });
 
 function loadSalesOrderData() {
+  console.log('Loading sales order data...');
+  console.log('Current user:', frappe.session.user);
+  
   frappe.call({
     method: "phamos.api.get_customer_sales_order_status",
     callback: function(response) {
+      console.log('Sales Order Response:', response);
+      console.log('Response message:', response.message);
+      console.log('Response exc:', response.exc);
+      
       if (response.exc) {
         console.error('API Exception:', response.exc);
         frappe.msgprint({
@@ -967,8 +958,12 @@ function loadSalesOrderData() {
       if (response.message) {
         salesOrderData = response.message;
         salesOrderDataLoaded = true;
+        console.log('Sales Orders loaded:', salesOrderData);
+        console.log('Summary:', salesOrderData.summary);
+        console.log('Sales Orders count:', salesOrderData.sales_orders.length);
         renderSalesOrderData(salesOrderData);
       } else {
+        console.log('No data returned from API');
         showSalesOrderError();
       }
     },
@@ -985,25 +980,44 @@ function loadSalesOrderData() {
 }
 
 function renderSalesOrderData(data) {
+  console.log('Rendering sales order data...');
+  console.log('Data received:', data);
+  
   // Render summary cards
   $('#total-so-hrs').text(formatNumber(data.summary.total_so_hrs));
   $('#delivered-hrs').text(formatNumber(data.summary.delivered_hrs));
   
+  console.log('Summary cards updated');
+  
   // Store all sales orders
-  originalSalesOrders = data.sales_orders || [];
-  allSalesOrders = [...originalSalesOrders];
+  allSalesOrders = data.sales_orders;
   soCurrentPage = 1;
   
   // Render table with pagination
   try {
     renderSalesOrderTable();
     renderSalesOrderPagination();
+    console.log('Table rendered');
   } catch (e) {
     console.error('Error rendering table:', e);
   }
 }
 
-
+// Map Sales Order status to Frappe indicator colors
+function getStatusColor(status) {
+  const statusColors = {
+    'Draft': { bg: '#d1d8dd', text: '#364a59' },
+    'On Hold': { bg: '#ffeab6', text: '#7f5c00' },
+    'To Deliver and Bill': { bg: '#ffe6cc', text: '#7f4200' },
+    'To Bill': { bg: '#d4f5d4', text: '#1a731a' },
+    'To Deliver': { bg: '#d4e7f7', text: '#16537a' },
+    'Completed': { bg: '#d4f5d4', text: '#0a5e0a' },
+    'Cancelled': { bg: '#ffe6e6', text: '#a10000' },
+    'Closed': { bg: '#e8e8e8', text: '#4d4d4d' }
+  };
+  
+  return statusColors[status] || { bg: '#e8f4f8', text: '#2e5f75' };
+}
 
 function renderSalesOrderTable() {
   const tbody = $('#so-table-body');
@@ -1019,7 +1033,7 @@ function renderSalesOrderTable() {
         </td>
       </tr>
     `);
-    $('#so-page-info').text('Showing 0 - 0 of 0');
+    document.getElementById('so-page-info').textContent = 'Showing 0 - 0 of 0';
     return;
   }
   
@@ -1063,31 +1077,14 @@ function renderSalesOrderTable() {
     tbody.append(row);
   });
   
-  // Update page info directly
+  // Update page info
   const pageInfoText = `Showing ${startIndex + 1} - ${endIndex} of ${allSalesOrders.length}`;
   document.getElementById('so-page-info').textContent = pageInfoText;
-  $('#so-page-info').text(pageInfoText);
 }
-
 
 function getStatusBadge(status) {
   const colors = getStatusColor(status);
   return `<span class="badge" style="background-color: ${colors.bg}; color: ${colors.text}; font-weight: 500; padding: 5px 12px; border-radius: 4px;">${status}</span>`;
-}
-
-function getStatusColor(status) {
-  const statusColors = {
-    'Draft': { bg: '#d1d8dd', text: '#364a59' },
-    'On Hold': { bg: '#ffeab6', text: '#7f5c00' },
-    'To Deliver and Bill': { bg: '#ffe6cc', text: '#7f4200' },
-    'To Bill': { bg: '#d4f5d4', text: '#1a731a' },
-    'To Deliver': { bg: '#d4e7f7', text: '#16537a' },
-    'Completed': { bg: '#d4f5d4', text: '#0a5e0a' },
-    'Cancelled': { bg: '#ffe6e6', text: '#a10000' },
-    'Closed': { bg: '#e8e8e8', text: '#4d4d4d' }
-  };
-  
-  return statusColors[status] || { bg: '#e8f4f8', text: '#2e5f75' };
 }
 
 function getProgressColor(percent) {
@@ -1207,173 +1204,4 @@ function renderSalesOrderPagination() {
       renderSalesOrderPagination();
     }
   });
-}
-
-function updateSalesOrderPageInfo(start, end, total) {
-  $('#so-page-info').text(`Showing ${start} - ${end} of ${total}`);
-}
-
-// ========================================
-// Sales Orders Tab - Filters, Sort, and Search
-// ========================================
-
-let soCurrentSortColumn = null;
-let soCurrentSortOrder = null;
-
-// Status filter - use delegated event handler
-$(document).on('change', '#so_status_filter', function() {
-  applySalesOrderFilters();
-});
-
-// Clear filters - use delegated event handler
-$(document).on('click', '#so_clear_filters', function() {
-  $('#so_status_filter').val('');
-  $('.so-column-filter').val('');
-  applySalesOrderFilters();
-});
-
-// In-table search
-$(document).on('input', '.so-column-filter', function() {
-  applySalesOrderFilters();
-});
-
-// Sort functionality
-$(document).on('click', '.sort-icon[data-so-column]', function(e) {
-  e.stopPropagation();
-  const column = $(this).data('so-column');
-  const menu = $(this).siblings('.so-menu');
-  
-  // Hide all other menus
-  $('.so-menu').not(menu).hide();
-  
-  // Toggle current menu
-  menu.toggle();
-});
-
-$(document).on('click', '.so-menu .menu-item', function(e) {
-  e.stopPropagation();
-  const action = $(this).data('action');
-  const menu = $(this).closest('.so-menu');
-  const column = menu.siblings('.sort-icon').data('so-column');
-  
-  if (action === 'asc') {
-    soCurrentSortColumn = column;
-    soCurrentSortOrder = 'asc';
-  } else if (action === 'desc') {
-    soCurrentSortColumn = column;
-    soCurrentSortOrder = 'desc';
-  } else if (action === 'reset') {
-    soCurrentSortColumn = null;
-    soCurrentSortOrder = null;
-  }
-  
-  applySalesOrderFilters();
-  menu.hide();
-});
-
-// Hide menus when clicking outside
-$(document).on('click', function() {
-  $('.so-menu').hide();
-});
-
-function applySalesOrderFilters() {
-  if (!originalSalesOrders || originalSalesOrders.length === 0) {
-    return;
-  }
-  
-  // Start with original data
-  let filtered = [...originalSalesOrders];
-  
-  // Apply status filter
-  const statusFilter = $('#so_status_filter').val();
-  if (statusFilter) {
-    filtered = filtered.filter(so => so.status === statusFilter);
-  }
-  
-  // Apply column filters
-  const columnFilterElements = $('.so-column-filter');
-  
-  columnFilterElements.each(function() {
-    const column = $(this).data('so-column');
-    const value = ($(this).val() || '').trim().toLowerCase();
-    
-    if (value) {
-      filtered = filtered.filter(so => {
-        let fieldValue = '';
-        
-        if (column === 'name') {
-          fieldValue = (so.name || '').toString().toLowerCase();
-        } else if (column === 'title') {
-          fieldValue = (so.title || '').toString().toLowerCase();
-        } else if (column === 'delivery_date') {
-          fieldValue = (so.delivery_date || '').toString().toLowerCase();
-        } else if (column === 'status') {
-          fieldValue = (so.status || '').toString().toLowerCase();
-        } else if (column === 'total_hrs') {
-          fieldValue = (so.total_hrs || 0).toString();
-        } else if (column === 'delivered_hrs') {
-          fieldValue = (so.delivered_hrs || 0).toString();
-        } else if (column === 'remaining_hrs') {
-          fieldValue = (so.remaining_hrs || 0).toString();
-        } else if (column === 'progress') {
-          const progress = so.total_hrs > 0 ? ((so.delivered_hrs / so.total_hrs * 100).toFixed(1)) : '0';
-          fieldValue = progress.toString();
-        }
-        
-        return fieldValue.includes(value);
-      });
-    }
-  });
-  
-  // Apply sorting
-  if (soCurrentSortColumn && soCurrentSortOrder) {
-    filtered.sort((a, b) => {
-      let aVal, bVal;
-      
-      if (soCurrentSortColumn === 'name') {
-        aVal = a.name || '';
-        bVal = b.name || '';
-      } else if (soCurrentSortColumn === 'title') {
-        aVal = a.title || '';
-        bVal = b.title || '';
-      } else if (soCurrentSortColumn === 'delivery_date') {
-        aVal = a.delivery_date || '';
-        bVal = b.delivery_date || '';
-      } else if (soCurrentSortColumn === 'status') {
-        aVal = a.status || '';
-        bVal = b.status || '';
-      } else if (soCurrentSortColumn === 'total_hrs') {
-        aVal = parseFloat(a.total_hrs) || 0;
-        bVal = parseFloat(b.total_hrs) || 0;
-      } else if (soCurrentSortColumn === 'delivered_hrs') {
-        aVal = parseFloat(a.delivered_hrs) || 0;
-        bVal = parseFloat(b.delivered_hrs) || 0;
-      } else if (soCurrentSortColumn === 'remaining_hrs') {
-        aVal = parseFloat(a.remaining_hrs) || 0;
-        bVal = parseFloat(b.remaining_hrs) || 0;
-      } else if (soCurrentSortColumn === 'progress') {
-        aVal = a.total_hrs > 0 ? (a.delivered_hrs / a.total_hrs * 100) : 0;
-        bVal = b.total_hrs > 0 ? (b.delivered_hrs / b.total_hrs * 100) : 0;
-      }
-      
-      if (typeof aVal === 'string') {
-        aVal = aVal.toLowerCase();
-        bVal = bVal.toLowerCase();
-      }
-      
-      if (soCurrentSortOrder === 'asc') {
-        return aVal > bVal ? 1 : aVal < bVal ? -1 : 0;
-      } else {
-        return aVal < bVal ? 1 : aVal > bVal ? -1 : 0;
-      }
-    });
-  }
-  
-  // Update filtered list and reset to first page
-  allSalesOrders = filtered;
-  soCurrentPage = 1;
-  
-  // Re-render table
-  renderSalesOrderTable();
-  renderSalesOrderPagination();
 }
