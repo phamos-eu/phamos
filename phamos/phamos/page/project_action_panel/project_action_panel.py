@@ -595,7 +595,7 @@ def get_team_holidays():
 
 
 @frappe.whitelist()
-def update_and_submit_timesheet_record(name, to_time, percent_billable, activity_type, result, task=None, issues=None, parent_issues_url=None):
+def update_and_submit_timesheet_record(name, to_time, percent_billable, activity_type, result, task=None, issues=None, parent_issues_url=None, productivity=None):
     try:
         # Retrieve the Timesheet Record document
         doc = frappe.get_doc("Timesheet Record", name)
@@ -630,6 +630,8 @@ def update_and_submit_timesheet_record(name, to_time, percent_billable, activity
         if parent_issues_url:
             doc.parent_issues_url = parent_issues_url
         doc.percent_billable = percent_billable
+        if productivity is not None:
+            doc.productivity = productivity
 
         # ✅ Final validation before any save or submit
         if doc.from_time and doc.to_time and get_datetime(doc.to_time) < get_datetime(doc.from_time):
@@ -650,7 +652,7 @@ def update_and_submit_timesheet_record(name, to_time, percent_billable, activity
             new_doc.employee = doc.employee
 
             # Copy parent fields from original
-            for field in ["project", "customer", "task", "goal","issues", "expected_time", "activity_type", "result", "percent_billable", "parent_issues_url"]:
+            for field in ["project", "customer", "task", "goal","issues", "expected_time", "activity_type", "result", "percent_billable", "parent_issues_url", "productivity"]:
                 new_doc.set(field, doc.get(field))
 
             # Parent times from selected row
