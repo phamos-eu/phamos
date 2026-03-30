@@ -91,8 +91,29 @@ frappe.ui.form.on('Holiday Handover', {
 	}
 });
 
-// Child table event handler for auto-fill
+// Child table event handlers
 frappe.ui.form.on('Holiday Handover Issue', {
+	form_render: function(frm, cdt, cdn) {
+		let row = locals[cdt][cdn];
+		if (!row.issue_url || !row.issue_title) return;
+
+		let grid_row = frm.fields_dict['issues'].grid.get_row(cdn);
+		if (!grid_row || !grid_row.grid_form) return;
+
+		let field = grid_row.grid_form.fields_dict['issue_title'];
+		if (!field) return;
+
+		let $display = field.$wrapper.find('.like-disabled-input, .control-value');
+		if ($display.length && !$display.find('a').length) {
+			$display.html(
+				'<a href="' + frappe.utils.escape_html(row.issue_url) + '"'
+				+ ' target="_blank" rel="noopener">'
+				+ frappe.utils.escape_html(row.issue_title)
+				+ '</a>'
+			);
+		}
+	},
+
 	gitlab_issue_id: function(frm, cdt, cdn) {
 		let row = locals[cdt][cdn];
 		
