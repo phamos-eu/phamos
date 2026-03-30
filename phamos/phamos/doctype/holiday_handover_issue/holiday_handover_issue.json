@@ -19,6 +19,8 @@
   "section_break_2",
   "description",
   "section_break_3",
+  "owner_comments",
+  "section_break_4",
   "pm_comments"
  ],
  "fields": [
@@ -103,11 +105,23 @@
   {
    "fieldname": "section_break_3",
    "fieldtype": "Section Break",
+   "label": "Owner Comments"
+  },
+  {
+   "fieldname": "owner_comments",
+   "fieldtype": "Text",
+   "in_list_view": 1,
+   "label": "Owner Comments"
+  },
+  {
+   "fieldname": "section_break_4",
+   "fieldtype": "Section Break",
    "label": "Project Manager Comments"
   },
   {
    "fieldname": "pm_comments",
    "fieldtype": "Text",
+   "in_list_view": 1,
    "label": "PM Comments"
   }
  ],
