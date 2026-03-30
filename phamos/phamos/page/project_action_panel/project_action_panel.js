@@ -467,6 +467,7 @@ function openStopProjectDialog(timesheet_record, percent_billable, project, task
           to_time_field.$input.on('focus mousedown keydown', function() {
             if (!user_interacted) {
               user_interacted = true;
+              actual_to_time = null;
               if (time_update_interval) {
                 clearInterval(time_update_interval);
                 time_update_interval = null;
