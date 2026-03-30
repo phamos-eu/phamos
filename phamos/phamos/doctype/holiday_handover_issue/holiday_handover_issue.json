@@ -37,7 +37,8 @@
    "fieldtype": "Data",
    "in_list_view": 1,
    "label": "Issue Title",
-   "read_only": 1
+   "read_only": 1,
+   "description": "Click to open the issue in GitLab."
   },
   {
    "fieldname": "issue_status",
