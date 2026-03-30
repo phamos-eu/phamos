@@ -9,8 +9,21 @@ frappe.ui.form.on('Holiday Handover', {
 				fetch_gitlab_issues(frm);
 			});
 		}
+
+		// Inject clickable links into issue_title cells.
+		// MutationObserver re-injects after any row expand/collapse/re-render.
+		let grid = frm.fields_dict['issues'].grid;
+		if (!grid._issue_links_hooked) {
+			grid._issue_links_hooked = true;
+			let observer = new MutationObserver(function() {
+				inject_issue_title_links(frm);
+			});
+			observer.observe(grid.wrapper[0], { childList: true, subtree: true });
+			grid._issue_observer = observer;
+		}
+		inject_issue_title_links(frm);
 	},
-	
+
 	setup: function(frm) {
 		// Set query for GitLab Issue in child table to filter by selected GitLab Project
 		frm.set_query('gitlab_issue_id', 'issues', function(doc) {
@@ -112,6 +125,39 @@ frappe.ui.form.on('Holiday Handover Issue', {
 		}
 	}
 });
+
+
+function inject_issue_title_links(frm) {
+	let grid = frm.fields_dict['issues'].grid;
+	let issues = frm.doc.issues || [];
+
+	// Disconnect observer during DOM mutation to avoid infinite loop
+	if (grid._issue_observer) grid._issue_observer.disconnect();
+
+	grid.wrapper.find('.grid-row[data-idx]').each(function() {
+		let idx = parseInt($(this).attr('data-idx'));
+		let row = issues.find(r => r.idx === idx);
+		let $cell = $(this).find('[data-fieldname="issue_title"] .static-area');
+		if (!row || !row.issue_url || !$cell.length || $cell.find('a').length) return;
+
+		let title = $cell.text().trim();
+		if (!title) return;
+
+		$cell.html(
+			'<a href="' + frappe.utils.escape_html(row.issue_url) + '"'
+			+ ' target="_blank" rel="noopener">'
+			+ frappe.utils.escape_html(title)
+			+ '</a>'
+		).find('a').on('click', function(e) {
+			e.stopPropagation();
+		});
+	});
+
+	// Reconnect observer
+	if (grid._issue_observer) {
+		grid._issue_observer.observe(grid.wrapper[0], { childList: true, subtree: true });
+	}
+}
 
 
 function fetch_gitlab_issues(frm) {
