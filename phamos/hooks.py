@@ -102,6 +102,7 @@ website_route_rules = [
 # Installation
 # ------------
 
+after_install = "phamos.install.after_install"
 # after_migrate = "phamos.install.after_migrate"
 
 # Uninstallation
