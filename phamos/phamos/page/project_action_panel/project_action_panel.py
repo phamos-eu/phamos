@@ -629,6 +629,8 @@ def update_and_submit_timesheet_record(name, to_time, percent_billable, activity
         doc.result = result
         if parent_issues_url:
             doc.parent_issues_url = parent_issues_url
+        if productivity not in (None, "", 0):
+            percent_billable = 0
         doc.percent_billable = percent_billable
         if productivity is not None:
             doc.productivity = productivity
