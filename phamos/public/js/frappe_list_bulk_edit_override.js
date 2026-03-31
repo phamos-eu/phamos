@@ -1,7 +1,7 @@
 /**
  * Frappe Bulk Edit Null-Label Fix
  *
- * Two-part fix for the crash in frappe/public/js/frappe/list/bulk_operations.js:
+ * Fixes the crash in frappe/public/js/frappe/list/bulk_operations.js:
  *   TypeError: Cannot read properties of null/undefined (reading 'match')
  *   at set_value_field (bulk_operations.js:387)
  *
@@ -10,16 +10,18 @@
  * Additionally, BulkOperations.edit() is triggered at menu-setup time
  * (via jQuery event cascade inside add_dropdown_item), at which point
  * dialog.get_value("field") returns undefined, so new_df comes back as {}
- * and new_df.label is undefined regardless of label fix.
+ * and new_df.label is undefined regardless.
  *
- * Part 1 — add_field patch (belt-and-suspenders):
- *   Patches frappe.meta.add_field so null labels never enter the meta system.
- *   Runs synchronously before $(document).ready so the patch is in place
- *   when frappe.model.sync(frappe.boot.docs) iterates all fields.
+ * Part 1 — meta cleanup (runs at DOMContentLoaded):
+ *   Scans frappe.meta.docfield_map and removes any label that was
+ *   incorrectly set to the fieldname on layout fields (Section Break,
+ *   Column Break, Tab Break).  This undoes damage caused by a previous
+ *   version of this file that patched frappe.meta.add_field too
+ *   aggressively.  Layout fields are supposed to have no visible label.
  *
  * Part 2 — safe bulk-edit override:
- *   Replaces the Edit action in ListView.get_actions_menu_items with a safe
- *   implementation that:
+ *   Replaces the Edit action in ListView.get_actions_menu_items with a
+ *   safe implementation that:
  *     a) Returns early (no-op) when nothing is checked — prevents the
  *        spurious call that happens at menu-build time.
  *     b) Guards new_df.label before calling .match() in set_value_field.
@@ -29,28 +31,45 @@
 (function () {
 	"use strict";
 
-	/* ── Part 1: add_field null-label guard ────────────────────────── */
-	if (
-		window.frappe &&
-		frappe.meta &&
-		typeof frappe.meta.add_field === "function" &&
-		!frappe.meta._phamos_null_label_fix
-	) {
-		var _orig_add_field = frappe.meta.add_field;
-		frappe.meta.add_field = function (df) {
-			if (df && !df.label) {
-				df.label = df.fieldname || df.fieldtype || "Unknown";
-			}
-			return _orig_add_field.call(this, df);
-		};
-		frappe.meta._phamos_null_label_fix = true;
-		console.log("[phamos] Null-label guard active on frappe.meta.add_field");
+	/* ── Part 1: meta cleanup for layout fields ─────────────────────── */
+
+	// Layout fieldtypes whose label should always be null/empty — they have
+	// no visible heading in the form.  If label === fieldname it was set by
+	// a previous (overly broad) version of this override and must be cleared.
+	var LAYOUT_TYPES = {
+		"Section Break": true,
+		"Column Break": true,
+		"Tab Break": true,
+	};
+
+	function cleanup_layout_labels() {
+		if (!window.frappe || !frappe.meta || !frappe.meta.docfield_map) return;
+		var cleaned = 0;
+		Object.keys(frappe.meta.docfield_map).forEach(function (doctype) {
+			var fields = frappe.meta.docfield_map[doctype];
+			if (!fields) return;
+			Object.keys(fields).forEach(function (fieldname) {
+				var df = fields[fieldname];
+				if (df && LAYOUT_TYPES[df.fieldtype] && df.label === df.fieldname) {
+					df.label = null;
+					cleaned++;
+				}
+			});
+		});
+		if (cleaned > 0) {
+			console.log("[phamos] Cleared " + cleaned + " spurious layout-field label(s) from meta.");
+		}
 	}
+
+	// Run immediately (meta may already be populated) and again after DOM is
+	// ready in case some doctypes are synced during the initial render pass.
+	cleanup_layout_labels();
+	document.addEventListener("DOMContentLoaded", cleanup_layout_labels);
 
 	/* ── Part 2: safe bulk-edit override ───────────────────────────── */
 
 	/**
-	 * Safe drop-in for BulkOperations.edit() with two null guards:
+	 * Safe drop-in for BulkOperations.edit() with null guards:
 	 *  - Bails out silently when docnames is empty (setup-time spurious call)
 	 *  - Guards new_df.label before .match() in set_value_field
 	 */
