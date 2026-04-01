@@ -1,5 +1,6 @@
 import frappe
-from frappe.utils import getdate, get_url, format_datetime, strip_html
+import random
+from frappe.utils import getdate, get_url, format_datetime, strip_html, nowdate, getdate
 from frappe import _
 
 
@@ -717,3 +718,55 @@ def send_monthly_comment_summary():
                 title="Monthly Timesheet Comment Summary: Email Send Failed",
                 message=frappe.get_traceback()
             )
+
+
+
+def send_daily_birthday_wishes():
+    today = getdate(nowdate())
+    site_url = frappe.utils.get_url() 
+
+    image_urls = [
+        "/assets/phamos/images/birthday_cards/BW2.png",
+        "/assets/phamos/images/birthday_cards/BW3.png",
+        "/assets/phamos/images/birthday_cards/BW4.png",
+        "/assets/phamos/images/birthday_cards/BW5.png",
+        "/assets/phamos/images/birthday_cards/BW6.png",
+        "/assets/phamos/images/birthday_cards/BW7.png",
+        "/assets/phamos/images/birthday_cards/BW8.png",
+        "/assets/phamos/images/birthday_cards/BW9.png",
+    ]
+
+    employees = frappe.get_all(
+        "Employee",
+        filters={
+            "status": "Active",
+            "user_id": ["is", "set"]
+        },
+        fields=["name", "employee_name", "date_of_birth", "user_id"]
+    )
+
+    for emp in employees:
+        if emp.date_of_birth:
+            dob = getdate(emp.date_of_birth)
+
+            if dob.day == today.day and dob.month == today.month:
+
+                random_image = random.choice(image_urls)
+
+                full_image_url = f"{site_url}{random_image}"
+
+                message = f"""
+                    <div style="text-align:center; font-family: Arial;">
+                        <h2>Happy Birthday {emp.employee_name} 🎉</h2>
+
+                        <img src="{full_image_url}" 
+                             style="width:100%; max-width:500px; border-radius:12px; margin-top:10px;">
+
+                    </div>
+                """
+
+                frappe.sendmail(
+                    recipients=[emp.user_id],
+                    subject="Happy Birthday 🎉",
+                    message=message
+                )
