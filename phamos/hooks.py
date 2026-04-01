@@ -205,7 +205,8 @@ scheduler_events = {
     "daily": [
         "phamos.api.send_daily_timesheet_comment_summary",
         "phamos.phamos.doctype.team.team.update_all_teams_weekly_holidays",
-        "phamos.phamos.doctype.monthly_implementation_summery.create_monthly_implementation_summaries.create_monthly_implementation_summaries"
+        "phamos.phamos.doctype.monthly_implementation_summery.create_monthly_implementation_summaries.create_monthly_implementation_summaries",
+        "phamos.api.send_daily_birthday_wishes"
     ],
     "monthly": [
         "phamos.api.send_monthly_comment_summary"
