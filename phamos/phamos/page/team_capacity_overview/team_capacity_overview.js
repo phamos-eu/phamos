@@ -255,74 +255,72 @@ frappe.pages['team-capacity-overview'].on_page_load = function (wrapper) {
                 color: "#666"
             });
         }
-        frappe.require(["https://code.highcharts.com/highcharts-more.js"], () => {
 
-            Highcharts.chart("team_chart", {
+        // frappe.require hataya - seedha Highcharts use karo
+        if (typeof Highcharts === "undefined") {
+            frappe.msgprint("Highcharts load nahi hua. Page refresh karo.", "Error");
+            return;
+        }
+
+        Highcharts.chart("team_chart", {
             chart: { type: "area" },
             title: { text: "Team Weekly Capacity" },
             xAxis: { categories: weeks },
             yAxis: { min: 0, title: { text: "Hours" } },
-
             tooltip: {
-            shared: true,
-            formatter: function () {
+                shared: true,
+                formatter: function () {
+                    let idx = this.points[0].point.index;
 
-            let idx = this.points[0].point.index;
+                    let weekStart = new Date(page.from_date.get_value());
+                    weekStart.setDate(weekStart.getDate() + (idx * 7));
 
-            // Current week start & end
-            let weekStart = new Date(page.from_date.get_value());
-            weekStart.setDate(weekStart.getDate() + (idx * 7));
+                    let weekEnd = new Date(weekStart);
+                    weekEnd.setDate(weekEnd.getDate() + 6);
 
-            let weekEnd = new Date(weekStart);
-            weekEnd.setDate(weekEnd.getDate() + 6);
-
-            let actualRange =
-                frappe.datetime.obj_to_str(weekStart) +
-                " - " +
-                frappe.datetime.obj_to_str(weekEnd);
-
-            let html = `<b>${actualRange}</b><br/>`;
-
-            this.points.forEach(p => {
-
-                if (p.series.name === "Historical Actual Time") {
-
-                    let hFrom = new Date(weekStart);
-                    let hTo = new Date(weekEnd);
-
-                    if (page.comparison_type.get_value() === "last_year") {
-                        hFrom.setFullYear(hFrom.getFullYear() - 1);
-                        hTo.setFullYear(hTo.getFullYear() - 1);
-                    } else if (page.comparison_type.get_value() === "last_month") {
-                        hFrom.setMonth(hFrom.getMonth() - 1);
-                        hTo.setMonth(hTo.getMonth() - 1);
-                    }
-
-                    let histRange =
-                        frappe.datetime.obj_to_str(hFrom) +
+                    let actualRange =
+                        frappe.datetime.obj_to_str(weekStart) +
                         " - " +
-                        frappe.datetime.obj_to_str(hTo);
+                        frappe.datetime.obj_to_str(weekEnd);
 
-                    html += `
-                        <span style="color:${p.color}">●</span>
-                        ${p.series.name} (${histRange}):
-                        <b>${p.y}</b><br/>
-                    `;
-                } else {
-                    html += `
-                        <span style="color:${p.color}">●</span>
-                        ${p.series.name}:
-                        <b>${p.y}</b><br/>
-                    `;
+                    let html = `<b>${actualRange}</b><br/>`;
+
+                    this.points.forEach(p => {
+                        if (p.series.name === "Historical Actual Time") {
+                            let hFrom = new Date(weekStart);
+                            let hTo = new Date(weekEnd);
+
+                            if (page.comparison_type.get_value() === "last_year") {
+                                hFrom.setFullYear(hFrom.getFullYear() - 1);
+                                hTo.setFullYear(hTo.getFullYear() - 1);
+                            } else if (page.comparison_type.get_value() === "last_month") {
+                                hFrom.setMonth(hFrom.getMonth() - 1);
+                                hTo.setMonth(hTo.getMonth() - 1);
+                            }
+
+                            let histRange =
+                                frappe.datetime.obj_to_str(hFrom) +
+                                " - " +
+                                frappe.datetime.obj_to_str(hTo);
+
+                            html += `
+                                <span style="color:${p.color}">●</span>
+                                ${p.series.name} (${histRange}):
+                                <b>${p.y}</b><br/>
+                            `;
+                        } else {
+                            html += `
+                                <span style="color:${p.color}">●</span>
+                                ${p.series.name}:
+                                <b>${p.y}</b><br/>
+                            `;
+                        }
+                    });
+
+                    return html;
                 }
-            });
-
-            return html;
-        }
-        },
+            },
             series
-        });
-
         });
     }
         function shift_range(range, value, unit) {
