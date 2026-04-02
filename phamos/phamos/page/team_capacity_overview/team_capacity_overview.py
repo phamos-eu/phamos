@@ -13,6 +13,13 @@ def get_team_capacity(filters=None):
     enable_comparison = filters.get("enable_comparison")
     comparison_type = filters.get("comparison_type")
 
+    # FIX 1: string vs list
+    if isinstance(selected_team, str):
+        selected_team = [selected_team] if selected_team else []
+
+    # FIX 2: "0" string truthy bug
+    enable_comparison = frappe.utils.cint(enable_comparison)
+
     if not from_date or not to_date:
         frappe.throw("Please select both From Date and To Date.")
 
@@ -95,7 +102,7 @@ def get_team_capacity(filters=None):
             "color": colors[i % len(colors)]
         })
 
-    # Actual line
+    # FIX 3: docstatus = 1 only
     actual_line = []
     for w in week_buckets:
         week_start = w["start"].date() if isinstance(w["start"], datetime) else w["start"]
@@ -108,6 +115,7 @@ def get_team_capacity(filters=None):
             SELECT SUM(actual_time)
             FROM `tabTimesheet Record`
             WHERE from_time BETWEEN %s AND %s
+            AND docstatus = 1
         """, (s, e))[0][0] or 0
 
         actual_line.append(round(total_actual / 3600, 2))
@@ -117,23 +125,40 @@ def get_team_capacity(filters=None):
     if enable_comparison:
         hist_start, hist_end = shift_period(from_dt, to_dt, comparison_type)
 
-        hist_weeks = generate_weeks(hist_start, hist_end)
-        historical_actual_line = []
-
-        for w in hist_weeks:
-            week_start = w["start"]
-            week_end = w["end"]
-
-            s = week_start.strftime("%Y-%m-%d") + " 00:00:00"
-            e = week_end.strftime("%Y-%m-%d") + " 23:59:59"
-
-            total_actual = frappe.db.sql("""
-                SELECT SUM(actual_time)
+        if not hist_start or not hist_end:
+            frappe.msgprint("Invalid comparison type selected.", alert=True)
+        else:
+            hist_count = frappe.db.sql("""
+                SELECT COUNT(*)
                 FROM `tabTimesheet Record`
-                WHERE from_time <= %s AND to_time >= %s
-            """, (e, s))[0][0] or 0
+                WHERE from_time BETWEEN %s AND %s
+                AND docstatus = 1
+            """, (str(hist_start) + " 00:00:00", str(hist_end) + " 23:59:59"))[0][0]
 
-            historical_actual_line.append(round(total_actual / 3600, 2))
+            if hist_count == 0:
+                frappe.msgprint(
+                    f"No data found for comparison period ({hist_start} to {hist_end}).",
+                    alert=True
+                )
+            else:
+                hist_weeks = generate_weeks(hist_start, hist_end)
+                historical_actual_line = []
+
+                for w in hist_weeks:
+                    week_start = w["start"].date() if isinstance(w["start"], datetime) else w["start"]
+                    week_end = w["end"].date() if isinstance(w["end"], datetime) else w["end"]
+
+                    s = week_start.strftime("%Y-%m-%d") + " 00:00:00"
+                    e = week_end.strftime("%Y-%m-%d") + " 23:59:59"
+
+                    total_actual = frappe.db.sql("""
+                        SELECT SUM(actual_time)
+                        FROM `tabTimesheet Record`
+                        WHERE from_time BETWEEN %s AND %s
+                        AND docstatus = 1
+                    """, (s, e))[0][0] or 0
+
+                    historical_actual_line.append(round(total_actual / 3600, 2))
 
 
     return {
@@ -154,15 +179,39 @@ def generate_weeks(start_date, end_date):
         current = week_end + timedelta(days=1)
     return weeks
 
+
+# FIX 4: leap year + last_month safe shift
+def safe_replace_year(d, year):
+    try:
+        return d.replace(year=year)
+    except ValueError:
+        # Feb 29 edge case - use Feb 28
+        return d.replace(year=year, day=28)
+
 def shift_period(start, end, comparison_type):
     if comparison_type == "last_year":
         return (
-            start.replace(year=start.year - 1),
-            end.replace(year=end.year - 1)
+            safe_replace_year(start, start.year - 1),
+            safe_replace_year(end, end.year - 1)
         )
+
     elif comparison_type == "last_month":
-        return (
-            start - timedelta(days=30),
-            end - timedelta(days=30)
-        )
+        # Start ka same din, previous month mein
+        first_of_start = start.replace(day=1)
+        prev_month_end = first_of_start - timedelta(days=1)
+        try:
+            shifted_start = prev_month_end.replace(day=start.day)
+        except ValueError:
+            # Agar din month se bara ho (e.g. Jan 31 -> Feb 28)
+            shifted_start = prev_month_end
+
+        first_of_end = end.replace(day=1)
+        prev_month_end2 = first_of_end - timedelta(days=1)
+        try:
+            shifted_end = prev_month_end2.replace(day=end.day)
+        except ValueError:
+            shifted_end = prev_month_end2
+
+        return shifted_start, shifted_end
+
     return None, None
