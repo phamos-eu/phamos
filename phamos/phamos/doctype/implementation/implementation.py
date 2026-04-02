@@ -401,6 +401,39 @@ def generate_auto_email_reports(docname):
 
     frappe.db.commit()
 
+@frappe.whitelist()
+def get_auto_email_reports(user_email: str):
+    """Return count of Auto Email Reports where user matches Implementation.user_with_permission."""
+    if not user_email:
+        return 0
+    return frappe.db.count(
+        "Auto Email Report",
+        filters={"user": user_email, "enabled": 1},
+    )
 
 
 
+@frappe.whitelist()
+def get_auto_email_reports_for_users(user_list):
+    if isinstance(user_list, str):
+        user_list = [user_list]
+
+    reports = frappe.get_all(
+        "Auto Email Report",
+        filters={"user": ["in", user_list]},
+        fields=["email_to", "report", "frequency"]
+    )
+
+    result = []
+
+    for r in reports:
+        # split by comma, semicolon or new line
+        emails = [e.strip() for e in r.email_to.replace("\n",",").replace(";",",").split(",") if e.strip()]
+        for email in emails:
+            if email not in [x.get("recipient") for x in result]:
+                result.append({
+                    "recipient": email,
+                    "template": r.report,
+                    "frequency": r.frequency
+                })
+    return result

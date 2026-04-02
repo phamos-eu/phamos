@@ -13,6 +13,9 @@ frappe.ui.form.on("Implementation", {
     prediction_to_date(frm) {
         render_resource_planning_graph(frm, true); // Prediction date change
     },
+    user_with_permission(frm) {
+    frm.trigger("render_auto_email_reports_section");
+    },
     setup: function (frm) {
             add_row_to_sales_order(frm)
                 frappe.call({
@@ -48,6 +51,7 @@ frappe.ui.form.on("Implementation", {
                 });
     },
     refresh: function (frm) {
+        frm.trigger("render_auto_email_reports_section");
         // Sort resource_planning_prediction by date (descending - newest first)
         if (frm.doc.resource_planning_prediction && frm.doc.resource_planning_prediction.length > 0) {
             frm.doc.resource_planning_prediction.sort((a, b) => {
@@ -367,6 +371,7 @@ frappe.ui.form.on("Implementation", {
             });
     },
     onload: function (frm) {
+        populate_auto_email_reports(frm);
         frm.set_df_property("graph_overview_section", "collapsible", 0);
         if (frm.is_new()) {
             frappe.call({
@@ -413,11 +418,115 @@ frappe.ui.form.on("Implementation", {
                 }
             }
         });
+    },
+    render_auto_email_reports_section(frm) {
+        if (frm.is_new() || !frm.dashboard) return;
+
+        const user = frm.doc.user_with_permission;
+        const $parent = frm.dashboard.parent;
+        const $transactions = $parent
+            .find(".form-dashboard-section.form-links .section-body .transactions .form-documents")
+            .first();
+
+        if (!$transactions.length) {
+            if (!frm.__auto_email_render_retry_scheduled) {
+                frm.__auto_email_render_retry_scheduled = true;
+                setTimeout(() => {
+                    frm.__auto_email_render_retry_scheduled = false;
+                    frm.trigger("render_auto_email_reports_section");
+                }, 250);
+            }
+            return;
+        }
+
+        $parent.find(".auto-email-reports-section").remove();
+        $transactions.find(".auto-email-report-connection").remove();
+
+        let $row = $transactions.find(".row").filter(function () {
+            return $(this).children(".col-md-4").length < 3;
+        }).first();
+
+        if (!$row.length) $row = $('<div class="row"></div>').appendTo($transactions);
+
+        $row.append(`
+            <div class="col-md-4 auto-email-report-connection">
+                <div class="document-link" data-doctype="Auto Email Report">
+                    <div class="document-link-badge">
+                        <span class="count hidden"></span>
+                        <a class="badge-link">${__("Auto Email Report")}</a>
+                    </div>
+                    <button class="btn btn-new btn-secondary btn-xs icon-btn">
+                        <svg class="icon icon-sm"><use href="#icon-add"></use></svg>
+                    </button>
+                </div>
+            </div>
+        `);
+
+        const $link = $row.find(".auto-email-report-connection .document-link").last();
+        const $count = $link.find(".count");
+
+        const needUser = () =>
+            frappe.msgprint(__("Set User With Permission to see Auto Email Reports."));
+
+        $link.find(".badge-link").on("click", e => {
+            e.preventDefault();
+            user ? (
+                frappe.route_options = { user },
+                frappe.set_route("List", "Auto Email Report", "List")
+            ) : needUser();
+        });
+
+        $link.find(".btn-new").on("click", e => {
+            e.preventDefault();
+            user ? frappe.new_doc("Auto Email Report", { user }) : needUser();
+        });
+
+        if (!user) return $count.addClass("hidden").text("0");
+
+        frappe.call({
+            method: "phamos.phamos.doctype.implementation.implementation.get_auto_email_reports",
+            args: { user_email: user },
+            callback: r => {
+                const c = cint(r.message);
+                $count.toggleClass("hidden", !c).text(c > 99 ? "99+" : c || "0");
+            }
+        });
+    }
+    
+});
+
+function populate_auto_email_reports(frm) {
+    if (!frm.doc.user_with_permission) return;
+
+    // safety check for child table
+    if (!frm.fields_dict.auto_email_report_record) {
+        frappe.msgprint("Child Table 'auto_email_report_record' not found!");
+        return;
     }
 
+    frappe.call({
+        method: "phamos.phamos.doctype.implementation.implementation.get_auto_email_reports_for_users",
+        args: {
+            user_list: frm.doc.user_with_permission
+        },
+        callback: function(r) {
+            if (r.message) {
+                // clear existing child table
+                frm.clear_table("auto_email_report_record");
 
+                r.message.forEach(function(row) {
+                    let child = frm.add_child("auto_email_report_record");
+                    child.recipients = row.recipient;
+                    child.templates = row.template;
+                    child.frequency = row.frequency;
+                });
 
-});
+                frm.refresh_field("auto_email_report_record");
+
+            }
+        }
+    });
+}
 function render_module_chart(frm, canvasId) {
     const labels = [];
     const currentLevels = [];
