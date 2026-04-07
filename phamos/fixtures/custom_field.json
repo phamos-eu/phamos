@@ -2357,11 +2357,11 @@
         "hide_seconds": 0,
         "ignore_user_permissions": 0,
         "ignore_xss_filter": 0,
-        "in_global_search": 1,
+        "in_global_search": 0,
         "in_list_view": 1,
         "in_preview": 0,
         "in_standard_filter": 1,
-        "insert_after": "country",
+        "insert_after": "custom_phamos",
         "is_system_generated": 0,
         "is_virtual": 0,
         "label": "Application Status",
@@ -2387,7 +2387,7 @@
         "search_index": 0,
         "show_dashboard": 0,
         "sort_options": 0,
-        "translatable": 1,
+        "translatable": 0,
         "unique": 0,
         "width": null
     }
