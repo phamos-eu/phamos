@@ -34,7 +34,9 @@
   "mistral_model",
   "mistral_base_url",
   "monthly_implementation_summery_tab",
-  "item"
+  "year",
+  "month",
+  "execute_scheduled_job"
  ],
  "fields": [
   {
@@ -183,17 +185,26 @@
    "label": "Monthly Implementation Summery"
   },
   {
-   "description": "Select the default service item to be used when generating Delivery Note and Sales Invoice for Monthly Implementation Summary.",
-   "fieldname": "item",
-   "fieldtype": "Link",
-   "label": "Item",
-   "options": "Item"
+   "fieldname": "month",
+   "fieldtype": "Select",
+   "label": "Month",
+   "options": "January\nFebruary\nMarch\nApril\nMay\nJune\nJuly\nAugust\nSeptember\nOctober\nNovember\nDecember"
+  },
+  {
+   "fieldname": "year",
+   "fieldtype": "Select",
+   "label": "Year"
+  },
+  {
+   "fieldname": "execute_scheduled_job",
+   "fieldtype": "Button",
+   "label": "Execute Scheduled Job"
   }
  ],
  "index_web_pages_for_search": 1,
  "issingle": 1,
  "links": [],
- "modified": "2026-02-21 15:32:51.417147",
+ "modified": "2026-04-07 12:10:21.987787",
  "modified_by": "Administrator",
  "module": "Phamos",
  "name": "phamos Settings",
