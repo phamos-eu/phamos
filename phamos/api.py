@@ -722,9 +722,9 @@ def send_monthly_comment_summary():
 
 def send_daily_birthday_wishes():
     today = getdate(nowdate())
-    site_url = frappe.utils.get_url() 
+    site_url = frappe.utils.get_url()
 
-    image_urls = [
+    birthday_image_urls = [
         "/assets/phamos/images/birthday_cards/BW2.png",
         "/assets/phamos/images/birthday_cards/BW3.png",
         "/assets/phamos/images/birthday_cards/BW4.png",
@@ -735,37 +735,74 @@ def send_daily_birthday_wishes():
         "/assets/phamos/images/birthday_cards/BW9.png",
     ]
 
+    anniversary_image_urls = [
+        "/assets/phamos/images/anniversary_cards/WA1.png",
+        "/assets/phamos/images/anniversary_cards/WA2.png",
+        "/assets/phamos/images/anniversary_cards/WA3.png",
+        "/assets/phamos/images/anniversary_cards/WA4.png",
+        "/assets/phamos/images/anniversary_cards/WA5.png",
+        "/assets/phamos/images/anniversary_cards/WA6.png",
+        "/assets/phamos/images/anniversary_cards/WA7.png",
+        "/assets/phamos/images/anniversary_cards/WA8.png",
+        "/assets/phamos/images/anniversary_cards/WA9.png",
+        "/assets/phamos/images/anniversary_cards/WA10.png",
+    ]
+
     employees = frappe.get_all(
         "Employee",
         filters={
             "status": "Active",
             "user_id": ["is", "set"]
         },
-        fields=["name", "employee_name", "date_of_birth", "user_id"]
+        fields=["name", "employee_name", "date_of_birth", "date_of_joining", "user_id"]
     )
 
     for emp in employees:
+
+        # --- Birthday Check ---
         if emp.date_of_birth:
             dob = getdate(emp.date_of_birth)
-
             if dob.day == today.day and dob.month == today.month:
-
-                random_image = random.choice(image_urls)
-
+                random_image = random.choice(birthday_image_urls)
                 full_image_url = f"{site_url}{random_image}"
 
                 message = f"""
                     <div style="text-align:center; font-family: Arial;">
                         <h2>Happy Birthday {emp.employee_name} 🎉</h2>
-
                         <img src="{full_image_url}" 
                              style="width:100%; max-width:500px; border-radius:12px; margin-top:10px;">
-
                     </div>
                 """
 
                 frappe.sendmail(
                     recipients=[emp.user_id],
                     subject="Happy Birthday 🎉",
+                    message=message
+                )
+
+        # --- Work Anniversary Check ---
+        if emp.date_of_joining:
+            doj = getdate(emp.date_of_joining)
+
+            years_completed = today.year - doj.year
+            if doj.day == today.day and doj.month == today.month and years_completed > 0:
+
+                random_image = random.choice(anniversary_image_urls)
+                full_image_url = f"{site_url}{random_image}"
+
+                message = f"""
+                    <div style="text-align:center; font-family: Arial;">
+                        <h2>Happy Work Anniversary {emp.employee_name} 🏆</h2>
+                        <p style="font-size:16px;">
+                            Congratulations on completing <strong>{years_completed} year{'s' if years_completed > 1 else ''}</strong> with us!
+                        </p>
+                        <img src="{full_image_url}" 
+                             style="width:100%; max-width:500px; border-radius:12px; margin-top:10px;">
+                    </div>
+                """
+
+                frappe.sendmail(
+                    recipients=[emp.user_id],
+                    subject=f"Happy Work Anniversary 🏆 - {years_completed} Year{'s' if years_completed > 1 else ''}!",
                     message=message
                 )
