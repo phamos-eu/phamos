@@ -42,27 +42,57 @@
 		"Tab Break": true,
 	};
 
+	// Auto-generated fieldnames for layout fields always follow one of these
+	// patterns.  A label matching this is definitely synthetic, not real.
+	var AUTO_LABEL_RE = /^(section_break|column_break|tab_break)[\w]*$/i;
+
+	function is_synthetic_label(df) {
+		if (!df.label) return false;
+		// Was set by old patch: label === fieldname
+		if (df.label === df.fieldname) return true;
+		// Matches auto-generated naming pattern even if different from fieldname
+		if (AUTO_LABEL_RE.test(df.label)) return true;
+		return false;
+	}
+
 	function cleanup_layout_labels() {
-		if (!window.frappe || !frappe.meta || !frappe.meta.docfield_map) return;
-		var cleaned = 0;
-		Object.keys(frappe.meta.docfield_map).forEach(function (doctype) {
-			var fields = frappe.meta.docfield_map[doctype];
+		if (!window.frappe || !frappe.meta) return;
+
+		var cleaned_doctypes = [];
+
+		// 1. Clean master meta — docfield_map and docfield_list share the same
+		//    df objects by reference, so one write fixes both.
+		var dmap = frappe.meta.docfield_map || {};
+		Object.keys(dmap).forEach(function (doctype) {
+			var fields = dmap[doctype];
 			if (!fields) return;
+			var dirty = false;
 			Object.keys(fields).forEach(function (fieldname) {
 				var df = fields[fieldname];
-				if (df && LAYOUT_TYPES[df.fieldtype] && df.label === df.fieldname) {
+				if (df && LAYOUT_TYPES[df.fieldtype] && is_synthetic_label(df)) {
 					df.label = null;
-					cleaned++;
+					dirty = true;
 				}
 			});
+			if (dirty) cleaned_doctypes.push(doctype);
 		});
-		if (cleaned > 0) {
-			console.log("[phamos] Cleared " + cleaned + " spurious layout-field label(s) from meta.");
+
+		// 2. Invalidate per-document copies so Frappe rebuilds them from the
+		//    now-clean master meta the next time a form opens.
+		var dcopy = frappe.meta.docfield_copy || {};
+		cleaned_doctypes.forEach(function (doctype) {
+			delete dcopy[doctype];
+		});
+
+		if (cleaned_doctypes.length) {
+			console.log(
+				"[phamos] Cleared spurious layout labels for: " + cleaned_doctypes.join(", ")
+			);
 		}
 	}
 
-	// Run immediately (meta may already be populated) and again after DOM is
-	// ready in case some doctypes are synced during the initial render pass.
+	// Run immediately (meta may already be populated from boot sync) and
+	// again at DOMContentLoaded to catch anything synced during first render.
 	cleanup_layout_labels();
 	document.addEventListener("DOMContentLoaded", cleanup_layout_labels);
 
