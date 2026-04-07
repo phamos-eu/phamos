@@ -3,7 +3,7 @@
 
 import frappe
 from frappe.model.document import Document
-from frappe.utils import get_first_day, get_last_day, flt
+from frappe.utils import get_first_day, get_last_day, flt, getdate
 from frappe.query_builder import DocType, Order
 
 from phamos.phamos.doctype.implementation.implementation import (
@@ -24,24 +24,6 @@ def _company_for_customer(customer):
 		or frappe.db.get_value("Customer", customer, "customer_primary_company")
 		or frappe.db.get_single_value("Global Defaults", "default_company")
 	)
-
-
-def _phamos_settings_item():
-	return frappe.db.get_single_value("phamos Settings", "item")
-
-
-def _item_selling_rate(item_code, uom=None):
-	filters = {"item_code": item_code, "selling": 1}
-	if uom:
-		filters["uom"] = uom
-	rate = frappe.db.get_value("Item Price", filters, "price_list_rate", order_by="valid_from desc")
-	if rate is not None:
-		return flt(rate, 2)
-	if uom:
-		rate = frappe.db.get_value(
-			"Item Price", {"item_code": item_code, "selling": 1}, "price_list_rate", order_by="valid_from desc"
-		)
-	return flt(rate, 2) if rate is not None else 0
 
 
 def _rate_from_dn_line(itm):
@@ -71,15 +53,6 @@ def _rate_from_sales_order(so_name, item_code):
 	return 0
 
 
-def _dn_line_for_item(dn_doc, item_code):
-	if not dn_doc or not item_code:
-		return None
-	for itm in dn_doc.items:
-		if itm.item_code == item_code:
-			return itm
-	return None
-
-
 def _resolve_rate_for_mis_from_dn_row(mis_doc, dn_item):
 	"""Create-DN sync: DN / SO only, never Item Price."""
 	r = _rate_from_dn_line(dn_item)
@@ -90,36 +63,30 @@ def _resolve_rate_for_mis_from_dn_row(mis_doc, dn_item):
 	return flt(r, 2)
 
 
-def _rate_for_timesheet_row(mis_doc, item_code, dn_doc):
-	"""Timesheet update: DN/SO rate if item on linked DN or SO; else Item Price."""
-	dn_line = _dn_line_for_item(dn_doc, item_code)
-	on_so = bool(
-		mis_doc.sales_order
-		and frappe.db.exists("Sales Order Item", {"parent": mis_doc.sales_order, "item_code": item_code})
-	)
-	if dn_line or on_so:
-		r = _rate_from_dn_line(dn_line) if dn_line else 0
-		if not r and mis_doc.sales_order:
-			r = _rate_from_sales_order(mis_doc.sales_order, item_code)
-		if r:
-			return flt(r, 2)
-	return _item_selling_rate(item_code, uom="Hour")
-
-
-def _get_previous_month_year_and_name(year_str, month_name):
-	if not year_str or not month_name:
-		return None, None
-	month_num = MONTH_NAME_TO_NUM.get(month_name)
-	if not month_num:
-		return None, None
-	try:
-		year_int = int(str(year_str).strip())
-	except (ValueError, TypeError):
-		return None, None
-	if month_num == 1:
-		return str(year_int - 1), "December"
-	names = list(MONTH_NAME_TO_NUM.keys())
-	return str(year_int), names[month_num - 2]
+def _so_line_for_billable_hours(sales_order):
+	"""SO line when creating a Delivery Note from billable hours: open lines first, prefer Hour UOM."""
+	if not sales_order:
+		frappe.throw(frappe._("Sales Order is required."))
+	so = frappe.get_doc("Sales Order", sales_order)
+	if not so.items:
+		frappe.throw(frappe._("Sales Order {0} has no items.").format(sales_order))
+	open_lines = [
+		d
+		for d in so.items
+		if abs(flt(d.delivered_qty)) < abs(flt(d.qty)) and not getattr(d, "delivered_by_supplier", 0)
+	]
+	pool = open_lines if open_lines else list(so.items)
+	hour_lines = [
+		d
+		for d in pool
+		if (getattr(d, "uom", None) or "").strip() == "Hour"
+		or (getattr(d, "stock_uom", None) or "").strip() == "Hour"
+	]
+	if hour_lines:
+		return hour_lines[0]
+	if len(pool) == 1:
+		return pool[0]
+	return pool[0]
 
 
 def _get_month_date_range(year_str, month_name):
@@ -141,16 +108,80 @@ def _require_docname(docname):
 		raise frappe.ValidationError("docname is required")
 
 
+def _delivered_hours_against_sales_order(sales_order_name):
+	"""Submitted DN line qty linked to SO — same logic as Implementation.add_delivered_hrs."""
+	rows = frappe.db.sql(
+		"""
+		SELECT dni.qty
+		FROM `tabDelivery Note Item` dni
+		INNER JOIN `tabDelivery Note` dn ON dn.name = dni.parent
+		WHERE dni.against_sales_order = %s
+			AND dn.docstatus = 1
+			AND IFNULL(dn.status, '') NOT IN ('Cancelled', 'Closed')
+		""",
+		sales_order_name,
+		as_dict=True,
+	)
+	return flt(sum(flt(r.get("qty")) for r in rows)) if rows else 0
+
+
 class MonthlyImplementationSummery(Document):
 	def validate(self):
+		prev = self.get_doc_before_save() if not self.is_new() else None
+		if prev and self.docstatus == 0:
+			period_changed = str(self.year or "").strip() != str(
+				prev.year or ""
+			).strip() or (self.month or "").strip() != (prev.month or "").strip()
+			impl_changed = (self.implementation or "") != (prev.implementation or "")
+			if period_changed or impl_changed:
+				self.timesheets_table = []
+
 		self.validate_year()
 		self.validate_month()
-		self.validate_duplicate_record()
 		if self.implementation and self.year and self.month and not self.timesheets_table:
 			self.set_timesheets_table()
 		self._recalculate_totals_from_timesheets_table()
+		self._sync_month_year_from_timesheet_dates()
+		self.validate_year()
+		self.validate_month()
+		self.validate_duplicate_record()
 		self._recalculate_delivery_note_item_amounts()
+		self._set_sales_order_status_information()
 		self.populate_financial_history_fields()
+
+	def on_submit(self):
+		dn_name = self._resolve_dn_name_for_timesheet_stamp()
+		if dn_name:
+			self._update_timesheets_delivery_note(dn_name)
+
+	def _resolve_dn_name_for_timesheet_stamp(self):
+		"""Resolve Delivery Note for stamping timesheets: DB ``delivery_note`` first (reliable after
+		workflow / ``db_set``), then latest non-cancelled DN whose item row links this MIS, then
+		``_get_linked_dn_name`` fallbacks (SO / implementation).
+		"""
+		if not self.name:
+			return None
+		dn = frappe.db.get_value(self.doctype, self.name, "delivery_note")
+		if dn and frappe.db.exists("Delivery Note", dn):
+			ds = frappe.db.get_value("Delivery Note", dn, "docstatus")
+			if ds is not None and int(ds) != 2:
+				return dn
+		row = frappe.db.sql(
+			"""
+			select dni.parent
+			from `tabDelivery Note Item` dni
+			inner join `tabDelivery Note` dn on dn.name = dni.parent
+			where ifnull(dn.docstatus, 0) != 2
+				and dni.custom_against_monthly_implementation_summery = %s
+			order by dni.modified desc
+			limit 1
+			""",
+			self.name,
+			as_list=True,
+		)
+		if row and row[0] and row[0][0]:
+			return row[0][0]
+		return self._get_linked_dn_name(persist_link=False)
 
 	def _recalculate_delivery_note_item_amounts(self):
 		for row in self.delivery_note_item or []:
@@ -175,11 +206,38 @@ class MonthlyImplementationSummery(Document):
 		self.sales_order_qty = self.dn_qty = self.timesheet_hrs = self.remaining_hrs = 0
 		self.open_so = 0
 
-	def validate_phamos_settings_item(self):
-		if not _phamos_settings_item():
-			frappe.throw(
-				"No item configured in Phamos Settings. Please set the default Item in Phamos Settings "
-				"(Monthly Implementation Summery tab) before submitting."
+	def _set_sales_order_status_information(self):
+		"""Match Implementation: open SOs for this implementation’s customer + delivered/remaining hrs."""
+		self.sales_order_status_information = []
+		if not self.implementation:
+			return
+		customer = frappe.db.get_value("Implementation", self.implementation, "customer")
+		if not customer:
+			return
+		orders = frappe.get_all(
+			"Sales Order",
+			filters={
+				"customer": customer,
+				"custom_implementation": self.implementation,
+				"status": ["in", ["To Deliver", "To Bill", "To Deliver and Bill"]],
+				"docstatus": 1,
+			},
+			fields=["name", "status", "total_qty", "customer_name"],
+			order_by="transaction_date desc",
+		)
+		for o in orders:
+			total = flt(o.total_qty)
+			delivered = _delivered_hours_against_sales_order(o.name)
+			self.append(
+				"sales_order_status_information",
+				{
+					"sales_order": o.name,
+					"so_title": o.customer_name or "",
+					"total_hrs": total,
+					"status": o.status or "",
+					"delivered_total_hrs": delivered,
+					"remaining_hrs": flt(total - delivered, 2),
+				},
 			)
 
 	def validate_timesheet_hours_for_delivery_note(self):
@@ -191,32 +249,52 @@ class MonthlyImplementationSummery(Document):
 
 	def _create_dn_from_timesheets(self):
 		try:
-			self.validate_phamos_settings_item()
 			self.validate_timesheet_hours_for_delivery_note()
 			hours = flt(self.billable_hours)
 			if hours <= 0:
 				frappe.throw("Total billing hours is zero. Delivery Note cannot be created.")
-			item = _phamos_settings_item()
-			if not item:
-				frappe.throw("No item configured in Phamos Settings.")
+			if not self.sales_order:
+				frappe.throw(
+					frappe._("Select a Sales Order on this summary to create a Delivery Note from billable hours.")
+				)
+			so_line = _so_line_for_billable_hours(self.sales_order)
+			so_customer = frappe.db.get_value("Sales Order", self.sales_order, "customer")
 			customer = frappe.db.get_value("Implementation", self.implementation, "customer")
 			if not customer:
 				frappe.throw("Implementation has no Customer.")
+			if so_customer and customer and so_customer != customer:
+				frappe.throw(
+					frappe._("Sales Order customer does not match the customer on this Implementation.")
+				)
 			company = _company_for_customer(customer)
 			if not company:
 				frappe.throw("No Company found. Set default Company in Global Defaults.")
+			uom = so_line.uom or so_line.stock_uom
+			stock_uom = so_line.stock_uom or so_line.uom
+			cf = flt(so_line.conversion_factor, 9) or 1
+			rate = flt(so_line.rate)
+			spl = frappe.db.get_value("Sales Order", self.sales_order, "selling_price_list")
+			dn_items = {
+				"item_code": so_line.item_code,
+				"item_name": so_line.item_name,
+				"qty": hours,
+				"uom": uom,
+				"stock_uom": stock_uom,
+				"conversion_factor": cf,
+				"rate": rate,
+				"amount": flt(rate * hours, 2),
+				"against_sales_order": self.sales_order,
+				"so_detail": so_line.name,
+				"allow_zero_valuation_rate": 1,
+				"custom_against_monthly_implementation_summery": self.name,
+			}
 			dn = frappe.get_doc({
 				"doctype": "Delivery Note",
 				"customer": customer,
 				"company": company,
 				"custom_implementation": self.implementation,
-				"items": [{
-					"item_code": item,
-					"qty": hours,
-					"uom": "Hour",
-					"allow_zero_valuation_rate": 1,
-					"custom_against_monthly_implementation_summery": self.name,
-				}],
+				"selling_price_list": spl,
+				"items": [dn_items],
 			})
 			dn.insert()
 			self.delivery_note = dn.name
@@ -226,45 +304,6 @@ class MonthlyImplementationSummery(Document):
 		except Exception as e:
 			frappe.log_error(f"Error creating Delivery Note for {self.name}: {str(e)}")
 			frappe.throw(f"Error creating Delivery Note: {str(e)}")
-
-	def update_mis_delivery_note_item_from_timesheets(self, existing_rows=None):
-		self.validate_phamos_settings_item()
-		self.validate_timesheet_hours_for_delivery_note()
-		hours = flt(self.billable_hours)
-		if hours <= 0:
-			frappe.throw("Total billable hours is zero. Nothing to add.")
-		item_code = _phamos_settings_item()
-		if not item_code:
-			frappe.throw("No item configured in Phamos Settings.")
-		self.reload()
-		item_name = frappe.db.get_value("Item", item_code, "item_name")
-		item_group = frappe.db.get_value("Item", item_code, "item_group")
-		dn_doc = frappe.get_doc("Delivery Note", self.delivery_note) if self.delivery_note else None
-		rate = _rate_for_timesheet_row(self, item_code, dn_doc)
-		row_data = {
-			"item_code": item_code,
-			"item_name": item_name,
-			"item_group": item_group,
-			"qty": hours,
-			"stock_uom": "Hour",
-			"uom": "Hour",
-			"conversion_factor": 1,
-			"rate": rate,
-			"amount": flt(rate * hours, 2),
-			"custom_ref_doc": self.name,
-		}
-		idx = None
-		for i, row in enumerate(self.delivery_note_item or []):
-			ref = getattr(row, "custom_ref_doc", None)
-			if row.item_code == item_code and (ref == self.name or not ref):
-				idx = i
-				break
-		if idx is not None:
-			for k, v in row_data.items():
-				setattr(self.delivery_note_item[idx], k, v)
-		else:
-			self.append("delivery_note_item", row_data)
-		self.save()
 
 	def _build_dn_items_from_mis_dni(self):
 		grouped = {}
@@ -379,18 +418,67 @@ class MonthlyImplementationSummery(Document):
 			if ts and frappe.db.exists("Timesheet", ts):
 				frappe.db.set_value("Timesheet", ts, "custom_delivery_note", dn_name)
 
-	def _get_linked_dn_name(self):
+	def _get_linked_dn_name(self, persist_link=True):
+		"""Resolve a Delivery Note for this MIS.
+
+		When persist_link is True, found DN is written to this document (and db_set for side paths).
+		When False, only returns the name — does not set ``delivery_note`` on the doc.
+		"""
 		if self.delivery_note:
-			return self.delivery_note
-		dn_name = frappe.db.get_value(
-			"Delivery Note Item",
-			{"custom_against_monthly_implementation_summery": self.name},
-			"parent",
-		)
+			ds = frappe.db.get_value("Delivery Note", self.delivery_note, "docstatus")
+			if ds is not None and int(ds) != 2:
+				return self.delivery_note
+		dn_name = None
+		if self.name:
+			dn_name = frappe.db.get_value(
+				"Delivery Note Item",
+				{"custom_against_monthly_implementation_summery": self.name},
+				"parent",
+			)
 		if dn_name:
-			self.delivery_note = dn_name
-			self.db_set("delivery_note", dn_name)
-		return dn_name
+			if persist_link:
+				self.delivery_note = dn_name
+				self.db_set("delivery_note", dn_name, update_modified=False)
+			return dn_name
+		if self.sales_order and self.implementation:
+			row = frappe.db.sql(
+				"""
+				select dn.name
+				from `tabDelivery Note` dn
+				inner join `tabDelivery Note Item` dni on dni.parent = dn.name
+					and dni.against_sales_order = %(so)s
+				where dn.docstatus != 2 and dn.custom_implementation = %(impl)s
+				order by dn.modified desc
+				limit 1
+				""",
+				{"so": self.sales_order, "impl": self.implementation},
+				as_list=True,
+			)
+			if row:
+				dn_name = row[0][0]
+				if persist_link:
+					self.delivery_note = dn_name
+					self.db_set("delivery_note", dn_name, update_modified=False)
+				return dn_name
+		if self.implementation:
+			row = frappe.db.sql(
+				"""
+				select dn.name
+				from `tabDelivery Note` dn
+				where dn.docstatus != 2 and dn.custom_implementation = %(impl)s
+				order by dn.modified desc
+				limit 1
+				""",
+				{"impl": self.implementation},
+				as_list=True,
+			)
+			if row:
+				dn_name = row[0][0]
+				if persist_link:
+					self.delivery_note = dn_name
+					self.db_set("delivery_note", dn_name, update_modified=False)
+				return dn_name
+		return None
 
 	def validate_year(self):
 		if not self.year:
@@ -417,6 +505,7 @@ class MonthlyImplementationSummery(Document):
 	def validate_duplicate_record(self):
 		if not (self.implementation and self.year and self.month):
 			return
+		# Only draft/submitted block duplicates; cancelled MIS can be replaced by a new doc.
 		existing = frappe.get_all(
 			"Monthly Implementation Summery",
 			filters={
@@ -424,7 +513,7 @@ class MonthlyImplementationSummery(Document):
 				"year": self.year,
 				"month": self.month,
 				"name": ["!=", self.name],
-				"docstatus": ["!=", 2],
+				"docstatus": ["in", [0, 1]],
 			},
 			fields=["name"],
 			limit=1,
@@ -444,12 +533,30 @@ class MonthlyImplementationSummery(Document):
 		self.total_hours = flt(sum(flt(r.total_hours) for r in self.timesheets_table), precision=2)
 		self.billable_hours = flt(sum(flt(r.billable_hours) for r in self.timesheets_table), precision=2)
 
+	def _sync_month_year_from_timesheet_dates(self):
+		"""Keep Year / Month aligned with the calendar month of timesheet rows."""
+		if not self.timesheets_table:
+			return
+		dates = []
+		for r in self.timesheets_table:
+			d = getattr(r, "date", None)
+			if d:
+				try:
+					dates.append(getdate(d))
+				except Exception:
+					continue
+		if not dates:
+			return
+		d0 = min(dates)
+		months = list(MONTH_NAME_TO_NUM.keys())
+		self.month = months[d0.month - 1]
+		self.year = str(d0.year)
+
 	def set_timesheets_table(self):
-		prev_year, prev_month = _get_previous_month_year_and_name(self.year, self.month)
-		if not prev_year or not prev_month:
+		if not self.year or not self.month:
 			self.timesheets_table = []
 			return
-		from_date, to_date = _get_month_date_range(prev_year, prev_month)
+		from_date, to_date = _get_month_date_range(self.year, self.month)
 		if not from_date or not to_date:
 			self.timesheets_table = []
 			return
@@ -515,22 +622,36 @@ def create_delivery_note(docname: str, sales_order=None, delivery_note_item=None
 
 
 def _create_dn_from_sales_order(docname, sales_order, delivery_note_item=None):
+	"""Create a draft Delivery Note using ERPNext's Sales Order → DN mapping (remaining qty per line)."""
 	try:
-		items = get_items_for_delivery_note(docname, sales_order)
-		if not items:
-			frappe.throw("No items in Sales Order.")
-		so_doc = frappe.get_doc("Sales Order", sales_order)
-		dn = frappe.get_doc({
-			"doctype": "Delivery Note",
-			"customer": so_doc.customer,
-			"project": so_doc.project,
-			"palette": 0,
-			"paket": 0,
-			"items": items,
-			"docstatus": 0,
-			"posting_date": frappe.utils.nowdate(),
-			"selling_price_list": so_doc.selling_price_list,
-		})
+		from erpnext.selling.doctype.sales_order.sales_order import make_delivery_note
+
+		mis_doc = frappe.get_doc("Monthly Implementation Summery", docname)
+		if not mis_doc.implementation:
+			frappe.throw(frappe._("Implementation is required on Monthly Implementation Summery."))
+		so_name = (mis_doc.sales_order or sales_order or "").strip()
+		if not so_name:
+			frappe.throw(frappe._("Select a Sales Order on the Monthly Implementation Summery."))
+		if mis_doc.sales_order and sales_order and mis_doc.sales_order != sales_order:
+			frappe.throw(
+				frappe._("Sales Order on the form ({0}) does not match the request ({1}).").format(
+					mis_doc.sales_order, sales_order
+				)
+			)
+		dn = make_delivery_note(so_name)
+		if not dn.items:
+			frappe.throw(
+				frappe._(
+					"Nothing left to deliver against Sales Order {0}. All line items may already be fully delivered."
+				).format(so_name)
+			)
+
+		dn.custom_implementation = mis_doc.implementation
+		dn_meta = frappe.get_meta("Delivery Note")
+		for fn in ("palette", "paket"):
+			if dn_meta.has_field(fn):
+				dn.set(fn, 0)
+
 		dn.insert()
 		old_dn = frappe.db.get_value("Monthly Implementation Summery", docname, "delivery_note")
 		frappe.db.set_value("Monthly Implementation Summery", docname, "delivery_note", dn.name)
@@ -555,18 +676,46 @@ def update_dn_table_in_summary(docname, dn_name, old_dn=None, existing_rows=None
 		r for r in (doc.delivery_note_item or []) if getattr(r, "custom_ref_doc", None) not in dn_refs
 	]
 	for item in dn_doc.items:
+		ao = getattr(item, "against_sales_order", None)
+		if doc.sales_order and ao and ao != doc.sales_order:
+			continue
+		qty = flt(item.qty)
 		rate = _resolve_rate_for_mis_from_dn_row(doc, item)
-		amount = flt(rate * flt(item.qty), 2)
+		icode = item.item_code
+		iname = item.item_name
+		igroup = item.item_group
+		suom = item.stock_uom or item.uom
+		uom = item.uom
+		cf = flt(item.conversion_factor, 9) or 1
+		if (
+			doc.sales_order
+			and getattr(item, "so_detail", None)
+			and frappe.db.exists("Sales Order Item", {"name": item.so_detail, "parent": doc.sales_order})
+		):
+			soi = frappe.db.get_value(
+				"Sales Order Item",
+				item.so_detail,
+				["item_code", "item_name", "item_group", "stock_uom", "uom", "conversion_factor", "rate"],
+				as_dict=True,
+			)
+			if soi:
+				icode = soi.item_code or icode
+				iname = soi.item_name or iname
+				igroup = soi.item_group or igroup
+				suom = soi.stock_uom or suom
+				uom = soi.uom or uom
+				cf = flt(soi.conversion_factor, 9) or cf
+				rate = flt(soi.rate)
 		row_data = {
-			"item_code": item.item_code,
-			"item_name": item.item_name,
-			"item_group": item.item_group,
-			"qty": item.qty,
-			"stock_uom": item.stock_uom or item.uom,
-			"uom": item.uom,
-			"conversion_factor": flt(item.conversion_factor, 9) or 1,
+			"item_code": icode,
+			"item_name": iname,
+			"item_group": igroup,
+			"qty": qty,
+			"stock_uom": suom,
+			"uom": uom,
+			"conversion_factor": cf,
 			"rate": rate,
-			"amount": amount,
+			"amount": flt(rate * qty, 2),
 			"expense_account": item.expense_account,
 			"cost_center": item.cost_center,
 			"custom_ref_doc": dn_name,
@@ -579,14 +728,6 @@ def update_dn_table_in_summary(docname, dn_name, old_dn=None, existing_rows=None
 
 
 @frappe.whitelist()
-def update_delivery_note_from_summary(docname: str, delivery_note_item=None):
-	_require_docname(docname)
-	doc = frappe.get_doc("Monthly Implementation Summery", docname)
-	doc.update_mis_delivery_note_item_from_timesheets(existing_rows=delivery_note_item)
-	return {"status": "ok", "message": frappe._("Delivery Note Items updated from current timesheets.")}
-
-
-@frappe.whitelist()
 def submit_mis_dn_action(docname: str):
 	_require_docname(docname)
 	doc = frappe.get_doc("Monthly Implementation Summery", docname)
@@ -595,6 +736,11 @@ def submit_mis_dn_action(docname: str):
 		doc.update_delivery_note_from_mis_items()
 	else:
 		doc._create_dn_from_mis_dni()
+	# Sub-methods may stamp timesheets; repeat after reload so DB ``delivery_note`` / links are visible.
+	doc.reload()
+	dn_name = doc._resolve_dn_name_for_timesheet_stamp()
+	if dn_name:
+		doc._update_timesheets_delivery_note(dn_name)
 	return {"status": "ok"}
 
 
@@ -614,26 +760,43 @@ def create_dn_from_mis_dni(docname: str):
 	return {"status": "ok"}
 
 
-def get_items_for_delivery_note(docname, sales_order):
-	"""Build Delivery Note Item rows from Sales Order. `docname` kept for API compatibility."""
-	if not sales_order:
-		return []
-	so_doc = frappe.get_doc("Sales Order", sales_order)
-	out = []
-	for so_item in so_doc.items:
-		out.append(
-			frappe.get_doc({
-				"doctype": "Delivery Note Item",
-				"item_code": so_item.item_code,
-				"delivery_date": so_item.delivery_date.strftime("%Y-%m-%d") if so_item.delivery_date else "",
-				"conversion_factor": so_item.conversion_factor,
-				"qty": so_item.qty,
-				"rate": so_item.rate,
-				"uom": so_item.uom,
-				"idx": so_item.idx,
-				"warehouse": so_item.warehouse,
-				"against_sales_order": so_doc.name,
-				"so_detail": so_item.name,
-			})
-		)
-	return out
+def update_mis_timesheets_on_delivery_note_submit(doc, method=None):
+	"""Document hook: when a Delivery Note is submitted, set custom_delivery_note on each Timesheet in linked MIS rows."""
+	if not doc or getattr(doc, "doctype", None) != "Delivery Note":
+		return
+	if doc.docstatus != 1:
+		return
+	dn_name = doc.name
+	mis_from_link = frappe.get_all(
+		"Monthly Implementation Summery",
+		filters={"delivery_note": dn_name, "docstatus": ["!=", 2]},
+		pluck="name",
+	)
+	mis_from_items = frappe.get_all(
+		"Delivery Note Item",
+		filters={
+			"parent": dn_name,
+			"custom_against_monthly_implementation_summery": ["is", "set"],
+		},
+		pluck="custom_against_monthly_implementation_summery",
+	)
+	# MIS child ``delivery_note_item.custom_ref_doc`` sometimes holds the DN id when copied from DN sync.
+	mis_from_ref = frappe.get_all(
+		"Delivery Note Item",
+		filters={"parenttype": "Monthly Implementation Summery", "custom_ref_doc": dn_name},
+		pluck="parent",
+		distinct=True,
+	)
+	mis_names = {m for m in mis_from_link if m}
+	for m in mis_from_items:
+		if m:
+			mis_names.add(m)
+	for m in mis_from_ref:
+		if m and frappe.db.get_value("Monthly Implementation Summery", m, "docstatus") != 2:
+			mis_names.add(m)
+	for mis_name in mis_names:
+		if not frappe.db.exists("Monthly Implementation Summery", mis_name):
+			continue
+		mis_doc = frappe.get_doc("Monthly Implementation Summery", mis_name)
+		mis_doc.reload()
+		mis_doc._update_timesheets_delivery_note(dn_name)
