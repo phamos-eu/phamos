@@ -536,7 +536,7 @@ frappe.ready(function () {
       sessionStorage.setItem(storageKey, response);
       applyActiveState(response);
       frappe.call({
-        method: "phamos.phamos.doctype.phamos_event.phamos_event.submit_interest",
+        method: "phamos.phamos.doctype.marketing_content.marketing_content.submit_interest",
         args: { event_name: eventName, response: response, previous_response: prev },
         callback: function (r) {
           if (r.message && r.message.status === "ok") updateCounts(r.message.counts);
@@ -567,7 +567,7 @@ frappe.ready(function () {
     subscribeMsg.textContent = "Subscribing...";
     subscribeMsg.className = "pe-subscribe-msg";
     frappe.call({
-      method: "phamos.phamos.doctype.phamos_event.phamos_event.subscribe_to_event",
+      method: "phamos.phamos.doctype.marketing_content.marketing_content.subscribe_to_event",
       args: { event_name: eventName, email: email },
       callback: function (r) {
         subscribeBtn.disabled = false;

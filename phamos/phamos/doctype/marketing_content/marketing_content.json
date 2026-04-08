@@ -1,7 +1,7 @@
 {
  "actions": [],
  "allow_guest_to_view": 1,
- "autoname": "PHAMOS-EVENT-.YYYY.-.#####",
+ "autoname": "MKT-CONTENT-.YYYY.-.#####",
  "creation": "2026-03-25 00:00:00.000000",
  "doctype": "DocType",
  "engine": "InnoDB",
@@ -217,7 +217,7 @@
    "fieldname": "responses",
    "fieldtype": "Table",
    "label": "Responses",
-   "options": "Phamos Event Response",
+   "options": "Marketing Event Response",
    "no_copy": 1
   }
  ],
@@ -226,7 +226,7 @@
  "modified": "2026-03-25 00:00:00.000000",
  "modified_by": "Administrator",
  "module": "Phamos",
- "name": "Phamos Event",
+ "name": "Marketing Content",
  "naming_rule": "Expression (old style)",
  "owner": "Administrator",
  "page_title_field": "title",
