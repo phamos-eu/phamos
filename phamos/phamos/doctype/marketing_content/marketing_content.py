@@ -3,17 +3,17 @@ from frappe.website.website_generator import WebsiteGenerator
 from frappe.utils import get_datetime
 
 
-class PhamosEvent(WebsiteGenerator):
+class MarketingContent(WebsiteGenerator):
     website = frappe._dict(
         page_title_field="title",
         condition_field="published",
-        template="phamos/phamos/doctype/phamos_event/templates/phamos_event.html",
-        row_template="phamos/phamos/doctype/phamos_event/templates/phamos_event_row.html",
+        template="phamos/phamos/doctype/marketing_content/templates/marketing_content.html",
+        row_template="phamos/phamos/doctype/marketing_content/templates/marketing_content_row.html",
     )
 
     def before_save(self):
         if not self.route:
-            self.route = "phamos-events/" + self.title.lower().replace(" ", "-")
+            self.route = "marketing-events/" + self.title.lower().replace(" ", "-")
         if not self.starts_on and not self.date_note:
             frappe.throw(
                 frappe._("Please set either a confirmed Start Date or a Date Note "
@@ -48,12 +48,12 @@ class PhamosEvent(WebsiteGenerator):
         context.spots_left = None
         if self.registration_open:
             registered_count = frappe.db.count(
-                "Phamos Event Registration",
+                "Marketing Event Registration",
                 filters={"event": self.name, "status": ["!=", "Cancelled"]},
             )
             if self.max_attendees:
                 context.spots_left = max(0, self.max_attendees - registered_count)
-        context.parents = [{"title": "Events", "route": "phamos-events"}]
+        context.parents = [{"title": "Events", "route": "marketing-events"}]
         if self.starts_on:
             dt = get_datetime(self.starts_on)
             context.starts_day_num  = dt.strftime("%d")
@@ -82,19 +82,19 @@ def submit_interest(event_name, response, previous_response=None):
     if previous_response and previous_response != response:
         prev_field = field_map[previous_response]
         frappe.db.sql(
-            "UPDATE `tabPhamos Event`"
+            "UPDATE `tabMarketing Content`"
             f" SET `{prev_field}` = GREATEST(0, COALESCE(`{prev_field}`, 0) - 1)"
             " WHERE name = %s", event_name,
         )
     new_field = field_map[response]
     frappe.db.sql(
-        "UPDATE `tabPhamos Event`"
+        "UPDATE `tabMarketing Content`"
         f" SET `{new_field}` = COALESCE(`{new_field}`, 0) + 1"
         " WHERE name = %s", event_name,
     )
     frappe.db.commit()
     counts = frappe.db.get_value(
-        "Phamos Event", event_name,
+        "Marketing Content", event_name,
         ["going_count", "maybe_count", "not_going_count"], as_dict=True,
     )
     return {"status": "ok", "counts": counts}
@@ -102,18 +102,18 @@ def submit_interest(event_name, response, previous_response=None):
 
 @frappe.whitelist(allow_guest=True)
 def subscribe_to_event(event_name, email):
-    if not frappe.db.exists("Phamos Event", event_name):
+    if not frappe.db.exists("Marketing Content", event_name):
         frappe.throw(frappe._("Event not found"))
     if not frappe.utils.validate_email_address(email):
         frappe.throw(frappe._("Please enter a valid email address"))
     existing = frappe.db.exists(
-        "Phamos Event Response", {"parent": event_name, "email": email}
+        "Marketing Event Response", {"parent": event_name, "email": email}
     )
     if existing:
         return {"status": "already_subscribed"}
     child = frappe.get_doc({
-        "doctype": "Phamos Event Response",
-        "parenttype": "Phamos Event",
+        "doctype": "Marketing Event Response",
+        "parenttype": "Marketing Content",
         "parent": event_name,
         "parentfield": "responses",
         "email": email,

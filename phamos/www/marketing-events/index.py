@@ -23,7 +23,7 @@ def get_context(context):
         db_filters["status"] = ["in", ["Upcoming", "Ongoing"]]
 
     events = frappe.get_all(
-        "Phamos Event",
+        "Marketing Content",
         filters=db_filters,
         fields=[
             "name", "title", "subtitle", "event_type", "status",
@@ -45,7 +45,7 @@ def get_context(context):
         ]
 
     all_published = frappe.get_all(
-        "Phamos Event",
+        "Marketing Content",
         filters={"published": 1},
         fields=["event_type", "city"],
     )
