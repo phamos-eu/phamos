@@ -156,7 +156,10 @@ doc_events = {
             "phamos.phamos.doctype.accounting_receipt.accounting_receipt.sync_attachment_from_files",
             "phamos.phamos.doctype.accounting_receipt.mistral_pdf.run_auto_extract_if_attachment",
         ]
-    }
+    },
+    "Delivery Note": {
+        "on_submit": "phamos.phamos.doctype.monthly_implementation_summery.monthly_implementation_summery.update_mis_timesheets_on_delivery_note_submit",
+    },
 }
 
 # Scheduled Tasks
@@ -194,6 +197,7 @@ scheduler_events = {
     "daily": [
         "phamos.api.send_daily_timesheet_comment_summary",
         "phamos.phamos.doctype.team.team.update_all_teams_weekly_holidays",
+        # MIS: on 1st only — previous calendar month; see create_monthly_implementation_summaries docstring
         "phamos.phamos.doctype.monthly_implementation_summery.create_monthly_implementation_summaries.create_monthly_implementation_summaries"
     ],
     "monthly": [

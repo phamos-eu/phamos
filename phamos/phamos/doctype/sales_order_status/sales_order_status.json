@@ -18,6 +18,7 @@
  ],
  "fields": [
   {
+   "allow_on_submit": 1,
    "fieldname": "sales_order",
    "fieldtype": "Link",
    "in_list_view": 1,
@@ -27,6 +28,7 @@
    "read_only": 1
   },
   {
+   "allow_on_submit": 1,
    "fetch_from": "sales_order.total_qty",
    "fieldname": "total_hrs",
    "fieldtype": "Data",
@@ -36,6 +38,7 @@
    "read_only": 1
   },
   {
+   "allow_on_submit": 1,
    "fetch_from": "sales_order.customer_name",
    "fieldname": "so_title",
    "fieldtype": "Data",
@@ -53,6 +56,7 @@
    "fieldtype": "Column Break"
   },
   {
+   "allow_on_submit": 1,
    "fetch_from": "sales_order.status",
    "fieldname": "status",
    "fieldtype": "Data",
@@ -61,6 +65,7 @@
    "read_only": 1
   },
   {
+   "allow_on_submit": 1,
    "fieldname": "delivered_total_hrs",
    "fieldtype": "Data",
    "in_list_view": 1,
@@ -68,6 +73,7 @@
    "read_only": 1
   },
   {
+   "allow_on_submit": 1,
    "fieldname": "remaining_hrs",
    "fieldtype": "Data",
    "label": "Remaining Hrs",

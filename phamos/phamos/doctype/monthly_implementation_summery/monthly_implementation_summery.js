@@ -1,6 +1,16 @@
 // Copyright (c) 2026, phamos.eu and contributors
 // For license information, please see license.txt
 
+function _mis_hint_reload_timesheets(frm) {
+	if (frm.is_new() || cint(frm.doc.docstatus) !== 0) {
+		return;
+	}
+	frappe.show_alert({
+		message: __("Save to reload the Timesheets table for the selected month and year."),
+		indicator: "blue",
+	});
+}
+
 frappe.ui.form.on("Monthly Implementation Summery", {
 	onload: function(frm) {
 		// Set year options dynamically: last year, current year, next 2 years
@@ -13,32 +23,17 @@ frappe.ui.form.on("Monthly Implementation Summery", {
 		];
 		frm.set_df_property('year', 'options', years.join('\n'));
 	},
-	update_current_timesheets_hours: function(frm) {
-		frappe.call({
-			method: "phamos.phamos.doctype.monthly_implementation_summery.monthly_implementation_summery.update_delivery_note_from_summary",
-			args: {
-				docname: frm.doc.name,
-				delivery_note_item: frm.doc.delivery_note_item || []
-			},
-			freeze: true,
-			freeze_message: __("Updating delivery note items from timesheets..."),
-			callback: function(r) {
-				if (r.exc) {
-					frappe.msgprint({
-						title: __("Error"),
-						message: r.exc[0] || __("Failed to update delivery note items."),
-						indicator: "red"
-					});
-					return;
-				}
-				frappe.msgprint({
-					title: __("Success"),
-					indicator: "green",
-					message: (r.message && r.message.message) || __("Delivery Note Items updated.")
-				});
-				frm.reload_doc();
-			}
-		});
+	month: function (frm) {
+		_mis_hint_reload_timesheets(frm);
+	},
+	year: function (frm) {
+		if (typeof frm.doc.year === "number") {
+			frm.set_value("year", String(frm.doc.year));
+		}
+		_mis_hint_reload_timesheets(frm);
+	},
+	implementation: function (frm) {
+		_mis_hint_reload_timesheets(frm);
 	},
 	create_delivery_note: function(frm) {
 		frappe.call({
@@ -78,12 +73,14 @@ frappe.ui.form.on("Monthly Implementation Summery", {
             add_custom_links("delivery_note", "Delivery Note", frm.doc.delivery_note);
         }
 		if (frm.is_new()) {
+			frm.doc.delivery_note='';
+			frm.refresh_field('delivery_note');
 			const d = new Date();
 			const months = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
 			const defaults = {
 				sales_order: null,
 				delivery_note: null,
-				year: d.getFullYear(),
+				year: String(d.getFullYear()),
 				month: months[d.getMonth()],
 				delivery_note_item: [],
 				timesheets_table: [],
@@ -98,7 +95,8 @@ frappe.ui.form.on("Monthly Implementation Summery", {
 			frappe.db.get_list('Sales Order', {
 				filters: {
 					custom_implementation: frm.doc.implementation,
-					status: ['!=', 'completed']
+					status: ['!=', 'completed'],
+					docstatus: 1
 				},
 				fields: ['name']
 			}).then(records => {
@@ -151,22 +149,17 @@ frappe.ui.form.on("Monthly Implementation Summery", {
 
 		frappe.dom.unfreeze();
 
-		const has_dn = !!frm.doc.delivery_note;
-		const method = has_dn
-			? "phamos.phamos.doctype.monthly_implementation_summery.monthly_implementation_summery.update_dn_from_mis_items"
-			: "phamos.phamos.doctype.monthly_implementation_summery.monthly_implementation_summery.create_dn_from_mis_dni";
-
 		return new Promise(function (resolve) {
 			frappe.call({
-				method,
+				method: "phamos.phamos.doctype.monthly_implementation_summery.monthly_implementation_summery.submit_mis_dn_action",
 				args: { docname: frm.doc.name },
 				freeze: true,
-				freeze_message: has_dn ? __("Updating delivery note...") : __("Creating delivery note..."),
+				freeze_message: __("Syncing delivery note with this summary..."),
 				callback: function (r) {
 					if (r.exc) {
 						frappe.msgprint({
 							title: __("Error"),
-							message: r.exc[0] || (has_dn ? __("Failed to update delivery note.") : __("Failed to create delivery note.")),
+							message: r.exc[0] || __("Failed to sync delivery note."),
 							indicator: "red"
 						});
 						resolve();

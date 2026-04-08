@@ -20,8 +20,9 @@
   "billable_hours",
   "section_break_xunv",
   "delivery_note_details",
-  "update_current_timesheets_hours",
   "delivery_note_item",
+  "section_break_gn1x",
+  "sales_order_status_information",
   "financial_history_section",
   "sales_order_qty",
   "dn_qty",
@@ -35,8 +36,7 @@
  "fields": [
   {
    "fieldname": "section_break_xunv",
-   "fieldtype": "Section Break",
-   "label": ""
+   "fieldtype": "Section Break"
   },
   {
    "fieldname": "naming_series",
@@ -78,6 +78,7 @@
    "label": "Total Hours"
   },
   {
+   "description": "Total from the timesheets table.",
    "fieldname": "billable_hours",
    "fieldtype": "Float",
    "label": "Billable Hours"
@@ -98,8 +99,7 @@
   },
   {
    "fieldname": "section_break_1_section",
-   "fieldtype": "Section Break",
-   "label": ""
+   "fieldtype": "Section Break"
   },
   {
    "fieldname": "create_delivery_note",
@@ -125,11 +125,6 @@
    "options": "Delivery Note Item"
   },
   {
-   "fieldname": "update_current_timesheets_hours",
-   "fieldtype": "Button",
-   "label": "Update current timesheets hours"
-  },
-  {
    "fieldname": "financial_history_section",
    "fieldtype": "Section Break",
    "label": "Financial History"
@@ -143,6 +138,7 @@
    "read_only": 1
   },
   {
+   "allow_on_submit": 1,
    "description": "Sum of Delivery Note item quantities against those Sales Orders where DN status is Completed or To Bill. Same as dn_qty.\n",
    "fieldname": "dn_qty",
    "fieldtype": "Float",
@@ -159,6 +155,7 @@
    "read_only": 1
   },
   {
+   "allow_on_submit": 1,
    "description": "Open SO hours minus delivered-on-DN hours minus draft timesheet hours not yet on a DN. Same as remaining_hrs.\n",
    "fieldname": "remaining_hrs",
    "fieldtype": "Float",
@@ -181,8 +178,7 @@
   },
   {
    "fieldname": "column_break_w99l",
-   "fieldtype": "Column Break",
-   "label": ""
+   "fieldtype": "Column Break"
   },
   {
    "fieldname": "amended_from",
@@ -193,17 +189,22 @@
    "print_hide": 1,
    "read_only": 1,
    "search_index": 1
+  },
+  {
+   "fieldname": "section_break_gn1x",
+   "fieldtype": "Section Break"
+  },
+  {
+   "fieldname": "sales_order_status_information",
+   "fieldtype": "Table",
+   "label": "Sales Order Status Information",
+   "options": "Sales Order Status"
   }
  ],
  "index_web_pages_for_search": 1,
  "is_submittable": 1,
- "links": [
-  {
-   "link_doctype": "Delivery Note",
-   "link_fieldname": "custom_against_monthly_implementation_summery"
-  }
- ],
- "modified": "2026-03-24 17:15:37.196846",
+ "links": [],
+ "modified": "2026-04-08 10:27:44.411631",
  "modified_by": "Administrator",
  "module": "Phamos",
  "name": "Monthly Implementation Summery",
