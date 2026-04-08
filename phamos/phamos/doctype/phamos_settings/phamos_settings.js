@@ -67,7 +67,7 @@ frappe.ui.form.on('phamos Settings', {
 			() => {
 				frappe.call({
 					method:
-						"phamos.phamos.doctype.monthly_implementation_summery.create_monthly_implementation_summaries.run_manual_mis_creation",
+						"phamos.phamos.doctype.monthly_implementation_summary.create_monthly_implementation_summaries.run_manual_mis_creation",
 					args: {
 						month: frm.doc.month,
 						year: String(frm.doc.year),
