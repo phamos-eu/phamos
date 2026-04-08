@@ -95,7 +95,8 @@ frappe.ui.form.on("Monthly Implementation Summery", {
 			frappe.db.get_list('Sales Order', {
 				filters: {
 					custom_implementation: frm.doc.implementation,
-					status: ['!=', 'completed']
+					status: ['!=', 'completed'],
+					docstatus: 1
 				},
 				fields: ['name']
 			}).then(records => {

@@ -196,6 +196,7 @@
    "label": "Year"
   },
   {
+   "description": "Manually run the job that creates Monthly Implementation Summaries for open Implementations with timesheets in the selected Month and Year (same logic as the scheduled task).",
    "fieldname": "execute_scheduled_job",
    "fieldtype": "Button",
    "label": "Execute Scheduled Job"
@@ -204,7 +205,7 @@
  "index_web_pages_for_search": 1,
  "issingle": 1,
  "links": [],
- "modified": "2026-04-07 12:10:21.987787",
+ "modified": "2026-04-08 10:10:21.987787",
  "modified_by": "Administrator",
  "module": "Phamos",
  "name": "phamos Settings",
