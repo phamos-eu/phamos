@@ -1,0 +1,68 @@
+{
+ "accept_payment": 0,
+ "allow_guest": 1,
+ "allow_multiple": 1,
+ "button_label": "Register Now",
+ "creation": "2026-03-25 00:00:00.000000",
+ "doc_type": "Marketing Event Registration",
+ "doctype": "Web Form",
+ "introduction_text": "<p>Fill in the details below to register for this event. You will receive a confirmation once your registration is processed.</p>",
+ "is_standard": 1,
+ "login_required": 0,
+ "modified": "2026-03-25 00:00:00.000000",
+ "modified_by": "Administrator",
+ "module": "Phamos",
+ "name": "event-registration",
+ "owner": "Administrator",
+ "published": 1,
+ "route": "event-registration",
+ "show_sidebar": 0,
+ "success_message": "Thank you for registering! We will be in touch with more details as the event approaches.",
+ "success_title": "You're registered!",
+ "title": "Event Registration",
+ "web_form_fields": [
+  {
+   "doctype": "Web Form Field",
+   "fieldname": "event",
+   "fieldtype": "Link",
+   "label": "Event",
+   "options": "Marketing Content",
+   "read_only": 1,
+   "reqd": 1
+  },
+  {
+   "doctype": "Web Form Field",
+   "fieldname": "full_name",
+   "fieldtype": "Data",
+   "label": "Full Name",
+   "reqd": 1
+  },
+  {
+   "doctype": "Web Form Field",
+   "fieldname": "email",
+   "fieldtype": "Data",
+   "label": "Email",
+   "options": "Email",
+   "reqd": 1
+  },
+  {
+   "doctype": "Web Form Field",
+   "fieldname": "phone",
+   "fieldtype": "Data",
+   "label": "Phone"
+  },
+  {
+   "doctype": "Web Form Field",
+   "fieldname": "number_of_attendees",
+   "fieldtype": "Int",
+   "label": "Number of Attendees",
+   "default": "1"
+  },
+  {
+   "doctype": "Web Form Field",
+   "fieldname": "notes",
+   "fieldtype": "Small Text",
+   "label": "Notes / Special Requests"
+  }
+ ]
+}

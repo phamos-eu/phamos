@@ -1,0 +1,508 @@
+{% extends "templates/web.html" %}
+
+{% block page_content %}
+<style>
+  :root {
+    --pe-accent:  #8b1a2e;
+    --pe-border:  #e8e2d9;
+    --pe-muted:   #78716c;
+    --pe-surface: #ffffff;
+    --pe-bg:      #faf8f5;
+    --pe-radius:  10px;
+  }
+
+  /* ── Badges ─────────────────────────────────── */
+  .pe-badge {
+    display: inline-block;
+    font-size: .68rem; font-weight: 700;
+    letter-spacing: .07em; text-transform: uppercase;
+    padding: .2em .75em; border-radius: 50px; color: #fff;
+    white-space: nowrap;
+  }
+  .pe-badge--workshop       { background: #1e40af; }
+  .pe-badge--conference     { background: #8b1a2e; }
+  .pe-badge--webinar        { background: #065f46; }
+  .pe-badge--training       { background: #92400e; }
+  .pe-badge--meetup         { background: #5b21b6; }
+  .pe-badge--hackathon      { background: #7c2d12; }
+  .pe-badge--team-building  { background: #6d28d9; }
+  .pe-badge--seminar        { background: #047857; }
+  .pe-badge--networking     { background: #be123c; }
+  .pe-badge--product-launch { background: #a21caf; }
+  .pe-badge--town-hall      { background: #0e7490; }
+  .pe-badge--social-event   { background: #b91c1c; }
+  .pe-badge--default        { background: #44403c; }
+
+  /* ── Page header ─────────────────────────────── */
+  .pe-page-header { margin-bottom: 1.6rem; }
+  .pe-page-header h2 {
+    font-size: 1.6rem; font-weight: 700;
+    letter-spacing: -.025em; margin: 0 0 .2rem;
+  }
+  .pe-page-header p { color: var(--pe-muted); font-size: .88rem; margin: 0; }
+
+  /* ── Sidebar ─────────────────────────────────── */
+  .pe-sidebar {
+    position: sticky; top: 20px;
+    align-self: flex-start; padding-right: 1.5rem;
+  }
+  .pe-sidebar-title {
+    font-size: .72rem; font-weight: 700;
+    text-transform: uppercase; letter-spacing: .08em;
+    color: var(--pe-muted); margin: 0 0 .8rem;
+  }
+  .pe-filter-group {
+    margin-bottom: 1.4rem; padding-bottom: 1.4rem;
+    border-bottom: 1px solid var(--pe-border);
+  }
+  .pe-filter-group:last-of-type { border-bottom: none; margin-bottom: .8rem; }
+  .pe-filter-label { font-size: .78rem; font-weight: 600; color: #1c1917; margin-bottom: .55rem; }
+  .pe-filter-item {
+    display: flex; align-items: center; gap: .55rem;
+    font-size: .85rem; color: #1c1917;
+    cursor: pointer; padding: .22rem 0; user-select: none;
+  }
+  .pe-filter-item input[type="checkbox"],
+  .pe-filter-item input[type="radio"] {
+    width: 15px; height: 15px;
+    accent-color: var(--pe-accent); cursor: pointer; flex-shrink: 0;
+  }
+  .pe-clear-link {
+    text-align: center; font-size: .8rem;
+    color: var(--pe-muted); text-decoration: none;
+  }
+  .pe-clear-link:hover { color: var(--pe-accent); }
+
+  /* ── Toolbar ─────────────────────────────────── */
+  .pe-toolbar { display: flex; align-items: center; gap: .75rem; margin-bottom: 1rem; }
+  .pe-search-wrap { flex: 1; position: relative; }
+  .pe-search-wrap svg {
+    position: absolute; left: .85rem; top: 50%;
+    transform: translateY(-50%); color: var(--pe-muted); pointer-events: none;
+  }
+  .pe-search-input {
+    width: 100%; padding: .52rem .9rem .52rem 2.4rem;
+    border: 1.5px solid var(--pe-border);
+    border-radius: 50px; font-size: .88rem;
+    background: var(--pe-surface); color: #1c1917;
+    outline: none; transition: border-color .15s;
+  }
+  .pe-search-input:focus { border-color: var(--pe-accent); }
+  .pe-view-btns { display: flex; gap: .25rem; }
+  .pe-view-btn {
+    padding: .45rem .6rem;
+    border: 1.5px solid var(--pe-border);
+    border-radius: 8px; background: var(--pe-surface);
+    color: var(--pe-muted); cursor: pointer;
+    display: flex; align-items: center; transition: all .15s;
+  }
+  .pe-view-btn.active { border-color: var(--pe-accent); color: var(--pe-accent); background: #fdf2f4; }
+  .pe-view-btn:hover:not(.active) { border-color: #9ca3af; color: #1c1917; }
+  .pe-mobile-filter-btn {
+    display: none; align-items: center; gap: .4rem;
+    padding: .48rem .9rem;
+    border: 1.5px solid var(--pe-border);
+    border-radius: 50px; background: var(--pe-surface);
+    font-size: .82rem; font-weight: 500; color: #1c1917;
+    cursor: pointer; white-space: nowrap;
+  }
+  .pe-filter-dot {
+    display: inline-block; width: 7px; height: 7px;
+    border-radius: 50%; background: var(--pe-accent); margin-left: .15rem;
+  }
+  .pe-count { font-size: .82rem; color: var(--pe-muted); margin-bottom: .9rem; }
+
+  /* ── Grid mode ───────────────────────────────── */
+  .pe-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+    gap: 1.1rem;
+  }
+  .pe-card {
+    display: flex; flex-direction: column;
+    background: var(--pe-surface);
+    border: 1px solid var(--pe-border);
+    border-radius: var(--pe-radius);
+    overflow: hidden; text-decoration: none; color: inherit;
+    transition: box-shadow .18s, transform .18s;
+  }
+  .pe-card:hover {
+    box-shadow: 0 6px 20px rgba(0,0,0,.09);
+    transform: translateY(-2px);
+    text-decoration: none; color: inherit;
+  }
+  .pe-card-thumb {
+    position: relative; height: 170px; overflow: hidden;
+    background: #f0ede8; flex-shrink: 0;
+  }
+  .pe-card-thumb img { width: 100%; height: 100%; object-fit: cover; display: block; }
+  .pe-card-thumb-placeholder {
+    width: 100%; height: 100%;
+    display: flex; align-items: center; justify-content: center; color: #c7bfb5;
+  }
+  .pe-card-thumb .pe-badge { position: absolute; top: .6rem; left: .6rem; }
+  .pe-card-body { flex: 1; padding: .8rem 1rem .5rem; }
+  .pe-card-title {
+    font-size: .95rem; font-weight: 600; color: #1c1917;
+    line-height: 1.3; margin: 0 0 .3rem;
+  }
+  .pe-card-intro {
+    font-size: .78rem; color: var(--pe-muted); margin: 0;
+    display: -webkit-box;
+    -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;
+  }
+  .pe-card-meta {
+    padding: .5rem 1rem .7rem;
+    border-top: 1px solid var(--pe-border);
+    display: flex; flex-direction: column; gap: .2rem;
+    font-size: .76rem; color: var(--pe-muted);
+  }
+  .pe-card-meta-row { display: flex; align-items: center; gap: .35rem; }
+  /* Date + time clearly separated */
+  .pe-card-meta-date { font-weight: 600; color: #1c1917; }
+  .pe-card-meta-time {
+    display: inline-flex; align-items: center; gap: .2rem;
+    margin-left: .4rem; color: var(--pe-muted); font-size: .72rem;
+  }
+  .pe-card-date-note {
+    display: flex; align-items: center; gap: .35rem;
+    font-style: italic; color: var(--pe-accent);
+    font-weight: 500;
+  }
+  .pe-card-footer {
+    padding: .45rem 1rem;
+    background: var(--pe-bg);
+    border-top: 1px solid var(--pe-border);
+    display: flex; align-items: center; justify-content: space-between;
+    font-size: .74rem;
+  }
+  .pe-rsvp-mini { display: flex; gap: .65rem; color: var(--pe-muted); }
+  .pe-rsvp-mini span { display: flex; align-items: center; gap: .25rem; }
+  .pe-card-arrow { color: var(--pe-accent); font-size: .78rem; font-weight: 600; }
+
+  /* ── List mode ───────────────────────────────── */
+  .pe-grid.list-mode { grid-template-columns: 1fr; gap: .55rem; }
+  .pe-grid.list-mode .pe-card { flex-direction: row; min-height: 90px; }
+  .pe-grid.list-mode .pe-card-thumb {
+    width: 110px; height: auto; min-height: 90px;
+    border-radius: var(--pe-radius) 0 0 var(--pe-radius); flex-shrink: 0;
+  }
+  .pe-grid.list-mode .pe-card-thumb .pe-badge { font-size: .6rem; padding: .15em .55em; }
+  .pe-grid.list-mode .pe-card-body {
+    flex: 1; min-width: 0; padding: .65rem .9rem .5rem;
+    display: flex; flex-direction: column; justify-content: center;
+  }
+  .pe-grid.list-mode .pe-card-intro { display: -webkit-box; }
+  .pe-grid.list-mode .pe-card-meta {
+    flex-direction: row; flex-wrap: wrap; gap: .1rem .8rem;
+    padding: 0; border-top: none; margin-top: .3rem;
+  }
+  .pe-grid.list-mode .pe-card-meta-row {
+    overflow: hidden; white-space: nowrap; text-overflow: ellipsis; max-width: 100%;
+  }
+  .pe-grid.list-mode .pe-card-footer {
+    flex-direction: column; justify-content: center;
+    padding: .65rem 1rem; min-width: 88px; flex-shrink: 0;
+    border-top: none; border-left: 1px solid var(--pe-border);
+    background: var(--pe-bg);
+  }
+  .pe-grid.list-mode .pe-rsvp-mini { flex-direction: column; gap: .3rem; }
+  .pe-grid.list-mode .pe-card-arrow { margin-top: .4rem; }
+
+  /* ── Empty state ─────────────────────────────── */
+  .pe-empty { text-align: center; padding: 4rem 1rem; color: var(--pe-muted); }
+  .pe-empty p { font-size: 1rem; font-weight: 500; margin: .6rem 0 .3rem; }
+
+  /* ── Mobile drawer ───────────────────────────── */
+  .pe-drawer {
+    position: fixed; top: 0; right: -320px;
+    width: 300px; height: 100%; z-index: 1050;
+    background: var(--pe-surface);
+    box-shadow: -4px 0 24px rgba(0,0,0,.12);
+    display: flex; flex-direction: column;
+    transition: right .25s ease; overflow-y: auto;
+  }
+  .pe-drawer.open { right: 0; }
+  .pe-drawer-header {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 1rem 1.2rem; border-bottom: 1px solid var(--pe-border); font-weight: 600;
+  }
+  .pe-drawer-close {
+    background: none; border: none; cursor: pointer;
+    color: var(--pe-muted); padding: .2rem; display: flex; align-items: center;
+  }
+  .pe-drawer-body { padding: 1.2rem; flex: 1; overflow-y: auto; }
+  .pe-overlay {
+    display: none; position: fixed; inset: 0;
+    background: rgba(0,0,0,.3); z-index: 1040;
+  }
+  .pe-overlay.open { display: block; }
+  .pe-apply-btn {
+    width: 100%; padding: .5rem;
+    background: var(--pe-accent); color: #fff;
+    border: none; border-radius: var(--pe-radius);
+    font-size: .85rem; font-weight: 600; cursor: pointer;
+  }
+  .pe-apply-btn:hover { background: #6d1523; }
+  .pe-filter-actions { display: flex; flex-direction: column; gap: .5rem; margin-top: .5rem; }
+
+  /* ── Responsive ──────────────────────────────── */
+  @media (max-width: 767px) {
+    .pe-mobile-filter-btn { display: flex; }
+    .pe-sidebar { display: none; }
+    .pe-grid { grid-template-columns: repeat(auto-fill, minmax(160px, 1fr)); gap: .8rem; }
+    .pe-card-thumb { height: 130px; }
+  }
+</style>
+
+{# ── Filter fields macro ───────────────────────── #}
+{% macro filter_fields() %}
+  {% if available_types %}
+  <div class="pe-filter-group">
+    <div class="pe-filter-label">Event Type</div>
+    {% for t in available_types %}
+    <label class="pe-filter-item">
+      <input type="checkbox" name="event_type" value="{{ t }}"
+             {% if t in selected_types %}checked{% endif %}
+             onchange="this.form.submit()">
+      <span>{{ t }}</span>
+    </label>
+    {% endfor %}
+  </div>
+  {% endif %}
+
+  {% if available_cities %}
+  <div class="pe-filter-group">
+    <div class="pe-filter-label">City</div>
+    {% for c in available_cities %}
+    <label class="pe-filter-item">
+      <input type="radio" name="city" value="{{ c }}"
+             {% if selected_city == c %}checked{% endif %}
+             onchange="this.form.submit()">
+      <span>{{ c }}</span>
+    </label>
+    {% endfor %}
+    {% if selected_city %}
+    <label class="pe-filter-item">
+      <input type="radio" name="city" value="" onchange="this.form.submit()">
+      <span style="color:var(--pe-muted);">All cities</span>
+    </label>
+    {% endif %}
+  </div>
+  {% endif %}
+
+  <div class="pe-filter-group">
+    <div class="pe-filter-label">Time</div>
+    <label class="pe-filter-item">
+      <input type="checkbox" name="show_past" value="1"
+             {% if show_past %}checked{% endif %}
+             onchange="this.form.submit()">
+      <span>Include past events</span>
+    </label>
+  </div>
+
+  {% if search %}<input type="hidden" name="search" value="{{ search }}">{% endif %}
+{% endmacro %}
+
+<div class="pe-list-page">
+
+  <div class="pe-page-header">
+    <h2>Events</h2>
+    <p>Workshops &nbsp;·&nbsp; Conferences &nbsp;·&nbsp; Meetups &nbsp;·&nbsp; Webinars &nbsp;·&nbsp; and more</p>
+  </div>
+
+  <div class="row">
+
+    {# ── Desktop Sidebar ──────────────────────── #}
+    <div class="col-md-3 pe-sidebar">
+      <div class="pe-sidebar-title">Filters
+        {% if selected_types or selected_city or show_past %}
+          &nbsp;·&nbsp; <a href="/marketing-events{% if search %}?search={{ search }}{% endif %}" class="pe-clear-link" style="font-size:.72rem; text-transform:none; letter-spacing:0;">Clear all</a>
+        {% endif %}
+      </div>
+      <form method="get" id="sidebar-form">
+        {{ filter_fields() }}
+      </form>
+    </div>
+
+    {# ── Main content ─────────────────────────── #}
+    <div class="col-md-9">
+
+      <form method="get" id="search-form">
+        {% for t in selected_types %}<input type="hidden" name="event_type" value="{{ t }}">{% endfor %}
+        {% if selected_city %}<input type="hidden" name="city" value="{{ selected_city }}">{% endif %}
+        {% if show_past %}<input type="hidden" name="show_past" value="1">{% endif %}
+
+        <div class="pe-toolbar">
+          <div class="pe-search-wrap">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+            <input class="pe-search-input" type="text" name="search" value="{{ search }}" placeholder="Search events…">
+          </div>
+          <div class="pe-view-btns">
+            <button type="button" class="pe-view-btn" id="btn-grid" title="Grid view">
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/></svg>
+            </button>
+            <button type="button" class="pe-view-btn" id="btn-list" title="List view">
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/><line x1="3" y1="6" x2="3.01" y2="6"/><line x1="3" y1="12" x2="3.01" y2="12"/><line x1="3" y1="18" x2="3.01" y2="18"/></svg>
+            </button>
+          </div>
+          <button type="button" class="pe-mobile-filter-btn" id="open-drawer">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="4" y1="6" x2="20" y2="6"/><line x1="8" y1="12" x2="20" y2="12"/><line x1="12" y1="18" x2="20" y2="18"/></svg>
+            Filters
+            {% if selected_types or selected_city or show_past %}<span class="pe-filter-dot"></span>{% endif %}
+          </button>
+        </div>
+      </form>
+
+      <p class="pe-count">
+        {{ event_count }} event{{ "s" if event_count != 1 else "" }}
+        {% if search %} matching <em>"{{ search }}"</em>{% endif %}
+      </p>
+
+      {% if events %}
+      <div class="pe-grid" id="events-grid">
+        {% for event in events %}
+        {%- set et_slug = (event.event_type or "default") | lower | replace(" ", "-") -%}
+        {%- set dt_str = event.starts_on | string if event.starts_on else "" -%}
+        <a class="pe-card" href="/{{ event.route }}">
+
+          <div class="pe-card-thumb">
+            {% if event.image %}
+              <img src="{{ event.image }}" alt="{{ event.title }}">
+            {% else %}
+              <div class="pe-card-thumb-placeholder">
+                <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/></svg>
+              </div>
+            {% endif %}
+            {% if event.event_type %}
+              <span class="pe-badge pe-badge--{{ et_slug }}">{{ event.event_type }}</span>
+            {% endif %}
+          </div>
+
+          <div class="pe-card-body">
+            <div class="pe-card-title">{{ event.title }}</div>
+            {% if event.intro %}
+              <p class="pe-card-intro">{{ event.intro }}</p>
+            {% endif %}
+          </div>
+
+          <div class="pe-card-meta">
+            {% if event.starts_on %}
+            <div class="pe-card-meta-row">
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
+              <span>
+                <span class="pe-card-meta-date">{{ event.starts_on.strftime("%d %b %Y") if event.starts_on else "" }}</span>
+                <span class="pe-card-meta-time">
+                  <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+                  {{ event.starts_on.strftime("%H:%M") if event.starts_on else "" }}
+                </span>
+              </span>
+            </div>
+            {% elif event.date_note %}
+            <div class="pe-card-date-note">
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/><line x1="10" y1="16" x2="14" y2="16"/></svg>
+              {{ event.date_note }}
+            </div>
+            {% endif %}
+            {% if event.location or event.city %}
+            <div class="pe-card-meta-row">
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>
+              {{ event.location or "" }}{% if event.location and event.city %}, {% endif %}{{ event.city or "" }}
+            </div>
+            {% endif %}
+          </div>
+
+          <div class="pe-card-footer">
+            <div class="pe-rsvp-mini">
+              <span style="color:#065f46;" title="Yes">
+                <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+                {{ event.going_count or 0 }}
+              </span>
+              <span style="color:#92400e;" title="Maybe">
+                <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+                {{ event.maybe_count or 0 }}
+              </span>
+              <span style="color:#44403c;" title="No">
+                <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+                {{ event.not_going_count or 0 }}
+              </span>
+            </div>
+            <span class="pe-card-arrow">→</span>
+          </div>
+
+        </a>
+        {% endfor %}
+      </div>
+
+      {% else %}
+      <div class="pe-empty">
+        <svg width="44" height="44" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
+        <p>No events found{% if search or selected_types or selected_city %} matching your filters{% endif %}</p>
+        {% if search or selected_types or selected_city or show_past %}
+          <a href="/marketing-events" class="pe-clear-link">Clear all filters</a>
+        {% endif %}
+      </div>
+      {% endif %}
+
+    </div>{# end col-md-9 #}
+  </div>{# end row #}
+</div>
+
+{# ── Mobile filter drawer ─────────────────────── #}
+<div class="pe-drawer" id="filter-drawer">
+  <div class="pe-drawer-header">
+    <span>Filters</span>
+    <button class="pe-drawer-close" id="close-drawer">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+    </button>
+  </div>
+  <div class="pe-drawer-body">
+    <form method="get" id="drawer-form">
+      {{ filter_fields() }}
+      <div class="pe-filter-actions">
+        <button type="submit" class="pe-apply-btn">Apply</button>
+        {% if selected_types or selected_city or show_past %}
+          <a href="/marketing-events{% if search %}?search={{ search }}{% endif %}" class="pe-clear-link">Clear all</a>
+        {% endif %}
+      </div>
+    </form>
+  </div>
+</div>
+<div class="pe-overlay" id="drawer-overlay"></div>
+
+<script>
+(function () {
+  var grid    = document.getElementById("events-grid");
+  var btnGrid = document.getElementById("btn-grid");
+  var btnList = document.getElementById("btn-list");
+  var stored  = localStorage.getItem("pe_view") || "grid";
+
+  function setView(v) {
+    if (!grid) return;
+    if (v === "list") {
+      grid.classList.add("list-mode");
+      btnList.classList.add("active"); btnGrid.classList.remove("active");
+    } else {
+      grid.classList.remove("list-mode");
+      btnGrid.classList.add("active"); btnList.classList.remove("active");
+    }
+    localStorage.setItem("pe_view", v);
+  }
+
+  setView(stored);
+  if (btnGrid) btnGrid.addEventListener("click", function() { setView("grid"); });
+  if (btnList) btnList.addEventListener("click", function() { setView("list"); });
+
+  var drawer  = document.getElementById("filter-drawer");
+  var overlay = document.getElementById("drawer-overlay");
+  function openDrawer()  { drawer.classList.add("open"); overlay.classList.add("open"); document.body.style.overflow = "hidden"; }
+  function closeDrawer() { drawer.classList.remove("open"); overlay.classList.remove("open"); document.body.style.overflow = ""; }
+
+  var openBtn  = document.getElementById("open-drawer");
+  var closeBtn = document.getElementById("close-drawer");
+  if (openBtn)  openBtn.addEventListener("click", openDrawer);
+  if (closeBtn) closeBtn.addEventListener("click", closeDrawer);
+  if (overlay)  overlay.addEventListener("click", closeDrawer);
+})();
+</script>
+{% endblock %}
