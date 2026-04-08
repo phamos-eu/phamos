@@ -158,7 +158,7 @@ doc_events = {
         ]
     },
     "Delivery Note": {
-        "on_submit": "phamos.phamos.doctype.monthly_implementation_summery.monthly_implementation_summery.update_mis_timesheets_on_delivery_note_submit",
+        "on_submit": "phamos.phamos.doctype.monthly_implementation_summary.monthly_implementation_summary.update_mis_timesheets_on_delivery_note_submit",
     },
 }
 
@@ -198,7 +198,7 @@ scheduler_events = {
         "phamos.api.send_daily_timesheet_comment_summary",
         "phamos.phamos.doctype.team.team.update_all_teams_weekly_holidays",
         # MIS: on 1st only — previous calendar month; see create_monthly_implementation_summaries docstring
-        "phamos.phamos.doctype.monthly_implementation_summery.create_monthly_implementation_summaries.create_monthly_implementation_summaries"
+        "phamos.phamos.doctype.monthly_implementation_summary.create_monthly_implementation_summaries.create_monthly_implementation_summaries"
     ],
     "monthly": [
         "phamos.api.send_monthly_comment_summary"

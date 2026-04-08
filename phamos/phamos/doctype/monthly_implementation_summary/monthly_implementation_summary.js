@@ -11,7 +11,7 @@ function _mis_hint_reload_timesheets(frm) {
 	});
 }
 
-frappe.ui.form.on("Monthly Implementation Summery", {
+frappe.ui.form.on("Monthly Implementation Summary", {
 	onload: function(frm) {
 		// Set year options dynamically: last year, current year, next 2 years
 		const currentYear = new Date().getFullYear();
@@ -37,7 +37,7 @@ frappe.ui.form.on("Monthly Implementation Summery", {
 	},
 	create_delivery_note: function(frm) {
 		frappe.call({
-			method: "phamos.phamos.doctype.monthly_implementation_summery.monthly_implementation_summery.create_delivery_note",
+			method: "phamos.phamos.doctype.monthly_implementation_summary.monthly_implementation_summary.create_delivery_note",
 			args: {
 				docname: frm.doc.name,
 				sales_order: frm.doc.sales_order || null,
@@ -151,7 +151,7 @@ frappe.ui.form.on("Monthly Implementation Summery", {
 
 		return new Promise(function (resolve) {
 			frappe.call({
-				method: "phamos.phamos.doctype.monthly_implementation_summery.monthly_implementation_summery.submit_mis_dn_action",
+				method: "phamos.phamos.doctype.monthly_implementation_summary.monthly_implementation_summary.submit_mis_dn_action",
 				args: { docname: frm.doc.name },
 				freeze: true,
 				freeze_message: __("Syncing delivery note with this summary..."),
@@ -197,7 +197,7 @@ frappe.ui.form.on("Timesheets", {
 // Delivery Note Item embedded in MIS does not load ERPNext TransactionController, so qty/rate do not
 // recalculate amount. Mirror standard behaviour: amount = qty * rate; stock_qty = qty * conversion_factor.
 function mis_recalculate_dn_item_row(frm, cdt, cdn) {
-	if (frm.doc.doctype !== "Monthly Implementation Summery") return;
+	if (frm.doc.doctype !== "Monthly Implementation Summary") return;
 	var row = locals[cdt][cdn];
 	if (!row) return;
 	frappe.model.round_floats_in(row, ["qty", "rate", "conversion_factor"]);
@@ -212,7 +212,7 @@ function mis_recalculate_dn_item_row(frm, cdt, cdn) {
 // Fetch Item Name, UOM, UOM Conversion Factor when item_code is selected in MIS delivery_note_item
 frappe.ui.form.on("Delivery Note Item", {
 	item_code: function(frm, cdt, cdn) {
-		if (frm.doc.doctype !== "Monthly Implementation Summery") return;
+		if (frm.doc.doctype !== "Monthly Implementation Summary") return;
 		var row = frappe.model.get_doc(cdt, cdn);
 		if (!row.item_code) return;
 		frappe.db.get_value("Item", row.item_code, ["item_name", "stock_uom"], function(r) {
