@@ -5,5 +5,5 @@
 from frappe.tests.utils import FrappeTestCase
 
 
-class TestMonthlyImplementationSummery(FrappeTestCase):
+class TestMonthlyImplementationSummary(FrappeTestCase):
 	pass

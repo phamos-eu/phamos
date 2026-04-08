@@ -185,7 +185,7 @@
    "fieldtype": "Link",
    "label": "Amended From",
    "no_copy": 1,
-   "options": "Monthly Implementation Summery",
+   "options": "Monthly Implementation Summary",
    "print_hide": 1,
    "read_only": 1,
    "search_index": 1
@@ -207,7 +207,7 @@
  "modified": "2026-04-08 10:27:44.411631",
  "modified_by": "Administrator",
  "module": "Phamos",
- "name": "Monthly Implementation Summery",
+ "name": "Monthly Implementation Summary",
  "naming_rule": "By \"Naming Series\" field",
  "owner": "Administrator",
  "permissions": [
