@@ -8,7 +8,7 @@ from frappe import _
 from frappe.query_builder import DocType
 from frappe.utils import add_months, get_first_day, getdate, today
 
-from phamos.phamos.doctype.monthly_implementation_summery.monthly_implementation_summery import (
+from phamos.phamos.doctype.monthly_implementation_summary.monthly_implementation_summary import (
 	_get_month_date_range,
 )
 
@@ -36,7 +36,7 @@ def _mis_rows_for_impl_period(implementation, year_str, month_name):
 	y = str(year_str or "").strip()
 	m = (month_name or "").strip()
 	return frappe.get_all(
-		"Monthly Implementation Summery",
+		"Monthly Implementation Summary",
 		filters={"implementation": implementation, "year": y, "month": m},
 		fields=["name", "docstatus"],
 		order_by="modified desc",
@@ -92,7 +92,7 @@ def _why_skipped_existing_mis(
 		parts.append(f"{b.get('name')} ({_docstatus_label(ds)})")
 	docs = ", ".join(parts)
 	return (
-		f"Not created: active Monthly Implementation Summery already exists for "
+		f"Not created: active Monthly Implementation Summary already exists for "
 		f"{implementation}, {month_name} {year_str}: {docs}. "
 		f"Cancel or amend that document if you need a new summary for the same period."
 	)
@@ -177,7 +177,7 @@ def _implementation_timesheet_audit(implementation, mis_year_str, mis_month_name
 
 def _run_mis_creation_for_period(sched_year_str, sched_month_name):
 	"""
-	Create Monthly Implementation Summery for each **active** Implementation
+	Create Monthly Implementation Summary for each **active** Implementation
 	(any status except **Completed** or **Cancelled**) that has at least one
 	non-cancelled timesheet in the given calendar month.
 
@@ -275,7 +275,7 @@ def _run_mis_creation_for_period(sched_year_str, sched_month_name):
 
 			doc = frappe.get_doc(
 				{
-					"doctype": "Monthly Implementation Summery",
+					"doctype": "Monthly Implementation Summary",
 					"implementation": impl.name,
 					"year": str(sched_year_str),
 					"month": sched_month_name,
@@ -369,7 +369,7 @@ def create_monthly_implementation_summaries():
 def run_manual_mis_creation(month, year):
 	"""
 	From phamos Settings: same logic as the scheduled job, for a chosen month/year.
-	Creates Monthly Implementation Summery rows (not Implementation master records).
+	Creates Monthly Implementation Summary rows (not Implementation master records).
 	Response includes `details` per active implementation (skip reason).
 	"""
 	frappe.only_for("System Manager")

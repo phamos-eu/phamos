@@ -131,7 +131,7 @@ def _so_row_qty_str(v):
 	return str(int(f)) if f == int(f) else ("%.6f" % f).rstrip("0").rstrip(".") or "0"
 
 
-class MonthlyImplementationSummery(Document):
+class MonthlyImplementationSummary(Document):
 	def validate(self):
 		prev = self.get_doc_before_save() if not self.is_new() else None
 		if prev and self.docstatus == 0:
@@ -178,7 +178,7 @@ class MonthlyImplementationSummery(Document):
 			from `tabDelivery Note Item` dni
 			inner join `tabDelivery Note` dn on dn.name = dni.parent
 			where ifnull(dn.docstatus, 0) != 2
-				and dni.custom_against_monthly_implementation_summery = %s
+				and dni.custom_against_monthly_implementation_summary = %s
 			order by dni.modified desc
 			limit 1
 			""",
@@ -326,7 +326,7 @@ class MonthlyImplementationSummery(Document):
 				"against_sales_order": self.sales_order,
 				"so_detail": so_line.name,
 				"allow_zero_valuation_rate": 1,
-				"custom_against_monthly_implementation_summery": self.name,
+				"custom_against_monthly_implementation_summary": self.name,
 			}
 			dn = frappe.get_doc({
 				"doctype": "Delivery Note",
@@ -342,7 +342,6 @@ class MonthlyImplementationSummery(Document):
 			frappe.msgprint(f"Delivery Note {dn.name} created with {hours:.2f} Hour(s).")
 			return dn.name
 		except Exception as e:
-			frappe.log_error(f"Error creating Delivery Note for {self.name}: {str(e)}")
 			frappe.throw(f"Error creating Delivery Note: {str(e)}")
 
 	def _build_dn_items_from_mis_dni(self):
@@ -397,7 +396,7 @@ class MonthlyImplementationSummery(Document):
 				item_row["against_sales_order"] = self.sales_order
 				item_row["so_detail"] = g["so_detail"]
 			else:
-				item_row["custom_against_monthly_implementation_summery"] = self.name
+				item_row["custom_against_monthly_implementation_summary"] = self.name
 			items.append(item_row)
 		return items
 
@@ -433,7 +432,7 @@ class MonthlyImplementationSummery(Document):
 		try:
 			dn_name = self._get_linked_dn_name()
 			if not dn_name:
-				frappe.throw("No Delivery Note linked to this Monthly Implementation Summery.")
+				frappe.throw("No Delivery Note linked to this Monthly Implementation Summary.")
 			dn = frappe.get_doc("Delivery Note", dn_name)
 			if dn.docstatus == 2:
 				frappe.throw("Cannot update Delivery Note as it is cancelled.")
@@ -445,9 +444,8 @@ class MonthlyImplementationSummery(Document):
 				dn.append("items", it)
 			dn.save()
 			self._update_timesheets_delivery_note(dn.name)
-			frappe.msgprint(f"Delivery Note {dn.name} updated from Monthly Implementation Summery items.")
+			frappe.msgprint(f"Delivery Note {dn.name} updated from Monthly Implementation Summary items.")
 		except Exception as e:
-			frappe.log_error(f"Error updating Delivery Note from MIS items for {self.name}: {str(e)}")
 			frappe.throw(f"Error updating Delivery Note: {str(e)}")
 
 	def _update_timesheets_delivery_note(self, dn_name):
@@ -472,7 +470,7 @@ class MonthlyImplementationSummery(Document):
 		if self.name:
 			dn_name = frappe.db.get_value(
 				"Delivery Note Item",
-				{"custom_against_monthly_implementation_summery": self.name},
+				{"custom_against_monthly_implementation_summary": self.name},
 				"parent",
 			)
 		if dn_name:
@@ -547,7 +545,7 @@ class MonthlyImplementationSummery(Document):
 			return
 		# Only draft/submitted block duplicates; cancelled MIS can be replaced by a new doc.
 		existing = frappe.get_all(
-			"Monthly Implementation Summery",
+			"Monthly Implementation Summary",
 			filters={
 				"implementation": self.implementation,
 				"year": self.year,
@@ -560,10 +558,10 @@ class MonthlyImplementationSummery(Document):
 		)
 		if not existing:
 			return
-		link = frappe.utils.get_link_to_form("Monthly Implementation Summery", existing[0].name)
+		link = frappe.utils.get_link_to_form("Monthly Implementation Summary", existing[0].name)
 		impl = frappe.utils.get_link_to_form("Implementation", self.implementation)
 		frappe.throw(
-			f"A Monthly Implementation Summery record {link} already exists for "
+			f"A Monthly Implementation Summary record {link} already exists for "
 			f"Implementation {impl}, Year {self.year} and Month {self.month}."
 		)
 
@@ -654,7 +652,7 @@ def create_delivery_note(docname: str, sales_order=None, delivery_note_item=None
 	if sales_order:
 		dn_name = _create_dn_from_sales_order(docname, sales_order, delivery_note_item)
 	else:
-		doc = frappe.get_doc("Monthly Implementation Summery", docname)
+		doc = frappe.get_doc("Monthly Implementation Summary", docname)
 		old_dn = doc.delivery_note
 		dn_name = doc._create_dn_from_timesheets()
 		update_dn_table_in_summary(docname, dn_name, old_dn=old_dn)
@@ -666,12 +664,12 @@ def _create_dn_from_sales_order(docname, sales_order, delivery_note_item=None):
 	try:
 		from erpnext.selling.doctype.sales_order.sales_order import make_delivery_note
 
-		mis_doc = frappe.get_doc("Monthly Implementation Summery", docname)
+		mis_doc = frappe.get_doc("Monthly Implementation Summary", docname)
 		if not mis_doc.implementation:
-			frappe.throw(frappe._("Implementation is required on Monthly Implementation Summery."))
+			frappe.throw(frappe._("Implementation is required on Monthly Implementation Summary."))
 		so_name = (mis_doc.sales_order or sales_order or "").strip()
 		if not so_name:
-			frappe.throw(frappe._("Select a Sales Order on the Monthly Implementation Summery."))
+			frappe.throw(frappe._("Select a Sales Order on the Monthly Implementation Summary."))
 		if mis_doc.sales_order and sales_order and mis_doc.sales_order != sales_order:
 			frappe.throw(
 				frappe._("Sales Order on the form ({0}) does not match the request ({1}).").format(
@@ -693,13 +691,12 @@ def _create_dn_from_sales_order(docname, sales_order, delivery_note_item=None):
 				dn.set(fn, 0)
 
 		dn.insert()
-		old_dn = frappe.db.get_value("Monthly Implementation Summery", docname, "delivery_note")
-		frappe.db.set_value("Monthly Implementation Summery", docname, "delivery_note", dn.name)
+		old_dn = frappe.db.get_value("Monthly Implementation Summary", docname, "delivery_note")
+		frappe.db.set_value("Monthly Implementation Summary", docname, "delivery_note", dn.name)
 		frappe.db.commit()
 		update_dn_table_in_summary(docname, dn.name, old_dn=old_dn)
 		return dn.name
 	except Exception as e:
-		frappe.log_error(f"Error creating DN for {docname}: {str(e)}")
 		frappe.throw(str(e))
 
 
@@ -707,7 +704,7 @@ def update_dn_table_in_summary(docname, dn_name, old_dn=None, existing_rows=None
 	if not docname or not dn_name:
 		return
 	dn_doc = frappe.get_doc("Delivery Note", dn_name)
-	doc = frappe.get_doc("Monthly Implementation Summery", docname)
+	doc = frappe.get_doc("Monthly Implementation Summary", docname)
 	doc.reload()
 	dn_refs = {dn_name}
 	if old_dn:
@@ -770,7 +767,7 @@ def update_dn_table_in_summary(docname, dn_name, old_dn=None, existing_rows=None
 @frappe.whitelist()
 def submit_mis_dn_action(docname: str):
 	_require_docname(docname)
-	doc = frappe.get_doc("Monthly Implementation Summery", docname)
+	doc = frappe.get_doc("Monthly Implementation Summary", docname)
 	doc.reload()
 	if doc._get_linked_dn_name():
 		doc.update_delivery_note_from_mis_items()
@@ -787,7 +784,7 @@ def submit_mis_dn_action(docname: str):
 @frappe.whitelist()
 def update_dn_from_mis_items(docname: str):
 	_require_docname(docname)
-	doc = frappe.get_doc("Monthly Implementation Summery", docname)
+	doc = frappe.get_doc("Monthly Implementation Summary", docname)
 	doc.update_delivery_note_from_mis_items()
 	return {"status": "ok"}
 
@@ -795,7 +792,7 @@ def update_dn_from_mis_items(docname: str):
 @frappe.whitelist()
 def create_dn_from_mis_dni(docname: str):
 	_require_docname(docname)
-	doc = frappe.get_doc("Monthly Implementation Summery", docname)
+	doc = frappe.get_doc("Monthly Implementation Summary", docname)
 	doc._create_dn_from_mis_dni()
 	return {"status": "ok"}
 
@@ -803,24 +800,24 @@ def create_dn_from_mis_dni(docname: str):
 def _mis_after_dn_submit(dn):
 	"""(mis_names_get_timesheet_stamp, mis_names_to_save) for this submitted Delivery Note."""
 	stamp = {n for n in frappe.get_all(
-		"Monthly Implementation Summery",
+		"Monthly Implementation Summary",
 		filters={"delivery_note": dn.name, "docstatus": ["!=", 2]},
 		pluck="name",
 	) if n}
 	for n in frappe.get_all(
 		"Delivery Note Item",
-		filters={"parent": dn.name, "custom_against_monthly_implementation_summery": ["is", "set"]},
-		pluck="custom_against_monthly_implementation_summery",
+		filters={"parent": dn.name, "custom_against_monthly_implementation_summary": ["is", "set"]},
+		pluck="custom_against_monthly_implementation_summary",
 	):
 		if n:
 			stamp.add(n)
 	for n in frappe.get_all(
 		"Delivery Note Item",
-		filters={"parenttype": "Monthly Implementation Summery", "custom_ref_doc": dn.name},
+		filters={"parenttype": "Monthly Implementation Summary", "custom_ref_doc": dn.name},
 		pluck="parent",
 		distinct=True,
 	):
-		if n and cint(frappe.db.get_value("Monthly Implementation Summery", n, "docstatus")) != 2:
+		if n and cint(frappe.db.get_value("Monthly Implementation Summary", n, "docstatus")) != 2:
 			stamp.add(n)
 
 	save = set(stamp)
@@ -835,7 +832,7 @@ def _mis_after_dn_submit(dn):
 			impl.add(i)
 	for i in impl:
 		for n in frappe.get_all(
-			"Monthly Implementation Summery",
+			"Monthly Implementation Summary",
 			filters={"implementation": i, "docstatus": ["in", [0, 1]]},
 			pluck="name",
 		):
@@ -850,9 +847,9 @@ def update_mis_timesheets_on_delivery_note_submit(doc, method=None):
 	stamp, save = _mis_after_dn_submit(doc)
 	dn_name = doc.name
 	for mis_name in save:
-		if not mis_name or not frappe.db.exists("Monthly Implementation Summery", mis_name):
+		if not mis_name or not frappe.db.exists("Monthly Implementation Summary", mis_name):
 			continue
-		m = frappe.get_doc("Monthly Implementation Summery", mis_name)
+		m = frappe.get_doc("Monthly Implementation Summary", mis_name)
 		m.reload()
 		if mis_name in stamp:
 			m._update_timesheets_delivery_note(dn_name)
