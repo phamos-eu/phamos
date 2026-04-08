@@ -11,7 +11,7 @@ def get_context(context):
         return
 
     try:
-        event = frappe.get_doc("Phamos Event", event_name)
+        event = frappe.get_doc("Marketing Content", event_name)
     except Exception:
         return
 

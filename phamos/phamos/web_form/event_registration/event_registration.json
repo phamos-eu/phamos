@@ -4,7 +4,7 @@
  "allow_multiple": 1,
  "button_label": "Register Now",
  "creation": "2026-03-25 00:00:00.000000",
- "doc_type": "Phamos Event Registration",
+ "doc_type": "Marketing Event Registration",
  "doctype": "Web Form",
  "introduction_text": "<p>Fill in the details below to register for this event. You will receive a confirmation once your registration is processed.</p>",
  "is_standard": 1,
@@ -24,8 +24,9 @@
   {
    "doctype": "Web Form Field",
    "fieldname": "event",
-   "fieldtype": "Data",
+   "fieldtype": "Link",
    "label": "Event",
+   "options": "Marketing Content",
    "read_only": 1,
    "reqd": 1
   },
