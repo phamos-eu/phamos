@@ -12,6 +12,8 @@ from frappe.desk.form.utils import add_comment
 
 
 class AccountingReceipt(Document):
+	def before_insert(self):
+		self.sent_to_datev = 0
 	def validate(self):
 		"""
 		Fetch and apply correct exchange rate based on posting_date
