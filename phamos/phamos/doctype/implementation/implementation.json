@@ -59,7 +59,13 @@
   "report_tab",
   "user_with_permission",
   "auto_email_report_record",
-  "generate_auto_email"
+  "generate_auto_email",
+  "gitlab_tab",
+  "gitlab_projects_html",
+  "column_break_amyu",
+  "gitlab_issues_html",
+  "column_break_mdrq",
+  "gitlab_milestones_html"
  ],
  "fields": [
   {
@@ -362,6 +368,34 @@
    "fieldname": "generate_auto_email",
    "fieldtype": "Button",
    "label": "Generate Auto Email"
+  },
+  {
+   "fieldname": "gitlab_tab",
+   "fieldtype": "Tab Break",
+   "label": "GitLab"
+  },
+  {
+   "fieldname": "gitlab_projects_html",
+   "fieldtype": "HTML",
+   "label": "GitLab Projects"
+  },
+  {
+   "fieldname": "column_break_amyu",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "gitlab_issues_html",
+   "fieldtype": "HTML",
+   "label": "GitLab Issues"
+  },
+  {
+   "fieldname": "gitlab_milestones_html",
+   "fieldtype": "HTML",
+   "label": "GitLab Milestones"
+  },
+  {
+   "fieldname": "column_break_mdrq",
+   "fieldtype": "Column Break"
   }
  ],
  "index_web_pages_for_search": 1,
@@ -387,7 +421,7 @@
    "link_fieldname": "custom_implementation"
   }
  ],
- "modified": "2025-11-26 07:45:02.091002",
+ "modified": "2026-04-13 12:54:56.022278",
  "modified_by": "Administrator",
  "module": "Phamos",
  "name": "Implementation",

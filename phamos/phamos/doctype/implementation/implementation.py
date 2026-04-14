@@ -411,8 +411,67 @@ def get_auto_email_reports(user_email: str):
         filters={"user": user_email, "enabled": 1},
     )
 
+@frappe.whitelist()
+def get_gitlab_projects_count(custom_implementation: str):
+    """Return count of GitLab Projects linked with this Implementation."""
+    if not custom_implementation:
+        return 0
 
+    return frappe.db.count(
+        "GitLab Project",
+        filters={
+            "custom_implementation": custom_implementation
+        },
+    )
 
+@frappe.whitelist()
+def get_gitlab_issues_count(custom_implementation: str):
+    """Return count of GitLab Issues linked via GitLab Projects of this Implementation."""
+    if not custom_implementation:
+        return 0
+
+    return frappe.db.count(
+        "GitLab Issue",
+        filters={
+            "gitlab_project": ["in", frappe.get_all(
+                "GitLab Project",
+                filters={"custom_implementation": custom_implementation},
+                pluck="name"
+            )]
+        }
+    )
+@frappe.whitelist()
+def get_gitlab_issues_count(custom_implementation: str):
+    """Return count of GitLab Issues linked via GitLab Projects of this Implementation."""
+    if not custom_implementation:
+        return 0
+
+    return frappe.db.count(
+        "GitLab Issue",
+        filters={
+            "gitlab_project": ["in", frappe.get_all(
+                "GitLab Project",
+                filters={"custom_implementation": custom_implementation},
+                pluck="name"
+            )]
+        }
+    )
+@frappe.whitelist()
+def get_gitlab_milestones_count(custom_implementation: str):
+    """Return count of GitLab Milestones linked via GitLab Projects of this Implementation."""
+    if not custom_implementation:
+        return 0
+
+    return frappe.db.count(
+        "GitLab Milestones",
+        filters={
+            "gitlab_project": ["in", frappe.get_all(
+                "GitLab Project",
+                filters={"custom_implementation": custom_implementation},
+                pluck="name"
+            )]
+        }
+    )
 @frappe.whitelist()
 def get_auto_email_reports_for_users(user_list):
     if isinstance(user_list, str):
