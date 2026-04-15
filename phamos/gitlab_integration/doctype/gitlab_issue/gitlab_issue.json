@@ -13,7 +13,8 @@
   "assignee",
   "issue_url",
   "parent_issue",
-  "gitlab_project"
+  "gitlab_project",
+  "gitlab_milestone"
  ],
  "fields": [
   {
@@ -67,14 +68,20 @@
    "fieldname": "due_date",
    "fieldtype": "Date",
    "label": "Due Date"
+  },
+  {
+   "fieldname": "gitlab_milestone",
+   "fieldtype": "Link",
+   "label": "GitLab Milestone",
+   "options": "GitLab Milestones"
   }
  ],
  "grid_page_length": 50,
  "index_web_pages_for_search": 1,
  "links": [],
- "modified": "2025-07-03 16:23:25.423284",
+ "modified": "2026-04-15 09:35:21.376652",
  "modified_by": "Administrator",
- "module": "GitLab Integration",
+ "module": "Gitlab Integration",
  "name": "GitLab Issue",
  "owner": "Administrator",
  "permissions": [

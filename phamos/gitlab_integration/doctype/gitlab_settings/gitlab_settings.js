@@ -2,20 +2,29 @@
 // For license information, please see license.txt
 
 frappe.ui.form.on("GitLab Settings", {
-	refresh(frm) {
-        frm.add_custom_button('Sync Projects & Issues', function () {
+    refresh(frm) {
+        frm.add_custom_button('Sync Projects', function () {
             frappe.call({
-                method: 'phamos.gitlab_integration.gitlab_utils.sync_gitlab_data',
-                callback: function () {
-                    frappe.msgprint("GitLab data synced!");
+                method: 'phamos.gitlab_integration.gitlab_utils.sync_projects_only',
+                callback: function (r) {
+                    frappe.msgprint(r.message || "Projects synced!");
+                }
+            });
+        });
+
+        frm.add_custom_button('Sync Issues', function () {
+            frappe.call({
+                method: 'phamos.gitlab_integration.gitlab_utils.sync_issues_only',
+                callback: function (r) {
+                    frappe.msgprint(r.message || "Issues synced!");
                 }
             });
         });
         frm.add_custom_button('Sync Milestones', function () {
             frappe.call({
                 method: 'phamos.gitlab_integration.gitlab_utils.sync_gitlab_milestones',
-                callback: function () {
-                    frappe.msgprint("GitLab milestones synced!");
+                callback: function (r) {
+                    frappe.msgprint(r.message || "Milestones synced!");
                 }
             });
         });

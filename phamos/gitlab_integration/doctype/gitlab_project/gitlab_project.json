@@ -53,11 +53,15 @@
   {
    "link_doctype": "GitLab Issue",
    "link_fieldname": "gitlab_project"
+  },
+  {
+   "link_doctype": "GitLab Milestones",
+   "link_fieldname": "gitlab_project"
   }
  ],
- "modified": "2026-01-29 09:02:38.774692",
+ "modified": "2026-04-15 08:42:13.565182",
  "modified_by": "Administrator",
- "module": "GitLab Integration",
+ "module": "Gitlab Integration",
  "name": "GitLab Project",
  "naming_rule": "By fieldname",
  "owner": "Administrator",
