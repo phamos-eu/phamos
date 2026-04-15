@@ -14,8 +14,6 @@
   "column_break_szyj",
   "enable_feedback_dialog",
   "is_employee_feedback",
-  "timesheet_settings_section",
-  "allowed_additional_work_time",
   "mattermost_daily_thread_settings_tab",
   "enable_daily_thread_creation",
   "section_break_boza",
@@ -35,8 +33,10 @@
   "mistral_base_url",
   "timesheet_settings_section",
   "allowed_additional_work_time",
-  "monthly_implementation_summery_tab",
-  "item"
+  "monthly_implementation_summary_tab",
+  "year",
+  "month",
+  "execute_scheduled_job"
  ],
  "fields": [
   {
@@ -180,22 +180,32 @@
    "label": "Base URL (optional)"
   },
   {
-   "fieldname": "monthly_implementation_summery_tab",
+   "fieldname": "monthly_implementation_summary_tab",
    "fieldtype": "Tab Break",
-   "label": "Monthly Implementation Summery"
+   "label": "Monthly Implementation Summary"
   },
   {
-   "description": "Select the default service item to be used when generating Delivery Note and Sales Invoice for Monthly Implementation Summary.",
-   "fieldname": "item",
-   "fieldtype": "Link",
-   "label": "Item",
-   "options": "Item"
+   "fieldname": "month",
+   "fieldtype": "Select",
+   "label": "Month",
+   "options": "January\nFebruary\nMarch\nApril\nMay\nJune\nJuly\nAugust\nSeptember\nOctober\nNovember\nDecember"
+  },
+  {
+   "fieldname": "year",
+   "fieldtype": "Select",
+   "label": "Year"
+  },
+  {
+   "description": "Manually run the job that creates Monthly Implementation Summaries for open Implementations with timesheets in the selected Month and Year (same logic as the scheduled task).",
+   "fieldname": "execute_scheduled_job",
+   "fieldtype": "Button",
+   "label": "Execute Scheduled Job"
   }
  ],
  "index_web_pages_for_search": 1,
  "issingle": 1,
  "links": [],
- "modified": "2026-02-20 15:32:51.417147",
+ "modified": "2026-04-08 15:46:41.122104",
  "modified_by": "Administrator",
  "module": "Phamos",
  "name": "phamos Settings",
