@@ -72,8 +72,13 @@
  ],
  "grid_page_length": 50,
  "index_web_pages_for_search": 1,
- "links": [],
- "modified": "2026-04-14 08:47:49.025575",
+ "links": [
+  {
+   "link_doctype": "GitLab Issue",
+   "link_fieldname": "gitlab_milestone"
+  }
+ ],
+ "modified": "2026-04-15 11:52:53.849851",
  "modified_by": "Administrator",
  "module": "Gitlab Integration",
  "name": "GitLab Milestones",

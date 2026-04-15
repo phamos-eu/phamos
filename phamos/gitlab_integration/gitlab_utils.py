@@ -130,117 +130,11 @@ def get_issue_parent(project_path, issue_iid):
         return None
 
 
-@frappe.whitelist()
-def sync_gitlab_data():
-    projects = get_all_projects()
-
-    for project in projects:
-        # 1. Create / Update GitLab Project
-        existing = frappe.db.exists("GitLab Project", {"project_id": project["id"]})
-        if existing:
-            doc = frappe.get_doc("GitLab Project", existing)
-        else:
-            doc = frappe.new_doc("GitLab Project")
-            doc.project_id = project["id"]
-
-        doc.title = project["name"]
-        doc.namespace = project["name_with_namespace"]
-        doc.web_url = project["web_url"]
-        doc.save(ignore_permissions=True)
-
-        # 2. READ last_synced FIRST
-        last_sync = doc.get("last_synced")
-
-
-        # 3. Fetch issues (incremental)
-        issues = get_issues_for_project(project["id"], last_sync)
-
-        # GitLab GraphQL needs path_with_namespace
-        project_path = project.get("path_with_namespace")
-
-        issue_map = {}
-
-        for issue in issues:
-            try:
-                existing_issue = frappe.db.exists(
-                    "GitLab Issue",
-                    {
-                        "issue_id": issue["iid"],
-                        "gitlab_project": doc.name
-                    }
-                )
-
-                if existing_issue:
-                    issue_map[str(issue["iid"])] = existing_issue
-                    continue
-
-                gitlab_issue_doc = frappe.new_doc("GitLab Issue")
-                gitlab_issue_doc.update({
-                    "issue_id": issue["iid"],
-                    "title": issue["title"],
-                    "description": issue.get("description", ""),
-                    "state": issue["state"],
-                    "assignee": issue["assignee"]["name"] if issue.get("assignee") else "",
-                    "issue_url": issue["web_url"],
-                    "gitlab_project": doc.name
-                })
-                gitlab_issue_doc.save(ignore_permissions=True)
-
-                issue_map[str(issue["iid"])] = gitlab_issue_doc.name
-
-            except Exception as ex:
-                frappe.log_error(
-                    title="GitLab Issue Sync Error (First Pass)",
-                    message=(
-                        f"Project: {project.get('name')}, "
-                        f"Issue IID: {issue.get('iid')}, "
-                        f"Error: {str(ex)}"
-                    )
-                )
-
-        # 5. Second pass: link parent issues
-        for issue in issues:
-            try:
-                issue_doc_name = issue_map.get(str(issue["iid"]))
-                if not issue_doc_name:
-                    continue
-
-                parent_info = None
-                if project_path:
-                    parent_info = get_issue_parent(project_path, issue["iid"])
-
-                if parent_info and parent_info.get("iid"):
-                    parent_iid = str(parent_info["iid"])
-                    parent_doc_name = issue_map.get(parent_iid)
-
-                    if parent_doc_name:
-                        gitlab_issue_doc = frappe.get_doc("GitLab Issue", issue_doc_name)
-                        gitlab_issue_doc.parent_issue = parent_doc_name
-                        gitlab_issue_doc.save(ignore_permissions=True)
-
-            except Exception as ex:
-                frappe.log_error(
-                    title="GitLab Parent Link Error",
-                    message=(
-                        f"Project: {project.get('name')}, "
-                        f"Issue IID: {issue.get('iid')}, "
-                        f"Error: {str(ex)}"
-                    )
-                )
-
-        # 6. UPDATE last_synced AFTER successful sync
-        doc.last_synced = now_datetime()
-        doc.save(ignore_permissions=True)
-
-    frappe.db.commit()
-
 def get_milestones_for_project(project_id):
-    """Fetch all milestones for a given project from GitLab API"""
     settings = frappe.get_single("GitLab Settings")
     base_url = settings.gitlab_url.rstrip("/")
-    token = settings.get_password("access_token")
 
-    headers = {"PRIVATE-TOKEN": token}
+    headers = get_gitlab_headers()
     milestones = []
     page = 1
 
@@ -261,6 +155,160 @@ def get_milestones_for_project(project_id):
 
     return milestones
 
+
+@frappe.whitelist()
+def sync_projects_only():
+    projects = get_all_projects()
+
+    for project in projects:
+        # 1. Create / Update GitLab Project
+        existing = frappe.db.exists("GitLab Project", {"project_id": project["id"]})
+        if existing:
+            doc = frappe.get_doc("GitLab Project", existing)
+        else:
+            doc = frappe.new_doc("GitLab Project")
+            doc.project_id = project["id"]
+
+        doc.title = project["name"]
+        doc.namespace = project.get("path_with_namespace")
+        doc.web_url = project["web_url"]
+        doc.save(ignore_permissions=True)
+
+    frappe.db.commit()
+    return "Projects synced successfully"
+
+
+@frappe.whitelist()
+def sync_issues_only():
+    """Sirf issues sync karo — update bhi karo agar fields change hui hain"""
+
+    projects = frappe.get_all(
+        "GitLab Project",
+        fields=["name", "project_id", "last_synced", "title", "namespace"]
+    )
+
+    for project in projects:
+        try:
+            issues = get_issues_for_project(project["project_id"], project.get("last_synced"))
+            project_path = project.get("namespace") or None
+
+            issue_map = {}
+
+            for issue in issues:
+                try:
+                    # 🔹 Milestone handling (FIX)
+                    milestone_title = issue.get("milestone", {}).get("title") if issue.get("milestone") else None
+                    milestone_name = None
+
+                    if milestone_title:
+                        milestone_name = frappe.db.get_value(
+                            "GitLab Milestones",
+                            {"title": milestone_title},
+                            "name"
+                        )
+
+                        if not milestone_name:
+                            milestone_doc = frappe.new_doc("GitLab Milestones")
+                            milestone_doc.title = milestone_title
+                            milestone_doc.save(ignore_permissions=True)
+                            milestone_name = milestone_doc.name
+
+                    existing_issue = frappe.db.exists(
+                        "GitLab Issue",
+                        {
+                            "issue_id": issue["iid"],
+                            "gitlab_project": project["name"]
+                        }
+                    )
+
+                    if existing_issue:
+                        # ✅ Existing issue — update
+                        gitlab_issue_doc = frappe.get_doc("GitLab Issue", existing_issue)
+                        issue_map[str(issue["iid"])] = existing_issue
+
+                        gitlab_issue_doc.update({
+                            "title": issue["title"],
+                            "description": issue.get("description", ""),
+                            "state": issue["state"],
+                            "assignee": issue["assignee"]["name"] if issue.get("assignee") else "",
+                            "issue_url": issue["web_url"],
+                            "gitlab_milestone": milestone_name or gitlab_issue_doc.get("gitlab_milestone"),
+                        })
+
+                        gitlab_issue_doc.save(ignore_permissions=True)
+
+                    else:
+                        # ✅ New issue
+                        gitlab_issue_doc = frappe.new_doc("GitLab Issue")
+
+                        gitlab_issue_doc.update({
+                            "issue_id": issue["iid"],
+                            "title": issue["title"],
+                            "description": issue.get("description", ""),
+                            "state": issue["state"],
+                            "assignee": issue["assignee"]["name"] if issue.get("assignee") else "",
+                            "issue_url": issue["web_url"],
+                            "gitlab_project": project["name"],
+                            "gitlab_milestone": milestone_name,
+                        })
+
+                        gitlab_issue_doc.save(ignore_permissions=True)
+                        issue_map[str(issue["iid"])] = gitlab_issue_doc.name
+
+                except Exception as ex:
+                    frappe.log_error(
+                        title="GitLab Issue Sync Error",
+                        message=(
+                            f"Project: {project.get('title')}, "
+                            f"Issue IID: {issue.get('iid')}, "
+                            f"Error: {str(ex)}"
+                        )
+                    )
+
+            # 🔁 Second pass: parent linking
+            for issue in issues:
+                try:
+                    issue_doc_name = issue_map.get(str(issue["iid"]))
+                    if not issue_doc_name:
+                        continue
+
+                    if project_path:
+                        parent_info = get_issue_parent(project_path, issue["iid"])
+
+                        if parent_info and parent_info.get("iid"):
+                            parent_iid = str(parent_info["iid"])
+                            parent_doc_name = issue_map.get(parent_iid)
+
+                            if parent_doc_name:
+                                gitlab_issue_doc = frappe.get_doc("GitLab Issue", issue_doc_name)
+                                gitlab_issue_doc.parent_issue = parent_doc_name
+                                gitlab_issue_doc.save(ignore_permissions=True)
+
+                except Exception as ex:
+                    frappe.log_error(
+                        title="GitLab Parent Link Error",
+                        message=(
+                            f"Project: {project.get('title')}, "
+                            f"Issue IID: {issue.get('iid')}, "
+                            f"Error: {str(ex)}"
+                        )
+                    )
+
+            # ✅ Update last_synced
+            project_doc = frappe.get_doc("GitLab Project", project["name"])
+            project_doc.last_synced = now_datetime()
+            project_doc.save(ignore_permissions=True)
+
+        except Exception as ex:
+            frappe.log_error(
+                title="GitLab Project Sync Error",
+                message=f"Project: {project.get('title')}, Error: {str(ex)}"
+            )
+
+    frappe.db.commit()
+    return "Issues synced successfully"
+
+
 @frappe.whitelist()
 def sync_gitlab_milestones():
     projects = get_all_projects()
@@ -277,7 +325,6 @@ def sync_gitlab_milestones():
 
         for milestone in milestones:
             try:
-                # ✅ get_value use karo exists ki jagah
                 existing_milestone = frappe.db.get_value(
                     "GitLab Milestones",
                     {
