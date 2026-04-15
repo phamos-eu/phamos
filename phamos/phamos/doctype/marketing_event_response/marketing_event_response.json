@@ -1,0 +1,42 @@
+{
+ "actions": [],
+ "creation": "2026-03-25 00:00:00.000000",
+ "doctype": "DocType",
+ "engine": "InnoDB",
+ "field_order": [
+  "email",
+  "gdpr_consent",
+  "subscribed_on"
+ ],
+ "fields": [
+  {
+   "fieldname": "email",
+   "fieldtype": "Data",
+   "options": "Email",
+   "label": "Email",
+   "reqd": 1,
+   "in_list_view": 1
+  },
+  {
+   "fieldname": "gdpr_consent",
+   "fieldtype": "Check",
+   "label": "GDPR Consent",
+   "default": 0,
+   "in_list_view": 1
+  },
+  {
+   "fieldname": "subscribed_on",
+   "fieldtype": "Datetime",
+   "label": "Subscribed On",
+   "read_only": 1,
+   "in_list_view": 1
+  }
+ ],
+ "istable": 1,
+ "modified": "2026-03-25 00:00:00.000000",
+ "modified_by": "Administrator",
+ "module": "Phamos",
+ "name": "Marketing Event Response",
+ "owner": "Administrator",
+ "track_changes": 0
+}

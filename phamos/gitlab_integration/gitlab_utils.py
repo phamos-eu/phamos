@@ -234,6 +234,88 @@ def sync_gitlab_data():
 
     frappe.db.commit()
 
+def get_milestones_for_project(project_id):
+    """Fetch all milestones for a given project from GitLab API"""
+    settings = frappe.get_single("GitLab Settings")
+    base_url = settings.gitlab_url.rstrip("/")
+    token = settings.get_password("access_token")
+
+    headers = {"PRIVATE-TOKEN": token}
+    milestones = []
+    page = 1
+
+    while True:
+        url = f"{base_url}/api/v4/projects/{project_id}/milestones"
+        params = {"per_page": 100, "page": page}
+        response = requests.get(url, headers=headers, params=params)
+
+        if response.status_code != 200:
+            break
+
+        data = response.json()
+        if not data:
+            break
+
+        milestones.extend(data)
+        page += 1
+
+    return milestones
+
+@frappe.whitelist()
+def sync_gitlab_milestones():
+    projects = get_all_projects()
+
+    for project in projects:
+        existing_project = frappe.db.exists(
+            "GitLab Project",
+            {"project_id": project["id"]}
+        )
+        if not existing_project:
+            continue
+
+        milestones = get_milestones_for_project(project["id"])
+
+        for milestone in milestones:
+            try:
+                # ✅ get_value use karo exists ki jagah
+                existing_milestone = frappe.db.get_value(
+                    "GitLab Milestones",
+                    {
+                        "milestone_id": int(milestone["id"]),
+                        "gitlab_project": existing_project
+                    },
+                    "name"
+                )
+
+                if existing_milestone:
+                    doc = frappe.get_doc("GitLab Milestones", existing_milestone)
+                else:
+                    doc = frappe.new_doc("GitLab Milestones")
+                    doc.milestone_id   = int(milestone["id"])
+                    doc.gitlab_project = existing_project
+
+                doc.milestone_iid  = int(milestone["iid"])
+                doc.title          = milestone["title"]
+                doc.description    = milestone.get("description") or ""
+                doc.state          = milestone["state"]
+                doc.start_date     = milestone.get("start_date") or None
+                doc.due_date       = milestone.get("due_date") or None
+                doc.expired        = 1 if milestone.get("expired") else 0
+                doc.web_url        = milestone.get("web_url") or ""
+                doc.save(ignore_permissions=True)
+
+            except Exception as ex:
+                frappe.log_error(
+                    title="GitLab Milestone Sync Error",
+                    message=(
+                        f"Project: {project.get('name')}, "
+                        f"Milestone ID: {milestone.get('id')}, "
+                        f"Error: {str(ex)}"
+                    )
+                )
+
+    frappe.db.commit()
+    return "Milestones synced successfully"
 
 @frappe.whitelist()
 def sync_gitlab_data_background():

@@ -11,5 +11,13 @@ frappe.ui.form.on("GitLab Settings", {
                 }
             });
         });
+        frm.add_custom_button('Sync Milestones', function () {
+            frappe.call({
+                method: 'phamos.gitlab_integration.gitlab_utils.sync_gitlab_milestones',
+                callback: function () {
+                    frappe.msgprint("GitLab milestones synced!");
+                }
+            });
+        });
 	},
 });
