@@ -13,7 +13,7 @@ class MarketingContent(WebsiteGenerator):
 
     def before_save(self):
         if not self.route:
-            self.route = "marketing-events/" + self.title.lower().replace(" ", "-")
+            self.route = "events/" + self.title.lower().replace(" ", "-")
         if not self.starts_on and not self.date_note:
             frappe.throw(
                 frappe._("Please set either a confirmed Start Date or a Date Note "
@@ -53,7 +53,7 @@ class MarketingContent(WebsiteGenerator):
             )
             if self.max_attendees:
                 context.spots_left = max(0, self.max_attendees - registered_count)
-        context.parents = [{"title": "Events", "route": "marketing-events"}]
+        context.parents = [{"title": "Events", "route": "events"}]
         if self.starts_on:
             dt = get_datetime(self.starts_on)
             context.starts_day_num  = dt.strftime("%d")

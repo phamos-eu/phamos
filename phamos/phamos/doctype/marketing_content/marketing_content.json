@@ -105,7 +105,6 @@
    "fieldname": "route",
    "fieldtype": "Data",
    "label": "Route",
-   "read_only": 1,
    "unique": 1,
    "no_copy": 1
   },
@@ -266,7 +265,7 @@
  ],
  "has_web_view": 1,
  "is_published_field": "published",
- "modified": "2026-04-30 00:00:00.000000",
+ "modified": "2026-05-24 00:00:00.000000",
  "modified_by": "Administrator",
  "module": "Phamos",
  "name": "Marketing Content",
