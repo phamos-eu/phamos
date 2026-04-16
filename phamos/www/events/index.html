@@ -317,7 +317,7 @@
     <div class="col-md-3 pe-sidebar">
       <div class="pe-sidebar-title">Filters
         {% if selected_types or selected_city or show_past %}
-          &nbsp;·&nbsp; <a href="/marketing-events{% if search %}?search={{ search }}{% endif %}" class="pe-clear-link" style="font-size:.72rem; text-transform:none; letter-spacing:0;">Clear all</a>
+          &nbsp;·&nbsp; <a href="/events{% if search %}?search={{ search }}{% endif %}" class="pe-clear-link" style="font-size:.72rem; text-transform:none; letter-spacing:0;">Clear all</a>
         {% endif %}
       </div>
       <form method="get" id="sidebar-form">
@@ -439,7 +439,7 @@
         <svg width="44" height="44" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
         <p>No events found{% if search or selected_types or selected_city %} matching your filters{% endif %}</p>
         {% if search or selected_types or selected_city or show_past %}
-          <a href="/marketing-events" class="pe-clear-link">Clear all filters</a>
+          <a href="/events" class="pe-clear-link">Clear all filters</a>
         {% endif %}
       </div>
       {% endif %}
@@ -462,7 +462,7 @@
       <div class="pe-filter-actions">
         <button type="submit" class="pe-apply-btn">Apply</button>
         {% if selected_types or selected_city or show_past %}
-          <a href="/marketing-events{% if search %}?search={{ search }}{% endif %}" class="pe-clear-link">Clear all</a>
+          <a href="/events{% if search %}?search={{ search }}{% endif %}" class="pe-clear-link">Clear all</a>
         {% endif %}
       </div>
     </form>
