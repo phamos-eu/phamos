@@ -11,6 +11,10 @@ function _mis_hint_reload_timesheets(frm) {
 	});
 }
 
+function _mis_has_workflow(frm) {
+	return !!frappe.workflow.get_state_fieldname(frm.doc.doctype);
+}
+
 frappe.ui.form.on("Monthly Implementation Summary", {
 	onload: function(frm) {
 		// Set year options dynamically: last year, current year, next 2 years
@@ -143,9 +147,34 @@ frappe.ui.form.on("Monthly Implementation Summary", {
 			});
 		}
 	},
+	on_submit: function(frm) {
+		// Workflow submits use before_workflow_action; avoid double sync if standard Submit is still available.
+		if (_mis_has_workflow(frm)) {
+			return;
+		}
+		frappe.call({
+				method: "phamos.phamos.doctype.monthly_implementation_summary.monthly_implementation_summary.submit_mis_dn_action",
+				args: { docname: frm.doc.name },
+				freeze: true,
+				freeze_message: __("Syncing delivery note with this summary..."),
+				callback: function (r) {
+					if (r.exc) {
+						frappe.msgprint({
+							title: __("Error"),
+							message: r.exc[0] || __("Failed to sync delivery note."),
+							indicator: "red"
+						});
+						return;
+					}
+					frm.reload_doc();
+				}
+			});
+	},
 	
 	before_workflow_action(frm) {
-		if (frm.selected_workflow_action !== "Submit") return;
+		if (!_mis_has_workflow(frm) || frm.selected_workflow_action !== "Submit") {
+			return;
+		}
 
 		frappe.dom.unfreeze();
 
@@ -170,9 +199,6 @@ frappe.ui.form.on("Monthly Implementation Summary", {
 			});
 		});
 	},
-		
-		// ...existing code...
-	
 });
 
 function recalculate_totals_from_timesheets(frm) {
