@@ -1,5 +1,6 @@
 import frappe
-from frappe.utils import getdate, get_url, format_datetime, strip_html
+import random
+from frappe.utils import getdate, get_url, format_datetime, strip_html, nowdate, getdate
 from frappe import _
 
 
