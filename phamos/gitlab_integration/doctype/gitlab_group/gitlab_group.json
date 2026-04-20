@@ -2,45 +2,17 @@
  "actions": [],
  "allow_rename": 1,
  "autoname": "field:title",
- "creation": "2025-07-01 13:15:58.608176",
+ "creation": "2026-04-17 11:31:54.957005",
  "doctype": "DocType",
  "engine": "InnoDB",
  "field_order": [
   "title",
-  "project_id",
+  "group_id",
   "web_url",
-  "description",
-  "namespace",
-  "group",
-  "last_synced"
+  "full_path",
+  "path"
  ],
  "fields": [
-  {
-   "fieldname": "project_id",
-   "fieldtype": "Data",
-   "label": "Project ID"
-  },
-  {
-   "fieldname": "web_url",
-   "fieldtype": "Data",
-   "label": "Web URL"
-  },
-  {
-   "fieldname": "description",
-   "fieldtype": "Long Text",
-   "label": "Description"
-  },
-  {
-   "fieldname": "namespace",
-   "fieldtype": "Data",
-   "in_list_view": 1,
-   "label": "Namespace"
-  },
-  {
-   "fieldname": "last_synced",
-   "fieldtype": "Datetime",
-   "label": "Last Synced"
-  },
   {
    "fieldname": "title",
    "fieldtype": "Data",
@@ -48,29 +20,39 @@
    "unique": 1
   },
   {
-   "fieldname": "group",
-   "fieldtype": "Link",
+   "fieldname": "web_url",
+   "fieldtype": "Data",
+   "label": "Web URL"
+  },
+  {
+   "fieldname": "group_id",
+   "fieldtype": "Int",
+   "label": "Group ID"
+  },
+  {
+   "fieldname": "full_path",
+   "fieldtype": "Data",
    "in_list_view": 1,
-   "label": "Group",
-   "options": "GitLab Group"
+   "label": "Full Path"
+  },
+  {
+   "fieldname": "path",
+   "fieldtype": "Data",
+   "label": "Path"
   }
  ],
  "grid_page_length": 50,
  "index_web_pages_for_search": 1,
  "links": [
   {
-   "link_doctype": "GitLab Issue",
-   "link_fieldname": "gitlab_project"
-  },
-  {
-   "link_doctype": "GitLab Milestones",
-   "link_fieldname": "gitlab_project"
+   "link_doctype": "GitLab Project",
+   "link_fieldname": "group"
   }
  ],
- "modified": "2026-04-20 10:34:12.569471",
+ "modified": "2026-04-20 12:01:53.952114",
  "modified_by": "Administrator",
  "module": "Gitlab Integration",
- "name": "GitLab Project",
+ "name": "GitLab Group",
  "naming_rule": "By fieldname",
  "owner": "Administrator",
  "permissions": [

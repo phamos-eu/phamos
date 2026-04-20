@@ -18,6 +18,45 @@ def get_all_projects():
     response.raise_for_status()
     return response.json()
 
+def get_all_groups():
+    settings = frappe.get_single("GitLab Settings")
+    url = f"{settings.gitlab_url}/api/v4/groups?all_available=true"
+    
+    response = requests.request("GET", url, headers=get_gitlab_headers())
+
+    response.raise_for_status()
+    return response.json()
+
+@frappe.whitelist()
+def sync_groups_only():
+    groups = get_all_groups()
+
+    # Step 1: FEtch existing group_ids from DB
+    existing_groups = frappe.get_all("GitLab Group", fields=["group_id"])
+    existing_group_ids = {g.group_id for g in existing_groups}
+
+    new_count = 0
+
+    for group in groups:
+        # Step 2: Only new groups process 
+        if group["id"] in existing_group_ids:
+            continue
+
+        doc = frappe.new_doc("GitLab Group")
+        doc.group_id = group["id"]
+        doc.title = group["name"]
+        doc.path = group["path"]
+        doc.full_path = group["full_path"]
+        doc.web_url = group["web_url"]
+
+        doc.save(ignore_permissions=True)
+        new_count += 1
+
+    frappe.db.commit()
+
+    return f"{new_count} new groups synced successfully"
+
+
 def get_issues_for_project(project_id, updated_after=None):
     settings = frappe.get_single("GitLab Settings")
     base_url = f"{settings.gitlab_url}/api/v4/projects/{project_id}/issues"
