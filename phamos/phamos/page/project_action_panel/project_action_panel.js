@@ -683,7 +683,6 @@ function openStopProjectDialog(timesheet_record, percent_billable, project, task
                   in_list_view: 1,
                   reqd: 1,
                   read_only: 0,
-                  default: frappe.datetime.system_datetime(),
                   description: "Auto-filled with current time. Adjust if needed.",
                 },
                 { 
@@ -713,6 +712,13 @@ function openStopProjectDialog(timesheet_record, percent_billable, project, task
             // Set the width using CSS
             dialog.$wrapper.find(".modal-dialog").css("max-width", "800px");
             dialog.show();
+
+            setTimeout(function() {
+              var field = dialog.fields_dict.from_time;
+              if (field && field.datepicker) {
+                field.datepicker.selectDate(frappe.datetime.now_datetime(true));
+              }
+            }, 0);
 
             setTimeout(function () {
               const $quick = dialog.$wrapper.find('[data-fieldname="expected_time_quick"]').find("input");
