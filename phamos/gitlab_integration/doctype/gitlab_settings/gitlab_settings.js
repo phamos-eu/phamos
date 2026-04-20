@@ -11,6 +11,14 @@ frappe.ui.form.on("GitLab Settings", {
                 }
             });
         });
+        frm.add_custom_button('Sync Groups', function () {
+            frappe.call({
+                method: 'phamos.gitlab_integration.gitlab_utils.sync_groups_only',
+                callback: function (r) {
+                    frappe.msgprint(r.message || "Groups synced!");
+                }
+            });
+        });
 
         frm.add_custom_button('Sync Issues', function () {
             frappe.call({
