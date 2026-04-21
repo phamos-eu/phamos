@@ -61,6 +61,82 @@ def get_all_groups():
     return response.json()
 
 @frappe.whitelist()
+def sync_gitlab_labels():
+    settings = frappe.get_single("GitLab Settings")
+
+    if not settings.gitlab_url:
+        frappe.throw("GitLab URL not set")
+
+    headers = get_gitlab_headers()
+
+    projects = frappe.get_all(
+        "GitLab Project",
+        fields=["name", "project_id"]
+    )
+
+    total_synced = 0
+
+    for project in projects:
+        try:
+            page = 1
+
+            while True:
+                url = f"{settings.gitlab_url}/api/v4/projects/{project.project_id}/labels?page={page}&per_page=100"
+
+                resp = requests.get(url, headers=headers)
+
+                if resp.status_code != 200:
+                    frappe.log_error(resp.text, "GitLab Label Sync Error")
+                    break
+
+                labels = resp.json()
+
+                if not labels:
+                    break
+
+                for label in labels:
+                    label_id = label.get("id")
+
+                    # Check if already exists
+                    existing = frappe.db.get_value(
+                        "GitLab Labels",
+                        {
+                            "label_id": label_id,
+                            "project": project.name
+                        },
+                        "name"
+                    )
+
+                    data = {
+                        "doctype": "GitLab Labels",
+                        "label_id": label_id,
+                        "name1": label.get("name"),
+                        "text_color": label.get("text_color"),
+                        "color": label.get("color"),
+                        "priority": label.get("priority"),
+                        "project": project.name
+                    }
+
+                    if existing:
+                        doc = frappe.get_doc("GitLab Labels", existing)
+                        doc.update(data)
+                        doc.save(ignore_permissions=True)
+                    else:
+                        doc = frappe.get_doc(data)
+                        doc.insert(ignore_permissions=True)
+
+                    total_synced += 1
+
+                page += 1
+
+        except Exception as e:
+            frappe.log_error(frappe.get_traceback(), "GitLab Label Sync Failed")
+
+    frappe.db.commit()
+
+    return f"{total_synced} labels synced successfully"
+
+@frappe.whitelist()
 def sync_groups_only():
     groups = get_all_groups()
 
