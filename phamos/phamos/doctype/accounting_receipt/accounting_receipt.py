@@ -11,6 +11,38 @@ from frappe.desk.form.utils import add_comment
 
 
 class AccountingReceipt(Document):
+	def before_insert(self):
+		self.sent_to_datev = 0
+		self.datev_sent_by = None
+		self.datev_sent_at = None
+		self.datev_email_queue_ref = None
+	def validate(self):
+		"""
+		Fetch and apply correct exchange rate based on posting_date
+		and compute converted sum in company currency.
+		"""
+		company = self.company or get_default_company()
+		if not company or not self.currency:
+			return
+		company_currency = frappe.db.get_value("Company", company, "default_currency")
+		if not company_currency:
+			return
+		if company_currency == self.currency:
+			# Same currency: ensure conversion_rate is 1 and base sum equals sum
+			self.conversion_rate = 1
+			if self.sum:
+				self.sum_in_company_currency = self.sum
+			return
+		# Fetch exchange rate for date
+		try:
+			rate = get_exchange_rate(self.currency, company_currency, self.posting_date or today())
+		except Exception:
+			rate = None
+		if rate:
+			self.conversion_rate = rate
+			if self.sum:
+				self.sum_in_company_currency = float(self.sum) * float(rate)
+
 	@frappe.whitelist()
 	def make_purchase_invoice(self):
 		"""
