@@ -12,7 +12,8 @@
   "description",
   "namespace",
   "group",
-  "last_synced"
+  "last_synced",
+  "frappe_project"
  ],
  "fields": [
   {
@@ -37,6 +38,13 @@
    "label": "Namespace"
   },
   {
+   "fieldname": "group",
+   "fieldtype": "Link",
+   "in_list_view": 1,
+   "label": "Group",
+   "options": "GitLab Group"
+  },
+  {
    "fieldname": "last_synced",
    "fieldtype": "Datetime",
    "label": "Last Synced"
@@ -48,11 +56,12 @@
    "unique": 1
   },
   {
-   "fieldname": "group",
+   "description": "Link this GitLab project to its corresponding ERPNext project to enable automatic timesheet resolution.",
+   "fieldname": "frappe_project",
    "fieldtype": "Link",
    "in_list_view": 1,
-   "label": "Group",
-   "options": "GitLab Group"
+   "label": "ERPNext Project",
+   "options": "Project"
   }
  ],
  "grid_page_length": 50,
@@ -67,7 +76,7 @@
    "link_fieldname": "gitlab_project"
   }
  ],
- "modified": "2026-04-20 10:34:12.569471",
+ "modified": "2026-04-21 09:00:00.000000",
  "modified_by": "Administrator",
  "module": "Gitlab Integration",
  "name": "GitLab Project",
