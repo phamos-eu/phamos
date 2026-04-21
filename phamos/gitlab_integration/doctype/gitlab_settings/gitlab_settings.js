@@ -36,5 +36,13 @@ frappe.ui.form.on("GitLab Settings", {
                 }
             });
         });
+        frm.add_custom_button('Sync Labels', function () {
+            frappe.call({
+                method: 'phamos.gitlab_integration.gitlab_utils.sync_gitlab_labels',
+                callback: function (r) {
+                    frappe.msgprint(r.message || "Labels synced!");
+                }
+            });
+        });
 	},
 });
