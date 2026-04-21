@@ -19,9 +19,25 @@ const mineOnly = ref(true); // default: show only current user's issues
 // Filter state
 const searchQuery = ref("");
 const dueFilter = ref("all");
+const assigneeFilter = ref([]);
+const labelFilter = ref([]);
 const sortBy = ref("due_date");
 const sortDir = ref("asc");
-function clearAllFilters() { searchQuery.value = ""; dueFilter.value = "all"; sortBy.value = "due_date"; sortDir.value = "asc"; }
+function clearAllFilters() { searchQuery.value = ""; dueFilter.value = "all"; assigneeFilter.value = []; labelFilter.value = []; sortBy.value = "due_date"; sortDir.value = "asc"; }
+
+// Dynamic filter options derived from the loaded issues
+const assigneeOptions = computed(() => {
+  const set = new Set();
+  issues.value.forEach(i => { if (i.assignee) set.add(i.assignee); });
+  return [...set].sort();
+});
+const labelOptions = computed(() => {
+  const set = new Set();
+  issues.value.forEach(i => {
+    if (i.labels) i.labels.split(",").map(l => l.trim()).filter(Boolean).forEach(l => set.add(l));
+  });
+  return [...set].sort();
+});
 
 // Derived
 const myIssuesCount = computed(() => issues.value.filter(i => i.is_mine).length);
@@ -47,7 +63,18 @@ const filteredIssues = computed(() => {
   if (selectedProject.value) list = list.filter(i => i.gitlab_project === selectedProject.value);
 
   const q = searchQuery.value.trim().toLowerCase();
-  if (q) list = list.filter(i => i.title?.toLowerCase().includes(q) || String(i.issue_id).includes(q) || i.gitlab_project_title?.toLowerCase().includes(q));
+  if (q) list = list.filter(i =>
+    i.title?.toLowerCase().includes(q) ||
+    String(i.issue_id).includes(q) ||
+    i.gitlab_project_title?.toLowerCase().includes(q) ||
+    i.assignee?.toLowerCase().includes(q) ||
+    i.labels?.toLowerCase().includes(q)
+  );
+
+  if (assigneeFilter.value.length) list = list.filter(i => assigneeFilter.value.includes(i.assignee));
+  if (labelFilter.value.length) list = list.filter(i =>
+    i.labels && labelFilter.value.some(l => i.labels.split(",").map(s => s.trim()).includes(l))
+  );
 
   if (dueFilter.value !== "all") {
     list = list.filter(i => {
@@ -185,8 +212,12 @@ onUnmounted(() => { stopTick(); });
         <FilterBar
           v-model:search="searchQuery"
           v-model:dueFilter="dueFilter"
+          v-model:assigneeFilter="assigneeFilter"
+          v-model:labelFilter="labelFilter"
           v-model:sortBy="sortBy"
           v-model:sortDir="sortDir"
+          :assignee-options="assigneeOptions"
+          :label-options="labelOptions"
           :result-count="filteredIssues.length"
           :total-count="issues.length"
           @clear-all="clearAllFilters"
