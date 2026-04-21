@@ -25,6 +25,7 @@
   "section_break_hqfwm",
   "goal",
   "issues",
+  "gitlab_issue",
   "column_break_8016u",
   "result",
   "parent_issues_url",
@@ -172,6 +173,14 @@
    "fieldname": "issues",
    "fieldtype": "Data",
    "label": "Issues"
+  },
+  {
+   "fieldname": "gitlab_issue",
+   "fieldtype": "Link",
+   "label": "GitLab Issue",
+   "no_copy": 1,
+   "options": "GitLab Issue",
+   "read_only": 1
   },
   {
    "fieldname": "parent_issues_url",

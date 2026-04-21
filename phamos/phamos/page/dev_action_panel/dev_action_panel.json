@@ -1,0 +1,19 @@
+{
+ "content": null,
+ "creation": "2026-04-17 07:41:13.225140",
+ "docstatus": 0,
+ "doctype": "Page",
+ "idx": 0,
+ "modified": "2026-04-17 07:41:13.225140",
+ "modified_by": "Administrator",
+ "module": "Phamos",
+ "name": "dev-action-panel",
+ "owner": "Administrator",
+ "page_name": "dev-action-panel",
+ "roles": [],
+ "script": null,
+ "standard": "Yes",
+ "style": null,
+ "system_page": 0,
+ "title": "Developer Action Panel"
+}

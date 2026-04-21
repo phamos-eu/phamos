@@ -9,6 +9,39 @@ def get_gitlab_headers():
         "PRIVATE-TOKEN": get_decrypted_password("GitLab Settings", "GitLab Settings", "access_token")
     }
 
+
+# Cache so we don't call /api/v4/users/{id} more than once per user per sync run
+_user_email_cache = {}
+
+def get_user_email(user_id):
+    """
+    Try to resolve a GitLab user's email from their user ID.
+    Falls back to None silently if the token doesn't have permission.
+    Results are cached for the lifetime of the current process/sync run.
+    """
+    if not user_id:
+        return None
+
+    if user_id in _user_email_cache:
+        return _user_email_cache[user_id]
+
+    try:
+        settings = frappe.get_single("GitLab Settings")
+        url = f"{settings.gitlab_url}/api/v4/users/{user_id}"
+        response = requests.get(url, headers=get_gitlab_headers(), timeout=10)
+
+        if response.status_code == 200:
+            data = response.json()
+            # GitLab returns public_email if set, otherwise email (admin only)
+            email = data.get("public_email") or data.get("email") or None
+            _user_email_cache[user_id] = email
+            return email
+    except Exception:
+        pass
+
+    _user_email_cache[user_id] = None
+    return None
+
 def get_all_projects():
     settings = frappe.get_single("GitLab Settings")
     url = f"{settings.gitlab_url}/api/v4/projects?membership=true"
@@ -221,8 +254,15 @@ def sync_issues_only():
                         }
                     )
 
+                    # Resolve assignee fields once for this issue
+                    assignee_data = issue.get("assignee") or {}
+                    assignee_name = assignee_data.get("name", "")
+                    assignee_username = assignee_data.get("username", "")
+                    assignee_id = assignee_data.get("id")
+                    assignee_email = get_user_email(assignee_id) if assignee_id else ""
+
                     if existing_issue:
-                        # ✅ Existing issue — update
+                        # ✅ Existing issue — update all fields including new ones
                         gitlab_issue_doc = frappe.get_doc("GitLab Issue", existing_issue)
                         issue_map[str(issue["iid"])] = existing_issue
 
@@ -230,15 +270,19 @@ def sync_issues_only():
                             "title": issue["title"],
                             "description": issue.get("description", ""),
                             "state": issue["state"],
-                            "assignee": issue["assignee"]["name"] if issue.get("assignee") else "",
+                            "due_date": issue.get("due_date") or None,
+                            "assignee": assignee_name,
+                            "assignee_email": assignee_email or "",
+                            "gitlab_username": assignee_username,
                             "issue_url": issue["web_url"],
                             "gitlab_milestone": milestone_name or gitlab_issue_doc.get("gitlab_milestone"),
+                            "labels": ", ".join(issue.get("labels", [])),
                         })
 
                         gitlab_issue_doc.save(ignore_permissions=True)
 
                     else:
-                        # ✅ New issue
+                        # ✅ New issue — populate all fields
                         gitlab_issue_doc = frappe.new_doc("GitLab Issue")
 
                         gitlab_issue_doc.update({
@@ -246,10 +290,14 @@ def sync_issues_only():
                             "title": issue["title"],
                             "description": issue.get("description", ""),
                             "state": issue["state"],
-                            "assignee": issue["assignee"]["name"] if issue.get("assignee") else "",
+                            "due_date": issue.get("due_date") or None,
+                            "assignee": assignee_name,
+                            "assignee_email": assignee_email or "",
+                            "gitlab_username": assignee_username,
                             "issue_url": issue["web_url"],
                             "gitlab_project": project["name"],
                             "gitlab_milestone": milestone_name,
+                            "labels": ", ".join(issue.get("labels", [])),
                         })
 
                         gitlab_issue_doc.save(ignore_permissions=True)
@@ -340,6 +388,8 @@ def sync_gitlab_milestones():
                     doc = frappe.new_doc("GitLab Milestones")
                     doc.milestone_id   = int(milestone["id"])
                     doc.gitlab_project = existing_project
+                    # Use project+milestone_id as name to avoid title collisions across projects
+                    doc.name = f"{existing_project}-{milestone['id']}"
 
                 doc.milestone_iid  = int(milestone["iid"])
                 doc.title          = milestone["title"]
@@ -352,6 +402,8 @@ def sync_gitlab_milestones():
                 doc.save(ignore_permissions=True)
 
             except Exception as ex:
+                # Roll back the failed statement so the transaction stays usable
+                frappe.db.rollback()
                 frappe.log_error(
                     title="GitLab Milestone Sync Error",
                     message=(
@@ -365,15 +417,26 @@ def sync_gitlab_milestones():
     return "Milestones synced successfully"
 
 @frappe.whitelist()
+def sync_gitlab_data():
+    """
+    Full sync in order: projects → milestones → issues.
+    This is what the Dev Action Panel sync button calls.
+    """
+    sync_projects_only()
+    sync_gitlab_milestones()
+    sync_issues_only()
+    return "Sync complete"
+
+
+@frappe.whitelist()
 def sync_gitlab_data_background():
     frappe.enqueue(
         method="phamos.gitlab_integration.gitlab_utils.sync_gitlab_data",
-        queue="long",          # 👈 long running jobs
-        timeout=60 * 60,       # 1 hour
+        queue="long",
+        timeout=60 * 60,
         is_async=True
     )
-
     return {
         "status": "queued",
-        "message": "GitLab sync go into background job"
+        "message": "GitLab sync queued as background job",
     }
