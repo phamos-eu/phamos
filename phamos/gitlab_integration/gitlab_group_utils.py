@@ -58,7 +58,7 @@ def update_gitlab_avatar(group_id=None, project_id=None, customer_doc=None):
 
     except Exception:
         frappe.log_error("GitLab Avatar Update Failed", frappe.get_traceback())
-        
+
 def update_gitlab_avatar_on_customer(doc, method=None):
     if not doc.image:
         return
@@ -138,7 +138,7 @@ def create_gitlab_group(group_name, customer_doc=None):
     )
 
     response.raise_for_status()
-    return response.json() 
+    return response.json()
 
 
 def create_gitlab_project(project_name, group_id, customer_doc=None):
