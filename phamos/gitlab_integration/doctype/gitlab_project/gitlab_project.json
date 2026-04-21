@@ -11,6 +11,7 @@
   "web_url",
   "description",
   "namespace",
+  "group",
   "last_synced",
   "frappe_project"
  ],
@@ -35,6 +36,13 @@
    "fieldtype": "Data",
    "in_list_view": 1,
    "label": "Namespace"
+  },
+  {
+   "fieldname": "group",
+   "fieldtype": "Link",
+   "in_list_view": 1,
+   "label": "Group",
+   "options": "GitLab Group"
   },
   {
    "fieldname": "last_synced",
@@ -68,7 +76,7 @@
    "link_fieldname": "gitlab_project"
   }
  ],
- "modified": "2026-04-15 08:42:13.565182",
+ "modified": "2026-04-21 09:00:00.000000",
  "modified_by": "Administrator",
  "module": "Gitlab Integration",
  "name": "GitLab Project",
