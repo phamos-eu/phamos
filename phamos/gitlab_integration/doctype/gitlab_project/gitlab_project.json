@@ -11,7 +11,8 @@
   "web_url",
   "description",
   "namespace",
-  "last_synced"
+  "last_synced",
+  "frappe_project"
  ],
  "fields": [
   {
@@ -45,6 +46,14 @@
    "fieldtype": "Data",
    "label": "Title",
    "unique": 1
+  },
+  {
+   "description": "Link this GitLab project to its corresponding ERPNext project to enable automatic timesheet resolution.",
+   "fieldname": "frappe_project",
+   "fieldtype": "Link",
+   "in_list_view": 1,
+   "label": "ERPNext Project",
+   "options": "Project"
   }
  ],
  "grid_page_length": 50,

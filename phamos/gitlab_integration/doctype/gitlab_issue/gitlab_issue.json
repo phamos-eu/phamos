@@ -10,11 +10,15 @@
   "description",
   "state",
   "due_date",
+  "start_date",
   "assignee",
+  "assignee_email",
+  "gitlab_username",
   "issue_url",
   "parent_issue",
   "gitlab_project",
-  "gitlab_milestone"
+  "gitlab_milestone",
+  "labels"
  ],
  "fields": [
   {
@@ -67,13 +71,36 @@
   {
    "fieldname": "due_date",
    "fieldtype": "Date",
+   "in_list_view": 1,
    "label": "Due Date"
+  },
+  {
+   "fieldname": "start_date",
+   "fieldtype": "Date",
+   "label": "Start Date"
+  },
+  {
+   "fieldname": "assignee_email",
+   "fieldtype": "Data",
+   "in_list_view": 1,
+   "in_standard_filter": 1,
+   "label": "Assignee Email"
+  },
+  {
+   "fieldname": "gitlab_username",
+   "fieldtype": "Data",
+   "label": "GitLab Username"
   },
   {
    "fieldname": "gitlab_milestone",
    "fieldtype": "Link",
    "label": "GitLab Milestone",
    "options": "GitLab Milestones"
+  },
+  {
+   "fieldname": "labels",
+   "fieldtype": "Data",
+   "label": "Labels"
   }
  ],
  "grid_page_length": 50,
