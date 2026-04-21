@@ -25,6 +25,7 @@
   {
    "fieldname": "timesheet",
    "fieldtype": "Link",
+   "ignore_user_permissions": 1,
    "in_list_view": 1,
    "label": "Timesheet",
    "options": "Timesheet"
@@ -56,6 +57,7 @@
   {
    "fieldname": "employee",
    "fieldtype": "Link",
+   "ignore_user_permissions": 1,
    "label": "Employee",
    "options": "Employee"
   },
@@ -80,7 +82,7 @@
  "index_web_pages_for_search": 1,
  "istable": 1,
  "links": [],
- "modified": "2026-03-19 15:56:10.212580",
+ "modified": "2026-04-21 17:47:57.804260",
  "modified_by": "Administrator",
  "module": "Phamos",
  "name": "Timesheets",
