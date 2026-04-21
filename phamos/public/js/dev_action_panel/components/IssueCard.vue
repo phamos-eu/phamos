@@ -589,4 +589,6 @@ function onStopKey(e)  { if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) conf
 [data-theme="dark"] .ic__panel-btn--danger:hover {
   background: #991b1b; border-color: #991b1b;
 }
+[data-theme="dark"] .ic__title { color: #e2e8f0; }
+[data-theme="dark"] .ic__title:hover { color: #93c5fd; }
 </style>
