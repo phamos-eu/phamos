@@ -10,8 +10,7 @@
   "name1",
   "text_color",
   "color",
-  "priority",
-  "project"
+  "priority"
  ],
  "fields": [
   {
@@ -39,18 +38,12 @@
    "fieldname": "priority",
    "fieldtype": "Data",
    "label": "Priority"
-  },
-  {
-   "fieldname": "project",
-   "fieldtype": "Link",
-   "label": "Project",
-   "options": "GitLab Project"
   }
  ],
  "grid_page_length": 50,
  "index_web_pages_for_search": 1,
  "links": [],
- "modified": "2026-04-21 10:49:09.132186",
+ "modified": "2026-04-22 07:40:51.371245",
  "modified_by": "Administrator",
  "module": "Gitlab Integration",
  "name": "GitLab Labels",

@@ -102,7 +102,6 @@ def sync_gitlab_labels():
                         "GitLab Labels",
                         {
                             "label_id": label_id,
-                            "project": project.name
                         },
                         "name"
                     )
@@ -114,7 +113,6 @@ def sync_gitlab_labels():
                         "text_color": label.get("text_color"),
                         "color": label.get("color"),
                         "priority": label.get("priority"),
-                        "project": project.name
                     }
 
                     if existing:
@@ -328,7 +326,6 @@ def sync_projects_only():
 
 @frappe.whitelist()
 def sync_issues_only():
-    """Sirf issues sync karo — update bhi karo agar fields change hui hain"""
 
     projects = frappe.get_all(
         "GitLab Project",
