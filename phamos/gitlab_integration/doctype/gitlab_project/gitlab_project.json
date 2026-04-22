@@ -74,13 +74,9 @@
   {
    "link_doctype": "GitLab Milestones",
    "link_fieldname": "gitlab_project"
-  },
-  {
-   "link_doctype": "GitLab Labels",
-   "link_fieldname": "project"
   }
  ],
- "modified": "2026-04-21 11:17:15.064054",
+ "modified": "2026-04-22 08:30:59.737239",
  "modified_by": "Administrator",
  "module": "Gitlab Integration",
  "name": "GitLab Project",
