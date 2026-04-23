@@ -8,11 +8,13 @@ let cachedTimesheetData = null; // Cache the timesheet data
 const sortFieldMap = {
     1: "timesheet",
     2: "start_date",
-    3: "billing_status",
-    4: "total_hours",
-    5: "billable_hours",
-    6: "related_issue",
-    7: "comment"
+    3: "employee_name",
+    4: "activity_type",
+    5: "billing_status",
+    6: "total_hours",
+    7: "billable_hours",
+    8: "related_issue",
+    9: "comment"
 };
 
 frappe.ready(() => {
@@ -200,11 +202,13 @@ function load_timesheets() {
       data.forEach(row => {
         let btnText = "Give Feedback";
         let btnColor = "#5198e3"; // default blue
+        let btnFontSize = "10px"
 
         
         if (Number(row.custom_rating) > 0) {
             btnText = "Under Review";
           btnColor = "#ffc107";
+          btnFontSize = "10px"
         }
 
         const relatedIssues = row.related_issue || '';
@@ -216,6 +220,8 @@ function load_timesheets() {
             <td><input type="checkbox" class="row-select" /></td>
             <td>${row.name}</td>
             <td>${frappe.datetime.str_to_user(row.start_date)}</td>
+            <td>${row.employee_name}</td>
+            <td>${row.activity_type}</td>
             <td>${row.custom_billing_status || ''}</td>
             <td>${format_hours(row.total_hours)}</td>
             <td>${format_hours(row.total_billable_hours)}</td>
@@ -229,7 +235,7 @@ function load_timesheets() {
             <td>
               <button 
                 class="btn btn-sm comment-btn"
-                style="background-color: ${btnColor}; color: white;"
+                style="background-color: ${btnColor}; color: white; font-size: ${btnFontSize};"
                 data-name="${row.name}" 
                 data-comment="${row.customer_comment || ''}">
                 ${btnText}
@@ -415,7 +421,7 @@ function download_selected_as_csv() {
     return;
   }
 
-  const headers = ['Employee', 'Employee Name', 'Start Date', 'End Date', 'Total Hours', 'Billable Hours'];
+  const headers = ['Employee', 'Employee Name', 'Activity Type', 'Start Date', 'End Date', 'Total Hours', 'Billable Hours'];
   const csv = [headers.join(",")].concat(rows.map(r => r.join(","))).join("\n");
 
   const blob = new Blob([csv], { type: 'text/csv' });
@@ -440,7 +446,7 @@ function download_visible_csv() {
     return;
   }
 
-  const headers = ['Timesheet', 'Status', 'Employee ID', 'Employee Name', 'Start Date', 'End Date', 'Billing Status', 'Total Hours', 'Billable Hours'];
+  const headers = ['Timesheet', 'Employee ID', 'Employee Name', 'Activity Type', 'Start Date', 'End Date', 'Billing Status', 'Total Hours', 'Billable Hours'];
   const csv = [headers.join(",")].concat(rows.map(r => r.join(","))).join("\n");
 
   const blob = new Blob([csv], { type: 'text/csv' });
@@ -472,6 +478,7 @@ function download_all_csv() {
         row.timesheet_status || '',
         row.employee || '',
         row.employee_name || '',
+        row.activity_type || '',
         row.start_date,
         row.end_date,
         row.custom_billing_status || '',
@@ -479,7 +486,7 @@ function download_all_csv() {
         row.total_billable_hours
       ]);
 
-      const headers = ['Timesheet', 'Status', 'Employee ID', 'Employee Name', 'Start Date', 'End Date', 'Billing Status', 'Total Hours', 'Billable Hours'];
+      const headers = ['Timesheet', 'Employee ID', 'Employee Name', 'Activity Type', 'Start Date', 'End Date', 'Billing Status', 'Total Hours', 'Billable Hours'];
       const csv = [headers.join(",")].concat(rows.map(r => r.join(","))).join("\n");
 
       const blob = new Blob([csv], { type: 'text/csv' });
@@ -852,7 +859,7 @@ function load_graph_data() {
 }
 
 /////////////////////////////////////
-loadAndRenderGraph();
+// loadAndRenderGraph();
 
 // Handle "Give Feedback" button click dynamically
 $(document).on('click', '.comment-btn', function () {
