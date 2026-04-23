@@ -110,3 +110,21 @@
 #so-table-body .badge {
     font-size: 0.75rem;
 }
+
+/* Table header font size */
+#timesheet_table thead th,
+#so_table thead th {
+  font-size: 11px;
+}
+
+/* Table body/data font size */
+#timesheet_table tbody td,
+#so_table tbody td {
+  font-size: 11px;
+}
+
+/* Column filter inputs */
+#timesheet_table thead tr:nth-child(2) input,
+#so_table thead tr:nth-child(2) input {
+  font-size: 10px;
+}
