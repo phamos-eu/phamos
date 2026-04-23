@@ -281,6 +281,7 @@
  "module": "OKR Addon",
  "name": "OKR",
  "naming_rule": "By fieldname",
+ "title_field": "title",
  "nsm_parent_field": "parent_okr",
  "owner": "Administrator",
  "permissions": [
