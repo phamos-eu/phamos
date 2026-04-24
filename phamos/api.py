@@ -36,10 +36,12 @@ def get_timesheets(from_date=None, to_date=None, project=None, offset=0, limit=2
     valid_sort_fields = {
         "timesheet": "ts.name",
         "start_date": "ts.start_date",
+        "employee_name": "ts.employee_name",
         "billing_status": "ts.custom_billing_status",
         "total_hours": "ts.total_hours",
         "billable_hours": "ts.total_billable_hours",
         "related_issue": "related_issue",
+        "activity_type": "activity_type",
         "comment": "ts.customer_comment",
         "creation": "ts.creation"
     }
@@ -58,8 +60,8 @@ def get_timesheets(from_date=None, to_date=None, project=None, offset=0, limit=2
         SELECT
             ts.name,
             ts.employee,
+            ts.employee_name,
             ts.custom_billing_status,
-            ts.project_owner,
             ts.total_hours,
             ts.total_billable_hours,
             ts.project_name,
@@ -74,7 +76,14 @@ def get_timesheets(from_date=None, to_date=None, project=None, offset=0, limit=2
                 WHERE td.parent = ts.name
                 ORDER BY td.idx
                 LIMIT 1
-            ) AS related_issue
+            ) AS related_issue,
+            (
+                SELECT activity_type
+                FROM `tabTimesheet Detail` td
+                WHERE td.parent = ts.name
+                ORDER BY td.idx
+                LIMIT 1
+            ) AS activity_type
         FROM `tabTimesheet` ts
         WHERE ts.docstatus IN (0, 1) {conditions}
         ORDER BY {order_field} {order_direction}
@@ -385,15 +394,10 @@ def get_customer_sales_order_status():
 
     # Process each sales order
     for so in sales_orders:
-        # Calculate delivered hours from delivery notes (matching Implementation doctype logic)
         delivered_hrs = frappe.db.sql("""
-            SELECT SUM(dni.qty) as delivered_qty
-            FROM `tabDelivery Note Item` dni
-            JOIN `tabDelivery Note` dn ON dn.name = dni.parent
-            WHERE
-                dni.against_sales_order = %s
-                AND dn.docstatus = 1
-                AND dn.status IN ('Completed', 'To Bill')
+            SELECT SUM(delivered_qty) as delivered_qty
+            FROM `tabSales Order Item`
+            WHERE parent = %s
         """, so.name, as_dict=True)
 
         so.delivered_hrs = delivered_hrs[0].delivered_qty if delivered_hrs[0].delivered_qty else 0

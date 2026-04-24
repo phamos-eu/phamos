@@ -1,7 +1,7 @@
 {
  "actions": [],
  "allow_rename": 1,
- "autoname": "field:title",
+ "autoname": "field:milestone_id",
  "creation": "2026-04-13 12:21:49.461156",
  "doctype": "DocType",
  "engine": "InnoDB",
@@ -20,8 +20,9 @@
   {
    "fieldname": "title",
    "fieldtype": "Data",
-   "label": "Title",
-   "unique": 1
+   "in_list_view": 1,
+   "in_standard_filter": 1,
+   "label": "Title"
   },
   {
    "fieldname": "start_date",
@@ -50,7 +51,9 @@
   {
    "fieldname": "milestone_id",
    "fieldtype": "Int",
-   "label": "Milestone ID"
+   "in_standard_filter": 1,
+   "label": "Milestone ID",
+   "unique": 1
   },
   {
    "fieldname": "milestone_iid",
@@ -78,7 +81,7 @@
    "link_fieldname": "gitlab_milestone"
   }
  ],
- "modified": "2026-04-15 11:52:53.849851",
+ "modified": "2026-04-23 07:09:35.075398",
  "modified_by": "Administrator",
  "module": "Gitlab Integration",
  "name": "GitLab Milestones",
@@ -100,7 +103,9 @@
  ],
  "row_format": "Dynamic",
  "rows_threshold_for_grid_search": 20,
+ "show_title_field_in_link": 1,
  "sort_field": "modified",
  "sort_order": "DESC",
- "states": []
+ "states": [],
+ "title_field": "title"
 }

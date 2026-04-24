@@ -342,19 +342,21 @@ def sync_issues_only():
             for issue in issues:
                 try:
                     # 🔹 Milestone handling (FIX)
-                    milestone_title = issue.get("milestone", {}).get("title") if issue.get("milestone") else None
+                    milestone_id = issue.get("milestone", {}).get("id") if issue.get("milestone") else None
                     milestone_name = None
 
-                    if milestone_title:
+                    if milestone_id and project["name"]:
                         milestone_name = frappe.db.get_value(
                             "GitLab Milestones",
-                            {"title": milestone_title},
+                            {"id": milestone_id,      
+                             "gitlab_project": project["name"]},
                             "name"
                         )
 
                         if not milestone_name:
                             milestone_doc = frappe.new_doc("GitLab Milestones")
-                            milestone_doc.title = milestone_title
+                            milestone_doc.id = milestone_id
+                            milestone_doc.gitlab_project = project["name"]
                             milestone_doc.save(ignore_permissions=True)
                             milestone_name = milestone_doc.name
 
