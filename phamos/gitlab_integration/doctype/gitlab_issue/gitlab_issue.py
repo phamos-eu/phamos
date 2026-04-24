@@ -23,4 +23,4 @@ class GitLabIssue(Document):
         project_title = re.sub(r"\s+", "-", project_title.strip().lower())
 
         self.name = f"{project_title}-{self.issue_id}"
-        frappe.msgprint(f"GitLab Issue named as: {self.name}")
+        # frappe.msgprint(f"GitLab Issue named as: {self.name}")
