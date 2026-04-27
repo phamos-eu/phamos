@@ -22,6 +22,7 @@ SKIP_FIELDNAMES = {
 	"docstatus", "idx", "amended_from", "attachment",
 	"supplier_name",  # fetch_from supplier
 	"pdf_preview", "naming_series",
+	"title",  # email subject / inbox; do not overwrite from PDF or AI extract
 }
 
 
