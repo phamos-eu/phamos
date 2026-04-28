@@ -7,13 +7,26 @@ const emit = defineEmits(["confirm", "cancel"]);
 const goal = ref("");
 const hours = ref(1);
 const goalRef = ref(null);
+const startTime = ref(nowLocal());
 
 onMounted(() => goalRef.value?.focus());
+
+function nowLocal() {
+  const d = new Date();
+  const pad = n => String(n).padStart(2, "0");
+  return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+}
+
+function isManualStart() {
+  return startTime.value !== nowLocal();
+}
 
 function submit() {
   if (!goal.value.trim()) { frappe.msgprint(__("Please enter a goal.")); return; }
   if (!hours.value || hours.value < 0.25) { frappe.msgprint(__("Minimum expected time is 15 minutes (0.25h).")); return; }
-  emit("confirm", { goal: goal.value.trim(), expectedTime: Math.round(parseFloat(hours.value) * 3600) });
+  const payload = { goal: goal.value.trim(), expectedTime: Math.round(parseFloat(hours.value) * 3600) };
+  if (startTime.value) payload.manualStartTime = startTime.value.replace("T", " ") + ":00";
+  emit("confirm", payload);
 }
 
 function onKey(e) {
@@ -79,6 +92,12 @@ function onKey(e) {
               {{ hours ? `= ${Math.floor(hours)}h ${Math.round((hours % 1) * 60)}m` : "" }}
             </span>
           </div>
+        </div>
+
+        <div class="mo__field">
+          <label class="mo__label">Start time</label>
+          <p class="mo__hint">Set a past time to log retroactively, or leave as-is to start now.</p>
+          <input v-model="startTime" type="datetime-local" class="mo__input mo__input--datetime" />
         </div>
       </div>
 
@@ -186,6 +205,7 @@ function onKey(e) {
 }
 .mo__duration-row { display: flex; align-items: center; gap: 8px; }
 .mo__input { width: 100px; flex-shrink: 0; }
+.mo__input--datetime { width: 100%; }
 .mo__unit { font-size: 13px; color: var(--text-muted); font-weight: 500; }
 .mo__duration-hint { font-size: 12px; color: var(--text-muted); margin-left: 4px; }
 

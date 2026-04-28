@@ -1,6 +1,6 @@
 import frappe
 from frappe import _
-from frappe.utils import now_datetime, add_to_date, time_diff_in_seconds
+from frappe.utils import now_datetime, add_to_date, time_diff_in_seconds, get_datetime
 
 
 # ---------------------------------------------------------------------------
@@ -201,7 +201,7 @@ def get_issue_timesheets(gitlab_issue_name):
 
 
 @frappe.whitelist()
-def start_issue_timer(gitlab_issue_name, expected_time, goal=None):
+def start_issue_timer(gitlab_issue_name, expected_time, goal=None, manual_start_time=None):
     """
     Create a Timesheet Record from a GitLab Issue, auto-resolving:
       - project   ← GitLab Issue → GitLab Project → frappe_project
@@ -243,7 +243,7 @@ def start_issue_timer(gitlab_issue_name, expected_time, goal=None):
     customer = frappe.db.get_value("Project", frappe_project, "customer")
 
     # --- create the Timesheet Record -----------------------------------------
-    now = now_datetime()
+    start_time = get_datetime(manual_start_time) if manual_start_time else now_datetime()
     ts = frappe.new_doc("Timesheet Record")
     ts.project = frappe_project
     ts.customer = customer
@@ -251,22 +251,24 @@ def start_issue_timer(gitlab_issue_name, expected_time, goal=None):
     ts.activity_type = employee.activity_type
     ts.goal = goal or issue.title  # default to issue title — the issue IS the goal
     ts.expected_time = expected_time
-    ts.from_time = now
+    ts.from_time = start_time
     ts.gitlab_issue = gitlab_issue_name
     ts.issues = issue.issue_url
     ts.parent_issues_url = issue.issue_url
 
-    # First time-log row (open — no to_time yet)
-    ts.append("item", {"from_time": now})
+    # First time-log row (open — no to_time, session is running)
+    ts.append("item", {"from_time": start_time})
 
     ts.insert(ignore_permissions=True)
     frappe.db.commit()
 
+    elapsed = int(time_diff_in_seconds(now_datetime(), start_time)) if manual_start_time else 0
+
     return {
         "name": ts.name,
-        "from_time": str(now),
+        "from_time": str(start_time),
         "session_state": "running",
-        "elapsed_seconds": 0,
+        "elapsed_seconds": elapsed,
     }
 
 
@@ -366,7 +368,7 @@ def resume_timer(name):
 
 
 @frappe.whitelist()
-def stop_timer(name, result, percent_billable=100, productivity=None, activity_type=None):
+def stop_timer(name, result, percent_billable=100, productivity=None, activity_type=None, manual_end_time=None):
     """
     Close the open row (if running), calculate actual_time from all item rows,
     fill in result fields, and submit the Timesheet Record.
@@ -375,12 +377,12 @@ def stop_timer(name, result, percent_billable=100, productivity=None, activity_t
     actual_time = sum of all row durations.
     """
     doc = frappe.get_doc("Timesheet Record", name)
-    now = now_datetime()
+    end_time = get_datetime(manual_end_time) if manual_end_time else now_datetime()
 
     # Close the open row if the session is currently running
     for row in reversed(doc.item):
         if not row.get("to_time"):
-            row.to_time = now
+            row.to_time = end_time
             break
 
     # Calculate duration for each row and sum
@@ -393,7 +395,7 @@ def stop_timer(name, result, percent_billable=100, productivity=None, activity_t
     # Set parent-level time fields required by before_submit and create_timesheet
     if doc.item:
         doc.from_time = doc.item[0].from_time
-        doc.to_time = now
+        doc.to_time = end_time
 
     doc.actual_time = total_seconds
     doc.result = result

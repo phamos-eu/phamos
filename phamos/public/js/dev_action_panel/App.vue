@@ -124,13 +124,20 @@ async function loadIssues() { loading.value = true; const r = await frappe.call(
 async function loadSession() { const r = await frappe.call({ method: "phamos.phamos.page.dev_action_panel.dev_action_panel.get_active_session" }); activeSession.value = r.message || null; if (activeSession.value) { elapsedSeconds.value = activeSession.value.elapsed_seconds || 0; startTick(); } }
 async function loadStats() { const r = await frappe.call({ method: "phamos.phamos.page.dev_action_panel.dev_action_panel.get_time_stats" }); stats.value = r.message || null; }
 
-// Inline start (emitted from card with { issue, expectedTime })
-async function onStart({ issue, expectedTime, goal }) {
+// Inline start (emitted from card with { issue, expectedTime, goal, manualStartTime? })
+async function onStart({ issue, expectedTime, goal, manualStartTime }) {
+  const args = { gitlab_issue_name: issue.name, expected_time: expectedTime, goal: goal || null };
+  if (manualStartTime) args.manual_start_time = manualStartTime;
   const r = await frappe.call({
     method: "phamos.phamos.page.dev_action_panel.dev_action_panel.start_issue_timer",
-    args: { gitlab_issue_name: issue.name, expected_time: expectedTime, goal: goal || null },
+    args,
   });
-  if (r.message) { activeSession.value = { ...r.message, gitlab_issue: issue.name }; elapsedSeconds.value = 0; startTick(); await loadIssues(); }
+  if (r.message) {
+    activeSession.value = { ...r.message, gitlab_issue: issue.name };
+    elapsedSeconds.value = Math.max(0, r.message.elapsed_seconds || 0);
+    startTick();
+    await loadIssues();
+  }
 }
 
 async function onPause() {
@@ -146,11 +153,13 @@ async function onResume() {
   startTick(); await loadIssues();
 }
 
-// Inline stop (emitted from card with { result, percentBillable })
-async function onStop({ result, percentBillable, activityType }) {
+// Inline stop (emitted from card with { result, percentBillable, activityType, manualEndTime? })
+async function onStop({ result, percentBillable, activityType, manualEndTime }) {
+  const args = { name: activeSession.value.name, result, percent_billable: percentBillable, activity_type: activityType };
+  if (manualEndTime) args.manual_end_time = manualEndTime;
   const r = await frappe.call({
     method: "phamos.phamos.page.dev_action_panel.dev_action_panel.stop_timer",
-    args: { name: activeSession.value.name, result, percent_billable: percentBillable, activity_type: activityType },
+    args,
   });
   if (r.message) { stopTick(); activeSession.value = null; elapsedSeconds.value = 0; await Promise.all([loadIssues(), loadStats()]); frappe.show_alert({ message: __("Session submitted."), indicator: "green" }); }
 }
