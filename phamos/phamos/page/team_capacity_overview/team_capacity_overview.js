@@ -1,5 +1,42 @@
 frappe.pages['team-capacity-overview'].on_page_load = function (wrapper) {
 
+    /* ---------------- HIGHCHARTS MORE MODULE ---------------- */
+
+    function ensure_highcharts_more(callback) {
+        if (
+            typeof Highcharts !== "undefined" &&
+            Highcharts.seriesTypes &&
+            Highcharts.seriesTypes.arearange
+        ) {
+            callback();
+            return;
+        }
+
+        let version = (typeof Highcharts !== "undefined" && Highcharts.version)
+            ? Highcharts.version
+            : "12.5.0";
+
+        let existing = document.getElementById("highcharts-more-script");
+        if (existing) existing.remove();
+
+        let script = document.createElement("script");
+        script.id = "highcharts-more-script";
+        script.src = `https://code.highcharts.com/${version}/highcharts-more.js`;
+
+        script.onload = function () {
+            setTimeout(callback, 100);
+        };
+
+        script.onerror = function () {
+            console.error("Failed to load highcharts-more.js version:", version);
+            frappe.msgprint("Failed to load Highcharts module. Check your internet connection.", "Error");
+        };
+
+        document.head.appendChild(script);
+    }
+
+    /* ---------------- PAGE SETUP ---------------- */
+
     var page = frappe.ui.make_app_page({
         parent: wrapper,
         title: 'Team Capacity Overview',
@@ -210,120 +247,7 @@ frappe.pages['team-capacity-overview'].on_page_load = function (wrapper) {
         };
     }
 
-    function render_chart(weeks, teams, actual_line, historical_actual_line) {
-
-        let series = [];
-
-        teams.sort((a, b) =>
-            a.data.reduce((x, y) => x + y, 0) -
-            b.data.reduce((x, y) => x + y, 0)
-        );
-
-        if (teams.length) {
-            series.push({
-                name: teams[0].name,
-                type: "area",
-                data: teams[0].data,
-                color: teams[0].color
-            });
-        }
-
-        for (let i = 1; i < teams.length; i++) {
-            series.push({
-                name: teams[i].name,
-                type: "arearange",
-                data: teams[i].data.map((v, idx) => [teams[i - 1].data[idx], v]),
-                color: teams[i].color,
-                lineWidth: 0
-            });
-        }
-
-        series.push({
-            name: "Actual Time Spent",
-            type: "line",
-            data: actual_line,
-            dashStyle: "ShortDash",
-            color: "#000"
-        });
-
-        if (historical_actual_line) {
-            series.push({
-                name: "Historical Actual Time",
-                type: "line",
-                data: historical_actual_line,
-                dashStyle: "Dot",
-                color: "#666"
-            });
-        }
-
-        // frappe.require hataya - seedha Highcharts use karo
-        if (typeof Highcharts === "undefined") {
-            frappe.msgprint("Highcharts load nahi hua. Page refresh karo.", "Error");
-            return;
-        }
-
-        Highcharts.chart("team_chart", {
-            chart: { type: "area" },
-            title: { text: "Team Weekly Capacity" },
-            xAxis: { categories: weeks },
-            yAxis: { min: 0, title: { text: "Hours" } },
-            tooltip: {
-                shared: true,
-                formatter: function () {
-                    let idx = this.points[0].point.index;
-
-                    let weekStart = new Date(page.from_date.get_value());
-                    weekStart.setDate(weekStart.getDate() + (idx * 7));
-
-                    let weekEnd = new Date(weekStart);
-                    weekEnd.setDate(weekEnd.getDate() + 6);
-
-                    let actualRange =
-                        frappe.datetime.obj_to_str(weekStart) +
-                        " - " +
-                        frappe.datetime.obj_to_str(weekEnd);
-
-                    let html = `<b>${actualRange}</b><br/>`;
-
-                    this.points.forEach(p => {
-                        if (p.series.name === "Historical Actual Time") {
-                            let hFrom = new Date(weekStart);
-                            let hTo = new Date(weekEnd);
-
-                            if (page.comparison_type.get_value() === "last_year") {
-                                hFrom.setFullYear(hFrom.getFullYear() - 1);
-                                hTo.setFullYear(hTo.getFullYear() - 1);
-                            } else if (page.comparison_type.get_value() === "last_month") {
-                                hFrom.setMonth(hFrom.getMonth() - 1);
-                                hTo.setMonth(hTo.getMonth() - 1);
-                            }
-
-                            let histRange =
-                                frappe.datetime.obj_to_str(hFrom) +
-                                " - " +
-                                frappe.datetime.obj_to_str(hTo);
-
-                            html += `
-                                <span style="color:${p.color}">●</span>
-                                ${p.series.name} (${histRange}):
-                                <b>${p.y}</b><br/>
-                            `;
-                        } else {
-                            html += `
-                                <span style="color:${p.color}">●</span>
-                                ${p.series.name}:
-                                <b>${p.y}</b><br/>
-                            `;
-                        }
-                    });
-
-                    return html;
-                }
-            },
-            series
-        });
-    }
-        function shift_range(range, value, unit) {
+    function shift_range(range, value, unit) {
         let parts = range.split(" - ");
 
         let start = new Date(parts[0]);
@@ -337,11 +261,132 @@ frappe.pages['team-capacity-overview'].on_page_load = function (wrapper) {
             end.setMonth(end.getMonth() + value);
         }
 
-        return `
-            ${frappe.datetime.obj_to_str(start)}
-            -
-            ${frappe.datetime.obj_to_str(end)}
-        `;
+        return `${frappe.datetime.obj_to_str(start)} - ${frappe.datetime.obj_to_str(end)}`;
+    }
+
+    /* ---------------- RENDER CHART ---------------- */
+
+    function render_chart(weeks, teams, actual_line, historical_actual_line) {
+
+        if (typeof Highcharts === "undefined") {
+            frappe.msgprint("Highcharts is not loaded. Please refresh the page.", "Error");
+            return;
+        }
+
+        let needs_arearange = teams.length > 1;
+
+        let do_render = function () {
+            let series = [];
+
+            teams.sort((a, b) =>
+                a.data.reduce((x, y) => x + y, 0) -
+                b.data.reduce((x, y) => x + y, 0)
+            );
+
+            if (teams.length) {
+                series.push({
+                    name: teams[0].name,
+                    type: "area",
+                    data: teams[0].data,
+                    color: teams[0].color
+                });
+            }
+
+            for (let i = 1; i < teams.length; i++) {
+                series.push({
+                    name: teams[i].name,
+                    type: "arearange",
+                    data: teams[i].data.map((v, idx) => [teams[i - 1].data[idx], v]),
+                    color: teams[i].color,
+                    lineWidth: 0
+                });
+            }
+
+            series.push({
+                name: "Actual Time Spent",
+                type: "line",
+                data: actual_line,
+                dashStyle: "ShortDash",
+                color: "#000"
+            });
+
+            if (historical_actual_line) {
+                series.push({
+                    name: "Historical Actual Time",
+                    type: "line",
+                    data: historical_actual_line,
+                    dashStyle: "Dot",
+                    color: "#666"
+                });
+            }
+
+            Highcharts.chart("team_chart", {
+                chart: { type: "area" },
+                title: { text: "Team Weekly Capacity" },
+                xAxis: { categories: weeks },
+                yAxis: { min: 0, title: { text: "Hours" } },
+                tooltip: {
+                    shared: true,
+                    formatter: function () {
+                        let idx = this.points[0].point.index;
+
+                        let weekStart = new Date(page.from_date.get_value());
+                        weekStart.setDate(weekStart.getDate() + (idx * 7));
+
+                        let weekEnd = new Date(weekStart);
+                        weekEnd.setDate(weekEnd.getDate() + 6);
+
+                        let actualRange =
+                            frappe.datetime.obj_to_str(weekStart) +
+                            " - " +
+                            frappe.datetime.obj_to_str(weekEnd);
+
+                        let html = `<b>${actualRange}</b><br/>`;
+
+                        this.points.forEach(p => {
+                            if (p.series.name === "Historical Actual Time") {
+                                let hFrom = new Date(weekStart);
+                                let hTo = new Date(weekEnd);
+
+                                if (page.comparison_type.get_value() === "last_year") {
+                                    hFrom.setFullYear(hFrom.getFullYear() - 1);
+                                    hTo.setFullYear(hTo.getFullYear() - 1);
+                                } else if (page.comparison_type.get_value() === "last_month") {
+                                    hFrom.setMonth(hFrom.getMonth() - 1);
+                                    hTo.setMonth(hTo.getMonth() - 1);
+                                }
+
+                                let histRange =
+                                    frappe.datetime.obj_to_str(hFrom) +
+                                    " - " +
+                                    frappe.datetime.obj_to_str(hTo);
+
+                                html += `
+                                    <span style="color:${p.color}">●</span>
+                                    ${p.series.name} (${histRange}):
+                                    <b>${p.y}</b><br/>
+                                `;
+                            } else {
+                                html += `
+                                    <span style="color:${p.color}">●</span>
+                                    ${p.series.name}:
+                                    <b>${p.y}</b><br/>
+                                `;
+                            }
+                        });
+
+                        return html;
+                    }
+                },
+                series
+            });
+        };
+
+        if (needs_arearange) {
+            ensure_highcharts_more(do_render);
+        } else {
+            do_render();
+        }
     }
 
 };
