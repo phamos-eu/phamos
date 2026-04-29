@@ -465,6 +465,46 @@ def get_customer_sales_order_status():
     return result
 
 
+@frappe.whitelist()
+def pull_emails_now(email_account):
+    from frappe.email.doctype.email_account.email_account import pull_from_email_account
+
+    if not frappe.has_permission("Email Account", "write", email_account):
+        frappe.throw(_("Not permitted"), frappe.PermissionError)
+
+    # Provide a useful result to the UI: whether anything was actually pulled.
+    # Email pull is often a no-op when Email Sync Option = UNSEEN and there are no new emails.
+    before = frappe.get_doc("Email Account", email_account)
+    before_last_sync = before.get("__last_sync_on")
+    before_uidnext = {}
+    for row in (before.get("imap_folder") or []):
+        before_uidnext[row.folder_name] = row.uidnext
+
+    try:
+        pull_from_email_account(email_account)
+    except Exception:
+        # Surface real errors (auth, folder not found, parsing) instead of always showing success.
+        return {"ok": False, "error": frappe.get_traceback()}
+
+    after = frappe.get_doc("Email Account", email_account)
+    after_last_sync = after.get("__last_sync_on")
+    after_uidnext = {}
+    for row in (after.get("imap_folder") or []):
+        after_uidnext[row.folder_name] = row.uidnext
+
+    changed_folders = [
+        folder for folder, uid in after_uidnext.items()
+        if str(uid or "") != str(before_uidnext.get(folder) or "")
+    ]
+
+    return {
+        "ok": True,
+        "changed_folders": changed_folders,
+        "last_sync_before": before_last_sync,
+        "last_sync_after": after_last_sync,
+    }
+
+
 def send_daily_timesheet_comment_summary():
     rows = frappe.db.sql(
         """

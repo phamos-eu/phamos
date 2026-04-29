@@ -53,7 +53,7 @@ doctype_js = {
     "User": "public/js/mailcow_user.js",
     "Event": "public/js/event.js",
     "Sales Invoice": "public/js/sales_invoice.js",
-
+    "Email Account": "public/js/email_account.js",
 }
 
 doctype_list_js = {
