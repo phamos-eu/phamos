@@ -14,6 +14,7 @@
   "status",
   "receipt_type",
   "receipt_attached",
+  "pdf_attachment_choice",
   "attachment",
   "supplier_reference",
   "sum",
@@ -74,8 +75,7 @@
    "fieldtype": "Data",
    "in_list_view": 1,
    "label": "Title",
-   "reqd": 1,
-   "unique": 1
+   "reqd": 1
   },
   {
    "description": "This is the date of the receipt",
@@ -373,10 +373,15 @@
    "fieldname": "pdf_preview",
    "fieldtype": "HTML",
    "label": "PDF Preview"
+  },
+  {
+   "description": "If multiple PDFs are attached, pick the correct one to use as Attachment.",
+   "fieldname": "pdf_attachment_choice",
+   "fieldtype": "Select",
+   "label": "PDF Attachment (Select)"
   }
  ],
  "index_web_pages_for_search": 1,
- "is_submittable": 0,
  "links": [],
  "modified": "2026-04-30 13:30:31.878140",
  "modified_by": "Administrator",
@@ -398,6 +403,7 @@
    "write": 1
   }
  ],
+ "row_format": "Dynamic",
  "sender_field": "uploaded_by",
  "sort_field": "modified",
  "sort_order": "DESC",
