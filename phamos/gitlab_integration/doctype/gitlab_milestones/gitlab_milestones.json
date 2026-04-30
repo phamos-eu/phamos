@@ -52,8 +52,7 @@
    "fieldname": "milestone_id",
    "fieldtype": "Int",
    "in_standard_filter": 1,
-   "label": "Milestone ID",
-   "unique": 1
+   "label": "Milestone ID"
   },
   {
    "fieldname": "milestone_iid",
