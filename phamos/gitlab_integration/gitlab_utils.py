@@ -2,6 +2,9 @@ from frappe.auth import get_decrypted_password
 import requests
 import frappe
 from frappe.utils import now_datetime
+import json
+import hashlib
+import hmac
 
 def get_gitlab_headers():
     settings = frappe.get_single("GitLab Settings")
@@ -323,6 +326,174 @@ def sync_projects_only():
     frappe.db.commit()
     return "Projects synced successfully"
 
+@frappe.whitelist()
+def sync_all_issues():
+    projects = frappe.get_all(
+        "GitLab Project",
+        fields=["name", "project_id", "last_synced", "title", "namespace"]
+    )
+
+    for project in projects:
+        try:
+            # ── Full fetch (no last_synced)
+            issues = get_issues_for_project(project["project_id"])
+            project_path = project.get("namespace") or None
+            issue_map = {}
+
+            # ── Step 1: Fetched issues iids
+            issues = [issue for issue in issues if issue.get("assignee")]
+            fetched_iids = {str(issue["iid"]) for issue in issues}
+
+            # ── Step 2: Checking issues in Frappe 
+            existing_in_frappe = frappe.get_all(
+                "GitLab Issue",
+                filters={"gitlab_project": project["name"]},
+                fields=["name", "issue_id"]
+            )
+
+            #  collect Open issues parents 
+            open_parent_iids = set()
+
+            for issue in issues:
+                try:
+                    if not project_path:
+                        continue
+
+                    parent_info = get_issue_parent(project_path, issue["iid"])
+                    if parent_info and parent_info.get("iid"):
+                        open_parent_iids.add(str(parent_info["iid"]))
+                except Exception:
+                    pass
+
+
+            for existing in existing_in_frappe:
+                issue_id_str = str(existing["issue_id"])
+
+                # ❌ Skip delete if:
+                # 1. Issue fetched (means open)
+                # 2. Issue is open issue parent
+                if issue_id_str in fetched_iids or issue_id_str in open_parent_iids:
+                    continue
+
+                # ✅ Safe to delete
+                frappe.delete_doc(
+                    "GitLab Issue",
+                    existing["name"],
+                    ignore_permissions=True,
+                    force=True
+                )
+
+            # ── Step 3: Upsert all fetched (opened) issues ──
+            for issue in issues:
+                try:
+                    milestone_id = (
+                        issue.get("milestone", {}).get("id")
+                        if issue.get("milestone") else None
+                    )
+                    milestone_name = None
+                    if milestone_id and project["name"]:
+                        milestone_name = frappe.db.get_value(
+                            "GitLab Milestones",
+                            {"milestone_id": milestone_id, "gitlab_project": project["name"]},
+                            "name"
+                        )
+                        if not milestone_name:
+                            milestone_doc = frappe.new_doc("GitLab Milestones")
+                            milestone_doc.milestone_id = milestone_id
+                            milestone_doc.gitlab_project = project["name"]
+                            milestone_doc.save(ignore_permissions=True)
+                            milestone_name = milestone_doc.name
+
+                    existing_issue = frappe.db.exists(
+                        "GitLab Issue",
+                        {"issue_id": issue["iid"], "gitlab_project": project["name"]}
+                    )
+
+                    assignee_data = issue.get("assignee") or {}
+                    assignee_name = assignee_data.get("name", "")
+                    assignee_username = assignee_data.get("username", "")
+                    assignee_id = assignee_data.get("id")
+                    assignee_email = get_user_email(assignee_id) if assignee_id else ""
+
+                    fields = {
+                        "title": issue["title"],
+                        "description": issue.get("description", ""),
+                        "state": issue["state"],
+                        "due_date": issue.get("due_date") or None,
+                        "assignee": assignee_name,
+                        "assignee_email": assignee_email or "",
+                        "gitlab_username": assignee_username,
+                        "issue_url": issue["web_url"],
+                        "labels": ", ".join(issue.get("labels", [])),
+                    }
+                    if milestone_name:
+                        fields["gitlab_milestone"] = milestone_name
+
+                    if existing_issue:
+                        gitlab_issue_doc = frappe.get_doc("GitLab Issue", existing_issue)
+                        gitlab_issue_doc.update(fields)
+                        gitlab_issue_doc.save(ignore_permissions=True)
+                        issue_map[str(issue["iid"])] = existing_issue
+                    else:
+                        gitlab_issue_doc = frappe.new_doc("GitLab Issue")
+                        gitlab_issue_doc.update(fields)
+                        gitlab_issue_doc.update({
+                            "issue_id": issue["iid"],
+                            "gitlab_project": project["name"],
+                        })
+                        gitlab_issue_doc.save(ignore_permissions=True)
+                        issue_map[str(issue["iid"])] = gitlab_issue_doc.name
+
+                except Exception as ex:
+                    frappe.log_error(
+                        title="GitLab Issue Sync Error",
+                        message=(
+                            f"Project: {project.get('title')}, "
+                            f"Issue IID: {issue.get('iid')}, "
+                            f"Error: {str(ex)}"
+                        )
+                    )
+
+            # ── Step 4: Parent linking ──
+            for issue in issues:
+                try:
+                    issue_doc_name = issue_map.get(str(issue["iid"]))
+                    if not issue_doc_name or not project_path:
+                        continue
+
+                    parent_info = get_issue_parent(project_path, issue["iid"])
+                    if parent_info and parent_info.get("iid"):
+                        parent_iid = str(parent_info["iid"])
+                        parent_doc_name = issue_map.get(parent_iid)
+                        if parent_doc_name:
+                            gitlab_issue_doc = frappe.get_doc("GitLab Issue", issue_doc_name)
+                            gitlab_issue_doc.parent_issue = parent_doc_name
+                            gitlab_issue_doc.save(ignore_permissions=True)
+
+                except Exception as ex:
+                    frappe.log_error(
+                        title="GitLab Parent Link Error",
+                        message=(
+                            f"Project: {project.get('title')}, "
+                            f"Issue IID: {issue.get('iid')}, "
+                            f"Error: {str(ex)}"
+                        )
+                    )
+
+            # ── Step 5: Update last_synced ──
+            project_doc = frappe.get_doc("GitLab Project", project["name"])
+            project_doc.last_synced = now_datetime()
+            project_doc.save(ignore_permissions=True)
+            frappe.db.commit()
+
+        except Exception as ex:
+            frappe.db.rollback()
+            frappe.log_error(
+                title="GitLab Project Sync Error",
+                message=f"Project: {project.get('title')}, Error: {str(ex)}"
+            )
+
+    return "Issues synced successfully"
 
 @frappe.whitelist()
 def sync_issues_only():
@@ -531,6 +702,76 @@ def sync_gitlab_milestones():
     return "Milestones synced successfully"
 
 @frappe.whitelist()
+def register_webhooks_for_all_projects():
+    """
+    GitLab Project doctype se saare projects le aur
+    har project ke liye webhook automatically register kare.
+    """
+    settings = frappe.get_single("GitLab Settings")
+    
+    if not settings.gitlab_url:
+        frappe.throw("GitLab URL not set")
+
+    # Webhook secret get 
+    try:
+        webhook_secret = get_decrypted_password(
+            "GitLab Settings", "GitLab Settings", "webhook_secret"
+        )
+    except Exception:
+        webhook_secret = None
+
+    # Webhook receiver URL — apna ngrok/server URL 
+    webhook_url = f"{settings.webhook_base_url}/api/method/phamos.gitlab_integration.gitlab_utils.gitlab_webhook_receiver"
+
+    headers = get_gitlab_headers()
+    projects = frappe.get_all(
+        "GitLab Project",
+        fields=["name", "project_id", "title"]
+    )
+
+    results = []
+
+    for project in projects:
+        try:
+            project_id = project["project_id"]
+
+            # ── Step 1: Existing webhooks check (duplicate avoid) ──
+            existing_url = f"{settings.gitlab_url}/api/v4/projects/{project_id}/hooks"
+            existing_resp = requests.get(existing_url, headers=headers)
+            existing_hooks = existing_resp.json() if existing_resp.status_code == 200 else []
+
+            already_exists = any(
+                hook.get("url") == webhook_url
+                for hook in existing_hooks
+            )
+
+            if already_exists:
+                results.append(f"⏭ {project['title']} — already registered")
+                continue
+
+            # ── Step 2: Webhook register ──
+            payload = {
+                "url": webhook_url,
+                "issues_events": True,
+                "enable_ssl_verification": False,
+            }
+
+            if webhook_secret:
+                payload["token"] = webhook_secret
+
+            resp = requests.post(existing_url, json=payload, headers=headers)
+
+            if resp.status_code == 201:
+                results.append(f"✅ {project['title']} — webhook registered")
+            else:
+                results.append(f"❌ {project['title']} — failed: {resp.text}")
+
+        except Exception as ex:
+            results.append(f"❌ {project['title']} — error: {str(ex)}")
+
+    return "\n".join(results)
+
+@frappe.whitelist()
 def sync_gitlab_data():
     """
     Full sync in order: projects → milestones → issues.
@@ -538,7 +779,7 @@ def sync_gitlab_data():
     """
     sync_projects_only()
     sync_gitlab_milestones()
-    sync_issues_only()
+    sync_all_issues()
     return "Sync complete"
 
 
@@ -554,3 +795,170 @@ def sync_gitlab_data_background():
         "status": "queued",
         "message": "GitLab sync queued as background job",
     }
+
+
+
+@frappe.whitelist(allow_guest=True)
+def gitlab_webhook_receiver():
+    settings = frappe.get_single("GitLab Settings")
+    
+    try:
+        expected_secret = get_decrypted_password(
+            "GitLab Settings", "GitLab Settings", "webhook_secret"
+        )
+    except Exception:
+        expected_secret = None  # Field exist nahi karti, skip karo
+
+    if expected_secret:
+        incoming_token = frappe.request.headers.get("X-Gitlab-Token", "")
+        if incoming_token != expected_secret:
+            frappe.response.http_status_code = 401
+            return {"error": "Unauthorized"}
+
+    try:
+        payload = json.loads(frappe.request.data)
+    except Exception:
+        frappe.response.http_status_code = 400
+        return {"error": "Invalid JSON"}
+
+    event_type = frappe.request.headers.get("X-Gitlab-Event", "")
+
+    if event_type != "Issue Hook":
+        return {"status": "ignored", "event": event_type}
+
+    try:
+        _handle_issue_webhook(payload)
+    except Exception:
+        frappe.log_error(frappe.get_traceback(), "GitLab Webhook Error")
+        frappe.response.http_status_code = 500
+        return {"error": "Internal error"}
+
+    return {"status": "ok"}
+
+
+def _handle_issue_webhook(payload):
+   
+    action        = payload.get("object_attributes", {}).get("action")
+    issue_attrs   = payload.get("object_attributes", {})
+    project_info  = payload.get("project", {})
+    gl_project_id = project_info.get("id")
+
+    project_doc_name = frappe.db.get_value(
+        "GitLab Project",
+        {"project_id": gl_project_id},
+        "name"
+    )
+
+    if not project_doc_name:
+        frappe.log_error(
+            title="GitLab Webhook - Unknown Project",
+            message=f"Project ID {gl_project_id} not found in GitLab Project doctype."
+        )
+        return
+
+    project_doc = frappe.get_doc("GitLab Project", project_doc_name)
+    issue_iid   = issue_attrs.get("iid")
+
+    if action == "delete":
+        existing = frappe.db.get_value(
+            "GitLab Issue",
+            {"issue_id": issue_iid, "gitlab_project": project_doc_name},
+            "name"
+        )
+        if existing:
+            frappe.delete_doc("GitLab Issue", existing, ignore_permissions=True)
+            frappe.db.commit()
+        return
+
+    # ── CREATE / UPDATE / CLOSE / REOPEN ─────────────────────────────────
+    milestone_name = _resolve_milestone_from_webhook(issue_attrs, project_doc_name)
+
+    assignee_name     = ""
+    assignee_username = ""
+    assignee_email    = ""
+
+    assignees = payload.get("assignees", [])
+    if assignees:
+        first = assignees[0]
+        assignee_name     = first.get("name", "")
+        assignee_username = first.get("username", "")
+        assignee_id       = first.get("id")
+        assignee_email    = get_user_email(assignee_id) or ""
+
+    labels_list = [lbl.get("title", "") for lbl in payload.get("labels", [])]
+    labels_str  = ", ".join(filter(None, labels_list))
+
+    state = issue_attrs.get("state", "opened")
+
+    data = {
+        "title"          : issue_attrs.get("title", ""),
+        "description"    : issue_attrs.get("description", ""),
+        "state"          : state,
+        "due_date"       : issue_attrs.get("due_date") or None,
+        "assignee"       : assignee_name,
+        "assignee_email" : assignee_email,
+        "gitlab_username": assignee_username,
+        "issue_url"      : issue_attrs.get("url", ""),
+        "labels"         : labels_str,
+        "gitlab_milestone": milestone_name,
+    }
+
+    existing = frappe.db.get_value(
+        "GitLab Issue",
+        {"issue_id": issue_iid, "gitlab_project": project_doc_name},
+        "name"
+    )
+
+    if existing:
+        doc = frappe.get_doc("GitLab Issue", existing)
+        doc.update(data)
+        doc.save(ignore_permissions=True)
+    else:
+        if action == "open":
+            doc = frappe.new_doc("GitLab Issue")
+            doc.update(data)
+            doc.issue_id       = issue_iid
+            doc.gitlab_project = project_doc_name
+            doc.save(ignore_permissions=True)
+
+            _try_link_parent_from_webhook(
+                doc.name,
+                project_doc.namespace,
+                issue_iid
+            )
+
+    frappe.db.commit()
+
+
+def _resolve_milestone_from_webhook(issue_attrs, project_doc_name):
+   
+    milestone_id = issue_attrs.get("milestone_id")
+    if not milestone_id:
+        return None
+
+    milestone_name = frappe.db.get_value(
+        "GitLab Milestones",
+        {"milestone_id": int(milestone_id), "gitlab_project": project_doc_name},
+        "name"
+    )
+    return milestone_name or None
+
+
+def _try_link_parent_from_webhook(issue_doc_name, project_path, issue_iid):
+   
+    if not project_path:
+        return
+    try:
+        parent_info = get_issue_parent(project_path, issue_iid)
+        if parent_info and parent_info.get("iid"):
+            parent_doc_name = frappe.db.get_value(
+                "GitLab Issue",
+                {"issue_id": parent_info["iid"]},
+                "name"
+            )
+            if parent_doc_name:
+                doc = frappe.get_doc("GitLab Issue", issue_doc_name)
+                doc.parent_issue = parent_doc_name
+                doc.save(ignore_permissions=True)
+    except Exception:
+        frappe.log_error(frappe.get_traceback(), "Webhook Parent Link Error")
