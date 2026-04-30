@@ -6,7 +6,9 @@
  "engine": "InnoDB",
  "field_order": [
   "gitlab_url",
-  "access_token"
+  "access_token",
+  "webhook_base_url",
+  "webhook_secret"
  ],
  "fields": [
   {
@@ -18,15 +20,25 @@
    "fieldname": "access_token",
    "fieldtype": "Password",
    "label": "Access Token"
+  },
+  {
+   "fieldname": "webhook_secret",
+   "fieldtype": "Password",
+   "label": "Webhook Secret Token"
+  },
+  {
+   "fieldname": "webhook_base_url",
+   "fieldtype": "Data",
+   "label": "Webhook Base URL"
   }
  ],
  "grid_page_length": 50,
  "index_web_pages_for_search": 1,
  "issingle": 1,
  "links": [],
- "modified": "2025-07-02 17:15:14.344077",
- "modified_by": "Administrator",
- "module": "GitLab Integration",
+ "modified": "2026-04-27 12:45:30.309940",
+ "modified_by": "kalsoom.akhtar@phamos.eu",
+ "module": "Gitlab Integration",
  "name": "GitLab Settings",
  "owner": "Administrator",
  "permissions": [

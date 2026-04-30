@@ -114,8 +114,6 @@ def create_gitlab_group(group_name, customer_doc=None):
     }
 
     files = None
-
-    # ✅ Image attach
     if customer_doc:
         image_content = get_customer_image_file(customer_doc)
         if image_content:
@@ -131,24 +129,13 @@ def create_gitlab_group(group_name, customer_doc=None):
     )
 
     response.raise_for_status()
-    group = response.json()
-
-    # ERPNext save
-    if not frappe.db.exists("GitLab Group", {"group_id": group["id"]}):
-        doc = frappe.new_doc("GitLab Group")
-        doc.group_id = group["id"]
-        doc.title = group["name"]
-        doc.path = group["path"]
-        doc.full_path = group.get("full_path")
-        doc.web_url = group["web_url"]
-        doc.insert(ignore_permissions=True)
-
-    return group
+    return response.json() 
 
 
 def create_gitlab_project(project_name, group_id, customer_doc=None):
     settings = frappe.get_single("GitLab Settings")
-    url = f"{settings.gitlab_url.rstrip('/')}/api/v4/projects"
+    base_url = settings.gitlab_url.rstrip('/')
+    url = f"{base_url}/api/v4/projects"
 
     data = {
         "name": project_name,
@@ -159,8 +146,6 @@ def create_gitlab_project(project_name, group_id, customer_doc=None):
     }
 
     files = None
-
-    # ✅ Image attach
     if customer_doc:
         image_content = get_customer_image_file(customer_doc)
         if image_content:
@@ -177,22 +162,38 @@ def create_gitlab_project(project_name, group_id, customer_doc=None):
 
     response.raise_for_status()
     project = response.json()
+    project_id = project["id"]
 
-    # ERPNext save
-    if not frappe.db.exists("GitLab Project", {"project_id": project["id"]}):
-        doc = frappe.new_doc("GitLab Project")
-        doc.project_id = project["id"]
-        doc.title = project["name"]
-        doc.path = project["path"]
-        doc.web_url = project["web_url"]
-        doc.namespace = project.get("namespace", {}).get("full_path")
-        group_doc_name = frappe.db.get_value(
-            "GitLab Group",
-            {"group_id": group_id},
-            "name"
+    # ── Webhook register for new project ──
+    try:
+        webhook_secret = get_decrypted_password(
+            "GitLab Settings", "GitLab Settings", "webhook_secret"
         )
-        doc.group = group_doc_name
-        doc.insert(ignore_permissions=True)
+    except Exception:
+        webhook_secret = None
+
+    if settings.webhook_base_url:
+        webhook_url = f"{settings.webhook_base_url}/api/method/phamos.gitlab_integration.gitlab_utils.gitlab_webhook_receiver"
+
+        webhook_payload = {
+            "url": webhook_url,
+            "issues_events": True,
+            "enable_ssl_verification": False,
+        }
+        if webhook_secret:
+            webhook_payload["token"] = webhook_secret
+
+        hook_resp = requests.post(
+            f"{base_url}/api/v4/projects/{project_id}/hooks",
+            json=webhook_payload,
+            headers=get_gitlab_headers()
+        )
+
+        if hook_resp.status_code != 201:
+            frappe.log_error(
+                title="GitLab Webhook Register Failed",
+                message=f"Project: {project_name}, Response: {hook_resp.text}"
+            )
 
     return project
 
