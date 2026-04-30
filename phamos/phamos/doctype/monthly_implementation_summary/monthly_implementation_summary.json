@@ -93,7 +93,7 @@
    "fieldname": "sales_order",
    "fieldtype": "Link",
    "label": "Sales Order",
-   "link_filters": "[\n  [\"Sales Order\", \"docstatus\", \"=\", 1],\n  [\"Sales Order\", \"custom_implementation\", \"=\", \"eval:doc.implementation\"],\n  [\"Sales Order\", \"status\", \"!=\", \"Completed\"]\n]",
+   "link_filters": "[\n  [\"Sales Order\", \"docstatus\", \"=\", 1],\n  [\"Sales Order\", \"custom_implementation\", \"=\", \"eval:doc.implementation\"],\n  [\"Sales Order\", \"status\", \"not in\", [\"Completed\", \"Closed\", \"On Hold\"]]\n]",
    "no_copy": 1,
    "options": "Sales Order"
   },
