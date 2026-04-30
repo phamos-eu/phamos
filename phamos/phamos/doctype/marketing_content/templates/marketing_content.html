@@ -160,16 +160,37 @@
 
   /* Organizer */
   .pe-organizer { display: flex; align-items: center; gap: .55rem; }
+  .pe-org-logo {
+    width: 56px; height: 56px;
+    border-radius: 8px;
+    border: 1px solid var(--pe-border);
+    background: #fff;
+    display: flex; align-items: center; justify-content: center;
+    overflow: hidden; margin-bottom: .5rem;
+  }
+  .pe-org-logo img { width: 100%; height: 100%; object-fit: contain; padding: 4px; }
   .pe-org-avatar {
-    width: 30px; height: 30px; border-radius: 50%;
+    width: 28px; height: 28px; border-radius: 50%;
     background: #f0ede8; flex-shrink: 0;
     display: flex; align-items: center; justify-content: center;
-    color: var(--pe-muted);
+    color: var(--pe-muted); overflow: hidden;
   }
-  .pe-org-name  { font-size: .82rem; font-weight: 600; margin: 0 0 .1rem; color: #1c1917; }
-  .pe-org-email { font-size: .74rem; margin: 0; }
+  .pe-org-name    { font-size: .82rem; font-weight: 600; margin: 0 0 .1rem; color: #1c1917; }
+  .pe-org-email   { font-size: .74rem; margin: 0; }
   .pe-org-email a { color: var(--pe-accent); text-decoration: none; }
   .pe-org-email a:hover { text-decoration: underline; }
+  .pe-org-website { font-size: .74rem; margin: .1rem 0 0; }
+  .pe-org-website a { color: var(--pe-accent); text-decoration: none; }
+  .pe-org-website a:hover { text-decoration: underline; }
+  .pe-contact-person {
+    margin-top: .65rem; padding-top: .65rem;
+    border-top: 1px solid var(--pe-border);
+  }
+  .pe-contact-label {
+    font-size: .6rem; font-weight: 700; text-transform: uppercase;
+    letter-spacing: .08em; color: var(--pe-muted); margin-bottom: .3rem;
+  }
+  .pe-org-phone { font-size: .74rem; margin: .1rem 0 0; color: #1c1917; }
 
   /* ── Sidebar info card ───────────────────────── */
   .pe-sidebar-card {
@@ -347,21 +368,50 @@
       {# ── RSVP + Organizer ────────────────────── #}
       <div class="pe-bottom-cards">
 
-        {% if organizer_name or organizer_email %}
+        {% if organizer_name or organizer_email or organizer_website_link or organizer_logo or contact_person or contact_person_email or contact_person_phone %}
         <div class="pe-card">
           <div class="pe-card-header">Organizer</div>
           <div class="pe-card-body">
-            <div class="pe-organizer">
-              <div class="pe-org-avatar">
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+            {% if organizer_logo %}
+              <div class="pe-org-logo">
+                <img src="{{ organizer_logo }}" alt="{{ organizer_name }}">
               </div>
+            {% endif %}
+            <div class="pe-organizer">
+              {% if not organizer_logo %}
+              <div class="pe-org-avatar">
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+              </div>
+              {% endif %}
               <div>
                 {% if organizer_name %}<p class="pe-org-name">{{ organizer_name }}</p>{% endif %}
                 {% if organizer_email %}
                   <p class="pe-org-email"><a href="mailto:{{ organizer_email }}">{{ organizer_email }}</a></p>
                 {% endif %}
+                {% if organizer_website_link %}
+                  <p class="pe-org-website"><a href="{{ organizer_website_link }}" target="_blank" rel="noopener">{{ organizer_website_link }}</a></p>
+                {% endif %}
               </div>
             </div>
+            {% if contact_person or contact_person_email or contact_person_phone %}
+            <div class="pe-contact-person">
+              <div class="pe-contact-label">Contact Person</div>
+              <div class="pe-organizer">
+                <div class="pe-org-avatar">
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+                </div>
+                <div>
+                  {% if contact_person %}<p class="pe-org-name">{{ contact_person }}</p>{% endif %}
+                  {% if contact_person_email %}
+                    <p class="pe-org-email"><a href="mailto:{{ contact_person_email }}">{{ contact_person_email }}</a></p>
+                  {% endif %}
+                  {% if contact_person_phone %}
+                    <p class="pe-org-phone"><a href="tel:{{ contact_person_phone }}" style="color:inherit;text-decoration:none;">{{ contact_person_phone }}</a></p>
+                  {% endif %}
+                </div>
+              </div>
+            </div>
+            {% endif %}
           </div>
         </div>
         {% endif %}

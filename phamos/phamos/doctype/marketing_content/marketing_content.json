@@ -25,8 +25,14 @@
   "intro",
   "description",
   "section_organizer",
+  "organizer_logo",
   "organizer_name",
   "organizer_email",
+  "organizer_website_link",
+  "column_break_organizer",
+  "contact_person",
+  "contact_person_email",
+  "contact_person_phone",
   "section_counts",
   "going_count",
   "maybe_count",
@@ -150,6 +156,12 @@
    "label": "Organizer"
   },
   {
+   "fieldname": "organizer_logo",
+   "fieldtype": "Attach Image",
+   "label": "Organizer Logo",
+   "description": "Small logo shown on the event page beside the organizer name"
+  },
+  {
    "fieldname": "organizer_name",
    "fieldtype": "Data",
    "label": "Organizer Name"
@@ -159,6 +171,37 @@
    "fieldtype": "Data",
    "options": "Email",
    "label": "Organizer Email"
+  },
+  {
+   "fieldname": "organizer_website_link",
+   "fieldtype": "Data",
+   "options": "URL",
+   "label": "Organizer Website Link",
+   "description": "Public website of the organizing company or person"
+  },
+  {
+   "fieldname": "column_break_organizer",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "contact_person",
+   "fieldtype": "Data",
+   "label": "Contact Person",
+   "description": "Name of the person attendees can reach out to"
+  },
+  {
+   "fieldname": "contact_person_email",
+   "fieldtype": "Data",
+   "options": "Email",
+   "label": "Contact Person Email",
+   "description": "Email address for event-specific inquiries"
+  },
+  {
+   "fieldname": "contact_person_phone",
+   "fieldtype": "Data",
+   "options": "Phone",
+   "label": "Contact Person Phone",
+   "description": "Phone number for event-specific inquiries"
   },
   {
    "fieldname": "section_counts",
@@ -223,7 +266,7 @@
  ],
  "has_web_view": 1,
  "is_published_field": "published",
- "modified": "2026-03-25 00:00:00.000000",
+ "modified": "2026-04-30 00:00:00.000000",
  "modified_by": "Administrator",
  "module": "Phamos",
  "name": "Marketing Content",
