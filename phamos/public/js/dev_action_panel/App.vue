@@ -155,20 +155,10 @@ async function onStop({ result, percentBillable, activityType }) {
   if (r.message) { stopTick(); activeSession.value = null; elapsedSeconds.value = 0; await Promise.all([loadIssues(), loadStats()]); frappe.show_alert({ message: __("Session submitted."), indicator: "green" }); }
 }
 
-function onSync() {
+async function onSync() {
   syncing.value = true;
-  frappe.call({
-    method: "phamos.gitlab_integration.gitlab_utils.sync_gitlab_data",
-    callback: async () => {
-      await loadIssues();
-      syncing.value = false;
-      frappe.show_alert({ message: __("Sync complete"), indicator: "green" });
-    },
-    error: () => {
-      syncing.value = false;
-      // Frappe already shows the server error dialog with details
-    },
-  });
+  await loadIssues();
+  syncing.value = false;
 }
 
 onMounted(async () => { await Promise.all([loadIssues(), loadSession(), loadStats()]); });
