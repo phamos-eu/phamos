@@ -45,18 +45,18 @@ def get_user_email(user_id):
     _user_email_cache[user_id] = None
     return None
 
-def get_all_projects():
+def get_all_projects(page=1, per_page=100):
     settings = frappe.get_single("GitLab Settings")
-    url = f"{settings.gitlab_url}/api/v4/projects?membership=true"
+    url = f"{settings.gitlab_url}/api/v4/projects?membership=true&page={page}&per_page={per_page}"
     
     response = requests.request("GET", url, headers=get_gitlab_headers())
 
     response.raise_for_status()
     return response.json()
 
-def get_all_groups():
+def get_all_groups(page=1, per_page=100):
     settings = frappe.get_single("GitLab Settings")
-    url = f"{settings.gitlab_url}/api/v4/groups?all_available=true"
+    url = f"{settings.gitlab_url}/api/v4/groups?all_available=true&page={page}&per_page={per_page}"
     
     response = requests.request("GET", url, headers=get_gitlab_headers())
 
@@ -321,6 +321,12 @@ def sync_projects_only():
         doc.title = project["name"]
         doc.namespace = project.get("path_with_namespace")
         doc.web_url = project["web_url"]
+        namespace = project.get("namespace", {})
+        if namespace.get("kind") == "group":
+            group_name = frappe.db.get_value("GitLab Group", {"group_id": namespace["id"]}, "name")
+            doc.group = group_name or None
+        else:
+            doc.group = None
         doc.save(ignore_permissions=True)
 
     frappe.db.commit()

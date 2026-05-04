@@ -3,7 +3,9 @@
 
 frappe.ui.form.on("GitLab Settings", {
     refresh(frm) {
-        
+
+        let sync_group = __("GitLab Sync");
+
         frm.add_custom_button('Sync Groups', function () {
             frappe.call({
                 method: 'phamos.gitlab_integration.gitlab_utils.sync_groups_only',
@@ -11,7 +13,8 @@ frappe.ui.form.on("GitLab Settings", {
                     frappe.msgprint(r.message || "Groups synced!");
                 }
             });
-        });
+        }, sync_group);
+
         frm.add_custom_button('Sync Projects', function () {
             frappe.call({
                 method: 'phamos.gitlab_integration.gitlab_utils.sync_projects_only',
@@ -19,7 +22,8 @@ frappe.ui.form.on("GitLab Settings", {
                     frappe.msgprint(r.message || "Projects synced!");
                 }
             });
-        });
+        }, sync_group);
+
         frm.add_custom_button('Sync All Issues', function () {
             frappe.call({
                 method: 'phamos.gitlab_integration.gitlab_utils.sync_all_issues',
@@ -27,7 +31,8 @@ frappe.ui.form.on("GitLab Settings", {
                     frappe.msgprint(r.message || "All issues synced!");
                 }
             });
-        });
+        }, sync_group);
+
         frm.add_custom_button('Sync Milestones', function () {
             frappe.call({
                 method: 'phamos.gitlab_integration.gitlab_utils.sync_gitlab_milestones',
@@ -35,7 +40,8 @@ frappe.ui.form.on("GitLab Settings", {
                     frappe.msgprint(r.message || "Milestones synced!");
                 }
             });
-        });
+        }, sync_group);
+
         frm.add_custom_button('Sync Labels', function () {
             frappe.call({
                 method: 'phamos.gitlab_integration.gitlab_utils.sync_gitlab_labels',
@@ -43,7 +49,8 @@ frappe.ui.form.on("GitLab Settings", {
                     frappe.msgprint(r.message || "Labels synced!");
                 }
             });
-        });
+        }, sync_group);
+
         frm.add_custom_button('Set Webhooks', function () {
             frappe.call({
                 method: 'phamos.gitlab_integration.gitlab_utils.register_webhooks_for_all_projects',
@@ -51,6 +58,7 @@ frappe.ui.form.on("GitLab Settings", {
                     frappe.msgprint(r.message || "Webhooks registered!");
                 }
             });
-        });
-	},
+        }, sync_group);
+
+    },
 });
