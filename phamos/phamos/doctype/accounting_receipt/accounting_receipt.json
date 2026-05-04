@@ -28,6 +28,8 @@
   "column_break_pvwrj",
   "supplier_name",
   "purchase_invoice",
+  "is_return",
+  "return_against",
   "time_sheet_list_section",
   "timesheets",
   "section_break_emmu",
@@ -165,6 +167,20 @@
    "options": "Purchase Invoice"
   },
   {
+   "default": "0",
+   "fieldname": "is_return",
+   "fieldtype": "Check",
+   "label": "Is Return"
+  },
+  {
+   "depends_on": "eval:doc.is_return == 1",
+   "description": "The original Accounting Receipt this return is issued against",
+   "fieldname": "return_against",
+   "fieldtype": "Link",
+   "label": "Return Against",
+   "options": "Accounting Receipt"
+  },
+  {
    "fieldname": "payment_section",
    "fieldtype": "Section Break",
    "label": "Payment Section"
@@ -200,7 +216,8 @@
    "fieldtype": "Column Break"
   },
   {
-   "description": "Due date to when the receipt should be payed",
+   "depends_on": "eval:!doc.is_return",
+   "description": "Due date to when the receipt should be paid",
    "fieldname": "due_date",
    "fieldtype": "Date",
    "label": "Due Date"
@@ -361,7 +378,7 @@
  "index_web_pages_for_search": 1,
  "is_submittable": 0,
  "links": [],
- "modified": "2026-03-02 15:05:36.281984",
+ "modified": "2026-04-30 13:30:31.878140",
  "modified_by": "Administrator",
  "module": "Phamos",
  "name": "Accounting Receipt",
