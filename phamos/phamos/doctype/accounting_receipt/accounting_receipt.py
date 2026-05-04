@@ -22,6 +22,9 @@ class AccountingReceipt(Document):
 		Fetch and apply correct exchange rate based on posting_date
 		and compute converted sum in company currency.
 		"""
+		if self.is_return:
+			self.due_date = None
+
 		company = self.company or get_default_company()
 		if not company or not self.currency:
 			return
@@ -49,6 +52,8 @@ class AccountingReceipt(Document):
 		"""
 			Create a Purchase Invoice from Accounting Receipt
 		"""
+		is_return = bool(self.is_return)
+
 		pi = frappe.new_doc("Purchase Invoice")
 		pi.posting_date = today()
 		company = get_default_company()
@@ -57,12 +62,22 @@ class AccountingReceipt(Document):
 		pi.currency = self.currency
 		pi.exchange_rate = self.conversion_rate
 		pi.expense_account = self.payment_account
+
+		if is_return:
+			pi.is_return = 1
+			if self.return_against:
+				original_pi = frappe.db.get_value(
+					"Accounting Receipt", self.return_against, "purchase_invoice"
+				)
+				if original_pi:
+					pi.return_against = original_pi
+
 		pi.append(
 			"items",
 			{
 				"item_code": self.item,
-				"qty": 1,
-				"rate": self.total_billing_amount,
+				"qty": -1 if is_return else 1,
+				"rate": abs(self.total_billing_amount or 0),
 				"project": self.project,
 				"expense_account": self.payment_account
 			},
