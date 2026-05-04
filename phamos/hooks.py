@@ -174,7 +174,12 @@ doc_events = {
     },
     "Customer": {
         "on_update": "phamos.gitlab_integration.gitlab_group_utils.update_gitlab_avatar_on_customer"
-    }
+    },
+    "Interview Feedback": {
+        "on_update": "phamos.phamos.hr.interview_summary.trigger_interview_summary",
+        "on_submit": "phamos.phamos.hr.interview_summary.trigger_interview_summary",
+        "on_cancel": "phamos.phamos.hr.interview_summary.trigger_interview_summary",
+    },
 }
 
 
