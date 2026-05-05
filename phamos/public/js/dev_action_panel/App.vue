@@ -4,11 +4,16 @@ import Sidebar from "./components/Sidebar.vue";
 import StatsBar from "./components/StatsBar.vue";
 import FilterBar from "./components/FilterBar.vue";
 import IssueList from "./components/IssueList.vue";
+import BreakModal from "./components/BreakModal.vue";
+import BreakConfirm from "./components/BreakConfirm.vue";
 
 const issues = ref([]);
 const stats = ref(null);
 const loading = ref(false);
 const syncing = ref(false);
+const showBreakConfirm = ref(false);
+const showBreakModal = ref(false);
+const breakFrom = ref(null); // system-tz string set when timer is paused
 const activeSession = ref(null);
 const elapsedSeconds = ref(0);
 const sidebarOpen = ref(true);
@@ -121,7 +126,15 @@ function stopTick() { clearInterval(timerInterval); timerInterval = null; }
 
 // API
 async function loadIssues() { loading.value = true; const r = await frappe.call({ method: "phamos.phamos.page.dev_action_panel.dev_action_panel.get_my_issues" }); issues.value = r.message || []; loading.value = false; }
-async function loadSession() { const r = await frappe.call({ method: "phamos.phamos.page.dev_action_panel.dev_action_panel.get_active_session" }); activeSession.value = r.message || null; if (activeSession.value) { elapsedSeconds.value = activeSession.value.elapsed_seconds || 0; startTick(); } }
+async function loadSession() {
+  const r = await frappe.call({ method: "phamos.phamos.page.dev_action_panel.dev_action_panel.get_active_session" });
+  activeSession.value = r.message || null;
+  if (activeSession.value) {
+    elapsedSeconds.value = activeSession.value.elapsed_seconds || 0;
+    if (activeSession.value.session_state === "running") startTick();
+    if (activeSession.value.session_state === "paused") breakFrom.value = activeSession.value.break_from || null;
+  }
+}
 async function loadStats() { const r = await frappe.call({ method: "phamos.phamos.page.dev_action_panel.dev_action_panel.get_time_stats" }); stats.value = r.message || null; }
 
 // Inline start (emitted from card with { issue, expectedTime })
@@ -135,15 +148,72 @@ async function onStart({ issue, expectedTime, goal }) {
 
 async function onPause() {
   if (!activeSession.value) return;
-  await frappe.call({ method: "phamos.phamos.page.dev_action_panel.dev_action_panel.pause_timer", args: { name: activeSession.value.name } });
+  const r = await frappe.call({ method: "phamos.phamos.page.dev_action_panel.dev_action_panel.pause_timer", args: { name: activeSession.value.name } });
+  breakFrom.value = r.message?.break_from || null;
   activeSession.value = { ...activeSession.value, session_state: "paused" };
-  stopTick(); await loadIssues();
+  stopTick();
+  await loadIssues();
 }
+
 async function onResume() {
   if (!activeSession.value) return;
+  if (breakFrom.value) {
+    showBreakConfirm.value = true;
+  } else {
+    await doResume();
+  }
+}
+
+function onBreakConfirmYes() {
+  showBreakConfirm.value = false;
+  showBreakModal.value = true;
+}
+
+async function onBreakConfirmNo() {
+  showBreakConfirm.value = false;
+  breakFrom.value = null;
+  await doResume();
+}
+
+function onBreakConfirmClose() {
+  // Dismissed without choosing — session stays paused, no rows written
+  showBreakConfirm.value = false;
+}
+
+function onBreakModalClose() {
+  // Dismissed without choosing — session stays paused, no rows written
+  showBreakModal.value = false;
+}
+
+async function doResume() {
   await frappe.call({ method: "phamos.phamos.page.dev_action_panel.dev_action_panel.resume_timer", args: { name: activeSession.value.name } });
   activeSession.value = { ...activeSession.value, session_state: "running" };
-  startTick(); await loadIssues();
+  startTick();
+  await loadIssues();
+}
+
+async function onBreakSubmit({ project, activityType, goal, result, percentBillable }) {
+  showBreakModal.value = false;
+  await frappe.call({
+    method: "phamos.phamos.page.dev_action_panel.dev_action_panel.create_break_timesheet",
+    args: {
+      from_time: breakFrom.value,
+      project,
+      goal,
+      result,
+      percent_billable: percentBillable,
+      activity_type: activityType || null,
+    },
+  });
+  breakFrom.value = null;
+  await doResume();
+  frappe.show_alert({ message: __("Break timesheet submitted."), indicator: "green" });
+}
+
+async function onBreakSkip() {
+  showBreakModal.value = false;
+  breakFrom.value = null;
+  await doResume();
 }
 
 // Inline stop (emitted from card with { result, percentBillable })
@@ -166,6 +236,21 @@ onUnmounted(() => { stopTick(); });
 </script>
 
 <template>
+  <BreakConfirm
+    v-if="showBreakConfirm && breakFrom"
+    :break-from="breakFrom"
+    @confirm="onBreakConfirmYes"
+    @skip="onBreakConfirmNo"
+    @close="onBreakConfirmClose"
+  />
+  <BreakModal
+    v-if="showBreakModal && breakFrom"
+    :break-from="breakFrom"
+    @confirm="onBreakSubmit"
+    @skip="onBreakSkip"
+    @close="onBreakModalClose"
+  />
+
   <div class="dc-root">
     <!-- Top bar: hamburger + title -->
     <div class="dc-topbar">
