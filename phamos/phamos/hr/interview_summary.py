@@ -4,7 +4,7 @@ from frappe import _
 MISTRAL_CHAT_MODEL_DEFAULT = "mistral-small-latest"
 
 
-def trigger_interview_summary(doc, method=None):
+def trigger_interview_summary(doc, _method=None):
     """doc_events handler: regenerate AI summary on the parent Interview."""
     if not doc.interview:
         return
@@ -91,34 +91,34 @@ def generate_interview_ai_summary(interview_name):
 
     feedback_block = "\n".join(context_lines)
 
-    prompt = f"""You are a senior HR advisor writing a decision-support summary for management.
+    prompt = f"""You are an HR analyst preparing an interview summary for management review.
 
 Below are the interview feedbacks collected for a candidate.
 
 {feedback_block}
 
-Write a structured summary (max 400 words) using these sections:
+Write a clear, structured summary (max 350 words) using exactly these four sections:
 
-**Overall Recommendation** — State clearly: Hire / Hold for next round / Reject. Justify briefly.
+**Overall Recommendation** — Summarise the interviewers' collective assessment of the candidate (e.g. Hire / Hold / Reject) based purely on what the interviewers reported. Explain the reasoning briefly.
 
-**Key Strengths** — 3–5 concrete positives backed by the feedback data.
+**Key Strengths** — 3–5 concrete positives observed and noted by interviewers, backed by the feedback data.
 
-**Concerns & Gaps** — Honest assessment of risks, missing skills, or red flags raised by any interviewer.
+**Concerns & Gaps** — Factual account of any skill gaps, uncertainties, or concerns raised by interviewers.
 
-**Interviewer Consensus** — Do interviewers agree? Highlight any conflicting opinions and what they mean.
+**Interviewer Consensus** — Summarise where interviewers agree and where they differ. Highlight any conflicting opinions.
 
-**Suggested Next Steps** — Specific actions for management (e.g., proceed to offer, schedule technical round, reject with reason).
-
-Rules: Be factual and objective. Do not repeat raw numbers — interpret what the ratings mean in context. Write in professional business English. Use plain text with section headers as shown."""
+Rules: Do NOT include a "Suggested Next Steps" section or any action items. Management will decide next steps. Be factual and concise. Use markdown bold for section headers exactly as shown above. Use numbered lists for strengths and bullet points for concerns."""
 
     summary = _call_mistral_chat(settings, prompt)
     if not summary:
         return
 
+    summary = frappe.utils.markdown(summary)
+
     frappe.db.set_value(
         "Interview",
         interview_name,
-        "interview_summary",
+        "custom_interview_summary",
         summary,
         update_modified=False,
     )
