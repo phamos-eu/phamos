@@ -14,8 +14,9 @@
  "fields": [
   {
    "fieldname": "team",
-   "fieldtype": "Data",
-   "label": "Team"
+   "fieldtype": "Link",
+   "label": "Team",
+   "options": "Team"
   },
   {
    "fieldname": "date",
@@ -36,7 +37,7 @@
  "grid_page_length": 50,
  "index_web_pages_for_search": 1,
  "links": [],
- "modified": "2026-01-13 08:56:22.980730",
+ "modified": "2026-05-05 10:09:06.655932",
  "modified_by": "Administrator",
  "module": "Phamos",
  "name": "Team Capacity Ledger",
