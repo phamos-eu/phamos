@@ -63,28 +63,37 @@ def update_gitlab_avatar_on_customer(doc, method=None):
     if not doc.image:
         return
 
+    doc_before = doc.get_doc_before_save()
+    if doc_before and doc_before.image == doc.image:
+        return
+
     try:
-        # 🔹 Find linked group
         group = frappe.db.get_value(
             "GitLab Group",
             {"title": doc.name},
-            ["group_id"],
+            ["name", "group_id"],
             as_dict=True
         )
 
-        # 🔹 Find linked project
-        project = frappe.db.get_value(
-            "GitLab Project",
-            {"title": doc.name},
-            ["project_id"],
-            as_dict=True
-        )
+        if group:
+            update_gitlab_avatar(
+                group_id=group["group_id"],
+                project_id=None,
+                customer_doc=doc
+            )
 
-        update_gitlab_avatar(
-            group_id=group["group_id"] if group else None,
-            project_id=project["project_id"] if project else None,
-            customer_doc=doc
-        )
+            projects = frappe.db.get_all(
+                "GitLab Project",
+                {"group": group["name"]},
+                ["project_id"]
+            )
+
+            for project in projects:
+                update_gitlab_avatar(
+                    group_id=None,
+                    project_id=project["project_id"],
+                    customer_doc=doc
+                )
 
     except Exception:
         frappe.log_error(
@@ -198,27 +207,99 @@ def create_gitlab_project(project_name, group_id, customer_doc=None):
     return project
 
 
-def create_group_and_project_if_not_exists(doc, method=None):
-    customer_name = doc.customer
+@frappe.whitelist()
+def create_gitlab_group_for_customer(customer_name):
     if not customer_name:
-        return
+        frappe.throw("Customer name is required")
 
     try:
         customer_doc = frappe.get_doc("Customer", customer_name)
 
+        # GitLab group create
         group = create_gitlab_group(customer_name, customer_doc)
 
-        project = create_gitlab_project(
-            customer_name,
-            group["id"],
-            customer_doc
-        )
+        #  GitLab Group record in erp
+        if not frappe.db.exists("GitLab Group", {"title": customer_name}):
+            gitlab_group_doc = frappe.get_doc({
+                "doctype": "GitLab Group",
+                "title": customer_name,
+                "group_id": group["id"],
+                "web_url": group["web_url"],
+                "full_path": group["full_path"],
+                "path": group["path"],
+                "customer": customer_name,
+            })
+            gitlab_group_doc.insert(ignore_permissions=True)
+            frappe.db.commit()
 
-        frappe.msgprint("Group & Project with image created successfully")
+        frappe.msgprint(f"GitLab Group '{customer_name}' successfully created!")
 
     except Exception:
         frappe.log_error(
-            title="GitLab Create Error",
+            title="GitLab Group Create Error",
             message=frappe.get_traceback()
         )
-        frappe.msgprint("Error while creating GitLab resources")
+        frappe.throw("Error while creating GitLab Group")
+
+@frappe.whitelist()
+def create_gitlab_project_for_implementation(implementation_name):
+    if not implementation_name:
+        frappe.throw("Implementation name is required")
+
+    try:
+        impl_doc = frappe.get_doc("Implementation", implementation_name)
+        customer_name = impl_doc.customer
+
+        if not customer_name:
+            frappe.throw("No customer linked to this Implementation")
+
+        customer_doc = frappe.get_doc("Customer", customer_name)
+
+        gitlab_group = frappe.db.get_value(
+            "GitLab Group",
+            {"title": customer_name},
+            ["group_id"],
+            as_dict=True
+        )
+
+        if not gitlab_group:
+            frappe.throw(f"No GitLab Group found for customer '{customer_name}'. Please create the group first.")
+
+        project = create_gitlab_project(
+            implementation_name,
+            gitlab_group["group_id"],
+            customer_doc
+        )
+
+        if not frappe.db.exists("GitLab Project", {"title": implementation_name}):
+            # Namespace/group resolve
+            group_link = None
+            namespace = project.get("namespace", {})
+            if namespace.get("kind") == "group":
+                group_link = frappe.db.get_value(
+                    "GitLab Group",
+                    {"group_id": namespace["id"]},
+                    "name"
+                )
+
+            gitlab_project_doc = frappe.get_doc({
+                "doctype": "GitLab Project",
+                "title": project["name"],
+                "project_id": project["id"],
+                "namespace": project.get("path_with_namespace"),
+                "web_url": project["web_url"],
+                "group": group_link or None,
+            })
+            gitlab_project_doc.insert(ignore_permissions=True)
+            frappe.db.commit()
+
+        frappe.msgprint(f"GitLab Project '{implementation_name}' successfully created!")
+
+    except frappe.ValidationError:
+        raise
+    except Exception:
+        frappe.log_error(
+            title="GitLab Project Create Error",
+            message=frappe.get_traceback()
+        )
+        frappe.throw("Error while creating GitLab Project")

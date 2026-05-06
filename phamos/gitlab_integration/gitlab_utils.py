@@ -709,10 +709,6 @@ def sync_gitlab_milestones():
 
 @frappe.whitelist()
 def register_webhooks_for_all_projects():
-    """
-    GitLab Project doctype se saare projects le aur
-    har project ke liye webhook automatically register kare.
-    """
     settings = frappe.get_single("GitLab Settings")
     
     if not settings.gitlab_url:
@@ -726,7 +722,7 @@ def register_webhooks_for_all_projects():
     except Exception:
         webhook_secret = None
 
-    # Webhook receiver URL — apna ngrok/server URL 
+    # Webhook receiver URL — ngrok/server URL 
     webhook_url = f"{settings.webhook_base_url}/api/method/phamos.gitlab_integration.gitlab_utils.gitlab_webhook_receiver"
 
     headers = get_gitlab_headers()
