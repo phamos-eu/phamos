@@ -111,12 +111,23 @@ def get_team_capacity(filters=None):
         s = week_start.strftime("%Y-%m-%d") + " 00:00:00"
         e = week_end.strftime("%Y-%m-%d") + " 23:59:59"
 
-        total_actual = frappe.db.sql("""
-            SELECT SUM(actual_time)
-            FROM `tabTimesheet Record`
-            WHERE from_time BETWEEN %s AND %s
-            AND docstatus = 1
-        """, (s, e))[0][0] or 0
+        team_join_condition = ""
+        team_values = [s, e]
+
+        if selected_team:
+            placeholders = ", ".join(["%s"] * len(selected_team))
+            team_join_condition = f"AND impl.team IN ({placeholders})"
+            team_values.extend(selected_team)
+
+        total_actual = frappe.db.sql(f"""
+            SELECT SUM(tr.actual_time)
+            FROM `tabTimesheet Record` tr
+            LEFT JOIN `tabProject` proj ON proj.name = tr.project
+            LEFT JOIN `tabImplementation` impl ON impl.name = proj.custom_implementation
+            WHERE tr.from_time BETWEEN %s AND %s
+            AND tr.docstatus = 1
+            {team_join_condition}
+        """, team_values)[0][0] or 0
 
         actual_line.append(round(total_actual / 3600, 2))
 
@@ -151,12 +162,23 @@ def get_team_capacity(filters=None):
                     s = week_start.strftime("%Y-%m-%d") + " 00:00:00"
                     e = week_end.strftime("%Y-%m-%d") + " 23:59:59"
 
-                    total_actual = frappe.db.sql("""
-                        SELECT SUM(actual_time)
-                        FROM `tabTimesheet Record`
-                        WHERE from_time BETWEEN %s AND %s
-                        AND docstatus = 1
-                    """, (s, e))[0][0] or 0
+                    team_join_condition = ""
+                    team_values = [s, e]
+
+                    if selected_team:
+                        placeholders = ", ".join(["%s"] * len(selected_team))
+                        team_join_condition = f"AND impl.team IN ({placeholders})"
+                        team_values.extend(selected_team)
+
+                    total_actual = frappe.db.sql(f"""
+                        SELECT SUM(tr.actual_time)
+                        FROM `tabTimesheet Record` tr
+                        LEFT JOIN `tabProject` proj ON proj.name = tr.project
+                        LEFT JOIN `tabImplementation` impl ON impl.name = proj.custom_implementation
+                        WHERE tr.from_time BETWEEN %s AND %s
+                        AND tr.docstatus = 1
+                        {team_join_condition}
+                    """, team_values)[0][0] or 0
 
                     historical_actual_line.append(round(total_actual / 3600, 2))
 
@@ -215,3 +237,13 @@ def shift_period(start, end, comparison_type):
         return shifted_start, shifted_end
 
     return None, None
+
+@frappe.whitelist()
+def get_all_teams(txt="", **kwargs):
+    teams = frappe.db.sql("""
+        SELECT name FROM `tabTeam`
+        WHERE name LIKE %s
+        ORDER BY name
+        LIMIT 50
+    """, f"%{txt}%", as_dict=1)
+    return [t.name for t in teams]
