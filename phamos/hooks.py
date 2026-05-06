@@ -53,6 +53,7 @@ doctype_js = {
     "User": "public/js/mailcow_user.js",
     "Event": "public/js/event.js",
     "Sales Invoice": "public/js/sales_invoice.js",
+    "Customer": "public/js/customer.js",
 
 }
 
@@ -168,9 +169,6 @@ doc_events = {
     },
     "Delivery Note": {
         "on_submit": "phamos.phamos.doctype.monthly_implementation_summary.monthly_implementation_summary.update_mis_timesheets_on_delivery_note_submit",
-    },
-    "Implementation": {
-        "after_insert": "phamos.gitlab_integration.gitlab_group_utils.create_group_and_project_if_not_exists"
     },
     "Customer": {
         "on_update": "phamos.gitlab_integration.gitlab_group_utils.update_gitlab_avatar_on_customer"
