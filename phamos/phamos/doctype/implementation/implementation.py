@@ -441,22 +441,6 @@ def get_gitlab_issues_count(custom_implementation: str):
         }
     )
 @frappe.whitelist()
-def get_gitlab_issues_count(custom_implementation: str):
-    """Return count of GitLab Issues linked via GitLab Projects of this Implementation."""
-    if not custom_implementation:
-        return 0
-
-    return frappe.db.count(
-        "GitLab Issue",
-        filters={
-            "gitlab_project": ["in", frappe.get_all(
-                "GitLab Project",
-                filters={"custom_implementation": custom_implementation},
-                pluck="name"
-            )]
-        }
-    )
-@frappe.whitelist()
 def get_gitlab_milestones_count(custom_implementation: str):
     """Return count of GitLab Milestones linked via GitLab Projects of this Implementation."""
     if not custom_implementation:
