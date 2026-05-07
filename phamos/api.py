@@ -810,3 +810,64 @@ def send_daily_birthday_wishes():
                     subject=f"Happy Work Anniversary 🏆 - {years_completed} Year{'s' if years_completed > 1 else ''}!",
                     message=message
                 )
+
+@frappe.whitelist()
+def get_gitlab_group_count(customer: str):
+    """Return count of GitLab Groups linked with this Customer."""
+    if not customer:
+        return 0
+
+    return frappe.db.count(
+        "GitLab Group",
+        filters={
+            "customer": customer
+        },
+    )
+
+@frappe.whitelist()
+def get_gitlab_project_count(customer: str):
+    if not customer:
+        return 0
+
+    gitlab_groups = frappe.get_all(
+        "GitLab Group",
+        filters={"customer": customer},
+        pluck="name"
+    )
+
+    if not gitlab_groups:
+        return 0
+
+    return frappe.db.count(
+        "GitLab Project",
+        filters={
+            "group": ["in", gitlab_groups]  
+        }
+    )
+
+@frappe.whitelist()
+def get_gitlab_issue_count(customer: str):
+    """Return count of GitLab Issues linked via Groups → Projects of this Customer."""
+    if not customer:
+        return 0
+
+    gitlab_groups = frappe.get_all(
+        "GitLab Group",
+        filters={"customer": customer},
+        pluck="name"
+    )
+    if not gitlab_groups:
+        return 0
+
+    gitlab_projects = frappe.get_all(
+        "GitLab Project",
+        filters={"group": ["in", gitlab_groups]},
+        pluck="name"
+    )
+    if not gitlab_projects:
+        return 0
+
+    return frappe.db.count(
+        "GitLab Issue",
+        filters={"gitlab_project": ["in", gitlab_projects]}
+    )
