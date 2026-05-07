@@ -236,7 +236,7 @@ async function onStop({ result, percentBillable, activityType, manualEndTime }) 
 
 async function onSync() {
   syncing.value = true;
-  await loadIssues();
+  await Promise.all([loadIssues(), loadStats()]);
   syncing.value = false;
 }
 
