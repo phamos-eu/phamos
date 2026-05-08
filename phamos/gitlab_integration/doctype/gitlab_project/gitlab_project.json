@@ -9,6 +9,7 @@
   "title",
   "project_id",
   "web_url",
+  "implementation",
   "description",
   "namespace",
   "group",
@@ -65,6 +66,12 @@
    "in_list_view": 1,
    "label": "ERPNext Project",
    "options": "Project"
+  },
+  {
+   "fieldname": "implementation",
+   "fieldtype": "Link",
+   "label": "Implementation",
+   "options": "Implementation"
   }
  ],
  "grid_page_length": 50,
@@ -79,7 +86,7 @@
    "link_fieldname": "gitlab_project"
   }
  ],
- "modified": "2026-04-29 12:00:12.271265",
+ "modified": "2026-05-08 08:00:39.961563",
  "modified_by": "Administrator",
  "module": "Gitlab Integration",
  "name": "GitLab Project",
