@@ -98,21 +98,21 @@ def sync_gitlab_labels():
                     break
 
                 for label in labels:
-                    label_id = label.get("id")
+                    label_name = label.get("name")
 
-                    # Check if already exists
+                    # Check by label name instead of ID
                     existing = frappe.db.get_value(
                         "GitLab Labels",
                         {
-                            "label_id": label_id,
+                            "name1": label_name,
                         },
                         "name"
                     )
 
                     data = {
                         "doctype": "GitLab Labels",
-                        "label_id": label_id,
-                        "name1": label.get("name"),
+                        "label_id": label.get("id"),
+                        "name1": label_name,
                         "text_color": label.get("text_color"),
                         "color": label.get("color"),
                         "priority": label.get("priority"),
@@ -120,8 +120,16 @@ def sync_gitlab_labels():
 
                     if existing:
                         doc = frappe.get_doc("GitLab Labels", existing)
-                        doc.update(data)
+
+                        # Optional:
+                        # only update empty fields
+                        doc.label_id = doc.label_id or data["label_id"]
+                        doc.text_color = doc.text_color or data["text_color"]
+                        doc.color = doc.color or data["color"]
+                        doc.priority = doc.priority or data["priority"]
+
                         doc.save(ignore_permissions=True)
+
                     else:
                         doc = frappe.get_doc(data)
                         doc.insert(ignore_permissions=True)
@@ -130,7 +138,7 @@ def sync_gitlab_labels():
 
                 page += 1
 
-        except Exception as e:
+        except Exception:
             frappe.log_error(frappe.get_traceback(), "GitLab Label Sync Failed")
 
     frappe.db.commit()
