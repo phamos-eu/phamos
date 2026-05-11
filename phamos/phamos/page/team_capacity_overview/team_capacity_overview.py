@@ -94,11 +94,69 @@ def get_team_capacity(filters=None):
 
     # Convert to list for chart
     teams = []
-    colors = ["#7cb5ec", "#434348", "#90ed7d", "#f7a35c", "#8085e9", "#f15c80"]
+    colors = ["#7cb5ec", "#F30BE7", "#90ed7d", "#f7a35c", "#8085e9", "#f15c80"]
+
     for i, (team_name, data) in enumerate(teams_dict.items()):
+
+        # ── Current Team Actual Time ──
+        actual_data = []
+
+        for w in week_buckets:
+
+            week_start = w["start"].date() if isinstance(w["start"], datetime) else w["start"]
+            week_end = w["end"].date() if isinstance(w["end"], datetime) else w["end"]
+
+            s = week_start.strftime("%Y-%m-%d") + " 00:00:00"
+            e = week_end.strftime("%Y-%m-%d") + " 23:59:59"
+
+            total_actual = frappe.db.sql("""
+                SELECT SUM(tr.actual_time)
+                FROM `tabTimesheet Record` tr
+                LEFT JOIN `tabProject` proj ON proj.name = tr.project
+                LEFT JOIN `tabImplementation` impl ON impl.name = proj.custom_implementation
+                WHERE tr.from_time BETWEEN %s AND %s
+                AND tr.docstatus = 1
+                AND impl.team = %s
+            """, (s, e, team_name))[0][0] or 0
+
+            actual_data.append(round(total_actual / 3600, 2))
+
+        # ── Historical Team Actual Time ──
+        historical_actual_data = []
+
+        if enable_comparison:
+
+            hist_start, hist_end = shift_period(from_dt, to_dt, comparison_type)
+
+            if hist_start and hist_end:
+
+                hist_weeks = generate_weeks(hist_start, hist_end)
+
+                for w in hist_weeks:
+
+                    week_start = w["start"].date() if isinstance(w["start"], datetime) else w["start"]
+                    week_end = w["end"].date() if isinstance(w["end"], datetime) else w["end"]
+
+                    s = week_start.strftime("%Y-%m-%d") + " 00:00:00"
+                    e = week_end.strftime("%Y-%m-%d") + " 23:59:59"
+
+                    total_actual = frappe.db.sql("""
+                        SELECT SUM(tr.actual_time)
+                        FROM `tabTimesheet Record` tr
+                        LEFT JOIN `tabProject` proj ON proj.name = tr.project
+                        LEFT JOIN `tabImplementation` impl ON impl.name = proj.custom_implementation
+                        WHERE tr.from_time BETWEEN %s AND %s
+                        AND tr.docstatus = 1
+                        AND impl.team = %s
+                    """, (s, e, team_name))[0][0] or 0
+
+                    historical_actual_data.append(round(total_actual / 3600, 2))
+
         teams.append({
             "name": team_name,
             "data": data,
+            "actual_data": actual_data,
+            "historical_actual_data": historical_actual_data,
             "color": colors[i % len(colors)]
         })
 
