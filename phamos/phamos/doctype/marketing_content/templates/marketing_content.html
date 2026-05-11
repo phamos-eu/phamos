@@ -556,7 +556,7 @@
 frappe.ready(function () {
   var eventName   = {{ doc.name | tojson }};
   var storageKey  = "pe_voted_" + eventName;
-  var currentVote = sessionStorage.getItem(storageKey);
+  var currentVote = localStorage.getItem(storageKey);
 
   var btnMap = {
     "Yes":   { btn: document.getElementById("btn-yes"),   count: document.getElementById("count-yes"),   cls: "active-yes"   },
@@ -578,12 +578,21 @@ frappe.ready(function () {
 
   if (currentVote) applyActiveState(currentVote);
 
+  // Always fetch fresh counts from backend on page load (Jinja-rendered values may be stale/cached)
+  frappe.call({
+    method: "phamos.phamos.doctype.marketing_content.marketing_content.get_interest_counts",
+    args: { event_name: eventName },
+    callback: function (r) {
+      if (r.message) updateCounts(r.message);
+    }
+  });
+
   Object.keys(btnMap).forEach(function (response) {
     btnMap[response].btn.addEventListener("click", function () {
       if (response === currentVote) return;
       var prev = currentVote;
       currentVote = response;
-      sessionStorage.setItem(storageKey, response);
+      localStorage.setItem(storageKey, response);
       applyActiveState(response);
       frappe.call({
         method: "phamos.phamos.doctype.marketing_content.marketing_content.submit_interest",

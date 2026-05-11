@@ -72,6 +72,15 @@ class MarketingContent(WebsiteGenerator):
 
 
 @frappe.whitelist(allow_guest=True)
+def get_interest_counts(event_name):
+    counts = frappe.db.get_value(
+        "Marketing Content", event_name,
+        ["going_count", "maybe_count", "not_going_count"], as_dict=True,
+    )
+    return counts or {"going_count": 0, "maybe_count": 0, "not_going_count": 0}
+
+
+@frappe.whitelist(allow_guest=True)
 def submit_interest(event_name, response, previous_response=None):
     allowed = {"Yes", "Maybe", "No"}
     if response not in allowed:
@@ -93,6 +102,7 @@ def submit_interest(event_name, response, previous_response=None):
         " WHERE name = %s", event_name,
     )
     frappe.db.commit()
+    frappe.clear_document_cache("Marketing Content", event_name)
     counts = frappe.db.get_value(
         "Marketing Content", event_name,
         ["going_count", "maybe_count", "not_going_count"], as_dict=True,

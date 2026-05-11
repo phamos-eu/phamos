@@ -60,6 +60,11 @@ frappe.ui.form.on("Accounting Receipt", {
             frm.page.set_inner_btn_group_as_primary(__("Create"));
         }
 
+        // Filter return_against by same supplier
+        frm.set_query("return_against", function () {
+            return { filters: { supplier: frm.doc.supplier || "", is_return: 0 } };
+        });
+
         // Hide PDF Preview if no attachment available or display it onload of document
         frm.toggle_display("pdf_preview", false);
         frm.trigger("attachment");
@@ -425,6 +430,12 @@ frappe.ui.form.on("Accounting Receipt", {
     getFileExtension: function (filename) {
         // Get extension of the file
         return filename.split('.').pop();
+    },
+
+    is_return: function (frm) {
+        if (frm.doc.is_return && frm.doc.due_date) {
+            frm.set_value("due_date", null);
+        }
     },
 
     make_purchase_invoice: function (frm) {

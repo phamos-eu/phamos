@@ -386,15 +386,10 @@ def get_customer_sales_order_status():
     
     # Process each sales order
     for so in sales_orders:
-        # Calculate delivered hours from delivery notes (matching Implementation doctype logic)
         delivered_hrs = frappe.db.sql("""
-            SELECT SUM(dni.qty) as delivered_qty
-            FROM `tabDelivery Note Item` dni
-            JOIN `tabDelivery Note` dn ON dn.name = dni.parent
-            WHERE 
-                dni.against_sales_order = %s
-                AND dn.docstatus = 1
-                AND dn.status IN ('Completed', 'To Bill')
+            SELECT SUM(delivered_qty) as delivered_qty
+            FROM `tabSales Order Item`
+            WHERE parent = %s
         """, so.name, as_dict=True)
         
         so.delivered_hrs = delivered_hrs[0].delivered_qty if delivered_hrs[0].delivered_qty else 0
