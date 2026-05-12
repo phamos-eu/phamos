@@ -13,13 +13,17 @@ required_apps = ["erpnext", "hrms"]
 
 # include js, css files in header of desk.html
 app_include_css = [
+    "/assets/phamos/css/sales_order_kpi.css",
     "/assets/phamos/css/dark_mode_fix.css"
-
 ]
 # app_include_js = "/assets/phamos/js/phamos.js"
+
 app_include_js = [
-    "phamos.bundle.js",
-    "https://code.highcharts.com/highcharts.js"
+    "https://code.highcharts.com/highcharts.js",
+    "/assets/phamos/js/have_a_great_day.js",
+    "/assets/phamos/js/custom_crm_activities.js",
+    "/assets/phamos/js/hybrid_meeting_composer.js",
+    "/assets/phamos/js/frappe_list_bulk_edit_override.js",  # Fixes null-label crash in bulk edit
 ]
 
 
@@ -49,6 +53,7 @@ doctype_js = {
     "User": "public/js/mailcow_user.js",
     "Event": "public/js/event.js",
     "Sales Invoice": "public/js/sales_invoice.js",
+    "Customer": "public/js/customer.js",
 
 }
 
@@ -143,7 +148,13 @@ website_route_rules = [
 #		"on_trash": "method"
 #	}
 # }
+
 doc_events = {
+	"Event": {
+		"after_insert": "phamos.mailcow_integration.caldav.sync_event.on_upsert",
+        "on_update": "phamos.mailcow_integration.caldav.sync_event.on_upsert",
+		"on_trash": "phamos.mailcow_integration.caldav.sync_event.on_delete",
+	},
     "Team": {
         "after_save": "phamos.phamos.doctype.team.team.create_team_capacity_ledger_entry"
     },
@@ -159,12 +170,16 @@ doc_events = {
     "Delivery Note": {
         "on_submit": "phamos.phamos.doctype.monthly_implementation_summary.monthly_implementation_summary.update_mis_timesheets_on_delivery_note_submit",
     },
+    "Customer": {
+        "on_update": "phamos.gitlab_integration.gitlab_group_utils.update_gitlab_avatar_on_customer"
+    },
     "Interview Feedback": {
         "on_update": "phamos.phamos.hr.interview_summary.trigger_interview_summary",
         "on_submit": "phamos.phamos.hr.interview_summary.trigger_interview_summary",
         "on_cancel": "phamos.phamos.hr.interview_summary.trigger_interview_summary",
     },
 }
+
 
 # Scheduled Tasks
 # ---------------
@@ -201,6 +216,7 @@ scheduler_events = {
     "daily": [
         "phamos.api.send_daily_timesheet_comment_summary",
         "phamos.phamos.doctype.team.team.update_all_teams_weekly_holidays",
+        # MIS: on 1st only — previous calendar month; see create_monthly_implementation_summaries docstring
         "phamos.phamos.doctype.monthly_implementation_summary.create_monthly_implementation_summaries.create_monthly_implementation_summaries",
         "phamos.api.send_daily_birthday_wishes"
     ],

@@ -1,0 +1,64 @@
+{
+ "actions": [],
+ "allow_rename": 1,
+ "creation": "2025-07-02 17:13:30.008113",
+ "doctype": "DocType",
+ "engine": "InnoDB",
+ "field_order": [
+  "gitlab_url",
+  "access_token",
+  "webhook_base_url",
+  "webhook_secret"
+ ],
+ "fields": [
+  {
+   "description": "Set the GitLab instance URL to be used for integration.",
+   "fieldname": "gitlab_url",
+   "fieldtype": "Data",
+   "label": "GitLab URL"
+  },
+  {
+   "description": "Set Access token for GitLab API authentication.",
+   "fieldname": "access_token",
+   "fieldtype": "Password",
+   "label": "Access Token"
+  },
+  {
+   "description": "Set the Secret token for GitLab webhook verification.",
+   "fieldname": "webhook_secret",
+   "fieldtype": "Password",
+   "label": "Webhook Secret Token"
+  },
+  {
+   "description": "Set the base URL of the instance that will receive and sync GitLab Webhooks.",
+   "fieldname": "webhook_base_url",
+   "fieldtype": "Data",
+   "label": "Webhook Base URL"
+  }
+ ],
+ "grid_page_length": 50,
+ "index_web_pages_for_search": 1,
+ "issingle": 1,
+ "links": [],
+ "modified": "2026-05-08 08:18:16.457383",
+ "modified_by": "Administrator",
+ "module": "Gitlab Integration",
+ "name": "GitLab Settings",
+ "owner": "Administrator",
+ "permissions": [
+  {
+   "create": 1,
+   "delete": 1,
+   "email": 1,
+   "print": 1,
+   "read": 1,
+   "role": "System Manager",
+   "share": 1,
+   "write": 1
+  }
+ ],
+ "row_format": "Dynamic",
+ "sort_field": "modified",
+ "sort_order": "DESC",
+ "states": []
+}
