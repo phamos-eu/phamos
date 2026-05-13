@@ -127,7 +127,6 @@ def subscribe_to_event(event_name, email):
         "parent": event_name,
         "parentfield": "responses",
         "email": email,
-        "gdpr_consent": 1,
         "subscribed_on": frappe.utils.now(),
     })
     child.insert(ignore_permissions=True)
