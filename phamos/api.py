@@ -36,10 +36,12 @@ def get_timesheets(from_date=None, to_date=None, project=None, offset=0, limit=2
     valid_sort_fields = {
         "timesheet": "ts.name",
         "start_date": "ts.start_date",
+        "employee_name": "ts.employee_name",
         "billing_status": "ts.custom_billing_status",
         "total_hours": "ts.total_hours",
         "billable_hours": "ts.total_billable_hours",
         "related_issue": "related_issue",
+        "activity_type": "activity_type",
         "comment": "ts.customer_comment",
         "creation": "ts.creation"
     }
@@ -58,8 +60,8 @@ def get_timesheets(from_date=None, to_date=None, project=None, offset=0, limit=2
         SELECT
             ts.name,
             ts.employee,
+            ts.employee_name,
             ts.custom_billing_status,
-            ts.project_owner,
             ts.total_hours,
             ts.total_billable_hours,
             ts.project_name,
@@ -74,7 +76,14 @@ def get_timesheets(from_date=None, to_date=None, project=None, offset=0, limit=2
                 WHERE td.parent = ts.name
                 ORDER BY td.idx
                 LIMIT 1
-            ) AS related_issue
+            ) AS related_issue,
+            (
+                SELECT activity_type
+                FROM `tabTimesheet Detail` td
+                WHERE td.parent = ts.name
+                ORDER BY td.idx
+                LIMIT 1
+            ) AS activity_type
         FROM `tabTimesheet` ts
         WHERE ts.docstatus IN (0, 1) {conditions}
         ORDER BY {order_field} {order_direction}
@@ -311,32 +320,31 @@ def get_sales_order_kpi_stats(sales_order):
         "billing_status": so.billing_status
     }
 
-
 @frappe.whitelist()
 def get_customer_sales_order_status():
     """Get sales order delivery status for customer portal
-    
+
     Returns all sales orders linked to implementations for the logged-in customer
     with delivery status information, summary metrics, and chart data
     """
     user = frappe.session.user
-    
+
     validate_guest_user()
     customer = get_customer_for_user(user)
     if not customer:
         frappe.throw("No Customer linked to user.", frappe.PermissionError)
-    
+
     frappe.log_error(f"Customer Portal - User: {user}, Customer: {customer}", "SO Status Debug")
-    
+
     # Get all implementations for this customer using SQL (bypasses permission check)
     implementations = frappe.db.sql("""
         SELECT name, status, department
         FROM `tabImplementation`
         WHERE customer = %s
     """, customer, as_dict=True)
-    
+
     frappe.log_error(f"Found {len(implementations)} implementations: {[i.name for i in implementations]}", "SO Status Debug")
-    
+
     if not implementations:
         return {
             "sales_orders": [],
@@ -353,12 +361,12 @@ def get_customer_sales_order_status():
                 "values": [0, 0, 0]
             }
         }
-    
+
     implementation_names = [impl.name for impl in implementations]
 
     # Get all OPEN sales orders for these implementations (matching Implementation doctype logic)
     sales_orders = frappe.db.sql("""
-        SELECT 
+        SELECT
             so.name,
             so.customer_name as title,
             so.status,
@@ -370,20 +378,20 @@ def get_customer_sales_order_status():
             so.grand_total,
             so.custom_implementation as implementation
         FROM `tabSales Order` so
-        WHERE 
+        WHERE
             so.custom_implementation IN %(implementations)s
             AND so.docstatus = 1
             AND so.status IN ('To Deliver and Bill', 'To Deliver', 'To Bill')
         ORDER BY so.transaction_date DESC
     """, {"implementations": implementation_names}, as_dict=True)
-    
+
     frappe.log_error(f"Found {len(sales_orders)} sales orders", "SO Status Debug")
-    
+
     total_so_hrs = 0
     total_delivered_hrs = 0
     total_timesheet_hrs = 0
     open_so_count = 0
-    
+
     # Process each sales order
     for so in sales_orders:
         delivered_hrs = frappe.db.sql("""
@@ -391,10 +399,10 @@ def get_customer_sales_order_status():
             FROM `tabSales Order Item`
             WHERE parent = %s
         """, so.name, as_dict=True)
-        
+
         so.delivered_hrs = delivered_hrs[0].delivered_qty if delivered_hrs[0].delivered_qty else 0
         so.remaining_hrs = so.total_hrs - so.delivered_hrs
-        
+
         # Add to totals
         total_so_hrs += so.total_hrs or 0
         total_delivered_hrs += so.delivered_hrs or 0
@@ -439,7 +447,7 @@ def get_customer_sales_order_status():
             float(total_remaining_hrs)
         ]
     }
-    
+
     result = {
         "sales_orders": sales_orders,
         "summary": {
@@ -452,7 +460,7 @@ def get_customer_sales_order_status():
         },
         "chart_data": chart_data
     }
-    
+
     frappe.log_error(f"Returning result with {len(sales_orders)} orders", "SO Status Debug")
     return result
 
@@ -802,3 +810,64 @@ def send_daily_birthday_wishes():
                     subject=f"Happy Work Anniversary 🏆 - {years_completed} Year{'s' if years_completed > 1 else ''}!",
                     message=message
                 )
+
+@frappe.whitelist()
+def get_gitlab_group_count(customer: str):
+    """Return count of GitLab Groups linked with this Customer."""
+    if not customer:
+        return 0
+
+    return frappe.db.count(
+        "GitLab Group",
+        filters={
+            "customer": customer
+        },
+    )
+
+@frappe.whitelist()
+def get_gitlab_project_count(customer: str):
+    if not customer:
+        return 0
+
+    gitlab_groups = frappe.get_all(
+        "GitLab Group",
+        filters={"customer": customer},
+        pluck="name"
+    )
+
+    if not gitlab_groups:
+        return 0
+
+    return frappe.db.count(
+        "GitLab Project",
+        filters={
+            "group": ["in", gitlab_groups]  
+        }
+    )
+
+@frappe.whitelist()
+def get_gitlab_issue_count(customer: str):
+    """Return count of GitLab Issues linked via Groups → Projects of this Customer."""
+    if not customer:
+        return 0
+
+    gitlab_groups = frappe.get_all(
+        "GitLab Group",
+        filters={"customer": customer},
+        pluck="name"
+    )
+    if not gitlab_groups:
+        return 0
+
+    gitlab_projects = frappe.get_all(
+        "GitLab Project",
+        filters={"group": ["in", gitlab_groups]},
+        pluck="name"
+    )
+    if not gitlab_projects:
+        return 0
+
+    return frappe.db.count(
+        "GitLab Issue",
+        filters={"gitlab_project": ["in", gitlab_projects]}
+    )

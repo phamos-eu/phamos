@@ -52,6 +52,42 @@ frappe.ui.form.on("Implementation", {
     },
     refresh: function (frm) {
         frm.trigger("render_auto_email_reports_section");
+        frm.trigger("render_gitlab_projects_section");
+        frm.trigger("render_gitlab_issues_section");
+        frm.trigger("render_gitlab_milestones_section");
+
+        if (!document.getElementById("gitlab-custom-style")) {
+            const style = document.createElement("style");
+            style.id = "gitlab-custom-style";
+            style.innerHTML = `
+                .gitlab-project-connection .document-link {
+                    display: flex;
+                    align-items: center;
+                }
+
+                .gitlab-project-connection .document-link-badge {
+                    display: flex;
+                    align-items: center;
+                    gap: 6px;
+                }
+
+                .gitlab-project-connection .btn-new {
+                    height: 22px;
+                    width: 22px;
+                    padding: 0;
+                    display: flex;
+                    align-items: center;
+                    justify-content: center;
+                }
+
+                .gitlab-project-connection .btn-new svg {
+                    width: 12px;
+                    height: 12px;
+                }
+            `;
+            document.head.appendChild(style);
+        }
+
         // Sort resource_planning_prediction by date (descending - newest first)
         if (frm.doc.resource_planning_prediction && frm.doc.resource_planning_prediction.length > 0) {
             frm.doc.resource_planning_prediction.sort((a, b) => {
@@ -160,7 +196,7 @@ frappe.ui.form.on("Implementation", {
                 // Get predictions from dialog (only data, no indexes)
                 let tableData = values.predictions_table || [];
                 
-                // Filter and add valid predictions to the child table
+                // Filter and add valid predictions to the child tablerender_gitlab_issues_section
                 tableData.forEach(row => {
                     if (row.prediction && row.prediction > 0 && row.month_and_year) {
                         let child_row = frm.add_child('resource_planning_prediction');
@@ -220,6 +256,19 @@ frappe.ui.form.on("Implementation", {
         } else {
             console.warn("Child table field not available yet.");
         }
+        frm.add_custom_button('Create Gitlab Project', function () {
+            frappe.call({
+                method: 'phamos.gitlab_integration.gitlab_group_utils.create_gitlab_project_for_implementation',
+                args: {
+                    implementation_name: frm.doc.name
+                },
+                callback: function (r) {
+                        if (!r.exc) {
+                            frm.reload_doc();
+                        }
+                    }
+            });
+        });
 
         frm.add_custom_button('Set Implementation Status', () => {
             let d = new frappe.ui.Dialog({
@@ -416,6 +465,200 @@ frappe.ui.form.on("Implementation", {
                 if (!r.exc) {
                     frm.reload_doc();
                 }
+            }
+        });
+    },
+    render_gitlab_issues_section(frm) {
+        if (frm.is_new()) return;
+
+        const implementation = frm.doc.name;
+        const wrapper = frm.fields_dict.gitlab_issues_html?.wrapper;
+        if (!wrapper) return;
+
+        $(wrapper).html(`
+            <div class="gitlab-project-connection">
+                <div class="document-link" data-doctype="GitLab Issue">
+                    <div class="document-link-badge">
+                        <span class="count hidden"></span>
+                        <a class="badge-link" href="#">${__("GitLab Issues")}</a>
+                    </div>
+                    <button class="btn btn-new btn-secondary btn-xs icon-btn">
+                        <svg class="icon icon-sm"><use href="#icon-add"></use></svg>
+                    </button>
+                </div>
+            </div>
+        `);
+
+        const $link  = $(wrapper).find(".document-link");
+        const $count = $link.find(".count");
+
+        // ── open list ──────────────────────────────────────────────────
+        $link.find(".badge-link").on("click", e => {
+            e.preventDefault();
+
+            frappe.call({
+                method: "frappe.client.get_list",
+                args: {
+                    doctype: "GitLab Project",
+                    filters: { implementation: implementation },
+                    fields: ["name"],
+                    limit: 0
+                },
+                callback: r => {
+                    const projects = (r.message || []).map(d => d.name);
+
+                    if (!projects.length) {
+                        frappe.msgprint(__("Koi GitLab Project linked nahi hai."));
+                        return;
+                    }
+
+                    frappe.route_options = { gitlab_project: ["in", projects] };
+                    frappe.set_route("List", "GitLab Issue", "List");
+                }
+            });
+        });
+
+        // ── new doc ────────────────────────────────────────────────────
+        $link.find(".btn-new").on("click", e => {
+            e.preventDefault();
+            frappe.new_doc("GitLab Issue", {
+                implementation: implementation
+            });
+        });
+
+        frappe.call({
+            method: "phamos.phamos.doctype.implementation.implementation.get_gitlab_issues_count",
+            args: { implementation: implementation },
+            callback: r => {
+                const c = cint(r.message);
+                $count.toggleClass("hidden", !c).text(c > 99 ? "99+" : c);  // ✅ $count
+            },
+            error: () => $count.addClass("hidden")
+        });
+    },
+    render_gitlab_milestones_section(frm) {
+        if (frm.is_new()) return;
+
+        const implementation = frm.doc.name;
+        const wrapper = frm.fields_dict.gitlab_milestones_html?.wrapper;
+        if (!wrapper) return;
+
+        $(wrapper).html(`
+            <div class="gitlab-project-connection">
+                <div class="document-link" data-doctype="GitLab Milestones">
+                    <div class="document-link-badge">
+                        <span class="count hidden"></span>
+                        <a class="badge-link" href="#">${__("GitLab Milestones")}</a>
+                    </div>
+                    <button class="btn btn-new btn-secondary btn-xs icon-btn">
+                        <svg class="icon icon-sm"><use href="#icon-add"></use></svg>
+                    </button>
+                </div>
+            </div>
+        `);
+
+        const $link  = $(wrapper).find(".document-link");
+        const $count = $link.find(".count");
+
+        // ── open list ──────────────────────────────────────────────────
+        $link.find(".badge-link").on("click", e => {
+            e.preventDefault();
+
+            frappe.call({
+                method: "frappe.client.get_list",
+                args: {
+                    doctype: "GitLab Project",
+                    filters: { implementation: implementation },
+                    fields: ["name"],
+                    limit: 0
+                },
+                callback: r => {
+                    const projects = (r.message || []).map(d => d.name);
+
+                    if (!projects.length) {
+                        frappe.msgprint(__("Koi GitLab Project linked nahi hai."));
+                        return;
+                    }
+
+                    frappe.route_options = { gitlab_project: ["in", projects] };
+                    frappe.set_route("List", "GitLab Milestones", "List");
+                }
+            });
+        });
+
+        // ── new doc ────────────────────────────────────────────────────
+        $link.find(".btn-new").on("click", e => {
+            e.preventDefault();
+            frappe.new_doc("GitLab Milestones", {
+                implementation: implementation
+            });
+        });
+
+        frappe.call({
+            method: "phamos.phamos.doctype.implementation.implementation.get_gitlab_milestones_count",
+            args: { implementation: implementation },
+            callback: r => {
+                const c = cint(r.message);
+                $count.toggleClass("hidden", !c).text(c > 99 ? "99+" : c);
+            },
+            error: () => $count.addClass("hidden")
+        });
+    },
+    render_gitlab_projects_section(frm) {
+        if (frm.is_new()) return;
+
+        const implementation = frm.doc.name;
+        const wrapper = frm.fields_dict.gitlab_projects_html?.wrapper;
+
+        if (!wrapper) return;
+
+        // clear old
+        $(wrapper).empty();
+
+        // UI block (same style feel)
+        $(wrapper).html(`
+            <div class="gitlab-project-connection">
+                <div class="document-link" data-doctype="GitLab Project">
+                    <div class="document-link-badge">
+                        <span class="count hidden"></span>
+                        <a class="badge-link">${__("GitLab Project")}</a>
+                    </div>
+                    <button class="btn btn-new btn-secondary btn-xs icon-btn">
+                        <svg class="icon icon-sm"><use href="#icon-add"></use></svg>
+                    </button>
+                </div>
+            </div>
+        `);
+
+        const $link = $(wrapper).find(".document-link");
+        const $count = $link.find(".count");
+
+        // open list
+        $link.find(".badge-link").on("click", e => {
+            e.preventDefault();
+            frappe.route_options = {
+                    implementation: implementation
+            };
+            frappe.set_route("List", "GitLab Project", "List");
+        });
+
+        // new
+        $link.find(".btn-new").on("click", e => {
+            e.preventDefault();
+            frappe.new_doc("GitLab Project", {
+                implementation: implementation
+            });
+        });
+
+        // count
+        frappe.call({
+            method: "phamos.phamos.doctype.implementation.implementation.get_gitlab_projects_count",
+            args: {
+                implementation: implementation
+            },
+            callback: r => {
+                const c = cint(r.message);
+                $count.toggleClass("hidden", !c).text(c > 99 ? "99+" : c || "0");
             }
         });
     },

@@ -1,0 +1,93 @@
+{
+ "actions": [],
+ "allow_rename": 1,
+ "autoname": "field:group_id",
+ "creation": "2026-04-17 11:31:54.957005",
+ "doctype": "DocType",
+ "engine": "InnoDB",
+ "field_order": [
+  "title",
+  "group_id",
+  "web_url",
+  "full_path",
+  "path",
+  "erpnext_section",
+  "customer"
+ ],
+ "fields": [
+  {
+   "fieldname": "title",
+   "fieldtype": "Data",
+   "in_list_view": 1,
+   "label": "Title"
+  },
+  {
+   "fieldname": "web_url",
+   "fieldtype": "Data",
+   "in_list_view": 1,
+   "label": "Web URL"
+  },
+  {
+   "fieldname": "group_id",
+   "fieldtype": "Int",
+   "label": "Group ID",
+   "unique": 1
+  },
+  {
+   "fieldname": "full_path",
+   "fieldtype": "Data",
+   "in_list_view": 1,
+   "label": "Full Path"
+  },
+  {
+   "fieldname": "path",
+   "fieldtype": "Data",
+   "label": "Path"
+  },
+  {
+   "fieldname": "erpnext_section",
+   "fieldtype": "Section Break",
+   "label": "ERPNext"
+  },
+  {
+   "fieldname": "customer",
+   "fieldtype": "Link",
+   "label": "Customer",
+   "options": "Customer"
+  }
+ ],
+ "grid_page_length": 50,
+ "index_web_pages_for_search": 1,
+ "links": [
+  {
+   "link_doctype": "GitLab Project",
+   "link_fieldname": "group"
+  }
+ ],
+ "modified": "2026-05-06 08:17:37.228367",
+ "modified_by": "Administrator",
+ "module": "Gitlab Integration",
+ "name": "GitLab Group",
+ "naming_rule": "By fieldname",
+ "owner": "Administrator",
+ "permissions": [
+  {
+   "create": 1,
+   "delete": 1,
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "System Manager",
+   "share": 1,
+   "write": 1
+  }
+ ],
+ "row_format": "Dynamic",
+ "show_title_field_in_link": 1,
+ "sort_field": "modified",
+ "sort_order": "DESC",
+ "states": [],
+ "title_field": "title"
+}
