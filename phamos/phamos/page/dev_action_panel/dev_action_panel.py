@@ -439,6 +439,16 @@ def stop_timer(name, result, percent_billable=100, productivity=None, activity_t
 
 
 @frappe.whitelist()
+def get_gitlab_labels():
+    """Return all GitLab Labels with their background and text colours."""
+    return frappe.get_all(
+        "GitLab Labels",
+        fields=["name", "color", "text_color"],
+        order_by="name asc",
+    )
+
+
+@frappe.whitelist()
 def create_break_timesheet(from_time, to_time=None, project=None, goal=None, result=None, percent_billable=100, activity_type=None):
     user = frappe.session.user
     employee = frappe.db.get_value("Employee", {"user_id": user}, ["name", "activity_type"], as_dict=True)

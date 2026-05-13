@@ -124,8 +124,19 @@ let timerInterval = null;
 function startTick() { clearInterval(timerInterval); timerInterval = setInterval(() => { if (activeSession.value?.session_state === "running") elapsedSeconds.value++; }, 1000); }
 function stopTick() { clearInterval(timerInterval); timerInterval = null; }
 
+// Labels map: { labelName: { bg: "#hex", text: "#hex" } }
+const labelsMap = ref({});
+
 // API
 async function loadIssues() { loading.value = true; const r = await frappe.call({ method: "phamos.phamos.page.dev_action_panel.dev_action_panel.get_my_issues" }); issues.value = r.message || []; loading.value = false; }
+async function loadLabels() {
+  const r = await frappe.call({ method: "phamos.phamos.page.dev_action_panel.dev_action_panel.get_gitlab_labels" });
+  const map = {};
+  for (const l of (r.message || [])) {
+    map[l.name] = { bg: l.color || "#6b7280", text: l.text_color || "#fff" };
+  }
+  labelsMap.value = map;
+}
 async function loadSession() {
   const r = await frappe.call({ method: "phamos.phamos.page.dev_action_panel.dev_action_panel.get_active_session" });
   activeSession.value = r.message || null;
@@ -240,7 +251,7 @@ async function onSync() {
   syncing.value = false;
 }
 
-onMounted(async () => { await Promise.all([loadIssues(), loadSession(), loadStats()]); });
+onMounted(async () => { await Promise.all([loadIssues(), loadSession(), loadStats(), loadLabels()]); });
 onUnmounted(() => { stopTick(); });
 </script>
 
@@ -317,6 +328,7 @@ onUnmounted(() => { stopTick(); });
           :active-session="activeSession"
           :elapsed-seconds="elapsedSeconds"
           :selected-project="selectedProject"
+          :labels-map="labelsMap"
           @start="onStart"
           @pause="onPause"
           @resume="onResume"
