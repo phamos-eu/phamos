@@ -200,15 +200,15 @@ frappe.pages['team-capacity-overview'].on_page_load = function (wrapper) {
         fieldtype: 'Select',
         options: [
             {
-                label: "Same period last year",
-                value: "last_year"
-            },
-            {
                 label: "Same period last month (30 days back)",
                 value: "last_month"
+            },
+            {
+                label: "Same period last year",
+                value: "last_year"
             }
         ],
-        default: "last_year",
+        default: "last_month",
         hidden: true
     });
 
@@ -378,7 +378,7 @@ frappe.pages['team-capacity-overview'].on_page_load = function (wrapper) {
 
         let hist_enabled = $("#enable_comparison_toggle").is(":checked");
 
-        let hist_type = page.comparison_type.get_value() || "last_year";
+        let hist_type = page.comparison_type.get_value() || "last_month";
 
         let filters = {
             from_date,
@@ -414,16 +414,39 @@ frappe.pages['team-capacity-overview'].on_page_load = function (wrapper) {
 
         let today = new Date();
 
-        let start = new Date(today.getFullYear(), today.getMonth(), 1);
-
-        let end = new Date(today.getFullYear(), today.getMonth() + 1, 0);
-
-        start.setDate(start.getDate() - 14);
+        let start = new Date(today.getFullYear(), today.getMonth(), 1);      
+        let end   = new Date(today.getFullYear(), today.getMonth() + 1, 0);
 
         return {
             start_date: frappe.datetime.obj_to_str(start),
             end_date: frappe.datetime.obj_to_str(end)
         };
+    }
+
+    /* ----------------------------------------------------------------
+       TOOLTIP HELPER — historical week ka date range compute karo
+       week_label format: "YYYY-MM-DD to YYYY-MM-DD"
+    ---------------------------------------------------------------- */
+    function get_hist_week_label(week_label, comparison_type) {
+        let parts = week_label.split(" to ");
+        if (parts.length !== 2) return "";
+
+        let start = new Date(parts[0]);
+        let end   = new Date(parts[1]);
+
+        if (comparison_type === "last_year") {
+            start.setFullYear(start.getFullYear() - 1);
+            end.setFullYear(end.getFullYear() - 1);
+        } else {
+            start.setDate(start.getDate() - 30);
+            end.setDate(end.getDate() - 30);
+        }
+
+        let fmt = function (dt) {
+            return dt.toISOString().slice(0, 10);
+        };
+
+        return fmt(start) + " - " + fmt(end);
     }
 
     /* ================================================================
@@ -484,6 +507,8 @@ frappe.pages['team-capacity-overview'].on_page_load = function (wrapper) {
             });
         }
 
+        let comparison_type = page.comparison_type.get_value() || "last_year";
+
         Highcharts.chart("team_chart", {
 
             chart: {
@@ -501,6 +526,29 @@ frappe.pages['team-capacity-overview'].on_page_load = function (wrapper) {
             yAxis: {
                 min: 0,
                 title: { text: "Hours" }
+            },
+
+            tooltip: {
+                shared: true,
+                formatter: function () {
+                    // point.key = index, weeks[index] = "YYYY-MM-DD to YYYY-MM-DD"
+                    let idx = this.points[0].point.index;
+                    let week_label = weeks[idx] || this.x;
+
+                    let s = "<b>" + week_label + "</b>";
+
+                    this.points.forEach(function (point) {
+                        let name = point.series.name;
+                        if (name === "Historical Actual Time") {
+                            let hist_range = get_hist_week_label(week_label, comparison_type);
+                            name = name + " (" + hist_range + ")";
+                        }
+                        s += "<br/>"
+                            + '<span style="color:' + point.series.color + '">\u25CF</span> '
+                            + name + ": <b>" + Highcharts.numberFormat(point.y, 2) + "</b>";
+                    });
+                    return s;
+                }
             },
 
             series
@@ -577,7 +625,7 @@ frappe.pages['team-capacity-overview'].on_page_load = function (wrapper) {
                 marker: { enabled: false }
             });
         }
-        console.log("TEAMS DATA", teams);
+
         teams.forEach(function (team, i) {
 
             let color = team.color || colors[i % colors.length];
@@ -643,6 +691,29 @@ frappe.pages['team-capacity-overview'].on_page_load = function (wrapper) {
             yAxis: {
                 min: 0,
                 title: { text: "Hours" }
+            },
+
+            tooltip: {
+                shared: true,
+                formatter: function () {
+                    // point.key = index, weeks[index] = "YYYY-MM-DD to YYYY-MM-DD"
+                    let idx = this.points[0].point.index;
+                    let week_label = weeks[idx] || this.x;
+
+                    let s = "<b>" + week_label + "</b>";
+
+                    this.points.forEach(function (point) {
+                        let name = point.series.name;
+                        if (name.toLowerCase().includes("historical")) {
+                            let hist_range = get_hist_week_label(week_label, hist_type);
+                            name = name + " (" + hist_range + ")";
+                        }
+                        s += "<br/>"
+                            + '<span style="color:' + point.series.color + '">\u25CF</span> '
+                            + name + ": <b>" + Highcharts.numberFormat(point.y, 2) + "</b>";
+                    });
+                    return s;
+                }
             },
 
             series
