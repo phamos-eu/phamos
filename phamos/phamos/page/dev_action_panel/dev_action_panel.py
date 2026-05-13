@@ -160,26 +160,32 @@ def _get_active_session_raw(user):
         return None
 
     last_row = rows[-1]
+    last_idx = len(rows) - 1
     if last_row.get("to_time"):
-        # All rows are closed — session is paused (even row count)
         session_state = "paused"
     else:
-        # Last row is open — session is running (odd row count)
-        session_state = "running"
+        # Even index (0, 2, 4…) = work row → running
+        # Odd index  (1, 3, 5…) = break row → paused
+        session_state = "running" if last_idx % 2 == 0 else "paused"
 
     record["session_state"] = session_state
     record["elapsed_seconds"] = _calc_elapsed_seconds(rows)
+    # Expose break_from so the frontend can show a live break timer without calling resume first
+    if session_state == "paused" and not last_row.get("to_time"):
+        record["break_from"] = str(last_row["from_time"])
+    else:
+        record["break_from"] = None
     return record
 
 
 def _calc_elapsed_seconds(rows):
-    """Sum all closed intervals plus the current open interval if running."""
     total = 0
-    for row in rows:
+    for idx, row in enumerate(rows):
+        if idx % 2 != 0:  # skip break rows (odd indices)
+            continue
         if row.get("from_time") and row.get("to_time"):
             total += time_diff_in_seconds(row["to_time"], row["from_time"])
         elif row.get("from_time") and not row.get("to_time"):
-            # Open interval — count up to now
             total += time_diff_in_seconds(now_datetime(), row["from_time"])
     return int(total)
 
@@ -339,29 +345,27 @@ def _empty_stats():
 
 @frappe.whitelist()
 def pause_timer(name):
-    """
-    Close the currently open item row to pause the session.
-    Does NOT add a new row — resume will add one.
-    """
     doc = frappe.get_doc("Timesheet Record", name)
     now = now_datetime()
     for row in reversed(doc.item):
         if not row.get("to_time"):
             row.to_time = now
             break
+    doc.append("item", {"from_time": now})  # open break row starts immediately
     doc.save(ignore_permissions=True)
     frappe.db.commit()
-    return {"session_state": "paused"}
+    return {"session_state": "paused", "break_from": str(now)}
 
 
 @frappe.whitelist()
 def resume_timer(name):
-    """
-    Add a new open item row to resume a paused session.
-    """
     doc = frappe.get_doc("Timesheet Record", name)
     now = now_datetime()
-    doc.append("item", {"from_time": now})
+    for row in reversed(doc.item):
+        if not row.get("to_time"):
+            row.to_time = now
+            break
+    doc.append("item", {"from_time": now})  # open new work row
     doc.save(ignore_permissions=True)
     frappe.db.commit()
     return {"session_state": "running"}
@@ -369,35 +373,27 @@ def resume_timer(name):
 
 @frappe.whitelist()
 def stop_timer(name, result, percent_billable=100, productivity=None, activity_type=None, manual_end_time=None):
-    """
-    Close the open row (if running), calculate actual_time from all item rows,
-    fill in result fields, and submit the Timesheet Record.
-
-    All item rows are work intervals (no break rows in this flow).
-    actual_time = sum of all row durations.
-    """
     doc = frappe.get_doc("Timesheet Record", name)
     end_time = get_datetime(manual_end_time) if manual_end_time else now_datetime()
 
-    # Close the open row if the session is currently running
+    # Close any open row (work or break)
     for row in reversed(doc.item):
         if not row.get("to_time"):
             row.to_time = end_time
             break
 
-    # Calculate duration for each row and sum
-    total_seconds = 0
+    # Calculate duration for every row
     for row in doc.item:
         if row.from_time and row.to_time:
             row.duration = time_diff_in_seconds(row.to_time, row.from_time)
-            total_seconds += row.duration
 
-    # Set parent-level time fields required by before_submit and create_timesheet
+    # Main timesheet uses only the first work row (index 0)
     if doc.item:
-        doc.from_time = doc.item[0].from_time
-        doc.to_time = end_time
+        first_row = doc.item[0]
+        doc.from_time = first_row.from_time
+        doc.to_time = first_row.to_time
+        doc.actual_time = first_row.duration or 0
 
-    doc.actual_time = total_seconds
     doc.result = result
     doc.percent_billable = int(percent_billable)
     if activity_type:
@@ -409,4 +405,76 @@ def stop_timer(name, result, percent_billable=100, productivity=None, activity_t
     doc.submit()
     frappe.db.commit()
 
-    return {"name": doc.name, "session_state": "submitted"}
+    # Create separate submitted Timesheet Records for additional work segments (indices 2, 4, 6…)
+    extra_names = []
+    for i in range(2, len(doc.item), 2):
+        alt_row = doc.item[i]
+        if not (alt_row.from_time and alt_row.to_time):
+            continue
+        duration = time_diff_in_seconds(alt_row.to_time, alt_row.from_time)
+        if duration <= 0:
+            continue
+
+        extra = frappe.new_doc("Timesheet Record")
+        for field in ["project", "customer", "employee", "activity_type", "goal",
+                      "issues", "expected_time", "result", "percent_billable",
+                      "parent_issues_url", "gitlab_issue"]:
+            extra.set(field, doc.get(field))
+        if productivity is not None:
+            extra.productivity = productivity
+        extra.from_time = alt_row.from_time
+        extra.to_time = alt_row.to_time
+        extra.actual_time = duration
+        extra.append("item", {
+            "from_time": alt_row.from_time,
+            "to_time": alt_row.to_time,
+            "duration": duration,
+        })
+        extra.insert(ignore_permissions=True)
+        extra.submit()
+        extra_names.append(extra.name)
+
+    frappe.db.commit()
+    return {"name": doc.name, "session_state": "submitted", "extra_timesheets": extra_names}
+
+
+@frappe.whitelist()
+def get_gitlab_labels():
+    """Return all GitLab Labels with their background and text colours."""
+    return frappe.get_all(
+        "GitLab Labels",
+        fields=["name", "color", "text_color"],
+        order_by="name asc",
+    )
+
+
+@frappe.whitelist()
+def create_break_timesheet(from_time, to_time=None, project=None, goal=None, result=None, percent_billable=100, activity_type=None):
+    user = frappe.session.user
+    employee = frappe.db.get_value("Employee", {"user_id": user}, ["name", "activity_type"], as_dict=True)
+    if not employee:
+        frappe.throw(_("No Employee record linked to your user account."))
+
+    from_dt = get_datetime(from_time)
+    to_dt = get_datetime(to_time) if to_time else now_datetime()
+    duration = time_diff_in_seconds(to_dt, from_dt)
+    customer = frappe.db.get_value("Project", project, "customer")
+
+    ts = frappe.new_doc("Timesheet Record")
+    ts.project = project
+    ts.customer = customer
+    ts.employee = employee.name
+    ts.activity_type = activity_type or employee.activity_type
+    ts.goal = goal
+    ts.result = result
+    ts.from_time = from_dt
+    ts.to_time = to_dt
+    ts.actual_time = duration
+    ts.expected_time = duration
+    ts.percent_billable = int(percent_billable)
+    ts.append("item", {"from_time": from_dt, "to_time": to_dt, "duration": duration})
+    ts.insert(ignore_permissions=True)
+    ts.submit()
+    frappe.db.commit()
+
+    return {"name": ts.name}

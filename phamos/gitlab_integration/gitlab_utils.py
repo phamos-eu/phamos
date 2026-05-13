@@ -98,21 +98,21 @@ def sync_gitlab_labels():
                     break
 
                 for label in labels:
-                    label_id = label.get("id")
+                    label_name = label.get("name")
 
-                    # Check if already exists
+                    # Check by label name instead of ID
                     existing = frappe.db.get_value(
                         "GitLab Labels",
                         {
-                            "label_id": label_id,
+                            "name1": label_name,
                         },
                         "name"
                     )
 
                     data = {
                         "doctype": "GitLab Labels",
-                        "label_id": label_id,
-                        "name1": label.get("name"),
+                        "label_id": label.get("id"),
+                        "name1": label_name,
                         "text_color": label.get("text_color"),
                         "color": label.get("color"),
                         "priority": label.get("priority"),
@@ -120,8 +120,16 @@ def sync_gitlab_labels():
 
                     if existing:
                         doc = frappe.get_doc("GitLab Labels", existing)
-                        doc.update(data)
+
+                        # Optional:
+                        # only update empty fields
+                        doc.label_id = doc.label_id or data["label_id"]
+                        doc.text_color = doc.text_color or data["text_color"]
+                        doc.color = doc.color or data["color"]
+                        doc.priority = doc.priority or data["priority"]
+
                         doc.save(ignore_permissions=True)
+
                     else:
                         doc = frappe.get_doc(data)
                         doc.insert(ignore_permissions=True)
@@ -130,7 +138,7 @@ def sync_gitlab_labels():
 
                 page += 1
 
-        except Exception as e:
+        except Exception:
             frappe.log_error(frappe.get_traceback(), "GitLab Label Sync Failed")
 
     frappe.db.commit()
@@ -501,152 +509,6 @@ def sync_all_issues():
 
     return "Issues synced successfully"
 
-@frappe.whitelist()
-def sync_issues_only():
-
-    projects = frappe.get_all(
-        "GitLab Project",
-        fields=["name", "project_id", "last_synced", "title", "namespace"]
-    )
-
-    for project in projects:
-        try:
-            issues = get_issues_for_project(project["project_id"], project.get("last_synced"))
-            project_path = project.get("namespace") or None
-
-            issue_map = {}
-
-            for issue in issues:
-                try:
-                    # 🔹 Milestone handling (FIX)
-                    milestone_id = issue.get("milestone", {}).get("id") if issue.get("milestone") else None
-                    milestone_name = None
-
-                    if milestone_id and project["name"]:
-                        milestone_name = frappe.db.get_value(
-                            "GitLab Milestones",
-                            {"id": milestone_id,      
-                             "gitlab_project": project["name"]},
-                            "name"
-                        )
-
-                        if not milestone_name:
-                            milestone_doc = frappe.new_doc("GitLab Milestones")
-                            milestone_doc.id = milestone_id
-                            milestone_doc.gitlab_project = project["name"]
-                            milestone_doc.save(ignore_permissions=True)
-                            milestone_name = milestone_doc.name
-
-                    existing_issue = frappe.db.exists(
-                        "GitLab Issue",
-                        {
-                            "issue_id": issue["iid"],
-                            "gitlab_project": project["name"]
-                        }
-                    )
-
-                    # Resolve assignee fields once for this issue
-                    assignee_data = issue.get("assignee") or {}
-                    assignee_name = assignee_data.get("name", "")
-                    assignee_username = assignee_data.get("username", "")
-                    assignee_id = assignee_data.get("id")
-                    assignee_email = get_user_email(assignee_id) if assignee_id else ""
-
-                    if existing_issue:
-                        # ✅ Existing issue — update all fields including new ones
-                        gitlab_issue_doc = frappe.get_doc("GitLab Issue", existing_issue)
-                        issue_map[str(issue["iid"])] = existing_issue
-
-                        gitlab_issue_doc.update({
-                            "title": issue["title"],
-                            "description": issue.get("description", ""),
-                            "state": issue["state"],
-                            "due_date": issue.get("due_date") or None,
-                            "assignee": assignee_name,
-                            "assignee_email": assignee_email or "",
-                            "gitlab_username": assignee_username,
-                            "issue_url": issue["web_url"],
-                            "gitlab_milestone": milestone_name or gitlab_issue_doc.get("gitlab_milestone"),
-                            "labels": ", ".join(issue.get("labels", [])),
-                        })
-
-                        gitlab_issue_doc.save(ignore_permissions=True)
-
-                    else:
-                        # ✅ New issue — populate all fields
-                        gitlab_issue_doc = frappe.new_doc("GitLab Issue")
-
-                        gitlab_issue_doc.update({
-                            "issue_id": issue["iid"],
-                            "title": issue["title"],
-                            "description": issue.get("description", ""),
-                            "state": issue["state"],
-                            "due_date": issue.get("due_date") or None,
-                            "assignee": assignee_name,
-                            "assignee_email": assignee_email or "",
-                            "gitlab_username": assignee_username,
-                            "issue_url": issue["web_url"],
-                            "gitlab_project": project["name"],
-                            "gitlab_milestone": milestone_name,
-                            "labels": ", ".join(issue.get("labels", [])),
-                        })
-
-                        gitlab_issue_doc.save(ignore_permissions=True)
-                        issue_map[str(issue["iid"])] = gitlab_issue_doc.name
-
-                except Exception as ex:
-                    frappe.log_error(
-                        title="GitLab Issue Sync Error",
-                        message=(
-                            f"Project: {project.get('title')}, "
-                            f"Issue IID: {issue.get('iid')}, "
-                            f"Error: {str(ex)}"
-                        )
-                    )
-
-            # 🔁 Second pass: parent linking
-            for issue in issues:
-                try:
-                    issue_doc_name = issue_map.get(str(issue["iid"]))
-                    if not issue_doc_name:
-                        continue
-
-                    if project_path:
-                        parent_info = get_issue_parent(project_path, issue["iid"])
-
-                        if parent_info and parent_info.get("iid"):
-                            parent_iid = str(parent_info["iid"])
-                            parent_doc_name = issue_map.get(parent_iid)
-
-                            if parent_doc_name:
-                                gitlab_issue_doc = frappe.get_doc("GitLab Issue", issue_doc_name)
-                                gitlab_issue_doc.parent_issue = parent_doc_name
-                                gitlab_issue_doc.save(ignore_permissions=True)
-
-                except Exception as ex:
-                    frappe.log_error(
-                        title="GitLab Parent Link Error",
-                        message=(
-                            f"Project: {project.get('title')}, "
-                            f"Issue IID: {issue.get('iid')}, "
-                            f"Error: {str(ex)}"
-                        )
-                    )
-
-            # ✅ Update last_synced
-            project_doc = frappe.get_doc("GitLab Project", project["name"])
-            project_doc.last_synced = now_datetime()
-            project_doc.save(ignore_permissions=True)
-
-        except Exception as ex:
-            frappe.log_error(
-                title="GitLab Project Sync Error",
-                message=f"Project: {project.get('title')}, Error: {str(ex)}"
-            )
-
-    frappe.db.commit()
-    return "Issues synced successfully"
-
 
 @frappe.whitelist()
 def sync_gitlab_milestones():
@@ -709,10 +571,6 @@ def sync_gitlab_milestones():
 
 @frappe.whitelist()
 def register_webhooks_for_all_projects():
-    """
-    GitLab Project doctype se saare projects le aur
-    har project ke liye webhook automatically register kare.
-    """
     settings = frappe.get_single("GitLab Settings")
     
     if not settings.gitlab_url:
@@ -726,7 +584,7 @@ def register_webhooks_for_all_projects():
     except Exception:
         webhook_secret = None
 
-    # Webhook receiver URL — apna ngrok/server URL 
+    # Webhook receiver URL — ngrok/server URL 
     webhook_url = f"{settings.webhook_base_url}/api/method/phamos.gitlab_integration.gitlab_utils.gitlab_webhook_receiver"
 
     headers = get_gitlab_headers()

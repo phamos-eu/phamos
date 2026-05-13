@@ -412,22 +412,22 @@ def get_auto_email_reports(user_email: str):
     )
 
 @frappe.whitelist()
-def get_gitlab_projects_count(custom_implementation: str):
+def get_gitlab_projects_count(implementation: str):
     """Return count of GitLab Projects linked with this Implementation."""
-    if not custom_implementation:
+    if not implementation:
         return 0
 
     return frappe.db.count(
         "GitLab Project",
         filters={
-            "custom_implementation": custom_implementation
+            "implementation": implementation
         },
     )
 
 @frappe.whitelist()
-def get_gitlab_issues_count(custom_implementation: str):
+def get_gitlab_issues_count(implementation: str):
     """Return count of GitLab Issues linked via GitLab Projects of this Implementation."""
-    if not custom_implementation:
+    if not implementation:
         return 0
 
     return frappe.db.count(
@@ -435,31 +435,15 @@ def get_gitlab_issues_count(custom_implementation: str):
         filters={
             "gitlab_project": ["in", frappe.get_all(
                 "GitLab Project",
-                filters={"custom_implementation": custom_implementation},
+                filters={"implementation": implementation},
                 pluck="name"
             )]
         }
     )
 @frappe.whitelist()
-def get_gitlab_issues_count(custom_implementation: str):
-    """Return count of GitLab Issues linked via GitLab Projects of this Implementation."""
-    if not custom_implementation:
-        return 0
-
-    return frappe.db.count(
-        "GitLab Issue",
-        filters={
-            "gitlab_project": ["in", frappe.get_all(
-                "GitLab Project",
-                filters={"custom_implementation": custom_implementation},
-                pluck="name"
-            )]
-        }
-    )
-@frappe.whitelist()
-def get_gitlab_milestones_count(custom_implementation: str):
+def get_gitlab_milestones_count(implementation: str):
     """Return count of GitLab Milestones linked via GitLab Projects of this Implementation."""
-    if not custom_implementation:
+    if not implementation:
         return 0
 
     return frappe.db.count(
@@ -467,7 +451,7 @@ def get_gitlab_milestones_count(custom_implementation: str):
         filters={
             "gitlab_project": ["in", frappe.get_all(
                 "GitLab Project",
-                filters={"custom_implementation": custom_implementation},
+                filters={"implementation": 	implementation},
                 pluck="name"
             )]
         }

@@ -10,7 +10,9 @@
   "group_id",
   "web_url",
   "full_path",
-  "path"
+  "path",
+  "erpnext_section",
+  "customer"
  ],
  "fields": [
   {
@@ -41,6 +43,17 @@
    "fieldname": "path",
    "fieldtype": "Data",
    "label": "Path"
+  },
+  {
+   "fieldname": "erpnext_section",
+   "fieldtype": "Section Break",
+   "label": "ERPNext"
+  },
+  {
+   "fieldname": "customer",
+   "fieldtype": "Link",
+   "label": "Customer",
+   "options": "Customer"
   }
  ],
  "grid_page_length": 50,
@@ -51,7 +64,7 @@
    "link_fieldname": "group"
   }
  ],
- "modified": "2026-05-04 07:19:15.043826",
+ "modified": "2026-05-06 08:17:37.228367",
  "modified_by": "Administrator",
  "module": "Gitlab Integration",
  "name": "GitLab Group",

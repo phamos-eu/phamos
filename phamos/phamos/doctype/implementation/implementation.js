@@ -256,6 +256,19 @@ frappe.ui.form.on("Implementation", {
         } else {
             console.warn("Child table field not available yet.");
         }
+        frm.add_custom_button('Create Gitlab Project', function () {
+            frappe.call({
+                method: 'phamos.gitlab_integration.gitlab_group_utils.create_gitlab_project_for_implementation',
+                args: {
+                    implementation_name: frm.doc.name
+                },
+                callback: function (r) {
+                        if (!r.exc) {
+                            frm.reload_doc();
+                        }
+                    }
+            });
+        });
 
         frm.add_custom_button('Set Implementation Status', () => {
             let d = new frappe.ui.Dialog({
@@ -487,7 +500,7 @@ frappe.ui.form.on("Implementation", {
                 method: "frappe.client.get_list",
                 args: {
                     doctype: "GitLab Project",
-                    filters: { custom_implementation: implementation },
+                    filters: { implementation: implementation },
                     fields: ["name"],
                     limit: 0
                 },
@@ -509,13 +522,13 @@ frappe.ui.form.on("Implementation", {
         $link.find(".btn-new").on("click", e => {
             e.preventDefault();
             frappe.new_doc("GitLab Issue", {
-                custom_implementation: implementation
+                implementation: implementation
             });
         });
 
         frappe.call({
             method: "phamos.phamos.doctype.implementation.implementation.get_gitlab_issues_count",
-            args: { custom_implementation: implementation },
+            args: { implementation: implementation },
             callback: r => {
                 const c = cint(r.message);
                 $count.toggleClass("hidden", !c).text(c > 99 ? "99+" : c);  // ✅ $count
@@ -532,7 +545,7 @@ frappe.ui.form.on("Implementation", {
 
         $(wrapper).html(`
             <div class="gitlab-project-connection">
-                <div class="document-link" data-doctype="GitLab Milestone">
+                <div class="document-link" data-doctype="GitLab Milestones">
                     <div class="document-link-badge">
                         <span class="count hidden"></span>
                         <a class="badge-link" href="#">${__("GitLab Milestones")}</a>
@@ -555,7 +568,7 @@ frappe.ui.form.on("Implementation", {
                 method: "frappe.client.get_list",
                 args: {
                     doctype: "GitLab Project",
-                    filters: { custom_implementation: implementation },
+                    filters: { implementation: implementation },
                     fields: ["name"],
                     limit: 0
                 },
@@ -568,7 +581,7 @@ frappe.ui.form.on("Implementation", {
                     }
 
                     frappe.route_options = { gitlab_project: ["in", projects] };
-                    frappe.set_route("List", "GitLab Milestone", "List");
+                    frappe.set_route("List", "GitLab Milestones", "List");
                 }
             });
         });
@@ -576,14 +589,14 @@ frappe.ui.form.on("Implementation", {
         // ── new doc ────────────────────────────────────────────────────
         $link.find(".btn-new").on("click", e => {
             e.preventDefault();
-            frappe.new_doc("GitLab Milestone", {
-                custom_implementation: implementation
+            frappe.new_doc("GitLab Milestones", {
+                implementation: implementation
             });
         });
 
         frappe.call({
             method: "phamos.phamos.doctype.implementation.implementation.get_gitlab_milestones_count",
-            args: { custom_implementation: implementation },
+            args: { implementation: implementation },
             callback: r => {
                 const c = cint(r.message);
                 $count.toggleClass("hidden", !c).text(c > 99 ? "99+" : c);
@@ -624,7 +637,7 @@ frappe.ui.form.on("Implementation", {
         $link.find(".badge-link").on("click", e => {
             e.preventDefault();
             frappe.route_options = {
-                custom_implementation: implementation
+                    implementation: implementation
             };
             frappe.set_route("List", "GitLab Project", "List");
         });
@@ -633,7 +646,7 @@ frappe.ui.form.on("Implementation", {
         $link.find(".btn-new").on("click", e => {
             e.preventDefault();
             frappe.new_doc("GitLab Project", {
-                custom_implementation: implementation
+                implementation: implementation
             });
         });
 
@@ -641,7 +654,7 @@ frappe.ui.form.on("Implementation", {
         frappe.call({
             method: "phamos.phamos.doctype.implementation.implementation.get_gitlab_projects_count",
             args: {
-                custom_implementation: implementation
+                implementation: implementation
             },
             callback: r => {
                 const c = cint(r.message);

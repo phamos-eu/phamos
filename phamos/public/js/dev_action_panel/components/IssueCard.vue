@@ -2,36 +2,6 @@
 import { ref, computed } from "vue";
 import DateTimePicker from "./DateTimePicker.vue";
 
-// GitLab label colors
-const LABEL_COLORS = {
-  "Hotfix":                 { bg: "#dc143c", text: "#fff" },
-  "Revision Needed":        { bg: "#dc143c", text: "#fff" },
-  "P:1":                    { bg: "#dc143c", text: "#fff" },
-  "Critical":               { bg: "#cd5b45", text: "#fff" },
-  "P:2":                    { bg: "#9400d3", text: "#fff" },
-  "Discussion":             { bg: "#ed9121", text: "#fff" },
-  "P:3":                    { bg: "#6699cc", text: "#fff" },
-  "PR Review":              { bg: "#6699cc", text: "#fff" },
-  "Merged into Production": { bg: "#6699cc", text: "#fff" },
-  "Working":                { bg: "#6699cc", text: "#fff" },
-  "Ready for Dev":          { bg: "#eee600", text: "#1a1a1a" },
-  "Ready for Staging":      { bg: "#009966", text: "#fff" },
-  "Ready for Release":      { bg: "#009966", text: "#fff" },
-  "Testing":                { bg: "#009966", text: "#fff" },
-  "PM Review":              { bg: "#8fbc8f", text: "#1a1a1a" },
-  "Ready for Production":   { bg: "#8fbc8f", text: "#1a1a1a" },
-  "Testing on Production":  { bg: "#330066", text: "#fff" },
-  "Onboarding Tasks":       { bg: "#808080", text: "#fff" },
-  "Open":                   { bg: "#1f1f1f", text: "#fff" },
-  "Closed":                 { bg: "#424242", text: "#fff" },
-  "Support Task":           { bg: "#616161", text: "#fff" },
-};
-
-function labelStyle(name) {
-  const c = LABEL_COLORS[name] || { bg: "#6b7280", text: "#fff" };
-  return { background: c.bg, color: c.text, borderColor: c.bg };
-}
-
 function labelNames(labels) {
   if (!labels) return [];
   return labels.split(",").map(l => l.trim()).filter(Boolean);
@@ -41,7 +11,13 @@ const props = defineProps({
   issue: Object,
   activeSession: Object,
   elapsedSeconds: Number,
+  labelsMap: { type: Object, default: () => ({}) },
 });
+
+function labelStyle(name) {
+  const c = props.labelsMap[name] || { bg: "#6b7280", text: "#fff" };
+  return { background: c.bg, color: c.text, borderColor: c.bg };
+}
 
 const emit = defineEmits(["start", "pause", "resume", "stop"]);
 
