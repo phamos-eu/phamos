@@ -572,11 +572,11 @@ def sync_gitlab_milestones():
 @frappe.whitelist()
 def register_webhooks_for_all_projects():
     settings = frappe.get_single("GitLab Settings")
-    
+
     if not settings.gitlab_url:
         frappe.throw("GitLab URL not set")
 
-    # Webhook secret get 
+    # Webhook secret get
     try:
         webhook_secret = get_decrypted_password(
             "GitLab Settings", "GitLab Settings", "webhook_secret"
@@ -584,7 +584,7 @@ def register_webhooks_for_all_projects():
     except Exception:
         webhook_secret = None
 
-    # Webhook receiver URL — ngrok/server URL 
+    # Webhook receiver URL — ngrok/server URL
     webhook_url = f"{settings.webhook_base_url}/api/method/phamos.gitlab_integration.gitlab_utils.gitlab_webhook_receiver"
 
     headers = get_gitlab_headers()
