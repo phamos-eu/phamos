@@ -5,5 +5,5 @@ import frappe
 from frappe.model.document import Document
 
 
-class HolidayHandoverIssue(Document):
+class HandoverIssue(Document):
 	pass
