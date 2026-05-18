@@ -88,15 +88,15 @@
    "fieldname": "issues",
    "fieldtype": "Table",
    "label": "GitLab Issues",
-   "options": "Holiday Handover Issue"
+   "options": "Handover Issue"
   }
  ],
  "index_web_pages_for_search": 1,
  "links": [],
- "modified": "2026-03-04 10:00:00.000000",
+ "modified": "2026-05-18 10:00:00.000000",
  "modified_by": "Administrator",
  "module": "Phamos",
- "name": "Holiday Handover",
+ "name": "Handover",
  "naming_rule": "Expression",
  "owner": "Administrator",
  "permissions": [

@@ -1,7 +1,7 @@
 // Copyright (c) 2026, phamos.eu and contributors
 // For license information, please see license.txt
 
-frappe.ui.form.on('Holiday Handover', {
+frappe.ui.form.on('Handover', {
 	refresh: function(frm) {
 		// Add custom button to fetch GitLab issues
 		if (!frm.is_new()) {
@@ -37,7 +37,7 @@ frappe.ui.form.on('Holiday Handover', {
 				}
 			};
 		});
-		
+
 		// Set query for Acting Project Manager to exclude the current Project Manager
 		frm.set_query('acting_project_manager', function(doc) {
 			let filters = {};
@@ -71,7 +71,7 @@ frappe.ui.form.on('Holiday Handover', {
 			});
 		}
 	},
-	
+
 	gitlab_project: function(frm) {
 		// Clear child table when GitLab Project changes
 		if (frm.doc.issues && frm.doc.issues.length > 0) {
@@ -92,7 +92,7 @@ frappe.ui.form.on('Holiday Handover', {
 });
 
 // Child table event handlers
-frappe.ui.form.on('Holiday Handover Issue', {
+frappe.ui.form.on('Handover Issue', {
 	form_render: function(frm, cdt, cdn) {
 		let row = locals[cdt][cdn];
 		if (!row.issue_url || !row.issue_title) return;
@@ -116,7 +116,7 @@ frappe.ui.form.on('Holiday Handover Issue', {
 
 	gitlab_issue_id: function(frm, cdt, cdn) {
 		let row = locals[cdt][cdn];
-		
+
 		if (row.gitlab_issue_id) {
 			// Fetch GitLab Issue data
 			frappe.call({
@@ -128,7 +128,7 @@ frappe.ui.form.on('Holiday Handover Issue', {
 				callback: function(r) {
 					if (r.message) {
 						let gitlab_issue = r.message;
-						
+
 						// Auto-fill the fields from GitLab Issue
 						frappe.model.set_value(cdt, cdn, 'issue_title', gitlab_issue.title || '');
 						frappe.model.set_value(cdt, cdn, 'issue_status', gitlab_issue.state || '');
@@ -138,7 +138,7 @@ frappe.ui.form.on('Holiday Handover Issue', {
 						frappe.model.set_value(cdt, cdn, 'issue_url', gitlab_issue.issue_url || '');
 						frappe.model.set_value(cdt, cdn, 'parent_issue', gitlab_issue.parent_issue || '');
 						frappe.model.set_value(cdt, cdn, 'gitlab_project', gitlab_issue.gitlab_project || '');
-						
+
 						frm.refresh_field('issues');
 					}
 				}
@@ -217,7 +217,7 @@ description: __('GitLab project URL')
 label: __('Note'),
 fieldname: 'note',
 fieldtype: 'HTML',
-options: '<p class="text-muted">' + 
+options: '<p class="text-muted">' +
 __('GitLab API integration can be configured to auto-fetch issues. ') +
 __('For now, you can manually add issues in the table below.') +
 '</p>'
