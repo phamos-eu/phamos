@@ -12,22 +12,16 @@ def get_my_issues():
     """
     Return ALL open GitLab Issues with an `is_mine` flag.
 
-    `is_mine` is True when the GitLab issue's `assignee` field matches
-    the current user's Employee employee_name (primary) or User full_name
-    (fallback). Email-based matching is intentionally excluded — the GitLab
-    token often lacks read_user scope so get_user_email() returns the token
-    owner's email for every user, making email matching unreliable.
+    Matching priority:
+    1. assignee_email (stored at sync time) compared against the user's ERPNext email.
+    2. gitlab_username compared against the local part of the user's email
+       (e.g. "simon.wanyama" matches "simon.wanyama@phamos.eu").
+    3. No match → is_mine = False.
     """
     user = frappe.session.user
 
-    # Build set of display names that identify "me"
-    mine_names = set()
-    employee_name = frappe.db.get_value("Employee", {"user_id": user}, "employee_name")
-    if employee_name:
-        mine_names.add(employee_name)
-    full_name = frappe.db.get_value("User", user, "full_name")
-    if full_name:
-        mine_names.add(full_name)
+    user_email = (frappe.db.get_value("User", user, "email") or "").lower()
+    user_email_local = user_email.split("@")[0]  # e.g. "simon.wanyama"
 
     # --- fetch ALL open issues -----------------------------------------------
     issues = frappe.get_all(
@@ -72,8 +66,15 @@ def get_my_issues():
         issue["timesheet_count"] = ts_data["cnt"]
         issue["total_tracked_seconds"] = ts_data["total_seconds"]
 
-        # Primary: assignee == employee_name; fallback: assignee == user full_name
-        issue["is_mine"] = bool(issue.get("assignee") and issue["assignee"] in mine_names)
+        # 1. Email match; 2. gitlab_username matches local part of user email; 3. not mine
+        assignee_email = (issue.get("assignee_email") or "").lower()
+        gitlab_username = (issue.get("gitlab_username") or "").lower()
+        if assignee_email:
+            issue["is_mine"] = assignee_email == user_email
+        elif gitlab_username:
+            issue["is_mine"] = gitlab_username == user_email_local
+        else:
+            issue["is_mine"] = False
 
         # Resolve parent title for display
         if issue.get("parent_issue"):
