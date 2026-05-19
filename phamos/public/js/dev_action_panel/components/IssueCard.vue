@@ -1,5 +1,6 @@
 <script setup>
 import { ref, computed } from "vue";
+import DateTimePicker from "./DateTimePicker.vue";
 
 function labelNames(labels) {
   if (!labels) return [];
@@ -29,12 +30,59 @@ const loadingSessions = ref(false);
 // Start form
 const expectedHours = ref(1);
 const startGoal = ref("");
+const startTimeDate = ref(new Date());
+const startTimeModified = ref(false);
 
 // Stop form
 const stopResult = ref("");
 const stopBillable = ref(100);
 const stopActivityType = ref("");
+const stopEndTimeDate = ref(new Date());
+const stopEndTimeModified = ref(false);
 const activityTypes = ["Working Alone", "Working with Customer", "Working With Team"];
+
+const dateFormat = frappe.boot?.sysdefaults?.date_format || "dd.mm.yyyy";
+const timeFormat = frappe.boot?.sysdefaults?.time_format || "HH:mm:ss";
+const userTz = frappe.boot?.time_zone?.user || frappe.boot?.sysdefaults?.time_zone || "";
+
+// Format a Date whose local h/m values are the user's intended user-tz time → system-tz string for backend
+function formatForApi(date) {
+  if (!date) return null;
+  const pad = n => String(n).padStart(2, "0");
+  const localStr = `${date.getFullYear()}-${pad(date.getMonth()+1)}-${pad(date.getDate())} ${pad(date.getHours())}:${pad(date.getMinutes())}:00`;
+  const uTz = frappe.boot?.time_zone?.user;
+  const sTz = frappe.boot?.time_zone?.system;
+  if (uTz && sTz && typeof moment !== "undefined" && moment.tz) {
+    try { return moment.tz(localStr, uTz).tz(sTz).format("YYYY-MM-DD HH:mm:ss"); } catch(e) {}
+  }
+  return localStr;
+}
+
+function onStartTimeChange(date) { startTimeDate.value = date; startTimeModified.value = true; }
+function onStopEndTimeChange(date) { stopEndTimeDate.value = date; stopEndTimeModified.value = true; }
+
+// Parse a "YYYY-MM-DD HH:mm:ss" string and reformat per system date/time format (no Date object to avoid tz issues)
+function fmtStr(dtStr) {
+  if (!dtStr) return "—";
+  const parts = dtStr.split(/[- :]/);
+  if (parts.length < 5) return dtStr;
+  const [y, mo, dd, hh, mm, ss = "00"] = parts;
+  const pad = n => String(n).padStart(2, "0");
+  const datePart = dateFormat.replace("dd", pad(dd)).replace("mm", pad(mo)).replace("yyyy", y);
+  const timePart = timeFormat.includes("ss") ? `${pad(hh)}:${pad(mm)}:${pad(ss)}` : `${pad(hh)}:${pad(mm)}`;
+  return `${datePart} ${timePart}`;
+}
+
+// from_time from backend is in system tz → convert to user tz for display
+function formatDatetime(dtStr) {
+  if (!dtStr) return "—";
+  const sysTz = frappe.boot?.time_zone?.system;
+  const uTz = frappe.boot?.time_zone?.user;
+  if (sysTz && uTz && typeof moment !== "undefined" && moment.tz) {
+    try { return fmtStr(moment.tz(dtStr, sysTz).tz(uTz).format("YYYY-MM-DD HH:mm:ss")); } catch(e) {}
+  }
+  return fmtStr(dtStr);
+}
 
 // Derived
 const isActive = computed(() => props.activeSession?.gitlab_issue === props.issue.name);
@@ -42,6 +90,7 @@ const sessionState = computed(() => isActive.value ? props.activeSession?.sessio
 const hasAnySession = computed(() => !!props.activeSession);
 
 function fmtElapsed(s) {
+  s = Math.max(0, s);
   const h = Math.floor(s / 3600), m = Math.floor((s % 3600) / 60), sec = s % 60;
   return `${String(h).padStart(2,"0")}:${String(m).padStart(2,"0")}:${String(sec).padStart(2,"0")}`;
 }
@@ -68,19 +117,32 @@ const due = computed(() => {
 });
 
 // Actions
-function openStart() { panel.value = panel.value === 'start' ? null : 'start'; stopResult.value = ""; }
-function openStop() { panel.value = panel.value === 'stop' ? null : 'stop'; }
+function openStart() {
+  panel.value = panel.value === "start" ? null : "start";
+  stopResult.value = "";
+  startTimeDate.value = new Date();
+  startTimeModified.value = false;
+}
+function openStop() {
+  panel.value = panel.value === "stop" ? null : "stop";
+  stopEndTimeDate.value = new Date();
+  stopEndTimeModified.value = false;
+}
 function closePanel() { panel.value = null; }
 
 function confirmStart() {
   if (!expectedHours.value || expectedHours.value < 0.25) { frappe.msgprint(__("Minimum 0.25h")); return; }
-  emit("start", { issue: props.issue, expectedTime: Math.round(parseFloat(expectedHours.value) * 3600), goal: startGoal.value.trim() || null });
+  const payload = { issue: props.issue, expectedTime: Math.round(parseFloat(expectedHours.value) * 3600), goal: startGoal.value.trim() || null };
+  if (startTimeModified.value) payload.manualStartTime = formatForApi(startTimeDate.value);
+  emit("start", payload);
   panel.value = null; startGoal.value = "";
 }
 function confirmStop() {
   if (!stopResult.value.trim()) { frappe.msgprint(__("Please describe what you accomplished.")); return; }
   if (!stopActivityType.value) { frappe.msgprint(__("Please select an Activity Type.")); return; }
-  emit("stop", { result: stopResult.value.trim(), percentBillable: stopBillable.value, activityType: stopActivityType.value });
+  const payload = { result: stopResult.value.trim(), percentBillable: stopBillable.value, activityType: stopActivityType.value };
+  if (stopEndTimeModified.value) payload.manualEndTime = formatForApi(stopEndTimeDate.value);
+  emit("stop", payload);
   panel.value = null; stopResult.value = ""; stopActivityType.value = "";
 }
 
@@ -204,19 +266,25 @@ function onStopKey(e)  { if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) conf
     <Transition name="panel">
       <div v-if="panel === 'start'" class="ic__panel ic__panel--start" @keydown="onStartKey">
         <div class="ic__panel-inner">
-          <div class="ic__panel-field">
-            <label class="ic__panel-label">Expected time</label>
-            <div class="ic__panel-input-row">
-              <input
-                v-model.number="expectedHours"
-                type="number" min="0.25" step="0.25"
-                class="ic__panel-input ic__panel-input--sm"
-                autofocus
-              />
-              <span class="ic__panel-unit">hours</span>
-              <span v-if="expectedHours" class="ic__panel-hint">
-                = {{ Math.floor(expectedHours) }}h {{ Math.round((expectedHours % 1) * 60) }}m
-              </span>
+          <div class="ic__panel-row ic__panel-row--top">
+            <div class="ic__panel-field">
+              <label class="ic__panel-label">Expected time</label>
+              <div class="ic__panel-input-row">
+                <input
+                  v-model.number="expectedHours"
+                  type="number" min="0.25" step="0.25"
+                  class="ic__panel-input ic__panel-input--sm"
+                  autofocus
+                />
+                <span class="ic__panel-unit">hours</span>
+                <span v-if="expectedHours" class="ic__panel-hint">
+                  = {{ Math.floor(expectedHours) }}h {{ Math.round((expectedHours % 1) * 60) }}m
+                </span>
+              </div>
+            </div>
+            <div class="ic__panel-field ic__panel-field--grow">
+              <label class="ic__panel-label">Start time <span class="ic__panel-optional">{{ userTz }}</span></label>
+              <DateTimePicker :model-value="startTimeDate" :date-format="dateFormat" :time-format="timeFormat" :auto-update="!startTimeModified" @update:model-value="onStartTimeChange" />
             </div>
           </div>
           <div class="ic__panel-field ic__panel-field--full">
@@ -246,6 +314,17 @@ function onStopKey(e)  { if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) conf
     <Transition name="panel">
       <div v-if="panel === 'stop'" class="ic__panel ic__panel--stop" @keydown="onStopKey">
         <div class="ic__panel-inner">
+          <div class="ic__panel-session-info">
+            <span class="ic__panel-session-info__item">
+              <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/></svg>
+              Started: <strong>{{ formatDatetime(activeSession?.from_time) }}</strong>
+            </span>
+            <span class="ic__panel-session-info__sep">·</span>
+            <span class="ic__panel-session-info__item">
+              <svg width="11" height="11" viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z"/></svg>
+              Elapsed: <strong>{{ fmtElapsed(elapsedSeconds) }}</strong>
+            </span>
+          </div>
           <div class="ic__panel-field ic__panel-field--full">
             <label class="ic__panel-label">What did you accomplish?</label>
             <textarea
@@ -273,6 +352,10 @@ function onStopKey(e)  { if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) conf
                 <option :value="25">25%</option>
                 <option :value="0">0% — Internal</option>
               </select>
+            </div>
+            <div class="ic__panel-field ic__panel-field--grow">
+              <label class="ic__panel-label">End time <span class="ic__panel-optional">{{ userTz }}</span></label>
+              <DateTimePicker :model-value="stopEndTimeDate" :date-format="dateFormat" :time-format="timeFormat" :auto-update="!stopEndTimeModified" @update:model-value="onStopEndTimeChange" />
             </div>
             <div class="ic__panel-actions ic__panel-actions--end">
               <button class="ic__panel-btn ic__panel-btn--ghost" @click="closePanel">
@@ -424,6 +507,16 @@ function onStopKey(e)  { if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) conf
 .ic__panel--start { background: var(--green-50, #f0fdf4); border-top-color: var(--green-200, #bbf7d0); }
 .ic__panel--stop  { background: var(--red-50, #fef2f2); border-top-color: var(--red-200, #fecaca); }
 
+.ic__panel-session-info {
+  display: flex; align-items: center; gap: 6px;
+  padding: 6px 10px; border-radius: 6px;
+  background: rgba(0,0,0,0.04);
+  font-size: 11.5px; color: var(--text-muted);
+}
+.ic__panel-session-info__item { display: inline-flex; align-items: center; gap: 4px; }
+.ic__panel-session-info__item strong { color: var(--text-color); font-weight: 600; }
+.ic__panel-session-info__sep { color: var(--border-color); }
+
 .ic__panel-inner { padding: 12px 14px; display: flex; flex-direction: column; gap: 10px; }
 .ic__panel-field { display: flex; flex-direction: column; gap: 4px; }
 .ic__panel-field--full { flex: 1; }
@@ -438,6 +531,9 @@ function onStopKey(e)  { if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) conf
 .ic__panel-input:focus { outline: none; border-color: var(--primary); box-shadow: 0 0 0 3px rgba(37,99,235,0.1); }
 .ic__panel-input--sm { width: 80px; }
 .ic__panel-input--full { width: 100%; box-sizing: border-box; }
+.ic__panel-input--fp { width: 100%; box-sizing: border-box; cursor: pointer; }
+.ic__panel-field--grow { flex: 1; min-width: 0; }
+.ic__panel-row--top { align-items: flex-start; }
 .ic__panel-unit { font-size: 12.5px; color: var(--text-muted); font-weight: 500; }
 .ic__panel-hint { font-size: 12px; color: var(--text-muted); }
 .ic__panel-optional { font-size: 10px; font-weight: 400; color: var(--text-muted); text-transform: none; letter-spacing: 0; }
@@ -508,11 +604,11 @@ function onStopKey(e)  { if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) conf
 .ic__session-link:hover { opacity: 1; }
 
 /* ── Transitions ───────────────────────────────────────────────── */
-.panel-enter-active { transition: max-height 0.22s ease-out, opacity 0.18s ease-out; max-height: 300px; overflow: hidden; }
+.panel-enter-active { transition: max-height 0.22s ease-out, opacity 0.18s ease-out; max-height: 400px; overflow: hidden; }
 .panel-leave-active { transition: max-height 0.18s ease-in, opacity 0.15s ease-in; overflow: hidden; }
 .panel-enter-from   { max-height: 0; opacity: 0; }
 .panel-leave-to     { max-height: 0; opacity: 0; }
-.panel-enter-to     { max-height: 300px; opacity: 1; }
+.panel-enter-to     { max-height: 400px; opacity: 1; }
 </style>
 
 <style>

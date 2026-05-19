@@ -6,12 +6,21 @@ const emit = defineEmits(["confirm", "cancel"]);
 const result = ref("");
 const percentBillable = ref(100);
 const resultRef = ref(null);
+const endTime = ref(nowLocal());
 
 onMounted(() => resultRef.value?.focus());
 
+function nowLocal() {
+  const d = new Date();
+  const pad = n => String(n).padStart(2, "0");
+  return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+}
+
 function submit() {
   if (!result.value.trim()) { frappe.msgprint(__("Please describe what you accomplished.")); return; }
-  emit("confirm", { result: result.value.trim(), percentBillable: percentBillable.value });
+  const payload = { result: result.value.trim(), percentBillable: percentBillable.value };
+  if (endTime.value) payload.manualEndTime = endTime.value.replace("T", " ") + ":00";
+  emit("confirm", payload);
 }
 
 function onKey(e) {
@@ -61,6 +70,12 @@ const billableOptions = [
             rows="3"
             placeholder="e.g. Fixed the pagination bug, added 4 unit tests, opened MR !38"
           ></textarea>
+        </div>
+
+        <div class="mo__field">
+          <label class="mo__label">End time</label>
+          <p class="mo__hint">Set a past time to log retroactively, or leave as-is to stop now.</p>
+          <input v-model="endTime" type="datetime-local" class="mo__input--datetime" />
         </div>
 
         <div class="mo__field">
@@ -155,6 +170,15 @@ const billableOptions = [
   box-sizing: border-box;
 }
 .mo__textarea:focus { outline: none; border-color: var(--primary); box-shadow: 0 0 0 3px rgba(37,99,235,0.1); }
+.mo__input--datetime {
+  width: 100%; padding: 9px 12px;
+  border: 1px solid var(--border-color); border-radius: 7px;
+  background: var(--card-bg); color: var(--text-color);
+  font-size: 13.5px; font-family: inherit;
+  transition: border-color 0.15s, box-shadow 0.15s;
+  box-sizing: border-box;
+}
+.mo__input--datetime:focus { outline: none; border-color: var(--primary); box-shadow: 0 0 0 3px rgba(37,99,235,0.1); }
 
 /* Billable grid */
 .mo__billable-grid {
