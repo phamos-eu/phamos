@@ -257,18 +257,37 @@ frappe.ui.form.on("Implementation", {
             console.warn("Child table field not available yet.");
         }
         frm.add_custom_button('Create Gitlab Project', function () {
-            frappe.call({
-                method: 'phamos.gitlab_integration.gitlab_group_utils.create_gitlab_project_for_implementation',
-                args: {
-                    implementation_name: frm.doc.name
-                },
-                callback: function (r) {
+        let d = new frappe.ui.Dialog({
+            title: 'Create GitLab Project',
+            fields: [
+                {
+                    label: 'GitLab Project Name',
+                    fieldname: 'gitlab_project_name',
+                    fieldtype: 'Data',
+                    default: frm.doc.name,
+                    reqd: 1,
+                    description: 'You can edit this name for GitLab Project. Implementation link will remain the same.'
+                }
+            ],
+            primary_action_label: 'Create Project',
+            primary_action(values) {
+                d.hide();
+                frappe.call({
+                    method: 'phamos.gitlab_integration.gitlab_group_utils.create_gitlab_project_for_implementation',
+                    args: {
+                        implementation_name: frm.doc.name,
+                        gitlab_project_name: values.gitlab_project_name
+                    },
+                    callback: function (r) {
                         if (!r.exc) {
                             frm.reload_doc();
                         }
                     }
-            });
+                });
+            }
         });
+        d.show();
+    });
 
         frm.add_custom_button('Set Implementation Status', () => {
             let d = new frappe.ui.Dialog({
