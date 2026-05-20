@@ -14,6 +14,9 @@
   "status",
   "notes",
   "start_date",
+  "github_links",
+  "show_on_customer_portal",
+  "links",
   "column_break_7p95",
   "department",
   "account_manager",
@@ -396,6 +399,22 @@
   {
    "fieldname": "column_break_mdrq",
    "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "github_links",
+   "fieldtype": "Heading",
+   "label": "GitHub Links"
+  },
+  {
+   "default": "0",
+   "fieldname": "show_on_customer_portal",
+   "fieldtype": "Check",
+   "label": "Show on Customer Portal?"
+  },
+  {
+   "fieldname": "links",
+   "fieldtype": "Text Editor",
+   "label": "Links"
   }
  ],
  "index_web_pages_for_search": 1,
@@ -425,7 +444,7 @@
    "link_fieldname": "implementation"
   }
  ],
- "modified": "2026-05-15 14:55:09.922244",
+ "modified": "2026-05-20 12:46:08.897457",
  "modified_by": "Administrator",
  "module": "Phamos",
  "name": "Implementation",
