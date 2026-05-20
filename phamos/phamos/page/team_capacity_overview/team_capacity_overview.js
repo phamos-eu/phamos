@@ -529,24 +529,93 @@ frappe.pages['team-capacity-overview'].on_page_load = function (wrapper) {
             },
 
             tooltip: {
-                shared: true,
+                shared: false,
+                useHTML: true,
                 formatter: function () {
-                    // point.key = index, weeks[index] = "YYYY-MM-DD to YYYY-MM-DD"
-                    let idx = this.points[0].point.index;
+                    let idx = this.point.index;
                     let week_label = weeks[idx] || this.x;
+                    let series_name = this.series.name;
+                    let chart = this.series.chart;
+                    let comparison_type = page.comparison_type.get_value() || "last_month";
 
-                    let s = "<b>" + week_label + "</b>";
+                    let fmt = function (val) {
+                        return "<b>" + Highcharts.numberFormat(val, 2) + " hrs</b>";
+                    };
 
-                    this.points.forEach(function (point) {
-                        let name = point.series.name;
-                        if (name === "Historical Actual Time") {
+                    let row = function (color, label, val) {
+                        return '<tr>'
+                            + '<td style="padding-right:6px;vertical-align:middle;">'
+                            + '<span style="color:' + color + ';font-size:15px;">&#9679;</span>'
+                            + '</td>'
+                            + '<td style="padding-right:16px;white-space:nowrap;">' + label + '</td>'
+                            + '<td style="text-align:right;">' + fmt(val) + '</td>'
+                            + '</tr>';
+                    };
+
+                    let s = '<table style="border-collapse:collapse;font-size:12px;min-width:240px;">';
+
+                    // Date header
+                    s += '<tr><td colspan="3" style="font-weight:700;font-size:13px;padding-bottom:8px;border-bottom:2px solid #ddd;">'
+                        + week_label + '</td></tr>';
+
+                    // Agar Actual Time Spent ya Historical Actual Time line pe hover kiya
+                    if (series_name === "Actual Time Spent" || series_name === "Historical Actual Time") {
+                        s += '<tr><td colspan="3" style="padding-top:6px;"></td></tr>';
+
+                        let label = series_name;
+                        if (series_name === "Historical Actual Time") {
                             let hist_range = get_hist_week_label(week_label, comparison_type);
-                            name = name + " (" + hist_range + ")";
+                            label = series_name + " (" + hist_range + ")";
                         }
-                        s += "<br/>"
-                            + '<span style="color:' + point.series.color + '">\u25CF</span> '
-                            + name + ": <b>" + Highcharts.numberFormat(point.y, 2) + "</b>";
+                        s += row(this.series.color, label, this.y);
+                        s += '</table>';
+                        return s;
+                    }
+
+                    // Team line pe hover — us team ka naam dhundho
+                    let matched_team = null;
+                    teams.forEach(function (team) {
+                        if (series_name === team.name) {
+                            matched_team = team;
+                        }
                     });
+
+                    if (!matched_team) {
+                        s += row(this.series.color, series_name, this.y);
+                        s += '</table>';
+                        return s;
+                    }
+
+                    // Team name header
+                    s += '<tr><td colspan="3" style="font-weight:700;font-size:13px;padding:8px 0 4px 0;color:#333;">'
+                        + matched_team.name + '</td></tr>';
+
+                    // Team capacity (ye line khud)
+                    let cap_val = this.y;
+                    s += row(this.series.color, "Capacity", cap_val);
+
+                    // Actual Time Spent — chart se uthao
+                    chart.series.forEach(function (ser) {
+                        if (ser.name === "Actual Time Spent") {
+                            let val = ser.data[idx] ? ser.data[idx].y : null;
+                            if (val !== null && val !== undefined) {
+                                s += row(ser.color, "Teams Actual Time Spent", val);
+                            }
+                        }
+                    });
+
+                    // Historical Actual Time — chart se uthao
+                    chart.series.forEach(function (ser) {
+                        if (ser.name === "Historical Actual Time") {
+                            let val = ser.data[idx] ? ser.data[idx].y : null;
+                            if (val !== null && val !== undefined) {
+                                let hist_range = get_hist_week_label(week_label, comparison_type);
+                                s += row(ser.color, "Teams Historical Actual Time (" + hist_range + ")", val);
+                            }
+                        }
+                    });
+
+                    s += '</table>';
                     return s;
                 }
             },
@@ -694,24 +763,88 @@ frappe.pages['team-capacity-overview'].on_page_load = function (wrapper) {
             },
 
             tooltip: {
-                shared: true,
+                shared: false,
+                useHTML: true,
                 formatter: function () {
-                    // point.key = index, weeks[index] = "YYYY-MM-DD to YYYY-MM-DD"
-                    let idx = this.points[0].point.index;
+                    let idx = this.point.index;
                     let week_label = weeks[idx] || this.x;
+                    let series_name = this.series.name;
+                    let chart = this.series.chart;
+                    let fmt = function (val) {
+                        return "<b>" + Highcharts.numberFormat(val, 2) + " hrs</b>";
+                    };
+                    let row = function (color, label, val) {
+                        return '<tr>'
+                            + '<td style="padding-right:6px;vertical-align:middle;">'
+                            + '<span style="color:' + color + ';font-size:15px;">&#9679;</span>'
+                            + '</td>'
+                            + '<td style="padding-right:16px;white-space:nowrap;">' + label + '</td>'
+                            + '<td style="text-align:right;">' + fmt(val) + '</td>'
+                            + '</tr>';
+                    };
 
-                    let s = "<b>" + week_label + "</b>";
+                    let s = '<table style="border-collapse:collapse;font-size:12px;min-width:240px;">';
+                    s += '<tr><td colspan="3" style="font-weight:700;font-size:13px;padding-bottom:8px;border-bottom:2px solid #ddd;">'
+                        + week_label + '</td></tr>';
 
-                    this.points.forEach(function (point) {
-                        let name = point.series.name;
-                        if (name.toLowerCase().includes("historical")) {
+                    // TOTAL LINES
+                    if (
+                        series_name === "Total Capacity" ||
+                        series_name === "Total Time Spent" ||
+                        series_name === "Historical Total Time Spent"
+                    ) {
+
+                        let label = series_name;
+                        if (series_name === "Historical Total Time Spent") {
                             let hist_range = get_hist_week_label(week_label, hist_type);
-                            name = name + " (" + hist_range + ")";
+                            label = series_name + " (" + hist_range + ")";
                         }
-                        s += "<br/>"
-                            + '<span style="color:' + point.series.color + '">\u25CF</span> '
-                            + name + ": <b>" + Highcharts.numberFormat(point.y, 2) + "</b>";
+                        // Current hovered line
+                        s += row(this.series.color, label, this.y);
+                        if (series_name === "Total Capacity") {
+                            chart.series.forEach(function (ser) {
+                                if (ser.name === "Total Time Spent") {
+                                    let val = ser.data[idx] ? ser.data[idx].y : null;
+                                    if (val !== null && val !== undefined) {
+                                        s += row(ser.color, "Total Time Spent", val);
+                                    }
+                                }
+                            });
+                        }
+                        s += '</table>';
+                        return s;
+                    }
+                    // TEAM LINES
+                    let matched_team = null;
+                    teams.forEach(function (team) {
+                        if (series_name.startsWith(team.name)) {
+                            matched_team = team;
+                        }
                     });
+                    if (!matched_team) {
+                        s += row(this.series.color, series_name, this.y);
+                        s += '</table>';
+                        return s;
+                    }
+                    // Team name header
+                    s += '<tr><td colspan="3" style="font-weight:700;font-size:13px;padding:8px 0 4px 0;color:#333;">'
+                        + matched_team.name + '</td></tr>';
+                    // Show all series for the team
+                    chart.series.forEach(function (ser) {
+                        if (!ser.name.startsWith(matched_team.name)) return;
+                        let val = ser.data[idx] ? ser.data[idx].y : null;
+                        if (val === null || val === undefined) return;
+                        let label = ser.name;
+                        if (ser.name.toLowerCase().includes("historical")) {
+                            let hist_range = get_hist_week_label(week_label, hist_type);
+                            label = ser.name.replace(matched_team.name + " ", "")
+                                + " (" + hist_range + ")";
+                        } else {
+                            label = ser.name.replace(matched_team.name + " ", "");
+                        }
+                        s += row(ser.color, label, val);
+                    });
+                    s += '</table>';
                     return s;
                 }
             },
