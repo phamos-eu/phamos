@@ -39,16 +39,37 @@ frappe.ui.form.on("Customer", {
         }
 
         frm.add_custom_button('Create Gitlab Group', function () {
-            frappe.call({
-                method: 'phamos.gitlab_integration.gitlab_group_utils.create_gitlab_group_for_customer',
-                args: {
-                    customer_name: frm.doc.name
-                },
-                callback: function (r) {
-                    frappe.msgprint(r.message || "Gitlab Group created successfully!");
+        // Confirmation dialog with editable name
+        let d = new frappe.ui.Dialog({
+            title: 'Create GitLab Group',
+            fields: [
+                {
+                    label: 'GitLab Group Name',
+                    fieldname: 'gitlab_group_name',
+                    fieldtype: 'Data',
+                    default: frm.doc.name,
+                    reqd: 1,
+                    description: 'You can edit this name for GitLab Group. Customer link will remain the same.'
                 }
-            });
-        }, __("Create"));
+            ],
+            primary_action_label: 'Create Group',
+            primary_action(values) {
+                d.hide();
+                frappe.call({
+                    method: 'phamos.gitlab_integration.gitlab_group_utils.create_gitlab_group_for_customer',
+                    args: {
+                        customer_name: frm.doc.name,         
+                        gitlab_group_name: values.gitlab_group_name  
+                    },
+                    callback: function (r) {
+                        frappe.msgprint(r.message || "GitLab Group created successfully!");
+                        frm.reload_doc();
+                    }
+                });
+            }
+        });
+        d.show();
+    }, __("Create"));
 
     },
 });
