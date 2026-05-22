@@ -1,0 +1,132 @@
+{
+ "actions": [],
+ "allow_rename": 0,
+ "autoname": "format:HH-{YYYY}-{#####}",
+ "creation": "2026-03-03 10:00:00.000000",
+ "doctype": "DocType",
+ "engine": "InnoDB",
+ "field_order": [
+  "implementation",
+  "column_break_1",
+  "gitlab_project",
+  "section_break_2",
+  "project_manager",
+  "column_break_2",
+  "acting_project_manager",
+  "section_break_3",
+  "overview",
+  "section_break_4",
+  "issues"
+ ],
+ "fields": [
+  {
+   "fieldname": "implementation",
+   "fieldtype": "Link",
+   "in_list_view": 1,
+   "in_standard_filter": 1,
+   "label": "Implementation",
+   "options": "Implementation",
+   "reqd": 1
+  },
+  {
+   "fieldname": "column_break_1",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "gitlab_project",
+   "fieldtype": "Link",
+   "in_list_view": 1,
+   "in_standard_filter": 1,
+   "label": "GitLab Project",
+   "options": "GitLab Project",
+   "reqd": 1
+  },
+  {
+   "fieldname": "section_break_2",
+   "fieldtype": "Section Break",
+   "label": "Handover Details"
+  },
+  {
+   "default": "__user",
+   "fieldname": "project_manager",
+   "fieldtype": "Link",
+   "in_list_view": 1,
+   "label": "Project Manager (Handover By)",
+   "options": "User",
+   "read_only": 1
+  },
+  {
+   "fieldname": "column_break_2",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "acting_project_manager",
+   "fieldtype": "Link",
+   "in_list_view": 1,
+   "in_standard_filter": 1,
+   "label": "Acting Project Manager",
+   "options": "User",
+   "reqd": 1
+  },
+  {
+   "fieldname": "section_break_3",
+   "fieldtype": "Section Break",
+   "label": "Overview / Implementation Status"
+  },
+  {
+   "fieldname": "overview",
+   "fieldtype": "Text Editor",
+   "label": "Overview / Implementation Status",
+   "reqd": 1
+  },
+  {
+   "fieldname": "section_break_4",
+   "fieldtype": "Section Break",
+   "label": "GitLab Issues"
+  },
+  {
+   "fieldname": "issues",
+   "fieldtype": "Table",
+   "label": "GitLab Issues",
+   "options": "Handover Issue"
+  }
+ ],
+ "index_web_pages_for_search": 1,
+ "links": [],
+ "modified": "2026-05-18 10:00:00.000000",
+ "modified_by": "Administrator",
+ "module": "Phamos",
+ "name": "Handover",
+ "naming_rule": "Expression",
+ "owner": "Administrator",
+ "permissions": [
+  {
+   "create": 1,
+   "delete": 1,
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "System Manager",
+   "share": 1,
+   "write": 1
+  },
+  {
+   "create": 1,
+   "delete": 1,
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "Projects Manager",
+   "share": 1,
+   "write": 1
+  }
+ ],
+ "sort_field": "modified",
+ "sort_order": "DESC",
+ "states": [],
+ "track_changes": 1
+}

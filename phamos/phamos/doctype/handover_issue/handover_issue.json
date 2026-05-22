@@ -1,0 +1,141 @@
+{
+ "actions": [],
+ "allow_rename": 1,
+ "creation": "2026-03-03 10:00:00.000000",
+ "doctype": "DocType",
+ "editable_grid": 1,
+ "engine": "InnoDB",
+ "field_order": [
+  "gitlab_issue_id",
+  "issue_title",
+  "issue_status",
+  "priority",
+  "assigned_to",
+  "due_date",
+  "column_break_1",
+  "issue_url",
+  "parent_issue",
+  "gitlab_project",
+  "section_break_2",
+  "description",
+  "section_break_3",
+  "owner_comments",
+  "section_break_4",
+  "pm_comments"
+ ],
+ "fields": [
+  {
+   "fieldname": "gitlab_issue_id",
+   "fieldtype": "Link",
+   "in_list_view": 1,
+   "label": "GitLab Issue",
+   "options": "GitLab Issue",
+   "reqd": 1
+  },
+  {
+   "fieldname": "issue_title",
+   "fieldtype": "Data",
+   "in_list_view": 1,
+   "label": "Issue Title",
+   "read_only": 1,
+   "description": "Click to open the issue in GitLab."
+  },
+  {
+   "fieldname": "issue_status",
+   "fieldtype": "Data",
+   "in_list_view": 1,
+   "label": "Status",
+   "read_only": 1
+  },
+  {
+   "default": "Medium",
+   "fieldname": "priority",
+   "fieldtype": "Select",
+   "in_list_view": 1,
+   "label": "Priority",
+   "options": "Low\nMedium\nHigh\nCritical"
+  },
+  {
+   "fieldname": "assigned_to",
+   "fieldtype": "Data",
+   "in_list_view": 1,
+   "label": "Assigned To",
+   "read_only": 1
+  },
+  {
+   "fieldname": "due_date",
+   "fieldtype": "Date",
+   "label": "Due Date",
+   "read_only": 1
+  },
+  {
+   "fieldname": "column_break_1",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "issue_url",
+   "fieldtype": "Data",
+   "label": "Issue URL",
+   "read_only": 1
+  },
+  {
+   "fieldname": "parent_issue",
+   "fieldtype": "Link",
+   "label": "Parent Issue",
+   "options": "GitLab Issue",
+   "read_only": 1
+  },
+  {
+   "fieldname": "gitlab_project",
+   "fieldtype": "Link",
+   "label": "GitLab Project",
+   "options": "GitLab Project",
+   "read_only": 1
+  },
+  {
+   "fieldname": "section_break_2",
+   "fieldtype": "Section Break",
+   "label": "Description"
+  },
+  {
+   "fieldname": "description",
+   "fieldtype": "Markdown Editor",
+   "label": "Description",
+   "read_only": 1
+  },
+  {
+   "fieldname": "section_break_3",
+   "fieldtype": "Section Break",
+   "label": "Owner Comments"
+  },
+  {
+   "fieldname": "owner_comments",
+   "fieldtype": "Text",
+   "in_list_view": 1,
+   "label": "Owner Comments"
+  },
+  {
+   "fieldname": "section_break_4",
+   "fieldtype": "Section Break",
+   "label": "Project Manager Comments"
+  },
+  {
+   "fieldname": "pm_comments",
+   "fieldtype": "Text",
+   "in_list_view": 1,
+   "label": "PM Comments"
+  }
+ ],
+ "index_web_pages_for_search": 1,
+ "istable": 1,
+ "links": [],
+ "modified": "2026-05-18 10:00:00.000000",
+ "modified_by": "Administrator",
+ "module": "Phamos",
+ "name": "Handover Issue",
+ "owner": "Administrator",
+ "permissions": [],
+ "sort_field": "modified",
+ "sort_order": "DESC",
+ "states": []
+}
