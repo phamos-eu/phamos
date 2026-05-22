@@ -1,4 +1,7 @@
 import frappe
+from frappe.query_builder import DocType
+from frappe.query_builder.functions import Sum, Avg, Count
+from pypika import Criterion
 from datetime import datetime, timedelta, date
 
 @frappe.whitelist()
@@ -29,27 +32,36 @@ def get_team_capacity(filters=None):
 
     # Generate weekly ranges
     week_buckets = generate_weeks(from_dt, to_dt)
-    week_labels = [f"{w['start'].strftime('%Y-%m-%d')} to {w['end'].strftime('%Y-%m-%d')}" for w in week_buckets]
+    week_labels = [
+        f"{w['start'].strftime('%Y-%m-%d')} to {w['end'].strftime('%Y-%m-%d')}"
+        for w in week_buckets
+    ]
 
-    # Fetch all Ledger entries in range
-    conditions = ["date >= %s", "date <= %s"]
-    values = [from_date, to_date]
+    # ── Fetch Ledger entries via QueryBuilder ──
+    Ledger = DocType("Team Capacity Ledger")
+    ledger_query = (
+        frappe.qb.from_(Ledger)
+        .select(Ledger.team, Ledger.total_team_capacity, Ledger.date)
+        .where(Ledger.date >= from_date)
+        .where(Ledger.date <= to_date)
+        .orderby(Ledger.team)
+        .orderby(Ledger.date)
+    )
     if selected_team:
-        placeholders = ", ".join(["%s"] * len(selected_team))
-        conditions.append(f"team IN ({placeholders})")
-        values.extend(selected_team)
+        ledger_query = ledger_query.where(Ledger.team.isin(selected_team))
 
-    entries = frappe.db.sql(f"""
-        SELECT team, total_team_capacity, date
-        FROM `tabTeam Capacity Ledger`
-        WHERE {" AND ".join(conditions)}
-        ORDER BY team, date
-    """, values, as_dict=1)
+    entries = ledger_query.run(as_dict=True)
 
-    # Fetch default Team capacities (fallback)
-    teams_default = frappe.get_all("Team", fields=["name", "total_team_capacity"])
+    # ── Fetch default Team capacities via QueryBuilder ──
+    Team = DocType("Team")
+    team_query = (
+        frappe.qb.from_(Team)
+        .select(Team.name, Team.total_team_capacity)
+    )
     if selected_team:
-        teams_default = [t for t in teams_default if t.name in selected_team]
+        team_query = team_query.where(Team.name.isin(selected_team))
+
+    teams_default = team_query.run(as_dict=True)
 
     # Prepare team-week capacities
     teams_dict = {}
@@ -92,34 +104,92 @@ def get_team_capacity(filters=None):
         else:
             continue
 
-    # Convert to list for chart
+    # ── DocTypes for Timesheet queries ──
+    TS   = DocType("Timesheet")
+    Proj = DocType("Project")
+    Impl = DocType("Implementation")
+
+    # ── Helper: fetch actual hours for a team + date range ──
+    def get_actual_hours(week_start_str, week_end_str, team_name=None, team_list=None):
+        """
+        Returns total hours from tabTimesheet for the given date range.
+        - Uses start_date (DATE field) — no time suffix needed.
+        - total_hours is already in hours, so NO /3600 division.
+        - Filters by team via Implementation join.
+        """
+        q = (
+            frappe.qb.from_(TS)
+            .left_join(Proj).on(Proj.name == TS.parent_project)
+            .left_join(Impl).on(Impl.name == Proj.custom_implementation)
+            .select(Sum(TS.total_hours))
+            .where(TS.start_date >= week_start_str)
+            .where(TS.start_date <= week_end_str)
+            .where(TS.docstatus != 2)
+        )
+        if team_name:
+            q = q.where(Impl.team == team_name)
+        elif team_list:
+            q = q.where(Impl.team.isin(team_list))
+
+        result = q.run()
+        return round(float(result[0][0] or 0), 2)
+
+    # ── Convert to list for chart ──
+    colors = ["#7cb5ec", "#F30BE7", "#90ed7d", "#f7a35c", "#8085e9", "#f15c80"]
     teams = []
-    colors = ["#7cb5ec", "#434348", "#90ed7d", "#f7a35c", "#8085e9", "#f15c80"]
+
     for i, (team_name, data) in enumerate(teams_dict.items()):
+
+        # ── Current Team Actual Time ──
+        actual_data = []
+
+        for w in week_buckets:
+            ws = w["start"].date() if isinstance(w["start"], datetime) else w["start"]
+            we = w["end"].date() if isinstance(w["end"], datetime) else w["end"]
+            actual_data.append(
+                get_actual_hours(ws.strftime("%Y-%m-%d"), we.strftime("%Y-%m-%d"), team_name=team_name)
+            )
+
+        # ── Historical Team Actual Time ──
+        historical_actual_data = []
+
+        if enable_comparison:
+
+            hist_start, hist_end = shift_period(from_dt, to_dt, comparison_type)
+
+            if hist_start and hist_end:
+
+                hist_weeks = generate_weeks(hist_start, hist_end)
+
+                for w in hist_weeks:
+                    ws = w["start"].date() if isinstance(w["start"], datetime) else w["start"]
+                    we = w["end"].date() if isinstance(w["end"], datetime) else w["end"]
+                    historical_actual_data.append(
+                        get_actual_hours(ws.strftime("%Y-%m-%d"), we.strftime("%Y-%m-%d"), team_name=team_name)
+                    )
+
         teams.append({
             "name": team_name,
             "data": data,
+            "actual_data": actual_data,
+            "historical_actual_data": historical_actual_data,
             "color": colors[i % len(colors)]
         })
 
-    # FIX 3: docstatus = 1 only
+    # ── Overall actual_line (all selected teams combined) ──
     actual_line = []
     for w in week_buckets:
-        week_start = w["start"].date() if isinstance(w["start"], datetime) else w["start"]
-        week_end = w["end"].date() if isinstance(w["end"], datetime) else w["end"]
+        ws = w["start"].date() if isinstance(w["start"], datetime) else w["start"]
+        we = w["end"].date() if isinstance(w["end"], datetime) else w["end"]
+        actual_line.append(
+            get_actual_hours(
+                ws.strftime("%Y-%m-%d"),
+                we.strftime("%Y-%m-%d"),
+                team_list=selected_team if selected_team else None
+            )
+        )
 
-        s = week_start.strftime("%Y-%m-%d") + " 00:00:00"
-        e = week_end.strftime("%Y-%m-%d") + " 23:59:59"
-
-        total_actual = frappe.db.sql("""
-            SELECT SUM(actual_time)
-            FROM `tabTimesheet Record`
-            WHERE from_time BETWEEN %s AND %s
-            AND docstatus = 1
-        """, (s, e))[0][0] or 0
-
-        actual_line.append(round(total_actual / 3600, 2))
-
+    # ── Historical actual_line ──
     historical_actual_line = None
 
     if enable_comparison:
@@ -128,12 +198,15 @@ def get_team_capacity(filters=None):
         if not hist_start or not hist_end:
             frappe.msgprint("Invalid comparison type selected.", alert=True)
         else:
-            hist_count = frappe.db.sql("""
-                SELECT COUNT(*)
-                FROM `tabTimesheet Record`
-                WHERE from_time BETWEEN %s AND %s
-                AND docstatus = 1
-            """, (str(hist_start) + " 00:00:00", str(hist_end) + " 23:59:59"))[0][0]
+            # Check if hist data exists via QueryBuilder
+            hist_count_q = (
+                frappe.qb.from_(TS)
+                .select(Count("*"))
+                .where(TS.start_date >= str(hist_start))
+                .where(TS.start_date <= str(hist_end))
+                .where(TS.docstatus != 2)
+            )
+            hist_count = hist_count_q.run()[0][0]
 
             if hist_count == 0:
                 frappe.msgprint(
@@ -145,28 +218,21 @@ def get_team_capacity(filters=None):
                 historical_actual_line = []
 
                 for w in hist_weeks:
-                    week_start = w["start"].date() if isinstance(w["start"], datetime) else w["start"]
-                    week_end = w["end"].date() if isinstance(w["end"], datetime) else w["end"]
-
-                    s = week_start.strftime("%Y-%m-%d") + " 00:00:00"
-                    e = week_end.strftime("%Y-%m-%d") + " 23:59:59"
-
-                    total_actual = frappe.db.sql("""
-                        SELECT SUM(actual_time)
-                        FROM `tabTimesheet Record`
-                        WHERE from_time BETWEEN %s AND %s
-                        AND docstatus = 1
-                    """, (s, e))[0][0] or 0
-
-                    historical_actual_line.append(round(total_actual / 3600, 2))
-
+                    ws = w["start"].date() if isinstance(w["start"], datetime) else w["start"]
+                    we = w["end"].date() if isinstance(w["end"], datetime) else w["end"]
+                    historical_actual_line.append(
+                        get_actual_hours(
+                            ws.strftime("%Y-%m-%d"),
+                            we.strftime("%Y-%m-%d"),
+                            team_list=selected_team if selected_team else None
+                        )
+                    )
 
     return {
         "weeks": week_labels,
         "teams": teams,
         "actual_line": actual_line,
-        "historical_actual_line": historical_actual_line
-
+        "historical_actual_line": historical_actual_line,
     }
 
 def generate_weeks(start_date, end_date):
@@ -192,17 +258,15 @@ def shift_period(start, end, comparison_type):
     if comparison_type == "last_year":
         return (
             safe_replace_year(start, start.year - 1),
-            safe_replace_year(end, end.year - 1)
+            safe_replace_year(end, end.year - 1),
         )
 
     elif comparison_type == "last_month":
-        # Start ka same din, previous month mein
         first_of_start = start.replace(day=1)
         prev_month_end = first_of_start - timedelta(days=1)
         try:
             shifted_start = prev_month_end.replace(day=start.day)
         except ValueError:
-            # Agar din month se bara ho (e.g. Jan 31 -> Feb 28)
             shifted_start = prev_month_end
 
         first_of_end = end.replace(day=1)
@@ -215,3 +279,15 @@ def shift_period(start, end, comparison_type):
         return shifted_start, shifted_end
 
     return None, None
+
+@frappe.whitelist()
+def get_all_teams(txt="", **kwargs):
+    Team = DocType("Team")
+    result = (
+        frappe.qb.from_(Team)
+        .select(Team.name)
+        .where(Team.name.like(f"%{txt}%"))
+        .orderby(Team.name)
+        .limit(50)
+    ).run(as_dict=True)
+    return [t.name for t in result]
