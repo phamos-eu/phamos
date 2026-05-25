@@ -131,16 +131,6 @@
     outline: none; transition: border-color .15s;
   }
   .pe-email-input:focus { border-color: var(--pe-accent); }
-  .pe-gdpr-label {
-    display: flex; align-items: flex-start; gap: .45rem;
-    font-size: .7rem; color: var(--pe-muted); margin-bottom: .5rem;
-    cursor: pointer; user-select: none;
-  }
-  .pe-gdpr-label input[type="checkbox"] {
-    margin-top: .15rem; flex-shrink: 0;
-    width: 14px; height: 14px; cursor: pointer;
-    accent-color: var(--pe-accent);
-  }
   .pe-subscribe-btn {
     width: 100%; padding: .5rem;
     background: var(--pe-accent); color: #fff;
@@ -442,10 +432,6 @@
             <div class="pe-email-subscribe">
               <div class="pe-email-title">Stay Updated</div>
               <input type="email" id="subscribe-email" class="pe-email-input" placeholder="your.email@example.com">
-              <label class="pe-gdpr-label">
-                <input type="checkbox" id="gdpr-consent">
-                <span>I agree to receive event updates and accept the data privacy policy</span>
-              </label>
               <button id="subscribe-btn" class="pe-subscribe-btn">Subscribe</button>
               <div id="subscribe-msg" class="pe-subscribe-msg"></div>
             </div>
@@ -607,18 +593,12 @@ frappe.ready(function () {
   // Email subscription
   var subscribeBtn   = document.getElementById("subscribe-btn");
   var subscribeEmail = document.getElementById("subscribe-email");
-  var gdprConsent    = document.getElementById("gdpr-consent");
   var subscribeMsg   = document.getElementById("subscribe-msg");
 
   subscribeBtn.addEventListener("click", function () {
     var email = subscribeEmail.value.trim();
     if (!email) {
       subscribeMsg.textContent = "Please enter your email address";
-      subscribeMsg.className = "pe-subscribe-msg error";
-      return;
-    }
-    if (!gdprConsent.checked) {
-      subscribeMsg.textContent = "Please accept the data privacy policy";
       subscribeMsg.className = "pe-subscribe-msg error";
       return;
     }
@@ -634,7 +614,6 @@ frappe.ready(function () {
           subscribeMsg.textContent = "✓ Successfully subscribed!";
           subscribeMsg.className = "pe-subscribe-msg success";
           subscribeEmail.value = "";
-          gdprConsent.checked = false;
         } else if (r.message && r.message.status === "already_subscribed") {
           subscribeMsg.textContent = "You're already subscribed";
           subscribeMsg.className = "pe-subscribe-msg";
