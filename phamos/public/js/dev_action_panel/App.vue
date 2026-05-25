@@ -62,7 +62,9 @@ const projects = computed(() => {
 const filteredIssues = computed(() => {
   const today = new Date(); today.setHours(0, 0, 0, 0);
   const weekEnd = new Date(today); weekEnd.setDate(today.getDate() + 7);
-  let list = issues.value;
+  const activeIssueName = activeSession.value?.gitlab_issue;
+  const activeIssue = issues.value.find(i => i.name === activeIssueName);
+  let list = issues.value.filter(i => i.name !== activeIssueName);
 
   if (mineOnly.value) list = list.filter(i => i.is_mine);
   if (selectedProject.value) list = list.filter(i => i.gitlab_project === selectedProject.value);
@@ -93,12 +95,7 @@ const filteredIssues = computed(() => {
     });
   }
 
-  const activeIssueName = activeSession.value?.gitlab_issue;
   list = [...list].sort((a, b) => {
-    // Active issue always first
-    if (a.name === activeIssueName) return -1;
-    if (b.name === activeIssueName) return 1;
-
     let va, vb;
     if (sortBy.value === "due_date") {
       if (!a.due_date && !b.due_date) return 0;
@@ -116,6 +113,9 @@ const filteredIssues = computed(() => {
     if (va > vb) return sortDir.value === "asc" ? 1 : -1;
     return 0;
   });
+
+  // Re-inject the active issue at the top, bypassing all filters
+  if (activeIssue) list = [activeIssue, ...list];
   return list;
 });
 
