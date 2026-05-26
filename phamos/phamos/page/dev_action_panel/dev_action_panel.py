@@ -61,6 +61,23 @@ def get_my_issues():
     active_ts_name = active.get("name") if active else None
     active_issue = active.get("gitlab_issue") if active else None
 
+    # If there is a running session whose issue is closed/not in the opened list,
+    # fetch it without a state filter and prepend it so the user can still stop it.
+    if active_issue and active_issue not in {i["name"] for i in issues}:
+        extra = frappe.get_all(
+            "GitLab Issue",
+            filters={"name": active_issue},
+            fields=[
+                "name", "issue_id", "title", "state",
+                "due_date", "start_date",
+                "assignee", "assignee_email", "gitlab_username",
+                "issue_url", "parent_issue", "gitlab_project",
+                "labels",
+            ],
+        )
+        if extra:
+            issues = extra + issues
+
     for issue in issues:
         ts_data = count_map.get(issue["name"], {"cnt": 0, "total_seconds": 0})
         issue["timesheet_count"] = ts_data["cnt"]
