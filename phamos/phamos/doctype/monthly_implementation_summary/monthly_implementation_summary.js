@@ -37,7 +37,8 @@ frappe.ui.form.on("Monthly Implementation Summary", {
 		_mis_hint_reload_timesheets(frm);
 	},
 	implementation: function (frm) {
-		_mis_hint_reload_timesheets(frm);
+		if (frm.is_new()) return;
+		frm.save();
 	},
 	create_delivery_note: function(frm) {
 		frappe.call({

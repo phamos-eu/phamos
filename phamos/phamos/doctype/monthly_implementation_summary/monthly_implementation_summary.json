@@ -93,7 +93,7 @@
    "fieldname": "sales_order",
    "fieldtype": "Link",
    "label": "Sales Order",
-   "link_filters": "[\n  [\"Sales Order\", \"docstatus\", \"=\", 1],\n  [\"Sales Order\", \"custom_implementation\", \"=\", \"eval:doc.implementation\"],\n  [\"Sales Order\", \"status\", \"!=\", \"Completed\"]\n]",
+   "link_filters": "[\n  [\"Sales Order\", \"docstatus\", \"=\", 1],\n  [\"Sales Order\", \"custom_implementation\", \"=\", \"eval:doc.implementation\"],\n  [\"Sales Order\", \"status\", \"not in\", [\"Completed\", \"Closed\", \"On Hold\"]]\n]",
    "no_copy": 1,
    "options": "Sales Order"
   },
@@ -204,7 +204,7 @@
  "index_web_pages_for_search": 1,
  "is_submittable": 1,
  "links": [],
- "modified": "2026-04-08 10:27:44.411631",
+ "modified": "2026-05-25 10:27:44.411631",
  "modified_by": "Administrator",
  "module": "Phamos",
  "name": "Monthly Implementation Summary",
