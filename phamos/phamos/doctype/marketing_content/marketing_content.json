@@ -41,6 +41,7 @@
   "registration_open",
   "max_attendees",
   "section_responses",
+  "subscription_description",
   "responses"
  ],
  "fields": [
@@ -256,6 +257,12 @@
    "label": "Email Subscriptions"
   },
   {
+   "fieldname": "subscription_description",
+   "fieldtype": "Small Text",
+   "label": "Subscription Description",
+   "description": "Text shown below the 'Stay Updated' heading on the event page. Leave blank to use the default."
+  },
+  {
    "fieldname": "responses",
    "fieldtype": "Table",
    "label": "Responses",
@@ -265,7 +272,7 @@
  ],
  "has_web_view": 1,
  "is_published_field": "published",
- "modified": "2026-04-30 00:00:00.000000",
+ "modified": "2026-05-29 00:00:00.000000",
  "modified_by": "Administrator",
  "module": "Phamos",
  "name": "Marketing Content",
