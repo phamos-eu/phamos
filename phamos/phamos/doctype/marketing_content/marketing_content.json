@@ -260,7 +260,8 @@
    "fieldname": "subscription_description",
    "fieldtype": "Small Text",
    "label": "Subscription Description",
-   "description": "Text shown below the 'Stay Updated' heading on the event page. Leave blank to use the default."
+   "description": "Text shown below the 'Stay Updated' heading on the event page. Clear to hide it.",
+   "default": "Get notified about event updates, schedule changes, and reminders straight to your inbox."
   },
   {
    "fieldname": "responses",
