@@ -435,7 +435,7 @@
             {# Email subscription #}
             <div class="pe-email-subscribe">
               <div class="pe-email-title">Stay Updated</div>
-              <p class="pe-email-desc">Get notified about event updates, schedule changes, and reminders straight to your inbox.</p>
+              <p class="pe-email-desc">{{ subscription_description or "Get notified about event updates, schedule changes, and reminders straight to your inbox." }}</p>
               <input type="email" id="subscribe-email" class="pe-email-input" placeholder="your.email@example.com">
               <button id="subscribe-btn" class="pe-subscribe-btn">Subscribe</button>
               <div id="subscribe-msg" class="pe-subscribe-msg"></div>
