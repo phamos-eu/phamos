@@ -47,12 +47,27 @@ def get_user_email(user_id):
 
 def get_all_projects(page=1, per_page=100):
     settings = frappe.get_single("GitLab Settings")
-    url = f"{settings.gitlab_url}/api/v4/projects?membership=true&page={page}&per_page={per_page}"
     
-    response = requests.request("GET", url, headers=get_gitlab_headers())
+    all_projects = []
+    current_page = page
 
-    response.raise_for_status()
-    return response.json()
+    while True:
+        url = f"{settings.gitlab_url}/api/v4/projects?page={current_page}&per_page={per_page}&order_by=id&sort=asc"
+        
+        response = requests.request("GET", url, headers=get_gitlab_headers())
+        response.raise_for_status()
+        data = response.json()
+        if not data:
+            break
+            
+        all_projects.extend(data)
+        
+        total_pages = int(response.headers.get("X-Total-Pages", 1))
+        if current_page >= total_pages:
+            break
+        current_page += 1
+
+    return all_projects
 
 def get_all_groups(page=1, per_page=100):
     settings = frappe.get_single("GitLab Settings")
