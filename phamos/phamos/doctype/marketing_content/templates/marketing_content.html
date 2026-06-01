@@ -147,6 +147,10 @@
   }
   .pe-subscribe-msg.success { color: #065f46; }
   .pe-subscribe-msg.error { color: #991b1b; }
+  .pe-email-desc {
+    font-size: .72rem; color: var(--pe-muted);
+    margin-bottom: .55rem; line-height: 1.5;
+  }
 
   /* Organizer */
   .pe-organizer { display: flex; align-items: center; gap: .55rem; }
@@ -431,6 +435,7 @@
             {# Email subscription #}
             <div class="pe-email-subscribe">
               <div class="pe-email-title">Stay Updated</div>
+              {% if subscription_description %}<p class="pe-email-desc">{{ subscription_description }}</p>{% endif %}
               <input type="email" id="subscribe-email" class="pe-email-input" placeholder="your.email@example.com">
               <button id="subscribe-btn" class="pe-subscribe-btn">Subscribe</button>
               <div id="subscribe-msg" class="pe-subscribe-msg"></div>
