@@ -32,10 +32,7 @@ def execute():
             )
         ).run()
         frappe.db.commit()
-        print(f"MIS DNI rows clean ho gayi: {len(mis_rows)} rows ✅")
-    else:
-        print("MIS rows pehle se clean hain ✅")
-
+        print(f"Cleaned {len(mis_rows)} MIS rows with SO reference.")
     # ── Step 2: SO Items delivered_qty recalculate
     so_items = (
         frappe.qb.from_(SOI)
@@ -49,7 +46,6 @@ def execute():
     ).run(as_dict=True)
 
     if not so_items:
-        print("✅ Koi submitted SO Items nahi mili.")
         return
 
     print(f"Total SO Items check hongi: {len(so_items)}")
@@ -95,4 +91,3 @@ def execute():
                 message=frappe.get_traceback(),
             )
     frappe.db.commit()
-    print("\n✅ Patch complete!")
