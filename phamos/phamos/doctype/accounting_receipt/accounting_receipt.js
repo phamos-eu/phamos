@@ -69,6 +69,9 @@ frappe.ui.form.on("Accounting Receipt", {
         frm.toggle_display("pdf_preview", false);
         frm.trigger("attachment");
 
+        // PDF selection from multiple email attachments
+        frm.events.refresh_pdf_attachment_choices(frm);
+
         // Fetch PDF (Mistral) - show review popup, then apply on Proceed
         if (!frm.doc.__islocal && frm.doc.attachment && frm.doc.attachment.toLowerCase().endsWith(".pdf")) {
             frm.add_custom_button(__("Fetch PDF"), function () {
@@ -99,6 +102,77 @@ frappe.ui.form.on("Accounting Receipt", {
                 });
             });
         }
+    },
+
+    pdf_attachment_choice: function (frm) {
+        var chosen = (frm.doc.pdf_attachment_choice || "").trim();
+        if (!chosen) return;
+        if (frm.doc.attachment === chosen) return;
+        frm.set_value("attachment", chosen);
+        frm.trigger("attachment");
+    },
+
+    _is_pdf_file: function (f) {
+        var url = (f && f.file_url) ? String(f.file_url) : "";
+        var name = (f && f.file_name) ? String(f.file_name) : "";
+        return (/\.pdf$/i.test(url) || /\.pdf$/i.test(name));
+    },
+
+    refresh_pdf_attachment_choices: function (frm) {
+        if (frm.doc.__islocal) return;
+        if (!frm.fields_dict || !frm.fields_dict.pdf_attachment_choice) return;
+
+        frappe.call({
+            method: "frappe.client.get_list",
+            args: {
+                doctype: "File",
+                fields: ["name", "file_name", "file_url", "file_size", "creation"],
+                filters: {
+                    attached_to_doctype: "Accounting Receipt",
+                    attached_to_name: frm.doc.name,
+                },
+                order_by: "creation desc",
+                limit_page_length: 50,
+            },
+            callback: function (r) {
+                var files = (r && r.message) || [];
+                var pdf_urls = files
+                    .filter(function (f) { return frm.events._is_pdf_file(f); })
+                    .map(function (f) { return (f && f.file_url) ? String(f.file_url) : ""; })
+                    .filter(function (u) { return !!u; });
+
+                // De-dupe while preserving order
+                var seen = {};
+                pdf_urls = pdf_urls.filter(function (u) {
+                    if (seen[u]) return false;
+                    seen[u] = true;
+                    return true;
+                });
+
+                frm.set_df_property("pdf_attachment_choice", "options", pdf_urls.join("\n"));
+                frm.refresh_field("pdf_attachment_choice");
+
+                if (pdf_urls.length === 1) {
+                    // Only one PDF: auto-select + set attachment if missing or not in list
+                    var only = pdf_urls[0];
+                    if (frm.doc.pdf_attachment_choice !== only) {
+                        frm.set_value("pdf_attachment_choice", only);
+                    }
+                    if (!frm.doc.attachment || pdf_urls.indexOf(frm.doc.attachment) === -1) {
+                        frm.set_value("attachment", only);
+                        frm.trigger("attachment");
+                    }
+                    return;
+                }
+
+                // Multiple PDFs: keep choice in sync with attachment if possible
+                if (frm.doc.attachment && pdf_urls.indexOf(frm.doc.attachment) !== -1) {
+                    if (frm.doc.pdf_attachment_choice !== frm.doc.attachment) {
+                        frm.set_value("pdf_attachment_choice", frm.doc.attachment);
+                    }
+                }
+            },
+        });
     },
 
     show_extract_review_dialog: function (frm, fields, extracted, pdf_url) {
@@ -476,6 +550,9 @@ frappe.ui.form.on("Accounting Receipt", {
             frm.toggle_display("pdf_preview", true);
             frm.get_field("pdf_preview").$wrapper.html($preview);
         }
+
+        // Keep PDF selector in sync as attachments might get copied asynchronously from email -> Communication -> Accounting Receipt
+        frm.events.refresh_pdf_attachment_choices(frm);
     },
 
     getFileExtension: function (filename) {

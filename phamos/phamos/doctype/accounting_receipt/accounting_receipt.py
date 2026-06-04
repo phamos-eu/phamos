@@ -121,12 +121,17 @@ def make_accounting_receipt(issue):
 
 
 def _sync_attachment_field(accounting_receipt_name):
-	"""Set Accounting Receipt's attachment field from first File attached to it, if field is empty."""
+	"""Set Accounting Receipt's attachment field from first attached PDF, if available.
+
+	We intentionally ignore non-PDF attachments (logos, signatures, .p7s, images, etc.)
+	because downstream flows (preview, extraction, DATEV) expect a PDF.
+	"""
 	first = frappe.db.get_value(
 		"File",
 		filters={
 			"attached_to_doctype": "Accounting Receipt",
 			"attached_to_name": accounting_receipt_name,
+			"file_url": ["like", "%.pdf"],
 		},
 		fieldname="file_url",
 		order_by="creation asc",
