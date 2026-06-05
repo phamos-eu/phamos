@@ -32,7 +32,9 @@ def update_gitlab_avatar(group_id=None, project_id=None, customer_doc=None):
     base_url = settings.gitlab_url.rstrip('/')
 
     headers = {
-        "PRIVATE-TOKEN": get_gitlab_headers()["PRIVATE-TOKEN"]
+        "PRIVATE-TOKEN": get_decrypted_password(
+        "GitLab Settings", "GitLab Settings", "access_token"
+        )
     }
 
     files = {
