@@ -36,6 +36,14 @@
   "section_break_ky9b",
   "customer",
   "contact_person",
+  "commercial_details_tab",
+  "billing_address",
+  "invoicing_email_id",
+  "billing_mode",
+  "column_break_tbmt",
+  "billing_contact",
+  "payment_terms",
+  "item_pricepricing_rule_for_services_per_hour",
   "resource_planning_tab",
   "from_date",
   "column_break_wufw",
@@ -396,6 +404,65 @@
   {
    "fieldname": "column_break_mdrq",
    "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "github_links",
+   "fieldtype": "Heading",
+   "label": "GitHub Links"
+  },
+  {
+   "default": "0",
+   "fieldname": "show_on_customer_portal",
+   "fieldtype": "Check",
+   "label": "Show on Customer Portal?"
+  },
+  {
+   "fieldname": "links",
+   "fieldtype": "Text Editor",
+   "label": "Links"
+  },
+  {
+   "fieldname": "invoicing_email_id",
+   "fieldtype": "Link",
+   "label": "Invoicing Email ID",
+   "options": "Contact"
+  },
+  {
+   "fieldname": "item_pricepricing_rule_for_services_per_hour",
+   "fieldtype": "Small Text",
+   "label": "Item Price/Pricing Rule for services per hour"
+  },
+  {
+   "fieldname": "billing_mode",
+   "fieldtype": "Small Text",
+   "label": "Billing Mode"
+  },
+  {
+   "fieldname": "payment_terms",
+   "fieldtype": "Link",
+   "label": "Payment Terms",
+   "options": "Payment Term"
+  },
+  {
+   "fieldname": "column_break_tbmt",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "billing_address",
+   "fieldtype": "Link",
+   "label": "Billing Address",
+   "options": "Address"
+  },
+  {
+   "fieldname": "billing_contact",
+   "fieldtype": "Link",
+   "label": "Billing Contact",
+   "options": "Contact"
+  },
+  {
+   "fieldname": "commercial_details_tab",
+   "fieldtype": "Tab Break",
+   "label": "Commercial Details"
   }
  ],
  "index_web_pages_for_search": 1,
@@ -425,7 +492,7 @@
    "link_fieldname": "implementation"
   }
  ],
- "modified": "2026-05-15 14:55:09.922244",
+ "modified": "2026-06-04 09:56:31.302460",
  "modified_by": "Administrator",
  "module": "Phamos",
  "name": "Implementation",
