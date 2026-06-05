@@ -6,20 +6,57 @@
  "doctype": "DocType",
  "engine": "InnoDB",
  "field_order": [
+  "document",
+  "reference_record",
+  "column_break_wvig",
+  "status",
+  "completion_percentage",
+  "section_break_hnfc",
   "checklist_items"
  ],
  "fields": [
   {
    "fieldname": "checklist_items",
    "fieldtype": "Table",
-   "label": "Checklist Items",
+   "label": "Checklist Item",
    "options": "Checklist Items"
+  },
+  {
+   "fieldname": "section_break_hnfc",
+   "fieldtype": "Section Break"
+  },
+  {
+   "fieldname": "document",
+   "fieldtype": "Link",
+   "label": "Document",
+   "options": "DocType"
+  },
+  {
+   "fieldname": "reference_record",
+   "fieldtype": "Dynamic Link",
+   "label": "Reference Record",
+   "options": "document"
+  },
+  {
+   "fieldname": "column_break_wvig",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "status",
+   "fieldtype": "Select",
+   "label": "Status",
+   "options": "Not Started\nIn Progress\nCompleted"
+  },
+  {
+   "fieldname": "completion_percentage",
+   "fieldtype": "Percent",
+   "label": "Completion Percentage"
   }
  ],
  "grid_page_length": 50,
  "index_web_pages_for_search": 1,
  "links": [],
- "modified": "2026-05-22 12:47:46.073778",
+ "modified": "2026-06-04 15:09:45.520558",
  "modified_by": "Administrator",
  "module": "Phamos",
  "name": "Checklist",
