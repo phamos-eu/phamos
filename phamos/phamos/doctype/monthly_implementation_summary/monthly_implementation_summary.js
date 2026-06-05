@@ -15,6 +15,55 @@ function _mis_has_workflow(frm) {
 	return !!frappe.workflow.get_state_fieldname(frm.doc.doctype);
 }
 
+function _mis_set_create_dn_button(frm) {
+	const label = __("Create Delivery Note");
+	frm.remove_custom_button(label);
+	if (!frm.is_new() && !frm.is_dirty() && frm.doc.sales_order) {
+		frm.add_custom_button(label, () => _mis_confirm_create_dn(frm));
+	}
+}
+
+function _mis_confirm_create_dn(frm) {
+	frappe.confirm(
+		__("Create a Delivery Note for Sales Order {0}?", [frm.doc.sales_order]),
+		() => _mis_do_create_dn(frm)
+	);
+}
+
+function _mis_do_create_dn(frm) {
+	frappe.call({
+		method: "phamos.phamos.doctype.monthly_implementation_summary.monthly_implementation_summary.create_delivery_note",
+		args: {
+			docname: frm.doc.name,
+			sales_order: frm.doc.sales_order || null,
+			delivery_note_item: frm.doc.delivery_note_item || []
+		},
+		freeze: true,
+		freeze_message: __("Creating delivery note..."),
+		callback: function(r) {
+			if (r.exc) {
+				frappe.msgprint({
+					title: __("Error"),
+					message: r.exc[0] || __("Failed to create delivery note."),
+					indicator: "red"
+				});
+				return;
+			}
+			const msg = r.message && r.message.dn_name;
+			if (msg) {
+				frappe.msgprint({
+					title: __('Success'),
+					indicator: 'green',
+					message: __('Delivery Note {0} created and items synced to Delivery Note Item table.', [msg])
+				});
+				frm.reload_doc();
+			} else {
+				frappe.msgprint(__("Failed to create Delivery Note. Please try again."));
+			}
+		}
+	});
+}
+
 frappe.ui.form.on("Monthly Implementation Summary", {
 	onload: function(frm) {
 		// Set year options dynamically: last year, current year, next 2 years
@@ -40,40 +89,11 @@ frappe.ui.form.on("Monthly Implementation Summary", {
 		if (frm.is_new()) return;
 		frm.save();
 	},
-	create_delivery_note: function(frm) {
-		frappe.call({
-			method: "phamos.phamos.doctype.monthly_implementation_summary.monthly_implementation_summary.create_delivery_note",
-			args: {
-				docname: frm.doc.name,
-				sales_order: frm.doc.sales_order || null,
-				delivery_note_item: frm.doc.delivery_note_item || []
-			},
-			freeze: true,
-			freeze_message: __("Creating delivery note..."),
-			callback: function(r) {
-				if (r.exc) {
-					frappe.msgprint({
-						title: __("Error"),
-						message: r.exc[0] || __("Failed to create delivery note."),
-						indicator: "red"
-					});
-					return;
-				}
-				const msg = r.message && r.message.dn_name;
-				if (msg) {
-					frappe.msgprint({
-						title: __('Success'),
-						indicator: 'green',
-						message: __('Delivery Note {0} created and items synced to Delivery Note Item table.', [msg])
-					});
-					frm.reload_doc();
-				} else {
-					frappe.msgprint(__("Failed to create Delivery Note. Please try again."));
-				}
-			}
-		});
+	sales_order: function(frm) {
+		_mis_set_create_dn_button(frm);
 	},
 	refresh: function(frm) {
+		_mis_set_create_dn_button(frm);
 		if (frm.doc.delivery_note) {
             add_custom_links("delivery_note", "Delivery Note", frm.doc.delivery_note);
         }
@@ -109,18 +129,18 @@ frappe.ui.form.on("Monthly Implementation Summary", {
 				setTimeout(() => {
 					// Remove any existing Sales Order badges to avoid duplicates
 					$('.document-link[data-doctype="Sales Order"]').remove();
-					
+
 					// Find the container
 					let $container = $('.form-links');
-					
+
 					if ($container.length === 0) {
 						$container = $('.form-dashboard-section.connections');
 					}
-					
+
 					if ($container.length === 0) {
 						$container = $('[data-doctype="Delivery Note"]').parent();
 					}
-					
+
 					if ($container.length > 0) {
 						let badge_html = `
 							<div class="document-link" data-doctype="Sales Order">
@@ -130,9 +150,9 @@ frappe.ui.form.on("Monthly Implementation Summary", {
 								</div>
 							</div>
 						`;
-						
+
 						$container.append(badge_html);
-						
+
 						// Add click handler
 						$('.document-link[data-doctype="Sales Order"] .badge-link').on('click', function(e) {
 							e.preventDefault();
@@ -171,7 +191,7 @@ frappe.ui.form.on("Monthly Implementation Summary", {
 				}
 			});
 	},
-	
+
 	before_workflow_action(frm) {
 		if (!_mis_has_workflow(frm) || frm.selected_workflow_action !== "Submit") {
 			return;

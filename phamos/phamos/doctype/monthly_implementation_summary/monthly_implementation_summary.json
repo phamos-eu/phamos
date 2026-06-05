@@ -9,7 +9,6 @@
   "naming_series",
   "implementation",
   "sales_order",
-  "create_delivery_note",
   "delivery_note",
   "section_break_1_section",
   "year",
@@ -102,11 +101,6 @@
    "fieldtype": "Section Break"
   },
   {
-   "fieldname": "create_delivery_note",
-   "fieldtype": "Button",
-   "label": "Create Delivery Note"
-  },
-  {
    "fieldname": "delivery_note",
    "fieldtype": "Data",
    "label": "Delivery Note",
@@ -147,7 +141,7 @@
    "read_only": 1
   },
   {
-   "description": "Sum of billable Timesheet Detail hours on draft timesheets for this Implementation\u2019s projects, with no custom_delivery_note. Same as timesheet_hrs.\n",
+   "description": "Sum of billable Timesheet Detail hours on draft timesheets for this Implementation’s projects, with no custom_delivery_note. Same as timesheet_hrs.\n",
    "fieldname": "timesheet_hrs",
    "fieldtype": "Float",
    "label": "Draft billable TS hours",
