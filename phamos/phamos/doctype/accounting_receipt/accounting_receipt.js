@@ -156,7 +156,9 @@ frappe.ui.form.on("Accounting Receipt", {
                     // Only one PDF: auto-select + set attachment if missing or not in list
                     var only = pdf_urls[0];
                     if (frm.doc.pdf_attachment_choice !== only) {
-                        frm.set_value("pdf_attachment_choice", only);
+                        // Direct assignment avoids marking the form dirty
+                        frm.doc.pdf_attachment_choice = only;
+                        frm.refresh_field("pdf_attachment_choice");
                     }
                     if (!frm.doc.attachment || pdf_urls.indexOf(frm.doc.attachment) === -1) {
                         frm.set_value("attachment", only);
@@ -168,7 +170,9 @@ frappe.ui.form.on("Accounting Receipt", {
                 // Multiple PDFs: keep choice in sync with attachment if possible
                 if (frm.doc.attachment && pdf_urls.indexOf(frm.doc.attachment) !== -1) {
                     if (frm.doc.pdf_attachment_choice !== frm.doc.attachment) {
-                        frm.set_value("pdf_attachment_choice", frm.doc.attachment);
+                        // Direct assignment avoids marking the form dirty
+                        frm.doc.pdf_attachment_choice = frm.doc.attachment;
+                        frm.refresh_field("pdf_attachment_choice");
                     }
                 }
             },
