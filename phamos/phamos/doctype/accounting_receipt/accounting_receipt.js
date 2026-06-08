@@ -69,6 +69,9 @@ frappe.ui.form.on("Accounting Receipt", {
         frm.toggle_display("pdf_preview", false);
         frm.trigger("attachment");
 
+        // PDF selection from multiple email attachments
+        frm.events.refresh_pdf_attachment_choices(frm);
+
         // Fetch PDF (Mistral) - show review popup, then apply on Proceed
         if (!frm.doc.__islocal && frm.doc.attachment && frm.doc.attachment.toLowerCase().endsWith(".pdf")) {
             frm.add_custom_button(__("Fetch PDF"), function () {
@@ -99,6 +102,81 @@ frappe.ui.form.on("Accounting Receipt", {
                 });
             });
         }
+    },
+
+    pdf_attachment_choice: function (frm) {
+        var chosen = (frm.doc.pdf_attachment_choice || "").trim();
+        if (!chosen) return;
+        if (frm.doc.attachment === chosen) return;
+        frm.set_value("attachment", chosen);
+        frm.trigger("attachment");
+    },
+
+    _is_pdf_file: function (f) {
+        var url = (f && f.file_url) ? String(f.file_url) : "";
+        var name = (f && f.file_name) ? String(f.file_name) : "";
+        return (/\.pdf$/i.test(url) || /\.pdf$/i.test(name));
+    },
+
+    refresh_pdf_attachment_choices: function (frm) {
+        if (frm.doc.__islocal) return;
+        if (!frm.fields_dict || !frm.fields_dict.pdf_attachment_choice) return;
+
+        frappe.call({
+            method: "frappe.client.get_list",
+            args: {
+                doctype: "File",
+                fields: ["name", "file_name", "file_url", "file_size", "creation"],
+                filters: {
+                    attached_to_doctype: "Accounting Receipt",
+                    attached_to_name: frm.doc.name,
+                },
+                order_by: "creation desc",
+                limit_page_length: 50,
+            },
+            callback: function (r) {
+                var files = (r && r.message) || [];
+                var pdf_urls = files
+                    .filter(function (f) { return frm.events._is_pdf_file(f); })
+                    .map(function (f) { return (f && f.file_url) ? String(f.file_url) : ""; })
+                    .filter(function (u) { return !!u; });
+
+                // De-dupe while preserving order
+                var seen = {};
+                pdf_urls = pdf_urls.filter(function (u) {
+                    if (seen[u]) return false;
+                    seen[u] = true;
+                    return true;
+                });
+
+                frm.set_df_property("pdf_attachment_choice", "options", pdf_urls.join("\n"));
+                frm.refresh_field("pdf_attachment_choice");
+
+                if (pdf_urls.length === 1) {
+                    // Only one PDF: auto-select + set attachment if missing or not in list
+                    var only = pdf_urls[0];
+                    if (frm.doc.pdf_attachment_choice !== only) {
+                        // Direct assignment avoids marking the form dirty
+                        frm.doc.pdf_attachment_choice = only;
+                        frm.refresh_field("pdf_attachment_choice");
+                    }
+                    if (!frm.doc.attachment || pdf_urls.indexOf(frm.doc.attachment) === -1) {
+                        frm.set_value("attachment", only);
+                        frm.trigger("attachment");
+                    }
+                    return;
+                }
+
+                // Multiple PDFs: keep choice in sync with attachment if possible
+                if (frm.doc.attachment && pdf_urls.indexOf(frm.doc.attachment) !== -1) {
+                    if (frm.doc.pdf_attachment_choice !== frm.doc.attachment) {
+                        // Direct assignment avoids marking the form dirty
+                        frm.doc.pdf_attachment_choice = frm.doc.attachment;
+                        frm.refresh_field("pdf_attachment_choice");
+                    }
+                }
+            },
+        });
     },
 
     show_extract_review_dialog: function (frm, fields, extracted, pdf_url) {
@@ -139,59 +217,92 @@ frappe.ui.form.on("Accounting Receipt", {
     },
 
     _apply_review_dialog_layout: function (d) {
-        if (!d.$wrapper || !d.$wrapper.hasClass("review-ar-dialog")) return;
-        var $body = d.$wrapper.find(".modal-body");
-        var $formLayout = $body.find(".form-layout");
-        if (!$formLayout.length) return;
-        var $formPage = $formLayout.find(".form-page");
-        var $sectionBody = $formPage.find(".section-body");
-        var $columns = $formPage.find(".form-column");
-        if ($sectionBody.length === 0 || $columns.length < 2) return;
-        var $content = d.$wrapper.find(".modal-content");
-        var $bodyInner = $body.children().first();
-        // Tall popup (88vh) so left column scrolls and PDF gets full height
-        $content.css({ "height": "88vh", "max-height": "88vh", "min-height": "520px", "display": "flex", "flex-direction": "column" });
-        $body.css({ "flex": "1 1 0", "min-height": "0", "overflow": "hidden", "display": "flex", "flex-direction": "column" });
-        $bodyInner.css({ "flex": "1 1 0", "min-height": "0", "overflow": "hidden", "display": "flex", "flex-direction": "column" });
-        $formLayout.css({ "flex": "1 1 0", "min-height": "0", "overflow": "hidden", "display": "flex", "flex-direction": "column" });
-        $formPage.css({ "flex": "1 1 0", "min-height": "0", "overflow": "hidden", "display": "flex", "flex-direction": "column" });
-        $formPage.find(".form-section, .row").css({ "flex": "1 1 0", "min-height": "0", "overflow": "hidden", "display": "flex", "flex-direction": "column" });
-        // Force row height so both columns get a fixed height (left scrolls, right fills)
+        if (!d.$wrapper) return;
+        var modal = d.$wrapper[0];
+        if (!modal) return;
+
+        // Dialog now uses 3 Frappe columns: form-left | form-right | PDF
+        var allCols = modal.querySelectorAll(".form-column");
+        if (allCols.length < 2) return;
+
+        var formLeftEl  = allCols[0];
+        var formRightEl = allCols.length >= 3 ? allCols[1] : null;
+        var pdfColEl    = allCols[allCols.length - 1];
+        var colParent   = formLeftEl.parentElement;
+
         var bodyHeight = "calc(88vh - 130px)";
-        $sectionBody.css({
-            "flex": "1 1 0",
-            "min-height": "0",
-            "height": bodyHeight,
-            "max-height": bodyHeight,
-            "overflow": "hidden",
-            "display": "flex",
-            "align-items": "stretch"
+
+        // 1. Stretch modal-content to 88vh
+        var modalContent = modal.querySelector(".modal-content");
+        if (modalContent) {
+            modalContent.style.setProperty("height", "88vh", "important");
+            modalContent.style.setProperty("max-height", "88vh", "important");
+            modalContent.style.minHeight = "520px";
+            modalContent.style.display = "flex";
+            modalContent.style.flexDirection = "column";
+        }
+
+        // 2. modal-body grows to fill the space between dialog header and footer
+        var modalBody = modal.querySelector(".modal-body");
+        if (modalBody) {
+            modalBody.style.flex = "1 1 0";
+            modalBody.style.minHeight = "0";
+            modalBody.style.overflow = "hidden";
+            modalBody.style.display = "flex";
+            modalBody.style.flexDirection = "column";
+        }
+
+        // 3. Walk UP from colParent to modal-body; every intermediate wrapper must be
+        //    a flex column so height flows down to the column row
+        var cur = colParent.parentElement;
+        while (cur && cur !== modalBody && cur !== modal) {
+            cur.style.flex = "1 1 0";
+            cur.style.minHeight = "0";
+            cur.style.overflow = "hidden";
+            cur.style.display = "flex";
+            cur.style.flexDirection = "column";
+            cur = cur.parentElement;
+        }
+
+        // 4. colParent: fixed-height flex row holding all columns side-by-side
+        colParent.style.display = "flex";
+        colParent.style.flexDirection = "row";
+        colParent.style.flexWrap = "nowrap";
+        colParent.style.alignItems = "stretch";
+        colParent.style.flex = "1 1 0";
+        colParent.style.minHeight = "0";
+        colParent.style.height = bodyHeight;
+        colParent.style.maxHeight = bodyHeight;
+        colParent.style.overflow = "hidden";
+
+        // 5. Form sub-columns: scrollable, share the left 50% equally
+        [formLeftEl, formRightEl].forEach(function (col) {
+            if (!col) return;
+            col.style.setProperty("flex", "1 1 0", "important");
+            col.style.setProperty("max-width", "none", "important");
+            col.style.minWidth = "0";
+            col.style.minHeight = "0";
+            col.style.maxHeight = bodyHeight;
+            col.style.overflowY = "auto";
+            col.style.overflowX = "hidden";
+            col.style.paddingRight = "8px";
+            col.style.paddingBottom = "20px";
+            col.style.WebkitOverflowScrolling = "touch";
         });
-        // Left: explicit max-height so overflow-y: auto always shows scrollbar when needed
-        $columns.eq(0).css({
-            "flex": "1 1 0",
-            "min-height": "0",
-            "max-height": bodyHeight,
-            "min-width": "0",
-            "overflow-y": "auto",
-            "overflow-x": "hidden",
-            "padding-right": "8px",
-            "padding-bottom": "20px",
-            "WebkitOverflowScrolling": "touch"
-        });
-        // Right: full height for PDF preview
-        $columns.eq(1).css({
-            "flex": "1 1 0",
-            "min-height": "0",
-            "height": bodyHeight,
-            "min-width": "0",
-            "overflow": "hidden",
-            "display": "flex",
-            "flex-direction": "column",
-            "padding-bottom": "16px"
-        });
-        $columns.eq(1).find(".review-pdf-column").css({ "flex": "1", "min-height": "0", "display": "flex", "flex-direction": "column" });
-        $columns.eq(1).find(".review-pdf-iframe").css({ "flex": "1", "min-height": "72vh", "height": "100%" });
+
+        // 6. PDF column: takes the right 50%, full height
+        pdfColEl.style.setProperty("flex", "0 0 50%", "important");
+        pdfColEl.style.setProperty("max-width", "50%", "important");
+        pdfColEl.style.minHeight = "0";
+        pdfColEl.style.height = bodyHeight;
+        pdfColEl.style.overflow = "hidden";
+        pdfColEl.style.display = "flex";
+        pdfColEl.style.flexDirection = "column";
+        pdfColEl.style.paddingBottom = "16px";
+        var pdfInner = pdfColEl.querySelector(".review-pdf-column");
+        if (pdfInner) { pdfInner.style.flex = "1"; pdfInner.style.minHeight = "0"; pdfInner.style.display = "flex"; pdfInner.style.flexDirection = "column"; }
+        var pdfFrame = pdfColEl.querySelector(".review-pdf-iframe");
+        if (pdfFrame) { pdfFrame.style.flex = "1"; pdfFrame.style.minHeight = "72vh"; pdfFrame.style.height = "100%"; }
     },
 
     _build_and_show_review_dialog: function (frm, fields, missing_by_fieldname, resolved_name_by_fieldname, extracted, pdf_url) {
@@ -203,14 +314,15 @@ frappe.ui.form.on("Accounting Receipt", {
             if (f.fieldname === "sent_to_datev" || f.fieldname === "uploaded_by" || f.fieldname === "company" || f.fieldname === "payment_date") return false;
             return !(f.fieldtype === "Link" && (f.options === "Project" || f.options === "Cost Center"));
         });
-        var dialog_fields = [];
-        // Left column: section header + all extracted fields (single column, structured)
-        dialog_fields.push({
-            fieldtype: "HTML",
-            fieldname: "extracted_header",
-            options: "<div class=\"control-label\" style=\"font-weight: 600; margin-bottom: 10px; font-size: 12px; color: var(--text-color);\">" + __("Extracted content") + "</div>"
-        });
-        fields.forEach(function (f, idx) {
+        // Split fields into two sub-columns: non-wide fields alternate left/right,
+        // wide fields (Small Text / Text) always go to the left sub-column.
+        var WIDE_TYPES = ["Small Text", "Text", "Text Editor"];
+        var left_group = [];
+        var right_group = [];
+        var narrow_idx = 0;
+        var link_doctypes_with_create = ["Supplier", "Company"];
+
+        fields.forEach(function (f) {
             var default_val = "";
             if (f.fieldtype === "Link" && f.options && missing_by_fieldname[f.fieldname]) {
                 default_val = "";
@@ -226,8 +338,13 @@ frappe.ui.form.on("Accounting Receipt", {
                 default: default_val
             };
             if (f.options) df.options = f.options;
-            dialog_fields.push(df);
-            var link_doctypes_with_create = ["Supplier", "Company"];
+
+            var is_wide = WIDE_TYPES.indexOf(df.fieldtype) !== -1;
+            var goes_left = is_wide || (narrow_idx % 2 === 0);
+            var target = goes_left ? left_group : right_group;
+            target.push(df);
+            if (!is_wide) narrow_idx++;
+
             if (f.fieldtype === "Link" && f.options && missing_by_fieldname[f.fieldname] && link_doctypes_with_create.indexOf(f.options) !== -1) {
                 var lf = missing_by_fieldname[f.fieldname];
                 var extracted_name = frappe.utils.escape_html(lf.value || "");
@@ -237,10 +354,22 @@ frappe.ui.form.on("Accounting Receipt", {
                     "<span class=\"extracted-name\" title=\"" + not_in_system + "\">" + (extracted_name ? (__("Extracted: ") + "<strong>" + extracted_name + "</strong> — " + not_in_system) : not_in_system) + "</span>" +
                     " <button type=\"button\" class=\"btn btn-default btn-xs\" data-doctype=\"" + frappe.utils.escape_html(lf.doctype) + "\" data-fieldname=\"" + frappe.utils.escape_html(lf.fieldname) + "\">" + frappe.utils.escape_html(btn_label) + "</button>" +
                     "</div>";
-                dialog_fields.push({ fieldtype: "HTML", fieldname: "create_btn_" + f.fieldname, options: html });
+                // Create button follows its field into the same sub-column
+                target.push({ fieldtype: "HTML", fieldname: "create_btn_" + f.fieldname, options: html });
             }
         });
-        // Column break: then right column = PDF preview
+
+        // Build dialog_fields: header | left sub-col | Column Break | right sub-col | Column Break | PDF
+        var dialog_fields = [];
+        dialog_fields.push({
+            fieldtype: "HTML",
+            fieldname: "extracted_header",
+            options: "<div class=\"control-label\" style=\"font-weight:600;margin-bottom:10px;font-size:12px;color:var(--text-color);\">" + __("Extracted content") + "</div>"
+        });
+        left_group.forEach(function (df) { dialog_fields.push(df); });
+        dialog_fields.push({ fieldtype: "Column Break", fieldname: "ar_inner_col_break" });
+        right_group.forEach(function (df) { dialog_fields.push(df); });
+        // Column break before PDF
         dialog_fields.push({ fieldtype: "Column Break", fieldname: "pdf_review_col_break" });
         if (pdf_url && String(pdf_url).toLowerCase().endsWith(".pdf")) {
             var pdf_src = pdf_url.indexOf("/") === 0 ? (window.location.origin + pdf_url) : pdf_url;
@@ -425,6 +554,9 @@ frappe.ui.form.on("Accounting Receipt", {
             frm.toggle_display("pdf_preview", true);
             frm.get_field("pdf_preview").$wrapper.html($preview);
         }
+
+        // Keep PDF selector in sync as attachments might get copied asynchronously from email -> Communication -> Accounting Receipt
+        frm.events.refresh_pdf_attachment_choices(frm);
     },
 
     getFileExtension: function (filename) {
