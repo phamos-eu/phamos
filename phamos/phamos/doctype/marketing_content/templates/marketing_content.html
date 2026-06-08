@@ -34,10 +34,10 @@
 
   /* ── Hero ────────────────────────────────────── */
   .pe-hero {
-    width: 100%; height: 380px;
+    width: 100%; height: 360px;
     border-radius: var(--pe-radius);
     overflow: hidden; background: #f0ede8;
-    margin-bottom: 1.8rem;
+    margin-bottom: 1.6rem;
   }
   .pe-hero img {
     width: 100%; height: 100%;
@@ -49,22 +49,54 @@
   }
 
   /* ── Title area ──────────────────────────────── */
-  .pe-title-area { margin-bottom: 1.2rem; }
+  .pe-title-area { margin-bottom: 1rem; }
   .pe-title-area h1 {
-    font-size: 1.8rem; font-weight: 800;
+    font-size: 1.7rem; font-weight: 800;
     letter-spacing: -.03em; line-height: 1.15;
-    margin: .4rem 0 .3rem; color: #1c1917;
+    margin: .35rem 0 .25rem; color: #1c1917;
   }
-  .pe-subtitle { font-size: 1rem; color: var(--pe-muted); margin: 0; }
+  .pe-subtitle { font-size: .95rem; color: var(--pe-muted); margin: 0; }
 
   /* ── Description ─────────────────────────────── */
   .pe-description {
-    font-size: .95rem; line-height: 1.8; color: #1c1917;
-    margin-bottom: 1.8rem;
+    font-size: .93rem; line-height: 1.8; color: #1c1917;
+    margin-bottom: 1.6rem;
   }
   .pe-description h1, .pe-description h2, .pe-description h3 {
     font-size: 1.05rem; font-weight: 700; margin: 1.2rem 0 .4rem;
   }
+
+  /* ── Section label ───────────────────────────── */
+  .pe-section-label {
+    font-size: .6rem; font-weight: 700; text-transform: uppercase;
+    letter-spacing: .1em; color: var(--pe-muted);
+    margin: 0 0 .7rem;
+  }
+
+  /* ── Speakers — separated rows ──────────────── */
+  .pe-speakers {
+    margin-bottom: 1.8rem;
+    border-top: 1px solid var(--pe-border);
+  }
+  .pe-speaker {
+    display: flex; align-items: center; gap: .6rem;
+    padding: .55rem 0;
+    border-bottom: 1px solid var(--pe-border);
+  }
+  .pe-speaker-avatar {
+    width: 36px; height: 36px; border-radius: 50%;
+    object-fit: cover; object-position: center top;
+    flex-shrink: 0; background: #f0ede8;
+  }
+  .pe-speaker-avatar-ph {
+    width: 36px; height: 36px; border-radius: 50%;
+    background: #f0ede8; flex-shrink: 0;
+    display: flex; align-items: center; justify-content: center;
+    color: #c7bfb5;
+  }
+  .pe-speaker-meta { line-height: 1.2; }
+  .pe-speaker-name { font-size: .78rem; font-weight: 700; color: #1c1917; margin: 0; }
+  .pe-speaker-topic { font-size: .68rem; color: var(--pe-muted); margin: .1rem 0 0; }
 
   /* ── Bottom cards: RSVP + Organizer ─────────── */
   .pe-bottom-cards {
@@ -85,12 +117,12 @@
     padding: .35rem .75rem;
     background: var(--pe-bg);
     border-bottom: 1px solid var(--pe-border);
-    font-size: .64rem; font-weight: 700;
+    font-size: .62rem; font-weight: 700;
     text-transform: uppercase; letter-spacing: .09em; color: var(--pe-muted);
   }
   .pe-card-body { padding: .65rem .75rem; }
 
-  /* Interest tracking — horizontal buttons */
+  /* Interest tracking */
   .pe-rsvp-btns { display: flex; gap: .4rem; margin-bottom: .4rem; }
   .pe-rsvp-btn {
     flex: 1;
@@ -113,216 +145,229 @@
     background: rgba(0,0,0,.07); border-radius: 50px;
     padding: .05em .45em; min-width: 1.6em; text-align: center;
   }
-  .pe-rsvp-hint { font-size: .68rem; color: var(--pe-muted); margin: 0; text-align: center; }
+  .pe-rsvp-hint { font-size: .67rem; color: var(--pe-muted); margin: 0; text-align: center; }
 
   /* Email subscription */
   .pe-email-subscribe {
-    margin-top: .8rem; padding-top: .8rem;
+    margin-top: .75rem; padding-top: .75rem;
     border-top: 1px solid var(--pe-border);
   }
   .pe-email-title {
-    font-size: .7rem; font-weight: 700; text-transform: uppercase;
-    letter-spacing: .08em; color: var(--pe-muted); margin-bottom: .5rem;
+    font-size: .68rem; font-weight: 700; text-transform: uppercase;
+    letter-spacing: .08em; color: var(--pe-muted); margin-bottom: .45rem;
   }
   .pe-email-input {
-    width: 100%; padding: .5rem .65rem;
+    width: 100%; padding: .45rem .6rem;
     border: 1.5px solid var(--pe-border); border-radius: 6px;
-    font-size: .82rem; margin-bottom: .4rem;
+    font-size: .8rem; margin-bottom: .4rem;
     outline: none; transition: border-color .15s;
   }
   .pe-email-input:focus { border-color: var(--pe-accent); }
   .pe-subscribe-btn {
-    width: 100%; padding: .5rem;
+    width: 100%; padding: .48rem;
     background: var(--pe-accent); color: #fff;
     border: none; border-radius: 6px;
-    font-size: .8rem; font-weight: 600; cursor: pointer;
+    font-size: .78rem; font-weight: 600; cursor: pointer;
     transition: opacity .15s;
   }
   .pe-subscribe-btn:hover { opacity: .9; }
-  .pe-subscribe-btn:disabled {
-    opacity: .5; cursor: not-allowed;
-  }
-  .pe-subscribe-msg {
-    font-size: .72rem; margin-top: .4rem; text-align: center;
-  }
+  .pe-subscribe-btn:disabled { opacity: .5; cursor: not-allowed; }
+  .pe-subscribe-msg { font-size: .7rem; margin-top: .4rem; text-align: center; }
   .pe-subscribe-msg.success { color: #065f46; }
   .pe-subscribe-msg.error { color: #991b1b; }
   .pe-email-desc {
-    font-size: .72rem; color: var(--pe-muted);
-    margin-bottom: .55rem; line-height: 1.5;
+    font-size: .7rem; color: var(--pe-muted);
+    margin-bottom: .5rem; line-height: 1.5;
   }
 
   /* Organizer */
   .pe-organizer { display: flex; align-items: center; gap: .55rem; }
   .pe-org-logo {
-    width: 56px; height: 56px;
-    border-radius: 8px;
-    border: 1px solid var(--pe-border);
-    background: #fff;
+    width: 52px; height: 52px; border-radius: 8px;
+    border: 1px solid var(--pe-border); background: #fff;
     display: flex; align-items: center; justify-content: center;
     overflow: hidden; margin-bottom: .5rem;
   }
   .pe-org-logo img { width: 100%; height: 100%; object-fit: contain; padding: 4px; }
   .pe-org-avatar {
-    width: 28px; height: 28px; border-radius: 50%;
+    width: 26px; height: 26px; border-radius: 50%;
     background: #f0ede8; flex-shrink: 0;
     display: flex; align-items: center; justify-content: center;
     color: var(--pe-muted); overflow: hidden;
   }
-  .pe-org-name    { font-size: .82rem; font-weight: 600; margin: 0 0 .1rem; color: #1c1917; }
-  .pe-org-email   { font-size: .74rem; margin: 0; }
+  .pe-org-name    { font-size: .8rem; font-weight: 600; margin: 0 0 .1rem; color: #1c1917; }
+  .pe-org-email   { font-size: .72rem; margin: 0; }
   .pe-org-email a { color: var(--pe-accent); text-decoration: none; }
   .pe-org-email a:hover { text-decoration: underline; }
-  .pe-org-website { font-size: .74rem; margin: .1rem 0 0; }
+  .pe-org-website { font-size: .72rem; margin: .1rem 0 0; }
   .pe-org-website a { color: var(--pe-accent); text-decoration: none; }
   .pe-org-website a:hover { text-decoration: underline; }
   .pe-contact-person {
-    margin-top: .65rem; padding-top: .65rem;
+    margin-top: .6rem; padding-top: .6rem;
     border-top: 1px solid var(--pe-border);
   }
   .pe-contact-label {
-    font-size: .6rem; font-weight: 700; text-transform: uppercase;
-    letter-spacing: .08em; color: var(--pe-muted); margin-bottom: .3rem;
+    font-size: .58rem; font-weight: 700; text-transform: uppercase;
+    letter-spacing: .08em; color: var(--pe-muted); margin-bottom: .28rem;
   }
-  .pe-org-phone { font-size: .74rem; margin: .1rem 0 0; color: #1c1917; }
+  .pe-org-phone { font-size: .72rem; margin: .1rem 0 0; color: #1c1917; }
 
-  /* ── Sidebar info card ───────────────────────── */
+  /* ── Sidebar ─────────────────────────────────── */
+  .pe-sidebar-sticky {
+    position: sticky;
+    top: 80px;
+  }
   .pe-sidebar-card {
     border: 1.5px solid var(--pe-border);
     border-radius: var(--pe-radius);
     background: var(--pe-surface);
     overflow: hidden;
-    position: sticky;
-    top: 80px;
   }
   .pe-sidebar-card-header {
-    background: var(--pe-accent);
-    color: #fff;
-    padding: .5rem .9rem;
-    font-size: .65rem; font-weight: 700;
+    background: var(--pe-accent); color: #fff;
+    padding: .45rem .9rem;
+    font-size: .62rem; font-weight: 700;
     text-transform: uppercase; letter-spacing: .09em;
   }
-  .pe-sidebar-card-body { padding: 1rem; }
+  .pe-sidebar-card-body { padding: .9rem; }
 
-  /* Date display (calendar widget or date note) */
+  /* Date display */
   .pe-date-note {
-    text-align: center;
-    padding: 1rem .9rem;
-    margin-bottom: .9rem;
-    padding-bottom: .9rem;
+    text-align: center; padding: .9rem .8rem;
+    margin-bottom: .8rem; padding-bottom: .8rem;
     border-bottom: 1px solid var(--pe-border);
   }
-  .pe-date-note-icon {
-    color: var(--pe-accent);
-    margin-bottom: .4rem;
-  }
-  .pe-date-note-text {
-    font-size: .88rem; font-weight: 600;
-    color: var(--pe-muted); line-height: 1.4;
-  }
+  .pe-date-note-icon { color: var(--pe-accent); margin-bottom: .35rem; }
+  .pe-date-note-text { font-size: .85rem; font-weight: 600; color: var(--pe-muted); line-height: 1.4; }
   .pe-cal-widget {
-    display: flex; align-items: center; gap: .85rem;
-    margin-bottom: .9rem;
-    padding-bottom: .9rem;
+    display: flex; align-items: center; gap: .8rem;
+    margin-bottom: .8rem; padding-bottom: .8rem;
     border-bottom: 1px solid var(--pe-border);
   }
   .pe-cal {
     text-align: center; line-height: 1;
     border: 1.5px solid var(--pe-border);
     border-radius: 8px; overflow: hidden;
-    min-width: 54px; flex-shrink: 0;
+    min-width: 50px; flex-shrink: 0;
   }
   .pe-cal-month {
     background: var(--pe-accent); color: #fff;
-    font-size: .58rem; font-weight: 800; letter-spacing: .07em;
-    padding: .28rem .2rem;
+    font-size: .56rem; font-weight: 800; letter-spacing: .07em; padding: .26rem .2rem;
   }
-  .pe-cal-day {
-    font-size: 1.6rem; font-weight: 800;
-    color: #1c1917; padding: .1rem .2rem .05rem;
-  }
-  .pe-cal-wd {
-    font-size: .57rem; font-weight: 600; color: var(--pe-muted);
-    letter-spacing: .05em; padding: .05rem .2rem .3rem;
-  }
-  .pe-cal-info { }
-  .pe-cal-year { font-size: .72rem; color: var(--pe-muted); margin-bottom: .2rem; }
-  .pe-cal-time {
-    font-size: 1.1rem; font-weight: 700; color: #1c1917;
-    display: flex; align-items: center; gap: .3rem;
-    margin-bottom: .1rem;
+  .pe-cal-day { font-size: 1.5rem; font-weight: 800; color: #1c1917; padding: .08rem .2rem .04rem; }
+  .pe-cal-wd  { font-size: .54rem; font-weight: 600; color: var(--pe-muted); letter-spacing: .05em; padding: .04rem .2rem .28rem; }
+  .pe-cal-year  { font-size: .7rem; color: var(--pe-muted); margin-bottom: .15rem; }
+  .pe-cal-time  {
+    font-size: 1rem; font-weight: 700; color: #1c1917;
+    display: flex; align-items: center; gap: .28rem; margin-bottom: .08rem;
   }
   .pe-cal-time svg { color: var(--pe-muted); flex-shrink: 0; }
   .pe-cal-until {
-    font-size: .75rem; color: var(--pe-muted);
-    display: flex; align-items: center; gap: .3rem;
+    font-size: .72rem; color: var(--pe-muted);
+    display: flex; align-items: center; gap: .28rem;
   }
 
-  /* Venue row */
+  /* Venue / status rows */
   .pe-sidebar-row {
-    display: flex; align-items: flex-start; gap: .6rem;
-    margin-bottom: .7rem;
+    display: flex; align-items: flex-start; gap: .55rem; margin-bottom: .65rem;
   }
   .pe-sidebar-row:last-child { margin-bottom: 0; }
   .pe-sidebar-row svg { color: var(--pe-muted); flex-shrink: 0; margin-top: .1rem; }
   .pe-sidebar-row-label {
-    font-size: .62rem; font-weight: 700; text-transform: uppercase;
-    letter-spacing: .07em; color: var(--pe-muted); margin-bottom: .1rem;
+    font-size: .6rem; font-weight: 700; text-transform: uppercase;
+    letter-spacing: .07em; color: var(--pe-muted); margin-bottom: .08rem;
   }
-  .pe-sidebar-row-value { font-size: .88rem; font-weight: 600; color: #1c1917; }
-  .pe-sidebar-row-sub   { font-size: .78rem; color: var(--pe-muted); }
-
-  /* Map link */
+  .pe-sidebar-row-value { font-size: .85rem; font-weight: 600; color: #1c1917; }
+  .pe-sidebar-row-sub   { font-size: .75rem; color: var(--pe-muted); }
   .pe-map-link {
-    display: inline-flex; align-items: center; gap: .25rem;
-    font-size: .72rem; color: var(--pe-accent); text-decoration: none;
-    margin-top: .25rem;
+    display: inline-flex; align-items: center; gap: .22rem;
+    font-size: .7rem; color: var(--pe-accent); text-decoration: none; margin-top: .2rem;
   }
   .pe-map-link:hover { text-decoration: underline; }
 
   /* Register button */
-  .pe-register-wrap { margin-top: .9rem; padding-top: .9rem; border-top: 1px solid var(--pe-border); }
+  .pe-register-wrap { margin-top: .85rem; padding-top: .85rem; border-top: 1px solid var(--pe-border); }
   .pe-register-btn {
     display: block; width: 100%; text-align: center;
-    padding: .65rem 1rem;
+    padding: .6rem 1rem;
     background: var(--pe-accent); color: #fff;
-    border-radius: 7px; font-size: .88rem; font-weight: 700;
-    text-decoration: none; letter-spacing: .02em;
-    transition: opacity .15s;
+    border-radius: 7px; font-size: .85rem; font-weight: 700;
+    text-decoration: none; letter-spacing: .02em; transition: opacity .15s;
   }
   .pe-register-btn:hover { opacity: .88; color: #fff; text-decoration: none; }
-  .pe-spots {
-    font-size: .72rem; text-align: center;
-    margin-bottom: .45rem; font-weight: 600;
-  }
+  .pe-spots { font-size: .7rem; text-align: center; margin-bottom: .4rem; font-weight: 600; }
   .pe-spots.ok   { color: #065f46; }
   .pe-spots.low  { color: #92400e; }
   .pe-spots.full { color: #9f1239; }
   .pe-register-full {
     display: block; width: 100%; text-align: center;
-    padding: .6rem 1rem;
-    background: #f5f5f4; color: var(--pe-muted);
-    border-radius: 7px; font-size: .82rem; font-weight: 600;
+    padding: .55rem 1rem; background: #f5f5f4; color: var(--pe-muted);
+    border-radius: 7px; font-size: .8rem; font-weight: 600;
     border: 1.5px solid var(--pe-border);
   }
 
   /* Status pill */
   .pe-status-pill {
     display: inline-block;
-    font-size: .68rem; font-weight: 700; text-transform: uppercase;
-    letter-spacing: .06em; padding: .28em .8em;
+    font-size: .66rem; font-weight: 700; text-transform: uppercase;
+    letter-spacing: .06em; padding: .25em .75em;
     border-radius: 50px; border: 1.5px solid var(--pe-border);
-    color: var(--pe-muted); margin-top: .5rem;
+    color: var(--pe-muted); margin-top: .4rem;
   }
   .pe-status-pill.upcoming  { border-color: #065f46; color: #065f46; background: #ecfdf5; }
   .pe-status-pill.ongoing   { border-color: #1e40af; color: #1e40af; background: #eff6ff; }
   .pe-status-pill.cancelled { border-color: #9f1239; color: #9f1239; background: #fff1f2; }
 
+  /* ── Sponsors sidebar card ───────────────────── */
+  .pe-sponsors-card {
+    border: 1.5px solid var(--pe-border);
+    border-radius: var(--pe-radius);
+    overflow: hidden;
+    margin-top: .7rem;
+  }
+  .pe-sponsors-card-header {
+    padding: .35rem .75rem;
+    background: var(--pe-bg);
+    border-bottom: 1px solid var(--pe-border);
+    font-size: .62rem; font-weight: 700;
+    text-transform: uppercase; letter-spacing: .09em; color: var(--pe-muted);
+  }
+  .pe-sponsors-card-body { padding: .6rem .75rem; }
+  .pe-sponsor-row {
+    display: flex; align-items: center; gap: .55rem;
+    padding: .4rem 0;
+    border-bottom: 1px solid var(--pe-border);
+  }
+  .pe-sponsor-row:last-child { border-bottom: none; padding-bottom: 0; }
+  .pe-sponsor-row:first-child { padding-top: 0; }
+  .pe-sponsor-logo {
+    width: 30px; height: 30px; border-radius: 6px;
+    border: 1px solid var(--pe-border); background: #fff;
+    display: flex; align-items: center; justify-content: center;
+    overflow: hidden; flex-shrink: 0;
+  }
+  .pe-sponsor-logo img { width: 100%; height: 100%; object-fit: contain; padding: 2px; }
+  .pe-sponsor-logo-ph {
+    width: 30px; height: 30px; border-radius: 6px;
+    border: 1px solid var(--pe-border); background: #f5f3f0;
+    display: flex; align-items: center; justify-content: center;
+    color: #d4ccc5; flex-shrink: 0;
+  }
+  .pe-sponsor-link {
+    display: flex; align-items: center; gap: .55rem;
+    min-width: 0; flex: 1; text-decoration: none;
+    transition: opacity .15s;
+  }
+  .pe-sponsor-link:hover { opacity: .72; }
+  .pe-sponsor-meta { min-width: 0; }
+  .pe-sponsor-name { font-size: .78rem; font-weight: 700; color: #1c1917; margin: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .pe-sponsor-info { font-size: .67rem; color: var(--pe-muted); margin: .08rem 0 0; }
+
   /* ── Responsive ──────────────────────────────── */
   @media (max-width: 767px) {
-    .pe-hero { height: 220px; }
+    .pe-hero { height: 200px; }
     .pe-title-area h1 { font-size: 1.4rem; }
-    .pe-sidebar-card { position: static; margin-top: 1.5rem; }
+    .pe-sidebar-sticky { position: static; margin-top: 1.5rem; }
   }
 </style>
 
@@ -337,7 +382,7 @@
       <img src="{{ image }}" alt="{{ title }}">
     {% else %}
       <div class="pe-hero-placeholder">
-        <svg width="52" height="52" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/></svg>
+        <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/></svg>
       </div>
     {% endif %}
   </div>
@@ -359,6 +404,28 @@
         <div class="pe-description from-markdown">{{ description }}</div>
       {% endif %}
 
+      {# ── Speakers ── horizontal pill chips ────── #}
+      {% if speakers %}
+      <p class="pe-section-label">Speakers</p>
+      <div class="pe-speakers">
+        {% for speaker in speakers %}
+        <div class="pe-speaker">
+          {% if speaker.image %}
+            <img class="pe-speaker-avatar" src="{{ speaker.image }}" alt="{{ speaker.full_name }}">
+          {% else %}
+            <div class="pe-speaker-avatar-ph">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+            </div>
+          {% endif %}
+          <div class="pe-speaker-meta">
+            <p class="pe-speaker-name">{{ speaker.full_name }}</p>
+            {% if speaker.topic %}<p class="pe-speaker-topic">{{ speaker.topic }}</p>{% endif %}
+          </div>
+        </div>
+        {% endfor %}
+      </div>
+      {% endif %}
+
       {# ── RSVP + Organizer ────────────────────── #}
       <div class="pe-bottom-cards">
 
@@ -374,7 +441,7 @@
             <div class="pe-organizer">
               {% if not organizer_logo %}
               <div class="pe-org-avatar">
-                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
               </div>
               {% endif %}
               <div>
@@ -392,7 +459,7 @@
               <div class="pe-contact-label">Contact Person</div>
               <div class="pe-organizer">
                 <div class="pe-org-avatar">
-                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
                 </div>
                 <div>
                   {% if contact_person %}<p class="pe-org-name">{{ contact_person }}</p>{% endif %}
@@ -415,24 +482,23 @@
           <div class="pe-card-body">
             <div class="pe-rsvp-btns">
               <button class="pe-rsvp-btn" id="btn-yes" data-response="Yes">
-                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
                 Yes
                 <span class="pe-rsvp-count" id="count-yes">{{ going_count }}</span>
               </button>
               <button class="pe-rsvp-btn" id="btn-maybe" data-response="Maybe">
-                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
                 Maybe
                 <span class="pe-rsvp-count" id="count-maybe">{{ maybe_count }}</span>
               </button>
               <button class="pe-rsvp-btn" id="btn-no" data-response="No">
-                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
                 No
                 <span class="pe-rsvp-count" id="count-no">{{ not_going_count }}</span>
               </button>
             </div>
             <p class="pe-rsvp-hint">No account needed · Change anytime</p>
 
-            {# Email subscription #}
             <div class="pe-email-subscribe">
               <div class="pe-email-title">Stay Updated</div>
               {% if subscription_description %}<p class="pe-email-desc">{{ subscription_description }}</p>{% endif %}
@@ -446,28 +512,27 @@
       </div>
     </div>
 
-    {# ── Right: sticky info sidebar ────────────── #}
+    {# ── Right: sidebar ───────────────────────── #}
     <div class="col-md-4">
+      <div class="pe-sidebar-sticky">
+
+      {# Event Details #}
       <div class="pe-sidebar-card">
         <div class="pe-sidebar-card-header">Event Details</div>
         <div class="pe-sidebar-card-body">
 
           {% if date_note and not starts_on %}
-          {# Show date note when no fixed date is set #}
           <div class="pe-date-note">
             <div class="pe-date-note-icon">
-              <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+              <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
                 <rect x="3" y="4" width="18" height="18" rx="2" ry="2"/>
-                <line x1="16" y1="2" x2="16" y2="6"/>
-                <line x1="8" y1="2" x2="8" y2="6"/>
-                <line x1="3" y1="10" x2="21" y2="10"/>
-                <line x1="10" y1="16" x2="14" y2="16"/>
+                <line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/>
+                <line x1="3" y1="10" x2="21" y2="10"/><line x1="10" y1="16" x2="14" y2="16"/>
               </svg>
             </div>
             <div class="pe-date-note-text">{{ date_note }}</div>
           </div>
           {% elif starts_day_num %}
-          {# Show calendar widget when fixed date is set #}
           <div class="pe-cal-widget">
             <div class="pe-cal">
               <div class="pe-cal-month">{{ starts_month }}</div>
@@ -477,12 +542,12 @@
             <div class="pe-cal-info">
               <div class="pe-cal-year">{{ starts_year }}</div>
               <div class="pe-cal-time">
-                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
                 {{ starts_time }}
               </div>
               {% if ends_time %}
               <div class="pe-cal-until">
-                <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="5 12 12 5 19 12"/></svg>
+                <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="5 12 12 5 19 12"/></svg>
                 ends {{ ends_time }}
               </div>
               {% endif %}
@@ -492,14 +557,14 @@
 
           {% if location or city %}
           <div class="pe-sidebar-row">
-            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>
             <div>
               <div class="pe-sidebar-row-label">Venue</div>
               {% if location %}<div class="pe-sidebar-row-value">{{ location }}</div>{% endif %}
               {% if city %}<div class="pe-sidebar-row-sub">{{ city }}</div>{% endif %}
               {% if map_link %}
                 <a href="{{ map_link }}" target="_blank" rel="noopener" class="pe-map-link">
-                  <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>
+                  <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>
                   View on Maps
                 </a>
               {% endif %}
@@ -509,7 +574,7 @@
 
           {% if status %}
           <div class="pe-sidebar-row">
-            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
             <div>
               <div class="pe-sidebar-row-label">Status</div>
               <span class="pe-status-pill {{ status_cls }}">{{ status }}</span>
@@ -538,6 +603,42 @@
 
         </div>
       </div>
+
+      {# Sponsors — below Event Details, non-sticky #}
+      {% if sponsors %}
+      <div class="pe-sponsors-card">
+        <div class="pe-sponsors-card-header">Sponsors</div>
+        <div class="pe-sponsors-card-body">
+          {% for sponsor in sponsors %}
+          <div class="pe-sponsor-row">
+            {% if sponsor.url %}
+              <a href="{{ sponsor.url }}" target="_blank" rel="noopener" class="pe-sponsor-link">
+            {% endif %}
+            {% if sponsor.logo %}
+              <div class="pe-sponsor-logo">
+                <img src="{{ sponsor.logo }}" alt="{{ sponsor.sponsor_name }}">
+              </div>
+            {% else %}
+              <div class="pe-sponsor-logo-ph">
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18M9 21V9"/></svg>
+              </div>
+            {% endif %}
+            <div class="pe-sponsor-meta">
+              <p class="pe-sponsor-name">{{ sponsor.sponsor_name }}</p>
+              {% if sponsor.additional_information %}
+                <p class="pe-sponsor-info">{{ sponsor.additional_information }}</p>
+              {% endif %}
+            </div>
+            {% if sponsor.url %}
+              </a>
+            {% endif %}
+          </div>
+          {% endfor %}
+        </div>
+      </div>
+      {% endif %}
+
+      </div>{# end pe-sidebar-sticky #}
     </div>
 
   </div>{# end row #}
@@ -569,7 +670,6 @@ frappe.ready(function () {
 
   if (currentVote) applyActiveState(currentVote);
 
-  // Always fetch fresh counts from backend on page load (Jinja-rendered values may be stale/cached)
   frappe.call({
     method: "phamos.phamos.doctype.marketing_content.marketing_content.get_interest_counts",
     args: { event_name: eventName },
@@ -595,7 +695,6 @@ frappe.ready(function () {
     });
   });
 
-  // Email subscription
   var subscribeBtn   = document.getElementById("subscribe-btn");
   var subscribeEmail = document.getElementById("subscribe-email");
   var subscribeMsg   = document.getElementById("subscribe-msg");
