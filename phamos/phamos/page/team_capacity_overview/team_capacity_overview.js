@@ -414,7 +414,7 @@ frappe.pages['team-capacity-overview'].on_page_load = function (wrapper) {
 
         let today = new Date();
 
-        let start = new Date(today.getFullYear(), today.getMonth(), 1);      
+        let start = new Date(today.getFullYear(), today.getMonth() - 1, 1);    
         let end   = new Date(today.getFullYear(), today.getMonth() + 1, 0);
 
         return {
@@ -660,26 +660,32 @@ frappe.pages['team-capacity-overview'].on_page_load = function (wrapper) {
             }, 0);
         });
 
-        series.push({
-            name: "Total Capacity",
-            type: "line",
-            data: total_capacity,
-            color: "#000",
-            lineWidth: 3,
-            zIndex: 10,
-            marker: { enabled: false }
-        });
+        let selected_teams = page.team.get_value() || [];
 
-        series.push({
-            name: "Total Time Spent",
-            type: "line",
-            data: actual_line,
-            dashStyle: "Dot",
-            color: "#000",
-            lineWidth: 2.5,
-            zIndex: 9,
-            marker: { enabled: false }
-        });
+        if (selected_teams.length !== 1) {
+            series.push({
+                name: "Total Capacity",
+                type: "line",
+                data: total_capacity,
+                color: "#000",
+                lineWidth: 3,
+                zIndex: 10,
+                marker: { enabled: false }
+            });
+        }
+        if (selected_teams.length !== 1) {
+            series.push({
+                name: "Total Time Spent",
+                type: "line",
+                data: actual_line,
+                dashStyle: "Dot",
+                color: "#000",
+                lineWidth: 2.5,
+                zIndex: 9,
+                marker: { enabled: false }
+            });
+        }
+        
 
         if (hist_enabled && historical_actual_line) {
 
