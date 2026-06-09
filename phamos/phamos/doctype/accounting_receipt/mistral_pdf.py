@@ -104,6 +104,19 @@ def _call_mistral_ocr(api_key, base_url, pdf_base64):
 	return "\n\n".join(markdown_parts)
 
 
+def _get_prompt_rules():
+	"""Load enabled AI Prompt Rules from AI Prompt Configuration, sorted by order."""
+	try:
+		config = frappe.get_single("AI Prompt Configuration")
+		rules = sorted(
+			[r for r in (config.get("rules") or []) if r.get("enabled")],
+			key=lambda r: (r.get("order") or 0),
+		)
+		return rules
+	except Exception:
+		return []
+
+
 def _call_mistral_chat_extract(api_key, base_url, model, document_markdown):
 	"""Ask Mistral to return a JSON object with Accounting Receipt fields from the document text."""
 	import requests
@@ -116,12 +129,19 @@ def _call_mistral_chat_extract(api_key, base_url, model, document_markdown):
 	field_list = ", ".join([f'"{m["key"]}" (for {m["label"]})' for m in schema])
 	address_keys = "address_line1, address_line2, city, state, country, pincode"
 
+	rules = _get_prompt_rules()
+	rules_block = ""
+	if rules:
+		lines = [f"{i + 1}. Case: {r.get('case_description', '').strip()}\n   Action: {r.get('action', '').strip()}"
+			for i, r in enumerate(rules)]
+		rules_block = "\n\nAdditional extraction rules — apply these in order:\n" + "\n".join(lines)
+
 	prompt = f"""You are extracting structured data from a receipt/invoice document. The following text was extracted from a PDF via OCR.
 
 Return a JSON object with keys matching these field names (use the key in quotes): {field_list}.
 If the document contains a vendor/supplier address, also include these optional keys: {address_keys}.
-Use only the keys listed (plus the optional address keys when present). For dates use YYYY-MM-DD. For numbers use digits (no currency symbols). For missing values omit the key.
-Output nothing else except the JSON object.
+Use only the keys listed (plus the optional address keys when present). For dates use YYYY-MM-DD. For numbers: this document uses German locale formatting where comma (,) is the decimal separator and period (.) is the thousands separator — always convert to a standard decimal number before outputting (e.g. "520,03" → 520.03, "1.234,56" → 1234.56, "52.003,00" → 52003.0). Output no currency symbols. For missing values omit the key.
+Output nothing else except the JSON object.{rules_block}
 
 Document text:
 ---
@@ -299,12 +319,17 @@ def _build_review_fields(extracted):
 	for meta in meta_list:
 		fieldname = meta["fieldname"]
 		value = _value_for_field_from_extracted(fieldname, extracted, key_map)
+		if value is not None and meta["fieldtype"] in ("Currency", "Float", "Int"):
+			try:
+				value = float(value) if not isinstance(value, (int, float)) else value
+			except (ValueError, TypeError):
+				pass
 		fields.append({
 			"fieldname": fieldname,
 			"label": meta["label"],
 			"fieldtype": meta["fieldtype"],
 			"options": meta.get("options"),
-			"value": value if value is None else str(value),
+			"value": value,
 		})
 	return fields
 

@@ -96,6 +96,33 @@ def _normalize_extraction_key(key):
 	return key.strip().lower().replace(" ", "_").replace("-", "_")
 
 
+def _parse_german_number(value):
+	"""
+	Normalize a German-locale number string to a plain decimal string before flt().
+	German format: period = thousands separator, comma = decimal separator.
+	  "520,03"   -> "520.03"
+	  "1.234,56" -> "1234.56"
+	  "437,00"   -> "437.00"
+	Non-string or already-numeric values pass through unchanged.
+	"""
+	if not isinstance(value, str):
+		return value
+	v = value.strip()
+	if "," in v and "." in v:
+		# e.g. "1.234,56" — period is thousands separator
+		v = v.replace(".", "").replace(",", ".")
+	elif "," in v:
+		# e.g. "520,03" — comma is decimal separator (not thousands)
+		# Only treat as decimal if digits after comma look like cents (1-2 digits)
+		parts = v.split(",")
+		if len(parts) == 2 and parts[1].isdigit() and len(parts[1]) <= 2:
+			v = v.replace(",", ".")
+		else:
+			# comma as thousands separator (e.g. "1,234") — strip it
+			v = v.replace(",", "")
+	return v
+
+
 def _set_value_for_field(doc, fieldname, value, meta):
 	"""Set one field on doc from extracted value. Validates type and Link existence."""
 	if value is None or (isinstance(value, str) and not value.strip()):
@@ -125,7 +152,7 @@ def _set_value_for_field(doc, fieldname, value, meta):
 
 	if fieldtype in ("Currency", "Float", "Int"):
 		try:
-			doc.set(fieldname, flt(value))
+			doc.set(fieldname, flt(_parse_german_number(value)))
 			return True
 		except Exception:
 			return False
