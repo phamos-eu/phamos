@@ -1,0 +1,60 @@
+{
+ "actions": [],
+ "creation": "2026-06-08 00:00:00.000000",
+ "doctype": "DocType",
+ "engine": "InnoDB",
+ "field_order": [
+  "accounting_receipt_section",
+  "rules_description",
+  "rules"
+ ],
+ "fields": [
+  {
+   "fieldname": "accounting_receipt_section",
+   "fieldtype": "Section Break",
+   "label": "Accounting Receipt Extraction Rules"
+  },
+  {
+   "fieldname": "rules_description",
+   "fieldtype": "HTML",
+   "options": "<p style=\"color: var(--text-muted); margin-bottom: 12px;\">Define extraction rules to guide the AI when reading receipts. Rules are injected into the prompt in <strong>order</strong> — move critical or frequently-failing cases to the top. Only <strong>enabled</strong> rows are sent to the AI. The <em>Reason</em> column is internal documentation only and is not sent to the AI.</p>"
+  },
+  {
+   "fieldname": "rules",
+   "fieldtype": "Table",
+   "label": "Rules",
+   "options": "AI Prompt Rule"
+  }
+ ],
+ "issingle": 1,
+ "links": [],
+ "modified": "2026-06-08 00:00:00.000000",
+ "modified_by": "Administrator",
+ "module": "Phamos",
+ "name": "AI Prompt Configuration",
+ "owner": "Administrator",
+ "permissions": [
+  {
+   "create": 1,
+   "delete": 1,
+   "email": 1,
+   "print": 1,
+   "read": 1,
+   "role": "System Manager",
+   "share": 1,
+   "write": 1
+  },
+  {
+   "create": 1,
+   "email": 1,
+   "print": 1,
+   "read": 1,
+   "role": "Accounts Manager",
+   "share": 1,
+   "write": 1
+  }
+ ],
+ "sort_field": "modified",
+ "sort_order": "DESC",
+ "states": []
+}
