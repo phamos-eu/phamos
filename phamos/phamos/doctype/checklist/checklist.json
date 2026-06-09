@@ -50,7 +50,8 @@
   {
    "fieldname": "completion_percentage",
    "fieldtype": "Percent",
-   "label": "Completion Percentage"
+   "label": "Completion Percentage",
+   "read_only": 1
   }
  ],
  "grid_page_length": 50,
