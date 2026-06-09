@@ -373,44 +373,6 @@ def sync_all_issues():
             issues = [issue for issue in issues if issue.get("assignee")]
             fetched_iids = {str(issue["iid"]) for issue in issues}
 
-            # ── Step 2: Checking issues in Frappe 
-            existing_in_frappe = frappe.get_all(
-                "GitLab Issue",
-                filters={"gitlab_project": project["name"]},
-                fields=["name", "issue_id"]
-            )
-
-            #  collect Open issues parents 
-            open_parent_iids = set()
-
-            for issue in issues:
-                try:
-                    if not project_path:
-                        continue
-
-                    parent_info = get_issue_parent(project_path, issue["iid"])
-                    if parent_info and parent_info.get("iid"):
-                        open_parent_iids.add(str(parent_info["iid"]))
-                except Exception:
-                    pass
-
-
-            for existing in existing_in_frappe:
-                issue_id_str = str(existing["issue_id"])
-
-                # ❌ Skip delete if:
-                # 1. Issue fetched (means open)
-                # 2. Issue is open issue parent
-                if issue_id_str in fetched_iids or issue_id_str in open_parent_iids:
-                    continue
-
-                # ✅ Safe to delete
-                frappe.delete_doc(
-                    "GitLab Issue",
-                    existing["name"],
-                    ignore_permissions=True,
-                    force=True
-                )
 
             # ── Step 3: Upsert all fetched (opened) issues ──
             for issue in issues:
@@ -435,7 +397,7 @@ def sync_all_issues():
 
                     existing_issue = frappe.db.exists(
                         "GitLab Issue",
-                        {"issue_id": issue["iid"], "gitlab_project": project["name"]}
+                        {"issue_id": str(issue["iid"]), "gitlab_project": project["name"]}
                     )
 
                     assignee_data = issue.get("assignee") or {}
@@ -467,7 +429,7 @@ def sync_all_issues():
                         gitlab_issue_doc = frappe.new_doc("GitLab Issue")
                         gitlab_issue_doc.update(fields)
                         gitlab_issue_doc.update({
-                            "issue_id": issue["iid"],
+                            "issue_id": str(issue["iid"]),
                             "gitlab_project": project["name"],
                         })
                         gitlab_issue_doc.save(ignore_permissions=True)
@@ -544,38 +506,6 @@ def sync_issues_for_project(project_name):
         issues = [issue for issue in issues if issue.get("assignee")]
         fetched_iids = {str(issue["iid"]) for issue in issues}
 
-        existing_in_frappe = frappe.get_all(
-            "GitLab Issue",
-            filters={"gitlab_project": project.name},
-            fields=["name", "issue_id"]
-        )
-
-        open_parent_iids = set()
-
-        for issue in issues:
-            try:
-                if not project_path:
-                    continue
-
-                parent_info = get_issue_parent(project_path, issue["iid"])
-                if parent_info and parent_info.get("iid"):
-                    open_parent_iids.add(str(parent_info["iid"]))
-            except Exception:
-                pass
-
-        # Delete closed issues
-        for existing in existing_in_frappe:
-            issue_id_str = str(existing.issue_id)
-
-            if issue_id_str in fetched_iids or issue_id_str in open_parent_iids:
-                continue
-
-            frappe.delete_doc(
-                "GitLab Issue",
-                existing.name,
-                ignore_permissions=True,
-                force=True
-            )
 
         # Create / Update issues
         for issue in issues:
@@ -600,7 +530,7 @@ def sync_issues_for_project(project_name):
                 existing_issue = frappe.db.exists(
                     "GitLab Issue",
                     {
-                        "issue_id": issue["iid"],
+                        "issue_id": str(issue["iid"]),
                         "gitlab_project": project.name
                     }
                 )
@@ -631,7 +561,7 @@ def sync_issues_for_project(project_name):
                 else:
                     doc = frappe.new_doc("GitLab Issue")
                     doc.update(fields)
-                    doc.issue_id = issue["iid"]
+                    doc.issue_id = str(issue["iid"])
                     doc.gitlab_project = project.name
                     doc.save(ignore_permissions=True)
                     issue_map[str(issue["iid"])] = doc.name
@@ -846,7 +776,7 @@ def gitlab_webhook_receiver():
             "GitLab Settings", "GitLab Settings", "webhook_secret"
         )
     except Exception:
-        expected_secret = None  # Field exist nahi karti, skip karo
+        expected_secret = None
 
     if expected_secret:
         incoming_token = frappe.request.headers.get("X-Gitlab-Token", "")
@@ -896,7 +826,9 @@ def _handle_issue_webhook(payload):
         return
 
     project_doc = frappe.get_doc("GitLab Project", project_doc_name)
-    issue_iid   = issue_attrs.get("iid")
+
+    # Always cast iid to string to avoid type mismatch with DB
+    issue_iid = str(issue_attrs.get("iid"))
 
     if action == "delete":
         existing = frappe.db.get_value(
@@ -949,22 +881,34 @@ def _handle_issue_webhook(payload):
     )
 
     if existing:
+        # Record found — update it (handles update, close, reopen all in one place)
         doc = frappe.get_doc("GitLab Issue", existing)
         doc.update(data)
         doc.save(ignore_permissions=True)
     else:
-        if action == "open":
+        # Record not found — insert it
+        try:
             doc = frappe.new_doc("GitLab Issue")
             doc.update(data)
             doc.issue_id       = issue_iid
             doc.gitlab_project = project_doc_name
-            doc.save(ignore_permissions=True)
-
+            doc.insert(ignore_permissions=True)
             _try_link_parent_from_webhook(
                 doc.name,
                 project_doc.namespace,
                 issue_iid
             )
+        except frappe.DuplicateEntryError:
+            frappe.db.rollback()
+            existing = frappe.db.get_value(
+                "GitLab Issue",
+                {"issue_id": issue_iid, "gitlab_project": project_doc_name},
+                "name"
+            )
+            if existing:
+                doc = frappe.get_doc("GitLab Issue", existing)
+                doc.update(data)
+                doc.save(ignore_permissions=True)
 
     frappe.db.commit()
 
@@ -992,7 +936,7 @@ def _try_link_parent_from_webhook(issue_doc_name, project_path, issue_iid):
         if parent_info and parent_info.get("iid"):
             parent_doc_name = frappe.db.get_value(
                 "GitLab Issue",
-                {"issue_id": parent_info["iid"]},
+                {"issue_id": str(parent_info["iid"])},
                 "name"
             )
             if parent_doc_name:
