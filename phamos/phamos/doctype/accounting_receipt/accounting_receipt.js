@@ -72,6 +72,11 @@ frappe.ui.form.on("Accounting Receipt", {
         // PDF selection from multiple email attachments
         frm.events.refresh_pdf_attachment_choices(frm);
 
+        // Quick access to AI Prompt Configuration
+        frm.page.add_menu_item(__("AI Prompt Config"), function () {
+            frappe.set_route("Form", "AI Prompt Configuration");
+        });
+
         // Fetch PDF (Mistral) - show review popup, then apply on Proceed
         if (!frm.doc.__islocal && frm.doc.attachment && frm.doc.attachment.toLowerCase().endsWith(".pdf")) {
             frm.add_custom_button(__("Fetch PDF"), function () {
