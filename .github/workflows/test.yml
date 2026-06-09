@@ -1,0 +1,166 @@
+name: Run Tests
+
+on:
+  push:
+    branches: [ version-15, develop, automated-testing ]
+  pull_request:
+    branches: [ version-15, develop ]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ['3.11']
+    
+    services:
+      mariadb:
+        image: mariadb:10.6
+        env:
+          MYSQL_ROOT_PASSWORD: root
+          MYSQL_DATABASE: test_frappe
+        ports:
+          - 3306:3306
+        options: --health-cmd="mysqladmin ping" --health-interval=10s --health-timeout=5s --health-retries=3
+      
+      redis-cache:
+        image: redis:alpine
+        ports:
+          - 6379:6379
+      
+      redis-queue:
+        image: redis:alpine
+        ports:
+          - 6380:6379
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      with:
+        path: apps/phamos
+
+    - name: Set up Python ${{ matrix.python-version }}
+      uses: actions/setup-python@v5
+      with:
+        python-version: ${{ matrix.python-version }}
+
+    - name: Setup Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: '18'
+
+    - name: Install system dependencies
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y \
+          git \
+          mariadb-client \
+          redis-tools \
+          python3-dev \
+          libmariadb-dev \
+          libmariadb-dev-compat \
+          wkhtmltopdf \
+          xvfb \
+          libfontconfig \
+          libxrender1
+
+    - name: Install Frappe Bench
+      run: |
+        pip install --upgrade pip
+        pip install frappe-bench
+        bench --version
+        
+    - name: Initialize Frappe Bench
+      run: |
+        bench init --skip-redis-config-generation --frappe-branch version-15 frappe-bench
+        cd frappe-bench
+        ls -la
+      env:
+        CI: true
+
+    - name: Setup Frappe Site
+      working-directory: ./frappe-bench
+      run: |
+        # Configure for CI environment
+        bench set-config -g db_host 127.0.0.1
+        bench set-config -g db_port 3306
+        bench set-config -g redis_cache redis://127.0.0.1:6379
+        bench set-config -g redis_queue redis://127.0.0.1:6380
+        bench set-config -g redis_socketio redis://127.0.0.1:6379
+        
+        # Create test site
+        bench new-site test.localhost \
+          --db-root-password root \
+          --admin-password admin \
+          --mariadb-root-username root \
+          --mariadb-root-password root \
+          --no-mariadb-socket
+
+    - name: Install required apps
+      working-directory: ./frappe-bench
+      run: |
+        # Install ERPNext (required by phamos)
+        bench get-app --branch version-15 erpnext
+        bench --site test.localhost install-app erpnext
+        
+        # Install HRMS (required by phamos)
+        bench get-app --branch version-15 hrms
+        bench --site test.localhost install-app hrms
+
+    - name: Install Phamos app
+      working-directory: ./frappe-bench
+      run: |
+        # Copy phamos app
+        cp -r ../apps/phamos ./apps/phamos
+        
+        # Register app in bench before installation
+        # Ensure apps.txt ends with a newline before appending
+        if [ -s sites/apps.txt ] && [ -n "$(tail -c1 sites/apps.txt)" ]; then
+          echo >> sites/apps.txt
+        fi
+        grep -qxF "phamos" sites/apps.txt || echo "phamos" >> sites/apps.txt
+
+        # Make app importable in bench env before install-app loads app modules
+        bench pip install -e ./apps/phamos
+        bench pip install coverage
+        
+        # Install app on the site
+        bench --site test.localhost install-app phamos
+
+    - name: Run Tests
+      working-directory: ./frappe-bench
+      run: |
+        bench --site test.localhost run-tests --app phamos --coverage
+      env:
+        CI: true
+
+    - name: Upload Coverage Reports
+      if: matrix.python-version == '3.10'
+      uses: codecov/codecov-action@v4
+      with:
+        file: ./frappe-bench/coverage.xml
+        flags: unittests
+        name: codecov-phamos
+        fail_ci_if_error: false
+      env:
+        CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }}
+
+    - name: Test Summary
+      if: always()
+      run: |
+        echo "## Test Results" >> $GITHUB_STEP_SUMMARY
+        echo "" >> $GITHUB_STEP_SUMMARY
+        echo "Tests completed for Python ${{ matrix.python-version }}" >> $GITHUB_STEP_SUMMARY
+        
+    - name: Archive test results
+      if: always()
+      uses: actions/upload-artifact@v4
+      with:
+        name: test-results-py${{ matrix.python-version }}
+        path: |
+          frappe-bench/sites/test.localhost/logs/
+          frappe-bench/coverage.xml
+        retention-days: 7
+        if-no-files-found: warn
