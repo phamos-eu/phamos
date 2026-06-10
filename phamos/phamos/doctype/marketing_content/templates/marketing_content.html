@@ -405,10 +405,11 @@
       {% endif %}
 
       {# ── Speakers ── horizontal pill chips ────── #}
-      {% if speakers %}
+      {% set published_speakers = speakers | selectattr("published") | list %}
+      {% if published_speakers %}
       <p class="pe-section-label">Speakers</p>
       <div class="pe-speakers">
-        {% for speaker in speakers %}
+        {% for speaker in published_speakers %}
         <div class="pe-speaker">
           {% if speaker.image %}
             <img class="pe-speaker-avatar" src="{{ speaker.image }}" alt="{{ speaker.full_name }}">
@@ -605,11 +606,12 @@
       </div>
 
       {# Sponsors — below Event Details, non-sticky #}
-      {% if sponsors %}
+      {% set published_sponsors = sponsors | selectattr("published") | list %}
+      {% if published_sponsors %}
       <div class="pe-sponsors-card">
         <div class="pe-sponsors-card-header">Sponsors</div>
         <div class="pe-sponsors-card-body">
-          {% for sponsor in sponsors %}
+          {% for sponsor in published_sponsors %}
           <div class="pe-sponsor-row">
             {% if sponsor.url %}
               <a href="{{ sponsor.url }}" target="_blank" rel="noopener" class="pe-sponsor-link">
