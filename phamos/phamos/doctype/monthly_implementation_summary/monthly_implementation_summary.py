@@ -352,9 +352,18 @@ class MonthlyImplementationSummary(Document):
 				continue
 			qty = flt(row.qty)
 			amount = flt(row.amount)
-			so_detail = getattr(row, "so_detail", None) or (
-				row.get("so_detail") if isinstance(row, dict) else None
-			)
+			so_detail = getattr(row, "so_detail", None)
+			if not so_detail and getattr(row, "custom_ref_doc", None):
+				so_detail = frappe.db.get_value(
+					"Delivery Note Item",
+					{
+						"parent": row.custom_ref_doc,
+						"item_code": ic,
+						"parenttype": "Delivery Note",
+					},
+					"so_detail",
+				)
+
 			key = (ic, so_detail)
 			if key not in grouped:
 				grouped[key] = {
@@ -757,9 +766,6 @@ def update_dn_table_in_summary(docname, dn_name, old_dn=None, existing_rows=None
 			"cost_center": item.cost_center,
 			"custom_ref_doc": dn_name,
 		}
-		if getattr(item, "against_sales_order", None) and getattr(item, "so_detail", None):
-			row_data["against_sales_order"] = item.against_sales_order
-			row_data["so_detail"] = item.so_detail
 		doc.append("delivery_note_item", row_data)
 	doc.save()
 
