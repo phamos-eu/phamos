@@ -27,6 +27,12 @@ frappe.ready(() => {
     }, 1500);
     return; // Stop further execution
   }
+  const plTab = document.getElementById('project-links-tab');
+    if (plTab) {
+      plTab.addEventListener('shown.bs.tab', function () {
+        loadProjectLinks();
+      });
+    }
 
   // Initialize chart view from localStorage or default to 'week'
   currentChartView = localStorage.getItem('timesheetChartView') || 'week';
@@ -134,6 +140,36 @@ $('#from_date').on('change', function () {
   });
   
 });
+function loadProjectLinks() {
+  const tbody = $('#pl-table-body');
+  tbody.html(`<tr><td class="text-center text-muted"><i class="fa fa-spinner fa-spin me-1"></i> Loading...</td></tr>`);
+
+  frappe.call({
+    method: "phamos.api.get_customer_project_links",
+    callback: function (r) {
+      tbody.empty();
+
+      if (!r.message || !r.message.show || !r.message.links) {
+        tbody.append(`
+          <tr>
+            <td class="text-center text-muted py-4">
+              <i class="fa fa-info-circle me-1"></i> No project links available.
+            </td>
+          </tr>
+        `);
+        return;
+      }
+
+      tbody.append(`
+        <tr>
+          <td style="padding: 16px;">
+            ${r.message.links}
+          </td>
+        </tr>
+      `);
+    }
+  });
+}
 
 function reset_and_load() {
   totalCount = 0;
