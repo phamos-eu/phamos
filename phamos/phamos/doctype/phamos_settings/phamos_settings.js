@@ -14,6 +14,11 @@ frappe.ui.form.on('phamos Settings', {
             // Prevent the form from being saved
             frappe.validated = false;
         }
+
+        if (frm.doc.enable_raven_daily_thread && (!frm.doc.raven_bot || !frm.doc.raven_channel)) {
+            frappe.msgprint(__('Raven Bot and Target channel are required when the Raven scheduler is enabled.'));
+            frappe.validated = false;
+        }
     },
     onload: function(frm) {
 		// Set year options dynamically: last year, current year, next 2 years
@@ -146,6 +151,33 @@ frappe.ui.form.on('phamos Settings', {
 							) + detailBlock,
 							indicator: m.errors ? "red" : "green",
 						});
+					},
+				});
+			}
+		);
+	},
+	execute_raven_thread: function (frm) {
+		if (!frm.doc.raven_bot || !frm.doc.raven_channel) {
+			frappe.msgprint(__("Please set Raven Bot and Target channel first."));
+			return;
+		}
+		frappe.confirm(
+			__("Post a test daily thread to Raven now?"),
+			() => {
+				frappe.call({
+					method: "phamos.custom_scripts.custom_python.raven_daily_thread.test_raven_thread",
+					freeze: true,
+					freeze_message: __("Posting to Raven..."),
+					callback: function (r) {
+						if (r.exc) {
+							return;
+						}
+						frappe.msgprint({
+							title: __("Success"),
+							message: __("Daily thread posted to Raven."),
+							indicator: "green",
+						});
+						frm.reload_doc();
 					},
 				});
 			}
