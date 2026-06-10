@@ -70,6 +70,22 @@ class MarketingContent(WebsiteGenerator):
             "image": self.image or "",
         }
 
+@frappe.whitelist()
+def get_linked_checklists(doctype, name):
+    return frappe.get_all(
+        "Checklist",
+        filters={
+            "document": doctype,
+            "reference_record": name,
+        },
+        fields=[
+            "name",
+            "status",
+            "completion_percentage",
+        ],
+        order_by="modified desc",
+    )
+
 
 @frappe.whitelist(allow_guest=True)
 def get_interest_counts(event_name):
