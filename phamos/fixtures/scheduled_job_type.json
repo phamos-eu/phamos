@@ -13,5 +13,17 @@
   "scheduler_event": null,
   "server_script": null,
   "stopped": 0
+ },
+ {
+  "create_log": 1,
+  "cron_format": "0 6 * * 1-5",
+  "docstatus": 0,
+  "doctype": "Scheduled Job Type",
+  "frequency": "Cron",
+  "method": "phamos.custom_scripts.custom_python.raven_daily_thread.create_raven_thread",
+  "name": "raven_daily_thread.create_raven_thread",
+  "scheduler_event": null,
+  "server_script": null,
+  "stopped": 1
  }
 ]
