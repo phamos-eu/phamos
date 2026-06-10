@@ -22,6 +22,24 @@ def _validate_raven_installed():
 		frappe.throw("Raven app is not installed on this site.")
 
 
+def _set_bot_message_owner(message_name, bot):
+	"""Raven thread header reads owner, not is_bot_message — show the bot, not session user."""
+	if bot.raven_user:
+		frappe.db.set_value(
+			"Raven Message",
+			message_name,
+			"owner",
+			bot.raven_user,
+			update_modified=False,
+		)
+
+
+def _bot_send_message(bot, channel_id, text="", **kwargs):
+	message_id = bot.send_message(channel_id, text, **kwargs)
+	_set_bot_message_owner(message_id, bot)
+	return message_id
+
+
 def _get_daily_image_file_url(settings, quote):
 	if settings.daily_image_folder:
 		return settings.daily_image_folder
@@ -71,19 +89,19 @@ def _create_raven_thread(settings, today_date):
 	bot.add_to_channel(channel_id)
 
 	parent_text = f"{today_compact} - Daily {phamos_emoji}"
-	parent_message_id = bot.send_message(channel_id, parent_text)
+	parent_message_id = _bot_send_message(bot, channel_id, parent_text)
 
 	create_thread(parent_message_id)
 
 	reply_message = (
 		f"Good Morning 'phamos' {phamos_emoji} 🙏\n> {thought_of_the_day} {reply_emoji}"
 	)
-	bot.send_message(parent_message_id, reply_message, markdown=True)
+	_bot_send_message(bot, parent_message_id, reply_message, markdown=True)
 
 	if settings.enable_daily_image:
 		try:
 			image_file = _get_daily_image_file_url(settings, thought_of_the_day)
-			bot.send_message(parent_message_id, text="", file=image_file)
+			_bot_send_message(bot, parent_message_id, text="", file=image_file)
 		except Exception:
 			frappe.log_error(
 				frappe.get_traceback(),
