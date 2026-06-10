@@ -1,30 +1,38 @@
-import requests
-import frappe
-from datetime import datetime
 import random
-import os
-
-import os
 from datetime import datetime
+
+import frappe
+import requests
+
+FALLBACK_QUOTES = [
+	"The only way to do great work is to love what you do. - Steve Jobs",
+	"Believe you can and you're halfway there. - Theodore Roosevelt",
+	"Start where you are. Use what you have. Do what you can. - Arthur Ashe",
+	"Success is not final, failure is not fatal: it is the courage to continue that counts. - Winston Churchill",
+	"Act as if what you do makes a difference. It does. - William James",
+]
+
 
 def get_thought_of_the_day():
-    url = "https://zenquotes.io/api/today"
-    
-    try:
-        response = requests.get(url)
-        response.raise_for_status()
+	url = "https://zenquotes.io/api/today"
 
-        data = response.json()
+	try:
+		response = requests.get(url, timeout=15, headers={"User-Agent": "Phamos-Daily-Thread/1.0"})
+		response.raise_for_status()
+		data = response.json()
 
-        if data and isinstance(data, list):
-            thought_of_the_day = data[0].get("q","No thought available")
-            author = data[0].get("a","Unknown")
-            return f"{thought_of_the_day} - {author}"
+		if data and isinstance(data, list):
+			thought_of_the_day = data[0].get("q", "No thought available")
+			author = data[0].get("a", "Unknown")
+			return f"{thought_of_the_day} - {author}"
 
-        else:
-            return "No thought available from the API."
-    except requests.exceptions.RequestException as e:
-        raise f"An error occurred while fetching the thought of the day : {e}"
+		return random.choice(FALLBACK_QUOTES)
+	except requests.exceptions.RequestException as e:
+		frappe.log_error(
+			title="Daily Thread: zenquotes.io unavailable",
+			message=f"Using fallback quote. Error: {e}",
+		)
+		return random.choice(FALLBACK_QUOTES)
 
 
 def post_to_mattermost(channel_id, message, bot_username="Jarvis", parent_id=None):

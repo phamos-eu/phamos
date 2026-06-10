@@ -36,7 +36,16 @@
   "monthly_implementation_summary_tab",
   "year",
   "month",
-  "execute_scheduled_job"
+  "execute_scheduled_job",
+  "raven_daily_thread_settings_tab",
+  "enable_raven_daily_thread",
+  "raven_bot",
+  "raven_channel",
+  "thread_posting_hour_raven",
+  "last_daily_thread_creation_date_raven",
+  "enable_daily_image",
+  "daily_image_folder",
+  "execute_raven_thread"
  ],
  "fields": [
   {
@@ -200,12 +209,68 @@
    "fieldname": "execute_scheduled_job",
    "fieldtype": "Button",
    "label": "Execute Scheduled Job"
+  },
+  {
+   "fieldname": "raven_daily_thread_settings_tab",
+   "fieldtype": "Tab Break",
+   "label": "Raven Daily Thread Settings"
+  },
+  {
+   "default": "0",
+   "fieldname": "enable_raven_daily_thread",
+   "fieldtype": "Check",
+   "label": "Enable scheduler"
+  },
+  {
+   "fieldname": "raven_bot",
+   "fieldtype": "Link",
+   "label": "Bot that posts messages",
+   "mandatory_depends_on": "eval:doc.enable_raven_daily_thread == 1",
+   "options": "Raven Bot"
+  },
+  {
+   "fieldname": "raven_channel",
+   "fieldtype": "Link",
+   "label": "Target channel",
+   "mandatory_depends_on": "eval:doc.enable_raven_daily_thread == 1",
+   "options": "Raven Channel"
+  },
+  {
+   "default": "6",
+   "fieldname": "thread_posting_hour_raven",
+   "fieldtype": "Select",
+   "label": "Thread Posting Hour",
+   "options": "\n1\n2\n3\n4\n5\n6\n7\n8\n9\n10\n11\n12\n13\n14\n15\n16\n17\n18\n19\n20\n21\n22\n23"
+  },
+  {
+   "fieldname": "last_daily_thread_creation_date_raven",
+   "fieldtype": "Date",
+   "label": "Last Daily Thread Creation Date",
+   "read_only": 1
+  },
+  {
+   "default": "0",
+   "description": "When enabled, Mistral AI generates an author portrait poster with the quote text on the image (requires Mistral API key under Data Extract).",
+   "fieldname": "enable_daily_image",
+   "fieldtype": "Check",
+   "label": "Post image with quote"
+  },
+  {
+   "description": "Optional fixed image. If set, this file is used instead of Mistral-generated art.",
+   "fieldname": "daily_image_folder",
+   "fieldtype": "Attach Image",
+   "label": "Daily image (optional)"
+  },
+  {
+   "fieldname": "execute_raven_thread",
+   "fieldtype": "Button",
+   "label": "Test Raven Daily Thread"
   }
  ],
  "index_web_pages_for_search": 1,
  "issingle": 1,
  "links": [],
- "modified": "2026-04-08 15:46:41.122104",
+ "modified": "2026-06-10 17:11:36.844474",
  "modified_by": "Administrator",
  "module": "Phamos",
  "name": "phamos Settings",
