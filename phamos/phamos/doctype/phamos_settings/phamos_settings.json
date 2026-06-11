@@ -39,12 +39,18 @@
   "execute_scheduled_job",
   "raven_daily_thread_settings_tab",
   "enable_raven_daily_thread",
-  "raven_bot",
-  "raven_channel",
+  "raven_scheduler_section",
   "thread_posting_hour_raven",
+  "column_break_raven_schedule",
   "last_daily_thread_creation_date_raven",
+  "raven_connection_section",
+  "raven_bot",
+  "column_break_raven_conn",
+  "raven_channel",
+  "raven_image_section",
   "enable_daily_image",
   "daily_image_folder",
+  "raven_actions_section",
   "execute_raven_thread"
  ],
  "fields": [
@@ -213,27 +219,18 @@
   {
    "fieldname": "raven_daily_thread_settings_tab",
    "fieldtype": "Tab Break",
-   "label": "Raven Daily Thread Settings"
+   "label": "Raven"
   },
   {
    "default": "0",
    "fieldname": "enable_raven_daily_thread",
    "fieldtype": "Check",
-   "label": "Enable scheduler"
+   "label": "Enable Daily Thread Creation"
   },
   {
-   "fieldname": "raven_bot",
-   "fieldtype": "Link",
-   "label": "Bot that posts messages",
-   "mandatory_depends_on": "eval:doc.enable_raven_daily_thread == 1",
-   "options": "Raven Bot"
-  },
-  {
-   "fieldname": "raven_channel",
-   "fieldtype": "Link",
-   "label": "Target channel",
-   "mandatory_depends_on": "eval:doc.enable_raven_daily_thread == 1",
-   "options": "Raven Channel"
+   "fieldname": "raven_scheduler_section",
+   "fieldtype": "Section Break",
+   "label": "Schedule"
   },
   {
    "default": "6",
@@ -243,23 +240,61 @@
    "options": "\n1\n2\n3\n4\n5\n6\n7\n8\n9\n10\n11\n12\n13\n14\n15\n16\n17\n18\n19\n20\n21\n22\n23"
   },
   {
+   "fieldname": "column_break_raven_schedule",
+   "fieldtype": "Column Break"
+  },
+  {
    "fieldname": "last_daily_thread_creation_date_raven",
    "fieldtype": "Date",
    "label": "Last Daily Thread Creation Date",
    "read_only": 1
   },
   {
-   "default": "0",
-   "description": "When enabled, Mistral AI generates an author portrait poster with the quote text on the image (requires Mistral API key under Data Extract).",
-   "fieldname": "enable_daily_image",
-   "fieldtype": "Check",
-   "label": "Post image with quote"
+   "fieldname": "raven_connection_section",
+   "fieldtype": "Section Break",
+   "label": "Bot & Channel"
   },
   {
-   "description": "Optional fixed image. If set, this file is used instead of Mistral-generated art.",
+   "fieldname": "raven_bot",
+   "fieldtype": "Link",
+   "label": "Raven Bot",
+   "mandatory_depends_on": "eval:doc.enable_raven_daily_thread == 1",
+   "options": "Raven Bot"
+  },
+  {
+   "fieldname": "column_break_raven_conn",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "raven_channel",
+   "fieldtype": "Link",
+   "label": "Target Channel",
+   "mandatory_depends_on": "eval:doc.enable_raven_daily_thread == 1",
+   "options": "Raven Channel"
+  },
+  {
+   "fieldname": "raven_image_section",
+   "fieldtype": "Section Break",
+   "label": "Daily Image"
+  },
+  {
+   "default": "0",
+   "description": "Uses Mistral AI to generate an author portrait with the quote. Requires Mistral API key under Data Extract tab.",
+   "fieldname": "enable_daily_image",
+   "fieldtype": "Check",
+   "label": "Post Image with Quote"
+  },
+  {
+   "depends_on": "eval:doc.enable_daily_image == 1",
+   "description": "Leave empty to generate a new image from the quote each day via Mistral.",
    "fieldname": "daily_image_folder",
    "fieldtype": "Attach Image",
-   "label": "Daily image (optional)"
+   "label": "Fixed Daily Image (optional)"
+  },
+  {
+   "fieldname": "raven_actions_section",
+   "fieldtype": "Section Break",
+   "label": "Actions"
   },
   {
    "fieldname": "execute_raven_thread",
@@ -270,7 +305,7 @@
  "index_web_pages_for_search": 1,
  "issingle": 1,
  "links": [],
- "modified": "2026-06-10 17:11:36.844474",
+ "modified": "2026-06-11 17:18:53.508135",
  "modified_by": "Administrator",
  "module": "Phamos",
  "name": "phamos Settings",
