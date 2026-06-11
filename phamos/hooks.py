@@ -192,6 +192,7 @@ fixtures = [
         [
             "name", "in", [
                 "mattermost_daily_thread.create_mattermost_thread",
+                "raven_daily_thread.create_raven_thread",
             ]
         ]
     ]},
