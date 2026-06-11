@@ -56,7 +56,7 @@ def get_team_capacity(filters=None):
     Team = DocType("Team")
     team_query = (
         frappe.qb.from_(Team)
-        .select(Team.name, Team.total_team_capacity)
+        .select(Team.name, Team.team_members_capacity)
     )
     if selected_team:
         team_query = team_query.where(Team.name.isin(selected_team))
@@ -66,10 +66,9 @@ def get_team_capacity(filters=None):
     # Prepare team-week capacities
     teams_dict = {}
     for t in teams_default:
-        teams_dict[t["name"]] = [t["total_team_capacity"] or 0] * len(week_buckets)
+        teams_dict[t["name"]] = [t["team_members_capacity"] or 0] * len(week_buckets)
 
-    # Apply Ledger entries with carry-forward logic
-    # Organize entries by team
+    # Organize ledger entries by team
     entries_by_team = {}
     for e in entries:
         team = e.team
@@ -80,31 +79,112 @@ def get_team_capacity(filters=None):
             entries_by_team[team] = []
         entries_by_team[team].append((entry_date, e.total_team_capacity or 0))
 
+
+    TeamMember = DocType("Team Members")
+    all_members_query = (
+        frappe.qb.from_(TeamMember)
+        .select(TeamMember.parent, TeamMember.employee)
+        .where(TeamMember.parenttype == "Team")
+    )
+    if selected_team:
+        all_members_query = all_members_query.where(TeamMember.parent.isin(selected_team))
+
+    all_members = all_members_query.run(as_dict=True)
+
+    team_employees = {}
+    for row in all_members:
+        team_employees.setdefault(row.parent, [])
+        if row.employee:
+            team_employees[row.parent].append(row.employee)
+
+    def get_employee_daily_hours(employee, work_date):
+        """Return scheduled working hours for an employee on a specific date."""
+        day_name = work_date.strftime("%A")
+        wwh = frappe.db.get_value("Weekly Working Hours", {"employee": employee}, "name")
+        if not wwh:
+            return 0
+        hours = frappe.db.get_value(
+            "Daily Hours Detail",
+            {"parent": wwh, "day": day_name},
+            "hours"
+        )
+        return hours or 0
+
+    def get_week_leave_hours(employee, week_start, week_end):
+        from datetime import timedelta
+        total = 0.0
+        holiday_dates = set()
+
+        # Holiday hours
+        holiday_list = frappe.db.get_value("Employee", employee, "holiday_list")
+        if holiday_list:
+            holidays = frappe.db.get_all(
+                "Holiday",
+                filters={
+                    "parent": holiday_list,
+                    "holiday_date": ["between", [week_start, week_end]]
+                },
+                fields=["holiday_date"]
+            )
+            for h in holidays:
+                holiday_dates.add(h.holiday_date) 
+                total += get_employee_daily_hours(employee, h.holiday_date)
+
+        # Leave Application hours
+        leave_apps = frappe.db.get_all(
+            "Leave Application",
+            filters={
+                "employee": employee,
+                "docstatus": 1,
+                "from_date": ["<=", week_end],
+                "to_date": [">=", week_start],
+            },
+            fields=["from_date", "to_date", "half_day"]
+        )
+        for leave in leave_apps:
+            day = max(leave.from_date, week_start)
+            last_day = min(leave.to_date, week_end)
+            while day <= last_day:
+                if day not in holiday_dates:  # holiday wala din skip karo
+                    hrs = get_employee_daily_hours(employee, day)
+                    if leave.half_day:
+                        hrs = hrs / 2
+                    total += hrs
+                day += timedelta(days=1)
+
+        return total
+
+    def calculate_capacity_from_doctypes(team_name, week_start, week_end, base_capacity):
+        employees = team_employees.get(team_name, [])
+        total_leave_hrs = 0.0
+
+        for emp in employees:
+            total_leave_hrs += get_week_leave_hours(emp, week_start, week_end)
+
+        return round(max(base_capacity - total_leave_hrs, 0), 2)
+
     for team, week_data in teams_dict.items():
-        last_capacity = week_data[0]  # start with default team capacity
+        default_capacity = week_data[0]
 
-        if team in entries_by_team:
-            ledger_entries = sorted(entries_by_team[team], key=lambda x: x[0])
+        ledger_entries = sorted(entries_by_team.get(team, []), key=lambda x: x[0])
 
-            for idx, w in enumerate(week_buckets):
-                week_start = w["start"].date() if isinstance(w["start"], datetime) else w["start"]
-                week_end = w["end"].date() if isinstance(w["end"], datetime) else w["end"]
+        for idx, w in enumerate(week_buckets):
+            week_start = w["start"].date() if isinstance(w["start"], datetime) else w["start"]
+            week_end = w["end"].date() if isinstance(w["end"], datetime) else w["end"]
 
-                # Collect all entries for this week
-                week_caps = [cap for (d, cap) in ledger_entries if week_start <= d <= week_end]
+            # Collect all ledger entries within this week
+            week_caps = [cap for (d, cap) in ledger_entries if week_start <= d <= week_end]
 
-                if week_caps:
-                    # Average for this week
-                    avg_cap = sum(week_caps) / len(week_caps)
-                    week_data[idx] = round(avg_cap, 2)
-                    last_capacity = week_data[idx]
-                else:
-                    # No entries → use last known capacity
-                    week_data[idx] = last_capacity
-        else:
-            continue
+            if week_caps:
+                # Ledger entries exist — average them (each entry already has leave/holiday deducted)
+                week_data[idx] = round(sum(week_caps) / len(week_caps), 2)
+            else:
+                # No ledger entry — calculate live from Leave Application and Holiday doctypes
+                week_data[idx] = calculate_capacity_from_doctypes(
+                    team, week_start, week_end, default_capacity
+                )
 
-    # ── DocTypes for Timesheet queries ──
+    # DocTypes for Timesheet queries
     TS   = DocType("Timesheet")
     Proj = DocType("Project")
     Impl = DocType("Implementation")
