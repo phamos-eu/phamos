@@ -40,6 +40,10 @@
   "section_registration",
   "registration_open",
   "max_attendees",
+  "section_speakers",
+  "speakers",
+  "section_sponsors",
+  "sponsors",
   "section_responses",
   "subscription_description",
   "responses"
@@ -252,6 +256,28 @@
    "no_copy": 1
   },
   {
+   "fieldname": "section_speakers",
+   "fieldtype": "Section Break",
+   "label": "Speakers"
+  },
+  {
+   "fieldname": "speakers",
+   "fieldtype": "Table",
+   "label": "Speakers",
+   "options": "Marketing Event Speaker"
+  },
+  {
+   "fieldname": "section_sponsors",
+   "fieldtype": "Section Break",
+   "label": "Sponsors"
+  },
+  {
+   "fieldname": "sponsors",
+   "fieldtype": "Table",
+   "label": "Sponsors",
+   "options": "Marketing Event Sponsor"
+  },
+  {
    "fieldname": "section_responses",
    "fieldtype": "Section Break",
    "label": "Email Subscriptions"
@@ -274,7 +300,7 @@
  ],
  "has_web_view": 1,
  "is_published_field": "published",
- "modified": "2026-05-29 00:00:00.000000",
+ "modified": "2026-06-08 15:00:26.796667",
  "modified_by": "Administrator",
  "module": "Phamos",
  "name": "Marketing Content",
