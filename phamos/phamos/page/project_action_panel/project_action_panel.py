@@ -626,6 +626,12 @@ def update_and_submit_timesheet_record(name, to_time, percent_billable, activity
 
         doc.task = task
         doc.activity_type = activity_type
+        if doc.gitlab_issue:
+            parent_issue = frappe.db.get_value("GitLab Issue", doc.gitlab_issue, "parent_issue")
+            if parent_issue:
+                parent_url = frappe.db.get_value("GitLab Issue", parent_issue, "issue_url")
+                if parent_url:
+                    result = (result + "\n\n" if result else "") + f"Parent Issue: {parent_url}"
         doc.result = result
         if parent_issues_url:
             doc.parent_issues_url = parent_issues_url
