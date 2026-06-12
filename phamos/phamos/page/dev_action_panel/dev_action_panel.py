@@ -417,7 +417,7 @@ def stop_timer(name, result, percent_billable=100, productivity=None, activity_t
         if parent_issue:
             parent_url = frappe.db.get_value("GitLab Issue", parent_issue, "issue_url")
             if parent_url:
-                result = (result + "\n\n" if result else "") + f"Parent Issue: {parent_url}"
+                result = (result + "\n\n" if result else "") + parent_url
     doc.result = result
     doc.percent_billable = int(percent_billable)
     if activity_type:
