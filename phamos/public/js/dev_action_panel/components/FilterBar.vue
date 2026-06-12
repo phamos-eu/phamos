@@ -38,6 +38,7 @@ const SORT_OPTIONS = [
   { value: "id:desc",       label: "Issue ID", dir: "desc", icon: "↓" },
   { value: "project:asc",   label: "Project",  dir: "asc",  icon: "A–Z" },
   { value: "title:asc",     label: "Title",    dir: "asc",  icon: "A–Z" },
+  { value: "priority:asc",  label: "Priority", dir: "asc",  icon: "P1–P3" },
 ];
 
 const sortKey = computed(() => `${props.sortBy}:${props.sortDir}`);
