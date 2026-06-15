@@ -10,6 +10,12 @@ from phamos.api import get_customer_for_user
 class TestPhamosAPI(FrappeTestCase):
 	def setUp(self):
 		"""Set up test data before each test."""
+		frappe.set_user("Administrator")
+		
+		# Ensure necessary master records exist
+		self._ensure_customer_group_exists()
+		self._ensure_territory_exists()
+		
 		# Create test user
 		if not frappe.db.exists("User", "test_customer@example.com"):
 			self.test_user = frappe.get_doc({
@@ -22,6 +28,46 @@ class TestPhamosAPI(FrappeTestCase):
 			self.test_user.insert(ignore_permissions=True)
 		else:
 			self.test_user = frappe.get_doc("User", "test_customer@example.com")
+	
+	def _ensure_customer_group_exists(self):
+		"""Ensure Customer Group exists for tests."""
+		if not frappe.db.exists("Customer Group", "Commercial"):
+			if not frappe.db.exists("Customer Group", "All Customer Groups"):
+				doc = frappe.get_doc({
+					"doctype": "Customer Group",
+					"customer_group_name": "All Customer Groups",
+					"is_group": 1,
+					"parent_customer_group": ""
+				})
+				doc.insert(ignore_permissions=True)
+			
+			doc = frappe.get_doc({
+				"doctype": "Customer Group",
+				"customer_group_name": "Commercial",
+				"is_group": 0,
+				"parent_customer_group": "All Customer Groups"
+			})
+			doc.insert(ignore_permissions=True)
+	
+	def _ensure_territory_exists(self):
+		"""Ensure Territory exists for tests."""
+		if not frappe.db.exists("Territory", "Germany"):
+			if not frappe.db.exists("Territory", "All Territories"):
+				doc = frappe.get_doc({
+					"doctype": "Territory",
+					"territory_name": "All Territories",
+					"is_group": 1,
+					"parent_territory": ""
+				})
+				doc.insert(ignore_permissions=True)
+			
+			doc = frappe.get_doc({
+				"doctype": "Territory",
+				"territory_name": "Germany",
+				"is_group": 0,
+				"parent_territory": "All Territories"
+			})
+			doc.insert(ignore_permissions=True)
 	
 	def test_get_customer_for_user_no_contact(self):
 		"""Test get_customer_for_user when user has no contact."""
@@ -52,20 +98,30 @@ class TestPhamosAPI(FrappeTestCase):
 			})
 			customer.insert(ignore_permissions=True)
 		
+		# Delete existing contact if it exists (for clean test)
+		if frappe.db.exists("Contact", {"user": self.test_user.email}):
+			existing_contact = frappe.get_doc("Contact", {"user": self.test_user.email})
+			existing_contact.delete(ignore_permissions=True)
+		
 		# Create contact linked to user and customer
-		if not frappe.db.exists("Contact", {"email_id": self.test_user.email}):
-			contact = frappe.get_doc({
-				"doctype": "Contact",
-				"first_name": "Test",
-				"last_name": "Customer",
-				"email_id": self.test_user.email,
-				"user": self.test_user.email,
-				"links": [{
-					"link_doctype": "Customer",
-					"link_name": "_Test Customer for API"
-				}]
-			})
-			contact.insert(ignore_permissions=True)
+		contact = frappe.get_doc({
+			"doctype": "Contact",
+			"first_name": "Test",
+			"last_name": "Customer",
+			"user": self.test_user.email,
+			"links": [{
+				"link_doctype": "Customer",
+				"link_name": "_Test Customer for API"
+			}]
+		})
+		contact.insert(ignore_permissions=True)
+		
+		# Add email to contact
+		contact.append("email_ids", {
+			"email_id": self.test_user.email,
+			"is_primary": 1
+		})
+		contact.save(ignore_permissions=True)
 		
 		customer_name = get_customer_for_user(self.test_user.email)
 		self.assertIsNotNone(customer_name)

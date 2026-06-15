@@ -231,7 +231,7 @@ scheduler_events = {
 # Testing
 # -------
 
-# before_tests = "phamos.install.before_tests"
+before_tests = "phamos.install.before_tests"
 
 # Overriding Methods
 # ------------------------------

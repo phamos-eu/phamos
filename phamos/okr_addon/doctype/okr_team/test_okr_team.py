@@ -6,6 +6,10 @@ from frappe.tests.utils import FrappeTestCase
 
 
 class TestOKRTeam(FrappeTestCase):
+	def setUp(self):
+		"""Set up test data before each test."""
+		frappe.set_user("Administrator")
+	
 	def test_create_okr_team(self):
 		"""Test creating a basic OKR Team."""
 		team = frappe.get_doc({
@@ -28,4 +32,5 @@ class TestOKRTeam(FrappeTestCase):
 
 	def tearDown(self):
 		"""Clean up test data."""
+		frappe.set_user("Administrator")
 		frappe.db.rollback()

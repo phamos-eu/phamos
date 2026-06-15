@@ -6,6 +6,10 @@ from frappe.tests.utils import FrappeTestCase
 
 
 class TestKR(FrappeTestCase):
+	def setUp(self):
+		"""Set up test data before each test."""
+		frappe.set_user("Administrator")
+	
 	def test_create_kr(self):
 		"""Test creating a basic Key Result."""
 		kr = frappe.get_doc({
@@ -43,4 +47,5 @@ class TestKR(FrappeTestCase):
 
 	def tearDown(self):
 		"""Clean up test data."""
+		frappe.set_user("Administrator")
 		frappe.db.rollback()

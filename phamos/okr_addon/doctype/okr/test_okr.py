@@ -10,6 +10,7 @@ from phamos.okr_addon.doctype.okr.okr import get_next_okr_id, OKR_ID_PATTERN
 class TestOKR(FrappeTestCase):
 	def setUp(self):
 		"""Set up test data before each test."""
+		frappe.set_user("Administrator")
 		self.test_okr_data = {
 			"doctype": "OKR",
 			"title": "Test OKR",
@@ -109,4 +110,5 @@ class TestOKR(FrappeTestCase):
 
 	def tearDown(self):
 		"""Clean up test data after each test."""
+		frappe.set_user("Administrator")
 		frappe.db.rollback()
