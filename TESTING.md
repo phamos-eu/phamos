@@ -72,7 +72,9 @@ The `before_tests` hook in `phamos/install.py` automatically creates the followi
 - Territories (Germany, United States, etc.)
 - Activity Types (Development, Testing, etc.)
 - Employment Types (Full-time, Part-time, etc.)
-- Departments (Engineering, Sales, etc.)
+- Departments (Engineering, Sales, etc.) - automatically associated with a test company
+
+**Note:** Departments require a company in ERPNext/HRMS. The setup automatically finds or creates a test company to associate with departments.
 
 ### Troubleshooting
 

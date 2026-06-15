@@ -12,6 +12,7 @@ def before_tests():
 	make_custom_fields_optional_for_tests()
 	
 	# Create necessary master records for tests
+	# Note: Company is created by ERPNext's test records
 	create_warehouse_types()
 	create_opportunity_types()
 	create_customer_groups()
@@ -208,7 +209,31 @@ def create_employment_types():
 
 
 def create_departments():
-	"""Create Departments for Employee."""
+	"""Create Departments for Employee.
+	
+	Note: Departments require a company field in ERPNext/HRMS.
+	This function finds an existing company or creates a test company
+	to associate with the departments.
+	"""
+	# Get or use a test company - ERPNext creates test companies during test setup
+	company = frappe.db.get_value("Company", {"docstatus": ["!=", 2]}, "name")
+	
+	if not company:
+		# If no company exists, create a minimal one for tests
+		try:
+			company_doc = frappe.get_doc({
+				"doctype": "Company",
+				"company_name": "_Test Company",
+				"abbr": "_TC",
+				"default_currency": "USD",
+				"country": "United States"
+			})
+			company_doc.insert(ignore_permissions=True, ignore_if_duplicate=True)
+			company = company_doc.name
+		except Exception:
+			# If company creation fails, skip department creation
+			return
+	
 	departments = [
 		"Engineering",
 		"Sales",
@@ -223,8 +248,12 @@ def create_departments():
 			try:
 				doc = frappe.get_doc({
 					"doctype": "Department",
-					"department_name": dept
+					"department_name": dept,
+					"company": company
 				})
 				doc.insert(ignore_permissions=True, ignore_if_duplicate=True)
 			except frappe.DuplicateEntryError:
+				pass
+			except Exception:
+				# Skip if department creation fails
 				pass
