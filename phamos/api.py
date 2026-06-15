@@ -896,3 +896,13 @@ def get_customer_project_links():
         "show": True,
         "links": impl[0].get("links") or ""
     }
+
+@frappe.whitelist()
+def get_popup_doctypes():
+    settings = frappe.get_single("phamos Settings")
+
+    return [
+        row.applicable_doctype
+        for row in settings.checklist_popup
+        if row.enabled and row.applicable_doctype
+    ]
