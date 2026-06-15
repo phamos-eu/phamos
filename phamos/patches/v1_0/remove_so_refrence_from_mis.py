@@ -79,15 +79,28 @@ def execute():
 
     frappe.db.commit()
 
-    # ── Step 3: Affected SO status update 
+ # ── Step 3: Recalculate affected Sales Orders
     for so_name in affected_so:
         try:
             so = frappe.get_doc("Sales Order", so_name)
+
+            # Recalculate all derived values including per_delivered
+            so.save(ignore_permissions=True)
+
+            # Update status after recalculation
             so.set_status(update=True)
             so.notify_update()
+
+            print(
+                f"Updated SO {so.name}: "
+                f"per_delivered={so.per_delivered}, "
+                f"status={so.status}"
+            )
+
         except Exception:
             frappe.log_error(
-                title=f"Patch: SO {so_name} status update failed",
+                title=f"Patch: SO {so_name} update failed",
                 message=frappe.get_traceback(),
             )
+
     frappe.db.commit()

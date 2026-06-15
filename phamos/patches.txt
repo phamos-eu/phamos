@@ -17,5 +17,5 @@ phamos.patches.v1_0.update_parent_okrs_is_group
 phamos.patches.v1_0.set_timesheet_record_colors #123
 phamos.patches.v1_0.clear_synthetic_layout_field_labels
 phamos.patches.v1_0.update_application_type
-phamos.patches.v1_0.remove_so_refrence_from_mis
+phamos.patches.v1_0.remove_so_refrence_from_mis #123
 
