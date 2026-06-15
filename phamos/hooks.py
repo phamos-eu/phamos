@@ -24,6 +24,7 @@ app_include_js = [
     "/assets/phamos/js/custom_crm_activities.js",
     "/assets/phamos/js/hybrid_meeting_composer.js",
     "/assets/phamos/js/frappe_list_bulk_edit_override.js",  # Fixes null-label crash in bulk edit
+    "/assets/phamos/js/checklist_dialog.js",
 ]
 
 

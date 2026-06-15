@@ -1,0 +1,41 @@
+{
+ "actions": [],
+ "allow_rename": 1,
+ "creation": "2026-06-12 15:33:07.224377",
+ "doctype": "DocType",
+ "editable_grid": 1,
+ "engine": "InnoDB",
+ "field_order": [
+  "applicable_doctype",
+  "enabled"
+ ],
+ "fields": [
+  {
+   "fieldname": "applicable_doctype",
+   "fieldtype": "Link",
+   "label": "Applicable Doctype",
+   "options": "DocType"
+  },
+  {
+   "default": "0",
+   "fieldname": "enabled",
+   "fieldtype": "Check",
+   "label": "Enabled"
+  }
+ ],
+ "grid_page_length": 50,
+ "index_web_pages_for_search": 1,
+ "istable": 1,
+ "links": [],
+ "modified": "2026-06-12 15:34:40.719114",
+ "modified_by": "Administrator",
+ "module": "Phamos",
+ "name": "Checklist Popup Doctype",
+ "owner": "Administrator",
+ "permissions": [],
+ "row_format": "Dynamic",
+ "rows_threshold_for_grid_search": 20,
+ "sort_field": "modified",
+ "sort_order": "DESC",
+ "states": []
+}
