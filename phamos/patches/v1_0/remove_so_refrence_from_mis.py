@@ -48,7 +48,7 @@ def execute():
     if not so_items:
         return
 
-    print(f"Total SO Items check hongi: {len(so_items)}")
+    print(f"Total SO Items check : {len(so_items)}")
 
     affected_so = set()
 
