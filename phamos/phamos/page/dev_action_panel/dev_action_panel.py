@@ -244,6 +244,30 @@ def start_issue_timer(gitlab_issue_name, expected_time, goal=None, manual_start_
     )
     if not employee:
         frappe.throw(_("No Employee record linked to your user account."))
+    
+    # --- block duplicate drafts for this employee ---------------------------
+    existing_drafts = frappe.get_all(
+        "Timesheet Record",
+        filters={"employee": employee.name, "docstatus": 0},
+        fields=["name"],
+        order_by="creation desc",
+    )
+
+    if existing_drafts:
+        draft_links = ", ".join(
+            f'<a href="/app/timesheet-record/{d["name"]}" target="_blank">{d["name"]}</a>'
+            for d in existing_drafts[:3]
+        )
+
+        if len(existing_drafts) > 3:
+            draft_links += ", ..."
+
+        frappe.throw(
+            _(
+                "You already have draft Timesheet Record(s): {0}. "
+                "Please submit or cancel them before starting a new timer."
+            ).format(draft_links)
+        )
 
     # --- resolve issue -------------------------------------------------------
     issue = frappe.get_doc("GitLab Issue", gitlab_issue_name)
