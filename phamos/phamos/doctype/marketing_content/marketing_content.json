@@ -40,6 +40,10 @@
   "section_registration",
   "registration_open",
   "max_attendees",
+  "section_speakers",
+  "speakers",
+  "section_sponsors",
+  "sponsors",
   "section_responses",
   "subscription_description",
   "responses"
@@ -250,6 +254,28 @@
    "fieldtype": "Int",
    "label": "Max Attendees",
    "no_copy": 1
+  },
+  {
+   "fieldname": "section_speakers",
+   "fieldtype": "Section Break",
+   "label": "Speakers"
+  },
+  {
+   "fieldname": "speakers",
+   "fieldtype": "Table",
+   "label": "Speakers",
+   "options": "Marketing Event Speaker"
+  },
+  {
+   "fieldname": "section_sponsors",
+   "fieldtype": "Section Break",
+   "label": "Sponsors"
+  },
+  {
+   "fieldname": "sponsors",
+   "fieldtype": "Table",
+   "label": "Sponsors",
+   "options": "Marketing Event Sponsor"
   },
   {
    "fieldname": "section_responses",

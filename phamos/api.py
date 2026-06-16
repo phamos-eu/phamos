@@ -871,3 +871,28 @@ def get_gitlab_issue_count(customer: str):
         "GitLab Issue",
         filters={"gitlab_project": ["in", gitlab_projects]}
     )
+
+@frappe.whitelist()
+def get_customer_project_links():
+    user = frappe.session.user
+    validate_guest_user()
+    
+    customer = get_customer_for_user(user)
+    
+    if not customer:
+        return {"show": False, "links": ""}
+    
+    impl = frappe.db.sql("""
+        SELECT name, show_on_customer_portal, links
+        FROM `tabImplementation`
+        WHERE customer = %s
+        LIMIT 1
+    """, customer, as_dict=True)
+    
+    if not impl or not impl[0].get("show_on_customer_portal"):
+        return {"show": False, "links": ""}
+    
+    return {
+        "show": True,
+        "links": impl[0].get("links") or ""
+    }
