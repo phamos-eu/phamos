@@ -2,7 +2,7 @@
  "actions": [],
  "allow_guest_to_view": 1,
  "autoname": "MKT-CONTENT-.YYYY.-.#####",
- "creation": "2026-03-25 00:00:00.000000",
+ "creation": "2026-03-25 00:00:00",
  "doctype": "DocType",
  "engine": "InnoDB",
  "field_order": [
@@ -54,9 +54,9 @@
    "fieldtype": "Data",
    "in_list_view": 1,
    "label": "Title",
+   "no_copy": 1,
    "reqd": 1,
-   "unique": 1,
-   "no_copy": 1
+   "unique": 1
   },
   {
    "fieldname": "subtitle",
@@ -71,22 +71,22 @@
    "options": "\nWorkshop\nConference\nWebinar\nTraining\nMeetup\nHackathon\nTeam Building\nSeminar\nNetworking\nProduct Launch\nTown Hall\nSocial Event"
   },
   {
+   "default": "Upcoming",
    "fieldname": "status",
    "fieldtype": "Select",
    "in_list_view": 1,
    "label": "Status",
-   "options": "Upcoming\nOngoing\nCompleted\nCancelled",
-   "default": "Upcoming"
+   "options": "Upcoming\nOngoing\nCompleted\nCancelled"
   },
   {
    "fieldname": "column_break_1",
    "fieldtype": "Column Break"
   },
   {
+   "description": "Shown when no exact date is set, e.g. 'Expected: July 2026'",
    "fieldname": "date_note",
    "fieldtype": "Data",
-   "label": "Date Note",
-   "description": "Shown when no exact date is set, e.g. 'Expected: July 2026'"
+   "label": "Date Note"
   },
   {
    "fieldname": "starts_on",
@@ -100,18 +100,18 @@
    "label": "Ends On"
   },
   {
+   "default": "0",
    "fieldname": "published",
    "fieldtype": "Check",
    "label": "Published",
-   "default": 0,
    "no_copy": 1
   },
   {
    "fieldname": "route",
    "fieldtype": "Data",
    "label": "Route",
-   "unique": 1,
-   "no_copy": 1
+   "no_copy": 1,
+   "unique": 1
   },
   {
    "fieldname": "section_location",
@@ -129,10 +129,10 @@
    "label": "City"
   },
   {
+   "description": "Google Maps or OpenStreetMap share URL",
    "fieldname": "map_link",
    "fieldtype": "Data",
-   "label": "Map Link",
-   "description": "Google Maps or OpenStreetMap share URL"
+   "label": "Map Link"
   },
   {
    "fieldname": "section_media",
@@ -160,10 +160,10 @@
    "label": "Organizer"
   },
   {
+   "description": "Small logo shown on the event page beside the organizer name",
    "fieldname": "organizer_logo",
    "fieldtype": "Attach Image",
-   "label": "Organizer Logo",
-   "description": "Small logo shown on the event page beside the organizer name"
+   "label": "Organizer Logo"
   },
   {
    "fieldname": "organizer_name",
@@ -173,39 +173,39 @@
   {
    "fieldname": "organizer_email",
    "fieldtype": "Data",
-   "options": "Email",
-   "label": "Organizer Email"
+   "label": "Organizer Email",
+   "options": "Email"
   },
   {
+   "description": "Public website of the organizing company or person",
    "fieldname": "organizer_website_link",
    "fieldtype": "Data",
-   "options": "URL",
    "label": "Organizer Website Link",
-   "description": "Public website of the organizing company or person"
+   "options": "URL"
   },
   {
    "fieldname": "column_break_organizer",
    "fieldtype": "Column Break"
   },
   {
+   "description": "Name of the person attendees can reach out to",
    "fieldname": "contact_person",
    "fieldtype": "Data",
-   "label": "Contact Person",
-   "description": "Name of the person attendees can reach out to"
+   "label": "Contact Person"
   },
   {
+   "description": "Email address for event-specific inquiries",
    "fieldname": "contact_person_email",
    "fieldtype": "Data",
-   "options": "Email",
    "label": "Contact Person Email",
-   "description": "Email address for event-specific inquiries"
+   "options": "Email"
   },
   {
+   "description": "Phone number for event-specific inquiries",
    "fieldname": "contact_person_phone",
    "fieldtype": "Data",
-   "options": "Phone",
    "label": "Contact Person Phone",
-   "description": "Phone number for event-specific inquiries"
+   "options": "Phone"
   },
   {
    "fieldname": "section_counts",
@@ -213,28 +213,28 @@
    "label": "Interest Counts"
   },
   {
+   "default": "0",
    "fieldname": "going_count",
    "fieldtype": "Int",
    "label": "Interested (Yes)",
-   "default": 0,
-   "read_only": 1,
-   "no_copy": 1
+   "no_copy": 1,
+   "read_only": 1
   },
   {
+   "default": "0",
    "fieldname": "maybe_count",
    "fieldtype": "Int",
    "label": "Maybe",
-   "default": 0,
-   "read_only": 1,
-   "no_copy": 1
+   "no_copy": 1,
+   "read_only": 1
   },
   {
+   "default": "0",
    "fieldname": "not_going_count",
    "fieldtype": "Int",
    "label": "Not Interested (No)",
-   "default": 0,
-   "read_only": 1,
-   "no_copy": 1
+   "no_copy": 1,
+   "read_only": 1
   },
   {
    "fieldname": "section_registration",
@@ -242,17 +242,17 @@
    "label": "Registration"
   },
   {
+   "default": "0",
    "fieldname": "registration_open",
    "fieldtype": "Check",
    "label": "Registration Open",
-   "default": 0,
    "no_copy": 1
   },
   {
+   "description": "Leave 0 for unlimited",
    "fieldname": "max_attendees",
    "fieldtype": "Int",
    "label": "Max Attendees",
-   "description": "Leave 0 for unlimited",
    "no_copy": 1
   },
   {
@@ -283,30 +283,34 @@
    "label": "Email Subscriptions"
   },
   {
+   "default": "Get notified about event updates, schedule changes, and reminders straight to your inbox.",
+   "description": "Text shown below the 'Stay Updated' heading on the event page. Clear to hide it.",
    "fieldname": "subscription_description",
    "fieldtype": "Small Text",
-   "label": "Subscription Description",
-   "description": "Text shown below the 'Stay Updated' heading on the event page",
-   "default": "Get notified about event updates, schedule changes, and reminders straight to your inbox."
-
+   "label": "Subscription Description"
   },
   {
    "fieldname": "responses",
    "fieldtype": "Table",
    "label": "Responses",
-   "options": "Marketing Event Response",
-   "no_copy": 1
+   "no_copy": 1,
+   "options": "Marketing Event Response"
   }
  ],
  "has_web_view": 1,
  "is_published_field": "published",
+ "links": [
+  {
+   "link_doctype": "Checklist",
+   "link_fieldname": "reference_record"
+  }
+ ],
  "modified": "2026-06-08 15:00:26.796667",
  "modified_by": "Administrator",
  "module": "Phamos",
  "name": "Marketing Content",
- "naming_rule": "Expression (old style)",
+ "naming_rule": "Expression",
  "owner": "Administrator",
- "page_title_field": "title",
  "permissions": [
   {
    "create": 1,
@@ -318,7 +322,6 @@
    "report": 1,
    "role": "System Manager",
    "share": 1,
-   "submit": 0,
    "write": 1
   },
   {
@@ -342,7 +345,8 @@
    "role": "All"
   }
  ],
+ "row_format": "Dynamic",
  "sort_field": "starts_on",
  "sort_order": "ASC",
- "track_changes": 0
+ "states": []
 }
