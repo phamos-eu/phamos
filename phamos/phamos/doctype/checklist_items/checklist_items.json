@@ -22,7 +22,7 @@
   },
   {
    "fieldname": "note",
-   "fieldtype": "Data",
+   "fieldtype": "Text Editor",
    "label": "Note"
   },
   {
