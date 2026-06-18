@@ -881,12 +881,9 @@ def _handle_issue_webhook(payload):
     )
 
     if existing:
-        # Record found — update it (handles update, close, reopen all in one place)
-        doc = frappe.get_doc("GitLab Issue", existing)
-        doc.update(data)
-        doc.save(ignore_permissions=True)
+        # use set_value to avoid TimestampMismatchError on concurrent webhooks
+        frappe.db.set_value("GitLab Issue", existing, data, update_modified=True)
     else:
-        # Record not found — insert it
         try:
             doc = frappe.new_doc("GitLab Issue")
             doc.update(data)
@@ -906,9 +903,7 @@ def _handle_issue_webhook(payload):
                 "name"
             )
             if existing:
-                doc = frappe.get_doc("GitLab Issue", existing)
-                doc.update(data)
-                doc.save(ignore_permissions=True)
+                frappe.db.set_value("GitLab Issue", existing, data, update_modified=True)
 
     frappe.db.commit()
 
@@ -940,8 +935,12 @@ def _try_link_parent_from_webhook(issue_doc_name, project_path, issue_iid):
                 "name"
             )
             if parent_doc_name:
-                doc = frappe.get_doc("GitLab Issue", issue_doc_name)
-                doc.parent_issue = parent_doc_name
-                doc.save(ignore_permissions=True)
+                # ── FIX: set_value instead of get_doc + save ──
+                frappe.db.set_value(
+                    "GitLab Issue",
+                    issue_doc_name,
+                    "parent_issue",
+                    parent_doc_name
+                )
     except Exception:
         frappe.log_error(frappe.get_traceback(), "Webhook Parent Link Error")
