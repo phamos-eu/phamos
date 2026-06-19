@@ -5,6 +5,8 @@ import frappe
 from frappe.model.document import Document
 from frappe.utils import cint, get_first_day, get_last_day, flt, getdate
 from frappe.query_builder import DocType, Order
+from frappe.desk.form.assign_to import add
+from frappe.desk.form.assign_to import add as add_assignment
 
 from phamos.phamos.doctype.implementation.implementation import (
 	get_financial_history as get_implementation_financial_history,
@@ -132,6 +134,36 @@ def _so_row_qty_str(v):
 
 
 class MonthlyImplementationSummary(Document):
+
+	def on_update(self):
+		if not self.implementation:
+			return
+
+		account_manager = frappe.db.get_value(
+			"Implementation",
+			self.implementation,
+			"account_manager"
+		)
+
+		if not account_manager:
+			return
+
+		# Remove existing assignments
+		frappe.db.delete(
+			"ToDo",
+			{
+				"reference_type": self.doctype,
+				"reference_name": self.name,
+				"status": ["!=", "Cancelled"],
+			},
+		)
+
+		# Assign new account manager
+		add_assignment({
+			"assign_to": [account_manager],
+			"doctype": self.doctype,
+			"name": self.name,
+		})
 	def validate(self):
 		prev = self.get_doc_before_save() if not self.is_new() else None
 		if prev and self.docstatus == 0:
