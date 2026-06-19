@@ -24,11 +24,10 @@
   "item",
   "section_break_hqfwm",
   "goal",
-  "issues",
   "gitlab_issue",
+  "gitlab_parent_issue",
   "column_break_8016u",
   "result",
-  "parent_issues_url",
   "amended_from"
  ],
  "fields": [
@@ -170,23 +169,19 @@
    "options": "\nRed\nGreen\nAmber"
   },
   {
-   "fieldname": "issues",
-   "fieldtype": "Data",
-   "label": "Issues"
-  },
-  {
    "fieldname": "gitlab_issue",
    "fieldtype": "Link",
-   "label": "GitLab Issue",
+   "label": "GitLab Child Issue",
    "no_copy": 1,
    "options": "GitLab Issue",
    "read_only": 1
   },
   {
-   "fieldname": "parent_issues_url",
-   "fieldtype": "Small Text",
-   "label": "Issues URL",
+   "fieldname": "gitlab_parent_issue",
+   "fieldtype": "Link",
+   "label": "GitLab Parent Issue",
    "no_copy": 1,
+   "options": "GitLab Issue",
    "read_only": 1
   },
   {
@@ -201,7 +196,7 @@
  "index_web_pages_for_search": 1,
  "is_submittable": 1,
  "links": [],
- "modified": "2026-03-25 12:24:40.408154",
+ "modified": "2026-06-19 00:00:00.000000",
  "modified_by": "kalsoom.akhtar@pahmos.eu",
  "module": "Phamos",
  "name": "Timesheet Record",

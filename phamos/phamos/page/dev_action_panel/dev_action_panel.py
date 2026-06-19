@@ -301,8 +301,7 @@ def start_issue_timer(gitlab_issue_name, expected_time, goal=None, manual_start_
     ts.expected_time = expected_time
     ts.from_time = start_time
     ts.gitlab_issue = gitlab_issue_name
-    ts.issues = issue.issue_url
-    ts.parent_issues_url = issue.issue_url
+    ts.gitlab_parent_issue = issue.parent_issue if issue.parent_issue else gitlab_issue_name
 
     # First time-log row (open — no to_time, session is running)
     ts.append("item", {"from_time": start_time})
@@ -459,8 +458,8 @@ def stop_timer(name, result, percent_billable=100, productivity=None, activity_t
 
         extra = frappe.new_doc("Timesheet Record")
         for field in ["project", "customer", "employee", "activity_type", "goal",
-                      "issues", "expected_time", "result", "percent_billable",
-                      "parent_issues_url", "gitlab_issue"]:
+                      "gitlab_issue", "gitlab_parent_issue", "expected_time", "result",
+                      "percent_billable"]:
             extra.set(field, doc.get(field))
         if productivity is not None:
             extra.productivity = productivity

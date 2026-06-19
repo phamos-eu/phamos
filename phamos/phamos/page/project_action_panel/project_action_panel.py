@@ -1,4 +1,4 @@
-import frappe
+import re
 import frappe
 import pytz
 from frappe.utils import get_datetime
@@ -15,26 +15,40 @@ from frappe.query_builder.functions import Concat, Max, Sum, Round, Coalesce, If
 from frappe.utils import getdate, nowdate, get_first_day, get_last_day, add_days, add_months
 
 
+def _find_gitlab_issue_in_text(*text_fields):
+    """Scan text fields for the first GitLab issue URL and return its Frappe name, or None."""
+    text = " ".join(t for t in text_fields if t)
+    for url in re.findall(r'https?://\S+/-/issues/\d+', text):
+        issue_name = frappe.db.get_value("GitLab Issue", {"issue_url": url}, "name")
+        if issue_name:
+            return issue_name
+    return None
+
+
+def _resolve_gitlab_parent(child_issue_name):
+    """Return parent GitLab Issue name, or child itself if it has no parent."""
+    parent = frappe.db.get_value("GitLab Issue", child_issue_name, "parent_issue")
+    return parent if parent else child_issue_name
+
+
 @frappe.whitelist()
-def create_timesheet_record(project_name,  customer, from_time, expected_time, goal,task=None, issues=None, parent_issues_url=None):
+def create_timesheet_record(project_name, customer, from_time, expected_time, goal, task=None):
     try:
         employee_name = frappe.db.get_value("Employee", {"user_id": frappe.session.user}, "name")
         activity_type = frappe.db.get_value("Employee", {"user_id": frappe.session.user}, "activity_type")
         customer = frappe.db.get_value("Customer", {"customer_name": customer}, "name")
         project = frappe.db.get_value("Project", {"project_name": project_name}, "name")
-        
+
         if employee_name:
             after_1_minute = add_to_date(from_time, seconds=10, as_string=True)
-            
+
             timesheet_record = frappe.new_doc('Timesheet Record')
             timesheet_record.project = project
-            timesheet_record.task=task
+            timesheet_record.task = task
             timesheet_record.customer = customer
             timesheet_record.from_time = after_1_minute
             timesheet_record.expected_time = expected_time
             timesheet_record.goal = goal
-            timesheet_record.issues = issues
-            timesheet_record.parent_issues_url = parent_issues_url
             timesheet_record.employee = employee_name
             timesheet_record.activity_type = activity_type
             timesheet_record.append("item", {
@@ -183,24 +197,8 @@ def create_and_submit_timesheet(
     percent_billable,
     activity_type,
     result,
-    issues=None,
-    parent_issues_url=None
 ):
     try:
-        # 🔍 DEBUG 0 – function entry
-        frappe.log_error(
-            title="TS DEBUG 0 – Function Entry",
-            message=f"""
-project_name={project_name}
-percent_billable={percent_billable}
-activity_type={activity_type}
-from_time={from_time}
-to_time={to_time}
-issues={issues}
-parent_issues_url={parent_issues_url}
-"""
-        )
-
         # --------------------------------------------------
         # 1️⃣ Basic time validation
         # --------------------------------------------------
@@ -217,12 +215,6 @@ parent_issues_url={parent_issues_url}
             "name"
         )
 
-        # 🔍 DEBUG 1 – employee resolve
-        frappe.log_error(
-            title="TS DEBUG 1 – Employee",
-            message=f"Resolved employee = {employee}"
-        )
-
         if not employee:
             frappe.throw(_("No Employee linked with current user."))
 
@@ -235,24 +227,17 @@ parent_issues_url={parent_issues_url}
         ts.activity_type = activity_type
         ts.percent_billable = percent_billable
         ts.goal = goal
-        ts.issues = issues
         ts.expected_time = expected_time
         ts.result = result
-        ts.parent_issues_url = parent_issues_url
-
         ts.employee = employee
         ts.from_time = from_time
         ts.to_time = to_time
 
-        # 🔍 DEBUG 2 – after field assignment
-        frappe.log_error(
-            title="TS DEBUG 2 – After Assign",
-            message=f"""
-parent_issues_url in doc = {ts.parent_issues_url}
-from_time={ts.from_time}
-to_time={ts.to_time}
-"""
-        )
+        # Resolve GitLab issue references from goal / result text
+        child_issue = _find_gitlab_issue_in_text(goal, result)
+        if child_issue:
+            ts.gitlab_issue = child_issue
+            ts.gitlab_parent_issue = _resolve_gitlab_parent(child_issue)
 
         # --------------------------------------------------
         # 4️⃣ Add child row
@@ -282,75 +267,8 @@ to_time={ts.to_time}
         ts.actual_time = total_duration
         ts.status = "Complete"
 
-        # 🔍 DEBUG 3 – before insert
-        frappe.log_error(
-            title="TS DEBUG 3 – Before Insert",
-            message=f"""
-parent_issues_url={ts.parent_issues_url}
-actual_time={ts.actual_time}
-"""
-        )
-
-        # --------------------------------------------------
-        # 6️⃣ Insert
-        # --------------------------------------------------
         ts.insert(ignore_permissions=True)
-
-        # 🔍 DEBUG 4 – after insert
-        frappe.log_error(
-            title="TS DEBUG 4 – After Insert",
-            message=f"""
-name={ts.name}
-parent_issues_url={ts.parent_issues_url}
-"""
-        )
-
-        # --------------------------------------------------
-        # 7️⃣ Submit
-        # --------------------------------------------------
         ts.submit()
-
-        # 🔍 DEBUG 5 – after submit (doc object)
-        frappe.log_error(
-            title="TS DEBUG 5 – After Submit (Doc)",
-            message=f"""
-parent_issues_url={ts.parent_issues_url}
-"""
-        )
-
-        # 🔍 DEBUG 6 – after submit (DB read)
-        db_value = frappe.db.get_value(
-            "Timesheet Record",
-            ts.name,
-            "parent_issues_url"
-        )
-        frappe.log_error(
-            title="TS DEBUG 6 – After Submit (DB)",
-            message=f"DB parent_issues_url={db_value}"
-        )
-
-        # --------------------------------------------------
-        # 8️⃣ FORCE persist (submit-safe)
-        # --------------------------------------------------
-        if parent_issues_url:
-            frappe.db.set_value(
-                "Timesheet Record",
-                ts.name,
-                "parent_issues_url",
-                parent_issues_url,
-                update_modified=False
-            )
-
-            # 🔍 DEBUG 7 – after force set
-            db_value_2 = frappe.db.get_value(
-                "Timesheet Record",
-                ts.name,
-                "parent_issues_url"
-            )
-            frappe.log_error(
-                title="TS DEBUG 7 – After Force Set",
-                message=f"DB parent_issues_url={db_value_2}"
-            )
 
         return {
             "status": "success",
@@ -595,7 +513,7 @@ def get_team_holidays():
 
 
 @frappe.whitelist()
-def update_and_submit_timesheet_record(name, to_time, percent_billable, activity_type, result, task=None, issues=None, parent_issues_url=None, productivity=None):
+def update_and_submit_timesheet_record(name, to_time, percent_billable, activity_type, result, task=None, productivity=None):
     try:
         # Retrieve the Timesheet Record document
         doc = frappe.get_doc("Timesheet Record", name)
@@ -627,8 +545,15 @@ def update_and_submit_timesheet_record(name, to_time, percent_billable, activity
         doc.task = task
         doc.activity_type = activity_type
         doc.result = result
-        if parent_issues_url:
-            doc.parent_issues_url = parent_issues_url
+
+        # Resolve GitLab issue references if not already set by dev_action_panel
+        if not doc.gitlab_issue:
+            child_issue = _find_gitlab_issue_in_text(doc.goal, result)
+            if child_issue:
+                doc.gitlab_issue = child_issue
+        if doc.gitlab_issue and not doc.gitlab_parent_issue:
+            doc.gitlab_parent_issue = _resolve_gitlab_parent(doc.gitlab_issue)
+
         if productivity not in (None, "", 0):
             percent_billable = 0
         doc.percent_billable = percent_billable
@@ -654,7 +579,7 @@ def update_and_submit_timesheet_record(name, to_time, percent_billable, activity
             new_doc.employee = doc.employee
 
             # Copy parent fields from original
-            for field in ["project", "customer", "task", "goal","issues", "expected_time", "activity_type", "result", "percent_billable", "parent_issues_url", "productivity"]:
+            for field in ["project", "customer", "task", "goal", "gitlab_issue", "gitlab_parent_issue", "expected_time", "activity_type", "result", "percent_billable", "productivity"]:
                 new_doc.set(field, doc.get(field))
 
             # Parent times from selected row
