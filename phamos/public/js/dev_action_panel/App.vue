@@ -108,7 +108,20 @@ const filteredIssues = computed(() => {
       va = (a.gitlab_project_title || "").toLowerCase(); vb = (b.gitlab_project_title || "").toLowerCase();
     } else if (sortBy.value === "title") {
       va = (a.title || "").toLowerCase(); vb = (b.title || "").toLowerCase();
-    }
+    } else if (sortBy.value === "priority") {
+        const getPriority = (labels) => {
+          if (!labels) return 999;
+
+          if (labels.includes("P:1")) return 1;
+          if (labels.includes("P:2")) return 2;
+          if (labels.includes("P:3")) return 3;
+
+          return 999;
+        };
+
+        va = getPriority(a.labels);
+        vb = getPriority(b.labels);
+      }
     if (va < vb) return sortDir.value === "asc" ? -1 : 1;
     if (va > vb) return sortDir.value === "asc" ? 1 : -1;
     return 0;
@@ -128,7 +141,10 @@ function stopTick() { clearInterval(timerInterval); timerInterval = null; }
 const labelsMap = ref({});
 
 // API
-async function loadIssues() { loading.value = true; const r = await frappe.call({ method: "phamos.phamos.page.dev_action_panel.dev_action_panel.get_my_issues" }); issues.value = r.message || []; loading.value = false; }
+async function loadIssues() { loading.value = true; const r = await frappe.call({ method: "phamos.phamos.page.dev_action_panel.dev_action_panel.get_my_issues" }); issues.value = r.message || [];
+  console.log("FIRST ISSUE");
+  console.log(JSON.stringify(issues.value[0], null, 2));
+ loading.value = false; }
 async function loadLabels() {
   const r = await frappe.call({ method: "phamos.phamos.page.dev_action_panel.dev_action_panel.get_gitlab_labels" });
   const map = {};
