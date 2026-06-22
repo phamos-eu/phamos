@@ -21,9 +21,10 @@
   "doctype": "Scheduled Job Type",
   "frequency": "Cron",
   "method": "phamos.custom_scripts.custom_python.raven_daily_thread.create_raven_thread",
+  "modified": "2026-06-22 20:04:18.976058",
   "name": "raven_daily_thread.create_raven_thread",
   "scheduler_event": null,
   "server_script": null,
-  "stopped": 1
+  "stopped": 0
  }
 ]
