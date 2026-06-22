@@ -1,3 +1,5 @@
+import time
+
 import frappe
 import requests
 
@@ -69,18 +71,42 @@ def _get_or_create_image_agent(api_key, base_url):
 
 
 def _extract_file_id_from_conversation(data):
-	for output in data.get("outputs") or []:
-		content = output.get("content")
-		if not isinstance(content, list):
-			continue
-		for chunk in content:
-			if (
-				isinstance(chunk, dict)
-				and chunk.get("type") == "tool_file"
-				and chunk.get("file_id")
-			):
-				return chunk.get("file_id"), chunk.get("file_type") or "png"
+	"""Use the last output entry per Mistral docs (image is in message.output)."""
+	outputs = data.get("outputs") or []
+	if not outputs:
+		return None, None
+
+	content = outputs[-1].get("content")
+	if not isinstance(content, list):
+		return None, None
+
+	for chunk in reversed(content):
+		if (
+			isinstance(chunk, dict)
+			and chunk.get("type") == "tool_file"
+			and chunk.get("file_id")
+		):
+			return chunk.get("file_id"), chunk.get("file_type") or "png"
 	return None, None
+
+
+def _download_mistral_file(base_url, api_key, file_id, retries=5, delay=2):
+	download_url = f"{base_url.rstrip('/')}/files/{file_id}/content"
+	headers = {
+		"Authorization": f"Bearer {api_key}",
+		"Accept": "application/octet-stream",
+	}
+
+	for attempt in range(retries):
+		file_resp = requests.get(download_url, headers=headers, timeout=120)
+		if file_resp.ok:
+			return file_resp
+		if file_resp.status_code != 404 or attempt == retries - 1:
+			body = file_resp.text[:500] if file_resp.text else ""
+			raise Exception(
+				f"Mistral image download failed ({file_resp.status_code}): {body}"
+			)
+		time.sleep(delay * (attempt + 1))
 
 
 def generate_daily_image_from_quote(quote):
@@ -113,18 +139,7 @@ def generate_daily_image_from_quote(quote):
 	if not file_id:
 		raise Exception("Mistral did not return a generated image file.")
 
-	download_url = f"{base_url.rstrip('/')}/files/{file_id}/content"
-	file_resp = requests.get(
-		download_url,
-		headers={
-			"Authorization": f"Bearer {api_key}",
-			"Accept": "application/octet-stream",
-		},
-		timeout=120,
-	)
-	if not file_resp.ok:
-		body = file_resp.text[:500] if file_resp.text else ""
-		raise Exception(f"Mistral image download failed ({file_resp.status_code}): {body}")
+	file_resp = _download_mistral_file(base_url, api_key, file_id)
 
 	ext = (file_type or "png").lower()
 	if ext == "jpeg":
