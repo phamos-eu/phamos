@@ -5,7 +5,6 @@ frappe.ui.form.on("Team", {
     refresh(frm) {
         calculate_capacity(frm);
         calculate_leave_and_holiday(frm);
-        calculate_capacity_daily(frm);
     }
 });
 
@@ -31,11 +30,9 @@ frappe.ui.form.on("Team Members", {
     },
     weekly_capacity(frm, cdt, cdn) {
         calculate_capacity(frm);
-        calculate_capacity_daily(frm);
     },
     team_members_remove(frm) {
         calculate_capacity(frm);
-        calculate_capacity_daily(frm);
     },
 });
 
