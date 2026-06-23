@@ -1,4 +1,4 @@
-import frappe
+import re
 import frappe
 import pytz
 from frappe.utils import get_datetime
@@ -15,20 +15,36 @@ from frappe.query_builder.functions import Concat, Max, Sum, Round, Coalesce, If
 from frappe.utils import getdate, nowdate, get_first_day, get_last_day, add_days, add_months
 
 
+def _find_gitlab_issue_in_text(*text_fields):
+    """Scan text fields for the first GitLab issue URL and return its Frappe name, or None."""
+    text = " ".join(t for t in text_fields if t)
+    for url in re.findall(r'https?://\S+/-/issues/\d+', text):
+        issue_name = frappe.db.get_value("GitLab Issue", {"issue_url": url}, "name")
+        if issue_name:
+            return issue_name
+    return None
+
+
+def _resolve_gitlab_parent(child_issue_name):
+    """Return parent GitLab Issue name, or child itself if it has no parent."""
+    parent = frappe.db.get_value("GitLab Issue", child_issue_name, "parent_issue")
+    return parent if parent else child_issue_name
+
+
 @frappe.whitelist()
-def create_timesheet_record(project_name,  customer, from_time, expected_time, goal,task=None):
+def create_timesheet_record(project_name, customer, from_time, expected_time, goal, task=None):
     try:
         employee_name = frappe.db.get_value("Employee", {"user_id": frappe.session.user}, "name")
         activity_type = frappe.db.get_value("Employee", {"user_id": frappe.session.user}, "activity_type")
         customer = frappe.db.get_value("Customer", {"customer_name": customer}, "name")
         project = frappe.db.get_value("Project", {"project_name": project_name}, "name")
-        
+
         if employee_name:
             after_1_minute = add_to_date(from_time, seconds=10, as_string=True)
-            
+
             timesheet_record = frappe.new_doc('Timesheet Record')
             timesheet_record.project = project
-            timesheet_record.task=task
+            timesheet_record.task = task
             timesheet_record.customer = customer
             timesheet_record.from_time = after_1_minute
             timesheet_record.expected_time = expected_time
@@ -171,64 +187,6 @@ def is_task_running(name):
     return {"is_running": False}
 
 
-@frappe.whitelist()
-def create_and_submit_timesheet( project_name=None, 
-    percent_billable=None, 
-    result=None, 
-    activity_type=None, 
-    from_time=None, 
-    expected_time=None, 
-    goal=None, 
-    to_time=None):
-    try:
-        ts = frappe.new_doc("Timesheet Record")
-        ts.project = project_name
-        ts.activity_type = activity_type
-        ts.percent_billable = percent_billable
-        ts.goal = goal
-        ts.expected_time = expected_time
-        ts.result = result
-
-        # Parent field set
-        ts.from_time = from_time
-        ts.to_time = to_time
-
-        # Add child row
-        ts.append("item", {
-            "from_time": from_time,
-            "to_time": ts.to_time
-        })
-
-        # ✅ Calculate duration for each row and sum it up
-        total_duration = 0
-        for row in ts.item:
-            if row.from_time and row.to_time:
-                duration_seconds = time_diff_in_seconds(row.to_time, row.from_time)
-                row.duration = duration_seconds
-                total_duration += duration_seconds
-
-        # ✅ Set total duration in parent actual_time
-        ts.actual_time = total_duration
-
-        # ✅ Mark as complete before submit
-        ts.status = "Complete"
-
-        ts.insert(ignore_permissions=True)
-        ts.save()
-        ts.submit()
-
-        return {
-            "status": "success",
-            "message": f"Timesheet Record {ts.name} created and submitted successfully",
-            "name": ts.name
-        }
-
-    except Exception as e:
-        frappe.log_error(frappe.get_traceback(), "Create Timesheet Record Error")
-        return {
-            "status": "error",
-            "message": str(e)
-        }
 
 @frappe.whitelist()
 def get_assigned_projects(doctype, txt, searchfield, start, page_len, filters):
@@ -478,6 +436,11 @@ def create_and_submit_timesheet( project_name=None,
         ts.expected_time = expected_time
         ts.result = result
 
+        child_issue = _find_gitlab_issue_in_text(goal, result)
+        if child_issue:
+            ts.gitlab_issue = child_issue
+            ts.gitlab_parent_issue = _resolve_gitlab_parent(child_issue)
+
         # Parent field set
         ts.from_time = from_time
         ts.to_time = to_time
@@ -523,7 +486,7 @@ def create_and_submit_timesheet( project_name=None,
         }
 
 @frappe.whitelist()
-def update_and_submit_timesheet_record(name, to_time, percent_billable, activity_type, result, task=None):
+def update_and_submit_timesheet_record(name, to_time, percent_billable, activity_type, result, task=None, productivity=None):
     try:
         # Retrieve the Timesheet Record document
         doc = frappe.get_doc("Timesheet Record", name)
@@ -555,6 +518,17 @@ def update_and_submit_timesheet_record(name, to_time, percent_billable, activity
         doc.task = task
         doc.activity_type = activity_type
         doc.result = result
+
+        if not doc.gitlab_issue:
+            child_issue = _find_gitlab_issue_in_text(doc.goal, result)
+            if child_issue:
+                doc.gitlab_issue = child_issue
+        if doc.gitlab_issue and not doc.gitlab_parent_issue:
+            doc.gitlab_parent_issue = _resolve_gitlab_parent(doc.gitlab_issue)
+
+        if productivity not in (None, "", 0):
+            percent_billable = 0
+
         doc.percent_billable = percent_billable
 
         # ✅ Final validation before any save or submit
@@ -576,7 +550,7 @@ def update_and_submit_timesheet_record(name, to_time, percent_billable, activity
             new_doc.employee = doc.employee
 
             # Copy parent fields from original
-            for field in ["project", "customer", "task", "goal", "expected_time", "activity_type", "result", "percent_billable"]:
+            for field in ["project", "customer", "task", "goal", "gitlab_issue", "gitlab_parent_issue", "expected_time", "activity_type", "result", "percent_billable", "productivity"]:
                 new_doc.set(field, doc.get(field))
 
             # Parent times from selected row
