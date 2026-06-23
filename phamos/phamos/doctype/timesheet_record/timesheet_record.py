@@ -50,6 +50,10 @@ class TimesheetRecord(Document):
 	def create_timesheet(self):
 		description = "{0} : {1}".format(self.goal, self.result)
 		actual_hours = round(float(self.actual_time) / 3600, 6)
+
+		child_url = frappe.db.get_value("GitLab Issue", self.gitlab_issue, "issue_url") if self.gitlab_issue else None
+		parent_url = frappe.db.get_value("GitLab Issue", self.gitlab_parent_issue, "issue_url") if self.gitlab_parent_issue else None
+
 		timesheet = frappe.new_doc("Timesheet")
 		timesheet.update(
 			{
@@ -57,6 +61,8 @@ class TimesheetRecord(Document):
 				"customer": self.customer,
 				"note": description,
 				"employee": self.employee,
+				"custom_gitlab_child_issue_url": child_url,
+				"custom_gitlab_parent_issue_url": parent_url,
 			}
 		)
 		timesheet.append(
@@ -71,7 +77,7 @@ class TimesheetRecord(Document):
 				"hours": actual_hours,
 				"description": description,
 				"project": self.project,
-				"task": self.task
+				"task": self.task,
 			},
 		)
 		timesheet.insert()
