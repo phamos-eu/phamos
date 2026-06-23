@@ -500,6 +500,7 @@
             </div>
             <p class="pe-rsvp-hint">No account needed · Change anytime</p>
 
+            {% if email_group %}
             <div class="pe-email-subscribe">
               <div class="pe-email-title">Stay Updated</div>
               {% if subscription_description %}<p class="pe-email-desc">{{ subscription_description }}</p>{% endif %}
@@ -507,6 +508,7 @@
               <button id="subscribe-btn" class="pe-subscribe-btn">Subscribe</button>
               <div id="subscribe-msg" class="pe-subscribe-msg"></div>
             </div>
+            {% endif %}
           </div>
         </div>
 
@@ -701,7 +703,7 @@ frappe.ready(function () {
   var subscribeEmail = document.getElementById("subscribe-email");
   var subscribeMsg   = document.getElementById("subscribe-msg");
 
-  subscribeBtn.addEventListener("click", function () {
+  if (subscribeBtn) subscribeBtn.addEventListener("click", function () {
     var email = subscribeEmail.value.trim();
     if (!email) {
       subscribeMsg.textContent = "Please enter your email address";
