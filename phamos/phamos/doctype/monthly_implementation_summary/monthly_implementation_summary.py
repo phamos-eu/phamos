@@ -725,12 +725,23 @@ def _create_dn_from_sales_order(docname, sales_order, delivery_note_item=None):
 				).format(so_name)
 			)
 
-		dn.custom_implementation = mis_doc.implementation
-		dn_meta = frappe.get_meta("Delivery Note")
-		for fn in ("palette", "paket"):
-			if dn_meta.has_field(fn):
-				dn.set(fn, 0)
+		for item in dn.items:
+			if item.so_detail:
+				soi = frappe.get_doc("Sales Order Item", item.so_detail)
 
+				# Force SO values and ignore pricing rule values
+				item.rate = flt(soi.rate)
+				item.net_rate = flt(soi.rate)
+				item.price_list_rate = flt(soi.rate)
+
+				item.amount = flt(item.qty * item.rate)
+				item.net_amount = flt(item.qty * item.net_rate)
+
+				item.discount_percentage = 0
+
+		dn.flags.ignore_pricing_rule = True
+		dn.ignore_pricing_rule = 1
+		dn.custom_implementation = mis_doc.implementation
 		dn.insert()
 		old_dn = frappe.db.get_value("Monthly Implementation Summary", docname, "delivery_note")
 		frappe.db.set_value("Monthly Implementation Summary", docname, "delivery_note", dn.name)
