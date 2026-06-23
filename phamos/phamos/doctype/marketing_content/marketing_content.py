@@ -132,19 +132,43 @@ def subscribe_to_event(event_name, email):
         frappe.throw(frappe._("Event not found"))
     if not frappe.utils.validate_email_address(email):
         frappe.throw(frappe._("Please enter a valid email address"))
-    existing = frappe.db.exists(
-        "Marketing Event Response", {"parent": event_name, "email": email}
-    )
-    if existing:
+    email_group = frappe.db.get_value("Marketing Content", event_name, "email_group")
+    if not email_group:
+        frappe.throw(frappe._("This event does not have an Email Group configured"))
+    if frappe.db.exists("Email Group Member", {"email_group": email_group, "email": email}):
         return {"status": "already_subscribed"}
-    child = frappe.get_doc({
-        "doctype": "Marketing Event Response",
-        "parenttype": "Marketing Content",
-        "parent": event_name,
-        "parentfield": "responses",
+    frappe.get_doc({
+        "doctype": "Email Group Member",
+        "email_group": email_group,
         "email": email,
-        "subscribed_on": frappe.utils.now(),
-    })
-    child.insert(ignore_permissions=True)
+    }).insert(ignore_permissions=True)
     frappe.db.commit()
     return {"status": "ok"}
+
+
+@frappe.whitelist()
+def create_newsletter_for_event(event_name):
+    doc = frappe.get_doc("Marketing Content", event_name)
+    if not doc.email_group:
+        frappe.throw(frappe._("Please set an Email Group on this Marketing Content before creating a Newsletter."))
+    user_info = frappe.db.get_value(
+        "User", frappe.session.user, ["full_name", "email"], as_dict=True
+    )
+    now = frappe.utils.now_datetime()
+    title_slug = frappe.scrub(doc.title).replace("_", "-")
+    base_name = f"{now.strftime('%Y-%m')}-{title_slug}"
+    newsletter_name = base_name
+    subject = doc.title
+    counter = 2
+    while frappe.db.exists("Newsletter", newsletter_name):
+        newsletter_name = f"{base_name}-{counter}"
+        subject = f"{doc.title}"
+        counter += 1
+    newsletter = frappe.new_doc("Newsletter")
+    newsletter.subject = subject
+    newsletter.sender_name = user_info.full_name or frappe.session.user
+    newsletter.sender_email = user_info.email
+    newsletter.custom_marketing_content = doc.name
+    newsletter.append("email_group", {"email_group": doc.email_group})
+    newsletter.insert(set_name=newsletter_name)
+    return newsletter.name
