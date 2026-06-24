@@ -46,7 +46,7 @@
   "sponsors",
   "section_responses",
   "subscription_description",
-  "responses"
+  "email_group"
  ],
  "fields": [
   {
@@ -290,11 +290,10 @@
    "label": "Subscription Description"
   },
   {
-   "fieldname": "responses",
-   "fieldtype": "Table",
-   "label": "Responses",
-   "no_copy": 1,
-   "options": "Marketing Event Response"
+   "fieldname": "email_group",
+   "fieldtype": "Link",
+   "label": "Email Group",
+   "options": "Email Group"
   }
  ],
  "has_web_view": 1,
@@ -303,9 +302,13 @@
   {
    "link_doctype": "Checklist",
    "link_fieldname": "reference_record"
+  },
+  {
+   "link_doctype": "Newsletter",
+   "link_fieldname": "custom_marketing_content"
   }
  ],
- "modified": "2026-06-08 15:00:26.796667",
+ "modified": "2026-06-23 00:00:00.000000",
  "modified_by": "Administrator",
  "module": "Phamos",
  "name": "Marketing Content",
