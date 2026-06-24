@@ -82,7 +82,7 @@ def _post_daily_image(settings, raven_bot, parent_message_id, quote):
 	_bot_send_message(bot, parent_message_id, text="", file=image_file)
 
 
-def _enqueue_daily_image(settings, parent_message_id, quote):
+def _enqueue_daily_image(settings, parent_message_id, quote, today_date=None):
 	"""Mistral image gen can exceed the default worker timeout — run on long queue."""
 	frappe.enqueue(
 		"phamos.custom_scripts.custom_python.raven_daily_thread.post_raven_daily_image",
@@ -93,12 +93,15 @@ def _enqueue_daily_image(settings, parent_message_id, quote):
 		parent_message_id=parent_message_id,
 		quote=quote,
 		daily_image_folder=settings.daily_image_folder,
+		today_date=today_date,
 		job_id=f"raven_daily_image_{frappe.utils.today()}",
 		deduplicate=True,
 	)
 
 
-def post_raven_daily_image(raven_bot, parent_message_id, quote, daily_image_folder=None):
+def post_raven_daily_image(
+	raven_bot, parent_message_id, quote, daily_image_folder=None, today_date=None
+):
 	"""Background job: generate (or use fixed) image and post to the daily thread."""
 	try:
 		settings = frappe._dict(
@@ -110,6 +113,29 @@ def post_raven_daily_image(raven_bot, parent_message_id, quote, daily_image_fold
 		frappe.log_error(
 			frappe.get_traceback(),
 			"Raven Daily Thread: failed to post daily image",
+		)
+
+	if today_date:
+		_post_birthday_wishes_after_thread(parent_message_id, raven_bot, today_date)
+
+
+def _post_birthday_wishes_after_thread(thread_channel_id, raven_bot, today_date):
+	from phamos.phamos.doctype.birthday_wish.birthday_wish import (
+		post_birthday_wishes_to_raven_thread,
+	)
+
+	try:
+		posted = post_birthday_wishes_to_raven_thread(
+			thread_channel_id, raven_bot, today_date
+		)
+		if posted:
+			frappe.logger("phamos").info(
+				"Posted birthday wishes to Raven thread for: %s", ", ".join(posted)
+			)
+	except Exception:
+		frappe.log_error(
+			frappe.get_traceback(),
+			"Raven Daily Thread: failed to post birthday wishes",
 		)
 
 
@@ -135,24 +161,6 @@ def _create_raven_thread(settings, today_date, post_image_sync=False):
 	)
 	_bot_send_message(bot, parent_message_id, reply_message, markdown=True)
 
-	from phamos.phamos.doctype.birthday_wish.birthday_wish import (
-		post_birthday_wishes_to_raven_thread,
-	)
-
-	try:
-		posted = post_birthday_wishes_to_raven_thread(
-			parent_message_id, settings.raven_bot, today_date
-		)
-		if posted:
-			frappe.logger("phamos").info(
-				"Posted birthday wishes to Raven thread for: %s", ", ".join(posted)
-			)
-	except Exception:
-		frappe.log_error(
-			frappe.get_traceback(),
-			"Raven Daily Thread: failed to post birthday wishes",
-		)
-
 	if settings.enable_daily_image:
 		if post_image_sync:
 			try:
@@ -162,8 +170,17 @@ def _create_raven_thread(settings, today_date, post_image_sync=False):
 					frappe.get_traceback(),
 					"Raven Daily Thread: failed to post daily image",
 				)
+			_post_birthday_wishes_after_thread(
+				parent_message_id, settings.raven_bot, today_date
+			)
 		else:
-			_enqueue_daily_image(settings, parent_message_id, thought_of_the_day)
+			_enqueue_daily_image(
+				settings, parent_message_id, thought_of_the_day, today_date
+			)
+	else:
+		_post_birthday_wishes_after_thread(
+			parent_message_id, settings.raven_bot, today_date
+		)
 
 	frappe.db.set_single_value(
 		"phamos Settings",
