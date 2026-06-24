@@ -114,40 +114,6 @@ def _collect_event_participant_emails(doc) -> list[str]:
 	return uniq
 
 
-def _collect_event_participant_roles(doc) -> dict[str, str]:
-	"""Build attendee role map from Event Participants custom_participation."""
-	roles: dict[str, str] = {}
-
-	for row in (doc.get("event_participants") or []):
-		candidate = None
-
-		for fieldname in ("email", "email_id"):
-			val = (row.get(fieldname) or "").strip()
-			if val:
-				candidate = val
-				break
-
-		if not candidate:
-			candidate = _get_linked_email(row.get("reference_doctype"), row.get("reference_docname"))
-
-		if not candidate:
-			continue
-
-		parsed = getaddresses([candidate])
-		if not parsed:
-			continue
-
-		_, addr = parsed[0]
-		if not addr:
-			continue
-
-		participation = (row.get("custom_participation") or "Optional").strip().lower()
-		role = "REQ-PARTICIPANT" if participation == "required" else "OPT-PARTICIPANT"
-		roles[addr.lower()] = role
-
-	return roles
-
-
 def _merge_attendees(existing_csv: str, new_emails: list[str]) -> str:
 	"""Merge comma-separated attendees with new emails without duplicates."""
 	merged: list[str] = []
@@ -173,15 +139,17 @@ def _merge_attendees(existing_csv: str, new_emails: list[str]) -> str:
 
 
 def _event_location(doc) -> str:
-	"""Get Event location from the standard Event field."""
-	return (doc.get("location") or "").strip()
+	"""Get Event location, preferring standard field over legacy custom field."""
+	return (doc.get("location") or doc.get("custom_location") or "").strip()
 
 
 def _set_event_location(doc, value: str):
-	"""Set Event location on the standard Event field."""
+	"""Set Event location on available fields for compatibility."""
 	meta = frappe.get_meta(doc.doctype)
 	if meta.has_field("location"):
 		doc.location = value
+	if meta.has_field("custom_location"):
+		doc.custom_location = value
 
 def on_upsert(doc, method=None):
 	# auto_sync = frappe.db.get_value("Mailcow Settings", "auto_sync_events")
@@ -198,10 +166,9 @@ def on_upsert(doc, method=None):
 		attendees_cc = doc.get("custom_attendees_cc") or ""
 		attendees_bcc = doc.get("custom_attendees_bcc") or ""
 		participant_emails = _collect_event_participant_emails(doc)
-		participant_roles = _collect_event_participant_roles(doc)
 		attendees_to = _merge_attendees(attendees_to, participant_emails)
 		
-		# Use the standard Event.location field.
+		# Prefer standard Event.location; fallback for older records.
 		location = _event_location(doc)
 
 		ics = vevent(
@@ -356,6 +323,8 @@ def pull_events(start: str, end: str) -> list[dict]:
 				event_meta = frappe.get_meta("Event")
 				if event_meta.has_field("location"):
 					event_payload["location"] = loc
+				if event_meta.has_field("custom_location"):
+					event_payload["custom_location"] = loc
 				doc = frappe.get_doc(event_payload)
 				doc.insert()
 
