@@ -10,14 +10,153 @@ import frappe
 import requests
 from datetime import datetime
 import pytz
+from email.utils import getaddresses
 from .client import put_ics, delete_ics, organizer_email, dav_password
 from .ics import vevent
 from ..utils import get_site_timezone
+
+
+def _uid_from_description_marker(description: str | None) -> str | None:
+	"""Extract Mailcow UID marker used by hybrid flow, if present."""
+	desc = description or ""
+	marker = "[MAILCOW-UID: "
+	idx = desc.find(marker)
+	if idx < 0:
+		return None
+	uid = desc[idx + len(marker):].split("]")[0].strip()
+	return uid or None
+
+
+def _resolve_sync_uid(doc) -> str:
+	"""Choose a stable UID so updates do not create duplicate calendar objects."""
+	return (
+		(doc.get("custom_mailcow_uid") or "").strip()
+		or _uid_from_description_marker(doc.get("description"))
+		or doc.name
+	)
+
+
+def _get_linked_email(doctype: str | None, docname: str | None) -> str | None:
+	"""Resolve an email for a linked participant reference."""
+	if not (doctype and docname):
+		return None
+
+	if doctype == "User":
+		return frappe.db.get_value("User", docname, "email")
+
+	if doctype == "Lead":
+		return (
+			frappe.db.get_value("Lead", docname, "email_id")
+			or frappe.db.get_value("Lead", docname, "email")
+			or frappe.db.get_value("Lead", docname, "lead_email")
+		)
+
+	if doctype == "Contact":
+		# Contact email is usually in child table `Contact Email`; fall back to direct field if present.
+		email = frappe.db.sql(
+			"""
+			SELECT ce.email_id
+			FROM `tabContact Email` ce
+			WHERE ce.parent = %s
+			ORDER BY ce.is_primary DESC, ce.idx ASC
+			LIMIT 1
+			""",
+			(docname,),
+			as_dict=False,
+		)
+		if email and email[0] and email[0][0]:
+			return email[0][0]
+		return frappe.db.get_value("Contact", docname, "email_id")
+
+	# Best-effort fallback for doctypes that expose an email_id field.
+	try:
+		meta = frappe.get_meta(doctype)
+		if meta.has_field("email_id"):
+			return frappe.db.get_value(doctype, docname, "email_id")
+	except Exception:
+		pass
+
+	return None
+
+
+def _collect_event_participant_emails(doc) -> list[str]:
+	"""Collect attendee emails from Event Participants rows."""
+	emails: list[str] = []
+	for row in (doc.get("event_participants") or []):
+		candidate = None
+
+		# If customizations added a direct email field on child table, prefer it.
+		for fieldname in ("email", "email_id"):
+			val = (row.get(fieldname) or "").strip()
+			if val:
+				candidate = val
+				break
+
+		if not candidate:
+			candidate = _get_linked_email(row.get("reference_doctype"), row.get("reference_docname"))
+
+		if not candidate:
+			continue
+
+		for _, addr in getaddresses([candidate]):
+			if addr:
+				emails.append(addr)
+
+	# Deduplicate while preserving order.
+	seen = set()
+	uniq = []
+	for e in emails:
+		k = e.lower()
+		if k in seen:
+			continue
+		seen.add(k)
+		uniq.append(e)
+	return uniq
+
+
+def _merge_attendees(existing_csv: str, new_emails: list[str]) -> str:
+	"""Merge comma-separated attendees with new emails without duplicates."""
+	merged: list[str] = []
+	seen = set()
+
+	for _, addr in getaddresses([existing_csv or ""]):
+		if not addr:
+			continue
+		k = addr.lower()
+		if k in seen:
+			continue
+		seen.add(k)
+		merged.append(addr)
+
+	for addr in (new_emails or []):
+		k = addr.lower()
+		if k in seen:
+			continue
+		seen.add(k)
+		merged.append(addr)
+
+	return ", ".join(merged)
+
+
+def _event_location(doc) -> str:
+	"""Get Event location, preferring standard field over legacy custom field."""
+	return (doc.get("location") or doc.get("custom_location") or "").strip()
+
+
+def _set_event_location(doc, value: str):
+	"""Set Event location on available fields for compatibility."""
+	meta = frappe.get_meta(doc.doctype)
+	if meta.has_field("location"):
+		doc.location = value
+	if meta.has_field("custom_location"):
+		doc.custom_location = value
 
 def on_upsert(doc, method=None):
 	# auto_sync = frappe.db.get_value("Mailcow Settings", "auto_sync_events")
 
 	try:
+		sync_uid = _resolve_sync_uid(doc)
+
 		# bump sequence to force client refresh
 		seq = int(doc.get("custom_mailcow_seq") or 0) + 1
 		doc.db_set("custom_mailcow_seq", seq, notify=False)
@@ -26,12 +165,14 @@ def on_upsert(doc, method=None):
 		attendees_to = doc.get("custom_attendees_to") or ""
 		attendees_cc = doc.get("custom_attendees_cc") or ""
 		attendees_bcc = doc.get("custom_attendees_bcc") or ""
+		participant_emails = _collect_event_participant_emails(doc)
+		attendees_to = _merge_attendees(attendees_to, participant_emails)
 		
-		# Get location from custom field (Jitsi link for hybrid meetings)
-		location = doc.get("custom_location") or ""
+		# Prefer standard Event.location; fallback for older records.
+		location = _event_location(doc)
 
 		ics = vevent(
-			uid=doc.name,
+			uid=sync_uid,
 			seq=seq,
 			subject=doc.subject,
 			starts_on=doc.starts_on,
@@ -42,15 +183,15 @@ def on_upsert(doc, method=None):
 			attendees_cc=attendees_cc,
 			attendees_bcc=attendees_bcc,
 		)
-		put_ics(doc.name, ics, acting_user_id=doc.owner)
-		doc.db_set("custom_mailcow_uid", doc.name, notify=False)
+		put_ics(sync_uid, ics, acting_user_id=doc.owner)
+		doc.db_set("custom_mailcow_uid", sync_uid, notify=False)
 		doc.db_set("custom_mailcow_synched", 1, notify=False)
 	except Exception as e:
 		frappe.log_error(frappe.get_traceback(), "Event CalDAV Sync Error")
 
 def on_delete(doc, method=None):
 	try:
-		delete_ics(doc.name)
+		delete_ics(_resolve_sync_uid(doc))
 	except Exception:
 		frappe.log_error(frappe.get_traceback(), "Event CalDAV Delete Error")
 
@@ -162,23 +303,28 @@ def pull_events(start: str, end: str) -> list[dict]:
 				doc.starts_on = dtstart_db
 				doc.ends_on = dtend_db
 				doc.description = desc
-				doc.custom_location = loc
+				_set_event_location(doc, loc)
 				doc.custom_mailcow_etag = etag
 				doc.save()
 			else:
-				doc = frappe.get_doc({
+				event_payload = {
 					"doctype": "Event",
 					"subject": summary,
 					"starts_on": dtstart_db,
 					"ends_on": dtend_db,
 					"description": desc,
-					"custom_location": loc,
 					"custom_mailcow_uid": uid,
 					"custom_mailcow_etag": etag,
 					"owner": owner,
 					"event_type": "Private",
 					"custom_mailcow_synched": 1,
-				})
+				}
+				event_meta = frappe.get_meta("Event")
+				if event_meta.has_field("location"):
+					event_payload["location"] = loc
+				if event_meta.has_field("custom_location"):
+					event_payload["custom_location"] = loc
+				doc = frappe.get_doc(event_payload)
 				doc.insert()
 
 			events.append({
