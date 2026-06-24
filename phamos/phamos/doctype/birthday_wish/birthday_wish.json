@@ -1,0 +1,126 @@
+{
+ "actions": [],
+ "allow_rename": 1,
+ "autoname": "format:{birthday_employee}-{birthday_date}",
+ "creation": "2026-06-22 17:08:35.492696",
+ "doctype": "DocType",
+ "engine": "InnoDB",
+ "field_order": [
+  "section_break_w85z",
+  "birthday_employee",
+  "employee_name",
+  "birthday_date",
+  "due_date",
+  "birthday_wishes",
+  "section_break_bb5m",
+  "status",
+  "raven_message_id",
+  "ai_composed_message"
+ ],
+ "fields": [
+  {
+   "fieldname": "section_break_w85z",
+   "fieldtype": "Section Break"
+  },
+  {
+   "fieldname": "birthday_employee",
+   "fieldtype": "Link",
+   "in_list_view": 1,
+   "label": "Birthday Employee",
+   "options": "Employee",
+   "reqd": 1
+  },
+  {
+   "fieldname": "birthday_date",
+   "fieldtype": "Date",
+   "in_list_view": 1,
+   "label": "Birthday Date",
+   "reqd": 1
+  },
+  {
+   "fieldname": "due_date",
+   "fieldtype": "Date",
+   "in_list_view": 1,
+   "label": "Due Date",
+   "reqd": 1
+  },
+  {
+   "fieldname": "birthday_wishes",
+   "fieldtype": "Table",
+   "label": "Birthday Wishes",
+   "options": "Birthday Wishes"
+  },
+  {
+   "fetch_from": "birthday_employee.employee_name",
+   "fieldname": "employee_name",
+   "fieldtype": "Data",
+   "in_list_view": 1,
+   "label": "Employee Name",
+   "read_only": 1
+  },
+  {
+   "fieldname": "section_break_bb5m",
+   "fieldtype": "Section Break"
+  },
+  {
+   "default": "Collecting",
+   "fieldname": "status",
+   "fieldtype": "Select",
+   "in_list_view": 1,
+   "label": "Status",
+   "options": "Collecting\nReady\nPosted to Raven",
+   "reqd": 1
+  },
+  {
+   "fieldname": "raven_message_id",
+   "fieldtype": "Link",
+   "label": "Raven Message Id",
+   "options": "Raven Message",
+   "read_only_depends_on": "eval:doc.status == \"Posted to Raven\""
+  },
+  {
+   "fieldname": "ai_composed_message",
+   "fieldtype": "Small Text",
+   "label": "AI Composed Message",
+   "read_only_depends_on": "eval:doc.status == \"Posted to Raven\""
+  }
+ ],
+ "index_web_pages_for_search": 1,
+ "links": [],
+ "modified": "2026-06-22 17:32:32.950041",
+ "modified_by": "Administrator",
+ "module": "Phamos",
+ "name": "Birthday Wish",
+ "naming_rule": "Expression",
+ "owner": "Administrator",
+ "permissions": [
+  {
+   "create": 1,
+   "delete": 1,
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "System Manager",
+   "share": 1,
+   "write": 1
+  },
+  {
+   "create": 0,
+   "delete": 0,
+   "email": 0,
+   "export": 0,
+   "print": 0,
+   "read": 1,
+   "report": 0,
+   "role": "Employee",
+   "share": 0,
+   "write": 0
+  }
+ ],
+ "sort_field": "modified",
+ "sort_order": "DESC",
+ "states": [],
+ "title_field": "employee_name"
+}
