@@ -1,3 +1,4 @@
+import html
 import re
 import frappe
 import pytz
@@ -15,20 +16,41 @@ from frappe.query_builder.functions import Concat, Max, Sum, Round, Coalesce, If
 from frappe.utils import getdate, nowdate, get_first_day, get_last_day, add_days, add_months
 
 
-def _find_gitlab_issue_in_text(*text_fields):
-    """Scan text fields for the first GitLab issue URL and return its Frappe name, or None."""
+def _find_gitlab_issues_in_text(*text_fields):
+    """Scan text for GitLab URLs and return (child_issue_name, parent_issue_name).
+
+    URL classification:
+      - /-/work_items/N  →  child issue
+      - /-/issues/N      →  parent issue
+
+    Rules:
+      - Child found: child = child, parent = child.parent_issue from DB (None if unset)
+      - Only parent found: both = parent (same issue fills both slots)
+      - Neither found: (None, None)
+    """
     text = " ".join(t for t in text_fields if t)
-    for url in re.findall(r'https?://\S+/-/issues/\d+', text):
-        issue_name = frappe.db.get_value("GitLab Issue", {"issue_url": url}, "name")
-        if issue_name:
-            return issue_name
-    return None
+    text = html.unescape(strip_html(text))
+
+    child_issue = None
+    parent_issue = None
+
+    for url in re.findall(r'https?://[^\s"\'<>]+/-/(?:issues|work_items)/\d+', text):
+        if "/-/work_items/" in url and child_issue is None:
+            child_issue = frappe.db.get_value("GitLab Issue", {"issue_url": url}, "name")
+        elif "/-/issues/" in url and parent_issue is None:
+            parent_issue = frappe.db.get_value("GitLab Issue", {"issue_url": url}, "name")
+
+    if child_issue:
+        resolved_parent = frappe.db.get_value("GitLab Issue", child_issue, "parent_issue") or None
+        return child_issue, resolved_parent
+    elif parent_issue:
+        return parent_issue, parent_issue
+    return None, None
 
 
 def _resolve_gitlab_parent(child_issue_name):
-    """Return parent GitLab Issue name, or child itself if it has no parent."""
-    parent = frappe.db.get_value("GitLab Issue", child_issue_name, "parent_issue")
-    return parent if parent else child_issue_name
+    """Return parent GitLab Issue name, or None if child has no parent."""
+    return frappe.db.get_value("GitLab Issue", child_issue_name, "parent_issue") or None
 
 
 @frappe.whitelist()
@@ -199,16 +221,12 @@ def create_and_submit_timesheet(
     result,
 ):
     try:
-        # --------------------------------------------------
-        # 1️⃣ Basic time validation
-        # --------------------------------------------------
+        # Basic time validation
         if from_time and to_time:
             if get_datetime(to_time) < get_datetime(from_time):
                 frappe.throw(_("To Time cannot be earlier than From Time."))
 
-        # --------------------------------------------------
-        # 2️⃣ Resolve employee
-        # --------------------------------------------------
+        # Resolve employee
         employee = frappe.db.get_value(
             "Employee",
             {"user_id": frappe.session.user},
@@ -218,9 +236,7 @@ def create_and_submit_timesheet(
         if not employee:
             frappe.throw(_("No Employee linked with current user."))
 
-        # --------------------------------------------------
-        # 3️⃣ Create Timesheet Record
-        # --------------------------------------------------
+        # Create Timesheet Record
         ts = frappe.new_doc("Timesheet Record")
 
         ts.project = project_name
@@ -234,22 +250,20 @@ def create_and_submit_timesheet(
         ts.to_time = to_time
 
         # Resolve GitLab issue references from goal / result text
-        child_issue = _find_gitlab_issue_in_text(goal, result)
+        child_issue, parent_issue = _find_gitlab_issues_in_text(goal, result)
         if child_issue:
             ts.gitlab_issue = child_issue
-            ts.gitlab_parent_issue = _resolve_gitlab_parent(child_issue)
+        if parent_issue:
+            ts.gitlab_parent_issue = parent_issue
 
-        # --------------------------------------------------
-        # 4️⃣ Add child row
-        # --------------------------------------------------
+        # Add child row
         ts.append("item", {
             "from_time": from_time,
             "to_time": to_time
         })
 
-        # --------------------------------------------------
-        # 5️⃣ Calculate duration
-        # --------------------------------------------------
+        
+        # Calculate duration
         total_duration = 0
         for row in ts.item:
             if row.from_time and row.to_time:
@@ -319,10 +333,10 @@ def is_task_running(name):
 def get_employee_leaves():
     today = getdate(nowdate())
 
-    # ✅ Current year start
+    # Current year start
     year_start = get_first_day(today.replace(month=1, day=1))
 
-    # ✅ Next year  end
+    # Next year  end
     next_year = today.year + 1
     year_end = get_last_day(getdate(f"{next_year}-12-31"))
 
@@ -442,7 +456,7 @@ def get_timesheet_records_by_date(selected_date=None):
         rec["from_time_germany"] = from_dt.strftime("%H:%M")
         rec["to_time_germany"]   = to_dt.strftime("%H:%M")
 
-        # ✅ Filter records for selected date
+        # Filter records for selected date
         if (from_dt.astimezone(user_zone).date() == selected_date
             or from_dt.date() == selected_date):
             date_records.append(rec)
@@ -470,10 +484,10 @@ def get_timesheet_records_by_date(selected_date=None):
 def get_team_holidays():
     today = getdate(nowdate())
 
-    # ✅ Current year ka start
+    # Current year ka start
     from_date = get_first_day(today.replace(month=1, day=1))
 
-    # ✅ Next year ka end
+    # Next year ka end
     next_year = today.year + 1
     to_date = get_last_day(getdate(f"{next_year}-12-31"))
 
@@ -522,7 +536,7 @@ def update_and_submit_timesheet_record(name, to_time, percent_billable, activity
         if doc.item:
             for idx, row in enumerate(reversed(doc.item)):
                 if row.from_time and not row.to_time:
-                    # ✅ Validate before assigning
+                    # Validate before assigning
                     if get_datetime(to_time) < get_datetime(row.from_time):
                         frappe.throw(_("To Time cannot be earlier than From Time. Update aborted."))
                     row.to_time = to_time
@@ -548,9 +562,11 @@ def update_and_submit_timesheet_record(name, to_time, percent_billable, activity
 
         # Resolve GitLab issue references if not already set by dev_action_panel
         if not doc.gitlab_issue:
-            child_issue = _find_gitlab_issue_in_text(doc.goal, result)
+            child_issue, parent_issue = _find_gitlab_issues_in_text(doc.goal, result)
             if child_issue:
                 doc.gitlab_issue = child_issue
+            if parent_issue:
+                doc.gitlab_parent_issue = parent_issue
         if doc.gitlab_issue and not doc.gitlab_parent_issue:
             doc.gitlab_parent_issue = _resolve_gitlab_parent(doc.gitlab_issue)
 
@@ -560,7 +576,7 @@ def update_and_submit_timesheet_record(name, to_time, percent_billable, activity
         if productivity is not None:
             doc.productivity = productivity
 
-        # ✅ Final validation before any save or submit
+        # Final validation before any save or submit
         if doc.from_time and doc.to_time and get_datetime(doc.to_time) < get_datetime(doc.from_time):
             frappe.throw(_("To Time cannot be earlier than From Time. Update aborted."))
 
@@ -571,7 +587,7 @@ def update_and_submit_timesheet_record(name, to_time, percent_billable, activity
         for i in range(2, len(doc.item), 2):  # start from 3rd row (index 2)
             alt_row = doc.item[i]
 
-            # ✅ Skip invalid alternate rows
+            # Skip invalid alternate rows
             if alt_row.from_time and alt_row.to_time and get_datetime(alt_row.to_time) < get_datetime(alt_row.from_time):
                 continue
 
