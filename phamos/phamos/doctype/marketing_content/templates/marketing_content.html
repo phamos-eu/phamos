@@ -306,6 +306,156 @@
     border: 1.5px solid var(--pe-border);
   }
 
+  /* Buy Ticket button */
+  .pe-buy-wrap { margin-top: .6rem; }
+  .pe-buy-btn {
+    display: block; width: 100%; text-align: center;
+    padding: .6rem 1rem;
+    background: #065f46; color: #fff;
+    border: none; border-radius: 7px; font-size: .85rem; font-weight: 700;
+    letter-spacing: .02em; cursor: pointer; transition: opacity .15s;
+  }
+  .pe-buy-btn:hover { opacity: .82; }
+
+  /* ── Ticket Modal ────────────────────────────── */
+  .pe-modal-overlay {
+    display: none; position: fixed; inset: 0;
+    background: rgba(0,0,0,.62); z-index: 1050;
+    align-items: center; justify-content: center;
+  }
+  .pe-modal-overlay.open { display: flex; }
+  .pe-modal {
+    background: #fff; border-radius: 12px;
+    width: calc(100% - 2rem); max-width: 820px; min-height: 660px;
+    max-height: 94vh; display: flex; flex-direction: column;
+    box-shadow: 0 28px 80px rgba(0,0,0,.38);
+    margin: 1rem;
+  }
+  .pe-modal-header {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 1.1rem 1.4rem .9rem;
+    border-bottom: 1px solid var(--pe-border);
+  }
+  .pe-modal-title { font-size: 1.1rem; font-weight: 700; color: #1c1917; margin: 0; }
+  .pe-modal-steps { font-size: .78rem; color: var(--pe-muted); }
+  .pe-modal-close {
+    background: none; border: none; cursor: pointer; color: var(--pe-muted);
+    padding: .2rem; line-height: 1;
+  }
+  .pe-modal-close:hover { color: #1c1917; }
+  .pe-modal-body { padding: 1.3rem 1.6rem; flex: 1; overflow-y: auto; }
+  .pe-modal-footer {
+    padding: .9rem 1.4rem; border-top: 1px solid var(--pe-border);
+    display: flex; gap: .5rem; justify-content: flex-end;
+  }
+  .pe-modal-footer .btn-back {
+    padding: .6rem 1.2rem; background: transparent; color: var(--pe-muted);
+    border: 1.5px solid var(--pe-border); border-radius: 6px;
+    font-size: .92rem; font-weight: 600; cursor: pointer;
+  }
+  .pe-modal-footer .btn-next {
+    padding: .6rem 1.4rem; background: var(--pe-accent); color: #fff;
+    border: none; border-radius: 6px;
+    font-size: .92rem; font-weight: 600; cursor: pointer; transition: opacity .15s;
+  }
+  .pe-modal-footer .btn-next:hover { opacity: .88; }
+  .pe-modal-footer .btn-next:disabled { opacity: .5; cursor: not-allowed; }
+
+  /* Form fields inside modal */
+  .pe-field { margin-bottom: 1rem; }
+  .pe-field label { display: block; font-size: .82rem; font-weight: 600; color: #44403c; margin-bottom: .35rem; }
+  .pe-field input, .pe-field textarea {
+    width: 100%; padding: .58rem .8rem;
+    border: 1.5px solid var(--pe-border); border-radius: 6px;
+    font-size: .95rem; outline: none; transition: border-color .15s;
+    font-family: inherit;
+  }
+  .pe-field input:focus, .pe-field textarea:focus { border-color: var(--pe-accent); }
+  .pe-field textarea { resize: vertical; min-height: 80px; }
+  .pe-field-error { font-size: .75rem; color: #991b1b; margin-top: .28rem; display: none; }
+
+  /* Ticket price row */
+  .pe-ticket-info {
+    background: var(--pe-bg); border: 1.5px solid var(--pe-border);
+    border-radius: 8px; padding: .85rem 1rem; margin-bottom: 1rem;
+  }
+  .pe-ticket-name { font-size: .95rem; font-weight: 700; color: #1c1917; margin: 0 0 .2rem; }
+  .pe-ticket-desc { font-size: .82rem; color: var(--pe-muted); margin: 0 0 .6rem; }
+  .pe-qty-row { display: flex; align-items: center; gap: .6rem; margin-bottom: .5rem; }
+  .pe-qty-label { font-size: .82rem; font-weight: 600; color: #44403c; flex-shrink: 0; }
+  .pe-qty-ctrl { display: flex; align-items: center; gap: .4rem; }
+  .pe-qty-btn {
+    width: 30px; height: 30px; border-radius: 50%;
+    border: 1.5px solid var(--pe-border); background: #fff;
+    font-size: 1rem; font-weight: 700; cursor: pointer; color: #1c1917;
+    display: flex; align-items: center; justify-content: center;
+    transition: border-color .12s;
+  }
+  .pe-qty-btn:hover { border-color: var(--pe-accent); color: var(--pe-accent); }
+  .pe-qty-val { font-size: 1.05rem; font-weight: 700; min-width: 1.6em; text-align: center; }
+  .pe-subtotal-row {
+    display: flex; justify-content: space-between; align-items: center;
+    font-size: .88rem; padding: .26rem 0; color: var(--pe-muted);
+  }
+  .pe-tax-row {
+    display: flex; justify-content: space-between; align-items: center; gap: .5rem;
+    font-size: .85rem; padding: .24rem 0; color: var(--pe-muted);
+  }
+  .pe-tax-row-label { min-width: 0; flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .pe-tax-row-rate { flex-shrink: 0; font-size: .78rem; background: #f0ede8; border-radius: 4px; padding: .1em .4em; margin-left: .3rem; }
+  .pe-tax-row-amt { flex-shrink: 0; }
+  .pe-total-row {
+    display: flex; justify-content: space-between; align-items: center;
+    border-top: 1px solid var(--pe-border); padding-top: .5rem; margin-top: .4rem;
+  }
+  .pe-total-label { font-size: .82rem; font-weight: 600; text-transform: uppercase; letter-spacing: .06em; color: var(--pe-muted); }
+  .pe-total-val { font-size: 1.15rem; font-weight: 800; color: #1c1917; }
+
+  /* Tax invoice checkbox */
+  .pe-check-row { display: flex; align-items: center; gap: .55rem; margin-bottom: 1rem; cursor: pointer; }
+  .pe-check-row input[type=checkbox] { width: 16px; height: 16px; accent-color: var(--pe-accent); flex-shrink: 0; }
+  .pe-check-row span { font-size: .92rem; color: #1c1917; }
+
+  /* Payment terms */
+  .pe-terms-box {
+    background: var(--pe-bg); border: 1px solid var(--pe-border);
+    border-radius: 6px; padding: .7rem .9rem;
+    font-size: .82rem; color: var(--pe-muted); line-height: 1.6;
+    margin-bottom: 1rem;
+  }
+  .pe-terms-label { font-size: .7rem; font-weight: 700; text-transform: uppercase; letter-spacing: .08em; margin-bottom: .35rem; color: var(--pe-muted); }
+
+  /* Order overview (step 3) */
+  .pe-overview-section { margin-bottom: 1.1rem; }
+  .pe-overview-label {
+    font-size: .7rem; font-weight: 700; text-transform: uppercase;
+    letter-spacing: .08em; color: var(--pe-muted); margin-bottom: .45rem;
+  }
+  .pe-overview-row {
+    display: flex; justify-content: space-between;
+    font-size: .92rem; padding: .32rem 0;
+    border-bottom: 1px solid var(--pe-border);
+  }
+  .pe-overview-row:last-child { border-bottom: none; }
+  .pe-overview-key { color: var(--pe-muted); }
+  .pe-overview-val { font-weight: 600; color: #1c1917; text-align: right; max-width: 60%; }
+  .pe-overview-total {
+    display: flex; justify-content: space-between; align-items: center;
+    background: var(--pe-bg); border-radius: 7px;
+    padding: .7rem .9rem; margin-top: .5rem;
+  }
+  .pe-overview-total-label { font-size: .82rem; font-weight: 700; text-transform: uppercase; letter-spacing: .06em; color: var(--pe-muted); }
+  .pe-overview-total-val { font-size: 1.25rem; font-weight: 800; color: #1c1917; }
+
+  /* Success state */
+  .pe-success {
+    text-align: center; padding: 2rem 1.2rem;
+  }
+  .pe-success-icon { color: #065f46; margin-bottom: .85rem; }
+  .pe-success-title { font-size: 1.15rem; font-weight: 700; color: #1c1917; margin-bottom: .45rem; }
+  .pe-success-msg { font-size: .92rem; color: var(--pe-muted); line-height: 1.6; }
+  .pe-success-so { font-size: .88rem; color: var(--pe-accent); font-weight: 600; margin-top: .55rem; }
+
   /* Status pill */
   .pe-status-pill {
     display: inline-block;
@@ -604,6 +754,12 @@
           </div>
           {% endif %}
 
+          {% if ticket_item %}
+          <div class="pe-buy-wrap">
+            <button class="pe-buy-btn" id="btn-buy-ticket">Buy Ticket</button>
+          </div>
+          {% endif %}
+
         </div>
       </div>
 
@@ -647,6 +803,35 @@
 
   </div>{# end row #}
 </div>
+
+{% if ticket_item %}
+<!-- ── Buy Ticket Modal ──────────────────────────────────── -->
+<div class="pe-modal-overlay" id="ticket-modal-overlay">
+  <div class="pe-modal" role="dialog" aria-modal="true" aria-labelledby="modal-title">
+
+    <!-- Header -->
+    <div class="pe-modal-header">
+      <div>
+        <p class="pe-modal-title" id="modal-title">Buy Ticket</p>
+        <span class="pe-modal-steps" id="modal-step-label">Step 1 of 3</span>
+      </div>
+      <button class="pe-modal-close" id="modal-close-btn" aria-label="Close">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+      </button>
+    </div>
+
+    <!-- Body (steps injected by JS) -->
+    <div class="pe-modal-body" id="modal-body"></div>
+
+    <!-- Footer -->
+    <div class="pe-modal-footer" id="modal-footer">
+      <button class="btn-back" id="modal-btn-back" style="display:none">Back</button>
+      <button class="btn-next" id="modal-btn-next">Next</button>
+    </div>
+
+  </div>
+</div>
+{% endif %}
 
 <script>
 frappe.ready(function () {
@@ -736,6 +921,397 @@ frappe.ready(function () {
         subscribeMsg.className = "pe-subscribe-msg error";
       }
     });
+  });
+
+  // ── Buy Ticket Modal ────────────────────────────────────
+  var buyBtn = document.getElementById("btn-buy-ticket");
+  if (!buyBtn) return;  // no ticket item configured
+
+  var overlay    = document.getElementById("ticket-modal-overlay");
+  var modalBody  = document.getElementById("modal-body");
+  var modalFooter= document.getElementById("modal-footer");
+  var stepLabel  = document.getElementById("modal-step-label");
+  var btnBack    = document.getElementById("modal-btn-back");
+  var btnNext    = document.getElementById("modal-btn-next");
+  var closeBtn   = document.getElementById("modal-close-btn");
+
+  var ticketInfo  = null;   // loaded from backend
+  var currentStep = 1;
+  var totalSteps  = 3;      // may become 2 if no tax invoice
+  var state = {
+    full_name: "", email: "", qty: 1,
+    needs_invoice: false,
+    inv_full_name: "", inv_email: "", inv_company: "", inv_address: "", inv_city: ""
+  };
+
+  var paymentTermsNote = {{ payment_terms_note | tojson }};
+
+  function formatMoney(amount, currency) {
+    try {
+      return new Intl.NumberFormat(undefined, { style: "currency", currency: currency }).format(amount);
+    } catch(e) {
+      return currency + " " + parseFloat(amount).toFixed(2);
+    }
+  }
+
+  function openModal() {
+    overlay.classList.add("open");
+    document.body.style.overflow = "hidden";
+    currentStep = 1;
+    if (!ticketInfo) {
+      renderLoading();
+      frappe.call({
+        method: "phamos.phamos.doctype.marketing_content.marketing_content.get_ticket_info",
+        args: { event_name: eventName },
+        callback: function(r) {
+          ticketInfo = r.message;
+          document.getElementById("modal-title").textContent = "Buy Ticket | " + ticketInfo.event_title;
+          renderStep(1);
+        },
+        error: function() { renderError("Could not load ticket details. Please try again."); }
+      });
+    } else {
+      renderStep(1);
+    }
+  }
+
+  function closeModal() {
+    overlay.classList.remove("open");
+    document.body.style.overflow = "";
+  }
+
+  function renderLoading() {
+    modalBody.innerHTML = '<p style="text-align:center;color:var(--pe-muted);padding:2rem 0;">Loading…</p>';
+    btnNext.style.display = "none";
+    btnBack.style.display = "none";
+  }
+
+  function renderError(msg) {
+    modalBody.innerHTML = '<p style="text-align:center;color:#991b1b;padding:2rem 0;">' + msg + '</p>';
+    btnNext.style.display = "none";
+    btnBack.style.display = "none";
+  }
+
+  function updateStepLabel() {
+    var maxSteps = state.needs_invoice ? 3 : 2;
+    // Internal step 3 is display step 2 when tax invoice is skipped
+    var displayStep = (state.needs_invoice || currentStep < 3) ? currentStep : 2;
+    stepLabel.textContent = "Step " + displayStep + " of " + maxSteps;
+  }
+
+  function renderStep(step) {
+    currentStep = step;
+    updateStepLabel();
+    if (step === 1) renderStep1();
+    else if (step === 2) renderStep2();
+    else renderStep3();
+  }
+
+  // ── Step 1: Attendee info + ticket ──────────────────────
+  function calcAmounts(qty) {
+    var net   = ticketInfo.rate * qty;
+    var tax   = ticketInfo.tax_rate > 0 ? net * (ticketInfo.tax_rate / 100) : 0;
+    return { net: net, tax: tax, grand: net + tax };
+  }
+
+  function renderStep1() {
+    var rate   = ticketInfo.rate;
+    var cur    = ticketInfo.currency;
+    var hasTax = ticketInfo.tax_rate > 0;
+    var amt    = calcAmounts(state.qty);
+
+    var html = '';
+    html += '<div class="pe-ticket-info">';
+    html += '  <div class="pe-qty-row">';
+    html += '    <span class="pe-qty-label">Quantity</span>';
+    html += '    <div class="pe-qty-ctrl">';
+    html += '      <button class="pe-qty-btn" id="qty-minus">−</button>';
+    html += '      <span class="pe-qty-val" id="qty-display">' + state.qty + '</span>';
+    html += '      <button class="pe-qty-btn" id="qty-plus">+</button>';
+    html += '    </div>';
+    html += '    <span style="font-size:.75rem;color:var(--pe-muted);margin-left:.3rem;">× ' + formatMoney(rate, cur) + '</span>';
+    html += '  </div>';
+    if (hasTax) {
+      html += '  <div class="pe-subtotal-row"><span>Net</span><span id="net-display">' + formatMoney(amt.net, cur) + '</span></div>';
+      (ticketInfo.tax_rows || []).forEach(function(row, i) {
+        var rowAmt = amt.net * (row.rate / 100);
+        html += '  <div class="pe-tax-row">';
+        html += '    <span class="pe-tax-row-label">' + frappe.utils.escape_html(row.account_head) + '</span>';
+        html += '    <span class="pe-tax-row-rate">' + row.rate + '%</span>';
+        html += '    <span class="pe-tax-row-amt" id="tax-row-' + i + '">' + formatMoney(rowAmt, cur) + '</span>';
+        html += '  </div>';
+      });
+    }
+    html += '  <div class="pe-total-row">';
+    html += '    <span class="pe-total-label">' + (hasTax ? 'Grand Total' : 'Total') + '</span>';
+    html += '    <span class="pe-total-val" id="total-display">' + formatMoney(amt.grand, cur) + '</span>';
+    html += '  </div>';
+    html += '</div>';
+
+    html += '<div class="pe-field">';
+    html += '  <label for="s1-name">Full Name <span style="color:#9f1239">*</span></label>';
+    html += '  <input type="text" id="s1-name" placeholder="Jane Smith" value="' + frappe.utils.escape_html(state.full_name) + '">';
+    html += '  <div class="pe-field-error" id="err-name">Please enter your full name</div>';
+    html += '</div>';
+
+    html += '<div class="pe-field">';
+    html += '  <label for="s1-email">Email (ticket will be sent here) <span style="color:#9f1239">*</span></label>';
+    html += '  <input type="email" id="s1-email" placeholder="you@example.com" value="' + frappe.utils.escape_html(state.email) + '">';
+    html += '  <div class="pe-field-error" id="err-email">Please enter a valid email address</div>';
+    html += '</div>';
+
+    html += '<label class="pe-check-row">';
+    html += '  <input type="checkbox" id="s1-invoice"' + (state.needs_invoice ? " checked" : "") + '>';
+    html += '  <span>I need a tax invoice</span>';
+    html += '</label>';
+
+    if (paymentTermsNote) {
+      html += '<div class="pe-terms-box">';
+      html += '  <div class="pe-terms-label">Payment &amp; Refund Terms</div>';
+      html += frappe.utils.escape_html(paymentTermsNote).replace(/\n/g, '<br>');
+      html += '</div>';
+    }
+
+    modalBody.innerHTML = html;
+    btnBack.style.display = "none";
+    btnNext.style.display = "inline-block";
+    btnNext.textContent = "Next";
+    btnNext.disabled = false;
+
+    // qty controls
+    document.getElementById("qty-minus").addEventListener("click", function() {
+      if (state.qty > 1) { state.qty--; refreshQty(); }
+    });
+    document.getElementById("qty-plus").addEventListener("click", function() {
+      state.qty++;
+      refreshQty();
+    });
+
+    function refreshQty() {
+      var cur = ticketInfo.currency;
+      var amt = calcAmounts(state.qty);
+      document.getElementById("qty-display").textContent = state.qty;
+      if (ticketInfo.tax_rate > 0) {
+        document.getElementById("net-display").textContent = formatMoney(amt.net, cur);
+        (ticketInfo.tax_rows || []).forEach(function(row, i) {
+          var el = document.getElementById("tax-row-" + i);
+          if (el) el.textContent = formatMoney(amt.net * (row.rate / 100), cur);
+        });
+      }
+      document.getElementById("total-display").textContent = formatMoney(amt.grand, cur);
+    }
+
+    btnNext.onclick = function() {
+      var nameVal  = document.getElementById("s1-name").value.trim();
+      var emailVal = document.getElementById("s1-email").value.trim();
+      var ok = true;
+      if (!nameVal) {
+        document.getElementById("err-name").style.display = "block"; ok = false;
+      } else { document.getElementById("err-name").style.display = "none"; }
+      if (!emailVal || !emailVal.includes("@")) {
+        document.getElementById("err-email").style.display = "block"; ok = false;
+      } else { document.getElementById("err-email").style.display = "none"; }
+      if (!ok) return;
+      state.full_name     = nameVal;
+      state.email         = emailVal;
+      state.needs_invoice = document.getElementById("s1-invoice").checked;
+      if (state.needs_invoice) renderStep(2);
+      else renderStep(3);
+    };
+  }
+
+  // ── Step 2: Tax invoice details ─────────────────────────
+  function renderStep2() {
+    var html = '';
+    html += '<p style="font-size:.8rem;color:var(--pe-muted);margin-bottom:.9rem;">Please provide your billing details for the tax invoice.</p>';
+
+    var fields = [
+      { id: "s2-company", label: "Company Name", type: "text", key: "inv_company", placeholder: "Acme GmbH", required: true },
+      { id: "s2-invname", label: "Invoice Recipient Name", type: "text", key: "inv_full_name", placeholder: "Jane Smith", required: true },
+      { id: "s2-invemail", label: "Invoice Email", type: "email", key: "inv_email", placeholder: "billing@acme.com", required: true },
+      { id: "s2-address", label: "Full Address", type: "textarea", key: "inv_address", placeholder: "Street, Postcode, City, Country", required: true },
+    ];
+
+    fields.forEach(function(f) {
+      html += '<div class="pe-field">';
+      html += '  <label for="' + f.id + '">' + f.label + (f.required ? ' <span style="color:#9f1239">*</span>' : '') + '</label>';
+      var val = frappe.utils.escape_html(state[f.key] || "");
+      if (f.type === "textarea") {
+        html += '  <textarea id="' + f.id + '" placeholder="' + f.placeholder + '">' + val + '</textarea>';
+      } else {
+        html += '  <input type="' + f.type + '" id="' + f.id + '" placeholder="' + f.placeholder + '" value="' + val + '">';
+      }
+      html += '  <div class="pe-field-error" id="err-' + f.id + '">This field is required</div>';
+      html += '</div>';
+    });
+
+    modalBody.innerHTML = html;
+    btnBack.style.display = "inline-block";
+    btnNext.style.display = "inline-block";
+    btnNext.textContent = "Review Order";
+    btnNext.disabled = false;
+
+    btnBack.onclick = function() { renderStep(1); };
+    btnNext.onclick = function() {
+      var ok = true;
+      [
+        { id: "s2-company",  key: "inv_company" },
+        { id: "s2-invname",  key: "inv_full_name" },
+        { id: "s2-invemail", key: "inv_email" },
+        { id: "s2-address",  key: "inv_address" },
+      ].forEach(function(f) {
+        var el = document.getElementById(f.id);
+        var val = el.value.trim();
+        if (!val) {
+          document.getElementById("err-" + f.id).style.display = "block"; ok = false;
+        } else {
+          document.getElementById("err-" + f.id).style.display = "none";
+          state[f.key] = val;
+        }
+      });
+      if (!ok) return;
+      renderStep(3);
+    };
+  }
+
+  // ── Step 3: Order overview + Confirm ────────────────────
+  function renderStep3() {
+    var rate   = ticketInfo.rate;
+    var cur    = ticketInfo.currency;
+    var hasTax = ticketInfo.tax_rate > 0;
+    var amt    = calcAmounts(state.qty);
+
+    var html = '';
+
+    // Attendee section
+    html += '<div class="pe-overview-section">';
+    html += '  <div class="pe-overview-label">Attendee</div>';
+    html += '  <div class="pe-overview-row"><span class="pe-overview-key">Name</span><span class="pe-overview-val">' + frappe.utils.escape_html(state.full_name) + '</span></div>';
+    html += '  <div class="pe-overview-row"><span class="pe-overview-key">Email</span><span class="pe-overview-val">' + frappe.utils.escape_html(state.email) + '</span></div>';
+    html += '</div>';
+
+    // Order section
+    html += '<div class="pe-overview-section">';
+    html += '  <div class="pe-overview-label">Order</div>';
+    html += '  <div class="pe-overview-row"><span class="pe-overview-key">Ticket</span><span class="pe-overview-val">' + frappe.utils.escape_html(ticketInfo.event_title) + '</span></div>';
+    html += '  <div class="pe-overview-row"><span class="pe-overview-key">Quantity</span><span class="pe-overview-val">' + state.qty + '</span></div>';
+    html += '  <div class="pe-overview-row"><span class="pe-overview-key">Unit Price</span><span class="pe-overview-val">' + formatMoney(rate, cur) + '</span></div>';
+    html += '</div>';
+
+    // Tax invoice section
+    if (state.needs_invoice) {
+      html += '<div class="pe-overview-section">';
+      html += '  <div class="pe-overview-label">Tax Invoice</div>';
+      html += '  <div class="pe-overview-row"><span class="pe-overview-key">Company</span><span class="pe-overview-val">' + frappe.utils.escape_html(state.inv_company) + '</span></div>';
+      html += '  <div class="pe-overview-row"><span class="pe-overview-key">Recipient</span><span class="pe-overview-val">' + frappe.utils.escape_html(state.inv_full_name) + '</span></div>';
+      html += '  <div class="pe-overview-row"><span class="pe-overview-key">Invoice Email</span><span class="pe-overview-val">' + frappe.utils.escape_html(state.inv_email) + '</span></div>';
+      html += '  <div class="pe-overview-row"><span class="pe-overview-key">Address</span><span class="pe-overview-val">' + frappe.utils.escape_html(state.inv_address) + '</span></div>';
+      html += '</div>';
+    }
+
+    // Totals
+    if (hasTax) {
+      html += '<div class="pe-overview-total" style="flex-direction:column;align-items:stretch;gap:.3rem;">';
+      html += '  <div style="display:flex;justify-content:space-between;font-size:.9rem;color:var(--pe-muted)"><span>Net</span><span>' + formatMoney(amt.net, cur) + '</span></div>';
+      (ticketInfo.tax_rows || []).forEach(function(row) {
+        var rowAmt = amt.net * (row.rate / 100);
+        html += '  <div style="display:flex;justify-content:space-between;align-items:center;gap:.4rem;font-size:.88rem;color:var(--pe-muted)">';
+        html += '    <span style="flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">' + frappe.utils.escape_html(row.account_head) + '</span>';
+        html += '    <span style="flex-shrink:0;font-size:.76rem;background:#f0ede8;border-radius:4px;padding:.1em .4em;">' + row.rate + '%</span>';
+        html += '    <span style="flex-shrink:0;">' + formatMoney(rowAmt, cur) + '</span>';
+        html += '  </div>';
+      });
+      html += '  <div style="display:flex;justify-content:space-between;border-top:1px solid var(--pe-border);padding-top:.4rem;margin-top:.1rem;">';
+      html += '    <span class="pe-overview-total-label">Grand Total</span>';
+      html += '    <span class="pe-overview-total-val">' + formatMoney(amt.grand, cur) + '</span>';
+      html += '  </div>';
+      html += '</div>';
+    } else {
+      html += '<div class="pe-overview-total">';
+      html += '  <span class="pe-overview-total-label">Total</span>';
+      html += '  <span class="pe-overview-total-val">' + formatMoney(amt.grand, cur) + '</span>';
+      html += '</div>';
+    }
+
+    modalBody.innerHTML = html;
+    btnBack.style.display = "inline-block";
+    btnNext.style.display = "inline-block";
+    btnNext.textContent = "Confirm Order";
+    btnNext.disabled = false;
+
+    btnBack.onclick = function() {
+      renderStep(state.needs_invoice ? 2 : 1);
+    };
+    btnNext.onclick = function() {
+      submitOrder();
+    };
+  }
+
+  // ── Submit ───────────────────────────────────────────────
+  function submitOrder() {
+    btnNext.disabled = true;
+    btnNext.textContent = "Placing order…";
+
+    var invoiceData = null;
+    if (state.needs_invoice) {
+      invoiceData = {
+        company_name: state.inv_company,
+        full_name:    state.inv_full_name,
+        email:        state.inv_email,
+        address:      state.inv_address,
+      };
+    }
+
+    frappe.call({
+      method: "phamos.phamos.doctype.marketing_content.marketing_content.create_ticket_order",
+      args: {
+        event_name:   eventName,
+        full_name:    state.full_name,
+        email:        state.email,
+        qty:          state.qty,
+        invoice_data: invoiceData ? JSON.stringify(invoiceData) : null,
+      },
+      callback: function(r) {
+        if (r.message && r.message.sales_order) {
+          renderSuccess(r.message.sales_order);
+        } else {
+          btnNext.disabled = false;
+          btnNext.textContent = "Confirm Order";
+          frappe.msgprint("Something went wrong. Please try again.");
+        }
+      },
+      error: function(r) {
+        btnNext.disabled = false;
+        btnNext.textContent = "Confirm Order";
+        var msg = (r && r.message) ? r.message : "Please try again.";
+        frappe.msgprint("Order failed: " + msg);
+      }
+    });
+  }
+
+  // ── Success screen ───────────────────────────────────────
+  function renderSuccess(soName) {
+    stepLabel.textContent = "Order placed";
+    modalBody.innerHTML =
+      '<div class="pe-success">' +
+      '  <div class="pe-success-icon"><svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="9 12 11 14 15 10"/></svg></div>' +
+      '  <div class="pe-success-title">Order Received!</div>' +
+      '  <div class="pe-success-msg">Your order has been submitted. Our team will review it and reach out with payment details and confirmation.</div>' +
+      '  <div class="pe-success-so">Order: ' + frappe.utils.escape_html(soName) + '</div>' +
+      '</div>';
+    btnBack.style.display = "none";
+    btnNext.style.display = "none";
+    modalFooter.innerHTML = '<button class="btn-next" onclick="document.getElementById(\'ticket-modal-overlay\').classList.remove(\'open\');document.body.style.overflow=\'\'">Close</button>';
+  }
+
+  // ── Event listeners ──────────────────────────────────────
+  buyBtn.addEventListener("click", openModal);
+  closeBtn.addEventListener("click", closeModal);
+  overlay.addEventListener("click", function(e) {
+    if (e.target === overlay) closeModal();
+  });
+  document.addEventListener("keydown", function(e) {
+    if (e.key === "Escape" && overlay.classList.contains("open")) closeModal();
   });
 });
 </script>
