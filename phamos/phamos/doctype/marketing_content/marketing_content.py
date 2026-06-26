@@ -55,7 +55,8 @@ class MarketingContent(WebsiteGenerator):
             if self.max_attendees:
                 context.spots_left = max(0, self.max_attendees - registered_count)
         context.ticket_item = self.ticket_item
-        context.payment_terms_note = self.payment_terms_note
+        context.email_group = self.email_group
+        context.tc_name = self.tc_name
         context.parents = [{"title": "Events", "route": "events"}]
         if self.starts_on:
             dt = get_datetime(self.starts_on)
@@ -194,6 +195,11 @@ def get_ticket_info(event_name):
 
     event_title = frappe.db.get_value("Marketing Content", event_name, "title") or item.item_name
 
+    tc_name = frappe.db.get_value("Marketing Content", event_name, "tc_name")
+    tc_text = None
+    if tc_name:
+        tc_text = frappe.db.get_value("Terms and Conditions", tc_name, "terms")
+
     return {
         "item_code": item_code,
         "item_name": item.item_name,
@@ -202,11 +208,12 @@ def get_ticket_info(event_name):
         "currency": currency,
         "tax_rate": tax_rate,
         "tax_rows": tax_rows,
+        "tc_text": tc_text,
     }
 
 
 @frappe.whitelist(allow_guest=True)
-def create_ticket_order(event_name, full_name, email, qty, invoice_data=None):
+def create_ticket_order(event_name, attendees, qty, invoice_data=None):
     if not frappe.db.exists("Marketing Content", event_name):
         frappe.throw(frappe._("Event not found"))
 
@@ -218,13 +225,19 @@ def create_ticket_order(event_name, full_name, email, qty, invoice_data=None):
     if qty < 1:
         frappe.throw(frappe._("Quantity must be at least 1"))
 
+    if isinstance(attendees, str):
+        attendees = json.loads(attendees)
+    if not attendees:
+        frappe.throw(frappe._("At least one attendee is required"))
+
     if isinstance(invoice_data, str):
         invoice_data = json.loads(invoice_data) if invoice_data else None
 
     is_company_order = bool(invoice_data and invoice_data.get("company_name"))
 
-    # --- Find or create customer ---
-    customer = _resolve_customer(full_name, email, is_company_order, invoice_data)
+    # --- Find or create customer from primary attendee ---
+    primary = attendees[0]
+    customer = _resolve_customer(primary["full_name"], primary["email"], is_company_order, invoice_data)
 
     # --- Item rate ---
     item_price = frappe.db.get_value(
@@ -272,22 +285,35 @@ def create_ticket_order(event_name, full_name, email, qty, invoice_data=None):
                 "cost_center": tax_row.cost_center,
             })
 
+    tc_name = frappe.db.get_value("Marketing Content", event_name, "tc_name")
+    if tc_name:
+        so.tc_name = tc_name
+
     so.flags.ignore_permissions = True
     so.insert()
 
-    # --- Record on Marketing Content ---
-    mc = frappe.get_doc("Marketing Content", event_name)
-    mc.append("ticket_orders", {
-        "sales_order": so.name,
-        "customer": customer,
-        "total": so.total,
-        "total_taxes_and_charges": so.total_taxes_and_charges or 0,
-        "grand_total": so.grand_total,
-        "status": so.status,
-        "transaction_date": so.transaction_date,
-    })
-    mc.flags.ignore_permissions = True
-    mc.save()
+    # --- Register each attendee ---
+    for att in attendees:
+        reg = frappe.new_doc("Marketing Event Registration")
+        reg.event = event_name
+        reg.full_name = att.get("full_name")
+        reg.email = att.get("email")
+        reg.registered_on = frappe.utils.now_datetime()
+        reg.notes = "Sales Order: " + so.name
+        reg.flags.ignore_permissions = True
+        reg.insert()
+
+    # --- Subscribe all attendees to the event email group ---
+    email_group = frappe.db.get_value("Marketing Content", event_name, "email_group")
+    if email_group:
+        for att in attendees:
+            att_email = att.get("email")
+            if att_email and not frappe.db.exists("Email Group Member", {"email_group": email_group, "email": att_email}):
+                frappe.get_doc({
+                    "doctype": "Email Group Member",
+                    "email_group": email_group,
+                    "email": att_email,
+                }).insert(ignore_permissions=True)
 
     frappe.db.commit()
     return {"sales_order": so.name, "customer": customer}
@@ -303,6 +329,8 @@ def _resolve_customer(full_name, email, is_company, invoice_data):
             "link_name",
         )
         if linked and frappe.db.exists("Customer", linked):
+            cust_display_name = frappe.db.get_value("Customer", linked, "customer_name")
+            _maybe_create_address(linked, cust_display_name, invoice_data)
             return linked
 
     selling = frappe.get_single("Selling Settings")
@@ -332,20 +360,33 @@ def _resolve_customer(full_name, email, is_company, invoice_data):
     contact.flags.ignore_permissions = True
     contact.insert()
 
-    if is_company and invoice_data.get("address"):
-        default_country = frappe.db.get_single_value("System Settings", "country") or "Germany"
-        addr = frappe.new_doc("Address")
-        addr.address_title = cust_name
-        addr.address_type = "Billing"
-        addr.address_line1 = invoice_data["address"]
-        addr.city = invoice_data.get("city") or "-"
-        addr.country = default_country
-        addr.is_primary_address = 1
-        addr.append("links", {"link_doctype": "Customer", "link_name": cust.name})
-        addr.flags.ignore_permissions = True
-        addr.insert()
+    _maybe_create_address(cust.name, cust_name, invoice_data)
 
     return cust.name
+
+
+def _maybe_create_address(customer_name, address_title, invoice_data):
+    if not invoice_data:
+        return
+    address_line1 = invoice_data.get("address_line1")
+    if not address_line1:
+        return
+    city = invoice_data.get("city") or "-"
+    country = invoice_data.get("country") or frappe.db.get_single_value("System Settings", "country") or "Germany"
+    postcode = invoice_data.get("postcode") or ""
+
+    addr = frappe.new_doc("Address")
+    addr.address_title = address_title
+    addr.address_type = "Billing"
+    addr.address_line1 = address_line1
+    if postcode:
+        addr.pincode = postcode
+    addr.city = city
+    addr.country = country
+    addr.is_primary_address = 1
+    addr.append("links", {"link_doctype": "Customer", "link_name": customer_name})
+    addr.flags.ignore_permissions = True
+    addr.insert()
 
 
 @frappe.whitelist()

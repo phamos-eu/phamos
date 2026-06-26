@@ -49,9 +49,7 @@
   "email_group",
   "tab_ticketing",
   "ticket_item",
-  "payment_terms_note",
-  "section_ticket_orders",
-  "ticket_orders"
+  "tc_name"
  ],
  "fields": [
   {
@@ -303,7 +301,7 @@
   {
    "fieldname": "tab_ticketing",
    "fieldtype": "Tab Break",
-   "label": "Ticketing & Orders"
+   "label": "Ticket Configuration"
   },
   {
    "description": "ERPNext Item used for ticket sales. Price and tax info are read from this item.",
@@ -313,22 +311,10 @@
    "options": "Item"
   },
   {
-   "description": "Displayed in the Buy Ticket dialog (e.g. refund policy, payment instructions)",
-   "fieldname": "payment_terms_note",
-   "fieldtype": "Small Text",
-   "label": "Payment & Refund Terms"
-  },
-  {
-   "fieldname": "section_ticket_orders",
-   "fieldtype": "Section Break",
-   "label": "Sales Orders"
-  },
-  {
-   "fieldname": "ticket_orders",
-   "fieldtype": "Table",
-   "label": "Ticket Orders",
-   "options": "Marketing Content Order",
-   "read_only": 1
+   "fieldname": "tc_name",
+   "fieldtype": "Link",
+   "label": "Terms and Conditions",
+   "options": "Terms and Conditions"
   }
  ],
  "has_web_view": 1,
@@ -341,9 +327,13 @@
   {
    "link_doctype": "Newsletter",
    "link_fieldname": "custom_marketing_content"
+  },
+  {
+   "link_doctype": "Marketing Event Registration",
+   "link_fieldname": "event"
   }
  ],
- "modified": "2026-06-25 00:00:00.000000",
+ "modified": "2026-06-26 14:00:00.000000",
  "modified_by": "Administrator",
  "module": "Phamos",
  "name": "Marketing Content",
