@@ -107,7 +107,8 @@ function update_and_submit_timesheet_record(
   to_time,
   percent_billable,
   activity_type,
-  result
+  result,
+  productivity
 ) {
   frappe.call({
     method: "frappe.client.get",
@@ -144,6 +145,7 @@ function update_and_submit_timesheet_record(
           percent_billable: percent_billable,
           activity_type: activity_type,
           result: result,
+          productivity: productivity
         },
         freeze: true,
         freeze_message: __("Updating Timesheet Record......"),
@@ -273,7 +275,7 @@ function update_and_submit_timesheet_record(
 
   window.stopProject = function (timesheet_record, percent_billable, project, task, task_in_timesheet_record) {
 
-  // 🔹 Pehle Timesheet Record fetch karo
+  // Fetch Timesheet Record
   frappe.call({
     method: "frappe.client.get",
     args: {
@@ -288,7 +290,7 @@ function update_and_submit_timesheet_record(
 
       let doc = res.message;
 
-      // 🔹 Check: Child table 'item' exist
+      // Check: Child table 'item' exists
       if (!doc.item || doc.item.length === 0) {
         frappe.show_alert("No time logs found.");
         return;
@@ -298,7 +300,7 @@ function update_and_submit_timesheet_record(
       let rowCount = items.length;
       let lastRow = items[rowCount - 1];
 
-      // 🔹 Check 1st, 3rd, or 5th .. row
+      // Even row count means timer is paused (not running)
       if (rowCount % 2 === 0) {
         frappe.show_alert({
           message: "⏸️ Please Pause it first (▶️)",
@@ -314,13 +316,15 @@ function update_and_submit_timesheet_record(
   });
 };
 
-// 🔹 Separate function for dialog
+// Separate function for dialog
 function openStopProjectDialog(timesheet_record, percent_billable, project, task, task_in_timesheet_record, min_to_time) {
   let from_time = '';
   let expected_time = '';
   let timesheet_record_info = " Info from timesheet record";
 
+
   frappe.db.get_value("Timesheet Record", { name: timesheet_record }, ["goal", "from_time"], function (value) {
+
     from_time_formatted = frappe.datetime.str_to_user(value.from_time);
     timesheet_record_info = "From time: " + from_time_formatted + ",<br>Goal is: " + value.goal;
 
@@ -419,38 +423,67 @@ function openStopProjectDialog(timesheet_record, percent_billable, project, task
                     "This is a personal indicator to your own performance on the work you have done. It will influence the billable time of the Timesheet created.",
 
           },
+          {
+            fieldtype: "Select",
+            options: [0, 25, 50, 75, 100],
+            label: __("Productivity (%)"),
+            fieldname: "productivity",
+            reqd: 0,
+            default: 100,
+            description: "This field is used to indicate your productivity level on internal (non-billable) project work. It helps measure performance and effort for internal activities.",
+          },
         ],
         primary_action_label: __("Update Timesheet Record."),
         primary_action(values) {
           // Use actual_to_time if available (from auto-updater), otherwise use form value
           // This prevents the datetime field from stripping seconds
           let final_to_time = actual_to_time || values.to_time;
-          
+
           // Validate using Date comparison for better precision
           if (min_to_time) {
             let to_date = frappe.datetime.str_to_obj(final_to_time);
             let min_date = frappe.datetime.str_to_obj(min_to_time);
-            
+
             if (to_date < min_date) {
               final_to_time = min_to_time;
             }
           }
-          
+
           update_and_submit_timesheet_record(
             values.timesheet_record,
             values.task,
             final_to_time,
             values.percent_billable,
             values.activity_type,
-            values.result
+            values.result,
+            values.productivity
           );
           dialog.hide();
         }
       });
 
+      // Hide productivity by default; it replaces percent_billable for internal projects
+      dialog.set_df_property("productivity", "hidden", 1);
+      dialog.set_df_property("productivity", "reqd", 0);
+
       dialog.$wrapper.find(".modal-dialog").css("max-width", "800px");
       dialog.show();
-      
+
+      if (project) {
+        frappe.db.get_value("Project", project, ["custom_is_internal_project"], function(r) {
+          let is_internal = r && r.custom_is_internal_project === 1;
+          // Internal: hide Percent Billable, show Productivity
+          // Non-internal: show Percent Billable, hide Productivity
+          dialog.set_df_property("percent_billable", "hidden", is_internal ? 1 : 0);
+          dialog.set_df_property("percent_billable", "reqd",   is_internal ? 0 : 1);
+          dialog.set_df_property("productivity",     "hidden", is_internal ? 0 : 1);
+          dialog.set_df_property("productivity",     "reqd",   is_internal ? 1 : 0);
+          if (is_internal) {
+            dialog.set_value("productivity", 100);
+          }
+        });
+      }
+
       // Implement live time update for to_time field
       var time_update_interval = null;
       var user_interacted = false;
@@ -737,11 +770,6 @@ function openStopProjectDialog(timesheet_record, percent_billable, project, task
               }
             }, 0);
 
-            let initial_issues = dialog.get_value("issues") || [];
-            if (initial_issues.length) {
-              sync_issue_urls(dialog, initial_issues);
-            }
-
           }
         } else {
           frappe.show_alert(__("No response from server. Please try again."));
@@ -860,7 +888,7 @@ function openStopProjectDialog(timesheet_record, percent_billable, project, task
               const amberStop = greenPercent + amberPercent;
               const redStop = amberStop + redPercent;
 
-                // ✅ If no records, make background white
+                // If no records, make background white
                 if (greenPercent === 0 && amberPercent === 0 && redPercent === 0) {
                   gradientStyle = `
                     background: white;
@@ -1402,7 +1430,7 @@ function show_tab(tab, projectData) {
 function renderTimesheetCalendar(container) {
   const rowHeight = 40;
 
-  // 🔹 Date picker container
+  // Date picker container
   const dateWrapper = document.createElement("div");
   dateWrapper.className = "mb-2";
   dateWrapper.style.background = "var(--bg-color, #fff)";
@@ -1436,7 +1464,7 @@ function renderTimesheetCalendar(container) {
     }
 
 
-  // 🔹 function to load calendar for a given date
+  // Load calendar for a given date
   function loadCalendar(selectedDate) {
     frappe.call({
       method: "phamos.phamos.page.project_action_panel.project_action_panel.get_timesheet_records_by_date",
@@ -1537,12 +1565,12 @@ function renderTimesheetCalendar(container) {
     });
   }
 
-  // 🔹 Load first time with today's date
+  // Load first time with today's date
   loadCalendar(dateInput.value);
   updateDayName(dateInput.value);
 
 
-  // 🔹 Reload on date change
+  // Reload on date change
   dateInput.addEventListener("change", function() {
     loadCalendar(this.value);
     updateDayName(this.value);
@@ -1791,7 +1819,7 @@ window.togglePausePlay = function(taskId, timesheetName) {
 
 
   } else {
-    // ⏸️ Pause clicked → Close current row
+    // Pause clicked → Close current row
     btn.textContent = '▶️';
     btn.setAttribute('data-paused', 'true');
     console.log(`Paused Task: ${taskId}`);
@@ -1870,7 +1898,7 @@ function show_break_task_dialog(new_row_name, previous_from_time, previous_to_ti
                     return {
                         query: "phamos.phamos.page.project_action_panel.project_action_panel.get_assigned_projects"
                     };
-                }
+                  }
                 },
                 {
                   fieldtype: "Link",
@@ -1951,14 +1979,14 @@ function show_break_task_dialog(new_row_name, previous_from_time, previous_to_ti
                 frappe.call({
                 method: "phamos.phamos.page.project_action_panel.project_action_panel.create_and_submit_timesheet",
                 args: {
-                    project_name: values.project_name,
-                    percent_billable: values.percent_billable,
-                    result : values.result,
-                    activity_type: values.activity_type,
-                    from_time: values.from_time,
-                    to_time: values.to_time,
-                    expected_time: values.expected_time,
-                    goal: values.goal
+                    project_name: values.project_name,          
+                    goal: values.goal,                          
+                    from_time: values.from_time,                
+                    to_time: values.to_time,                    
+                    expected_time: values.expected_time,        
+                    percent_billable: values.percent_billable,  
+                    activity_type: values.activity_type,        
+                    result: values.result,                      
                 },
                 callback: function(r) {
                     if (r.message && r.message.status === "success") {
