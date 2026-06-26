@@ -24,7 +24,8 @@
    "options": "Marketing Content",
    "label": "Event",
    "reqd": 1,
-   "in_list_view": 1
+   "in_list_view": 1,
+   "in_standard_filter": 1
   },
   {
    "fieldname": "status",
@@ -55,7 +56,8 @@
    "fieldtype": "Data",
    "label": "Full Name",
    "reqd": 1,
-   "in_list_view": 1
+   "in_list_view": 1,
+   "in_standard_filter": 1
   },
   {
    "fieldname": "email",
@@ -63,7 +65,8 @@
    "options": "Email",
    "label": "Email",
    "reqd": 1,
-   "in_list_view": 1
+   "in_list_view": 1,
+   "in_standard_filter": 1
   },
   {
    "fieldname": "phone",
@@ -87,7 +90,7 @@
    "label": "Notes / Special Requests"
   }
  ],
- "modified": "2026-03-25 00:00:00.000000",
+ "modified": "2026-06-26 14:00:00.000000",
  "modified_by": "Administrator",
  "module": "Phamos",
  "name": "Marketing Event Registration",
