@@ -8,6 +8,23 @@ from frappe.utils import flt, today
 
 
 class Implementation(Document):
+	def validate(self):
+		if self.is_new():
+			return
+		db_status = frappe.db.get_value("Implementation", self.name, "status")
+		if db_status == "Escalated" and self.status != "Escalated":
+			has_resolved = frappe.db.exists(
+				"Escalation", {"implementation": self.name, "status": "Resolved"}
+			)
+			has_submitted = frappe.db.exists(
+				"Escalation", {"implementation": self.name, "docstatus": 1}
+			)
+			if not has_resolved and not has_submitted:
+				frappe.throw(
+					"Cannot change status from Escalated. "
+					"Please resolve or submit the linked Escalation first."
+				)
+
 	def before_save(self):
 		if self.resource_planning_prediction:
 			# Get existing row names from database to identify truly new rows
@@ -53,6 +70,30 @@ class Implementation(Document):
 		self.add_resource_planning()
 		self.add_status_history()
 
+
+	def after_save(self):
+		self._sync_linked_escalations()
+
+	def _sync_linked_escalations(self):
+		escalations = frappe.get_all(
+			"Escalation",
+			filters={"implementation": self.name, "docstatus": ["!=", 2]},
+			fields=["name", "open_date"],
+		)
+		for esc in escalations:
+			if not esc.open_date:
+				continue
+			snapshot = _get_escalation_snapshot(self.name, str(esc.open_date))
+			if snapshot:
+				frappe.db.set_value(
+					"Escalation",
+					esc.name,
+					{
+						"maturity_level": snapshot.get("maturity_level"),
+						"implementation_status": snapshot.get("forecast"),
+					},
+					update_modified=False,
+				)
 
 	def add_delivered_hrs(self):
 		delivered_total_hrs = 0
@@ -460,6 +501,67 @@ def get_gitlab_milestones_count(implementation: str):
             )]
         }
     )
+def _get_escalation_snapshot(implementation, open_date):
+	"""Return the Status Updates row strictly before open_date (non-Escalated).
+	Falls back to the row on or before open_date (today's entry) if none found."""
+	result = frappe.db.sql(
+		"""
+		SELECT maturity_level, forecast
+		FROM `tabStatus Information`
+		WHERE parent = %s
+		AND parentfield = 'status_updates'
+		AND `date` < %s
+		AND COALESCE(status, '') != 'Escalated'
+		ORDER BY `date` DESC
+		LIMIT 1
+		""",
+		(implementation, open_date),
+		as_dict=True,
+	)
+	if result:
+		return result[0]
+
+	# Fallback: today's row (no previous entry exists yet)
+	fallback = frappe.db.sql(
+		"""
+		SELECT maturity_level, forecast
+		FROM `tabStatus Information`
+		WHERE parent = %s
+		AND parentfield = 'status_updates'
+		AND `date` <= %s
+		ORDER BY `date` DESC
+		LIMIT 1
+		""",
+		(implementation, str(open_date)),
+		as_dict=True,
+	)
+	return fallback[0] if fallback else {}
+
+
+@frappe.whitelist()
+def escalate_implementation(implementation_name, reason):
+	open_date = today()
+
+	# Snapshot before save — today's row still holds the pre-escalation status
+	snapshot = _get_escalation_snapshot(implementation_name, open_date)
+
+	doc = frappe.get_doc("Implementation", implementation_name)
+	doc.status = "Escalated"
+	doc.status_statement = reason
+	doc.save(ignore_permissions=True)
+
+	escalation = frappe.new_doc("Escalation")
+	escalation.implementation = implementation_name
+	escalation.open_date = open_date
+	escalation.status = "Unresolved"
+	escalation.opening_statement = reason
+	if snapshot:
+		escalation.maturity_level = snapshot.get("maturity_level")
+		escalation.implementation_status = snapshot.get("status")
+	escalation.insert(ignore_permissions=True)
+	return escalation.name
+
+
 @frappe.whitelist()
 def get_auto_email_reports_for_users(user_list):
     if isinstance(user_list, str):
