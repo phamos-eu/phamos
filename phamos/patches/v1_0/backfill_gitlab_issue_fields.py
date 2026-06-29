@@ -16,9 +16,10 @@ def execute():
 	  - Project Action Panel records: scan goal + result for GitLab URLs.
 	"""
 
+	from frappe.database.schema import add_column as db_add_column
 	for col in ("custom_gitlab_child_issue_url", "custom_gitlab_parent_issue_url"):
 		if not frappe.db.has_column("Timesheet", col):
-			frappe.db.add_column("Timesheet", col, "varchar(140) null")
+			db_add_column("Timesheet", col, "Data")
 
 	records = frappe.db.sql("""
 		SELECT name, gitlab_issue, gitlab_parent_issue, goal, result, timesheet, docstatus
