@@ -364,8 +364,26 @@ frappe.ui.form.on("Implementation", {
                         frm.set_value('status_statement', values.reason);
                         frm.save();
                         d.hide();
-                    }else {
-                        // ✅ Hold & Escalated bypass condition
+                    } else if (values.status === 'Escalated') {
+                        d.hide();
+                        frappe.call({
+                            method: 'phamos.phamos.doctype.implementation.implementation.escalate_implementation',
+                            args: {
+                                implementation_name: frm.doc.name,
+                                reason: values.reason
+                            },
+                            callback: function(r) {
+                                if (!r.exc && r.message) {
+                                    frappe.show_alert({
+                                        message: __('Escalation {0} created', [r.message]),
+                                        indicator: 'orange'
+                                    });
+                                    frm.reload_doc();
+                                }
+                            }
+                        });
+                    } else {
+                        // Hold
                         frm.set_value('status', values.status);
                         frm.set_value('status_statement', values.reason);
                         frm.save();

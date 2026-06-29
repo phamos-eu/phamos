@@ -493,6 +493,10 @@
   {
    "link_doctype": "Monthly Implementation Summary",
    "link_fieldname": "implementation"
+  },
+  {
+   "link_doctype": "Escalation",
+   "link_fieldname": "implementation"
   }
  ],
  "modified": "2026-06-04 09:56:31.302460",
