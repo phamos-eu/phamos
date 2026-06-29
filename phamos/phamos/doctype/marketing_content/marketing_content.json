@@ -46,7 +46,10 @@
   "sponsors",
   "section_responses",
   "subscription_description",
-  "email_group"
+  "email_group",
+  "tab_ticketing",
+  "ticket_item",
+  "tc_name"
  ],
  "fields": [
   {
@@ -294,6 +297,24 @@
    "fieldtype": "Link",
    "label": "Email Group",
    "options": "Email Group"
+  },
+  {
+   "fieldname": "tab_ticketing",
+   "fieldtype": "Tab Break",
+   "label": "Ticket Configuration"
+  },
+  {
+   "description": "ERPNext Item used for ticket sales. Price and tax info are read from this item.",
+   "fieldname": "ticket_item",
+   "fieldtype": "Link",
+   "label": "Ticket Item",
+   "options": "Item"
+  },
+  {
+   "fieldname": "tc_name",
+   "fieldtype": "Link",
+   "label": "Terms and Conditions",
+   "options": "Terms and Conditions"
   }
  ],
  "has_web_view": 1,
@@ -306,9 +327,13 @@
   {
    "link_doctype": "Newsletter",
    "link_fieldname": "custom_marketing_content"
+  },
+  {
+   "link_doctype": "Marketing Event Registration",
+   "link_fieldname": "event"
   }
  ],
- "modified": "2026-06-23 00:00:00.000000",
+ "modified": "2026-06-26 14:00:00.000000",
  "modified_by": "Administrator",
  "module": "Phamos",
  "name": "Marketing Content",
