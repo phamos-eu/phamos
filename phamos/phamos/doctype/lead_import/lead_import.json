@@ -13,9 +13,7 @@
   "status",
   "reference_urls",
   "section_break_log",
-  "status_log",
-  "section_break_preview",
-  "leads_preview"
+  "status_log"
  ],
  "fields": [
   {
@@ -65,17 +63,6 @@
    "read_only": 1
   },
   {
-   "fieldname": "section_break_preview",
-   "fieldtype": "Section Break",
-   "label": "Extracted Leads Preview"
-  },
-  {
-   "fieldname": "leads_preview",
-   "fieldtype": "Table",
-   "label": "Leads Preview",
-   "options": "Lead Import Item"
-  },
-  {
    "description": "Page slugs to check per company website, one per line. E.g: impressum / legal / contact",
    "fieldname": "reference_urls",
    "fieldtype": "Small Text",
@@ -90,7 +77,7 @@
    "link_fieldname": "lead_import"
   }
  ],
- "modified": "2026-06-24 12:33:31.999320",
+ "modified": "2026-06-29 11:19:13.632692",
  "modified_by": "Administrator",
  "module": "Phamos",
  "name": "Lead Import",
