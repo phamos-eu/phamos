@@ -49,6 +49,38 @@ frappe.ui.form.on("Implementation", {
                         }
                     },
                 });
+        // Address - filter by customer via Dynamic Link
+        frm.set_query("billing_address", function() {
+            return {
+                query: "frappe.contacts.doctype.address.address.address_query",
+                filters: {
+                    link_doctype: "Customer",
+                    link_name: frm.doc.customer
+                }
+            };
+        });
+
+        // Contact - billing_contact
+        frm.set_query("billing_contact", function() {
+            return {
+                query: "frappe.contacts.doctype.contact.contact.contact_query",
+                filters: {
+                    link_doctype: "Customer",
+                    link_name: frm.doc.customer
+                }
+            };
+        });
+
+        // Contact - invoicing_email_id
+        frm.set_query("invoicing_email_id", function() {
+            return {
+                query: "frappe.contacts.doctype.contact.contact.contact_query",
+                filters: {
+                    link_doctype: "Customer",
+                    link_name: frm.doc.customer
+                }
+            };
+        });
     },
     refresh: function (frm) {
         frm.trigger("render_auto_email_reports_section");
