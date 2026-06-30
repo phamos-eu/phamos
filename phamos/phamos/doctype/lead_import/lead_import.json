@@ -63,6 +63,7 @@
    "read_only": 1
   },
   {
+   "default": "impressum\nlegal-info\nde/legal-info\nkontakt\nmeta/impressum/",
    "description": "Page slugs to check per company website, one per line. E.g: impressum / legal / contact",
    "fieldname": "reference_urls",
    "fieldtype": "Small Text",
@@ -77,7 +78,7 @@
    "link_fieldname": "lead_import"
   }
  ],
- "modified": "2026-06-29 11:19:13.632692",
+ "modified": "2026-06-30 12:23:56.087245",
  "modified_by": "Administrator",
  "module": "Phamos",
  "name": "Lead Import",
