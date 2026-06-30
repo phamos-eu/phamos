@@ -172,7 +172,7 @@
   },
   {
    "fieldname": "remaining_hrs",
-   "fieldtype": "Data",
+   "fieldtype": "Float",
    "label": "Remaining Sales Order Hours",
    "read_only": 1
   },
