@@ -131,9 +131,12 @@ def update_customer_comment(ts_name, comment=None, custom_rating=None):
 
 
 def get_customer_for_user(user):
-    # Get all Contact names linked to this User
-    contacts = frappe.get_list(
-        "Contact", filters={"user": user}, fields=["name"]
+    # Server-side lookup: session may be unset during on_login hooks.
+    contacts = frappe.get_all(
+        "Contact",
+        filters={"user": user},
+        pluck="name",
+        ignore_permissions=True,
     )
 
     if not contacts:
@@ -145,7 +148,7 @@ def get_customer_for_user(user):
             "Dynamic Link",
             {
                 "parenttype": "Contact",
-                "parent": contact.name,
+                "parent": contact,
                 "link_doctype": "Customer"
             },
             "link_name"
