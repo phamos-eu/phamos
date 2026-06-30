@@ -7,7 +7,7 @@ import os
 import re
 import time
 from concurrent.futures import ThreadPoolExecutor, as_completed
-from urllib.parse import urlparse
+from urllib.parse import parse_qs, quote_plus, unquote, urljoin, urlparse
 
 import frappe
 import requests
@@ -25,6 +25,11 @@ ENRICHMENT_WORKERS = 6
 ENRICHMENT_SLUG_LIMIT = 12
 BATCH_SIZE = 50
 LEAD_LIST_FIELDS = ("emails", "phones", "contact_persons", "addresses")
+FREE_EMAIL_DOMAINS = {
+    "gmail.com", "googlemail.com", "yahoo.com", "outlook.com", "hotmail.com",
+    "live.com", "icloud.com", "me.com", "aol.com", "gmx.de", "web.de",
+    "proton.me", "protonmail.com",
+}
 
 LEAD_FIELD_EXTRACTION_PROMPT = """Extract contact details for this company from the text.
 Company: {company_name}
@@ -151,6 +156,14 @@ def _populate_lead_data_child_tables(lead_data_doc, company, extracted=None):
             "comment": "main",
         })
 
+    attachments = _as_unique_list(company.get("source_attachments") or company.get("source_attachment"))
+    if attachments:
+        lead_data_doc.set("lead_data_attachment", [])
+        for attachment in attachments:
+            lead_data_doc.append("lead_data_attachment", {
+                "lead_data_attachment": attachment,
+            })
+
     emails = extracted.get("emails") or ([company["email"]] if company.get("email") else [])
     phones = _sanitize_phone_list(extracted.get("phones") or company.get("phone"))
     addresses = extracted.get("addresses") or ([company["address"]] if company.get("address") else [])
@@ -193,8 +206,14 @@ def _populate_lead_data_child_tables(lead_data_doc, company, extracted=None):
             "last_name": _truncate(last_name),
             "email_address": _truncate(clean_emails[idx]) if idx < len(clean_emails) else "",
             "phone": _truncate(phones[idx]) if idx < len(phones) else "",
+            "designation": _truncate(company.get("job_title")),
         })
 
+    if contacts:
+        parts = str(contacts[0]).strip().split(" ", 1)
+        lead_data_doc.first_name = _truncate(parts[0])
+        lead_data_doc.last_name = _truncate(parts[1] if len(parts) > 1 else "")
+    lead_data_doc.job_title = _truncate(company.get("job_title"))
     lead_data_doc.organization_name = _truncate(company.get("company_name"))
     lead_data_doc.website = _truncate(main_site)
     lead_data_doc.email = _format_email_field(", ".join(clean_emails)) if clean_emails else ""
@@ -364,14 +383,25 @@ def _pipeline_screenshot(lead_import_name, file_url):
     if not file_url:
         frappe.throw(_("Please upload a screenshot file."))
 
-    _log(lead_import_name, "Reading screenshot via Mistral vision...")
+    _log(lead_import_name, "Reading screenshot/business card via Mistral vision...")
     image_b64, mime = _load_file_as_base64(file_url)
     if not image_b64:
         _log(lead_import_name, "Could not read uploaded file.")
         return []
 
-    companies = _mistral_extract_companies_from_image(image_b64, mime)
-    _log(lead_import_name, f"Mistral identified {len(companies)} companies in the screenshot.")
+    qr_urls = _decode_qr_urls_from_file(file_url)
+    if qr_urls:
+        _log(lead_import_name, f"QR website found: {qr_urls[0]}")
+
+    companies = _mistral_extract_companies_from_image(image_b64, mime, qr_urls=qr_urls)
+    for company in companies:
+        if not company.get("website") and qr_urls:
+            company["website"] = qr_urls[0]
+        if not company.get("website"):
+            company["website"] = _infer_or_search_website(company)
+        company["source_attachment"] = file_url
+
+    _log(lead_import_name, f"Mistral identified {len(companies)} lead(s) in the screenshot.")
     return companies if not MAX_COMPANIES_PER_IMPORT else companies[:MAX_COMPANIES_PER_IMPORT]
 
 # Pipeline: PDF
@@ -386,11 +416,7 @@ def _pipeline_pdf(lead_import_name, file_url):
     if not settings:
         frappe.throw(_("Mistral API key is not configured in phamos Settings."))
 
-    url = file_url.strip().lstrip("/")
-    if url.startswith("private/files/"):
-        path = get_files_path(*url.replace("private/files/", "", 1).split("/"), is_private=1)
-    else:
-        path = get_files_path(*url.replace("files/", "", 1).split("/"))
+    path = _get_file_path_from_url(file_url)
 
     if not path or not os.path.isfile(path):
         _log(lead_import_name, "PDF file not found on disk.")
@@ -608,7 +634,7 @@ Page text:
     return _call_mistral_json_list(settings, prompt)
 
 
-def _mistral_extract_companies_from_image(image_b64, mime):
+def _mistral_extract_companies_from_image(image_b64, mime, qr_urls=None):
     settings = _get_phamos_settings()
     if not settings:
         frappe.throw(_("Mistral API key is not configured."))
@@ -617,18 +643,37 @@ def _mistral_extract_companies_from_image(image_b64, mime):
     if "ocr" in model.lower():
         model = MISTRAL_CHAT_MODEL_DEFAULT
 
-    prompt = """You are analyzing a screenshot of a company directory or partner listing page.
+    qr_hint = "\n".join(qr_urls or [])
+    prompt = f"""You are analyzing a screenshot. It may be a single business card, or it may be a company directory/partner listing page.
 
-Extract all visible company/organisation names and any website URLs you can see or infer from the logos/text.
+If it is a business card, return exactly ONE object for the card.
+If it is a directory/listing screenshot, return one object per visible company.
+
+Extract only details visible in the image, plus QR URL hints provided below.
+Use a QR URL as website when it is present.
 
 Return ONLY a valid JSON array, no explanation, no markdown.
 Format:
 [
-  {"company_name": "Acone Consulting", "website": "https://acone.de"},
-  {"company_name": "Atmos GmbH", "website": ""}
+  {{
+    "company_name": "Radio Neckaralb Live GmbH & Co. KG",
+    "website": "https://example.com",
+    "emails": ["name@example.com"],
+    "phones": ["+49 7121 9458900"],
+    "contact_persons": ["Bianca Rösch"],
+    "addresses": ["Obere Wässere 6-8, 72764 Reutlingen"],
+    "job_title": "Mediaberaterin",
+    "source_type": "business_card"
+  }}
 ]
 
-If you cannot find a website for a company, leave website as empty string."""
+If a field is not visible, use an empty string or empty array.
+Never invent phone numbers, emails, people, or addresses.
+
+QR URL hints:
+---
+{qr_hint}
+---"""
 
     url = f"{settings['base_url'].rstrip('/')}/chat/completions"
     headers = {
@@ -653,7 +698,12 @@ If you cannot find a website for a company, leave website as empty string."""
         return []
 
     content = (resp.json().get("choices") or [{}])[0].get("message", {}).get("content", "[]")
-    return _parse_json_list(content)
+    companies = _parse_json_list(content)
+    return [
+        _normalize_company_dict(company)
+        for company in companies
+        if company.get("company_name") or company.get("website")
+    ]
 
 
 def _mistral_extract_companies_from_text(text):
@@ -1021,11 +1071,7 @@ def _load_file_as_base64(file_url):
     if not file_url:
         return None, None
 
-    url = file_url.strip().lstrip("/")
-    if url.startswith("private/files/"):
-        path = get_files_path(*url.replace("private/files/", "", 1).split("/"), is_private=1)
-    else:
-        path = get_files_path(*url.replace("files/", "", 1).split("/"))
+    path = _get_file_path_from_url(file_url)
 
     if not path or not os.path.isfile(path):
         return None, None
@@ -1036,6 +1082,133 @@ def _load_file_as_base64(file_url):
 
     with open(path, "rb") as f:
         return base64.b64encode(f.read()).decode("utf-8"), mime
+
+
+def _get_file_path_from_url(file_url):
+    if not file_url:
+        return ""
+
+    url = file_url.strip().lstrip("/")
+    if url.startswith("private/files/"):
+        return get_files_path(*url.replace("private/files/", "", 1).split("/"), is_private=1)
+    return get_files_path(*url.replace("files/", "", 1).split("/"))
+
+
+def _decode_qr_urls_from_file(file_url):
+    """Best-effort QR decoding. Works when cv2 or pyzbar is installed."""
+    path = _get_file_path_from_url(file_url)
+    if not path or not os.path.isfile(path):
+        return []
+
+    decoded = []
+
+    try:
+        import cv2
+
+        image = cv2.imread(path)
+        if image is not None:
+            detector = cv2.QRCodeDetector()
+            data, _, _ = detector.detectAndDecode(image)
+            if data:
+                decoded.append(data)
+    except Exception:
+        pass
+
+    if not decoded:
+        try:
+            from PIL import Image
+            from pyzbar.pyzbar import decode
+
+            for item in decode(Image.open(path)):
+                data = item.data.decode("utf-8", errors="ignore")
+                if data:
+                    decoded.append(data)
+        except Exception:
+            pass
+
+    urls = []
+    for value in decoded:
+        url = _normalize_url(value)
+        if url and url not in urls:
+            urls.append(url)
+    return urls
+
+
+def _normalize_url(value):
+    value = str(value or "").strip()
+    if not value:
+        return ""
+
+    match = re.search(r"https?://[^\s<>\"]+", value, flags=re.I)
+    if match:
+        return match.group(0).rstrip(".,;)")
+
+    match = re.search(r"\b(?:www\.)?[a-z0-9][a-z0-9.-]+\.[a-z]{2,}(?:/[^\s<>\"]*)?", value, flags=re.I)
+    if match:
+        url = match.group(0).rstrip(".,;)")
+        return url if url.startswith(("http://", "https://")) else f"https://{url}"
+
+    return ""
+
+
+def _infer_or_search_website(company):
+    website = _normalize_url(company.get("website"))
+    if website:
+        return website
+
+    for email in company.get("emails") or _split_email_values(company.get("email")):
+        clean = _sanitize_email(email)
+        if not clean or "@" not in clean:
+            continue
+        domain = clean.split("@", 1)[1].lower()
+        if domain not in FREE_EMAIL_DOMAINS:
+            return f"https://{domain}"
+
+    return _search_company_website(company)
+
+
+def _search_company_website(company):
+    name = (company.get("company_name") or "").strip()
+    if not name:
+        return ""
+
+    location_bits = []
+    for address in company.get("addresses") or ([company.get("address")] if company.get("address") else []):
+        parsed = _parse_address_components(address)
+        if parsed.get("city"):
+            location_bits.append(parsed["city"])
+
+    query = " ".join([name] + location_bits + ["official website"])
+    search_url = f"https://duckduckgo.com/html/?q={quote_plus(query)}"
+    html = _fetch_html(search_url)
+    if not html:
+        return ""
+
+    candidates = []
+    for href in re.findall(r'href=["\']([^"\']+)["\']', html, flags=re.I):
+        if "uddg=" in href:
+            parsed = urlparse(href)
+            uddg = parse_qs(parsed.query).get("uddg")
+            if uddg:
+                candidates.append(unquote(uddg[0]))
+                continue
+        if href.startswith("http"):
+            candidates.append(href)
+    blocked_domains = (
+        "duckduckgo.com", "google.", "bing.com", "facebook.com", "instagram.com",
+        "linkedin.com", "youtube.com", "twitter.com", "x.com",
+    )
+    for candidate in candidates:
+        url = _normalize_url(candidate)
+        parsed = urlparse(url)
+        if not parsed.netloc:
+            continue
+        host = parsed.netloc.lower().replace("www.", "")
+        if any(blocked in host for blocked in blocked_domains):
+            continue
+        return _get_domain_root(url) or url
+
+    return ""
 
 
 # ---------------------------------------------------------------------------
@@ -1198,6 +1371,48 @@ def _merge_extracted_lead_fields(target, source):
     return target
 
 
+def _as_unique_list(value):
+    if not value:
+        return []
+
+    values = value if isinstance(value, list) else [value]
+    out = []
+    for item in values:
+        clean = str(item or "").strip()
+        if clean and clean not in out:
+            out.append(clean)
+    return out
+
+
+def _normalize_company_dict(company):
+    company = dict(company or {})
+    company["website"] = _normalize_url(company.get("website"))
+
+    emails = []
+    for email in company.get("emails") or _split_email_values(company.get("email")):
+        clean = _sanitize_email(email)
+        if clean and clean not in emails:
+            emails.append(clean)
+    company["emails"] = emails
+    company["email"] = ", ".join(emails)
+
+    phones = _sanitize_phone_list(company.get("phones") or company.get("phone"))
+    company["phones"] = phones
+    company["phone"] = ", ".join(phones)
+
+    contacts = company.get("contact_persons") or ([company.get("contact_person")] if company.get("contact_person") else [])
+    company["contact_persons"] = _as_unique_list(contacts)
+    if company["contact_persons"]:
+        company["contact_person"] = company["contact_persons"][0]
+
+    addresses = company.get("addresses") or ([company.get("address")] if company.get("address") else [])
+    company["addresses"] = _as_unique_list(addresses)
+    if company["addresses"]:
+        company["address"] = " | ".join(company["addresses"])
+
+    return company
+
+
 def _split_email_values(value):
     emails = []
     for email in re.split(r"\s*(?:,|\||;|\n)\s*", value or ""):
@@ -1340,6 +1555,15 @@ def _build_import_info(company):
     if company.get("website"):
         lines.append(f"Website : {company['website']}")
 
+    if company.get("job_title"):
+        lines.append(f"job_title : {company['job_title']}")
+
+    attachments = _as_unique_list(company.get("source_attachments") or company.get("source_attachment"))
+    if attachments:
+        lines.append("attachments :")
+        for attachment in attachments:
+            lines.append(f"  - {attachment}")
+
     # Multiple emails — agar list available hai to use karo, warna single field
     emails = company.get("emails") or ([company["email"]] if company.get("email") else [])
     if emails:
@@ -1398,14 +1622,18 @@ def _parse_json_list(text):
     try:
         result = json.loads(text)
         if isinstance(result, list):
-            return result
+            return [item for item in result if isinstance(item, dict)]
         if isinstance(result, dict):
+            if result.get("company_name") or result.get("website"):
+                return [result]
             for v in result.values():
                 if isinstance(v, list):
-                    return v
+                    return [item for item in v if isinstance(item, dict)]
     except Exception:
         pass
     return []
+
+
 def _sanitize_email(email):
     if not email:
         return ""
