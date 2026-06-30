@@ -448,6 +448,9 @@ function openStopProjectDialog(timesheet_record, percent_billable, project, task
               final_to_time = min_to_time;
             }
           }
+          
+          // Only send productivity for internal projects (when the field is visible)
+          let final_productivity = dialog.fields_dict.productivity.df.hidden ? null : values.productivity;
 
           update_and_submit_timesheet_record(
             values.timesheet_record,
@@ -456,7 +459,7 @@ function openStopProjectDialog(timesheet_record, percent_billable, project, task
             values.percent_billable,
             values.activity_type,
             values.result,
-            values.productivity
+            final_productivity
           );
           dialog.hide();
         }
