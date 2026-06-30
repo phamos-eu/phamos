@@ -1,6 +1,30 @@
+import re
+import json
 import frappe
 from frappe.website.website_generator import WebsiteGenerator
 from frappe.utils import get_datetime
+
+# Full-string match: same character set as Frappe's EMAIL_MATCH_PATTERN but anchored with ^ and $
+# so trailing garbage like a slash is rejected rather than silently ignored.
+_STRICT_EMAIL_RE = re.compile(
+    r"^[a-z0-9][a-z0-9!#$%&'*+/=?^_`{|}~-]*(?:\.[a-z0-9!#$%&'*+/=?^_`{|}~-]+)*"
+    r"@(?:[a-z0-9](?:[a-z0-9-]*[a-z0-9])?\.)+[a-z0-9](?:[a-z0-9-]*[a-z0-9])?$",
+    re.IGNORECASE,
+)
+
+
+def _clean_and_validate_email(raw_email):
+    """Return the trimmed, validated bare email address or throw."""
+    raw = (raw_email or "").strip()
+    # Frappe parses display-name formats ("Name <addr>") and returns the bare address.
+    # Returns empty string when invalid.
+    parsed = frappe.utils.validate_email_address(raw)
+    if not parsed:
+        frappe.throw(frappe._("Please enter a valid email address"))
+    cleaned = parsed.split(",")[0].strip()
+    if not _STRICT_EMAIL_RE.match(cleaned):
+        frappe.throw(frappe._("Please enter a valid email address"))
+    return cleaned
 
 
 class MarketingContent(WebsiteGenerator):
@@ -130,20 +154,25 @@ def submit_interest(event_name, response, previous_response=None):
 def subscribe_to_event(event_name, email):
     if not frappe.db.exists("Marketing Content", event_name):
         frappe.throw(frappe._("Event not found"))
-    if not frappe.utils.validate_email_address(email):
-        frappe.throw(frappe._("Please enter a valid email address"))
+    raw_email = (email or "").strip()
+    try:
+        email = _clean_and_validate_email(email)
+    except Exception:
+        return {"status": "invalid_email"}
     email_group = frappe.db.get_value("Marketing Content", event_name, "email_group")
     if not email_group:
         frappe.throw(frappe._("This event does not have an Email Group configured"))
     if frappe.db.exists("Email Group Member", {"email_group": email_group, "email": email}):
-        return {"status": "already_subscribed"}
+        return {"status": "already_subscribed", "email": email,
+                "raw_email": raw_email if raw_email != email else None}
     frappe.get_doc({
         "doctype": "Email Group Member",
         "email_group": email_group,
         "email": email,
     }).insert(ignore_permissions=True)
     frappe.db.commit()
-    return {"status": "ok"}
+    return {"status": "ok", "email": email,
+            "raw_email": raw_email if raw_email != email else None}
 
 
 @frappe.whitelist()
