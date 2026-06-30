@@ -903,6 +903,11 @@ frappe.ready(function () {
       subscribeMsg.className = "pe-subscribe-msg error";
       return;
     }
+    if (/\s/.test(email) || !/^[a-zA-Z0-9][^\s@]*@[^\s@]+\.[^\s@]{2,}$/.test(email)) {
+      subscribeMsg.textContent = "“" + email + "” does not look like a valid email address";
+      subscribeMsg.className = "pe-subscribe-msg error";
+      return;
+    }
     subscribeBtn.disabled = true;
     subscribeMsg.textContent = "Subscribing...";
     subscribeMsg.className = "pe-subscribe-msg";
@@ -912,20 +917,31 @@ frappe.ready(function () {
       callback: function (r) {
         subscribeBtn.disabled = false;
         if (r.message && r.message.status === "ok") {
-          subscribeMsg.textContent = "✓ Successfully subscribed!";
+          var okText = "✓ Subscribed with " + r.message.email;
+          if (r.message.raw_email) {
+            okText += " (corrected from " + r.message.raw_email + ")";
+          }
+          subscribeMsg.textContent = okText;
           subscribeMsg.className = "pe-subscribe-msg success";
           subscribeEmail.value = "";
         } else if (r.message && r.message.status === "already_subscribed") {
-          subscribeMsg.textContent = "You're already subscribed";
+          var alreadyText = r.message.email + " is already subscribed";
+          if (r.message.raw_email) {
+            alreadyText += " (corrected from " + r.message.raw_email + ")";
+          }
+          subscribeMsg.textContent = alreadyText;
           subscribeMsg.className = "pe-subscribe-msg";
+        } else if (r.message && r.message.status === "invalid_email") {
+          subscribeMsg.textContent = "“" + email + "” does not look like a valid email address";
+          subscribeMsg.className = "pe-subscribe-msg error";
         } else {
-          subscribeMsg.textContent = "Error: " + (r.message || "Please try again");
+          subscribeMsg.textContent = "Something went wrong. Please try again.";
           subscribeMsg.className = "pe-subscribe-msg error";
         }
       },
-      error: function (r) {
+      error: function () {
         subscribeBtn.disabled = false;
-        subscribeMsg.textContent = "Error: Please try again";
+        subscribeMsg.textContent = "Something went wrong. Please try again.";
         subscribeMsg.className = "pe-subscribe-msg error";
       }
     });
