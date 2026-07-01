@@ -130,6 +130,39 @@ def _first_address_components(addresses):
     return {}
 
 
+def _clean_address_values(values):
+    addresses = []
+    if isinstance(values, str):
+        values = re.split(r"\s*(?:\||\n)\s*", values)
+
+    for value in values or []:
+        text = str(value or "").strip()
+        if not text:
+            continue
+
+        compact_addresses = _extract_addresses_from_text(text) if len(text) > 140 else []
+        candidates = compact_addresses or [text]
+        for candidate in candidates:
+            clean = re.sub(r"\s+", " ", str(candidate or "")).strip(" ,.;")
+            if clean and clean not in addresses:
+                addresses.append(clean)
+
+    return addresses
+
+
+def _address_line_for_child(address):
+    """Return a Data-field-safe address line without surrounding legal prose."""
+    text = str(address or "").strip()
+    if not text:
+        return ""
+
+    extracted = _extract_addresses_from_text(text)
+    if extracted:
+        text = extracted[0]
+
+    return _truncate(text)
+
+
 def _normalize_country(value):
     raw = str(value or "").strip()
     clean = re.sub(r"[^A-Za-zÀ-ÖØ-öø-ÿ]", "", raw).lower()
@@ -187,7 +220,9 @@ def _populate_lead_data_child_tables(lead_data_doc, company, extracted=None):
 
     emails = extracted.get("emails") or ([company["email"]] if company.get("email") else [])
     phones = _sanitize_phone_list(extracted.get("phones") or company.get("phone"))
-    addresses = extracted.get("addresses") or ([company["address"]] if company.get("address") else [])
+    addresses = _clean_address_values(
+        extracted.get("addresses") or ([company["address"]] if company.get("address") else [])
+    )
 
     clean_emails = []
     for e in emails:
@@ -199,8 +234,8 @@ def _populate_lead_data_child_tables(lead_data_doc, company, extracted=None):
         for idx, addr in enumerate(addresses):
             address_parts = _parse_address_components(addr)
             lead_data_doc.append("lead_data_address", {
-                "address_title": company.get("company_name"),
-                "address_line_1": _truncate(addr, max_len=1000),
+                "address_title": _truncate(company.get("company_name")),
+                "address_line_1": _address_line_for_child(addr),
                 "citytown": _truncate(address_parts.get("city")),
                 "stateprovince": _truncate(address_parts.get("state")),
                 "country": _truncate(address_parts.get("country")),
@@ -210,7 +245,7 @@ def _populate_lead_data_child_tables(lead_data_doc, company, extracted=None):
             })
     elif clean_emails or phones:
         lead_data_doc.append("lead_data_address", {
-            "address_title": company.get("company_name"),
+            "address_title": _truncate(company.get("company_name")),
             "email_address": _truncate(clean_emails[0]) if clean_emails else "",
             "phone": _truncate(phones[0]) if phones else "",
         })
@@ -237,8 +272,8 @@ def _populate_lead_data_child_tables(lead_data_doc, company, extracted=None):
     lead_data_doc.job_title = _truncate(company.get("job_title"))
     lead_data_doc.organization_name = _truncate(company.get("company_name"))
     lead_data_doc.website = _truncate(main_site)
-    lead_data_doc.email = _format_email_field(", ".join(clean_emails)) if clean_emails else ""
-    lead_data_doc.phone = _truncate(", ".join(phones)) if phones else ""
+    lead_data_doc.email = _truncate(clean_emails[0]) if clean_emails else ""
+    lead_data_doc.phone = _truncate(phones[0]) if phones else ""
     primary_address = _first_address_components(addresses)
     lead_data_doc.city = _truncate(primary_address.get("city"))
     lead_data_doc.stateprovince = _truncate(primary_address.get("state"))
@@ -288,6 +323,10 @@ def _run_extraction(lead_import_name):
             _finish(lead_import_name, "Error: Unknown input type.")
             return
 
+        if not companies and input_type == "URL":
+            _log(lead_import_name, "No companies detected. Treating source URL as one company website.")
+            companies = [_company_from_website_html(None, doc.source_url)]
+
         if not companies:
             _finish(lead_import_name, "No companies found. Check the URL or file and try again.")
             return
@@ -327,7 +366,7 @@ def _run_extraction(lead_import_name):
     except Exception:
         tb = frappe.get_traceback()
         frappe.log_error(title=_("Lead Import extraction failed"), message=tb)
-        _finish(lead_import_name, "Error during extraction. Check Error Log for details.")
+        _finish(lead_import_name, _format_error_for_status("Error during extraction.", tb))
 
 
 # Pipeline: URL
@@ -339,8 +378,8 @@ def _pipeline_url(lead_import_name, url):
     _log(lead_import_name, f"Scraping: {url}")
     html = _fetch_html(url)
     if not html:
-        _log(lead_import_name, "Could not fetch the page. Check the URL.")
-        return []
+        _log(lead_import_name, "Could not fetch the page HTML. Treating URL as one company website.")
+        return [_company_from_website_html(None, url)]
 
     companies = _extract_companies_from_partner_html(html, url, ai_fallback=False)
 
@@ -421,7 +460,7 @@ def _extract_companies_from_partner_html(html, page_url, ai_fallback=True):
             if key and key not in {c.get("company_name", "").lower() for c in companies}:
                 companies.append(company)
 
-    return companies
+    return _filter_company_candidates(companies, page_url)
 
 
 def _extract_companies_from_links_and_logos(html, page_url):
@@ -473,10 +512,35 @@ def _should_treat_as_directory(html, companies):
     if not companies:
         return False
 
-    if len(companies) >= 2:
-        return True
-
     return _has_directory_page_signals(html)
+
+
+def _filter_company_candidates(companies, page_url=None):
+    filtered = []
+    seen = set()
+
+    for company in companies or []:
+        website = _normalize_url(company.get("website"))
+        domain = _normalized_domain(website)
+        name = _clean_company_candidate_text(company.get("company_name"))
+        if domain and _is_noise_domain(domain):
+            continue
+        if name and not _is_probable_company_name(name):
+            continue
+        if not website and not name:
+            continue
+
+        key = domain or name.lower()
+        if key in seen:
+            continue
+        seen.add(key)
+
+        clean_company = dict(company)
+        clean_company["company_name"] = name or _domain_to_company_name(website)
+        clean_company["website"] = (_get_domain_root(website) or website) if website else ""
+        filtered.append(clean_company)
+
+    return filtered
 
 
 def _has_directory_page_signals(html):
@@ -592,6 +656,8 @@ def _is_probable_company_name(value):
         "logo", "image", "bild", "partner", "sponsor", "shop",
         "handler", "haendler", "händler", "handler shop", "haendler shop",
         "händler shop", "dealer shop", "online shop", "store", "portal",
+        "whatsapp", "link zu whatsapp", "review", "reviews", "bewertung",
+        "bewertungen",
     )
     return not any(item == lowered or item in lowered for item in noise)
 
@@ -624,6 +690,8 @@ def _is_noise_domain(domain):
         "facebook.com", "instagram.com", "linkedin.com", "youtube.com",
         "youtu.be", "twitter.com", "x.com", "tiktok.com", "eventbrite.",
         "pretix.", "google.", "maps.google.", "apple.com", "microsoft.com",
+        "whatsapp.com", "wa.me", "ekomi.", "trustpilot.", "trustedshops.",
+        "paypal.", "klarna.",
     )
     return any(noise in domain for noise in noise_domains)
 
@@ -742,9 +810,14 @@ def _enrich_and_save_companies(lead_import_name, companies, ai_fallback=False):
                 try:
                     enriched = future.result()
                 except Exception:
+                    tb = frappe.get_traceback()
                     frappe.log_error(
                         title=_("Lead Import company enrichment failed"),
-                        message=frappe.get_traceback(),
+                        message=tb,
+                    )
+                    _log(
+                        lead_import_name,
+                        _format_error_for_status(f"[{idx}/{total}] {name} enrichment error.", tb),
                     )
                     enriched = company
 
@@ -903,7 +976,7 @@ Page text:
 {clean}
 ---"""
 
-    return _call_mistral_json_list(settings, prompt)
+    return _filter_company_candidates(_call_mistral_json_list(settings, prompt), page_url)
 
 
 def _mistral_extract_companies_from_image(image_b64, mime, qr_urls=None):
@@ -1045,11 +1118,12 @@ def _mistral_extract_lead_fields(settings, text, company_name):
         contacts = [c for c in result.get("contact_persons", []) if c]
         addresses = [a for a in result.get("addresses", []) if a]
 
-        result["email"] = ", ".join(_sanitize_email(e) for e in emails if _sanitize_email(e))
+        clean_emails = [_sanitize_email(e) for e in emails if _sanitize_email(e)]
+        result["email"] = clean_emails[0] if clean_emails else ""
         result["phones"] = phones
-        result["phone"] = ", ".join(phones)
-        result["contact_person"] = ", ".join(contacts)
-        result["address"] = " | ".join(addresses)
+        result["phone"] = phones[0] if phones else ""
+        result["contact_person"] = contacts[0] if contacts else ""
+        result["address"] = addresses[0] if addresses else ""
 
         return result
     except Exception:
@@ -1241,13 +1315,13 @@ def _extract_contact_fields_from_html(html):
     out = {}
     if emails:
         out["emails"] = emails
-        out["email"] = ", ".join(emails)
+        out["email"] = emails[0]
     if phones:
         out["phones"] = phones
-        out["phone"] = ", ".join(phones)
+        out["phone"] = phones[0]
     if addresses:
         out["addresses"] = addresses
-        out["address"] = " | ".join(addresses)
+        out["address"] = addresses[0]
     return out
 
 
@@ -1261,13 +1335,14 @@ def _extract_addresses_from_text(text):
     )
     pattern = (
         rf"\b([A-ZÄÖÜ][A-Za-zÀ-ÖØ-öø-ÿ0-9 .'\-]+?{street_words}\s+"
-        rf"\d+[A-Za-z]?(?:\s*[-/]\s*\d+[A-Za-z]?)?)\s+"
+        rf"\d+[A-Za-z]?(?:\s*[-/]\s*\d+[A-Za-z]?)?)\s*,?\s+"
         rf"((?:[A-Z]{1,3}-)?\d{{4,6}}\s+[A-ZÄÖÜ][A-Za-zÀ-ÖØ-öø-ÿ .'\-]+)"
     )
 
     addresses = []
     for match in re.finditer(pattern, text, flags=re.I):
         street = re.sub(r"\s+", " ", match.group(1)).strip(" ,.;")
+        street = re.split(r"[.;]\s+", street)[-1].strip(" ,.;")
         city = re.sub(r"\s+", " ", match.group(2)).strip(" ,.;")
         city = re.split(
             r"\s+(?:tel|telefon|phone|fax|e-?mail|mail|kontakt|contact|"
@@ -1527,11 +1602,6 @@ def _search_company_website(company):
 
     return ""
 
-
-# ---------------------------------------------------------------------------
-# Child table + logging helpers
-# ---------------------------------------------------------------------------
-
 def _has_desired_lead_data(data):
     """Email is the primary signal that enrichment succeeded."""
     if not data:
@@ -1715,11 +1785,11 @@ def _normalize_company_dict(company):
         if clean and clean not in emails:
             emails.append(clean)
     company["emails"] = emails
-    company["email"] = ", ".join(emails)
+    company["email"] = emails[0] if emails else ""
 
     phones = _sanitize_phone_list(company.get("phones") or company.get("phone"))
     company["phones"] = phones
-    company["phone"] = ", ".join(phones)
+    company["phone"] = phones[0] if phones else ""
 
     contacts = company.get("contact_persons") or ([company.get("contact_person")] if company.get("contact_person") else [])
     company["contact_persons"] = _as_unique_list(contacts)
@@ -1727,9 +1797,9 @@ def _normalize_company_dict(company):
         company["contact_person"] = company["contact_persons"][0]
 
     addresses = company.get("addresses") or ([company.get("address")] if company.get("address") else [])
-    company["addresses"] = _as_unique_list(addresses)
+    company["addresses"] = _clean_address_values(addresses)
     if company["addresses"]:
-        company["address"] = " | ".join(company["addresses"])
+        company["address"] = company["addresses"][0]
 
     return company
 
@@ -1789,13 +1859,13 @@ def _lead_data_doc_to_company(lead_data_doc):
 
     if emails:
         company["emails"] = emails
-        company["email"] = ", ".join(emails)
+        company["email"] = emails[0]
     if phones:
         company["phones"] = phones
-        company["phone"] = ", ".join(phones)
+        company["phone"] = phones[0]
     if addresses:
         company["addresses"] = addresses
-        company["address"] = " | ".join(addresses)
+        company["address"] = addresses[0]
     if contacts:
         company["contact_persons"] = contacts
         company["contact_person"] = contacts[0]
@@ -1867,7 +1937,6 @@ def _first_value(value, sep=","):
 
 
 def _build_import_info(company):
-    """Build a compact summary string for the lead_import_info field — including all found values."""
     lines = []
 
     if company.get("company_name"):
@@ -1925,10 +1994,24 @@ def _log(lead_import_name, message):
     frappe.db.commit()
 
 
+def _format_error_for_status(message, traceback_text=None, max_len=6000):
+    details = str(traceback_text or "").strip()
+    if not details:
+        return message
+
+    if len(details) > max_len:
+        details = "...\n" + details[-max_len:]
+
+    return f"{message}\n\nDetails:\n{details}"
+
+
 def _finish(lead_import_name, message):
+    doc = frappe.get_doc("Lead Import", lead_import_name)
+    existing = (doc.status_log or "").strip()
+    status_log = f"{existing}\n{message}".strip() if existing else message
     frappe.db.set_value("Lead Import", lead_import_name, {
         "status": "Ready",
-        "status_log": message,
+        "status_log": status_log,
     })
     frappe.db.commit()
 
@@ -2131,8 +2214,12 @@ def _run_re_enrichment(lead_import_name, incomplete_rows):
                 try:
                     row_name, company, extracted = future.result()
                 except Exception:
-                    frappe.log_error(title=_("Lead Import re-enrichment row failed"), message=frappe.get_traceback())
-                    _log(lead_import_name, f"[{idx}/{total}] [{name}] Error")
+                    tb = frappe.get_traceback()
+                    frappe.log_error(title=_("Lead Import re-enrichment row failed"), message=tb)
+                    _log(
+                        lead_import_name,
+                        _format_error_for_status(f"[{idx}/{total}] [{name}] Error", tb),
+                    )
                     continue
 
                 if not extracted:
@@ -2155,15 +2242,14 @@ def _run_re_enrichment(lead_import_name, incomplete_rows):
     except Exception:
         tb = frappe.get_traceback()
         frappe.log_error(title=_("Lead Import re-enrichment failed"), message=tb)
-        _finish(lead_import_name, "Error during re-enrichment. Check Error Log.")
+        _finish(lead_import_name, _format_error_for_status("Error during re-enrichment.", tb))
 
     except Exception:
         tb = frappe.get_traceback()
         frappe.log_error(title=_("Lead Import re-enrichment failed"), message=tb)
-        _finish(lead_import_name, "Error during re-enrichment. Check Error Log.")
+        _finish(lead_import_name, _format_error_for_status("Error during re-enrichment.", tb))
 
 def _discover_internal_links(base_url, html, limit=8):
-    """Same-domain links nikaalo jab koi slug data na de — fallback crawl ke liye."""
     if not html:
         return []
 
@@ -2211,7 +2297,6 @@ def _discover_internal_links(base_url, html, limit=8):
             break
 
     return result
-
 
 def _discover_legal_links(base_url, html, limit=6):
     if not html:
