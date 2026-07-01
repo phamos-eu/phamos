@@ -9,7 +9,6 @@
   "item_code",
   "description",
   "qty",
-  "rate",
   "amount"
  ],
  "fields": [
@@ -37,18 +36,12 @@
    "reqd": 1
   },
   {
-   "fieldname": "rate",
-   "fieldtype": "Currency",
-   "in_list_view": 1,
-   "label": "Rate",
-   "reqd": 1
-  },
-  {
    "fieldname": "amount",
    "fieldtype": "Currency",
    "in_list_view": 1,
    "label": "Amount",
-   "read_only": 1
+    "options": "currency",
+    "reqd": 1
   }
  ],
  "grid_page_length": 50,
