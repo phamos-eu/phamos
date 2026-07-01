@@ -7,15 +7,18 @@ const props = defineProps({
 const emit = defineEmits(["confirm", "skip", "close"]);
 
 const project = ref("");
+const projectLabel = ref("");
+const projectResults = ref([]);
+const showDropdown = ref(false);
 const goal = ref("");
 const result = ref("");
 const percentBillable = ref(0);
 const activityType = ref("");
-const projects = ref([]);
 const goalRef = ref(null);
 const liveNow = ref(new Date());
 
 let liveInterval = null;
+let searchTimer = null;
 
 const ACTIVITY_TYPES = ["Working Alone", "Working with Customer", "Working With Team"];
 
@@ -30,14 +33,42 @@ const billableOptions = [
 onMounted(async () => {
   goalRef.value?.focus();
   liveInterval = setInterval(() => { liveNow.value = new Date(); }, 1000);
-  const r = await frappe.call({
-    method: "frappe.client.get_list",
-    args: { doctype: "Project", filters: [["status", "=", "Open"]], fields: ["name", "project_name"], limit: 200 },
-  });
-  projects.value = r.message || [];
+  await fetchProjects("");
 });
 
-onUnmounted(() => { clearInterval(liveInterval); });
+onUnmounted(() => { clearInterval(liveInterval); clearTimeout(searchTimer); });
+
+async function fetchProjects(term) {
+  const filters = [["status", "=", "Open"]];
+  if (term) filters.push(["project_name", "like", `%${term}%`]);
+  const r = await frappe.call({
+    method: "frappe.client.get_list",
+    args: { doctype: "Project", filters, fields: ["name", "project_name"], limit: 50, order_by: "project_name asc" },
+  });
+  projectResults.value = r.message || [];
+}
+
+function onSearchInput() {
+  project.value = "";
+  showDropdown.value = true;
+  clearTimeout(searchTimer);
+  searchTimer = setTimeout(() => fetchProjects(projectLabel.value), 300);
+}
+
+function onSearchFocus() {
+  showDropdown.value = true;
+  if (!projectResults.value.length) fetchProjects(projectLabel.value);
+}
+
+function onSearchBlur() {
+  setTimeout(() => { showDropdown.value = false; }, 150);
+}
+
+function selectProject(p) {
+  project.value = p.name;
+  projectLabel.value = p.project_name || p.name;
+  showDropdown.value = false;
+}
 
 const breakDuration = computed(() => {
   liveNow.value; // reactive trigger — re-runs every second
@@ -119,12 +150,30 @@ function onKey(e) {
           <div class="mo__field mo__field--half">
             <label class="mo__label">Project <span class="mo__req">*</span></label>
             <p class="mo__hint">Which project was this break for?</p>
-            <select v-model="project" class="mo__select">
-              <option value="">— Select project —</option>
-              <option v-for="p in projects" :key="p.name" :value="p.name">
-                {{ p.project_name || p.name }}
-              </option>
-            </select>
+            <div class="mo__search-wrap">
+              <input
+                v-model="projectLabel"
+                class="mo__search-input"
+                placeholder="Search project..."
+                autocomplete="off"
+                @input="onSearchInput"
+                @focus="onSearchFocus"
+                @blur="onSearchBlur"
+              />
+              <ul v-if="showDropdown && projectResults.length" class="mo__dropdown">
+                <li
+                  v-for="p in projectResults"
+                  :key="p.name"
+                  class="mo__dropdown-item"
+                  @mousedown.prevent="selectProject(p)"
+                >
+                  {{ p.project_name || p.name }}
+                </li>
+              </ul>
+              <div v-else-if="showDropdown && projectLabel" class="mo__dropdown mo__dropdown--empty">
+                No projects found
+              </div>
+            </div>
           </div>
 
           <div class="mo__field mo__field--half">
@@ -244,6 +293,30 @@ function onKey(e) {
 .mo__label { font-size: 13px; font-weight: 600; color: var(--text-color); }
 .mo__req { color: var(--red-500, #ef4444); margin-left: 2px; }
 .mo__hint { font-size: 12px; color: var(--text-muted); margin: 0; }
+
+.mo__search-wrap { position: relative; }
+.mo__search-input {
+  width: 100%; padding: 8px 12px;
+  border: 1px solid var(--border-color); border-radius: 7px;
+  background: var(--card-bg); color: var(--text-color);
+  font-size: 13.5px; font-family: inherit;
+  transition: border-color 0.15s, box-shadow 0.15s;
+  box-sizing: border-box;
+}
+.mo__search-input:focus { outline: none; border-color: var(--primary); box-shadow: 0 0 0 3px rgba(37,99,235,0.1); }
+.mo__dropdown {
+  position: absolute; top: calc(100% + 4px); left: 0; right: 0;
+  background: var(--card-bg); border: 1px solid var(--border-color);
+  border-radius: 7px; max-height: 200px; overflow-y: auto;
+  z-index: 10; box-shadow: 0 4px 12px rgba(0,0,0,0.12);
+  list-style: none; margin: 0; padding: 4px 0;
+}
+.mo__dropdown-item {
+  padding: 8px 12px; font-size: 13px; cursor: pointer; color: var(--text-color);
+}
+.mo__dropdown-item:hover { background: var(--control-bg); }
+.mo__dropdown--empty { padding: 8px 12px; font-size: 13px; color: var(--text-muted); }
+
 .mo__select {
   width: 100%; padding: 8px 12px;
   border: 1px solid var(--border-color); border-radius: 7px;
