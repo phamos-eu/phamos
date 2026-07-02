@@ -387,10 +387,14 @@ def generate_and_send_weekly_report(implementation_name, from_date=None, to_date
 @frappe.whitelist()
 def send_weekly_reports_for_all_implementations(from_date=None, to_date=None):
     """
-    Scheduled entrypoint (see hooks.py "cron" — Monday mornings) and manual test button
-    (GitLab Settings). Generates & sends the weekly customer report for every Implementation
-    that has at least one stakeholder opted in via 'Weekly Report'. Each implementation is
-    isolated so one failure (missing prompt settings, GitLab API error, etc.) doesn't block the rest.
+    Scheduled entrypoint — see hooks.py "cron" (Monday mornings). Runs inside a worker
+    process already, so it's safe to call directly here. For UI-triggered manual testing,
+    use send_weekly_reports_for_all_implementations_background instead, which queues this
+    so the request doesn't block on however many implementations there are.
+
+    Generates & sends the weekly customer report for every Implementation that has at
+    least one stakeholder opted in via 'Weekly Report'. Each implementation is isolated
+    so one failure (missing prompt settings, GitLab API error, etc.) doesn't block the rest.
     """
     implementation_names = frappe.db.sql_list(
         """
@@ -412,3 +416,22 @@ def send_weekly_reports_for_all_implementations(from_date=None, to_date=None):
             results["failed"].append(implementation_name)
 
     return results
+
+
+@frappe.whitelist()
+def send_weekly_reports_for_all_implementations_background(from_date=None, to_date=None):
+    """UI-triggered async wrapper — generating+sending a report per implementation
+    (GitLab sync, Mistral call, email) can take long enough to exceed a web request's
+    timeout once there are more than a handful of implementations, so run it on the long queue."""
+    frappe.enqueue(
+        method="phamos.gitlab_integration.generate_weekly_report.send_weekly_reports_for_all_implementations",
+        queue="long",
+        timeout=60 * 60,
+        is_async=True,
+        from_date=from_date,
+        to_date=to_date,
+    )
+    return {
+        "status": "queued",
+        "message": "Weekly customer reports queued as background job",
+    }
