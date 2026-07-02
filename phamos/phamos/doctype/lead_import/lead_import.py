@@ -702,7 +702,7 @@ def _pipeline_screenshot(lead_import_name, file_url):
     if not file_url:
         frappe.throw(_("Please upload a screenshot file."))
 
-    _log(lead_import_name, "Reading screenshot/business card via Mistral vision...")
+    _log(lead_import_name, "Reading screenshot/business card/webpage via Mistral vision...")
     image_b64, mime = _load_file_as_base64(file_url)
     if not image_b64:
         _log(lead_import_name, "Could not read uploaded file.")
@@ -713,11 +713,18 @@ def _pipeline_screenshot(lead_import_name, file_url):
         _log(lead_import_name, f"QR website found: {qr_urls[0]}")
 
     companies = _mistral_extract_companies_from_image(image_b64, mime, qr_urls=qr_urls)
+    if not companies:
+        _log(lead_import_name, "No direct lead found. Trying partner/logo extraction from screenshot...")
+        companies = _mistral_extract_logo_companies_from_image(image_b64, mime)
+
+    is_logo_list = any(company.get("source_type") == "logo_list" for company in companies)
     for company in companies:
-        if not company.get("website") and qr_urls:
+        if not company.get("website") and qr_urls and not is_logo_list:
             company["website"] = qr_urls[0]
         if not company.get("website"):
             company["website"] = _infer_or_search_website(company)
+        if not company.get("company_name") and company.get("website"):
+            company["company_name"] = _domain_to_company_name(company["website"])
         company["source_attachment"] = file_url
 
     _log(lead_import_name, f"Mistral identified {len(companies)} lead(s) in the screenshot.")
@@ -989,26 +996,45 @@ def _mistral_extract_companies_from_image(image_b64, mime, qr_urls=None):
         model = MISTRAL_CHAT_MODEL_DEFAULT
 
     qr_hint = "\n".join(qr_urls or [])
-    prompt = f"""You are analyzing a screenshot. It may be a single business card, or it may be a company directory/partner listing page.
+    prompt = f"""You are analyzing a screenshot. It may be:
+- a single business card,
+- a company directory/partner listing page,
+- a partner/supporter/sponsor logo section,
+- or a single company website page such as Impressum, Imprint, Legal, Contact, or Customer Service.
 
 If it is a business card, return exactly ONE object for the card.
 If it is a directory/listing screenshot, return one object per visible company.
+If it is a partner/supporter/sponsor logo section, return one object per readable logo/company name; use an empty website if no company website is visible.
+If it is a single company website page, return exactly ONE object for the company whose details are shown.
 
-Extract only details visible in the image, plus QR URL hints provided below.
-Use a QR URL as website when it is present.
+Extract all visible lead details from the image, plus QR URL hints provided below.
+Use the visible browser address bar URL as website only for a single company website page, not for every company in a logo/partner list. Use a QR URL as website when it belongs to the same single lead.
+For Impressum/Imprint/Legal/Contact pages, extract the registered company name, email, telephone, and postal address shown in the page body.
+Do not create separate companies from navigation links, review links, social links, shopping links, or payment/vendor links.
+Ignore fax numbers unless no telephone number is visible.
 
 Return ONLY a valid JSON array, no explanation, no markdown.
 Format:
 [
   {{
-    "company_name": "Radio Neckaralb Live GmbH & Co. KG",
-    "website": "https://example.com",
-    "emails": ["name@example.com"],
-    "phones": ["+49 7121 9458900"],
-    "contact_persons": ["Bianca Rösch"],
-    "addresses": ["Obere Wässere 6-8, 72764 Reutlingen"],
-    "job_title": "Mediaberaterin",
-    "source_type": "business_card"
+    "company_name": "Trigema W. Grupp KG",
+    "website": "https://www.trigema.de/en/customer-service/legal/imprint/",
+    "emails": ["bestellservice@trigema.de"],
+    "phones": ["+49 (0) 7475/88 - 0"],
+    "contact_persons": [],
+    "addresses": ["Josef-Mayer-Str. 31-35, D-72393 Burladingen", "Postfach 100, D-72393 Burladingen"],
+    "job_title": "",
+    "source_type": "website_screenshot"
+  }},
+  {{
+    "company_name": "Sparkasse Zollernalb",
+    "website": "",
+    "emails": [],
+    "phones": [],
+    "contact_persons": [],
+    "addresses": [],
+    "job_title": "",
+    "source_type": "logo_list"
   }}
 ]
 
@@ -1049,6 +1075,66 @@ QR URL hints:
         for company in companies
         if company.get("company_name") or company.get("website")
     ]
+
+
+def _mistral_extract_logo_companies_from_image(image_b64, mime):
+    settings = _get_phamos_settings()
+    if not settings:
+        frappe.throw(_("Mistral API key is not configured."))
+
+    model = settings["model"]
+    if "ocr" in model.lower():
+        model = MISTRAL_CHAT_MODEL_DEFAULT
+
+    prompt = """You are analyzing a screenshot that may show partner, supporter, sponsor, member, or logo lists.
+
+Extract every visible organization/company name from logos or nearby labels.
+Return organizations even when no website is visible. In that case use an empty website string.
+If a website URL is visibly printed inside a logo or nearby text, include it.
+Ignore page headings, body paragraphs, browser UI text, buttons, navigation, and generic funding labels unless they are clearly an organization logo/name.
+Do not invent hidden names. Use the readable logo text only.
+
+Return ONLY a valid JSON array, no explanation, no markdown.
+Format:
+[
+  {"company_name": "Hochschule Albstadt-Sigmaringen", "website": "", "source_type": "logo_list"},
+  {"company_name": "Sparkasse Zollernalb", "website": "", "source_type": "logo_list"}
+]
+"""
+
+    url = f"{settings['base_url'].rstrip('/')}/chat/completions"
+    headers = {
+        "Authorization": f"Bearer {settings['api_key']}",
+        "Content-Type": "application/json",
+    }
+    payload = {
+        "model": model,
+        "messages": [
+            {
+                "role": "user",
+                "content": [
+                    {"type": "image_url", "image_url": f"data:{mime};base64,{image_b64}"},
+                    {"type": "text", "text": prompt},
+                ],
+            }
+        ],
+    }
+    resp = requests.post(url, json=payload, headers=headers, timeout=60)
+    if not resp.ok:
+        frappe.log_error(title=_("Lead Import: Mistral logo vision failed"), message=resp.text[:500])
+        return []
+
+    content = (resp.json().get("choices") or [{}])[0].get("message", {}).get("content", "[]")
+    companies = _parse_json_list(content)
+    normalized = []
+    for company in companies:
+        clean = _normalize_company_dict(company)
+        if not clean.get("company_name") and not clean.get("website"):
+            continue
+        clean["source_type"] = "logo_list"
+        normalized.append(clean)
+
+    return normalized
 
 
 def _mistral_extract_companies_from_text(text):
