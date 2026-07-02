@@ -191,7 +191,9 @@ def _run_mis_creation_for_period(sched_year_str, sched_month_name):
 	"""
 	implementations = frappe.get_all(
 		"Implementation",
-		filters={"status": ["not in", ["Completed", "Cancelled"]]},
+		filters={
+		   "status": ["not in", ["Completed", "Cancelled"]],
+		   "customer": ["!=", "Knd-0000"],},
 		fields=["name"],
 	)
 
