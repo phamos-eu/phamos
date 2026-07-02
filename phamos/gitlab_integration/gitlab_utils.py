@@ -1122,5 +1122,26 @@ def backfill_issue_comments(project_name=None):
 
                 page += 1
 
-    frappe.db.commit()
+            # Commit after each issue rather than only at the very end, so a
+            # timeout/kill on a large backfill only loses the current issue's
+            # progress instead of the whole run.
+            frappe.db.commit()
+
     return f"{synced} comments synced"
+
+
+@frappe.whitelist()
+def backfill_issue_comments_background(project_name=None):
+    """UI-triggered async wrapper — backfilling all projects/issues can take
+    long enough to exceed a web request's timeout, so run it on the long queue."""
+    frappe.enqueue(
+        method="phamos.gitlab_integration.gitlab_utils.backfill_issue_comments",
+        queue="long",
+        timeout=60 * 60,
+        is_async=True,
+        project_name=project_name,
+    )
+    return {
+        "status": "queued",
+        "message": "Issue comment backfill queued as background job",
+    }
