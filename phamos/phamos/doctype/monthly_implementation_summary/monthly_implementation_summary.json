@@ -20,6 +20,7 @@
   "section_break_xunv",
   "delivery_note_details",
   "delivery_note_item",
+  "notes",
   "section_break_gn1x",
   "sales_order_status_information",
   "financial_history_section",
@@ -193,12 +194,17 @@
    "fieldtype": "Table",
    "label": "Sales Order Status Information",
    "options": "Sales Order Status"
+  },
+  {
+   "fieldname": "notes",
+   "fieldtype": "Text Editor",
+   "label": "Notes"
   }
  ],
  "index_web_pages_for_search": 1,
  "is_submittable": 1,
  "links": [],
- "modified": "2026-04-08 10:27:44.411631",
+ "modified": "2026-07-02 07:19:55.527163",
  "modified_by": "Administrator",
  "module": "Phamos",
  "name": "Monthly Implementation Summary",
