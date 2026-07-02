@@ -71,6 +71,8 @@
   "user_with_permission",
   "auto_email_report_record",
   "generate_auto_email",
+  "stakeholders_tab",
+  "stakeholders",
   "gitlab_tab",
   "gitlab_projects_html",
   "column_break_amyu",
@@ -379,6 +381,17 @@
    "fieldname": "generate_auto_email",
    "fieldtype": "Button",
    "label": "Generate Auto Email"
+  },
+  {
+   "fieldname": "stakeholders_tab",
+   "fieldtype": "Tab Break",
+   "label": "Stakeholder Management"
+  },
+  {
+   "fieldname": "stakeholders",
+   "fieldtype": "Table",
+   "label": "Stakeholders",
+   "options": "Implementation Stakeholder"
   },
   {
    "fieldname": "gitlab_tab",

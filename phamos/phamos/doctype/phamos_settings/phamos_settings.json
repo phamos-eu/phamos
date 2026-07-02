@@ -31,6 +31,7 @@
   "column_break_de",
   "mistral_model",
   "mistral_base_url",
+  "weekly_report_mistral_model",
   "timesheet_settings_section",
   "allowed_additional_work_time",
   "monthly_implementation_summary_tab",
@@ -196,6 +197,13 @@
    "fieldname": "mistral_base_url",
    "fieldtype": "Data",
    "label": "Base URL (optional)"
+  },
+  {
+   "default": "mistral-small-latest",
+   "description": "Chat-completions model used to generate the customer weekly report. Kept separate from 'Model' above, which is used for OCR receipt extraction and is not chat-completions capable.",
+   "fieldname": "weekly_report_mistral_model",
+   "fieldtype": "Data",
+   "label": "Weekly Report Model"
   },
   {
    "fieldname": "monthly_implementation_summary_tab",
