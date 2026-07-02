@@ -563,6 +563,12 @@ def escalate_implementation(implementation_name, reason):
 
 
 @frappe.whitelist()
+def generate_weekly_customer_report(implementation_name, from_date=None, to_date=None):
+    from phamos.gitlab_integration.generate_weekly_report import generate_and_send_weekly_report
+    return generate_and_send_weekly_report(implementation_name, from_date=from_date, to_date=to_date)
+
+
+@frappe.whitelist()
 def get_auto_email_reports_for_users(user_list):
     if isinstance(user_list, str):
         user_list = [user_list]

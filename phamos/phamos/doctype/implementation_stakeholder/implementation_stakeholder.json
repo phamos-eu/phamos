@@ -1,0 +1,100 @@
+{
+ "actions": [],
+ "creation": "2025-07-01 00:00:00.000000",
+ "doctype": "DocType",
+ "editable_grid": 1,
+ "engine": "InnoDB",
+ "field_order": [
+  "contact",
+  "full_name",
+  "email",
+  "stakeholder_organisation",
+  "stakeholder_type",
+  "stakeholder_position",
+  "receive_timesheet_report",
+  "receive_weekly_customer_report",
+  "comments"
+ ],
+ "fields": [
+  {
+   "columns": 2,
+   "fieldname": "contact",
+   "fieldtype": "Link",
+   "in_list_view": 1,
+   "label": "Contact",
+   "options": "Contact"
+  },
+  {
+   "columns": 2,
+   "fetch_from": "contact.full_name",
+   "fieldname": "full_name",
+   "fieldtype": "Data",
+   "in_list_view": 1,
+   "label": "Full Name",
+   "read_only": 1
+  },
+  {
+   "columns": 2,
+   "fetch_from": "contact.email_id",
+   "fieldname": "email",
+   "fieldtype": "Data",
+   "in_list_view": 1,
+   "label": "Email",
+   "options": "Email",
+   "reqd": 1
+  },
+  {
+   "columns": 2,
+   "fieldname": "stakeholder_organisation",
+   "fieldtype": "Select",
+   "in_list_view": 1,
+   "label": "Stakeholder Organisation",
+   "options": "Internal\nCustomer\nThird Party"
+  },
+  {
+   "columns": 2,
+   "fieldname": "stakeholder_type",
+   "fieldtype": "Select",
+   "in_list_view": 1,
+   "label": "Stakeholder Type",
+   "options": "Project Manager\nTeam Member\nSponsor\nSupplier\nEnd User"
+  },
+  {
+   "fieldname": "stakeholder_position",
+   "fieldtype": "Data",
+   "label": "Stakeholder Position"
+  },
+  {
+   "columns": 1,
+   "default": "0",
+   "fieldname": "receive_timesheet_report",
+   "fieldtype": "Check",
+   "in_list_view": 1,
+   "label": "Timesheet Report"
+  },
+  {
+   "columns": 1,
+   "default": "0",
+   "fieldname": "receive_weekly_customer_report",
+   "fieldtype": "Check",
+   "in_list_view": 1,
+   "label": "Weekly Report"
+  },
+  {
+   "fieldname": "comments",
+   "fieldtype": "Small Text",
+   "label": "Comments"
+  }
+ ],
+ "istable": 1,
+ "links": [],
+ "modified": "2025-07-01 00:00:00.000000",
+ "modified_by": "Administrator",
+ "module": "Phamos",
+ "name": "Implementation Stakeholder",
+ "owner": "Administrator",
+ "permissions": [],
+ "sort_field": "modified",
+ "sort_order": "DESC",
+ "states": []
+}

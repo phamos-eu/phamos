@@ -394,6 +394,57 @@ frappe.ui.form.on("Implementation", {
             d.show();
         });
 
+        frm.add_custom_button(__('Generate Weekly Report'), function () {
+            const today = frappe.datetime.get_today();
+            const weekStart = frappe.datetime.week_start();
+            const weekEnd = frappe.datetime.add_days(weekStart, 6);
+
+            let d = new frappe.ui.Dialog({
+                title: __('Generate Weekly Customer Report'),
+                fields: [
+                    {
+                        label: __('From Date'),
+                        fieldname: 'from_date',
+                        fieldtype: 'Date',
+                        default: weekStart,
+                        reqd: 1
+                    },
+                    {
+                        label: __('To Date'),
+                        fieldname: 'to_date',
+                        fieldtype: 'Date',
+                        default: weekEnd,
+                        reqd: 1
+                    }
+                ],
+                primary_action_label: __('Generate & Send'),
+                primary_action(values) {
+                    d.hide();
+                    frappe.show_alert({ message: __('Generating report, please wait…'), indicator: 'blue' });
+                    frappe.call({
+                        method: 'phamos.phamos.doctype.implementation.implementation.generate_weekly_customer_report',
+                        args: {
+                            implementation_name: frm.doc.name,
+                            from_date: values.from_date,
+                            to_date: values.to_date
+                        },
+                        callback: function (r) {
+                            if (!r.exc && r.message) {
+                                const res = r.message;
+                                frappe.show_alert({
+                                    message: __('Report sent to {0} recipient(s). {1} ticket(s) included.', [
+                                        res.recipients.length, res.issues_count
+                                    ]),
+                                    indicator: 'green'
+                                });
+                            }
+                        }
+                    });
+                }
+            });
+            d.show();
+        }, __('Reports'));
+
         //////////////////////////////////////////////////////////////////////////////////////////////////////
 
         // radar chart
