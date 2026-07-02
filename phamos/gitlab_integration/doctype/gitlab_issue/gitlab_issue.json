@@ -18,7 +18,10 @@
   "parent_issue",
   "gitlab_project",
   "gitlab_milestone",
-  "labels"
+  "labels",
+  "merged_to_production_at",
+  "testing_on_production_at",
+  "comments"
  ],
  "fields": [
   {
@@ -101,6 +104,27 @@
    "fieldname": "labels",
    "fieldtype": "Data",
    "label": "Labels"
+  },
+  {
+   "fieldname": "merged_to_production_at",
+   "fieldtype": "Datetime",
+   "in_standard_filter": 1,
+   "label": "Merged to Production At",
+   "read_only": 1
+  },
+  {
+   "fieldname": "testing_on_production_at",
+   "fieldtype": "Datetime",
+   "in_standard_filter": 1,
+   "label": "Testing on Production At",
+   "read_only": 1
+  },
+  {
+   "description": "Non-system comments synced from GitLab (via Note Hook webhook, plus one-off backfill).",
+   "fieldname": "comments",
+   "fieldtype": "Table",
+   "label": "Comments",
+   "options": "GitLab Issue Comment"
   }
  ],
  "grid_page_length": 50,

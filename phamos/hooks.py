@@ -223,9 +223,13 @@ scheduler_events = {
     ],
     "monthly": [
         "phamos.api.send_monthly_comment_summary"
-    ]
-
-
+    ],
+    "cron": {
+        # Weekly customer report — every Monday at 07:00 server time.
+        "0 7 * * 1": [
+            "phamos.gitlab_integration.generate_weekly_report.send_weekly_reports_for_all_implementations",
+        ],
+    },
 }
 
 
