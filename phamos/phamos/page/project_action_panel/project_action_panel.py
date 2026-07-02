@@ -507,7 +507,7 @@ def create_and_submit_timesheet( project_name=None,
         }
 
 @frappe.whitelist()
-def update_and_submit_timesheet_record(name, to_time, percent_billable, activity_type, result, task=None, productivity=None):
+def update_and_submit_timesheet_record(name, to_time, percent_billable, activity_type, result, task=None):
     try:
         # Retrieve the Timesheet Record document
         doc = frappe.get_doc("Timesheet Record", name)
@@ -549,10 +549,8 @@ def update_and_submit_timesheet_record(name, to_time, percent_billable, activity
         if doc.gitlab_issue and not doc.gitlab_parent_issue:
             doc.gitlab_parent_issue = _resolve_gitlab_parent(doc.gitlab_issue)
 
-        if productivity not in (None, "", 0):
-            percent_billable = 0
-
         doc.percent_billable = percent_billable
+      
 
         # Final validation before any save or submit
         if doc.from_time and doc.to_time and get_datetime(doc.to_time) < get_datetime(doc.from_time):
@@ -573,7 +571,7 @@ def update_and_submit_timesheet_record(name, to_time, percent_billable, activity
             new_doc.employee = doc.employee
 
             # Copy parent fields from original
-            for field in ["project", "customer", "task", "goal", "gitlab_issue", "gitlab_parent_issue", "expected_time", "activity_type", "result", "percent_billable", "productivity"]:
+            for field in ["project", "customer", "task", "goal", "gitlab_issue", "gitlab_parent_issue", "expected_time", "activity_type", "result", "percent_billable"]:
                 new_doc.set(field, doc.get(field))
 
             # Parent times from selected row
