@@ -193,7 +193,7 @@ def _run_mis_creation_for_period(sched_year_str, sched_month_name):
 		"Implementation",
 		filters={
 		   "status": ["not in", ["Completed", "Cancelled"]],
-		   "customer": ["!=", "Knd-0000"],},
+		   "customer": ["!=", "Knd-00000"],},
 		fields=["name"],
 	)
 
