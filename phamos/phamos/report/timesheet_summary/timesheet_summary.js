@@ -15,7 +15,6 @@ frappe.query_reports["Timesheet Summary"] = {
                 "Last 6 Months"
             ],
             "default": "Last Month",
-            "reqd": 1, // Makes the filter mandatory
             "on_change": function() {
                 // Automatically refreshes the report when the selection changes
                 frappe.query_report.refresh();
