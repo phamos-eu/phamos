@@ -195,29 +195,22 @@ def get_ticket_info(event_name):
     rate = item_price.price_list_rate if item_price else (item.standard_rate or 0)
     currency = item_price.currency if item_price else frappe.db.get_single_value("Global Defaults", "default_currency") or "EUR"
 
-    # Read the default Sales Taxes and Charges Template for the company.
-    # Item Tax Template Detail stores a rate *override* (0 = use account default),
-    # so we must read from the Sales T&C template to get the actual applied rates.
-    company = frappe.db.get_single_value("Global Defaults", "default_company")
-    tax_template_name = frappe.db.get_value(
-        "Sales Taxes and Charges Template",
-        {"company": company, "is_default": 1},
-        "name",
-    )
+    item_tax_template = frappe.db.get_value("Marketing Content", event_name, "item_tax_template")
     tax_rate = 0.0
     tax_rows = []
-    if tax_template_name:
-        on_net_rows = frappe.get_all(
-            "Sales Taxes and Charges",
-            filters={"parent": tax_template_name, "charge_type": "On Net Total"},
-            fields=["rate", "account_head"],
+    if item_tax_template:
+        tax_detail_rows = frappe.get_all(
+            "Item Tax Template Detail",
+            filters={"parent": item_tax_template, "tax_rate": [">", 0]},
+            fields=["tax_type", "tax_rate"],
             order_by="idx asc",
+            limit=1,
         )
-        for r in on_net_rows:
-            row_rate = float(r.get("rate") or 0)
+        for r in tax_detail_rows:
+            row_rate = float(r.get("tax_rate") or 0)
             tax_rate += row_rate
             tax_rows.append({
-                "account_head": r.get("account_head") or "",
+                "account_head": r.get("tax_type") or "",
                 "rate": row_rate,
             })
 
@@ -300,17 +293,23 @@ def create_ticket_order(event_name, attendees, qty, invoice_data=None):
         "delivery_date": frappe.utils.today(),
     })
 
-    if tax_template_name:
-        so.taxes_and_charges = tax_template_name
-        tax_template_doc = frappe.get_doc("Sales Taxes and Charges Template", tax_template_name)
-        for tax_row in tax_template_doc.taxes:
+    item_tax_template = frappe.db.get_value("Marketing Content", event_name, "item_tax_template")
+    if item_tax_template:
+        tax_detail_rows = frappe.get_all(
+            "Item Tax Template Detail",
+            filters={"parent": item_tax_template, "tax_rate": [">", 0]},
+            fields=["tax_type", "tax_rate"],
+            order_by="idx asc",
+            limit=1,
+        )
+        default_cost_center = frappe.get_cached_value("Company", company, "cost_center")
+        for tax_row in tax_detail_rows:
             so.append("taxes", {
-                "charge_type": tax_row.charge_type,
-                "account_head": tax_row.account_head,
-                "rate": tax_row.rate,
-                "description": tax_row.description or tax_row.account_head,
-                "included_in_print_rate": tax_row.included_in_print_rate,
-                "cost_center": tax_row.cost_center,
+                "charge_type": "On Net Total",
+                "account_head": tax_row.tax_type,
+                "rate": tax_row.tax_rate,
+                "description": tax_row.tax_type,
+                "cost_center": default_cost_center,
             })
 
     tc_name = frappe.db.get_value("Marketing Content", event_name, "tc_name")
