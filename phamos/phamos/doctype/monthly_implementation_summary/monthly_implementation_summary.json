@@ -43,6 +43,7 @@
    "fieldtype": "Link",
    "in_list_view": 1,
    "label": "Implementation",
+   "link_filters": "[[\"Implementation\",\"customer\",\"!=\",\"Knd-00000\"]]",
    "options": "Implementation",
    "reqd": 1
   },
@@ -194,7 +195,7 @@
  "index_web_pages_for_search": 1,
  "is_submittable": 1,
  "links": [],
- "modified": "2026-07-02 23:22:18.549619",
+ "modified": "2026-07-03 11:54:11.906793",
  "modified_by": "Administrator",
  "module": "Phamos",
  "name": "Monthly Implementation Summary",
