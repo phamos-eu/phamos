@@ -418,18 +418,38 @@ def send_weekly_reports_for_all_implementations(from_date=None, to_date=None):
     return results
 
 
+def _send_weekly_reports_and_notify(from_date, to_date, notify_user):
+    """Runs the bulk send, then pushes a realtime summary to whoever triggered it —
+    the background job's return value otherwise isn't visible anywhere in the UI."""
+    results = send_weekly_reports_for_all_implementations(from_date, to_date)
+
+    sent = results.get("sent") or []
+    failed = results.get("failed") or []
+    if failed:
+        message = f"⚠️ Weekly reports: sent {len(sent)}, failed {len(failed)} ({', '.join(failed)}). Check Error Log for details."
+    elif sent:
+        message = f"✅ Weekly reports sent to {len(sent)} implementation(s)."
+    else:
+        message = "ℹ️ Weekly reports: no Implementation currently has a stakeholder opted into 'Weekly Report' — nothing to send."
+
+    frappe.publish_realtime(event="show_alert", message=message, user=notify_user)
+
+
 @frappe.whitelist()
 def send_weekly_reports_for_all_implementations_background(from_date=None, to_date=None):
     """UI-triggered async wrapper — generating+sending a report per implementation
     (GitLab sync, Mistral call, email) can take long enough to exceed a web request's
-    timeout once there are more than a handful of implementations, so run it on the long queue."""
+    timeout once there are more than a handful of implementations, so run it on the long queue.
+    Notifies the triggering user via a realtime alert once done, since the job's return
+    value otherwise isn't visible anywhere."""
     frappe.enqueue(
-        method="phamos.gitlab_integration.generate_weekly_report.send_weekly_reports_for_all_implementations",
+        method="phamos.gitlab_integration.generate_weekly_report._send_weekly_reports_and_notify",
         queue="long",
         timeout=60 * 60,
         is_async=True,
         from_date=from_date,
         to_date=to_date,
+        notify_user=frappe.session.user,
     )
     return {
         "status": "queued",

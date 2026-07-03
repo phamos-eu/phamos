@@ -1130,16 +1130,26 @@ def backfill_issue_comments(project_name=None):
     return f"{synced} comments synced"
 
 
+def _backfill_issue_comments_and_notify(project_name, notify_user):
+    """Runs the backfill, then pushes a realtime summary to whoever triggered it —
+    the background job's return value otherwise isn't visible anywhere in the UI."""
+    result = backfill_issue_comments(project_name)
+    frappe.publish_realtime(event="show_alert", message=f"✅ {result}", user=notify_user)
+
+
 @frappe.whitelist()
 def backfill_issue_comments_background(project_name=None):
     """UI-triggered async wrapper — backfilling all projects/issues can take
-    long enough to exceed a web request's timeout, so run it on the long queue."""
+    long enough to exceed a web request's timeout, so run it on the long queue.
+    Notifies the triggering user via a realtime alert once done, since the job's
+    return value otherwise isn't visible anywhere."""
     frappe.enqueue(
-        method="phamos.gitlab_integration.gitlab_utils.backfill_issue_comments",
+        method="phamos.gitlab_integration.gitlab_utils._backfill_issue_comments_and_notify",
         queue="long",
         timeout=60 * 60,
         is_async=True,
         project_name=project_name,
+        notify_user=frappe.session.user,
     )
     return {
         "status": "queued",
