@@ -20,6 +20,7 @@
   "section_break_xunv",
   "delivery_note_details",
   "delivery_note_item",
+  "notes",
   "section_break_gn1x",
   "sales_order_status_information",
   "financial_history_section",
@@ -194,6 +195,11 @@
    "fieldtype": "Table",
    "label": "Sales Order Status Information",
    "options": "Sales Order Status"
+  },
+  {
+   "fieldname": "notes",
+   "fieldtype": "Text Editor",
+   "label": "Notes"
   }
  ],
  "index_web_pages_for_search": 1,
