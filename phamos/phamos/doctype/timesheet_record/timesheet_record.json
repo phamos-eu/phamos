@@ -178,21 +178,14 @@
    "no_copy": 1,
    "options": "GitLab Issue",
    "read_only": 1
-  },
-  {
-   "description": "It is used to indicate your productivity level on internal (non-billable) project work. It helps measure performance and effort for internal activities.",
-   "fieldname": "productivity",
-   "fieldtype": "Select",
-   "label": "Productivity",
-   "options": "\n0\n25\n50\n75\n100"
   }
  ],
  "grid_page_length": 50,
  "index_web_pages_for_search": 1,
  "is_submittable": 1,
  "links": [],
- "modified": "2026-06-22 00:00:00.000000",
- "modified_by": "kalsoom.akhtar@pahmos.eu",
+ "modified": "2026-07-06 11:35:34.847182",
+ "modified_by": "Administrator",
  "module": "Phamos",
  "name": "Timesheet Record",
  "naming_rule": "Expression (old style)",

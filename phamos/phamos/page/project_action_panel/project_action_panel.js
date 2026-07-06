@@ -108,7 +108,6 @@ function update_and_submit_timesheet_record(
   percent_billable,
   activity_type,
   result,
-  productivity
 ) {
   frappe.call({
     method: "frappe.client.get",
@@ -145,7 +144,6 @@ function update_and_submit_timesheet_record(
           percent_billable: percent_billable,
           activity_type: activity_type,
           result: result,
-          productivity: productivity
         },
         freeze: true,
         freeze_message: __("Updating Timesheet Record......"),
@@ -423,15 +421,6 @@ function openStopProjectDialog(timesheet_record, percent_billable, project, task
                     "This is a personal indicator to your own performance on the work you have done. It will influence the billable time of the Timesheet created.",
 
           },
-          {
-            fieldtype: "Select",
-            options: [0, 25, 50, 75, 100],
-            label: __("Productivity (%)"),
-            fieldname: "productivity",
-            reqd: 0,
-            default: 100,
-            description: "This field is used to indicate your productivity level on internal (non-billable) project work. It helps measure performance and effort for internal activities.",
-          },
         ],
         primary_action_label: __("Update Timesheet Record."),
         primary_action(values) {
@@ -448,9 +437,6 @@ function openStopProjectDialog(timesheet_record, percent_billable, project, task
               final_to_time = min_to_time;
             }
           }
-          
-          // Only send productivity for internal projects (when the field is visible)
-          let final_productivity = dialog.fields_dict.productivity.df.hidden ? null : values.productivity;
 
           update_and_submit_timesheet_record(
             values.timesheet_record,
@@ -459,7 +445,6 @@ function openStopProjectDialog(timesheet_record, percent_billable, project, task
             values.percent_billable,
             values.activity_type,
             values.result,
-            final_productivity
           );
           dialog.hide();
         }
@@ -471,21 +456,6 @@ function openStopProjectDialog(timesheet_record, percent_billable, project, task
 
       dialog.$wrapper.find(".modal-dialog").css("max-width", "800px");
       dialog.show();
-
-      if (project) {
-        frappe.db.get_value("Project", project, ["custom_is_internal_project"], function(r) {
-          let is_internal = r && r.custom_is_internal_project === 1;
-          // Internal: hide Percent Billable, show Productivity
-          // Non-internal: show Percent Billable, hide Productivity
-          dialog.set_df_property("percent_billable", "hidden", is_internal ? 1 : 0);
-          dialog.set_df_property("percent_billable", "reqd",   is_internal ? 0 : 1);
-          dialog.set_df_property("productivity",     "hidden", is_internal ? 0 : 1);
-          dialog.set_df_property("productivity",     "reqd",   is_internal ? 1 : 0);
-          if (is_internal) {
-            dialog.set_value("productivity", 100);
-          }
-        });
-      }
 
       // Implement live time update for to_time field
       var time_update_interval = null;
