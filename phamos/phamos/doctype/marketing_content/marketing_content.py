@@ -253,8 +253,11 @@ def create_ticket_order(event_name, attendees, qty, invoice_data=None):
 
     # --- Draft Sales Order ---
     so = frappe.new_doc("Sales Order")
-    so.customer = customer
+    so.customer = "Ticket Buyer Walk In"
     so.company = company
+    so.po_no = f"Ticket purchase for {event_name}"
+    so.po_date = frappe.utils.today()
+    so.order_type = "Shopping Cart"
     so.transaction_date = frappe.utils.today()
     so.delivery_date = frappe.utils.today()
     so.selling_price_list = price_list
