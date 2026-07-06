@@ -150,7 +150,7 @@
   },
   {
    "fieldname": "total_hrs_timesheet",
-   "fieldtype": "Int",
+   "fieldtype": "Float",
    "label": "Billable Timesheet Hours (Not on Delivery Note)",
    "read_only": 1
   },
@@ -166,13 +166,13 @@
   },
   {
    "fieldname": "delivered_total_hrs",
-   "fieldtype": "Int",
+   "fieldtype": "Float",
    "label": "Total Billable Hours on Delivery Note",
    "read_only": 1
   },
   {
    "fieldname": "remaining_hrs",
-   "fieldtype": "Data",
+   "fieldtype": "Float",
    "label": "Remaining Sales Order Hours",
    "read_only": 1
   },
@@ -495,7 +495,7 @@
    "link_fieldname": "implementation"
   }
  ],
- "modified": "2026-06-04 09:56:31.302460",
+ "modified": "2026-06-29 12:29:34.921599",
  "modified_by": "Administrator",
  "module": "Phamos",
  "name": "Implementation",
