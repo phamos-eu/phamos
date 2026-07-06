@@ -25,6 +25,9 @@ FAST_REEXTRACT_CRAWL_LIMIT = 5
 ENRICHMENT_WORKERS = 6
 ENRICHMENT_SLUG_LIMIT = 12
 BATCH_SIZE = 50
+LEAD_DATA_IMPORT_DOCTYPE = "Lead Data Import"
+LEAD_DATA_DOCTYPE = "Lead Data"
+LEAD_DATA_IMPORT_FIELD = "lead_data_import"
 LEAD_LIST_FIELDS = ("emails", "phones", "contact_persons", "addresses")
 FREE_EMAIL_DOMAINS = {
     "gmail.com", "googlemail.com", "yahoo.com", "outlook.com", "hotmail.com",
@@ -42,6 +45,23 @@ TECHNICAL_EMAIL_LOCAL_PARTS = {
     "mailer-daemon", "postmaster", "webmaster",
 }
 
+
+def _ensure_lead_data_import_schema():
+    if frappe.db.has_column(LEAD_DATA_DOCTYPE, LEAD_DATA_IMPORT_FIELD):
+        return
+
+    old_field = "lead_import"
+    if frappe.db.has_column(LEAD_DATA_DOCTYPE, old_field):
+        frappe.throw(_(
+            "Lead Data table still has the old field '{0}' and is missing the renamed field '{1}'. "
+            "Please run: bench --site <site-name> migrate, then bench --site <site-name> clear-cache."
+        ).format(old_field, LEAD_DATA_IMPORT_FIELD))
+
+    frappe.throw(_(
+        "Lead Data table is missing field '{0}'. Please run: bench --site <site-name> migrate, "
+        "then bench --site <site-name> clear-cache."
+    ).format(LEAD_DATA_IMPORT_FIELD))
+
 LEAD_FIELD_EXTRACTION_PROMPT = """Extract contact details for this company from the text.
 Company: {company_name}
 
@@ -58,7 +78,7 @@ Text:
 ---"""
 
 
-class LeadImport(Document):
+class LeadDataImport(Document):
     pass
 
 
@@ -282,23 +302,25 @@ def _populate_lead_data_child_tables(lead_data_doc, company, extracted=None):
     return lead_data_doc 
 
 @frappe.whitelist()
-def extract_leads(lead_import_name):
-    doc = frappe.get_doc("Lead Import", lead_import_name)
+def extract_leads(lead_data_import_name):
+    _ensure_lead_data_import_schema()
+
+    doc = frappe.get_doc(LEAD_DATA_IMPORT_DOCTYPE, lead_data_import_name)
     if doc.status == "Processing":
         frappe.throw(_("Extraction is already running for this document."))
 
-    frappe.db.set_value("Lead Import", lead_import_name, {
+    frappe.db.set_value(LEAD_DATA_IMPORT_DOCTYPE, lead_data_import_name, {
         "status": "Processing",
         "status_log": "Starting extraction...",
     })
-    frappe.db.delete("Lead Import Item", {"parent": lead_import_name})
+    frappe.db.delete(LEAD_DATA_DOCTYPE, {LEAD_DATA_IMPORT_FIELD: lead_data_import_name})
     frappe.db.commit()
 
     frappe.enqueue(
         _run_extraction,
         queue="default",
         timeout=600,
-        lead_import_name=lead_import_name,
+        lead_data_import_name=lead_data_import_name,
         enqueue_after_commit=True,
     )
     return {"ok": True, "message": "Extraction started. Refresh the page in a moment to see results."}
@@ -306,33 +328,33 @@ def extract_leads(lead_import_name):
 
 # Background job
 
-def _run_extraction(lead_import_name):
+def _run_extraction(lead_data_import_name):
     try:
-        doc = frappe.get_doc("Lead Import", lead_import_name)
+        doc = frappe.get_doc(LEAD_DATA_IMPORT_DOCTYPE, lead_data_import_name)
         input_type = doc.input_type
 
-        _log(lead_import_name, f"Input type: {input_type}")
+        _log(lead_data_import_name, f"Input type: {input_type}")
 
         if input_type == "URL":
-            companies = _pipeline_url(lead_import_name, doc.source_url)
+            companies = _pipeline_url(lead_data_import_name, doc.source_url)
         elif input_type == "Screenshot":
-            companies = _pipeline_screenshot(lead_import_name, doc.upload_file)
+            companies = _pipeline_screenshot(lead_data_import_name, doc.upload_file)
         elif input_type == "PDF":
-            companies = _pipeline_pdf(lead_import_name, doc.upload_file)
+            companies = _pipeline_pdf(lead_data_import_name, doc.upload_file)
         else:
-            _finish(lead_import_name, "Error: Unknown input type.")
+            _finish(lead_data_import_name, "Error: Unknown input type.")
             return
 
         if not companies and input_type == "URL":
-            _log(lead_import_name, "No companies detected. Treating source URL as one company website.")
+            _log(lead_data_import_name, "No companies detected. Treating source URL as one company website.")
             companies = [_company_from_website_html(None, doc.source_url)]
 
         if not companies:
-            _finish(lead_import_name, "No companies found. Check the URL or file and try again.")
+            _finish(lead_data_import_name, "No companies found. Check the URL or file and try again.")
             return
 
         _log(
-            lead_import_name,
+            lead_data_import_name,
             f"Found {len(companies)} companies. Processing in batches of {BATCH_SIZE}..."
         )
 
@@ -342,43 +364,43 @@ def _run_extraction(lead_import_name):
             batch = companies[i:i + BATCH_SIZE]
 
             _log(
-                lead_import_name,
+                lead_data_import_name,
                 f"Processing batch {i // BATCH_SIZE + 1} "
                 f"({len(batch)} companies)"
             )
 
             # Enrich + save each company immediately (incremental)
             saved_in_batch = _enrich_and_save_companies(
-                lead_import_name, batch, ai_fallback=True
+                lead_data_import_name, batch, ai_fallback=True
             )
             total_saved += saved_in_batch
 
             _log(
-                lead_import_name,
+                lead_data_import_name,
                 f"Processed {total_saved}/{len(companies)} companies"
             )
 
         _finish(
-            lead_import_name,
+            lead_data_import_name,
             f"Ready. {total_saved} leads extracted. Review and create."
         )
 
     except Exception:
         tb = frappe.get_traceback()
         frappe.log_error(title=_("Lead Import extraction failed"), message=tb)
-        _finish(lead_import_name, _format_error_for_status("Error during extraction.", tb))
+        _finish(lead_data_import_name, _format_error_for_status("Error during extraction.", tb))
 
 
 # Pipeline: URL
 
-def _pipeline_url(lead_import_name, url):
+def _pipeline_url(lead_data_import_name, url):
     if not url:
         frappe.throw(_("Source URL is required for URL input type."))
 
-    _log(lead_import_name, f"Scraping: {url}")
+    _log(lead_data_import_name, f"Scraping: {url}")
     html = _fetch_html(url)
     if not html:
-        _log(lead_import_name, "Could not fetch the page HTML. Treating URL as one company website.")
+        _log(lead_data_import_name, "Could not fetch the page HTML. Treating URL as one company website.")
         return [_company_from_website_html(None, url)]
 
     companies = _extract_companies_from_partner_html(html, url, ai_fallback=False)
@@ -389,7 +411,7 @@ def _pipeline_url(lead_import_name, url):
             companies = []
 
     if not companies:
-        _log(lead_import_name, "No companies in static HTML. Trying JS render...")
+        _log(lead_data_import_name, "No companies in static HTML. Trying JS render...")
         html = _fetch_html(url, js_render=True)
         if html:
             companies = _extract_companies_from_partner_html(html, url, ai_fallback=False)
@@ -401,14 +423,14 @@ def _pipeline_url(lead_import_name, url):
                 companies = _mistral_extract_companies_from_html(html, url)
 
     if not companies:
-        _log(lead_import_name, "No directory companies found. Treating URL as one company website.")
+        _log(lead_data_import_name, "No directory companies found. Treating URL as one company website.")
         companies = [_company_from_website_html(html, url)]
 
     for company in companies:
         if not company.get("website"):
             company["website"] = _infer_or_search_website(company)
 
-    _log(lead_import_name, f"Found {len(companies)} companies on the page.")
+    _log(lead_data_import_name, f"Found {len(companies)} companies on the page.")
     return companies if not MAX_COMPANIES_PER_IMPORT else companies[:MAX_COMPANIES_PER_IMPORT]
 
 
@@ -698,23 +720,23 @@ def _is_noise_domain(domain):
 
 # Pipeline: Screenshot
 
-def _pipeline_screenshot(lead_import_name, file_url):
+def _pipeline_screenshot(lead_data_import_name, file_url):
     if not file_url:
         frappe.throw(_("Please upload a screenshot file."))
 
-    _log(lead_import_name, "Reading screenshot/business card/webpage via Mistral vision...")
+    _log(lead_data_import_name, "Reading screenshot/business card/webpage via Mistral vision...")
     image_b64, mime = _load_file_as_base64(file_url)
     if not image_b64:
-        _log(lead_import_name, "Could not read uploaded file.")
+        _log(lead_data_import_name, "Could not read uploaded file.")
         return []
 
     qr_urls = _decode_qr_urls_from_file(file_url)
     if qr_urls:
-        _log(lead_import_name, f"QR website found: {qr_urls[0]}")
+        _log(lead_data_import_name, f"QR website found: {qr_urls[0]}")
 
     companies = _mistral_extract_companies_from_image(image_b64, mime, qr_urls=qr_urls)
     if not companies:
-        _log(lead_import_name, "No direct lead found. Trying partner/logo extraction from screenshot...")
+        _log(lead_data_import_name, "No direct lead found. Trying partner/logo extraction from screenshot...")
         companies = _mistral_extract_logo_companies_from_image(image_b64, mime)
 
     is_logo_list = any(company.get("source_type") == "logo_list" for company in companies)
@@ -727,16 +749,16 @@ def _pipeline_screenshot(lead_import_name, file_url):
             company["company_name"] = _domain_to_company_name(company["website"])
         company["source_attachment"] = file_url
 
-    _log(lead_import_name, f"Mistral identified {len(companies)} lead(s) in the screenshot.")
+    _log(lead_data_import_name, f"Mistral identified {len(companies)} lead(s) in the screenshot.")
     return companies if not MAX_COMPANIES_PER_IMPORT else companies[:MAX_COMPANIES_PER_IMPORT]
 
 # Pipeline: PDF
 
-def _pipeline_pdf(lead_import_name, file_url):
+def _pipeline_pdf(lead_data_import_name, file_url):
     if not file_url:
         frappe.throw(_("Please upload a PDF file."))
 
-    _log(lead_import_name, "Running OCR on PDF via Mistral...")
+    _log(lead_data_import_name, "Running OCR on PDF via Mistral...")
 
     settings = _get_phamos_settings()
     if not settings:
@@ -745,7 +767,7 @@ def _pipeline_pdf(lead_import_name, file_url):
     path = _get_file_path_from_url(file_url)
 
     if not path or not os.path.isfile(path):
-        _log(lead_import_name, "PDF file not found on disk.")
+        _log(lead_data_import_name, "PDF file not found on disk.")
         return []
 
     with open(path, "rb") as f:
@@ -765,26 +787,26 @@ def _pipeline_pdf(lead_import_name, file_url):
     }
     resp = requests.post(ocr_url, json=payload, headers=headers, timeout=120)
     if not resp.ok:
-        _log(lead_import_name, f"OCR failed: {resp.status_code}")
+        _log(lead_data_import_name, f"OCR failed: {resp.status_code}")
         return []
 
     markdown = "\n\n".join(p.get("markdown", "") for p in resp.json().get("pages", []))
     if not markdown.strip():
-        _log(lead_import_name, "OCR returned empty text.")
+        _log(lead_data_import_name, "OCR returned empty text.")
         return []
 
     companies = _mistral_extract_companies_from_text(markdown)
-    _log(lead_import_name, f"Mistral identified {len(companies)} companies in the PDF.")
+    _log(lead_data_import_name, f"Mistral identified {len(companies)} companies in the PDF.")
     return companies if not MAX_COMPANIES_PER_IMPORT else companies[:MAX_COMPANIES_PER_IMPORT]
 
 
-def _enrich_and_save_companies(lead_import_name, companies, ai_fallback=False):
+def _enrich_and_save_companies(lead_data_import_name, companies, ai_fallback=False):
     """Enrich each company and immediately save it to the child table."""
     settings = _get_phamos_settings()
     if ai_fallback and not settings:
         frappe.throw(_("Mistral API key is not configured in phamos Settings."))
 
-    doc = frappe.get_doc("Lead Import", lead_import_name)
+    doc = frappe.get_doc(LEAD_DATA_IMPORT_DOCTYPE, lead_data_import_name)
     raw_refs = doc.reference_urls or ""
     slugs = [
         s.strip().strip("/")
@@ -796,7 +818,7 @@ def _enrich_and_save_companies(lead_import_name, companies, ai_fallback=False):
 
     if ai_fallback and total > 1:
         workers = min(ENRICHMENT_WORKERS, total)
-        _log(lead_import_name, f"Fast enrichment running with {workers} workers.")
+        _log(lead_data_import_name, f"Fast enrichment running with {workers} workers.")
 
         with ThreadPoolExecutor(max_workers=workers) as executor:
             future_map = {
@@ -823,29 +845,29 @@ def _enrich_and_save_companies(lead_import_name, companies, ai_fallback=False):
                         message=tb,
                     )
                     _log(
-                        lead_import_name,
+                        lead_data_import_name,
                         _format_error_for_status(f"[{idx}/{total}] {name} enrichment error.", tb),
                     )
                     enriched = company
 
-                _save_single_company(lead_import_name, enriched)
-                _log(lead_import_name, f"[{idx}/{total}] Saved: {name}")
+                _save_single_company(lead_data_import_name, enriched)
+                _log(lead_data_import_name, f"[{idx}/{total}] Saved: {name}")
 
         return total
 
     for idx, company in enumerate(companies, start=1):
         name = company.get("company_name", "Unknown")
         action = "Enriching" if ai_fallback else "Saving"
-        _log(lead_import_name, f"[{idx}/{total}] {action}: {name}")
+        _log(lead_data_import_name, f"[{idx}/{total}] {action}: {name}")
 
         enriched = _enrich_single_company(
-            settings, slugs, company, lead_import_name, ai_fallback=ai_fallback
+            settings, slugs, company, lead_data_import_name, ai_fallback=ai_fallback
         )
-        _save_single_company(lead_import_name, enriched)
+        _save_single_company(lead_data_import_name, enriched)
 
     return total
 
-def _enrich_single_company(settings, slugs, company, lead_import_name=None, ai_fallback=True):
+def _enrich_single_company(settings, slugs, company, lead_data_import_name=None, ai_fallback=True):
     name    = company.get("company_name", "Unknown")
     website = company.get("website", "")
 
@@ -944,11 +966,11 @@ def _enrich_single_company(settings, slugs, company, lead_import_name=None, ai_f
                 break
 
     if extracted:
-        if lead_import_name:
-            _log(lead_import_name, f"  → [{name}] Data found via: {', '.join(sources_found)}")
+        if lead_data_import_name:
+            _log(lead_data_import_name, f"  → [{name}] Data found via: {', '.join(sources_found)}")
     else:
-        if lead_import_name:
-            _log(lead_import_name, f"  → [{name}] No data extracted")
+        if lead_data_import_name:
+            _log(lead_data_import_name, f"  → [{name}] No data extracted")
 
     merged = {**company, **{k: v for k, v in extracted.items() if v and k != "website"}}
     return merged
@@ -1338,7 +1360,7 @@ def _fetch_html(url, js_render=False):
             return None
     else:
         try:
-            headers = {"User-Agent": "Mozilla/5.0 (compatible; PhamosLeadImporter/1.0)"}
+            headers = {"User-Agent": "Mozilla/5.0 (compatible; PhamosLeadDataImporter/1.0)"}
             resp = requests.get(url, headers=headers, timeout=SCRAPE_TIMEOUT, allow_redirects=True)
             if resp.ok:
                 return resp.text
@@ -1991,9 +2013,9 @@ def _format_email_field(value, max_len=140):
 
     return ", ".join(out)
 
-def _save_single_company(lead_import_name, company):
+def _save_single_company(lead_data_import_name, company):
     doc = frappe.new_doc("Lead Data")
-    doc.lead_import = lead_import_name
+    doc.set(LEAD_DATA_IMPORT_FIELD, lead_data_import_name)
 
     _populate_lead_data_child_tables(doc, company, extracted=company)
 
@@ -2070,13 +2092,13 @@ def _build_import_info(company):
     return "\n".join(lines)
 
 
-def _log(lead_import_name, message):
-    if not lead_import_name:
+def _log(lead_data_import_name, message):
+    if not lead_data_import_name:
         return
-    doc = frappe.get_doc("Lead Import", lead_import_name)
+    doc = frappe.get_doc(LEAD_DATA_IMPORT_DOCTYPE, lead_data_import_name)
     existing = doc.status_log or ""
     new_log = f"{existing}\n{message}".strip()
-    frappe.db.set_value("Lead Import", lead_import_name, "status_log", new_log)
+    frappe.db.set_value(LEAD_DATA_IMPORT_DOCTYPE, lead_data_import_name, "status_log", new_log)
     frappe.db.commit()
 
 
@@ -2091,11 +2113,11 @@ def _format_error_for_status(message, traceback_text=None, max_len=6000):
     return f"{message}\n\nDetails:\n{details}"
 
 
-def _finish(lead_import_name, message):
-    doc = frappe.get_doc("Lead Import", lead_import_name)
+def _finish(lead_data_import_name, message):
+    doc = frappe.get_doc(LEAD_DATA_IMPORT_DOCTYPE, lead_data_import_name)
     existing = (doc.status_log or "").strip()
     status_log = f"{existing}\n{message}".strip() if existing else message
-    frappe.db.set_value("Lead Import", lead_import_name, {
+    frappe.db.set_value(LEAD_DATA_IMPORT_DOCTYPE, lead_data_import_name, {
         "status": "Ready",
         "status_log": status_log,
     })
@@ -2155,14 +2177,16 @@ def _sanitize_email(email):
         return ""
     
 @frappe.whitelist()
-def re_enrich_incomplete(lead_import_name):
-    doc = frappe.get_doc("Lead Import", lead_import_name)
+def re_enrich_incomplete(lead_data_import_name):
+    _ensure_lead_data_import_schema()
+
+    doc = frappe.get_doc(LEAD_DATA_IMPORT_DOCTYPE, lead_data_import_name)
     if doc.status == "Processing":
         frappe.throw(_("Extraction is already running for this document."))
 
     candidates = frappe.get_all(
         "Lead Data",
-        filters={"lead_import": lead_import_name},
+        filters={LEAD_DATA_IMPORT_FIELD: lead_data_import_name},
         fields=["name", "organization_name", "website", "email", "phone"],
     )
     incomplete = [
@@ -2182,7 +2206,7 @@ def re_enrich_incomplete(lead_import_name):
     if not incomplete:
         return {"ok": True, "message": "No incomplete rows found."}
 
-    frappe.db.set_value("Lead Import", lead_import_name, {
+    frappe.db.set_value(LEAD_DATA_IMPORT_DOCTYPE, lead_data_import_name, {
         "status": "Processing",
         "status_log": f"Re-enriching {len(incomplete)} incomplete rows...",
     })
@@ -2192,7 +2216,7 @@ def re_enrich_incomplete(lead_import_name):
         _run_re_enrichment,
         queue="default",
         timeout=600,
-        lead_import_name=lead_import_name,
+        lead_data_import_name=lead_data_import_name,
         incomplete_rows=incomplete,
         enqueue_after_commit=True,
     )
@@ -2271,14 +2295,14 @@ def _reenrich_single_row(settings, slugs, row):
     return row["name"], company, extracted
 
 
-def _run_re_enrichment(lead_import_name, incomplete_rows):
+def _run_re_enrichment(lead_data_import_name, incomplete_rows):
     try:
         settings = _get_phamos_settings()
         if not settings:
-            _finish(lead_import_name, "Error: Mistral API key not configured.")
+            _finish(lead_data_import_name, "Error: Mistral API key not configured.")
             return
 
-        doc = frappe.get_doc("Lead Import", lead_import_name)
+        doc = frappe.get_doc(LEAD_DATA_IMPORT_DOCTYPE, lead_data_import_name)
         raw_refs = doc.reference_urls or ""
         slugs = [s.strip().strip("/") for s in raw_refs.splitlines() if s.strip() and not s.strip().startswith("#")]
 
@@ -2286,7 +2310,7 @@ def _run_re_enrichment(lead_import_name, incomplete_rows):
         updated = 0
         workers = min(ENRICHMENT_WORKERS, total) or 1
 
-        _log(lead_import_name, f"Re-enriching {total} rows with {workers} workers.")
+        _log(lead_data_import_name, f"Re-enriching {total} rows with {workers} workers.")
 
         with ThreadPoolExecutor(max_workers=workers) as executor:
             future_map = {
@@ -2303,13 +2327,13 @@ def _run_re_enrichment(lead_import_name, incomplete_rows):
                     tb = frappe.get_traceback()
                     frappe.log_error(title=_("Lead Import re-enrichment row failed"), message=tb)
                     _log(
-                        lead_import_name,
+                        lead_data_import_name,
                         _format_error_for_status(f"[{idx}/{total}] [{name}] Error", tb),
                     )
                     continue
 
                 if not extracted:
-                    _log(lead_import_name, f"[{idx}/{total}] [{name}] No data found")
+                    _log(lead_data_import_name, f"[{idx}/{total}] [{name}] No data found")
                     continue
 
                 lead_data_doc = frappe.get_doc("Lead Data", row_name)
@@ -2321,19 +2345,19 @@ def _run_re_enrichment(lead_import_name, incomplete_rows):
                 frappe.db.commit()
 
                 updated += 1
-                _log(lead_import_name, f"[{idx}/{total}] ✓ [{name}] Updated")
+                _log(lead_data_import_name, f"[{idx}/{total}] ✓ [{name}] Updated")
 
-        _finish(lead_import_name, f"Re-enrichment done. Updated {updated}/{total} rows.")
-
-    except Exception:
-        tb = frappe.get_traceback()
-        frappe.log_error(title=_("Lead Import re-enrichment failed"), message=tb)
-        _finish(lead_import_name, _format_error_for_status("Error during re-enrichment.", tb))
+        _finish(lead_data_import_name, f"Re-enrichment done. Updated {updated}/{total} rows.")
 
     except Exception:
         tb = frappe.get_traceback()
         frappe.log_error(title=_("Lead Import re-enrichment failed"), message=tb)
-        _finish(lead_import_name, _format_error_for_status("Error during re-enrichment.", tb))
+        _finish(lead_data_import_name, _format_error_for_status("Error during re-enrichment.", tb))
+
+    except Exception:
+        tb = frappe.get_traceback()
+        frappe.log_error(title=_("Lead Import re-enrichment failed"), message=tb)
+        _finish(lead_data_import_name, _format_error_for_status("Error during re-enrichment.", tb))
 
 def _discover_internal_links(base_url, html, limit=8):
     if not html:
