@@ -1,13 +1,13 @@
 // Copyright (c) 2026, phamos.eu and contributors
 // For license information, please see license.txt
 
-frappe.ui.form.on("Lead Import", {
+frappe.ui.form.on("Lead Data Import", {
     refresh(frm) {
         if (frm.doc.status === "Ready") {
             frm.add_custom_button(__("Re-Extract"), () => {
                 frappe.call({
-                    method: "phamos.phamos.doctype.lead_import.lead_import.re_enrich_incomplete",
-                    args: { lead_import_name: frm.doc.name },
+                    method: "phamos.phamos.doctype.lead_data_import.lead_data_import.re_enrich_incomplete",
+                    args: { lead_data_import_name: frm.doc.name },
                     callback(r) {
                         if (r.message?.ok) {
                             frappe.msgprint(r.message.message);
@@ -57,8 +57,8 @@ function _setup_extract_button(frm) {
                     .then(() => {
                     });
                     frappe.call({
-                        method: "phamos.phamos.doctype.lead_import.lead_import.extract_leads",
-                        args: { lead_import_name: frm.doc.name },
+                        method: "phamos.phamos.doctype.lead_data_import.lead_data_import.extract_leads",
+                        args: { lead_data_import_name: frm.doc.name },
                         freeze: true,
                         freeze_message: __("Starting extraction..."),
                         callback(r) {
@@ -96,7 +96,7 @@ function _start_polling(frm) {
             return;
         }
 
-        frappe.db.get_value("Lead Import", frm.doc.name, ["status", "status_log"])
+        frappe.db.get_value("Lead Data Import", frm.doc.name, ["status", "status_log"])
             .then((r) => {
                 const { status, status_log } = r.message || {};
 

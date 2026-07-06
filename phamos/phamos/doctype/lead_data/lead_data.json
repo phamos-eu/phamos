@@ -12,7 +12,7 @@
   "lead_data",
   "lead_data_attachment",
   "lead_data_website",
-  "lead_import",
+  "lead_data_import",
   "column_break_cfus",
   "salutation",
   "first_name",
@@ -68,10 +68,10 @@
    "options": "Lead Data Website"
   },
   {
-   "fieldname": "lead_import",
+   "fieldname": "lead_data_import",
    "fieldtype": "Link",
-   "label": "Lead Import",
-   "options": "Lead Import"
+   "label": "Lead Data Import",
+   "options": "Lead Data Import"
   },
   {
    "fieldname": "column_break_cfus",
@@ -206,7 +206,7 @@
  "grid_page_length": 50,
  "index_web_pages_for_search": 1,
  "links": [],
- "modified": "2026-06-24 12:59:45.262179",
+ "modified": "2026-07-06 10:35:25.474441",
  "modified_by": "Administrator",
  "module": "Phamos",
  "name": "Lead Data",

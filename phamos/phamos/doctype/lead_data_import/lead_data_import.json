@@ -75,13 +75,13 @@
  "links": [
   {
    "link_doctype": "Lead Data",
-   "link_fieldname": "lead_import"
+   "link_fieldname": "lead_data_import"
   }
  ],
  "modified": "2026-06-30 12:23:56.087245",
  "modified_by": "Administrator",
  "module": "Phamos",
- "name": "Lead Import",
+ "name": "Lead Data Import",
  "naming_rule": "Expression",
  "owner": "Administrator",
  "permissions": [

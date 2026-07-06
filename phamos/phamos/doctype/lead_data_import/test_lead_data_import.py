@@ -5,5 +5,5 @@
 from frappe.tests.utils import FrappeTestCase
 
 
-class TestLeadImport(FrappeTestCase):
+class TestLeadDataImport(FrappeTestCase):
 	pass
