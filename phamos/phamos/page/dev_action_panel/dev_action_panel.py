@@ -413,14 +413,7 @@ def resume_timer(name):
 
 
 @frappe.whitelist()
-def stop_timer(name, result, percent_billable=100, productivity=None, activity_type=None, manual_end_time=None):
-    """
-    Close the open row (if running), calculate actual_time from all item rows,
-    fill in result fields, and submit the Timesheet Record.
-
-    All item rows are work intervals (no break rows in this flow).
-    actual_time = sum of all row durations.
-    """
+def stop_timer(name, result, percent_billable=100, activity_type=None, manual_end_time=None):
     doc = frappe.get_doc("Timesheet Record", name)
     end_time = get_datetime(manual_end_time) if manual_end_time else now_datetime()
 
@@ -446,8 +439,6 @@ def stop_timer(name, result, percent_billable=100, productivity=None, activity_t
     doc.percent_billable = int(percent_billable)
     if activity_type:
         doc.activity_type = activity_type
-    if productivity is not None:
-        doc.productivity = productivity
 
     doc.save(ignore_permissions=True)
     doc.submit()
@@ -468,8 +459,6 @@ def stop_timer(name, result, percent_billable=100, productivity=None, activity_t
                       "gitlab_issue", "gitlab_parent_issue", "expected_time", "result",
                       "percent_billable"]:
             extra.set(field, doc.get(field))
-        if productivity is not None:
-            extra.productivity = productivity
         extra.from_time = alt_row.from_time
         extra.to_time = alt_row.to_time
         extra.actual_time = duration
