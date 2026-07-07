@@ -450,10 +450,6 @@ function openStopProjectDialog(timesheet_record, percent_billable, project, task
         }
       });
 
-      // Hide productivity by default; it replaces percent_billable for internal projects
-      dialog.set_df_property("productivity", "hidden", 1);
-      dialog.set_df_property("productivity", "reqd", 0);
-
       dialog.$wrapper.find(".modal-dialog").css("max-width", "800px");
       dialog.show();
 
