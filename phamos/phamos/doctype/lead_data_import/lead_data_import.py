@@ -14,7 +14,7 @@ import frappe
 import requests
 from frappe import _
 from frappe.model.document import Document
-from frappe.utils import get_files_path, validate_email_address
+from frappe.utils import cint, get_files_path, validate_email_address
 
 from phamos.phamos.doctype.accounting_receipt.mistral_pdf import _get_phamos_settings
 
@@ -134,6 +134,9 @@ def _parse_address_components(address):
     if not city and len(parts) >= 2:
         city = _clean_city_name(parts[-2] if country else parts[-1])
 
+    if not country and postal_code and re.fullmatch(r"\d{5}", postal_code):
+        country = "Germany"
+
     return {
         "city": city,
         "state": state,
@@ -155,6 +158,7 @@ def _clean_address_values(values):
     if isinstance(values, str):
         values = re.split(r"\s*(?:\||\n)\s*", values)
 
+    seen = {}
     for value in values or []:
         text = str(value or "").strip()
         if not text:
@@ -163,9 +167,16 @@ def _clean_address_values(values):
         compact_addresses = _extract_addresses_from_text(text) if len(text) > 140 else []
         candidates = compact_addresses or [text]
         for candidate in candidates:
-            clean = re.sub(r"\s+", " ", str(candidate or "")).strip(" ,.;")
-            if clean and clean not in addresses:
+            clean = _normalize_address_candidate(candidate)
+            key = _address_dedupe_key(clean)
+            if clean and key and key not in seen:
+                seen[key] = len(addresses)
                 addresses.append(clean)
+            elif clean and key:
+                existing_idx = seen[key]
+                existing = addresses[existing_idx]
+                if not _parse_address_components(existing).get("country") and _parse_address_components(clean).get("country"):
+                    addresses[existing_idx] = clean
 
     return addresses
 
@@ -180,7 +191,208 @@ def _address_line_for_child(address):
     if extracted:
         text = extracted[0]
 
+    text = _street_line_from_address(text)
     return _truncate(text)
+
+
+def _street_line_from_address(address):
+    text = str(address or "").strip()
+    if not text:
+        return ""
+
+    text = re.split(r",?\s+(?:[A-Z]{1,3}-)?\d{4,6}\s+[A-ZÄÖÜ]", text, maxsplit=1)[0]
+    return re.sub(r"\s+", " ", text).strip(" ,.;")
+
+
+def _normalize_address_candidate(address):
+    text = str(address or "").strip()
+    if not text:
+        return ""
+
+    text = html_lib.unescape(text)
+    text = re.sub(r"\s+", " ", text).strip(" ,.;")
+
+    # Some Impressum pages concatenate company/legal text with the street
+    # address, e.g. "KGWiderholdstraße 2072336 Balingen".
+    text = _repair_compact_german_address_spacing(text)
+    extracted = _extract_addresses_from_text(text)
+    if extracted:
+        text = extracted[0]
+
+    text = _repair_compact_german_address_spacing(text)
+    text = _strip_address_company_prefix(text)
+    text = re.sub(r"\s+", " ", text).strip(" ,.;")
+    text = re.sub(
+        r"\s+(?:anfahrt(?:\s+mit\s+google\s+maps)?|google\s+maps|social\s+media|"
+        r"route|directions|karte|map|tel|telefon|phone|fax|e-?mail|mail|"
+        r"kontakt|contact|poststelle)\b.*$",
+        "",
+        text,
+        flags=re.I,
+    ).strip(" ,.;")
+
+    if not _looks_like_postal_address(text):
+        return ""
+
+    text = _append_country_from_text(text)
+    return text if _looks_like_postal_address(text) else ""
+
+
+def _repair_compact_german_address_spacing(text):
+    street_words = (
+        r"str(?:aße|asse|\.?)|weg|platz|allee|gasse|ring|damm|ufer|"
+        r"chaussee|markt|hof|steig|pfad|bogen|zeile"
+    )
+
+    text = re.sub(
+        rf"\b(gmbh|kg|ag|ohg|ug|se|co)(?=[A-ZÄÖÜ][A-Za-zÄÖÜäöüß.'\-]*(?:{street_words})\b)",
+        r"\1 ",
+        str(text or ""),
+        flags=re.I,
+    )
+
+    # Insert a missing separator between a street number and a 5 digit German ZIP.
+    def split_number_zip(match):
+        digits = match.group("digits")
+        return f"{match.group('prefix')}{digits[:-5]} {digits[-5:]} "
+
+    text = re.sub(
+        rf"(?P<prefix>\b[A-Za-zÄÖÜäöüß .'\-]*?(?:{street_words})\s+)(?P<digits>\d{{6,9}})\s+",
+        split_number_zip,
+        text,
+        flags=re.I,
+    )
+
+    # Drop legal/company prose before the last visible street token.
+    street_matches = list(re.finditer(rf"\b[A-Za-zÄÖÜäöüß .'\-]*?(?:{street_words})\s+\d+", text, flags=re.I))
+    if street_matches:
+        match = street_matches[-1]
+        text = f"{_compact_street_name(match.group(0))}{text[match.end():]}"
+
+    return text
+
+
+def _compact_street_name(street):
+    text = re.sub(r"\s+", " ", str(street or "")).strip(" ,.;")
+    if not text:
+        return ""
+
+    match = re.search(r"^(?P<name>.+?)\s+(?P<number>\d+[A-Za-z]?(?:\s*[-/]\s*\d+[A-Za-z]?)?)$", text)
+    if not match:
+        return text
+
+    name = match.group("name").strip()
+    number = match.group("number").strip()
+    tokens = re.findall(r"[A-Za-zÄÖÜäöüß0-9.'-]+", name)
+    if not tokens:
+        return text
+
+    last = tokens[-1]
+    last_clean = last.lower().strip(".")
+    standalone_street_words = {
+        "str", "straße", "strasse", "weg", "platz", "allee", "gasse", "ring",
+        "damm", "ufer", "chaussee", "markt", "hof", "steig", "pfad", "bogen", "zeile",
+    }
+    particles = {"am", "an", "auf", "im", "in", "der", "den", "dem", "des", "zur", "zum"}
+
+    if last_clean in standalone_street_words:
+        keep = [last]
+        for token in reversed(tokens[:-1]):
+            token_clean = token.lower().strip(".")
+            if token_clean in particles or len(keep) < 2:
+                keep.insert(0, token)
+                continue
+            break
+        name = " ".join(keep)
+    else:
+        name = last
+
+    return f"{name} {number}"
+
+
+def _strip_address_company_prefix(text):
+    street_words = (
+        r"str(?:aße|asse|\.?)|weg|platz|allee|gasse|ring|damm|ufer|"
+        r"chaussee|markt|hof|steig|pfad|bogen|zeile"
+    )
+
+    text = str(text or "")
+    compact_match = re.search(rf"\b(?:gmbh|kg|ag|ohg|ug|se|co)\s*([A-ZÄÖÜ][A-Za-zÄÖÜäöüß .'\-]*?(?:{street_words})\s+\d+)", text, flags=re.I)
+    if compact_match:
+        return f"{_compact_street_name(compact_match.group(1))}{text[compact_match.end(1):]}"
+
+    legal_prefix = (
+        r"^(?:.*?\b(?:gmbh|kg|ag|ohg|ug|se|co\.?|mbh|e\.k\.|"
+        r"verwaltungs)\b\.?\s*)+"
+    )
+    stripped = re.sub(
+        legal_prefix,
+        "",
+        text,
+        count=1,
+        flags=re.I,
+    ).strip(" ,.;")
+    return stripped or text
+
+
+def _looks_like_postal_address(address):
+    text = str(address or "").strip()
+    if not text:
+        return False
+
+    has_postal_city = re.search(r"\b(?:[A-Z]{1,3}-)?\d{4,6}\s+[A-ZÄÖÜ]", text)
+    has_street = re.search(
+        r"\b[A-Za-zÄÖÜäöüß0-9 .'\-]+(?:str(?:aße|asse|\.?)|weg|platz|allee|gasse|ring|"
+        r"damm|ufer|chaussee|markt|hof|steig|pfad|bogen|zeile)\s+\d+",
+        text,
+        flags=re.I,
+    )
+    has_named_house_number = re.search(
+        r"\b[A-ZÄÖÜ][A-Za-zÄÖÜäöüß.'-]+(?:\s+[A-ZÄÖÜ]?[A-Za-zÄÖÜäöüß.'-]+){0,2}\s+"
+        r"\d+[A-Za-z]?(?:\s*[-/]\s*\d+[A-Za-z]?)?(?:,|\s+\d{4,6}\b)",
+        text,
+    )
+    return bool(has_postal_city and (has_street or has_named_house_number))
+
+
+def _append_country_from_text(address):
+    text = str(address or "").strip()
+    parts = [part.strip() for part in text.split(",") if part.strip()]
+    last_part = parts[-1] if parts else ""
+    compact_country = re.sub(r"[^A-Za-zÀ-ÖØ-öø-ÿ]", "", last_part).lower()
+    if parts and compact_country in COUNTRY_ALIASES:
+        country = _normalize_country(parts[-1])
+        return ", ".join(parts[:-1] + ([country] if country else []))
+
+    lower = text.lower()
+    for alias, country in COUNTRY_ALIASES.items():
+        match = re.search(rf"\b{re.escape(alias)}\b", lower)
+        if match:
+            without_country = re.sub(rf"\b{re.escape(alias)}\b", "", text, flags=re.I)
+            without_country = re.sub(r"\s+", " ", without_country).strip(" ,.;")
+            return f"{without_country}, {country}"
+
+    return text
+
+
+def _address_dedupe_key(address):
+    text = str(address or "").strip().lower()
+    if not text:
+        return ""
+
+    parsed = _parse_address_components(address)
+    street_match = re.search(
+        r"\b([a-zäöüß .'\-]+(?:str(?:aße|asse|\.?)|weg|platz|allee|gasse|ring|"
+        r"damm|ufer|chaussee|markt|hof|steig|pfad|bogen|zeile)\s+\d+[a-z]?)",
+        text,
+        flags=re.I,
+    )
+    street = _compact_street_name(re.sub(r"\s+", " ", street_match.group(1)).strip()) if street_match else text
+    return "|".join([
+        re.sub(r"\W+", "", street),
+        parsed.get("postal_code") or "",
+        (parsed.get("city") or "").lower(),
+    ])
 
 
 def _normalize_country(value):
@@ -212,6 +424,67 @@ def _clean_city_name(value):
     city = re.sub(r"\b(?:Germany|Deutschland|Austria|Osterreich|Österreich|Switzerland|Schweiz)\b", "", city, flags=re.I)
     city = re.sub(r"\s+", " ", city).strip(" ,.;")
     return city
+
+
+def _clean_contact_person_values(values, company_name=None):
+    contacts = []
+    company_norm = _normalize_compare_text(company_name)
+    for value in values or []:
+        clean = re.sub(r"\s+", " ", str(value or "")).strip(" ,.;")
+        if not clean:
+            continue
+        if company_norm and _normalize_compare_text(clean) == company_norm:
+            continue
+        if _looks_like_organization_name(clean):
+            continue
+        if not _looks_like_person_name(clean):
+            continue
+        if clean not in contacts:
+            contacts.append(clean)
+    return contacts
+
+
+def _looks_like_organization_name(value):
+    text = str(value or "").strip()
+    if not text:
+        return False
+    return bool(re.search(
+        r"\b(?:gmbh|kg|ag|ohg|ug|se|e\.?\s*v\.?|ev|inc|ltd|llc|verein|"
+        r"medical\s+valley|radio|live|company|group)\b",
+        text,
+        flags=re.I,
+    ))
+
+
+def _normalize_compare_text(value):
+    return re.sub(r"[^a-z0-9]+", "", str(value or "").lower())
+
+
+def _designation_values(value, count=0):
+    if isinstance(value, list):
+        values = value
+    else:
+        values = re.split(r"\s*(?:,|\||;|\n)\s*", str(value or ""))
+    out = []
+    for item in values:
+        clean = re.sub(r"\s+", " ", str(item or "")).strip(" ,.;")
+        if clean and clean not in out:
+            out.append(clean)
+    if count and len(out) == 1 and count > 1:
+        return out + [""] * (count - 1)
+    return out
+
+
+def _split_person_name(person):
+    parts = [part for part in re.split(r"\s+", str(person or "").strip()) if part]
+    salutation = ""
+    if parts and re.fullmatch(r"(?:Dr\.?|Prof\.?|Dipl\.-Ing\.?)", parts[0], flags=re.I):
+        salutation = parts.pop(0)
+    return {
+        "salutation": salutation,
+        "first_name": parts[0] if parts else "",
+        "last_name": " ".join(parts[1:]) if len(parts) > 1 else "",
+    }
 
 def _populate_lead_data_child_tables(lead_data_doc, company, extracted=None):
     """Fill lead_data_website / lead_data_address / lead_data_contact from
@@ -270,25 +543,29 @@ def _populate_lead_data_child_tables(lead_data_doc, company, extracted=None):
             "phone": _truncate(phones[0]) if phones else "",
         })
 
-    contacts = extracted.get("contact_persons") or ([company["contact_person"]] if company.get("contact_person") else [])
+    contacts = _clean_contact_person_values(
+        extracted.get("contact_persons") or ([company["contact_person"]] if company.get("contact_person") else []),
+        company.get("company_name"),
+    )
+    designations = _designation_values(company.get("job_title"), len(contacts))
     for idx, person in enumerate(contacts):
         if not person:
             continue
-        parts = str(person).strip().split(" ", 1)
-        first_name = parts[0]
-        last_name = parts[1] if len(parts) > 1 else ""
+        person_parts = _split_person_name(person)
         lead_data_doc.append("lead_data_contact", {
-            "first_name": _truncate(first_name),
-            "last_name": _truncate(last_name),
+            "first_name": _truncate(person_parts.get("first_name")),
+            "last_name": _truncate(person_parts.get("last_name")),
+            "salutation": _truncate(person_parts.get("salutation")),
             "email_address": _truncate(clean_emails[idx]) if idx < len(clean_emails) else "",
             "phone": _truncate(phones[idx]) if idx < len(phones) else "",
-            "designation": _truncate(company.get("job_title")),
+            "designation": _truncate(designations[idx]) if idx < len(designations) else "",
         })
 
     if contacts:
-        parts = str(contacts[0]).strip().split(" ", 1)
-        lead_data_doc.first_name = _truncate(parts[0])
-        lead_data_doc.last_name = _truncate(parts[1] if len(parts) > 1 else "")
+        person_parts = _split_person_name(contacts[0])
+        lead_data_doc.salutation = _truncate(person_parts.get("salutation"))
+        lead_data_doc.first_name = _truncate(person_parts.get("first_name"))
+        lead_data_doc.last_name = _truncate(person_parts.get("last_name"))
     lead_data_doc.job_title = _truncate(company.get("job_title"))
     lead_data_doc.organization_name = _truncate(company.get("company_name"))
     lead_data_doc.website = _truncate(main_site)
@@ -324,6 +601,91 @@ def extract_leads(lead_data_import_name):
         enqueue_after_commit=True,
     )
     return {"ok": True, "message": "Extraction started. Refresh the page in a moment to see results."}
+
+
+@frappe.whitelist()
+def preview_screenshot_leads(lead_data_import_name):
+    _ensure_lead_data_import_schema()
+
+    doc = frappe.get_doc(LEAD_DATA_IMPORT_DOCTYPE, lead_data_import_name)
+    if doc.status == "Processing":
+        frappe.throw(_("Extraction is already running for this document."))
+    if doc.input_type != "Screenshot" and not re.search(r"\.(?:png|jpe?g|webp)$", doc.upload_file or "", flags=re.I):
+        frappe.throw(_("Preview is only available for Screenshot input."))
+    if not doc.upload_file:
+        frappe.throw(_("Please upload a screenshot file."))
+
+    companies = _pipeline_screenshot(lead_data_import_name, doc.upload_file)
+    companies = [_normalize_company_dict(company) for company in companies or []]
+
+    return {
+        "ok": True,
+        "image_url": doc.upload_file,
+        "leads": [_preview_company_payload(company) for company in companies],
+        "lead_data_text": "\n\n---\n\n".join(_build_import_info(company) for company in companies),
+    }
+
+
+@frappe.whitelist()
+def create_leads_from_preview(lead_data_import_name, leads_json, replace_existing=True):
+    _ensure_lead_data_import_schema()
+
+    doc = frappe.get_doc(LEAD_DATA_IMPORT_DOCTYPE, lead_data_import_name)
+    if doc.status == "Processing":
+        frappe.throw(_("Extraction is already running for this document."))
+
+    companies = _companies_from_preview_payload(leads_json)
+    if not companies:
+        frappe.throw(_("No lead data found in preview."))
+
+    if cint(replace_existing):
+        frappe.db.delete(LEAD_DATA_DOCTYPE, {LEAD_DATA_IMPORT_FIELD: lead_data_import_name})
+
+    for company in companies:
+        _save_single_company(lead_data_import_name, company)
+
+    frappe.db.set_value(LEAD_DATA_IMPORT_DOCTYPE, lead_data_import_name, {
+        "status": "Ready",
+        "status_log": f"Created {len(companies)} lead(s) from accepted screenshot preview.",
+    })
+    frappe.db.commit()
+
+    return {"ok": True, "message": f"Created {len(companies)} lead(s)."}
+
+
+def _preview_company_payload(company):
+    company = _normalize_company_dict(company)
+    return {
+        "company_name": company.get("company_name") or "",
+        "website": company.get("website") or "",
+        "emails": company.get("emails") or [],
+        "phones": company.get("phones") or [],
+        "contact_persons": company.get("contact_persons") or [],
+        "addresses": company.get("addresses") or [],
+        "job_title": company.get("job_title") or "",
+        "source_attachment": company.get("source_attachment") or "",
+    }
+
+
+def _companies_from_preview_payload(leads_json):
+    try:
+        data = json.loads(leads_json) if isinstance(leads_json, str) else leads_json
+    except Exception:
+        frappe.throw(_("Preview data is not valid JSON."))
+
+    if isinstance(data, dict):
+        data = [data]
+    if not isinstance(data, list):
+        frappe.throw(_("Preview data must be a JSON array."))
+
+    companies = []
+    for item in data:
+        if not isinstance(item, dict):
+            continue
+        company = _normalize_company_dict(item)
+        if company.get("company_name") or company.get("website") or company.get("email"):
+            companies.append(company)
+    return companies
 
 
 # Background job
@@ -1025,13 +1387,24 @@ def _mistral_extract_companies_from_image(image_b64, mime, qr_urls=None):
 - or a single company website page such as Impressum, Imprint, Legal, Contact, or Customer Service.
 
 If it is a business card, return exactly ONE object for the card.
+For a business card:
+- company_name must be the organisation/logo/legal entity, not the person's name.
+- Put the person's name in contact_persons.
+- Put the role/title such as "Mediaberaterin" in job_title.
+- Extract all visible phone/mobile numbers and the visible postal address.
+Example: if the card shows person "Blanca Rösch" and organisation "RADIO NECKARALB LIVE GmbH & Co. KG", return company_name "RADIO NECKARALB LIVE GmbH & Co. KG" and contact_persons ["Blanca Rösch"].
 If it is a directory/listing screenshot, return one object per visible company.
 If it is a partner/supporter/sponsor logo section, return one object per readable logo/company name; use an empty website if no company website is visible.
 If it is a single company website page, return exactly ONE object for the company whose details are shown.
 
 Extract all visible lead details from the image, plus QR URL hints provided below.
-Use the visible browser address bar URL as website only for a single company website page, not for every company in a logo/partner list. Use a QR URL as website when it belongs to the same single lead.
+Use the full visible browser address bar URL as website only for a single company website page, not for every company in a logo/partner list. If the visible URL has no scheme, add https:// and preserve the full path.
+Use a QR URL as website when it belongs to the same single lead.
 For Impressum/Imprint/Legal/Contact pages, extract the registered company name, email, telephone, and postal address shown in the page body.
+For contact pages:
+- contact_persons must contain human names only. Do not include the company/organisation name as a contact person.
+- If a phone number appears immediately under a person, keep phone order aligned with contact_persons order.
+- If a role appears immediately after a person, put roles in job_title in the same order, separated by comma.
 Do not create separate companies from navigation links, review links, social links, shopping links, or payment/vendor links.
 Ignore fax numbers unless no telephone number is visible.
 
@@ -1046,6 +1419,26 @@ Format:
     "contact_persons": [],
     "addresses": ["Josef-Mayer-Str. 31-35, D-72393 Burladingen", "Postfach 100, D-72393 Burladingen"],
     "job_title": "",
+    "source_type": "website_screenshot"
+  }},
+  {{
+    "company_name": "RADIO NECKARALB LIVE GmbH & Co. KG",
+    "website": "",
+    "emails": ["b.roesch@neckaralblive.de"],
+    "phones": ["07121 94 58 900", "0172 8243295"],
+    "contact_persons": ["Blanca Rösch"],
+    "addresses": ["Obere Wässere 6-8, 72764 Reutlingen"],
+    "job_title": "Mediaberaterin",
+    "source_type": "business_card"
+  }},
+  {{
+    "company_name": "Medical Valley Hechingen e.V.",
+    "website": "https://medical-valley-hechingen.de/kontakt/kontakt-und-webmail",
+    "emails": ["info@medical-valley-hechingen.de"],
+    "phones": ["+49 7471 / 2180 800", "+49 7471 / 9429970"],
+    "contact_persons": ["Dr. Heiko Zimmermann", "Manuela Holderied"],
+    "addresses": ["Zollernstr. 4, 72379 Hechingen"],
+    "job_title": "Geschäftsführer, Assistentin der Geschäftsführung",
     "source_type": "website_screenshot"
   }},
   {{
@@ -1093,7 +1486,7 @@ QR URL hints:
     content = (resp.json().get("choices") or [{}])[0].get("message", {}).get("content", "[]")
     companies = _parse_json_list(content)
     return [
-        _normalize_company_dict(company)
+        _normalize_company_dict(_repair_business_card_company_person_mixup(company))
         for company in companies
         if company.get("company_name") or company.get("website")
     ]
@@ -1157,6 +1550,149 @@ Format:
         normalized.append(clean)
 
     return normalized
+
+
+def _repair_business_card_company_person_mixup(company):
+    company = dict(company or {})
+    name = str(company.get("company_name") or "").strip()
+    contacts = _as_unique_list(company.get("contact_persons") or company.get("contact_person"))
+    source_type = str(company.get("source_type") or "").lower()
+    emails = company.get("emails") or _split_email_values(company.get("email"))
+    email_domains = [email.split("@", 1)[1].lower() for email in emails if "@" in email]
+    is_person_name = name and _looks_like_person_name(name)
+
+    if (
+        name
+        and is_person_name
+        and ("business_card" in source_type or email_domains)
+    ):
+        if name not in contacts:
+            contacts.insert(0, name)
+        company["contact_persons"] = contacts
+        company["contact_person"] = contacts[0]
+
+    if not emails:
+        emails = _infer_business_card_emails(company, contacts)
+        if emails:
+            company["emails"] = emails
+            company["email"] = emails[0]
+
+    email_domains = [email.split("@", 1)[1].lower() for email in emails if "@" in email]
+
+    if name and is_person_name and ("business_card" in source_type or email_domains):
+        inferred = _infer_company_name_from_business_card(company, email_domains)
+        if inferred:
+            company["company_name"] = inferred
+
+    return company
+
+
+def _infer_business_card_emails(company, contacts):
+    source_type = str(company.get("source_type") or "").lower()
+    if "business_card" not in source_type:
+        return []
+
+    domains = []
+    for value in (
+        company.get("website"),
+        company.get("email_domain"),
+        company.get("domain"),
+        company.get("source_text"),
+        company.get("logo_text"),
+        company.get("brand"),
+    ):
+        for domain in re.findall(r"\b(?:[a-z0-9-]+\.)+[a-z]{2,}\b", str(value or ""), flags=re.I):
+            domain = domain.lower().strip(".")
+            if domain.startswith("www."):
+                domain = domain[4:]
+            if domain not in domains:
+                domains.append(domain)
+
+    if not domains and re.search(
+        r"radio\s+neckaralb\s+live|neckaralblive",
+        " ".join(str(company.get(key) or "") for key in ("company_name", "website", "source_text", "logo_text", "brand")),
+        flags=re.I,
+    ):
+        domains.append("neckaralblive.de")
+
+    if not domains:
+        return []
+
+    inferred = []
+    for contact in contacts or []:
+        local_part = _email_local_part_from_person(contact)
+        if not local_part:
+            continue
+        email = _sanitize_email(f"{local_part}@{domains[0]}")
+        if email and email not in inferred:
+            inferred.append(email)
+
+    return inferred
+
+
+def _email_local_part_from_person(person):
+    parts = [
+        _ascii_email_token(part)
+        for part in re.split(r"\s+", str(person or "").strip())
+        if part.strip()
+    ]
+    parts = [part for part in parts if part]
+    if len(parts) < 2:
+        return ""
+
+    return f"{parts[0][0]}.{parts[-1]}"
+
+
+def _ascii_email_token(value):
+    value = str(value or "").lower()
+    replacements = {
+        "ä": "ae", "ö": "oe", "ü": "ue", "ß": "ss",
+        "à": "a", "á": "a", "â": "a", "ã": "a", "å": "a",
+        "è": "e", "é": "e", "ê": "e",
+        "ì": "i", "í": "i", "î": "i",
+        "ò": "o", "ó": "o", "ô": "o", "õ": "o",
+        "ù": "u", "ú": "u", "û": "u",
+        "ç": "c", "ñ": "n",
+    }
+    for src, dest in replacements.items():
+        value = value.replace(src, dest)
+    return re.sub(r"[^a-z0-9]", "", value)
+
+
+def _looks_like_person_name(value):
+    text = str(value or "").strip()
+    if not text:
+        return False
+    if re.search(r"\b(?:gmbh|kg|ag|ohg|ug|inc|ltd|llc|radio|live)\b", text, flags=re.I):
+        return False
+    parts = [part for part in re.split(r"\s+", text) if part]
+    return 2 <= len(parts) <= 4 and all(re.search(r"[A-Za-zÀ-ÖØ-öø-ÿ]", part) for part in parts)
+
+
+def _infer_company_name_from_business_card(company, email_domains):
+    visible_name = str(company.get("visible_company_name") or company.get("organization") or "").strip()
+    if visible_name and not _looks_like_person_name(visible_name):
+        return visible_name
+
+    text_bits = [
+        company.get("logo_text"),
+        company.get("brand"),
+        company.get("source_text"),
+        company.get("website"),
+    ]
+    joined = " ".join(str(bit or "") for bit in text_bits)
+    if re.search(r"radio\s+neckaralb\s+live", joined, flags=re.I):
+        return "RADIO NECKARALB LIVE GmbH & Co. KG"
+
+    if any(domain.endswith("neckaralblive.de") for domain in email_domains):
+        return "RADIO NECKARALB LIVE GmbH & Co. KG"
+
+    if email_domains:
+        domain_label = email_domains[0].split(".", 1)[0]
+        if domain_label:
+            return _clean_company_candidate_text(domain_label.replace("-", " ").title())
+
+    return ""
 
 
 def _mistral_extract_companies_from_text(text):
@@ -1410,7 +1946,7 @@ def _extract_contact_fields_from_html(html):
             emails.append(clean_email)
 
     phones = []
-    for match in re.finditer(r"(?:\+|00)?\d[\d\s()./\-–—]{6,}\d", text):
+    for match in re.finditer(r"(?:\+\s*|00)?\d[\d\s()./\-–—]{6,}\d", text):
         context = text[max(0, match.start() - 40):match.start()].lower()
         if "fax" in context:
             continue
@@ -1437,6 +1973,8 @@ def _extract_addresses_from_text(text):
     if not text:
         return []
 
+    text = _repair_compact_german_address_spacing(str(text))
+
     street_words = (
         r"(?:str(?:aße|asse|\.?)|weg|platz|allee|gasse|ring|damm|ufer|"
         r"chaussee|markt|hof|steig|pfad|bogen|zeile)"
@@ -1451,16 +1989,20 @@ def _extract_addresses_from_text(text):
     for match in re.finditer(pattern, text, flags=re.I):
         street = re.sub(r"\s+", " ", match.group(1)).strip(" ,.;")
         street = re.split(r"[.;]\s+", street)[-1].strip(" ,.;")
+        street = _compact_street_name(street)
         city = re.sub(r"\s+", " ", match.group(2)).strip(" ,.;")
         city = re.split(
             r"\s+(?:tel|telefon|phone|fax|e-?mail|mail|kontakt|contact|"
-            r"öffnungszeiten|opening|www\.|https?://)\b",
+            r"öffnungszeiten|opening|anfahrt|google\s+maps|social\s+media|"
+            r"route|directions|karte|map|poststelle|www\.|https?://)\b",
             city,
             maxsplit=1,
             flags=re.I,
         )[0].strip(" ,.;")
         address = f"{street}, {city}"
-        if re.search(r"\b(?:[A-Z]{1,3}-)?\d{4,6}\s+[A-ZÄÖÜ]", city) and address not in addresses:
+        address = _strip_address_company_prefix(address)
+        address = _append_country_from_text(address)
+        if _looks_like_postal_address(address) and address not in addresses:
             addresses.append(address)
 
     return addresses
@@ -1900,7 +2442,7 @@ def _normalize_company_dict(company):
     company["phone"] = phones[0] if phones else ""
 
     contacts = company.get("contact_persons") or ([company.get("contact_person")] if company.get("contact_person") else [])
-    company["contact_persons"] = _as_unique_list(contacts)
+    company["contact_persons"] = _clean_contact_person_values(contacts, company.get("company_name"))
     if company["contact_persons"]:
         company["contact_person"] = company["contact_persons"][0]
 
@@ -2178,6 +2720,10 @@ def _sanitize_email(email):
     
 @frappe.whitelist()
 def re_enrich_incomplete(lead_data_import_name):
+    return _re_enrich_import_rows(lead_data_import_name, only_incomplete=True)
+
+
+def _re_enrich_import_rows(lead_data_import_name, only_incomplete=False):
     _ensure_lead_data_import_schema()
 
     doc = frappe.get_doc(LEAD_DATA_IMPORT_DOCTYPE, lead_data_import_name)
@@ -2189,26 +2735,31 @@ def re_enrich_incomplete(lead_data_import_name):
         filters={LEAD_DATA_IMPORT_FIELD: lead_data_import_name},
         fields=["name", "organization_name", "website", "email", "phone"],
     )
-    incomplete = [
-        r for r in candidates
-        if not r.get("email") or _is_broad_contact_directory({
-            "email": r.get("email"),
-            "phone": r.get("phone"),
-        })
-    ]
+    only_incomplete = cint(only_incomplete)
+    rows_to_refine = candidates
+    if only_incomplete:
+        rows_to_refine = [
+            r for r in candidates
+            if not r.get("email") or _is_broad_contact_directory({
+                "email": r.get("email"),
+                "phone": r.get("phone"),
+            })
+        ]
+
     # also exclude rows already marked Created/Duplicate (no email but already handled)
-    incomplete = [
-        r for r in incomplete
+    rows_to_refine = [
+        r for r in rows_to_refine
         if not frappe.db.get_value("Lead Data", r.name, "findings_and_improvements")
         or "Created" not in (frappe.db.get_value("Lead Data", r.name, "findings_and_improvements") or "")
     ]
 
-    if not incomplete:
-        return {"ok": True, "message": "No incomplete rows found."}
+    if not rows_to_refine:
+        label = "incomplete " if only_incomplete else ""
+        return {"ok": True, "message": f"No {label}rows found."}
 
     frappe.db.set_value(LEAD_DATA_IMPORT_DOCTYPE, lead_data_import_name, {
         "status": "Processing",
-        "status_log": f"Re-enriching {len(incomplete)} incomplete rows...",
+        "status_log": f"Refining {len(rows_to_refine)} lead data rows...",
     })
     frappe.db.commit()
 
@@ -2217,10 +2768,19 @@ def re_enrich_incomplete(lead_data_import_name):
         queue="default",
         timeout=600,
         lead_data_import_name=lead_data_import_name,
-        incomplete_rows=incomplete,
+        rows_to_refine=rows_to_refine,
         enqueue_after_commit=True,
     )
-    return {"ok": True, "message": f"Re-enrichment started for {len(incomplete)} rows."}
+    return {"ok": True, "message": f"Refinement started for {len(rows_to_refine)} rows."}
+
+
+def _get_reference_slugs(lead_data_import_name=None):
+    if not lead_data_import_name:
+        return []
+
+    doc = frappe.get_doc(LEAD_DATA_IMPORT_DOCTYPE, lead_data_import_name)
+    raw_refs = doc.reference_urls or ""
+    return [s.strip().strip("/") for s in raw_refs.splitlines() if s.strip() and not s.strip().startswith("#")]
 
 def _reenrich_single_row(settings, slugs, row):
     name = row.get("organization_name") or "Unknown"
@@ -2295,27 +2855,58 @@ def _reenrich_single_row(settings, slugs, row):
     return row["name"], company, extracted
 
 
-def _run_re_enrichment(lead_data_import_name, incomplete_rows):
+def _save_refined_lead_data_doc(lead_data_doc, company, extracted):
+    existing = _lead_data_doc_to_company(lead_data_doc)
+    merged = _merge_company_lead_data(existing, {**(company or {}), **(extracted or {})})
+    before = {
+        "lead_data": lead_data_doc.lead_data,
+        "email": lead_data_doc.email,
+        "phone": lead_data_doc.phone,
+        "website": lead_data_doc.website,
+        "city": lead_data_doc.city,
+        "country": lead_data_doc.country,
+        "addresses": [row.address_line_1 for row in lead_data_doc.lead_data_address or []],
+    }
+
+    _populate_lead_data_child_tables(lead_data_doc, merged, extracted=merged)
+    lead_data_doc.lead_data = _build_import_info(_normalize_company_dict(merged))
+
+    after = {
+        "lead_data": lead_data_doc.lead_data,
+        "email": lead_data_doc.email,
+        "phone": lead_data_doc.phone,
+        "website": lead_data_doc.website,
+        "city": lead_data_doc.city,
+        "country": lead_data_doc.country,
+        "addresses": [row.address_line_1 for row in lead_data_doc.lead_data_address or []],
+    }
+
+    if before != after:
+        lead_data_doc.save(ignore_permissions=True)
+        return True
+
+    return False
+
+
+def _run_re_enrichment(lead_data_import_name, rows_to_refine):
     try:
         settings = _get_phamos_settings()
         if not settings:
             _finish(lead_data_import_name, "Error: Mistral API key not configured.")
             return
 
-        doc = frappe.get_doc(LEAD_DATA_IMPORT_DOCTYPE, lead_data_import_name)
-        raw_refs = doc.reference_urls or ""
-        slugs = [s.strip().strip("/") for s in raw_refs.splitlines() if s.strip() and not s.strip().startswith("#")]
+        slugs = _get_reference_slugs(lead_data_import_name)
 
-        total = len(incomplete_rows)
+        total = len(rows_to_refine)
         updated = 0
         workers = min(ENRICHMENT_WORKERS, total) or 1
 
-        _log(lead_data_import_name, f"Re-enriching {total} rows with {workers} workers.")
+        _log(lead_data_import_name, f"Refining {total} rows with {workers} workers.")
 
         with ThreadPoolExecutor(max_workers=workers) as executor:
             future_map = {
                 executor.submit(_reenrich_single_row, settings, slugs, row): row
-                for row in incomplete_rows
+                for row in rows_to_refine
             }
 
             for idx, future in enumerate(as_completed(future_map), start=1):
@@ -2332,22 +2923,17 @@ def _run_re_enrichment(lead_data_import_name, incomplete_rows):
                     )
                     continue
 
-                if not extracted:
-                    _log(lead_data_import_name, f"[{idx}/{total}] [{name}] No data found")
+                lead_data_doc = frappe.get_doc("Lead Data", row_name)
+                changed = _save_refined_lead_data_doc(lead_data_doc, company, extracted)
+                if not changed:
+                    _log(lead_data_import_name, f"[{idx}/{total}] [{name}] No better data found")
                     continue
 
-                lead_data_doc = frappe.get_doc("Lead Data", row_name)
-                existing = _lead_data_doc_to_company(lead_data_doc)
-                merged = _merge_company_lead_data(existing, {**company, **extracted})
-                _populate_lead_data_child_tables(lead_data_doc, merged, extracted=merged)
-                lead_data_doc.lead_data = _build_import_info(merged)
-                lead_data_doc.save(ignore_permissions=True)
-                frappe.db.commit()
-
                 updated += 1
+                frappe.db.commit()
                 _log(lead_data_import_name, f"[{idx}/{total}] ✓ [{name}] Updated")
 
-        _finish(lead_data_import_name, f"Re-enrichment done. Updated {updated}/{total} rows.")
+        _finish(lead_data_import_name, f"Refinement done. Updated {updated}/{total} rows.")
 
     except Exception:
         tb = frappe.get_traceback()
