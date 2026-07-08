@@ -227,7 +227,9 @@ def create_ticket_order(event_name, attendees, qty, invoice_data=None):
 
     # --- Find or create customer from primary attendee ---
     primary = attendees[0]
-    customer = _resolve_customer(primary["full_name"], primary["email"], is_company_order, invoice_data)
+    customer = frappe.db.get_single_value("phamos Settings", "walk_in_customer")
+    if needs_tax_invoice:
+        customer = _resolve_customer(primary["full_name"], primary["email"], is_company_order, invoice_data)
 
     # --- Item rate ---
     item_price = frappe.db.get_value(
@@ -258,12 +260,16 @@ def create_ticket_order(event_name, attendees, qty, invoice_data=None):
     so.delivery_date = frappe.utils.today()
     so.selling_price_list = price_list
     so.ignore_pricing_rule = 1
-    so.append("items", {
-        "item_code": item_code,
-        "qty": qty,
-        "rate": rate,
-        "delivery_date": frappe.utils.today(),
-    })
+
+    for att in attendees:
+        so.append("items", {
+            "item_code": item_code,
+            "qty": 1,
+            "rate": rate,
+            "additional_notes": att.get("full_name") + "\n" + att.get("email"),
+            "item_tax_template": item_tax_template,
+            "delivery_date": frappe.utils.today(),
+        })
 
     item_tax_template = frappe.db.get_value("Marketing Content", event_name, "item_tax_template")
     if item_tax_template:
