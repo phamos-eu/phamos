@@ -55,7 +55,9 @@
   "execute_raven_thread",
   "checklist_tab",
   "checklist_section",
-  "checklist_popup"
+  "checklist_popup",
+  "ticketing_tab",
+  "walk_in_customer"
  ],
  "fields": [
   {
@@ -327,12 +329,24 @@
    "fieldtype": "Table",
    "label": "Checklist Popup",
    "options": "Checklist Popup Doctype"
+  },
+  {
+   "fieldname": "ticketing_tab",
+   "fieldtype": "Tab Break",
+   "label": "Event Ticketing"
+  },
+  {
+   "description": "Used as the default Customer for ticket Sales Orders when no invoice/company details are given (individual, no-invoice purchases).",
+   "fieldname": "walk_in_customer",
+   "fieldtype": "Link",
+   "label": "Walk In Customer",
+   "options": "Customer"
   }
  ],
  "index_web_pages_for_search": 1,
  "issingle": 1,
  "links": [],
- "modified": "2026-06-15 12:14:27.226685",
+ "modified": "2026-07-08 08:37:16.073881",
  "modified_by": "Administrator",
  "module": "Phamos",
  "name": "phamos Settings",

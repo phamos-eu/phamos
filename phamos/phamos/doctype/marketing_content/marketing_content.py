@@ -259,7 +259,7 @@ def create_ticket_order(event_name, attendees, qty, invoice_data=None):
 
     # --- Only create/resolve a customer when a tax invoice is requested ---
     primary = attendees[0]
-    customer = "Ticket Buyer Walk In"
+    customer = frappe.db.get_single_value("phamos Settings", "walk_in_customer")
     if needs_tax_invoice:
         customer = _resolve_customer(primary["full_name"], primary["email"], is_company_order, invoice_data)
 
@@ -293,7 +293,7 @@ def create_ticket_order(event_name, attendees, qty, invoice_data=None):
             "item_code": item_code,
             "qty": 1,
             "rate": rate,
-            "additional_notes": att.get("full_name") + "<br>" + att.get("email"),
+            "additional_notes": att.get("full_name") + "\n" + att.get("email"),
             "item_tax_template": item_tax_template,
             "delivery_date": frappe.utils.today(),
         })
