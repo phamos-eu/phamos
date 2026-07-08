@@ -66,11 +66,19 @@ LEAD_FIELD_EXTRACTION_PROMPT = """Extract contact details for this company from 
 Company: {company_name}
 
 Return only this JSON object:
-{{"emails":[],"phones":[],"contact_persons":[],"addresses":[],"website":""}}
+{{"emails":[],"phones":[],"contact_persons":[],"addresses":[],"website":"","job_title":""}}
+
+Use these field-specific instructions when deciding what belongs in each field:
+{field_guidance}
 
 Use only values explicitly present in the text. Keep list fields as arrays of strings.
 Phones must be real telephone/mobile numbers. Exclude fax numbers, dates, IDs,
 prices, percentages, coordinates, and list numbering.
+Addresses must be clean postal addresses only. Do not include VAT IDs, tax text,
+commercial register text, legal paragraphs, labels, navigation text, or cookie text.
+If a role/designation appears next to a contact person, put the role in job_title.
+When there are multiple contact persons, keep job_title values in the same order,
+separated by commas.
 
 Text:
 ---
@@ -80,6 +88,21 @@ Text:
 
 class LeadDataImport(Document):
     pass
+
+
+def _get_lead_data_mapping_prompt():
+    if not frappe.db.exists("DocType", "Lead Data Mapping"):
+        return ""
+
+    mapping = frappe.get_single("Lead Data Mapping")
+    lines = []
+    for row in mapping.lead_data_field_mapping or []:
+        field = (row.lead_data_field or "").strip()
+        conditions = (row.conditions or "").strip()
+        if field and conditions:
+            lines.append(f"- {field}: {conditions}")
+
+    return "\n".join(lines)
 
 
 COUNTRY_ALIASES = {
@@ -222,20 +245,45 @@ def _normalize_address_candidate(address):
     text = _repair_compact_german_address_spacing(text)
     text = _strip_address_company_prefix(text)
     text = re.sub(r"\s+", " ", text).strip(" ,.;")
+    text = _trim_address_after_postal_city(text)
     text = re.sub(
         r"\s+(?:anfahrt(?:\s+mit\s+google\s+maps)?|google\s+maps|social\s+media|"
         r"route|directions|karte|map|tel|telefon|phone|fax|e-?mail|mail|"
-        r"kontakt|contact|poststelle)\b.*$",
+        r"kontakt|contact|poststelle|vat(?:\s+id)?|ust-?id|ust\.?-?idnr|"
+        r"sales\s+tax|tax\s+identification|commercial\s+register|registergericht|"
+        r"handelsregister|managing\s+director|geschaftsfuhrer|geschäftsführer)\b.*$",
         "",
         text,
         flags=re.I,
     ).strip(" ,.;")
+    text = _trim_address_after_postal_city(text)
 
     if not _looks_like_postal_address(text):
         return ""
 
     text = _append_country_from_text(text)
     return text if _looks_like_postal_address(text) else ""
+
+
+def _trim_address_after_postal_city(text):
+    text = str(text or "").strip(" ,.;")
+    if not text:
+        return ""
+
+    match = re.search(
+        r"^(?P<prefix>.*?\b(?:[A-Z]{1,3}-)?\d{4,6}\s+"
+        r"[A-ZÄÖÜ][A-Za-zÀ-ÖØ-öø-ÿ .'-]+?)"
+        r"(?=\s+(?:der|die|das|website|impressum|datenschutz|erklarung|erklärung|"
+        r"recht|barrierefreiheit|kontakt|anfahrt|route|vat(?:\s+id)?|ust-?id|ust\.?-?idnr|sales\s+tax|tax\s+identification|"
+        r"commercial\s+register|registergericht|handelsregister|managing\s+director|"
+        r"geschaftsfuhrer|geschäftsführer|phone|telefon|tel|fax|email|e-?mail)\b|$)",
+        text,
+        flags=re.I,
+    )
+    if match:
+        return re.sub(r"\s+", " ", match.group("prefix")).strip(" ,.;")
+
+    return text
 
 
 def _repair_compact_german_address_spacing(text):
@@ -391,7 +439,6 @@ def _address_dedupe_key(address):
     return "|".join([
         re.sub(r"\W+", "", street),
         parsed.get("postal_code") or "",
-        (parsed.get("city") or "").lower(),
     ])
 
 
@@ -467,12 +514,36 @@ def _designation_values(value, count=0):
         values = re.split(r"\s*(?:,|\||;|\n)\s*", str(value or ""))
     out = []
     for item in values:
-        clean = re.sub(r"\s+", " ", str(item or "")).strip(" ,.;")
+        clean = _clean_job_title_value(item)
         if clean and clean not in out:
             out.append(clean)
     if count and len(out) == 1 and count > 1:
         return out + [""] * (count - 1)
     return out
+
+
+def _clean_job_title_text(value):
+    return ", ".join(_designation_values(value))
+
+
+def _clean_job_title_value(value):
+    clean = re.sub(r"\s+", " ", str(value or "")).strip(" ,.;")
+    if not clean:
+        return ""
+
+    if re.search(
+        r"\b(?:verantwortlich(?:e|er)?|gem[aä]ß|gemaess|rundfunkstaatsvertrag|"
+        r"rstv|tm?g|inhaltlich\s+verantwortlich|redaktionell\s+verantwortlich|"
+        r"§|paragraph|datenschutz|impressum|legal\s+notice)\b",
+        clean,
+        flags=re.I,
+    ):
+        return ""
+
+    if len(clean) > 80:
+        return ""
+
+    return clean
 
 
 def _split_person_name(person):
@@ -566,7 +637,7 @@ def _populate_lead_data_child_tables(lead_data_doc, company, extracted=None):
         lead_data_doc.salutation = _truncate(person_parts.get("salutation"))
         lead_data_doc.first_name = _truncate(person_parts.get("first_name"))
         lead_data_doc.last_name = _truncate(person_parts.get("last_name"))
-    lead_data_doc.job_title = _truncate(company.get("job_title"))
+    lead_data_doc.job_title = _truncate(_clean_job_title_text(company.get("job_title")))
     lead_data_doc.organization_name = _truncate(company.get("company_name"))
     lead_data_doc.website = _truncate(main_site)
     lead_data_doc.email = _truncate(clean_emails[0]) if clean_emails else ""
@@ -1075,7 +1146,7 @@ def _is_noise_domain(domain):
         "youtu.be", "twitter.com", "x.com", "tiktok.com", "eventbrite.",
         "pretix.", "google.", "maps.google.", "apple.com", "microsoft.com",
         "whatsapp.com", "wa.me", "ekomi.", "trustpilot.", "trustedshops.",
-        "paypal.", "klarna.",
+        "paypal.", "klarna.", "calendly.com",
     )
     return any(noise in domain for noise in noise_domains)
 
@@ -1102,6 +1173,7 @@ def _pipeline_screenshot(lead_data_import_name, file_url):
         companies = _mistral_extract_logo_companies_from_image(image_b64, mime)
 
     is_logo_list = any(company.get("source_type") == "logo_list" for company in companies)
+    normalized_companies = []
     for company in companies:
         if not company.get("website") and qr_urls and not is_logo_list:
             company["website"] = qr_urls[0]
@@ -1109,10 +1181,12 @@ def _pipeline_screenshot(lead_data_import_name, file_url):
             company["website"] = _infer_or_search_website(company)
         if not company.get("company_name") and company.get("website"):
             company["company_name"] = _domain_to_company_name(company["website"])
+        company = _normalize_company_dict(_prioritize_business_card_emails(company))
         company["source_attachment"] = file_url
+        normalized_companies.append(company)
 
-    _log(lead_data_import_name, f"Mistral identified {len(companies)} lead(s) in the screenshot.")
-    return companies if not MAX_COMPANIES_PER_IMPORT else companies[:MAX_COMPANIES_PER_IMPORT]
+    _log(lead_data_import_name, f"Mistral identified {len(normalized_companies)} lead(s) in the screenshot.")
+    return normalized_companies if not MAX_COMPANIES_PER_IMPORT else normalized_companies[:MAX_COMPANIES_PER_IMPORT]
 
 # Pipeline: PDF
 
@@ -1176,7 +1250,10 @@ def _enrich_and_save_companies(lead_data_import_name, companies, ai_fallback=Fal
         if s.strip() and not s.strip().startswith("#")
     ]
 
+    field_guidance = _get_lead_data_mapping_prompt()
     total = len(companies)
+    saved_keys = set()
+    saved_count = 0
 
     if ai_fallback and total > 1:
         workers = min(ENRICHMENT_WORKERS, total)
@@ -1191,6 +1268,7 @@ def _enrich_and_save_companies(lead_data_import_name, companies, ai_fallback=Fal
                     company,
                     None,
                     ai_fallback,
+                    field_guidance,
                 ): (idx, company)
                 for idx, company in enumerate(companies, start=1)
             }
@@ -1212,10 +1290,13 @@ def _enrich_and_save_companies(lead_data_import_name, companies, ai_fallback=Fal
                     )
                     enriched = company
 
-                _save_single_company(lead_data_import_name, enriched)
-                _log(lead_data_import_name, f"[{idx}/{total}] Saved: {name}")
+                if _save_single_company_once(lead_data_import_name, enriched, saved_keys):
+                    saved_count += 1
+                    _log(lead_data_import_name, f"[{idx}/{total}] Saved: {name}")
+                else:
+                    _log(lead_data_import_name, f"[{idx}/{total}] Skipped duplicate: {name}")
 
-        return total
+        return saved_count
 
     for idx, company in enumerate(companies, start=1):
         name = company.get("company_name", "Unknown")
@@ -1223,13 +1304,21 @@ def _enrich_and_save_companies(lead_data_import_name, companies, ai_fallback=Fal
         _log(lead_data_import_name, f"[{idx}/{total}] {action}: {name}")
 
         enriched = _enrich_single_company(
-            settings, slugs, company, lead_data_import_name, ai_fallback=ai_fallback
+            settings,
+            slugs,
+            company,
+            lead_data_import_name,
+            ai_fallback=ai_fallback,
+            field_guidance=field_guidance,
         )
-        _save_single_company(lead_data_import_name, enriched)
+        if _save_single_company_once(lead_data_import_name, enriched, saved_keys):
+            saved_count += 1
+        else:
+            _log(lead_data_import_name, f"[{idx}/{total}] Skipped duplicate: {name}")
 
-    return total
+    return saved_count
 
-def _enrich_single_company(settings, slugs, company, lead_data_import_name=None, ai_fallback=True):
+def _enrich_single_company(settings, slugs, company, lead_data_import_name=None, ai_fallback=True, field_guidance=""):
     name    = company.get("company_name", "Unknown")
     website = company.get("website", "")
 
@@ -1256,6 +1345,7 @@ def _enrich_single_company(settings, slugs, company, lead_data_import_name=None,
             f"Reference page: {slug_url}",
             ai_fallback=ai_fallback,
             force_ai=_is_preferred_legal_slug(slug_url),
+            field_guidance=field_guidance,
         )
         if not _has_contact_lead_data(page_extracted):
             continue
@@ -1288,6 +1378,7 @@ def _enrich_single_company(settings, slugs, company, lead_data_import_name=None,
                 name,
                 f"Original page: {website}",
                 ai_fallback=ai_fallback,
+                field_guidance=field_guidance,
             )
             if _has_contact_lead_data(page_extracted) and not _is_broad_contact_directory(page_extracted):
                 _merge_extracted_lead_fields(extracted, page_extracted)
@@ -1301,6 +1392,7 @@ def _enrich_single_company(settings, slugs, company, lead_data_import_name=None,
             name,
             f"Main page: {base}",
             ai_fallback=ai_fallback,
+            field_guidance=field_guidance,
         )
         if _has_contact_lead_data(page_extracted) and not _is_broad_contact_directory(page_extracted):
             _merge_extracted_lead_fields(extracted, page_extracted)
@@ -1318,6 +1410,7 @@ def _enrich_single_company(settings, slugs, company, lead_data_import_name=None,
                 f"crawl: {link}",
                 ai_fallback=ai_fallback,
                 force_ai=_is_preferred_legal_slug(link),
+                field_guidance=field_guidance,
             )
             if _is_broad_contact_directory(page_extracted) and not _is_preferred_legal_slug(link):
                 continue
@@ -1335,7 +1428,7 @@ def _enrich_single_company(settings, slugs, company, lead_data_import_name=None,
             _log(lead_data_import_name, f"  → [{name}] No data extracted")
 
     merged = {**company, **{k: v for k, v in extracted.items() if v and k != "website"}}
-    return merged
+    return _prioritize_business_card_emails(merged)
 
 # Mistral API calls
 
@@ -1380,6 +1473,7 @@ def _mistral_extract_companies_from_image(image_b64, mime, qr_urls=None):
         model = MISTRAL_CHAT_MODEL_DEFAULT
 
     qr_hint = "\n".join(qr_urls or [])
+    field_guidance = _get_lead_data_mapping_prompt()
     prompt = f"""You are analyzing a screenshot. It may be:
 - a single business card,
 - a company directory/partner listing page,
@@ -1391,7 +1485,8 @@ For a business card:
 - company_name must be the organisation/logo/legal entity, not the person's name.
 - Put the person's name in contact_persons.
 - Put the role/title such as "Mediaberaterin" in job_title.
-- Extract all visible phone/mobile numbers and the visible postal address.
+- Extract all visible phone/mobile numbers, the visible postal address, and every visible email address.
+- Pay close attention to small or rotated email text on business cards. If the card shows a person email such as b.roesch@neckaralblive.de, include that exact email before generic company emails.
 Example: if the card shows person "Blanca Rösch" and organisation "RADIO NECKARALB LIVE GmbH & Co. KG", return company_name "RADIO NECKARALB LIVE GmbH & Co. KG" and contact_persons ["Blanca Rösch"].
 If it is a directory/listing screenshot, return one object per visible company.
 If it is a partner/supporter/sponsor logo section, return one object per readable logo/company name; use an empty website if no company website is visible.
@@ -1405,6 +1500,8 @@ For contact pages:
 - contact_persons must contain human names only. Do not include the company/organisation name as a contact person.
 - If a phone number appears immediately under a person, keep phone order aligned with contact_persons order.
 - If a role appears immediately after a person, put roles in job_title in the same order, separated by comma.
+Use these field-specific instructions when deciding what belongs in each field:
+{field_guidance}
 Do not create separate companies from navigation links, review links, social links, shopping links, or payment/vendor links.
 Ignore fax numbers unless no telephone number is visible.
 
@@ -1630,6 +1727,54 @@ def _infer_business_card_emails(company, contacts):
     return inferred
 
 
+def _prioritize_business_card_emails(company):
+    company = dict(company or {})
+    source_type = str(company.get("source_type") or "").lower()
+    if "business_card" not in source_type:
+        return company
+
+    contacts = _as_unique_list(company.get("contact_persons") or company.get("contact_person"))
+    website_domain = _domain_from_url(company.get("website"))
+    current_emails = []
+    for email in company.get("emails") or _split_email_values(company.get("email")):
+        clean = _sanitize_email(email)
+        if clean and clean not in current_emails:
+            current_emails.append(clean)
+
+    inferred = []
+    if website_domain:
+        for contact in contacts:
+            local_part = _email_local_part_from_person(contact)
+            if not local_part:
+                continue
+            email = _sanitize_email(f"{local_part}@{website_domain}")
+            if email and email not in inferred:
+                inferred.append(email)
+
+        same_domain = [
+            email for email in current_emails
+            if email.split("@", 1)[1].lower() == website_domain
+        ]
+        current_emails = same_domain or current_emails
+
+    emails = []
+    for email in inferred + current_emails:
+        if email and email not in emails:
+            emails.append(email)
+
+    company["emails"] = emails
+    company["email"] = emails[0] if emails else ""
+    return company
+
+
+def _domain_from_url(url):
+    parsed = urlparse(_normalize_url(url) or "")
+    domain = (parsed.netloc or "").lower()
+    if domain.startswith("www."):
+        domain = domain[4:]
+    return domain
+
+
 def _email_local_part_from_person(person):
     parts = [
         _ascii_email_token(part)
@@ -1719,13 +1864,14 @@ Text:
     return _call_mistral_json_list(settings, prompt)
 
 
-def _mistral_extract_lead_fields(settings, text, company_name):
+def _mistral_extract_lead_fields(settings, text, company_name, field_guidance=None):
     model = settings["model"]
     if "ocr" in model.lower():
         model = MISTRAL_CHAT_MODEL_DEFAULT
 
     prompt = LEAD_FIELD_EXTRACTION_PROMPT.format(
         company_name=company_name,
+        field_guidance=field_guidance if field_guidance is not None else _get_lead_data_mapping_prompt(),
         text=text,
     )
 
@@ -1753,6 +1899,7 @@ def _mistral_extract_lead_fields(settings, text, company_name):
                 result[key] = [val] if val.strip() else []
             elif not isinstance(val, list):
                 result[key] = []
+        result["job_title"] = ", ".join(_designation_values(result.get("job_title")))
 
         result = _filter_extracted_to_source_text(result, text)
 
@@ -1768,6 +1915,7 @@ def _mistral_extract_lead_fields(settings, text, company_name):
         result["phone"] = phones[0] if phones else ""
         result["contact_person"] = contacts[0] if contacts else ""
         result["address"] = addresses[0] if addresses else ""
+        result["job_title"] = ", ".join(_designation_values(result.get("job_title")))
 
         return result
     except Exception:
@@ -2084,7 +2232,7 @@ def _sanitize_phone_list(value):
         if not clean_phone:
             continue
 
-        digits_key = re.sub(r"\D", "", clean_phone)
+        digits_key = _phone_dedupe_key(clean_phone)
         if digits_key in seen_digits:
             continue
 
@@ -2092,6 +2240,19 @@ def _sanitize_phone_list(value):
         phones.append(clean_phone)
 
     return phones
+
+
+def _phone_dedupe_key(phone):
+    digits = re.sub(r"\D", "", str(phone or ""))
+    if digits.startswith("490"):
+        return "0" + digits[3:]
+    if digits.startswith("49") and len(digits) > 8:
+        return "0" + digits[2:]
+    if digits.startswith("00490"):
+        return "0" + digits[5:]
+    if digits.startswith("0049") and len(digits) > 10:
+        return "0" + digits[4:]
+    return digits
 
 
 def _format_phone_field(value, max_len=140):
@@ -2367,7 +2528,15 @@ def _is_broad_contact_directory(data):
     return len(emails) > 4 or len(phones) > 8
 
 
-def _extract_lead_fields_from_page(settings, html, company_name, source_label, ai_fallback=True, force_ai=False):
+def _extract_lead_fields_from_page(
+    settings,
+    html,
+    company_name,
+    source_label,
+    ai_fallback=True,
+    force_ai=False,
+    field_guidance=None,
+):
     if not html:
         return {}
 
@@ -2381,6 +2550,7 @@ def _extract_lead_fields_from_page(settings, html, company_name, source_label, a
             settings,
             f"\n\n=== {source_label} ===\n{clean}"[:10000],
             company_name,
+            field_guidance=field_guidance,
         )
         _merge_extracted_lead_fields(extracted, ai_extracted)
 
@@ -2428,18 +2598,31 @@ def _as_unique_list(value):
 def _normalize_company_dict(company):
     company = dict(company or {})
     company["website"] = _normalize_url(company.get("website"))
+    website_domain = _normalized_domain(company.get("website"))
 
     emails = []
     for email in company.get("emails") or _split_email_values(company.get("email")):
         clean = _sanitize_email(email)
         if clean and clean not in emails:
             emails.append(clean)
+    if website_domain:
+        website_emails = [
+            email for email in emails
+            if _normalized_domain(email.split("@", 1)[1]) == website_domain
+        ]
+        emails = website_emails or [
+            email for email in emails
+            if not _is_noise_email(email)
+        ]
+    else:
+        emails = [email for email in emails if not _is_noise_email(email)]
     company["emails"] = emails
     company["email"] = emails[0] if emails else ""
 
     phones = _sanitize_phone_list(company.get("phones") or company.get("phone"))
     company["phones"] = phones
     company["phone"] = phones[0] if phones else ""
+    company["job_title"] = _clean_job_title_text(company.get("job_title"))
 
     contacts = company.get("contact_persons") or ([company.get("contact_person")] if company.get("contact_person") else [])
     company["contact_persons"] = _clean_contact_person_values(contacts, company.get("company_name"))
@@ -2452,6 +2635,24 @@ def _normalize_company_dict(company):
         company["address"] = company["addresses"][0]
 
     return company
+
+
+def _is_noise_email(email):
+    clean = _sanitize_email(email)
+    if not clean or "@" not in clean:
+        return True
+
+    local_part, domain = clean.split("@", 1)
+    if _is_noise_domain(domain):
+        return True
+
+    if local_part in {
+        "privacy", "dpo", "dpo-google", "datenschutz", "privacyshield",
+        "abuse", "security", "legal", "noreply", "no-reply",
+    }:
+        return True
+
+    return False
 
 
 def _split_email_values(value):
@@ -2555,7 +2756,30 @@ def _format_email_field(value, max_len=140):
 
     return ", ".join(out)
 
+def _save_single_company_once(lead_data_import_name, company, saved_keys):
+    clean_company = _normalize_company_dict(company)
+    key = _company_dedupe_key(clean_company)
+    if key and key in saved_keys:
+        return False
+
+    _save_single_company(lead_data_import_name, clean_company)
+    if key:
+        saved_keys.add(key)
+    return True
+
+
+def _company_dedupe_key(company):
+    website = _normalize_url((company or {}).get("website"))
+    domain = _normalized_domain(website)
+    if domain:
+        return f"domain:{domain}"
+
+    name = _normalize_compare_text((company or {}).get("company_name"))
+    return f"name:{name}" if name else ""
+
+
 def _save_single_company(lead_data_import_name, company):
+    company = _normalize_company_dict(company)
     doc = frappe.new_doc("Lead Data")
     doc.set(LEAD_DATA_IMPORT_FIELD, lead_data_import_name)
 
@@ -2782,7 +3006,7 @@ def _get_reference_slugs(lead_data_import_name=None):
     raw_refs = doc.reference_urls or ""
     return [s.strip().strip("/") for s in raw_refs.splitlines() if s.strip() and not s.strip().startswith("#")]
 
-def _reenrich_single_row(settings, slugs, row):
+def _reenrich_single_row(settings, slugs, row, field_guidance=""):
     name = row.get("organization_name") or "Unknown"
     website = row.get("website") or ""
 
@@ -2804,6 +3028,7 @@ def _reenrich_single_row(settings, slugs, row):
             f"Reference page: {slug_url}",
             ai_fallback=True,
             force_ai=_is_preferred_legal_slug(slug_url),
+            field_guidance=field_guidance,
         )
         if not _has_contact_lead_data(page_extracted):
             continue
@@ -2829,6 +3054,7 @@ def _reenrich_single_row(settings, slugs, row):
             name,
             f"Original page: {website}",
             ai_fallback=True,
+            field_guidance=field_guidance,
         )
         if _has_contact_lead_data(page_extracted) and not _is_broad_contact_directory(page_extracted):
             _merge_extracted_lead_fields(extracted, page_extracted)
@@ -2845,6 +3071,7 @@ def _reenrich_single_row(settings, slugs, row):
                 f"crawl: {link}",
                 ai_fallback=True,
                 force_ai=_is_preferred_legal_slug(link),
+                field_guidance=field_guidance,
             )
             if _is_broad_contact_directory(page_extracted) and not _is_preferred_legal_slug(link):
                 continue
@@ -2896,6 +3123,7 @@ def _run_re_enrichment(lead_data_import_name, rows_to_refine):
             return
 
         slugs = _get_reference_slugs(lead_data_import_name)
+        field_guidance = _get_lead_data_mapping_prompt()
 
         total = len(rows_to_refine)
         updated = 0
@@ -2905,7 +3133,7 @@ def _run_re_enrichment(lead_data_import_name, rows_to_refine):
 
         with ThreadPoolExecutor(max_workers=workers) as executor:
             future_map = {
-                executor.submit(_reenrich_single_row, settings, slugs, row): row
+                executor.submit(_reenrich_single_row, settings, slugs, row, field_guidance): row
                 for row in rows_to_refine
             }
 
