@@ -139,17 +139,15 @@ def _merge_attendees(existing_csv: str, new_emails: list[str]) -> str:
 
 
 def _event_location(doc) -> str:
-	"""Get Event location, preferring standard field over legacy custom field."""
-	return (doc.get("location") or doc.get("custom_location") or "").strip()
+	"""Get Event location from the standard Event field."""
+	return (doc.get("location") or "").strip()
 
 
 def _set_event_location(doc, value: str):
-	"""Set Event location on available fields for compatibility."""
+	"""Set Event location on the standard Event field."""
 	meta = frappe.get_meta(doc.doctype)
 	if meta.has_field("location"):
 		doc.location = value
-	if meta.has_field("custom_location"):
-		doc.custom_location = value
 
 def on_upsert(doc, method=None):
 	# auto_sync = frappe.db.get_value("Mailcow Settings", "auto_sync_events")
@@ -168,7 +166,7 @@ def on_upsert(doc, method=None):
 		participant_emails = _collect_event_participant_emails(doc)
 		attendees_to = _merge_attendees(attendees_to, participant_emails)
 		
-		# Prefer standard Event.location; fallback for older records.
+		# Use the standard Event.location field.
 		location = _event_location(doc)
 
 		ics = vevent(
@@ -323,8 +321,6 @@ def pull_events(start: str, end: str) -> list[dict]:
 				event_meta = frappe.get_meta("Event")
 				if event_meta.has_field("location"):
 					event_payload["location"] = loc
-				if event_meta.has_field("custom_location"):
-					event_payload["custom_location"] = loc
 				doc = frappe.get_doc(event_payload)
 				doc.insert()
 
