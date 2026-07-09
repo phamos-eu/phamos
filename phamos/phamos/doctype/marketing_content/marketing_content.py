@@ -1,3 +1,4 @@
+import json
 import frappe
 from frappe.website.website_generator import WebsiteGenerator
 from frappe.utils import get_datetime
@@ -53,6 +54,9 @@ class MarketingContent(WebsiteGenerator):
             )
             if self.max_attendees:
                 context.spots_left = max(0, self.max_attendees - registered_count)
+        context.ticket_item = self.ticket_item
+        context.email_group = self.email_group
+        context.tc_name = self.tc_name
         context.parents = [{"title": "Events", "route": "events"}]
         if self.starts_on:
             dt = get_datetime(self.starts_on)
