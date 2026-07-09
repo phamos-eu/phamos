@@ -13,11 +13,9 @@ The following hidden custom fields are added to Event doctype via migrations:
 - **`custom_attendees_to`** (Small Text) - TO recipients who receive calendar invites
 - **`custom_attendees_cc`** (Small Text) - CC recipients who receive calendar invites
 - **`custom_attendees_bcc`** (Small Text) - BCC recipients who receive email only (no calendar invite)
-- **`custom_location`** (Data) - Meeting location or URL (e.g., Jitsi link)
 
 **Migrations:**
 - `phamos/patches/v1_0/add_event_attendee_fields.py`
-- `phamos/patches/v1_0/add_event_location_field.py`
 
 ### How Attendees Work
 
@@ -54,7 +52,7 @@ This means:
 ### Location Field (Jitsi Links)
 
 - Auto-generated when creating hybrid meetings: `https://meet.jit.si/{15-char-random-id}`
-- Stored in `custom_location` field on Event
+- Stored in standard `location` field on Event
 - Included in ICS as `LOCATION:` field
 - SOGo and other calendar apps automatically render URLs as clickable links
 

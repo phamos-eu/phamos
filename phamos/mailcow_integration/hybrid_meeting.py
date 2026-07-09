@@ -323,7 +323,6 @@ def create_proposals_and_send_email(payload: str):
             "custom_attendees_to": recipients,  # Optional attendees
             "custom_attendees_cc": data.get("cc") or "",  # Optional attendees
             "custom_attendees_bcc": data.get("bcc") or "",  # Optional attendees (hidden)
-            "custom_location": location,  # Store location (Jitsi link)
         }).insert(ignore_permissions=True)
         created_events.append(ev.name)
 
@@ -527,7 +526,7 @@ def confirm_proposal(gid: str, uid: str, exp: str, sig: str):
                 start_iso=chosen.starts_on.isoformat() if hasattr(chosen.starts_on, 'isoformat') else str(chosen.starts_on),
                 end_iso=chosen.ends_on.isoformat() if hasattr(chosen.ends_on, 'isoformat') else str(chosen.ends_on),
                 description=chosen.description or "",
-                location=(chosen.get("location") or chosen.get("custom_location") or ""),
+                location=(chosen.get("location") or ""),
                 seq=2,  # Increment sequence for update
                 status="CONFIRMED",
                 organizer=organizer_email,
@@ -546,7 +545,7 @@ def confirm_proposal(gid: str, uid: str, exp: str, sig: str):
             cc=chosen.get("custom_attendees_cc"),
             bcc=chosen.get("custom_attendees_bcc"),
             subject=f"Confirmed: {chosen.subject}",
-            message=f"Your meeting has been confirmed.<br><br><strong>Subject:</strong> {chosen.subject}<br><strong>Time:</strong> {chosen.starts_on} - {chosen.ends_on}<br><strong>Location:</strong> {(chosen.get('location') or chosen.get('custom_location') or 'Not specified')}",
+            message=f"Your meeting has been confirmed.<br><br><strong>Subject:</strong> {chosen.subject}<br><strong>Time:</strong> {chosen.starts_on} - {chosen.ends_on}<br><strong>Location:</strong> {(chosen.get('location') or 'Not specified')}",
             sender=organizer_user,
             attachments=ics_attachment or None
         )
