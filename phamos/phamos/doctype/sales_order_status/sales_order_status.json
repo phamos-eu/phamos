@@ -31,7 +31,7 @@
    "allow_on_submit": 1,
    "fetch_from": "sales_order.total_qty",
    "fieldname": "total_hrs",
-   "fieldtype": "Data",
+   "fieldtype": "Float",
    "in_list_view": 1,
    "label": "Total Hrs",
    "non_negative": 1,
@@ -67,7 +67,7 @@
   {
    "allow_on_submit": 1,
    "fieldname": "delivered_total_hrs",
-   "fieldtype": "Data",
+   "fieldtype": "Float",
    "in_list_view": 1,
    "label": "Delivered Total Hrs",
    "read_only": 1
@@ -75,7 +75,7 @@
   {
    "allow_on_submit": 1,
    "fieldname": "remaining_hrs",
-   "fieldtype": "Data",
+   "fieldtype": "Float",
    "label": "Remaining Hrs",
    "read_only": 1
   },
