@@ -44,8 +44,6 @@ TECHNICAL_EMAIL_LOCAL_PARTS = {
     "sentry", "noreply", "no-reply", "donotreply", "do-not-reply",
     "mailer-daemon", "postmaster", "webmaster",
 }
-
-
 def _ensure_lead_data_import_schema():
     if frappe.db.has_column(LEAD_DATA_DOCTYPE, LEAD_DATA_IMPORT_FIELD):
         return
@@ -84,12 +82,8 @@ Text:
 ---
 {text}
 ---"""
-
-
 class LeadDataImport(Document):
     pass
-
-
 def _get_lead_data_mapping_prompt():
     if not frappe.db.exists("DocType", "Lead Data Mapping"):
         return ""
@@ -125,8 +119,6 @@ COUNTRY_ALIASES = {
     "usa": "United States",
     "unitedstates": "United States",
 }
-
-
 def _parse_address_components(address):
     """Best-effort parsing for compact postal addresses."""
     text = str(address or "").strip()
@@ -166,16 +158,12 @@ def _parse_address_components(address):
         "country": country,
         "postal_code": postal_code,
     }
-
-
 def _first_address_components(addresses):
     for address in addresses or []:
         parsed = _parse_address_components(address)
         if any(parsed.values()):
             return parsed
     return {}
-
-
 def _clean_address_values(values):
     addresses = []
     if isinstance(values, str):
@@ -202,8 +190,6 @@ def _clean_address_values(values):
                     addresses[existing_idx] = clean
 
     return addresses
-
-
 def _address_line_for_child(address):
     """Return a Data-field-safe address line without surrounding legal prose."""
     text = str(address or "").strip()
@@ -216,8 +202,6 @@ def _address_line_for_child(address):
 
     text = _street_line_from_address(text)
     return _truncate(text)
-
-
 def _street_line_from_address(address):
     text = str(address or "").strip()
     if not text:
@@ -225,8 +209,6 @@ def _street_line_from_address(address):
 
     text = re.split(r",?\s+(?:[A-Z]{1,3}-)?\d{4,6}\s+[A-ZÄÖÜ]", text, maxsplit=1)[0]
     return re.sub(r"\s+", " ", text).strip(" ,.;")
-
-
 def _normalize_address_candidate(address):
     text = str(address or "").strip()
     if not text:
@@ -263,8 +245,6 @@ def _normalize_address_candidate(address):
 
     text = _append_country_from_text(text)
     return text if _looks_like_postal_address(text) else ""
-
-
 def _trim_address_after_postal_city(text):
     text = str(text or "").strip(" ,.;")
     if not text:
@@ -284,8 +264,6 @@ def _trim_address_after_postal_city(text):
         return re.sub(r"\s+", " ", match.group("prefix")).strip(" ,.;")
 
     return text
-
-
 def _repair_compact_german_address_spacing(text):
     street_words = (
         r"str(?:aße|asse|\.?)|weg|platz|allee|gasse|ring|damm|ufer|"
@@ -318,8 +296,6 @@ def _repair_compact_german_address_spacing(text):
         text = f"{_compact_street_name(match.group(0))}{text[match.end():]}"
 
     return text
-
-
 def _compact_street_name(street):
     text = re.sub(r"\s+", " ", str(street or "")).strip(" ,.;")
     if not text:
@@ -356,8 +332,6 @@ def _compact_street_name(street):
         name = last
 
     return f"{name} {number}"
-
-
 def _strip_address_company_prefix(text):
     street_words = (
         r"str(?:aße|asse|\.?)|weg|platz|allee|gasse|ring|damm|ufer|"
@@ -381,8 +355,6 @@ def _strip_address_company_prefix(text):
         flags=re.I,
     ).strip(" ,.;")
     return stripped or text
-
-
 def _looks_like_postal_address(address):
     text = str(address or "").strip()
     if not text:
@@ -401,8 +373,6 @@ def _looks_like_postal_address(address):
         text,
     )
     return bool(has_postal_city and (has_street or has_named_house_number))
-
-
 def _append_country_from_text(address):
     text = str(address or "").strip()
     parts = [part.strip() for part in text.split(",") if part.strip()]
@@ -421,8 +391,6 @@ def _append_country_from_text(address):
             return f"{without_country}, {country}"
 
     return text
-
-
 def _address_dedupe_key(address):
     text = str(address or "").strip().lower()
     if not text:
@@ -440,8 +408,6 @@ def _address_dedupe_key(address):
         re.sub(r"\W+", "", street),
         parsed.get("postal_code") or "",
     ])
-
-
 def _normalize_country(value):
     raw = str(value or "").strip()
     clean = re.sub(r"[^A-Za-zÀ-ÖØ-öø-ÿ]", "", raw).lower()
@@ -454,8 +420,6 @@ def _normalize_country(value):
             return country
 
     return raw if raw and len(raw.split()) <= 3 else ""
-
-
 def _is_country_value(value):
     raw = str(value or "").strip()
     clean = re.sub(r"[^A-Za-zÀ-ÖØ-öø-ÿ]", "", raw).lower()
@@ -464,15 +428,11 @@ def _is_country_value(value):
 
     lowered = raw.lower()
     return any(re.search(rf"\b{re.escape(alias)}\b", lowered) for alias in COUNTRY_ALIASES)
-
-
 def _clean_city_name(value):
     city = str(value or "").strip()
     city = re.sub(r"\b(?:Germany|Deutschland|Austria|Osterreich|Österreich|Switzerland|Schweiz)\b", "", city, flags=re.I)
     city = re.sub(r"\s+", " ", city).strip(" ,.;")
     return city
-
-
 def _clean_contact_person_values(values, company_name=None):
     contacts = []
     company_norm = _normalize_compare_text(company_name)
@@ -489,8 +449,6 @@ def _clean_contact_person_values(values, company_name=None):
         if clean not in contacts:
             contacts.append(clean)
     return contacts
-
-
 def _looks_like_organization_name(value):
     text = str(value or "").strip()
     if not text:
@@ -501,12 +459,8 @@ def _looks_like_organization_name(value):
         text,
         flags=re.I,
     ))
-
-
 def _normalize_compare_text(value):
     return re.sub(r"[^a-z0-9]+", "", str(value or "").lower())
-
-
 def _designation_values(value, count=0):
     if isinstance(value, list):
         values = value
@@ -520,12 +474,8 @@ def _designation_values(value, count=0):
     if count and len(out) == 1 and count > 1:
         return out + [""] * (count - 1)
     return out
-
-
 def _clean_job_title_text(value):
     return ", ".join(_designation_values(value))
-
-
 def _clean_job_title_value(value):
     clean = re.sub(r"\s+", " ", str(value or "")).strip(" ,.;")
     if not clean:
@@ -544,8 +494,6 @@ def _clean_job_title_value(value):
         return ""
 
     return clean
-
-
 def _split_person_name(person):
     parts = [part for part in re.split(r"\s+", str(person or "").strip()) if part]
     salutation = ""
@@ -556,7 +504,6 @@ def _split_person_name(person):
         "first_name": parts[0] if parts else "",
         "last_name": " ".join(parts[1:]) if len(parts) > 1 else "",
     }
-
 def _populate_lead_data_child_tables(lead_data_doc, company, extracted=None):
     """Fill lead_data_website / lead_data_address / lead_data_contact from
     a company dict (and optional extracted dict with emails/phones/contact_persons/addresses lists)."""
@@ -648,7 +595,6 @@ def _populate_lead_data_child_tables(lead_data_doc, company, extracted=None):
     lead_data_doc.country = _truncate(primary_address.get("country"))
 
     return lead_data_doc 
-
 @frappe.whitelist()
 def extract_leads(lead_data_import_name):
     _ensure_lead_data_import_schema()
@@ -672,8 +618,6 @@ def extract_leads(lead_data_import_name):
         enqueue_after_commit=True,
     )
     return {"ok": True, "message": "Extraction started. Refresh the page in a moment to see results."}
-
-
 @frappe.whitelist()
 def preview_screenshot_leads(lead_data_import_name):
     _ensure_lead_data_import_schema()
@@ -695,8 +639,6 @@ def preview_screenshot_leads(lead_data_import_name):
         "leads": [_preview_company_payload(company) for company in companies],
         "lead_data_text": "\n\n---\n\n".join(_build_import_info(company) for company in companies),
     }
-
-
 @frappe.whitelist()
 def create_leads_from_preview(lead_data_import_name, leads_json, replace_existing=True):
     _ensure_lead_data_import_schema()
@@ -722,8 +664,6 @@ def create_leads_from_preview(lead_data_import_name, leads_json, replace_existin
     frappe.db.commit()
 
     return {"ok": True, "message": f"Created {len(companies)} lead(s)."}
-
-
 def _preview_company_payload(company):
     company = _normalize_company_dict(company)
     return {
@@ -736,8 +676,6 @@ def _preview_company_payload(company):
         "job_title": company.get("job_title") or "",
         "source_attachment": company.get("source_attachment") or "",
     }
-
-
 def _companies_from_preview_payload(leads_json):
     try:
         data = json.loads(leads_json) if isinstance(leads_json, str) else leads_json
@@ -760,7 +698,6 @@ def _companies_from_preview_payload(leads_json):
 
 
 # Background job
-
 def _run_extraction(lead_data_import_name):
     try:
         doc = frappe.get_doc(LEAD_DATA_IMPORT_DOCTYPE, lead_data_import_name)
@@ -825,7 +762,6 @@ def _run_extraction(lead_data_import_name):
 
 
 # Pipeline: URL
-
 def _pipeline_url(lead_data_import_name, url):
     if not url:
         frappe.throw(_("Source URL is required for URL input type."))
@@ -865,8 +801,6 @@ def _pipeline_url(lead_data_import_name, url):
 
     _log(lead_data_import_name, f"Found {len(companies)} companies on the page.")
     return companies if not MAX_COMPANIES_PER_IMPORT else companies[:MAX_COMPANIES_PER_IMPORT]
-
-
 def _extract_companies_from_partner_html(html, page_url, ai_fallback=True):
     """
     Extract company names and website URLs from a JS-rendered
@@ -916,8 +850,6 @@ def _extract_companies_from_partner_html(html, page_url, ai_fallback=True):
                 companies.append(company)
 
     return _filter_company_candidates(companies, page_url)
-
-
 def _extract_companies_from_links_and_logos(html, page_url):
     """Generic directory fallback for pages that list partners as plain links/logos."""
     if not html:
@@ -960,16 +892,12 @@ def _extract_companies_from_links_and_logos(html, page_url):
         })
 
     return companies
-
-
 def _should_treat_as_directory(html, companies):
     """Decide whether generic external links are directory entries or just outbound site links."""
     if not companies:
         return False
 
     return _has_directory_page_signals(html)
-
-
 def _filter_company_candidates(companies, page_url=None):
     filtered = []
     seen = set()
@@ -996,8 +924,6 @@ def _filter_company_candidates(companies, page_url=None):
         filtered.append(clean_company)
 
     return filtered
-
-
 def _has_directory_page_signals(html):
     text = _clean_html(html).lower()
     signals = (
@@ -1006,8 +932,6 @@ def _has_directory_page_signals(html):
         "partnernetzwerk", "kooperationspartner", "referenzen",
     )
     return any(re.search(rf"\b{re.escape(signal)}\b", text) for signal in signals)
-
-
 def _company_from_website_html(html, page_url):
     name = ""
     if html:
@@ -1023,8 +947,6 @@ def _company_from_website_html(html, page_url):
         "company_name": name,
         "website": _normalize_url(page_url),
     }
-
-
 def _company_name_from_anchor(body, website):
     candidates = []
 
@@ -1046,8 +968,6 @@ def _company_name_from_anchor(body, website):
         return ""
 
     return _domain_to_company_name(website)
-
-
 def _extract_companies_from_images(html):
     companies = []
     seen = set()
@@ -1077,16 +997,12 @@ def _extract_companies_from_images(html):
             break
 
     return companies
-
-
 def _clean_asset_filename(value):
     filename = os.path.basename(urlparse(str(value or "")).path)
     filename = re.sub(r"\.[a-z0-9]{2,5}$", "", filename, flags=re.I)
     filename = re.sub(r"^csm_", "", filename, flags=re.I)
     filename = re.sub(r"[_-][a-f0-9]{8,}$", "", filename, flags=re.I)
     return filename
-
-
 def _clean_company_candidate_text(value):
     text = html_lib.unescape(str(value or ""))
     text = re.sub(r"<(script|style)[^>]*>.*?</(script|style)>", " ", text, flags=re.I | re.S)
@@ -1094,8 +1010,6 @@ def _clean_company_candidate_text(value):
     text = re.sub(r"https?://\S+|www\.\S+", " ", text, flags=re.I)
     text = re.sub(r"\s+", " ", text).strip(" \t\r\n-|:;.,")
     return text[:140]
-
-
 def _is_probable_company_name(value):
     text = str(value or "").strip()
     if len(text) < 2 or len(text) > 140:
@@ -1115,8 +1029,6 @@ def _is_probable_company_name(value):
         "bewertungen",
     )
     return not any(item == lowered or item in lowered for item in noise)
-
-
 def _domain_to_company_name(url):
     domain = _normalized_domain(url)
     if not domain:
@@ -1124,13 +1036,9 @@ def _domain_to_company_name(url):
 
     label = domain.split(".")[0]
     return re.sub(r"[-_]+", " ", label).title()
-
-
 def _normalized_domain(url):
     parsed = urlparse(_normalize_url(url) or url)
     return (parsed.netloc or "").lower().replace("www.", "").strip()
-
-
 def _skip_company_candidate_href(href):
     low = (href or "").strip().lower()
     return (
@@ -1138,8 +1046,6 @@ def _skip_company_candidate_href(href):
         or low.startswith(("mailto:", "tel:", "#", "javascript:"))
         or low.endswith((".jpg", ".jpeg", ".png", ".gif", ".svg", ".webp", ".pdf", ".zip", ".css", ".js"))
     )
-
-
 def _is_noise_domain(domain):
     noise_domains = (
         "facebook.com", "instagram.com", "linkedin.com", "youtube.com",
@@ -1152,7 +1058,6 @@ def _is_noise_domain(domain):
 
 
 # Pipeline: Screenshot
-
 def _pipeline_screenshot(lead_data_import_name, file_url):
     if not file_url:
         frappe.throw(_("Please upload a screenshot file."))
@@ -1189,7 +1094,6 @@ def _pipeline_screenshot(lead_data_import_name, file_url):
     return normalized_companies if not MAX_COMPANIES_PER_IMPORT else normalized_companies[:MAX_COMPANIES_PER_IMPORT]
 
 # Pipeline: PDF
-
 def _pipeline_pdf(lead_data_import_name, file_url):
     if not file_url:
         frappe.throw(_("Please upload a PDF file."))
@@ -1234,8 +1138,6 @@ def _pipeline_pdf(lead_data_import_name, file_url):
     companies = _mistral_extract_companies_from_text(markdown)
     _log(lead_data_import_name, f"Mistral identified {len(companies)} companies in the PDF.")
     return companies if not MAX_COMPANIES_PER_IMPORT else companies[:MAX_COMPANIES_PER_IMPORT]
-
-
 def _enrich_and_save_companies(lead_data_import_name, companies, ai_fallback=False):
     """Enrich each company and immediately save it to the child table."""
     settings = _get_phamos_settings()
@@ -1317,7 +1219,6 @@ def _enrich_and_save_companies(lead_data_import_name, companies, ai_fallback=Fal
             _log(lead_data_import_name, f"[{idx}/{total}] Skipped duplicate: {name}")
 
     return saved_count
-
 def _enrich_single_company(settings, slugs, company, lead_data_import_name=None, ai_fallback=True, field_guidance=""):
     name    = company.get("company_name", "Unknown")
     website = company.get("website", "")
@@ -1431,7 +1332,34 @@ def _enrich_single_company(settings, slugs, company, lead_data_import_name=None,
     return _prioritize_business_card_emails(merged)
 
 # Mistral API calls
+def _mistral_chat_model(settings):
+    model = settings["model"]
+    return MISTRAL_CHAT_MODEL_DEFAULT if "ocr" in model.lower() else model
+def _call_mistral_vision_json_list(settings, prompt, image_b64, mime, error_title):
+    url = f"{settings['base_url'].rstrip('/')}/chat/completions"
+    headers = {
+        "Authorization": f"Bearer {settings['api_key']}",
+        "Content-Type": "application/json",
+    }
+    payload = {
+        "model": _mistral_chat_model(settings),
+        "messages": [
+            {
+                "role": "user",
+                "content": [
+                    {"type": "image_url", "image_url": f"data:{mime};base64,{image_b64}"},
+                    {"type": "text", "text": prompt},
+                ],
+            }
+        ],
+    }
+    resp = requests.post(url, json=payload, headers=headers, timeout=60)
+    if not resp.ok:
+        frappe.log_error(title=_(error_title), message=resp.text[:500])
+        return []
 
+    content = (resp.json().get("choices") or [{}])[0].get("message", {}).get("content", "[]")
+    return _parse_json_list(content)
 def _mistral_extract_companies_from_html(html, page_url):
     settings = _get_phamos_settings()
     if not settings:
@@ -1461,16 +1389,10 @@ Page text:
 ---"""
 
     return _filter_company_candidates(_call_mistral_json_list(settings, prompt), page_url)
-
-
 def _mistral_extract_companies_from_image(image_b64, mime, qr_urls=None):
     settings = _get_phamos_settings()
     if not settings:
         frappe.throw(_("Mistral API key is not configured."))
-
-    model = settings["model"]
-    if "ocr" in model.lower():
-        model = MISTRAL_CHAT_MODEL_DEFAULT
 
     qr_hint = "\n".join(qr_urls or [])
     field_guidance = _get_lead_data_mapping_prompt()
@@ -1558,45 +1480,22 @@ QR URL hints:
 {qr_hint}
 ---"""
 
-    url = f"{settings['base_url'].rstrip('/')}/chat/completions"
-    headers = {
-        "Authorization": f"Bearer {settings['api_key']}",
-        "Content-Type": "application/json",
-    }
-    payload = {
-        "model": model,
-        "messages": [
-            {
-                "role": "user",
-                "content": [
-                    {"type": "image_url", "image_url": f"data:{mime};base64,{image_b64}"},
-                    {"type": "text", "text": prompt},
-                ],
-            }
-        ],
-    }
-    resp = requests.post(url, json=payload, headers=headers, timeout=60)
-    if not resp.ok:
-        frappe.log_error(title=_("Lead Import: Mistral vision failed"), message=resp.text[:500])
-        return []
-
-    content = (resp.json().get("choices") or [{}])[0].get("message", {}).get("content", "[]")
-    companies = _parse_json_list(content)
+    companies = _call_mistral_vision_json_list(
+        settings,
+        prompt,
+        image_b64,
+        mime,
+        "Lead Import: Mistral vision failed",
+    )
     return [
         _normalize_company_dict(_repair_business_card_company_person_mixup(company))
         for company in companies
         if company.get("company_name") or company.get("website")
     ]
-
-
 def _mistral_extract_logo_companies_from_image(image_b64, mime):
     settings = _get_phamos_settings()
     if not settings:
         frappe.throw(_("Mistral API key is not configured."))
-
-    model = settings["model"]
-    if "ocr" in model.lower():
-        model = MISTRAL_CHAT_MODEL_DEFAULT
 
     prompt = """You are analyzing a screenshot that may show partner, supporter, sponsor, member, or logo lists.
 
@@ -1614,30 +1513,13 @@ Format:
 ]
 """
 
-    url = f"{settings['base_url'].rstrip('/')}/chat/completions"
-    headers = {
-        "Authorization": f"Bearer {settings['api_key']}",
-        "Content-Type": "application/json",
-    }
-    payload = {
-        "model": model,
-        "messages": [
-            {
-                "role": "user",
-                "content": [
-                    {"type": "image_url", "image_url": f"data:{mime};base64,{image_b64}"},
-                    {"type": "text", "text": prompt},
-                ],
-            }
-        ],
-    }
-    resp = requests.post(url, json=payload, headers=headers, timeout=60)
-    if not resp.ok:
-        frappe.log_error(title=_("Lead Import: Mistral logo vision failed"), message=resp.text[:500])
-        return []
-
-    content = (resp.json().get("choices") or [{}])[0].get("message", {}).get("content", "[]")
-    companies = _parse_json_list(content)
+    companies = _call_mistral_vision_json_list(
+        settings,
+        prompt,
+        image_b64,
+        mime,
+        "Lead Import: Mistral logo vision failed",
+    )
     normalized = []
     for company in companies:
         clean = _normalize_company_dict(company)
@@ -1647,8 +1529,6 @@ Format:
         normalized.append(clean)
 
     return normalized
-
-
 def _repair_business_card_company_person_mixup(company):
     company = dict(company or {})
     name = str(company.get("company_name") or "").strip()
@@ -1682,8 +1562,6 @@ def _repair_business_card_company_person_mixup(company):
             company["company_name"] = inferred
 
     return company
-
-
 def _infer_business_card_emails(company, contacts):
     source_type = str(company.get("source_type") or "").lower()
     if "business_card" not in source_type:
@@ -1725,8 +1603,6 @@ def _infer_business_card_emails(company, contacts):
             inferred.append(email)
 
     return inferred
-
-
 def _prioritize_business_card_emails(company):
     company = dict(company or {})
     source_type = str(company.get("source_type") or "").lower()
@@ -1765,16 +1641,12 @@ def _prioritize_business_card_emails(company):
     company["emails"] = emails
     company["email"] = emails[0] if emails else ""
     return company
-
-
 def _domain_from_url(url):
     parsed = urlparse(_normalize_url(url) or "")
     domain = (parsed.netloc or "").lower()
     if domain.startswith("www."):
         domain = domain[4:]
     return domain
-
-
 def _email_local_part_from_person(person):
     parts = [
         _ascii_email_token(part)
@@ -1786,8 +1658,6 @@ def _email_local_part_from_person(person):
         return ""
 
     return f"{parts[0][0]}.{parts[-1]}"
-
-
 def _ascii_email_token(value):
     value = str(value or "").lower()
     replacements = {
@@ -1802,8 +1672,6 @@ def _ascii_email_token(value):
     for src, dest in replacements.items():
         value = value.replace(src, dest)
     return re.sub(r"[^a-z0-9]", "", value)
-
-
 def _looks_like_person_name(value):
     text = str(value or "").strip()
     if not text:
@@ -1812,8 +1680,6 @@ def _looks_like_person_name(value):
         return False
     parts = [part for part in re.split(r"\s+", text) if part]
     return 2 <= len(parts) <= 4 and all(re.search(r"[A-Za-zÀ-ÖØ-öø-ÿ]", part) for part in parts)
-
-
 def _infer_company_name_from_business_card(company, email_domains):
     visible_name = str(company.get("visible_company_name") or company.get("organization") or "").strip()
     if visible_name and not _looks_like_person_name(visible_name):
@@ -1838,8 +1704,6 @@ def _infer_company_name_from_business_card(company, email_domains):
             return _clean_company_candidate_text(domain_label.replace("-", " ").title())
 
     return ""
-
-
 def _mistral_extract_companies_from_text(text):
     settings = _get_phamos_settings()
     if not settings:
@@ -1862,13 +1726,7 @@ Text:
 ---"""
 
     return _call_mistral_json_list(settings, prompt)
-
-
 def _mistral_extract_lead_fields(settings, text, company_name, field_guidance=None):
-    model = settings["model"]
-    if "ocr" in model.lower():
-        model = MISTRAL_CHAT_MODEL_DEFAULT
-
     prompt = LEAD_FIELD_EXTRACTION_PROMPT.format(
         company_name=company_name,
         field_guidance=field_guidance if field_guidance is not None else _get_lead_data_mapping_prompt(),
@@ -1881,7 +1739,7 @@ def _mistral_extract_lead_fields(settings, text, company_name, field_guidance=No
         "Content-Type": "application/json",
     }
     payload = {
-        "model": model,
+        "model": _mistral_chat_model(settings),
         "messages": [{"role": "user", "content": prompt}],
         "response_format": {"type": "json_object"},
     }
@@ -1920,20 +1778,14 @@ def _mistral_extract_lead_fields(settings, text, company_name, field_guidance=No
         return result
     except Exception:
         return {}
-
-
 def _call_mistral_json_list(settings, prompt):
-    model = settings["model"]
-    if "ocr" in model.lower():
-        model = MISTRAL_CHAT_MODEL_DEFAULT
-
     url = f"{settings['base_url'].rstrip('/')}/chat/completions"
     headers = {
         "Authorization": f"Bearer {settings['api_key']}",
         "Content-Type": "application/json",
     }
     payload = {
-        "model": model,
+        "model": _mistral_chat_model(settings),
         "messages": [{"role": "user", "content": prompt}],
     }
     try:
@@ -1947,8 +1799,6 @@ def _call_mistral_json_list(settings, prompt):
         tb = frappe.get_traceback()
         frappe.log_error(title=_("Lead Import: Mistral call exception"), message=tb)
         return []
-
-
 def _filter_extracted_to_source_text(result, source_text):
     source = source_text or ""
     source_lower = source.lower()
@@ -2010,7 +1860,6 @@ def _filter_extracted_to_source_text(result, source_text):
 
 
 # Web scraping helpers
-
 def _fetch_html(url, js_render=False):
     if not url:
         return None
@@ -2051,8 +1900,6 @@ def _fetch_html(url, js_render=False):
         except Exception:
             pass
         return None
-
-
 def _clean_html(html):
 	if not html:
 		return ""
@@ -2060,7 +1907,6 @@ def _clean_html(html):
 	html = re.sub(r"<[^>]+>", " ", html)
 	html = re.sub(r"\s+", " ", html).strip()
 	return html
-
 def _decode_cf_email(encoded_hex):
     """Decode Cloudflare's data-cfemail obfuscated email hex string."""
     try:
@@ -2072,7 +1918,6 @@ def _decode_cf_email(encoded_hex):
         return email
     except Exception:
         return ""
-
 def _extract_contact_fields_from_html(html):
     if not html:
         return {}
@@ -2115,8 +1960,6 @@ def _extract_contact_fields_from_html(html):
         out["addresses"] = addresses
         out["address"] = addresses[0]
     return out
-
-
 def _extract_addresses_from_text(text):
     if not text:
         return []
@@ -2154,8 +1997,6 @@ def _extract_addresses_from_text(text):
             addresses.append(address)
 
     return addresses
-
-
 def _get_domain_root(url):
     """Strip path/query from a URL, keep scheme+netloc only."""
     if not url:
@@ -2164,8 +2005,6 @@ def _get_domain_root(url):
     if not parsed.scheme or not parsed.netloc:
         return url.rstrip("/")
     return f"{parsed.scheme}://{parsed.netloc}"
-
-
 def _sanitize_phone(phone):
     if not phone:
         return ""
@@ -2214,8 +2053,6 @@ def _sanitize_phone(phone):
         return ""
 
     return phone
-
-
 def _sanitize_phone_list(value):
     if not value:
         return []
@@ -2240,8 +2077,6 @@ def _sanitize_phone_list(value):
         phones.append(clean_phone)
 
     return phones
-
-
 def _phone_dedupe_key(phone):
     digits = re.sub(r"\D", "", str(phone or ""))
     if digits.startswith("490"):
@@ -2253,23 +2088,6 @@ def _phone_dedupe_key(phone):
     if digits.startswith("0049") and len(digits) > 10:
         return "0" + digits[4:]
     return digits
-
-
-def _format_phone_field(value, max_len=140):
-    phones = _sanitize_phone_list(value)
-    if not phones:
-        return ""
-
-    out = []
-    for phone in phones:
-        candidate = ", ".join(out + [phone])
-        if len(candidate) > max_len:
-            break
-        out.append(phone)
-
-    return ", ".join(out)
-
-
 def _load_file_as_base64(file_url):
     if not file_url:
         return None, None
@@ -2285,8 +2103,6 @@ def _load_file_as_base64(file_url):
 
     with open(path, "rb") as f:
         return base64.b64encode(f.read()).decode("utf-8"), mime
-
-
 def _get_file_path_from_url(file_url):
     if not file_url:
         return ""
@@ -2295,8 +2111,6 @@ def _get_file_path_from_url(file_url):
     if url.startswith("private/files/"):
         return get_files_path(*url.replace("private/files/", "", 1).split("/"), is_private=1)
     return get_files_path(*url.replace("files/", "", 1).split("/"))
-
-
 def _decode_qr_urls_from_file(file_url):
     """Best-effort QR decoding. Works when cv2 or pyzbar is installed."""
     path = _get_file_path_from_url(file_url)
@@ -2335,8 +2149,6 @@ def _decode_qr_urls_from_file(file_url):
         if url and url not in urls:
             urls.append(url)
     return urls
-
-
 def _normalize_url(value):
     value = str(value or "").strip()
     if not value:
@@ -2352,8 +2164,6 @@ def _normalize_url(value):
         return url if url.startswith(("http://", "https://")) else f"https://{url}"
 
     return ""
-
-
 def _infer_or_search_website(company):
     website = _normalize_url(company.get("website"))
     if website:
@@ -2368,8 +2178,6 @@ def _infer_or_search_website(company):
             return f"https://{domain}"
 
     return _search_company_website(company)
-
-
 def _search_company_website(company):
     name = (company.get("company_name") or "").strip()
     if not name:
@@ -2412,7 +2220,6 @@ def _search_company_website(company):
         return _get_domain_root(url) or url
 
     return ""
-
 def _has_desired_lead_data(data):
     """Email is the primary signal that enrichment succeeded."""
     if not data:
@@ -2427,8 +2234,6 @@ def _has_desired_lead_data(data):
             return True
 
     return False
-
-
 def _has_contact_lead_data(data):
     """True when we have any usable contact detail, not just an email."""
     if not data:
@@ -2442,8 +2247,6 @@ def _has_contact_lead_data(data):
 
     addresses = data.get("addresses") or ([data.get("address")] if data.get("address") else [])
     return any(str(address).strip() for address in addresses)
-
-
 def _has_direct_contact_lead_data(data):
     if not data:
         return False
@@ -2456,13 +2259,9 @@ def _has_direct_contact_lead_data(data):
 
     contacts = data.get("contact_persons") or ([data.get("contact_person")] if data.get("contact_person") else [])
     return any(str(contact).strip() for contact in contacts)
-
-
 def _is_preferred_legal_slug(slug):
     slug = (slug or "").lower().strip("/")
     return any(keyword in slug for keyword in ("impressum", "imprint", "legal"))
-
-
 def _ordered_reference_slugs(slugs):
     unique = []
     for slug in slugs or []:
@@ -2473,8 +2272,6 @@ def _ordered_reference_slugs(slugs):
     legal = [slug for slug in unique if _is_preferred_legal_slug(slug)]
     rest = [slug for slug in unique if slug not in legal]
     return legal + rest
-
-
 def _reference_urls_for_company(base, website, slugs):
     candidates = []
 
@@ -2514,8 +2311,6 @@ def _reference_urls_for_company(base, website, slugs):
             add(link)
 
     return candidates
-
-
 def _is_broad_contact_directory(data):
     if not data:
         return False
@@ -2526,8 +2321,6 @@ def _is_broad_contact_directory(data):
     emails = emails or []
     phones = _sanitize_phone_list(data.get("phones") or data.get("phone"))
     return len(emails) > 4 or len(phones) > 8
-
-
 def _extract_lead_fields_from_page(
     settings,
     html,
@@ -2555,8 +2348,6 @@ def _extract_lead_fields_from_page(
         _merge_extracted_lead_fields(extracted, ai_extracted)
 
     return extracted
-
-
 def _merge_extracted_lead_fields(target, source):
     if not source:
         return target
@@ -2580,8 +2371,6 @@ def _merge_extracted_lead_fields(target, source):
             target[key] = value
 
     return target
-
-
 def _as_unique_list(value):
     if not value:
         return []
@@ -2593,8 +2382,6 @@ def _as_unique_list(value):
         if clean and clean not in out:
             out.append(clean)
     return out
-
-
 def _normalize_company_dict(company):
     company = dict(company or {})
     company["website"] = _normalize_url(company.get("website"))
@@ -2635,8 +2422,6 @@ def _normalize_company_dict(company):
         company["address"] = company["addresses"][0]
 
     return company
-
-
 def _is_noise_email(email):
     clean = _sanitize_email(email)
     if not clean or "@" not in clean:
@@ -2653,8 +2438,6 @@ def _is_noise_email(email):
         return True
 
     return False
-
-
 def _split_email_values(value):
     emails = []
     for email in re.split(r"\s*(?:,|\||;|\n)\s*", value or ""):
@@ -2662,8 +2445,6 @@ def _split_email_values(value):
         if clean and clean not in emails:
             emails.append(clean)
     return emails
-
-
 def _lead_data_doc_to_company(lead_data_doc):
     company = {
         "company_name": lead_data_doc.organization_name,
@@ -2722,8 +2503,6 @@ def _lead_data_doc_to_company(lead_data_doc):
         company["contact_person"] = contacts[0]
 
     return company
-
-
 def _merge_company_lead_data(existing, incoming):
     merged = dict(existing or {})
     _merge_extracted_lead_fields(merged, incoming or {})
@@ -2734,28 +2513,6 @@ def _merge_company_lead_data(existing, incoming):
         merged["company_name"] = incoming.get("company_name")
 
     return merged
-
-
-
-def _format_email_field(value, max_len=140):
-    """Join valid emails up to max_len without ever cutting one mid-string."""
-    if isinstance(value, str):
-        emails = [e.strip() for e in value.split(",") if e.strip()]
-    else:
-        emails = value or []
-
-    out = []
-    for email in emails:
-        clean = _sanitize_email(email)
-        if not clean or clean in out:
-            continue
-        candidate = ", ".join(out + [clean])
-        if len(candidate) > max_len:
-            break
-        out.append(clean)
-
-    return ", ".join(out)
-
 def _save_single_company_once(lead_data_import_name, company, saved_keys):
     clean_company = _normalize_company_dict(company)
     key = _company_dedupe_key(clean_company)
@@ -2766,8 +2523,6 @@ def _save_single_company_once(lead_data_import_name, company, saved_keys):
     if key:
         saved_keys.add(key)
     return True
-
-
 def _company_dedupe_key(company):
     website = _normalize_url((company or {}).get("website"))
     domain = _normalized_domain(website)
@@ -2776,8 +2531,6 @@ def _company_dedupe_key(company):
 
     name = _normalize_compare_text((company or {}).get("company_name"))
     return f"name:{name}" if name else ""
-
-
 def _save_single_company(lead_data_import_name, company):
     company = _normalize_company_dict(company)
     doc = frappe.new_doc("Lead Data")
@@ -2790,8 +2543,6 @@ def _save_single_company(lead_data_import_name, company):
 
     doc.insert(ignore_permissions=True)
     frappe.db.commit()
-
-
 def _truncate(value, max_len=140):
     if not value:
         return ""
@@ -2799,17 +2550,6 @@ def _truncate(value, max_len=140):
     if len(value) <= max_len:
         return value
     return value[: max_len - 3].rstrip(", |") + "..."
-
-
-def _first_value(value, sep=","):
-    if not value:
-        return ""
-    value = str(value)
-    if sep in value:
-        return value.split(sep)[0].strip()
-    return value.strip()
-
-
 def _build_import_info(company):
     lines = []
 
@@ -2856,8 +2596,6 @@ def _build_import_info(company):
             lines.append(f"  - {a}")
 
     return "\n".join(lines)
-
-
 def _log(lead_data_import_name, message):
     if not lead_data_import_name:
         return
@@ -2866,8 +2604,6 @@ def _log(lead_data_import_name, message):
     new_log = f"{existing}\n{message}".strip()
     frappe.db.set_value(LEAD_DATA_IMPORT_DOCTYPE, lead_data_import_name, "status_log", new_log)
     frappe.db.commit()
-
-
 def _format_error_for_status(message, traceback_text=None, max_len=6000):
     details = str(traceback_text or "").strip()
     if not details:
@@ -2877,8 +2613,6 @@ def _format_error_for_status(message, traceback_text=None, max_len=6000):
         details = "...\n" + details[-max_len:]
 
     return f"{message}\n\nDetails:\n{details}"
-
-
 def _finish(lead_data_import_name, message):
     doc = frappe.get_doc(LEAD_DATA_IMPORT_DOCTYPE, lead_data_import_name)
     existing = (doc.status_log or "").strip()
@@ -2888,8 +2622,6 @@ def _finish(lead_data_import_name, message):
         "status_log": status_log,
     })
     frappe.db.commit()
-
-
 def _parse_json_list(text):
     if not text:
         return []
@@ -2910,8 +2642,6 @@ def _parse_json_list(text):
     except Exception:
         pass
     return []
-
-
 def _sanitize_email(email):
     if not email:
         return ""
@@ -2941,12 +2671,9 @@ def _sanitize_email(email):
         return email
     except Exception:
         return ""
-    
 @frappe.whitelist()
 def re_enrich_incomplete(lead_data_import_name):
     return _re_enrich_import_rows(lead_data_import_name, only_incomplete=True)
-
-
 def _re_enrich_import_rows(lead_data_import_name, only_incomplete=False):
     _ensure_lead_data_import_schema()
 
@@ -2996,8 +2723,6 @@ def _re_enrich_import_rows(lead_data_import_name, only_incomplete=False):
         enqueue_after_commit=True,
     )
     return {"ok": True, "message": f"Refinement started for {len(rows_to_refine)} rows."}
-
-
 def _get_reference_slugs(lead_data_import_name=None):
     if not lead_data_import_name:
         return []
@@ -3005,7 +2730,6 @@ def _get_reference_slugs(lead_data_import_name=None):
     doc = frappe.get_doc(LEAD_DATA_IMPORT_DOCTYPE, lead_data_import_name)
     raw_refs = doc.reference_urls or ""
     return [s.strip().strip("/") for s in raw_refs.splitlines() if s.strip() and not s.strip().startswith("#")]
-
 def _reenrich_single_row(settings, slugs, row, field_guidance=""):
     name = row.get("organization_name") or "Unknown"
     website = row.get("website") or ""
@@ -3080,8 +2804,6 @@ def _reenrich_single_row(settings, slugs, row, field_guidance=""):
                 break
 
     return row["name"], company, extracted
-
-
 def _save_refined_lead_data_doc(lead_data_doc, company, extracted):
     existing = _lead_data_doc_to_company(lead_data_doc)
     merged = _merge_company_lead_data(existing, {**(company or {}), **(extracted or {})})
@@ -3113,8 +2835,6 @@ def _save_refined_lead_data_doc(lead_data_doc, company, extracted):
         return True
 
     return False
-
-
 def _run_re_enrichment(lead_data_import_name, rows_to_refine):
     try:
         settings = _get_phamos_settings()
@@ -3167,12 +2887,6 @@ def _run_re_enrichment(lead_data_import_name, rows_to_refine):
         tb = frappe.get_traceback()
         frappe.log_error(title=_("Lead Import re-enrichment failed"), message=tb)
         _finish(lead_data_import_name, _format_error_for_status("Error during re-enrichment.", tb))
-
-    except Exception:
-        tb = frappe.get_traceback()
-        frappe.log_error(title=_("Lead Import re-enrichment failed"), message=tb)
-        _finish(lead_data_import_name, _format_error_for_status("Error during re-enrichment.", tb))
-
 def _discover_internal_links(base_url, html, limit=8):
     if not html:
         return []
@@ -3221,7 +2935,6 @@ def _discover_internal_links(base_url, html, limit=8):
             break
 
     return result
-
 def _discover_legal_links(base_url, html, limit=6):
     if not html:
         return []
