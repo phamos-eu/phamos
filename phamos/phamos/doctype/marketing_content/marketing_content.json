@@ -339,6 +339,10 @@
   {
    "link_doctype": "Newsletter",
    "link_fieldname": "custom_marketing_content"
+  },
+  {
+   "link_doctype": "Marketing Event Registration",
+   "link_fieldname": "event"
   }
  ],
  "modified": "2026-07-02 12:15:12.535620",
