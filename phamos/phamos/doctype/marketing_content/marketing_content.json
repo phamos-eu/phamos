@@ -49,7 +49,9 @@
   "email_group",
   "tab_ticketing",
   "ticket_item",
-  "tc_name"
+  "tc_name",
+  "column_break_srnt",
+  "item_tax_template"
  ],
  "fields": [
   {
@@ -315,6 +317,16 @@
    "fieldtype": "Link",
    "label": "Terms and Conditions",
    "options": "Terms and Conditions"
+  },
+  {
+   "fieldname": "column_break_srnt",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "item_tax_template",
+   "fieldtype": "Link",
+   "label": "Item Tax Template",
+   "options": "Item Tax Template"
   }
  ],
  "has_web_view": 1,
@@ -333,7 +345,7 @@
    "link_fieldname": "event"
   }
  ],
- "modified": "2026-06-26 14:00:00.000000",
+ "modified": "2026-07-02 12:15:12.535620",
  "modified_by": "Administrator",
  "module": "Phamos",
  "name": "Marketing Content",
