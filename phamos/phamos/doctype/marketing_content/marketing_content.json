@@ -49,7 +49,6 @@
   "email_group",
   "tab_ticketing",
   "ticket_item",
-  "tc_name"
   "tc_name",
   "column_break_srnt",
   "item_tax_template"
@@ -305,7 +304,6 @@
    "fieldname": "tab_ticketing",
    "fieldtype": "Tab Break",
    "label": "Ticket Configuration"
-   "label": "Ticket Configuration"
   },
   {
    "description": "ERPNext Item used for ticket sales. Price and tax info are read from this item.",
@@ -315,10 +313,6 @@
    "options": "Item"
   },
   {
-   "fieldname": "tc_name",
-   "fieldtype": "Link",
-   "label": "Terms and Conditions",
-   "options": "Terms and Conditions"
    "fieldname": "tc_name",
    "fieldtype": "Link",
    "label": "Terms and Conditions",
@@ -355,7 +349,6 @@
    "link_fieldname": "event"
   }
  ],
- "modified": "2026-06-26 14:00:00.000000",
  "modified": "2026-07-02 12:15:12.535620",
  "modified_by": "Administrator",
  "module": "Phamos",
