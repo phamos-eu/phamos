@@ -51,7 +51,7 @@ doctype_js = {
 	"Job Applicant": "public/js/job_applicant.js",
 	"Job Opening": "public/js/job_opening.js",
     "Timesheet":"public/js/timesheet.js",
-    "User": "public/js/mailcow_user.js",
+    "Email Account": "public/js/mailcow_email_account.js",
     "Event": "public/js/event.js",
     "Sales Invoice": "public/js/sales_invoice.js",
     "Customer": "public/js/customer.js",
