@@ -20,7 +20,8 @@ def _fmt(dt: datetime) -> str:
 
 def vevent(uid: str, seq: int, subject: str, starts_on, ends_on,
            description: str = "", location: str = "Online", 
-           attendees_to: str = "", attendees_cc: str = "", attendees_bcc: str = "") -> str:
+           attendees_to: str = "", attendees_cc: str = "", attendees_bcc: str = "",
+           attendee_role_map: dict[str, str] | None = None) -> str:
     tz = get_site_timezone()
     summary = (subject or "").replace("\n", " ")
     desc = strip_html(description or "")
@@ -47,22 +48,24 @@ def vevent(uid: str, seq: int, subject: str, starts_on, ends_on,
     # Parse and add attendees
     from email.utils import getaddresses
     
-    # Add TO recipients as optional participants with RSVP enabled (sends auto-invites)
+    # Add TO recipients with RSVP enabled (role defaults to optional)
     if attendees_to:
         to_list = [email.strip() for email in attendees_to.split(",") if email.strip()]
         for email_addr in to_list:
             # Extract email from "Name <email>" format if present
             _, addr = getaddresses([email_addr])[0] if getaddresses([email_addr]) else ("", email_addr)
             if addr:
-                ics_lines.append(f"ATTENDEE;ROLE=OPT-PARTICIPANT;PARTSTAT=NEEDS-ACTION;RSVP=TRUE:mailto:{addr}")
+                role = (attendee_role_map or {}).get(addr.lower(), "OPT-PARTICIPANT")
+                ics_lines.append(f"ATTENDEE;ROLE={role};PARTSTAT=NEEDS-ACTION;RSVP=TRUE:mailto:{addr}")
     
-    # Add CC recipients as optional participants with RSVP enabled
+    # Add CC recipients with RSVP enabled (role defaults to optional)
     if attendees_cc:
         cc_list = [email.strip() for email in attendees_cc.split(",") if email.strip()]
         for email_addr in cc_list:
             _, addr = getaddresses([email_addr])[0] if getaddresses([email_addr]) else ("", email_addr)
             if addr:
-                ics_lines.append(f"ATTENDEE;ROLE=OPT-PARTICIPANT;PARTSTAT=NEEDS-ACTION;RSVP=TRUE:mailto:{addr}")
+                role = (attendee_role_map or {}).get(addr.lower(), "OPT-PARTICIPANT")
+                ics_lines.append(f"ATTENDEE;ROLE={role};PARTSTAT=NEEDS-ACTION;RSVP=TRUE:mailto:{addr}")
     
     # BCC recipients are NOT added as attendees (they receive the email but not the calendar invite)
     # This maintains the "blind" nature of BCC - they get the email notification only

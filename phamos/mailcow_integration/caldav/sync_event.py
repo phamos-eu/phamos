@@ -114,6 +114,40 @@ def _collect_event_participant_emails(doc) -> list[str]:
 	return uniq
 
 
+def _collect_event_participant_roles(doc) -> dict[str, str]:
+	"""Build attendee role map from Event Participants custom_participation."""
+	roles: dict[str, str] = {}
+
+	for row in (doc.get("event_participants") or []):
+		candidate = None
+
+		for fieldname in ("email", "email_id"):
+			val = (row.get(fieldname) or "").strip()
+			if val:
+				candidate = val
+				break
+
+		if not candidate:
+			candidate = _get_linked_email(row.get("reference_doctype"), row.get("reference_docname"))
+
+		if not candidate:
+			continue
+
+		parsed = getaddresses([candidate])
+		if not parsed:
+			continue
+
+		_, addr = parsed[0]
+		if not addr:
+			continue
+
+		participation = (row.get("custom_participation") or "Optional").strip().lower()
+		role = "REQ-PARTICIPANT" if participation == "required" else "OPT-PARTICIPANT"
+		roles[addr.lower()] = role
+
+	return roles
+
+
 def _merge_attendees(existing_csv: str, new_emails: list[str]) -> str:
 	"""Merge comma-separated attendees with new emails without duplicates."""
 	merged: list[str] = []
@@ -164,6 +198,7 @@ def on_upsert(doc, method=None):
 		attendees_cc = doc.get("custom_attendees_cc") or ""
 		attendees_bcc = doc.get("custom_attendees_bcc") or ""
 		participant_emails = _collect_event_participant_emails(doc)
+		participant_roles = _collect_event_participant_roles(doc)
 		attendees_to = _merge_attendees(attendees_to, participant_emails)
 		
 		# Use the standard Event.location field.
@@ -180,6 +215,7 @@ def on_upsert(doc, method=None):
 			attendees_to=attendees_to,
 			attendees_cc=attendees_cc,
 			attendees_bcc=attendees_bcc,
+			attendee_role_map=participant_roles,
 		)
 		put_ics(sync_uid, ics, acting_user_id=doc.owner)
 		doc.db_set("custom_mailcow_uid", sync_uid, notify=False)
@@ -333,4 +369,4 @@ def pull_events(start: str, end: str) -> list[dict]:
 			})
 
 	return events
-	
+		
