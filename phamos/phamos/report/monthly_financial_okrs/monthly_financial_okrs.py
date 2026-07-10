@@ -49,6 +49,7 @@ def execute(filters=None):
             SELECT SUM(total_qty)
             FROM `tabDelivery Note`
             WHERE posting_date BETWEEN %s AND %s
+            AND docstatus = 1
         """, (month_start, month_end))[0][0] or 0
 
         invoiced_hrs = frappe.db.sql("""
@@ -56,6 +57,7 @@ def execute(filters=None):
             FROM `tabSales Invoice Item` sii
             JOIN `tabSales Invoice` si ON sii.parent = si.name
             WHERE si.posting_date BETWEEN %s AND %s
+            AND si.docstatus = 1
         """, (month_start, month_end))[0][0] or 0
 
         paid_invoiced_hrs = frappe.db.sql("""
@@ -63,6 +65,7 @@ def execute(filters=None):
             FROM `tabSales Invoice Item` sii
             JOIN `tabSales Invoice` si ON sii.parent = si.name
             WHERE si.posting_date BETWEEN %s AND %s
+            AND si.docstatus = 1
             AND si.status = 'Paid'
         """, (month_start, month_end))[0][0] or 0
 
@@ -71,6 +74,7 @@ def execute(filters=None):
             FROM `tabSales Invoice Item` sii
             JOIN `tabSales Invoice` si ON sii.parent = si.name
             WHERE si.posting_date BETWEEN %s AND %s
+            AND si.docstatus = 1
         """, (month_start, month_end))[0][0] or 0
 
         amount_received = frappe.db.sql("""
@@ -78,6 +82,7 @@ def execute(filters=None):
             FROM `tabSales Invoice Item` sii
             JOIN `tabSales Invoice` si ON sii.parent = si.name
             WHERE si.posting_date BETWEEN %s AND %s
+            AND si.docstatus = 1
             AND si.status = 'Paid'
         """, (month_start, month_end))[0][0] or 0
 
