@@ -544,7 +544,7 @@ def create_ticket_order(event_name, attendees, qty, invoice_data=None):
             "item_code": item_code,
             "qty": 1,
             "rate": rate,
-            "additional_notes": att.get("full_name") + "<br>" + att.get("email"),
+            "additional_notes": att.get("full_name") + "\n" + att.get("email"),
             "item_tax_template": item_tax_template,
             "delivery_date": frappe.utils.today(),
         })
