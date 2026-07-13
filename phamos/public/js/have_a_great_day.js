@@ -171,6 +171,7 @@ class MorningFeedbackDialog {
 
     this._styleDialog(this.dialog, this.pendingBirthdays.length > 0);
     this.dialog.show();
+    this._applyBirthdayWishCollapse();
   }
 
   birthday_wishes_dialog() {
@@ -196,6 +197,143 @@ class MorningFeedbackDialog {
 
     this._styleDialog(this.dialog, true);
     this.dialog.show();
+    this._applyBirthdayWishCollapse();
+    this._setupBirthdaySaveButtonVisibility();
+  }
+
+  _allBirthdaysSubmitted() {
+    return (
+      this.pendingBirthdays.length > 0 &&
+      this.pendingBirthdays.every(function (item) {
+        return item.already_submitted;
+      })
+    );
+  }
+
+  _hasBirthdayWishEdits() {
+    var self = this;
+    if (!this.dialog) {
+      return false;
+    }
+
+    for (var index = 0; index < this.pendingBirthdays.length; index++) {
+      var item = this.pendingBirthdays[index];
+      var fieldname = self._getBirthdayWishFieldname(item, index);
+      var field = self.dialog.fields_dict[fieldname];
+      if (!field) {
+        continue;
+      }
+      var current = (field.get_value() || "").trim();
+      var original = (item.submitted_message || "").trim();
+      if (current !== original) {
+        return true;
+      }
+    }
+    return false;
+  }
+
+  _setBirthdaySaveButtonVisible(visible) {
+    if (!this.dialog) {
+      return;
+    }
+    this.dialog.get_primary_btn().toggle(visible);
+  }
+
+  _setupBirthdaySaveButtonVisibility() {
+    var self = this;
+    if (!this.dialog) {
+      return;
+    }
+
+    self._setBirthdaySaveButtonVisible(false);
+
+    this.pendingBirthdays.forEach(function (item, index) {
+      var fieldname = self._getBirthdayWishFieldname(item, index);
+      var field = self.dialog.fields_dict[fieldname];
+      if (!field || !field.$input) {
+        return;
+      }
+      field.$input
+        .off("input.birthdayWishSave change.birthdayWishSave")
+        .on("input.birthdayWishSave change.birthdayWishSave", function () {
+          self._setBirthdaySaveButtonVisible(self._hasBirthdayWishEdits());
+        });
+    });
+  }
+
+  _getCollapsedWishSummaryHtml(item, index) {
+    var preview = item.submitted_message || "";
+    if (preview.length > 100) {
+      preview = preview.substring(0, 100) + "…";
+    }
+    var birthdayLabel = frappe.datetime.str_to_user(item.birthday_date);
+    var dueLabel = frappe.datetime.str_to_user(item.due_date);
+    return (
+      "<div class='birthday-wish-collapsed' data-birthday-index='" +
+      index +
+      "' style='margin-bottom: 12px; padding: 10px 12px; border: 1px solid var(--border-color); border-radius: 6px;'>" +
+      "<div class='small' style='font-weight: 600;'>" +
+      __("✓ Wish sent for {0}", [frappe.utils.escape_html(item.employee_name)]) +
+      "</div>" +
+      "<div class='text-muted small' style='margin-top: 4px;'>" +
+      frappe.utils.escape_html(preview) +
+      "</div>" +
+      "<div class='text-muted small' style='margin-top: 6px;'>" +
+      __(
+        "<strong>{0}</strong>'s birthday is in {1} days ({2}). You can edit until <strong>{3}</strong>.",
+        [
+          frappe.utils.escape_html(item.employee_name),
+          item.days_until,
+          birthdayLabel,
+          dueLabel,
+        ]
+      ) +
+      "</div>" +
+      "<button type='button' class='btn btn-default btn-sm birthday-wish-expand-btn' data-birthday-index='" +
+      index +
+      "' style='margin-top: 10px;'>" +
+      __("Click to expand and edit") +
+      "</button>" +
+      "</div>"
+    );
+  }
+
+  _applyBirthdayWishCollapse() {
+    var self = this;
+    if (!this.dialog) {
+      return;
+    }
+
+    this.pendingBirthdays.forEach(function (item, index) {
+      if (!item.already_submitted) {
+        return;
+      }
+
+      var introKey = "birthday_intro_" + index;
+      var fieldname = self._getBirthdayWishFieldname(item, index);
+
+      if (self.dialog.fields_dict[introKey]) {
+        self.dialog.fields_dict[introKey].$wrapper.hide();
+      }
+      if (self.dialog.fields_dict[fieldname]) {
+        self.dialog.fields_dict[fieldname].$wrapper.hide();
+      }
+
+      self.dialog.$wrapper
+        .find(".birthday-wish-expand-btn[data-birthday-index='" + index + "']")
+        .on("click", function () {
+          self.dialog.$wrapper
+            .find(".birthday-wish-collapsed[data-birthday-index='" + index + "']")
+            .hide();
+          if (self.dialog.fields_dict[introKey]) {
+            self.dialog.fields_dict[introKey].$wrapper.show();
+          }
+          if (self.dialog.fields_dict[fieldname]) {
+            self.dialog.fields_dict[fieldname].$wrapper.show();
+            self.dialog.fields_dict[fieldname].set_focus();
+          }
+        });
+    });
   }
 
   _getBirthdayWishFieldname(item, index) {
@@ -233,6 +371,14 @@ class MorningFeedbackDialog {
       var dueLabel = frappe.datetime.str_to_user(item.due_date);
       var fieldname = self._getBirthdayWishFieldname(item, index);
 
+      if (item.already_submitted) {
+        fields.push({
+          fieldtype: "HTML",
+          fieldname: "birthday_collapsed_" + index,
+          options: self._getCollapsedWishSummaryHtml(item, index),
+        });
+      }
+
       fields.push({
         fieldtype: "HTML",
         fieldname: "birthday_intro_" + index,
@@ -250,6 +396,7 @@ class MorningFeedbackDialog {
         label: __("Add birthday wishes for {0}", [item.employee_name]),
         fieldname: fieldname,
         reqd: 0,
+        default: item.submitted_message || "",
         description: __(
           "We collect these messages to wish your colleagues on their special day. Your note will be included in the team birthday post in Raven."
         ),
