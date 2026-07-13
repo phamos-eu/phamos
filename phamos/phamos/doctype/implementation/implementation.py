@@ -4,7 +4,7 @@
 import frappe
 from frappe.model.document import Document
 from frappe.query_builder import DocType, get_query_builder
-from frappe.utils import today
+from frappe.utils import flt, today
 
 
 class Implementation(Document):
@@ -55,6 +55,7 @@ class Implementation(Document):
 
 
 	def add_delivered_hrs(self):
+		delivered_total_hrs = 0
 		if self.sales_order_status_information:
 			for row in self.sales_order_status_information:
 				total_hours = 0
@@ -76,7 +77,10 @@ class Implementation(Document):
 						total_hours += dn.get("qty", 0)
 					row.delivered_total_hrs = total_hours
 
-				row.remaining_hrs = row.total_hrs - row.delivered_total_hrs
+				delivered_total_hrs += flt(row.delivered_total_hrs)
+				row.remaining_hrs = flt(row.total_hrs) - flt(row.delivered_total_hrs)
+
+		self.delivered_total_hrs = delivered_total_hrs
 
 	def add_resource_planning(self):
 		if self.name:
