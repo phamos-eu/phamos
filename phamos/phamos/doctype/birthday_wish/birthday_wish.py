@@ -76,6 +76,15 @@ def _wish_already_submitted(parent_name, wish_giver):
 	)
 
 
+def _get_existing_wish_message(parent, wish_giver):
+	if not wish_giver:
+		return ""
+	for row in parent.birthday_wishes or []:
+		if row.wish_giver == wish_giver:
+			return (row.message or "").strip()
+	return ""
+
+
 @frappe.whitelist()
 def get_pending_birthday_wish_prompts():
 	"""Colleagues with birthdays in the next 30 days the current user can still wish."""
@@ -116,8 +125,7 @@ def get_pending_birthday_wish_prompts():
 		if parent.status != "Collecting":
 			continue
 
-		if wish_giver and _wish_already_submitted(parent.name, wish_giver):
-			continue
+		submitted_message = _get_existing_wish_message(parent, wish_giver)
 
 		pending.append(
 			{
@@ -127,6 +135,8 @@ def get_pending_birthday_wish_prompts():
 				"birthday_date": str(celebration),
 				"due_date": str(due_date),
 				"days_until": days_until,
+				"already_submitted": bool(submitted_message),
+				"submitted_message": submitted_message,
 			}
 		)
 
