@@ -85,6 +85,7 @@ def get_pending_birthday_wish_prompts():
 		"Employee",
 		filters={"status": "Active", "date_of_birth": ["is", "set"]},
 		fields=["name", "employee_name", "date_of_birth"],
+		ignore_permissions=True,
 	)
 
 	pending = []
