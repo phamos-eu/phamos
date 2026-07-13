@@ -7,6 +7,7 @@ from functools import lru_cache
 import requests
 
 import frappe
+from frappe.utils import get_url_to_form
 
 from phamos.mailcow_integration.caldav.client import (
     calendar_item_url,
@@ -18,6 +19,7 @@ from phamos.mailcow_integration.caldav.ics import vevent
 
 SCHEDULE_TABLE_FIELD = "custom_team_daily_schedule"
 SCHEDULE_ROW_DOCTYPE = "Team Daily Schedule"
+AUTO_GENERATED_MARKER = "***** Auto Generated *****"
 
 
 def _normalize_csv_emails(raw_value: str | None) -> str:
@@ -130,6 +132,37 @@ def _attendee_role_map(required_csv: str, optional_csv: str) -> dict[str, str]:
         if addr and addr.lower() not in role_map:
             role_map[addr.lower()] = "OPT-PARTICIPANT"
     return role_map
+
+
+def _ensure_description_has_source_url(doc, row) -> str:
+    source_url = get_url_to_form(doc.doctype, doc.name)
+    current_description = (row.get("description") or "").strip()
+
+    if not source_url:
+        return current_description
+
+    auto_block = f"{AUTO_GENERATED_MARKER}\n{source_url}"
+    if auto_block in current_description:
+        return current_description
+
+    if AUTO_GENERATED_MARKER in current_description:
+        prefix = current_description.split(AUTO_GENERATED_MARKER, 1)[0].strip()
+        new_description = f"{prefix}\n\n{auto_block}" if prefix else auto_block
+    else:
+        new_description = f"{current_description}\n\n{auto_block}" if current_description else auto_block
+
+    if row.name and new_description != current_description:
+        _update_row_sync_fields(row.name, {"description": new_description})
+        row.description = new_description
+
+    return new_description
+
+
+def _attach_source_url_on_row_create(doc, row, previous_row):
+    # Only auto-append the source URL when the child row is newly created.
+    if previous_row:
+        return
+    _ensure_description_has_source_url(doc, row)
 
 
 def _build_ics(row, uid: str, seq: int, organizer: str) -> str:
@@ -263,8 +296,10 @@ def sync_events_from_parent(doc, method=None):
             continue
 
         try:
-            mailbox_email = _row_mailbox_email(row)
             previous_row = previous_rows_by_name.get(row.name)
+            _attach_source_url_on_row_create(doc, row, previous_row)
+
+            mailbox_email = _row_mailbox_email(row)
             previous_mailbox = _row_mailbox_email(previous_row) if previous_row else None
 
             if not _row_is_complete(row):
