@@ -72,18 +72,8 @@ def get_timeframes():
 """
 from frappe.utils import now_datetime, get_datetime_str
 from pytz import timezone
-import frappe
 
-# Define get_user_time_zone function to get user's timezone from User doctype
-def get_user_time_zone(user):
-    user_doc = frappe.get_doc("User", user)
-    return user_doc.time_zone if user_doc.time_zone else 'UTC'
 
-from frappe.utils import now_datetime, get_datetime_str
-from pytz import timezone
-import frappe
-
-# Define get_user_time_zone function to get user's timezone from User doctype
 def get_user_time_zone(user):
     user_doc = frappe.get_doc("User", user)
     return user_doc.time_zone if user_doc.time_zone else 'UTC'
@@ -115,7 +105,7 @@ def get_user_time(user, to_string=False):
             "user_time_str": user_time_str,
             "from_time": from_time,
             "till_time": till_time,
-			"enable_feedback_dialog":enable_feedback_dialog
+			"enable_feedback_dialog":enable_feedback_dialog,
         }
     except Exception as e:
         frappe.log_error(frappe.get_traceback(), 'get_user_time error')
