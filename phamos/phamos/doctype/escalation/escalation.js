@@ -7,6 +7,21 @@ frappe.ui.form.on('Escalation', {
 		frm.trigger('fetch_snapshot_fields');
 	},
 
+	before_submit(frm) {
+		if (frm.doc.status !== 'Resolved') {
+			frappe.validated = false;
+			frappe.confirm(
+				__('The status is still "{0}". Do you want to set it to "Resolved" before submitting?', [frm.doc.status]),
+				() => {
+					frm.set_value('status', 'Resolved').then(() => frm.savesubmit());
+				},
+				() => {
+					frappe.msgprint(__('Submission cancelled. Please resolve the escalation before submitting.'));
+				}
+			);
+		}
+	},
+
 	open_date(frm) {
 		frm.trigger('update_days');
 		frm.trigger('fetch_snapshot_fields');
