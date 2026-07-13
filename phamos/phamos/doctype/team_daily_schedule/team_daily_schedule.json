@@ -1,0 +1,111 @@
+{
+ "actions": [],
+ "allow_rename": 1,
+ "creation": "2026-07-13 13:40:51.989733",
+ "doctype": "DocType",
+ "editable_grid": 1,
+ "engine": "InnoDB",
+ "field_order": [
+  "subject",
+  "location",
+  "repeat_this_event",
+  "repeat_on",
+  "repeat_till",
+  "column_break_uloa",
+  "description",
+  "start",
+  "end",
+  "section_break_yfye",
+  "required_attendees",
+  "email_account",
+  "column_break_hxpy",
+  "optional_attendees"
+ ],
+ "fields": [
+  {
+   "fieldname": "subject",
+   "fieldtype": "Small Text",
+   "label": "Subject"
+  },
+  {
+   "fieldname": "location",
+   "fieldtype": "Data",
+   "label": "Location"
+  },
+  {
+   "default": "0",
+   "fieldname": "repeat_this_event",
+   "fieldtype": "Check",
+   "label": "Repeat This Event"
+  },
+  {
+   "fieldname": "repeat_on",
+   "fieldtype": "Select",
+   "label": "Repeat On",
+   "options": "\nDaily\nWeekly\nMonthly\nYearly"
+  },
+  {
+   "fieldname": "repeat_till",
+   "fieldtype": "Date",
+   "label": "Repeat Till"
+  },
+  {
+   "fieldname": "column_break_uloa",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "description",
+   "fieldtype": "Small Text",
+   "label": "Description"
+  },
+  {
+   "fieldname": "start",
+   "fieldtype": "Datetime",
+   "label": "Start"
+  },
+  {
+   "fieldname": "end",
+   "fieldtype": "Datetime",
+   "label": "End"
+  },
+  {
+   "fieldname": "section_break_yfye",
+   "fieldtype": "Section Break"
+  },
+  {
+   "fieldname": "required_attendees",
+   "fieldtype": "Small Text",
+   "label": "Required Attendees"
+  },
+  {
+   "fieldname": "email_account",
+   "fieldtype": "Link",
+   "label": "Email Account",
+   "options": "Email Account"
+  },
+  {
+   "fieldname": "column_break_hxpy",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "optional_attendees",
+   "fieldtype": "Small Text",
+   "label": "Optional Attendees"
+  }
+ ],
+ "grid_page_length": 50,
+ "index_web_pages_for_search": 1,
+ "istable": 1,
+ "links": [],
+ "modified": "2026-07-13 13:54:20.114896",
+ "modified_by": "Administrator",
+ "module": "Phamos",
+ "name": "Team Daily Schedule",
+ "owner": "organisation@phamos.eu",
+ "permissions": [],
+ "row_format": "Dynamic",
+ "rows_threshold_for_grid_search": 20,
+ "sort_field": "modified",
+ "sort_order": "DESC",
+ "states": []
+}
