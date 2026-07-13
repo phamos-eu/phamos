@@ -7,9 +7,27 @@ from frappe.utils import date_diff, today
 
 
 class Escalation(Document):
+	def after_insert(self):
+		self._set_implementation_escalated()
+
 	def before_save(self):
 		self._update_days_of_escalation()
 		self._fetch_snapshot_fields()
+
+	def before_submit(self):
+		if self.status != "Resolved":
+			frappe.throw(
+				"Cannot submit an Escalation with status '{0}'. "
+				"Please set status to 'Resolved' before submitting.".format(self.status)
+			)
+
+	def _set_implementation_escalated(self):
+		if not self.implementation:
+			return
+		current = frappe.db.get_value("Implementation", self.implementation, "status")
+		if current != "Escalated":
+			frappe.db.set_value("Implementation", self.implementation, "status", "Escalated")
+			frappe.db.commit()
 
 	def _update_days_of_escalation(self):
 		if not self.open_date:

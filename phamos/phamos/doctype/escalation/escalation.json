@@ -112,7 +112,8 @@
   {
    "fieldname": "opening_statement",
    "fieldtype": "Text",
-   "label": "Opening Statement"
+   "label": "Opening Statement",
+   "reqd": 1
   },
   {
    "fieldname": "column_break_3",
