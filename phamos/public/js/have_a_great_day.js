@@ -271,7 +271,7 @@ class MorningFeedbackDialog {
     return (
       "<div class='birthday-wish-collapsed' data-birthday-index='" +
       index +
-      "' style='margin-bottom: 12px; padding: 10px 12px; border: 1px solid var(--border-color); border-radius: 6px; cursor: pointer;'>" +
+      "' style='margin-bottom: 12px; padding: 10px 12px; border: 1px solid var(--border-color); border-radius: 6px;'>" +
       "<div class='small' style='font-weight: 600;'>" +
       __("✓ Wish sent for {0}", [frappe.utils.escape_html(item.employee_name)]) +
       "</div>" +
@@ -289,9 +289,11 @@ class MorningFeedbackDialog {
         ]
       ) +
       "</div>" +
-      "<div class='text-muted small' style='margin-top: 4px;'>" +
+      "<button type='button' class='btn btn-default btn-sm birthday-wish-expand-btn' data-birthday-index='" +
+      index +
+      "' style='margin-top: 10px;'>" +
       __("Click to expand and edit") +
-      "</div>" +
+      "</button>" +
       "</div>"
     );
   }
@@ -318,9 +320,11 @@ class MorningFeedbackDialog {
       }
 
       self.dialog.$wrapper
-        .find("[data-birthday-index='" + index + "']")
+        .find(".birthday-wish-expand-btn[data-birthday-index='" + index + "']")
         .on("click", function () {
-          self.dialog.$wrapper.find("[data-birthday-index='" + index + "']").hide();
+          self.dialog.$wrapper
+            .find(".birthday-wish-collapsed[data-birthday-index='" + index + "']")
+            .hide();
           if (self.dialog.fields_dict[introKey]) {
             self.dialog.fields_dict[introKey].$wrapper.show();
           }
