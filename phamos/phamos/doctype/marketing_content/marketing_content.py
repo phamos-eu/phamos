@@ -260,8 +260,6 @@ def create_ticket_order(event_name, attendees, qty, invoice_data=None):
     # --- Only create/resolve a customer when a tax invoice is requested ---
     primary = attendees[0]
     customer = frappe.db.get_single_value("phamos Settings", "walk_in_customer")
-    if needs_tax_invoice:
-        customer = _resolve_customer(primary["full_name"], primary["email"], is_company_order, invoice_data)
 
     # --- Item rate ---
     item_price = frappe.db.get_value(
@@ -280,13 +278,34 @@ def create_ticket_order(event_name, attendees, qty, invoice_data=None):
     so = frappe.new_doc("Sales Order")
     so.customer = customer
     so.company = company
-    so.po_no = f"Ticket purchase for {event_name}"
+    so.po_no = f"Ticket purchase for {event_name} {frappe.utils.now_datetime().strftime('%Y-%m-%d %H:%M:%S')}"
     so.po_date = frappe.utils.today()
     so.order_type = "Shopping Cart"
     so.transaction_date = frappe.utils.today()
     so.delivery_date = frappe.utils.today()
     so.selling_price_list = price_list
     so.ignore_pricing_rule = 1
+
+    if needs_tax_invoice:
+        notes_parts = []
+        if is_company_order:
+            notes_parts.append(invoice_data.get("company_name") or "")
+            recipient = invoice_data.get("invoice_recipient") or invoice_data.get("full_name") or primary["full_name"]
+            notes_parts.append(recipient)
+            recipient_email = invoice_data.get("email")
+            notes_parts.append(recipient_email)
+            if invoice_data.get("address_line1"):
+                notes_parts.append(invoice_data.get("address_line1"))
+            postcode_city = " ".join(filter(None, [invoice_data.get("postcode"), invoice_data.get("city")]))
+            if postcode_city:
+                notes_parts.append(postcode_city)
+            if invoice_data.get("country"):
+                notes_parts.append(invoice_data.get("country"))
+        else:
+            recipient = invoice_data.get("invoice_recipient") or invoice_data.get("full_name") or primary["full_name"]
+            notes_parts.append(recipient)
+
+        so.custom_shopping_cart_notes = "\n".join(filter(None, notes_parts))
 
     for att in attendees:
         so.append("items", {
@@ -348,95 +367,6 @@ def create_ticket_order(event_name, attendees, qty, invoice_data=None):
 
     frappe.db.commit()
     return {"sales_order": so.name, "customer": customer}
-
-
-def _resolve_customer(full_name, email, is_company, invoice_data):
-    if is_company:
-        cust_name = invoice_data["company_name"]
-        invoice_recipient = invoice_data.get("invoice_recipient") or invoice_data.get("full_name") or full_name
-        invoice_email = invoice_data.get("invoice_email") or invoice_data.get("email") or email
-
-        # Check if a customer with this company name already exists
-        existing = frappe.db.get_value("Customer", {"customer_name": cust_name}, "name")
-        if existing:
-            _maybe_create_address(existing, cust_name, invoice_data)
-            return existing
-
-        cust = frappe.new_doc("Customer")
-        cust.customer_name = cust_name
-        cust.customer_type = "Company"
-        cust.customer_group = "Commercial"
-        cust.territory = frappe.get_single("Selling Settings").territory or "All Territories"
-        cust.flags.ignore_permissions = True
-        cust.insert()
-
-        contact = frappe.new_doc("Contact")
-        contact.first_name = invoice_recipient
-        contact.append("email_ids", {"email_id": invoice_email, "is_primary": 1})
-        contact.append("links", {"link_doctype": "Customer", "link_name": cust.name})
-        contact.flags.ignore_permissions = True
-        contact.insert()
-
-        _maybe_create_address(cust.name, cust_name, invoice_data)
-        return cust.name
-
-    # --- Individual order: look up existing customer linked to this email via Contact ---
-    existing = frappe.db.get_value("Contact Email", {"email_id": email}, "parent")
-    if existing:
-        linked = frappe.db.get_value(
-            "Dynamic Link",
-            {"parenttype": "Contact", "parent": existing, "link_doctype": "Customer"},
-            "link_name",
-        )
-        if linked and frappe.db.exists("Customer", linked):
-            cust_display_name = frappe.db.get_value("Customer", linked, "customer_name")
-            _maybe_create_address(linked, cust_display_name, invoice_data)
-            return linked
-
-    territory = frappe.get_single("Selling Settings").territory or "All Territories"
-
-    cust = frappe.new_doc("Customer")
-    cust.customer_name = full_name
-    cust.customer_type = "Individual"
-    cust.customer_group = "Individual"
-    cust.territory = territory
-    cust.flags.ignore_permissions = True
-    cust.insert()
-
-    contact = frappe.new_doc("Contact")
-    contact.first_name = full_name
-    contact.append("email_ids", {"email_id": email, "is_primary": 1})
-    contact.append("links", {"link_doctype": "Customer", "link_name": cust.name})
-    contact.flags.ignore_permissions = True
-    contact.insert()
-
-    _maybe_create_address(cust.name, full_name, invoice_data)
-
-    return cust.name
-
-
-def _maybe_create_address(customer_name, address_title, invoice_data):
-    if not invoice_data:
-        return
-    address_line1 = invoice_data.get("address_line1")
-    if not address_line1:
-        return
-    city = invoice_data.get("city") or "-"
-    country = invoice_data.get("country") or frappe.db.get_single_value("System Settings", "country") or "Germany"
-    postcode = invoice_data.get("postcode") or ""
-
-    addr = frappe.new_doc("Address")
-    addr.address_title = address_title
-    addr.address_type = "Billing"
-    addr.address_line1 = address_line1
-    if postcode:
-        addr.pincode = postcode
-    addr.city = city
-    addr.country = country
-    addr.is_primary_address = 1
-    addr.append("links", {"link_doctype": "Customer", "link_name": customer_name})
-    addr.flags.ignore_permissions = True
-    addr.insert()
 
 
 @frappe.whitelist()
