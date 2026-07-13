@@ -209,13 +209,17 @@ def _format_issues_for_prompt(issues):
         return "No tickets found for this period."
     lines = []
     for issue in issues:
-        label_note = ""
         if issue.get("merged_to_production_at"):
-            label_note = "(Merged to Production)"
+            label_note = "Merged to Production"
+            deploy_ts = str(issue["merged_to_production_at"])
         elif issue.get("testing_on_production_at"):
-            label_note = "(Testing on Production)"
+            label_note = "Testing on Production"
+            deploy_ts = str(issue["testing_on_production_at"])
+        else:
+            label_note = ""
+            deploy_ts = ""
+
         desc = (issue.get("description") or "").strip()
-        # Truncate long descriptions
         if len(desc) > 400:
             desc = desc[:397] + "..."
 
@@ -227,11 +231,15 @@ def _format_issues_for_prompt(issues):
                 body = (c.get("comment") or "").strip()
                 if len(body) > 300:
                     body = body[:297] + "..."
-                comment_lines.append(f"    - {c.get('author', 'unknown')}: {body}")
+                comment_lines.append(
+                    f"    - [{c.get('commented_at', '')}] {c.get('author', 'unknown')}: {body}"
+                )
             comments_text = "\n".join(comment_lines)
 
         lines.append(
-            f"- #{issue['issue_id']}: {issue['title']} {label_note}\n"
+            f"- #{issue['issue_id']}: {issue['title']}\n"
+            f"  Status: {label_note}\n"
+            f"  Deployed at: {deploy_ts}\n"
             f"  URL: {issue.get('issue_url', '')}\n"
             f"  Description: {desc or '(no description)'}\n"
             f"  Comments:\n{comments_text}"
@@ -267,21 +275,27 @@ def _call_mistral(system_prompt, user_message):
     return resp.json()["choices"][0]["message"]["content"]
 
 
-def _get_report_prompt(implementation_name):
+def _get_report_settings(implementation_name):
+    """Return (prompt, language) from the most specific enabled settings doc."""
     specific = frappe.db.get_value(
         "Customer Weekly Report Settings",
         {"implementation": implementation_name, "enabled": 1},
-        "prompt",
+        ["prompt", "language"],
+        as_dict=True,
     )
-    if specific:
-        return specific
+    if specific and specific.prompt:
+        return specific.prompt, specific.language or "German"
 
     default = frappe.db.get_value(
         "Customer Weekly Report Settings",
         {"is_default": 1, "enabled": 1},
-        "prompt",
+        ["prompt", "language"],
+        as_dict=True,
     )
-    return default or None
+    if default and default.prompt:
+        return default.prompt, default.language or "German"
+
+    return None, "German"
 
 
 def _get_stakeholder_emails(implementation_name):
@@ -305,7 +319,7 @@ def generate_and_send_weekly_report(implementation_name, from_date=None, to_date
     """
     from_date, to_date = _get_week_range(from_date, to_date)
 
-    prompt = _get_report_prompt(implementation_name)
+    prompt, language = _get_report_settings(implementation_name)
     if not prompt:
         frappe.throw(
             "No Customer Weekly Report Settings found. "
@@ -344,28 +358,53 @@ def generate_and_send_weekly_report(implementation_name, from_date=None, to_date
         "Write concise, professional weekly progress reports for customers. "
         "Use clear, non-technical language. Format the report with a brief intro, "
         "a section per deployed ticket (1-2 sentences each), and a time summary at the end. "
-        "Write in the language that best matches the customer context (default: German unless English is clearly appropriate)."
+        f"You MUST write the entire report in {language}. Do not switch languages."
     )
 
     user_message = (
         f"Customer: {customer_name}\n"
         f"Report period: {from_date} to {to_date}\n\n"
         f"Instructions: {prompt}\n\n"
-        f"Deployed tickets:\n{issues_text}\n\n"
-        f"Time tracking:\n{timesheet_text}"
+        f"Deployed tickets (use the 'Deployed at' timestamp verbatim — do not invent dates):\n{issues_text}\n\n"
+        f"Time tracking (source: Frappe timesheets linked to this implementation):\n{timesheet_text}"
     )
 
     # Step 3: generate report
     report_body = _call_mistral(system_prompt, user_message)
 
-    # Step 4: send email
-    subject = f"Wochenbericht {from_date} – {to_date} | {customer_name}"
+    # Step 4: send email — subject and footer follow the report language
+    _SUBJECT = {
+        "German": f"Wochenbericht {from_date} – {to_date} | {customer_name}",
+        "English": f"Weekly Report {from_date} – {to_date} | {customer_name}",
+        "French": f"Rapport hebdomadaire {from_date} – {to_date} | {customer_name}",
+        "Spanish": f"Informe semanal {from_date} – {to_date} | {customer_name}",
+        "Italian": f"Report settimanale {from_date} – {to_date} | {customer_name}",
+        "Dutch": f"Weekrapport {from_date} – {to_date} | {customer_name}",
+    }
+    _GREETING = {
+        "German": "phamos wünscht einen wunderschönen guten Morgen!",
+        "English": "phamos wishes you a wonderful good morning!",
+        "French": "phamos vous souhaite une merveilleuse bonne journée !",
+        "Spanish": "¡phamos les desea una maravillosa buena mañana!",
+        "Italian": "phamos vi augura uno splendido buongiorno!",
+        "Dutch": "phamos wenst u een prachtige goedemorgen!",
+    }
+    _FOOTER = {
+        "German": "Bei Fragen wenden Sie sich bitte an Ihren Projektleiter. Vielen Dank.<br><br>Wir wünschen eine gute Woche!<br><b>Ihr team phamos</b>",
+        "English": "For any questions, please contact your project manager. Thank you.<br><br>Have a great week!<br><b>Your phamos team</b>",
+        "French": "Pour toute question, veuillez contacter votre chef de projet. Merci.<br><br>Bonne semaine !<br><b>Votre équipe phamos</b>",
+        "Spanish": "Para cualquier consulta, contacte con su gestor de proyecto. Gracias.<br><br>¡Que tenga una buena semana!<br><b>Su equipo phamos</b>",
+        "Italian": "Per qualsiasi domanda, contattare il proprio project manager. Grazie.<br><br>Buona settimana!<br><b>Il vostro team phamos</b>",
+        "Dutch": "Voor vragen kunt u contact opnemen met uw projectmanager. Dank u wel.<br><br>Fijne week!<br><b>Uw phamos team</b>",
+    }
+    subject = _SUBJECT.get(language, _SUBJECT["German"])
+    greeting = _GREETING.get(language, _GREETING["German"])
+    footer = _FOOTER.get(language, _FOOTER["German"])
 
     email_body = (
-        f"<b><i>phamos wünscht einen wunderschönen guten Morgen!</i></b><br><br>"
+        f"<b><i>{greeting}</i></b><br><br>"
         f"{report_body.replace(chr(10), '<br>')}"
-        f"<br><br>Bei Fragen wenden Sie sich bitte an Ihren Projektleiter. Vielen Dank.<br><br>"
-        f"Wir wünschen eine gute Woche!<br><b>Ihr team phamos</b>"
+        f"<br><br>{footer}"
     )
 
     frappe.sendmail(

@@ -9,6 +9,7 @@
   "enabled",
   "is_default",
   "implementation",
+  "language",
   "prompt"
  ],
  "fields": [
@@ -37,6 +38,14 @@
    "fieldtype": "Link",
    "label": "Implementation",
    "options": "Implementation"
+  },
+  {
+   "default": "German",
+   "description": "Language the AI will write the report in.",
+   "fieldname": "language",
+   "fieldtype": "Select",
+   "label": "Report Language",
+   "options": "German\nEnglish\nFrench\nSpanish\nItalian\nDutch"
   },
   {
    "fieldname": "prompt",
