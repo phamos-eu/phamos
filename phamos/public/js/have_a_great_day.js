@@ -198,67 +198,6 @@ class MorningFeedbackDialog {
     this._styleDialog(this.dialog, true);
     this.dialog.show();
     this._applyBirthdayWishCollapse();
-    this._setupBirthdaySaveButtonVisibility();
-  }
-
-  _allBirthdaysSubmitted() {
-    return (
-      this.pendingBirthdays.length > 0 &&
-      this.pendingBirthdays.every(function (item) {
-        return item.already_submitted;
-      })
-    );
-  }
-
-  _hasBirthdayWishEdits() {
-    var self = this;
-    if (!this.dialog) {
-      return false;
-    }
-
-    for (var index = 0; index < this.pendingBirthdays.length; index++) {
-      var item = this.pendingBirthdays[index];
-      var fieldname = self._getBirthdayWishFieldname(item, index);
-      var field = self.dialog.fields_dict[fieldname];
-      if (!field) {
-        continue;
-      }
-      var current = (field.get_value() || "").trim();
-      var original = (item.submitted_message || "").trim();
-      if (current !== original) {
-        return true;
-      }
-    }
-    return false;
-  }
-
-  _setBirthdaySaveButtonVisible(visible) {
-    if (!this.dialog) {
-      return;
-    }
-    this.dialog.get_primary_btn().toggle(visible);
-  }
-
-  _setupBirthdaySaveButtonVisibility() {
-    var self = this;
-    if (!this.dialog) {
-      return;
-    }
-
-    self._setBirthdaySaveButtonVisible(false);
-
-    this.pendingBirthdays.forEach(function (item, index) {
-      var fieldname = self._getBirthdayWishFieldname(item, index);
-      var field = self.dialog.fields_dict[fieldname];
-      if (!field || !field.$input) {
-        return;
-      }
-      field.$input
-        .off("input.birthdayWishSave change.birthdayWishSave")
-        .on("input.birthdayWishSave change.birthdayWishSave", function () {
-          self._setBirthdaySaveButtonVisible(self._hasBirthdayWishEdits());
-        });
-    });
   }
 
   _getCollapsedWishSummaryHtml(item, index) {
@@ -271,7 +210,7 @@ class MorningFeedbackDialog {
     return (
       "<div class='birthday-wish-collapsed' data-birthday-index='" +
       index +
-      "' style='margin-bottom: 12px; padding: 10px 12px; border: 1px solid var(--border-color); border-radius: 6px;'>" +
+      "' style='margin-bottom: 12px; padding: 10px 12px; border: 1px solid var(--border-color); border-radius: 6px; cursor: pointer;'>" +
       "<div class='small' style='font-weight: 600;'>" +
       __("✓ Wish sent for {0}", [frappe.utils.escape_html(item.employee_name)]) +
       "</div>" +
@@ -289,11 +228,9 @@ class MorningFeedbackDialog {
         ]
       ) +
       "</div>" +
-      "<button type='button' class='btn btn-default btn-sm birthday-wish-expand-btn' data-birthday-index='" +
-      index +
-      "' style='margin-top: 10px;'>" +
+      "<div class='text-muted small' style='margin-top: 4px;'>" +
       __("Click to expand and edit") +
-      "</button>" +
+      "</div>" +
       "</div>"
     );
   }
@@ -320,11 +257,9 @@ class MorningFeedbackDialog {
       }
 
       self.dialog.$wrapper
-        .find(".birthday-wish-expand-btn[data-birthday-index='" + index + "']")
+        .find("[data-birthday-index='" + index + "']")
         .on("click", function () {
-          self.dialog.$wrapper
-            .find(".birthday-wish-collapsed[data-birthday-index='" + index + "']")
-            .hide();
+          self.dialog.$wrapper.find("[data-birthday-index='" + index + "']").hide();
           if (self.dialog.fields_dict[introKey]) {
             self.dialog.fields_dict[introKey].$wrapper.show();
           }
