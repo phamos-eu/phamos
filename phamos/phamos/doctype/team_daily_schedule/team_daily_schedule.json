@@ -8,6 +8,7 @@
  "field_order": [
   "subject",
   "location",
+  "event",
   "repeat_this_event",
   "repeat_on",
   "repeat_till",
@@ -15,22 +16,37 @@
   "description",
   "start",
   "end",
+  "fetch_free_slots",
   "section_break_yfye",
   "required_attendees",
   "email_account",
   "column_break_hxpy",
-  "optional_attendees"
+  "optional_attendees",
+  "mailcow_uid",
+  "mailcow_seq",
+  "mailcow_synced",
+  "mailcow_last_sync_at",
+  "mailcow_mailbox",
+  "mailcow_last_error"
  ],
  "fields": [
   {
    "fieldname": "subject",
    "fieldtype": "Small Text",
-   "label": "Subject"
+    "label": "Subject",
+    "reqd": 1
   },
   {
    "fieldname": "location",
    "fieldtype": "Data",
    "label": "Location"
+  },
+  {
+   "fieldname": "event",
+   "fieldtype": "Link",
+   "label": "Event",
+   "options": "Event",
+   "read_only": 1
   },
   {
    "default": "0",
@@ -61,12 +77,20 @@
   {
    "fieldname": "start",
    "fieldtype": "Datetime",
-   "label": "Start"
+    "label": "Start",
+    "reqd": 1
   },
   {
    "fieldname": "end",
    "fieldtype": "Datetime",
-   "label": "End"
+    "label": "End",
+    "reqd": 1
+  },
+  {
+   "depends_on": "eval:doc.email_account",
+   "fieldname": "fetch_free_slots",
+   "fieldtype": "Button",
+   "label": "Fetch Free Slots"
   },
   {
    "fieldname": "section_break_yfye",
@@ -81,7 +105,8 @@
    "fieldname": "email_account",
    "fieldtype": "Link",
    "label": "Email Account",
-   "options": "Email Account"
+    "options": "Email Account",
+    "reqd": 1
   },
   {
    "fieldname": "column_break_hxpy",
@@ -91,6 +116,50 @@
    "fieldname": "optional_attendees",
    "fieldtype": "Small Text",
    "label": "Optional Attendees"
+  },
+  {
+   "fieldname": "mailcow_uid",
+   "fieldtype": "Data",
+   "hidden": 1,
+   "label": "Mailcow UID",
+   "read_only": 1
+  },
+  {
+   "fieldname": "mailcow_seq",
+   "fieldtype": "Int",
+   "hidden": 1,
+   "label": "Mailcow Sequence",
+   "read_only": 1
+  },
+  {
+   "default": "0",
+   "fieldname": "mailcow_synced",
+   "fieldtype": "Check",
+   "hidden": 1,
+   "label": "Mailcow Synced",
+   "read_only": 1
+  },
+  {
+   "fieldname": "mailcow_last_sync_at",
+   "fieldtype": "Datetime",
+   "hidden": 1,
+   "label": "Mailcow Last Sync At",
+   "read_only": 1
+  },
+  {
+   "fieldname": "mailcow_mailbox",
+   "fieldtype": "Data",
+   "hidden": 1,
+   "label": "Mailcow Mailbox",
+   "options": "Email",
+   "read_only": 1
+  },
+  {
+   "fieldname": "mailcow_last_error",
+   "fieldtype": "Small Text",
+   "hidden": 1,
+   "label": "Mailcow Last Error",
+   "read_only": 1
   }
  ],
  "grid_page_length": 50,

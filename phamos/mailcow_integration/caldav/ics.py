@@ -21,11 +21,14 @@ def _fmt(dt: datetime) -> str:
 def vevent(uid: str, seq: int, subject: str, starts_on, ends_on,
            description: str = "", location: str = "Online", 
            attendees_to: str = "", attendees_cc: str = "", attendees_bcc: str = "",
-           attendee_role_map: dict[str, str] | None = None) -> str:
+           attendee_role_map: dict[str, str] | None = None,
+           organizer_email: str | None = None) -> str:
     tz = get_site_timezone()
     summary = (subject or "").replace("\n", " ")
     desc = strip_html(description or "")
     loc = (location or "").replace("\n", " ")
+
+    organizer = (organizer_email or frappe.session.user or "").strip()
 
     # Build base ICS
     ics_lines = [
@@ -42,7 +45,7 @@ def vevent(uid: str, seq: int, subject: str, starts_on, ends_on,
         f"SUMMARY:{summary}",
         f"DESCRIPTION:{desc}",
         f"LOCATION:{loc}",
-        f"ORGANIZER;CN={frappe.session.user}:mailto:{frappe.session.user}",
+        f"ORGANIZER;CN={organizer}:mailto:{organizer}",
     ]
 
     # Parse and add attendees
