@@ -151,18 +151,16 @@ on_login = ["phamos.website.on_login"]
 # }
 
 doc_events = {
-    "*": {
-        "after_insert": "phamos.events.team_daily_schedule.sync_events_from_parent",
-        "on_update": "phamos.events.team_daily_schedule.sync_events_from_parent",
-        "on_trash": "phamos.events.team_daily_schedule.cleanup_events_on_parent_trash",
-    },
 	"Event": {
 		"after_insert": "phamos.mailcow_integration.caldav.sync_event.on_upsert",
         "on_update": "phamos.mailcow_integration.caldav.sync_event.on_upsert",
 		"on_trash": "phamos.mailcow_integration.caldav.sync_event.on_delete",
 	},
     "Team": {
-        "after_save": "phamos.phamos.doctype.team.team.create_team_capacity_ledger_entry"
+        "after_save": "phamos.phamos.doctype.team.team.create_team_capacity_ledger_entry",
+        "after_insert": "phamos.events.team_daily_schedule.sync_events_from_parent",
+        "on_update": "phamos.events.team_daily_schedule.sync_events_from_parent",
+        "on_trash": "phamos.events.team_daily_schedule.cleanup_events_on_parent_trash"
     },
     "Communication": {
         "on_update": "phamos.events.communication.copy_attachments_to_reference_doc"
