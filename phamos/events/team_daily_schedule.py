@@ -285,16 +285,18 @@ def sync_events_from_parent(doc, method=None):
     _cleanup_removed_row_events(doc)
 
     previous_doc = doc.get_doc_before_save()
+    previous_rows = (previous_doc.get(SCHEDULE_TABLE_FIELD) or []) if previous_doc else []
     previous_rows_by_name = {
         row.name: row
-        for row in (previous_doc.get(SCHEDULE_TABLE_FIELD) or [])
-        if previous_doc and row.name
+        for row in previous_rows
+        if row.name
     }
 
     for row in (doc.get(SCHEDULE_TABLE_FIELD) or []):
         if not row.name:
             continue
 
+        mailbox_email = None
         try:
             previous_row = previous_rows_by_name.get(row.name)
             _attach_source_url_on_row_create(doc, row, previous_row)
