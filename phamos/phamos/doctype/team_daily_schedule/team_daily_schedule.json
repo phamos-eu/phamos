@@ -58,9 +58,11 @@
    "fieldname": "repeat_on",
    "fieldtype": "Select",
    "label": "Repeat On",
+    "depends_on": "eval:doc.repeat_this_event",
    "options": "\nDaily\nWeekly\nMonthly\nYearly"
   },
   {
+    "depends_on": "eval:doc.repeat_this_event",
    "fieldname": "repeat_till",
    "fieldtype": "Date",
    "label": "Repeat Till"

@@ -9,6 +9,19 @@ from frappe.utils import get_datetime
 from frappe.utils import strip_html
 
 
+def _escape_ics_text(value: str) -> str:
+    # RFC5545 text escaping: backslash, semicolon, comma, and newline.
+    return (
+        (value or "")
+        .replace("\\", "\\\\")
+        .replace(";", "\\;")
+        .replace(",", "\\,")
+        .replace("\r\n", "\\n")
+        .replace("\n", "\\n")
+        .replace("\r", "\\n")
+    )
+
+
 def _fmt(dt: datetime) -> str:
     # local datetime as YYYYMMDDTHHMMSS (SOGo accepts TZID on DTSTART/DTEND)
     if not isinstance(dt, datetime):
@@ -22,13 +35,14 @@ def vevent(uid: str, seq: int, subject: str, starts_on, ends_on,
            description: str = "", location: str = "Online", 
            attendees_to: str = "", attendees_cc: str = "", attendees_bcc: str = "",
            attendee_role_map: dict[str, str] | None = None,
-           organizer_email: str | None = None) -> str:
+           organizer_email: str | None = None,
+           recurrence_rule: str | None = None) -> str:
     tz = get_site_timezone()
-    summary = (subject or "").replace("\n", " ")
-    desc = strip_html(description or "")
-    loc = (location or "").replace("\n", " ")
+    summary = _escape_ics_text((subject or "").replace("\n", " "))
+    desc = _escape_ics_text(strip_html(description or ""))
+    loc = _escape_ics_text((location or "").replace("\n", " "))
 
-    organizer = (organizer_email or frappe.session.user or "").strip()
+    organizer = _escape_ics_text((organizer_email or frappe.session.user or "").strip())
 
     # Build base ICS
     ics_lines = [
@@ -72,6 +86,9 @@ def vevent(uid: str, seq: int, subject: str, starts_on, ends_on,
     
     # BCC recipients are NOT added as attendees (they receive the email but not the calendar invite)
     # This maintains the "blind" nature of BCC - they get the email notification only
+
+    if recurrence_rule:
+        ics_lines.append(f"RRULE:{recurrence_rule}")
 
     # Close the event
     ics_lines.extend([
