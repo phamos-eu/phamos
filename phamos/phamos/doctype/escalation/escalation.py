@@ -21,12 +21,27 @@ class Escalation(Document):
 				"Please set status to 'Resolved' before submitting.".format(self.status)
 			)
 
+	def on_submit(self):
+		self._revert_implementation_status()
+
 	def _set_implementation_escalated(self):
 		if not self.implementation:
 			return
 		current = frappe.db.get_value("Implementation", self.implementation, "status")
 		if current != "Escalated":
 			frappe.db.set_value("Implementation", self.implementation, "status", "Escalated")
+			frappe.db.commit()
+
+	def _revert_implementation_status(self):
+		if not self.implementation:
+			return
+		# Only revert if no other open (draft) escalations exist for this implementation
+		other_open = frappe.db.exists(
+			"Escalation",
+			{"implementation": self.implementation, "docstatus": 0, "name": ("!=", self.name)},
+		)
+		if not other_open:
+			frappe.db.set_value("Implementation", self.implementation, "status", "Open")
 			frappe.db.commit()
 
 	def _update_days_of_escalation(self):
