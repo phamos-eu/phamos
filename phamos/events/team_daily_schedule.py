@@ -7,7 +7,7 @@ from functools import lru_cache
 import requests
 
 import frappe
-from frappe.utils import get_url_to_form
+from frappe.utils import get_datetime, get_url_to_form
 
 from phamos.mailcow_integration.caldav.client import (
     calendar_item_url,
@@ -158,16 +158,49 @@ def _ensure_description_has_source_url(doc, row) -> str:
     return new_description
 
 
-def _attach_source_url_on_row_create(doc, row, previous_row):
-    # Only auto-append the source URL when the child row is newly created.
-    if previous_row:
-        return
-    _ensure_description_has_source_url(doc, row)
+def _ensure_row_description_for_sync(doc, row):
+    # Keep description canonical before building ICS so Mailcow always receives latest source URL block.
+    return _ensure_description_has_source_url(doc, row)
+
+
+def _row_recurrence_rule(row) -> str | None:
+    if not row or not row.get("repeat_this_event"):
+        return None
+
+    repeat_on = (row.get("repeat_on") or "").strip().lower()
+    freq = {
+        "daily": "DAILY",
+        "weekly": "WEEKLY",
+        "monthly": "MONTHLY",
+        "yearly": "YEARLY",
+    }.get(repeat_on)
+    if not freq:
+        return None
+
+    parts: list[str] = [f"FREQ={freq}"]
+
+    if freq == "WEEKLY" and row.get("start"):
+        try:
+            weekday = get_datetime(row.get("start")).weekday()
+            byday = ["MO", "TU", "WE", "TH", "FR", "SA", "SU"][weekday]
+            parts.append(f"BYDAY={byday}")
+        except Exception:
+            pass
+
+    if row.get("repeat_till"):
+        try:
+            until_date = get_datetime(row.get("repeat_till"))
+            parts.append(f"UNTIL={until_date.strftime('%Y%m%d')}T235959Z")
+        except Exception:
+            pass
+
+    return ";".join(parts)
 
 
 def _build_ics(row, uid: str, seq: int, organizer: str) -> str:
     required_csv = _normalize_csv_emails(row.get("required_attendees"))
     optional_csv = _normalize_csv_emails(row.get("optional_attendees"))
+    recurrence_rule = _row_recurrence_rule(row)
     return vevent(
         uid=uid,
         seq=seq,
@@ -181,6 +214,7 @@ def _build_ics(row, uid: str, seq: int, organizer: str) -> str:
         attendees_bcc="",
         attendee_role_map=_attendee_role_map(required_csv, optional_csv),
         organizer_email=organizer,
+        recurrence_rule=recurrence_rule,
     )
 
 
@@ -299,7 +333,7 @@ def sync_events_from_parent(doc, method=None):
         mailbox_email = None
         try:
             previous_row = previous_rows_by_name.get(row.name)
-            _attach_source_url_on_row_create(doc, row, previous_row)
+            _ensure_row_description_for_sync(doc, row)
 
             mailbox_email = _row_mailbox_email(row)
             previous_mailbox = _row_mailbox_email(previous_row) if previous_row else None
