@@ -35,15 +35,14 @@ def vevent(uid: str, seq: int, subject: str, starts_on, ends_on,
            description: str = "", location: str = "Online", 
            attendees_to: str = "", attendees_cc: str = "", attendees_bcc: str = "",
            attendee_role_map: dict[str, str] | None = None,
-           organizer_email: str | None = None) -> str:
+           organizer_email: str | None = None,
+           recurrence_rule: str | None = None) -> str:
     tz = get_site_timezone()
     summary = _escape_ics_text((subject or "").replace("\n", " "))
     desc = _escape_ics_text(strip_html(description or ""))
     loc = _escape_ics_text((location or "").replace("\n", " "))
 
     organizer = _escape_ics_text((organizer_email or frappe.session.user or "").strip())
-
-    organizer = (organizer_email or frappe.session.user or "").strip()
 
     # Build base ICS
     ics_lines = [
