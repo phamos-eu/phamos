@@ -2,12 +2,12 @@
 # For license information, please see license.txt
 
 import json
-from datetime import datetime, timedelta
+from datetime import datetime
 
 import frappe
 import requests
 from frappe.auth import get_decrypted_password
-from frappe.utils import get_first_day_of_week, now_datetime, nowdate
+from frappe.utils import add_to_date, now_datetime, nowdate
 
 from .gitlab_utils import get_gitlab_headers
 
@@ -25,11 +25,10 @@ INTERNAL_ACTIVITY_TYPES = ["Working alone", "Working with Team"]
 def _get_week_range(from_date=None, to_date=None):
     if from_date and to_date:
         return str(from_date), str(to_date)
-    today = nowdate()
-    # Monday of current week
-    week_start = get_first_day_of_week(today)
-    week_end = str((datetime.strptime(str(week_start), "%Y-%m-%d") + timedelta(days=6)).date())
-    return str(week_start), week_end
+    # Default: previous 7 days (yesterday back to 7 days ago)
+    yesterday = add_to_date(nowdate(), days=-1)
+    week_ago = add_to_date(nowdate(), days=-7)
+    return str(week_ago), str(yesterday)
 
 
 def sync_production_label_timestamps(implementation_name):
