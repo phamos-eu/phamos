@@ -876,6 +876,10 @@ frappe.ready(function () {
   var storageKey  = "pe_voted_" + eventName;
   var currentVote = localStorage.getItem(storageKey);
 
+  function isValidEmail(email) {
+    return /^[A-Za-z0-9][^\s@]*@[^\s@]+\.[^\s@]{2,}$/.test(email);
+  }
+
   var btnMap = {
     "Yes":   { btn: document.getElementById("btn-yes"),   count: document.getElementById("count-yes"),   cls: "active-yes"   },
     "Maybe": { btn: document.getElementById("btn-maybe"), count: document.getElementById("count-maybe"), cls: "active-maybe" },
@@ -932,7 +936,7 @@ frappe.ready(function () {
       subscribeMsg.className = "pe-subscribe-msg error";
       return;
     }
-    if (/\s/.test(email) || !/^[a-zA-Z0-9][^\s@]*@[^\s@]+\.[^\s@]{2,}$/.test(email)) {
+    if (!isValidEmail(email)) {
       subscribeMsg.textContent = "“" + email + "” does not look like a valid email address";
       subscribeMsg.className = "pe-subscribe-msg error";
       return;
@@ -1179,7 +1183,7 @@ frappe.ready(function () {
         if (!nameVal) {
           document.getElementById("err-name-" + j).style.display = "block"; ok = false;
         } else { document.getElementById("err-name-" + j).style.display = "none"; }
-        if (!emailVal || !emailVal.includes("@")) {
+        if (!emailVal || !isValidEmail(emailVal)) {
           document.getElementById("err-email-" + j).style.display = "block"; ok = false;
         } else { document.getElementById("err-email-" + j).style.display = "none"; }
         newAttendees.push({ full_name: nameVal, email: emailVal });
@@ -1241,10 +1245,16 @@ frappe.ready(function () {
       fields.forEach(function(f) {
         var el = document.getElementById(f.id);
         var val = el.value.trim();
-        if (!val) {
-          document.getElementById("err-" + f.id).style.display = "block"; ok = false;
+        var errEl = document.getElementById("err-" + f.id);
+        var isEmailField = f.type === "email";
+        var valid = !!val && (!isEmailField || isValidEmail(val));
+
+        if (!valid) {
+          errEl.textContent = (isEmailField && val) ? "Please enter a valid email address" : "This field is required";
+          errEl.style.display = "block";
+          ok = false;
         } else {
-          document.getElementById("err-" + f.id).style.display = "none";
+          errEl.style.display = "none";
           state[f.key] = val;
         }
       });
