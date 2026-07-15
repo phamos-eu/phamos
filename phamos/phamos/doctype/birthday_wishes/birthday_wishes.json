@@ -10,7 +10,8 @@
   "wish_giver",
   "message",
   "submitted_on",
-  "wish_giver_name"
+  "wish_giver_name",
+  "mute"
  ],
  "fields": [
   {
@@ -30,7 +31,7 @@
    "fieldtype": "Small Text",
    "in_list_view": 1,
    "label": "Message",
-   "reqd": 1
+   "reqd": 0
   },
   {
    "fieldname": "submitted_on",
@@ -45,12 +46,18 @@
    "in_list_view": 1,
    "label": "Wish Giver Name",
    "read_only": 1
+  },
+  {
+   "fieldname": "mute",
+   "fieldtype": "Date",
+   "label": "Mute",
+   "description": "Do not show the birthday prompt until this date."
   }
  ],
  "index_web_pages_for_search": 1,
  "istable": 1,
  "links": [],
- "modified": "2026-06-22 18:26:40.633425",
+ "modified": "2026-07-15 18:26:40.633425",
  "modified_by": "Administrator",
  "module": "Phamos",
  "name": "Birthday Wishes",

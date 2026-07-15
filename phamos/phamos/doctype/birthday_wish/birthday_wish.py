@@ -76,13 +76,38 @@ def _wish_already_submitted(parent_name, wish_giver):
 	)
 
 
-def _get_existing_wish_message(parent, wish_giver):
+def _get_existing_wish_row(parent, wish_giver):
 	if not wish_giver:
-		return ""
+		return None
 	for row in parent.birthday_wishes or []:
 		if row.wish_giver == wish_giver:
-			return (row.message or "").strip()
-	return ""
+			return row
+	return None
+
+
+def _get_existing_wish_message(parent, wish_giver):
+	row = _get_existing_wish_row(parent, wish_giver)
+	if not row:
+		return ""
+	return (row.message or "").strip()
+
+
+def _is_birthday_wish_muted(mute_until, reference=None):
+	if not mute_until:
+		return False
+	return getdate(reference or today()) < getdate(mute_until)
+
+
+def _mute_until_for_type(mute_type, reference=None):
+	today_date = getdate(reference or today())
+	if mute_type == "tomorrow":
+		return add_days(today_date, 1)
+	if mute_type == "week":
+		# Hide for the rest of this week; show again next Monday.
+		weekday = today_date.weekday()
+		days_until_next_monday = (7 - weekday) % 7 or 7
+		return add_days(today_date, days_until_next_monday)
+	frappe.throw(_("Invalid mute option."))
 
 
 @frappe.whitelist()
@@ -125,7 +150,11 @@ def get_pending_birthday_wish_prompts():
 		if parent.status != "Collecting":
 			continue
 
-		submitted_message = _get_existing_wish_message(parent, wish_giver)
+		existing_row = _get_existing_wish_row(parent, wish_giver)
+		if existing_row and _is_birthday_wish_muted(existing_row.mute, today_date):
+			continue
+
+		submitted_message = (existing_row.message or "").strip() if existing_row else ""
 
 		pending.append(
 			{
@@ -179,6 +208,7 @@ def save_birthday_wish_message(birthday_wish, message):
 		existing_row.message = message
 		existing_row.submitted_on = now_datetime()
 		existing_row.wish_giver_name = wish_giver_name
+		existing_row.mute = None
 	else:
 		doc.append(
 			"birthday_wishes",
@@ -192,6 +222,51 @@ def save_birthday_wish_message(birthday_wish, message):
 
 	doc.save(ignore_permissions=True)
 	return {"status": "ok", "birthday_wish": doc.name}
+
+
+@frappe.whitelist()
+def mute_birthday_wish(birthday_wish, mute_type):
+	"""Hide a birthday wish prompt until tomorrow or until next week."""
+	wish_giver = _get_current_employee()
+	if not wish_giver:
+		frappe.throw(_("Employee not found for the current user."))
+
+	doc = frappe.get_doc("Birthday Wish", birthday_wish)
+	today_date = getdate(today())
+
+	if doc.status != "Collecting":
+		frappe.throw(_("Birthday wishes are no longer being collected for this colleague."))
+
+	if doc.due_date and getdate(doc.due_date) < today_date:
+		frappe.throw(_("The deadline to submit birthday wishes has passed."))
+
+	if doc.birthday_employee == wish_giver:
+		frappe.throw(_("You cannot mute your own birthday wish prompt here."))
+
+	mute_until = _mute_until_for_type(mute_type, today_date)
+	wish_giver_name = frappe.db.get_value("Employee", wish_giver, "employee_name") or wish_giver
+
+	existing_row = _get_existing_wish_row(doc, wish_giver)
+	if existing_row:
+		existing_row.mute = mute_until
+		if not existing_row.wish_giver_name:
+			existing_row.wish_giver_name = wish_giver_name
+	else:
+		doc.append(
+			"birthday_wishes",
+			{
+				"wish_giver": wish_giver,
+				"wish_giver_name": wish_giver_name,
+				"mute": mute_until,
+			},
+		)
+
+	doc.save(ignore_permissions=True)
+	return {
+		"status": "ok",
+		"birthday_wish": doc.name,
+		"mute": str(mute_until),
+	}
 
 
 def _get_employee_raven_user(birthday_employee):
