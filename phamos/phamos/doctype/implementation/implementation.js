@@ -396,8 +396,8 @@ frappe.ui.form.on("Implementation", {
 
         frm.add_custom_button(__('Generate Weekly Report'), function () {
             const today = frappe.datetime.get_today();
-            const weekStart = frappe.datetime.week_start();
-            const weekEnd = frappe.datetime.add_days(weekStart, 6);
+            const toDate = frappe.datetime.add_days(today, -1);
+            const fromDate = frappe.datetime.add_days(today, -7);
 
             let d = new frappe.ui.Dialog({
                 title: __('Generate Weekly Customer Report'),
@@ -406,14 +406,14 @@ frappe.ui.form.on("Implementation", {
                         label: __('From Date'),
                         fieldname: 'from_date',
                         fieldtype: 'Date',
-                        default: weekStart,
+                        default: fromDate,
                         reqd: 1
                     },
                     {
                         label: __('To Date'),
                         fieldname: 'to_date',
                         fieldtype: 'Date',
-                        default: weekEnd,
+                        default: toDate,
                         reqd: 1
                     }
                 ],
