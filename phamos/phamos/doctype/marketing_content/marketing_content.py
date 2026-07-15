@@ -339,13 +339,14 @@ def create_ticket_order(event_name, attendees, qty, invoice_data=None):
     if tc_name:
         so.tc_name = tc_name
 
-    # This endpoint is intentionally available to guests. All links on the order
-    # (customer, item, tax account, etc.) are resolved from server-side settings,
-    # but Guest cannot read Account and Frappe validates those links on insert.
-    # Skip link permission validation here so buying a ticket does not require a
-    # logged-in user; the configured records are still validated by ERPNext's
-    # Sales Order controller.
-    so.insert(ignore_permissions=True, ignore_links=True)
+    guest_session = frappe.session.user == "Guest"
+    if guest_session:
+        frappe.set_user("Administrator")
+    try:
+        so.insert(ignore_permissions=True, ignore_links=True)
+    finally:
+        if guest_session:
+            frappe.set_user("Guest")
 
     # --- Register each attendee ---
     for att in attendees:
