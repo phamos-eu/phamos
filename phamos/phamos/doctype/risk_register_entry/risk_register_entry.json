@@ -1,0 +1,220 @@
+{
+ "actions": [],
+ "autoname": "naming_series:",
+ "creation": "2026-07-15 00:00:00.000000",
+ "doctype": "DocType",
+ "engine": "InnoDB",
+ "field_order": [
+  "naming_series",
+  "implementation",
+  "status",
+  "risk_category",
+  "column_break_header",
+  "open_date",
+  "close_date",
+  "last_reviewed",
+  "owner_user",
+  "section_break_description",
+  "risk_description",
+  "impact_description",
+  "section_break_assessment",
+  "implementation_severity",
+  "company_severity",
+  "column_break_assessment",
+  "likelihood",
+  "implementation_risk_level",
+  "company_risk_level",
+  "risk_rating",
+  "section_break_mitigation",
+  "mitigation_plan",
+  "mitigation_status",
+  "column_break_mitigation",
+  "response_action",
+  "comments"
+ ],
+ "fields": [
+  {
+   "fieldname": "naming_series",
+   "fieldtype": "Select",
+   "label": "Series",
+   "options": "RRE-.YYYY.-"
+  },
+  {
+   "fieldname": "implementation",
+   "fieldtype": "Link",
+   "in_list_view": 1,
+   "label": "Implementation",
+   "options": "Implementation"
+  },
+  {
+   "default": "Not Started",
+   "fieldname": "status",
+   "fieldtype": "Select",
+   "in_list_view": 1,
+   "label": "Status",
+   "options": "Accepted\nNot Started\nIn Progress\nEscalated\nClosed",
+   "reqd": 1
+  },
+  {
+   "fieldname": "risk_category",
+   "fieldtype": "Select",
+   "in_list_view": 1,
+   "label": "Risk Category",
+   "options": "\nSchedule\nCost\nScope\nResources\nCompliance\nVendor\nTechnical\nStakeholder"
+  },
+  {
+   "fieldname": "column_break_header",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "open_date",
+   "fieldtype": "Date",
+   "label": "Open Date",
+   "reqd": 1
+  },
+  {
+   "fieldname": "close_date",
+   "fieldtype": "Date",
+   "label": "Close Date"
+  },
+  {
+   "fieldname": "last_reviewed",
+   "fieldtype": "Date",
+   "label": "Last Reviewed"
+  },
+  {
+   "fieldname": "owner_user",
+   "fieldtype": "Link",
+   "label": "Owner",
+   "options": "User"
+  },
+  {
+   "fieldname": "section_break_description",
+   "fieldtype": "Section Break",
+   "label": "Risk Description"
+  },
+  {
+   "fieldname": "risk_description",
+   "fieldtype": "Data",
+   "label": "Risk Description",
+   "reqd": 1
+  },
+  {
+   "fieldname": "impact_description",
+   "fieldtype": "Small Text",
+   "label": "Impact Description",
+   "reqd": 1
+  },
+  {
+   "fieldname": "section_break_assessment",
+   "fieldtype": "Section Break",
+   "label": "Risk Assessment"
+  },
+  {
+   "fieldname": "implementation_severity",
+   "fieldtype": "Select",
+   "label": "Implementation Severity",
+   "options": "\n5 Catastrophic\n4 Major\n3 Moderate\n2 Minor\n1 Insignificant"
+  },
+  {
+   "fieldname": "company_severity",
+   "fieldtype": "Select",
+   "label": "Company Severity",
+   "options": "\n5 Catastrophic\n4 Major\n3 Moderate\n2 Minor\n1 Insignificant"
+  },
+  {
+   "fieldname": "column_break_assessment",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "likelihood",
+   "fieldtype": "Select",
+   "label": "Likelihood",
+   "options": "\n5 Certain\n4 Likely\n3 Moderate\n2 Unlikely\n1 Rare"
+  },
+  {
+   "fieldname": "implementation_risk_level",
+   "fieldtype": "Int",
+   "label": "Implementation Risk Level",
+   "read_only": 1
+  },
+  {
+   "fieldname": "company_risk_level",
+   "fieldtype": "Int",
+   "label": "Company Risk Level",
+   "read_only": 1
+  },
+  {
+   "fieldname": "risk_rating",
+   "fieldtype": "Data",
+   "in_list_view": 1,
+   "label": "Risk Rating",
+   "read_only": 1
+  },
+  {
+   "fieldname": "section_break_mitigation",
+   "fieldtype": "Section Break",
+   "label": "Mitigation"
+  },
+  {
+   "fieldname": "mitigation_plan",
+   "fieldtype": "Small Text",
+   "label": "Mitigation Plan"
+  },
+  {
+   "fieldname": "mitigation_status",
+   "fieldtype": "Small Text",
+   "label": "Mitigation Status"
+  },
+  {
+   "fieldname": "column_break_mitigation",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "response_action",
+   "fieldtype": "Small Text",
+   "label": "Response Action"
+  },
+  {
+   "fieldname": "comments",
+   "fieldtype": "Small Text",
+   "label": "Comments"
+  }
+ ],
+ "links": [],
+ "modified": "2026-07-15 00:00:00.000000",
+ "modified_by": "Administrator",
+ "module": "Phamos",
+ "name": "Risk Register Entry",
+ "naming_rule": "By \"Naming Series\" field",
+ "owner": "Administrator",
+ "permissions": [
+  {
+   "create": 1,
+   "delete": 1,
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "System Manager",
+   "share": 1,
+   "write": 1
+  },
+  {
+   "create": 1,
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "All",
+   "share": 1,
+   "write": 1
+  }
+ ],
+ "sort_field": "modified",
+ "sort_order": "DESC",
+ "states": [],
+ "track_changes": 1
+}
