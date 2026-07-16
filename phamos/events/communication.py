@@ -72,3 +72,19 @@ def copy_attachments_to_reference_doc(doc, event=None):
 				title=_("Sync Accounting Receipt attachment field failed"),
 				message=frappe.get_traceback(),
 			)
+
+	# Incoming emails appended to Lead Data Import keep their files on the
+	# Communication. Copying above makes them visible on the import; now select
+	# the first business-card PDF/image and run the normal extraction pipeline.
+	if doc.reference_doctype == "Lead Data Import" and doc.reference_name:
+		try:
+			from phamos.phamos.doctype.lead_data_import.lead_data_import import (
+				sync_email_attachment_and_extract,
+			)
+
+			sync_email_attachment_and_extract(doc.reference_name)
+		except Exception:
+			frappe.log_error(
+				title=_("Process Lead Data Import email attachment failed"),
+				message=frappe.get_traceback(),
+			)

@@ -84,6 +84,58 @@ Text:
 ---"""
 class LeadDataImport(Document):
     pass
+
+
+def sync_email_attachment_and_extract(lead_data_import_name):
+    """Use an emailed business-card attachment as input and start extraction.
+
+    Communication can be updated more than once while an incoming email is
+    processed. An existing ``upload_file`` therefore acts as the idempotency
+    guard and prevents the same attachment from starting extraction twice.
+    """
+    doc = frappe.get_doc(LEAD_DATA_IMPORT_DOCTYPE, lead_data_import_name)
+    if doc.upload_file:
+        return False
+
+    files = frappe.get_all(
+        "File",
+        filters={
+            "attached_to_doctype": LEAD_DATA_IMPORT_DOCTYPE,
+            "attached_to_name": lead_data_import_name,
+        },
+        fields=["file_name", "file_url"],
+        order_by="creation asc",
+    )
+
+    selected_file = None
+    input_type = None
+    for file_row in files:
+        filename = (file_row.file_name or file_row.file_url or "").lower()
+        if re.search(r"\.pdf(?:$|[?#])", filename):
+            selected_file = file_row.file_url
+            input_type = "PDF"
+            break
+        if re.search(r"\.(?:png|jpe?g|webp)(?:$|[?#])", filename):
+            selected_file = file_row.file_url
+            input_type = "Screenshot"
+            break
+
+    if not selected_file:
+        return False
+
+    frappe.db.set_value(
+        LEAD_DATA_IMPORT_DOCTYPE,
+        lead_data_import_name,
+        {
+            "input_type": input_type,
+            "upload_file": selected_file,
+        },
+        update_modified=False,
+    )
+    extract_leads(lead_data_import_name)
+    return True
+
+
 def _get_lead_data_mapping_prompt():
     if not frappe.db.exists("DocType", "Lead Data Mapping"):
         return ""
