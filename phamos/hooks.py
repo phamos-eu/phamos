@@ -165,6 +165,12 @@ doc_events = {
     "Communication": {
         "on_update": "phamos.events.communication.copy_attachments_to_reference_doc"
     },
+    "Lead Data": {
+        "after_insert": "phamos.events.lead_data.notify_lead_data_created_via_raven_dm"
+    },
+    "Raven Message": {
+		"after_insert": "phamos.events.raven_bot.handle_lead_option_reply"
+	},
     "Accounting Receipt": {
         "after_insert": [
             "phamos.phamos.doctype.accounting_receipt.accounting_receipt.sync_attachment_from_files",

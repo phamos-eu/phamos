@@ -1,0 +1,81 @@
+{
+ "actions": [],
+ "allow_rename": 1,
+ "creation": "2026-07-15 10:11:26.468685",
+ "doctype": "DocType",
+ "engine": "InnoDB",
+ "field_order": [
+  "raven_bot",
+  "recipient_user",
+  "column_break_pagl",
+  "section_break_pdad",
+  "message_template",
+  "section_break_xaky",
+  "table_npdu"
+ ],
+ "fields": [
+  {
+   "fieldname": "raven_bot",
+   "fieldtype": "Link",
+   "label": "Raven Bot",
+   "options": "Raven Bot"
+  },
+  {
+   "fieldname": "recipient_user",
+   "fieldtype": "Link",
+   "label": "Recipient User",
+   "options": "User"
+  },
+  {
+   "default": "What would you like to do?",
+   "description": "Intro text shown above the enabled options. Option lines are generated automatically from the Bot Options table.",
+   "fieldname": "message_template",
+   "fieldtype": "Small Text",
+   "label": "Message Template"
+  },
+  {
+   "fieldname": "column_break_pagl",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "section_break_pdad",
+   "fieldtype": "Section Break"
+  },
+  {
+   "fieldname": "section_break_xaky",
+   "fieldtype": "Section Break"
+  },
+  {
+   "fieldname": "table_npdu",
+   "fieldtype": "Table",
+   "label": "Bot Options",
+   "options": "Raven Bot Option"
+  }
+ ],
+ "grid_page_length": 50,
+ "index_web_pages_for_search": 1,
+ "issingle": 1,
+ "links": [],
+ "modified": "2026-07-15 15:25:07.904793",
+ "modified_by": "Administrator",
+ "module": "Phamos",
+ "name": "Raven Bot Setting",
+ "owner": "Administrator",
+ "permissions": [
+  {
+   "create": 1,
+   "delete": 1,
+   "email": 1,
+   "print": 1,
+   "read": 1,
+   "role": "System Manager",
+   "share": 1,
+   "write": 1
+  }
+ ],
+ "row_format": "Dynamic",
+ "rows_threshold_for_grid_search": 20,
+ "sort_field": "modified",
+ "sort_order": "DESC",
+ "states": []
+}

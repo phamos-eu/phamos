@@ -1,0 +1,100 @@
+{
+ "actions": [],
+ "allow_rename": 1,
+ "creation": "2026-07-15 15:21:16.689454",
+ "doctype": "DocType",
+ "editable_grid": 1,
+ "engine": "InnoDB",
+ "field_order": [
+  "option_key",
+  "option_label",
+  "action_type",
+  "column_break_mhek",
+  "response_message",
+  "section_break_yvfm",
+  "email_subject",
+  "email_attachment",
+  "email_body",
+  "is_enabled"
+ ],
+ "fields": [
+  {
+   "description": "Single letter the user will type, e.g. a, b, c, d",
+   "fieldname": "option_key",
+   "fieldtype": "Data",
+   "in_list_view": 1,
+   "label": "Option Key",
+   "reqd": 1
+  },
+  {
+   "description": "Text shown next to the option key in the Raven message, e.g. 'Send a welcome email'",
+   "fieldname": "option_label",
+   "fieldtype": "Data",
+   "in_list_view": 1,
+   "label": "Option Text"
+  },
+  {
+   "fieldname": "action_type",
+   "fieldtype": "Select",
+   "in_list_view": 1,
+   "label": "Action Type",
+   "options": "Send Welcome Email\nSuggest Appointment\nAdd to Newsletter\nAll Actions\nNo Action",
+   "reqd": 1
+  },
+  {
+   "description": "Short message shown in Raven chat after this action runs, e.g. '\u2705 Welcome email sent.'",
+   "fieldname": "response_message",
+   "fieldtype": "Small Text",
+   "in_list_view": 1,
+   "label": "Chat Confirmation Message"
+  },
+  {
+   "depends_on": "eval:doc.action_type=='Send Welcome Email'",
+   "description": "Only used when Action Type is 'Send Welcome Email'",
+   "fieldname": "email_subject",
+   "fieldtype": "Data",
+   "label": "Email Subject"
+  },
+  {
+   "depends_on": "eval:doc.action_type=='Send Welcome Email'",
+   "fieldname": "email_body",
+   "fieldtype": "Text Editor",
+   "label": "Email Body"
+  },
+  {
+   "depends_on": "eval:doc.action_type=='Send Welcome Email'",
+   "fieldname": "email_attachment",
+   "fieldtype": "Attach",
+   "label": "Email Attachment (PDF)"
+  },
+  {
+   "default": "1",
+   "fieldname": "is_enabled",
+   "fieldtype": "Check",
+   "label": "Enabled"
+  },
+  {
+   "fieldname": "column_break_mhek",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "section_break_yvfm",
+   "fieldtype": "Section Break"
+  }
+ ],
+ "grid_page_length": 50,
+ "index_web_pages_for_search": 1,
+ "istable": 1,
+ "links": [],
+ "modified": "2026-07-15 17:14:14.288553",
+ "modified_by": "Administrator",
+ "module": "Phamos",
+ "name": "Raven Bot Option",
+ "owner": "Administrator",
+ "permissions": [],
+ "row_format": "Dynamic",
+ "rows_threshold_for_grid_search": 20,
+ "sort_field": "modified",
+ "sort_order": "DESC",
+ "states": []
+}
