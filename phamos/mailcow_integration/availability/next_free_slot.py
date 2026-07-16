@@ -157,7 +157,34 @@ def next_three_free_slots_me(duration_minutes: int = 60,
     Look only at the current user's SOGo calendar.
     Return up to 3 soonest slots: [{"start": ISO, "end": ISO}]
     """
-    user_id = frappe.session.user
+    return next_three_free_slots_for_user(
+        frappe.session.user,
+        duration_minutes=duration_minutes,
+        search_days=search_days,
+        work_start=work_start,
+        work_end=work_end,
+        tz_name=tz_name,
+    )
+
+
+def next_three_free_slots_for_user(user_id: str,
+                                   duration_minutes: int = 60,
+                                   search_days: int = 14,
+                                   work_start: str = "08:00",
+                                   work_end: str = "18:00",
+                                   tz_name: str | None = None):
+    """Return the next three free slots from the selected user's SOGo calendar."""
+    import pytz
+
+    if not user_id:
+        frappe.throw("A calendar user is required to fetch appointment slots.")
+
+    tz_name = (
+        tz_name
+        or frappe.db.get_value("User", user_id, "time_zone")
+        or get_site_timezone()
+    )
+    tz = pytz.timezone(tz_name)
     now_utc = _now_utc()
     duration = timedelta(minutes=int(duration_minutes))
     results = []
@@ -177,10 +204,20 @@ def next_three_free_slots_me(duration_minutes: int = 60,
             t = _round_to_15min(t, direction="up")
             
             while t + duration <= e:
-                results.append({"start": t.isoformat(), "end": (t + duration).isoformat()})
+                local_start = t.astimezone(tz)
+                local_end = (t + duration).astimezone(tz)
+                results.append({
+                    "start": t.isoformat(),
+                    "end": (t + duration).isoformat(),
+                    "start_local": local_start.strftime("%Y-%m-%d %H:%M:%S"),
+                    "end_local": local_end.strftime("%Y-%m-%d %H:%M:%S"),
+                    "label": (
+                        f"{local_start.strftime('%a, %b %d')} — "
+                        f"{local_start.strftime('%H:%M')}–{local_end.strftime('%H:%M')}"
+                    ),
+                })
                 if len(results) >= 3:
                     return results
                 t += timedelta(minutes=15)
 
     return results
-

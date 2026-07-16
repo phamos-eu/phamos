@@ -69,17 +69,46 @@ def _extract_dt_pairs(ics_text: str) -> List[Tuple[datetime, datetime]]:
     Extract DTSTART/DTEND pairs from VCALENDAR/VEVENT. Handles single instances.
     Times are usually returned expanded by server when we used <c:expand>.
     """
-    # capture lines; tolerate TZID or Zulu
-    dtstart = re.findall(r"^DTSTART(?:;TZID=[^\r\n:]+)?:([0-9T]+Z?)", ics_text, flags=re.M)
-    dtend   = re.findall(r"^DTEND(?:;TZID=[^\r\n:]+)?:([0-9T]+Z?)",   ics_text, flags=re.M)
     out: List[Tuple[datetime, datetime]] = []
-    for a, b in zip(dtstart, dtend):
-        def parse(x: str) -> datetime:
-            if x.endswith("Z"):
-                return datetime.strptime(x, RFC3339Z).replace(tzinfo=timezone.utc)
-            # naive local; treat as UTC for union—SOGo usually returns with TZ or Z
-            return datetime.strptime(x, "%Y%m%dT%H%M%S").replace(tzinfo=timezone.utc)
-        out.append((parse(a), parse(b)))
+
+    # Parse each VEVENT independently. Searching the complete VCALENDAR pairs
+    # VTIMEZONE DTSTART values (often historical dates such as 1893) with an
+    # event DTEND, which can incorrectly mark the entire calendar as busy.
+    event_blocks = re.findall(
+        r"BEGIN:VEVENT\s*(.*?)\s*END:VEVENT",
+        ics_text,
+        flags=re.S | re.I,
+    )
+    property_pattern = r"^{name}(?P<params>(?:;[^:\r\n]+)*):(?P<value>[0-9T]+Z?)"
+
+    def parse(match) -> datetime:
+        import pytz
+
+        value = match.group("value")
+        params = match.group("params") or ""
+        if value.endswith("Z"):
+            return datetime.strptime(value, RFC3339Z).replace(tzinfo=timezone.utc)
+        if len(value) == 8:
+            return datetime.strptime(value, "%Y%m%d").replace(tzinfo=timezone.utc)
+
+        parsed = datetime.strptime(value, "%Y%m%dT%H%M%S")
+        tzid_match = re.search(r"(?:^|;)TZID=([^;:]+)", params, flags=re.I)
+        if tzid_match:
+            try:
+                return pytz.timezone(tzid_match.group(1)).localize(parsed).astimezone(timezone.utc)
+            except pytz.UnknownTimeZoneError:
+                pass
+        return parsed.replace(tzinfo=timezone.utc)
+
+    for block in event_blocks:
+        start_match = re.search(
+            property_pattern.format(name="DTSTART"), block, flags=re.M | re.I
+        )
+        end_match = re.search(
+            property_pattern.format(name="DTEND"), block, flags=re.M | re.I
+        )
+        if start_match and end_match:
+            out.append((parse(start_match), parse(end_match)))
     return out
 
 def fetch_busy_intervals_from_sogo(user_id: str,
@@ -90,11 +119,11 @@ def fetch_busy_intervals_from_sogo(user_id: str,
     """
     s = _settings()
     email = _get_user_email(user_id)
-    if not email: return []
+    if not email:
+        raise CalDAVReadError(f"No email is configured for User {user_id}")
     pw = _dav_pw(email)
     if not pw:
-        frappe.log_error(f"No DAV app password for {email}", "CalDAV read")
-        return []
+        raise CalDAVReadError(f"No DAV app password is configured for {email}")
 
     url = _calendar_url(s.base_url, email)
     body = _build_report_xml(window_start_utc, window_end_utc, expand=True)
@@ -105,8 +134,7 @@ def fetch_busy_intervals_from_sogo(user_id: str,
     }
     r = requests.request("REPORT", url, data=body.encode("utf-8"), headers=headers, timeout=30)
     if r.status_code not in (200, 207):
-        frappe.log_error(f"{r.status_code} {r.text[:500]}", "CalDAV REPORT")
-        return []
+        raise CalDAVReadError(f"CalDAV REPORT failed ({r.status_code}): {r.text[:500]}")
 
     intervals: List[Tuple[datetime, datetime]] = []
     for ics in _parse_ics_blocks(r.text):

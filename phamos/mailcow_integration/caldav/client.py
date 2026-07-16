@@ -36,12 +36,16 @@ def calendar_item_url(base_url: str, email: str, uid: str) -> str:
 
 def put_ics(uid: str, ics: str, acting_user_id: str):
     s = settings()
-    email = organizer_email()
-    if not email: return
+    email = None
+    if acting_user_id:
+        email = frappe.db.get_value("User", acting_user_id, "email") or acting_user_id
+    if not email:
+        email = organizer_email()
+    if not email:
+        raise CalDAVError("Could not determine the calendar owner email.")
     pw = dav_password(email)
     if not pw:
-        frappe.log_error(f"No DAV app password for {email}", "CalDAV PUT")
-        return
+        raise CalDAVError(f"No DAV app password is configured for {email}.")
     url = calendar_item_url(s.base_url, email, uid)
     r = requests.put(
         url, data=ics.encode("utf-8"),
@@ -50,7 +54,8 @@ def put_ics(uid: str, ics: str, acting_user_id: str):
         timeout=30
     )
     if r.status_code not in (200, 201, 204):
-        frappe.log_error(f"{r.status_code} {r.text}", "CalDAV PUT")
+        raise CalDAVError(f"SOGo calendar update failed ({r.status_code}): {r.text[:500]}")
+    return {"uid": uid, "calendar_user": acting_user_id, "email": email}
 
 def delete_ics(uid: str):
     s = settings()
