@@ -3,7 +3,7 @@ frappe.ready(function () {
 	if (!event_name) return;
 
 	function isValidEmail(email) {
-		return /^[A-Za-z0-9][^\s@]*@[^\s@]+\.[^\s@]{2,}$/.test(email);
+		return /^[A-Za-z0-9][A-Za-z0-9!#$%&'*+\/=?^_`{|}~-]*(?:\.[A-Za-z0-9!#$%&'*+\/=?^_`{|}~-]+)*@(?:[A-Za-z0-9](?:[A-Za-z0-9-]*[A-Za-z0-9])?\.)+[A-Za-z]{2,}$/i.test(email);
 	}
 
 	var form = document.querySelector(".web-form");
