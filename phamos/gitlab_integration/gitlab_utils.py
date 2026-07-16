@@ -5,6 +5,7 @@ from frappe.utils import now_datetime
 import json
 import hashlib
 import hmac
+from datetime import datetime
 
 def get_gitlab_headers():
     settings = frappe.get_single("GitLab Settings")
@@ -709,19 +710,32 @@ def register_webhooks_for_all_projects():
             existing_resp = requests.get(existing_url, headers=headers)
             existing_hooks = existing_resp.json() if existing_resp.status_code == 200 else []
 
-            already_exists = any(
-                hook.get("url") == webhook_url
-                for hook in existing_hooks
+            existing_hook = next(
+                (hook for hook in existing_hooks if hook.get("url") == webhook_url),
+                None,
             )
 
-            if already_exists:
-                results.append(f"⏭ {project['title']} — already registered")
+            if existing_hook:
+                if existing_hook.get("note_events"):
+                    results.append(f"⏭ {project['title']} — already registered")
+                    continue
+                # Hook exists from before Note Hook support was added — enable it.
+                update_resp = requests.put(
+                    f"{existing_url}/{existing_hook['id']}",
+                    json={"note_events": True, "enable_ssl_verification": False},
+                    headers=headers,
+                )
+                if update_resp.status_code == 200:
+                    results.append(f"🔄 {project['title']} — enabled note_events on existing webhook")
+                else:
+                    results.append(f"❌ {project['title']} — failed to enable note_events: {update_resp.text}")
                 continue
 
             # ── Step 2: Webhook register ──
             payload = {
                 "url": webhook_url,
                 "issues_events": True,
+                "note_events": True,
                 "enable_ssl_verification": False,
             }
 
@@ -792,11 +806,14 @@ def gitlab_webhook_receiver():
 
     event_type = frappe.request.headers.get("X-Gitlab-Event", "")
 
-    if event_type != "Issue Hook":
+    if event_type not in ("Issue Hook", "Note Hook"):
         return {"status": "ignored", "event": event_type}
 
     try:
-        _handle_issue_webhook(payload)
+        if event_type == "Issue Hook":
+            _handle_issue_webhook(payload)
+        else:
+            _handle_note_webhook(payload)
     except Exception:
         frappe.log_error(frappe.get_traceback(), "GitLab Webhook Error")
         frappe.response.http_status_code = 500
@@ -881,6 +898,8 @@ def _handle_issue_webhook(payload):
     )
 
     if existing:
+        # Detect newly added prod labels before overwriting the labels field
+        _stamp_prod_labels_on_change(existing, labels_list)
         # use set_value to avoid TimestampMismatchError on concurrent webhooks
         frappe.db.set_value("GitLab Issue", existing, data, update_modified=True)
     else:
@@ -889,6 +908,8 @@ def _handle_issue_webhook(payload):
             doc.update(data)
             doc.issue_id       = issue_iid
             doc.gitlab_project = project_doc_name
+            # Stamp prod label timestamps for a brand-new issue
+            _stamp_prod_labels_initial(doc, labels_list)
             doc.insert(ignore_permissions=True)
             _try_link_parent_from_webhook(
                 doc.name,
@@ -903,9 +924,45 @@ def _handle_issue_webhook(payload):
                 "name"
             )
             if existing:
+                _stamp_prod_labels_on_change(existing, labels_list)
                 frappe.db.set_value("GitLab Issue", existing, data, update_modified=True)
 
     frappe.db.commit()
+
+
+_PROD_LABEL_FIELDS = {
+    "Merged into Production": "merged_to_production_at",
+    "Testing on Production": "testing_on_production_at",
+}
+
+
+def _stamp_prod_labels_on_change(issue_doc_name, new_labels_list):
+    """Set timestamp fields when a prod label is newly added (not already stored)."""
+    ts_fields = frappe.db.get_value(
+        "GitLab Issue",
+        issue_doc_name,
+        ["labels", "merged_to_production_at", "testing_on_production_at"],
+        as_dict=True,
+    ) or {}
+    old_labels = {l.strip() for l in (ts_fields.get("labels") or "").split(",") if l.strip()}
+    new_labels = set(new_labels_list)
+    now = now_datetime()
+
+    updates = {}
+    for label, field in _PROD_LABEL_FIELDS.items():
+        if label in new_labels and label not in old_labels and not ts_fields.get(field):
+            updates[field] = now
+
+    if updates:
+        frappe.db.set_value("GitLab Issue", issue_doc_name, updates, update_modified=False)
+
+
+def _stamp_prod_labels_initial(doc, labels_list):
+    """Set timestamp fields on a brand-new issue that already carries a prod label."""
+    now = now_datetime()
+    for label, field in _PROD_LABEL_FIELDS.items():
+        if label in labels_list:
+            setattr(doc, field, now)
 
 
 def _resolve_milestone_from_webhook(issue_attrs, project_doc_name):
@@ -944,3 +1001,157 @@ def _try_link_parent_from_webhook(issue_doc_name, project_path, issue_iid):
                 )
     except Exception:
         frappe.log_error(frappe.get_traceback(), "Webhook Parent Link Error")
+
+
+def _parse_gitlab_datetime(value):
+    if not value:
+        return None
+    for fmt in ("%Y-%m-%dT%H:%M:%S.%fZ", "%Y-%m-%dT%H:%M:%SZ"):
+        try:
+            return datetime.strptime(value, fmt)
+        except ValueError:
+            continue
+    return None
+
+
+def _upsert_issue_comment(issue_doc_name, note_id, author, body, commented_at):
+    """Create or update a single 'GitLab Issue Comment' row on a GitLab Issue."""
+    existing_row = frappe.db.exists(
+        "GitLab Issue Comment", {"note_id": note_id, "parent": issue_doc_name}
+    )
+    if existing_row:
+        frappe.db.set_value(
+            "GitLab Issue Comment",
+            existing_row,
+            {"author": author, "comment": body, "commented_at": commented_at},
+        )
+        return
+
+    issue_doc = frappe.get_doc("GitLab Issue", issue_doc_name)
+    issue_doc.append("comments", {
+        "note_id": note_id,
+        "author": author,
+        "comment": body,
+        "commented_at": commented_at,
+    })
+    issue_doc.save(ignore_permissions=True)
+
+
+def _handle_note_webhook(payload):
+    obj_attrs = payload.get("object_attributes", {})
+
+    # Only care about comments on Issues, and skip system-generated notes
+    # (e.g. "changed label to X", "closed") — those aren't real discussion.
+    if obj_attrs.get("noteable_type") != "Issue" or obj_attrs.get("system"):
+        return
+
+    project_info = payload.get("project", {})
+    gl_project_id = project_info.get("id")
+    project_doc_name = frappe.db.get_value(
+        "GitLab Project", {"project_id": gl_project_id}, "name"
+    )
+    if not project_doc_name:
+        return
+
+    issue_info = payload.get("issue", {})
+    issue_iid = str(issue_info.get("iid"))
+    issue_doc_name = frappe.db.get_value(
+        "GitLab Issue",
+        {"issue_id": issue_iid, "gitlab_project": project_doc_name},
+        "name",
+    )
+    if not issue_doc_name:
+        return
+
+    note_id = str(obj_attrs.get("id"))
+    author = (payload.get("user") or {}).get("name", "")
+    body = obj_attrs.get("note", "")
+    commented_at = _parse_gitlab_datetime(obj_attrs.get("created_at")) or now_datetime()
+
+    _upsert_issue_comment(issue_doc_name, note_id, author, body, commented_at)
+    frappe.db.commit()
+
+
+@frappe.whitelist()
+def backfill_issue_comments(project_name=None):
+    """
+    One-off historical sync of non-system Issue comments via the GitLab API.
+    Only needed for issues that existed before the Note Hook webhook was registered —
+    new comments arrive live via _handle_note_webhook.
+    """
+    settings = frappe.get_single("GitLab Settings")
+    base_url = settings.gitlab_url.rstrip("/")
+    headers = get_gitlab_headers()
+
+    filters = {"name": project_name} if project_name else {}
+    projects = frappe.get_all("GitLab Project", filters=filters, fields=["name", "project_id"])
+
+    synced = 0
+    for project in projects:
+        issues = frappe.get_all(
+            "GitLab Issue",
+            filters={"gitlab_project": project.name},
+            fields=["name", "issue_id"],
+        )
+        for issue in issues:
+            page = 1
+            while True:
+                resp = requests.get(
+                    f"{base_url}/api/v4/projects/{project.project_id}/issues/{issue.issue_id}/notes",
+                    headers=headers,
+                    params={"per_page": 100, "page": page},
+                    timeout=30,
+                )
+                if resp.status_code != 200:
+                    break
+                notes = resp.json()
+                if not notes:
+                    break
+
+                for note in notes:
+                    if note.get("system"):
+                        continue
+                    _upsert_issue_comment(
+                        issue.name,
+                        str(note["id"]),
+                        (note.get("author") or {}).get("name", ""),
+                        note.get("body", ""),
+                        _parse_gitlab_datetime(note.get("created_at")),
+                    )
+                    synced += 1
+
+                page += 1
+
+            # Commit after each issue rather than only at the very end, so a
+            # timeout/kill on a large backfill only loses the current issue's
+            # progress instead of the whole run.
+            frappe.db.commit()
+
+    return f"{synced} comments synced"
+
+
+def _backfill_issue_comments_and_notify(project_name, notify_user):
+    """Runs the backfill, then pushes a realtime summary to whoever triggered it —
+    the background job's return value otherwise isn't visible anywhere in the UI."""
+    result = backfill_issue_comments(project_name)
+    frappe.publish_realtime(event="show_alert", message=f"✅ {result}", user=notify_user)
+
+
+@frappe.whitelist()
+def backfill_issue_comments_background(project_name=None):
+    """UI-triggered async wrapper — backfilling all projects/issues can take
+    long enough to exceed a web request's timeout, so run it on the long queue.
+    Notifies the triggering user via a realtime alert once done, since the job's
+    return value otherwise isn't visible anywhere."""
+    frappe.enqueue(
+        method="phamos.gitlab_integration.gitlab_utils._backfill_issue_comments_and_notify",
+        queue="long",
+        timeout=60 * 60,
+        is_async=True,
+        project_name=project_name,
+        notify_user=frappe.session.user,
+    )
+    return {
+        "status": "queued",
+        "message": "Issue comment backfill queued as background job",
+    }

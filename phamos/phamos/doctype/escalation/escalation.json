@@ -1,0 +1,178 @@
+{
+ "actions": [],
+ "autoname": "naming_series:",
+ "creation": "2026-06-29 00:00:00.000000",
+ "doctype": "DocType",
+ "engine": "InnoDB",
+ "field_order": [
+  "naming_series",
+  "implementation",
+  "status",
+  "column_break_1",
+  "open_date",
+  "close_date",
+  "section_break_details",
+  "source",
+  "escalation_reason",
+  "column_break_2",
+  "maturity_level",
+  "implementation_status",
+  "days_of_escalation",
+  "section_break_statements",
+  "opening_statement",
+  "column_break_3",
+  "escalation_documentation",
+  "column_break_4",
+  "closing_statement"
+ ],
+ "fields": [
+  {
+   "fieldname": "naming_series",
+   "fieldtype": "Select",
+   "label": "Series",
+   "options": "ESC-.YYYY.-"
+  },
+  {
+   "fieldname": "implementation",
+   "fieldtype": "Link",
+   "in_list_view": 1,
+   "label": "Implementation",
+   "options": "Implementation",
+   "reqd": 1
+  },
+  {
+   "default": "Unresolved",
+   "fieldname": "status",
+   "fieldtype": "Select",
+   "in_list_view": 1,
+   "label": "Status",
+   "options": "Unresolved\nResolved",
+   "reqd": 1
+  },
+  {
+   "fieldname": "column_break_1",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "open_date",
+   "fieldtype": "Date",
+   "label": "Open Date",
+   "reqd": 1
+  },
+  {
+   "fieldname": "close_date",
+   "fieldtype": "Date",
+   "label": "Close Date"
+  },
+  {
+   "fieldname": "section_break_details",
+   "fieldtype": "Section Break",
+   "label": "Escalation Details"
+  },
+  {
+   "fieldname": "source",
+   "fieldtype": "Select",
+   "label": "Source",
+   "options": "\nInternal\nExternal"
+  },
+  {
+   "fieldname": "escalation_reason",
+   "fieldtype": "Link",
+   "label": "Escalation Reason",
+   "options": "Escalation Reason"
+  },
+  {
+   "fieldname": "column_break_2",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "maturity_level",
+   "fieldtype": "Select",
+   "label": "Maturity Level",
+   "options": "\n1 - Inception Phase. Early Implementation, no previous Frappe experience\n2 - Initial Development Phase. Initial development work, Power user can navigate system\n3 - Development Phase. Development process understood, first modules customized\n4 - Go Live Phase. Go Live, first modules in use with real life data\n5 - Live Development Phase. Ongoing development in parallel to system in daily use with live data\n6 - Support Phase. System in daily use, development work limited to customer support",
+   "read_only": 1
+  },
+  {
+   "fieldname": "implementation_status",
+   "fieldtype": "Data",
+   "label": "Implementation Status (before escalation)",
+   "read_only": 1
+  },
+  {
+   "fieldname": "days_of_escalation",
+   "fieldtype": "Int",
+   "label": "Days of Escalation",
+   "read_only": 1
+  },
+  {
+   "fieldname": "section_break_statements",
+   "fieldtype": "Section Break",
+   "label": "Statements"
+  },
+  {
+   "fieldname": "opening_statement",
+   "fieldtype": "Text",
+   "label": "Opening Statement",
+   "reqd": 1
+  },
+  {
+   "fieldname": "column_break_3",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "escalation_documentation",
+   "fieldtype": "Text",
+   "label": "Escalation Documentation"
+  },
+  {
+   "fieldname": "column_break_4",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "closing_statement",
+   "fieldtype": "Text",
+   "label": "Closing Statement"
+  }
+ ],
+ "is_submittable": 1,
+ "links": [],
+ "modified": "2026-06-29 00:00:00.000000",
+ "modified_by": "Administrator",
+ "module": "Phamos",
+ "name": "Escalation",
+ "naming_rule": "By \"Naming Series\" field",
+ "owner": "Administrator",
+ "permissions": [
+  {
+   "amend": 1,
+   "cancel": 1,
+   "create": 1,
+   "delete": 1,
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "System Manager",
+   "share": 1,
+   "submit": 1,
+   "write": 1
+  },
+  {
+   "create": 1,
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "All",
+   "share": 1,
+   "submit": 1,
+   "write": 1
+  }
+ ],
+ "sort_field": "modified",
+ "sort_order": "DESC",
+ "states": [],
+ "track_changes": 1
+}
