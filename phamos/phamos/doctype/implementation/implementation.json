@@ -9,7 +9,11 @@
   "graph_overview_section",
   "total_time_spend",
   "column_break_vsmt",
+  "risk_chart_html",
+  "column_break_risk_chart",
   "modules_overview",
+  "risk_overview_section",
+  "risk_overview_html",
   "section_break_ukuc",
   "status",
   "notes",
@@ -329,9 +333,29 @@
    "fieldtype": "Column Break"
   },
   {
+   "fieldname": "risk_chart_html",
+   "fieldtype": "HTML",
+   "label": "Risk Overview"
+  },
+  {
+   "fieldname": "column_break_risk_chart",
+   "fieldtype": "Column Break"
+  },
+  {
    "fieldname": "modules_overview",
    "fieldtype": "HTML",
    "label": "Modules Overview"
+  },
+  {
+   "collapsible": 1,
+   "fieldname": "risk_overview_section",
+   "fieldtype": "Section Break",
+   "label": "Risk Overview"
+  },
+  {
+   "fieldname": "risk_overview_html",
+   "fieldtype": "HTML",
+   "label": "Top Risks"
   },
   {
    "fieldname": "section_break_ukuc",
