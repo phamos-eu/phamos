@@ -16,18 +16,20 @@ def preview(lead_data_import_name):
     doc = frappe.get_doc(core.LEAD_DATA_IMPORT_DOCTYPE, lead_data_import_name)
     if doc.status == "Processing":
         frappe.throw(_("Extraction is already running for this document."))
+    file_urls = core._screenshot_file_urls(doc)
     if doc.input_type != "Screenshot" and not re.search(
         r"\.(?:png|jpe?g|webp)$", doc.upload_file or "", flags=re.I
     ):
         frappe.throw(_("Preview is only available for Screenshot input."))
-    if not doc.upload_file:
+    if not file_urls:
         frappe.throw(_("Please upload a screenshot file."))
 
-    companies = extract(lead_data_import_name, doc.upload_file)
+    companies = extract(lead_data_import_name, file_urls)
     companies = [core._normalize_company_dict(company) for company in companies or []]
     return {
         "ok": True,
-        "image_url": doc.upload_file,
+        "image_url": file_urls[0],
+        "image_urls": file_urls,
         "leads": [_preview_company_payload(company) for company in companies],
         "lead_data_text": "\n\n---\n\n".join(
             core._build_import_info(company) for company in companies
@@ -70,32 +72,42 @@ def create_from_preview(lead_data_import_name, leads_json, replace_existing=True
 
 
 def extract(lead_data_import_name, file_url):
-    """Extract business-card, webpage, or logo-list leads from an image."""
+    """Extract leads from one image or multiple images of the same card."""
     from .. import lead_data_import as core
 
-    if not file_url:
+    file_urls = file_url if isinstance(file_url, (list, tuple)) else [file_url]
+    file_urls = [url for url in file_urls if url]
+    if not file_urls:
         frappe.throw(_("Please upload a screenshot file."))
 
     core._log(
         lead_data_import_name,
-        "Reading screenshot/business card/webpage via Mistral vision...",
+        f"Reading {len(file_urls)} screenshot/business-card image(s) via Mistral vision...",
     )
-    image_b64, mime = core._load_file_as_base64(file_url)
-    if not image_b64:
-        core._log(lead_data_import_name, "Could not read uploaded file.")
+    images = []
+    for url in file_urls:
+        image_b64, mime = core._load_file_as_base64(url)
+        if image_b64:
+            images.append((image_b64, mime))
+    if not images:
+        core._log(lead_data_import_name, "Could not read uploaded image files.")
         return []
 
-    qr_urls = core._decode_qr_urls_from_file(file_url)
+    qr_urls = []
+    for url in file_urls:
+        for qr_url in core._decode_qr_urls_from_file(url):
+            if qr_url not in qr_urls:
+                qr_urls.append(qr_url)
     if qr_urls:
         core._log(lead_data_import_name, f"QR website found: {qr_urls[0]}")
 
-    companies = core._mistral_extract_companies_from_image(image_b64, mime, qr_urls=qr_urls)
+    companies = core._mistral_extract_companies_from_image(images, None, qr_urls=qr_urls)
     if not companies:
         core._log(
             lead_data_import_name,
             "No direct lead found. Trying partner/logo extraction from screenshot...",
         )
-        companies = core._mistral_extract_logo_companies_from_image(image_b64, mime)
+        companies = core._mistral_extract_logo_companies_from_image(images[0][0], images[0][1])
 
     is_logo_list = any(company.get("source_type") == "logo_list" for company in companies)
     normalized_companies = []
@@ -109,7 +121,8 @@ def extract(lead_data_import_name, file_url):
         company = core._normalize_company_dict(
             core._prioritize_business_card_emails(company)
         )
-        company["source_attachment"] = file_url
+        company["source_attachments"] = file_urls
+        company["source_attachment"] = file_urls[0]
         normalized_companies.append(company)
 
     core._log(
@@ -158,4 +171,3 @@ def _companies_from_preview_payload(leads_json):
         if company.get("company_name") or company.get("website") or company.get("email"):
             companies.append(company)
     return companies
-

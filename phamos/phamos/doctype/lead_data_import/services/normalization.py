@@ -528,6 +528,12 @@ def _populate_lead_data_child_tables(lead_data_doc, company, extracted=None):
     lead_data_doc.organization_name = _truncate(company.get("company_name"))
     lead_data_doc.website = _truncate(main_site)
     lead_data_doc.email = _truncate(clean_emails[0]) if clean_emails else ""
+    card_emails = [
+        email for email in (
+            _sanitize_email(value) for value in company.get("card_emails") or []
+        ) if email
+    ]
+    lead_data_doc.card_email = _truncate(card_emails[0]) if card_emails else ""
     lead_data_doc.phone = _truncate(phones[0]) if phones else ""
     primary_address = _first_address_components(addresses)
     lead_data_doc.city = _truncate(primary_address.get("city"))

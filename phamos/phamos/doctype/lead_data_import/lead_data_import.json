@@ -10,6 +10,7 @@
   "input_type",
   "source_url",
   "upload_file",
+  "upload_files",
   "column_break_1",
   "status",
   "reference_urls",
@@ -37,10 +38,18 @@
   },
   {
    "depends_on": "eval:doc.input_type === 'Screenshot' || doc.input_type === 'PDF'",
-   "description": "Upload a screenshot (PNG/JPG) or PDF",
+   "description": "For screenshots, each selected image is added to Card Images and this picker resets for the next image. PDFs remain here.",
    "fieldname": "upload_file",
    "fieldtype": "Attach",
-   "label": "Upload File"
+   "label": "Add Image / Upload PDF"
+  },
+  {
+   "depends_on": "eval:doc.input_type === 'Screenshot'",
+   "description": "Upload one or more images of the same card (for example, front and back).",
+   "fieldname": "upload_files",
+   "fieldtype": "Table",
+   "label": "Card Images",
+   "options": "Lead Data Attachment"
   },
   {
    "default": "Draft",

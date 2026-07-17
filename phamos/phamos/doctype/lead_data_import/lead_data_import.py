@@ -86,6 +86,18 @@ class LeadDataImport(Document):
     pass
 
 
+def _screenshot_file_urls(doc):
+    """Return card images from the multi-file table plus the legacy upload field."""
+    file_urls = []
+    for row in doc.get("upload_files") or []:
+        file_url = (row.get("lead_data_attachment") or "").strip()
+        if file_url and file_url not in file_urls:
+            file_urls.append(file_url)
+    if doc.upload_file and doc.upload_file not in file_urls:
+        file_urls.append(doc.upload_file)
+    return file_urls
+
+
 def sync_email_attachment_and_extract(lead_data_import_name):
     """Use an emailed business-card attachment as input and start extraction.
 
@@ -313,7 +325,7 @@ def _run_extraction(lead_data_import_name):
         if input_type == "URL":
             companies = _pipeline_url(lead_data_import_name, doc.source_url)
         elif input_type == "Screenshot":
-            companies = _pipeline_screenshot(lead_data_import_name, doc.upload_file)
+            companies = _pipeline_screenshot(lead_data_import_name, _screenshot_file_urls(doc))
         elif input_type == "PDF":
             companies = _pipeline_pdf(lead_data_import_name, doc.upload_file)
         else:
