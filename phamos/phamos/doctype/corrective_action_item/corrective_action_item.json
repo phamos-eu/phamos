@@ -1,0 +1,68 @@
+{
+ "actions": [],
+ "creation": "2026-07-17 00:00:00.000000",
+ "doctype": "DocType",
+ "editable_grid": 1,
+ "engine": "InnoDB",
+ "field_order": [
+  "action",
+  "owner",
+  "date",
+  "result",
+  "to_be_implemented"
+ ],
+ "fields": [
+  {
+   "columns": 3,
+   "fieldname": "action",
+   "fieldtype": "Data",
+   "in_list_view": 1,
+   "label": "Action"
+  },
+  {
+   "columns": 2,
+   "fieldname": "owner",
+   "fieldtype": "Link",
+   "in_list_view": 1,
+   "label": "Owner",
+   "options": "User"
+  },
+  {
+   "columns": 2,
+   "fieldname": "date",
+   "fieldtype": "Date",
+   "in_list_view": 1,
+   "label": "Date"
+  },
+  {
+   "columns": 2,
+   "depends_on": "eval:doc.parentfield!='prevent_recurrence_actions'",
+   "fieldname": "result",
+   "fieldtype": "Select",
+   "in_list_view": 1,
+   "label": "Result",
+   "options": "\nSuccess\nFailed"
+  },
+  {
+   "columns": 2,
+   "default": "0",
+   "depends_on": "eval:doc.parentfield=='corrective_actions'",
+   "fieldname": "to_be_implemented",
+   "fieldtype": "Check",
+   "in_list_view": 1,
+   "label": "To be Implemented"
+  }
+ ],
+ "istable": 1,
+ "links": [],
+ "modified": "2026-07-17 00:00:00.000000",
+ "modified_by": "Administrator",
+ "module": "Phamos",
+ "name": "Corrective Action Item",
+ "owner": "Administrator",
+ "permissions": [],
+ "row_format": "Dynamic",
+ "sort_field": "modified",
+ "sort_order": "DESC",
+ "states": []
+}
