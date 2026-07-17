@@ -87,6 +87,7 @@ frappe.ui.form.on("Implementation", {
         frm.trigger("render_gitlab_projects_section");
         frm.trigger("render_gitlab_issues_section");
         frm.trigger("render_gitlab_milestones_section");
+        frm.trigger("render_risk_overview_section");
 
         if (!document.getElementById("gitlab-custom-style")) {
             const style = document.createElement("style");
@@ -118,6 +119,59 @@ frappe.ui.form.on("Implementation", {
                 }
             `;
             document.head.appendChild(style);
+        }
+
+        if (!document.getElementById("risk-overview-style")) {
+            const riskStyle = document.createElement("style");
+            riskStyle.id = "risk-overview-style";
+            riskStyle.innerHTML = `
+                .risk-overview-table {
+                    width: 100%;
+                    border-collapse: collapse;
+                    font-size: 12px;
+                }
+
+                .risk-overview-table thead th {
+                    text-align: left;
+                    font-size: 10px;
+                    text-transform: uppercase;
+                    letter-spacing: 0.02em;
+                    color: var(--text-muted, #8d99a6);
+                    font-weight: 600;
+                    padding: 4px 6px;
+                    border-bottom: 1px solid var(--border-color, #d1d8dd);
+                }
+
+                .risk-overview-table tbody td {
+                    padding: 6px;
+                    border-bottom: 1px solid var(--border-color, #f0f2f4);
+                    vertical-align: middle;
+                }
+
+                .risk-overview-table tbody tr:last-child td {
+                    border-bottom: none;
+                }
+
+                .risk-overview-table tbody tr:hover {
+                    background: var(--control-bg, #f8f9fa);
+                }
+
+                .risk-overview-table td.risk-level {
+                    text-align: right;
+                    font-weight: 600;
+                }
+
+                .risk-overview-pill {
+                    display: inline-block;
+                    padding: 1px 8px;
+                    border-radius: 10px;
+                    font-size: 10px;
+                    font-weight: 600;
+                    color: #fff;
+                    white-space: nowrap;
+                }
+            `;
+            document.head.appendChild(riskStyle);
         }
 
         // Sort resource_planning_prediction by date (descending - newest first)
@@ -856,8 +910,80 @@ frappe.ui.form.on("Implementation", {
                 $count.toggleClass("hidden", !c).text(c > 99 ? "99+" : c || "0");
             }
         });
+    },
+    render_risk_overview_section(frm) {
+        if (frm.is_new()) return;
+
+        const wrapper = frm.fields_dict.risk_overview_html?.wrapper;
+        if (!wrapper) return;
+
+        frappe.call({
+            method: "frappe.client.get_list",
+            args: {
+                doctype: "Risk Register Entry",
+                filters: {
+                    implementation: frm.doc.name,
+                    status: ["!=", "Closed"],
+                    close_date: ["is", "not set"]
+                },
+                fields: ["name", "risk_description", "implementation_risk_level", "risk_rating", "status"],
+                order_by: "implementation_risk_level desc",
+                limit_page_length: 5
+            },
+            callback: r => {
+                const risks = r.message || [];
+
+                if (!risks.length) {
+                    $(wrapper).html(`<div class="text-muted">${__("No open risks.")}</div>`);
+                    return;
+                }
+
+                const ratingColors = {
+                    Extreme: "#e03131",
+                    High: "#e8590c",
+                    Moderate: "#f2b705",
+                    Low: "#2f9e44"
+                };
+                const statusColors = {
+                    Escalated: "#e03131",
+                    "In Progress": "#1c7ed6",
+                    Accepted: "#2f9e44",
+                    "Not Started": "#868e96"
+                };
+                const pill = (text, colors) =>
+                    `<span class="risk-overview-pill" style="background:${colors[text] || "#868e96"}">${frappe.utils.escape_html(text || "")}</span>`;
+                const truncate = (text, max = 28) =>
+                    text && text.length > max ? `${text.slice(0, max - 1)}…` : (text || "");
+
+                const rows = risks.map(risk => `
+                    <tr>
+                        <td title="${frappe.utils.escape_html(risk.risk_description || "")}">
+                            <a href="/app/risk-register-entry/${encodeURIComponent(risk.name)}">${frappe.utils.escape_html(truncate(risk.risk_description))}</a>
+                        </td>
+                        <td class="risk-level">${frappe.utils.escape_html(risk.implementation_risk_level ?? "")}</td>
+                        <td>${pill(risk.risk_rating, ratingColors)}</td>
+                        <td>${pill(risk.status, statusColors)}</td>
+                    </tr>
+                `).join("");
+
+                $(wrapper).html(`
+                    <div style="max-width: 320px; overflow-x: auto;">
+                        <table class="risk-overview-table">
+                            <thead>
+                                <tr>
+                                    <th>${__("Risk Description")}</th>
+                                    <th>${__("Risk Level")}</th>
+                                    <th>${__("Risk Rating")}</th>
+                                    <th>${__("Status")}</th>
+                                </tr>
+                            </thead>
+                            <tbody>${rows}</tbody>
+                        </table>
+                    </div>
+                `);
+            }
+        });
     }
-    
 });
 
 function populate_auto_email_reports(frm) {

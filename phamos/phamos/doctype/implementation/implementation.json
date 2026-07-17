@@ -9,6 +9,8 @@
   "graph_overview_section",
   "total_time_spend",
   "column_break_vsmt",
+  "risk_overview_html",
+  "column_break_risk_overview",
   "modules_overview",
   "section_break_ukuc",
   "status",
@@ -326,6 +328,15 @@
   },
   {
    "fieldname": "column_break_vsmt",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "risk_overview_html",
+   "fieldtype": "HTML",
+   "label": "Risk Overview"
+  },
+  {
+   "fieldname": "column_break_risk_overview",
    "fieldtype": "Column Break"
   },
   {
