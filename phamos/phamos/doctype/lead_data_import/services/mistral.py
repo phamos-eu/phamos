@@ -38,15 +38,18 @@ def _call_mistral_vision_json_list(settings, prompt, image_b64, mime, error_titl
         "Authorization": f"Bearer {settings['api_key']}",
         "Content-Type": "application/json",
     }
+    images = image_b64 if isinstance(image_b64, (list, tuple)) else [(image_b64, mime)]
+    content = [
+        {"type": "image_url", "image_url": f"data:{image_mime};base64,{image_data}"}
+        for image_data, image_mime in images
+    ]
+    content.append({"type": "text", "text": prompt})
     payload = {
         "model": _mistral_chat_model(settings),
         "messages": [
             {
                 "role": "user",
-                "content": [
-                    {"type": "image_url", "image_url": f"data:{mime};base64,{image_b64}"},
-                    {"type": "text", "text": prompt},
-                ],
+                "content": content,
             }
         ],
     }
@@ -97,18 +100,20 @@ def _mistral_extract_companies_from_image(image_b64, mime, qr_urls=None):
 
     qr_hint = "\n".join(qr_urls or [])
     field_guidance = _get_lead_data_mapping_prompt()
-    prompt = f"""You are analyzing a screenshot. It may be:
+    prompt = f"""You are analyzing one or more related screenshots. Multiple images may be the front and back of the same business card. It may be:
 - a single business card,
 - a company directory/partner listing page,
 - a partner/supporter/sponsor logo section,
 - or a single company website page such as Impressum, Imprint, Legal, Contact, or Customer Service.
 
-If it is a business card, return exactly ONE object for the card.
+If the images are sides of the same business card, combine all visible details and return exactly ONE object for the card.
 For a business card:
 - company_name must be the organisation/logo/legal entity, not the person's name.
 - Put the person's name in contact_persons.
 - Put the role/title such as "Mediaberaterin" in job_title.
 - Extract all visible phone/mobile numbers, the visible postal address, and every visible email address.
+- Copy printed email addresses exactly as shown. Never construct, abbreviate, concatenate, or guess an email from the person's name.
+- Keep a personally addressed card email (for example first.last@company.com) before generic addresses such as info@, post@, or contact@.
 - Pay close attention to small or rotated email text on business cards. If the card shows a person email such as b.roesch@neckaralblive.de, include that exact email before generic company emails.
 Example: if the card shows person "Blanca Rösch" and organisation "RADIO NECKARALB LIVE GmbH & Co. KG", return company_name "RADIO NECKARALB LIVE GmbH & Co. KG" and contact_persons ["Blanca Rösch"].
 If it is a directory/listing screenshot, return one object per visible company.
@@ -188,11 +193,21 @@ QR URL hints:
         mime,
         "Lead Import: Mistral vision failed",
     )
-    return [
-        _normalize_company_dict(_repair_business_card_company_person_mixup(company))
-        for company in companies
-        if company.get("company_name") or company.get("website")
-    ]
+    normalized = []
+    for company in companies:
+        source_type = str(company.get("source_type") or "").lower()
+        card_emails = []
+        if "business_card" in source_type:
+            for email in company.get("emails") or _split_email_values(company.get("email")):
+                clean = _sanitize_email(email)
+                if clean and clean not in card_emails:
+                    card_emails.append(clean)
+        company = _normalize_company_dict(_repair_business_card_company_person_mixup(company))
+        if card_emails:
+            company["card_emails"] = card_emails
+        if company.get("company_name") or company.get("website") or company.get("email"):
+            normalized.append(company)
+    return normalized
 
 
 def _mistral_extract_logo_companies_from_image(image_b64, mime):
@@ -261,7 +276,7 @@ def _repair_business_card_company_person_mixup(company):
 
     email_domains = [email.split("@", 1)[1].lower() for email in emails if "@" in email]
 
-    if name and is_person_name and ("business_card" in source_type or email_domains):
+    if (not name or is_person_name) and ("business_card" in source_type or email_domains):
         inferred = _infer_company_name_from_business_card(company, email_domains)
         if inferred:
             company["company_name"] = inferred
@@ -325,6 +340,20 @@ def _prioritize_business_card_emails(company):
         clean = _sanitize_email(email)
         if clean and clean not in current_emails:
             current_emails.append(clean)
+
+    card_emails = []
+    for email in company.get("card_emails") or []:
+        clean = _sanitize_email(email)
+        if clean and clean not in card_emails:
+            card_emails.append(clean)
+
+    # Vision-extracted card addresses are direct source evidence. Website
+    # enrichment and name-based guesses must never outrank them.
+    if card_emails:
+        emails = card_emails + [email for email in current_emails if email not in card_emails]
+        company["emails"] = emails
+        company["email"] = emails[0]
+        return company
 
     inferred = []
     if website_domain:

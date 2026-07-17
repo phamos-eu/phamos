@@ -107,6 +107,8 @@ def _lead_data_doc_to_company(lead_data_doc):
         "email": lead_data_doc.email,
         "phone": lead_data_doc.phone,
     }
+    if lead_data_doc.get("card_email"):
+        company["card_emails"] = [lead_data_doc.card_email]
 
     websites = [
         row.website for row in (lead_data_doc.lead_data_website or [])
