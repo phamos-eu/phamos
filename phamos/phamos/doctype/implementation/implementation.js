@@ -121,6 +121,59 @@ frappe.ui.form.on("Implementation", {
             document.head.appendChild(style);
         }
 
+        if (!document.getElementById("risk-overview-style")) {
+            const riskStyle = document.createElement("style");
+            riskStyle.id = "risk-overview-style";
+            riskStyle.innerHTML = `
+                .risk-overview-table {
+                    width: 100%;
+                    border-collapse: collapse;
+                    font-size: 12px;
+                }
+
+                .risk-overview-table thead th {
+                    text-align: left;
+                    font-size: 10px;
+                    text-transform: uppercase;
+                    letter-spacing: 0.02em;
+                    color: var(--text-muted, #8d99a6);
+                    font-weight: 600;
+                    padding: 4px 6px;
+                    border-bottom: 1px solid var(--border-color, #d1d8dd);
+                }
+
+                .risk-overview-table tbody td {
+                    padding: 6px;
+                    border-bottom: 1px solid var(--border-color, #f0f2f4);
+                    vertical-align: middle;
+                }
+
+                .risk-overview-table tbody tr:last-child td {
+                    border-bottom: none;
+                }
+
+                .risk-overview-table tbody tr:hover {
+                    background: var(--control-bg, #f8f9fa);
+                }
+
+                .risk-overview-table td.risk-level {
+                    text-align: right;
+                    font-weight: 600;
+                }
+
+                .risk-overview-pill {
+                    display: inline-block;
+                    padding: 1px 8px;
+                    border-radius: 10px;
+                    font-size: 10px;
+                    font-weight: 600;
+                    color: #fff;
+                    white-space: nowrap;
+                }
+            `;
+            document.head.appendChild(riskStyle);
+        }
+
         // Sort resource_planning_prediction by date (descending - newest first)
         if (frm.doc.resource_planning_prediction && frm.doc.resource_planning_prediction.length > 0) {
             frm.doc.resource_planning_prediction.sort((a, b) => {
@@ -861,9 +914,8 @@ frappe.ui.form.on("Implementation", {
     render_risk_overview_section(frm) {
         if (frm.is_new()) return;
 
-        const chartWrapper = frm.fields_dict.risk_chart_html?.wrapper;
-        const tableWrapper = frm.fields_dict.risk_overview_html?.wrapper;
-        if (!chartWrapper || !tableWrapper) return;
+        const wrapper = frm.fields_dict.risk_overview_html?.wrapper;
+        if (!wrapper) return;
 
         frappe.call({
             method: "frappe.client.get_list",
@@ -882,8 +934,7 @@ frappe.ui.form.on("Implementation", {
                 const risks = r.message || [];
 
                 if (!risks.length) {
-                    $(chartWrapper).html(`<div class="text-muted">${__("No open risks.")}</div>`);
-                    $(tableWrapper).html(`<div class="text-muted">${__("No open risks.")}</div>`);
+                    $(wrapper).html(`<div class="text-muted">${__("No open risks.")}</div>`);
                     return;
                 }
 
@@ -893,105 +944,47 @@ frappe.ui.form.on("Implementation", {
                     Moderate: "#f2b705",
                     Low: "#2f9e44"
                 };
+                const statusColors = {
+                    Escalated: "#e03131",
+                    "In Progress": "#1c7ed6",
+                    Accepted: "#2f9e44",
+                    "Not Started": "#868e96"
+                };
+                const pill = (text, colors) =>
+                    `<span class="risk-overview-pill" style="background:${colors[text] || "#868e96"}">${frappe.utils.escape_html(text || "")}</span>`;
+                const truncate = (text, max = 28) =>
+                    text && text.length > max ? `${text.slice(0, max - 1)}…` : (text || "");
 
-                render_risk_chart(chartWrapper, risks, ratingColors);
-                render_risk_table(tableWrapper, risks);
+                const rows = risks.map(risk => `
+                    <tr>
+                        <td title="${frappe.utils.escape_html(risk.risk_description || "")}">
+                            <a href="/app/risk-register-entry/${encodeURIComponent(risk.name)}">${frappe.utils.escape_html(truncate(risk.risk_description))}</a>
+                        </td>
+                        <td class="risk-level">${frappe.utils.escape_html(risk.implementation_risk_level ?? "")}</td>
+                        <td>${pill(risk.risk_rating, ratingColors)}</td>
+                        <td>${pill(risk.status, statusColors)}</td>
+                    </tr>
+                `).join("");
+
+                $(wrapper).html(`
+                    <div style="max-width: 320px; overflow-x: auto;">
+                        <table class="risk-overview-table">
+                            <thead>
+                                <tr>
+                                    <th>${__("Risk Description")}</th>
+                                    <th>${__("Risk Level")}</th>
+                                    <th>${__("Risk Rating")}</th>
+                                    <th>${__("Status")}</th>
+                                </tr>
+                            </thead>
+                            <tbody>${rows}</tbody>
+                        </table>
+                    </div>
+                `);
             }
         });
     }
 });
-
-function render_risk_chart(wrapper, risks, ratingColors) {
-    const truncate = (text, max = 22) =>
-        text && text.length > max ? `${text.slice(0, max - 1)}…` : (text || "");
-
-    $(wrapper).empty();
-    $(wrapper).append(`
-        <div id="risk-overview-chart" style="width:300px; height:260px;"></div>
-        <div style="display:flex; gap:10px; flex-wrap:wrap; font-size:11px; margin-top:4px;">
-            ${Object.entries(ratingColors).map(([label, color]) => `
-                <span style="display:flex; align-items:center; gap:4px;">
-                    <span style="width:10px; height:10px; background:${color}; display:inline-block; border-radius:2px;"></span>
-                    ${__(label)}
-                </span>
-            `).join("")}
-        </div>
-    `);
-
-    Highcharts.chart("risk-overview-chart", {
-        chart: { type: "bar" },
-        title: { text: null },
-        xAxis: {
-            categories: risks.map(risk => truncate(risk.risk_description)),
-            labels: { style: { fontSize: "10px" } }
-        },
-        yAxis: {
-            min: 0,
-            title: { text: __("Impl. Risk Level"), style: { fontSize: "10px" } }
-        },
-        legend: { enabled: false },
-        credits: { enabled: false },
-        tooltip: {
-            useHTML: true,
-            formatter: function () {
-                const risk = risks[this.point.index];
-                return `<b>${frappe.utils.escape_html(risk.risk_description || "")}</b><br/>
-                    ${__("Impl. Risk Level")}: ${risk.implementation_risk_level ?? ""}<br/>
-                    ${__("Risk Rating")}: ${frappe.utils.escape_html(risk.risk_rating || "")}<br/>
-                    ${__("Status")}: ${frappe.utils.escape_html(risk.status || "")}`;
-            }
-        },
-        plotOptions: {
-            series: {
-                pointPadding: 0.1,
-                groupPadding: 0.1,
-                cursor: "pointer",
-                point: {
-                    events: {
-                        click: function () {
-                            frappe.set_route("Form", "Risk Register Entry", risks[this.index].name);
-                        }
-                    }
-                }
-            }
-        },
-        series: [{
-            name: __("Implementation Risk Level"),
-            data: risks.map(risk => ({
-                y: risk.implementation_risk_level || 0,
-                color: ratingColors[risk.risk_rating] || "#868e96"
-            }))
-        }]
-    });
-}
-
-function render_risk_table(wrapper, risks) {
-    const rows = risks.map(risk => `
-        <tr>
-            <td><a href="/app/risk-register-entry/${encodeURIComponent(risk.name)}">${frappe.utils.escape_html(risk.risk_description || "")}</a></td>
-            <td>${frappe.utils.escape_html(risk.implementation_risk_level ?? "")}</td>
-            <td>${frappe.utils.escape_html(risk.risk_rating || "")}</td>
-            <td>${frappe.utils.escape_html(risk.status || "")}</td>
-        </tr>
-    `).join("");
-
-    $(wrapper).empty();
-    $(wrapper).append(`
-        <div style="max-width: 700px; overflow-x: auto;">
-            <table class="table table-bordered">
-                <thead>
-                    <tr>
-                        <th>${__("Risk Description")}</th>
-                        <th>${__("Impl. Risk Level")}</th>
-                        <th>${__("Risk Rating")}</th>
-                        <th>${__("Status")}</th>
-                    </tr>
-                </thead>
-                <tbody>${rows}</tbody>
-            </table>
-        </div>
-    `);
-}
 
 function populate_auto_email_reports(frm) {
     if (!frm.doc.user_with_permission) return;
