@@ -283,7 +283,7 @@
    "fieldname": "sent_to_datev",
    "fieldtype": "Check",
    "label": "Sent to DATEV",
-   "read_only": 1
+   "no_copy": 1
   },
   {
    "fieldname": "column_break_datev_audit",
@@ -393,11 +393,11 @@
  ],
  "index_web_pages_for_search": 1,
  "links": [],
- "modified": "2026-04-30 13:30:31.878140",
+ "modified": "2026-07-17 09:10:21.294330",
  "modified_by": "Administrator",
  "module": "Phamos",
  "name": "Accounting Receipt",
- "naming_rule": "Expression",
+ "naming_rule": "Expression (old style)",
  "owner": "Administrator",
  "permissions": [
   {
