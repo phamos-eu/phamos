@@ -55,6 +55,48 @@ def handle_lead_option_reply(doc, method=None):
 	option_key = strip_html(doc.content or "").strip().lower().replace(" ", "")
 	lead_name = parent.link_document
 
+	repeat_option_key = get_pending_repeat_confirmation(lead_name, doc.channel_id)
+	if repeat_option_key:
+		if option_key not in {"a", "b"}:
+			send_thread_reply(
+				doc.channel_id,
+				settings.raven_bot,
+				"This action was already performed. Please confirm:\na) Yes, perform it again\nb) No, cancel",
+			)
+			return
+
+		if option_key == "b":
+			mark_repeat_confirmation_completed(lead_name, doc.channel_id, repeat_option_key)
+			send_thread_reply(doc.channel_id, settings.raven_bot, "✅ Cancelled. The action was not repeated.")
+			return
+
+		repeat_option_row = next(
+			(
+				row for row in settings.get("table_npdu", [])
+				if (row.option_key or "").strip().lower() == repeat_option_key and row.is_enabled
+			),
+			None,
+		)
+		if not repeat_option_row:
+			mark_repeat_confirmation_completed(lead_name, doc.channel_id, repeat_option_key)
+			send_thread_reply(doc.channel_id, settings.raven_bot, "The original option is no longer available.")
+			return
+
+		action_reply = run_action(
+			repeat_option_row,
+			lead_name,
+			settings.recipient_user,
+			doc.channel_id,
+			repeat=True,
+		)
+		mark_repeat_confirmation_completed(lead_name, doc.channel_id, repeat_option_key)
+		send_thread_reply(
+			doc.channel_id,
+			settings.raven_bot,
+			action_reply or repeat_option_row.response_message or "✅ Action performed again.",
+		)
+		return
+
 	pending_slots = get_pending_appointment_slots(lead_name, doc.channel_id)
 	if pending_slots:
 		if option_key not in {"1", "2", "3"}:
@@ -140,14 +182,14 @@ def handle_lead_option_reply(doc, method=None):
 	if not option_row:
 		return
 
-	if (
-		is_option_processed(lead_name, option_key)
-		and option_row.action_type != "Suggest Appointment"
-	):
+	if is_option_processed(lead_name, option_key):
+		mark_repeat_confirmation_pending(lead_name, doc.channel_id, option_key)
 		send_thread_reply(
 			doc.channel_id,
 			settings.raven_bot,
-			f"⚠️ Option '{option_key}' has already been processed for this lead. No action was taken again.",
+			f"⚠️ Option '{option_key}' has already been performed. Do you want to perform it again?\n"
+			"a) Yes\n"
+			"b) No",
 		)
 		return
 
@@ -163,18 +205,35 @@ def handle_lead_option_reply(doc, method=None):
 	send_thread_reply(doc.channel_id, settings.raven_bot, reply_text)
 
 
-def run_action(option_row, lead_name, recipient, channel_id):
+def run_action(option_row, lead_name, recipient, channel_id, repeat=False):
 	"""Dispatch to the correct action based on the row's configured action_type."""
 	if option_row.action_type == "Send Welcome Email":
 		send_welcome_email(option_row, lead_name, recipient)
 	elif option_row.action_type == "Suggest Appointment":
 		return suggest_appointment(lead_name, recipient, channel_id)
 	elif option_row.action_type == "Add to Newsletter":
-		add_to_newsletter(lead_name)
+		return add_to_newsletter(option_row, lead_name)
 	elif option_row.action_type == "All Actions":
-		send_welcome_email(option_row, lead_name, recipient)
+		settings = frappe.get_single("Raven Bot Setting")
+		welcome_option = next(
+			(
+				row for row in settings.get("table_npdu", [])
+				if row.is_enabled and row.action_type == "Send Welcome Email"
+			),
+			option_row,
+		)
+		newsletter_option = next(
+			(
+				row for row in settings.get("table_npdu", [])
+				if row.is_enabled and row.action_type == "Add to Newsletter"
+			),
+			None,
+		)
+		if not newsletter_option:
+			frappe.throw("Please enable and configure an Add to Newsletter option before using All Actions.")
+		send_welcome_email(welcome_option, lead_name, recipient)
 		appointment_reply = suggest_appointment(lead_name, recipient, channel_id)
-		add_to_newsletter(lead_name)
+		add_to_newsletter(newsletter_option, lead_name)
 		return appointment_reply
 	# "No Action" -> nothing to do
 
@@ -198,6 +257,51 @@ def mark_option_processed(lead_name, option_key):
 		"reference_name": lead_name,
 		"content": f"raven_bot_option_processed:{option_key}",
 	}).insert(ignore_permissions=True)
+
+
+def _repeat_confirmation_content(state, channel_id, option_key):
+	return f"raven_bot_repeat_{state}:{channel_id}:{option_key}"
+
+
+def mark_repeat_confirmation_pending(lead_name, channel_id, option_key):
+	frappe.get_doc({
+		"doctype": "Comment",
+		"comment_type": "Info",
+		"reference_doctype": "Lead Data",
+		"reference_name": lead_name,
+		"content": _repeat_confirmation_content("pending", channel_id, option_key),
+	}).insert(ignore_permissions=True)
+
+
+def mark_repeat_confirmation_completed(lead_name, channel_id, option_key):
+	frappe.get_doc({
+		"doctype": "Comment",
+		"comment_type": "Info",
+		"reference_doctype": "Lead Data",
+		"reference_name": lead_name,
+		"content": _repeat_confirmation_content("completed", channel_id, option_key),
+	}).insert(ignore_permissions=True)
+
+
+def get_pending_repeat_confirmation(lead_name, channel_id):
+	prefix = f"raven_bot_repeat_"
+	suffix = f":{channel_id}:"
+	rows = frappe.get_all(
+		"Comment",
+		filters={
+			"reference_doctype": "Lead Data",
+			"reference_name": lead_name,
+			"content": ["like", f"{prefix}%{suffix}%"],
+		},
+		fields=["content"],
+		order_by="creation desc",
+		limit=1,
+	)
+	if not rows:
+		return None
+	content = rows[0].content or ""
+	pending_prefix = f"{prefix}pending{suffix}"
+	return content[len(pending_prefix):] if content.startswith(pending_prefix) else None
 
 
 def send_thread_reply(channel_id, bot_name, text):
@@ -230,9 +334,11 @@ def send_thread_reply(channel_id, bot_name, text):
 	return message_doc
 
 
-def send_welcome_email(option_row, lead_name, recipient):
-	if not recipient:
-		frappe.throw("Please select a Recipient User in Raven Bot Setting.")
+def send_welcome_email(option_row, lead_name, _recipient):
+	lead = frappe.get_doc("Lead Data", lead_name)
+	lead_email = (lead.get("card_email") or "").strip()
+	if not lead_email:
+		frappe.throw("No business-card email is available on this Lead Data record.")
 
 	subject = option_row.email_subject or "Welcome to Phamos"
 	message = prepare_email_body(option_row.email_body)
@@ -246,7 +352,7 @@ def send_welcome_email(option_row, lead_name, recipient):
 		})
 
 	frappe.sendmail(
-		recipients=[recipient],
+		recipients=[lead_email],
 		subject=subject,
 		message=message,
 		attachments=attachments,
@@ -431,5 +537,27 @@ def available_slot_message(recipient, duration_minutes):
 	return "\n".join(lines), True, slots
 
 
-def add_to_newsletter(lead_name):
-	pass  # not implemented yet
+def add_to_newsletter(option_row, lead_name):
+	"""Add the business-card email to the configured Email Group."""
+	lead = frappe.get_doc("Lead Data", lead_name)
+	card_email = (lead.get("card_email") or "").strip()
+	if not card_email:
+		frappe.throw("No business-card email is available on this Lead Data record.")
+
+	email_group_name = (option_row.newsletter_email_group or "").strip()
+	if not email_group_name:
+		frappe.throw("Please configure Newsletter Email Group in the Add to Newsletter option.")
+
+	if frappe.db.exists(
+		"Email Group Member",
+		{"email_group": email_group_name, "email": card_email},
+	):
+		return f"✅ {card_email} is already in Email Group: {email_group_name}"
+
+	frappe.get_doc({
+		"doctype": "Email Group Member",
+		"email_group": email_group_name,
+		"email": card_email,
+	}).insert(ignore_permissions=True)
+	frappe.db.commit()
+	return f"✅ {card_email} added to Email Group: {email_group_name}"

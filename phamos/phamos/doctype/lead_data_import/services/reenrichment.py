@@ -181,6 +181,7 @@ def _save_refined_lead_data_doc(lead_data_doc, company, extracted):
     before = {
         "lead_data": lead_data_doc.lead_data,
         "email": lead_data_doc.email,
+        "card_email": lead_data_doc.get("card_email"),
         "phone": lead_data_doc.phone,
         "website": lead_data_doc.website,
         "city": lead_data_doc.city,
@@ -194,6 +195,7 @@ def _save_refined_lead_data_doc(lead_data_doc, company, extracted):
     after = {
         "lead_data": lead_data_doc.lead_data,
         "email": lead_data_doc.email,
+        "card_email": lead_data_doc.get("card_email"),
         "phone": lead_data_doc.phone,
         "website": lead_data_doc.website,
         "city": lead_data_doc.city,

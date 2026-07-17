@@ -15,6 +15,7 @@
   "email_subject",
   "email_attachment",
   "email_body",
+  "newsletter_email_group",
   "is_enabled"
  ],
  "fields": [
@@ -66,6 +67,15 @@
    "fieldname": "email_attachment",
    "fieldtype": "Attach",
    "label": "Email Attachment (PDF)"
+  },
+  {
+   "depends_on": "eval:doc.action_type=='Add to Newsletter'",
+   "description": "The lead's business-card email is added to this group.",
+   "fieldname": "newsletter_email_group",
+   "fieldtype": "Link",
+   "label": "Newsletter Email Group",
+   "mandatory_depends_on": "eval:doc.action_type=='Add to Newsletter'",
+   "options": "Email Group"
   },
   {
    "default": "1",
