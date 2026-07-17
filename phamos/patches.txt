@@ -10,6 +10,7 @@ phamos.patches.v1_0.implementation_fix
 phamos.patches.v1_0.migrate_measurable_to_kr
 phamos.patches.v1_0.set_project_name_in_timesheet
 phamos.patches.v1_0.fix_implementation_null_hrs
+phamos.patches.v1_0.add_event_attendee_fields
 
 
 [post_model_sync]
@@ -21,3 +22,4 @@ phamos.patches.v1_0.backfill_gitlab_issue_fields
 phamos.patches.v1_0.fix_billable_hours_zeroed_by_productivity_bug
 phamos.patches.v1_0.update_sales_order_status_hour_fields_to_float
 phamos.patches.v1_0.fix_timesheet_summary_auto_email_report_filters
+phamos.patches.v1_0.remove_event_custom_location_field

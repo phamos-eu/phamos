@@ -2,9 +2,13 @@
 // For license information, please see license.txt
 
 frappe.ui.form.on("Team", {
+    setup(frm) {
+        setup_daily_schedule_email_account_query(frm);
+    },
     refresh(frm) {
         calculate_capacity(frm);
         calculate_leave_and_holiday(frm);
+        setup_daily_schedule_email_account_query(frm);
     }
 });
 
@@ -63,4 +67,16 @@ function calculate_leave_and_holiday(frm) {
     frm.set_value("team_members_leaves_and_holidays", total);
     console.log(total)
 
+}
+
+
+function setup_daily_schedule_email_account_query(frm) {
+    const grid = frm.fields_dict.custom_team_daily_schedule && frm.fields_dict.custom_team_daily_schedule.grid;
+    if (!grid) return;
+
+    grid.get_field("email_account").get_query = function () {
+        return {
+            query: "phamos.phamos.doctype.team_daily_schedule.team_daily_schedule.email_account_with_dav_password_query",
+        };
+    };
 }

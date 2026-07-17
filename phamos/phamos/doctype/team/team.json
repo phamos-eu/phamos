@@ -23,7 +23,9 @@
   "section_break_ptxt",
   "total_team_capacity",
   "column_break_ywhn",
-  "total_team_capacity_daily"
+  "total_team_capacity_daily",
+  "custom_team_daily",
+  "custom_team_daily_schedule"
  ],
  "fields": [
   {
@@ -112,12 +114,23 @@
    "fieldname": "team_members_capacitydaily",
    "fieldtype": "Int",
    "label": "Team Members Capacity(Daily)"
+  },
+  {
+   "fieldname": "custom_team_daily",
+   "fieldtype": "Tab Break",
+   "label": "Team Daily"
+  },
+  {
+   "fieldname": "custom_team_daily_schedule",
+   "fieldtype": "Table",
+   "label": "Team Daily Schedule",
+   "options": "Team Daily Schedule"
   }
  ],
  "grid_page_length": 50,
  "index_web_pages_for_search": 1,
  "links": [],
- "modified": "2026-01-20 14:47:47.689471",
+ "modified": "2026-07-13 13:59:14.342947",
  "modified_by": "Administrator",
  "module": "Phamos",
  "name": "Team",

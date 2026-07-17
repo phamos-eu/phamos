@@ -23,6 +23,7 @@ app_include_js = [
     "/assets/phamos/js/have_a_great_day.js",
     "/assets/phamos/js/custom_crm_activities.js",
     "/assets/phamos/js/hybrid_meeting_composer.js",
+    "/assets/phamos/js/team_daily_schedule.js",
     "/assets/phamos/js/frappe_list_bulk_edit_override.js",  # Fixes null-label crash in bulk edit
     "/assets/phamos/js/checklist_dialog.js",
 ]
@@ -51,7 +52,7 @@ doctype_js = {
 	"Job Applicant": "public/js/job_applicant.js",
 	"Job Opening": "public/js/job_opening.js",
     "Timesheet":"public/js/timesheet.js",
-    "User": "public/js/mailcow_user.js",
+    "Email Account": "public/js/mailcow_email_account.js",
     "Event": "public/js/event.js",
     "Sales Invoice": "public/js/sales_invoice.js",
     "Customer": "public/js/customer.js",
@@ -156,7 +157,10 @@ doc_events = {
 		"on_trash": "phamos.mailcow_integration.caldav.sync_event.on_delete",
 	},
     "Team": {
-        "after_save": "phamos.phamos.doctype.team.team.create_team_capacity_ledger_entry"
+        "after_save": "phamos.phamos.doctype.team.team.create_team_capacity_ledger_entry",
+        "after_insert": "phamos.events.team_daily_schedule.sync_events_from_parent",
+        "on_update": "phamos.events.team_daily_schedule.sync_events_from_parent",
+        "on_trash": "phamos.events.team_daily_schedule.cleanup_events_on_parent_trash"
     },
     "Communication": {
         "on_update": "phamos.events.communication.copy_attachments_to_reference_doc"
