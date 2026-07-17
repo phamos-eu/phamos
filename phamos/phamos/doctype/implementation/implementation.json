@@ -525,6 +525,10 @@
   {
    "link_doctype": "Risk Register Entry",
    "link_fieldname": "implementation"
+  },
+  {
+   "link_doctype": "Incident Corrective Action",
+   "link_fieldname": "implementation"
   }
  ],
  "modified": "2026-06-29 12:29:34.921599",
