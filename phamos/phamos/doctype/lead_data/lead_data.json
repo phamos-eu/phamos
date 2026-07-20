@@ -21,6 +21,7 @@
   "job_title",
   "lead_owner",
   "email",
+  "card_email",
   "website",
   "mobile_no",
   "phone",
@@ -111,6 +112,14 @@
    "fieldname": "email",
    "fieldtype": "Data",
    "label": "Email"
+  },
+  {
+   "description": "Email visibly extracted from the uploaded business card. Raven welcome emails use only this address.",
+   "fieldname": "card_email",
+   "fieldtype": "Data",
+   "label": "Business Card Email",
+   "options": "Email",
+   "read_only": 1
   },
   {
    "fieldname": "website",

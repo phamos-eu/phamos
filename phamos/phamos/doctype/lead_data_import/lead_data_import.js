@@ -30,6 +30,20 @@ frappe.ui.form.on("Lead Data Import", {
         _toggle_source_fields(frm);
     },
 
+    upload_file(frm) {
+        if (frm.doc.input_type !== "Screenshot" || !frm.doc.upload_file) return;
+
+        const file_url = frm.doc.upload_file;
+        const already_added = (frm.doc.upload_files || []).some(
+            (row) => row.lead_data_attachment === file_url
+        );
+        if (!already_added) {
+            frm.add_child("upload_files", { lead_data_attachment: file_url });
+            frm.refresh_field("upload_files");
+        }
+        frm.set_value("upload_file", "");
+    },
+
     onload(frm) {
         _toggle_source_fields(frm);
     },
@@ -42,7 +56,12 @@ function _setup_extract_button(frm) {
             frappe.msgprint(__("Please enter a Source URL before extracting."));
             return;
         }
-        if ((frm.doc.input_type === "Screenshot" || frm.doc.input_type === "PDF") && !frm.doc.upload_file) {
+        const has_card_images = (frm.doc.upload_files || []).some((row) => row.lead_data_attachment);
+        if (frm.doc.input_type === "Screenshot" && !has_card_images) {
+            frappe.msgprint(__("Please upload at least one card image before extracting."));
+            return;
+        }
+        if (frm.doc.input_type === "PDF" && !frm.doc.upload_file) {
             frappe.msgprint(__("Please upload a file before extracting."));
             return;
         }
@@ -153,6 +172,12 @@ function _toggle_source_fields(frm) {
 
     frm.toggle_display("source_url", is_url);
     frm.toggle_display("upload_file", is_file);
+    frm.toggle_display("upload_files", frm.doc.input_type === "Screenshot");
+    frm.set_df_property(
+        "upload_file",
+        "label",
+        frm.doc.input_type === "Screenshot" ? __("Add Card Image") : __("Upload PDF")
+    );
 }
 
 function _show_summary(frm) {
