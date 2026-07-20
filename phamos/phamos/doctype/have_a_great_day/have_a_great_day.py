@@ -30,7 +30,6 @@ def create_todays_feedback(lookingForward,todaysChallenge):
 				todays_feedback.what_challange_will_you_tackle_today = todaysChallange
 				todays_feedback.creation_date = frappe.utils.today()
 				todays_feedback.save()
-				todays_feedback.update()
 				return todays_feedback
 			elif not employee_name and is_employee_feedback == 1:
 				frappe.throw("Employee not found for the current user.")
@@ -41,7 +40,7 @@ def create_todays_feedback(lookingForward,todaysChallenge):
 				todays_feedback.what_challange_will_you_tackle_today = todaysChallange
 				todays_feedback.creation_date = frappe.utils.today()
 				todays_feedback.save()
-				todays_feedback.update()
+				return todays_feedback
 		except Exception as e:
 			frappe.log_error(frappe.get_traceback(), "Record Creation Error")
 			return None
