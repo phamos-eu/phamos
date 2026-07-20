@@ -967,7 +967,7 @@ frappe.ui.form.on("Implementation", {
                 `).join("");
 
                 $(wrapper).html(`
-                    <div style="max-width: 320px; overflow-x: auto;">
+                    <div style="overflow-x: auto;">
                         <table class="risk-overview-table">
                             <thead>
                                 <tr>
