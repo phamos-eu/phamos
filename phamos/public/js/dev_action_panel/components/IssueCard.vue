@@ -44,6 +44,7 @@ const activityTypes = ["Working Alone", "Working with Customer", "Working With T
 const dateFormat = frappe.boot?.sysdefaults?.date_format || "dd.mm.yyyy";
 const timeFormat = frappe.boot?.sysdefaults?.time_format || "HH:mm:ss";
 const userTz = frappe.boot?.time_zone?.user || frappe.boot?.sysdefaults?.time_zone || "";
+const systemTz = frappe.boot?.time_zone?.system || "";
 
 // Format a Date whose local h/m values are the user's intended user-tz time → system-tz string for backend
 function formatForApi(date) {
@@ -60,6 +61,29 @@ function formatForApi(date) {
 
 function onStartTimeChange(date) { startTimeDate.value = date; startTimeModified.value = true; }
 function onStopEndTimeChange(date) { stopEndTimeDate.value = date; stopEndTimeModified.value = true; }
+
+function parseSystemDatetimeToUserDate(dtStr) {
+  if (!dtStr || typeof dtStr !== "string") return null;
+
+  if (systemTz && userTz && typeof moment !== "undefined" && moment.tz) {
+    try {
+      const m = moment.tz(dtStr, "YYYY-MM-DD HH:mm:ss", systemTz).tz(userTz);
+      if (!m.isValid()) return null;
+      return new Date(m.year(), m.month(), m.date(), m.hour(), m.minute(), m.second());
+    } catch (e) {}
+  }
+
+  const parts = dtStr.split(/[- :]/).map(Number);
+  if (parts.length < 5 || parts.some(Number.isNaN)) return null;
+  const [y, mo, dd, hh, mm, ss = 0] = parts;
+  return new Date(y, mo - 1, dd, hh, mm, ss);
+}
+
+function isSameCalendarDate(a, b) {
+  return a.getFullYear() === b.getFullYear() &&
+    a.getMonth() === b.getMonth() &&
+    a.getDate() === b.getDate();
+}
 
 // Parse a "YYYY-MM-DD HH:mm:ss" string and reformat per system date/time format (no Date object to avoid tz issues)
 function fmtStr(dtStr) {
@@ -100,8 +124,8 @@ function fmtDuration(s) {
   return h ? `${h}h ${m}m` : `${m}m`;
 }
 function fmtDate(dt) {
-  if (!dt) return "";
-  const d = new Date(dt);
+  const d = parseSystemDatetimeToUserDate(dt);
+  if (!d || isNaN(d)) return "";
   return d.toLocaleDateString("en-GB", { day: "numeric", month: "short" });
 }
 
@@ -125,8 +149,17 @@ function openStart() {
 }
 function openStop() {
   panel.value = panel.value === "stop" ? null : "stop";
-  stopEndTimeDate.value = new Date();
-  stopEndTimeModified.value = false;
+  const now = new Date();
+  const fromDate = parseSystemDatetimeToUserDate(props.activeSession?.from_time);
+
+  // Keep existing "now" behavior for today's sessions, but preserve retroactive dates.
+  if (fromDate && !isNaN(fromDate) && !isSameCalendarDate(fromDate, now)) {
+    stopEndTimeDate.value = new Date(fromDate);
+    stopEndTimeModified.value = true;
+  } else {
+    stopEndTimeDate.value = now;
+    stopEndTimeModified.value = false;
+  }
 }
 function closePanel() { panel.value = null; }
 
