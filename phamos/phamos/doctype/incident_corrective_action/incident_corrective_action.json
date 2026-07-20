@@ -36,6 +36,7 @@
  "fields": [
   {
    "collapsible": 1,
+   "collapsible_depends_on": "eval:true",
    "fieldname": "section_break_context",
    "fieldtype": "Section Break",
    "label": "Context"
@@ -85,6 +86,7 @@
   },
   {
    "collapsible": 1,
+   "collapsible_depends_on": "eval:true",
    "fieldname": "section_break_d0",
    "fieldtype": "Section Break",
    "label": "D0: Emergency Response"
@@ -96,6 +98,7 @@
   },
   {
    "collapsible": 1,
+   "collapsible_depends_on": "eval:true",
    "fieldname": "section_break_d1",
    "fieldtype": "Section Break",
    "label": "D1: Team"
@@ -108,6 +111,7 @@
   },
   {
    "collapsible": 1,
+   "collapsible_depends_on": "eval:true",
    "fieldname": "section_break_d2",
    "fieldtype": "Section Break",
    "label": "D2: Problem Description"
@@ -119,6 +123,7 @@
   },
   {
    "collapsible": 1,
+   "collapsible_depends_on": "eval:true",
    "fieldname": "section_break_d3",
    "fieldtype": "Section Break",
    "label": "D3: Containment Actions"
@@ -131,6 +136,7 @@
   },
   {
    "collapsible": 1,
+   "collapsible_depends_on": "eval:true",
    "fieldname": "section_break_d4",
    "fieldtype": "Section Break",
    "label": "D4: Root Cause Analysis"
@@ -142,6 +148,7 @@
   },
   {
    "collapsible": 1,
+   "collapsible_depends_on": "eval:true",
    "fieldname": "section_break_d5",
    "fieldtype": "Section Break",
    "label": "D5: Corrective Actions"
@@ -154,6 +161,7 @@
   },
   {
    "collapsible": 1,
+   "collapsible_depends_on": "eval:true",
    "fieldname": "section_break_d6",
    "fieldtype": "Section Break",
    "label": "D6: Corrective Action Implementation"
@@ -166,6 +174,7 @@
   },
   {
    "collapsible": 1,
+   "collapsible_depends_on": "eval:true",
    "fieldname": "section_break_d7",
    "fieldtype": "Section Break",
    "label": "D7: Prevent Recurrence"
@@ -178,6 +187,7 @@
   },
   {
    "collapsible": 1,
+   "collapsible_depends_on": "eval:true",
    "fieldname": "section_break_d8",
    "fieldtype": "Section Break",
    "label": "D8: Congratulate Team"
@@ -199,7 +209,7 @@
  ],
  "is_submittable": 1,
  "links": [],
- "modified": "2026-07-17 00:00:00.000000",
+ "modified": "2026-07-20 12:00:00.000000",
  "modified_by": "Administrator",
  "module": "Phamos",
  "name": "Incident Corrective Action",
