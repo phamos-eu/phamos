@@ -58,6 +58,9 @@ def _normalize_company_dict(company):
     phones = _sanitize_phone_list(company.get("phones") or company.get("phone"))
     company["phones"] = phones
     company["phone"] = phones[0] if phones else ""
+    mobile_numbers = _sanitize_phone_list(company.get("mobile_numbers") or company.get("mobile_no"))
+    company["mobile_numbers"] = mobile_numbers
+    company["mobile_no"] = mobile_numbers[0] if mobile_numbers else ""
     company["job_title"] = _clean_job_title_text(company.get("job_title"))
 
     contacts = company.get("contact_persons") or ([company.get("contact_person")] if company.get("contact_person") else [])
@@ -252,6 +255,12 @@ def _build_import_info(company):
         for p in phones:
             lines.append(f"  - {p}")
 
+    mobile_numbers = _sanitize_phone_list(company.get("mobile_numbers") or company.get("mobile_no"))
+    if mobile_numbers:
+        lines.append(f"mobile_numbers ({len(mobile_numbers)}) :")
+        for mobile in mobile_numbers:
+            lines.append(f"  - {mobile}")
+
     contacts = company.get("contact_persons") or ([company["contact_person"]] if company.get("contact_person") else [])
     if contacts:
         lines.append(f"contact_persons ({len(contacts)}) :")
@@ -263,5 +272,27 @@ def _build_import_info(company):
         lines.append(f"addresses ({len(addresses)}) :")
         for a in addresses:
             lines.append(f"  - {a}")
+
+    website_research = company.get("website_research") or {}
+    if isinstance(website_research, dict) and website_research:
+        lines.append("website_research :")
+        labels = {
+            "company_name": "company_name",
+            "job_title": "job_title",
+            "emails": "emails",
+            "phones": "phones",
+            "mobile_numbers": "mobile_numbers",
+            "contact_persons": "contact_persons",
+            "addresses": "addresses",
+            "sources": "sources",
+        }
+        for key, label in labels.items():
+            value = website_research.get(key)
+            if not value:
+                continue
+            values = value if isinstance(value, list) else [value]
+            lines.append(f"  {label} :")
+            for item in values:
+                lines.append(f"    - {item}")
 
     return "\n".join(lines)
