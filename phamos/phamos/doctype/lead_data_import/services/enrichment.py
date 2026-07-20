@@ -20,6 +20,8 @@ from ..lead_data_import import (
     _is_preferred_legal_slug,
     _log,
     _merge_extracted_lead_fields,
+    _normalize_compare_text,
+    _sanitize_phone_list,
     _prioritize_business_card_emails,
     _reference_urls_for_company,
     _save_single_company_once,
@@ -111,9 +113,106 @@ def _enrich_and_save_companies(lead_data_import_name, companies, ai_fallback=Fal
     return saved_count
 
 
+def _merge_business_card_safe(company, extracted):
+    """Merge website data except when the original source is a business card."""
+    company = dict(company or {})
+    if "business_card" in str(company.get("source_type") or "").lower():
+        return company
+    return {**company, **{k: v for k, v in (extracted or {}).items() if v and k != "website"}}
+
+
+def _attach_business_card_research(company, extracted, sources=None):
+    """Keep website findings as unstructured research, never as card fields."""
+    company = dict(company or {})
+    research = {
+        key: value for key, value in (extracted or {}).items()
+        if value and key != "website"
+    }
+    if sources:
+        research["sources"] = list(sources)
+    if research:
+        company["website_research"] = research
+    return company
+
+
+def _reconcile_card_with_matching_website_research(company, extracted):
+    """Correct OCR typos only when website data matches the same printed value."""
+    company = dict(company or {})
+    extracted = extracted or {}
+
+    card_addresses = list(company.get("addresses") or [])
+    website_addresses = list(extracted.get("addresses") or [])
+    for index, card_address in enumerate(card_addresses):
+        card_street = _normalize_compare_text(str(card_address).split(",", 1)[0])
+        matches = [
+            address for address in website_addresses
+            if card_street
+            and _normalize_compare_text(str(address).split(",", 1)[0]) == card_street
+        ]
+        if matches:
+            # Prefer the concise address over a duplicate carrying a country suffix.
+            card_addresses[index] = min(matches, key=lambda value: len(str(value)))
+    if card_addresses:
+        company["addresses"] = card_addresses
+        company["address"] = card_addresses[0]
+
+    card_phones = _sanitize_phone_list(company.get("card_phones") or company.get("phones"))
+    website_phones = _sanitize_phone_list(extracted.get("phones"))
+    for index, card_phone in enumerate(card_phones):
+        card_digits = "".join(character for character in card_phone if character.isdigit())
+        matches = []
+        for website_phone in website_phones:
+            website_digits = "".join(character for character in website_phone if character.isdigit())
+            if len(card_digits) >= 7 and card_digits[-7:] == website_digits[-7:]:
+                matches.append(website_phone)
+        if matches:
+            card_phones[index] = matches[0]
+    if card_phones:
+        company["card_phones"] = card_phones
+        company["phones"] = card_phones
+        company["phone"] = card_phones[0]
+
+    return company
+
+
+def _fill_missing_card_fields_from_website(company, extracted):
+    """Use website values only where the business card supplied no value."""
+    company = dict(company or {})
+    extracted = extracted or {}
+
+    list_fields = (
+        ("emails", "email"),
+        ("phones", "phone"),
+        ("mobile_numbers", "mobile_no"),
+        ("contact_persons", "contact_person"),
+        ("addresses", "address"),
+    )
+    for list_field, single_field in list_fields:
+        current = company.get(list_field) or (
+            [company.get(single_field)] if company.get(single_field) else []
+        )
+        if current:
+            continue
+        website_values = extracted.get(list_field) or (
+            [extracted.get(single_field)] if extracted.get(single_field) else []
+        )
+        website_values = [value for value in website_values if value]
+        if website_values:
+            company[list_field] = website_values
+            company[single_field] = website_values[0]
+
+    for fieldname in ("company_name", "job_title"):
+        if not company.get(fieldname) and extracted.get(fieldname):
+            company[fieldname] = extracted[fieldname]
+
+    return company
+
+
 def _enrich_single_company(settings, slugs, company, lead_data_import_name=None, ai_fallback=True, field_guidance=""):
     name    = company.get("company_name", "Unknown")
     website = company.get("website", "")
+    is_business_card = "business_card" in str(company.get("source_type") or "").lower()
+    card_company = dict(company) if is_business_card else None
 
     sources_found = []
     extracted     = {}
@@ -220,5 +319,21 @@ def _enrich_single_company(settings, slugs, company, lead_data_import_name=None,
         if lead_data_import_name:
             _log(lead_data_import_name, f"  → [{name}] No data extracted")
 
-    merged = {**company, **{k: v for k, v in extracted.items() if v and k != "website"}}
+    # A website is only a research source for business-card imports. Printed
+    # card data is authoritative and website contacts/legal details must not be
+    # written into any Lead Data field.
+    if card_company is not None:
+        card_company = _reconcile_card_with_matching_website_research(
+            card_company,
+            extracted,
+        )
+        card_company = _fill_missing_card_fields_from_website(
+            card_company,
+            extracted,
+        )
+        return _prioritize_business_card_emails(
+            _attach_business_card_research(card_company, extracted, sources_found)
+        )
+
+    merged = _merge_business_card_safe(company, extracted)
     return _prioritize_business_card_emails(merged)

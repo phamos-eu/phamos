@@ -471,6 +471,9 @@ def _populate_lead_data_child_tables(lead_data_doc, company, extracted=None):
 
     emails = extracted.get("emails") or ([company["email"]] if company.get("email") else [])
     phones = _sanitize_phone_list(extracted.get("phones") or company.get("phone"))
+    mobile_numbers = _sanitize_phone_list(
+        extracted.get("mobile_numbers") or company.get("mobile_no")
+    )
     addresses = _clean_address_values(
         extracted.get("addresses") or ([company["address"]] if company.get("address") else [])
     )
@@ -516,6 +519,7 @@ def _populate_lead_data_child_tables(lead_data_doc, company, extracted=None):
             "salutation": _truncate(person_parts.get("salutation")),
             "email_address": _truncate(clean_emails[idx]) if idx < len(clean_emails) else "",
             "phone": _truncate(phones[idx]) if idx < len(phones) else "",
+            "mobile_no": _truncate(mobile_numbers[idx]) if idx < len(mobile_numbers) else "",
             "designation": _truncate(designations[idx]) if idx < len(designations) else "",
         })
 
@@ -535,6 +539,7 @@ def _populate_lead_data_child_tables(lead_data_doc, company, extracted=None):
     ]
     lead_data_doc.card_email = _truncate(card_emails[0]) if card_emails else ""
     lead_data_doc.phone = _truncate(phones[0]) if phones else ""
+    lead_data_doc.mobile_no = _truncate(mobile_numbers[0]) if mobile_numbers else ""
     primary_address = _first_address_components(addresses)
     lead_data_doc.city = _truncate(primary_address.get("city"))
     lead_data_doc.stateprovince = _truncate(primary_address.get("state"))

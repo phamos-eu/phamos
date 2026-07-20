@@ -89,6 +89,9 @@ def extract(lead_data_import_name, file_url):
         image_b64, mime = core._load_file_as_base64(url)
         if image_b64:
             images.append((image_b64, mime))
+        crop_b64, crop_mime = core._load_card_crop_as_base64(url)
+        if crop_b64:
+            images.append((crop_b64, crop_mime))
     if not images:
         core._log(lead_data_import_name, "Could not read uploaded image files.")
         return []
@@ -143,6 +146,7 @@ def _preview_company_payload(company):
         "website": company.get("website") or "",
         "emails": company.get("emails") or [],
         "phones": company.get("phones") or [],
+        "mobile_numbers": company.get("mobile_numbers") or [],
         "contact_persons": company.get("contact_persons") or [],
         "addresses": company.get("addresses") or [],
         "job_title": company.get("job_title") or "",

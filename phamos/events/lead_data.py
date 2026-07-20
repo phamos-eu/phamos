@@ -46,19 +46,54 @@ def notify_lead_data_created_via_raven_dm(doc, method=None):
 		]
 
 		text = f"New Lead Data created: **{frappe.as_unicode(lead_title)}**\n\n"
-		if body:
-			text += f"{body}\n\n"
-		if options:
-			text += "\n\n".join(options) + "\n\n"
+		email = (doc.get("card_email") or doc.get("email") or "").strip()
+		contact_number = (doc.get("mobile_no") or doc.get("phone") or "").strip()
+		if email:
+			text += f"Email: {frappe.as_unicode(email)}\n\n"
+		if contact_number:
+			number_label = "Mobile" if doc.get("mobile_no") else "Phone"
+			text += f"{number_label}: {frappe.as_unicode(contact_number)}\n\n"
 		text += f"[Open Lead Data]({lead_url})"
 
-		bot.send_direct_message(
+		parent_message_id = bot.send_direct_message(
 			user_id=recipient,
 			text=text,
 			link_doctype="Lead Data",
 			link_document=doc.name,
 			markdown=True,
 		)
+
+		# Raven threads use the parent message ID as their channel ID. Create the
+		# thread immediately and post the configured actions as its first message.
+		if body or options:
+			from raven.api.threads import create_thread
+
+			# Raven's thread header currently renders the standard owner instead of
+			# the bot field. Align the parent owner with the Raven Bot identity and
+			# create membership under the actual recipient, not the background
+			# Administrator session.
+			frappe.db.set_value(
+				"Raven Message",
+				parent_message_id,
+				"owner",
+				bot.raven_user,
+				update_modified=False,
+			)
+			original_user = frappe.session.user
+			try:
+				frappe.set_user(recipient)
+				thread = create_thread(parent_message_id)
+			finally:
+				frappe.set_user(original_user)
+			thread_text = ""
+			if body:
+				thread_text += f"{body}\n\n"
+			thread_text += "\n\n".join(options)
+			bot.send_message(
+				channel_id=thread["thread_id"],
+				text=thread_text,
+				markdown=True,
+			)
 	except Exception:
 		frappe.log_error(
 			frappe.get_traceback(),
