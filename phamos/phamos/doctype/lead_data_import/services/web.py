@@ -292,6 +292,106 @@ def _load_file_as_base64(file_url):
         return base64.b64encode(f.read()).decode("utf-8"), mime
 
 
+def _load_card_crop_as_base64(file_url):
+    """Crop a small card/photo out of a large dark screenshot and enlarge it."""
+    path = _get_file_path_from_url(file_url)
+    if not path or not os.path.isfile(path):
+        return None, None
+
+    try:
+        from io import BytesIO
+
+        import numpy
+        from PIL import Image
+
+        image = Image.open(path).convert("RGB")
+        width, height = image.size
+
+        # Component detection is done on a small grayscale copy so it remains
+        # inexpensive even for large screenshots.
+        detection = image.copy()
+        detection.thumbnail((500, 500))
+        gray = numpy.asarray(detection.convert("L"))
+        mask = gray > 35
+        visited = numpy.zeros(mask.shape, dtype=bool)
+        best = None
+        rows, columns = mask.shape
+
+        for start_y, start_x in zip(*numpy.nonzero(mask & ~visited)):
+            if visited[start_y, start_x]:
+                continue
+            stack = [(int(start_y), int(start_x))]
+            visited[start_y, start_x] = True
+            count = 0
+            min_x = max_x = int(start_x)
+            min_y = max_y = int(start_y)
+
+            while stack:
+                current_y, current_x = stack.pop()
+                count += 1
+                min_x = min(min_x, current_x)
+                max_x = max(max_x, current_x)
+                min_y = min(min_y, current_y)
+                max_y = max(max_y, current_y)
+                for next_y, next_x in (
+                    (current_y - 1, current_x),
+                    (current_y + 1, current_x),
+                    (current_y, current_x - 1),
+                    (current_y, current_x + 1),
+                ):
+                    if (
+                        0 <= next_y < rows
+                        and 0 <= next_x < columns
+                        and mask[next_y, next_x]
+                        and not visited[next_y, next_x]
+                    ):
+                        visited[next_y, next_x] = True
+                        stack.append((next_y, next_x))
+
+            if best is None or count > best[0]:
+                best = (count, min_x, min_y, max_x + 1, max_y + 1)
+
+        if not best:
+            return None, None
+
+        count, min_x, min_y, max_x, max_y = best
+        component_ratio = count / mask.size if mask.size else 0
+        if not (0.02 <= component_ratio <= 0.60):
+            return None, None
+
+        scale_x = width / columns
+        scale_y = height / rows
+        left = int(min_x * scale_x)
+        top = int(min_y * scale_y)
+        right = int(max_x * scale_x)
+        bottom = int(max_y * scale_y)
+        crop_width = right - left
+        crop_height = bottom - top
+        if crop_width < 100 or crop_height < 100:
+            return None, None
+
+        padding = max(12, int(max(crop_width, crop_height) * 0.04))
+        cropped = image.crop((
+            max(0, left - padding),
+            max(0, top - padding),
+            min(width, right + padding),
+            min(height, bottom + padding),
+        ))
+
+        if cropped.width < 1000:
+            scale = min(5.0, 1000 / cropped.width)
+            cropped = cropped.resize(
+                (int(cropped.width * scale), int(cropped.height * scale)),
+                Image.Resampling.LANCZOS,
+            )
+
+        output = BytesIO()
+        cropped.save(output, format="PNG")
+        return base64.b64encode(output.getvalue()).decode("utf-8"), "image/png"
+    except Exception:
+        return None, None
+
+
 def _get_file_path_from_url(file_url):
     if not file_url:
         return ""
