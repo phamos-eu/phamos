@@ -357,7 +357,7 @@ def get_time_stats():
             FROM `tabTimesheet Record` tr
             WHERE tr.employee = %(employee)s
               AND tr.docstatus != 2
-              AND DATE(tr.creation) BETWEEN %(from)s AND %(to)s
+              AND DATE(tr.from_time) BETWEEN %(from)s AND %(to)s
             """,
             {"employee": employee, "from": date_from, "to": date_to},
             as_dict=True,
