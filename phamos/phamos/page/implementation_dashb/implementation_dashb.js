@@ -54,13 +54,41 @@ frappe.pages['implementation-dashb'].on_page_load = function (wrapper) {
     const filters = {};
     filters.from_date = create_filter('From Date', 'Date', 'from_date', '#filter-section');
     filters.to_date = create_filter('To Date', 'Date', 'to_date', '#filter-section');
-    filters.team = create_filter('Team', 'Link', 'team', '#filter-section', null, 'Team');
+    filters.team = create_filter('Team', 'MultiSelectList', 'team', '#filter-section', null, 'Team');
     filters.implementation = create_filter('Implementation', 'MultiSelectList', 'implementation', '#filter-section', null, 'Implementation');
+    filters.department = create_filter('Department', 'MultiSelectList', 'department', '#filter-section', null, 'Department');
     // Clear Filters Button Handler
     $('#clear-filters-btn').on('click', () => {
         Object.values(filters).forEach(ctrl => ctrl.set_value(''));
         load_chart();
     });
+
+    // Resolve the chart's colors from the ERP's own theme setting (document's
+    // resolved data-theme, set by Frappe's User "Desk Theme" preference),
+    // never from the browser/OS prefers-color-scheme directly. This also lets
+    // us declare an explicit color-scheme + background so browsers with
+    // "force dark mode for web content" stop auto-inverting the chart canvas.
+    function get_chart_theme() {
+        const theme = document.documentElement.getAttribute('data-theme') === 'dark' ? 'dark' : 'light';
+        const css_var = (name, fallback) => {
+            const val = getComputedStyle(document.documentElement).getPropertyValue(name).trim();
+            return val || fallback;
+        };
+        if (theme === 'dark') {
+            return {
+                mode: 'dark',
+                background: css_var('--fg-color', '#242629'),
+                text: css_var('--text-on-gray', '#d2d6da'),
+                gridLine: css_var('--dark-border-color', '#4a5258')
+            };
+        }
+        return {
+            mode: 'light',
+            background: css_var('--fg-color', '#ffffff'),
+            text: css_var('--text-color', '#36414c'),
+            gridLine: css_var('--border-color', '#e0e0e0')
+        };
+    }
 
     const implementationColorMap = {};
     const colorPairs = [
@@ -91,8 +119,9 @@ frappe.pages['implementation-dashb'].on_page_load = function (wrapper) {
         const args = {
             from_date: filters.from_date.get_value(),
             to_date: filters.to_date.get_value(),
-            team: filters.team.get_value() ? String(filters.team.get_value()) : null,
-            implementation: filters.implementation.get_value() ? filters.implementation.get_value().join(',') : ''
+            team: filters.team.get_value() ? filters.team.get_value().join(',') : '',
+            implementation: filters.implementation.get_value() ? filters.implementation.get_value().join(',') : '',
+            department: filters.department.get_value() ? filters.department.get_value().join(',') : ''
         };
 
         frappe.call({
@@ -267,9 +296,10 @@ frappe.pages['implementation-dashb'].on_page_load = function (wrapper) {
                 });
 
 
+                const selectedTeams = filters.team.get_value() || [];
                 series.push({
-                    name: filters.team.get_value()
-                        ? `Team Capacity (${filters.team.get_value()})`
+                    name: selectedTeams.length
+                        ? `Team Capacity (${selectedTeams.join(', ')})`
                         : "Overall Team Capacity",
                     type: "line",
                     data: teamCapacitySeries,
@@ -292,8 +322,13 @@ frappe.pages['implementation-dashb'].on_page_load = function (wrapper) {
                 };
 
                 // Chart rendering
+                const chartTheme = get_chart_theme();
                 $('#chart-container').html(`
                     <style>
+                        #implementation-chart {
+                            color-scheme: ${chartTheme.mode};
+                            background-color: ${chartTheme.background};
+                        }
                         .display-mode-btn:not(.btn-primary) {
                             background-color: var(--fg-color, #fff);
                             color: var(--text-color, #000);
@@ -372,11 +407,20 @@ frappe.pages['implementation-dashb'].on_page_load = function (wrapper) {
                 });
 
                 const chart = Highcharts.chart('implementation-chart', {
-                    chart: { zoomType: 'xy' },
+                    chart: { zoomType: 'xy', backgroundColor: chartTheme.background, style: { color: chartTheme.text } },
                     legend: { enabled: false },
-                    title: { text: chartTitles[currentDisplayMode] || 'Time with Prediction' },
-                    xAxis: { categories: categories },
-                    yAxis: { title: { text: 'Time (hrs)' } },
+                    title: { text: chartTitles[currentDisplayMode] || 'Time with Prediction', style: { color: chartTheme.text } },
+                    xAxis: {
+                        categories: categories,
+                        labels: { style: { color: chartTheme.text } },
+                        lineColor: chartTheme.gridLine,
+                        tickColor: chartTheme.gridLine
+                    },
+                    yAxis: {
+                        title: { text: 'Time (hrs)', style: { color: chartTheme.text } },
+                        labels: { style: { color: chartTheme.text } },
+                        gridLineColor: chartTheme.gridLine
+                    },
                     tooltip: {
                         shared: false,
                         useHTML: true,

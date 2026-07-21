@@ -1,14 +1,36 @@
 import json
 import frappe
+from calendar import monthrange
+from datetime import date
 from frappe.utils import formatdate
+from phamos.phamos.team_capacity_utils import get_team_employees, calculate_live_team_capacity
 
-def get_team_capacity_avg(from_month=None, to_month=None, team=None):
+
+def _month_range(from_month, to_month):
+    """Return 'YYYY-MM' strings from from_month to to_month inclusive."""
+    if not from_month or not to_month:
+        return []
+    start_year, start_mon = (int(p) for p in from_month.split('-'))
+    end_year, end_mon = (int(p) for p in to_month.split('-'))
+    months = []
+    year, mon = start_year, start_mon
+    while (year, mon) <= (end_year, end_mon):
+        months.append(f"{year:04d}-{mon:02d}")
+        mon += 1
+        if mon > 12:
+            mon = 1
+            year += 1
+    return months
+
+
+def get_team_capacity_avg(from_month=None, to_month=None, teams=None):
     conditions = []
     values = []
 
-    if team:
-        conditions.append("team = %s")
-        values.append(str(team))
+    if teams:
+        placeholders = ", ".join(["%s"] * len(teams))
+        conditions.append(f"team IN ({placeholders})")
+        values.extend(teams)
 
     if from_month:
         conditions.append("date >= %s")
@@ -22,7 +44,7 @@ def get_team_capacity_avg(from_month=None, to_month=None, team=None):
     if where_clause:
         where_clause = "WHERE " + where_clause
 
-    result = frappe.db.sql(f"""
+    ledger_result = frappe.db.sql(f"""
         SELECT
             DATE_FORMAT(date, '%%Y-%%m') AS month_and_year,
             COALESCE(SUM(total_team_capacity_daily), 0) AS avg_capacity
@@ -32,14 +54,35 @@ def get_team_capacity_avg(from_month=None, to_month=None, team=None):
         ORDER BY month_and_year
     """, values, as_dict=True)
 
-    return result
+    capacity_by_month = {row.month_and_year: row.avg_capacity for row in ledger_result}
+
+    # The Team Capacity Ledger only has entries for dates the nightly job has
+    # already run for (today and earlier), so future months are missing here.
+    # Compute those live instead of leaving them out, so approved Leave
+    # Applications still reduce future capacity, matching Team Capacity Overview.
+    missing_months = [m for m in _month_range(from_month, to_month) if m not in capacity_by_month]
+    if missing_months:
+        team_employees = get_team_employees(teams)
+        employees = [emp for emps in team_employees.values() for emp in emps]
+        for month in missing_months:
+            year, mon = (int(p) for p in month.split('-'))
+            month_start = date(year, mon, 1)
+            month_end = date(year, mon, monthrange(year, mon)[1])
+            capacity_by_month[month] = calculate_live_team_capacity(employees, month_start, month_end)
+
+    return [
+        {"month_and_year": month, "avg_capacity": capacity_by_month[month]}
+        for month in sorted(capacity_by_month)
+    ]
 
 
 
 @frappe.whitelist()
-def get_chart_data(from_date=None, to_date=None, team=None, implementation=None):
+def get_chart_data(from_date=None, to_date=None, team=None, implementation=None, department=None):
     from_month = from_date[:7] if from_date else None
     to_month = to_date[:7] if to_date else None
+    team_list = [t.strip() for t in team.split(',') if t.strip()] if team else []
+    department_list = [d.strip() for d in department.split(',') if d.strip()] if department else []
 
     def is_within_range(month_year):
         return (not from_month or month_year >= from_month) and (not to_month or month_year <= to_month)
@@ -65,8 +108,10 @@ def get_chart_data(from_date=None, to_date=None, team=None, implementation=None)
                 prediction.append(row_dict)
     else:
         filters = {}
-        if team:
-            filters["team"] = team
+        if team_list:
+            filters["team"] = ["in", team_list]
+        if department_list:
+            filters["department"] = ["in", department_list]
 
         # Get implementations that should NOT be excluded (i.e., not purely internal)
         all_impls = frappe.get_all("Implementation", filters=filters, fields=["name", "team"])
@@ -138,7 +183,7 @@ def get_chart_data(from_date=None, to_date=None, team=None, implementation=None)
     team_capacity_avg = get_team_capacity_avg(
         from_month=from_month,
         to_month=to_month,
-        team=team
+        teams=team_list
     )
     return {
         "planning": planning_filtered,
