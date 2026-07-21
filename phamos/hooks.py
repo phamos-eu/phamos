@@ -229,7 +229,8 @@ scheduler_events = {
         "phamos.phamos.doctype.team.team.update_all_teams_weekly_holidays",
         # MIS: on 1st only — previous calendar month; see create_monthly_implementation_summaries docstring
         "phamos.phamos.doctype.monthly_implementation_summary.create_monthly_implementation_summaries.create_monthly_implementation_summaries",
-        "phamos.api.send_daily_birthday_wishes"
+        "phamos.api.send_daily_birthday_wishes",
+        "phamos.bookstack_integration.sync.sync_all_instances",
     ],
     "monthly": [
         "phamos.api.send_monthly_comment_summary"
