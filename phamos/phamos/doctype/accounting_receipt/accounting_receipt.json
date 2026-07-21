@@ -282,7 +282,7 @@
    "fieldname": "sent_to_datev",
    "fieldtype": "Check",
    "label": "Sent to DATEV",
-   "read_only": 1
+   "no_copy": 1
   },
   {
    "fieldname": "column_break_datev_audit",
