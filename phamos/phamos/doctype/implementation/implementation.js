@@ -24,7 +24,7 @@ frappe.ui.form.on("Implementation", {
                     callback: function (r) {
                         if (r.message) {
                             frm.set_value('sales_order_total_hrs', r.message['sales_order_qty'])
-                            set_parent_delivered_total_hrs_from_child(frm, r.message['dn_qty'])
+                            frm.set_value('delivered_total_hrs', r.message['dn_qty'])
                             frm.set_value('total_hrs_timesheet', r.message['timesheet_hrs'])
                             frm.set_value('remaining_hrs', r.message['remaining_hrs'])
                             let label1 = ['Sales Order Hrs']
@@ -523,8 +523,8 @@ frappe.ui.form.on("Implementation", {
                 args: { 'customer': frm.doc.customer, 'name': frm.doc.name },
                 callback: function (r) {
                     if (r.message) {
-                        const delivered_total_hrs = get_child_delivered_total_hrs(frm, r.message['dn_qty']);
-                        set_parent_delivered_total_hrs_from_child(frm, r.message['dn_qty']);
+                        const delivered_total_hrs = flt(r.message['dn_qty']);
+                        frm.set_value('delivered_total_hrs', delivered_total_hrs);
                         if (r.message['sales_order_qty'] < r.message['timesheet_hrs']) {
                             let string1 = "TS Hrs exceeding Open SO Hrs"
                             let remaining_hrs = Math.abs(r.message['remaining_hrs']).toString();
@@ -1113,20 +1113,9 @@ function add_row_to_sales_order(frm) {
                     row.status = order.status;
                 });
                 frm.refresh_field("sales_order_status_information"); // Refresh child table
-                set_parent_delivered_total_hrs_from_child(frm);
             }
         }
     });
-}
-
-function get_child_delivered_total_hrs(frm, fallback = 0) {
-    const rows = frm.doc.sales_order_status_information || [];
-    const total = rows.reduce((sum, row) => sum + flt(row.delivered_total_hrs), 0);
-    return rows.length ? total : flt(fallback);
-}
-
-function set_parent_delivered_total_hrs_from_child(frm, fallback = 0) {
-    frm.set_value("delivered_total_hrs", get_child_delivered_total_hrs(frm, fallback));
 }
 
 function render_resource_planning_graph(frm, usePredictionFilter = false) {
@@ -1261,7 +1250,7 @@ frappe.ui.form.on("Sales Order Status Information", {
                 callback: function (r) {
                     if (r.message) {
                         frm.set_value('sales_order_total_hrs', r.message['sales_order_qty'])
-                        set_parent_delivered_total_hrs_from_child(frm, r.message['dn_qty'])
+                        frm.set_value('delivered_total_hrs', r.message['dn_qty'])
                         frm.set_value('total_hrs_timesheet', r.message['timesheet_hrs'])
                         frm.set_value('remaining_hrs', r.message['remaining_hrs'])
                     }
@@ -1288,8 +1277,6 @@ frappe.ui.form.on('Implementation Item', {
         }
     }
 });
-
-
 
 
 
