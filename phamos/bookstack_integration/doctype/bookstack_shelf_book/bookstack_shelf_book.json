@@ -4,9 +4,18 @@
  "doctype": "DocType",
  "editable_grid": 1,
  "engine": "InnoDB",
- "field_order": ["book"],
+ "field_order": [
+  "book"
+ ],
  "fields": [
-  {"fieldname": "book", "fieldtype": "Link", "label": "Book", "options": "Bookstack Book", "in_list_view": 1, "reqd": 1}
+  {
+   "fieldname": "book",
+   "fieldtype": "Link",
+   "label": "Book",
+   "options": "Bookstack Book",
+   "in_list_view": 1,
+   "reqd": 1
+  }
  ],
  "index_web_pages_for_search": 1,
  "istable": 1,
