@@ -2,3 +2,4 @@ Phamos
 OKR Addon
 Mailcow Integration
 Gitlab Integration
+Bookstack Integration
