@@ -4,9 +4,8 @@
 import frappe
 from frappe import _
 from frappe.model.document import Document
-from frappe.utils import cstr, now_datetime, time_diff_in_seconds, get_datetime,time_diff,today
-from frappe.utils.data import add_to_date,format_duration, time_diff_in_seconds
-from datetime import datetime
+from frappe.utils import cstr, now_datetime, time_diff_in_seconds, get_datetime, time_diff, today, add_days, getdate
+from frappe.utils.data import add_to_date, format_duration, time_diff_in_seconds
 from datetime import datetime, timedelta
 from frappe.utils import (
 	get_datetime_str,
@@ -101,12 +100,40 @@ def get_user_time(user, to_string=False):
         enable_feedback_dialog = frappe.db.get_single_value('phamos Settings', 'enable_feedback_dialog')
 		
         
+        employee = frappe.db.get_value(
+            "Employee", {"user_id": user}, ["name", "custom_mute"], as_dict=True
+        )
+        custom_mute = str(employee.custom_mute) if employee and employee.custom_mute else None
+
         return {
             "user_time_str": user_time_str,
             "from_time": from_time,
             "till_time": till_time,
-			"enable_feedback_dialog":enable_feedback_dialog,
+            "enable_feedback_dialog": enable_feedback_dialog,
+            "custom_mute": custom_mute,
         }
     except Exception as e:
         frappe.log_error(frappe.get_traceback(), 'get_user_time error')
         return {'error': str(e)}
+
+
+@frappe.whitelist()
+def mute_daily_dialog(mute_type):
+    """Set Employee.custom_mute to suppress the Have a Great Day dialog until tomorrow or next week."""
+    employee = frappe.db.get_value("Employee", {"user_id": frappe.session.user}, "name")
+    if not employee:
+        frappe.throw(frappe._("Employee record not found for the current user."))
+
+    today_date = getdate(today())
+    if mute_type == "tomorrow":
+        mute_until = add_days(today_date, 1)
+    elif mute_type == "week":
+        weekday = today_date.weekday()
+        days_until_next_monday = (7 - weekday) % 7 or 7
+        mute_until = add_days(today_date, days_until_next_monday)
+    else:
+        frappe.throw(frappe._("Invalid mute option."))
+
+    frappe.db.set_value("Employee", employee, "custom_mute", mute_until, update_modified=False)
+    frappe.db.commit()
+    return {"status": "ok", "mute": str(mute_until)}
