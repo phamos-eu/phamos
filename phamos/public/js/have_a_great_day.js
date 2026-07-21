@@ -2,6 +2,7 @@ class MorningFeedbackDialog {
   constructor() {
     this.dialog = null;
     this.pendingBirthdays = [];
+    this.isDailyMuted = false;
     this.init();
   }
 
@@ -30,6 +31,11 @@ class MorningFeedbackDialog {
           var userTimeSeconds = timeToSeconds(userTimeStr);
           var fromTimeSeconds = timeToSeconds(fromTimeStr);
           var tillTimeSeconds = timeToSeconds(tillTimeStr);
+
+          var customMute = response.message.custom_mute || null;
+          var today_date = frappe.datetime.nowdate();
+          // Daily mute only affects Have a Great Day — birthday prompts stay independent.
+          self.isDailyMuted = !!(customMute && today_date < customMute);
 
           if (
             fromTimeSeconds <= userTimeSeconds &&
@@ -73,7 +79,19 @@ class MorningFeedbackDialog {
     var self = this;
     var today_date = frappe.datetime.nowdate();
 
+    function openBirthdayOnlyIfNeeded() {
+      if (self.pendingBirthdays.length) {
+        self.birthday_wishes_dialog();
+      }
+    }
+
     function openDailyDialog() {
+      // Daily muted: skip Have a Great Day, still show birthdays if any.
+      if (self.isDailyMuted) {
+        openBirthdayOnlyIfNeeded();
+        return;
+      }
+
       frappe.db.get_value(
         "Have a Great Day",
         {
@@ -89,12 +107,6 @@ class MorningFeedbackDialog {
           }
         }
       );
-    }
-
-    function openBirthdayOnlyIfNeeded() {
-      if (self.pendingBirthdays.length) {
-        self.birthday_wishes_dialog();
-      }
     }
 
     frappe.db.get_value(
@@ -139,7 +151,25 @@ class MorningFeedbackDialog {
         fieldname: "todaysChallenge",
         reqd: 1,
       },
+      {
+        fieldtype: "HTML",
+        fieldname: "daily_mute_buttons",
+        options: this._getDailyMuteButtonsHtml(),
+      },
     ];
+  }
+
+  _getDailyMuteButtonsHtml() {
+    return (
+      "<div class='daily-mute-actions' style='margin-top: 6px; display: flex; gap: 8px; flex-wrap: wrap;'>" +
+      "<button type='button' class='btn btn-default btn-xs daily-mute-btn' data-mute-type='tomorrow'>" +
+      __("Mute until tomorrow") +
+      "</button>" +
+      "<button type='button' class='btn btn-default btn-xs daily-mute-btn' data-mute-type='week'>" +
+      __("Mute for this week") +
+      "</button>" +
+      "</div>"
+    );
   }
 
   _buildDialogFields() {
@@ -172,6 +202,40 @@ class MorningFeedbackDialog {
     this._styleDialog(this.dialog, this.pendingBirthdays.length > 0);
     this.dialog.show();
     this._applyBirthdayWishCollapse();
+    this._setupBirthdayWishMuteHandlers();
+    this._setupDailyMuteHandlers();
+  }
+
+  _setupDailyMuteHandlers() {
+    var self = this;
+    if (!this.dialog) {
+      return;
+    }
+    this.dialog.$wrapper
+      .find(".daily-mute-btn")
+      .off("click.dailyMute")
+      .on("click.dailyMute", function (e) {
+        e.preventDefault();
+        e.stopPropagation();
+        var muteType = $(this).attr("data-mute-type");
+        frappe.call({
+          method:
+            "phamos.phamos.doctype.have_a_great_day.have_a_great_day.mute_daily_dialog",
+          args: { mute_type: muteType },
+          callback: function () {
+            self.isDailyMuted = true;
+            self.dialog.hide();
+            frappe.show_alert({
+              message: __("Daily dialog muted."),
+              indicator: "green",
+            });
+            // Birthday mute is independent — keep showing birthday wishes if pending.
+            if (self.pendingBirthdays.length) {
+              self.birthday_wishes_dialog();
+            }
+          },
+        });
+      });
   }
 
   birthday_wishes_dialog() {
@@ -199,15 +263,81 @@ class MorningFeedbackDialog {
     this.dialog.show();
     this._applyBirthdayWishCollapse();
     this._setupBirthdaySaveButtonVisibility();
+    this._setupBirthdayWishMuteHandlers();
   }
 
-  _allBirthdaysSubmitted() {
-    return (
-      this.pendingBirthdays.length > 0 &&
-      this.pendingBirthdays.every(function (item) {
-        return item.already_submitted;
-      })
-    );
+  _setupBirthdayWishMuteHandlers() {
+    var self = this;
+    if (!this.dialog) {
+      return;
+    }
+
+    this.dialog.$wrapper
+      .find(".birthday-wish-mute-btn")
+      .off("click.birthdayWishMute")
+      .on("click.birthdayWishMute", function (e) {
+        e.preventDefault();
+        e.stopPropagation();
+        var index = parseInt($(this).attr("data-birthday-index"), 10);
+        var muteType = $(this).attr("data-mute-type");
+        self._muteBirthdayWish(index, muteType);
+      });
+  }
+
+  _removeBirthdayWishFromDialog(index) {
+    var self = this;
+    var keys = [
+      "birthday_collapsed_" + index,
+      "birthday_intro_" + index,
+      "birthday_mute_" + index,
+      "birthday_wish_break_" + index,
+    ];
+    keys.forEach(function (key) {
+      if (self.dialog.fields_dict[key]) {
+        self.dialog.fields_dict[key].$wrapper.hide();
+      }
+    });
+
+    var item = self.pendingBirthdays[index];
+    if (item) {
+      var fieldname = self._getBirthdayWishFieldname(item, index);
+      if (self.dialog.fields_dict[fieldname]) {
+        self.dialog.fields_dict[fieldname].$wrapper.hide();
+      }
+    }
+
+    self.dialog.$wrapper
+      .find(".birthday-wish-collapsed[data-birthday-index='" + index + "']")
+      .hide();
+
+    self.pendingBirthdays.splice(index, 1);
+    if (!self.pendingBirthdays.length) {
+      self.dialog.hide();
+    }
+  }
+
+  _muteBirthdayWish(index, muteType) {
+    var self = this;
+    var item = this.pendingBirthdays[index];
+    if (!item) {
+      return;
+    }
+
+    frappe.call({
+      method:
+        "phamos.phamos.doctype.birthday_wish.birthday_wish.mute_birthday_wish",
+      args: {
+        birthday_wish: item.birthday_wish,
+        mute_type: muteType,
+      },
+      callback: function () {
+        frappe.show_alert({
+          message: __("Birthday wish reminder muted."),
+          indicator: "green",
+        });
+        self._removeBirthdayWishFromDialog(index);
+      },
+    });
   }
 
   _hasBirthdayWishEdits() {
@@ -262,6 +392,7 @@ class MorningFeedbackDialog {
   }
 
   _getCollapsedWishSummaryHtml(item, index) {
+    var self = this;
     var preview = item.submitted_message || "";
     if (preview.length > 100) {
       preview = preview.substring(0, 100) + "…";
@@ -293,6 +424,26 @@ class MorningFeedbackDialog {
       index +
       "' style='margin-top: 10px;'>" +
       __("Click to expand and edit") +
+      "</button>" +
+      self._getMuteButtonsHtml(index) +
+      "</div>"
+    );
+  }
+
+  _getMuteButtonsHtml(index) {
+    return (
+      "<div class='birthday-wish-mute-actions' data-birthday-index='" +
+      index +
+      "' style='margin-top: 8px; display: flex; gap: 8px; flex-wrap: wrap;'>" +
+      "<button type='button' class='btn btn-default btn-xs birthday-wish-mute-btn' data-birthday-index='" +
+      index +
+      "' data-mute-type='tomorrow'>" +
+      __("Mute until tomorrow") +
+      "</button>" +
+      "<button type='button' class='btn btn-default btn-xs birthday-wish-mute-btn' data-birthday-index='" +
+      index +
+      "' data-mute-type='week'>" +
+      __("Mute for this week") +
       "</button>" +
       "</div>"
     );
@@ -390,6 +541,14 @@ class MorningFeedbackDialog {
           ) +
           "</p>",
       });
+
+      if (!item.already_submitted) {
+        fields.push({
+          fieldtype: "HTML",
+          fieldname: "birthday_mute_" + index,
+          options: self._getMuteButtonsHtml(index),
+        });
+      }
 
       fields.push({
         fieldtype: "Small Text",
