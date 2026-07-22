@@ -23,7 +23,7 @@ app_include_js = [
     "/assets/phamos/js/have_a_great_day.js",
     "/assets/phamos/js/custom_crm_activities.js",
     "/assets/phamos/js/hybrid_meeting_composer.js",
-    "/assets/phamos/js/team_daily_schedule.js",
+    "/assets/phamos/js/functional_calendar.js",
     "/assets/phamos/js/frappe_list_bulk_edit_override.js",  # Fixes null-label crash in bulk edit
     "/assets/phamos/js/checklist_dialog.js",
 ]
@@ -56,6 +56,8 @@ doctype_js = {
     "Event": "public/js/event.js",
     "Sales Invoice": "public/js/sales_invoice.js",
     "Customer": "public/js/customer.js",
+    "Department": "public/js/functional_calendar_parent.js",
+    "Employee": "public/js/functional_calendar_parent.js",
 
 }
 
@@ -158,9 +160,24 @@ doc_events = {
 	},
     "Team": {
         "after_save": "phamos.phamos.doctype.team.team.create_team_capacity_ledger_entry",
-        "after_insert": "phamos.events.team_daily_schedule.sync_events_from_parent",
-        "on_update": "phamos.events.team_daily_schedule.sync_events_from_parent",
-        "on_trash": "phamos.events.team_daily_schedule.cleanup_events_on_parent_trash"
+        "after_insert": "phamos.mailcow_integration.schedule_sync.sync_events_from_parent",
+        "on_update": "phamos.mailcow_integration.schedule_sync.sync_events_from_parent",
+        "on_trash": "phamos.mailcow_integration.schedule_sync.cleanup_events_on_parent_trash",
+    },
+    "Implementation": {
+        "after_insert": "phamos.mailcow_integration.schedule_sync.sync_events_from_parent",
+        "on_update": "phamos.mailcow_integration.schedule_sync.sync_events_from_parent",
+        "on_trash": "phamos.mailcow_integration.schedule_sync.cleanup_events_on_parent_trash",
+    },
+    "Department": {
+        "after_insert": "phamos.mailcow_integration.schedule_sync.sync_events_from_parent",
+        "on_update": "phamos.mailcow_integration.schedule_sync.sync_events_from_parent",
+        "on_trash": "phamos.mailcow_integration.schedule_sync.cleanup_events_on_parent_trash",
+    },
+    "Employee": {
+        "after_insert": "phamos.mailcow_integration.schedule_sync.sync_events_from_parent",
+        "on_update": "phamos.mailcow_integration.schedule_sync.sync_events_from_parent",
+        "on_trash": "phamos.mailcow_integration.schedule_sync.cleanup_events_on_parent_trash",
     },
     "Communication": {
         "on_update": "phamos.events.communication.copy_attachments_to_reference_doc"

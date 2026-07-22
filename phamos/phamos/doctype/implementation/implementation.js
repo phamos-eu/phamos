@@ -17,6 +17,9 @@ frappe.ui.form.on("Implementation", {
     frm.trigger("render_auto_email_reports_section");
     },
     setup: function (frm) {
+            if (window.phamos && phamos.functional_calendar) {
+                phamos.functional_calendar.setup_email_account_query(frm);
+            }
             add_row_to_sales_order(frm)
                 frappe.call({
                     method: "phamos.phamos.doctype.implementation.implementation.get_financial_history",
@@ -83,6 +86,9 @@ frappe.ui.form.on("Implementation", {
         });
     },
     refresh: function (frm) {
+        if (window.phamos && phamos.functional_calendar) {
+            phamos.functional_calendar.setup_email_account_query(frm);
+        }
         frm.trigger("render_auto_email_reports_section");
         frm.trigger("render_gitlab_projects_section");
         frm.trigger("render_gitlab_issues_section");

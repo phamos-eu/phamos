@@ -118,13 +118,13 @@
   {
    "fieldname": "custom_team_daily",
    "fieldtype": "Tab Break",
-   "label": "Team Daily"
+   "label": "Appointments"
   },
   {
    "fieldname": "custom_team_daily_schedule",
    "fieldtype": "Table",
-   "label": "Team Daily Schedule",
-   "options": "Team Daily Schedule"
+   "label": "Appointment Schedule",
+   "options": "Functional Calendar Entry"
   }
  ],
  "grid_page_length": 50,

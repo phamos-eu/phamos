@@ -63,6 +63,8 @@
   "quick_add_button_html",
   "resource_planning",
   "resource_planning_prediction",
+  "appointment_schedule_tab",
+  "appointment_schedule",
   "modules_tab",
   "target_level",
   "module_chart",
@@ -490,6 +492,17 @@
    "fieldname": "commercial_details_tab",
    "fieldtype": "Tab Break",
    "label": "Commercial Details"
+  },
+  {
+   "fieldname": "appointment_schedule_tab",
+   "fieldtype": "Tab Break",
+   "label": "Appointments"
+  },
+  {
+   "fieldname": "appointment_schedule",
+   "fieldtype": "Table",
+   "label": "Appointment Schedule",
+   "options": "Functional Calendar Entry"
   }
  ],
  "index_web_pages_for_search": 1,

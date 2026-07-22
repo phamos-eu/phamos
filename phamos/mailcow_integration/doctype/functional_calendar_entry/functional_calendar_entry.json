@@ -1,0 +1,187 @@
+{
+ "actions": [],
+ "allow_rename": 1,
+ "creation": "2026-07-22 12:00:00.000000",
+ "doctype": "DocType",
+ "editable_grid": 1,
+ "engine": "InnoDB",
+ "field_order": [
+  "subject",
+  "location",
+  "repeat_this_event",
+  "repeat_on",
+  "repeat_till",
+  "column_break_uloa",
+  "description",
+  "start",
+  "end",
+  "fetch_free_slots",
+  "section_break_yfye",
+  "required_attendees",
+  "email_account",
+  "column_break_hxpy",
+  "optional_attendees",
+  "mailcow_uid",
+  "mailcow_seq",
+  "mailcow_synced",
+  "mailcow_last_sync_at",
+  "mailcow_mailbox",
+  "mailcow_last_error"
+ ],
+ "fields": [
+  {
+   "fieldname": "subject",
+   "fieldtype": "Small Text",
+   "in_list_view": 1,
+   "label": "Subject",
+   "reqd": 1
+  },
+  {
+   "fieldname": "location",
+   "fieldtype": "Data",
+   "in_list_view": 1,
+   "label": "Location"
+  },
+  {
+   "default": "0",
+   "fieldname": "repeat_this_event",
+   "fieldtype": "Check",
+   "in_list_view": 1,
+   "label": "Repeat This Event"
+  },
+  {
+   "depends_on": "eval:doc.repeat_this_event",
+   "fieldname": "repeat_on",
+   "fieldtype": "Select",
+   "in_list_view": 1,
+   "label": "Repeat On",
+   "options": "\nDaily\nWeekly\nMonthly\nYearly"
+  },
+  {
+   "depends_on": "eval:doc.repeat_this_event",
+   "fieldname": "repeat_till",
+   "fieldtype": "Date",
+   "in_list_view": 1,
+   "label": "Repeat Till"
+  },
+  {
+   "fieldname": "column_break_uloa",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "description",
+   "fieldtype": "Small Text",
+   "in_list_view": 1,
+   "label": "Description"
+  },
+  {
+   "fieldname": "start",
+   "fieldtype": "Datetime",
+   "in_list_view": 1,
+   "label": "Start",
+   "reqd": 1
+  },
+  {
+   "fieldname": "end",
+   "fieldtype": "Datetime",
+   "in_list_view": 1,
+   "label": "End",
+   "reqd": 1
+  },
+  {
+   "depends_on": "eval:doc.email_account",
+   "fieldname": "fetch_free_slots",
+   "fieldtype": "Button",
+   "in_list_view": 1,
+   "label": "Fetch Free Slots"
+  },
+  {
+   "fieldname": "section_break_yfye",
+   "fieldtype": "Section Break"
+  },
+  {
+   "fieldname": "required_attendees",
+   "fieldtype": "Small Text",
+   "in_list_view": 1,
+   "label": "Required Attendees"
+  },
+  {
+   "description": "Only email accounts with a configured DAV password will be available.",
+   "fieldname": "email_account",
+   "fieldtype": "Link",
+   "in_list_view": 1,
+   "label": "Email Account",
+   "options": "Email Account",
+   "reqd": 1
+  },
+  {
+   "fieldname": "column_break_hxpy",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "optional_attendees",
+   "fieldtype": "Small Text",
+   "in_list_view": 1,
+   "label": "Optional Attendees"
+  },
+  {
+   "fieldname": "mailcow_uid",
+   "fieldtype": "Data",
+   "hidden": 1,
+   "label": "Mailcow UID",
+   "read_only": 1
+  },
+  {
+   "fieldname": "mailcow_seq",
+   "fieldtype": "Int",
+   "hidden": 1,
+   "label": "Mailcow Sequence",
+   "read_only": 1
+  },
+  {
+   "default": "0",
+   "fieldname": "mailcow_synced",
+   "fieldtype": "Check",
+   "hidden": 1,
+   "label": "Mailcow Synced",
+   "read_only": 1
+  },
+  {
+   "fieldname": "mailcow_last_sync_at",
+   "fieldtype": "Datetime",
+   "hidden": 1,
+   "label": "Mailcow Last Sync At",
+   "read_only": 1
+  },
+  {
+   "fieldname": "mailcow_mailbox",
+   "fieldtype": "Data",
+   "hidden": 1,
+   "label": "Mailcow Mailbox",
+   "options": "Email",
+   "read_only": 1
+  },
+  {
+   "fieldname": "mailcow_last_error",
+   "fieldtype": "Small Text",
+   "hidden": 1,
+   "label": "Mailcow Last Error",
+   "read_only": 1
+  }
+ ],
+ "grid_page_length": 50,
+ "index_web_pages_for_search": 1,
+ "istable": 1,
+ "links": [],
+ "modified": "2026-07-22 12:00:00.000000",
+ "modified_by": "Administrator",
+ "module": "Mailcow Integration",
+ "name": "Functional Calendar Entry",
+ "owner": "Administrator",
+ "permissions": [],
+ "row_format": "Dynamic",
+ "rows_threshold_for_grid_search": 20,
+ "sort_field": "modified",
+ "sort_order": "DESC",
+ "states": []
+}

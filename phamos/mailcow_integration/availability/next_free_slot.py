@@ -2,7 +2,7 @@ from __future__ import annotations
 from datetime import datetime, timedelta, timezone
 from typing import List, Tuple
 import frappe
-from .caldav_read import fetch_busy_intervals_from_sogo
+from .caldav_read import fetch_busy_intervals_for_mailbox, fetch_busy_intervals_from_sogo
 from ..utils import get_site_timezone
 
 def _now_utc() -> datetime:
@@ -69,17 +69,26 @@ def _subtract_busy_from_window(busy: List[Tuple[datetime, datetime]], window: Tu
     return [x for x in free if x[1] > x[0]]
 
 
+def _mailbox_email_from_account(email_account: str | None) -> str | None:
+    if not email_account:
+        return None
+    return frappe.db.get_value("Email Account", email_account, "email_id")
+
+
 @frappe.whitelist()
 def free_slots_for_day(day: str,
                        duration_minutes: int = 60,
                        time_from: str | None = None,
-                       time_to: str | None = None) -> list[dict]:
+                       time_to: str | None = None,
+                       email_account: str | None = None) -> list[dict]:
     """Return up to five free slots for the given date using site/user timezone.
 
     Args:
         day: 'YYYY-MM-DD'
         duration_minutes: length of each proposed slot
         time_from/time_to: optional HH:MM strings delimiting search window; if missing, full day is used
+        email_account: optional Email Account name; when set, busy times are read from that
+            functional mailbox calendar instead of the session user's calendar
     """
     import pytz
     from frappe.utils import getdate
@@ -116,8 +125,11 @@ def free_slots_for_day(day: str,
     day_start_utc = start_local.astimezone(timezone.utc)
     day_end_utc = end_local.astimezone(timezone.utc)
 
-    user_id = frappe.session.user
-    busy = fetch_busy_intervals_from_sogo(user_id, day_start_utc, day_end_utc)
+    mailbox_email = _mailbox_email_from_account(email_account)
+    if mailbox_email:
+        busy = fetch_busy_intervals_for_mailbox(mailbox_email, day_start_utc, day_end_utc)
+    else:
+        busy = fetch_busy_intervals_from_sogo(frappe.session.user, day_start_utc, day_end_utc)
     free_blocks = _subtract_busy_from_window(busy, (day_start_utc, day_end_utc))
 
     results: list[dict] = []

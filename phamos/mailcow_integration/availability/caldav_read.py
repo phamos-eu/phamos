@@ -111,16 +111,14 @@ def _extract_dt_pairs(ics_text: str) -> List[Tuple[datetime, datetime]]:
             out.append((parse(start_match), parse(end_match)))
     return out
 
-def fetch_busy_intervals_from_sogo(user_id: str,
-                                   window_start_utc: datetime,
-                                   window_end_utc: datetime) -> List[Tuple[datetime, datetime]]:
-    """
-    REPORT calendar-query to user’s SOGo calendar; return merged busy intervals.
-    """
+def fetch_busy_intervals_for_mailbox(mailbox_email: str,
+                                     window_start_utc: datetime,
+                                     window_end_utc: datetime) -> List[Tuple[datetime, datetime]]:
+    """REPORT calendar-query to a mailbox SOGo calendar; return merged busy intervals."""
     s = _settings()
-    email = _get_user_email(user_id)
+    email = (mailbox_email or "").strip()
     if not email:
-        raise CalDAVReadError(f"No email is configured for User {user_id}")
+        raise CalDAVReadError("No mailbox email provided")
     pw = _dav_pw(email)
     if not pw:
         raise CalDAVReadError(f"No DAV app password is configured for {email}")
@@ -149,3 +147,15 @@ def fetch_busy_intervals_from_sogo(user_id: str,
         else:
             merged[-1] = (merged[-1][0], max(merged[-1][1], end))
     return merged
+
+
+def fetch_busy_intervals_from_sogo(user_id: str,
+                                   window_start_utc: datetime,
+                                   window_end_utc: datetime) -> List[Tuple[datetime, datetime]]:
+    """
+    REPORT calendar-query to user’s SOGo calendar; return merged busy intervals.
+    """
+    email = _get_user_email(user_id)
+    if not email:
+        raise CalDAVReadError(f"No email is configured for User {user_id}")
+    return fetch_busy_intervals_for_mailbox(email, window_start_utc, window_end_utc)
