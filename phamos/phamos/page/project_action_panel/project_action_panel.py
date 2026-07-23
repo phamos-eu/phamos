@@ -14,6 +14,7 @@ from frappe.utils import strip_html
 from frappe.query_builder import Field, Case, Order, DocType, functions as fn
 from frappe.query_builder.functions import Concat, Max, Sum, Round, Coalesce, IfNull
 from frappe.utils import getdate, nowdate, get_first_day, get_last_day, add_days, add_months
+from phamos.phamos.timesheet_utils import normalize_percent_billable
 
 
 def _find_gitlab_issues_in_text(*text_fields):
@@ -208,6 +209,95 @@ def is_task_running(name):
     return {"is_running": False}
 
 
+@frappe.whitelist()
+def create_and_submit_timesheet(
+    project_name,
+    goal,
+    from_time,
+    to_time,
+    expected_time,
+    percent_billable,
+    activity_type,
+    result,
+):
+    try:
+        # Basic time validation
+        if from_time and to_time:
+            if get_datetime(to_time) < get_datetime(from_time):
+                frappe.throw(_("To Time cannot be earlier than From Time."))
+
+        # Resolve employee
+        employee = frappe.db.get_value(
+            "Employee",
+            {"user_id": frappe.session.user},
+            "name"
+        )
+
+        if not employee:
+            frappe.throw(_("No Employee linked with current user."))
+
+        # Create Timesheet Record
+        ts = frappe.new_doc("Timesheet Record")
+
+        ts.project = project_name
+        ts.activity_type = activity_type
+        ts.percent_billable = normalize_percent_billable(percent_billable)
+        ts.goal = goal
+        ts.expected_time = expected_time
+        ts.result = result
+        ts.employee = employee
+        ts.from_time = from_time
+        ts.to_time = to_time
+
+        # Resolve GitLab issue references from goal / result text
+        child_issue, parent_issue = _find_gitlab_issues_in_text(goal, result)
+        if child_issue:
+            ts.gitlab_issue = child_issue
+        if parent_issue:
+            ts.gitlab_parent_issue = parent_issue
+
+        # Add child row
+        ts.append("item", {
+            "from_time": from_time,
+            "to_time": to_time
+        })
+
+        
+        # Calculate duration
+        total_duration = 0
+        for row in ts.item:
+            if row.from_time and row.to_time:
+                if get_datetime(row.to_time) < get_datetime(row.from_time):
+                    frappe.throw(
+                        _("Row #{0}: To Time cannot be earlier than From Time.")
+                        .format(row.idx)
+                    )
+
+                row.duration = time_diff_in_seconds(
+                    row.to_time, row.from_time
+                )
+                total_duration += row.duration
+
+        ts.actual_time = total_duration
+        ts.status = "Complete"
+
+        ts.insert(ignore_permissions=True)
+        ts.submit()
+
+        return {
+            "status": "success",
+            "name": ts.name
+        }
+
+    except Exception as e:
+        frappe.log_error(
+            frappe.get_traceback(),
+            "Create & Submit Timesheet Record ERROR"
+        )
+        return {
+            "status": "error",
+            "message": str(e)
+        }
 
 @frappe.whitelist()
 def get_assigned_projects(doctype, txt, searchfield, start, page_len, filters):
@@ -549,7 +639,7 @@ def update_and_submit_timesheet_record(name, to_time, percent_billable, activity
         if doc.gitlab_issue and not doc.gitlab_parent_issue:
             doc.gitlab_parent_issue = _resolve_gitlab_parent(doc.gitlab_issue)
 
-        doc.percent_billable = percent_billable
+        doc.percent_billable = normalize_percent_billable(percent_billable)
       
 
         # Final validation before any save or submit

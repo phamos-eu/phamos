@@ -1,6 +1,7 @@
 import frappe
 from frappe import _
 from frappe.utils import now_datetime, add_to_date, time_diff_in_seconds, get_datetime
+from phamos.phamos.timesheet_utils import normalize_percent_billable
 
 
 # ---------------------------------------------------------------------------
@@ -436,7 +437,7 @@ def stop_timer(name, result, percent_billable=100, activity_type=None, manual_en
         doc.actual_time = first_row.duration or 0
 
     doc.result = result
-    doc.percent_billable = int(percent_billable)
+    doc.percent_billable = normalize_percent_billable(percent_billable)
     if activity_type:
         doc.activity_type = activity_type
 
@@ -508,7 +509,7 @@ def create_break_timesheet(from_time, to_time=None, project=None, goal=None, res
     ts.to_time = to_dt
     ts.actual_time = duration
     ts.expected_time = duration
-    ts.percent_billable = int(percent_billable)
+    ts.percent_billable = normalize_percent_billable(percent_billable)
     ts.append("item", {"from_time": from_dt, "to_time": to_dt, "duration": duration})
     ts.insert(ignore_permissions=True)
     ts.submit()
