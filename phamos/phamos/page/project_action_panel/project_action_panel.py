@@ -14,6 +14,7 @@ from frappe.utils import strip_html
 from frappe.query_builder import Field, Case, Order, DocType, functions as fn
 from frappe.query_builder.functions import Concat, Max, Sum, Round, Coalesce, IfNull
 from frappe.utils import getdate, nowdate, get_first_day, get_last_day, add_days, add_months
+from phamos.phamos.timesheet_utils import normalize_percent_billable
 
 
 def _find_gitlab_issues_in_text(*text_fields):
@@ -241,7 +242,7 @@ def create_and_submit_timesheet(
 
         ts.project = project_name
         ts.activity_type = activity_type
-        ts.percent_billable = percent_billable
+        ts.percent_billable = normalize_percent_billable(percent_billable)
         ts.goal = goal
         ts.expected_time = expected_time
         ts.result = result
@@ -570,7 +571,7 @@ def update_and_submit_timesheet_record(name, to_time, percent_billable, activity
         if doc.gitlab_issue and not doc.gitlab_parent_issue:
             doc.gitlab_parent_issue = _resolve_gitlab_parent(doc.gitlab_issue)
 
-        doc.percent_billable = percent_billable
+        doc.percent_billable = normalize_percent_billable(percent_billable)
       
 
         # Final validation before any save or submit
