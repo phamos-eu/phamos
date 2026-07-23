@@ -1,0 +1,70 @@
+{
+ "actions": [],
+ "allow_rename": 0,
+ "creation": "2026-07-23 15:20:00.000000",
+ "doctype": "DocType",
+ "engine": "InnoDB",
+ "field_order": [
+  "timesheet_section",
+  "cost_center_project"
+ ],
+ "fields": [
+  {
+   "fieldname": "timesheet_section",
+   "fieldtype": "Section Break",
+   "label": "Timesheet Defaults"
+  },
+  {
+   "description": "Project auto-selected when starting a Timesheet via the Start Work button in Sales Action Panel.",
+   "fieldname": "cost_center_project",
+   "fieldtype": "Link",
+   "label": "Cost Center Project",
+   "options": "Project"
+  }
+ ],
+ "index_web_pages_for_search": 0,
+ "issingle": 1,
+ "links": [],
+ "modified": "2026-07-23 15:20:00.000000",
+ "modified_by": "Administrator",
+ "module": "Phamos",
+ "name": "Sales Action Panel Settings",
+ "naming_rule": "",
+ "owner": "Administrator",
+ "permissions": [
+  {
+   "create": 1,
+   "delete": 1,
+   "email": 1,
+   "print": 1,
+   "read": 1,
+   "role": "System Manager",
+   "share": 1,
+   "write": 1
+  },
+  {
+   "create": 1,
+   "delete": 0,
+   "email": 0,
+   "print": 0,
+   "read": 1,
+   "role": "Sales User",
+   "share": 0,
+   "write": 1
+  },
+  {
+   "create": 1,
+   "delete": 0,
+   "email": 0,
+   "print": 0,
+   "read": 1,
+   "role": "Sales Manager",
+   "share": 0,
+   "write": 1
+  }
+ ],
+ "sort_field": "modified",
+ "sort_order": "DESC",
+ "states": [],
+ "track_changes": 1
+}
