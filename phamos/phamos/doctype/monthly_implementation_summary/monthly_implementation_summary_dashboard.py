@@ -5,11 +5,11 @@ from frappe import _
 
 
 def get_data():
-	# delivery_note on this doc points to Delivery Note — internal link (not a field on DN).
+	# delivery_note and sales_invoice on this doc point to linked transactions.
 	# fieldname + non_standard_fieldnames: safe fallback when no DN is set (query yields 0 rows).
 	return {
 		"fieldname": "name",
-		"non_standard_fieldnames": {"Delivery Note": "name"},
-		"internal_links": {"Delivery Note": "delivery_note"},
-		"transactions": [{"label": _("Related"), "items": ["Delivery Note"]}],
+		"non_standard_fieldnames": {"Delivery Note": "name", "Sales Invoice": "name"},
+		"internal_links": {"Delivery Note": "delivery_note", "Sales Invoice": "sales_invoice"},
+		"transactions": [{"label": _("Related"), "items": ["Delivery Note", "Sales Invoice"]}],
 	}
