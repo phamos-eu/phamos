@@ -187,10 +187,36 @@ class MonthlyImplementationSummary(Document):
 		self._set_sales_order_status_information()
 		self.populate_financial_history_fields()
 
+	def before_submit(self):
+		self._submit_linked_delivery_note_before_mis_submit()
+
 	def on_submit(self):
 		dn_name = self._resolve_dn_name_for_timesheet_stamp()
 		if dn_name:
 			self._update_timesheets_delivery_note(dn_name)
+
+	def _submit_linked_delivery_note_before_mis_submit(self):
+		dn_name = (self.delivery_note or "").strip()
+		if not dn_name:
+			dn_name = self._get_linked_dn_name(persist_link=True)
+
+		if not dn_name:
+			frappe.throw(frappe._("No Delivery Note linked to this Monthly Implementation Summary."))
+
+		if not frappe.db.exists("Delivery Note", dn_name):
+			frappe.throw(frappe._("Delivery Note {0} does not exist.").format(frappe.bold(dn_name)))
+
+		dn = frappe.get_doc("Delivery Note", dn_name)
+		dn_status = cint(dn.docstatus)
+
+		if dn_status == 2:
+			frappe.throw(frappe._("Delivery Note {0} is cancelled.").format(frappe.bold(dn_name)))
+
+		if dn_status == 0:
+			# Native submit flow; any ERPNext validation error is raised as-is.
+			dn.submit()
+
+		self.delivery_note = dn.name
 
 	def _resolve_dn_name_for_timesheet_stamp(self):
 		"""Resolve Delivery Note for stamping timesheets: DB ``delivery_note`` first (reliable after
@@ -818,8 +844,13 @@ def submit_mis_dn_action(docname: str):
 	_require_docname(docname)
 	doc = frappe.get_doc("Monthly Implementation Summary", docname)
 	doc.reload()
-	if doc._get_linked_dn_name():
-		doc.update_delivery_note_from_mis_items()
+	dn_name = doc._get_linked_dn_name()
+	if dn_name:
+		dn_status = cint(frappe.db.get_value("Delivery Note", dn_name, "docstatus") or 0)
+		if dn_status == 0:
+			doc.update_delivery_note_from_mis_items()
+		elif dn_status == 2:
+			frappe.throw(frappe._("Cannot use cancelled Delivery Note {0}.").format(frappe.bold(dn_name)))
 	else:
 		doc._create_dn_from_mis_dni()
 	# Sub-methods may stamp timesheets; repeat after reload so DB ``delivery_note`` / links are visible.
@@ -828,6 +859,112 @@ def submit_mis_dn_action(docname: str):
 	if dn_name:
 		doc._update_timesheets_delivery_note(dn_name)
 	return {"status": "ok"}
+
+
+def _find_existing_sales_invoice_for_delivery_note(delivery_note):
+	if not delivery_note:
+		return None
+
+	row = frappe.db.sql(
+		"""
+		select distinct si.name
+		from `tabSales Invoice` si
+		inner join `tabSales Invoice Item` sii on sii.parent = si.name
+		where si.docstatus != 2
+			and (
+				sii.delivery_note = %(delivery_note)s
+				or sii.dn_detail in (
+					select dni.name
+					from `tabDelivery Note Item` dni
+					where dni.parent = %(delivery_note)s
+				)
+			)
+		order by si.creation desc
+		limit 1
+		""",
+		{"delivery_note": delivery_note},
+		as_dict=True,
+	)
+	if row:
+		return row[0].name
+
+	if frappe.db.has_column("Sales Invoice", "against_delivery_note"):
+		si = frappe.db.get_value(
+			"Sales Invoice",
+			{"against_delivery_note": delivery_note, "docstatus": ["!=", 2]},
+			"name",
+		)
+		if si:
+			return si
+
+	return None
+
+
+@frappe.whitelist()
+def create_sales_invoice_from_mis(docname: str):
+	_require_docname(docname)
+	doc = frappe.get_doc("Monthly Implementation Summary", docname)
+	doc.check_permission("read")
+	has_sales_invoice_field = bool(doc.meta.get_field("sales_invoice"))
+	mis_sales_invoice = getattr(doc, "sales_invoice", None) if has_sales_invoice_field else None
+
+	if cint(doc.docstatus) != 1:
+		frappe.throw(frappe._("Monthly Implementation Summary must be submitted before creating a Sales Invoice."))
+
+	delivery_note = (doc.delivery_note or "").strip()
+	if not delivery_note:
+		frappe.throw(frappe._("No Delivery Note linked to this Monthly Implementation Summary."))
+
+	if not frappe.db.exists("Delivery Note", delivery_note):
+		frappe.throw(frappe._("Delivery Note {0} does not exist.").format(frappe.bold(delivery_note)))
+
+	dn_docstatus = cint(frappe.db.get_value("Delivery Note", delivery_note, "docstatus") or 0)
+	if dn_docstatus == 2:
+		frappe.throw(frappe._("Delivery Note {0} is cancelled.").format(frappe.bold(delivery_note)))
+	if dn_docstatus != 1:
+		frappe.throw(
+			frappe._("Delivery Note {0} must be submitted before creating a Sales Invoice.").format(
+				frappe.bold(delivery_note)
+			)
+		)
+
+	if not frappe.has_permission("Sales Invoice", "create"):
+		raise frappe.PermissionError
+
+	existing_si = None
+	if mis_sales_invoice and frappe.db.exists(
+		"Sales Invoice", {"name": mis_sales_invoice, "docstatus": ["!=", 2]}
+	):
+		existing_si = mis_sales_invoice
+	else:
+		existing_si = _find_existing_sales_invoice_for_delivery_note(delivery_note)
+
+	if existing_si:
+		if has_sales_invoice_field and mis_sales_invoice != existing_si:
+			doc.db_set("sales_invoice", existing_si, update_modified=False)
+		si_link = frappe.utils.get_link_to_form("Sales Invoice", existing_si)
+		frappe.throw(
+			frappe._("A Sales Invoice {0} already exists for Delivery Note {1}.").format(
+				si_link,
+				frappe.bold(delivery_note),
+			)
+		)
+
+	from erpnext.stock.doctype.delivery_note.delivery_note import make_sales_invoice
+
+	si_doc = make_sales_invoice(delivery_note)
+	if not si_doc or not getattr(si_doc, "items", None):
+		frappe.throw(
+			frappe._("No billable items available to create Sales Invoice from Delivery Note {0}.").format(
+				frappe.bold(delivery_note)
+			)
+		)
+
+	si_doc.insert()
+	if has_sales_invoice_field:
+		doc.db_set("sales_invoice", si_doc.name, update_modified=False)
+
+	return {"status": "ok", "sales_invoice": si_doc.name}
 
 
 @frappe.whitelist()

@@ -23,6 +23,60 @@ function _mis_set_create_dn_button(frm) {
 	}
 }
 
+function _mis_set_create_sales_invoice_button(frm) {
+	const label = __("Create Sales Invoice");
+	frm.remove_custom_button(label);
+
+	if (
+		frm.is_new() ||
+		cint(frm.doc.docstatus) !== 1 ||
+		!frm.doc.delivery_note ||
+		!!frm.doc.sales_invoice
+	) {
+		return;
+	}
+
+	frappe.db.get_value("Delivery Note", frm.doc.delivery_note, "docstatus").then((r) => {
+		const dn_docstatus = cint((r && r.message && r.message.docstatus) || 0);
+		if (dn_docstatus !== 1) {
+			return;
+		}
+
+		frm.add_custom_button(label, () => _mis_create_sales_invoice(frm));
+	});
+}
+
+function _mis_create_sales_invoice(frm) {
+	frappe.call({
+		method: "phamos.phamos.doctype.monthly_implementation_summary.monthly_implementation_summary.create_sales_invoice_from_mis",
+		args: {
+			docname: frm.doc.name,
+		},
+		freeze: true,
+		freeze_message: __("Creating sales invoice..."),
+		callback: function (r) {
+			if (r.exc) {
+				frappe.msgprint({
+					title: __("Error"),
+					message: r.exc[0] || __("Failed to create sales invoice."),
+					indicator: "red"
+				});
+				return;
+			}
+
+			const si_name = r.message && r.message.sales_invoice;
+			if (!si_name) {
+				frappe.msgprint(__("Failed to create Sales Invoice. Please try again."));
+				return;
+			}
+
+			frm.reload_doc().then(() => {
+				frappe.set_route("Form", "Sales Invoice", si_name);
+			});
+		}
+	});
+}
+
 function _mis_confirm_create_dn(frm) {
 	frappe.confirm(
 		__("Create a Delivery Note for Sales Order {0}?", [frm.doc.sales_order]),
@@ -94,9 +148,13 @@ frappe.ui.form.on("Monthly Implementation Summary", {
 	},
 	refresh: function(frm) {
 		_mis_set_create_dn_button(frm);
+		_mis_set_create_sales_invoice_button(frm);
 		if (frm.doc.delivery_note) {
             add_custom_links("delivery_note", "Delivery Note", frm.doc.delivery_note);
         }
+		if (frm.doc.sales_invoice) {
+			add_custom_links("sales_invoice", "Sales Invoice", frm.doc.sales_invoice);
+		}
 		if (frm.is_new()) {
 			frm.doc.delivery_note='';
 			frm.refresh_field('delivery_note');
@@ -105,6 +163,7 @@ frappe.ui.form.on("Monthly Implementation Summary", {
 			const defaults = {
 				sales_order: null,
 				delivery_note: null,
+				sales_invoice: null,
 				year: String(d.getFullYear()),
 				month: months[d.getMonth()],
 				delivery_note_item: [],
