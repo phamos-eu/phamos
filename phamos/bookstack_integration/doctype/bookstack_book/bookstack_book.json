@@ -81,14 +81,16 @@
    "fieldtype": "Data",
    "label": "URL",
    "read_only": 1,
-   "options": "URL"
+   "options": "URL",
+   "length": 500
   },
   {
    "fieldname": "cover_url",
    "fieldtype": "Data",
    "label": "Cover URL",
    "read_only": 1,
-   "options": "URL"
+   "options": "URL",
+   "length": 500
   },
   {
    "fieldname": "section_meta",

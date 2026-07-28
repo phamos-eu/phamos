@@ -95,6 +95,10 @@ def sync_users(client: BookstackClient, instance: str) -> int:
 		count += 1
 	return count
 
+def _owner_id(value):
+	if isinstance(value, dict):
+		return value.get("id")
+	return value
 
 def sync_shelves(client: BookstackClient, instance: str) -> int:
 	count = 0
@@ -112,7 +116,7 @@ def sync_shelves(client: BookstackClient, instance: str) -> int:
 			"description": detail.get("description"),
 			"url": f"{client.base_url}/shelves/{detail.get('slug')}" if detail.get("slug") else None,
 			"cover_url": (detail.get("cover") or {}).get("url"),
-			"owned_by": detail.get("owned_by"),
+			"owned_by": _owner_id(detail.get("owned_by")),
 			"created_at": _iso(detail.get("created_at")),
 			"updated_at": _iso(detail.get("updated_at")),
 			"books": books,
