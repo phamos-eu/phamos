@@ -1,0 +1,131 @@
+{
+ "actions": [],
+ "allow_rename": 1,
+ "autoname": "field:title_hour",
+ "creation": "2026-07-28 00:00:00.000000",
+ "doctype": "DocType",
+ "editable_grid": 1,
+ "engine": "InnoDB",
+ "field_order": [
+  "title_hour",
+  "employee",
+  "company",
+  "section_break_dates",
+  "from_date",
+  "to_date",
+  "section_break_slot_preferences",
+  "appointment_duration",
+  "day",
+  "section_break_available_slots",
+  "available_slots",
+  "section_break_appointment_slots",
+  "appointment_slots"
+ ],
+ "fields": [
+  {
+   "fieldname": "title_hour",
+   "fieldtype": "Data",
+   "in_list_view": 1,
+   "label": "Hour Title",
+   "read_only": 1,
+   "set_only_once": 1,
+   "unique": 1
+  },
+  {
+   "fieldname": "employee",
+   "fieldtype": "Link",
+   "in_list_view": 1,
+   "label": "Employee",
+   "options": "Employee",
+   "reqd": 1
+  },
+  {
+   "fetch_from": "employee.company",
+   "fieldname": "company",
+   "fieldtype": "Link",
+   "label": "Company",
+   "options": "Company"
+  },
+  {
+   "fieldname": "section_break_dates",
+   "fieldtype": "Section Break",
+   "label": "Date Range"
+  },
+  {
+   "fieldname": "from_date",
+   "fieldtype": "Date",
+    "label": "From Date",
+    "reqd": 1
+  },
+  {
+   "fieldname": "to_date",
+   "fieldtype": "Date",
+    "label": "To Date",
+    "reqd": 1
+  },
+  {
+   "fieldname": "section_break_slot_preferences",
+   "fieldtype": "Section Break",
+   "label": "Slot Preferences"
+  },
+  {
+   "fieldname": "appointment_duration",
+   "fieldtype": "Select",
+   "label": "Appointment Duration",
+    "options": "\n15\n30\n45\n60"
+  },
+  {
+   "fieldname": "day",
+   "fieldtype": "Select",
+   "label": "Day",
+    "options": "\nMonday\nTuesday\nWednesday\nThursday\nFriday\nSaturday\nSunday"
+  },
+  {
+   "fieldname": "section_break_available_slots",
+   "fieldtype": "Section Break",
+   "label": "Available Slots"
+  },
+  {
+   "fieldname": "available_slots",
+   "fieldtype": "Table",
+   "label": "Available Slots",
+    "options": "Available Slot"
+  },
+  {
+   "fieldname": "section_break_appointment_slots",
+   "fieldtype": "Section Break",
+   "label": "Appointment Slots"
+  },
+  {
+   "fieldname": "appointment_slots",
+   "fieldtype": "Table",
+   "label": "Appointment Slots",
+   "options": "Appointment Slot"
+  }
+ ],
+ "index_web_pages_for_search": 1,
+ "links": [],
+ "modified": "2026-07-28 00:00:00.000000",
+ "modified_by": "Administrator",
+ "module": "Phamos",
+ "name": "Employee Availability",
+ "owner": "Administrator",
+ "permissions": [
+  {
+   "create": 1,
+   "delete": 1,
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "System Manager",
+   "share": 1,
+   "write": 1
+  }
+ ],
+ "sort_field": "modified",
+ "sort_order": "DESC",
+ "states": [],
+ "track_changes": 1
+}
