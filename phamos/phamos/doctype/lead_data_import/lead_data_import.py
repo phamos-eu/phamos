@@ -82,8 +82,67 @@ Text:
 ---
 {text}
 ---"""
+
 class LeadDataImport(Document):
-    pass
+    def on_update(self):
+        self.auto_extract()
+
+    def auto_extract(self):
+        
+        if self.status == "Processing":
+            return
+
+        if frappe.flags.in_import or frappe.flags.in_patch or frappe.flags.in_migrate:
+            return
+
+        if not self.can_extract():
+            return
+
+        signature = _current_source_signature(self)
+        previous_signature = frappe.db.get_value(
+            LEAD_DATA_IMPORT_DOCTYPE, self.name, "last_extract_signature"
+        )
+
+        if signature == (previous_signature or ""):
+            return
+
+        frappe.db.set_value(
+            LEAD_DATA_IMPORT_DOCTYPE,
+            self.name,
+            "last_extract_signature",
+            signature,
+            update_modified=False,
+        )
+
+        try:
+            extract_leads(self.name)
+            frappe.msgprint(_("Auto-extraction started in the background."))
+        except Exception:
+            frappe.log_error(
+                title=_("Auto-extract on save failed"),
+                message=frappe.get_traceback(),
+            )
+
+    def can_extract(self):
+        if self.input_type == "URL":
+            return bool(self.source_url)
+        elif self.input_type == "Screenshot":
+            return bool(self.upload_files)
+        elif self.input_type == "PDF":
+            return bool(self.upload_file)
+        return False
+
+
+def _current_source_signature(doc):
+    """A fingerprint of whatever the user currently has as input."""
+    if doc.input_type == "URL":
+        return f"URL::{(doc.source_url or '').strip()}"
+    if doc.input_type == "PDF":
+        return f"PDF::{(doc.upload_file or '').strip()}"
+    if doc.input_type == "Screenshot":
+        return "Screenshot::" + "|".join(sorted(_screenshot_file_urls(doc)))
+    return ""
+
 
 
 def _screenshot_file_urls(doc):
