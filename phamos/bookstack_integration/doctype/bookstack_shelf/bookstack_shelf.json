@@ -73,7 +73,8 @@
    "fieldtype": "Data",
    "label": "URL",
    "read_only": 1,
-   "options": "URL"
+   "options": "URL",
+   "length": 500
   },
   {
    "fieldname": "cover_url",
