@@ -44,8 +44,6 @@ frappe.ui.form.on("Implementation", {
                                 height: 250,
                                 width: 250
                             });
-
-                            frm.save()
                         }
                     },
                 });
@@ -523,74 +521,101 @@ frappe.ui.form.on("Implementation", {
                 args: { 'customer': frm.doc.customer, 'name': frm.doc.name },
                 callback: function (r) {
                     if (r.message) {
-                        const delivered_total_hrs = flt(r.message['dn_qty']);
-                        frm.set_value('delivered_total_hrs', delivered_total_hrs);
-                        if (r.message['sales_order_qty'] < r.message['timesheet_hrs']) {
-                            let string1 = "TS Hrs exceeding Open SO Hrs"
-                            let remaining_hrs = Math.abs(r.message['remaining_hrs']).toString();
-                            let string2 = "TH"
-                            let warning_label = r.message['sales_order_qty'] < r.message['timesheet_hrs'] ? '⚠️' + string1 : '';
+                        // Use one rounded set of values for both the fields and the chart
+                        const float_precision = cint(frappe.sys_defaults.float_precision) || 3;
+                        const sales_order_hrs = cint(r.message['sales_order_qty']);
+                        const delivered_total_hrs = flt(r.message['dn_qty'], float_precision);
+                        const timesheet_hrs = flt(r.message['timesheet_hrs'], float_precision);
+                        const remaining_hrs = flt(r.message['remaining_hrs'], float_precision);
 
-                            let labels = ['DN Hrs', 'TS Hrs', warning_label];
-                            let values = [delivered_total_hrs, r.message['timesheet_hrs'], 0];
+                        const fields_update = frm.set_value({
+                            sales_order_total_hrs: sales_order_hrs,
+                            delivered_total_hrs: delivered_total_hrs,
+                            total_hrs_timesheet: timesheet_hrs,
+                            remaining_hrs: remaining_hrs,
+                        });
 
-                            $(frm.fields_dict.order_chart.wrapper).html('<div id="delivered-qty-chart"><h1></h1></div>');
+                        const has_overrun = remaining_hrs < 0;
+                        const labels = ['DN Hrs', 'TS Hrs', 'Rm Hrs'];
+                        // Percentage charts cannot plot a negative segment.
+                        const values = [
+                            delivered_total_hrs,
+                            timesheet_hrs,
+                            Math.max(remaining_hrs, 0),
+                        ];
+                        const remaining_color = has_overrun ? '#e24c4c' : '#418fe5';
+                        const format_hrs = value =>
+                            format_number(value, null, float_precision);
 
-                            let chart = new frappe.Chart("#delivered-qty-chart", {
-                                type: 'percentage',
-                                data: {
-                                    labels: labels,
-                                    datasets: [
-                                        { name: "Financial Information", values: values }]
-                                },
-                                colors: ['green', 'yellow', 'red'],
-                                height: 250,
-                                width: 550,
-                                maxLegendLines: 2,
-                                truncateLegends: 10,
-                            });
-                        }
-                        else if (r.message['sales_order_qty'] > r.message['timesheet_hrs']) {
-                            let labels = ['DN Hrs', 'TS Hrs', 'Rm Hrs'];
-                            let values = [delivered_total_hrs, r.message['timesheet_hrs'], r.message['remaining_hrs']];
+                        $(frm.fields_dict.order_chart.wrapper).html(`
+                            <style>
+                                .financial-chart-legend {
+                                    display: flex;
+                                    flex-wrap: wrap;
+                                    gap: 42px;
+                                    margin: -70px 0 35px 50px;
+                                }
+                                .financial-chart-legend-item {
+                                    display: grid;
+                                    grid-template-columns: 12px auto;
+                                    column-gap: 9px;
+                                    align-items: center;
+                                }
+                                .financial-chart-legend-dot {
+                                    width: 12px;
+                                    height: 12px;
+                                    border-radius: 3px;
+                                    grid-row: 1 / span 2;
+                                }
+                                .financial-chart-legend-label {
+                                    font-weight: 600;
+                                }
+                                .financial-chart-legend-value {
+                                    color: var(--text-muted);
+                                    font-size: 12px;
+                                }
+                            </style>
+                            <div id="delivered-qty-chart"></div>
+                            <div class="financial-chart-legend">
+                                <div class="financial-chart-legend-item">
+                                    <span class="financial-chart-legend-dot" style="background:#48bb78"></span>
+                                    <span class="financial-chart-legend-label">DN Hrs</span>
+                                    <span class="financial-chart-legend-value">${format_hrs(delivered_total_hrs)}</span>
+                                </div>
+                                <div class="financial-chart-legend-item">
+                                    <span class="financial-chart-legend-dot" style="background:#f6c768"></span>
+                                    <span class="financial-chart-legend-label">TS Hrs</span>
+                                    <span class="financial-chart-legend-value">${format_hrs(timesheet_hrs)}</span>
+                                </div>
+                                <div class="financial-chart-legend-item">
+                                    <span class="financial-chart-legend-dot" style="background:${remaining_color}"></span>
+                                    <span class="financial-chart-legend-label">Rm Hrs</span>
+                                    <span class="financial-chart-legend-value">${format_hrs(remaining_hrs)}</span>
+                                </div>
+                            </div>
+                        `);
 
-                            $(frm.fields_dict.order_chart.wrapper).html('<div id="delivered-qty-chart"><h1></h1></div>');
+                        new frappe.Chart("#delivered-qty-chart", {
+                            type: 'percentage',
+                            data: {
+                                labels: labels,
+                                datasets: [
+                                    { name: "Financial Information", values: values }
+                                ]
+                            },
+                            colors: ['#48bb78', '#f6c768', remaining_color],
+                            showLegend: false,
+                            height: 250,
+                            width: 550,
+                            maxLegendLines: 2,
+                            truncateLegends: 10,
+                        });
 
-                            let chart = new frappe.Chart("#delivered-qty-chart", {
-                                type: 'percentage',
-                                data: {
-                                    labels: labels,
-                                    datasets: [
-                                        { name: "Financial Information", values: values }]
-                                },
-                                colors: ['green', 'yellow', 'blue'],
-                                height: 250,
-                                width: 500,
-                                maxLegendLines: 2,
-                                truncateLegends: 10,
-                            });
-                        }
-                        else if (r.message['sales_order_qty'] == r.message['timesheet_hrs']) {
-                            let labels = ['DN Hrs', 'TS Hrs', 'Rm Hrs'];
-                            let values = [delivered_total_hrs, r.message['timesheet_hrs'], r.message['remaining_hrs']];
-
-                            $(frm.fields_dict.order_chart.wrapper).html('<div id="delivered-qty-chart"><h1></h1></div>');
-
-                            let chart = new frappe.Chart("#delivered-qty-chart", {
-                                type: 'percentage',
-                                data: {
-                                    labels: labels,
-                                    datasets: [
-                                        { name: "Financial Information", values: values }]
-                                },
-                                colors: ['green', 'yellow', 'blue'],
-                                height: 250,
-                                width: 500,
-                                maxLegendLines: 2,
-                                truncateLegends: 10,
-                            });
-
-                        }
+                        fields_update.then(() => {
+                            if (!frm.is_new() && frm.is_dirty() && !frm.saving) {
+                                frm.save();
+                            }
+                        });
                     }
                 },
             });
@@ -1277,6 +1302,3 @@ frappe.ui.form.on('Implementation Item', {
         }
     }
 });
-
-
-
