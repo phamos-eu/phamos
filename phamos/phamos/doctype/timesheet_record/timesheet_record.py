@@ -72,7 +72,7 @@ class TimesheetRecord(Document):
 				"billing_hours": actual_hours * (float(self.percent_billable) / 100) if self.percent_billable!="0" else 0,
 				"activity_type": self.activity_type,
 				"from_time": self.from_time,
-				"to_time": self.to_time,
+				#"to_time": self.to_time,
 				"expected_hours": round(float(self.expected_time) / 3600, 6),
 				"hours": actual_hours,
 				"description": description,
