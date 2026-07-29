@@ -590,6 +590,10 @@ def _load_file_as_base64(file_url):
     from .services.web import _load_file_as_base64 as implementation
 
     return implementation(file_url)
+def _load_card_crop_as_base64(file_url):
+    from .services.web import _load_card_crop_as_base64 as implementation
+
+    return implementation(file_url)
 def _get_file_path_from_url(file_url):
     from .services.web import _get_file_path_from_url as implementation
 
