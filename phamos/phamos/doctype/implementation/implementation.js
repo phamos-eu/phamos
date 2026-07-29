@@ -527,13 +527,22 @@ frappe.ui.form.on("Implementation", {
                         const delivered_total_hrs = flt(r.message['dn_qty'], float_precision);
                         const timesheet_hrs = flt(r.message['timesheet_hrs'], float_precision);
                         const remaining_hrs = flt(r.message['remaining_hrs'], float_precision);
+      
+                        const financial_values_changed = (
+                            cint(frm.doc.sales_order_total_hrs) !== sales_order_hrs
+                            || flt(frm.doc.delivered_total_hrs, float_precision) !== delivered_total_hrs
+                            || flt(frm.doc.total_hrs_timesheet, float_precision) !== timesheet_hrs
+                            || flt(frm.doc.remaining_hrs, float_precision) !== remaining_hrs
+                        );
 
-                        const fields_update = frm.set_value({
-                            sales_order_total_hrs: sales_order_hrs,
-                            delivered_total_hrs: delivered_total_hrs,
-                            total_hrs_timesheet: timesheet_hrs,
-                            remaining_hrs: remaining_hrs,
-                        });
+                        const fields_update = financial_values_changed
+                            ? frm.set_value({
+                                sales_order_total_hrs: sales_order_hrs,
+                                delivered_total_hrs: delivered_total_hrs,
+                                total_hrs_timesheet: timesheet_hrs,
+                                remaining_hrs: remaining_hrs,
+                            })
+                            : Promise.resolve();
 
                         const has_overrun = remaining_hrs < 0;
                         const labels = ['DN Hrs', 'TS Hrs', 'Rm Hrs'];
@@ -612,7 +621,11 @@ frappe.ui.form.on("Implementation", {
                         });
 
                         fields_update.then(() => {
-                            if (!frm.is_new() && frm.is_dirty() && !frm.saving) {
+                            if (
+                                financial_values_changed
+                                && !frm.is_new()
+                                && !frm.saving
+                            ) {
                                 frm.save();
                             }
                         });
