@@ -157,6 +157,7 @@ doc_events = {
 		"on_trash": "phamos.mailcow_integration.caldav.sync_event.on_delete",
 	},
     "Team": {
+        "validate": "phamos.events.team_daily_schedule.validate_schedule_rows",
         "after_save": "phamos.phamos.doctype.team.team.create_team_capacity_ledger_entry",
         "after_insert": "phamos.events.team_daily_schedule.sync_events_from_parent",
         "on_update": "phamos.events.team_daily_schedule.sync_events_from_parent",
