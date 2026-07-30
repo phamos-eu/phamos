@@ -113,17 +113,17 @@
   {
    "fieldname": "team_members_capacitydaily",
    "fieldtype": "Int",
-   "label": "Team Members Capacity(Daily)"
+   "label": "Team Members Capacity (Daily)"
   },
   {
    "fieldname": "custom_team_daily",
    "fieldtype": "Tab Break",
-   "label": "Team Daily"
+   "label": "Events"
   },
   {
    "fieldname": "custom_team_daily_schedule",
    "fieldtype": "Table",
-   "label": "Team Daily Schedule",
+   "label": "Event Schedule",
    "options": "Team Daily Schedule"
   }
  ],
