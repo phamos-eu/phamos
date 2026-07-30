@@ -28,13 +28,34 @@ def _uid_from_description_marker(description: str | None) -> str | None:
 	return uid or None
 
 
+def _uid_belongs_to_other_event(uid: str | None, current_event_name: str | None) -> bool:
+	"""True when UID is already linked to another Event record."""
+	uid = (uid or "").strip()
+	if not uid:
+		return False
+
+	filters = {"custom_mailcow_uid": uid}
+	if current_event_name:
+		filters["name"] = ["!=", current_event_name]
+
+	other = frappe.db.get_value("Event", filters, "name")
+	return bool(other)
+
+
 def _resolve_sync_uid(doc) -> str:
-	"""Choose a stable UID so updates do not create duplicate calendar objects."""
-	return (
-		(doc.get("custom_mailcow_uid") or "").strip()
-		or _uid_from_description_marker(doc.get("description"))
-		or doc.name
-	)
+	"""Choose a stable UID while preventing duplicate records from reusing another Event UID."""
+	current_name = doc.get("name") or None
+
+	stored_uid = (doc.get("custom_mailcow_uid") or "").strip()
+	if stored_uid and not _uid_belongs_to_other_event(stored_uid, current_name):
+		return stored_uid
+
+	marker_uid = _uid_from_description_marker(doc.get("description"))
+	if marker_uid and not _uid_belongs_to_other_event(marker_uid, current_name):
+		return marker_uid
+
+	# Fallback for duplicates/new docs: use this Event's own identity.
+	return doc.name
 
 
 def _get_linked_email(doctype: str | None, docname: str | None) -> str | None:
@@ -278,7 +299,12 @@ def on_upsert(doc, method=None):
 
 def on_delete(doc, method=None):
 	try:
-		delete_ics(_resolve_sync_uid(doc))
+		uid = (doc.get("custom_mailcow_uid") or "").strip() or _uid_from_description_marker(doc.get("description"))
+		if uid and _uid_belongs_to_other_event(uid, doc.get("name")):
+			# Safety: don't delete a calendar object that is still referenced by another Event.
+			return
+
+		delete_ics(uid or doc.name)
 	except Exception:
 		frappe.log_error(frappe.get_traceback(), "Event CalDAV Delete Error")
 
