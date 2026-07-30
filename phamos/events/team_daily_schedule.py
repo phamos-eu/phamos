@@ -3,6 +3,7 @@ from __future__ import annotations
 from email.utils import getaddresses
 from datetime import datetime
 from functools import lru_cache
+import re
 
 import requests
 
@@ -20,23 +21,66 @@ from phamos.mailcow_integration.caldav.ics import vevent
 SCHEDULE_TABLE_FIELD = "custom_team_daily_schedule"
 SCHEDULE_ROW_DOCTYPE = "Team Daily Schedule"
 AUTO_GENERATED_MARKER = "***** Auto Generated *****"
+EMAIL_RE = re.compile(r"^[^@\s,;<>]+@[^@\s,;<>]+\.[^@\s,;<>]+$")
+EMAIL_IN_TEXT_RE = re.compile(r"[A-Za-z0-9._%+\-]+@[A-Za-z0-9.\-]+\.[A-Za-z]{2,}")
 
 
-def _normalize_csv_emails(raw_value: str | None) -> str:
-    """Parse and deduplicate comma-separated emails while preserving order."""
-    emails: list[str] = []
+def _looks_like_email(value: str) -> bool:
+    return bool(EMAIL_RE.match((value or "").strip()))
+
+
+def _parse_attendee_field(raw_value: str | None, field_label: str, row_number: int) -> list[str]:
+    """Parse attendee input supporting comma, semicolon, and newline separators.
+
+    Raises a validation error for ambiguous inputs (e.g., missing commas between emails).
+    """
+    raw = (raw_value or "").strip()
+    if not raw:
+        return []
+
+    normalized = raw.replace(";", ",").replace("\n", ",")
+    parts = [part.strip() for part in normalized.split(",") if part.strip()]
+
+    if len(parts) == 1 and len(EMAIL_IN_TEXT_RE.findall(parts[0])) > 1:
+        frappe.throw(
+            f"Row #{row_number} ({field_label}): multiple email addresses detected without commas. "
+            "Please separate each address with a comma.",
+            title="Invalid attendee format",
+        )
+
+    parsed: list[str] = []
     seen: set[str] = set()
 
-    for _, addr in getaddresses([raw_value or ""]):
-        if not addr:
-            continue
+    for part in parts:
+        if len(EMAIL_IN_TEXT_RE.findall(part)) > 1:
+            frappe.throw(
+                f"Row #{row_number} ({field_label}): '{part}' contains more than one email address. "
+                "Please separate each address with a comma.",
+                title="Invalid attendee format",
+            )
+
+        addresses = [addr.strip() for _, addr in getaddresses([part]) if addr and addr.strip()]
+        if len(addresses) != 1:
+            frappe.throw(
+                f"Row #{row_number} ({field_label}): '{part}' is not a valid email entry. "
+                "Use formats like 'name@example.com' or 'Full Name <name@example.com>'.",
+                title="Invalid attendee format",
+            )
+
+        addr = addresses[0]
+        if not _looks_like_email(addr):
+            frappe.throw(
+                f"Row #{row_number} ({field_label}): '{addr}' is not a valid email address.",
+                title="Invalid attendee format",
+            )
+
         key = addr.lower()
         if key in seen:
             continue
         seen.add(key)
-        emails.append(addr)
+        parsed.append(addr)
 
-    return ", ".join(emails)
+    return parsed
 
 
 def _row_is_complete(row) -> bool:
@@ -134,6 +178,36 @@ def _attendee_role_map(required_csv: str, optional_csv: str) -> dict[str, str]:
     return role_map
 
 
+def _collect_attendees_for_row(row, row_number: int) -> tuple[list[str], list[str]]:
+    """Return required/optional attendees with role-safe dedup across both fields."""
+    required = _parse_attendee_field(row.get("required_attendees"), "Required Attendees", row_number)
+    optional_raw = _parse_attendee_field(row.get("optional_attendees"), "Optional Attendees", row_number)
+
+    required_keys = {addr.lower() for addr in required}
+    optional = [addr for addr in optional_raw if addr.lower() not in required_keys]
+    return required, optional
+
+
+def validate_schedule_rows(doc, method=None):
+    """Validate and normalize attendee fields before Team save.
+
+    This gives immediate user feedback for malformed attendee lists.
+    """
+    if not _has_schedule_table(doc):
+        return
+
+    for row_number, row in enumerate(doc.get(SCHEDULE_TABLE_FIELD) or [], start=1):
+        required, optional = _collect_attendees_for_row(row, row_number)
+
+        required_csv = ", ".join(required)
+        optional_csv = ", ".join(optional)
+
+        if (row.get("required_attendees") or "").strip() != required_csv:
+            row.required_attendees = required_csv
+        if (row.get("optional_attendees") or "").strip() != optional_csv:
+            row.optional_attendees = optional_csv
+
+
 def _ensure_description_has_source_url(doc, row) -> str:
     source_url = get_url_to_form(doc.doctype, doc.name)
     current_description = (row.get("description") or "").strip()
@@ -198,8 +272,10 @@ def _row_recurrence_rule(row) -> str | None:
 
 
 def _build_ics(row, uid: str, seq: int, organizer: str) -> str:
-    required_csv = _normalize_csv_emails(row.get("required_attendees"))
-    optional_csv = _normalize_csv_emails(row.get("optional_attendees"))
+    row_number = row.get("idx") or 0
+    required_list, optional_list = _collect_attendees_for_row(row, row_number)
+    required_csv = ", ".join(required_list)
+    optional_csv = ", ".join(optional_list)
     recurrence_rule = _row_recurrence_rule(row)
     return vevent(
         uid=uid,
