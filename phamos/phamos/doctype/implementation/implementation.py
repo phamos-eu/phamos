@@ -27,6 +27,8 @@ class Implementation(Document):
 				)
 
 	def before_save(self):
+		self.add_financial_snapshot()
+
 		if self.resource_planning_prediction:
 			# Get existing row names from database to identify truly new rows
 			existing_names = set()
@@ -70,6 +72,15 @@ class Implementation(Document):
 		self.add_delivered_hrs()
 		self.add_resource_planning()
 		self.add_status_history()
+
+	def add_financial_snapshot(self):
+		if not self.customer or not self.name:
+			return
+
+		financial_history = get_financial_history(self.name, self.customer) or {}
+		self.sales_order_total_hrs = int(flt(financial_history.get("sales_order_qty")))
+		self.total_hrs_timesheet = flt(financial_history.get("timesheet_hrs"))
+		self.remaining_hrs = flt(financial_history.get("remaining_hrs"))
 
 
 	def after_save(self):
