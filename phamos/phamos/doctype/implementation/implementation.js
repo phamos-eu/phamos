@@ -17,16 +17,29 @@ frappe.ui.form.on("Implementation", {
     frm.trigger("render_auto_email_reports_section");
     },
     setup: function (frm) {
-            add_row_to_sales_order(frm)
+            if (frm.is_new()) {
+                add_row_to_sales_order(frm);
+            }
                 frappe.call({
                     method: "phamos.phamos.doctype.implementation.implementation.get_financial_history",
                     args: { 'name': frm.doc.name, 'customer': frm.doc.customer },
                     callback: function (r) {
                         if (r.message) {
-                            frm.set_value('sales_order_total_hrs', r.message['sales_order_qty'])
-                            frm.set_value('delivered_total_hrs', r.message['dn_qty'])
-                            frm.set_value('total_hrs_timesheet', r.message['timesheet_hrs'])
-                            frm.set_value('remaining_hrs', r.message['remaining_hrs'])
+                            const float_precision = cint(frappe.sys_defaults.float_precision) || 3;
+                            const updates = {
+                                sales_order_total_hrs: cint(r.message['sales_order_qty']),
+                                delivered_total_hrs: flt(r.message['dn_qty'], float_precision),
+                                total_hrs_timesheet: flt(r.message['timesheet_hrs'], float_precision),
+                                remaining_hrs: flt(r.message['remaining_hrs'], float_precision)
+                            };
+
+                            Object.keys(updates).forEach(fieldname => {
+                                if (frm.doc[fieldname] !== updates[fieldname]) {
+                                    frm.doc[fieldname] = updates[fieldname];
+                                    frm.refresh_field(fieldname);
+                                }
+                            });
+
                             let label1 = ['Sales Order Hrs']
                             let value1 = [r.message['sales_order_qty']]
 
@@ -172,16 +185,6 @@ frappe.ui.form.on("Implementation", {
             document.head.appendChild(riskStyle);
         }
 
-        // Sort resource_planning_prediction by date (descending - newest first)
-        if (frm.doc.resource_planning_prediction && frm.doc.resource_planning_prediction.length > 0) {
-            frm.doc.resource_planning_prediction.sort((a, b) => {
-                let dateA = a.date ? new Date(a.date) : new Date(0);
-                let dateB = b.date ? new Date(b.date) : new Date(0);
-                return dateB - dateA; // Descending order (newest first)
-            });
-            frm.refresh_field('resource_planning_prediction');
-        }
-        
         // add_row_to_sales_order(frm);
         frm.fields_dict.reset.$input.on('click', function () {
             frm.set_value("prediction_from_date", "");
@@ -527,22 +530,21 @@ frappe.ui.form.on("Implementation", {
                         const delivered_total_hrs = flt(r.message['dn_qty'], float_precision);
                         const timesheet_hrs = flt(r.message['timesheet_hrs'], float_precision);
                         const remaining_hrs = flt(r.message['remaining_hrs'], float_precision);
-      
-                        const financial_values_changed = (
-                            cint(frm.doc.sales_order_total_hrs) !== sales_order_hrs
-                            || flt(frm.doc.delivered_total_hrs, float_precision) !== delivered_total_hrs
-                            || flt(frm.doc.total_hrs_timesheet, float_precision) !== timesheet_hrs
-                            || flt(frm.doc.remaining_hrs, float_precision) !== remaining_hrs
-                        );
 
-                        const fields_update = financial_values_changed
-                            ? frm.set_value({
-                                sales_order_total_hrs: sales_order_hrs,
-                                delivered_total_hrs: delivered_total_hrs,
-                                total_hrs_timesheet: timesheet_hrs,
-                                remaining_hrs: remaining_hrs,
-                            })
-                            : Promise.resolve();
+                        // Keep dashboard fields in sync without marking form dirty on every refresh.
+                        const set_computed_field = (fieldname, value, normalize) => {
+                            const current = normalize(frm.doc[fieldname]);
+                            const next = normalize(value);
+                            if (current !== next) {
+                                frm.doc[fieldname] = value;
+                                frm.refresh_field(fieldname);
+                            }
+                        };
+
+                        set_computed_field('sales_order_total_hrs', sales_order_hrs, cint);
+                        set_computed_field('delivered_total_hrs', delivered_total_hrs, v => flt(v, float_precision));
+                        set_computed_field('total_hrs_timesheet', timesheet_hrs, v => flt(v, float_precision));
+                        set_computed_field('remaining_hrs', remaining_hrs, v => flt(v, float_precision));
 
                         const has_overrun = remaining_hrs < 0;
                         const labels = ['DN Hrs', 'TS Hrs', 'Rm Hrs'];
@@ -618,16 +620,6 @@ frappe.ui.form.on("Implementation", {
                             width: 550,
                             maxLegendLines: 2,
                             truncateLegends: 10,
-                        });
-
-                        fields_update.then(() => {
-                            if (
-                                financial_values_changed
-                                && !frm.is_new()
-                                && !frm.saving
-                            ) {
-                                frm.save();
-                            }
                         });
                     }
                 },
@@ -1039,20 +1031,32 @@ function populate_auto_email_reports(frm) {
             user_list: frm.doc.user_with_permission
         },
         callback: function(r) {
-            if (r.message) {
-                // clear existing child table
-                frm.clear_table("auto_email_report_record");
+            const incoming = (r.message || []).map(row => ({
+                recipients: row.recipient || "",
+                templates: row.template || "",
+                frequency: row.frequency || ""
+            }));
 
-                r.message.forEach(function(row) {
-                    let child = frm.add_child("auto_email_report_record");
-                    child.recipients = row.recipient;
-                    child.templates = row.template;
-                    child.frequency = row.frequency;
-                });
+            const existing = (frm.doc.auto_email_report_record || []).map(row => ({
+                recipients: row.recipients || "",
+                templates: row.templates || "",
+                frequency: row.frequency || ""
+            }));
 
-                frm.refresh_field("auto_email_report_record");
-
+            if (JSON.stringify(existing) === JSON.stringify(incoming)) {
+                return;
             }
+
+            frm.clear_table("auto_email_report_record");
+
+            incoming.forEach(function(row) {
+                let child = frm.add_child("auto_email_report_record");
+                child.recipients = row.recipients;
+                child.templates = row.templates;
+                child.frequency = row.frequency;
+            });
+
+            frm.refresh_field("auto_email_report_record");
         }
     });
 }
@@ -1279,23 +1283,6 @@ function render_resource_planning_graph(frm, usePredictionFilter = false) {
 }
 
 
-
-frappe.ui.form.on("Sales Order Status Information", {
-    setup: function (frm) {
-            frappe.call({
-                method: "phamos.phamos.doctype.implementation.implementation.get_financial_history",
-                args: { 'name': frm.doc.name },
-                callback: function (r) {
-                    if (r.message) {
-                        frm.set_value('sales_order_total_hrs', r.message['sales_order_qty'])
-                        frm.set_value('delivered_total_hrs', r.message['dn_qty'])
-                        frm.set_value('total_hrs_timesheet', r.message['timesheet_hrs'])
-                        frm.set_value('remaining_hrs', r.message['remaining_hrs'])
-                    }
-                },
-            });
-    }
-});
 
 frappe.ui.form.on('Implementation Item', {
     module: function(frm, cdt, cdn) {
