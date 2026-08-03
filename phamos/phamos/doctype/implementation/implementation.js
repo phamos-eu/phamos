@@ -1067,14 +1067,15 @@ function render_module_chart(frm, canvasId) {
 
     (frm.doc.modules || []).forEach(row => {
         if (row.is_required) {
-            let label = row.module;
+            const baseLabel = (row.module_description || "").trim() || row.module;
+            let label = baseLabel;
 
-            const duplicateCount = labels.filter(l => l.startsWith(row.module)).length;
+            const duplicateCount = labels.filter(l => l.startsWith(baseLabel)).length;
 
             if (duplicateCount > 0 && row.stage) {
-                label = `${row.module} (${row.stage})`;
+                label = `${baseLabel} (${row.stage})`;
             } else if (duplicateCount > 0) {
-                label = `${row.module} (${duplicateCount + 1})`;
+                label = `${baseLabel} (${duplicateCount + 1})`;
             }
 
             labels.push(label);
