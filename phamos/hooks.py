@@ -86,6 +86,8 @@ get_website_user_home_page = "phamos.website.get_website_user_home_page"
 
 on_login = ["phamos.website.on_login"]
 
+update_website_context = ["phamos.website.update_website_context"]
+
 # Generators
 # ----------
 

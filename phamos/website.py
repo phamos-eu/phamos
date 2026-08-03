@@ -13,6 +13,18 @@ def on_login(login_manager):
 		frappe.local.flags.home_page = CUSTOMER_PORTAL_HOME
 
 
+def update_website_context(context):
+	post_login = list(context.get("post_login") or [])
+
+	portal_item = {"label": "Customer Portal", "url": "/timesheet"}
+	already_present = any((item or {}).get("url") == portal_item["url"] for item in post_login)
+
+	if not already_present:
+		post_login.append(portal_item)
+
+	return {"post_login": post_login}
+
+
 def _is_customer_portal_user(user):
 	if not user or user == "Guest":
 		return False
