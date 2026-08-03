@@ -94,6 +94,7 @@ frappe.ui.form.on("Implementation", {
         });
     },
     refresh: function (frm) {
+        sort_resource_planning_by_month_desc(frm);
         frm.trigger("render_auto_email_reports_section");
         frm.trigger("render_gitlab_projects_section");
         frm.trigger("render_gitlab_issues_section");
@@ -1158,6 +1159,22 @@ function add_row_to_sales_order(frm) {
             }
         }
     });
+}
+
+function sort_resource_planning_by_month_desc(frm) {
+    const rows = frm.doc.resource_planning || [];
+    if (rows.length < 2 || !frm.fields_dict.resource_planning) return;
+
+    const normalizeMonth = value => (value ? String(value).trim() : "");
+    const sortedRows = [...rows].sort((a, b) =>
+        normalizeMonth(b.month_and_year).localeCompare(normalizeMonth(a.month_and_year))
+    );
+
+    const isOrderChanged = rows.some((row, idx) => row.name !== sortedRows[idx]?.name);
+    if (!isOrderChanged) return;
+
+    frm.doc.resource_planning = sortedRows;
+    frm.refresh_field("resource_planning");
 }
 
 function render_resource_planning_graph(frm, usePredictionFilter = false) {
