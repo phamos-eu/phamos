@@ -1,4 +1,110 @@
-frappe.views.calendar["Employee Availability"] = {
+const SLOT_STATUS_STORAGE_KEY = "employee_availability_calendar_slot_status";
+const SLOT_STATUS_FIELDNAME = "slot_status";
+const SLOT_STATUS_DEFAULT = "All";
+const SLOT_STATUS_OPTIONS = ["All", "Available", "Booked", "Optional"];
+
+const CALENDAR_DOCTYPE = "Employee Availability";
+const SLOT_STATUS_FILTER_CLASS = "employee-availability-slot-status-filter";
+const LEGEND_CLASS = "employee-availability-legend";
+
+function get_slot_status_filter_value() {
+	return window.localStorage.getItem(SLOT_STATUS_STORAGE_KEY) || SLOT_STATUS_DEFAULT;
+}
+
+function set_slot_status_filter_value(value) {
+	window.localStorage.setItem(SLOT_STATUS_STORAGE_KEY, value || SLOT_STATUS_DEFAULT);
+}
+
+function refresh_employee_availability_calendar() {
+	const calendar = window.cur_list && window.cur_list.calendar;
+	if (calendar && calendar.$cal) {
+		calendar.$cal.fullCalendar("refetchEvents");
+	}
+}
+
+function get_filter_fieldname(filterItem) {
+	if (Array.isArray(filterItem)) {
+		if (filterItem.length >= 4) return filterItem[1];
+		if (filterItem.length >= 3) return filterItem[0];
+	}
+
+	if (filterItem && typeof filterItem === "object") {
+		return filterItem.fieldname || filterItem.field || filterItem.name;
+	}
+
+	return null;
+}
+
+function build_slot_status_filter_html() {
+	const options = SLOT_STATUS_OPTIONS.map((value) => `<option value="${value}">${value}</option>`).join("");
+	return [
+		'<div style="font-weight:600; margin-bottom:6px;">Slot Status</div>',
+		`<select class="form-control input-xs" style="width:100%;">${options}</select>`,
+	].join("");
+}
+
+function get_calendar_side_section() {
+	return (
+		document.querySelector(".layout-side-section") ||
+		document.querySelector(".list-sidebar") ||
+		document.querySelector(".page-sidebar")
+	);
+}
+
+function ensure_employee_availability_legend() {
+	const calendarRoot = document.querySelector(".fc");
+	if (!calendarRoot) return;
+
+	const sideSection = get_calendar_side_section();
+	if (!sideSection) return;
+
+	if (!sideSection.querySelector(`.${SLOT_STATUS_FILTER_CLASS}`)) {
+		const wrapper = document.createElement("div");
+		wrapper.className = SLOT_STATUS_FILTER_CLASS;
+		wrapper.style.marginTop = "12px";
+		wrapper.innerHTML = build_slot_status_filter_html();
+
+		const select = wrapper.querySelector("select");
+		select.value = get_slot_status_filter_value();
+		select.addEventListener("change", () => {
+			set_slot_status_filter_value(select.value);
+			refresh_employee_availability_calendar();
+		});
+
+		sideSection.appendChild(wrapper);
+	}
+
+	if (sideSection.querySelector(`.${LEGEND_CLASS}`)) return;
+
+	const legend = document.createElement("div");
+	legend.className = LEGEND_CLASS;
+	legend.style.marginTop = "16px";
+	legend.style.padding = "10px";
+	legend.style.border = "1px solid #e3e3e3";
+	legend.style.borderRadius = "8px";
+	legend.style.background = "#fff";
+	legend.innerHTML = [
+		'<div style="font-weight:600; margin-bottom:8px;">Status Legend</div>',
+		'<div style="display:flex; align-items:center; gap:8px; margin-bottom:6px;"><span style="width:10px; height:10px; border-radius:50%; display:inline-block; background:#D94841;"></span><span>Booked</span></div>',
+		'<div style="display:flex; align-items:center; gap:8px; margin-bottom:6px;"><span style="width:10px; height:10px; border-radius:50%; display:inline-block; background:#E0A106;"></span><span>Optional</span></div>',
+		'<div style="display:flex; align-items:center; gap:8px;"><span style="width:10px; height:10px; border-radius:50%; display:inline-block; background:#2EAF4A;"></span><span>Available</span></div>',
+	].join("");
+
+	sideSection.appendChild(legend);
+}
+
+function ensure_employee_availability_sidebar_with_retry(attempt = 0) {
+	ensure_employee_availability_legend();
+
+	const sideSection = get_calendar_side_section();
+	const hasFilter = sideSection && sideSection.querySelector(`.${SLOT_STATUS_FILTER_CLASS}`);
+	if (hasFilter) return;
+
+	if (attempt >= 20) return;
+	window.setTimeout(() => ensure_employee_availability_sidebar_with_retry(attempt + 1), 250);
+}
+
+frappe.views.calendar[CALENDAR_DOCTYPE] = {
 	field_map: {
 		start: "start",
 		end: "end",
@@ -20,10 +126,10 @@ frappe.views.calendar["Employee Availability"] = {
 		},
 		{
 			fieldtype: "Select",
-			fieldname: "slot_status",
+			fieldname: SLOT_STATUS_FIELDNAME,
 			label: __("Slot Status"),
-			options: "All\nAvailable\nBooked\nOptional",
-			default: "All",
+			options: SLOT_STATUS_OPTIONS.join("\n"),
+			default: SLOT_STATUS_DEFAULT,
 		},
 	],
 	editable: false,
@@ -37,40 +143,33 @@ frappe.views.calendar["Employee Availability"] = {
 	eventClick() {
 		return false;
 	},
+	get_args(start, end) {
+		let filters = (this.list_view && this.list_view.filter_area && this.list_view.filter_area.get()) || [];
+		const slotStatus = get_slot_status_filter_value();
+
+		filters = filters.filter((item) => get_filter_fieldname(item) !== SLOT_STATUS_FIELDNAME);
+
+		if (slotStatus && slotStatus !== SLOT_STATUS_DEFAULT) {
+			filters.push([CALENDAR_DOCTYPE, SLOT_STATUS_FIELDNAME, "=", slotStatus]);
+		}
+
+		return {
+			doctype: this.doctype,
+			start: this.get_system_datetime(start),
+			end: this.get_system_datetime(end),
+			fields: this.fields,
+			filters,
+			field_map: this.field_map,
+		};
+	},
 	get_events_method:
 		"phamos.phamos.doctype.employee_availability.employee_availability.get_employee_availability_calendar_events",
 };
 
-function ensure_employee_availability_legend() {
-	const calendarRoot = document.querySelector(".fc");
-	if (!calendarRoot) return;
-
-	const sideSection = document.querySelector(".layout-side-section");
-	if (!sideSection) return;
-
-	if (sideSection.querySelector(".employee-availability-legend")) return;
-
-	const legend = document.createElement("div");
-	legend.className = "employee-availability-legend";
-	legend.style.marginTop = "16px";
-	legend.style.padding = "10px";
-	legend.style.border = "1px solid #e3e3e3";
-	legend.style.borderRadius = "8px";
-	legend.style.background = "#fff";
-	legend.innerHTML = [
-		'<div style="font-weight:600; margin-bottom:8px;">Status Legend</div>',
-		'<div style="display:flex; align-items:center; gap:8px; margin-bottom:6px;"><span style="width:10px; height:10px; border-radius:50%; display:inline-block; background:#D94841;"></span><span>Booked</span></div>',
-		'<div style="display:flex; align-items:center; gap:8px; margin-bottom:6px;"><span style="width:10px; height:10px; border-radius:50%; display:inline-block; background:#E0A106;"></span><span>Optional</span></div>',
-		'<div style="display:flex; align-items:center; gap:8px;"><span style="width:10px; height:10px; border-radius:50%; display:inline-block; background:#2EAF4A;"></span><span>Available</span></div>',
-	].join("");
-
-	sideSection.appendChild(legend);
-}
-
 if (typeof frappe !== "undefined" && frappe.router && frappe.router.on) {
 	frappe.router.on("change", () => {
-		window.setTimeout(ensure_employee_availability_legend, 100);
+		window.setTimeout(() => ensure_employee_availability_sidebar_with_retry(0), 100);
 	});
 }
 
-window.setTimeout(ensure_employee_availability_legend, 100);
+window.setTimeout(() => ensure_employee_availability_sidebar_with_retry(0), 100);
