@@ -448,4 +448,169 @@ def pull_events(start: str, end: str) -> list[dict]:
 			})
 
 	return events
+
+
+@frappe.whitelist()
+def pull_event_slots(start: str, end: str) -> list[dict]:
+	"""
+	Read-only pull from Mailcow for the current user between start and end (ISO strings).
+	Returns normalized time slots and does not create/update ERPNext Event records.
+	"""
+
+	from frappe.utils import date_diff, get_datetime
+	import dateutil.parser
+	from icalendar import Calendar
+	from xml.etree import ElementTree as ET
+
+	s = frappe.get_single("Mailcow Settings")
+
+	owner = frappe.session.user
+	if owner == "Administrator":
+		frappe.throw("You're logged in as Administrator; cannot determine organizer email.")
+
+	email = organizer_email()
+	pw = dav_password(email)
+	if not (email and pw):
+		frappe.throw("Missing DAV credentials for organizer")
+
+	start_dt = dateutil.parser.isoparse(start)
+	end_dt = dateutil.parser.isoparse(end)
+	if date_diff(end_dt, start_dt) > 90:
+		frappe.throw("Date range too large; max 90 days")
+
+	# Normalize all comparisons to UTC aware datetimes
+	site_tz = pytz.timezone(get_site_timezone())
+
+	def to_utc(dt: datetime):
+		# If dt is date-only or naive, localize to site tz first
+		if dt is None:
+			return None
+		if dt.tzinfo is None:
+			dt = site_tz.localize(dt)
+		return dt.astimezone(pytz.UTC)
+
+	start_dt_utc = to_utc(start_dt)
+	end_dt_utc = to_utc(end_dt)
+
+	def collect_slots_from_ical(cal_raw) -> list[dict]:
+		"""Parse VCALENDAR payload and return slot rows within requested range."""
+		parsed_slots = []
+		if not cal_raw:
+			return parsed_slots
+
+		cal = Calendar.from_ical(cal_raw)
+		for component in cal.walk():
+			if component.name != "VEVENT":
+				continue
+
+			uid = str(component.get("UID") or "")
+			summary = str(component.get("SUMMARY") or "")
+			desc = str(component.get("DESCRIPTION") or "")
+			loc = str(component.get("LOCATION") or "")
+			dtstart_prop = component.get("DTSTART")
+			if not dtstart_prop:
+				continue
+
+			raw_start = dtstart_prop.dt
+			dtend_prop = component.get("DTEND")
+			raw_end = dtend_prop.dt if dtend_prop else raw_start
+			dtstart = get_datetime(raw_start)
+			dtend = get_datetime(raw_end)
+
+			dtstart_utc = to_utc(dtstart)
+			dtend_utc = to_utc(dtend)
+
+			if (dtend_utc and dtend_utc < start_dt_utc) or (dtstart_utc and dtstart_utc > end_dt_utc):
+				continue
+
+			duration_minutes = None
+			if dtstart_utc and dtend_utc:
+				duration_minutes = int((dtend_utc - dtstart_utc).total_seconds() // 60)
+
+			parsed_slots.append({
+				"uid": uid,
+				"subject": summary,
+				"start": dtstart_utc.isoformat() if dtstart_utc else None,
+				"end": dtend_utc.isoformat() if dtend_utc else None,
+				"duration_minutes": duration_minutes,
+				"slot": {
+					"start": dtstart_utc.isoformat() if dtstart_utc else None,
+					"end": dtend_utc.isoformat() if dtend_utc else None,
+				},
+				"description": desc,
+				"location": loc,
+			})
+
+		return parsed_slots
+
+	url = f"{s.base_url.rstrip('/')}/SOGo/dav/{email}/Calendar/personal/"
+	start_utc_str = start_dt_utc.strftime("%Y%m%dT%H%M%SZ")
+	end_utc_str = end_dt_utc.strftime("%Y%m%dT%H%M%SZ")
+
+	query_xml = f"""<?xml version=\"1.0\" encoding=\"utf-8\" ?>
+<C:calendar-query xmlns:D=\"DAV:\" xmlns:C=\"urn:ietf:params:xml:ns:caldav\">
+	<D:prop>
+		<D:getetag/>
+		<C:calendar-data/>
+	</D:prop>
+	<C:filter>
+		<C:comp-filter name=\"VCALENDAR\">
+			<C:comp-filter name=\"VEVENT\">
+				<C:time-range start=\"{start_utc_str}\" end=\"{end_utc_str}\"/>
+			</C:comp-filter>
+		</C:comp-filter>
+	</C:filter>
+</C:calendar-query>"""
+
+	r = requests.request("REPORT", url,
+		auth=(email, pw),
+		headers={"Depth": "1", "Content-Type": "application/xml; charset=utf-8"},
+		data=query_xml.encode("utf-8"),
+		timeout=30
+	)
+	if r.status_code != 207:
+		frappe.throw(f"SOGo calendar REPORT failed: {r.status_code}: {r.text[:500]}")
+
+	ns = {"D": "DAV:", "C": "urn:ietf:params:xml:ns:caldav"}
+	root = ET.fromstring(r.content)
+	slots = []
+
+	for resp in root.findall("D:response", ns):
+		calendar_data_el = resp.find("D:propstat/D:prop/C:calendar-data", ns)
+		calendar_data_text = (calendar_data_el.text or "") if calendar_data_el is not None else ""
+		if not calendar_data_text.strip():
+			continue
+		slots.extend(collect_slots_from_ical(calendar_data_text))
+
+	# Some SOGo setups return empty calendar-data for time-range REPORT.
+	# Fallback to PROPFIND + GET to keep behavior reliable.
+	if not slots:
+		r_fallback = requests.request("PROPFIND", url,
+			auth=(email, pw),
+			headers={"Depth": "1"},
+			timeout=30
+		)
+		if r_fallback.status_code != 207:
+			frappe.throw(f"SOGo fallback PROPFIND failed: {r_fallback.status_code}: {r_fallback.text[:500]}")
+
+		root_fb = ET.fromstring(r_fallback.content)
+		for resp in root_fb.findall("D:response", ns):
+			href = resp.find("D:href", ns)
+			if href is None or not (href.text or "").endswith(".ics"):
+				continue
+
+			caldav_url = url + href.text.split("/")[-1]
+			r2 = requests.get(caldav_url,
+				auth=(email, pw),
+				timeout=30
+			)
+			if r2.status_code != 200:
+				frappe.log_error(f"SOGo GET failed: {r2.status_code}: {r2.text[:500]}", "CalDAV GET")
+				continue
+
+			slots.extend(collect_slots_from_ical(r2.content))
+
+	# Stable order for consumers (earliest first)
+	slots.sort(key=lambda item: (item.get("start") or "", item.get("end") or ""))
+	return slots
 		

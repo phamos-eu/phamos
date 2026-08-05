@@ -6,8 +6,12 @@ frappe.ui.form.on("Employee Availability", {
 		set_default_month_range(frm);
 	},
 
+	refresh(frm) {
+		add_fetch_slots_button(frm);
+	},
+
 	employee(frm) {
-		queue_available_slot_fetch(frm);
+		invalidate_available_slots(frm);
 	},
 
 	appointment_duration(frm) {
@@ -19,13 +23,19 @@ frappe.ui.form.on("Employee Availability", {
 	},
 
 	from_date(frm) {
-		queue_available_slot_fetch(frm);
+		invalidate_available_slots(frm);
 	},
 
 	to_date(frm) {
-		queue_available_slot_fetch(frm);
+		invalidate_available_slots(frm);
 	},
 });
+
+function add_fetch_slots_button(frm) {
+	frm.add_custom_button(__("Fetch Slots"), () => {
+		fetch_available_slots(frm);
+	});
+}
 
 function set_default_month_range(frm) {
 	if (!frm.is_new()) return;
@@ -55,35 +65,17 @@ function is_available_fetch_ready(frm) {
 	);
 }
 
-function queue_available_slot_fetch(frm) {
-	if (frm._available_slot_timer) {
-		clearTimeout(frm._available_slot_timer);
+function invalidate_available_slots(frm) {
+	if ((frm.doc.available_slots || []).length) {
+		frm.clear_table("available_slots");
+		frm.refresh_field("available_slots");
 	}
-
-	if (!is_available_fetch_ready(frm)) {
-		if ((frm.doc.available_slots || []).length) {
-			frm.clear_table("available_slots");
-			frm.refresh_field("available_slots");
-		}
-		clear_appointment_slots(frm);
-		return;
-	}
-
-	show_slot_fetch_progress(0, 2, __("Queued"));
-
-	frm._available_slot_timer = setTimeout(() => {
-		fetch_available_slots(frm);
-	}, 200);
+	clear_appointment_slots(frm);
 }
 
 function fetch_available_slots(frm) {
 	if (!is_available_fetch_ready(frm)) {
-		if ((frm.doc.available_slots || []).length) {
-			frm.clear_table("available_slots");
-			frm.refresh_field("available_slots");
-		}
-		clear_appointment_slots(frm);
-		show_slot_fetch_progress(2, 2, __("Done"));
+		frappe.msgprint(__("Please select Employee, From Date, and To Date before fetching slots."));
 		return;
 	}
 
@@ -100,11 +92,12 @@ function fetch_available_slots(frm) {
 	show_slot_fetch_progress(1, 2, __("Fetching from Mailcow"));
 
 	frappe.call({
-		method: "phamos.phamos.doctype.employee_availability.employee_availability.generate_available_slots",
+		method: "phamos.phamos.doctype.employee_availability.employee_availability.get_free_slots",
 		args: {
 			employee: frm.doc.employee,
 			from_date: frm.doc.from_date,
 			to_date: frm.doc.to_date,
+			tz_name: Intl.DateTimeFormat().resolvedOptions().timeZone,
 		},
 		freeze: true,
 		freeze_message: __("Fetching available slots from Mailcow..."),
