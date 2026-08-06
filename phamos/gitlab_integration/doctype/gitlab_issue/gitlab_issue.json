@@ -9,6 +9,8 @@
   "title",
   "description",
   "state",
+  "created_at",
+  "closed_at",
   "due_date",
   "start_date",
   "assignee",
@@ -44,6 +46,16 @@
    "fieldname": "state",
    "fieldtype": "Data",
    "label": "State"
+  },
+  {
+   "fieldname": "created_at",
+   "fieldtype": "Datetime",
+   "label": "Created At"
+  },
+  {
+   "fieldname": "closed_at",
+   "fieldtype": "Datetime",
+   "label": "Closed At"
   },
   {
    "fieldname": "assignee",

@@ -21,3 +21,6 @@ phamos.patches.v1_0.fix_billable_hours_zeroed_by_productivity_bug
 phamos.patches.v1_0.update_sales_order_status_hour_fields_to_float
 phamos.patches.v1_0.fix_timesheet_summary_auto_email_report_filters
 phamos.patches.v1_0.remove_event_custom_location_field
+phamos.patches.v1_0.update_sales_order_status_hour_fields_to_float
+phamos.patches.v1_0.queue_gitlab_full_sync_after_deploy
+
