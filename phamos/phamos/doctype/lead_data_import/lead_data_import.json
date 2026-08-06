@@ -13,6 +13,7 @@
   "upload_files",
   "column_break_1",
   "status",
+  "last_extract_signature",
   "reference_urls",
   "section_break_log",
   "status_log",
@@ -59,6 +60,13 @@
    "options": "Draft\nProcessing\nReady\nDone",
    "read_only": 1
   },
+  {
+ "fieldname": "last_extract_signature",
+ "fieldtype": "Data",
+ "hidden": 1,
+ "read_only": 1,
+ "label": "Last Extract Signature"
+},
   {
    "fieldname": "column_break_1",
    "fieldtype": "Column Break"
