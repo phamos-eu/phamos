@@ -191,7 +191,7 @@ def sync_groups_only():
     return f"{new_count} new groups synced successfully"
 
 
-def get_issues_for_project(project_id, updated_after=None):
+def get_issues_for_project(project_id, updated_after=None, state="all"):
     settings = frappe.get_single("GitLab Settings")
     base_url = f"{settings.gitlab_url}/api/v4/projects/{project_id}/issues"
 
@@ -201,7 +201,7 @@ def get_issues_for_project(project_id, updated_after=None):
 
     while True:
         params = {
-            "state": "opened",
+            "state": state,
             "per_page": per_page,
             "page": page
         }
@@ -220,6 +220,32 @@ def get_issues_for_project(project_id, updated_after=None):
         page += 1
 
     return all_issues
+
+
+def get_issue_for_project(project_id, issue_iid):
+    settings = frappe.get_single("GitLab Settings")
+    base_url = settings.gitlab_url.rstrip("/")
+    response = requests.get(
+        f"{base_url}/api/v4/projects/{project_id}/issues/{issue_iid}",
+        headers=get_gitlab_headers(),
+        timeout=30,
+    )
+    response.raise_for_status()
+    return response.json()
+
+
+def _get_issue_timestamp_fields(issue):
+    return {
+        "created_at": _parse_gitlab_datetime(issue.get("created_at")),
+        "closed_at": _parse_gitlab_datetime(issue.get("closed_at")),
+    }
+
+
+def _normalize_issue_text(value):
+    """Keep text storage format stable so form editors don't mark docs dirty on load."""
+    if value is None:
+        return ""
+    return str(value).replace("\r\n", "\n").replace("\r", "\n")
 
 
 def get_issue_parent(project_path, issue_iid):
@@ -370,8 +396,7 @@ def sync_all_issues():
             project_path = project.get("namespace") or None
             issue_map = {}
 
-            # ── Step 1: Fetched issues iids
-            issues = [issue for issue in issues if issue.get("assignee")]
+            # ── Step 1: Fetched issues iids (include assigned + unassigned issues)
             fetched_iids = {str(issue["iid"]) for issue in issues}
 
 
@@ -408,8 +433,8 @@ def sync_all_issues():
                     assignee_email = get_user_email(assignee_id) if assignee_id else ""
 
                     fields = {
-                        "title": issue["title"],
-                        "description": issue.get("description", ""),
+                        "title": _normalize_issue_text(issue.get("title", "")),
+                        "description": _normalize_issue_text(issue.get("description", "")),
                         "state": issue["state"],
                         "due_date": issue.get("due_date") or None,
                         "assignee": assignee_name,
@@ -418,6 +443,7 @@ def sync_all_issues():
                         "issue_url": issue["web_url"],
                         "labels": ", ".join(issue.get("labels", [])),
                     }
+                    fields.update(_get_issue_timestamp_fields(issue))
                     if milestone_name:
                         fields["gitlab_milestone"] = milestone_name
 
@@ -504,7 +530,7 @@ def sync_issues_for_project(project_name):
         project_path = project.namespace or None
         issue_map = {}
 
-        issues = [issue for issue in issues if issue.get("assignee")]
+        # Include assigned + unassigned issues to keep all GitLab issues in sync.
         fetched_iids = {str(issue["iid"]) for issue in issues}
 
 
@@ -540,8 +566,8 @@ def sync_issues_for_project(project_name):
                 assignee_id = assignee_data.get("id")
 
                 fields = {
-                    "title": issue["title"],
-                    "description": issue.get("description", ""),
+                    "title": _normalize_issue_text(issue.get("title", "")),
+                    "description": _normalize_issue_text(issue.get("description", "")),
                     "state": issue["state"],
                     "due_date": issue.get("due_date") or None,
                     "assignee": assignee_data.get("name", ""),
@@ -550,6 +576,7 @@ def sync_issues_for_project(project_name):
                     "issue_url": issue["web_url"],
                     "labels": ", ".join(issue.get("labels", [])),
                 }
+                fields.update(_get_issue_timestamp_fields(issue))
 
                 if milestone_name:
                     fields["gitlab_milestone"] = milestone_name
@@ -877,10 +904,20 @@ def _handle_issue_webhook(payload):
     labels_str  = ", ".join(filter(None, labels_list))
 
     state = issue_attrs.get("state", "opened")
+    timestamp_data = _get_issue_timestamp_fields(issue_attrs)
+    if state == "closed" and not timestamp_data.get("closed_at"):
+        try:
+            issue_detail = get_issue_for_project(gl_project_id, issue_iid)
+            timestamp_data.update(_get_issue_timestamp_fields(issue_detail))
+        except Exception:
+            frappe.log_error(
+                frappe.get_traceback(),
+                f"GitLab Issue Timestamp Fetch Failed - {project_doc.title}"
+            )
 
     data = {
-        "title"          : issue_attrs.get("title", ""),
-        "description"    : issue_attrs.get("description", ""),
+        "title"          : _normalize_issue_text(issue_attrs.get("title", "")),
+        "description"    : _normalize_issue_text(issue_attrs.get("description", "")),
         "state"          : state,
         "due_date"       : issue_attrs.get("due_date") or None,
         "assignee"       : assignee_name,
@@ -890,6 +927,7 @@ def _handle_issue_webhook(payload):
         "labels"         : labels_str,
         "gitlab_milestone": milestone_name,
     }
+    data.update(timestamp_data)
 
     existing = frappe.db.get_value(
         "GitLab Issue",
@@ -1128,6 +1166,61 @@ def backfill_issue_comments(project_name=None):
             frappe.db.commit()
 
     return f"{synced} comments synced"
+
+
+@frappe.whitelist()
+def backfill_issue_timestamps(project_name=None, limit=None):
+    """
+    One-off sync of created_at/closed_at for GitLab Issues already stored in ERPNext.
+    New and closed issues are kept updated by the normal issue sync/webhook flow.
+    """
+    if project_name:
+        projects = frappe.get_all(
+            "GitLab Project",
+            filters={"name": project_name},
+            fields=["name", "project_id"],
+        )
+        if not projects:
+            projects = frappe.get_all(
+                "GitLab Project",
+                filters={"title": project_name},
+                fields=["name", "project_id"],
+            )
+    else:
+        projects = frappe.get_all("GitLab Project", fields=["name", "project_id"])
+
+    limit = int(limit) if limit else None
+    synced = 0
+    for project in projects:
+        issues = frappe.get_all(
+            "GitLab Issue",
+            filters={"gitlab_project": project.name},
+            fields=["name", "issue_id"],
+            limit_page_length=limit,
+        )
+        for issue in issues:
+            try:
+                issue_detail = get_issue_for_project(project.project_id, issue.issue_id)
+                updates = _get_issue_timestamp_fields(issue_detail)
+                if issue_detail.get("state"):
+                    updates["state"] = issue_detail.get("state")
+
+                frappe.db.set_value(
+                    "GitLab Issue",
+                    issue.name,
+                    updates,
+                    update_modified=False,
+                )
+                synced += 1
+            except Exception:
+                frappe.log_error(
+                    frappe.get_traceback(),
+                    f"GitLab Issue Timestamp Backfill Failed - {project.name} #{issue.issue_id}"
+                )
+
+        frappe.db.commit()
+
+    return f"{synced} issue timestamps synced"
 
 
 def _backfill_issue_comments_and_notify(project_name, notify_user):
