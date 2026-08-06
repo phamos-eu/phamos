@@ -394,6 +394,39 @@ def _merge_intervals(intervals):
 
 	return merged
 
+
+def _subtract_intervals(base_intervals, blocked_intervals):
+	"""Subtract blocked intervals from base intervals and return remaining fragments."""
+	if not base_intervals:
+		return []
+	if not blocked_intervals:
+		return base_intervals
+
+	blocked = _merge_intervals(blocked_intervals)
+	result = []
+
+	for base_start, base_end in base_intervals:
+		fragments = [(base_start, base_end)]
+		for block_start, block_end in blocked:
+			next_fragments = []
+			for frag_start, frag_end in fragments:
+				if block_end <= frag_start or block_start >= frag_end:
+					next_fragments.append((frag_start, frag_end))
+					continue
+
+				if block_start > frag_start:
+					next_fragments.append((frag_start, min(block_start, frag_end)))
+				if block_end < frag_end:
+					next_fragments.append((max(block_end, frag_start), frag_end))
+
+			fragments = next_fragments
+			if not fragments:
+				break
+
+		result.extend(fragments)
+
+	return result
+
 def _resolve_calendar_timezone(user_id: str, tz_name: str | None = None):
 	import pytz
 
@@ -598,16 +631,24 @@ def _ensure_dict_filters(filters):
 		normalized = {}
 		for item in filters:
 			if isinstance(item, dict):
-				fieldname = item.get("fieldname")
+				fieldname = item.get("fieldname") or item.get("field") or item.get("name")
 				if fieldname:
 					normalized[fieldname] = item.get("value")
 				continue
 
-			# Fallback for legacy list/tuple shape: [fieldname, operator, value]
-			if isinstance(item, (list, tuple)) and len(item) >= 3:
-				fieldname = item[0]
-				if fieldname:
-					normalized[fieldname] = item[2]
+			if isinstance(item, (list, tuple)):
+				# Common Frappe shape: [doctype, fieldname, operator, value]
+				if len(item) >= 4:
+					fieldname = item[1]
+					if fieldname:
+						normalized[fieldname] = item[3]
+					continue
+
+				# Legacy shape: [fieldname, operator, value]
+				if len(item) >= 3:
+					fieldname = item[0]
+					if fieldname:
+						normalized[fieldname] = item[2]
 
 		return normalized
 
@@ -652,26 +693,32 @@ def _date_range_from_calendar(start: str, end: str):
 
 
 def _get_booked_events(user_id: str, from_date, to_date):
-	tz = _resolve_calendar_timezone(user_id)
-	busy = _build_busy_slots_for_range(user_id, from_date, to_date)
+	booked_events, tz = _fetch_mailcow_events_for_range(
+		user_id=user_id,
+		from_date=from_date,
+		to_date=to_date,
+		time_from="00:00",
+		time_to="23:59",
+		tz_name=None,
+		include_all_calendars=INCLUDE_ALL_CALENDARS,
+	)
 
 	events = []
-	for slot in busy:
-		local_start = tz.localize(
-			datetime.strptime(f"{slot['date']} {slot['from_time']}", "%Y-%m-%d %H:%M:%S")
-		)
-		local_end = tz.localize(
-			datetime.strptime(f"{slot['date']} {slot['to_time']}", "%Y-%m-%d %H:%M:%S")
-		)
+	for event in booked_events:
+		local_start = event["start_utc"].astimezone(tz)
+		local_end = event["end_utc"].astimezone(tz)
+		event_title = (event.get("title") or "").strip() or "Booked"
 		events.append(
 			{
-				"name": f"Booked-{local_start.isoformat()}-{local_end.isoformat()}",
-				"title": "Booked",
+				"name": f"Booked-{event.get('uid') or ''}-{local_start.isoformat()}-{local_end.isoformat()}",
+				"title": event_title,
 				"start": local_start.strftime("%Y-%m-%d %H:%M:%S"),
 				"end": local_end.strftime("%Y-%m-%d %H:%M:%S"),
 				"allDay": 0,
 				"slot_status": "Booked",
 				"color": STATUS_COLORS["Booked"],
+				"description": event.get("description") or "",
+				"location": event.get("location") or "",
 			}
 		)
 
@@ -681,9 +728,56 @@ def _get_booked_events(user_id: str, from_date, to_date):
 def _get_optional_events(from_date, to_date):
 	events = []
 	for date_value in _iter_dates(from_date, to_date):
-		for label, start_time, end_time in OPTIONAL_SLOTS:
-			events.append(_to_event(date_value, f"{start_time}:00", f"{end_time}:00", label, "Optional"))
+		for _, start_time, end_time in OPTIONAL_SLOTS:
+			events.append(_to_event(date_value, f"{start_time}:00", f"{end_time}:00", "", "Optional"))
 	return events
+
+
+def _exclude_optional_from_slot_rows(slot_rows):
+	"""Calendar-only: remove optional windows from available slot rows."""
+	adjusted = []
+	for slot in slot_rows or []:
+		date_value = slot.get("date")
+		if hasattr(date_value, "strftime"):
+			date_text = date_value.strftime("%Y-%m-%d")
+		else:
+			date_text = str(date_value)
+
+		start_dt = datetime.strptime(f"{date_text} {slot['from_time']}", "%Y-%m-%d %H:%M:%S")
+		end_dt = datetime.strptime(f"{date_text} {slot['to_time']}", "%Y-%m-%d %H:%M:%S")
+		if end_dt <= start_dt:
+			continue
+
+		optional_intervals = []
+		for _, optional_from, optional_to in OPTIONAL_SLOTS:
+			opt_start = datetime.strptime(f"{date_text} {optional_from}:00", "%Y-%m-%d %H:%M:%S")
+			opt_end = datetime.strptime(f"{date_text} {optional_to}:00", "%Y-%m-%d %H:%M:%S")
+			if opt_end > start_dt and opt_start < end_dt:
+				optional_intervals.append((opt_start, opt_end))
+
+		remaining = _subtract_intervals([(start_dt, end_dt)], optional_intervals)
+		for rem_start, rem_end in remaining:
+			duration_seconds = int((rem_end - rem_start).total_seconds())
+			if duration_seconds <= 0:
+				continue
+
+			adjusted.append(
+				{
+					"date": rem_start.date(),
+					"day": rem_start.strftime("%A"),
+					"duration": duration_seconds,
+					"from_time": rem_start.strftime("%H:%M:%S"),
+					"to_time": rem_end.strftime("%H:%M:%S"),
+				}
+			)
+
+	unique = {}
+	for row in adjusted:
+		key = (row["date"], row["from_time"], row["to_time"])
+		if key not in unique:
+			unique[key] = row
+
+	return sorted(unique.values(), key=lambda d: (d["date"], d["from_time"], d["to_time"]))
 
 
 @frappe.whitelist()
@@ -692,7 +786,11 @@ def get_employee_availability_calendar_events(start, end, filters=None):
 	filters = _ensure_dict_filters(filters)
 	employee = _resolve_employee_from_filters(filters)
 	if not employee:
-		return []
+		frappe.throw(
+			_(
+				"Please select an Employee in the calendar filters, or link an Employee record to your User account."
+			)
+		)
 
 	from_date, to_date = _date_range_from_calendar(start, end)
 	if from_date > to_date:
@@ -705,17 +803,19 @@ def get_employee_availability_calendar_events(start, end, filters=None):
 		to_date = selected_date
 
 	status_filter = (filters.get("slot_status") or "All").strip()
-	user_id, _ = _resolve_employee_calendar_user(employee)
+	user_id, _employee_email = _resolve_employee_calendar_user(employee)
 	events = []
 
 	if status_filter in ("All", "Available"):
-		for slot in _build_free_slots_for_range(user_id, from_date, to_date):
+		available_slots = _build_free_slots_for_range(user_id, from_date, to_date)
+		available_slots = _exclude_optional_from_slot_rows(available_slots)
+		for slot in available_slots:
 			events.append(
 				_to_event(
 					slot["date"],
 					slot["from_time"],
 					slot["to_time"],
-					"Available",
+					"",
 					"Available",
 				)
 			)

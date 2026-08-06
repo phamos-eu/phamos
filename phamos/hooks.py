@@ -63,6 +63,10 @@ doctype_list_js = {
     "Event": "public/js/event_list.js",
 }
 
+doctype_calendar_js = {
+    "Employee Availability": "public/js/employee_availability_calendar.js",
+}
+
 override_doctype_class = {
 	"Job Applicant": "phamos.events.job_applicant.CustomJobApplicant"
 }
