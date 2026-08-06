@@ -11,6 +11,7 @@ import requests
 from datetime import datetime
 import pytz
 from email.utils import getaddresses
+from frappe.utils import get_datetime
 from .client import put_ics, delete_ics, organizer_email, dav_password
 from .ics import vevent
 from ..utils import get_site_timezone
@@ -27,13 +28,34 @@ def _uid_from_description_marker(description: str | None) -> str | None:
 	return uid or None
 
 
+def _uid_belongs_to_other_event(uid: str | None, current_event_name: str | None) -> bool:
+	"""True when UID is already linked to another Event record."""
+	uid = (uid or "").strip()
+	if not uid:
+		return False
+
+	filters = {"custom_mailcow_uid": uid}
+	if current_event_name:
+		filters["name"] = ["!=", current_event_name]
+
+	other = frappe.db.get_value("Event", filters, "name")
+	return bool(other)
+
+
 def _resolve_sync_uid(doc) -> str:
-	"""Choose a stable UID so updates do not create duplicate calendar objects."""
-	return (
-		(doc.get("custom_mailcow_uid") or "").strip()
-		or _uid_from_description_marker(doc.get("description"))
-		or doc.name
-	)
+	"""Choose a stable UID while preventing duplicate records from reusing another Event UID."""
+	current_name = doc.get("name") or None
+
+	stored_uid = (doc.get("custom_mailcow_uid") or "").strip()
+	if stored_uid and not _uid_belongs_to_other_event(stored_uid, current_name):
+		return stored_uid
+
+	marker_uid = _uid_from_description_marker(doc.get("description"))
+	if marker_uid and not _uid_belongs_to_other_event(marker_uid, current_name):
+		return marker_uid
+
+	# Fallback for duplicates/new docs: use this Event's own identity.
+	return doc.name
 
 
 def _get_linked_email(doctype: str | None, docname: str | None) -> str | None:
@@ -183,6 +205,56 @@ def _set_event_location(doc, value: str):
 	if meta.has_field("location"):
 		doc.location = value
 
+
+def _event_recurrence_rule(doc) -> str | None:
+	"""Map Event repeat fields to RFC5545 RRULE for Mailcow sync."""
+	if not doc.get("repeat_this_event"):
+		return None
+
+	repeat_on = (doc.get("repeat_on") or "").strip().lower()
+	freq = {
+		"daily": "DAILY",
+		"weekly": "WEEKLY",
+		"monthly": "MONTHLY",
+		"yearly": "YEARLY",
+	}.get(repeat_on)
+	if not freq:
+		return None
+
+	parts: list[str] = [f"FREQ={freq}"]
+
+	if freq == "WEEKLY":
+		weekday_flags = [
+			("monday", "MO"),
+			("tuesday", "TU"),
+			("wednesday", "WE"),
+			("thursday", "TH"),
+			("friday", "FR"),
+			("saturday", "SA"),
+			("sunday", "SU"),
+		]
+		selected_days = [abbr for fieldname, abbr in weekday_flags if doc.get(fieldname)]
+
+		# Fallback for old data/UI states where no weekday checkbox is set.
+		if not selected_days and doc.get("starts_on"):
+			try:
+				weekday = get_datetime(doc.get("starts_on")).weekday()
+				selected_days = [["MO", "TU", "WE", "TH", "FR", "SA", "SU"][weekday]]
+			except Exception:
+				selected_days = []
+
+		if selected_days:
+			parts.append(f"BYDAY={','.join(selected_days)}")
+
+	if doc.get("repeat_till"):
+		try:
+			until_date = get_datetime(doc.get("repeat_till"))
+			parts.append(f"UNTIL={until_date.strftime('%Y%m%d')}T235959Z")
+		except Exception:
+			pass
+
+	return ";".join(parts)
+
 def on_upsert(doc, method=None):
 	# auto_sync = frappe.db.get_value("Mailcow Settings", "auto_sync_events")
 
@@ -203,6 +275,7 @@ def on_upsert(doc, method=None):
 		
 		# Use the standard Event.location field.
 		location = _event_location(doc)
+		recurrence_rule = _event_recurrence_rule(doc)
 
 		ics = vevent(
 			uid=sync_uid,
@@ -216,6 +289,7 @@ def on_upsert(doc, method=None):
 			attendees_cc=attendees_cc,
 			attendees_bcc=attendees_bcc,
 			attendee_role_map=participant_roles,
+			recurrence_rule=recurrence_rule,
 		)
 		put_ics(sync_uid, ics, acting_user_id=doc.owner)
 		doc.db_set("custom_mailcow_uid", sync_uid, notify=False)
@@ -225,7 +299,12 @@ def on_upsert(doc, method=None):
 
 def on_delete(doc, method=None):
 	try:
-		delete_ics(_resolve_sync_uid(doc))
+		uid = (doc.get("custom_mailcow_uid") or "").strip() or _uid_from_description_marker(doc.get("description"))
+		if uid and _uid_belongs_to_other_event(uid, doc.get("name")):
+			# Safety: don't delete a calendar object that is still referenced by another Event.
+			return
+
+		delete_ics(uid or doc.name)
 	except Exception:
 		frappe.log_error(frappe.get_traceback(), "Event CalDAV Delete Error")
 

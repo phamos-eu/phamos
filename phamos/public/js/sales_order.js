@@ -9,70 +9,77 @@ frappe.ui.form.on('Sales Order', {
         console.log('Sales Order refresh event triggered', frm.doc.name, 'docstatus:', frm.doc.docstatus);
         
         // Always cleanup first to handle duplicated records
-        cleanup_kpi_displays();
+        cleanup_kpi_displays(frm);
         
         if (frm.doc.docstatus === 1 && !frm.doc.__islocal) {
-            console.log('Loading KPI preferences for', frm.doc.name);
-            // Load user preference and display KPIs
-            frappe.call({
-                method: 'phamos.api.get_sales_order_kpi_preference',
-                callback: function(r) {
-                    console.log('KPI preference loaded:', r.message);
-                    const display_mode = r.message || 'all';
-                    render_kpi_display(frm, display_mode);
-                }
-            });
-        }
-    },
-    
-    onload: function(frm) {
-        // Add style preference button in toolbar
-        if (!frm.is_new() && frm.doc.docstatus === 1) {
-            add_style_selector_button(frm);
+            render_kpi_display(frm, 'progress_bars');
         }
     }
 });
 
 // Cleanup function to remove all KPI visualizations
-function cleanup_kpi_displays() {
-    $('.so-progress-bars').remove();
-    $('.so-kpi-cards').remove();
-    $('.so-kpi-container').remove();
+function cleanup_kpi_displays(frm) {
+    const $scope = frm?.$wrapper || $(document);
+    $scope.find('.so-progress-bars').remove();
+    $scope.find('.so-kpi-cards').remove();
+    $scope.find('.so-kpi-container').remove();
+    $scope.find('.so-kpi-host').remove();
 }
 
 function render_kpi_display(frm, display_mode) {
     // Get the KPI values
     const per_delivered = flt(frm.doc.per_delivered, 2);
     const per_billed = flt(frm.doc.per_billed, 2);
+    const $host_content = ensure_kpi_host(frm);
     
     
     if (display_mode === 'all' || display_mode === 'html_section') {
-        add_html_kpi_section(frm, per_delivered, per_billed);
+        add_html_kpi_section(frm, per_delivered, per_billed, $host_content);
     }
     
     if (display_mode === 'all' || display_mode === 'progress_bars') {
-        add_progress_bar_section(frm, per_delivered, per_billed);
+        add_progress_bar_section(frm, per_delivered, per_billed, $host_content);
     }
     
     if (display_mode === 'all' || display_mode === 'cards') {
-        add_kpi_cards(frm, per_delivered, per_billed);
-    }
-    
-    // Show current mode indicator
-    if (display_mode !== 'all') {
-        add_display_mode_toggle(frm, display_mode);
+        add_kpi_cards(frm, per_delivered, per_billed, $host_content);
     }
 }
 
-// OPTION 2: HTML Section with custom styling
-function add_html_kpi_section(frm, per_delivered, per_billed) {
-    // Check if field exists, if not we'll add it programmatically
-    if (!frm.fields_dict.kpi_html_section) {
-        const html = get_html_kpi_content(per_delivered, per_billed);
-        
-        // Insert after customer section
-        frm.set_df_property('customer_section', 'description', html);
+function ensure_kpi_host(frm) {
+    const $existing = frm.$wrapper.find('.so-kpi-host');
+    if ($existing.length) {
+        return $existing.find('.so-kpi-content');
     }
+
+    const $host = $(`
+        <div class="so-kpi-host" style="margin: 6px 0 10px 0;">
+            <div class="so-kpi-content"></div>
+        </div>
+    `);
+
+    const $tabs = frm.$wrapper.find('.form-tabs-list').first();
+    if ($tabs.length) {
+        $tabs.before($host);
+    } else {
+        const $first_section = frm.$wrapper.find('.layout-main-section .form-section').first();
+        if ($first_section.length) {
+            $first_section.before($host);
+        } else {
+            const $fallback = frm.$wrapper.find('.layout-main-section').first();
+            if ($fallback.length) {
+                $fallback.prepend($host);
+            }
+        }
+    }
+
+    return $host.find('.so-kpi-content');
+}
+
+// OPTION 2: HTML Section with custom styling
+function add_html_kpi_section(frm, per_delivered, per_billed, $host_content) {
+    const html = get_html_kpi_content(per_delivered, per_billed);
+    $host_content.append(html);
 }
 
 function get_html_kpi_content(per_delivered, per_billed) {
@@ -131,41 +138,14 @@ function get_html_kpi_content(per_delivered, per_billed) {
 }
 
 // OPTION 3: Progress Bars
-function add_progress_bar_section(frm, per_delivered, per_billed) {
+function add_progress_bar_section(frm, per_delivered, per_billed, $host_content) {
     const html = get_progress_bar_html(per_delivered, per_billed);
-    
-    // Remove existing if any
-    $('.so-progress-bars').remove();
-    
-    // Try multiple locations in order of preference
-    let $target = frm.fields_dict.currency_and_price_list?.$wrapper;
-    
-    if (!$target || !$target.length) {
-        $target = frm.fields_dict.currency?.$wrapper.closest('.form-section');
-    }
-    
-    if (!$target || !$target.length) {
-        $target = frm.fields_dict.items?.$wrapper;
-    }
-    
-    if ($target && $target.length) {
-        // Add before the target section
-        $target.before(`
-            <div class="so-progress-bars" style="margin: 15px 15px 20px 15px;">
-                ${html}
-            </div>
-        `);
-    } else {
-        // Fallback: add after customer section
-        const $customerSection = frm.fields_dict.customer_section?.$wrapper;
-        if ($customerSection) {
-            $customerSection.after(`
-                <div class="so-progress-bars" style="margin: 15px 15px 20px 15px;">
-                    ${html}
-                </div>
-            `);
-        }
-    }
+
+    $host_content.append(`
+        <div class="so-progress-bars" style="margin: 10px 0 14px 0;">
+            ${html}
+        </div>
+    `);
 }
 
 function get_progress_bar_html(per_delivered, per_billed) {
@@ -235,19 +215,14 @@ function get_progress_bar_html(per_delivered, per_billed) {
 }
 
 // OPTION 4: Card-based KPI Display
-function add_kpi_cards(frm, per_delivered, per_billed) {
+function add_kpi_cards(frm, per_delivered, per_billed, $host_content) {
     const html = get_kpi_cards_html(per_delivered, per_billed);
-    
-    // Add to form layout
-    const $wrapper = frm.fields_dict.customer_section?.$wrapper;
-    if ($wrapper) {
-        $wrapper.find('.so-kpi-cards').remove();
-        $wrapper.after(`
-            <div class="so-kpi-cards" style="margin: 20px 0;">
-                ${html}
-            </div>
-        `);
-    }
+
+    $host_content.append(`
+        <div class="so-kpi-cards" style="margin: 0 0 12px 0;">
+            ${html}
+        </div>
+    `);
 }
 
 function get_kpi_cards_html(per_delivered, per_billed) {
@@ -394,84 +369,3 @@ function get_status_text(percent) {
     return '🔴 Urgent - Just Started';
 }
 
-// Display Mode Toggle
-function add_style_selector_button(frm) {
-    // Add a custom button to switch between display modes
-    frm.add_custom_button(__('KPI Display Style'), function() {
-        const d = new frappe.ui.Dialog({
-            title: __('Select KPI Display Style'),
-            fields: [
-                {
-                    fieldname: 'display_mode',
-                    fieldtype: 'Select',
-                    label: __('Display Mode'),
-                    options: [
-                        'All Styles',
-                        'Progress Bars Only',
-                        'Cards Only',
-                        'HTML Section Only'
-                    ],
-                    default: 'All Styles'
-                },
-                {
-                    fieldname: 'preview',
-                    fieldtype: 'HTML',
-                    options: `
-                        <div style="margin-top: 15px; padding: 15px; background: var(--control-bg); border-radius: 6px; border: 1px solid var(--border-color);">
-                            <h4 style="color: var(--text-color);">Preview Options:</h4>
-                            <ul style="margin-left: 20px; line-height: 1.8; color: var(--text-color);">
-                                <li><strong>All Styles:</strong> Shows all visualization options at once</li>
-                                <li><strong>Progress Bars:</strong> Animated progress bars with gradients</li>
-                                <li><strong>Cards:</strong> Modern card-based design with icons</li>
-                                <li><strong>HTML Section:</strong> Compact inline display</li>
-                            </ul>
-                        </div>
-                    `
-                }
-            ],
-            primary_action_label: __('Apply'),
-            primary_action: function(values) {
-                const mode_map = {
-                    'All Styles': 'all',
-                    'Progress Bars Only': 'progress_bars',
-                    'Cards Only': 'cards',
-                    'HTML Section Only': 'html_section'
-                };
-                
-                const selected_mode = mode_map[values.display_mode];
-                
-                // Save preference via API
-                frappe.call({
-                    method: 'phamos.api.set_sales_order_kpi_preference',
-                    args: {
-                        mode: selected_mode
-                    },
-                    callback: function(r) {
-                        if (r.message && r.message.success) {
-                            frappe.show_alert({
-                                message: __('Display preference saved'),
-                                indicator: 'green'
-                            });
-                            d.hide();
-                            frm.reload_doc();
-                        }
-                    }
-                });
-            }
-        });
-        d.show();
-    }, __('View'));
-}
-
-function add_display_mode_toggle(frm, current_mode) {
-    // Show current mode
-    const mode_names = {
-        'progress_bars': 'Progress Bars',
-        'cards': 'Cards',
-        'html_section': 'HTML Section'
-    };
-    
-    const mode_name = mode_names[current_mode] || 'All Styles';
-    
-    frm.set_intro(__('Current KPI Display: {0}', [mode_name]), 'blue');
-}
