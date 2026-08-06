@@ -162,10 +162,10 @@
    "label": "Mitigation Plan"
   },
   {
-    "fieldname": "mitigation_response",
-    "fieldtype": "MultiSelect",
-    "label": "Mitigation Response",
-    "options": "Avoid\nReduce\nTransfer\nAccept"
+   "fieldname": "mitigation_response",
+   "fieldtype": "Table MultiSelect",
+   "label": "Mitigation Response",
+   "options": "Risk Mitigation Responses"
   },
   {
    "fieldname": "column_break_mitigation",
