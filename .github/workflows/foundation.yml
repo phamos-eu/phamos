@@ -1,0 +1,210 @@
+# =============================================================================
+# Foundation Workflow
+# =============================================================================
+# Purpose:
+#   Prepares a complete, verified Frappe/ERPNext testing environment that all
+#   downstream CI stages (Unit Tests, E2E Tests, Import Validation,
+#   Property Setter Validation, Custom Field Validation, AI Validation, etc.)
+#   depend on. This is the single source of truth for Bench initialization
+#   and infrastructure provisioning.
+#
+# Responsibilities:
+#   - Provision Python, Node, and system dependencies
+#   - Install Bench and initialize a Frappe bench
+#   - Configure MariaDB / Redis and create the test site
+#   - Install required apps (ERPNext, HRMS, Phamos)
+#   - Validate that the environment is actually healthy
+#   - Snapshot the environment (bench dir + DB backup) as an artifact so
+#     downstream jobs/workflows can restore it without repeating setup
+#
+# Out of scope (pipeline contract):
+#   - Running unit tests, E2E tests, validation workflows
+#   - Linting, static analysis, AI-assisted review
+#   - Uploading coverage or test reports
+#
+# How downstream workflows use this:
+#   Call it as a reusable job and gate your job on its result:
+#
+#     jobs:
+#       foundation:
+#         uses: ./.github/workflows/foundation.yml
+#       test:
+#         needs: foundation
+#         if: needs.foundation.result == 'success'
+#         ...
+#
+#   Downstream jobs run on a separate runner, so they must bring up their own
+#   MariaDB/Redis services and restore the "bench-environment" artifact
+#   produced by the "Upload environment artifact" step below.
+#
+# Assumptions:
+#   - Target branch for Frappe/ERPNext/HRMS is version-15 (overridable input).
+#   - Caller has access to this repo's artifacts (same repo / workflow run).
+#
+# Extension points:
+#   - Add apps to the "Install required apps" step.
+#   - Add checks to "Validate environment" as new invariants are needed.
+# =============================================================================
+
+
+name: Foundation
+
+on:
+  workflow_call:
+    inputs:
+      python-version:
+        type: string
+        default: '3.11'
+      frappe-branch:
+        type: string
+        default: version-15
+
+jobs:
+  prepare:
+    runs-on: ubuntu-latest
+
+    services:
+      mariadb:
+        image: mariadb:10.6
+        env:
+          MYSQL_ROOT_PASSWORD: root
+          MYSQL_DATABASE: test_frappe
+        ports:
+          - 3306:3306
+        options: --health-cmd="mysqladmin ping" --health-interval=10s --health-timeout=5s --health-retries=3
+
+      redis-cache:
+        image: redis:alpine
+        ports:
+          - 6379:6379
+
+      redis-queue:
+        image: redis:alpine
+        ports:
+          - 6380:6379
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      with:
+        path: apps/phamos
+
+    - name: Set up Python ${{ inputs.python-version }}
+      uses: actions/setup-python@v5
+      with:
+        python-version: ${{ inputs.python-version }}
+
+    - name: Setup Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: '18'
+
+    - name: Install system dependencies
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y \
+          git \
+          mariadb-client \
+          redis-tools \
+          python3-dev \
+          libmariadb-dev \
+          libmariadb-dev-compat \
+          wkhtmltopdf \
+          xvfb \
+          libfontconfig \
+          libxrender1
+
+    - name: Install Frappe Bench
+      run: |
+        pip install --upgrade pip
+        pip install frappe-bench
+        bench --version
+
+    - name: Initialize Frappe Bench
+      run: |
+        bench init --skip-redis-config-generation --frappe-branch ${{ inputs.frappe-branch }} frappe-bench
+      env:
+        CI: true
+
+    - name: Configure Bench
+      working-directory: ./frappe-bench
+      run: |
+        bench set-config -g db_host 127.0.0.1
+        bench set-config -g db_port 3306
+        bench set-config -g redis_cache redis://127.0.0.1:6379
+        bench set-config -g redis_queue redis://127.0.0.1:6380
+        bench set-config -g redis_socketio redis://127.0.0.1:6379
+
+    - name: Create test site
+      working-directory: ./frappe-bench
+      run: |
+        bench new-site test.localhost \
+          --db-root-password root \
+          --admin-password admin \
+          --mariadb-root-username root \
+          --mariadb-root-password root \
+          --no-mariadb-socket
+
+    - name: Install required apps
+      working-directory: ./frappe-bench
+      run: |
+        # ERPNext (required by phamos)
+        bench get-app --branch ${{ inputs.frappe-branch }} erpnext
+        bench --site test.localhost install-app erpnext
+
+        # HRMS (required by phamos)
+        bench get-app --branch ${{ inputs.frappe-branch }} hrms
+        bench --site test.localhost install-app hrms
+
+    - name: Install Phamos app
+      working-directory: ./frappe-bench
+      run: |
+        cp -r ../apps/phamos ./apps/phamos
+
+        # Ensure apps.txt ends with a newline before appending
+        if [ -s sites/apps.txt ] && [ -n "$(tail -c1 sites/apps.txt)" ]; then
+          echo >> sites/apps.txt
+        fi
+        grep -qxF "phamos" sites/apps.txt || echo "phamos" >> sites/apps.txt
+
+        # Make app importable in bench env before install-app loads app modules
+        bench pip install -e ./apps/phamos
+
+        bench --site test.localhost install-app phamos
+        bench --site test.localhost migrate
+
+    - name: Validate environment
+      working-directory: ./frappe-bench
+      run: |
+        echo "Checking bench and site exist..."
+        bench --site test.localhost list-apps | grep -q frappe
+
+        echo "Checking required apps are installed..."
+        for app in erpnext hrms phamos; do
+          bench --site test.localhost list-apps | grep -q "$app" || { echo "Missing app: $app"; exit 1; }
+        done
+
+        echo "Checking database connectivity..."
+        bench --site test.localhost mariadb -e "SELECT 1;" > /dev/null
+
+        echo "Checking Redis connectivity..."
+        redis-cli -h 127.0.0.1 -p 6379 ping | grep -q PONG
+        redis-cli -h 127.0.0.1 -p 6380 ping | grep -q PONG
+
+        echo "Environment is ready."
+
+    - name: Snapshot site for downstream jobs
+      working-directory: ./frappe-bench
+      run: |
+        bench --site test.localhost backup --with-files
+
+    - name: Package environment artifact
+      run: |
+        tar -czf bench-environment.tar.gz frappe-bench
+
+    - name: Upload environment artifact
+      uses: actions/upload-artifact@v4
+      with:
+        name: bench-environment
+        path: bench-environment.tar.gz
+        retention-days: 1
