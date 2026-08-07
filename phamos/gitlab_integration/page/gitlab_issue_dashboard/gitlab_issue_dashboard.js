@@ -15,9 +15,12 @@ class GitLabIssueDashboard {
         this.wrapper = wrapper;
         this.filters = {};
         this.currentData = null;
+        this.themeObserver = null;
+        this.lastThemeKey = "";
 
         this.makeLayout();
         this.makeFilters();
+        this.setupThemeWatcher();
         this.loadData();
     }
 
@@ -28,25 +31,53 @@ class GitLabIssueDashboard {
         root.append(`
             <div class="gitlab-issue-dashboard">
                 <style>
+                    .gitlab-issue-dashboard {
+                        --gid-card-bg: var(--card-bg, #ffffff);
+                        --gid-card-border: var(--border-color, #dbe5ef);
+                        --gid-title-color: var(--heading-color, #12344d);
+                        --gid-subtitle-color: var(--text-muted, #4a6572);
+                        --gid-grid-color: var(--border-color, #dbe5ef);
+                        --gid-shadow: 0 4px 14px rgba(15, 23, 42, 0.06);
+                        --gid-aging-green: #2e7d32;
+                        --gid-aging-amber: #ef6c00;
+                        --gid-aging-red: #c62828;
+                        --gid-flow-opened: #1976d2;
+                        --gid-flow-closed: #43a047;
+                    }
+
+                    .gitlab-issue-dashboard.gid-theme-dark {
+                        --gid-card-bg: var(--fg-color, #1a1f2b);
+                        --gid-card-border: var(--border-color, #3a4250);
+                        --gid-title-color: var(--heading-color, #f2f5f7);
+                        --gid-subtitle-color: var(--text-muted, #c3c7ce);
+                        --gid-grid-color: rgba(255, 255, 255, 0.18);
+                        --gid-shadow: 0 8px 24px rgba(0, 0, 0, 0.35);
+                        --gid-aging-green: #2e7d32;
+                        --gid-aging-amber: #ef6c00;
+                        --gid-aging-red: #c62828;
+                        --gid-flow-opened: #1e88e5;
+                        --gid-flow-closed: #43a047;
+                    }
+
                     .gitlab-issue-dashboard .gid-filter-card,
                     .gitlab-issue-dashboard .gid-section-card {
-                        background: linear-gradient(180deg, #ffffff 0%, #f7fafc 100%);
-                        border: 1px solid #dbe5ef;
+                        background: var(--gid-card-bg);
+                        border: 1px solid var(--gid-card-border);
                         border-radius: 12px;
                         padding: 16px;
-                        box-shadow: 0 4px 14px rgba(15, 23, 42, 0.06);
+                        box-shadow: var(--gid-shadow);
                     }
 
                     .gitlab-issue-dashboard .gid-title {
                         font-size: 16px;
                         font-weight: 700;
-                        color: #12344d;
+                        color: var(--gid-title-color);
                         margin-bottom: 8px;
                     }
 
                     .gitlab-issue-dashboard .gid-subtitle {
                         font-size: 12px;
-                        color: #4a6572;
+                        color: var(--gid-subtitle-color);
                         margin-bottom: 12px;
                     }
 
@@ -83,13 +114,36 @@ class GitLabIssueDashboard {
                         line-height: 1;
                     }
 
-                    .gitlab-issue-dashboard .gid-kpi-green { background: #2e7d32; }
-                    .gitlab-issue-dashboard .gid-kpi-amber { background: #ef6c00; }
-                    .gitlab-issue-dashboard .gid-kpi-red { background: #c62828; }
+                    .gitlab-issue-dashboard .gid-kpi-green { background: var(--gid-aging-green); }
+                    .gitlab-issue-dashboard .gid-kpi-amber { background: var(--gid-aging-amber); }
+                    .gitlab-issue-dashboard .gid-kpi-red { background: var(--gid-aging-red); }
 
                     .gitlab-issue-dashboard .gid-table-wrap {
                         max-height: 360px;
                         overflow: auto;
+                    }
+
+                    .gitlab-issue-dashboard .table {
+                        color: var(--gid-title-color);
+                    }
+
+                    .gitlab-issue-dashboard .table > thead > tr > th,
+                    .gitlab-issue-dashboard .table > tbody > tr > td {
+                        border-color: var(--gid-card-border);
+                    }
+
+                    .gitlab-issue-dashboard .chart-container svg text {
+                        fill: var(--gid-subtitle-color) !important;
+                    }
+
+                    .gitlab-issue-dashboard .chart-container .title,
+                    .gitlab-issue-dashboard .chart-container .chart-title {
+                        fill: var(--gid-title-color) !important;
+                    }
+
+                    .gitlab-issue-dashboard .chart-container svg line,
+                    .gitlab-issue-dashboard .chart-container svg path.domain {
+                        stroke: var(--gid-grid-color) !important;
                     }
                 </style>
 
@@ -97,11 +151,14 @@ class GitLabIssueDashboard {
                     <div class="gid-title">${__("Filters")}</div>
                     <div id="gid-filter-summary" class="gid-subtitle"></div>
                     <div class="row">
-                        <div class="col-md-8">
+                        <div class="col-md-6">
                             <div id="filter-projects"></div>
                         </div>
-                        <div class="col-md-4">
-                            <div id="filter-year"></div>
+                        <div class="col-md-3">
+                            <div id="filter-from-date"></div>
+                        </div>
+                        <div class="col-md-3">
+                            <div id="filter-to-date"></div>
                         </div>
                     </div>
                     <div class="gid-actions">
@@ -129,7 +186,9 @@ class GitLabIssueDashboard {
         `);
 
         this.$projectsFilter = root.find("#filter-projects");
-        this.$yearFilter = root.find("#filter-year");
+        this.$fromDateFilter = root.find("#filter-from-date");
+        this.$toDateFilter = root.find("#filter-to-date");
+        this.$dashboard = root.find(".gitlab-issue-dashboard");
         this.$filterSummary = root.find("#gid-filter-summary");
         this.$applyBtn = root.find("#gid-apply-filters");
         this.$resetBtn = root.find("#gid-reset-filters");
@@ -137,9 +196,80 @@ class GitLabIssueDashboard {
         this.$agingChart = root.find("#aging-chart");
         this.$flowChart = root.find("#flow-chart");
         this.$flowTable = root.find("#flow-table");
+
+        this.applyThemeClass();
+    }
+
+    setupThemeWatcher() {
+        this.lastThemeKey = this.getThemeKey();
+
+        if (this.themeObserver) {
+            this.themeObserver.disconnect();
+        }
+
+        this.themeObserver = new MutationObserver(() => {
+            const nextThemeKey = this.getThemeKey();
+            if (nextThemeKey === this.lastThemeKey) return;
+
+            this.lastThemeKey = nextThemeKey;
+            this.applyThemeClass();
+
+            if (this.currentData) {
+                this.renderAgingChart();
+                this.renderFlowChart();
+            }
+        });
+
+        this.themeObserver.observe(document.documentElement, {
+            attributes: true,
+            attributeFilter: ["class", "data-theme", "data-theme-mode", "style"],
+        });
+    }
+
+    getThemeKey() {
+        const htmlClass = document.documentElement.className || "";
+        const htmlDataTheme = document.documentElement.getAttribute("data-theme") || "";
+        const htmlDataThemeMode = document.documentElement.getAttribute("data-theme-mode") || "";
+        const bodyClass = document.body ? document.body.className : "";
+        return [htmlClass, htmlDataTheme, htmlDataThemeMode, bodyClass].join("|");
+    }
+
+    isDarkTheme() {
+        const html = document.documentElement;
+        const body = document.body;
+        const classText = `${html.className || ""} ${body ? body.className || "" : ""}`.toLowerCase();
+        const dataTheme = `${html.getAttribute("data-theme") || ""} ${html.getAttribute("data-theme-mode") || ""}`.toLowerCase();
+        return classText.includes("dark") || dataTheme.includes("dark");
+    }
+
+    applyThemeClass() {
+        if (!this.$dashboard || !this.$dashboard.length) return;
+        this.$dashboard.toggleClass("gid-theme-dark", this.isDarkTheme());
+    }
+
+    getChartColors(type) {
+        const rootNode = this.$dashboard && this.$dashboard.length
+            ? this.$dashboard[0]
+            : document.documentElement;
+        const styles = window.getComputedStyle(rootNode);
+
+        if (type === "aging") {
+            return [
+                styles.getPropertyValue("--gid-aging-green").trim() || "#2E7D32",
+                styles.getPropertyValue("--gid-aging-amber").trim() || "#EF6C00",
+                styles.getPropertyValue("--gid-aging-red").trim() || "#C62828",
+            ];
+        }
+
+        return [
+            styles.getPropertyValue("--gid-flow-opened").trim() || "#1976D2",
+            styles.getPropertyValue("--gid-flow-closed").trim() || "#43A047",
+        ];
     }
 
     makeFilters() {
+        const defaultRange = this.getDefaultDateRange();
+
         this.filters.projects = frappe.ui.form.make_control({
             parent: this.$projectsFilter,
             df: {
@@ -155,14 +285,13 @@ class GitLabIssueDashboard {
             render_input: true,
         });
 
-        this.filters.year = frappe.ui.form.make_control({
-            parent: this.$yearFilter,
+        this.filters.from_date = frappe.ui.form.make_control({
+            parent: this.$fromDateFilter,
             df: {
-                label: __("Year"),
-                fieldname: "year",
-                fieldtype: "Select",
-                options: this.getLastFiveYears(),
-                default: String(new Date().getFullYear()),
+                label: __("From Date"),
+                fieldname: "from_date",
+                fieldtype: "Date",
+                default: defaultRange.from_date,
                 reqd: 1,
                 onchange: () => {
                     this.updateFilterState();
@@ -172,7 +301,24 @@ class GitLabIssueDashboard {
             render_input: true,
         });
 
-        this.filters.year.set_value(String(new Date().getFullYear()));
+        this.filters.to_date = frappe.ui.form.make_control({
+            parent: this.$toDateFilter,
+            df: {
+                label: __("To Date"),
+                fieldname: "to_date",
+                fieldtype: "Date",
+                default: defaultRange.to_date,
+                reqd: 1,
+                onchange: () => {
+                    this.updateFilterState();
+                    this.loadData();
+                },
+            },
+            render_input: true,
+        });
+
+        this.filters.from_date.set_value(defaultRange.from_date);
+        this.filters.to_date.set_value(defaultRange.to_date);
 
         this.$applyBtn.on("click", () => this.loadData());
         this.$resetBtn.on("click", () => this.resetFilters());
@@ -181,18 +327,25 @@ class GitLabIssueDashboard {
     }
 
     resetFilters() {
+        const defaultRange = this.getDefaultDateRange();
         this.filters.projects.set_value([]);
-        this.filters.year.set_value(String(new Date().getFullYear()));
+        this.filters.from_date.set_value(defaultRange.from_date);
+        this.filters.to_date.set_value(defaultRange.to_date);
         this.updateFilterState();
         this.loadData();
     }
 
     updateFilterState() {
         const projects = this.normalizeProjectsValue(this.filters.projects.get_value() || []);
-        const year = this.filters.year.get_value() || String(new Date().getFullYear());
+        const { from_date: defaultFromDate, to_date: defaultToDate } = this.getDefaultDateRange();
+        const fromDate = this.filters.from_date.get_value() || defaultFromDate;
+        const toDate = this.filters.to_date.get_value() || defaultToDate;
         const summary = projects.length
-            ? __("{0} project(s) selected, Year: {1}", [projects.length, year])
-            : __("All projects, Year: {0}", [year]);
+            ? __(
+                "{0} project(s) selected, Date Range: {1} to {2}",
+                [projects.length, fromDate, toDate]
+            )
+            : __("All projects, Date Range: {0} to {1}", [fromDate, toDate]);
         this.$filterSummary.text(summary);
     }
 
@@ -232,13 +385,25 @@ class GitLabIssueDashboard {
             frappe.dom.freeze(__("Loading dashboard..."));
 
             const projects = this.normalizeProjectsValue(this.filters.projects.get_value() || []);
-            const year = this.filters.year.get_value();
+            const { from_date: defaultFromDate, to_date: defaultToDate } = this.getDefaultDateRange();
+            const from_date = this.filters.from_date.get_value() || defaultFromDate;
+            const to_date = this.filters.to_date.get_value() || defaultToDate;
+
+            if (from_date > to_date) {
+                frappe.msgprint({
+                    title: __("Invalid Date Range"),
+                    message: __("From Date cannot be after To Date."),
+                    indicator: "orange",
+                });
+                return;
+            }
 
             const response = await frappe.call({
                 method: "phamos.gitlab_integration.page.gitlab_issue_dashboard.gitlab_issue_dashboard.get_gitlab_issue_dashboard_data",
                 args: {
                     projects,
-                    year,
+                    from_date,
+                    to_date,
                 },
             });
 
@@ -261,10 +426,12 @@ class GitLabIssueDashboard {
 
     renderAgingChart() {
         this.$agingChart.empty();
+        this.applyThemeClass();
 
         const aging = (this.currentData && this.currentData.aging) || {};
         const projectBuckets = aging.project_buckets || [];
         const projectTitles = (this.currentData && this.currentData.project_titles) || {};
+        const agingColors = this.getChartColors("aging");
         const values = [
             aging.bucket_0_30 || 0,
             aging.bucket_31_90 || 0,
@@ -299,7 +466,7 @@ class GitLabIssueDashboard {
                 },
                 type: "bar",
                 height: 300,
-                colors: ["#2E7D32", "#EF6C00", "#C62828"],
+                colors: agingColors,
             });
             return;
         }
@@ -329,42 +496,57 @@ class GitLabIssueDashboard {
             },
             type: "bar",
             height: 300,
-            colors: ["#2E7D32", "#EF6C00", "#C62828"],
+            colors: agingColors,
         });
     }
 
     renderFlowChart() {
         this.$flowChart.empty();
+        this.applyThemeClass();
 
         const monthly = (this.currentData && this.currentData.monthly_flow) || [];
         const selectedProjects = (this.currentData && this.currentData.projects) || [];
-
+        const flowColors = this.getChartColors("flow");
         const monthAgg = {};
-        for (let i = 1; i <= 12; i++) {
-            monthAgg[i] = { month: "", opened: 0, closed: 0 };
-        }
 
         monthly.forEach((row) => {
             const include = selectedProjects.length === 0 || selectedProjects.includes(row.gitlab_project);
             if (!include) return;
 
-            const m = row.month_no;
-            if (!monthAgg[m]) return;
+            const monthKey = row.month_key || `${row.year_no || ""}-${String(row.month_no || "").padStart(2, "0")}`;
+            if (!monthAgg[monthKey]) {
+                monthAgg[monthKey] = {
+                    month: row.month || monthKey,
+                    opened: 0,
+                    closed: 0,
+                    month_order: row.month_order || 0,
+                };
+            }
 
-            monthAgg[m].month = row.month || monthAgg[m].month;
-            monthAgg[m].opened += row.opened || 0;
-            monthAgg[m].closed += row.closed || 0;
+            monthAgg[monthKey].opened += row.opened || 0;
+            monthAgg[monthKey].closed += row.closed || 0;
+        });
+
+        const sortedMonthKeys = Object.keys(monthAgg).sort((a, b) => {
+            const monthOrderDiff = (monthAgg[a].month_order || 0) - (monthAgg[b].month_order || 0);
+            if (monthOrderDiff !== 0) return monthOrderDiff;
+            return a.localeCompare(b);
         });
 
         const labels = [];
         const openedValues = [];
         const closedValues = [];
 
-        Object.keys(monthAgg).forEach((monthNo) => {
-            labels.push(monthAgg[monthNo].month || monthNo);
-            openedValues.push(monthAgg[monthNo].opened);
-            closedValues.push(monthAgg[monthNo].closed);
+        sortedMonthKeys.forEach((monthKey) => {
+            labels.push(monthAgg[monthKey].month || monthKey);
+            openedValues.push(monthAgg[monthKey].opened);
+            closedValues.push(monthAgg[monthKey].closed);
         });
+
+        if (!labels.length) {
+            this.$flowChart.html(`<p class="text-muted">${__("No monthly data found for selected filters.")}</p>`);
+            return;
+        }
 
         this.flowChart = new frappe.Chart(this.$flowChart[0], {
             title: __("Opened vs Closed by Month"),
@@ -377,7 +559,7 @@ class GitLabIssueDashboard {
             },
             type: "bar",
             height: 300,
-            colors: ["#1976D2", "#43A047"],
+            colors: flowColors,
         });
     }
 
@@ -442,28 +624,31 @@ class GitLabIssueDashboard {
         const byMonth = {};
 
         rows.forEach((row) => {
-            const monthNo = row.month_no;
-            if (!byMonth[monthNo]) {
-                byMonth[monthNo] = {
-                    month: row.month || String(monthNo),
+            const monthKey = row.month_key || `${row.year_no || ""}-${String(row.month_no || "").padStart(2, "0")}`;
+            if (!byMonth[monthKey]) {
+                byMonth[monthKey] = {
+                    month_key: monthKey,
+                    month: row.month || monthKey,
                     opened: 0,
                     closed: 0,
+                    month_order: row.month_order || 0,
                 };
             }
 
-            byMonth[monthNo].opened += row.opened || 0;
-            byMonth[monthNo].closed += row.closed || 0;
+            byMonth[monthKey].opened += row.opened || 0;
+            byMonth[monthKey].closed += row.closed || 0;
         });
 
         const collectiveRows = Object.keys(byMonth)
-            .map((monthNo) => {
-                const monthData = byMonth[monthNo];
+            .map((monthKey) => {
+                const monthData = byMonth[monthKey];
                 const opened = monthData.opened;
                 const closed = monthData.closed;
                 const flowBalance = opened ? (closed / opened) * 100 : 0;
 
                 return {
-                    month_no: Number(monthNo),
+                    month_key: monthData.month_key,
+                    month_order: monthData.month_order,
                     month: monthData.month,
                     opened,
                     closed,
@@ -471,7 +656,11 @@ class GitLabIssueDashboard {
                 };
             })
             .filter((row) => row.opened > 0 || row.closed > 0)
-            .sort((a, b) => a.month_no - b.month_no);
+            .sort((a, b) => {
+                const monthOrderDiff = (a.month_order || 0) - (b.month_order || 0);
+                if (monthOrderDiff !== 0) return monthOrderDiff;
+                return (a.month_key || "").localeCompare(b.month_key || "");
+            });
 
         if (!collectiveRows.length) {
             this.$flowTable.html(`<p class="text-muted">${__("No monthly activity found.")}</p>`);
@@ -508,14 +697,21 @@ class GitLabIssueDashboard {
         this.$flowTable.html(html.join(""));
     }
 
-    getLastFiveYears() {
-        const currentYear = new Date().getFullYear();
-        const years = [];
+    getDefaultDateRange() {
+        const toDate = new Date();
+        const fromDate = new Date(toDate);
+        fromDate.setMonth(fromDate.getMonth() - 6);
 
-        for (let i = 0; i < 5; i++) {
-            years.push(String(currentYear - i));
-        }
+        return {
+            from_date: this.formatDate(fromDate),
+            to_date: this.formatDate(toDate),
+        };
+    }
 
-        return years.join("\n");
+    formatDate(dateObj) {
+        const year = dateObj.getFullYear();
+        const month = String(dateObj.getMonth() + 1).padStart(2, "0");
+        const day = String(dateObj.getDate()).padStart(2, "0");
+        return `${year}-${month}-${day}`;
     }
 }
