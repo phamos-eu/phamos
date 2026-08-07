@@ -1,19 +1,21 @@
 from calendar import month_name
+from datetime import date
 import json
 import frappe
-from frappe.utils import nowdate
+from frappe.utils import getdate, nowdate
 
 
 @frappe.whitelist()
-def get_gitlab_issue_dashboard_data(projects=None, year=None):
+def get_gitlab_issue_dashboard_data(projects=None, year=None, from_date=None, to_date=None):
     selected_projects = _normalize_projects(projects)
-    year = int(year or nowdate().split("-")[0])
+    from_date, to_date = _resolve_date_range(from_date, to_date, year)
 
-    flow_rows, aging_map, project_names = _build_flow_rows_and_aging(year, selected_projects)
+    flow_rows, aging_map, project_names = _build_flow_rows_and_aging(from_date, to_date, selected_projects)
     project_titles = _get_project_titles(project_names)
 
     return {
-        "year": year,
+        "from_date": str(from_date),
+        "to_date": str(to_date),
         "projects": selected_projects,
         "project_titles": project_titles,
         "aging": _format_aging_response(aging_map, selected_projects, project_names),
@@ -54,9 +56,55 @@ def _normalize_projects(projects):
     return []
 
 
-def _build_flow_rows_and_aging(year, selected_projects):
+def _resolve_date_range(from_date, to_date, year):
+    if from_date and to_date:
+        start_date = getdate(from_date)
+        end_date = getdate(to_date)
+
+    elif year:
+        year = int(year)
+        start_date = date(year, 1, 1)
+        end_date = date(year, 12, 31)
+
+    else:
+        end_date = getdate(nowdate())
+        start_date = _shift_months(end_date, -6)
+
+    if start_date > end_date:
+        start_date, end_date = end_date, start_date
+
+    return start_date, end_date
+
+
+def _shift_months(input_date, months):
+    month_index = input_date.month - 1 + months
+    year = input_date.year + month_index // 12
+    month = month_index % 12 + 1
+    day = min(input_date.day, 28)
+    return date(year, month, day)
+
+
+def _month_sequence(start_date, end_date):
+    year, month = start_date.year, start_date.month
+    end_year, end_month = end_date.year, end_date.month
+    sequence = []
+
+    while (year, month) <= (end_year, end_month):
+        sequence.append((year, month))
+        month += 1
+        if month > 12:
+            month = 1
+            year += 1
+
+    return sequence
+
+
+def _build_flow_rows_and_aging(from_date, to_date, selected_projects):
     conditions = ["1=1"]
-    params = {"year": year}
+    params = {
+        "from_date": from_date,
+        "to_date": to_date,
+    }
 
     if selected_projects:
         conditions.append("gi.gitlab_project IN %(projects)s")
@@ -66,12 +114,16 @@ def _build_flow_rows_and_aging(year, selected_projects):
 
     opened_rows = frappe.db.sql(
         f"""
-        SELECT gi.gitlab_project, MONTH(gi.created_at) AS month_no, COUNT(*) AS opened
+                SELECT
+                        gi.gitlab_project,
+                        YEAR(gi.created_at) AS year_no,
+                        MONTH(gi.created_at) AS month_no,
+                        COUNT(*) AS opened
         FROM `tabGitLab Issue` gi
         WHERE gi.created_at IS NOT NULL
-          AND YEAR(gi.created_at) = %(year)s
+                    AND DATE(gi.created_at) BETWEEN %(from_date)s AND %(to_date)s
           AND {project_filter_sql}
-        GROUP BY gi.gitlab_project, MONTH(gi.created_at)
+                GROUP BY gi.gitlab_project, YEAR(gi.created_at), MONTH(gi.created_at)
         """,
         params,
         as_dict=True,
@@ -79,12 +131,16 @@ def _build_flow_rows_and_aging(year, selected_projects):
 
     closed_rows = frappe.db.sql(
         f"""
-        SELECT gi.gitlab_project, MONTH(gi.closed_at) AS month_no, COUNT(*) AS closed
+                SELECT
+                        gi.gitlab_project,
+                        YEAR(gi.closed_at) AS year_no,
+                        MONTH(gi.closed_at) AS month_no,
+                        COUNT(*) AS closed
         FROM `tabGitLab Issue` gi
         WHERE gi.closed_at IS NOT NULL
-          AND YEAR(gi.closed_at) = %(year)s
+                    AND DATE(gi.closed_at) BETWEEN %(from_date)s AND %(to_date)s
           AND {project_filter_sql}
-        GROUP BY gi.gitlab_project, MONTH(gi.closed_at)
+                GROUP BY gi.gitlab_project, YEAR(gi.closed_at), MONTH(gi.closed_at)
         """,
         params,
         as_dict=True,
@@ -101,7 +157,7 @@ def _build_flow_rows_and_aging(year, selected_projects):
         WHERE gi.state = 'closed'
           AND gi.created_at IS NOT NULL
                     AND gi.closed_at IS NOT NULL
-                    AND YEAR(gi.closed_at) = %(year)s
+                    AND DATE(gi.closed_at) BETWEEN %(from_date)s AND %(to_date)s
           AND {project_filter_sql}
         GROUP BY gi.gitlab_project
         """,
@@ -110,30 +166,34 @@ def _build_flow_rows_and_aging(year, selected_projects):
     )
 
     opened_map = {
-        (row.gitlab_project, int(row.month_no)): int(row.opened or 0)
+        (row.gitlab_project, int(row.year_no), int(row.month_no)): int(row.opened or 0)
         for row in opened_rows
-        if row.month_no
+        if row.month_no and row.year_no
     }
     closed_map = {
-        (row.gitlab_project, int(row.month_no)): int(row.closed or 0)
+        (row.gitlab_project, int(row.year_no), int(row.month_no)): int(row.closed or 0)
         for row in closed_rows
-        if row.month_no
+        if row.month_no and row.year_no
     }
 
     project_names = _collect_project_names(opened_rows, closed_rows, aging_rows, selected_projects)
+    months = _month_sequence(from_date, to_date)
 
     flow_rows = []
     for project in project_names:
-        for month_no in range(1, 13):
-            opened = opened_map.get((project, month_no), 0)
-            closed = closed_map.get((project, month_no), 0)
+        for index, (year_no, month_no) in enumerate(months, start=1):
+            opened = opened_map.get((project, year_no, month_no), 0)
+            closed = closed_map.get((project, year_no, month_no), 0)
             flow_balance = round((closed / opened) * 100, 2) if opened else 0
 
             flow_rows.append(
                 {
                     "gitlab_project": project,
+                    "month_key": f"{year_no}-{month_no:02d}",
+                    "year_no": year_no,
                     "month_no": month_no,
-                    "month": month_name[month_no],
+                    "month_order": index,
+                    "month": f"{month_name[month_no]} {year_no}",
                     "opened": opened,
                     "closed": closed,
                     "flow_balance": flow_balance,
