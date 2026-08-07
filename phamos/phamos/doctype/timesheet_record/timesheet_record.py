@@ -52,7 +52,7 @@ class TimesheetRecord(Document):
 		actual_hours = round(float(self.actual_time) / 3600, 6)
 
 		child_url = frappe.db.get_value("GitLab Issue", self.gitlab_issue, "issue_url") if self.gitlab_issue else None
-		parent_url = frappe.db.get_value("GitLab Issue", self.gitlab_parent_issue, "issue_url") if self.gitlab_parent_issue else None
+		parent_url = frappe.db.get_value("GitLab Issue", self.gitlab_parent_issue, "issue_url") if self.gitlab_parent_issue else child_url
 
 		timesheet = frappe.new_doc("Timesheet")
 		timesheet.update(
