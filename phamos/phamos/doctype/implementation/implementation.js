@@ -94,6 +94,8 @@ frappe.ui.form.on("Implementation", {
         });
     },
     refresh: function (frm) {
+        sort_resource_planning_by_month_desc(frm);
+        setup_implementation_theme_watcher(frm);
         frm.trigger("render_auto_email_reports_section");
         frm.trigger("render_gitlab_projects_section");
         frm.trigger("render_gitlab_issues_section");
@@ -206,8 +208,22 @@ frappe.ui.form.on("Implementation", {
     
         if (frm.fields_dict.quick_add_button_html && frm.fields_dict.quick_add_button_html.$wrapper) {
             let button_html = `
-                <div style="margin: 15px 0; padding: 10px; background-color: #f8f9fa; border-radius: 5px; text-align: center;">
-                    <button class="btn btn-primary" id="quick-add-predictions-btn" style="font-size: 14px;">
+                <style>
+                    .quick-add-predictions-wrap {
+                        margin: 15px 0;
+                        padding: 10px;
+                        background: var(--control-bg, #f8f9fa);
+                        border: 1px solid var(--border-color, #d1d8dd);
+                        border-radius: 8px;
+                        text-align: center;
+                    }
+
+                    .quick-add-predictions-wrap #quick-add-predictions-btn {
+                        font-size: 14px;
+                    }
+                </style>
+                <div class="quick-add-predictions-wrap">
+                    <button class="btn btn-primary" id="quick-add-predictions-btn">
                         <svg class="icon icon-sm" style="margin-right: 5px;">
                             <use href="#icon-add"></use>
                         </svg>
@@ -1013,6 +1029,16 @@ frappe.ui.form.on("Implementation", {
                 `);
             }
         });
+    },
+    on_form_unload(frm) {
+        if (frm.__implementation_theme_observer) {
+            frm.__implementation_theme_observer.disconnect();
+            frm.__implementation_theme_observer = null;
+        }
+        if (frm.__implementation_theme_redraw_timer) {
+            clearTimeout(frm.__implementation_theme_redraw_timer);
+            frm.__implementation_theme_redraw_timer = null;
+        }
     }
 });
 
@@ -1160,6 +1186,92 @@ function add_row_to_sales_order(frm) {
     });
 }
 
+function sort_resource_planning_by_month_desc(frm) {
+    const rows = frm.doc.resource_planning || [];
+    if (rows.length < 2 || !frm.fields_dict.resource_planning) return;
+
+    const normalizeMonth = value => (value ? String(value).trim() : "");
+    const sortedRows = [...rows].sort((a, b) =>
+        normalizeMonth(b.month_and_year).localeCompare(normalizeMonth(a.month_and_year))
+    );
+
+    const isOrderChanged = rows.some((row, idx) => row.name !== sortedRows[idx]?.name);
+    if (!isOrderChanged) return;
+
+    frm.doc.resource_planning = sortedRows;
+    frm.refresh_field("resource_planning");
+}
+
+function get_implementation_theme_signature() {
+    const html = document.documentElement;
+    const body = document.body;
+    const extractThemeClasses = (className) => {
+        if (!className) return "";
+
+        return className
+            .split(/\s+/)
+            .filter(cls => /theme|dark|light/i.test(cls))
+            .sort()
+            .join(" ");
+    };
+
+    const htmlClass = extractThemeClasses(html?.className || "");
+    const bodyClass = extractThemeClasses(body?.className || "");
+    const dataTheme = html?.getAttribute("data-theme") || "";
+    const dataThemeMode = html?.getAttribute("data-theme-mode") || "";
+
+    return [htmlClass, bodyClass, dataTheme, dataThemeMode].join("|");
+}
+
+function setup_implementation_theme_watcher(frm) {
+    const redrawCharts = () => {
+        const usePredictionFilter = !!(frm.doc.prediction_from_date || frm.doc.prediction_to_date);
+        render_resource_planning_graph(frm, usePredictionFilter);
+
+        if (frm.fields_dict.module_chart?.$wrapper?.find("canvas").length) {
+            render_module_chart(frm, "radar-chart-1");
+        }
+        if (frm.fields_dict.modules_overview?.$wrapper?.find("canvas").length) {
+            render_module_chart(frm, "radar-chart-2");
+        }
+    };
+
+    if (frm.__implementation_theme_observer) {
+        frm.__implementation_theme_signature = get_implementation_theme_signature();
+        return;
+    }
+
+    frm.__implementation_theme_signature = get_implementation_theme_signature();
+
+    const observer = new MutationObserver(() => {
+        if (frm.__implementation_theme_redraw_timer) {
+            clearTimeout(frm.__implementation_theme_redraw_timer);
+        }
+
+        frm.__implementation_theme_redraw_timer = setTimeout(() => {
+            const nextSignature = get_implementation_theme_signature();
+            if (nextSignature === frm.__implementation_theme_signature) return;
+
+            frm.__implementation_theme_signature = nextSignature;
+            redrawCharts();
+        }, 120);
+    });
+
+    observer.observe(document.documentElement, {
+        attributes: true,
+        attributeFilter: ["class", "data-theme", "data-theme-mode"],
+    });
+
+    if (document.body) {
+        observer.observe(document.body, {
+            attributes: true,
+            attributeFilter: ["class"],
+        });
+    }
+
+    frm.__implementation_theme_observer = observer;
+}
+
 function render_resource_planning_graph(frm, usePredictionFilter = false) {
     const fromMonth = frm.doc.from_date ? frm.doc.from_date.slice(0, 7) : null;
     const toMonth = frm.doc.to_date ? frm.doc.to_date.slice(0, 7) : null;
@@ -1236,6 +1348,57 @@ function render_resource_planning_graph(frm, usePredictionFilter = false) {
         return count > 0 ? sum / count : null;
     });
 
+    const htmlClass = (document.documentElement.className || "").toLowerCase();
+    const bodyClass = (document.body ? document.body.className : "").toLowerCase();
+    const dataTheme = (document.documentElement.getAttribute("data-theme") || "").toLowerCase();
+    const dataThemeMode = (document.documentElement.getAttribute("data-theme-mode") || "").toLowerCase();
+    const themeHints = [htmlClass, bodyClass, dataTheme, dataThemeMode].join(" ");
+
+    const parseRgb = (color) => {
+        if (!color) return null;
+        const match = color.match(/rgba?\((\d+),\s*(\d+),\s*(\d+)/i);
+        if (!match) return null;
+        return {
+            r: parseInt(match[1], 10),
+            g: parseInt(match[2], 10),
+            b: parseInt(match[3], 10),
+        };
+    };
+
+    const getLuminance = (rgb) => {
+        if (!rgb) return 255;
+        return (0.2126 * rgb.r) + (0.7152 * rgb.g) + (0.0722 * rgb.b);
+    };
+
+    const bodyBg = document.body ? window.getComputedStyle(document.body).backgroundColor : "";
+    const pageBg = window.getComputedStyle(document.documentElement).backgroundColor;
+    const effectiveBg = bodyBg && bodyBg !== "rgba(0, 0, 0, 0)" ? bodyBg : pageBg;
+    const bgLuminance = getLuminance(parseRgb(effectiveBg));
+
+    const isDarkTheme = themeHints.includes("dark") || bgLuminance < 140;
+
+    const chartPalette = isDarkTheme
+        ? {
+            textColor: "#e7edf3",
+            mutedColor: "#b8c2cc",
+            borderColor: "rgba(255, 255, 255, 0.22)",
+            tooltipBg: "rgba(17, 24, 39, 0.96)",
+            nonBillable: "#ffb84d",
+            billable: "#66b3ff",
+            prediction: "#58d68d",
+            averagePrediction: "#ff6b6b",
+        }
+        : {
+            textColor: "#2f3a45",
+            mutedColor: "#6b7682",
+            borderColor: "#d7dee5",
+            tooltipBg: "rgba(255, 255, 255, 0.98)",
+            nonBillable: "#ff9933",
+            billable: "#3399ff",
+            prediction: "#28a745",
+            averagePrediction: "#d62828",
+        };
+
     // Function to render chart in any field
     function renderChartInField(fieldname, containerId, height = 400, width = 400) {
         const wrapper = frm.fields_dict[fieldname].$wrapper;
@@ -1243,14 +1406,45 @@ function render_resource_planning_graph(frm, usePredictionFilter = false) {
         wrapper.append(`<div id="${containerId}" style="height:${height}px; width:${width}px;"></div>`);
 
         Highcharts.chart(containerId, {
-            chart: { zoomType: 'xy' },
-            title: { text: 'Billable vs Non-Billable Time with Prediction' },
-            xAxis: { categories, title: { text: 'Month' } },
-            yAxis: { title: { text: 'Time (hrs)' } },
-            tooltip: { shared: true, valueSuffix: ' hrs' },
+            chart: {
+                zoomType: 'xy',
+                backgroundColor: 'transparent',
+                style: { color: chartPalette.textColor }
+            },
+            title: {
+                text: 'Billable vs Non-Billable Time with Prediction',
+                style: { color: chartPalette.textColor, fontWeight: '600' }
+            },
+            xAxis: {
+                categories,
+                title: { text: 'Month', style: { color: chartPalette.mutedColor } },
+                labels: { style: { color: chartPalette.mutedColor } },
+                lineColor: chartPalette.borderColor,
+                tickColor: chartPalette.borderColor,
+                gridLineColor: chartPalette.borderColor
+            },
+            yAxis: {
+                title: { text: 'Time (hrs)', style: { color: chartPalette.mutedColor } },
+                labels: { style: { color: chartPalette.mutedColor } },
+                gridLineColor: chartPalette.borderColor
+            },
+            tooltip: {
+                shared: true,
+                valueSuffix: ' hrs',
+                backgroundColor: chartPalette.tooltipBg,
+                borderColor: chartPalette.borderColor,
+                style: { color: chartPalette.textColor }
+            },
             legend: {
                 itemStyle: {
-                    fontSize: '10px'
+                    fontSize: '10px',
+                    color: chartPalette.textColor
+                },
+                itemHoverStyle: {
+                    color: chartPalette.textColor
+                },
+                itemHiddenStyle: {
+                    color: chartPalette.mutedColor
                 }
             },
             plotOptions: {
@@ -1258,15 +1452,15 @@ function render_resource_planning_graph(frm, usePredictionFilter = false) {
                 line: { marker: { enabled: true, radius: 4 } }
             },
             series: [
-                { name: 'Non-Billable Time', type: 'area', data: nonBillable, color: '#ff9933' },
-                { name: 'Billable Time', type: 'area', data: billable, color: '#3399ff' },
+                { name: 'Non-Billable Time', type: 'area', data: nonBillable, color: chartPalette.nonBillable },
+                { name: 'Billable Time', type: 'area', data: billable, color: chartPalette.billable },
                 {
-                    name: 'Prediction', type: 'scatter', data: predictionPoints, color: '#28a745',
+                    name: 'Prediction', type: 'scatter', data: predictionPoints, color: chartPalette.prediction,
                     marker: { symbol: 'circle', radius: 5 },
                     tooltip: { pointFormat: '<span style="color:{series.color}">●</span> {series.name}: <b>{point.y} hrs</b><br/>' }
                 },
                 {
-                    name: 'Average Prediction', type: 'line', data: averagePredictions, color: 'red',
+                    name: 'Average Prediction', type: 'line', data: averagePredictions, color: chartPalette.averagePrediction,
                     dashStyle: 'ShortDash',
                     marker: { enabled: true, symbol: 'diamond', radius: 4 },
                     tooltip: { pointFormat: '<span style="color:{series.color}">●</span> {series.name}: <b>{point.y:.2f} hrs</b><br/>' }
