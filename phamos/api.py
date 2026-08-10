@@ -367,7 +367,7 @@ def get_customer_sales_order_status():
 
     implementation_names = [impl.name for impl in implementations]
 
-    # Get all OPEN sales orders for these implementations (matching Implementation doctype logic)
+    # Get all submitted sales orders for these implementations except cancelled.
     sales_orders = frappe.db.sql("""
         SELECT
             so.name,
@@ -384,7 +384,7 @@ def get_customer_sales_order_status():
         WHERE
             so.custom_implementation IN %(implementations)s
             AND so.docstatus = 1
-            AND so.status IN ('To Deliver and Bill', 'To Deliver', 'To Bill')
+            AND so.status != 'Cancelled'
         ORDER BY so.transaction_date DESC
     """, {"implementations": implementation_names}, as_dict=True)
 
@@ -410,8 +410,9 @@ def get_customer_sales_order_status():
         total_so_hrs += so.total_hrs or 0
         total_delivered_hrs += so.delivered_hrs or 0
 
-        # Count open sales orders (all fetched orders are open based on our query)
-        open_so_count += 1
+        # Count open sales orders only (exclude completed/closed from open bucket)
+        if so.status not in ("Completed", "Closed"):
+            open_so_count += 1
 
     # Calculate billable timesheet hours (not on delivery note) - matching Implementation doctype logic
     # Get projects for these implementations using SQL
