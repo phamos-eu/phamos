@@ -15,6 +15,7 @@ class GitLabIssueDashboard {
         this.wrapper = wrapper;
         this.filters = {};
         this.currentData = null;
+        this.compareToCompany = false;
         this.themeObserver = null;
         this.lastThemeKey = "";
 
@@ -88,6 +89,21 @@ class GitLabIssueDashboard {
                         margin-top: 8px;
                     }
 
+                    .gitlab-issue-dashboard .gid-compare-toggle {
+                        margin-top: 10px;
+                        color: var(--gid-title-color);
+                        font-size: 13px;
+                        display: none;
+                    }
+
+                    .gitlab-issue-dashboard .gid-compare-toggle label {
+                        display: inline-flex;
+                        align-items: center;
+                        gap: 8px;
+                        margin: 0;
+                        cursor: pointer;
+                    }
+
                     .gitlab-issue-dashboard .gid-kpi-row {
                         display: grid;
                         grid-template-columns: repeat(3, minmax(140px, 1fr));
@@ -117,6 +133,8 @@ class GitLabIssueDashboard {
                     .gitlab-issue-dashboard .gid-kpi-green { background: var(--gid-aging-green); }
                     .gitlab-issue-dashboard .gid-kpi-amber { background: var(--gid-aging-amber); }
                     .gitlab-issue-dashboard .gid-kpi-red { background: var(--gid-aging-red); }
+                    .gitlab-issue-dashboard .gid-kpi-opened { background: var(--gid-flow-opened); }
+                    .gitlab-issue-dashboard .gid-kpi-closed { background: var(--gid-flow-closed); }
 
                     .gitlab-issue-dashboard .gid-table-wrap {
                         max-height: 360px;
@@ -151,8 +169,11 @@ class GitLabIssueDashboard {
                     <div class="gid-title">${__("Filters")}</div>
                     <div id="gid-filter-summary" class="gid-subtitle"></div>
                     <div class="row">
-                        <div class="col-md-6">
+                        <div class="col-md-4">
                             <div id="filter-projects"></div>
+                        </div>
+                        <div class="col-md-2">
+                            <div id="filter-issue-scope"></div>
                         </div>
                         <div class="col-md-3">
                             <div id="filter-from-date"></div>
@@ -160,6 +181,12 @@ class GitLabIssueDashboard {
                         <div class="col-md-3">
                             <div id="filter-to-date"></div>
                         </div>
+                    </div>
+                    <div id="gid-compare-company-wrap" class="gid-compare-toggle">
+                        <label>
+                            <input type="checkbox" id="gid-compare-company" />
+                            <span>${__("Compare to Company")}</span>
+                        </label>
                     </div>
                     <div class="gid-actions">
                         <button class="btn btn-default btn-sm" id="gid-reset-filters">${__("Reset")}</button>
@@ -175,6 +202,7 @@ class GitLabIssueDashboard {
 
                 <div class="gid-section-card" style="margin-bottom: 16px;">
                     <div class="gid-title">${__("Opened vs Closed by Month")}</div>
+                    <div class="gid-kpi-row" id="flow-kpis"></div>
                     <div id="flow-chart" style="min-height: 320px;"></div>
                 </div>
 
@@ -186,14 +214,18 @@ class GitLabIssueDashboard {
         `);
 
         this.$projectsFilter = root.find("#filter-projects");
+        this.$issueScopeFilter = root.find("#filter-issue-scope");
         this.$fromDateFilter = root.find("#filter-from-date");
         this.$toDateFilter = root.find("#filter-to-date");
         this.$dashboard = root.find(".gitlab-issue-dashboard");
         this.$filterSummary = root.find("#gid-filter-summary");
+        this.$compareCompanyWrap = root.find("#gid-compare-company-wrap");
+        this.$compareCompanyToggle = root.find("#gid-compare-company");
         this.$applyBtn = root.find("#gid-apply-filters");
         this.$resetBtn = root.find("#gid-reset-filters");
         this.$agingKpis = root.find("#aging-kpis");
         this.$agingChart = root.find("#aging-chart");
+        this.$flowKpis = root.find("#flow-kpis");
         this.$flowChart = root.find("#flow-chart");
         this.$flowTable = root.find("#flow-table");
 
@@ -285,6 +317,23 @@ class GitLabIssueDashboard {
             render_input: true,
         });
 
+        this.filters.issue_scope = frappe.ui.form.make_control({
+            parent: this.$issueScopeFilter,
+            df: {
+                label: __("Issue Type"),
+                fieldname: "issue_scope",
+                fieldtype: "Select",
+                options: `${__("Both")}\n${__("Parent Issues")}\n${__("Child Issues")}`,
+                default: __("Both"),
+                reqd: 1,
+                onchange: () => {
+                    this.updateFilterState();
+                    this.loadData();
+                },
+            },
+            render_input: true,
+        });
+
         this.filters.from_date = frappe.ui.form.make_control({
             parent: this.$fromDateFilter,
             df: {
@@ -319,9 +368,15 @@ class GitLabIssueDashboard {
 
         this.filters.from_date.set_value(defaultRange.from_date);
         this.filters.to_date.set_value(defaultRange.to_date);
+        this.filters.issue_scope.set_value(__("Both"));
 
         this.$applyBtn.on("click", () => this.loadData());
         this.$resetBtn.on("click", () => this.resetFilters());
+        this.$compareCompanyToggle.on("change", () => {
+            this.compareToCompany = !!this.$compareCompanyToggle.prop("checked");
+            this.updateFilterState();
+            this.loadData();
+        });
         this.page.set_primary_action(__("Apply Filters"), () => this.loadData());
         this.updateFilterState();
     }
@@ -329,8 +384,11 @@ class GitLabIssueDashboard {
     resetFilters() {
         const defaultRange = this.getDefaultDateRange();
         this.filters.projects.set_value([]);
+        this.filters.issue_scope.set_value(__("Both"));
         this.filters.from_date.set_value(defaultRange.from_date);
         this.filters.to_date.set_value(defaultRange.to_date);
+        this.compareToCompany = false;
+        this.$compareCompanyToggle.prop("checked", false);
         this.updateFilterState();
         this.loadData();
     }
@@ -340,13 +398,33 @@ class GitLabIssueDashboard {
         const { from_date: defaultFromDate, to_date: defaultToDate } = this.getDefaultDateRange();
         const fromDate = this.filters.from_date.get_value() || defaultFromDate;
         const toDate = this.filters.to_date.get_value() || defaultToDate;
+        const issueScope = this.normalizeIssueScopeValue(this.filters.issue_scope.get_value());
+        const issueScopeLabelMap = {
+            both: __("Both"),
+            parent: __("Parent Issues"),
+            child: __("Child Issues"),
+        };
+        const issueScopeLabel = issueScopeLabelMap[issueScope] || __("Both");
+        const canCompareToCompany = projects.length === 1;
+
+        if (canCompareToCompany) {
+            this.$compareCompanyWrap.show();
+        } else {
+            this.$compareCompanyWrap.hide();
+            this.compareToCompany = false;
+            this.$compareCompanyToggle.prop("checked", false);
+        }
+
         const summary = projects.length
             ? __(
                 "{0} project(s) selected, Date Range: {1} to {2}",
                 [projects.length, fromDate, toDate]
             )
             : __("All projects, Date Range: {0} to {1}", [fromDate, toDate]);
-        this.$filterSummary.text(summary);
+        const compareNote = canCompareToCompany && this.compareToCompany
+            ? ` | ${__("Comparison: Company")}`
+            : "";
+        this.$filterSummary.text(`${summary} | ${__("Issue Type")}: ${issueScopeLabel}${compareNote}`);
     }
 
     normalizeProjectsValue(rawValue) {
@@ -380,6 +458,13 @@ class GitLabIssueDashboard {
         return [];
     }
 
+    normalizeIssueScopeValue(rawValue) {
+        const value = (rawValue || "").toString().trim().toLowerCase();
+        if (value === "parent" || value === "parent issues") return "parent";
+        if (value === "child" || value === "child issues") return "child";
+        return "both";
+    }
+
     async loadData() {
         try {
             frappe.dom.freeze(__("Loading dashboard..."));
@@ -388,6 +473,8 @@ class GitLabIssueDashboard {
             const { from_date: defaultFromDate, to_date: defaultToDate } = this.getDefaultDateRange();
             const from_date = this.filters.from_date.get_value() || defaultFromDate;
             const to_date = this.filters.to_date.get_value() || defaultToDate;
+            const issue_scope = this.normalizeIssueScopeValue(this.filters.issue_scope.get_value());
+            const compare_to_company = this.compareToCompany && projects.length === 1;
 
             if (from_date > to_date) {
                 frappe.msgprint({
@@ -404,10 +491,14 @@ class GitLabIssueDashboard {
                     projects,
                     from_date,
                     to_date,
+                    issue_scope,
+                    compare_to_company,
                 },
             });
 
             this.currentData = response.message || {};
+            this.compareToCompany = !!this.currentData.compare_to_company;
+            this.$compareCompanyToggle.prop("checked", this.compareToCompany);
             this.updateFilterState();
             this.renderAgingChart();
             this.renderFlowChart();
@@ -429,6 +520,10 @@ class GitLabIssueDashboard {
         this.applyThemeClass();
 
         const aging = (this.currentData && this.currentData.aging) || {};
+        const companyAging = (this.currentData && this.currentData.company_aging) || {};
+        const compareToCompany = !!(this.currentData && this.currentData.compare_to_company);
+        const selectedProjects = (this.currentData && this.currentData.projects) || [];
+        const compareSingleProject = compareToCompany && selectedProjects.length === 1;
         const projectBuckets = aging.project_buckets || [];
         const projectTitles = (this.currentData && this.currentData.project_titles) || {};
         const agingColors = this.getChartColors("aging");
@@ -437,12 +532,47 @@ class GitLabIssueDashboard {
             aging.bucket_31_90 || 0,
             aging.bucket_gt_90 || 0,
         ];
+        const companyValues = [
+            companyAging.bucket_0_30 || 0,
+            companyAging.bucket_31_90 || 0,
+            companyAging.bucket_gt_90 || 0,
+        ];
 
         this.$agingKpis.html(`
             <div class="gid-kpi gid-kpi-green"><small>${__("0-30 days")}</small><strong>${values[0]}</strong></div>
             <div class="gid-kpi gid-kpi-amber"><small>${__("31-90 days")}</small><strong>${values[1]}</strong></div>
             <div class="gid-kpi gid-kpi-red"><small>${__(">90 days")}</small><strong>${values[2]}</strong></div>
         `);
+
+        if (compareSingleProject) {
+            const selectedProject = selectedProjects[0];
+            const selectedTitle = projectTitles[selectedProject] || selectedProject || __("Project");
+
+            this.agingChart = new frappe.Chart(this.$agingChart[0], {
+                title: __("Closed Tickets Aging - Project vs Company"),
+                data: {
+                    labels: [selectedTitle, __("Company")],
+                    datasets: [
+                        {
+                            name: __("0-30 days"),
+                            values: [values[0], companyValues[0]],
+                        },
+                        {
+                            name: __("31-90 days"),
+                            values: [values[1], companyValues[1]],
+                        },
+                        {
+                            name: __(">90 days"),
+                            values: [values[2], companyValues[2]],
+                        },
+                    ],
+                },
+                type: "bar",
+                height: 300,
+                colors: agingColors,
+            });
+            return;
+        }
 
         if (aging.mode === "project_compare" && projectBuckets.length > 1) {
             this.agingChart = new frappe.Chart(this.$agingChart[0], {
@@ -505,21 +635,46 @@ class GitLabIssueDashboard {
         this.applyThemeClass();
 
         const monthly = (this.currentData && this.currentData.monthly_flow) || [];
+        const companyMonthly = (this.currentData && this.currentData.company_monthly_flow) || [];
         const selectedProjects = (this.currentData && this.currentData.projects) || [];
+        const projectTitles = (this.currentData && this.currentData.project_titles) || {};
+        const compareToCompany = !!(this.currentData && this.currentData.compare_to_company);
+        const compareSingleProject = compareToCompany && selectedProjects.length === 1;
         const flowColors = this.getChartColors("flow");
+        const filteredRows = monthly.filter((row) => {
+            return selectedProjects.length === 0 || selectedProjects.includes(row.gitlab_project);
+        });
+
+        const monthMeta = {};
+        filteredRows.forEach((row) => {
+            const monthKey = row.month_key || `${row.year_no || ""}-${String(row.month_no || "").padStart(2, "0")}`;
+            if (!monthMeta[monthKey]) {
+                monthMeta[monthKey] = {
+                    month: row.month || monthKey,
+                    month_order: row.month_order || 0,
+                };
+            }
+        });
+
+        if (compareSingleProject) {
+            companyMonthly.forEach((row) => {
+                const monthKey = row.month_key || `${row.year_no || ""}-${String(row.month_no || "").padStart(2, "0")}`;
+                if (!monthMeta[monthKey]) {
+                    monthMeta[monthKey] = {
+                        month: row.month || monthKey,
+                        month_order: row.month_order || 0,
+                    };
+                }
+            });
+        }
+
         const monthAgg = {};
-
-        monthly.forEach((row) => {
-            const include = selectedProjects.length === 0 || selectedProjects.includes(row.gitlab_project);
-            if (!include) return;
-
+        filteredRows.forEach((row) => {
             const monthKey = row.month_key || `${row.year_no || ""}-${String(row.month_no || "").padStart(2, "0")}`;
             if (!monthAgg[monthKey]) {
                 monthAgg[monthKey] = {
-                    month: row.month || monthKey,
                     opened: 0,
                     closed: 0,
-                    month_order: row.month_order || 0,
                 };
             }
 
@@ -527,26 +682,134 @@ class GitLabIssueDashboard {
             monthAgg[monthKey].closed += row.closed || 0;
         });
 
-        const sortedMonthKeys = Object.keys(monthAgg).sort((a, b) => {
-            const monthOrderDiff = (monthAgg[a].month_order || 0) - (monthAgg[b].month_order || 0);
+        const totals = filteredRows.reduce((acc, row) => {
+            acc.opened += row.opened || 0;
+            acc.closed += row.closed || 0;
+            return acc;
+        }, { opened: 0, closed: 0 });
+
+        this.$flowKpis.html(`
+            <div class="gid-kpi gid-kpi-opened"><small>${__("Opened Total")}</small><strong>${totals.opened}</strong></div>
+            <div class="gid-kpi gid-kpi-closed"><small>${__("Closed Total")}</small><strong>${totals.closed}</strong></div>
+        `);
+
+        const sortedMonthKeys = Object.keys(monthMeta).sort((a, b) => {
+            const monthOrderDiff = (monthMeta[a].month_order || 0) - (monthMeta[b].month_order || 0);
             if (monthOrderDiff !== 0) return monthOrderDiff;
             return a.localeCompare(b);
         });
 
-        const labels = [];
-        const openedValues = [];
-        const closedValues = [];
-
-        sortedMonthKeys.forEach((monthKey) => {
-            labels.push(monthAgg[monthKey].month || monthKey);
-            openedValues.push(monthAgg[monthKey].opened);
-            closedValues.push(monthAgg[monthKey].closed);
-        });
+        const labels = sortedMonthKeys.map((monthKey) => monthMeta[monthKey].month || monthKey);
 
         if (!labels.length) {
             this.$flowChart.html(`<p class="text-muted">${__("No monthly data found for selected filters.")}</p>`);
             return;
         }
+
+        if (compareSingleProject) {
+            const selectedProject = selectedProjects[0];
+            const selectedTitle = projectTitles[selectedProject] || selectedProject || __("Project");
+
+            const companyMap = {};
+            companyMonthly.forEach((row) => {
+                const monthKey = row.month_key || `${row.year_no || ""}-${String(row.month_no || "").padStart(2, "0")}`;
+                companyMap[monthKey] = {
+                    opened: row.opened || 0,
+                    closed: row.closed || 0,
+                };
+            });
+
+            const selectedOpenedValues = sortedMonthKeys.map((monthKey) => (monthAgg[monthKey] ? monthAgg[monthKey].opened : 0));
+            const selectedClosedValues = sortedMonthKeys.map((monthKey) => (monthAgg[monthKey] ? monthAgg[monthKey].closed : 0));
+            const companyOpenedValues = sortedMonthKeys.map((monthKey) => (companyMap[monthKey] ? companyMap[monthKey].opened : 0));
+            const companyClosedValues = sortedMonthKeys.map((monthKey) => (companyMap[monthKey] ? companyMap[monthKey].closed : 0));
+
+            this.flowChart = new frappe.Chart(this.$flowChart[0], {
+                title: __("Opened vs Closed by Month - Project vs Company"),
+                data: {
+                    labels,
+                    datasets: [
+                        { name: `${selectedTitle} - ${__("Opened")}`, values: selectedOpenedValues },
+                        { name: `${selectedTitle} - ${__("Closed")}`, values: selectedClosedValues },
+                        { name: `${__("Company")} - ${__("Opened")}`, values: companyOpenedValues },
+                        { name: `${__("Company")} - ${__("Closed")}`, values: companyClosedValues },
+                    ],
+                },
+                type: "bar",
+                height: 300,
+                colors: ["#1976d2", "#43a047", "#ef6c00", "#8e24aa"],
+            });
+            return;
+        }
+
+        // Show project-wise bars for multi-project comparison instead of summing into one pair.
+        if (selectedProjects.length > 1) {
+            const projectMonthMap = {};
+            filteredRows.forEach((row) => {
+                const project = row.gitlab_project;
+                const monthKey = row.month_key || `${row.year_no || ""}-${String(row.month_no || "").padStart(2, "0")}`;
+
+                if (!projectMonthMap[project]) {
+                    projectMonthMap[project] = {};
+                }
+
+                projectMonthMap[project][monthKey] = {
+                    opened: row.opened || 0,
+                    closed: row.closed || 0,
+                };
+            });
+
+            const comparePalette = [
+                ["#1976d2", "#43a047"],
+                ["#ef6c00", "#8e24aa"],
+                ["#00897b", "#c62828"],
+                ["#3949ab", "#f9a825"],
+            ];
+
+            const datasets = [];
+            const chartColors = [];
+
+            selectedProjects.forEach((project, index) => {
+                const title = projectTitles[project] || project || "";
+                const palette = comparePalette[index % comparePalette.length];
+
+                const openedValues = sortedMonthKeys.map((monthKey) => {
+                    return (projectMonthMap[project] && projectMonthMap[project][monthKey]
+                        ? projectMonthMap[project][monthKey].opened
+                        : 0);
+                });
+
+                const closedValues = sortedMonthKeys.map((monthKey) => {
+                    return (projectMonthMap[project] && projectMonthMap[project][monthKey]
+                        ? projectMonthMap[project][monthKey].closed
+                        : 0);
+                });
+
+                datasets.push({ name: `${title} - ${__("Opened")}`, values: openedValues });
+                datasets.push({ name: `${title} - ${__("Closed")}`, values: closedValues });
+                chartColors.push(palette[0], palette[1]);
+            });
+
+            this.flowChart = new frappe.Chart(this.$flowChart[0], {
+                title: __("Opened vs Closed by Month - Project Comparison"),
+                data: {
+                    labels,
+                    datasets,
+                },
+                type: "bar",
+                height: 300,
+                colors: chartColors,
+            });
+            return;
+        }
+
+        const openedValues = [];
+        const closedValues = [];
+
+        sortedMonthKeys.forEach((monthKey) => {
+            openedValues.push((monthAgg[monthKey] && monthAgg[monthKey].opened) || 0);
+            closedValues.push((monthAgg[monthKey] && monthAgg[monthKey].closed) || 0);
+        });
 
         this.flowChart = new frappe.Chart(this.$flowChart[0], {
             title: __("Opened vs Closed by Month"),
@@ -573,9 +836,20 @@ class GitLabIssueDashboard {
         }
 
         const selectedProjects = (this.currentData && this.currentData.projects) || [];
+        const compareToCompany = !!(this.currentData && this.currentData.compare_to_company);
 
         if (!selectedProjects.length) {
             this.renderCollectiveFlowTable(rows);
+            return;
+        }
+
+        if (selectedProjects.length === 1 && compareToCompany) {
+            this.renderSingleProjectVsCompanyFlowTable(rows, selectedProjects[0], projectTitles);
+            return;
+        }
+
+        if (selectedProjects.length > 1) {
+            this.renderProjectComparisonFlowTable(rows, selectedProjects, projectTitles);
             return;
         }
 
@@ -611,6 +885,197 @@ class GitLabIssueDashboard {
             html.push(`<td class="text-right">${row.opened || 0}</td>`);
             html.push(`<td class="text-right">${row.closed || 0}</td>`);
             html.push(`<td class="text-right">${(row.flow_balance || 0).toFixed(2)}%</td>`);
+            html.push("</tr>");
+        });
+
+        html.push("</tbody>");
+        html.push("</table>");
+
+        this.$flowTable.html(html.join(""));
+    }
+
+    renderSingleProjectVsCompanyFlowTable(rows, selectedProject, projectTitles) {
+        const companyRows = (this.currentData && this.currentData.company_monthly_flow) || [];
+        const monthMap = {};
+
+        rows.forEach((row) => {
+            if (row.gitlab_project !== selectedProject) return;
+
+            const monthKey = row.month_key || `${row.year_no || ""}-${String(row.month_no || "").padStart(2, "0")}`;
+            if (!monthMap[monthKey]) {
+                monthMap[monthKey] = {
+                    month_key: monthKey,
+                    month: row.month || monthKey,
+                    month_order: row.month_order || 0,
+                    project: { opened: 0, closed: 0, flow_balance: 0 },
+                    company: { opened: 0, closed: 0, flow_balance: 0 },
+                };
+            }
+
+            monthMap[monthKey].project = {
+                opened: row.opened || 0,
+                closed: row.closed || 0,
+                flow_balance: row.flow_balance || 0,
+            };
+        });
+
+        companyRows.forEach((row) => {
+            const monthKey = row.month_key || `${row.year_no || ""}-${String(row.month_no || "").padStart(2, "0")}`;
+            if (!monthMap[monthKey]) {
+                monthMap[monthKey] = {
+                    month_key: monthKey,
+                    month: row.month || monthKey,
+                    month_order: row.month_order || 0,
+                    project: { opened: 0, closed: 0, flow_balance: 0 },
+                    company: { opened: 0, closed: 0, flow_balance: 0 },
+                };
+            }
+
+            monthMap[monthKey].company = {
+                opened: row.opened || 0,
+                closed: row.closed || 0,
+                flow_balance: row.flow_balance || 0,
+            };
+        });
+
+        const monthRows = Object.keys(monthMap)
+            .map((monthKey) => monthMap[monthKey])
+            .filter((row) => {
+                return (
+                    row.project.opened > 0
+                    || row.project.closed > 0
+                    || row.company.opened > 0
+                    || row.company.closed > 0
+                );
+            })
+            .sort((a, b) => {
+                const monthOrderDiff = (a.month_order || 0) - (b.month_order || 0);
+                if (monthOrderDiff !== 0) return monthOrderDiff;
+                return (a.month_key || "").localeCompare(b.month_key || "");
+            });
+
+        if (!monthRows.length) {
+            this.$flowTable.html(`<p class="text-muted">${__("No monthly activity for selected project/company.")}</p>`);
+            return;
+        }
+
+        const projectTitle = frappe.utils.escape_html(projectTitles[selectedProject] || selectedProject || __("Project"));
+        const html = [
+            '<table class="table table-bordered table-hover">',
+            "<thead>",
+            "<tr>",
+            `<th rowspan="2">${__("Month")}</th>`,
+            `<th class="text-center" colspan="3">${projectTitle}</th>`,
+            `<th class="text-center" colspan="3">${__("Company")}</th>`,
+            "</tr>",
+            "<tr>",
+            `<th class="text-right">${__("Opened")}</th>`,
+            `<th class="text-right">${__("Closed")}</th>`,
+            `<th class="text-right">${__("Flow Balance %")}</th>`,
+            `<th class="text-right">${__("Opened")}</th>`,
+            `<th class="text-right">${__("Closed")}</th>`,
+            `<th class="text-right">${__("Flow Balance %")}</th>`,
+            "</tr>",
+            "</thead>",
+            "<tbody>",
+        ];
+
+        monthRows.forEach((row) => {
+            html.push("<tr>");
+            html.push(`<td>${frappe.utils.escape_html(row.month || "")}</td>`);
+            html.push(`<td class="text-right">${row.project.opened}</td>`);
+            html.push(`<td class="text-right">${row.project.closed}</td>`);
+            html.push(`<td class="text-right">${(row.project.flow_balance || 0).toFixed(2)}%</td>`);
+            html.push(`<td class="text-right">${row.company.opened}</td>`);
+            html.push(`<td class="text-right">${row.company.closed}</td>`);
+            html.push(`<td class="text-right">${(row.company.flow_balance || 0).toFixed(2)}%</td>`);
+            html.push("</tr>");
+        });
+
+        html.push("</tbody>");
+        html.push("</table>");
+
+        this.$flowTable.html(html.join(""));
+    }
+
+    renderProjectComparisonFlowTable(rows, selectedProjects, projectTitles) {
+        const byMonth = {};
+
+        rows.forEach((row) => {
+            if (!selectedProjects.includes(row.gitlab_project)) return;
+
+            const monthKey = row.month_key || `${row.year_no || ""}-${String(row.month_no || "").padStart(2, "0")}`;
+            if (!byMonth[monthKey]) {
+                byMonth[monthKey] = {
+                    month_key: monthKey,
+                    month: row.month || monthKey,
+                    month_order: row.month_order || 0,
+                    projects: {},
+                };
+            }
+
+            byMonth[monthKey].projects[row.gitlab_project] = {
+                opened: row.opened || 0,
+                closed: row.closed || 0,
+                flow_balance: row.flow_balance || 0,
+            };
+        });
+
+        const monthRows = Object.keys(byMonth)
+            .map((monthKey) => byMonth[monthKey])
+            .filter((monthData) => {
+                return selectedProjects.some((project) => {
+                    const data = monthData.projects[project];
+                    return data && (data.opened > 0 || data.closed > 0);
+                });
+            })
+            .sort((a, b) => {
+                const monthOrderDiff = (a.month_order || 0) - (b.month_order || 0);
+                if (monthOrderDiff !== 0) return monthOrderDiff;
+                return (a.month_key || "").localeCompare(b.month_key || "");
+            });
+
+        if (!monthRows.length) {
+            this.$flowTable.html(`<p class="text-muted">${__("No monthly activity for selected project(s).")}</p>`);
+            return;
+        }
+
+        const html = [
+            '<table class="table table-bordered table-hover">',
+            "<thead>",
+            "<tr>",
+            `<th rowspan="2">${__("Month")}</th>`,
+        ];
+
+        selectedProjects.forEach((project) => {
+            const projectTitle = frappe.utils.escape_html(projectTitles[project] || project || "");
+            html.push(`<th class="text-center" colspan="3">${projectTitle}</th>`);
+        });
+
+        html.push("</tr>");
+        html.push("<tr>");
+
+        selectedProjects.forEach(() => {
+            html.push(`<th class="text-right">${__("Opened")}</th>`);
+            html.push(`<th class="text-right">${__("Closed")}</th>`);
+            html.push(`<th class="text-right">${__("Flow Balance %")}</th>`);
+        });
+
+        html.push("</tr>");
+        html.push("</thead>");
+        html.push("<tbody>");
+
+        monthRows.forEach((monthData) => {
+            html.push("<tr>");
+            html.push(`<td>${frappe.utils.escape_html(monthData.month || "")}</td>`);
+
+            selectedProjects.forEach((project) => {
+                const projectMonthData = monthData.projects[project] || { opened: 0, closed: 0, flow_balance: 0 };
+                html.push(`<td class="text-right">${projectMonthData.opened || 0}</td>`);
+                html.push(`<td class="text-right">${projectMonthData.closed || 0}</td>`);
+                html.push(`<td class="text-right">${(projectMonthData.flow_balance || 0).toFixed(2)}%</td>`);
+            });
+
             html.push("</tr>");
         });
 
