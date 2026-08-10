@@ -6,21 +6,52 @@ from frappe.utils import getdate, nowdate
 
 
 @frappe.whitelist()
-def get_gitlab_issue_dashboard_data(projects=None, year=None, from_date=None, to_date=None):
+def get_gitlab_issue_dashboard_data(projects=None, year=None, from_date=None, to_date=None, issue_scope=None, compare_to_company=None):
     selected_projects = _normalize_projects(projects)
+    issue_scope = _normalize_issue_scope(issue_scope)
+    compare_to_company = _to_bool(compare_to_company)
+    compare_to_company = compare_to_company and len(selected_projects) == 1
     from_date, to_date = _resolve_date_range(from_date, to_date, year)
 
-    flow_rows, aging_map, project_names = _build_flow_rows_and_aging(from_date, to_date, selected_projects)
+    flow_rows, aging_map, project_names = _build_flow_rows_and_aging(from_date, to_date, selected_projects, issue_scope)
     project_titles = _get_project_titles(project_names)
+    company_monthly_flow = []
+    company_aging = {}
+
+    if compare_to_company:
+        company_flow_rows, company_aging_map, _ = _build_flow_rows_and_aging(from_date, to_date, [], issue_scope)
+        company_monthly_flow = _aggregate_monthly_totals(company_flow_rows)
+        company_aging = _aggregate_aging_totals(company_aging_map)
 
     return {
         "from_date": str(from_date),
         "to_date": str(to_date),
         "projects": selected_projects,
+        "issue_scope": issue_scope,
+        "compare_to_company": compare_to_company,
         "project_titles": project_titles,
         "aging": _format_aging_response(aging_map, selected_projects, project_names),
         "monthly_flow": flow_rows,
+        "company_monthly_flow": company_monthly_flow,
+        "company_aging": company_aging,
     }
+
+
+def _to_bool(value):
+    if isinstance(value, bool):
+        return value
+    if value is None:
+        return False
+
+    text = str(value).strip().lower()
+    return text in {"1", "true", "yes", "on"}
+
+
+def _normalize_issue_scope(value):
+    normalized = (value or "both").strip().lower() if isinstance(value, str) else "both"
+    if normalized in {"parent", "child", "both"}:
+        return normalized
+    return "both"
 
 
 def _normalize_projects(projects):
@@ -99,7 +130,7 @@ def _month_sequence(start_date, end_date):
     return sequence
 
 
-def _build_flow_rows_and_aging(from_date, to_date, selected_projects):
+def _build_flow_rows_and_aging(from_date, to_date, selected_projects, issue_scope="both"):
     conditions = ["1=1"]
     params = {
         "from_date": from_date,
@@ -109,6 +140,11 @@ def _build_flow_rows_and_aging(from_date, to_date, selected_projects):
     if selected_projects:
         conditions.append("gi.gitlab_project IN %(projects)s")
         params["projects"] = tuple(selected_projects)
+
+    if issue_scope == "parent":
+        conditions.append("gi.parent_issue IS NULL")
+    elif issue_scope == "child":
+        conditions.append("gi.parent_issue IS NOT NULL")
 
     project_filter_sql = " AND ".join(conditions)
 
@@ -225,6 +261,64 @@ def _collect_project_names(opened_rows, closed_rows, aging_rows, selected_projec
         names.add(row.gitlab_project)
 
     return sorted(names)
+
+
+def _aggregate_monthly_totals(flow_rows):
+    by_month = {}
+
+    for row in flow_rows:
+        month_key = row.get("month_key")
+        if not month_key:
+            continue
+
+        if month_key not in by_month:
+            by_month[month_key] = {
+                "month_key": month_key,
+                "year_no": row.get("year_no"),
+                "month_no": row.get("month_no"),
+                "month_order": row.get("month_order") or 0,
+                "month": row.get("month") or month_key,
+                "opened": 0,
+                "closed": 0,
+            }
+
+        by_month[month_key]["opened"] += int(row.get("opened") or 0)
+        by_month[month_key]["closed"] += int(row.get("closed") or 0)
+
+    totals = []
+    for month_key, month_data in by_month.items():
+        opened = month_data["opened"]
+        closed = month_data["closed"]
+        flow_balance = round((closed / opened) * 100, 2) if opened else 0
+
+        totals.append(
+            {
+                "gitlab_project": "__company__",
+                "month_key": month_key,
+                "year_no": month_data.get("year_no"),
+                "month_no": month_data.get("month_no"),
+                "month_order": month_data.get("month_order") or 0,
+                "month": month_data.get("month") or month_key,
+                "opened": opened,
+                "closed": closed,
+                "flow_balance": flow_balance,
+            }
+        )
+
+    totals.sort(key=lambda item: ((item.get("month_order") or 0), item.get("month_key") or ""))
+    return totals
+
+
+def _aggregate_aging_totals(aging_map):
+    total_0_30 = sum((row or {}).get("bucket_0_30", 0) for row in aging_map.values())
+    total_31_90 = sum((row or {}).get("bucket_31_90", 0) for row in aging_map.values())
+    total_gt_90 = sum((row or {}).get("bucket_gt_90", 0) for row in aging_map.values())
+
+    return {
+        "bucket_0_30": int(total_0_30),
+        "bucket_31_90": int(total_31_90),
+        "bucket_gt_90": int(total_gt_90),
+    }
 
 
 def _get_project_titles(project_names):
