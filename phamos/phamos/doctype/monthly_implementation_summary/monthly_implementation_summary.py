@@ -3,7 +3,7 @@
 
 import frappe
 from frappe.model.document import Document
-from frappe.utils import cint, get_first_day, get_last_day, flt, getdate
+from frappe.utils import cint, get_first_day, get_last_day, flt, getdate, add_to_date
 from frappe.query_builder import DocType, Order
 from frappe.desk.form.assign_to import add
 from frappe.desk.form.assign_to import add as add_assignment
@@ -898,6 +898,297 @@ def _find_existing_sales_invoice_for_delivery_note(delivery_note):
 			return si
 
 	return None
+
+
+def _timesheet_is_pending_for_approval(docstatus, status=None):
+	status_norm = (status or "").strip().lower()
+	if status_norm:
+		return status_norm == "draft"
+
+	if cint(docstatus) == 2:
+		return False
+	if cint(docstatus) == 1:
+		return False
+	return True
+
+
+def _parse_timesheet_names(timesheets):
+	if not timesheets:
+		return []
+	if isinstance(timesheets, str):
+		try:
+			import json
+
+			timesheets = json.loads(timesheets)
+		except Exception:
+			timesheets = [timesheets]
+	if not isinstance(timesheets, (list, tuple, set)):
+		return []
+	out = []
+	seen = set()
+	for ts in timesheets:
+		name = (str(ts or "")).strip()
+		if not name or name in seen:
+			continue
+		seen.add(name)
+		out.append(name)
+	return out
+
+
+def _parse_timesheet_billable_rows(rows):
+	if not rows:
+		return []
+	if isinstance(rows, str):
+		try:
+			import json
+
+			rows = json.loads(rows)
+		except Exception:
+			return []
+	if not isinstance(rows, (list, tuple)):
+		return []
+	out = []
+	for row in rows:
+		if not isinstance(row, dict):
+			continue
+		ts_name = (str(row.get("timesheet") or "")).strip()
+		if not ts_name:
+			continue
+		out.append({"timesheet": ts_name, "billable_hours": flt(row.get("billable_hours"))})
+	return out
+
+
+def _set_timesheet_billable_hours(ts_doc, target_billable_hours):
+	"""Update Timesheet Detail billing_hours and hours, then save in draft.
+
+	This keeps billable edits from the MIS dialog in sync with Timesheet worked hours
+	so MIS totals reflect the same value after refresh.
+	"""
+	if cint(ts_doc.docstatus) != 0:
+		frappe.throw(frappe._("Timesheet {0} is not in Draft.").format(frappe.bold(ts_doc.name)))
+
+	logs = list(ts_doc.get("time_logs") or [])
+	if not logs:
+		frappe.throw(frappe._("Timesheet {0} has no time logs.").format(frappe.bold(ts_doc.name)))
+
+	target = max(flt(target_billable_hours), 0)
+	total_hours = flt(sum(flt(getattr(log, "hours", 0)) for log in logs), 2)
+
+	if total_hours <= 0:
+		for idx, log in enumerate(logs):
+			bill = target if idx == 0 else 0
+			log.billing_hours = bill
+			log.hours = bill
+			if getattr(log, "from_time", None):
+				log.to_time = add_to_date(log.from_time, hours=bill)
+		ts_doc.save(ignore_permissions=True)
+		return
+
+	running = 0.0
+	for idx, log in enumerate(logs):
+		if idx == len(logs) - 1:
+			bill = flt(target - running, 2)
+		else:
+			ratio = flt(getattr(log, "hours", 0)) / total_hours if total_hours else 0
+			bill = flt(target * ratio, 2)
+			running += bill
+		bill = max(bill, 0)
+		log.billing_hours = bill
+		log.hours = bill
+		if getattr(log, "from_time", None):
+			log.to_time = add_to_date(log.from_time, hours=bill)
+
+	ts_doc.save(ignore_permissions=True)
+	ts_doc.reload()
+	total_hours = flt(sum(flt(getattr(log, "hours", 0)) for log in (ts_doc.time_logs or [])), 2)
+	total_billable_hours = flt(sum(flt(getattr(log, "billing_hours", 0)) for log in (ts_doc.time_logs or [])), 2)
+	frappe.db.set_value(
+		"Timesheet",
+		ts_doc.name,
+		{"total_hours": total_hours, "total_billable_hours": total_billable_hours},
+		update_modified=False,
+	)
+
+
+@frappe.whitelist()
+def get_timesheet_approval_rows(docname: str, employee=None, project=None, date_from=None, date_to=None):
+	_require_docname(docname)
+	doc = frappe.get_doc("Monthly Implementation Summary", docname)
+	doc.check_permission("read")
+
+	employee_filter = (employee or "").strip()
+	project_filter = (project or "").strip()
+	from_date = getdate(date_from) if date_from else None
+	to_date = getdate(date_to) if date_to else None
+
+	base_rows = list(doc.timesheets_table or [])
+	timesheet_names = [
+		(str(getattr(r, "timesheet", "") or "").strip())
+		for r in base_rows
+		if (str(getattr(r, "timesheet", "") or "").strip())
+	]
+	meta_by_name = {}
+	if timesheet_names:
+		ts_has_status = frappe.db.has_column("Timesheet", "status")
+		ts_fields = ["name", "docstatus"]
+		if ts_has_status:
+			ts_fields.append("status")
+		for ts in frappe.get_all(
+			"Timesheet",
+			filters={"name": ["in", list(set(timesheet_names))]},
+			fields=ts_fields,
+		):
+			meta_by_name[ts.name] = ts
+
+	result = []
+	for row in base_rows:
+		ts_name = (getattr(row, "timesheet", "") or "").strip()
+		emp_name = (getattr(row, "employee_name", "") or "").strip()
+		row_project = (getattr(row, "project", "") or "").strip()
+		row_employee = (getattr(row, "employee", "") or "").strip()
+		row_date_raw = getattr(row, "date", None)
+		row_date = getdate(row_date_raw) if row_date_raw else None
+		meta = meta_by_name.get(ts_name)
+		docstatus = cint(meta.docstatus) if meta else 0
+		status = (meta.status if meta else "") or ""
+		is_pending = _timesheet_is_pending_for_approval(docstatus, status)
+
+		if employee_filter:
+			if row_employee != employee_filter and emp_name != employee_filter:
+				continue
+		if project_filter:
+			if row_project != project_filter:
+				continue
+		if from_date and (not row_date or row_date < from_date):
+			continue
+		if to_date and (not row_date or row_date > to_date):
+			continue
+		if not is_pending:
+			continue
+
+		result.append(
+			{
+				"timesheet": ts_name,
+				"date": str(getattr(row, "date", "") or ""),
+				"employee_name": emp_name,
+				"employee": row_employee,
+				"project": row_project,
+				"total_hours": flt(getattr(row, "total_hours", 0)),
+				"billable_hours": flt(getattr(row, "billable_hours", 0)),
+				"docstatus": docstatus,
+				"status": status,
+				"is_pending": 1 if is_pending else 0,
+			}
+		)
+
+	return result
+
+
+@frappe.whitelist()
+def save_timesheet_billable_in_mis(docname: str, rows):
+	_require_docname(docname)
+	doc = frappe.get_doc("Monthly Implementation Summary", docname)
+	doc.check_permission("read")
+
+	updates = _parse_timesheet_billable_rows(rows)
+	if not updates:
+		return {"updated": 0, "failed": 0, "failed_details": []}
+
+	allowed = {
+		(str(getattr(r, "timesheet", "") or "")).strip()
+		for r in (doc.timesheets_table or [])
+		if (str(getattr(r, "timesheet", "") or "")).strip()
+	}
+
+	updated = 0
+	updated_timesheets = []
+	failed_details = []
+
+	for row in updates:
+		ts_name = row["timesheet"]
+		if ts_name not in allowed:
+			failed_details.append({"timesheet": ts_name, "error": "Timesheet is not part of this MIS."})
+			continue
+		if not frappe.db.exists("Timesheet", ts_name):
+			failed_details.append({"timesheet": ts_name, "error": "Timesheet not found."})
+			continue
+
+		try:
+			ts_doc = frappe.get_doc("Timesheet", ts_name)
+			# MIS action should be able to persist draft-hour corrections for linked timesheets.
+			_set_timesheet_billable_hours(ts_doc, row["billable_hours"])
+			updated += 1
+			updated_timesheets.append(ts_name)
+		except Exception as e:
+			failed_details.append({"timesheet": ts_name, "error": str(e)})
+
+	if updated:
+		doc.reload()
+		doc.set_timesheets_table()
+		doc._recalculate_totals_from_timesheets_table()
+		doc.save(ignore_permissions=True)
+		frappe.db.commit()
+
+	return {
+		"updated": updated,
+		"updated_timesheets": updated_timesheets,
+		"requested": len(updates),
+		"failed": len(failed_details),
+		"failed_details": failed_details,
+	}
+
+
+@frappe.whitelist()
+def approve_timesheets_in_mis(docname: str, timesheets):
+	_require_docname(docname)
+	doc = frappe.get_doc("Monthly Implementation Summary", docname)
+	doc.check_permission("read")
+
+	selected = _parse_timesheet_names(timesheets)
+	if not selected:
+		return {"approved": 0, "already_approved": 0, "failed": 0, "failed_details": []}
+
+	allowed = {
+		(str(getattr(r, "timesheet", "") or "")).strip()
+		for r in (doc.timesheets_table or [])
+		if (str(getattr(r, "timesheet", "") or "")).strip()
+	}
+
+	approved = 0
+	already_approved = 0
+	failed_details = []
+
+	for ts_name in selected:
+		if ts_name not in allowed:
+			failed_details.append({"timesheet": ts_name, "error": "Timesheet is not part of this MIS."})
+			continue
+		if not frappe.db.exists("Timesheet", ts_name):
+			failed_details.append({"timesheet": ts_name, "error": "Timesheet not found."})
+			continue
+
+		try:
+			ts_doc = frappe.get_doc("Timesheet", ts_name)
+			ts_doc.check_permission("submit")
+			if not _timesheet_is_pending_for_approval(
+				ts_doc.docstatus,
+				getattr(ts_doc, "status", None),
+			):
+				already_approved += 1
+				continue
+
+			if cint(ts_doc.docstatus) == 0:
+				ts_doc.submit()
+
+			approved += 1
+		except Exception as e:
+			failed_details.append({"timesheet": ts_name, "error": str(e)})
+
+	return {
+		"approved": approved,
+		"already_approved": already_approved,
+		"failed": len(failed_details),
+		"failed_details": failed_details,
+	}
 
 
 @frappe.whitelist()

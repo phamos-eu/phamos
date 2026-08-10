@@ -46,6 +46,397 @@ function _mis_set_create_sales_invoice_button(frm) {
 	});
 }
 
+function _mis_is_timesheet_pending(row) {
+	if (!row) return false;
+	if (Object.prototype.hasOwnProperty.call(row, "is_pending")) {
+		return cint(row.is_pending) === 1;
+	}
+	if (cint(row.docstatus) === 2) return false;
+	if (cint(row.docstatus) === 1) return false;
+	const workflow_state = (row.workflow_state || "").toLowerCase();
+	const status = (row.status || "").toLowerCase();
+	if (["approved", "submitted", "completed", "billed"].includes(workflow_state)) {
+		return false;
+	}
+	if (["submitted", "completed", "billed"].includes(status)) {
+		return false;
+	}
+	return true;
+}
+
+function _mis_escape(value) {
+	return frappe.utils.escape_html(value || "");
+}
+
+function _mis_number(value) {
+	return _mis_escape(format_number(flt(value || 0), null, 2));
+}
+
+function _mis_get_active_filters_summary_html(filters) {
+	const parts = [];
+	if (filters.employee) {
+		parts.push(`${__("Employee")}: <strong>${_mis_escape(filters.employee)}</strong>`);
+	}
+	if (filters.project) {
+		parts.push(`${__("Project")}: <strong>${_mis_escape(filters.project)}</strong>`);
+	}
+	if (filters.date_from || filters.date_to) {
+		const from_label = filters.date_from ? _mis_escape(filters.date_from) : "-";
+		const to_label = filters.date_to ? _mis_escape(filters.date_to) : "-";
+		parts.push(`${__("Date")}: <strong>${from_label}</strong> - <strong>${to_label}</strong>`);
+	}
+	if (!parts.length) {
+		return `<div class="mis-ts-filters text-muted">${__("Active filters: None")}</div>`;
+	}
+	return `<div class="mis-ts-filters">${__("Active filters")}: ${parts.join(" | ")}</div>`;
+}
+
+function _mis_timesheet_row_html(row) {
+	const pending = _mis_is_timesheet_pending(row);
+	const can_select = pending && row.timesheet;
+	const badge_class = pending ? "orange" : "green";
+	const badge_label = pending ? __("Pending") : __("Approved");
+	const billable_value = flt(row.billable_hours || 0);
+
+	return `
+		<tr>
+			<td class="mis-ts-col-check">
+				<input type="checkbox" class="mis-ts-select" data-timesheet="${_mis_escape(row.timesheet)}" ${can_select ? "" : "disabled"}>
+			</td>
+			<td><a href="/app/timesheet/${encodeURIComponent(row.timesheet || "")}" target="_blank">${_mis_escape(row.timesheet)}</a></td>
+			<td>${_mis_escape(row.date)}</td>
+			<td>${_mis_escape(row.employee_name)}</td>
+			<td>${_mis_escape(row.project)}</td>
+			<td class="mis-ts-col-num">${_mis_number(row.total_hours)}</td>
+			<td class="mis-ts-col-num">
+				<input
+					type="text"
+					inputmode="decimal"
+					class="mis-ts-billable-input"
+					data-timesheet="${_mis_escape(row.timesheet)}"
+					value="${billable_value}"
+					style="width:92px; text-align:right;"
+				>
+			</td>
+			<td><span class="indicator-pill ${badge_class}">${badge_label}</span></td>
+		</tr>
+	`;
+}
+
+function _mis_render_timesheet_approval_table(dialog, rows) {
+	const html_field = dialog.get_field("timesheet_approval_html");
+	if (!html_field || !html_field.$wrapper) return;
+	const filters = dialog.__mis_ts_filters || {};
+	const filters_summary_html = _mis_get_active_filters_summary_html(filters);
+	const table_rows = (rows || []).map(_mis_timesheet_row_html).join("");
+
+	html_field.$wrapper.html(`
+		<style>
+			.mis-ts-wrap .mis-ts-note { margin-bottom: 8px; }
+			.mis-ts-wrap .mis-ts-filters { margin-bottom: 10px; font-size: 12px; }
+			.mis-ts-wrap .mis-ts-toolbar { display:flex; justify-content:space-between; align-items:center; gap:8px; margin-bottom:10px; }
+			.mis-ts-wrap .mis-ts-actions { display:flex; gap:8px; align-items:center; }
+			.mis-ts-wrap .mis-ts-select-all { margin:0; display:flex; align-items:center; gap:8px; font-weight:500; }
+			.mis-ts-wrap .mis-ts-table-wrap { max-height: 58vh; overflow: auto; border: 1px solid var(--border-color); border-radius: 8px; }
+			.mis-ts-wrap .mis-ts-col-check { width: 36px; text-align: center; }
+			.mis-ts-wrap .mis-ts-col-num { text-align: right; }
+			.mis-ts-wrap table { margin-bottom: 0; }
+			.mis-ts-wrap thead th { position: sticky; top: 0; background: var(--bg-color); z-index: 1; }
+		</style>
+		<div class="mis-ts-wrap">
+		<div class="small text-muted mis-ts-note">
+			${__("Review and approve pending timesheets for this MIS period.")}
+		</div>
+		${filters_summary_html}
+		<div class="mis-ts-toolbar">
+			<div class="mis-ts-actions">
+				<button class="btn btn-default btn-sm" type="button" id="mis-ts-filter-btn">${__("Filter")}</button>
+				<button class="btn btn-light btn-sm" type="button" id="mis-ts-clear-filter-btn">${__("Clear")}</button>
+			</div>
+			<label class="mis-ts-select-all">
+				<input type="checkbox" id="mis-ts-select-all"> ${__("Select all pending")}
+			</label>
+		</div>
+		<div class="mis-ts-table-wrap">
+			<table class="table table-bordered table-hover">
+				<thead>
+					<tr>
+						<th class="mis-ts-col-check"></th>
+						<th>${__("Timesheet")}</th>
+						<th>${__("Date")}</th>
+						<th>${__("Employee")}</th>
+						<th>${__("Project")}</th>
+						<th class="mis-ts-col-num">${__("Total")}</th>
+						<th class="mis-ts-col-num">${__("Billable")}</th>
+						<th>${__("Status")}</th>
+					</tr>
+				</thead>
+				<tbody>
+					${table_rows || `<tr><td colspan="8" class="text-muted text-center">${__("No timesheets found for the current filter.")}</td></tr>`}
+				</tbody>
+			</table>
+		</div>
+		</div>
+	`);
+}
+
+function _mis_render_timesheet_loading_state(dialog) {
+	const html_field = dialog.get_field("timesheet_approval_html");
+	if (!html_field || !html_field.$wrapper) return;
+	html_field.$wrapper.html(
+		`<div class="small text-muted" style="padding:16px 6px;">${__("Loading timesheets...")}</div>`
+	);
+}
+
+function _mis_get_selected_timesheets(dialog) {
+	const selected = [];
+	dialog.$wrapper.find(".mis-ts-select:checked").each(function () {
+		const ts = $(this).attr("data-timesheet");
+		if (ts) selected.push(ts);
+	});
+	return selected;
+}
+
+function _mis_get_billable_updates(dialog) {
+	const updates = [];
+	const originals = dialog.__mis_ts_original_billable || {};
+	dialog.$wrapper.find(".mis-ts-billable-input").each(function () {
+		const timesheet = ($(this).attr("data-timesheet") || "").trim();
+		const billable = flt($(this).val() || 0);
+		const original = flt(originals[timesheet] || 0);
+		if (!timesheet) return;
+		if (Math.abs(billable - original) < 0.0001) return;
+		updates.push({
+			timesheet,
+			billable_hours: billable,
+		});
+	});
+	return updates;
+}
+
+function _mis_save_billable_changes(frm, dialog) {
+	const rows = _mis_get_billable_updates(dialog);
+	if (!rows.length) {
+		frappe.show_alert({
+			message: __("No billable changes to save."),
+			indicator: "blue",
+		});
+		return Promise.resolve();
+	}
+
+	return frappe.call({
+		method: "phamos.phamos.doctype.monthly_implementation_summary.monthly_implementation_summary.save_timesheet_billable_in_mis",
+		args: {
+			docname: frm.doc.name,
+			rows,
+		},
+		freeze: true,
+		freeze_message: __("Saving billable hours..."),
+	}).then((r) => {
+		const data = (r && r.message) || {};
+		const updated_names = Array.isArray(data.updated_timesheets) ? data.updated_timesheets : [];
+		frappe.show_alert({
+			message: updated_names.length
+				? __("Saved: {0} ({1}), Failed: {2}", [
+					cint(data.updated || 0),
+					updated_names.join(", "),
+					cint(data.failed || 0),
+				])
+				: __("Saved: {0}, Failed: {1}", [cint(data.updated || 0), cint(data.failed || 0)]),
+			indicator: cint(data.failed || 0) ? "orange" : "green",
+		});
+
+		if (data.failed_details && data.failed_details.length) {
+			frappe.msgprint({
+				title: __("Some updates failed"),
+				indicator: "orange",
+				message: data.failed_details
+					.map((item) => `${_mis_escape(item.timesheet || "")} : ${_mis_escape(item.error || "")}`)
+					.join("<br>"),
+			});
+		}
+
+		return frm.reload_doc().then(() => _mis_load_timesheet_approval_rows(frm, dialog));
+	});
+}
+
+function _mis_submit_selected_timesheets(frm, dialog) {
+	const selected_timesheets = _mis_get_selected_timesheets(dialog);
+	if (!selected_timesheets.length) {
+		frappe.show_alert({
+			message: __("Select at least one pending timesheet to submit."),
+			indicator: "orange",
+		});
+		return Promise.resolve(false);
+	}
+
+	return frappe.call({
+		method: "phamos.phamos.doctype.monthly_implementation_summary.monthly_implementation_summary.approve_timesheets_in_mis",
+		args: {
+			docname: frm.doc.name,
+			timesheets: selected_timesheets,
+		},
+		freeze: true,
+		freeze_message: __("Submitting selected timesheets..."),
+	}).then((r) => {
+		const data = (r && r.message) || {};
+		frappe.show_alert({
+			message: __("Submitted: {0}, Skipped: {1}, Failed: {2}", [
+				cint(data.approved || 0),
+				cint(data.already_approved || 0),
+				cint(data.failed || 0),
+			]),
+			indicator: cint(data.failed || 0) ? "orange" : "green",
+		});
+
+		if (data.failed_details && data.failed_details.length) {
+			frappe.msgprint({
+				title: __("Some submissions failed"),
+				indicator: "orange",
+				message: data.failed_details
+					.map((item) => `${_mis_escape(item.timesheet || "")} : ${_mis_escape(item.error || "")}`)
+					.join("<br>"),
+			});
+		}
+
+		return frm.reload_doc().then(() => true);
+	});
+}
+
+function _mis_bind_timesheet_approval_dialog_events(frm, dialog) {
+	dialog.$wrapper.off("change", "#mis-ts-select-all");
+	dialog.$wrapper.on("change", "#mis-ts-select-all", function () {
+		const checked = !!$(this).is(":checked");
+		dialog.$wrapper.find(".mis-ts-select:not(:disabled)").prop("checked", checked);
+	});
+
+	dialog.$wrapper.off("click", "#mis-ts-filter-btn");
+	dialog.$wrapper.on("click", "#mis-ts-filter-btn", function () {
+		const filters = dialog.__mis_ts_filters || {};
+		frappe.prompt(
+			[
+				{
+					label: __("Employee"),
+					fieldname: "employee",
+						fieldtype: "Link",
+						options: "Employee",
+					default: filters.employee || "",
+				},
+				{
+					label: __("Project"),
+					fieldname: "project",
+						fieldtype: "Link",
+						options: "Project",
+					default: filters.project || "",
+				},
+				{
+						label: __("From Date"),
+						fieldname: "date_from",
+						fieldtype: "Date",
+						default: filters.date_from || "",
+					},
+					{
+						label: __("To Date"),
+						fieldname: "date_to",
+						fieldtype: "Date",
+						default: filters.date_to || "",
+				},
+			],
+			(values) => {
+				dialog.__mis_ts_filters = {
+					employee: values.employee || "",
+					project: values.project || "",
+					date_from: values.date_from || "",
+					date_to: values.date_to || "",
+				};
+				_mis_load_timesheet_approval_rows(frm, dialog);
+			},
+			__("Filter Timesheets"),
+			__("Apply")
+		);
+	});
+
+	dialog.$wrapper.off("click", "#mis-ts-clear-filter-btn");
+	dialog.$wrapper.on("click", "#mis-ts-clear-filter-btn", function () {
+		dialog.__mis_ts_filters = {};
+		dialog.$wrapper.find("#mis-ts-select-all").prop("checked", false);
+		_mis_load_timesheet_approval_rows(frm, dialog);
+	});
+}
+
+function _mis_load_timesheet_approval_rows(frm, dialog) {
+	const filters = dialog.__mis_ts_filters || {};
+	_mis_render_timesheet_loading_state(dialog);
+	return frappe.call({
+		method: "phamos.phamos.doctype.monthly_implementation_summary.monthly_implementation_summary.get_timesheet_approval_rows",
+		args: {
+			docname: frm.doc.name,
+			employee: filters.employee || null,
+			project: filters.project || null,
+			date_from: filters.date_from || null,
+			date_to: filters.date_to || null,
+		},
+		freeze: false,
+	}).then((r) => {
+		dialog.__mis_ts_rows = (r && r.message) || [];
+		dialog.__mis_ts_original_billable = {};
+		dialog.__mis_ts_rows.forEach((row) => {
+			if (row && row.timesheet) {
+				dialog.__mis_ts_original_billable[row.timesheet] = flt(row.billable_hours || 0);
+			}
+		});
+		_mis_render_timesheet_approval_table(dialog, dialog.__mis_ts_rows);
+		_mis_bind_timesheet_approval_dialog_events(frm, dialog);
+	});
+}
+
+function _mis_show_timesheet_approval_dialog(frm) {
+	const dialog = new frappe.ui.Dialog({
+		title: __("Timesheet Approval"),
+		fields: [{
+			fieldname: "timesheet_approval_html",
+			fieldtype: "HTML",
+		}],
+		primary_action_label: __("Save"),
+		secondary_action_label: __("Close"),
+		secondary_action: () => {
+			_mis_submit_selected_timesheets(frm, dialog).then((ok) => {
+				if (ok) dialog.hide();
+			});
+		},
+		primary_action: () => {
+			_mis_save_billable_changes(frm, dialog);
+		},
+	});
+
+	dialog.__mis_ts_filters = {};
+	dialog.show();
+	dialog.$wrapper.find(".modal-dialog").css("max-width", "1180px");
+	const $footer = dialog.$wrapper.find(".modal-footer");
+	$footer.find(".btn-primary").css({
+		background: "#111",
+		borderColor: "#111",
+		fontWeight: "700",
+	});
+	$footer.find(".btn-secondary, .btn-default").first().css({
+		background: "#111",
+		color: "#fff",
+		borderColor: "#111",
+		fontWeight: "700",
+	});
+	_mis_load_timesheet_approval_rows(frm, dialog);
+}
+
+function _mis_maybe_open_timesheet_approval_dialog(frm) {
+	if (frm.is_new() || !frm.doc.name) return;
+	if (!Array.isArray(frm.doc.timesheets_table) || !frm.doc.timesheets_table.length) return;
+	if (frm.__mis_timesheet_dialog_opened_for === frm.doc.name) return;
+	frm.__mis_timesheet_dialog_opened_for = frm.doc.name;
+	setTimeout(() => {
+		_mis_show_timesheet_approval_dialog(frm);
+	}, 250);
+}
+
 function _mis_create_sales_invoice(frm) {
 	frappe.call({
 		method: "phamos.phamos.doctype.monthly_implementation_summary.monthly_implementation_summary.create_sales_invoice_from_mis",
@@ -174,6 +565,7 @@ frappe.ui.form.on("Monthly Implementation Summary", {
 			Object.keys(defaults).forEach(k => { frm.set_value(k, defaults[k]); });
 			return;
 		}
+		_mis_maybe_open_timesheet_approval_dialog(frm);
 		// Add Sales Orders to connections dashboard
 		if (frm.doc.implementation) {
 			frappe.db.get_list('Sales Order', {
