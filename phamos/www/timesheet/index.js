@@ -3,7 +3,7 @@ let totalCount = 0;
 let loadedCount = 0;
 let currentSortBy = null;
 let currentSortOrder = null;
-let currentChartView = 'week'; // 'week' or 'month'
+let currentChartView = 'month'; // 'week' or 'month'
 let cachedTimesheetData = null; // Cache the timesheet data
 const sortFieldMap = {
     1: "timesheet",
@@ -34,12 +34,13 @@ frappe.ready(() => {
       });
     }
 
-  // Initialize chart view from localStorage or default to 'week'
-  currentChartView = localStorage.getItem('timesheetChartView') || 'week';
+  // Force month view on page load.
+  currentChartView = 'month';
+  localStorage.setItem('timesheetChartView', 'month');
   updateChartViewButtons();
 
-  //set default date range
-  // set_default_month_range();
+  // Set default date range to last 6 months till today.
+  set_default_month_range();
   load_projects();
   attach_filter_events();
   reset_and_load();
@@ -536,14 +537,8 @@ function download_all_csv() {
 
 function set_default_month_range() {
   const today = new Date();
-  const year = today.getFullYear();
-  const month = today.getMonth();
-
-  // First day of current month
-  const firstDay = new Date(year, month, 1);
-
-  // Last day of current month
-  const lastDay = new Date(year, month + 1, 0);
+  const fromDate = new Date(today);
+  fromDate.setMonth(fromDate.getMonth() - 6);
 
   // Format as yyyy-mm-dd
   const format = (date) => {
@@ -553,8 +548,8 @@ function set_default_month_range() {
     return `${yyyy}-${mm}-${dd}`;
   };
 
-  $('#from_date').val(format(firstDay));
-  $('#to_date').val(format(lastDay));
+  $('#from_date').val(format(fromDate));
+  $('#to_date').val(format(today));
 }
 
 function format_hours(decimal_hours) {
@@ -666,7 +661,28 @@ function generateCompletePeriods(minDate, maxDate, viewType) {
 }
 
 //////////////////////////process your timesheets data////////////////////
-function processDataForGraph(timesheets) {
+function processDataForGraph(timesheets, allowRetry = true) {
+  if (typeof Highcharts === 'undefined') {
+    if (!allowRetry) {
+      return;
+    }
+
+    const existing = document.querySelector('script[data-timesheet-highcharts="1"]');
+
+    if (existing) {
+      existing.addEventListener('load', () => processDataForGraph(timesheets, false), { once: true });
+      return;
+    }
+
+    const script = document.createElement('script');
+    script.src = 'https://code.highcharts.com/highcharts.js';
+    script.async = true;
+    script.dataset.timesheetHighcharts = '1';
+    script.onload = () => processDataForGraph(timesheets, false);
+    document.head.appendChild(script);
+    return;
+  }
+
     // Cache the data for later use when toggling
     cachedTimesheetData = timesheets;
     
