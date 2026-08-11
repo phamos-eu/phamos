@@ -90,6 +90,7 @@ frappe.ui.form.on("Implementation", {
         frm.trigger("render_gitlab_issues_section");
         frm.trigger("render_gitlab_milestones_section");
         frm.trigger("render_risk_overview_section");
+        frm.trigger("render_rank_html_section");
 
         if (!document.getElementById("gitlab-custom-style")) {
             const style = document.createElement("style");
@@ -229,7 +230,7 @@ frappe.ui.form.on("Implementation", {
             document.head.appendChild(rankStyle);
         }
 
-        // Avoid mutating child table on every refresh; server-side save logic keeps rows consistent.
+        // add_row_to_sales_order(frm);
         frm.fields_dict.reset.$input.on('click', function () {
             frm.set_value("prediction_from_date", "");
             frm.set_value("prediction_to_date", "");
@@ -1070,6 +1071,21 @@ frappe.ui.form.on("Implementation", {
                         </table>
                     </div>
                 `);
+            }
+        });
+    },
+    render_rank_html_section(frm) {
+        if (frm.is_new()) return;
+
+        const wrapper = frm.fields_dict.rank_html?.wrapper;
+        if (!wrapper) return;
+
+        frappe.call({
+            method: "phamos.phamos.doctype.implementation.implementation.get_implementation_rank_overview",
+            args: { name: frm.doc.name },
+            callback: function (r) {
+                const rankHtml = r.message?.rank_html || `<div class="text-muted">${__("No ranking available.")}</div>`;
+                $(wrapper).html(rankHtml);
             }
         });
     },
