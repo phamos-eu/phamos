@@ -101,6 +101,7 @@ frappe.ui.form.on("Implementation", {
         frm.trigger("render_gitlab_issues_section");
         frm.trigger("render_gitlab_milestones_section");
         frm.trigger("render_risk_overview_section");
+        frm.trigger("render_rank_html_section");
 
         if (!document.getElementById("gitlab-custom-style")) {
             const style = document.createElement("style");
@@ -185,6 +186,59 @@ frappe.ui.form.on("Implementation", {
                 }
             `;
             document.head.appendChild(riskStyle);
+        }
+
+        if (!document.getElementById("implementation-rank-style")) {
+            const rankStyle = document.createElement("style");
+            rankStyle.id = "implementation-rank-style";
+            rankStyle.innerHTML = `
+                .implementation-rank-card {
+                    border: 1px solid var(--border-color, #d1d8dd);
+                    border-radius: 10px;
+                    padding: 10px 12px;
+                    background: var(--control-bg, #f8f9fa);
+                }
+
+                .implementation-rank-title {
+                    font-size: 12px;
+                    font-weight: 700;
+                    text-transform: uppercase;
+                    letter-spacing: 0.03em;
+                    color: var(--text-muted, #8d99a6);
+                    margin-bottom: 6px;
+                }
+
+                .implementation-rank-row {
+                    display: flex;
+                    justify-content: space-between;
+                    align-items: center;
+                    gap: 8px;
+                    padding: 5px 0;
+                    border-top: 1px solid var(--border-color, #e3e8ee);
+                }
+
+                .implementation-rank-row:first-of-type {
+                    border-top: none;
+                }
+
+                .implementation-rank-label {
+                    font-size: 13px;
+                    color: var(--text-color, #2f3542);
+                }
+
+                .implementation-rank-value {
+                    font-size: 12px;
+                    font-weight: 700;
+                    color: var(--text-color, #2f3542);
+                    background: var(--bg-color, #ffffff);
+                    border: 1px solid var(--border-color, #d1d8dd);
+                    border-radius: 999px;
+                    padding: 2px 8px;
+                    min-width: 42px;
+                    text-align: center;
+                }
+            `;
+            document.head.appendChild(rankStyle);
         }
 
         // add_row_to_sales_order(frm);
@@ -1027,6 +1081,21 @@ frappe.ui.form.on("Implementation", {
                         </table>
                     </div>
                 `);
+            }
+        });
+    },
+    render_rank_html_section(frm) {
+        if (frm.is_new()) return;
+
+        const wrapper = frm.fields_dict.rank_html?.wrapper;
+        if (!wrapper) return;
+
+        frappe.call({
+            method: "phamos.phamos.doctype.implementation.implementation.get_implementation_rank_overview",
+            args: { name: frm.doc.name },
+            callback: function (r) {
+                const rankHtml = r.message?.rank_html || `<div class="text-muted">${__("No ranking available.")}</div>`;
+                $(wrapper).html(rankHtml);
             }
         });
     },

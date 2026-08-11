@@ -12,6 +12,14 @@
   "risk_overview_html",
   "column_break_risk_overview",
   "modules_overview",
+  "implementation_stats_section",
+  "total_time_implementation_life",
+  "total_time_last_12_months",
+  "total_time_last_6_months",
+  "total_time_last_3_months",
+  "predicted_time_next_3_months",
+  "column_break_implementation_stats",
+  "rank_html",
   "section_break_ukuc",
   "status",
   "notes",
@@ -345,6 +353,46 @@
    "label": "Modules Overview"
   },
   {
+   "collapsible": 1,
+   "fieldname": "implementation_stats_section",
+   "fieldtype": "Section Break",
+   "label": "Implementation Stats"
+  },
+  {
+   "fieldname": "total_time_implementation_life",
+   "fieldtype": "Float",
+   "label": "Total Time Implementation Life",
+   "read_only": 1
+  },
+  {
+   "fieldname": "total_time_last_12_months",
+   "fieldtype": "Float",
+   "label": "Total Time Last 12 Months",
+   "read_only": 1
+  },
+  {
+   "fieldname": "column_break_implementation_stats",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "total_time_last_6_months",
+   "fieldtype": "Float",
+   "label": "Total Time Last 6 Months",
+   "read_only": 1
+  },
+  {
+   "fieldname": "total_time_last_3_months",
+   "fieldtype": "Float",
+   "label": "Total Time Last 3 Months",
+   "read_only": 1
+  },
+  {
+   "fieldname": "predicted_time_next_3_months",
+   "fieldtype": "Float",
+   "label": "Predicted Time Next 3 Months",
+   "read_only": 1
+  },
+  {
    "fieldname": "section_break_ukuc",
    "fieldtype": "Section Break"
   },
@@ -490,6 +538,11 @@
    "fieldname": "commercial_details_tab",
    "fieldtype": "Tab Break",
    "label": "Commercial Details"
+  },
+  {
+   "fieldname": "rank_html",
+   "fieldtype": "HTML",
+   "label": "Rank"
   }
  ],
  "index_web_pages_for_search": 1,
@@ -531,7 +584,7 @@
    "link_fieldname": "implementation"
   }
  ],
- "modified": "2026-06-29 12:29:34.921599",
+ "modified": "2026-08-11 12:27:46.478884",
  "modified_by": "Administrator",
  "module": "Phamos",
  "name": "Implementation",
