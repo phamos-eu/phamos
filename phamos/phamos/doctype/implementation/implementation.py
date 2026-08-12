@@ -30,6 +30,7 @@ class Implementation(Document):
 				)
 
 	def before_save(self):
+		self.sync_sales_order_status_information()
 		self.add_financial_snapshot()
 
 		if self.resource_planning_prediction:
@@ -77,6 +78,16 @@ class Implementation(Document):
 		self.add_implementation_stats()
 		self.add_rank_html()
 		self.add_status_history()
+
+	def sync_sales_order_status_information(self):
+		if not self.name or not self.customer:
+			self.sales_order_status_information = []
+			return
+
+		rows = get_sales_order_status_information(name=self.name, customer=self.customer)
+		self.sales_order_status_information = []
+		for row in rows:
+			self.append("sales_order_status_information", row)
 
 	def _parse_month_key(self, value):
 		if not value:
@@ -465,6 +476,71 @@ def get_financial_history(name, customer = None):
 		"timesheet_hrs": 0,
 		"remaining_hrs": 0,
 		"open_so": 0,
+	}
+
+
+def _delivered_hours_against_sales_order(sales_order_name):
+	rows = frappe.db.sql(
+		"""
+		SELECT dni.qty
+		FROM `tabDelivery Note Item` dni
+		INNER JOIN `tabDelivery Note` dn ON dn.name = dni.parent
+		WHERE dni.against_sales_order = %s
+			AND dn.docstatus = 1
+			AND IFNULL(dn.status, '') NOT IN ('Cancelled', 'Closed')
+		""",
+		sales_order_name,
+		as_dict=True,
+	)
+	return flt(sum(flt(r.get("qty")) for r in rows)) if rows else 0
+
+
+def get_sales_order_status_information(name, customer=None):
+	if not name:
+		return []
+
+	if not customer:
+		customer = frappe.db.get_value("Implementation", name, "customer")
+
+	if not customer:
+		return []
+
+	open_so = {
+		"customer": customer,
+		"custom_implementation": name,
+		"status": ["in", ["To Deliver", "To Bill", "To Deliver and Bill"]],
+		"docstatus": 1,
+	}
+
+	rows = []
+	for so in frappe.get_all(
+		"Sales Order",
+		filters=open_so,
+		fields=["name", "status", "total_qty", "customer_name"],
+		order_by="transaction_date desc",
+	):
+		total_hrs = flt(so.total_qty)
+		delivered_total_hrs = _delivered_hours_against_sales_order(so.name)
+		remaining_hrs = flt(total_hrs - delivered_total_hrs, 2)
+		rows.append(
+			{
+				"sales_order": so.name,
+				"so_title": so.customer_name or "",
+				"total_hrs": total_hrs,
+				"status": so.status or "",
+				"delivered_total_hrs": delivered_total_hrs,
+				"remaining_hrs": remaining_hrs,
+			}
+		)
+
+	return rows
+
+
+@frappe.whitelist()
+def get_financial_snapshot(name, customer=None):
+	return {
+		"financial_history": get_financial_history(name=name, customer=customer),
+		"sales_order_status_information": get_sales_order_status_information(name=name, customer=customer),
 	}
 
 
