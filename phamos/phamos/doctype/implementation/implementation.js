@@ -21,27 +21,13 @@ frappe.ui.form.on("Implementation", {
                 add_row_to_sales_order(frm);
             }
                 frappe.call({
-                    method: "phamos.phamos.doctype.implementation.implementation.get_financial_history",
+                    method: "phamos.phamos.doctype.implementation.implementation.get_financial_snapshot",
                     args: { 'name': frm.doc.name, 'customer': frm.doc.customer },
                     callback: function (r) {
                         if (r.message) {
-                            const float_precision = cint(frappe.sys_defaults.float_precision) || 3;
-                            const updates = {
-                                sales_order_total_hrs: cint(r.message['sales_order_qty']),
-                                delivered_total_hrs: flt(r.message['dn_qty'], float_precision),
-                                total_hrs_timesheet: flt(r.message['timesheet_hrs'], float_precision),
-                                remaining_hrs: flt(r.message['remaining_hrs'], float_precision)
-                            };
-
-                            Object.keys(updates).forEach(fieldname => {
-                                if (frm.doc[fieldname] !== updates[fieldname]) {
-                                    frm.doc[fieldname] = updates[fieldname];
-                                    frm.refresh_field(fieldname);
-                                }
-                            });
-
-                            let label1 = ['Sales Order Hrs']
-                            let value1 = [r.message['sales_order_qty']]
+                            const financial = r.message.financial_history || {};
+                            let label1 = ['Sales Order Hrs'];
+                            let value1 = [financial['sales_order_qty']];
 
 
                             $(frm.fields_dict.total_sales.wrapper).html('<div id="total-sales"><h1>hiiii</h1></div>');
@@ -187,7 +173,60 @@ frappe.ui.form.on("Implementation", {
             document.head.appendChild(riskStyle);
         }
 
-        // add_row_to_sales_order(frm);
+        if (!document.getElementById("implementation-rank-style")) {
+            const rankStyle = document.createElement("style");
+            rankStyle.id = "implementation-rank-style";
+            rankStyle.innerHTML = `
+                .implementation-rank-card {
+                    border: 1px solid var(--border-color, #d1d8dd);
+                    border-radius: 10px;
+                    padding: 10px 12px;
+                    background: var(--control-bg, #f8f9fa);
+                }
+
+                .implementation-rank-title {
+                    font-size: 12px;
+                    font-weight: 700;
+                    text-transform: uppercase;
+                    letter-spacing: 0.03em;
+                    color: var(--text-muted, #8d99a6);
+                    margin-bottom: 6px;
+                }
+
+                .implementation-rank-row {
+                    display: flex;
+                    justify-content: space-between;
+                    align-items: center;
+                    gap: 8px;
+                    padding: 5px 0;
+                    border-top: 1px solid var(--border-color, #e3e8ee);
+                }
+
+                .implementation-rank-row:first-of-type {
+                    border-top: none;
+                }
+
+                .implementation-rank-label {
+                    font-size: 13px;
+                    color: var(--text-color, #2f3542);
+                }
+
+                .implementation-rank-value {
+                    font-size: 12px;
+                    font-weight: 700;
+                    color: var(--text-color, #2f3542);
+                    background: var(--bg-color, #ffffff);
+                    border: 1px solid var(--border-color, #d1d8dd);
+                    border-radius: 999px;
+                    padding: 2px 8px;
+                    min-width: 42px;
+                    text-align: center;
+                }
+            `;
+            document.head.appendChild(rankStyle);
+        }
+
+        // Avoid mutating child table on every refresh; server-side save logic keeps rows consistent.
         frm.fields_dict.reset.$input.on('click', function () {
             frm.set_value("prediction_from_date", "");
             frm.set_value("prediction_to_date", "");
@@ -536,16 +575,17 @@ frappe.ui.form.on("Implementation", {
         });
         // radar chart ends
             frappe.call({
-                method: "phamos.phamos.doctype.implementation.implementation.get_financial_history",
+                method: "phamos.phamos.doctype.implementation.implementation.get_financial_snapshot",
                 args: { 'customer': frm.doc.customer, 'name': frm.doc.name },
                 callback: function (r) {
                     if (r.message) {
+                        const financial = r.message.financial_history || {};
                         // Use one rounded set of values for both the fields and the chart
                         const float_precision = cint(frappe.sys_defaults.float_precision) || 3;
-                        const sales_order_hrs = cint(r.message['sales_order_qty']);
-                        const delivered_total_hrs = flt(r.message['dn_qty'], float_precision);
-                        const timesheet_hrs = flt(r.message['timesheet_hrs'], float_precision);
-                        const remaining_hrs = flt(r.message['remaining_hrs'], float_precision);
+                        const sales_order_hrs = cint(financial['sales_order_qty']);
+                        const delivered_total_hrs = flt(financial['dn_qty'], float_precision);
+                        const timesheet_hrs = flt(financial['timesheet_hrs'], float_precision);
+                        const remaining_hrs = flt(financial['remaining_hrs'], float_precision);
 
                         // Keep dashboard fields in sync without marking form dirty on every refresh.
                         const set_computed_field = (fieldname, value, normalize) => {
@@ -1158,31 +1198,34 @@ function render_module_chart(frm, canvasId) {
 }
 
 function add_row_to_sales_order(frm) {
+    if (!frm.doc.customer || !frm.doc.name) {
+        frm.clear_table("sales_order_status_information");
+        frm.refresh_field("sales_order_status_information");
+        return;
+    }
+
     frappe.call({
-        method: "frappe.client.get_list",
+        method: "phamos.phamos.doctype.implementation.implementation.get_financial_snapshot",
         args: {
-            doctype: "Sales Order",
-            filters: {
-                customer: frm.doc.customer,
-                custom_implementation: frm.doc.name,
-                status: ["in", ["To Deliver", "To Bill", "To Deliver and Bill"]]
-            },
-            fields: ["name", "status", "total_qty", "customer_name"],
-            order_by: "transaction_date desc",
+            customer: frm.doc.customer,
+            name: frm.doc.name,
         },
         callback: function (response) {
-            if (response.message.length > 0) {
-                frm.clear_table("sales_order_status_information"); // Clear existing data
+            const salesOrders = response.message?.sales_order_status_information || [];
 
-                response.message.forEach(order => {
-                    let row = frm.add_child("sales_order_status_information");
-                    row.sales_order = order.name;
-                    row.so_title = order.customer_name;
-                    row.total_hrs = order.total_qty;
-                    row.status = order.status;
-                });
-                frm.refresh_field("sales_order_status_information"); // Refresh child table
-            }
+            frm.clear_table("sales_order_status_information");
+
+            salesOrders.forEach(order => {
+                let row = frm.add_child("sales_order_status_information");
+                row.sales_order = order.sales_order;
+                row.so_title = order.so_title;
+                row.total_hrs = order.total_hrs;
+                row.status = order.status;
+                row.delivered_total_hrs = order.delivered_total_hrs;
+                row.remaining_hrs = order.remaining_hrs;
+            });
+
+            frm.refresh_field("sales_order_status_information");
         }
     });
 }
@@ -1274,6 +1317,16 @@ function setup_implementation_theme_watcher(frm) {
 }
 
 function render_resource_planning_graph(frm, usePredictionFilter = false) {
+    if (typeof Highcharts === "undefined") {
+        ["resource_chart", "total_time_spend"].forEach(fieldname => {
+            const wrapper = frm.fields_dict[fieldname]?.$wrapper;
+            if (wrapper) {
+                wrapper.html('<div class="text-muted">Chart unavailable (Highcharts failed to load).</div>');
+            }
+        });
+        return;
+    }
+
     const fromMonth = frm.doc.from_date ? frm.doc.from_date.slice(0, 7) : null;
     const toMonth = frm.doc.to_date ? frm.doc.to_date.slice(0, 7) : null;
 

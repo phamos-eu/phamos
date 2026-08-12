@@ -27,6 +27,7 @@ class Implementation(Document):
 				)
 
 	def before_save(self):
+		self.sync_sales_order_status_information()
 		self.add_financial_snapshot()
 
 		if self.resource_planning_prediction:
@@ -72,6 +73,153 @@ class Implementation(Document):
 		self.add_delivered_hrs()
 		self.add_resource_planning()
 		self.add_status_history()
+
+	def sync_sales_order_status_information(self):
+		if not self.name or not self.customer:
+			self.sales_order_status_information = []
+			return
+
+		rows = get_sales_order_status_information(name=self.name, customer=self.customer)
+		self.sales_order_status_information = []
+		for row in rows:
+			self.append("sales_order_status_information", row)
+
+	def _parse_month_key(self, value):
+		if not value:
+			return None
+
+		if isinstance(value, date):
+			return date(value.year, value.month, 1)
+
+		if not isinstance(value, str):
+			return None
+
+		value = value.strip()
+		if not value:
+			return None
+
+		match = re.match(r"^(\d{4})-(\d{1,2})(?:-\d{1,2})?$", value)
+		if match:
+			year = int(match.group(1))
+			month = int(match.group(2))
+			if 1 <= month <= 12:
+				return date(year, month, 1)
+
+		for fmt in ("%Y/%m", "%b %Y", "%B %Y", "%m-%Y", "%Y-%m-%d"):
+			try:
+				parsed = datetime.strptime(value, fmt)
+				return date(parsed.year, parsed.month, 1)
+			except ValueError:
+				continue
+
+		try:
+			year_str, month_str = value.split("-", 1)
+			year = int(year_str)
+			month = int(month_str)
+			if month < 1 or month > 12:
+				return None
+			return date(year, month, 1)
+		except Exception:
+			return None
+
+	def _month_shift(self, base_month_start, delta):
+		year = base_month_start.year + ((base_month_start.month - 1 + delta) // 12)
+		month = ((base_month_start.month - 1 + delta) % 12) + 1
+		return date(year, month, 1)
+
+	def add_implementation_stats(self):
+		month_totals = {}
+		life_total = 0.0
+		for row in self.resource_planning or []:
+			life_total += flt(row.total_time)
+			month_start = self._parse_month_key(row.month_and_year)
+			if not month_start:
+				continue
+			month_totals[month_start] = month_totals.get(month_start, 0.0) + flt(row.total_time)
+
+		self.total_time_implementation_life = life_total
+
+		today_date = date.today()
+		current_month_start = date(today_date.year, today_date.month, 1)
+
+		def rolling_total(month_count):
+			start_month = self._month_shift(current_month_start, -(month_count - 1))
+			return sum(
+				value
+				for month_start, value in month_totals.items()
+				if start_month <= month_start <= current_month_start
+			)
+
+		self.total_time_last_12_months = rolling_total(12)
+		self.total_time_last_6_months = rolling_total(6)
+		self.total_time_last_3_months = rolling_total(3)
+
+		# For next 3 upcoming months: if a month has multiple predictions,
+		# use that month's average; then add month values together.
+		predictions_by_month = {}
+		for row in self.resource_planning_prediction or []:
+			month_start = self._parse_month_key(row.month_and_year)
+			if not month_start:
+				continue
+			if month_start <= current_month_start:
+				continue
+			predictions_by_month.setdefault(month_start, []).append(flt(row.prediction))
+
+		upcoming_months = sorted(
+			month_start
+			for month_start in predictions_by_month
+		)[:3]
+
+		if upcoming_months:
+			total_prediction = 0.0
+			for month in upcoming_months:
+				month_values = predictions_by_month.get(month, [])
+				if not month_values:
+					continue
+				if len(month_values) >= 2:
+					total_prediction += sum(month_values) / len(month_values)
+				else:
+					total_prediction += month_values[0]
+			self.predicted_time_next_3_months = total_prediction
+		else:
+			self.predicted_time_next_3_months = 0
+
+	def _get_rank_fraction(self, metric_field, current_value):
+		current_value = flt(current_value)
+		if current_value <= 0:
+			return "-"
+
+		other_rows = frappe.get_all(
+			"Implementation",
+			filters={
+				"name": ["!=", self.name],
+				metric_field: [">", 0],
+			},
+			fields=[metric_field],
+			limit_page_length=0,
+		)
+
+		other_values = [flt(row.get(metric_field)) for row in other_rows if flt(row.get(metric_field)) > 0]
+		higher_count = sum(1 for value in other_values if value > current_value)
+		total_active = len(other_values) + 1
+		rank = higher_count + 1
+		return f"{rank}/{total_active}"
+
+	def add_rank_html(self):
+		rank_last_12 = self._get_rank_fraction("total_time_last_12_months", self.total_time_last_12_months)
+		rank_last_6 = self._get_rank_fraction("total_time_last_6_months", self.total_time_last_6_months)
+		rank_last_3 = self._get_rank_fraction("total_time_last_3_months", self.total_time_last_3_months)
+		rank_next_3 = self._get_rank_fraction("predicted_time_next_3_months", self.predicted_time_next_3_months)
+
+		self.rank_html = (
+			"<div class='implementation-rank-card'>"
+			"<div class='implementation-rank-title'>Implementation Ranking</div>"
+			f"<div class='implementation-rank-row'><span class='implementation-rank-label'>Last 12 months</span><span class='implementation-rank-value'>{rank_last_12}</span></div>"
+			f"<div class='implementation-rank-row'><span class='implementation-rank-label'>Last 6 months</span><span class='implementation-rank-value'>{rank_last_6}</span></div>"
+			f"<div class='implementation-rank-row'><span class='implementation-rank-label'>Last 3 months</span><span class='implementation-rank-value'>{rank_last_3}</span></div>"
+			f"<div class='implementation-rank-row'><span class='implementation-rank-label'>Next 3 months</span><span class='implementation-rank-value'>{rank_next_3}</span></div>"
+			"</div>"
+		)
 
 	def add_financial_snapshot(self):
 		if not self.customer or not self.name:
@@ -324,6 +472,122 @@ def get_financial_history(name, customer = None):
 		"remaining_hrs": 0,
 		"open_so": 0,
 	}
+
+
+def _delivered_hours_against_sales_order(sales_order_name):
+	rows = frappe.db.sql(
+		"""
+		SELECT dni.qty
+		FROM `tabDelivery Note Item` dni
+		INNER JOIN `tabDelivery Note` dn ON dn.name = dni.parent
+		WHERE dni.against_sales_order = %s
+			AND dn.docstatus = 1
+			AND IFNULL(dn.status, '') NOT IN ('Cancelled', 'Closed')
+		""",
+		sales_order_name,
+		as_dict=True,
+	)
+	return flt(sum(flt(r.get("qty")) for r in rows)) if rows else 0
+
+
+def get_sales_order_status_information(name, customer=None):
+	if not name:
+		return []
+
+	if not customer:
+		customer = frappe.db.get_value("Implementation", name, "customer")
+
+	if not customer:
+		return []
+
+	open_so = {
+		"customer": customer,
+		"custom_implementation": name,
+		"status": ["in", ["To Deliver", "To Bill", "To Deliver and Bill"]],
+		"docstatus": 1,
+	}
+
+	rows = []
+	for so in frappe.get_all(
+		"Sales Order",
+		filters=open_so,
+		fields=["name", "status", "total_qty", "customer_name"],
+		order_by="transaction_date desc",
+	):
+		total_hrs = flt(so.total_qty)
+		delivered_total_hrs = _delivered_hours_against_sales_order(so.name)
+		remaining_hrs = flt(total_hrs - delivered_total_hrs, 2)
+		rows.append(
+			{
+				"sales_order": so.name,
+				"so_title": so.customer_name or "",
+				"total_hrs": total_hrs,
+				"status": so.status or "",
+				"delivered_total_hrs": delivered_total_hrs,
+				"remaining_hrs": remaining_hrs,
+			}
+		)
+
+	return rows
+
+
+@frappe.whitelist()
+def get_financial_snapshot(name, customer=None):
+	return {
+		"financial_history": get_financial_history(name=name, customer=customer),
+		"sales_order_status_information": get_sales_order_status_information(name=name, customer=customer),
+	}
+
+
+@frappe.whitelist()
+def recompute_implementation_stats(name):
+	"""Recompute stats fields from existing child table rows for one record."""
+	doc = frappe.get_doc("Implementation", name)
+	doc.add_implementation_stats()
+	doc.add_rank_html()
+	frappe.db.set_value(
+		"Implementation",
+		name,
+		{
+			"total_time_implementation_life": flt(doc.total_time_implementation_life),
+			"total_time_last_12_months": flt(doc.total_time_last_12_months),
+			"total_time_last_6_months": flt(doc.total_time_last_6_months),
+			"total_time_last_3_months": flt(doc.total_time_last_3_months),
+			"predicted_time_next_3_months": flt(doc.predicted_time_next_3_months),
+		},
+		update_modified=False,
+	)
+	return {
+		"name": name,
+		"total_time_implementation_life": flt(doc.total_time_implementation_life),
+		"total_time_last_12_months": flt(doc.total_time_last_12_months),
+		"total_time_last_6_months": flt(doc.total_time_last_6_months),
+		"total_time_last_3_months": flt(doc.total_time_last_3_months),
+		"predicted_time_next_3_months": flt(doc.predicted_time_next_3_months),
+		"rank_html": doc.rank_html,
+	}
+
+
+@frappe.whitelist()
+def get_implementation_rank_overview(name):
+	doc = frappe.get_doc("Implementation", name)
+	doc.add_implementation_stats()
+	doc.add_rank_html()
+	return {
+		"rank_html": doc.rank_html,
+		"rank_last_12": doc._get_rank_fraction("total_time_last_12_months", doc.total_time_last_12_months),
+		"rank_last_6": doc._get_rank_fraction("total_time_last_6_months", doc.total_time_last_6_months),
+		"rank_last_3": doc._get_rank_fraction("total_time_last_3_months", doc.total_time_last_3_months),
+		"rank_next_3": doc._get_rank_fraction("predicted_time_next_3_months", doc.predicted_time_next_3_months),
+	}
+
+
+@frappe.whitelist()
+def recompute_all_implementation_stats(limit=None):
+	"""Backfill stats for all Implementation records (optional limit)."""
+	limit = int(limit) if limit else None
+	names = frappe.get_all("Implementation", pluck="name", limit=limit)
+	return [recompute_implementation_stats(name) for name in names]
 
 
 @frappe.whitelist()
