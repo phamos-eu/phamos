@@ -42,7 +42,7 @@ STATUS_COLORS = {
 
 
 # Keep Employee Availability focused on the employee's primary calendar.
-INCLUDE_ALL_CALENDARS = False
+INCLUDE_ALL_CALENDARS = True
 
 
 def _run_as_user(user_id: str, fn, *args, **kwargs):

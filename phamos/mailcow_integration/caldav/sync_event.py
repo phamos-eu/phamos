@@ -11,10 +11,12 @@ import requests
 from datetime import datetime
 import pytz
 from email.utils import getaddresses
-from frappe.utils import get_datetime
+from datetime import datetime, timedelta, date
 from .client import put_ics, delete_ics, organizer_email, dav_password
 from .ics import vevent
 from ..utils import get_site_timezone
+from dateutil.rrule import rrulestr
+
 
 
 def _uid_from_description_marker(description: str | None) -> str | None:
@@ -453,164 +455,766 @@ def pull_events(start: str, end: str) -> list[dict]:
 @frappe.whitelist()
 def pull_event_slots(start: str, end: str) -> list[dict]:
 	"""
-	Read-only pull from Mailcow for the current user between start and end (ISO strings).
-	Returns normalized time slots and does not create/update ERPNext Event records.
+	Read events from Mailcow/SOGo CalDAV for the current user.
+
+	- Does NOT create/update ERPNext Events.
+	- Supports normal VEVENTs.
+	- Supports recurring VEVENTs.
+	- Supports RRULE with DAILY/WEEKLY/MONTHLY/YEARLY.
+	- Supports COUNT and UNTIL.
+	- Preserves the original event timezone while expanding recurrence.
+	- Converts returned slots to UTC ISO strings.
 	"""
 
-	from frappe.utils import date_diff, get_datetime
+	import datetime
+	from datetime import timedelta
+
 	import dateutil.parser
+	import requests
+	import pytz
+
 	from icalendar import Calendar
+	from dateutil.rrule import rrulestr
 	from xml.etree import ElementTree as ET
+
+	from frappe.utils import get_datetime
+
+	# CONFIG
 
 	s = frappe.get_single("Mailcow Settings")
 
-	owner = frappe.session.user
-	if owner == "Administrator":
-		frappe.throw("You're logged in as Administrator; cannot determine organizer email.")
+	# Use the current user's organizer email.
+	EMAIL = organizer_email()
 
-	email = organizer_email()
-	pw = dav_password(email)
-	if not (email and pw):
-		frappe.throw("Missing DAV credentials for organizer")
+	if not EMAIL:
+		frappe.throw(
+			"Could not determine organizer email."
+		)
+
+	# PASSWORD
+
+	pw = dav_password(EMAIL)
+
+	if not pw:
+		frappe.throw(
+			f"Missing DAV password for {EMAIL}"
+		)
+
+	# REQUEST RANGE
 
 	start_dt = dateutil.parser.isoparse(start)
 	end_dt = dateutil.parser.isoparse(end)
-	if date_diff(end_dt, start_dt) > 90:
-		frappe.throw("Date range too large; max 90 days")
 
-	# Normalize all comparisons to UTC aware datetimes
-	site_tz = pytz.timezone(get_site_timezone())
+	if start_dt.tzinfo is None:
+		start_dt = start_dt.replace(
+			tzinfo=pytz.UTC
+		)
 
-	def to_utc(dt: datetime):
-		# If dt is date-only or naive, localize to site tz first
+	if end_dt.tzinfo is None:
+		end_dt = end_dt.replace(
+			tzinfo=pytz.UTC
+		)
+
+	# Maximum 90 days
+	if (end_dt - start_dt).days > 90:
+		frappe.throw(
+			"Date range too large; max 90 days"
+		)
+
+	# UTC HELPER
+
+	def to_utc(dt):
+		"""
+		Convert datetime to timezone-aware UTC datetime.
+		"""
+
 		if dt is None:
 			return None
+
+		if (
+			isinstance(dt, datetime.date)
+			and not isinstance(dt, datetime.datetime)
+		):
+			dt = datetime.datetime.combine(
+				dt,
+				datetime.time.min
+			)
+
 		if dt.tzinfo is None:
+			site_timezone = get_site_timezone()
+			site_tz = pytz.timezone(
+				site_timezone
+			)
+
 			dt = site_tz.localize(dt)
+
 		return dt.astimezone(pytz.UTC)
+
+	# REQUEST RANGE IN UTC
 
 	start_dt_utc = to_utc(start_dt)
 	end_dt_utc = to_utc(end_dt)
 
-	def collect_slots_from_ical(cal_raw) -> list[dict]:
-		"""Parse VCALENDAR payload and return slot rows within requested range."""
+
+	# OVERLAP CHECK
+
+	def overlaps(event_start, event_end):
+		return (
+			event_end >= start_dt_utc
+			and event_start <= end_dt_utc
+		)
+
+	# RRULE PARSER
+
+	def parse_rrule(component, dtstart):
+		"""
+		Convert iCalendar RRULE into dateutil rrule.
+
+		DTSTART remains in the original event timezone.
+		"""
+
+		rrule_prop = component.get("RRULE")
+
+		if not rrule_prop:
+			return None
+
+		try:
+
+			rule_string = (
+				rrule_prop
+				.to_ical()
+				.decode()
+			)
+
+
+			return rrulestr(
+				rule_string,
+				dtstart=dtstart,
+			)
+
+		except Exception:
+
+			frappe.log_error(
+				frappe.get_traceback(),
+				"Mailcow CalDAV RRULE Parse Error"
+			)
+
+			return None
+
+	# PARSE ONE VCALENDAR
+
+	def collect_slots_from_ical(cal_raw):
+
 		parsed_slots = []
+
 		if not cal_raw:
 			return parsed_slots
 
-		cal = Calendar.from_ical(cal_raw)
+		try:
+
+			cal = Calendar.from_ical(
+				cal_raw
+			)
+
+		except Exception:
+
+			frappe.log_error(
+				frappe.get_traceback(),
+				"Mailcow CalDAV iCalendar Parse Error"
+			)
+
+			return parsed_slots
+
+		# COLLECT EXDATE VALUES
+
+		exdates = set()
+
 		for component in cal.walk():
+
 			if component.name != "VEVENT":
 				continue
 
-			uid = str(component.get("UID") or "")
-			summary = str(component.get("SUMMARY") or "")
-			desc = str(component.get("DESCRIPTION") or "")
-			loc = str(component.get("LOCATION") or "")
-			dtstart_prop = component.get("DTSTART")
+			exdate_prop = component.get(
+				"EXDATE"
+			)
+
+			if not exdate_prop:
+				continue
+
+			try:
+
+				values = []
+
+				if isinstance(
+					exdate_prop,
+					list
+				):
+
+					for item in exdate_prop:
+						values.extend(
+							item.dts
+						)
+
+				else:
+
+					values.extend(
+						exdate_prop.dts
+					)
+
+				for item in values:
+
+					exdate = item.dt
+
+					if (
+						isinstance(
+							exdate,
+							datetime.date
+						)
+						and not isinstance(
+							exdate,
+							datetime.datetime
+						)
+					):
+
+						exdate = (
+							datetime.datetime.combine(
+								exdate,
+								datetime.time.min
+							)
+						)
+
+					if exdate.tzinfo is None:
+
+						site_timezone = (
+							get_site_timezone()
+						)
+
+						site_tz = pytz.timezone(
+							site_timezone
+						)
+
+						exdate = site_tz.localize(
+							exdate
+						)
+
+					exdates.add(
+						exdate.astimezone(
+							pytz.UTC
+						)
+					)
+
+			except Exception:
+				pass
+
+		# PROCESS VEVENTS
+
+		for component in cal.walk():
+
+			if component.name != "VEVENT":
+				continue
+
+			uid = str(
+				component.get("UID") or ""
+			)
+
+			summary = str(
+				component.get("SUMMARY") or ""
+			)
+
+			desc = str(
+				component.get("DESCRIPTION") or ""
+			)
+
+			loc = str(
+				component.get("LOCATION") or ""
+			)
+
+			# DTSTART
+
+			dtstart_prop = component.get(
+				"DTSTART"
+			)
+
 			if not dtstart_prop:
 				continue
 
 			raw_start = dtstart_prop.dt
-			dtend_prop = component.get("DTEND")
-			raw_end = dtend_prop.dt if dtend_prop else raw_start
-			dtstart = get_datetime(raw_start)
-			dtend = get_datetime(raw_end)
 
-			dtstart_utc = to_utc(dtstart)
-			dtend_utc = to_utc(dtend)
+			if (
+				isinstance(
+					raw_start,
+					datetime.date
+				)
+				and not isinstance(
+					raw_start,
+					datetime.datetime
+				)
+			):
 
-			if (dtend_utc and dtend_utc < start_dt_utc) or (dtstart_utc and dtstart_utc > end_dt_utc):
+				raw_start = (
+					datetime.datetime.combine(
+						raw_start,
+						datetime.time.min
+					)
+				)
+
+			# IMPORTANT:
+			# Keep original timezone.
+			dtstart = get_datetime(
+				raw_start
+			)
+
+			if dtstart.tzinfo is None:
+
+				site_timezone = (
+					get_site_timezone()
+				)
+
+				site_tz = pytz.timezone(
+					site_timezone
+				)
+
+				dtstart = site_tz.localize(
+					dtstart
+				)
+
+			# DTEND / DURATION
+
+			dtend_prop = component.get(
+				"DTEND"
+			)
+
+			if dtend_prop:
+
+				raw_end = dtend_prop.dt
+
+				if (
+					isinstance(
+						raw_end,
+						datetime.date
+					)
+					and not isinstance(
+						raw_end,
+						datetime.datetime
+					)
+				):
+
+					raw_end = (
+						datetime.datetime.combine(
+							raw_end,
+							datetime.time.min
+						)
+					)
+
+				dtend = get_datetime(
+					raw_end
+				)
+
+				if dtend.tzinfo is None:
+
+					site_timezone = (
+						get_site_timezone()
+					)
+
+					site_tz = pytz.timezone(
+						site_timezone
+					)
+
+					dtend = site_tz.localize(
+						dtend
+					)
+
+				duration = (
+					dtend - dtstart
+				)
+
+			elif component.get(
+				"DURATION"
+			):
+
+				duration = component.get(
+					"DURATION"
+				).dt
+
+				dtend = (
+					dtstart + duration
+				)
+
+			else:
+
+				duration = timedelta(0)
+
+				dtend = dtstart
+
+			# UTC BASE TIMES
+
+			dtstart_utc = to_utc(
+				dtstart
+			)
+
+			dtend_utc = to_utc(
+				dtend
+			)
+
+			# RECURRENCE ID
+
+			recurrence_id_prop = (
+				component.get(
+					"RECURRENCE-ID"
+				)
+			)
+
+			# NON-RECURRING EVENT
+
+			rrule_prop = component.get(
+				"RRULE"
+			)
+
+			if not rrule_prop:
+
+				if not overlaps(
+					dtstart_utc,
+					dtend_utc
+				):
+					continue
+
+				parsed_slots.append({
+
+					"uid": uid,
+
+					"subject": summary,
+
+					"start":
+						dtstart_utc.isoformat(),
+
+					"end":
+						dtend_utc.isoformat(),
+
+					"duration_minutes":
+						int(
+							duration.total_seconds()
+							/ 60
+						),
+
+					"slot": {
+						"start":
+							dtstart_utc.isoformat(),
+
+						"end":
+							dtend_utc.isoformat(),
+					},
+
+					"description": desc,
+
+					"location": loc,
+				})
+
 				continue
 
-			duration_minutes = None
-			if dtstart_utc and dtend_utc:
-				duration_minutes = int((dtend_utc - dtstart_utc).total_seconds() // 60)
+			# RECURRING EVENT
 
-			parsed_slots.append({
-				"uid": uid,
-				"subject": summary,
-				"start": dtstart_utc.isoformat() if dtstart_utc else None,
-				"end": dtend_utc.isoformat() if dtend_utc else None,
-				"duration_minutes": duration_minutes,
-				"slot": {
-					"start": dtstart_utc.isoformat() if dtstart_utc else None,
-					"end": dtend_utc.isoformat() if dtend_utc else None,
-				},
-				"description": desc,
-				"location": loc,
-			})
+			rule = parse_rrule(
+				component,
+				dtstart
+			)
+
+			if not rule:
+				continue
+
+			# IMPORTANT:
+			# Expand in the event's original timezone.
+			event_tz = dtstart.tzinfo
+
+			range_start_local = (
+				start_dt_utc.astimezone(
+					event_tz
+				)
+				- duration
+			)
+
+			range_end_local = (
+				end_dt_utc.astimezone(
+					event_tz
+				)
+			)
+
+			try:
+
+				occurrences = rule.between(
+					range_start_local,
+					range_end_local,
+					inc=True,
+				)
+
+			except Exception:
+
+				frappe.log_error(
+					frappe.get_traceback(),
+					"Mailcow CalDAV Recurrence Expansion Error"
+				)
+
+				continue
+
+			# OCCURRENCES
+
+			for occurrence in occurrences:
+
+				if occurrence.tzinfo is None:
+
+					occurrence = (
+						event_tz.localize(
+							occurrence
+						)
+					)
+
+				occurrence_utc = (
+					occurrence.astimezone(
+						pytz.UTC
+					)
+				)
+
+				occurrence_end_utc = (
+					occurrence_utc
+					+ duration
+				)
+
+				# EXDATE
+
+				if occurrence_utc in exdates:
+					continue
+
+				# RANGE
+
+				if not overlaps(
+					occurrence_utc,
+					occurrence_end_utc
+				):
+					continue
+
+				parsed_slots.append({
+
+					"uid": uid,
+
+					"subject": summary,
+
+					"start":
+						occurrence_utc.isoformat(),
+
+					"end":
+						occurrence_end_utc.isoformat(),
+
+					"duration_minutes":
+						int(
+							duration.total_seconds()
+							/ 60
+						),
+
+					"slot": {
+						"start":
+							occurrence_utc.isoformat(),
+
+						"end":
+							occurrence_end_utc.isoformat(),
+					},
+
+					"description": desc,
+
+					"location": loc,
+				})
 
 		return parsed_slots
 
-	url = f"{s.base_url.rstrip('/')}/SOGo/dav/{email}/Calendar/personal/"
-	start_utc_str = start_dt_utc.strftime("%Y%m%dT%H%M%SZ")
-	end_utc_str = end_dt_utc.strftime("%Y%m%dT%H%M%SZ")
+	# CALDAV URL
 
-	query_xml = f"""<?xml version=\"1.0\" encoding=\"utf-8\" ?>
-<C:calendar-query xmlns:D=\"DAV:\" xmlns:C=\"urn:ietf:params:xml:ns:caldav\">
+	url = (
+		f"{s.base_url.rstrip('/')}"
+		f"/SOGo/dav/{EMAIL}/Calendar/personal/"
+	)
+
+	# CALDAV REPORT RANGE
+
+	start_utc_str = (
+		start_dt_utc.strftime(
+			"%Y%m%dT%H%M%SZ"
+		)
+	)
+
+	end_utc_str = (
+		end_dt_utc.strftime(
+			"%Y%m%dT%H%M%SZ"
+		)
+	)
+
+	# IMPORTANT:
+	# Keep the time-range filter.
+	#
+	# DO NOT replace this with PROPFIND/full-calendar GET,
+	# otherwise SOGo can return the entire calendar.
+
+	query_xml = f"""<?xml version="1.0" encoding="utf-8" ?>
+<C:calendar-query
+	xmlns:D="DAV:"
+	xmlns:C="urn:ietf:params:xml:ns:caldav">
+
 	<D:prop>
 		<D:getetag/>
 		<C:calendar-data/>
 	</D:prop>
+
 	<C:filter>
-		<C:comp-filter name=\"VCALENDAR\">
-			<C:comp-filter name=\"VEVENT\">
-				<C:time-range start=\"{start_utc_str}\" end=\"{end_utc_str}\"/>
+		<C:comp-filter name="VCALENDAR">
+			<C:comp-filter name="VEVENT">
+				<C:time-range
+					start="{start_utc_str}"
+					end="{end_utc_str}"/>
 			</C:comp-filter>
 		</C:comp-filter>
 	</C:filter>
+
 </C:calendar-query>"""
 
-	r = requests.request("REPORT", url,
-		auth=(email, pw),
-		headers={"Depth": "1", "Content-Type": "application/xml; charset=utf-8"},
-		data=query_xml.encode("utf-8"),
-		timeout=30
-	)
-	if r.status_code != 207:
-		frappe.throw(f"SOGo calendar REPORT failed: {r.status_code}: {r.text[:500]}")
+	# CALDAV REPORT
 
-	ns = {"D": "DAV:", "C": "urn:ietf:params:xml:ns:caldav"}
-	root = ET.fromstring(r.content)
+	try:
+
+		r = requests.request(
+			"REPORT",
+			url,
+			auth=(
+				EMAIL,
+				pw
+			),
+			headers={
+				"Depth": "1",
+				"Content-Type":
+					"application/xml; charset=utf-8",
+			},
+			data=query_xml.encode(
+				"utf-8"
+			),
+			timeout=30,
+		)
+
+	except Exception:
+
+		frappe.log_error(
+			frappe.get_traceback(),
+			"Mailcow CalDAV REPORT Request Error"
+		)
+
+		frappe.throw(
+			"Could not connect to Mailcow CalDAV."
+		)
+
+	# RESPONSE
+
+	if r.status_code != 207:
+
+		frappe.log_error(
+			r.text[:5000],
+			"Mailcow CalDAV REPORT Failed"
+		)
+
+		frappe.throw(
+			"Mailcow calendar REPORT failed: "
+			f"{r.status_code}"
+		)
+
+	# XML
+
+	ns = {
+		"D": "DAV:",
+		"C": "urn:ietf:params:xml:ns:caldav",
+	}
+
+	try:
+
+		root = ET.fromstring(
+			r.content
+		)
+
+	except Exception:
+
+		frappe.log_error(
+			frappe.get_traceback(),
+			"Mailcow CalDAV XML Parse Error"
+		)
+
+		frappe.throw(
+			"Invalid XML returned by Mailcow."
+		)
+
+	responses = root.findall(
+		"D:response",
+		ns
+	)
+
+	# COLLECT
+
 	slots = []
 
-	for resp in root.findall("D:response", ns):
-		calendar_data_el = resp.find("D:propstat/D:prop/C:calendar-data", ns)
-		calendar_data_text = (calendar_data_el.text or "") if calendar_data_el is not None else ""
-		if not calendar_data_text.strip():
-			continue
-		slots.extend(collect_slots_from_ical(calendar_data_text))
+	for resp in responses:
 
-	# Some SOGo setups return empty calendar-data for time-range REPORT.
-	# Fallback to PROPFIND + GET to keep behavior reliable.
-	if not slots:
-		r_fallback = requests.request("PROPFIND", url,
-			auth=(email, pw),
-			headers={"Depth": "1"},
-			timeout=30
+		calendar_data_el = resp.find(
+			"D:propstat/D:prop/C:calendar-data",
+			ns
 		)
-		if r_fallback.status_code != 207:
-			frappe.throw(f"SOGo fallback PROPFIND failed: {r_fallback.status_code}: {r_fallback.text[:500]}")
 
-		root_fb = ET.fromstring(r_fallback.content)
-		for resp in root_fb.findall("D:response", ns):
-			href = resp.find("D:href", ns)
-			if href is None or not (href.text or "").endswith(".ics"):
-				continue
+		if (
+			calendar_data_el is None
+			or not calendar_data_el.text
+		):
+			continue
 
-			caldav_url = url + href.text.split("/")[-1]
-			r2 = requests.get(caldav_url,
-				auth=(email, pw),
-				timeout=30
+		try:
+
+			new_slots = (
+				collect_slots_from_ical(
+					calendar_data_el.text
+				)
 			)
-			if r2.status_code != 200:
-				frappe.log_error(f"SOGo GET failed: {r2.status_code}: {r2.text[:500]}", "CalDAV GET")
-				continue
 
-			slots.extend(collect_slots_from_ical(r2.content))
+			slots.extend(
+				new_slots
+			)
 
-	# Stable order for consumers (earliest first)
-	slots.sort(key=lambda item: (item.get("start") or "", item.get("end") or ""))
-	return slots
-		
+		except Exception:
+
+			frappe.log_error(
+				frappe.get_traceback(),
+				"Mailcow Calendar Event Parsing Error"
+			)
+
+	# DEDUPLICATE
+
+	unique_slots = []
+
+	seen = set()
+
+	for slot in slots:
+
+		key = (
+			slot.get("uid"),
+			slot.get("start"),
+			slot.get("end"),
+		)
+
+		if key in seen:
+			continue
+
+		seen.add(key)
+
+		unique_slots.append(
+			slot
+		)
+
+	# SORT
+
+	unique_slots.sort(
+		key=lambda item: (
+			item.get("start") or "",
+			item.get("end") or "",
+		)
+	)
+
+	return unique_slots
