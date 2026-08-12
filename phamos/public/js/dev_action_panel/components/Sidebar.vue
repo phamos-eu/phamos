@@ -11,9 +11,10 @@ const props = defineProps({
   myIssuesCount: Number,
   mineOnly: Boolean,
   syncing: Boolean,
+  hrProject: Object,
 });
 
-const emit = defineEmits(["select-project", "change-view", "toggle-mine", "sync"]);
+const emit = defineEmits(["select-project", "change-view", "toggle-mine", "sync", "start-meeting"]);
 
 const user = frappe.session.user;
 const userName = frappe.user.full_name() || user;
@@ -28,10 +29,10 @@ function fmtElapsed(s) {
 const isRunning = computed(() => props.activeSession?.session_state === "running");
 
 const OTHER_VIEWS = [
-  { key: "timesheets", label: "My Timesheets", icon: "M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" },
-  { key: "calendar",   label: "Calendar",      icon: "M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" },
-  { key: "kanban",     label: "Kanban",        icon: "M9 17V7m0 10a2 2 0 01-2 2H5a2 2 0 01-2-2V7a2 2 0 012-2h2a2 2 0 012 2m0 10a2 2 0 002 2h2a2 2 0 002-2M9 7a2 2 0 012-2h2a2 2 0 012 2m0 10V7m0 10a2 2 0 002 2h2a2 2 0 002-2V7a2 2 0 00-2-2h-2a2 2 0 00-2 2" },
-  { key: "team",       label: "Team Calendar", icon: "M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z" },
+  { key: "timesheets", label: "My Timesheets", disabled: false, icon: "M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" },
+  { key: "calendar",   label: "Calendar",      disabled: true,  icon: "M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" },
+  { key: "kanban",     label: "Kanban",        disabled: true,  icon: "M9 17V7m0 10a2 2 0 01-2 2H5a2 2 0 01-2-2V7a2 2 0 012-2h2a2 2 0 012 2m0 10a2 2 0 002 2h2a2 2 0 002-2M9 7a2 2 0 012-2h2a2 2 0 012 2m0 10V7m0 10a2 2 0 002 2h2a2 2 0 002-2V7a2 2 0 00-2-2h-2a2 2 0 00-2 2" },
+  { key: "team",       label: "Team Calendar", disabled: false, icon: "M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z" },
 ];
 
 const ISSUE_ICON = "M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2";
@@ -101,14 +102,35 @@ const ISSUE_ICON = "M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00
       <button
         v-for="view in OTHER_VIEWS"
         :key="view.key"
-        class="sb__nav-item sb__nav-item--soon"
-        disabled
+        class="sb__nav-item"
+        :class="{
+          'sb__nav-item--active': currentView === view.key && !view.disabled,
+          'sb__nav-item--soon': view.disabled,
+        }"
+        :disabled="view.disabled"
+        @click="emit('change-view', view.key)"
       >
         <svg class="sb__nav-svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
           <path :d="view.icon"/>
         </svg>
         <span class="sb__nav-label">{{ view.label }}</span>
-        <span class="sb__soon">soon</span>
+        <span v-if="view.disabled" class="sb__soon">soon</span>
+      </button>
+    </nav>
+
+    <!-- Cost Center HR -->
+    <div class="sb__section-label">Cost Center</div>
+    <nav class="sb__nav">
+      <button
+        class="sb__nav-item"
+        :class="{ 'sb__nav-item--soon': !hrProject }"
+        :disabled="!hrProject"
+        :title="hrProject ? `Log meeting time against ${hrProject.project_name}` : 'HR cost-center project not found'"
+        @click="emit('start-meeting')"
+      >
+        <span class="sb__nav-dot" style="background:#8b5cf6"></span>
+        <span class="sb__nav-label">HR Meeting</span>
+        <span v-if="!hrProject" class="sb__soon">n/a</span>
       </button>
     </nav>
 
