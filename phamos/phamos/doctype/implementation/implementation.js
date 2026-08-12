@@ -230,7 +230,7 @@ frappe.ui.form.on("Implementation", {
             document.head.appendChild(rankStyle);
         }
 
-        // add_row_to_sales_order(frm);
+        // Avoid mutating child table on every refresh; server-side save logic keeps rows consistent.
         frm.fields_dict.reset.$input.on('click', function () {
             frm.set_value("prediction_from_date", "");
             frm.set_value("prediction_to_date", "");
