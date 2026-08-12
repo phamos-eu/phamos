@@ -4,6 +4,9 @@ from frappe.utils import now_datetime, add_to_date, time_diff_in_seconds, get_da
 from phamos.phamos.timesheet_utils import normalize_percent_billable
 
 
+HR_COST_CENTER_PROJECT_NAME = "Cost Center - Human Resources (2025 HR Internal)"
+
+
 # ---------------------------------------------------------------------------
 # Issue list
 # ---------------------------------------------------------------------------
@@ -516,3 +519,104 @@ def create_break_timesheet(from_time, to_time=None, project=None, goal=None, res
     frappe.db.commit()
 
     return {"name": ts.name}
+
+
+# ---------------------------------------------------------------------------
+# Cost Center HR project
+# ---------------------------------------------------------------------------
+
+@frappe.whitelist()
+def get_hr_cost_center_project():
+    """
+    Return the hard-coded HR cost-center project so the Developer Action Panel
+    can log company meetings / HR activities against a single project.
+    """
+    project = frappe.db.get_value(
+        "Project",
+        {"project_name": HR_COST_CENTER_PROJECT_NAME},
+        ["name", "project_name", "customer"],
+        as_dict=True,
+    )
+    if project and project.customer:
+        project["customer_name"] = frappe.db.get_value(
+            "Customer", project.customer, "customer_name"
+        )
+    return project
+
+
+@frappe.whitelist()
+def get_current_employee():
+    """Return the Employee record linked to the current user."""
+    return frappe.db.get_value("Employee", {"user_id": frappe.session.user}, "name")
+
+
+# ---------------------------------------------------------------------------
+# Team calendar
+# ---------------------------------------------------------------------------
+
+@frappe.whitelist()
+def get_team_calendar_events():
+    """
+    Return approved leave applications and team holidays for the team calendar.
+    Reuses the same logic as the Project Action Panel calendar.
+    """
+    from phamos.phamos.page.project_action_panel.project_action_panel import (
+        get_employee_leaves,
+        get_team_holidays,
+    )
+
+    return {
+        "leaves": get_employee_leaves(),
+        "holidays": get_team_holidays(),
+    }
+
+
+# ---------------------------------------------------------------------------
+# My Timesheets
+# ---------------------------------------------------------------------------
+
+@frappe.whitelist()
+def get_my_timesheets():
+    """
+    Return the current employee's Timesheets with project/customer names and
+    total billable hours. Used by the Developer Action Panel 'My Timesheets' view.
+    """
+    employee = frappe.db.get_value("Employee", {"user_id": frappe.session.user}, "name")
+    if not employee:
+        return []
+
+    results = frappe.db.sql(
+        """
+        SELECT
+            t.name,
+            t.parent_project,
+            t.customer,
+            t.total_hours,
+            t.status,
+            t.creation,
+            t.docstatus,
+            p.project_name,
+            c.customer_name,
+            COALESCE(SUM(td.billing_hours), 0) AS billable_hours
+        FROM `tabTimesheet` t
+        LEFT JOIN `tabProject` p ON p.name = t.parent_project
+        LEFT JOIN `tabCustomer` c ON c.name = t.customer
+        LEFT JOIN `tabTimesheet Detail` td ON td.parent = t.name
+        WHERE t.employee = %(employee)s
+          AND t.docstatus != 2
+        GROUP BY t.name
+        ORDER BY t.creation DESC
+        LIMIT 500
+        """,
+        {"employee": employee},
+        as_dict=True,
+    )
+
+    for r in results:
+        r["status_label"] = {
+            0: "Draft",
+            1: "Submitted",
+            2: "Cancelled",
+        }.get(r.docstatus, r.status)
+
+    return results

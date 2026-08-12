@@ -6,6 +6,10 @@ import FilterBar from "./components/FilterBar.vue";
 import IssueList from "./components/IssueList.vue";
 import BreakModal from "./components/BreakModal.vue";
 import BreakConfirm from "./components/BreakConfirm.vue";
+import CalendarView from "./components/CalendarView.vue";
+import TimesheetList from "./components/TimesheetList.vue";
+import MeetingModal from "./components/MeetingModal.vue";
+import ConfirmDialog from "./components/ConfirmDialog.vue";
 
 const issues = ref([]);
 const stats = ref(null);
@@ -20,6 +24,11 @@ const sidebarOpen = ref(true);
 const selectedProject = ref(null);
 const currentView = ref("issues"); // 'issues' | future views
 const mineOnly = ref(true); // default: show only current user's issues
+const hrProject = ref(null);
+const showMeetingModal = ref(false);
+const meetingStart = ref(null);
+const showResumePrompt = ref(false);
+const meetingSubmitting = ref(false);
 
 // Filter state
 const searchQuery = ref("");
@@ -163,6 +172,61 @@ async function loadSession() {
   }
 }
 async function loadStats() { const r = await frappe.call({ method: "phamos.phamos.page.dev_action_panel.dev_action_panel.get_time_stats" }); stats.value = r.message || null; }
+async function loadHrProject() { const r = await frappe.call({ method: "phamos.phamos.page.dev_action_panel.dev_action_panel.get_hr_cost_center_project" }); hrProject.value = r.message || null; }
+
+// Cost Center HR meeting flow
+async function startCostCenterMeeting() {
+  if (showMeetingModal.value) return;
+  if (activeSession.value?.session_state === "running") {
+    await onPause();
+  }
+  meetingStart.value = breakFrom.value || frappe.datetime.now_datetime();
+  showMeetingModal.value = true;
+}
+
+function closeMeetingModal() {
+  showMeetingModal.value = false;
+}
+
+async function onMeetingSubmit({ activityType, goal, result, percentBillable }) {
+  if (meetingSubmitting.value) return;
+  meetingSubmitting.value = true;
+  try {
+    const toTime = frappe.datetime.now_datetime();
+    await frappe.call({
+      method: "phamos.phamos.page.dev_action_panel.dev_action_panel.create_break_timesheet",
+      args: {
+        from_time: meetingStart.value,
+        to_time: toTime,
+        project: hrProject.value.name,
+        goal,
+        result,
+        percent_billable: percentBillable,
+        activity_type: activityType || null,
+      },
+    });
+    showMeetingModal.value = false;
+    breakFrom.value = null;
+    await loadStats();
+    frappe.show_alert({ message: __("HR meeting timesheet submitted."), indicator: "green" });
+    if (activeSession.value?.session_state === "paused") {
+      showResumePrompt.value = true;
+    }
+  } finally {
+    meetingSubmitting.value = false;
+  }
+}
+
+async function onResumePromptConfirm() {
+  showResumePrompt.value = false;
+  await doResume();
+  frappe.show_alert({ message: __("Previous task resumed."), indicator: "green" });
+}
+
+function onResumePromptCancel() {
+  showResumePrompt.value = false;
+  frappe.show_alert({ message: __("Previous task kept paused."), indicator: "orange" });
+}
 
 // Inline start (emitted from card with { issue, expectedTime, goal, manualStartTime? })
 async function onStart({ issue, expectedTime, goal, manualStartTime }) {
@@ -267,7 +331,7 @@ async function onSync() {
   syncing.value = false;
 }
 
-onMounted(async () => { await Promise.all([loadIssues(), loadSession(), loadStats(), loadLabels()]); });
+onMounted(async () => { await Promise.all([loadIssues(), loadSession(), loadStats(), loadLabels(), loadHrProject()]); });
 onUnmounted(() => { stopTick(); });
 </script>
 
@@ -285,6 +349,22 @@ onUnmounted(() => { stopTick(); });
     @confirm="onBreakSubmit"
     @skip="onBreakSkip"
     @close="onBreakModalClose"
+  />
+  <MeetingModal
+    v-if="showMeetingModal && hrProject"
+    :project="hrProject"
+    :start-from="meetingStart"
+    @confirm="onMeetingSubmit"
+    @close="closeMeetingModal"
+  />
+  <ConfirmDialog
+    v-if="showResumePrompt"
+    title="Resume previous task?"
+    message="The meeting timesheet has been saved. Do you want to resume the task you were working on?"
+    confirm-label="Resume task"
+    cancel-label="Keep paused"
+    @confirm="onResumePromptConfirm"
+    @cancel="onResumePromptCancel"
   />
 
   <div class="dc-root">
@@ -312,44 +392,51 @@ onUnmounted(() => { stopTick(); });
           :my-issues-count="myIssuesCount"
           :mine-only="mineOnly"
           :syncing="syncing"
+          :hr-project="hrProject"
           @select-project="selectedProject = $event"
           @change-view="currentView = $event"
           @toggle-mine="mineOnly = $event"
           @sync="onSync"
+          @start-meeting="startCostCenterMeeting"
         />
       </aside>
 
       <div class="dc-body">
-        <FilterBar
-          v-model:search="searchQuery"
-          v-model:dueFilter="dueFilter"
-          v-model:assigneeFilter="assigneeFilter"
-          v-model:labelFilter="labelFilter"
-          v-model:sortBy="sortBy"
-          v-model:sortDir="sortDir"
-          :assignee-options="assigneeOptions"
-          :label-options="labelOptions"
-          :result-count="filteredIssues.length"
-          :total-count="issues.length"
-          @clear-all="clearAllFilters"
-        />
-        <div v-if="loading" class="dc-loading">
-          <div class="dc-loading__spinner"></div>
-          <span>Loading your issues…</span>
-        </div>
-        <IssueList
-          v-else
-          :issues="filteredIssues"
-          :all-count="issues.length"
-          :active-session="activeSession"
-          :elapsed-seconds="elapsedSeconds"
-          :selected-project="selectedProject"
-          :labels-map="labelsMap"
-          @start="onStart"
-          @pause="onPause"
-          @resume="onResume"
-          @stop="onStop"
-        />
+        <template v-if="currentView === 'issues'">
+          <FilterBar
+            v-model:search="searchQuery"
+            v-model:dueFilter="dueFilter"
+            v-model:assigneeFilter="assigneeFilter"
+            v-model:labelFilter="labelFilter"
+            v-model:sortBy="sortBy"
+            v-model:sortDir="sortDir"
+            :assignee-options="assigneeOptions"
+            :label-options="labelOptions"
+            :result-count="filteredIssues.length"
+            :total-count="issues.length"
+            @clear-all="clearAllFilters"
+          />
+          <div v-if="loading" class="dc-loading">
+            <div class="dc-loading__spinner"></div>
+            <span>Loading your issues…</span>
+          </div>
+          <IssueList
+            v-else
+            :issues="filteredIssues"
+            :all-count="issues.length"
+            :active-session="activeSession"
+            :elapsed-seconds="elapsedSeconds"
+            :selected-project="selectedProject"
+            :labels-map="labelsMap"
+            @start="onStart"
+            @pause="onPause"
+            @resume="onResume"
+            @stop="onStop"
+          />
+        </template>
+
+        <CalendarView v-else-if="currentView === 'team'" />
+        <TimesheetList v-else-if="currentView === 'timesheets'" />
       </div>
     </div>
   </div>
