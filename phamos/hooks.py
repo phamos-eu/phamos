@@ -240,6 +240,10 @@ scheduler_events = {
         "0 7 * * 1": [
             "phamos.gitlab_integration.generate_weekly_report.send_weekly_reports_for_all_implementations",
         ],
+        # Keep GitLab projects/milestones/issues fresh, including already synced issues.
+        "30 */2 * * *": [
+            "phamos.gitlab_integration.gitlab_utils.sync_gitlab_data_background",
+        ],
     },
 }
 
