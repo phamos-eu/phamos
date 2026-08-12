@@ -555,15 +555,6 @@ def pull_event_slots(start: str, end: str) -> list[dict]:
 	start_dt_utc = to_utc(start_dt)
 	end_dt_utc = to_utc(end_dt)
 
-	print(
-		f"[Mailcow Calendar] User: {EMAIL}"
-	)
-
-	print(
-		f"[Mailcow Calendar] Range: "
-		f"{start_dt_utc.isoformat()} -> "
-		f"{end_dt_utc.isoformat()}"
-	)
 
 	# OVERLAP CHECK
 
@@ -595,10 +586,6 @@ def pull_event_slots(start: str, end: str) -> list[dict]:
 				.decode()
 			)
 
-			print(
-				"[Mailcow Calendar] RRULE:",
-				rule_string
-			)
 
 			return rrulestr(
 				rule_string,
@@ -610,11 +597,6 @@ def pull_event_slots(start: str, end: str) -> list[dict]:
 			frappe.log_error(
 				frappe.get_traceback(),
 				"Mailcow CalDAV RRULE Parse Error"
-			)
-
-			print(
-				"[Mailcow Calendar] FAILED RRULE:",
-				rrule_prop
 			)
 
 			return None
@@ -1063,18 +1045,6 @@ def pull_event_slots(start: str, end: str) -> list[dict]:
 		)
 	)
 
-	print(
-		"[Mailcow Calendar] CalDAV URL:",
-		url
-	)
-
-	print(
-		"[Mailcow Calendar] REPORT:",
-		start_utc_str,
-		"->",
-		end_utc_str
-	)
-
 	# IMPORTANT:
 	# Keep the time-range filter.
 	#
@@ -1179,11 +1149,6 @@ def pull_event_slots(start: str, end: str) -> list[dict]:
 		ns
 	)
 
-	print(
-		"[Mailcow Calendar] CalDAV responses:",
-		len(responses)
-	)
-
 	# COLLECT
 
 	slots = []
@@ -1250,11 +1215,6 @@ def pull_event_slots(start: str, end: str) -> list[dict]:
 			item.get("start") or "",
 			item.get("end") or "",
 		)
-	)
-
-	print(
-		"[Mailcow Calendar] Returned slots:",
-		len(unique_slots)
 	)
 
 	return unique_slots
