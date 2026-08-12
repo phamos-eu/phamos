@@ -188,6 +188,7 @@ class MonthlyImplementationSummary(Document):
 		self.populate_financial_history_fields()
 
 	def before_submit(self):
+		self._sync_delivery_note_from_mis_items_for_submit()
 		self._submit_linked_delivery_note_before_mis_submit()
 
 	def on_submit(self):
@@ -211,10 +212,6 @@ class MonthlyImplementationSummary(Document):
 
 		if dn_status == 2:
 			frappe.throw(frappe._("Delivery Note {0} is cancelled.").format(frappe.bold(dn_name)))
-
-		if dn_status == 0:
-			# Native submit flow; any ERPNext validation error is raised as-is.
-			dn.submit()
 
 		self.delivery_note = dn.name
 
@@ -403,13 +400,19 @@ class MonthlyImplementationSummary(Document):
 			frappe.throw(f"Error creating Delivery Note: {str(e)}")
 
 	def _build_dn_items_from_mis_dni(self):
-		grouped = {}
+		if not self.sales_order:
+			frappe.throw("Sales Order is required to fetch rates for Delivery Note items.")
+
+		items = []
 		for row in self.delivery_note_item:
 			ic = row.item_code
 			if not ic:
 				continue
+
 			qty = flt(row.qty)
-			amount = flt(row.amount)
+			if qty <= 0:
+				continue
+
 			so_detail = getattr(row, "so_detail", None)
 			if not so_detail and getattr(row, "custom_ref_doc", None):
 				so_detail = frappe.db.get_value(
@@ -422,50 +425,72 @@ class MonthlyImplementationSummary(Document):
 					"so_detail",
 				)
 
-			key = (ic, so_detail)
-			if key not in grouped:
-				grouped[key] = {
-					"item_code": ic,
-					"item_name": row.item_name or frappe.db.get_value("Item", ic, "item_name"),
-					"item_group": row.item_group,
-					"qty": qty,
-					"amount": amount,
-					"stock_uom": row.stock_uom or row.uom,
-					"uom": row.uom,
-					"conversion_factor": flt(row.conversion_factor, 9) or 1,
-					"expense_account": row.expense_account,
-					"cost_center": row.cost_center,
-					"so_detail": so_detail,
-				}
+			so_item = None
+			if so_detail and frappe.db.exists("Sales Order Item", {"name": so_detail, "parent": self.sales_order}):
+				so_item = frappe.db.get_value(
+					"Sales Order Item",
+					so_detail,
+					["name", "item_code", "item_name", "item_group", "stock_uom", "uom", "conversion_factor", "rate"],
+					as_dict=True,
+				)
 			else:
-				grouped[key]["qty"] += qty
-				grouped[key]["amount"] += amount
-		items = []
-		for g in grouped.values():
-			qty = g["qty"]
-			g["rate"] = flt(g["amount"] / qty, 2) if qty else 0
-			g["amount"] = flt(g["amount"], 2)
+				so_item_name = frappe.db.get_value(
+					"Sales Order Item",
+					{"parent": self.sales_order, "item_code": ic},
+					"name",
+				)
+				if so_item_name:
+					so_item = frappe.db.get_value(
+						"Sales Order Item",
+						so_item_name,
+						["name", "item_code", "item_name", "item_group", "stock_uom", "uom", "conversion_factor", "rate"],
+						as_dict=True,
+					)
+
+			if not so_item:
+				frappe.throw(
+					"No matching Sales Order Item found for item {0} in Sales Order {1}.".format(ic, self.sales_order)
+				)
+
+			rate = flt(so_item.rate)
+			cf = flt(so_item.conversion_factor, 9) or flt(row.conversion_factor, 9) or 1
+			uom = so_item.uom or row.uom
+			stock_uom = so_item.stock_uom or row.stock_uom or uom
+
 			item_row = {
-				"item_code": g["item_code"],
-				"item_name": g["item_name"],
-				"item_group": g["item_group"],
+				"item_code": so_item.item_code or ic,
+				"item_name": so_item.item_name or row.item_name or frappe.db.get_value("Item", ic, "item_name"),
+				"item_group": so_item.item_group or row.item_group,
 				"qty": qty,
-				"stock_uom": g["stock_uom"],
-				"uom": g["uom"],
-				"conversion_factor": g["conversion_factor"],
-				"rate": g["rate"],
-				"amount": g["amount"],
-				"expense_account": g["expense_account"],
-				"cost_center": g["cost_center"],
+				"stock_uom": stock_uom,
+				"uom": uom,
+				"conversion_factor": cf,
+				"rate": rate,
+				"amount": flt(rate * qty, 2),
+				"expense_account": row.expense_account,
+				"cost_center": row.cost_center,
 				"allow_zero_valuation_rate": 1,
+				"against_sales_order": self.sales_order,
+				"so_detail": so_item.name,
 			}
-			if g.get("so_detail"):
-				item_row["against_sales_order"] = self.sales_order
-				item_row["so_detail"] = g["so_detail"]
-			else:
-				item_row["custom_against_monthly_implementation_summary"] = self.name
 			items.append(item_row)
+
 		return items
+
+	def _sync_delivery_note_from_mis_items_for_submit(self):
+		if not self.delivery_note_item:
+			return
+
+		dn_name = self._get_linked_dn_name(persist_link=True)
+		if dn_name:
+			dn_status = cint(frappe.db.get_value("Delivery Note", dn_name, "docstatus") or 0)
+			if dn_status == 0:
+				self.update_delivery_note_from_mis_items()
+			elif dn_status == 2:
+				frappe.throw(frappe._("Cannot use cancelled Delivery Note {0}.").format(frappe.bold(dn_name)))
+			return
+
+		self._create_dn_from_mis_dni()
 
 	def _create_dn_from_mis_dni(self):
 		if not self.delivery_note_item:
@@ -844,15 +869,7 @@ def submit_mis_dn_action(docname: str):
 	_require_docname(docname)
 	doc = frappe.get_doc("Monthly Implementation Summary", docname)
 	doc.reload()
-	dn_name = doc._get_linked_dn_name()
-	if dn_name:
-		dn_status = cint(frappe.db.get_value("Delivery Note", dn_name, "docstatus") or 0)
-		if dn_status == 0:
-			doc.update_delivery_note_from_mis_items()
-		elif dn_status == 2:
-			frappe.throw(frappe._("Cannot use cancelled Delivery Note {0}.").format(frappe.bold(dn_name)))
-	else:
-		doc._create_dn_from_mis_dni()
+	doc._sync_delivery_note_from_mis_items_for_submit()
 	# Sub-methods may stamp timesheets; repeat after reload so DB ``delivery_note`` / links are visible.
 	doc.reload()
 	dn_name = doc._resolve_dn_name_for_timesheet_stamp()
