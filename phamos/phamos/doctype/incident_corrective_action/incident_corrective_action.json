@@ -1,0 +1,251 @@
+{
+ "actions": [],
+ "autoname": "format:ICA-{#####}-{implementation}",
+ "creation": "2026-07-17 00:00:00.000000",
+ "doctype": "DocType",
+ "engine": "InnoDB",
+ "field_order": [
+  "section_break_context",
+  "implementation",
+  "open_date",
+  "column_break_context",
+  "gitlab_issue",
+  "customer",
+  "workflow_state",
+  "section_break_d0",
+  "emergency_response_actions",
+  "section_break_d1",
+  "team",
+  "section_break_d2",
+  "problem_description",
+  "section_break_d3",
+  "containment_actions",
+  "section_break_d4",
+  "root_cause_analysis",
+  "section_break_d5",
+  "corrective_actions",
+  "section_break_d6",
+  "corrective_action_implementation",
+  "section_break_d7",
+  "prevent_recurrence_actions",
+  "section_break_d8",
+  "closing_comments",
+  "column_break_d8",
+  "close_date"
+ ],
+ "fields": [
+  {
+   "collapsible": 1,
+   "collapsible_depends_on": "eval:true",
+   "fieldname": "section_break_context",
+   "fieldtype": "Section Break",
+   "label": "Context"
+  },
+  {
+   "fieldname": "implementation",
+   "fieldtype": "Link",
+   "in_list_view": 1,
+   "label": "Implementation",
+   "options": "Implementation",
+   "reqd": 1
+  },
+  {
+   "default": "Today",
+   "fieldname": "open_date",
+   "fieldtype": "Date",
+   "in_list_view": 1,
+   "label": "Open Date",
+   "reqd": 1
+  },
+  {
+   "fieldname": "column_break_context",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "gitlab_issue",
+   "fieldtype": "Link",
+   "label": "GitLab Issue",
+   "options": "GitLab Issue"
+  },
+  {
+   "fieldname": "customer",
+   "fieldtype": "Link",
+   "fetch_from": "implementation.customer",
+   "label": "Customer",
+   "options": "Customer",
+   "read_only": 1
+  },
+  {
+   "fieldname": "workflow_state",
+   "fieldtype": "Select",
+   "hidden": 1,
+   "label": "Status",
+   "no_copy": 1,
+   "print_hide": 1,
+   "read_only": 1
+  },
+  {
+   "collapsible": 1,
+   "collapsible_depends_on": "eval:true",
+   "fieldname": "section_break_d0",
+   "fieldtype": "Section Break",
+   "label": "D0: Emergency Response"
+  },
+  {
+   "fieldname": "emergency_response_actions",
+   "fieldtype": "Text",
+   "label": "Emergency Response Actions"
+  },
+  {
+   "collapsible": 1,
+   "collapsible_depends_on": "eval:true",
+   "fieldname": "section_break_d1",
+   "fieldtype": "Section Break",
+   "label": "D1: Team"
+  },
+  {
+   "fieldname": "team",
+   "fieldtype": "Table",
+   "label": "Team",
+   "options": "Incident Team Member"
+  },
+  {
+   "collapsible": 1,
+   "collapsible_depends_on": "eval:true",
+   "fieldname": "section_break_d2",
+   "fieldtype": "Section Break",
+   "label": "D2: Problem Description"
+  },
+  {
+   "fieldname": "problem_description",
+   "fieldtype": "Text",
+   "label": "Problem Description"
+  },
+  {
+   "collapsible": 1,
+   "collapsible_depends_on": "eval:true",
+   "fieldname": "section_break_d3",
+   "fieldtype": "Section Break",
+   "label": "D3: Containment Actions"
+  },
+  {
+   "fieldname": "containment_actions",
+   "fieldtype": "Table",
+   "label": "Containment Actions",
+   "options": "Corrective Action Item"
+  },
+  {
+   "collapsible": 1,
+   "collapsible_depends_on": "eval:true",
+   "fieldname": "section_break_d4",
+   "fieldtype": "Section Break",
+   "label": "D4: Root Cause Analysis"
+  },
+  {
+   "fieldname": "root_cause_analysis",
+   "fieldtype": "Text Editor",
+   "label": "Root Cause Analysis"
+  },
+  {
+   "collapsible": 1,
+   "collapsible_depends_on": "eval:true",
+   "fieldname": "section_break_d5",
+   "fieldtype": "Section Break",
+   "label": "D5: Corrective Actions"
+  },
+  {
+   "fieldname": "corrective_actions",
+   "fieldtype": "Table",
+   "label": "Corrective Actions",
+   "options": "Corrective Action Item"
+  },
+  {
+   "collapsible": 1,
+   "collapsible_depends_on": "eval:true",
+   "fieldname": "section_break_d6",
+   "fieldtype": "Section Break",
+   "label": "D6: Corrective Action Implementation"
+  },
+  {
+   "fieldname": "corrective_action_implementation",
+   "fieldtype": "Table",
+   "label": "Corrective Action Implementation",
+   "options": "Corrective Action Item"
+  },
+  {
+   "collapsible": 1,
+   "collapsible_depends_on": "eval:true",
+   "fieldname": "section_break_d7",
+   "fieldtype": "Section Break",
+   "label": "D7: Prevent Recurrence"
+  },
+  {
+   "fieldname": "prevent_recurrence_actions",
+   "fieldtype": "Table",
+   "label": "Actions to Prevent Recurrence",
+   "options": "Corrective Action Item"
+  },
+  {
+   "collapsible": 1,
+   "collapsible_depends_on": "eval:true",
+   "fieldname": "section_break_d8",
+   "fieldtype": "Section Break",
+   "label": "D8: Congratulate Team"
+  },
+  {
+   "fieldname": "closing_comments",
+   "fieldtype": "Text",
+   "label": "Closing Comments"
+  },
+  {
+   "fieldname": "column_break_d8",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "close_date",
+   "fieldtype": "Date",
+   "label": "Close Date"
+  }
+ ],
+ "is_submittable": 1,
+ "links": [],
+ "modified": "2026-07-20 12:00:00.000000",
+ "modified_by": "Administrator",
+ "module": "Phamos",
+ "name": "Incident Corrective Action",
+ "naming_rule": "Expression",
+ "owner": "Administrator",
+ "permissions": [
+  {
+   "amend": 1,
+   "cancel": 1,
+   "create": 1,
+   "delete": 1,
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "System Manager",
+   "share": 1,
+   "submit": 1,
+   "write": 1
+  },
+  {
+   "create": 1,
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "All",
+   "share": 1,
+   "submit": 1,
+   "write": 1
+  }
+ ],
+ "sort_field": "modified",
+ "sort_order": "DESC",
+ "states": [],
+ "track_changes": 1
+}
