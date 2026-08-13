@@ -27,6 +27,7 @@ WEEKDAYS = [
 
 DEFAULT_TIME_FROM = "07:00"
 DEFAULT_TIME_TO = "18:00"
+WORKING_DAYS_PER_WEEK = 5
 
 OPTIONAL_SLOTS = [
 	("Before Working Hours", "07:00", "08:00"),
@@ -598,26 +599,44 @@ def get_free_slots(
 	time_from: str = DEFAULT_TIME_FROM,
 	time_to: str = DEFAULT_TIME_TO,
 ):
-	"""Return all free slots from Mailcow in the given date range and window."""
+	"""Return available slots from the employee's calendar."""
+
 	if not employee:
 		frappe.throw(_("Employee is required."))
+
 	if not from_date or not to_date:
 		frappe.throw(_("From Date and To Date are required."))
 
 	start_date = getdate(from_date)
 	end_date = getdate(to_date)
+
 	if start_date > end_date:
 		frappe.throw(_("From Date cannot be after To Date."))
 
 	user_id, _ = _resolve_employee_calendar_user(employee)
-	return _build_free_slots_for_range(
-		user_id,
-		start_date,
-		end_date,
-		tz_name=tz_name,
+
+	# Use the same timezone resolution as the Calendar.
+	# Passing None makes _resolve_calendar_timezone() use
+	# the timezone configured in the User record.
+	available_slots = _build_free_slots_for_range(
+		user_id=user_id,
+		from_date=start_date,
+		to_date=end_date,
+		tz_name=None,
 		time_from=time_from,
 		time_to=time_to,
 	)
+
+	# Apply the same Optional-slot exclusion used by the Calendar.
+	available_slots = _exclude_optional_from_slot_rows(available_slots)
+	# Remove Saturdays and Sundays.
+	available_slots = [
+		slot
+		for slot in available_slots
+		if slot["date"].weekday() < WORKING_DAYS_PER_WEEK
+	]
+
+	return available_slots
 
 
 def _ensure_dict_filters(filters):
