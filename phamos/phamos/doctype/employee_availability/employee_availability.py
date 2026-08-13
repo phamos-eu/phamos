@@ -27,6 +27,7 @@ WEEKDAYS = [
 
 DEFAULT_TIME_FROM = "07:00"
 DEFAULT_TIME_TO = "18:00"
+WORKING_DAYS_PER_WEEK = 5
 
 OPTIONAL_SLOTS = [
 	("Before Working Hours", "07:00", "08:00"),
@@ -632,7 +633,7 @@ def get_free_slots(
 	available_slots = [
 		slot
 		for slot in available_slots
-		if slot["date"].weekday() < 5
+		if slot["date"].weekday() < WORKING_DAYS_PER_WEEK
 	]
 
 	return available_slots
