@@ -94,7 +94,7 @@ def get_chart_data(from_date=None, to_date=None, team=None, implementation=None,
     if implementation:
         impl_list = [i.strip() for i in implementation.split(',') if i.strip()]
         for impl_name in impl_list:
-            full_doc = frappe.get_doc("Implementation", impl_name)
+            full_doc = frappe.get_cached_doc("Implementation", impl_name)
             implementation_teams[impl_name] = full_doc.team or "Unassigned"
             
             for row in (full_doc.resource_planning or []):
@@ -115,19 +115,28 @@ def get_chart_data(from_date=None, to_date=None, team=None, implementation=None,
 
         # Get implementations that should NOT be excluded (i.e., not purely internal)
         all_impls = frappe.get_all("Implementation", filters=filters, fields=["name", "team"])
-        
+        impl_names = [impl.name for impl in all_impls]
+
         # Identify implementations that only have internal projects (to exclude them)
         internal_only_implementations = set()
-        for impl in all_impls:
-            projects = frappe.db.get_all(
+        if impl_names:
+            all_projects = frappe.get_all(
                 "Project",
-                filters={"custom_implementation": impl.name},
-                fields=["name", "custom_is_internal_project"]
+                filters={"custom_implementation": ["in", impl_names]},
+                fields=["custom_implementation", "custom_is_internal_project"]
             )
-            if projects:
-                # If ALL projects are internal, mark this implementation for exclusion
-                if all(p.get("custom_is_internal_project") == 1 for p in projects):
-                    internal_only_implementations.add(impl.name)
+
+            projects_by_implementation = {}
+            for project in all_projects:
+                impl_name = project.get("custom_implementation")
+                if not impl_name:
+                    continue
+                projects_by_implementation.setdefault(impl_name, []).append(project)
+
+            for impl_name, projects in projects_by_implementation.items():
+                # Keep existing behavior: only mark internal-only when projects exist and all are internal.
+                if projects and all((project.get("custom_is_internal_project") or 0) == 1 for project in projects):
+                    internal_only_implementations.add(impl_name)
         
         for impl in all_impls:
             # Skip implementations that are purely internal (they'll be aggregated separately)
@@ -135,7 +144,7 @@ def get_chart_data(from_date=None, to_date=None, team=None, implementation=None,
                 continue
                 
             implementation_teams[impl.name] = impl.team or "Unassigned"
-            full_doc = frappe.get_doc("Implementation", impl.name)
+            full_doc = frappe.get_cached_doc("Implementation", impl.name)
             
             for row in (full_doc.resource_planning or []):
                 row_dict = row.as_dict()
