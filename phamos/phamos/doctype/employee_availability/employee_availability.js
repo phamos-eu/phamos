@@ -98,7 +98,6 @@ function fetch_available_slots(frm) {
 			employee: frm.doc.employee,
 			from_date: frm.doc.from_date,
 			to_date: frm.doc.to_date,
-			tz_name: Intl.DateTimeFormat().resolvedOptions().timeZone,
 		},
 		freeze: true,
 		freeze_message: __("Fetching available slots from Mailcow..."),
