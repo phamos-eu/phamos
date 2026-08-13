@@ -8,6 +8,7 @@ frappe.ui.form.on("Employee Availability", {
 
 	refresh(frm) {
 		add_fetch_slots_button(frm);
+		set_child_table_pagination(frm);
 	},
 
 	employee(frm) {
@@ -189,4 +190,17 @@ function update_appointment_slots_from_available(frm) {
 	});
 
 	frm.refresh_field("appointment_slots");
+}
+
+function set_child_table_pagination(frm) {
+	const available_grid = frm.get_field("available_slots").grid;
+	const appointment_grid = frm.get_field("appointment_slots").grid;
+
+	available_grid.grid_pagination.page_length = 10;
+	available_grid.cannot_add_rows = true;
+	available_grid.reset_grid();
+
+	appointment_grid.grid_pagination.page_length = 10;
+	appointment_grid.cannot_add_rows = true;
+	appointment_grid.reset_grid();
 }
