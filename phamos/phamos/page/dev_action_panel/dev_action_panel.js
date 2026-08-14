@@ -4,10 +4,12 @@ frappe.pages["dev-action-panel"].on_page_load = function (wrapper) {
 		title: __("Developer Action Panel"),
 		single_column: true,
 	});
+
+	load_desk_page(wrapper);   
 };
 
 frappe.pages["dev-action-panel"].on_page_show = function (wrapper) {
-	load_desk_page(wrapper);
+	frappe.dev_action_panel?.refresh?.();   
 };
 
 function load_desk_page(wrapper) {

@@ -1,13 +1,25 @@
 <script setup>
-import { ref, computed, onMounted } from "vue";
+import { ref, computed, onMounted, onUnmounted } from "vue";
 
 const timesheets = ref([]);
 const loading = ref(false);
 const employeeName = ref("");
 
+
+const handleVisibilityChange = () => {
+  if (!document.hidden) {
+    loadTimesheets();
+  }
+};
+
 onMounted(async () => {
   employeeName.value = await fetchCurrentEmployee();
   await loadTimesheets();
+  document.addEventListener('visibilitychange', handleVisibilityChange);
+});
+
+onUnmounted(() => {
+  document.removeEventListener('visibilitychange', handleVisibilityChange);
 });
 
 async function fetchCurrentEmployee() {
@@ -42,7 +54,7 @@ function fmtHours(val) {
 }
 
 function openTimesheet(name) {
-  window.open(`/app/timesheet/${encodeURIComponent(name)}`, "_blank");
+  frappe.set_route("Form", "Timesheet", name);
 }
 
 function openDeskList() {
@@ -91,32 +103,36 @@ const totals = computed(() => {
       <p class="tl__empty-sub">Start a session from an issue to create your first timesheet.</p>
     </div>
 
-    <div v-else class="tl__cards">
+    <div v-else class="tl__list">
       <div
         v-for="ts in timesheets"
         :key="ts.name"
-        class="tl__card"
+        class="tl__list-item"
         @click="openTimesheet(ts.name)"
       >
-        <div class="tl__card-top">
-          <span class="tl__name">{{ ts.name }}</span>
-          <span class="tl__badge" :class="`tl__badge--${ts.status_label?.toLowerCase() || 'draft'}`">
-            {{ ts.status_label }}
-          </span>
-        </div>
-        <div class="tl__card-meta">
-          <span v-if="ts.project_name" class="tl__meta-item">{{ ts.project_name }}</span>
-          <span v-if="ts.customer_name" class="tl__meta-item">{{ ts.customer_name }}</span>
-          <span class="tl__meta-item">{{ fmtDate(ts.creation) }}</span>
-        </div>
-        <div class="tl__card-hours">
-          <div class="tl__hour">
-            <span class="tl__hour-label">Total</span>
-            <span class="tl__hour-value">{{ fmtHours(ts.total_hours) }}</span>
+        <div class="tl__list-content">
+          <div class="tl__list-left">
+            <h3 class="tl__list-title">{{ ts.name }}</h3>
+            <p class="tl__list-meta">
+              <span v-if="ts.project_name" class="tl__list-meta-item">{{ ts.project_name }}</span>
+              <span v-if="ts.customer_name" class="tl__list-meta-item">{{ ts.customer_name }}</span>
+              <span class="tl__list-meta-item">{{ fmtDate(ts.creation) }}</span>
+            </p>
           </div>
-          <div class="tl__hour">
-            <span class="tl__hour-label">Billable</span>
-            <span class="tl__hour-value">{{ fmtHours(ts.billable_hours) }}</span>
+          <div class="tl__list-right">
+            <div class="tl__list-stats">
+              <div class="tl__list-stat">
+                <span class="tl__list-label">Total</span>
+                <span class="tl__list-value">{{ fmtHours(ts.total_hours) }}</span>
+              </div>
+              <div class="tl__list-stat">
+                <span class="tl__list-label">Billable</span>
+                <span class="tl__list-value">{{ fmtHours(ts.billable_hours) }}</span>
+              </div>
+            </div>
+            <span class="tl__list-badge" :class="`tl__list-badge--${ts.status_label?.toLowerCase() || 'draft'}`">
+              {{ ts.status_label }}
+            </span>
           </div>
         </div>
       </div>
@@ -159,38 +175,96 @@ const totals = computed(() => {
 .tl__empty-title { font-size: 14px; font-weight: 600; color: var(--text-color); margin: 0 0 6px; }
 .tl__empty-sub { font-size: 13px; color: var(--text-muted); margin: 0; }
 
-.tl__cards { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 12px; }
-.tl__card {
-  background: var(--card-bg); border: 1px solid var(--border-color); border-radius: 10px;
-  padding: 14px; cursor: pointer; transition: box-shadow 0.12s, border-color 0.12s;
+.tl__list { }
+.tl__list-item {
+  background: var(--card-bg);
+  border: 1px solid var(--border-color);
+  border-radius: 8px;
+  padding: 12px 16px;
+  margin-bottom: 8px;
+  cursor: pointer;
+  transition: box-shadow 0.12s, border-color 0.12s;
 }
-.tl__card:hover { border-color: var(--primary); box-shadow: 0 2px 8px rgba(0,0,0,0.06); }
-.tl__card-top {
-  display: flex; align-items: center; justify-content: space-between; gap: 8px;
+.tl__list-item:hover {
+  border-color: var(--primary);
+  box-shadow: 0 2px 8px rgba(0,0,0,0.06);
+}
+.tl__list-content {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+}
+.tl__list-left {
+  flex: 1;
+}
+.tl__list-title {
+  margin: 0 0 4px 0;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--primary);
+}
+.tl__list-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 12px;
+  font-size: 12px;
+  color: var(--text-muted);
   margin-bottom: 8px;
 }
-.tl__name { font-size: 13px; font-weight: 700; color: var(--primary); }
-.tl__badge {
-  font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.04em;
-  padding: 2px 7px; border-radius: 10px;
+.tl__list-meta-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
 }
-.tl__badge--draft { background: var(--yellow-50, #fefce8); color: var(--yellow-700, #a16207); }
-.tl__badge--submitted { background: var(--green-50, #f0fdf4); color: var(--green-700, #15803d); }
-.tl__badge--cancelled { background: var(--red-50, #fef2f2); color: var(--red-700, #b91c1c); }
-
-.tl__card-meta {
-  display: flex; flex-wrap: wrap; gap: 6px 12px;
-  font-size: 12px; color: var(--text-muted); margin-bottom: 12px;
+.tl__list-meta-item:not(:last-child)::after {
+  content: "·";
+  margin-left: 6px;
+  color: var(--border-color);
 }
-.tl__meta-item { display: inline-flex; align-items: center; gap: 4px; }
-.tl__meta-item:not(:last-child)::after {
-  content: "·"; margin-left: 6px; color: var(--border-color);
+.tl__list-right {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 8px;
 }
-
-.tl__card-hours {
-  display: flex; gap: 16px;
+.tl__list-stats {
+  display: flex;
+  gap: 16px;
 }
-.tl__hour { display: flex; flex-direction: column; }
-.tl__hour-label { font-size: 10px; font-weight: 700; text-transform: uppercase; color: var(--text-muted); letter-spacing: 0.04em; }
-.tl__hour-value { font-size: 14px; font-weight: 700; color: var(--text-color); }
+.tl__list-stat {
+  display: flex;
+  flex-direction: column;
+}
+.tl__list-label {
+  font-size: 10px;
+  font-weight: 600;
+  text-transform: uppercase;
+  color: var(--text-muted);
+  letter-spacing: 0.04em;
+}
+.tl__list-value {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-color);
+}
+.tl__list-badge {
+  font-size: 10px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  padding: 2px 6px;
+  border-radius: 4px;
+}
+.tl__list-badge--draft {
+  background: var(--yellow-50, #fefce8);
+  color: var(--yellow-700, #a16207);
+}
+.tl__list-badge--submitted {
+  background: var(--green-50, #f0fdf4);
+  color: var(--green-700, #15803d);
+}
+.tl__list-badge--cancelled {
+  background: var(--red-50, #fef2f2);
+  color: var(--red-700, #b91c1c);
+}
 </style>
