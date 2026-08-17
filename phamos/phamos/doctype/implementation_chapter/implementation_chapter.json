@@ -1,0 +1,122 @@
+{
+ "actions": [],
+ "allow_rename": 1,
+ "autoname": "field:chapter_title",
+ "creation": "2026-08-13 08:34:57.430972",
+ "default_view": "List",
+ "doctype": "DocType",
+ "engine": "InnoDB",
+ "field_order": [
+  "attachment",
+  "creating_author",
+  "edited_by_human",
+  "column_break_yqzd",
+  "implementation",
+  "column_break_lnfo",
+  "planned_start",
+  "planned_end",
+  "section_break_zmul",
+  "chapter_title",
+  "chapter_introduction",
+  "full_chapter_description"
+ ],
+ "fields": [
+  {
+   "description": "If you have already created a requirements sheet you can upload it here.",
+   "fieldname": "attachment",
+   "fieldtype": "Attach",
+   "label": "Attachment"
+  },
+  {
+   "description": "If AI is selected the attachment will be read by an AI agent and the Chapter will be written automatically.",
+   "fieldname": "creating_author",
+   "fieldtype": "Select",
+   "label": "Creating Author",
+   "options": "Human\nAI"
+  },
+  {
+   "default": "0",
+   "description": "When activated the AI created version can be edited.",
+   "fieldname": "edited_by_human",
+   "fieldtype": "Check",
+   "label": "Edited by Human"
+  },
+  {
+   "fieldname": "column_break_yqzd",
+   "fieldtype": "Column Break"
+  },
+  {
+   "description": "Link to the Implementation if it already exists.",
+   "fieldname": "implementation",
+   "fieldtype": "Link",
+   "label": "Implementation",
+   "options": "Implementation"
+  },
+  {
+   "fieldname": "column_break_lnfo",
+   "fieldtype": "Column Break"
+  },
+  {
+   "description": "Please add a date that you would like to start this with. This date will be used to identify the year, quarter and week that you are planning to start.",
+   "fieldname": "planned_start",
+   "fieldtype": "Date",
+   "label": "Planned Start"
+  },
+  {
+   "description": "Please add a desired end date to when this chapter should be completed. This date will be used to identify the year, quarter and week.",
+   "fieldname": "planned_end",
+   "fieldtype": "Data",
+   "label": "Planned End"
+  },
+  {
+   "fieldname": "section_break_zmul",
+   "fieldtype": "Section Break"
+  },
+  {
+   "description": "Please give a short title to the Chapter that you are looking to complete like \"Replace legacy CRM\" or \"Introduce HR Processes\" or \"Introduce Purchase Cycle\"",
+   "fieldname": "chapter_title",
+   "fieldtype": "Data",
+   "label": "Chapter Title",
+   "unique": 1
+  },
+  {
+   "description": "Please give an introduction to the Subject mentioned. For the detailed description there is a seperate field",
+   "fieldname": "chapter_introduction",
+   "fieldtype": "Small Text",
+   "label": "Chapter Introduction"
+  },
+  {
+   "fieldname": "full_chapter_description",
+   "fieldtype": "Text Editor",
+   "label": "Full Chapter Description"
+  }
+ ],
+ "grid_page_length": 50,
+ "index_web_pages_for_search": 1,
+ "links": [],
+ "modified": "2026-08-13 09:04:36.672797",
+ "modified_by": "Administrator",
+ "module": "Phamos",
+ "name": "Implementation Chapter",
+ "naming_rule": "By fieldname",
+ "owner": "Administrator",
+ "permissions": [
+  {
+   "create": 1,
+   "delete": 1,
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "System Manager",
+   "share": 1,
+   "write": 1
+  }
+ ],
+ "row_format": "Dynamic",
+ "rows_threshold_for_grid_search": 20,
+ "sort_field": "creation",
+ "sort_order": "DESC",
+ "states": []
+}
