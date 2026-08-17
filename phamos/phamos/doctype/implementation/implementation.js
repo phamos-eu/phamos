@@ -82,6 +82,7 @@ frappe.ui.form.on("Implementation", {
     refresh: function (frm) {
         sort_resource_planning_by_month_desc(frm);
         setup_implementation_theme_watcher(frm);
+        frm.trigger("append_implementation_chapters_to_modules");
         frm.trigger("render_auto_email_reports_section");
         frm.trigger("render_gitlab_projects_section");
         frm.trigger("render_gitlab_issues_section");
@@ -1086,6 +1087,28 @@ frappe.ui.form.on("Implementation", {
             }
         });
     },
+    append_implementation_chapters_to_modules(frm) {
+        if (frm.is_new() || !frm.doc.name) return;
+        if (frm.__chapter_sync_in_progress) return;
+
+        frm.__chapter_sync_in_progress = true;
+
+        frappe.call({
+            method: "phamos.phamos.doctype.implementation.implementation.sync_modules_with_implementation_chapters",
+            args: {
+                name: frm.doc.name,
+            },
+            callback: (r) => {
+                const addedCount = cint(r.message?.added_count || 0);
+                if (addedCount > 0) {
+                    frm.reload_doc();
+                }
+            },
+            always: () => {
+                frm.__chapter_sync_in_progress = false;
+            }
+        });
+    },
     on_form_unload(frm) {
         if (frm.__implementation_theme_observer) {
             frm.__implementation_theme_observer.disconnect();
@@ -1149,7 +1172,10 @@ function render_module_chart(frm, canvasId) {
 
     (frm.doc.modules || []).forEach(row => {
         if (row.is_required) {
-            const baseLabel = (row.module_description || "").trim() || row.module;
+            const baseLabel =
+                (row.implementation_chapter || "").trim() ||
+                (row.module_description || "").trim() ||
+                row.module;
             let label = baseLabel;
 
             const duplicateCount = labels.filter(l => l.startsWith(baseLabel)).length;

@@ -6,9 +6,9 @@
  "editable_grid": 1,
  "engine": "InnoDB",
  "field_order": [
+  "implementation_chapter",
   "module",
   "module_description",
-  "stage",
   "is_required",
   "target_date",
   "project",
@@ -64,13 +64,6 @@
   },
   {
    "columns": 1,
-   "fieldname": "stage",
-   "fieldtype": "Data",
-   "in_list_view": 1,
-   "label": "Stage"
-  },
-  {
-   "columns": 1,
    "fieldname": "target_date",
    "fieldtype": "Date",
    "in_list_view": 1,
@@ -82,13 +75,21 @@
    "fieldtype": "Data",
    "in_list_view": 1,
    "label": "Module Description"
+  },
+  {
+   "columns": 1,
+   "fieldname": "implementation_chapter",
+   "fieldtype": "Link",
+   "in_list_view": 1,
+   "label": "Implementation Chapter",
+   "options": "Implementation Chapter"
   }
  ],
  "grid_page_length": 50,
  "index_web_pages_for_search": 1,
  "istable": 1,
  "links": [],
- "modified": "2026-08-03 08:49:49.823658",
+ "modified": "2026-08-13 09:07:03.218366",
  "modified_by": "Administrator",
  "module": "Phamos",
  "name": "Implementation Item",
