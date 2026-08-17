@@ -774,12 +774,16 @@ function processDataForGraph(timesheets) {
         tooltip: {
             shared: true,
             useHTML: true,
+            style: {
+                width: '280px',
+                whiteSpace: 'normal'
+            },
             formatter: function () {
                 const pointIndex = this.points[0].point.index;
                 const period = sortedCategories[pointIndex];
                 const displayLabel = displayCategories[pointIndex];
                 
-                let tooltipHTML = `<div style="padding: 5px;">`;
+                let tooltipHTML = `<div style="padding: 5px; width: 280px; max-width: 280px; white-space: normal;">`;
                 
                 // Header with week/month info
                 if (currentChartView === 'week') {
@@ -800,7 +804,7 @@ function processDataForGraph(timesheets) {
                     if (point.y > 0) {
                         tooltipHTML += `<div style="margin: 3px 0;">
                             <span style="color:${point.color}; font-size: 16px;">●</span> 
-                            <span style="font-size: 12px;">${point.series.name}: <strong>${point.y.toFixed(2)} hrs</strong></span>
+                            <span style="font-size: 12px; white-space: normal; word-break: break-word;">${point.series.name}: <strong>${point.y.toFixed(2)} hrs</strong></span>
                         </div>`;
                     }
                 });
