@@ -545,6 +545,75 @@ def get_financial_snapshot(name, customer=None):
 
 
 @frappe.whitelist()
+def sync_modules_with_implementation_chapters(name):
+	if not name:
+		return {"added_count": 0}
+
+	existing_chapters = {
+		(chapter or "").strip()
+		for chapter in frappe.get_all(
+			"Implementation Item",
+			filters={"parent": name, "parenttype": "Implementation", "parentfield": "modules"},
+			pluck="implementation_chapter",
+		)
+		if (chapter or "").strip()
+	}
+
+	chapters = frappe.get_all(
+		"Implementation Chapter",
+		filters={"implementation": name},
+		fields=["name"],
+		order_by="creation asc",
+		limit_page_length=1000,
+	)
+
+	last_row = frappe.get_all(
+		"Implementation Item",
+		filters={"parent": name, "parenttype": "Implementation", "parentfield": "modules"},
+		fields=["idx"],
+		order_by="idx desc",
+		limit_page_length=1,
+	)
+
+	next_idx = int(last_row[0].idx) if last_row and last_row[0].get("idx") else 0
+	added_count = 0
+
+	for chapter in chapters:
+		chapter_name = (chapter.get("name") or "").strip()
+		if not chapter_name or chapter_name in existing_chapters:
+			continue
+
+		if frappe.db.exists(
+			"Implementation Item",
+			{
+				"parent": name,
+				"parenttype": "Implementation",
+				"parentfield": "modules",
+				"implementation_chapter": chapter_name,
+			},
+		):
+			existing_chapters.add(chapter_name)
+			continue
+
+		next_idx += 1
+		frappe.get_doc(
+			{
+				"doctype": "Implementation Item",
+				"parent": name,
+				"parenttype": "Implementation",
+				"parentfield": "modules",
+				"idx": next_idx,
+				"implementation_chapter": chapter_name,
+			}
+		).insert(ignore_permissions=True)
+
+		existing_chapters.add(chapter_name)
+		added_count += 1
+
+	return {"added_count": added_count}
+
+
+@frappe.whitelist()
 def recompute_implementation_stats(name):
 	"""Recompute stats fields from existing child table rows for one record."""
 	doc = frappe.get_doc("Implementation", name)
