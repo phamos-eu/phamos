@@ -976,8 +976,15 @@ def _set_timesheet_billable_hours(ts_doc, target_billable_hours):
 
 
 @frappe.whitelist()
-def get_timesheet_approval_rows(docname: str, employee=None, project=None, date_from=None, date_to=None):
+def get_timesheet_approval_rows(
+	docname: str,
+	employee=None,
+	project=None,
+	date_from=None,
+	date_to=None,
+):
 	_require_docname(docname)
+
 	doc = frappe.get_doc("Monthly Implementation Summary", docname)
 	doc.check_permission("read")
 
@@ -987,47 +994,90 @@ def get_timesheet_approval_rows(docname: str, employee=None, project=None, date_
 	to_date = getdate(date_to) if date_to else None
 
 	base_rows = list(doc.timesheets_table or [])
+
 	timesheet_names = [
 		(str(getattr(r, "timesheet", "") or "").strip())
 		for r in base_rows
 		if (str(getattr(r, "timesheet", "") or "").strip())
 	]
+
 	meta_by_name = {}
+	description_by_timesheet = {}
+
 	if timesheet_names:
+		timesheet_names = list(set(timesheet_names))
+
+		# Fetch Timesheet parent information
 		ts_has_status = frappe.db.has_column("Timesheet", "status")
+		ts_has_rating = frappe.db.has_column("Timesheet", "custom_rating")
+
 		ts_fields = ["name", "docstatus"]
+
 		if ts_has_status:
 			ts_fields.append("status")
+
+		if ts_has_rating:
+			ts_fields.append("custom_rating")
+
 		for ts in frappe.get_all(
 			"Timesheet",
-			filters={"name": ["in", list(set(timesheet_names))]},
+			filters={"name": ["in", timesheet_names]},
 			fields=ts_fields,
 		):
 			meta_by_name[ts.name] = ts
 
+		# Fetch description from the Time Sheets child table
+		for time_sheet in frappe.get_all(
+			"Timesheet Detail",
+			filters={
+				"parent": ["in", timesheet_names],
+				"parenttype": "Timesheet",
+			},
+			fields=["parent", "description"],
+			order_by="idx asc",
+		):
+			# Keep the first Time Sheets row's description.
+			# This preserves the existing single-description display.
+			if time_sheet.parent not in description_by_timesheet:
+				description_by_timesheet[time_sheet.parent] = (
+					time_sheet.description or ""
+				)
+
 	result = []
+
 	for row in base_rows:
 		ts_name = (getattr(row, "timesheet", "") or "").strip()
 		emp_name = (getattr(row, "employee_name", "") or "").strip()
 		row_project = (getattr(row, "project", "") or "").strip()
 		row_employee = (getattr(row, "employee", "") or "").strip()
+
 		row_date_raw = getattr(row, "date", None)
 		row_date = getdate(row_date_raw) if row_date_raw else None
+
 		meta = meta_by_name.get(ts_name)
+
 		docstatus = cint(meta.docstatus) if meta else 0
 		status = (meta.status if meta else "") or ""
-		is_pending = _timesheet_is_pending_for_approval(docstatus, status)
+
+		is_pending = _timesheet_is_pending_for_approval(
+			docstatus,
+			status,
+		)
 
 		if employee_filter:
 			if row_employee != employee_filter and emp_name != employee_filter:
 				continue
+
 		if project_filter:
 			if row_project != project_filter:
 				continue
+
 		if from_date and (not row_date or row_date < from_date):
 			continue
+
 		if to_date and (not row_date or row_date > to_date):
 			continue
+
 		if not is_pending:
 			continue
 
@@ -1043,6 +1093,20 @@ def get_timesheet_approval_rows(docname: str, employee=None, project=None, date_
 				"docstatus": docstatus,
 				"status": status,
 				"is_pending": 1 if is_pending else 0,
+
+				# Rating comes from the Timesheet parent
+				"rating": (
+					meta.custom_rating
+					if meta and hasattr(meta, "custom_rating")
+					else ""
+				)
+				or "",
+
+				# Description comes from the Timesheet -> Time Sheets child table
+				"description": description_by_timesheet.get(
+					ts_name,
+					"",
+				),
 			}
 		)
 
