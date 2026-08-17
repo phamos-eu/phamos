@@ -80,6 +80,9 @@ frappe.ui.form.on("Implementation", {
         });
     },
     refresh: function (frm) {
+        if (!frm.is_new()) {
+            add_row_to_sales_order(frm);
+        }
         sort_resource_planning_by_month_desc(frm);
         setup_implementation_theme_watcher(frm);
         frm.trigger("render_auto_email_reports_section");
