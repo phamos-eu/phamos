@@ -8,6 +8,7 @@ const props = defineProps({
   elapsedSeconds: Number,
   selectedProject: String,
   labelsMap: Object,
+  activeProjectSession: Object,
 });
 
 const emit = defineEmits(["start", "pause", "resume", "stop"]);
@@ -42,6 +43,7 @@ const emit = defineEmits(["start", "pause", "resume", "stop"]);
         :active-session="activeSession"
         :elapsed-seconds="elapsedSeconds"
         :labels-map="labelsMap"
+        :active-project-session="activeProjectSession"
         @start="emit('start', $event)"
         @pause="emit('pause')"
         @resume="emit('resume')"

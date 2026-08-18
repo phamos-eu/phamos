@@ -256,12 +256,12 @@ const totals = computed(() => {
   border-radius: 4px;
 }
 .tl__list-badge--draft {
-  background: var(--yellow-50, #fefce8);
-  color: var(--yellow-700, #a16207);
+  background: var(--red-50, #fff0f0);
+  color: var(--red-700, #b52a2a);
 }
 .tl__list-badge--submitted {
-  background: var(--green-50, #f0fdf4);
-  color: var(--green-700, #15803d);
+  background: var(--blue-50, #edf6fd);
+  color: var(--blue-700, #0070cc);
 }
 .tl__list-badge--cancelled {
   background: var(--red-50, #fef2f2);
