@@ -1,7 +1,7 @@
 {
  "actions": [],
  "allow_rename": 1,
- "autoname": "field:chapter_title",
+ "autoname": "IC-.{implementation}.-.####",
  "creation": "2026-08-13 08:34:57.430972",
  "default_view": "List",
  "doctype": "DocType",
@@ -78,8 +78,7 @@
    "description": "Please give a short title to the Chapter that you are looking to complete like \"Replace legacy CRM\" or \"Introduce HR Processes\" or \"Introduce Purchase Cycle\"",
    "fieldname": "chapter_title",
    "fieldtype": "Data",
-   "label": "Chapter Title",
-   "unique": 1
+   "label": "Chapter Title"
   },
   {
    "description": "Please give an introduction to the Subject mentioned. For the detailed description there is a seperate field",
@@ -100,7 +99,7 @@
  "modified_by": "Administrator",
  "module": "Phamos",
  "name": "Implementation Chapter",
- "naming_rule": "By fieldname",
+ "naming_rule": "Expression (old style)",
  "owner": "Administrator",
  "permissions": [
   {
