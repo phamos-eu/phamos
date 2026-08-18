@@ -1079,14 +1079,28 @@ frappe.ui.form.on("Implementation", {
         if (frm.is_new()) return;
 
         const wrapper = frm.fields_dict.rank_html?.wrapper;
-        if (!wrapper) return;
 
         frappe.call({
-            method: "phamos.phamos.doctype.implementation.implementation.get_implementation_rank_overview",
+            method: "phamos.phamos.doctype.implementation.implementation.recompute_implementation_stats",
             args: { name: frm.doc.name },
             callback: function (r) {
-                const rankHtml = r.message?.rank_html || `<div class="text-muted">${__("No ranking available.")}</div>`;
-                $(wrapper).html(rankHtml);
+                if (!r.message) return;
+
+                // Keep the on-screen stat fields fresh on every view, without
+                // marking the form dirty (this is a read-time background sync).
+                ["total_time_implementation_life", "total_time_last_12_months",
+                 "total_time_last_6_months", "total_time_last_3_months",
+                 "predicted_time_next_3_months"].forEach(fieldname => {
+                    if (fieldname in r.message) {
+                        frm.doc[fieldname] = r.message[fieldname];
+                        frm.refresh_field(fieldname);
+                    }
+                });
+
+                if (wrapper) {
+                    const rankHtml = r.message.rank_html || `<div class="text-muted">${__("No ranking available.")}</div>`;
+                    $(wrapper).html(rankHtml);
+                }
             }
         });
     },
