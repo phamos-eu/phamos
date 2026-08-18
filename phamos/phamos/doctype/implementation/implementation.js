@@ -1165,6 +1165,9 @@ function populate_auto_email_reports(frm) {
             });
 
             frm.refresh_field("auto_email_report_record");
+            // Background reconciliation on load shouldn't mark the form as having unsaved changes.
+            frm.doc.__unsaved = 0;
+            frm.refresh_header();
         }
     });
 }
@@ -1258,6 +1261,28 @@ function add_row_to_sales_order(frm) {
         callback: function (response) {
             const salesOrders = response.message?.sales_order_status_information || [];
 
+            const incoming = salesOrders.map(order => ({
+                sales_order: order.sales_order || "",
+                so_title: order.so_title || "",
+                total_hrs: order.total_hrs || 0,
+                status: order.status || "",
+                delivered_total_hrs: order.delivered_total_hrs || 0,
+                remaining_hrs: order.remaining_hrs || 0,
+            }));
+
+            const existing = (frm.doc.sales_order_status_information || []).map(row => ({
+                sales_order: row.sales_order || "",
+                so_title: row.so_title || "",
+                total_hrs: row.total_hrs || 0,
+                status: row.status || "",
+                delivered_total_hrs: row.delivered_total_hrs || 0,
+                remaining_hrs: row.remaining_hrs || 0,
+            }));
+
+            if (JSON.stringify(existing) === JSON.stringify(incoming)) {
+                return;
+            }
+
             frm.clear_table("sales_order_status_information");
 
             salesOrders.forEach(order => {
@@ -1271,6 +1296,9 @@ function add_row_to_sales_order(frm) {
             });
 
             frm.refresh_field("sales_order_status_information");
+            // Background reconciliation on refresh shouldn't mark the form as having unsaved changes.
+            frm.doc.__unsaved = 0;
+            frm.refresh_header();
         }
     });
 }

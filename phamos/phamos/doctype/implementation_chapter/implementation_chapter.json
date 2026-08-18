@@ -14,7 +14,7 @@
   "implementation",
   "column_break_lnfo",
   "planned_start",
-  "planned_end",
+  "target_date",
   "section_break_zmul",
   "chapter_title",
   "chapter_introduction",
@@ -49,8 +49,10 @@
    "description": "Link to the Implementation if it already exists.",
    "fieldname": "implementation",
    "fieldtype": "Link",
+   "in_list_view": 1,
    "label": "Implementation",
-   "options": "Implementation"
+   "options": "Implementation",
+   "reqd": 1
   },
   {
    "fieldname": "column_break_lnfo",
@@ -64,9 +66,9 @@
   },
   {
    "description": "Please add a desired end date to when this chapter should be completed. This date will be used to identify the year, quarter and week.",
-   "fieldname": "planned_end",
-   "fieldtype": "Data",
-   "label": "Planned End"
+   "fieldname": "target_date",
+   "fieldtype": "Date",
+   "label": "Target Date"
   },
   {
    "fieldname": "section_break_zmul",
@@ -94,7 +96,7 @@
  "grid_page_length": 50,
  "index_web_pages_for_search": 1,
  "links": [],
- "modified": "2026-08-13 09:04:36.672797",
+ "modified": "2026-08-18 11:27:55.234306",
  "modified_by": "Administrator",
  "module": "Phamos",
  "name": "Implementation Chapter",
@@ -116,7 +118,9 @@
  ],
  "row_format": "Dynamic",
  "rows_threshold_for_grid_search": 20,
+ "show_title_field_in_link": 1,
  "sort_field": "creation",
  "sort_order": "DESC",
- "states": []
+ "states": [],
+ "title_field": "chapter_title"
 }
