@@ -10,6 +10,7 @@
   "module",
   "module_description",
   "is_required",
+  "planned_start",
   "target_date",
   "project",
   "target_level",
@@ -64,6 +65,13 @@
   },
   {
    "columns": 1,
+    "fieldname": "planned_start",
+    "fieldtype": "Date",
+    "in_list_view": 1,
+    "label": "Planned Start"
+  },
+  {
+    "columns": 1,
    "fieldname": "target_date",
    "fieldtype": "Date",
    "in_list_view": 1,

@@ -30,6 +30,7 @@ class Implementation(Document):
 				)
 
 	def before_save(self):
+		self.sync_modules_from_implementation_chapters()
 		self.sync_sales_order_status_information()
 		self.add_financial_snapshot()
 
@@ -378,6 +379,46 @@ class Implementation(Document):
 				"trend" : self.trend
 			})
 
+	def sync_modules_from_implementation_chapters(self):
+		if not self.name:
+			return
+
+		existing_by_chapter = {
+			(row.implementation_chapter or "").strip(): row
+			for row in self.modules or []
+			if (row.implementation_chapter or "").strip()
+		}
+
+		chapters = frappe.get_all(
+			"Implementation Chapter",
+			filters={"implementation": self.name},
+			fields=["name", "chapter_title", "planned_start", "target_date"],
+			order_by="creation asc",
+			limit_page_length=1000,
+		)
+
+		for chapter in chapters:
+			chapter_name = (chapter.get("name") or "").strip()
+			if not chapter_name:
+				continue
+
+			existing_row = existing_by_chapter.get(chapter_name)
+			if existing_row:
+				if chapter.get("planned_start") and not existing_row.planned_start:
+					existing_row.planned_start = chapter.get("planned_start")
+				if chapter.get("target_date") and not existing_row.target_date:
+					existing_row.target_date = chapter.get("target_date")
+				continue
+
+			self.append(
+				"modules",
+				{
+					"implementation_chapter": chapter_name,
+					"planned_start": chapter.get("planned_start"),
+					"target_date": chapter.get("target_date"),
+				},
+			)
+
 
 
 						
@@ -547,7 +588,7 @@ def get_financial_snapshot(name, customer=None):
 @frappe.whitelist()
 def sync_modules_with_implementation_chapters(name):
 	if not name:
-		return {"added_count": 0}
+		return {"added_count": 0, "updated_count": 0}
 
 	existing_chapters = {
 		(chapter or "").strip()
@@ -562,7 +603,7 @@ def sync_modules_with_implementation_chapters(name):
 	chapters = frappe.get_all(
 		"Implementation Chapter",
 		filters={"implementation": name},
-		fields=["name"],
+		fields=["name", "chapter_title", "planned_start", "target_date"],
 		order_by="creation asc",
 		limit_page_length=1000,
 	)
@@ -577,10 +618,42 @@ def sync_modules_with_implementation_chapters(name):
 
 	next_idx = int(last_row[0].idx) if last_row and last_row[0].get("idx") else 0
 	added_count = 0
+	updated_count = 0
 
 	for chapter in chapters:
 		chapter_name = (chapter.get("name") or "").strip()
-		if not chapter_name or chapter_name in existing_chapters:
+		if not chapter_name:
+			continue
+
+		chapter_planned_start = chapter.get("planned_start")
+		chapter_target_date = chapter.get("target_date")
+
+		if chapter_name in existing_chapters:
+			existing_item = frappe.db.get_value(
+				"Implementation Item",
+				{
+					"parent": name,
+					"parenttype": "Implementation",
+					"parentfield": "modules",
+					"implementation_chapter": chapter_name,
+				},
+				["name", "planned_start", "target_date"],
+				as_dict=True,
+			)
+			updates = {}
+			if existing_item and existing_item.get("planned_start") != chapter_planned_start:
+				updates["planned_start"] = chapter_planned_start
+			if existing_item and existing_item.get("target_date") != chapter_target_date:
+				updates["target_date"] = chapter_target_date
+
+			if existing_item and updates:
+				frappe.db.set_value(
+					"Implementation Item",
+					existing_item.get("name"),
+					updates,
+					update_modified=False,
+				)
+				updated_count += 1
 			continue
 
 		if frappe.db.exists(
@@ -604,13 +677,15 @@ def sync_modules_with_implementation_chapters(name):
 				"parentfield": "modules",
 				"idx": next_idx,
 				"implementation_chapter": chapter_name,
+				"planned_start": chapter_planned_start,
+				"target_date": chapter_target_date,
 			}
 		).insert(ignore_permissions=True)
 
 		existing_chapters.add(chapter_name)
 		added_count += 1
 
-	return {"added_count": added_count}
+	return {"added_count": added_count, "updated_count": updated_count}
 
 
 @frappe.whitelist()
