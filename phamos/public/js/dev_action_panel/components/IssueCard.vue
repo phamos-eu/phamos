@@ -12,6 +12,7 @@ const props = defineProps({
   activeSession: Object,
   elapsedSeconds: Number,
   labelsMap: { type: Object, default: () => ({}) },
+  activeProjectSession: Object,
 });
 
 function labelStyle(name) {
@@ -111,7 +112,7 @@ function formatDatetime(dtStr) {
 // Derived
 const isActive = computed(() => props.activeSession?.gitlab_issue === props.issue.name);
 const sessionState = computed(() => isActive.value ? props.activeSession?.session_state : null);
-const hasAnySession = computed(() => !!props.activeSession);
+const hasAnySession = computed(() => !!props.activeSession || !!props.activeProjectSession);
 
 function fmtElapsed(s) {
   s = Math.max(0, s);
