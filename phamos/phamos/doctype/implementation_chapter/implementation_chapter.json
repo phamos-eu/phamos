@@ -12,13 +12,17 @@
   "edited_by_human",
   "column_break_yqzd",
   "implementation",
+  "status",
+  "target_level",
+  "current_level",
   "column_break_lnfo",
   "planned_start",
   "target_date",
   "section_break_zmul",
   "chapter_title",
   "chapter_introduction",
-  "full_chapter_description"
+  "full_chapter_description",
+  "current_revision"
  ],
  "fields": [
   {
@@ -52,6 +56,16 @@
    "in_list_view": 1,
    "label": "Implementation",
    "options": "Implementation",
+   "reqd": 1
+  },
+  {
+   "default": "Draft",
+   "fieldname": "status",
+   "fieldtype": "Select",
+   "in_list_view": 1,
+   "in_standard_filter": 1,
+   "label": "Status",
+   "options": "Draft\nPlanned\nCancelled",
    "reqd": 1
   },
   {
@@ -90,12 +104,30 @@
    "fieldname": "full_chapter_description",
    "fieldtype": "Text Editor",
    "label": "Full Chapter Description"
+  },
+  {
+   "fieldname": "current_level",
+   "fieldtype": "Int",
+   "label": "Current Level"
+  },
+  {
+   "fieldname": "target_level",
+   "fieldtype": "Int",
+   "label": "Target Level"
+  },
+  {
+   "description": "Set automatically when this Chapter is planned. The agreed content of the corresponding revision is the immutable, authoritative snapshot.",
+   "fieldname": "current_revision",
+   "fieldtype": "Link",
+   "label": "Current Revision",
+   "options": "Implementation Chapter Revision",
+   "read_only": 1
   }
  ],
  "grid_page_length": 50,
  "index_web_pages_for_search": 1,
  "links": [],
- "modified": "2026-08-18 11:27:55.234306",
+ "modified": "2026-08-19 07:34:28.274828",
  "modified_by": "Administrator",
  "module": "Phamos",
  "name": "Implementation Chapter",
