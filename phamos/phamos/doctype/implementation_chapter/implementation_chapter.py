@@ -25,6 +25,21 @@ class ImplementationChapter(Document):
 		self.validate_duplicate_chapter_title()
 		self.validate_status_transition()
 		self.validate_agreed_content_locked()
+		self.validate_target_date_after_planned_start()
+
+	def on_update(self):
+		self.sync_module_row_in_implementation()
+
+	def sync_module_row_in_implementation(self):
+		"""Mirror this Chapter onto its row in the parent Implementation's Modules
+		table right away, instead of waiting for someone to open and save the
+		Implementation by hand. Reuses the Implementation's own sync methods so a
+		brand-new Chapter gets its row created (with Is Required checked) and an
+		edited Chapter's levels/dates are pushed through immediately."""
+		if not self.implementation:
+			return
+
+		frappe.get_doc("Implementation", self.implementation).save(ignore_permissions=True)
 
 	def validate_duplicate_chapter_title(self):
 		if not self.implementation or not self.chapter_title:
@@ -69,6 +84,13 @@ class ImplementationChapter(Document):
 			frappe.throw(
 				frappe._('Use the "Set as Planned" action to move a Chapter from Draft to Planned.')
 			)
+
+	def validate_target_date_after_planned_start(self):
+		if not self.planned_start or not self.target_date:
+			return
+
+		if self.target_date <= self.planned_start:
+			frappe.throw(frappe._("Target Date must be after Planned Start."))
 
 	def validate_agreed_content_locked(self):
 		"""Once a Chapter leaves Draft, its agreed content is frozen. The only way

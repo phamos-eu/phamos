@@ -417,16 +417,18 @@ class Implementation(Document):
 					"implementation_chapter": chapter_name,
 					"planned_start": chapter.get("planned_start"),
 					"target_date": chapter.get("target_date"),
+					"is_required": 1,
 				},
 			)
 
 	def sync_module_levels_with_chapters(self):
-		"""Implementation Chapter is the single source of truth for current/target level.
+		"""Implementation Chapter is the single source of truth for current/target level
+		and planned start/target date.
 
 		Only a row that was actually edited in *this* save (its value differs from
 		what was loaded from the database, per get_doc_before_save()) writes through
 		to its chapter. Every row is then set to match its chapter, so an unrelated
-		save never reverts a level someone changed directly on the Chapter, and the
+		save never reverts a value someone changed directly on the Chapter, and the
 		grid never diverges from the source of truth.
 		"""
 		chapter_names = [
@@ -442,7 +444,7 @@ class Implementation(Document):
 			for d in frappe.get_all(
 				"Implementation Chapter",
 				filters={"name": ["in", chapter_names]},
-				fields=["name", "current_level", "target_level"],
+				fields=["name", "current_level", "target_level", "planned_start", "target_date"],
 			)
 		}
 
@@ -462,20 +464,29 @@ class Implementation(Document):
 			previous_row = previous_by_name.get(row.name)
 			current_edited = not previous_row or cint(previous_row.current_level) != cint(row.current_level)
 			target_edited = not previous_row or cint(previous_row.target_level) != cint(row.target_level)
+			planned_start_edited = not previous_row or previous_row.planned_start != row.planned_start
+			target_date_edited = not previous_row or previous_row.target_date != row.target_date
 
 			final_current, final_target = chapter.current_level, chapter.target_level
+			final_planned_start, final_target_date = chapter.planned_start, chapter.target_date
 			updates = {}
 
 			if current_edited and row.current_level is not None and cint(row.current_level) != cint(chapter.current_level):
 				updates["current_level"] = final_current = cint(row.current_level)
 			if target_edited and row.target_level is not None and cint(row.target_level) != cint(chapter.target_level):
 				updates["target_level"] = final_target = cint(row.target_level)
+			if planned_start_edited and row.planned_start and row.planned_start != chapter.planned_start:
+				updates["planned_start"] = final_planned_start = row.planned_start
+			if target_date_edited and row.target_date and row.target_date != chapter.target_date:
+				updates["target_date"] = final_target_date = row.target_date
 
 			if updates:
 				chapter_updates.setdefault(chapter_name, {}).update(updates)
 
 			row.current_level = final_current
 			row.target_level = final_target
+			row.planned_start = final_planned_start
+			row.target_date = final_target_date
 
 		for chapter_name, updates in chapter_updates.items():
 			frappe.db.set_value("Implementation Chapter", chapter_name, updates, update_modified=False)
