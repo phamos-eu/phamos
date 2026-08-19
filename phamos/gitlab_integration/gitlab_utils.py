@@ -5,7 +5,29 @@ from frappe.utils import now_datetime
 import json
 import hashlib
 import hmac
+import time
 from datetime import datetime
+
+
+def _set_gitlab_issue_value_with_retry(name, data, max_retries=3):
+    """frappe.db.set_value with retry-on-lock-timeout.
+
+    Concurrent GitLab webhooks landing for the same issue can hit MySQL's
+    lock wait timeout (1205) while another request holds the row lock.
+    Retrying the same write after a short backoff resolves the transient
+    contention without changing what gets written or when.
+    """
+    for attempt in range(max_retries + 1):
+        try:
+            frappe.db.set_value("GitLab Issue", name, data, update_modified=True)
+            return
+        except (frappe.QueryTimeoutError, frappe.QueryDeadlockError):
+            if attempt < max_retries:
+                frappe.db.rollback()
+                time.sleep(1 + attempt)
+                continue
+            raise
+
 
 def get_gitlab_headers():
     settings = frappe.get_single("GitLab Settings")
@@ -939,7 +961,7 @@ def _handle_issue_webhook(payload):
         # Detect newly added prod labels before overwriting the labels field
         _stamp_prod_labels_on_change(existing, labels_list)
         # use set_value to avoid TimestampMismatchError on concurrent webhooks
-        frappe.db.set_value("GitLab Issue", existing, data, update_modified=True)
+        _set_gitlab_issue_value_with_retry(existing, data)
     else:
         try:
             doc = frappe.new_doc("GitLab Issue")
@@ -963,7 +985,7 @@ def _handle_issue_webhook(payload):
             )
             if existing:
                 _stamp_prod_labels_on_change(existing, labels_list)
-                frappe.db.set_value("GitLab Issue", existing, data, update_modified=True)
+                _set_gitlab_issue_value_with_retry(existing, data)
 
     frappe.db.commit()
 
