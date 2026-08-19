@@ -1,0 +1,97 @@
+{
+ "actions": [],
+ "autoname": "format:{implementation_chapter}-REV-{revision_number}",
+ "creation": "2026-08-19 00:00:00.000000",
+ "default_view": "List",
+ "doctype": "DocType",
+ "engine": "InnoDB",
+ "field_order": [
+  "implementation_chapter",
+  "revision_number",
+  "column_break_rev",
+  "planned_start",
+  "target_date",
+  "section_break_rev",
+  "chapter_title",
+  "chapter_introduction",
+  "full_chapter_description"
+ ],
+ "fields": [
+  {
+   "description": "The Implementation Chapter this is an immutable snapshot of.",
+   "fieldname": "implementation_chapter",
+   "fieldtype": "Link",
+   "in_list_view": 1,
+   "label": "Implementation Chapter",
+   "options": "Implementation Chapter",
+   "reqd": 1
+  },
+  {
+   "default": "1",
+   "fieldname": "revision_number",
+   "fieldtype": "Int",
+   "in_list_view": 1,
+   "label": "Revision Number",
+   "reqd": 1
+  },
+  {
+   "fieldname": "column_break_rev",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "planned_start",
+   "fieldtype": "Date",
+   "label": "Planned Start"
+  },
+  {
+   "fieldname": "target_date",
+   "fieldtype": "Date",
+   "label": "Target Date"
+  },
+  {
+   "fieldname": "section_break_rev",
+   "fieldtype": "Section Break"
+  },
+  {
+   "fieldname": "chapter_title",
+   "fieldtype": "Data",
+   "label": "Chapter Title"
+  },
+  {
+   "fieldname": "chapter_introduction",
+   "fieldtype": "Small Text",
+   "label": "Chapter Introduction"
+  },
+  {
+   "fieldname": "full_chapter_description",
+   "fieldtype": "Text Editor",
+   "label": "Full Chapter Description"
+  }
+ ],
+ "index_web_pages_for_search": 1,
+ "links": [],
+ "modified": "2026-08-19 00:00:00.000000",
+ "modified_by": "Administrator",
+ "module": "Phamos",
+ "name": "Implementation Chapter Revision",
+ "naming_rule": "Expression",
+ "owner": "Administrator",
+ "permissions": [
+  {
+   "create": 1,
+   "delete": 1,
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "System Manager",
+   "share": 1,
+   "write": 1
+  }
+ ],
+ "row_format": "Dynamic",
+ "sort_field": "creation",
+ "sort_order": "DESC",
+ "states": []
+}
