@@ -11,10 +11,14 @@ const props = defineProps({
   myIssuesCount: Number,
   mineOnly: Boolean,
   syncing: Boolean,
-  hrProject: Object,
+  projectsFilter: String,
+  myProjectsCount: Number,
+  allProjectsCount: Number,
+  activeProjectSession: Object,
+  projectElapsedSeconds: Number,
 });
 
-const emit = defineEmits(["select-project", "change-view", "toggle-mine", "sync", "start-meeting"]);
+const emit = defineEmits(["select-project", "change-view", "toggle-mine", "sync", "navigate-projects"]);
 
 const user = frappe.session.user;
 const userName = frappe.user.full_name() || user;
@@ -31,7 +35,11 @@ function selectIssueView(mineOnly) {
   emit('change-view', 'issues');
 }
 
-const isRunning = computed(() => props.activeSession?.session_state === "running");
+// Unified: project session takes precedence if both somehow exist
+const displaySession = computed(() => props.activeProjectSession || props.activeSession || null);
+const displayElapsed = computed(() => props.activeProjectSession ? props.projectElapsedSeconds : props.elapsedSeconds);
+const isRunning = computed(() => displaySession.value?.session_state === "running");
+const isProjectSession = computed(() => !!props.activeProjectSession);
 
 const OTHER_VIEWS = [
   { key: "timesheets", label: "My Timesheets", disabled: false, icon: "M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" },
@@ -65,13 +73,14 @@ const ISSUE_ICON = "M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00
     </div>
 
     <!-- Active session widget -->
-    <div v-if="activeSession" class="sb__session" :class="isRunning ? 'sb__session--running' : 'sb__session--paused'">
+    <div v-if="displaySession" class="sb__session" :class="isRunning ? 'sb__session--running' : 'sb__session--paused'">
       <div class="sb__session-head">
         <span class="sb__dot" :class="isRunning ? 'dot--green' : 'dot--amber'"></span>
         <span class="sb__session-state">{{ isRunning ? "Running" : "Paused" }}</span>
-        <span class="sb__session-timer">{{ fmtElapsed(elapsedSeconds) }}</span>
+        <span v-if="isProjectSession" class="sb__session-type">Project</span>
+        <span class="sb__session-timer">{{ fmtElapsed(displayElapsed) }}</span>
       </div>
-      <div class="sb__session-goal">{{ activeSession.goal }}</div>
+      <div class="sb__session-goal">{{ displaySession.goal }}</div>
     </div>
 
     <!-- Issues filter: Mine / All -->
@@ -123,24 +132,35 @@ const ISSUE_ICON = "M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00
       </button>
     </nav>
 
-    <!-- Cost Center HR -->
-    <div class="sb__section-label">Cost Center</div>
+    <!-- Projects -->
+    <div class="sb__section-label">Projects</div>
     <nav class="sb__nav">
       <button
         class="sb__nav-item"
-        :class="{ 'sb__nav-item--soon': !hrProject }"
-        :disabled="!hrProject"
-        :title="hrProject ? `Log meeting time against ${hrProject.project_name}` : 'HR cost-center project not found'"
-        @click="emit('start-meeting')"
+        :class="{ 'sb__nav-item--active': currentView === 'projects' && projectsFilter === 'my' }"
+        @click="emit('navigate-projects', 'my')"
       >
-        <span class="sb__nav-dot" style="background:#8b5cf6"></span>
-        <span class="sb__nav-label">HR Meeting</span>
-        <span v-if="!hrProject" class="sb__soon">n/a</span>
+        <svg class="sb__nav-svg" width="14" height="14" viewBox="0 0 24 24" fill="currentColor">
+          <path d="M16 11c1.66 0 2.99-1.34 2.99-3S17.66 5 16 5c-1.66 0-3 1.34-3 3s1.34 3 3 3zm-8 0c1.66 0 2.99-1.34 2.99-3S9.66 5 8 5C6.34 5 5 6.34 5 8s1.34 3 3 3zm0 2c-2.33 0-7 1.17-7 3.5V19h14v-2.5c0-2.33-4.67-3.5-7-3.5zm8 0c-.29 0-.62.02-.97.05 1.16.84 1.97 1.97 1.97 3.45V19h6v-2.5c0-2.33-4.67-3.5-7-3.5z"/>
+        </svg>
+        <span class="sb__nav-label">My Projects</span>
+        <span class="sb__nav-count">{{ myProjectsCount }}</span>
+      </button>
+      <button
+        class="sb__nav-item"
+        :class="{ 'sb__nav-item--active': currentView === 'projects' && projectsFilter === 'all' }"
+        @click="emit('navigate-projects', 'all')"
+      >
+        <svg class="sb__nav-svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M3 7h18M3 12h18M3 17h18"/>
+        </svg>
+        <span class="sb__nav-label">All Projects</span>
+        <span class="sb__nav-count">{{ allProjectsCount }}</span>
       </button>
     </nav>
 
-    <!-- Projects filter -->
-    <div class="sb__section-label">Projects</div>
+    <!-- Filter by Project -->
+    <div class="sb__section-label">Filter by Project</div>
     <nav class="sb__nav">
       <button
         class="sb__nav-item"
@@ -211,6 +231,7 @@ const ISSUE_ICON = "M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00
 .dot--amber { background: var(--yellow-500, #eab308); }
 @keyframes pulse { 0%,100% { box-shadow: 0 0 0 2px rgba(34,197,94,0.25); } 50% { box-shadow: 0 0 0 4px rgba(34,197,94,0.1); } }
 .sb__session-state { font-size: 10.5px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.06em; color: var(--text-muted); flex: 1; }
+.sb__session-type { font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; background: var(--blue-50, #eff6ff); color: var(--primary); border-radius: 3px; padding: 1px 5px; flex-shrink: 0; }
 .sb__session-timer { font-family: var(--font-monospace, monospace); font-size: 12.5px; font-weight: 700; color: var(--text-color); }
 .sb__session-goal { font-size: 11.5px; color: var(--text-muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 

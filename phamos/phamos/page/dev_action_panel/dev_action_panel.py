@@ -2,9 +2,9 @@ import frappe
 from frappe import _
 from frappe.utils import now_datetime, add_to_date, time_diff_in_seconds, get_datetime
 from phamos.phamos.timesheet_utils import normalize_percent_billable
-
-
-HR_COST_CENTER_PROJECT_NAME = "Cost Center - Human Resources (2025 HR Internal)"
+from frappe.query_builder import Order
+from frappe.query_builder.functions import Coalesce, Sum, Count
+from pypika import Case
 
 
 # ---------------------------------------------------------------------------
@@ -522,26 +522,266 @@ def create_break_timesheet(from_time, to_time=None, project=None, goal=None, res
 
 
 # ---------------------------------------------------------------------------
-# Cost Center HR project
+# Projects section
 # ---------------------------------------------------------------------------
 
 @frappe.whitelist()
-def get_hr_cost_center_project():
-    """
-    Return the hard-coded HR cost-center project so the Developer Action Panel
-    can log company meetings / HR activities against a single project.
-    """
-    project = frappe.db.get_value(
-        "Project",
-        {"project_name": HR_COST_CENTER_PROJECT_NAME},
-        ["name", "project_name", "customer"],
-        as_dict=True,
-    )
-    if project and project.customer:
-        project["customer_name"] = frappe.db.get_value(
-            "Customer", project.customer, "customer_name"
+def get_dev_my_projects():
+    """Return projects assigned to the current user via open ToDo records."""
+    user = frappe.session.user
+
+    Project = frappe.qb.DocType("Project")
+    Customer = frappe.qb.DocType("Customer")
+    ToDo = frappe.qb.DocType("ToDo")
+
+    query = (
+        frappe.qb.from_(Project)
+        .left_join(Customer)
+        .on(Customer.name == Project.customer)
+        .join(ToDo)
+        .on(
+            (ToDo.reference_name == Project.name)
+            & (ToDo.reference_type == "Project")
+            & (ToDo.status == "Open")
+            & (ToDo.allocated_to == user)
         )
-    return project
+        .select(
+            Project.name,
+            Project.project_name,
+            Project.status,
+            Project.percent_billable,
+            Project.customer,
+            Coalesce(Customer.customer_name, Project.customer).as_("customer_desc"),
+        )
+        .distinct()
+        .orderby(Project.project_name, order=Order.asc)
+    )
+    projects = query.run(as_dict=True)
+    return _enrich_projects(projects, user)
+
+@frappe.whitelist()
+def get_dev_all_projects():
+    """Return all open projects; is_assigned=1 if the current user already has a ToDo for it."""
+    user = frappe.session.user
+
+    Project = frappe.qb.DocType("Project")
+    Customer = frappe.qb.DocType("Customer")
+    ToDo = frappe.qb.DocType("ToDo")
+
+    is_assigned = Case().when(ToDo.reference_name.isnotnull(), 1).else_(0).as_("is_assigned")
+
+    query = (
+        frappe.qb.from_(Project)
+        .left_join(Customer)
+        .on(Customer.name == Project.customer)
+        .left_join(ToDo)
+        .on(
+            (ToDo.reference_name == Project.name)
+            & (ToDo.reference_type == "Project")
+            & (ToDo.status == "Open")
+            & (ToDo.allocated_to == user)
+        )
+        .select(
+            Project.name,
+            Project.project_name,
+            Project.status,
+            Project.customer,
+            Coalesce(Customer.customer_name, Project.customer).as_("customer_desc"),
+            is_assigned,
+        )
+        .where(Project.status == "Open")
+        .orderby(is_assigned, order=Order.asc)
+        .orderby(Project.project_name, order=Order.asc)
+    )
+    projects = query.run(as_dict=True)
+    return _enrich_projects(projects, user)
+
+
+def _enrich_projects(projects, user):
+    """Add assignees list and my timesheet stats to each project dict."""
+    if not projects:
+        return projects
+
+    project_names = [p["name"] for p in projects]
+    employee = frappe.db.get_value("Employee", {"user_id": user}, "name")
+
+    ToDo = frappe.qb.DocType("ToDo")
+    User = frappe.qb.DocType("User")
+
+    assignee_rows = (
+        frappe.qb.from_(ToDo)
+        .left_join(User)
+        .on(User.name == ToDo.allocated_to)
+        .select(
+            ToDo.reference_name.as_("project"),
+            ToDo.allocated_to,
+            Coalesce(User.full_name, ToDo.allocated_to).as_("full_name"),
+        )
+        .where(
+            (ToDo.reference_type == "Project")
+            & (ToDo.status == "Open")
+            & (ToDo.reference_name.isin(project_names))
+        )
+        .orderby(ToDo.creation)
+    ).run(as_dict=True)
+
+    assignees_map = {}
+    for row in assignee_rows:
+        assignees_map.setdefault(row.project, []).append({
+            "user": row.allocated_to,
+            "full_name": row.full_name,
+            "initial": (row.full_name or row.allocated_to or "?")[0].upper(),
+        })
+
+    ts_map = {}
+    if employee:
+        TimesheetRecord = frappe.qb.DocType("Timesheet Record")
+
+        billed_seconds = Sum(
+            Case().when(TimesheetRecord.docstatus == 1, TimesheetRecord.actual_time).else_(0)
+        )
+
+        ts_rows = (
+            frappe.qb.from_(TimesheetRecord)
+            .select(
+                TimesheetRecord.project,
+                Count("*").as_("cnt"),
+                Coalesce(billed_seconds, 0).as_("total_seconds"),
+            )
+            .where(
+                (TimesheetRecord.project.isin(project_names))
+                & (TimesheetRecord.employee == employee)
+                & (TimesheetRecord.docstatus != 2)
+            )
+            .groupby(TimesheetRecord.project)
+        ).run(as_dict=True)
+
+        ts_map = {r.project: {"count": r.cnt, "total_seconds": int(r.total_seconds)} for r in ts_rows}
+
+    for p in projects:
+        p["assignees"] = assignees_map.get(p["name"], [])
+        ts = ts_map.get(p["name"], {"count": 0, "total_seconds": 0})
+        p["timesheet_count"] = ts["count"]
+        p["total_tracked_seconds"] = ts["total_seconds"]
+
+    return projects
+
+@frappe.whitelist()
+def get_project_timesheets(project_name):
+    """Return submitted/draft Timesheet Records for the current employee on a project."""
+    employee = frappe.db.get_value("Employee", {"user_id": frappe.session.user}, "name")
+    if not employee:
+        return []
+    return frappe.get_all(
+        "Timesheet Record",
+        filters={"project": project_name, "employee": employee, "docstatus": ["!=", 2]},
+        fields=["name", "from_time", "to_time", "actual_time", "goal", "result", "docstatus"],
+        order_by="from_time desc",
+    )
+
+
+@frappe.whitelist()
+def assign_dev_project(project_name):
+    """Assign a project to the current user using Frappe's assignment mechanism."""
+    from frappe.desk.form import assign_to as frappe_assign
+    frappe_assign.add({
+        "doctype": "Project",
+        "name": project_name,
+        "assign_to": [frappe.session.user],
+        "description": f"Assigned to {frappe.session.user} via Developer Action Panel",
+    })
+    frappe.db.commit()
+    return {"project": project_name}
+
+
+@frappe.whitelist()
+def get_active_project_session():
+    """Return the active project-based timer (no gitlab_issue) for the current user."""
+    user = frappe.session.user
+    employee = frappe.db.get_value("Employee", {"user_id": user}, "name")
+    if not employee:
+        return None
+
+    open_records = frappe.get_all(
+        "Timesheet Record",
+        filters={"employee": employee, "docstatus": 0, "gitlab_issue": ""},
+        fields=["name", "goal", "from_time", "project"],
+        order_by="creation desc",
+        limit=1,
+    )
+    if not open_records:
+        return None
+
+    record = open_records[0]
+    rows = frappe.get_all(
+        "Timesheet Record Item",
+        filters={"parent": record["name"]},
+        fields=["name", "from_time", "to_time"],
+        order_by="idx asc",
+    )
+    if not rows:
+        return None
+
+    last_row = rows[-1]
+    last_idx = len(rows) - 1
+    session_state = "paused" if last_row.get("to_time") else (
+        "running" if last_idx % 2 == 0 else "paused"
+    )
+    record["session_state"] = session_state
+    record["elapsed_seconds"] = _calc_elapsed_seconds(rows)
+    record["break_from"] = str(last_row["from_time"]) if session_state == "paused" and not last_row.get("to_time") else None
+    return record
+
+
+@frappe.whitelist()
+def start_project_timer(project_name, expected_time, goal, manual_start_time=None):
+    """Create a project-based Timesheet Record (no GitLab issue)."""
+    user = frappe.session.user
+    employee = frappe.db.get_value(
+        "Employee", {"user_id": user}, ["name", "activity_type"], as_dict=True
+    )
+    if not employee:
+        frappe.throw(_("No Employee record linked to your user account."))
+
+    existing_drafts = frappe.get_all(
+        "Timesheet Record",
+        filters={"employee": employee.name, "docstatus": 0},
+        fields=["name"],
+        limit=3,
+    )
+    if existing_drafts:
+        draft_links = ", ".join(
+            f'<a href="/app/timesheet-record/{d["name"]}" target="_blank">{d["name"]}</a>'
+            for d in existing_drafts[:3]
+        )
+        frappe.throw(
+            _("You already have draft Timesheet Record(s): {0}. "
+              "Please submit or cancel them before starting a new timer.").format(draft_links)
+        )
+
+    customer = frappe.db.get_value("Project", project_name, "customer")
+    start_time = get_datetime(manual_start_time) if manual_start_time else now_datetime()
+
+    ts = frappe.new_doc("Timesheet Record")
+    ts.project = project_name
+    ts.customer = customer
+    ts.employee = employee.name
+    ts.activity_type = employee.activity_type
+    ts.goal = goal
+    ts.expected_time = int(float(expected_time))
+    ts.from_time = start_time
+    ts.append("item", {"from_time": start_time})
+    ts.insert(ignore_permissions=True)
+    frappe.db.commit()
+
+    return {
+        "name": ts.name,
+        "project": project_name,
+        "from_time": str(start_time),
+        "session_state": "running",
+        "elapsed_seconds": int(time_diff_in_seconds(now_datetime(), start_time)) if manual_start_time else 0,
+        "goal": goal,
+    }
 
 
 @frappe.whitelist()
@@ -585,32 +825,40 @@ def get_my_timesheets():
     if not employee:
         return []
 
-    results = frappe.db.sql(
-        """
-        SELECT
-            t.name,
-            t.parent_project,
-            t.customer,
-            t.total_hours,
-            t.status,
-            t.creation,
-            t.docstatus,
-            p.project_name,
-            c.customer_name,
-            COALESCE(SUM(td.billing_hours), 0) AS billable_hours
-        FROM `tabTimesheet` t
-        LEFT JOIN `tabProject` p ON p.name = t.parent_project
-        LEFT JOIN `tabCustomer` c ON c.name = t.customer
-        LEFT JOIN `tabTimesheet Detail` td ON td.parent = t.name
-        WHERE t.employee = %(employee)s
-          AND t.docstatus != 2
-        GROUP BY t.name
-        ORDER BY t.creation DESC
-        LIMIT 500
-        """,
-        {"employee": employee},
-        as_dict=True,
+    Timesheet = frappe.qb.DocType("Timesheet")
+    Project = frappe.qb.DocType("Project")
+    Customer = frappe.qb.DocType("Customer")
+    TimesheetDetail = frappe.qb.DocType("Timesheet Detail")
+
+    query = (
+        frappe.qb.from_(Timesheet)
+        .left_join(Project)
+        .on(Project.name == Timesheet.parent_project)
+        .left_join(Customer)
+        .on(Customer.name == Timesheet.customer)
+        .left_join(TimesheetDetail)
+        .on(TimesheetDetail.parent == Timesheet.name)
+        .select(
+            Timesheet.name,
+            Timesheet.parent_project,
+            Timesheet.customer,
+            Timesheet.total_hours,
+            Timesheet.status,
+            Timesheet.creation,
+            Timesheet.docstatus,
+            Project.project_name,
+            Customer.customer_name,
+            Coalesce(Sum(TimesheetDetail.billing_hours), 0).as_("billable_hours"),
+        )
+        .where(
+            (Timesheet.employee == employee)
+            & (Timesheet.docstatus != 2)
+        )
+        .groupby(Timesheet.name)
+        .orderby(Timesheet.creation, order=Order.desc)
+        .limit(500)
     )
+    results = query.run(as_dict=True)
 
     for r in results:
         r["status_label"] = {
