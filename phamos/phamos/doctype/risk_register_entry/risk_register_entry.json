@@ -27,7 +27,7 @@
   "risk_rating",
   "section_break_mitigation",
   "mitigation_plan",
-  "mitigation_status",
+  "mitigation_response",
   "column_break_mitigation",
   "response_action",
   "comments"
@@ -162,9 +162,10 @@
    "label": "Mitigation Plan"
   },
   {
-   "fieldname": "mitigation_status",
-   "fieldtype": "Small Text",
-   "label": "Mitigation Status"
+   "fieldname": "mitigation_response",
+   "fieldtype": "Table MultiSelect",
+   "label": "Mitigation Response",
+   "options": "Risk Mitigation Responses"
   },
   {
    "fieldname": "column_break_mitigation",

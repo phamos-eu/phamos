@@ -44,8 +44,6 @@
     }
   </style>
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
-  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
-  <script src="https://code.highcharts.com/highcharts.js"></script>
 {% endblock %}
 
 {% block page_content %}
@@ -136,7 +134,7 @@
   <div class="border rounded" style="flex: 1 1 auto; min-height: 320px; width: 100%; overflow-x: hidden; overflow-y: auto;">
     <table class="table table-hover align-middle mb-0 w-100"
           id="timesheet_table"
-          style="min-width: 1300px; table-layout: fixed;">
+          style="table-layout: auto;">
       <thead class="table-light sticky-top small">
         <tr>
           <th style="width: 2%;"><input type="checkbox" id="select_all" /></th>
@@ -312,6 +310,8 @@
               <option value="To Bill">To Bill</option>
               <option value="To Deliver">To Deliver</option>
               <option value="Completed">Completed</option>
+              <option value="Closed">Closed</option>
+              <option value="On Hold">On Hold</option>
             </select>
           </div>
           <div class="col-12 col-sm-4 col-md-2">
@@ -496,6 +496,8 @@
   </div>
 </div>
 
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+<script src="https://code.highcharts.com/highcharts.js"></script>
 <script>
   frappe.ready(function() {
     console.log('Customer Portal loaded');
