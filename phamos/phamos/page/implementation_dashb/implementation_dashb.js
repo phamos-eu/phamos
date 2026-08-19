@@ -57,9 +57,30 @@ frappe.pages['implementation-dashb'].on_page_load = function (wrapper) {
     filters.team = create_filter('Team', 'MultiSelectList', 'team', '#filter-section', null, 'Team');
     filters.implementation = create_filter('Implementation', 'MultiSelectList', 'implementation', '#filter-section', null, 'Implementation');
     filters.department = create_filter('Department', 'MultiSelectList', 'department', '#filter-section', null, 'Department');
+    let suppressFilterOnChange = false;
+    let filterReloadTimer = null;
+
+    function schedule_chart_reload(delay = 250) {
+        if (suppressFilterOnChange) {
+            return;
+        }
+        if (filterReloadTimer) {
+            clearTimeout(filterReloadTimer);
+        }
+        filterReloadTimer = setTimeout(() => {
+            load_chart();
+        }, delay);
+    }
+
     // Clear Filters Button Handler
     $('#clear-filters-btn').on('click', () => {
-        Object.values(filters).forEach(ctrl => ctrl.set_value(''));
+        suppressFilterOnChange = true;
+        filters.from_date.set_value('');
+        filters.to_date.set_value('');
+        filters.team.set_value([]);
+        filters.implementation.set_value([]);
+        filters.department.set_value([]);
+        suppressFilterOnChange = false;
         load_chart();
     });
 
@@ -896,5 +917,7 @@ frappe.pages['implementation-dashb'].on_page_load = function (wrapper) {
     }
 
     load_chart();
-    Object.values(filters).forEach(ctrl => { ctrl.df.onchange = () => load_chart(); });
+    Object.values(filters).forEach(ctrl => {
+        ctrl.df.onchange = () => schedule_chart_reload();
+    });
 };
