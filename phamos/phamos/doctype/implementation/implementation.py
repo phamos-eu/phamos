@@ -8,7 +8,7 @@ import re
 from frappe.model.document import Document
 from frappe.query_builder import Case, DocType
 from frappe.query_builder.functions import Coalesce, Count, Sum
-from frappe.utils import flt, today
+from frappe.utils import cint, flt, today
 
 
 class Implementation(Document):
@@ -31,6 +31,7 @@ class Implementation(Document):
 
 	def before_save(self):
 		self.sync_modules_from_implementation_chapters()
+		self.sync_module_levels_with_chapters()
 		self.sync_sales_order_status_information()
 		self.add_financial_snapshot()
 
@@ -419,6 +420,65 @@ class Implementation(Document):
 				},
 			)
 
+	def sync_module_levels_with_chapters(self):
+		"""Implementation Chapter is the single source of truth for current/target level.
+
+		Only a row that was actually edited in *this* save (its value differs from
+		what was loaded from the database, per get_doc_before_save()) writes through
+		to its chapter. Every row is then set to match its chapter, so an unrelated
+		save never reverts a level someone changed directly on the Chapter, and the
+		grid never diverges from the source of truth.
+		"""
+		chapter_names = [
+			(row.implementation_chapter or "").strip()
+			for row in self.modules or []
+			if (row.implementation_chapter or "").strip()
+		]
+		if not chapter_names:
+			return
+
+		chapter_levels = {
+			d.name: d
+			for d in frappe.get_all(
+				"Implementation Chapter",
+				filters={"name": ["in", chapter_names]},
+				fields=["name", "current_level", "target_level"],
+			)
+		}
+
+		previous_by_name = {}
+		if not self.is_new():
+			doc_before_save = self.get_doc_before_save()
+			if doc_before_save:
+				previous_by_name = {row.name: row for row in doc_before_save.modules or []}
+
+		chapter_updates = {}
+		for row in self.modules or []:
+			chapter_name = (row.implementation_chapter or "").strip()
+			chapter = chapter_levels.get(chapter_name)
+			if not chapter:
+				continue
+
+			previous_row = previous_by_name.get(row.name)
+			current_edited = not previous_row or cint(previous_row.current_level) != cint(row.current_level)
+			target_edited = not previous_row or cint(previous_row.target_level) != cint(row.target_level)
+
+			final_current, final_target = chapter.current_level, chapter.target_level
+			updates = {}
+
+			if current_edited and row.current_level is not None and cint(row.current_level) != cint(chapter.current_level):
+				updates["current_level"] = final_current = cint(row.current_level)
+			if target_edited and row.target_level is not None and cint(row.target_level) != cint(chapter.target_level):
+				updates["target_level"] = final_target = cint(row.target_level)
+
+			if updates:
+				chapter_updates.setdefault(chapter_name, {}).update(updates)
+
+			row.current_level = final_current
+			row.target_level = final_target
+
+		for chapter_name, updates in chapter_updates.items():
+			frappe.db.set_value("Implementation Chapter", chapter_name, updates, update_modified=False)
 
 
 						
