@@ -63,8 +63,10 @@ class ImplementationChapter(Document):
 
 	def validate_status_transition(self):
 		"""v1 rule: no un-plan. Draft -> Planned may only happen through the
-		"Set as Planned" action (which sets current_revision before saving);
-		a Planned/Cancelled Chapter can never go back to Draft."""
+		"Set as Planned" action (which sets current_revision before saving).
+		Once Planned, the Chapter may move between Planned / In Progress /
+		Blocked (execution status, not agreed content) or terminate as
+		Cancelled, but can never go back to Draft."""
 		if self.is_new():
 			return
 
@@ -80,10 +82,17 @@ class ImplementationChapter(Document):
 		if self.status == "Draft":
 			frappe.throw(frappe._("A Chapter cannot be reverted back to Draft once it has left Draft."))
 
-		if previous_status == "Draft" and self.status == "Planned" and not self.current_revision:
-			frappe.throw(
-				frappe._('Use the "Set as Planned" action to move a Chapter from Draft to Planned.')
-			)
+		if previous_status == "Draft":
+			if self.status != "Planned":
+				frappe.throw(
+					frappe._("A Draft Chapter can only move to Planned or Cancelled, not directly to {0}.").format(
+						self.status
+					)
+				)
+			if not self.current_revision:
+				frappe.throw(
+					frappe._('Use the "Set as Planned" action to move a Chapter from Draft to Planned.')
+				)
 
 	def validate_target_date_after_planned_start(self):
 		if not self.planned_start or not self.target_date:
