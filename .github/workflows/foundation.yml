@@ -14,8 +14,7 @@
 #   - Configure MariaDB / Redis and create the test site
 #   - Install required apps (ERPNext, HRMS, Phamos)
 #   - Validate that the environment is actually healthy
-#   - Snapshot the environment (bench dir + DB backup) as an artifact so
-#     downstream jobs/workflows can restore it without repeating setup
+#   - Execute the Phamos unit test suite on the prepared environment
 #
 # Out of scope (pipeline contract):
 #   - Running unit tests, E2E tests, validation workflows
@@ -33,9 +32,8 @@
 #         if: needs.foundation.result == 'success'
 #         ...
 #
-#   Downstream jobs run on a separate runner, so they must bring up their own
-#   MariaDB/Redis services and restore the "bench-environment" artifact
-#   produced by the "Upload environment artifact" step below.
+#   This workflow now performs all Bench-bound work (setup + tests) in a
+#   single job, so no artifacts need to be passed between jobs.
 #
 # Assumptions:
 #   - Target branch for Frappe/ERPNext/HRMS is version-15 (overridable input).
@@ -193,18 +191,38 @@ jobs:
 
         echo "Environment is ready."
 
-    - name: Snapshot site for downstream jobs
+    - name: Run Tests
       working-directory: ./frappe-bench
       run: |
-        bench --site test.localhost backup --with-files
+        echo "Running phamos API tests..."
+        bench --site test.localhost run-tests --app phamos --module phamos.tests.test_api
 
-    - name: Package environment artifact
+        echo "Running OKR tests..."
+        bench --site test.localhost run-tests --app phamos --module phamos.okr_addon.doctype.okr.test_okr
+
+        echo "Running KR tests..."
+        bench --site test.localhost run-tests --app phamos --module phamos.okr_addon.doctype.kr.test_kr
+
+        echo "Running OKR Team tests..."
+        bench --site test.localhost run-tests --app phamos --module phamos.okr_addon.doctype.okr_team.test_okr_team
+
+        echo "All tests completed successfully!"
+      env:
+        CI: true
+
+    - name: Test Summary
+      if: always()
       run: |
-        tar -czf bench-environment.tar.gz frappe-bench
+        echo "## Test Results" >> $GITHUB_STEP_SUMMARY
+        echo "" >> $GITHUB_STEP_SUMMARY
+        echo "Tests completed" >> $GITHUB_STEP_SUMMARY
 
-    - name: Upload environment artifact
+    - name: Archive test results
+      if: always()
       uses: actions/upload-artifact@v4
       with:
-        name: bench-environment
-        path: bench-environment.tar.gz
-        retention-days: 1
+        name: test-results
+        path: |
+          frappe-bench/sites/test.localhost/logs/
+        retention-days: 7
+        if-no-files-found: warn
