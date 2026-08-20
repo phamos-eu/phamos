@@ -8,10 +8,11 @@
  "field_order": [
   "naming_series",
   "implementation",
-  "sales_order",
   "sales_order_status_information",
-  "delivery_note",
-  "sales_invoice",
+  "mis_delivery_notes_section",
+  "mis_delivery_notes",
+  "mis_sales_invoices_section",
+  "mis_sales_invoices",
   "section_break_1_section",
   "year",
   "month",
@@ -86,33 +87,33 @@
    "options": "Timesheets"
   },
   {
-   "fieldname": "sales_order",
-   "fieldtype": "Link",
-   "label": "Sales Order",
-   "link_filters": "[\n  [\"Sales Order\", \"docstatus\", \"=\", 1],\n  [\"Sales Order\", \"custom_implementation\", \"=\", \"eval:doc.implementation\"],\n  [\"Sales Order\", \"status\", \"not in\", [\"Completed\", \"Closed\", \"On Hold\"]]\n]",
-   "no_copy": 1,
-   "options": "Sales Order"
-  },
-  {
    "fieldname": "section_break_1_section",
    "fieldtype": "Section Break"
   },
   {
-   "fieldname": "delivery_note",
-   "fieldtype": "Data",
-   "label": "Delivery Note",
-   "no_copy": 1,
-   "read_only": 1
+   "fieldname": "mis_delivery_notes_section",
+   "fieldtype": "Section Break",
+   "label": "Delivery Notes"
   },
-    {
-     "allow_on_submit": 1,
-     "fieldname": "sales_invoice",
-     "fieldtype": "Link",
-     "label": "Sales Invoice",
-     "no_copy": 1,
-     "options": "Sales Invoice",
-     "read_only": 1
-    },
+  {
+   "allow_on_submit": 1,
+   "fieldname": "mis_delivery_notes",
+   "fieldtype": "Table",
+   "label": "Delivery Notes",
+   "options": "MIS Delivery Note"
+  },
+  {
+   "fieldname": "mis_sales_invoices_section",
+   "fieldtype": "Section Break",
+   "label": "Sales Invoices"
+  },
+  {
+   "allow_on_submit": 1,
+   "fieldname": "mis_sales_invoices",
+   "fieldtype": "Table",
+   "label": "Sales Invoices",
+   "options": "MIS Sales Invoice"
+  },
   {
    "fieldname": "delivery_note_details",
    "fieldtype": "Section Break",
