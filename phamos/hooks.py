@@ -8,6 +8,17 @@ app_email = "support@phamos.eu"
 app_license = "MIT"
 
 required_apps = ["erpnext", "hrms"]
+
+add_to_apps_screen = [
+	{
+		"name": "i_own_my_work",
+		"logo": "/assets/frappe/images/frappe-favicon.svg",
+		"title": "I Own My Work",
+		"route": "/i-own-my-work",
+		"has_permission": "phamos.api.i_own_my_work.check_app_permission",
+	}
+]
+
 # Includes in <head>
 # ------------------
 
@@ -72,7 +83,9 @@ override_doctype_class = {
 }
 
 website_route_rules = [
-    {"from_route": "/schedule_interview/<name>", "to_route": "schedule_interview"}
+    {"from_route": "/schedule_interview/<name>", "to_route": "schedule_interview"},
+    {"from_route": "/i-own-my-work", "to_route": "i_own_my_work"},
+    {"from_route": "/i-own-my-work/<path:app_path>", "to_route": "i_own_my_work"},
 ]
 
 
@@ -110,7 +123,11 @@ update_website_context = ["phamos.website.update_website_context"]
 # Installation
 # ------------
 
-# after_migrate = "phamos.install.after_migrate"
+after_install = "phamos.setup.ops_inbox.ensure_ops_inbox_setup"
+
+after_migrate = [
+	"phamos.setup.ops_inbox.ensure_ops_inbox_setup",
+]
 
 # Uninstallation
 # ------------
