@@ -9,28 +9,43 @@ function set_items_amount_currency(frm) {
 
 function recalculate_total_amount(frm) {
 	if (!frm.fields_dict || !frm.fields_dict.total_amount) return;
+
 	let total = 0;
+
 	(frm.doc.items || []).forEach((row) => {
 		total += flt(row.amount);
 	});
+
 	frm.set_value("total_amount", flt(total, 2));
 }
+
 frappe.ui.form.on("Monthly Salary Invoice", {
 	setup(frm) {
 		set_items_amount_currency(frm);
+
+		frm.set_query("employee", () => {
+			return {
+				filters: {
+					user_id: frappe.session.user
+				}
+			};
+		});
 	},
+
 	refresh(frm) {
 		set_items_amount_currency(frm);
 		recalculate_total_amount(frm);
 	},
-	
+
 	currency(frm) {
 		set_items_amount_currency(frm);
 		recalculate_total_amount(frm);
 	},
+
 	items_add(frm) {
 		recalculate_total_amount(frm);
 	},
+
 	items_remove(frm) {
 		recalculate_total_amount(frm);
 	}
