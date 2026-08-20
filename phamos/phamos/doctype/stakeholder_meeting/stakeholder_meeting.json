@@ -1,0 +1,152 @@
+{
+ "actions": [],
+ "allow_rename": 1,
+ "autoname": "SM-.{implementation}.-.####",
+ "creation": "2026-08-20 00:00:00.000000",
+ "default_view": "List",
+ "doctype": "DocType",
+ "engine": "InnoDB",
+ "field_order": [
+  "implementation",
+  "meeting_type",
+  "column_break_header",
+  "meeting_date",
+  "chair",
+  "section_break_attendees",
+  "attendees",
+  "section_break_chapters",
+  "chapter_reviews",
+  "section_break_decisions",
+  "decisions",
+  "section_break_notes",
+  "notes"
+ ],
+ "fields": [
+  {
+   "description": "Link to the Implementation if it already exists.",
+   "fieldname": "implementation",
+   "fieldtype": "Link",
+   "in_list_view": 1,
+   "in_standard_filter": 1,
+   "label": "Implementation",
+   "options": "Implementation",
+   "reqd": 1
+  },
+  {
+   "fieldname": "meeting_type",
+   "fieldtype": "Link",
+   "in_list_view": 1,
+   "in_standard_filter": 1,
+   "label": "Meeting Type",
+   "options": "Meeting Type",
+   "reqd": 1
+  },
+  {
+   "fieldname": "column_break_header",
+   "fieldtype": "Column Break"
+  },
+  {
+   "default": "Today",
+   "fieldname": "meeting_date",
+   "fieldtype": "Date",
+   "in_list_view": 1,
+   "label": "Meeting Date",
+   "reqd": 1
+  },
+  {
+   "description": "The user chairing this meeting. Can remove seeded attendees/chapter rows before submitting.",
+   "fieldname": "chair",
+   "fieldtype": "Link",
+   "label": "Chair",
+   "options": "User",
+   "reqd": 1
+  },
+  {
+   "fieldname": "section_break_attendees",
+   "fieldtype": "Section Break",
+   "label": "Attendees"
+  },
+  {
+   "description": "Imported from the Implementation's Internal and Customer stakeholders when this meeting is created. Third Party stakeholders are skipped. Rows are a snapshot and can be removed by the chair.",
+   "fieldname": "attendees",
+   "fieldtype": "Table",
+   "label": "Attendees",
+   "options": "Stakeholder Meeting Attendee"
+  },
+  {
+   "fieldname": "section_break_chapters",
+   "fieldtype": "Section Break",
+   "label": "Chapter Reviews"
+  },
+  {
+   "description": "Seeded from the Implementation's Planned / In Progress / Blocked Chapters, pinned to each Chapter's current revision. The chair can remove seeded rows and add other Chapters manually.",
+   "fieldname": "chapter_reviews",
+   "fieldtype": "Table",
+   "label": "Chapter Reviews",
+   "options": "Stakeholder Meeting Chapter Review"
+  },
+  {
+   "fieldname": "section_break_decisions",
+   "fieldtype": "Section Break",
+   "label": "Decisions"
+  },
+  {
+   "fieldname": "decisions",
+   "fieldtype": "Table",
+   "label": "Decisions",
+   "options": "Stakeholder Meeting Decision"
+  },
+  {
+   "fieldname": "section_break_notes",
+   "fieldtype": "Section Break",
+   "label": "Notes"
+  },
+  {
+   "fieldname": "notes",
+   "fieldtype": "Text Editor",
+   "label": "Notes"
+  }
+ ],
+ "index_web_pages_for_search": 1,
+ "is_submittable": 1,
+ "links": [],
+ "modified": "2026-08-20 00:00:00.000000",
+ "modified_by": "Administrator",
+ "module": "Phamos",
+ "name": "Stakeholder Meeting",
+ "naming_rule": "Expression (old style)",
+ "owner": "Administrator",
+ "permissions": [
+  {
+   "amend": 1,
+   "cancel": 1,
+   "create": 1,
+   "delete": 1,
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "System Manager",
+   "share": 1,
+   "submit": 1,
+   "write": 1
+  },
+  {
+   "create": 1,
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "All",
+   "share": 1,
+   "submit": 1,
+   "write": 1
+  }
+ ],
+ "sort_field": "creation",
+ "sort_order": "DESC",
+ "states": [],
+ "track_changes": 1
+}

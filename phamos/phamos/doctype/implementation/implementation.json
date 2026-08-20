@@ -586,9 +586,13 @@
   {
    "link_doctype": "Implementation Chapter",
    "link_fieldname": "implementation"
+  },
+  {
+   "link_doctype": "Stakeholder Meeting",
+   "link_fieldname": "implementation"
   }
  ],
- "modified": "2026-08-13 09:05:58.342753",
+ "modified": "2026-08-20 09:12:30.396213",
  "modified_by": "Administrator",
  "module": "Phamos",
  "name": "Implementation",

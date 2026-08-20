@@ -1,0 +1,56 @@
+{
+ "actions": [],
+ "autoname": "field:meeting_type_name",
+ "creation": "2026-08-20 00:00:00.000000",
+ "doctype": "DocType",
+ "engine": "InnoDB",
+ "field_order": [
+  "meeting_type_name"
+ ],
+ "fields": [
+  {
+   "description": "The header meeting type, e.g. Status Review, Go Live, Kickoff, Data Migration.",
+   "fieldname": "meeting_type_name",
+   "fieldtype": "Data",
+   "in_list_view": 1,
+   "label": "Meeting Type",
+   "reqd": 1,
+   "unique": 1
+  }
+ ],
+ "links": [],
+ "modified": "2026-08-20 00:00:00.000000",
+ "modified_by": "Administrator",
+ "module": "Phamos",
+ "name": "Meeting Type",
+ "naming_rule": "By fieldname",
+ "owner": "Administrator",
+ "permissions": [
+  {
+   "create": 1,
+   "delete": 1,
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "System Manager",
+   "share": 1,
+   "write": 1
+  },
+  {
+   "create": 1,
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "All",
+   "share": 1
+  }
+ ],
+ "sort_field": "modified",
+ "sort_order": "DESC",
+ "states": [],
+ "track_changes": 1
+}
