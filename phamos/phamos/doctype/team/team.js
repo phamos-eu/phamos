@@ -71,7 +71,7 @@ function calculate_leave_and_holiday(frm) {
 
 
 function setup_daily_schedule_email_account_query(frm) {
-    const grid = frm.fields_dict.custom_team_daily_schedule && frm.fields_dict.custom_team_daily_schedule.grid;
+    const grid = frm.fields_dict.event_schedule && frm.fields_dict.event_schedule.grid;
     if (!grid) return;
 
     grid.get_field("email_account").get_query = function () {

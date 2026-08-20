@@ -39,7 +39,7 @@ function show_free_slots_dialog_for_row(frm, row, cdt, cdn) {
 			const [start, end] = picked.split('|');
 			frappe.model.set_value(cdt, cdn, 'start', start);
 			frappe.model.set_value(cdt, cdn, 'end', end);
-			frm.refresh_field('custom_team_daily_schedule');
+			frm.refresh_field('event_schedule');
 			d.hide();
 		},
 	});
