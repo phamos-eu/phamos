@@ -53,6 +53,10 @@
   "daily_image_folder",
   "raven_actions_section",
   "execute_raven_thread",
+  "issue_raven_chat_section",
+  "enable_issue_raven_chat",
+  "column_break_issue_raven",
+  "issue_raven_workspace",
   "checklist_tab",
   "checklist_section",
   "checklist_popup",
@@ -313,6 +317,30 @@
    "fieldname": "execute_raven_thread",
    "fieldtype": "Button",
    "label": "Test Raven Daily Thread"
+  },
+  {
+   "fieldname": "issue_raven_chat_section",
+   "fieldtype": "Section Break",
+   "label": "I Own My Work — Issue Chat"
+  },
+  {
+   "default": "0",
+   "description": "Allow creating a Private Raven channel per Issue and chatting from /i-own-my-work.",
+   "fieldname": "enable_issue_raven_chat",
+   "fieldtype": "Check",
+   "label": "Enable Issue Raven Chat"
+  },
+  {
+   "fieldname": "column_break_issue_raven",
+   "fieldtype": "Column Break"
+  },
+  {
+   "depends_on": "eval:doc.enable_issue_raven_chat == 1",
+   "description": "Workspace used when creating Issue discussion channels. Falls back to the first Raven Workspace if empty.",
+   "fieldname": "issue_raven_workspace",
+   "fieldtype": "Link",
+   "label": "Issue Chat Workspace",
+   "options": "Raven Workspace"
   },
   {
    "fieldname": "checklist_tab",
