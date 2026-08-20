@@ -1042,17 +1042,7 @@ def get_timesheet_approval_rows(
 	if timesheet_names:
 		timesheet_names = list(set(timesheet_names))
 
-		# Fetch Timesheet parent information
-		ts_has_status = frappe.db.has_column("Timesheet", "status")
-		ts_has_rating = frappe.db.has_column("Timesheet", "custom_rating")
-
-		ts_fields = ["name", "docstatus"]
-
-		if ts_has_status:
-			ts_fields.append("status")
-
-		if ts_has_rating:
-			ts_fields.append("custom_rating")
+		ts_fields = ["name", "docstatus", "status", "custom_rating"]
 
 		for ts in frappe.get_all(
 			"Timesheet",
@@ -1128,15 +1118,8 @@ def get_timesheet_approval_rows(
 				"docstatus": docstatus,
 				"status": status,
 				"is_pending": 1 if is_pending else 0,
-
 				# Rating comes from the Timesheet parent
-				"rating": (
-					meta.custom_rating
-					if meta and hasattr(meta, "custom_rating")
-					else ""
-				)
-				or "",
-
+				"rating": (meta.custom_rating if meta else "") or "",
 				# Description comes from the Timesheet -> Time Sheets child table
 				"description": description_by_timesheet.get(
 					ts_name,
