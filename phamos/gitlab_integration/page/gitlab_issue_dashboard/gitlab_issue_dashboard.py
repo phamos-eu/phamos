@@ -15,6 +15,7 @@ def get_gitlab_issue_dashboard_data(projects=None, year=None, from_date=None, to
 
     flow_rows, aging_map, project_names = _build_flow_rows_and_aging(from_date, to_date, selected_projects, issue_scope)
     project_titles = _get_project_titles(project_names)
+    lead_time = _build_lead_time_kpis(from_date, to_date, selected_projects, issue_scope)
     company_monthly_flow = []
     company_aging = {}
 
@@ -34,6 +35,7 @@ def get_gitlab_issue_dashboard_data(projects=None, year=None, from_date=None, to
         "monthly_flow": flow_rows,
         "company_monthly_flow": company_monthly_flow,
         "company_aging": company_aging,
+        "lead_time": lead_time,
     }
 
 
@@ -246,6 +248,76 @@ def _build_flow_rows_and_aging(from_date, to_date, selected_projects, issue_scop
     }
 
     return flow_rows, aging_map, project_names
+
+
+LEAD_TIME_ROLLING_PERIODS = {
+    "last_month": 1,
+    "last_3_months": 3,
+    "last_6_months": 6,
+    "last_12_months": 12,
+}
+
+
+def _build_lead_time_kpis(from_date, to_date, selected_projects, issue_scope="both"):
+    conditions = ["1=1"]
+    params = {}
+
+    if selected_projects:
+        conditions.append("gi.gitlab_project IN %(projects)s")
+        params["projects"] = tuple(selected_projects)
+
+    if issue_scope == "parent":
+        conditions.append("gi.parent_issue IS NULL")
+    elif issue_scope == "child":
+        conditions.append("gi.parent_issue IS NOT NULL")
+
+    project_filter_sql = " AND ".join(conditions)
+
+    filtered_params = dict(params)
+    filtered_params["from_date"] = from_date
+    filtered_params["to_date"] = to_date
+
+    filtered_row = frappe.db.sql(
+        f"""
+        SELECT AVG(DATEDIFF(DATE(gi.closed_at), DATE(gi.created_at))) AS avg_lead_time
+        FROM `tabGitLab Issue` gi
+        WHERE gi.state = 'closed'
+          AND gi.created_at IS NOT NULL
+          AND gi.closed_at IS NOT NULL
+          AND DATE(gi.closed_at) BETWEEN %(from_date)s AND %(to_date)s
+          AND {project_filter_sql}
+        """,
+        filtered_params,
+        as_dict=True,
+    )
+
+    rolling = {}
+    for key, months in LEAD_TIME_ROLLING_PERIODS.items():
+        rolling_row = frappe.db.sql(
+            f"""
+            SELECT AVG(DATEDIFF(DATE(gi.closed_at), DATE(gi.created_at))) AS avg_lead_time
+            FROM `tabGitLab Issue` gi
+            WHERE gi.state = 'closed'
+              AND gi.created_at IS NOT NULL
+              AND gi.closed_at IS NOT NULL
+              AND DATE(gi.closed_at) >= DATE_SUB(CURDATE(), INTERVAL {months} MONTH)
+              AND {project_filter_sql}
+            """,
+            params,
+            as_dict=True,
+        )
+        rolling[key] = _round_avg(rolling_row[0].avg_lead_time if rolling_row else None)
+
+    return {
+        "filtered": _round_avg(filtered_row[0].avg_lead_time if filtered_row else None),
+        "rolling": rolling,
+    }
+
+
+def _round_avg(value):
+    if value is None:
+        return None
+    return round(float(value), 2)
 
 
 def _collect_project_names(opened_rows, closed_rows, aging_rows, selected_projects):
