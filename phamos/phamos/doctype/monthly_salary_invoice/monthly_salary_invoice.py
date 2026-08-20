@@ -13,7 +13,7 @@ class MonthlySalaryInvoice(Document):
         year = invoice_date.strftime("%Y")
         month = invoice_date.strftime("%m")
 
-        self.name = f"ACC-SINV-{year}-00{month}"
+        self.name = f"ACC-SINV-{year}-{month}"
     
     def validate(self):
         if not self.supplier_email:
