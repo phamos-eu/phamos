@@ -8,11 +8,34 @@ import re
 from frappe.model.document import Document
 from frappe.query_builder import Case, DocType
 from frappe.query_builder.functions import Coalesce, Count, Sum
-from frappe.utils import cint, flt, today
+from frappe.utils import add_days, add_months, cint, flt, getdate, today
+
+REVIEW_CADENCE_INTERVALS = {
+	"Weekly": {"days": 7},
+	"Biweekly": {"days": 14},
+	"Monthly": {"months": 1},
+	"Quarterly": {"months": 3},
+}
+
+
+def compute_next_review_due(base_date, cadence):
+	"""Add a single Review Cadence interval to base_date. Deliberately just
+	this - a plain fixed-interval step, not a recurrence engine - so a later
+	calendar integration remains free to own actual event scheduling."""
+	interval = REVIEW_CADENCE_INTERVALS.get(cadence)
+	if not interval:
+		return None
+
+	base_date = getdate(base_date)
+	if "days" in interval:
+		return add_days(base_date, interval["days"])
+	return add_months(base_date, interval["months"])
 
 
 class Implementation(Document):
 	def validate(self):
+		self.set_initial_next_review_due()
+
 		if self.is_new():
 			return
 		db_status = frappe.db.get_value("Implementation", self.name, "status")
@@ -28,6 +51,14 @@ class Implementation(Document):
 					"Cannot change status from Escalated. "
 					"Please resolve or submit the linked Escalation first."
 				)
+
+	def set_initial_next_review_due(self):
+		"""Give Next Review Due a sensible starting point the first time a
+		Review Cadence is set, without overriding a date someone already
+		chose. After that, only a submitted Stakeholder Meeting (or a manual
+		edit) moves it - this never recomputes it on a later save."""
+		if self.review_cadence and not self.next_review_due:
+			self.next_review_due = compute_next_review_due(self.last_reviewed_on or today(), self.review_cadence)
 
 	def before_save(self):
 		self.sync_modules_from_implementation_chapters()

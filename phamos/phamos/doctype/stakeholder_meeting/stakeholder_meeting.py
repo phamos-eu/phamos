@@ -5,6 +5,8 @@ import frappe
 from frappe.model.document import Document
 from frappe.utils import formatdate
 
+from phamos.phamos.doctype.implementation.implementation import compute_next_review_due
+
 ATTENDEE_ORGANISATIONS = ("Internal", "Customer")
 CHAPTER_REVIEW_STATUSES = ("Planned", "In Progress", "Blocked")
 PROPOSED_CONTENT_REQUIRED = (
@@ -52,7 +54,19 @@ class StakeholderMeeting(Document):
 				)
 
 	def on_submit(self):
-		self.sync_chapter_reviews_to_chapters()
+		"""Saving a Chapter (in sync_chapter_reviews_to_chapters) and saving the
+		Implementation (in advance_implementation_review_cadence) both cascade
+		into an Implementation.save(), which would otherwise log a new
+		Implementation status history entry for today. That history is meant to
+		capture deliberate Implementation-level status entries, not a side
+		effect of a meeting, so it is suppressed for this whole submit via
+		frappe.flags."""
+		frappe.flags.in_stakeholder_meeting_submit = True
+		try:
+			self.sync_chapter_reviews_to_chapters()
+			self.advance_implementation_review_cadence()
+		finally:
+			frappe.flags.in_stakeholder_meeting_submit = False
 
 	def sync_chapter_reviews_to_chapters(self):
 		"""Write the agreed operational fields captured on each Chapter Review row
@@ -60,45 +74,54 @@ class StakeholderMeeting(Document):
 		and last-reviewed metadata. It never edits the Chapter's own agreed content
 		fields directly - a Scope Change instead creates a new immutable Chapter
 		Revision from the row's proposed content and repoints the Chapter's
-		current_revision at it.
-
-		Saving the Chapter cascades into an Implementation.save() (to mirror the
-		module row), which would otherwise also log a new Implementation status
-		history entry for today. That history is meant to capture deliberate
-		Implementation-level status entries, not a side effect of a meeting, so it
-		is suppressed for the duration of this sync via frappe.flags."""
+		current_revision at it."""
 		created_revisions = []
-		frappe.flags.in_stakeholder_meeting_submit = True
-		try:
-			for row in self.chapter_reviews:
-				if not row.chapter:
-					continue
+		for row in self.chapter_reviews:
+			if not row.chapter:
+				continue
 
-				chapter = frappe.get_doc("Implementation Chapter", row.chapter)
-				chapter.current_level = row.current_level
-				chapter.target_level = row.target_level
-				if row.chapter_status_after:
-					chapter.status = row.chapter_status_after
-				chapter.last_meeting = self.name
-				chapter.last_reviewed_on = self.meeting_date
+			chapter = frappe.get_doc("Implementation Chapter", row.chapter)
+			chapter.current_level = row.current_level
+			chapter.target_level = row.target_level
+			if row.chapter_status_after:
+				chapter.status = row.chapter_status_after
+			chapter.last_meeting = self.name
+			chapter.last_reviewed_on = self.meeting_date
 
-				new_revision_name = None
-				if row.scope_change:
-					new_revision_name = self.create_chapter_revision_from_row(chapter, row)
-					chapter.current_revision = new_revision_name
+			new_revision_name = None
+			if row.scope_change:
+				new_revision_name = self.create_chapter_revision_from_row(chapter, row)
+				chapter.current_revision = new_revision_name
 
-				chapter.save(ignore_permissions=True)
+			chapter.save(ignore_permissions=True)
 
-				if new_revision_name:
-					row.db_set(
-						{"previous_revision": row.current_revision, "current_revision": new_revision_name},
-						update_modified=False,
-					)
-					created_revisions.append((chapter.name, new_revision_name))
-		finally:
-			frappe.flags.in_stakeholder_meeting_submit = False
+			if new_revision_name:
+				row.db_set(
+					{"previous_revision": row.current_revision, "current_revision": new_revision_name},
+					update_modified=False,
+				)
+				created_revisions.append((chapter.name, new_revision_name))
 
 		self.notify_created_revisions(created_revisions)
+
+	def advance_implementation_review_cadence(self):
+		"""Record this submitted meeting as the Implementation's latest review
+		and, if a Review Cadence is configured, push Next Review Due forward
+		from this meeting's date. Only ever runs off an actual submit - nothing
+		here runs on a schedule, so overdue only ever clears through a real
+		review, and a later calendar integration remains free to own actual
+		scheduling."""
+		if not self.implementation:
+			return
+
+		implementation = frappe.get_doc("Implementation", self.implementation)
+		implementation.last_stakeholder_meeting = self.name
+		implementation.last_reviewed_on = self.meeting_date
+		if implementation.review_cadence:
+			implementation.next_review_due = compute_next_review_due(
+				self.meeting_date, implementation.review_cadence
+			)
+		implementation.save(ignore_permissions=True)
 
 	def notify_created_revisions(self, created_revisions):
 		"""Tell the chair what this submit actually created, with links, instead
