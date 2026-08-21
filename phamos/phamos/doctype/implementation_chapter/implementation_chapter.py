@@ -3,6 +3,7 @@
 
 import frappe
 from frappe.model.document import Document
+from frappe.utils import getdate
 
 AGREED_CONTENT_FIELDS = (
 	"chapter_title",
@@ -112,11 +113,16 @@ class ImplementationChapter(Document):
 		if not doc_before_save or doc_before_save.status == "Draft":
 			return
 
-		changed_labels = [
-			self.meta.get_label(fieldname)
-			for fieldname in AGREED_CONTENT_FIELDS
-			if self.get(fieldname) != doc_before_save.get(fieldname)
-		]
+		changed_labels = []
+		for fieldname in AGREED_CONTENT_FIELDS:
+			current_value = self.get(fieldname)
+			previous_value = doc_before_save.get(fieldname)
+			if self.meta.get_field(fieldname).fieldtype in ("Date", "Datetime"):
+				current_value = getdate(current_value) if current_value else current_value
+				previous_value = getdate(previous_value) if previous_value else previous_value
+			if current_value != previous_value:
+				changed_labels.append(self.meta.get_label(fieldname))
+
 		if changed_labels:
 			frappe.throw(
 				frappe._(

@@ -1,6 +1,6 @@
 {
  "actions": [],
- "creation": "2026-08-20 00:00:00.000000",
+ "creation": "2026-08-20 00:00:00",
  "doctype": "DocType",
  "editable_grid": 1,
  "engine": "InnoDB",
@@ -8,6 +8,11 @@
   "chapter",
   "chapter_title",
   "current_revision",
+  "chapter_status_before",
+  "planned_start",
+  "target_date",
+  "drift_detected",
+  "drift_details",
   "progress",
   "chapter_status_after",
   "current_level",
@@ -30,7 +35,6 @@
    "fetch_from": "chapter.chapter_title",
    "fieldname": "chapter_title",
    "fieldtype": "Data",
-   "in_list_view": 1,
    "label": "Chapter Title",
    "read_only": 1
   },
@@ -40,6 +44,46 @@
    "fieldtype": "Link",
    "label": "Current Revision",
    "options": "Implementation Chapter Revision",
+   "read_only": 1
+  },
+  {
+   "description": "Snapshot of the Chapter's status when this row was seeded, i.e. going into this meeting.",
+   "fieldname": "chapter_status_before",
+   "fieldtype": "Select",
+   "label": "Status Before Meeting",
+   "options": "Draft\nPlanned\nIn Progress\nBlocked\nCancelled",
+   "read_only": 1
+  },
+  {
+   "description": "Snapshot of the Chapter's Planned Start when this row was seeded.",
+   "fieldname": "planned_start",
+   "fieldtype": "Date",
+   "label": "Planned Start",
+   "read_only": 1
+  },
+  {
+   "description": "Snapshot of the Chapter's Target Date when this row was seeded.",
+   "fieldname": "target_date",
+   "fieldtype": "Date",
+   "label": "Target Date",
+   "read_only": 1
+  },
+  {
+   "columns": 1,
+   "default": "0",
+   "description": "Set automatically when this Chapter's live levels, status, or planned dates differ from the last submitted meeting's snapshot.",
+   "fieldname": "drift_detected",
+   "fieldtype": "Check",
+   "in_list_view": 1,
+   "label": "Drift Since Last Meeting",
+   "read_only": 1
+  },
+  {
+   "depends_on": "eval:doc.drift_detected",
+   "description": "What changed since the last submitted meeting for this Chapter.",
+   "fieldname": "drift_details",
+   "fieldtype": "Small Text",
+   "label": "Drift Details",
    "read_only": 1
   },
   {
@@ -80,7 +124,6 @@
    "description": "Flag that this review surfaced a scope change. Creating a new revision for a scope change is handled in a later ticket.",
    "fieldname": "scope_change",
    "fieldtype": "Check",
-   "in_list_view": 1,
    "label": "Scope Change"
   },
   {
@@ -91,12 +134,13 @@
  ],
  "istable": 1,
  "links": [],
- "modified": "2026-08-20 00:00:00.000000",
+ "modified": "2026-08-21 08:13:46.416682",
  "modified_by": "Administrator",
  "module": "Phamos",
  "name": "Stakeholder Meeting Chapter Review",
  "owner": "Administrator",
  "permissions": [],
+ "row_format": "Dynamic",
  "sort_field": "modified",
  "sort_order": "DESC",
  "states": []

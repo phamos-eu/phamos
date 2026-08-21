@@ -356,6 +356,9 @@ class Implementation(Document):
 	
 
 	def add_status_history(self):
+		if frappe.flags.in_stakeholder_meeting_submit:
+			return
+
 		date = today()
 		found_today = False
 
