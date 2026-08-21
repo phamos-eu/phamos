@@ -105,12 +105,14 @@ def sync_shelves(client: BookstackClient, instance: str) -> int:
 	for shelf in client.paginate("shelves"):
 		detail = client.get(f"shelves/{shelf['id']}")
 		books = []
+		book_names = []
 		for b in detail.get("books", []) or []:
 			book_name = _lookup_name("Bookstack Book", instance, b.get("id"))
 			if book_name:
 				books.append({"book": book_name})
+				book_names.append(book_name)
 
-		_upsert("Bookstack Shelf", instance, detail["id"], {
+		shelf_name = _upsert("Bookstack Shelf", instance, detail["id"], {
 			"title": detail.get("name"),
 			"slug": detail.get("slug"),
 			"description": detail.get("description"),
@@ -121,6 +123,13 @@ def sync_shelves(client: BookstackClient, instance: str) -> int:
 			"updated_at": _iso(detail.get("updated_at")),
 			"books": books,
 		})
+
+		for book_name in book_names:
+			book_doc = frappe.get_doc("Bookstack Book", book_name)
+			if book_doc.get("shelf") != shelf_name:
+				book_doc.shelf = shelf_name
+				book_doc.save(ignore_permissions=True)
+
 		count += 1
 	return count
 
