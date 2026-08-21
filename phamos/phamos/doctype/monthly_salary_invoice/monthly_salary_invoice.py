@@ -3,10 +3,18 @@
 
 import frappe
 from frappe.model.document import Document
-from frappe.utils import flt
+from frappe.utils import flt, getdate
 
 
 class MonthlySalaryInvoice(Document):
+
+    def autoname(self):
+        invoice_date = getdate(self.invoice_date)
+        year = invoice_date.strftime("%Y")
+        month = invoice_date.strftime("%m")
+
+        self.name = f"ACC-SINV-{year}-{month}"
+    
     def validate(self):
         if not self.supplier_email:
             frappe.throw(frappe._("Supplier Email is required. Please set an email on the Employee."))

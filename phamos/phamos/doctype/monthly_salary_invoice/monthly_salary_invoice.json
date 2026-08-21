@@ -1,13 +1,12 @@
 {
  "actions": [],
  "allow_rename": 1,
- "autoname": "naming_series:",
+ "autoname": "",
  "creation": "2026-06-30 00:00:00",
  "doctype": "DocType",
  "engine": "InnoDB",
  "field_order": [
   "invoice_date",
-  "naming_series",
   "column_break_haqk",
   "payroll_start_date",
   "payroll_end_date",
@@ -29,14 +28,6 @@
   "amended_from"
  ],
  "fields": [
-  {
-   "fieldname": "naming_series",
-   "fieldtype": "Select",
-   "in_list_view": 1,
-   "label": "Naming Series",
-   "options": "ACC-SINV-.YYYY.-.#####\nACC-DEV-.YYYY.-.#####\nACC-PM-.YYYY.-.#####",
-   "reqd": 1
-  },
   {
    "default": "Today",
    "fieldname": "invoice_date",
@@ -174,7 +165,7 @@
  "modified_by": "Administrator",
  "module": "Phamos",
  "name": "Monthly Salary Invoice",
- "naming_rule": "By \"Naming Series\" field",
+ "naming_rule": "",
  "owner": "Administrator",
  "permissions": [
   {
