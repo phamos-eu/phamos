@@ -55,11 +55,25 @@ def extract(lead_data_import_name, file_url):
         return []
 
     companies = core._mistral_extract_companies_from_text(markdown)
+    normalized = []
+    for company in companies or []:
+        company = dict(company or {})
+        if "logo_list" not in str(company.get("source_type") or "").lower():
+            company["source_type"] = "business_card"
+        if not company.get("website"):
+            company["website"] = core._infer_or_search_website(company)
+        company = core._normalize_company_dict(
+            core._prioritize_business_card_emails(company)
+        )
+        company["source_attachments"] = [file_url]
+        company["source_attachment"] = file_url
+        normalized.append(company)
+
     core._log(
         lead_data_import_name,
-        f"Mistral identified {len(companies)} companies in the PDF.",
+        f"Mistral identified {len(normalized)} companies in the PDF.",
     )
     if core.MAX_COMPANIES_PER_IMPORT:
-        return companies[:core.MAX_COMPANIES_PER_IMPORT]
-    return companies
+        return normalized[:core.MAX_COMPANIES_PER_IMPORT]
+    return normalized
 

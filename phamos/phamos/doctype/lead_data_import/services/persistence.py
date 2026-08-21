@@ -10,9 +10,11 @@ from ..lead_data_import import (
     _normalize_compare_text,
     _normalize_url,
     _normalized_domain,
+    _partition_phones_and_mobiles,
     _populate_lead_data_child_tables,
     _sanitize_email,
     _sanitize_phone_list,
+    cint,
     frappe,
     re,
 )
@@ -56,9 +58,10 @@ def _normalize_company_dict(company):
     company["email"] = emails[0] if emails else ""
 
     phones = _sanitize_phone_list(company.get("phones") or company.get("phone"))
+    mobile_numbers = _sanitize_phone_list(company.get("mobile_numbers") or company.get("mobile_no"))
+    phones, mobile_numbers = _partition_phones_and_mobiles(phones, mobile_numbers)
     company["phones"] = phones
     company["phone"] = phones[0] if phones else ""
-    mobile_numbers = _sanitize_phone_list(company.get("mobile_numbers") or company.get("mobile_no"))
     company["mobile_numbers"] = mobile_numbers
     company["mobile_no"] = mobile_numbers[0] if mobile_numbers else ""
     company["job_title"] = _clean_job_title_text(company.get("job_title"))
@@ -72,6 +75,8 @@ def _normalize_company_dict(company):
     company["addresses"] = _clean_address_values(addresses)
     if company["addresses"]:
         company["address"] = company["addresses"][0]
+    else:
+        company["address"] = ""
 
     return company
 
@@ -109,9 +114,15 @@ def _lead_data_doc_to_company(lead_data_doc):
         "website": lead_data_doc.website,
         "email": lead_data_doc.email,
         "phone": lead_data_doc.phone,
+        "mobile_no": lead_data_doc.mobile_no,
+        "job_title": lead_data_doc.job_title,
     }
     if lead_data_doc.get("card_email"):
         company["card_emails"] = [lead_data_doc.card_email]
+        company["source_type"] = "business_card"
+    elif lead_data_doc.get("first_name") or lead_data_doc.get("last_name"):
+        # Progressive card enrich: treat person-led rows as business cards.
+        company["source_type"] = "business_card"
 
     websites = [
         row.website for row in (lead_data_doc.lead_data_website or [])
@@ -122,17 +133,17 @@ def _lead_data_doc_to_company(lead_data_doc):
 
     emails = _split_email_values(lead_data_doc.email)
     phones = _sanitize_phone_list(lead_data_doc.phone)
+    mobiles = _sanitize_phone_list(lead_data_doc.mobile_no)
     addresses = []
     contacts = []
+    secondary_contacts = []
 
     for row in lead_data_doc.lead_data_address or []:
-        if row.address_line_1 and row.address_line_1 not in addresses:
-            addresses.append(row.address_line_1)
-        email = _sanitize_email(row.email_address)
-        if email and email not in emails:
-            emails.append(email)
+        composed = _compose_address_from_child_row(row)
+        if composed and composed not in addresses:
+            addresses.append(composed)
         for phone in _sanitize_phone_list(row.phone):
-            if phone not in phones:
+            if phone not in phones and phone not in mobiles:
                 phones.append(phone)
 
     for row in lead_data_doc.lead_data_contact or []:
@@ -140,29 +151,69 @@ def _lead_data_doc_to_company(lead_data_doc):
             part for part in (row.first_name, row.middle_name, row.last_name)
             if part
         ).strip()
-        if name and name not in contacts:
-            contacts.append(name)
-        email = _sanitize_email(row.email_address)
-        if email and email not in emails:
-            emails.append(email)
-        for phone in _sanitize_phone_list(row.phone or row.mobile_no):
-            if phone not in phones:
-                phones.append(phone)
+        is_primary = cint(getattr(row, "is_primary", 0))
+        if is_primary and name:
+            if name not in contacts:
+                contacts.insert(0, name)
+            company["card_contact_persons"] = [name]
+            for email in _split_email_values(row.email_address):
+                if email and email not in emails:
+                    emails.insert(0, email)
+            for phone in _sanitize_phone_list(row.phone):
+                if phone and phone not in phones:
+                    phones.append(phone)
+            for phone in _sanitize_phone_list(row.mobile_no):
+                if phone and phone not in mobiles:
+                    mobiles.append(phone)
+        elif name:
+            secondary_contacts.append({
+                "name": name,
+                "email": _sanitize_email(row.email_address) or "",
+                "phone": (row.phone or ""),
+                "mobile_no": (row.mobile_no or ""),
+                "designation": (row.designation or ""),
+            })
+
+    primary_name = " ".join(
+        part for part in (lead_data_doc.first_name, lead_data_doc.last_name) if part
+    ).strip()
+    if primary_name and primary_name not in contacts:
+        contacts.insert(0, primary_name)
+        company.setdefault("card_contact_persons", [primary_name])
+
+    phones, mobiles = _partition_phones_and_mobiles(phones, mobiles)
 
     if emails:
         company["emails"] = emails
-        company["email"] = emails[0]
+        company["email"] = emails[0] if len(emails) == 1 else ", ".join(emails)
     if phones:
         company["phones"] = phones
         company["phone"] = phones[0]
+        company["card_phones"] = list(phones)
+    if mobiles:
+        company["mobile_numbers"] = mobiles
+        company["mobile_no"] = mobiles[0]
+        company["card_mobile_numbers"] = list(mobiles)
     if addresses:
         company["addresses"] = addresses
         company["address"] = addresses[0]
     if contacts:
         company["contact_persons"] = contacts
         company["contact_person"] = contacts[0]
+    if secondary_contacts:
+        company["secondary_contacts"] = secondary_contacts
 
     return company
+
+
+def _compose_address_from_child_row(row):
+    street = (getattr(row, "address_line_1", None) or "").strip()
+    postal = (getattr(row, "postal_code", None) or "").strip()
+    city = (getattr(row, "citytown", None) or "").strip()
+    country = (getattr(row, "country", None) or "").strip()
+    locality = " ".join(part for part in (postal, city) if part)
+    chunks = [part for part in (street, locality, country) if part]
+    return ", ".join(chunks)
 
 
 def _merge_company_lead_data(existing, incoming):
@@ -272,6 +323,16 @@ def _build_import_info(company):
         lines.append(f"addresses ({len(addresses)}) :")
         for a in addresses:
             lines.append(f"  - {a}")
+
+    secondary_contacts = company.get("secondary_contacts") or []
+    if secondary_contacts:
+        lines.append(f"secondary_contacts ({len(secondary_contacts)}) :")
+        for contact in secondary_contacts:
+            if not isinstance(contact, dict):
+                continue
+            label = contact.get("name") or ""
+            email = contact.get("email") or ""
+            lines.append(f"  - {label}" + (f" <{email}>" if email else ""))
 
     website_research = company.get("website_research") or {}
     if isinstance(website_research, dict) and website_research:
