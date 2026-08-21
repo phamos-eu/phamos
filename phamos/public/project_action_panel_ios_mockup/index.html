@@ -835,27 +835,27 @@
                     <input v-model="query" type="search" placeholder="Search projects or customers" class="h-9 w-full rounded-xl bg-ios-fill pl-9 pr-3 text-[15px] outline-none placeholder:text-ios-gray" />
                   </div>
 
-                  <div class="no-scrollbar mb-3 flex gap-2 overflow-x-auto">
-                    <div class="min-w-[148px] rounded-2xl bg-ios-card p-3 shadow-card">
-                      <p class="text-[11px] font-bold uppercase tracking-wider text-ios-gray">Projects</p>
-                      <p class="mt-1 text-[22px] font-bold tabular-nums">{{ filter === 'my' ? myProjects.length : allProjects.length }}</p>
-                      <p class="text-[11px] text-ios-secondary">{{ filter === 'my' ? 'assigned to you' : 'open in company' }}</p>
+                  <div class="mb-3 grid grid-cols-2 gap-2">
+                    <div class="rounded-2xl bg-ios-card p-3 shadow-card">
+                      <p class="text-[10px] font-bold uppercase tracking-wider text-ios-gray">Projects</p>
+                      <p class="mt-1 text-[22px] font-bold tabular-nums leading-none">{{ filter === 'my' ? myProjects.length : allProjects.length }}</p>
+                      <p class="mt-1 text-[11px] text-ios-secondary">{{ filter === 'my' ? 'assigned to you' : 'open in company' }}</p>
                     </div>
                     <div v-for="period in [
                       { key: 'today', label: 'Today' },
                       { key: 'week', label: 'This week' },
                       { key: 'month', label: 'This month' },
-                    ]" :key="period.key" class="min-w-[168px] rounded-2xl bg-ios-card p-3 shadow-card">
-                      <p class="text-[11px] font-bold uppercase tracking-wider text-ios-gray">{{ period.label }}</p>
-                      <div class="mt-1 flex items-end justify-between">
-                        <p class="text-[22px] font-bold tabular-nums">{{ stats[period.key].working }}h</p>
-                        <p class="pb-0.5 text-[12px] font-semibold text-ios-green">{{ stats[period.key].billable }}h bill</p>
+                    ]" :key="period.key" class="rounded-2xl bg-ios-card p-3 shadow-card">
+                      <p class="text-[10px] font-bold uppercase tracking-wider text-ios-gray">{{ period.label }}</p>
+                      <div class="mt-1 flex items-end justify-between gap-1">
+                        <p class="text-[20px] font-bold tabular-nums leading-none">{{ stats[period.key].working }}h</p>
+                        <p class="text-[11px] font-semibold text-ios-green">{{ stats[period.key].billable }}h bill</p>
                       </div>
                       <div class="mt-2 h-1.5 overflow-hidden rounded-full bg-ios-fill">
                         <div class="flex h-full w-full">
-                          <div class="bg-ios-green" :style="{ width: stats[period.key].green + '%' }"></div>
-                          <div class="bg-ios-orange" :style="{ width: stats[period.key].amber + '%' }"></div>
-                          <div class="bg-ios-red" :style="{ width: stats[period.key].red + '%' }"></div>
+                          <div class="h-full bg-ios-green" :style="{ width: stats[period.key].green + '%' }"></div>
+                          <div class="h-full bg-ios-orange" :style="{ width: stats[period.key].amber + '%' }"></div>
+                          <div class="h-full bg-ios-red" :style="{ width: stats[period.key].red + '%' }"></div>
                         </div>
                       </div>
                     </div>
@@ -898,9 +898,9 @@
                           <button class="mt-0.5 text-left text-[16px] font-semibold leading-snug text-ios-blue" @click="openProject(p)">{{ p.project_name }}</button>
                           <div class="mt-2 flex flex-wrap items-center gap-1.5">
                             <span v-for="a in p.assignees" :key="a" class="flex h-6 w-6 items-center justify-center rounded-full bg-ios-fill text-[10px] font-bold text-ios-secondary">{{ a }}</span>
-                            <span class="ml-1 rounded-md bg-ios-fill px-1.5 py-0.5 text-[10px] font-semibold tabular-nums text-hours-planned">P {{ fmtHours(p.planned_hours) }}h</span>
-                            <span class="rounded-md bg-orange-50 px-1.5 py-0.5 text-[10px] font-semibold tabular-nums text-hours-draft">D {{ fmtHours(p.spent_hours_draft) }}h</span>
-                            <span class="rounded-md bg-green-50 px-1.5 py-0.5 text-[10px] font-semibold tabular-nums text-hours-submitted">S {{ fmtHours(p.spent_hours_submitted) }}h</span>
+                            <span class="ml-1 rounded-md bg-ios-fill px-1.5 py-0.5 text-[10px] font-semibold tabular-nums text-hours-planned">P: {{ fmtHours(p.planned_hours) }}h</span>
+                            <span class="rounded-md bg-orange-50 px-1.5 py-0.5 text-[10px] font-semibold tabular-nums text-hours-draft">D: {{ fmtHours(p.spent_hours_draft) }}h</span>
+                            <span class="rounded-md bg-green-50 px-1.5 py-0.5 text-[10px] font-semibold tabular-nums text-hours-submitted">S: {{ fmtHours(p.spent_hours_submitted) }}h</span>
                           </div>
                           <p v-if="p.timesheet_record" class="mt-1.5 text-[12px] text-ios-blue">{{ p.timesheet_record }}</p>
                         </div>
