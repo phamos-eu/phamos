@@ -1,0 +1,1237 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="default" />
+  <meta name="theme-color" content="#F2F2F7" />
+  <title>Project Action Panel — iOS Click Dummy</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          colors: {
+            ios: {
+              bg: "#F2F2F7",
+              grouped: "#F2F2F7",
+              card: "#FFFFFF",
+              blue: "#007AFF",
+              indigo: "#5856D6",
+              green: "#34C759",
+              red: "#FF3B30",
+              orange: "#FF9500",
+              yellow: "#FFCC00",
+              teal: "#30B0C7",
+              gray: "#8E8E93",
+              fill: "#E5E5EA",
+              fill2: "#D1D1D6",
+              label: "#000000",
+              secondary: "rgba(60,60,67,0.6)",
+              separator: "rgba(60,60,67,0.12)",
+            },
+            hours: {
+              planned: "#4682B4",
+              draft: "#FFA500",
+              submitted: "#32CD32",
+            },
+          },
+          fontFamily: {
+            ios: [
+              "-apple-system",
+              "BlinkMacSystemFont",
+              "SF Pro Text",
+              "SF Pro Display",
+              "Helvetica Neue",
+              "ui-sans-serif",
+              "system-ui",
+              "sans-serif",
+            ],
+          },
+          boxShadow: {
+            phone: "0 25px 80px rgba(0,0,0,0.45), 0 0 0 1px rgba(255,255,255,0.08)",
+            sheet: "0 -12px 40px rgba(0,0,0,0.18)",
+            card: "0 1px 2px rgba(0,0,0,0.04)",
+          },
+        },
+      },
+    };
+  </script>
+  <style>
+    html, body { height: 100%; }
+    body { -webkit-tap-highlight-color: transparent; }
+    .no-scrollbar::-webkit-scrollbar { display: none; }
+    .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+    .island { box-shadow: inset 0 0 0 1px rgba(255,255,255,0.06); }
+    .sheet-enter { animation: sheetUp 0.32s cubic-bezier(0.32, 0.72, 0, 1); }
+    .fade-enter { animation: fadeIn 0.2s ease; }
+    @keyframes sheetUp {
+      from { transform: translateY(100%); }
+      to { transform: translateY(0); }
+    }
+    @keyframes fadeIn {
+      from { opacity: 0; }
+      to { opacity: 1; }
+    }
+    .pulse-dot {
+      animation: pulseDot 1.6s ease-in-out infinite;
+    }
+    @keyframes pulseDot {
+      0%, 100% { opacity: 1; transform: scale(1); }
+      50% { opacity: 0.45; transform: scale(0.85); }
+    }
+    @media (max-width: 480px) {
+      .phone-shell { border-radius: 0 !important; padding: 0 !important; box-shadow: none !important; width: 100% !important; height: 100dvh !important; max-height: none !important; }
+      .phone-screen { border-radius: 0 !important; }
+      .dynamic-island, .home-bar { display: none !important; }
+    }
+  </style>
+</head>
+<body class="min-h-full bg-slate-950 font-ios text-ios-label antialiased">
+  <div id="app" class="min-h-full"></div>
+
+  <script src="https://unpkg.com/vue@3.5.13/dist/vue.global.prod.js"></script>
+  <script>
+    const { createApp, ref, computed, onMounted, onUnmounted, watch } = Vue;
+
+    const TEAM = [
+      { id: "ws", name: "Wolfram Schmidt", initial: "WS" },
+      { id: "ak", name: "Amina Khalid", initial: "AK" },
+      { id: "jn", name: "Jonas Neumann", initial: "JN" },
+      { id: "el", name: "Elena Rossi", initial: "ER" },
+      { id: "mk", name: "Max Krüger", initial: "MK" },
+    ];
+
+    const ACTIVITY_TYPES = [
+      "Development",
+      "Planning",
+      "Communication",
+      "Execution",
+      "Proposal Writing",
+    ];
+
+    const TASKS = {
+      "PROJ-0042": [
+        { id: "TASK-101", title: "Custom print formats" },
+        { id: "TASK-102", title: "Payroll mapping" },
+        { id: "TASK-103", title: "UAT support" },
+      ],
+      "PROJ-0058": [
+        { id: "TASK-210", title: "Retainer support" },
+        { id: "TASK-211", title: "Month-end checklist" },
+      ],
+      "PROJ-0071": [
+        { id: "TASK-301", title: "Shopfloor terminals" },
+        { id: "TASK-302", title: "BOM import" },
+      ],
+      "PROJ-0084": [
+        { id: "TASK-401", title: "Portal login" },
+        { id: "TASK-402", title: "Ticket workflow" },
+      ],
+      "PROJ-0090": [
+        { id: "TASK-501", title: "Internal tooling" },
+      ],
+      "PROJ-0112": [
+        { id: "TASK-601", title: "Kickoff workshop" },
+        { id: "TASK-602", title: "Process discovery" },
+      ],
+    };
+
+    function cloneProjects() {
+      return [
+        {
+          name: "PROJ-0042",
+          project_name: "ERPNext Implementation",
+          customer: "CUST-NORD",
+          customer_desc: "Nordlicht GmbH",
+          planned_hours: 120,
+          spent_hours_draft: 4.5,
+          spent_hours_submitted: 86.25,
+          timesheet_record: "TSR-00418",
+          assigned: true,
+          task: "TASK-102",
+          percent_billable: 100,
+          status: "Open",
+          assignees: ["WS", "AK"],
+          session: "running",
+          started_at: null,
+          goal: "Finish payroll mapping for Nordlicht UAT",
+        },
+        {
+          name: "PROJ-0058",
+          project_name: "Support Retainer 2026",
+          customer: "CUST-HARB",
+          customer_desc: "Harborline AG",
+          planned_hours: 40,
+          spent_hours_draft: 0,
+          spent_hours_submitted: 22.0,
+          timesheet_record: "",
+          assigned: true,
+          task: "TASK-210",
+          percent_billable: 100,
+          status: "Open",
+          assignees: ["WS"],
+          session: "idle",
+          started_at: null,
+          goal: "",
+        },
+        {
+          name: "PROJ-0071",
+          project_name: "Manufacturing Rollout",
+          customer: "CUST-ATLAS",
+          customer_desc: "Atlas Werkstatt",
+          planned_hours: 200,
+          spent_hours_draft: 1.25,
+          spent_hours_submitted: 64.5,
+          timesheet_record: "",
+          assigned: true,
+          task: "TASK-301",
+          percent_billable: 75,
+          status: "Open",
+          assignees: ["WS", "JN", "MK"],
+          session: "idle",
+          started_at: null,
+          goal: "",
+        },
+        {
+          name: "PROJ-0084",
+          project_name: "Customer Portal v2",
+          customer: "CUST-BRIGHT",
+          customer_desc: "Brightfield Digital",
+          planned_hours: 80,
+          spent_hours_draft: 0,
+          spent_hours_submitted: 18.75,
+          timesheet_record: "",
+          assigned: true,
+          task: "TASK-401",
+          percent_billable: 100,
+          status: "Open",
+          assignees: ["AK", "WS"],
+          session: "idle",
+          started_at: null,
+          goal: "",
+        },
+        {
+          name: "PROJ-0090",
+          project_name: "Internal Tooling",
+          customer: "CUST-INT",
+          customer_desc: "phamos Internal",
+          planned_hours: 30,
+          spent_hours_draft: 0.5,
+          spent_hours_submitted: 11.0,
+          timesheet_record: "",
+          assigned: true,
+          task: "TASK-501",
+          percent_billable: 0,
+          status: "Open",
+          assignees: ["WS"],
+          session: "idle",
+          started_at: null,
+          goal: "",
+        },
+        {
+          name: "PROJ-0112",
+          project_name: "Discovery Workshop",
+          customer: "CUST-KITE",
+          customer_desc: "Kite & Co.",
+          planned_hours: 16,
+          spent_hours_draft: 0,
+          spent_hours_submitted: 0,
+          timesheet_record: "",
+          assigned: false,
+          task: "TASK-601",
+          percent_billable: 100,
+          status: "Open",
+          assignees: ["ER"],
+          session: "idle",
+          started_at: null,
+          goal: "",
+        },
+        {
+          name: "PROJ-0120",
+          project_name: "Helpdesk SLA Review",
+          customer: "CUST-HARB",
+          customer_desc: "Harborline AG",
+          planned_hours: 12,
+          spent_hours_draft: 0,
+          spent_hours_submitted: 3.5,
+          timesheet_record: "",
+          assigned: false,
+          task: "TASK-211",
+          percent_billable: 50,
+          status: "Open",
+          assignees: ["JN"],
+          session: "idle",
+          started_at: null,
+          goal: "",
+        },
+      ];
+    }
+
+    function pad(n) { return String(n).padStart(2, "0"); }
+
+    function fmtClock(date) {
+      return `${pad(date.getHours())}:${pad(date.getMinutes())}`;
+    }
+
+    function fmtHMS(totalSeconds) {
+      const s = Math.max(0, Math.floor(totalSeconds || 0));
+      const h = Math.floor(s / 3600);
+      const m = Math.floor((s % 3600) / 60);
+      const sec = s % 60;
+      return `${pad(h)}:${pad(m)}:${pad(sec)}`;
+    }
+
+    function fmtHours(n) {
+      const v = Number(n) || 0;
+      return Number.isInteger(v) ? String(v) : v.toFixed(2).replace(/0+$/, "").replace(/\.$/, "");
+    }
+
+    function parseDurationToSeconds(input) {
+      if (!input || typeof input !== "string") return null;
+      const normalized = input.trim().replace(/\uFF0E/g, ".").replace(/\uFF0C/g, ",");
+      if (!normalized) return null;
+      const hasDotOrComma = /[.,]/.test(normalized) && !normalized.includes(":");
+      const rawParts = hasDotOrComma ? normalized.split(/[.,]/) : normalized.split(":");
+      const parts = rawParts.map((p) => parseInt(String(p).trim(), 10));
+      if (parts.some((n) => isNaN(n))) return null;
+      const SEC_PER_MIN = 60;
+      const SEC_PER_HOUR = 3600;
+      let seconds;
+      switch (parts.length) {
+        case 1: seconds = parts[0] * SEC_PER_MIN; break;
+        case 2: seconds = parts[0] * SEC_PER_HOUR + parts[1] * SEC_PER_MIN; break;
+        case 3: seconds = parts[0] * SEC_PER_HOUR + parts[1] * SEC_PER_MIN + parts[2]; break;
+        default: return null;
+      }
+      return Math.min(seconds, 23 * SEC_PER_HOUR + 59 * SEC_PER_MIN + 59);
+    }
+
+    function fmtDurationLabel(seconds) {
+      if (seconds == null) return "—";
+      const h = Math.floor(seconds / 3600);
+      const m = Math.floor((seconds % 3600) / 60);
+      const s = seconds % 60;
+      if (h && s) return `${h}h ${m}m ${s}s`;
+      if (h) return `${h}h ${m}m`;
+      if (m) return `${m}m`;
+      return `${s}s`;
+    }
+
+    function datetimeLocal(d) {
+      return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+    }
+
+    function ymd(d) {
+      return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+    }
+
+    function addDays(d, n) {
+      const x = new Date(d);
+      x.setDate(x.getDate() + n);
+      return x;
+    }
+
+    function prettyDate(d) {
+      return d.toLocaleDateString("en-GB", { weekday: "short", day: "numeric", month: "short" });
+    }
+
+    function nextTsr(n) {
+      return `TSR-${String(n).padStart(5, "0")}`;
+    }
+
+    const INITIAL_STATS = {
+      today: { working: 3.2, billable: 2.8, green: 70, amber: 22, red: 8 },
+      week: { working: 18.5, billable: 16.0, green: 64, amber: 28, red: 8 },
+      month: { working: 62.0, billable: 54.25, green: 58, amber: 30, red: 12 },
+    };
+
+    createApp({
+      setup() {
+        const now = ref(new Date());
+        const tab = ref("projects");
+        const filter = ref("my");
+        const query = ref("");
+        const sheet = ref(null);
+        const toast = ref(null);
+        const toastTimer = ref(null);
+        const infoOpenOnce = ref(false);
+
+        const projects = ref(cloneProjects());
+        const stats = ref({ ...JSON.parse(JSON.stringify(INITIAL_STATS)) });
+        const nextRecord = ref(419);
+        const elapsed = ref(0);
+        const pausedAt = ref(null);
+        const breakSeconds = ref(0);
+
+        const calendarDate = ref(new Date());
+        const teamMonth = ref(new Date(2026, 7, 1));
+        const teamFilter = ref("all");
+        const selectedDay = ref(null);
+        const selectedProject = ref(null);
+        const selectedBlock = ref(null);
+        const assignTarget = ref(null);
+        const assignMode = ref("self");
+        const assignUser = ref("ak");
+
+        const startForm = ref(blankStart());
+        const stopForm = ref(blankStop());
+        const breakForm = ref(blankBreak());
+        const fieldError = ref("");
+
+        function blankStart() {
+          return {
+            project: null,
+            task: "",
+            expectedQuick: "1:00",
+            expectedSeconds: 3600,
+            fromTime: datetimeLocal(new Date()),
+            goal: "",
+          };
+        }
+        function blankStop() {
+          return {
+            project: null,
+            task: "",
+            result: "",
+            activity_type: "Development",
+            toTime: datetimeLocal(new Date()),
+            percent_billable: 100,
+            live: true,
+          };
+        }
+        function blankBreak() {
+          return {
+            project_name: "PROJ-0058",
+            goal: "",
+            activity_type: "Communication",
+            percent_billable: 0,
+            result: "",
+            expectedQuick: "0:30",
+            expectedSeconds: 1800,
+          };
+        }
+
+        const runningProject = computed(() => projects.value.find((p) => p.session === "running" || p.session === "paused") || null);
+        const myProjects = computed(() => projects.value.filter((p) => p.assigned));
+        const allProjects = computed(() => projects.value);
+
+        const visibleProjects = computed(() => {
+          const list = filter.value === "my" ? myProjects.value : allProjects.value;
+          const q = query.value.trim().toLowerCase();
+          if (!q) return list;
+          return list.filter((p) =>
+            p.project_name.toLowerCase().includes(q) ||
+            p.customer_desc.toLowerCase().includes(q) ||
+            p.name.toLowerCase().includes(q)
+          );
+        });
+
+        const statusTime = computed(() => fmtClock(now.value));
+        const elapsedLabel = computed(() => fmtHMS(elapsed.value));
+
+        const expectedPreview = computed(() => fmtDurationLabel(startForm.value.expectedSeconds));
+
+        const todayBlocks = computed(() => {
+          const date = calendarDate.value;
+          const isToday = ymd(date) === ymd(now.value);
+          const blocks = [
+            { id: "TSR-00415", title: "Harborline AG · Support", from: 8.5, to: 10.0, color: "green", note: "Resolved two portal tickets" },
+            { id: "TSR-00416", title: "Break · Standup", from: 10.25, to: 10.75, color: "amber", note: "Team standup + review" },
+            { id: "TSR-00417", title: "Atlas Werkstatt · Terminals", from: 11.0, to: 12.5, color: "green", note: "BOM import dry-run" },
+          ];
+          if (isToday && runningProject.value) {
+            const startHour = 13 + 5 / 60;
+            const endHour = now.value.getHours() + now.value.getMinutes() / 60 + now.value.getSeconds() / 3600;
+            blocks.push({
+              id: runningProject.value.timesheet_record || "TSR-LIVE",
+              title: `${runningProject.value.customer_desc} · ${runningProject.value.session === "paused" ? "Paused" : "Running"}`,
+              from: startHour,
+              to: Math.max(startHour + 0.15, Math.min(19, endHour)),
+              color: runningProject.value.session === "paused" ? "amber" : "blue",
+              note: runningProject.value.goal || "Current session",
+              live: true,
+            });
+          } else if (!isToday) {
+            blocks.length = 0;
+            blocks.push(
+              { id: "TSR-00402", title: "Nordlicht GmbH · Payroll", from: 9.0, to: 12.25, color: "green", note: "Mapping review" },
+              { id: "TSR-00403", title: "Brightfield Digital · Portal", from: 13.0, to: 16.5, color: "amber", note: "Logged after 1h" },
+            );
+          }
+          return blocks;
+        });
+
+        const teamEvents = [
+          { date: "2026-08-15", type: "holiday", title: "Assumption of Mary", who: "Public holiday (BY)" },
+          { date: "2026-08-17", type: "leave-full", title: "Annual leave", who: "Elena Rossi" },
+          { date: "2026-08-18", type: "leave-full", title: "Annual leave", who: "Elena Rossi" },
+          { date: "2026-08-21", type: "leave-half", title: "Half day", who: "Amina Khalid" },
+          { date: "2026-08-24", type: "leave-full", title: "Vacation", who: "Jonas Neumann" },
+          { date: "2026-08-25", type: "leave-full", title: "Vacation", who: "Jonas Neumann" },
+          { date: "2026-08-26", type: "leave-full", title: "Vacation", who: "Jonas Neumann" },
+          { date: "2026-08-27", type: "leave-full", title: "Vacation", who: "Jonas Neumann" },
+          { date: "2026-08-28", type: "leave-full", title: "Vacation", who: "Jonas Neumann" },
+        ];
+
+        const teamDays = computed(() => {
+          const year = teamMonth.value.getFullYear();
+          const month = teamMonth.value.getMonth();
+          const first = new Date(year, month, 1);
+          const startWeekday = first.getDay(); // 0 Sun
+          const daysInMonth = new Date(year, month + 1, 0).getDate();
+          const leading = startWeekday === 0 ? 6 : startWeekday - 1;
+          const cells = [];
+          for (let i = 0; i < leading; i++) cells.push(null);
+          for (let d = 1; d <= daysInMonth; d++) {
+            const date = `${year}-${pad(month + 1)}-${pad(d)}`;
+            let events = teamEvents.filter((e) => e.date === date);
+            if (teamFilter.value === "holidays") events = events.filter((e) => e.type === "holiday");
+            if (teamFilter.value === "leaves") events = events.filter((e) => e.type !== "holiday");
+            cells.push({ day: d, date, events, isToday: date === ymd(now.value) });
+          }
+          while (cells.length % 7) cells.push(null);
+          return cells;
+        });
+
+        const teamMonthLabel = computed(() =>
+          teamMonth.value.toLocaleDateString("en-GB", { month: "long", year: "numeric" })
+        );
+
+        const calendarHours = [8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18];
+        const HOUR_PX = 56;
+
+        function blockStyle(block) {
+          const top = (block.from - 8) * HOUR_PX;
+          const height = Math.max(28, (block.to - block.from) * HOUR_PX - 4);
+          return { top: `${top}px`, height: `${height}px` };
+        }
+
+        function blockClass(color) {
+          return {
+            green: "bg-green-500/20 border-green-500 text-green-900",
+            amber: "bg-orange-400/20 border-orange-400 text-orange-900",
+            red: "bg-red-500/20 border-red-500 text-red-900",
+            blue: "bg-ios-blue/15 border-ios-blue text-ios-blue",
+          }[color];
+        }
+
+        function padHour(h) {
+          return String(h).padStart(2, "0") + ":00";
+        }
+
+        function showToast(message, kind = "success") {
+          toast.value = { message, kind };
+          clearTimeout(toastTimer.value);
+          toastTimer.value = setTimeout(() => { toast.value = null; }, 2200);
+        }
+
+        function closeSheet() {
+          sheet.value = null;
+          fieldError.value = "";
+        }
+
+        function openInfo() { sheet.value = "info"; }
+        function openProject(p) { selectedProject.value = p; sheet.value = "project"; }
+        function openBlock(b) { selectedBlock.value = b; sheet.value = "block"; }
+        function openDay(cell) {
+          if (!cell) return;
+          selectedDay.value = cell;
+          sheet.value = "day";
+        }
+
+        function openStart(project) {
+          if (runningProject.value && runningProject.value.name !== project.name) {
+            showToast("Stop or pause the current timesheet first", "warn");
+            return;
+          }
+          startForm.value = {
+            project,
+            task: (TASKS[project.name] || [])[0]?.id || "",
+            expectedQuick: "1:00",
+            expectedSeconds: 3600,
+            fromTime: datetimeLocal(new Date()),
+            goal: "",
+          };
+          fieldError.value = "";
+          sheet.value = "start";
+        }
+
+        function onExpectedInput() {
+          const seconds = parseDurationToSeconds(startForm.value.expectedQuick);
+          startForm.value.expectedSeconds = seconds == null ? null : seconds;
+        }
+
+        function confirmStart() {
+          const f = startForm.value;
+          if (!f.goal.trim()) {
+            fieldError.value = "Please write a goal. This is shared with the customer the next day.";
+            return;
+          }
+          if (f.expectedSeconds == null || f.expectedSeconds <= 0) {
+            fieldError.value = "Enter expected time as minutes (20) or hours:minutes (1:20).";
+            return;
+          }
+          const p = projects.value.find((x) => x.name === f.project.name);
+          p.session = "running";
+          p.started_at = Date.now();
+          p.timesheet_record = nextTsr(nextRecord.value++);
+          p.task = f.task;
+          p.goal = f.goal.trim();
+          p.spent_hours_draft = Number((p.spent_hours_draft + 0.01).toFixed(2));
+          elapsed.value = 0;
+          pausedAt.value = null;
+          closeSheet();
+          showToast(`Timesheet ${p.timesheet_record} created`);
+        }
+
+        function pauseProject(project) {
+          if (project.session !== "running") return;
+          project.session = "paused";
+          pausedAt.value = Date.now();
+          showToast("First task paused. Time updated.");
+        }
+
+        function resumeProject(project) {
+          breakSeconds.value = pausedAt.value ? Math.max(15, Math.round((Date.now() - pausedAt.value) / 1000)) : 72;
+          breakForm.value = blankBreak();
+          sheet.value = "breakConfirm";
+        }
+
+        function skipBreak() {
+          const p = runningProject.value;
+          if (p) p.session = "running";
+          pausedAt.value = null;
+          closeSheet();
+          showToast("Break time noted");
+        }
+
+        function openBreakLog() {
+          sheet.value = "breakLog";
+        }
+
+        function confirmBreakLog() {
+          const f = breakForm.value;
+          if (!f.goal.trim() || !f.result.trim()) {
+            fieldError.value = "Goal and “What I did” are required for a break timesheet.";
+            return;
+          }
+          const p = runningProject.value;
+          if (p) p.session = "running";
+          pausedAt.value = null;
+          closeSheet();
+          showToast(`Break timesheet ${nextTsr(nextRecord.value++)} submitted`);
+        }
+
+        function openStop(project) {
+          if (project.session === "paused") {
+            showToast("Please resume or keep it paused — stop needs an open row", "warn");
+            return;
+          }
+          stopForm.value = {
+            project,
+            task: project.task,
+            result: "",
+            activity_type: "Development",
+            toTime: datetimeLocal(new Date()),
+            percent_billable: project.percent_billable,
+            live: true,
+          };
+          fieldError.value = "";
+          sheet.value = "stop";
+        }
+
+        function confirmStop() {
+          const f = stopForm.value;
+          if (!f.result.trim()) {
+            fieldError.value = "Describe what you did. This is sent to the customer the next day.";
+            return;
+          }
+          const p = projects.value.find((x) => x.name === f.project.name);
+          const hours = Math.max(0.25, elapsed.value / 3600);
+          p.spent_hours_submitted = Number((p.spent_hours_submitted + hours).toFixed(2));
+          p.spent_hours_draft = 0;
+          p.session = "idle";
+          p.timesheet_record = "";
+          p.goal = "";
+          p.started_at = null;
+          elapsed.value = 0;
+          pausedAt.value = null;
+          stats.value.today.working = Number((stats.value.today.working + hours).toFixed(2));
+          stats.value.today.billable = Number((stats.value.today.billable + hours * (f.percent_billable / 100)).toFixed(2));
+          closeSheet();
+          showToast(`Timesheet updated and submitted`);
+        }
+
+        function openAssign(project) {
+          assignTarget.value = project;
+          assignMode.value = "self";
+          assignUser.value = "ak";
+          sheet.value = "assign";
+        }
+
+        function confirmAssign() {
+          const p = projects.value.find((x) => x.name === assignTarget.value.name);
+          if (assignMode.value === "self") {
+            p.assigned = true;
+            if (!p.assignees.includes("WS")) p.assignees = ["WS", ...p.assignees];
+            closeSheet();
+            filter.value = "my";
+            showToast("Project assigned to you");
+          } else {
+            const user = TEAM.find((t) => t.id === assignUser.value);
+            if (user && !p.assignees.includes(user.initial)) p.assignees.push(user.initial);
+            closeSheet();
+            showToast(`Assigned to ${user.name}`);
+          }
+        }
+
+        function resetDummy() {
+          projects.value = cloneProjects();
+          const running = projects.value.find((p) => p.session === "running");
+          if (running) running.started_at = Date.now() - (1 * 3600 + 24 * 60) * 1000;
+          elapsed.value = 1 * 3600 + 24 * 60;
+          stats.value = JSON.parse(JSON.stringify(INITIAL_STATS));
+          nextRecord.value = 419;
+          query.value = "";
+          filter.value = "my";
+          tab.value = "projects";
+          closeSheet();
+          showToast("Dummy reset to sample state");
+        }
+
+        function shiftCalendar(n) {
+          calendarDate.value = addDays(calendarDate.value, n);
+        }
+        function shiftTeamMonth(n) {
+          const d = new Date(teamMonth.value);
+          d.setMonth(d.getMonth() + n);
+          teamMonth.value = d;
+        }
+
+        watch(() => startForm.value.expectedQuick, onExpectedInput);
+
+        let tick;
+        onMounted(() => {
+          const running = projects.value.find((p) => p.session === "running");
+          if (running) {
+            running.started_at = Date.now() - (1 * 3600 + 24 * 60) * 1000;
+            elapsed.value = 1 * 3600 + 24 * 60;
+          }
+          tick = setInterval(() => {
+            now.value = new Date();
+            const rp = runningProject.value;
+            if (rp && rp.session === "running") elapsed.value += 1;
+            if (sheet.value === "stop" && stopForm.value.live) {
+              stopForm.value.toTime = datetimeLocal(new Date());
+            }
+          }, 1000);
+
+          const params = new URLSearchParams(location.search);
+          if (params.get("tab")) tab.value = params.get("tab");
+          if (params.get("filter")) filter.value = params.get("filter");
+          if (params.get("sheet") === "start") {
+            const first = myProjects.value.find((p) => p.session === "idle") || myProjects.value[0];
+            if (first) openStart(first);
+          } else if (params.get("sheet") === "stop" && running) {
+            openStop(running);
+          } else if (params.get("sheet") === "info") {
+            openInfo();
+          }
+        });
+        onUnmounted(() => clearInterval(tick));
+
+        return {
+          now, tab, filter, query, sheet, toast, projects, stats,
+          runningProject, visibleProjects, myProjects, allProjects,
+          statusTime, elapsedLabel, expectedPreview,
+          startForm, stopForm, breakForm, fieldError,
+          calendarDate, calendarHours, todayBlocks, HOUR_PX,
+          teamMonth, teamMonthLabel, teamDays, teamFilter, teamEvents,
+          selectedDay, selectedProject, selectedBlock,
+          assignTarget, assignMode, assignUser, TEAM, ACTIVITY_TYPES, TASKS,
+          breakSeconds, padHour,
+          showToast, closeSheet, openInfo, openProject, openBlock, openDay,
+          openStart, confirmStart, pauseProject, resumeProject, skipBreak,
+          openBreakLog, confirmBreakLog, openStop, confirmStop,
+          openAssign, confirmAssign, resetDummy, shiftCalendar, shiftTeamMonth,
+          blockStyle, blockClass, fmtHours, fmtDurationLabel, prettyDate, ymd,
+          fmtHMS,
+        };
+      },
+      template: `
+        <div class="min-h-full flex flex-col items-center justify-center px-4 py-6 sm:py-8">
+          <div class="mb-3 hidden w-full max-w-[430px] items-center justify-between text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-400 sm:flex">
+            <span>Project Action Panel</span>
+            <span class="rounded-full bg-orange-500/15 px-2 py-0.5 text-[10px] font-bold tracking-wider text-orange-400">iOS click dummy</span>
+          </div>
+
+          <div class="phone-shell relative h-[844px] w-[390px] max-h-[90vh] rounded-[54px] bg-black p-[11px] shadow-phone">
+            <div class="dynamic-island island pointer-events-none absolute left-1/2 top-[18px] z-30 h-[34px] w-[120px] -translate-x-1/2 rounded-full bg-black"></div>
+
+            <div class="phone-screen relative flex h-full w-full flex-col overflow-hidden rounded-[44px] bg-ios-bg">
+              <!-- Status bar -->
+              <div class="relative z-20 flex h-11 shrink-0 items-end justify-between px-7 pb-1.5 text-[14px] font-semibold">
+                <span class="tabular-nums">{{ statusTime }}</span>
+                <div class="flex items-center gap-1.5">
+                  <svg class="h-3.5 w-4" viewBox="0 0 20 12" fill="currentColor"><rect x="0" y="7" width="3" height="5" rx="0.5"/><rect x="4.5" y="5" width="3" height="7" rx="0.5"/><rect x="9" y="3" width="3" height="9" rx="0.5"/><rect x="13.5" y="0" width="3" height="12" rx="0.5" opacity="0.35"/></svg>
+                  <svg class="h-3.5 w-4" viewBox="0 0 16 12" fill="currentColor"><path d="M8 3.2c2.2 0 4.2.9 5.7 2.3l-1.1 1.1A6.1 6.1 0 0 0 8 4.7 6.1 6.1 0 0 0 3.4 6.6L2.3 5.5A8 8 0 0 1 8 3.2zm0 3.2c1.3 0 2.5.5 3.4 1.4L10.3 9A3.3 3.3 0 0 0 8 8.1 3.3 3.3 0 0 0 5.7 9L4.6 7.8A4.9 4.9 0 0 1 8 6.4zM8 11.2a1.2 1.2 0 1 0 0-2.4 1.2 1.2 0 0 0 0 2.4z"/></svg>
+                  <div class="flex items-center gap-0.5">
+                    <div class="relative h-[11px] w-[24px] rounded-[3px] border border-black/80 p-[1px]">
+                      <div class="h-full w-[78%] rounded-[1.5px] bg-black"></div>
+                    </div>
+                    <div class="h-[5px] w-[1.5px] rounded-r bg-black/80"></div>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Toast -->
+              <div v-if="toast" class="fade-enter pointer-events-none absolute left-1/2 top-14 z-40 w-[78%] -translate-x-1/2 rounded-2xl bg-black/85 px-3 py-2.5 text-center text-[13px] font-medium text-white shadow-lg backdrop-blur">
+                {{ toast.message }}
+              </div>
+
+              <!-- Header -->
+              <div class="flex shrink-0 items-start justify-between px-5 pb-2 pt-1">
+                <div>
+                  <p class="text-[13px] font-semibold text-ios-blue">phamos</p>
+                  <h1 class="text-[32px] font-bold leading-none tracking-tight">
+                    {{ tab === 'projects' ? 'Projects' : tab === 'calendar' ? 'My Calendar' : 'Team' }}
+                  </h1>
+                </div>
+                <div class="flex items-center gap-2 pt-6">
+                  <button class="flex h-8 w-8 items-center justify-center rounded-full bg-ios-fill text-ios-blue" title="About this dummy" @click="openInfo">
+                    <span class="text-[15px] font-bold">i</span>
+                  </button>
+                  <button class="flex h-8 w-8 items-center justify-center rounded-full bg-ios-fill text-ios-gray" title="Reset sample data" @click="resetDummy">
+                    <svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 12a9 9 0 1 0 3-6.7M3 4v5h5"/></svg>
+                  </button>
+                </div>
+              </div>
+
+              <!-- Running banner -->
+              <button
+                v-if="runningProject && tab === 'projects'"
+                class="mx-5 mb-2 flex items-center gap-3 rounded-2xl bg-black px-3 py-2.5 text-left text-white"
+                @click="filter = 'my'"
+              >
+                <span class="relative flex h-2.5 w-2.5">
+                  <span class="pulse-dot absolute inline-flex h-full w-full rounded-full" :class="runningProject.session === 'running' ? 'bg-ios-green' : 'bg-ios-orange'"></span>
+                </span>
+                <div class="min-w-0 flex-1">
+                  <p class="truncate text-[12px] font-semibold">{{ runningProject.session === 'running' ? 'Recording' : 'Paused' }} · {{ runningProject.customer_desc }}</p>
+                  <p class="truncate text-[11px] text-white/60">{{ runningProject.timesheet_record }} · {{ runningProject.goal }}</p>
+                </div>
+                <span class="font-mono text-[13px] font-bold tabular-nums">{{ elapsedLabel }}</span>
+              </button>
+
+              <!-- Main scroll -->
+              <div class="no-scrollbar min-h-0 flex-1 overflow-y-auto pb-2">
+
+                <!-- PROJECTS -->
+                <div v-if="tab === 'projects'" class="px-5">
+                  <div class="relative mb-3">
+                    <svg class="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-ios-gray" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="M20 20l-3-3"/></svg>
+                    <input v-model="query" type="search" placeholder="Search projects or customers" class="h-9 w-full rounded-xl bg-ios-fill pl-9 pr-3 text-[15px] outline-none placeholder:text-ios-gray" />
+                  </div>
+
+                  <div class="no-scrollbar mb-3 flex gap-2 overflow-x-auto">
+                    <div class="min-w-[148px] rounded-2xl bg-ios-card p-3 shadow-card">
+                      <p class="text-[11px] font-bold uppercase tracking-wider text-ios-gray">Projects</p>
+                      <p class="mt-1 text-[22px] font-bold tabular-nums">{{ filter === 'my' ? myProjects.length : allProjects.length }}</p>
+                      <p class="text-[11px] text-ios-secondary">{{ filter === 'my' ? 'assigned to you' : 'open in company' }}</p>
+                    </div>
+                    <div v-for="period in [
+                      { key: 'today', label: 'Today' },
+                      { key: 'week', label: 'This week' },
+                      { key: 'month', label: 'This month' },
+                    ]" :key="period.key" class="min-w-[168px] rounded-2xl bg-ios-card p-3 shadow-card">
+                      <p class="text-[11px] font-bold uppercase tracking-wider text-ios-gray">{{ period.label }}</p>
+                      <div class="mt-1 flex items-end justify-between">
+                        <p class="text-[22px] font-bold tabular-nums">{{ stats[period.key].working }}h</p>
+                        <p class="pb-0.5 text-[12px] font-semibold text-ios-green">{{ stats[period.key].billable }}h bill</p>
+                      </div>
+                      <div class="mt-2 h-1.5 overflow-hidden rounded-full bg-ios-fill">
+                        <div class="flex h-full w-full">
+                          <div class="bg-ios-green" :style="{ width: stats[period.key].green + '%' }"></div>
+                          <div class="bg-ios-orange" :style="{ width: stats[period.key].amber + '%' }"></div>
+                          <div class="bg-ios-red" :style="{ width: stats[period.key].red + '%' }"></div>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div class="mb-3 flex rounded-[9px] bg-black/5 p-[2px]">
+                    <button class="flex-1 rounded-[7px] py-1.5 text-[13px] font-semibold transition" :class="filter === 'my' ? 'bg-white shadow-sm text-black' : 'text-ios-secondary'" @click="filter = 'my'">Your Projects</button>
+                    <button class="flex-1 rounded-[7px] py-1.5 text-[13px] font-semibold transition" :class="filter === 'all' ? 'bg-white shadow-sm text-black' : 'text-ios-secondary'" @click="filter = 'all'">All Projects</button>
+                  </div>
+
+                  <p class="mb-2 text-[11px] text-ios-secondary">
+                    <span class="font-semibold text-hours-planned">P</span> planned ·
+                    <span class="font-semibold text-hours-draft">D</span> draft ·
+                    <span class="font-semibold text-hours-submitted">S</span> submitted
+                  </p>
+
+                  <div v-if="!visibleProjects.length" class="rounded-2xl bg-ios-card px-4 py-10 text-center text-[14px] text-ios-gray">
+                    {{ filter === 'my' ? 'No projects assigned to you' : 'No open projects found' }}
+                  </div>
+
+                  <div class="space-y-2 pb-4">
+                    <article
+                      v-for="p in visibleProjects"
+                      :key="p.name"
+                      class="rounded-2xl bg-ios-card p-3.5 shadow-card ring-1 ring-transparent"
+                      :class="{
+                        'ring-ios-green/40': p.session === 'running',
+                        'ring-ios-orange/40': p.session === 'paused',
+                        'opacity-70': runningProject && runningProject.name !== p.name && p.session === 'idle' && filter === 'my',
+                      }"
+                    >
+                      <div class="flex items-start gap-3">
+                        <span class="mt-1.5 h-2.5 w-2.5 shrink-0 rounded-full"
+                          :class="p.session === 'running' ? 'bg-ios-green pulse-dot' : p.session === 'paused' ? 'bg-ios-orange' : 'bg-ios-fill2'"></span>
+                        <div class="min-w-0 flex-1">
+                          <div class="flex items-center justify-between gap-2">
+                            <p class="truncate text-[12px] font-semibold uppercase tracking-wide text-ios-gray">{{ p.customer_desc }}</p>
+                            <p class="text-[11px] text-ios-gray">{{ p.name }}</p>
+                          </div>
+                          <button class="mt-0.5 text-left text-[16px] font-semibold leading-snug text-ios-blue" @click="openProject(p)">{{ p.project_name }}</button>
+                          <div class="mt-2 flex flex-wrap items-center gap-1.5">
+                            <span v-for="a in p.assignees" :key="a" class="flex h-6 w-6 items-center justify-center rounded-full bg-ios-fill text-[10px] font-bold text-ios-secondary">{{ a }}</span>
+                            <span class="ml-1 rounded-md bg-ios-fill px-1.5 py-0.5 text-[10px] font-semibold tabular-nums text-hours-planned">P {{ fmtHours(p.planned_hours) }}h</span>
+                            <span class="rounded-md bg-orange-50 px-1.5 py-0.5 text-[10px] font-semibold tabular-nums text-hours-draft">D {{ fmtHours(p.spent_hours_draft) }}h</span>
+                            <span class="rounded-md bg-green-50 px-1.5 py-0.5 text-[10px] font-semibold tabular-nums text-hours-submitted">S {{ fmtHours(p.spent_hours_submitted) }}h</span>
+                          </div>
+                          <p v-if="p.timesheet_record" class="mt-1.5 text-[12px] text-ios-blue">{{ p.timesheet_record }}</p>
+                        </div>
+                      </div>
+
+                      <div class="mt-3 flex items-center justify-end gap-2">
+                        <template v-if="filter === 'my'">
+                          <span v-if="p.session !== 'idle'" class="mr-auto font-mono text-[13px] font-bold tabular-nums" :class="p.session === 'running' ? 'text-ios-green' : 'text-ios-orange'">{{ elapsedLabel }}</span>
+                          <button v-if="p.session === 'idle'" class="h-9 min-w-[72px] rounded-full bg-ios-green px-3.5 text-[13px] font-semibold text-white active:scale-95 disabled:bg-ios-fill disabled:text-ios-gray" :disabled="!!runningProject" @click="openStart(p)">Start</button>
+                          <template v-else-if="runningProject && runningProject.name === p.name">
+                            <button v-if="p.session === 'running'" class="h-9 min-w-[72px] rounded-full bg-ios-orange px-3.5 text-[13px] font-semibold text-white active:scale-95" @click="pauseProject(p)">Pause</button>
+                            <button v-else class="h-9 min-w-[72px] rounded-full bg-ios-green px-3.5 text-[13px] font-semibold text-white active:scale-95" @click="resumeProject(p)">Resume</button>
+                            <button class="h-9 min-w-[72px] rounded-full bg-ios-red px-3.5 text-[13px] font-semibold text-white active:scale-95" @click="openStop(p)">Stop</button>
+                          </template>
+                        </template>
+                        <template v-else>
+                          <button v-if="!p.assigned" class="h-9 rounded-full bg-ios-orange px-4 text-[13px] font-semibold text-white active:scale-95" @click="openAssign(p)">Assign</button>
+                          <span v-else class="rounded-full bg-green-50 px-3 py-1.5 text-[12px] font-semibold text-ios-green">Assigned</span>
+                        </template>
+                      </div>
+                    </article>
+                  </div>
+                </div>
+
+                <!-- MY CALENDAR -->
+                <div v-if="tab === 'calendar'" class="px-5 pb-4">
+                  <div class="mb-3 flex items-center justify-between">
+                    <button class="h-8 w-8 rounded-full bg-ios-fill text-ios-blue" @click="shiftCalendar(-1)">‹</button>
+                    <div class="text-center">
+                      <p class="text-[16px] font-semibold">{{ prettyDate(calendarDate) }}</p>
+                      <p class="text-[11px] text-ios-gray">Europe/Berlin</p>
+                    </div>
+                    <button class="h-8 w-8 rounded-full bg-ios-fill text-ios-blue" @click="shiftCalendar(1)">›</button>
+                  </div>
+                  <div class="mb-3 flex justify-center">
+                    <button class="rounded-full bg-ios-fill px-3 py-1 text-[12px] font-semibold text-ios-blue" @click="calendarDate = new Date()">Today</button>
+                  </div>
+                  <div class="relative overflow-hidden rounded-2xl bg-ios-card shadow-card">
+                    <div class="relative" :style="{ height: (calendarHours.length * HOUR_PX) + 'px' }">
+                      <div v-for="h in calendarHours" :key="h" class="absolute left-0 right-0 flex border-t border-ios-separator" :style="{ top: ((h - 8) * HOUR_PX) + 'px', height: HOUR_PX + 'px' }">
+                        <span class="w-12 shrink-0 pr-2 pt-1 text-right text-[11px] tabular-nums text-ios-gray">{{ padHour(h) }}</span>
+                        <div class="flex-1"></div>
+                      </div>
+                      <button
+                        v-for="b in todayBlocks"
+                        :key="b.id"
+                        class="absolute left-14 right-3 rounded-lg border-l-4 px-2 py-1 text-left"
+                        :class="blockClass(b.color)"
+                        :style="blockStyle(b)"
+                        @click="openBlock(b)"
+                      >
+                        <p class="truncate text-[11px] font-bold">{{ b.title }}</p>
+                        <p class="truncate text-[10px] opacity-80">{{ b.id }} · {{ b.note }}</p>
+                      </button>
+                    </div>
+                  </div>
+                  <p class="mt-3 text-[11px] leading-relaxed text-ios-secondary">
+                    Green = submitted within 1 hour · Amber = submitted later the same day · Red = crossed midnight.
+                    Live sessions are blue.
+                  </p>
+                </div>
+
+                <!-- TEAM CALENDAR -->
+                <div v-if="tab === 'team'" class="px-5 pb-4">
+                  <div class="mb-3 flex items-center justify-between">
+                    <button class="h-8 w-8 rounded-full bg-ios-fill text-ios-blue" @click="shiftTeamMonth(-1)">‹</button>
+                    <p class="text-[16px] font-semibold">{{ teamMonthLabel }}</p>
+                    <button class="h-8 w-8 rounded-full bg-ios-fill text-ios-blue" @click="shiftTeamMonth(1)">›</button>
+                  </div>
+                  <div class="mb-3 flex gap-2">
+                    <button class="rounded-full px-3 py-1 text-[12px] font-semibold" :class="teamFilter === 'all' ? 'bg-black text-white' : 'bg-ios-fill text-ios-secondary'" @click="teamFilter = 'all'">All</button>
+                    <button class="rounded-full px-3 py-1 text-[12px] font-semibold" :class="teamFilter === 'holidays' ? 'bg-black text-white' : 'bg-ios-fill text-ios-secondary'" @click="teamFilter = 'holidays'">Holidays</button>
+                    <button class="rounded-full px-3 py-1 text-[12px] font-semibold" :class="teamFilter === 'leaves' ? 'bg-black text-white' : 'bg-ios-fill text-ios-secondary'" @click="teamFilter = 'leaves'">Leaves</button>
+                  </div>
+                  <div class="mb-3 flex flex-wrap gap-x-3 gap-y-1 text-[11px] text-ios-secondary">
+                    <span class="inline-flex items-center gap-1"><i class="h-2.5 w-2.5 rounded-sm bg-ios-green"></i> Public holiday</span>
+                    <span class="inline-flex items-center gap-1"><i class="h-2.5 w-2.5 rounded-sm bg-pink-400"></i> Half day</span>
+                    <span class="inline-flex items-center gap-1"><i class="h-2.5 w-2.5 rounded-sm bg-blue-400"></i> Full day leave</span>
+                  </div>
+                  <div class="overflow-hidden rounded-2xl bg-ios-card p-2 shadow-card">
+                    <div class="grid grid-cols-7 text-center text-[11px] font-semibold text-ios-gray">
+                      <span v-for="(d, i) in ['M','T','W','T','F','S','S']" :key="i" class="py-1">{{ d }}</span>
+                    </div>
+                    <div class="grid grid-cols-7">
+                      <button
+                        v-for="(cell, i) in teamDays"
+                        :key="i"
+                        class="relative flex h-12 flex-col items-center justify-start pt-1 text-[13px]"
+                        :disabled="!cell"
+                        @click="openDay(cell)"
+                      >
+                        <span v-if="cell" class="flex h-7 w-7 items-center justify-center rounded-full" :class="cell.isToday ? 'bg-ios-blue text-white font-semibold' : ''">{{ cell.day }}</span>
+                        <div v-if="cell && cell.events.length" class="mt-0.5 flex gap-0.5">
+                          <i v-for="(e, j) in cell.events.slice(0, 3)" :key="j" class="h-1.5 w-1.5 rounded-full"
+                            :class="e.type === 'holiday' ? 'bg-ios-green' : e.type === 'leave-half' ? 'bg-pink-400' : 'bg-blue-400'"></i>
+                        </div>
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Tab bar -->
+              <div class="relative z-20 shrink-0 border-t border-ios-separator bg-white/90 pb-5 pt-1 backdrop-blur">
+                <div class="grid grid-cols-3">
+                  <button class="flex flex-col items-center gap-0.5 py-1" :class="tab === 'projects' ? 'text-ios-blue' : 'text-ios-gray'" @click="tab = 'projects'">
+                    <svg class="h-6 w-6" viewBox="0 0 24 24" fill="currentColor"><path d="M4 6.5A2.5 2.5 0 0 1 6.5 4h11A2.5 2.5 0 0 1 20 6.5v11a2.5 2.5 0 0 1-2.5 2.5h-11A2.5 2.5 0 0 1 4 17.5v-11zM7 8v2h10V8H7zm0 4v2h6v-2H7z"/></svg>
+                    <span class="text-[10px] font-semibold">Projects</span>
+                  </button>
+                  <button class="flex flex-col items-center gap-0.5 py-1" :class="tab === 'calendar' ? 'text-ios-blue' : 'text-ios-gray'" @click="tab = 'calendar'">
+                    <svg class="h-6 w-6" viewBox="0 0 24 24" fill="currentColor"><path d="M7 3h2v2h6V3h2v2h3v16H4V5h3V3zm12 6H5v10h14V9z"/></svg>
+                    <span class="text-[10px] font-semibold">My Calendar</span>
+                  </button>
+                  <button class="flex flex-col items-center gap-0.5 py-1" :class="tab === 'team' ? 'text-ios-blue' : 'text-ios-gray'" @click="tab = 'team'">
+                    <svg class="h-6 w-6" viewBox="0 0 24 24" fill="currentColor"><path d="M9 11a3 3 0 1 1 0-6 3 3 0 0 1 0 6zm6.5.5a2.5 2.5 0 1 1 0-5 2.5 2.5 0 0 1 0 5zM9 12.5c-3.1 0-6 1.6-6 4V19h12v-2.5c0-2.4-2.9-4-6-4zm6.5 0c-.5 0-1 .05-1.5.14 1.6.9 2.5 2.2 2.5 3.86V19H21v-1.7c0-2.2-2.4-3.8-5.5-3.8z"/></svg>
+                    <span class="text-[10px] font-semibold">Team</span>
+                  </button>
+                </div>
+                <div class="home-bar mx-auto mt-1 h-1.5 w-32 rounded-full bg-black/80"></div>
+              </div>
+
+              <!-- Sheets -->
+              <div v-if="sheet" class="fade-enter absolute inset-0 z-50 flex flex-col justify-end bg-black/40" @click.self="closeSheet">
+                <div class="sheet-enter max-h-[86%] overflow-y-auto rounded-t-[28px] bg-ios-bg shadow-sheet">
+                  <div class="sticky top-0 z-10 flex justify-center bg-ios-bg pt-2">
+                    <div class="h-1.5 w-10 rounded-full bg-black/20"></div>
+                  </div>
+
+                  <!-- START -->
+                  <div v-if="sheet === 'start'" class="px-5 pb-8 pt-3">
+                    <div class="mb-4 flex items-start justify-between">
+                      <div>
+                        <p class="text-[13px] font-semibold text-ios-green">Start session</p>
+                        <h2 class="text-[22px] font-bold">Add Timesheet record</h2>
+                        <p class="text-[13px] text-ios-secondary">{{ startForm.project.customer_desc }} · {{ startForm.project.project_name }}</p>
+                      </div>
+                      <button class="text-[16px] font-semibold text-ios-blue" @click="closeSheet">Cancel</button>
+                    </div>
+                    <label class="mb-1 block text-[12px] font-semibold text-ios-gray">Task</label>
+                    <select v-model="startForm.task" class="mb-3 h-11 w-full rounded-xl bg-ios-card px-3 text-[15px]">
+                      <option v-for="t in (TASKS[startForm.project.name] || [])" :key="t.id" :value="t.id">{{ t.title }}</option>
+                    </select>
+                    <p class="mb-3 text-[11px] text-ios-secondary">Consult the Project Manager if you are unsure which task to choose.</p>
+                    <label class="mb-1 block text-[12px] font-semibold text-ios-gray">Expected time (quick input)</label>
+                    <input v-model="startForm.expectedQuick" class="h-11 w-full rounded-xl bg-ios-card px-3 text-[15px]" placeholder="20 or 1:20 or 1.20" />
+                    <p class="mb-3 mt-1 text-[11px] text-ios-secondary">Resolves to <span class="font-semibold text-ios-label">{{ expectedPreview }}</span>. Minutes (20), hours:minutes (1:20), or 1.20 / 1,20.</p>
+                    <label class="mb-1 block text-[12px] font-semibold text-ios-gray">From time</label>
+                    <input v-model="startForm.fromTime" type="datetime-local" class="mb-3 h-11 w-full rounded-xl bg-ios-card px-3 text-[15px]" />
+                    <label class="mb-1 block text-[12px] font-semibold text-ios-gray">Goal <span class="text-ios-red">*</span></label>
+                    <textarea v-model="startForm.goal" rows="3" class="w-full rounded-xl bg-ios-card px-3 py-2 text-[15px]" placeholder="What are you going to do? This is shared with the customer next day."></textarea>
+                    <p v-if="fieldError" class="mt-2 text-[12px] font-medium text-ios-red">{{ fieldError }}</p>
+                    <button class="mt-4 h-12 w-full rounded-2xl bg-ios-green text-[16px] font-semibold text-white active:scale-[0.99]" @click="confirmStart">Create Timesheet Record</button>
+                  </div>
+
+                  <!-- STOP -->
+                  <div v-if="sheet === 'stop'" class="px-5 pb-8 pt-3">
+                    <div class="mb-4 flex items-start justify-between">
+                      <div>
+                        <p class="text-[13px] font-semibold text-ios-red">Stop session</p>
+                        <h2 class="text-[22px] font-bold">Mark complete</h2>
+                        <p class="text-[13px] text-ios-secondary">{{ stopForm.project.timesheet_record }} · {{ stopForm.project.customer_desc }}</p>
+                      </div>
+                      <button class="text-[16px] font-semibold text-ios-blue" @click="closeSheet">Cancel</button>
+                    </div>
+                    <div class="mb-3 rounded-xl bg-ios-card px-3 py-2 text-[13px] text-ios-secondary">
+                      From time on this record, goal: {{ stopForm.project.goal }}
+                    </div>
+                    <label class="mb-1 block text-[12px] font-semibold text-ios-gray">Task</label>
+                    <select v-model="stopForm.task" class="mb-3 h-11 w-full rounded-xl bg-ios-card px-3 text-[15px]">
+                      <option v-for="t in (TASKS[stopForm.project.name] || [])" :key="t.id" :value="t.id">{{ t.title }}</option>
+                    </select>
+                    <label class="mb-1 block text-[12px] font-semibold text-ios-gray">What I did <span class="text-ios-red">*</span></label>
+                    <textarea v-model="stopForm.result" rows="3" class="mb-3 w-full rounded-xl bg-ios-card px-3 py-2 text-[15px]" placeholder="Meaningful summary. Issue IDs and URLs help."></textarea>
+                    <label class="mb-1 block text-[12px] font-semibold text-ios-gray">Activity type</label>
+                    <select v-model="stopForm.activity_type" class="mb-3 h-11 w-full rounded-xl bg-ios-card px-3 text-[15px]">
+                      <option v-for="a in ACTIVITY_TYPES" :key="a" :value="a">{{ a }}</option>
+                    </select>
+                    <label class="mb-1 block text-[12px] font-semibold text-ios-gray">To time</label>
+                    <input v-model="stopForm.toTime" type="datetime-local" class="mb-1 h-11 w-full rounded-xl bg-ios-card px-3 text-[15px]" @focus="stopForm.live = false" />
+                    <p class="mb-3 text-[11px] text-ios-secondary">Updates live until you edit it. Session length {{ elapsedLabel }}.</p>
+                    <label class="mb-2 block text-[12px] font-semibold text-ios-gray">Percent billable</label>
+                    <div class="mb-2 grid grid-cols-5 gap-1 rounded-[9px] bg-black/5 p-1">
+                      <button v-for="n in [0,25,50,75,100]" :key="n" class="rounded-lg py-2 text-[13px] font-semibold" :class="stopForm.percent_billable === n ? 'bg-white shadow-sm' : 'text-ios-secondary'" @click="stopForm.percent_billable = n">{{ n }}%</button>
+                    </div>
+                    <p class="text-[11px] text-ios-secondary">Personal performance indicator. Influences billable time on the Timesheet.</p>
+                    <p v-if="fieldError" class="mt-2 text-[12px] font-medium text-ios-red">{{ fieldError }}</p>
+                    <button class="mt-4 h-12 w-full rounded-2xl bg-ios-red text-[16px] font-semibold text-white" @click="confirmStop">Update Timesheet Record</button>
+                  </div>
+
+                  <!-- BREAK CONFIRM -->
+                  <div v-if="sheet === 'breakConfirm'" class="px-5 pb-8 pt-4 text-center">
+                    <div class="mx-auto mb-3 flex h-12 w-12 items-center justify-center rounded-full bg-orange-100 text-ios-orange">
+                      <svg class="h-6 w-6" viewBox="0 0 24 24" fill="currentColor"><path d="M6 19h4V5H6v14zm8-14v14h4V5h-4z"/></svg>
+                    </div>
+                    <h2 class="text-[22px] font-bold">Log break time?</h2>
+                    <p class="mx-auto mt-1 inline-flex items-center gap-1 rounded-full bg-ios-fill px-3 py-1 font-mono text-[13px] font-semibold">{{ fmtHMS(breakSeconds) }}</p>
+                    <p class="mt-3 text-[14px] leading-relaxed text-ios-secondary">Do you want to create a timesheet record for this break? Use it for meetings, reviews, or standups that happened while paused.</p>
+                    <div class="mt-5 grid grid-cols-2 gap-2">
+                      <button class="h-12 rounded-2xl bg-ios-fill text-[15px] font-semibold" @click="skipBreak">No, skip it</button>
+                      <button class="h-12 rounded-2xl bg-ios-orange text-[15px] font-semibold text-white" @click="openBreakLog">Yes, log break</button>
+                    </div>
+                  </div>
+
+                  <!-- BREAK LOG -->
+                  <div v-if="sheet === 'breakLog'" class="px-5 pb-8 pt-3">
+                    <div class="mb-3 flex items-start justify-between">
+                      <h2 class="text-[22px] font-bold">Break timesheet</h2>
+                      <button class="text-[16px] font-semibold text-ios-blue" @click="closeSheet">Cancel</button>
+                    </div>
+                    <label class="mb-1 block text-[12px] font-semibold text-ios-gray">Project</label>
+                    <select v-model="breakForm.project_name" class="mb-3 h-11 w-full rounded-xl bg-ios-card px-3 text-[15px]">
+                      <option v-for="p in myProjects" :key="p.name" :value="p.name">{{ p.customer_desc }} — {{ p.project_name }}</option>
+                    </select>
+                    <label class="mb-1 block text-[12px] font-semibold text-ios-gray">Goal <span class="text-ios-red">*</span></label>
+                    <textarea v-model="breakForm.goal" rows="2" class="mb-3 w-full rounded-xl bg-ios-card px-3 py-2 text-[15px]" placeholder="What was this break for?"></textarea>
+                    <label class="mb-1 block text-[12px] font-semibold text-ios-gray">What I did <span class="text-ios-red">*</span></label>
+                    <textarea v-model="breakForm.result" rows="2" class="mb-3 w-full rounded-xl bg-ios-card px-3 py-2 text-[15px]"></textarea>
+                    <label class="mb-1 block text-[12px] font-semibold text-ios-gray">Activity type</label>
+                    <select v-model="breakForm.activity_type" class="mb-3 h-11 w-full rounded-xl bg-ios-card px-3 text-[15px]">
+                      <option v-for="a in ACTIVITY_TYPES" :key="a" :value="a">{{ a }}</option>
+                    </select>
+                    <label class="mb-2 block text-[12px] font-semibold text-ios-gray">Percent billable</label>
+                    <div class="grid grid-cols-5 gap-1 rounded-[9px] bg-black/5 p-1">
+                      <button v-for="n in [0,25,50,75,100]" :key="n" class="rounded-lg py-2 text-[13px] font-semibold" :class="breakForm.percent_billable === n ? 'bg-white shadow-sm' : 'text-ios-secondary'" @click="breakForm.percent_billable = n">{{ n }}%</button>
+                    </div>
+                    <p v-if="fieldError" class="mt-2 text-[12px] font-medium text-ios-red">{{ fieldError }}</p>
+                    <button class="mt-4 h-12 w-full rounded-2xl bg-black text-[16px] font-semibold text-white" @click="confirmBreakLog">Create Timesheet Record</button>
+                  </div>
+
+                  <!-- ASSIGN -->
+                  <div v-if="sheet === 'assign'" class="px-5 pb-8 pt-3">
+                    <div class="mb-4 flex items-start justify-between">
+                      <div>
+                        <p class="text-[13px] font-semibold text-ios-orange">Assign To</p>
+                        <h2 class="text-[22px] font-bold">{{ assignTarget.project_name }}</h2>
+                        <p class="text-[13px] text-ios-secondary">{{ assignTarget.customer_desc }}</p>
+                      </div>
+                      <button class="text-[16px] font-semibold text-ios-blue" @click="closeSheet">Cancel</button>
+                    </div>
+                    <div class="mb-4 flex rounded-[9px] bg-black/5 p-[2px]">
+                      <button class="flex-1 rounded-[7px] py-2 text-[13px] font-semibold" :class="assignMode === 'self' ? 'bg-white shadow-sm' : 'text-ios-secondary'" @click="assignMode = 'self'">Self</button>
+                      <button class="flex-1 rounded-[7px] py-2 text-[13px] font-semibold" :class="assignMode === 'others' ? 'bg-white shadow-sm' : 'text-ios-secondary'" @click="assignMode = 'others'">Others</button>
+                    </div>
+                    <div v-if="assignMode === 'others'" class="mb-4 overflow-hidden rounded-2xl bg-ios-card">
+                      <button v-for="u in TEAM.filter(t => t.id !== 'ws')" :key="u.id" class="flex w-full items-center gap-3 border-b border-ios-separator px-4 py-3 last:border-0" @click="assignUser = u.id">
+                        <span class="flex h-8 w-8 items-center justify-center rounded-full bg-ios-fill text-[11px] font-bold">{{ u.initial }}</span>
+                        <span class="flex-1 text-left text-[15px]">{{ u.name }}</span>
+                        <span v-if="assignUser === u.id" class="text-ios-blue">✓</span>
+                      </button>
+                    </div>
+                    <button class="h-12 w-full rounded-2xl bg-ios-orange text-[16px] font-semibold text-white" @click="confirmAssign">
+                      {{ assignMode === 'self' ? 'Assign to me' : 'Assign to teammate' }}
+                    </button>
+                  </div>
+
+                  <!-- PROJECT DETAIL -->
+                  <div v-if="sheet === 'project'" class="px-5 pb-8 pt-3">
+                    <div class="mb-3 flex items-start justify-between">
+                      <div>
+                        <p class="text-[13px] font-semibold text-ios-gray">{{ selectedProject.customer_desc }}</p>
+                        <h2 class="text-[22px] font-bold">{{ selectedProject.project_name }}</h2>
+                        <p class="text-[13px] text-ios-secondary">{{ selectedProject.name }} · {{ selectedProject.status }}</p>
+                      </div>
+                      <button class="text-[16px] font-semibold text-ios-blue" @click="closeSheet">Done</button>
+                    </div>
+                    <div class="mb-3 grid grid-cols-3 gap-2 text-center">
+                      <div class="rounded-2xl bg-ios-card p-3"><p class="text-[10px] font-bold uppercase text-hours-planned">Planned</p><p class="text-[18px] font-bold">{{ fmtHours(selectedProject.planned_hours) }}</p></div>
+                      <div class="rounded-2xl bg-ios-card p-3"><p class="text-[10px] font-bold uppercase text-hours-draft">Draft</p><p class="text-[18px] font-bold">{{ fmtHours(selectedProject.spent_hours_draft) }}</p></div>
+                      <div class="rounded-2xl bg-ios-card p-3"><p class="text-[10px] font-bold uppercase text-hours-submitted">Submitted</p><p class="text-[18px] font-bold">{{ fmtHours(selectedProject.spent_hours_submitted) }}</p></div>
+                    </div>
+                    <p class="mb-2 text-[12px] font-semibold text-ios-gray">Assignees</p>
+                    <div class="mb-4 flex gap-2">
+                      <span v-for="a in selectedProject.assignees" :key="a" class="rounded-full bg-ios-card px-3 py-1.5 text-[13px] font-semibold">{{ a }}</span>
+                    </div>
+                    <p class="text-[13px] text-ios-secondary">In the desk page this opens <span class="font-semibold">/app/project/{{ selectedProject.name }}</span>. Customer opens the Customer form. Dummy only.</p>
+                  </div>
+
+                  <!-- BLOCK DETAIL -->
+                  <div v-if="sheet === 'block'" class="px-5 pb-8 pt-3">
+                    <div class="mb-3 flex items-start justify-between">
+                      <h2 class="text-[22px] font-bold">{{ selectedBlock.id }}</h2>
+                      <button class="text-[16px] font-semibold text-ios-blue" @click="closeSheet">Done</button>
+                    </div>
+                    <p class="text-[15px] font-semibold">{{ selectedBlock.title }}</p>
+                    <p class="mt-1 text-[14px] text-ios-secondary">{{ selectedBlock.note }}</p>
+                    <p class="mt-3 text-[13px] text-ios-gray">Desk equivalent: open Timesheet Record in a new window.</p>
+                  </div>
+
+                  <!-- DAY DETAIL -->
+                  <div v-if="sheet === 'day'" class="px-5 pb-8 pt-3">
+                    <div class="mb-3 flex items-start justify-between">
+                      <h2 class="text-[22px] font-bold">{{ selectedDay.date }}</h2>
+                      <button class="text-[16px] font-semibold text-ios-blue" @click="closeSheet">Done</button>
+                    </div>
+                    <div v-if="!selectedDay.events.length" class="rounded-2xl bg-ios-card px-4 py-6 text-center text-[14px] text-ios-gray">No holidays or leaves</div>
+                    <div v-else class="overflow-hidden rounded-2xl bg-ios-card">
+                      <div v-for="e in selectedDay.events" :key="e.title + e.who" class="border-b border-ios-separator px-4 py-3 last:border-0">
+                        <p class="text-[15px] font-semibold">{{ e.title }}</p>
+                        <p class="text-[13px] text-ios-secondary">{{ e.who }} · {{ e.type === 'holiday' ? 'Public holiday' : e.type === 'leave-half' ? 'Half day' : 'Full day leave' }}</p>
+                      </div>
+                    </div>
+                  </div>
+
+                  <!-- INFO -->
+                  <div v-if="sheet === 'info'" class="px-5 pb-8 pt-3">
+                    <div class="mb-3 flex items-start justify-between">
+                      <h2 class="text-[22px] font-bold">Click dummy</h2>
+                      <button class="text-[16px] font-semibold text-ios-blue" @click="closeSheet">Done</button>
+                    </div>
+                    <p class="mb-3 text-[14px] leading-relaxed text-ios-secondary">This HTML prototype maps the Project Action Panel desk page to an iOS layout. Sample data only — nothing is saved to ERPNext.</p>
+                    <ul class="space-y-2 text-[14px]">
+                      <li class="rounded-2xl bg-ios-card px-4 py-3"><span class="font-semibold">Your / All Projects</span> — start, pause, resume, stop, assign</li>
+                      <li class="rounded-2xl bg-ios-card px-4 py-3"><span class="font-semibold">Hours cards</span> — today / week / month working vs billable, RAG bar</li>
+                      <li class="rounded-2xl bg-ios-card px-4 py-3"><span class="font-semibold">Start sheet</span> — task, expected time quick input, from time, goal</li>
+                      <li class="rounded-2xl bg-ios-card px-4 py-3"><span class="font-semibold">Stop sheet</span> — what I did, activity type, live to-time, % billable</li>
+                      <li class="rounded-2xl bg-ios-card px-4 py-3"><span class="font-semibold">Pause / resume</span> — optional break timesheet</li>
+                      <li class="rounded-2xl bg-ios-card px-4 py-3"><span class="font-semibold">Calendars</span> — my day timeline and team holidays / leaves</li>
+                    </ul>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <p class="mt-4 hidden max-w-[390px] text-center text-[12px] leading-relaxed text-slate-500 sm:block">
+            Open on an iPhone or in Safari responsive mode for the full-screen app chrome.
+            Desk page: <span class="text-slate-300">/app/project-action-panel</span>
+          </p>
+        </div>
+      `,
+    }).mount("#app");
+  </script>
+</body>
+</html>
