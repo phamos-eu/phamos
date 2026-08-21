@@ -4,11 +4,16 @@ import frappe
 
 
 def notify_lead_data_created_via_raven_dm(doc, method=None):
-	"""Notify configured recipient via a personal Raven DM when Lead Data is created."""
-	if "raven" not in frappe.get_installed_apps():
-		return
+	"""Notify configured recipient via a personal Raven DM when Lead Data is created.
 
+	Must never raise: Lead Data Import extraction inserts Lead Data rows, and an
+	uncaught hook error would abort persistence. Raven is imported lazily inside
+	the try block so a missing/broken raven install cannot fail the insert.
+	"""
 	try:
+		if "raven" not in frappe.get_installed_apps():
+			return
+
 		settings = frappe.get_single("Raven Bot Setting")
 		raven_bot = settings.raven_bot
 		recipient = settings.recipient_user
@@ -95,6 +100,8 @@ def notify_lead_data_created_via_raven_dm(doc, method=None):
 				markdown=True,
 			)
 	except Exception:
+		# Swallow all errors (incl. ModuleNotFoundError for raven) so Lead Data
+		# inserts from extraction are never rolled back by this notification.
 		frappe.log_error(
 			frappe.get_traceback(),
 			f"Lead Data Raven DM failed: {doc.name}",

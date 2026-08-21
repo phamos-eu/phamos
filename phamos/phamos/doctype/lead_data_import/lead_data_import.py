@@ -334,6 +334,26 @@ def _split_person_name(person):
     from .services.normalization import _split_person_name as implementation
 
     return implementation(person)
+
+
+def _rank_and_keep_person_emails(emails, job_title="", card_emails=None):
+    from .services.normalization import _rank_and_keep_person_emails as implementation
+
+    return implementation(emails, job_title=job_title, card_emails=card_emails)
+
+
+def _persons_are_same(person_a, person_b):
+    from .services.normalization import _persons_are_same as implementation
+
+    return implementation(person_a, person_b)
+
+
+def _addresses_match(address_a, address_b):
+    from .services.normalization import _addresses_match as implementation
+
+    return implementation(address_a, address_b)
+
+
 def _populate_lead_data_child_tables(lead_data_doc, company, extracted=None):
     from .services.normalization import _populate_lead_data_child_tables as implementation
 
@@ -353,12 +373,16 @@ def extract_leads(lead_data_import_name):
     frappe.db.delete(LEAD_DATA_DOCTYPE, {LEAD_DATA_IMPORT_FIELD: lead_data_import_name})
     frappe.db.commit()
 
+    # Use a dotted method path (not the function object) so RQ workers resolve
+    # the job by import, not pickle. Enqueue immediately after the explicit
+    # commit above — do not use enqueue_after_commit=True here, or the after-
+    # commit hook never fires and the job never enters the queue (UI stuck on
+    # "Starting extraction...").
     frappe.enqueue(
-        _run_extraction,
+        "phamos.phamos.doctype.lead_data_import.lead_data_import._run_extraction",
         queue="default",
         timeout=600,
         lead_data_import_name=lead_data_import_name,
-        enqueue_after_commit=True,
     )
     return {"ok": True, "message": "Extraction started. Refresh the page in a moment to see results."}
 @frappe.whitelist()
@@ -405,26 +429,50 @@ def _run_extraction(lead_data_import_name):
         )
 
         total_saved = 0
+        progressive_card = input_type in ("Screenshot", "PDF")
 
-        for i in range(0, len(companies), BATCH_SIZE):
-            batch = companies[i:i + BATCH_SIZE]
+        if progressive_card:
+            # Show card contacts immediately; website enrich updates the same rows.
+            for i in range(0, len(companies), BATCH_SIZE):
+                batch = companies[i:i + BATCH_SIZE]
+                _log(
+                    lead_data_import_name,
+                    f"Saving card batch {i // BATCH_SIZE + 1} ({len(batch)} companies)"
+                )
+                saved_in_batch = _save_companies_without_enrichment(
+                    lead_data_import_name, batch
+                )
+                total_saved += saved_in_batch
+                _log(
+                    lead_data_import_name,
+                    f"Card contacts ready: {total_saved}/{len(companies)}"
+                )
 
             _log(
                 lead_data_import_name,
-                f"Processing batch {i // BATCH_SIZE + 1} "
-                f"({len(batch)} companies)"
+                "Card contacts ready. Enriching from website…"
             )
+            _enrich_existing_lead_data_for_import(lead_data_import_name)
+        else:
+            for i in range(0, len(companies), BATCH_SIZE):
+                batch = companies[i:i + BATCH_SIZE]
 
-            # Enrich + save each company immediately (incremental)
-            saved_in_batch = _enrich_and_save_companies(
-                lead_data_import_name, batch, ai_fallback=True
-            )
-            total_saved += saved_in_batch
+                _log(
+                    lead_data_import_name,
+                    f"Processing batch {i // BATCH_SIZE + 1} "
+                    f"({len(batch)} companies)"
+                )
 
-            _log(
-                lead_data_import_name,
-                f"Processed {total_saved}/{len(companies)} companies"
-            )
+                # Enrich + save each company immediately (incremental)
+                saved_in_batch = _enrich_and_save_companies(
+                    lead_data_import_name, batch, ai_fallback=True
+                )
+                total_saved += saved_in_batch
+
+                _log(
+                    lead_data_import_name,
+                    f"Processed {total_saved}/{len(companies)} companies"
+                )
 
         _finish(
             lead_data_import_name,
@@ -434,7 +482,30 @@ def _run_extraction(lead_data_import_name):
     except Exception:
         tb = frappe.get_traceback()
         frappe.log_error(title=_("Lead Import extraction failed"), message=tb)
-        _finish(lead_data_import_name, _format_error_for_status("Error during extraction.", tb))
+        failure_message = _format_error_for_status("Error during extraction.", tb)
+        try:
+            _finish(lead_data_import_name, failure_message)
+        except Exception:
+            # Ensure the UI never stays stuck on Processing / "Starting extraction..."
+            frappe.log_error(
+                title=_("Lead Import failed to update status after error"),
+                message=frappe.get_traceback(),
+            )
+            try:
+                frappe.db.set_value(
+                    LEAD_DATA_IMPORT_DOCTYPE,
+                    lead_data_import_name,
+                    {
+                        "status": "Ready",
+                        "status_log": failure_message,
+                    },
+                )
+                frappe.db.commit()
+            except Exception:
+                frappe.log_error(
+                    title=_("Lead Import status update fallback failed"),
+                    message=frappe.get_traceback(),
+                )
 
 
 # Pipeline: URL
@@ -519,6 +590,20 @@ def _enrich_and_save_companies(lead_data_import_name, companies, ai_fallback=Fal
     from .services.enrichment import _enrich_and_save_companies as implementation
 
     return implementation(lead_data_import_name, companies, ai_fallback)
+
+
+def _save_companies_without_enrichment(lead_data_import_name, companies):
+    from .services.enrichment import _save_companies_without_enrichment as implementation
+
+    return implementation(lead_data_import_name, companies)
+
+
+def _enrich_existing_lead_data_for_import(lead_data_import_name):
+    from .services.enrichment import _enrich_existing_lead_data_for_import as implementation
+
+    return implementation(lead_data_import_name)
+
+
 def _enrich_single_company(settings, slugs, company, lead_data_import_name=None, ai_fallback=True, field_guidance=""):
     from .services.enrichment import _enrich_single_company as implementation
 
@@ -628,6 +713,18 @@ def _sanitize_phone_list(value):
     from .services.web import _sanitize_phone_list as implementation
 
     return implementation(value)
+
+
+def _is_mobile_phone(phone):
+    from .services.web import _is_mobile_phone as implementation
+
+    return implementation(phone)
+
+
+def _partition_phones_and_mobiles(phones=None, mobile_numbers=None):
+    from .services.web import _partition_phones_and_mobiles as implementation
+
+    return implementation(phones=phones, mobile_numbers=mobile_numbers)
 def _phone_dedupe_key(phone):
     from .services.web import _phone_dedupe_key as implementation
 

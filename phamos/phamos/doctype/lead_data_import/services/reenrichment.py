@@ -26,6 +26,7 @@ from ..lead_data_import import (
     _merge_extracted_lead_fields,
     _normalize_company_dict,
     _populate_lead_data_child_tables,
+    _prioritize_business_card_emails,
     _reference_urls_for_company,
     as_completed,
     cint,
@@ -79,13 +80,16 @@ def _re_enrich_import_rows(lead_data_import_name, only_incomplete=False):
     })
     frappe.db.commit()
 
+    # Dotted method path so RQ workers resolve the job by import, not pickle.
+    # Enqueue immediately after the explicit commit — do not use
+    # enqueue_after_commit=True here, or the after-commit hook never fires and
+    # the job never enters the queue (UI stuck on Processing).
     frappe.enqueue(
-        _run_re_enrichment,
+        "phamos.phamos.doctype.lead_data_import.services.reenrichment._run_re_enrichment",
         queue="default",
         timeout=600,
         lead_data_import_name=lead_data_import_name,
         rows_to_refine=rows_to_refine,
-        enqueue_after_commit=True,
     )
     return {"ok": True, "message": f"Refinement started for {len(rows_to_refine)} rows."}
 
@@ -176,8 +180,42 @@ def _reenrich_single_row(settings, slugs, row, field_guidance=""):
 
 
 def _save_refined_lead_data_doc(lead_data_doc, company, extracted):
+    from .enrichment import (
+        _build_secondary_contacts_and_addresses,
+        _fill_missing_card_fields_from_website,
+        _reconcile_card_with_matching_website_research,
+    )
+
     existing = _lead_data_doc_to_company(lead_data_doc)
-    merged = _merge_company_lead_data(existing, {**(company or {}), **(extracted or {})})
+    extracted = extracted or {}
+
+    if "business_card" in str(existing.get("source_type") or "").lower() or lead_data_doc.get("card_email"):
+        existing["source_type"] = "business_card"
+        if lead_data_doc.get("card_email"):
+            existing.setdefault("card_emails", [lead_data_doc.card_email])
+        existing = _reconcile_card_with_matching_website_research(existing, extracted)
+        existing = _fill_missing_card_fields_from_website(existing, extracted)
+        secondary_contacts, secondary_addresses = _build_secondary_contacts_and_addresses(
+            existing, extracted
+        )
+        # Preserve previously saved secondary contacts; append new distinct ones.
+        prior_secondary = list(existing.get("secondary_contacts") or [])
+        prior_names = {
+            (c.get("name") or "").strip().lower() for c in prior_secondary if isinstance(c, dict)
+        }
+        for contact in secondary_contacts:
+            name = (contact.get("name") or "").strip().lower()
+            if name and name not in prior_names:
+                prior_secondary.append(contact)
+                prior_names.add(name)
+        if prior_secondary:
+            existing["secondary_contacts"] = prior_secondary
+        if secondary_addresses:
+            existing["secondary_addresses"] = secondary_addresses
+        merged = _prioritize_business_card_emails(existing)
+    else:
+        merged = _merge_company_lead_data(existing, {**(company or {}), **(extracted or {})})
+
     before = {
         "lead_data": lead_data_doc.lead_data,
         "email": lead_data_doc.email,
@@ -187,6 +225,10 @@ def _save_refined_lead_data_doc(lead_data_doc, company, extracted):
         "city": lead_data_doc.city,
         "country": lead_data_doc.country,
         "addresses": [row.address_line_1 for row in lead_data_doc.lead_data_address or []],
+        "contacts": [
+            (row.first_name, row.last_name, row.email_address, cint(getattr(row, "is_primary", 0)))
+            for row in lead_data_doc.lead_data_contact or []
+        ],
     }
 
     _populate_lead_data_child_tables(lead_data_doc, merged, extracted=merged)
@@ -201,6 +243,10 @@ def _save_refined_lead_data_doc(lead_data_doc, company, extracted):
         "city": lead_data_doc.city,
         "country": lead_data_doc.country,
         "addresses": [row.address_line_1 for row in lead_data_doc.lead_data_address or []],
+        "contacts": [
+            (row.first_name, row.last_name, row.email_address, cint(getattr(row, "is_primary", 0)))
+            for row in lead_data_doc.lead_data_contact or []
+        ],
     }
 
     if before != after:
@@ -261,7 +307,29 @@ def _run_re_enrichment(lead_data_import_name, rows_to_refine):
     except Exception:
         tb = frappe.get_traceback()
         frappe.log_error(title=_("Lead Import re-enrichment failed"), message=tb)
-        _finish(lead_data_import_name, _format_error_for_status("Error during re-enrichment.", tb))
+        failure_message = _format_error_for_status("Error during re-enrichment.", tb)
+        try:
+            _finish(lead_data_import_name, failure_message)
+        except Exception:
+            frappe.log_error(
+                title=_("Lead Import failed to update status after re-enrichment error"),
+                message=frappe.get_traceback(),
+            )
+            try:
+                frappe.db.set_value(
+                    LEAD_DATA_IMPORT_DOCTYPE,
+                    lead_data_import_name,
+                    {
+                        "status": "Ready",
+                        "status_log": failure_message,
+                    },
+                )
+                frappe.db.commit()
+            except Exception:
+                frappe.log_error(
+                    title=_("Lead Import re-enrichment status fallback failed"),
+                    message=frappe.get_traceback(),
+                )
 
 
 def _discover_internal_links(base_url, html, limit=8):

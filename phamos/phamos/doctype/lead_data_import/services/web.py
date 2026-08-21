@@ -187,6 +187,12 @@ def _get_domain_root(url):
 
 
 def _sanitize_phone(phone):
+    """Validate and normalize to compact E.164 (e.g. +4917655591059).
+
+    Default region is DE for national numbers starting with 0.
+    Strips spaces/parentheses/hyphens and removes the national trunk 0 after
+    a country code (+49(0)176… → +49176…).
+    """
     if not phone:
         return ""
 
@@ -217,23 +223,103 @@ def _sanitize_phone(phone):
     if not phone.startswith(("+", "00", "0")):
         return ""
 
-    phone = re.sub(r"(?<=\d)\s*[.]\s*(?=\d)", " ", phone)
-    phone = re.sub(r"\s+", " ", phone).strip()
-
+    # Digits only for length checks (before E.164 rewrite).
     digits = re.sub(r"\D", "", phone)
     if not 7 <= len(digits) <= 16:
-        return ""
-
-    if re.fullmatch(r"\d{11,16}", phone) and not phone.startswith(("+", "00", "0")):
         return ""
 
     if len(set(digits)) <= 2:
         return ""
 
-    if not any(sep in phone for sep in ("+", " ", "-", "/", "(", ")")) and not phone.startswith("0"):
+    e164 = _to_e164_phone(phone)
+    if not e164:
         return ""
 
-    return phone
+    e164_digits = re.sub(r"\D", "", e164)
+    if not 8 <= len(e164_digits) <= 15:
+        return ""
+
+    return e164
+
+
+def _is_mobile_phone(phone):
+    """Heuristic: German mobile prefixes 15/16/17 (E.164 or national)."""
+    clean = _sanitize_phone(phone) if phone else ""
+    digits = re.sub(r"\D", "", clean or str(phone or ""))
+    if not digits:
+        return False
+    if digits.startswith("49"):
+        national = digits[2:]
+        if national.startswith("0"):
+            national = national[1:]
+        return national.startswith(("15", "16", "17"))
+    if digits.startswith("0"):
+        return digits.startswith(("015", "016", "017"))
+    return False
+
+
+def _partition_phones_and_mobiles(phones=None, mobile_numbers=None):
+    """Split mixed phone lists into landlines vs mobiles; prefer explicit mobiles."""
+    landlines = []
+    mobiles = []
+
+    for value in mobile_numbers or []:
+        clean = _sanitize_phone(value)
+        if clean and clean not in mobiles:
+            mobiles.append(clean)
+
+    for value in phones or []:
+        clean = _sanitize_phone(value)
+        if not clean:
+            continue
+        if _is_mobile_phone(clean):
+            if clean not in mobiles:
+                mobiles.append(clean)
+        elif clean not in landlines:
+            landlines.append(clean)
+
+    # Drop mobiles that were also listed as landlines after mis-classification.
+    landlines = [phone for phone in landlines if phone not in mobiles]
+    return landlines, mobiles
+
+
+def _to_e164_phone(phone, default_region="DE"):
+    """Convert a validated phone string to compact +CC… E.164."""
+    raw = str(phone or "").strip()
+    if not raw:
+        return ""
+
+    # Keep leading +; treat 00 as international prefix.
+    has_plus = raw.startswith("+")
+    if raw.startswith("00"):
+        has_plus = True
+        raw = raw[2:]
+
+    digits = re.sub(r"\D", "", raw)
+    if not digits:
+        return ""
+
+    if has_plus or (not digits.startswith("0") and len(digits) >= 10):
+        # International form. Strip trunk 0 that often appears after country code
+        # in German print: +49 (0) 176… → digits 490176… → 49176…
+        # Common EU CCs used on cards we see in demos.
+        for cc in ("49", "43", "41", "31", "33", "32", "39", "44", "1"):
+            if digits.startswith(cc) and len(digits) > len(cc) + 1:
+                national = digits[len(cc):]
+                if national.startswith("0"):
+                    national = national[1:]
+                digits = cc + national
+                break
+        return f"+{digits}"
+
+    # National number (leading 0…) — default to DE.
+    if digits.startswith("0"):
+        national = digits[1:]
+        if default_region == "DE":
+            return f"+49{national}"
+        return f"+{digits}"
+
+    return f"+{digits}"
 
 
 def _sanitize_phone_list(value):
