@@ -7,6 +7,12 @@ from frappe.utils import formatdate
 
 ATTENDEE_ORGANISATIONS = ("Internal", "Customer")
 CHAPTER_REVIEW_STATUSES = ("Planned", "In Progress", "Blocked")
+PROPOSED_CONTENT_REQUIRED = (
+	"proposed_chapter_title",
+	"proposed_full_chapter_description",
+	"proposed_planned_start",
+	"proposed_target_date",
+)
 
 
 class StakeholderMeeting(Document):
@@ -22,6 +28,28 @@ class StakeholderMeeting(Document):
 					", ".join(missing)
 				)
 			)
+		self.validate_proposed_content_for_scope_changes()
+
+	def validate_proposed_content_for_scope_changes(self):
+		"""A Chapter Review flagged with Scope Change must have its proposed
+		content filled in before submit, since that content becomes the new
+		Chapter Revision."""
+		review_meta = frappe.get_meta("Stakeholder Meeting Chapter Review")
+		for row in self.chapter_reviews:
+			if not row.scope_change:
+				continue
+
+			missing_labels = [
+				review_meta.get_label(fieldname)
+				for fieldname in PROPOSED_CONTENT_REQUIRED
+				if not row.get(fieldname)
+			]
+			if missing_labels:
+				frappe.throw(
+					frappe._(
+						"Please fill in the following proposed content for the Scope Change on Chapter {0}: {1}"
+					).format(row.chapter_title or row.chapter, ", ".join(missing_labels))
+				)
 
 	def on_submit(self):
 		self.sync_chapter_reviews_to_chapters()
@@ -29,14 +57,17 @@ class StakeholderMeeting(Document):
 	def sync_chapter_reviews_to_chapters(self):
 		"""Write the agreed operational fields captured on each Chapter Review row
 		back onto its Chapter: current/target level, the optional proposed status,
-		and last-reviewed metadata. This only touches operational fields - it never
-		creates a Chapter Revision or changes agreed content prose.
+		and last-reviewed metadata. It never edits the Chapter's own agreed content
+		fields directly - a Scope Change instead creates a new immutable Chapter
+		Revision from the row's proposed content and repoints the Chapter's
+		current_revision at it.
 
 		Saving the Chapter cascades into an Implementation.save() (to mirror the
 		module row), which would otherwise also log a new Implementation status
 		history entry for today. That history is meant to capture deliberate
 		Implementation-level status entries, not a side effect of a meeting, so it
 		is suppressed for the duration of this sync via frappe.flags."""
+		created_revisions = []
 		frappe.flags.in_stakeholder_meeting_submit = True
 		try:
 			for row in self.chapter_reviews:
@@ -50,9 +81,66 @@ class StakeholderMeeting(Document):
 					chapter.status = row.chapter_status_after
 				chapter.last_meeting = self.name
 				chapter.last_reviewed_on = self.meeting_date
+
+				new_revision_name = None
+				if row.scope_change:
+					new_revision_name = self.create_chapter_revision_from_row(chapter, row)
+					chapter.current_revision = new_revision_name
+
 				chapter.save(ignore_permissions=True)
+
+				if new_revision_name:
+					row.db_set(
+						{"previous_revision": row.current_revision, "current_revision": new_revision_name},
+						update_modified=False,
+					)
+					created_revisions.append((chapter.name, new_revision_name))
 		finally:
 			frappe.flags.in_stakeholder_meeting_submit = False
+
+		self.notify_created_revisions(created_revisions)
+
+	def notify_created_revisions(self, created_revisions):
+		"""Tell the chair what this submit actually created, with links, instead
+		of the meeting appearing to submit silently."""
+		if not created_revisions:
+			return
+
+		lines = [
+			frappe._("{0} → new revision {1}").format(
+				frappe.utils.get_link_to_form("Implementation Chapter", chapter_name),
+				frappe.utils.get_link_to_form("Implementation Chapter Revision", revision_name),
+			)
+			for chapter_name, revision_name in created_revisions
+		]
+		frappe.msgprint(
+			"<br>".join(lines),
+			title=frappe._("Scope Changes Applied"),
+			indicator="green",
+		)
+
+	def create_chapter_revision_from_row(self, chapter, row):
+		"""Freeze this Chapter Review row's proposed content as the next
+		immutable Chapter Revision. Mirrors set_as_planned()'s revision creation,
+		but sourced from the agreed proposal captured in this meeting instead of
+		the Chapter's own (locked) fields."""
+		next_revision_number = (
+			frappe.db.count("Implementation Chapter Revision", {"implementation_chapter": chapter.name}) + 1
+		)
+		revision = frappe.get_doc(
+			{
+				"doctype": "Implementation Chapter Revision",
+				"implementation_chapter": chapter.name,
+				"revision_number": next_revision_number,
+				"chapter_title": row.proposed_chapter_title,
+				"chapter_introduction": row.proposed_chapter_introduction,
+				"full_chapter_description": row.proposed_full_chapter_description,
+				"planned_start": row.proposed_planned_start,
+				"target_date": row.proposed_target_date,
+			}
+		)
+		revision.insert(ignore_permissions=True)
+		return revision.name
 
 	def seed_attendees_from_implementation(self):
 		"""Snapshot the Implementation's Internal and Customer stakeholders as

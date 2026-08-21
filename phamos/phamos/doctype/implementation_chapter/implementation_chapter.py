@@ -172,4 +172,13 @@ def set_as_planned(name):
 	doc.status = "Planned"
 	doc.save(ignore_permissions=True)
 
+	frappe.msgprint(
+		frappe._("Created {0} and set it as the current revision of {1}.").format(
+			frappe.utils.get_link_to_form("Implementation Chapter Revision", revision.name),
+			frappe.utils.get_link_to_form("Implementation Chapter", doc.name),
+		),
+		title=frappe._("Chapter Planned"),
+		indicator="green",
+	)
+
 	return {"status": doc.status, "current_revision": doc.current_revision}
