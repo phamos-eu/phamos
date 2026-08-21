@@ -2,7 +2,7 @@
  "actions": [],
  "allow_rename": 1,
  "autoname": "prompt",
- "creation": "2025-01-08 18:25:12.851586",
+ "creation": "2026-08-21 12:27:19.135944",
  "doctype": "DocType",
  "engine": "InnoDB",
  "field_order": [
@@ -83,6 +83,12 @@
   "generate_auto_email",
   "stakeholders_tab",
   "stakeholders",
+  "section_break_review_cadence",
+  "review_cadence",
+  "next_review_due",
+  "column_break_review_cadence",
+  "last_stakeholder_meeting",
+  "last_reviewed_on",
   "gitlab_tab",
   "gitlab_projects_html",
   "column_break_amyu",
@@ -321,6 +327,43 @@
    "fieldtype": "Link",
    "label": "Team",
    "options": "Team"
+  },
+  {
+   "fieldname": "section_break_review_cadence",
+   "fieldtype": "Section Break",
+   "label": "Review Cadence"
+  },
+  {
+   "description": "How often this Implementation should be reviewed with the customer in a Stakeholder Meeting. Leave blank to not track a cadence for this Implementation.",
+   "fieldname": "review_cadence",
+   "fieldtype": "Select",
+   "label": "Review Cadence",
+   "options": "\nWeekly\nBiweekly\nMonthly\nQuarterly"
+  },
+  {
+   "description": "The next date a Stakeholder Meeting should be held. Automatically pushed forward by the Review Cadence whenever a Meeting is submitted; can also be adjusted manually.",
+   "fieldname": "next_review_due",
+   "fieldtype": "Date",
+   "label": "Next Review Due"
+  },
+  {
+   "fieldname": "column_break_review_cadence",
+   "fieldtype": "Column Break"
+  },
+  {
+   "description": "The most recently submitted Stakeholder Meeting for this Implementation.",
+   "fieldname": "last_stakeholder_meeting",
+   "fieldtype": "Link",
+   "label": "Last Stakeholder Meeting",
+   "options": "Stakeholder Meeting",
+   "read_only": 1
+  },
+  {
+   "description": "The date of the most recently submitted Stakeholder Meeting.",
+   "fieldname": "last_reviewed_on",
+   "fieldtype": "Date",
+   "label": "Last Reviewed On",
+   "read_only": 1
   },
   {
    "collapsible": 1,
@@ -592,7 +635,7 @@
    "link_fieldname": "implementation"
   }
  ],
- "modified": "2026-08-20 09:12:30.396213",
+ "modified": "2026-08-21 13:08:07.247694",
  "modified_by": "Administrator",
  "module": "Phamos",
  "name": "Implementation",

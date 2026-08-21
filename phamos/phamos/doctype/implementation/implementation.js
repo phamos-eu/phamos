@@ -86,6 +86,15 @@ frappe.ui.form.on("Implementation", {
         sort_resource_planning_by_month_desc(frm);
         setup_implementation_theme_watcher(frm);
         frm.trigger("append_implementation_chapters_to_modules");
+        frm.trigger("render_review_cadence_indicator");
+
+        if (!frm.is_new()) {
+            frm.add_custom_button(__("Create Meeting"), () => {
+                frappe.new_doc("Stakeholder Meeting", {
+                    implementation: frm.doc.name,
+                });
+            });
+        }
         frm.trigger("render_auto_email_reports_section");
         frm.trigger("render_gitlab_projects_section");
         frm.trigger("render_gitlab_issues_section");
@@ -1074,6 +1083,17 @@ frappe.ui.form.on("Implementation", {
                 `);
             }
         });
+    },
+    render_review_cadence_indicator(frm) {
+        if (frm.is_new() || !frm.doc.review_cadence || !frm.doc.next_review_due) return;
+
+        const is_overdue = frappe.datetime.get_diff(frappe.datetime.get_today(), frm.doc.next_review_due) > 0;
+        const due_label = frappe.datetime.str_to_user(frm.doc.next_review_due);
+
+        frm.dashboard.add_indicator(
+            is_overdue ? __("Review Overdue since {0}", [due_label]) : __("Next Review Due {0}", [due_label]),
+            is_overdue ? "red" : "blue"
+        );
     },
     render_rank_html_section(frm) {
         if (frm.is_new()) return;
