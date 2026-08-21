@@ -15,7 +15,7 @@ def get_gitlab_issue_dashboard_data(projects=None, year=None, from_date=None, to
 
     flow_rows, aging_map, project_names = _build_flow_rows_and_aging(from_date, to_date, selected_projects, issue_scope)
     project_titles = _get_project_titles(project_names)
-    lead_time = _build_lead_time_kpis(from_date, to_date, selected_projects, issue_scope)
+    lead_time = _format_lead_time_response(from_date, to_date, selected_projects, issue_scope, compare_to_company)
     company_monthly_flow = []
     company_aging = {}
 
@@ -311,6 +311,49 @@ def _build_lead_time_kpis(from_date, to_date, selected_projects, issue_scope="bo
     return {
         "filtered": _round_avg(filtered_row[0].avg_lead_time if filtered_row else None),
         "rolling": rolling,
+    }
+
+
+def _format_lead_time_response(from_date, to_date, selected_projects, issue_scope, compare_to_company):
+    """Mirrors _format_aging_response's mode pattern: a single project never gets
+    silently averaged with others, and Compare to Company reports the company's
+    own figure alongside the project's, rather than folding it into one number."""
+    combined = _build_lead_time_kpis(from_date, to_date, selected_projects, issue_scope)
+
+    if len(selected_projects) > 1:
+        project_lead_times = [
+            {
+                "project": project,
+                **_build_lead_time_kpis(from_date, to_date, [project], issue_scope),
+            }
+            for project in selected_projects
+        ]
+        return {
+            "mode": "project_compare",
+            "project": None,
+            "filtered": combined["filtered"],
+            "rolling": combined["rolling"],
+            "project_lead_times": project_lead_times,
+        }
+
+    if len(selected_projects) == 1:
+        result = {
+            "mode": "single",
+            "project": selected_projects[0],
+            "filtered": combined["filtered"],
+            "rolling": combined["rolling"],
+            "project_lead_times": [],
+        }
+        if compare_to_company:
+            result["company"] = _build_lead_time_kpis(from_date, to_date, [], issue_scope)
+        return result
+
+    return {
+        "mode": "combined",
+        "project": None,
+        "filtered": combined["filtered"],
+        "rolling": combined["rolling"],
+        "project_lead_times": [],
     }
 
 

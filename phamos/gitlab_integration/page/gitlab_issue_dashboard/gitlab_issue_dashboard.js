@@ -119,6 +119,21 @@ class GitLabIssueDashboard {
                         grid-template-columns: repeat(5, minmax(120px, 1fr));
                     }
 
+                    .gitlab-issue-dashboard .gid-lead-row {
+                        margin-bottom: 12px;
+                    }
+
+                    .gitlab-issue-dashboard .gid-lead-row:last-child {
+                        margin-bottom: 0;
+                    }
+
+                    .gitlab-issue-dashboard .gid-lead-row-label {
+                        font-size: 12px;
+                        font-weight: 600;
+                        color: var(--gid-subtitle-color);
+                        margin-bottom: 6px;
+                    }
+
                     .gitlab-issue-dashboard .gid-kpi {
                         border-radius: 10px;
                         padding: 10px 12px;
@@ -207,7 +222,7 @@ class GitLabIssueDashboard {
                 <div class="gid-section-card" style="margin-bottom: 16px;">
                     <div class="gid-title">${__("Lead Time (Created to Completed)")}</div>
                     <div class="gid-subtitle">${__("Average number of days from ticket creation to completion.")}</div>
-                    <div class="gid-kpi-row gid-kpi-row-lead" id="lead-time-kpis"></div>
+                    <div id="lead-time-kpis"></div>
                 </div>
 
                 <div class="gid-section-card" style="margin-bottom: 16px;">
@@ -535,20 +550,49 @@ class GitLabIssueDashboard {
 
     renderLeadTimeKpis() {
         const leadTime = (this.currentData && this.currentData.lead_time) || {};
-        const rolling = leadTime.rolling || {};
+        const mode = leadTime.mode || "combined";
+        const projectTitles = (this.currentData && this.currentData.project_titles) || {};
 
         const formatDays = (value) => {
             if (value === null || value === undefined) return __("N/A");
             return __("{0} days", [value]);
         };
 
-        this.$leadTimeKpis.html(`
-            <div class="gid-kpi gid-kpi-lead-main"><small>${__("Selected Filter Avg")}</small><strong>${formatDays(leadTime.filtered)}</strong></div>
-            <div class="gid-kpi gid-kpi-lead"><small>${__("Last Month")}</small><strong>${formatDays(rolling.last_month)}</strong></div>
-            <div class="gid-kpi gid-kpi-lead"><small>${__("Last 3 Months")}</small><strong>${formatDays(rolling.last_3_months)}</strong></div>
-            <div class="gid-kpi gid-kpi-lead"><small>${__("Last 6 Months")}</small><strong>${formatDays(rolling.last_6_months)}</strong></div>
-            <div class="gid-kpi gid-kpi-lead"><small>${__("Last 12 Months")}</small><strong>${formatDays(rolling.last_12_months)}</strong></div>
-        `);
+        const buildRow = (label, data) => {
+            const rolling = (data && data.rolling) || {};
+            const labelHtml = label
+                ? `<div class="gid-lead-row-label">${frappe.utils.escape_html(label)}</div>`
+                : "";
+            return `
+                <div class="gid-lead-row">
+                    ${labelHtml}
+                    <div class="gid-kpi-row gid-kpi-row-lead">
+                        <div class="gid-kpi gid-kpi-lead-main"><small>${__("Selected Filter Avg")}</small><strong>${formatDays(data ? data.filtered : null)}</strong></div>
+                        <div class="gid-kpi gid-kpi-lead"><small>${__("Last Month")}</small><strong>${formatDays(rolling.last_month)}</strong></div>
+                        <div class="gid-kpi gid-kpi-lead"><small>${__("Last 3 Months")}</small><strong>${formatDays(rolling.last_3_months)}</strong></div>
+                        <div class="gid-kpi gid-kpi-lead"><small>${__("Last 6 Months")}</small><strong>${formatDays(rolling.last_6_months)}</strong></div>
+                        <div class="gid-kpi gid-kpi-lead"><small>${__("Last 12 Months")}</small><strong>${formatDays(rolling.last_12_months)}</strong></div>
+                    </div>
+                </div>
+            `;
+        };
+
+        let html = "";
+
+        if (mode === "single" && leadTime.company) {
+            const projectTitle = projectTitles[leadTime.project] || leadTime.project || __("Project");
+            html += buildRow(projectTitle, leadTime);
+            html += buildRow(__("Company"), leadTime.company);
+        } else if (mode === "project_compare" && (leadTime.project_lead_times || []).length) {
+            leadTime.project_lead_times.forEach((row) => {
+                const title = projectTitles[row.project] || row.project || __("Project");
+                html += buildRow(title, row);
+            });
+        } else {
+            html += buildRow(null, leadTime);
+        }
+
+        this.$leadTimeKpis.html(html);
     }
 
     renderAgingChart() {
