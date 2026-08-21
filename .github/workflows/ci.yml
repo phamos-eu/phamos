@@ -1,0 +1,26 @@
+# =============================================================================
+# Test Workflow
+# =============================================================================
+# Purpose:
+#   Orchestrates the Phamos CI pipeline. The foundation job delegates all
+#   environment setup, provisioning, validation, and test execution to
+#   foundation.yml. This workflow only coordinates the high-level stages.
+#
+# Depends on: .github/workflows/foundation.yml (called as a reusable job)
+# =============================================================================
+
+name: Run Tests
+
+on:
+  push:
+    branches: [ version-15, develop, automated-testing ]
+  pull_request:
+    branches: [ version-15, develop ]
+
+jobs:
+  foundation:
+    uses: ./.github/workflows/foundation.yml
+
+  # Future CI stages (Unit Tests, E2E Tests, Import Validation,
+  # Property Setter Validation, Custom Field Validation, AI Validation, etc.)
+  # can be added here as separate jobs that depend on foundation.
