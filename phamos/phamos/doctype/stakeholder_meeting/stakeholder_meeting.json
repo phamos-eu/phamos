@@ -109,7 +109,13 @@
  ],
  "index_web_pages_for_search": 1,
  "is_submittable": 1,
- "links": [],
+ "links": [
+  {
+   "group": "Chapters",
+   "link_doctype": "Implementation Chapter",
+   "link_fieldname": "last_meeting"
+  }
+ ],
  "modified": "2026-08-20 00:00:00.000000",
  "modified_by": "Administrator",
  "module": "Phamos",
