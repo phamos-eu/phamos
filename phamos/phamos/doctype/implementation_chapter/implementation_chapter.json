@@ -22,7 +22,9 @@
   "chapter_title",
   "chapter_introduction",
   "full_chapter_description",
-  "current_revision"
+  "current_revision",
+  "last_meeting",
+  "last_reviewed_on"
  ],
  "fields": [
   {
@@ -122,6 +124,21 @@
    "fieldtype": "Link",
    "label": "Current Revision",
    "options": "Implementation Chapter Revision",
+   "read_only": 1
+  },
+  {
+   "description": "Set automatically when a Stakeholder Meeting reviewing this Chapter is submitted.",
+   "fieldname": "last_meeting",
+   "fieldtype": "Link",
+   "label": "Last Meeting",
+   "options": "Stakeholder Meeting",
+   "read_only": 1
+  },
+  {
+   "description": "Set automatically when a Stakeholder Meeting reviewing this Chapter is submitted.",
+   "fieldname": "last_reviewed_on",
+   "fieldtype": "Date",
+   "label": "Last Reviewed On",
    "read_only": 1
   }
  ],
