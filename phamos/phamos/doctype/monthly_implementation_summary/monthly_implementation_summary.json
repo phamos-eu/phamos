@@ -1,234 +1,239 @@
 {
- "actions": [],
- "allow_rename": 1,
- "autoname": "naming_series:",
- "creation": "2026-02-20 15:02:36.902750",
- "doctype": "DocType",
- "engine": "InnoDB",
- "field_order": [
-  "naming_series",
-  "implementation",
-  "sales_order_status_information",
-  "mis_delivery_notes_section",
-  "mis_delivery_notes",
-  "mis_sales_invoices_section",
-  "mis_sales_invoices",
-  "section_break_1_section",
-  "year",
-  "month",
-  "timesheets",
-  "timesheets_table",
-  "total_hours",
-  "billable_hours",
-  "delivery_note_details",
-  "delivery_note_item",
-  "notes",
-  "financial_history_section",
-  "sales_order_qty",
-  "dn_qty",
-  "timesheet_hrs",
-  "column_break_w99l",
-  "remaining_hrs",
-  "open_so",
-  "section_break_ntan",
-  "amended_from"
- ],
- "fields": [
-  {
-   "fieldname": "naming_series",
-   "fieldtype": "Select",
-   "hidden": 1,
-   "label": "Naming Series"
+  "actions": [],
+  "allow_rename": 1,
+  "autoname": "naming_series:",
+  "creation": "2026-02-20 15:02:36.902750",
+  "doctype": "DocType",
+  "engine": "InnoDB",
+  "field_order": [
+    "naming_series",
+    "implementation",
+    "sales_order_status_information",
+    "mis_delivery_notes_section",
+    "mis_delivery_notes",
+    "mis_sales_invoices_section",
+    "mis_sales_invoices",
+    "section_break_1_section",
+    "delivery_note_details",
+    "delivery_note_item",
+    "notes",
+    "financial_history_section",
+    "sales_order_qty",
+    "dn_qty",
+    "timesheet_hrs",
+    "column_break_w99l",
+    "remaining_hrs",
+    "open_so",
+    "section_break_ntan",
+    "amended_from",
+    "timesheets_tab",
+    "year",
+    "month",
+    "timesheets",
+    "timesheets_table",
+    "total_hours",
+    "billable_hours"
+  ],
+  "fields": [
+    {
+    "fieldname": "naming_series",
+    "fieldtype": "Select",
+    "hidden": 1,
+    "label": "Naming Series"
   },
-  {
-   "fieldname": "implementation",
-   "fieldtype": "Link",
-   "in_list_view": 1,
-   "label": "Implementation",
-   "link_filters": "[[\"Implementation\",\"customer\",\"!=\",\"Knd-00000\"]]",
-   "options": "Implementation",
-   "reqd": 1
-  },
-  {
-   "fieldname": "year",
-   "fieldtype": "Select",
-   "in_list_view": 1,
-   "label": "Year",
-   "reqd": 1
-  },
-  {
-   "fieldname": "month",
-   "fieldtype": "Select",
-   "label": "Month",
-   "options": "January\nFebruary\nMarch\nApril\nMay\nJune\nJuly\nAugust\nSeptember\nOctober\nNovember\nDecember"
-  },
-  {
-   "fieldname": "timesheets",
-   "fieldtype": "Text Editor",
-   "label": "Timesheets",
-   "no_copy": 1,
-   "read_only": 1
-  },
-  {
-   "fieldname": "total_hours",
-   "fieldtype": "Float",
-   "label": "Total Hours"
-  },
-  {
-   "description": "Total from the timesheets table.",
-   "fieldname": "billable_hours",
-   "fieldtype": "Float",
-   "label": "Billable Hours"
-  },
-  {
-   "fieldname": "timesheets_table",
-   "fieldtype": "Table",
-   "label": "Timesheets",
-   "options": "Timesheets"
-  },
-  {
-   "fieldname": "section_break_1_section",
-   "fieldtype": "Section Break"
-  },
-  {
-   "fieldname": "mis_delivery_notes_section",
-   "fieldtype": "Section Break",
-   "label": "Delivery Notes"
-  },
-  {
-   "allow_on_submit": 1,
-   "fieldname": "mis_delivery_notes",
-   "fieldtype": "Table",
-   "label": "Delivery Notes",
-   "options": "MIS Delivery Note"
-  },
-  {
-   "fieldname": "mis_sales_invoices_section",
-   "fieldtype": "Section Break",
-   "label": "Sales Invoices"
-  },
-  {
-   "allow_on_submit": 1,
-   "fieldname": "mis_sales_invoices",
-   "fieldtype": "Table",
-   "label": "Sales Invoices",
-   "options": "MIS Sales Invoice"
-  },
-  {
-   "fieldname": "delivery_note_details",
-   "fieldtype": "Section Break",
-   "label": "Delivery Note Details"
-  },
-  {
-   "fieldname": "delivery_note_item",
-   "fieldtype": "Table",
-   "label": "Delivery Note Item",
-   "options": "Delivery Note Item"
-  },
-  {
-   "fieldname": "financial_history_section",
-   "fieldtype": "Section Break",
-   "label": "Financial History"
-  },
-  {
-   "description": "Sum of total_qty on open Sales Orders linked to this Implementation (status To Deliver / To Deliver and Bill / To Bill). Same as sales_order_qty from get_financial_history.\n",
-   "fieldname": "sales_order_qty",
-   "fieldtype": "Float",
-   "label": "Total open SO hours",
-   "no_copy": 1,
-   "read_only": 1
-  },
-  {
-   "allow_on_submit": 1,
-   "description": "Sum of Delivery Note item quantities against those Sales Orders where DN status is Completed or To Bill. Same as dn_qty.\n",
-   "fieldname": "dn_qty",
-   "fieldtype": "Float",
-   "label": "Delivered on DN",
-   "no_copy": 1,
-   "read_only": 1
-  },
-  {
-   "description": "Sum of billable Timesheet Detail hours on draft timesheets for this Implementation\u2019s projects, with no custom_delivery_note. Same as timesheet_hrs.\n",
-   "fieldname": "timesheet_hrs",
-   "fieldtype": "Float",
-   "label": "Draft billable TS hours",
-   "no_copy": 1,
-   "read_only": 1
-  },
-  {
-   "allow_on_submit": 1,
-   "description": "Open SO hours minus delivered-on-DN hours minus draft timesheet hours not yet on a DN. Same as remaining_hrs.\n",
-   "fieldname": "remaining_hrs",
-   "fieldtype": "Float",
-   "label": "Remaining sales hours",
-   "no_copy": 1,
-   "read_only": 1
-  },
-  {
-   "default": "0",
-   "description": "Global indicator: 1 if any Sales Order is still To Deliver/Bill (not scoped to this Implementation).",
-   "fieldname": "open_so",
-   "fieldtype": "Check",
-   "label": "Open SO?",
-   "no_copy": 1,
-   "read_only": 1
-  },
-  {
-   "fieldname": "section_break_ntan",
-   "fieldtype": "Section Break"
-  },
-  {
-   "fieldname": "column_break_w99l",
-   "fieldtype": "Column Break"
-  },
-  {
-   "fieldname": "amended_from",
-   "fieldtype": "Link",
-   "label": "Amended From",
-   "no_copy": 1,
-   "options": "Monthly Implementation Summary",
-   "print_hide": 1,
-   "read_only": 1,
-   "search_index": 1
-  },
-  {
-   "fieldname": "sales_order_status_information",
-   "fieldtype": "Table",
-   "label": "Sales Order Status Information",
-   "options": "Sales Order Status"
-  },
-  {
-   "fieldname": "notes",
-   "fieldtype": "Text Editor",
-   "label": "Notes"
-  }
- ],
- "index_web_pages_for_search": 1,
- "is_submittable": 1,
- "links": [],
- "modified": "2026-07-03 11:54:11.906793",
- "modified_by": "Administrator",
- "module": "Phamos",
- "name": "Monthly Implementation Summary",
- "naming_rule": "By \"Naming Series\" field",
- "owner": "Administrator",
- "permissions": [
-  {
-   "create": 1,
-   "delete": 1,
-   "email": 1,
-   "export": 1,
-   "print": 1,
-   "read": 1,
-   "report": 1,
-   "role": "System Manager",
-   "share": 1,
-   "submit": 1,
-   "write": 1
-  }
- ],
- "row_format": "Dynamic",
- "sort_field": "modified",
- "sort_order": "DESC",
- "states": []
+    {
+      "fieldname": "implementation",
+      "fieldtype": "Link",
+      "in_list_view": 1,
+      "label": "Implementation",
+      "link_filters": "[[\"Implementation\",\"customer\",\"!=\",\"Knd-00000\"]]",
+      "options": "Implementation",
+      "reqd": 1
+    },
+    {
+      "fieldname": "sales_order_status_information",
+      "fieldtype": "Table",
+      "label": "Sales Order Status Information",
+      "options": "Sales Order Status"
+    },
+    {
+      "fieldname": "mis_delivery_notes_section",
+      "fieldtype": "Section Break",
+      "label": "Delivery Notes"
+    },
+    {
+      "allow_on_submit": 1,
+      "fieldname": "mis_delivery_notes",
+      "fieldtype": "Table",
+      "label": "Delivery Notes",
+      "options": "MIS Delivery Note"
+    },
+    {
+      "fieldname": "mis_sales_invoices_section",
+      "fieldtype": "Section Break",
+      "label": "Sales Invoices"
+    },
+    {
+      "allow_on_submit": 1,
+      "fieldname": "mis_sales_invoices",
+      "fieldtype": "Table",
+      "label": "Sales Invoices",
+      "options": "MIS Sales Invoice"
+    },
+    {
+      "fieldname": "section_break_1_section",
+      "fieldtype": "Section Break"
+    },
+    {
+      "fieldname": "delivery_note_details",
+      "fieldtype": "Section Break",
+      "label": "Delivery Note Details"
+    },
+    {
+      "fieldname": "delivery_note_item",
+      "fieldtype": "Table",
+      "label": "Delivery Note Item",
+      "options": "Delivery Note Item"
+    },
+    {
+      "fieldname": "notes",
+      "fieldtype": "Text Editor",
+      "label": "Notes"
+    },
+    {
+      "fieldname": "financial_history_section",
+      "fieldtype": "Section Break",
+      "label": "Financial History"
+    },
+    {
+      "description": "Sum of total_qty on open Sales Orders linked to this Implementation (status To Deliver / To Deliver and Bill / To Bill). Same as sales_order_qty from get_financial_history.\n",
+      "fieldname": "sales_order_qty",
+      "fieldtype": "Float",
+      "label": "Total open SO hours",
+      "no_copy": 1,
+      "read_only": 1
+    },
+    {
+      "allow_on_submit": 1,
+      "description": "Sum of Delivery Note item quantities against those Sales Orders where DN status is Completed or To Bill. Same as dn_qty.\n",
+      "fieldname": "dn_qty",
+      "fieldtype": "Float",
+      "label": "Delivered on DN",
+      "no_copy": 1,
+      "read_only": 1
+    },
+    {
+      "description": "Sum of billable Timesheet Detail hours on draft timesheets for this Implementation’s projects, with no custom_delivery_note. Same as timesheet_hrs.\n",
+      "fieldname": "timesheet_hrs",
+      "fieldtype": "Float",
+      "label": "Draft billable TS hours",
+      "no_copy": 1,
+      "read_only": 1
+    },
+    {
+      "fieldname": "column_break_w99l",
+      "fieldtype": "Column Break"
+    },
+    {
+      "description": "Open SO hours minus delivered-on-DN hours minus draft timesheet hours not yet on a DN. Same as remaining_hrs.\n",
+      "fieldname": "remaining_hrs",
+      "fieldtype": "Float",
+      "label": "Remaining sales hours",
+      "no_copy": 1,
+      "read_only": 1
+    },
+    {
+      "default": "0",
+      "description": "Global indicator: 1 if any Sales Order is still To Deliver/Bill (not scoped to this Implementation).",
+      "fieldname": "open_so",
+      "fieldtype": "Check",
+      "label": "Open SO?",
+      "no_copy": 1,
+      "read_only": 1
+    },
+    {
+      "fieldname": "section_break_ntan",
+      "fieldtype": "Section Break"
+    },
+    {
+      "fieldname": "amended_from",
+      "fieldtype": "Link",
+      "label": "Amended From",
+      "no_copy": 1,
+      "options": "Monthly Implementation Summary",
+      "print_hide": 1,
+      "read_only": 1,
+      "search_index": 1
+    },
+    {
+      "fieldname": "timesheets_tab",
+      "fieldtype": "Tab Break",
+      "label": "Timesheets"
+    },
+    {
+      "fieldname": "year",
+      "fieldtype": "Select",
+      "in_list_view": 1,
+      "label": "Year",
+      "reqd": 1
+    },
+    {
+      "fieldname": "month",
+      "fieldtype": "Select",
+      "label": "Month",
+      "options": "January\nFebruary\nMarch\nApril\nMay\nJune\nJuly\nAugust\nSeptember\nOctober\nNovember\nDecember"
+    },
+    {
+      "fieldname": "timesheets",
+      "fieldtype": "Text Editor",
+      "label": "Timesheets",
+      "no_copy": 1,
+      "read_only": 1
+    },
+    {
+      "fieldname": "timesheets_table",
+      "fieldtype": "Table",
+      "label": "Timesheets",
+      "options": "Timesheets"
+    },
+    {
+      "fieldname": "total_hours",
+      "fieldtype": "Float",
+      "label": "Total Hours"
+    },
+    {
+      "description": "Total from the timesheets table.",
+      "fieldname": "billable_hours",
+      "fieldtype": "Float",
+      "label": "Billable Hours"
+    }
+  ],
+  "index_web_pages_for_search": 1,
+  "is_submittable": 1,
+  "links": [],
+  "modified": "2026-07-03 11:54:11.906793",
+  "modified_by": "Administrator",
+  "module": "Phamos",
+  "name": "Monthly Implementation Summary",
+  "naming_rule": "By \"Naming Series\" field",
+  "owner": "Administrator",
+  "permissions": [
+    {
+      "create": 1,
+      "delete": 1,
+      "email": 1,
+      "export": 1,
+      "print": 1,
+      "read": 1,
+      "report": 1,
+      "role": "System Manager",
+      "share": 1,
+      "submit": 1,
+      "write": 1
+    }
+  ],
+  "row_format": "Dynamic",
+  "sort_field": "modified",
+  "sort_order": "DESC",
+  "states": []
 }
