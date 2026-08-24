@@ -1,43 +1,51 @@
 <template>
 	<div class="flex min-h-0 flex-1 flex-col overflow-y-auto">
-		<div class="flex flex-shrink-0 items-center justify-between border-b border-gray-200 px-4 py-2">
+		<div
+			class="flex flex-shrink-0 items-center justify-between border-b border-gray-200 px-4 py-2 dark:border-gray-800"
+		>
 			<button
 				type="button"
-				class="rounded-md px-2 py-1 text-sm text-gray-600 hover:bg-gray-100"
+				class="rounded-md px-2 py-1 text-sm text-gray-600 hover:bg-gray-100 dark:text-gray-400 dark:hover:bg-gray-800"
 				@click="shiftMonth(-1)"
 			>
 				←
 			</button>
-			<div class="text-sm font-semibold text-gray-900">{{ monthLabel }}</div>
+			<div class="text-sm font-semibold text-gray-900 dark:text-gray-100">{{ monthLabel }}</div>
 			<button
 				type="button"
-				class="rounded-md px-2 py-1 text-sm text-gray-600 hover:bg-gray-100"
+				class="rounded-md px-2 py-1 text-sm text-gray-600 hover:bg-gray-100 dark:text-gray-400 dark:hover:bg-gray-800"
 				@click="shiftMonth(1)"
 			>
 				→
 			</button>
 		</div>
 
-		<div class="grid grid-cols-7 gap-px border-b border-gray-200 bg-gray-200 text-center">
+		<div
+			class="grid grid-cols-7 gap-px border-b border-gray-200 bg-gray-200 text-center dark:border-gray-800 dark:bg-gray-800"
+		>
 			<div
 				v-for="d in weekdays"
 				:key="d"
-				class="bg-gray-50 px-1 py-1.5 text-[10px] font-semibold uppercase tracking-wide text-gray-500"
+				class="bg-gray-50 px-1 py-1.5 text-[10px] font-semibold uppercase tracking-wide text-gray-500 dark:bg-gray-900 dark:text-gray-400"
 			>
 				{{ d }}
 			</div>
 		</div>
 
-		<div class="grid flex-1 grid-cols-7 gap-px bg-gray-200">
+		<div class="grid flex-1 grid-cols-7 gap-px bg-gray-200 dark:bg-gray-800">
 			<div
 				v-for="(cell, idx) in cells"
 				:key="idx"
-				class="min-h-[72px] bg-white p-1"
-				:class="{ 'bg-gray-50': !cell.inMonth }"
+				class="min-h-[72px] bg-white p-1 dark:bg-gray-900"
+				:class="{ 'bg-gray-50 dark:bg-gray-950': !cell.inMonth }"
 			>
 				<div
 					class="mb-1 text-[11px]"
-					:class="cell.inMonth ? 'font-medium text-gray-700' : 'text-gray-400'"
+					:class="
+						cell.inMonth
+							? 'font-medium text-gray-700 dark:text-gray-300'
+							: 'text-gray-400 dark:text-gray-600'
+					"
 				>
 					{{ cell.day }}
 				</div>
@@ -45,11 +53,11 @@
 					v-for="issue in cell.issues"
 					:key="issue.name"
 					type="button"
-					class="mb-0.5 block w-full truncate rounded px-1 py-0.5 text-left text-[10px] hover:bg-gray-100"
+					class="mb-0.5 block w-full truncate rounded px-1 py-0.5 text-left text-[10px] hover:bg-gray-100 dark:hover:bg-gray-800"
 					:class="
 						issue.name === selectedName
-							? 'bg-gray-900 text-white hover:bg-gray-800'
-							: 'bg-blue-50 text-blue-800'
+							? 'bg-gray-900 text-white hover:bg-gray-800 dark:bg-gray-100 dark:text-gray-900 dark:hover:bg-gray-200'
+							: 'bg-blue-50 text-blue-800 dark:bg-blue-950 dark:text-blue-300'
 					"
 					:title="issue.subject"
 					@click="emit('select', issue.name)"
@@ -59,8 +67,8 @@
 			</div>
 		</div>
 
-		<div v-if="noDateIssues.length" class="border-t border-gray-200 px-4 py-3">
-			<div class="mb-2 text-[11px] font-semibold uppercase tracking-wide text-gray-500">
+		<div v-if="noDateIssues.length" class="border-t border-gray-200 px-4 py-3 dark:border-gray-800">
+			<div class="mb-2 text-[11px] font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400">
 				No date
 			</div>
 			<div class="flex flex-wrap gap-2">
@@ -68,8 +76,10 @@
 					v-for="issue in noDateIssues"
 					:key="issue.name"
 					type="button"
-					class="rounded-md border border-gray-200 px-2 py-1 text-xs text-gray-700 hover:bg-gray-50"
-					:class="{ 'border-gray-900 bg-gray-50': issue.name === selectedName }"
+					class="rounded-md border border-gray-200 px-2 py-1 text-xs text-gray-700 hover:bg-gray-50 dark:border-gray-700 dark:text-gray-300 dark:hover:bg-gray-800"
+					:class="{
+						'border-gray-900 bg-gray-50 dark:border-gray-300 dark:bg-gray-800': issue.name === selectedName,
+					}"
 					@click="emit('select', issue.name)"
 				>
 					{{ issue.name }} — {{ issue.subject }}
@@ -81,6 +91,7 @@
 
 <script setup>
 import { computed, ref } from "vue"
+import { formatMonthYear, getFirstDayOfWeekIndex, getWeekdayLabels } from "../utils/datetime"
 
 const props = defineProps({
 	issues: { type: Array, default: () => [] },
@@ -89,12 +100,10 @@ const props = defineProps({
 
 const emit = defineEmits(["select"])
 
-const weekdays = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"]
+const weekdays = computed(() => getWeekdayLabels())
 const cursor = ref(startOfMonth(new Date()))
 
-const monthLabel = computed(() =>
-	cursor.value.toLocaleDateString(undefined, { month: "long", year: "numeric" })
-)
+const monthLabel = computed(() => formatMonthYear(cursor.value))
 
 function startOfMonth(d) {
 	return new Date(d.getFullYear(), d.getMonth(), 1)
@@ -142,7 +151,8 @@ const cells = computed(() => {
 	const year = cursor.value.getFullYear()
 	const month = cursor.value.getMonth()
 	const first = new Date(year, month, 1)
-	const startPad = first.getDay()
+	const weekStart = getFirstDayOfWeekIndex()
+	const startPad = (first.getDay() - weekStart + 7) % 7
 	const daysInMonth = new Date(year, month + 1, 0).getDate()
 	const prevDays = new Date(year, month, 0).getDate()
 	const total = Math.ceil((startPad + daysInMonth) / 7) * 7

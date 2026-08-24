@@ -4,17 +4,17 @@
 			<div
 				v-for="col in columns"
 				:key="col"
-				class="flex w-56 flex-none flex-col rounded-lg bg-gray-50"
+				class="flex w-56 flex-none flex-col rounded-lg bg-gray-50 dark:bg-gray-800/60"
 				@dragover.prevent
 				@drop="onDrop(col, $event)"
 			>
 				<div
-					class="flex flex-shrink-0 items-center justify-between border-b border-gray-200 px-3 py-2"
+					class="flex flex-shrink-0 items-center justify-between border-b border-gray-200 px-3 py-2 dark:border-gray-700"
 				>
-					<span class="text-xs font-semibold uppercase tracking-wide text-gray-600">
+					<span class="text-xs font-semibold uppercase tracking-wide text-gray-600 dark:text-gray-400">
 						{{ col }}
 					</span>
-					<span class="rounded-full bg-white px-1.5 py-0.5 text-[11px] text-gray-500">
+					<span class="rounded-full bg-white px-1.5 py-0.5 text-[11px] text-gray-500 dark:bg-gray-900 dark:text-gray-400">
 						{{ byStatus[col]?.length || 0 }}
 					</span>
 				</div>
@@ -23,15 +23,16 @@
 						v-for="issue in byStatus[col] || []"
 						:key="issue.name"
 						draggable="true"
-						class="cursor-pointer rounded-md border border-gray-200 bg-white px-2.5 py-2 shadow-sm hover:border-gray-300"
+						class="cursor-pointer rounded-md border border-gray-200 bg-white px-2.5 py-2 shadow-sm hover:border-gray-300 dark:border-gray-700 dark:bg-gray-900 dark:hover:border-gray-600"
 						:class="{
-							'ring-2 ring-gray-900 ring-offset-1': issue.name === selectedName,
+							'ring-2 ring-gray-900 ring-offset-1 dark:ring-gray-100 dark:ring-offset-gray-900':
+								issue.name === selectedName,
 						}"
 						@dragstart="onDragStart(issue, $event)"
 						@click="emit('select', issue.name)"
 					>
-						<div class="mb-1 text-[11px] font-semibold text-gray-500">{{ issue.name }}</div>
-						<div class="mb-1 text-sm font-medium leading-snug text-gray-900">
+						<div class="mb-1 text-[11px] font-semibold text-gray-500 dark:text-gray-400">{{ issue.name }}</div>
+						<div class="mb-1 text-sm font-medium leading-snug text-gray-900 dark:text-gray-100">
 							{{ issue.subject }}
 						</div>
 						<span
@@ -73,9 +74,9 @@ const byStatus = computed(() => {
 
 function priorityClass(priority) {
 	const p = (priority || "").toLowerCase()
-	if (p === "high") return "bg-red-50 text-red-700"
-	if (p === "low") return "bg-yellow-50 text-yellow-700"
-	return "bg-orange-50 text-orange-700"
+	if (p === "high") return "bg-red-50 text-red-700 dark:bg-red-950 dark:text-red-300"
+	if (p === "low") return "bg-yellow-50 text-yellow-700 dark:bg-yellow-950 dark:text-yellow-300"
+	return "bg-orange-50 text-orange-700 dark:bg-orange-950 dark:text-orange-300"
 }
 
 function onDragStart(issue, event) {

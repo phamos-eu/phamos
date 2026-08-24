@@ -16,7 +16,14 @@ add_to_apps_screen = [
 		"title": "I Own My Work",
 		"route": "/i-own-my-work",
 		"has_permission": "phamos.api.i_own_my_work.check_app_permission",
-	}
+	},
+	{
+		"name": "hr_spa",
+		"logo": "/assets/frappe/images/frappe-favicon.svg",
+		"title": "HR",
+		"route": "/hr-cockpit",
+		"has_permission": "phamos.api.hr_spa.check_app_permission",
+	},
 ]
 
 # Includes in <head>
@@ -86,6 +93,8 @@ website_route_rules = [
     {"from_route": "/schedule_interview/<name>", "to_route": "schedule_interview"},
     {"from_route": "/i-own-my-work", "to_route": "i_own_my_work"},
     {"from_route": "/i-own-my-work/<path:app_path>", "to_route": "i_own_my_work"},
+    {"from_route": "/hr-cockpit", "to_route": "hr_spa"},
+    {"from_route": "/hr-cockpit/<path:app_path>", "to_route": "hr_spa"},
 ]
 
 

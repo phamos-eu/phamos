@@ -1,7 +1,7 @@
 # Copyright (c) 2026, phamos.eu and contributors
 # For license information, please see license.txt
 
-"""Issue ↔ Raven chat helpers for I Own My Work SPA."""
+"""Issue / Checklist ↔ Raven chat helpers for I Own My Work SPA."""
 
 import re
 
@@ -9,6 +9,8 @@ import frappe
 from frappe import _
 from frappe.desk.form.load import get_assignments
 from frappe.utils import cint, get_fullname, get_url
+
+LINKED_CHAT_DOCTYPES = ("Issue", "Checklist", "Task")
 
 
 def _parse_list(value):
@@ -64,27 +66,43 @@ def _require_raven_feature():
 
 
 def _require_issue_read(name):
-	frappe.has_permission("Issue", "read", throw=True)
-	doc = frappe.get_doc("Issue", name)
+	return _require_linked_read("Issue", name)
+
+
+def _require_issue_write(name):
+	return _require_linked_write("Issue", name)
+
+
+def _require_linked_read(doctype, name):
+	if doctype not in LINKED_CHAT_DOCTYPES:
+		frappe.throw(_("Unsupported linked doctype: {0}").format(doctype))
+	frappe.has_permission(doctype, "read", throw=True)
+	doc = frappe.get_doc(doctype, name)
 	doc.check_permission("read")
 	return doc
 
 
-def _require_issue_write(name):
-	frappe.has_permission("Issue", "write", throw=True)
-	doc = frappe.get_doc("Issue", name)
+def _require_linked_write(doctype, name):
+	if doctype not in LINKED_CHAT_DOCTYPES:
+		frappe.throw(_("Unsupported linked doctype: {0}").format(doctype))
+	frappe.has_permission(doctype, "write", throw=True)
+	doc = frappe.get_doc(doctype, name)
 	doc.check_permission("write")
 	return doc
 
 
-def find_issue_channel(issue_name):
-	if not is_raven_installed():
+def find_linked_channel(doctype, docname):
+	if not is_raven_installed() or doctype not in LINKED_CHAT_DOCTYPES:
 		return None
 	return frappe.db.get_value(
 		"Raven Channel",
-		{"linked_doctype": "Issue", "linked_document": issue_name, "is_archived": 0},
+		{"linked_doctype": doctype, "linked_document": docname, "is_archived": 0},
 		"name",
 	)
+
+
+def find_issue_channel(issue_name):
+	return find_linked_channel("Issue", issue_name)
 
 
 def _resolve_workspace():
@@ -108,17 +126,6 @@ def _user_to_raven_user(user):
 		return user
 	name = frappe.db.get_value("Raven User", {"user": user, "type": "User"}, "name")
 	return name
-
-
-def _issue_member_users(issue_doc):
-	"""Frappe User ids that should be auto-synced: owner + assignees."""
-	users = {issue_doc.owner}
-	for row in get_assignments("Issue", issue_doc.name):
-		if row.get("owner"):
-			users.add(row["owner"])
-	users.discard(None)
-	users.discard("")
-	return users
 
 
 def _channel_member_raven_users(channel_id):
@@ -156,21 +163,60 @@ def _add_members(channel_id, raven_users, *, keep_extras=True):
 			)
 
 
-def _channel_name_for_issue(issue_doc):
+def _channel_name_for_linked(doctype, doc):
 	# autoname: "{workspace}-{channel_name}" with spaces → hyphens
-	safe = re.sub(r"[^a-zA-Z0-9_-]+", "-", issue_doc.name).strip("-").lower()
-	return f"issue-{safe}"
+	prefix_map = {"Issue": "issue", "Checklist": "checklist", "Task": "task"}
+	prefix = prefix_map.get(doctype, doctype.lower())
+	safe = re.sub(r"[^a-zA-Z0-9_-]+", "-", doc.name).strip("-").lower()
+	return f"{prefix}-{safe}"
 
 
-def sync_issue_channel_members(name, *, force=False):
-	"""
-	Add owner + assignees as Raven Channel Members.
-	Keeps manually invited extras (does not remove members).
-	"""
-	if not is_raven_installed():
+def _channel_name_for_issue(issue_doc):
+	return _channel_name_for_linked("Issue", issue_doc)
+
+
+def _member_users_for_doc(doctype, doc):
+	users = {doc.owner}
+	if doctype in ("Issue", "Task"):
+		for row in get_assignments(doctype, doc.name):
+			if row.get("owner"):
+				users.add(row["owner"])
+	users.discard(None)
+	users.discard("")
+	return users
+
+
+def _issue_member_users(issue_doc):
+	return _member_users_for_doc("Issue", issue_doc)
+
+
+def _spa_path_for(doctype, name):
+	if doctype == "Checklist":
+		return f"/i-own-my-work/checklists/{name}"
+	if doctype == "Task":
+		department = frappe.db.get_value("Task", name, "department")
+		sales_department = frappe.db.get_single_value("phamos Settings", "sales_department")
+		hr_department = frappe.db.get_single_value("phamos Settings", "hr_department")
+		if department and sales_department and department == sales_department:
+			return f"/sales-cockpit/tasks/{name}"
+		if department and hr_department and department == hr_department:
+			return f"/hr-cockpit/tasks/{name}"
+		return f"/hr-cockpit/tasks/{name}"
+	return f"/i-own-my-work/issues/{name}"
+
+
+def _doc_label(doctype, doc):
+	if doctype in ("Issue", "Task"):
+		return doc.subject or doc.name
+	return doc.name
+
+
+def sync_linked_channel_members(doctype, name, *, force=False):
+	"""Add owner (+ Issue assignees) as Raven Channel Members. Keeps invited extras."""
+	if not is_raven_installed() or doctype not in LINKED_CHAT_DOCTYPES:
 		return None
 
-	channel_id = find_issue_channel(name)
+	channel_id = find_linked_channel(doctype, name)
 	if not channel_id:
 		return None
 
@@ -179,8 +225,8 @@ def sync_issue_channel_members(name, *, force=False):
 		if not flags["enabled"]:
 			return channel_id
 
-	issue = frappe.get_doc("Issue", name)
-	desired_users = _issue_member_users(issue)
+	doc = frappe.get_doc(doctype, name)
+	desired_users = _member_users_for_doc(doctype, doc)
 	raven_users = []
 	for user in desired_users:
 		ru = _user_to_raven_user(user)
@@ -189,6 +235,10 @@ def sync_issue_channel_members(name, *, force=False):
 
 	_add_members(channel_id, raven_users, keep_extras=True)
 	return channel_id
+
+
+def sync_issue_channel_members(name, *, force=False):
+	return sync_linked_channel_members("Issue", name, force=force)
 
 
 def _reply_preview(details):
@@ -239,12 +289,10 @@ def _serialize_messages(messages):
 	return out
 
 
-def _assert_issue_channel_access(channel_id, issue_name=None):
+def _assert_linked_channel_access(channel_id, linked_doctype=None, linked_document=None):
 	"""
-	Allow access when:
-	- Channel is linked to an Issue, OR
-	- Channel is a thread (is_thread=1) whose root message lives in an Issue-linked parent channel.
-	Returns the Issue name.
+	Allow access when channel (or thread parent) is linked to Issue or Checklist.
+	Returns (doctype, docname).
 	"""
 	if not channel_id:
 		frappe.throw(_("channel_id is required"))
@@ -258,14 +306,21 @@ def _assert_issue_channel_access(channel_id, issue_name=None):
 	if not channel:
 		frappe.throw(_("Channel not found"))
 
-	if channel.linked_doctype == "Issue" and channel.linked_document:
-		if issue_name and channel.linked_document != issue_name:
-			frappe.throw(_("Channel does not belong to this issue"))
-		_require_issue_read(channel.linked_document)
-		return channel.linked_document
+	def _check(doctype, docname):
+		if doctype not in LINKED_CHAT_DOCTYPES or not docname:
+			return None
+		if linked_doctype and doctype != linked_doctype:
+			frappe.throw(_("Channel does not belong to this document"))
+		if linked_document and docname != linked_document:
+			frappe.throw(_("Channel does not belong to this document"))
+		_require_linked_read(doctype, docname)
+		return doctype, docname
+
+	hit = _check(channel.linked_doctype, channel.linked_document)
+	if hit:
+		return hit
 
 	if cint(channel.is_thread):
-		# Thread channel name == root Raven Message name
 		root = frappe.db.get_value(
 			"Raven Message",
 			channel_id,
@@ -280,13 +335,32 @@ def _assert_issue_channel_access(channel_id, issue_name=None):
 			["linked_doctype", "linked_document"],
 			as_dict=True,
 		)
-		if parent and parent.linked_doctype == "Issue" and parent.linked_document:
-			if issue_name and parent.linked_document != issue_name:
-				frappe.throw(_("Thread does not belong to this issue"))
-			_require_issue_read(parent.linked_document)
-			return parent.linked_document
+		if parent:
+			hit = _check(parent.linked_doctype, parent.linked_document)
+			if hit:
+				return hit
 
-	frappe.throw(_("Not an Issue discussion channel"))
+	frappe.throw(_("Not an I Own My Work discussion channel"))
+
+
+def _assert_issue_channel_access(channel_id, issue_name=None):
+	_doctype, docname = _assert_linked_channel_access(
+		channel_id, linked_doctype="Issue" if issue_name else None, linked_document=issue_name
+	)
+	return docname
+
+
+def _resolve_linked_args(linked_doctype=None, linked_document=None, issue_name=None):
+	"""Normalize SPA args; issue_name remains supported for Issue chat."""
+	if issue_name and not linked_document:
+		linked_doctype = linked_doctype or "Issue"
+		linked_document = issue_name
+	linked_doctype = linked_doctype or "Issue"
+	if linked_doctype not in LINKED_CHAT_DOCTYPES:
+		frappe.throw(_("Unsupported linked doctype: {0}").format(linked_doctype))
+	if not linked_document:
+		frappe.throw(_("Document name is required"))
+	return linked_doctype, linked_document
 
 
 def _serialize_members(channel_id):
@@ -310,9 +384,10 @@ def _serialize_members(channel_id):
 
 
 @frappe.whitelist()
-def get_issue_chat(name, limit=50):
-	"""Resolve linked channel + recent messages for an Issue."""
-	_require_issue_read(name)
+def get_document_chat(linked_doctype, name, limit=50):
+	"""Resolve linked channel + recent messages for Issue or Checklist."""
+	linked_doctype, name = _resolve_linked_args(linked_doctype, name)
+	_require_linked_read(linked_doctype, name)
 	flags = get_chat_feature_flags()
 	if not flags["enabled"]:
 		return {
@@ -322,15 +397,17 @@ def get_issue_chat(name, limit=50):
 			**flags,
 		}
 
-	channel_id = find_issue_channel(name)
+	channel_id = find_linked_channel(linked_doctype, name)
 	if not channel_id:
 		return {"channel_id": None, "members": [], "messages": [], **flags}
 
-	# Ensure current user can read; if they're owner/assignee, try to add them
-	issue = frappe.get_doc("Issue", name)
+	doc = frappe.get_doc(linked_doctype, name)
 	ru = _user_to_raven_user(frappe.session.user)
 	if ru and ru not in _channel_member_raven_users(channel_id):
-		if frappe.session.user in _issue_member_users(issue) or frappe.session.user == "Administrator":
+		if (
+			frappe.session.user in _member_users_for_doc(linked_doctype, doc)
+			or frappe.session.user == "Administrator"
+		):
 			_add_members(channel_id, [ru])
 
 	payload = _fetch_messages(channel_id, limit=cint(limit) or 50)
@@ -345,74 +422,88 @@ def get_issue_chat(name, limit=50):
 
 
 @frappe.whitelist()
-def ensure_issue_channel(name):
-	"""Get-or-create a Private Raven Channel linked to the Issue."""
-	_require_raven_feature()
-	issue = _require_issue_write(name)
+def get_issue_chat(name, limit=50):
+	return get_document_chat("Issue", name, limit=limit)
 
-	existing = find_issue_channel(name)
+
+@frappe.whitelist()
+def ensure_document_channel(linked_doctype, name):
+	"""Get-or-create a Private Raven Channel linked to Issue or Checklist."""
+	_require_raven_feature()
+	linked_doctype, name = _resolve_linked_args(linked_doctype, name)
+	doc = _require_linked_write(linked_doctype, name)
+
+	existing = find_linked_channel(linked_doctype, name)
 	if existing:
-		sync_issue_channel_members(name)
-		return get_issue_chat(name)
+		sync_linked_channel_members(linked_doctype, name)
+		return get_document_chat(linked_doctype, name)
 
 	workspace = _resolve_workspace()
+	label = _doc_label(linked_doctype, doc)
 	channel = frappe.get_doc(
 		{
 			"doctype": "Raven Channel",
-			"channel_name": _channel_name_for_issue(issue),
-			"channel_description": f"{issue.name}: {issue.subject}",
+			"channel_name": _channel_name_for_linked(linked_doctype, doc),
+			"channel_description": f"{doc.name}: {label}",
 			"type": "Private",
 			"workspace": workspace,
-			"linked_doctype": "Issue",
-			"linked_document": issue.name,
+			"linked_doctype": linked_doctype,
+			"linked_document": doc.name,
 			"is_synced": 1,
 		}
 	)
 	channel.insert()
 	channel_id = channel.name
 
-	# Ensure linked_* stuck (read_only fields may be skipped on some versions)
-	if frappe.db.get_value("Raven Channel", channel_id, "linked_document") != issue.name:
+	if frappe.db.get_value("Raven Channel", channel_id, "linked_document") != doc.name:
 		frappe.db.set_value(
 			"Raven Channel",
 			channel_id,
 			{
-				"linked_doctype": "Issue",
-				"linked_document": issue.name,
+				"linked_doctype": linked_doctype,
+				"linked_document": doc.name,
 				"is_synced": 1,
 			},
 			update_modified=False,
 		)
 
-	sync_issue_channel_members(name, force=True)
+	sync_linked_channel_members(linked_doctype, name, force=True)
 
-	# Ensure current user is a member
 	ru = _user_to_raven_user(frappe.session.user)
 	if ru:
 		_add_members(channel_id, [ru])
 
-	spa_url = get_url(f"/i-own-my-work/issue/{issue.name}")
+	spa_url = get_url(_spa_path_for(linked_doctype, doc.name))
 	intro = (
-		f"Discussion started for **{issue.name}**: {issue.subject}\n\n"
+		f"Discussion started for **{doc.name}**: {label}\n\n"
 		f"[Open in I Own My Work]({spa_url})"
 	)
-	try:
-		from raven.api.raven_message import send_message
+	frappe.get_doc(
+		{
+			"doctype": "Raven Message",
+			"channel_id": channel_id,
+			"message_type": "Text",
+			"text": intro,
+			"json": {
+				"type": "doc",
+				"content": [
+					{
+						"type": "paragraph",
+						"content": [{"type": "text", "text": intro}],
+					}
+				],
+			},
+			"link_doctype": linked_doctype,
+			"link_document": doc.name,
+		}
+	).insert()
 
-		send_message(channel_id=channel_id, text=intro)
-	except Exception:
-		frappe.get_doc(
-			{
-				"doctype": "Raven Message",
-				"channel_id": channel_id,
-				"text": intro,
-				"message_type": "Text",
-				"link_doctype": "Issue",
-				"link_document": issue.name,
-			}
-		).insert()
+	return get_document_chat(linked_doctype, name)
 
-	return get_issue_chat(name)
+
+@frappe.whitelist()
+def ensure_issue_channel(name):
+	return ensure_document_channel("Issue", name)
 
 
 def _fetch_messages(channel_id, limit=50, before=None):
@@ -426,13 +517,16 @@ def _fetch_messages(channel_id, limit=50, before=None):
 
 
 @frappe.whitelist()
-def get_chat_messages(channel_id, limit=50, before=None, issue_name=None):
+def get_chat_messages(
+	channel_id, limit=50, before=None, issue_name=None, linked_doctype=None, linked_document=None
+):
 	"""Fetch messages for a channel the user can access."""
 	_require_raven_feature()
 	if not channel_id:
 		frappe.throw(_("channel_id is required"))
 
-	_assert_issue_channel_access(channel_id, issue_name=issue_name)
+	doctype, docname = _resolve_linked_args(linked_doctype, linked_document, issue_name)
+	_assert_linked_channel_access(channel_id, linked_doctype=doctype, linked_document=docname)
 
 	payload = _fetch_messages(channel_id, limit=cint(limit) or 50, before=before or None)
 	return {
@@ -443,7 +537,15 @@ def get_chat_messages(channel_id, limit=50, before=None, issue_name=None):
 
 
 @frappe.whitelist()
-def send_chat_message(channel_id, text, is_reply=0, linked_message=None, issue_name=None):
+def send_chat_message(
+	channel_id,
+	text,
+	is_reply=0,
+	linked_message=None,
+	issue_name=None,
+	linked_doctype=None,
+	linked_document=None,
+):
 	"""Send a text message as the current user (no ignore_permissions)."""
 	_require_raven_feature()
 	text = (text or "").strip()
@@ -452,7 +554,8 @@ def send_chat_message(channel_id, text, is_reply=0, linked_message=None, issue_n
 	if not channel_id:
 		frappe.throw(_("channel_id is required"))
 
-	_assert_issue_channel_access(channel_id, issue_name=issue_name)
+	doctype, docname = _resolve_linked_args(linked_doctype, linked_document, issue_name)
+	_assert_linked_channel_access(channel_id, linked_doctype=doctype, linked_document=docname)
 
 	from raven.api.raven_message import send_message
 
@@ -480,18 +583,21 @@ def send_chat_message(channel_id, text, is_reply=0, linked_message=None, issue_n
 
 
 @frappe.whitelist()
-def open_or_create_thread(message_id, issue_name):
+def open_or_create_thread(
+	message_id, issue_name=None, linked_doctype=None, linked_document=None
+):
 	"""Open an existing thread or create one from a channel message."""
 	_require_raven_feature()
-	_require_issue_read(issue_name)
+	doctype, docname = _resolve_linked_args(linked_doctype, linked_document, issue_name)
+	_require_linked_read(doctype, docname)
 
 	if not message_id:
 		frappe.throw(_("message_id is required"))
 
 	message = frappe.get_doc("Raven Message", message_id)
-	parent_channel = find_issue_channel(issue_name)
+	parent_channel = find_linked_channel(doctype, docname)
 	if not parent_channel or message.channel_id != parent_channel:
-		frappe.throw(_("Message does not belong to this issue's discussion"))
+		frappe.throw(_("Message does not belong to this document's discussion"))
 
 	if cint(message.is_thread):
 		thread_id = message.name
@@ -500,7 +606,6 @@ def open_or_create_thread(message_id, issue_name):
 
 		result = create_thread(message_id)
 		thread_id = result.get("thread_id") or message_id
-		# Reload after create_thread marks is_thread
 		message.reload()
 
 	payload = _fetch_messages(thread_id, limit=50)
@@ -528,14 +633,15 @@ def open_or_create_thread(message_id, issue_name):
 
 
 @frappe.whitelist()
-def get_thread(thread_id, issue_name):
+def get_thread(thread_id, issue_name=None, linked_doctype=None, linked_document=None):
 	"""Refresh/poll thread overlay messages."""
 	_require_raven_feature()
-	_require_issue_read(issue_name)
+	doctype, docname = _resolve_linked_args(linked_doctype, linked_document, issue_name)
+	_require_linked_read(doctype, docname)
 	if not thread_id:
 		frappe.throw(_("thread_id is required"))
 
-	_assert_issue_channel_access(thread_id, issue_name=issue_name)
+	_assert_linked_channel_access(thread_id, linked_doctype=doctype, linked_document=docname)
 
 	root_doc = None
 	if frappe.db.exists("Raven Message", thread_id):
@@ -559,7 +665,7 @@ def get_thread(thread_id, issue_name):
 			}
 		)
 
-	parent_channel = find_issue_channel(issue_name)
+	parent_channel = find_linked_channel(doctype, docname)
 	return {
 		"thread_id": thread_id,
 		"channel_id": parent_channel,
@@ -570,12 +676,13 @@ def get_thread(thread_id, issue_name):
 
 
 @frappe.whitelist()
-def invite_to_issue_channel(name, users=None):
-	"""Invite extra users (Frappe User names) to the Issue's Raven channel."""
+def invite_to_document_channel(linked_doctype, name, users=None):
+	"""Invite extra users to the document's Raven channel."""
 	_require_raven_feature()
-	_require_issue_write(name)
+	linked_doctype, name = _resolve_linked_args(linked_doctype, name)
+	_require_linked_write(linked_doctype, name)
 
-	channel_id = find_issue_channel(name)
+	channel_id = find_linked_channel(linked_doctype, name)
 	if not channel_id:
 		frappe.throw(_("No discussion channel yet. Start a discussion first."))
 
@@ -603,6 +710,11 @@ def invite_to_issue_channel(name, users=None):
 		"members": _serialize_members(channel_id),
 		"skipped": skipped,
 	}
+
+
+@frappe.whitelist()
+def invite_to_issue_channel(name, users=None):
+	return invite_to_document_channel("Issue", name, users=users)
 
 
 @frappe.whitelist()
