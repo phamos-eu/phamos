@@ -2,6 +2,9 @@
 # For license information, please see license.txt
 
 import frappe
+from datetime import date
+from datetime import datetime
+import re
 from frappe.model.document import Document
 from frappe.query_builder import Case, DocType
 from frappe.query_builder.functions import Coalesce, Count, Sum
@@ -72,6 +75,8 @@ class Implementation(Document):
 		
 		self.add_delivered_hrs()
 		self.add_resource_planning()
+		self.add_implementation_stats()
+		self.add_rank_html()
 		self.add_status_history()
 
 	def sync_sales_order_status_information(self):
@@ -541,8 +546,19 @@ def get_financial_snapshot(name, customer=None):
 
 @frappe.whitelist()
 def recompute_implementation_stats(name):
-	"""Recompute stats fields from existing child table rows for one record."""
+	"""Rebuild resource planning from Timesheets and recompute stats fields for one record."""
 	doc = frappe.get_doc("Implementation", name)
+	doc.add_resource_planning()
+
+	frappe.db.delete(
+		"Resource planning",
+		{"parent": name, "parenttype": "Implementation", "parentfield": "resource_planning"},
+	)
+	for idx, row in enumerate(doc.resource_planning or [], start=1):
+		row.idx = idx
+		row.name = None
+		frappe.get_doc(row.as_dict()).insert(ignore_permissions=True)
+
 	doc.add_implementation_stats()
 	doc.add_rank_html()
 	frappe.db.set_value(
