@@ -1,15 +1,15 @@
 <template>
-	<section class="relative flex h-full min-h-0 flex-col overflow-hidden bg-white">
+	<section class="relative flex h-full min-h-0 flex-col overflow-hidden bg-white dark:bg-gray-900">
 		<div
-			class="flex flex-shrink-0 flex-wrap items-center justify-between gap-2 border-b border-gray-200 px-4 py-3"
+			class="flex flex-shrink-0 flex-wrap items-center justify-between gap-2 border-b border-gray-200 px-4 py-3 dark:border-gray-800"
 		>
-			<div class="text-[11px] font-semibold uppercase tracking-wide text-gray-500">
+			<div class="text-[11px] font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400">
 				Discussion
 			</div>
 			<div v-if="channelId && !activeThread" class="flex items-center gap-2">
 				<button
 					type="button"
-					class="rounded-md border border-gray-200 px-2 py-1 text-xs text-gray-700 hover:bg-gray-50"
+					class="rounded-md border border-gray-200 px-2 py-1 text-xs text-gray-700 hover:bg-gray-50 dark:border-gray-700 dark:text-gray-300 dark:hover:bg-gray-800"
 					@click="showInvite = !showInvite"
 				>
 					Invite
@@ -18,14 +18,14 @@
 					:href="ravenUrl"
 					target="_blank"
 					rel="noopener"
-					class="rounded-md border border-gray-200 px-2 py-1 text-xs text-gray-700 hover:bg-gray-50"
+					class="rounded-md border border-gray-200 px-2 py-1 text-xs text-gray-700 hover:bg-gray-50 dark:border-gray-700 dark:text-gray-300 dark:hover:bg-gray-800"
 				>
 					Open in Raven
 				</a>
 			</div>
 		</div>
 
-		<div v-if="!featureEnabled" class="px-4 py-4 text-sm text-gray-500">
+		<div v-if="!featureEnabled" class="px-4 py-4 text-sm text-gray-500 dark:text-gray-400">
 			<template v-if="resolvedFlags.raven_unavailable">
 				Raven is not installed on this site.
 			</template>
@@ -37,7 +37,7 @@
 		<template v-else>
 			<div
 				v-if="loading && !channelId"
-				class="flex flex-1 items-center justify-center px-4 text-sm text-gray-500"
+				class="flex flex-1 items-center justify-center px-4 text-sm text-gray-500 dark:text-gray-400"
 			>
 				Loading…
 			</div>
@@ -46,7 +46,7 @@
 				v-else-if="!channelId"
 				class="flex flex-1 flex-col justify-center gap-3 px-4 py-6"
 			>
-				<p class="text-sm text-gray-600">
+				<p class="text-sm text-gray-600 dark:text-gray-400">
 					Start a private Raven channel for this issue. Creator and assignees are added
 					automatically.
 				</p>
@@ -55,32 +55,32 @@
 						Start discussion
 					</Button>
 				</div>
-				<p v-if="error" class="text-sm text-red-600">{{ error }}</p>
+				<p v-if="error" class="text-sm text-red-600 dark:text-red-400">{{ error }}</p>
 			</div>
 
 			<div v-else class="relative flex min-h-0 flex-1 flex-col">
 				<div
 					ref="listEl"
-					class="min-h-0 flex-1 space-y-3 overflow-y-auto bg-gray-50 px-3 py-3"
+					class="min-h-0 flex-1 space-y-3 overflow-y-auto bg-gray-50 px-3 py-3 dark:bg-gray-950"
 				>
-					<div v-if="!messages.length" class="text-center text-sm text-gray-500">
+					<div v-if="!messages.length" class="text-center text-sm text-gray-500 dark:text-gray-400">
 						No messages yet. Say hello.
 					</div>
 					<button
 						v-for="m in messages"
 						:key="m.name"
 						type="button"
-						class="block w-full rounded-md bg-white px-3 py-2 text-left shadow-sm transition hover:ring-1 hover:ring-gray-300"
+						class="block w-full rounded-md bg-white px-3 py-2 text-left shadow-sm transition hover:ring-1 hover:ring-gray-300 dark:bg-gray-900 dark:hover:ring-gray-600"
 						@click="openThread(m)"
 					>
 						<div class="mb-0.5 flex items-baseline justify-between gap-2">
-							<span class="text-xs font-semibold text-gray-800">
+							<span class="text-xs font-semibold text-gray-800 dark:text-gray-200">
 								{{ m.owner_name || m.owner }}
 							</span>
 							<span class="flex items-center gap-1.5">
 								<span
 									v-if="m.is_thread"
-									class="rounded-full bg-violet-50 px-1.5 py-0.5 text-[10px] font-semibold text-violet-700"
+									class="rounded-full bg-violet-50 px-1.5 py-0.5 text-[10px] font-semibold text-violet-700 dark:bg-violet-950 dark:text-violet-300"
 								>
 									Thread
 								</span>
@@ -89,24 +89,24 @@
 						</div>
 						<div
 							v-if="m.is_reply && m.reply_preview"
-							class="mb-1 border-l-2 border-gray-300 pl-2 text-[11px] text-gray-500"
+							class="mb-1 border-l-2 border-gray-300 pl-2 text-[11px] text-gray-500 dark:border-gray-600 dark:text-gray-400"
 						>
 							{{ m.reply_preview }}
 						</div>
 						<div
-							class="whitespace-pre-wrap text-sm text-gray-800"
+							class="whitespace-pre-wrap text-sm text-gray-800 dark:text-gray-200"
 							v-html="renderText(m.text)"
 						></div>
 					</button>
 				</div>
 
-				<div v-if="showInvite" class="border-t border-gray-200 bg-white px-3 py-2">
-					<div class="mb-2 text-xs font-medium text-gray-600">Invite Raven users</div>
-					<div class="mb-2 max-h-28 overflow-y-auto rounded border border-gray-200 p-1">
+				<div v-if="showInvite" class="border-t border-gray-200 bg-white px-3 py-2 dark:border-gray-800 dark:bg-gray-900">
+					<div class="mb-2 text-xs font-medium text-gray-600 dark:text-gray-400">Invite Raven users</div>
+					<div class="mb-2 max-h-28 overflow-y-auto rounded border border-gray-200 p-1 dark:border-gray-700">
 						<label
 							v-for="u in inviteUsers"
 							:key="u.user"
-							class="flex cursor-pointer items-center gap-2 rounded px-2 py-1 text-sm hover:bg-gray-50"
+							class="flex cursor-pointer items-center gap-2 rounded px-2 py-1 text-sm hover:bg-gray-50 dark:hover:bg-gray-800"
 						>
 							<input
 								type="checkbox"
@@ -120,13 +120,13 @@
 				</div>
 
 				<form
-					class="flex flex-shrink-0 gap-2 border-t border-gray-200 bg-white p-2"
+					class="flex flex-shrink-0 gap-2 border-t border-gray-200 bg-white p-2 dark:border-gray-800 dark:bg-gray-900"
 					@submit.prevent="send"
 				>
 					<input
 						v-model="draft"
 						type="text"
-						class="min-w-0 flex-1 rounded-md border border-gray-300 px-3 py-2 text-sm"
+						class="min-w-0 flex-1 rounded-md border border-gray-300 bg-white px-3 py-2 text-sm dark:border-gray-600 dark:bg-gray-800 dark:text-gray-200"
 						placeholder="Write a message…"
 						:disabled="sending"
 					/>
@@ -139,20 +139,20 @@
 				<!-- Thread overlay stays inside Discussion column -->
 				<div
 					v-if="activeThread"
-					class="absolute inset-0 z-10 flex flex-col bg-white"
+					class="absolute inset-0 z-10 flex flex-col bg-white dark:bg-gray-900"
 				>
 					<div
-						class="flex flex-shrink-0 items-center justify-between gap-2 border-b border-gray-200 px-3 py-2"
+						class="flex flex-shrink-0 items-center justify-between gap-2 border-b border-gray-200 px-3 py-2 dark:border-gray-800"
 					>
 						<div class="flex min-w-0 items-center gap-2">
 							<button
 								type="button"
-								class="rounded-md px-2 py-1 text-sm text-gray-600 hover:bg-gray-100"
+								class="rounded-md px-2 py-1 text-sm text-gray-600 hover:bg-gray-100 dark:text-gray-400 dark:hover:bg-gray-800"
 								@click="closeThread"
 							>
 								← Back
 							</button>
-							<span class="text-[11px] font-semibold uppercase tracking-wide text-gray-500">
+							<span class="text-[11px] font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400">
 								Thread
 							</span>
 						</div>
@@ -161,7 +161,7 @@
 							:href="threadRavenUrl"
 							target="_blank"
 							rel="noopener"
-							class="rounded-md border border-gray-200 px-2 py-1 text-xs text-gray-700 hover:bg-gray-50"
+							class="rounded-md border border-gray-200 px-2 py-1 text-xs text-gray-700 hover:bg-gray-50 dark:border-gray-700 dark:text-gray-300 dark:hover:bg-gray-800"
 						>
 							Open in Raven
 						</a>
@@ -169,10 +169,10 @@
 
 					<div
 						v-if="threadRoot"
-						class="flex-shrink-0 border-b border-gray-100 bg-gray-50 px-3 py-3"
+						class="flex-shrink-0 border-b border-gray-100 bg-gray-50 px-3 py-3 dark:border-gray-800 dark:bg-gray-950"
 					>
 						<div class="mb-0.5 flex items-baseline justify-between gap-2">
-							<span class="text-xs font-semibold text-gray-800">
+							<span class="text-xs font-semibold text-gray-800 dark:text-gray-200">
 								{{ threadRoot.owner_name || threadRoot.owner }}
 							</span>
 							<span class="text-[11px] text-gray-400">
@@ -180,24 +180,24 @@
 							</span>
 						</div>
 						<div
-							class="whitespace-pre-wrap text-sm text-gray-800"
+							class="whitespace-pre-wrap text-sm text-gray-800 dark:text-gray-200"
 							v-html="renderText(threadRoot.text)"
 						></div>
 					</div>
 
 					<div
 						ref="threadListEl"
-						class="min-h-0 flex-1 space-y-2 overflow-y-auto bg-gray-50 px-3 py-3"
+						class="min-h-0 flex-1 space-y-2 overflow-y-auto bg-gray-50 px-3 py-3 dark:bg-gray-950"
 					>
 						<div
 							v-if="threadLoading && !threadMessages.length"
-							class="text-center text-sm text-gray-500"
+							class="text-center text-sm text-gray-500 dark:text-gray-400"
 						>
 							Loading…
 						</div>
 						<div
 							v-else-if="!threadMessages.length"
-							class="text-center text-sm text-gray-500"
+							class="text-center text-sm text-gray-500 dark:text-gray-400"
 						>
 							No replies yet. Click a message below to answer, or write a reply.
 						</div>
@@ -205,33 +205,33 @@
 							v-for="m in threadMessages"
 							:key="m.name"
 							type="button"
-							class="block w-full rounded-md bg-white px-3 py-2 text-left shadow-sm transition hover:ring-1 hover:ring-gray-300"
+							class="block w-full rounded-md bg-white px-3 py-2 text-left shadow-sm transition hover:ring-1 hover:ring-gray-300 dark:bg-gray-900 dark:hover:ring-gray-600"
 							:class="{ 'ring-1 ring-blue-400': replyTo?.name === m.name }"
 							@click="setReplyTo(m)"
 						>
 							<div class="mb-0.5 flex items-baseline justify-between gap-2">
-								<span class="text-xs font-semibold text-gray-800">
+								<span class="text-xs font-semibold text-gray-800 dark:text-gray-200">
 									{{ m.owner_name || m.owner }}
 								</span>
 								<span class="text-[11px] text-gray-400">{{ formatTime(m.creation) }}</span>
 							</div>
 							<div
 								v-if="m.is_reply && m.reply_preview"
-								class="mb-1 border-l-2 border-gray-300 pl-2 text-[11px] text-gray-500"
+								class="mb-1 border-l-2 border-gray-300 pl-2 text-[11px] text-gray-500 dark:border-gray-600 dark:text-gray-400"
 							>
 								{{ m.reply_preview }}
 							</div>
 							<div
-								class="whitespace-pre-wrap text-sm text-gray-800"
+								class="whitespace-pre-wrap text-sm text-gray-800 dark:text-gray-200"
 								v-html="renderText(m.text)"
 							></div>
 						</button>
 					</div>
 
-					<div class="flex-shrink-0 border-t border-gray-200 bg-white p-2">
+					<div class="flex-shrink-0 border-t border-gray-200 bg-white p-2 dark:border-gray-800 dark:bg-gray-900">
 						<div
 							v-if="replyTo"
-							class="mb-2 flex items-center justify-between gap-2 rounded-md bg-blue-50 px-2 py-1.5 text-xs text-blue-800"
+							class="mb-2 flex items-center justify-between gap-2 rounded-md bg-blue-50 px-2 py-1.5 text-xs text-blue-800 dark:bg-blue-950 dark:text-blue-300"
 						>
 							<span class="min-w-0 truncate">
 								Replying to {{ replyTo.owner_name || replyTo.owner }}
@@ -248,7 +248,7 @@
 							<input
 								v-model="threadDraft"
 								type="text"
-								class="min-w-0 flex-1 rounded-md border border-gray-300 px-3 py-2 text-sm"
+								class="min-w-0 flex-1 rounded-md border border-gray-300 bg-white px-3 py-2 text-sm dark:border-gray-600 dark:bg-gray-800 dark:text-gray-200"
 								:placeholder="replyTo ? 'Write a reply…' : 'Reply in thread…'"
 								:disabled="threadSending"
 							/>
@@ -272,9 +272,12 @@
 <script setup>
 import { computed, nextTick, onMounted, onUnmounted, ref, watch } from "vue"
 import { call } from "frappe-ui"
+import { formatDatetime } from "../utils/datetime"
 
 const props = defineProps({
-	issueName: { type: String, required: true },
+	issueName: { type: String, default: "" },
+	documentName: { type: String, default: "" },
+	linkedDoctype: { type: String, default: "Issue" },
 	chatFlags: {
 		type: Object,
 		default: () => ({
@@ -287,9 +290,24 @@ const props = defineProps({
 		type: Object,
 		default: null,
 	},
+	apiPrefix: {
+		type: String,
+		default: "phamos.api.i_own_my_work",
+	},
 })
 
-const API = "phamos.api.i_own_my_work"
+const API = computed(() => props.apiPrefix || "phamos.api.i_own_my_work")
+
+const docName = computed(() => props.documentName || props.issueName)
+const linkedDoctype = computed(() => props.linkedDoctype || "Issue")
+
+function linkedArgs(extra = {}) {
+	return {
+		linked_doctype: linkedDoctype.value,
+		linked_document: docName.value,
+		...extra,
+	}
+}
 
 const loading = ref(false)
 const starting = ref(false)
@@ -323,12 +341,7 @@ const resolvedFlags = computed(() => props.flags || props.chatFlags || {})
 const featureEnabled = computed(() => !!resolvedFlags.value?.enabled)
 
 function formatTime(value) {
-	if (!value) return ""
-	try {
-		return new Date(value).toLocaleString()
-	} catch (e) {
-		return value
-	}
+	return formatDatetime(value)
 }
 
 function renderText(text) {
@@ -361,11 +374,14 @@ async function scrollThreadToBottom() {
 }
 
 async function loadChat() {
-	if (!featureEnabled.value || !props.issueName) return
+	if (!featureEnabled.value || !docName.value) return
 	loading.value = true
 	error.value = ""
 	try {
-		const data = await call(`${API}.get_issue_chat`, { name: props.issueName })
+		const data = await call(`${API.value}.get_document_chat`, {
+			linked_doctype: linkedDoctype.value,
+			name: docName.value,
+		})
 		channelId.value = data.channel_id || null
 		messages.value = data.messages || []
 		members.value = data.members || []
@@ -383,7 +399,10 @@ async function startDiscussion() {
 	starting.value = true
 	error.value = ""
 	try {
-		const data = await call(`${API}.ensure_issue_channel`, { name: props.issueName })
+		const data = await call(`${API.value}.ensure_document_channel`, {
+			linked_doctype: linkedDoctype.value,
+			name: docName.value,
+		})
 		channelId.value = data.channel_id
 		messages.value = data.messages || []
 		members.value = data.members || []
@@ -400,10 +419,10 @@ async function startDiscussion() {
 async function refreshMessages() {
 	if (!channelId.value || activeThread.value) return
 	try {
-		const data = await call(`${API}.get_chat_messages`, {
+		const data = await call(`${API.value}.get_chat_messages`, {
 			channel_id: channelId.value,
 			limit: 50,
-			issue_name: props.issueName,
+			...linkedArgs(),
 		})
 		const next = data.messages || []
 		const prevLast = messages.value[messages.value.length - 1]?.name
@@ -421,10 +440,10 @@ async function send() {
 	sending.value = true
 	error.value = ""
 	try {
-		const msg = await call(`${API}.send_chat_message`, {
+		const msg = await call(`${API.value}.send_chat_message`, {
 			channel_id: channelId.value,
 			text,
-			issue_name: props.issueName,
+			...linkedArgs(),
 		})
 		draft.value = ""
 		messages.value = [...messages.value, msg]
@@ -443,15 +462,14 @@ async function openThread(message) {
 	replyTo.value = null
 	threadDraft.value = ""
 	try {
-		const data = await call(`${API}.open_or_create_thread`, {
+		const data = await call(`${API.value}.open_or_create_thread`, {
 			message_id: message.name,
-			issue_name: props.issueName,
+			...linkedArgs(),
 		})
 		activeThread.value = data.thread_id
 		threadRoot.value = data.root_message
 		threadMessages.value = (data.messages || []).filter((m) => m.name !== data.thread_id)
 		threadRavenUrl.value = data.raven_url || `/raven/channel/${data.thread_id}`
-		// Mark parent message as thread in local list
 		messages.value = messages.value.map((m) =>
 			m.name === message.name ? { ...m, is_thread: 1 } : m
 		)
@@ -484,9 +502,9 @@ function setReplyTo(message) {
 async function refreshThread() {
 	if (!activeThread.value) return
 	try {
-		const data = await call(`${API}.get_thread`, {
+		const data = await call(`${API.value}.get_thread`, {
 			thread_id: activeThread.value,
-			issue_name: props.issueName,
+			...linkedArgs(),
 		})
 		if (data.root_message) threadRoot.value = data.root_message
 		const next = (data.messages || []).filter((m) => m.name !== activeThread.value)
@@ -508,13 +526,13 @@ async function sendThread() {
 		const args = {
 			channel_id: activeThread.value,
 			text,
-			issue_name: props.issueName,
+			...linkedArgs(),
 		}
 		if (replyTo.value?.name) {
 			args.is_reply = 1
 			args.linked_message = replyTo.value.name
 		}
-		const msg = await call(`${API}.send_chat_message`, args)
+		const msg = await call(`${API.value}.send_chat_message`, args)
 		threadDraft.value = ""
 		replyTo.value = null
 		threadMessages.value = [...threadMessages.value, msg]
@@ -528,7 +546,7 @@ async function sendThread() {
 
 async function loadInviteUsers() {
 	try {
-		inviteUsers.value = await call(`${API}.get_raven_users_for_invite`)
+		inviteUsers.value = await call(`${API.value}.get_raven_users_for_invite`)
 	} catch (e) {
 		inviteUsers.value = []
 	}
@@ -547,8 +565,9 @@ async function sendInvites() {
 	inviting.value = true
 	error.value = ""
 	try {
-		const data = await call(`${API}.invite_to_issue_channel`, {
-			name: props.issueName,
+		const data = await call(`${API.value}.invite_to_document_channel`, {
+			linked_doctype: linkedDoctype.value,
+			name: docName.value,
 			users: inviteSelection.value,
 		})
 		members.value = data.members || []
@@ -591,7 +610,7 @@ function stopThreadPolling() {
 }
 
 watch(
-	() => props.issueName,
+	() => [linkedDoctype.value, docName.value],
 	async () => {
 		stopPolling()
 		closeThread()

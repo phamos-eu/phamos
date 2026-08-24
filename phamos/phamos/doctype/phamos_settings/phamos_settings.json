@@ -61,7 +61,12 @@
   "checklist_section",
   "checklist_popup",
   "ticketing_tab",
-  "walk_in_customer"
+  "walk_in_customer",
+  "hr_spa_tab",
+  "hr_spa_section",
+  "hr_department",
+  "column_break_hr_spa",
+  "hr_timesheet_project"
  ],
  "fields": [
   {
@@ -369,6 +374,34 @@
    "fieldtype": "Link",
    "label": "Walk In Customer",
    "options": "Customer"
+  },
+  {
+   "fieldname": "hr_spa_tab",
+   "fieldtype": "Tab Break",
+   "label": "HR SPA"
+  },
+  {
+   "fieldname": "hr_spa_section",
+   "fieldtype": "Section Break",
+   "label": "HR SPA Settings"
+  },
+  {
+   "description": "Department used to scope Issues (via linked projects) and Tasks in the /hr-cockpit SPA.",
+   "fieldname": "hr_department",
+   "fieldtype": "Link",
+   "label": "HR Department",
+   "options": "Department"
+  },
+  {
+   "fieldname": "column_break_hr_spa",
+   "fieldtype": "Column Break"
+  },
+  {
+   "description": "Default project for the start/stop timesheet timer in the HR SPA.",
+   "fieldname": "hr_timesheet_project",
+   "fieldtype": "Link",
+   "label": "HR Timesheet Project",
+   "options": "Project"
   }
  ],
  "index_web_pages_for_search": 1,
