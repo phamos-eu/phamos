@@ -1,0 +1,27 @@
+<!DOCTYPE html>
+<html lang="en">
+	<head>
+		<meta charset="UTF-8" />
+		<link rel="icon" href="/assets/frappe/images/frappe-favicon.svg" />
+		<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+		<title>Accounting</title>
+		<meta name="theme-color" content="#ffffff" />
+		<script type="module" crossorigin src="/assets/phamos/accounting/assets/index-Bxj7cSL_.js"></script>
+		<link rel="modulepreload" crossorigin href="/assets/phamos/accounting/assets/frappe-ui-xxxZKB0C.js">
+		<link rel="stylesheet" crossorigin href="/assets/phamos/accounting/assets/frappe-ui-D1rk2b8Q.css">
+		<link rel="stylesheet" crossorigin href="/assets/phamos/accounting/assets/index-CiSjgUPG.css">
+	</head>
+	<body class="antialiased">
+		<div id="app"></div>
+		<div id="modals"></div>
+		<div id="popovers"></div>
+
+		<script>
+			window.csrf_token = "{{ csrf_token }}"
+			window.site_name = "{{ site_name }}"
+			if (!window.frappe) window.frappe = {}
+			frappe.boot = {{ boot }}
+		</script>
+
+	</body>
+</html>

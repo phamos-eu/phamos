@@ -1,0 +1,24 @@
+<!DOCTYPE html>
+<html lang="en">
+	<head>
+		<meta charset="UTF-8" />
+		<link rel="icon" href="/assets/frappe/images/frappe-favicon.svg" />
+		<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+		<title>Sales</title>
+		<meta name="theme-color" content="#ffffff" />
+	</head>
+	<body class="antialiased">
+		<div id="app"></div>
+		<div id="modals"></div>
+		<div id="popovers"></div>
+
+		<script>
+			window.csrf_token = "{{ csrf_token }}"
+			window.site_name = "{{ site_name }}"
+			if (!window.frappe) window.frappe = {}
+			frappe.boot = {{ boot }}
+		</script>
+
+		<script type="module" src="/src/main.js"></script>
+	</body>
+</html>

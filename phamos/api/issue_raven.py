@@ -197,10 +197,16 @@ def _spa_path_for(doctype, name):
 		department = frappe.db.get_value("Task", name, "department")
 		sales_department = frappe.db.get_single_value("phamos Settings", "sales_department")
 		hr_department = frappe.db.get_single_value("phamos Settings", "hr_department")
+		accounting_department = frappe.db.get_single_value("phamos Settings", "accounting_department")
+		pm_department = frappe.db.get_single_value("phamos Settings", "pm_department")
 		if department and sales_department and department == sales_department:
 			return f"/sales-cockpit/tasks/{name}"
 		if department and hr_department and department == hr_department:
 			return f"/hr-cockpit/tasks/{name}"
+		if department and accounting_department and department == accounting_department:
+			return f"/accounting-cockpit/tasks/{name}"
+		if department and pm_department and department == pm_department:
+			return f"/project-management-cockpit/tasks/{name}"
 		return f"/hr-cockpit/tasks/{name}"
 	return f"/i-own-my-work/issues/{name}"
 
