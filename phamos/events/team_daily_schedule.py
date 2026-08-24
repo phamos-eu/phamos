@@ -18,7 +18,7 @@ from phamos.mailcow_integration.caldav.client import (
 from phamos.mailcow_integration.caldav.ics import vevent
 
 
-SCHEDULE_TABLE_FIELD = "custom_team_daily_schedule"
+SCHEDULE_TABLE_FIELD = "event_schedule"
 SCHEDULE_ROW_DOCTYPE = "Team Daily Schedule"
 AUTO_GENERATED_MARKER = "***** Auto Generated *****"
 EMAIL_RE = re.compile(r"^[^@\s,;<>]+@[^@\s,;<>]+\.[^@\s,;<>]+$")

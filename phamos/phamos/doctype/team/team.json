@@ -25,7 +25,7 @@
   "column_break_ywhn",
   "total_team_capacity_daily",
   "custom_team_daily",
-  "custom_team_daily_schedule"
+  "event_schedule"
  ],
  "fields": [
   {
@@ -121,7 +121,7 @@
    "label": "Events"
   },
   {
-   "fieldname": "custom_team_daily_schedule",
+   "fieldname": "event_schedule",
    "fieldtype": "Table",
    "label": "Event Schedule",
    "options": "Team Daily Schedule"
