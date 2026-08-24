@@ -2,9 +2,10 @@
 	"name": "phamos",
 	"private": true,
 	"scripts": {
-		"postinstall": "cd frontend && yarn install --check-files && cd ../hr_frontend && yarn install --check-files",
+		"postinstall": "cd frontend && yarn install --check-files && cd ../hr_frontend && yarn install --check-files && cd ../project_management_frontend && yarn install --check-files",
 		"dev": "cd frontend && yarn dev",
 		"dev:hr": "cd hr_frontend && yarn dev",
-		"build": "cd frontend && yarn build && cd ../hr_frontend && yarn build"
+		"dev:pm": "cd project_management_frontend && yarn dev",
+		"build": "cd frontend && yarn build && cd ../hr_frontend && yarn build && cd ../project_management_frontend && yarn build"
 	}
 }

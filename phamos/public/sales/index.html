@@ -1,0 +1,27 @@
+<!DOCTYPE html>
+<html lang="en">
+	<head>
+		<meta charset="UTF-8" />
+		<link rel="icon" href="/assets/frappe/images/frappe-favicon.svg" />
+		<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+		<title>Sales</title>
+		<meta name="theme-color" content="#ffffff" />
+		<script type="module" crossorigin src="/assets/phamos/sales/assets/index-C4L5jtnp.js"></script>
+		<link rel="modulepreload" crossorigin href="/assets/phamos/sales/assets/frappe-ui-Bw_jiPJb.js">
+		<link rel="stylesheet" crossorigin href="/assets/phamos/sales/assets/frappe-ui-D1rk2b8Q.css">
+		<link rel="stylesheet" crossorigin href="/assets/phamos/sales/assets/index-6TdZWocA.css">
+	</head>
+	<body class="antialiased">
+		<div id="app"></div>
+		<div id="modals"></div>
+		<div id="popovers"></div>
+
+		<script>
+			window.csrf_token = "{{ csrf_token }}"
+			window.site_name = "{{ site_name }}"
+			if (!window.frappe) window.frappe = {}
+			frappe.boot = {{ boot }}
+		</script>
+
+	</body>
+</html>
