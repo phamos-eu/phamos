@@ -90,6 +90,7 @@ frappe.ui.form.on("Implementation", {
         frm.trigger("render_gitlab_issues_section");
         frm.trigger("render_gitlab_milestones_section");
         frm.trigger("render_risk_overview_section");
+        frm.trigger("render_rank_html_section");
 
         if (!document.getElementById("gitlab-custom-style")) {
             const style = document.createElement("style");
@@ -1070,6 +1071,35 @@ frappe.ui.form.on("Implementation", {
                         </table>
                     </div>
                 `);
+            }
+        });
+    },
+    render_rank_html_section(frm) {
+        if (frm.is_new()) return;
+
+        const wrapper = frm.fields_dict.rank_html?.wrapper;
+
+        frappe.call({
+            method: "phamos.phamos.doctype.implementation.implementation.recompute_implementation_stats",
+            args: { name: frm.doc.name },
+            callback: function (r) {
+                if (!r.message) return;
+
+                // Keep the on-screen stat fields fresh on every view, without
+                // marking the form dirty (this is a read-time background sync).
+                ["total_time_implementation_life", "total_time_last_12_months",
+                 "total_time_last_6_months", "total_time_last_3_months",
+                 "predicted_time_next_3_months"].forEach(fieldname => {
+                    if (fieldname in r.message) {
+                        frm.doc[fieldname] = r.message[fieldname];
+                        frm.refresh_field(fieldname);
+                    }
+                });
+
+                if (wrapper) {
+                    const rankHtml = r.message.rank_html || `<div class="text-muted">${__("No ranking available.")}</div>`;
+                    $(wrapper).html(rankHtml);
+                }
             }
         });
     },
