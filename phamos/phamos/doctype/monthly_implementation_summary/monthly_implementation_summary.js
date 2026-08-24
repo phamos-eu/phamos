@@ -181,6 +181,7 @@ function _mis_create_si_for_dns(frm, delivery_notes) {
 	);
 }
 
+
 function _mis_is_timesheet_pending(row) {
 	if (!row) return false;
 	if (Object.prototype.hasOwnProperty.call(row, "is_pending")) {
@@ -261,9 +262,16 @@ function _mis_timesheet_row_html(row) {
 function _mis_render_timesheet_approval_table(dialog, rows) {
 	const html_field = dialog.get_field("timesheet_approval_html");
 	if (!html_field || !html_field.$wrapper) return;
+
 	const filters = dialog.__mis_ts_filters || {};
 	const filters_summary_html = _mis_get_active_filters_summary_html(filters);
-	const table_rows = (rows || []).map(_mis_timesheet_row_html).join("");
+
+	// Sort by billable hours: highest to lowest
+	const sorted_rows = [...(rows || [])].sort((a, b) => {
+		return flt(b.billable_hours || 0) - flt(a.billable_hours || 0);
+	});
+
+	const table_rows = sorted_rows.map(_mis_timesheet_row_html).join("");
 
 	html_field.$wrapper.html(`
 		<style>
@@ -314,6 +322,7 @@ function _mis_render_timesheet_approval_table(dialog, rows) {
 		</div>
 	`);
 }
+
 
 function _mis_render_timesheet_loading_state(dialog) {
 	const html_field = dialog.get_field("timesheet_approval_html");
@@ -437,7 +446,6 @@ function _mis_submit_selected_timesheets(frm, dialog) {
 		return frm.reload_doc().then(() => true);
 	});
 }
-
 function _mis_bind_timesheet_approval_dialog_events(frm, dialog) {
 	dialog.$wrapper.off("change", "#mis-ts-select-all");
 	dialog.$wrapper.on("change", "#mis-ts-select-all", function () {
@@ -448,33 +456,34 @@ function _mis_bind_timesheet_approval_dialog_events(frm, dialog) {
 	dialog.$wrapper.off("click", "#mis-ts-filter-btn");
 	dialog.$wrapper.on("click", "#mis-ts-filter-btn", function () {
 		const filters = dialog.__mis_ts_filters || {};
+
 		frappe.prompt(
 			[
 				{
 					label: __("Employee"),
 					fieldname: "employee",
-						fieldtype: "Link",
-						options: "Employee",
+					fieldtype: "Link",
+					options: "Employee",
 					default: filters.employee || "",
 				},
 				{
 					label: __("Project"),
 					fieldname: "project",
-						fieldtype: "Link",
-						options: "Project",
+					fieldtype: "Link",
+					options: "Project",
 					default: filters.project || "",
 				},
 				{
-						label: __("From Date"),
-						fieldname: "date_from",
-						fieldtype: "Date",
-						default: filters.date_from || "",
-					},
-					{
-						label: __("To Date"),
-						fieldname: "date_to",
-						fieldtype: "Date",
-						default: filters.date_to || "",
+					label: __("From Date"),
+					fieldname: "date_from",
+					fieldtype: "Date",
+					default: filters.date_from || "",
+				},
+				{
+					label: __("To Date"),
+					fieldname: "date_to",
+					fieldtype: "Date",
+					default: filters.date_to || "",
 				},
 			],
 			(values) => {
@@ -484,6 +493,7 @@ function _mis_bind_timesheet_approval_dialog_events(frm, dialog) {
 					date_from: values.date_from || "",
 					date_to: values.date_to || "",
 				};
+
 				_mis_load_timesheet_approval_rows(frm, dialog);
 			},
 			__("Filter Timesheets"),
@@ -495,9 +505,175 @@ function _mis_bind_timesheet_approval_dialog_events(frm, dialog) {
 	dialog.$wrapper.on("click", "#mis-ts-clear-filter-btn", function () {
 		dialog.__mis_ts_filters = {};
 		dialog.$wrapper.find("#mis-ts-select-all").prop("checked", false);
+
 		_mis_load_timesheet_approval_rows(frm, dialog);
 	});
+
+	// ---------------------------------------------------------
+	// Create column search fields
+	// ---------------------------------------------------------
+
+	const $table = dialog.$wrapper.find(".mis-ts-table-wrap table");
+
+	if ($table.length && !$table.find("thead .mis-ts-column-filter-row").length) {
+		$table.find("thead").append(`
+			<tr class="mis-ts-column-filter-row">
+				<th></th>
+				<th>
+					<input
+						type="text"
+						class="form-control input-sm mis-ts-column-filter"
+						data-column="timesheet"
+						placeholder="${__("Search")}"
+					>
+				</th>
+				<th>
+					<input
+						type="text"
+						class="form-control input-sm mis-ts-column-filter"
+						data-column="date"
+						placeholder="${__("Search")}"
+					>
+				</th>
+				<th>
+					<input
+						type="text"
+						class="form-control input-sm mis-ts-column-filter"
+						data-column="employee_name"
+						placeholder="${__("Search")}"
+					>
+				</th>
+				<th>
+					<input
+						type="text"
+						class="form-control input-sm mis-ts-column-filter"
+						data-column="project"
+						placeholder="${__("Search")}"
+					>
+				</th>
+				<th>
+					<input
+						type="text"
+						class="form-control input-sm mis-ts-column-filter"
+						data-column="total_hours"
+						placeholder="${__("Search")}"
+					>
+				</th>
+				<th>
+					<input
+						type="text"
+						class="form-control input-sm mis-ts-column-filter"
+						data-column="billable_hours"
+						placeholder="${__("Search")}"
+					>
+				</th>
+				<th>
+					<input
+						type="text"
+						class="form-control input-sm mis-ts-column-filter"
+						data-column="status"
+						placeholder="${__("Search")}"
+					>
+				</th>
+			</tr>
+		`);
+
+		$table.find("thead .mis-ts-column-filter-row th").css({
+			padding: "4px",
+			background: "var(--bg-color)",
+		});
+
+		$table.find(".mis-ts-column-filter").css({
+			width: "100%",
+			fontSize: "12px",
+		});
+	}
+
+	// ---------------------------------------------------------
+	// Column search functionality
+	// ---------------------------------------------------------
+
+	dialog.$wrapper.off("input", ".mis-ts-column-filter");
+	dialog.$wrapper.on("input", ".mis-ts-column-filter", function () {
+		const column_filters = {};
+
+		dialog.$wrapper.find(".mis-ts-column-filter").each(function () {
+			const column = $(this).attr("data-column");
+			const value = String($(this).val() || "")
+				.trim()
+				.toLowerCase();
+
+			if (column && value) {
+				column_filters[column] = value;
+			}
+		});
+
+		dialog.$wrapper
+			.find(".mis-ts-table-wrap tbody tr")
+			.each(function () {
+				const $row = $(this);
+
+				if (!$row.find(".mis-ts-select").length) {
+					return;
+				}
+
+				const row_values = {
+					timesheet: String(
+						$row.find("td").eq(1).text() || ""
+					)
+						.trim()
+						.toLowerCase(),
+
+					date: String(
+						$row.find("td").eq(2).text() || ""
+					)
+						.trim()
+						.toLowerCase(),
+
+					employee_name: String(
+						$row.find("td").eq(3).text() || ""
+					)
+						.trim()
+						.toLowerCase(),
+
+					project: String(
+						$row.find("td").eq(4).text() || ""
+					)
+						.trim()
+						.toLowerCase(),
+
+					total_hours: String(
+						$row.find("td").eq(5).text() || ""
+					)
+						.trim()
+						.toLowerCase(),
+
+					billable_hours: String(
+						$row.find(".mis-ts-billable-input").val() || ""
+					)
+						.trim()
+						.toLowerCase(),
+
+					status: String(
+						$row.find("td").eq(7).text() || ""
+					)
+						.trim()
+						.toLowerCase(),
+				};
+
+				const matches = Object.keys(column_filters).every(
+					(column) => {
+						return row_values[column].includes(
+							column_filters[column]
+						);
+					}
+				);
+
+				$row.toggle(matches);
+			});
+	});
 }
+
 
 function _mis_load_timesheet_approval_rows(frm, dialog) {
 	const filters = dialog.__mis_ts_filters || {};
@@ -533,7 +709,7 @@ function _mis_show_timesheet_approval_dialog(frm) {
 			fieldtype: "HTML",
 		}],
 		primary_action_label: __("Save"),
-		secondary_action_label: __("Close"),
+		secondary_action_label: __("Approve"),
 		secondary_action: () => {
 			_mis_submit_selected_timesheets(frm, dialog).then((ok) => {
 				if (ok) dialog.hide();
@@ -564,12 +740,33 @@ function _mis_show_timesheet_approval_dialog(frm) {
 
 function _mis_maybe_open_timesheet_approval_dialog(frm) {
 	if (frm.is_new() || !frm.doc.name) return;
-	if (!Array.isArray(frm.doc.timesheets_table) || !frm.doc.timesheets_table.length) return;
+
 	if (frm.__mis_timesheet_dialog_opened_for === frm.doc.name) return;
-	frm.__mis_timesheet_dialog_opened_for = frm.doc.name;
-	setTimeout(() => {
-		_mis_show_timesheet_approval_dialog(frm);
-	}, 250);
+
+	frappe.call({
+		method: "phamos.phamos.doctype.monthly_implementation_summary.monthly_implementation_summary.get_timesheet_approval_rows",
+		args: {
+			docname: frm.doc.name,
+		},
+		freeze: false,
+	}).then((r) => {
+		const rows = (r && r.message) || [];
+
+		// Only open the dialog when at least one timesheet is pending
+		const has_pending_timesheet = rows.some((row) =>
+			_mis_is_timesheet_pending(row)
+		);
+
+		if (!has_pending_timesheet) {
+			return;
+		}
+
+		frm.__mis_timesheet_dialog_opened_for = frm.doc.name;
+
+		setTimeout(() => {
+			_mis_show_timesheet_approval_dialog(frm);
+		}, 250);
+	});
 }
 
 frappe.ui.form.on("Monthly Implementation Summary", {
