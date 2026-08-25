@@ -71,7 +71,17 @@
   "pm_spa_section",
   "pm_department",
   "column_break_pm_spa",
-  "pm_timesheet_project"
+  "pm_timesheet_project",
+  "sales_spa_tab",
+  "sales_spa_section",
+  "sales_department",
+  "column_break_sales_spa",
+  "sales_standard_project",
+  "accounting_spa_tab",
+  "accounting_spa_section",
+  "accounting_department",
+  "column_break_accounting_spa",
+  "accounting_standard_project"
  ],
  "fields": [
   {
@@ -435,12 +445,68 @@
    "fieldtype": "Link",
    "label": "Project Management Timesheet Project",
    "options": "Project"
+  },
+  {
+   "fieldname": "sales_spa_tab",
+   "fieldtype": "Tab Break",
+   "label": "Sales SPA"
+  },
+  {
+   "fieldname": "sales_spa_section",
+   "fieldtype": "Section Break",
+   "label": "Sales SPA Settings"
+  },
+  {
+   "description": "Department used to scope Issues (via linked projects) and Tasks in the /sales-cockpit SPA.",
+   "fieldname": "sales_department",
+   "fieldtype": "Link",
+   "label": "Sales Department",
+   "options": "Department"
+  },
+  {
+   "fieldname": "column_break_sales_spa",
+   "fieldtype": "Column Break"
+  },
+  {
+   "description": "Default project for the start/stop timesheet timer and new Issues/Tasks in the Sales SPA.",
+   "fieldname": "sales_standard_project",
+   "fieldtype": "Link",
+   "label": "Sales Standard Project",
+   "options": "Project"
+  },
+  {
+   "fieldname": "accounting_spa_tab",
+   "fieldtype": "Tab Break",
+   "label": "Accounting SPA"
+  },
+  {
+   "fieldname": "accounting_spa_section",
+   "fieldtype": "Section Break",
+   "label": "Accounting SPA Settings"
+  },
+  {
+   "description": "Department used to scope Issues (via linked projects) and Tasks in the /accounting-cockpit SPA.",
+   "fieldname": "accounting_department",
+   "fieldtype": "Link",
+   "label": "Accounting Department",
+   "options": "Department"
+  },
+  {
+   "fieldname": "column_break_accounting_spa",
+   "fieldtype": "Column Break"
+  },
+  {
+   "description": "Default project for the start/stop timesheet timer and new Issues/Tasks in the Accounting SPA (Accounting Cost Center Project).",
+   "fieldname": "accounting_standard_project",
+   "fieldtype": "Link",
+   "label": "Accounting Standard Project",
+   "options": "Project"
   }
  ],
  "index_web_pages_for_search": 1,
  "issingle": 1,
  "links": [],
- "modified": "2026-07-08 08:37:16.073881",
+ "modified": "2026-08-25 14:57:25.006749",
  "modified_by": "Administrator",
  "module": "Phamos",
  "name": "phamos Settings",

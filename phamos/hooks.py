@@ -25,6 +25,13 @@ add_to_apps_screen = [
 		"has_permission": "phamos.api.hr_spa.check_app_permission",
 	},
 	{
+		"name": "sales_spa",
+		"logo": "/assets/frappe/images/frappe-favicon.svg",
+		"title": "Sales",
+		"route": "/sales-cockpit",
+		"has_permission": "phamos.api.sales_spa.check_app_permission",
+	},
+	{
 		"name": "project_management_spa",
 		"logo": "/assets/frappe/images/frappe-favicon.svg",
 		"title": "Project Management Cockpit",
@@ -109,6 +116,8 @@ website_route_rules = [
     {"from_route": "/i-own-my-work/<path:app_path>", "to_route": "i_own_my_work"},
     {"from_route": "/hr-cockpit", "to_route": "hr_spa"},
     {"from_route": "/hr-cockpit/<path:app_path>", "to_route": "hr_spa"},
+    {"from_route": "/sales-cockpit", "to_route": "sales_spa"},
+    {"from_route": "/sales-cockpit/<path:app_path>", "to_route": "sales_spa"},
     {"from_route": "/project-management-cockpit", "to_route": "project_management_spa"},
     {"from_route": "/project-management-cockpit/<path:app_path>", "to_route": "project_management_spa"},
     {"from_route": "/accounting-cockpit", "to_route": "accounting_spa"},

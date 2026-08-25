@@ -190,15 +190,24 @@ def _issue_member_users(issue_doc):
 	return _member_users_for_doc("Issue", issue_doc)
 
 
+def _settings_dept(fieldname):
+	"""Read a phamos Settings field only if it exists (avoids get_single_value throw)."""
+	if not fieldname:
+		return None
+	if not frappe.get_meta("phamos Settings").has_field(fieldname):
+		return None
+	return frappe.db.get_single_value("phamos Settings", fieldname)
+
+
 def _spa_path_for(doctype, name):
 	if doctype == "Checklist":
 		return f"/i-own-my-work/checklists/{name}"
 	if doctype == "Task":
 		department = frappe.db.get_value("Task", name, "department")
-		sales_department = frappe.db.get_single_value("phamos Settings", "sales_department")
-		hr_department = frappe.db.get_single_value("phamos Settings", "hr_department")
-		accounting_department = frappe.db.get_single_value("phamos Settings", "accounting_department")
-		pm_department = frappe.db.get_single_value("phamos Settings", "pm_department")
+		sales_department = _settings_dept("sales_department")
+		hr_department = _settings_dept("hr_department")
+		accounting_department = _settings_dept("accounting_department")
+		pm_department = _settings_dept("pm_department")
 		if department and sales_department and department == sales_department:
 			return f"/sales-cockpit/tasks/{name}"
 		if department and hr_department and department == hr_department:
@@ -207,8 +216,22 @@ def _spa_path_for(doctype, name):
 			return f"/accounting-cockpit/tasks/{name}"
 		if department and pm_department and department == pm_department:
 			return f"/project-management-cockpit/tasks/{name}"
-		return f"/hr-cockpit/tasks/{name}"
+		return f"/app/task/{name}"
 	return f"/i-own-my-work/issues/{name}"
+
+
+def _spa_open_label(spa_path):
+	if spa_path.startswith("/sales-cockpit"):
+		return "Open in Sales Cockpit"
+	if spa_path.startswith("/hr-cockpit"):
+		return "Open in HR Cockpit"
+	if spa_path.startswith("/accounting-cockpit"):
+		return "Open in Accounting Cockpit"
+	if spa_path.startswith("/project-management-cockpit"):
+		return "Open in Project Management Cockpit"
+	if spa_path.startswith("/app/"):
+		return "Open in Desk"
+	return "Open in I Own My Work"
 
 
 def _doc_label(doctype, doc):
@@ -479,18 +502,21 @@ def ensure_document_channel(linked_doctype, name):
 	if ru:
 		_add_members(channel_id, [ru])
 
-	spa_url = get_url(_spa_path_for(linked_doctype, doc.name))
+	spa_path = _spa_path_for(linked_doctype, doc.name)
+	spa_url = get_url(spa_path)
+	open_label = _spa_open_label(spa_path)
 	intro = (
-		f"Discussion started for **{doc.name}**: {label}\n\n"
-		f"[Open in I Own My Work]({spa_url})"
+		_("Discussion started for **{0}**: {1}").format(doc.name, label)
+		+ f"\n\n[{open_label}]({spa_url})"
 	)
-	frappe.get_doc(
-		{
-			"doctype": "Raven Message",
-			"channel_id": channel_id,
-			"message_type": "Text",
-			"text": intro,
-			"json": {
+	try:
+		from raven.api.raven_message import send_message
+
+		send_message(
+			channel_id=channel_id,
+			message_type="Text",
+			text=intro,
+			json={
 				"type": "doc",
 				"content": [
 					{
@@ -499,10 +525,29 @@ def ensure_document_channel(linked_doctype, name):
 					}
 				],
 			},
-			"link_doctype": linked_doctype,
-			"link_document": doc.name,
-		}
-	).insert()
+			link_doctype=linked_doctype,
+			link_document=doc.name,
+		)
+	except Exception:
+		frappe.get_doc(
+			{
+				"doctype": "Raven Message",
+				"channel_id": channel_id,
+				"message_type": "Text",
+				"text": intro,
+				"json": {
+					"type": "doc",
+					"content": [
+						{
+							"type": "paragraph",
+							"content": [{"type": "text", "text": intro}],
+						}
+					],
+				},
+				"link_doctype": linked_doctype,
+				"link_document": doc.name,
+			}
+		).insert()
 
 	return get_document_chat(linked_doctype, name)
 

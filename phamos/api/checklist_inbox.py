@@ -7,6 +7,8 @@ import frappe
 from frappe import _
 from frappe.utils import cint
 
+CHECKLIST_REFERENCE_DOCTYPES = ("Issue", "Task", "Project", "Lead", "Opportunity", "Customer")
+
 
 def _require_checklist_read(name):
 	frappe.has_permission("Checklist", "read", throw=True)
@@ -22,20 +24,38 @@ def _require_checklist_write(name):
 	return doc
 
 
-def _item_counts(checklist_name):
+def _item_counts_map(checklist_names):
+	"""Batch-count checklist items for many parents (avoids N+1)."""
+	counts = {name: (0, 0) for name in checklist_names}
+	if not checklist_names:
+		return counts
 	rows = frappe.get_all(
 		"Checklist Items",
-		filters={"parent": checklist_name, "parenttype": "Checklist"},
-		fields=["done"],
+		filters={"parent": ("in", list(checklist_names)), "parenttype": "Checklist"},
+		fields=["parent", "done"],
 		limit_page_length=0,
 	)
-	total = len(rows)
-	done = sum(1 for r in rows if cint(r.done))
+	totals = {name: [0, 0] for name in checklist_names}
+	for row in rows:
+		parent = row.parent
+		if parent not in totals:
+			continue
+		totals[parent][1] += 1
+		if cint(row.done):
+			totals[parent][0] += 1
+	return {name: (done, total) for name, (done, total) in totals.items()}
+
+
+def _item_counts(checklist_name):
+	done, total = _item_counts_map([checklist_name]).get(checklist_name, (0, 0))
 	return done, total
 
 
-def _serialize_row(row):
-	done_count, total_count = _item_counts(row.name)
+def _serialize_row(row, counts=None):
+	if counts is None:
+		done_count, total_count = _item_counts(row.name)
+	else:
+		done_count, total_count = counts.get(row.name, (0, 0))
 	return {
 		"name": row.name,
 		"status": row.status,
@@ -73,7 +93,8 @@ def get_checklist_inbox(include_completed=0):
 		order_by="modified desc",
 		limit_page_length=200,
 	)
-	return [_serialize_row(r) for r in rows]
+	counts = _item_counts_map([r.name for r in rows])
+	return [_serialize_row(r, counts) for r in rows]
 
 
 @frappe.whitelist()
@@ -127,10 +148,7 @@ def get_checklists_for_reference(document, reference_record):
 	if not document or not reference_record:
 		return []
 
-	if not frappe.db.exists("DocType", document):
-		frappe.throw(_("Invalid document type: {0}").format(document))
-	if not frappe.db.exists(document, reference_record):
-		frappe.throw(_("Reference record not found: {0}").format(reference_record))
+	_validate_reference_record(document, reference_record)
 
 	rows = frappe.get_list(
 		"Checklist",
@@ -147,7 +165,8 @@ def get_checklists_for_reference(document, reference_record):
 		order_by="modified desc",
 		limit_page_length=200,
 	)
-	return [_serialize_row(r) for r in rows]
+	counts = _item_counts_map([r.name for r in rows])
+	return [_serialize_row(r, counts) for r in rows]
 
 
 def _validate_reference_record(document, reference_record):
@@ -157,14 +176,13 @@ def _validate_reference_record(document, reference_record):
 		frappe.throw(_("Document type is required"))
 	if not reference_record:
 		frappe.throw(_("Reference record is required"))
-	if not frappe.db.exists("DocType", document):
-		frappe.throw(_("Invalid document type: {0}").format(document))
+	if document not in CHECKLIST_REFERENCE_DOCTYPES:
+		frappe.throw(_("Unsupported checklist reference type: {0}").format(document))
 	if not frappe.db.exists(document, reference_record):
 		frappe.throw(_("Reference record not found: {0}").format(reference_record))
 
-	if document == "Issue":
-		frappe.has_permission("Issue", "read", throw=True)
-		frappe.get_doc("Issue", reference_record).check_permission("read")
+	frappe.has_permission(document, "read", throw=True)
+	frappe.get_doc(document, reference_record).check_permission("read")
 
 
 def _resolve_checklist_name(name, document, reference_record):
@@ -177,14 +195,10 @@ def _resolve_checklist_name(name, document, reference_record):
 
 
 def _unique_checklist_name(base_name):
-	base_name = base_name.strip()
-	if not frappe.db.exists("Checklist", base_name):
-		return base_name
+	from frappe.model.naming import append_number_if_name_exists
 
-	counter = 2
-	while frappe.db.exists("Checklist", f"{base_name} ({counter})"):
-		counter += 1
-	return f"{base_name} ({counter})"
+	base_name = base_name.strip()
+	return append_number_if_name_exists("Checklist", base_name)
 
 
 def _parse_items(items):

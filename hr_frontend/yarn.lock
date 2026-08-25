@@ -1165,7 +1165,7 @@ fraction.js@^5.3.4:
   resolved "https://registry.npmjs.org/fraction.js/-/fraction.js-5.3.4.tgz#8c0fcc6a9908262df4ed197427bdeef563e0699a"
   integrity sha512-1X1NTtiJphryn/uLQz3whtY6jK3fTqoE3ohKs0tT+Ujr1W59oopxmoEh7Lu5p6vBaPbgoM0bzveAW4Qi5RyWDQ==
 
-frappe-gantt@^0.6.1:
+frappe-gantt@0.6.1:
   version "0.6.1"
   resolved "https://registry.npmjs.org/frappe-gantt/-/frappe-gantt-0.6.1.tgz#57ae0b5f024101fc7cd5ba92f605de97dba9c9a1"
   integrity sha512-1cSU9vLbwypjzaxnCfnEE03Xr3HlAV2S8dRtjxw62o+amkx1A8bBIFd2jp84mcDdTCM77Ij4LzZBslAKZB8oMg==

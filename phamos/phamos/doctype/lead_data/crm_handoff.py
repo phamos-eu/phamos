@@ -634,6 +634,12 @@ def create_crm_records(lead_data_name: str, force: int = 0, customer: str | None
 	customer = (customer or party.get("customer") or "").strip()
 	supplier = (supplier or party.get("supplier") or "").strip()
 
+	for dt, val in (("Customer", customer), ("Supplier", supplier)):
+		if val:
+			if not frappe.db.exists(dt, val):
+				frappe.throw(_("{0} {1} not found").format(dt, val))
+			frappe.has_permission(dt, "read", doc=val, throw=True)
+
 	strong = [m for m in matches if m.get("score", 0) >= 85]
 	# Party-aware create is intentional (Converted Lead / Supplier link).
 	# Otherwise require force when strong Contact/Lead duplicates exist.
