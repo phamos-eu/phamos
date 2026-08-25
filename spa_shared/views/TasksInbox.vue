@@ -106,7 +106,7 @@
 import { computed, onMounted, ref, watch } from "vue"
 import { useRoute, useRouter } from "vue-router"
 import { call, toast } from "frappe-ui"
-import IssueChat from "@iown/components/IssueChat.vue"
+import IssueChat from "@spa/components/IssueChat.vue"
 import TaskDetail from "@spa/components/TaskDetail.vue"
 import TaskGantt from "@spa/components/TaskGantt.vue"
 import TaskKanban from "@spa/components/TaskKanban.vue"

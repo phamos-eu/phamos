@@ -134,7 +134,7 @@
 <script setup>
 import { computed, ref, watch } from "vue"
 import { call } from "frappe-ui"
-import LinkedChecklistsSection from "./LinkedChecklistsSection.vue"
+import LinkedChecklistsSection from "@spa/components/LinkedChecklistsSection.vue"
 
 const props = defineProps({
 	issue: { type: Object, required: true },

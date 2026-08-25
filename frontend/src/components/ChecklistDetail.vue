@@ -64,7 +64,7 @@
 </template>
 
 <script setup>
-import ChecklistEditor from "./ChecklistEditor.vue"
+import ChecklistEditor from "@spa/components/ChecklistEditor.vue"
 
 defineProps({
 	checklist: { type: Object, required: true },

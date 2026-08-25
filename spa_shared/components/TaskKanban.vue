@@ -47,7 +47,7 @@
 
 <script setup>
 import { computed } from "vue"
-import { formatDate } from "@iown/utils/datetime"
+import { formatDate } from "@spa/utils/datetime"
 
 const COLUMNS = ["Open", "Working", "Pending Review", "Overdue", "Completed"]
 

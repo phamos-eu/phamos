@@ -95,7 +95,7 @@
 <script setup>
 import { ref, watch } from "vue"
 import { call } from "frappe-ui"
-import FrappeLink from "./FrappeLink.vue"
+import FrappeLink from "@spa/components/FrappeLink.vue"
 
 const props = defineProps({
 	modelValue: { type: Boolean, default: false },
@@ -106,7 +106,7 @@ const props = defineProps({
 
 const emit = defineEmits(["update:modelValue", "created"])
 
-const API = "phamos.api.i_own_my_work"
+const API = "phamos.api.checklist_inbox"
 
 let nextId = 1
 const rows = ref([])

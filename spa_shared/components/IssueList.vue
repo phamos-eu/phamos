@@ -56,7 +56,7 @@
 </template>
 
 <script setup>
-import { formatDatetime } from "../utils/datetime"
+import { formatDatetime } from "@spa/utils/datetime"
 
 defineProps({
 	issues: { type: Array, default: () => [] },

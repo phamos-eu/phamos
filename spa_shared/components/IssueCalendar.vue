@@ -91,7 +91,7 @@
 
 <script setup>
 import { computed, ref } from "vue"
-import { formatMonthYear, getFirstDayOfWeekIndex, getWeekdayLabels } from "../utils/datetime"
+import { formatMonthYear, getFirstDayOfWeekIndex, getWeekdayLabels } from "@spa/utils/datetime"
 
 const props = defineProps({
 	issues: { type: Array, default: () => [] },

@@ -272,7 +272,7 @@
 <script setup>
 import { computed, nextTick, onMounted, onUnmounted, ref, watch } from "vue"
 import { call } from "frappe-ui"
-import { formatDatetime } from "../utils/datetime"
+import { formatDatetime } from "@spa/utils/datetime"
 
 const props = defineProps({
 	issueName: { type: String, default: "" },

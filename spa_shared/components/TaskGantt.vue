@@ -269,7 +269,7 @@
 import { computed, nextTick, onMounted, onUnmounted, ref, watch } from "vue"
 import Gantt from "frappe-gantt"
 import { call } from "frappe-ui"
-import { formatDate, todayIsoInUserTz } from "@iown/utils/datetime"
+import { formatDate, todayIsoInUserTz } from "@spa/utils/datetime"
 import {
 	buildTimeline,
 	defaultFrameRange,
