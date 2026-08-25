@@ -119,6 +119,7 @@
 <script setup>
 import { ref, watch } from "vue"
 import { call, TextEditor } from "frappe-ui"
+import spaConfig from "@/config"
 
 const props = defineProps({
 	modelValue: { type: Boolean, default: false },
@@ -130,15 +131,13 @@ const props = defineProps({
 			users: [],
 			departments: [],
 			projects: [],
-			accounting_department: null,
-			accounting_standard_project: null,
 		}),
 	},
 })
 
 const emit = defineEmits(["update:modelValue", "created"])
 
-const API = "phamos.api.accounting_spa"
+const API = spaConfig.api
 const editorMenu = [
 	"Paragraph",
 	"Heading 2",
@@ -173,9 +172,10 @@ watch(
 		issueType.value = ""
 		assignTo.value = []
 		error.value = ""
-		department.value = props.options.accounting_department || props.options.departments?.[0] || ""
+		department.value =
+			props.options[spaConfig.departmentField] || props.options.departments?.[0] || ""
 		project.value =
-			props.options.accounting_standard_project ||
+			props.options[spaConfig.projectField] ||
 			props.options.projects?.[0]?.name ||
 			""
 		const priorities = props.options.priorities || []

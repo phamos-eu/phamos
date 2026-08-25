@@ -645,7 +645,6 @@ function applyGanttFrame() {
 	gantt.gantt_end = frame.frameEndExclusive
 	gantt.setup_date_values()
 	gantt.options.column_width = zoom.value
-	gantt.options.header_height = 0
 	gantt.render()
 	fixSvgWidth()
 	updateBarStateClasses()
@@ -675,7 +674,7 @@ function buildGantt() {
 	if (!ganttHost.value) return
 
 	injectBarColors()
-	const tasksForGantt = ganttTasks.value.length ? ganttTasks.value : []
+	const tasksForGantt = ganttTasks.value
 
 	gantt = new Gantt(ganttHost.value, tasksForGantt, {
 		view_mode: "Day",

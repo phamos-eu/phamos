@@ -1,7 +1,13 @@
 # Copyright (c) 2026, phamos.eu and contributors
 # For license information, please see license.txt
 
-"""Timesheet timer APIs for department cockpits (moved off dev_action_panel)."""
+"""Timesheet timer APIs for department cockpits.
+
+Facade over the existing desk-page implementation in
+`phamos.phamos.page.dev_action_panel` so SPA clients do not call that page
+module directly. Moving the timer implementation into this package (and
+retiring `public/js/dev_action_panel`) is intentional follow-up work.
+"""
 
 import frappe
 

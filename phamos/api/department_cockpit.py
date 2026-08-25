@@ -19,7 +19,6 @@ from phamos.api.i_own_my_work import (
 )
 from phamos.api.i_own_my_work import create_issue as _create_issue
 from phamos.api.i_own_my_work import get_form_options as _base_form_options
-from phamos.api.i_own_my_work import get_issue as _get_issue_detail
 from phamos.api.i_own_my_work import set_assignees as _set_assignees
 from phamos.api.i_own_my_work import update_status as _update_status
 
@@ -272,6 +271,30 @@ def get_inbox(config: CockpitConfig, view="assigned", include_closed=0):
 	return [_serialize_issue_row(r) for r in rows]
 
 
+def _serialize_issue_detail(doc):
+	"""Build SPA issue detail payload from an already-loaded Issue doc."""
+	assignees = [a.get("owner") for a in get_assignments("Issue", doc.name)]
+	return {
+		"name": doc.name,
+		"subject": doc.subject,
+		"description": doc.description or "",
+		"status": doc.status,
+		"priority": doc.priority,
+		"issue_type": doc.issue_type,
+		"project": doc.project,
+		"department": getattr(doc, "custom_department", None),
+		"owner": doc.owner,
+		"owner_name": _user_label(doc.owner),
+		"raised_by": doc.raised_by,
+		"modified": doc.modified,
+		"creation": doc.creation,
+		"opening_date": getattr(doc, "opening_date", None),
+		"assignees": assignees,
+		"assignee_names": [_user_label(u) for u in assignees],
+		"desk_url": f"/app/issue/{doc.name}",
+	}
+
+
 def get_issue(config: CockpitConfig, name):
 	"""Return Issue detail if it belongs to department scope."""
 	frappe.has_permission("Issue", "read", throw=True)
@@ -281,7 +304,7 @@ def get_issue(config: CockpitConfig, name):
 	doc.check_permission("read")
 	_ensure_issue_in_scope(config, doc)
 
-	return _get_issue_detail(name)
+	return _serialize_issue_detail(doc)
 
 
 def get_form_options(config: CockpitConfig):

@@ -129,7 +129,7 @@ def get_checklist(name):
 	}
 
 
-@frappe.whitelist()
+@frappe.whitelist(methods=["POST"])
 def update_spa_checklist_item(checklist_name, item_name, values):
 	"""Update a checklist item and return full SPA checklist payload."""
 	_require_checklist_write(checklist_name)
@@ -211,7 +211,7 @@ def _parse_items(items):
 	return items
 
 
-@frappe.whitelist()
+@frappe.whitelist(methods=["POST"])
 def create_spa_checklist(document, reference_record, name=None, items=None):
 	"""Create a Checklist linked to a parent document."""
 	frappe.has_permission("Checklist", "create", throw=True)
@@ -250,7 +250,7 @@ def create_spa_checklist(document, reference_record, name=None, items=None):
 	return get_checklist(doc.name)
 
 
-@frappe.whitelist()
+@frappe.whitelist(methods=["POST"])
 def add_spa_checklist_item(checklist_name, values=None):
 	"""Append a checklist item and return full SPA checklist payload."""
 	doc = _require_checklist_write(checklist_name)

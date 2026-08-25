@@ -20,8 +20,9 @@ export default defineConfig({
 			vue: path.resolve(__dirname, "node_modules/vue"),
 			"frappe-ui": path.resolve(__dirname, "node_modules/frappe-ui"),
 			"frappe-gantt": path.resolve(__dirname, "node_modules/frappe-gantt"),
+			"vue-router": path.resolve(__dirname, "node_modules/vue-router"),
 		},
-		dedupe: ["vue", "frappe-ui", "frappe-gantt"],
+		dedupe: ["vue", "vue-router", "frappe-ui", "frappe-gantt"],
 	},
 	build: {
 		outDir: "../phamos/public/hr",

@@ -32,18 +32,27 @@ app.provide("$session", session)
 app.config.globalProperties.$toast = toast
 
 async function mountApp() {
-	if (import.meta.env.DEV) {
-		const values = await frappeRequest({
-			url: "/api/method/phamos.www.project_management_spa.get_context_for_dev",
-		})
-		if (!window.frappe) window.frappe = {}
-		window.frappe.boot = values
-		if (!window.csrf_token && values?.csrf_token) {
-			window.csrf_token = values.csrf_token
+	try {
+		if (import.meta.env.DEV) {
+			const values = await frappeRequest({
+				url: "/api/method/phamos.www.project_management_spa.get_context_for_dev",
+			})
+			if (!window.frappe) window.frappe = {}
+			window.frappe.boot = values
+			if (!window.csrf_token && values?.csrf_token) {
+				window.csrf_token = values.csrf_token
+			}
+		}
+
+		app.mount("#app")
+	} catch (e) {
+		console.error("Failed to boot SPA", e)
+		const el = document.getElementById("app")
+		if (el) {
+			el.innerHTML =
+				'<p style="padding:1.5rem;font-family:sans-serif;color:#b91c1c">Failed to load app. Check the console for details.</p>'
 		}
 	}
-
-	app.mount("#app")
 }
 
 mountApp()

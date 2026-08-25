@@ -1,16 +1,4 @@
 import frappeUIPreset from "frappe-ui/src/tailwind/preset"
+import { makeConfig } from "../spa_shared/tailwind.shared.js"
 
-export default {
-	darkMode: "media",
-	presets: [frappeUIPreset],
-	content: [
-		"./index.html",
-		"./src/**/*.{vue,js,ts,jsx,tsx}",
-		"../frontend/src/**/*.{vue,js,ts,jsx,tsx}",
-		"./node_modules/frappe-ui/src/components/**/*.{vue,js,ts,jsx,tsx}",
-	],
-	theme: {
-		extend: {},
-	},
-	plugins: [],
-}
+export default makeConfig(frappeUIPreset)

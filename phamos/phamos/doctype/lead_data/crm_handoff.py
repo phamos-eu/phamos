@@ -422,7 +422,7 @@ def get_improve_form(lead_data_name: str):
 	}
 
 
-@frappe.whitelist()
+@frappe.whitelist(methods=["POST"])
 def update_lead_data_fields(lead_data_name: str, values=None, create_after: int = 1):
 	"""Update configured fields from Improve dialog, refresh readiness, optionally create."""
 	import json
@@ -607,7 +607,7 @@ def get_handoff_review(lead_data_name: str) -> dict:
 	}
 
 
-@frappe.whitelist()
+@frappe.whitelist(methods=["POST"])
 def create_crm_records(lead_data_name: str, force: int = 0, customer: str | None = None, supplier: str | None = None):
 	"""Create Lead (+ Contact/Address) with Customer/Supplier-aware rules."""
 	force = cint(force)
@@ -718,7 +718,7 @@ def create_crm_records(lead_data_name: str, force: int = 0, customer: str | None
 	}
 
 
-@frappe.whitelist()
+@frappe.whitelist(methods=["POST"])
 def link_crm_records(
 	lead_data_name: str,
 	lead: str | None = None,
@@ -729,6 +729,14 @@ def link_crm_records(
 	"""Link Lead Data to existing CRM docs without creating a new Lead (rare path)."""
 	doc = frappe.get_doc("Lead Data", lead_data_name)
 	frappe.has_permission("Lead Data", doc=doc.name, ptype="write", throw=True)
+
+	customer = (customer or "").strip()
+	supplier = (supplier or "").strip()
+	for dt, val in (("Customer", customer), ("Supplier", supplier)):
+		if val:
+			if not frappe.db.exists(dt, val):
+				frappe.throw(_("{0} {1} not found").format(dt, val))
+			frappe.has_permission(dt, "read", doc=val, throw=True)
 
 	updates = {"handoff_status": "Linked"}
 	if lead:
@@ -752,7 +760,7 @@ def link_crm_records(
 	return {"ok": True, "handoff_status": "Linked", **{k: updates.get(k, "") for k in updates}}
 
 
-@frappe.whitelist()
+@frappe.whitelist(methods=["POST"])
 def skip_handoff(lead_data_name: str):
 	doc = frappe.get_doc("Lead Data", lead_data_name)
 	frappe.has_permission("Lead Data", doc=doc.name, ptype="write", throw=True)
