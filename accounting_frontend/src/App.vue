@@ -36,7 +36,7 @@
 import { computed, inject } from "vue"
 import { useRoute } from "vue-router"
 import AccountingSidebar from "./components/AccountingSidebar.vue"
-import TimesheetPanel from "./components/TimesheetPanel.vue"
+import TimesheetPanel from "@spa/components/TimesheetPanel.vue"
 
 const session = inject("$session")
 const route = useRoute()

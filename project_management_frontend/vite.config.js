@@ -14,8 +14,14 @@ export default defineConfig({
 		alias: {
 			"@": path.resolve(__dirname, "src"),
 			"@iown": path.resolve(__dirname, "../frontend/src"),
-			"frappe-gantt/src/gantt.scss": path.resolve(__dirname, "src/lib/empty.scss"),
+			"@spa": path.resolve(__dirname, "../spa_shared"),
+			"frappe-gantt/src/gantt.scss": path.resolve(__dirname, "../spa_shared/lib/empty.scss"),
+			// Resolve shared deps from this SPA's node_modules (spa_shared is outside root)
+			vue: path.resolve(__dirname, "node_modules/vue"),
+			"frappe-ui": path.resolve(__dirname, "node_modules/frappe-ui"),
+			"frappe-gantt": path.resolve(__dirname, "node_modules/frappe-gantt"),
 		},
+		dedupe: ["vue", "frappe-ui", "frappe-gantt"],
 	},
 	build: {
 		outDir: "../phamos/public/project_management",
