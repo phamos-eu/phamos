@@ -165,8 +165,7 @@ def _add_members(channel_id, raven_users, *, keep_extras=True):
 
 def _channel_name_for_linked(doctype, doc):
 	# autoname: "{workspace}-{channel_name}" with spaces → hyphens
-	prefix_map = {"Issue": "issue", "Checklist": "checklist", "Task": "task"}
-	prefix = prefix_map.get(doctype, doctype.lower())
+	prefix = (doctype or "").lower()
 	safe = re.sub(r"[^a-zA-Z0-9_-]+", "-", doc.name).strip("-").lower()
 	return f"{prefix}-{safe}"
 
@@ -320,7 +319,7 @@ def _serialize_messages(messages):
 
 def _assert_linked_channel_access(channel_id, linked_doctype=None, linked_document=None):
 	"""
-	Allow access when channel (or thread parent) is linked to Issue or Checklist.
+	Allow access when channel (or thread parent) is linked to Issue, Checklist, or Task.
 	Returns (doctype, docname).
 	"""
 	if not channel_id:
@@ -414,7 +413,7 @@ def _serialize_members(channel_id):
 
 @frappe.whitelist()
 def get_document_chat(linked_doctype, name, limit=50):
-	"""Resolve linked channel + recent messages for Issue or Checklist."""
+	"""Resolve linked channel + recent messages for Issue, Checklist, or Task."""
 	linked_doctype, name = _resolve_linked_args(linked_doctype, name)
 	_require_linked_read(linked_doctype, name)
 	flags = get_chat_feature_flags()
@@ -455,9 +454,9 @@ def get_issue_chat(name, limit=50):
 	return get_document_chat("Issue", name, limit=limit)
 
 
-@frappe.whitelist()
+@frappe.whitelist(methods=["POST"])
 def ensure_document_channel(linked_doctype, name):
-	"""Get-or-create a Private Raven Channel linked to Issue or Checklist."""
+	"""Get-or-create a Private Raven Channel linked to Issue, Checklist, or Task."""
 	_require_raven_feature()
 	linked_doctype, name = _resolve_linked_args(linked_doctype, name)
 	doc = _require_linked_write(linked_doctype, name)
@@ -552,7 +551,7 @@ def ensure_document_channel(linked_doctype, name):
 	return get_document_chat(linked_doctype, name)
 
 
-@frappe.whitelist()
+@frappe.whitelist(methods=["POST"])
 def ensure_issue_channel(name):
 	return ensure_document_channel("Issue", name)
 
@@ -587,7 +586,7 @@ def get_chat_messages(
 	}
 
 
-@frappe.whitelist()
+@frappe.whitelist(methods=["POST"])
 def send_chat_message(
 	channel_id,
 	text,
@@ -633,7 +632,7 @@ def send_chat_message(
 	)
 
 
-@frappe.whitelist()
+@frappe.whitelist(methods=["POST"])
 def open_or_create_thread(
 	message_id, issue_name=None, linked_doctype=None, linked_document=None
 ):
@@ -726,7 +725,7 @@ def get_thread(thread_id, issue_name=None, linked_doctype=None, linked_document=
 	}
 
 
-@frappe.whitelist()
+@frappe.whitelist(methods=["POST"])
 def invite_to_document_channel(linked_doctype, name, users=None):
 	"""Invite extra users to the document's Raven channel."""
 	_require_raven_feature()
@@ -763,7 +762,7 @@ def invite_to_document_channel(linked_doctype, name, users=None):
 	}
 
 
-@frappe.whitelist()
+@frappe.whitelist(methods=["POST"])
 def invite_to_issue_channel(name, users=None):
 	return invite_to_document_channel("Issue", name, users=users)
 

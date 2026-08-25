@@ -1,42 +1,46 @@
 import { createRouter, createWebHistory } from "vue-router"
 import { session } from "./session"
-import SalesIssuesInbox from "./views/SalesIssuesInbox.vue"
-import SalesTasksInbox from "./views/SalesTasksInbox.vue"
+import IssuesInbox from "@spa/views/IssuesInbox.vue"
+import TasksInbox from "@spa/views/TasksInbox.vue"
+import spaConfig from "./config"
 
 const routes = [
 	{ path: "/", redirect: "/issues" },
 	{
 		path: "/issues",
 		name: "Issues",
-		component: SalesIssuesInbox,
+		component: IssuesInbox,
 	},
 	{
 		path: "/issues/:name",
 		name: "IssueDetail",
-		component: SalesIssuesInbox,
+		component: IssuesInbox,
 		props: true,
 	},
 	{
 		path: "/tasks",
 		name: "Tasks",
-		component: SalesTasksInbox,
+		component: TasksInbox,
 	},
 	{
 		path: "/tasks/:name",
 		name: "TaskDetail",
-		component: SalesTasksInbox,
+		component: TasksInbox,
 		props: true,
 	},
 ]
 
 const router = createRouter({
-	history: createWebHistory("/sales-cockpit"),
+	history: createWebHistory(spaConfig.basePath),
 	routes,
 })
 
-router.beforeEach(async (to, from, next) => {
+router.beforeEach((to, _from, next) => {
 	if (!session.isLoggedIn) {
-		window.location.href = `/login?redirect-to=/sales-cockpit${to.fullPath === "/" ? "" : to.fullPath}`
+		const redirect = encodeURIComponent(
+			`${spaConfig.basePath}${to.fullPath === "/" ? "" : to.fullPath}`
+		)
+		window.location.href = `/login?redirect-to=${redirect}`
 		return
 	}
 	next()

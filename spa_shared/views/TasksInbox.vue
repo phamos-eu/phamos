@@ -44,9 +44,9 @@
 			</div>
 			<template v-else-if="!filteredTasks.length && layout !== 'gantt'">
 				<div class="flex flex-1 flex-col items-center justify-center gap-2 px-6 text-center">
-					<p class="font-medium text-gray-900 dark:text-gray-100">No HR tasks found</p>
+					<p class="font-medium text-gray-900 dark:text-gray-100">No {{ spaConfig.label }} tasks found</p>
 					<p class="max-w-sm text-sm text-gray-500 dark:text-gray-400">
-						Tasks linked to the HR department configured in phamos Settings will appear here.
+						Tasks linked to the {{ spaConfig.label }} department configured in phamos Settings will appear here.
 					</p>
 				</div>
 			</template>
@@ -110,8 +110,9 @@ import IssueChat from "@iown/components/IssueChat.vue"
 import TaskDetail from "@spa/components/TaskDetail.vue"
 import TaskGantt from "@spa/components/TaskGantt.vue"
 import TaskKanban from "@spa/components/TaskKanban.vue"
+import spaConfig from "@/config"
 
-const API = "phamos.api.hr_spa"
+const API = spaConfig.api
 const layouts = [
 	{ id: "gantt", label: "Gantt" },
 	{ id: "kanban", label: "Kanban" },
@@ -145,11 +146,13 @@ const filteredTasks = computed(() => {
 
 async function loadSettings() {
 	try {
-		const settings = await call(`${API}.get_hr_settings`)
+		const settings = await call(`${API}.${spaConfig.settingsMethod}`)
 		chatFlags.value = settings.chat || chatFlags.value
-		configError.value = settings.hr_department ? "" : "Configure HR Department in phamos Settings."
+		configError.value = settings[spaConfig.departmentField]
+			? ""
+			: `Configure ${spaConfig.label} Department in phamos Settings.`
 	} catch (e) {
-		configError.value = e?.messages?.[0] || e?.message || "Could not load HR settings"
+		configError.value = e?.messages?.[0] || e?.message || `Could not load ${spaConfig.label} settings`
 	}
 }
 

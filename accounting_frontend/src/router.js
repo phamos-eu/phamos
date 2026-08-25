@@ -1,7 +1,8 @@
 import { createRouter, createWebHistory } from "vue-router"
 import { session } from "./session"
-import AccountingIssuesInbox from "./views/AccountingIssuesInbox.vue"
-import AccountingTasksInbox from "./views/AccountingTasksInbox.vue"
+import IssuesInbox from "@spa/views/IssuesInbox.vue"
+import TasksInbox from "@spa/views/TasksInbox.vue"
+import spaConfig from "./config"
 import ReceiptsInbox from "./views/ReceiptsInbox.vue"
 
 const routes = [
@@ -9,23 +10,23 @@ const routes = [
 	{
 		path: "/issues",
 		name: "Issues",
-		component: AccountingIssuesInbox,
+		component: IssuesInbox,
 	},
 	{
 		path: "/issues/:name",
 		name: "IssueDetail",
-		component: AccountingIssuesInbox,
+		component: IssuesInbox,
 		props: true,
 	},
 	{
 		path: "/tasks",
 		name: "Tasks",
-		component: AccountingTasksInbox,
+		component: TasksInbox,
 	},
 	{
 		path: "/tasks/:name",
 		name: "TaskDetail",
-		component: AccountingTasksInbox,
+		component: TasksInbox,
 		props: true,
 	},
 	{
@@ -42,13 +43,13 @@ const routes = [
 ]
 
 const router = createRouter({
-	history: createWebHistory("/accounting-cockpit"),
+	history: createWebHistory(spaConfig.basePath),
 	routes,
 })
 
 router.beforeEach(async (to, from, next) => {
 	if (!session.isLoggedIn) {
-		window.location.href = `/login?redirect-to=/accounting-cockpit${to.fullPath === "/" ? "" : to.fullPath}`
+		window.location.href = `/login?redirect-to=${encodeURIComponent(`${spaConfig.basePath}${to.fullPath === "/" ? "" : to.fullPath}`)}`
 		return
 	}
 	next()

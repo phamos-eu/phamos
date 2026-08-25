@@ -114,14 +114,6 @@ const timeStatus = computed(() =>
 	getTimeStatus(elapsedSeconds.value, expectedSeconds.value)
 )
 
-function fmtDurationShort(s) {
-	s = Math.abs(Math.round(s))
-	const h = Math.floor(s / 3600)
-	const m = Math.floor((s % 3600) / 60)
-	if (h) return `${h}h ${m}m`
-	return `${m}m`
-}
-
 function getTimeStatus(elapsed, expected) {
 	if (!expected || expected <= 0) {
 		return { color: "neutral", label: "No expected time" }
@@ -136,8 +128,8 @@ function getTimeStatus(elapsed, expected) {
 
 	const label =
 		remaining >= 0
-			? `${fmtDurationShort(remaining)} left`
-			: `+${fmtDurationShort(-remaining)} over`
+			? `${formatDurationShort(remaining)} left`
+			: `+${formatDurationShort(-remaining)} over`
 
 	return {
 		color,

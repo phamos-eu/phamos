@@ -65,13 +65,13 @@
 					<template v-if="view === 'assigned'">
 						<p class="font-medium text-gray-900 dark:text-gray-100">Nothing assigned to you</p>
 						<p class="max-w-sm text-sm text-gray-500 dark:text-gray-400">
-							When someone assigns a Sales issue to you, it will show up here.
+							When someone assigns a {{ spaConfig.label }} issue to you, it will show up here.
 						</p>
 					</template>
 					<template v-else>
 						<p class="font-medium text-gray-900 dark:text-gray-100">You have not created any issues yet</p>
 						<p class="max-w-sm text-sm text-gray-500 dark:text-gray-400">
-							Capture a Sales topic or follow-up with New Issue.
+							Capture a {{ spaConfig.label }} topic or follow-up with New Issue.
 						</p>
 						<Button class="mt-2" @click="showCreate = true">Create an issue</Button>
 					</template>
@@ -136,7 +136,7 @@
 			</div>
 		</aside>
 
-		<SalesCreateIssueDialog
+		<CreateIssueDialog
 			v-model="showCreate"
 			:options="formOptions"
 			@created="onCreated"
@@ -153,10 +153,11 @@ import IssueChat from "@iown/components/IssueChat.vue"
 import IssueDetail from "@iown/components/IssueDetail.vue"
 import IssueKanban from "@iown/components/IssueKanban.vue"
 import IssueList from "@iown/components/IssueList.vue"
-import SalesCreateIssueDialog from "../components/SalesCreateIssueDialog.vue"
+import CreateIssueDialog from "@spa/components/CreateIssueDialog.vue"
+import spaConfig from "@/config"
 
-const API = "phamos.api.sales_spa"
-const LAYOUT_KEY = "sales-spa-issues-layout"
+const API = spaConfig.api
+const LAYOUT_KEY = `${spaConfig.slug}-spa-issues-layout`
 const tabs = [
 	{ id: "assigned", label: "Assigned to me" },
 	{ id: "created", label: "Created by me" },
@@ -187,8 +188,6 @@ const formOptions = ref({
 	users: [],
 	departments: [],
 	projects: [],
-	sales_department: null,
-	sales_standard_project: null,
 	chat: { raven_installed: false, enabled: false, raven_unavailable: true },
 })
 
@@ -229,7 +228,7 @@ async function loadOptions() {
 		formOptions.value = await call(`${API}.get_form_options`)
 		configError.value = ""
 	} catch (e) {
-		configError.value = e?.messages?.[0] || e?.message || "Could not load Sales settings"
+		configError.value = e?.messages?.[0] || e?.message || `Could not load ${spaConfig.label} settings`
 	}
 }
 

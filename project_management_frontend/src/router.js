@@ -1,7 +1,8 @@
 import { createRouter, createWebHistory } from "vue-router"
 import { session } from "./session"
-import PmIssuesInbox from "./views/PmIssuesInbox.vue"
-import PmTasksInbox from "./views/PmTasksInbox.vue"
+import IssuesInbox from "@spa/views/IssuesInbox.vue"
+import TasksInbox from "@spa/views/TasksInbox.vue"
+import spaConfig from "./config"
 import PmImplementationsHub from "./views/PmImplementationsHub.vue"
 import PmWeeklyMonitoring from "./views/PmWeeklyMonitoring.vue"
 import PmWeeklyMonitoringDetail from "./views/PmWeeklyMonitoringDetail.vue"
@@ -11,23 +12,23 @@ const routes = [
 	{
 		path: "/issues",
 		name: "Issues",
-		component: PmIssuesInbox,
+		component: IssuesInbox,
 	},
 	{
 		path: "/issues/:name",
 		name: "IssueDetail",
-		component: PmIssuesInbox,
+		component: IssuesInbox,
 		props: true,
 	},
 	{
 		path: "/tasks",
 		name: "Tasks",
-		component: PmTasksInbox,
+		component: TasksInbox,
 	},
 	{
 		path: "/tasks/:name",
 		name: "TaskDetail",
-		component: PmTasksInbox,
+		component: TasksInbox,
 		props: true,
 	},
 	{
@@ -49,13 +50,13 @@ const routes = [
 ]
 
 const router = createRouter({
-	history: createWebHistory("/project-management-cockpit"),
+	history: createWebHistory(spaConfig.basePath),
 	routes,
 })
 
 router.beforeEach((to, _from, next) => {
 	if (!session.isLoggedIn) {
-		window.location.href = `/login?redirect-to=/project-management-cockpit${to.fullPath === "/" ? "" : to.fullPath}`
+		window.location.href = `/login?redirect-to=${encodeURIComponent(`${spaConfig.basePath}${to.fullPath === "/" ? "" : to.fullPath}`)}`
 		return
 	}
 	next()
