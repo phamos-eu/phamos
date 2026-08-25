@@ -110,7 +110,7 @@ import { computed, onMounted, ref, watch } from "vue"
 import { useRoute, useRouter } from "vue-router"
 import { call } from "frappe-ui"
 import ChecklistDetail from "../components/ChecklistDetail.vue"
-import IssueChat from "../components/IssueChat.vue"
+import IssueChat from "@spa/components/IssueChat.vue"
 
 const API = "phamos.api.i_own_my_work"
 

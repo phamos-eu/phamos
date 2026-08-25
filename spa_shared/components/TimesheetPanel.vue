@@ -81,7 +81,7 @@ import { call, toast } from "frappe-ui"
 import {
 	formatDurationShort,
 	secondsSinceSystemDatetime,
-} from "@iown/utils/datetime"
+} from "@spa/utils/datetime"
 import BreakConfirm from "./timesheet/BreakConfirm.vue"
 import BreakModal from "./timesheet/BreakModal.vue"
 import ProjectStartModal from "./timesheet/ProjectStartModal.vue"

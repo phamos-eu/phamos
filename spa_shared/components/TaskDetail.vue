@@ -76,7 +76,7 @@
 </template>
 
 <script setup>
-import { formatDate } from "@iown/utils/datetime"
+import { formatDate } from "@spa/utils/datetime"
 
 defineProps({
 	task: { type: Object, required: true },

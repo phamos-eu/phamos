@@ -3,7 +3,7 @@ import { ref, computed, onMounted, onUnmounted } from "vue";
 import {
 	formatDurationShort,
 	secondsSinceSystemDatetime,
-} from "@iown/utils/datetime";
+} from "@spa/utils/datetime";
 
 const props = defineProps({
   breakFrom: String,  // system-tz "YYYY-MM-DD HH:mm:ss"

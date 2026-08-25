@@ -73,7 +73,7 @@
 
 <script setup>
 import { computed } from "vue"
-import { formatDate } from "@iown/utils/datetime"
+import { formatDate } from "@spa/utils/datetime"
 
 const COLUMNS = [
 	"Inbox",

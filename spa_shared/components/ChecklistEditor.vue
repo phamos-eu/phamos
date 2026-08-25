@@ -73,7 +73,7 @@
 <script setup>
 import { ref } from "vue"
 import { call, TextEditor, debounce } from "frappe-ui"
-import FrappeLink from "./FrappeLink.vue"
+import FrappeLink from "@spa/components/FrappeLink.vue"
 
 const props = defineProps({
 	checklist: { type: Object, required: true },
@@ -82,7 +82,7 @@ const props = defineProps({
 
 const emit = defineEmits(["updated"])
 
-const API = "phamos.api.i_own_my_work"
+const API = "phamos.api.checklist_inbox"
 const editorMenu = [
 	"Paragraph",
 	"Bold",

@@ -4,7 +4,7 @@ import {
 	formatDurationShort,
 	formatTime as formatBreakTime,
 	secondsSinceSystemDatetime,
-} from "@iown/utils/datetime";
+} from "@spa/utils/datetime";
 import { call } from "frappe-ui";
 import spaConfig from "@/config";
 

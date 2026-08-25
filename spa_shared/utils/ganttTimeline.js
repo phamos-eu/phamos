@@ -1,4 +1,4 @@
-import { formatGanttDayLabel, formatMonthYear, dayProgressFraction, todayIsoInUserTz } from "@iown/utils/datetime"
+import { formatGanttDayLabel, formatMonthYear, dayProgressFraction, todayIsoInUserTz } from "@spa/utils/datetime"
 import { formatDateIso } from "./ganttTimelineFormat.js"
 
 const MIN_FRAME_DAYS = 7

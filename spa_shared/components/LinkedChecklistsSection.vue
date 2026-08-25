@@ -76,8 +76,8 @@
 import { onMounted, reactive, ref, watch } from "vue"
 import { useRouter } from "vue-router"
 import { call } from "frappe-ui"
-import ChecklistEditor from "./ChecklistEditor.vue"
-import CreateChecklistDialog from "./CreateChecklistDialog.vue"
+import ChecklistEditor from "@spa/components/ChecklistEditor.vue"
+import CreateChecklistDialog from "@spa/components/CreateChecklistDialog.vue"
 
 const props = defineProps({
 	document: { type: String, required: true },
@@ -85,7 +85,7 @@ const props = defineProps({
 	referenceTitle: { type: String, default: "" },
 })
 
-const API = "phamos.api.i_own_my_work"
+const API = "phamos.api.checklist_inbox"
 const router = useRouter()
 
 const loading = ref(false)
@@ -155,7 +155,10 @@ async function onChecklistCreated(created) {
 }
 
 function openInChecklists(name) {
-	router.push({ name: "ChecklistDetail", params: { name } })
+	// Checklist inbox route exists on I Own My Work; other cockpits skip navigation.
+	if (router.hasRoute("ChecklistDetail")) {
+		router.push({ name: "ChecklistDetail", params: { name } })
+	}
 }
 
 watch(

@@ -12,6 +12,7 @@
 	"dependencies": {
 		"@vitejs/plugin-vue": "^4.4.0",
 		"autoprefixer": "^10.4.19",
+		"dayjs": "1.11.13",
 		"feather-icons": "^4.29.1",
 		"frappe-ui": "0.1.105",
 		"postcss": "^8.4.5",

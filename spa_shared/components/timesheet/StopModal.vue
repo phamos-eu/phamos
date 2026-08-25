@@ -5,7 +5,7 @@ import {
 	formatForApi,
 	parseDatetimeLocalValue,
 	toDatetimeLocalValue,
-} from "@iown/utils/datetime";
+} from "@spa/utils/datetime";
 
 const emit = defineEmits(["confirm", "cancel"]);
 
