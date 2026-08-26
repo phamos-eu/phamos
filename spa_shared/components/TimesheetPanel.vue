@@ -88,6 +88,7 @@ import ProjectStartModal from "./timesheet/ProjectStartModal.vue"
 import StopModal from "./timesheet/StopModal.vue"
 
 import spaConfig from "@/config"
+import { __ } from "@spa/utils/i18n"
 
 const TIMER_API = spaConfig.timerApi
 const SETTINGS_API = spaConfig.api
@@ -116,7 +117,7 @@ const timeStatus = computed(() =>
 
 function getTimeStatus(elapsed, expected) {
 	if (!expected || expected <= 0) {
-		return { color: "neutral", label: "No expected time" }
+		return { color: "neutral", label: __("No expected time") }
 	}
 	const ratio = elapsed / expected
 	const remaining = expected - elapsed
@@ -219,7 +220,7 @@ async function onStartConfirm({ goal, expectedTime, manualStartTime, task }) {
 		breakFrom.value = null
 		pauseSeconds.value = 0
 		startTick()
-		toast.success("Timer started")
+		toast.success(__("Timer started"))
 	} catch (e) {
 		toast.error(apiErrorMessage(e))
 	}
@@ -284,7 +285,7 @@ async function onBreakSubmit({ project, activityType, goal, result, percentBilla
 		breakFrom.value = null
 		pauseSeconds.value = 0
 		await doResume()
-		toast.success("Break timesheet submitted")
+		toast.success(__("Break timesheet submitted"))
 	} catch (e) {
 		toast.error(apiErrorMessage(e))
 		await loadSession()
@@ -315,7 +316,7 @@ async function onStopConfirm({ result, percentBillable, manualEndTime, activityT
 		elapsedSeconds.value = 0
 		pauseSeconds.value = 0
 		breakFrom.value = null
-		toast.success("Session submitted")
+		toast.success(__("Session submitted"))
 	} catch (e) {
 		toast.error(apiErrorMessage(e))
 		await loadSession()

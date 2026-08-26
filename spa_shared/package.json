@@ -1,0 +1,13 @@
+{
+	"name": "@phamos/spa-shared",
+	"private": true,
+	"version": "0.0.0",
+	"type": "module",
+	"peerDependencies": {
+		"dayjs": "1.11.23",
+		"frappe-gantt": "0.6.1",
+		"frappe-ui": "0.1.105",
+		"vue": "^3.5.12",
+		"vue-router": "^4.3.2"
+	}
+}

@@ -92,3 +92,24 @@ class TestDepartmentCockpitScope(FrappeTestCase):
 			filters = _issue_or_filters(HR)
 			self.assertIn(["project", "in", ["P1"]], filters)
 			self.assertIn(["custom_department", "=", "Human Resources"], filters)
+
+
+class TestCrmHandoffPartyValidation(FrappeTestCase):
+	def test_validate_customer_supplier_rejects_missing(self):
+		from phamos.phamos.doctype.lead_data.crm_handoff import _validate_customer_supplier
+
+		with patch("frappe.db.exists", return_value=False):
+			with self.assertRaises(frappe.ValidationError):
+				_validate_customer_supplier(customer="CUST-MISSING")
+
+	def test_validate_customer_supplier_checks_read_permission(self):
+		from phamos.phamos.doctype.lead_data.crm_handoff import _validate_customer_supplier
+
+		doc = MagicMock()
+		with (
+			patch("frappe.db.exists", return_value=True),
+			patch("frappe.get_doc", return_value=doc) as get_doc,
+		):
+			_validate_customer_supplier(supplier="SUP-1")
+			get_doc.assert_called_once_with("Supplier", "SUP-1")
+			doc.check_permission.assert_called_once_with("read")
