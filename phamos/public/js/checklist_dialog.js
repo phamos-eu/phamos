@@ -6,16 +6,24 @@ function register_checklist_popup_handlers(doctypes) {
 	doctypes.forEach((doctype) => {
 		frappe.ui.form.on(doctype, {
 			onload(frm) {
-				frm.__checklist_dialog_shown = false;
+				frm.__checklist_dialog_shown_for = null;
 			},
+
 			refresh(frm) {
-				if (frm.is_new() || frm.__checklist_dialog_shown) {
+				if (frm.is_new() || !frm.doc.name) {
 					return;
 				}
 
-				frm.__checklist_dialog_shown = true;
+				if (frm.__checklist_dialog_shown_for === frm.doc.name) {
+					return;
+				}
+
+				frm.__checklist_dialog_shown_for = frm.doc.name;
+
 				requestAnimationFrame(() => {
-					setTimeout(() => show_linked_checklists_dialog(frm), 100);
+					setTimeout(() => {
+						show_linked_checklists_dialog(frm);
+					}, 100);
 				});
 			},
 		});
