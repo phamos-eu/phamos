@@ -4,13 +4,11 @@
 """Shared boot payload helpers for department / I Own My Work SPAs."""
 
 import frappe
-from frappe.translate import get_all_translations
 from frappe.utils import cint, get_system_timezone
 
 
 def get_spa_boot(default_route):
-	"""Boot dict for Vite SPAs (csrf, timezone, translations)."""
-	lang = frappe.local.lang or "en"
+	"""Boot dict for Vite SPAs (csrf, timezone, user)."""
 	tz = {
 		"system": get_system_timezone(),
 		"user": frappe.db.get_value("User", frappe.session.user, "time_zone")
@@ -27,8 +25,6 @@ def get_spa_boot(default_route):
 			"sysdefaults": frappe.defaults.get_defaults(),
 			"timezone": tz,
 			"time_zone": tz,
-			"lang": lang,
-			"__messages": get_all_translations(lang),
 			"user": {
 				"name": frappe.session.user,
 				"full_name": frappe.utils.get_fullname(),
