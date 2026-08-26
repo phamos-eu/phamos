@@ -99,9 +99,6 @@
 								</div>
 								<div class="text-xs text-slate-500 mt-0.5">
 									{{ issue.name }}
-									<span v-if="issue.custom_lead_data_slug">
-										· {{ issue.custom_lead_data_slug }}
-									</span>
 								</div>
 								<div class="text-xs text-slate-500 mt-1">
 									{{ issue.age_label }}

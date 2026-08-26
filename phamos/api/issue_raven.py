@@ -221,16 +221,16 @@ def _spa_path_for(doctype, name):
 
 def _spa_open_label(spa_path):
 	if spa_path.startswith("/sales-cockpit"):
-		return "Open in Sales Cockpit"
+		return _("Open in Sales Cockpit")
 	if spa_path.startswith("/hr-cockpit"):
-		return "Open in HR Cockpit"
+		return _("Open in HR Cockpit")
 	if spa_path.startswith("/accounting-cockpit"):
-		return "Open in Accounting Cockpit"
+		return _("Open in Accounting Cockpit")
 	if spa_path.startswith("/project-management-cockpit"):
-		return "Open in Project Management Cockpit"
+		return _("Open in Project Management Cockpit")
 	if spa_path.startswith("/app/"):
-		return "Open in Desk"
-	return "Open in I Own My Work"
+		return _("Open in Desk")
+	return _("Open in I Own My Work")
 
 
 def _doc_label(doctype, doc):

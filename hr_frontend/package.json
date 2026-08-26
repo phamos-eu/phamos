@@ -10,7 +10,7 @@
 		"copy-html-entry": "cp ../phamos/public/hr/index.html ../phamos/www/hr_spa.html"
 	},
 	"dependencies": {
-		"dayjs": "^1.11.23",
+		"dayjs": "1.11.23",
 		"feather-icons": "^4.29.1",
 		"frappe-gantt": "0.6.1",
 		"frappe-ui": "0.1.105",

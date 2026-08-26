@@ -3,7 +3,7 @@
 
 import frappe
 from frappe import _
-from frappe.utils import cint, get_system_timezone
+from phamos.www.spa_boot import get_spa_boot
 from phamos.api.accounting_spa import check_app_permission
 
 no_cache = 1
@@ -34,25 +34,6 @@ def get_context_for_dev():
 
 
 def get_boot():
-	tz = {
-		"system": get_system_timezone(),
-		"user": frappe.db.get_value("User", frappe.session.user, "time_zone")
-		or get_system_timezone(),
-	}
-	return frappe._dict(
-		{
-			"frappe_version": frappe.__version__,
-			"default_route": "/accounting-cockpit",
-			"site_name": frappe.local.site,
-			"socketio_port": frappe.conf.socketio_port,
-			"csrf_token": frappe.sessions.get_csrf_token(),
-			"setup_complete": cint(frappe.get_system_settings("setup_complete")),
-			"sysdefaults": frappe.defaults.get_defaults(),
-			"timezone": tz,
-			"time_zone": tz,
-			"user": {
-				"name": frappe.session.user,
-				"full_name": frappe.utils.get_fullname(),
-			},
-		}
-	)
+	return get_spa_boot("/accounting-cockpit")
+
+
