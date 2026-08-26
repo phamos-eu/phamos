@@ -81,7 +81,11 @@
   "accounting_spa_section",
   "accounting_department",
   "column_break_accounting_spa",
-  "accounting_standard_project"
+  "accounting_standard_project",
+  "lead_scan_tab",
+  "lead_scan_section",
+  "lead_handoff_auto_create_min_score",
+  "lead_handoff_improve_fields"
  ],
  "fields": [
   {
@@ -341,7 +345,7 @@
   {
    "fieldname": "issue_raven_chat_section",
    "fieldtype": "Section Break",
-   "label": "I Own My Work — Issue Chat"
+   "label": "I Own My Work \u2014 Issue Chat"
   },
   {
    "default": "0",
@@ -501,6 +505,31 @@
    "fieldtype": "Link",
    "label": "Accounting Standard Project",
    "options": "Project"
+  },
+  {
+   "fieldname": "lead_scan_tab",
+   "fieldtype": "Tab Break",
+   "label": "Lead Scan"
+  },
+  {
+   "fieldname": "lead_scan_section",
+   "fieldtype": "Section Break",
+   "label": "CRM Handoff"
+  },
+  {
+   "default": "95",
+   "description": "After enrichment, automatically create Lead/Contact/Address when readiness score is at least this value and status is Ready (not Possible Duplicate).",
+   "fieldname": "lead_handoff_auto_create_min_score",
+   "fieldtype": "Int",
+   "label": "Auto-create min score",
+   "non_negative": 1
+  },
+  {
+   "description": "Fields shown in the mobile Improve & create dialog. Use Lead Data parent fields or Lead Data Contact / Lead Data Address child fields.",
+   "fieldname": "lead_handoff_improve_fields",
+   "fieldtype": "Table",
+   "label": "Improve Dialog Fields",
+   "options": "Lead Handoff Improve Field"
   }
  ],
  "index_web_pages_for_search": 1,

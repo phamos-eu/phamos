@@ -339,10 +339,11 @@ def create_scan(filename: str, content: str):
 
 
 @frappe.whitelist()
-def list_scans(limit: int = 30):
-	"""Recent Lead Data Imports created by the current user."""
+def list_scans(limit: int = 20, start: int = 0):
+	"""Recent Lead Data Imports created by the current user (paginated)."""
 	_require_scan_access()
-	limit = min(max(cint(limit) or 30, 1), 100)
+	limit = min(max(cint(limit) or 20, 1), 50)
+	start = max(cint(start) or 0, 0)
 	user = frappe.session.user
 
 	rows = frappe.get_all(
@@ -358,8 +359,12 @@ def list_scans(limit: int = 30):
 			"owner",
 		],
 		order_by="modified desc",
-		limit_page_length=limit,
+		limit_start=start,
+		limit_page_length=limit + 1,
 	)
+
+	has_more = len(rows) > limit
+	rows = rows[:limit]
 
 	# Prefer first card image from child table when upload_file is empty (screenshots)
 	result = []
@@ -381,7 +386,12 @@ def list_scans(limit: int = 30):
 		)
 		result.append(item)
 
-	return result
+	return {
+		"scans": result,
+		"has_more": has_more,
+		"start": start,
+		"limit": limit,
+	}
 
 
 @frappe.whitelist()
@@ -417,6 +427,10 @@ def get_scan(name: str):
 			"website",
 			"city",
 			"country",
+			"handoff_status",
+			"erpnext_lead",
+			"erpnext_customer",
+			"erpnext_supplier",
 		],
 		order_by="creation asc",
 	)
@@ -425,12 +439,22 @@ def get_scan(name: str):
 	for row in leads:
 		contact = _serialize_lead(row)
 		_enrich_lead_payload(contact, row.get("name"), include_secondaries=True)
+		contact["handoff_status"] = row.get("handoff_status") or "Draft"
+		contact["erpnext_lead"] = row.get("erpnext_lead") or ""
+		contact["erpnext_customer"] = row.get("erpnext_customer") or ""
+		contact["erpnext_supplier"] = row.get("erpnext_supplier") or ""
 		contacts.append(contact)
 
 	payload = _serialize_import(doc.as_dict(), include_log=True)
 	payload["upload_file"] = preview
 	payload["contacts"] = contacts
 	payload["contact_count"] = len(contacts)
+	try:
+		from phamos.phamos.doctype.lead_data.crm_handoff import handoff_status_summary
+
+		payload["handoff_summary"] = handoff_status_summary(name)
+	except Exception:
+		payload["handoff_summary"] = {}
 	return payload
 
 
@@ -461,6 +485,12 @@ def get_contact(name: str):
 			"website",
 			"city",
 			"country",
+			"handoff_status",
+			"erpnext_lead",
+			"erpnext_contact",
+			"erpnext_address",
+			"erpnext_customer",
+			"erpnext_supplier",
 		],
 		as_dict=True,
 	)
@@ -468,4 +498,252 @@ def get_contact(name: str):
 	contact["lead_data_import"] = row.get("lead_data_import")
 	_enrich_lead_payload(contact, name, include_secondaries=False)
 	contact["upload_file"] = _preview_file_for_import(row.get("lead_data_import"))
+	contact["handoff_status"] = row.get("handoff_status") or "Draft"
+	contact["erpnext_lead"] = row.get("erpnext_lead") or ""
+	contact["erpnext_contact"] = row.get("erpnext_contact") or ""
+	contact["erpnext_address"] = row.get("erpnext_address") or ""
+	contact["erpnext_customer"] = row.get("erpnext_customer") or ""
+	contact["erpnext_supplier"] = row.get("erpnext_supplier") or ""
+	try:
+		from phamos.phamos.doctype.lead_data.crm_handoff import get_handoff_review
+
+		contact["handoff"] = get_handoff_review(name)
+	except Exception:
+		contact["handoff"] = {}
 	return contact
+
+
+@frappe.whitelist()
+def create_crm_records(lead_data_name: str, force: int = 0, customer: str | None = None, supplier: str | None = None):
+	_require_scan_access()
+	from phamos.phamos.doctype.lead_data.crm_handoff import create_crm_records as _create
+
+	return _create(lead_data_name, force=force, customer=customer, supplier=supplier)
+
+
+@frappe.whitelist()
+def skip_handoff(lead_data_name: str):
+	_require_scan_access()
+	from phamos.phamos.doctype.lead_data.crm_handoff import skip_handoff as _skip
+
+	return _skip(lead_data_name)
+
+
+@frappe.whitelist()
+def link_crm_records(
+	lead_data_name: str,
+	lead: str | None = None,
+	contact: str | None = None,
+	customer: str | None = None,
+	supplier: str | None = None,
+):
+	_require_scan_access()
+	from phamos.phamos.doctype.lead_data.crm_handoff import link_crm_records as _link
+
+	return _link(
+		lead_data_name,
+		lead=lead,
+		contact=contact,
+		customer=customer,
+		supplier=supplier,
+	)
+
+
+@frappe.whitelist()
+def get_improve_form(lead_data_name: str):
+	_require_scan_access()
+	from phamos.phamos.doctype.lead_data.crm_handoff import get_improve_form as _form
+
+	return _form(lead_data_name)
+
+
+@frappe.whitelist()
+def update_lead_data_fields(lead_data_name: str, values=None, create_after: int = 1):
+	_require_scan_access()
+	from phamos.phamos.doctype.lead_data.crm_handoff import update_lead_data_fields as _update
+
+	return _update(lead_data_name, values=values, create_after=create_after)
+
+
+OPEN_ISSUE_STATUSES = ("Open", "Replied", "On Hold")
+CLOSED_ISSUE_STATUSES = ("Resolved", "Closed")
+LEAD_SCAN_ISSUE_TYPE = "Lead Scan"
+
+
+def _issue_age_label(creation) -> str:
+	"""Age label: N days / weeks / months old."""
+	from frappe.utils import date_diff, get_datetime, now_datetime
+
+	created = get_datetime(creation)
+	if not created:
+		return ""
+	days = max(0, date_diff(now_datetime().date(), created.date()))
+	if days < 7:
+		n = max(1, days) if days > 0 else 0
+		if n == 0:
+			return _("today")
+		return _("1 day old") if n == 1 else _("{0} days old").format(n)
+	if days < 30:
+		weeks = max(1, days // 7)
+		return _("1 week old") if weeks == 1 else _("{0} weeks old").format(weeks)
+	months = max(1, days // 30)
+	return _("1 month old") if months == 1 else _("{0} months old").format(months)
+
+
+def _ensure_lead_scan_issue_type():
+	from phamos.setup.ops_inbox import ensure_ops_inbox_setup
+
+	ensure_ops_inbox_setup()
+	if not frappe.db.exists("Issue Type", LEAD_SCAN_ISSUE_TYPE):
+		doc = frappe.new_doc("Issue Type")
+		doc.name = LEAD_SCAN_ISSUE_TYPE
+		doc.description = "Feedback from the Lead Scan mobile app"
+		doc.insert(ignore_permissions=True)
+
+
+@frappe.whitelist()
+def list_scan_issues(
+	lead_data_slug: str | None = None,
+	status_group: str = "open",
+	search: str = "",
+	limit: int = 20,
+	start: int = 0,
+):
+	"""List Lead Scan Issues for Home inbox or per-contact report dialog."""
+	_require_scan_access()
+	_ensure_lead_scan_issue_type()
+
+	limit = min(max(cint(limit) or 20, 1), 50)
+	start = max(cint(start) or 0, 0)
+	status_group = (status_group or "open").strip().lower()
+	statuses = OPEN_ISSUE_STATUSES if status_group != "closed" else CLOSED_ISSUE_STATUSES
+
+	filters = {
+		"issue_type": LEAD_SCAN_ISSUE_TYPE,
+		"status": ["in", list(statuses)],
+	}
+	slug = (lead_data_slug or "").strip()
+	if slug:
+		filters["custom_lead_data_slug"] = slug
+
+	or_filters = None
+	search = (search or "").strip()
+	if search:
+		like = f"%{search}%"
+		or_filters = [
+			["subject", "like", like],
+			["name", "like", like],
+			["custom_lead_data_slug", "like", like],
+		]
+
+	fields = [
+		"name",
+		"subject",
+		"status",
+		"creation",
+		"modified",
+		"custom_lead_data_slug",
+	]
+	rows = frappe.get_all(
+		"Issue",
+		filters=filters,
+		or_filters=or_filters,
+		fields=fields,
+		order_by="modified desc",
+		limit_start=start,
+		limit_page_length=limit + 1,
+	)
+	has_more = len(rows) > limit
+	rows = rows[:limit]
+	issues = []
+	for row in rows:
+		issues.append(
+			{
+				"name": row.name,
+				"subject": row.subject or "",
+				"status": row.status or "",
+				"creation": str(row.creation) if row.creation else "",
+				"modified": str(row.modified) if row.modified else "",
+				"custom_lead_data_slug": row.get("custom_lead_data_slug") or "",
+				"age_label": _issue_age_label(row.creation),
+			}
+		)
+	return {
+		"issues": issues,
+		"has_more": has_more,
+		"start": start,
+		"limit": limit,
+	}
+
+
+@frappe.whitelist()
+def create_scan_issue(description: str, lead_data_slug: str | None = None, lead_data_import: str | None = None):
+	"""Create an Issue from Lead Scan feedback."""
+	_require_scan_access()
+	_ensure_lead_scan_issue_type()
+	frappe.has_permission("Issue", "create", throw=True)
+
+	description = (description or "").strip()
+	if not description:
+		frappe.throw(_("Please describe the problem briefly."))
+
+	slug = (lead_data_slug or "").strip()
+	import_name = (lead_data_import or "").strip()
+	person = ""
+	org = ""
+	if slug:
+		if not frappe.db.exists(LEAD_DATA, slug):
+			frappe.throw(_("Lead Data {0} not found").format(slug))
+		frappe.has_permission(LEAD_DATA, doc=slug, ptype="read", throw=True)
+		row = frappe.db.get_value(
+			LEAD_DATA,
+			slug,
+			["first_name", "last_name", "organization_name", "lead_data_import"],
+			as_dict=True,
+		)
+		person = " ".join(p for p in (row.first_name, row.last_name) if p).strip()
+		org = (row.organization_name or "").strip()
+		import_name = import_name or (row.lead_data_import or "")
+
+	label = person or org or slug or import_name or _("Lead Scan")
+	subject = _("Lead Scan: {0}").format(label)
+	if slug:
+		subject = f"{subject} ({slug})"
+	# Keep subject within typical limits
+	subject = subject[:140]
+
+	footer_lines = ["", "---", _("Lead Scan context")]
+	if slug:
+		footer_lines.append(f"Scan: /scan/contact/{slug}")
+		footer_lines.append(f"Desk: /app/lead-data/{slug}")
+	if import_name:
+		footer_lines.append(f"Import: /scan/detail/{import_name}")
+		footer_lines.append(f"Desk import: /app/lead-data-import/{import_name}")
+	full_description = description + "\n".join(footer_lines)
+
+	user = frappe.session.user
+	user_email = frappe.db.get_value("User", user, "email") or user
+
+	doc = frappe.get_doc(
+		{
+			"doctype": "Issue",
+			"subject": subject,
+			"description": full_description,
+			"issue_type": LEAD_SCAN_ISSUE_TYPE,
+			"raised_by": user_email,
+			"status": "Open",
+		}
+	)
+	if frappe.get_meta("Issue").has_field("custom_lead_data_slug"):
+		doc.custom_lead_data_slug = slug
+	doc.insert()
+
+	return {
+		"ok": True,
+		"name": doc.name,
+		"subject": doc.subject,
+		"status": doc.status,
+		"custom_lead_data_slug": slug,
+		"age_label": _issue_age_label(doc.creation),
+		"message": _("Issue {0} created").format(doc.name),
+	}

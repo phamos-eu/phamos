@@ -925,6 +925,16 @@ def re_enrich_incomplete(lead_data_import_name):
     from .services.reenrichment import re_enrich_incomplete as implementation
 
     return implementation(lead_data_import_name)
+
+
+@frappe.whitelist()
+def get_handoff_summary(lead_data_import_name):
+    from phamos.phamos.doctype.lead_data.crm_handoff import handoff_status_summary
+
+    frappe.has_permission(
+        "Lead Data Import", doc=lead_data_import_name, ptype="read", throw=True
+    )
+    return handoff_status_summary(lead_data_import_name)
 def _re_enrich_import_rows(lead_data_import_name, only_incomplete=False):
     from .services.reenrichment import _re_enrich_import_rows as implementation
 

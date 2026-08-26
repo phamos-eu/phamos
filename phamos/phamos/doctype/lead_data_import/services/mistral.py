@@ -113,16 +113,20 @@ For a business card:
 - company_name must be the organisation/logo/legal entity, not the person's name.
 - Put the person's name in contact_persons.
 - Put the role/title such as "Mediaberaterin" in job_title.
-- Put landline numbers in phones and numbers labelled Mobil/Mobile in mobile_numbers.
+- Put landline numbers in phones and numbers labelled Mobil/Mobile/Handy in mobile_numbers.
+- German mobile prefixes after +49 are 15x, 16x, 17x (example: Mobil +49 (0) 171 1007759 → mobile_numbers ["+491711007759"]). Never rewrite 171 as area code 7121.
 - Prefer compact international phone form without spaces or parentheses (e.g. +4917655591059).
 - Extract the visible postal address and every visible email address.
 - Copy the street, postal code, and city exactly as printed on the card. Never
   replace them with a city/postal code from memory or from the company website.
   If any address part is unreadable, leave that part empty instead of guessing.
-- Copy printed email addresses exactly as shown. Never construct, abbreviate, concatenate, or guess an email from the person's name.
+- Copy printed email addresses exactly as shown (including every letter). Never construct, abbreviate, concatenate, or guess an email from the person's name.
 - Keep a personally addressed card email (for example first.last@company.com) before generic addresses such as info@, post@, or contact@.
 - Pay close attention to small or rotated email text on business cards. If the card shows a person email such as b.roesch@neckaralblive.de, include that exact email before generic company emails.
 Example: if the card shows person "Blanca Rösch" and organisation "RADIO NECKARALB LIVE GmbH & Co. KG", return company_name "RADIO NECKARALB LIVE GmbH & Co. KG" and contact_persons ["Blanca Rösch"].
+Example business card with mobile only:
+  name Maximilian ETTINGER, Mobil +49 (0) 171 1007759, E-Mail maximilian.ettinger@pgub-consult.de
+  → phones [], mobile_numbers ["+491711007759"], emails ["maximilian.ettinger@pgub-consult.de"]
 If it is a directory/listing screenshot, return one object per visible company.
 If it is a partner/supporter/sponsor logo section, return one object per readable logo/company name; use an empty website if no company website is visible.
 If it is a single company website page, return exactly ONE object for the company whose details are shown.

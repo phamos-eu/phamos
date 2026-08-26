@@ -259,9 +259,20 @@ def _save_single_company(lead_data_import_name, company):
 
     doc.lead_data = _build_import_info(company)
     doc.findings_and_improvements = "Status: Pending"
+    doc.handoff_status = "Draft"
 
     doc.insert(ignore_permissions=True)
     frappe.db.commit()
+
+    try:
+        from phamos.phamos.doctype.lead_data.crm_handoff import refresh_handoff_status
+
+        refresh_handoff_status(doc, commit=True)
+    except Exception:
+        frappe.log_error(
+            title="Lead Data handoff status refresh failed",
+            message=frappe.get_traceback(),
+        )
 
 
 def _truncate(value, max_len=140):

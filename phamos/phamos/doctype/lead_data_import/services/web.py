@@ -243,44 +243,72 @@ def _sanitize_phone(phone):
 
 
 def _is_mobile_phone(phone):
-    """Heuristic: German mobile prefixes 15/16/17 (E.164 or national)."""
-    clean = _sanitize_phone(phone) if phone else ""
-    digits = re.sub(r"\D", "", clean or str(phone or ""))
-    if not digits:
-        return False
-    if digits.startswith("49"):
-        national = digits[2:]
-        if national.startswith("0"):
-            national = national[1:]
-        return national.startswith(("15", "16", "17"))
-    if digits.startswith("0"):
-        return digits.startswith(("015", "016", "017"))
-    return False
+	"""Heuristic: German mobile prefixes 15/16/17 (E.164 or national)."""
+	clean = _sanitize_phone(phone) if phone else ""
+	digits = re.sub(r"\D", "", clean or str(phone or ""))
+	if not digits:
+		return False
+	if digits.startswith("49"):
+		national = digits[2:]
+		if national.startswith("0"):
+			national = national[1:]
+		return national.startswith(("15", "16", "17"))
+	if digits.startswith("0"):
+		return digits.startswith(("015", "016", "017"))
+	return False
+
+
+def _repair_ocr_german_mobile(phone):
+	"""Fix common vision OCR: Mobil +49 (0) 171… misread as +497121… (area-code-like).
+
+	Printed German mobiles often look like ``+49 (0) 171 1007759``. Models
+	sometimes emit ``+4971211007759`` (inserting a digit so 171 becomes 7121).
+	When that happens the number is mis-filed as a landline.
+	"""
+	clean = _sanitize_phone(phone) if phone else ""
+	if not clean:
+		return ""
+	if _is_mobile_phone(clean):
+		return clean
+	digits = re.sub(r"\D", "", clean)
+	# +497121xxxxxxx → +49171xxxxxxx (171 misread as Reutlingen 7121)
+	match = re.fullmatch(r"497121(\d{7})", digits)
+	if match:
+		candidate = f"+49171{match.group(1)}"
+		if _is_mobile_phone(candidate):
+			return candidate
+	# +497151… / +497161… / +497171… → +49151… / +49161… / +49171…
+	match = re.fullmatch(r"4971([567])1(\d{7})", digits)
+	if match:
+		candidate = f"+491{match.group(1)}1{match.group(2)}"
+		if _is_mobile_phone(candidate):
+			return candidate
+	return clean
 
 
 def _partition_phones_and_mobiles(phones=None, mobile_numbers=None):
-    """Split mixed phone lists into landlines vs mobiles; prefer explicit mobiles."""
-    landlines = []
-    mobiles = []
+	"""Split mixed phone lists into landlines vs mobiles; prefer explicit mobiles."""
+	landlines = []
+	mobiles = []
 
-    for value in mobile_numbers or []:
-        clean = _sanitize_phone(value)
-        if clean and clean not in mobiles:
-            mobiles.append(clean)
+	for value in mobile_numbers or []:
+		clean = _repair_ocr_german_mobile(value) or _sanitize_phone(value)
+		if clean and clean not in mobiles:
+			mobiles.append(clean)
 
-    for value in phones or []:
-        clean = _sanitize_phone(value)
-        if not clean:
-            continue
-        if _is_mobile_phone(clean):
-            if clean not in mobiles:
-                mobiles.append(clean)
-        elif clean not in landlines:
-            landlines.append(clean)
+	for value in phones or []:
+		clean = _repair_ocr_german_mobile(value) or _sanitize_phone(value)
+		if not clean:
+			continue
+		if _is_mobile_phone(clean):
+			if clean not in mobiles:
+				mobiles.append(clean)
+		elif clean not in landlines:
+			landlines.append(clean)
 
-    # Drop mobiles that were also listed as landlines after mis-classification.
-    landlines = [phone for phone in landlines if phone not in mobiles]
-    return landlines, mobiles
+	# Drop mobiles that were also listed as landlines after mis-classification.
+	landlines = [phone for phone in landlines if phone not in mobiles]
+	return landlines, mobiles
 
 
 def _to_e164_phone(phone, default_region="DE"):

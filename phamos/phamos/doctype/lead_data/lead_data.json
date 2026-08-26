@@ -8,7 +8,15 @@
  "engine": "InnoDB",
  "field_order": [
   "lead_data_import",
+  "handoff_status",
   "findings_and_improvements",
+  "crm_links_section",
+  "erpnext_lead",
+  "erpnext_contact",
+  "erpnext_address",
+  "column_break_crm",
+  "erpnext_customer",
+  "erpnext_supplier",
   "section_break_ykza",
   "lead_data",
   "lead_data_attachment",
@@ -42,9 +50,63 @@
  ],
  "fields": [
   {
+   "default": "Draft",
+   "fieldname": "handoff_status",
+   "fieldtype": "Select",
+   "in_list_view": 1,
+   "in_standard_filter": 1,
+   "label": "Handoff Status",
+   "options": "Draft\nNeeds Review\nReady\nPossible Duplicate\nLinked\nCreated\nSkipped"
+  },
+  {
    "fieldname": "findings_and_improvements",
    "fieldtype": "Small Text",
    "label": "Findings and improvements"
+  },
+  {
+   "collapsible": 1,
+   "fieldname": "crm_links_section",
+   "fieldtype": "Section Break",
+   "label": "CRM Links"
+  },
+  {
+   "fieldname": "erpnext_lead",
+   "fieldtype": "Link",
+   "label": "ERPNext Lead",
+   "options": "Lead",
+   "read_only": 1
+  },
+  {
+   "fieldname": "erpnext_contact",
+   "fieldtype": "Link",
+   "label": "ERPNext Contact",
+   "options": "Contact",
+   "read_only": 1
+  },
+  {
+   "fieldname": "erpnext_address",
+   "fieldtype": "Link",
+   "label": "ERPNext Address",
+   "options": "Address",
+   "read_only": 1
+  },
+  {
+   "fieldname": "column_break_crm",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "erpnext_customer",
+   "fieldtype": "Link",
+   "label": "ERPNext Customer",
+   "options": "Customer",
+   "read_only": 1
+  },
+  {
+   "fieldname": "erpnext_supplier",
+   "fieldtype": "Link",
+   "label": "ERPNext Supplier",
+   "options": "Supplier",
+   "read_only": 1
   },
   {
    "fieldname": "section_break_ykza",

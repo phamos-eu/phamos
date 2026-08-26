@@ -251,6 +251,15 @@ def _save_refined_lead_data_doc(lead_data_doc, company, extracted):
 
     if before != after:
         lead_data_doc.save(ignore_permissions=True)
+        try:
+            from phamos.phamos.doctype.lead_data.crm_handoff import refresh_handoff_status
+
+            refresh_handoff_status(lead_data_doc, commit=False)
+        except Exception:
+            frappe.log_error(
+                title="Lead Data handoff status refresh failed",
+                message=frappe.get_traceback(),
+            )
         return True
 
     return False
