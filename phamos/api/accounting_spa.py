@@ -295,6 +295,21 @@ def _get_receipt_extract_status(name):
 	return frappe.cache.get_value(_receipt_extract_cache_key(name)) or {"status": "idle"}
 
 
+def _receipt_extract_lock_key(name):
+	return frappe.cache.make_key(f"accounting_receipt_extract_lock:{name}")
+
+
+def _acquire_receipt_extract_lock(name):
+	"""Atomic set-if-absent; True only for the caller that wins the race."""
+	return bool(
+		frappe.cache.set(_receipt_extract_lock_key(name), b"1", nx=True, ex=EXTRACT_CACHE_TTL)
+	)
+
+
+def _release_receipt_extract_lock(name):
+	frappe.cache.delete(_receipt_extract_lock_key(name))
+
+
 def _run_receipt_pdf_extract_job(accounting_receipt_name):
 	from phamos.phamos.doctype.accounting_receipt.mistral_pdf import extract_from_pdf_and_update_ar
 
@@ -323,6 +338,9 @@ def _run_receipt_pdf_extract_job(accounting_receipt_name):
 			accounting_receipt_name,
 			{"status": "failed", "reason": "error", "message": str(e)},
 		)
+	finally:
+		# Terminal state reached: allow the receipt to be re-extracted immediately.
+		_release_receipt_extract_lock(accounting_receipt_name)
 
 
 @frappe.whitelist(methods=["POST"])
@@ -336,21 +354,30 @@ def enqueue_receipt_pdf_extract(name):
 	if not attachment or not attachment.lower().endswith(".pdf"):
 		return {"queued": False, "reason": "no_attachment"}
 
-	current = _get_receipt_extract_status(name)
-	if current.get("status") == "running":
-		return {"queued": False, "reason": "already_running", "status": current}
+	# Atomic claim: two concurrent callers can no longer both enqueue the same extract.
+	if not _acquire_receipt_extract_lock(name):
+		return {
+			"queued": False,
+			"reason": "already_running",
+			"status": _get_receipt_extract_status(name),
+		}
 
-	_set_receipt_extract_status(
-		name,
-		{"status": "running", "started_at": frappe.utils.now()},
-	)
-	frappe.enqueue(
-		_run_receipt_pdf_extract_job,
-		queue="default",
-		timeout=300,
-		accounting_receipt_name=name,
-		enqueue_after_commit=True,
-	)
+	try:
+		_set_receipt_extract_status(
+			name,
+			{"status": "running", "started_at": frappe.utils.now()},
+		)
+		frappe.enqueue(
+			_run_receipt_pdf_extract_job,
+			queue="default",
+			timeout=300,
+			accounting_receipt_name=name,
+			enqueue_after_commit=True,
+		)
+	except Exception:
+		_release_receipt_extract_lock(name)
+		raise
+
 	return {"queued": True, "status": {"status": "running"}}
 
 
