@@ -58,7 +58,7 @@
 					type="button"
 					class="text-sm text-blue-600 font-medium"
 					:disabled="loading"
-					@click="loadScans"
+					@click="refresh"
 				>
 					Refresh
 				</button>
@@ -75,29 +75,57 @@
 				<p class="text-sm text-slate-600">No scans yet. Start with a business card.</p>
 			</div>
 
-			<ul v-else class="mt-3 space-y-3 pb-8">
+			<ul v-else class="mt-3 space-y-3 pb-4">
 				<li
 					v-for="scan in scans"
 					:key="scan.name"
 					class="contact-card active:bg-slate-50 cursor-pointer"
 					@click="openScan(scan.name)"
 				>
-					<div class="flex items-start justify-between gap-3">
-						<div class="min-w-0">
-							<div class="font-medium text-slate-900 truncate">{{ scan.name }}</div>
-							<div class="text-xs text-slate-500 mt-0.5">
-								{{ formatRelativeTime(scan.modified) }}
-								<span v-if="scan.input_type"> · {{ scan.input_type }}</span>
-								<span v-if="scan.contact_count">
-									· {{ scan.contact_count }}
-									{{ scan.contact_count === 1 ? "contact" : "contacts" }}
-								</span>
-							</div>
+					<div class="flex items-start gap-3">
+						<div
+							class="h-12 w-12 shrink-0 overflow-hidden rounded-xl border border-slate-200 bg-slate-100 flex items-center justify-center"
+						>
+							<img
+								v-if="isImagePreview(scan.upload_file)"
+								:src="scan.upload_file"
+								alt=""
+								class="h-full w-full object-cover"
+							/>
+							<ion-icon
+								v-else
+								:icon="documentOutline"
+								class="text-xl text-slate-400"
+							/>
 						</div>
-						<StatusBadge :status="scan.status" />
+						<div class="min-w-0 flex-1 flex items-start justify-between gap-3">
+							<div class="min-w-0">
+								<div class="font-medium text-slate-900 truncate">{{ scan.name }}</div>
+								<div class="text-xs text-slate-500 mt-0.5">
+									{{ formatRelativeTime(scan.modified) }}
+									<span v-if="scan.input_type"> · {{ scan.input_type }}</span>
+									<span v-if="scan.contact_count">
+										· {{ scan.contact_count }}
+										{{ scan.contact_count === 1 ? "contact" : "contacts" }}
+									</span>
+								</div>
+							</div>
+							<StatusBadge :status="scan.status" />
+						</div>
 					</div>
 				</li>
 			</ul>
+
+			<button
+				v-if="hasMore"
+				type="button"
+				class="mb-24 w-full rounded-2xl border border-slate-300 bg-white py-3 text-sm font-medium text-slate-800 active:bg-slate-50 disabled:opacity-50"
+				:disabled="loadingMore"
+				@click="loadMore"
+			>
+				{{ loadingMore ? "Loading…" : "Load more" }}
+			</button>
+			<div v-else class="pb-24" />
 		</ion-content>
 	</ion-page>
 </template>
@@ -115,10 +143,12 @@ import {
 	IonButton,
 	IonIcon,
 } from "@ionic/vue"
-import { logOutOutline, scanOutline } from "ionicons/icons"
+import { documentOutline, logOutOutline, scanOutline } from "ionicons/icons"
 import { createResource } from "frappe-ui"
 import StatusBadge from "@/components/StatusBadge.vue"
 import { fileToBase64, formatRelativeTime } from "@/utils/upload"
+
+const PAGE_SIZE = 20
 
 const session = inject("$session")
 const toast = inject("$toast")
@@ -127,26 +157,53 @@ const router = useRouter()
 const fileInput = ref(null)
 const scans = ref([])
 const loading = ref(false)
+const loadingMore = ref(false)
 const uploading = ref(false)
 const error = ref("")
+const hasMore = ref(false)
+const nextStart = ref(0)
 
-const listResource = createResource({
-	url: "phamos.api.scan.list_scans",
-	auto: false,
-	onSuccess(data) {
-		scans.value = data || []
-	},
-})
+async function fetchPage({ start = 0, append = false } = {}) {
+	const data = await createResource({
+		url: "phamos.api.scan.list_scans",
+		auto: false,
+	}).submit({
+		limit: PAGE_SIZE,
+		start,
+	})
+	// Back-compat: older API returned a bare array
+	const rows = Array.isArray(data) ? data : data?.scans || []
+	hasMore.value = Array.isArray(data) ? rows.length >= PAGE_SIZE : !!data?.has_more
+	nextStart.value = start + rows.length
+	if (append) {
+		scans.value = [...scans.value, ...rows]
+	} else {
+		scans.value = rows
+	}
+}
 
-async function loadScans() {
+async function refresh() {
 	loading.value = true
 	error.value = ""
 	try {
-		await listResource.fetch({ limit: 40 })
+		await fetchPage({ start: 0, append: false })
 	} catch (e) {
 		error.value = e?.messages?.[0] || e?.message || "Could not load scans"
 	} finally {
 		loading.value = false
+	}
+}
+
+async function loadMore() {
+	if (!hasMore.value || loadingMore.value) return
+	loadingMore.value = true
+	error.value = ""
+	try {
+		await fetchPage({ start: nextStart.value, append: true })
+	} catch (e) {
+		error.value = e?.messages?.[0] || e?.message || "Could not load more"
+	} finally {
+		loadingMore.value = false
 	}
 }
 
@@ -163,7 +220,6 @@ async function onFileSelected(event) {
 	uploading.value = true
 	error.value = ""
 	try {
-		// Read before clearing the input — clearing first breaks FileReader on iOS Safari
 		const content = await fileToBase64(file)
 		const filename = file.name || "scan.pdf"
 		input.value = ""
@@ -193,7 +249,6 @@ async function onFileSelected(event) {
 		})
 	} finally {
 		uploading.value = false
-		// Ensure input can be reused even if read failed mid-way
 		if (input && input.value) input.value = ""
 	}
 }
@@ -202,5 +257,20 @@ function openScan(name) {
 	router.push({ name: "ScanDetail", params: { name } })
 }
 
-onMounted(loadScans)
+function isImagePreview(url) {
+	const value = (url || "").toLowerCase()
+	if (!value) return false
+	if (value.includes(".pdf")) return false
+	return (
+		value.includes(".png") ||
+		value.includes(".jpg") ||
+		value.includes(".jpeg") ||
+		value.includes(".webp") ||
+		value.includes(".gif") ||
+		value.includes(".heic") ||
+		!value.includes(".")
+	)
+}
+
+onMounted(refresh)
 </script>

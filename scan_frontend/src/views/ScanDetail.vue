@@ -7,6 +7,9 @@
 				</ion-buttons>
 				<ion-title>{{ scan?.name || "Scan" }}</ion-title>
 				<ion-buttons slot="end">
+					<ion-button @click="reportOpen = true">
+						<ion-icon :icon="flagOutline" slot="icon-only" />
+					</ion-button>
 					<ion-button :disabled="loading" @click="refresh">
 						<ion-icon :icon="refreshOutline" slot="icon-only" />
 					</ion-button>
@@ -85,6 +88,13 @@
 					</h2>
 				</div>
 
+				<p
+					v-if="handoffSummaryLine"
+					class="mb-3 text-xs text-slate-600"
+				>
+					{{ handoffSummaryLine }}
+				</p>
+
 				<div
 					v-if="!contacts.length"
 					class="rounded-2xl border border-dashed border-slate-300 bg-white/70 p-5 text-center text-sm text-slate-600 mb-6"
@@ -111,6 +121,15 @@
 								{{ contact.display_name }}
 							</div>
 							<div
+								v-if="contact.handoff_status"
+								class="text-[11px] mt-0.5 font-medium"
+								:class="handoffStatusClass(contact.handoff_status)"
+							>
+								{{ contact.handoff_status }}
+								<span v-if="contact.erpnext_customer"> · Customer</span>
+								<span v-else-if="contact.erpnext_supplier"> · Supplier</span>
+							</div>
+							<div
 								v-if="contact.organization_name || contact.job_title"
 								class="text-xs text-slate-500 mt-0.5"
 							>
@@ -133,44 +152,36 @@
 									/>
 									<span class="break-words">{{ contact.email }}</span>
 								</div>
-								<a
+								<div
 									v-if="contact.mobile_no"
-									:href="`tel:${contact.mobile_no}`"
-									class="flex items-center gap-2 text-slate-700 no-underline"
-									@click.stop
+									class="flex items-center gap-2 text-slate-700"
 								>
 									<ion-icon :icon="callOutline" class="text-slate-400" />
 									<span>
 										<span class="text-xs text-slate-500 mr-1">Mobile</span>
 										{{ contact.mobile_no }}
 									</span>
-								</a>
-								<a
+								</div>
+								<div
 									v-if="contact.phone_no"
-									:href="`tel:${contact.phone_no}`"
-									class="flex items-center gap-2 text-slate-700 no-underline"
-									@click.stop
+									class="flex items-center gap-2 text-slate-700"
 								>
 									<ion-icon :icon="callOutline" class="text-slate-400" />
 									<span>
 										<span class="text-xs text-slate-500 mr-1">Landline</span>
 										{{ contact.phone_no }}
 									</span>
-								</a>
-								<a
+								</div>
+								<div
 									v-if="contact.address_display"
-									:href="mapsUrl(contact.address_display)"
-									target="_blank"
-									rel="noopener"
-									class="flex items-start gap-2 text-slate-700 no-underline"
-									@click.stop
+									class="flex items-start gap-2 text-slate-700"
 								>
 									<ion-icon
 										:icon="locationOutline"
 										class="text-slate-400 mt-0.5 shrink-0"
 									/>
 									<span class="break-words">{{ contact.address_display }}</span>
-								</a>
+								</div>
 								<div
 									v-if="
 										!contact.email &&
@@ -246,12 +257,20 @@
 			</template>
 
 			<p v-if="error" class="text-sm text-red-600 mt-4">{{ error }}</p>
+
+			<ReportIssueModal
+				:is-open="reportOpen"
+				:slug="reportSlug"
+				:import-name="props.name"
+				@close="reportOpen = false"
+				@created="onIssueCreated"
+			/>
 		</ion-content>
 	</ion-page>
 </template>
 
 <script setup>
-import { computed, onBeforeUnmount, onMounted, ref, watch } from "vue"
+import { computed, inject, onBeforeUnmount, onMounted, ref, watch } from "vue"
 import { useRouter } from "vue-router"
 import {
 	IonPage,
@@ -270,25 +289,55 @@ import {
 	callOutline,
 	locationOutline,
 	documentOutline,
+	flagOutline,
 } from "ionicons/icons"
 import { createResource } from "frappe-ui"
 import StatusBadge from "@/components/StatusBadge.vue"
+import ReportIssueModal from "@/components/ReportIssueModal.vue"
 
 const props = defineProps({
 	name: { type: String, required: true },
 })
 
 const router = useRouter()
+const toast = inject("$toast")
 const scan = ref(null)
 const loading = ref(false)
 const error = ref("")
+const reportOpen = ref(false)
 let pollTimer = null
 
 const contacts = computed(() => scan.value?.contacts || [])
+const reportSlug = computed(() => contacts.value[0]?.name || "")
 const isProcessing = computed(() => {
 	const status = scan.value?.status
 	return status === "Processing" || status === "Draft"
 })
+
+const handoffSummaryLine = computed(() => {
+	const s = scan.value?.handoff_summary
+	if (!s || !s.total) return ""
+	const bits = []
+	if (s.Ready) bits.push(`${s.Ready} ready`)
+	if (s["Needs Review"]) bits.push(`${s["Needs Review"]} need review`)
+	if (s["Possible Duplicate"]) bits.push(`${s["Possible Duplicate"]} possible duplicates`)
+	if (s.Created) bits.push(`${s.Created} created`)
+	if (s.Skipped) bits.push(`${s.Skipped} skipped`)
+	return bits.length ? bits.join(" · ") : ""
+})
+
+function handoffStatusClass(status) {
+	const map = {
+		Ready: "text-emerald-700",
+		"Needs Review": "text-amber-700",
+		"Possible Duplicate": "text-orange-700",
+		Created: "text-blue-700",
+		Skipped: "text-slate-400",
+		Linked: "text-blue-600",
+		Draft: "text-slate-500",
+	}
+	return map[status] || "text-slate-500"
+}
 
 const statusHint = computed(() => {
 	if (contacts.value.length) {
@@ -354,8 +403,13 @@ function openContact(contactName) {
 	router.push({ name: "ContactDetail", params: { name: contactName } })
 }
 
-function mapsUrl(address) {
-	return `https://maps.google.com/?q=${encodeURIComponent(address || "")}`
+function onIssueCreated(result) {
+	toast?.({
+		title: "Issue reported",
+		text: result?.message || result?.name || "Thanks for the feedback",
+		icon: "check",
+		iconClasses: "text-emerald-600",
+	})
 }
 
 watch(isProcessing, (processing) => {

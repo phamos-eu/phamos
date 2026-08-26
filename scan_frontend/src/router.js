@@ -4,12 +4,23 @@ import { session } from "./session"
 const routes = [
 	{
 		path: "/",
-		redirect: "/home",
-	},
-	{
-		path: "/home",
-		name: "Home",
-		component: () => import("@/views/Home.vue"),
+		component: () => import("@/views/AppShell.vue"),
+		children: [
+			{
+				path: "",
+				redirect: "/home",
+			},
+			{
+				path: "home",
+				name: "Home",
+				component: () => import("@/views/Home.vue"),
+			},
+			{
+				path: "issues",
+				name: "Issues",
+				component: () => import("@/views/Issues.vue"),
+			},
+		],
 	},
 	{
 		path: "/detail/:name",

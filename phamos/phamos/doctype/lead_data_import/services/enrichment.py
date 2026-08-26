@@ -205,6 +205,15 @@ def _enrich_existing_lead_data_for_import(lead_data_import_name):
         lead_doc.lead_data = _build_import_info(_normalize_company_dict(enriched))
         lead_doc.save(ignore_permissions=True)
         frappe.db.commit()
+        try:
+            from phamos.phamos.doctype.lead_data.crm_handoff import refresh_handoff_status
+
+            refresh_handoff_status(lead_doc, commit=True)
+        except Exception:
+            frappe.log_error(
+                title="Lead Data handoff status refresh failed",
+                message=frappe.get_traceback(),
+            )
         updated += 1
         _log(lead_data_import_name, f"[{idx}/{total}] Updated: {row.organization_name or row.name}")
 

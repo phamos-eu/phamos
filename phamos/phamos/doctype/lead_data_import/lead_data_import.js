@@ -197,4 +197,26 @@ function _show_summary(frm) {
         __("{0} total | {1} pending | {2} created | {3} errors", [total, pending, created, errors]),
         color
     );
+
+    frappe.call({
+        method: "phamos.phamos.doctype.lead_data_import.lead_data_import.get_handoff_summary",
+        args: { lead_data_import_name: frm.doc.name },
+        callback(r) {
+            if (!r.message || !r.message.total) return;
+            const s = r.message;
+            frm.dashboard.add_indicator(
+                __(
+                    "Handoff: {0} ready | {1} review | {2} duplicates | {3} created | {4} skipped",
+                    [
+                        s.Ready || 0,
+                        s["Needs Review"] || 0,
+                        s["Possible Duplicate"] || 0,
+                        s.Created || 0,
+                        s.Skipped || 0,
+                    ]
+                ),
+                s.Created === s.total ? "green" : "blue"
+            );
+        },
+    });
 }
