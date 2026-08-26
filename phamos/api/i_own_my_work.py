@@ -342,12 +342,24 @@ def get_chat_settings():
 
 # Re-export Raven chat APIs for a stable SPA method prefix
 from phamos.api.issue_raven import (  # noqa: E402, F401
+	ensure_document_channel,
 	ensure_issue_channel,
 	get_chat_messages,
+	get_document_chat,
 	get_issue_chat,
 	get_raven_users_for_invite,
 	get_thread,
+	invite_to_document_channel,
 	invite_to_issue_channel,
 	open_or_create_thread,
 	send_chat_message,
+)
+
+# Checklist APIs used by LinkedChecklistsSection in Issue detail
+from phamos.api.checklist_inbox import (  # noqa: E402, F401
+	add_spa_checklist_item,
+	create_spa_checklist,
+	get_checklist,
+	get_checklists_for_reference,
+	update_spa_checklist_item,
 )

@@ -13,7 +13,13 @@ export default defineConfig({
 	resolve: {
 		alias: {
 			"@": path.resolve(__dirname, "src"),
+			"@spa": path.resolve(__dirname, "../spa_shared"),
+			vue: path.resolve(__dirname, "node_modules/vue"),
+			"frappe-ui": path.resolve(__dirname, "node_modules/frappe-ui"),
+			"vue-router": path.resolve(__dirname, "node_modules/vue-router"),
+			dayjs: path.resolve(__dirname, "node_modules/dayjs"),
 		},
+		dedupe: ["dayjs", "vue", "vue-router", "frappe-ui"],
 	},
 	build: {
 		outDir: "../phamos/public/frontend",

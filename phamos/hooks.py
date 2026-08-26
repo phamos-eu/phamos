@@ -16,7 +16,35 @@ add_to_apps_screen = [
 		"title": "I Own My Work",
 		"route": "/i-own-my-work",
 		"has_permission": "phamos.api.i_own_my_work.check_app_permission",
-	}
+	},
+	{
+		"name": "hr_spa",
+		"logo": "/assets/frappe/images/frappe-favicon.svg",
+		"title": "HR",
+		"route": "/hr-cockpit",
+		"has_permission": "phamos.api.hr_spa.check_app_permission",
+	},
+	{
+		"name": "sales_spa",
+		"logo": "/assets/frappe/images/frappe-favicon.svg",
+		"title": "Sales",
+		"route": "/sales-cockpit",
+		"has_permission": "phamos.api.sales_spa.check_app_permission",
+	},
+	{
+		"name": "project_management_spa",
+		"logo": "/assets/frappe/images/frappe-favicon.svg",
+		"title": "Project Management Cockpit",
+		"route": "/project-management-cockpit",
+		"has_permission": "phamos.api.project_management_spa.check_app_permission",
+	},
+	{
+		"name": "accounting_spa",
+		"logo": "/assets/frappe/images/frappe-favicon.svg",
+		"title": "Accounting",
+		"route": "/accounting-cockpit",
+		"has_permission": "phamos.api.accounting_spa.check_app_permission",
+	},
 ]
 
 # Includes in <head>
@@ -86,6 +114,14 @@ website_route_rules = [
     {"from_route": "/schedule_interview/<name>", "to_route": "schedule_interview"},
     {"from_route": "/i-own-my-work", "to_route": "i_own_my_work"},
     {"from_route": "/i-own-my-work/<path:app_path>", "to_route": "i_own_my_work"},
+    {"from_route": "/hr-cockpit", "to_route": "hr_spa"},
+    {"from_route": "/hr-cockpit/<path:app_path>", "to_route": "hr_spa"},
+    {"from_route": "/sales-cockpit", "to_route": "sales_spa"},
+    {"from_route": "/sales-cockpit/<path:app_path>", "to_route": "sales_spa"},
+    {"from_route": "/project-management-cockpit", "to_route": "project_management_spa"},
+    {"from_route": "/project-management-cockpit/<path:app_path>", "to_route": "project_management_spa"},
+    {"from_route": "/accounting-cockpit", "to_route": "accounting_spa"},
+    {"from_route": "/accounting-cockpit/<path:app_path>", "to_route": "accounting_spa"},
 ]
 
 

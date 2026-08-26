@@ -28,4 +28,5 @@ phamos.patches.v1_0.update_lead_data_mapping_defaults #1234566
 phamos.patches.v1_0.remove_event_custom_location_field
 phamos.patches.v1_0.update_sales_order_status_hour_fields_to_float
 phamos.patches.v1_0.queue_gitlab_full_sync_after_deploy
+phamos.patches.v1_0.remove_lead_handoff_improve_field
 

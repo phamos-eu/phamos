@@ -10,3 +10,15 @@ node_modules/*
 **/node_modules/
 phamos/public/dist/js
 phamos/public/node_modules
+
+# SPA Vite build output (built via yarn build / postinstall)
+phamos/public/hr
+phamos/public/sales
+phamos/public/accounting
+phamos/public/project_management
+phamos/public/frontend
+phamos/www/hr_spa.html
+phamos/www/sales_spa.html
+phamos/www/accounting_spa.html
+phamos/www/project_management_spa.html
+phamos/www/i_own_my_work.html
