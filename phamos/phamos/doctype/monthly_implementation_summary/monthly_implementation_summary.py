@@ -659,8 +659,8 @@ class MonthlyImplementationSummary(Document):
 			.where(TD.project.isin(projects))
 			.where(TS.docstatus != 2)
 			.where(TS.start_date.between(from_date, to_date))
+			.orderby(TS.start_date, order=Order.asc)
 			.orderby(Emp.employee_name, order=Order.asc)
-			.orderby(TS.total_billable_hours, order=Order.desc)
 		).run(as_dict=True)
 		self.timesheets_table = []
 		for row in rows:
