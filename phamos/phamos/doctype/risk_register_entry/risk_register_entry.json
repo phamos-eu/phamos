@@ -1,7 +1,7 @@
 {
  "actions": [],
  "autoname": "naming_series:",
- "creation": "2026-07-15 00:00:00.000000",
+ "creation": "2026-07-15 00:00:00",
  "doctype": "DocType",
  "engine": "InnoDB",
  "field_order": [
@@ -47,12 +47,12 @@
    "options": "Implementation"
   },
   {
-   "default": "Not Started",
+   "default": "Identified",
    "fieldname": "status",
    "fieldtype": "Select",
    "in_list_view": 1,
    "label": "Status",
-   "options": "Accepted\nNot Started\nIn Progress\nEscalated\nClosed",
+   "options": "Accepted\nIdentified\nIn Progress\nEscalated\nMitigated\nRealised",
    "reqd": 1
   },
   {
@@ -182,8 +182,14 @@
    "label": "Comments"
   }
  ],
- "links": [],
- "modified": "2026-07-15 00:00:00.000000",
+ "links": [
+  {
+   "group": "",
+   "link_doctype": "Incident Corrective Action",
+   "link_fieldname": "risk"
+  }
+ ],
+ "modified": "2026-08-27 11:47:50.888198",
  "modified_by": "Administrator",
  "module": "Phamos",
  "name": "Risk Register Entry",
@@ -214,6 +220,7 @@
    "write": 1
   }
  ],
+ "row_format": "Dynamic",
  "sort_field": "modified",
  "sort_order": "DESC",
  "states": [],

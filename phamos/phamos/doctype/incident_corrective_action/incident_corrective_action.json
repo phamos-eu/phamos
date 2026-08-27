@@ -11,6 +11,7 @@
   "column_break_context",
   "gitlab_issue",
   "customer",
+  "risk",
   "workflow_state",
   "section_break_d0",
   "emergency_response_actions",
@@ -74,6 +75,13 @@
    "label": "Customer",
    "options": "Customer",
    "read_only": 1
+  },
+  {
+   "description": "Set when this Incident was opened from a Risk Register Entry that was realised.",
+   "fieldname": "risk",
+   "fieldtype": "Link",
+   "label": "Risk",
+   "options": "Risk Register Entry"
   },
   {
    "fieldname": "workflow_state",
