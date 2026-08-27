@@ -91,14 +91,14 @@ function _mis_setup_dn_table_create_si_btn(frm) {
 		__("Create Sales Invoice"),
 		function(selected) {
 			return !frm.is_new() && !frm.is_dirty() &&
-				selected.some(r => r.delivery_note && !r.sales_invoice && r.status === "To Bill");
+				selected.some(r => r.delivery_note && r.status === "To Bill");
 		},
 		function(selected) {
 			const dns = selected
-				.filter(r => r.delivery_note && !r.sales_invoice && r.status === "To Bill")
+				.filter(r => r.delivery_note && r.status === "To Bill")
 				.map(r => r.delivery_note);
 			if (!dns.length) {
-				frappe.show_alert({ message: __("No eligible Delivery Notes selected (must have status 'To Bill' and no Sales Invoice)."), indicator: "orange" });
+				frappe.show_alert({ message: __("No eligible Delivery Notes selected (must have status 'To Bill')."), indicator: "orange" });
 				return;
 			}
 			_mis_create_si_for_dns(frm, dns);
@@ -106,9 +106,61 @@ function _mis_setup_dn_table_create_si_btn(frm) {
 	);
 }
 
+function _mis_setup_dn_table_submit_btn(frm) {
+	const field = frm.fields_dict.mis_delivery_notes;
+	if (!field || !field.grid) return;
+
+	_mis_inject_grid_button(
+		field.grid,
+		"mis-submit-dn-btn",
+		__("Submit Delivery Note(s)"),
+		function(selected) {
+			return !frm.is_new() && !frm.is_dirty() &&
+				selected.some(r => r.delivery_note && r.status === "Draft");
+		},
+		function(selected) {
+			const draft_dns = selected
+				.filter(r => r.delivery_note && r.status === "Draft")
+				.map(r => r.delivery_note);
+			if (!draft_dns.length) {
+				frappe.show_alert({ message: __("No draft Delivery Notes selected."), indicator: "orange" });
+				return;
+			}
+			_mis_submit_dns_from_table(frm, draft_dns);
+		}
+	);
+}
+
+function _mis_setup_si_table_submit_btn(frm) {
+	const field = frm.fields_dict.mis_sales_invoices;
+	if (!field || !field.grid) return;
+
+	_mis_inject_grid_button(
+		field.grid,
+		"mis-submit-si-btn",
+		__("Submit Sales Invoice(s)"),
+		function(selected) {
+			return !frm.is_new() && !frm.is_dirty() &&
+				selected.some(r => r.sales_invoice && r.status === "Draft");
+		},
+		function(selected) {
+			const draft_sis = selected
+				.filter(r => r.sales_invoice && r.status === "Draft")
+				.map(r => r.sales_invoice);
+			if (!draft_sis.length) {
+				frappe.show_alert({ message: __("No draft Sales Invoices selected."), indicator: "orange" });
+				return;
+			}
+			_mis_submit_sis_from_table(frm, draft_sis);
+		}
+	);
+}
+
 function _mis_setup_grid_action_buttons(frm) {
 	_mis_setup_so_table_create_dn_btn(frm);
+	_mis_setup_dn_table_submit_btn(frm);
 	_mis_setup_dn_table_create_si_btn(frm);
+	_mis_setup_si_table_submit_btn(frm);
 }
 
 // ── DN creation ─────────────────────────────────────────────────────────────
@@ -179,6 +231,142 @@ function _mis_create_si_for_dns(frm, delivery_notes) {
 			promise.then(function() { frm.reload_doc(); });
 		}
 	);
+}
+
+function _mis_submit_dns_from_table(frm, delivery_notes) {
+	if (!delivery_notes || !delivery_notes.length) return;
+	frappe.confirm(
+		__("{0} Delivery Note(s) will be submitted. Continue?", [delivery_notes.length]),
+		function() {
+			frappe.call({
+				method: "phamos.phamos.doctype.monthly_implementation_summary.monthly_implementation_summary.submit_delivery_notes_in_mis",
+				args: { docname: frm.doc.name, delivery_notes: delivery_notes },
+				freeze: true,
+				freeze_message: __("Submitting Delivery Note(s)..."),
+				callback: function(r) {
+					if (r.exc) {
+						frappe.msgprint({ title: __("Error"), message: r.exc[0] || __("Failed."), indicator: "red" });
+						return;
+					}
+					const d = r.message || {};
+					if (d.failed_details && d.failed_details.length) {
+						frappe.msgprint({
+							title: __("Some submissions failed"),
+							indicator: "orange",
+							message: d.failed_details
+								.map(item => `${_mis_escape(item.delivery_note || "")} : ${_mis_escape(item.error || "")}` )
+								.join("<br>"),
+						});
+					}
+					frappe.show_alert({
+						message: __("Submitted: {0}, Skipped: {1}, Failed: {2}", [
+							cint(d.submitted || 0), cint(d.already_submitted || 0), cint(d.failed || 0)
+						]),
+						indicator: cint(d.failed || 0) ? "orange" : "green",
+					});
+					frm.reload_doc();
+				}
+			});
+		}
+	);
+}
+
+function _mis_submit_sis_from_table(frm, sales_invoices) {
+	if (!sales_invoices || !sales_invoices.length) return;
+	frappe.confirm(
+		__("{0} Sales Invoice(s) will be submitted. Continue?", [sales_invoices.length]),
+		function() {
+			frappe.call({
+				method: "phamos.phamos.doctype.monthly_implementation_summary.monthly_implementation_summary.submit_sales_invoices_in_mis",
+				args: { docname: frm.doc.name, sales_invoices: sales_invoices },
+				freeze: true,
+				freeze_message: __("Submitting Sales Invoice(s)..."),
+				callback: function(r) {
+					if (r.exc) {
+						frappe.msgprint({ title: __("Error"), message: r.exc[0] || __("Failed."), indicator: "red" });
+						return;
+					}
+					const d = r.message || {};
+					if (d.failed_details && d.failed_details.length) {
+						frappe.msgprint({
+							title: __("Some submissions failed"),
+							indicator: "orange",
+							message: d.failed_details
+								.map(item => `${_mis_escape(item.sales_invoice || "")} : ${_mis_escape(item.error || "")}` )
+								.join("<br>"),
+						});
+					}
+					frappe.show_alert({
+						message: __("Submitted: {0}, Skipped: {1}, Failed: {2}", [
+							cint(d.submitted || 0), cint(d.already_submitted || 0), cint(d.failed || 0)
+						]),
+						indicator: cint(d.failed || 0) ? "orange" : "green",
+					});
+					frm.reload_doc();
+				}
+			});
+		}
+	);
+}
+
+function _mis_show_create_si_dialog(frm) {
+	const eligible = (frm.doc.mis_delivery_notes || []).filter(
+		r => r.delivery_note && !r.sales_invoice && r.status === "To Bill"
+	);
+	if (!eligible.length) {
+		frappe.show_alert({ message: __("No Delivery Notes available for invoicing."), indicator: "orange" });
+		return;
+	}
+
+	const rows_html = eligible.map(r => `
+		<tr>
+			<td style="width:36px; text-align:center;">
+				<input type="checkbox" class="mis-si-dn-check" data-dn="${_mis_escape(r.delivery_note)}" checked>
+			</td>
+			<td><a href="/app/delivery-note/${encodeURIComponent(r.delivery_note || "")}" target="_blank">${_mis_escape(r.delivery_note)}</a></td>
+			<td>${_mis_escape(r.sales_order || "")}</td>
+			<td style="text-align:right;">${_mis_number(r.grand_total)}</td>
+		</tr>
+	`).join("");
+
+	const dialog = new frappe.ui.Dialog({
+		title: __("Create Sales Invoice"),
+		fields: [{ fieldname: "dn_list_html", fieldtype: "HTML" }],
+		primary_action_label: __("Create"),
+		primary_action: function() {
+			const selected = [];
+			dialog.$wrapper.find(".mis-si-dn-check:checked").each(function() {
+				const dn = $(this).attr("data-dn");
+				if (dn) selected.push(dn);
+			});
+			if (!selected.length) {
+				frappe.show_alert({ message: __("Select at least one Delivery Note."), indicator: "orange" });
+				return;
+			}
+			dialog.hide();
+			_mis_create_si_for_dns(frm, selected);
+		},
+	});
+
+	dialog.get_field("dn_list_html").$wrapper.html(`
+		<table class="table table-bordered table-hover" style="margin-bottom:0;">
+			<thead>
+				<tr>
+					<th style="width:36px;"><input type="checkbox" id="mis-si-select-all" checked></th>
+					<th>${__("Delivery Note")}</th>
+					<th>${__("Sales Order")}</th>
+					<th style="text-align:right;">${__("Grand Total")}</th>
+				</tr>
+			</thead>
+			<tbody>${rows_html}</tbody>
+		</table>
+	`);
+
+	dialog.$wrapper.on("change", "#mis-si-select-all", function() {
+		dialog.$wrapper.find(".mis-si-dn-check").prop("checked", $(this).is(":checked"));
+	});
+
+	dialog.show();
 }
 
 
@@ -813,6 +1001,16 @@ frappe.ui.form.on("Monthly Implementation Summary", {
 			};
 			Object.keys(defaults).forEach(k => { frm.set_value(k, defaults[k]); });
 			return;
+		}
+		if (cint(frm.doc.docstatus) === 1) {
+			const has_billable_dns = (frm.doc.mis_delivery_notes || []).some(
+				r => r.delivery_note && r.status === "To Bill"
+			);
+			if (has_billable_dns) {
+				frm.add_custom_button(__("Create Sales Invoice"), function() {
+					_mis_show_create_si_dialog(frm);
+				});
+			}
 		}
 		_mis_maybe_open_timesheet_approval_dialog(frm);
 		// Add Sales Orders to connections dashboard
