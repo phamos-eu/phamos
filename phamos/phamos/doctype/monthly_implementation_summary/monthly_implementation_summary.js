@@ -1028,40 +1028,34 @@ frappe.ui.form.on("Monthly Implementation Summary", {
 					// Remove any existing Sales Order badges to avoid duplicates
 					$('.document-link[data-doctype="Sales Order"]').remove();
 
-					// Find the container
-					let $container = $('.form-links');
-
-					if ($container.length === 0) {
-						$container = $('.form-dashboard-section.connections');
-					}
-
-					if ($container.length === 0) {
-						$container = $('[data-doctype="Delivery Note"]').parent();
-					}
-
-					if ($container.length > 0) {
-						let badge_html = `
-							<div class="document-link" data-doctype="Sales Order">
-								<div class="document-link-badge" data-doctype="Sales Order">
-									${records.length > 0 ? `<span class="count">${records.length}</span>` : ''}
-									<a class="badge-link">Sales Order</a>
-								</div>
+					let $anchor = $('.document-link[data-doctype="Delivery Note"]');
+					let badge_html = `
+						<div class="document-link" data-doctype="Sales Order">
+							<div class="document-link-badge" data-doctype="Sales Order">
+								${records.length > 0 ? `<span class="count">${records.length}</span>` : ''}
+								<a class="badge-link">Sales Order</a>
 							</div>
-						`;
+						</div>
+					`;
 
+					if ($anchor.length) {
+						$anchor.after(badge_html);
+					} else {
+						// Fallback: append to the Related section if Delivery Note badge isn't rendered yet
+						let $container = $('.form-links, .form-dashboard-section.connections').first();
 						$container.append(badge_html);
-
-						// Add click handler
-						$('.document-link[data-doctype="Sales Order"] .badge-link').on('click', function(e) {
-							e.preventDefault();
-							if (records.length > 0) {
-								let names = records.map(r => r.name);
-								frappe.set_route('List', 'Sales Order', {name: ['in', names]});
-							} else {
-								frappe.set_route('List', 'Sales Order', {custom_implementation: frm.doc.implementation});
-							}
-						});
 					}
+
+					// Add click handler
+					$('.document-link[data-doctype="Sales Order"] .badge-link').on('click', function(e) {
+						e.preventDefault();
+						if (records.length > 0) {
+							let names = records.map(r => r.name);
+							frappe.set_route('List', 'Sales Order', {name: ['in', names]});
+						} else {
+							frappe.set_route('List', 'Sales Order', {custom_implementation: frm.doc.implementation});
+						}
+					});
 				}, 1000);
 			});
 		}
