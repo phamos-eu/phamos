@@ -188,7 +188,8 @@ class MonthlyImplementationSummary(Document):
 		self.populate_financial_history_fields()
 
 	def before_submit(self):
-		pass
+		self._sync_delivery_note_from_mis_items_for_submit()
+		self._submit_linked_delivery_note_before_mis_submit()
 
 	def on_submit(self):
 		dn_name = self._resolve_dn_name_for_timesheet_stamp()
