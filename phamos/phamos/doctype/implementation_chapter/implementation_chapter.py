@@ -182,3 +182,80 @@ def set_as_planned(name):
 	)
 
 	return {"status": doc.status, "current_revision": doc.current_revision}
+
+
+@frappe.whitelist()
+def get_chapter_history(chapter):
+	"""Read-only history for the Chapter's History tab: the revision sequence
+	and the submitted Stakeholder Meetings (with their outcomes and any linked
+	Decisions) that reviewed this Chapter. Built entirely from Implementation
+	Chapter Revision / Stakeholder Meeting Chapter Review / Stakeholder Meeting
+	Decision - never touches Implementation.status_updates."""
+	doc = frappe.get_doc("Implementation Chapter", chapter)
+
+	revisions = frappe.get_all(
+		"Implementation Chapter Revision",
+		filters={"implementation_chapter": chapter},
+		fields=[
+			"name",
+			"revision_number",
+			"chapter_title",
+			"chapter_introduction",
+			"planned_start",
+			"target_date",
+			"creation",
+		],
+		order_by="revision_number asc",
+	)
+	for revision in revisions:
+		revision["is_current"] = revision.name == doc.current_revision
+
+	review_rows = frappe.get_all(
+		"Stakeholder Meeting Chapter Review",
+		filters={"chapter": chapter, "docstatus": 1},
+		fields=[
+			"parent",
+			"progress",
+			"scope_change",
+			"chapter_status_before",
+			"chapter_status_after",
+			"previous_revision",
+			"current_revision",
+		],
+	)
+	reviews_by_meeting = {row.parent: row for row in review_rows}
+
+	meetings = []
+	if reviews_by_meeting:
+		meeting_rows = frappe.get_all(
+			"Stakeholder Meeting",
+			filters={"name": ["in", list(reviews_by_meeting.keys())], "docstatus": 1},
+			fields=["name", "meeting_date", "meeting_type", "chair"],
+			order_by="meeting_date desc, creation desc",
+		)
+
+		decision_rows = frappe.get_all(
+			"Stakeholder Meeting Decision",
+			filters={"chapter": chapter, "docstatus": 1},
+			fields=["parent", "decision_type", "decision", "subject", "effective_date", "notes"],
+		)
+		decisions_by_meeting = {}
+		for decision in decision_rows:
+			decisions_by_meeting.setdefault(decision.parent, []).append(decision)
+
+		for meeting in meeting_rows:
+			review = reviews_by_meeting.get(meeting.name, {})
+			meeting["progress"] = review.get("progress")
+			meeting["scope_change"] = review.get("scope_change")
+			meeting["chapter_status_before"] = review.get("chapter_status_before")
+			meeting["chapter_status_after"] = review.get("chapter_status_after")
+			meeting["previous_revision"] = review.get("previous_revision")
+			meeting["current_revision"] = review.get("current_revision")
+			meeting["decisions"] = decisions_by_meeting.get(meeting.name, [])
+			meetings.append(meeting)
+
+	return {
+		"current_revision": doc.current_revision,
+		"revisions": revisions,
+		"meetings": meetings,
+	}
