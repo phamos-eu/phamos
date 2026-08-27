@@ -637,8 +637,14 @@ def _enrich_projects(projects, user):
     if employee:
         TimesheetRecord = frappe.qb.DocType("Timesheet Record")
 
-        billed_seconds = Sum(
+        total_seconds = Sum(
             Case().when(TimesheetRecord.docstatus == 1, TimesheetRecord.actual_time).else_(0)
+        )
+        billable_seconds = Sum(
+            Case().when(
+                TimesheetRecord.docstatus != 2,
+                TimesheetRecord.actual_time * TimesheetRecord.percent_billable / 100,
+            ).else_(0)
         )
 
         ts_rows = (
@@ -646,7 +652,8 @@ def _enrich_projects(projects, user):
             .select(
                 TimesheetRecord.project,
                 Count("*").as_("cnt"),
-                Coalesce(billed_seconds, 0).as_("total_seconds"),
+                Coalesce(total_seconds, 0).as_("total_seconds"),
+                Coalesce(billable_seconds, 0).as_("billable_seconds"),
             )
             .where(
                 (TimesheetRecord.project.isin(project_names))
@@ -656,13 +663,22 @@ def _enrich_projects(projects, user):
             .groupby(TimesheetRecord.project)
         ).run(as_dict=True)
 
-        ts_map = {r.project: {"count": r.cnt, "total_seconds": int(r.total_seconds)} for r in ts_rows}
+        ts_map = {
+            r.project: {
+                "count": r.cnt,
+                "total_seconds": int(r.total_seconds),
+                "billable_seconds": int(r.billable_seconds),
+            }
+            for r in ts_rows
+        }
 
     for p in projects:
         p["assignees"] = assignees_map.get(p["name"], [])
-        ts = ts_map.get(p["name"], {"count": 0, "total_seconds": 0})
+        ts = ts_map.get(p["name"], {"count": 0, "total_seconds": 0, "billable_seconds": 0})
         p["timesheet_count"] = ts["count"]
         p["total_tracked_seconds"] = ts["total_seconds"]
+        p["billable_seconds"] = ts["billable_seconds"]
+        p["non_billable_seconds"] = max(0, ts["total_seconds"] - ts["billable_seconds"])
 
     return projects
 
