@@ -52,12 +52,14 @@
    "fieldname": "milestone_id",
    "fieldtype": "Int",
    "in_standard_filter": 1,
-   "label": "Milestone ID"
+   "label": "Milestone ID",
+   "description": "ID of the milestone in ERPNext, used for internal reference"
   },
   {
    "fieldname": "milestone_iid",
    "fieldtype": "Int",
-   "label": "Milestone IID"
+   "label": "Milestone IID(from GitLab)",
+   "description": "The IID of the milestone from GitLab"
   },
   {
    "fieldname": "state",
