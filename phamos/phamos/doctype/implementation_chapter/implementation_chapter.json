@@ -24,7 +24,9 @@
   "full_chapter_description",
   "current_revision",
   "last_meeting",
-  "last_reviewed_on"
+  "last_reviewed_on",
+  "history_tab",
+  "chapter_history_html"
  ],
  "fields": [
   {
@@ -140,6 +142,16 @@
    "fieldtype": "Date",
    "label": "Last Reviewed On",
    "read_only": 1
+  },
+  {
+   "fieldname": "history_tab",
+   "fieldtype": "Tab Break",
+   "label": "History"
+  },
+  {
+   "fieldname": "chapter_history_html",
+   "fieldtype": "HTML",
+   "label": "History"
   }
  ],
  "grid_page_length": 50,
