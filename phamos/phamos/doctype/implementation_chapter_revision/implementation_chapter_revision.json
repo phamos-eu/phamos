@@ -24,6 +24,7 @@
    "in_list_view": 1,
    "label": "Implementation Chapter",
    "options": "Implementation Chapter",
+   "read_only": 1,
    "reqd": 1
   },
   {
@@ -32,6 +33,7 @@
    "fieldtype": "Int",
    "in_list_view": 1,
    "label": "Revision Number",
+   "read_only": 1,
    "reqd": 1
   },
   {
@@ -41,12 +43,14 @@
   {
    "fieldname": "planned_start",
    "fieldtype": "Date",
-   "label": "Planned Start"
+   "label": "Planned Start",
+   "read_only": 1
   },
   {
    "fieldname": "target_date",
    "fieldtype": "Date",
-   "label": "Target Date"
+   "label": "Target Date",
+   "read_only": 1
   },
   {
    "fieldname": "section_break_rev",
@@ -55,17 +59,20 @@
   {
    "fieldname": "chapter_title",
    "fieldtype": "Data",
-   "label": "Chapter Title"
+   "label": "Chapter Title",
+   "read_only": 1
   },
   {
    "fieldname": "chapter_introduction",
    "fieldtype": "Small Text",
-   "label": "Chapter Introduction"
+   "label": "Chapter Introduction",
+   "read_only": 1
   },
   {
    "fieldname": "full_chapter_description",
    "fieldtype": "Text Editor",
-   "label": "Full Chapter Description"
+   "label": "Full Chapter Description",
+   "read_only": 1
   }
  ],
  "index_web_pages_for_search": 1,
