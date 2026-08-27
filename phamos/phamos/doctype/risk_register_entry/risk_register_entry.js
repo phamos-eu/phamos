@@ -18,6 +18,29 @@ frappe.ui.form.on('Risk Register Entry', {
 	implementation_severity(frm) { _update_risk(frm); },
 	company_severity(frm)        { _update_risk(frm); },
 	likelihood(frm)              { _update_risk(frm); },
+	status(frm) {
+		if (frm.doc.status === 'Realised') {
+			frm.trigger('prompt_incident_corrective_action');
+		}
+	},
+	prompt_incident_corrective_action(frm) {
+		frappe.confirm(
+			__('This Risk is now marked as Realised. Open a new Incident Corrective Action for it?'),
+			() => {
+				const open_incident = () => {
+					frappe.new_doc('Incident Corrective Action', {
+						implementation: frm.doc.implementation,
+						risk: frm.doc.name,
+					});
+				};
+				if (frm.is_new() || frm.is_dirty()) {
+					frm.save().then(open_incident);
+				} else {
+					open_incident();
+				}
+			}
+		);
+	},
 });
 
 function _parse_level(value) {
