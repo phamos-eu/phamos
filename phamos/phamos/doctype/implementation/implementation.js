@@ -584,8 +584,10 @@ frappe.ui.form.on("Implementation", {
 
         // Load Chart.js and render
         frappe.require("https://cdn.jsdelivr.net/npm/chart.js", function () {
-            render_module_chart(frm, 'radar-chart-1');
-            render_module_chart(frm, 'radar-chart-2');
+            load_module_chapter_titles(frm, () => {
+                render_module_chart(frm, 'radar-chart-1');
+                render_module_chart(frm, 'radar-chart-2');
+            });
         });
         // radar chart ends
             frappe.call({
@@ -1205,15 +1207,52 @@ function populate_auto_email_reports(frm) {
         }
     });
 }
+function load_module_chapter_titles(frm, callback) {
+    const chapter_names = [
+        ...new Set(
+            (frm.doc.modules || [])
+                .map(row => (row.implementation_chapter || "").trim())
+                .filter(Boolean)
+        ),
+    ];
+
+    frm.__chapter_titles = frm.__chapter_titles || {};
+    const missing = chapter_names.filter(name => !(name in frm.__chapter_titles));
+
+    if (!missing.length) {
+        callback();
+        return;
+    }
+
+    frappe.call({
+        method: "frappe.client.get_list",
+        args: {
+            doctype: "Implementation Chapter",
+            filters: { name: ["in", missing] },
+            fields: ["name", "chapter_title"],
+            limit_page_length: 0,
+        },
+        callback: r => {
+            (r.message || []).forEach(chapter => {
+                frm.__chapter_titles[chapter.name] = chapter.chapter_title;
+            });
+            callback();
+        },
+    });
+}
+
 function render_module_chart(frm, canvasId) {
     const labels = [];
     const currentLevels = [];
     const targetLevels = [];
+    const chapter_titles = frm.__chapter_titles || {};
 
     (frm.doc.modules || []).forEach(row => {
         if (row.is_required) {
+            const chapter_name = (row.implementation_chapter || "").trim();
             const baseLabel =
-                (row.implementation_chapter || "").trim() ||
+                (chapter_titles[chapter_name] || "").trim() ||
+                chapter_name ||
                 (row.module_description || "").trim() ||
                 row.module;
             let label = baseLabel;
@@ -1379,12 +1418,14 @@ function setup_implementation_theme_watcher(frm) {
         const usePredictionFilter = !!(frm.doc.prediction_from_date || frm.doc.prediction_to_date);
         render_resource_planning_graph(frm, usePredictionFilter);
 
-        if (frm.fields_dict.module_chart?.$wrapper?.find("canvas").length) {
-            render_module_chart(frm, "radar-chart-1");
-        }
-        if (frm.fields_dict.modules_overview?.$wrapper?.find("canvas").length) {
-            render_module_chart(frm, "radar-chart-2");
-        }
+        load_module_chapter_titles(frm, () => {
+            if (frm.fields_dict.module_chart?.$wrapper?.find("canvas").length) {
+                render_module_chart(frm, "radar-chart-1");
+            }
+            if (frm.fields_dict.modules_overview?.$wrapper?.find("canvas").length) {
+                render_module_chart(frm, "radar-chart-2");
+            }
+        });
     };
 
     if (frm.__implementation_theme_observer) {
