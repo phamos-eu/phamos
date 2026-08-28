@@ -1,8 +1,10 @@
 from calendar import month_name
 from datetime import date
+import csv
+import io
 import json
 import frappe
-from frappe.utils import getdate, nowdate
+from frappe.utils import cint, getdate, nowdate
 
 
 @frappe.whitelist()
@@ -16,6 +18,7 @@ def get_gitlab_issue_dashboard_data(projects=None, year=None, from_date=None, to
     flow_rows, aging_map, project_names = _build_flow_rows_and_aging(from_date, to_date, selected_projects, issue_scope)
     project_titles = _get_project_titles(project_names)
     lead_time = _format_lead_time_response(from_date, to_date, selected_projects, issue_scope, compare_to_company)
+    open_now_total = _count_open_now(from_date, to_date, selected_projects, issue_scope)
     company_monthly_flow = []
     company_aging = {}
 
@@ -36,7 +39,192 @@ def get_gitlab_issue_dashboard_data(projects=None, year=None, from_date=None, to
         "company_monthly_flow": company_monthly_flow,
         "company_aging": company_aging,
         "lead_time": lead_time,
+        "open_now_total": open_now_total,
     }
+
+
+DRILLDOWN_ROW_LIMIT = 200
+DRILLDOWN_EXPORT_ROW_LIMIT = 10000
+
+
+def _build_drilldown_where(
+	projects=None,
+	issue_scope=None,
+	date_field=None,
+	from_date=None,
+	to_date=None,
+	rolling_months=None,
+	state=None,
+	aging_bucket=None,
+):
+	"""Shared WHERE-clause builder for the drilldown table and its CSV export.
+
+	`aging_bucket` (0-30 / 31-90 / >90 days) is a value computed on the fly via
+	DATEDIFF, not a stored column, so it can only be filtered here in SQL — it
+	can never be passed through to the standard GitLab Issue list view URL,
+	which only understands real doctype fields.
+	"""
+	selected_projects = _normalize_projects(projects)
+	issue_scope = _normalize_issue_scope(issue_scope)
+	date_field = date_field if date_field in ("created_at", "closed_at") else "created_at"
+
+	if aging_bucket and not state:
+		state = "closed"
+
+	conditions = ["1=1"]
+	params = {}
+
+	if selected_projects:
+		conditions.append("gi.gitlab_project IN %(projects)s")
+		params["projects"] = tuple(selected_projects)
+
+	if issue_scope == "parent":
+		conditions.append("gi.parent_issue IS NULL")
+	elif issue_scope == "child":
+		conditions.append("gi.parent_issue IS NOT NULL")
+
+	if state:
+		conditions.append("gi.state = %(state)s")
+		params["state"] = state
+
+	if rolling_months:
+		conditions.append(f"gi.{date_field} >= DATE_SUB(CURDATE(), INTERVAL {int(rolling_months)} MONTH)")
+	elif from_date and to_date:
+		conditions.append(f"DATE(gi.{date_field}) BETWEEN %(from_date)s AND %(to_date)s")
+		params["from_date"] = getdate(from_date)
+		params["to_date"] = getdate(to_date)
+
+	if aging_bucket in {"0_30", "31_90", "gt_90"}:
+		conditions.append("gi.created_at IS NOT NULL AND gi.closed_at IS NOT NULL")
+		if aging_bucket == "0_30":
+			conditions.append("DATEDIFF(DATE(gi.closed_at), DATE(gi.created_at)) <= 30")
+		elif aging_bucket == "31_90":
+			conditions.append(
+				"DATEDIFF(DATE(gi.closed_at), DATE(gi.created_at)) > 30"
+				" AND DATEDIFF(DATE(gi.closed_at), DATE(gi.created_at)) <= 90"
+			)
+		else:
+			conditions.append("DATEDIFF(DATE(gi.closed_at), DATE(gi.created_at)) > 90")
+
+	return " AND ".join(conditions), params, date_field
+
+
+@frappe.whitelist()
+def get_gitlab_issue_drilldown(
+	projects=None,
+	issue_scope=None,
+	date_field=None,
+	from_date=None,
+	to_date=None,
+	rolling_months=None,
+	state=None,
+	aging_bucket=None,
+	start=0,
+):
+	"""Returns a page of the individual GitLab Issue rows behind a dashboard card/chart
+	segment, so the UI can show a first-stage popup before linking out to the full list
+	view (or, for filters the list view can't express, paging through everything here)."""
+	where_sql, params, date_field = _build_drilldown_where(
+		projects, issue_scope, date_field, from_date, to_date, rolling_months, state, aging_bucket
+	)
+	start = max(cint(start), 0)
+
+	total = frappe.db.sql(
+		f"SELECT COUNT(*) AS total FROM `tabGitLab Issue` gi WHERE {where_sql}",
+		params,
+		as_dict=True,
+	)[0].total
+
+	rows = frappe.db.sql(
+		f"""
+		SELECT
+			gi.name,
+			gi.issue_id,
+			gi.title,
+			gi.state,
+			gi.gitlab_project,
+			gi.created_at,
+			gi.closed_at,
+			gi.assignee,
+			gi.issue_url,
+			DATEDIFF(DATE(gi.closed_at), DATE(gi.created_at)) AS lead_time_days
+		FROM `tabGitLab Issue` gi
+		WHERE {where_sql}
+		ORDER BY gi.{date_field} DESC
+		LIMIT {DRILLDOWN_ROW_LIMIT}
+		OFFSET {start}
+		""",
+		params,
+		as_dict=True,
+	)
+
+	project_titles = _get_project_titles(sorted({row.gitlab_project for row in rows if row.gitlab_project}))
+
+	return {
+		"total": int(total or 0),
+		"rows": rows,
+		"start": start,
+		"limit": DRILLDOWN_ROW_LIMIT,
+		"project_titles": project_titles,
+	}
+
+
+@frappe.whitelist()
+def download_gitlab_issue_drilldown_csv(
+	projects=None,
+	issue_scope=None,
+	date_field=None,
+	from_date=None,
+	to_date=None,
+	rolling_months=None,
+	state=None,
+	aging_bucket=None,
+):
+	"""CSV export of every row matching a drilldown's filters (not just the on-screen
+	page), for filters like aging_bucket that the standard list view can't apply."""
+	where_sql, params, date_field = _build_drilldown_where(
+		projects, issue_scope, date_field, from_date, to_date, rolling_months, state, aging_bucket
+	)
+
+	rows = frappe.db.sql(
+		f"""
+		SELECT
+			gi.issue_id,
+			gi.title,
+			gi.state,
+			gi.gitlab_project,
+			gi.created_at,
+			gi.closed_at,
+			gi.issue_url,
+			DATEDIFF(DATE(gi.closed_at), DATE(gi.created_at)) AS lead_time_days
+		FROM `tabGitLab Issue` gi
+		WHERE {where_sql}
+		ORDER BY gi.{date_field} DESC
+		LIMIT {DRILLDOWN_EXPORT_ROW_LIMIT}
+		""",
+		params,
+		as_dict=True,
+	)
+
+	project_titles = _get_project_titles(sorted({row.gitlab_project for row in rows if row.gitlab_project}))
+
+	buffer = io.StringIO()
+	writer = csv.writer(buffer)
+	writer.writerow(["Issue", "Project", "State", "Created", "Closed", "Lead Time (days)", "URL"])
+	for row in rows:
+		writer.writerow([
+			row.issue_id or "",
+			project_titles.get(row.gitlab_project, row.gitlab_project or ""),
+			row.state or "",
+			row.created_at or "",
+			row.closed_at or "",
+			row.lead_time_days if row.lead_time_days is not None else "",
+			row.issue_url or "",
+		])
+
+	frappe.response["result"] = buffer.getvalue()
+	frappe.response["type"] = "csv"
+	frappe.response["doctype"] = "GitLab Issue Drilldown"
 
 
 def _to_bool(value):
@@ -160,6 +348,7 @@ def _build_flow_rows_and_aging(from_date, to_date, selected_projects, issue_scop
         FROM `tabGitLab Issue` gi
         WHERE gi.created_at IS NOT NULL
                     AND DATE(gi.created_at) BETWEEN %(from_date)s AND %(to_date)s
+          AND gi.state = 'opened'
           AND {project_filter_sql}
                 GROUP BY gi.gitlab_project, YEAR(gi.created_at), MONTH(gi.created_at)
         """,
@@ -177,6 +366,7 @@ def _build_flow_rows_and_aging(from_date, to_date, selected_projects, issue_scop
         FROM `tabGitLab Issue` gi
         WHERE gi.closed_at IS NOT NULL
                     AND DATE(gi.closed_at) BETWEEN %(from_date)s AND %(to_date)s
+          AND gi.state = 'closed'
           AND {project_filter_sql}
                 GROUP BY gi.gitlab_project, YEAR(gi.closed_at), MONTH(gi.closed_at)
         """,
@@ -248,6 +438,43 @@ def _build_flow_rows_and_aging(from_date, to_date, selected_projects, issue_scop
     }
 
     return flow_rows, aging_map, project_names
+
+
+def _count_open_now(from_date, to_date, selected_projects, issue_scope="both"):
+	"""Counts issues created within the selected range that are still in the
+	'opened' state today — matches the filters used by the Opened Total drill-down,
+	so the KPI card and its popup always agree."""
+	conditions = ["1=1"]
+	params = {
+		"from_date": from_date,
+		"to_date": to_date,
+	}
+
+	if selected_projects:
+		conditions.append("gi.gitlab_project IN %(projects)s")
+		params["projects"] = tuple(selected_projects)
+
+	if issue_scope == "parent":
+		conditions.append("gi.parent_issue IS NULL")
+	elif issue_scope == "child":
+		conditions.append("gi.parent_issue IS NOT NULL")
+
+	project_filter_sql = " AND ".join(conditions)
+
+	row = frappe.db.sql(
+		f"""
+		SELECT COUNT(*) AS total
+		FROM `tabGitLab Issue` gi
+		WHERE gi.state = 'opened'
+		  AND gi.created_at IS NOT NULL
+		  AND DATE(gi.created_at) BETWEEN %(from_date)s AND %(to_date)s
+		  AND {project_filter_sql}
+		""",
+		params,
+		as_dict=True,
+	)
+
+	return int(row[0].total or 0) if row else 0
 
 
 LEAD_TIME_ROLLING_PERIODS = {
