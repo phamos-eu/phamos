@@ -77,7 +77,7 @@ const ISSUE_ICON = "M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00
       <div class="sb__session-head">
         <span class="sb__dot" :class="isRunning ? 'dot--green' : 'dot--amber'"></span>
         <span class="sb__session-state">{{ isRunning ? "Running" : "Paused" }}</span>
-        <span v-if="isProjectSession" class="sb__session-type">Project</span>
+        <span v-if="isProjectSession" class="sb__session-type" title="Project">Prj</span>
         <span class="sb__session-timer">{{ fmtElapsed(displayElapsed) }}</span>
       </div>
       <div class="sb__session-goal">{{ displaySession.goal }}</div>
