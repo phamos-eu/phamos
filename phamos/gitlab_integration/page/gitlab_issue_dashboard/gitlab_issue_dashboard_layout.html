@@ -1,0 +1,240 @@
+<div class="gitlab-issue-dashboard">
+    <style>
+        .gitlab-issue-dashboard {
+            --gid-card-bg: var(--card-bg, #ffffff);
+            --gid-card-border: var(--border-color, #dbe5ef);
+            --gid-title-color: var(--heading-color, #12344d);
+            --gid-subtitle-color: var(--text-muted, #4a6572);
+            --gid-grid-color: var(--border-color, #dbe5ef);
+            --gid-shadow: 0 4px 14px rgba(15, 23, 42, 0.06);
+            --gid-aging-green: #2e7d32;
+            --gid-aging-amber: #ef6c00;
+            --gid-aging-red: #c62828;
+            --gid-flow-opened: #1976d2;
+            --gid-flow-closed: #43a047;
+            --gid-lead-main: #6a1b9a;
+            --gid-lead-accent: #5e35b1;
+        }
+
+        .gitlab-issue-dashboard.gid-theme-dark {
+            --gid-card-bg: var(--fg-color, #1a1f2b);
+            --gid-card-border: var(--border-color, #3a4250);
+            --gid-title-color: var(--heading-color, #f2f5f7);
+            --gid-subtitle-color: var(--text-muted, #c3c7ce);
+            --gid-grid-color: rgba(255, 255, 255, 0.18);
+            --gid-shadow: 0 8px 24px rgba(0, 0, 0, 0.35);
+            --gid-aging-green: #2e7d32;
+            --gid-aging-amber: #ef6c00;
+            --gid-aging-red: #c62828;
+            --gid-flow-opened: #1e88e5;
+            --gid-flow-closed: #43a047;
+            --gid-lead-main: #8e24aa;
+            --gid-lead-accent: #7e57c2;
+        }
+
+        .gitlab-issue-dashboard .gid-filter-card,
+        .gitlab-issue-dashboard .gid-section-card {
+            background: var(--gid-card-bg);
+            border: 1px solid var(--gid-card-border);
+            border-radius: 12px;
+            padding: 16px;
+            box-shadow: var(--gid-shadow);
+        }
+
+        .gitlab-issue-dashboard .gid-title {
+            font-size: 16px;
+            font-weight: 700;
+            color: var(--gid-title-color);
+            margin-bottom: 8px;
+        }
+
+        .gitlab-issue-dashboard .gid-subtitle {
+            font-size: 12px;
+            color: var(--gid-subtitle-color);
+            margin-bottom: 12px;
+        }
+
+        .gitlab-issue-dashboard .gid-actions {
+            display: flex;
+            gap: 8px;
+            justify-content: flex-end;
+            margin-top: 8px;
+        }
+
+        .gitlab-issue-dashboard .gid-compare-toggle {
+            margin-top: 10px;
+            color: var(--gid-title-color);
+            font-size: 13px;
+            display: none;
+        }
+
+        .gitlab-issue-dashboard .gid-compare-toggle label {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            margin: 0;
+            cursor: pointer;
+        }
+
+        .gitlab-issue-dashboard .gid-kpi-row {
+            display: grid;
+            grid-template-columns: repeat(3, minmax(140px, 1fr));
+            gap: 10px;
+            margin-bottom: 12px;
+        }
+
+        .gitlab-issue-dashboard .gid-kpi-row-lead {
+            grid-template-columns: repeat(5, minmax(120px, 1fr));
+        }
+
+        .gitlab-issue-dashboard .gid-lead-row {
+            margin-bottom: 12px;
+        }
+
+        .gitlab-issue-dashboard .gid-lead-row:last-child {
+            margin-bottom: 0;
+        }
+
+        .gitlab-issue-dashboard .gid-lead-row-label {
+            font-size: 12px;
+            font-weight: 600;
+            color: var(--gid-subtitle-color);
+            margin-bottom: 6px;
+        }
+
+        .gitlab-issue-dashboard .gid-kpi {
+            border-radius: 10px;
+            padding: 10px 12px;
+            color: #fff;
+            font-weight: 600;
+        }
+
+        .gitlab-issue-dashboard .gid-kpi small {
+            display: block;
+            opacity: 0.9;
+            font-size: 11px;
+            margin-bottom: 4px;
+        }
+
+        .gitlab-issue-dashboard .gid-kpi strong {
+            font-size: 20px;
+            line-height: 1;
+        }
+
+        .gitlab-issue-dashboard .gid-kpi-green { background: var(--gid-aging-green); }
+        .gitlab-issue-dashboard .gid-kpi-amber { background: var(--gid-aging-amber); }
+        .gitlab-issue-dashboard .gid-kpi-red { background: var(--gid-aging-red); }
+        .gitlab-issue-dashboard .gid-kpi-opened { background: var(--gid-flow-opened); }
+        .gitlab-issue-dashboard .gid-kpi-closed { background: var(--gid-flow-closed); }
+        .gitlab-issue-dashboard .gid-kpi-lead-main { background: var(--gid-lead-main); }
+        .gitlab-issue-dashboard .gid-kpi-lead { background: var(--gid-lead-accent); }
+
+        .gitlab-issue-dashboard .gid-table-wrap {
+            max-height: 360px;
+            overflow: auto;
+        }
+
+        .gitlab-issue-dashboard .table {
+            color: var(--gid-title-color);
+        }
+
+        .gitlab-issue-dashboard .table > thead > tr > th,
+        .gitlab-issue-dashboard .table > tbody > tr > td {
+            border-color: var(--gid-card-border);
+        }
+
+        .gitlab-issue-dashboard .chart-container svg text {
+            fill: var(--gid-subtitle-color) !important;
+        }
+
+        .gitlab-issue-dashboard .chart-container .title,
+        .gitlab-issue-dashboard .chart-container .chart-title {
+            fill: var(--gid-title-color) !important;
+        }
+
+        .gitlab-issue-dashboard .chart-container svg line,
+        .gitlab-issue-dashboard .chart-container svg path.domain {
+            stroke: var(--gid-grid-color) !important;
+        }
+
+        .gitlab-issue-dashboard .gid-kpi.gid-clickable,
+        .gitlab-issue-dashboard td.gid-clickable {
+            cursor: pointer;
+            transition: filter 0.1s ease, background 0.1s ease;
+        }
+
+        .gitlab-issue-dashboard .gid-kpi.gid-clickable:hover {
+            filter: brightness(1.1);
+        }
+
+        .gitlab-issue-dashboard td.gid-clickable:hover {
+            background: rgba(90, 145, 255, 0.12);
+            text-decoration: underline;
+        }
+
+        .gitlab-issue-dashboard .chart-container {
+            cursor: pointer;
+        }
+
+        .gid-drilldown-tab {
+            margin-right: 6px;
+            margin-bottom: 10px;
+        }
+
+        .gid-drilldown-note {
+            font-size: 12px;
+        }
+    </style>
+
+    <div class="gid-filter-card" style="margin-bottom: 16px;">
+        <div class="gid-title">{{ __("Filters") }}</div>
+        <div id="gid-filter-summary" class="gid-subtitle"></div>
+        <div class="row">
+            <div class="col-md-4">
+                <div id="filter-projects"></div>
+            </div>
+            <div class="col-md-2">
+                <div id="filter-issue-scope"></div>
+            </div>
+            <div class="col-md-3">
+                <div id="filter-from-date"></div>
+            </div>
+            <div class="col-md-3">
+                <div id="filter-to-date"></div>
+            </div>
+        </div>
+        <div id="gid-compare-company-wrap" class="gid-compare-toggle">
+            <label>
+                <input type="checkbox" id="gid-compare-company" />
+                <span>{{ __("Compare to Company") }}</span>
+            </label>
+        </div>
+        <div class="gid-actions">
+            <button class="btn btn-default btn-sm" id="gid-reset-filters">{{ __("Reset") }}</button>
+            <button class="btn btn-primary btn-sm" id="gid-apply-filters">{{ __("Apply") }}</button>
+        </div>
+    </div>
+
+    <div class="gid-section-card" style="margin-bottom: 16px;">
+        <div class="gid-title">{{ __("Lead Time (Created to Completed)") }}</div>
+        <div class="gid-subtitle">{{ __("Average number of days from ticket creation to completion.") }}</div>
+        <div id="lead-time-kpis"></div>
+    </div>
+
+    <div class="gid-section-card" style="margin-bottom: 16px;">
+        <div class="gid-title">{{ __("Closed Tickets Aging") }}</div>
+        <div class="gid-kpi-row" id="aging-kpis"></div>
+        <div id="aging-chart" style="min-height: 320px;"></div>
+    </div>
+
+    <div class="gid-section-card" style="margin-bottom: 16px;">
+        <div class="gid-title">{{ __("Opened vs Closed by Month") }}</div>
+        <div class="gid-kpi-row" id="flow-kpis"></div>
+        <div id="flow-chart" style="min-height: 320px;"></div>
+    </div>
+
+    <div class="gid-section-card">
+        <div class="gid-title">{{ __("Flow Balance Table") }}</div>
+        <div class="gid-table-wrap" id="flow-table"></div>
+    </div>
+</div>

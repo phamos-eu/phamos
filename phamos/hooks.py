@@ -80,7 +80,9 @@ app_include_js = [
 # webform_include_css = {"doctype": "public/css/doctype.css"}
 
 # include js in page
-# page_js = {"page" : "public/js/file.js"}
+page_js = {
+	"gitlab-issue-dashboard": "gitlab_integration/page/gitlab_issue_dashboard/gitlab_issue_dashboard_drilldown.js",
+}
 
 # include js in doctype views
 doctype_js = {
