@@ -300,7 +300,11 @@ function onBreakConfirmYes() {
 async function onBreakConfirmNo() {
   showBreakConfirm.value = false;
   breakFrom.value = null;
-  await doResume();
+  if (activeProjectSession.value?.session_state === "paused") {
+    await doResumeProjectTimer();
+  } else if (activeSession.value?.session_state === "paused") {
+    await doResume();
+  }
 }
 
 function onBreakConfirmClose() {
