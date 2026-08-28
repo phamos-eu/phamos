@@ -128,9 +128,17 @@ function onStopKey(e)  { if (e.key === "Escape") closePanel(); if (e.key === "En
             :title="a.full_name || a.user"
           >{{ a.initial }}</span>
           <!-- Tracked time -->
-          <span v-if="project.total_tracked_seconds" class="pc__info-item pc__info-item--tracked">
+          <span v-if="project.total_tracked_seconds" class="pc__info-item pc__info-item--tracked" title="Total tracked">
             <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="pc__info-icon"><circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/></svg>
             {{ fmtDuration(project.total_tracked_seconds) }}
+          </span>
+          <span v-if="project.billable_seconds" class="pc__info-item pc__info-item--billable" title="Billable">
+            <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="pc__info-icon"><path d="M12 1v22M17 5H9.5a3.5 3.5 0 000 7h5a3.5 3.5 0 010 7H6"/></svg>
+            {{ fmtDuration(project.billable_seconds) }}
+          </span>
+          <span v-if="project.non_billable_seconds" class="pc__info-item pc__info-item--non-billable" title="Non-billable">
+            <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="pc__info-icon"><path d="M18.36 6.64a9 9 0 11-12.73 0M12 2v10"/></svg>
+            {{ fmtDuration(project.non_billable_seconds) }}
           </span>
           <span class="pc__info-flex"></span>
 
@@ -355,11 +363,17 @@ function onStopKey(e)  { if (e.key === "Escape") closePanel(); if (e.key === "En
 .pc__btn--assign:hover { background: var(--primary); color: #fff; border-color: var(--primary); }
 .pc__assigned-badge { font-size: 11px; font-weight: 600; padding: 3px 8px; border-radius: 10px; background: var(--green-50, #f0fdf4); color: var(--green-700, #15803d); border: 1px solid var(--green-200, #bbf7d0); white-space: nowrap; }
 
+/* Dark theme: invert "Assign to me" hover to a lighter background with dark text */
+[data-theme="dark"] .pc__btn--assign { background: var(--control-bg); color: var(--text-color); border-color: var(--border-color); }
+[data-theme="dark"] .pc__btn--assign:hover { background: #e5e7eb; color: #111827; border-color: #e5e7eb; }
+
 /* ── Info row extras ───────────────────────────────────────────── */
 .pc__info { display: flex; align-items: center; flex-wrap: wrap; gap: 5px; margin-top: 5px; }
 .pc__info-flex { flex: 1; min-width: 4px; }
 .pc__info-item { display: inline-flex; align-items: center; gap: 4px; font-size: 11.5px; color: var(--text-muted); white-space: nowrap; }
-.pc__info-item--tracked { color: #16a34a; font-weight: 600; }
+.pc__info-item--tracked { color: #2563eb; font-weight: 600; }
+.pc__info-item--billable { color: #16a34a; font-weight: 600; }
+.pc__info-item--non-billable { color: #f97316; font-weight: 600; }
 .pc__info-icon { flex-shrink: 0; opacity: 0.7; }
 .pc__assignee {
   display: inline-flex; align-items: center; justify-content: center;
