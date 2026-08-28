@@ -29,220 +29,7 @@ class GitLabIssueDashboard {
         const root = $(this.page.main);
         root.empty();
 
-        root.append(`
-            <div class="gitlab-issue-dashboard">
-                <style>
-                    .gitlab-issue-dashboard {
-                        --gid-card-bg: var(--card-bg, #ffffff);
-                        --gid-card-border: var(--border-color, #dbe5ef);
-                        --gid-title-color: var(--heading-color, #12344d);
-                        --gid-subtitle-color: var(--text-muted, #4a6572);
-                        --gid-grid-color: var(--border-color, #dbe5ef);
-                        --gid-shadow: 0 4px 14px rgba(15, 23, 42, 0.06);
-                        --gid-aging-green: #2e7d32;
-                        --gid-aging-amber: #ef6c00;
-                        --gid-aging-red: #c62828;
-                        --gid-flow-opened: #1976d2;
-                        --gid-flow-closed: #43a047;
-                        --gid-lead-main: #6a1b9a;
-                        --gid-lead-accent: #5e35b1;
-                    }
-
-                    .gitlab-issue-dashboard.gid-theme-dark {
-                        --gid-card-bg: var(--fg-color, #1a1f2b);
-                        --gid-card-border: var(--border-color, #3a4250);
-                        --gid-title-color: var(--heading-color, #f2f5f7);
-                        --gid-subtitle-color: var(--text-muted, #c3c7ce);
-                        --gid-grid-color: rgba(255, 255, 255, 0.18);
-                        --gid-shadow: 0 8px 24px rgba(0, 0, 0, 0.35);
-                        --gid-aging-green: #2e7d32;
-                        --gid-aging-amber: #ef6c00;
-                        --gid-aging-red: #c62828;
-                        --gid-flow-opened: #1e88e5;
-                        --gid-flow-closed: #43a047;
-                        --gid-lead-main: #8e24aa;
-                        --gid-lead-accent: #7e57c2;
-                    }
-
-                    .gitlab-issue-dashboard .gid-filter-card,
-                    .gitlab-issue-dashboard .gid-section-card {
-                        background: var(--gid-card-bg);
-                        border: 1px solid var(--gid-card-border);
-                        border-radius: 12px;
-                        padding: 16px;
-                        box-shadow: var(--gid-shadow);
-                    }
-
-                    .gitlab-issue-dashboard .gid-title {
-                        font-size: 16px;
-                        font-weight: 700;
-                        color: var(--gid-title-color);
-                        margin-bottom: 8px;
-                    }
-
-                    .gitlab-issue-dashboard .gid-subtitle {
-                        font-size: 12px;
-                        color: var(--gid-subtitle-color);
-                        margin-bottom: 12px;
-                    }
-
-                    .gitlab-issue-dashboard .gid-actions {
-                        display: flex;
-                        gap: 8px;
-                        justify-content: flex-end;
-                        margin-top: 8px;
-                    }
-
-                    .gitlab-issue-dashboard .gid-compare-toggle {
-                        margin-top: 10px;
-                        color: var(--gid-title-color);
-                        font-size: 13px;
-                        display: none;
-                    }
-
-                    .gitlab-issue-dashboard .gid-compare-toggle label {
-                        display: inline-flex;
-                        align-items: center;
-                        gap: 8px;
-                        margin: 0;
-                        cursor: pointer;
-                    }
-
-                    .gitlab-issue-dashboard .gid-kpi-row {
-                        display: grid;
-                        grid-template-columns: repeat(3, minmax(140px, 1fr));
-                        gap: 10px;
-                        margin-bottom: 12px;
-                    }
-
-                    .gitlab-issue-dashboard .gid-kpi-row-lead {
-                        grid-template-columns: repeat(5, minmax(120px, 1fr));
-                    }
-
-                    .gitlab-issue-dashboard .gid-lead-row {
-                        margin-bottom: 12px;
-                    }
-
-                    .gitlab-issue-dashboard .gid-lead-row:last-child {
-                        margin-bottom: 0;
-                    }
-
-                    .gitlab-issue-dashboard .gid-lead-row-label {
-                        font-size: 12px;
-                        font-weight: 600;
-                        color: var(--gid-subtitle-color);
-                        margin-bottom: 6px;
-                    }
-
-                    .gitlab-issue-dashboard .gid-kpi {
-                        border-radius: 10px;
-                        padding: 10px 12px;
-                        color: #fff;
-                        font-weight: 600;
-                    }
-
-                    .gitlab-issue-dashboard .gid-kpi small {
-                        display: block;
-                        opacity: 0.9;
-                        font-size: 11px;
-                        margin-bottom: 4px;
-                    }
-
-                    .gitlab-issue-dashboard .gid-kpi strong {
-                        font-size: 20px;
-                        line-height: 1;
-                    }
-
-                    .gitlab-issue-dashboard .gid-kpi-green { background: var(--gid-aging-green); }
-                    .gitlab-issue-dashboard .gid-kpi-amber { background: var(--gid-aging-amber); }
-                    .gitlab-issue-dashboard .gid-kpi-red { background: var(--gid-aging-red); }
-                    .gitlab-issue-dashboard .gid-kpi-opened { background: var(--gid-flow-opened); }
-                    .gitlab-issue-dashboard .gid-kpi-closed { background: var(--gid-flow-closed); }
-                    .gitlab-issue-dashboard .gid-kpi-lead-main { background: var(--gid-lead-main); }
-                    .gitlab-issue-dashboard .gid-kpi-lead { background: var(--gid-lead-accent); }
-
-                    .gitlab-issue-dashboard .gid-table-wrap {
-                        max-height: 360px;
-                        overflow: auto;
-                    }
-
-                    .gitlab-issue-dashboard .table {
-                        color: var(--gid-title-color);
-                    }
-
-                    .gitlab-issue-dashboard .table > thead > tr > th,
-                    .gitlab-issue-dashboard .table > tbody > tr > td {
-                        border-color: var(--gid-card-border);
-                    }
-
-                    .gitlab-issue-dashboard .chart-container svg text {
-                        fill: var(--gid-subtitle-color) !important;
-                    }
-
-                    .gitlab-issue-dashboard .chart-container .title,
-                    .gitlab-issue-dashboard .chart-container .chart-title {
-                        fill: var(--gid-title-color) !important;
-                    }
-
-                    .gitlab-issue-dashboard .chart-container svg line,
-                    .gitlab-issue-dashboard .chart-container svg path.domain {
-                        stroke: var(--gid-grid-color) !important;
-                    }
-                </style>
-
-                <div class="gid-filter-card" style="margin-bottom: 16px;">
-                    <div class="gid-title">${__("Filters")}</div>
-                    <div id="gid-filter-summary" class="gid-subtitle"></div>
-                    <div class="row">
-                        <div class="col-md-4">
-                            <div id="filter-projects"></div>
-                        </div>
-                        <div class="col-md-2">
-                            <div id="filter-issue-scope"></div>
-                        </div>
-                        <div class="col-md-3">
-                            <div id="filter-from-date"></div>
-                        </div>
-                        <div class="col-md-3">
-                            <div id="filter-to-date"></div>
-                        </div>
-                    </div>
-                    <div id="gid-compare-company-wrap" class="gid-compare-toggle">
-                        <label>
-                            <input type="checkbox" id="gid-compare-company" />
-                            <span>${__("Compare to Company")}</span>
-                        </label>
-                    </div>
-                    <div class="gid-actions">
-                        <button class="btn btn-default btn-sm" id="gid-reset-filters">${__("Reset")}</button>
-                        <button class="btn btn-primary btn-sm" id="gid-apply-filters">${__("Apply")}</button>
-                    </div>
-                </div>
-
-                <div class="gid-section-card" style="margin-bottom: 16px;">
-                    <div class="gid-title">${__("Lead Time (Created to Completed)")}</div>
-                    <div class="gid-subtitle">${__("Average number of days from ticket creation to completion.")}</div>
-                    <div id="lead-time-kpis"></div>
-                </div>
-
-                <div class="gid-section-card" style="margin-bottom: 16px;">
-                    <div class="gid-title">${__("Closed Tickets Aging")}</div>
-                    <div class="gid-kpi-row" id="aging-kpis"></div>
-                    <div id="aging-chart" style="min-height: 320px;"></div>
-                </div>
-
-                <div class="gid-section-card" style="margin-bottom: 16px;">
-                    <div class="gid-title">${__("Opened vs Closed by Month")}</div>
-                    <div class="gid-kpi-row" id="flow-kpis"></div>
-                    <div id="flow-chart" style="min-height: 320px;"></div>
-                </div>
-
-                <div class="gid-section-card">
-                    <div class="gid-title">${__("Flow Balance Table")}</div>
-                    <div class="gid-table-wrap" id="flow-table"></div>
-                </div>
-            </div>
-        `);
+        root.append(frappe.render_template("gitlab_issue_dashboard_layout"));
 
         this.$projectsFilter = root.find("#filter-projects");
         this.$issueScopeFilter = root.find("#filter-issue-scope");
@@ -260,6 +47,17 @@ class GitLabIssueDashboard {
         this.$flowKpis = root.find("#flow-kpis");
         this.$flowChart = root.find("#flow-chart");
         this.$flowTable = root.find("#flow-table");
+
+        this.agingChartContext = null;
+        this.flowChartContext = null;
+        this.$agingChart[0].addEventListener("click", (e) => {
+            const index = this.getChartClickIndex(e);
+            if (index !== null) this.handleAgingChartSelect({ index });
+        });
+        this.$flowChart[0].addEventListener("click", (e) => {
+            const index = this.getChartClickIndex(e);
+            if (index !== null) this.handleFlowChartSelect({ index });
+        });
 
         this.applyThemeClass();
     }
@@ -558,20 +356,26 @@ class GitLabIssueDashboard {
             return __("{0} days", [value]);
         };
 
-        const buildRow = (label, data) => {
+        const buildRow = (label, data, projectId) => {
             const rolling = (data && data.rolling) || {};
             const labelHtml = label
                 ? `<div class="gid-lead-row-label">${frappe.utils.escape_html(label)}</div>`
                 : "";
+            const projAttr = projectId ? frappe.utils.escape_html(projectId) : "";
+            const kpi = (period, title, value, extraClass) => `
+                <div class="gid-kpi ${extraClass} gid-clickable" data-drill="lead_time" data-project="${projAttr}" data-period="${period}">
+                    <small>${title}</small><strong>${formatDays(value)}</strong>
+                </div>
+            `;
             return `
                 <div class="gid-lead-row">
                     ${labelHtml}
                     <div class="gid-kpi-row gid-kpi-row-lead">
-                        <div class="gid-kpi gid-kpi-lead-main"><small>${__("Selected Filter Avg")}</small><strong>${formatDays(data ? data.filtered : null)}</strong></div>
-                        <div class="gid-kpi gid-kpi-lead"><small>${__("Last Month")}</small><strong>${formatDays(rolling.last_month)}</strong></div>
-                        <div class="gid-kpi gid-kpi-lead"><small>${__("Last 3 Months")}</small><strong>${formatDays(rolling.last_3_months)}</strong></div>
-                        <div class="gid-kpi gid-kpi-lead"><small>${__("Last 6 Months")}</small><strong>${formatDays(rolling.last_6_months)}</strong></div>
-                        <div class="gid-kpi gid-kpi-lead"><small>${__("Last 12 Months")}</small><strong>${formatDays(rolling.last_12_months)}</strong></div>
+                        ${kpi("filtered", __("Selected Filter Avg"), data ? data.filtered : null, "gid-kpi-lead-main")}
+                        ${kpi("last_month", __("Last Month"), rolling.last_month, "gid-kpi-lead")}
+                        ${kpi("last_3_months", __("Last 3 Months"), rolling.last_3_months, "gid-kpi-lead")}
+                        ${kpi("last_6_months", __("Last 6 Months"), rolling.last_6_months, "gid-kpi-lead")}
+                        ${kpi("last_12_months", __("Last 12 Months"), rolling.last_12_months, "gid-kpi-lead")}
                     </div>
                 </div>
             `;
@@ -581,23 +385,30 @@ class GitLabIssueDashboard {
 
         if (mode === "single" && leadTime.company) {
             const projectTitle = projectTitles[leadTime.project] || leadTime.project || __("Project");
-            html += buildRow(projectTitle, leadTime);
-            html += buildRow(__("Company"), leadTime.company);
+            html += buildRow(projectTitle, leadTime, leadTime.project);
+            html += buildRow(__("Company"), leadTime.company, null);
         } else if (mode === "project_compare" && (leadTime.project_lead_times || []).length) {
             leadTime.project_lead_times.forEach((row) => {
                 const title = projectTitles[row.project] || row.project || __("Project");
-                html += buildRow(title, row);
+                html += buildRow(title, row, row.project);
             });
         } else {
-            html += buildRow(null, leadTime);
+            html += buildRow(null, leadTime, null);
         }
 
         this.$leadTimeKpis.html(html);
+        this.$leadTimeKpis.off("click", ".gid-kpi").on("click", ".gid-kpi", (e) => {
+            const $el = $(e.currentTarget);
+            const project = $el.attr("data-project");
+            const period = $el.attr("data-period");
+            this.openLeadTimeDrilldown(project ? [project] : [], period);
+        });
     }
 
     renderAgingChart() {
         this.$agingChart.empty();
         this.applyThemeClass();
+        this.agingChartContext = null;
 
         const aging = (this.currentData && this.currentData.aging) || {};
         const companyAging = (this.currentData && this.currentData.company_aging) || {};
@@ -619,10 +430,14 @@ class GitLabIssueDashboard {
         ];
 
         this.$agingKpis.html(`
-            <div class="gid-kpi gid-kpi-green"><small>${__("0-30 days")}</small><strong>${values[0]}</strong></div>
-            <div class="gid-kpi gid-kpi-amber"><small>${__("31-90 days")}</small><strong>${values[1]}</strong></div>
-            <div class="gid-kpi gid-kpi-red"><small>${__(">90 days")}</small><strong>${values[2]}</strong></div>
+            <div class="gid-kpi gid-kpi-green gid-clickable" data-bucket="0_30"><small>${__("0-30 days")}</small><strong>${values[0]}</strong></div>
+            <div class="gid-kpi gid-kpi-amber gid-clickable" data-bucket="31_90"><small>${__("31-90 days")}</small><strong>${values[1]}</strong></div>
+            <div class="gid-kpi gid-kpi-red gid-clickable" data-bucket="gt_90"><small>${__(">90 days")}</small><strong>${values[2]}</strong></div>
         `);
+        this.$agingKpis.off("click", ".gid-kpi").on("click", ".gid-kpi", (e) => {
+            const bucket = $(e.currentTarget).attr("data-bucket");
+            this.openAgingDrilldown(selectedProjects, bucket);
+        });
 
         if (compareSingleProject) {
             const selectedProject = selectedProjects[0];
@@ -649,8 +464,10 @@ class GitLabIssueDashboard {
                 },
                 type: "bar",
                 height: 300,
+                isNavigable: 1,
                 colors: agingColors,
             });
+            this.agingChartContext = { mode: "index_project", indexProjects: [selectedProject, null] };
             return;
         }
 
@@ -676,8 +493,10 @@ class GitLabIssueDashboard {
                 },
                 type: "bar",
                 height: 300,
+                isNavigable: 1,
                 colors: agingColors,
             });
+            this.agingChartContext = { mode: "index_project", indexProjects: projectBuckets.map((row) => row.project) };
             return;
         }
 
@@ -706,13 +525,16 @@ class GitLabIssueDashboard {
             },
             type: "bar",
             height: 300,
+            isNavigable: 1,
             colors: agingColors,
         });
+        this.agingChartContext = { mode: "bucket", bucketOrder: ["0_30", "31_90", "gt_90"], projects: selectedProjects };
     }
 
     renderFlowChart() {
         this.$flowChart.empty();
         this.applyThemeClass();
+        this.flowChartContext = null;
 
         const monthly = (this.currentData && this.currentData.monthly_flow) || [];
         const companyMonthly = (this.currentData && this.currentData.company_monthly_flow) || [];
@@ -767,11 +589,18 @@ class GitLabIssueDashboard {
             acc.closed += row.closed || 0;
             return acc;
         }, { opened: 0, closed: 0 });
+        const openNowTotal = (this.currentData && this.currentData.open_now_total !== undefined)
+            ? this.currentData.open_now_total
+            : totals.opened;
 
         this.$flowKpis.html(`
-            <div class="gid-kpi gid-kpi-opened"><small>${__("Opened Total")}</small><strong>${totals.opened}</strong></div>
-            <div class="gid-kpi gid-kpi-closed"><small>${__("Closed Total")}</small><strong>${totals.closed}</strong></div>
+            <div class="gid-kpi gid-kpi-opened gid-clickable" data-flow-kind="opened"><small>${__("Opened Total")}</small><strong>${openNowTotal}</strong></div>
+            <div class="gid-kpi gid-kpi-closed gid-clickable" data-flow-kind="closed"><small>${__("Closed Total")}</small><strong>${totals.closed}</strong></div>
         `);
+        this.$flowKpis.off("click", ".gid-kpi").on("click", ".gid-kpi", (e) => {
+            const kind = $(e.currentTarget).attr("data-flow-kind");
+            this.openFlowTotalsDrilldown(selectedProjects, kind);
+        });
 
         const sortedMonthKeys = Object.keys(monthMeta).sort((a, b) => {
             const monthOrderDiff = (monthMeta[a].month_order || 0) - (monthMeta[b].month_order || 0);
@@ -817,8 +646,10 @@ class GitLabIssueDashboard {
                 },
                 type: "bar",
                 height: 300,
+                isNavigable: 1,
                 colors: ["#1976d2", "#43a047", "#ef6c00", "#8e24aa"],
             });
+            this.flowChartContext = { monthKeys: sortedMonthKeys, projects: [selectedProject] };
             return;
         }
 
@@ -878,8 +709,10 @@ class GitLabIssueDashboard {
                 },
                 type: "bar",
                 height: 300,
+                isNavigable: 1,
                 colors: chartColors,
             });
+            this.flowChartContext = { monthKeys: sortedMonthKeys, projects: selectedProjects };
             return;
         }
 
@@ -902,13 +735,24 @@ class GitLabIssueDashboard {
             },
             type: "bar",
             height: 300,
+            isNavigable: 1,
             colors: flowColors,
         });
+        this.flowChartContext = { monthKeys: sortedMonthKeys, projects: selectedProjects };
     }
 
     renderFlowTable() {
         const rows = (this.currentData && this.currentData.monthly_flow) || [];
         const projectTitles = (this.currentData && this.currentData.project_titles) || {};
+
+        this.$flowTable.off("click", "[data-drill='flow-cell']").on("click", "[data-drill='flow-cell']", (e) => {
+            const $el = $(e.currentTarget);
+            const kind = $el.attr("data-kind");
+            const project = $el.attr("data-project");
+            const monthKey = $el.attr("data-month-key");
+            if (!monthKey) return;
+            this.openFlowMonthDrilldown(project ? [project] : [], monthKey, kind);
+        });
 
         if (!rows.length) {
             this.$flowTable.html(`<p class="text-muted">${__("No data found for selected filters.")}</p>`);
@@ -962,8 +806,8 @@ class GitLabIssueDashboard {
             html.push("<tr>");
             html.push(`<td>${frappe.utils.escape_html(projectTitles[row.gitlab_project] || row.gitlab_project || "")}</td>`);
             html.push(`<td>${frappe.utils.escape_html(row.month || "")}</td>`);
-            html.push(`<td class="text-right">${row.opened || 0}</td>`);
-            html.push(`<td class="text-right">${row.closed || 0}</td>`);
+            html.push(`<td class="text-right gid-clickable" data-drill="flow-cell" data-kind="opened" data-project="${frappe.utils.escape_html(row.gitlab_project || "")}" data-month-key="${row.month_key}">${row.opened || 0}</td>`);
+            html.push(`<td class="text-right gid-clickable" data-drill="flow-cell" data-kind="closed" data-project="${frappe.utils.escape_html(row.gitlab_project || "")}" data-month-key="${row.month_key}">${row.closed || 0}</td>`);
             html.push(`<td class="text-right">${(row.flow_balance || 0).toFixed(2)}%</td>`);
             html.push("</tr>");
         });
@@ -1063,11 +907,11 @@ class GitLabIssueDashboard {
         monthRows.forEach((row) => {
             html.push("<tr>");
             html.push(`<td>${frappe.utils.escape_html(row.month || "")}</td>`);
-            html.push(`<td class="text-right">${row.project.opened}</td>`);
-            html.push(`<td class="text-right">${row.project.closed}</td>`);
+            html.push(`<td class="text-right gid-clickable" data-drill="flow-cell" data-kind="opened" data-project="${frappe.utils.escape_html(selectedProject || "")}" data-month-key="${row.month_key}">${row.project.opened}</td>`);
+            html.push(`<td class="text-right gid-clickable" data-drill="flow-cell" data-kind="closed" data-project="${frappe.utils.escape_html(selectedProject || "")}" data-month-key="${row.month_key}">${row.project.closed}</td>`);
             html.push(`<td class="text-right">${(row.project.flow_balance || 0).toFixed(2)}%</td>`);
-            html.push(`<td class="text-right">${row.company.opened}</td>`);
-            html.push(`<td class="text-right">${row.company.closed}</td>`);
+            html.push(`<td class="text-right gid-clickable" data-drill="flow-cell" data-kind="opened" data-project="" data-month-key="${row.month_key}">${row.company.opened}</td>`);
+            html.push(`<td class="text-right gid-clickable" data-drill="flow-cell" data-kind="closed" data-project="" data-month-key="${row.month_key}">${row.company.closed}</td>`);
             html.push(`<td class="text-right">${(row.company.flow_balance || 0).toFixed(2)}%</td>`);
             html.push("</tr>");
         });
@@ -1151,8 +995,8 @@ class GitLabIssueDashboard {
 
             selectedProjects.forEach((project) => {
                 const projectMonthData = monthData.projects[project] || { opened: 0, closed: 0, flow_balance: 0 };
-                html.push(`<td class="text-right">${projectMonthData.opened || 0}</td>`);
-                html.push(`<td class="text-right">${projectMonthData.closed || 0}</td>`);
+                html.push(`<td class="text-right gid-clickable" data-drill="flow-cell" data-kind="opened" data-project="${frappe.utils.escape_html(project || "")}" data-month-key="${monthData.month_key}">${projectMonthData.opened || 0}</td>`);
+                html.push(`<td class="text-right gid-clickable" data-drill="flow-cell" data-kind="closed" data-project="${frappe.utils.escape_html(project || "")}" data-month-key="${monthData.month_key}">${projectMonthData.closed || 0}</td>`);
                 html.push(`<td class="text-right">${(projectMonthData.flow_balance || 0).toFixed(2)}%</td>`);
             });
 
@@ -1230,8 +1074,8 @@ class GitLabIssueDashboard {
             html.push("<tr>");
             html.push(`<td>${__("All Projects")}</td>`);
             html.push(`<td>${frappe.utils.escape_html(row.month || "")}</td>`);
-            html.push(`<td class="text-right">${row.opened || 0}</td>`);
-            html.push(`<td class="text-right">${row.closed || 0}</td>`);
+            html.push(`<td class="text-right gid-clickable" data-drill="flow-cell" data-kind="opened" data-project="" data-month-key="${row.month_key}">${row.opened || 0}</td>`);
+            html.push(`<td class="text-right gid-clickable" data-drill="flow-cell" data-kind="closed" data-project="" data-month-key="${row.month_key}">${row.closed || 0}</td>`);
             html.push(`<td class="text-right">${(row.flow_balance || 0).toFixed(2)}%</td>`);
             html.push("</tr>");
         });
@@ -1241,6 +1085,10 @@ class GitLabIssueDashboard {
 
         this.$flowTable.html(html.join(""));
     }
+
+    // Drill-down methods (getChartClickIndex, getFilterContext, openDrilldown, etc.)
+    // live in gitlab_issue_dashboard_drilldown.js, attached to this prototype via
+    // the `page_js` hook in hooks.py.
 
     getDefaultDateRange() {
         const toDate = new Date();
