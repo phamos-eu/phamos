@@ -214,12 +214,21 @@ async function onStartProjectTimer({ project, expectedTime, goal }) {
 async function onPauseProjectTimer() {
   if (!activeProjectSession.value) return;
   const r = await frappe.call({ method: "phamos.phamos.page.dev_action_panel.dev_action_panel.pause_timer", args: { name: activeProjectSession.value.name } });
+  breakFrom.value = r.message?.break_from || null;
   activeProjectSession.value = { ...activeProjectSession.value, session_state: "paused" };
   stopProjectTick();
 }
 
 async function onResumeProjectTimer() {
   if (!activeProjectSession.value) return;
+  if (breakFrom.value) {
+    showBreakConfirm.value = true;
+  } else {
+    await doResumeProjectTimer();
+  }
+}
+
+async function doResumeProjectTimer() {
   await frappe.call({ method: "phamos.phamos.page.dev_action_panel.dev_action_panel.resume_timer", args: { name: activeProjectSession.value.name } });
   activeProjectSession.value = { ...activeProjectSession.value, session_state: "running" };
   startProjectTick();
@@ -291,7 +300,11 @@ function onBreakConfirmYes() {
 async function onBreakConfirmNo() {
   showBreakConfirm.value = false;
   breakFrom.value = null;
-  await doResume();
+  if (activeProjectSession.value?.session_state === "paused") {
+    await doResumeProjectTimer();
+  } else if (activeSession.value?.session_state === "paused") {
+    await doResume();
+  }
 }
 
 function onBreakConfirmClose() {
@@ -325,14 +338,22 @@ async function onBreakSubmit({ project, activityType, goal, result, percentBilla
     },
   });
   breakFrom.value = null;
-  await doResume();
+  if (activeProjectSession.value?.session_state === "paused") {
+    await doResumeProjectTimer();
+  } else {
+    await doResume();
+  }
   frappe.show_alert({ message: __("Break timesheet submitted."), indicator: "green" });
 }
 
 async function onBreakSkip() {
   showBreakModal.value = false;
   breakFrom.value = null;
-  await doResume();
+  if (activeProjectSession.value?.session_state === "paused") {
+    await doResumeProjectTimer();
+  } else {
+    await doResume();
+  }
 }
 
 // Inline stop (emitted from card with { result, percentBillable, activityType, manualEndTime? })
