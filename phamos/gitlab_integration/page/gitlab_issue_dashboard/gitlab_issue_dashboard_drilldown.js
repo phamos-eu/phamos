@@ -67,6 +67,22 @@ Object.assign(GitLabIssueDashboard.prototype, {
             searchParams.set("state", params.state);
         }
 
+        if (params.require_touch_time) {
+            searchParams.set("total_touch_time", JSON.stringify(["is", "set"]));
+        }
+
+        if (params.require_cycle_time) {
+            searchParams.set("cycle_time_started_at", JSON.stringify(["is", "set"]));
+        }
+
+        if (params.aging_bucket === "0_30") {
+            searchParams.set("aging_days", JSON.stringify(["<=", 30]));
+        } else if (params.aging_bucket === "31_90") {
+            searchParams.set("aging_days", JSON.stringify(["between", [31, 90]]));
+        } else if (params.aging_bucket === "gt_90") {
+            searchParams.set("aging_days", JSON.stringify([">", 90]));
+        }
+
         if (params.date_field && params.from_date && params.to_date) {
             searchParams.set(params.date_field, JSON.stringify(["between", [params.from_date, params.to_date]]));
         } else if (params.date_field && params.rolling_months) {
@@ -79,19 +95,7 @@ Object.assign(GitLabIssueDashboard.prototype, {
         return `/app/${slug}${query ? "?" + query : ""}`;
     },
 
-    buildCsvExportUrl(params) {
-        const searchParams = new URLSearchParams();
-
-        Object.keys(params || {}).forEach((key) => {
-            const value = params[key];
-            if (value === undefined || value === null || value === "") return;
-            searchParams.set(key, Array.isArray(value) ? JSON.stringify(value) : String(value));
-        });
-
-        return `/api/method/phamos.gitlab_integration.page.gitlab_issue_dashboard.gitlab_issue_dashboard.download_gitlab_issue_drilldown_csv?${searchParams.toString()}`;
-    },
-
-    renderDrilldownBody($body, data, note, showLeadTime, onLoadMore) {
+    renderDrilldownBody($body, data, note, showLeadTime, onLoadMore, showTouchTime, showCycleTime) {
         const rows = (data && data.rows) || [];
         const total = (data && data.total) || 0;
         const projectTitles = (data && data.project_titles) || {};
@@ -112,6 +116,13 @@ Object.assign(GitLabIssueDashboard.prototype, {
             ? `<div class="text-muted gid-drilldown-note" style="margin-top: 8px;">${frappe.utils.escape_html(note)}</div>`
             : "";
         const leadTimeHeader = showLeadTime ? `<th class="text-right">${__("Lead Time (days)")}</th>` : "";
+        const touchTimeHeader = showTouchTime ? `<th class="text-right">${__("Touch Time (days)")}</th>` : "";
+        const cycleTimeHeader = showCycleTime ? `<th class="text-right">${__("Cycle Time (days)")}</th>` : "";
+        const summary = (showTouchTime && data && data.touch_time_summary)
+            || (showCycleTime && data && data.cycle_time_summary);
+        const summaryHtml = summary
+            ? `<div class="gid-drilldown-note" style="margin-top: 8px;"><strong>${__("Total")}: ${summary.total_days} ${__("days")} &nbsp;·&nbsp; ${__("Average")}: ${summary.avg_days} ${__("days")}</strong></div>`
+            : "";
 
         const tableRows = rows.map((row) => {
             const project = frappe.utils.escape_html(projectTitles[row.gitlab_project] || row.gitlab_project || "");
@@ -124,6 +135,12 @@ Object.assign(GitLabIssueDashboard.prototype, {
             const leadTimeCell = showLeadTime
                 ? `<td class="text-right">${row.lead_time_days === null || row.lead_time_days === undefined ? "-" : row.lead_time_days}</td>`
                 : "";
+            const touchTimeCell = showTouchTime
+                ? `<td class="text-right">${row.touch_time_days === null || row.touch_time_days === undefined ? "-" : row.touch_time_days}</td>`
+                : "";
+            const cycleTimeCell = showCycleTime
+                ? `<td class="text-right">${row.cycle_time_days === null || row.cycle_time_days === undefined ? "-" : row.cycle_time_days}</td>`
+                : "";
 
             return `
                 <tr>
@@ -133,6 +150,8 @@ Object.assign(GitLabIssueDashboard.prototype, {
                     <td>${created}</td>
                     <td>${closed}</td>
                     ${leadTimeCell}
+                    ${touchTimeCell}
+                    ${cycleTimeCell}
                 </tr>
             `;
         }).join("");
@@ -149,11 +168,14 @@ Object.assign(GitLabIssueDashboard.prototype, {
                             <th>${__("Created")}</th>
                             <th>${__("Closed")}</th>
                             ${leadTimeHeader}
+                            ${touchTimeHeader}
+                            ${cycleTimeHeader}
                         </tr>
                     </thead>
                     <tbody>${tableRows}</tbody>
                 </table>
             </div>
+            ${summaryHtml}
             ${loadMoreHtml}
             ${noteHtml}
         `);
@@ -191,15 +213,9 @@ Object.assign(GitLabIssueDashboard.prototype, {
             const tab = tabs.find((t) => t.key === state.activeKey);
             if (!tab) return;
 
-            if (tab.csvExportOnly) {
-                dialog.set_primary_action(__("Export to CSV"), () => {
-                    window.open(this.buildCsvExportUrl(tab.params), "_blank");
-                });
-            } else {
-                dialog.set_primary_action(__("Open in New Tab"), () => {
-                    window.open(this.buildListViewUrl(tab.params), "_blank");
-                });
-            }
+            dialog.set_primary_action(__("Open in New Tab"), () => {
+                window.open(this.buildListViewUrl(tab.params), "_blank");
+            });
         };
 
         const renderTabs = () => {
@@ -236,7 +252,7 @@ Object.assign(GitLabIssueDashboard.prototype, {
             if (!tab) return;
 
             if (state.cache[tab.key]) {
-                this.renderDrilldownBody($body, state.cache[tab.key], tab.note, tab.showLeadTime, () => loadMore(tab));
+                this.renderDrilldownBody($body, state.cache[tab.key], tab.note, tab.showLeadTime, () => loadMore(tab), tab.showTouchTime, tab.showCycleTime);
                 return;
             }
 
@@ -245,7 +261,7 @@ Object.assign(GitLabIssueDashboard.prototype, {
             fetchPage(tab, 0).then((data) => {
                 state.cache[tab.key] = data;
                 if (state.activeKey === tab.key) {
-                    this.renderDrilldownBody($body, data, tab.note, tab.showLeadTime, () => loadMore(tab));
+                    this.renderDrilldownBody($body, data, tab.note, tab.showLeadTime, () => loadMore(tab), tab.showTouchTime, tab.showCycleTime);
                 }
             });
         };
@@ -259,7 +275,7 @@ Object.assign(GitLabIssueDashboard.prototype, {
                 cached.total = data.total;
                 cached.project_titles = Object.assign({}, cached.project_titles, data.project_titles);
                 if (state.activeKey === tab.key) {
-                    this.renderDrilldownBody($body, cached, tab.note, tab.showLeadTime, () => loadMore(tab));
+                    this.renderDrilldownBody($body, cached, tab.note, tab.showLeadTime, () => loadMore(tab), tab.showTouchTime, tab.showCycleTime);
                 }
             });
         };
@@ -301,6 +317,82 @@ Object.assign(GitLabIssueDashboard.prototype, {
         });
     },
 
+    openTouchTimeDrilldown(projects, period) {
+        const filterCtx = this.getFilterContext();
+        const periodLabelMap = {
+            filtered: __("Selected Filter Range"),
+            last_month: __("Last Month"),
+            last_3_months: __("Last 3 Months"),
+            last_6_months: __("Last 6 Months"),
+            last_12_months: __("Last 12 Months"),
+        };
+        const rollingMonthsMap = { last_month: 1, last_3_months: 3, last_6_months: 6, last_12_months: 12 };
+
+        const params = {
+            projects,
+            issue_scope: filterCtx.issue_scope,
+            date_field: "closed_at",
+            state: "closed",
+            require_touch_time: true,
+        };
+
+        if (period === "filtered") {
+            params.from_date = filterCtx.from_date;
+            params.to_date = filterCtx.to_date;
+        } else {
+            params.rolling_months = rollingMonthsMap[period];
+        }
+
+        this.openDrilldown({
+            title: __("Touch Time — {0} ({1})", [this.getScopeLabel(projects), periodLabelMap[period] || period]),
+            tabs: [{
+                key: "closed",
+                label: __("Closed Issues"),
+                params,
+                showTouchTime: true,
+                note: __("Only issues with a counted timesheet are shown, matching the average above."),
+            }],
+        });
+    },
+
+    openCycleTimeDrilldown(projects, period) {
+        const filterCtx = this.getFilterContext();
+        const periodLabelMap = {
+            filtered: __("Selected Filter Range"),
+            last_month: __("Last Month"),
+            last_3_months: __("Last 3 Months"),
+            last_6_months: __("Last 6 Months"),
+            last_12_months: __("Last 12 Months"),
+        };
+        const rollingMonthsMap = { last_month: 1, last_3_months: 3, last_6_months: 6, last_12_months: 12 };
+
+        const params = {
+            projects,
+            issue_scope: filterCtx.issue_scope,
+            date_field: "closed_at",
+            state: "closed",
+            require_cycle_time: true,
+        };
+
+        if (period === "filtered") {
+            params.from_date = filterCtx.from_date;
+            params.to_date = filterCtx.to_date;
+        } else {
+            params.rolling_months = rollingMonthsMap[period];
+        }
+
+        this.openDrilldown({
+            title: __("Cycle Time — {0} ({1})", [this.getScopeLabel(projects), periodLabelMap[period] || period]),
+            tabs: [{
+                key: "closed",
+                label: __("Closed Issues"),
+                params,
+                showCycleTime: true,
+                note: __("Only issues with a resolved Cycle Time start are shown, matching the average above."),
+            }],
+        });
+    },
+
     openAgingDrilldown(projects, bucket) {
         const filterCtx = this.getFilterContext();
         const bucketLabelMap = { "0_30": __("0-30 days"), "31_90": __("31-90 days"), gt_90: __(">90 days") };
@@ -318,13 +410,10 @@ Object.assign(GitLabIssueDashboard.prototype, {
         const title = bucket
             ? __("Closed Tickets Aging — {0} ({1})", [this.getScopeLabel(projects), bucketLabelMap[bucket]])
             : __("Closed Tickets — {0}", [this.getScopeLabel(projects)]);
-        const note = bucket
-            ? __("Aging buckets aren't a field on GitLab Issue, so the standard list view can't filter by them. Use \"Load More\" below to page through every matching issue, or \"Export to CSV\" to download the full list.")
-            : null;
 
         this.openDrilldown({
             title,
-            tabs: [{ key: "closed", label: __("Closed Issues"), params, note, csvExportOnly: !!bucket }],
+            tabs: [{ key: "closed", label: __("Closed Issues"), params }],
         });
     },
 

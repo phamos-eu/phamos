@@ -29,6 +29,59 @@ def _set_gitlab_issue_value_with_retry(name, data, max_retries=3):
             raise
 
 
+def sync_touch_time_on_timesheet_change(doc, method=None):
+    """Recompute the linked GitLab Issue's Total Touch Time whenever a Timesheet
+    Record referencing it is submitted or cancelled, so the field on the issue
+    always matches the SUM(actual_time) the dashboard's Touch Time KPI is built
+    from (see _build_touch_time_kpis in gitlab_issue_dashboard.py). A Timesheet
+    Record counts as long as its parent Timesheet is Draft or Submitted (not
+    Cancelled)."""
+    if not doc.gitlab_issue:
+        return
+
+    total = frappe.db.sql(
+        """
+        SELECT SUM(tr.actual_time)
+        FROM `tabTimesheet Record` tr
+        JOIN `tabTimesheet` t ON t.name = tr.timesheet
+        WHERE t.docstatus IN (0, 1) AND tr.gitlab_issue = %s
+        """,
+        doc.gitlab_issue,
+    )[0][0] or 0
+
+    _set_gitlab_issue_value_with_retry(doc.gitlab_issue, {"total_touch_time": total})
+
+
+def sync_cycle_time_start(issue_name):
+    """Resolve Cycle Time Started At: the earliest Timesheet Record on this issue
+    logged on/after Cycle Start Label Set At (parent Timesheet Draft or Submitted,
+    not Cancelled — same rule as Touch Time). Left blank if the trigger label
+    hasn't been set yet, or no qualifying Timesheet Record exists yet."""
+    label_set_at = frappe.db.get_value("GitLab Issue", issue_name, "cycle_start_label_set_at")
+    if not label_set_at:
+        return
+
+    started_at = frappe.db.sql(
+        """
+        SELECT MIN(tr.from_time)
+        FROM `tabTimesheet Record` tr
+        JOIN `tabTimesheet` t ON t.name = tr.timesheet
+        WHERE t.docstatus IN (0, 1) AND tr.gitlab_issue = %(issue)s AND tr.from_time >= %(label_set_at)s
+        """,
+        {"issue": issue_name, "label_set_at": label_set_at},
+    )[0][0]
+
+    _set_gitlab_issue_value_with_retry(issue_name, {"cycle_time_started_at": started_at})
+
+
+def sync_cycle_time_start_on_timesheet_change(doc, method=None):
+    """Re-resolve Cycle Time Started At whenever a Timesheet Record on this issue
+    is submitted or cancelled — see sync_cycle_time_start."""
+    if not doc.gitlab_issue:
+        return
+    sync_cycle_time_start(doc.gitlab_issue)
+
+
 def get_gitlab_headers():
     settings = frappe.get_single("GitLab Settings")
     return {
@@ -951,6 +1004,11 @@ def _handle_issue_webhook(payload):
     }
     data.update(timestamp_data)
 
+    if data.get("closed_at") and data.get("created_at"):
+        data["aging_days"] = (data["closed_at"].date() - data["created_at"].date()).days
+    else:
+        data["aging_days"] = None
+
     existing = frappe.db.get_value(
         "GitLab Issue",
         {"issue_id": issue_iid, "gitlab_project": project_doc_name},
@@ -960,6 +1018,7 @@ def _handle_issue_webhook(payload):
     if existing:
         # Detect newly added prod labels before overwriting the labels field
         _stamp_prod_labels_on_change(existing, labels_list)
+        _stamp_cycle_start_label_on_change(existing, labels_list)
         # use set_value to avoid TimestampMismatchError on concurrent webhooks
         _set_gitlab_issue_value_with_retry(existing, data)
     else:
@@ -970,7 +1029,10 @@ def _handle_issue_webhook(payload):
             doc.gitlab_project = project_doc_name
             # Stamp prod label timestamps for a brand-new issue
             _stamp_prod_labels_initial(doc, labels_list)
+            _stamp_cycle_start_label_initial(doc, labels_list)
             doc.insert(ignore_permissions=True)
+            if doc.cycle_start_label_set_at:
+                sync_cycle_time_start(doc.name)
             _try_link_parent_from_webhook(
                 doc.name,
                 project_doc.namespace,
@@ -985,6 +1047,7 @@ def _handle_issue_webhook(payload):
             )
             if existing:
                 _stamp_prod_labels_on_change(existing, labels_list)
+                _stamp_cycle_start_label_on_change(existing, labels_list)
                 _set_gitlab_issue_value_with_retry(existing, data)
 
     frappe.db.commit()
@@ -1023,6 +1086,36 @@ def _stamp_prod_labels_initial(doc, labels_list):
     for label, field in _PROD_LABEL_FIELDS.items():
         if label in labels_list:
             setattr(doc, field, now)
+
+
+def _stamp_cycle_start_label_on_change(issue_doc_name, new_labels_list):
+    """Set cycle_start_label_set_at the first time the Cycle Time Trigger Label
+    (GitLab Settings) is newly added to this issue, then resolve Cycle Time
+    Started At from the Timesheet Records logged since."""
+    trigger_label = frappe.db.get_single_value("GitLab Settings", "cycle_time_trigger_label")
+    if not trigger_label:
+        return
+
+    ts_fields = frappe.db.get_value(
+        "GitLab Issue", issue_doc_name, ["labels", "cycle_start_label_set_at"], as_dict=True
+    ) or {}
+    if ts_fields.get("cycle_start_label_set_at"):
+        return
+
+    old_labels = {l.strip() for l in (ts_fields.get("labels") or "").split(",") if l.strip()}
+    new_labels = set(new_labels_list)
+
+    if trigger_label in new_labels and trigger_label not in old_labels:
+        _set_gitlab_issue_value_with_retry(issue_doc_name, {"cycle_start_label_set_at": now_datetime()})
+        sync_cycle_time_start(issue_doc_name)
+
+
+def _stamp_cycle_start_label_initial(doc, labels_list):
+    """Set cycle_start_label_set_at on a brand-new issue that already carries the
+    Cycle Time Trigger Label (GitLab Settings)."""
+    trigger_label = frappe.db.get_single_value("GitLab Settings", "cycle_time_trigger_label")
+    if trigger_label and trigger_label in labels_list:
+        doc.cycle_start_label_set_at = now_datetime()
 
 
 def _resolve_milestone_from_webhook(issue_attrs, project_doc_name):
