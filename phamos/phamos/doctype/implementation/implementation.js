@@ -96,6 +96,7 @@ frappe.ui.form.on("Implementation", {
             });
         }
         frm.trigger("render_auto_email_reports_section");
+        frm.trigger("render_active_reports_overview");
         frm.trigger("render_gitlab_projects_section");
         frm.trigger("render_gitlab_issues_section");
         frm.trigger("render_gitlab_milestones_section");
@@ -746,6 +747,61 @@ frappe.ui.form.on("Implementation", {
             }
         });
     },
+    render_active_reports_overview(frm) {
+        if (frm.is_new()) return;
+        if (!frm.fields_dict.active_email_reports) return;
+
+        frappe.call({
+            method: "phamos.phamos.doctype.implementation.implementation.get_active_email_reports_overview",
+            args: { implementation: frm.doc.name },
+            callback: r => {
+                const data = r.message || {};
+                const weekly = data.weekly_report || {};
+                const recipients = weekly.enabled ? (weekly.recipients || []) : [];
+
+                const buttonWrapper = frm.fields_dict.weekly_report_settings_button_html?.wrapper;
+                if (buttonWrapper) {
+                    $(buttonWrapper).html(
+                        `<button class="btn btn-default btn-sm" type="button">${__("Weekly Report Settings")}</button>`
+                    );
+                    $(buttonWrapper).find("button").on("click", () => {
+                        if (weekly.settings) {
+                            frappe.set_route("Form", "Customer Weekly Report Settings", weekly.settings);
+                        } else {
+                            frappe.new_doc("Customer Weekly Report Settings", {
+                                implementation: frm.doc.name,
+                            });
+                        }
+                    });
+                }
+
+                const incoming = recipients.map(email => ({
+                    email,
+                    report: __("Weekly Customer Report"),
+                    status: __("Active"),
+                }));
+
+                const existing = (frm.doc.active_email_reports || []).map(row => ({
+                    email: row.email || "",
+                    report: row.report || "",
+                    status: row.status || "",
+                }));
+
+                if (JSON.stringify(existing) === JSON.stringify(incoming)) return;
+
+                frm.clear_table("active_email_reports");
+                incoming.forEach(row => {
+                    const child = frm.add_child("active_email_reports");
+                    child.email = row.email;
+                    child.report = row.report;
+                    child.status = row.status;
+                });
+                frm.refresh_field("active_email_reports");
+                frm.doc.__unsaved = 0;
+                frm.toolbar && frm.toolbar.show_title_as_dirty();
+            },
+        });
+    },
     render_gitlab_issues_section(frm) {
         if (frm.is_new()) return;
 
@@ -1203,7 +1259,7 @@ function populate_auto_email_reports(frm) {
             frm.refresh_field("auto_email_report_record");
             // Background reconciliation on load shouldn't mark the form as having unsaved changes.
             frm.doc.__unsaved = 0;
-            frm.refresh_header();
+            frm.toolbar && frm.toolbar.show_title_as_dirty();
         }
     });
 }
@@ -1371,7 +1427,7 @@ function add_row_to_sales_order(frm) {
             frm.refresh_field("sales_order_status_information");
             // Background reconciliation on refresh shouldn't mark the form as having unsaved changes.
             frm.doc.__unsaved = 0;
-            frm.refresh_header();
+            frm.toolbar && frm.toolbar.show_title_as_dirty();
         }
     });
 }

@@ -1022,6 +1022,55 @@ def get_gitlab_milestones_count(implementation: str):
             )]
         }
     )
+
+@frappe.whitelist()
+def get_weekly_report_settings_link(implementation: str):
+    """Resolve which Customer Weekly Report Settings doc to open from this
+    Implementation: its own settings doc if one exists (even if disabled, so
+    the user can find and fix it), else the enabled default, else None."""
+    if not implementation:
+        return None
+
+    specific = frappe.db.get_value(
+        "Customer Weekly Report Settings",
+        {"implementation": implementation},
+        "name",
+    )
+    if specific:
+        return specific
+
+    return frappe.db.get_value(
+        "Customer Weekly Report Settings",
+        {"is_default": 1, "enabled": 1},
+        "name",
+    )
+
+@frappe.whitelist()
+def get_active_email_reports_overview(implementation: str):
+    """Read-only summary, for the Stakeholder Management tab, of the GitLab-based
+    Weekly Customer Report currently going out for this Implementation (driven
+    by the Stakeholders table). Purely a read of existing data — doesn't change
+    how the report is sent."""
+    if not implementation:
+        return {}
+
+    from phamos.gitlab_integration.generate_weekly_report import _get_report_settings
+
+    doc = frappe.get_doc("Implementation", implementation)
+
+    weekly_recipients = [
+        row.email for row in doc.stakeholders
+        if row.receive_weekly_customer_report and row.email
+    ]
+    prompt, _ = _get_report_settings(implementation)
+
+    return {
+        "weekly_report": {
+            "settings": get_weekly_report_settings_link(implementation),
+            "enabled": bool(prompt),
+            "recipients": weekly_recipients,
+        },
+    }
 def _get_escalation_snapshot(implementation, open_date):
 	"""Return the Status Updates row strictly before open_date (non-Escalated).
 	Falls back to the row on or before open_date (today's entry) if none found."""
