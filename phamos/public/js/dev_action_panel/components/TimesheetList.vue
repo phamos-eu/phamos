@@ -267,4 +267,15 @@ const totals = computed(() => {
   background: var(--red-50, #fef2f2);
   color: var(--red-700, #b91c1c);
 }
+
+[data-theme="dark"] .tl__list-badge--draft,
+[data-theme="dark"] .tl__list-badge--cancelled {
+  background: #cc2929;
+  color: #fff7f7;
+}
+
+[data-theme="dark"] .tl__list-badge--submitted {
+  background: #007be0;
+  color: #f7fbfd;
+}
 </style>
