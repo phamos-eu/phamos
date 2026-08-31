@@ -1,0 +1,193 @@
+{
+ "actions": [],
+ "allow_rename": 1,
+ "autoname": "field:title",
+ "creation": "2026-07-20 12:00:00.000000",
+ "doctype": "DocType",
+ "engine": "InnoDB",
+ "field_order": [
+  "section_general",
+  "title",
+  "enabled",
+  "column_break_1",
+  "customer",
+  "language",
+  "section_connection",
+  "instance_url",
+  "column_break_2",
+  "token_id",
+  "token_secret",
+  "section_provisioning",
+  "default_role_name",
+  "column_break_3",
+  "send_invite_by_default",
+  "section_sync",
+  "last_synced",
+  "column_break_4",
+  "sync_error_count"
+ ],
+ "fields": [
+  {
+   "fieldname": "section_general",
+   "fieldtype": "Section Break",
+   "label": "General"
+  },
+  {
+   "fieldname": "title",
+   "fieldtype": "Data",
+   "label": "Title",
+   "reqd": 1,
+   "unique": 1,
+   "in_list_view": 1,
+   "description": "Human readable identifier, e.g. 'Acme Wiki'."
+  },
+  {
+   "fieldname": "enabled",
+   "fieldtype": "Check",
+   "label": "Enabled",
+   "default": "1",
+   "in_list_view": 1
+  },
+  {
+   "fieldname": "column_break_1",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "customer",
+   "fieldtype": "Link",
+   "label": "Customer",
+   "options": "Customer"
+  },
+  {
+   "fieldname": "language",
+   "fieldtype": "Data",
+   "label": "Default Language",
+   "default": "en",
+   "description": "Default UI language applied to newly provisioned Bookstack users (e.g. en, de)."
+  },
+  {
+   "fieldname": "section_connection",
+   "fieldtype": "Section Break",
+   "label": "Connection"
+  },
+  {
+   "fieldname": "instance_url",
+   "fieldtype": "Data",
+   "label": "Instance URL",
+   "reqd": 1,
+   "in_list_view": 1,
+   "description": "Base URL of the Bookstack instance, e.g. https://customer.site.eu"
+  },
+  {
+   "fieldname": "column_break_2",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "token_id",
+   "fieldtype": "Data",
+   "label": "API Token ID",
+   "reqd": 1
+  },
+  {
+   "fieldname": "token_secret",
+   "fieldtype": "Password",
+   "label": "API Token Secret",
+   "reqd": 1
+  },
+  {
+   "fieldname": "section_provisioning",
+   "fieldtype": "Section Break",
+   "label": "Provisioning Defaults"
+  },
+  {
+   "fieldname": "default_role_name",
+   "fieldtype": "Data",
+   "label": "Default Role (display_name)",
+   "description": "Bookstack role display_name assigned to newly created users when no explicit role is given."
+  },
+  {
+   "fieldname": "column_break_3",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "send_invite_by_default",
+   "fieldtype": "Check",
+   "label": "Send Invite Email by Default",
+   "default": "1"
+  },
+  {
+   "fieldname": "section_sync",
+   "fieldtype": "Section Break",
+   "label": "Sync Status"
+  },
+  {
+   "fieldname": "last_synced",
+   "fieldtype": "Datetime",
+   "label": "Last Synced",
+   "read_only": 1
+  },
+  {
+   "fieldname": "column_break_4",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "sync_error_count",
+   "fieldtype": "Int",
+   "label": "Sync Errors (last run)",
+   "read_only": 1
+  }
+ ],
+ "grid_page_length": 50,
+ "index_web_pages_for_search": 1,
+ "links": [
+  {
+   "link_doctype": "Bookstack Shelf",
+   "link_fieldname": "instance"
+  },
+  {
+   "link_doctype": "Bookstack Book",
+   "link_fieldname": "instance"
+  },
+  {
+   "link_doctype": "Bookstack Chapter",
+   "link_fieldname": "instance"
+  },
+  {
+   "link_doctype": "Bookstack Page",
+   "link_fieldname": "instance"
+  },
+  {
+   "link_doctype": "Bookstack User",
+   "link_fieldname": "instance"
+  },
+  {
+   "link_doctype": "Bookstack Role",
+   "link_fieldname": "instance"
+  }
+ ],
+ "modified": "2026-07-20 12:00:00.000000",
+ "modified_by": "Administrator",
+ "module": "Bookstack Integration",
+ "name": "Bookstack Configuration",
+ "naming_rule": "By fieldname",
+ "owner": "Administrator",
+ "permissions": [
+  {
+   "create": 1,
+   "delete": 1,
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "System Manager",
+   "share": 1,
+   "write": 1
+  }
+ ],
+ "row_format": "Dynamic",
+ "sort_field": "modified",
+ "sort_order": "DESC",
+ "states": [],
+ "title_field": "title"
+}
