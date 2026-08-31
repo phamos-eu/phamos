@@ -1657,8 +1657,101 @@ function render_resource_planning_graph(frm, usePredictionFilter = false) {
             averagePrediction: "#d62828",
         };
 
+    // ---- Maturity level & Escalation phase bands (derived from Status History) ----
+    const statusHistory = (frm.doc.status_updates || [])
+        .filter(row => row.date)
+        .slice()
+        .sort((a, b) => new Date(a.date) - new Date(b.date));
+
+    function forwardFillByMonth(field) {
+        let ptr = 0;
+        let current = null;
+        return categories.map(month => {
+            while (ptr < statusHistory.length && statusHistory[ptr].date.slice(0, 7) <= month) {
+                if (statusHistory[ptr][field]) current = statusHistory[ptr][field];
+                ptr++;
+            }
+            return current;
+        });
+    }
+
+    function buildRuns(values) {
+        if (!values.length) return [];
+        const runs = [];
+        let start = 0;
+        let currentVal = values[0];
+        const END = Symbol('end');
+        for (let idx = 1; idx <= values.length; idx++) {
+            const val = idx < values.length ? values[idx] : END;
+            if (val !== currentVal) {
+                runs.push({ value: currentVal, from: start, to: idx - 1 });
+                start = idx;
+                currentVal = val;
+            }
+        }
+        return runs;
+    }
+
+    const maturityLevelColors = {
+        1: '231, 76, 60',   // Inception
+        2: '243, 156, 18',  // Initial Development
+        3: '241, 196, 15',  // Development
+        4: '46, 204, 113',  // Go Live
+        5: '52, 152, 219',  // Live Development
+        6: '155, 89, 182',  // Support
+    };
+
+    function maturityLevelNumber(label) {
+        const match = /^(\d+)/.exec(String(label || '').trim());
+        return match ? parseInt(match[1], 10) : null;
+    }
+
+    function maturityShortLabel(label) {
+        const match = /^\d+\s*-\s*([^.]+)/.exec(String(label || '').trim());
+        return match ? match[1].trim() : (label || '');
+    }
+
+    const maturityBands = buildRuns(forwardFillByMonth('maturity_level'))
+        .filter(run => run.value)
+        .map(run => {
+            const rgb = maturityLevelColors[maturityLevelNumber(run.value)] || '148, 163, 184';
+            return {
+                from: run.from - 0.5,
+                to: run.to + 0.5,
+                color: `rgba(${rgb}, ${isDarkTheme ? 0.28 : 0.18})`,
+                zIndex: 0,
+                label: {
+                    text: maturityShortLabel(run.value),
+                    style: { color: chartPalette.textColor, fontSize: '10px', fontWeight: '600' },
+                    align: 'center',
+                    verticalAlign: 'top',
+                    y: 18
+                }
+            };
+        });
+
+    const escalationBands = buildRuns(forwardFillByMonth('status'))
+        .filter(run => run.value === 'Escalated')
+        .map(run => ({
+            from: run.from - 0.5,
+            to: run.to + 0.5,
+            color: 'transparent',
+            borderColor: isDarkTheme ? '#f70808' : '#aa0404',
+            borderWidth: 2,
+            zIndex: 5,
+            label: {
+                text: 'Escalated',
+                style: { color: isDarkTheme ? '#f70808' : '#aa0404', fontSize: '10px', fontWeight: '600' },
+                align: 'center',
+                verticalAlign: 'top',
+                y: 36
+            }
+        }));
+
+    const phaseBands = [...maturityBands, ...escalationBands];
+
     // Function to render chart in any field
-    function renderChartInField(fieldname, containerId, height = 400, width = 400) {
+    function renderChartInField(fieldname, containerId, height = 400, width = 400, bands = []) {
         const wrapper = frm.fields_dict[fieldname].$wrapper;
         wrapper.empty();
         wrapper.append(`<div id="${containerId}" style="height:${height}px; width:${width}px;"></div>`);
@@ -1679,7 +1772,8 @@ function render_resource_planning_graph(frm, usePredictionFilter = false) {
                 labels: { style: { color: chartPalette.mutedColor } },
                 lineColor: chartPalette.borderColor,
                 tickColor: chartPalette.borderColor,
-                gridLineColor: chartPalette.borderColor
+                gridLineColor: chartPalette.borderColor,
+                plotBands: bands
             },
             yAxis: {
                 title: { text: 'Time (hrs)', style: { color: chartPalette.mutedColor } },
@@ -1728,8 +1822,8 @@ function render_resource_planning_graph(frm, usePredictionFilter = false) {
     }
 
 
-    // Render in both fields
-    renderChartInField('resource_chart', 'resource-planning-highchart-1', 400, 1000);
+    // Render in both fields (phase bands only on the main chart - the small one has no room for labels)
+    renderChartInField('resource_chart', 'resource-planning-highchart-1', 400, 1000, phaseBands);
     renderChartInField('total_time_spend', 'resource-planning-highchart-2', 300, 300);
 
 }
