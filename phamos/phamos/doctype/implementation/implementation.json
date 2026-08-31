@@ -83,6 +83,8 @@
   "generate_auto_email",
   "stakeholders_tab",
   "stakeholders",
+  "active_email_reports",
+  "weekly_report_settings_button_html",
   "section_break_review_cadence",
   "review_cadence",
   "next_review_due",
@@ -496,6 +498,18 @@
    "options": "Implementation Stakeholder"
   },
   {
+   "fieldname": "active_email_reports",
+   "fieldtype": "Table",
+   "label": "Active Email Reports",
+   "options": "Active Email Report",
+   "read_only": 1
+  },
+  {
+   "fieldname": "weekly_report_settings_button_html",
+   "fieldtype": "HTML",
+   "label": "Customer Weekly Report Settings Button"
+  },
+  {
    "fieldname": "gitlab_tab",
    "fieldtype": "Tab Break",
    "label": "GitLab"
@@ -635,7 +649,7 @@
    "link_fieldname": "implementation"
   }
  ],
- "modified": "2026-08-21 13:08:07.247694",
+ "modified": "2026-08-31 12:24:42.075040",
  "modified_by": "Administrator",
  "module": "Phamos",
  "name": "Implementation",
