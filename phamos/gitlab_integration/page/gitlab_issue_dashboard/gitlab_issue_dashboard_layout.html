@@ -14,6 +14,10 @@
             --gid-flow-closed: #43a047;
             --gid-lead-main: #6a1b9a;
             --gid-lead-accent: #5e35b1;
+            --gid-touch-main: #00695c;
+            --gid-touch-accent: #00897b;
+            --gid-cycle-main: #ad6800;
+            --gid-cycle-accent: #d48806;
         }
 
         .gitlab-issue-dashboard.gid-theme-dark {
@@ -30,6 +34,10 @@
             --gid-flow-closed: #43a047;
             --gid-lead-main: #8e24aa;
             --gid-lead-accent: #7e57c2;
+            --gid-touch-main: #00897b;
+            --gid-touch-accent: #26a69a;
+            --gid-cycle-main: #d48806;
+            --gid-cycle-accent: #ffa940;
         }
 
         .gitlab-issue-dashboard .gid-filter-card,
@@ -121,6 +129,13 @@
             line-height: 1;
         }
 
+        .gitlab-issue-dashboard .gid-kpi-sub {
+            font-size: 10px;
+            opacity: 0.85;
+            margin-top: 4px;
+            font-weight: 500;
+        }
+
         .gitlab-issue-dashboard .gid-kpi-green { background: var(--gid-aging-green); }
         .gitlab-issue-dashboard .gid-kpi-amber { background: var(--gid-aging-amber); }
         .gitlab-issue-dashboard .gid-kpi-red { background: var(--gid-aging-red); }
@@ -128,6 +143,10 @@
         .gitlab-issue-dashboard .gid-kpi-closed { background: var(--gid-flow-closed); }
         .gitlab-issue-dashboard .gid-kpi-lead-main { background: var(--gid-lead-main); }
         .gitlab-issue-dashboard .gid-kpi-lead { background: var(--gid-lead-accent); }
+        .gitlab-issue-dashboard .gid-kpi-touch-main { background: var(--gid-touch-main); }
+        .gitlab-issue-dashboard .gid-kpi-touch { background: var(--gid-touch-accent); }
+        .gitlab-issue-dashboard .gid-kpi-cycle-main { background: var(--gid-cycle-main); }
+        .gitlab-issue-dashboard .gid-kpi-cycle { background: var(--gid-cycle-accent); }
 
         .gitlab-issue-dashboard .gid-table-wrap {
             max-height: 360px;
@@ -219,6 +238,18 @@
         <div class="gid-title">{{ __("Lead Time (Created to Completed)") }}</div>
         <div class="gid-subtitle">{{ __("Average number of days from ticket creation to completion.") }}</div>
         <div id="lead-time-kpis"></div>
+    </div>
+
+    <div class="gid-section-card" style="margin-bottom: 16px;">
+        <div class="gid-title">{{ __("Touch Time (Timesheet Time Between Create To Completed)") }}</div>
+        <div class="gid-subtitle">{{ __("Average total logged work time (Timesheet) per ticket, shown as a percentage of Lead Time.") }}</div>
+        <div id="touch-time-kpis"></div>
+    </div>
+
+    <div class="gid-section-card" style="margin-bottom: 16px;">
+        <div class="gid-title">{{ __("Cycle Time (Working Label to Completed)") }}</div>
+        <div class="gid-subtitle">{{ __("Average days from the Cycle Time Trigger Label (GitLab Settings) plus the first Timesheet logged after it, to completion.") }}</div>
+        <div id="cycle-time-kpis"></div>
     </div>
 
     <div class="gid-section-card" style="margin-bottom: 16px;">

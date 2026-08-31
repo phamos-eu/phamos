@@ -1,7 +1,5 @@
 from calendar import month_name
 from datetime import date
-import csv
-import io
 import json
 import frappe
 from frappe.utils import cint, getdate, nowdate
@@ -18,6 +16,8 @@ def get_gitlab_issue_dashboard_data(projects=None, year=None, from_date=None, to
     flow_rows, aging_map, project_names = _build_flow_rows_and_aging(from_date, to_date, selected_projects, issue_scope)
     project_titles = _get_project_titles(project_names)
     lead_time = _format_lead_time_response(from_date, to_date, selected_projects, issue_scope, compare_to_company)
+    touch_time = _format_touch_time_response(from_date, to_date, selected_projects, issue_scope, compare_to_company)
+    cycle_time = _format_cycle_time_response(from_date, to_date, selected_projects, issue_scope, compare_to_company)
     open_now_total = _count_open_now(from_date, to_date, selected_projects, issue_scope)
     company_monthly_flow = []
     company_aging = {}
@@ -39,12 +39,23 @@ def get_gitlab_issue_dashboard_data(projects=None, year=None, from_date=None, to
         "company_monthly_flow": company_monthly_flow,
         "company_aging": company_aging,
         "lead_time": lead_time,
+        "touch_time": touch_time,
+        "cycle_time": cycle_time,
         "open_now_total": open_now_total,
     }
 
 
 DRILLDOWN_ROW_LIMIT = 200
-DRILLDOWN_EXPORT_ROW_LIMIT = 10000
+
+# Shared with _build_touch_time_kpis: a Timesheet Record counts as long as its
+# parent Timesheet is Draft or Submitted (not Cancelled).
+TOUCH_TIME_SUBQUERY_SQL = """
+    SELECT tr.gitlab_issue, SUM(tr.actual_time) AS touch_seconds
+    FROM `tabTimesheet Record` tr
+    JOIN `tabTimesheet` t ON t.name = tr.timesheet
+    WHERE t.docstatus IN (0, 1) AND tr.gitlab_issue IS NOT NULL
+    GROUP BY tr.gitlab_issue
+"""
 
 
 def _build_drilldown_where(
@@ -59,10 +70,8 @@ def _build_drilldown_where(
 ):
 	"""Shared WHERE-clause builder for the drilldown table and its CSV export.
 
-	`aging_bucket` (0-30 / 31-90 / >90 days) is a value computed on the fly via
-	DATEDIFF, not a stored column, so it can only be filtered here in SQL — it
-	can never be passed through to the standard GitLab Issue list view URL,
-	which only understands real doctype fields.
+	`aging_bucket` (0-30 / 31-90 / >90 days) filters on gi.aging_days, a stored
+	field kept in sync with DATEDIFF(DATE(closed_at), DATE(created_at)).
 	"""
 	selected_projects = _normalize_projects(projects)
 	issue_scope = _normalize_issue_scope(issue_scope)
@@ -95,16 +104,13 @@ def _build_drilldown_where(
 		params["to_date"] = getdate(to_date)
 
 	if aging_bucket in {"0_30", "31_90", "gt_90"}:
-		conditions.append("gi.created_at IS NOT NULL AND gi.closed_at IS NOT NULL")
+		conditions.append("gi.aging_days IS NOT NULL")
 		if aging_bucket == "0_30":
-			conditions.append("DATEDIFF(DATE(gi.closed_at), DATE(gi.created_at)) <= 30")
+			conditions.append("gi.aging_days <= 30")
 		elif aging_bucket == "31_90":
-			conditions.append(
-				"DATEDIFF(DATE(gi.closed_at), DATE(gi.created_at)) > 30"
-				" AND DATEDIFF(DATE(gi.closed_at), DATE(gi.created_at)) <= 90"
-			)
+			conditions.append("gi.aging_days > 30 AND gi.aging_days <= 90")
 		else:
-			conditions.append("DATEDIFF(DATE(gi.closed_at), DATE(gi.created_at)) > 90")
+			conditions.append("gi.aging_days > 90")
 
 	return " AND ".join(conditions), params, date_field
 
@@ -119,18 +125,26 @@ def get_gitlab_issue_drilldown(
 	rolling_months=None,
 	state=None,
 	aging_bucket=None,
+	require_touch_time=None,
+	require_cycle_time=None,
 	start=0,
 ):
 	"""Returns a page of the individual GitLab Issue rows behind a dashboard card/chart
-	segment, so the UI can show a first-stage popup before linking out to the full list
-	view (or, for filters the list view can't express, paging through everything here)."""
+	segment, so the UI can show a first-stage popup before linking out to the full list view.
+
+	`require_touch_time` / `require_cycle_time` restrict to issues with a counted
+	Timesheet Record / a resolved cycle_time_started_at, matching the population
+	the respective KPI average is built from."""
 	where_sql, params, date_field = _build_drilldown_where(
 		projects, issue_scope, date_field, from_date, to_date, rolling_months, state, aging_bucket
 	)
 	start = max(cint(start), 0)
+	touch_join_sql = f"{'JOIN' if _to_bool(require_touch_time) else 'LEFT JOIN'} ({TOUCH_TIME_SUBQUERY_SQL}) touch ON touch.gitlab_issue = gi.name"
+	if _to_bool(require_cycle_time):
+		where_sql = f"{where_sql} AND gi.cycle_time_started_at IS NOT NULL"
 
 	total = frappe.db.sql(
-		f"SELECT COUNT(*) AS total FROM `tabGitLab Issue` gi WHERE {where_sql}",
+		f"SELECT COUNT(*) AS total FROM `tabGitLab Issue` gi {touch_join_sql} WHERE {where_sql}",
 		params,
 		as_dict=True,
 	)[0].total
@@ -147,8 +161,11 @@ def get_gitlab_issue_drilldown(
 			gi.closed_at,
 			gi.assignee,
 			gi.issue_url,
-			DATEDIFF(DATE(gi.closed_at), DATE(gi.created_at)) AS lead_time_days
+			DATEDIFF(DATE(gi.closed_at), DATE(gi.created_at)) AS lead_time_days,
+			ROUND(touch.touch_seconds / 86400, 2) AS touch_time_days,
+			DATEDIFF(DATE(gi.closed_at), DATE(gi.cycle_time_started_at)) AS cycle_time_days
 		FROM `tabGitLab Issue` gi
+		{touch_join_sql}
 		WHERE {where_sql}
 		ORDER BY gi.{date_field} DESC
 		LIMIT {DRILLDOWN_ROW_LIMIT}
@@ -160,71 +177,50 @@ def get_gitlab_issue_drilldown(
 
 	project_titles = _get_project_titles(sorted({row.gitlab_project for row in rows if row.gitlab_project}))
 
+	touch_time_summary = None
+	if _to_bool(require_touch_time):
+		summary_row = frappe.db.sql(
+			f"""
+			SELECT SUM(touch.touch_seconds) / 86400 AS total_days, AVG(touch.touch_seconds) / 86400 AS avg_days
+			FROM `tabGitLab Issue` gi
+			{touch_join_sql}
+			WHERE {where_sql}
+			""",
+			params,
+			as_dict=True,
+		)[0]
+		touch_time_summary = {
+			"total_days": _round_avg(summary_row.total_days),
+			"avg_days": _round_avg(summary_row.avg_days),
+		}
+
+	cycle_time_summary = None
+	if _to_bool(require_cycle_time):
+		summary_row = frappe.db.sql(
+			f"""
+			SELECT
+				SUM(DATEDIFF(DATE(gi.closed_at), DATE(gi.cycle_time_started_at))) AS total_days,
+				AVG(DATEDIFF(DATE(gi.closed_at), DATE(gi.cycle_time_started_at))) AS avg_days
+			FROM `tabGitLab Issue` gi
+			WHERE {where_sql}
+			""",
+			params,
+			as_dict=True,
+		)[0]
+		cycle_time_summary = {
+			"total_days": _round_avg(summary_row.total_days),
+			"avg_days": _round_avg(summary_row.avg_days),
+		}
+
 	return {
 		"total": int(total or 0),
 		"rows": rows,
 		"start": start,
 		"limit": DRILLDOWN_ROW_LIMIT,
 		"project_titles": project_titles,
+		"touch_time_summary": touch_time_summary,
+		"cycle_time_summary": cycle_time_summary,
 	}
-
-
-@frappe.whitelist()
-def download_gitlab_issue_drilldown_csv(
-	projects=None,
-	issue_scope=None,
-	date_field=None,
-	from_date=None,
-	to_date=None,
-	rolling_months=None,
-	state=None,
-	aging_bucket=None,
-):
-	"""CSV export of every row matching a drilldown's filters (not just the on-screen
-	page), for filters like aging_bucket that the standard list view can't apply."""
-	where_sql, params, date_field = _build_drilldown_where(
-		projects, issue_scope, date_field, from_date, to_date, rolling_months, state, aging_bucket
-	)
-
-	rows = frappe.db.sql(
-		f"""
-		SELECT
-			gi.issue_id,
-			gi.title,
-			gi.state,
-			gi.gitlab_project,
-			gi.created_at,
-			gi.closed_at,
-			gi.issue_url,
-			DATEDIFF(DATE(gi.closed_at), DATE(gi.created_at)) AS lead_time_days
-		FROM `tabGitLab Issue` gi
-		WHERE {where_sql}
-		ORDER BY gi.{date_field} DESC
-		LIMIT {DRILLDOWN_EXPORT_ROW_LIMIT}
-		""",
-		params,
-		as_dict=True,
-	)
-
-	project_titles = _get_project_titles(sorted({row.gitlab_project for row in rows if row.gitlab_project}))
-
-	buffer = io.StringIO()
-	writer = csv.writer(buffer)
-	writer.writerow(["Issue", "Project", "State", "Created", "Closed", "Lead Time (days)", "URL"])
-	for row in rows:
-		writer.writerow([
-			row.issue_id or "",
-			project_titles.get(row.gitlab_project, row.gitlab_project or ""),
-			row.state or "",
-			row.created_at or "",
-			row.closed_at or "",
-			row.lead_time_days if row.lead_time_days is not None else "",
-			row.issue_url or "",
-		])
-
-	frappe.response["result"] = buffer.getvalue()
-	frappe.response["type"] = "csv"
-	frappe.response["doctype"] = "GitLab Issue Drilldown"
 
 
 def _to_bool(value):
@@ -378,12 +374,12 @@ def _build_flow_rows_and_aging(from_date, to_date, selected_projects, issue_scop
         f"""
         SELECT
             gi.gitlab_project,
-                        SUM(CASE WHEN DATEDIFF(DATE(gi.closed_at), DATE(gi.created_at)) <= 30 THEN 1 ELSE 0 END) AS bucket_0_30,
-                        SUM(CASE WHEN DATEDIFF(DATE(gi.closed_at), DATE(gi.created_at)) > 30 AND DATEDIFF(DATE(gi.closed_at), DATE(gi.created_at)) <= 90 THEN 1 ELSE 0 END) AS bucket_31_90,
-                        SUM(CASE WHEN DATEDIFF(DATE(gi.closed_at), DATE(gi.created_at)) > 90 THEN 1 ELSE 0 END) AS bucket_gt_90
+                        SUM(CASE WHEN gi.aging_days <= 30 THEN 1 ELSE 0 END) AS bucket_0_30,
+                        SUM(CASE WHEN gi.aging_days > 30 AND gi.aging_days <= 90 THEN 1 ELSE 0 END) AS bucket_31_90,
+                        SUM(CASE WHEN gi.aging_days > 90 THEN 1 ELSE 0 END) AS bucket_gt_90
         FROM `tabGitLab Issue` gi
         WHERE gi.state = 'closed'
-          AND gi.created_at IS NOT NULL
+          AND gi.aging_days IS NOT NULL
                     AND gi.closed_at IS NOT NULL
                     AND DATE(gi.closed_at) BETWEEN %(from_date)s AND %(to_date)s
           AND {project_filter_sql}
@@ -581,6 +577,217 @@ def _format_lead_time_response(from_date, to_date, selected_projects, issue_scop
         "filtered": combined["filtered"],
         "rolling": combined["rolling"],
         "project_lead_times": [],
+    }
+
+
+def _build_touch_time_kpis(from_date, to_date, selected_projects, issue_scope="both"):
+    """Touch Time = total Timesheet Record time logged against a ticket, counted
+    as long as the Timesheet Record's parent Timesheet is Draft or Submitted (not
+    Cancelled) (in calendar days, i.e. hours / 24, to stay comparable with Lead
+    Time's days), averaged over the same closed-ticket population used for Lead
+    Time. Tickets with no counted timesheet are excluded from the average, same
+    as Lead Time already excludes tickets without a closed_at."""
+    conditions = ["1=1"]
+    params = {}
+
+    if selected_projects:
+        conditions.append("gi.gitlab_project IN %(projects)s")
+        params["projects"] = tuple(selected_projects)
+
+    if issue_scope == "parent":
+        conditions.append("gi.parent_issue IS NULL")
+    elif issue_scope == "child":
+        conditions.append("gi.parent_issue IS NOT NULL")
+
+    project_filter_sql = " AND ".join(conditions)
+
+    touch_join = f"JOIN ({TOUCH_TIME_SUBQUERY_SQL}) tr ON tr.gitlab_issue = gi.name"
+
+    filtered_params = dict(params)
+    filtered_params["from_date"] = from_date
+    filtered_params["to_date"] = to_date
+
+    filtered_row = frappe.db.sql(
+        f"""
+        SELECT AVG(tr.touch_seconds) / 86400 AS avg_touch_time
+        FROM `tabGitLab Issue` gi
+        {touch_join}
+        WHERE gi.state = 'closed'
+          AND gi.created_at IS NOT NULL
+          AND gi.closed_at IS NOT NULL
+          AND DATE(gi.closed_at) BETWEEN %(from_date)s AND %(to_date)s
+          AND {project_filter_sql}
+        """,
+        filtered_params,
+        as_dict=True,
+    )
+
+    rolling = {}
+    for key, months in LEAD_TIME_ROLLING_PERIODS.items():
+        rolling_row = frappe.db.sql(
+            f"""
+            SELECT AVG(tr.touch_seconds) / 86400 AS avg_touch_time
+            FROM `tabGitLab Issue` gi
+            {touch_join}
+            WHERE gi.state = 'closed'
+              AND gi.created_at IS NOT NULL
+              AND gi.closed_at IS NOT NULL
+              AND DATE(gi.closed_at) >= DATE_SUB(CURDATE(), INTERVAL {months} MONTH)
+              AND {project_filter_sql}
+            """,
+            params,
+            as_dict=True,
+        )
+        rolling[key] = _round_avg(rolling_row[0].avg_touch_time if rolling_row else None)
+
+    return {
+        "filtered": _round_avg(filtered_row[0].avg_touch_time if filtered_row else None),
+        "rolling": rolling,
+    }
+
+
+def _format_touch_time_response(from_date, to_date, selected_projects, issue_scope, compare_to_company):
+    """Mirrors _format_lead_time_response's mode/shape exactly, so the frontend can
+    pair up matching rows by project/mode when computing Touch Time as a percentage
+    of Lead Time."""
+    combined = _build_touch_time_kpis(from_date, to_date, selected_projects, issue_scope)
+
+    if len(selected_projects) > 1:
+        project_touch_times = [
+            {
+                "project": project,
+                **_build_touch_time_kpis(from_date, to_date, [project], issue_scope),
+            }
+            for project in selected_projects
+        ]
+        return {
+            "mode": "project_compare",
+            "project": None,
+            "filtered": combined["filtered"],
+            "rolling": combined["rolling"],
+            "project_touch_times": project_touch_times,
+        }
+
+    if len(selected_projects) == 1:
+        result = {
+            "mode": "single",
+            "project": selected_projects[0],
+            "filtered": combined["filtered"],
+            "rolling": combined["rolling"],
+            "project_touch_times": [],
+        }
+        if compare_to_company:
+            result["company"] = _build_touch_time_kpis(from_date, to_date, [], issue_scope)
+        return result
+
+    return {
+        "mode": "combined",
+        "project": None,
+        "filtered": combined["filtered"],
+        "rolling": combined["rolling"],
+        "project_touch_times": [],
+    }
+
+
+def _build_cycle_time_kpis(from_date, to_date, selected_projects, issue_scope="both"):
+    """Cycle Time = days from gi.cycle_time_started_at (the first Timesheet Record
+    logged on/after the Cycle Time Trigger Label was set — see
+    gitlab_utils.sync_cycle_time_start) to closed_at. Tickets where the trigger
+    label was never set, or no qualifying Timesheet Record exists, are excluded
+    from the average — same exclusion pattern as Touch Time."""
+    conditions = ["1=1"]
+    params = {}
+
+    if selected_projects:
+        conditions.append("gi.gitlab_project IN %(projects)s")
+        params["projects"] = tuple(selected_projects)
+
+    if issue_scope == "parent":
+        conditions.append("gi.parent_issue IS NULL")
+    elif issue_scope == "child":
+        conditions.append("gi.parent_issue IS NOT NULL")
+
+    project_filter_sql = " AND ".join(conditions)
+
+    filtered_params = dict(params)
+    filtered_params["from_date"] = from_date
+    filtered_params["to_date"] = to_date
+
+    filtered_row = frappe.db.sql(
+        f"""
+        SELECT AVG(DATEDIFF(DATE(gi.closed_at), DATE(gi.cycle_time_started_at))) AS avg_cycle_time
+        FROM `tabGitLab Issue` gi
+        WHERE gi.state = 'closed'
+          AND gi.cycle_time_started_at IS NOT NULL
+          AND gi.closed_at IS NOT NULL
+          AND DATE(gi.closed_at) BETWEEN %(from_date)s AND %(to_date)s
+          AND {project_filter_sql}
+        """,
+        filtered_params,
+        as_dict=True,
+    )
+
+    rolling = {}
+    for key, months in LEAD_TIME_ROLLING_PERIODS.items():
+        rolling_row = frappe.db.sql(
+            f"""
+            SELECT AVG(DATEDIFF(DATE(gi.closed_at), DATE(gi.cycle_time_started_at))) AS avg_cycle_time
+            FROM `tabGitLab Issue` gi
+            WHERE gi.state = 'closed'
+              AND gi.cycle_time_started_at IS NOT NULL
+              AND gi.closed_at IS NOT NULL
+              AND DATE(gi.closed_at) >= DATE_SUB(CURDATE(), INTERVAL {months} MONTH)
+              AND {project_filter_sql}
+            """,
+            params,
+            as_dict=True,
+        )
+        rolling[key] = _round_avg(rolling_row[0].avg_cycle_time if rolling_row else None)
+
+    return {
+        "filtered": _round_avg(filtered_row[0].avg_cycle_time if filtered_row else None),
+        "rolling": rolling,
+    }
+
+
+def _format_cycle_time_response(from_date, to_date, selected_projects, issue_scope, compare_to_company):
+    """Mirrors _format_touch_time_response's mode/shape."""
+    combined = _build_cycle_time_kpis(from_date, to_date, selected_projects, issue_scope)
+
+    if len(selected_projects) > 1:
+        project_cycle_times = [
+            {
+                "project": project,
+                **_build_cycle_time_kpis(from_date, to_date, [project], issue_scope),
+            }
+            for project in selected_projects
+        ]
+        return {
+            "mode": "project_compare",
+            "project": None,
+            "filtered": combined["filtered"],
+            "rolling": combined["rolling"],
+            "project_cycle_times": project_cycle_times,
+        }
+
+    if len(selected_projects) == 1:
+        result = {
+            "mode": "single",
+            "project": selected_projects[0],
+            "filtered": combined["filtered"],
+            "rolling": combined["rolling"],
+            "project_cycle_times": [],
+        }
+        if compare_to_company:
+            result["company"] = _build_cycle_time_kpis(from_date, to_date, [], issue_scope)
+        return result
+
+    return {
+        "mode": "combined",
+        "project": None,
+        "filtered": combined["filtered"],
+        "rolling": combined["rolling"],
+        "project_cycle_times": [],
     }
 
 

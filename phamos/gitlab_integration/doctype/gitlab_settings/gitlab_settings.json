@@ -8,7 +8,8 @@
   "gitlab_url",
   "access_token",
   "webhook_base_url",
-  "webhook_secret"
+  "webhook_secret",
+  "cycle_time_trigger_label"
  ],
  "fields": [
   {
@@ -34,6 +35,13 @@
    "fieldname": "webhook_base_url",
    "fieldtype": "Data",
    "label": "Webhook Base URL"
+  },
+  {
+   "default": "Working",
+   "description": "GitLab label that marks the start of active work on a ticket. When this label is newly added to a GitLab Issue, its timestamp is stamped and used as the earliest possible start of Cycle Time.",
+   "fieldname": "cycle_time_trigger_label",
+   "fieldtype": "Data",
+   "label": "Cycle Time Trigger Label"
   }
  ],
  "grid_page_length": 50,

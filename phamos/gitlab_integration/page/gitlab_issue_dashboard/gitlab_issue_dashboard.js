@@ -42,6 +42,8 @@ class GitLabIssueDashboard {
         this.$applyBtn = root.find("#gid-apply-filters");
         this.$resetBtn = root.find("#gid-reset-filters");
         this.$leadTimeKpis = root.find("#lead-time-kpis");
+        this.$touchTimeKpis = root.find("#touch-time-kpis");
+        this.$cycleTimeKpis = root.find("#cycle-time-kpis");
         this.$agingKpis = root.find("#aging-kpis");
         this.$agingChart = root.find("#aging-chart");
         this.$flowKpis = root.find("#flow-kpis");
@@ -331,6 +333,8 @@ class GitLabIssueDashboard {
             this.$compareCompanyToggle.prop("checked", this.compareToCompany);
             this.updateFilterState();
             this.renderLeadTimeKpis();
+            this.renderTouchTimeKpis();
+            this.renderCycleTimeKpis();
             this.renderAgingChart();
             this.renderFlowChart();
             this.renderFlowTable();
@@ -402,6 +406,156 @@ class GitLabIssueDashboard {
             const project = $el.attr("data-project");
             const period = $el.attr("data-period");
             this.openLeadTimeDrilldown(project ? [project] : [], period);
+        });
+    }
+
+    renderTouchTimeKpis() {
+        const touchTime = (this.currentData && this.currentData.touch_time) || {};
+        const leadTime = (this.currentData && this.currentData.lead_time) || {};
+        const mode = touchTime.mode || "combined";
+        const projectTitles = (this.currentData && this.currentData.project_titles) || {};
+
+        const formatDays = (value) => {
+            if (value === null || value === undefined) return __("N/A");
+            return __("{0} days", [value]);
+        };
+
+        const formatPct = (touchValue, leadValue) => {
+            if (touchValue === null || touchValue === undefined) return null;
+            if (!leadValue) return null;
+            return Math.round((touchValue / leadValue) * 1000) / 10;
+        };
+
+        const buildRow = (label, data, leadData, projectId) => {
+            const rolling = (data && data.rolling) || {};
+            const leadRolling = (leadData && leadData.rolling) || {};
+            const labelHtml = label
+                ? `<div class="gid-lead-row-label">${frappe.utils.escape_html(label)}</div>`
+                : "";
+            const projAttr = projectId ? frappe.utils.escape_html(projectId) : "";
+            const kpi = (period, title, value, leadValue, extraClass) => {
+                const pct = formatPct(value, leadValue);
+                const pctHtml = pct !== null
+                    ? `<div class="gid-kpi-sub">${__("{0}% of Lead Time", [pct])}</div>`
+                    : "";
+                return `
+                    <div class="gid-kpi ${extraClass} gid-clickable" data-drill="touch_time" data-project="${projAttr}" data-period="${period}">
+                        <small>${title}</small><strong>${formatDays(value)}</strong>
+                        ${pctHtml}
+                    </div>
+                `;
+            };
+            return `
+                <div class="gid-lead-row">
+                    ${labelHtml}
+                    <div class="gid-kpi-row gid-kpi-row-lead">
+                        ${kpi("filtered", __("Selected Filter Avg"), data ? data.filtered : null, leadData ? leadData.filtered : null, "gid-kpi-touch-main")}
+                        ${kpi("last_month", __("Last Month"), rolling.last_month, leadRolling.last_month, "gid-kpi-touch")}
+                        ${kpi("last_3_months", __("Last 3 Months"), rolling.last_3_months, leadRolling.last_3_months, "gid-kpi-touch")}
+                        ${kpi("last_6_months", __("Last 6 Months"), rolling.last_6_months, leadRolling.last_6_months, "gid-kpi-touch")}
+                        ${kpi("last_12_months", __("Last 12 Months"), rolling.last_12_months, leadRolling.last_12_months, "gid-kpi-touch")}
+                    </div>
+                </div>
+            `;
+        };
+
+        let html = "";
+
+        if (mode === "single" && touchTime.company) {
+            const projectTitle = projectTitles[touchTime.project] || touchTime.project || __("Project");
+            html += buildRow(projectTitle, touchTime, leadTime, touchTime.project);
+            html += buildRow(__("Company"), touchTime.company, leadTime.company, null);
+        } else if (mode === "project_compare" && (touchTime.project_touch_times || []).length) {
+            touchTime.project_touch_times.forEach((row) => {
+                const title = projectTitles[row.project] || row.project || __("Project");
+                const leadRow = (leadTime.project_lead_times || []).find((t) => t.project === row.project);
+                html += buildRow(title, row, leadRow, row.project);
+            });
+        } else {
+            html += buildRow(null, touchTime, leadTime, null);
+        }
+
+        this.$touchTimeKpis.html(html);
+        this.$touchTimeKpis.off("click", ".gid-kpi").on("click", ".gid-kpi", (e) => {
+            const $el = $(e.currentTarget);
+            const project = $el.attr("data-project");
+            const period = $el.attr("data-period");
+            this.openTouchTimeDrilldown(project ? [project] : [], period);
+        });
+    }
+
+    renderCycleTimeKpis() {
+        const cycleTime = (this.currentData && this.currentData.cycle_time) || {};
+        const leadTime = (this.currentData && this.currentData.lead_time) || {};
+        const mode = cycleTime.mode || "combined";
+        const projectTitles = (this.currentData && this.currentData.project_titles) || {};
+
+        const formatDays = (value) => {
+            if (value === null || value === undefined) return __("N/A");
+            return __("{0} days", [value]);
+        };
+
+        const formatPct = (cycleValue, leadValue) => {
+            if (cycleValue === null || cycleValue === undefined) return null;
+            if (!leadValue) return null;
+            return Math.round((cycleValue / leadValue) * 1000) / 10;
+        };
+
+        const buildRow = (label, data, leadData, projectId) => {
+            const rolling = (data && data.rolling) || {};
+            const leadRolling = (leadData && leadData.rolling) || {};
+            const labelHtml = label
+                ? `<div class="gid-lead-row-label">${frappe.utils.escape_html(label)}</div>`
+                : "";
+            const projAttr = projectId ? frappe.utils.escape_html(projectId) : "";
+            const kpi = (period, title, value, leadValue, extraClass) => {
+                const pct = formatPct(value, leadValue);
+                const pctHtml = pct !== null
+                    ? `<div class="gid-kpi-sub">${__("{0}% of Lead Time", [pct])}</div>`
+                    : "";
+                return `
+                    <div class="gid-kpi ${extraClass} gid-clickable" data-drill="cycle_time" data-project="${projAttr}" data-period="${period}">
+                        <small>${title}</small><strong>${formatDays(value)}</strong>
+                        ${pctHtml}
+                    </div>
+                `;
+            };
+            return `
+                <div class="gid-lead-row">
+                    ${labelHtml}
+                    <div class="gid-kpi-row gid-kpi-row-lead">
+                        ${kpi("filtered", __("Selected Filter Avg"), data ? data.filtered : null, leadData ? leadData.filtered : null, "gid-kpi-cycle-main")}
+                        ${kpi("last_month", __("Last Month"), rolling.last_month, leadRolling.last_month, "gid-kpi-cycle")}
+                        ${kpi("last_3_months", __("Last 3 Months"), rolling.last_3_months, leadRolling.last_3_months, "gid-kpi-cycle")}
+                        ${kpi("last_6_months", __("Last 6 Months"), rolling.last_6_months, leadRolling.last_6_months, "gid-kpi-cycle")}
+                        ${kpi("last_12_months", __("Last 12 Months"), rolling.last_12_months, leadRolling.last_12_months, "gid-kpi-cycle")}
+                    </div>
+                </div>
+            `;
+        };
+
+        let html = "";
+
+        if (mode === "single" && cycleTime.company) {
+            const projectTitle = projectTitles[cycleTime.project] || cycleTime.project || __("Project");
+            html += buildRow(projectTitle, cycleTime, leadTime, cycleTime.project);
+            html += buildRow(__("Company"), cycleTime.company, leadTime.company, null);
+        } else if (mode === "project_compare" && (cycleTime.project_cycle_times || []).length) {
+            cycleTime.project_cycle_times.forEach((row) => {
+                const title = projectTitles[row.project] || row.project || __("Project");
+                const leadRow = (leadTime.project_lead_times || []).find((t) => t.project === row.project);
+                html += buildRow(title, row, leadRow, row.project);
+            });
+        } else {
+            html += buildRow(null, cycleTime, leadTime, null);
+        }
+
+        this.$cycleTimeKpis.html(html);
+        this.$cycleTimeKpis.off("click", ".gid-kpi").on("click", ".gid-kpi", (e) => {
+            const $el = $(e.currentTarget);
+            const project = $el.attr("data-project");
+            const period = $el.attr("data-period");
+            this.openCycleTimeDrilldown(project ? [project] : [], period);
         });
     }
 

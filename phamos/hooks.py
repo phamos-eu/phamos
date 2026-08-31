@@ -258,6 +258,16 @@ doc_events = {
         "on_submit": "phamos.phamos.hr.interview_summary.trigger_interview_summary",
         "on_cancel": "phamos.phamos.hr.interview_summary.trigger_interview_summary",
     },
+    "Timesheet Record": {
+        "on_submit": [
+            "phamos.gitlab_integration.gitlab_utils.sync_touch_time_on_timesheet_change",
+            "phamos.gitlab_integration.gitlab_utils.sync_cycle_time_start_on_timesheet_change",
+        ],
+        "on_cancel": [
+            "phamos.gitlab_integration.gitlab_utils.sync_touch_time_on_timesheet_change",
+            "phamos.gitlab_integration.gitlab_utils.sync_cycle_time_start_on_timesheet_change",
+        ],
+    },
 }
 
 

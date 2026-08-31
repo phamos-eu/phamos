@@ -23,7 +23,12 @@
   "labels",
   "merged_to_production_at",
   "testing_on_production_at",
-  "comments"
+  "comments",
+  "section_break_gkku",
+  "aging_days",
+  "cycle_time_started_at",
+  "cycle_start_label_set_at",
+  "total_touch_time"
  ],
  "fields": [
   {
@@ -132,17 +137,57 @@
    "read_only": 1
   },
   {
+   "description": "Days from Created At to Closed At",
+   "fieldname": "aging_days",
+   "fieldtype": "Int",
+   "in_standard_filter": 1,
+   "label": "Aging (Days)",
+   "read_only": 1
+  },
+  {
+   "description": "Timestamp of when the Cycle Time Trigger Label (GitLab Settings) was first added to this issue.",
+   "fieldname": "cycle_start_label_set_at",
+   "fieldtype": "Datetime",
+   "in_standard_filter": 1,
+   "label": "Cycle Start Label Set At",
+   "read_only": 1
+  },
+  {
+   "description": "The first Timesheet Record on/after Cycle Start Label Set At.",
+   "fieldname": "cycle_time_started_at",
+   "fieldtype": "Datetime",
+   "in_standard_filter": 1,
+   "label": "Cycle Time Started At",
+   "read_only": 1
+  },
+  {
+   "description": "Sum of actual_time from all counted Timesheet Records linked to this issue (parent Timesheet Draft or Submitted). ",
+   "fieldname": "total_touch_time",
+   "fieldtype": "Duration",
+   "label": "Total Touch Time",
+   "read_only": 1
+  },
+  {
    "description": "Non-system comments synced from GitLab (via Note Hook webhook, plus one-off backfill).",
    "fieldname": "comments",
    "fieldtype": "Table",
    "label": "Comments",
    "options": "GitLab Issue Comment"
+  },
+  {
+   "fieldname": "section_break_gkku",
+   "fieldtype": "Section Break"
   }
  ],
  "grid_page_length": 50,
  "index_web_pages_for_search": 1,
- "links": [],
- "modified": "2026-04-15 09:35:21.376652",
+ "links": [
+  {
+   "link_doctype": "Timesheet Record",
+   "link_fieldname": "gitlab_issue"
+  }
+ ],
+ "modified": "2026-08-31 10:20:04.836336",
  "modified_by": "Administrator",
  "module": "Gitlab Integration",
  "name": "GitLab Issue",
