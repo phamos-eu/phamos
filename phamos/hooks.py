@@ -95,6 +95,7 @@ doctype_js = {
     "Timesheet":"public/js/timesheet.js",
     "Email Account": "public/js/mailcow_email_account.js",
     "Event": "public/js/event.js",
+    "Appointment": "public/js/appointment.js",
     "Sales Invoice": "public/js/sales_invoice.js",
     "Customer": "public/js/customer.js",
 
