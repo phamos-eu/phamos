@@ -316,9 +316,9 @@ def create_proposals_and_send_email(payload: str):
             "starts_on": start_iso,
             "ends_on": end_iso,
             "description": _event_desc_with_markers("", group_id, uid, start_iso, end_iso, status="Tentative"),
-            "event_participants": [
-                {"reference_doctype": reference_doctype, "reference_docname": reference_name},
-            ],
+            **({"event_participants": [
+                    {"reference_doctype": reference_doctype, "reference_docname": reference_name},
+                ],} if reference_doctype and reference_name else {}),
             "location": location,
             "custom_attendees_to": recipients,  # Optional attendees
             "custom_attendees_cc": data.get("cc") or "",  # Optional attendees
