@@ -9,8 +9,6 @@
     "naming_series",
     "implementation",
     "sales_order_status_information",
-    "mis_delivery_notes_section",
-    "mis_delivery_notes",
     "section_break_1_section",
     "delivery_note_details",
     "delivery_note_item",
@@ -53,18 +51,6 @@
       "fieldtype": "Table",
       "label": "Sales Order Status Information",
       "options": "Sales Order Status"
-    },
-    {
-      "fieldname": "mis_delivery_notes_section",
-      "fieldtype": "Section Break",
-      "label": "Delivery Notes"
-    },
-    {
-      "allow_on_submit": 1,
-      "fieldname": "mis_delivery_notes",
-      "fieldtype": "Table",
-      "label": "Delivery Notes",
-      "options": "MIS Delivery Note"
     },
     {
       "fieldname": "section_break_1_section",
