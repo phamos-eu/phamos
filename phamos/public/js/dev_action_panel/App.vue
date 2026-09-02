@@ -6,6 +6,9 @@ import FilterBar from "./components/FilterBar.vue";
 import IssueList from "./components/IssueList.vue";
 import BreakModal from "./components/BreakModal.vue";
 import BreakConfirm from "./components/BreakConfirm.vue";
+import CalendarView from "./components/CalendarView.vue";
+import TimesheetList from "./components/TimesheetList.vue";
+import ProjectsView from "./components/ProjectsView.vue";
 
 const issues = ref([]);
 const stats = ref(null);
@@ -18,8 +21,17 @@ const activeSession = ref(null);
 const elapsedSeconds = ref(0);
 const sidebarOpen = ref(true);
 const selectedProject = ref(null);
-const currentView = ref("issues"); // 'issues' | future views
+const currentView = ref("issues"); // 'issues' | 'timesheets' | 'team' | 'projects'
 const mineOnly = ref(true); // default: show only current user's issues
+
+// Projects section
+const myProjects = ref([]);
+const allProjects = ref([]);
+const projectsFilter = ref("my"); // 'my' | 'all'
+const projectsLoading = ref(false);
+const activeProjectSession = ref(null);
+const projectElapsedSeconds = ref(0);
+let projectTimerInterval = null;
 
 // Filter state
 const searchQuery = ref("");
@@ -141,10 +153,7 @@ function stopTick() { clearInterval(timerInterval); timerInterval = null; }
 const labelsMap = ref({});
 
 // API
-async function loadIssues() { loading.value = true; const r = await frappe.call({ method: "phamos.phamos.page.dev_action_panel.dev_action_panel.get_my_issues" }); issues.value = r.message || [];
-  console.log("FIRST ISSUE");
-  console.log(JSON.stringify(issues.value[0], null, 2));
- loading.value = false; }
+async function loadIssues() { loading.value = true; const r = await frappe.call({ method: "phamos.phamos.page.dev_action_panel.dev_action_panel.get_my_issues" }); issues.value = r.message || []; loading.value = false; }
 async function loadLabels() {
   const r = await frappe.call({ method: "phamos.phamos.page.dev_action_panel.dev_action_panel.get_gitlab_labels" });
   const map = {};
@@ -163,6 +172,91 @@ async function loadSession() {
   }
 }
 async function loadStats() { const r = await frappe.call({ method: "phamos.phamos.page.dev_action_panel.dev_action_panel.get_time_stats" }); stats.value = r.message || null; }
+
+// Projects
+async function loadMyProjects() {
+  const r = await frappe.call({ method: "phamos.phamos.page.dev_action_panel.dev_action_panel.get_dev_my_projects" });
+  myProjects.value = r.message || [];
+}
+async function loadAllProjects() {
+  const r = await frappe.call({ method: "phamos.phamos.page.dev_action_panel.dev_action_panel.get_dev_all_projects" });
+  allProjects.value = r.message || [];
+}
+async function loadActiveProjectSession() {
+  const r = await frappe.call({ method: "phamos.phamos.page.dev_action_panel.dev_action_panel.get_active_project_session" });
+  activeProjectSession.value = r.message || null;
+  if (activeProjectSession.value) {
+    projectElapsedSeconds.value = activeProjectSession.value.elapsed_seconds || 0;
+    if (activeProjectSession.value.session_state === "running") startProjectTick();
+  }
+}
+
+function startProjectTick() {
+  clearInterval(projectTimerInterval);
+  projectTimerInterval = setInterval(() => {
+    if (activeProjectSession.value?.session_state === "running") projectElapsedSeconds.value++;
+  }, 1000);
+}
+function stopProjectTick() { clearInterval(projectTimerInterval); projectTimerInterval = null; }
+
+async function onStartProjectTimer({ project, expectedTime, goal }) {
+  const r = await frappe.call({
+    method: "phamos.phamos.page.dev_action_panel.dev_action_panel.start_project_timer",
+    args: { project_name: project.name, expected_time: expectedTime, goal },
+  });
+  if (r.message) {
+    activeProjectSession.value = { ...r.message };
+    projectElapsedSeconds.value = Math.max(0, r.message.elapsed_seconds || 0);
+    startProjectTick();
+  }
+}
+
+async function onPauseProjectTimer() {
+  if (!activeProjectSession.value) return;
+  const r = await frappe.call({ method: "phamos.phamos.page.dev_action_panel.dev_action_panel.pause_timer", args: { name: activeProjectSession.value.name } });
+  breakFrom.value = r.message?.break_from || null;
+  activeProjectSession.value = { ...activeProjectSession.value, session_state: "paused" };
+  stopProjectTick();
+}
+
+async function onResumeProjectTimer() {
+  if (!activeProjectSession.value) return;
+  if (breakFrom.value) {
+    showBreakConfirm.value = true;
+  } else {
+    await doResumeProjectTimer();
+  }
+}
+
+async function doResumeProjectTimer() {
+  await frappe.call({ method: "phamos.phamos.page.dev_action_panel.dev_action_panel.resume_timer", args: { name: activeProjectSession.value.name } });
+  activeProjectSession.value = { ...activeProjectSession.value, session_state: "running" };
+  startProjectTick();
+}
+
+async function onStopProjectTimer({ result, percentBillable, activityType }) {
+  if (!activeProjectSession.value) return;
+  const r = await frappe.call({
+    method: "phamos.phamos.page.dev_action_panel.dev_action_panel.stop_timer",
+    args: { name: activeProjectSession.value.name, result, percent_billable: percentBillable, activity_type: activityType },
+  });
+  if (r.message) {
+    stopProjectTick();
+    activeProjectSession.value = null;
+    projectElapsedSeconds.value = 0;
+    await Promise.all([loadMyProjects(), loadStats()]);
+    frappe.show_alert({ message: __("Project session submitted."), indicator: "green" });
+  }
+}
+
+async function assignProject(project) {
+  await frappe.call({
+    method: "phamos.phamos.page.dev_action_panel.dev_action_panel.assign_dev_project",
+    args: { project_name: project.name },
+  });
+  frappe.show_alert({ message: __("Project assigned to you."), indicator: "green" });
+  await Promise.all([loadMyProjects(), loadAllProjects()]);
+}
 
 // Inline start (emitted from card with { issue, expectedTime, goal, manualStartTime? })
 async function onStart({ issue, expectedTime, goal, manualStartTime }) {
@@ -206,7 +300,11 @@ function onBreakConfirmYes() {
 async function onBreakConfirmNo() {
   showBreakConfirm.value = false;
   breakFrom.value = null;
-  await doResume();
+  if (activeProjectSession.value?.session_state === "paused") {
+    await doResumeProjectTimer();
+  } else if (activeSession.value?.session_state === "paused") {
+    await doResume();
+  }
 }
 
 function onBreakConfirmClose() {
@@ -240,14 +338,22 @@ async function onBreakSubmit({ project, activityType, goal, result, percentBilla
     },
   });
   breakFrom.value = null;
-  await doResume();
+  if (activeProjectSession.value?.session_state === "paused") {
+    await doResumeProjectTimer();
+  } else {
+    await doResume();
+  }
   frappe.show_alert({ message: __("Break timesheet submitted."), indicator: "green" });
 }
 
 async function onBreakSkip() {
   showBreakModal.value = false;
   breakFrom.value = null;
-  await doResume();
+  if (activeProjectSession.value?.session_state === "paused") {
+    await doResumeProjectTimer();
+  } else {
+    await doResume();
+  }
 }
 
 // Inline stop (emitted from card with { result, percentBillable, activityType, manualEndTime? })
@@ -267,8 +373,8 @@ async function onSync() {
   syncing.value = false;
 }
 
-onMounted(async () => { await Promise.all([loadIssues(), loadSession(), loadStats(), loadLabels()]); });
-onUnmounted(() => { stopTick(); });
+onMounted(async () => { await Promise.all([loadIssues(), loadSession(), loadStats(), loadLabels(), loadMyProjects(), loadAllProjects(), loadActiveProjectSession()]); });
+onUnmounted(() => { stopTick(); stopProjectTick(); });
 </script>
 
 <template>
@@ -312,43 +418,71 @@ onUnmounted(() => { stopTick(); });
           :my-issues-count="myIssuesCount"
           :mine-only="mineOnly"
           :syncing="syncing"
+          :projects-filter="projectsFilter"
+          :my-projects-count="myProjects.length"
+          :all-projects-count="allProjects.length"
+          :active-project-session="activeProjectSession"
+          :project-elapsed-seconds="projectElapsedSeconds"
           @select-project="selectedProject = $event"
           @change-view="currentView = $event"
           @toggle-mine="mineOnly = $event"
           @sync="onSync"
+          @navigate-projects="(tab) => { currentView = 'projects'; projectsFilter = tab; }"
         />
       </aside>
 
       <div class="dc-body">
-        <FilterBar
-          v-model:search="searchQuery"
-          v-model:dueFilter="dueFilter"
-          v-model:assigneeFilter="assigneeFilter"
-          v-model:labelFilter="labelFilter"
-          v-model:sortBy="sortBy"
-          v-model:sortDir="sortDir"
-          :assignee-options="assigneeOptions"
-          :label-options="labelOptions"
-          :result-count="filteredIssues.length"
-          :total-count="issues.length"
-          @clear-all="clearAllFilters"
-        />
-        <div v-if="loading" class="dc-loading">
-          <div class="dc-loading__spinner"></div>
-          <span>Loading your issues…</span>
-        </div>
-        <IssueList
-          v-else
-          :issues="filteredIssues"
-          :all-count="issues.length"
-          :active-session="activeSession"
-          :elapsed-seconds="elapsedSeconds"
-          :selected-project="selectedProject"
-          :labels-map="labelsMap"
-          @start="onStart"
-          @pause="onPause"
-          @resume="onResume"
-          @stop="onStop"
+        <template v-if="currentView === 'issues'">
+          <FilterBar
+            v-model:search="searchQuery"
+            v-model:dueFilter="dueFilter"
+            v-model:assigneeFilter="assigneeFilter"
+            v-model:labelFilter="labelFilter"
+            v-model:sortBy="sortBy"
+            v-model:sortDir="sortDir"
+            :assignee-options="assigneeOptions"
+            :label-options="labelOptions"
+            :result-count="filteredIssues.length"
+            :total-count="issues.length"
+            @clear-all="clearAllFilters"
+          />
+          <div v-if="loading" class="dc-loading">
+            <div class="dc-loading__spinner"></div>
+            <span>Loading your issues…</span>
+          </div>
+          <IssueList
+            v-else
+            :issues="filteredIssues"
+            :all-count="issues.length"
+            :active-session="activeSession"
+            :elapsed-seconds="elapsedSeconds"
+            :selected-project="selectedProject"
+            :labels-map="labelsMap"
+            :active-project-session="activeProjectSession"
+            @start="onStart"
+            @pause="onPause"
+            @resume="onResume"
+            @stop="onStop"
+          />
+        </template>
+
+        <CalendarView v-else-if="currentView === 'team'" />
+        <TimesheetList v-else-if="currentView === 'timesheets'" />
+        <ProjectsView
+          v-else-if="currentView === 'projects'"
+          :filter="projectsFilter"
+          :my-projects="myProjects"
+          :all-projects="allProjects"
+          :active-project-session="activeProjectSession"
+          :project-elapsed-seconds="projectElapsedSeconds"
+          :loading="projectsLoading"
+          :active-issue-session="activeSession"
+          @change-filter="projectsFilter = $event"
+          @start="onStartProjectTimer"
+          @pause="onPauseProjectTimer"
+          @resume="onResumeProjectTimer"
+          @stop="onStopProjectTimer"
+          @assign="assignProject"
         />
       </div>
     </div>
