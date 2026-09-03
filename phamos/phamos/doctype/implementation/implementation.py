@@ -1047,22 +1047,66 @@ def get_weekly_report_settings_link(implementation: str):
 
 @frappe.whitelist()
 def get_active_email_reports_overview(implementation: str):
-    """Read-only summary, for the Stakeholder Management tab, of the GitLab-based
-    Weekly Customer Report currently going out for this Implementation (driven
-    by the Stakeholders table). Purely a read of existing data — doesn't change
-    how the report is sent."""
+    """Read-only summary, for the Stakeholder Management tab, of every report
+    currently going out for this Implementation — the GitLab-based Weekly
+    Customer Report (driven by the Stakeholders table), the Auto Email Reports
+    configured on the Report tab, and the Collect Progress updates of any
+    Project linked to this Implementation. Purely a read of existing data —
+    doesn't change how any of these reports are sent."""
     if not implementation:
         return {}
 
     from phamos.gitlab_integration.generate_weekly_report import _get_report_settings
 
     doc = frappe.get_doc("Implementation", implementation)
+    rows = []
 
+    # 1. GitLab-based Weekly Customer Report
     weekly_recipients = [
         row.email for row in doc.stakeholders
         if row.receive_weekly_customer_report and row.email
     ]
-    prompt, _ = _get_report_settings(implementation)
+    prompt, _lang = _get_report_settings(implementation)
+    if prompt:
+        for email in weekly_recipients:
+            rows.append({"email": email, "report": "Weekly Customer Report", "frequency": "Weekly", "status": "Active"})
+
+    # 2. Auto Email Reports configured on the Report tab (e.g. Daily Timesheet Summary)
+    seen_keys = set()
+    for record in doc.auto_email_report_record:
+        key = (record.templates, record.frequency)
+        if not record.templates or key in seen_keys:
+            continue
+        seen_keys.add(key)
+
+        auto_email = frappe.db.get_value(
+            "Auto Email Report",
+            {"user": doc.user_with_permission, "report": record.templates, "frequency": record.frequency},
+            ["email_to", "enabled"],
+            as_dict=True,
+        )
+        if auto_email:
+            emails = [e.strip() for e in (auto_email.email_to or "").splitlines() if e.strip()]
+            status = "Active" if auto_email.enabled else "Disabled"
+        else:
+            emails = [e.strip() for e in (record.recipients or "").split(",") if e.strip()]
+            status = "Not Generated Yet"
+
+        for email in emails:
+            rows.append({"email": email, "report": record.templates, "frequency": record.frequency, "status": status})
+
+    # 3. Collect Progress updates of Projects linked to this Implementation
+    linked_projects = frappe.get_all(
+        "Project",
+        filters={"custom_implementation": implementation, "collect_progress": 1},
+        fields=["name", "project_name", "frequency"],
+    )
+    for project in linked_projects:
+        user_emails = frappe.get_all("Project User", filters={"parent": project.name}, pluck="email")
+        report_label = f"{project.project_name or project.name} - Project Progress Update"
+        for email in user_emails:
+            if email:
+                rows.append({"email": email, "report": report_label, "frequency": project.frequency, "status": "Active"})
 
     return {
         "weekly_report": {
@@ -1070,6 +1114,7 @@ def get_active_email_reports_overview(implementation: str):
             "enabled": bool(prompt),
             "recipients": weekly_recipients,
         },
+        "reports": rows,
     }
 def _get_escalation_snapshot(implementation, open_date):
 	"""Return the Status Updates row strictly before open_date (non-Escalated).

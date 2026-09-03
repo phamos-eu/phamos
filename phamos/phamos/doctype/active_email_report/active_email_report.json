@@ -8,6 +8,7 @@
  "field_order": [
   "email",
   "report",
+  "frequency",
   "status"
  ],
  "fields": [
@@ -23,6 +24,13 @@
    "fieldtype": "Data",
    "in_list_view": 1,
    "label": "Report",
+   "read_only": 1
+  },
+  {
+   "fieldname": "frequency",
+   "fieldtype": "Data",
+   "in_list_view": 1,
+   "label": "Frequency",
    "read_only": 1
   },
   {
