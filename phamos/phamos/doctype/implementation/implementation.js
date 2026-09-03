@@ -757,7 +757,6 @@ frappe.ui.form.on("Implementation", {
             callback: r => {
                 const data = r.message || {};
                 const weekly = data.weekly_report || {};
-                const recipients = weekly.enabled ? (weekly.recipients || []) : [];
 
                 const buttonWrapper = frm.fields_dict.weekly_report_settings_button_html?.wrapper;
                 if (buttonWrapper) {
@@ -775,15 +774,17 @@ frappe.ui.form.on("Implementation", {
                     });
                 }
 
-                const incoming = recipients.map(email => ({
-                    email,
-                    report: __("Weekly Customer Report"),
-                    status: __("Active"),
+                const incoming = (data.reports || []).map(row => ({
+                    email: row.email || "",
+                    report: row.report || "",
+                    frequency: row.frequency || "",
+                    status: row.status || "",
                 }));
 
                 const existing = (frm.doc.active_email_reports || []).map(row => ({
                     email: row.email || "",
                     report: row.report || "",
+                    frequency: row.frequency || "",
                     status: row.status || "",
                 }));
 
@@ -794,6 +795,7 @@ frappe.ui.form.on("Implementation", {
                     const child = frm.add_child("active_email_reports");
                     child.email = row.email;
                     child.report = row.report;
+                    child.frequency = row.frequency;
                     child.status = row.status;
                 });
                 frm.refresh_field("active_email_reports");
