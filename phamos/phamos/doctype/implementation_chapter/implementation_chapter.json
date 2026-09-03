@@ -25,6 +25,8 @@
   "current_revision",
   "last_meeting",
   "last_reviewed_on",
+  "decision",
+  "decision_description",
   "history_tab",
   "chapter_history_html"
  ],
@@ -121,7 +123,6 @@
    "label": "Target Level"
   },
   {
-   "description": "Set automatically when this Chapter is planned. The agreed content of the corresponding revision is the immutable, authoritative snapshot.",
    "fieldname": "current_revision",
    "fieldtype": "Link",
    "label": "Current Revision",
@@ -129,7 +130,6 @@
    "read_only": 1
   },
   {
-   "description": "Set automatically when a Stakeholder Meeting reviewing this Chapter is submitted.",
    "fieldname": "last_meeting",
    "fieldtype": "Link",
    "label": "Last Meeting",
@@ -137,10 +137,22 @@
    "read_only": 1
   },
   {
-   "description": "Set automatically when a Stakeholder Meeting reviewing this Chapter is submitted.",
    "fieldname": "last_reviewed_on",
    "fieldtype": "Date",
    "label": "Last Reviewed On",
+   "read_only": 1
+  },
+  {
+   "fieldname": "decision",
+   "fieldtype": "Select",
+   "label": "Decision",
+   "options": "\nYes\nNo\nDeferred",
+   "read_only": 1
+  },
+  {
+   "fieldname": "decision_description",
+   "fieldtype": "Small Text",
+   "label": "Decision Description",
    "read_only": 1
   },
   {

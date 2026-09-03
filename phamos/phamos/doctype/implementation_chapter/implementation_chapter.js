@@ -72,6 +72,15 @@ function chapter_history_pill(text, colors) {
 	return `<span class="chapter-history-pill" style="background:${color}">${frappe.utils.escape_html(text)}</span>`;
 }
 
+function build_revision_decision_html(rev) {
+	if (!rev.decision) return "-";
+	const heading = `<strong>${frappe.utils.escape_html(rev.decision)}</strong>`;
+	const description = rev.decision_description
+		? `<div class="text-muted">${frappe.utils.escape_html(rev.decision_description)}</div>`
+		: "";
+	return `${heading}${description}`;
+}
+
 function build_revisions_html(revisions) {
 	if (!revisions || !revisions.length) {
 		return `<div class="text-muted">${__("No revisions yet.")}</div>`;
@@ -93,6 +102,8 @@ function build_revisions_html(revisions) {
 					<td>${frappe.utils.escape_html(rev.chapter_title || "")}</td>
 					<td>${rev.planned_start ? frappe.datetime.str_to_user(rev.planned_start) : "-"}</td>
 					<td>${rev.target_date ? frappe.datetime.str_to_user(rev.target_date) : "-"}</td>
+					<td>${chapter_history_pill(rev.progress, PROGRESS_COLORS) || "-"}</td>
+					<td>${build_revision_decision_html(rev)}</td>
 					<td>${frappe.datetime.str_to_user(rev.creation)}</td>
 				</tr>
 			`;
@@ -108,66 +119,9 @@ function build_revisions_html(revisions) {
 						<th>${__("Title")}</th>
 						<th>${__("Planned Start")}</th>
 						<th>${__("Target Date")}</th>
-						<th>${__("Created On")}</th>
-					</tr>
-				</thead>
-				<tbody>${rows}</tbody>
-			</table>
-		</div>
-	`;
-}
-
-function build_meetings_html(meetings) {
-	if (!meetings || !meetings.length) {
-		return `<div class="text-muted">${__("No submitted meetings have reviewed this Chapter yet.")}</div>`;
-	}
-
-	const rows = meetings
-		.map((meeting) => {
-			const scope_change_badge = meeting.scope_change
-				? `<span class="chapter-history-pill" style="background:#7048e8">${__("Scope Change")}</span> ${__(
-						"Rev {0} → Rev {1}",
-						[meeting.previous_revision || "-", meeting.current_revision || "-"]
-				  )}`
-				: "-";
-
-			const decisions_html = (meeting.decisions || []).length
-				? `<ul class="chapter-history-decisions">${meeting.decisions
-						.map(
-							(d) =>
-								`<li>${frappe.utils.escape_html(d.decision_type || "")}: <strong>${frappe.utils.escape_html(
-									d.decision || ""
-								)}</strong>${d.subject ? " – " + frappe.utils.escape_html(d.subject) : ""}</li>`
-						)
-						.join("")}</ul>`
-				: "-";
-
-			return `
-				<tr>
-					<td>
-						<a href="/app/stakeholder-meeting/${encodeURIComponent(meeting.name)}">
-							${frappe.datetime.str_to_user(meeting.meeting_date)}
-						</a>
-					</td>
-					<td>${frappe.utils.escape_html(meeting.meeting_type || "")}</td>
-					<td>${chapter_history_pill(meeting.progress, PROGRESS_COLORS)}</td>
-					<td>${scope_change_badge}</td>
-					<td>${decisions_html}</td>
-				</tr>
-			`;
-		})
-		.join("");
-
-	return `
-		<div style="overflow-x: auto;">
-			<table class="chapter-history-table">
-				<thead>
-					<tr>
-						<th>${__("Meeting Date")}</th>
-						<th>${__("Type")}</th>
 						<th>${__("Progress")}</th>
-						<th>${__("Scope Change")}</th>
 						<th>${__("Decisions")}</th>
+						<th>${__("Created On")}</th>
 					</tr>
 				</thead>
 				<tbody>${rows}</tbody>
@@ -199,7 +153,5 @@ function build_chapter_history_html(data) {
 		${current_html}
 		<h6 style="margin-top:15px;">${__("Revisions")}</h6>
 		${build_revisions_html(data.revisions)}
-		<h6 style="margin-top:20px;">${__("Stakeholder Meetings")}</h6>
-		${build_meetings_html(data.meetings)}
 	`;
 }

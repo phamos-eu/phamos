@@ -8,6 +8,9 @@
  "field_order": [
   "implementation_chapter",
   "revision_number",
+  "status",
+  "target_level",
+  "current_level",
   "column_break_rev",
   "planned_start",
   "target_date",
@@ -33,6 +36,26 @@
    "in_list_view": 1,
    "label": "Revision Number",
    "reqd": 1
+  },
+  {
+   "default": "Draft",
+   "fieldname": "status",
+   "fieldtype": "Select",
+   "in_list_view": 1,
+   "in_standard_filter": 1,
+   "label": "Status",
+   "options": "Draft\nPlanned\nIn Progress\nBlocked\nCancelled",
+   "reqd": 1
+  },
+  {
+   "fieldname": "current_level",
+   "fieldtype": "Int",
+   "label": "Current Level"
+  },
+  {
+   "fieldname": "target_level",
+   "fieldtype": "Int",
+   "label": "Target Level"
   },
   {
    "fieldname": "column_break_rev",

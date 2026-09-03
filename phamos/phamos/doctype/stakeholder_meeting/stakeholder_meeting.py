@@ -6,6 +6,7 @@ from frappe.model.document import Document
 from frappe.utils import formatdate
 
 from phamos.phamos.doctype.implementation.implementation import compute_next_review_due
+from phamos.phamos.doctype.implementation_chapter.implementation_chapter import create_revision_snapshot
 
 ATTENDEE_ORGANISATIONS = ("Internal", "Customer")
 CHAPTER_REVIEW_STATUSES = ("Planned", "In Progress", "Blocked")
@@ -69,28 +70,38 @@ class StakeholderMeeting(Document):
 			frappe.flags.in_stakeholder_meeting_submit = False
 
 	def sync_chapter_reviews_to_chapters(self):
-		"""Write the agreed operational fields captured on each Chapter Review row
-		back onto its Chapter: current/target level, the optional proposed status,
-		and last-reviewed metadata. It never edits the Chapter's own agreed content
-		fields directly - a Scope Change instead creates a new immutable Chapter
-		Revision from the row's proposed content and repoints the Chapter's
-		current_revision at it."""
 		created_revisions = []
 		for row in self.chapter_reviews:
 			if not row.chapter:
 				continue
 
 			chapter = frappe.get_doc("Implementation Chapter", row.chapter)
+			level_changed = (
+				row.current_level != chapter.current_level or row.target_level != chapter.target_level
+			)
 			chapter.current_level = row.current_level
 			chapter.target_level = row.target_level
 			if row.chapter_status_after:
 				chapter.status = row.chapter_status_after
 			chapter.last_meeting = self.name
 			chapter.last_reviewed_on = self.meeting_date
+			if row.decision:
+				chapter.decision = row.decision
+			if row.decision_description:
+				chapter.decision_description = row.decision_description
 
 			new_revision_name = None
 			if row.scope_change:
 				new_revision_name = self.create_chapter_revision_from_row(chapter, row)
+				chapter.chapter_title = row.proposed_chapter_title
+				chapter.chapter_introduction = row.proposed_chapter_introduction
+				chapter.full_chapter_description = row.proposed_full_chapter_description
+				chapter.planned_start = row.proposed_planned_start
+				chapter.target_date = row.proposed_target_date
+			elif level_changed:
+				new_revision_name = create_revision_snapshot(chapter).name
+
+			if new_revision_name:
 				chapter.current_revision = new_revision_name
 
 			chapter.save(ignore_permissions=True)
@@ -138,7 +149,7 @@ class StakeholderMeeting(Document):
 		]
 		frappe.msgprint(
 			"<br>".join(lines),
-			title=frappe._("Scope Changes Applied"),
+			title=frappe._("Chapter Revisions Created"),
 			indicator="green",
 		)
 
@@ -155,6 +166,9 @@ class StakeholderMeeting(Document):
 				"doctype": "Implementation Chapter Revision",
 				"implementation_chapter": chapter.name,
 				"revision_number": next_revision_number,
+				"status": chapter.status,
+				"target_level": chapter.target_level,
+				"current_level": chapter.current_level,
 				"chapter_title": row.proposed_chapter_title,
 				"chapter_introduction": row.proposed_chapter_introduction,
 				"full_chapter_description": row.proposed_full_chapter_description,

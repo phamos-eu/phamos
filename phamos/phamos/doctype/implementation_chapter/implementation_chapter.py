@@ -29,7 +29,41 @@ class ImplementationChapter(Document):
 		self.validate_target_date_after_planned_start()
 
 	def on_update(self):
+		self.sync_level_change_to_revision()
 		self.sync_module_row_in_implementation()
+
+	def sync_level_change_to_revision(self):
+		"""A Current Level / Target Level edit made directly on the Chapter (outside
+		a Stakeholder Meeting) updates the existing current Revision in place rather
+		than creating a new one - a fresh Revision is only ever minted by a
+		Stakeholder Meeting. Only applies once the Chapter has left Draft and
+		already has a current Revision to update."""
+		if self.is_new():
+			return
+
+		doc_before_save = self.get_doc_before_save()
+		if not doc_before_save or doc_before_save.status == "Draft":
+			return
+
+		if (
+			self.current_level == doc_before_save.current_level
+			and self.target_level == doc_before_save.target_level
+		):
+			return
+
+		if not self.current_revision:
+			return
+
+		frappe.db.set_value(
+			"Implementation Chapter Revision",
+			self.current_revision,
+			{
+				"status": self.status,
+				"target_level": self.target_level,
+				"current_level": self.current_level,
+			},
+			update_modified=False,
+		)
 
 	def sync_module_row_in_implementation(self):
 		"""Mirror this Chapter onto its row in the parent Implementation's Modules
@@ -103,10 +137,11 @@ class ImplementationChapter(Document):
 			frappe.throw(frappe._("Target Date must be after Planned Start."))
 
 	def validate_agreed_content_locked(self):
-		"""Once a Chapter leaves Draft, its agreed content is frozen. The only way
-		to change it going forward is a future revision workflow (Stakeholder
-		Meeting), not a direct edit on the Chapter."""
-		if self.is_new():
+		"""Once a Chapter leaves Draft, its agreed content is frozen against a direct
+		edit on the Chapter. A submitted Stakeholder Meeting is the only exception:
+		a Scope Change there pushes its new Revision's content back onto the Chapter,
+		which it does under frappe.flags.in_stakeholder_meeting_submit."""
+		if self.is_new() or frappe.flags.in_stakeholder_meeting_submit:
 			return
 
 		doc_before_save = self.get_doc_before_save()
@@ -131,6 +166,33 @@ class ImplementationChapter(Document):
 			)
 
 
+def create_revision_snapshot(chapter):
+	"""Freeze the Chapter's current status/levels/content as the next immutable
+	Chapter Revision. Shared by set_as_planned() and by a direct Current
+	Level / Target Level edit on the Chapter; the caller is responsible for
+	pointing the Chapter's current_revision at the result."""
+	next_revision_number = (
+		frappe.db.count("Implementation Chapter Revision", {"implementation_chapter": chapter.name}) + 1
+	)
+	revision = frappe.get_doc(
+		{
+			"doctype": "Implementation Chapter Revision",
+			"implementation_chapter": chapter.name,
+			"revision_number": next_revision_number,
+			"status": chapter.status,
+			"target_level": chapter.target_level,
+			"current_level": chapter.current_level,
+			"chapter_title": chapter.chapter_title,
+			"chapter_introduction": chapter.chapter_introduction,
+			"full_chapter_description": chapter.full_chapter_description,
+			"planned_start": chapter.planned_start,
+			"target_date": chapter.target_date,
+		}
+	)
+	revision.insert(ignore_permissions=True)
+	return revision
+
+
 @frappe.whitelist()
 def set_as_planned(name):
 	"""Freeze the Chapter's current agreed content as an immutable Revision 1
@@ -150,26 +212,10 @@ def set_as_planned(name):
 			)
 		)
 
-	next_revision_number = (
-		frappe.db.count("Implementation Chapter Revision", {"implementation_chapter": doc.name}) + 1
-	)
-
-	revision = frappe.get_doc(
-		{
-			"doctype": "Implementation Chapter Revision",
-			"implementation_chapter": doc.name,
-			"revision_number": next_revision_number,
-			"chapter_title": doc.chapter_title,
-			"chapter_introduction": doc.chapter_introduction,
-			"full_chapter_description": doc.full_chapter_description,
-			"planned_start": doc.planned_start,
-			"target_date": doc.target_date,
-		}
-	)
-	revision.insert(ignore_permissions=True)
+	doc.status = "Planned"
+	revision = create_revision_snapshot(doc)
 
 	doc.current_revision = revision.name
-	doc.status = "Planned"
 	doc.save(ignore_permissions=True)
 
 	frappe.msgprint(
@@ -186,11 +232,11 @@ def set_as_planned(name):
 
 @frappe.whitelist()
 def get_chapter_history(chapter):
-	"""Read-only history for the Chapter's History tab: the revision sequence
-	and the submitted Stakeholder Meetings (with their outcomes and any linked
-	Decisions) that reviewed this Chapter. Built entirely from Implementation
-	Chapter Revision / Stakeholder Meeting Chapter Review / Stakeholder Meeting
-	Decision - never touches Implementation.status_updates."""
+	"""Read-only history for the Chapter's History tab: each Revision together with
+	the Progress and Decision recorded by the Stakeholder Meeting Chapter Review
+	row that produced it (if any - Revision 1 comes from Set as Planned, not a
+	meeting). Built entirely from Implementation Chapter Revision / Stakeholder
+	Meeting Chapter Review - never touches Implementation.status_updates."""
 	doc = frappe.get_doc("Implementation Chapter", chapter)
 
 	revisions = frappe.get_all(
@@ -207,55 +253,22 @@ def get_chapter_history(chapter):
 		],
 		order_by="revision_number asc",
 	)
-	for revision in revisions:
-		revision["is_current"] = revision.name == doc.current_revision
 
 	review_rows = frappe.get_all(
 		"Stakeholder Meeting Chapter Review",
 		filters={"chapter": chapter, "docstatus": 1},
-		fields=[
-			"parent",
-			"progress",
-			"scope_change",
-			"chapter_status_before",
-			"chapter_status_after",
-			"previous_revision",
-			"current_revision",
-		],
+		fields=["progress", "current_revision", "decision", "decision_description"],
 	)
-	reviews_by_meeting = {row.parent: row for row in review_rows}
+	review_by_revision = {row.current_revision: row for row in review_rows if row.current_revision}
 
-	meetings = []
-	if reviews_by_meeting:
-		meeting_rows = frappe.get_all(
-			"Stakeholder Meeting",
-			filters={"name": ["in", list(reviews_by_meeting.keys())], "docstatus": 1},
-			fields=["name", "meeting_date", "meeting_type", "chair"],
-			order_by="meeting_date desc, creation desc",
-		)
-
-		decision_rows = frappe.get_all(
-			"Stakeholder Meeting Decision",
-			filters={"chapter": chapter, "docstatus": 1},
-			fields=["parent", "decision_type", "decision", "subject", "effective_date", "notes"],
-		)
-		decisions_by_meeting = {}
-		for decision in decision_rows:
-			decisions_by_meeting.setdefault(decision.parent, []).append(decision)
-
-		for meeting in meeting_rows:
-			review = reviews_by_meeting.get(meeting.name, {})
-			meeting["progress"] = review.get("progress")
-			meeting["scope_change"] = review.get("scope_change")
-			meeting["chapter_status_before"] = review.get("chapter_status_before")
-			meeting["chapter_status_after"] = review.get("chapter_status_after")
-			meeting["previous_revision"] = review.get("previous_revision")
-			meeting["current_revision"] = review.get("current_revision")
-			meeting["decisions"] = decisions_by_meeting.get(meeting.name, [])
-			meetings.append(meeting)
+	for revision in revisions:
+		revision["is_current"] = revision.name == doc.current_revision
+		review = review_by_revision.get(revision.name)
+		revision["progress"] = review.progress if review else None
+		revision["decision"] = review.decision if review else None
+		revision["decision_description"] = review.decision_description if review else None
 
 	return {
 		"current_revision": doc.current_revision,
 		"revisions": revisions,
-		"meetings": meetings,
 	}
