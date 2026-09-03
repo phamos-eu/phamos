@@ -8,7 +8,9 @@
   "field_order": [
     "naming_series",
     "implementation",
+    "sales_order",
     "sales_order_status_information",
+    "delivery_note",
     "section_break_1_section",
     "delivery_note_details",
     "delivery_note_item",
@@ -47,10 +49,25 @@
       "reqd": 1
     },
     {
+      "fieldname": "sales_order",
+      "fieldtype": "Link",
+      "label": "Sales Order",
+      "link_filters": "[\n  [\"Sales Order\", \"docstatus\", \"=\", 1],\n  [\"Sales Order\", \"custom_implementation\", \"=\", \"eval:doc.implementation\"],\n  [\"Sales Order\", \"status\", \"not in\", [\"Completed\", \"Closed\", \"On Hold\"]]\n]",
+      "no_copy": 1,
+      "options": "Sales Order"
+    },
+    {
       "fieldname": "sales_order_status_information",
       "fieldtype": "Table",
       "label": "Sales Order Status Information",
       "options": "Sales Order Status"
+    },
+    {
+      "fieldname": "delivery_note",
+      "fieldtype": "Data",
+      "label": "Delivery Note",
+      "no_copy": 1,
+      "read_only": 1
     },
     {
       "fieldname": "section_break_1_section",
@@ -183,7 +200,7 @@
   "index_web_pages_for_search": 1,
   "is_submittable": 1,
   "links": [],
-  "modified": "2026-07-03 11:54:11.906793",
+  "modified": "2026-09-03 16:30:00.000000",
   "modified_by": "Administrator",
   "module": "Phamos",
   "name": "Monthly Implementation Summary",
