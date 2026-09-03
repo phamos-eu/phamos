@@ -2,7 +2,7 @@
  "actions": [],
  "allow_rename": 1,
  "autoname": "SM-.{implementation}.-.####",
- "creation": "2026-08-20 00:00:00.000000",
+ "creation": "2026-08-21 12:27:19.629400",
  "default_view": "List",
  "doctype": "DocType",
  "engine": "InnoDB",
@@ -16,10 +16,9 @@
   "attendees",
   "section_break_chapters",
   "chapter_reviews",
-  "section_break_decisions",
-  "decisions",
   "section_break_notes",
-  "notes"
+  "notes",
+  "amended_from"
  ],
  "fields": [
   {
@@ -86,17 +85,6 @@
    "options": "Stakeholder Meeting Chapter Review"
   },
   {
-   "fieldname": "section_break_decisions",
-   "fieldtype": "Section Break",
-   "label": "Decisions"
-  },
-  {
-   "fieldname": "decisions",
-   "fieldtype": "Table",
-   "label": "Decisions",
-   "options": "Stakeholder Meeting Decision"
-  },
-  {
    "fieldname": "section_break_notes",
    "fieldtype": "Section Break",
    "label": "Notes"
@@ -105,6 +93,16 @@
    "fieldname": "notes",
    "fieldtype": "Text Editor",
    "label": "Notes"
+  },
+  {
+   "fieldname": "amended_from",
+   "fieldtype": "Link",
+   "label": "Amended From",
+   "no_copy": 1,
+   "options": "Stakeholder Meeting",
+   "print_hide": 1,
+   "read_only": 1,
+   "search_index": 1
   }
  ],
  "index_web_pages_for_search": 1,
@@ -116,7 +114,7 @@
    "link_fieldname": "last_meeting"
   }
  ],
- "modified": "2026-08-20 00:00:00.000000",
+ "modified": "2026-09-03 07:15:11.462353",
  "modified_by": "Administrator",
  "module": "Phamos",
  "name": "Stakeholder Meeting",
@@ -151,6 +149,7 @@
    "write": 1
   }
  ],
+ "row_format": "Dynamic",
  "sort_field": "creation",
  "sort_order": "DESC",
  "states": [],

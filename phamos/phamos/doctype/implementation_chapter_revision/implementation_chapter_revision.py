@@ -6,5 +6,4 @@ from frappe.model.document import Document
 
 
 class ImplementationChapterRevision(Document):
-	def on_trash(self):
-		frappe.throw(frappe._("Implementation Chapter Revisions are immutable and cannot be deleted."))
+	pass
