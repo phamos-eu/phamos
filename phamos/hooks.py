@@ -279,6 +279,14 @@ doc_events = {
 # your_app/hooks.py
 
 fixtures = [
+    {"dt": "Role", "filters": [
+        [
+            "name", "in", [
+                "Bookstack User",
+                "Bookstack Manager",
+            ]
+        ]
+    ]},
     {"dt": "Scheduled Job Type", "filters": [
         [
             "name", "in", [
