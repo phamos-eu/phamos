@@ -8,11 +8,6 @@ frappe.ui.form.on("Checklist Template", {
 		frm.can_make_methods = {
 			Checklist: () => false,
 		};
-
-		frm.set_query("checklist_template_owner", () => ({
-			query:
-				"phamos.phamos.doctype.checklist_template.checklist_template.checklist_template_owner_query",
-		}));
 	},
 
 	refresh(frm) {
