@@ -62,8 +62,27 @@ def get_checklist_details(checklist_name):
 		"name": checklist.name,
 		"status": checklist.status,
 		"completion_percentage": checklist.completion_percentage or 0,
+		"checklist_owner": checklist.checklist_owner,
 		"items": items,
 	}
+
+
+@frappe.whitelist()
+def get_linked_checklists(doctype, name):
+	return frappe.get_all(
+		"Checklist",
+		filters={
+			"document": doctype,
+			"reference_record": name,
+		},
+		fields=[
+			"name",
+			"status",
+			"completion_percentage",
+			"checklist_owner",
+		],
+		order_by="modified desc",
+	)
 
 
 @frappe.whitelist()

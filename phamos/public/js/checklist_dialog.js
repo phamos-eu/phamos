@@ -38,7 +38,7 @@ frappe.call({
 
 function show_linked_checklists_dialog(frm) {
 	frappe.call({
-		method: "phamos.phamos.doctype.marketing_content.marketing_content.get_linked_checklists",
+		method: "phamos.phamos.doctype.checklist.checklist.get_linked_checklists",
 		args: {
 			doctype: frm.doctype,
 			name: frm.doc.name,
@@ -86,6 +86,7 @@ function build_checklist_dialog_html(checklists) {
 			}[row.status] || "blue";
 
 			const escaped_name = frappe.utils.escape_html(row.name);
+			const escaped_owner = frappe.utils.escape_html(row.checklist_owner || "-");
 			return `
 				<tr class="checklist-summary-row" data-checklist-name="${escaped_name}">
 					<td>
@@ -94,6 +95,12 @@ function build_checklist_dialog_html(checklists) {
 							<span>${escaped_name}</span>
 						</button>
 						<a href="/app/checklist/${encodeURIComponent(row.name)}" target="_blank" class="ml-2 text-muted" title="${__("Open checklist")}">↗</a>
+					</td>
+
+					<td>
+						<span class="checklist-owner" data-checklist-name="${escaped_name}">
+							${escaped_owner}
+						</span>
 					</td>
 
 					<td>
@@ -119,7 +126,7 @@ function build_checklist_dialog_html(checklists) {
 					</td>
 				</tr>
 				<tr class="checklist-detail-row" data-checklist-name="${escaped_name}" style="display:none;">
-					<td colspan="3">
+					<td colspan="4">
 						<div class="checklist-items-container" data-checklist-name="${escaped_name}">
 							<div class="text-muted">${__("Click to load items")}</div>
 						</div>
@@ -135,6 +142,7 @@ function build_checklist_dialog_html(checklists) {
 				<thead>
 					<tr>
 						<th>${__("Checklist")}</th>
+						<th>${__("Owner")}</th>
 						<th>${__("Status")}</th>
 						<th>${__("Completion")}</th>
 					</tr>
