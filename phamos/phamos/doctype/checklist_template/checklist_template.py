@@ -13,7 +13,7 @@ class ChecklistTemplate(Document):
 
 
 @frappe.whitelist()
-def create_checklist_from_template(template_name, checklist_name=None, reference_record=None):
+def create_checklist_from_template(template_name, title=None, reference_record=None):
 	"""Snapshot template items into a new Checklist. Reference Record is optional."""
 	if not template_name:
 		frappe.throw(_("Checklist Template is required"))
@@ -27,9 +27,7 @@ def create_checklist_from_template(template_name, checklist_name=None, reference
 	if not template.checklist_template_items:
 		frappe.throw(_("Checklist Template has no items to copy"))
 
-	checklist_name = (checklist_name or "").strip() or template.name
-	if frappe.db.exists("Checklist", checklist_name):
-		frappe.throw(_("Checklist {0} already exists").format(checklist_name))
+	title = (title or "").strip() or template.title or template.name
 
 	reference_record = (reference_record or "").strip() or None
 	if reference_record:
@@ -43,7 +41,8 @@ def create_checklist_from_template(template_name, checklist_name=None, reference
 	checklist = frappe.get_doc(
 		{
 			"doctype": "Checklist",
-			"name": checklist_name,
+			"naming_series": "CHK-.####",
+			"title": title,
 			"document": template.document,
 			"reference_record": reference_record,
 			"checklist_template": template.name,

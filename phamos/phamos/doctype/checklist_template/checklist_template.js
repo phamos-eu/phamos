@@ -24,11 +24,11 @@ frappe.ui.form.on("Checklist Template", {
 function show_create_checklist_dialog(frm) {
 	const fields = [
 		{
-			fieldname: "checklist_name",
+			fieldname: "title",
 			fieldtype: "Data",
-			label: __("Checklist Name"),
+			label: __("Title"),
 			reqd: 1,
-			default: frm.doc.name,
+			default: frm.doc.title || frm.doc.name,
 		},
 		{
 			fieldname: "reference_record",
@@ -49,7 +49,7 @@ function show_create_checklist_dialog(frm) {
 					"phamos.phamos.doctype.checklist_template.checklist_template.create_checklist_from_template",
 				args: {
 					template_name: frm.doc.name,
-					checklist_name: values.checklist_name,
+					title: values.title,
 					reference_record: values.reference_record || null,
 				},
 				freeze: true,
