@@ -108,6 +108,7 @@ def get_checklist(name):
 				"name": row.name,
 				"idx": row.idx,
 				"done": cint(row.done),
+				"description": row.description or "",
 				"note": row.note or "",
 				"document": row.document,
 				"record": row.record,
@@ -239,6 +240,7 @@ def create_spa_checklist(document, reference_record, name=None, items=None):
 			"checklist_items",
 			{
 				"done": cint(item.get("done")),
+				"description": item.get("description") or "",
 				"note": item.get("note") or "",
 				"document": item.get("document") or None,
 				"record": item.get("record") or None,
@@ -264,6 +266,7 @@ def add_spa_checklist_item(checklist_name, values=None):
 		"checklist_items",
 		{
 			"done": cint(values.get("done")),
+			"description": values.get("description") or "",
 			"note": values.get("note") or "",
 			"document": values.get("document") or None,
 			"record": values.get("record") or None,
