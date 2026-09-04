@@ -8,6 +8,7 @@
  "field_order": [
   "document",
   "reference_record",
+  "checklist_template",
   "column_break_wvig",
   "status",
   "completion_percentage",
@@ -36,6 +37,13 @@
    "fieldtype": "Dynamic Link",
    "label": "Reference Record",
    "options": "document"
+  },
+  {
+   "fieldname": "checklist_template",
+   "fieldtype": "Link",
+   "label": "Checklist Template",
+   "options": "Checklist Template",
+   "read_only": 1
   },
   {
    "fieldname": "column_break_wvig",
