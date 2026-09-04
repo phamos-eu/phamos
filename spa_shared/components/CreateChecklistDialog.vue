@@ -51,6 +51,12 @@
 								</button>
 							</div>
 							<div class="space-y-2">
+								<input
+									v-model="row.description"
+									type="text"
+									class="w-full rounded-md border border-gray-300 px-3 py-2 text-sm"
+									placeholder="Short description"
+								/>
 								<textarea
 									v-model="row.note"
 									rows="2"
@@ -116,6 +122,7 @@ const error = ref("")
 function emptyRow() {
 	return {
 		id: nextId++,
+		description: "",
 		note: "",
 		document: "",
 		record: "",
@@ -146,11 +153,12 @@ function onDocumentChange(row, document) {
 function buildItems() {
 	return rows.value
 		.map((row) => ({
+			description: (row.description || "").trim(),
 			note: row.note.trim(),
 			document: row.document || null,
 			record: row.record || null,
 		}))
-		.filter((row) => row.note || row.document || row.record)
+		.filter((row) => row.description || row.note || row.document || row.record)
 }
 
 async function submit() {

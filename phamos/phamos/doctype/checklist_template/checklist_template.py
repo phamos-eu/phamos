@@ -53,6 +53,7 @@ def create_checklist_from_template(template_name, title=None, reference_record=N
 		checklist.append(
 			"checklist_items",
 			{
+				"description": item.description,
 				"note": item.note,
 				"document": item.document,
 				"record": item.record,

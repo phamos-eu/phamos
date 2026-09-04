@@ -9,6 +9,7 @@
 				<thead>
 					<tr class="border-b border-gray-200 text-left text-[11px] font-semibold uppercase tracking-wide text-gray-500">
 						<th class="w-12 px-2 py-2">Done</th>
+						<th class="min-w-[160px] px-2 py-2">Description</th>
 						<th class="min-w-[200px] px-2 py-2">Note</th>
 						<th class="w-40 px-2 py-2">Document</th>
 						<th class="w-44 px-2 py-2">Record</th>
@@ -28,6 +29,16 @@
 								:checked="!!item.done"
 								:disabled="savingItem === item.name"
 								@change="saveField(item, 'done', $event.target.checked ? 1 : 0, $event)"
+							/>
+						</td>
+						<td class="px-2 py-2">
+							<input
+								type="text"
+								class="w-full rounded-md border border-gray-300 px-2 py-1.5 text-sm"
+								:value="item.description || ''"
+								:disabled="savingItem === item.name"
+								placeholder="Short description"
+								@change="saveField(item, 'description', $event.target.value)"
 							/>
 						</td>
 						<td class="px-2 py-2">
