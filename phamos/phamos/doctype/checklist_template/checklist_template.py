@@ -13,30 +13,6 @@ class ChecklistTemplate(Document):
 
 
 @frappe.whitelist()
-@frappe.validate_and_sanitize_search_inputs
-def checklist_template_owner_query(doctype, txt, searchfield, start, page_len, filters):
-	"""Link search: enabled Users that have the Employee role."""
-	return frappe.db.sql(
-		"""
-		select distinct u.name, u.full_name
-		from `tabUser` u
-		inner join `tabHas Role` hr
-			on hr.parent = u.name and hr.parenttype = 'User'
-		where hr.role = 'Employee'
-			and u.enabled = 1
-			and u.name != 'Guest'
-			and (
-				u.name like %(txt)s
-				or ifnull(u.full_name, '') like %(txt)s
-			)
-		order by u.name
-		limit %(start)s, %(page_len)s
-		""",
-		{"txt": f"%{txt}%", "start": start, "page_len": page_len},
-	)
-
-
-@frappe.whitelist()
 def create_checklist_from_template(template_name, checklist_name=None, reference_record=None):
 	"""Snapshot template items into a new Checklist. Reference Record is optional."""
 	if not template_name:

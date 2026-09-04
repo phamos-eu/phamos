@@ -43,6 +43,7 @@
    "in_list_view": 1,
    "in_standard_filter": 1,
    "label": "Checklist Template Owner",
+   "link_filters": "[[\"User\",\"role\",\"=\",\"Employee\"]]",
    "options": "User",
    "reqd": 1
   },
