@@ -3,9 +3,10 @@ import IssuesHome from "@spa/views/IssuesHome.vue"
 import IssuesInbox from "@spa/views/IssuesInbox.vue"
 import TasksHome from "@spa/views/TasksHome.vue"
 import TasksInbox from "@spa/views/TasksInbox.vue"
+import ChecklistsInbox from "@spa/views/ChecklistsInbox.vue"
 import { session } from "@spa/session.js"
 
-/** Issues + Tasks routes shared by every department cockpit. */
+/** Issues + Tasks + Checklists routes shared by every department cockpit. */
 export const coreRoutes = [
 	{
 		path: "/issues",
@@ -37,6 +38,17 @@ export const coreRoutes = [
 		path: "/tasks/gantt/:name",
 		name: "TaskDetail",
 		component: TasksInbox,
+		props: true,
+	},
+	{
+		path: "/checklists",
+		name: "Checklists",
+		component: ChecklistsInbox,
+	},
+	{
+		path: "/checklists/:name",
+		name: "ChecklistDetail",
+		component: ChecklistsInbox,
 		props: true,
 	},
 ]
