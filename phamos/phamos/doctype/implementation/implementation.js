@@ -85,6 +85,7 @@ frappe.ui.form.on("Implementation", {
         }
         sort_resource_planning_by_month_desc(frm);
         setup_implementation_theme_watcher(frm);
+        frm.trigger("append_implementation_chapters_to_modules");
         frm.trigger("render_auto_email_reports_section");
         frm.trigger("render_gitlab_projects_section");
         frm.trigger("render_gitlab_issues_section");
@@ -574,8 +575,10 @@ frappe.ui.form.on("Implementation", {
 
         // Load Chart.js and render
         frappe.require("https://cdn.jsdelivr.net/npm/chart.js", function () {
-            render_module_chart(frm, 'radar-chart-1');
-            render_module_chart(frm, 'radar-chart-2');
+            load_module_chapter_titles(frm, () => {
+                render_module_chart(frm, 'radar-chart-1');
+                render_module_chart(frm, 'radar-chart-2');
+            });
         });
         // radar chart ends
             frappe.call({
@@ -1103,6 +1106,28 @@ frappe.ui.form.on("Implementation", {
             }
         });
     },
+    append_implementation_chapters_to_modules(frm) {
+        if (frm.is_new() || !frm.doc.name) return;
+        if (frm.__chapter_sync_in_progress) return;
+
+        frm.__chapter_sync_in_progress = true;
+
+        frappe.call({
+            method: "phamos.phamos.doctype.implementation.implementation.sync_modules_with_implementation_chapters",
+            args: {
+                name: frm.doc.name,
+            },
+            callback: (r) => {
+                const addedCount = cint(r.message?.added_count || 0);
+                if (addedCount > 0) {
+                    frm.reload_doc();
+                }
+            },
+            always: () => {
+                frm.__chapter_sync_in_progress = false;
+            }
+        });
+    },
     on_form_unload(frm) {
         if (frm.__implementation_theme_observer) {
             frm.__implementation_theme_observer.disconnect();
@@ -1156,17 +1181,60 @@ function populate_auto_email_reports(frm) {
             });
 
             frm.refresh_field("auto_email_report_record");
+            // Background reconciliation on load shouldn't mark the form as having unsaved changes.
+            frm.doc.__unsaved = 0;
+            frm.refresh_header();
         }
     });
 }
+function load_module_chapter_titles(frm, callback) {
+    const chapter_names = [
+        ...new Set(
+            (frm.doc.modules || [])
+                .map(row => (row.implementation_chapter || "").trim())
+                .filter(Boolean)
+        ),
+    ];
+
+    frm.__chapter_titles = frm.__chapter_titles || {};
+    const missing = chapter_names.filter(name => !(name in frm.__chapter_titles));
+
+    if (!missing.length) {
+        callback();
+        return;
+    }
+
+    frappe.call({
+        method: "frappe.client.get_list",
+        args: {
+            doctype: "Implementation Chapter",
+            filters: { name: ["in", missing] },
+            fields: ["name", "chapter_title"],
+            limit_page_length: 0,
+        },
+        callback: r => {
+            (r.message || []).forEach(chapter => {
+                frm.__chapter_titles[chapter.name] = chapter.chapter_title;
+            });
+            callback();
+        },
+    });
+}
+
 function render_module_chart(frm, canvasId) {
     const labels = [];
     const currentLevels = [];
     const targetLevels = [];
+    const chapter_titles = frm.__chapter_titles || {};
 
     (frm.doc.modules || []).forEach(row => {
         if (row.is_required) {
-            const baseLabel = (row.module_description || "").trim() || row.module;
+            const chapter_name = (row.implementation_chapter || "").trim();
+            const baseLabel =
+                (chapter_titles[chapter_name] || "").trim() ||
+                chapter_name ||
+                (row.module_description || "").trim() ||
+                row.module;
             let label = baseLabel;
 
             const duplicateCount = labels.filter(l => l.startsWith(baseLabel)).length;
@@ -1246,6 +1314,28 @@ function add_row_to_sales_order(frm) {
         callback: function (response) {
             const salesOrders = response.message?.sales_order_status_information || [];
 
+            const incoming = salesOrders.map(order => ({
+                sales_order: order.sales_order || "",
+                so_title: order.so_title || "",
+                total_hrs: order.total_hrs || 0,
+                status: order.status || "",
+                delivered_total_hrs: order.delivered_total_hrs || 0,
+                remaining_hrs: order.remaining_hrs || 0,
+            }));
+
+            const existing = (frm.doc.sales_order_status_information || []).map(row => ({
+                sales_order: row.sales_order || "",
+                so_title: row.so_title || "",
+                total_hrs: row.total_hrs || 0,
+                status: row.status || "",
+                delivered_total_hrs: row.delivered_total_hrs || 0,
+                remaining_hrs: row.remaining_hrs || 0,
+            }));
+
+            if (JSON.stringify(existing) === JSON.stringify(incoming)) {
+                return;
+            }
+
             frm.clear_table("sales_order_status_information");
 
             salesOrders.forEach(order => {
@@ -1259,6 +1349,9 @@ function add_row_to_sales_order(frm) {
             });
 
             frm.refresh_field("sales_order_status_information");
+            // Background reconciliation on refresh shouldn't mark the form as having unsaved changes.
+            frm.doc.__unsaved = 0;
+            frm.refresh_header();
         }
     });
 }
@@ -1305,12 +1398,14 @@ function setup_implementation_theme_watcher(frm) {
         const usePredictionFilter = !!(frm.doc.prediction_from_date || frm.doc.prediction_to_date);
         render_resource_planning_graph(frm, usePredictionFilter);
 
-        if (frm.fields_dict.module_chart?.$wrapper?.find("canvas").length) {
-            render_module_chart(frm, "radar-chart-1");
-        }
-        if (frm.fields_dict.modules_overview?.$wrapper?.find("canvas").length) {
-            render_module_chart(frm, "radar-chart-2");
-        }
+        load_module_chapter_titles(frm, () => {
+            if (frm.fields_dict.module_chart?.$wrapper?.find("canvas").length) {
+                render_module_chart(frm, "radar-chart-1");
+            }
+            if (frm.fields_dict.modules_overview?.$wrapper?.find("canvas").length) {
+                render_module_chart(frm, "radar-chart-2");
+            }
+        });
     };
 
     if (frm.__implementation_theme_observer) {
