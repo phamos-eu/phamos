@@ -32,4 +32,5 @@ phamos.patches.v1_0.remove_lead_handoff_improve_field
 phamos.patches.v1_0.remap_risk_register_entry_status
 phamos.patches.v1_0.backfill_gitlab_issue_touch_time  #123
 phamos.patches.v1_0.backfill_gitlab_issue_aging_days #123
+phamos.patches.v1_0.backfill_gitlab_cycle_start_label #123
 
