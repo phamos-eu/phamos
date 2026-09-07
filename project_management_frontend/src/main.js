@@ -1,5 +1,6 @@
 import "./main.css"
 
+import { syncThemeFromMediaPreference } from "@spa/theme.js"
 import { createApp } from "vue"
 import {
 	Button,
@@ -14,9 +15,10 @@ import {
 } from "frappe-ui"
 import App from "./App.vue"
 import router from "./router"
-import { session } from "./session"
+import { session } from "@spa/session.js"
 
 setConfig("resourceFetcher", frappeRequest)
+syncThemeFromMediaPreference()
 
 const app = createApp(App)
 app.use(FrappeUI)
