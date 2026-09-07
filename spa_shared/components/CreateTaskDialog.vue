@@ -1,7 +1,7 @@
 <template>
 	<Dialog
 		:options="{
-			title: 'New Issue',
+			title: 'New Task',
 			size: '3xl',
 			actions: [
 				{
@@ -28,17 +28,17 @@
 					type="text"
 					required
 					size="sm"
-					placeholder="e.g. Policy update for remote work"
+					placeholder="e.g. Prepare onboarding checklist"
 				/>
 
-				<div class="w-full">
+				<div>
 					<label class="mb-1.5 block text-xs text-ink-gray-5">Description</label>
 					<TextEditor
 						v-if="modelValue"
 						:content="description"
 						:fixed-menu="editorMenu"
-						placeholder="What needs to be discussed or resolved?"
-						editor-class="prose-sm dark:prose-invert max-w-none w-full min-h-[140px] max-h-[280px] overflow-y-auto px-3 py-2 border border-t-0 border-gray-300 rounded-b-lg bg-white dark:border-gray-600 dark:bg-gray-800"
+						placeholder="What needs to be done?"
+						editor-class="prose-sm dark:prose-invert min-h-[140px] max-h-[280px] overflow-y-auto px-3 py-2 border border-gray-300 rounded-lg bg-white dark:border-gray-600 dark:bg-gray-800"
 						@change="(html) => (description = html)"
 					/>
 				</div>
@@ -52,32 +52,21 @@
 						:options="priorityOptions"
 					/>
 					<FormControl
-						v-model="issueType"
-						label="Issue Type"
-						type="select"
-						size="sm"
-						:options="issueTypeOptions"
-					/>
-					<FormControl
-						v-model="department"
-						label="Department"
-						type="select"
-						size="sm"
-						:options="departmentOptions"
-					/>
-					<FormControl
 						v-model="project"
 						label="Project"
 						type="select"
 						size="sm"
 						:options="projectOptions"
 					/>
+					<div>
+						<label class="mb-1.5 block text-xs text-ink-gray-5">Expected start</label>
+						<DatePicker v-model="expStartDate" placeholder="Start date" class="w-full" />
+					</div>
+					<div>
+						<label class="mb-1.5 block text-xs text-ink-gray-5">Expected end</label>
+						<DatePicker v-model="expEndDate" placeholder="End date" class="w-full" />
+					</div>
 				</div>
-
-				<AssigneePicker
-					v-model="assignTo"
-					:shortlist-users="options.shortlist_users || []"
-				/>
 				<ErrorMessage :message="error" />
 			</div>
 		</template>
@@ -86,8 +75,7 @@
 
 <script setup>
 import { computed, ref, watch } from "vue"
-import { call, TextEditor } from "frappe-ui"
-import AssigneePicker from "@spa/components/AssigneePicker.vue"
+import { call, DatePicker, TextEditor } from "frappe-ui"
 import spaConfig from "@/config"
 
 const props = defineProps({
@@ -96,9 +84,6 @@ const props = defineProps({
 		type: Object,
 		default: () => ({
 			priorities: [],
-			issue_types: [],
-			shortlist_users: [],
-			departments: [],
 			projects: [],
 		}),
 	},
@@ -118,33 +103,20 @@ const editorMenu = [
 	"Separator",
 	"Bullet List",
 	"Numbered List",
-	"Separator",
-	"Image",
 ]
 
 const subject = ref("")
 const description = ref("")
 const priority = ref("")
-const issueType = ref("")
-const department = ref("")
 const project = ref("")
-const assignTo = ref([])
+const expStartDate = ref("")
+const expEndDate = ref("")
 const saving = ref(false)
 const error = ref("")
 
 const priorityOptions = computed(() => [
 	{ label: "—", value: "" },
 	...(props.options.priorities || []).map((p) => ({ label: p, value: p })),
-])
-
-const issueTypeOptions = computed(() => [
-	{ label: "—", value: "" },
-	...(props.options.issue_types || []).map((t) => ({ label: t, value: t })),
-])
-
-const departmentOptions = computed(() => [
-	{ label: "—", value: "" },
-	...(props.options.departments || []).map((d) => ({ label: d, value: d })),
 ])
 
 const projectOptions = computed(() => [
@@ -161,11 +133,9 @@ watch(
 		if (!open) return
 		subject.value = ""
 		description.value = ""
-		issueType.value = ""
-		assignTo.value = []
+		expStartDate.value = ""
+		expEndDate.value = ""
 		error.value = ""
-		department.value =
-			props.options[spaConfig.departmentField] || props.options.departments?.[0] || ""
 		project.value =
 			props.options[spaConfig.projectField] || props.options.projects?.[0]?.name || ""
 		const priorities = props.options.priorities || []
@@ -191,18 +161,17 @@ async function submit() {
 	}
 	saving.value = true
 	try {
-		const issue = await call(`${API}.create_issue`, {
+		const task = await call(`${API}.create_task`, {
 			subject: subject.value.trim(),
 			description: isEmptyHtml(description.value) ? "" : description.value,
 			priority: priority.value || null,
-			issue_type: issueType.value || null,
-			department: department.value || null,
 			project: project.value || null,
-			assign_to: assignTo.value,
+			exp_start_date: expStartDate.value || null,
+			exp_end_date: expEndDate.value || null,
 		})
-		emit("created", issue)
+		emit("created", task)
 	} catch (e) {
-		error.value = e?.messages?.[0] || e?.message || "Could not create issue"
+		error.value = e?.messages?.[0] || e?.message || "Could not create task"
 	} finally {
 		saving.value = false
 	}

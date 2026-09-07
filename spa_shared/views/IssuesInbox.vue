@@ -1,146 +1,104 @@
 <template>
 	<div class="flex h-full min-h-0">
 		<section
-			class="flex min-w-0 flex-col border-r border-gray-200 bg-white dark:border-gray-800 dark:bg-gray-900"
-			:class="selectedName ? 'w-1/3 flex-none' : 'flex-1'"
+			v-if="!selectedName"
+			class="order-1 flex min-w-0 flex-1 flex-col border-r border-gray-200 bg-white dark:border-gray-800 dark:bg-gray-900"
 		>
 			<div
 				class="flex flex-wrap items-center justify-between gap-3 border-b border-gray-200 px-5 py-3 dark:border-gray-800"
 			>
-				<div class="flex flex-wrap items-center gap-3">
-					<div class="inline-flex rounded-lg bg-gray-100 p-1 dark:bg-gray-800">
-						<button
-							v-for="tab in tabs"
-							:key="tab.id"
-							class="rounded-md px-3 py-1.5 text-sm font-medium transition"
-							:class="
-								view === tab.id
-									? 'bg-white text-gray-900 shadow-sm dark:bg-gray-900 dark:text-gray-100'
-									: 'text-gray-600 hover:text-gray-900 dark:text-gray-400 dark:hover:text-gray-100'
-							"
-							@click="view = tab.id"
-						>
-							{{ tab.label }}
-						</button>
-					</div>
-					<div class="inline-flex rounded-lg border border-gray-200 p-0.5 dark:border-gray-700">
-						<button
-							v-for="opt in layouts"
-							:key="opt.id"
-							class="rounded-md px-2.5 py-1 text-xs font-medium transition"
-							:class="
-								layout === opt.id
-									? 'bg-gray-900 text-white dark:bg-gray-100 dark:text-gray-900'
-									: 'text-gray-600 hover:bg-gray-50 hover:text-gray-900 dark:text-gray-400 dark:hover:bg-gray-800 dark:hover:text-gray-100'
-							"
-							@click="setLayout(opt.id)"
-						>
-							{{ opt.label }}
-						</button>
-					</div>
-				</div>
-				<div class="flex items-center gap-3">
-					<label class="flex items-center gap-2 text-sm text-gray-600 dark:text-gray-400">
-						<input v-model="includeClosed" type="checkbox" class="rounded border-gray-300 dark:border-gray-600" />
-						Show closed
-					</label>
-					<input
-						v-model="search"
-						type="search"
-						placeholder="Search…"
-						class="h-8 w-44 rounded-md border border-gray-300 bg-white px-2 text-sm dark:border-gray-600 dark:bg-gray-800 dark:text-gray-200"
+				<div class="flex flex-wrap items-center gap-x-8 gap-y-3">
+					<FormControl v-model="search" type="text" size="sm" placeholder="Search…" class="w-44" />
+					<StatusFilter v-model="statusFilter" />
+					<PriorityFilter v-model="priorityFilter" :priorities="formOptions.priorities || []" />
+					<ListSortSelector
+						v-model:sort-by="sortBy"
+						v-model:sort-order="sortOrder"
+						:options="sortFieldOptions"
 					/>
-					<Button variant="solid" @click="showCreate = true">New Issue</Button>
 				</div>
+				<Button variant="solid" @click="showCreate = true">New Issue</Button>
 			</div>
 
-			<div v-if="configError" class="flex flex-1 items-center justify-center px-6 text-center text-sm text-red-600 dark:text-red-400">
+			<div
+				v-if="configError"
+				class="flex flex-1 items-center justify-center px-6 text-center text-sm text-red-600 dark:text-red-400"
+			>
 				{{ configError }}
 			</div>
-			<div v-else-if="loading" class="flex flex-1 items-center justify-center text-sm text-gray-500 dark:text-gray-400">
+			<div
+				v-else-if="loading"
+				class="flex flex-1 items-center justify-center text-sm text-gray-500 dark:text-gray-400"
+			>
 				Loading…
 			</div>
-			<template v-else-if="!filteredIssues.length && layout === 'list'">
+			<template v-else-if="!filteredIssues.length">
 				<div class="flex flex-1 flex-col items-center justify-center gap-2 px-6 text-center">
-					<template v-if="view === 'assigned'">
-						<p class="font-medium text-gray-900 dark:text-gray-100">Nothing assigned to you</p>
-						<p class="max-w-sm text-sm text-gray-500 dark:text-gray-400">
-							When someone assigns a {{ spaConfig.label }} issue to you, it will show up here.
-						</p>
-					</template>
-					<template v-else>
-						<p class="font-medium text-gray-900 dark:text-gray-100">You have not created any issues yet</p>
-						<p class="max-w-sm text-sm text-gray-500 dark:text-gray-400">
-							Capture a {{ spaConfig.label }} topic or follow-up with New Issue.
-						</p>
-						<Button class="mt-2" @click="showCreate = true">Create an issue</Button>
-					</template>
+					<p class="font-medium text-gray-900 dark:text-gray-100">No {{ spaConfig.label }} issues found</p>
+					<p class="max-w-sm text-sm text-gray-500 dark:text-gray-400">
+						Issues linked to the {{ spaConfig.label }} department configured in phamos Settings will appear
+						here.
+					</p>
+					<Button class="mt-2" @click="showCreate = true">Create an issue</Button>
 				</div>
 			</template>
+			<!-- List-only inbox (Kanban/Calendar deferred). -->
 			<IssueList
-				v-else-if="layout === 'list'"
-				:issues="filteredIssues"
-				:selected-name="selectedName"
-				:show-creator="view === 'assigned'"
-				@select="openIssue"
-			/>
-			<IssueKanban
-				v-else-if="layout === 'kanban'"
-				:issues="filteredIssues"
-				:selected-name="selectedName"
-				@select="openIssue"
-				@status-change="onKanbanStatusChange"
-			/>
-			<IssueCalendar
 				v-else
 				:issues="filteredIssues"
 				:selected-name="selectedName"
+				show-creator
 				@select="openIssue"
 			/>
 		</section>
 
+		<!-- Host first in DOM so Teleport target exists before IssueDetail mounts; order keeps it far right. -->
 		<aside
 			v-if="selectedName"
-			class="flex w-2/3 min-w-0 flex-none flex-col bg-white dark:bg-gray-900 md:flex-row"
+			id="issue-properties-host"
+			class="order-4 flex w-72 flex-none flex-col overflow-hidden border-l border-gray-200 bg-gray-50/80 dark:border-gray-800 dark:bg-gray-950/40"
+		/>
+
+		<aside
+			v-if="selectedName"
+			class="order-2 flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden border-r border-gray-200 bg-white dark:border-gray-800 dark:bg-gray-900"
 		>
 			<div
-				class="flex min-h-0 min-w-0 flex-1 flex-col overflow-y-auto"
-				:class="{ 'md:border-r md:border-gray-200 dark:md:border-gray-800': showChatColumn }"
+				v-if="detailLoading && !selectedIssue"
+				class="flex flex-1 items-center justify-center text-sm text-gray-500 dark:text-gray-400"
 			>
-				<div
-					v-if="detailLoading && !selectedIssue"
-					class="flex flex-1 items-center justify-center text-sm text-gray-500 dark:text-gray-400"
-				>
-					Loading…
-				</div>
-				<IssueDetail
-					v-else-if="selectedIssue"
-					:issue="selectedIssue"
-					:options="formOptions"
-					:api-prefix="API"
-					@close="closeIssue"
-					@updated="onIssueUpdated"
-				/>
+				Loading…
 			</div>
-
-			<div
-				v-if="showChatColumn && selectedIssue"
-				class="flex min-h-[280px] min-w-0 flex-1 flex-col border-t border-gray-200 dark:border-gray-800 md:min-h-0 md:border-l md:border-t-0"
-			>
-				<IssueChat
-					:document-name="selectedIssue.name"
-					linked-doctype="Issue"
-					:chat-flags="chatFlags"
-					:api-prefix="API"
-				/>
-			</div>
+			<IssueDetail
+				v-else-if="selectedIssue"
+				:issue="selectedIssue"
+				:options="formOptions"
+				:api-prefix="API"
+				@close="closeIssue"
+				@updated="onIssueUpdated"
+			/>
 		</aside>
 
-		<CreateIssueDialog
-			v-model="showCreate"
-			:options="formOptions"
-			@created="onCreated"
-		/>
+		<aside
+			v-if="selectedName"
+			class="order-3 flex min-w-0 flex-1 flex-col overflow-y-auto border-r border-gray-200 bg-white px-5 py-4 dark:border-gray-800 dark:bg-gray-900"
+		>
+			<div
+				v-if="detailLoading && !selectedIssue"
+				class="flex flex-1 items-center justify-center text-sm text-gray-500 dark:text-gray-400"
+			>
+				Loading checklists…
+			</div>
+			<LinkedChecklistsSection
+				v-else-if="selectedIssue"
+				:key="selectedIssue.name"
+				document="Issue"
+				:reference-record="selectedIssue.name"
+				:reference-title="selectedIssue.subject"
+			/>
+		</aside>
+
+		<CreateIssueDialog v-model="showCreate" :options="formOptions" @created="onCreated" />
 	</div>
 </template>
 
@@ -148,33 +106,30 @@
 import { computed, onMounted, ref, watch } from "vue"
 import { useRoute, useRouter } from "vue-router"
 import { call } from "frappe-ui"
-import IssueCalendar from "@spa/components/IssueCalendar.vue"
-import IssueChat from "@spa/components/IssueChat.vue"
 import IssueDetail from "@spa/components/IssueDetail.vue"
-import IssueKanban from "@spa/components/IssueKanban.vue"
 import IssueList from "@spa/components/IssueList.vue"
 import CreateIssueDialog from "@spa/components/CreateIssueDialog.vue"
+import LinkedChecklistsSection from "@spa/components/LinkedChecklistsSection.vue"
+import ListSortSelector from "@spa/components/ListSortSelector.vue"
+import PriorityFilter from "@spa/components/PriorityFilter.vue"
+import StatusFilter from "@spa/components/StatusFilter.vue"
 import spaConfig from "@/config"
 
 const API = spaConfig.api
-const LAYOUT_KEY = `${spaConfig.slug}-spa-issues-layout`
-const tabs = [
-	{ id: "assigned", label: "Assigned to me" },
-	{ id: "created", label: "Created by me" },
-]
-const layouts = [
-	{ id: "list", label: "List" },
-	{ id: "kanban", label: "Kanban" },
-	{ id: "calendar", label: "Calendar" },
-]
 
 const route = useRoute()
 const router = useRouter()
 
-const view = ref("assigned")
-const layout = ref(loadLayout())
-const includeClosed = ref(false)
 const search = ref("")
+const priorityFilter = ref([])
+const statusFilter = ref([])
+// Desk Issue list defaults: sort_field=modified, sort_order=DESC
+const sortBy = ref("modified")
+const sortOrder = ref("desc")
+const sortFieldOptions = [
+	{ label: "Last Updated", value: "modified" },
+	{ label: "Created On", value: "creation" },
+]
 const loading = ref(false)
 const configError = ref("")
 const issues = ref([])
@@ -185,43 +140,58 @@ const detailLoading = ref(false)
 const formOptions = ref({
 	priorities: [],
 	issue_types: [],
-	users: [],
+	shortlist_users: [],
 	departments: [],
 	projects: [],
-	chat: { raven_installed: false, enabled: false, raven_unavailable: true },
 })
 
-const chatFlags = computed(() => formOptions.value.chat || {})
-const showChatColumn = computed(() => !!chatFlags.value.raven_installed)
+function compareIssues(a, b) {
+	const field = sortBy.value === "creation" ? "creation" : "modified"
+	const cmp = String(a[field] || "").localeCompare(String(b[field] || ""))
+	return sortOrder.value === "desc" ? -cmp : cmp
+}
+
+function stripHtml(value) {
+	return String(value || "")
+		.replace(/<[^>]*>/g, " ")
+		.replace(/\s+/g, " ")
+		.trim()
+}
+
+function issueMatchesSearch(issue, q) {
+	const fields = [
+		issue.subject,
+		issue.name,
+		issue.priority,
+		issue.issue_type,
+		issue.owner_name,
+		issue.description,
+		issue.checklist_search,
+		...(issue.assignee_names || []),
+	]
+	return fields
+		.filter(Boolean)
+		.some((v) => stripHtml(v).toLowerCase().includes(q))
+}
 
 const filteredIssues = computed(() => {
 	const q = search.value.trim().toLowerCase()
-	if (!q) return issues.value
-	return issues.value.filter((i) =>
-		[i.subject, i.name, i.priority, i.issue_type, i.owner_name, ...(i.assignee_names || [])]
-			.filter(Boolean)
-			.some((v) => String(v).toLowerCase().includes(q))
-	)
+	const priorities = priorityFilter.value
+	const statuses = statusFilter.value
+	let list = issues.value
+	if (priorities.length) {
+		const allowed = new Set(priorities)
+		list = list.filter((i) => allowed.has(i.priority))
+	}
+	if (statuses.length) {
+		const allowed = new Set(statuses)
+		list = list.filter((i) => allowed.has(i.status))
+	}
+	if (q) {
+		list = list.filter((i) => issueMatchesSearch(i, q))
+	}
+	return [...list].sort(compareIssues)
 })
-
-function loadLayout() {
-	try {
-		const stored = localStorage.getItem(LAYOUT_KEY)
-		if (["list", "kanban", "calendar"].includes(stored)) return stored
-	} catch (e) {
-		/* ignore */
-	}
-	return "list"
-}
-
-function setLayout(id) {
-	layout.value = id
-	try {
-		localStorage.setItem(LAYOUT_KEY, id)
-	} catch (e) {
-		/* ignore */
-	}
-}
 
 async function loadOptions() {
 	try {
@@ -236,10 +206,8 @@ async function loadInbox() {
 	if (configError.value) return
 	loading.value = true
 	try {
-		issues.value = await call(`${API}.get_inbox`, {
-			view: view.value,
-			include_closed: includeClosed.value ? 1 : 0,
-		})
+		// Always include closed so StatusFilter can toggle Closed client-side.
+		issues.value = await call(`${API}.get_issues`, { include_closed: 1 })
 	} catch (e) {
 		configError.value = e?.messages?.[0] || e?.message || "Could not load issues"
 	} finally {
@@ -263,7 +231,7 @@ async function openIssue(name) {
 function closeIssue() {
 	selectedName.value = null
 	selectedIssue.value = null
-	router.replace({ name: "Issues" })
+	router.replace({ name: "IssuesList" })
 }
 
 async function onCreated(issue) {
@@ -276,22 +244,6 @@ async function onIssueUpdated(issue) {
 	selectedIssue.value = issue
 	await loadInbox()
 }
-
-async function onKanbanStatusChange({ name, status }) {
-	try {
-		const updated = await call(`${API}.update_status`, { name, status })
-		await loadInbox()
-		if (selectedName.value === name) {
-			selectedIssue.value = updated
-		}
-	} catch (e) {
-		await loadInbox()
-	}
-}
-
-watch([view, includeClosed], () => {
-	loadInbox()
-})
 
 watch(
 	() => route.params.name,

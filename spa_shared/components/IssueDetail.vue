@@ -1,170 +1,375 @@
 <template>
 	<div class="flex h-full min-h-0 flex-col overflow-y-auto p-5 text-gray-900 dark:text-gray-100">
-		<header class="mb-4 flex items-start justify-between gap-3">
-			<div>
-				<div class="text-xs font-semibold text-gray-500 dark:text-gray-400">{{ issue.name }}</div>
-				<h2 class="mt-1 text-lg font-semibold leading-snug text-gray-900 dark:text-gray-100">
-					{{ issue.subject }}
-				</h2>
+		<section class="flex min-h-[50%] flex-1 flex-col">
+			<label class="mb-1.5 block flex-shrink-0 text-xs text-ink-gray-5">Description</label>
+			<div class="relative min-h-0 flex-1">
+				<TextEditor
+					class="absolute inset-0 flex flex-col overflow-hidden [&_.ProseMirror]:min-h-0 [&_.ProseMirror]:flex-1 [&_.ProseMirror]:overflow-y-auto"
+					:content="description"
+					:fixed-menu="editorMenu"
+					placeholder="What needs to be discussed or resolved?"
+					editor-class="prose-sm dark:prose-invert max-w-none w-full h-full px-3 py-2 border border-t-0 border-gray-300 rounded-b-lg bg-white dark:border-gray-600 dark:bg-gray-800"
+					@change="(html) => (description = html)"
+				/>
 			</div>
-			<button
-				class="rounded-md px-2 py-1 text-xl leading-none text-gray-500 hover:bg-gray-100 dark:text-gray-400 dark:hover:bg-gray-800"
-				title="Close"
-				@click="emit('close')"
-			>
-				×
-			</button>
-		</header>
-
-		<section class="mb-5">
-			<div class="mb-2 text-[11px] font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400">
-				Status
-			</div>
-			<div class="flex flex-wrap gap-2">
-				<button
-					v-for="s in statuses"
-					:key="s"
-					type="button"
-					class="rounded-md border px-2.5 py-1 text-xs font-medium"
-					:class="
-						status === s
-							? 'border-gray-900 bg-gray-900 text-white dark:border-gray-100 dark:bg-gray-100 dark:text-gray-900'
-							: 'border-gray-200 bg-white text-gray-700 hover:bg-gray-50 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-300 dark:hover:bg-gray-800'
-					"
-					:disabled="savingStatus"
-					@click="changeStatus(s)"
-				>
-					{{ s }}
-				</button>
-			</div>
-			<button
-				v-if="status === 'Closed'"
-				type="button"
-				class="mt-2 text-xs text-blue-600 hover:underline dark:text-blue-400"
-				:disabled="savingStatus"
-				@click="changeStatus('Open')"
-			>
-				Reopen
-			</button>
+			<ErrorMessage class="mt-2 flex-shrink-0" :message="fieldError" />
 		</section>
-
-		<section class="mb-5 grid grid-cols-2 gap-3 text-sm sm:grid-cols-3">
-			<div>
-				<div class="mb-1 text-[11px] font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400">
-					Priority
-				</div>
-				<div>{{ issue.priority || "—" }}</div>
-			</div>
-			<div>
-				<div class="mb-1 text-[11px] font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400">
-					Issue Type
-				</div>
-				<div>{{ issue.issue_type || "—" }}</div>
-			</div>
-			<div>
-				<div class="mb-1 text-[11px] font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400">
-					Created by
-				</div>
-				<div>{{ issue.owner_name || issue.owner }}</div>
-			</div>
-			<div>
-				<div class="mb-1 text-[11px] font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400">
-					Department
-				</div>
-				<div>{{ issue.department || "—" }}</div>
-			</div>
-			<div>
-				<div class="mb-1 text-[11px] font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400">
-					Project
-				</div>
-				<div>{{ issue.project || "—" }}</div>
-			</div>
-		</section>
-
-		<section class="mb-5">
-			<div class="mb-2 text-[11px] font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400">
-				Description
-			</div>
-			<div
-				v-if="issue.description"
-				class="prose prose-sm dark:prose-invert max-w-none text-sm text-gray-800 [&_img]:max-w-full [&_img]:rounded-md"
-				v-html="issue.description"
-			></div>
-			<div v-else class="text-sm text-gray-500 dark:text-gray-400">No description</div>
-		</section>
-
-		<LinkedChecklistsSection
-			document="Issue"
-			:reference-record="issue.name"
-			:reference-title="issue.subject"
-		/>
-
-		<section class="mb-5">
-			<div class="mb-2 text-[11px] font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400">
-				Assignees
-			</div>
-			<div class="mb-3 max-h-48 overflow-y-auto rounded-md border border-gray-200 p-1 dark:border-gray-700">
-				<label
-					v-for="u in options.users"
-					:key="u.name"
-					class="flex cursor-pointer items-center gap-2 rounded px-2 py-1.5 text-sm hover:bg-gray-50 dark:hover:bg-gray-800"
-				>
-					<input
-						type="checkbox"
-						:checked="assignees.includes(u.name)"
-						@change="toggleUser(u.name)"
-					/>
-					<span>{{ u.full_name }}</span>
-				</label>
-			</div>
-			<Button :loading="savingAssignees" @click="saveAssignees">Save assignees</Button>
-		</section>
-
-		<footer class="mt-auto border-t border-gray-200 pt-4 dark:border-gray-800">
-			<a
-				:href="issue.desk_url"
-				class="inline-flex rounded-md border border-gray-200 px-3 py-1.5 text-sm text-gray-700 hover:bg-gray-50 dark:border-gray-700 dark:text-gray-300 dark:hover:bg-gray-800"
-			>
-				Open in Desk
-			</a>
-		</footer>
 	</div>
+
+	<Teleport v-if="chromeHostReady" to="#cockpit-page-chrome">
+		<div class="flex min-w-0 items-center gap-0 pr-3 text-base tracking-tight">
+			<span class="flex-shrink-0 font-normal text-gray-500 dark:text-gray-400">{{ issue.name }}:</span>
+			<input
+				v-if="editingSubject"
+				ref="subjectInput"
+				v-model="subject"
+				type="text"
+				class="ml-1.5 min-w-0 flex-1 border-0 bg-transparent p-0 font-bold tracking-tight text-gray-900 outline-none ring-0 focus:ring-0 dark:text-gray-100"
+				placeholder="Subject"
+				@keydown.enter.prevent="finishEditSubject"
+				@keydown.escape.prevent="cancelEditSubject"
+				@blur="finishEditSubject"
+			/>
+			<button
+				v-else
+				type="button"
+				class="ml-1.5 min-w-0 flex-1 truncate rounded-sm text-left font-bold text-gray-900 hover:bg-gray-50 dark:text-gray-100 dark:hover:bg-gray-800/60"
+				@click="startEditSubject"
+			>
+				{{ subject.trim() || "Untitled" }}
+			</button>
+		</div>
+	</Teleport>
+
+	<Teleport v-if="propertiesHostReady" to="#issue-properties-host">
+		<div class="flex h-full min-h-0 flex-col bg-gray-50/80 dark:bg-gray-950/40">
+			<div class="flex min-h-0 flex-1 flex-col gap-5 overflow-y-auto p-4">
+				<section>
+					<div class="mb-2 text-[11px] font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400">
+						Status
+					</div>
+					<div class="flex flex-wrap items-center gap-2.5">
+						<button
+							v-for="s in statuses"
+							:key="s"
+							type="button"
+							class="rounded-full disabled:opacity-50"
+							:class="
+								status === s
+									? 'origin-center scale-[1.2] z-[1]'
+									: 'opacity-70 hover:opacity-100'
+							"
+							:disabled="savingStatus"
+							@click="changeStatus(s)"
+						>
+							<span
+								v-if="status === s"
+								class="inline-flex h-5 items-center rounded-full px-1.5 text-xs font-semibold"
+								:class="statusStrongClass(s)"
+							>
+								{{ s }}
+							</span>
+							<Badge
+								v-else
+								:label="s"
+								:theme="statusTheme(s)"
+								size="sm"
+								variant="subtle"
+							/>
+						</button>
+					</div>
+					<Button
+						v-if="status === 'Closed'"
+						class="mt-2"
+						variant="ghost"
+						size="sm"
+						:disabled="savingStatus"
+						@click="changeStatus('Open')"
+					>
+						Reopen
+					</Button>
+				</section>
+
+				<section class="space-y-3">
+					<FormControl
+						v-model="priority"
+						label="Priority"
+						type="select"
+						size="sm"
+						:options="priorityOptions"
+					/>
+					<FormControl
+						v-model="issueType"
+						label="Issue Type"
+						type="select"
+						size="sm"
+						:options="issueTypeOptions"
+					/>
+					<FormControl
+						v-model="project"
+						label="Project"
+						type="select"
+						size="sm"
+						:options="projectOptions"
+					/>
+				</section>
+
+				<section>
+					<AssigneePicker
+						v-model="assignees"
+						:assignee-details="assigneeDetails"
+						:shortlist-users="options.shortlist_users || []"
+						:api-prefix="API"
+						:document-name="issue.name"
+						method-name="set_assignees"
+						@updated="onAssigneesUpdated"
+					/>
+				</section>
+			</div>
+
+			<div class="mt-auto flex-shrink-0 space-y-2 border-t border-gray-200 p-4 dark:border-gray-800">
+				<p class="text-xs text-gray-500 dark:text-gray-400">
+					Created by {{ issue.owner_name || issue.owner }}
+					<span v-if="issue.department"> · {{ issue.department }}</span>
+				</p>
+				<a
+					:href="issue.desk_url"
+					class="flex w-full items-center gap-2 rounded-md px-2 py-2 text-sm font-medium text-gray-600 hover:bg-gray-100 hover:text-gray-900 dark:text-gray-400 dark:hover:bg-gray-800 dark:hover:text-gray-100"
+				>
+					<FeatherIcon name="external-link" class="h-4 w-4 flex-shrink-0" />
+					<span class="truncate">Open in Desk</span>
+				</a>
+			</div>
+		</div>
+	</Teleport>
 </template>
 
 <script setup>
-import { computed, ref, watch } from "vue"
-import { call } from "frappe-ui"
-import LinkedChecklistsSection from "@spa/components/LinkedChecklistsSection.vue"
+import { computed, nextTick, onMounted, onBeforeUnmount, ref, watch } from "vue"
+import { call, debounce, TextEditor, toast, Badge } from "frappe-ui"
+import AssigneePicker from "@spa/components/AssigneePicker.vue"
+import { setPageChromeActive } from "@spa/pageChrome.js"
+import spaConfig from "@/config"
 
 const props = defineProps({
 	issue: { type: Object, required: true },
 	options: {
 		type: Object,
-		default: () => ({ priorities: [], issue_types: [], users: [], chat: {} }),
+		default: () => ({
+			priorities: [],
+			issue_types: [],
+			shortlist_users: [],
+			projects: [],
+		}),
 	},
 	apiPrefix: {
 		type: String,
-		default: "phamos.api.i_own_my_work",
+		default: "",
 	},
 })
 
 const emit = defineEmits(["close", "updated"])
 
-const API = computed(() => props.apiPrefix || "phamos.api.i_own_my_work")
-const statuses = ["Open", "On Hold", "Resolved", "Closed"]
+const API = computed(() => props.apiPrefix || spaConfig.api)
+const propertiesHostReady = ref(false)
+const chromeHostReady = ref(false)
+const editorMenu = [
+	"Paragraph",
+	"Heading 2",
+	"Heading 3",
+	"Separator",
+	"Bold",
+	"Italic",
+	"Link",
+	"Separator",
+	"Bullet List",
+	"Numbered List",
+	"Separator",
+	"Image",
+]
+const statuses = ["Open", "Replied", "On Hold", "Resolved", "Closed"]
+
+function statusTheme(status) {
+	const map = {
+		Open: "red",
+		Replied: "blue",
+		"On Hold": "orange",
+		Resolved: "green",
+		Closed: "gray",
+	}
+	return map[status] || "blue"
+}
+
+function statusStrongClass(status) {
+	const map = {
+		Open: "bg-red-600 text-white dark:bg-red-500",
+		Replied: "bg-blue-600 text-white dark:bg-blue-500",
+		"On Hold": "bg-amber-500 text-white dark:bg-amber-500",
+		Resolved: "bg-green-600 text-white dark:bg-green-500",
+		Closed: "bg-gray-700 text-white dark:bg-gray-500",
+	}
+	return map[status] || "bg-blue-600 text-white dark:bg-blue-500"
+}
+
 const status = ref(props.issue.status)
+const subject = ref(props.issue.subject || "")
+const description = ref(props.issue.description || "")
+const priority = ref(props.issue.priority || "")
+const issueType = ref(props.issue.issue_type || "")
+const project = ref(props.issue.project || "")
 const assignees = ref([...(props.issue.assignees || [])])
 const savingStatus = ref(false)
-const savingAssignees = ref(false)
+const savingFields = ref(false)
+const fieldError = ref("")
+const syncing = ref(false)
+const editingSubject = ref(false)
+const subjectInput = ref(null)
+const subjectBeforeEdit = ref("")
+
+async function startEditSubject() {
+	subjectBeforeEdit.value = subject.value
+	editingSubject.value = true
+	await nextTick()
+	subjectInput.value?.focus?.()
+}
+
+function finishEditSubject() {
+	if (!editingSubject.value) return
+	editingSubject.value = false
+	if (!subject.value.trim()) {
+		subject.value = subjectBeforeEdit.value || props.issue.subject || ""
+	}
+}
+
+function cancelEditSubject() {
+	subject.value = subjectBeforeEdit.value
+	editingSubject.value = false
+}
+
+const assigneeDetails = computed(() => {
+	const names = props.issue.assignees || []
+	const labels = props.issue.assignee_names || []
+	const images = props.issue.assignee_images || []
+	return names.map((name, i) => ({
+		name,
+		full_name: labels[i] || name,
+		user_image: images[i] || "",
+	}))
+})
+
+const priorityOptions = computed(() => [
+	{ label: "—", value: "" },
+	...(props.options.priorities || []).map((p) => ({ label: p, value: p })),
+])
+
+const issueTypeOptions = computed(() => [
+	{ label: "—", value: "" },
+	...(props.options.issue_types || []).map((t) => ({ label: t, value: t })),
+])
+
+const projectOptions = computed(() => [
+	{ label: "—", value: "" },
+	...(props.options.projects || []).map((p) => ({
+		label: p.project_name || p.name,
+		value: p.name,
+	})),
+])
+
+async function syncPropertiesHost() {
+	await nextTick()
+	propertiesHostReady.value = !!document.getElementById("issue-properties-host")
+	chromeHostReady.value = !!document.getElementById("cockpit-page-chrome")
+	if (chromeHostReady.value) setPageChromeActive(true)
+}
+
+onMounted(syncPropertiesHost)
+
+onBeforeUnmount(() => {
+	setPageChromeActive(false)
+})
 
 watch(
 	() => props.issue,
 	(issue) => {
+		syncing.value = true
 		status.value = issue.status
+		subject.value = issue.subject || ""
+		description.value = issue.description || ""
+		priority.value = issue.priority || ""
+		issueType.value = issue.issue_type || ""
+		project.value = issue.project || ""
 		assignees.value = [...(issue.assignees || [])]
+		fieldError.value = ""
+		editingSubject.value = false
+		nextTick(() => {
+			syncing.value = false
+		})
+		syncPropertiesHost()
 	},
 	{ deep: true }
 )
+
+function isEmptyHtml(html) {
+	if (!html) return true
+	const text = String(html)
+		.replace(/<img[^>]*>/gi, "img")
+		.replace(/<[^>]+>/g, "")
+		.replace(/&nbsp;/g, " ")
+		.trim()
+	return !text
+}
+
+function normalizedDescription() {
+	return isEmptyHtml(description.value) ? "" : description.value
+}
+
+function fieldsDirty() {
+	const issue = props.issue
+	return (
+		subject.value.trim() !== (issue.subject || "").trim() ||
+		normalizedDescription() !== (issue.description || "") ||
+		(priority.value || "") !== (issue.priority || "") ||
+		(issueType.value || "") !== (issue.issue_type || "") ||
+		(project.value || "") !== (issue.project || "")
+	)
+}
+
+async function saveFields() {
+	if (syncing.value || savingFields.value) return
+	if (!subject.value.trim()) {
+		fieldError.value = "Subject is required"
+		return
+	}
+	if (!fieldsDirty()) return
+
+	fieldError.value = ""
+	savingFields.value = true
+	try {
+		const updated = await call(`${API.value}.update_issue`, {
+			name: props.issue.name,
+			subject: subject.value.trim(),
+			description: normalizedDescription(),
+			priority: priority.value || "",
+			issue_type: issueType.value || "",
+			project: project.value || "",
+		})
+		emit("updated", updated)
+	} catch (e) {
+		fieldError.value = e?.messages?.[0] || e?.message || "Could not save issue"
+		toast.error(fieldError.value)
+	} finally {
+		savingFields.value = false
+	}
+}
+
+const scheduleSave = debounce(() => {
+	saveFields()
+}, 500)
+
+watch([subject, description, priority, issueType, project], () => {
+	if (syncing.value) return
+	scheduleSave()
+})
 
 async function changeStatus(next) {
 	if (next === props.issue.status) return
@@ -176,29 +381,15 @@ async function changeStatus(next) {
 		})
 		status.value = updated.status
 		emit("updated", updated)
+	} catch (e) {
+		toast.error(e?.messages?.[0] || e?.message || "Could not update status")
 	} finally {
 		savingStatus.value = false
 	}
 }
 
-function toggleUser(name) {
-	if (assignees.value.includes(name)) {
-		assignees.value = assignees.value.filter((u) => u !== name)
-	} else {
-		assignees.value = [...assignees.value, name]
-	}
-}
-
-async function saveAssignees() {
-	savingAssignees.value = true
-	try {
-		const updated = await call(`${API.value}.set_assignees`, {
-			name: props.issue.name,
-			users: assignees.value,
-		})
-		emit("updated", updated)
-	} finally {
-		savingAssignees.value = false
-	}
+function onAssigneesUpdated(updated) {
+	assignees.value = [...(updated.assignees || [])]
+	emit("updated", updated)
 }
 </script>

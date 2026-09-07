@@ -1,4 +1,9 @@
 <template>
+	<!--
+		Selection list for the cockpit master-detail split pane.
+		Not frappe-ui ListView: that widget targets full doctype list pages,
+		not a pane that also hosts Kanban/Calendar.
+	-->
 	<div class="min-h-0 flex-1 overflow-y-auto">
 		<button
 			v-for="issue in issues"
@@ -15,25 +20,17 @@
 			@click="emit('select', issue.name)"
 		>
 			<div class="mb-1 flex flex-wrap items-center gap-1.5">
-				<span
-					v-if="!compact"
-					class="text-xs font-semibold text-gray-500 dark:text-gray-400"
-				>
+				<span v-if="!compact" class="text-xs font-semibold text-gray-500 dark:text-gray-400">
 					{{ issue.name }}
 				</span>
-				<span
-					class="rounded-full px-1.5 py-0.5 text-[10px] font-semibold"
-					:class="statusClass(issue.status)"
-				>
-					{{ issue.status }}
-				</span>
-				<span
+				<Badge :label="issue.status" :theme="statusTheme(issue.status)" size="sm" variant="subtle" />
+				<Badge
 					v-if="issue.priority && !compact"
-					class="rounded-full px-2 py-0.5 text-[11px] font-semibold"
-					:class="priorityClass(issue.priority)"
-				>
-					{{ issue.priority }}
-				</span>
+					:label="issue.priority"
+					:theme="priorityTheme(issue.priority)"
+					size="sm"
+					variant="subtle"
+				/>
 			</div>
 			<div
 				class="font-medium text-gray-900 dark:text-gray-100"
@@ -46,17 +43,36 @@
 				v-if="!compact"
 				class="flex flex-wrap gap-x-3 gap-y-1 text-xs text-gray-500 dark:text-gray-400"
 			>
+				<span v-if="creationValue(issue)">
+					created on {{ formatDate(creationValue(issue)) }}
+				</span>
+				<span v-if="modifiedValue(issue)">
+					last updated on {{ formatDate(modifiedValue(issue)) }}
+				</span>
+				<span title="Issue age">{{ ageLabel(issue) }}</span>
 				<span v-if="issue.issue_type">{{ issue.issue_type }}</span>
-				<span v-if="showCreator">by {{ issue.owner_name || issue.owner }}</span>
+				<span v-if="showCreator">created by {{ issue.owner_name || issue.owner }}</span>
 				<span>{{ assigneeLabel(issue) }}</span>
-				<span>{{ formatDatetime(issue.modified) }}</span>
+			</div>
+			<div
+				v-else
+				class="mt-0.5 flex flex-wrap gap-x-2 text-xs text-gray-500 dark:text-gray-400"
+			>
+				<span v-if="creationValue(issue)">
+					created on {{ formatDate(creationValue(issue)) }}
+				</span>
+				<span v-if="modifiedValue(issue)">
+					last updated on {{ formatDate(modifiedValue(issue)) }}
+				</span>
+				<span title="Issue age">{{ ageLabel(issue) }}</span>
 			</div>
 		</button>
 	</div>
 </template>
 
 <script setup>
-import { formatDatetime } from "@spa/utils/datetime"
+import { Badge } from "frappe-ui"
+import { formatDate, formatIssueAge } from "@spa/utils/datetime"
 
 defineProps({
 	issues: { type: Array, default: () => [] },
@@ -67,22 +83,38 @@ defineProps({
 
 const emit = defineEmits(["select"])
 
-function statusClass(status) {
-	const map = {
-		Open: "bg-blue-50 text-blue-700 dark:bg-blue-950 dark:text-blue-300",
-		Replied: "bg-violet-50 text-violet-700 dark:bg-violet-950 dark:text-violet-300",
-		"On Hold": "bg-amber-50 text-amber-700 dark:bg-amber-950 dark:text-amber-300",
-		Resolved: "bg-emerald-50 text-emerald-700 dark:bg-emerald-950 dark:text-emerald-300",
-		Closed: "bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-400",
-	}
-	return map[status] || map.Open
+function creationValue(issue) {
+	const raw = issue.creation || issue.opening_date || ""
+	return raw ? String(raw).slice(0, 10) : ""
 }
 
-function priorityClass(priority) {
+function modifiedValue(issue) {
+	const raw = issue.modified || ""
+	return raw ? String(raw).slice(0, 10) : ""
+}
+
+function ageLabel(issue) {
+	const age = formatIssueAge(issue)
+	if (!age || age === "—" || age === "Today") return age
+	return `${age} old`
+}
+
+function statusTheme(status) {
+	const map = {
+		Open: "red",
+		Replied: "blue",
+		"On Hold": "orange",
+		Resolved: "green",
+		Closed: "gray",
+	}
+	return map[status] || "blue"
+}
+
+function priorityTheme(priority) {
 	const p = (priority || "").toLowerCase()
-	if (p === "high") return "bg-red-50 text-red-700 dark:bg-red-950 dark:text-red-300"
-	if (p === "low") return "bg-yellow-50 text-yellow-700 dark:bg-yellow-950 dark:text-yellow-300"
-	return "bg-orange-50 text-orange-700 dark:bg-orange-950 dark:text-orange-300"
+	if (p === "high") return "red"
+	if (p === "low") return "gray"
+	return "orange"
 }
 
 function assigneeLabel(issue) {
