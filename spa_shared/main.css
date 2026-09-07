@@ -222,6 +222,12 @@ body {
 		--bg-color: #111827;
 		--control-bg: #374151;
 		--blue-50: #1e3a5f;
+		--yellow-50: #422006;
+		--yellow-200: #854d0e;
+		--yellow-600: #facc15;
+		--yellow-700: #fde047;
+		--red-50: #450a0a;
+		--red-600: #f87171;
 	}
 
 	.hr-gantt-header-row {
@@ -281,6 +287,20 @@ body {
 
 	.hr-gantt-wrap .gantt .bar-wrapper:not([class*="color-"]) .bar-progress {
 		fill: #6b7280;
+	}
+
+	.hr-gantt-wrap .gantt .bar-wrapper:not([class*="color-"]):hover .bar,
+	.hr-gantt-wrap .gantt .bar-wrapper:not([class*="color-"]).active .bar {
+		fill: #6b7280;
+	}
+
+	.hr-gantt-wrap .gantt .bar-wrapper:not([class*="color-"]):hover .bar-progress,
+	.hr-gantt-wrap .gantt .bar-wrapper:not([class*="color-"]).active .bar-progress {
+		fill: #9ca3af;
+	}
+
+	.hr-gantt-wrap .gantt .handle {
+		fill: #9ca3af;
 	}
 
 	.hr-gantt-today-strip {

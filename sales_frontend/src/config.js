@@ -7,6 +7,5 @@ export default {
 	settingsMethod: "get_sales_settings",
 	projectField: "sales_standard_project",
 	projectNameField: "sales_standard_project_name",
-	timerApi: "phamos.api.timesheet_timer",
 	barColorStyleId: "sales-gantt-bar-colors",
 }

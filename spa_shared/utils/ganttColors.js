@@ -60,9 +60,14 @@ export function buildBarColorCss(tasks) {
 		.map((className) => {
 			const hex = `#${className.slice(6)}`
 			const progress = progressTone(hex)
+			const hover = progressTone(progress)
 			return `
 .gantt .bar-wrapper.${className} .bar { fill: ${hex}; }
 .gantt .bar-wrapper.${className} .bar-progress { fill: ${progress}; }
+.gantt .bar-wrapper.${className}:hover .bar,
+.gantt .bar-wrapper.${className}.active .bar { fill: ${hover}; }
+.gantt .bar-wrapper.${className}:hover .bar-progress,
+.gantt .bar-wrapper.${className}.active .bar-progress { fill: ${hex}; }
 `
 		})
 		.join("")

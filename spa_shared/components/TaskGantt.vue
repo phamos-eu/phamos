@@ -78,7 +78,7 @@
 						</button>
 					</div>
 					<div v-if="undatedTasks.length" class="border-t border-gray-200 dark:border-gray-700">
-						<p class="px-3 py-1.5 text-[10px] font-medium uppercase tracking-wide text-gray-400">
+						<p class="px-3 py-1.5 text-[10px] font-medium uppercase tracking-wide text-gray-400 dark:text-gray-500">
 							No dates
 						</p>
 						<button
