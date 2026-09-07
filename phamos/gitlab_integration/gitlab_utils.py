@@ -257,9 +257,12 @@ def get_issue_for_project(project_id, issue_iid):
 
 
 def _get_issue_timestamp_fields(issue):
+    created_at = _parse_gitlab_datetime(issue.get("created_at"))
+    closed_at = _parse_gitlab_datetime(issue.get("closed_at"))
     return {
-        "created_at": _parse_gitlab_datetime(issue.get("created_at")),
-        "closed_at": _parse_gitlab_datetime(issue.get("closed_at")),
+        "created_at": created_at,
+        "closed_at": closed_at,
+        "aging_days": (closed_at.date() - created_at.date()).days if (closed_at and created_at) else None,
     }
 
 
