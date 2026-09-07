@@ -8,8 +8,18 @@ from frappe.exceptions import TimestampMismatchError
 
 class Checklist(Document):
 	def validate(self):
+		self.validate_checklist_owner()
 		self.set_completion_percentage_and_status()
 
+	def validate_checklist_owner(self):
+		if not self.checklist_owner:
+			frappe.throw(frappe._("Checklist Owner is required"))
+
+		if not frappe.db.exists("User", self.checklist_owner):
+			frappe.throw(frappe._("Checklist Owner must be a valid User"))
+
+		if frappe.db.get_value("User", self.checklist_owner, "enabled") == 0:
+			frappe.throw(frappe._("Checklist Owner must be an enabled User"))
 
 	def set_completion_percentage_and_status(self):
 		if not self.checklist_items:
@@ -52,8 +62,27 @@ def get_checklist_details(checklist_name):
 		"name": checklist.name,
 		"status": checklist.status,
 		"completion_percentage": checklist.completion_percentage or 0,
+		"checklist_owner": checklist.checklist_owner,
 		"items": items,
 	}
+
+
+@frappe.whitelist()
+def get_linked_checklists(doctype, name):
+	return frappe.get_all(
+		"Checklist",
+		filters={
+			"document": doctype,
+			"reference_record": name,
+		},
+		fields=[
+			"name",
+			"status",
+			"completion_percentage",
+			"checklist_owner",
+		],
+		order_by="modified desc",
+	)
 
 
 @frappe.whitelist()
