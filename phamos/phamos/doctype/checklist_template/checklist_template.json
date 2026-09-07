@@ -1,11 +1,13 @@
 {
  "actions": [],
  "allow_rename": 1,
- "autoname": "prompt",
+ "autoname": "naming_series:",
  "creation": "2026-09-04 10:00:00.000000",
  "doctype": "DocType",
  "engine": "InnoDB",
  "field_order": [
+  "naming_series",
+  "title",
   "department",
   "document",
   "column_break_meta",
@@ -15,6 +17,22 @@
   "amended_from"
  ],
  "fields": [
+  {
+   "default": "CHKT-.####",
+   "fieldname": "naming_series",
+   "fieldtype": "Select",
+   "label": "Series",
+   "options": "CHKT-.####",
+   "reqd": 1
+  },
+  {
+   "fieldname": "title",
+   "fieldtype": "Data",
+   "in_list_view": 1,
+   "in_standard_filter": 1,
+   "label": "Title",
+   "reqd": 1
+  },
   {
    "fieldname": "department",
    "fieldtype": "Link",
@@ -80,11 +98,11 @@
    "link_fieldname": "checklist_template"
   }
  ],
- "modified": "2026-09-04 13:50:00.000000",
+ "modified": "2026-09-04 14:00:00.000000",
  "modified_by": "Administrator",
  "module": "Phamos",
  "name": "Checklist Template",
- "naming_rule": "Set by user",
+ "naming_rule": "By \"Naming Series\" field",
  "owner": "Administrator",
  "permissions": [
   {
@@ -108,5 +126,6 @@
  "sort_field": "modified",
  "sort_order": "DESC",
  "states": [],
+ "title_field": "title",
  "track_changes": 1
 }
