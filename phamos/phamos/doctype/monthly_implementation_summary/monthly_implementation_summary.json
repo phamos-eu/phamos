@@ -88,7 +88,8 @@
       "fieldname": "mis_sales_invoices",
       "fieldtype": "Table",
       "label": "Sales Invoices",
-      "options": "MIS Sales Invoice"
+      "options": "MIS Sales Invoice",
+      "ignore_user_permissions": 1
     },
     {
       "fieldname": "section_break_1_section",
