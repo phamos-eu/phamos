@@ -95,7 +95,7 @@ Object.assign(GitLabIssueDashboard.prototype, {
         return `/app/${slug}${query ? "?" + query : ""}`;
     },
 
-    renderDrilldownBody($body, data, note, showLeadTime, onLoadMore, showTouchTime, showCycleTime) {
+    renderDrilldownBody($body, data, note, showLeadTime, onLoadMore, showTouchTime, showCycleTime, leadTimeLabel) {
         const rows = (data && data.rows) || [];
         const total = (data && data.total) || 0;
         const projectTitles = (data && data.project_titles) || {};
@@ -115,7 +115,7 @@ Object.assign(GitLabIssueDashboard.prototype, {
         const noteHtml = note
             ? `<div class="text-muted gid-drilldown-note" style="margin-top: 8px;">${frappe.utils.escape_html(note)}</div>`
             : "";
-        const leadTimeHeader = showLeadTime ? `<th class="text-right">${__("Lead Time (days)")}</th>` : "";
+        const leadTimeHeader = showLeadTime ? `<th class="text-right">${leadTimeLabel || __("Lead Time (days)")}</th>` : "";
         const touchTimeHeader = showTouchTime ? `<th class="text-right">${__("Touch Time (days)")}</th>` : "";
         const cycleTimeHeader = showCycleTime ? `<th class="text-right">${__("Cycle Time (days)")}</th>` : "";
         const summary = (showTouchTime && data && data.touch_time_summary)
@@ -252,7 +252,7 @@ Object.assign(GitLabIssueDashboard.prototype, {
             if (!tab) return;
 
             if (state.cache[tab.key]) {
-                this.renderDrilldownBody($body, state.cache[tab.key], tab.note, tab.showLeadTime, () => loadMore(tab), tab.showTouchTime, tab.showCycleTime);
+                this.renderDrilldownBody($body, state.cache[tab.key], tab.note, tab.showLeadTime, () => loadMore(tab), tab.showTouchTime, tab.showCycleTime, tab.leadTimeLabel);
                 return;
             }
 
@@ -261,7 +261,7 @@ Object.assign(GitLabIssueDashboard.prototype, {
             fetchPage(tab, 0).then((data) => {
                 state.cache[tab.key] = data;
                 if (state.activeKey === tab.key) {
-                    this.renderDrilldownBody($body, data, tab.note, tab.showLeadTime, () => loadMore(tab), tab.showTouchTime, tab.showCycleTime);
+                    this.renderDrilldownBody($body, data, tab.note, tab.showLeadTime, () => loadMore(tab), tab.showTouchTime, tab.showCycleTime, tab.leadTimeLabel);
                 }
             });
         };
@@ -275,7 +275,7 @@ Object.assign(GitLabIssueDashboard.prototype, {
                 cached.total = data.total;
                 cached.project_titles = Object.assign({}, cached.project_titles, data.project_titles);
                 if (state.activeKey === tab.key) {
-                    this.renderDrilldownBody($body, cached, tab.note, tab.showLeadTime, () => loadMore(tab), tab.showTouchTime, tab.showCycleTime);
+                    this.renderDrilldownBody($body, cached, tab.note, tab.showLeadTime, () => loadMore(tab), tab.showTouchTime, tab.showCycleTime, tab.leadTimeLabel);
                 }
             });
         };
@@ -413,7 +413,13 @@ Object.assign(GitLabIssueDashboard.prototype, {
 
         this.openDrilldown({
             title,
-            tabs: [{ key: "closed", label: __("Closed Issues"), params }],
+            tabs: [{
+                key: "closed",
+                label: __("Closed Issues"),
+                params,
+                showLeadTime: true,
+                leadTimeLabel: __("Aging (days)"),
+            }],
         });
     },
 

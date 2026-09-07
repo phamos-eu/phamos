@@ -310,9 +310,12 @@ def get_issue_for_project(project_id, issue_iid):
 
 
 def _get_issue_timestamp_fields(issue):
+    created_at = _parse_gitlab_datetime(issue.get("created_at"))
+    closed_at = _parse_gitlab_datetime(issue.get("closed_at"))
     return {
-        "created_at": _parse_gitlab_datetime(issue.get("created_at")),
-        "closed_at": _parse_gitlab_datetime(issue.get("closed_at")),
+        "created_at": created_at,
+        "closed_at": closed_at,
+        "aging_days": (closed_at.date() - created_at.date()).days if (closed_at and created_at) else None,
     }
 
 
@@ -1003,11 +1006,6 @@ def _handle_issue_webhook(payload):
         "gitlab_milestone": milestone_name,
     }
     data.update(timestamp_data)
-
-    if data.get("closed_at") and data.get("created_at"):
-        data["aging_days"] = (data["closed_at"].date() - data["created_at"].date()).days
-    else:
-        data["aging_days"] = None
 
     existing = frappe.db.get_value(
         "GitLab Issue",
