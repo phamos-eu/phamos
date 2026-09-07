@@ -63,6 +63,7 @@ doctype_js = {
 
 doctype_list_js = {
     "Event": "public/js/event_list.js",
+    "Monthly Implementation Summary": "public/js/monthly_implementation_summary_list.js",
 }
 
 override_doctype_class = {
@@ -191,7 +192,11 @@ doc_events = {
         "on_submit": "phamos.phamos.doctype.monthly_implementation_summary.monthly_implementation_summary.sync_mis_status_for_sales_invoice",
         "on_update": "phamos.phamos.doctype.monthly_implementation_summary.monthly_implementation_summary.sync_mis_status_for_sales_invoice",
         "on_cancel": "phamos.phamos.doctype.monthly_implementation_summary.monthly_implementation_summary.sync_mis_status_for_sales_invoice",
-            
+    },
+    "Sales Order": {
+        "on_submit": "phamos.phamos.doctype.monthly_implementation_summary.monthly_implementation_summary.sync_mis_status_for_sales_order",
+        "on_update": "phamos.phamos.doctype.monthly_implementation_summary.monthly_implementation_summary.sync_mis_status_for_sales_order",
+        "on_cancel": "phamos.phamos.doctype.monthly_implementation_summary.monthly_implementation_summary.sync_mis_status_for_sales_order",
     },
     "Customer": {
         "on_update": "phamos.gitlab_integration.gitlab_group_utils.update_gitlab_avatar_on_customer"
@@ -244,6 +249,8 @@ scheduler_events = {
         "phamos.phamos.doctype.monthly_implementation_summary.create_monthly_implementation_summaries.create_monthly_implementation_summaries",
         "phamos.api.send_daily_birthday_wishes",
         "phamos.bookstack_integration.sync.sync_all_instances",
+        # MIS: auto-close open summaries once every linked SO/DN is fully delivered and billed
+        "phamos.phamos.doctype.monthly_implementation_summary.monthly_implementation_summary.auto_close_fulfilled_mis",
     ],
     "monthly": [
         "phamos.api.send_monthly_comment_summary"

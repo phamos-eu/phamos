@@ -157,80 +157,203 @@ function _mis_setup_si_table_submit_btn(frm) {
 }
 
 function _mis_setup_grid_action_buttons(frm) {
+	if (frm.doc.status === "Closed") return;
 	_mis_setup_so_table_create_dn_btn(frm);
 	_mis_setup_dn_table_submit_btn(frm);
 	_mis_setup_dn_table_create_si_btn(frm);
 	_mis_setup_si_table_submit_btn(frm);
 }
 
+function _mis_setup_status_buttons(frm) {
+	if (!frm.has_perm("submit")) return;
+	if (frm.doc.status === "Closed") {
+		frm.add_custom_button(__("Re-open"), function() {
+			frappe.call({
+				method: "phamos.phamos.doctype.monthly_implementation_summary.monthly_implementation_summary.reopen_monthly_implementation_summary",
+				args: { docname: frm.doc.name },
+				freeze: true,
+				callback: function() { frm.reload_doc(); },
+			});
+		}, __("Status"));
+	} else {
+		frm.add_custom_button(__("Close"), function() {
+			frappe.confirm(
+				__("Close this Monthly Implementation Summary? It will be excluded from Sales Order / Delivery Note update logic until re-opened."),
+				function() {
+					frappe.call({
+						method: "phamos.phamos.doctype.monthly_implementation_summary.monthly_implementation_summary.close_monthly_implementation_summary",
+						args: { docname: frm.doc.name },
+						freeze: true,
+						callback: function() { frm.reload_doc(); },
+					});
+				}
+			);
+		}, __("Status"));
+	}
+}
+
 // ── DN creation ─────────────────────────────────────────────────────────────
+
+function _mis_run_create_dns(frm, sales_orders, submit_after_create) {
+	const created = [];
+	let promise = Promise.resolve();
+	sales_orders.forEach(function(so) {
+		promise = promise.then(function() {
+			return new Promise(function(resolve) {
+				frappe.call({
+					method: "phamos.phamos.doctype.monthly_implementation_summary.monthly_implementation_summary.create_delivery_note",
+					args: {
+						docname: frm.doc.name,
+						sales_order: so,
+						delivery_note_item: []
+					},
+					freeze: true,
+					freeze_message: __("Creating Delivery Note for {0}...", [so]),
+					callback: function(r) {
+						if (r.exc) {
+							frappe.msgprint({ title: __("Error for {0}", [so]), message: r.exc[0] || __("Failed."), indicator: "red" });
+						} else if (r.message && r.message.dn_name) {
+							created.push(r.message.dn_name);
+							frappe.show_alert({ message: __("Created {0}", [r.message.dn_name]), indicator: "green" });
+						}
+						resolve();
+					}
+				});
+			});
+		});
+	});
+	return promise
+		.then(function() {
+			if (!submit_after_create || !created.length) return;
+			return new Promise(function(resolve) {
+				frappe.call({
+					method: "phamos.phamos.doctype.monthly_implementation_summary.monthly_implementation_summary.submit_delivery_notes_in_mis",
+					args: { docname: frm.doc.name, delivery_notes: created },
+					freeze: true,
+					freeze_message: __("Submitting Delivery Note(s)..."),
+					callback: function(r) {
+						const d = r.message || {};
+						if (d.failed_details && d.failed_details.length) {
+							frappe.msgprint({
+								title: __("Some submissions failed"),
+								indicator: "orange",
+								message: d.failed_details
+									.map(item => `${_mis_escape(item.delivery_note || "")} : ${_mis_escape(item.error || "")}`)
+									.join("<br>"),
+							});
+						}
+						resolve();
+					}
+				});
+			});
+		})
+		.then(function() { frm.reload_doc(); });
+}
 
 function _mis_create_dns_for_sos(frm, sales_orders) {
 	if (!sales_orders || !sales_orders.length) return;
-	frappe.confirm(
-		__("Create Delivery Note(s) for {0} Sales Order(s)?", [sales_orders.length]),
-		function() {
-			let promise = Promise.resolve();
-			sales_orders.forEach(function(so) {
-				promise = promise.then(function() {
-					return new Promise(function(resolve) {
-						frappe.call({
-							method: "phamos.phamos.doctype.monthly_implementation_summary.monthly_implementation_summary.create_delivery_note",
-							args: {
-								docname: frm.doc.name,
-								sales_order: so,
-								delivery_note_item: []
-							},
-							freeze: true,
-							freeze_message: __("Creating Delivery Note for {0}...", [so]),
-							callback: function(r) {
-								if (r.exc) {
-									frappe.msgprint({ title: __("Error for {0}", [so]), message: r.exc[0] || __("Failed."), indicator: "red" });
-								} else if (r.message && r.message.dn_name) {
-									frappe.show_alert({ message: __("Created {0}", [r.message.dn_name]), indicator: "green" });
-								}
-								resolve();
-							}
-						});
-					});
-				});
-			});
-			promise.then(function() { frm.reload_doc(); });
-		}
-	);
+	const dialog = new frappe.ui.Dialog({
+		title: __("Create Delivery Note(s)"),
+		fields: [
+			{
+				fieldname: "info",
+				fieldtype: "HTML",
+				options: `<p>${__("Create Delivery Note(s) for {0} Sales Order(s)?", [sales_orders.length])}</p>`,
+			},
+			{
+				fieldname: "submit_after_create",
+				fieldtype: "Check",
+				label: __("Submit Delivery Note(s) after creation"),
+				default: 0,
+			},
+		],
+		primary_action_label: __("Create"),
+		primary_action: function(values) {
+			dialog.hide();
+			_mis_run_create_dns(frm, sales_orders, values.submit_after_create);
+		},
+	});
+	dialog.show();
 }
 
 // ── SI creation ─────────────────────────────────────────────────────────────
 
-function _mis_create_si_for_dns(frm, delivery_notes) {
-	if (!delivery_notes || !delivery_notes.length) return;
-	frappe.confirm(
-		__("Create Sales Invoice(s) for {0} Delivery Note(s)?", [delivery_notes.length]),
-		function() {
-			let promise = Promise.resolve();
-			delivery_notes.forEach(function(dn) {
-				promise = promise.then(function() {
-					return new Promise(function(resolve) {
-						frappe.call({
-							method: "phamos.phamos.doctype.monthly_implementation_summary.monthly_implementation_summary.create_sales_invoice_from_mis",
-							args: { docname: frm.doc.name, delivery_note: dn },
-							freeze: true,
-							freeze_message: __("Creating Sales Invoice for {0}...", [dn]),
-							callback: function(r) {
-								if (r.exc) {
-									frappe.msgprint({ title: __("Error for {0}", [dn]), message: r.exc[0] || __("Failed."), indicator: "red" });
-								} else if (r.message && r.message.sales_invoice) {
-									frappe.show_alert({ message: __("Created {0}", [r.message.sales_invoice]), indicator: "green" });
-								}
-								resolve();
-							}
-						});
-					});
+function _mis_run_create_si(frm, delivery_notes, submit_after_create) {
+	const created = [];
+	let promise = Promise.resolve();
+	delivery_notes.forEach(function(dn) {
+		promise = promise.then(function() {
+			return new Promise(function(resolve) {
+				frappe.call({
+					method: "phamos.phamos.doctype.monthly_implementation_summary.monthly_implementation_summary.create_sales_invoice_from_mis",
+					args: { docname: frm.doc.name, delivery_note: dn },
+					freeze: true,
+					freeze_message: __("Creating Sales Invoice for {0}...", [dn]),
+					callback: function(r) {
+						if (r.exc) {
+							frappe.msgprint({ title: __("Error for {0}", [dn]), message: r.exc[0] || __("Failed."), indicator: "red" });
+						} else if (r.message && r.message.sales_invoice) {
+							created.push(r.message.sales_invoice);
+							frappe.show_alert({ message: __("Created {0}", [r.message.sales_invoice]), indicator: "green" });
+						}
+						resolve();
+					}
 				});
 			});
-			promise.then(function() { frm.reload_doc(); });
-		}
-	);
+		});
+	});
+	return promise
+		.then(function() {
+			if (!submit_after_create || !created.length) return;
+			return new Promise(function(resolve) {
+				frappe.call({
+					method: "phamos.phamos.doctype.monthly_implementation_summary.monthly_implementation_summary.submit_sales_invoices_in_mis",
+					args: { docname: frm.doc.name, sales_invoices: created },
+					freeze: true,
+					freeze_message: __("Submitting Sales Invoice(s)..."),
+					callback: function(r) {
+						const d = r.message || {};
+						if (d.failed_details && d.failed_details.length) {
+							frappe.msgprint({
+								title: __("Some submissions failed"),
+								indicator: "orange",
+								message: d.failed_details
+									.map(item => `${_mis_escape(item.sales_invoice || "")} : ${_mis_escape(item.error || "")}`)
+									.join("<br>"),
+							});
+						}
+						resolve();
+					}
+				});
+			});
+		})
+		.then(function() { frm.reload_doc(); });
+}
+
+function _mis_create_si_for_dns(frm, delivery_notes) {
+	if (!delivery_notes || !delivery_notes.length) return;
+	const dialog = new frappe.ui.Dialog({
+		title: __("Create Sales Invoice(s)"),
+		fields: [
+			{
+				fieldname: "info",
+				fieldtype: "HTML",
+				options: `<p>${__("Create Sales Invoice(s) for {0} Delivery Note(s)?", [delivery_notes.length])}</p>`,
+			},
+			{
+				fieldname: "submit_after_create",
+				fieldtype: "Check",
+				label: __("Submit Sales Invoice(s) after creation"),
+				default: 0,
+			},
+		],
+		primary_action_label: __("Create"),
+		primary_action: function(values) {
+			dialog.hide();
+			_mis_run_create_si(frm, delivery_notes, values.submit_after_create);
+		},
+	});
+	dialog.show();
 }
 
 function _mis_submit_dns_from_table(frm, delivery_notes) {
@@ -309,9 +432,145 @@ function _mis_submit_sis_from_table(frm, sales_invoices) {
 	);
 }
 
+function _mis_show_create_dn_dialog(frm) {
+	const eligible = (frm.doc.sales_order_status_information || []).filter(
+		r => r.sales_order && ["To Deliver", "To Deliver and Bill"].includes(r.status)
+	);
+	if (!eligible.length) {
+		frappe.show_alert({ message: __("No Sales Orders available for delivery."), indicator: "orange" });
+		return;
+	}
+
+	const rows_html = eligible.map(r => `
+		<tr>
+			<td style="width:36px; text-align:center;">
+				<input type="checkbox" class="mis-dn-so-check" data-so="${_mis_escape(r.sales_order)}" checked>
+			</td>
+			<td><a href="/app/sales-order/${encodeURIComponent(r.sales_order || "")}" target="_blank">${_mis_escape(r.sales_order)}</a></td>
+			<td>${_mis_escape(r.status || "")}</td>
+			<td style="text-align:right;">${_mis_number(r.remaining_hrs)}</td>
+		</tr>
+	`).join("");
+
+	const dialog = new frappe.ui.Dialog({
+		title: __("Create Delivery Note"),
+		fields: [
+			{ fieldname: "so_list_html", fieldtype: "HTML" },
+			{
+				fieldname: "submit_after_create",
+				fieldtype: "Check",
+				label: __("Submit Delivery Note(s) after creation"),
+				default: 0,
+			},
+		],
+		primary_action_label: __("Create"),
+		primary_action: function(values) {
+			const selected = [];
+			dialog.$wrapper.find(".mis-dn-so-check:checked").each(function() {
+				const so = $(this).attr("data-so");
+				if (so) selected.push(so);
+			});
+			if (!selected.length) {
+				frappe.show_alert({ message: __("Select at least one Sales Order."), indicator: "orange" });
+				return;
+			}
+			dialog.hide();
+			_mis_run_create_dns(frm, selected, values.submit_after_create);
+		},
+	});
+
+	dialog.get_field("so_list_html").$wrapper.html(`
+		<table class="table table-bordered table-hover" style="margin-bottom:0;">
+			<thead>
+				<tr>
+					<th style="width:36px;"><input type="checkbox" id="mis-dn-select-all" checked></th>
+					<th>${__("Sales Order")}</th>
+					<th>${__("Status")}</th>
+					<th style="text-align:right;">${__("Remaining Hrs")}</th>
+				</tr>
+			</thead>
+			<tbody>${rows_html}</tbody>
+		</table>
+	`);
+
+	dialog.$wrapper.on("change", "#mis-dn-select-all", function() {
+		dialog.$wrapper.find(".mis-dn-so-check").prop("checked", $(this).is(":checked"));
+	});
+
+	dialog.show();
+}
+
+function _mis_show_create_dn_dialog(frm) {
+	const eligible = (frm.doc.sales_order_status_information || []).filter(
+		r => r.sales_order && ["To Deliver", "To Deliver and Bill"].includes(r.status)
+	);
+	if (!eligible.length) {
+		frappe.show_alert({ message: __("No Sales Orders available for delivery."), indicator: "orange" });
+		return;
+	}
+
+	const rows_html = eligible.map(r => `
+		<tr>
+			<td style="width:36px; text-align:center;">
+				<input type="checkbox" class="mis-dn-so-check" data-so="${_mis_escape(r.sales_order)}" checked>
+			</td>
+			<td><a href="/app/sales-order/${encodeURIComponent(r.sales_order || "")}" target="_blank">${_mis_escape(r.sales_order)}</a></td>
+			<td>${_mis_escape(r.status || "")}</td>
+			<td style="text-align:right;">${_mis_number(r.remaining_hrs)}</td>
+		</tr>
+	`).join("");
+
+	const dialog = new frappe.ui.Dialog({
+		title: __("Create Delivery Note"),
+		fields: [
+			{ fieldname: "so_list_html", fieldtype: "HTML" },
+			{
+				fieldname: "submit_after_create",
+				fieldtype: "Check",
+				label: __("Submit Delivery Note(s) after creation"),
+				default: 0,
+			},
+		],
+		primary_action_label: __("Create"),
+		primary_action: function(values) {
+			const selected = [];
+			dialog.$wrapper.find(".mis-dn-so-check:checked").each(function() {
+				const so = $(this).attr("data-so");
+				if (so) selected.push(so);
+			});
+			if (!selected.length) {
+				frappe.show_alert({ message: __("Select at least one Sales Order."), indicator: "orange" });
+				return;
+			}
+			dialog.hide();
+			_mis_run_create_dns(frm, selected, values.submit_after_create);
+		},
+	});
+
+	dialog.get_field("so_list_html").$wrapper.html(`
+		<table class="table table-bordered table-hover" style="margin-bottom:0;">
+			<thead>
+				<tr>
+					<th style="width:36px;"><input type="checkbox" id="mis-dn-select-all" checked></th>
+					<th>${__("Sales Order")}</th>
+					<th>${__("Status")}</th>
+					<th style="text-align:right;">${__("Remaining Hrs")}</th>
+				</tr>
+			</thead>
+			<tbody>${rows_html}</tbody>
+		</table>
+	`);
+
+	dialog.$wrapper.on("change", "#mis-dn-select-all", function() {
+		dialog.$wrapper.find(".mis-dn-so-check").prop("checked", $(this).is(":checked"));
+	});
+
+	dialog.show();
+}
+
 function _mis_show_create_si_dialog(frm) {
 	const eligible = (frm.doc.mis_delivery_notes || []).filter(
-		r => r.delivery_note && !r.sales_invoice && r.status === "To Bill"
+		r => r.delivery_note && r.status === "To Bill"
 	);
 	if (!eligible.length) {
 		frappe.show_alert({ message: __("No Delivery Notes available for invoicing."), indicator: "orange" });
@@ -331,9 +590,17 @@ function _mis_show_create_si_dialog(frm) {
 
 	const dialog = new frappe.ui.Dialog({
 		title: __("Create Sales Invoice"),
-		fields: [{ fieldname: "dn_list_html", fieldtype: "HTML" }],
+		fields: [
+			{ fieldname: "dn_list_html", fieldtype: "HTML" },
+			{
+				fieldname: "submit_after_create",
+				fieldtype: "Check",
+				label: __("Submit Sales Invoice(s) after creation"),
+				default: 0,
+			},
+		],
 		primary_action_label: __("Create"),
-		primary_action: function() {
+		primary_action: function(values) {
 			const selected = [];
 			dialog.$wrapper.find(".mis-si-dn-check:checked").each(function() {
 				const dn = $(this).attr("data-dn");
@@ -344,7 +611,7 @@ function _mis_show_create_si_dialog(frm) {
 				return;
 			}
 			dialog.hide();
-			_mis_create_si_for_dns(frm, selected);
+			_mis_run_create_si(frm, selected, values.submit_after_create);
 		},
 	});
 
@@ -813,62 +1080,26 @@ frappe.ui.form.on("Monthly Implementation Summary", {
 			return;
 		}
 		if (cint(frm.doc.docstatus) === 1) {
-			const has_billable_dns = (frm.doc.mis_delivery_notes || []).some(
+			_mis_setup_status_buttons(frm);
+			const not_closed = frm.doc.status !== "Closed";
+			const has_deliverable_so = not_closed && (frm.doc.sales_order_status_information || []).some(
+				r => r.sales_order && ["To Deliver", "To Deliver and Bill"].includes(r.status)
+			);
+			if (has_deliverable_so) {
+				frm.add_custom_button(__("Create Delivery Note"), function() {
+					_mis_show_create_dn_dialog(frm);
+				}, __("Actions"));
+			}
+			const has_billable_dns = not_closed && (frm.doc.mis_delivery_notes || []).some(
 				r => r.delivery_note && r.status === "To Bill"
 			);
 			if (has_billable_dns) {
 				frm.add_custom_button(__("Create Sales Invoice"), function() {
 					_mis_show_create_si_dialog(frm);
-				});
+				}, __("Actions"));
 			}
 		}
 		_mis_maybe_open_timesheet_approval_dialog(frm);
-		// Add Sales Orders to connections dashboard
-		if (frm.doc.implementation) {
-			frappe.db.get_list('Sales Order', {
-				filters: {
-					custom_implementation: frm.doc.implementation,
-					status: ['!=', 'completed'],
-					docstatus: 1
-				},
-				fields: ['name']
-			}).then(records => {
-				// Wait for sidebar to render
-				setTimeout(() => {
-					// Remove any existing Sales Order badges to avoid duplicates
-					$('.document-link[data-doctype="Sales Order"]').remove();
-
-					let $anchor = $('.document-link[data-doctype="Delivery Note"]');
-					let badge_html = `
-						<div class="document-link" data-doctype="Sales Order">
-							<div class="document-link-badge" data-doctype="Sales Order">
-								${records.length > 0 ? `<span class="count">${records.length}</span>` : ''}
-								<a class="badge-link">Sales Order</a>
-							</div>
-						</div>
-					`;
-
-					if ($anchor.length) {
-						$anchor.after(badge_html);
-					} else {
-						// Fallback: append to the Related section if Delivery Note badge isn't rendered yet
-						let $container = $('.form-links, .form-dashboard-section.connections').first();
-						$container.append(badge_html);
-					}
-
-					// Add click handler
-					$('.document-link[data-doctype="Sales Order"] .badge-link').on('click', function(e) {
-						e.preventDefault();
-						if (records.length > 0) {
-							let names = records.map(r => r.name);
-							frappe.set_route('List', 'Sales Order', {name: ['in', names]});
-						} else {
-							frappe.set_route('List', 'Sales Order', {custom_implementation: frm.doc.implementation});
-						}
-					});
-				}, 1000);
-			});
-		}
 	},
 	on_submit: function(frm) {
 		// Workflow submits use before_workflow_action; avoid double sync if standard Submit is still available.
