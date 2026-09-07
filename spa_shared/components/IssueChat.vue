@@ -84,7 +84,7 @@
 								>
 									Thread
 								</span>
-								<span class="text-[11px] text-gray-400">{{ formatTime(m.creation) }}</span>
+								<span class="text-[11px] text-gray-400 dark:text-gray-500">{{ formatTime(m.creation) }}</span>
 							</span>
 						</div>
 						<div
@@ -134,7 +134,7 @@
 						Send
 					</Button>
 				</form>
-				<p v-if="error && !activeThread" class="px-3 pb-2 text-sm text-red-600">{{ error }}</p>
+				<p v-if="error && !activeThread" class="px-3 pb-2 text-sm text-red-600 dark:text-red-400">{{ error }}</p>
 
 				<!-- Thread overlay stays inside Discussion column -->
 				<div
@@ -175,7 +175,7 @@
 							<span class="text-xs font-semibold text-gray-800 dark:text-gray-200">
 								{{ threadRoot.owner_name || threadRoot.owner }}
 							</span>
-							<span class="text-[11px] text-gray-400">
+							<span class="text-[11px] text-gray-400 dark:text-gray-500">
 								{{ formatTime(threadRoot.creation) }}
 							</span>
 						</div>
@@ -213,7 +213,7 @@
 								<span class="text-xs font-semibold text-gray-800 dark:text-gray-200">
 									{{ m.owner_name || m.owner }}
 								</span>
-								<span class="text-[11px] text-gray-400">{{ formatTime(m.creation) }}</span>
+								<span class="text-[11px] text-gray-400 dark:text-gray-500">{{ formatTime(m.creation) }}</span>
 							</div>
 							<div
 								v-if="m.is_reply && m.reply_preview"
@@ -261,7 +261,7 @@
 								Send
 							</Button>
 						</form>
-						<p v-if="error" class="mt-1 text-sm text-red-600">{{ error }}</p>
+						<p v-if="error" class="mt-1 text-sm text-red-600 dark:text-red-400">{{ error }}</p>
 					</div>
 				</div>
 			</div>
@@ -354,7 +354,7 @@ function renderText(text) {
 		.replace(/\*\*(.+?)\*\*/g, "<strong>$1</strong>")
 		.replace(
 			/\[([^\]]+)\]\((https?:\/\/[^\s)]+|\/[^\s)]+)\)/g,
-			'<a class="text-blue-600 underline" href="$2" target="_blank" rel="noopener">$1</a>'
+			'<a class="text-blue-600 underline dark:text-blue-400" href="$2" target="_blank" rel="noopener">$1</a>'
 		)
 		.replace(/\n/g, "<br>")
 }
