@@ -8,6 +8,7 @@
   "field_order": [
     "naming_series",
     "implementation",
+    "status",
     "sales_order_status_information",
     "mis_delivery_notes_section",
     "mis_delivery_notes",
@@ -51,6 +52,17 @@
       "reqd": 1
     },
     {
+      "default": "Draft",
+      "fieldname": "status",
+      "fieldtype": "Select",
+      "in_list_view": 1,
+      "in_standard_filter": 1,
+      "label": "Status",
+      "no_copy": 1,
+      "options": "Draft\nOpen\nClosed",
+      "read_only": 1
+    },
+    {
       "fieldname": "sales_order_status_information",
       "fieldtype": "Table",
       "label": "Sales Order Status Information",
@@ -62,7 +74,6 @@
       "label": "Delivery Notes"
     },
     {
-      "allow_on_submit": 1,
       "fieldname": "mis_delivery_notes",
       "fieldtype": "Table",
       "label": "Delivery Notes",
@@ -74,7 +85,6 @@
       "label": "Sales Invoices"
     },
     {
-      "allow_on_submit": 1,
       "fieldname": "mis_sales_invoices",
       "fieldtype": "Table",
       "label": "Sales Invoices",
