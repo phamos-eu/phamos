@@ -50,6 +50,12 @@ def get_inbox(view="assigned", include_closed=0):
 
 
 @frappe.whitelist()
+def get_issues(include_closed=0):
+	"""Return all Accounting department Issues."""
+	return dc.get_issues(CONFIG, include_closed=include_closed)
+
+
+@frappe.whitelist()
 def get_issue(name):
 	"""Return Issue detail if it belongs to Accounting scope."""
 	return dc.get_issue(CONFIG, name)
@@ -96,10 +102,33 @@ def set_assignees(name, users=None):
 	return dc.set_assignees(CONFIG, name, users=users)
 
 
+@frappe.whitelist(methods=["POST"])
+def update_issue(name, subject=None, description=None, priority=None, issue_type=None, project=None):
+	"""Update whitelisted Issue fields within Accounting scope."""
+	fields = {}
+	if subject is not None:
+		fields["subject"] = subject
+	if description is not None:
+		fields["description"] = description
+	if priority is not None:
+		fields["priority"] = priority
+	if issue_type is not None:
+		fields["issue_type"] = issue_type
+	if project is not None:
+		fields["project"] = project
+	return dc.update_issue(CONFIG, name, **fields)
+
+
 @frappe.whitelist()
 def get_tasks(include_completed=0):
 	"""Return Tasks for the Accounting department."""
 	return dc.get_tasks(CONFIG, include_completed=include_completed)
+
+
+@frappe.whitelist()
+def get_checklists(include_completed=0):
+	"""Return Checklists linked to Accounting Issues/Tasks."""
+	return dc.get_checklists(CONFIG, include_completed=include_completed)
 
 
 @frappe.whitelist()
@@ -118,6 +147,45 @@ def update_task_status(name, status):
 def update_task_dates(name, exp_start_date=None, exp_end_date=None):
 	"""Update Task expected dates (Gantt drag)."""
 	return dc.update_task_dates(CONFIG, name, exp_start_date=exp_start_date, exp_end_date=exp_end_date)
+
+
+@frappe.whitelist(methods=["POST"])
+def update_task(
+	name,
+	subject=None,
+	description=None,
+	priority=None,
+	status=None,
+	exp_start_date=None,
+	exp_end_date=None,
+	progress=None,
+	project=None,
+):
+	"""Update whitelisted Task fields within Accounting scope."""
+	fields = {}
+	if subject is not None:
+		fields["subject"] = subject
+	if description is not None:
+		fields["description"] = description
+	if priority is not None:
+		fields["priority"] = priority
+	if status is not None:
+		fields["status"] = status
+	if exp_start_date is not None:
+		fields["exp_start_date"] = exp_start_date
+	if exp_end_date is not None:
+		fields["exp_end_date"] = exp_end_date
+	if progress is not None:
+		fields["progress"] = progress
+	if project is not None:
+		fields["project"] = project
+	return dc.update_task(CONFIG, name, **fields)
+
+
+@frappe.whitelist(methods=["POST"])
+def set_task_assignees(name, users=None):
+	"""Replace Task assignees within Accounting scope."""
+	return dc.set_task_assignees(CONFIG, name, users=users)
 
 
 @frappe.whitelist(methods=["POST"])
@@ -147,12 +215,6 @@ def create_task(
 def add_task_dependency(name, depends_on):
 	"""Add a predecessor dependency to a Task (Gantt link mode)."""
 	return dc.add_task_dependency(CONFIG, name, depends_on)
-
-
-@frappe.whitelist()
-def get_chat_settings():
-	"""SPA soft-dependency flags for Raven chat."""
-	return dc.get_chat_settings()
 
 
 RECEIPT_KANBAN_STATUSES = (
@@ -400,16 +462,3 @@ def get_receipt_review_fields(name):
 
 	fields, extracted = build_review_fields_from_doc(doc)
 	return {"ok": True, "fields": fields, "extracted": extracted}
-
-
-# Re-export Raven chat APIs for a stable SPA method prefix
-from phamos.api.issue_raven import (  # noqa: E402, F401
-	ensure_document_channel,
-	get_chat_messages,
-	get_document_chat,
-	get_raven_users_for_invite,
-	get_thread,
-	invite_to_document_channel,
-	open_or_create_thread,
-	send_chat_message,
-)
