@@ -11,16 +11,33 @@ from frappe import _
 from frappe.desk.form.load import get_assignments
 from frappe.utils import get_fullname
 
+from frappe.desk.form.assign_to import add as add_assignment
+from frappe.desk.form.assign_to import remove as remove_assignment
+
 from phamos.api.i_own_my_work import (
 	LIST_FIELDS,
 	_parse_assignees,
+	_parse_list,
 	_serialize_issue_row,
 	_status_filters,
+	enrich_issue_rows_for_search,
 )
 from phamos.api.i_own_my_work import create_issue as _create_issue
 from phamos.api.i_own_my_work import get_form_options as _base_form_options
 from phamos.api.i_own_my_work import set_assignees as _set_assignees
 from phamos.api.i_own_my_work import update_status as _update_status
+
+ISSUE_EDITABLE_FIELDS = ("subject", "description", "priority", "issue_type", "project")
+TASK_EDITABLE_FIELDS = (
+	"subject",
+	"description",
+	"priority",
+	"status",
+	"exp_start_date",
+	"exp_end_date",
+	"progress",
+	"project",
+)
 
 TASK_LIST_FIELDS = [
 	"name",
@@ -179,8 +196,6 @@ def get_settings(config: CockpitConfig, read_permission: Optional[Callable[[], N
 	else:
 		frappe.has_permission("Issue", "read", throw=True)
 
-	from phamos.api.issue_raven import get_chat_feature_flags
-
 	department = _get_department(config)
 	project = _get_project(config)
 	project_names = _get_project_names(config, department)
@@ -194,7 +209,6 @@ def get_settings(config: CockpitConfig, read_permission: Optional[Callable[[], N
 		config.project_field: project,
 		config.project_name_key: project_label,
 		config.project_count_key: len(project_names),
-		"chat": get_chat_feature_flags(),
 	}
 
 
@@ -268,7 +282,42 @@ def get_inbox(config: CockpitConfig, view="assigned", include_closed=0):
 			limit_page_length=200,
 		)
 
-	return [_serialize_issue_row(r) for r in rows]
+	return enrich_issue_rows_for_search(rows)
+
+
+def get_issues(config: CockpitConfig, include_closed=0):
+	"""Return all department-scoped Issues (not limited to assigned/created)."""
+	frappe.has_permission("Issue", "read", throw=True)
+	_require_department(config)
+
+	include_closed = frappe.utils.cint(include_closed)
+	filters = _status_filters(include_closed)
+	or_filters = _issue_or_filters(config)
+	if not or_filters:
+		return []
+
+	rows = frappe.get_list(
+		"Issue",
+		filters=filters,
+		or_filters=or_filters,
+		fields=LIST_FIELDS,
+		order_by="modified desc",
+		limit_page_length=200,
+	)
+	return enrich_issue_rows_for_search(rows)
+
+
+def _user_images(users):
+	"""Return user_image for each user name, preserving order."""
+	if not users:
+		return []
+	rows = frappe.get_all(
+		"User",
+		filters={"name": ("in", list(users))},
+		fields=["name", "user_image"],
+	)
+	by_name = {r.name: r.user_image for r in rows}
+	return [by_name.get(u) for u in users]
 
 
 def _serialize_issue_detail(doc):
@@ -291,6 +340,7 @@ def _serialize_issue_detail(doc):
 		"opening_date": getattr(doc, "opening_date", None),
 		"assignees": assignees,
 		"assignee_names": [_user_label(u) for u in assignees],
+		"assignee_images": _user_images(assignees),
 		"desk_url": f"/app/issue/{doc.name}",
 	}
 
@@ -322,8 +372,52 @@ def get_form_options(config: CockpitConfig):
 		options["projects"] = [p for p in options.get("projects", []) if p["name"] in project_names]
 	options[config.department_field] = department
 	options[config.project_field] = _get_project(config)
-	options["chat"] = get_chat_settings()
+	# Cockpits use a role shortlist + search_link; do not ship the full user dump.
+	options.pop("users", None)
+	options.pop("chat", None)
+	options["shortlist_users"] = _role_shortlist_users(config)
 	return options
+
+
+def _role_shortlist_users(config: CockpitConfig, limit=50):
+	"""Enabled System Users who hold any of the cockpit roles."""
+	role_names = [r for r in (config.roles or ()) if r]
+	if not role_names:
+		return []
+
+	user_names = set()
+	for role in role_names:
+		try:
+			from frappe.utils.user import get_users_with_role
+
+			user_names.update(get_users_with_role(role) or [])
+		except Exception:
+			rows = frappe.get_all(
+				"Has Role",
+				filters={"role": role, "parenttype": "User"},
+				pluck="parent",
+			)
+			user_names.update(rows or [])
+
+	user_names.discard("Guest")
+	if not user_names:
+		return []
+
+	users = frappe.get_all(
+		"User",
+		filters={
+			"name": ("in", list(user_names)),
+			"enabled": 1,
+			"user_type": "System User",
+		},
+		fields=["name", "full_name", "user_image"],
+		order_by="full_name asc",
+		limit_page_length=limit,
+	)
+	return [
+		{"name": u.name, "full_name": u.full_name or u.name, "user_image": u.user_image}
+		for u in users
+	]
 
 
 def create_issue(
@@ -371,6 +465,35 @@ def set_assignees(config: CockpitConfig, name, users=None):
 	return _set_assignees(name, users)
 
 
+def update_issue(config: CockpitConfig, name, **fields):
+	"""Update whitelisted Issue fields within department scope."""
+	frappe.has_permission("Issue", "write", throw=True)
+	get_issue(config, name)
+
+	doc = frappe.get_doc("Issue", name)
+	doc.check_permission("write")
+
+	updates = {k: fields[k] for k in ISSUE_EDITABLE_FIELDS if k in fields}
+	unknown = set(fields) - set(ISSUE_EDITABLE_FIELDS)
+	if unknown:
+		frappe.throw(_("Invalid Issue field(s): {0}").format(", ".join(sorted(unknown))))
+
+	if "subject" in updates:
+		subject = (updates["subject"] or "").strip()
+		if not subject:
+			frappe.throw(_("Subject is required"))
+		updates["subject"] = subject
+
+	if "project" in updates and updates["project"]:
+		validate_project(config, updates["project"])
+
+	for key, value in updates.items():
+		doc.set(key, value)
+
+	doc.save()
+	return get_issue(config, name)
+
+
 def _serialize_task_row(row):
 	assignees = _parse_assignees(row.get("_assign"))
 	return {
@@ -389,6 +512,7 @@ def _serialize_task_row(row):
 		"modified": row.get("modified"),
 		"assignees": assignees,
 		"assignee_names": [_user_label(u) for u in assignees],
+		"assignee_images": _user_images(assignees),
 	}
 
 
@@ -441,8 +565,77 @@ def get_task(config: CockpitConfig, name):
 		"modified": doc.modified,
 		"assignees": assignees,
 		"assignee_names": [_user_label(u) for u in assignees],
+		"assignee_images": _user_images(assignees),
 		"desk_url": f"/app/task/{doc.name}",
 	}
+
+
+def get_checklists(config: CockpitConfig, include_completed=0):
+	"""Return Checklists linked to Issues/Tasks in this department scope."""
+	frappe.has_permission("Checklist", "read", throw=True)
+	department = _require_department(config)
+	include_completed = frappe.utils.cint(include_completed)
+
+	from phamos.api.checklist_inbox import _item_counts_map, _serialize_row
+
+	issue_names = []
+	or_filters = _issue_or_filters(config, department)
+	if or_filters:
+		issue_names = frappe.get_list(
+			"Issue",
+			or_filters=or_filters,
+			pluck="name",
+			limit_page_length=500,
+		)
+
+	task_names = frappe.get_list(
+		"Task",
+		filters={"department": department},
+		pluck="name",
+		limit_page_length=500,
+	)
+
+	if not issue_names and not task_names:
+		return []
+
+	filters_base = {}
+	if not include_completed:
+		filters_base["status"] = ("!=", "Completed")
+
+	fields = [
+		"name",
+		"status",
+		"completion_percentage",
+		"document",
+		"reference_record",
+		"modified",
+		"owner",
+	]
+	merged = {}
+
+	if issue_names:
+		for row in frappe.get_list(
+			"Checklist",
+			filters={**filters_base, "document": "Issue", "reference_record": ("in", issue_names)},
+			fields=fields,
+			order_by="modified desc",
+			limit_page_length=200,
+		):
+			merged[row.name] = row
+
+	if task_names:
+		for row in frappe.get_list(
+			"Checklist",
+			filters={**filters_base, "document": "Task", "reference_record": ("in", task_names)},
+			fields=fields,
+			order_by="modified desc",
+			limit_page_length=200,
+		):
+			merged[row.name] = row
+
+	ordered = sorted(merged.values(), key=lambda r: r.modified or "", reverse=True)[:200]
+	counts = _item_counts_map([r.name for r in ordered])
+	return [_serialize_row(r, counts) for r in ordered]
 
 
 def update_task_status(config: CockpitConfig, name, status):
@@ -524,6 +717,72 @@ def create_task(
 	return get_task(config, doc.name)
 
 
+def update_task(config: CockpitConfig, name, **fields):
+	"""Update whitelisted Task fields within department scope."""
+	frappe.has_permission("Task", "write", throw=True)
+	get_task(config, name)
+
+	doc = frappe.get_doc("Task", name)
+	doc.check_permission("write")
+
+	updates = {k: fields[k] for k in TASK_EDITABLE_FIELDS if k in fields}
+	unknown = set(fields) - set(TASK_EDITABLE_FIELDS)
+	if unknown:
+		frappe.throw(_("Invalid Task field(s): {0}").format(", ".join(sorted(unknown))))
+
+	if "subject" in updates:
+		subject = (updates["subject"] or "").strip()
+		if not subject:
+			frappe.throw(_("Subject is required"))
+		updates["subject"] = subject
+
+	if "status" in updates:
+		status = (updates["status"] or "").strip()
+		if status not in TASK_KANBAN_STATUSES:
+			frappe.throw(_("Invalid status: {0}").format(status))
+		updates["status"] = status
+
+	if "project" in updates and updates["project"]:
+		validate_project(config, updates["project"])
+
+	if "progress" in updates and updates["progress"] is not None:
+		updates["progress"] = frappe.utils.flt(updates["progress"])
+
+	for key, value in updates.items():
+		doc.set(key, value)
+
+	doc.save()
+	return get_task(config, name)
+
+
+def set_task_assignees(config: CockpitConfig, name, users=None):
+	"""Replace Task assignees within department scope."""
+	frappe.has_permission("Task", "write", throw=True)
+	task = get_task(config, name)
+
+	doc = frappe.get_doc("Task", name)
+	doc.check_permission("write")
+
+	desired = set(_parse_list(users))
+	current = {a.get("owner") for a in get_assignments("Task", name)}
+
+	for user in current - desired:
+		remove_assignment("Task", name, user)
+
+	to_add = list(desired - current)
+	if to_add:
+		add_assignment(
+			{
+				"doctype": "Task",
+				"name": name,
+				"assign_to": to_add,
+				"description": doc.subject or task.get("subject"),
+			}
+		)
+
+	return get_task(config, name)
+
+
 def add_task_dependency(config: CockpitConfig, name, depends_on):
 	"""Add a predecessor dependency to a Task (Gantt link mode)."""
 	frappe.has_permission("Task", "write", throw=True)
@@ -541,10 +800,3 @@ def add_task_dependency(config: CockpitConfig, name, depends_on):
 	doc.append("depends_on", {"task": depends_on})
 	doc.save()
 	return get_task(config, name)
-
-
-def get_chat_settings():
-	"""SPA soft-dependency flags for Raven chat."""
-	from phamos.api.issue_raven import get_chat_feature_flags
-
-	return get_chat_feature_flags()

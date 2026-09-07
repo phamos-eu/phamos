@@ -25,6 +25,7 @@ LIST_FIELDS = [
 	"modified",
 	"creation",
 	"opening_date",
+	"description",
 	"_assign",
 ]
 
@@ -95,9 +96,62 @@ def _serialize_issue_row(row):
 		"modified": row.get("modified"),
 		"creation": row.get("creation"),
 		"opening_date": row.get("opening_date"),
+		"description": row.get("description") or "",
+		"checklist_search": row.get("checklist_search") or "",
 		"assignees": assignees,
 		"assignee_names": [_user_label(u) for u in assignees],
 	}
+
+
+def _checklist_search_by_issue(issue_names):
+	"""Map Issue name -> plain text from linked checklist titles and item notes."""
+	if not issue_names:
+		return {}
+
+	checklists = frappe.get_all(
+		"Checklist",
+		filters={"document": "Issue", "reference_record": ("in", list(issue_names))},
+		fields=["name", "reference_record"],
+		limit_page_length=0,
+	)
+	if not checklists:
+		return {}
+
+	blobs = {name: [] for name in issue_names}
+	checklist_to_issue = {}
+	for row in checklists:
+		issue_name = row.reference_record
+		if issue_name not in blobs:
+			continue
+		checklist_to_issue[row.name] = issue_name
+		blobs[issue_name].append(row.name)
+
+	checklist_names = list(checklist_to_issue.keys())
+	if checklist_names:
+		items = frappe.get_all(
+			"Checklist Items",
+			filters={"parent": ("in", checklist_names), "parenttype": "Checklist"},
+			fields=["parent", "note"],
+			limit_page_length=0,
+		)
+		for item in items:
+			issue_name = checklist_to_issue.get(item.parent)
+			if not issue_name:
+				continue
+			note = frappe.utils.strip_html(item.note or "").strip()
+			if note:
+				blobs[issue_name].append(note)
+
+	return {name: " ".join(parts) for name, parts in blobs.items() if parts}
+
+
+def enrich_issue_rows_for_search(rows):
+	"""Attach checklist search text to serialized or raw issue rows, then serialize."""
+	serialized = [_serialize_issue_row(r) for r in rows]
+	search_map = _checklist_search_by_issue([r["name"] for r in serialized if r.get("name")])
+	for row in serialized:
+		row["checklist_search"] = search_map.get(row["name"], "")
+	return serialized
 
 
 def _status_filters(include_closed):
@@ -148,7 +202,7 @@ def get_inbox(view="assigned", include_closed=0):
 			limit_page_length=200,
 		)
 
-	return [_serialize_issue_row(r) for r in rows]
+	return enrich_issue_rows_for_search(rows)
 
 
 @frappe.whitelist()

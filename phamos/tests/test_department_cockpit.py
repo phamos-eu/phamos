@@ -14,6 +14,8 @@ from phamos.api.department_cockpit import (
 	_issue_in_scope,
 	_issue_or_filters,
 	_require_department,
+	update_issue,
+	update_task,
 	validate_project,
 )
 
@@ -92,3 +94,49 @@ class TestDepartmentCockpitScope(FrappeTestCase):
 			filters = _issue_or_filters(HR)
 			self.assertIn(["project", "in", ["P1"]], filters)
 			self.assertIn(["custom_department", "=", "Human Resources"], filters)
+
+	def test_update_issue_rejects_unknown_fields(self):
+		with (
+			patch("frappe.has_permission"),
+			patch("phamos.api.department_cockpit.get_issue", return_value={"name": "ISS-1"}),
+			patch("frappe.get_doc") as get_doc,
+		):
+			doc = MagicMock()
+			get_doc.return_value = doc
+			with self.assertRaises(frappe.ValidationError):
+				update_issue(HR, "ISS-1", custom_field="nope")
+			doc.save.assert_not_called()
+
+	def test_update_issue_rejects_out_of_scope(self):
+		with (
+			patch("frappe.has_permission"),
+			patch(
+				"phamos.api.department_cockpit.get_issue",
+				side_effect=frappe.ValidationError("out of scope"),
+			),
+		):
+			with self.assertRaises(frappe.ValidationError):
+				update_issue(HR, "ISS-1", subject="Updated")
+
+	def test_update_task_rejects_unknown_fields(self):
+		with (
+			patch("frappe.has_permission"),
+			patch("phamos.api.department_cockpit.get_task", return_value={"name": "TASK-1"}),
+			patch("frappe.get_doc") as get_doc,
+		):
+			doc = MagicMock()
+			get_doc.return_value = doc
+			with self.assertRaises(frappe.ValidationError):
+				update_task(HR, "TASK-1", is_group=1)
+			doc.save.assert_not_called()
+
+	def test_update_task_rejects_out_of_scope(self):
+		with (
+			patch("frappe.has_permission"),
+			patch(
+				"phamos.api.department_cockpit.get_task",
+				side_effect=frappe.ValidationError("out of scope"),
+			),
+		):
+			with self.assertRaises(frappe.ValidationError):
+				update_task(HR, "TASK-1", subject="Updated")
