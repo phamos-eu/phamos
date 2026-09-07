@@ -1,11 +1,12 @@
 {
  "actions": [],
  "autoname": "format:ICA-{#####}-{implementation}",
- "creation": "2026-07-17 00:00:00.000000",
+ "creation": "2026-07-17 00:00:00",
  "doctype": "DocType",
  "engine": "InnoDB",
  "field_order": [
   "section_break_context",
+  "title",
   "implementation",
   "open_date",
   "column_break_context",
@@ -32,7 +33,8 @@
   "section_break_d8",
   "closing_comments",
   "column_break_d8",
-  "close_date"
+  "close_date",
+  "amended_from"
  ],
  "fields": [
   {
@@ -69,9 +71,9 @@
    "options": "GitLab Issue"
   },
   {
+   "fetch_from": "implementation.customer",
    "fieldname": "customer",
    "fieldtype": "Link",
-   "fetch_from": "implementation.customer",
    "label": "Customer",
    "options": "Customer",
    "read_only": 1
@@ -93,8 +95,15 @@
    "read_only": 1
   },
   {
+   "fieldname": "title",
+   "fieldtype": "Data",
+   "label": "Title",
+   "no_copy": 1,
+   "reqd": 1
+  },
+  {
    "collapsible": 1,
-   "collapsible_depends_on": "eval:true",
+   "collapsible_depends_on": "emergency_response_actions",
    "fieldname": "section_break_d0",
    "fieldtype": "Section Break",
    "label": "D0: Emergency Response"
@@ -213,11 +222,21 @@
    "fieldname": "close_date",
    "fieldtype": "Date",
    "label": "Close Date"
+  },
+  {
+   "fieldname": "amended_from",
+   "fieldtype": "Link",
+   "label": "Amended From",
+   "no_copy": 1,
+   "options": "Incident Corrective Action",
+   "print_hide": 1,
+   "read_only": 1,
+   "search_index": 1
   }
  ],
  "is_submittable": 1,
  "links": [],
- "modified": "2026-07-20 12:00:00.000000",
+ "modified": "2026-08-27 12:32:58.860179",
  "modified_by": "Administrator",
  "module": "Phamos",
  "name": "Incident Corrective Action",
@@ -252,8 +271,10 @@
    "write": 1
   }
  ],
+ "row_format": "Dynamic",
  "sort_field": "modified",
  "sort_order": "DESC",
  "states": [],
+ "title_field": "title",
  "track_changes": 1
 }
