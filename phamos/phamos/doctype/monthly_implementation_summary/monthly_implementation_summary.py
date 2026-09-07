@@ -1244,15 +1244,10 @@ def _set_timesheet_billable_hours(ts_doc, target_billable_hours):
 
 
 @frappe.whitelist()
-def get_timesheet_approval_rows(docname: str, employee=None, project=None, date_from=None, date_to=None):
+def get_timesheet_approval_rows(docname: str):
 	_require_docname(docname)
 	doc = frappe.get_doc("Monthly Implementation Summary", docname)
 	doc.check_permission("read")
-
-	employee_filter = (employee or "").strip()
-	project_filter = (project or "").strip()
-	from_date = getdate(date_from) if date_from else None
-	to_date = getdate(date_to) if date_to else None
 
 	base_rows = list(doc.timesheets_table or [])
 	timesheet_names = [
@@ -1279,23 +1274,11 @@ def get_timesheet_approval_rows(docname: str, employee=None, project=None, date_
 		emp_name = (getattr(row, "employee_name", "") or "").strip()
 		row_project = (getattr(row, "project", "") or "").strip()
 		row_employee = (getattr(row, "employee", "") or "").strip()
-		row_date_raw = getattr(row, "date", None)
-		row_date = getdate(row_date_raw) if row_date_raw else None
 		meta = meta_by_name.get(ts_name)
 		docstatus = cint(meta.docstatus) if meta else 0
 		status = (meta.status if meta else "") or ""
 		is_pending = _timesheet_is_pending_for_approval(docstatus, status)
 
-		if employee_filter:
-			if row_employee != employee_filter and emp_name != employee_filter:
-				continue
-		if project_filter:
-			if row_project != project_filter:
-				continue
-		if from_date and (not row_date or row_date < from_date):
-			continue
-		if to_date and (not row_date or row_date > to_date):
-			continue
 		if not is_pending:
 			continue
 
@@ -1308,6 +1291,8 @@ def get_timesheet_approval_rows(docname: str, employee=None, project=None, date_
 				"project": row_project,
 				"total_hours": flt(getattr(row, "total_hours", 0)),
 				"billable_hours": flt(getattr(row, "billable_hours", 0)),
+				"description": (getattr(row, "description", "") or ""),
+				"rating": (getattr(row, "rating", "") or ""),
 				"docstatus": docstatus,
 				"status": status,
 				"is_pending": 1 if is_pending else 0,
