@@ -22,14 +22,14 @@
 	>
 		<template #body-content>
 			<div class="space-y-4">
-				<p v-if="referenceTitle" class="text-sm text-gray-600">
+				<p v-if="referenceTitle" class="text-sm text-gray-600 dark:text-gray-400">
 					Checklist name:
-					<span class="font-medium text-gray-900">{{ referenceTitle }}</span>
+					<span class="font-medium text-gray-900 dark:text-gray-100">{{ referenceTitle }}</span>
 				</p>
 
 				<div>
 					<div class="mb-2 flex items-center justify-between gap-2">
-						<label class="text-xs font-medium text-gray-600">Items *</label>
+						<label class="text-xs font-medium text-gray-600 dark:text-gray-400">Items *</label>
 						<Button size="sm" variant="subtle" @click="addRow">Add item</Button>
 					</div>
 
@@ -37,14 +37,16 @@
 						<div
 							v-for="(row, index) in rows"
 							:key="row.id"
-							class="rounded-md border border-gray-200 p-3"
+							class="rounded-md border border-gray-200 p-3 dark:border-gray-700 dark:bg-gray-800/40"
 						>
 							<div class="mb-2 flex items-center justify-between gap-2">
-								<span class="text-xs font-semibold text-gray-500">Item {{ index + 1 }}</span>
+								<span class="text-xs font-semibold text-gray-500 dark:text-gray-400">
+									Item {{ index + 1 }}
+								</span>
 								<button
 									v-if="rows.length > 1"
 									type="button"
-									class="text-xs text-gray-500 hover:text-red-600"
+									class="text-xs text-gray-500 hover:text-red-600 dark:text-gray-400 dark:hover:text-red-400"
 									@click="removeRow(row.id)"
 								>
 									Remove
@@ -52,14 +54,15 @@
 							</div>
 							<div class="space-y-2">
 								<textarea
+									:ref="(el) => setNoteRef(row.id, el)"
 									v-model="row.note"
 									rows="2"
-									class="w-full rounded-md border border-gray-300 px-3 py-2 text-sm"
+									class="w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-100"
 									placeholder="What needs to be done?"
 								/>
 								<div class="grid grid-cols-2 gap-2">
 									<div>
-										<label class="mb-1 block text-[11px] font-medium text-gray-500">
+										<label class="mb-1 block text-[11px] font-medium text-gray-500 dark:text-gray-400">
 											Document
 										</label>
 										<FrappeLink
@@ -70,7 +73,7 @@
 										/>
 									</div>
 									<div>
-										<label class="mb-1 block text-[11px] font-medium text-gray-500">
+										<label class="mb-1 block text-[11px] font-medium text-gray-500 dark:text-gray-400">
 											Record
 										</label>
 										<FrappeLink
@@ -86,14 +89,14 @@
 					</div>
 				</div>
 
-				<p v-if="error" class="text-sm text-red-600">{{ error }}</p>
+				<p v-if="error" class="text-sm text-red-600 dark:text-red-400">{{ error }}</p>
 			</div>
 		</template>
 	</Dialog>
 </template>
 
 <script setup>
-import { ref, watch } from "vue"
+import { nextTick, ref, watch } from "vue"
 import { call } from "frappe-ui"
 import FrappeLink from "@spa/components/FrappeLink.vue"
 
@@ -110,8 +113,14 @@ const API = "phamos.api.checklist_inbox"
 
 let nextId = 1
 const rows = ref([])
+const noteRefs = new Map()
 const creating = ref(false)
 const error = ref("")
+
+function setNoteRef(id, el) {
+	if (el) noteRefs.set(id, el)
+	else noteRefs.delete(id)
+}
 
 function emptyRow() {
 	return {
@@ -124,12 +133,16 @@ function emptyRow() {
 
 function resetRows() {
 	nextId = 1
+	noteRefs.clear()
 	rows.value = [emptyRow()]
 	error.value = ""
 }
 
-function addRow() {
-	rows.value = [...rows.value, emptyRow()]
+async function addRow() {
+	const row = emptyRow()
+	rows.value = [...rows.value, row]
+	await nextTick()
+	noteRefs.get(row.id)?.focus()
 }
 
 function removeRow(id) {
