@@ -202,20 +202,25 @@ class MonthlyImplementationSummary(Document):
 
 	def _auto_submit_draft_delivery_notes(self):
 		errors = []
-		for row in (self.mis_delivery_notes or []):
-			dn_name = row.delivery_note
-			if not dn_name or not frappe.db.exists("Delivery Note", dn_name):
-				continue
-			dn_status = cint(frappe.db.get_value("Delivery Note", dn_name, "docstatus") or 0)
-			if dn_status != 0:
-				continue
-			try:
-				dn_doc = frappe.get_doc("Delivery Note", dn_name)
-				dn_doc.submit()
-				row.status = dn_doc.status or ""
-				row.grand_total = flt(dn_doc.grand_total)
-			except Exception as e:
-				errors.append(f"{frappe.bold(dn_name)}: {str(e)}")
+		prev_submitting = frappe.flags.get("mis_submitting")
+		frappe.flags.mis_submitting = self.name
+		try:
+			for row in (self.mis_delivery_notes or []):
+				dn_name = row.delivery_note
+				if not dn_name or not frappe.db.exists("Delivery Note", dn_name):
+					continue
+				dn_status = cint(frappe.db.get_value("Delivery Note", dn_name, "docstatus") or 0)
+				if dn_status != 0:
+					continue
+				try:
+					dn_doc = frappe.get_doc("Delivery Note", dn_name)
+					dn_doc.submit()
+					row.status = dn_doc.status or ""
+					row.grand_total = flt(dn_doc.grand_total)
+				except Exception as e:
+					errors.append(f"{frappe.bold(dn_name)}: {str(e)}")
+		finally:
+			frappe.flags.mis_submitting = prev_submitting
 		if errors:
 			frappe.throw(
 				frappe._("Could not submit the following Delivery Note(s):<br>{0}").format(
@@ -254,7 +259,9 @@ class MonthlyImplementationSummary(Document):
 
 	def _all_linked_docs_completed(self):
 		"""True only if every linked Sales Order / Delivery Note is fulfilled and no Sales Order
-		for this Implementation is still open (an open SO may not have a Delivery Note yet)."""
+		for this Implementation is still open (an open SO may not have a Delivery Note yet).
+		A timesheet-only MIS (no Sales Order / Delivery Note ever linked) has nothing to wait
+		on and is treated as completed."""
 		if any(
 			(row.status or "") not in ("Completed", "Closed")
 			for row in (self.sales_order_status_information or [])
@@ -267,7 +274,7 @@ class MonthlyImplementationSummary(Document):
 			if row.delivery_note:
 				delivery_notes.add(row.delivery_note)
 		if not sales_orders and not delivery_notes:
-			return False
+			return not (self.sales_order_status_information or [])
 		for so in sales_orders:
 			status = frappe.db.get_value("Sales Order", so, "status")
 			if status not in ("Completed", "Closed"):
@@ -290,6 +297,18 @@ class MonthlyImplementationSummary(Document):
 		self._set_status("Closed", frappe._("Auto-closed: all linked Sales Orders / Delivery Notes are fulfilled."))
 		return True
 
+	def _sync_snapshot(self):
+		"""Fields sync_and_auto_close may touch — used to skip saving when nothing changed."""
+		return (
+			tuple((r.delivery_note, r.status, flt(r.grand_total)) for r in (self.mis_delivery_notes or [])),
+			tuple((r.sales_invoice, r.status, flt(r.grand_total)) for r in (self.mis_sales_invoices or [])),
+			tuple(
+				(r.sales_order, r.status, r.total_hrs, r.delivered_total_hrs, r.remaining_hrs)
+				for r in (self.sales_order_status_information or [])
+			),
+			(flt(self.sales_order_qty), flt(self.dn_qty), flt(self.timesheet_hrs), flt(self.remaining_hrs), cint(self.open_so)),
+		)
+
 	def sync_and_auto_close(self):
 		"""Re-read live Delivery Note / Sales Invoice / Sales Order status into this MIS.
 
@@ -299,6 +318,7 @@ class MonthlyImplementationSummary(Document):
 		"""
 		if self.is_closed():
 			return False
+		before = self._sync_snapshot()
 		for row in (self.mis_delivery_notes or []):
 			if not row.delivery_note:
 				continue
@@ -314,9 +334,10 @@ class MonthlyImplementationSummary(Document):
 				row.status = live.status or ""
 				row.grand_total = flt(live.grand_total)
 		self._refresh_sales_order_status_and_financials()
-		self.flags.ignore_permissions = True
-		self.flags.ignore_validate_update_after_submit = True
-		self.save()
+		if self._sync_snapshot() != before:
+			self.flags.ignore_permissions = True
+			self.flags.ignore_validate_update_after_submit = True
+			self.save()
 		return self.auto_close_if_fulfilled()
 
 	def _recalculate_delivery_note_item_amounts(self):
@@ -1570,11 +1591,10 @@ def _implementations_for_sales_invoice(si):
 
 def _mis_after_dn_submit(dn):
 	"""(mis_names_get_timesheet_stamp, mis_names_to_save) for this submitted Delivery Note."""
-	stamp = {n for n in frappe.get_all(
-		"Monthly Implementation Summary",
-		filters={"delivery_note": dn.name, "docstatus": ["!=", 2]},
-		pluck="name",
-	) if n}
+	stamp = set()
+	for n in frappe.get_all("MIS Delivery Note", filters={"delivery_note": dn.name}, pluck="parent"):
+		if n and cint(frappe.db.get_value("Monthly Implementation Summary", n, "docstatus")) != 2:
+			stamp.add(n)
 	for n in frappe.get_all(
 		"Delivery Note Item",
 		filters={"parent": dn.name, "custom_against_monthly_implementation_summary": ["is", "set"]},
@@ -1601,7 +1621,10 @@ def update_mis_timesheets_on_delivery_note_submit(doc, method=None):
 		return
 	stamp, save = _mis_after_dn_submit(doc)
 	dn_name = doc.name
+	submitting = frappe.flags.get("mis_submitting")
 	for mis_name in save:
+		if mis_name == submitting:
+			continue
 		if not mis_name or not frappe.db.exists("Monthly Implementation Summary", mis_name):
 			continue
 		m = frappe.get_doc("Monthly Implementation Summary", mis_name)
