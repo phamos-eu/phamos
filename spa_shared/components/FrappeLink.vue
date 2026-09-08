@@ -25,7 +25,7 @@ const props = defineProps({
 		default: "",
 	},
 	filters: {
-		type: Object,
+		type: [Object, Array],
 		default: () => ({}),
 	},
 	disabled: {

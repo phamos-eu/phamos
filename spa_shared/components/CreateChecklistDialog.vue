@@ -39,7 +39,7 @@
 						doctype="User"
 						v-model="checklistOwner"
 						placeholder="Select owner"
-						:filters="{ enabled: 1 }"
+						:filters="ownerFilters"
 					/>
 				</div>
 
@@ -134,6 +134,13 @@ const props = defineProps({
 const emit = defineEmits(["update:modelValue", "created"])
 
 const API = "phamos.api.checklist_inbox"
+
+/** Enabled Users who hold the Employee role (same pattern as Desk Checklist Owner). */
+const ownerFilters = [
+	["Has Role", "role", "=", "Employee"],
+	["Has Role", "parenttype", "=", "User"],
+	["enabled", "=", 1],
+]
 
 let nextId = 1
 const title = ref("")
