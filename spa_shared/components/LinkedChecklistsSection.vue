@@ -1,10 +1,7 @@
 <template>
 	<section class="mb-5">
-		<div class="mb-2 flex items-center justify-between gap-2">
-			<div class="text-[11px] font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400">
-				Checklists
-			</div>
-			<Button size="sm" @click="showCreate = true">New checklist</Button>
+		<div class="mb-2 text-[11px] font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400">
+			Checklists
 		</div>
 
 		<div v-if="loading" class="text-sm text-gray-500 dark:text-gray-400">Loading checklists…</div>
@@ -17,25 +14,33 @@
 				:key="row.name"
 				class="rounded-md border border-gray-200 bg-white dark:border-gray-700 dark:bg-gray-900"
 			>
-				<button
-					type="button"
-					class="flex w-full items-center gap-2 px-3 py-2.5 text-left hover:bg-gray-50 dark:hover:bg-gray-800"
-					@click="toggleExpand(row.name)"
+				<div
+					class="flex w-full items-center gap-1 px-2 py-1.5 hover:bg-surface-gray-2 dark:hover:bg-gray-800"
 				>
-					<span class="text-xs text-gray-400">{{ expanded[row.name] ? "▼" : "▶" }}</span>
-					<span class="min-w-0 flex-1 truncate text-sm font-medium text-gray-900 dark:text-gray-100">
-						{{ row.name }}
-					</span>
-					<span
-						class="rounded-full px-1.5 py-0.5 text-[10px] font-semibold"
-						:class="statusClass(row.status)"
+					<Button
+						variant="ghost"
+						theme="gray"
+						size="sm"
+						:icon="expanded[row.name] ? 'chevron-down' : 'chevron-right'"
+						:label="expanded[row.name] ? 'Collapse checklist' : 'Expand checklist'"
+						@click="toggleExpand(row.name)"
+					/>
+					<button
+						type="button"
+						class="flex min-w-0 flex-1 items-center gap-2 rounded-md px-1 py-1 text-left"
+						@click="toggleExpand(row.name)"
 					>
-						{{ row.status }}
-					</span>
-					<span class="text-[11px] tabular-nums text-gray-500">
-						{{ row.done_count || 0 }}/{{ row.total_count || 0 }}
-					</span>
-				</button>
+						<span class="min-w-0 flex-1 truncate text-sm font-medium text-ink-gray-8 dark:text-gray-100">
+							{{ row.title || row.name }}
+						</span>
+						<Badge
+							:label="`${row.status} ${row.done_count || 0}/${row.total_count || 0}`"
+							:theme="statusTheme(row.status)"
+							size="sm"
+							variant="subtle"
+						/>
+					</button>
+				</div>
 
 				<div v-if="expanded[row.name]" class="border-t border-gray-100 px-3 py-3 dark:border-gray-800">
 					<div
@@ -44,22 +49,18 @@
 					>
 						Loading items…
 					</div>
-					<template v-else-if="details[row.name]">
-						<ChecklistEditor
-							:checklist="details[row.name]"
-							compact
-							@updated="(payload) => onChecklistUpdated(row.name, payload)"
-						/>
-						<button
-							type="button"
-							class="mt-3 text-xs text-blue-600 hover:underline dark:text-blue-400"
-							@click="openInChecklists(row.name)"
-						>
-							Open in Checklists
-						</button>
-					</template>
+					<ChecklistEditor
+						v-else-if="details[row.name]"
+						:checklist="details[row.name]"
+						compact
+						@updated="(payload) => onChecklistUpdated(row.name, payload)"
+					/>
 				</div>
 			</div>
+		</div>
+
+		<div class="mt-3">
+			<Button size="sm" @click="showCreate = true">New checklist</Button>
 		</div>
 
 		<CreateChecklistDialog
@@ -74,8 +75,7 @@
 
 <script setup>
 import { onMounted, reactive, ref, watch } from "vue"
-import { useRouter } from "vue-router"
-import { call } from "frappe-ui"
+import { Badge, call } from "frappe-ui"
 import ChecklistEditor from "@spa/components/ChecklistEditor.vue"
 import CreateChecklistDialog from "@spa/components/CreateChecklistDialog.vue"
 
@@ -86,7 +86,6 @@ const props = defineProps({
 })
 
 const API = "phamos.api.checklist_inbox"
-const router = useRouter()
 
 const loading = ref(false)
 const summaries = ref([])
@@ -95,11 +94,21 @@ const details = reactive({})
 const detailLoading = reactive({})
 const showCreate = ref(false)
 
-function statusClass(status) {
-	if (status === "Completed") return "bg-green-100 text-green-800 dark:bg-green-950 dark:text-green-300"
-	if (status === "In Progress") return "bg-amber-100 text-amber-800 dark:bg-amber-950 dark:text-amber-300"
-	if (status === "Not Started") return "bg-gray-100 text-gray-700 dark:bg-gray-800 dark:text-gray-300"
-	return "bg-blue-100 text-blue-800 dark:bg-blue-950 dark:text-blue-300"
+function statusTheme(status) {
+	if (status === "Completed") return "green"
+	if (status === "In Progress") return "orange"
+	return "gray"
+}
+
+function applyDefaultExpansion(rows) {
+	Object.keys(expanded).forEach((k) => delete expanded[k])
+	const toLoad = []
+	for (const row of rows) {
+		const open = row.status !== "Completed"
+		expanded[row.name] = open
+		if (open) toLoad.push(row.name)
+	}
+	return toLoad
 }
 
 async function loadSummaries() {
@@ -113,6 +122,8 @@ async function loadSummaries() {
 			document: props.document,
 			reference_record: props.referenceRecord,
 		})
+		const toLoad = applyDefaultExpansion(summaries.value)
+		await Promise.all(toLoad.map((name) => loadDetail(name)))
 	} finally {
 		loading.value = false
 	}
@@ -134,7 +145,8 @@ async function toggleExpand(name) {
 	}
 }
 
-function onChecklistUpdated(name, payload) {
+async function onChecklistUpdated(name, payload) {
+	const previousStatus = summaries.value.find((r) => r.name === name)?.status
 	details[name] = payload
 	const idx = summaries.value.findIndex((r) => r.name === name)
 	if (idx >= 0) {
@@ -146,18 +158,19 @@ function onChecklistUpdated(name, payload) {
 			total_count: payload.total_count,
 		}
 	}
+	if (payload.status === "Completed") {
+		expanded[name] = false
+	} else if (previousStatus === "Completed" && payload.status !== "Completed") {
+		expanded[name] = true
+		if (!details[name]) await loadDetail(name)
+	}
 }
 
 async function onChecklistCreated(created) {
 	await loadSummaries()
-	expanded[created.name] = true
-	details[created.name] = created
-}
-
-function openInChecklists(name) {
-	// Checklist inbox route exists on I Own My Work; other cockpits skip navigation.
-	if (router.hasRoute("ChecklistDetail")) {
-		router.push({ name: "ChecklistDetail", params: { name } })
+	if (created?.name) {
+		expanded[created.name] = created.status !== "Completed"
+		details[created.name] = created
 	}
 }
 

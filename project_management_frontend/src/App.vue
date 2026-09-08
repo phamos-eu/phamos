@@ -57,8 +57,24 @@ const inactiveClass =
 	"text-gray-600 hover:bg-gray-100 hover:text-gray-900 dark:text-gray-400 dark:hover:bg-gray-800 dark:hover:text-gray-100"
 
 const topItems = [
-	{ name: "Issues", label: "Issues", icon: "inbox", match: ["Issues", "IssueDetail"] },
-	{ name: "Tasks", label: "Tasks", icon: "check-square", match: ["Tasks", "TaskDetail"] },
+	{
+		name: "Issues",
+		label: "Issues",
+		icon: "inbox",
+		match: ["Issues"],
+		children: [
+			{ name: "IssuesList", label: "List", icon: "list", match: ["IssuesList", "IssueDetail"] },
+		],
+	},
+	{
+		name: "Tasks",
+		label: "Tasks",
+		icon: "check-square",
+		match: ["Tasks"],
+		children: [
+			{ name: "TasksGantt", label: "Gantt", icon: "bar-chart-2", match: ["TasksGantt", "TaskDetail"] },
+		],
+	}
 ]
 
 const implementationItems = [
@@ -109,7 +125,9 @@ onMounted(() => {
 })
 
 const pageTitle = computed(() => {
-	if (route.name === "Tasks" || route.name === "TaskDetail") return "Tasks"
+	if (route.name === "Tasks" || route.name === "TasksGantt" || route.name === "TaskDetail") {
+		return "Tasks"
+	}
 	if (route.name === "ImplementationsHub") return "Implementations"
 	if (route.name === "WeeklyMonitoring" || route.name === "WeeklyMonitoringDetail") {
 		return "Weekly Implementation Monitoring"
@@ -118,8 +136,11 @@ const pageTitle = computed(() => {
 })
 
 const pageSubtitle = computed(() => {
-	if (route.name === "Tasks" || route.name === "TaskDetail") {
+	if (route.name === "TasksGantt" || route.name === "TaskDetail") {
 		return "Project Management department tasks"
+	}
+	if (route.name === "Tasks") {
+		return "Project Management department tasks overview"
 	}
 	if (route.name === "ImplementationsHub") {
 		return "Navigate implementation workflows for the Project Management department"
@@ -130,6 +151,9 @@ const pageSubtitle = computed(() => {
 	if (route.name === "WeeklyMonitoringDetail") {
 		return route.params.name || "Implementation review"
 	}
-	return "Project Management department issues"
+	if (route.name === "IssuesList" || route.name === "IssueDetail") {
+		return "Project Management department issues"
+	}
+	return "Project Management department issues overview"
 })
 </script>

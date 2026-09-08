@@ -193,6 +193,44 @@ export function formatDurationShort(seconds) {
 	return `${sec}s`
 }
 
+/** Issue open moment: opening_date (date) preferred, else creation. */
+export function getIssueOpenedAt(issue) {
+	if (!issue) return null
+	if (issue.opening_date) {
+		const d = dayjs(String(issue.opening_date).slice(0, 10))
+		return d.isValid() ? d.startOf("day") : null
+	}
+	if (issue.creation) {
+		const d = dayjs(String(issue.creation).replace(" ", "T"))
+		return d.isValid() ? d : null
+	}
+	return null
+}
+
+/** Milliseconds since epoch for sorting by issue age (older = smaller). */
+export function getIssueAgeMs(issue) {
+	const opened = getIssueOpenedAt(issue)
+	return opened ? opened.valueOf() : Number.POSITIVE_INFINITY
+}
+
+/** Human-readable issue age, e.g. "Today", "3 days", "2 weeks". */
+export function formatIssueAge(issue, now = null) {
+	const opened = getIssueOpenedAt(issue)
+	if (!opened) return "—"
+	const end = (now ? dayjs(now) : dayjs()).startOf("day")
+	const start = opened.startOf("day")
+	const days = Math.max(0, end.diff(start, "day"))
+	if (days === 0) return "Today"
+	if (days === 1) return "1 day"
+	if (days < 7) return `${days} days`
+	const weeks = Math.floor(days / 7)
+	if (days < 30) return weeks === 1 ? "1 week" : `${weeks} weeks`
+	const months = Math.floor(days / 30)
+	if (days < 365) return months === 1 ? "1 month" : `${months} months`
+	const years = Math.floor(days / 365)
+	return years === 1 ? "1 year" : `${years} years`
+}
+
 /** Gantt day header label mode from zoom (px per day). */
 export function getGanttDayLabelMode(zoom) {
 	if (zoom >= 40) return "full"

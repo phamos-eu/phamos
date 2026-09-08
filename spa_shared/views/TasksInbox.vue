@@ -5,53 +5,19 @@
 			:class="selectedName ? 'w-1/3 flex-none' : 'flex-1'"
 		>
 			<div
-				class="flex flex-wrap items-center justify-between gap-3 border-b border-gray-200 px-5 py-3 dark:border-gray-800"
+				v-if="configError"
+				class="flex flex-1 items-center justify-center px-6 text-center text-sm text-red-600 dark:text-red-400"
 			>
-				<div class="inline-flex rounded-lg border border-gray-200 p-0.5 dark:border-gray-700">
-					<button
-						v-for="opt in layouts"
-						:key="opt.id"
-						class="rounded-md px-2.5 py-1 text-xs font-medium transition"
-						:class="
-							layout === opt.id
-								? 'bg-gray-900 text-white dark:bg-gray-100 dark:text-gray-900'
-								: 'text-gray-600 hover:bg-gray-50 hover:text-gray-900 dark:text-gray-400 dark:hover:bg-gray-800 dark:hover:text-gray-100'
-						"
-						@click="layout = opt.id"
-					>
-						{{ opt.label }}
-					</button>
-				</div>
-				<div v-if="layout !== 'gantt'" class="flex items-center gap-3">
-					<label class="flex items-center gap-2 text-sm text-gray-600 dark:text-gray-400">
-						<input v-model="includeCompleted" type="checkbox" class="rounded border-gray-300 dark:border-gray-600" />
-						Show completed
-					</label>
-					<input
-						v-model="search"
-						type="search"
-						placeholder="Search…"
-						class="h-8 w-44 rounded-md border border-gray-300 bg-white px-2 text-sm dark:border-gray-600 dark:bg-gray-800 dark:text-gray-200"
-					/>
-				</div>
-			</div>
-
-			<div v-if="configError" class="flex flex-1 items-center justify-center px-6 text-center text-sm text-red-600 dark:text-red-400">
 				{{ configError }}
 			</div>
-			<div v-else-if="loading" class="flex flex-1 items-center justify-center text-sm text-gray-500 dark:text-gray-400">
+			<div
+				v-else-if="loading"
+				class="flex flex-1 items-center justify-center text-sm text-gray-500 dark:text-gray-400"
+			>
 				Loading…
 			</div>
-			<template v-else-if="!filteredTasks.length && layout !== 'gantt'">
-				<div class="flex flex-1 flex-col items-center justify-center gap-2 px-6 text-center">
-					<p class="font-medium text-gray-900 dark:text-gray-100">No {{ spaConfig.label }} tasks found</p>
-					<p class="max-w-sm text-sm text-gray-500 dark:text-gray-400">
-						Tasks linked to the {{ spaConfig.label }} department configured in phamos Settings will appear here.
-					</p>
-				</div>
-			</template>
 			<TaskGantt
-				v-else-if="layout === 'gantt'"
+				v-else
 				v-model:search="search"
 				v-model:include-completed="includeCompleted"
 				:tasks="filteredTasks"
@@ -61,43 +27,26 @@
 				@dependency-change="onGanttDependencyChange"
 				@created="onTaskCreated"
 			/>
-			<TaskKanban
-				v-else
-				:tasks="filteredTasks"
-				:selected-name="selectedName"
-				@select="openTask"
-				@status-change="onKanbanStatusChange"
-			/>
 		</section>
 
 		<aside
 			v-if="selectedName"
-			class="flex w-2/3 min-w-0 flex-none flex-col bg-white dark:bg-gray-900 md:flex-row"
+			class="flex w-2/3 min-w-0 flex-none flex-col overflow-y-auto bg-white dark:bg-gray-900"
 		>
 			<div
-				class="flex min-h-0 min-w-0 flex-1 flex-col overflow-y-auto"
-				:class="{ 'md:border-r md:border-gray-200 dark:md:border-gray-800': showChatColumn }"
+				v-if="detailLoading && !selectedTask"
+				class="flex flex-1 items-center justify-center text-sm text-gray-500 dark:text-gray-400"
 			>
-				<div
-					v-if="detailLoading && !selectedTask"
-					class="flex flex-1 items-center justify-center text-sm text-gray-500 dark:text-gray-400"
-				>
-					Loading…
-				</div>
-				<TaskDetail v-else-if="selectedTask" :task="selectedTask" @close="closeTask" />
+				Loading…
 			</div>
-
-			<div
-				v-if="showChatColumn && selectedTask"
-				class="flex min-h-[280px] min-w-0 flex-1 flex-col border-t border-gray-200 dark:border-gray-800 md:min-h-0 md:border-l md:border-t-0"
-			>
-				<IssueChat
-					:document-name="selectedTask.name"
-					linked-doctype="Task"
-					:chat-flags="chatFlags"
-					:api-prefix="API"
-				/>
-			</div>
+			<TaskDetail
+				v-else-if="selectedTask"
+				:task="selectedTask"
+				:options="formOptions"
+				:api-prefix="API"
+				@close="closeTask"
+				@updated="onTaskUpdated"
+			/>
 		</aside>
 	</div>
 </template>
@@ -106,22 +55,15 @@
 import { computed, onMounted, ref, watch } from "vue"
 import { useRoute, useRouter } from "vue-router"
 import { call, toast } from "frappe-ui"
-import IssueChat from "@spa/components/IssueChat.vue"
 import TaskDetail from "@spa/components/TaskDetail.vue"
 import TaskGantt from "@spa/components/TaskGantt.vue"
-import TaskKanban from "@spa/components/TaskKanban.vue"
 import spaConfig from "@/config"
 
 const API = spaConfig.api
-const layouts = [
-	{ id: "gantt", label: "Gantt" },
-	{ id: "kanban", label: "Kanban" },
-]
 
 const route = useRoute()
 const router = useRouter()
 
-const layout = ref("gantt")
 const includeCompleted = ref(false)
 const search = ref("")
 const loading = ref(false)
@@ -130,9 +72,11 @@ const tasks = ref([])
 const selectedName = ref(null)
 const selectedTask = ref(null)
 const detailLoading = ref(false)
-const chatFlags = ref({ raven_installed: false, enabled: false, raven_unavailable: true })
-
-const showChatColumn = computed(() => !!chatFlags.value.raven_installed)
+const formOptions = ref({
+	priorities: [],
+	shortlist_users: [],
+	projects: [],
+})
 
 const filteredTasks = computed(() => {
 	const q = search.value.trim().toLowerCase()
@@ -144,13 +88,11 @@ const filteredTasks = computed(() => {
 	)
 })
 
-async function loadSettings() {
+async function loadOptions() {
 	try {
-		const settings = await call(`${API}.${spaConfig.settingsMethod}`)
-		chatFlags.value = settings.chat || chatFlags.value
-		configError.value = settings[spaConfig.departmentField]
-			? ""
-			: `Configure ${spaConfig.label} Department in phamos Settings.`
+		formOptions.value = await call(`${API}.get_form_options`)
+		const dept = formOptions.value[spaConfig.departmentField]
+		configError.value = dept ? "" : `Configure ${spaConfig.label} Department in phamos Settings.`
 	} catch (e) {
 		configError.value = e?.messages?.[0] || e?.message || `Could not load ${spaConfig.label} settings`
 	}
@@ -186,17 +128,7 @@ async function openTask(name) {
 function closeTask() {
 	selectedName.value = null
 	selectedTask.value = null
-	router.replace({ name: "Tasks" })
-}
-
-async function onKanbanStatusChange({ name, status }) {
-	try {
-		const updated = await call(`${API}.update_task_status`, { name, status })
-		await loadTasks()
-		if (selectedName.value === name) selectedTask.value = updated
-	} catch (e) {
-		await loadTasks()
-	}
+	router.replace({ name: "TasksGantt" })
 }
 
 async function onGanttDateChange({ name, exp_start_date, exp_end_date }) {
@@ -226,7 +158,12 @@ async function onGanttDependencyChange({ name, depends_on }) {
 
 async function onTaskCreated(name) {
 	await loadTasks()
-	await openTask(name)
+	if (name) await openTask(name)
+}
+
+async function onTaskUpdated(task) {
+	selectedTask.value = task
+	await loadTasks()
 }
 
 watch(includeCompleted, () => {
@@ -245,7 +182,7 @@ watch(
 )
 
 onMounted(async () => {
-	await loadSettings()
+	await loadOptions()
 	await loadTasks()
 	if (route.params.name) await openTask(route.params.name)
 })

@@ -22,29 +22,32 @@
 	>
 		<template #body-content>
 			<div class="space-y-4">
-				<p v-if="referenceTitle" class="text-sm text-gray-600">
-					Checklist name:
-					<span class="font-medium text-gray-900">{{ referenceTitle }}</span>
-				</p>
+				<FormControl
+					v-model="title"
+					label="Title"
+					type="text"
+					required
+					size="sm"
+					placeholder="Checklist title"
+				/>
 
 				<div>
-					<div class="mb-2 flex items-center justify-between gap-2">
-						<label class="text-xs font-medium text-gray-600">Items *</label>
-						<Button size="sm" variant="subtle" @click="addRow">Add item</Button>
-					</div>
+					<label class="mb-2 block text-xs font-medium text-gray-600 dark:text-gray-400">Items *</label>
 
 					<div class="space-y-3">
 						<div
 							v-for="(row, index) in rows"
 							:key="row.id"
-							class="rounded-md border border-gray-200 p-3"
+							class="rounded-md border border-gray-200 p-3 dark:border-gray-700 dark:bg-gray-800/40"
 						>
 							<div class="mb-2 flex items-center justify-between gap-2">
-								<span class="text-xs font-semibold text-gray-500">Item {{ index + 1 }}</span>
+								<span class="text-xs font-semibold text-gray-500 dark:text-gray-400">
+									Item {{ index + 1 }}
+								</span>
 								<button
 									v-if="rows.length > 1"
 									type="button"
-									class="text-xs text-gray-500 hover:text-red-600"
+									class="text-xs text-gray-500 hover:text-red-600 dark:text-gray-400 dark:hover:text-red-400"
 									@click="removeRow(row.id)"
 								>
 									Remove
@@ -58,14 +61,15 @@
 									placeholder="Short description"
 								/>
 								<textarea
+									:ref="(el) => setNoteRef(row.id, el)"
 									v-model="row.note"
 									rows="2"
-									class="w-full rounded-md border border-gray-300 px-3 py-2 text-sm"
+									class="w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-100"
 									placeholder="What needs to be done?"
 								/>
 								<div class="grid grid-cols-2 gap-2">
 									<div>
-										<label class="mb-1 block text-[11px] font-medium text-gray-500">
+										<label class="mb-1 block text-[11px] font-medium text-gray-500 dark:text-gray-400">
 											Document
 										</label>
 										<FrappeLink
@@ -76,7 +80,7 @@
 										/>
 									</div>
 									<div>
-										<label class="mb-1 block text-[11px] font-medium text-gray-500">
+										<label class="mb-1 block text-[11px] font-medium text-gray-500 dark:text-gray-400">
 											Record
 										</label>
 										<FrappeLink
@@ -90,16 +94,20 @@
 							</div>
 						</div>
 					</div>
+
+					<div class="mt-3">
+						<Button size="sm" @click="addRow">Add item</Button>
+					</div>
 				</div>
 
-				<p v-if="error" class="text-sm text-red-600">{{ error }}</p>
+				<p v-if="error" class="text-sm text-red-600 dark:text-red-400">{{ error }}</p>
 			</div>
 		</template>
 	</Dialog>
 </template>
 
 <script setup>
-import { ref, watch } from "vue"
+import { nextTick, ref, watch } from "vue"
 import { call } from "frappe-ui"
 import FrappeLink from "@spa/components/FrappeLink.vue"
 
@@ -115,9 +123,16 @@ const emit = defineEmits(["update:modelValue", "created"])
 const API = "phamos.api.checklist_inbox"
 
 let nextId = 1
+const title = ref("")
 const rows = ref([])
+const noteRefs = new Map()
 const creating = ref(false)
 const error = ref("")
+
+function setNoteRef(id, el) {
+	if (el) noteRefs.set(id, el)
+	else noteRefs.delete(id)
+}
 
 function emptyRow() {
 	return {
@@ -129,14 +144,19 @@ function emptyRow() {
 	}
 }
 
-function resetRows() {
+function resetForm() {
 	nextId = 1
+	noteRefs.clear()
+	title.value = (props.referenceTitle || "").trim()
 	rows.value = [emptyRow()]
 	error.value = ""
 }
 
-function addRow() {
-	rows.value = [...rows.value, emptyRow()]
+async function addRow() {
+	const row = emptyRow()
+	rows.value = [...rows.value, row]
+	await nextTick()
+	noteRefs.get(row.id)?.focus()
 }
 
 function removeRow(id) {
@@ -163,6 +183,11 @@ function buildItems() {
 
 async function submit() {
 	error.value = ""
+	const name = title.value.trim()
+	if (!name) {
+		error.value = "Title is required"
+		return
+	}
 	const items = buildItems()
 	if (!items.length) {
 		error.value = "Add at least one checklist item"
@@ -174,6 +199,7 @@ async function submit() {
 		const created = await call(`${API}.create_spa_checklist`, {
 			document: props.document,
 			reference_record: props.referenceRecord,
+			name,
 			items,
 		})
 		emit("created", created)
@@ -188,7 +214,7 @@ async function submit() {
 watch(
 	() => props.modelValue,
 	(open) => {
-		if (open) resetRows()
+		if (open) resetForm()
 	}
 )
 </script>
