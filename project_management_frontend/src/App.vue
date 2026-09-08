@@ -74,7 +74,13 @@ const topItems = [
 		children: [
 			{ name: "TasksGantt", label: "Gantt", icon: "bar-chart-2", match: ["TasksGantt", "TaskDetail"] },
 		],
-	}
+	},
+	{
+		name: "Checklists",
+		label: "Checklists",
+		icon: "list",
+		match: ["Checklists", "ChecklistDetail"],
+	},
 ]
 
 const implementationItems = [
@@ -128,6 +134,7 @@ const pageTitle = computed(() => {
 	if (route.name === "Tasks" || route.name === "TasksGantt" || route.name === "TaskDetail") {
 		return "Tasks"
 	}
+	if (route.name === "Checklists" || route.name === "ChecklistDetail") return "Checklists"
 	if (route.name === "ImplementationsHub") return "Implementations"
 	if (route.name === "WeeklyMonitoring" || route.name === "WeeklyMonitoringDetail") {
 		return "Weekly Implementation Monitoring"
@@ -141,6 +148,9 @@ const pageSubtitle = computed(() => {
 	}
 	if (route.name === "Tasks") {
 		return "Project Management department tasks overview"
+	}
+	if (route.name === "Checklists" || route.name === "ChecklistDetail") {
+		return "Checklists linked to Project Management issues and tasks"
 	}
 	if (route.name === "ImplementationsHub") {
 		return "Navigate implementation workflows for the Project Management department"

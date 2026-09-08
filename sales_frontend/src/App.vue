@@ -32,13 +32,20 @@ const navItems = [
 		children: [
 			{ name: "TasksGantt", label: "Gantt", icon: "bar-chart-2", match: ["TasksGantt", "TaskDetail"] },
 		],
-	}
+	},
+	{
+		name: "Checklists",
+		label: "Checklists",
+		icon: "list",
+		match: ["Checklists", "ChecklistDetail"],
+	},
 ]
 
 const pageTitle = computed(() => {
 	if (route.name === "Tasks" || route.name === "TasksGantt" || route.name === "TaskDetail") {
 		return "Tasks"
 	}
+	if (route.name === "Checklists" || route.name === "ChecklistDetail") return "Checklists"
 	return "Issues"
 })
 
@@ -48,6 +55,9 @@ const pageSubtitle = computed(() => {
 	}
 	if (route.name === "Tasks") {
 		return "Sales department tasks overview"
+	}
+	if (route.name === "Checklists" || route.name === "ChecklistDetail") {
+		return "Checklists linked to Sales issues and tasks"
 	}
 	if (route.name === "IssuesList" || route.name === "IssueDetail") {
 		return "Sales department issues"

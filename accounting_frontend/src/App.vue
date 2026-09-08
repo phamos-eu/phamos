@@ -36,7 +36,13 @@ const navItems = [
 		children: [
 			{ name: "TasksGantt", label: "Gantt", icon: "bar-chart-2", match: ["TasksGantt", "TaskDetail"] },
 		],
-	}
+	},
+	{
+		name: "Checklists",
+		label: "Checklists",
+		icon: "list",
+		match: ["Checklists", "ChecklistDetail"],
+	},
 	{ name: "Receipts", label: "Receipts", icon: "file-text", match: ["Receipts", "ReceiptDetail"] },
 ]
 
@@ -44,6 +50,7 @@ const pageTitle = computed(() => {
 	if (route.name === "Tasks" || route.name === "TasksGantt" || route.name === "TaskDetail") {
 		return "Tasks"
 	}
+	if (route.name === "Checklists" || route.name === "ChecklistDetail") return "Checklists"
 	if (route.name === "Receipts" || route.name === "ReceiptDetail") return "Receipts"
 	return "Issues"
 })
@@ -54,6 +61,9 @@ const pageSubtitle = computed(() => {
 	}
 	if (route.name === "Tasks") {
 		return "Accounting department tasks overview"
+	}
+	if (route.name === "Checklists" || route.name === "ChecklistDetail") {
+		return "Checklists linked to Accounting issues and tasks"
 	}
 	if (route.name === "Receipts" || route.name === "ReceiptDetail") {
 		return "Accounting receipts — review, decide payment, send to DATEV"

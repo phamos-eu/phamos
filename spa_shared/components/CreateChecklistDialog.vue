@@ -22,14 +22,27 @@
 	>
 		<template #body-content>
 			<div class="space-y-4">
-				<FormControl
-					v-model="title"
-					label="Title"
-					type="text"
-					required
-					size="sm"
-					placeholder="Checklist title"
-				/>
+				<div ref="titleFieldHost">
+					<FormControl
+						v-model="title"
+						label="Title"
+						type="text"
+						required
+						size="sm"
+						placeholder="Checklist title"
+					/>
+				</div>
+				<div>
+					<label class="mb-1.5 block text-xs font-medium text-gray-600 dark:text-gray-400">
+						Checklist Owner *
+					</label>
+					<FrappeLink
+						doctype="User"
+						v-model="checklistOwner"
+						placeholder="Select owner"
+						query="phamos.api.checklist_inbox.checklist_owner_query"
+					/>
+				</div>
 
 				<div>
 					<label class="mb-2 block text-xs font-medium text-gray-600 dark:text-gray-400">Items *</label>
@@ -55,13 +68,13 @@
 							</div>
 							<div class="space-y-2">
 								<input
+									:ref="(el) => setDescriptionRef(row.id, el)"
 									v-model="row.description"
 									type="text"
 									class="w-full rounded-md border border-gray-300 px-3 py-2 text-sm"
 									placeholder="Short description"
 								/>
 								<textarea
-									:ref="(el) => setNoteRef(row.id, el)"
 									v-model="row.note"
 									rows="2"
 									class="w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-100"
@@ -124,14 +137,16 @@ const API = "phamos.api.checklist_inbox"
 
 let nextId = 1
 const title = ref("")
+const checklistOwner = ref("")
+const titleFieldHost = ref(null)
 const rows = ref([])
-const noteRefs = new Map()
+const descriptionRefs = new Map()
 const creating = ref(false)
 const error = ref("")
 
-function setNoteRef(id, el) {
-	if (el) noteRefs.set(id, el)
-	else noteRefs.delete(id)
+function setDescriptionRef(id, el) {
+	if (el) descriptionRefs.set(id, el)
+	else descriptionRefs.delete(id)
 }
 
 function emptyRow() {
@@ -146,17 +161,29 @@ function emptyRow() {
 
 function resetForm() {
 	nextId = 1
-	noteRefs.clear()
+	descriptionRefs.clear()
 	title.value = (props.referenceTitle || "").trim()
+	checklistOwner.value = ""
 	rows.value = [emptyRow()]
 	error.value = ""
+}
+
+async function focusTitleEnd() {
+	await nextTick()
+	// Let Dialog finish mounting/focus trapping before we take focus.
+	await new Promise((resolve) => setTimeout(resolve, 50))
+	const input = titleFieldHost.value?.querySelector?.("input")
+	if (!input) return
+	input.focus()
+	const len = (input.value || "").length
+	input.setSelectionRange(len, len)
 }
 
 async function addRow() {
 	const row = emptyRow()
 	rows.value = [...rows.value, row]
 	await nextTick()
-	noteRefs.get(row.id)?.focus()
+	descriptionRefs.get(row.id)?.focus()
 }
 
 function removeRow(id) {
@@ -188,6 +215,11 @@ async function submit() {
 		error.value = "Title is required"
 		return
 	}
+	const owner = (checklistOwner.value || "").trim()
+	if (!owner) {
+		error.value = "Checklist Owner is required"
+		return
+	}
 	const items = buildItems()
 	if (!items.length) {
 		error.value = "Add at least one checklist item"
@@ -200,6 +232,7 @@ async function submit() {
 			document: props.document,
 			reference_record: props.referenceRecord,
 			name,
+			checklist_owner: owner,
 			items,
 		})
 		emit("created", created)
@@ -213,8 +246,10 @@ async function submit() {
 
 watch(
 	() => props.modelValue,
-	(open) => {
-		if (open) resetForm()
+	async (open) => {
+		if (!open) return
+		resetForm()
+		await focusTitleEnd()
 	}
 )
 </script>
