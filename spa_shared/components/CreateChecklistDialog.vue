@@ -22,15 +22,16 @@
 	>
 		<template #body-content>
 			<div class="space-y-4">
-				<FormControl
-					v-model="title"
-					label="Title"
-					type="text"
-					required
-					size="sm"
-					placeholder="Checklist title"
-				/>
-
+				<div ref="titleFieldHost">
+					<FormControl
+						v-model="title"
+						label="Title"
+						type="text"
+						required
+						size="sm"
+						placeholder="Checklist title"
+					/>
+				</div>
 				<div>
 					<label class="mb-1.5 block text-xs font-medium text-gray-600 dark:text-gray-400">
 						Checklist Owner *
@@ -137,6 +138,7 @@ const API = "phamos.api.checklist_inbox"
 let nextId = 1
 const title = ref("")
 const checklistOwner = ref("")
+const titleFieldHost = ref(null)
 const rows = ref([])
 const noteRefs = new Map()
 const creating = ref(false)
@@ -164,6 +166,17 @@ function resetForm() {
 	checklistOwner.value = ""
 	rows.value = [emptyRow()]
 	error.value = ""
+}
+
+async function focusTitleEnd() {
+	await nextTick()
+	// Let Dialog finish mounting/focus trapping before we take focus.
+	await new Promise((resolve) => setTimeout(resolve, 50))
+	const input = titleFieldHost.value?.querySelector?.("input")
+	if (!input) return
+	input.focus()
+	const len = (input.value || "").length
+	input.setSelectionRange(len, len)
 }
 
 async function addRow() {
@@ -233,8 +246,10 @@ async function submit() {
 
 watch(
 	() => props.modelValue,
-	(open) => {
-		if (open) resetForm()
+	async (open) => {
+		if (!open) return
+		resetForm()
+		await focusTitleEnd()
 	}
 )
 </script>
