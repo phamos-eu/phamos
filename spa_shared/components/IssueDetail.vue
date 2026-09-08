@@ -1,14 +1,14 @@
 <template>
-	<div class="flex h-full min-h-0 flex-col overflow-y-auto p-5 text-gray-900 dark:text-gray-100">
+	<div class="flex h-full min-h-0 w-full flex-1 flex-col overflow-hidden p-5 text-gray-900 dark:text-gray-100">
 		<section class="flex min-h-[50%] flex-1 flex-col">
 			<label class="mb-1.5 block flex-shrink-0 text-xs text-ink-gray-5">Description</label>
-			<div class="relative min-h-0 flex-1">
+			<div class="flex min-h-0 flex-1 flex-col">
 				<TextEditor
-					class="absolute inset-0 flex flex-col overflow-hidden [&_.ProseMirror]:min-h-0 [&_.ProseMirror]:flex-1 [&_.ProseMirror]:overflow-y-auto"
+					class="flex h-full min-h-0 flex-1 flex-col [&]:h-full [&_.ProseMirror]:min-h-full [&_.ProseMirror]:flex-1 [&_.ProseMirror]:overflow-y-auto"
 					:content="description"
 					:fixed-menu="editorMenu"
 					placeholder="What needs to be discussed or resolved?"
-					editor-class="prose-sm dark:prose-invert max-w-none w-full h-full px-3 py-2 border border-t-0 border-gray-300 rounded-b-lg bg-white dark:border-gray-600 dark:bg-gray-800"
+					editor-class="prose-sm dark:prose-invert max-w-none w-full min-h-full flex-1 px-3 py-2 border border-t-0 border-gray-300 rounded-b-lg bg-white dark:border-gray-600 dark:bg-gray-800"
 					@change="(html) => (description = html)"
 				/>
 			</div>

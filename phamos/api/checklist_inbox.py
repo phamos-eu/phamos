@@ -51,6 +51,16 @@ def _item_counts(checklist_name):
 	return done, total
 
 
+def _checklist_has_title_field():
+	return frappe.get_meta("Checklist").has_field("title")
+
+
+def _checklist_title_value(row_or_doc):
+	if _checklist_has_title_field():
+		return (getattr(row_or_doc, "title", None) or "").strip() or row_or_doc.name
+	return row_or_doc.name
+
+
 def _serialize_row(row, counts=None):
 	if counts is None:
 		done_count, total_count = _item_counts(row.name)
@@ -58,6 +68,7 @@ def _serialize_row(row, counts=None):
 		done_count, total_count = counts.get(row.name, (0, 0))
 	return {
 		"name": row.name,
+		"title": _checklist_title_value(row),
 		"status": row.status,
 		"completion_percentage": row.completion_percentage or 0,
 		"document": row.document,
@@ -79,18 +90,22 @@ def get_checklist_inbox(include_completed=0):
 	if not include_completed:
 		filters["status"] = ("!=", "Completed")
 
+	fields = [
+		"name",
+		"status",
+		"completion_percentage",
+		"document",
+		"reference_record",
+		"modified",
+		"owner",
+	]
+	if _checklist_has_title_field():
+		fields.insert(1, "title")
+
 	rows = frappe.get_list(
 		"Checklist",
 		filters=filters,
-		fields=[
-			"name",
-			"status",
-			"completion_percentage",
-			"document",
-			"reference_record",
-			"modified",
-			"owner",
-		],
+		fields=fields,
 		order_by="modified desc",
 		limit_page_length=200,
 	)
@@ -118,6 +133,7 @@ def get_checklist(name):
 	done_count = sum(1 for i in items if i["done"])
 	return {
 		"name": doc.name,
+		"title": _checklist_title_value(doc),
 		"status": doc.status,
 		"completion_percentage": doc.completion_percentage or 0,
 		"document": doc.document,
@@ -152,18 +168,22 @@ def get_checklists_for_reference(document, reference_record):
 
 	_validate_reference_record(document, reference_record)
 
+	fields = [
+		"name",
+		"status",
+		"completion_percentage",
+		"document",
+		"reference_record",
+		"modified",
+		"owner",
+	]
+	if _checklist_has_title_field():
+		fields.insert(1, "title")
+
 	rows = frappe.get_list(
 		"Checklist",
 		filters={"document": document, "reference_record": reference_record},
-		fields=[
-			"name",
-			"status",
-			"completion_percentage",
-			"document",
-			"reference_record",
-			"modified",
-			"owner",
-		],
+		fields=fields,
 		order_by="modified desc",
 		limit_page_length=200,
 	)
@@ -187,13 +207,16 @@ def _validate_reference_record(document, reference_record):
 	frappe.get_doc(document, reference_record).check_permission("read")
 
 
-def _resolve_checklist_name(name, document, reference_record):
-	name = (name or "").strip()
-	if not name and document == "Issue":
-		name = (frappe.db.get_value("Issue", reference_record, "subject") or "").strip()
-	if not name:
-		frappe.throw(_("Checklist name is required"))
-	return _unique_checklist_name(name)
+def _resolve_checklist_title(name, document, reference_record):
+	"""Resolve display title from SPA `name` arg or parent subject."""
+	title = (name or "").strip()
+	if not title and document == "Issue":
+		title = (frappe.db.get_value("Issue", reference_record, "subject") or "").strip()
+	if not title and document == "Task":
+		title = (frappe.db.get_value("Task", reference_record, "subject") or "").strip()
+	if not title:
+		frappe.throw(_("Checklist title is required"))
+	return title
 
 
 def _unique_checklist_name(base_name):
@@ -215,24 +238,29 @@ def _parse_items(items):
 
 @frappe.whitelist(methods=["POST"])
 def create_spa_checklist(document, reference_record, name=None, items=None):
-	"""Create a Checklist linked to a parent document."""
+	"""Create a Checklist linked to a parent document.
+
+	`name` is the user-facing title from the SPA. On sites with Checklist.title
+	+ naming_series, that value is stored in `title` and the series assigns `name`.
+	On older prompt-named Checklists, it becomes the document name.
+	"""
 	frappe.has_permission("Checklist", "create", throw=True)
 
 	document = (document or "").strip()
 	reference_record = (reference_record or "").strip()
 	_validate_reference_record(document, reference_record)
 
-	name = _resolve_checklist_name(name, document, reference_record)
+	title = _resolve_checklist_title(name, document, reference_record)
 	parsed_items = _parse_items(items)
+	meta = frappe.get_meta("Checklist")
 
-	doc = frappe.get_doc(
-		{
-			"doctype": "Checklist",
-			"name": name,
-			"document": document,
-			"reference_record": reference_record,
-		}
-	)
+	doc = frappe.new_doc("Checklist")
+	doc.document = document
+	doc.reference_record = reference_record
+	if meta.has_field("title"):
+		doc.title = title
+	else:
+		doc.name = _unique_checklist_name(title)
 
 	for item in parsed_items:
 		if not isinstance(item, dict):
