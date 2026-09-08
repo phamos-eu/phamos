@@ -22,10 +22,14 @@
 	>
 		<template #body-content>
 			<div class="space-y-4">
-				<p v-if="referenceTitle" class="text-sm text-gray-600 dark:text-gray-400">
-					Checklist name:
-					<span class="font-medium text-gray-900 dark:text-gray-100">{{ referenceTitle }}</span>
-				</p>
+				<FormControl
+					v-model="title"
+					label="Title"
+					type="text"
+					required
+					size="sm"
+					placeholder="Checklist title"
+				/>
 
 				<div>
 					<div class="mb-2 flex items-center justify-between gap-2">
@@ -112,6 +116,7 @@ const emit = defineEmits(["update:modelValue", "created"])
 const API = "phamos.api.checklist_inbox"
 
 let nextId = 1
+const title = ref("")
 const rows = ref([])
 const noteRefs = new Map()
 const creating = ref(false)
@@ -131,9 +136,10 @@ function emptyRow() {
 	}
 }
 
-function resetRows() {
+function resetForm() {
 	nextId = 1
 	noteRefs.clear()
+	title.value = (props.referenceTitle || "").trim()
 	rows.value = [emptyRow()]
 	error.value = ""
 }
@@ -168,6 +174,11 @@ function buildItems() {
 
 async function submit() {
 	error.value = ""
+	const name = title.value.trim()
+	if (!name) {
+		error.value = "Title is required"
+		return
+	}
 	const items = buildItems()
 	if (!items.length) {
 		error.value = "Add at least one checklist item"
@@ -179,6 +190,7 @@ async function submit() {
 		const created = await call(`${API}.create_spa_checklist`, {
 			document: props.document,
 			reference_record: props.referenceRecord,
+			name,
 			items,
 		})
 		emit("created", created)
@@ -193,7 +205,7 @@ async function submit() {
 watch(
 	() => props.modelValue,
 	(open) => {
-		if (open) resetRows()
+		if (open) resetForm()
 	}
 )
 </script>

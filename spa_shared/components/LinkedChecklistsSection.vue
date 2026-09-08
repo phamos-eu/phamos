@@ -31,7 +31,7 @@
 						@click="toggleExpand(row.name)"
 					>
 						<span class="min-w-0 flex-1 truncate text-sm font-medium text-ink-gray-8 dark:text-gray-100">
-							{{ row.name }}
+							{{ row.title || row.name }}
 						</span>
 						<Badge
 							:label="`${row.status} ${row.done_count || 0}/${row.total_count || 0}`"
