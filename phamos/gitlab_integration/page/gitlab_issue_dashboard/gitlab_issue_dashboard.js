@@ -415,9 +415,9 @@ class GitLabIssueDashboard {
         const mode = touchTime.mode || "combined";
         const projectTitles = (this.currentData && this.currentData.project_titles) || {};
 
-        const formatDays = (value) => {
+        const formatHours = (value) => {
             if (value === null || value === undefined) return __("N/A");
-            return __("{0} days", [value]);
+            return __("{0} hrs", [Math.round(value * 24 * 100) / 100]);
         };
 
         const formatPct = (touchValue, leadValue) => {
@@ -440,7 +440,7 @@ class GitLabIssueDashboard {
                     : "";
                 return `
                     <div class="gid-kpi ${extraClass} gid-clickable" data-drill="touch_time" data-project="${projAttr}" data-period="${period}">
-                        <small>${title}</small><strong>${formatDays(value)}</strong>
+                        <small>${title}</small><strong>${formatHours(value)}</strong>
                         ${pctHtml}
                     </div>
                 `;

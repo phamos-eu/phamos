@@ -57,6 +57,21 @@ TOUCH_TIME_SUBQUERY_SQL = """
     GROUP BY tr.gitlab_issue
 """
 
+# Shared with _build_cycle_time_kpis and its drilldown: Cycle Time ends at
+# to_time (when logged work finished, not when it started — a single Timesheet
+# Record can span several days) of the last qualifying Timesheet Record logged
+# on the issue on/before it closed (same Draft/Submitted, not Cancelled rule as
+# Touch Time and Cycle Time Started At), not at closed_at itself.
+CYCLE_TIME_END_SUBQUERY_SQL = """
+    SELECT tr.gitlab_issue, MAX(tr.to_time) AS cycle_time_ended_at
+    FROM `tabTimesheet Record` tr
+    JOIN `tabTimesheet` t ON t.name = tr.timesheet
+    JOIN `tabGitLab Issue` ce_gi ON ce_gi.name = tr.gitlab_issue
+    WHERE t.docstatus IN (0, 1) AND tr.gitlab_issue IS NOT NULL
+      AND tr.to_time <= ce_gi.closed_at
+    GROUP BY tr.gitlab_issue
+"""
+
 
 def _build_drilldown_where(
 	projects=None,
@@ -140,6 +155,7 @@ def get_gitlab_issue_drilldown(
 	)
 	start = max(cint(start), 0)
 	touch_join_sql = f"{'JOIN' if _to_bool(require_touch_time) else 'LEFT JOIN'} ({TOUCH_TIME_SUBQUERY_SQL}) touch ON touch.gitlab_issue = gi.name"
+	cycle_end_join_sql = f"LEFT JOIN ({CYCLE_TIME_END_SUBQUERY_SQL}) cycle_end ON cycle_end.gitlab_issue = gi.name"
 	if _to_bool(require_cycle_time):
 		where_sql = f"{where_sql} AND gi.cycle_time_started_at IS NOT NULL"
 
@@ -163,9 +179,10 @@ def get_gitlab_issue_drilldown(
 			gi.issue_url,
 			DATEDIFF(DATE(gi.closed_at), DATE(gi.created_at)) AS lead_time_days,
 			ROUND(touch.touch_seconds / 86400, 2) AS touch_time_days,
-			DATEDIFF(DATE(gi.closed_at), DATE(gi.cycle_time_started_at)) AS cycle_time_days
+			ROUND(TIMESTAMPDIFF(SECOND, gi.cycle_time_started_at, COALESCE(cycle_end.cycle_time_ended_at, gi.closed_at)) / 86400, 2) AS cycle_time_days
 		FROM `tabGitLab Issue` gi
 		{touch_join_sql}
+		{cycle_end_join_sql}
 		WHERE {where_sql}
 		ORDER BY gi.{date_field} DESC
 		LIMIT {DRILLDOWN_ROW_LIMIT}
@@ -199,9 +216,10 @@ def get_gitlab_issue_drilldown(
 		summary_row = frappe.db.sql(
 			f"""
 			SELECT
-				SUM(DATEDIFF(DATE(gi.closed_at), DATE(gi.cycle_time_started_at))) AS total_days,
-				AVG(DATEDIFF(DATE(gi.closed_at), DATE(gi.cycle_time_started_at))) AS avg_days
+				SUM(TIMESTAMPDIFF(SECOND, gi.cycle_time_started_at, COALESCE(cycle_end.cycle_time_ended_at, gi.closed_at)) / 86400) AS total_days,
+				AVG(TIMESTAMPDIFF(SECOND, gi.cycle_time_started_at, COALESCE(cycle_end.cycle_time_ended_at, gi.closed_at)) / 86400) AS avg_days
 			FROM `tabGitLab Issue` gi
+			{cycle_end_join_sql}
 			WHERE {where_sql}
 			""",
 			params,
@@ -692,9 +710,12 @@ def _format_touch_time_response(from_date, to_date, selected_projects, issue_sco
 def _build_cycle_time_kpis(from_date, to_date, selected_projects, issue_scope="both"):
     """Cycle Time = days from gi.cycle_time_started_at (the first Timesheet Record
     logged on/after the Cycle Time Trigger Label was set — see
-    gitlab_utils.sync_cycle_time_start) to closed_at. Tickets where the trigger
-    label was never set, or no qualifying Timesheet Record exists, are excluded
-    from the average — same exclusion pattern as Touch Time."""
+    gitlab_utils.sync_cycle_time_start) to the last qualifying Timesheet Record
+    logged on the issue on/before it closed (see CYCLE_TIME_END_SUBQUERY_SQL),
+    falling back to closed_at itself if no such Timesheet Record is found.
+    Tickets where the trigger label was never set, or no qualifying Timesheet
+    Record exists, are excluded from the average — same exclusion pattern as
+    Touch Time."""
     conditions = ["1=1"]
     params = {}
 
@@ -708,6 +729,8 @@ def _build_cycle_time_kpis(from_date, to_date, selected_projects, issue_scope="b
         conditions.append("gi.parent_issue IS NOT NULL")
 
     project_filter_sql = " AND ".join(conditions)
+    cycle_end_join = f"LEFT JOIN ({CYCLE_TIME_END_SUBQUERY_SQL}) cycle_end ON cycle_end.gitlab_issue = gi.name"
+    cycle_end_expr = "TIMESTAMPDIFF(SECOND, gi.cycle_time_started_at, COALESCE(cycle_end.cycle_time_ended_at, gi.closed_at)) / 86400"
 
     filtered_params = dict(params)
     filtered_params["from_date"] = from_date
@@ -715,8 +738,9 @@ def _build_cycle_time_kpis(from_date, to_date, selected_projects, issue_scope="b
 
     filtered_row = frappe.db.sql(
         f"""
-        SELECT AVG(DATEDIFF(DATE(gi.closed_at), DATE(gi.cycle_time_started_at))) AS avg_cycle_time
+        SELECT AVG({cycle_end_expr}) AS avg_cycle_time
         FROM `tabGitLab Issue` gi
+        {cycle_end_join}
         WHERE gi.state = 'closed'
           AND gi.cycle_time_started_at IS NOT NULL
           AND gi.closed_at IS NOT NULL
@@ -731,8 +755,9 @@ def _build_cycle_time_kpis(from_date, to_date, selected_projects, issue_scope="b
     for key, months in LEAD_TIME_ROLLING_PERIODS.items():
         rolling_row = frappe.db.sql(
             f"""
-            SELECT AVG(DATEDIFF(DATE(gi.closed_at), DATE(gi.cycle_time_started_at))) AS avg_cycle_time
+            SELECT AVG({cycle_end_expr}) AS avg_cycle_time
             FROM `tabGitLab Issue` gi
+            {cycle_end_join}
             WHERE gi.state = 'closed'
               AND gi.cycle_time_started_at IS NOT NULL
               AND gi.closed_at IS NOT NULL

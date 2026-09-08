@@ -116,13 +116,16 @@ Object.assign(GitLabIssueDashboard.prototype, {
             ? `<div class="text-muted gid-drilldown-note" style="margin-top: 8px;">${frappe.utils.escape_html(note)}</div>`
             : "";
         const leadTimeHeader = showLeadTime ? `<th class="text-right">${leadTimeLabel || __("Lead Time (days)")}</th>` : "";
-        const touchTimeHeader = showTouchTime ? `<th class="text-right">${__("Touch Time (days)")}</th>` : "";
+        const touchTimeHeader = showTouchTime ? `<th class="text-right">${__("Touch Time (hrs)")}</th>` : "";
         const cycleTimeHeader = showCycleTime ? `<th class="text-right">${__("Cycle Time (days)")}</th>` : "";
-        const summary = (showTouchTime && data && data.touch_time_summary)
-            || (showCycleTime && data && data.cycle_time_summary);
-        const summaryHtml = summary
-            ? `<div class="gid-drilldown-note" style="margin-top: 8px;"><strong>${__("Total")}: ${summary.total_days} ${__("days")} &nbsp;·&nbsp; ${__("Average")}: ${summary.avg_days} ${__("days")}</strong></div>`
-            : "";
+        const daysToHours = (value) => Math.round(value * 24 * 100) / 100;
+        const touchSummary = showTouchTime && data && data.touch_time_summary;
+        const cycleSummary = showCycleTime && data && data.cycle_time_summary;
+        const summaryHtml = touchSummary
+            ? `<div class="gid-drilldown-note" style="margin-top: 8px;"><strong>${__("Total")}: ${daysToHours(touchSummary.total_days)} ${__("hrs")} &nbsp;·&nbsp; ${__("Average")}: ${daysToHours(touchSummary.avg_days)} ${__("hrs")}</strong></div>`
+            : cycleSummary
+                ? `<div class="gid-drilldown-note" style="margin-top: 8px;"><strong>${__("Total")}: ${cycleSummary.total_days} ${__("days")} &nbsp;·&nbsp; ${__("Average")}: ${cycleSummary.avg_days} ${__("days")}</strong></div>`
+                : "";
 
         const tableRows = rows.map((row) => {
             const project = frappe.utils.escape_html(projectTitles[row.gitlab_project] || row.gitlab_project || "");
@@ -136,7 +139,7 @@ Object.assign(GitLabIssueDashboard.prototype, {
                 ? `<td class="text-right">${row.lead_time_days === null || row.lead_time_days === undefined ? "-" : row.lead_time_days}</td>`
                 : "";
             const touchTimeCell = showTouchTime
-                ? `<td class="text-right">${row.touch_time_days === null || row.touch_time_days === undefined ? "-" : row.touch_time_days}</td>`
+                ? `<td class="text-right">${row.touch_time_days === null || row.touch_time_days === undefined ? "-" : daysToHours(row.touch_time_days)}</td>`
                 : "";
             const cycleTimeCell = showCycleTime
                 ? `<td class="text-right">${row.cycle_time_days === null || row.cycle_time_days === undefined ? "-" : row.cycle_time_days}</td>`
