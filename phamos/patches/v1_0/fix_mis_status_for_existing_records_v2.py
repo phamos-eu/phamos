@@ -59,9 +59,19 @@ def _restore_legacy_links():
 	for mis_name, entries in by_mis.items():
 		if not frappe.db.exists("Monthly Implementation Summary", mis_name):
 			continue
-		doc = frappe.get_doc("Monthly Implementation Summary", mis_name)
-		existing = {r.delivery_note for r in (doc.mis_delivery_notes or [])}
-		changed = False
+		# Use db_insert so cancelled (and submitted) MIS docs can receive child rows
+		# without Document.save(), which raises "Cannot edit cancelled document".
+		existing = set(
+			frappe.get_all(
+				"MIS Delivery Note",
+				filters={"parent": mis_name},
+				pluck="delivery_note",
+			)
+		)
+		idx = frappe.db.sql(
+			"select coalesce(max(idx), 0) from `tabMIS Delivery Note` where parent=%s",
+			mis_name,
+		)[0][0]
 		for entry in entries:
 			dn = entry["delivery_note"]
 			if dn in existing:
@@ -69,18 +79,22 @@ def _restore_legacy_links():
 			dn_status, dn_total = frappe.db.get_value(
 				"Delivery Note", dn, ["status", "grand_total"]
 			) or ("", 0)
-			doc.append("mis_delivery_notes", {
-				"delivery_note": dn,
-				"sales_order": entry.get("sales_order"),
-				"status": dn_status or "",
-				"grand_total": flt(dn_total),
-			})
-			changed = True
-		if changed:
-			doc.flags.ignore_permissions = True
-			doc.flags.ignore_validate_update_after_submit = True
-			doc.flags.ignore_links = True
-			doc.save()
+			idx += 1
+			row = frappe.get_doc(
+				{
+					"doctype": "MIS Delivery Note",
+					"parent": mis_name,
+					"parenttype": "Monthly Implementation Summary",
+					"parentfield": "mis_delivery_notes",
+					"idx": idx,
+					"delivery_note": dn,
+					"sales_order": entry.get("sales_order"),
+					"status": dn_status or "",
+					"grand_total": flt(dn_total),
+				}
+			)
+			row.db_insert()
+			existing.add(dn)
 
 	os.remove(path)
 
