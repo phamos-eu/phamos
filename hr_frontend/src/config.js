@@ -7,6 +7,5 @@ export default {
 	settingsMethod: "get_hr_settings",
 	projectField: "hr_timesheet_project",
 	projectNameField: "hr_timesheet_project_name",
-	timerApi: "phamos.api.timesheet_timer",
 	barColorStyleId: "hr-gantt-bar-colors",
 }
