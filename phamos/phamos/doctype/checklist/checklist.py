@@ -8,8 +8,18 @@ from frappe.exceptions import TimestampMismatchError
 
 class Checklist(Document):
 	def validate(self):
+		self.validate_checklist_owner()
 		self.set_completion_percentage_and_status()
 
+	def validate_checklist_owner(self):
+		if not self.checklist_owner:
+			frappe.throw(frappe._("Checklist Owner is required"))
+
+		if not frappe.db.exists("User", self.checklist_owner):
+			frappe.throw(frappe._("Checklist Owner must be a valid User"))
+
+		if frappe.db.get_value("User", self.checklist_owner, "enabled") == 0:
+			frappe.throw(frappe._("Checklist Owner must be an enabled User"))
 
 	def set_completion_percentage_and_status(self):
 		if not self.checklist_items:
@@ -42,6 +52,7 @@ def get_checklist_details(checklist_name):
 				"name": row.name,
 				"idx": row.idx,
 				"done": row.done,
+				"description": row.description,
 				"note": row.note,
 				"document": row.document,
 				"record": row.record,
@@ -52,8 +63,27 @@ def get_checklist_details(checklist_name):
 		"name": checklist.name,
 		"status": checklist.status,
 		"completion_percentage": checklist.completion_percentage or 0,
+		"checklist_owner": checklist.checklist_owner,
 		"items": items,
 	}
+
+
+@frappe.whitelist()
+def get_linked_checklists(doctype, name):
+	return frappe.get_all(
+		"Checklist",
+		filters={
+			"document": doctype,
+			"reference_record": name,
+		},
+		fields=[
+			"name",
+			"status",
+			"completion_percentage",
+			"checklist_owner",
+		],
+		order_by="modified desc",
+	)
 
 
 @frappe.whitelist()
@@ -64,7 +94,7 @@ def update_checklist_item(checklist_name, item_name, values):
 	if not isinstance(values, dict):
 		frappe.throw(frappe._("Invalid checklist item payload"))
 
-	allowed_fields = {"done", "note", "document", "record"}
+	allowed_fields = {"done", "description", "note", "document", "record"}
 	invalid_fields = [field for field in values.keys() if field not in allowed_fields]
 	if invalid_fields:
 		frappe.throw(frappe._("Unsupported fields: {0}").format(", ".join(invalid_fields)))
@@ -77,6 +107,9 @@ def update_checklist_item(checklist_name, item_name, values):
 
 		if "record" in values:
 			target_row.record = values.get("record") or None
+
+		if "description" in values:
+			target_row.description = values.get("description") or ""
 
 		if "note" in values:
 			target_row.note = values.get("note") or ""
@@ -119,6 +152,7 @@ def update_checklist_item(checklist_name, item_name, values):
 		"item": {
 			"name": row.name,
 			"done": row.done,
+			"description": row.description,
 			"note": row.note,
 			"document": row.document,
 			"record": row.record,

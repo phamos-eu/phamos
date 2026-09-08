@@ -110,8 +110,10 @@ def sync_production_label_timestamps(implementation_name):
 
 def get_deployed_issues(implementation_name, from_date, to_date):
     """
-    Return GitLab Issues where merged_to_production_at or testing_on_production_at
-    falls within [from_date, to_date] for projects linked to this implementation.
+    Return reportable parent GitLab Issues for deployment activity in the date range.
+
+    A deployed child is retained as context on its parent, but is never returned as a
+    top-level report item.
     """
     project_names = frappe.get_all(
         "GitLab Project",
@@ -128,7 +130,7 @@ def get_deployed_issues(implementation_name, from_date, to_date):
         """
         SELECT
             name, issue_id, title, description, state,
-            labels, issue_url, assignee,
+            labels, issue_url, assignee, parent_issue,
             merged_to_production_at, testing_on_production_at
         FROM `tabGitLab Issue`
         WHERE gitlab_project IN %(projects)s
@@ -144,9 +146,39 @@ def get_deployed_issues(implementation_name, from_date, to_date):
     if not issues:
         return issues
 
+    parent_names = {issue.parent_issue for issue in issues if issue.parent_issue}
+    parents = (
+        frappe.get_all(
+            "GitLab Issue",
+            filters={"name": ["in", list(parent_names)]},
+            fields=[
+                "name",
+                "issue_id",
+                "title",
+                "description",
+                "state",
+                "labels",
+                "issue_url",
+                "assignee",
+                "parent_issue",
+                "merged_to_production_at",
+                "testing_on_production_at",
+            ],
+        )
+        if parent_names
+        else []
+    )
+    report_issues = _group_deployed_issues_by_parent(issues, parents)
+
+    context_issue_names = {
+        source["name"]
+        for report_issue in report_issues
+        for source in report_issue["deployment_sources"]
+    }
+    context_issue_names.update(report_issue["name"] for report_issue in report_issues)
     comments = frappe.get_all(
         "GitLab Issue Comment",
-        filters={"parent": ["in", [issue.name for issue in issues]]},
+        filters={"parent": ["in", list(context_issue_names)]},
         fields=["parent", "author", "comment", "commented_at"],
         order_by="commented_at asc",
     )
@@ -154,10 +186,29 @@ def get_deployed_issues(implementation_name, from_date, to_date):
     for c in comments:
         comments_by_issue.setdefault(c.parent, []).append(c)
 
-    for issue in issues:
-        issue["comments"] = comments_by_issue.get(issue.name, [])
+    for report_issue in report_issues:
+        report_issue["comments"] = comments_by_issue.get(report_issue["name"], [])
+        for source in report_issue["deployment_sources"]:
+            source["comments"] = comments_by_issue.get(source["name"], [])
 
-    return issues
+    return report_issues
+
+
+def _group_deployed_issues_by_parent(deployed_issues, parent_issues):
+    parents_by_name = {issue["name"]: issue for issue in parent_issues}
+    report_issues_by_name = {}
+
+    for deployed_issue in deployed_issues:
+        report_issue_name = deployed_issue.get("parent_issue") or deployed_issue["name"]
+        report_issue = report_issues_by_name.get(report_issue_name)
+        if not report_issue:
+            report_issue = parents_by_name.get(report_issue_name, deployed_issue).copy()
+            report_issue["deployment_sources"] = []
+            report_issues_by_name[report_issue_name] = report_issue
+
+        report_issue["deployment_sources"].append(deployed_issue.copy())
+
+    return list(report_issues_by_name.values())
 
 
 def get_timesheet_breakdown(implementation_name, from_date, to_date):
@@ -208,42 +259,62 @@ def _format_issues_for_prompt(issues):
         return "No tickets found for this period."
     lines = []
     for issue in issues:
-        if issue.get("merged_to_production_at"):
-            label_note = "Merged to Production"
-            deploy_ts = str(issue["merged_to_production_at"])
-        elif issue.get("testing_on_production_at"):
-            label_note = "Testing on Production"
-            deploy_ts = str(issue["testing_on_production_at"])
-        else:
-            label_note = ""
-            deploy_ts = ""
-
         desc = (issue.get("description") or "").strip()
         if len(desc) > 400:
             desc = desc[:397] + "..."
 
-        comments_text = "(no comments)"
-        comment_rows = issue.get("comments") or []
-        if comment_rows:
-            comment_lines = []
-            for c in comment_rows:
-                body = (c.get("comment") or "").strip()
-                if len(body) > 300:
-                    body = body[:297] + "..."
-                comment_lines.append(
-                    f"    - [{c.get('commented_at', '')}] {c.get('author', 'unknown')}: {body}"
-                )
-            comments_text = "\n".join(comment_lines)
+        comments_text = _format_comments(issue.get("comments"))
+        deployment_sources = []
+        for source in issue.get("deployment_sources") or []:
+            if source.get("merged_to_production_at"):
+                label_note = "Merged to Production"
+                deploy_ts = str(source["merged_to_production_at"])
+            else:
+                label_note = "Testing on Production"
+                deploy_ts = str(source.get("testing_on_production_at") or "")
 
+            relationship = (
+                "parent issue"
+                if source["name"] == issue["name"]
+                else "child issue; context only, never report separately"
+            )
+            source_desc = (source.get("description") or "").strip()
+            if len(source_desc) > 400:
+                source_desc = source_desc[:397] + "..."
+            deployment_sources.append(
+                f"    - #{source['issue_id']}: {source['title']} ({relationship})\n"
+                f"      Status: {label_note}\n"
+                f"      Deployed at: {deploy_ts}\n"
+                f"      Description: {source_desc or '(no description)'}\n"
+                f"      Comments:\n{_format_comments(source.get('comments'), indent='        ')}"
+            )
+
+        deployment_text = "\n".join(deployment_sources)
         lines.append(
-            f"- #{issue['issue_id']}: {issue['title']}\n"
-            f"  Status: {label_note}\n"
-            f"  Deployed at: {deploy_ts}\n"
+            f"- REPORTABLE PARENT ISSUE #{issue['issue_id']}: {issue['title']}\n"
             f"  URL: {issue.get('issue_url', '')}\n"
             f"  Description: {desc or '(no description)'}\n"
-            f"  Comments:\n{comments_text}"
+            f"  Parent comments:\n{comments_text}\n"
+            f"  Deployment evidence and child context:\n"
+            f"{deployment_text}"
         )
     return "\n".join(lines)
+
+
+def _format_comments(comments, indent="    "):
+    if not comments:
+        return f"{indent}(no comments)"
+
+    comment_lines = []
+    for comment in comments:
+        body = (comment.get("comment") or "").strip()
+        if len(body) > 300:
+            body = body[:297] + "..."
+        comment_lines.append(
+            f"{indent}- [{comment.get('commented_at', '')}] "
+            f"{comment.get('author', 'unknown')}: {body}"
+        )
+    return "\n".join(comment_lines)
 
 
 def _call_mistral(system_prompt, user_message):
@@ -357,6 +428,9 @@ def generate_and_send_weekly_report(implementation_name, from_date=None, to_date
         "Write concise, professional weekly progress reports for customers. "
         "Use clear, non-technical language. Format the report with a brief intro, "
         "a section per deployed ticket (1-2 sentences each), and a time summary at the end. "
+        "Only create ticket sections for entries marked REPORTABLE PARENT ISSUE. "
+        "Child issues are context for explaining their parent and must never be named, linked, "
+        "or reported as separate tickets. "
         f"You MUST write the entire report in {language}. Do not switch languages."
     )
 
@@ -364,7 +438,8 @@ def generate_and_send_weekly_report(implementation_name, from_date=None, to_date
         f"Customer: {customer_name}\n"
         f"Report period: {from_date} to {to_date}\n\n"
         f"Instructions: {prompt}\n\n"
-        f"Deployed tickets (use the 'Deployed at' timestamp verbatim — do not invent dates):\n{issues_text}\n\n"
+        "Deployed parent tickets (use child details only as supporting context and use "
+        f"'Deployed at' timestamps verbatim — do not invent dates):\n{issues_text}\n\n"
         f"Time tracking (source: Frappe timesheets linked to this implementation):\n{timesheet_text}"
     )
 

@@ -10,7 +10,6 @@
   "sales_order",
   "status",
   "grand_total",
-  "sales_invoice",
   "posting_date"
  ],
  "fields": [
@@ -46,15 +45,6 @@
    "fieldtype": "Currency",
    "in_list_view": 1,
    "label": "Grand Total",
-   "read_only": 1
-  },
-  {
-   "allow_on_submit": 1,
-   "fieldname": "sales_invoice",
-   "fieldtype": "Link",
-   "in_list_view": 1,
-   "label": "Sales Invoice",
-   "options": "Sales Invoice",
    "read_only": 1
   },
   {

@@ -1,10 +1,24 @@
 <script setup>
-import { ref, computed, onMounted, onUnmounted } from "vue";
+import { ref, computed, onMounted, onUnmounted, watch } from "vue";
 
 const timesheets = ref([]);
 const loading = ref(false);
+const loadingMore = ref(false);
 const employeeName = ref("");
+const hasMore = ref(false);
+const currentOffset = ref(0);
 
+function getTodayDate() {
+  const today = new Date();
+  return today.toISOString().split('T')[0];
+}
+
+const fromDate = ref(getTodayDate());
+const toDate = ref(getTodayDate());
+
+watch([fromDate, toDate], () => {
+  loadTimesheets();
+});
 
 const handleVisibilityChange = () => {
   if (!document.hidden) {
@@ -29,14 +43,43 @@ async function fetchCurrentEmployee() {
   return r.message || "";
 }
 
-async function loadTimesheets() {
-  loading.value = true;
+async function loadTimesheets(isLoadMore = false) {
+  if (isLoadMore) {
+    loadingMore.value = true;
+  } else {
+    loading.value = true;
+    timesheets.value = [];
+    currentOffset.value = 0;
+  }
+  
   const r = await frappe.call({
     method: "phamos.phamos.page.dev_action_panel.dev_action_panel.get_my_timesheets",
+    args: {
+      from_date: fromDate.value,
+      to_date: toDate.value,
+      offset: currentOffset.value,
+    },
   });
-  timesheets.value = r.message || [];
+  
+  if (r.message) {
+    const response = r.message;
+    if (isLoadMore) {
+      timesheets.value.push(...(response.timesheets || []));
+    } else {
+      timesheets.value = response.timesheets || [];
+    }
+    hasMore.value = response.has_more || false;
+    currentOffset.value = (response.offset || 0) + (response.total_on_page || 0);
+  }
+  
   loading.value = false;
+  loadingMore.value = false;
 }
+
+async function loadMore() {
+  await loadTimesheets(true);
+}
+
 
 function fmtDate(iso) {
   if (!iso) return "—";
@@ -93,6 +136,25 @@ const totals = computed(() => {
       </button>
     </div>
 
+    <div class="tl__filter-bar">
+      <div class="tl__filter-group">
+        <label class="tl__filter-label">From Date</label>
+        <input 
+          v-model="fromDate" 
+          type="date" 
+          class="tl__filter-input"
+        />
+      </div>
+      <div class="tl__filter-group">
+        <label class="tl__filter-label">To Date</label>
+        <input 
+          v-model="toDate" 
+          type="date" 
+          class="tl__filter-input"
+        />
+      </div>
+    </div>
+
     <div v-if="loading" class="tl__loading">
       <div class="tl__spinner"></div>
       <span>Loading timesheets…</span>
@@ -136,6 +198,17 @@ const totals = computed(() => {
           </div>
         </div>
       </div>
+
+      <div v-if="hasMore" class="tl__load-more-wrapper">
+        <button 
+          class="tl__load-more-btn" 
+          @click="loadMore"
+          :disabled="loadingMore"
+        >
+          <span v-if="loadingMore" class="tl__load-more-spinner"></span>
+          <span v-else>Load more timesheets</span>
+        </button>
+      </div>
     </div>
   </div>
 </template>
@@ -156,6 +229,48 @@ const totals = computed(() => {
   transition: background 0.12s, border-color 0.12s;
 }
 .tl__desk-btn:hover { background: var(--control-bg); }
+
+.tl__filter-bar {
+  display: flex;
+  gap: 12px;
+  margin-bottom: 16px;
+  align-items: flex-end;
+}
+
+.tl__filter-group {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.tl__filter-label {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.tl__filter-input {
+  padding: 6px 8px;
+  border: 1px solid var(--border-color);
+  border-radius: 4px;
+  background: var(--card-bg);
+  color: var(--text-color);
+  font-size: 13px;
+  font-family: inherit;
+  transition: border-color 0.12s, background 0.12s;
+}
+
+.tl__filter-input:hover {
+  border-color: var(--text-muted);
+}
+
+.tl__filter-input:focus {
+  outline: none;
+  border-color: var(--primary);
+  background: var(--control-bg);
+}
 
 .tl__loading {
   display: flex; align-items: center; gap: 10px;
@@ -189,6 +304,49 @@ const totals = computed(() => {
   border-color: var(--primary);
   box-shadow: 0 2px 8px rgba(0,0,0,0.06);
 }
+
+.tl__load-more-wrapper {
+  display: flex;
+  justify-content: center;
+  padding: 16px 0 8px;
+}
+
+.tl__load-more-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 16px;
+  border-radius: 6px;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  border: 1px solid var(--border-color);
+  background: var(--card-bg);
+  color: var(--text-color);
+  transition: background 0.12s, border-color 0.12s, color 0.12s;
+}
+
+.tl__load-more-btn:hover:not(:disabled) {
+  background: var(--control-bg);
+  border-color: var(--primary);
+  color: var(--primary);
+}
+
+.tl__load-more-btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.tl__load-more-spinner {
+  display: inline-block;
+  width: 14px;
+  height: 14px;
+  border: 2px solid var(--border-color);
+  border-top-color: var(--primary);
+  border-radius: 50%;
+  animation: tl-spin 0.8s linear infinite;
+}
+
 .tl__list-content {
   display: flex;
   align-items: flex-start;

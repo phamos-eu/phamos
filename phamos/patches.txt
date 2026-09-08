@@ -10,7 +10,7 @@ phamos.patches.v1_0.implementation_fix
 phamos.patches.v1_0.migrate_measurable_to_kr
 phamos.patches.v1_0.set_project_name_in_timesheet
 phamos.patches.v1_0.fix_implementation_null_hrs
-
+execute:from phamos.patches.v1_0.fix_mis_status_for_existing_records_v2 import capture_legacy_links; capture_legacy_links()
 
 
 [post_model_sync]
@@ -30,6 +30,7 @@ phamos.patches.v1_0.update_sales_order_status_hour_fields_to_float
 phamos.patches.v1_0.queue_gitlab_full_sync_after_deploy
 phamos.patches.v1_0.remove_lead_handoff_improve_field
 phamos.patches.v1_0.remap_risk_register_entry_status
-phamos.patches.v1_0.backfill_gitlab_issue_touch_time
-phamos.patches.v1_0.backfill_gitlab_issue_aging_days
-
+phamos.patches.v1_0.backfill_gitlab_issue_touch_time  #123
+phamos.patches.v1_0.backfill_gitlab_issue_aging_days #123
+phamos.patches.v1_0.backfill_gitlab_cycle_start_label #123
+phamos.patches.v1_0.fix_mis_status_for_existing_records_v2

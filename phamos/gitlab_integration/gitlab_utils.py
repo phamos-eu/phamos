@@ -310,9 +310,12 @@ def get_issue_for_project(project_id, issue_iid):
 
 
 def _get_issue_timestamp_fields(issue):
+    created_at = _parse_gitlab_datetime(issue.get("created_at"))
+    closed_at = _parse_gitlab_datetime(issue.get("closed_at"))
     return {
-        "created_at": _parse_gitlab_datetime(issue.get("created_at")),
-        "closed_at": _parse_gitlab_datetime(issue.get("closed_at")),
+        "created_at": created_at,
+        "closed_at": closed_at,
+        "aging_days": (closed_at.date() - created_at.date()).days if (closed_at and created_at) else None,
     }
 
 
@@ -404,6 +407,91 @@ def get_issue_parent(project_path, issue_iid):
         return None
 
 
+def get_label_events_for_project_issue(project_id, issue_iid):
+    """Fetch every label add/remove event GitLab recorded for this issue via its
+    Resource Label Events API — lets us find exactly when a label was first
+    added straight from GitLab, without depending on our webhook having caught
+    it live."""
+    settings = frappe.get_single("GitLab Settings")
+    base_url = settings.gitlab_url.rstrip("/")
+    headers = get_gitlab_headers()
+
+    events = []
+    page = 1
+    while True:
+        resp = requests.get(
+            f"{base_url}/api/v4/projects/{project_id}/issues/{issue_iid}/resource_label_events",
+            headers=headers,
+            params={"per_page": 100, "page": page},
+            timeout=30,
+        )
+        if resp.status_code != 200:
+            break
+
+        data = resp.json()
+        if not data:
+            break
+
+        events.extend(data)
+        page += 1
+
+    return events
+
+
+def _labels_contain(labels, target_label):
+    """Case-insensitive membership check. GitLab Settings' trigger label is
+    free-typed (a Data field, not a Link to GitLab Labels), so a casing
+    mismatch against the real GitLab label (e.g. "working" vs "Working")
+    would otherwise make every comparison below silently never match."""
+    target = (target_label or "").strip().lower()
+    return any((label or "").strip().lower() == target for label in labels)
+
+
+def _find_label_added_at(label_events, label_name):
+    """Earliest time GitLab recorded `label_name` being added to the issue."""
+    added_at = [
+        _parse_gitlab_datetime(event.get("created_at"))
+        for event in label_events
+        if event.get("action") == "add"
+        and _labels_contain([(event.get("label") or {}).get("name")], label_name)
+    ]
+    added_at = [dt for dt in added_at if dt]
+    return min(added_at) if added_at else None
+
+
+def sync_cycle_start_label_from_gitlab(issue_doc_name):
+    """Fill Cycle Start Label Set At straight from GitLab's Resource Label Events
+    API instead of waiting on a webhook to catch the label being added — covers
+    issues a webhook never reached (e.g. develop, where GitLab can't reach our
+    webhook URL) and issues that already carried the trigger label before we
+    started tracking it. Leaves an already-set value untouched."""
+    trigger_label = frappe.db.get_single_value("GitLab Settings", "cycle_time_trigger_label")
+    if not trigger_label:
+        return False
+
+    issue = frappe.db.get_value(
+        "GitLab Issue",
+        issue_doc_name,
+        ["issue_id", "gitlab_project", "cycle_start_label_set_at"],
+        as_dict=True,
+    )
+    if not issue or issue.cycle_start_label_set_at:
+        return False
+
+    project_id = frappe.db.get_value("GitLab Project", issue.gitlab_project, "project_id")
+    if not project_id:
+        return False
+
+    events = get_label_events_for_project_issue(project_id, issue.issue_id)
+    added_at = _find_label_added_at(events, trigger_label)
+    if not added_at:
+        return False
+
+    _set_gitlab_issue_value_with_retry(issue_doc_name, {"cycle_start_label_set_at": added_at})
+    sync_cycle_time_start(issue_doc_name)
+    return True
+
+
 def get_milestones_for_project(project_id):
     settings = frappe.get_single("GitLab Settings")
     base_url = settings.gitlab_url.rstrip("/")
@@ -463,6 +551,7 @@ def sync_all_issues():
         "GitLab Project",
         fields=["name", "project_id", "last_synced", "title", "namespace"]
     )
+    trigger_label = frappe.db.get_single_value("GitLab Settings", "cycle_time_trigger_label")
 
     for project in projects:
         try:
@@ -537,6 +626,13 @@ def sync_all_issues():
                         gitlab_issue_doc.save(ignore_permissions=True)
                         issue_map[str(issue["iid"])] = gitlab_issue_doc.name
 
+                    if trigger_label and not gitlab_issue_doc.cycle_start_label_set_at:
+                        # Don't gate on the label still being in the issue's current
+                        # labels — it's often been replaced by a later-stage label
+                        # (e.g. "Ready for Production") by the time we re-sync, but
+                        # GitLab's label event history still has the original add.
+                        sync_cycle_start_label_from_gitlab(gitlab_issue_doc.name)
+
                 except Exception as ex:
                     frappe.log_error(
                         title="GitLab Issue Sync Error",
@@ -604,6 +700,7 @@ def sync_issues_for_project(project_name):
         issues = get_issues_for_project(project.project_id)
         project_path = project.namespace or None
         issue_map = {}
+        trigger_label = frappe.db.get_single_value("GitLab Settings", "cycle_time_trigger_label")
 
         # Include assigned + unassigned issues to keep all GitLab issues in sync.
         fetched_iids = {str(issue["iid"]) for issue in issues}
@@ -668,6 +765,13 @@ def sync_issues_for_project(project_name):
                     doc.gitlab_project = project.name
                     doc.save(ignore_permissions=True)
                     issue_map[str(issue["iid"])] = doc.name
+
+                if trigger_label and not doc.cycle_start_label_set_at:
+                    # Don't gate on the label still being in the issue's current
+                    # labels — it's often been replaced by a later-stage label
+                    # (e.g. "Ready for Production") by the time we re-sync, but
+                    # GitLab's label event history still has the original add.
+                    sync_cycle_start_label_from_gitlab(doc.name)
 
             except Exception:
                 frappe.log_error(
@@ -1004,11 +1108,6 @@ def _handle_issue_webhook(payload):
     }
     data.update(timestamp_data)
 
-    if data.get("closed_at") and data.get("created_at"):
-        data["aging_days"] = (data["closed_at"].date() - data["created_at"].date()).days
-    else:
-        data["aging_days"] = None
-
     existing = frappe.db.get_value(
         "GitLab Issue",
         {"issue_id": issue_iid, "gitlab_project": project_doc_name},
@@ -1102,10 +1201,9 @@ def _stamp_cycle_start_label_on_change(issue_doc_name, new_labels_list):
     if ts_fields.get("cycle_start_label_set_at"):
         return
 
-    old_labels = {l.strip() for l in (ts_fields.get("labels") or "").split(",") if l.strip()}
-    new_labels = set(new_labels_list)
+    old_labels = [l.strip() for l in (ts_fields.get("labels") or "").split(",") if l.strip()]
 
-    if trigger_label in new_labels and trigger_label not in old_labels:
+    if _labels_contain(new_labels_list, trigger_label) and not _labels_contain(old_labels, trigger_label):
         _set_gitlab_issue_value_with_retry(issue_doc_name, {"cycle_start_label_set_at": now_datetime()})
         sync_cycle_time_start(issue_doc_name)
 
@@ -1114,7 +1212,7 @@ def _stamp_cycle_start_label_initial(doc, labels_list):
     """Set cycle_start_label_set_at on a brand-new issue that already carries the
     Cycle Time Trigger Label (GitLab Settings)."""
     trigger_label = frappe.db.get_single_value("GitLab Settings", "cycle_time_trigger_label")
-    if trigger_label and trigger_label in labels_list:
+    if trigger_label and _labels_contain(labels_list, trigger_label):
         doc.cycle_start_label_set_at = now_datetime()
 
 
@@ -1336,6 +1434,91 @@ def backfill_issue_timestamps(project_name=None, limit=None):
         frappe.db.commit()
 
     return f"{synced} issue timestamps synced"
+
+
+@frappe.whitelist()
+def backfill_cycle_start_labels(project_name=None, limit=None):
+    """One-off historical fill of Cycle Start Label Set At (and the Cycle Time
+    Started At it drives) straight from GitLab's Resource Label Events API —
+    for issues where the trigger label was added before we ever had a webhook
+    catching it live, e.g. on environments like develop where GitLab can't
+    reach our webhook receiver. Going forward, sync_all_issues/
+    sync_issues_for_project fill this in automatically on every sync, so this
+    is only needed to catch up already-synced issues."""
+    if project_name:
+        projects = frappe.get_all(
+            "GitLab Project",
+            filters={"name": project_name},
+            fields=["name", "project_id"],
+        )
+        if not projects:
+            projects = frappe.get_all(
+                "GitLab Project",
+                filters={"title": project_name},
+                fields=["name", "project_id"],
+            )
+    else:
+        projects = frappe.get_all("GitLab Project", fields=["name", "project_id"])
+
+    limit = int(limit) if limit else None
+    synced = 0
+    for project in projects:
+        issues = frappe.get_all(
+            "GitLab Issue",
+            filters={
+                "gitlab_project": project.name,
+                "cycle_start_label_set_at": ["is", "not set"],
+            },
+            fields=["name"],
+            limit_page_length=limit,
+        )
+        for issue in issues:
+            try:
+                if sync_cycle_start_label_from_gitlab(issue.name):
+                    synced += 1
+            except Exception:
+                frappe.log_error(
+                    frappe.get_traceback(),
+                    f"Cycle Start Label Backfill Failed - {project.name} - {issue.name}"
+                )
+
+            # Commit after each issue rather than only per-project — each issue
+            # can make a slow GitLab API call, and a project can have thousands
+            # of issues, so holding one long-running transaction over all of
+            # them was blocking unrelated schema migrations (metadata lock on
+            # tables read via the joins in sync_cycle_time_start) for as long
+            # as the backfill ran.
+            frappe.db.commit()
+
+    return f"{synced} issues backfilled with cycle start label"
+
+
+def _backfill_cycle_start_labels_and_notify(project_name, notify_user):
+    """Runs the backfill, then pushes a realtime summary to whoever triggered it —
+    the background job's return value otherwise isn't visible anywhere in the UI."""
+    result = backfill_cycle_start_labels(project_name)
+    frappe.publish_realtime(event="show_alert", message=f"✅ {result}", user=notify_user)
+
+
+@frappe.whitelist()
+def backfill_cycle_start_labels_background(project_name=None):
+    """UI-triggered async wrapper — with thousands of issues each needing their
+    own GitLab API call, this can take far longer than a web request's timeout,
+    so run it on the long queue. Notifies the triggering user via a realtime
+    alert once done, since the job's return value otherwise isn't visible
+    anywhere."""
+    frappe.enqueue(
+        method="phamos.gitlab_integration.gitlab_utils._backfill_cycle_start_labels_and_notify",
+        queue="long",
+        timeout=60 * 60,
+        is_async=True,
+        project_name=project_name,
+        notify_user=frappe.session.user,
+    )
+    return {
+        "status": "queued",
+        "message": "Cycle start label backfill queued as background job",
+    }
 
 
 def _backfill_issue_comments_and_notify(project_name, notify_user):

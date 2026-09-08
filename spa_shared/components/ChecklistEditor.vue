@@ -24,11 +24,23 @@
 				<div v-if="expandedItem !== item.name" class="flex items-start gap-3 px-3 py-2.5">
 					<div class="min-w-0 flex-1">
 						<div
+							v-if="(item.description || '').trim()"
+							class="truncate text-sm font-medium text-gray-900 dark:text-gray-100"
+						>
+							{{ item.description }}
+						</div>
+						<div
 							v-if="hasNote(item)"
 							class="prose-sm dark:prose-invert max-w-none text-gray-900 dark:text-gray-100 [&_p]:my-0.5"
+							:class="(item.description || '').trim() ? 'mt-0.5 text-gray-600 dark:text-gray-300' : ''"
 							v-html="item.note"
 						/>
-						<span v-else class="text-sm text-gray-400 dark:text-gray-500">Click to edit…</span>
+						<span
+							v-else-if="!(item.description || '').trim()"
+							class="text-sm text-gray-400 dark:text-gray-500"
+						>
+							Click to edit…
+						</span>
 						<div
 							v-if="item.document"
 							class="mt-1 truncate text-xs text-gray-500 dark:text-gray-400"
@@ -51,7 +63,15 @@
 				<!-- Expanded -->
 				<div v-else class="space-y-3 px-3 py-3" @click.stop>
 					<div class="flex items-start gap-3">
-						<div class="min-w-0 flex-1">
+						<div class="min-w-0 flex-1 space-y-2">
+							<input
+								type="text"
+								class="w-full rounded-md border border-gray-300 bg-white px-2 py-1.5 text-sm text-gray-900 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-100"
+								:value="item.description || ''"
+								:disabled="savingItem === item.name"
+								placeholder="Short description"
+								@change="saveField(item, 'description', $event.target.value)"
+							/>
 							<TextEditor
 								ref="noteEditor"
 								:content="item.note || ''"
@@ -171,7 +191,12 @@ function hasNote(item) {
 }
 
 function isEmptyItem(item) {
-	return !hasNote(item) && !(item.document || "").trim() && !(item.record || "").trim()
+	return (
+		!hasNote(item) &&
+		!(item.description || "").trim() &&
+		!(item.document || "").trim() &&
+		!(item.record || "").trim()
+	)
 }
 
 function findItem(name) {

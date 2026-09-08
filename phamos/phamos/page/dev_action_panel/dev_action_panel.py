@@ -832,19 +832,33 @@ def get_team_calendar_events():
 # ---------------------------------------------------------------------------
 
 @frappe.whitelist()
-def get_my_timesheets():
+def get_my_timesheets(from_date=None, to_date=None, offset=0):
     """
     Return the current employee's Timesheets with project/customer names and
     total billable hours. Used by the Developer Action Panel 'My Timesheets' view.
     """
     employee = frappe.db.get_value("Employee", {"user_id": frappe.session.user}, "name")
     if not employee:
-        return []
+        return {"timesheets": [], "has_more": False, "offset": offset, "total_on_page": 0}
+
+    offset = int(offset) or 0
+    PAGE_SIZE = 500
 
     Timesheet = frappe.qb.DocType("Timesheet")
     Project = frappe.qb.DocType("Project")
     Customer = frappe.qb.DocType("Customer")
     TimesheetDetail = frappe.qb.DocType("Timesheet Detail")
+
+    conditions = [
+        (Timesheet.employee == employee),
+        (Timesheet.docstatus != 2)
+    ]
+    
+    # Add date filters if provided (filter by start_date)
+    if from_date:
+        conditions.append(Timesheet.start_date >= from_date)
+    if to_date:
+        conditions.append(Timesheet.start_date <= to_date)
 
     query = (
         frappe.qb.from_(Timesheet)
@@ -861,20 +875,30 @@ def get_my_timesheets():
             Timesheet.total_hours,
             Timesheet.status,
             Timesheet.creation,
+            Timesheet.start_date,
+            Timesheet.end_date,
             Timesheet.docstatus,
             Project.project_name,
             Customer.customer_name,
             Coalesce(Sum(TimesheetDetail.billing_hours), 0).as_("billable_hours"),
         )
-        .where(
-            (Timesheet.employee == employee)
-            & (Timesheet.docstatus != 2)
-        )
+    )
+    
+    for condition in conditions:
+        query = query.where(condition)
+    
+    query = (
+        query
         .groupby(Timesheet.name)
         .orderby(Timesheet.creation, order=Order.desc)
-        .limit(500)
+        .offset(offset)
+        .limit(PAGE_SIZE + 1)
     )
     results = query.run(as_dict=True)
+
+    has_more = len(results) > PAGE_SIZE
+    if has_more:
+        results = results[:PAGE_SIZE]  
 
     for r in results:
         r["status_label"] = {
@@ -883,4 +907,9 @@ def get_my_timesheets():
             2: "Cancelled",
         }.get(r.docstatus, r.status)
 
-    return results
+    return {
+        "timesheets": results,
+        "has_more": has_more,
+        "offset": offset,
+        "total_on_page": len(results),
+    }

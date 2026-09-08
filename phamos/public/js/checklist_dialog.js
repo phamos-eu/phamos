@@ -46,7 +46,7 @@ frappe.call({
 
 function show_linked_checklists_dialog(frm) {
 	frappe.call({
-		method: "phamos.phamos.doctype.marketing_content.marketing_content.get_linked_checklists",
+		method: "phamos.phamos.doctype.checklist.checklist.get_linked_checklists",
 		args: {
 			doctype: frm.doctype,
 			name: frm.doc.name,
@@ -94,6 +94,7 @@ function build_checklist_dialog_html(checklists) {
 			}[row.status] || "blue";
 
 			const escaped_name = frappe.utils.escape_html(row.name);
+			const escaped_owner = frappe.utils.escape_html(row.checklist_owner || "-");
 			return `
 				<tr class="checklist-summary-row" data-checklist-name="${escaped_name}">
 					<td>
@@ -102,6 +103,12 @@ function build_checklist_dialog_html(checklists) {
 							<span>${escaped_name}</span>
 						</button>
 						<a href="/app/checklist/${encodeURIComponent(row.name)}" target="_blank" class="ml-2 text-muted" title="${__("Open checklist")}">↗</a>
+					</td>
+
+					<td>
+						<span class="checklist-owner" data-checklist-name="${escaped_name}">
+							${escaped_owner}
+						</span>
 					</td>
 
 					<td>
@@ -127,7 +134,7 @@ function build_checklist_dialog_html(checklists) {
 					</td>
 				</tr>
 				<tr class="checklist-detail-row" data-checklist-name="${escaped_name}" style="display:none;">
-					<td colspan="3">
+					<td colspan="4">
 						<div class="checklist-items-container" data-checklist-name="${escaped_name}">
 							<div class="text-muted">${__("Click to load items")}</div>
 						</div>
@@ -143,6 +150,7 @@ function build_checklist_dialog_html(checklists) {
 				<thead>
 					<tr>
 						<th>${__("Checklist")}</th>
+						<th>${__("Owner")}</th>
 						<th>${__("Status")}</th>
 						<th>${__("Completion")}</th>
 					</tr>
@@ -177,6 +185,15 @@ function bind_checklist_dialog_events(dialog, frm, checklists) {
 		const done = $input.prop("checked") ? 1 : 0;
 
 		save_checklist_item_changes($wrapper, frm, checklistName, itemName, { done }, $input);
+	});
+
+	$wrapper.on("blur", ".checklist-item-description", function () {
+		const $input = $(this);
+		const checklistName = $input.data("checklistName");
+		const itemName = $input.data("itemName");
+		const description = $input.val();
+
+		save_checklist_item_changes($wrapper, frm, checklistName, itemName, { description }, $input);
 	});
 
 	$wrapper.on("blur", ".checklist-item-note", function () {
@@ -229,6 +246,7 @@ function build_checklist_items_table(checklistName, items) {
 		.map((item) => {
 			const escapedItemName = frappe.utils.escape_html(item.name);
 			const escapedChecklistName = frappe.utils.escape_html(checklistName);
+			const safeDescription = frappe.utils.escape_html(item.description || "");
 			const safeNote = frappe.utils.escape_html(item.note || "");
 			const safeDocument = frappe.utils.escape_html(item.document || "");
 			const safeRecord = frappe.utils.escape_html(item.record || "");
@@ -251,11 +269,20 @@ function build_checklist_items_table(checklistName, items) {
 						/>
 					</td>
 					<td>
+						<input
+							type="text"
+							class="form-control checklist-item-description mb-2"
+							data-checklist-name="${escapedChecklistName}"
+							data-item-name="${escapedItemName}"
+							placeholder="${__("Description")}"
+							value="${safeDescription}"
+						/>
 						<textarea
 							class="form-control checklist-item-note"
 							data-checklist-name="${escapedChecklistName}"
 							data-item-name="${escapedItemName}"
 							rows="2"
+							placeholder="${__("Note")}"
 						>${safeNote}</textarea>
 					</td>
 					<td style="width:180px;">
@@ -276,7 +303,7 @@ function build_checklist_items_table(checklistName, items) {
 				<thead>
 					<tr>
 						<th>${__("Done")}</th>
-						<th>${__("Note")}</th>
+						<th>${__("Description / Note")}</th>
 						<th>${__("Document")}</th>
 						<th>${__("Record")}</th>
 					</tr>
