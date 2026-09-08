@@ -24,6 +24,10 @@ const props = defineProps({
 		type: String,
 		default: "",
 	},
+	query: {
+		type: String,
+		default: "",
+	},
 	filters: {
 		type: [Object, Array],
 		default: () => ({}),
@@ -58,6 +62,7 @@ const options = createResource({
 		doctype: props.doctype,
 		txt: searchText.value,
 		filters: props.filters,
+		...(props.query ? { query: props.query } : {}),
 	},
 	method: "POST",
 	transform: (data) => {
@@ -91,6 +96,7 @@ const reloadOptions = (searchTextVal) => {
 			txt: searchTextVal,
 			doctype: props.doctype,
 			filters: props.filters,
+			...(props.query ? { query: props.query } : {}),
 		},
 	})
 	options.reload()

@@ -10,6 +10,37 @@ from frappe.utils import cint
 CHECKLIST_REFERENCE_DOCTYPES = ("Issue", "Task", "Project", "Lead", "Opportunity", "Customer")
 
 
+@frappe.whitelist()
+@frappe.validate_and_sanitize_search_inputs
+def checklist_owner_query(doctype, txt, searchfield, start, page_len, filters):
+	"""Link search: enabled System Users with Role = Employee."""
+	from frappe.utils.user import get_users_with_role
+
+	user_names = set(get_users_with_role("Employee") or [])
+	user_names.discard("Guest")
+	if not user_names:
+		return []
+
+	or_filters = [[searchfield, "like", f"%{txt}%"]]
+	if searchfield == "name":
+		or_filters += [[field, "like", f"%{txt}%"] for field in ("full_name", "first_name", "last_name")]
+
+	return frappe.get_list(
+		"User",
+		filters={
+			"name": ("in", list(user_names)),
+			"enabled": 1,
+			"user_type": ("!=", "Website User"),
+		},
+		fields=["name", "full_name"],
+		limit_start=start,
+		limit_page_length=page_len,
+		order_by="full_name asc",
+		or_filters=or_filters,
+		as_list=True,
+	)
+
+
 def _require_checklist_read(name):
 	frappe.has_permission("Checklist", "read", throw=True)
 	doc = frappe.get_doc("Checklist", name)
