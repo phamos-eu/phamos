@@ -1180,12 +1180,33 @@ function _mis_show_timesheet_approval_dialog(frm) {
 
 function _mis_maybe_open_timesheet_approval_dialog(frm) {
 	if (frm.is_new() || !frm.doc.name) return;
-	if (!Array.isArray(frm.doc.timesheets_table) || !frm.doc.timesheets_table.length) return;
+
 	if (frm.__mis_timesheet_dialog_opened_for === frm.doc.name) return;
-	frm.__mis_timesheet_dialog_opened_for = frm.doc.name;
-	setTimeout(() => {
-		_mis_show_timesheet_approval_dialog(frm);
-	}, 250);
+
+	frappe.call({
+		method: "phamos.phamos.doctype.monthly_implementation_summary.monthly_implementation_summary.get_timesheet_approval_rows",
+		args: {
+			docname: frm.doc.name,
+		},
+		freeze: false,
+	}).then((r) => {
+		const rows = (r && r.message) || [];
+
+		// Only open the dialog when at least one timesheet is pending
+		const has_pending_timesheet = rows.some((row) =>
+			_mis_is_timesheet_pending(row)
+		);
+
+		if (!has_pending_timesheet) {
+			return;
+		}
+
+		frm.__mis_timesheet_dialog_opened_for = frm.doc.name;
+
+		setTimeout(() => {
+			_mis_show_timesheet_approval_dialog(frm);
+		}, 250);
+	});
 }
 
 frappe.ui.form.on("Monthly Implementation Summary", {

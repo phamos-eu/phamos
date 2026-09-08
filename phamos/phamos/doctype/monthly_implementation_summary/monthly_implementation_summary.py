@@ -859,11 +859,6 @@ def _create_dn_from_sales_order(docname, sales_order, delivery_note_item=None):
 		dn.flags.ignore_pricing_rule = True
 		dn.ignore_pricing_rule = 1
 		dn.custom_implementation = mis_doc.implementation
-		dn_meta = frappe.get_meta("Delivery Note")
-		for fn in ("palette", "paket"):
-			if dn_meta.has_field(fn):
-				dn.set(fn, 0)
-
 		dn.insert()
 		frappe.db.commit()
 		update_dn_table_in_summary(docname, dn.name)
