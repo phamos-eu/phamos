@@ -261,6 +261,8 @@ def create_spa_checklist(document, reference_record, name=None, items=None):
 		doc.title = title
 	else:
 		doc.name = _unique_checklist_name(title)
+	if meta.has_field("checklist_owner"):
+		doc.checklist_owner = frappe.session.user
 
 	for item in parsed_items:
 		if not isinstance(item, dict):
