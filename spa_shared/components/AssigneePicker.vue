@@ -1,6 +1,6 @@
 <template>
 	<div class="space-y-3">
-		<div class="text-[11px] font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400">
+		<div class="text-[11px] font-semibold uppercase tracking-wide text-ink-gray-6">
 			Assignees
 		</div>
 
@@ -8,7 +8,7 @@
 			<span
 				v-for="user in selected"
 				:key="user.name"
-				class="inline-flex items-center gap-1 rounded-full bg-gray-100 py-0.5 pl-1 pr-1 text-xs font-medium text-gray-800 dark:bg-gray-800 dark:text-gray-200"
+				class="inline-flex items-center gap-1 rounded-full bg-surface-gray-3 py-0.5 pl-1 pr-1 text-xs font-medium text-ink-gray-9"
 			>
 				<Avatar
 					size="xs"
@@ -19,7 +19,7 @@
 				<span class="pl-0.5">{{ user.full_name || user.name }}</span>
 				<button
 					type="button"
-					class="rounded-full p-0.5 text-gray-500 hover:bg-gray-200 hover:text-gray-900 dark:text-gray-400 dark:hover:bg-gray-700 dark:hover:text-gray-100"
+					class="rounded-full p-0.5 text-ink-gray-6 hover:bg-surface-gray-4 hover:text-ink-gray-9"
 					:disabled="saving"
 					:title="`Remove ${user.full_name || user.name}`"
 					@click="removeUser(user.name)"
@@ -28,16 +28,16 @@
 				</button>
 			</span>
 		</div>
-		<div v-else class="text-sm text-gray-500 dark:text-gray-400">No assignees</div>
+		<div v-else class="text-sm text-ink-gray-6">No assignees</div>
 
 		<div v-if="availableShortlist.length" class="space-y-1.5">
-			<div class="text-[11px] font-medium text-gray-500 dark:text-gray-400">Suggested</div>
+			<div class="text-[11px] font-medium text-ink-gray-6">Suggested</div>
 			<div class="flex flex-wrap gap-1.5">
 				<button
 					v-for="user in availableShortlist"
 					:key="user.name"
 					type="button"
-					class="inline-flex items-center gap-1.5 rounded-full border border-dashed border-gray-300 py-0.5 pl-1 pr-2.5 text-xs text-gray-700 hover:border-gray-400 hover:bg-gray-50 dark:border-gray-600 dark:text-gray-300 dark:hover:bg-gray-800"
+					class="inline-flex items-center gap-1.5 rounded-full border border-dashed border-outline-gray-3 py-0.5 pl-1 pr-2.5 text-xs text-ink-gray-8 hover:border-outline-gray-4 hover:bg-surface-gray-2"
 					:disabled="saving"
 					@click="addUser(user)"
 				>
@@ -53,7 +53,7 @@
 		</div>
 
 		<div>
-			<label class="mb-1.5 block text-xs text-ink-gray-5">Search users</label>
+			<label class="mb-1.5 block text-xs text-ink-gray-6">Search users</label>
 			<div ref="searchWrap">
 				<Autocomplete
 					v-model="searchValue"

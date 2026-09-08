@@ -56,7 +56,7 @@
 		<aside
 			v-if="selectedName"
 			id="issue-properties-host"
-			class="order-4 flex w-72 flex-none flex-col overflow-hidden border-l border-gray-200 bg-gray-50/80 dark:border-gray-800 dark:bg-gray-950/40"
+			class="order-4 flex w-72 flex-none flex-col overflow-hidden border-l border-outline-gray-2 bg-surface-white"
 		/>
 
 		<aside
