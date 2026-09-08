@@ -32,10 +32,7 @@
 				/>
 
 				<div>
-					<div class="mb-2 flex items-center justify-between gap-2">
-						<label class="text-xs font-medium text-gray-600 dark:text-gray-400">Items *</label>
-						<Button size="sm" variant="subtle" @click="addRow">Add item</Button>
-					</div>
+					<label class="mb-2 block text-xs font-medium text-gray-600 dark:text-gray-400">Items *</label>
 
 					<div class="space-y-3">
 						<div
@@ -90,6 +87,10 @@
 								</div>
 							</div>
 						</div>
+					</div>
+
+					<div class="mt-3">
+						<Button size="sm" @click="addRow">Add item</Button>
 					</div>
 				</div>
 
