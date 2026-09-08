@@ -68,13 +68,13 @@
 							</div>
 							<div class="space-y-2">
 								<input
+									:ref="(el) => setDescriptionRef(row.id, el)"
 									v-model="row.description"
 									type="text"
 									class="w-full rounded-md border border-gray-300 px-3 py-2 text-sm"
 									placeholder="Short description"
 								/>
 								<textarea
-									:ref="(el) => setNoteRef(row.id, el)"
 									v-model="row.note"
 									rows="2"
 									class="w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-100"
@@ -140,13 +140,13 @@ const title = ref("")
 const checklistOwner = ref("")
 const titleFieldHost = ref(null)
 const rows = ref([])
-const noteRefs = new Map()
+const descriptionRefs = new Map()
 const creating = ref(false)
 const error = ref("")
 
-function setNoteRef(id, el) {
-	if (el) noteRefs.set(id, el)
-	else noteRefs.delete(id)
+function setDescriptionRef(id, el) {
+	if (el) descriptionRefs.set(id, el)
+	else descriptionRefs.delete(id)
 }
 
 function emptyRow() {
@@ -161,7 +161,7 @@ function emptyRow() {
 
 function resetForm() {
 	nextId = 1
-	noteRefs.clear()
+	descriptionRefs.clear()
 	title.value = (props.referenceTitle || "").trim()
 	checklistOwner.value = ""
 	rows.value = [emptyRow()]
@@ -183,7 +183,7 @@ async function addRow() {
 	const row = emptyRow()
 	rows.value = [...rows.value, row]
 	await nextTick()
-	noteRefs.get(row.id)?.focus()
+	descriptionRefs.get(row.id)?.focus()
 }
 
 function removeRow(id) {
