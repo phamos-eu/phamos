@@ -42,10 +42,10 @@
 	</Teleport>
 
 	<Teleport v-if="propertiesHostReady" to="#issue-properties-host">
-		<div class="flex h-full min-h-0 flex-col bg-gray-50/80 dark:bg-gray-950/40">
+		<div class="flex h-full min-h-0 flex-col bg-surface-white text-ink-gray-8">
 			<div class="flex min-h-0 flex-1 flex-col gap-5 overflow-y-auto p-4">
 				<section>
-					<div class="mb-2 text-[11px] font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400">
+					<div class="mb-2 text-[11px] font-semibold uppercase tracking-wide text-ink-gray-5">
 						Status
 					</div>
 					<div class="flex flex-wrap items-center gap-2.5">
@@ -127,14 +127,14 @@
 				</section>
 			</div>
 
-			<div class="mt-auto flex-shrink-0 space-y-2 border-t border-gray-200 p-4 dark:border-gray-800">
-				<p class="text-xs text-gray-500 dark:text-gray-400">
+			<div class="mt-auto flex-shrink-0 space-y-2 border-t border-outline-gray-1 p-4">
+				<p class="text-xs text-ink-gray-5">
 					Created by {{ issue.owner_name || issue.owner }}
 					<span v-if="issue.department"> · {{ issue.department }}</span>
 				</p>
 				<a
 					:href="issue.desk_url"
-					class="flex w-full items-center gap-2 rounded-md px-2 py-2 text-sm font-medium text-gray-600 hover:bg-gray-100 hover:text-gray-900 dark:text-gray-400 dark:hover:bg-gray-800 dark:hover:text-gray-100"
+					class="flex w-full items-center gap-2 rounded-md px-2 py-2 text-sm font-medium text-ink-gray-6 hover:bg-surface-gray-2 hover:text-ink-gray-9"
 				>
 					<FeatherIcon name="external-link" class="h-4 w-4 flex-shrink-0" />
 					<span class="truncate">Open in Desk</span>
