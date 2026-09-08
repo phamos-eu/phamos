@@ -32,6 +32,18 @@
 				/>
 
 				<div>
+					<label class="mb-1.5 block text-xs font-medium text-gray-600 dark:text-gray-400">
+						Checklist Owner *
+					</label>
+					<FrappeLink
+						doctype="User"
+						v-model="checklistOwner"
+						placeholder="Select owner"
+						:filters="{ enabled: 1 }"
+					/>
+				</div>
+
+				<div>
 					<label class="mb-2 block text-xs font-medium text-gray-600 dark:text-gray-400">Items *</label>
 
 					<div class="space-y-3">
@@ -110,6 +122,7 @@
 import { nextTick, ref, watch } from "vue"
 import { call } from "frappe-ui"
 import FrappeLink from "@spa/components/FrappeLink.vue"
+import { session } from "@spa/session.js"
 
 const props = defineProps({
 	modelValue: { type: Boolean, default: false },
@@ -124,6 +137,7 @@ const API = "phamos.api.checklist_inbox"
 
 let nextId = 1
 const title = ref("")
+const checklistOwner = ref("")
 const rows = ref([])
 const noteRefs = new Map()
 const creating = ref(false)
@@ -148,6 +162,7 @@ function resetForm() {
 	nextId = 1
 	noteRefs.clear()
 	title.value = (props.referenceTitle || "").trim()
+	checklistOwner.value = session.user || ""
 	rows.value = [emptyRow()]
 	error.value = ""
 }
@@ -188,6 +203,11 @@ async function submit() {
 		error.value = "Title is required"
 		return
 	}
+	const owner = (checklistOwner.value || "").trim()
+	if (!owner) {
+		error.value = "Checklist Owner is required"
+		return
+	}
 	const items = buildItems()
 	if (!items.length) {
 		error.value = "Add at least one checklist item"
@@ -200,6 +220,7 @@ async function submit() {
 			document: props.document,
 			reference_record: props.referenceRecord,
 			name,
+			checklist_owner: owner,
 			items,
 		})
 		emit("created", created)
