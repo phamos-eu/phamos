@@ -5,11 +5,15 @@ from frappe import _
 
 
 def get_data():
-	# delivery_note on this doc points to Delivery Note — internal link (not a field on DN).
-	# fieldname + non_standard_fieldnames: safe fallback when no DN is set (query yields 0 rows).
 	return {
 		"fieldname": "name",
-		"non_standard_fieldnames": {"Delivery Note": "name"},
-		"internal_links": {"Delivery Note": "delivery_note"},
-		"transactions": [{"label": _("Related"), "items": ["Delivery Note"]}],
+		"internal_links": {
+			"Sales Order": ["mis_delivery_notes", "sales_order"],
+			"Delivery Note": ["mis_delivery_notes", "delivery_note"],
+			"Sales Invoice": ["mis_sales_invoices", "sales_invoice"],
+		},
+		"transactions": [
+			{"label": _("Related"), "items": ["Sales Order", "Delivery Note", "Sales Invoice"]},
+		],
 	}
+

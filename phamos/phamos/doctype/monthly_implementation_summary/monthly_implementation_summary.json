@@ -8,9 +8,12 @@
   "field_order": [
     "naming_series",
     "implementation",
-    "sales_order",
+    "status",
     "sales_order_status_information",
-    "delivery_note",
+    "mis_delivery_notes_section",
+    "mis_delivery_notes",
+    "mis_sales_invoices_section",
+    "mis_sales_invoices",
     "section_break_1_section",
     "delivery_note_details",
     "delivery_note_item",
@@ -49,12 +52,15 @@
       "reqd": 1
     },
     {
-      "fieldname": "sales_order",
-      "fieldtype": "Link",
-      "label": "Sales Order",
-      "link_filters": "[\n  [\"Sales Order\", \"docstatus\", \"=\", 1],\n  [\"Sales Order\", \"custom_implementation\", \"=\", \"eval:doc.implementation\"],\n  [\"Sales Order\", \"status\", \"not in\", [\"Completed\", \"Closed\", \"On Hold\"]]\n]",
+      "default": "Draft",
+      "fieldname": "status",
+      "fieldtype": "Select",
+      "in_list_view": 1,
+      "in_standard_filter": 1,
+      "label": "Status",
       "no_copy": 1,
-      "options": "Sales Order"
+      "options": "Draft\nOpen\nClosed",
+      "read_only": 1
     },
     {
       "fieldname": "sales_order_status_information",
@@ -63,11 +69,27 @@
       "options": "Sales Order Status"
     },
     {
-      "fieldname": "delivery_note",
-      "fieldtype": "Data",
-      "label": "Delivery Note",
-      "no_copy": 1,
-      "read_only": 1
+      "fieldname": "mis_delivery_notes_section",
+      "fieldtype": "Section Break",
+      "label": "Delivery Notes"
+    },
+    {
+      "fieldname": "mis_delivery_notes",
+      "fieldtype": "Table",
+      "label": "Delivery Notes",
+      "options": "MIS Delivery Note"
+    },
+    {
+      "fieldname": "mis_sales_invoices_section",
+      "fieldtype": "Section Break",
+      "label": "Sales Invoices"
+    },
+    {
+      "fieldname": "mis_sales_invoices",
+      "fieldtype": "Table",
+      "label": "Sales Invoices",
+      "options": "MIS Sales Invoice",
+      "ignore_user_permissions": 1
     },
     {
       "fieldname": "section_break_1_section",
@@ -200,7 +222,7 @@
   "index_web_pages_for_search": 1,
   "is_submittable": 1,
   "links": [],
-  "modified": "2026-09-03 16:30:00.000000",
+  "modified": "2026-09-08 12:00:00.000000",
   "modified_by": "Administrator",
   "module": "Phamos",
   "name": "Monthly Implementation Summary",

@@ -60,8 +60,10 @@ def _resolve_rate_for_mis_from_dn_row(mis_doc, dn_item):
 	r = _rate_from_dn_line(dn_item)
 	if not r and getattr(dn_item, "so_detail", None):
 		r = _rate_from_so_detail(dn_item.so_detail)
-	if not r and mis_doc.sales_order:
-		r = _rate_from_sales_order(mis_doc.sales_order, dn_item.item_code)
+	if not r:
+		so = getattr(dn_item, "against_sales_order", None)
+		if so:
+			r = _rate_from_sales_order(so, dn_item.item_code)
 	return flt(r, 2)
 
 
@@ -174,6 +176,9 @@ class MonthlyImplementationSummary(Document):
 			if period_changed or impl_changed:
 				self.timesheets_table = []
 
+		if cint(self.docstatus) == 0:
+			self.status = "Draft"
+
 		self.validate_year()
 		self.validate_month()
 		if self.implementation and self.year and self.month and not self.timesheets_table:
@@ -184,65 +189,156 @@ class MonthlyImplementationSummary(Document):
 		self.validate_month()
 		self.validate_duplicate_record()
 		self._recalculate_delivery_note_item_amounts()
-		self._set_sales_order_status_information()
-		self.populate_financial_history_fields()
+		if not self.is_closed():
+			self._set_sales_order_status_information()
+			self.populate_financial_history_fields()
+
+	def is_closed(self):
+		return cint(self.docstatus) == 1 and self.status == "Closed"
 
 	def before_submit(self):
-		self._sync_delivery_note_from_mis_items_for_submit()
-		self._submit_linked_delivery_note_before_mis_submit()
+		self.status = "Open"
+		self._auto_submit_draft_delivery_notes()
+
+	def _auto_submit_draft_delivery_notes(self):
+		errors = []
+		prev_submitting = frappe.flags.get("mis_submitting")
+		frappe.flags.mis_submitting = self.name
+		try:
+			for row in (self.mis_delivery_notes or []):
+				dn_name = row.delivery_note
+				if not dn_name or not frappe.db.exists("Delivery Note", dn_name):
+					continue
+				dn_status = cint(frappe.db.get_value("Delivery Note", dn_name, "docstatus") or 0)
+				if dn_status != 0:
+					continue
+				try:
+					dn_doc = frappe.get_doc("Delivery Note", dn_name)
+					dn_doc.submit()
+					row.status = dn_doc.status or ""
+					row.grand_total = flt(dn_doc.grand_total)
+				except Exception as e:
+					errors.append(f"{frappe.bold(dn_name)}: {str(e)}")
+		finally:
+			frappe.flags.mis_submitting = prev_submitting
+		if errors:
+			frappe.throw(
+				frappe._("Could not submit the following Delivery Note(s):<br>{0}").format(
+					"<br>".join(errors)
+				)
+			)
 
 	def on_submit(self):
-		dn_name = self._resolve_dn_name_for_timesheet_stamp()
-		if dn_name:
-			self._update_timesheets_delivery_note(dn_name)
+		# Stamp timesheets with the first non-cancelled DN from mis_delivery_notes
+		for row in (self.mis_delivery_notes or []):
+			dn_name = row.delivery_note
+			if dn_name and frappe.db.exists("Delivery Note", dn_name):
+				dn_status = cint(frappe.db.get_value("Delivery Note", dn_name, "docstatus") or 0)
+				if dn_status != 2:
+					self._update_timesheets_delivery_note(dn_name)
+					break
 
-	def _submit_linked_delivery_note_before_mis_submit(self):
-		dn_name = (self.delivery_note or "").strip()
-		if not dn_name:
-			dn_name = self._get_linked_dn_name(persist_link=True)
+	def close(self):
+		if cint(self.docstatus) != 1:
+			frappe.throw(frappe._("Only a submitted Monthly Implementation Summary can be closed."))
+		self._set_status("Closed", frappe._("Closed by {0}").format(frappe.session.user))
 
-		if not dn_name:
-			frappe.throw(frappe._("No Delivery Note linked to this Monthly Implementation Summary."))
+	def reopen(self):
+		if cint(self.docstatus) != 1:
+			frappe.throw(frappe._("Only a submitted Monthly Implementation Summary can be re-opened."))
+		self._set_status("Open", frappe._("Re-opened by {0}").format(frappe.session.user))
 
-		if not frappe.db.exists("Delivery Note", dn_name):
-			frappe.throw(frappe._("Delivery Note {0} does not exist.").format(frappe.bold(dn_name)))
+	def _set_status(self, status, comment):
+		if self.status == status:
+			return
+		self.status = status
+		self.flags.ignore_permissions = True
+		self.flags.ignore_validate_update_after_submit = True
+		self.save()
+		self.add_comment("Info", comment)
 
-		dn = frappe.get_doc("Delivery Note", dn_name)
-		dn_status = cint(dn.docstatus)
+	def _all_linked_docs_completed(self):
+		"""True only if every linked Sales Order / Delivery Note is fulfilled and no Sales Order
+		for this Implementation is still open (an open SO may not have a Delivery Note yet).
+		A timesheet-only MIS (no Sales Order / Delivery Note ever linked) has nothing to wait
+		on and is treated as completed."""
+		if any(
+			(row.status or "") not in ("Completed", "Closed")
+			for row in (self.sales_order_status_information or [])
+		):
+			return False
+		sales_orders, delivery_notes = set(), set()
+		for row in (self.mis_delivery_notes or []):
+			if row.sales_order:
+				sales_orders.add(row.sales_order)
+			if row.delivery_note:
+				delivery_notes.add(row.delivery_note)
+		if not sales_orders and not delivery_notes:
+			return not (self.sales_order_status_information or [])
+		for so in sales_orders:
+			status = frappe.db.get_value("Sales Order", so, "status")
+			if status not in ("Completed", "Closed"):
+				return False
+		for dn in delivery_notes:
+			docstatus = cint(frappe.db.get_value("Delivery Note", dn, "docstatus") or 0)
+			if docstatus == 2:
+				continue
+			status = frappe.db.get_value("Delivery Note", dn, "status")
+			if status not in ("Completed", "Closed"):
+				return False
+		return True
 
-		if dn_status == 2:
-			frappe.throw(frappe._("Delivery Note {0} is cancelled.").format(frappe.bold(dn_name)))
+	def auto_close_if_fulfilled(self):
+		"""Close an Open MIS once every linked Sales Order / Delivery Note is fully delivered and billed."""
+		if cint(self.docstatus) != 1 or self.status != "Open":
+			return False
+		if not self._all_linked_docs_completed():
+			return False
+		self._set_status("Closed", frappe._("Auto-closed: all linked Sales Orders / Delivery Notes are fulfilled."))
+		return True
 
-		self.delivery_note = dn.name
-
-	def _resolve_dn_name_for_timesheet_stamp(self):
-		"""Resolve Delivery Note for stamping timesheets: DB ``delivery_note`` first (reliable after
-		workflow / ``db_set``), then latest non-cancelled DN whose item row links this MIS, then
-		``_get_linked_dn_name`` fallbacks (SO / implementation).
-		"""
-		if not self.name:
-			return None
-		dn = frappe.db.get_value(self.doctype, self.name, "delivery_note")
-		if dn and frappe.db.exists("Delivery Note", dn):
-			ds = frappe.db.get_value("Delivery Note", dn, "docstatus")
-			if ds is not None and int(ds) != 2:
-				return dn
-		row = frappe.db.sql(
-			"""
-			select dni.parent
-			from `tabDelivery Note Item` dni
-			inner join `tabDelivery Note` dn on dn.name = dni.parent
-			where ifnull(dn.docstatus, 0) != 2
-				and dni.custom_against_monthly_implementation_summary = %s
-			order by dni.modified desc
-			limit 1
-			""",
-			self.name,
-			as_list=True,
+	def _sync_snapshot(self):
+		"""Fields sync_and_auto_close may touch — used to skip saving when nothing changed."""
+		return (
+			tuple((r.delivery_note, r.status, flt(r.grand_total)) for r in (self.mis_delivery_notes or [])),
+			tuple((r.sales_invoice, r.status, flt(r.grand_total)) for r in (self.mis_sales_invoices or [])),
+			tuple(
+				(r.sales_order, r.status, r.total_hrs, r.delivered_total_hrs, r.remaining_hrs)
+				for r in (self.sales_order_status_information or [])
+			),
+			(flt(self.sales_order_qty), flt(self.dn_qty), flt(self.timesheet_hrs), flt(self.remaining_hrs), cint(self.open_so)),
 		)
-		if row and row[0] and row[0][0]:
-			return row[0][0]
-		return self._get_linked_dn_name(persist_link=False)
+
+	def sync_and_auto_close(self):
+		"""Re-read live Delivery Note / Sales Invoice / Sales Order status into this MIS.
+
+		Submitting a Sales Invoice (or Delivery Note) updates the underlying DN/SO status via
+		direct db writes that skip their own doc hooks, so cached rows here go stale unless we
+		re-read the live status ourselves. Also attempts auto-close once everything lines up.
+		"""
+		if self.is_closed():
+			return False
+		before = self._sync_snapshot()
+		for row in (self.mis_delivery_notes or []):
+			if not row.delivery_note:
+				continue
+			live = frappe.db.get_value("Delivery Note", row.delivery_note, ["status", "grand_total"], as_dict=True)
+			if live and (row.status != (live.status or "") or flt(row.grand_total) != flt(live.grand_total)):
+				row.status = live.status or ""
+				row.grand_total = flt(live.grand_total)
+		for row in (self.mis_sales_invoices or []):
+			if not row.sales_invoice:
+				continue
+			live = frappe.db.get_value("Sales Invoice", row.sales_invoice, ["status", "grand_total"], as_dict=True)
+			if live and (row.status != (live.status or "") or flt(row.grand_total) != flt(live.grand_total)):
+				row.status = live.status or ""
+				row.grand_total = flt(live.grand_total)
+		self._refresh_sales_order_status_and_financials()
+		if self._sync_snapshot() != before:
+			self.flags.ignore_permissions = True
+			self.flags.ignore_validate_update_after_submit = True
+			self.save()
+		return self.auto_close_if_fulfilled()
 
 	def _recalculate_delivery_note_item_amounts(self):
 		for row in self.delivery_note_item or []:
@@ -268,12 +364,12 @@ class MonthlyImplementationSummary(Document):
 		self.open_so = 0
 
 	def _refresh_sales_order_status_and_financials(self):
+		if self.is_closed():
+			return
 		self._set_sales_order_status_information()
 		self.populate_financial_history_fields()
 
 	def _set_sales_order_status_information(self):
-		# Open SOs for this implementation + delivered hrs (like Implementation). Submitted: update rows in place
-		# so child row names stay valid; draft: rebuild table.
 		def clear_table():
 			for r in list(self.sales_order_status_information or []):
 				self.remove(r)
@@ -286,16 +382,15 @@ class MonthlyImplementationSummary(Document):
 			clear_table()
 			return
 
-		open_so = {
+		so_filters = {
 			"customer": customer,
 			"custom_implementation": self.implementation,
-			"status": ["in", ["To Deliver", "To Bill", "To Deliver and Bill"]],
 			"docstatus": 1,
 		}
 		target = {}
 		for o in frappe.get_all(
 			"Sales Order",
-			filters=open_so,
+			filters=so_filters,
 			fields=["name", "status", "total_qty", "customer_name"],
 			order_by="transaction_date desc",
 		):
@@ -342,18 +437,24 @@ class MonthlyImplementationSummary(Document):
 				"as a Delivery Note will be created."
 			)
 
-	def _create_dn_from_timesheets(self):
+	def _create_dn_from_timesheets(self, sales_order=None):
 		try:
 			self.validate_timesheet_hours_for_delivery_note()
 			hours = flt(self.billable_hours)
 			if hours <= 0:
 				frappe.throw("Total billing hours is zero. Delivery Note cannot be created.")
-			if not self.sales_order:
+			if not sales_order:
+				# Pick first deliverable SO from the status table
+				for row in (self.sales_order_status_information or []):
+					if row.status in ("To Deliver", "To Deliver and Bill"):
+						sales_order = row.sales_order
+						break
+			if not sales_order:
 				frappe.throw(
-					frappe._("Select a Sales Order on this summary to create a Delivery Note from billable hours.")
+					frappe._("No deliverable Sales Order found. Select a Sales Order with status 'To Deliver' or 'To Deliver and Bill'.")
 				)
-			so_line = _so_line_for_billable_hours(self.sales_order)
-			so_customer = frappe.db.get_value("Sales Order", self.sales_order, "customer")
+			so_line = _so_line_for_billable_hours(sales_order)
+			so_customer = frappe.db.get_value("Sales Order", sales_order, "customer")
 			customer = frappe.db.get_value("Implementation", self.implementation, "customer")
 			if not customer:
 				frappe.throw("Implementation has no Customer.")
@@ -368,7 +469,7 @@ class MonthlyImplementationSummary(Document):
 			stock_uom = so_line.stock_uom or so_line.uom
 			cf = flt(so_line.conversion_factor, 9) or 1
 			rate = flt(so_line.rate)
-			spl = frappe.db.get_value("Sales Order", self.sales_order, "selling_price_list")
+			spl = frappe.db.get_value("Sales Order", sales_order, "selling_price_list")
 			dn_items = {
 				"item_code": so_line.item_code,
 				"item_name": so_line.item_name,
@@ -378,7 +479,7 @@ class MonthlyImplementationSummary(Document):
 				"conversion_factor": cf,
 				"rate": rate,
 				"amount": flt(rate * hours, 2),
-				"against_sales_order": self.sales_order,
+				"against_sales_order": sales_order,
 				"so_detail": so_line.name,
 				"allow_zero_valuation_rate": 1,
 				"custom_against_monthly_implementation_summary": self.name,
@@ -392,17 +493,13 @@ class MonthlyImplementationSummary(Document):
 				"items": [dn_items],
 			})
 			dn.insert()
-			self.delivery_note = dn.name
-			self.db_set("delivery_note", dn.name)
+			_add_or_update_mis_dn_row(self.name, dn.name, sales_order)
 			frappe.msgprint(f"Delivery Note {dn.name} created with {hours:.2f} Hour(s).")
 			return dn.name
 		except Exception as e:
 			frappe.throw(f"Error creating Delivery Note: {str(e)}")
 
-	def _build_dn_items_from_mis_dni(self):
-		if not self.sales_order:
-			frappe.throw("Sales Order is required to fetch rates for Delivery Note items.")
-
+	def _build_dn_items_from_mis_dni(self, sales_order=None):
 		items = []
 		for row in self.delivery_note_item:
 			ic = row.item_code
@@ -426,31 +523,55 @@ class MonthlyImplementationSummary(Document):
 				)
 
 			so_item = None
-			if so_detail and frappe.db.exists("Sales Order Item", {"name": so_detail, "parent": self.sales_order}):
+			if so_detail:
 				so_item = frappe.db.get_value(
 					"Sales Order Item",
 					so_detail,
-					["name", "item_code", "item_name", "item_group", "stock_uom", "uom", "conversion_factor", "rate"],
+					["name", "item_code", "item_name", "item_group", "stock_uom", "uom", "conversion_factor", "rate", "parent"],
 					as_dict=True,
 				)
-			else:
+			# If no match or SO doesn't align, look up by item_code in the given sales_order
+			if not so_item and sales_order:
 				so_item_name = frappe.db.get_value(
 					"Sales Order Item",
-					{"parent": self.sales_order, "item_code": ic},
+					{"parent": sales_order, "item_code": ic},
 					"name",
 				)
 				if so_item_name:
 					so_item = frappe.db.get_value(
 						"Sales Order Item",
 						so_item_name,
-						["name", "item_code", "item_name", "item_group", "stock_uom", "uom", "conversion_factor", "rate"],
+						["name", "item_code", "item_name", "item_group", "stock_uom", "uom", "conversion_factor", "rate", "parent"],
 						as_dict=True,
 					)
 
+			# Determine the SO for this item row
+			item_so = sales_order or (so_item.parent if so_item else None)
+
 			if not so_item:
-				frappe.throw(
-					"No matching Sales Order Item found for item {0} in Sales Order {1}.".format(ic, self.sales_order)
-				)
+				# Fall back to using row values directly
+				rate = _rate_from_dn_line(row)
+				cf = flt(row.conversion_factor, 9) or 1
+				uom = row.uom
+				stock_uom = row.stock_uom or uom
+				item_row = {
+					"item_code": ic,
+					"item_name": row.item_name or frappe.db.get_value("Item", ic, "item_name"),
+					"item_group": row.item_group,
+					"qty": qty,
+					"stock_uom": stock_uom,
+					"uom": uom,
+					"conversion_factor": cf,
+					"rate": rate,
+					"amount": flt(rate * qty, 2),
+					"expense_account": row.expense_account,
+					"cost_center": row.cost_center,
+					"allow_zero_valuation_rate": 1,
+					"against_sales_order": item_so,
+					"so_detail": so_detail,
+				}
+				items.append(item_row)
+				continue
 
 			rate = flt(so_item.rate)
 			cf = flt(so_item.conversion_factor, 9) or flt(row.conversion_factor, 9) or 1
@@ -470,27 +591,12 @@ class MonthlyImplementationSummary(Document):
 				"expense_account": row.expense_account,
 				"cost_center": row.cost_center,
 				"allow_zero_valuation_rate": 1,
-				"against_sales_order": self.sales_order,
+				"against_sales_order": item_so,
 				"so_detail": so_item.name,
 			}
 			items.append(item_row)
 
 		return items
-
-	def _sync_delivery_note_from_mis_items_for_submit(self):
-		if not self.delivery_note_item:
-			return
-
-		dn_name = self._get_linked_dn_name(persist_link=True)
-		if dn_name:
-			dn_status = cint(frappe.db.get_value("Delivery Note", dn_name, "docstatus") or 0)
-			if dn_status == 0:
-				self.update_delivery_note_from_mis_items()
-			elif dn_status == 2:
-				frappe.throw(frappe._("Cannot use cancelled Delivery Note {0}.").format(frappe.bold(dn_name)))
-			return
-
-		self._create_dn_from_mis_dni()
 
 	def _create_dn_from_mis_dni(self):
 		if not self.delivery_note_item:
@@ -512,8 +618,7 @@ class MonthlyImplementationSummary(Document):
 			"items": items,
 		})
 		dn.insert()
-		self.delivery_note = dn.name
-		self.db_set("delivery_note", dn.name)
+		_add_or_update_mis_dn_row(self.name, dn.name)
 		for row in self.delivery_note_item:
 			row.custom_ref_doc = dn.name
 		self.save()
@@ -549,15 +654,15 @@ class MonthlyImplementationSummary(Document):
 				frappe.db.set_value("Timesheet", ts, "custom_delivery_note", dn_name)
 
 	def _get_linked_dn_name(self, persist_link=True):
-		"""Resolve a Delivery Note for this MIS.
-
-		When persist_link is True, found DN is written to this document (and db_set for side paths).
-		When False, only returns the name — does not set ``delivery_note`` on the doc.
-		"""
-		if self.delivery_note:
-			ds = frappe.db.get_value("Delivery Note", self.delivery_note, "docstatus")
-			if ds is not None and int(ds) != 2:
-				return self.delivery_note
+		"""Resolve a Delivery Note for this MIS: mis_delivery_notes table first, then fallbacks."""
+		# Primary: first non-cancelled DN from mis_delivery_notes table
+		for row in (self.mis_delivery_notes or []):
+			dn = row.delivery_note
+			if dn and frappe.db.exists("Delivery Note", dn):
+				ds = frappe.db.get_value("Delivery Note", dn, "docstatus")
+				if ds is not None and int(ds) != 2:
+					return dn
+		# Fallback: find via Delivery Note Item custom field
 		dn_name = None
 		if self.name:
 			dn_name = frappe.db.get_value(
@@ -566,30 +671,8 @@ class MonthlyImplementationSummary(Document):
 				"parent",
 			)
 		if dn_name:
-			if persist_link:
-				self.delivery_note = dn_name
-				self.db_set("delivery_note", dn_name, update_modified=False)
 			return dn_name
-		if self.sales_order and self.implementation:
-			row = frappe.db.sql(
-				"""
-				select dn.name
-				from `tabDelivery Note` dn
-				inner join `tabDelivery Note Item` dni on dni.parent = dn.name
-					and dni.against_sales_order = %(so)s
-				where dn.docstatus != 2 and dn.custom_implementation = %(impl)s
-				order by dn.modified desc
-				limit 1
-				""",
-				{"so": self.sales_order, "impl": self.implementation},
-				as_list=True,
-			)
-			if row:
-				dn_name = row[0][0]
-				if persist_link:
-					self.delivery_note = dn_name
-					self.db_set("delivery_note", dn_name, update_modified=False)
-				return dn_name
+		# Fallback: find by implementation
 		if self.implementation:
 			row = frappe.db.sql(
 				"""
@@ -603,11 +686,7 @@ class MonthlyImplementationSummary(Document):
 				as_list=True,
 			)
 			if row:
-				dn_name = row[0][0]
-				if persist_link:
-					self.delivery_note = dn_name
-					self.db_set("delivery_note", dn_name, update_modified=False)
-				return dn_name
+				return row[0][0]
 		return None
 
 	def validate_year(self):
@@ -717,8 +796,8 @@ class MonthlyImplementationSummary(Document):
 			.where(TD.project.isin(projects))
 			.where(TS.docstatus != 2)
 			.where(TS.start_date.between(from_date, to_date))
-			.orderby(TS.start_date, order=Order.asc)
 			.orderby(Emp.employee_name, order=Order.asc)
+			.orderby(TS.total_billable_hours, order=Order.desc)
 		).run(as_dict=True)
 		self.timesheets_table = []
 		for row in rows:
@@ -741,13 +820,15 @@ class MonthlyImplementationSummary(Document):
 @frappe.whitelist()
 def create_delivery_note(docname: str, sales_order=None, delivery_note_item=None):
 	_require_docname(docname)
+	if frappe.db.get_value("Monthly Implementation Summary", docname, "status") == "Closed":
+		frappe.throw(frappe._("This Monthly Implementation Summary is closed."))
 	if sales_order:
 		dn_name = _create_dn_from_sales_order(docname, sales_order, delivery_note_item)
 	else:
 		doc = frappe.get_doc("Monthly Implementation Summary", docname)
-		old_dn = doc.delivery_note
 		dn_name = doc._create_dn_from_timesheets()
-		update_dn_table_in_summary(docname, dn_name, old_dn=old_dn)
+		if dn_name:
+			update_dn_table_in_summary(docname, dn_name)
 	return {"status": "ok", "dn_name": dn_name}
 
 
@@ -759,15 +840,21 @@ def _create_dn_from_sales_order(docname, sales_order, delivery_note_item=None):
 		mis_doc = frappe.get_doc("Monthly Implementation Summary", docname)
 		if not mis_doc.implementation:
 			frappe.throw(frappe._("Implementation is required on Monthly Implementation Summary."))
-		so_name = (mis_doc.sales_order or sales_order or "").strip()
+		so_name = (sales_order or "").strip()
 		if not so_name:
-			frappe.throw(frappe._("Select a Sales Order on the Monthly Implementation Summary."))
-		if mis_doc.sales_order and sales_order and mis_doc.sales_order != sales_order:
-			frappe.throw(
-				frappe._("Sales Order on the form ({0}) does not match the request ({1}).").format(
-					mis_doc.sales_order, sales_order
-				)
-			)
+			frappe.throw(frappe._("A Sales Order is required to create a Delivery Note."))
+		# Reuse an existing draft DN for this SO rather than creating a duplicate
+		for row in (mis_doc.mis_delivery_notes or []):
+			if (row.sales_order or "") == so_name and row.delivery_note:
+				if frappe.db.exists("Delivery Note", row.delivery_note):
+					existing_status = cint(frappe.db.get_value("Delivery Note", row.delivery_note, "docstatus") or 0)
+					if existing_status == 0:
+						frappe.msgprint(
+							frappe._("Using existing draft Delivery Note {0} for Sales Order {1}.").format(
+								frappe.bold(row.delivery_note), frappe.bold(so_name)
+							)
+						)
+						return row.delivery_note
 		dn = make_delivery_note(so_name)
 		if not dn.items:
 			frappe.throw(
@@ -776,20 +863,58 @@ def _create_dn_from_sales_order(docname, sales_order, delivery_note_item=None):
 				).format(so_name)
 			)
 
-		dn.custom_implementation = mis_doc.implementation
-		dn_meta = frappe.get_meta("Delivery Note")
-		for fn in ("palette", "paket"):
-			if dn_meta.has_field(fn):
-				dn.set(fn, 0)
+		for item in dn.items:
+			if item.so_detail:
+				soi = frappe.get_doc("Sales Order Item", item.so_detail)
 
+				# Force SO values and ignore pricing rule values
+				item.rate = flt(soi.rate)
+				item.net_rate = flt(soi.rate)
+				item.price_list_rate = flt(soi.rate)
+
+				item.amount = flt(item.qty * item.rate)
+				item.net_amount = flt(item.qty * item.net_rate)
+
+				item.discount_percentage = 0
+
+		dn.flags.ignore_pricing_rule = True
+		dn.ignore_pricing_rule = 1
+		dn.custom_implementation = mis_doc.implementation
 		dn.insert()
-		old_dn = frappe.db.get_value("Monthly Implementation Summary", docname, "delivery_note")
-		frappe.db.set_value("Monthly Implementation Summary", docname, "delivery_note", dn.name)
 		frappe.db.commit()
-		update_dn_table_in_summary(docname, dn.name, old_dn=old_dn)
+		update_dn_table_in_summary(docname, dn.name)
+		_add_or_update_mis_dn_row(docname, dn.name, so_name)
 		return dn.name
 	except Exception as e:
 		frappe.throw(str(e))
+
+
+def _add_or_update_mis_dn_row(docname, dn_name, sales_order=None):
+	"""Add or update a row in the mis_delivery_notes child table for the given DN."""
+	if not docname or not dn_name:
+		return
+	dn_doc = frappe.get_doc("Delivery Note", dn_name)
+	doc = frappe.get_doc("Monthly Implementation Summary", docname)
+	doc.reload()
+	existing = next(
+		(r for r in (doc.mis_delivery_notes or []) if r.delivery_note == dn_name),
+		None,
+	)
+	data = {
+		"delivery_note": dn_name,
+		"sales_order": sales_order,
+		"status": dn_doc.status or "",
+		"grand_total": flt(dn_doc.grand_total),
+		"posting_date": dn_doc.posting_date,
+	}
+	if existing:
+		for k, v in data.items():
+			setattr(existing, k, v)
+	else:
+		doc.append("mis_delivery_notes", data)
+	doc.flags.ignore_permissions = True
+	doc.flags.ignore_validate_update_after_submit = True
+	doc.save()
 
 
 def update_dn_table_in_summary(docname, dn_name, old_dn=None, existing_rows=None):
@@ -805,9 +930,6 @@ def update_dn_table_in_summary(docname, dn_name, old_dn=None, existing_rows=None
 		r for r in (doc.delivery_note_item or []) if getattr(r, "custom_ref_doc", None) not in dn_refs
 	]
 	for item in dn_doc.items:
-		ao = getattr(item, "against_sales_order", None)
-		if doc.sales_order and ao and ao != doc.sales_order:
-			continue
 		qty = flt(item.qty)
 		rate = _resolve_rate_for_mis_from_dn_row(doc, item)
 		icode = item.item_code
@@ -816,11 +938,7 @@ def update_dn_table_in_summary(docname, dn_name, old_dn=None, existing_rows=None
 		suom = item.stock_uom or item.uom
 		uom = item.uom
 		cf = flt(item.conversion_factor, 9) or 1
-		if (
-			doc.sales_order
-			and getattr(item, "so_detail", None)
-			and frappe.db.exists("Sales Order Item", {"name": item.so_detail, "parent": doc.sales_order})
-		):
+		if getattr(item, "so_detail", None):
 			soi = frappe.db.get_value(
 				"Sales Order Item",
 				item.so_detail,
@@ -850,7 +968,27 @@ def update_dn_table_in_summary(docname, dn_name, old_dn=None, existing_rows=None
 			"custom_ref_doc": dn_name,
 		}
 		doc.append("delivery_note_item", row_data)
+	doc.flags.ignore_permissions = True
+	doc.flags.ignore_validate_update_after_submit = True
 	doc.save()
+
+
+@frappe.whitelist()
+def close_monthly_implementation_summary(docname: str):
+	_require_docname(docname)
+	frappe.has_permission("Monthly Implementation Summary", "submit", docname, throw=True)
+	doc = frappe.get_doc("Monthly Implementation Summary", docname)
+	doc.close()
+	return {"status": "ok"}
+
+
+@frappe.whitelist()
+def reopen_monthly_implementation_summary(docname: str):
+	_require_docname(docname)
+	frappe.has_permission("Monthly Implementation Summary", "submit", docname, throw=True)
+	doc = frappe.get_doc("Monthly Implementation Summary", docname)
+	doc.reopen()
+	return {"status": "ok"}
 
 
 @frappe.whitelist()
@@ -858,13 +996,163 @@ def submit_mis_dn_action(docname: str):
 	_require_docname(docname)
 	doc = frappe.get_doc("Monthly Implementation Summary", docname)
 	doc.reload()
-	doc._sync_delivery_note_from_mis_items_for_submit()
-	# Sub-methods may stamp timesheets; repeat after reload so DB ``delivery_note`` / links are visible.
-	doc.reload()
-	dn_name = doc._resolve_dn_name_for_timesheet_stamp()
-	if dn_name:
-		doc._update_timesheets_delivery_note(dn_name)
+	# Stamp timesheets with the first non-cancelled DN from mis_delivery_notes
+	for row in (doc.mis_delivery_notes or []):
+		dn_name = row.delivery_note
+		if dn_name and frappe.db.exists("Delivery Note", dn_name):
+			dn_status = cint(frappe.db.get_value("Delivery Note", dn_name, "docstatus") or 0)
+			if dn_status != 2:
+				doc._update_timesheets_delivery_note(dn_name)
+				break
 	return {"status": "ok"}
+
+
+@frappe.whitelist()
+def submit_delivery_notes_in_mis(docname: str, delivery_notes):
+	_require_docname(docname)
+	doc = frappe.get_doc("Monthly Implementation Summary", docname)
+	doc.check_permission("write")
+
+	dn_names = _parse_timesheet_names(delivery_notes)
+	if not dn_names:
+		return {"submitted": 0, "already_submitted": 0, "failed": 0, "failed_details": []}
+
+	allowed = {(row.delivery_note or "") for row in (doc.mis_delivery_notes or []) if row.delivery_note}
+
+	submitted = 0
+	already_submitted = 0
+	failed_details = []
+
+	for dn_name in dn_names:
+		if dn_name not in allowed:
+			failed_details.append({"delivery_note": dn_name, "error": "Not part of this MIS."})
+			continue
+		if not frappe.db.exists("Delivery Note", dn_name):
+			failed_details.append({"delivery_note": dn_name, "error": "Delivery Note not found."})
+			continue
+		dn_status = cint(frappe.db.get_value("Delivery Note", dn_name, "docstatus") or 0)
+		if dn_status == 2:
+			failed_details.append({"delivery_note": dn_name, "error": "Delivery Note is cancelled."})
+			continue
+		if dn_status == 1:
+			already_submitted += 1
+			continue
+		try:
+			dn_doc = frappe.get_doc("Delivery Note", dn_name)
+			dn_doc.check_permission("submit")
+			dn_doc.submit()
+			for row in (doc.mis_delivery_notes or []):
+				if row.delivery_note == dn_name:
+					frappe.db.set_value(
+						row.doctype, row.name,
+						{"status": dn_doc.status or "", "grand_total": flt(dn_doc.grand_total)},
+						update_modified=False,
+					)
+					break
+			submitted += 1
+		except Exception as e:
+			failed_details.append({"delivery_note": dn_name, "error": str(e)})
+
+	return {
+		"submitted": submitted,
+		"already_submitted": already_submitted,
+		"failed": len(failed_details),
+		"failed_details": failed_details,
+	}
+
+
+@frappe.whitelist()
+def submit_sales_invoices_in_mis(docname: str, sales_invoices):
+	_require_docname(docname)
+	doc = frappe.get_doc("Monthly Implementation Summary", docname)
+	doc.check_permission("write")
+
+	si_names = _parse_timesheet_names(sales_invoices)
+	if not si_names:
+		return {"submitted": 0, "already_submitted": 0, "failed": 0, "failed_details": []}
+
+	allowed = {(row.sales_invoice or "") for row in (doc.mis_sales_invoices or []) if row.sales_invoice}
+
+	submitted = 0
+	already_submitted = 0
+	failed_details = []
+
+	for si_name in si_names:
+		if si_name not in allowed:
+			failed_details.append({"sales_invoice": si_name, "error": "Not part of this MIS."})
+			continue
+		if not frappe.db.exists("Sales Invoice", si_name):
+			failed_details.append({"sales_invoice": si_name, "error": "Sales Invoice not found."})
+			continue
+		si_status = cint(frappe.db.get_value("Sales Invoice", si_name, "docstatus") or 0)
+		if si_status == 2:
+			failed_details.append({"sales_invoice": si_name, "error": "Sales Invoice is cancelled."})
+			continue
+		if si_status == 1:
+			already_submitted += 1
+			continue
+		try:
+			si_doc = frappe.get_doc("Sales Invoice", si_name)
+			si_doc.check_permission("submit")
+			si_doc.submit()
+			for row in (doc.mis_sales_invoices or []):
+				if row.sales_invoice == si_name:
+					frappe.db.set_value(
+						row.doctype, row.name,
+						{"status": si_doc.status or "", "grand_total": flt(si_doc.grand_total)},
+						update_modified=False,
+					)
+					break
+			submitted += 1
+		except Exception as e:
+			failed_details.append({"sales_invoice": si_name, "error": str(e)})
+
+	return {
+		"submitted": submitted,
+		"already_submitted": already_submitted,
+		"failed": len(failed_details),
+		"failed_details": failed_details,
+	}
+
+
+def _find_existing_sales_invoice_for_delivery_note(delivery_note):
+	if not delivery_note:
+		return None
+
+	row = frappe.db.sql(
+		"""
+		select distinct si.name
+		from `tabSales Invoice` si
+		inner join `tabSales Invoice Item` sii on sii.parent = si.name
+		where si.docstatus != 2
+			and (
+				sii.delivery_note = %(delivery_note)s
+				or sii.dn_detail in (
+					select dni.name
+					from `tabDelivery Note Item` dni
+					where dni.parent = %(delivery_note)s
+				)
+			)
+		order by si.creation desc
+		limit 1
+		""",
+		{"delivery_note": delivery_note},
+		as_dict=True,
+	)
+	if row:
+		return row[0].name
+
+	if frappe.db.has_column("Sales Invoice", "against_delivery_note"):
+		si = frappe.db.get_value(
+			"Sales Invoice",
+			{"against_delivery_note": delivery_note, "docstatus": ["!=", 2]},
+			"name",
+		)
+		if si:
+			return si
+
+	return None
+
 
 def _timesheet_is_pending_for_approval(docstatus, status=None):
 	status_norm = (status or "").strip().lower()
@@ -977,97 +1265,40 @@ def _set_timesheet_billable_hours(ts_doc, target_billable_hours):
 
 
 @frappe.whitelist()
-def get_timesheet_approval_rows(
-	docname: str,
-	employee=None,
-	project=None,
-	date_from=None,
-	date_to=None,
-):
+def get_timesheet_approval_rows(docname: str):
 	_require_docname(docname)
-
 	doc = frappe.get_doc("Monthly Implementation Summary", docname)
 	doc.check_permission("read")
 
-	employee_filter = (employee or "").strip()
-	project_filter = (project or "").strip()
-	from_date = getdate(date_from) if date_from else None
-	to_date = getdate(date_to) if date_to else None
-
 	base_rows = list(doc.timesheets_table or [])
-
 	timesheet_names = [
 		(str(getattr(r, "timesheet", "") or "").strip())
 		for r in base_rows
 		if (str(getattr(r, "timesheet", "") or "").strip())
 	]
-
 	meta_by_name = {}
-	description_by_timesheet = {}
-
 	if timesheet_names:
-		timesheet_names = list(set(timesheet_names))
-
-		ts_fields = ["name", "docstatus", "status", "custom_rating"]
-
+		ts_has_status = frappe.db.has_column("Timesheet", "status")
+		ts_fields = ["name", "docstatus"]
+		if ts_has_status:
+			ts_fields.append("status")
 		for ts in frappe.get_all(
 			"Timesheet",
-			filters={"name": ["in", timesheet_names]},
+			filters={"name": ["in", list(set(timesheet_names))]},
 			fields=ts_fields,
 		):
 			meta_by_name[ts.name] = ts
 
-		# Fetch description from the Time Sheets child table
-		for time_sheet in frappe.get_all(
-			"Timesheet Detail",
-			filters={
-				"parent": ["in", timesheet_names],
-				"parenttype": "Timesheet",
-			},
-			fields=["parent", "description"],
-			order_by="idx asc",
-		):
-			# Keep the first Time Sheets row's description.
-			# This preserves the existing single-description display.
-			if time_sheet.parent not in description_by_timesheet:
-				description_by_timesheet[time_sheet.parent] = (
-					time_sheet.description or ""
-				)
-
 	result = []
-
 	for row in base_rows:
 		ts_name = (getattr(row, "timesheet", "") or "").strip()
 		emp_name = (getattr(row, "employee_name", "") or "").strip()
 		row_project = (getattr(row, "project", "") or "").strip()
 		row_employee = (getattr(row, "employee", "") or "").strip()
-
-		row_date_raw = getattr(row, "date", None)
-		row_date = getdate(row_date_raw) if row_date_raw else None
-
 		meta = meta_by_name.get(ts_name)
-
 		docstatus = cint(meta.docstatus) if meta else 0
 		status = (meta.status if meta else "") or ""
-
-		is_pending = _timesheet_is_pending_for_approval(
-			docstatus,
-			status,
-		)
-
-		if employee_filter:
-			if row_employee != employee_filter and emp_name != employee_filter:
-				continue
-
-		if project_filter:
-			if row_project != project_filter:
-				continue
-
-		if from_date and (not row_date or row_date < from_date):
-			continue
-
-		if to_date and (not row_date or row_date > to_date):
-			continue
+		is_pending = _timesheet_is_pending_for_approval(docstatus, status)
 
 		if not is_pending:
 			continue
@@ -1081,16 +1312,11 @@ def get_timesheet_approval_rows(
 				"project": row_project,
 				"total_hours": flt(getattr(row, "total_hours", 0)),
 				"billable_hours": flt(getattr(row, "billable_hours", 0)),
+				"description": (getattr(row, "description", "") or ""),
+				"rating": (getattr(row, "rating", "") or ""),
 				"docstatus": docstatus,
 				"status": status,
 				"is_pending": 1 if is_pending else 0,
-				# Rating comes from the Timesheet parent
-				"rating": (meta.custom_rating if meta else "") or "",
-				# Description comes from the Timesheet -> Time Sheets child table
-				"description": description_by_timesheet.get(
-					ts_name,
-					"",
-				),
 			}
 		)
 
@@ -1203,6 +1429,112 @@ def approve_timesheets_in_mis(docname: str, timesheets):
 		"failed_details": failed_details,
 	}
 
+
+@frappe.whitelist()
+def create_sales_invoice_from_mis(docname: str, delivery_note: str = None):
+	_require_docname(docname)
+	doc = frappe.get_doc("Monthly Implementation Summary", docname)
+	doc.check_permission("read")
+	if doc.status == "Closed":
+		frappe.throw(frappe._("This Monthly Implementation Summary is closed."))
+
+	if not delivery_note:
+		frappe.throw(frappe._("Delivery Note is required to create a Sales Invoice."))
+
+	delivery_note = delivery_note.strip()
+
+	if not frappe.db.exists("Delivery Note", delivery_note):
+		frappe.throw(frappe._("Delivery Note {0} does not exist.").format(frappe.bold(delivery_note)))
+
+	dn_docstatus = cint(frappe.db.get_value("Delivery Note", delivery_note, "docstatus") or 0)
+	if dn_docstatus == 2:
+		frappe.throw(frappe._("Delivery Note {0} is cancelled.").format(frappe.bold(delivery_note)))
+	if dn_docstatus != 1:
+		frappe.throw(
+			frappe._("Delivery Note {0} must be submitted before creating a Sales Invoice.").format(
+				frappe.bold(delivery_note)
+			)
+		)
+
+	if not frappe.has_permission("Sales Invoice", "create"):
+		raise frappe.PermissionError
+
+	existing_si = _find_existing_sales_invoice_for_delivery_note(delivery_note)
+	if existing_si:
+		existing_si_docstatus = cint(frappe.db.get_value("Sales Invoice", existing_si, "docstatus") or 0)
+		if existing_si_docstatus == 0:
+			# Draft SI exists — link it to MIS and return it
+			si_doc = frappe.get_doc("Sales Invoice", existing_si)
+			doc.reload()
+			dn_sales_order = None
+			for row in (doc.mis_delivery_notes or []):
+				if row.delivery_note == delivery_note:
+					dn_sales_order = row.sales_order
+					break
+			doc.reload()
+			existing_si_row = next(
+				(r for r in (doc.mis_sales_invoices or []) if r.sales_invoice == existing_si),
+				None,
+			)
+			if not existing_si_row:
+				doc.append("mis_sales_invoices", {
+					"sales_invoice": existing_si,
+					"delivery_note": delivery_note,
+					"sales_order": dn_sales_order,
+					"status": si_doc.status or "",
+					"grand_total": flt(si_doc.grand_total),
+					"posting_date": si_doc.posting_date,
+				})
+				doc.flags.ignore_permissions = True
+				doc.flags.ignore_validate_update_after_submit = True
+				doc.save()
+			return {"status": "ok", "sales_invoice": existing_si}
+		si_link = frappe.utils.get_link_to_form("Sales Invoice", existing_si)
+		frappe.throw(
+			frappe._("A Sales Invoice {0} already exists for Delivery Note {1}.").format(
+				si_link, frappe.bold(delivery_note)
+			)
+		)
+
+	from erpnext.stock.doctype.delivery_note.delivery_note import make_sales_invoice
+
+	si_doc = make_sales_invoice(delivery_note)
+	if not si_doc or not getattr(si_doc, "items", None):
+		frappe.throw(
+			frappe._("No billable items available to create Sales Invoice from Delivery Note {0}.").format(
+				frappe.bold(delivery_note)
+			)
+		)
+
+	si_doc.insert()
+
+	# Add a mis_sales_invoices row referencing the delivery note and its sales order
+	doc.reload()
+	dn_sales_order = None
+	for row in (doc.mis_delivery_notes or []):
+		if row.delivery_note == delivery_note:
+			dn_sales_order = row.sales_order
+			break
+	existing_si_row = next(
+		(r for r in (doc.mis_sales_invoices or []) if r.sales_invoice == si_doc.name),
+		None,
+	)
+	if not existing_si_row:
+		doc.append("mis_sales_invoices", {
+			"sales_invoice": si_doc.name,
+			"delivery_note": delivery_note,
+			"sales_order": dn_sales_order,
+			"status": si_doc.status or "",
+			"grand_total": flt(si_doc.grand_total),
+			"posting_date": si_doc.posting_date,
+		})
+		doc.flags.ignore_permissions = True
+		doc.flags.ignore_validate_update_after_submit = True
+		doc.save()
+
+	return {"status": "ok", "sales_invoice": si_doc.name}
+
+
 @frappe.whitelist()
 def update_dn_from_mis_items(docname: str):
 	_require_docname(docname)
@@ -1219,13 +1551,50 @@ def create_dn_from_mis_dni(docname: str):
 	return {"status": "ok"}
 
 
+def _open_mis_for_implementations(implementations):
+	"""Draft/submitted MIS for any of the given Implementations — used to catch Sales Order /
+	Delivery Note / Sales Invoice changes made entirely outside the MIS UI."""
+	names = set()
+	for impl in implementations:
+		if not impl:
+			continue
+		names.update(frappe.get_all(
+			"Monthly Implementation Summary",
+			filters={"implementation": impl, "docstatus": ["in", [0, 1]]},
+			pluck="name",
+		))
+	return names
+
+
+def _implementations_for_delivery_note(dn):
+	impl = {getattr(dn, "custom_implementation", None)}
+	for item in dn.get("items") or []:
+		so = getattr(item, "against_sales_order", None)
+		if so:
+			impl.add(frappe.db.get_value("Sales Order", so, "custom_implementation"))
+	impl.discard(None)
+	return impl
+
+
+def _implementations_for_sales_invoice(si):
+	impl = set()
+	for item in si.get("items") or []:
+		so = getattr(item, "sales_order", None)
+		dn = getattr(item, "delivery_note", None)
+		if so:
+			impl.add(frappe.db.get_value("Sales Order", so, "custom_implementation"))
+		if dn:
+			impl.add(frappe.db.get_value("Delivery Note", dn, "custom_implementation"))
+	impl.discard(None)
+	return impl
+
+
 def _mis_after_dn_submit(dn):
 	"""(mis_names_get_timesheet_stamp, mis_names_to_save) for this submitted Delivery Note."""
-	stamp = {n for n in frappe.get_all(
-		"Monthly Implementation Summary",
-		filters={"delivery_note": dn.name, "docstatus": ["!=", 2]},
-		pluck="name",
-	) if n}
+	stamp = set()
+	for n in frappe.get_all("MIS Delivery Note", filters={"delivery_note": dn.name}, pluck="parent"):
+		if n and cint(frappe.db.get_value("Monthly Implementation Summary", n, "docstatus")) != 2:
+			stamp.add(n)
 	for n in frappe.get_all(
 		"Delivery Note Item",
 		filters={"parent": dn.name, "custom_against_monthly_implementation_summary": ["is", "set"]},
@@ -1243,23 +1612,7 @@ def _mis_after_dn_submit(dn):
 			stamp.add(n)
 
 	save = set(stamp)
-	impl = {getattr(dn, "custom_implementation", None)}
-	impl.discard(None)
-	for it in dn.get("items") or []:
-		so = getattr(it, "against_sales_order", None)
-		if not so:
-			continue
-		i = frappe.db.get_value("Sales Order", so, "custom_implementation")
-		if i:
-			impl.add(i)
-	for i in impl:
-		for n in frappe.get_all(
-			"Monthly Implementation Summary",
-			filters={"implementation": i, "docstatus": ["in", [0, 1]]},
-			pluck="name",
-		):
-			if n:
-				save.add(n)
+	save.update(_open_mis_for_implementations(_implementations_for_delivery_note(dn)))
 	return stamp, save
 
 
@@ -1268,17 +1621,65 @@ def update_mis_timesheets_on_delivery_note_submit(doc, method=None):
 		return
 	stamp, save = _mis_after_dn_submit(doc)
 	dn_name = doc.name
+	submitting = frappe.flags.get("mis_submitting")
 	for mis_name in save:
+		if mis_name == submitting:
+			continue
 		if not mis_name or not frappe.db.exists("Monthly Implementation Summary", mis_name):
 			continue
 		m = frappe.get_doc("Monthly Implementation Summary", mis_name)
-		m.reload()
+		if m.is_closed():
+			continue
 		if mis_name in stamp:
 			m._update_timesheets_delivery_note(dn_name)
-		m._refresh_sales_order_status_and_financials()
 		try:
-			m.flags.ignore_permissions = True
-			m.flags.ignore_validate_update_after_submit = True
-			m.save()
+			m.sync_and_auto_close()
 		except Exception:
 			frappe.log_error(title="MIS refresh after Delivery Note submit", message=frappe.get_traceback())
+
+
+def _sync_and_auto_close_mis(mis_names):
+	for mis_name in mis_names:
+		if not mis_name or not frappe.db.exists("Monthly Implementation Summary", mis_name):
+			continue
+		try:
+			frappe.get_doc("Monthly Implementation Summary", mis_name).sync_and_auto_close()
+		except Exception:
+			frappe.log_error(title="MIS status resync", message=frappe.get_traceback())
+
+
+def auto_close_fulfilled_mis():
+	"""Scheduled fallback: Sales Order / Delivery Note / Sales Invoice status changes don't always
+	trigger doc hooks, so periodically re-sync open MIS directly against live status."""
+	open_names = frappe.get_all(
+		"Monthly Implementation Summary",
+		filters={"docstatus": 1, "status": "Open"},
+		pluck="name",
+	)
+	_sync_and_auto_close_mis(open_names)
+
+
+def sync_mis_status_for_delivery_note(doc, method=None):
+	"""Re-sync MIS caches whenever the source DN status changes — matches both DNs already
+	tracked in mis_delivery_notes and any DN worked on outside the MIS UI for the same
+	Implementation, and also picks up Sales Order status cascades that don't fire the Sales
+	Order's own hooks."""
+	mis_names = set(frappe.get_all("MIS Delivery Note", filters={"delivery_note": doc.name}, pluck="parent"))
+	mis_names.update(_open_mis_for_implementations(_implementations_for_delivery_note(doc)))
+	_sync_and_auto_close_mis(mis_names)
+
+
+def sync_mis_status_for_sales_invoice(doc, method=None):
+	"""Re-sync MIS caches whenever the source SI status changes — matches both SIs already
+	tracked in mis_sales_invoices and any SI raised outside the MIS UI for the same
+	Implementation. A submitted Sales Invoice can silently flip the underlying Delivery
+	Note / Sales Order to Completed without firing their own doc hooks."""
+	mis_names = set(frappe.get_all("MIS Sales Invoice", filters={"sales_invoice": doc.name}, pluck="parent"))
+	mis_names.update(_open_mis_for_implementations(_implementations_for_sales_invoice(doc)))
+	_sync_and_auto_close_mis(mis_names)
+
+
+def sync_mis_status_for_sales_order(doc, method=None):
+	"""Re-sync MIS caches when a Sales Order itself is touched directly (e.g. manually closed),
+	regardless of whether it was ever created or delivered through an MIS."""
+	_sync_and_auto_close_mis(_open_mis_for_implementations([getattr(doc, "custom_implementation", None)]))
