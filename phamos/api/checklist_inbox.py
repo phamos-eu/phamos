@@ -237,7 +237,7 @@ def _parse_items(items):
 
 
 @frappe.whitelist(methods=["POST"])
-def create_spa_checklist(document, reference_record, name=None, items=None):
+def create_spa_checklist(document, reference_record, name=None, items=None, checklist_owner=None):
 	"""Create a Checklist linked to a parent document.
 
 	`name` is the user-facing title from the SPA. On sites with Checklist.title
@@ -253,6 +253,7 @@ def create_spa_checklist(document, reference_record, name=None, items=None):
 	title = _resolve_checklist_title(name, document, reference_record)
 	parsed_items = _parse_items(items)
 	meta = frappe.get_meta("Checklist")
+	owner = (checklist_owner or "").strip() or frappe.session.user
 
 	doc = frappe.new_doc("Checklist")
 	doc.document = document
@@ -262,7 +263,7 @@ def create_spa_checklist(document, reference_record, name=None, items=None):
 	else:
 		doc.name = _unique_checklist_name(title)
 	if meta.has_field("checklist_owner"):
-		doc.checklist_owner = frappe.session.user
+		doc.checklist_owner = owner
 
 	for item in parsed_items:
 		if not isinstance(item, dict):
