@@ -122,7 +122,6 @@
 import { nextTick, ref, watch } from "vue"
 import { call } from "frappe-ui"
 import FrappeLink from "@spa/components/FrappeLink.vue"
-import { session } from "@spa/session.js"
 
 const props = defineProps({
 	modelValue: { type: Boolean, default: false },
@@ -162,7 +161,7 @@ function resetForm() {
 	nextId = 1
 	noteRefs.clear()
 	title.value = (props.referenceTitle || "").trim()
-	checklistOwner.value = session.user || ""
+	checklistOwner.value = ""
 	rows.value = [emptyRow()]
 	error.value = ""
 }
