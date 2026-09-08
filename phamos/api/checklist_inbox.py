@@ -66,6 +66,7 @@ def _serialize_row(row, counts=None):
 		"owner": row.owner,
 		"done_count": done_count,
 		"total_count": total_count,
+		"desk_url": f"/app/checklist/{row.name}",
 	}
 
 
@@ -274,4 +275,21 @@ def add_spa_checklist_item(checklist_name, values=None):
 	)
 	doc.save()
 
+	return get_checklist(checklist_name)
+
+
+@frappe.whitelist(methods=["POST"])
+def delete_spa_checklist_item(checklist_name, item_name):
+	"""Remove a checklist item and return full SPA checklist payload."""
+	doc = _require_checklist_write(checklist_name)
+	item_name = (item_name or "").strip()
+	if not item_name:
+		frappe.throw(_("Checklist item is required"))
+
+	row = next((r for r in doc.checklist_items if r.name == item_name), None)
+	if not row:
+		frappe.throw(_("Checklist item not found"))
+
+	doc.remove(row)
+	doc.save()
 	return get_checklist(checklist_name)
