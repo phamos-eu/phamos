@@ -13,10 +13,16 @@ class ChecklistTemplate(Document):
 
 
 @frappe.whitelist()
-def create_checklist_from_template(template_name, title=None, reference_record=None):
+def create_checklist_from_template(
+	template_name, title=None, reference_record=None, checklist_owner=None
+):
 	"""Snapshot template items into a new Checklist. Reference Record is optional."""
 	if not template_name:
 		frappe.throw(_("Checklist Template is required"))
+
+	checklist_owner = (checklist_owner or "").strip()
+	if not checklist_owner:
+		frappe.throw(_("Checklist Owner is required"))
 
 	template = frappe.get_doc("Checklist Template", template_name)
 	template.check_permission("read")
@@ -46,6 +52,7 @@ def create_checklist_from_template(template_name, title=None, reference_record=N
 			"document": template.document,
 			"reference_record": reference_record,
 			"checklist_template": template.name,
+			"checklist_owner": checklist_owner,
 		}
 	)
 
