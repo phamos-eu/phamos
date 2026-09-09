@@ -77,7 +77,7 @@
 				>
 					<p class="font-medium text-ink-gray-9">No {{ spaConfig.label }} issues found</p>
 					<p class="max-w-sm text-sm text-ink-gray-6">
-						Try clearing search or status/priority filters, or create a new issue.
+						Try clearing search or status/priority filters, or select Closed to include closed issues.
 					</p>
 					<Button class="mt-2" @click="showCreate = true">Create an issue</Button>
 				</div>
@@ -217,6 +217,9 @@ const filteredIssues = computed(() => {
 	if (statuses.length) {
 		const allowed = new Set(statuses)
 		list = list.filter((i) => allowed.has(i.status))
+	} else {
+		// Default: Closed hidden until the Closed status filter is activated
+		list = list.filter((i) => i.status !== "Closed")
 	}
 	if (q) {
 		list = list.filter((i) => issueMatchesSearch(i, q))
@@ -237,7 +240,8 @@ async function loadInbox() {
 	if (configError.value) return
 	loading.value = true
 	try {
-		// Always include closed so StatusFilter can toggle Closed client-side.
+		// Include closed so StatusFilter can activate Closed client-side;
+		// filteredIssues hides Closed by default until that pill is selected.
 		issues.value = await call(`${API}.get_issues`, { include_closed: 1 })
 	} catch (e) {
 		configError.value = e?.messages?.[0] || e?.message || "Could not load issues"
