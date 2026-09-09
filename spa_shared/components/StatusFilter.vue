@@ -1,6 +1,6 @@
 <template>
 	<div
-		class="flex flex-wrap items-center gap-2.5"
+		class="flex flex-nowrap items-center gap-2.5"
 		role="group"
 		aria-label="Filter by status"
 	>
@@ -8,7 +8,7 @@
 			v-for="status in statuses"
 			:key="status"
 			type="button"
-			class="rounded-full"
+			class="shrink-0 rounded-full"
 			:class="
 				isSelected(status)
 					? 'origin-center scale-[1.2] z-[1]'
@@ -19,13 +19,14 @@
 		>
 			<span
 				v-if="isSelected(status)"
-				class="inline-flex h-5 items-center rounded-full px-1.5 text-xs font-semibold"
+				class="inline-flex h-5 items-center whitespace-nowrap rounded-full px-1.5 text-xs font-semibold"
 				:class="statusStrongClass(status)"
 			>
 				{{ status }}
 			</span>
 			<Badge
 				v-else
+				class="whitespace-nowrap"
 				:label="status"
 				:theme="statusTheme(status)"
 				size="sm"

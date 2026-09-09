@@ -2,24 +2,8 @@
 	<div class="flex h-full min-h-0">
 		<section
 			v-if="!selectedName"
-			class="order-1 flex min-w-0 flex-1 flex-col border-r border-gray-200 bg-white dark:border-gray-800 dark:bg-gray-900"
+			class="order-1 flex min-w-0 flex-1 flex-col border-r border-outline-gray-2 bg-surface-white"
 		>
-			<div
-				class="flex flex-wrap items-center justify-between gap-3 border-b border-gray-200 px-5 py-3 dark:border-gray-800"
-			>
-				<div class="flex flex-wrap items-center gap-x-8 gap-y-3">
-					<FormControl v-model="search" type="text" size="sm" placeholder="Search…" class="w-44" />
-					<StatusFilter v-model="statusFilter" />
-					<PriorityFilter v-model="priorityFilter" :priorities="formOptions.priorities || []" />
-					<ListSortSelector
-						v-model:sort-by="sortBy"
-						v-model:sort-order="sortOrder"
-						:options="sortFieldOptions"
-					/>
-				</div>
-				<Button variant="solid" @click="showCreate = true">New Issue</Button>
-			</div>
-
 			<div
 				v-if="configError"
 				class="flex flex-1 items-center justify-center px-6 text-center text-sm text-red-600 dark:text-red-400"
@@ -28,28 +12,76 @@
 			</div>
 			<div
 				v-else-if="loading"
-				class="flex flex-1 items-center justify-center text-sm text-gray-500 dark:text-gray-400"
+				class="flex flex-1 items-center justify-center text-sm text-ink-gray-5"
 			>
 				Loading…
 			</div>
-			<template v-else-if="!filteredIssues.length">
-				<div class="flex flex-1 flex-col items-center justify-center gap-2 px-6 text-center">
-					<p class="font-medium text-gray-900 dark:text-gray-100">No {{ spaConfig.label }} issues found</p>
-					<p class="max-w-sm text-sm text-gray-500 dark:text-gray-400">
-						Issues linked to the {{ spaConfig.label }} department configured in phamos Settings will appear
-						here.
+			<!-- Shared parent grid: toolbar always visible so filters can be cleared when empty. -->
+			<div
+				v-else
+				:class="[ISSUE_LIST_FILTER_GRID, 'min-h-0 flex-1 content-start overflow-y-auto px-5']"
+			>
+				<div
+					:class="[
+						ISSUE_LIST_FILTER_SUBGRID,
+						'sticky top-0 z-[1] border-b border-outline-gray-2 bg-surface-white py-3',
+					]"
+				>
+					<FormControl
+						v-model="search"
+						type="text"
+						size="sm"
+						placeholder="Search…"
+						class="w-full min-w-0"
+					/>
+					<div class="flex min-w-0 justify-center">
+						<PriorityFilter
+							v-model="priorityFilter"
+							:priorities="formOptions.priorities || []"
+						/>
+					</div>
+					<div class="flex min-w-0 justify-center">
+						<StatusFilter v-model="statusFilter" />
+					</div>
+					<div class="flex min-w-0 justify-center">
+						<ListSortSelector
+							standalone
+							v-model:sort-by="sortBy"
+							v-model:sort-order="sortOrder"
+							:options="createdSortOption"
+						/>
+					</div>
+					<div class="flex min-w-0 justify-center">
+						<ListSortSelector
+							standalone
+							v-model:sort-by="sortBy"
+							v-model:sort-order="sortOrder"
+							:options="modifiedSortOption"
+						/>
+					</div>
+					<Button class="justify-self-end" variant="solid" @click="showCreate = true">
+						New Issue
+					</Button>
+				</div>
+				<IssueList
+					v-if="filteredIssues.length"
+					:issues="filteredIssues"
+					:selected-name="selectedName"
+					show-creator
+					align-with-filters
+					@select="openIssue"
+				/>
+				<div
+					v-else
+					class="col-span-6 flex flex-1 flex-col items-center justify-center gap-2 px-6 py-16 text-center"
+				>
+					<p class="font-medium text-ink-gray-9">No {{ spaConfig.label }} issues found</p>
+					<p class="max-w-sm text-sm text-ink-gray-6">
+						Try clearing search or status/priority filters, or create a new issue.
 					</p>
 					<Button class="mt-2" @click="showCreate = true">Create an issue</Button>
 				</div>
-			</template>
-			<!-- List-only inbox (Kanban/Calendar deferred). -->
-			<IssueList
-				v-else
-				:issues="filteredIssues"
-				:selected-name="selectedName"
-				show-creator
-				@select="openIssue"
-			/>
+			</div>
 		</section>
 
 		<!-- Host first in DOM so Teleport target exists before IssueDetail mounts; order keeps it far right. -->
@@ -113,6 +145,7 @@ import LinkedChecklistsSection from "@spa/components/LinkedChecklistsSection.vue
 import ListSortSelector from "@spa/components/ListSortSelector.vue"
 import PriorityFilter from "@spa/components/PriorityFilter.vue"
 import StatusFilter from "@spa/components/StatusFilter.vue"
+import { ISSUE_LIST_FILTER_GRID, ISSUE_LIST_FILTER_SUBGRID } from "@spa/issueListColumns.js"
 import spaConfig from "@/config"
 
 const API = spaConfig.api
@@ -126,10 +159,8 @@ const statusFilter = ref([])
 // Desk Issue list defaults: sort_field=modified, sort_order=DESC
 const sortBy = ref("modified")
 const sortOrder = ref("desc")
-const sortFieldOptions = [
-	{ label: "Last Updated", value: "modified" },
-	{ label: "Created On", value: "creation" },
-]
+const createdSortOption = [{ label: "Created On", value: "creation" }]
+const modifiedSortOption = [{ label: "Last Updated", value: "modified" }]
 const loading = ref(false)
 const configError = ref("")
 const issues = ref([])
