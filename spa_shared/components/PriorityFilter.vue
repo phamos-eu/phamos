@@ -1,7 +1,7 @@
 <template>
 	<div
 		v-if="priorities.length"
-		class="flex flex-wrap items-center gap-2.5"
+		class="flex flex-nowrap items-center gap-2.5"
 		role="group"
 		aria-label="Filter by priority"
 	>
@@ -9,7 +9,7 @@
 			v-for="priority in priorities"
 			:key="priority"
 			type="button"
-			class="rounded-full"
+			class="shrink-0 rounded-full"
 			:class="
 				isSelected(priority)
 					? 'origin-center scale-[1.2] z-[1]'
@@ -20,13 +20,14 @@
 		>
 			<span
 				v-if="isSelected(priority)"
-				class="inline-flex h-5 items-center rounded-full px-1.5 text-xs font-semibold"
+				class="inline-flex h-5 items-center whitespace-nowrap rounded-full px-1.5 text-xs font-semibold"
 				:class="priorityStrongClass(priority)"
 			>
 				{{ priority }}
 			</span>
 			<Badge
 				v-else
+				class="whitespace-nowrap"
 				:label="priority"
 				:theme="priorityTheme(priority)"
 				size="sm"
