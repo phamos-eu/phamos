@@ -215,7 +215,7 @@ def get_checklists_for_reference(document, reference_record):
 		"Checklist",
 		filters={"document": document, "reference_record": reference_record},
 		fields=fields,
-		order_by="modified desc",
+		order_by="creation asc",
 		limit_page_length=200,
 	)
 	counts = _item_counts_map([r.name for r in rows])
