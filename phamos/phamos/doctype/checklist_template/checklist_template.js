@@ -37,6 +37,14 @@ function show_create_checklist_dialog(frm) {
 			options: frm.doc.document,
 			description: __("Optional. Leave empty to create without linking a specific record."),
 		},
+		{
+			fieldname: "checklist_owner",
+			fieldtype: "Link",
+			label: __("Checklist Owner"),
+			options: "User",
+			reqd: 1,
+			"link_filters": "[[\"User\",\"role\",\"=\",\"Employee\"]]",
+		},
 	];
 
 	const dialog = new frappe.ui.Dialog({
@@ -51,6 +59,7 @@ function show_create_checklist_dialog(frm) {
 					template_name: frm.doc.name,
 					title: values.title,
 					reference_record: values.reference_record || null,
+					checklist_owner: values.checklist_owner,
 				},
 				freeze: true,
 				freeze_message: __("Creating Checklist..."),
