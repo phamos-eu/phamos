@@ -57,7 +57,10 @@ def _restore_legacy_links():
 			by_mis.setdefault(link["mis_name"], []).append(link)
 
 	for mis_name, entries in by_mis.items():
-		if not frappe.db.exists("Monthly Implementation Summary", mis_name):
+		docstatus = frappe.db.get_value("Monthly Implementation Summary", mis_name, "docstatus")
+		if docstatus is None:
+			continue
+		if docstatus == 2:
 			continue
 		doc = frappe.get_doc("Monthly Implementation Summary", mis_name)
 		existing = {r.delivery_note for r in (doc.mis_delivery_notes or [])}
