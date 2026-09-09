@@ -30,8 +30,7 @@
    "fieldname": "note",
    "fieldtype": "Text Editor",
    "in_list_view": 1,
-   "label": "Note",
-   "reqd": 1
+   "label": "Note"
   },
   {
    "fieldname": "column_break_uxrc",
