@@ -87,6 +87,8 @@ frappe.ui.form.on("Implementation", {
         setup_implementation_theme_watcher(frm);
         frm.trigger("append_implementation_chapters_to_modules");
         frm.trigger("render_review_cadence_indicator");
+        frm.trigger("set_default_time_limit_period");
+        frm.trigger("render_time_limit_indicator");
 
         if (!frm.is_new()) {
             frm.add_custom_button(__("Create Meeting"), () => {
@@ -1154,6 +1156,43 @@ frappe.ui.form.on("Implementation", {
             is_overdue ? __("Review Overdue since {0}", [due_label]) : __("Next Review Due {0}", [due_label]),
             is_overdue ? "red" : "blue"
         );
+    },
+    render_time_limit_indicator(frm) {
+        if (frm.is_new() || !frm.doc.enable_time_limit) return;
+
+        const used = frm.doc.hours_used_this_period || 0;
+        const limit = frm.doc.limit_hours || 0;
+        const percent = frm.doc.time_limit_percent_used || 0;
+        const threshold = frm.doc.warning_threshold_percent || 0;
+
+        let color = "blue";
+        if (percent >= 100) {
+            color = "red";
+        } else if (threshold && percent >= threshold) {
+            color = "orange";
+        }
+
+        frm.dashboard.add_indicator(
+            __("Time Limit: {0}/{1}h used ({2}%)", [used.toFixed(1), limit.toFixed(1), percent.toFixed(0)]),
+            color
+        );
+    },
+    set_default_time_limit_period(frm) {
+        if (!frm.doc.enable_time_limit || frm.doc.recurring_monthly) {
+            return;
+        }
+        if (!frm.doc.time_limit_from_date) {
+            frm.set_value("time_limit_from_date", frappe.datetime.month_start());
+        }
+        if (!frm.doc.time_limit_to_date) {
+            frm.set_value("time_limit_to_date", frappe.datetime.month_end());
+        }
+    },
+    enable_time_limit(frm) {
+        frm.trigger("set_default_time_limit_period");
+    },
+    recurring_monthly(frm) {
+        frm.trigger("set_default_time_limit_period");
     },
     render_rank_html_section(frm) {
         if (frm.is_new()) return;

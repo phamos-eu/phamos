@@ -96,7 +96,18 @@
   "column_break_amyu",
   "gitlab_issues_html",
   "column_break_mdrq",
-  "gitlab_milestones_html"
+  "gitlab_milestones_html",
+  "time_limit_tab",
+  "enable_time_limit",
+  "recurring_monthly",
+  "time_limit_from_date",
+  "time_limit_to_date",
+  "limit_hours",
+  "enforce_limit",
+  "warning_threshold_percent",
+  "hours_used_this_period",
+  "remaining_hours",
+  "time_limit_percent_used"
  ],
  "fields": [
   {
@@ -600,6 +611,82 @@
    "fieldname": "rank_html",
    "fieldtype": "HTML",
    "label": "Rank"
+  },
+  {
+   "fieldname": "time_limit_tab",
+   "fieldtype": "Tab Break",
+   "label": "Time Limit"
+  },
+  {
+   "default": "0",
+   "description": "Limit how much billable time can be booked across all Projects linked to this Implementation within a period",
+   "fieldname": "enable_time_limit",
+   "fieldtype": "Check",
+   "label": "Enable Time Limit"
+  },
+  {
+   "default": "1",
+   "depends_on": "eval:doc.enable_time_limit",
+   "description": "If checked, the limit hours apply fresh every calendar month automatically. Uncheck to set a specific From/To date range instead (e.g. a fixed trial period).",
+   "fieldname": "recurring_monthly",
+   "fieldtype": "Check",
+   "label": "Repeat Every Calendar Month"
+  },
+  {
+   "depends_on": "eval:doc.enable_time_limit && !doc.recurring_monthly",
+   "fieldname": "time_limit_from_date",
+   "fieldtype": "Date",
+   "label": "From Date"
+  },
+  {
+   "depends_on": "eval:doc.enable_time_limit && !doc.recurring_monthly",
+   "fieldname": "time_limit_to_date",
+   "fieldtype": "Date",
+   "label": "To Date"
+  },
+  {
+   "depends_on": "eval:doc.enable_time_limit",
+   "description": "Sum of billable hours across all Projects linked to this Implementation",
+   "fieldname": "limit_hours",
+   "fieldtype": "Float",
+   "label": "Limit Hours (per period)"
+  },
+  {
+   "depends_on": "eval:doc.enable_time_limit",
+   "description": "If unchecked, the limit is only used to trigger the warning notification",
+   "fieldname": "enforce_limit",
+   "fieldtype": "Check",
+   "label": "Enforce Limit (block timesheets beyond limit)"
+  },
+  {
+   "default": "80",
+   "depends_on": "eval:doc.enable_time_limit",
+   "description": "Warn when booked hours reach this percentage of the limit",
+   "fieldname": "warning_threshold_percent",
+   "fieldtype": "Int",
+   "label": "Warning Threshold (%)"
+  },
+  {
+   "depends_on": "eval:doc.enable_time_limit",
+   "description": "Billable hours booked across all linked Projects within the current period",
+   "fieldname": "hours_used_this_period",
+   "fieldtype": "Float",
+   "label": "Hours Used (Current Period)",
+   "read_only": 1
+  },
+  {
+   "depends_on": "eval:doc.enable_time_limit",
+   "fieldname": "remaining_hours",
+   "fieldtype": "Float",
+   "label": "Remaining Hours (Current Period)",
+   "read_only": 1
+  },
+  {
+   "depends_on": "eval:doc.enable_time_limit",
+   "fieldname": "time_limit_percent_used",
+   "fieldtype": "Percent",
+   "label": "% of Limit Used",
+   "read_only": 1
   }
  ],
  "index_web_pages_for_search": 1,
@@ -649,7 +736,7 @@
    "link_fieldname": "implementation"
   }
  ],
- "modified": "2026-08-31 12:24:42.075040",
+ "modified": "2026-09-09 12:10:26.929494",
  "modified_by": "Administrator",
  "module": "Phamos",
  "name": "Implementation",

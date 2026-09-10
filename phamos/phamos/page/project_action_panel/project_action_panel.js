@@ -148,14 +148,66 @@ function update_and_submit_timesheet_record(
         freeze: true,
         freeze_message: __("Updating Timesheet Record......"),
         callback: function (r) {
-          if (r.message) {
-            let timesheet_name = r.message.timesheet_name;
-            frappe.show_alert({
-              message: `Timesheet <a href="${frappe.utils.get_form_link("Timesheet-Record", timesheet_name)}" target="_blank">${timesheet_name}</a> Updated Successfully.`,
-              indicator: 'green'
-            });            
-          render_datatable();
+          if (!r.message) return;
+
+          if (r.message.exceeds) {
+            let status = r.message;
+            frappe.msgprint({
+              title: __("Time Limit Reached"),
+              indicator: "red",
+              message: __(
+                "Only {0}h are available out of the {1}h time limit for {2} to {3}, but this record is for {4}h billable.",
+                [
+                  flt(status.remaining_hours).toFixed(2),
+                  status.limit_hours,
+                  status.from_date,
+                  status.to_date,
+                  flt(status.requested_hours).toFixed(2),
+                ]
+              ),
+              primary_action: {
+                label: __("Continue with Available Hours"),
+                action: () => {
+                  frappe.call({
+                    method: "phamos.phamos.doctype.timesheet_record.timesheet_record.submit_at_available_hours",
+                    args: { name: status.timesheet_name },
+                    freeze: true,
+                    callback: function () {
+                      frappe.show_alert({ message: __("Submitted at available hours."), indicator: "green" });
+                      frappe.hide_msgprint();
+                      render_datatable();
+                    },
+                  });
+                },
+              },
+              secondary_action: {
+                label: __("Notify Account Manager"),
+                action: () => {
+                  frappe.call({
+                    method: "phamos.phamos.doctype.timesheet_record.timesheet_record.notify_pm_of_time_limit",
+                    args: { name: status.timesheet_name },
+                    freeze: true,
+                    callback: function () {
+                      frappe.show_alert({
+                        message: __("The account manager has been emailed and can submit this record."),
+                        indicator: "green",
+                      });
+                      frappe.hide_msgprint();
+                      render_datatable();
+                    },
+                  });
+                },
+              },
+            });
+            return;
           }
+
+          let timesheet_name = r.message.timesheet_name;
+          frappe.show_alert({
+            message: `Timesheet <a href="${frappe.utils.get_form_link("Timesheet-Record", timesheet_name)}" target="_blank">${timesheet_name}</a> Updated Successfully.`,
+            indicator: 'green'
+          });
+          render_datatable();
         },
       });
     }

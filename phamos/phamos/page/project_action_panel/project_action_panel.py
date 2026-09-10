@@ -15,6 +15,7 @@ from frappe.query_builder import Field, Case, Order, DocType, functions as fn
 from frappe.query_builder.functions import Concat, Max, Sum, Round, Coalesce, IfNull
 from frappe.utils import getdate, nowdate, get_first_day, get_last_day, add_days, add_months
 from phamos.phamos.timesheet_utils import normalize_percent_billable
+from phamos.phamos.doctype.timesheet_record.timesheet_record import compute_time_limit_status
 
 
 def _find_gitlab_issues_in_text(*text_fields):
@@ -578,8 +579,14 @@ def update_and_submit_timesheet_record(name, to_time, percent_billable, activity
         if doc.from_time and doc.to_time and get_datetime(doc.to_time) < get_datetime(doc.from_time):
             frappe.throw(_("To Time cannot be earlier than From Time. Update aborted."))
 
+        time_limit_status = compute_time_limit_status(doc)
+        if time_limit_status.get("exceeds"):
+            doc.save()
+            time_limit_status["timesheet_name"] = doc.name
+            return time_limit_status
+
+        doc.docstatus = 1
         doc.save()
-        doc.submit()
 
         # --- Create alternative records (3rd, 5th, etc.) ---
         for i in range(2, len(doc.item), 2):  # start from 3rd row (index 2)
@@ -609,8 +616,8 @@ def update_and_submit_timesheet_record(name, to_time, percent_billable, activity
                     "duration": original_row.duration or 0
                 })
 
+            new_doc.docstatus = 1
             new_doc.insert(ignore_permissions=True)
-            new_doc.submit()
 
         return {"timesheet_name": doc.name}
 

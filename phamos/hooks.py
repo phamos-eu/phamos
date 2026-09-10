@@ -259,6 +259,9 @@ doc_events = {
     "Customer": {
         "on_update": "phamos.gitlab_integration.gitlab_group_utils.update_gitlab_avatar_on_customer"
     },
+    "Implementation": {
+        "on_update": "phamos.phamos.doctype.timesheet_record.timesheet_record.sync_implementation_time_limit_summary_on_save",
+    },
     "Interview Feedback": {
         "on_update": "phamos.phamos.hr.interview_summary.trigger_interview_summary",
         "on_submit": "phamos.phamos.hr.interview_summary.trigger_interview_summary",
