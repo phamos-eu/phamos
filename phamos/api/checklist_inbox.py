@@ -5,9 +5,62 @@
 
 import frappe
 from frappe import _
-from frappe.utils import cint
+from frappe.model import no_value_fields, table_fields
+from frappe.utils import cint, cstr
 
 CHECKLIST_REFERENCE_DOCTYPES = ("Issue", "Task", "Project", "Lead", "Opportunity", "Customer")
+TEMPLATE_DOCTYPE = "Checklist Template"
+
+
+def _preview_fieldnames(doctype):
+	meta = frappe.get_meta(doctype)
+	return [
+		field.fieldname
+		for field in meta.fields
+		if field.in_preview
+		and field.fieldtype not in no_value_fields
+		and field.fieldtype not in table_fields
+	]
+
+
+def _preview_cell(value, meta, fieldname):
+	if value in (None, ""):
+		return None
+	field = meta.get_field(fieldname)
+	if not field:
+		return cstr(value)
+	return f"{field.label}: {frappe.format(value, field, translated=True)}"
+
+
+def _preview_line(value, meta, fieldname):
+	if value in (None, ""):
+		return None
+	field = meta.get_field(fieldname)
+	if not field:
+		return {"label": fieldname, "value": cstr(value)}
+	return {
+		"label": field.label,
+		"value": frappe.format(value, field, translated=True),
+	}
+
+
+def _template_picker_filters(document):
+	template_filters = {"docstatus": 1}
+	document = (document or "").strip()
+	if document:
+		template_filters["document"] = document
+	return template_filters
+
+
+def _template_search_or_filters(meta, preview_fields, txt, searchfield="name"):
+	or_filters = [[searchfield, "like", f"%{txt}%"]]
+	if searchfield != "title":
+		or_filters.append(["title", "like", f"%{txt}%"])
+	for fieldname in preview_fields:
+		field = meta.get_field(fieldname)
+		if field and field.fieldtype in {"Data", "Link", "Select", "Read Only"}:
+			or_filters.append([fieldname, "like", f"%{txt}%"])
+	return or_filters
 
 
 @frappe.whitelist()
@@ -39,6 +92,130 @@ def checklist_owner_query(doctype, txt, searchfield, start, page_len, filters):
 		or_filters=or_filters,
 		as_list=True,
 	)
+
+
+@frappe.whitelist()
+@frappe.validate_and_sanitize_search_inputs
+def checklist_template_query(doctype, txt, searchfield, start, page_len, filters):
+	"""Link search: submitted Checklist Templates, optionally filtered by Document."""
+	frappe.has_permission("Checklist", "create", throw=True)
+	filters = frappe.parse_json(filters) if isinstance(filters, str) else (filters or {})
+
+	meta = frappe.get_meta(TEMPLATE_DOCTYPE)
+	preview_fields = _preview_fieldnames(TEMPLATE_DOCTYPE)
+	document = (filters.get("document") or "").strip()
+	template_filters = _template_picker_filters(document)
+	or_filters = _template_search_or_filters(meta, preview_fields, txt, searchfield)
+
+	list_fields = ["name", "title", *preview_fields]
+	rows = frappe.get_list(
+		TEMPLATE_DOCTYPE,
+		filters=template_filters,
+		fields=list_fields,
+		limit_start=start,
+		limit_page_length=page_len,
+		order_by="title asc",
+		or_filters=or_filters,
+		ignore_permissions=True,
+	)
+
+	results = []
+	for row in rows:
+		item = [row.name, row.title or row.name]
+		for fieldname in preview_fields:
+			cell = _preview_cell(row.get(fieldname), meta, fieldname)
+			if cell:
+				item.append(cell)
+		results.append(tuple(item))
+	return results
+
+
+@frappe.whitelist()
+def get_checklist_template_picker_options(document, txt="", start=0, page_len=20):
+	"""Structured options for SPA Checklist Template picker (submitted only)."""
+	frappe.has_permission("Checklist", "create", throw=True)
+	meta = frappe.get_meta(TEMPLATE_DOCTYPE)
+	preview_fields = _preview_fieldnames(TEMPLATE_DOCTYPE)
+	txt = (txt or "").strip()
+	start = cint(start)
+	page_len = cint(page_len) or 20
+
+	template_filters = _template_picker_filters(document)
+	or_filters = _template_search_or_filters(meta, preview_fields, txt) if txt else None
+
+	list_fields = ["name", "title", *preview_fields]
+	rows = frappe.get_list(
+		TEMPLATE_DOCTYPE,
+		filters=template_filters,
+		fields=list_fields,
+		limit_start=start,
+		limit_page_length=page_len,
+		order_by="title asc",
+		or_filters=or_filters,
+		ignore_permissions=True,
+	)
+
+	title_field = meta.title_field or "title"
+	# Title is shown as the option heading; Document is already used as a list filter.
+	picker_preview_fields = [
+		fn for fn in preview_fields if fn not in {title_field, "document"}
+	]
+
+	options = []
+	for row in rows:
+		preview_lines = [{"label": _("ID"), "value": row.name}]
+		for fieldname in picker_preview_fields:
+			line = _preview_line(row.get(fieldname), meta, fieldname)
+			if line:
+				preview_lines.append(line)
+		options.append(
+			{
+				"value": row.name,
+				"title": row.title or row.name,
+				"preview_lines": preview_lines,
+			}
+		)
+	return options
+
+
+@frappe.whitelist()
+def get_checklist_template(name):
+	"""Submitted template payload for SPA create dialog (snapshot preview)."""
+	frappe.has_permission("Checklist", "create", throw=True)
+	name = (name or "").strip()
+	if not name:
+		frappe.throw(_("Checklist Template is required"))
+
+	row = frappe.db.get_value(
+		"Checklist Template",
+		{"name": name, "docstatus": 1},
+		["name", "title", "document", "checklist_template_owner"],
+		as_dict=True,
+	)
+	if not row:
+		frappe.throw(_("Checklist Template not found or not submitted"))
+
+	items = frappe.get_all(
+		"Checklist Template Item",
+		filters={"parent": name, "parenttype": "Checklist Template"},
+		fields=["description", "note", "document", "record", "idx"],
+		order_by="idx asc",
+	)
+	return {
+		"name": row.name,
+		"title": row.title or row.name,
+		"document": row.document,
+		"checklist_template_owner": row.checklist_template_owner,
+		"items": [
+			{
+				"description": item.description or "",
+				"note": item.note or "",
+				"document": item.document,
+				"record": item.record,
+			}
+			for item in items
+		],
+	}
 
 
 def _require_checklist_read(name):
@@ -268,7 +445,14 @@ def _parse_items(items):
 
 
 @frappe.whitelist(methods=["POST"])
-def create_spa_checklist(document, reference_record, name=None, items=None, checklist_owner=None):
+def create_spa_checklist(
+	document,
+	reference_record,
+	name=None,
+	items=None,
+	checklist_owner=None,
+	checklist_template=None,
+):
 	"""Create a Checklist linked to a parent document.
 
 	`name` is the user-facing title from the SPA. On sites with Checklist.title
@@ -280,6 +464,20 @@ def create_spa_checklist(document, reference_record, name=None, items=None, chec
 	document = (document or "").strip()
 	reference_record = (reference_record or "").strip()
 	_validate_reference_record(document, reference_record)
+
+	template_name = (checklist_template or "").strip() or None
+	if template_name:
+		template_document = frappe.db.get_value(
+			"Checklist Template",
+			{"name": template_name, "docstatus": 1},
+			"document",
+		)
+		if not template_document:
+			frappe.throw(_("Checklist Template not found or not submitted"))
+		if template_document != document:
+			frappe.throw(
+				_("Checklist Template Document must match {0}").format(document)
+			)
 
 	title = _resolve_checklist_title(name, document, reference_record)
 	parsed_items = _parse_items(items)
@@ -295,6 +493,8 @@ def create_spa_checklist(document, reference_record, name=None, items=None, chec
 		doc.name = _unique_checklist_name(title)
 	if meta.has_field("checklist_owner"):
 		doc.checklist_owner = owner
+	if template_name and meta.has_field("checklist_template"):
+		doc.checklist_template = template_name
 
 	for item in parsed_items:
 		if not isinstance(item, dict):
