@@ -65,16 +65,15 @@
 
 					<div v-else class="space-y-3">
 						<div
-							v-for="(row, index) in rows"
+							v-for="row in rows"
 							:key="row.id"
 							class="rounded-lg border border-outline-gray-2 bg-surface-gray-1 p-3"
 						>
-							<div class="mb-2 flex items-center justify-between gap-2">
-								<span class="text-xs font-medium text-ink-gray-6">
-									Item {{ index + 1 }}
-								</span>
+							<div
+								v-if="rows.length > 1 && !checklistTemplate"
+								class="mb-2 flex justify-end"
+							>
 								<Button
-									v-if="rows.length > 1 && !checklistTemplate"
 									variant="ghost"
 									theme="red"
 									size="sm"
@@ -87,23 +86,19 @@
 								<div :ref="(el) => setDescriptionHost(row.id, el)">
 									<FormControl
 										v-model="row.description"
-										label="Description"
 										type="text"
 										size="sm"
-										placeholder="Short description"
+										placeholder="Add a short description…"
 									/>
 								</div>
-								<div>
-									<label class="mb-1.5 block text-xs text-ink-gray-5">Note</label>
-									<TextEditor
-										:key="`${row.id}-${noteEditorKey}`"
-										:content="row.note"
-										:fixed-menu="noteEditorMenu"
-										placeholder="What needs to be done?"
-										editor-class="prose-sm max-w-none min-h-[72px] max-h-[160px] overflow-y-auto rounded-md border border-outline-gray-2 bg-surface-white px-2 py-1.5 text-ink-gray-8"
-										@change="(html) => (row.note = html)"
-									/>
-								</div>
+								<TextEditor
+									:key="`${row.id}-${noteEditorKey}`"
+									:content="row.note"
+									:fixed-menu="noteEditorMenu"
+									placeholder="Add a note…"
+									editor-class="prose-sm max-w-none min-h-[72px] max-h-[160px] overflow-y-auto rounded-md border border-outline-gray-2 bg-surface-white px-2 py-1.5 text-ink-gray-8"
+									@change="(html) => (row.note = html)"
+								/>
 								<div class="grid grid-cols-2 gap-2">
 									<div>
 										<label class="mb-1.5 block text-xs text-ink-gray-5">Document</label>
