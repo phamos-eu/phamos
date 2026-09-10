@@ -567,7 +567,7 @@ def update_lead_data_fields(lead_data_name: str, values=None, create_after: int 
 
 OPEN_ISSUE_STATUSES = ("Open", "Replied", "On Hold")
 CLOSED_ISSUE_STATUSES = ("Resolved", "Closed")
-LEAD_SCAN_ISSUE_TYPE = "Lead Scan"
+LEAD_SCAN_SUBJECT_PREFIX = "Lead Scan:"
 
 
 def _issue_age_label(creation) -> str:
@@ -590,17 +590,6 @@ def _issue_age_label(creation) -> str:
 	return _("1 month old") if months == 1 else _("{0} months old").format(months)
 
 
-def _ensure_lead_scan_issue_type():
-	from phamos.setup.ops_inbox import ensure_ops_inbox_setup
-
-	ensure_ops_inbox_setup()
-	if not frappe.db.exists("Issue Type", LEAD_SCAN_ISSUE_TYPE):
-		doc = frappe.new_doc("Issue Type")
-		doc.name = LEAD_SCAN_ISSUE_TYPE
-		doc.description = "Feedback from the Lead Scan mobile app"
-		doc.insert(ignore_permissions=True)
-
-
 @frappe.whitelist()
 def list_scan_issues(
 	lead_data_slug: str | None = None,
@@ -609,9 +598,11 @@ def list_scan_issues(
 	limit: int = 20,
 	start: int = 0,
 ):
-	"""List Lead Scan Issues for Home inbox or per-contact report dialog."""
+	"""List Lead Scan Issues for Home inbox or per-contact report dialog.
+
+	Lead Scan issues are identified by subject prefix (no Issue Type / custom fields).
+	"""
 	_require_scan_access()
-	_ensure_lead_scan_issue_type()
 
 	limit = min(max(cint(limit) or 20, 1), 50)
 	start = max(cint(start) or 0, 0)
@@ -619,21 +610,34 @@ def list_scan_issues(
 	statuses = OPEN_ISSUE_STATUSES if status_group != "closed" else CLOSED_ISSUE_STATUSES
 
 	filters = {
-		"issue_type": LEAD_SCAN_ISSUE_TYPE,
+		"subject": ["like", f"{LEAD_SCAN_SUBJECT_PREFIX}%"],
 		"status": ["in", list(statuses)],
 	}
-	slug = (lead_data_slug or "").strip()
-	if slug:
-		filters["custom_lead_data_slug"] = slug
 
 	or_filters = None
+	slug = (lead_data_slug or "").strip()
 	search = (search or "").strip()
-	if search:
+	if slug and search:
 		like = f"%{search}%"
 		or_filters = [
 			["subject", "like", like],
 			["name", "like", like],
-			["custom_lead_data_slug", "like", like],
+			["description", "like", like],
+		]
+		# Still require the slug to appear in subject or description.
+		filters["description"] = ["like", f"%{slug}%"]
+	elif slug:
+		# Match context footer / subject that includes the Lead Data name.
+		or_filters = [
+			["subject", "like", f"%{slug}%"],
+			["description", "like", f"%{slug}%"],
+		]
+	elif search:
+		like = f"%{search}%"
+		or_filters = [
+			["subject", "like", like],
+			["name", "like", like],
+			["description", "like", like],
 		]
 
 	fields = [
@@ -642,7 +646,6 @@ def list_scan_issues(
 		"status",
 		"creation",
 		"modified",
-		"custom_lead_data_slug",
 	]
 	rows = frappe.get_all(
 		"Issue",
@@ -664,7 +667,6 @@ def list_scan_issues(
 				"status": row.status or "",
 				"creation": str(row.creation) if row.creation else "",
 				"modified": str(row.modified) if row.modified else "",
-				"custom_lead_data_slug": row.get("custom_lead_data_slug") or "",
 				"age_label": _issue_age_label(row.creation),
 			}
 		)
@@ -678,9 +680,12 @@ def list_scan_issues(
 
 @frappe.whitelist()
 def create_scan_issue(description: str, lead_data_slug: str | None = None, lead_data_import: str | None = None):
-	"""Create an Issue from Lead Scan feedback."""
+	"""Create an Issue from Lead Scan feedback.
+
+	Does not set Issue Type (assigned later by the receiving team). Lead Data /
+	Import identifiers are written into the description only.
+	"""
 	_require_scan_access()
-	_ensure_lead_scan_issue_type()
 	frappe.has_permission("Issue", "create", throw=True)
 
 	description = (description or "").strip()
@@ -712,11 +717,13 @@ def create_scan_issue(description: str, lead_data_slug: str | None = None, lead_
 	# Keep subject within typical limits
 	subject = subject[:140]
 
-	footer_lines = ["", "---", _("Lead Scan context")]
+	footer_lines = ["", "", "---", _("Lead Scan context")]
 	if slug:
+		footer_lines.append(_("Lead Data: {0}").format(slug))
 		footer_lines.append(f"Scan: /scan/contact/{slug}")
 		footer_lines.append(f"Desk: /app/lead-data/{slug}")
 	if import_name:
+		footer_lines.append(_("Lead Data Import: {0}").format(import_name))
 		footer_lines.append(f"Import: /scan/detail/{import_name}")
 		footer_lines.append(f"Desk import: /app/lead-data-import/{import_name}")
 	full_description = description + "\n".join(footer_lines)
@@ -729,13 +736,10 @@ def create_scan_issue(description: str, lead_data_slug: str | None = None, lead_
 			"doctype": "Issue",
 			"subject": subject,
 			"description": full_description,
-			"issue_type": LEAD_SCAN_ISSUE_TYPE,
 			"raised_by": user_email,
 			"status": "Open",
 		}
 	)
-	if frappe.get_meta("Issue").has_field("custom_lead_data_slug"):
-		doc.custom_lead_data_slug = slug
 	doc.insert()
 
 	return {
@@ -743,7 +747,6 @@ def create_scan_issue(description: str, lead_data_slug: str | None = None, lead_
 		"name": doc.name,
 		"subject": doc.subject,
 		"status": doc.status,
-		"custom_lead_data_slug": slug,
 		"age_label": _issue_age_label(doc.creation),
 		"message": _("Issue {0} created").format(doc.name),
 	}
