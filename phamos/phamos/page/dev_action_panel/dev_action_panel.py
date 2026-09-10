@@ -2,6 +2,7 @@ import frappe
 from frappe import _
 from frappe.utils import now_datetime, add_to_date, time_diff_in_seconds, get_datetime
 from phamos.phamos.timesheet_utils import normalize_percent_billable
+from phamos.phamos.doctype.timesheet_record.timesheet_record import compute_time_limit_status
 from frappe.query_builder import Order
 from frappe.query_builder.functions import Coalesce, Sum, Count
 from pypika import Case
@@ -443,6 +444,14 @@ def stop_timer(name, result, percent_billable=100, activity_type=None, manual_en
     doc.percent_billable = normalize_percent_billable(percent_billable)
     if activity_type:
         doc.activity_type = activity_type
+
+    time_limit_status = compute_time_limit_status(doc)
+    if time_limit_status.get("exceeds"):
+        doc.save(ignore_permissions=True)
+        frappe.db.commit()
+        time_limit_status["name"] = doc.name
+        time_limit_status["session_state"] = "exceeds_time_limit"
+        return time_limit_status
 
     doc.save(ignore_permissions=True)
     doc.submit()

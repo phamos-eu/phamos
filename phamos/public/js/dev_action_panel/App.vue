@@ -234,12 +234,70 @@ async function doResumeProjectTimer() {
   startProjectTick();
 }
 
+function showTimeLimitDialog(status, onSubmitted) {
+  frappe.msgprint({
+    title: __("Time Limit Reached"),
+    indicator: "red",
+    message: __(
+      "Only {0}h are available out of the {1}h time limit for {2} to {3}, but this record is for {4}h billable.",
+      [
+        flt(status.remaining_hours).toFixed(2),
+        status.limit_hours,
+        status.from_date,
+        status.to_date,
+        flt(status.requested_hours).toFixed(2),
+      ]
+    ),
+    primary_action: {
+      label: __("Continue with Available Hours"),
+      action: () => {
+        frappe.call({
+          method: "phamos.phamos.doctype.timesheet_record.timesheet_record.submit_at_available_hours",
+          args: { name: status.name },
+          freeze: true,
+          callback: function () {
+            frappe.show_alert({ message: __("Submitted at available hours."), indicator: "green" });
+            frappe.hide_msgprint();
+            onSubmitted && onSubmitted();
+          },
+        });
+      },
+    },
+    secondary_action: {
+      label: __("Notify Account Manager"),
+      action: () => {
+        frappe.call({
+          method: "phamos.phamos.doctype.timesheet_record.timesheet_record.notify_pm_of_time_limit",
+          args: { name: status.name },
+          freeze: true,
+          callback: function () {
+            frappe.show_alert({
+              message: __("The account manager has been emailed and can submit this record."),
+              indicator: "green",
+            });
+            frappe.hide_msgprint();
+          },
+        });
+      },
+    },
+  });
+}
+
 async function onStopProjectTimer({ result, percentBillable, activityType }) {
   if (!activeProjectSession.value) return;
   const r = await frappe.call({
     method: "phamos.phamos.page.dev_action_panel.dev_action_panel.stop_timer",
     args: { name: activeProjectSession.value.name, result, percent_billable: percentBillable, activity_type: activityType },
   });
+  if (r.message && r.message.exceeds) {
+    showTimeLimitDialog(r.message, async () => {
+      stopProjectTick();
+      activeProjectSession.value = null;
+      projectElapsedSeconds.value = 0;
+      await Promise.all([loadMyProjects(), loadStats()]);
+    });
+    return;
+  }
   if (r.message) {
     stopProjectTick();
     activeProjectSession.value = null;
@@ -364,6 +422,12 @@ async function onStop({ result, percentBillable, activityType, manualEndTime }) 
     method: "phamos.phamos.page.dev_action_panel.dev_action_panel.stop_timer",
     args,
   });
+  if (r.message && r.message.exceeds) {
+    showTimeLimitDialog(r.message, async () => {
+      stopTick(); activeSession.value = null; elapsedSeconds.value = 0; await Promise.all([loadIssues(), loadStats()]);
+    });
+    return;
+  }
   if (r.message) { stopTick(); activeSession.value = null; elapsedSeconds.value = 0; await Promise.all([loadIssues(), loadStats()]); frappe.show_alert({ message: __("Session submitted."), indicator: "green" }); }
 }
 
