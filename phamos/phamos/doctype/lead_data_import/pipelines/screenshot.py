@@ -121,6 +121,9 @@ def extract(lead_data_import_name, file_url):
             company["website"] = core._infer_or_search_website(company)
         if not company.get("company_name") and company.get("website"):
             company["company_name"] = core._domain_to_company_name(company["website"])
+        # Mobile /scan uploads are business cards unless this is a logo wall.
+        if not is_logo_list and "logo_list" not in str(company.get("source_type") or "").lower():
+            company["source_type"] = "business_card"
         company = core._normalize_company_dict(
             core._prioritize_business_card_emails(company)
         )

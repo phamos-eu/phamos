@@ -1,0 +1,72 @@
+@import "frappe-ui/src/style.css";
+@import "@ionic/vue/css/core.css";
+@import "@ionic/vue/css/normalize.css";
+@import "@ionic/vue/css/structure.css";
+@import "@ionic/vue/css/typography.css";
+@import "@ionic/vue/css/padding.css";
+@import "@ionic/vue/css/float-elements.css";
+@import "@ionic/vue/css/text-alignment.css";
+@import "@ionic/vue/css/text-transformation.css";
+@import "@ionic/vue/css/flex-utils.css";
+@import "@ionic/vue/css/display.css";
+@import "./theme/variables.css";
+
+html,
+body,
+#app {
+	height: 100%;
+}
+
+body {
+	margin: 0;
+	background: var(--ion-background-color, #f8fafc);
+}
+
+.scan-status-chip {
+	display: inline-flex;
+	align-items: center;
+	gap: 0.35rem;
+	padding: 0.2rem 0.65rem;
+	border-radius: 999px;
+	font-size: 0.75rem;
+	font-weight: 600;
+	letter-spacing: 0.01em;
+}
+
+.scan-status-chip--draft {
+	background: #e2e8f0;
+	color: #475569;
+}
+
+.scan-status-chip--processing {
+	background: #dbeafe;
+	color: #1d4ed8;
+}
+
+.scan-status-chip--ready,
+.scan-status-chip--done {
+	background: #dcfce7;
+	color: #15803d;
+}
+
+.contact-card {
+	background: #fff;
+	border-radius: 14px;
+	padding: 1rem 1.1rem;
+	box-shadow: 0 1px 2px rgba(15, 23, 42, 0.06);
+	border: 1px solid #e2e8f0;
+}
+
+.log-panel {
+	background: #0f172a;
+	color: #e2e8f0;
+	border-radius: 12px;
+	padding: 0.85rem 1rem;
+	font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+	font-size: 0.72rem;
+	line-height: 1.45;
+	max-height: 11rem;
+	overflow: auto;
+	white-space: pre-wrap;
+	word-break: break-word;
+}
