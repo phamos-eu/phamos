@@ -100,24 +100,18 @@
 									@change="(html) => (row.note = html)"
 								/>
 								<div class="grid grid-cols-2 gap-2">
-									<div>
-										<label class="mb-1.5 block text-xs text-ink-gray-5">Document</label>
-										<FrappeLink
-											doctype="DocType"
-											:model-value="row.document"
-											placeholder="DocType"
-											@update:model-value="(val) => onDocumentChange(row, val)"
-										/>
-									</div>
-									<div>
-										<label class="mb-1.5 block text-xs text-ink-gray-5">Record</label>
-										<FrappeLink
-											:doctype="row.document || 'DocType'"
-											v-model="row.record"
-											placeholder="Record"
-											:disabled="!row.document"
-										/>
-									</div>
+									<FrappeLink
+										doctype="DocType"
+										:model-value="row.document"
+										placeholder="Add a DocType…"
+										@update:model-value="(val) => onDocumentChange(row, val)"
+									/>
+									<FrappeLink
+										:doctype="row.document || 'DocType'"
+										v-model="row.record"
+										placeholder="Add a record…"
+										:disabled="!row.document"
+									/>
 								</div>
 							</div>
 						</div>
