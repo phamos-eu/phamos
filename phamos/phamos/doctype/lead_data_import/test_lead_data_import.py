@@ -36,8 +36,9 @@ class TestLeadDataImport(FrappeTestCase):
 
 		self.assertEqual(company["email"], "wolfram.schmidt@phamos.eu")
 		self.assertEqual(company["emails"], ["wolfram.schmidt@phamos.eu"])
-		self.assertEqual(company["phones"], ["+49 7131 618 865-0"])
-		self.assertEqual(company["mobile_numbers"], ["+49 171 640 93 60"])
+		# Card phones are normalized to compact E.164.
+		self.assertEqual(company["phones"], ["+4971316188650"])
+		self.assertEqual(company["mobile_numbers"], ["+491716409360"])
 		self.assertEqual(company["contact_persons"], ["Christoph Winkler"])
 		self.assertEqual(company["job_title"], "Rechtsanwalt")
 
@@ -86,7 +87,7 @@ class TestLeadDataImport(FrappeTestCase):
 
 		result = _reconcile_card_with_matching_website_research(card, website_data)
 		self.assertEqual(result["addresses"], ["Lise-Meitner-Straße 14, 74074 Heilbronn"])
-		self.assertEqual(result["phones"], ["+49 7131 618 865-0"])
+		self.assertEqual(result["phones"], ["+4971316188650"])
 		self.assertEqual(result["contact_persons"], ["Christoph Winkler"])
 
 	def test_website_fills_only_fields_missing_from_business_card(self):
@@ -110,6 +111,9 @@ class TestLeadDataImport(FrappeTestCase):
 
 		result = _fill_missing_card_fields_from_website(card, website_data)
 		self.assertEqual(result["emails"], ["wolfram.schmidt@phamos.eu"])
-		self.assertEqual(result["phones"], ["+49 176 555 190 59"])
+		# Card number is a mobile (176…) so it stays in mobile_numbers; website
+		# landline fills the empty landline side only.
+		self.assertEqual(result["mobile_numbers"], ["+4917655519059"])
+		self.assertEqual(result["phones"], ["+4971525693854"])
 		self.assertEqual(result["contact_persons"], ["Wolfram Schmidt"])
 		self.assertEqual(result["addresses"], ["Panoramastraße 19, 72119 Ammerbuch, Germany"])

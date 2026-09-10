@@ -21,6 +21,7 @@ from ..lead_data_import import (
     _log,
     _merge_extracted_lead_fields,
     _normalize_compare_text,
+    _parse_address_components,
     _sanitize_phone_list,
     _prioritize_business_card_emails,
     _reference_urls_for_company,
