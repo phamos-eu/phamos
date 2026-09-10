@@ -22,6 +22,15 @@
 	>
 		<template #body-content>
 			<div class="space-y-4">
+				<div>
+					<label class="mb-1.5 block text-xs text-ink-gray-5">Checklist Template</label>
+					<ChecklistTemplatePicker
+						v-model="checklistTemplate"
+						:document="document"
+						:disabled="loadingTemplate"
+					/>
+				</div>
+
 				<div ref="titleFieldHost">
 					<FormControl
 						v-model="title"
@@ -32,9 +41,11 @@
 						placeholder="Checklist title"
 					/>
 				</div>
+
 				<div>
-					<label class="mb-1.5 block text-xs font-medium text-gray-600 dark:text-gray-400">
-						Checklist Owner *
+					<label class="mb-1.5 block text-xs text-ink-gray-5">
+						Checklist Owner
+						<span class="text-ink-red-3">*</span>
 					</label>
 					<FrappeLink
 						doctype="User"
@@ -45,75 +56,73 @@
 				</div>
 
 				<div>
-					<label class="mb-2 block text-xs font-medium text-gray-600 dark:text-gray-400">Items *</label>
+					<label class="mb-2 block text-xs text-ink-gray-5">
+						Items
+						<span class="text-ink-red-3">*</span>
+					</label>
 
-					<div class="space-y-3">
+					<div v-if="loadingTemplate" class="text-sm text-ink-gray-6">Loading template…</div>
+
+					<div v-else class="space-y-3">
 						<div
-							v-for="(row, index) in rows"
+							v-for="row in rows"
 							:key="row.id"
-							class="rounded-md border border-gray-200 p-3 dark:border-gray-700 dark:bg-gray-800/40"
+							class="rounded-lg border border-outline-gray-2 bg-surface-gray-1 p-3"
 						>
-							<div class="mb-2 flex items-center justify-between gap-2">
-								<span class="text-xs font-semibold text-gray-500 dark:text-gray-400">
-									Item {{ index + 1 }}
-								</span>
-								<button
-									v-if="rows.length > 1"
-									type="button"
-									class="text-xs text-gray-500 hover:text-red-600 dark:text-gray-400 dark:hover:text-red-400"
+							<div
+								v-if="rows.length > 1 && !checklistTemplate"
+								class="mb-2 flex justify-end"
+							>
+								<Button
+									variant="ghost"
+									theme="red"
+									size="sm"
+									label="Remove"
 									@click="removeRow(row.id)"
-								>
-									Remove
-								</button>
-							</div>
-							<div class="space-y-2">
-								<input
-									:ref="(el) => setDescriptionRef(row.id, el)"
-									v-model="row.description"
-									type="text"
-									class="w-full rounded-md border border-gray-300 px-3 py-2 text-sm"
-									placeholder="Short description"
 								/>
-								<textarea
-									v-model="row.note"
-									rows="2"
-									class="w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-100"
-									placeholder="What needs to be done?"
+							</div>
+
+							<div class="space-y-2">
+								<div :ref="(el) => setDescriptionHost(row.id, el)">
+									<FormControl
+										v-model="row.description"
+										type="text"
+										size="sm"
+										placeholder="Add a short description…"
+									/>
+								</div>
+								<TextEditor
+									:key="`${row.id}-${noteEditorKey}`"
+									:content="row.note"
+									:fixed-menu="noteEditorMenu"
+									placeholder="Add a note…"
+									editor-class="prose-sm max-w-none min-h-[72px] max-h-[160px] overflow-y-auto rounded-md border border-outline-gray-2 bg-surface-white px-2 py-1.5 text-ink-gray-8"
+									@change="(html) => (row.note = html)"
 								/>
 								<div class="grid grid-cols-2 gap-2">
-									<div>
-										<label class="mb-1 block text-[11px] font-medium text-gray-500 dark:text-gray-400">
-											Document
-										</label>
-										<FrappeLink
-											doctype="DocType"
-											:model-value="row.document"
-											placeholder="DocType"
-											@update:model-value="(val) => onDocumentChange(row, val)"
-										/>
-									</div>
-									<div>
-										<label class="mb-1 block text-[11px] font-medium text-gray-500 dark:text-gray-400">
-											Record
-										</label>
-										<FrappeLink
-											:doctype="row.document || 'DocType'"
-											v-model="row.record"
-											placeholder="Record"
-											:disabled="!row.document"
-										/>
-									</div>
+									<FrappeLink
+										doctype="DocType"
+										:model-value="row.document"
+										placeholder="Add a DocType…"
+										@update:model-value="(val) => onDocumentChange(row, val)"
+									/>
+									<FrappeLink
+										:doctype="row.document || 'DocType'"
+										v-model="row.record"
+										placeholder="Add a record…"
+										:disabled="!row.document"
+									/>
 								</div>
 							</div>
 						</div>
 					</div>
 
 					<div class="mt-3">
-						<Button size="sm" @click="addRow">Add item</Button>
+						<Button size="sm" :disabled="loadingTemplate" @click="addRow">Add item</Button>
 					</div>
 				</div>
 
-				<p v-if="error" class="text-sm text-red-600 dark:text-red-400">{{ error }}</p>
+				<ErrorMessage :message="error" />
 			</div>
 		</template>
 	</Dialog>
@@ -121,7 +130,8 @@
 
 <script setup>
 import { nextTick, ref, watch } from "vue"
-import { call } from "frappe-ui"
+import { call, TextEditor } from "frappe-ui"
+import ChecklistTemplatePicker from "@spa/components/ChecklistTemplatePicker.vue"
 import FrappeLink from "@spa/components/FrappeLink.vue"
 
 const props = defineProps({
@@ -134,38 +144,102 @@ const props = defineProps({
 const emit = defineEmits(["update:modelValue", "created"])
 
 const API = "phamos.api.checklist_inbox"
+const noteEditorMenu = ["Bold", "Italic", "Link", "Separator", "Bullet List", "Numbered List"]
 
 let nextId = 1
+const checklistTemplate = ref("")
 const title = ref("")
 const checklistOwner = ref("")
 const titleFieldHost = ref(null)
 const rows = ref([])
-const descriptionRefs = new Map()
+const descriptionHosts = new Map()
 const creating = ref(false)
+const loadingTemplate = ref(false)
+const noteEditorKey = ref(0)
 const error = ref("")
+let applyToken = 0
 
-function setDescriptionRef(id, el) {
-	if (el) descriptionRefs.set(id, el)
-	else descriptionRefs.delete(id)
+function setDescriptionHost(id, el) {
+	if (el) descriptionHosts.set(id, el)
+	else descriptionHosts.delete(id)
 }
 
-function emptyRow() {
+function focusHostInput(host) {
+	host?.querySelector?.("input")?.focus()
+}
+
+function emptyRow(seed = {}) {
 	return {
 		id: nextId++,
-		description: "",
-		note: "",
-		document: "",
-		record: "",
+		description: seed.description || "",
+		note: seed.note || "",
+		document: seed.document || "",
+		record: seed.record || "",
 	}
+}
+
+function isEmptyHtml(html) {
+	if (!html) return true
+	const text = String(html)
+		.replace(/<img[^>]*>/gi, "img")
+		.replace(/<[^>]+>/g, "")
+		.replace(/&nbsp;/g, " ")
+		.trim()
+	return !text
 }
 
 function resetForm() {
 	nextId = 1
-	descriptionRefs.clear()
+	descriptionHosts.clear()
+	applyToken += 1
+	checklistTemplate.value = ""
 	title.value = (props.referenceTitle || "").trim()
 	checklistOwner.value = ""
 	rows.value = [emptyRow()]
+	noteEditorKey.value += 1
 	error.value = ""
+	loadingTemplate.value = false
+}
+
+function applyBlankItems() {
+	nextId = 1
+	descriptionHosts.clear()
+	title.value = (props.referenceTitle || "").trim()
+	checklistOwner.value = ""
+	rows.value = [emptyRow()]
+	noteEditorKey.value += 1
+}
+
+async function applyTemplate(name) {
+	const token = ++applyToken
+	error.value = ""
+	loadingTemplate.value = true
+	try {
+		const template = await call(`${API}.get_checklist_template`, { name })
+		if (token !== applyToken) return
+		if (template.document && template.document !== props.document) {
+			error.value = `Template is for ${template.document}, not ${props.document}`
+			checklistTemplate.value = ""
+			applyBlankItems()
+			return
+		}
+		nextId = 1
+		descriptionHosts.clear()
+		title.value = (template.title || "").trim() || (props.referenceTitle || "").trim()
+		checklistOwner.value = template.checklist_template_owner || ""
+		const items = template.items || []
+		rows.value = items.length
+			? items.map((item) => emptyRow(item))
+			: [emptyRow()]
+		noteEditorKey.value += 1
+	} catch (e) {
+		if (token !== applyToken) return
+		error.value = e?.messages?.[0] || e?.message || "Could not load checklist template"
+		checklistTemplate.value = ""
+		applyBlankItems()
+	} finally {
+		if (token === applyToken) loadingTemplate.value = false
+	}
 }
 
 async function focusTitleEnd() {
@@ -183,7 +257,7 @@ async function addRow() {
 	const row = emptyRow()
 	rows.value = [...rows.value, row]
 	await nextTick()
-	descriptionRefs.get(row.id)?.focus()
+	focusHostInput(descriptionHosts.get(row.id))
 }
 
 function removeRow(id) {
@@ -199,12 +273,15 @@ function onDocumentChange(row, document) {
 
 function buildItems() {
 	return rows.value
-		.map((row) => ({
-			description: (row.description || "").trim(),
-			note: row.note.trim(),
-			document: row.document || null,
-			record: row.record || null,
-		}))
+		.map((row) => {
+			const note = isEmptyHtml(row.note) ? "" : row.note
+			return {
+				description: (row.description || "").trim(),
+				note,
+				document: row.document || null,
+				record: row.record || null,
+			}
+		})
 		.filter((row) => row.description || row.note || row.document || row.record)
 }
 
@@ -233,6 +310,7 @@ async function submit() {
 			reference_record: props.referenceRecord,
 			name,
 			checklist_owner: owner,
+			checklist_template: checklistTemplate.value || null,
 			items,
 		})
 		emit("created", created)
@@ -252,4 +330,18 @@ watch(
 		await focusTitleEnd()
 	}
 )
+
+watch(checklistTemplate, (name, previous) => {
+	if (!props.modelValue) return
+	const next = (name || "").trim()
+	const prev = (previous || "").trim()
+	if (next === prev) return
+	if (!next) {
+		applyToken += 1
+		loadingTemplate.value = false
+		applyBlankItems()
+		return
+	}
+	applyTemplate(next)
+})
 </script>

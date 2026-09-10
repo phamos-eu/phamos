@@ -8,7 +8,16 @@
 		:class="disabled ? 'pointer-events-none opacity-60' : ''"
 		:disabled="disabled"
 		@update:query="handleQueryUpdate"
-	/>
+	>
+		<template v-if="stackDescription" #item-suffix="{ option }">
+			<div
+				v-if="option?.description"
+				class="max-w-[55%] whitespace-normal text-right text-xs leading-snug text-ink-gray-5"
+			>
+				{{ option.description }}
+			</div>
+		</template>
+	</Autocomplete>
 </template>
 
 <script setup>
@@ -40,6 +49,11 @@ const props = defineProps({
 		type: String,
 		default: "",
 	},
+	/** Show search_link description as a second line under the label in the dropdown. */
+	stackDescription: {
+		type: Boolean,
+		default: false,
+	},
 })
 
 const emit = defineEmits(["update:modelValue"])
@@ -67,15 +81,21 @@ const options = createResource({
 	method: "POST",
 	transform: (data) => {
 		const mapped = (data || []).map((doc) => {
+			if (doc.label) {
+				return {
+					label: doc.label,
+					value: doc.value,
+					description: doc.description || "",
+				}
+			}
 			let title = null
-			if (doc.label && doc.label !== doc.value) {
-				title = doc.label
-			} else if (doc.description) {
+			if (doc.description) {
 				title = doc.description.split(",")[0]
 			}
 			return {
 				label: title ? `${title} : ${doc.value}` : doc.value,
 				value: doc.value,
+				description: doc.description || "",
 			}
 		})
 
