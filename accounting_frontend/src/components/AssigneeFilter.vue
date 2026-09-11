@@ -8,12 +8,8 @@
 			v-for="user in users"
 			:key="user.name"
 			type="button"
-			class="shrink-0 rounded-full transition"
-			:class="
-				isSelected(user.name)
-					? 'origin-center scale-[1.15] z-[1] ring-2 ring-outline-gray-4 ring-offset-1 ring-offset-surface-white'
-					: 'opacity-70 hover:opacity-100'
-			"
+			class="shrink-0 rounded-full transition-opacity"
+			:class="isSelected(user.name) ? 'opacity-100' : 'opacity-40 hover:opacity-70'"
 			:aria-pressed="isSelected(user.name)"
 			:title="user.full_name || user.name"
 			@click="toggle(user.name)"
@@ -30,7 +26,7 @@
 
 <script setup>
 import { computed } from "vue"
-import UserAvatar from "@spa/components/UserAvatar.vue"
+import UserAvatar from "./UserAvatar.vue"
 
 const props = defineProps({
 	/** Currently selected user ids (empty = all) */

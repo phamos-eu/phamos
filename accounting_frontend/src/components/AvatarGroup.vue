@@ -43,7 +43,7 @@
 
 <script setup>
 import { computed } from "vue"
-import UserAvatar from "@spa/components/UserAvatar.vue"
+import UserAvatar from "./UserAvatar.vue"
 
 const props = defineProps({
 	/** [{ name, full_name, user_image }] */

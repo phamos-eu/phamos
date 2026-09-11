@@ -72,15 +72,8 @@
 						{{ formatDate(modifiedValue(issue)) }}
 					</div>
 				</div>
-				<!-- Desk list puts assignments on the right; align with New Issue column -->
-				<div class="flex min-w-0 items-center justify-end pr-1">
-					<AvatarGroup
-						:users="assigneeUsersFromRow(issue)"
-						:limit="3"
-						align="right"
-						:show-empty="false"
-					/>
-				</div>
+				<!-- Reserves the New Issue column track from the parent grid -->
+				<span aria-hidden="true" />
 			</template>
 			<template v-else>
 				<div class="mb-1 flex flex-wrap items-center gap-1.5">
@@ -112,7 +105,7 @@
 				</div>
 				<div
 					v-if="!compact"
-					class="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-ink-gray-6"
+					class="flex flex-wrap gap-x-3 gap-y-1 text-xs text-ink-gray-6"
 				>
 					<span v-if="creationValue(issue)">
 						created on {{ formatDate(creationValue(issue)) }}
@@ -123,11 +116,7 @@
 					<span title="Issue age">{{ ageLabel(issue) }}</span>
 					<span v-if="issue.issue_type">{{ issue.issue_type }}</span>
 					<span v-if="showCreator">created by {{ issue.owner_name || issue.owner }}</span>
-					<AvatarGroup
-						:users="assigneeUsersFromRow(issue)"
-						:limit="3"
-						align="right"
-					/>
+					<span>{{ assigneeLabel(issue) }}</span>
 				</div>
 				<div
 					v-else
@@ -148,9 +137,7 @@
 
 <script setup>
 import { Badge } from "frappe-ui"
-import AvatarGroup from "@spa/components/AvatarGroup.vue"
 import { ISSUE_LIST_FILTER_SUBGRID } from "@spa/issueListColumns.js"
-import { assigneeUsersFromRow } from "@spa/utils/avatar.js"
 import { formatDate, formatIssueAge } from "@spa/utils/datetime"
 
 const props = defineProps({
@@ -198,10 +185,18 @@ function priorityTheme(priority) {
 	return "orange"
 }
 
+function assigneeLabel(issue) {
+	const names = issue.assignee_names || []
+	if (!names.length) return "Unassigned"
+	if (names.length === 1) return names[0]
+	return `${names[0]} +${names.length - 1}`
+}
+
 function metaParts(issue) {
 	const parts = []
 	if (issue.issue_type) parts.push(issue.issue_type)
 	if (props.showCreator) parts.push(`created by ${issue.owner_name || issue.owner}`)
+	parts.push(assigneeLabel(issue))
 	return parts
 }
 </script>
