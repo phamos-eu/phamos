@@ -49,9 +49,12 @@ class GitLabIssueDashboard {
         this.$flowKpis = root.find("#flow-kpis");
         this.$flowChart = root.find("#flow-chart");
         this.$flowTable = root.find("#flow-table");
+        this.$lifetimeTicketsKpis = root.find("#lifetime-tickets-kpis");
+        this.$lifetimeTicketsChart = root.find("#lifetime-tickets-chart");
 
         this.agingChartContext = null;
         this.flowChartContext = null;
+        this.lifetimeChartContext = null;
         this.$agingChart[0].addEventListener("click", (e) => {
             const index = this.getChartClickIndex(e);
             if (index !== null) this.handleAgingChartSelect({ index });
@@ -59,6 +62,10 @@ class GitLabIssueDashboard {
         this.$flowChart[0].addEventListener("click", (e) => {
             const index = this.getChartClickIndex(e);
             if (index !== null) this.handleFlowChartSelect({ index });
+        });
+        this.$lifetimeTicketsChart[0].addEventListener("click", (e) => {
+            const index = this.getChartClickIndex(e);
+            if (index !== null) this.handleLifetimeChartSelect({ index });
         });
 
         this.applyThemeClass();
@@ -81,6 +88,7 @@ class GitLabIssueDashboard {
             if (this.currentData) {
                 this.renderAgingChart();
                 this.renderFlowChart();
+                this.renderLifetimeTicketsChart();
             }
         });
 
@@ -332,6 +340,7 @@ class GitLabIssueDashboard {
             this.compareToCompany = !!this.currentData.compare_to_company;
             this.$compareCompanyToggle.prop("checked", this.compareToCompany);
             this.updateFilterState();
+            this.renderLifetimeTicketsChart();
             this.renderLeadTimeKpis();
             this.renderTouchTimeKpis();
             this.renderCycleTimeKpis();
@@ -348,6 +357,92 @@ class GitLabIssueDashboard {
         } finally {
             frappe.dom.unfreeze();
         }
+    }
+
+    destroyChart(chart) {
+        if (chart && typeof chart.destroy === "function") {
+            chart.destroy();
+        }
+    }
+
+    renderLifetimeTicketsChart() {
+        this.destroyChart(this.lifetimeTicketsChart);
+        this.lifetimeTicketsChart = null;
+        this.$lifetimeTicketsChart.empty();
+        this.applyThemeClass();
+        this.lifetimeChartContext = null;
+
+        const rows = (this.currentData && this.currentData.lifetime_tickets) || [];
+        const selectedProjects = (this.currentData && this.currentData.projects) || [];
+        const projectTitles = (this.currentData && this.currentData.project_titles) || {};
+        const flowColors = this.getChartColors("flow");
+
+        const totals = rows.reduce((acc, row) => acc + (row.open_total || 0), 0);
+
+        this.$lifetimeTicketsKpis.html(`
+            <div class="gid-kpi gid-kpi-opened"><small>${__("Total Open")}</small><strong>${totals}</strong></div>
+        `);
+
+        if (!rows.length) {
+            this.$lifetimeTicketsChart.html(`<p class="text-muted">${__("No data found for selected filters.")}</p>`);
+            return;
+        }
+
+        const monthMeta = {};
+        rows.forEach((row) => {
+            if (!monthMeta[row.month_key]) {
+                monthMeta[row.month_key] = { month: row.month || row.month_key, month_order: row.month_order || 0 };
+            }
+        });
+        const sortedMonthKeys = Object.keys(monthMeta).sort((a, b) => {
+            const diff = (monthMeta[a].month_order || 0) - (monthMeta[b].month_order || 0);
+            return diff !== 0 ? diff : a.localeCompare(b);
+        });
+        const labels = sortedMonthKeys.map((monthKey) => monthMeta[monthKey].month || monthKey);
+
+        this.lifetimeChartContext = { monthKeys: sortedMonthKeys, projects: selectedProjects };
+
+        // Show project-wise bars for multi-project comparison instead of summing into one total.
+        if (selectedProjects.length > 1) {
+            const projectMonthMap = {};
+            rows.forEach((row) => {
+                if (!projectMonthMap[row.gitlab_project]) projectMonthMap[row.gitlab_project] = {};
+                projectMonthMap[row.gitlab_project][row.month_key] = row.open_total || 0;
+            });
+
+            const comparePalette = ["#1976d2", "#ef6c00", "#00897b", "#3949ab", "#43a047", "#8e24aa", "#c62828", "#f9a825"];
+
+            const datasets = selectedProjects.map((project) => ({
+                name: projectTitles[project] || project || "",
+                values: sortedMonthKeys.map((monthKey) => (projectMonthMap[project] ? (projectMonthMap[project][monthKey] || 0) : 0)),
+            }));
+            const chartColors = selectedProjects.map((_, index) => comparePalette[index % comparePalette.length]);
+
+            this.lifetimeTicketsChart = new frappe.Chart(this.$lifetimeTicketsChart[0], {
+                title: __("Lifetime Tickets - Open - Project Comparison"),
+                data: { labels, datasets },
+                type: "bar",
+                height: 300,
+                isNavigable: 1,
+                colors: chartColors,
+            });
+            return;
+        }
+
+        const monthAgg = {};
+        rows.forEach((row) => {
+            monthAgg[row.month_key] = (monthAgg[row.month_key] || 0) + (row.open_total || 0);
+        });
+        const openValues = sortedMonthKeys.map((monthKey) => monthAgg[monthKey] || 0);
+
+        this.lifetimeTicketsChart = new frappe.Chart(this.$lifetimeTicketsChart[0], {
+            title: __("Lifetime Tickets - Open"),
+            data: { labels, datasets: [{ name: __("Open"), values: openValues }] },
+            type: "bar",
+            height: 300,
+            isNavigable: 1,
+            colors: [flowColors[0]],
+        });
     }
 
     renderLeadTimeKpis() {
@@ -560,6 +655,8 @@ class GitLabIssueDashboard {
     }
 
     renderAgingChart() {
+        this.destroyChart(this.agingChart);
+        this.agingChart = null;
         this.$agingChart.empty();
         this.applyThemeClass();
         this.agingChartContext = null;
@@ -686,6 +783,8 @@ class GitLabIssueDashboard {
     }
 
     renderFlowChart() {
+        this.destroyChart(this.flowChart);
+        this.flowChart = null;
         this.$flowChart.empty();
         this.applyThemeClass();
         this.flowChartContext = null;

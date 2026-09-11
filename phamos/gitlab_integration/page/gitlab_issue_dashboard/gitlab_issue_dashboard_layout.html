@@ -235,6 +235,13 @@
     </div>
 
     <div class="gid-section-card" style="margin-bottom: 16px;">
+        <div class="gid-title">{{ __("Lifetime Tickets") }}</div>
+        <div class="gid-subtitle">{{ __("For each month, tickets created that month that were still open at the end of that same month (a ticket created and closed in the same month is not counted).") }}</div>
+        <div class="gid-kpi-row" id="lifetime-tickets-kpis"></div>
+        <div id="lifetime-tickets-chart" style="min-height: 320px;"></div>
+    </div>
+
+    <div class="gid-section-card" style="margin-bottom: 16px;">
         <div class="gid-title">{{ __("Lead Time (Created to Completed)") }}</div>
         <div class="gid-subtitle">{{ __("Average number of days from ticket creation to completion.") }}</div>
         <div id="lead-time-kpis"></div>
