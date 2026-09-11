@@ -4,16 +4,15 @@
  * @see frappe/public/scss/desk/avatar.scss
  */
 
-/** Light / dark hex values matching Frappe espresso avatar tokens. */
 const PALETTE = [
-	{ key: "orange", bg: "#fff1e7", color: "#d45a08", darkBg: "#d45a08", darkColor: "#fff1e7" },
-	{ key: "pink", bg: "#fff7fc", color: "#e34aa6", darkBg: "#e34aa6", darkColor: "#fff7fc" },
-	{ key: "blue", bg: "#f7fbfd", color: "#0289f7", darkBg: "#0289f7", darkColor: "#f7fbfd" },
-	{ key: "green", bg: "#daf0e1", color: "#16794c", darkBg: "#16794c", darkColor: "#daf0e1" },
-	{ key: "dark-green", bg: "#daf0e1", color: "#16794c", darkBg: "#16794c", darkColor: "#daf0e1" },
-	{ key: "red", bg: "#fff7f7", color: "#e03636", darkBg: "#e03636", darkColor: "#fff7f7" },
-	{ key: "yellow", bg: "#fffcef", color: "#edba13", darkBg: "#edba13", darkColor: "#fffcef" },
-	{ key: "purple", bg: "#fdfaff", color: "#9c45e3", darkBg: "#9c45e3", darkColor: "#fdfaff" },
+	{ key: "orange" },
+	{ key: "pink" },
+	{ key: "blue" },
+	{ key: "green" },
+	{ key: "dark-green" },
+	{ key: "red" },
+	{ key: "yellow" },
+	{ key: "purple" },
 ]
 
 /** Lightweight hash approximating Frappe's md5-based palette index. */
@@ -27,7 +26,7 @@ function paletteIndex(txt) {
 }
 
 /**
- * Palette for initials. Seed with the same display label everywhere (list + detail)
+ * Palette key for initials. Seed with the same display label everywhere (list + detail)
  * so the same assignee always gets the same color.
  */
 export function getAvatarPalette(label) {

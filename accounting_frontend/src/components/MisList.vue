@@ -30,7 +30,7 @@
 				<Badge
 					class="whitespace-nowrap"
 					:label="row.status"
-					:theme="statusTheme(row.status)"
+					:theme="misStatusTheme(row.status)"
 					size="sm"
 					variant="subtle"
 				/>
@@ -44,7 +44,7 @@
 			<div class="min-w-0 text-center text-sm tabular-nums">
 				<span
 					class="inline-flex flex-col items-center leading-tight"
-					:class="deltaClass(row.delta_ratio)"
+					:class="misDeltaTextClass(row.delta_ratio)"
 					:title="deltaTitle(row)"
 				>
 					<span class="font-medium">{{ formatHours(row.delta_hours) }}</span>
@@ -71,7 +71,7 @@ import {
 	formatDeltaPercent,
 	formatHours,
 	formatMisPeriod,
-	misDeltaTone,
+	misDeltaTextClass,
 	misStatusTheme,
 } from "../misListColumns.js"
 
@@ -81,21 +81,6 @@ defineProps({
 })
 
 const emit = defineEmits(["select"])
-
-function statusTheme(status) {
-	return misStatusTheme(status)
-}
-
-function deltaClass(ratio) {
-	const tone = misDeltaTone(ratio)
-	const map = {
-		green: "text-green-700 dark:text-green-400",
-		amber: "text-amber-700 dark:text-amber-400",
-		red: "text-red-700 dark:text-red-400",
-		gray: "text-ink-gray-6",
-	}
-	return map[tone]
-}
 
 function deltaTitle(row) {
 	const hours = formatHours(row.delta_hours)

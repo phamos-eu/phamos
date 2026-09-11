@@ -1,6 +1,6 @@
 <template>
 	<div
-		class="flex flex-nowrap items-center justify-start gap-1"
+		class="flex max-w-full flex-nowrap items-center justify-start gap-1 overflow-x-auto"
 		role="group"
 		aria-label="Filter by assignee"
 	>
