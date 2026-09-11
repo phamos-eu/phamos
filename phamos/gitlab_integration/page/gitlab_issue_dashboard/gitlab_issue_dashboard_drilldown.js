@@ -79,19 +79,7 @@ Object.assign(GitLabIssueDashboard.prototype, {
         return `/app/${slug}${query ? "?" + query : ""}`;
     },
 
-    buildCsvExportUrl(params) {
-        const searchParams = new URLSearchParams();
-
-        Object.keys(params || {}).forEach((key) => {
-            const value = params[key];
-            if (value === undefined || value === null || value === "") return;
-            searchParams.set(key, Array.isArray(value) ? JSON.stringify(value) : String(value));
-        });
-
-        return `/api/method/phamos.gitlab_integration.page.gitlab_issue_dashboard.gitlab_issue_dashboard.download_gitlab_issue_drilldown_csv?${searchParams.toString()}`;
-    },
-
-    renderDrilldownBody($body, data, note, showLeadTime, onLoadMore) {
+    renderDrilldownBody($body, data, note, showLeadTime, onLoadMore, showTouchTime, showCycleTime, leadTimeLabel, stateLabel) {
         const rows = (data && data.rows) || [];
         const total = (data && data.total) || 0;
         const projectTitles = (data && data.project_titles) || {};
@@ -129,7 +117,7 @@ Object.assign(GitLabIssueDashboard.prototype, {
                 <tr>
                     <td>${link}</td>
                     <td>${project}</td>
-                    <td>${frappe.utils.escape_html(row.state || "")}</td>
+                    <td>${frappe.utils.escape_html(stateLabel || row.state || "")}</td>
                     <td>${created}</td>
                     <td>${closed}</td>
                     ${leadTimeCell}
@@ -191,15 +179,15 @@ Object.assign(GitLabIssueDashboard.prototype, {
             const tab = tabs.find((t) => t.key === state.activeKey);
             if (!tab) return;
 
-            if (tab.csvExportOnly) {
-                dialog.set_primary_action(__("Export to CSV"), () => {
-                    window.open(this.buildCsvExportUrl(tab.params), "_blank");
-                });
-            } else {
-                dialog.set_primary_action(__("Open in New Tab"), () => {
-                    window.open(this.buildListViewUrl(tab.params), "_blank");
-                });
+            if (tab.noListView) {
+                dialog.get_primary_btn().hide();
+                return;
             }
+
+            dialog.get_primary_btn().show();
+            dialog.set_primary_action(__("Open in New Tab"), () => {
+                window.open(this.buildListViewUrl(tab.params), "_blank");
+            });
         };
 
         const renderTabs = () => {
@@ -226,7 +214,7 @@ Object.assign(GitLabIssueDashboard.prototype, {
 
         const fetchPage = (tab, startAt) => {
             return frappe.call({
-                method: "phamos.gitlab_integration.page.gitlab_issue_dashboard.gitlab_issue_dashboard.get_gitlab_issue_drilldown",
+                method: tab.method || "phamos.gitlab_integration.page.gitlab_issue_dashboard.gitlab_issue_dashboard.get_gitlab_issue_drilldown",
                 args: Object.assign({}, tab.params, { start: startAt }),
             }).then((r) => r.message || { rows: [], total: 0, project_titles: {} });
         };
@@ -236,7 +224,7 @@ Object.assign(GitLabIssueDashboard.prototype, {
             if (!tab) return;
 
             if (state.cache[tab.key]) {
-                this.renderDrilldownBody($body, state.cache[tab.key], tab.note, tab.showLeadTime, () => loadMore(tab));
+                this.renderDrilldownBody($body, state.cache[tab.key], tab.note, tab.showLeadTime, () => loadMore(tab), tab.showTouchTime, tab.showCycleTime, tab.leadTimeLabel, tab.stateLabel);
                 return;
             }
 
@@ -245,7 +233,7 @@ Object.assign(GitLabIssueDashboard.prototype, {
             fetchPage(tab, 0).then((data) => {
                 state.cache[tab.key] = data;
                 if (state.activeKey === tab.key) {
-                    this.renderDrilldownBody($body, data, tab.note, tab.showLeadTime, () => loadMore(tab));
+                    this.renderDrilldownBody($body, data, tab.note, tab.showLeadTime, () => loadMore(tab), tab.showTouchTime, tab.showCycleTime, tab.leadTimeLabel, tab.stateLabel);
                 }
             });
         };
@@ -259,7 +247,7 @@ Object.assign(GitLabIssueDashboard.prototype, {
                 cached.total = data.total;
                 cached.project_titles = Object.assign({}, cached.project_titles, data.project_titles);
                 if (state.activeKey === tab.key) {
-                    this.renderDrilldownBody($body, cached, tab.note, tab.showLeadTime, () => loadMore(tab));
+                    this.renderDrilldownBody($body, cached, tab.note, tab.showLeadTime, () => loadMore(tab), tab.showTouchTime, tab.showCycleTime, tab.leadTimeLabel, tab.stateLabel);
                 }
             });
         };
@@ -367,6 +355,38 @@ Object.assign(GitLabIssueDashboard.prototype, {
             ],
             activeKey: defaultKind,
         });
+    },
+
+    openLifetimeTicketsDrilldown(projects, monthKey) {
+        const filterCtx = this.getFilterContext();
+        const [year, month] = String(monthKey).split("-").map(Number);
+        const monthLabel = this.monthKeyToLabel(monthKey);
+        const method = "phamos.gitlab_integration.page.gitlab_issue_dashboard.gitlab_issue_dashboard.get_lifetime_ticket_drilldown";
+        const note = __("Status as of the end of {0}.", [monthLabel]);
+        const baseParams = { projects: projects || [], issue_scope: filterCtx.issue_scope, year, month };
+
+        this.openDrilldown({
+            title: __("{0} — {1}", [this.getScopeLabel(projects), monthLabel]),
+            tabs: [
+                {
+                    key: "open",
+                    label: __("Open"),
+                    method,
+                    params: Object.assign({}, baseParams, { lifetime_state: "open" }),
+                    noListView: true,
+                    note,
+                    stateLabel: __("Open"),
+                },
+            ],
+        });
+    },
+
+    handleLifetimeChartSelect(e) {
+        const ctx = this.lifetimeChartContext;
+        if (!ctx) return;
+        const monthKey = ctx.monthKeys[e.index];
+        if (!monthKey) return;
+        this.openLifetimeTicketsDrilldown(ctx.projects || [], monthKey);
     },
 
     handleAgingChartSelect(e) {
