@@ -11,7 +11,7 @@
 				class="inline-flex items-center gap-1 rounded-full bg-surface-gray-3 py-0.5 pl-1 pr-1 text-xs font-medium text-ink-gray-9"
 			>
 				<UserAvatar
-					size="sm"
+					size="xs"
 					:name="user.name"
 					:label="user.full_name || user.name"
 					:image="user.user_image"
@@ -42,7 +42,7 @@
 					@click="addUser(user)"
 				>
 					<UserAvatar
-						size="sm"
+						size="xs"
 						:name="user.name"
 						:label="user.full_name || user.name"
 						:image="user.user_image"

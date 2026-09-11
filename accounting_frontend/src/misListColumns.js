@@ -83,3 +83,15 @@ export function formatDeltaPercent(ratio) {
 		maximumFractionDigits: 1,
 	})}%`
 }
+
+const MIS_DELTA_TEXT_CLASSES = {
+	green: "text-green-700 dark:text-green-400",
+	amber: "text-amber-700 dark:text-amber-400",
+	red: "text-red-700 dark:text-red-400",
+	gray: "text-ink-gray-6",
+}
+
+export function misDeltaTextClass(ratio) {
+	return MIS_DELTA_TEXT_CLASSES[misDeltaTone(ratio)]
+}
+

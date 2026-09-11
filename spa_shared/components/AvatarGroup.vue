@@ -29,7 +29,8 @@
 				class="avatar-group-item relative -ml-2 transition-[margin] duration-100 group-hover/avatars:-ml-1"
 			>
 				<span
-					class="inline-flex h-7 w-7 items-center justify-center rounded-full bg-surface-gray-3 text-xs font-medium text-ink-gray-7"
+					class="inline-flex items-center justify-center rounded-full bg-surface-gray-3 font-medium text-ink-gray-7"
+					:class="overflowSizeClass"
 					:title="overflowTitle"
 				>
 					+{{ overflowCount }}
@@ -59,6 +60,15 @@ const props = defineProps({
 })
 
 const users = computed(() => props.users || [])
+
+const overflowSizeClass = computed(() => {
+	const map = {
+		xs: "h-4 w-4 text-[9px]",
+		sm: "h-7 w-7 text-xs",
+		md: "h-8 w-8 text-sm",
+	}
+	return map[props.size] || map.sm
+})
 
 /** Match frappe.avatar_group: if exactly one over limit, show it; else +N. */
 const visibleUsers = computed(() => {

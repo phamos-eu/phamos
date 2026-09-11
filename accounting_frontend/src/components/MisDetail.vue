@@ -6,7 +6,7 @@
 				<h2 class="mt-1 truncate text-lg font-semibold text-ink-gray-9">
 					{{ summary.implementation || "—" }}
 				</h2>
-				<p v-if="periodLabel" class="mt-1 text-sm text-ink-gray-6">{{ periodLabel }}</p>
+				<p class="mt-1 text-sm text-ink-gray-6">{{ formatMisPeriod(summary) }}</p>
 			</div>
 			<button
 				type="button"
@@ -24,7 +24,7 @@
 					<dd class="mt-1">
 						<Badge
 							:label="summary.status"
-							:theme="statusTheme(summary.status)"
+							:theme="misStatusTheme(summary.status)"
 							size="sm"
 							variant="subtle"
 						/>
@@ -32,7 +32,7 @@
 				</div>
 				<div>
 					<dt class="text-xs text-ink-gray-5">Period</dt>
-					<dd class="mt-1 font-medium text-ink-gray-9">{{ periodLabel || "—" }}</dd>
+					<dd class="mt-1 font-medium text-ink-gray-9">{{ formatMisPeriod(summary) }}</dd>
 				</div>
 				<div>
 					<dt class="text-xs text-ink-gray-5">Total Hours</dt>
@@ -48,7 +48,7 @@
 				</div>
 				<div class="sm:col-span-2">
 					<dt class="text-xs text-ink-gray-5">Non-billable Delta</dt>
-					<dd class="mt-1 font-medium tabular-nums" :class="deltaClass">
+					<dd class="mt-1 font-medium tabular-nums" :class="misDeltaTextClass(summary.delta_ratio)">
 						{{ formatHours(summary.delta_hours) }}
 						<span class="text-sm font-normal opacity-90">
 							({{ formatDeltaPercent(summary.delta_ratio) }} of total)
@@ -62,18 +62,6 @@
 	<Teleport v-if="propertiesHostReady" to="#mis-properties-host">
 		<div class="flex h-full min-h-0 flex-col bg-surface-white text-ink-gray-9">
 			<div class="flex min-h-0 flex-1 flex-col gap-5 overflow-y-auto p-4">
-				<section>
-					<div class="mb-2 text-[11px] font-semibold uppercase tracking-wide text-ink-gray-6">
-						Status
-					</div>
-					<Badge
-						:label="summary.status"
-						:theme="statusTheme(summary.status)"
-						size="sm"
-						variant="subtle"
-					/>
-				</section>
-
 				<section>
 					<AssigneePicker
 						v-model="assignees"
@@ -104,10 +92,12 @@
 import { computed, nextTick, onMounted, ref, watch } from "vue"
 import { Badge } from "frappe-ui"
 import AssigneePicker from "@spa/components/AssigneePicker.vue"
+import { assigneeUsersFromRow } from "@spa/utils/avatar.js"
 import {
 	formatDeltaPercent,
 	formatHours,
-	misDeltaTone,
+	formatMisPeriod,
+	misDeltaTextClass,
 	misStatusTheme,
 } from "../misListColumns.js"
 import spaConfig from "@/config"
@@ -131,37 +121,7 @@ const emit = defineEmits(["close", "updated"])
 const API = computed(() => props.apiPrefix || spaConfig.api)
 const propertiesHostReady = ref(false)
 const assignees = ref([...(props.summary.assignees || [])])
-
-const periodLabel = computed(() => {
-	const parts = [props.summary.month, props.summary.year].filter(Boolean)
-	return parts.join(" ")
-})
-
-const assigneeDetails = computed(() => {
-	const names = props.summary.assignees || []
-	const labels = props.summary.assignee_names || []
-	const images = props.summary.assignee_images || []
-	return names.map((name, i) => ({
-		name,
-		full_name: labels[i] || name,
-		user_image: images[i] || "",
-	}))
-})
-
-const deltaClass = computed(() => {
-	const tone = misDeltaTone(props.summary.delta_ratio)
-	const map = {
-		green: "text-green-700 dark:text-green-400",
-		amber: "text-amber-700 dark:text-amber-400",
-		red: "text-red-700 dark:text-red-400",
-		gray: "text-ink-gray-6",
-	}
-	return map[tone]
-})
-
-function statusTheme(status) {
-	return misStatusTheme(status)
-}
+const assigneeDetails = computed(() => assigneeUsersFromRow(props.summary))
 
 function onAssigneesUpdated(updated) {
 	if (updated?.assignees) {

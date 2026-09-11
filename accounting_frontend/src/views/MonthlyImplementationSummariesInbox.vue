@@ -137,6 +137,7 @@ import { call } from "frappe-ui"
 import AssigneeFilter from "@spa/components/AssigneeFilter.vue"
 import ListSortSelector from "@spa/components/ListSortSelector.vue"
 import StatusFilter from "@spa/components/StatusFilter.vue"
+import { assigneeUsersFromRow } from "@spa/utils/avatar.js"
 import MisDetail from "../components/MisDetail.vue"
 import MisList from "../components/MisList.vue"
 import {
@@ -234,17 +235,10 @@ const contextRows = computed(() => {
 const assigneeOptions = computed(() => {
 	const byName = new Map()
 	for (const row of contextRows.value) {
-		const ids = row.assignees || []
-		const names = row.assignee_names || []
-		const images = row.assignee_images || []
-		ids.forEach((id, i) => {
-			if (!id || byName.has(id)) return
-			byName.set(id, {
-				name: id,
-				full_name: names[i] || id,
-				user_image: images[i] || "",
-			})
-		})
+		for (const user of assigneeUsersFromRow(row)) {
+			if (!user.name || byName.has(user.name)) continue
+			byName.set(user.name, user)
+		}
 	}
 	return [...byName.values()].sort((a, b) =>
 		String(a.full_name || a.name).localeCompare(String(b.full_name || b.name))

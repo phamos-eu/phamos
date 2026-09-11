@@ -66,22 +66,23 @@ def get_accounting_settings():
 	return settings
 
 
-def _user_label(user):
-	if not user:
-		return ""
-	return get_fullname(user) or user
-
-
-def _user_images(users):
-	if not users:
-		return []
+def _user_info_map(users):
+	"""Map user name → {full_name, user_image} in one query."""
+	names = list({u for u in (users or []) if u})
+	if not names:
+		return {}
 	rows = frappe.get_all(
 		"User",
-		filters={"name": ("in", list(users))},
-		fields=["name", "user_image"],
+		filters={"name": ("in", names)},
+		fields=["name", "full_name", "user_image"],
 	)
-	by_name = {r.name: r.user_image for r in rows}
-	return [by_name.get(u) for u in users]
+	return {
+		r.name: {
+			"full_name": r.full_name or r.name,
+			"user_image": r.user_image,
+		}
+		for r in rows
+	}
 
 
 def _mis_delta(total_hours, billable_hours):
@@ -93,9 +94,10 @@ def _mis_delta(total_hours, billable_hours):
 	return delta_hours, delta_ratio
 
 
-def _serialize_mis_row(row, assignees=None, assignee_images=None):
+def _serialize_mis_row(row, assignees=None, user_info=None):
 	if assignees is None:
 		assignees = _parse_assignees(row.get("_assign"))
+	info = user_info if user_info is not None else _user_info_map(assignees)
 	total_hours = flt(row.get("total_hours"))
 	billable_hours = flt(row.get("billable_hours"))
 	delta_hours, delta_ratio = _mis_delta(total_hours, billable_hours)
@@ -112,8 +114,10 @@ def _serialize_mis_row(row, assignees=None, assignee_images=None):
 		"delta_ratio": delta_ratio,
 		"modified": row.get("modified"),
 		"assignees": assignees,
-		"assignee_names": [_user_label(u) for u in assignees],
-		"assignee_images": assignee_images if assignee_images is not None else _user_images(assignees),
+		"assignee_names": [
+			(info.get(u) or {}).get("full_name") or get_fullname(u) or u for u in assignees
+		],
+		"assignee_images": [(info.get(u) or {}).get("user_image") for u in assignees],
 		"desk_url": f"/app/monthly-implementation-summary/{name}",
 	}
 
@@ -133,7 +137,13 @@ def get_monthly_implementation_summaries():
 		order_by="modified desc",
 		limit_page_length=500,
 	)
-	return [_serialize_mis_row(r) for r in rows]
+	parsed = [(row, _parse_assignees(row.get("_assign"))) for row in rows]
+	all_assignees = {user for _, assignees in parsed for user in assignees}
+	user_info = _user_info_map(all_assignees)
+	return [
+		_serialize_mis_row(row, assignees=assignees, user_info=user_info)
+		for row, assignees in parsed
+	]
 
 
 @frappe.whitelist()
@@ -156,7 +166,7 @@ def get_monthly_implementation_summary(name):
 			"modified": doc.modified,
 		},
 		assignees=assignees,
-		assignee_images=_user_images(assignees),
+		user_info=_user_info_map(assignees),
 	)
 
 
