@@ -441,8 +441,10 @@ Object.assign(GitLabIssueDashboard.prototype, {
             date_field: dateField,
             from_date: filterCtx.from_date,
             to_date: filterCtx.to_date,
-            state: kind === "closed" ? "closed" : "opened",
         };
+        if (kind === "closed") {
+            params.state = "closed";
+        }
         const kindLabel = kind === "closed" ? __("Closed") : __("Opened");
 
         this.openDrilldown({
@@ -457,7 +459,7 @@ Object.assign(GitLabIssueDashboard.prototype, {
         const monthLabel = this.monthKeyToLabel(monthKey);
 
         const openedParams = {
-            projects, issue_scope: filterCtx.issue_scope, date_field: "created_at", from_date, to_date, state: "opened",
+            projects, issue_scope: filterCtx.issue_scope, date_field: "created_at", from_date, to_date,
         };
         const closedParams = {
             projects, issue_scope: filterCtx.issue_scope, date_field: "closed_at", from_date, to_date, state: "closed",

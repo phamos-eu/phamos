@@ -842,12 +842,8 @@ class GitLabIssueDashboard {
             acc.closed += row.closed || 0;
             return acc;
         }, { opened: 0, closed: 0 });
-        const openNowTotal = (this.currentData && this.currentData.open_now_total !== undefined)
-            ? this.currentData.open_now_total
-            : totals.opened;
-
         this.$flowKpis.html(`
-            <div class="gid-kpi gid-kpi-opened gid-clickable" data-flow-kind="opened"><small>${__("Opened Total")}</small><strong>${openNowTotal}</strong></div>
+            <div class="gid-kpi gid-kpi-opened gid-clickable" data-flow-kind="opened"><small>${__("Opened Total")}</small><strong>${totals.opened}</strong></div>
             <div class="gid-kpi gid-kpi-closed gid-clickable" data-flow-kind="closed"><small>${__("Closed Total")}</small><strong>${totals.closed}</strong></div>
         `);
         this.$flowKpis.off("click", ".gid-kpi").on("click", ".gid-kpi", (e) => {

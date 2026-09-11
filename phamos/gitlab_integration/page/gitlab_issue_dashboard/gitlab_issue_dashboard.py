@@ -18,7 +18,6 @@ def get_gitlab_issue_dashboard_data(projects=None, year=None, from_date=None, to
     lead_time = _format_lead_time_response(from_date, to_date, selected_projects, issue_scope, compare_to_company)
     touch_time = _format_touch_time_response(from_date, to_date, selected_projects, issue_scope, compare_to_company)
     cycle_time = _format_cycle_time_response(from_date, to_date, selected_projects, issue_scope, compare_to_company)
-    open_now_total = _count_open_now(from_date, to_date, selected_projects, issue_scope)
     lifetime_tickets = _build_lifetime_ticket_rows(from_date, to_date, selected_projects, issue_scope)
     company_monthly_flow = []
     company_aging = {}
@@ -42,7 +41,6 @@ def get_gitlab_issue_dashboard_data(projects=None, year=None, from_date=None, to
         "lead_time": lead_time,
         "touch_time": touch_time,
         "cycle_time": cycle_time,
-        "open_now_total": open_now_total,
         "lifetime_tickets": lifetime_tickets,
     }
 
@@ -354,6 +352,10 @@ def _build_flow_rows_and_aging(from_date, to_date, selected_projects, issue_scop
 
     project_filter_sql = " AND ".join(conditions)
 
+    # Opened is a flow count, same as Closed: every ticket created in the range
+    # counts once toward the month it was created, regardless of its current
+    # state, so a ticket opened and closed in the same or different months is
+    # counted once as opened and once as closed.
     opened_rows = frappe.db.sql(
         f"""
                 SELECT
@@ -364,7 +366,6 @@ def _build_flow_rows_and_aging(from_date, to_date, selected_projects, issue_scop
         FROM `tabGitLab Issue` gi
         WHERE gi.created_at IS NOT NULL
                     AND DATE(gi.created_at) BETWEEN %(from_date)s AND %(to_date)s
-          AND gi.state = 'opened'
           AND {project_filter_sql}
                 GROUP BY gi.gitlab_project, YEAR(gi.created_at), MONTH(gi.created_at)
         """,
@@ -454,43 +455,6 @@ def _build_flow_rows_and_aging(from_date, to_date, selected_projects, issue_scop
     }
 
     return flow_rows, aging_map, project_names
-
-
-def _count_open_now(from_date, to_date, selected_projects, issue_scope="both"):
-	"""Counts issues created within the selected range that are still in the
-	'opened' state today — matches the filters used by the Opened Total drill-down,
-	so the KPI card and its popup always agree."""
-	conditions = ["1=1"]
-	params = {
-		"from_date": from_date,
-		"to_date": to_date,
-	}
-
-	if selected_projects:
-		conditions.append("gi.gitlab_project IN %(projects)s")
-		params["projects"] = tuple(selected_projects)
-
-	if issue_scope == "parent":
-		conditions.append("gi.parent_issue IS NULL")
-	elif issue_scope == "child":
-		conditions.append("gi.parent_issue IS NOT NULL")
-
-	project_filter_sql = " AND ".join(conditions)
-
-	row = frappe.db.sql(
-		f"""
-		SELECT COUNT(*) AS total
-		FROM `tabGitLab Issue` gi
-		WHERE gi.state = 'opened'
-		  AND gi.created_at IS NOT NULL
-		  AND DATE(gi.created_at) BETWEEN %(from_date)s AND %(to_date)s
-		  AND {project_filter_sql}
-		""",
-		params,
-		as_dict=True,
-	)
-
-	return int(row[0].total or 0) if row else 0
 
 
 def _build_lifetime_ticket_rows(from_date, to_date, selected_projects, issue_scope="both"):
