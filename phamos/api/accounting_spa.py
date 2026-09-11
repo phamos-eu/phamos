@@ -5,8 +5,13 @@
 
 import frappe
 from frappe import _
+from frappe.desk.form.assign_to import add as add_assignment
+from frappe.desk.form.assign_to import remove as remove_assignment
+from frappe.desk.form.load import get_assignments
+from frappe.utils import flt, get_fullname
 
 from phamos.api import department_cockpit as dc
+from phamos.api.i_own_my_work import _parse_assignees, _parse_list
 
 CONFIG = dc.CockpitConfig(
 	label="Accounting",
@@ -16,10 +21,27 @@ CONFIG = dc.CockpitConfig(
 	settings_method_name="get_accounting_settings",
 )
 
+MIS_DOCTYPE = "Monthly Implementation Summary"
+
+MIS_LIST_FIELDS = [
+	"name",
+	"implementation",
+	"status",
+	"year",
+	"month",
+	"total_hours",
+	"billable_hours",
+	"modified",
+	"_assign",
+]
+
 
 def check_app_permission():
 	"""Show Accounting SPA on the Apps screen for eligible users."""
-	return dc.check_app_permission(CONFIG, extra_doctypes=("Accounting Receipt",))
+	return dc.check_app_permission(
+		CONFIG,
+		extra_doctypes=("Accounting Receipt", MIS_DOCTYPE),
+	)
 
 
 def _accounting_settings_permission():
@@ -27,14 +49,145 @@ def _accounting_settings_permission():
 		frappe.has_permission("Issue", "read")
 		or frappe.has_permission("Task", "read")
 		or frappe.has_permission("Accounting Receipt", "read")
+		or frappe.has_permission(MIS_DOCTYPE, "read")
 	):
 		frappe.throw(_("Not permitted"), frappe.PermissionError)
+
+
+def _can_read_mis():
+	return bool(frappe.has_permission(MIS_DOCTYPE, "read"))
 
 
 @frappe.whitelist()
 def get_accounting_settings():
 	"""Return Accounting SPA configuration for the frontend."""
-	return dc.get_settings(CONFIG, read_permission=_accounting_settings_permission)
+	settings = dc.get_settings(CONFIG, read_permission=_accounting_settings_permission)
+	settings["can_read_monthly_implementation_summary"] = 1 if _can_read_mis() else 0
+	return settings
+
+
+def _user_label(user):
+	if not user:
+		return ""
+	return get_fullname(user) or user
+
+
+def _user_images(users):
+	if not users:
+		return []
+	rows = frappe.get_all(
+		"User",
+		filters={"name": ("in", list(users))},
+		fields=["name", "user_image"],
+	)
+	by_name = {r.name: r.user_image for r in rows}
+	return [by_name.get(u) for u in users]
+
+
+def _mis_delta(total_hours, billable_hours):
+	"""Return non-billable hours and ratio of total (None when total is zero)."""
+	total = flt(total_hours)
+	billable = flt(billable_hours)
+	delta_hours = total - billable
+	delta_ratio = None if total == 0 else delta_hours / total
+	return delta_hours, delta_ratio
+
+
+def _serialize_mis_row(row, assignees=None, assignee_images=None):
+	if assignees is None:
+		assignees = _parse_assignees(row.get("_assign"))
+	total_hours = flt(row.get("total_hours"))
+	billable_hours = flt(row.get("billable_hours"))
+	delta_hours, delta_ratio = _mis_delta(total_hours, billable_hours)
+	name = row.get("name")
+	return {
+		"name": name,
+		"implementation": row.get("implementation"),
+		"status": row.get("status"),
+		"year": row.get("year"),
+		"month": row.get("month"),
+		"total_hours": total_hours,
+		"billable_hours": billable_hours,
+		"delta_hours": delta_hours,
+		"delta_ratio": delta_ratio,
+		"modified": row.get("modified"),
+		"assignees": assignees,
+		"assignee_names": [_user_label(u) for u in assignees],
+		"assignee_images": assignee_images if assignee_images is not None else _user_images(assignees),
+		"desk_url": f"/app/monthly-implementation-summary/{name}",
+	}
+
+
+def _require_mis_read():
+	frappe.has_permission(MIS_DOCTYPE, "read", throw=True)
+
+
+@frappe.whitelist()
+def get_monthly_implementation_summaries():
+	"""Return Monthly Implementation Summary rows the current user may read."""
+	_require_mis_read()
+
+	rows = frappe.get_list(
+		MIS_DOCTYPE,
+		fields=MIS_LIST_FIELDS,
+		order_by="modified desc",
+		limit_page_length=500,
+	)
+	return [_serialize_mis_row(r) for r in rows]
+
+
+@frappe.whitelist()
+def get_monthly_implementation_summary(name):
+	"""Return a single Monthly Implementation Summary for the SPA detail pane."""
+	_require_mis_read()
+	doc = frappe.get_doc(MIS_DOCTYPE, name)
+	doc.check_permission("read")
+
+	assignees = [a.get("owner") for a in get_assignments(MIS_DOCTYPE, doc.name)]
+	return _serialize_mis_row(
+		{
+			"name": doc.name,
+			"implementation": doc.implementation,
+			"status": doc.status,
+			"year": doc.year,
+			"month": doc.month,
+			"total_hours": doc.total_hours,
+			"billable_hours": doc.billable_hours,
+			"modified": doc.modified,
+		},
+		assignees=assignees,
+		assignee_images=_user_images(assignees),
+	)
+
+
+@frappe.whitelist(methods=["POST"])
+def set_monthly_implementation_summary_assignees(name, users=None):
+	"""Replace MIS assignees with the given user list."""
+	frappe.has_permission(MIS_DOCTYPE, "write", throw=True)
+	doc = frappe.get_doc(MIS_DOCTYPE, name)
+	doc.check_permission("write")
+
+	desired = set(_parse_list(users))
+	current = {a.get("owner") for a in get_assignments(MIS_DOCTYPE, name)}
+
+	for user in current - desired:
+		remove_assignment(MIS_DOCTYPE, name, user)
+
+	to_add = list(desired - current)
+	if to_add:
+		description = " · ".join(
+			part for part in (doc.implementation, doc.month, str(doc.year or "")) if part
+		)
+		add_assignment(
+			{
+				"doctype": MIS_DOCTYPE,
+				"name": name,
+				"assign_to": to_add,
+				"description": description or doc.name,
+			}
+		)
+
+	return get_monthly_implementation_summary(name)
 
 
 @frappe.whitelist()

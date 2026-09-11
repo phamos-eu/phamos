@@ -40,6 +40,22 @@
 import { computed } from "vue"
 import { Badge } from "frappe-ui"
 
+const DEFAULT_THEMES = {
+	Open: "red",
+	Replied: "blue",
+	"On Hold": "orange",
+	Resolved: "green",
+	Closed: "gray",
+}
+
+const DEFAULT_STRONG_CLASSES = {
+	Open: "bg-red-600 text-white dark:bg-red-500",
+	Replied: "bg-blue-600 text-white dark:bg-blue-500",
+	"On Hold": "bg-amber-500 text-white dark:bg-amber-500",
+	Resolved: "bg-green-600 text-white dark:bg-green-500",
+	Closed: "bg-gray-700 text-white dark:bg-gray-500",
+}
+
 const props = defineProps({
 	/** Currently selected status names (empty = all) */
 	modelValue: { type: Array, default: () => [] },
@@ -48,6 +64,10 @@ const props = defineProps({
 		type: Array,
 		default: () => ["Open", "Replied", "On Hold", "Resolved", "Closed"],
 	},
+	/** Optional frappe-ui Badge theme overrides keyed by status */
+	themes: { type: Object, default: null },
+	/** Optional selected-pill class overrides keyed by status */
+	strongClasses: { type: Object, default: null },
 })
 
 const emit = defineEmits(["update:modelValue"])
@@ -66,24 +86,12 @@ function toggle(status) {
 }
 
 function statusTheme(status) {
-	const map = {
-		Open: "red",
-		Replied: "blue",
-		"On Hold": "orange",
-		Resolved: "green",
-		Closed: "gray",
-	}
+	const map = props.themes || DEFAULT_THEMES
 	return map[status] || "blue"
 }
 
 function statusStrongClass(status) {
-	const map = {
-		Open: "bg-red-600 text-white dark:bg-red-500",
-		Replied: "bg-blue-600 text-white dark:bg-blue-500",
-		"On Hold": "bg-amber-500 text-white dark:bg-amber-500",
-		Resolved: "bg-green-600 text-white dark:bg-green-500",
-		Closed: "bg-gray-700 text-white dark:bg-gray-500",
-	}
+	const map = props.strongClasses || DEFAULT_STRONG_CLASSES
 	return map[status] || "bg-blue-600 text-white dark:bg-blue-500"
 }
 </script>

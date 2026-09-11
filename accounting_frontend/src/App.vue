@@ -11,14 +11,17 @@
 </template>
 
 <script setup>
-import { computed } from "vue"
+import { computed, onMounted, ref } from "vue"
 import { useRoute } from "vue-router"
+import { call } from "frappe-ui"
 import CockpitShell from "@spa/components/CockpitShell.vue"
 import CockpitSidebar from "@spa/components/CockpitSidebar.vue"
+import spaConfig from "./config"
 
 const route = useRoute()
+const canReadMis = ref(false)
 
-const navItems = [
+const baseNavItems = [
 	{
 		name: "Issues",
 		label: "Issues",
@@ -46,12 +49,27 @@ const navItems = [
 	{ name: "Receipts", label: "Receipts", icon: "file-text", match: ["Receipts", "ReceiptDetail"] },
 ]
 
+const misNavItem = {
+	name: "MisList",
+	label: "Monthly Implementation Summary",
+	icon: "calendar",
+	match: ["MisList", "MisDetail"],
+}
+
+const navItems = computed(() => {
+	if (!canReadMis.value) return baseNavItems
+	return [...baseNavItems, misNavItem]
+})
+
 const pageTitle = computed(() => {
 	if (route.name === "Tasks" || route.name === "TasksGantt" || route.name === "TaskDetail") {
 		return "Tasks"
 	}
 	if (route.name === "Checklists" || route.name === "ChecklistDetail") return "Checklists"
 	if (route.name === "Receipts" || route.name === "ReceiptDetail") return "Receipts"
+	if (route.name === "MisList" || route.name === "MisDetail") {
+		return "Monthly Implementation Summary"
+	}
 	return "Issues"
 })
 
@@ -68,9 +86,21 @@ const pageSubtitle = computed(() => {
 	if (route.name === "Receipts" || route.name === "ReceiptDetail") {
 		return "Accounting receipts — review, decide payment, send to DATEV"
 	}
+	if (route.name === "MisList" || route.name === "MisDetail") {
+		return "Monthly Implementation Summary records"
+	}
 	if (route.name === "IssuesList" || route.name === "IssueDetail") {
 		return "Accounting department issues"
 	}
 	return "Accounting department issues overview"
+})
+
+onMounted(async () => {
+	try {
+		const settings = await call(`${spaConfig.api}.${spaConfig.settingsMethod}`)
+		canReadMis.value = Boolean(settings?.can_read_monthly_implementation_summary)
+	} catch {
+		canReadMis.value = false
+	}
 })
 </script>
