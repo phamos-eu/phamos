@@ -19,6 +19,7 @@ def get_gitlab_issue_dashboard_data(projects=None, year=None, from_date=None, to
     touch_time = _format_touch_time_response(from_date, to_date, selected_projects, issue_scope, compare_to_company)
     cycle_time = _format_cycle_time_response(from_date, to_date, selected_projects, issue_scope, compare_to_company)
     open_now_total = _count_open_now(from_date, to_date, selected_projects, issue_scope)
+    lifetime_tickets = _build_lifetime_ticket_rows(from_date, to_date, selected_projects, issue_scope)
     company_monthly_flow = []
     company_aging = {}
 
@@ -42,6 +43,7 @@ def get_gitlab_issue_dashboard_data(projects=None, year=None, from_date=None, to
         "touch_time": touch_time,
         "cycle_time": cycle_time,
         "open_now_total": open_now_total,
+        "lifetime_tickets": lifetime_tickets,
     }
 
 
@@ -491,6 +493,143 @@ def _count_open_now(from_date, to_date, selected_projects, issue_scope="both"):
 	return int(row[0].total or 0) if row else 0
 
 
+def _build_lifetime_ticket_rows(from_date, to_date, selected_projects, issue_scope="both"):
+	conditions = ["1=1"]
+	params = {
+		"from_date": from_date,
+		"to_date": to_date,
+	}
+
+	if selected_projects:
+		conditions.append("gi.gitlab_project IN %(projects)s")
+		params["projects"] = tuple(selected_projects)
+
+	if issue_scope == "parent":
+		conditions.append("gi.parent_issue IS NULL")
+	elif issue_scope == "child":
+		conditions.append("gi.parent_issue IS NOT NULL")
+
+	project_filter_sql = " AND ".join(conditions)
+
+	rows = frappe.db.sql(
+		f"""
+		SELECT
+			gi.gitlab_project,
+			YEAR(gi.created_at) AS year_no,
+			MONTH(gi.created_at) AS month_no,
+			SUM(CASE WHEN gi.closed_at IS NULL OR DATE(gi.closed_at) > LAST_DAY(gi.created_at) THEN 1 ELSE 0 END) AS open_total,
+			SUM(CASE WHEN gi.closed_at IS NOT NULL AND DATE(gi.closed_at) <= LAST_DAY(gi.created_at) THEN 1 ELSE 0 END) AS closed_total
+		FROM `tabGitLab Issue` gi
+		WHERE gi.created_at IS NOT NULL
+		  AND DATE(gi.created_at) BETWEEN %(from_date)s AND %(to_date)s
+		  AND {project_filter_sql}
+		GROUP BY gi.gitlab_project, YEAR(gi.created_at), MONTH(gi.created_at)
+		""",
+		params,
+		as_dict=True,
+	)
+
+	totals_map = {
+		(row.gitlab_project, int(row.year_no), int(row.month_no)): (int(row.open_total or 0), int(row.closed_total or 0))
+		for row in rows
+		if row.year_no and row.month_no
+	}
+
+	project_names = selected_projects or sorted({row.gitlab_project for row in rows if row.gitlab_project})
+	months = _month_sequence(from_date, to_date)
+
+	lifetime_rows = []
+	for project in project_names:
+		for index, (year_no, month_no) in enumerate(months, start=1):
+			open_total, closed_total = totals_map.get((project, year_no, month_no), (0, 0))
+			lifetime_rows.append(
+				{
+					"gitlab_project": project,
+					"month_key": f"{year_no}-{month_no:02d}",
+					"year_no": year_no,
+					"month_no": month_no,
+					"month_order": index,
+					"month": f"{month_name[month_no]} {year_no}",
+					"open_total": open_total,
+					"closed_total": closed_total,
+				}
+			)
+
+	return lifetime_rows
+
+
+@frappe.whitelist()
+def get_lifetime_ticket_drilldown(projects=None, issue_scope=None, year=None, month=None, lifetime_state=None, start=0):
+	selected_projects = _normalize_projects(projects)
+	issue_scope = _normalize_issue_scope(issue_scope)
+	lifetime_state = (lifetime_state or "open").strip().lower() if isinstance(lifetime_state, str) else "open"
+	if lifetime_state not in ("open", "closed"):
+		lifetime_state = "open"
+	start = max(cint(start), 0)
+
+	conditions = [
+		"gi.created_at IS NOT NULL",
+		"YEAR(gi.created_at) = %(year)s",
+		"MONTH(gi.created_at) = %(month)s",
+	]
+	params = {"year": cint(year), "month": cint(month)}
+
+	if selected_projects:
+		conditions.append("gi.gitlab_project IN %(projects)s")
+		params["projects"] = tuple(selected_projects)
+
+	if issue_scope == "parent":
+		conditions.append("gi.parent_issue IS NULL")
+	elif issue_scope == "child":
+		conditions.append("gi.parent_issue IS NOT NULL")
+
+	if lifetime_state == "open":
+		conditions.append("(gi.closed_at IS NULL OR DATE(gi.closed_at) > LAST_DAY(gi.created_at))")
+	else:
+		conditions.append("gi.closed_at IS NOT NULL AND DATE(gi.closed_at) <= LAST_DAY(gi.created_at)")
+
+	where_sql = " AND ".join(conditions)
+
+	total = frappe.db.sql(
+		f"SELECT COUNT(*) AS total FROM `tabGitLab Issue` gi WHERE {where_sql}",
+		params,
+		as_dict=True,
+	)[0].total
+
+	rows = frappe.db.sql(
+		f"""
+		SELECT
+			gi.name,
+			gi.issue_id,
+			gi.title,
+			gi.state,
+			gi.gitlab_project,
+			gi.created_at,
+			gi.closed_at,
+			gi.assignee,
+			gi.issue_url,
+			DATEDIFF(DATE(gi.closed_at), DATE(gi.created_at)) AS lead_time_days
+		FROM `tabGitLab Issue` gi
+		WHERE {where_sql}
+		ORDER BY gi.created_at DESC
+		LIMIT {DRILLDOWN_ROW_LIMIT}
+		OFFSET {start}
+		""",
+		params,
+		as_dict=True,
+	)
+
+	project_titles = _get_project_titles(sorted({row.gitlab_project for row in rows if row.gitlab_project}))
+
+	return {
+		"total": int(total or 0),
+		"rows": rows,
+		"start": start,
+		"limit": DRILLDOWN_ROW_LIMIT,
+		"project_titles": project_titles,
+	}
+
+
 LEAD_TIME_ROLLING_PERIODS = {
     "last_month": 1,
     "last_3_months": 3,
@@ -556,9 +695,6 @@ def _build_lead_time_kpis(from_date, to_date, selected_projects, issue_scope="bo
 
 
 def _format_lead_time_response(from_date, to_date, selected_projects, issue_scope, compare_to_company):
-    """Mirrors _format_aging_response's mode pattern: a single project never gets
-    silently averaged with others, and Compare to Company reports the company's
-    own figure alongside the project's, rather than folding it into one number."""
     combined = _build_lead_time_kpis(from_date, to_date, selected_projects, issue_scope)
 
     if len(selected_projects) > 1:
@@ -711,11 +847,7 @@ def _build_cycle_time_kpis(from_date, to_date, selected_projects, issue_scope="b
     """Cycle Time = days from gi.cycle_time_started_at (the first Timesheet Record
     logged on/after the Cycle Time Trigger Label was set — see
     gitlab_utils.sync_cycle_time_start) to the last qualifying Timesheet Record
-    logged on the issue on/before it closed (see CYCLE_TIME_END_SUBQUERY_SQL),
-    falling back to closed_at itself if no such Timesheet Record is found.
-    Tickets where the trigger label was never set, or no qualifying Timesheet
-    Record exists, are excluded from the average — same exclusion pattern as
-    Touch Time."""
+    logged on the issue on/before it closed"""
     conditions = ["1=1"]
     params = {}
 
