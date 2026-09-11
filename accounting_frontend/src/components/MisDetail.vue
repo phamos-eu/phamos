@@ -92,7 +92,7 @@
 import { computed, nextTick, onMounted, ref, watch } from "vue"
 import { Badge } from "frappe-ui"
 import AssigneePicker from "@spa/components/AssigneePicker.vue"
-import { assigneeUsersFromRow } from "@spa/utils/avatar.js"
+import { assigneeUsersFromRow } from "../avatar.js"
 import {
 	formatDeltaPercent,
 	formatHours,

@@ -64,8 +64,8 @@
 
 <script setup>
 import { Badge } from "frappe-ui"
-import AvatarGroup from "@spa/components/AvatarGroup.vue"
-import { assigneeUsersFromRow } from "@spa/utils/avatar.js"
+import AvatarGroup from "./AvatarGroup.vue"
+import { assigneeUsersFromRow } from "../avatar.js"
 import {
 	MIS_LIST_FILTER_SUBGRID,
 	formatDeltaPercent,

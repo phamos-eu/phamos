@@ -10,11 +10,11 @@
 				:key="user.name"
 				class="inline-flex items-center gap-1 rounded-full bg-surface-gray-3 py-0.5 pl-1 pr-1 text-xs font-medium text-ink-gray-9"
 			>
-				<UserAvatar
+				<Avatar
 					size="xs"
-					:name="user.name"
+					shape="circle"
+					:image="user.user_image || undefined"
 					:label="user.full_name || user.name"
-					:image="user.user_image"
 				/>
 				<span class="pl-0.5">{{ user.full_name || user.name }}</span>
 				<button
@@ -41,11 +41,11 @@
 					:disabled="saving"
 					@click="addUser(user)"
 				>
-					<UserAvatar
+					<Avatar
 						size="xs"
-						:name="user.name"
+						shape="circle"
+						:image="user.user_image || undefined"
 						:label="user.full_name || user.name"
-						:image="user.user_image"
 					/>
 					<span>+ {{ user.full_name || user.name }}</span>
 				</button>
@@ -73,8 +73,7 @@
 
 <script setup>
 import { computed, nextTick, ref, watch } from "vue"
-import { Autocomplete, call, createResource, debounce, toast } from "frappe-ui"
-import UserAvatar from "@spa/components/UserAvatar.vue"
+import { Autocomplete, Avatar, call, createResource, debounce, toast } from "frappe-ui"
 
 const props = defineProps({
 	modelValue: { type: Array, default: () => [] },

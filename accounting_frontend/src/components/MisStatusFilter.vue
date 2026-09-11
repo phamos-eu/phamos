@@ -20,7 +20,7 @@
 			<span
 				v-if="isSelected(status)"
 				class="inline-flex h-5 items-center whitespace-nowrap rounded-full px-1.5 text-xs font-semibold"
-				:class="statusStrongClass(status)"
+				:class="MIS_STATUS_STRONG_CLASSES[status] || 'bg-blue-600 text-white'"
 			>
 				{{ status }}
 			</span>
@@ -28,7 +28,7 @@
 				v-else
 				class="whitespace-nowrap"
 				:label="status"
-				:theme="statusTheme(status)"
+				:theme="misStatusTheme(status)"
 				size="sm"
 				variant="subtle"
 			/>
@@ -39,15 +39,15 @@
 <script setup>
 import { computed } from "vue"
 import { Badge } from "frappe-ui"
+import {
+	MIS_STATUSES,
+	MIS_STATUS_STRONG_CLASSES,
+	misStatusTheme,
+} from "../misListColumns.js"
 
 const props = defineProps({
-	/** Currently selected status names (empty = all) */
 	modelValue: { type: Array, default: () => [] },
-	/** Available status names */
-	statuses: {
-		type: Array,
-		default: () => ["Open", "Replied", "On Hold", "Resolved", "Closed"],
-	},
+	statuses: { type: Array, default: () => MIS_STATUSES },
 })
 
 const emit = defineEmits(["update:modelValue"])
@@ -63,27 +63,5 @@ function toggle(status) {
 	if (next.has(status)) next.delete(status)
 	else next.add(status)
 	emit("update:modelValue", [...next])
-}
-
-function statusTheme(status) {
-	const map = {
-		Open: "red",
-		Replied: "blue",
-		"On Hold": "orange",
-		Resolved: "green",
-		Closed: "gray",
-	}
-	return map[status] || "blue"
-}
-
-function statusStrongClass(status) {
-	const map = {
-		Open: "bg-red-600 text-white dark:bg-red-500",
-		Replied: "bg-blue-600 text-white dark:bg-blue-500",
-		"On Hold": "bg-amber-500 text-white dark:bg-amber-500",
-		Resolved: "bg-green-600 text-white dark:bg-green-500",
-		Closed: "bg-gray-700 text-white dark:bg-gray-500",
-	}
-	return map[status] || "bg-blue-600 text-white dark:bg-blue-500"
 }
 </script>

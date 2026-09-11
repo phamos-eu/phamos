@@ -48,12 +48,7 @@
 						class="w-full min-w-0"
 					/>
 					<div class="flex min-w-0 justify-center">
-						<StatusFilter
-							v-model="statusFilter"
-							:statuses="MIS_STATUSES"
-							:themes="MIS_STATUS_THEMES"
-							:strong-classes="MIS_STATUS_STRONG_CLASSES"
-						/>
+						<MisStatusFilter v-model="statusFilter" :statuses="MIS_STATUSES" />
 					</div>
 					<div class="flex min-w-0 justify-center">
 						<ListSortSelector
@@ -134,19 +129,17 @@
 import { computed, onMounted, ref, watch } from "vue"
 import { useRoute, useRouter } from "vue-router"
 import { call } from "frappe-ui"
-import AssigneeFilter from "@spa/components/AssigneeFilter.vue"
+import AssigneeFilter from "../components/AssigneeFilter.vue"
 import ListSortSelector from "@spa/components/ListSortSelector.vue"
-import StatusFilter from "@spa/components/StatusFilter.vue"
-import { assigneeUsersFromRow } from "@spa/utils/avatar.js"
+import { assigneeUsersFromRow } from "../avatar.js"
 import MisDetail from "../components/MisDetail.vue"
 import MisList from "../components/MisList.vue"
+import MisStatusFilter from "../components/MisStatusFilter.vue"
 import {
 	MIS_LIST_FILTER_GRID,
 	MIS_LIST_FILTER_SUBGRID,
 	MIS_MONTHS,
 	MIS_STATUSES,
-	MIS_STATUS_STRONG_CLASSES,
-	MIS_STATUS_THEMES,
 } from "../misListColumns.js"
 import spaConfig from "@/config"
 

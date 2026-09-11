@@ -85,10 +85,10 @@ export function formatDeltaPercent(ratio) {
 }
 
 const MIS_DELTA_TEXT_CLASSES = {
-	green: "text-green-700 dark:text-green-400",
-	amber: "text-amber-700 dark:text-amber-400",
-	red: "text-red-700 dark:text-red-400",
-	gray: "text-ink-gray-6",
+	green: "text-green-800 dark:text-green-400",
+	amber: "text-amber-800 dark:text-amber-400",
+	red: "text-red-800 dark:text-red-400",
+	gray: "text-ink-gray-7",
 }
 
 export function misDeltaTextClass(ratio) {

@@ -23,7 +23,7 @@
 
 <script setup>
 import { computed } from "vue"
-import { getAvatarAbbr, getAvatarPalette } from "@spa/utils/avatar.js"
+import { getAvatarAbbr, getAvatarPalette } from "../avatar.js"
 
 const props = defineProps({
 	/** User id / email (optional; used for title fallback) */
@@ -70,35 +70,35 @@ const image = computed(() => (props.image || "").trim() || "")
 </script>
 
 <style>
-/* Desk espresso avatar tokens; dark via data-theme from spa theme sync */
+/* Light mode: stronger than Desk 50/100 tokens so initials read on white SPA surfaces */
 .avatar-desk-orange {
-	background-color: #fff1e7;
-	color: #d45a08;
+	background-color: #f7d6bd;
+	color: #bd3e0c;
 }
 .avatar-desk-pink {
-	background-color: #fff7fc;
-	color: #e34aa6;
+	background-color: #f8e2f0;
+	color: #9c2671;
 }
 .avatar-desk-blue {
-	background-color: #f7fbfd;
-	color: #0289f7;
+	background-color: #c9e7fc;
+	color: #0070cc;
 }
 .avatar-desk-green,
 .avatar-desk-dark-green {
-	background-color: #daf0e1;
+	background-color: #cae5d4;
 	color: #16794c;
 }
 .avatar-desk-red {
-	background-color: #fff7f7;
-	color: #e03636;
+	background-color: #fcd7d7;
+	color: #b52a2a;
 }
 .avatar-desk-yellow {
-	background-color: #fffcef;
-	color: #edba13;
+	background-color: #f7e9a8;
+	color: #ab6e05;
 }
 .avatar-desk-purple {
-	background-color: #fdfaff;
-	color: #9c45e3;
+	background-color: #f1e5fa;
+	color: #6e399d;
 }
 
 :root[data-theme="dark"] .avatar-desk-orange {
