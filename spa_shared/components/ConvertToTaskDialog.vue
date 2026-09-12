@@ -1,8 +1,8 @@
 <template>
 	<Dialog
 		:options="{
-			title: 'New Task',
-			size: '3xl',
+			title: 'Convert to Task',
+			size: '4xl',
 			actions: [
 				{
 					label: 'Cancel',
@@ -10,7 +10,7 @@
 					onClick: () => emit('update:modelValue', false),
 				},
 				{
-					label: saving ? 'Creating…' : 'Create',
+					label: saving ? 'Converting…' : 'Convert',
 					variant: 'solid',
 					loading: saving,
 					onClick: submit,
@@ -22,23 +22,29 @@
 	>
 		<template #body-content>
 			<div class="space-y-4">
+				<p class="text-sm text-ink-gray-6">
+					Creates a Task linked to
+					<span class="font-medium text-ink-gray-8">{{ issue?.name }}</span>,
+					moves checklists, and closes the Issue.
+				</p>
+
 				<FormControl
 					v-model="subject"
 					label="Subject"
 					type="text"
 					required
 					size="sm"
-					placeholder="e.g. Prepare onboarding checklist"
+					placeholder="Task subject"
 				/>
 
-				<div>
+				<div class="w-full">
 					<label class="mb-1.5 block text-xs text-ink-gray-5">Description</label>
 					<TextEditor
 						v-if="modelValue"
 						:content="description"
 						:fixed-menu="editorMenu"
 						placeholder="What needs to be done?"
-						editor-class="prose-sm dark:prose-invert min-h-[140px] max-h-[280px] overflow-y-auto px-3 py-2 border border-gray-300 rounded-lg bg-white dark:border-gray-600 dark:bg-gray-800"
+						editor-class="prose-sm dark:prose-invert max-w-none w-full min-h-[140px] max-h-[280px] overflow-y-auto px-3 py-2 border border-t-0 border-gray-300 rounded-b-lg bg-white dark:border-gray-600 dark:bg-gray-800"
 						@change="(html) => (description = html)"
 					/>
 				</div>
@@ -77,6 +83,19 @@
 						/>
 					</div>
 				</div>
+
+				<SchedulePreview
+					:start-date="expStartDate"
+					:end-date="expEndDate"
+					:subject="subject"
+					:api-prefix="API"
+				/>
+
+				<AssigneePicker
+					v-model="assignees"
+					:assignee-details="assigneeDetails"
+					:shortlist-users="options.shortlist_users || []"
+				/>
 				<ErrorMessage :message="error" />
 			</div>
 		</template>
@@ -86,23 +105,32 @@
 <script setup>
 import { computed, ref, watch } from "vue"
 import { call, DatePicker, TextEditor } from "frappe-ui"
+import AssigneePicker from "@spa/components/AssigneePicker.vue"
+import SchedulePreview from "@spa/components/SchedulePreview.vue"
 import { formatDate } from "@spa/utils/datetime.js"
 import spaConfig from "@/config"
 
 const props = defineProps({
 	modelValue: { type: Boolean, default: false },
+	issue: { type: Object, default: null },
 	options: {
 		type: Object,
 		default: () => ({
 			priorities: [],
 			projects: [],
+			shortlist_users: [],
 		}),
+	},
+	apiPrefix: {
+		type: String,
+		default: "",
 	},
 })
 
-const emit = defineEmits(["update:modelValue", "created"])
+const emit = defineEmits(["update:modelValue", "converted"])
 
-const API = spaConfig.api
+const API = computed(() => props.apiPrefix || spaConfig.api)
+const TASK_PRIORITIES = ["Low", "Medium", "High", "Urgent"]
 const editorMenu = [
 	"Paragraph",
 	"Heading 2",
@@ -122,12 +150,25 @@ const priority = ref("")
 const project = ref("")
 const expStartDate = ref("")
 const expEndDate = ref("")
+const assignees = ref([])
 const saving = ref(false)
 const error = ref("")
 
+const assigneeDetails = computed(() => {
+	const issue = props.issue || {}
+	const names = issue.assignees || []
+	const labels = issue.assignee_names || []
+	const images = issue.assignee_images || []
+	return names.map((name, i) => ({
+		name,
+		full_name: labels[i] || name,
+		user_image: images[i] || "",
+	}))
+})
+
 const priorityOptions = computed(() => [
 	{ label: "—", value: "" },
-	...(props.options.priorities || []).map((p) => ({ label: p, value: p })),
+	...TASK_PRIORITIES.map((p) => ({ label: p, value: p })),
 ])
 
 const projectOptions = computed(() => [
@@ -138,19 +179,26 @@ const projectOptions = computed(() => [
 	})),
 ])
 
+function mapIssuePriority(value) {
+	const raw = String(value || "").trim()
+	if (!raw) return TASK_PRIORITIES.includes("Medium") ? "Medium" : TASK_PRIORITIES[0] || ""
+	const exact = TASK_PRIORITIES.find((p) => p === raw || p.toLowerCase() === raw.toLowerCase())
+	return exact || (TASK_PRIORITIES.includes("Medium") ? "Medium" : TASK_PRIORITIES[0] || "")
+}
+
 watch(
 	() => props.modelValue,
 	(open) => {
 		if (!open) return
-		subject.value = ""
-		description.value = ""
+		const issue = props.issue || {}
+		subject.value = issue.subject || ""
+		description.value = issue.description || ""
+		project.value = issue.project || props.options[spaConfig.projectField] || ""
+		priority.value = mapIssuePriority(issue.priority)
+		assignees.value = [...(issue.assignees || [])]
 		expStartDate.value = ""
 		expEndDate.value = ""
 		error.value = ""
-		project.value =
-			props.options[spaConfig.projectField] || props.options.projects?.[0]?.name || ""
-		const priorities = props.options.priorities || []
-		priority.value = priorities.includes("Medium") ? "Medium" : priorities[0] || ""
 	}
 )
 
@@ -167,23 +215,43 @@ function isEmptyHtml(html) {
 async function submit() {
 	if (saving.value) return
 	error.value = ""
+	if (!props.issue?.name) {
+		error.value = "Issue is required"
+		return
+	}
 	if (!subject.value.trim()) {
 		error.value = "Subject is required"
 		return
 	}
+	if (!expStartDate.value || !expEndDate.value) {
+		error.value = "Expected start and end dates are required"
+		return
+	}
+	if (String(expEndDate.value) < String(expStartDate.value)) {
+		error.value = "Expected end date cannot be before start date"
+		return
+	}
+	if (!(assignees.value || []).length) {
+		error.value = "At least one assignee is required"
+		return
+	}
+
 	saving.value = true
 	try {
-		const task = await call(`${API}.create_task`, {
+		const result = await call(`${API.value}.create_task_from_issue`, {
+			issue_name: props.issue.name,
 			subject: subject.value.trim(),
 			description: isEmptyHtml(description.value) ? "" : description.value,
 			priority: priority.value || null,
 			project: project.value || null,
-			exp_start_date: expStartDate.value || null,
-			exp_end_date: expEndDate.value || null,
+			exp_start_date: expStartDate.value,
+			exp_end_date: expEndDate.value,
+			assignees: assignees.value,
 		})
-		emit("created", task)
+		emit("converted", result)
+		emit("update:modelValue", false)
 	} catch (e) {
-		error.value = e?.messages?.[0] || e?.message || "Could not create task"
+		error.value = e?.messages?.[0] || e?.message || "Could not convert to task"
 	} finally {
 		saving.value = false
 	}

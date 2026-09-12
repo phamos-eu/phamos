@@ -108,6 +108,7 @@
 				:api-prefix="API"
 				@close="closeIssue"
 				@updated="onIssueUpdated"
+				@converted="onIssueConverted"
 			/>
 		</aside>
 
@@ -127,6 +128,7 @@
 				document="Issue"
 				:reference-record="selectedIssue.name"
 				:reference-title="selectedIssue.subject"
+				:allow-create="selectedIssue.status !== 'Closed'"
 			/>
 		</aside>
 
@@ -277,6 +279,11 @@ async function onCreated(issue) {
 
 async function onIssueUpdated(issue) {
 	selectedIssue.value = issue
+	await loadInbox()
+}
+
+async function onIssueConverted(result) {
+	if (result?.issue) selectedIssue.value = result.issue
 	await loadInbox()
 }
 

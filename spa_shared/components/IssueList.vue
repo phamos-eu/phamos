@@ -81,6 +81,14 @@
 						{{ issue.name }}
 					</span>
 					<Badge
+						v-if="issue.converted_task"
+						class="whitespace-nowrap"
+						:label="`Task ${issue.converted_task}`"
+						theme="gray"
+						size="sm"
+						variant="subtle"
+					/>
+					<Badge
 						class="whitespace-nowrap"
 						:label="issue.status"
 						:theme="statusTheme(issue.status)"
@@ -194,6 +202,7 @@ function assigneeLabel(issue) {
 
 function metaParts(issue) {
 	const parts = []
+	if (issue.converted_task) parts.push(`Task ${issue.converted_task}`)
 	if (issue.issue_type) parts.push(issue.issue_type)
 	if (props.showCreator) parts.push(`created by ${issue.owner_name || issue.owner}`)
 	parts.push(assigneeLabel(issue))

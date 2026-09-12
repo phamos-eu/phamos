@@ -57,6 +57,7 @@ TASK_LIST_FIELDS = [
 ]
 
 TASK_KANBAN_STATUSES = ("Open", "Working", "Pending Review", "Overdue", "Completed")
+TASK_PRIORITIES = ("Low", "Medium", "High", "Urgent")
 
 
 @dataclass(frozen=True)
@@ -282,7 +283,9 @@ def get_inbox(config: CockpitConfig, view="assigned", include_closed=0):
 			limit_page_length=200,
 		)
 
-	return enrich_issue_rows_for_search(rows)
+	serialized = enrich_issue_rows_for_search(rows)
+	_attach_converted_tasks(serialized)
+	return serialized
 
 
 def get_issues(config: CockpitConfig, include_closed=0):
@@ -304,7 +307,59 @@ def get_issues(config: CockpitConfig, include_closed=0):
 		order_by="modified desc",
 		limit_page_length=200,
 	)
-	return enrich_issue_rows_for_search(rows)
+	serialized = enrich_issue_rows_for_search(rows)
+	_attach_converted_tasks(serialized)
+	return serialized
+
+
+def _attach_converted_tasks(rows):
+	"""Attach converted_task name when a Task.issue link exists."""
+	names = [r.get("name") for r in rows if r.get("name")]
+	if not names:
+		return
+	linked = frappe.get_all(
+		"Task",
+		filters={"issue": ("in", names)},
+		fields=["name", "issue"],
+		order_by="creation asc",
+	)
+	by_issue = {}
+	for row in linked:
+		# Prefer the earliest Task if duplicates exist.
+		by_issue.setdefault(row.issue, row.name)
+	for row in rows:
+		row["converted_task"] = by_issue.get(row.get("name"))
+
+
+def _converted_task_for_issue(issue_name):
+	if not issue_name:
+		return None
+	rows = frappe.get_all(
+		"Task",
+		filters={"issue": issue_name},
+		pluck="name",
+		order_by="creation asc",
+		limit_page_length=1,
+	)
+	return rows[0] if rows else None
+
+
+def _normalize_task_priority(priority):
+	"""Map Issue Priority (Link or string) onto Task Select options."""
+	if priority is None or priority == "":
+		return None
+	value = str(priority).strip()
+	if value in TASK_PRIORITIES:
+		return value
+	lower = value.lower()
+	for option in TASK_PRIORITIES:
+		if option.lower() == lower:
+			return option
+	frappe.throw(
+		_("Priority {0} is not valid for Task. Use one of: {1}.").format(
+			value, ", ".join(TASK_PRIORITIES)
+		)
+	)
 
 
 def _user_images(users):
@@ -341,6 +396,7 @@ def _serialize_issue_detail(doc):
 		"assignees": assignees,
 		"assignee_names": [_user_label(u) for u in assignees],
 		"assignee_images": _user_images(assignees),
+		"converted_task": _converted_task_for_issue(doc.name),
 		"desk_url": f"/app/issue/{doc.name}",
 	}
 
@@ -547,6 +603,18 @@ def get_task(config: CockpitConfig, name):
 		frappe.throw(_("This task is not in the {0} department.").format(config.label))
 
 	assignees = [a.get("owner") for a in get_assignments("Task", doc.name)]
+	issue_name = doc.issue or None
+	issue_has_chat = False
+	if issue_name:
+		try:
+			from phamos.api.issue_raven import find_issue_channel, get_chat_feature_flags
+
+			flags = get_chat_feature_flags()
+			if flags.get("enabled") and find_issue_channel(issue_name):
+				issue_has_chat = True
+		except Exception:
+			issue_has_chat = False
+
 	return {
 		"name": doc.name,
 		"subject": doc.subject,
@@ -555,6 +623,8 @@ def get_task(config: CockpitConfig, name):
 		"priority": doc.priority,
 		"project": doc.project,
 		"department": doc.department,
+		"issue": issue_name,
+		"issue_has_chat": issue_has_chat,
 		"exp_start_date": doc.exp_start_date,
 		"exp_end_date": doc.exp_end_date,
 		"progress": doc.progress or 0,
@@ -715,6 +785,142 @@ def create_task(
 		doc.exp_end_date = exp_end_date
 	doc.insert()
 	return get_task(config, doc.name)
+
+
+def _reparent_issue_checklists(issue_name, task_name):
+	"""Move Checklists linked to the Issue onto the new Task."""
+	checklist_names = frappe.get_all(
+		"Checklist",
+		filters={"document": "Issue", "reference_record": issue_name},
+		pluck="name",
+	)
+	for checklist_name in checklist_names:
+		if not frappe.has_permission("Checklist", "write", doc=checklist_name):
+			frappe.throw(
+				_("Cannot move Checklist {0}: write permission required.").format(checklist_name)
+			)
+		checklist = frappe.get_doc("Checklist", checklist_name)
+		checklist.document = "Task"
+		checklist.reference_record = task_name
+		checklist.save()
+
+
+def _post_convert_raven_message(issue_name, task_name):
+	"""Best-effort note on the Issue Raven channel when converting."""
+	try:
+		from phamos.api.issue_raven import post_issue_converted_to_task_message
+
+		post_issue_converted_to_task_message(issue_name, task_name)
+	except Exception:
+		frappe.log_error(
+			frappe.get_traceback(),
+			f"Failed to post convert message for {issue_name} → {task_name}",
+		)
+
+
+def create_task_from_issue(
+	config: CockpitConfig,
+	issue_name,
+	exp_start_date,
+	exp_end_date,
+	assignees=None,
+	subject=None,
+	description=None,
+	priority=None,
+	project=None,
+):
+	"""Hand off an Issue to a Task: create Task, reparent checklists, close Issue."""
+	frappe.has_permission("Task", "create", throw=True)
+	frappe.has_permission("Issue", "write", throw=True)
+	configured_department = _require_department(config)
+
+	issue_name = (issue_name or "").strip()
+	if not issue_name:
+		frappe.throw(_("Issue is required"))
+
+	issue_detail = get_issue(config, issue_name)
+	existing = _converted_task_for_issue(issue_name)
+	if existing:
+		frappe.throw(_("This Issue was already converted to Task {0}.").format(existing))
+
+	exp_start_date = (exp_start_date or "").strip()
+	exp_end_date = (exp_end_date or "").strip()
+	if not exp_start_date or not exp_end_date:
+		frappe.throw(_("Expected start and end dates are required"))
+	if exp_end_date < exp_start_date:
+		frappe.throw(_("Expected end date cannot be before start date"))
+
+	assignee_list = _parse_list(assignees)
+	if not assignee_list:
+		frappe.throw(_("At least one assignee is required"))
+
+	subject = (subject if subject is not None else issue_detail.get("subject") or "").strip()
+	if not subject:
+		frappe.throw(_("Subject is required"))
+
+	if description is None:
+		description = issue_detail.get("description") or ""
+
+	raw_priority = issue_detail.get("priority") if priority is None else priority
+	priority = _normalize_task_priority(raw_priority)
+
+	if project is None:
+		project = issue_detail.get("project")
+	if project:
+		validate_project(config, project)
+	else:
+		project = _get_project(config)
+
+	# Task.department is stock; Issue may only be in scope via project.
+	department = configured_department
+
+	doc = frappe.get_doc(
+		{
+			"doctype": "Task",
+			"subject": subject,
+			"status": "Open",
+			"department": department,
+			"project": project,
+			"issue": issue_name,
+			"exp_start_date": exp_start_date,
+			"exp_end_date": exp_end_date,
+		}
+	)
+	if description:
+		doc.description = description
+	if priority:
+		doc.priority = priority
+	doc.insert()
+
+	# Re-check after insert to reduce duplicate converts under concurrency.
+	existing = frappe.get_all(
+		"Task",
+		filters={"issue": issue_name, "name": ("!=", doc.name)},
+		pluck="name",
+		order_by="creation asc",
+		limit_page_length=1,
+	)
+	if existing:
+		frappe.throw(_("This Issue was already converted to Task {0}.").format(existing[0]))
+
+	set_task_assignees(config, doc.name, users=assignee_list)
+	_reparent_issue_checklists(issue_name, doc.name)
+
+	issue_doc = frappe.get_doc("Issue", issue_name)
+	issue_doc.check_permission("write")
+	issue_doc.status = "Closed"
+	issue_doc.save()
+	issue_doc.add_comment(
+		"Info",
+		_("Converted to Task {0}").format(frappe.utils.get_link_to_form("Task", doc.name)),
+	)
+
+	_post_convert_raven_message(issue_name, doc.name)
+
+	return {
+		"task": get_task(config, doc.name),
+		"issue": get_issue(config, issue_name),
+	}
 
 
 def update_task(config: CockpitConfig, name, **fields):

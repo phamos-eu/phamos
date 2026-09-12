@@ -9,6 +9,24 @@
 					{{ task.owner_name || task.owner || "—" }}
 					<span v-if="task.department"> · {{ task.department }}</span>
 				</div>
+				<div v-if="task.issue" class="mt-2 flex flex-wrap items-center gap-2 text-xs">
+					<span class="text-ink-gray-5">From Issue</span>
+					<button
+						type="button"
+						class="font-medium text-ink-gray-9 underline-offset-2 hover:underline"
+						@click="goToSourceIssue"
+					>
+						{{ task.issue }}
+					</button>
+					<Button
+						v-if="task.issue_has_chat"
+						size="sm"
+						variant="subtle"
+						@click="goToSourceIssue"
+					>
+						Open source Issue
+					</Button>
+				</div>
 			</div>
 			<div class="flex items-center gap-2">
 				<Button variant="subtle" :link="task.desk_url">Open in Desk</Button>
@@ -64,11 +82,21 @@
 					/>
 					<div>
 						<label class="mb-1.5 block text-xs text-ink-gray-5">Expected start</label>
-						<DatePicker v-model="expStartDate" placeholder="Start date" class="w-full" />
+						<DatePicker
+							v-model="expStartDate"
+							placeholder="Start date"
+							class="w-full"
+							:formatter="formatDate"
+						/>
 					</div>
 					<div>
 						<label class="mb-1.5 block text-xs text-ink-gray-5">Expected end</label>
-						<DatePicker v-model="expEndDate" placeholder="End date" class="w-full" />
+						<DatePicker
+							v-model="expEndDate"
+							placeholder="End date"
+							class="w-full"
+							:formatter="formatDate"
+						/>
 					</div>
 					<FormControl
 						v-model="progress"
@@ -108,9 +136,11 @@
 
 <script setup>
 import { computed, ref, watch } from "vue"
+import { useRouter } from "vue-router"
 import { call, DatePicker, TextEditor, toast } from "frappe-ui"
 import AssigneePicker from "@spa/components/AssigneePicker.vue"
 import LinkedChecklistsSection from "@spa/components/LinkedChecklistsSection.vue"
+import { formatDate } from "@spa/utils/datetime.js"
 import spaConfig from "@/config"
 
 const props = defineProps({
@@ -127,6 +157,7 @@ const props = defineProps({
 
 const emit = defineEmits(["close", "updated"])
 
+const router = useRouter()
 const API = computed(() => props.apiPrefix || spaConfig.api)
 const statuses = ["Open", "Working", "Pending Review", "Overdue", "Completed"]
 const editorMenu = [
@@ -253,5 +284,11 @@ async function saveFields() {
 function onAssigneesUpdated(updated) {
 	assignees.value = [...(updated.assignees || [])]
 	emit("updated", updated)
+}
+
+function goToSourceIssue() {
+	const name = props.task.issue
+	if (!name) return
+	router.push({ name: "IssueDetail", params: { name } })
 }
 </script>
