@@ -31,9 +31,9 @@
 		>
 			<div class="relative" :style="{ width: `${timeline.totalWidth + LABEL_WIDTH}px`, minWidth: '100%' }">
 				<!-- Header -->
-				<div class="sticky top-0 z-[1] flex border-b border-outline-gray-2 bg-surface-gray-1">
+				<div class="sticky top-0 z-[2] flex border-b border-outline-gray-2 bg-surface-gray-1">
 					<div
-						class="flex-shrink-0 border-r border-outline-gray-2 px-2 py-1 text-[10px] font-medium uppercase tracking-wide text-ink-gray-5"
+						class="sticky left-0 z-[4] flex-shrink-0 border-r border-outline-gray-2 bg-surface-gray-1 px-2 py-1 text-[10px] font-medium uppercase tracking-wide text-ink-gray-5"
 						:style="{ width: `${LABEL_WIDTH}px` }"
 					>
 						Tasks
@@ -69,11 +69,12 @@
 					v-for="row in rows"
 					:key="row.id"
 					class="flex border-b border-outline-gray-1 last:border-b-0"
-					:class="row.isFocus ? 'bg-surface-blue-1' : ''"
+					:class="row.isFocus ? 'bg-surface-blue-1' : 'bg-surface-white'"
 					:style="{ height: `${ROW_HEIGHT}px` }"
 				>
 					<div
-						class="flex flex-shrink-0 items-center border-r border-outline-gray-2 px-2 text-xs"
+						class="sticky left-0 z-[3] flex flex-shrink-0 items-center border-r border-outline-gray-2 px-2 text-xs"
+						:class="row.isFocus ? 'bg-surface-blue-1' : 'bg-surface-white'"
 						:style="{ width: `${LABEL_WIDTH}px` }"
 						:title="row.name"
 					>
@@ -113,7 +114,7 @@
 
 				<svg
 					v-if="dependencyArrows.length"
-					class="pointer-events-none absolute left-0 top-0 z-[2] text-ink-green-2"
+					class="pointer-events-none absolute left-0 top-0 z-[1] text-ink-green-2"
 					:width="timeline.totalWidth + LABEL_WIDTH"
 					:height="HEADER_HEIGHT + rows.length * ROW_HEIGHT"
 					aria-hidden="true"
