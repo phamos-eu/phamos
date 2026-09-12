@@ -92,9 +92,9 @@ export function formatDate(value) {
 	if (parts.length < 3) return str
 	let y, mo, dd
 	if (parts[0].length === 4) {
-		[y, mo, dd] = parts
+		;[y, mo, dd] = parts
 	} else {
-		[dd, mo, y] = parts
+		;[dd, mo, y] = parts
 	}
 	const dateFormat = getDateFormat()
 	return dateFormat.replace("dd", pad(dd)).replace("mm", pad(mo)).replace("yyyy", y)

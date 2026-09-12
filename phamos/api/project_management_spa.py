@@ -231,6 +231,33 @@ def create_task(
 
 
 @frappe.whitelist(methods=["POST"])
+def create_task_from_issue(
+	issue_name,
+	exp_start_date,
+	exp_end_date,
+	assignees=None,
+	subject=None,
+	description=None,
+	priority=None,
+	project=None,
+	depends_on=None,
+):
+	"""Convert an Issue into a Task (Project Management cockpit hand-off)."""
+	return dc.create_task_from_issue(
+		CONFIG,
+		issue_name,
+		exp_start_date=exp_start_date,
+		exp_end_date=exp_end_date,
+		assignees=assignees,
+		subject=subject,
+		description=description,
+		priority=priority,
+		project=project,
+		depends_on=depends_on,
+	)
+
+
+@frappe.whitelist(methods=["POST"])
 def add_task_dependency(name, depends_on):
 	"""Add a predecessor dependency to a Task (Gantt link mode)."""
 	return dc.add_task_dependency(CONFIG, name, depends_on)

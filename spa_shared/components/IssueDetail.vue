@@ -2,11 +2,12 @@
 	<div class="flex h-full min-h-0 w-full flex-1 flex-col overflow-hidden p-5 text-gray-900 dark:text-gray-100">
 		<section class="flex min-h-[50%] flex-1 flex-col">
 			<label class="mb-1.5 block flex-shrink-0 text-xs text-ink-gray-5">Description</label>
-			<div class="flex min-h-0 flex-1 flex-col">
+			<div class="flex min-h-0 flex-1 flex-col" :class="{ 'pointer-events-none opacity-80': isClosed }">
 				<TextEditor
 					class="flex h-full min-h-0 flex-1 flex-col [&]:h-full [&_.ProseMirror]:min-h-full [&_.ProseMirror]:flex-1 [&_.ProseMirror]:overflow-y-auto"
 					:content="description"
-					:fixed-menu="editorMenu"
+					:editable="!isClosed"
+					:fixed-menu="isClosed ? false : editorMenu"
 					placeholder="What needs to be discussed or resolved?"
 					editor-class="prose-sm dark:prose-invert max-w-none w-full min-h-full flex-1 px-3 py-2 border border-t-0 border-gray-300 rounded-b-lg bg-white dark:border-gray-600 dark:bg-gray-800"
 					@change="(html) => (description = html)"
@@ -20,7 +21,7 @@
 		<div class="flex min-w-0 items-center gap-0 pr-3 text-base tracking-tight">
 			<span class="flex-shrink-0 font-normal text-gray-500 dark:text-gray-400">{{ issue.name }}:</span>
 			<input
-				v-if="editingSubject"
+				v-if="editingSubject && !isClosed"
 				ref="subjectInput"
 				v-model="subject"
 				type="text"
@@ -33,7 +34,8 @@
 			<button
 				v-else
 				type="button"
-				class="ml-1.5 min-w-0 flex-1 truncate rounded-sm text-left font-bold text-gray-900 hover:bg-gray-50 dark:text-gray-100 dark:hover:bg-gray-800/60"
+				class="ml-1.5 min-w-0 flex-1 truncate rounded-sm text-left font-bold text-gray-900 dark:text-gray-100"
+				:class="isClosed ? 'cursor-default' : 'hover:bg-gray-50 dark:hover:bg-gray-800/60'"
 				@click="startEditSubject"
 			>
 				{{ subject.trim() || "Untitled" }}
@@ -78,16 +80,6 @@
 							/>
 						</button>
 					</div>
-					<Button
-						v-if="status === 'Closed'"
-						class="mt-2"
-						variant="ghost"
-						size="sm"
-						:disabled="savingStatus"
-						@click="changeStatus('Open')"
-					>
-						Reopen
-					</Button>
 				</section>
 
 				<section class="space-y-3">
@@ -96,6 +88,7 @@
 						label="Priority"
 						type="select"
 						size="sm"
+						:disabled="isClosed"
 						:options="priorityOptions"
 					/>
 					<FormControl
@@ -103,6 +96,7 @@
 						label="Issue Type"
 						type="select"
 						size="sm"
+						:disabled="isClosed"
 						:options="issueTypeOptions"
 					/>
 					<FormControl
@@ -110,6 +104,7 @@
 						label="Project"
 						type="select"
 						size="sm"
+						:disabled="isClosed"
 						:options="projectOptions"
 					/>
 				</section>
@@ -121,6 +116,7 @@
 						:shortlist-users="options.shortlist_users || []"
 						:api-prefix="API"
 						:document-name="issue.name"
+						:readonly="isClosed"
 						method-name="set_assignees"
 						@updated="onAssigneesUpdated"
 					/>
@@ -128,6 +124,29 @@
 			</div>
 
 			<div class="mt-auto flex-shrink-0 space-y-2 border-t border-outline-gray-2 p-4">
+				<div
+					v-if="issue.converted_task"
+					class="rounded-md border border-outline-gray-2 bg-surface-gray-1 px-3 py-2 text-sm"
+				>
+					<div class="text-[11px] font-semibold uppercase tracking-wide text-ink-gray-6">
+						Converted
+					</div>
+					<button
+						type="button"
+						class="mt-1 font-medium text-ink-gray-9 hover:underline"
+						@click="goToConvertedTask"
+					>
+						Open {{ issue.converted_task }}
+					</button>
+				</div>
+				<Button
+					v-else-if="!isClosed"
+					class="w-full"
+					variant="solid"
+					@click="showConvert = true"
+				>
+					Convert to Task
+				</Button>
 				<p class="text-xs text-ink-gray-6">
 					Created by {{ issue.owner_name || issue.owner }}
 					<span v-if="issue.department"> · {{ issue.department }}</span>
@@ -142,12 +161,92 @@
 			</div>
 		</div>
 	</Teleport>
+
+	<ConvertToTaskDialog
+		v-model="showConvert"
+		:issue="issue"
+		:options="options"
+		:api-prefix="API"
+		@converted="onConverted"
+	/>
+
+	<Dialog
+		v-model="showPostConvertChoice"
+		:options="{
+			title: 'Converted to Task',
+			size: '3xl',
+			actions: [
+				{
+					label: 'Issue list',
+					variant: 'subtle',
+					onClick: goToIssueListAfterConvert,
+				},
+				{
+					label: 'Open Task Gantt',
+					variant: 'solid',
+					onClick: goToTaskAfterConvert,
+				},
+			],
+		}"
+	>
+		<template #body-content>
+			<div class="space-y-4">
+				<p class="text-sm text-ink-gray-7">
+					Issue
+					<span class="font-medium text-ink-gray-9">{{ issue.name }}</span>
+					is now Task
+					<span class="font-semibold text-ink-gray-9">{{ postConvertTaskName }}</span>.
+					Where do you want to go next?
+				</p>
+				<SchedulePreview
+					v-if="showPostConvertChoice && postConvertTaskName"
+					:highlight-task-id="postConvertTaskName"
+					:api-prefix="API"
+					@open="goToTaskAfterConvert"
+				/>
+			</div>
+		</template>
+	</Dialog>
+
+	<Dialog
+		v-model="showConvertedNotice"
+		:options="{
+			title: 'Issue converted to Task',
+			size: '3xl',
+			actions: [],
+		}"
+	>
+		<template #body-content>
+			<div class="space-y-4">
+				<p class="text-sm text-ink-gray-7">
+					This Issue was converted to Task
+					<button
+						type="button"
+						class="font-semibold text-ink-gray-9 underline-offset-2 hover:underline"
+						@click="openConvertedFromNotice"
+					>
+						{{ issue.converted_task }}
+					</button>
+					and is now closed. Fields are read-only while the Issue stays Closed.
+				</p>
+				<SchedulePreview
+					v-if="showConvertedNotice && issue.converted_task"
+					:highlight-task-id="issue.converted_task"
+					:api-prefix="API"
+					@open="openConvertedFromNotice"
+				/>
+			</div>
+		</template>
+	</Dialog>
 </template>
 
 <script setup>
 import { computed, nextTick, onMounted, onBeforeUnmount, ref, watch } from "vue"
-import { call, debounce, TextEditor, toast, Badge } from "frappe-ui"
+import { useRouter } from "vue-router"
+import { call, debounce, Dialog, TextEditor, toast, Badge } from "frappe-ui"
 import AssigneePicker from "@spa/components/AssigneePicker.vue"
+import ConvertToTaskDialog from "@spa/components/ConvertToTaskDialog.vue"
+import SchedulePreview from "@spa/components/SchedulePreview.vue"
 import { setPageChromeActive } from "@spa/pageChrome.js"
 import spaConfig from "@/config"
 
@@ -168,11 +267,17 @@ const props = defineProps({
 	},
 })
 
-const emit = defineEmits(["close", "updated"])
+const emit = defineEmits(["close", "updated", "converted"])
 
+const router = useRouter()
 const API = computed(() => props.apiPrefix || spaConfig.api)
 const propertiesHostReady = ref(false)
 const chromeHostReady = ref(false)
+const showConvert = ref(false)
+const showConvertedNotice = ref(false)
+const showPostConvertChoice = ref(false)
+const postConvertTaskName = ref("")
+const isClosed = computed(() => (status.value || props.issue.status) === "Closed")
 const editorMenu = [
 	"Paragraph",
 	"Heading 2",
@@ -227,6 +332,7 @@ const subjectInput = ref(null)
 const subjectBeforeEdit = ref("")
 
 async function startEditSubject() {
+	if (isClosed.value) return
 	subjectBeforeEdit.value = subject.value
 	editingSubject.value = true
 	await nextTick()
@@ -309,6 +415,24 @@ watch(
 	{ deep: true }
 )
 
+watch(
+	() => props.issue?.name,
+	() => {
+		const issue = props.issue
+		// Skip reopen notice while the post-convert destination prompt is open.
+		if (showPostConvertChoice.value) {
+			showConvertedNotice.value = false
+			return
+		}
+		if (issue?.converted_task && issue.status === "Closed") {
+			showConvertedNotice.value = true
+		} else {
+			showConvertedNotice.value = false
+		}
+	},
+	{ immediate: true }
+)
+
 function isEmptyHtml(html) {
 	if (!html) return true
 	const text = String(html)
@@ -335,7 +459,7 @@ function fieldsDirty() {
 }
 
 async function saveFields() {
-	if (syncing.value || savingFields.value) return
+	if (syncing.value || savingFields.value || isClosed.value) return
 	if (!subject.value.trim()) {
 		fieldError.value = "Subject is required"
 		return
@@ -367,7 +491,7 @@ const scheduleSave = debounce(() => {
 }, 500)
 
 watch([subject, description, priority, issueType, project], () => {
-	if (syncing.value) return
+	if (syncing.value || isClosed.value) return
 	scheduleSave()
 })
 
@@ -391,5 +515,38 @@ async function changeStatus(next) {
 function onAssigneesUpdated(updated) {
 	assignees.value = [...(updated.assignees || [])]
 	emit("updated", updated)
+}
+
+function goToConvertedTask() {
+	const name = props.issue.converted_task || postConvertTaskName.value
+	if (!name) return
+	router.push({ name: "TaskDetail", params: { name } })
+}
+
+function openConvertedFromNotice() {
+	showConvertedNotice.value = false
+	goToConvertedTask()
+}
+
+function goToTaskAfterConvert() {
+	const name = postConvertTaskName.value
+	showPostConvertChoice.value = false
+	if (!name) return
+	router.push({ name: "TaskDetail", params: { name } })
+}
+
+function goToIssueListAfterConvert() {
+	showPostConvertChoice.value = false
+	postConvertTaskName.value = ""
+	emit("close")
+}
+
+function onConverted(result) {
+	const task = result?.task
+	postConvertTaskName.value = task?.name || ""
+	showConvertedNotice.value = false
+	showPostConvertChoice.value = true
+	emit("converted", result)
+	toast.success(task?.name ? `Converted to ${task.name}` : "Converted to Task")
 }
 </script>

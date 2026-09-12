@@ -59,11 +59,12 @@
 			</div>
 		</div>
 
-		<div class="mt-3">
+		<div v-if="allowCreate" class="mt-3">
 			<Button size="sm" @click="showCreate = true">New checklist</Button>
 		</div>
 
 		<CreateChecklistDialog
+			v-if="allowCreate"
 			v-model="showCreate"
 			:document="document"
 			:reference-record="referenceRecord"
@@ -83,6 +84,7 @@ const props = defineProps({
 	document: { type: String, required: true },
 	referenceRecord: { type: String, required: true },
 	referenceTitle: { type: String, default: "" },
+	allowCreate: { type: Boolean, default: true },
 })
 
 const API = "phamos.api.checklist_inbox"

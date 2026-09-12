@@ -1,13 +1,23 @@
 <template>
 	<div class="flex h-full min-h-0 flex-col">
 		<header
-			class="flex flex-shrink-0 items-start justify-between gap-4 border-b border-gray-200 px-5 py-4 dark:border-gray-800"
+			class="flex flex-shrink-0 items-start justify-between gap-4 border-b border-outline-gray-2 px-5 py-4"
 		>
 			<div class="min-w-0 flex-1">
-				<div class="mb-1 text-xs font-semibold text-gray-500 dark:text-gray-400">{{ task.name }}</div>
-				<div class="text-xs text-gray-500 dark:text-gray-400">
+				<div class="mb-1 text-xs font-semibold text-ink-gray-5">{{ task.name }}</div>
+				<div class="text-xs text-ink-gray-5">
 					{{ task.owner_name || task.owner || "—" }}
 					<span v-if="task.department"> · {{ task.department }}</span>
+				</div>
+				<div v-if="task.issue" class="mt-2 flex flex-wrap items-center gap-2 text-xs">
+					<span class="text-ink-gray-5">From Issue</span>
+					<button
+						type="button"
+						class="font-medium text-ink-gray-9 underline-offset-2 hover:underline"
+						@click="goToSourceIssue"
+					>
+						{{ task.issue }}
+					</button>
 				</div>
 			</div>
 			<div class="flex items-center gap-2">
@@ -16,9 +26,9 @@
 			</div>
 		</header>
 
-		<div class="flex-1 space-y-5 overflow-y-auto px-5 py-4 text-gray-900 dark:text-gray-100">
+		<div class="flex-1 space-y-5 overflow-y-auto px-5 py-4 text-ink-gray-9">
 			<section>
-				<div class="mb-2 text-[11px] font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400">
+				<div class="mb-2 text-[11px] font-semibold uppercase tracking-wide text-ink-gray-5">
 					Status
 				</div>
 				<div class="flex flex-wrap gap-2">
@@ -43,7 +53,7 @@
 						:content="description"
 						:fixed-menu="editorMenu"
 						placeholder="Task details…"
-						editor-class="prose-sm dark:prose-invert max-w-none w-full min-h-[160px] px-3 py-2 border border-t-0 border-gray-300 rounded-b-lg bg-white dark:border-gray-600 dark:bg-gray-800"
+						editor-class="prose-sm dark:prose-invert max-w-none w-full min-h-[160px] px-3 py-2 border border-t-0 border-outline-gray-2 rounded-b-lg bg-surface-white"
 						@change="(html) => (description = html)"
 					/>
 				</div>
@@ -64,11 +74,21 @@
 					/>
 					<div>
 						<label class="mb-1.5 block text-xs text-ink-gray-5">Expected start</label>
-						<DatePicker v-model="expStartDate" placeholder="Start date" class="w-full" />
+						<DatePicker
+							v-model="expStartDate"
+							placeholder="Start date"
+							class="w-full"
+							:formatter="formatDate"
+						/>
 					</div>
 					<div>
 						<label class="mb-1.5 block text-xs text-ink-gray-5">Expected end</label>
-						<DatePicker v-model="expEndDate" placeholder="End date" class="w-full" />
+						<DatePicker
+							v-model="expEndDate"
+							placeholder="End date"
+							class="w-full"
+							:formatter="formatDate"
+						/>
 					</div>
 					<FormControl
 						v-model="progress"
@@ -108,9 +128,11 @@
 
 <script setup>
 import { computed, ref, watch } from "vue"
+import { useRouter } from "vue-router"
 import { call, DatePicker, TextEditor, toast } from "frappe-ui"
 import AssigneePicker from "@spa/components/AssigneePicker.vue"
 import LinkedChecklistsSection from "@spa/components/LinkedChecklistsSection.vue"
+import { formatDate } from "@spa/utils/datetime.js"
 import spaConfig from "@/config"
 
 const props = defineProps({
@@ -127,6 +149,7 @@ const props = defineProps({
 
 const emit = defineEmits(["close", "updated"])
 
+const router = useRouter()
 const API = computed(() => props.apiPrefix || spaConfig.api)
 const statuses = ["Open", "Working", "Pending Review", "Overdue", "Completed"]
 const editorMenu = [
@@ -253,5 +276,11 @@ async function saveFields() {
 function onAssigneesUpdated(updated) {
 	assignees.value = [...(updated.assignees || [])]
 	emit("updated", updated)
+}
+
+function goToSourceIssue() {
+	const name = props.task.issue
+	if (!name) return
+	router.push({ name: "IssueDetail", params: { name } })
 }
 </script>
