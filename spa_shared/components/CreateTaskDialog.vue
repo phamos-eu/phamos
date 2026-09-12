@@ -38,7 +38,7 @@
 						:content="description"
 						:fixed-menu="editorMenu"
 						placeholder="What needs to be done?"
-						editor-class="prose-sm dark:prose-invert min-h-[140px] max-h-[280px] overflow-y-auto px-3 py-2 border border-gray-300 rounded-lg bg-white dark:border-gray-600 dark:bg-gray-800"
+					editor-class="prose-sm dark:prose-invert min-h-[140px] max-h-[280px] overflow-y-auto px-3 py-2 border border-outline-gray-2 rounded-lg bg-surface-white"
 						@change="(html) => (description = html)"
 					/>
 				</div>

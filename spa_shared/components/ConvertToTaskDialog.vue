@@ -44,7 +44,7 @@
 						:content="description"
 						:fixed-menu="editorMenu"
 						placeholder="What needs to be done?"
-						editor-class="prose-sm dark:prose-invert max-w-none w-full min-h-[140px] max-h-[280px] overflow-y-auto px-3 py-2 border border-t-0 border-gray-300 rounded-b-lg bg-white dark:border-gray-600 dark:bg-gray-800"
+						editor-class="prose-sm dark:prose-invert max-w-none w-full min-h-[140px] max-h-[280px] overflow-y-auto px-3 py-2 border border-t-0 border-outline-gray-2 rounded-b-lg bg-surface-white"
 						@change="(html) => (description = html)"
 					/>
 				</div>
@@ -90,39 +90,15 @@
 					:subject="subject"
 					:api-prefix="API"
 					:linked-task-ids="linkedTaskIds"
-					@select-task="onSelectTask"
+					@select-task="onToggleDependency"
 				/>
 
-				<div class="space-y-1.5">
-					<label class="block text-xs text-ink-gray-5">Depends on (optional)</label>
-					<div v-if="dependencies.length" class="flex flex-wrap gap-1.5">
-						<span
-							v-for="dep in dependencies"
-							:key="dep.name"
-							class="inline-flex max-w-full items-center gap-1 rounded-full bg-surface-gray-3 py-0.5 pl-2.5 pr-1 text-xs font-medium text-ink-gray-9"
-							:title="`${dep.name}: ${formatDate(dep.exp_start_date)} – ${formatDate(dep.exp_end_date)}`"
-						>
-							<span class="truncate">{{ dep.name }} · {{ dep.subject }}</span>
-							<button
-								type="button"
-								class="rounded-full p-0.5 text-ink-gray-6 hover:bg-surface-gray-4 hover:text-ink-gray-9"
-								:title="`Remove ${dep.name}`"
-								@click="removeDependency(dep.name)"
-							>
-								<FeatherIcon name="x" class="h-3 w-3" />
-							</button>
-						</span>
-					</div>
-					<p v-else class="text-xs text-ink-gray-5">
-						Click a nearby task in the preview to add a finish → start dependency.
-					</p>
-					<p
-						v-if="dateWarning"
-						class="text-xs text-amber-700 dark:text-amber-400"
-					>
-						{{ dateWarning }}
-					</p>
-				</div>
+				<p
+					v-if="dateWarning"
+					class="text-xs text-ink-amber-3"
+				>
+					{{ dateWarning }}
+				</p>
 
 				<AssigneePicker
 					v-model="assignees"
@@ -133,44 +109,11 @@
 			</div>
 		</template>
 	</Dialog>
-
-	<Dialog
-		v-model="showLinkConfirm"
-		:options="{
-			title: 'Link as dependency?',
-			size: 'sm',
-			actions: [
-				{
-					label: 'Cancel',
-					variant: 'subtle',
-					onClick: () => {
-						showLinkConfirm = false
-						pendingLink = null
-					},
-				},
-				{
-					label: 'Depend on this task',
-					variant: 'solid',
-					onClick: confirmLink,
-				},
-			],
-		}"
-	>
-		<template #body-content>
-			<p v-if="pendingLink" class="text-sm text-ink-gray-7">
-				This new task will depend on
-				<span class="font-semibold text-ink-gray-9">
-					{{ pendingLink.name }} · {{ pendingLink.subject }}
-				</span>
-				(finish → start).
-			</p>
-		</template>
-	</Dialog>
 </template>
 
 <script setup>
 import { computed, ref, watch } from "vue"
-import { call, DatePicker, Dialog, FeatherIcon, TextEditor } from "frappe-ui"
+import { call, DatePicker, TextEditor } from "frappe-ui"
 import AssigneePicker from "@spa/components/AssigneePicker.vue"
 import SchedulePreview from "@spa/components/SchedulePreview.vue"
 import { formatDate } from "@spa/utils/datetime.js"
@@ -218,8 +161,6 @@ const expStartDate = ref("")
 const expEndDate = ref("")
 const assignees = ref([])
 const dependencies = ref([])
-const showLinkConfirm = ref(false)
-const pendingLink = ref(null)
 const saving = ref(false)
 const error = ref("")
 
@@ -275,11 +216,7 @@ function mapIssuePriority(value) {
 watch(
 	() => props.modelValue,
 	(open) => {
-		if (!open) {
-			showLinkConfirm.value = false
-			pendingLink.value = null
-			return
-		}
+		if (!open) return
 		const issue = props.issue || {}
 		subject.value = issue.subject || ""
 		description.value = issue.description || ""
@@ -289,35 +226,25 @@ watch(
 		expStartDate.value = ""
 		expEndDate.value = ""
 		dependencies.value = []
-		showLinkConfirm.value = false
-		pendingLink.value = null
 		error.value = ""
 	}
 )
 
-function onSelectTask(task) {
+function onToggleDependency(task) {
 	if (!task?.name) return
-	if (dependencies.value.some((d) => d.name === task.name)) return
-	pendingLink.value = {
-		name: task.name,
-		subject: task.subject || task.name,
-		exp_start_date: task.exp_start_date || "",
-		exp_end_date: task.exp_end_date || task.exp_start_date || "",
+	if (dependencies.value.some((d) => d.name === task.name)) {
+		dependencies.value = dependencies.value.filter((d) => d.name !== task.name)
+		return
 	}
-	showLinkConfirm.value = true
-}
-
-function confirmLink() {
-	const task = pendingLink.value
-	if (task && !dependencies.value.some((d) => d.name === task.name)) {
-		dependencies.value = [...dependencies.value, task]
-	}
-	pendingLink.value = null
-	showLinkConfirm.value = false
-}
-
-function removeDependency(name) {
-	dependencies.value = dependencies.value.filter((d) => d.name !== name)
+	dependencies.value = [
+		...dependencies.value,
+		{
+			name: task.name,
+			subject: task.subject || task.name,
+			exp_start_date: task.exp_start_date || "",
+			exp_end_date: task.exp_end_date || task.exp_start_date || "",
+		},
+	]
 }
 
 function isEmptyHtml(html) {
