@@ -18,6 +18,7 @@
 				/>
 				<span class="pl-0.5">{{ user.full_name || user.name }}</span>
 				<button
+					v-if="!readonly"
 					type="button"
 					class="rounded-full p-0.5 text-ink-gray-6 hover:bg-surface-gray-4 hover:text-ink-gray-9"
 					:disabled="saving"
@@ -30,7 +31,7 @@
 		</div>
 		<div v-else class="text-sm text-ink-gray-6">No assignees</div>
 
-		<div v-if="availableShortlist.length" class="space-y-1.5">
+		<div v-if="!readonly && availableShortlist.length" class="space-y-1.5">
 			<div class="text-[11px] font-medium text-ink-gray-6">Suggested</div>
 			<div class="flex flex-wrap gap-1.5">
 				<button
@@ -52,7 +53,7 @@
 			</div>
 		</div>
 
-		<div>
+		<div v-if="!readonly">
 			<label class="mb-1.5 block text-xs text-ink-gray-6">Search users</label>
 			<div ref="searchWrap">
 				<Autocomplete
@@ -85,6 +86,7 @@ const props = defineProps({
 	documentName: { type: String, default: "" },
 	/** Issue uses set_assignees; Task uses set_task_assignees */
 	methodName: { type: String, default: "set_assignees" },
+	readonly: { type: Boolean, default: false },
 })
 
 const emit = defineEmits(["update:modelValue", "updated"])
@@ -233,6 +235,7 @@ async function persist(nextNames, previousNames) {
 }
 
 async function addUser(user) {
+	if (props.readonly) return
 	const name = typeof user === "string" ? user : user?.name || user?.value
 	if (!name || selectedNames.value.includes(name) || saving.value) return
 	const fullName =
@@ -252,7 +255,7 @@ async function addUser(user) {
 }
 
 async function removeUser(name) {
-	if (!name || saving.value) return
+	if (props.readonly || !name || saving.value) return
 	const previous = [...selectedNames.value]
 	await persist(
 		previous.filter((u) => u !== name),
