@@ -171,6 +171,44 @@
 	/>
 
 	<Dialog
+		v-model="showPostConvertChoice"
+		:options="{
+			title: 'Converted to Task',
+			size: '3xl',
+			actions: [
+				{
+					label: 'Issue list',
+					variant: 'subtle',
+					onClick: goToIssueListAfterConvert,
+				},
+				{
+					label: 'Open Task Gantt',
+					variant: 'solid',
+					onClick: goToTaskAfterConvert,
+				},
+			],
+		}"
+	>
+		<template #body-content>
+			<div class="space-y-4">
+				<p class="text-sm text-ink-gray-7">
+					Issue
+					<span class="font-medium text-ink-gray-9">{{ issue.name }}</span>
+					is now Task
+					<span class="font-semibold text-ink-gray-9">{{ postConvertTaskName }}</span>.
+					Where do you want to go next?
+				</p>
+				<SchedulePreview
+					v-if="showPostConvertChoice && postConvertTaskName"
+					:highlight-task-id="postConvertTaskName"
+					:api-prefix="API"
+					@open="goToTaskAfterConvert"
+				/>
+			</div>
+		</template>
+	</Dialog>
+
+	<Dialog
 		v-model="showConvertedNotice"
 		:options="{
 			title: 'Issue converted to Task',
@@ -237,6 +275,8 @@ const propertiesHostReady = ref(false)
 const chromeHostReady = ref(false)
 const showConvert = ref(false)
 const showConvertedNotice = ref(false)
+const showPostConvertChoice = ref(false)
+const postConvertTaskName = ref("")
 const isClosed = computed(() => (status.value || props.issue.status) === "Closed")
 const editorMenu = [
 	"Paragraph",
@@ -379,6 +419,11 @@ watch(
 	() => props.issue?.name,
 	() => {
 		const issue = props.issue
+		// Skip reopen notice while the post-convert destination prompt is open.
+		if (showPostConvertChoice.value) {
+			showConvertedNotice.value = false
+			return
+		}
 		if (issue?.converted_task && issue.status === "Closed") {
 			showConvertedNotice.value = true
 		} else {
@@ -473,7 +518,7 @@ function onAssigneesUpdated(updated) {
 }
 
 function goToConvertedTask() {
-	const name = props.issue.converted_task
+	const name = props.issue.converted_task || postConvertTaskName.value
 	if (!name) return
 	router.push({ name: "TaskDetail", params: { name } })
 }
@@ -483,12 +528,25 @@ function openConvertedFromNotice() {
 	goToConvertedTask()
 }
 
+function goToTaskAfterConvert() {
+	const name = postConvertTaskName.value
+	showPostConvertChoice.value = false
+	if (!name) return
+	router.push({ name: "TaskDetail", params: { name } })
+}
+
+function goToIssueListAfterConvert() {
+	showPostConvertChoice.value = false
+	postConvertTaskName.value = ""
+	emit("close")
+}
+
 function onConverted(result) {
 	const task = result?.task
+	postConvertTaskName.value = task?.name || ""
+	showConvertedNotice.value = false
+	showPostConvertChoice.value = true
 	emit("converted", result)
 	toast.success(task?.name ? `Converted to ${task.name}` : "Converted to Task")
-	if (task?.name) {
-		router.push({ name: "TaskDetail", params: { name: task.name } })
-	}
 }
 </script>
