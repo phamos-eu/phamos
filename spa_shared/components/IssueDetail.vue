@@ -174,41 +174,30 @@
 		v-model="showConvertedNotice"
 		:options="{
 			title: 'Issue converted to Task',
-			size: 'md',
-			actions: [
-				{
-					label: 'Close',
-					variant: 'subtle',
-					onClick: () => (showConvertedNotice = false),
-				},
-				{
-					label: `Open ${issue.converted_task || 'Task'}`,
-					variant: 'solid',
-					onClick: () => {
-						showConvertedNotice = false
-						goToConvertedTask()
-					},
-				},
-			],
+			size: '3xl',
+			actions: [],
 		}"
 	>
 		<template #body-content>
-			<p class="text-sm text-ink-gray-7">
-				This Issue was converted to Task
-				<button
-					type="button"
-					class="font-semibold text-ink-gray-9 underline-offset-2 hover:underline"
-					@click="
-						() => {
-							showConvertedNotice = false
-							goToConvertedTask()
-						}
-					"
-				>
-					{{ issue.converted_task }}
-				</button>
-				and is now closed. Fields are read-only while the Issue stays Closed.
-			</p>
+			<div class="space-y-4">
+				<p class="text-sm text-ink-gray-7">
+					This Issue was converted to Task
+					<button
+						type="button"
+						class="font-semibold text-ink-gray-9 underline-offset-2 hover:underline"
+						@click="openConvertedFromNotice"
+					>
+						{{ issue.converted_task }}
+					</button>
+					and is now closed. Fields are read-only while the Issue stays Closed.
+				</p>
+				<SchedulePreview
+					v-if="showConvertedNotice && issue.converted_task"
+					:highlight-task-id="issue.converted_task"
+					:api-prefix="API"
+					@open="openConvertedFromNotice"
+				/>
+			</div>
 		</template>
 	</Dialog>
 </template>
@@ -219,6 +208,7 @@ import { useRouter } from "vue-router"
 import { call, debounce, Dialog, TextEditor, toast, Badge } from "frappe-ui"
 import AssigneePicker from "@spa/components/AssigneePicker.vue"
 import ConvertToTaskDialog from "@spa/components/ConvertToTaskDialog.vue"
+import SchedulePreview from "@spa/components/SchedulePreview.vue"
 import { setPageChromeActive } from "@spa/pageChrome.js"
 import spaConfig from "@/config"
 
@@ -486,6 +476,11 @@ function goToConvertedTask() {
 	const name = props.issue.converted_task
 	if (!name) return
 	router.push({ name: "TaskDetail", params: { name } })
+}
+
+function openConvertedFromNotice() {
+	showConvertedNotice.value = false
+	goToConvertedTask()
 }
 
 function onConverted(result) {
