@@ -1,6 +1,6 @@
 /**
  * Keep frappe-ui CSS tokens in sync with OS prefers-color-scheme.
- * Tailwind dark: already uses darkMode: "media"; frappe-ui needs data-theme.
+ * Tokens and `dark:` variants follow `[data-theme="dark"]` (see spa_shared/tailwind.shared.js).
  */
 export function syncThemeFromMediaPreference() {
 	const mq = window.matchMedia("(prefers-color-scheme: dark)")
@@ -9,7 +9,16 @@ export function syncThemeFromMediaPreference() {
 		const dark = mq.matches
 		document.documentElement.dataset.theme = dark ? "dark" : "light"
 		const meta = document.querySelector('meta[name="theme-color"]')
-		if (meta) meta.setAttribute("content", dark ? "#111827" : "#ffffff")
+		if (meta) {
+			meta.setAttribute(
+				"content",
+				dark
+					? getComputedStyle(document.documentElement).getPropertyValue("--surface-gray-1").trim() ||
+							"#232323"
+					: getComputedStyle(document.documentElement).getPropertyValue("--surface-gray-1").trim() ||
+							"#F8F8F8"
+			)
+		}
 	}
 
 	apply()

@@ -1,18 +1,18 @@
 <template>
 	<aside
-		class="flex h-full flex-none flex-col border-r border-gray-200 bg-white transition-[width] dark:border-gray-800 dark:bg-gray-900"
+		class="flex h-full flex-none flex-col border-r border-outline-gray-2 bg-surface-white transition-[width] dark:bg-surface-gray-1"
 		:class="collapsed ? 'w-14' : 'w-52'"
 	>
 		<div
-			class="flex h-12 flex-shrink-0 items-center border-b border-gray-200 px-3 dark:border-gray-800"
+			class="flex h-12 flex-shrink-0 items-center border-b border-outline-gray-2 px-3"
 			:class="collapsed ? 'justify-center' : 'justify-between'"
 		>
-			<span v-if="!collapsed" class="truncate text-sm font-semibold text-gray-900 dark:text-gray-100">
+			<span v-if="!collapsed" class="truncate text-sm font-semibold text-ink-gray-9">
 				{{ label }}
 			</span>
 			<button
 				type="button"
-				class="rounded p-1.5 text-gray-500 hover:bg-gray-100 hover:text-gray-800 dark:text-gray-400 dark:hover:bg-gray-800 dark:hover:text-gray-200"
+				class="rounded p-1.5 text-ink-gray-5 hover:bg-surface-gray-2 hover:text-ink-gray-8"
 				:title="collapsed ? 'Expand' : 'Collapse'"
 				@click="toggle"
 			>
@@ -28,8 +28,8 @@
 						class="flex items-center gap-2 rounded-md px-2 py-2 text-sm font-medium transition"
 						:class="
 							isActive(item)
-								? 'bg-gray-900 text-white dark:bg-gray-100 dark:text-gray-900'
-								: 'text-gray-600 hover:bg-gray-100 hover:text-gray-900 dark:text-gray-400 dark:hover:bg-gray-800 dark:hover:text-gray-100'
+								? 'bg-surface-gray-7 text-ink-white'
+								: 'text-ink-gray-6 hover:bg-surface-gray-2 hover:text-ink-gray-9'
 						"
 						:title="collapsed ? item.label : undefined"
 					>
@@ -44,7 +44,7 @@
 
 					<div
 						v-if="item.children?.length && isGroupOpen(item) && !collapsed"
-						class="ml-2 mt-1 flex flex-col gap-1 border-l border-gray-200 pl-2 dark:border-gray-700"
+						class="ml-2 mt-1 flex flex-col gap-1 border-l border-outline-gray-2 pl-2"
 					>
 						<router-link
 							v-for="child in item.children"
@@ -53,8 +53,8 @@
 							class="flex items-center gap-2 rounded-md px-2 py-1.5 text-sm font-normal transition"
 							:class="
 								isActive(child)
-									? 'bg-gray-900 text-white dark:bg-gray-100 dark:text-gray-900'
-									: 'text-gray-600 hover:bg-gray-100 hover:text-gray-900 dark:text-gray-400 dark:hover:bg-gray-800 dark:hover:text-gray-100'
+									? 'bg-surface-gray-7 text-ink-white'
+									: 'text-ink-gray-6 hover:bg-surface-gray-2 hover:text-ink-gray-9'
 							"
 						>
 							<FeatherIcon :name="child.icon" class="h-3.5 w-3.5 flex-shrink-0" />
@@ -66,10 +66,10 @@
 			<slot :collapsed="collapsed" :expand="expand" />
 		</nav>
 
-		<div class="mt-auto flex-shrink-0 border-t border-gray-200 p-2 dark:border-gray-800">
+		<div class="mt-auto flex-shrink-0 border-t border-outline-gray-2 p-2">
 			<button
 				type="button"
-				class="flex w-full items-center gap-2 rounded-md px-2 py-2 text-sm font-medium text-gray-600 hover:bg-gray-100 hover:text-gray-900 dark:text-gray-400 dark:hover:bg-gray-800 dark:hover:text-gray-100"
+				class="flex w-full items-center gap-2 rounded-md px-2 py-2 text-sm font-medium text-ink-gray-6 hover:bg-surface-gray-2 hover:text-ink-gray-9"
 				:class="collapsed ? 'justify-center' : ''"
 				:title="collapsed ? 'Desk' : undefined"
 				@click="goDesk"

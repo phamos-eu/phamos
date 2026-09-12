@@ -1,18 +1,17 @@
 <template>
 	<div class="flex h-full min-h-0">
 		<section
-			class="flex min-w-0 flex-col border-r border-gray-200 bg-white dark:border-gray-800 dark:bg-gray-900"
-			:class="selectedName ? 'w-1/3 flex-none' : 'flex-1'"
+			class="flex min-w-0 flex-1 flex-col border-r border-outline-gray-2 bg-surface-white dark:bg-surface-gray-1"
 		>
 			<div
 				v-if="configError"
-				class="flex flex-1 items-center justify-center px-6 text-center text-sm text-red-600 dark:text-red-400"
+				class="flex flex-1 items-center justify-center px-6 text-center text-sm text-ink-red-4"
 			>
 				{{ configError }}
 			</div>
 			<div
 				v-else-if="loading"
-				class="flex flex-1 items-center justify-center text-sm text-gray-500 dark:text-gray-400"
+				class="flex flex-1 items-center justify-center text-sm text-ink-gray-5"
 			>
 				Loading…
 			</div>
@@ -31,11 +30,11 @@
 
 		<aside
 			v-if="selectedName"
-			class="flex w-2/3 min-w-0 flex-none flex-col overflow-y-auto bg-white dark:bg-gray-900"
+			class="flex w-96 flex-none flex-col overflow-hidden border-l border-outline-gray-2 bg-surface-white dark:bg-surface-gray-1"
 		>
 			<div
 				v-if="detailLoading && !selectedTask"
-				class="flex flex-1 items-center justify-center text-sm text-gray-500 dark:text-gray-400"
+				class="flex flex-1 items-center justify-center text-sm text-ink-gray-5"
 			>
 				Loading…
 			</div>
