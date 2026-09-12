@@ -208,13 +208,13 @@ def _spa_path_for(doctype, name):
 		accounting_department = _settings_dept("accounting_department")
 		pm_department = _settings_dept("pm_department")
 		if department and sales_department and department == sales_department:
-			return f"/sales-cockpit/tasks/gantt/{name}"
+			return f"/sales-cockpit/tasks/{name}"
 		if department and hr_department and department == hr_department:
-			return f"/hr-cockpit/tasks/gantt/{name}"
+			return f"/hr-cockpit/tasks/{name}"
 		if department and accounting_department and department == accounting_department:
-			return f"/accounting-cockpit/tasks/gantt/{name}"
+			return f"/accounting-cockpit/tasks/{name}"
 		if department and pm_department and department == pm_department:
-			return f"/project-management-cockpit/tasks/gantt/{name}"
+			return f"/project-management-cockpit/tasks/{name}"
 		return f"/app/task/{name}"
 	return f"/i-own-my-work/issues/{name}"
 
@@ -554,68 +554,6 @@ def ensure_document_channel(linked_doctype, name):
 @frappe.whitelist(methods=["POST"])
 def ensure_issue_channel(name):
 	return ensure_document_channel("Issue", name)
-
-
-def post_issue_converted_to_task_message(issue_name, task_name):
-	"""Post a note on the Issue channel that work moved to a Task. No-op if no channel."""
-	flags = get_chat_feature_flags()
-	if not flags.get("enabled"):
-		return None
-
-	channel_id = find_issue_channel(issue_name)
-	if not channel_id:
-		return None
-
-	_require_linked_read("Issue", issue_name)
-	spa_path = _spa_path_for("Task", task_name)
-	spa_url = get_url(spa_path)
-	open_label = _spa_open_label(spa_path)
-	text = (
-		_("Converted to Task **{0}**.").format(task_name)
-		+ f"\n\n[{open_label}]({spa_url})"
-	)
-
-	try:
-		from raven.api.raven_message import send_message
-
-		send_message(
-			channel_id=channel_id,
-			message_type="Text",
-			text=text,
-			json={
-				"type": "doc",
-				"content": [
-					{
-						"type": "paragraph",
-						"content": [{"type": "text", "text": text}],
-					}
-				],
-			},
-			link_doctype="Task",
-			link_document=task_name,
-		)
-	except Exception:
-		frappe.get_doc(
-			{
-				"doctype": "Raven Message",
-				"channel_id": channel_id,
-				"message_type": "Text",
-				"text": text,
-				"json": {
-					"type": "doc",
-					"content": [
-						{
-							"type": "paragraph",
-							"content": [{"type": "text", "text": text}],
-						}
-					],
-				},
-				"link_doctype": "Task",
-				"link_document": task_name,
-			}
-		).insert()
-
-	return channel_id
 
 
 def _fetch_messages(channel_id, limit=50, before=None):

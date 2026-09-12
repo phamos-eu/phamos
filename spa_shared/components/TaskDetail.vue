@@ -18,14 +18,6 @@
 					>
 						{{ task.issue }}
 					</button>
-					<Button
-						v-if="task.issue_has_chat"
-						size="sm"
-						variant="subtle"
-						@click="goToSourceIssue"
-					>
-						Open source Issue
-					</Button>
 				</div>
 			</div>
 			<div class="flex items-center gap-2">

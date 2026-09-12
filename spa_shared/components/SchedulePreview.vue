@@ -92,13 +92,14 @@
 						/>
 						<div
 							class="absolute top-1.5 flex h-5 items-center overflow-hidden rounded px-1.5 text-[10px] font-medium"
-							:class="
-								row.isDraft
-									? 'bg-blue-600 text-white shadow-sm dark:bg-blue-500'
-									: 'bg-surface-gray-4 text-ink-gray-8 dark:bg-gray-700 dark:text-gray-100'
-							"
+							:class="barClass(row)"
 							:style="barStyle(row)"
-							:title="`${row.name}: ${formatDate(row.start)} – ${formatDate(row.end)}`"
+							:title="barTitle(row)"
+							:role="row.isDraft ? undefined : 'button'"
+							:tabindex="row.isDraft ? undefined : 0"
+							@click="onBarClick(row)"
+							@keydown.enter.prevent="onBarClick(row)"
+							@keydown.space.prevent="onBarClick(row)"
 						>
 							<span class="truncate">{{ row.name }}</span>
 						</div>
@@ -117,7 +118,7 @@
 			<span class="inline-block h-2 w-2 rounded-sm bg-blue-600 align-middle dark:bg-blue-500" />
 			New task
 			<span class="mx-1.5 text-ink-gray-4">·</span>
-			Nearby department tasks shown for context
+			Click a nearby task to depend on it
 		</p>
 	</section>
 </template>
@@ -148,13 +149,18 @@ const props = defineProps({
 	endDate: { type: String, default: "" },
 	subject: { type: String, default: "" },
 	apiPrefix: { type: String, default: "" },
+	linkedTaskIds: { type: Array, default: () => [] },
 })
+
+const emit = defineEmits(["select-task"])
 
 const API = computed(() => props.apiPrefix || spaConfig.api)
 const scrollEl = ref(null)
 const loading = ref(false)
 const loadError = ref("")
 const contextTasks = ref([])
+
+const linkedSet = computed(() => new Set((props.linkedTaskIds || []).map(String)))
 
 const todayIso = computed(() => todayIsoInUserTz())
 
@@ -263,12 +269,40 @@ const rows = computed(() => {
 				start: formatDateIso(s),
 				end: formatDateIso(e),
 				isDraft: false,
+				isLinked: linkedSet.value.has(String(task.name)),
 			}
 		})
 		.sort((a, b) => a.start.localeCompare(b.start) || a.name.localeCompare(b.name))
 
 	return [draft, ...nearby]
 })
+
+function barClass(row) {
+	if (row.isDraft) {
+		return "bg-blue-600 text-white shadow-sm dark:bg-blue-500"
+	}
+	if (row.isLinked) {
+		return "cursor-pointer bg-emerald-600 text-white ring-2 ring-emerald-300 dark:bg-emerald-500 dark:ring-emerald-700"
+	}
+	return "cursor-pointer bg-surface-gray-4 text-ink-gray-8 hover:bg-surface-gray-5 dark:bg-gray-700 dark:text-gray-100 dark:hover:bg-gray-600"
+}
+
+function barTitle(row) {
+	const range = `${formatDate(row.start)} – ${formatDate(row.end)}`
+	if (row.isDraft) return `${row.name}: ${range}`
+	if (row.isLinked) return `${row.name}: ${range} (linked — remove via chip below)`
+	return `${row.name}: ${range} — click to depend on`
+}
+
+function onBarClick(row) {
+	if (!row || row.isDraft || row.isLinked) return
+	emit("select-task", {
+		name: row.id,
+		subject: row.name,
+		exp_start_date: row.start,
+		exp_end_date: row.end,
+	})
+}
 
 function barStyle(row) {
 	const days = timeline.value.days

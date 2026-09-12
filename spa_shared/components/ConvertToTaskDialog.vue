@@ -89,7 +89,40 @@
 					:end-date="expEndDate"
 					:subject="subject"
 					:api-prefix="API"
+					:linked-task-ids="linkedTaskIds"
+					@select-task="onSelectTask"
 				/>
+
+				<div class="space-y-1.5">
+					<label class="block text-xs text-ink-gray-5">Depends on (optional)</label>
+					<div v-if="dependencies.length" class="flex flex-wrap gap-1.5">
+						<span
+							v-for="dep in dependencies"
+							:key="dep.name"
+							class="inline-flex max-w-full items-center gap-1 rounded-full bg-surface-gray-3 py-0.5 pl-2.5 pr-1 text-xs font-medium text-ink-gray-9"
+							:title="`${dep.name}: ${formatDate(dep.exp_start_date)} – ${formatDate(dep.exp_end_date)}`"
+						>
+							<span class="truncate">{{ dep.name }} · {{ dep.subject }}</span>
+							<button
+								type="button"
+								class="rounded-full p-0.5 text-ink-gray-6 hover:bg-surface-gray-4 hover:text-ink-gray-9"
+								:title="`Remove ${dep.name}`"
+								@click="removeDependency(dep.name)"
+							>
+								<FeatherIcon name="x" class="h-3 w-3" />
+							</button>
+						</span>
+					</div>
+					<p v-else class="text-xs text-ink-gray-5">
+						Click a nearby task in the preview to add a finish → start dependency.
+					</p>
+					<p
+						v-if="dateWarning"
+						class="text-xs text-amber-700 dark:text-amber-400"
+					>
+						{{ dateWarning }}
+					</p>
+				</div>
 
 				<AssigneePicker
 					v-model="assignees"
@@ -100,11 +133,44 @@
 			</div>
 		</template>
 	</Dialog>
+
+	<Dialog
+		v-model="showLinkConfirm"
+		:options="{
+			title: 'Link as dependency?',
+			size: 'sm',
+			actions: [
+				{
+					label: 'Cancel',
+					variant: 'subtle',
+					onClick: () => {
+						showLinkConfirm = false
+						pendingLink = null
+					},
+				},
+				{
+					label: 'Depend on this task',
+					variant: 'solid',
+					onClick: confirmLink,
+				},
+			],
+		}"
+	>
+		<template #body-content>
+			<p v-if="pendingLink" class="text-sm text-ink-gray-7">
+				This new task will depend on
+				<span class="font-semibold text-ink-gray-9">
+					{{ pendingLink.name }} · {{ pendingLink.subject }}
+				</span>
+				(finish → start).
+			</p>
+		</template>
+	</Dialog>
 </template>
 
 <script setup>
 import { computed, ref, watch } from "vue"
-import { call, DatePicker, TextEditor } from "frappe-ui"
+import { call, DatePicker, Dialog, FeatherIcon, TextEditor } from "frappe-ui"
 import AssigneePicker from "@spa/components/AssigneePicker.vue"
 import SchedulePreview from "@spa/components/SchedulePreview.vue"
 import { formatDate } from "@spa/utils/datetime.js"
@@ -151,6 +217,9 @@ const project = ref("")
 const expStartDate = ref("")
 const expEndDate = ref("")
 const assignees = ref([])
+const dependencies = ref([])
+const showLinkConfirm = ref(false)
+const pendingLink = ref(null)
 const saving = ref(false)
 const error = ref("")
 
@@ -166,6 +235,8 @@ const assigneeDetails = computed(() => {
 	}))
 })
 
+const linkedTaskIds = computed(() => dependencies.value.map((d) => d.name))
+
 const priorityOptions = computed(() => [
 	{ label: "—", value: "" },
 	...TASK_PRIORITIES.map((p) => ({ label: p, value: p })),
@@ -179,6 +250,21 @@ const projectOptions = computed(() => [
 	})),
 ])
 
+const dateWarning = computed(() => {
+	const start = String(expStartDate.value || "").slice(0, 10)
+	if (!start || !dependencies.value.length) return ""
+	const conflicts = dependencies.value.filter((d) => {
+		const end = String(d.exp_end_date || "").slice(0, 10)
+		return end && start < end
+	})
+	if (!conflicts.length) return ""
+	if (conflicts.length === 1) {
+		const d = conflicts[0]
+		return `Start is before predecessor end (${d.name} ends ${formatDate(d.exp_end_date)}).`
+	}
+	return `Start is before ${conflicts.length} predecessor end dates.`
+})
+
 function mapIssuePriority(value) {
 	const raw = String(value || "").trim()
 	if (!raw) return TASK_PRIORITIES.includes("Medium") ? "Medium" : TASK_PRIORITIES[0] || ""
@@ -189,7 +275,11 @@ function mapIssuePriority(value) {
 watch(
 	() => props.modelValue,
 	(open) => {
-		if (!open) return
+		if (!open) {
+			showLinkConfirm.value = false
+			pendingLink.value = null
+			return
+		}
 		const issue = props.issue || {}
 		subject.value = issue.subject || ""
 		description.value = issue.description || ""
@@ -198,9 +288,37 @@ watch(
 		assignees.value = [...(issue.assignees || [])]
 		expStartDate.value = ""
 		expEndDate.value = ""
+		dependencies.value = []
+		showLinkConfirm.value = false
+		pendingLink.value = null
 		error.value = ""
 	}
 )
+
+function onSelectTask(task) {
+	if (!task?.name) return
+	if (dependencies.value.some((d) => d.name === task.name)) return
+	pendingLink.value = {
+		name: task.name,
+		subject: task.subject || task.name,
+		exp_start_date: task.exp_start_date || "",
+		exp_end_date: task.exp_end_date || task.exp_start_date || "",
+	}
+	showLinkConfirm.value = true
+}
+
+function confirmLink() {
+	const task = pendingLink.value
+	if (task && !dependencies.value.some((d) => d.name === task.name)) {
+		dependencies.value = [...dependencies.value, task]
+	}
+	pendingLink.value = null
+	showLinkConfirm.value = false
+}
+
+function removeDependency(name) {
+	dependencies.value = dependencies.value.filter((d) => d.name !== name)
+}
 
 function isEmptyHtml(html) {
 	if (!html) return true
@@ -247,6 +365,7 @@ async function submit() {
 			exp_start_date: expStartDate.value,
 			exp_end_date: expEndDate.value,
 			assignees: assignees.value,
+			depends_on: dependencies.value.map((d) => d.name),
 		})
 		emit("converted", result)
 		emit("update:modelValue", false)
