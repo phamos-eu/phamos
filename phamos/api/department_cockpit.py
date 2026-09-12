@@ -604,16 +604,6 @@ def get_task(config: CockpitConfig, name):
 
 	assignees = [a.get("owner") for a in get_assignments("Task", doc.name)]
 	issue_name = doc.issue or None
-	issue_has_chat = False
-	if issue_name:
-		try:
-			from phamos.api.issue_raven import find_issue_channel, get_chat_feature_flags
-
-			flags = get_chat_feature_flags()
-			if flags.get("enabled") and find_issue_channel(issue_name):
-				issue_has_chat = True
-		except Exception:
-			issue_has_chat = False
 
 	return {
 		"name": doc.name,
@@ -624,7 +614,6 @@ def get_task(config: CockpitConfig, name):
 		"project": doc.project,
 		"department": doc.department,
 		"issue": issue_name,
-		"issue_has_chat": issue_has_chat,
 		"exp_start_date": doc.exp_start_date,
 		"exp_end_date": doc.exp_end_date,
 		"progress": doc.progress or 0,
@@ -805,19 +794,6 @@ def _reparent_issue_checklists(issue_name, task_name):
 		checklist.save()
 
 
-def _post_convert_raven_message(issue_name, task_name):
-	"""Best-effort note on the Issue Raven channel when converting."""
-	try:
-		from phamos.api.issue_raven import post_issue_converted_to_task_message
-
-		post_issue_converted_to_task_message(issue_name, task_name)
-	except Exception:
-		frappe.log_error(
-			frappe.get_traceback(),
-			f"Failed to post convert message for {issue_name} → {task_name}",
-		)
-
-
 def create_task_from_issue(
 	config: CockpitConfig,
 	issue_name,
@@ -828,6 +804,7 @@ def create_task_from_issue(
 	description=None,
 	priority=None,
 	project=None,
+	depends_on=None,
 ):
 	"""Hand off an Issue to a Task: create Task, reparent checklists, close Issue."""
 	frappe.has_permission("Task", "create", throw=True)
@@ -853,6 +830,17 @@ def create_task_from_issue(
 	assignee_list = _parse_list(assignees)
 	if not assignee_list:
 		frappe.throw(_("At least one assignee is required"))
+
+	# Validate predecessors before insert (department-scoped).
+	predecessor_names = []
+	seen_predecessors = set()
+	for name in _parse_list(depends_on):
+		name = (name or "").strip()
+		if not name or name in seen_predecessors:
+			continue
+		get_task(config, name)
+		predecessor_names.append(name)
+		seen_predecessors.add(name)
 
 	subject = (subject if subject is not None else issue_detail.get("subject") or "").strip()
 	if not subject:
@@ -890,6 +878,8 @@ def create_task_from_issue(
 		doc.description = description
 	if priority:
 		doc.priority = priority
+	for pred in predecessor_names:
+		doc.append("depends_on", {"task": pred})
 	doc.insert()
 
 	# Re-check after insert to reduce duplicate converts under concurrency.
@@ -914,8 +904,6 @@ def create_task_from_issue(
 		"Info",
 		_("Converted to Task {0}").format(frappe.utils.get_link_to_form("Task", doc.name)),
 	)
-
-	_post_convert_raven_message(issue_name, doc.name)
 
 	return {
 		"task": get_task(config, doc.name),

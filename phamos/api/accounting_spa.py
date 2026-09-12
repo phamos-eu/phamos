@@ -384,6 +384,7 @@ def create_task_from_issue(
 	description=None,
 	priority=None,
 	project=None,
+	depends_on=None,
 ):
 	"""Convert an Issue into a Task (Accounting cockpit hand-off)."""
 	return dc.create_task_from_issue(
@@ -396,6 +397,7 @@ def create_task_from_issue(
 		description=description,
 		priority=priority,
 		project=project,
+		depends_on=depends_on,
 	)
 
 
