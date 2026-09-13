@@ -1,15 +1,15 @@
 <template>
 	<div
-		class="flex max-w-full flex-nowrap items-center justify-start gap-1 overflow-x-auto"
+		class="flex max-w-full items-center justify-center gap-1 overflow-x-auto"
 		role="group"
-		aria-label="Filter by assignee"
+		aria-label="Filter by owner"
 	>
 		<button
 			v-for="user in users"
 			:key="user.name"
 			type="button"
 			class="shrink-0 rounded-full transition-opacity"
-			:class="isSelected(user.name) ? 'opacity-100' : 'opacity-40 hover:opacity-70'"
+			:class="isSelected(user.name) ? 'opacity-100 ring-2 ring-outline-gray-4' : 'opacity-45 hover:opacity-80'"
 			:aria-pressed="isSelected(user.name)"
 			:title="user.full_name || user.name"
 			@click="toggle(user.name)"
@@ -29,14 +29,10 @@ import { computed } from "vue"
 import UserAvatar from "@spa/components/UserAvatar.vue"
 
 const props = defineProps({
-	/** Currently selected user ids (empty = all) */
 	modelValue: { type: Array, default: () => [] },
-	/** Available assignees: [{ name, full_name, user_image }] */
 	users: { type: Array, default: () => [] },
 })
-
 const emit = defineEmits(["update:modelValue"])
-
 const selected = computed(() => new Set(props.modelValue || []))
 
 function isSelected(name) {

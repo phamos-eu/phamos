@@ -23,7 +23,7 @@
 
 <script setup>
 import { computed } from "vue"
-import { getAvatarAbbr, getAvatarPalette } from "../avatar.js"
+import { getAvatarAbbr, getAvatarPalette } from "@spa/utils/avatar.js"
 
 const props = defineProps({
 	/** User id / email (optional; used for title fallback) */

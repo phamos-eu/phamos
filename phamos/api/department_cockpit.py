@@ -4,12 +4,14 @@
 """Shared department cockpit API — Issues, Tasks, inbox, and timesheet settings."""
 
 from dataclasses import dataclass
+from datetime import timedelta
+from statistics import median
 from typing import Callable, Optional
 
 import frappe
 from frappe import _
 from frappe.desk.form.load import get_assignments
-from frappe.utils import get_fullname
+from frappe.utils import get_datetime, get_fullname, now_datetime
 
 from frappe.desk.form.assign_to import add as add_assignment
 from frappe.desk.form.assign_to import remove as remove_assignment
@@ -629,13 +631,9 @@ def get_task(config: CockpitConfig, name):
 	}
 
 
-def get_checklists(config: CockpitConfig, include_completed=0):
-	"""Return Checklists linked to Issues/Tasks in this department scope."""
-	frappe.has_permission("Checklist", "read", throw=True)
+def _department_checklist_references(config: CockpitConfig, department):
+	"""Return parent Issue and Task names defining this cockpit's Checklist scope."""
 	department = _require_department(config)
-	include_completed = frappe.utils.cint(include_completed)
-
-	from phamos.api.checklist_inbox import _item_counts_map, _serialize_row
 
 	issue_names = []
 	or_filters = _issue_or_filters(config, department)
@@ -653,9 +651,35 @@ def get_checklists(config: CockpitConfig, include_completed=0):
 		pluck="name",
 		limit_page_length=500,
 	)
+	return issue_names, task_names
 
-	if not issue_names and not task_names:
-		return []
+
+def _department_checklist_rows(config, fields, filters=None, limit=10000):
+	department = _require_department(config)
+	issue_names, task_names = _department_checklist_references(config, department)
+	filters = filters or {}
+	merged = {}
+
+	for document, names in (("Issue", issue_names), ("Task", task_names)):
+		if not names:
+			continue
+		for row in frappe.get_list(
+			"Checklist",
+			filters={**filters, "document": document, "reference_record": ("in", names)},
+			fields=fields,
+			order_by="modified desc",
+			limit_page_length=limit,
+		):
+			merged[row.name] = row
+	return list(merged.values())
+
+
+def get_checklists(config: CockpitConfig, include_completed=0):
+	"""Return Checklists linked to Issues/Tasks in this department scope."""
+	frappe.has_permission("Checklist", "read", throw=True)
+	include_completed = frappe.utils.cint(include_completed)
+
+	from phamos.api.checklist_inbox import _item_counts_map, _item_search_map, _serialize_row
 
 	filters_base = {}
 	if not include_completed:
@@ -667,34 +691,189 @@ def get_checklists(config: CockpitConfig, include_completed=0):
 		"completion_percentage",
 		"document",
 		"reference_record",
+		"checklist_owner",
+		"creation",
 		"modified",
 		"owner",
 	]
-	merged = {}
-
-	if issue_names:
-		for row in frappe.get_list(
-			"Checklist",
-			filters={**filters_base, "document": "Issue", "reference_record": ("in", issue_names)},
-			fields=fields,
-			order_by="modified desc",
-			limit_page_length=200,
-		):
-			merged[row.name] = row
-
-	if task_names:
-		for row in frappe.get_list(
-			"Checklist",
-			filters={**filters_base, "document": "Task", "reference_record": ("in", task_names)},
-			fields=fields,
-			order_by="modified desc",
-			limit_page_length=200,
-		):
-			merged[row.name] = row
-
-	ordered = sorted(merged.values(), key=lambda r: r.modified or "", reverse=True)[:200]
+	if frappe.get_meta("Checklist").has_field("title"):
+		fields.insert(1, "title")
+	rows = _department_checklist_rows(config, fields, filters_base, limit=200)
+	ordered = sorted(rows, key=lambda r: r.modified or "", reverse=True)[:200]
 	counts = _item_counts_map([r.name for r in ordered])
-	return [_serialize_row(r, counts) for r in ordered]
+	item_search = _item_search_map([r.name for r in ordered])
+	owners = list(dict.fromkeys(r.checklist_owner for r in ordered if r.checklist_owner))
+	owner_images = dict(zip(owners, _user_images(owners)))
+	result = []
+	for row in ordered:
+		serialized = _serialize_row(row, counts, item_search)
+		serialized["checklist_owner_name"] = _user_label(row.checklist_owner) if row.checklist_owner else None
+		serialized["checklist_owner_image"] = owner_images.get(row.checklist_owner)
+		result.append(serialized)
+	return result
+
+
+def _window_metric(rows, start, end):
+	created = [r for r in rows if start <= get_datetime(r.creation) < end]
+	completed = [
+		r for r in rows
+		if r.completed_on and start <= get_datetime(r.completed_on) < end
+	]
+	durations = [
+		(get_datetime(r.completed_on) - get_datetime(r.creation)).total_seconds() / 86400
+		for r in completed
+	]
+	return {
+		"created": len(created),
+		"completed": len(completed),
+		"completion_rate": round(len(completed) * 100 / len(created), 1) if created else 0,
+		"median_days": round(median(durations), 1) if durations else None,
+	}
+
+
+def _open_at(rows, point):
+	return sum(
+		1
+		for r in rows
+		if get_datetime(r.creation) <= point
+		and not (r.status == "Completed" and not r.completed_on)
+		and (not r.completed_on or get_datetime(r.completed_on) > point)
+	)
+
+
+def get_checklist_dashboard(config: CockpitConfig):
+	"""Return truthful HR-scoped Checklist dashboard metrics and chart series."""
+	frappe.has_permission("Checklist", "read", throw=True)
+	meta = frappe.get_meta("Checklist")
+	fields = [
+		"name", "status", "completion_percentage", "checklist_owner",
+		"creation", "modified", "completed_on", "document", "reference_record",
+	]
+	if not meta.has_field("completed_on"):
+		fields.remove("completed_on")
+
+	rows = _department_checklist_rows(config, fields)
+	for row in rows:
+		if "completed_on" not in row:
+			row.completed_on = None
+
+	now = now_datetime()
+	current_start = now - timedelta(days=90)
+	previous_start = current_start - timedelta(days=90)
+	year_end = now - timedelta(days=365)
+	year_start = current_start - timedelta(days=365)
+
+	current = _window_metric(rows, current_start, now)
+	previous = _window_metric(rows, previous_start, current_start)
+	year_ago = _window_metric(rows, year_start, year_end)
+	current["open"] = _open_at(rows, now)
+	previous["open"] = _open_at(rows, current_start)
+	year_ago["open"] = _open_at(rows, year_end)
+
+	months = []
+	cursor = now.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
+	for offset in range(11, -1, -1):
+		year = cursor.year
+		month = cursor.month - offset
+		while month <= 0:
+			year -= 1
+			month += 12
+		start = cursor.replace(year=year, month=month, day=1)
+		if month == 12:
+			end = start.replace(year=year + 1, month=1)
+		else:
+			end = start.replace(month=month + 1)
+		metric = _window_metric(rows, start, end)
+		months.append({"label": start.strftime("%b"), **metric})
+
+	open_rows = [r for r in rows if r.status != "Completed"]
+	owners = {}
+	for row in open_rows:
+		owner = row.checklist_owner or _("Unassigned")
+		owners[owner] = owners.get(owner, 0) + 1
+
+	age_buckets = [
+		{"label": "0–7 days", "min": 0, "max": 7},
+		{"label": "8–14 days", "min": 8, "max": 14},
+		{"label": "15–30 days", "min": 15, "max": 30},
+		{"label": "31–90 days", "min": 31, "max": 90},
+		{"label": "90+ days", "min": 91, "max": None},
+	]
+	for bucket in age_buckets:
+		bucket["value"] = sum(
+			1 for row in open_rows
+			if bucket["min"] <= (now - get_datetime(row.creation)).days
+			and (bucket["max"] is None or (now - get_datetime(row.creation)).days <= bucket["max"])
+		)
+		bucket.pop("min")
+		bucket.pop("max")
+
+	return {
+		"windows": {"current": current, "previous": previous, "year_ago": year_ago},
+		"monthly": months,
+		"status": [
+			{"label": status, "value": sum(1 for r in open_rows if r.status == status)}
+			for status in ("Not Started", "In Progress")
+		],
+		"owners": [
+			{"label": _user_label(owner) if owner != _("Unassigned") else owner, "value": count}
+			for owner, count in sorted(owners.items(), key=lambda item: item[1], reverse=True)[:8]
+		],
+		"aging": age_buckets,
+		"generated_at": now,
+	}
+
+
+def create_checklist(
+	config: CockpitConfig,
+	document,
+	reference_record,
+	name=None,
+	items=None,
+	checklist_owner=None,
+	checklist_template=None,
+):
+	"""Create a Checklist only when its parent belongs to this department cockpit."""
+	department = _require_department(config)
+	issue_names, task_names = _department_checklist_references(config, department)
+	allowed = {"Issue": set(issue_names), "Task": set(task_names)}
+	if document not in allowed or reference_record not in allowed[document]:
+		frappe.throw(_("Select an Issue or Task in the {0} department.").format(config.label))
+
+	from phamos.api.checklist_inbox import create_spa_checklist
+
+	return create_spa_checklist(
+		document=document,
+		reference_record=reference_record,
+		name=name,
+		items=items,
+		checklist_owner=checklist_owner,
+		checklist_template=checklist_template,
+	)
+
+
+def checklist_reference_query(config, doctype, txt, searchfield, start, page_len, filters):
+	"""Link search restricted to Issues and Tasks belonging to this cockpit."""
+	department = _require_department(config)
+	issue_names, task_names = _department_checklist_references(config, department)
+	allowed = {"Issue": issue_names, "Task": task_names}
+	if doctype not in allowed or not allowed[doctype]:
+		return []
+
+	title_field = "subject"
+	return frappe.get_list(
+		doctype,
+		filters={"name": ("in", allowed[doctype])},
+		or_filters=[
+			["name", "like", f"%{txt}%"],
+			[title_field, "like", f"%{txt}%"],
+		],
+		fields=["name", title_field],
+		order_by=f"{title_field} asc",
+		limit_start=frappe.utils.cint(start),
+		limit_page_length=frappe.utils.cint(page_len),
+		as_list=True,
+	)
 
 
 def update_task_status(config: CockpitConfig, name, status):

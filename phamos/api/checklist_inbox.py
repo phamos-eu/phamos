@@ -254,6 +254,24 @@ def _item_counts_map(checklist_names):
 	return {name: (done, total) for name, (done, total) in totals.items()}
 
 
+def _item_search_map(checklist_names):
+	"""Flatten searchable item fields per Checklist for client-side inbox search."""
+	search = {name: [] for name in checklist_names}
+	if not checklist_names:
+		return {}
+	rows = frappe.get_all(
+		"Checklist Items",
+		filters={"parent": ("in", list(checklist_names)), "parenttype": "Checklist"},
+		fields=["parent", "description", "note", "document", "record"],
+		limit_page_length=0,
+	)
+	for row in rows:
+		search[row.parent].extend(
+			cstr(row.get(field)) for field in ("description", "note", "document", "record") if row.get(field)
+		)
+	return {name: " ".join(values) for name, values in search.items()}
+
+
 def _item_counts(checklist_name):
 	done, total = _item_counts_map([checklist_name]).get(checklist_name, (0, 0))
 	return done, total
@@ -269,7 +287,7 @@ def _checklist_title_value(row_or_doc):
 	return row_or_doc.name
 
 
-def _serialize_row(row, counts=None):
+def _serialize_row(row, counts=None, item_search=None):
 	if counts is None:
 		done_count, total_count = _item_counts(row.name)
 	else:
@@ -281,10 +299,13 @@ def _serialize_row(row, counts=None):
 		"completion_percentage": row.completion_percentage or 0,
 		"document": row.document,
 		"reference_record": row.reference_record,
+		"creation": getattr(row, "creation", None),
 		"modified": row.modified,
 		"owner": row.owner,
+		"checklist_owner": getattr(row, "checklist_owner", None),
 		"done_count": done_count,
 		"total_count": total_count,
+		"item_search": (item_search or {}).get(row.name, ""),
 		"desk_url": f"/app/checklist/{row.name}",
 	}
 
