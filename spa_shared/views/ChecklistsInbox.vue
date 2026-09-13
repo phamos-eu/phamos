@@ -69,8 +69,21 @@
 						v-if="!selectedName && (row.document || row.reference_record)"
 						class="mt-0.5 truncate text-xs text-gray-500 dark:text-gray-400"
 					>
-						{{ row.document }}
-						<span v-if="row.reference_record"> / {{ row.reference_record }}</span>
+						<a
+							v-if="row.document && row.reference_record"
+							:href="deskRecordUrl(row.document, row.reference_record)"
+							target="_blank"
+							rel="noopener noreferrer"
+							class="inline-flex max-w-full items-center gap-1 font-medium text-ink-gray-7 underline-offset-2 hover:text-ink-gray-9 hover:underline"
+							@click.stop
+						>
+							<span class="truncate">{{ row.document }} / {{ row.reference_record }}</span>
+							<FeatherIcon name="external-link" class="h-3 w-3 flex-shrink-0" />
+						</a>
+						<template v-else>
+							{{ row.document }}
+							<span v-if="row.reference_record"> / {{ row.reference_record }}</span>
+						</template>
 					</div>
 				</button>
 			</div>
@@ -102,6 +115,7 @@ import { useRoute, useRouter } from "vue-router"
 import { Badge, call } from "frappe-ui"
 import ChecklistDetail from "@spa/components/ChecklistDetail.vue"
 import InboxStatusFilter from "@spa/components/InboxStatusFilter.vue"
+import { deskRecordUrl } from "@spa/utils/deskUrl.js"
 import spaConfig from "@/config"
 
 const API = spaConfig.api

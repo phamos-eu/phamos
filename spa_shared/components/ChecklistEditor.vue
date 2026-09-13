@@ -41,12 +41,23 @@
 						>
 							Click to edit…
 						</span>
+						<a
+							v-if="item.document && item.record"
+							:href="deskRecordUrl(item.document, item.record)"
+							target="_blank"
+							rel="noopener noreferrer"
+							class="mt-1 inline-flex max-w-full items-center gap-1 truncate text-xs font-medium text-ink-gray-7 underline-offset-2 hover:text-ink-gray-9 hover:underline"
+							:title="`Open ${item.document} ${item.record}`"
+							@click.stop
+						>
+							<span class="truncate">{{ item.document }} · {{ item.record }}</span>
+							<FeatherIcon name="external-link" class="h-3 w-3 flex-shrink-0" />
+						</a>
 						<div
-							v-if="item.document"
-							class="mt-1 truncate text-xs text-gray-500 dark:text-gray-400"
+							v-else-if="item.document"
+							class="mt-1 truncate text-xs text-ink-gray-5"
 						>
 							{{ item.document }}
-							<span v-if="item.record"> · {{ item.record }}</span>
 						</div>
 					</div>
 					<div class="flex-shrink-0 pt-0.5" @click.stop>
@@ -110,13 +121,27 @@
 							<label class="mt-2 block text-[11px] font-medium text-gray-500 dark:text-gray-400">
 								Record
 							</label>
-							<FrappeLink
-								:doctype="item.document"
-								:model-value="item.record || ''"
-								placeholder="Record"
-								:disabled="savingItem === item.name"
-								@update:model-value="(val) => saveField(item, 'record', val)"
-							/>
+							<div class="flex items-center gap-2">
+								<FrappeLink
+									class="min-w-0 flex-1"
+									:doctype="item.document"
+									:model-value="item.record || ''"
+									placeholder="Record"
+									:disabled="savingItem === item.name"
+									@update:model-value="(val) => saveField(item, 'record', val)"
+								/>
+								<a
+									v-if="item.record"
+									:href="deskRecordUrl(item.document, item.record)"
+									target="_blank"
+									rel="noopener noreferrer"
+									class="flex h-7 w-7 flex-shrink-0 items-center justify-center rounded border border-outline-gray-2 text-ink-gray-6 hover:bg-surface-gray-2 hover:text-ink-gray-9"
+									:title="`Open ${item.document} ${item.record}`"
+									@click.stop
+								>
+									<FeatherIcon name="external-link" class="h-3.5 w-3.5" />
+								</a>
+							</div>
 						</template>
 					</div>
 				</div>
@@ -142,6 +167,7 @@
 import { computed, nextTick, onBeforeUnmount, onMounted, ref } from "vue"
 import { call, TextEditor, debounce } from "frappe-ui"
 import FrappeLink from "@spa/components/FrappeLink.vue"
+import { deskRecordUrl } from "@spa/utils/deskUrl.js"
 
 const props = defineProps({
 	checklist: { type: Object, required: true },
@@ -153,6 +179,7 @@ const emit = defineEmits(["updated"])
 const deskUrl = computed(
 	() => props.checklist.desk_url || (props.checklist.name ? `/app/checklist/${props.checklist.name}` : "")
 )
+
 const API = "phamos.api.checklist_inbox"
 const editorMenu = [
 	"Paragraph",
