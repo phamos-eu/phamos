@@ -2,9 +2,9 @@
 	<div ref="root" class="relative flex-shrink-0">
 		<button
 			type="button"
-			class="flex h-7 w-7 items-center justify-center rounded border border-gray-300 bg-white text-gray-600 hover:bg-gray-100 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-300 dark:hover:bg-gray-700"
+			class="flex h-7 w-7 items-center justify-center rounded border border-outline-gray-2 bg-surface-white text-ink-gray-5 hover:bg-surface-gray-2"
 			:class="{
-				'border-gray-900 text-gray-900 dark:border-gray-300 dark:text-gray-100': modelValue,
+				'border-outline-gray-5 text-ink-gray-9': modelValue,
 			}"
 			:aria-label="ariaLabel"
 			@click.stop="toggle"
@@ -13,28 +13,20 @@
 		</button>
 		<div
 			v-if="open"
-			class="absolute right-0 top-full z-20 mt-1 w-44 rounded-md border border-gray-200 bg-white py-1 shadow-lg dark:border-gray-700 dark:bg-gray-800"
+			class="absolute right-0 top-full z-20 mt-1 w-44 rounded-md border border-outline-gray-2 bg-surface-modal py-1 shadow-lg"
 		>
 			<button
 				type="button"
-				class="block w-full px-3 py-1.5 text-left text-xs hover:bg-gray-50 dark:hover:bg-gray-700"
-				:class="
-					!modelValue
-						? 'font-medium text-gray-900 dark:text-gray-100'
-						: 'text-gray-600 dark:text-gray-400'
-				"
+				class="block w-full px-3 py-1.5 text-left text-xs hover:bg-surface-gray-2"
+				:class="!modelValue ? 'font-medium text-ink-gray-9' : 'text-ink-gray-5'"
 				@click="setValue(false)"
 			>
 				{{ activeLabel }}
 			</button>
 			<button
 				type="button"
-				class="block w-full px-3 py-1.5 text-left text-xs hover:bg-gray-50 dark:hover:bg-gray-700"
-				:class="
-					modelValue
-						? 'font-medium text-gray-900 dark:text-gray-100'
-						: 'text-gray-600 dark:text-gray-400'
-				"
+				class="block w-full px-3 py-1.5 text-left text-xs hover:bg-surface-gray-2"
+				:class="modelValue ? 'font-medium text-ink-gray-9' : 'text-ink-gray-5'"
 				@click="setValue(true)"
 			>
 				{{ includeLabel }}
