@@ -72,6 +72,9 @@ function statusTheme(status) {
 		"On Hold": "orange",
 		Resolved: "green",
 		Closed: "gray",
+		"Not Started": "gray",
+		"In Progress": "orange",
+		Completed: "green",
 	}
 	return map[status] || "blue"
 }
@@ -83,6 +86,9 @@ function statusStrongClass(status) {
 		"On Hold": "bg-amber-500 text-white dark:bg-amber-500",
 		Resolved: "bg-green-600 text-white dark:bg-green-500",
 		Closed: "bg-gray-700 text-white dark:bg-gray-500",
+		"Not Started": "bg-gray-700 text-white dark:bg-gray-500",
+		"In Progress": "bg-amber-500 text-white dark:bg-amber-500",
+		Completed: "bg-green-600 text-white dark:bg-green-500",
 	}
 	return map[status] || "bg-blue-600 text-white dark:bg-blue-500"
 }

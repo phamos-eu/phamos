@@ -34,10 +34,18 @@ const navItems = [
 		],
 	},
 	{
-		name: "Checklists",
+		name: "ChecklistsHome",
 		label: "Checklists",
 		icon: "list",
-		match: ["Checklists", "ChecklistDetail"],
+		match: ["ChecklistsHome"],
+		children: [
+			{
+				name: "Checklists",
+				label: "Checklists",
+				icon: "list",
+				match: ["Checklists", "ChecklistDetail"],
+			},
+		],
 	},
 ]
 
@@ -45,7 +53,7 @@ const pageTitle = computed(() => {
 	if (route.name === "Tasks" || route.name === "TasksGantt" || route.name === "TaskDetail") {
 		return "Tasks"
 	}
-	if (route.name === "Checklists" || route.name === "ChecklistDetail") return "Checklists"
+	if (["ChecklistsHome", "Checklists", "ChecklistDetail"].includes(route.name)) return "Checklists"
 	return "Issues"
 })
 
@@ -55,6 +63,9 @@ const pageSubtitle = computed(() => {
 	}
 	if (route.name === "Tasks") {
 		return "HR department tasks overview"
+	}
+	if (route.name === "ChecklistsHome") {
+		return "HR checklist activity and workload"
 	}
 	if (route.name === "Checklists" || route.name === "ChecklistDetail") {
 		return "Checklists linked to HR issues and tasks"

@@ -122,6 +122,40 @@ def get_checklists(include_completed=0):
 
 
 @frappe.whitelist()
+def get_checklist_dashboard():
+	"""Return HR Checklist dashboard metrics and chart data."""
+	return dc.get_checklist_dashboard(CONFIG)
+
+
+@frappe.whitelist(methods=["POST"])
+def create_checklist(
+	document,
+	reference_record,
+	name=None,
+	items=None,
+	checklist_owner=None,
+	checklist_template=None,
+):
+	"""Create a Checklist linked to an HR Issue or Task."""
+	return dc.create_checklist(
+		CONFIG,
+		document,
+		reference_record,
+		name=name,
+		items=items,
+		checklist_owner=checklist_owner,
+		checklist_template=checklist_template,
+	)
+
+
+@frappe.whitelist()
+@frappe.validate_and_sanitize_search_inputs
+def checklist_reference_query(doctype, txt, searchfield, start, page_len, filters):
+	"""Search HR-scoped Issue/Task parents for Checklist creation."""
+	return dc.checklist_reference_query(CONFIG, doctype, txt, searchfield, start, page_len, filters)
+
+
+@frappe.whitelist()
 def get_task(name):
 	"""Return Task detail for the HR SPA."""
 	return dc.get_task(CONFIG, name)
