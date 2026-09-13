@@ -175,6 +175,8 @@
 			</p>
 			<a
 				:href="task.desk_url"
+				target="_blank"
+				rel="noopener noreferrer"
 				class="flex w-full items-center gap-2 rounded-md px-2 py-2 text-sm font-medium text-ink-gray-7 hover:bg-surface-gray-2 hover:text-ink-gray-9"
 			>
 				<FeatherIcon name="external-link" class="h-4 w-4 flex-shrink-0" />
