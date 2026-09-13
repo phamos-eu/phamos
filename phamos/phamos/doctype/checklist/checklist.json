@@ -15,6 +15,7 @@
   "checklist_owner",
   "status",
   "completion_percentage",
+  "completed_on",
   "section_break_hnfc",
   "checklist_items"
  ],
@@ -87,6 +88,13 @@
    "fieldname": "completion_percentage",
    "fieldtype": "Percent",
    "label": "Completion Percentage",
+   "read_only": 1
+  },
+  {
+   "fieldname": "completed_on",
+   "fieldtype": "Datetime",
+   "hidden": 1,
+   "label": "Completed On",
    "read_only": 1
   }
  ],

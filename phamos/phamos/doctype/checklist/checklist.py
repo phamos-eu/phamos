@@ -4,12 +4,14 @@
 import frappe
 from frappe.model.document import Document
 from frappe.exceptions import TimestampMismatchError
+from frappe.utils import now_datetime
 
 
 class Checklist(Document):
 	def validate(self):
 		self.validate_checklist_owner()
 		self.set_completion_percentage_and_status()
+		self.set_completed_on()
 
 	def validate_checklist_owner(self):
 		if not self.checklist_owner:
@@ -38,6 +40,15 @@ class Checklist(Document):
 			self.status = "Completed"
 		else:
 			self.status = "In Progress"
+
+	def set_completed_on(self):
+		"""Record the real transition time used by dashboard completion metrics."""
+		if not self.meta.has_field("completed_on"):
+			return
+		if self.status == "Completed" and not self.completed_on:
+			self.completed_on = now_datetime()
+		elif self.status != "Completed":
+			self.completed_on = None
 
 
 @frappe.whitelist()

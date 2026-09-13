@@ -22,11 +22,31 @@
 	>
 		<template #body-content>
 			<div class="space-y-4">
+				<div v-if="!hasFixedReference" class="grid grid-cols-2 gap-3">
+					<div>
+						<label class="mb-1.5 block text-xs text-ink-gray-5">Linked DocType</label>
+						<FormControl
+							v-model="selectedDocument"
+							type="select"
+							size="sm"
+							:options="['Issue', 'Task']"
+						/>
+					</div>
+					<div>
+						<label class="mb-1.5 block text-xs text-ink-gray-5">Linked record</label>
+						<FrappeLink
+							:doctype="selectedDocument"
+							v-model="selectedReferenceRecord"
+							placeholder="Select a record"
+							:query="referenceQuery"
+						/>
+					</div>
+				</div>
 				<div>
 					<label class="mb-1.5 block text-xs text-ink-gray-5">Checklist Template</label>
 					<ChecklistTemplatePicker
 						v-model="checklistTemplate"
-						:document="document"
+						:document="activeDocument"
 						:disabled="loadingTemplate"
 					/>
 				</div>
@@ -129,16 +149,18 @@
 </template>
 
 <script setup>
-import { nextTick, ref, watch } from "vue"
+import { computed, nextTick, ref, watch } from "vue"
 import { call, TextEditor } from "frappe-ui"
 import ChecklistTemplatePicker from "@spa/components/ChecklistTemplatePicker.vue"
 import FrappeLink from "@spa/components/FrappeLink.vue"
 
 const props = defineProps({
 	modelValue: { type: Boolean, default: false },
-	document: { type: String, required: true },
-	referenceRecord: { type: String, required: true },
+	document: { type: String, default: "" },
+	referenceRecord: { type: String, default: "" },
 	referenceTitle: { type: String, default: "" },
+	createMethod: { type: String, default: "phamos.api.checklist_inbox.create_spa_checklist" },
+	referenceQuery: { type: String, default: "" },
 })
 
 const emit = defineEmits(["update:modelValue", "created"])
@@ -148,6 +170,8 @@ const noteEditorMenu = ["Bold", "Italic", "Link", "Separator", "Bullet List", "N
 
 let nextId = 1
 const checklistTemplate = ref("")
+const selectedDocument = ref("Issue")
+const selectedReferenceRecord = ref("")
 const title = ref("")
 const checklistOwner = ref("")
 const titleFieldHost = ref(null)
@@ -158,6 +182,10 @@ const loadingTemplate = ref(false)
 const noteEditorKey = ref(0)
 const error = ref("")
 let applyToken = 0
+
+const hasFixedReference = computed(() => Boolean(props.document && props.referenceRecord))
+const activeDocument = computed(() => props.document || selectedDocument.value)
+const activeReferenceRecord = computed(() => props.referenceRecord || selectedReferenceRecord.value)
 
 function setDescriptionHost(id, el) {
 	if (el) descriptionHosts.set(id, el)
@@ -193,6 +221,8 @@ function resetForm() {
 	descriptionHosts.clear()
 	applyToken += 1
 	checklistTemplate.value = ""
+	selectedDocument.value = props.document || "Issue"
+	selectedReferenceRecord.value = props.referenceRecord || ""
 	title.value = (props.referenceTitle || "").trim()
 	checklistOwner.value = ""
 	rows.value = [emptyRow()]
@@ -217,8 +247,8 @@ async function applyTemplate(name) {
 	try {
 		const template = await call(`${API}.get_checklist_template`, { name })
 		if (token !== applyToken) return
-		if (template.document && template.document !== props.document) {
-			error.value = `Template is for ${template.document}, not ${props.document}`
+		if (template.document && template.document !== activeDocument.value) {
+			error.value = `Template is for ${template.document}, not ${activeDocument.value}`
 			checklistTemplate.value = ""
 			applyBlankItems()
 			return
@@ -297,6 +327,10 @@ async function submit() {
 		error.value = "Checklist Owner is required"
 		return
 	}
+	if (!activeReferenceRecord.value) {
+		error.value = "Linked record is required"
+		return
+	}
 	const items = buildItems()
 	if (!items.length) {
 		error.value = "Add at least one checklist item"
@@ -305,9 +339,9 @@ async function submit() {
 
 	creating.value = true
 	try {
-		const created = await call(`${API}.create_spa_checklist`, {
-			document: props.document,
-			reference_record: props.referenceRecord,
+		const created = await call(props.createMethod, {
+			document: activeDocument.value,
+			reference_record: activeReferenceRecord.value,
 			name,
 			checklist_owner: owner,
 			checklist_template: checklistTemplate.value || null,
@@ -343,5 +377,11 @@ watch(checklistTemplate, (name, previous) => {
 		return
 	}
 	applyTemplate(next)
+})
+
+watch(selectedDocument, () => {
+	if (hasFixedReference.value) return
+	selectedReferenceRecord.value = ""
+	checklistTemplate.value = ""
 })
 </script>
