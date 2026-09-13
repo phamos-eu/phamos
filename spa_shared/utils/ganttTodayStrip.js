@@ -5,6 +5,7 @@ const EDGE_WIDTH = 2
 /**
  * Draw today column inside the SVG grid layer (above row lines, below bars/arrows).
  * Edge line is placed at stripRect.edgeLeft (time-of-day within the day column).
+ * Extends SVG height when needed so the indicator reaches the body viewport bottom.
  */
 export function updateGanttTodayStrip(gantt, stripRect, minHeight = 0) {
 	if (!gantt?.layers?.grid) return
@@ -19,6 +20,9 @@ export function updateGanttTodayStrip(gantt, stripRect, minHeight = 0) {
 
 	const svgHeight = Number(svg.getAttribute("height")) || 0
 	const height = Math.max(svgHeight, minHeight)
+	if (height > svgHeight) {
+		svg.setAttribute("height", String(height))
+	}
 
 	const rect = document.createElementNS("http://www.w3.org/2000/svg", "rect")
 	rect.setAttribute("x", String(stripRect.left))

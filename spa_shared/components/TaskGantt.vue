@@ -371,9 +371,7 @@ const todayStrip = computed(() => {
 	return todayStripRect(timeline.value)
 })
 
-const bodyInnerMinHeightPx = computed(() =>
-	Math.max(ganttTasks.value.length ? 0 : 120, bodyViewportHeight.value)
-)
+const bodyInnerMinHeightPx = computed(() => Math.max(bodyViewportHeight.value, 1))
 
 const bodyInnerStyle = computed(() => {
 	const minH = bodyInnerMinHeightPx.value
