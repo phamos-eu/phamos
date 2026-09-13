@@ -35,10 +35,19 @@
 				<div class="mb-1 text-[11px] font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400">
 					Linked
 				</div>
-				<div>
-					{{ checklist.document }}
-					<span v-if="checklist.reference_record"> / {{ checklist.reference_record }}</span>
-				</div>
+				<a
+					v-if="checklist.reference_record"
+					:href="deskRecordUrl(checklist.document, checklist.reference_record)"
+					target="_blank"
+					rel="noopener noreferrer"
+					class="inline-flex max-w-full items-center gap-1 font-medium text-ink-gray-8 underline-offset-2 hover:underline"
+				>
+					<span class="truncate">
+						{{ checklist.document }} / {{ checklist.reference_record }}
+					</span>
+					<FeatherIcon name="external-link" class="h-3.5 w-3.5 flex-shrink-0" />
+				</a>
+				<div v-else>{{ checklist.document }}</div>
 			</div>
 		</section>
 
@@ -53,6 +62,7 @@
 
 <script setup>
 import ChecklistEditor from "@spa/components/ChecklistEditor.vue"
+import { deskRecordUrl } from "@spa/utils/deskUrl.js"
 
 defineProps({
 	checklist: { type: Object, required: true },
