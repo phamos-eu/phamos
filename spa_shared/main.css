@@ -150,8 +150,16 @@ html[data-theme="dark"] {
 }
 
 .hr-gantt-wrap .gantt .hr-gantt-selected-row {
-	fill: var(--surface-blue-1);
+	fill: var(--surface-blue-2);
 	pointer-events: none;
+}
+
+.hr-gantt-list-row:nth-child(even):not(.hr-gantt-list-row--selected) {
+	background: var(--surface-gray-1);
+}
+
+[data-theme="dark"] .hr-gantt-list-row:nth-child(even):not(.hr-gantt-list-row--selected) {
+	background: var(--surface-gray-2);
 }
 
 .hr-gantt-header-row {
@@ -198,7 +206,7 @@ html[data-theme="dark"] {
 }
 
 .hr-gantt-list-row--selected {
-	background: var(--surface-blue-1);
+	background: var(--surface-blue-2);
 	box-shadow: inset 3px 0 0 var(--ink-blue-3);
 }
 
