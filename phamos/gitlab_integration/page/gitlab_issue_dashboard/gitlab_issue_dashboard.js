@@ -377,10 +377,20 @@ class GitLabIssueDashboard {
         const projectTitles = (this.currentData && this.currentData.project_titles) || {};
         const flowColors = this.getChartColors("flow");
 
-        const totals = rows.reduce((acc, row) => acc + (row.open_total || 0), 0);
+        // open_total is now a running snapshot per month, not a per-month cohort,
+        // so "Total Open" sums only the latest month's rows (one per project)
+        // instead of adding every month together.
+        const latestOrder = rows.reduce((max, row) => Math.max(max, row.month_order || 0), 0);
+        const latestRows = rows.filter((row) => (row.month_order || 0) === latestOrder);
+        const totals = latestRows.reduce((acc, row) => acc + (row.open_total || 0), 0);
+        const latestMonthLabel = latestRows.length ? (latestRows[0].month || latestRows[0].month_key) : "";
 
         this.$lifetimeTicketsKpis.html(`
-            <div class="gid-kpi gid-kpi-opened"><small>${__("Total Open")}</small><strong>${totals}</strong></div>
+            <div class="gid-kpi gid-kpi-opened">
+                <small>${__("Total Open")}</small>
+                <strong>${totals}</strong>
+                ${latestMonthLabel ? `<div class="text-muted" style="font-size: 11px;">${__("As of {0} (the latest month in range)", [latestMonthLabel])}</div>` : ""}
+            </div>
         `);
 
         if (!rows.length) {
