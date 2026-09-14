@@ -179,16 +179,27 @@ def get_checklist_template_picker_options(document, txt="", start=0, page_len=20
 
 
 @frappe.whitelist()
-def get_checklist_template(name):
-	"""Submitted template payload for SPA create dialog (snapshot preview)."""
+def get_checklist_template(document, name):
+	"""Submitted template payload for SPA create dialog (snapshot preview).
+
+	`document` must match the same scope `checklist_template_query`/
+	`get_checklist_template_picker_options` already filter by. Without it, a
+	user could fetch any submitted template by `name` alone — and template
+	names are a predictable naming series (CHKT-####) — bypassing the
+	document-scoped browse flow entirely and reading template content that
+	was never surfaced to them.
+	"""
 	frappe.has_permission("Checklist", "create", throw=True)
+	document = (document or "").strip()
 	name = (name or "").strip()
+	if document not in CHECKLIST_REFERENCE_DOCTYPES:
+		frappe.throw(_("Unsupported checklist reference type: {0}").format(document))
 	if not name:
 		frappe.throw(_("Checklist Template is required"))
 
 	row = frappe.db.get_value(
 		"Checklist Template",
-		{"name": name, "docstatus": 1},
+		{"name": name, **_template_picker_filters(document)},
 		["name", "title", "document", "checklist_template_owner"],
 		as_dict=True,
 	)

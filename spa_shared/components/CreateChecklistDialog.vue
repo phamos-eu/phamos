@@ -247,14 +247,11 @@ async function applyTemplate(name) {
 	error.value = ""
 	loadingTemplate.value = true
 	try {
-		const template = await call(`${API}.get_checklist_template`, { name })
+		const template = await call(`${API}.get_checklist_template`, {
+			document: activeDocument.value,
+			name,
+		})
 		if (token !== applyToken) return
-		if (template.document && template.document !== activeDocument.value) {
-			error.value = `Template is for ${template.document}, not ${activeDocument.value}`
-			checklistTemplate.value = ""
-			applyBlankItems()
-			return
-		}
 		nextId = 1
 		descriptionHosts.clear()
 		title.value = (template.title || "").trim() || (props.referenceTitle || "").trim()
