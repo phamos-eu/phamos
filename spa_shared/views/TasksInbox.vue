@@ -10,7 +10,7 @@
 				{{ configError }}
 			</div>
 			<div
-				v-else-if="loading"
+				v-else-if="loading && !hasLoadedOnce"
 				class="flex flex-1 items-center justify-center text-sm text-ink-gray-5"
 			>
 				Loading…
@@ -66,6 +66,10 @@ const router = useRouter()
 const includeCompleted = ref(false)
 const search = ref("")
 const loading = ref(false)
+/** Only the very first load should replace the Gantt with a full-screen spinner —
+ *  later refreshes (e.g. after editing a task) must leave it mounted, since
+ *  unmounting/remounting resets its scroll position and flashes every bar. */
+const hasLoadedOnce = ref(false)
 const configError = ref("")
 const tasks = ref([])
 const selectedName = ref(null)
@@ -108,6 +112,7 @@ async function loadTasks() {
 		configError.value = e?.messages?.[0] || e?.message || "Could not load tasks"
 	} finally {
 		loading.value = false
+		hasLoadedOnce.value = true
 	}
 }
 

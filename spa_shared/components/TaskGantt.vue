@@ -667,35 +667,42 @@ function handleLinkClick(taskId) {
 }
 
 function buildGantt() {
-	destroyGantt()
-	if (!ganttHost.value) return
-
-	injectBarColors()
 	const tasksForGantt = ganttTasks.value
+	injectBarColors()
 
-	gantt = new Gantt(ganttHost.value, tasksForGantt, {
-		view_mode: "Day",
-		column_width: zoom.value,
-		bar_height: BAR_HEIGHT,
-		padding: ROW_PADDING,
-		header_height: 0,
-		date_format: "YYYY-MM-DD",
-		language: "en",
-		on_click: (task) => {
-			if (linkMode.value) {
-				handleLinkClick(task.id)
-				return
-			}
-			emit("select", task.id)
-		},
-		on_date_change: (task, start, end) => {
-			emit("date-change", {
-				name: task.id,
-				exp_start_date: formatDateIso(start),
-				exp_end_date: formatDateIso(end),
-			})
-		},
-	})
+	if (!gantt) {
+		if (!ganttHost.value) return
+		gantt = new Gantt(ganttHost.value, tasksForGantt, {
+			view_mode: "Day",
+			column_width: zoom.value,
+			bar_height: BAR_HEIGHT,
+			padding: ROW_PADDING,
+			header_height: 0,
+			date_format: "YYYY-MM-DD",
+			language: "en",
+			on_click: (task) => {
+				if (linkMode.value) {
+					handleLinkClick(task.id)
+					return
+				}
+				emit("select", task.id)
+			},
+			on_date_change: (task, start, end) => {
+				emit("date-change", {
+					name: task.id,
+					exp_start_date: formatDateIso(start),
+					exp_end_date: formatDateIso(end),
+				})
+			},
+		})
+	} else {
+		// Update the existing chart in place rather than tearing down and
+		// reconstructing the SVG on every edit: that caused every bar to visibly
+		// flash and reset the timeline's scroll position back to the top.
+		// setup_tasks() absorbs the new data without touching gantt_start/gantt_end,
+		// so applyGanttFrame() below still re-applies our own custom date range.
+		gantt.setup_tasks(tasksForGantt)
+	}
 
 	applyGanttFrame()
 
