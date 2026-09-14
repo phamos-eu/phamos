@@ -101,6 +101,7 @@ def execute():
 		doc.status = "Open"
 		doc.flags.ignore_permissions = True
 		doc.flags.ignore_validate_update_after_submit = True
+		doc.flags.ignore_links = True
 		doc.save()
 		doc.sync_and_auto_close()
 		if i % 50 == 0:
