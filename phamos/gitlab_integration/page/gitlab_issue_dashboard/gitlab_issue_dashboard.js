@@ -680,10 +680,15 @@ class GitLabIssueDashboard {
             companyAging.bucket_gt_90 || 0,
         ];
 
+        const avgAgeHtml = (value) => {
+            if (value === null || value === undefined) return "";
+            return `<div class="gid-kpi-sub">${__("{0} days on average", [value])}</div>`;
+        };
+
         this.$agingKpis.html(`
-            <div class="gid-kpi gid-kpi-green gid-clickable" data-bucket="0_30"><small>${__("0-30 days")}</small><strong>${values[0]}</strong></div>
-            <div class="gid-kpi gid-kpi-amber gid-clickable" data-bucket="31_90"><small>${__("31-90 days")}</small><strong>${values[1]}</strong></div>
-            <div class="gid-kpi gid-kpi-red gid-clickable" data-bucket="gt_90"><small>${__(">90 days")}</small><strong>${values[2]}</strong></div>
+            <div class="gid-kpi gid-kpi-green gid-clickable" data-bucket="0_30"><small>${__("0-30 days")}</small><strong>${values[0]}</strong>${avgAgeHtml(aging.avg_0_30)}</div>
+            <div class="gid-kpi gid-kpi-amber gid-clickable" data-bucket="31_90"><small>${__("31-90 days")}</small><strong>${values[1]}</strong>${avgAgeHtml(aging.avg_31_90)}</div>
+            <div class="gid-kpi gid-kpi-red gid-clickable" data-bucket="gt_90"><small>${__(">90 days")}</small><strong>${values[2]}</strong>${avgAgeHtml(aging.avg_gt_90)}</div>
         `);
         this.$agingKpis.off("click", ".gid-kpi").on("click", ".gid-kpi", (e) => {
             const bucket = $(e.currentTarget).attr("data-bucket");

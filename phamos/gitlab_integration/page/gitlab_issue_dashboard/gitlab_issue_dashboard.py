@@ -397,7 +397,10 @@ def _build_flow_rows_and_aging(from_date, to_date, selected_projects, issue_scop
             gi.gitlab_project,
                         SUM(CASE WHEN gi.aging_days <= 30 THEN 1 ELSE 0 END) AS bucket_0_30,
                         SUM(CASE WHEN gi.aging_days > 30 AND gi.aging_days <= 90 THEN 1 ELSE 0 END) AS bucket_31_90,
-                        SUM(CASE WHEN gi.aging_days > 90 THEN 1 ELSE 0 END) AS bucket_gt_90
+                        SUM(CASE WHEN gi.aging_days > 90 THEN 1 ELSE 0 END) AS bucket_gt_90,
+                        SUM(CASE WHEN gi.aging_days <= 30 THEN gi.aging_days ELSE 0 END) AS sum_0_30,
+                        SUM(CASE WHEN gi.aging_days > 30 AND gi.aging_days <= 90 THEN gi.aging_days ELSE 0 END) AS sum_31_90,
+                        SUM(CASE WHEN gi.aging_days > 90 THEN gi.aging_days ELSE 0 END) AS sum_gt_90
         FROM `tabGitLab Issue` gi
         WHERE gi.state = 'closed'
           AND gi.aging_days IS NOT NULL
@@ -450,6 +453,9 @@ def _build_flow_rows_and_aging(from_date, to_date, selected_projects, issue_scop
             "bucket_0_30": int(row.bucket_0_30 or 0),
             "bucket_31_90": int(row.bucket_31_90 or 0),
             "bucket_gt_90": int(row.bucket_gt_90 or 0),
+            "sum_0_30": float(row.sum_0_30 or 0),
+            "sum_31_90": float(row.sum_31_90 or 0),
+            "sum_gt_90": float(row.sum_gt_90 or 0),
         }
         for row in aging_rows
     }
@@ -918,6 +924,12 @@ def _round_avg(value):
     return round(float(value), 2)
 
 
+def _bucket_avg(total_days, count):
+    if not count:
+        return None
+    return round(total_days / count, 1)
+
+
 def _collect_project_names(opened_rows, closed_rows, aging_rows, selected_projects):
     if selected_projects:
         return selected_projects
@@ -983,11 +995,17 @@ def _aggregate_aging_totals(aging_map):
     total_0_30 = sum((row or {}).get("bucket_0_30", 0) for row in aging_map.values())
     total_31_90 = sum((row or {}).get("bucket_31_90", 0) for row in aging_map.values())
     total_gt_90 = sum((row or {}).get("bucket_gt_90", 0) for row in aging_map.values())
+    sum_0_30 = sum((row or {}).get("sum_0_30", 0) for row in aging_map.values())
+    sum_31_90 = sum((row or {}).get("sum_31_90", 0) for row in aging_map.values())
+    sum_gt_90 = sum((row or {}).get("sum_gt_90", 0) for row in aging_map.values())
 
     return {
         "bucket_0_30": int(total_0_30),
         "bucket_31_90": int(total_31_90),
         "bucket_gt_90": int(total_gt_90),
+        "avg_0_30": _bucket_avg(sum_0_30, total_0_30),
+        "avg_31_90": _bucket_avg(sum_31_90, total_31_90),
+        "avg_gt_90": _bucket_avg(sum_gt_90, total_gt_90),
     }
 
 
@@ -1017,17 +1035,26 @@ def _format_aging_response(aging_map, selected_projects, project_names):
     compare_projects = selected_projects or project_names
     project_buckets = []
 
+    empty_values = {
+        "bucket_0_30": 0,
+        "bucket_31_90": 0,
+        "bucket_gt_90": 0,
+        "sum_0_30": 0,
+        "sum_31_90": 0,
+        "sum_gt_90": 0,
+    }
+
     for project in compare_projects:
-        values = aging_map.get(
-            project,
-            {"bucket_0_30": 0, "bucket_31_90": 0, "bucket_gt_90": 0},
-        )
+        values = aging_map.get(project, empty_values)
         project_buckets.append(
             {
                 "project": project,
                 "bucket_0_30": values["bucket_0_30"],
                 "bucket_31_90": values["bucket_31_90"],
                 "bucket_gt_90": values["bucket_gt_90"],
+                "avg_0_30": _bucket_avg(values.get("sum_0_30", 0), values["bucket_0_30"]),
+                "avg_31_90": _bucket_avg(values.get("sum_31_90", 0), values["bucket_31_90"]),
+                "avg_gt_90": _bucket_avg(values.get("sum_gt_90", 0), values["bucket_gt_90"]),
             }
         )
 
@@ -1040,6 +1067,9 @@ def _format_aging_response(aging_map, selected_projects, project_names):
             "bucket_0_30": values["bucket_0_30"],
             "bucket_31_90": values["bucket_31_90"],
             "bucket_gt_90": values["bucket_gt_90"],
+            "avg_0_30": _bucket_avg(values.get("sum_0_30", 0), values["bucket_0_30"]),
+            "avg_31_90": _bucket_avg(values.get("sum_31_90", 0), values["bucket_31_90"]),
+            "avg_gt_90": _bucket_avg(values.get("sum_gt_90", 0), values["bucket_gt_90"]),
             "project_buckets": project_buckets,
         }
 
@@ -1047,6 +1077,9 @@ def _format_aging_response(aging_map, selected_projects, project_names):
         total_0_30 = sum(v["bucket_0_30"] for v in aging_map.values())
         total_31_90 = sum(v["bucket_31_90"] for v in aging_map.values())
         total_gt_90 = sum(v["bucket_gt_90"] for v in aging_map.values())
+        sum_0_30 = sum(v.get("sum_0_30", 0) for v in aging_map.values())
+        sum_31_90 = sum(v.get("sum_31_90", 0) for v in aging_map.values())
+        sum_gt_90 = sum(v.get("sum_gt_90", 0) for v in aging_map.values())
 
         return {
             "mode": "project_compare",
@@ -1054,12 +1087,18 @@ def _format_aging_response(aging_map, selected_projects, project_names):
             "bucket_0_30": total_0_30,
             "bucket_31_90": total_31_90,
             "bucket_gt_90": total_gt_90,
+            "avg_0_30": _bucket_avg(sum_0_30, total_0_30),
+            "avg_31_90": _bucket_avg(sum_31_90, total_31_90),
+            "avg_gt_90": _bucket_avg(sum_gt_90, total_gt_90),
             "project_buckets": project_buckets,
         }
 
     total_0_30 = sum(v["bucket_0_30"] for v in aging_map.values())
     total_31_90 = sum(v["bucket_31_90"] for v in aging_map.values())
     total_gt_90 = sum(v["bucket_gt_90"] for v in aging_map.values())
+    sum_0_30 = sum(v.get("sum_0_30", 0) for v in aging_map.values())
+    sum_31_90 = sum(v.get("sum_31_90", 0) for v in aging_map.values())
+    sum_gt_90 = sum(v.get("sum_gt_90", 0) for v in aging_map.values())
 
     return {
         "mode": "combined",
@@ -1067,5 +1106,8 @@ def _format_aging_response(aging_map, selected_projects, project_names):
         "bucket_0_30": total_0_30,
         "bucket_31_90": total_31_90,
         "bucket_gt_90": total_gt_90,
+        "avg_0_30": _bucket_avg(sum_0_30, total_0_30),
+        "avg_31_90": _bucket_avg(sum_31_90, total_31_90),
+        "avg_gt_90": _bucket_avg(sum_gt_90, total_gt_90),
         "project_buckets": project_buckets,
     }
