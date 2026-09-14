@@ -32,7 +32,7 @@
 				<div
 					ref="listScroll"
 					class="hr-gantt-list min-h-0 flex-1 overflow-y-auto overflow-x-hidden"
-					@wheel="onListWheel"
+					@scroll="onListScroll"
 				>
 					<div :style="listRowsStyle">
 						<button
@@ -790,11 +790,15 @@ function onHeaderWheel(e) {
 	el.scrollLeft += delta
 }
 
-function onListWheel(e) {
-	const body = bodyScroll.value
-	if (!body) return
-	e.preventDefault()
-	body.scrollTop += e.deltaY
+/** Mirrors onHeaderScroll/onBodyScroll: syncs the timeline to the list on any native
+ *  scroll of the list (wheel, touch, keyboard) — not just mouse-wheel deltas. */
+function onListScroll() {
+	if (syncingScroll) return
+	syncingScroll = true
+	if (bodyScroll.value && listScroll.value) {
+		bodyScroll.value.scrollTop = listScroll.value.scrollTop
+	}
+	syncingScroll = false
 }
 
 function onFrameChange() {
