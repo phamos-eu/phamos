@@ -1,28 +1,30 @@
 <template>
-	<Autocomplete
-		ref="autocompleteRef"
-		size="sm"
-		v-model="value"
-		:placeholder="placeholder"
-		:options="options.data || []"
-		:class="disabled ? 'pointer-events-none opacity-60' : ''"
-		:disabled="disabled"
-		@update:query="handleQueryUpdate"
-	>
-		<template v-if="stackDescription" #item-suffix="{ option }">
-			<div
-				v-if="option?.description"
-				class="max-w-[55%] whitespace-normal text-right text-xs leading-snug text-ink-gray-5"
-			>
-				{{ option.description }}
-			</div>
-		</template>
-	</Autocomplete>
+	<div ref="wrapperEl" @keydown="onTriggerKeydown">
+		<Autocomplete
+			ref="autocompleteRef"
+			size="sm"
+			v-model="value"
+			:placeholder="placeholder"
+			:options="options.data || []"
+			:class="disabled ? 'pointer-events-none opacity-60' : ''"
+			:disabled="disabled"
+			@update:query="handleQueryUpdate"
+		>
+			<template v-if="stackDescription" #item-suffix="{ option }">
+				<div
+					v-if="option?.description"
+					class="max-w-[55%] whitespace-normal text-right text-xs leading-snug text-ink-gray-5"
+				>
+					{{ option.description }}
+				</div>
+			</template>
+		</Autocomplete>
+	</div>
 </template>
 
 <script setup>
 import { createResource, Autocomplete, debounce } from "frappe-ui"
-import { ref, computed, watch } from "vue"
+import { ref, computed, watch, nextTick } from "vue"
 
 const props = defineProps({
 	doctype: {
@@ -59,7 +61,19 @@ const props = defineProps({
 const emit = defineEmits(["update:modelValue"])
 
 const autocompleteRef = ref(null)
+const wrapperEl = ref(null)
 const searchText = ref("")
+
+// Autocomplete's closed trigger is a plain <button> that only opens on click;
+// once open, focus moves to its own search input, which headlessui already
+// drives with the arrow keys. So only intercept the keys while still closed.
+function onTriggerKeydown(event) {
+	if (props.disabled) return
+	if (event.key !== "ArrowDown" && event.key !== "ArrowUp") return
+	if (event.target?.tagName !== "BUTTON") return
+	event.preventDefault()
+	autocompleteRef.value?.togglePopover?.()
+}
 
 const value = computed({
 	get: () => props.modelValue,
@@ -67,6 +81,11 @@ const value = computed({
 		const newVal =
 			val && typeof val === "object" && val.value !== undefined ? val.value : val
 		emit("update:modelValue", newVal || "")
+		// Selecting (or clearing) an option hides the dropdown via display:none,
+		// which per spec blurs focus to <body> — restore it to our own trigger
+		// button so a following Tab continues to the next field, not the top of
+		// the whole page.
+		nextTick(() => wrapperEl.value?.querySelector("button")?.focus())
 	},
 })
 
