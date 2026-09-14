@@ -16,7 +16,7 @@
 					savingItem === item.name ? 'opacity-60' : '',
 				]"
 				role="button"
-				tabindex="0"
+				:tabindex="expandedItem === item.name ? -1 : 0"
 				@click.stop="expand(item)"
 				@keydown.enter.prevent="expand(item)"
 			>
@@ -84,7 +84,6 @@
 								@change="saveField(item, 'description', $event.target.value)"
 							/>
 							<TextEditor
-								ref="noteEditor"
 								:content="item.note || ''"
 								:fixed-menu="editorMenu"
 								placeholder="Item note…"
@@ -168,6 +167,7 @@ import { computed, nextTick, onBeforeUnmount, onMounted, ref } from "vue"
 import { call, TextEditor, debounce } from "frappe-ui"
 import FrappeLink from "@spa/components/FrappeLink.vue"
 import { deskRecordUrl } from "@spa/utils/deskUrl.js"
+import { skipTextEditorToolbarTabStops } from "@spa/utils/textEditorFocus.js"
 
 const props = defineProps({
 	checklist: { type: Object, required: true },
@@ -192,23 +192,22 @@ const editorMenu = [
 ]
 
 const root = ref(null)
-const noteEditor = ref(null)
 const savingItem = ref(null)
 const adding = ref(false)
 const expandedItem = ref(null)
 
-async function focusNoteEditor() {
-	// TextEditor creates TipTap in mounted(), then v-if reveals .ProseMirror on a later tick.
+async function focusFirstField() {
+	// The description input is rendered immediately, but wait a tick so the
+	// expanded card (and its input) is actually in the DOM first.
 	for (let i = 0; i < 20; i++) {
 		await nextTick()
-		const editor = noteEditor.value?.editor
-		if (editor?.view?.dom?.isConnected) {
-			editor.commands.focus("end")
+		const input = root.value?.querySelector('input[type="text"]')
+		if (input?.isConnected) {
+			input.focus()
 			return
 		}
 		await new Promise((resolve) => setTimeout(resolve, 20))
 	}
-	root.value?.querySelector?.(".ProseMirror")?.focus?.()
 }
 
 function hasNote(item) {
@@ -260,6 +259,7 @@ async function expand(item) {
 	if (expandedItem.value === item.name) return
 	await collapse()
 	expandedItem.value = item.name
+	skipTextEditorToolbarTabStops(root.value)
 }
 
 async function onDocClick(event) {
@@ -306,7 +306,13 @@ async function saveField(item, field, value, event = null) {
 
 async function onDocumentChange(item, document) {
 	const previousDocument = item.document || ""
-	const record = document === previousDocument ? item.record || "" : ""
+	const previousRecord = item.record || ""
+	const record = document === previousDocument ? previousRecord : ""
+	// Apply locally right away: the Record field only renders once item.document
+	// is set (v-if="item.document"), and it needs to exist before Tab is pressed,
+	// not after this save round-trips.
+	item.document = document
+	item.record = record
 	savingItem.value = item.name
 	try {
 		const updated = await call(`${API}.update_spa_checklist_item`, {
@@ -315,6 +321,9 @@ async function onDocumentChange(item, document) {
 			values: { document, record },
 		})
 		emit("updated", updated)
+	} catch (e) {
+		item.document = previousDocument
+		item.record = previousRecord
 	} finally {
 		savingItem.value = null
 	}
@@ -357,6 +366,9 @@ async function addItem() {
 	} finally {
 		adding.value = false
 	}
-	if (newestName) await focusNoteEditor()
+	if (newestName) {
+		skipTextEditorToolbarTabStops(root.value)
+		await focusFirstField()
+	}
 }
 </script>

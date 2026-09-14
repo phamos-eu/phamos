@@ -83,7 +83,7 @@
 
 					<div v-if="loadingTemplate" class="text-sm text-ink-gray-6">Loading template…</div>
 
-					<div v-else class="space-y-3">
+					<div v-else ref="itemsHost" class="space-y-3">
 						<div
 							v-for="row in rows"
 							:key="row.id"
@@ -153,6 +153,7 @@ import { computed, nextTick, ref, watch } from "vue"
 import { call, TextEditor } from "frappe-ui"
 import ChecklistTemplatePicker from "@spa/components/ChecklistTemplatePicker.vue"
 import FrappeLink from "@spa/components/FrappeLink.vue"
+import { skipTextEditorToolbarTabStops } from "@spa/utils/textEditorFocus.js"
 
 const props = defineProps({
 	modelValue: { type: Boolean, default: false },
@@ -175,6 +176,7 @@ const selectedReferenceRecord = ref("")
 const title = ref("")
 const checklistOwner = ref("")
 const titleFieldHost = ref(null)
+const itemsHost = ref(null)
 const rows = ref([])
 const descriptionHosts = new Map()
 const creating = ref(false)
@@ -384,4 +386,13 @@ watch(selectedDocument, () => {
 	selectedReferenceRecord.value = ""
 	checklistTemplate.value = ""
 })
+
+watch(
+	[rows, loadingTemplate],
+	() => {
+		if (loadingTemplate.value) return
+		skipTextEditorToolbarTabStops(itemsHost.value)
+	},
+	{ flush: "post" }
+)
 </script>
