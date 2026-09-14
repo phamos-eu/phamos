@@ -31,9 +31,10 @@
 				/>
 				<div
 					ref="listScroll"
-					class="hr-gantt-list min-h-0 flex-1 overflow-hidden"
+					class="hr-gantt-list min-h-0 flex-1 overflow-y-auto overflow-x-hidden"
+					@scroll="onListScroll"
 				>
-					<div :style="{ paddingTop: `${LIST_TOP_OFFSET}px` }">
+					<div :style="listRowsStyle">
 						<button
 							v-for="task in ganttTasks"
 							:key="task.id"
@@ -72,6 +73,7 @@
 					</div>
 				</div>
 				<div
+					ref="listFooter"
 					class="hr-gantt-list-footer flex-shrink-0 border-t border-outline-gray-2 bg-surface-gray-1 p-2 dark:bg-surface-gray-2"
 				>
 					<form class="flex items-center gap-1.5" @submit.prevent="submitNewTask">
@@ -158,7 +160,7 @@
 				</div>
 				<div
 					ref="headerScroll"
-					class="hr-gantt-header-scroll flex-shrink-0 overflow-x-auto border-b border-outline-gray-2 bg-surface-gray-1 dark:bg-surface-gray-2"
+					class="hr-gantt-header-scroll flex-shrink-0 overflow-x-auto bg-surface-gray-1 dark:bg-surface-gray-2"
 					@scroll="onHeaderScroll"
 					@wheel="onHeaderWheel"
 				>
@@ -240,6 +242,10 @@
 						<div ref="ganttHost" class="hr-gantt-wrap" />
 					</div>
 				</div>
+				<div
+					class="hr-gantt-footer-spacer flex-shrink-0 border-t border-outline-gray-2 bg-surface-gray-1 dark:bg-surface-gray-2"
+					:style="{ height: `${listFooterHeight}px` }"
+				/>
 			</div>
 		</div>
 	</div>
@@ -299,11 +305,16 @@ const headerScroll = ref(null)
 const bodyScroll = ref(null)
 const listScroll = ref(null)
 const newTaskInput = ref(null)
+const listFooter = ref(null)
 const bodyViewportHeight = ref(0)
+/** Height of the list's "new task" footer, mirrored as a spacer under the timeline
+ *  so both columns have the same visible height and stay scroll-locked to the bottom. */
+const listFooterHeight = ref(0)
 /** Bumps periodically so the now-line tracks the clock. */
 const nowTick = ref(Date.now())
 
 let bodyResizeObserver = null
+let listFooterResizeObserver = null
 let nowTickTimer = null
 
 const zoom = ref(38)
@@ -373,6 +384,10 @@ const todayStrip = computed(() => {
 
 const bodyInnerMinHeightPx = computed(() => Math.max(bodyViewportHeight.value, 1))
 
+/** Real row-content height for the dated tasks, shared by the list and the timeline
+ *  so both scrollable columns end at the same point and stay row-locked. */
+const rowsContentHeight = computed(() => LIST_TOP_OFFSET + ganttTasks.value.length * ROW_HEIGHT)
+
 const bodyInnerStyle = computed(() => {
 	const minH = bodyInnerMinHeightPx.value
 	return {
@@ -380,6 +395,11 @@ const bodyInnerStyle = computed(() => {
 		minHeight: minH > 0 ? `${minH}px` : undefined,
 	}
 })
+
+const listRowsStyle = computed(() => ({
+	paddingTop: `${LIST_TOP_OFFSET}px`,
+	minHeight: `${bodyInnerMinHeightPx.value}px`,
+}))
 
 const selectionBandStyle = computed(() => {
 	if (selectionStartCol.value === null || selectionEndCol.value === null) return null
@@ -588,6 +608,15 @@ function fixSvgWidth() {
 	if (svg) svg.setAttribute("width", String(timeline.value.totalWidth))
 }
 
+/** frappe-gantt pads its own SVG height ~100px beyond the real rows, which would let
+ *  the timeline scroll further than the task list. Clip it to our own row formula so
+ *  both columns have the same scrollable height and stay locked row-for-row. */
+function fixSvgHeight() {
+	if (!gantt) return
+	const svg = ganttHost.value?.querySelector("svg.gantt")
+	if (svg) svg.setAttribute("height", String(rowsContentHeight.value))
+}
+
 function injectBarColors() {
 	let el = document.getElementById(BAR_COLOR_STYLE_ID)
 	if (!el) {
@@ -614,6 +643,7 @@ function applyGanttFrame() {
 	gantt.options.column_width = zoom.value
 	gantt.render()
 	fixSvgWidth()
+	fixSvgHeight()
 	updateBarStateClasses()
 	restyleDependencyArrows(gantt)
 	updateTodayStripOverlay()
@@ -637,35 +667,42 @@ function handleLinkClick(taskId) {
 }
 
 function buildGantt() {
-	destroyGantt()
-	if (!ganttHost.value) return
-
-	injectBarColors()
 	const tasksForGantt = ganttTasks.value
+	injectBarColors()
 
-	gantt = new Gantt(ganttHost.value, tasksForGantt, {
-		view_mode: "Day",
-		column_width: zoom.value,
-		bar_height: BAR_HEIGHT,
-		padding: ROW_PADDING,
-		header_height: 0,
-		date_format: "YYYY-MM-DD",
-		language: "en",
-		on_click: (task) => {
-			if (linkMode.value) {
-				handleLinkClick(task.id)
-				return
-			}
-			emit("select", task.id)
-		},
-		on_date_change: (task, start, end) => {
-			emit("date-change", {
-				name: task.id,
-				exp_start_date: formatDateIso(start),
-				exp_end_date: formatDateIso(end),
-			})
-		},
-	})
+	if (!gantt) {
+		if (!ganttHost.value) return
+		gantt = new Gantt(ganttHost.value, tasksForGantt, {
+			view_mode: "Day",
+			column_width: zoom.value,
+			bar_height: BAR_HEIGHT,
+			padding: ROW_PADDING,
+			header_height: 0,
+			date_format: "YYYY-MM-DD",
+			language: "en",
+			on_click: (task) => {
+				if (linkMode.value) {
+					handleLinkClick(task.id)
+					return
+				}
+				emit("select", task.id)
+			},
+			on_date_change: (task, start, end) => {
+				emit("date-change", {
+					name: task.id,
+					exp_start_date: formatDateIso(start),
+					exp_end_date: formatDateIso(end),
+				})
+			},
+		})
+	} else {
+		// Update the existing chart in place rather than tearing down and
+		// reconstructing the SVG on every edit: that caused every bar to visibly
+		// flash and reset the timeline's scroll position back to the top.
+		// setup_tasks() absorbs the new data without touching gantt_start/gantt_end,
+		// so applyGanttFrame() below still re-applies our own custom date range.
+		gantt.setup_tasks(tasksForGantt)
+	}
 
 	applyGanttFrame()
 
@@ -760,6 +797,17 @@ function onHeaderWheel(e) {
 	el.scrollLeft += delta
 }
 
+/** Mirrors onHeaderScroll/onBodyScroll: syncs the timeline to the list on any native
+ *  scroll of the list (wheel, touch, keyboard) — not just mouse-wheel deltas. */
+function onListScroll() {
+	if (syncingScroll) return
+	syncingScroll = true
+	if (bodyScroll.value && listScroll.value) {
+		bodyScroll.value.scrollTop = listScroll.value.scrollTop
+	}
+	syncingScroll = false
+}
+
 function onFrameChange() {
 	normalizeFrameInputs()
 	clearSelectionBand()
@@ -833,6 +881,13 @@ onMounted(() => {
 			bodyResizeObserver = new ResizeObserver(() => updateBodyViewportHeight())
 			bodyResizeObserver.observe(bodyScroll.value)
 		}
+		if (listFooter.value) {
+			listFooterHeight.value = listFooter.value.offsetHeight
+			listFooterResizeObserver = new ResizeObserver(() => {
+				listFooterHeight.value = listFooter.value?.offsetHeight || 0
+			})
+			listFooterResizeObserver.observe(listFooter.value)
+		}
 	})
 })
 
@@ -843,6 +898,8 @@ onUnmounted(() => {
 	}
 	bodyResizeObserver?.disconnect()
 	bodyResizeObserver = null
+	listFooterResizeObserver?.disconnect()
+	listFooterResizeObserver = null
 	document.removeEventListener("keydown", onKeyDown)
 	bodyScroll.value?.removeEventListener("wheel", onWheel)
 	document.getElementById(BAR_COLOR_STYLE_ID)?.remove()
@@ -868,6 +925,15 @@ onUnmounted(() => {
 }
 
 :deep(.hr-gantt-wrap .gantt .bar-label) {
+	display: none;
+}
+
+.hr-gantt-list {
+	scrollbar-width: none;
+	-ms-overflow-style: none;
+}
+
+.hr-gantt-list::-webkit-scrollbar {
 	display: none;
 }
 
