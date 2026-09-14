@@ -99,7 +99,20 @@ Object.assign(GitLabIssueDashboard.prototype, {
         const noteHtml = note
             ? `<div class="text-muted gid-drilldown-note" style="margin-top: 8px;">${frappe.utils.escape_html(note)}</div>`
             : "";
-        const leadTimeHeader = showLeadTime ? `<th class="text-right">${__("Lead Time (days)")}</th>` : "";
+        const stateHeaders = stateLabel
+            ? `<th>${__("Status (then)")}</th><th>${__("Status (now)")}</th>`
+            : `<th>${__("State")}</th>`;
+        const leadTimeHeader = showLeadTime ? `<th class="text-right">${leadTimeLabel || __("Lead Time (days)")}</th>` : "";
+        const touchTimeHeader = showTouchTime ? `<th class="text-right">${__("Touch Time (hrs)")}</th>` : "";
+        const cycleTimeHeader = showCycleTime ? `<th class="text-right">${__("Cycle Time (days)")}</th>` : "";
+        const daysToHours = (value) => Math.round(value * 24 * 100) / 100;
+        const touchSummary = showTouchTime && data && data.touch_time_summary;
+        const cycleSummary = showCycleTime && data && data.cycle_time_summary;
+        const summaryHtml = touchSummary
+            ? `<div class="gid-drilldown-note" style="margin-top: 8px;"><strong>${__("Total")}: ${daysToHours(touchSummary.total_days)} ${__("hrs")} &nbsp;·&nbsp; ${__("Average")}: ${daysToHours(touchSummary.avg_days)} ${__("hrs")}</strong></div>`
+            : cycleSummary
+                ? `<div class="gid-drilldown-note" style="margin-top: 8px;"><strong>${__("Total")}: ${cycleSummary.total_days} ${__("days")} &nbsp;·&nbsp; ${__("Average")}: ${cycleSummary.avg_days} ${__("days")}</strong></div>`
+                : "";
 
         const tableRows = rows.map((row) => {
             const project = frappe.utils.escape_html(projectTitles[row.gitlab_project] || row.gitlab_project || "");
@@ -112,12 +125,25 @@ Object.assign(GitLabIssueDashboard.prototype, {
             const leadTimeCell = showLeadTime
                 ? `<td class="text-right">${row.lead_time_days === null || row.lead_time_days === undefined ? "-" : row.lead_time_days}</td>`
                 : "";
+            const touchTimeCell = showTouchTime
+                ? `<td class="text-right">${row.touch_time_days === null || row.touch_time_days === undefined ? "-" : daysToHours(row.touch_time_days)}</td>`
+                : "";
+            const cycleTimeCell = showCycleTime
+                ? `<td class="text-right">${row.cycle_time_days === null || row.cycle_time_days === undefined ? "-" : row.cycle_time_days}</td>`
+                : "";
+
+            // stateLabel (when given) is the fixed criterion the row was matched on
+            // (e.g. "Open as of April 2026"), which can differ from the ticket's
+            // real current state — show both instead of hiding the current one.
+            const stateCells = stateLabel
+                ? `<td>${frappe.utils.escape_html(stateLabel)}</td><td>${frappe.utils.escape_html(row.state || "")}</td>`
+                : `<td>${frappe.utils.escape_html(row.state || "")}</td>`;
 
             return `
                 <tr>
                     <td>${link}</td>
                     <td>${project}</td>
-                    <td>${frappe.utils.escape_html(stateLabel || row.state || "")}</td>
+                    ${stateCells}
                     <td>${created}</td>
                     <td>${closed}</td>
                     ${leadTimeCell}
@@ -133,7 +159,7 @@ Object.assign(GitLabIssueDashboard.prototype, {
                         <tr>
                             <th>${__("Issue")}</th>
                             <th>${__("Project")}</th>
-                            <th>${__("State")}</th>
+                            ${stateHeaders}
                             <th>${__("Created")}</th>
                             <th>${__("Closed")}</th>
                             ${leadTimeHeader}
@@ -362,7 +388,7 @@ Object.assign(GitLabIssueDashboard.prototype, {
         const [year, month] = String(monthKey).split("-").map(Number);
         const monthLabel = this.monthKeyToLabel(monthKey);
         const method = "phamos.gitlab_integration.page.gitlab_issue_dashboard.gitlab_issue_dashboard.get_lifetime_ticket_drilldown";
-        const note = __("Status as of the end of {0}.", [monthLabel]);
+        const note = __("Open = still open as of the end of {0}, even if it has since been closed. \"Status (now)\" shows the ticket's current status so you can verify.", [monthLabel]);
         const baseParams = { projects: projects || [], issue_scope: filterCtx.issue_scope, year, month };
 
         this.openDrilldown({
@@ -375,7 +401,7 @@ Object.assign(GitLabIssueDashboard.prototype, {
                     params: Object.assign({}, baseParams, { lifetime_state: "open" }),
                     noListView: true,
                     note,
-                    stateLabel: __("Open"),
+                    stateLabel: __("Open (as of {0})", [monthLabel]),
                 },
             ],
         });

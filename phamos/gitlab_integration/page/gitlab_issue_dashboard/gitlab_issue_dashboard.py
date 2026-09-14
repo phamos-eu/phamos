@@ -1,4 +1,4 @@
-from calendar import month_name
+from calendar import month_name, monthrange
 from datetime import date
 import csv
 import io
@@ -480,11 +480,14 @@ def _count_open_now(from_date, to_date, selected_projects, issue_scope="both"):
 
 
 def _build_lifetime_ticket_rows(from_date, to_date, selected_projects, issue_scope="both"):
+	"""Lifetime Tickets = a running total, not a per-month cohort: open_total for
+	a given month is how many tickets (created anytime up to that month, project-
+	and scope-filtered) were still open as of that month's end, carried forward
+	the same way the "Status as of the end of {month}" drilldown note already
+	promises. So it counts every ticket created on/before that month, minus every
+	ticket closed on/before that month — not just tickets created in that month."""
 	conditions = ["1=1"]
-	params = {
-		"from_date": from_date,
-		"to_date": to_date,
-	}
+	params = {"to_date": to_date}
 
 	if selected_projects:
 		conditions.append("gi.gitlab_project IN %(projects)s")
@@ -497,17 +500,16 @@ def _build_lifetime_ticket_rows(from_date, to_date, selected_projects, issue_sco
 
 	project_filter_sql = " AND ".join(conditions)
 
-	rows = frappe.db.sql(
+	opened_rows = frappe.db.sql(
 		f"""
 		SELECT
 			gi.gitlab_project,
 			YEAR(gi.created_at) AS year_no,
 			MONTH(gi.created_at) AS month_no,
-			SUM(CASE WHEN gi.closed_at IS NULL OR DATE(gi.closed_at) > LAST_DAY(gi.created_at) THEN 1 ELSE 0 END) AS open_total,
-			SUM(CASE WHEN gi.closed_at IS NOT NULL AND DATE(gi.closed_at) <= LAST_DAY(gi.created_at) THEN 1 ELSE 0 END) AS closed_total
+			COUNT(*) AS opened
 		FROM `tabGitLab Issue` gi
 		WHERE gi.created_at IS NOT NULL
-		  AND DATE(gi.created_at) BETWEEN %(from_date)s AND %(to_date)s
+		  AND DATE(gi.created_at) <= %(to_date)s
 		  AND {project_filter_sql}
 		GROUP BY gi.gitlab_project, YEAR(gi.created_at), MONTH(gi.created_at)
 		""",
@@ -515,29 +517,68 @@ def _build_lifetime_ticket_rows(from_date, to_date, selected_projects, issue_sco
 		as_dict=True,
 	)
 
-	totals_map = {
-		(row.gitlab_project, int(row.year_no), int(row.month_no)): (int(row.open_total or 0), int(row.closed_total or 0))
-		for row in rows
+	closed_rows = frappe.db.sql(
+		f"""
+		SELECT
+			gi.gitlab_project,
+			YEAR(gi.closed_at) AS year_no,
+			MONTH(gi.closed_at) AS month_no,
+			COUNT(*) AS closed
+		FROM `tabGitLab Issue` gi
+		WHERE gi.closed_at IS NOT NULL
+		  AND DATE(gi.closed_at) <= %(to_date)s
+		  AND gi.state = 'closed'
+		  AND {project_filter_sql}
+		GROUP BY gi.gitlab_project, YEAR(gi.closed_at), MONTH(gi.closed_at)
+		""",
+		params,
+		as_dict=True,
+	)
+
+	opened_map = {
+		(row.gitlab_project, int(row.year_no), int(row.month_no)): int(row.opened or 0)
+		for row in opened_rows
+		if row.year_no and row.month_no
+	}
+	closed_map = {
+		(row.gitlab_project, int(row.year_no), int(row.month_no)): int(row.closed or 0)
+		for row in closed_rows
 		if row.year_no and row.month_no
 	}
 
-	project_names = selected_projects or sorted({row.gitlab_project for row in rows if row.gitlab_project})
-	months = _month_sequence(from_date, to_date)
+	project_names = selected_projects or sorted(
+		{row.gitlab_project for row in opened_rows if row.gitlab_project}
+		| {row.gitlab_project for row in closed_rows if row.gitlab_project}
+	)
+
+	all_year_months = {key[1:] for key in opened_map} | {key[1:] for key in closed_map}
+	earliest_year_month = min(all_year_months) if all_year_months else (from_date.year, from_date.month)
+	full_months = _month_sequence(date(earliest_year_month[0], earliest_year_month[1], 1), to_date)
+	visible_keys = {f"{year_no}-{month_no:02d}" for year_no, month_no in _month_sequence(from_date, to_date)}
 
 	lifetime_rows = []
 	for project in project_names:
-		for index, (year_no, month_no) in enumerate(months, start=1):
-			open_total, closed_total = totals_map.get((project, year_no, month_no), (0, 0))
+		running_open = 0
+		running_closed = 0
+		month_order = 0
+		for year_no, month_no in full_months:
+			running_open += opened_map.get((project, year_no, month_no), 0)
+			running_open -= closed_map.get((project, year_no, month_no), 0)
+			running_closed += closed_map.get((project, year_no, month_no), 0)
+			month_key = f"{year_no}-{month_no:02d}"
+			if month_key not in visible_keys:
+				continue
+			month_order += 1
 			lifetime_rows.append(
 				{
 					"gitlab_project": project,
-					"month_key": f"{year_no}-{month_no:02d}",
+					"month_key": month_key,
 					"year_no": year_no,
 					"month_no": month_no,
-					"month_order": index,
+					"month_order": month_order,
 					"month": f"{month_name[month_no]} {year_no}",
-					"open_total": open_total,
-					"closed_total": closed_total,
+					"open_total": running_open,
+					"closed_total": running_closed,
 				}
 			)
 
@@ -553,12 +594,17 @@ def get_lifetime_ticket_drilldown(projects=None, issue_scope=None, year=None, mo
 		lifetime_state = "open"
 	start = max(cint(start), 0)
 
+	month_end = date(cint(year), cint(month), monthrange(cint(year), cint(month))[1])
+
+	# Matches _build_lifetime_ticket_rows' running-total definition: every ticket
+	# created on/before this month's end, filtered by whether it was still open
+	# (or already closed) as of that same month end — not just tickets created
+	# in this particular month.
 	conditions = [
 		"gi.created_at IS NOT NULL",
-		"YEAR(gi.created_at) = %(year)s",
-		"MONTH(gi.created_at) = %(month)s",
+		"DATE(gi.created_at) <= %(month_end)s",
 	]
-	params = {"year": cint(year), "month": cint(month)}
+	params = {"month_end": month_end}
 
 	if selected_projects:
 		conditions.append("gi.gitlab_project IN %(projects)s")
@@ -570,9 +616,9 @@ def get_lifetime_ticket_drilldown(projects=None, issue_scope=None, year=None, mo
 		conditions.append("gi.parent_issue IS NOT NULL")
 
 	if lifetime_state == "open":
-		conditions.append("(gi.closed_at IS NULL OR DATE(gi.closed_at) > LAST_DAY(gi.created_at))")
+		conditions.append("(gi.closed_at IS NULL OR DATE(gi.closed_at) > %(month_end)s)")
 	else:
-		conditions.append("gi.closed_at IS NOT NULL AND DATE(gi.closed_at) <= LAST_DAY(gi.created_at)")
+		conditions.append("gi.closed_at IS NOT NULL AND DATE(gi.closed_at) <= %(month_end)s")
 
 	where_sql = " AND ".join(conditions)
 
