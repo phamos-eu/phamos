@@ -10,12 +10,14 @@
 			:disabled="disabled"
 			@update:query="handleQueryUpdate"
 		>
-			<template v-if="stackDescription" #item-suffix="{ option }">
+			<template #item-suffix="{ option }">
 				<div
-					v-if="option?.description"
-					class="max-w-[55%] whitespace-normal text-right text-xs leading-snug text-ink-gray-5"
+					v-if="previewLines[option.value]?.length"
+					class="max-w-[60%] space-y-0.5 whitespace-normal text-right text-xs leading-snug text-ink-gray-5"
 				>
-					{{ option.description }}
+					<div v-for="line in previewLines[option.value]" :key="line.label">
+						<span class="text-ink-gray-6">{{ line.label }}:</span> {{ line.value }}
+					</div>
 				</div>
 			</template>
 		</Autocomplete>
@@ -23,7 +25,7 @@
 </template>
 
 <script setup>
-import { createResource, Autocomplete, debounce } from "frappe-ui"
+import { createResource, Autocomplete, call, debounce } from "frappe-ui"
 import { ref, computed, watch, nextTick } from "vue"
 
 const props = defineProps({
@@ -51,11 +53,6 @@ const props = defineProps({
 		type: String,
 		default: "",
 	},
-	/** Show search_link description as a second line under the label in the dropdown. */
-	stackDescription: {
-		type: Boolean,
-		default: false,
-	},
 })
 
 const emit = defineEmits(["update:modelValue"])
@@ -63,6 +60,9 @@ const emit = defineEmits(["update:modelValue"])
 const autocompleteRef = ref(null)
 const wrapperEl = ref(null)
 const searchText = ref("")
+// { [value]: [{label, value}] } — labelled Search Fields + "Show in Preview"
+// fields for the options currently listed, so users can tell records apart.
+const previewLines = ref({})
 
 // Autocomplete's closed trigger is a plain <button> that only opens on click;
 // once open, focus moves to its own search input, which headlessui already
@@ -100,19 +100,23 @@ const options = createResource({
 	method: "POST",
 	transform: (data) => {
 		const mapped = (data || []).map((doc) => {
-			if (doc.label) {
-				return {
-					label: doc.label,
-					value: doc.value,
-					description: doc.description || "",
-				}
-			}
-			let title = null
-			if (doc.description) {
-				title = doc.description.split(",")[0]
-			}
+			// search_link joins matched fields with ", " into `description`. Without
+			// a title_field it doesn't include the record's own name, so keep
+			// showing "<first field> : <name>" as this field always has, and fold
+			// any remaining search-field values in as `extra`.
+			const descriptionParts = doc.description ? doc.description.split(", ") : []
+			const title =
+				doc.label || (descriptionParts.length ? `${descriptionParts[0]} : ${doc.value}` : doc.value)
+			const extra = doc.label ? descriptionParts : descriptionParts.slice(1)
+			// search_link already matches txt against the doctype's configured
+			// Search Fields server-side (the values making up `extra` here) —
+			// but Autocomplete re-filters its options client-side by label/value
+			// only, so a record the server correctly matched via e.g. an email
+			// Search Field would otherwise get silently dropped again here.
+			// Folding that text into the label keeps it searchable.
+			const label = extra.length ? `${title} — ${extra.join(", ")}` : title
 			return {
-				label: title ? `${title} : ${doc.value}` : doc.value,
+				label,
 				value: doc.value,
 				description: doc.description || "",
 			}
@@ -173,6 +177,29 @@ watch(
 		} else if (newVal && newVal !== oldVal) {
 			const inOptions = (options.data || []).find((o) => o.value === newVal)
 			if (options.data && !inOptions) reloadOptions("")
+		}
+	}
+)
+
+let previewToken = 0
+
+watch(
+	() => options.data,
+	async (data) => {
+		const token = ++previewToken
+		const names = (data || []).map((option) => option.value).filter(Boolean)
+		if (!props.doctype || !names.length) {
+			previewLines.value = {}
+			return
+		}
+		try {
+			const lines = await call("phamos.api.link_preview.get_link_preview_lines", {
+				doctype: props.doctype,
+				names,
+			})
+			if (token === previewToken) previewLines.value = lines || {}
+		} catch (e) {
+			if (token === previewToken) previewLines.value = {}
 		}
 	}
 )
