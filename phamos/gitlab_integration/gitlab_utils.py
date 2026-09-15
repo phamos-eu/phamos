@@ -54,21 +54,33 @@ def sync_touch_time_on_timesheet_change(doc, method=None):
 
 def sync_cycle_time_start(issue_name):
     """Resolve Cycle Time Started At: the earliest Timesheet Record on this issue
-    logged on/after Cycle Start Label Set At (parent Timesheet Draft or Submitted,
-    not Cancelled — same rule as Touch Time). Left blank if the trigger label
-    hasn't been set yet, or no qualifying Timesheet Record exists yet."""
-    label_set_at = frappe.db.get_value("GitLab Issue", issue_name, "cycle_start_label_set_at")
-    if not label_set_at:
+    logged on/after Cycle Start Label Set At and, once the issue is closed,
+    on/before closed_at (parent Timesheet Draft or Submitted, not Cancelled —
+    same rule as Touch Time). A Timesheet Record logged after closed_at (e.g.
+    bad/retroactive data) is excluded from consideration entirely, so it can
+    never resolve a cycle_time_started_at later than the issue's own Cycle
+    Time end point. Left blank if the trigger label hasn't been set yet, or no
+    qualifying Timesheet Record exists yet."""
+    issue = frappe.db.get_value(
+        "GitLab Issue", issue_name, ["cycle_start_label_set_at", "closed_at"], as_dict=True
+    )
+    if not issue or not issue.cycle_start_label_set_at:
         return
 
+    conditions = ["t.docstatus IN (0, 1)", "tr.gitlab_issue = %(issue)s", "tr.from_time >= %(label_set_at)s"]
+    params = {"issue": issue_name, "label_set_at": issue.cycle_start_label_set_at}
+    if issue.closed_at:
+        conditions.append("tr.to_time <= %(closed_at)s")
+        params["closed_at"] = issue.closed_at
+
     started_at = frappe.db.sql(
-        """
+        f"""
         SELECT MIN(tr.from_time)
         FROM `tabTimesheet Record` tr
         JOIN `tabTimesheet` t ON t.name = tr.timesheet
-        WHERE t.docstatus IN (0, 1) AND tr.gitlab_issue = %(issue)s AND tr.from_time >= %(label_set_at)s
+        WHERE {" AND ".join(conditions)}
         """,
-        {"issue": issue_name, "label_set_at": label_set_at},
+        params,
     )[0][0]
 
     _set_gitlab_issue_value_with_retry(issue_name, {"cycle_time_started_at": started_at})
