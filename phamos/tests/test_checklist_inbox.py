@@ -1,7 +1,8 @@
 # Copyright (c) 2026, phamos.eu and contributors
 # For license information, please see license.txt
 
-"""Unit tests for checklist inbox: template read scope, owner search, item deletion."""
+"""Unit tests for checklist inbox: template read scope, owner search, item
+deletion, and inbox row cap / truncation reporting."""
 
 from types import SimpleNamespace
 from unittest.mock import MagicMock, patch
@@ -10,8 +11,10 @@ import frappe
 from frappe.tests.utils import FrappeTestCase
 
 from phamos.api.checklist_inbox import (
+	CHECKLIST_INBOX_LIMIT,
 	checklist_owner_query,
 	delete_spa_checklist_item,
+	get_checklist_inbox,
 	get_checklist_template,
 )
 
@@ -130,3 +133,47 @@ class TestDeleteSpaChecklistItem(FrappeTestCase):
 				delete_spa_checklist_item("CHK-1", "ITEM-404")
 		doc.remove.assert_not_called()
 		doc.save.assert_not_called()
+
+
+def _row(name):
+	return frappe._dict(
+		name=name,
+		status="Open",
+		completion_percentage=0,
+		document="Issue",
+		reference_record="ISS-1",
+		modified="2026-01-01 10:00:00",
+		owner="user@example.com",
+	)
+
+
+class TestGetChecklistInbox(FrappeTestCase):
+	def test_not_truncated_under_the_cap(self):
+		rows = [_row(f"CHK-{i}") for i in range(3)]
+		with (
+			patch("frappe.has_permission"),
+			patch(
+				"phamos.api.checklist_inbox._checklist_has_title_field", return_value=False
+			),
+			patch("frappe.get_list", return_value=rows),
+			patch("phamos.api.checklist_inbox._item_counts_map", return_value={}),
+		):
+			result = get_checklist_inbox()
+
+		self.assertFalse(result["truncated"])
+		self.assertEqual(len(result["items"]), 3)
+
+	def test_truncated_when_over_the_cap(self):
+		rows = [_row(f"CHK-{i}") for i in range(CHECKLIST_INBOX_LIMIT + 1)]
+		with (
+			patch("frappe.has_permission"),
+			patch(
+				"phamos.api.checklist_inbox._checklist_has_title_field", return_value=False
+			),
+			patch("frappe.get_list", return_value=rows),
+			patch("phamos.api.checklist_inbox._item_counts_map", return_value={}),
+		):
+			result = get_checklist_inbox()
+
+		self.assertTrue(result["truncated"])
+		self.assertEqual(len(result["items"]), CHECKLIST_INBOX_LIMIT)

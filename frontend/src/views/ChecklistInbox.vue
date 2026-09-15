@@ -20,6 +20,13 @@
 				/>
 			</div>
 
+			<div
+				v-if="truncated"
+				class="border-b border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800"
+			>
+				Showing the latest {{ rows.length }} checklists — narrow your filters to see older ones.
+			</div>
+
 			<div v-if="loading" class="flex flex-1 items-center justify-center text-sm text-gray-500">
 				Loading…
 			</div>
@@ -121,6 +128,7 @@ const includeCompleted = ref(false)
 const search = ref("")
 const loading = ref(false)
 const rows = ref([])
+const truncated = ref(false)
 const selectedName = ref(null)
 const selected = ref(null)
 const detailLoading = ref(false)
@@ -167,9 +175,11 @@ async function loadFlags() {
 async function loadInbox() {
 	loading.value = true
 	try {
-		rows.value = await call(`${API}.get_checklist_inbox`, {
+		const data = await call(`${API}.get_checklist_inbox`, {
 			include_completed: includeCompleted.value ? 1 : 0,
 		})
+		rows.value = data.items || []
+		truncated.value = Boolean(data.truncated)
 	} finally {
 		loading.value = false
 	}

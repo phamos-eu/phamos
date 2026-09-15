@@ -11,6 +11,11 @@ from frappe.utils import cint, cstr
 CHECKLIST_REFERENCE_DOCTYPES = ("Issue", "Task", "Project", "Lead", "Opportunity", "Customer")
 TEMPLATE_DOCTYPE = "Checklist Template"
 
+# Row cap for get_checklist_inbox (no real pagination yet — see
+# phamos/phamos#1395). Comfortably above current volume; raise further, or
+# build real pagination, once a site gets close to it.
+CHECKLIST_INBOX_LIMIT = 1000
+
 
 def _preview_fieldnames(doctype):
 	meta = frappe.get_meta(doctype)
@@ -347,10 +352,15 @@ def get_checklist_inbox(include_completed=0):
 		filters=filters,
 		fields=fields,
 		order_by="modified desc",
-		limit_page_length=200,
+		limit_page_length=CHECKLIST_INBOX_LIMIT + 1,
 	)
+	truncated = len(rows) > CHECKLIST_INBOX_LIMIT
+	rows = rows[:CHECKLIST_INBOX_LIMIT]
 	counts = _item_counts_map([r.name for r in rows])
-	return [_serialize_row(r, counts) for r in rows]
+	return {
+		"items": [_serialize_row(r, counts) for r in rows],
+		"truncated": truncated,
+	}
 
 
 @frappe.whitelist()

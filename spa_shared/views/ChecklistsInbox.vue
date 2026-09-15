@@ -77,6 +77,14 @@
 					</Button>
 				</div>
 
+				<div
+					v-if="truncated"
+					style="grid-column: 1 / -1"
+					class="border-b border-outline-gray-2 bg-amber-50 px-3 py-2 text-xs text-amber-800 dark:bg-amber-950 dark:text-amber-200"
+				>
+					Showing the latest {{ rows.length }} checklists — narrow your filters to see older ones.
+				</div>
+
 				<div v-if="filtered.length" class="contents">
 					<button
 						v-for="row in filtered"
@@ -242,6 +250,7 @@ const sortOrder = ref("desc")
 const loading = ref(false)
 const configError = ref("")
 const rows = ref([])
+const truncated = ref(false)
 const showCreate = ref(false)
 const selectedName = ref(null)
 const selected = ref(null)
@@ -320,7 +329,9 @@ async function loadInbox() {
 	loading.value = true
 	configError.value = ""
 	try {
-		rows.value = await call(`${API}.get_checklists`, { include_completed: 1 })
+		const data = await call(`${API}.get_checklists`, { include_completed: 1 })
+		rows.value = data.items || []
+		truncated.value = Boolean(data.truncated)
 	} catch (e) {
 		configError.value = e?.messages?.[0] || e?.message || "Could not load checklists"
 	} finally {

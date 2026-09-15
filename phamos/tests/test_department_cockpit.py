@@ -9,6 +9,7 @@ import frappe
 from frappe.tests.utils import FrappeTestCase
 
 from phamos.api.department_cockpit import (
+	CHECKLIST_LIST_LIMIT,
 	ISSUE_LIST_LIMIT,
 	CockpitConfig,
 	_ensure_issue_in_scope,
@@ -256,7 +257,7 @@ class TestGetChecklists(FrappeTestCase):
 
 		args, kwargs = rows_fn.call_args
 		self.assertEqual(args[2], {"status": ("!=", "Completed")})
-		self.assertEqual(kwargs["limit"], 200)
+		self.assertEqual(kwargs["limit"], CHECKLIST_LIST_LIMIT)
 
 	def test_include_completed_drops_status_filter(self):
 		meta = MagicMock()
@@ -304,7 +305,7 @@ class TestGetChecklists(FrappeTestCase):
 			result = get_checklists(HR)
 
 		self.assertEqual(
-			result,
+			result["items"],
 			[
 				{
 					"name": "CHK-1",
@@ -314,3 +315,42 @@ class TestGetChecklists(FrappeTestCase):
 				}
 			],
 		)
+		self.assertFalse(result["truncated"])
+
+
+class TestGetChecklistsTruncation(FrappeTestCase):
+	def _rows(self, count):
+		return [
+			frappe._dict(name=f"CHK-{i}", checklist_owner=None, modified="2026-01-01 10:00:00")
+			for i in range(count)
+		]
+
+	def _run(self, row_count):
+		meta = MagicMock()
+		meta.has_field.return_value = False
+		with (
+			patch("frappe.has_permission"),
+			patch("frappe.get_meta", return_value=meta),
+			patch(
+				"phamos.api.department_cockpit._department_checklist_rows",
+				return_value=self._rows(row_count),
+			),
+			patch("phamos.api.checklist_inbox._item_counts_map", return_value={}),
+			patch("phamos.api.checklist_inbox._item_search_map", return_value={}),
+			patch(
+				"phamos.api.checklist_inbox._serialize_row",
+				side_effect=lambda r, counts=None, item_search=None: {"name": r.name},
+			),
+			patch("phamos.api.department_cockpit._user_images", return_value=[]),
+		):
+			return get_checklists(HR)
+
+	def test_not_truncated_under_the_cap(self):
+		result = self._run(3)
+		self.assertFalse(result["truncated"])
+		self.assertEqual(len(result["items"]), 3)
+
+	def test_truncated_when_over_the_cap(self):
+		result = self._run(CHECKLIST_LIST_LIMIT + 1)
+		self.assertTrue(result["truncated"])
+		self.assertEqual(len(result["items"]), CHECKLIST_LIST_LIMIT)
