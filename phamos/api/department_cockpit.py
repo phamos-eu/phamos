@@ -449,7 +449,7 @@ def _role_shortlist_users(config: CockpitConfig, limit=50):
 			from frappe.utils.user import get_users_with_role
 
 			user_names.update(get_users_with_role(role) or [])
-		except Exception:
+		except ImportError:
 			rows = frappe.get_all(
 				"Has Role",
 				filters={"role": role, "parenttype": "User"},
