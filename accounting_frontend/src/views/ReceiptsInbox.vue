@@ -158,13 +158,21 @@ async function pollExtractStatus(name) {
 				await refreshSelectedReceipt()
 			}
 			if (status.status === "failed") {
-				toast.error(formatExtractFailure(status))
+				toast({
+					title: formatExtractFailure(status),
+					icon: "x-circle",
+					iconClasses: "text-ink-red-4",
+				})
 			}
 		} else if (Date.now() - pollStartedAt > POLL_MAX_MS) {
 			stopExtractPolling()
 			extractStatus.value = "failed"
 			extractErrorMessage.value = "Extraction timed out."
-			toast.error("PDF extraction timed out.")
+			toast({
+				title: "PDF extraction timed out.",
+				icon: "x-circle",
+				iconClasses: "text-ink-red-4",
+			})
 		}
 	} catch (e) {
 		stopExtractPolling()
@@ -287,7 +295,11 @@ async function onReviewCorrect() {
 	try {
 		const res = await call(`${API}.get_receipt_review_fields`, { name: selectedReceipt.value.name })
 		if (!res?.ok || !res.fields?.length) {
-			toast.info("No fields available for review.")
+			toast({
+				title: "No fields available for review.",
+				icon: "info",
+				iconClasses: "text-ink-gray-5",
+			})
 			return
 		}
 		reviewState.value = {
@@ -298,7 +310,11 @@ async function onReviewCorrect() {
 		}
 		showReview.value = true
 	} catch (e) {
-		toast.error(e?.messages?.[0] || e?.message || "Could not load review fields")
+		toast({
+			title: e?.messages?.[0] || e?.message || "Could not load review fields",
+			icon: "x-circle",
+			iconClasses: "text-ink-red-4",
+		})
 	}
 }
 

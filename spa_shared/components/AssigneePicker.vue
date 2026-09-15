@@ -228,7 +228,7 @@ async function persist(nextNames, previousNames) {
 	} catch (e) {
 		emit("update:modelValue", previousNames)
 		error.value = e?.messages?.[0] || e?.message || "Could not update assignees"
-		toast.error(error.value)
+		toast({ title: error.value, icon: "x-circle", iconClasses: "text-ink-red-4" })
 	} finally {
 		saving.value = false
 	}

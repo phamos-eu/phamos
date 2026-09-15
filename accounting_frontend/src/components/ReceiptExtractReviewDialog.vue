@@ -211,7 +211,11 @@ async function apply() {
 			extracted_data: payload,
 		})
 		const updated = result?.updated || []
-		toast.success(updated.length ? `Updated: ${updated.join(", ")}` : "Data applied.")
+		toast({
+			title: updated.length ? `Updated: ${updated.join(", ")}` : "Data applied.",
+			icon: "check-circle",
+			iconClasses: "text-ink-green-4",
+		})
 		emit("applied")
 		emit("update:modelValue", false)
 	} catch (e) {

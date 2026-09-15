@@ -59,7 +59,11 @@ const saving = ref(false)
 
 async function submit() {
 	if (!description.value.trim()) {
-		toast.error("Topic is required")
+		toast({
+			title: "Topic is required",
+			icon: "x-circle",
+			iconClasses: "text-ink-red-4",
+		})
 		return
 	}
 	saving.value = true
@@ -74,9 +78,17 @@ async function submit() {
 		dueDate.value = ""
 		allocatedTo.value = props.defaultAssignee || ""
 		emit("created", todo)
-		toast.success("To-do created")
+		toast({
+			title: "To-do created",
+			icon: "check-circle",
+			iconClasses: "text-ink-green-4",
+		})
 	} catch (e) {
-		toast.error(e?.messages?.[0] || e?.message || "Could not create to-do")
+		toast({
+			title: e?.messages?.[0] || e?.message || "Could not create to-do",
+			icon: "x-circle",
+			iconClasses: "text-ink-red-4",
+		})
 	} finally {
 		saving.value = false
 	}

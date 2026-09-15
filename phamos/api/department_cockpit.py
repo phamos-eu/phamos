@@ -531,6 +531,8 @@ def update_issue(config: CockpitConfig, name, **fields):
 	doc = frappe.get_doc("Issue", name)
 	doc.check_permission("write")
 
+	client_modified = fields.pop("modified", None)
+
 	updates = {k: fields[k] for k in ISSUE_EDITABLE_FIELDS if k in fields}
 	unknown = set(fields) - set(ISSUE_EDITABLE_FIELDS)
 	if unknown:
@@ -547,6 +549,9 @@ def update_issue(config: CockpitConfig, name, **fields):
 
 	for key, value in updates.items():
 		doc.set(key, value)
+
+	if client_modified:
+		doc.modified = get_datetime(client_modified)
 
 	doc.save()
 	return get_issue(config, name)
@@ -1098,6 +1103,8 @@ def update_task(config: CockpitConfig, name, **fields):
 	doc = frappe.get_doc("Task", name)
 	doc.check_permission("write")
 
+	client_modified = fields.pop("modified", None)
+
 	updates = {k: fields[k] for k in TASK_EDITABLE_FIELDS if k in fields}
 	unknown = set(fields) - set(TASK_EDITABLE_FIELDS)
 	if unknown:
@@ -1123,6 +1130,9 @@ def update_task(config: CockpitConfig, name, **fields):
 
 	for key, value in updates.items():
 		doc.set(key, value)
+
+	if client_modified:
+		doc.modified = get_datetime(client_modified)
 
 	doc.save()
 	return get_task(config, name)
