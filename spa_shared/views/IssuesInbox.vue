@@ -63,6 +63,13 @@
 						New Issue
 					</Button>
 				</div>
+				<div
+					v-if="truncated"
+					style="grid-column: 1 / -1"
+					class="border-b border-outline-gray-2 bg-amber-50 px-3 py-2 text-xs text-amber-800 dark:bg-amber-950 dark:text-amber-200"
+				>
+					Showing the latest {{ issues.length }} issues — narrow your filters to see older ones.
+				</div>
 				<IssueList
 					v-if="filteredIssues.length"
 					:issues="filteredIssues"
@@ -166,6 +173,7 @@ const modifiedSortOption = [{ label: "Last Updated", value: "modified" }]
 const loading = ref(false)
 const configError = ref("")
 const issues = ref([])
+const truncated = ref(false)
 const showCreate = ref(false)
 const selectedName = ref(null)
 const selectedIssue = ref(null)
@@ -244,7 +252,9 @@ async function loadInbox() {
 	try {
 		// Include closed so StatusFilter can activate Closed client-side;
 		// filteredIssues hides Closed by default until that pill is selected.
-		issues.value = await call(`${API}.get_issues`, { include_closed: 1 })
+		const data = await call(`${API}.get_issues`, { include_closed: 1 })
+		issues.value = data.items || []
+		truncated.value = Boolean(data.truncated)
 	} catch (e) {
 		configError.value = e?.messages?.[0] || e?.message || "Could not load issues"
 	} finally {

@@ -9,11 +9,13 @@ import frappe
 from frappe.tests.utils import FrappeTestCase
 
 from phamos.api.department_cockpit import (
+	ISSUE_LIST_LIMIT,
 	CockpitConfig,
 	_ensure_issue_in_scope,
 	_issue_in_scope,
 	_issue_or_filters,
 	_require_department,
+	get_issues,
 	update_issue,
 	update_task,
 	validate_project,
@@ -140,3 +142,46 @@ class TestDepartmentCockpitScope(FrappeTestCase):
 		):
 			with self.assertRaises(frappe.ValidationError):
 				update_task(HR, "TASK-1", subject="Updated")
+
+
+class TestGetIssuesTruncation(FrappeTestCase):
+	def _rows(self, count):
+		return [frappe._dict(name=f"ISS-{i}") for i in range(count)]
+
+	def _run(self, row_count):
+		with (
+			patch("frappe.has_permission"),
+			patch("phamos.api.department_cockpit._require_department"),
+			patch(
+				"phamos.api.department_cockpit._issue_or_filters",
+				return_value=[["priority", "!=", ""]],
+			),
+			patch("frappe.get_list", return_value=self._rows(row_count)),
+			patch(
+				"phamos.api.department_cockpit.enrich_issue_rows_for_search",
+				side_effect=lambda rows: [dict(r) for r in rows],
+			),
+			patch("phamos.api.department_cockpit._attach_converted_tasks"),
+		):
+			return get_issues(HR)
+
+	def test_not_truncated_under_the_cap(self):
+		result = self._run(3)
+		self.assertFalse(result["truncated"])
+		self.assertEqual(len(result["items"]), 3)
+
+	def test_truncated_when_over_the_cap(self):
+		result = self._run(ISSUE_LIST_LIMIT + 1)
+		self.assertTrue(result["truncated"])
+		self.assertEqual(len(result["items"]), ISSUE_LIST_LIMIT)
+
+	def test_empty_or_filters_returns_empty_without_querying(self):
+		with (
+			patch("frappe.has_permission"),
+			patch("phamos.api.department_cockpit._require_department"),
+			patch("phamos.api.department_cockpit._issue_or_filters", return_value=[]),
+			patch("frappe.get_list") as get_list,
+		):
+			result = get_issues(HR)
+		self.assertEqual(result, {"items": [], "truncated": False})
+		get_list.assert_not_called()
