@@ -409,11 +409,15 @@ from phamos.api.issue_raven import (  # noqa: E402, F401
 	send_chat_message,
 )
 
-# Checklist APIs used by LinkedChecklistsSection in Issue detail
+# Checklist APIs used by LinkedChecklistsSection in Issue detail, and by the
+# ChecklistInbox view (get_checklist_inbox) — without this re-export,
+# `phamos.api.i_own_my_work.get_checklist_inbox` (what the frontend calls)
+# doesn't resolve to anything.
 from phamos.api.checklist_inbox import (  # noqa: E402, F401
 	add_spa_checklist_item,
 	create_spa_checklist,
 	get_checklist,
+	get_checklist_inbox,
 	get_checklists_for_reference,
 	update_spa_checklist_item,
 )

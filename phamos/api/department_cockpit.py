@@ -61,6 +61,11 @@ TASK_LIST_FIELDS = [
 TASK_KANBAN_STATUSES = ("Open", "Working", "Pending Review", "Overdue", "Completed")
 TASK_PRIORITIES = ("Low", "Medium", "High", "Urgent")
 
+# Row cap for get_checklists (no real pagination yet — see phamos/phamos#1395).
+# Comfortably above any department's current volume; raise further, or build
+# real pagination, if a department ever gets close to it.
+CHECKLIST_LIST_LIMIT = 1000
+
 # Row cap for get_issues (no real pagination yet — see phamos/phamos#1396).
 # IssuesInbox.vue deliberately fetches Closed issues too (include_closed=1)
 # so its status filter can toggle them in client-side with no extra round
@@ -711,8 +716,8 @@ def get_checklists(config: CockpitConfig, include_completed=0):
 	]
 	if frappe.get_meta("Checklist").has_field("title"):
 		fields.insert(1, "title")
-	rows = _department_checklist_rows(config, fields, filters_base, limit=200)
-	ordered = sorted(rows, key=lambda r: r.modified or "", reverse=True)[:200]
+	rows = _department_checklist_rows(config, fields, filters_base, limit=CHECKLIST_LIST_LIMIT)
+	ordered = sorted(rows, key=lambda r: r.modified or "", reverse=True)[:CHECKLIST_LIST_LIMIT]
 	counts = _item_counts_map([r.name for r in ordered])
 	item_search = _item_search_map([r.name for r in ordered])
 	owners = list(dict.fromkeys(r.checklist_owner for r in ordered if r.checklist_owner))
@@ -723,7 +728,7 @@ def get_checklists(config: CockpitConfig, include_completed=0):
 		serialized["checklist_owner_name"] = _user_label(row.checklist_owner) if row.checklist_owner else None
 		serialized["checklist_owner_image"] = owner_images.get(row.checklist_owner)
 		result.append(serialized)
-	return result
+	return {"items": result, "truncated": len(rows) > CHECKLIST_LIST_LIMIT}
 
 
 def _window_metric(rows, start, end):
