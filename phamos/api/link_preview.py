@@ -8,6 +8,11 @@ in a search dropdown (e.g. picking a Contact) instead of just seeing a name.
 Combines each DocType's configured Search Fields with every field marked
 "Show in Preview" (the same fields Frappe's own document-preview popover
 uses), and — unlike that raw value list — labels each one.
+
+Like that popover, this doesn't strip fields restricted by permlevel —
+row-level permissions are enforced (see get_link_preview_lines), but
+field-level ones aren't. That's an existing Frappe gap this endpoint
+deliberately mirrors, not an oversight introduced here.
 """
 
 import frappe
