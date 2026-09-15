@@ -59,10 +59,6 @@ class _FakeTimesheetRecord:
 		return self
 
 
-class TestTimesheetRecord(FrappeTestCase):
-	pass
-
-
 class TestNormalizePercentBillableForActionPanels(FrappeTestCase):
 	"""PAP submits percent_billable through the shared helper — keep Select-safe."""
 
