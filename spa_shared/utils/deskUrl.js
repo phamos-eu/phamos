@@ -2,5 +2,5 @@
 export function deskRecordUrl(doctype, name) {
 	if (!doctype || !name) return "#"
 	const slug = String(doctype).trim().toLowerCase().replace(/ /g, "-")
-	return `/app/${slug}/${encodeURIComponent(String(name).trim())}`
+	return `/app/${encodeURIComponent(slug)}/${encodeURIComponent(String(name).trim())}`
 }
