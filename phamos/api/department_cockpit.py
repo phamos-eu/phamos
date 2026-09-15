@@ -61,6 +61,12 @@ TASK_LIST_FIELDS = [
 TASK_KANBAN_STATUSES = ("Open", "Working", "Pending Review", "Overdue", "Completed")
 TASK_PRIORITIES = ("Low", "Medium", "High", "Urgent")
 
+# Row cap for get_issues (no real pagination yet — see phamos/phamos#1396).
+# IssuesInbox.vue deliberately fetches Closed issues too (include_closed=1)
+# so its status filter can toggle them in client-side with no extra round
+# trip; this cap is what stops that from being truly unbounded.
+ISSUE_LIST_LIMIT = 1000
+
 
 @dataclass(frozen=True)
 class CockpitConfig:
@@ -299,7 +305,7 @@ def get_issues(config: CockpitConfig, include_closed=0):
 	filters = _status_filters(include_closed)
 	or_filters = _issue_or_filters(config)
 	if not or_filters:
-		return []
+		return {"items": [], "truncated": False}
 
 	rows = frappe.get_list(
 		"Issue",
@@ -307,11 +313,13 @@ def get_issues(config: CockpitConfig, include_closed=0):
 		or_filters=or_filters,
 		fields=LIST_FIELDS,
 		order_by="modified desc",
-		limit_page_length=200,
+		limit_page_length=ISSUE_LIST_LIMIT + 1,
 	)
+	truncated = len(rows) > ISSUE_LIST_LIMIT
+	rows = rows[:ISSUE_LIST_LIMIT]
 	serialized = enrich_issue_rows_for_search(rows)
 	_attach_converted_tasks(serialized)
-	return serialized
+	return {"items": serialized, "truncated": truncated}
 
 
 def _attach_converted_tasks(rows):
