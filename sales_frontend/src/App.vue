@@ -16,6 +16,20 @@ const route = useRoute()
 
 const navItems = [
 	{
+		name: "Leads",
+		label: "Leads",
+		icon: "users",
+		match: ["Leads"],
+		children: [
+			{
+				name: "LeadsFollowUps",
+				label: "Follow Ups",
+				icon: "phone-call",
+				match: ["LeadsFollowUps", "LeadDetail"],
+			},
+		],
+	},
+	{
 		name: "Issues",
 		label: "Issues",
 		icon: "inbox",
@@ -42,6 +56,9 @@ const navItems = [
 ]
 
 const pageTitle = computed(() => {
+	if (route.name === "Leads" || route.name === "LeadsFollowUps" || route.name === "LeadDetail") {
+		return "Leads"
+	}
 	if (route.name === "Tasks" || route.name === "TasksGantt" || route.name === "TaskDetail") {
 		return "Tasks"
 	}
@@ -50,6 +67,10 @@ const pageTitle = computed(() => {
 })
 
 const pageSubtitle = computed(() => {
+	if (route.name === "Leads") return "Lead pipeline overview"
+	if (route.name === "LeadsFollowUps" || route.name === "LeadDetail") {
+		return "All leads, sorted for follow-up"
+	}
 	if (route.name === "TasksGantt" || route.name === "TaskDetail") {
 		return "Sales department tasks"
 	}
