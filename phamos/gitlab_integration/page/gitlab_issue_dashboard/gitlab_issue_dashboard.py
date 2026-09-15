@@ -62,6 +62,11 @@ TOUCH_TIME_SUBQUERY_SQL = """
 # Record can span several days) of the last qualifying Timesheet Record logged
 # on the issue on/before it closed (same Draft/Submitted, not Cancelled rule as
 # Touch Time and Cycle Time Started At), not at closed_at itself.
+#
+# A Timesheet Record logged after closed_at (e.g. bad/retroactive data) is
+# excluded here by design, which can leave cycle_time_started_at (unbounded)
+# later than this end point. _cycle_time_days_expr() below turns that negative
+# result into NULL rather than reporting a nonsensical negative duration.
 CYCLE_TIME_END_SUBQUERY_SQL = """
     SELECT tr.gitlab_issue, MAX(tr.to_time) AS cycle_time_ended_at
     FROM `tabTimesheet Record` tr
@@ -71,6 +76,15 @@ CYCLE_TIME_END_SUBQUERY_SQL = """
       AND tr.to_time <= ce_gi.closed_at
     GROUP BY tr.gitlab_issue
 """
+
+
+def _cycle_time_days_expr(cycle_end_col="cycle_end.cycle_time_ended_at"):
+	"""Cycle Time in days, or NULL when the raw calculation would be negative
+	(a qualifying Timesheet Record was logged after closed_at, so it was
+	excluded from CYCLE_TIME_END_SUBQUERY_SQL but still resolved
+	cycle_time_started_at — see the comment above)."""
+	raw_days = f"TIMESTAMPDIFF(SECOND, gi.cycle_time_started_at, COALESCE({cycle_end_col}, gi.closed_at)) / 86400"
+	return f"CASE WHEN {raw_days} >= 0 THEN {raw_days} ELSE NULL END"
 
 
 def _build_drilldown_where(
@@ -179,7 +193,7 @@ def get_gitlab_issue_drilldown(
 			gi.issue_url,
 			DATEDIFF(DATE(gi.closed_at), DATE(gi.created_at)) AS lead_time_days,
 			ROUND(touch.touch_seconds / 86400, 2) AS touch_time_days,
-			ROUND(TIMESTAMPDIFF(SECOND, gi.cycle_time_started_at, COALESCE(cycle_end.cycle_time_ended_at, gi.closed_at)) / 86400, 2) AS cycle_time_days
+			ROUND({_cycle_time_days_expr()}, 2) AS cycle_time_days
 		FROM `tabGitLab Issue` gi
 		{touch_join_sql}
 		{cycle_end_join_sql}
@@ -216,8 +230,8 @@ def get_gitlab_issue_drilldown(
 		summary_row = frappe.db.sql(
 			f"""
 			SELECT
-				SUM(TIMESTAMPDIFF(SECOND, gi.cycle_time_started_at, COALESCE(cycle_end.cycle_time_ended_at, gi.closed_at)) / 86400) AS total_days,
-				AVG(TIMESTAMPDIFF(SECOND, gi.cycle_time_started_at, COALESCE(cycle_end.cycle_time_ended_at, gi.closed_at)) / 86400) AS avg_days
+				SUM({_cycle_time_days_expr()}) AS total_days,
+				AVG({_cycle_time_days_expr()}) AS avg_days
 			FROM `tabGitLab Issue` gi
 			{cycle_end_join_sql}
 			WHERE {where_sql}
@@ -863,7 +877,9 @@ def _build_cycle_time_kpis(from_date, to_date, selected_projects, issue_scope="b
     """Cycle Time = days from gi.cycle_time_started_at (the first Timesheet Record
     logged on/after the Cycle Time Trigger Label was set — see
     gitlab_utils.sync_cycle_time_start) to the last qualifying Timesheet Record
-    logged on the issue on/before it closed"""
+    logged on the issue on/before it closed. Negative results (a Timesheet
+    Record logged after closed_at resolved cycle_time_started_at) are treated
+    as NULL — see _cycle_time_days_expr."""
     conditions = ["1=1"]
     params = {}
 
@@ -878,7 +894,7 @@ def _build_cycle_time_kpis(from_date, to_date, selected_projects, issue_scope="b
 
     project_filter_sql = " AND ".join(conditions)
     cycle_end_join = f"LEFT JOIN ({CYCLE_TIME_END_SUBQUERY_SQL}) cycle_end ON cycle_end.gitlab_issue = gi.name"
-    cycle_end_expr = "TIMESTAMPDIFF(SECOND, gi.cycle_time_started_at, COALESCE(cycle_end.cycle_time_ended_at, gi.closed_at)) / 86400"
+    cycle_end_expr = _cycle_time_days_expr()
 
     filtered_params = dict(params)
     filtered_params["from_date"] = from_date

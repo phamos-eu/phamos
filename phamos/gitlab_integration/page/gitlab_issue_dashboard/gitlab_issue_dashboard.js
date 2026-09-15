@@ -492,10 +492,12 @@ class GitLabIssueDashboard {
 
         let html = "";
 
-        if (mode === "single" && leadTime.company) {
+        if (mode === "single") {
             const projectTitle = projectTitles[leadTime.project] || leadTime.project || __("Project");
             html += buildRow(projectTitle, leadTime, leadTime.project);
-            html += buildRow(__("Company"), leadTime.company, null);
+            if (leadTime.company) {
+                html += buildRow(__("Company"), leadTime.company, null);
+            }
         } else if (mode === "project_compare" && (leadTime.project_lead_times || []).length) {
             leadTime.project_lead_times.forEach((row) => {
                 const title = projectTitles[row.project] || row.project || __("Project");
@@ -566,10 +568,12 @@ class GitLabIssueDashboard {
 
         let html = "";
 
-        if (mode === "single" && touchTime.company) {
+        if (mode === "single") {
             const projectTitle = projectTitles[touchTime.project] || touchTime.project || __("Project");
             html += buildRow(projectTitle, touchTime, leadTime, touchTime.project);
-            html += buildRow(__("Company"), touchTime.company, leadTime.company, null);
+            if (touchTime.company) {
+                html += buildRow(__("Company"), touchTime.company, leadTime.company, null);
+            }
         } else if (mode === "project_compare" && (touchTime.project_touch_times || []).length) {
             touchTime.project_touch_times.forEach((row) => {
                 const title = projectTitles[row.project] || row.project || __("Project");
@@ -641,10 +645,12 @@ class GitLabIssueDashboard {
 
         let html = "";
 
-        if (mode === "single" && cycleTime.company) {
+        if (mode === "single") {
             const projectTitle = projectTitles[cycleTime.project] || cycleTime.project || __("Project");
             html += buildRow(projectTitle, cycleTime, leadTime, cycleTime.project);
-            html += buildRow(__("Company"), cycleTime.company, leadTime.company, null);
+            if (cycleTime.company) {
+                html += buildRow(__("Company"), cycleTime.company, leadTime.company, null);
+            }
         } else if (mode === "project_compare" && (cycleTime.project_cycle_times || []).length) {
             cycleTime.project_cycle_times.forEach((row) => {
                 const title = projectTitles[row.project] || row.project || __("Project");
