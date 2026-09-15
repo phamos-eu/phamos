@@ -14,6 +14,8 @@ from phamos.api.department_cockpit import (
 	_issue_in_scope,
 	_issue_or_filters,
 	_require_department,
+	get_checklists,
+	set_task_assignees,
 	update_issue,
 	update_task,
 	validate_project,
@@ -140,3 +142,130 @@ class TestDepartmentCockpitScope(FrappeTestCase):
 		):
 			with self.assertRaises(frappe.ValidationError):
 				update_task(HR, "TASK-1", subject="Updated")
+
+
+class TestSetTaskAssignees(FrappeTestCase):
+	def test_adds_and_removes_to_match_desired_set(self):
+		task_doc = MagicMock()
+		task_doc.subject = "Do the thing"
+		with (
+			patch("frappe.has_permission"),
+			patch(
+				"phamos.api.department_cockpit.get_task",
+				return_value={"name": "TASK-1", "subject": "Do the thing"},
+			),
+			patch("frappe.get_doc", return_value=task_doc),
+			patch(
+				"phamos.api.department_cockpit.get_assignments",
+				return_value=[{"owner": "a@example.com"}, {"owner": "b@example.com"}],
+			),
+			patch("phamos.api.department_cockpit.remove_assignment") as remove_assignment,
+			patch("phamos.api.department_cockpit.add_assignment") as add_assignment,
+		):
+			set_task_assignees(HR, "TASK-1", users=["b@example.com", "c@example.com"])
+
+		remove_assignment.assert_called_once_with("Task", "TASK-1", "a@example.com")
+		add_assignment.assert_called_once_with(
+			{
+				"doctype": "Task",
+				"name": "TASK-1",
+				"assign_to": ["c@example.com"],
+				"description": "Do the thing",
+			}
+		)
+
+	def test_noop_when_assignees_already_match(self):
+		task_doc = MagicMock()
+		with (
+			patch("frappe.has_permission"),
+			patch(
+				"phamos.api.department_cockpit.get_task",
+				return_value={"name": "TASK-1", "subject": "X"},
+			),
+			patch("frappe.get_doc", return_value=task_doc),
+			patch(
+				"phamos.api.department_cockpit.get_assignments",
+				return_value=[{"owner": "a@example.com"}],
+			),
+			patch("phamos.api.department_cockpit.remove_assignment") as remove_assignment,
+			patch("phamos.api.department_cockpit.add_assignment") as add_assignment,
+		):
+			set_task_assignees(HR, "TASK-1", users=["a@example.com"])
+
+		remove_assignment.assert_not_called()
+		add_assignment.assert_not_called()
+
+
+class TestGetChecklists(FrappeTestCase):
+	def test_default_filters_out_completed(self):
+		meta = MagicMock()
+		meta.has_field.return_value = False
+		with (
+			patch("frappe.has_permission"),
+			patch("frappe.get_meta", return_value=meta),
+			patch(
+				"phamos.api.department_cockpit._department_checklist_rows", return_value=[]
+			) as rows_fn,
+		):
+			get_checklists(HR)
+
+		args, kwargs = rows_fn.call_args
+		self.assertEqual(args[2], {"status": ("!=", "Completed")})
+		self.assertEqual(kwargs["limit"], 200)
+
+	def test_include_completed_drops_status_filter(self):
+		meta = MagicMock()
+		meta.has_field.return_value = False
+		with (
+			patch("frappe.has_permission"),
+			patch("frappe.get_meta", return_value=meta),
+			patch(
+				"phamos.api.department_cockpit._department_checklist_rows", return_value=[]
+			) as rows_fn,
+		):
+			get_checklists(HR, include_completed=1)
+
+		args, _ = rows_fn.call_args
+		self.assertEqual(args[2], {})
+
+	def test_attaches_checklist_owner_name_and_image(self):
+		meta = MagicMock()
+		meta.has_field.return_value = False
+		row = frappe._dict(
+			name="CHK-1", checklist_owner="owner@example.com", modified="2026-01-01 10:00:00"
+		)
+		with (
+			patch("frappe.has_permission"),
+			patch("frappe.get_meta", return_value=meta),
+			patch(
+				"phamos.api.department_cockpit._department_checklist_rows", return_value=[row]
+			),
+			patch("phamos.api.checklist_inbox._item_counts_map", return_value={"CHK-1": (1, 2)}),
+			patch("phamos.api.checklist_inbox._item_search_map", return_value={"CHK-1": ""}),
+			patch(
+				"phamos.api.checklist_inbox._serialize_row",
+				side_effect=lambda r, counts=None, item_search=None: {
+					"name": r.name,
+					"checklist_owner": r.checklist_owner,
+				},
+			),
+			patch(
+				"phamos.api.department_cockpit._user_images", return_value=["owner.png"]
+			),
+			patch(
+				"phamos.api.department_cockpit._user_label", return_value="Owner Example"
+			),
+		):
+			result = get_checklists(HR)
+
+		self.assertEqual(
+			result,
+			[
+				{
+					"name": "CHK-1",
+					"checklist_owner": "owner@example.com",
+					"checklist_owner_name": "Owner Example",
+					"checklist_owner_image": "owner.png",
+				}
+			],
+		)
