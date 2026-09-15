@@ -93,7 +93,9 @@ def set_assignees(name, users=None):
 
 
 @frappe.whitelist(methods=["POST"])
-def update_issue(name, subject=None, description=None, priority=None, issue_type=None, project=None):
+def update_issue(
+	name, subject=None, description=None, priority=None, issue_type=None, project=None, modified=None
+):
 	"""Update whitelisted Issue fields within HR scope."""
 	fields = {}
 	if subject is not None:
@@ -106,6 +108,8 @@ def update_issue(name, subject=None, description=None, priority=None, issue_type
 		fields["issue_type"] = issue_type
 	if project is not None:
 		fields["project"] = project
+	if modified is not None:
+		fields["modified"] = modified
 	return dc.update_issue(CONFIG, name, **fields)
 
 
@@ -184,6 +188,7 @@ def update_task(
 	exp_end_date=None,
 	progress=None,
 	project=None,
+	modified=None,
 ):
 	"""Update whitelisted Task fields within HR scope."""
 	fields = {}
@@ -203,6 +208,8 @@ def update_task(
 		fields["progress"] = progress
 	if project is not None:
 		fields["project"] = project
+	if modified is not None:
+		fields["modified"] = modified
 	return dc.update_task(CONFIG, name, **fields)
 
 

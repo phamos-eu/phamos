@@ -203,7 +203,11 @@ async function navigateToDetail(name) {
 	try {
 		await router.push({ name: "WeeklyMonitoringDetail", params: { name } })
 	} catch (e) {
-		toast.error("Could not navigate to next implementation")
+		toast({
+			title: "Could not navigate to next implementation",
+			icon: "x-circle",
+			iconClasses: "text-ink-red-4",
+		})
 		throw e
 	}
 }
@@ -243,16 +247,28 @@ async function save(andNext) {
 			status_statement: formValues.value.status_statement,
 			predictions: predictions.value,
 		})
-		toast.success("Implementation updated")
+		toast({
+			title: "Implementation updated",
+			icon: "check-circle",
+			iconClasses: "text-ink-green-4",
+		})
 		if (andNext) {
 			if (updated.next_name) {
 				await navigateToDetail(updated.next_name)
 			} else {
-				toast.success("All implementations reviewed for today")
+				toast({
+					title: "All implementations reviewed for today",
+					icon: "check-circle",
+					iconClasses: "text-ink-green-4",
+				})
 				try {
 					await router.push({ name: "WeeklyMonitoring" })
 				} catch (e) {
-					toast.error("Could not return to queue")
+					toast({
+						title: "Could not return to queue",
+						icon: "x-circle",
+						iconClasses: "text-ink-red-4",
+					})
 				}
 			}
 			return
@@ -260,7 +276,11 @@ async function save(andNext) {
 		applyDetail(updated)
 		await loadQueue()
 	} catch (e) {
-		toast.error(e?.messages?.[0] || e?.message || "Could not save")
+		toast({
+			title: e?.messages?.[0] || e?.message || "Could not save",
+			icon: "x-circle",
+			iconClasses: "text-ink-red-4",
+		})
 	} finally {
 		saving.value = false
 	}
@@ -275,7 +295,11 @@ async function skip() {
 		try {
 			await router.push({ name: "WeeklyMonitoring" })
 		} catch (e) {
-			toast.error("Could not return to queue")
+			toast({
+				title: "Could not return to queue",
+				icon: "x-circle",
+				iconClasses: "text-ink-red-4",
+			})
 		}
 	}
 }

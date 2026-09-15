@@ -80,9 +80,17 @@ async function closeTodo(name) {
 	try {
 		await call(`${API}.close_implementation_todo`, { name })
 		emit("closed", name)
-		toast.success("To-do closed")
+		toast({
+			title: "To-do closed",
+			icon: "check-circle",
+			iconClasses: "text-ink-green-4",
+		})
 	} catch (e) {
-		toast.error(e?.messages?.[0] || e?.message || "Could not close to-do")
+		toast({
+			title: e?.messages?.[0] || e?.message || "Could not close to-do",
+			icon: "x-circle",
+			iconClasses: "text-ink-red-4",
+		})
 	} finally {
 		closing.value = ""
 	}

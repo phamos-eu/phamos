@@ -202,7 +202,11 @@ async function loadSession() {
 async function onStartConfirm({ goal, expectedTime, manualStartTime, task }) {
 	showStart.value = false
 	if (!timesheetProject.value) {
-		toast.error(`Configure ${spaConfig.label} timesheet project in phamos Settings.`)
+		toast({
+			title: `Configure ${spaConfig.label} timesheet project in phamos Settings.`,
+			icon: "x-circle",
+			iconClasses: "text-ink-red-4",
+		})
 		return
 	}
 	try {
@@ -219,9 +223,9 @@ async function onStartConfirm({ goal, expectedTime, manualStartTime, task }) {
 		breakFrom.value = null
 		pauseSeconds.value = 0
 		startTick()
-		toast.success("Timer started")
+		toast({ title: "Timer started", icon: "check-circle", iconClasses: "text-ink-green-4" })
 	} catch (e) {
-		toast.error(apiErrorMessage(e))
+		toast({ title: apiErrorMessage(e), icon: "x-circle", iconClasses: "text-ink-red-4" })
 	}
 }
 
@@ -233,7 +237,7 @@ async function onPause() {
 		activeSession.value = { ...activeSession.value, session_state: "paused" }
 		pauseSeconds.value = breakFrom.value ? secondsSinceSystemDatetime(breakFrom.value) : 0
 	} catch (e) {
-		toast.error(apiErrorMessage(e))
+		toast({ title: apiErrorMessage(e), icon: "x-circle", iconClasses: "text-ink-red-4" })
 	}
 }
 
@@ -253,7 +257,7 @@ async function doResume() {
 		breakFrom.value = null
 		pauseSeconds.value = 0
 	} catch (e) {
-		toast.error(apiErrorMessage(e))
+		toast({ title: apiErrorMessage(e), icon: "x-circle", iconClasses: "text-ink-red-4" })
 		await loadSession()
 	}
 }
@@ -284,9 +288,9 @@ async function onBreakSubmit({ project, activityType, goal, result, percentBilla
 		breakFrom.value = null
 		pauseSeconds.value = 0
 		await doResume()
-		toast.success("Break timesheet submitted")
+		toast({ title: "Break timesheet submitted", icon: "check-circle", iconClasses: "text-ink-green-4" })
 	} catch (e) {
-		toast.error(apiErrorMessage(e))
+		toast({ title: apiErrorMessage(e), icon: "x-circle", iconClasses: "text-ink-red-4" })
 		await loadSession()
 	}
 }
@@ -315,9 +319,9 @@ async function onStopConfirm({ result, percentBillable, manualEndTime, activityT
 		elapsedSeconds.value = 0
 		pauseSeconds.value = 0
 		breakFrom.value = null
-		toast.success("Session submitted")
+		toast({ title: "Session submitted", icon: "check-circle", iconClasses: "text-ink-green-4" })
 	} catch (e) {
-		toast.error(apiErrorMessage(e))
+		toast({ title: apiErrorMessage(e), icon: "x-circle", iconClasses: "text-ink-red-4" })
 		await loadSession()
 	}
 }

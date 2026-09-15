@@ -396,13 +396,32 @@ async function saveFields() {
 			exp_start_date: expStartDate.value || "",
 			exp_end_date: expEndDate.value || "",
 			progress: progressLabel.value,
+			modified: props.task.modified,
 		})
 		emit("updated", updated)
 	} catch (e) {
-		fieldError.value = e?.messages?.[0] || e?.message || "Could not save task"
-		toast.error(fieldError.value)
+		if (e?.exc_type === "TimestampMismatchError") {
+			await reloadAfterConflict()
+		} else {
+			fieldError.value = e?.messages?.[0] || e?.message || "Could not save task"
+			toast({ title: fieldError.value, icon: "x-circle", iconClasses: "text-ink-red-4" })
+		}
 	} finally {
 		savingFields.value = false
+	}
+}
+
+async function reloadAfterConflict() {
+	toast({
+		title: "Someone else changed this task. Reloading the latest version — your last change wasn't saved.",
+		icon: "alert-triangle",
+		iconClasses: "text-ink-amber-3",
+	})
+	try {
+		const latest = await call(`${API.value}.get_task`, { name: props.task.name })
+		emit("updated", latest)
+	} catch (e) {
+		// Reload failed too; the user can still retry the edit manually.
 	}
 }
 
@@ -426,7 +445,11 @@ async function changeStatus(next) {
 		status.value = updated.status
 		emit("updated", updated)
 	} catch (e) {
-		toast.error(e?.messages?.[0] || e?.message || "Could not update status")
+		toast({
+			title: e?.messages?.[0] || e?.message || "Could not update status",
+			icon: "x-circle",
+			iconClasses: "text-ink-red-4",
+		})
 	} finally {
 		savingStatus.value = false
 	}

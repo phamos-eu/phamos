@@ -154,9 +154,13 @@ async function onGanttDependencyChange({ name, depends_on }) {
 		const updated = await call(`${API}.add_task_dependency`, { name, depends_on })
 		await loadTasks()
 		if (selectedName.value === name) selectedTask.value = updated
-		toast.success("Dependency linked")
+		toast({ title: "Dependency linked", icon: "check-circle", iconClasses: "text-ink-green-4" })
 	} catch (e) {
-		toast.error(e?.messages?.[0] || e?.message || "Could not link tasks")
+		toast({
+			title: e?.messages?.[0] || e?.message || "Could not link tasks",
+			icon: "x-circle",
+			iconClasses: "text-ink-red-4",
+		})
 	}
 }
 

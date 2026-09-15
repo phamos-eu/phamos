@@ -476,13 +476,32 @@ async function saveFields() {
 			priority: priority.value || "",
 			issue_type: issueType.value || "",
 			project: project.value || "",
+			modified: props.issue.modified,
 		})
 		emit("updated", updated)
 	} catch (e) {
-		fieldError.value = e?.messages?.[0] || e?.message || "Could not save issue"
-		toast.error(fieldError.value)
+		if (e?.exc_type === "TimestampMismatchError") {
+			await reloadAfterConflict()
+		} else {
+			fieldError.value = e?.messages?.[0] || e?.message || "Could not save issue"
+			toast({ title: fieldError.value, icon: "x-circle", iconClasses: "text-ink-red-4" })
+		}
 	} finally {
 		savingFields.value = false
+	}
+}
+
+async function reloadAfterConflict() {
+	toast({
+		title: "Someone else changed this issue. Reloading the latest version — your last change wasn't saved.",
+		icon: "alert-triangle",
+		iconClasses: "text-ink-amber-3",
+	})
+	try {
+		const latest = await call(`${API.value}.get_issue`, { name: props.issue.name })
+		emit("updated", latest)
+	} catch (e) {
+		// Reload failed too; the user can still retry the edit manually.
 	}
 }
 
@@ -506,7 +525,11 @@ async function changeStatus(next) {
 		status.value = updated.status
 		emit("updated", updated)
 	} catch (e) {
-		toast.error(e?.messages?.[0] || e?.message || "Could not update status")
+		toast({
+			title: e?.messages?.[0] || e?.message || "Could not update status",
+			icon: "x-circle",
+			iconClasses: "text-ink-red-4",
+		})
 	} finally {
 		savingStatus.value = false
 	}
@@ -547,6 +570,10 @@ function onConverted(result) {
 	showConvertedNotice.value = false
 	showPostConvertChoice.value = true
 	emit("converted", result)
-	toast.success(task?.name ? `Converted to ${task.name}` : "Converted to Task")
+	toast({
+		title: task?.name ? `Converted to ${task.name}` : "Converted to Task",
+		icon: "check-circle",
+		iconClasses: "text-ink-green-4",
+	})
 }
 </script>
