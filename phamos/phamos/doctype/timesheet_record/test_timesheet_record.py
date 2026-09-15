@@ -208,7 +208,7 @@ class TestDapStartProjectTimer(FrappeTestCase):
 			patch(
 				"phamos.phamos.page.dev_action_panel.dev_action_panel.frappe.get_all",
 				return_value=[],
-			),
+			) as get_all,
 			patch(
 				"phamos.phamos.page.dev_action_panel.dev_action_panel.frappe.new_doc",
 				return_value=fake,
@@ -221,6 +221,12 @@ class TestDapStartProjectTimer(FrappeTestCase):
 				goal="Investigate bug",
 			)
 
+		get_all.assert_called_once_with(
+			"Timesheet Record",
+			filters={"employee": "EMP-001", "docstatus": 0},
+			fields=["name"],
+			limit=3,
+		)
 		new_doc.assert_called_once_with("Timesheet Record")
 		self.assertTrue(fake._inserted)
 		self.assertEqual(result["name"], fake.name)
@@ -245,7 +251,7 @@ class TestDapStartProjectTimer(FrappeTestCase):
 			patch(
 				"phamos.phamos.page.dev_action_panel.dev_action_panel.frappe.get_all",
 				return_value=[{"name": "TR-EXISTING"}],
-			),
+			) as get_all,
 		):
 			with self.assertRaises(frappe.ValidationError):
 				dap.start_project_timer(
@@ -253,3 +259,10 @@ class TestDapStartProjectTimer(FrappeTestCase):
 					expected_time=1800,
 					goal="Should fail",
 				)
+
+		get_all.assert_called_once_with(
+			"Timesheet Record",
+			filters={"employee": "EMP-001", "docstatus": 0},
+			fields=["name"],
+			limit=3,
+		)
