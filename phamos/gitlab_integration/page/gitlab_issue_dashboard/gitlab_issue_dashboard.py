@@ -225,6 +225,24 @@ def get_gitlab_issue_drilldown(
 			"avg_days": _round_avg(summary_row.avg_days),
 		}
 
+	lead_time_summary = None
+	lead_summary_row = frappe.db.sql(
+		f"""
+		SELECT
+			SUM(DATEDIFF(DATE(gi.closed_at), DATE(gi.created_at))) AS total_days,
+			AVG(DATEDIFF(DATE(gi.closed_at), DATE(gi.created_at))) AS avg_days
+		FROM `tabGitLab Issue` gi
+		WHERE {where_sql} AND gi.closed_at IS NOT NULL
+		""",
+		params,
+		as_dict=True,
+	)[0]
+	if lead_summary_row.total_days is not None:
+		lead_time_summary = {
+			"total_days": _round_avg(lead_summary_row.total_days),
+			"avg_days": _round_avg(lead_summary_row.avg_days),
+		}
+
 	cycle_time_summary = None
 	if _to_bool(require_cycle_time):
 		summary_row = frappe.db.sql(
@@ -252,6 +270,7 @@ def get_gitlab_issue_drilldown(
 		"project_titles": project_titles,
 		"touch_time_summary": touch_time_summary,
 		"cycle_time_summary": cycle_time_summary,
+		"lead_time_summary": lead_time_summary,
 	}
 
 

@@ -45,6 +45,7 @@ class GitLabIssueDashboard {
         this.$touchTimeKpis = root.find("#touch-time-kpis");
         this.$cycleTimeKpis = root.find("#cycle-time-kpis");
         this.$agingKpis = root.find("#aging-kpis");
+        this.$agingProjectKpis = root.find("#aging-project-kpis");
         this.$agingChart = root.find("#aging-chart");
         this.$flowKpis = root.find("#flow-kpis");
         this.$flowChart = root.find("#flow-chart");
@@ -683,6 +684,7 @@ class GitLabIssueDashboard {
         const selectedProjects = (this.currentData && this.currentData.projects) || [];
         const compareSingleProject = compareToCompany && selectedProjects.length === 1;
         const projectBuckets = aging.project_buckets || [];
+        const isComparing = compareSingleProject || (aging.mode === "project_compare" && projectBuckets.length > 1);
         const projectTitles = (this.currentData && this.currentData.project_titles) || {};
         const agingColors = this.getChartColors("aging");
         const values = [
@@ -701,14 +703,59 @@ class GitLabIssueDashboard {
             return `<div class="gid-kpi-sub">${__("{0} days on average", [value])}</div>`;
         };
 
-        this.$agingKpis.html(`
-            <div class="gid-kpi gid-kpi-green gid-clickable" data-bucket="0_30"><small>${__("0-30 days")}</small><strong>${values[0]}</strong>${avgAgeHtml(aging.avg_0_30)}</div>
-            <div class="gid-kpi gid-kpi-amber gid-clickable" data-bucket="31_90"><small>${__("31-90 days")}</small><strong>${values[1]}</strong>${avgAgeHtml(aging.avg_31_90)}</div>
-            <div class="gid-kpi gid-kpi-red gid-clickable" data-bucket="gt_90"><small>${__(">90 days")}</small><strong>${values[2]}</strong>${avgAgeHtml(aging.avg_gt_90)}</div>
-        `);
-        this.$agingKpis.off("click", ".gid-kpi").on("click", ".gid-kpi", (e) => {
-            const bucket = $(e.currentTarget).attr("data-bucket");
-            this.openAgingDrilldown(selectedProjects, bucket);
+        if (isComparing) {
+            this.$agingKpis.empty().hide();
+        } else {
+            this.$agingKpis.show().html(`
+                <div class="gid-kpi gid-kpi-green gid-clickable" data-bucket="0_30"><small>${__("0-30 days")}</small><strong>${values[0]}</strong>${avgAgeHtml(aging.avg_0_30)}</div>
+                <div class="gid-kpi gid-kpi-amber gid-clickable" data-bucket="31_90"><small>${__("31-90 days")}</small><strong>${values[1]}</strong>${avgAgeHtml(aging.avg_31_90)}</div>
+                <div class="gid-kpi gid-kpi-red gid-clickable" data-bucket="gt_90"><small>${__(">90 days")}</small><strong>${values[2]}</strong>${avgAgeHtml(aging.avg_gt_90)}</div>
+            `);
+            this.$agingKpis.off("click", ".gid-kpi").on("click", ".gid-kpi", (e) => {
+                const bucket = $(e.currentTarget).attr("data-bucket");
+                this.openAgingDrilldown(selectedProjects, bucket);
+            });
+        }
+
+        const buildAgingRow = (title, projectId, rowValues, rowAvgs) => {
+            const projAttr = projectId ? frappe.utils.escape_html(projectId) : "";
+            return `
+                <div class="gid-lead-row">
+                    <div class="gid-lead-row-label">${frappe.utils.escape_html(title)}</div>
+                    <div class="gid-kpi-row">
+                        <div class="gid-kpi gid-kpi-green gid-clickable" data-project="${projAttr}" data-bucket="0_30">
+                            <small>${__("0-30 days")}</small><strong>${rowValues[0] || 0}</strong>${avgAgeHtml(rowAvgs[0])}
+                        </div>
+                        <div class="gid-kpi gid-kpi-amber gid-clickable" data-project="${projAttr}" data-bucket="31_90">
+                            <small>${__("31-90 days")}</small><strong>${rowValues[1] || 0}</strong>${avgAgeHtml(rowAvgs[1])}
+                        </div>
+                        <div class="gid-kpi gid-kpi-red gid-clickable" data-project="${projAttr}" data-bucket="gt_90">
+                            <small>${__(">90 days")}</small><strong>${rowValues[2] || 0}</strong>${avgAgeHtml(rowAvgs[2])}
+                        </div>
+                    </div>
+                </div>
+            `;
+        };
+
+        let projectRowsHtml = "";
+        if (compareSingleProject) {
+            const selectedProject = selectedProjects[0];
+            const selectedTitle = projectTitles[selectedProject] || selectedProject || __("Project");
+            projectRowsHtml += buildAgingRow(selectedTitle, selectedProject, values, [aging.avg_0_30, aging.avg_31_90, aging.avg_gt_90]);
+            projectRowsHtml += buildAgingRow(__("Company"), null, companyValues, [companyAging.avg_0_30, companyAging.avg_31_90, companyAging.avg_gt_90]);
+        } else if (aging.mode === "project_compare" && projectBuckets.length > 1) {
+            projectBuckets.forEach((row) => {
+                const title = projectTitles[row.project] || row.project || __("Project");
+                projectRowsHtml += buildAgingRow(title, row.project, [row.bucket_0_30, row.bucket_31_90, row.bucket_gt_90], [row.avg_0_30, row.avg_31_90, row.avg_gt_90]);
+            });
+        }
+
+        this.$agingProjectKpis.html(projectRowsHtml);
+        this.$agingProjectKpis.off("click", ".gid-kpi").on("click", ".gid-kpi", (e) => {
+            const $el = $(e.currentTarget);
+            const project = $el.attr("data-project");
+            const bucket = $el.attr("data-bucket");
+            this.openAgingDrilldown(project ? [project] : [], bucket);
         });
 
         if (compareSingleProject) {

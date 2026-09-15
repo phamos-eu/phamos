@@ -124,11 +124,14 @@ Object.assign(GitLabIssueDashboard.prototype, {
         const daysToHours = (value) => Math.round(value * 24 * 100) / 100;
         const touchSummary = showTouchTime && data && data.touch_time_summary;
         const cycleSummary = showCycleTime && data && data.cycle_time_summary;
+        const leadSummary = showLeadTime && data && data.lead_time_summary;
         const summaryHtml = touchSummary
             ? `<div class="gid-drilldown-note" style="margin-top: 8px;"><strong>${__("Total")}: ${daysToHours(touchSummary.total_days)} ${__("hrs")} &nbsp;·&nbsp; ${__("Average")}: ${daysToHours(touchSummary.avg_days)} ${__("hrs")}</strong></div>`
             : cycleSummary
                 ? `<div class="gid-drilldown-note" style="margin-top: 8px;"><strong>${__("Total")}: ${cycleSummary.total_days} ${__("days")} &nbsp;·&nbsp; ${__("Average")}: ${cycleSummary.avg_days} ${__("days")}</strong></div>`
-                : "";
+                : leadSummary
+                    ? `<div class="gid-drilldown-note" style="margin-top: 8px;"><strong>${__("Total")}: ${leadSummary.total_days} ${__("days")} &nbsp;·&nbsp; ${__("Average")}: ${leadSummary.avg_days} ${__("days")}</strong></div>`
+                    : "";
 
         const tableRows = rows.map((row) => {
             const project = frappe.utils.escape_html(projectTitles[row.gitlab_project] || row.gitlab_project || "");
