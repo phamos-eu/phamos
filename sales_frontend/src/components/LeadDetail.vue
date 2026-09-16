@@ -173,6 +173,14 @@
 				</section>
 
 				<FormControl
+					v-model="leadOwner"
+					label="Lead Owner"
+					type="select"
+					size="sm"
+					:options="leadOwnerOptions"
+				/>
+
+				<FormControl
 					v-model="qualificationStatus"
 					label="Qualification Status"
 					type="select"
@@ -256,6 +264,8 @@ const status = ref("")
 const nextFollowUp = ref("")
 const qualificationStatus = ref("")
 const statusComment = ref("")
+const leadOwner = ref("")
+const owners = ref([])
 
 const companyName = ref("")
 const website = ref("")
@@ -350,6 +360,18 @@ const qualificationOptions = computed(() => [
 	...QUALIFICATION_STATUSES.map((q) => ({ label: q, value: q })),
 ])
 
+const leadOwnerOptions = computed(() => {
+	const options = owners.value.map((u) => ({ label: u.full_name || u.name, value: u.name }))
+	const current = lead.value?.lead_owner
+	// Keep the current owner selectable even when they're outside the Sales
+	// shortlist (no longer holds a Sales role, disabled, …); otherwise the
+	// select would show nothing and autosave would quietly reassign the lead.
+	if (current && !options.some((option) => option.value === current)) {
+		options.unshift({ label: lead.value.lead_owner_name || current, value: current })
+	}
+	return [{ label: "—", value: "" }, ...options]
+})
+
 const noOfEmployeesOptions = computed(() => [
 	{ label: "—", value: "" },
 	...NO_OF_EMPLOYEES_OPTIONS.map((o) => ({ label: o, value: o })),
@@ -416,6 +438,7 @@ function syncFieldsFromLead() {
 	nextFollowUp.value = lead.value.custom_next_followup || ""
 	qualificationStatus.value = lead.value.qualification_status || ""
 	statusComment.value = lead.value.custom_status_comment || ""
+	leadOwner.value = lead.value.lead_owner || ""
 	companyName.value = lead.value.company_name || ""
 	website.value = lead.value.website || ""
 	city.value = lead.value.city || ""
@@ -479,6 +502,7 @@ async function saveFields() {
 			custom_next_followup: nextFollowUp.value,
 			qualification_status: qualificationStatus.value,
 			custom_status_comment: statusComment.value,
+			lead_owner: leadOwner.value,
 			company_name: companyName.value,
 			website: website.value,
 			city: city.value,
@@ -522,6 +546,7 @@ watch(
 		nextFollowUp,
 		qualificationStatus,
 		statusComment,
+		leadOwner,
 		companyName,
 		website,
 		city,
@@ -548,12 +573,26 @@ function onNoteSaved(updated) {
 	loadActivity()
 }
 
+async function loadOwners() {
+	try {
+		owners.value = await call(`${API}.get_lead_owners`)
+	} catch (e) {
+		toast({
+			title: e?.messages?.[0] || e?.message || "Could not load lead owners",
+			icon: "x-circle",
+			iconClasses: "text-ink-red-4",
+		})
+	}
+}
+
 function loadAll() {
 	loadLead()
 	loadActivity()
 }
 
 onMounted(() => {
+	// Owner candidates don't change per lead, so they're loaded once.
+	loadOwners()
 	loadAll()
 })
 

@@ -15,7 +15,7 @@ import requests
 from frappe import _
 from frappe.utils import get_datetime, getdate, now_datetime
 
-from phamos.api.department_cockpit import _user_images, _user_label
+from phamos.api.department_cockpit import _user_images, _user_label, role_shortlist_users
 from phamos.phamos.page.sales_action_panel.sales_action_panel import LEAD_STATUSES
 
 LEAD_ROLES = ("System Manager", "Sales Manager", "Sales User")
@@ -42,7 +42,13 @@ LEAD_LIST_FIELDS = [
 # unset and get filled in over time. `qualified_by`/`qualified_on` stay
 # system-set (not in this list) since they're set by Frappe's own qualify
 # flow, not typed in directly.
-LEAD_TRANSACTIONAL_FIELDS = ("status", "custom_next_followup", "qualification_status", "custom_status_comment")
+LEAD_TRANSACTIONAL_FIELDS = (
+	"status",
+	"custom_next_followup",
+	"qualification_status",
+	"custom_status_comment",
+	"lead_owner",
+)
 LEAD_MASTER_FIELDS = (
 	"company_name",
 	"website",
@@ -296,6 +302,7 @@ def _serialize_lead_detail(doc):
 		"status": doc.status,
 		"lead_owner": doc.lead_owner,
 		"lead_owner_name": _user_label(doc.lead_owner) if doc.lead_owner else None,
+		"lead_owner_image": frappe.db.get_value("User", doc.lead_owner, "user_image") if doc.lead_owner else "",
 		"custom_next_followup": doc.custom_next_followup,
 		"custom_status_comment": doc.custom_status_comment,
 		"qualification_status": doc.qualification_status,
@@ -306,6 +313,13 @@ def _serialize_lead_detail(doc):
 		"modified": doc.modified,
 		"desk_url": f"/app/lead/{doc.name}",
 	}
+
+
+@frappe.whitelist()
+def get_lead_owners():
+	"""Enabled users holding a Sales role — candidates for Lead Owner."""
+	_check_lead_access()
+	return role_shortlist_users(LEAD_ROLES)
 
 
 @frappe.whitelist()
@@ -324,6 +338,7 @@ def update_lead(
 	custom_next_followup=None,
 	qualification_status=None,
 	custom_status_comment=None,
+	lead_owner=None,
 	company_name=None,
 	website=None,
 	city=None,
@@ -366,6 +381,7 @@ def update_lead(
 		"custom_next_followup": custom_next_followup,
 		"qualification_status": qualification_status,
 		"custom_status_comment": custom_status_comment,
+		"lead_owner": lead_owner,
 		"company_name": company_name,
 		"website": website,
 		"city": city,

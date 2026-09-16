@@ -270,6 +270,9 @@ function onLeadUpdated(updated) {
 			...leads.value[idx],
 			status: updated.status,
 			custom_next_followup: updated.custom_next_followup,
+			lead_owner: updated.lead_owner,
+			owner_name: updated.lead_owner_name,
+			owner_image: updated.lead_owner_image,
 		}
 	}
 }
