@@ -269,6 +269,26 @@ def _serialize_notes(doc):
 	return notes
 
 
+PLANNED_START_STEP = "Planned start"
+
+
+def _sync_planned_start_next_step(doc, planned_start):
+	"""Keep a single "Planned start" next step in step with the date.
+
+	Matched on its label so moving the planned start updates that row
+	rather than piling up a new one each time.
+	"""
+	if not planned_start:
+		return
+
+	for row in doc.get("custom_next_steps") or []:
+		if (row.next_step or "").strip().lower() == PLANNED_START_STEP.lower():
+			row.date = planned_start
+			return
+
+	doc.append("custom_next_steps", {"next_step": PLANNED_START_STEP, "date": planned_start})
+
+
 def _next_step_sort_key(row):
 	"""Date ascending, undated rows last."""
 	date = row.get("date")
@@ -448,6 +468,9 @@ def update_lead(
 
 	for key, value in updates.items():
 		doc.set(key, value)
+
+	if updates.get("custom_planned_start"):
+		_sync_planned_start_next_step(doc, updates["custom_planned_start"])
 
 	doc.save()
 	result = get_lead(name)
@@ -715,6 +738,35 @@ def _followup_bucket(row, today_date):
 	return "Due later"
 
 
+def _predicted_hours(lead_rows):
+	"""Total predicted hours across these leads, and the split by month."""
+	lead_names = [row.name for row in lead_rows]
+	if not lead_names:
+		return 0, []
+
+	predictions = frappe.get_all(
+		"Lead Hours Prediction",
+		filters={"parenttype": "Lead", "parent": ("in", lead_names)},
+		fields=["month_start", "hours"],
+		limit_page_length=0,
+	)
+
+	by_month = {}
+	total = 0
+	for row in predictions:
+		hours = int(row.hours or 0)
+		total += hours
+		if row.month_start:
+			key = str(row.month_start)[:7]
+			by_month[key] = by_month.get(key, 0) + hours
+
+	monthly = [
+		{"label": frappe.utils.formatdate(f"{month}-01", "MMM yyyy"), "value": hours}
+		for month, hours in sorted(by_month.items())
+	]
+	return total, monthly
+
+
 @frappe.whitelist()
 def get_lead_dashboard():
 	"""Return Lead pipeline KPI dashboard: follow-up backlog, trends, breakdowns."""
@@ -770,9 +822,13 @@ def get_lead_dashboard():
 	for row in open_rows:
 		followup_counts[_followup_bucket(row, today_date)] += 1
 
+	predicted_total, predicted_monthly = _predicted_hours(rows)
+
 	return {
 		"windows": windows,
 		"open_pipeline": len(open_rows),
+		"predicted_hours": predicted_total,
+		"predicted_monthly": predicted_monthly,
 		"monthly": months,
 		"status": [{"label": status, "value": status_counts[status]} for status in LEAD_STATUSES],
 		"owners": [

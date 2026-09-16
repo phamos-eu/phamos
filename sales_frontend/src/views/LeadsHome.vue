@@ -8,7 +8,7 @@
 				Loading lead dashboard…
 			</div>
 			<template v-else>
-				<section class="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-4">
+				<section class="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-5">
 					<div
 						v-for="stat in stats"
 						:key="stat.key"
@@ -66,6 +66,7 @@
 				</section>
 
 				<div class="grid grid-cols-1 gap-5 xl:grid-cols-3">
+					<DashboardBars title="Predicted hours by month" :rows="dashboard.predicted_monthly" />
 					<DashboardBars title="By status" :rows="dashboard.status" />
 					<DashboardBars title="By owner (open)" :rows="dashboard.owners" />
 					<DashboardBars title="Follow-up aging (open)" :rows="dashboard.follow_up" />
@@ -86,6 +87,8 @@ const error = ref("")
 const dashboard = ref({
 	windows: {},
 	open_pipeline: 0,
+	predicted_hours: 0,
+	predicted_monthly: [],
 	monthly: [],
 	status: [],
 	owners: [],
@@ -139,6 +142,11 @@ const stats = computed(() => {
 		{ key: "open", label: "Open pipeline", value: dashboard.value.open_pipeline ?? 0 },
 		{ key: "created", label: "New leads (90d)", value: current.created ?? 0 },
 		{ key: "converted", label: "Converted (90d)", value: current.converted ?? 0 },
+		{
+			key: "predicted",
+			label: "Predicted hours",
+			value: `${dashboard.value.predicted_hours ?? 0} h`,
+		},
 	]
 })
 
