@@ -101,33 +101,38 @@
 						/>
 					</div>
 
-					<div class="min-w-0">
-						<div class="mb-1.5 flex items-center justify-between gap-2">
-							<label class="text-xs text-ink-gray-5">Next Steps</label>
-							<button
-								type="button"
-								class="flex items-center gap-1 rounded px-1.5 py-0.5 text-xs text-ink-gray-6 hover:bg-surface-gray-2 hover:text-ink-gray-9"
-								@click="addNextStep"
-							>
-								<FeatherIcon name="plus" class="h-3.5 w-3.5" />
-								<span>Add</span>
-							</button>
-						</div>
-						<div v-if="!nextSteps.length" class="text-xs text-ink-gray-5">No next steps yet.</div>
-						<div v-else class="max-h-24 space-y-1.5 overflow-y-auto pr-1">
+					<div ref="nextStepsRoot" class="min-w-0">
+						<label class="mb-1.5 block text-xs text-ink-gray-5">Next Steps</label>
+						<!--
+							Keyboard-first, mirroring ChecklistEditor: Enter opens a new row
+							*below* the current one, Up/Down walk the rows, Backspace on an
+							empty row removes it. Blank rows are dropped server-side on save.
+						-->
+						<div v-if="nextSteps.length" class="mb-1.5 max-h-24 space-y-1.5 overflow-y-auto pr-1">
 							<div v-for="(step, index) in nextSteps" :key="index" class="flex items-center gap-1.5">
 								<input
 									v-model="step.next_step"
 									type="text"
 									placeholder="Next step"
+									:data-step-index="index"
+									data-step-field="next_step"
 									class="form-input h-7 min-w-0 flex-1 rounded border border-outline-gray-2 bg-surface-white px-2 text-sm text-ink-gray-8"
 									@change="scheduleNextStepsSave"
+									@keydown.enter.prevent="insertStepBelow(index)"
+									@keydown.down.prevent="moveStepFocus(index, 1, 'next_step')"
+									@keydown.up.prevent="moveStepFocus(index, -1, 'next_step')"
+									@keydown.backspace="onStepBackspace(index, $event)"
 								/>
 								<input
 									v-model="step.date"
 									type="date"
+									:data-step-index="index"
+									data-step-field="date"
 									class="form-input h-7 w-32 flex-none rounded border border-outline-gray-2 bg-surface-white px-1.5 text-xs text-ink-gray-8"
 									@change="scheduleNextStepsSave"
+									@keydown.enter.prevent="insertStepBelow(index)"
+									@keydown.down.prevent="moveStepFocus(index, 1, 'date')"
+									@keydown.up.prevent="moveStepFocus(index, -1, 'date')"
 								/>
 								<button
 									type="button"
@@ -139,6 +144,14 @@
 								</button>
 							</div>
 						</div>
+						<button
+							type="button"
+							class="flex items-center gap-1 rounded px-1.5 py-0.5 text-xs text-ink-gray-6 hover:bg-surface-gray-2 hover:text-ink-gray-9"
+							@click="addNextStep"
+						>
+							<FeatherIcon name="plus" class="h-3.5 w-3.5" />
+							<span>Add next step</span>
+						</button>
 					</div>
 				</div>
 				<div class="flex flex-shrink-0 items-center gap-2 border-b border-outline-gray-2 bg-surface-white px-4 py-2.5">
@@ -318,6 +331,7 @@ const owners = ref([])
 // Local working copy of the Lead's Next Steps child table; saved as a whole
 // (see set_lead_next_steps) rather than row by row.
 const nextSteps = ref([])
+const nextStepsRoot = ref(null)
 
 const companyName = ref("")
 const website = ref("")
@@ -617,8 +631,38 @@ const scheduleNextStepsSave = debounce(() => {
 	saveNextSteps()
 }, 500)
 
+/** Focus a row's input by position — rows are keyed by index, so query the DOM. */
+function focusStep(index, field = "next_step") {
+	nextTick(() => {
+		nextStepsRoot.value
+			?.querySelector(`input[data-step-index="${index}"][data-step-field="${field}"]`)
+			?.focus()
+	})
+}
+
 function addNextStep() {
 	nextSteps.value.push({ next_step: "", date: "" })
+	focusStep(nextSteps.value.length - 1)
+}
+
+/** Enter opens the next row directly below the current one, never above it. */
+function insertStepBelow(index) {
+	nextSteps.value.splice(index + 1, 0, { next_step: "", date: "" })
+	focusStep(index + 1)
+}
+
+function moveStepFocus(index, delta, field) {
+	const target = index + delta
+	if (target < 0 || target >= nextSteps.value.length) return
+	focusStep(target, field)
+}
+
+function onStepBackspace(index, event) {
+	// Only swallow Backspace when the row is empty — otherwise it's normal editing.
+	if ((nextSteps.value[index]?.next_step || "").length) return
+	event.preventDefault()
+	removeNextStep(index)
+	if (nextSteps.value.length) focusStep(Math.max(0, index - 1))
 }
 
 function removeNextStep(index) {
