@@ -76,30 +76,19 @@
 						<span class="truncate">{{ lead.email_id }}</span>
 					</button>
 
-					<!-- Everyone else on file at this company. The details to the left are
-					     a copy of one person's; these chips are the rest of them. -->
-					<div v-if="contacts.length" class="flex flex-wrap items-center gap-1.5">
-						<button
-							v-for="contact in contacts"
-							:key="contact.name"
-							type="button"
-							class="flex items-center gap-1 rounded-full border px-2 py-0.5 text-xs"
-							:class="
-								contact.is_primary
-									? 'border-transparent bg-surface-gray-3 font-medium text-ink-gray-9'
-									: 'border-outline-gray-2 text-ink-gray-7 hover:bg-surface-gray-2 hover:text-ink-gray-9'
-							"
-							:title="contact.email_id || contact.full_name"
-							@click="openContact(contact)"
-						>
-							<FeatherIcon
-								v-if="contact.is_primary"
-								name="star"
-								class="h-3 w-3 flex-none text-ink-amber-3"
-							/>
-							<span class="max-w-[10rem] truncate">{{ contact.full_name }}</span>
-						</button>
-					</div>
+					<!-- Only the main contact up here, so their number stays one click
+					     away. Everyone else is a chip in the stream below, where there's
+					     room and where the date they were added means something. -->
+					<button
+						v-if="primaryContact"
+						type="button"
+						class="flex items-center gap-1 rounded-full bg-surface-gray-3 px-2 py-0.5 text-xs font-medium text-ink-gray-9 hover:bg-surface-gray-4"
+						:title="primaryContact.email_id || primaryContact.full_name"
+						@click="openContact(primaryContact)"
+					>
+						<FeatherIcon name="star" class="h-3 w-3 flex-none text-ink-amber-3" />
+						<span class="max-w-[10rem] truncate">{{ primaryContact.full_name }}</span>
+					</button>
 
 					<!-- Reading the mail costs money and handles personal data, so it
 					     happens when asked for, not on every message that arrives. -->
@@ -244,6 +233,14 @@
 						<FeatherIcon :name="filter.icon" class="h-3.5 w-3.5 flex-none" />
 						<span>{{ filter.label }}</span>
 					</button>
+					<!-- Narrows this stream only; the lead's other columns are untouched. -->
+					<FormControl
+						v-model="feedSearch"
+						type="text"
+						size="sm"
+						placeholder="Search this timeline…"
+						class="w-44 min-w-0"
+					/>
 					<!-- One button rather than one per thing that can be created: the
 					     row is a filter row, and it shouldn't grow with every new type. -->
 					<Dropdown class="ml-auto" :options="createOptions" placement="right">
@@ -261,7 +258,7 @@
 						Select Communication, Notes, or Activities to view.
 					</div>
 					<div v-else-if="!timeline.length" class="flex items-center justify-center py-16 text-sm text-ink-gray-5">
-						Nothing recorded yet.
+						{{ feedSearch.trim() ? "Nothing here matches that search." : "Nothing recorded yet." }}
 					</div>
 					<!-- One chronological stream: the toggles above filter which entry types appear in it. -->
 					<div v-else class="space-y-2">
@@ -407,6 +404,22 @@
 											<EmailBody :html="message.content_html" max-height-class="max-h-[22vh]" />
 										</div>
 									</div>
+								</template>
+
+								<template v-else-if="entry.type === 'contacts'">
+									<button
+										type="button"
+										class="flex items-center gap-1 rounded-full border border-outline-gray-2 px-2 py-0.5 text-xs text-ink-gray-8 hover:bg-surface-gray-2 hover:text-ink-gray-9"
+										@click="openContact(entry.contact)"
+									>
+										<FeatherIcon
+											v-if="entry.contact.is_primary"
+											name="star"
+											class="h-3 w-3 flex-none text-ink-amber-3"
+										/>
+										<span class="max-w-[16rem] truncate">{{ entry.subject }}</span>
+									</button>
+									<div v-if="entry.body" class="mt-1 text-xs text-ink-gray-6">{{ entry.body }}</div>
 								</template>
 
 								<!-- Demos, opportunities and quotations are records elsewhere:
@@ -646,6 +659,7 @@ const contacts = ref([])
 const selectedContact = ref(null)
 const showContactDialog = ref(false)
 const showSuggestContacts = ref(false)
+const feedSearch = ref("")
 const creating = ref(false)
 
 /** Icons match the feed types, so the menu and the stream name things alike. */
@@ -768,7 +782,9 @@ const communications = ref([])
 const activities = ref([])
 // Independent show/hide toggles (not exclusive tabs) — any combination,
 // including all three at once, can be visible together.
-const activeFilters = ref(new Set(["communications", "demos", "opportunities", "quotations"]))
+const activeFilters = ref(
+	new Set(["communications", "demos", "opportunities", "quotations", "contacts"])
+)
 
 /**
  * Each entry type owns an icon and a colour, used identically on the filter
@@ -807,6 +823,14 @@ const FEED_TYPES = {
 		off: "text-purple-700 hover:bg-purple-50 dark:text-purple-400",
 		accent: "border-l-purple-500",
 		iconColor: "text-purple-600",
+	},
+	contacts: {
+		label: "Contacts",
+		icon: "user",
+		on: "bg-pink-600 text-white",
+		off: "text-pink-700 hover:bg-pink-50 dark:text-pink-400",
+		accent: "border-l-pink-500",
+		iconColor: "text-pink-600",
 	},
 	opportunities: {
 		label: "Opportunities",
@@ -914,6 +938,24 @@ const timeline = computed(() => {
 		}
 	}
 
+	if (activeFilters.value.has("contacts")) {
+		for (const contact of contacts.value) {
+			entries.push({
+				key: `contact:${contact.name}`,
+				type: "contacts",
+				date: contact.creation,
+				badge: contact.is_primary ? "Main contact" : "Contact",
+				badgeTheme: contact.is_primary ? "green" : "gray",
+				author: contact.full_name,
+				subject: contact.full_name,
+				body: [contact.designation, contact.email_id, ...(contact.phones || [])]
+					.filter(Boolean)
+					.join(" · "),
+				contact,
+			})
+		}
+	}
+
 	if (activeFilters.value.has("opportunities")) {
 		for (const opportunity of opportunities.value) {
 			entries.push({
@@ -967,7 +1009,27 @@ const timeline = computed(() => {
 		})
 	}
 
-	return entries.sort((a, b) => String(b.date || "").localeCompare(String(a.date || "")))
+	const sorted = entries.sort((a, b) => String(b.date || "").localeCompare(String(a.date || "")))
+
+	const query = feedSearch.value.trim().toLowerCase()
+	if (!query) return sorted
+
+	return sorted.filter((entry) => {
+		const haystack = [
+			entry.subject,
+			entry.author,
+			entry.body,
+			entry.badge,
+			entry.recipients,
+			// Emails render from HTML, so search the text of every message in the thread.
+			...(entry.messages || []).map((m) => `${m.subject} ${m.sender} ${stripHtml(m.content)}`),
+			entry.activity ? `${activityLabel(entry)} ${activityDetail(entry)}` : "",
+		]
+			.filter(Boolean)
+			.join(" ")
+			.toLowerCase()
+		return haystack.includes(query)
+	})
 })
 
 const qualificationOptions = computed(() => [
@@ -985,7 +1047,15 @@ const requestTypeOptions = computed(() => [
 	...REQUEST_TYPE_OPTIONS.map((o) => ({ label: o, value: o })),
 ])
 
-const phoneNumbers = computed(() => [...new Set([lead.value?.mobile_no, lead.value?.phone].filter(Boolean))])
+const primaryContact = computed(() => contacts.value.find((c) => c.is_primary) || null)
+
+/** The lead carries a copy of one person's number, but it can be blank while
+ *  the contact itself has one — so fall back rather than lose the click. */
+const phoneNumbers = computed(() => {
+	const own = [lead.value?.mobile_no, lead.value?.phone].filter(Boolean)
+	if (own.length) return [...new Set(own)]
+	return [...new Set(primaryContact.value?.phones || [])]
+})
 
 /** Left column: what was touched. */
 function activityLabel(entry) {

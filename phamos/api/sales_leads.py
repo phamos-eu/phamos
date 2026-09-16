@@ -946,6 +946,8 @@ def _serialize_contact(doc, lead_doc):
 		"mobile_no": doc.mobile_no,
 		"phone": doc.phone,
 		"is_primary": is_primary,
+		# When the contact was put on file — the timeline places it there.
+		"creation": doc.creation,
 	}
 
 
