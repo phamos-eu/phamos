@@ -332,5 +332,20 @@
   "property_type": "check",
   "row_name": null,
   "value": "1"
+ },
+ {
+  "default_value": null,
+  "doc_type": "Lead",
+  "docstatus": 0,
+  "doctype": "Property Setter",
+  "doctype_or_field": "DocType",
+  "field_name": null,
+  "is_system_generated": 0,
+  "module": "Phamos",
+  "name": "Lead-main-track_changes",
+  "property": "track_changes",
+  "property_type": "check",
+  "row_name": null,
+  "value": "1"
  }
 ]

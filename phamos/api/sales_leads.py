@@ -1,8 +1,9 @@
 # Copyright (c) 2026, phamos.eu and contributors
 # For license information, please see license.txt
 
-"""Sales Cockpit Leads API — Follow Ups list, Lead detail, notes, and pipeline KPIs."""
+"""Sales Cockpit Leads API — Follow Ups list, Lead detail, notes, activity, and pipeline KPIs."""
 
+import json
 from datetime import timedelta
 
 import frappe
@@ -30,6 +31,11 @@ LEAD_LIST_FIELDS = [
 	"creation",
 	"modified",
 ]
+
+# Fields editable inline from the Follow Ups cockpit's Transactional panel —
+# the things a rep changes on every follow-up. Everything else on Lead is
+# either master data (company/firmographic, read-only here) or system-set.
+LEAD_EDITABLE_FIELDS = ("status", "custom_next_followup", "qualification_status", "custom_status_comment")
 
 LOST_STATUSES = ("Do Not Contact", "Lost Quotation")
 CONVERTED_STATUS = "Converted"
@@ -112,43 +118,182 @@ def _serialize_notes(doc):
 
 
 def _serialize_lead_detail(doc):
-	communications = frappe.get_all(
-		"Communication",
-		filters={"reference_doctype": "Lead", "reference_name": doc.name},
-		fields=["name", "subject", "content", "sent_or_received", "communication_date", "sender", "recipients"],
-		order_by="communication_date desc",
-		limit_page_length=10,
-	)
+	"""Identity, master-data, and transactional fields — no notes/communications.
 
+	Notes and Communications are heavier (child table + separate doctype
+	query) and only needed by the Communication/Notes/Activities feed, so
+	they're served separately by `get_lead_activity` (and `notes` alone via
+	this same function is unnecessary — the feed calls `get_lead_activity`
+	and `_serialize_notes` is still used there for the Notes tab).
+	"""
 	return {
 		"name": doc.name,
+		# Master data — company/contact identity and firmographics; rarely
+		# changes once set, no inline editing in the cockpit for v1.
 		"lead_name": doc.lead_name,
 		"company_name": doc.company_name,
+		"email_id": doc.email_id,
+		"phone": doc.phone,
+		"mobile_no": doc.mobile_no,
+		"website": doc.website,
+		"city": doc.city,
+		"state": doc.state,
+		"country": doc.country,
+		"territory": doc.territory,
+		"source": doc.source,
+		"industry": doc.industry,
+		"no_of_employees": doc.no_of_employees,
+		"market_segment": doc.market_segment,
+		"annual_revenue": doc.annual_revenue,
+		"request_type": doc.request_type,
+		# Transactional data — changes on every follow-up, inline-editable
+		# via update_lead.
 		"status": doc.status,
 		"lead_owner": doc.lead_owner,
 		"lead_owner_name": _user_label(doc.lead_owner) if doc.lead_owner else None,
-		"source": doc.source,
-		"territory": doc.territory,
-		"phone": doc.phone,
-		"mobile_no": doc.mobile_no,
-		"email_id": doc.email_id,
 		"custom_next_followup": doc.custom_next_followup,
-		"custom_status_comment": doc.custom_status_comment if doc.status == "Do Not Contact" else None,
+		"custom_status_comment": doc.custom_status_comment,
+		"qualification_status": doc.qualification_status,
+		"qualified_by": doc.qualified_by,
+		"qualified_by_name": _user_label(doc.qualified_by) if doc.qualified_by else None,
+		"qualified_on": doc.qualified_on,
 		"creation": doc.creation,
 		"modified": doc.modified,
-		"notes": _serialize_notes(doc),
-		"communications": communications,
 		"desk_url": f"/app/lead/{doc.name}",
 	}
 
 
 @frappe.whitelist()
 def get_lead(name):
-	"""Return Lead detail for the Sales cockpit side panel."""
+	"""Return Lead master + transactional data for the Sales cockpit detail view."""
 	frappe.has_permission("Lead", "read", throw=True)
 	doc = frappe.get_doc("Lead", name)
 	doc.check_permission("read")
 	return _serialize_lead_detail(doc)
+
+
+@frappe.whitelist(methods=["POST"])
+def update_lead(name, status=None, custom_next_followup=None, qualification_status=None, custom_status_comment=None, if_modified=None):
+	"""Update whitelisted transactional Lead fields, autosave-style.
+
+	`if_modified` is the `modified` timestamp the client last saw. A
+	mismatch means someone else saved this Lead since the client loaded
+	it. This is a low-friction autosave, not a locking form, so the edit
+	is still saved — the mismatch is only reported back as `conflict` so
+	the caller can warn the user their change may have overwritten
+	someone else's, rather than losing it silently (same pattern as
+	department_cockpit.update_issue).
+
+	Lead's own mandatory-comment-on-"Do Not Contact" validation still
+	fires from `doc.save()`; a status change to "Do Not Contact" without
+	`custom_status_comment` in the same call will raise, and the caller
+	should let the Status Comment field pick that up on the next save.
+	"""
+	frappe.has_permission("Lead", "write", throw=True)
+	doc = frappe.get_doc("Lead", name)
+	doc.check_permission("write")
+	conflict = bool(if_modified) and str(doc.modified) != str(if_modified)
+
+	fields = {
+		"status": status,
+		"custom_next_followup": custom_next_followup,
+		"qualification_status": qualification_status,
+		"custom_status_comment": custom_status_comment,
+	}
+	updates = {k: v for k, v in fields.items() if v is not None}
+	unknown = set(updates) - set(LEAD_EDITABLE_FIELDS)
+	if unknown:
+		frappe.throw(_("Invalid Lead field(s): {0}").format(", ".join(sorted(unknown))))
+	if not updates:
+		frappe.throw(_("No fields to update"))
+
+	for key, value in updates.items():
+		doc.set(key, value)
+
+	doc.save()
+	result = get_lead(name)
+	result["conflict"] = conflict
+	return result
+
+
+def _format_lead_activities(docinfo):
+	"""Field-change (Version) and system comment entries, newest first.
+
+	Sentence construction ("changed from X to Y") is left to the frontend —
+	this just resolves each changed fieldname to its Lead form label.
+	"""
+	meta = frappe.get_meta("Lead")
+	activities = []
+
+	for version in docinfo.get("versions") or []:
+		try:
+			data = json.loads(version.get("data") or "{}")
+		except (TypeError, ValueError):
+			continue
+		for fieldname, old, new in data.get("changed") or []:
+			field = meta.get_field(fieldname)
+			activities.append(
+				{
+					"kind": "field_change",
+					"field": fieldname,
+					"label": field.label if field and field.label else fieldname,
+					"old": old,
+					"new": new,
+					"owner": version.get("owner"),
+					"creation": version.get("creation"),
+				}
+			)
+
+	for bucket in ("info_logs", "workflow_logs", "assignment_logs"):
+		for comment in docinfo.get(bucket) or []:
+			activities.append(
+				{
+					"kind": "comment",
+					"content": comment.get("content"),
+					"owner": comment.get("owner"),
+					"creation": comment.get("creation"),
+				}
+			)
+
+	activities.sort(key=lambda a: a.get("creation") or "", reverse=True)
+	return activities
+
+
+@frappe.whitelist()
+def get_lead_activity(name):
+	"""Return Communications and change/comment Activities for a Lead.
+
+	Notes stay out of this (they're Lead's own native `notes` child table,
+	served via `_serialize_notes` below). Activities are built from
+	Frappe's own `get_docinfo` — the same aggregation the Desk form's
+	timeline uses — for Versions and system comments, rather than
+	re-deriving Version-diff parsing by hand; Communications keep the
+	existing direct query since `get_docinfo`'s own field selection for
+	them isn't guaranteed to include everything the feed wants (e.g.
+	`sent_or_received`).
+	"""
+	frappe.has_permission("Lead", "read", throw=True)
+	doc = frappe.get_doc("Lead", name)
+	doc.check_permission("read")
+
+	from frappe.desk.form.load import get_docinfo
+
+	get_docinfo(doc=doc)
+	docinfo = frappe.response.pop("docinfo", None) or {}
+
+	communications = frappe.get_all(
+		"Communication",
+		filters={"reference_doctype": "Lead", "reference_name": doc.name},
+		fields=["name", "subject", "content", "sent_or_received", "communication_date", "sender", "recipients"],
+		order_by="communication_date desc",
+		limit_page_length=20,
+	)
+
+	return {
+		"notes": _serialize_notes(doc),
+		"communications": communications,
+		"activities": _format_lead_activities(docinfo),
+	}
 
 
 @frappe.whitelist(methods=["POST"])
