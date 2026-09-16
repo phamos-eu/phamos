@@ -269,6 +269,57 @@ def _serialize_notes(doc):
 	return notes
 
 
+def _serialize_modules(doc):
+	"""Implementation modules linked to this lead."""
+	return [
+		{"name": row.name, "module": row.module, "module_name": row.module_name or row.module}
+		for row in (doc.get("custom_modules") or [])
+	]
+
+
+@frappe.whitelist()
+def get_module_suggestions(limit=12):
+	"""Modules offered as one-click adds, standard ones first."""
+	_check_lead_access()
+	rows = frappe.get_all(
+		"Implementation Module",
+		fields=["name", "module_name", "is_standard", "is_required"],
+		order_by="is_required desc, is_standard desc, module_name asc",
+		limit_page_length=limit,
+	)
+	return [
+		{"name": row.name, "module_name": row.module_name or row.name}
+		for row in rows
+	]
+
+
+@frappe.whitelist(methods=["POST"])
+def set_lead_modules(lead, modules=None):
+	"""Replace the Lead's linked modules.
+
+	Wholesale replace like the other cockpit tables; duplicates are dropped
+	so adding the same module twice is a no-op rather than an error.
+	"""
+	frappe.has_permission("Lead", "write", throw=True)
+	doc = frappe.get_doc("Lead", lead)
+	doc.check_permission("write")
+
+	if isinstance(modules, str):
+		modules = json.loads(modules)
+
+	doc.set("custom_modules", [])
+	seen = set()
+	for module in modules or []:
+		name = module.get("module") if isinstance(module, dict) else module
+		if not name or name in seen:
+			continue
+		seen.add(name)
+		doc.append("custom_modules", {"module": name})
+
+	doc.save()
+	return _serialize_modules(doc)
+
+
 PLANNED_START_STEP = "Planned start"
 
 
@@ -359,6 +410,7 @@ def _serialize_lead_detail(doc):
 		"creation": doc.creation,
 		"modified": doc.modified,
 		"next_steps": _serialize_next_steps(doc),
+		"modules": _serialize_modules(doc),
 		"desk_url": f"/app/lead/{doc.name}",
 	}
 

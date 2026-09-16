@@ -148,6 +148,9 @@
 						</button>
 					</div>
 				</div>
+				<div class="flex-shrink-0 border-b border-outline-gray-2 bg-surface-white px-4 py-2.5">
+					<LeadModulePicker v-model="modules" @update:model-value="scheduleModulesSave" />
+				</div>
 				<div class="flex flex-shrink-0 items-center gap-2 border-b border-outline-gray-2 bg-surface-white px-4 py-2.5">
 					<button
 						v-for="filter in feedFilters"
@@ -373,6 +376,7 @@ import {
 	leadStatusTheme,
 } from "@/leadListColumns.js"
 import FrappeLink from "@spa/components/FrappeLink.vue"
+import LeadModulePicker from "./LeadModulePicker.vue"
 import AddLeadNoteDialog from "./AddLeadNoteDialog.vue"
 import CreateDemoDialog from "./CreateDemoDialog.vue"
 
@@ -405,6 +409,7 @@ const leadOwner = ref("")
 // Local working copy of the Lead's Next Steps child table; saved as a whole
 // (see set_lead_next_steps) rather than row by row.
 const demos = ref([])
+const modules = ref([])
 const plannedStart = ref("")
 const hoursPredictions = ref([])
 const predictionsRoot = ref(null)
@@ -600,6 +605,10 @@ function syncFieldsFromLead() {
 	if (plannedStart.value && !hoursPredictions.value.length) {
 		seedPredictionMonths()
 	}
+	modules.value = (lead.value.modules || []).map((row) => ({
+		module: row.module,
+		module_name: row.module_name,
+	}))
 	nextSteps.value = (lead.value.next_steps || []).map((step) => ({
 		key: nextStepKey++,
 		next_step: step.next_step || "",
@@ -738,6 +747,27 @@ async function saveNextSteps() {
 		})
 	}
 }
+
+async function saveModules() {
+	if (syncing.value || !lead.value) return
+	try {
+		const saved = await call(`${API}.set_lead_modules`, {
+			lead: lead.value.name,
+			modules: modules.value.map((row) => ({ module: row.module })),
+		})
+		lead.value = { ...lead.value, modules: saved }
+	} catch (e) {
+		toast({
+			title: e?.messages?.[0] || e?.message || "Could not save modules",
+			icon: "x-circle",
+			iconClasses: "text-ink-red-4",
+		})
+	}
+}
+
+const scheduleModulesSave = debounce(() => {
+	saveModules()
+}, 400)
 
 const scheduleNextStepsSave = debounce(() => {
 	saveNextSteps()
