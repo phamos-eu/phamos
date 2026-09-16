@@ -20,9 +20,11 @@
 							'sticky top-0 z-[1] border-b border-outline-gray-2 bg-surface-white py-3',
 						]"
 					>
-						<FormControl v-model="search" type="text" size="sm" placeholder="Search…" class="w-full min-w-0" />
+						<FormControl v-model="search" type="text" size="sm" placeholder="Search…" class="w-full min-w-0 max-w-56" />
 						<div class="flex min-w-0 justify-center">
-							<StatusFilter v-model="statusFilter" :statuses="statuses" />
+							<!-- Nine statuses, several of them two words: they wrap inside
+							     the column rather than running over their neighbours. -->
+							<StatusFilter v-model="statusFilter" :statuses="statuses" wrap />
 						</div>
 						<div class="flex min-w-0 justify-center">
 							<ListSortSelector

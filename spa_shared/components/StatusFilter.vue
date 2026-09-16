@@ -1,6 +1,7 @@
 <template>
 	<div
-		class="flex flex-nowrap items-center gap-2.5"
+		class="flex items-center"
+		:class="wrap ? 'w-full flex-wrap justify-center gap-1' : 'flex-nowrap gap-2.5'"
 		role="group"
 		aria-label="Filter by status"
 	>
@@ -9,11 +10,13 @@
 			:key="status"
 			type="button"
 			class="shrink-0 rounded-full"
-			:class="
-				isSelected(status)
-					? 'origin-center scale-[1.2] z-[1]'
-					: 'opacity-70 hover:opacity-100'
-			"
+			:class="[
+				isSelected(status) ? 'z-[1]' : 'opacity-70 hover:opacity-100',
+				// Scaling the selected chip grows the row past its column and
+				// overlaps its neighbours; where the chips wrap, the filled
+				// style already says 'selected' on its own.
+				isSelected(status) && !wrap ? 'origin-center scale-[1.2]' : '',
+			]"
 			:aria-pressed="isSelected(status)"
 			@click="toggle(status)"
 		>
@@ -43,6 +46,11 @@ import { Badge } from "frappe-ui"
 const props = defineProps({
 	/** Currently selected status names (empty = all) */
 	modelValue: { type: Array, default: () => [] },
+	/**
+	 * Let the chips wrap onto several rows instead of one long line — for
+	 * lists whose statuses are too many or too wordy to fit their column.
+	 */
+	wrap: { type: Boolean, default: false },
 	/** Available status names */
 	statuses: {
 		type: Array,

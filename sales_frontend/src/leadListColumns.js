@@ -6,7 +6,7 @@
  * trailing "New" button column (Lead creation is out of scope here).
  */
 export const LEAD_LIST_FILTER_GRID =
-	"grid grid-cols-[minmax(0,1.6fr)_minmax(0,1fr)_minmax(0,1fr)_minmax(0,1.3fr)_minmax(0,1fr)_minmax(0,0.95fr)] gap-x-6"
+	"grid grid-cols-[minmax(0,1.4fr)_minmax(0,1.4fr)_minmax(0,1fr)_minmax(0,1.3fr)_minmax(0,1fr)_minmax(0,0.95fr)] gap-x-6"
 
 /** Toolbar / row that participates in the parent LEAD_LIST_FILTER_GRID tracks */
 export const LEAD_LIST_FILTER_SUBGRID = "col-span-6 grid grid-cols-subgrid items-center"
