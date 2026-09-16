@@ -12,9 +12,6 @@
 					<p class="text-sm text-ink-gray-6">
 						{{ filteredLeads.length }} lead{{ filteredLeads.length === 1 ? "" : "s" }}
 					</p>
-					<Button variant="solid" :disabled="!filteredLeads.length" @click="startSession">
-						Start Follow-up Session
-					</Button>
 				</div>
 				<div :class="[LEAD_LIST_FILTER_GRID, 'min-h-0 flex-1 content-start overflow-y-auto px-5']">
 					<div
@@ -217,18 +214,6 @@ function openLead(name) {
 function closeLead() {
 	selectedName.value = null
 	router.replace({ name: "LeadsFollowUps" })
-}
-
-function startSession() {
-	// Reset filters first so the session always walks the complete default
-	// Follow-Ups queue, not whatever the user happened to have filtered/searched.
-	// Computeds re-evaluate synchronously on access, so filteredLeads already
-	// reflects the reset by the time it's read below.
-	search.value = ""
-	statusFilter.value = []
-	ownerFilter.value = []
-	const first = filteredLeads.value[0]?.name
-	if (first) openLead(first)
 }
 
 function onLeadUpdated(updated) {
