@@ -435,6 +435,17 @@ def update_lead(
 	if "website" in updates:
 		updates["website"] = normalize_website(updates["website"])
 
+	# Keep the status-comment stamps in step with the Desk client script
+	# (public/js/lead.js), which sets them whenever the comment changes —
+	# otherwise editing the comment from the cockpit leaves them pointing at
+	# whoever last touched it in Desk. Only on an actual change, so routine
+	# autosaves don't rewrite them.
+	if "custom_status_comment" in updates and updates["custom_status_comment"] != (
+		doc.custom_status_comment or ""
+	):
+		updates["custom_status_comment_modified_by"] = frappe.session.user
+		updates["custom_status_comment_modified_date"] = now_datetime()
+
 	for key, value in updates.items():
 		doc.set(key, value)
 

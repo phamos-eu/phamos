@@ -417,7 +417,7 @@ const demos = ref([])
 const plannedStart = ref("")
 const hoursPredictions = ref([])
 const predictionsRoot = ref(null)
-const DEFAULT_PREDICTION_MONTHS = 6
+const DEFAULT_PREDICTION_MONTHS = 3
 const nextSteps = ref([])
 const nextStepsRoot = ref(null)
 // Stable per-row key so re-sorting moves DOM nodes (and keeps focus with the
