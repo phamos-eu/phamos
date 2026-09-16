@@ -6,7 +6,7 @@
  * trailing "New" button column (Lead creation is out of scope here).
  */
 export const LEAD_LIST_FILTER_GRID =
-	"grid grid-cols-[minmax(0,1.4fr)_minmax(0,1.4fr)_minmax(0,1fr)_minmax(0,1.3fr)_minmax(0,1fr)_minmax(0,0.95fr)] gap-x-6"
+	"grid grid-cols-[minmax(0,1.2fr)_minmax(0,1.6fr)_minmax(0,1fr)_minmax(0,1.3fr)_minmax(0,1fr)_minmax(0,0.95fr)] gap-x-6"
 
 /** Toolbar / row that participates in the parent LEAD_LIST_FILTER_GRID tracks */
 export const LEAD_LIST_FILTER_SUBGRID = "col-span-6 grid grid-cols-subgrid items-center"
@@ -29,15 +29,23 @@ export const NO_OF_EMPLOYEES_OPTIONS = ["1-10", "11-50", "51-200", "201-500", "5
 
 export const REQUEST_TYPE_OPTIONS = ["Product Enquiry", "Request for Information", "Suggestions", "Other"]
 
+/**
+ * Desk colours Lead statuses through `frappe.utils.guess_colour`, which only
+ * recognises two of the nine: Open is red and Converted is green — everything
+ * else comes out gray. Those two are matched exactly; the rest are separated
+ * along the pipeline instead of being left indistinguishable.
+ */
 export const LEAD_STATUS_THEMES = {
 	Lead: "gray",
-	Open: "blue",
+	Open: "red",
 	Replied: "blue",
+	Interested: "blue",
 	Opportunity: "orange",
 	Quotation: "orange",
 	"Lost Quotation": "gray",
-	Interested: "green",
 	Converted: "green",
+	// Desk shows this gray; kept red here because it's the one status that
+	// means stop, and the cockpit already treats it specially.
 	"Do Not Contact": "red",
 }
 

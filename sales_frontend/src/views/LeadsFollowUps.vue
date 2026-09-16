@@ -24,7 +24,7 @@
 						<div class="flex min-w-0 justify-center">
 							<!-- Nine statuses, several of them two words: they wrap inside
 							     the column rather than running over their neighbours. -->
-							<StatusFilter v-model="statusFilter" :statuses="statuses" wrap />
+							<StatusFilter v-model="statusFilter" :statuses="statuses" :themes="LEAD_STATUS_THEMES" wrap />
 						</div>
 						<div class="flex min-w-0 justify-center">
 							<ListSortSelector
@@ -90,7 +90,11 @@ import LeadList from "@/components/LeadList.vue"
 import StatusFilter from "@spa/components/StatusFilter.vue"
 import ListSortSelector from "@spa/components/ListSortSelector.vue"
 import AssigneeFilter from "@spa/components/AssigneeFilter.vue"
-import { LEAD_LIST_FILTER_GRID, LEAD_LIST_FILTER_SUBGRID } from "@/leadListColumns.js"
+import {
+	LEAD_LIST_FILTER_GRID,
+	LEAD_LIST_FILTER_SUBGRID,
+	LEAD_STATUS_THEMES,
+} from "@/leadListColumns.js"
 
 const API = "phamos.api.sales_leads"
 
