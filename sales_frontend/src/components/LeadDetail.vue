@@ -100,6 +100,18 @@
 							<span class="max-w-[10rem] truncate">{{ contact.full_name }}</span>
 						</button>
 					</div>
+
+					<!-- Reading the mail costs money and handles personal data, so it
+					     happens when asked for, not on every message that arrives. -->
+					<button
+						type="button"
+						class="flex items-center gap-1 rounded-full border border-dashed border-outline-gray-3 px-2 py-0.5 text-xs text-ink-gray-6 hover:border-outline-gray-4 hover:bg-surface-gray-2 hover:text-ink-gray-9"
+						title="Read the emails on this lead and suggest contacts"
+						@click="showSuggestContacts = true"
+					>
+						<FeatherIcon name="zap" class="h-3 w-3 flex-none" />
+						<span>Find contacts</span>
+					</button>
 				</div>
 				<!-- Capped as a band rather than per field: each field shows as much as it
 				     has, and it's the band as a whole that yields height to the feed. -->
@@ -548,6 +560,13 @@
 		@sent="onEmailSent"
 	/>
 
+	<SuggestContactsDialog
+		v-if="lead"
+		v-model="showSuggestContacts"
+		:lead="lead"
+		@added="loadContacts"
+	/>
+
 	<LeadContactDialog
 		v-if="lead && selectedContact"
 		v-model="showContactDialog"
@@ -595,6 +614,7 @@ import EditLeadNoteDialog from "./EditLeadNoteDialog.vue"
 import ComposeEmailDialog from "./ComposeEmailDialog.vue"
 import EmailBody from "./EmailBody.vue"
 import LeadContactDialog from "./LeadContactDialog.vue"
+import SuggestContactsDialog from "./SuggestContactsDialog.vue"
 
 const API = "phamos.api.sales_leads"
 const DEMOS_API = "phamos.api.sales_demos"
@@ -614,6 +634,7 @@ const showNoteDialog = ref(false)
 const contacts = ref([])
 const selectedContact = ref(null)
 const showContactDialog = ref(false)
+const showSuggestContacts = ref(false)
 const creating = ref(false)
 
 /** Icons match the feed types, so the menu and the stream name things alike. */
