@@ -12,6 +12,7 @@ const salesRoutes = [
 	{ path: "/leads/follow-ups/:name", name: "LeadDetail", component: LeadsFollowUps, props: true },
 	{ path: "/demos", name: "Demos", component: DemosInbox },
 	{ path: "/demos/list", name: "DemosList", component: DemosInbox },
+	{ path: "/demos/list/:name", name: "DemoDetail", component: DemosInbox, props: true },
 ]
 
 export default createSpaRouter({ config: spaConfig, routes: salesRoutes })

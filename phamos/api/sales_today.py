@@ -115,7 +115,7 @@ def _demos_section(today_date):
 			"subtitle": row.lead_name or row.lead or "",
 			"meta": format_datetime(row.scheduled_on, "HH:mm"),
 			"tone": "blue",
-			"url": f"/app/demo/{row.name}",
+			"route": {"name": "DemoDetail", "params": {"name": row.name}},
 		}
 		for row in scheduled
 	]
@@ -148,7 +148,7 @@ def _awaiting_date_section():
 				"subtitle": row.lead_name or row.lead or "",
 				"meta": format_date(row.modified),
 				"tone": "gray",
-				"url": f"/app/demo/{row.name}",
+				"route": {"name": "DemoDetail", "params": {"name": row.name}},
 			}
 			for row in rows
 		],

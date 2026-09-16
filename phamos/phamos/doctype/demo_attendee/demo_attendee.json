@@ -11,7 +11,8 @@
   "full_name",
   "email",
   "participation",
-  "audience"
+  "audience",
+  "attended"
  ],
  "fields": [
   {
@@ -55,6 +56,14 @@
    "in_list_view": 1,
    "label": "Audience",
    "options": "Internal\nExternal"
+  },
+  {
+   "description": "Whether they actually joined. Blank means not recorded yet.",
+   "fieldname": "attended",
+   "fieldtype": "Select",
+   "in_list_view": 1,
+   "label": "Attended",
+   "options": "\nYes\nNo"
   }
  ],
  "grid_page_length": 10,

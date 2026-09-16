@@ -412,7 +412,17 @@
 								<!-- Demos, opportunities and quotations are records elsewhere:
 								     a titled link plus the one line that says where it stands. -->
 								<template v-else-if="['demos', 'opportunities', 'quotations'].includes(entry.type)">
+									<!-- A demo opens in the cockpit; opportunities and quotations
+									     still live in Desk. -->
+									<RouterLink
+										v-if="entry.route"
+										:to="entry.route"
+										class="text-sm font-medium text-ink-gray-9 underline-offset-2 hover:underline"
+									>
+										{{ entry.subject }}
+									</RouterLink>
 									<a
+										v-else
 										:href="entry.url"
 										class="text-sm font-medium text-ink-gray-9 underline-offset-2 hover:underline"
 									>
@@ -597,6 +607,7 @@
 
 <script setup>
 import { computed, nextTick, onMounted, ref, watch } from "vue"
+import { RouterLink } from "vue-router"
 import { call, debounce, toast, Badge, DatePicker, Dropdown } from "frappe-ui"
 import { formatDate, formatDatetime } from "@spa/utils/datetime"
 import {
@@ -898,7 +909,7 @@ const timeline = computed(() => {
 				author: demo.owner_name || demo.owner,
 				subject: demo.subject || demo.name,
 				body: demo.scheduled_on ? "" : "Awaiting a date",
-				url: `/app/demo/${demo.name}`,
+				route: { name: "DemoDetail", params: { name: demo.name } },
 			})
 		}
 	}

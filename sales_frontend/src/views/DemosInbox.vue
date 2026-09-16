@@ -1,5 +1,7 @@
 <template>
-	<div class="flex h-full min-h-0 flex-col bg-surface-white">
+	<div class="flex h-full min-h-0 flex-col">
+		<!-- Opening a demo takes over the pane, the same way a lead or an issue does. -->
+		<section v-if="!selectedName" class="flex h-full min-h-0 flex-col bg-surface-white">
 		<div v-if="configError" class="flex flex-1 items-center justify-center px-6 text-center text-sm text-red-600">
 			{{ configError }}
 		</div>
@@ -49,11 +51,12 @@
 					Showing the latest {{ demos.length }} demos — narrow your filters to see older ones.
 				</div>
 
-				<a
+				<button
 					v-for="demo in filteredDemos"
 					:key="demo.name"
-					:href="`/app/demo/${demo.name}`"
-					:class="[DEMO_LIST_FILTER_SUBGRID, 'border-b border-outline-gray-1 py-3 hover:bg-surface-gray-2']"
+					type="button"
+					:class="[DEMO_LIST_FILTER_SUBGRID, 'border-b border-outline-gray-1 py-3 text-left hover:bg-surface-gray-2']"
+					@click="openDemo(demo.name)"
 				>
 					<div class="min-w-0">
 						<div class="truncate text-sm font-medium text-ink-gray-9">{{ demo.subject }}</div>
@@ -73,7 +76,7 @@
 					<div class="min-w-0 text-center text-xs text-ink-gray-6">
 						{{ demo.modified ? formatDate(demo.modified) : "—" }}
 					</div>
-				</a>
+				</button>
 
 				<div
 					v-if="!filteredDemos.length"
@@ -83,13 +86,18 @@
 					No demos found. Create one from a lead in Follow Ups.
 				</div>
 			</div>
-		</template>
+			</template>
+		</section>
+
+		<DemoDetail v-else :name="selectedName" @close="closeDemo" @updated="onDemoUpdated" />
 	</div>
 </template>
 
 <script setup>
-import { computed, onMounted, ref } from "vue"
+import { computed, onMounted, ref, watch } from "vue"
+import { useRoute, useRouter } from "vue-router"
 import { call, Badge } from "frappe-ui"
+import DemoDetail from "@/components/DemoDetail.vue"
 import StatusFilter from "@spa/components/StatusFilter.vue"
 import ListSortSelector from "@spa/components/ListSortSelector.vue"
 import { formatDate, formatDatetime } from "@spa/utils/datetime"
@@ -109,6 +117,10 @@ const configError = ref("")
 const demos = ref([])
 const statuses = ref([])
 const truncated = ref(false)
+const selectedName = ref(null)
+
+const route = useRoute()
+const router = useRouter()
 
 const statusTheme = demoStatusTheme
 
@@ -158,5 +170,36 @@ async function loadDemos() {
 	}
 }
 
-onMounted(loadDemos)
+function openDemo(name) {
+	selectedName.value = name
+	if (route.params.name !== name) {
+		router.replace({ name: "DemoDetail", params: { name } })
+	}
+}
+
+function closeDemo() {
+	selectedName.value = null
+	router.replace({ name: "DemosList" })
+}
+
+/** Keep the row in step with an edit made in the detail view. */
+function onDemoUpdated(updated) {
+	const idx = demos.value.findIndex((d) => d.name === updated.name)
+	if (idx !== -1) {
+		demos.value[idx] = { ...demos.value[idx], ...updated }
+	}
+}
+
+watch(
+	() => route.params.name,
+	(name) => {
+		if (name && name !== selectedName.value) openDemo(name)
+		if (!name) selectedName.value = null
+	}
+)
+
+onMounted(async () => {
+	await loadDemos()
+	if (route.params.name) openDemo(route.params.name)
+})
 </script>

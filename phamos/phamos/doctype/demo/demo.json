@@ -15,9 +15,11 @@
   "status",
   "scheduled_on",
   "ends_on",
+  "next_followup",
   "event",
   "section_break_schedule",
   "location",
+  "nextcloud_link",
   "attendees",
   "proposed_slots",
   "section_break_details",
@@ -81,6 +83,12 @@
    "label": "Ends On"
   },
   {
+   "description": "Setting this also sets the follow-up date on the linked Lead.",
+   "fieldname": "next_followup",
+   "fieldtype": "Date",
+   "label": "Next Follow Up"
+  },
+  {
    "description": "Calendar event for the confirmed slot.",
    "fieldname": "event",
    "fieldtype": "Link",
@@ -98,6 +106,13 @@
    "fieldname": "location",
    "fieldtype": "Small Text",
    "label": "Location"
+  },
+  {
+   "description": "Recording of the meeting. Entered by hand until the Nextcloud integration lands.",
+   "fieldname": "nextcloud_link",
+   "fieldtype": "Data",
+   "label": "Nextcloud Link",
+   "options": "URL"
   },
   {
    "description": "Who is joining. Kept here rather than only on the calendar event, so reopening a demo says who was invited.",

@@ -198,6 +198,9 @@ def _attendee_rows(participants):
 		if not key or key in seen:
 			continue
 		seen.add(key)
+		if not full_name and user:
+			# The dialog sends an address, not a name; a User has a real one.
+			full_name = _user_label(user)
 		rows.append(
 			{
 				"contact": participant.get("contact") or None,
@@ -207,6 +210,8 @@ def _attendee_rows(participants):
 				"participation": participant.get("participation") or "Required",
 				# One of ours if they're a User; otherwise assume the customer side.
 				"audience": participant.get("audience") or ("Internal" if user else "External"),
+				# Blank until someone records it after the demo.
+				"attended": participant.get("attended") or None,
 			}
 		)
 	return rows
@@ -222,6 +227,7 @@ def _serialize_attendees(doc):
 			"email": row.email,
 			"participation": row.participation,
 			"audience": row.audience,
+			"attended": row.attended,
 		}
 		for row in (doc.get("attendees") or [])
 	]
@@ -257,7 +263,10 @@ def _serialize_demo(doc):
 		"event": doc.event,
 		"agenda": doc.agenda,
 		"location": doc.location,
+		"next_followup": doc.next_followup,
 		"meeting_url": _meeting_url(doc.location),
+		"nextcloud_link": doc.nextcloud_link,
+		"nextcloud_url": _meeting_url(doc.nextcloud_link),
 		"attendees": _serialize_attendees(doc),
 		"proposed_slots": [
 			{
@@ -284,7 +293,16 @@ def get_demo(name):
 	return _serialize_demo(doc)
 
 
-DEMO_EDITABLE_FIELDS = ("subject", "status", "scheduled_on", "ends_on", "location", "agenda")
+DEMO_EDITABLE_FIELDS = (
+	"subject",
+	"status",
+	"scheduled_on",
+	"ends_on",
+	"next_followup",
+	"location",
+	"nextcloud_link",
+	"agenda",
+)
 
 
 @frappe.whitelist(methods=["POST"])
@@ -316,7 +334,41 @@ def update_demo(name, if_modified=None, **fields):
 		doc.set(field, value if value not in ("", None) else None)
 
 	doc.save()
+
+	if "next_followup" in updates:
+		_sync_lead_followup(doc)
+
 	return {"demo": _serialize_demo(frappe.get_doc("Demo", name))}
+
+
+def _sync_lead_followup(demo):
+	"""Push the demo's follow-up date onto its Lead.
+
+	A demo is a step in the lead's pipeline, so agreeing a follow-up here is
+	agreeing one there. The lead also keeps a next step labelled after this
+	demo — matched on that label so moving the date updates the row rather
+	than piling up a new one, the same way the lead's own "Planned start"
+	row works.
+
+	Goes through the document rather than db_set so validation, versioning
+	and the Desk client's own stamps still fire.
+	"""
+	if not demo.lead or not frappe.db.exists("Lead", demo.lead):
+		return
+
+	lead = frappe.get_doc("Lead", demo.lead)
+	lead.custom_next_followup = demo.next_followup or None
+
+	label = f"Follow up on {demo.name}"
+	if demo.next_followup:
+		for row in lead.get("custom_next_steps") or []:
+			if (row.next_step or "").strip().lower() == label.lower():
+				row.date = demo.next_followup
+				break
+		else:
+			lead.append("custom_next_steps", {"next_step": label, "date": demo.next_followup})
+
+	lead.save(ignore_permissions=True)
 
 
 @frappe.whitelist(methods=["POST"])
