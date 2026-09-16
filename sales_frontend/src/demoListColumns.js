@@ -8,6 +8,9 @@ export const DEMO_LIST_FILTER_GRID =
 /** Toolbar / row that participates in the parent DEMO_LIST_FILTER_GRID tracks */
 export const DEMO_LIST_FILTER_SUBGRID = "col-span-4 grid grid-cols-subgrid items-center"
 
+/** Mirrors the doctype's own Select options. */
+export const DEMO_STATUSES = ["Planned", "Completed", "Cancelled"]
+
 export const DEMO_STATUS_THEMES = {
 	Planned: "blue",
 	Completed: "green",
