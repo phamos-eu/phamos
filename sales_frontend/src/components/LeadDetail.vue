@@ -58,30 +58,6 @@
 						<FeatherIcon name="mail" class="h-3.5 w-3.5 flex-shrink-0 text-ink-gray-5" />
 						<span class="truncate">{{ lead.email_id }}</span>
 					</a>
-					<span class="ml-auto flex items-center gap-1.5 text-sm text-ink-gray-6">
-						<span v-if="total" class="mr-1 tabular-nums">{{ position }} of {{ total }}</span>
-						<button
-							type="button"
-							class="rounded p-1.5 hover:bg-surface-gray-2 disabled:opacity-40"
-							:disabled="!hasPrevious"
-							title="Previous"
-							@click="emit('previous')"
-						>
-							<FeatherIcon name="chevron-left" class="h-4 w-4" />
-						</button>
-						<button
-							type="button"
-							class="rounded p-1.5 hover:bg-surface-gray-2 disabled:opacity-40"
-							:disabled="!hasNext"
-							title="Next"
-							@click="emit('next')"
-						>
-							<FeatherIcon name="chevron-right" class="h-4 w-4" />
-						</button>
-						<button type="button" class="rounded p-1.5 hover:bg-surface-gray-2" title="Back to list" @click="emit('close')">
-							<FeatherIcon name="x" class="h-4 w-4" />
-						</button>
-					</span>
 				</div>
 				<div class="grid flex-shrink-0 grid-cols-2 gap-4 border-b border-outline-gray-2 bg-surface-white px-4 py-2.5">
 					<div>
@@ -231,7 +207,17 @@
 			<!-- Transactional data: changes on every follow-up, inline-editable with autosave. -->
 			<section class="flex w-72 flex-none flex-col gap-5 overflow-y-auto border-l border-outline-gray-2 bg-surface-white p-4">
 				<section>
-					<div class="mb-2 text-[11px] font-semibold uppercase tracking-wide text-ink-gray-6">Status</div>
+					<div class="mb-2 flex items-center justify-between gap-2">
+						<span class="text-[11px] font-semibold uppercase tracking-wide text-ink-gray-6">Status</span>
+						<button
+							type="button"
+							class="rounded p-1 text-ink-gray-5 hover:bg-surface-gray-2 hover:text-ink-gray-9"
+							title="Back to list"
+							@click="emit('close')"
+						>
+							<FeatherIcon name="x" class="h-4 w-4" />
+						</button>
+					</div>
 					<div class="flex flex-wrap items-center gap-2">
 						<button
 							v-for="s in LEAD_STATUSES"
@@ -387,11 +373,9 @@ const DEMOS_API = "phamos.api.sales_demos"
 
 const props = defineProps({
 	name: { type: String, required: true },
-	position: { type: Number, default: 0 },
-	total: { type: Number, default: 0 },
 })
 
-const emit = defineEmits(["next", "previous", "close", "updated"])
+const emit = defineEmits(["close", "updated"])
 
 const lead = ref(null)
 const loading = ref(false)
@@ -509,9 +493,6 @@ const timeline = computed(() => {
 
 	return entries.sort((a, b) => String(b.date || "").localeCompare(String(a.date || "")))
 })
-
-const hasPrevious = computed(() => props.position > 1)
-const hasNext = computed(() => props.position > 0 && props.position < props.total)
 
 const qualificationOptions = computed(() => [
 	{ label: "—", value: "" },

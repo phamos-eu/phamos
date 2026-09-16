@@ -73,10 +73,6 @@
 		<LeadDetail
 			v-else
 			:name="selectedName"
-			:position="queuePosition"
-			:total="queueTotal"
-			@next="goToNext"
-			@previous="goToPrevious"
 			@close="closeLead"
 			@updated="onLeadUpdated"
 		/>
@@ -116,12 +112,6 @@ const leads = ref([])
 const statuses = ref([])
 const truncated = ref(false)
 const selectedName = ref(null)
-// Snapshot of the queue (names, in the order shown) taken when a lead is
-// opened, so Previous/Next walk a stable order rather than one that could
-// shift under the user mid-session (see plan: no persisted session object,
-// this is the same stateless "walk an array" approach as the PM Cockpit's
-// Weekly Implementation Monitoring session).
-const sessionQueue = ref([])
 
 function stripHtml(value) {
 	return String(value || "")
@@ -202,9 +192,6 @@ watch(ownerOptions, (users) => {
 	}
 })
 
-const queuePosition = computed(() => sessionQueue.value.indexOf(selectedName.value) + 1)
-const queueTotal = computed(() => sessionQueue.value.length)
-
 async function loadLeads() {
 	loading.value = true
 	try {
@@ -221,12 +208,6 @@ async function loadLeads() {
 }
 
 function openLead(name) {
-	// Snapshot the queue whenever entering detail from the list, so the
-	// order is stable for the rest of this look/session even if the list's
-	// filters would otherwise change it.
-	if (!selectedName.value) {
-		sessionQueue.value = filteredLeads.value.map((l) => l.name)
-	}
 	selectedName.value = name
 	if (route.params.name !== name) {
 		router.replace({ name: "LeadDetail", params: { name } })
@@ -235,20 +216,7 @@ function openLead(name) {
 
 function closeLead() {
 	selectedName.value = null
-	sessionQueue.value = []
 	router.replace({ name: "LeadsFollowUps" })
-}
-
-function goToNext() {
-	const idx = sessionQueue.value.indexOf(selectedName.value)
-	const next = sessionQueue.value[idx + 1]
-	if (next) openLead(next)
-}
-
-function goToPrevious() {
-	const idx = sessionQueue.value.indexOf(selectedName.value)
-	const prev = idx > 0 ? sessionQueue.value[idx - 1] : null
-	if (prev) openLead(prev)
 }
 
 function startSession() {
@@ -283,7 +251,6 @@ watch(
 		if (name && name !== selectedName.value) openLead(name)
 		if (!name) {
 			selectedName.value = null
-			sessionQueue.value = []
 		}
 	}
 )
