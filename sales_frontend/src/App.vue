@@ -30,6 +30,15 @@ const navItems = [
 		],
 	},
 	{
+		name: "Demos",
+		label: "Demos",
+		icon: "monitor",
+		match: ["Demos"],
+		children: [
+			{ name: "DemosList", label: "Demos", icon: "list", match: ["DemosList"] },
+		],
+	},
+	{
 		name: "Issues",
 		label: "Issues",
 		icon: "inbox",
@@ -59,6 +68,7 @@ const pageTitle = computed(() => {
 	if (route.name === "Leads" || route.name === "LeadsFollowUps" || route.name === "LeadDetail") {
 		return "Leads"
 	}
+	if (route.name === "Demos" || route.name === "DemosList") return "Demos"
 	if (route.name === "Tasks" || route.name === "TasksGantt" || route.name === "TaskDetail") {
 		return "Tasks"
 	}
@@ -67,6 +77,7 @@ const pageTitle = computed(() => {
 })
 
 const pageSubtitle = computed(() => {
+	if (route.name === "Demos" || route.name === "DemosList") return "Demos planned with leads"
 	if (route.name === "Leads") return "Lead pipeline overview"
 	if (route.name === "LeadsFollowUps" || route.name === "LeadDetail") {
 		return "All leads, sorted for follow-up"

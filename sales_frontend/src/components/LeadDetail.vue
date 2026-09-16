@@ -275,6 +275,7 @@
 				<ErrorMessage :message="saveError" />
 
 				<Button variant="subtle" @click="showNoteDialog = true">Add note</Button>
+				<Button variant="subtle" @click="showDemoDialog = true">Create Demo</Button>
 
 				<a
 					:href="lead.desk_url"
@@ -288,6 +289,8 @@
 	</div>
 
 	<AddLeadNoteDialog v-if="lead" v-model="showNoteDialog" :lead="lead" @saved="onNoteSaved" />
+
+	<CreateDemoDialog v-if="lead" v-model="showDemoDialog" :lead="lead" @created="onDemoCreated" />
 
 	<Dialog
 		v-model="showWebsiteDialog"
@@ -313,6 +316,7 @@ import {
 	leadStatusTheme,
 } from "@/leadListColumns.js"
 import AddLeadNoteDialog from "./AddLeadNoteDialog.vue"
+import CreateDemoDialog from "./CreateDemoDialog.vue"
 
 const API = "phamos.api.sales_leads"
 
@@ -331,6 +335,7 @@ const savingStatus = ref(false)
 const saveError = ref("")
 const showNoteDialog = ref(false)
 const showWebsiteDialog = ref(false)
+const showDemoDialog = ref(false)
 const checkingWebsite = ref(false)
 
 const status = ref("")
@@ -741,6 +746,12 @@ watch(
 		scheduleSave()
 	}
 )
+
+function onDemoCreated() {
+	// The demo's Event lands in the Lead's timeline, so refresh the feed.
+	loadActivity()
+	toast({ title: "Demo created", icon: "check-circle", iconClasses: "text-ink-green-4" })
+}
 
 function onNoteSaved(updated) {
 	lead.value = { ...lead.value, ...updated }

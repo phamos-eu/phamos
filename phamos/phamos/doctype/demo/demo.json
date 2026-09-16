@@ -1,0 +1,146 @@
+{
+ "actions": [],
+ "allow_rename": 1,
+ "autoname": "naming_series:",
+ "creation": "2026-09-16 12:00:00.000000",
+ "doctype": "DocType",
+ "editable_grid": 1,
+ "engine": "InnoDB",
+ "field_order": [
+  "naming_series",
+  "subject",
+  "lead",
+  "lead_name",
+  "column_break_main",
+  "status",
+  "scheduled_on",
+  "ends_on",
+  "event",
+  "section_break_details",
+  "agenda"
+ ],
+ "fields": [
+  {
+   "default": "DEMO-.####",
+   "fieldname": "naming_series",
+   "fieldtype": "Select",
+   "label": "Series",
+   "options": "DEMO-.####",
+   "reqd": 1
+  },
+  {
+   "fieldname": "subject",
+   "fieldtype": "Data",
+   "in_list_view": 1,
+   "label": "Subject",
+   "reqd": 1
+  },
+  {
+   "fieldname": "lead",
+   "fieldtype": "Link",
+   "in_list_view": 1,
+   "in_standard_filter": 1,
+   "label": "Lead",
+   "options": "Lead",
+   "reqd": 1
+  },
+  {
+   "fetch_from": "lead.lead_name",
+   "fieldname": "lead_name",
+   "fieldtype": "Data",
+   "label": "Lead Name",
+   "read_only": 1
+  },
+  {
+   "fieldname": "column_break_main",
+   "fieldtype": "Column Break"
+  },
+  {
+   "default": "Planned",
+   "fieldname": "status",
+   "fieldtype": "Select",
+   "in_list_view": 1,
+   "in_standard_filter": 1,
+   "label": "Status",
+   "options": "Planned\nCompleted\nCancelled"
+  },
+  {
+   "fieldname": "scheduled_on",
+   "fieldtype": "Datetime",
+   "in_list_view": 1,
+   "label": "Scheduled On"
+  },
+  {
+   "fieldname": "ends_on",
+   "fieldtype": "Datetime",
+   "label": "Ends On"
+  },
+  {
+   "description": "Calendar event created for this demo; synced to the organiser's calendar via the Mailcow integration.",
+   "fieldname": "event",
+   "fieldtype": "Link",
+   "label": "Event",
+   "options": "Event",
+   "read_only": 1
+  },
+  {
+   "fieldname": "section_break_details",
+   "fieldtype": "Section Break"
+  },
+  {
+   "fieldname": "agenda",
+   "fieldtype": "Small Text",
+   "label": "Agenda"
+  }
+ ],
+ "index_web_pages_for_search": 1,
+ "links": [],
+ "modified": "2026-09-16 12:00:00.000000",
+ "modified_by": "Administrator",
+ "module": "Phamos",
+ "name": "Demo",
+ "owner": "Administrator",
+ "permissions": [
+  {
+   "create": 1,
+   "delete": 1,
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "System Manager",
+   "share": 1,
+   "write": 1
+  },
+  {
+   "create": 1,
+   "delete": 1,
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "Sales Manager",
+   "share": 1,
+   "write": 1
+  },
+  {
+   "create": 1,
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "Sales User",
+   "share": 1,
+   "write": 1
+  }
+ ],
+ "row_format": "Dynamic",
+ "sort_field": "modified",
+ "sort_order": "DESC",
+ "states": [],
+ "title_field": "subject",
+ "track_changes": 1
+}
