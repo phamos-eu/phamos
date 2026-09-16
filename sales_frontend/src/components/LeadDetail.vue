@@ -277,6 +277,22 @@
 				<Button variant="subtle" @click="showNoteDialog = true">Add note</Button>
 				<Button variant="subtle" @click="showDemoDialog = true">Create Demo</Button>
 
+				<div v-if="demos.length" class="space-y-1">
+					<a
+						v-for="demo in demos"
+						:key="demo.name"
+						:href="`/app/demo/${demo.name}`"
+						class="flex items-center gap-1.5 rounded px-1.5 py-1 text-xs text-ink-gray-7 hover:bg-surface-gray-2 hover:text-ink-gray-9"
+						:title="demo.subject"
+					>
+						<FeatherIcon name="monitor" class="h-3.5 w-3.5 flex-shrink-0 text-ink-gray-5" />
+						<span class="min-w-0 flex-1 truncate">{{ demo.subject || demo.name }}</span>
+						<span class="flex-none text-ink-gray-5">
+							{{ demo.scheduled_on ? formatDate(demo.scheduled_on) : "proposed" }}
+						</span>
+					</a>
+				</div>
+
 				<a
 					:href="lead.desk_url"
 					class="mt-auto flex w-full items-center gap-2 rounded-md px-2 py-2 text-sm font-medium text-ink-gray-7 hover:bg-surface-gray-2 hover:text-ink-gray-9"
@@ -305,9 +321,7 @@
 <script setup>
 import { computed, nextTick, onMounted, ref, watch } from "vue"
 import { call, debounce, toast, Badge, DatePicker } from "frappe-ui"
-import {
-	formatDatetime,
-} from "@spa/utils/datetime"
+import { formatDate, formatDatetime } from "@spa/utils/datetime"
 import {
 	LEAD_STATUSES,
 	NO_OF_EMPLOYEES_OPTIONS,
@@ -319,6 +333,7 @@ import AddLeadNoteDialog from "./AddLeadNoteDialog.vue"
 import CreateDemoDialog from "./CreateDemoDialog.vue"
 
 const API = "phamos.api.sales_leads"
+const DEMOS_API = "phamos.api.sales_demos"
 
 const props = defineProps({
 	name: { type: String, required: true },
@@ -348,6 +363,7 @@ const leadOwner = ref("")
 const owners = ref([])
 // Local working copy of the Lead's Next Steps child table; saved as a whole
 // (see set_lead_next_steps) rather than row by row.
+const demos = ref([])
 const nextSteps = ref([])
 const nextStepsRoot = ref(null)
 // Stable per-row key so re-sorting moves DOM nodes (and keeps focus with the
@@ -567,6 +583,15 @@ async function loadLead() {
 	}
 }
 
+async function loadDemos() {
+	try {
+		const data = await call(`${DEMOS_API}.get_demos`, { lead: props.name })
+		demos.value = data.items || []
+	} catch (e) {
+		demos.value = []
+	}
+}
+
 async function loadActivity() {
 	activityLoading.value = true
 	try {
@@ -750,6 +775,7 @@ watch(
 function onDemoCreated() {
 	// The demo's Event lands in the Lead's timeline, so refresh the feed.
 	loadActivity()
+	loadDemos()
 	toast({ title: "Demo created", icon: "check-circle", iconClasses: "text-ink-green-4" })
 }
 
@@ -775,6 +801,7 @@ async function loadOwners() {
 function loadAll() {
 	loadLead()
 	loadActivity()
+	loadDemos()
 }
 
 onMounted(() => {

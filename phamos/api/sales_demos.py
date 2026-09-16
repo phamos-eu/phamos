@@ -31,13 +31,14 @@ DEMO_STATUSES = ("Planned", "Completed", "Cancelled")
 
 
 @frappe.whitelist()
-def get_demos():
+def get_demos(lead=None):
 	"""Return Demos, soonest scheduled first; unscheduled ones last."""
 	_check_lead_access()
 	frappe.has_permission("Demo", "read", throw=True)
 
 	rows = frappe.get_all(
 		"Demo",
+		filters={"lead": lead} if lead else None,
 		fields=DEMO_LIST_FIELDS,
 		order_by="scheduled_on is null desc, scheduled_on asc",
 		limit_page_length=DEMO_LIST_LIMIT + 1,
@@ -53,8 +54,39 @@ def get_demos():
 	return {"items": rows, "truncated": truncated, "statuses": list(DEMO_STATUSES)}
 
 
-def _create_demo_event(demo_subject, lead, lead_doc, starts_on, ends_on, agenda, location):
-	"""Tentative calendar entry holding one proposed slot."""
+def _create_demo_event(demo_subject, lead, lead_doc, starts_on, ends_on, agenda, location, participants):
+	"""Tentative calendar entry holding one proposed slot.
+
+	Invitees who map to a User become Event Participant rows carrying
+	`custom_participation` (which the CalDAV sync turns into REQ/OPT
+	attendee roles). Plain email invitees can't: Event Participants
+	requires a linked record, so they ride along in the attendee fields,
+	required in TO and optional in CC — the same split the hybrid meeting
+	composer uses.
+	"""
+	rows = [{"reference_doctype": "Lead", "reference_docname": lead, "custom_participation": "Required"}]
+	required = [lead_doc.email_id] if lead_doc.email_id else []
+	optional = []
+
+	for participant in participants:
+		email = (participant.get("email") or "").strip()
+		if not email:
+			continue
+		is_required = (participant.get("participation") or "Required") == "Required"
+		user = participant.get("user")
+		if user and frappe.db.exists("User", user):
+			rows.append(
+				{
+					"reference_doctype": "User",
+					"reference_docname": user,
+					"email": email,
+					"custom_participation": "Required" if is_required else "Optional",
+				}
+			)
+		if email in required or email in optional:
+			continue
+		(required if is_required else optional).append(email)
+
 	event = frappe.get_doc(
 		{
 			"doctype": "Event",
@@ -64,8 +96,9 @@ def _create_demo_event(demo_subject, lead, lead_doc, starts_on, ends_on, agenda,
 			"ends_on": ends_on or None,
 			"description": agenda or "",
 			"location": location or "",
-			"event_participants": [{"reference_doctype": "Lead", "reference_docname": lead}],
-			"custom_attendees_to": lead_doc.email_id or "",
+			"event_participants": rows,
+			"custom_attendees_to": ", ".join(required),
+			"custom_attendees_cc": ", ".join(optional),
 		}
 	)
 	event.insert()
@@ -73,7 +106,7 @@ def _create_demo_event(demo_subject, lead, lead_doc, starts_on, ends_on, agenda,
 
 
 @frappe.whitelist(methods=["POST"])
-def create_demo(lead, subject, slots=None, agenda=None, location=None):
+def create_demo(lead, subject, slots=None, participants=None, agenda=None, location=None):
 	"""Create a Demo for a Lead, holding a calendar Event per proposed slot.
 
 	A demo often isn't pinned to one date yet, so `slots` takes any number
@@ -99,6 +132,10 @@ def create_demo(lead, subject, slots=None, agenda=None, location=None):
 		slots = json.loads(slots)
 	slots = [s for s in (slots or []) if s.get("starts_on")]
 
+	if isinstance(participants, str):
+		participants = json.loads(participants)
+	participants = participants or []
+
 	lead_doc = frappe.get_doc("Lead", lead)
 	lead_doc.check_permission("read")
 
@@ -116,7 +153,7 @@ def create_demo(lead, subject, slots=None, agenda=None, location=None):
 
 	for slot in sorted(slots, key=lambda s: str(s.get("starts_on"))):
 		event_name = _create_demo_event(
-			subject, lead, lead_doc, slot["starts_on"], slot.get("ends_on"), agenda, location
+			subject, lead, lead_doc, slot["starts_on"], slot.get("ends_on"), agenda, location, participants
 		)
 		demo.append(
 			"proposed_slots",

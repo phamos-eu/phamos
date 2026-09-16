@@ -20,13 +20,11 @@
 			<div class="space-y-4">
 				<FormControl v-model="subject" label="Subject" type="text" size="sm" required />
 
-				<!-- Scheduling: same options the Mailcow-backed Desk dialogs offer
-				     (day + duration + free-slot lookup against the organiser's calendar). -->
 				<section class="rounded-md border border-outline-gray-2 p-3">
 					<div class="mb-2 text-[11px] font-semibold uppercase tracking-wide text-ink-gray-6">
 						Appointment
 					</div>
-					<div class="grid grid-cols-3 gap-3">
+					<div class="grid grid-cols-2 gap-3">
 						<FormControl v-model="day" label="Day" type="date" size="sm" />
 						<FormControl
 							v-model="durationMinutes"
@@ -35,36 +33,17 @@
 							size="sm"
 							:options="durationOptions"
 						/>
-						<div class="flex items-end">
-							<Button :loading="loadingSlots" class="w-full" @click="fetchSlots">
-								Fetch available slots
-							</Button>
-						</div>
 					</div>
 
-					<div v-if="slotsError" class="mt-2 text-xs text-red-600">{{ slotsError }}</div>
-
-					<!-- Click a slot to propose it; several can be offered while the
-					     date isn't settled yet. -->
-					<div v-if="slots.length" class="mt-3 flex flex-wrap gap-2">
-						<button
-							v-for="slot in slots"
-							:key="slot.start_local"
-							type="button"
-							class="rounded-md border px-2.5 py-1 text-xs transition"
-							:class="
-								isProposed(slot.start_local)
-									? 'border-transparent bg-surface-gray-7 text-ink-white'
-									: 'border-outline-gray-2 text-ink-gray-7 hover:bg-surface-gray-2'
-							"
-							@click="toggleSlot(slot)"
-						>
-							{{ slot.label || `${slot.start_local} – ${slot.end_local}` }}
-						</button>
+					<div class="mt-3">
+						<DemoCalendarPreview
+							:day="day"
+							:duration-minutes="durationMinutes"
+							:users="owners"
+							:proposals="proposals"
+							@propose="toggleProposal"
+						/>
 					</div>
-					<p v-else-if="slotsFetched && !loadingSlots && !slotsError" class="mt-2 text-xs text-ink-gray-5">
-						No free slots found for that day — pick another day, or add a time manually below.
-					</p>
 
 					<div class="mt-3 grid grid-cols-[1fr_1fr_auto] items-end gap-3">
 						<div>
@@ -114,6 +93,63 @@
 								</button>
 							</div>
 						</div>
+					</div>
+				</section>
+
+				<section class="rounded-md border border-outline-gray-2 p-3">
+					<div class="mb-2 text-[11px] font-semibold uppercase tracking-wide text-ink-gray-6">
+						Invitees
+					</div>
+
+					<div v-if="participants.length" class="mb-2 space-y-1.5">
+						<div
+							v-for="(participant, index) in participants"
+							:key="index"
+							class="flex items-center gap-1.5"
+						>
+							<input
+								v-model="participant.email"
+								type="email"
+								placeholder="name@example.com"
+								class="form-input h-7 min-w-0 flex-1 rounded border border-outline-gray-2 bg-surface-white px-2 text-sm text-ink-gray-8"
+							/>
+							<select
+								v-model="participant.participation"
+								class="form-select h-7 w-28 flex-none rounded border border-outline-gray-2 bg-surface-white px-1.5 text-xs text-ink-gray-8"
+							>
+								<option value="Required">Required</option>
+								<option value="Optional">Optional</option>
+							</select>
+							<button
+								type="button"
+								class="flex-none rounded p-1 text-ink-gray-5 hover:bg-surface-gray-2 hover:text-ink-gray-9"
+								title="Remove"
+								@click="participants.splice(index, 1)"
+							>
+								<FeatherIcon name="x" class="h-3.5 w-3.5" />
+							</button>
+						</div>
+					</div>
+
+					<div class="flex flex-wrap items-center gap-1.5">
+						<button
+							type="button"
+							class="flex items-center gap-1 rounded px-1.5 py-0.5 text-xs text-ink-gray-6 hover:bg-surface-gray-2 hover:text-ink-gray-9"
+							@click="addParticipant()"
+						>
+							<FeatherIcon name="plus" class="h-3.5 w-3.5" />
+							<span>Add invitee</span>
+						</button>
+						<span v-if="colleagueOptions.length" class="text-xs text-ink-gray-5">or</span>
+						<button
+							v-for="user in colleagueOptions"
+							:key="user.name"
+							type="button"
+							class="rounded-full border border-outline-gray-2 px-2 py-0.5 text-xs text-ink-gray-6 hover:bg-surface-gray-2 hover:text-ink-gray-9"
+							@click="addParticipant(user.name, 'Required', user.name)"
+						>
+							+ {{ user.full_name || user.name }}
+						</button>
 					</div>
 				</section>
 
@@ -187,6 +223,7 @@
 import { computed, ref, watch } from "vue"
 import { call } from "frappe-ui"
 import { DEMO_MODULES } from "@/demoModules.js"
+import DemoCalendarPreview from "./DemoCalendarPreview.vue"
 
 const props = defineProps({
 	modelValue: { type: Boolean, default: false },
@@ -194,8 +231,6 @@ const props = defineProps({
 })
 
 const emit = defineEmits(["update:modelValue", "created"])
-
-const SLOTS_METHOD = "phamos.mailcow_integration.availability.next_free_slot.free_slots_for_day"
 
 const subject = ref("")
 const day = ref("")
@@ -208,10 +243,11 @@ const selectedModules = ref([])
 // Several dates can be offered while the demo isn't pinned down yet.
 const proposals = ref([])
 
-const slots = ref([])
-const slotsFetched = ref(false)
-const loadingSlots = ref(false)
-const slotsError = ref("")
+const owners = ref([])
+// Invitees: a `user` makes it an Event participant row; email-only invitees
+// can't be (Event Participants requires a linked record) so they ride along
+// in the attendee fields instead.
+const participants = ref([])
 const saving = ref(false)
 const error = ref("")
 
@@ -234,37 +270,32 @@ watch(
 		location.value = ""
 		selectedModules.value = []
 		proposals.value = []
-		slots.value = []
-		slotsFetched.value = false
-		slotsError.value = ""
 		error.value = ""
+		participants.value = props.lead?.email_id
+			? [{ email: props.lead.email_id, participation: "Required", user: null }]
+			: []
+		loadOwners()
 	}
 )
+
+/** Colleagues not already invited, offered as one-click adds. */
+const colleagueOptions = computed(() =>
+	owners.value.filter((u) => !participants.value.some((p) => p.email === u.name))
+)
+
+async function loadOwners() {
+	if (owners.value.length) return
+	try {
+		owners.value = await call("phamos.api.sales_leads.get_lead_owners")
+	} catch (e) {
+		owners.value = []
+	}
+}
 
 function toggleModule(key) {
 	const index = selectedModules.value.indexOf(key)
 	if (index === -1) selectedModules.value.push(key)
 	else selectedModules.value.splice(index, 1)
-}
-
-async function fetchSlots() {
-	slotsError.value = ""
-	loadingSlots.value = true
-	try {
-		slots.value =
-			(await call(SLOTS_METHOD, {
-				day: day.value,
-				duration_minutes: Number(durationMinutes.value),
-			})) || []
-		slotsFetched.value = true
-	} catch (e) {
-		// Calendar lookups fail loudly (missing DAV password, unreachable SOGo);
-		// surface it here rather than looking like a day with no free time.
-		slots.value = []
-		slotsError.value = e?.messages?.[0] || e?.message || "Could not load free slots"
-	} finally {
-		loadingSlots.value = false
-	}
 }
 
 /** Slots come back as naive local 'YYYY-MM-DD HH:mm:ss'; the inputs want a T. */
@@ -286,14 +317,18 @@ function isProposed(startLocal) {
 	return proposals.value.some((p) => p.starts_on === startLocal)
 }
 
-function toggleSlot(slot) {
-	const index = proposals.value.findIndex((p) => p.starts_on === slot.start_local)
+function toggleProposal(slot) {
+	const index = proposals.value.findIndex((p) => p.starts_on === slot.starts_on)
 	if (index !== -1) {
 		proposals.value.splice(index, 1)
 		return
 	}
-	proposals.value.push({ starts_on: slot.start_local, ends_on: slot.end_local })
+	proposals.value.push({ starts_on: slot.starts_on, ends_on: slot.ends_on })
 	sortProposals()
+}
+
+function addParticipant(email = "", participation = "Required", user = null) {
+	participants.value.push({ email, participation, user })
 }
 
 function addManualProposal() {
@@ -335,6 +370,7 @@ async function submit() {
 			lead: props.lead.name,
 			subject: subject.value.trim(),
 			slots: proposals.value,
+			participants: participants.value.filter((p) => (p.email || "").trim()),
 			location: location.value.trim() || null,
 			agenda: agendaText || null,
 		})
