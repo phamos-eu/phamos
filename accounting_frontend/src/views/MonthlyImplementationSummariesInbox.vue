@@ -129,7 +129,7 @@
 import { computed, onMounted, ref, watch } from "vue"
 import { useRoute, useRouter } from "vue-router"
 import { call } from "frappe-ui"
-import AssigneeFilter from "../components/AssigneeFilter.vue"
+import AssigneeFilter from "@spa/components/AssigneeFilter.vue"
 import ListSortSelector from "@spa/components/ListSortSelector.vue"
 import { assigneeUsersFromRow } from "../avatar.js"
 import MisDetail from "../components/MisDetail.vue"

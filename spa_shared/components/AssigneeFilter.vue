@@ -2,7 +2,7 @@
 	<div
 		class="flex max-w-full flex-nowrap items-center justify-start gap-1 overflow-x-auto"
 		role="group"
-		aria-label="Filter by assignee"
+		:aria-label="ariaLabel"
 	>
 		<button
 			v-for="user in users"
@@ -31,8 +31,9 @@ import UserAvatar from "@spa/components/UserAvatar.vue"
 const props = defineProps({
 	/** Currently selected user ids (empty = all) */
 	modelValue: { type: Array, default: () => [] },
-	/** Available assignees: [{ name, full_name, user_image }] */
+	/** Available users: [{ name, full_name, user_image }] */
 	users: { type: Array, default: () => [] },
+	ariaLabel: { type: String, default: "Filter by assignee" },
 })
 
 const emit = defineEmits(["update:modelValue"])

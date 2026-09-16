@@ -43,6 +43,13 @@
 								:options="modifiedSortOption"
 							/>
 						</div>
+						<div class="flex min-w-0 items-center justify-center pr-3">
+							<AssigneeFilter
+								v-model="ownerFilter"
+								:users="ownerOptions"
+								aria-label="Filter by lead owner"
+							/>
+						</div>
 					</div>
 					<div
 						v-if="truncated"
@@ -84,6 +91,7 @@ import LeadDetail from "@/components/LeadDetail.vue"
 import LeadList from "@/components/LeadList.vue"
 import StatusFilter from "@spa/components/StatusFilter.vue"
 import ListSortSelector from "@spa/components/ListSortSelector.vue"
+import AssigneeFilter from "@spa/components/AssigneeFilter.vue"
 import { LEAD_LIST_FILTER_GRID, LEAD_LIST_FILTER_SUBGRID } from "@/leadListColumns.js"
 
 const API = "phamos.api.sales_leads"
@@ -99,6 +107,7 @@ const router = useRouter()
 
 const search = ref("")
 const statusFilter = ref([])
+const ownerFilter = ref([])
 const sortBy = ref("custom_next_followup")
 const sortOrder = ref("asc")
 const loading = ref(false)
@@ -142,7 +151,8 @@ function compareLeads(a, b) {
 	return sortOrder.value === "desc" ? -cmp : cmp
 }
 
-const filteredLeads = computed(() => {
+/** Rows after search / status — used to derive the owner filter's options. */
+const contextLeads = computed(() => {
 	const q = search.value.trim().toLowerCase()
 	const selected = statusFilter.value
 	let list = leads.value
@@ -155,7 +165,41 @@ const filteredLeads = computed(() => {
 	if (q) {
 		list = list.filter((l) => leadMatchesSearch(l, q))
 	}
+	return list
+})
+
+const ownerOptions = computed(() => {
+	const byName = new Map()
+	for (const lead of contextLeads.value) {
+		if (!lead.lead_owner || byName.has(lead.lead_owner)) continue
+		byName.set(lead.lead_owner, {
+			name: lead.lead_owner,
+			full_name: lead.owner_name || lead.lead_owner,
+			user_image: lead.owner_image || "",
+		})
+	}
+	return [...byName.values()].sort((a, b) =>
+		String(a.full_name || a.name).localeCompare(String(b.full_name || b.name))
+	)
+})
+
+const filteredLeads = computed(() => {
+	const owners = ownerFilter.value
+	let list = contextLeads.value
+	if (owners.length) {
+		const allowed = new Set(owners)
+		list = list.filter((l) => allowed.has(l.lead_owner))
+	}
 	return [...list].sort(compareLeads)
+})
+
+// Drop selected owners that are no longer among the visible options.
+watch(ownerOptions, (users) => {
+	const available = new Set(users.map((u) => u.name))
+	const next = (ownerFilter.value || []).filter((id) => available.has(id))
+	if (next.length !== ownerFilter.value.length) {
+		ownerFilter.value = next
+	}
 })
 
 const queuePosition = computed(() => sessionQueue.value.indexOf(selectedName.value) + 1)
@@ -214,6 +258,7 @@ function startSession() {
 	// reflects the reset by the time it's read below.
 	search.value = ""
 	statusFilter.value = []
+	ownerFilter.value = []
 	const first = filteredLeads.value[0]?.name
 	if (first) openLead(first)
 }

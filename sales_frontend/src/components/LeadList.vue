@@ -13,7 +13,6 @@
 					{{ lead.lead_name || lead.name }}
 				</div>
 				<div v-if="lead.company_name" class="truncate text-xs text-ink-gray-6">{{ lead.company_name }}</div>
-				<div v-if="lead.owner_name" class="mt-0.5 truncate text-xs text-ink-gray-5">{{ lead.owner_name }}</div>
 			</div>
 			<div class="flex min-w-0 flex-wrap items-center justify-center gap-1.5">
 				<Badge class="whitespace-nowrap" :label="lead.status" :theme="leadStatusTheme(lead.status)" size="sm" variant="subtle" />
@@ -40,6 +39,16 @@
 			<div class="min-w-0 text-center text-xs text-ink-gray-6">
 				{{ lead.modified ? formatDate(lead.modified) : "—" }}
 			</div>
+			<div class="flex min-w-0 items-center justify-center pr-3">
+				<UserAvatar
+					v-if="lead.lead_owner"
+					:name="lead.lead_owner"
+					:label="lead.owner_name || lead.lead_owner"
+					:image="lead.owner_image"
+					size="sm"
+				/>
+				<span v-else class="text-xs text-ink-gray-5">—</span>
+			</div>
 		</button>
 		<div
 			v-if="!leads.length"
@@ -53,6 +62,7 @@
 
 <script setup>
 import { Badge } from "frappe-ui"
+import UserAvatar from "@spa/components/UserAvatar.vue"
 import { formatDate } from "@spa/utils/datetime"
 import { LEAD_LIST_FILTER_SUBGRID, leadStatusTheme } from "@/leadListColumns.js"
 

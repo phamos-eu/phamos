@@ -15,7 +15,7 @@ import requests
 from frappe import _
 from frappe.utils import get_datetime, getdate, now_datetime
 
-from phamos.api.department_cockpit import _user_label
+from phamos.api.department_cockpit import _user_images, _user_label
 from phamos.phamos.page.sales_action_panel.sales_action_panel import LEAD_STATUSES
 
 LEAD_ROLES = ("System Manager", "Sales Manager", "Sales User")
@@ -206,8 +206,10 @@ def _is_overdue(next_followup, today_date=None):
 	return getdate(next_followup) < (today_date or getdate())
 
 
-def _serialize_lead_row(row, owner_names, today_date):
-	row["owner_name"] = owner_names.get(row.get("lead_owner")) or row.get("lead_owner")
+def _serialize_lead_row(row, owner_names, owner_images, today_date):
+	owner = row.get("lead_owner")
+	row["owner_name"] = owner_names.get(owner) or owner
+	row["owner_image"] = owner_images.get(owner) or ""
 	row["overdue"] = _is_overdue(row.get("custom_next_followup"), today_date)
 	return row
 
@@ -234,9 +236,10 @@ def get_leads():
 
 	owners = list(dict.fromkeys(r.lead_owner for r in rows if r.lead_owner))
 	owner_names = {owner: _user_label(owner) for owner in owners}
+	owner_images = dict(zip(owners, _user_images(owners)))
 
 	today_date = getdate()
-	items = [_serialize_lead_row(row, owner_names, today_date) for row in rows]
+	items = [_serialize_lead_row(row, owner_names, owner_images, today_date) for row in rows]
 
 	return {"items": items, "truncated": truncated, "statuses": LEAD_STATUSES}
 

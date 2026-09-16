@@ -1,14 +1,15 @@
 /**
  * Shared CSS grid for the Follow Ups filter bar + LeadList rows so columns
- * stay aligned. Order: name/company (search) | status | next follow up | last updated.
- * No priority column (Leads have none) and no trailing "New" button column
- * (Lead creation is out of scope for this cockpit).
+ * stay aligned. Order: name/company (search) | status | next follow up |
+ * last updated | owner. Owner sits last to match the MIS list's
+ * "Assigned To" column. No priority column (Leads have none) and no
+ * trailing "New" button column (Lead creation is out of scope here).
  */
 export const LEAD_LIST_FILTER_GRID =
-	"grid grid-cols-[minmax(0,1.6fr)_minmax(0,1fr)_minmax(0,1fr)_minmax(0,1fr)] gap-x-6"
+	"grid grid-cols-[minmax(0,1.6fr)_minmax(0,1fr)_minmax(0,1fr)_minmax(0,1fr)_minmax(0,0.95fr)] gap-x-6"
 
 /** Toolbar / row that participates in the parent LEAD_LIST_FILTER_GRID tracks */
-export const LEAD_LIST_FILTER_SUBGRID = "col-span-4 grid grid-cols-subgrid items-center"
+export const LEAD_LIST_FILTER_SUBGRID = "col-span-5 grid grid-cols-subgrid items-center"
 
 export const LEAD_STATUSES = [
 	"Lead",
