@@ -165,6 +165,7 @@
 						{{ filter.label }}
 					</button>
 					<span class="ml-auto flex items-center gap-2">
+						<Button v-if="lead.email_id" variant="subtle" :link="newEmailHref">New Email</Button>
 						<Button variant="subtle" @click="showNoteDialog = true">Add note</Button>
 						<Button variant="subtle" @click="showDemoDialog = true">Create Demo</Button>
 					</span>
@@ -180,55 +181,82 @@
 						Nothing recorded yet.
 					</div>
 					<!-- One chronological stream: the toggles above filter which entry types appear in it. -->
-					<div v-else class="space-y-3">
-						<div
-							v-for="entry in timeline"
-							:key="entry.key"
-							class="rounded-md border border-outline-gray-2 bg-surface-white px-3 py-2"
-						>
-							<div class="mb-1 flex flex-wrap items-center gap-2 text-xs text-ink-gray-5">
-								<Badge :label="entry.badge" :theme="entry.badgeTheme" size="sm" variant="subtle" />
-								<span v-if="entry.author" class="font-medium text-ink-gray-7">{{ entry.author }}</span>
-								<span>{{ formatDatetime(entry.date) }}</span>
+					<div v-else class="space-y-2">
+						<template v-for="entry in timeline" :key="entry.key">
+							<!--
+								Follows the Desk timeline's split: emails, notes and demos are
+								cards with an icon; version/system entries are plain muted lines,
+								so "what happened to the record" never competes with "what was
+								said to the customer".
+							-->
+							<div
+								v-if="entry.type === 'activities'"
+								class="flex items-start gap-2 px-1 py-1 text-xs text-ink-gray-6"
+							>
+								<FeatherIcon name="git-commit" class="mt-0.5 h-3.5 w-3.5 flex-none text-ink-gray-4" />
+								<span class="min-w-0 flex-1">
+									<span v-if="entry.activity?.kind === 'row_added'">
+										Added to <span class="font-medium">{{ entry.activity.label }}</span>:
+										{{ entry.activity.summary || "—" }}
+									</span>
+									<span v-else-if="entry.activity?.kind === 'row_removed'">
+										Removed from <span class="font-medium">{{ entry.activity.label }}</span>:
+										{{ entry.activity.summary || "—" }}
+									</span>
+									<span v-else-if="entry.fieldChange">
+										<span class="font-medium">{{ entry.fieldChange.label }}</span>:
+										{{ entry.fieldChange.old || "—" }} → {{ entry.fieldChange.new || "—" }}
+									</span>
+									<span v-else>{{ entry.body }}</span>
+									<span class="text-ink-gray-5"> · {{ entry.author }} · {{ formatDatetime(entry.date) }}</span>
+								</span>
 							</div>
 
-							<template v-if="entry.type === 'communications'">
-								<div class="text-sm font-medium text-ink-gray-9">{{ entry.subject || "(no subject)" }}</div>
-								<div class="mt-0.5 truncate text-xs text-ink-gray-6">{{ entry.body }}</div>
-							</template>
+							<div v-else class="rounded-md border border-outline-gray-2 bg-surface-white px-3 py-2.5">
+								<div class="mb-1.5 flex flex-wrap items-center gap-2 text-xs text-ink-gray-5">
+									<FeatherIcon :name="entryIcon(entry)" class="h-3.5 w-3.5 flex-none text-ink-gray-5" />
+									<Badge :label="entry.badge" :theme="entry.badgeTheme" size="sm" variant="subtle" />
+									<span v-if="entry.author" class="font-medium text-ink-gray-7">{{ entry.author }}</span>
+									<span>{{ formatDatetime(entry.date) }}</span>
+								</div>
 
-							<template v-else-if="entry.type === 'demos'">
-								<a
-									:href="entry.url"
-									class="text-sm font-medium text-ink-gray-9 underline-offset-2 hover:underline"
-								>
-									{{ entry.subject }}
-								</a>
-								<div v-if="entry.body" class="mt-0.5 text-xs text-ink-gray-6">{{ entry.body }}</div>
-							</template>
+								<template v-if="entry.type === 'communications'">
+									<div class="text-sm font-medium text-ink-gray-9">{{ entry.subject || "(no subject)" }}</div>
+									<div v-if="entry.recipients" class="mt-0.5 truncate text-xs text-ink-gray-5">
+										to {{ entry.recipients }}
+									</div>
+									<div class="mt-1 line-clamp-3 text-xs text-ink-gray-6">{{ entry.body }}</div>
+									<div class="mt-2 flex items-center gap-2">
+										<a
+											:href="replyHref(entry)"
+											class="inline-flex items-center gap-1 rounded px-1.5 py-0.5 text-xs font-medium text-ink-gray-7 hover:bg-surface-gray-2 hover:text-ink-gray-9"
+										>
+											<FeatherIcon name="corner-up-left" class="h-3.5 w-3.5" />
+											<span>Reply</span>
+										</a>
+										<a
+											:href="forwardHref(entry)"
+											class="inline-flex items-center gap-1 rounded px-1.5 py-0.5 text-xs font-medium text-ink-gray-7 hover:bg-surface-gray-2 hover:text-ink-gray-9"
+										>
+											<FeatherIcon name="corner-up-right" class="h-3.5 w-3.5" />
+											<span>Forward</span>
+										</a>
+									</div>
+								</template>
 
-							<div v-else-if="entry.type === 'notes'" class="whitespace-pre-wrap text-sm text-ink-gray-8">
-								{{ entry.body }}
+								<template v-else-if="entry.type === 'demos'">
+									<a
+										:href="entry.url"
+										class="text-sm font-medium text-ink-gray-9 underline-offset-2 hover:underline"
+									>
+										{{ entry.subject }}
+									</a>
+									<div v-if="entry.body" class="mt-0.5 text-xs text-ink-gray-6">{{ entry.body }}</div>
+								</template>
+
+								<div v-else class="whitespace-pre-wrap text-sm text-ink-gray-8">{{ entry.body }}</div>
 							</div>
-
-							<div v-else-if="entry.activity?.kind === 'row_added'" class="text-sm text-ink-gray-8">
-								Added to <span class="font-medium">{{ entry.activity.label }}</span>:
-								<span class="font-medium">{{ entry.activity.summary || "—" }}</span>
-							</div>
-
-							<div v-else-if="entry.activity?.kind === 'row_removed'" class="text-sm text-ink-gray-8">
-								Removed from <span class="font-medium">{{ entry.activity.label }}</span>:
-								<span class="font-medium">{{ entry.activity.summary || "—" }}</span>
-							</div>
-
-							<div v-else-if="entry.fieldChange" class="text-sm text-ink-gray-8">
-								Changed <span class="font-medium">{{ entry.fieldChange.label }}</span> from
-								<span class="font-medium">{{ entry.fieldChange.old || "—" }}</span> to
-								<span class="font-medium">{{ entry.fieldChange.new || "—" }}</span>
-							</div>
-
-							<div v-else class="text-sm text-ink-gray-8">{{ entry.body }}</div>
-						</div>
+						</template>
 					</div>
 				</div>
 			</section>
@@ -469,6 +497,8 @@ const timeline = computed(() => {
 				badge: comm.sent_or_received === "Sent" ? "Sent" : "Received",
 				badgeTheme: comm.sent_or_received === "Sent" ? "blue" : "green",
 				author: comm.sender,
+				sender: comm.sender,
+				recipients: comm.recipients,
 				subject: comm.subject,
 				body: stripHtml(comm.content),
 			})
@@ -543,10 +573,53 @@ const requestTypeOptions = computed(() => [
 
 const phoneNumbers = computed(() => [...new Set([lead.value?.mobile_no, lead.value?.phone].filter(Boolean))])
 
+const CRM_MAILBOX = "crm@phamos.eu"
+// mailto: URLs get truncated by some clients, so don't paste a whole thread in.
+const FORWARD_QUOTE_LIMIT = 1500
+
+function entryIcon(entry) {
+	if (entry.type === "communications") return "mail"
+	if (entry.type === "notes") return "message-square"
+	if (entry.type === "demos") return "monitor"
+	return "git-commit"
+}
+
+/** Everything composes in the user's own mail client, CC'd to the CRM inbox. */
+function mailto(to, subject, body) {
+	const params = [`cc=${encodeURIComponent(CRM_MAILBOX)}`]
+	if (subject) params.push(`subject=${encodeURIComponent(subject)}`)
+	if (body) params.push(`body=${encodeURIComponent(body)}`)
+	return `mailto:${to || ""}?${params.join("&")}`
+}
+
+/** Keep the thread's subject rather than stacking Re: on Re:. */
+function threadSubject(subject, prefix) {
+	const clean = (subject || "").replace(/^\s*(re|fwd|fw)\s*:\s*/i, "")
+	return `${prefix}: ${clean || lead.value?.lead_name || lead.value?.name || ""}`
+}
+
+function replyHref(entry) {
+	return mailto(entry.sender || lead.value?.email_id, threadSubject(entry.subject, "Re"))
+}
+
+function forwardHref(entry) {
+	const quoted = [
+		"---------- Forwarded message ----------",
+		`From: ${entry.sender || ""}`,
+		`Date: ${formatDatetime(entry.date)}`,
+		`Subject: ${entry.subject || ""}`,
+		"",
+		(entry.body || "").slice(0, FORWARD_QUOTE_LIMIT),
+	].join("\n")
+	// No recipient: forwarding is the user choosing someone new.
+	return mailto("", threadSubject(entry.subject, "Fwd"), quoted)
+}
+
+const newEmailHref = computed(() => mailto(lead.value?.email_id, ""))
+
 const mailtoHref = computed(() => {
 	if (!lead.value) return ""
-	const subject = encodeURIComponent(`Re: ${lead.value.lead_name || lead.value.company_name || lead.value.name}`)
-	return `mailto:${lead.value.email_id}?cc=crm@phamos.eu&subject=${subject}`
+	return mailto(lead.value.email_id, threadSubject("", "Re"))
 })
 
 // Resolved server-side by check_website_embeddable (normalized + redirects
