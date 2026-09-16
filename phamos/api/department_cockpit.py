@@ -1201,3 +1201,60 @@ def add_task_dependency(config: CockpitConfig, name, depends_on):
 	doc.append("depends_on", {"task": depends_on})
 	doc.save()
 	return get_task(config, name)
+
+
+def today_sections(config: CockpitConfig):
+	"""Issue/Task sections for a cockpit's "Today" dashboard.
+
+	Department-generic on purpose: every cockpit has Issues and Tasks, so
+	each one gets these for free and only has to add whatever is specific
+	to it (Leads and Demos for Sales, say). See `TodayDashboard.vue` for
+	the section shape this returns.
+	"""
+	today = frappe.utils.today()
+	sections = []
+
+	tasks = [
+		task
+		for task in get_tasks(config)
+		if task.get("exp_end_date") and str(task["exp_end_date"]) <= today
+	]
+	tasks.sort(key=lambda t: str(t.get("exp_end_date") or ""))
+	sections.append(
+		{
+			"key": "tasks_due",
+			"title": _("Tasks due"),
+			"empty": _("Nothing due today"),
+			"items": [
+				{
+					"title": task.get("subject"),
+					"subtitle": task.get("project") or "",
+					"meta": frappe.utils.format_date(task["exp_end_date"]),
+					"tone": "red" if str(task["exp_end_date"]) < today else "amber",
+					"url": f"/app/task/{task['name']}",
+				}
+				for task in tasks
+			],
+		}
+	)
+
+	issues = get_inbox(config, view="assigned")
+	sections.append(
+		{
+			"key": "issues_assigned",
+			"title": _("Issues assigned to me"),
+			"empty": _("No open issues assigned to you"),
+			"items": [
+				{
+					"title": issue.get("subject"),
+					"subtitle": issue.get("issue_type") or "",
+					"meta": issue.get("status"),
+					"tone": "gray",
+					"url": f"/app/issue/{issue['name']}",
+				}
+				for issue in issues
+			],
+		}
+	)
+
+	return sections

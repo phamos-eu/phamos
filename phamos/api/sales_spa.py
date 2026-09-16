@@ -239,3 +239,15 @@ def create_task_from_issue(
 def add_task_dependency(name, depends_on):
 	"""Add a predecessor dependency to a Task (Gantt link mode)."""
 	return dc.add_task_dependency(CONFIG, name, depends_on)
+
+
+@frappe.whitelist()
+def get_today():
+	"""Sections for the Sales cockpit's Today dashboard.
+
+	Sales-specific sections first (what a rep acts on today), then the
+	department-generic Issue/Task ones every cockpit shares.
+	"""
+	from phamos.api.sales_today import sales_today_sections
+
+	return {"sections": sales_today_sections() + dc.today_sections(CONFIG)}

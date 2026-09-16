@@ -16,6 +16,12 @@ const route = useRoute()
 
 const navItems = [
 	{
+		name: "Today",
+		label: "Today",
+		icon: "sun",
+		match: ["Today"],
+	},
+	{
 		name: "Leads",
 		label: "Leads",
 		icon: "users",
@@ -65,6 +71,7 @@ const navItems = [
 ]
 
 const pageTitle = computed(() => {
+	if (route.name === "Today") return "Today"
 	if (route.name === "Leads" || route.name === "LeadsFollowUps" || route.name === "LeadDetail") {
 		return "Leads"
 	}
@@ -77,6 +84,7 @@ const pageTitle = computed(() => {
 })
 
 const pageSubtitle = computed(() => {
+	if (route.name === "Today") return "What needs attention today"
 	if (route.name === "Demos" || route.name === "DemosList") return "Demos planned with leads"
 	if (route.name === "Leads") return "Lead pipeline overview"
 	if (route.name === "LeadsFollowUps" || route.name === "LeadDetail") {
