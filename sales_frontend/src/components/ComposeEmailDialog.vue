@@ -75,7 +75,10 @@
 					/>
 				</div>
 
-				<div>
+				<!-- The body beside a calendar: proposing a time is the commonest
+				     reason to write to a lead, so free slots are right there and
+				     clicking one drops the time into the message. -->
+				<div class="grid grid-cols-[1fr_18rem] gap-3">
 					<TextEditor
 						v-if="modelValue"
 						:content="content"
@@ -84,6 +87,32 @@
 						editor-class="prose-sm dark:prose-invert max-w-none w-full min-h-[200px] max-h-[40vh] overflow-y-auto px-3 py-2 border border-t-0 border-outline-gray-2 rounded-b-lg bg-surface-white"
 						@change="(html) => (content = html)"
 					/>
+					<div class="space-y-1.5">
+						<div class="flex items-center gap-2">
+							<input
+								v-model="calendarDay"
+								type="date"
+								class="form-input h-7 flex-1 rounded border border-outline-gray-2 bg-surface-white px-2 text-xs text-ink-gray-8"
+								aria-label="Day to check for free time"
+							/>
+							<select
+								v-model="calendarDuration"
+								class="form-select h-7 rounded border border-outline-gray-2 bg-surface-white px-1.5 text-xs text-ink-gray-8"
+								aria-label="Appointment length"
+							>
+								<option value="30">30 min</option>
+								<option value="60">1 h</option>
+								<option value="90">1.5 h</option>
+								<option value="120">2 h</option>
+							</select>
+						</div>
+						<DemoCalendarPreview
+							:day="calendarDay"
+							:duration-minutes="calendarDuration"
+							:users="calendarUsers"
+							@propose="insertSlot"
+						/>
+					</div>
 				</div>
 
 				<!-- The footer is assembled by the system at send time (Email Account
@@ -158,6 +187,8 @@ const drafts = new Map()
 import { computed, ref, watch } from "vue"
 import { call, FileUploader, TextEditor } from "frappe-ui"
 import EmailRecipientInput from "@/components/EmailRecipientInput.vue"
+import DemoCalendarPreview from "@/components/DemoCalendarPreview.vue"
+import { formatDate } from "@spa/utils/datetime.js"
 
 const props = defineProps({
 	modelValue: { type: Boolean, default: false },
@@ -199,6 +230,9 @@ const selectedTemplate = ref("")
 const attachments = ref([])
 const signature = ref("")
 const footer = ref("")
+const calendarDay = ref("")
+const calendarDuration = ref("60")
+const calendarUsers = ref([])
 /** Which recipient field the chips currently add to. */
 const focusedField = ref("")
 
@@ -293,6 +327,30 @@ async function loadContext() {
 		signature.value = ""
 		footer.value = ""
 	}
+}
+
+async function loadCalendarUsers() {
+	if (calendarUsers.value.length) return
+	try {
+		calendarUsers.value = await call("phamos.api.sales_leads.get_lead_owners")
+	} catch (e) {
+		calendarUsers.value = []
+	}
+}
+
+/** A clicked slot becomes a sentence in the message — the point of seeing
+ *  free time while writing is proposing it. Inserted above the signature. */
+function insertSlot(slot) {
+	// Straight off the slot, so the message says the time the user clicked —
+	// these are naive local stamps, not something to re-interpret in a tz.
+	const line = `<p>${formatDate(slot.starts_on.slice(0, 10))}, ${slot.starts_on.slice(
+		11,
+		16
+	)}–${slot.ends_on.slice(11, 16)}</p>`
+	const sig = signature.value
+	const body = content.value || ""
+	const at = sig ? body.lastIndexOf(`<p><br></p>${sig}`) : -1
+	content.value = at === -1 ? body + line : body.slice(0, at) + line + body.slice(at)
 }
 
 /** The signature is part of the body — editable, and shown where it'll land.
@@ -394,6 +452,8 @@ watch(
 		}
 		error.value = ""
 		focusedField.value = ""
+		calendarDay.value = new Date().toISOString().slice(0, 10)
+		loadCalendarUsers()
 
 		const draft = drafts.get(draftKey())
 		restore(draft || defaultValues())
