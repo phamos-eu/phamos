@@ -711,6 +711,52 @@ def render_lead_email_template(lead, template):
 
 
 @frappe.whitelist()
+def search_email_recipients(lead, txt="", limit=10):
+	"""Addresses matching `txt` for the compose dialog's recipient fields.
+
+	Searches what's already connected to the lead first (its own address,
+	its Contacts, anyone on the thread), then falls back to Contacts at
+	large so an address that isn't linked yet can still be picked.
+	"""
+	_check_lead_access()
+	lead_doc = frappe.get_doc("Lead", lead)
+	lead_doc.check_permission("read")
+
+	txt = (txt or "").strip().casefold()
+	limit = frappe.utils.cint(limit) or 10
+
+	found = {}
+	for suggestion in _contact_suggestions(lead, lead_doc):
+		haystack = f"{suggestion['label']} {suggestion['email']}".casefold()
+		if not txt or txt in haystack:
+			found[suggestion["email"].casefold()] = suggestion
+
+	if txt and len(found) < limit:
+		like = f"%{txt}%"
+		contacts = frappe.get_all(
+			"Contact",
+			or_filters=[
+				["first_name", "like", like],
+				["last_name", "like", like],
+				["email_id", "like", like],
+			],
+			fields=["name", "first_name", "last_name", "email_id"],
+			limit_page_length=limit,
+		)
+		for contact in contacts:
+			if not contact.email_id or contact.email_id.casefold() in found:
+				continue
+			label = " ".join(filter(None, [contact.first_name, contact.last_name])) or contact.name
+			found[contact.email_id.casefold()] = {
+				"email": contact.email_id,
+				"label": label,
+				"source": "Contact",
+			}
+
+	return list(found.values())[:limit]
+
+
+@frappe.whitelist()
 def get_contact_emails(contact):
 	"""Addresses on a Contact, for the 'choose an existing contact' picker."""
 	_check_lead_access()
@@ -725,7 +771,9 @@ def get_contact_emails(contact):
 
 
 @frappe.whitelist(methods=["POST"])
-def send_lead_email(lead, recipients, subject, content, cc=None, bcc=None, in_reply_to=None, send=1):
+def send_lead_email(
+	lead, recipients, subject, content, cc=None, bcc=None, in_reply_to=None, attachments=None, send=1
+):
 	"""Send an email from the system, linked to the Lead.
 
 	Goes through Frappe's own `communication.email.make`, so the outgoing
@@ -746,6 +794,10 @@ def send_lead_email(lead, recipients, subject, content, cc=None, bcc=None, in_re
 	if not subject:
 		frappe.throw(_("A subject is required."))
 
+	# Files the dialog uploaded against this Lead; `make` copies each one onto
+	# the Communication, so only names the user actually attached are passed on.
+	attachments = _clean_attachments(lead, attachments)
+
 	from frappe.core.doctype.communication.email import make
 
 	result = make(
@@ -757,11 +809,49 @@ def send_lead_email(lead, recipients, subject, content, cc=None, bcc=None, in_re
 		cc=cc or None,
 		bcc=bcc or None,
 		in_reply_to=in_reply_to or None,
+		attachments=attachments or None,
 		communication_medium="Email",
 		sent_or_received="Sent",
 		send_email=frappe.utils.cint(send),
 	)
 	return {"name": result.get("name")}
+
+
+def _clean_attachments(lead, attachments):
+	"""File names that really belong to this Lead, so a crafted payload can't
+	pull an unrelated private file into an outgoing email."""
+	if isinstance(attachments, str):
+		attachments = frappe.parse_json(attachments)
+	if not attachments:
+		return []
+
+	names = [str(a) for a in attachments if a]
+	if not names:
+		return []
+
+	return frappe.get_all(
+		"File",
+		filters={
+			"name": ["in", names],
+			"attached_to_doctype": "Lead",
+			"attached_to_name": lead,
+		},
+		pluck="name",
+	)
+
+
+@frappe.whitelist(methods=["POST"])
+def remove_lead_attachment(lead, file):
+	"""Drop a file the user attached in the compose dialog and then changed
+	their mind about, so abandoned uploads don't pile up on the Lead."""
+	_check_lead_access()
+	frappe.has_permission("Lead", "write", throw=True)
+
+	if not _clean_attachments(lead, [file]):
+		frappe.throw(_("That file is not attached to this lead."))
+
+	frappe.delete_doc("File", file)
+	return {"ok": True}
 
 
 @frappe.whitelist(methods=["POST"])

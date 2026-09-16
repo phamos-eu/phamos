@@ -2,7 +2,7 @@
 	<Dialog
 		:options="{
 			title: dialogTitle,
-			size: '3xl',
+			size: '5xl',
 			actions: [
 				{ label: 'Cancel', variant: 'subtle', onClick: () => emit('update:modelValue', false) },
 				{
@@ -17,62 +17,127 @@
 		@update:model-value="emit('update:modelValue', $event)"
 	>
 		<template #body-content>
-			<div class="space-y-3">
-				<FormControl
-					v-if="templateOptions.length > 1"
-					v-model="selectedTemplate"
-					label="Template"
-					type="select"
-					size="sm"
-					:options="templateOptions"
-					@change="applyTemplate"
-				/>
+			<div class="space-y-2.5">
+				<!-- Recipients side by side rather than stacked: the header costs
+				     one row instead of three, leaving the editor room to breathe. -->
+				<div class="grid grid-cols-3 gap-3">
+					<EmailRecipientInput
+						v-model="recipients"
+						label="To"
+						placeholder="name@example.com"
+						:lead="lead.name"
+						@focus="focusedField = 'recipients'"
+						@blur="onFieldBlur('recipients')"
+					/>
+					<EmailRecipientInput
+						v-model="cc"
+						label="Cc"
+						:lead="lead.name"
+						@focus="focusedField = 'cc'"
+						@blur="onFieldBlur('cc')"
+					/>
+					<EmailRecipientInput
+						v-model="bcc"
+						label="Bcc"
+						:lead="lead.name"
+						@focus="focusedField = 'bcc'"
+						@blur="onFieldBlur('bcc')"
+					/>
+				</div>
 
-				<FormControl v-model="recipients" label="To" type="text" size="sm" placeholder="name@example.com" />
-
-				<!-- Addresses already connected to this lead, so the common case
-				     is a click rather than typing an address from memory. -->
-				<div v-if="availableSuggestions.length" class="flex flex-wrap items-center gap-1.5">
+				<!-- Addresses already connected to this lead. Only while a recipient
+				     field has focus, so it's clear which field a chip lands in. -->
+				<div
+					v-if="focusedField && availableSuggestions.length"
+					class="flex flex-wrap items-center gap-1.5"
+				>
+					<span class="text-xs text-ink-gray-5">Add to {{ fieldLabels[focusedField] }}:</span>
 					<button
 						v-for="suggestion in availableSuggestions"
 						:key="suggestion.email"
 						type="button"
 						class="rounded-full border border-dashed border-outline-gray-3 px-2 py-0.5 text-xs text-ink-gray-8 hover:border-outline-gray-4 hover:bg-surface-gray-2"
 						:title="`${suggestion.email} · ${suggestion.source}`"
-						@click="addRecipient(suggestion.email)"
+						@mousedown.prevent="addRecipient(suggestion.email)"
 					>
 						+ {{ suggestion.label }}
 					</button>
 				</div>
 
-				<div>
-					<label class="mb-1.5 block text-xs text-ink-gray-5">Add an existing contact</label>
-					<FrappeLink
-						doctype="Contact"
-						:model-value="''"
-						placeholder="Search contacts…"
-						@update:model-value="addContact"
+				<div class="grid gap-3" :class="templateOptions.length > 1 ? 'grid-cols-3' : 'grid-cols-1'">
+					<FormControl
+						v-model="subject"
+						label="Subject"
+						type="text"
+						size="sm"
+						:class="templateOptions.length > 1 ? 'col-span-2' : ''"
+					/>
+					<FormControl
+						v-if="templateOptions.length > 1"
+						v-model="selectedTemplate"
+						label="Template"
+						type="select"
+						size="sm"
+						:options="templateOptions"
+						@change="applyTemplate"
 					/>
 				</div>
-				<div class="grid grid-cols-2 gap-3">
-					<FormControl v-model="cc" label="Cc" type="text" size="sm" />
-					<FormControl v-model="bcc" label="Bcc" type="text" size="sm" />
-				</div>
-				<FormControl v-model="subject" label="Subject" type="text" size="sm" />
+
 				<div>
-					<label class="mb-1.5 block text-xs text-ink-gray-5">Message</label>
 					<TextEditor
 						v-if="modelValue"
 						:content="content"
 						:fixed-menu="editorMenu"
 						placeholder="Write your message…"
-						editor-class="prose-sm dark:prose-invert max-w-none w-full min-h-[180px] max-h-[320px] overflow-y-auto px-3 py-2 border border-t-0 border-outline-gray-2 rounded-b-lg bg-surface-white"
+						editor-class="prose-sm dark:prose-invert max-w-none w-full min-h-[200px] max-h-[40vh] overflow-y-auto px-3 py-2 border border-t-0 border-outline-gray-2 rounded-b-lg bg-surface-white"
 						@change="(html) => (content = html)"
 					/>
 				</div>
-				<p class="text-xs text-ink-gray-5">
-					Sent from the system and filed against this lead, so replies stay linked.
-				</p>
+
+				<div class="flex flex-wrap items-center gap-1.5">
+					<FileUploader
+						:upload-args="{
+							doctype: 'Lead',
+							docname: lead.name,
+							private: 1,
+							folder: 'Home/Attachments',
+						}"
+						@success="onFileUploaded"
+						@failure="onFileFailed"
+					>
+						<template #default="{ openFileSelector, uploading, progress }">
+							<Button
+								size="sm"
+								variant="subtle"
+								:loading="uploading"
+								:label="uploading ? `Uploading ${progress}%` : 'Attach file'"
+								@click="openFileSelector"
+							>
+								<template #prefix><FeatherIcon name="paperclip" class="h-3.5 w-3.5" /></template>
+							</Button>
+						</template>
+					</FileUploader>
+
+					<span
+						v-for="file in attachments"
+						:key="file.name"
+						class="inline-flex max-w-[14rem] items-center gap-1 rounded-full bg-surface-gray-3 py-0.5 pl-2 pr-1 text-xs text-ink-gray-9"
+					>
+						<span class="truncate">{{ file.file_name }}</span>
+						<button
+							type="button"
+							class="rounded-full p-0.5 text-ink-gray-6 hover:bg-surface-gray-4 hover:text-ink-gray-9"
+							:title="`Remove ${file.file_name}`"
+							@click="removeAttachment(file)"
+						>
+							<FeatherIcon name="x" class="h-3 w-3" />
+						</button>
+					</span>
+
+					<span class="ml-auto text-xs text-ink-gray-5">
+						Sent from the system and filed against this lead, so replies stay linked.
+					</span>
+				</div>
 				<ErrorMessage :message="error" />
 			</div>
 		</template>
@@ -81,8 +146,8 @@
 
 <script setup>
 import { computed, ref, watch } from "vue"
-import { call, TextEditor } from "frappe-ui"
-import FrappeLink from "@spa/components/FrappeLink.vue"
+import { call, FileUploader, TextEditor } from "frappe-ui"
+import EmailRecipientInput from "@/components/EmailRecipientInput.vue"
 
 const props = defineProps({
 	modelValue: { type: Boolean, default: false },
@@ -105,6 +170,8 @@ const editorMenu = [
 	"Numbered List",
 ]
 
+const fieldLabels = { recipients: "To", cc: "Cc", bcc: "Bcc" }
+
 const recipients = ref("")
 const cc = ref("")
 const bcc = ref("")
@@ -115,6 +182,11 @@ const error = ref("")
 const suggestions = ref([])
 const templates = ref([])
 const selectedTemplate = ref("")
+const attachments = ref([])
+/** Which recipient field the chips currently add to. */
+const focusedField = ref("")
+
+const fields = { recipients, cc, bcc }
 
 const templateOptions = computed(() => [
 	{ label: "No template", value: "" },
@@ -134,21 +206,43 @@ const availableSuggestions = computed(() => {
 })
 
 function addRecipient(email) {
-	const current = recipients.value.trim()
-	recipients.value = current ? `${current}, ${email}` : email
+	const field = fields[focusedField.value] || recipients
+	const current = field.value.trim().replace(/,$/, "").trim()
+	field.value = current ? `${current}, ${email}` : email
 }
 
-async function addContact(contact) {
-	if (!contact) return
+/** Chips use mousedown.prevent so they never blur the field; a real blur
+ *  (tabbing away, clicking the editor) should hide them. Moving between two
+ *  recipient fields fires the next focus first, so only clear if this field
+ *  is still the focused one. */
+function onFieldBlur(field) {
+	setTimeout(() => {
+		if (focusedField.value === field) focusedField.value = ""
+	}, 120)
+}
+
+function onFileUploaded(file) {
+	if (!file?.name) return
+	attachments.value = [
+		...attachments.value,
+		{ name: file.name, file_name: file.file_name || file.file_url },
+	]
+}
+
+function onFileFailed(e) {
+	error.value = e?.messages?.[0] || e?.message || "Could not upload that file"
+}
+
+async function removeAttachment(file) {
+	attachments.value = attachments.value.filter((f) => f.name !== file.name)
 	try {
-		const result = await call("phamos.api.sales_leads.get_contact_emails", { contact })
-		if (!result.emails?.length) {
-			error.value = `${result.label} has no email address.`
-			return
-		}
-		result.emails.forEach(addRecipient)
+		await call("phamos.api.sales_leads.remove_lead_attachment", {
+			lead: props.lead.name,
+			file: file.name,
+		})
 	} catch (e) {
-		error.value = e?.messages?.[0] || e?.message || "Could not load that contact"
+		// The file is off the email either way; a leftover File row on the lead
+		// isn't worth blocking the user with.
 	}
 }
 
@@ -206,6 +300,8 @@ watch(
 		cc.value = ""
 		bcc.value = ""
 		selectedTemplate.value = ""
+		attachments.value = []
+		focusedField.value = ""
 		loadContext()
 
 		const source = props.source
@@ -243,11 +339,12 @@ async function submit() {
 	try {
 		await call("phamos.api.sales_leads.send_lead_email", {
 			lead: props.lead.name,
-			recipients: recipients.value.trim(),
-			cc: cc.value.trim() || null,
-			bcc: bcc.value.trim() || null,
+			recipients: recipients.value.trim().replace(/,$/, ""),
+			cc: cc.value.trim().replace(/,$/, "") || null,
+			bcc: bcc.value.trim().replace(/,$/, "") || null,
 			subject: subject.value.trim(),
 			content: content.value,
+			attachments: JSON.stringify(attachments.value.map((f) => f.name)),
 			// Threads the reply to the original message, not just by subject.
 			in_reply_to: props.mode === "reply" ? props.source?.name : null,
 		})
