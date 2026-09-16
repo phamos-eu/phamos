@@ -974,7 +974,10 @@ def get_lead_contacts(lead):
 	contacts.sort(
 		key=lambda c: (
 			not c["is_primary"],
-			not (c["phones"] or c["emails"]),
+			# A phone first: what the header needs from the main contact is a
+			# number to call, and the auto-created twin usually has only an email.
+			not c["phones"],
+			not c["emails"],
 			c["full_name"].casefold(),
 		)
 	)
