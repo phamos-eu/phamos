@@ -13,7 +13,7 @@ from urllib.parse import urlparse
 import frappe
 import requests
 from frappe import _
-from frappe.utils import get_datetime, now_datetime
+from frappe.utils import get_datetime, getdate, now_datetime
 
 from phamos.api.department_cockpit import _user_label
 from phamos.phamos.page.sales_action_panel.sales_action_panel import LEAD_STATUSES
@@ -199,15 +199,16 @@ def _lead_bucket(status):
 	return "open"
 
 
-def _is_overdue(next_followup, now=None):
+def _is_overdue(next_followup, today_date=None):
+	"""Overdue only once the due date has passed — a lead due today is not."""
 	if not next_followup:
 		return False
-	return get_datetime(next_followup) < (now or now_datetime())
+	return getdate(next_followup) < (today_date or getdate())
 
 
-def _serialize_lead_row(row, owner_names, now):
+def _serialize_lead_row(row, owner_names, today_date):
 	row["owner_name"] = owner_names.get(row.get("lead_owner")) or row.get("lead_owner")
-	row["overdue"] = _is_overdue(row.get("custom_next_followup"), now)
+	row["overdue"] = _is_overdue(row.get("custom_next_followup"), today_date)
 	return row
 
 
@@ -234,8 +235,8 @@ def get_leads():
 	owners = list(dict.fromkeys(r.lead_owner for r in rows if r.lead_owner))
 	owner_names = {owner: _user_label(owner) for owner in owners}
 
-	now = now_datetime()
-	items = [_serialize_lead_row(row, owner_names, now) for row in rows]
+	today_date = getdate()
+	items = [_serialize_lead_row(row, owner_names, today_date) for row in rows]
 
 	return {"items": items, "truncated": truncated, "statuses": LEAD_STATUSES}
 
@@ -518,16 +519,16 @@ def _window_metric(rows, start, end):
 	return {"created": len(created), "converted": len(converted), "lost": len(lost)}
 
 
-def _followup_bucket(row, now):
+def _followup_bucket(row, today_date):
 	next_followup = row.get("custom_next_followup")
 	if not next_followup:
 		return "No date set"
-	due = get_datetime(next_followup)
-	if due < now:
+	due = getdate(next_followup)
+	if due < today_date:
 		return "Overdue"
-	if due.date() == now.date():
+	if due == today_date:
 		return "Due today"
-	if due < now + timedelta(days=7):
+	if due < today_date + timedelta(days=7):
 		return "Due this week"
 	return "Due later"
 
@@ -583,8 +584,9 @@ def get_lead_dashboard():
 
 	followup_labels = ["No date set", "Overdue", "Due today", "Due this week", "Due later"]
 	followup_counts = {label: 0 for label in followup_labels}
+	today_date = getdate()
 	for row in open_rows:
-		followup_counts[_followup_bucket(row, now)] += 1
+		followup_counts[_followup_bucket(row, today_date)] += 1
 
 	return {
 		"windows": windows,

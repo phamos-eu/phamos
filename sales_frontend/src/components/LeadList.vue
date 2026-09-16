@@ -35,7 +35,7 @@
 					size="sm"
 					variant="subtle"
 				/>
-				<span v-else>{{ formatDatetime(lead.custom_next_followup) }}</span>
+				<span v-else>{{ formatDate(lead.custom_next_followup) }}</span>
 			</div>
 			<div class="min-w-0 text-center text-xs text-ink-gray-6">
 				{{ lead.modified ? formatDate(lead.modified) : "—" }}
@@ -53,7 +53,7 @@
 
 <script setup>
 import { Badge } from "frappe-ui"
-import { formatDate, formatDatetime } from "@spa/utils/datetime"
+import { formatDate } from "@spa/utils/datetime"
 import { LEAD_LIST_FILTER_SUBGRID, leadStatusTheme } from "@/leadListColumns.js"
 
 defineProps({

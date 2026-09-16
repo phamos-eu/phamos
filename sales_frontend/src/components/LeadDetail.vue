@@ -166,8 +166,8 @@
 				<section>
 					<label class="mb-1.5 block text-xs text-ink-gray-5">Next Follow Up On</label>
 					<input
-						v-model="nextFollowUpLocal"
-						type="datetime-local"
+						v-model="nextFollowUp"
+						type="date"
 						class="form-input block h-8 w-full rounded border border-outline-gray-2 bg-surface-white px-2 text-sm text-ink-gray-8"
 					/>
 				</section>
@@ -220,11 +220,7 @@
 import { computed, nextTick, onMounted, ref, watch } from "vue"
 import { call, debounce, toast, Badge } from "frappe-ui"
 import {
-	formatForApi,
 	formatDatetime,
-	parseDatetimeLocalValue,
-	parseSystemDatetimeToUserDate,
-	toDatetimeLocalValue,
 } from "@spa/utils/datetime"
 import {
 	LEAD_STATUSES,
@@ -255,7 +251,9 @@ const showWebsiteDialog = ref(false)
 const checkingWebsite = ref(false)
 
 const status = ref("")
-const nextFollowUpLocal = ref("")
+// Date-only (YYYY-MM-DD), bound straight to an <input type="date">: no
+// timezone conversion, which would shift a bare date across day boundaries.
+const nextFollowUp = ref("")
 const qualificationStatus = ref("")
 const statusComment = ref("")
 
@@ -415,7 +413,7 @@ function stripHtml(value) {
 function syncFieldsFromLead() {
 	syncing.value = true
 	status.value = lead.value.status || ""
-	nextFollowUpLocal.value = toDatetimeLocalValue(parseSystemDatetimeToUserDate(lead.value.custom_next_followup))
+	nextFollowUp.value = lead.value.custom_next_followup || ""
 	qualificationStatus.value = lead.value.qualification_status || ""
 	statusComment.value = lead.value.custom_status_comment || ""
 	companyName.value = lead.value.company_name || ""
@@ -478,9 +476,7 @@ async function saveFields() {
 		const updated = await call(`${API}.update_lead`, {
 			name: lead.value.name,
 			status: status.value,
-			custom_next_followup: nextFollowUpLocal.value
-				? formatForApi(parseDatetimeLocalValue(nextFollowUpLocal.value))
-				: "",
+			custom_next_followup: nextFollowUp.value,
 			qualification_status: qualificationStatus.value,
 			custom_status_comment: statusComment.value,
 			company_name: companyName.value,
@@ -523,7 +519,7 @@ const scheduleSave = debounce(() => {
 watch(
 	[
 		status,
-		nextFollowUpLocal,
+		nextFollowUp,
 		qualificationStatus,
 		statusComment,
 		companyName,
