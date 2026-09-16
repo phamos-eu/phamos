@@ -655,6 +655,47 @@ def set_lead_hours_predictions(lead, rows=None):
 	return _serialize_hours_predictions(doc)
 
 
+def _lead_communications(lead, fields, limit=20):
+	"""Every email on this Lead's timeline, however it got attached.
+
+	A Communication reaches a document two ways: `reference_doctype`/
+	`reference_name` on the Communication itself, or a row in its
+	`Communication Link` child table. Inbound mail matched to a lead by
+	address typically arrives by the second route, so querying only the
+	reference fields silently misses most of a real conversation — which is
+	why Frappe's own timeline unions both.
+	"""
+	rows = frappe.get_all(
+		"Communication",
+		filters={"reference_doctype": "Lead", "reference_name": lead},
+		fields=fields,
+		order_by="communication_date desc",
+		limit_page_length=limit,
+	)
+	found = {row["name"]: row for row in rows}
+
+	linked = frappe.get_all(
+		"Communication Link",
+		filters={"link_doctype": "Lead", "link_name": lead},
+		pluck="parent",
+	)
+	unseen = [name for name in linked if name not in found]
+	if unseen:
+		for row in frappe.get_all(
+			"Communication",
+			filters={"name": ("in", unseen)},
+			fields=fields,
+			order_by="communication_date desc",
+			limit_page_length=limit,
+		):
+			found[row["name"]] = row
+
+	merged = sorted(
+		found.values(), key=lambda r: str(r.get("communication_date") or ""), reverse=True
+	)
+	return merged[:limit]
+
+
 def _thread_key(subject):
 	"""Normalised subject used to group a conversation together.
 
@@ -704,12 +745,8 @@ def _contact_suggestions(lead, lead_doc):
 
 	# Anyone already on the thread — the practical source of addresses that
 	# were never captured as Contacts.
-	for comm in frappe.get_all(
-		"Communication",
-		filters={"reference_doctype": "Lead", "reference_name": lead},
-		fields=["sender", "recipients", "cc"],
-		order_by="communication_date desc",
-		limit_page_length=50,
+	for comm in _lead_communications(
+		lead, fields=["name", "communication_date", "sender", "recipients", "cc"], limit=50
 	):
 		for field in ("sender", "recipients", "cc"):
 			for address in (comm.get(field) or "").split(","):
@@ -1217,9 +1254,8 @@ def get_lead_activity(name):
 	get_docinfo(doc=doc)
 	docinfo = frappe.response.pop("docinfo", None) or {}
 
-	communications = frappe.get_all(
-		"Communication",
-		filters={"reference_doctype": "Lead", "reference_name": doc.name},
+	communications = _lead_communications(
+		doc.name,
 		fields=[
 			"name",
 			"subject",
@@ -1231,8 +1267,7 @@ def get_lead_activity(name):
 			"cc",
 			"in_reply_to",
 		],
-		order_by="communication_date desc",
-		limit_page_length=20,
+		limit=20,
 	)
 
 	# Tag each message with its conversation so the UI can show them as one.
