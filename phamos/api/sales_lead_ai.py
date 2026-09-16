@@ -15,6 +15,8 @@ import re
 import frappe
 from frappe import _
 
+from frappe.utils.html_utils import unescape_html
+
 from phamos.api.sales_leads import (
 	_check_lead_access,
 	_lead_communications,
@@ -57,7 +59,7 @@ Correspondence:
 def _strip_html(value):
 	text = re.sub(r"<(script|style)[^>]*>.*?</\1>", " ", value or "", flags=re.S | re.I)
 	text = re.sub(r"<[^>]+>", " ", text)
-	text = frappe.utils.unescape_html(text)
+	text = unescape_html(text)
 	return re.sub(r"[ \t]*\n\s*\n+", "\n\n", re.sub(r"[ \t]+", " ", text)).strip()
 
 
