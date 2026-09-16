@@ -48,6 +48,7 @@ LEAD_TRANSACTIONAL_FIELDS = (
 	"qualification_status",
 	"custom_status_comment",
 	"lead_owner",
+	"custom_planned_start",
 )
 LEAD_MASTER_FIELDS = (
 	"company_name",
@@ -283,6 +284,15 @@ def _serialize_next_steps(doc):
 	return sorted(rows, key=_next_step_sort_key)
 
 
+def _serialize_hours_predictions(doc):
+	"""Predicted hours per month, earliest month first."""
+	rows = [
+		{"name": row.name, "month_start": row.month_start, "hours": row.hours}
+		for row in (doc.get("custom_hours_predictions") or [])
+	]
+	return sorted(rows, key=lambda r: str(r["month_start"] or ""))
+
+
 def _serialize_lead_detail(doc):
 	"""Identity, master-data, and transactional fields — no notes/communications.
 
@@ -319,6 +329,8 @@ def _serialize_lead_detail(doc):
 		"lead_owner_name": _user_label(doc.lead_owner) if doc.lead_owner else None,
 		"lead_owner_image": frappe.db.get_value("User", doc.lead_owner, "user_image") if doc.lead_owner else "",
 		"custom_next_followup": doc.custom_next_followup,
+		"custom_planned_start": doc.custom_planned_start,
+		"hours_predictions": _serialize_hours_predictions(doc),
 		"custom_status_comment": doc.custom_status_comment,
 		"qualification_status": doc.qualification_status,
 		"qualified_by": doc.qualified_by,
@@ -355,6 +367,7 @@ def update_lead(
 	qualification_status=None,
 	custom_status_comment=None,
 	lead_owner=None,
+	custom_planned_start=None,
 	company_name=None,
 	website=None,
 	city=None,
@@ -398,6 +411,7 @@ def update_lead(
 		"qualification_status": qualification_status,
 		"custom_status_comment": custom_status_comment,
 		"lead_owner": lead_owner,
+		"custom_planned_start": custom_planned_start,
 		"company_name": company_name,
 		"website": website,
 		"city": city,
@@ -478,6 +492,33 @@ def _child_row_summary(meta, table_fieldname, row):
 		if df.in_list_view and row.get(df.fieldname)
 	]
 	return " · ".join(values)
+
+
+@frappe.whitelist(methods=["POST"])
+def set_lead_hours_predictions(lead, rows=None):
+	"""Replace the Lead's hours-per-month predictions.
+
+	Replaced wholesale for the same reason as Next Steps: the cockpit edits
+	the whole table at once, and months with no number yet are simply
+	dropped rather than stored as zeros.
+	"""
+	frappe.has_permission("Lead", "write", throw=True)
+	doc = frappe.get_doc("Lead", lead)
+	doc.check_permission("write")
+
+	if isinstance(rows, str):
+		rows = json.loads(rows)
+
+	doc.set("custom_hours_predictions", [])
+	for row in sorted(rows or [], key=lambda r: str(r.get("month_start") or "")):
+		month_start = row.get("month_start")
+		hours = row.get("hours")
+		if not month_start or hours in (None, ""):
+			continue
+		doc.append("custom_hours_predictions", {"month_start": month_start, "hours": hours})
+
+	doc.save()
+	return _serialize_hours_predictions(doc)
 
 
 def _format_lead_activities(docinfo):

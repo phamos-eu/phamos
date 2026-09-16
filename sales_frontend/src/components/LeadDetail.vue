@@ -256,6 +256,56 @@
 					/>
 				</section>
 
+				<section>
+					<label class="mb-1.5 block text-xs text-ink-gray-5">Planned Start</label>
+					<DatePicker
+						:model-value="plannedStart || ''"
+						placeholder="Not planned"
+						input-class="h-8"
+						@update:model-value="onPlannedStartChange"
+					/>
+
+					<!-- Only meaningful once there's a start month to count from. -->
+					<div v-if="plannedStart" ref="predictionsRoot" class="mt-2">
+						<div class="mb-1 flex items-center justify-between">
+							<span class="text-xs text-ink-gray-5">Hours per month</span>
+							<span v-if="totalPredictedHours" class="text-xs tabular-nums text-ink-gray-6">
+								{{ totalPredictedHours }} h
+							</span>
+						</div>
+						<div class="space-y-1">
+							<div
+								v-for="(row, index) in hoursPredictions"
+								:key="row.month_start"
+								class="flex items-center gap-1.5"
+							>
+								<span class="w-20 flex-none text-xs text-ink-gray-6">{{ monthLabel(row.month_start) }}</span>
+								<input
+									v-model="row.hours"
+									type="number"
+									min="0"
+									step="0.5"
+									placeholder="0"
+									:data-month-index="index"
+									class="form-input h-7 min-w-0 flex-1 rounded border border-outline-gray-2 bg-surface-white px-2 text-sm text-ink-gray-8"
+									@change="scheduleHoursSave"
+									@keydown.enter.prevent="focusMonth(index + 1)"
+									@keydown.down.prevent="focusMonth(index + 1)"
+									@keydown.up.prevent="focusMonth(index - 1)"
+								/>
+							</div>
+						</div>
+						<button
+							type="button"
+							class="mt-1 flex items-center gap-1 rounded px-1.5 py-0.5 text-xs text-ink-gray-6 hover:bg-surface-gray-2 hover:text-ink-gray-9"
+							@click="addMonth"
+						>
+							<FeatherIcon name="plus" class="h-3.5 w-3.5" />
+							<span>Add month</span>
+						</button>
+					</div>
+				</section>
+
 				<FormControl
 					v-model="leadOwner"
 					label="Lead Owner"
@@ -364,6 +414,10 @@ const owners = ref([])
 // Local working copy of the Lead's Next Steps child table; saved as a whole
 // (see set_lead_next_steps) rather than row by row.
 const demos = ref([])
+const plannedStart = ref("")
+const hoursPredictions = ref([])
+const predictionsRoot = ref(null)
+const DEFAULT_PREDICTION_MONTHS = 6
 const nextSteps = ref([])
 const nextStepsRoot = ref(null)
 // Stable per-row key so re-sorting moves DOM nodes (and keeps focus with the
@@ -543,6 +597,14 @@ function syncFieldsFromLead() {
 	qualificationStatus.value = lead.value.qualification_status || ""
 	statusComment.value = lead.value.custom_status_comment || ""
 	leadOwner.value = lead.value.lead_owner || ""
+	plannedStart.value = lead.value.custom_planned_start || ""
+	hoursPredictions.value = (lead.value.hours_predictions || []).map((row) => ({
+		month_start: row.month_start,
+		hours: row.hours ?? "",
+	}))
+	if (plannedStart.value && !hoursPredictions.value.length) {
+		seedPredictionMonths()
+	}
 	nextSteps.value = (lead.value.next_steps || []).map((step) => ({
 		key: nextStepKey++,
 		next_step: step.next_step || "",
@@ -622,6 +684,7 @@ async function saveFields() {
 			qualification_status: qualificationStatus.value,
 			custom_status_comment: statusComment.value,
 			lead_owner: leadOwner.value,
+			custom_planned_start: plannedStart.value,
 			company_name: companyName.value,
 			website: website.value,
 			city: city.value,
@@ -715,6 +778,83 @@ function onStepDateChange(step, value) {
 	sortNextSteps()
 	scheduleNextStepsSave()
 }
+
+/** First of the month, as YYYY-MM-01. */
+function monthStart(dateStr, offset = 0) {
+	const [year, month] = String(dateStr).slice(0, 10).split("-").map(Number)
+	const date = new Date(year, month - 1 + offset, 1)
+	return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-01`
+}
+
+function monthLabel(monthStartValue) {
+	const [year, month] = String(monthStartValue).slice(0, 10).split("-").map(Number)
+	return new Date(year, month - 1, 1).toLocaleDateString(undefined, { month: "short", year: "numeric" })
+}
+
+const totalPredictedHours = computed(() =>
+	hoursPredictions.value.reduce((sum, row) => sum + (Number(row.hours) || 0), 0)
+)
+
+/** Months run from the planned start, so the first row is that month. */
+function seedPredictionMonths() {
+	hoursPredictions.value = Array.from({ length: DEFAULT_PREDICTION_MONTHS }, (_, i) => ({
+		month_start: monthStart(plannedStart.value, i),
+		hours: "",
+	}))
+}
+
+function addMonth() {
+	const last = hoursPredictions.value[hoursPredictions.value.length - 1]
+	const next = last ? monthStart(last.month_start, 1) : monthStart(plannedStart.value)
+	hoursPredictions.value.push({ month_start: next, hours: "" })
+	focusMonth(hoursPredictions.value.length - 1)
+}
+
+function focusMonth(index) {
+	if (index < 0 || index >= hoursPredictions.value.length) return
+	nextTick(() => {
+		predictionsRoot.value?.querySelector(`input[data-month-index="${index}"]`)?.focus()
+	})
+}
+
+async function onPlannedStartChange(value) {
+	plannedStart.value = value || ""
+	// Re-anchor the months when the start moves, but don't discard numbers
+	// already entered for months that still apply.
+	if (plannedStart.value) {
+		const existing = new Map(hoursPredictions.value.map((r) => [r.month_start, r.hours]))
+		const count = Math.max(hoursPredictions.value.length, DEFAULT_PREDICTION_MONTHS)
+		hoursPredictions.value = Array.from({ length: count }, (_, i) => {
+			const month = monthStart(plannedStart.value, i)
+			return { month_start: month, hours: existing.get(month) ?? "" }
+		})
+	}
+	await saveFields()
+	saveHoursPredictions()
+}
+
+async function saveHoursPredictions() {
+	if (syncing.value || !lead.value) return
+	try {
+		const saved = await call(`${API}.set_lead_hours_predictions`, {
+			lead: lead.value.name,
+			rows: hoursPredictions.value
+				.filter((row) => row.hours !== "" && row.hours !== null)
+				.map((row) => ({ month_start: row.month_start, hours: Number(row.hours) || 0 })),
+		})
+		lead.value = { ...lead.value, hours_predictions: saved }
+	} catch (e) {
+		toast({
+			title: e?.messages?.[0] || e?.message || "Could not save hours predictions",
+			icon: "x-circle",
+			iconClasses: "text-ink-red-4",
+		})
+	}
+}
+
+const scheduleHoursSave = debounce(() => {
+	saveHoursPredictions()
+}, 500)
 
 function addNextStep() {
 	nextSteps.value.push({ key: nextStepKey++, next_step: "", date: "" })
