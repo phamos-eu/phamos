@@ -449,11 +449,33 @@ def set_lead_next_steps(lead, rows=None):
 	return _serialize_next_steps(doc)
 
 
+def _field_label(meta, fieldname):
+	field = meta.get_field(fieldname)
+	return field.label if field and field.label else fieldname
+
+
+def _child_row_summary(meta, table_fieldname, row):
+	"""Readable one-liner for a child row, built from its list-view fields."""
+	table_field = meta.get_field(table_fieldname)
+	if not (table_field and table_field.options):
+		return ""
+
+	child_meta = frappe.get_meta(table_field.options)
+	values = [
+		str(row.get(df.fieldname))
+		for df in child_meta.fields
+		if df.in_list_view and row.get(df.fieldname)
+	]
+	return " · ".join(values)
+
+
 def _format_lead_activities(docinfo):
 	"""Field-change (Version) and system comment entries, newest first.
 
 	Sentence construction ("changed from X to Y") is left to the frontend —
-	this just resolves each changed fieldname to its Lead form label.
+	this just resolves each changed fieldname to its Lead form label. Child
+	table rows (e.g. Next Steps) come through Version's added/removed/
+	row_changed buckets rather than `changed`.
 	"""
 	meta = frappe.get_meta("Lead")
 	activities = []
@@ -463,19 +485,56 @@ def _format_lead_activities(docinfo):
 			data = json.loads(version.get("data") or "{}")
 		except (TypeError, ValueError):
 			continue
+
+		owner = version.get("owner")
+		creation = version.get("creation")
+
 		for fieldname, old, new in data.get("changed") or []:
-			field = meta.get_field(fieldname)
 			activities.append(
 				{
 					"kind": "field_change",
 					"field": fieldname,
-					"label": field.label if field and field.label else fieldname,
+					"label": _field_label(meta, fieldname),
 					"old": old,
 					"new": new,
-					"owner": version.get("owner"),
-					"creation": version.get("creation"),
+					"owner": owner,
+					"creation": creation,
 				}
 			)
+
+		for kind, bucket in (("row_added", "added"), ("row_removed", "removed")):
+			for fieldname, row in data.get(bucket) or []:
+				activities.append(
+					{
+						"kind": kind,
+						"field": fieldname,
+						"label": _field_label(meta, fieldname),
+						"summary": _child_row_summary(meta, fieldname, row),
+						"owner": owner,
+						"creation": creation,
+					}
+				)
+
+		for entry in data.get("row_changed") or []:
+			# [table_fieldname, row_index, row_name, [[fieldname, old, new], ...]]
+			fieldname, changes = entry[0], entry[3]
+			table_label = _field_label(meta, fieldname)
+			table_field = meta.get_field(fieldname)
+			child_meta = frappe.get_meta(table_field.options) if table_field and table_field.options else None
+			for child_fieldname, old, new in changes:
+				child_field = child_meta.get_field(child_fieldname) if child_meta else None
+				child_label = child_field.label if child_field and child_field.label else child_fieldname
+				activities.append(
+					{
+						"kind": "field_change",
+						"field": f"{fieldname}.{child_fieldname}",
+						"label": f"{table_label} · {child_label}",
+						"old": old,
+						"new": new,
+						"owner": owner,
+						"creation": creation,
+					}
+				)
 
 	for bucket in ("info_logs", "workflow_logs", "assignment_logs"):
 		for comment in docinfo.get(bucket) or []:

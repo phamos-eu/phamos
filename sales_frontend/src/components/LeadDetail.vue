@@ -203,6 +203,16 @@
 								{{ entry.body }}
 							</div>
 
+							<div v-else-if="entry.activity?.kind === 'row_added'" class="text-sm text-ink-gray-8">
+								Added to <span class="font-medium">{{ entry.activity.label }}</span>:
+								<span class="font-medium">{{ entry.activity.summary || "—" }}</span>
+							</div>
+
+							<div v-else-if="entry.activity?.kind === 'row_removed'" class="text-sm text-ink-gray-8">
+								Removed from <span class="font-medium">{{ entry.activity.label }}</span>:
+								<span class="font-medium">{{ entry.activity.summary || "—" }}</span>
+							</div>
+
 							<div v-else-if="entry.fieldChange" class="text-sm text-ink-gray-8">
 								Changed <span class="font-medium">{{ entry.fieldChange.label }}</span> from
 								<span class="font-medium">{{ entry.fieldChange.old || "—" }}</span> to
@@ -409,6 +419,7 @@ const timeline = computed(() => {
 				badge: "Activity",
 				badgeTheme: "gray",
 				author: activity.owner,
+				activity,
 				fieldChange: activity.kind === "field_change" ? activity : null,
 				body: stripHtml(activity.content),
 			})
@@ -618,6 +629,9 @@ async function saveNextSteps() {
 			rows: nextSteps.value.filter((step) => (step.next_step || "").trim()),
 		})
 		lead.value = { ...lead.value, next_steps: saved }
+		// The add/remove lands in the Lead's version history, so refresh the
+		// feed to surface it under Activities without a reload.
+		loadActivity()
 	} catch (e) {
 		toast({
 			title: e?.messages?.[0] || e?.message || "Could not save next steps",
