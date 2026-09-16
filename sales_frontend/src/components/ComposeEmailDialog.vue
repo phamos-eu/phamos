@@ -45,23 +45,27 @@
 					/>
 				</div>
 
-				<!-- Addresses already connected to this lead. Only while a recipient
-				     field has focus, so it's clear which field a chip lands in. -->
+				<!-- Addresses already connected to this lead. Shown only while a
+				     recipient field has focus, so it's clear which field a chip
+				     lands in — but the row keeps its height either way, so the
+				     dialog doesn't jump as focus moves. -->
 				<div
-					v-if="focusedField && availableSuggestions.length"
-					class="flex flex-wrap items-center gap-1.5"
+					class="flex h-6 flex-none items-center gap-1.5 overflow-x-auto whitespace-nowrap"
+					:class="chipsVisible ? '' : 'invisible'"
 				>
-					<span class="text-xs text-ink-gray-5">Add to {{ fieldLabels[focusedField] }}:</span>
-					<button
-						v-for="suggestion in availableSuggestions"
-						:key="suggestion.email"
-						type="button"
-						class="rounded-full border border-dashed border-outline-gray-3 px-2 py-0.5 text-xs text-ink-gray-8 hover:border-outline-gray-4 hover:bg-surface-gray-2"
-						:title="`${suggestion.email} · ${suggestion.source}`"
-						@mousedown.prevent="addRecipient(suggestion.email)"
-					>
-						+ {{ suggestion.label }}
-					</button>
+					<template v-if="chipsVisible">
+						<span class="flex-none text-xs text-ink-gray-5">Add to {{ fieldLabels[focusedField] }}:</span>
+						<button
+							v-for="suggestion in availableSuggestions"
+							:key="suggestion.email"
+							type="button"
+							class="flex-none rounded-full border border-dashed border-outline-gray-3 px-2 py-0.5 text-xs text-ink-gray-8 hover:border-outline-gray-4 hover:bg-surface-gray-2"
+							:title="`${suggestion.email} · ${suggestion.source}`"
+							@mousedown.prevent="addRecipient(suggestion.email)"
+						>
+							+ {{ suggestion.label }}
+						</button>
+					</template>
 				</div>
 
 				<div class="grid gap-3" :class="templateOptions.length > 1 ? 'grid-cols-3' : 'grid-cols-1'">
@@ -204,6 +208,8 @@ const availableSuggestions = computed(() => {
 	)
 	return suggestions.value.filter((s) => !used.has(s.email.toLowerCase()))
 })
+
+const chipsVisible = computed(() => Boolean(focusedField.value) && availableSuggestions.value.length > 0)
 
 function addRecipient(email) {
 	const field = fields[focusedField.value] || recipients
