@@ -164,6 +164,10 @@
 					>
 						{{ filter.label }}
 					</button>
+					<span class="ml-auto flex items-center gap-2">
+						<Button variant="subtle" @click="showNoteDialog = true">Add note</Button>
+						<Button variant="subtle" @click="showDemoDialog = true">Create Demo</Button>
+					</span>
 				</div>
 				<div class="min-h-0 flex-1 overflow-y-auto p-4">
 					<div v-if="activityLoading" class="flex items-center justify-center py-16 text-sm text-ink-gray-5">
@@ -191,6 +195,16 @@
 							<template v-if="entry.type === 'communications'">
 								<div class="text-sm font-medium text-ink-gray-9">{{ entry.subject || "(no subject)" }}</div>
 								<div class="mt-0.5 truncate text-xs text-ink-gray-6">{{ entry.body }}</div>
+							</template>
+
+							<template v-else-if="entry.type === 'demos'">
+								<a
+									:href="entry.url"
+									class="text-sm font-medium text-ink-gray-9 underline-offset-2 hover:underline"
+								>
+									{{ entry.subject }}
+								</a>
+								<div v-if="entry.body" class="mt-0.5 text-xs text-ink-gray-6">{{ entry.body }}</div>
 							</template>
 
 							<div v-else-if="entry.type === 'notes'" class="whitespace-pre-wrap text-sm text-ink-gray-8">
@@ -322,25 +336,6 @@
 
 				<ErrorMessage :message="saveError" />
 
-				<Button variant="subtle" @click="showNoteDialog = true">Add note</Button>
-				<Button variant="subtle" @click="showDemoDialog = true">Create Demo</Button>
-
-				<div v-if="demos.length" class="space-y-1">
-					<a
-						v-for="demo in demos"
-						:key="demo.name"
-						:href="`/app/demo/${demo.name}`"
-						class="flex items-center gap-1.5 rounded px-1.5 py-1 text-xs text-ink-gray-7 hover:bg-surface-gray-2 hover:text-ink-gray-9"
-						:title="demo.subject"
-					>
-						<FeatherIcon name="monitor" class="h-3.5 w-3.5 flex-shrink-0 text-ink-gray-5" />
-						<span class="min-w-0 flex-1 truncate">{{ demo.subject || demo.name }}</span>
-						<span class="flex-none text-ink-gray-5">
-							{{ demo.scheduled_on ? formatDate(demo.scheduled_on) : "proposed" }}
-						</span>
-					</a>
-				</div>
-
 				<a
 					:href="lead.desk_url"
 					class="mt-auto flex w-full items-center gap-2 rounded-md px-2 py-2 text-sm font-medium text-ink-gray-7 hover:bg-surface-gray-2 hover:text-ink-gray-9"
@@ -369,7 +364,7 @@
 <script setup>
 import { computed, nextTick, onMounted, ref, watch } from "vue"
 import { call, debounce, toast, Badge, DatePicker } from "frappe-ui"
-import { formatDate, formatDatetime } from "@spa/utils/datetime"
+import { formatDatetime } from "@spa/utils/datetime"
 import {
 	LEAD_STATUSES,
 	NO_OF_EMPLOYEES_OPTIONS,
@@ -439,12 +434,13 @@ const communications = ref([])
 const activities = ref([])
 // Independent show/hide toggles (not exclusive tabs) — any combination,
 // including all three at once, can be visible together.
-const activeFilters = ref(new Set(["communications"]))
+const activeFilters = ref(new Set(["communications", "demos"]))
 
 const feedFilters = [
 	{ key: "communications", label: "Communication" },
 	{ key: "notes", label: "Notes" },
 	{ key: "activities", label: "Activities" },
+	{ key: "demos", label: "Demos" },
 ]
 
 function toggleFilter(key) {
@@ -483,6 +479,24 @@ const timeline = computed(() => {
 				badgeTheme: "orange",
 				author: note.added_by_name || note.added_by,
 				body: stripHtml(note.note),
+			})
+		}
+	}
+
+	if (activeFilters.value.has("demos")) {
+		for (const demo of demos.value) {
+			entries.push({
+				key: `demo:${demo.name}`,
+				type: "demos",
+				// Unscheduled demos still belong in the stream, so fall back to
+				// when the record last moved.
+				date: demo.scheduled_on || demo.modified,
+				badge: "Demo",
+				badgeTheme: "blue",
+				author: demo.owner_name || demo.owner,
+				subject: demo.subject || demo.name,
+				body: demo.scheduled_on ? "" : "Awaiting a date",
+				url: `/app/demo/${demo.name}`,
 			})
 		}
 	}
