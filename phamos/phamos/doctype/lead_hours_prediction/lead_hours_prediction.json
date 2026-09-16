@@ -20,9 +20,10 @@
   },
   {
    "fieldname": "hours",
-   "fieldtype": "Float",
+   "fieldtype": "Int",
    "in_list_view": 1,
-   "label": "Hours"
+   "label": "Hours",
+   "non_negative": 1
   }
  ],
  "grid_page_length": 10,

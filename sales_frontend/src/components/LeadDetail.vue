@@ -284,7 +284,7 @@
 									v-model="row.hours"
 									type="number"
 									min="0"
-									step="0.5"
+									step="1"
 									placeholder="0"
 									:data-month-index="index"
 									class="form-input h-7 min-w-0 flex-1 rounded border border-outline-gray-2 bg-surface-white px-2 text-sm text-ink-gray-8"
@@ -840,7 +840,7 @@ async function saveHoursPredictions() {
 			lead: lead.value.name,
 			rows: hoursPredictions.value
 				.filter((row) => row.hours !== "" && row.hours !== null)
-				.map((row) => ({ month_start: row.month_start, hours: Number(row.hours) || 0 })),
+				.map((row) => ({ month_start: row.month_start, hours: Math.round(Number(row.hours)) || 0 })),
 		})
 		lead.value = { ...lead.value, hours_predictions: saved }
 	} catch (e) {
