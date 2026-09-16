@@ -968,7 +968,16 @@ def get_lead_contacts(lead):
 		if doc.has_permission("read"):
 			contacts.append(_serialize_contact(doc, lead_doc))
 
-	contacts.sort(key=lambda c: (not c["is_primary"], c["full_name"].casefold()))
+	# Primary first, and among them the one that actually carries details —
+	# a lead often has an auto-created contact holding nothing but a name
+	# alongside the real one, and the header calls the first primary it finds.
+	contacts.sort(
+		key=lambda c: (
+			not c["is_primary"],
+			not (c["phones"] or c["emails"]),
+			c["full_name"].casefold(),
+		)
+	)
 
 	return {
 		"contacts": contacts,

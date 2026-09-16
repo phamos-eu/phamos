@@ -1054,7 +1054,10 @@ const primaryContact = computed(() => contacts.value.find((c) => c.is_primary) |
 const phoneNumbers = computed(() => {
 	const own = [lead.value?.mobile_no, lead.value?.phone].filter(Boolean)
 	if (own.length) return [...new Set(own)]
-	return [...new Set(primaryContact.value?.phones || [])]
+	// Every contact the lead's details match, not just the first: a lead can
+	// carry a bare auto-created contact next to the real one.
+	const fromContacts = contacts.value.filter((c) => c.is_primary).flatMap((c) => c.phones || [])
+	return [...new Set(fromContacts)]
 })
 
 /** Left column: what was touched. */
