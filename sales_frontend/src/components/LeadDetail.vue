@@ -189,35 +189,45 @@
 								so "what happened to the record" never competes with "what was
 								said to the customer".
 							-->
+							<!-- Columnar so a run of changes scans down the page rather
+							     than as sentences of differing length. -->
 							<div
 								v-if="entry.type === 'activities'"
-								class="flex items-start gap-2 px-1 py-1 text-xs text-ink-gray-6"
+								class="grid grid-cols-[0.9rem_minmax(0,1fr)_minmax(0,1.5fr)_minmax(0,0.9fr)_auto] items-baseline gap-x-3 px-1 py-1 text-xs text-ink-gray-6"
 							>
-								<FeatherIcon name="git-commit" class="mt-0.5 h-3.5 w-3.5 flex-none text-ink-gray-4" />
-								<span class="min-w-0 flex-1">
-									<span v-if="entry.activity?.kind === 'row_added'">
-										Added to <span class="font-medium">{{ entry.activity.label }}</span>:
-										{{ entry.activity.summary || "—" }}
-									</span>
-									<span v-else-if="entry.activity?.kind === 'row_removed'">
-										Removed from <span class="font-medium">{{ entry.activity.label }}</span>:
-										{{ entry.activity.summary || "—" }}
-									</span>
-									<span v-else-if="entry.fieldChange">
-										<span class="font-medium">{{ entry.fieldChange.label }}</span>:
-										{{ entry.fieldChange.old || "—" }} → {{ entry.fieldChange.new || "—" }}
-									</span>
-									<span v-else>{{ entry.body }}</span>
-									<span class="text-ink-gray-5"> · {{ entry.author }} · {{ formatDatetime(entry.date) }}</span>
+								<FeatherIcon name="git-commit" class="h-3.5 w-3.5 flex-none translate-y-0.5 text-ink-gray-4" />
+								<span class="truncate font-medium text-ink-gray-7">{{ activityLabel(entry) }}</span>
+								<span class="truncate">{{ activityDetail(entry) }}</span>
+								<span class="truncate text-ink-gray-5">{{ entry.author }}</span>
+								<span class="whitespace-nowrap tabular-nums text-ink-gray-5">
+									{{ formatDatetime(entry.date) }}
 								</span>
 							</div>
 
 							<div v-else class="rounded-md border border-outline-gray-2 bg-surface-white px-3 py-2.5">
-								<div class="mb-1.5 flex flex-wrap items-center gap-2 text-xs text-ink-gray-5">
+								<div class="mb-1.5 flex items-center gap-2 text-xs text-ink-gray-5">
 									<FeatherIcon :name="entryIcon(entry)" class="h-3.5 w-3.5 flex-none text-ink-gray-5" />
 									<Badge :label="entry.badge" :theme="entry.badgeTheme" size="sm" variant="subtle" />
-									<span v-if="entry.author" class="font-medium text-ink-gray-7">{{ entry.author }}</span>
-									<span>{{ formatDatetime(entry.date) }}</span>
+									<span v-if="entry.author" class="min-w-0 truncate font-medium text-ink-gray-7">
+										{{ entry.author }}
+									</span>
+									<span class="whitespace-nowrap">{{ formatDatetime(entry.date) }}</span>
+									<span v-if="entry.type === 'communications'" class="ml-auto flex flex-none items-center gap-1">
+										<a
+											:href="replyHref(entry)"
+											title="Reply"
+											class="rounded p-1 text-ink-gray-6 hover:bg-surface-gray-2 hover:text-ink-gray-9"
+										>
+											<FeatherIcon name="corner-up-left" class="h-3.5 w-3.5" />
+										</a>
+										<a
+											:href="forwardHref(entry)"
+											title="Forward"
+											class="rounded p-1 text-ink-gray-6 hover:bg-surface-gray-2 hover:text-ink-gray-9"
+										>
+											<FeatherIcon name="corner-up-right" class="h-3.5 w-3.5" />
+										</a>
+									</span>
 								</div>
 
 								<template v-if="entry.type === 'communications'">
@@ -226,22 +236,6 @@
 										to {{ entry.recipients }}
 									</div>
 									<div class="mt-1 line-clamp-3 text-xs text-ink-gray-6">{{ entry.body }}</div>
-									<div class="mt-2 flex items-center gap-2">
-										<a
-											:href="replyHref(entry)"
-											class="inline-flex items-center gap-1 rounded px-1.5 py-0.5 text-xs font-medium text-ink-gray-7 hover:bg-surface-gray-2 hover:text-ink-gray-9"
-										>
-											<FeatherIcon name="corner-up-left" class="h-3.5 w-3.5" />
-											<span>Reply</span>
-										</a>
-										<a
-											:href="forwardHref(entry)"
-											class="inline-flex items-center gap-1 rounded px-1.5 py-0.5 text-xs font-medium text-ink-gray-7 hover:bg-surface-gray-2 hover:text-ink-gray-9"
-										>
-											<FeatherIcon name="corner-up-right" class="h-3.5 w-3.5" />
-											<span>Forward</span>
-										</a>
-									</div>
 								</template>
 
 								<template v-else-if="entry.type === 'demos'">
@@ -576,6 +570,20 @@ const phoneNumbers = computed(() => [...new Set([lead.value?.mobile_no, lead.val
 const CRM_MAILBOX = "crm@phamos.eu"
 // mailto: URLs get truncated by some clients, so don't paste a whole thread in.
 const FORWARD_QUOTE_LIMIT = 1500
+
+/** Left column: what was touched. */
+function activityLabel(entry) {
+	return entry.activity?.label || entry.fieldChange?.label || "Update"
+}
+
+/** Middle column: what changed about it. */
+function activityDetail(entry) {
+	const activity = entry.activity
+	if (activity?.kind === "row_added") return `Added: ${activity.summary || "—"}`
+	if (activity?.kind === "row_removed") return `Removed: ${activity.summary || "—"}`
+	if (entry.fieldChange) return `${entry.fieldChange.old || "—"} → ${entry.fieldChange.new || "—"}`
+	return entry.body || ""
+}
 
 function entryIcon(entry) {
 	if (entry.type === "communications") return "mail"
