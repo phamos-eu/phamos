@@ -1531,3 +1531,164 @@ def get_lead_dashboard():
 		"follow_up": [{"label": label, "value": followup_counts[label]} for label in followup_labels],
 		"generated_at": now,
 	}
+
+
+# Working window the week view offers slots in. Outside it people are assumed
+# unavailable rather than merely un-booked.
+AVAILABILITY_START_HOUR = 8
+AVAILABILITY_END_HOUR = 18
+AVAILABILITY_DAYS = 7
+
+
+@frappe.whitelist()
+def get_week_availability(start, days=None, users=None, duration_minutes=60):
+	"""Busy blocks and free slots for a week, for the compose dialog's calendar.
+
+	Built from ERPNext Events, which is where this cockpit's own demos and
+	meetings land. Mailcow's CalDAV view of the session user's calendar is
+	merged in when the integration is configured — best-effort, because a site
+	without Mailcow should still get a usable week rather than an error.
+	"""
+	_check_lead_access()
+
+	days = frappe.utils.cint(days) or AVAILABILITY_DAYS
+	duration = frappe.utils.cint(duration_minutes) or 60
+	start_date = getdate(start)
+	end_date = frappe.utils.add_days(start_date, days - 1)
+
+	if isinstance(users, str):
+		users = frappe.parse_json(users)
+	users = [u for u in (users or []) if u] or [frappe.session.user]
+
+	busy = _events_busy_blocks(start_date, end_date, users)
+	busy += _mailcow_busy_blocks(start_date, end_date)
+
+	return {
+		"start": str(start_date),
+		"days": [
+			_availability_day(frappe.utils.add_days(start_date, offset), busy, duration)
+			for offset in range(days)
+		],
+		"start_hour": AVAILABILITY_START_HOUR,
+		"end_hour": AVAILABILITY_END_HOUR,
+	}
+
+
+def _events_busy_blocks(start_date, end_date, users):
+	"""Events in the range that any of the chosen people are on."""
+	rows = frappe.get_all(
+		"Event",
+		filters={
+			"starts_on": ["<=", f"{end_date} 23:59:59"],
+			"ends_on": [">=", f"{start_date} 00:00:00"],
+			"status": ["!=", "Cancelled"],
+		},
+		fields=["name", "subject", "starts_on", "ends_on", "owner"],
+		limit_page_length=500,
+	)
+	if not rows:
+		return []
+
+	chosen = {u.casefold() for u in users}
+	participants = frappe.get_all(
+		"Event Participants",
+		filters={"parent": ["in", [r.name for r in rows]], "reference_doctype": "User"},
+		fields=["parent", "reference_docname"],
+	)
+	by_event = {}
+	for row in participants:
+		by_event.setdefault(row.parent, set()).add((row.reference_docname or "").casefold())
+
+	blocks = []
+	for row in rows:
+		people = by_event.get(row.name, set()) | {(row.owner or "").casefold()}
+		if not people & chosen:
+			continue
+		blocks.append(
+			{
+				"subject": row.subject,
+				"starts_on": str(row.starts_on),
+				"ends_on": str(row.ends_on or row.starts_on),
+			}
+		)
+	return blocks
+
+
+def _mailcow_busy_blocks(start_date, end_date):
+	"""The session user's own calendar, when Mailcow is set up. Never fatal."""
+	try:
+		from phamos.mailcow_integration.caldav.sync_event import pull_event_slots
+
+		slots = pull_event_slots(str(start_date), str(frappe.utils.add_days(end_date, 1)))
+	except Exception:
+		return []
+
+	blocks = []
+	for slot in slots or []:
+		if not slot.get("start"):
+			continue
+		blocks.append(
+			{
+				"subject": slot.get("subject") or "Busy",
+				"starts_on": str(get_datetime(slot["start"])),
+				"ends_on": str(get_datetime(slot.get("end") or slot["start"])),
+			}
+		)
+	return blocks
+
+
+def _availability_day(day, busy, duration):
+	"""One day: what's booked, and the gaps long enough to offer."""
+	day_start = get_datetime(f"{day} {AVAILABILITY_START_HOUR:02d}:00:00")
+	day_end = get_datetime(f"{day} {AVAILABILITY_END_HOUR:02d}:00:00")
+
+	booked = []
+	for block in busy:
+		starts = get_datetime(block["starts_on"])
+		ends = get_datetime(block["ends_on"])
+		if ends <= day_start or starts >= day_end:
+			continue
+		booked.append(
+			{
+				"subject": block["subject"],
+				"starts_on": str(max(starts, day_start)),
+				"ends_on": str(min(ends, day_end)),
+			}
+		)
+	booked.sort(key=lambda b: b["starts_on"])
+
+	# Walk the day, stepping over each booking, and keep every gap that fits.
+	free = []
+	cursor = day_start
+	for block in booked:
+		block_start = get_datetime(block["starts_on"])
+		if (block_start - cursor).total_seconds() >= duration * 60:
+			free.extend(_split_gap(cursor, block_start, duration))
+		cursor = max(cursor, get_datetime(block["ends_on"]))
+	if (day_end - cursor).total_seconds() >= duration * 60:
+		free.extend(_split_gap(cursor, day_end, duration))
+
+	return {
+		"date": str(day),
+		"weekday": day.strftime("%a"),
+		"busy": booked,
+		"free": free,
+	}
+
+
+def _split_gap(start, end, duration):
+	"""Offer a gap as whole slots on the half hour, not one ragged block."""
+	slots = []
+	step = timedelta(minutes=30)
+	length = timedelta(minutes=duration)
+
+	cursor = start
+	# Start on the next half hour so suggestions read as times people say.
+	if cursor.minute % 30:
+		cursor += timedelta(minutes=30 - (cursor.minute % 30))
+	cursor = cursor.replace(second=0, microsecond=0)
+
+	while cursor + length <= end and len(slots) < 8:
+		slots.append({"starts_on": str(cursor), "ends_on": str(cursor + length)})
+		cursor += step
+	return slots

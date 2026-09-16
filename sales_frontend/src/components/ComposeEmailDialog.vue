@@ -2,7 +2,7 @@
 	<Dialog
 		:options="{
 			title: dialogTitle,
-			size: '5xl',
+			size: '7xl',
 			actions: [
 				{ label: 'Cancel', variant: 'subtle', onClick: () => emit('update:modelValue', false) },
 				{
@@ -17,7 +17,10 @@
 		@update:model-value="emit('update:modelValue', $event)"
 	>
 		<template #body-content>
-			<div class="space-y-2.5">
+			<!-- Two columns, not a calendar tucked inside the message: picking a
+			     time and writing the mail are separate jobs done side by side. -->
+			<div class="grid grid-cols-[minmax(0,1fr)_22rem] gap-4">
+				<div class="space-y-2.5">
 				<!-- Recipients side by side rather than stacked: the header costs
 				     one row instead of three, leaving the editor room to breathe.
 				     Each field carries its own chip row underneath, so a chip is
@@ -75,45 +78,37 @@
 					/>
 				</div>
 
-				<!-- The body beside a calendar: proposing a time is the commonest
-				     reason to write to a lead, so free slots are right there and
-				     clicking one drops the time into the message. -->
-				<div class="grid grid-cols-[1fr_18rem] gap-3">
-					<TextEditor
-						v-if="modelValue"
-						:content="content"
-						:fixed-menu="editorMenu"
-						placeholder="Write your message…"
-						editor-class="prose-sm dark:prose-invert max-w-none w-full min-h-[200px] max-h-[40vh] overflow-y-auto px-3 py-2 border border-t-0 border-outline-gray-2 rounded-b-lg bg-surface-white"
-						@change="(html) => (content = html)"
-					/>
-					<div class="space-y-1.5">
-						<div class="flex items-center gap-2">
-							<input
-								v-model="calendarDay"
-								type="date"
-								class="form-input h-7 flex-1 rounded border border-outline-gray-2 bg-surface-white px-2 text-xs text-ink-gray-8"
-								aria-label="Day to check for free time"
-							/>
-							<select
-								v-model="calendarDuration"
-								class="form-select h-7 rounded border border-outline-gray-2 bg-surface-white px-1.5 text-xs text-ink-gray-8"
-								aria-label="Appointment length"
-							>
-								<option value="30">30 min</option>
-								<option value="60">1 h</option>
-								<option value="90">1.5 h</option>
-								<option value="120">2 h</option>
-							</select>
-						</div>
-						<DemoCalendarPreview
-							:day="calendarDay"
-							:duration-minutes="calendarDuration"
-							:users="calendarUsers"
-							@propose="insertSlot"
-						/>
-					</div>
+				<!-- Slots picked from the calendar, ready to drop into the message. -->
+				<div v-if="pickedSlots.length" class="flex flex-wrap items-center gap-1.5">
+					<span class="text-xs text-ink-gray-5">Suggested times:</span>
+					<button
+						v-for="slot in pickedSlots"
+						:key="slot.starts_on"
+						type="button"
+						class="flex items-center gap-1 rounded-full bg-surface-green-2 px-2 py-0.5 text-xs text-ink-green-3 hover:bg-surface-green-3"
+						title="Add to the message"
+						@click="insertSlot(slot)"
+					>
+						<span>{{ slotLabel(slot) }}</span>
+						<FeatherIcon name="corner-down-left" class="h-3 w-3" />
+					</button>
+					<button
+						type="button"
+						class="rounded px-1.5 py-0.5 text-xs text-ink-gray-6 hover:bg-surface-gray-2 hover:text-ink-gray-9"
+						@click="insertAllSlots"
+					>
+						Add all
+					</button>
 				</div>
+
+				<TextEditor
+					v-if="modelValue"
+					:content="content"
+					:fixed-menu="editorMenu"
+					placeholder="Write your message…"
+					editor-class="prose-sm dark:prose-invert max-w-none w-full min-h-[240px] max-h-[44vh] overflow-y-auto px-3 py-2 border border-t-0 border-outline-gray-2 rounded-b-lg bg-surface-white"
+					@change="(html) => (content = html)"
+				/>
 
 				<!-- The footer is assembled by the system at send time (Email Account
 				     footer, System Settings' address, the standard footer), so it
@@ -170,7 +165,12 @@
 						Sent from the system and filed against this lead, so replies stay linked.
 					</span>
 				</div>
-				<ErrorMessage :message="error" />
+					<ErrorMessage :message="error" />
+				</div>
+
+				<div class="min-h-[28rem] rounded-md border border-outline-gray-2 bg-surface-white">
+					<AvailabilityWeek :users="calendarUsers" :picked="pickedSlots" @toggle="toggleSlot" />
+				</div>
 			</div>
 		</template>
 	</Dialog>
@@ -187,7 +187,7 @@ const drafts = new Map()
 import { computed, ref, watch } from "vue"
 import { call, FileUploader, TextEditor } from "frappe-ui"
 import EmailRecipientInput from "@/components/EmailRecipientInput.vue"
-import DemoCalendarPreview from "@/components/DemoCalendarPreview.vue"
+import AvailabilityWeek from "@/components/AvailabilityWeek.vue"
 import { formatDate } from "@spa/utils/datetime.js"
 
 const props = defineProps({
@@ -232,9 +232,9 @@ const selectedTemplate = ref("")
 const attachments = ref([])
 const signature = ref("")
 const footer = ref("")
-const calendarDay = ref("")
-const calendarDuration = ref("60")
 const calendarUsers = ref([])
+/** Times chosen in the calendar column, offered as chips to drop in the body. */
+const pickedSlots = ref([])
 /** Which recipient field the chips currently add to. */
 const focusedField = ref("")
 
@@ -340,19 +340,37 @@ async function loadCalendarUsers() {
 	}
 }
 
-/** A clicked slot becomes a sentence in the message — the point of seeing
- *  free time while writing is proposing it. Inserted above the signature. */
-function insertSlot(slot) {
-	// Straight off the slot, so the message says the time the user clicked —
-	// these are naive local stamps, not something to re-interpret in a tz.
-	const line = `<p>${formatDate(slot.starts_on.slice(0, 10))}, ${slot.starts_on.slice(
+/** Straight off the slot, so the message says the time that was picked —
+ *  these are naive local stamps, not something to re-interpret in a tz. */
+function slotLabel(slot) {
+	return `${formatDate(slot.starts_on.slice(0, 10))}, ${slot.starts_on.slice(
 		11,
 		16
-	)}–${slot.ends_on.slice(11, 16)}</p>`
+	)}–${slot.ends_on.slice(11, 16)}`
+}
+
+function toggleSlot(slot) {
+	const exists = pickedSlots.value.some((s) => s.starts_on === slot.starts_on)
+	pickedSlots.value = exists
+		? pickedSlots.value.filter((s) => s.starts_on !== slot.starts_on)
+		: [...pickedSlots.value, slot].sort((a, b) => a.starts_on.localeCompare(b.starts_on))
+}
+
+/** Inserted above the signature, so the message still reads correctly. */
+function insertLines(lines) {
 	const sig = signature.value
 	const body = content.value || ""
+	const html = lines.join("")
 	const at = sig ? body.lastIndexOf(`<p><br></p>${sig}`) : -1
-	content.value = at === -1 ? body + line : body.slice(0, at) + line + body.slice(at)
+	content.value = at === -1 ? body + html : body.slice(0, at) + html + body.slice(at)
+}
+
+function insertSlot(slot) {
+	insertLines([`<p>${slotLabel(slot)}</p>`])
+}
+
+function insertAllSlots() {
+	insertLines(pickedSlots.value.map((slot) => `<p>${slotLabel(slot)}</p>`))
 }
 
 /** The signature is part of the body — editable, and shown where it'll land.
@@ -454,7 +472,7 @@ watch(
 		}
 		error.value = ""
 		focusedField.value = ""
-		calendarDay.value = new Date().toISOString().slice(0, 10)
+		pickedSlots.value = []
 		loadCalendarUsers()
 
 		const draft = drafts.get(draftKey())
