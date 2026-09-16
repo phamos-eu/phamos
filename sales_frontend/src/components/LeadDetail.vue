@@ -193,20 +193,19 @@
 					</div>
 				</div>
 				<div class="flex flex-shrink-0 items-center gap-2 border-b border-outline-gray-2 bg-surface-white px-4 py-2.5">
+					<!-- Icon + colour per type, matching the entries below, so the row
+					     doubles as the stream's legend. -->
 					<button
 						v-for="filter in feedFilters"
 						:key="filter.key"
 						type="button"
-						class="rounded-md px-2.5 py-1 text-sm font-medium"
-						:class="
-							activeFilters.has(filter.key)
-								? 'bg-surface-gray-7 text-ink-white'
-								: 'text-ink-gray-6 hover:bg-surface-gray-2 hover:text-ink-gray-9'
-						"
+						class="flex items-center gap-1.5 rounded-md px-2.5 py-1 text-sm font-medium"
+						:class="activeFilters.has(filter.key) ? filter.on : filter.off"
 						:aria-pressed="activeFilters.has(filter.key)"
 						@click="toggleFilter(filter.key)"
 					>
-						{{ filter.label }}
+						<FeatherIcon :name="filter.icon" class="h-3.5 w-3.5 flex-none" />
+						<span>{{ filter.label }}</span>
 					</button>
 					<span class="ml-auto flex items-center gap-2">
 						<Button variant="subtle" @click="openCompose('new')">New Email</Button>
@@ -250,23 +249,33 @@
 
 							<div
 								v-else
-								class="rounded-md border border-outline-gray-2 bg-surface-white px-3 py-2.5"
-								:class="entry.threadSize > 1 ? 'border-l-2 border-l-blue-400' : ''"
+								class="rounded-md border border-l-2 border-outline-gray-2 bg-surface-white px-3 py-2.5"
+								:class="entryType(entry).accent"
 							>
 								<div class="mb-1.5 flex items-center gap-2 text-xs text-ink-gray-5">
-									<FeatherIcon :name="entryIcon(entry)" class="h-3.5 w-3.5 flex-none text-ink-gray-5" />
+									<FeatherIcon
+										:name="entryIcon(entry)"
+										class="h-3.5 w-3.5 flex-none"
+										:class="entryType(entry).iconColor"
+									/>
 									<Badge :label="entry.badge" :theme="entry.badgeTheme" size="sm" variant="subtle" />
 									<span v-if="entry.author" class="min-w-0 truncate font-medium text-ink-gray-7">
 										{{ entry.author }}
 									</span>
 									<span class="whitespace-nowrap">{{ formatDatetime(entry.date) }}</span>
-									<Badge
+									<button
 										v-if="entry.threadSize > 1"
-										:label="`Thread · ${entry.threadSize}`"
-										theme="blue"
-										size="sm"
-										variant="subtle"
-									/>
+										type="button"
+										class="flex flex-none items-center gap-1 rounded bg-blue-50 px-1.5 py-0.5 text-xs font-medium text-blue-700 hover:bg-blue-100 dark:bg-blue-900 dark:text-blue-300"
+										:aria-expanded="openThreads.has(entry.threadKey)"
+										@click="toggleThread(entry.threadKey)"
+									>
+										<FeatherIcon
+											:name="openThreads.has(entry.threadKey) ? 'chevron-down' : 'chevron-right'"
+											class="h-3 w-3"
+										/>
+										<span>{{ entry.threadSize }} messages</span>
+									</button>
 									<button
 										v-if="entry.type === 'notes'"
 										type="button"
@@ -298,10 +307,66 @@
 
 								<template v-if="entry.type === 'communications'">
 									<div class="text-sm font-medium text-ink-gray-9">{{ entry.subject || "(no subject)" }}</div>
-									<div v-if="entry.recipients" class="mt-0.5 truncate text-xs text-ink-gray-5">
-										to {{ entry.recipients }}
+
+									<!-- Folded: the latest message, rendered as it was written and
+									     given real room — enough to read rather than guess at. -->
+									<template v-if="!openThreads.has(entry.threadKey)">
+										<div v-if="entry.recipients" class="mt-0.5 truncate text-xs text-ink-gray-5">
+											to {{ entry.recipients }}
+										</div>
+										<EmailBody class="mt-1.5" :html="entry.communication.content_html" />
+										<button
+											v-if="entry.threadSize > 1"
+											type="button"
+											class="mt-1 text-xs font-medium text-blue-700 hover:underline dark:text-blue-400"
+											@click="toggleThread(entry.threadKey)"
+										>
+											Show {{ entry.threadSize - 1 }} earlier
+											{{ entry.threadSize === 2 ? "message" : "messages" }}
+										</button>
+									</template>
+
+									<!-- Unfolded: every message in the conversation, newest first. -->
+									<div v-else class="mt-2 space-y-2">
+										<div
+											v-for="message in entry.messages"
+											:key="message.name"
+											class="rounded border border-outline-gray-2 px-2.5 py-2"
+										>
+											<div class="mb-1 flex flex-wrap items-center gap-2 text-xs text-ink-gray-5">
+												<Badge
+													:label="message.sent_or_received === 'Sent' ? 'Sent' : 'Received'"
+													:theme="message.sent_or_received === 'Sent' ? 'blue' : 'green'"
+													size="sm"
+													variant="subtle"
+												/>
+												<span class="min-w-0 truncate font-medium text-ink-gray-7">{{ message.sender }}</span>
+												<span class="whitespace-nowrap">{{ formatDatetime(message.communication_date) }}</span>
+												<span class="ml-auto flex flex-none items-center gap-1">
+													<button
+														type="button"
+														title="Reply"
+														class="rounded p-1 text-ink-gray-6 hover:bg-surface-gray-2 hover:text-ink-gray-9"
+														@click="openCompose('reply', message)"
+													>
+														<FeatherIcon name="corner-up-left" class="h-3.5 w-3.5" />
+													</button>
+													<button
+														type="button"
+														title="Forward"
+														class="rounded p-1 text-ink-gray-6 hover:bg-surface-gray-2 hover:text-ink-gray-9"
+														@click="openCompose('forward', message)"
+													>
+														<FeatherIcon name="corner-up-right" class="h-3.5 w-3.5" />
+													</button>
+												</span>
+											</div>
+											<div v-if="message.recipients" class="mb-1 truncate text-xs text-ink-gray-5">
+												to {{ message.recipients }}
+											</div>
+											<EmailBody :html="message.content_html" max-height-class="max-h-[22vh]" />
+										</div>
 									</div>
-									<div class="mt-1 line-clamp-3 text-xs text-ink-gray-6">{{ entry.body }}</div>
 								</template>
 
 								<template v-else-if="entry.type === 'demos'">
@@ -487,6 +552,7 @@ import AddLeadNoteDialog from "./AddLeadNoteDialog.vue"
 import CreateDemoDialog from "./CreateDemoDialog.vue"
 import EditLeadNoteDialog from "./EditLeadNoteDialog.vue"
 import ComposeEmailDialog from "./ComposeEmailDialog.vue"
+import EmailBody from "./EmailBody.vue"
 
 const API = "phamos.api.sales_leads"
 const DEMOS_API = "phamos.api.sales_demos"
@@ -587,12 +653,57 @@ const activities = ref([])
 // including all three at once, can be visible together.
 const activeFilters = ref(new Set(["communications", "demos"]))
 
-const feedFilters = [
-	{ key: "communications", label: "Communication" },
-	{ key: "notes", label: "Notes" },
-	{ key: "activities", label: "Activities" },
-	{ key: "demos", label: "Demos" },
-]
+/**
+ * Each entry type owns an icon and a colour, used identically on the filter
+ * chip and on the entries themselves, so the toggle reads as a legend for the
+ * stream below it.
+ */
+const FEED_TYPES = {
+	communications: {
+		label: "Communication",
+		icon: "mail",
+		on: "bg-blue-600 text-white",
+		off: "text-blue-700 hover:bg-blue-50 dark:text-blue-400",
+		accent: "border-l-blue-500",
+		iconColor: "text-blue-600",
+	},
+	notes: {
+		label: "Notes",
+		icon: "message-square",
+		on: "bg-amber-600 text-white",
+		off: "text-amber-700 hover:bg-amber-50 dark:text-amber-400",
+		accent: "border-l-amber-500",
+		iconColor: "text-amber-600",
+	},
+	activities: {
+		label: "Activities",
+		icon: "git-commit",
+		on: "bg-gray-700 text-white",
+		off: "text-ink-gray-6 hover:bg-surface-gray-2",
+		accent: "border-l-gray-400",
+		iconColor: "text-ink-gray-5",
+	},
+	demos: {
+		label: "Demos",
+		icon: "monitor",
+		on: "bg-purple-600 text-white",
+		off: "text-purple-700 hover:bg-purple-50 dark:text-purple-400",
+		accent: "border-l-purple-500",
+		iconColor: "text-purple-600",
+	},
+}
+
+const feedFilters = Object.entries(FEED_TYPES).map(([key, type]) => ({ key, ...type }))
+
+/** Threads the user has opened, by thread key. */
+const openThreads = ref(new Set())
+
+function toggleThread(key) {
+	const next = new Set(openThreads.value)
+	if (next.has(key)) next.delete(key)
+	else next.add(key)
+	openThreads.value = next
+}
 
 function toggleFilter(key) {
 	const next = new Set(activeFilters.value)
@@ -606,20 +717,33 @@ const timeline = computed(() => {
 	const entries = []
 
 	if (activeFilters.value.has("communications")) {
+		// One entry per conversation, not per message: a thread is the unit
+		// people think in, and stacking it keeps a long back-and-forth from
+		// burying everything else in the stream.
+		const threads = new Map()
 		for (const comm of communications.value) {
+			const key = comm.thread_key || comm.name
+			if (!threads.has(key)) threads.set(key, [])
+			threads.get(key).push(comm)
+		}
+
+		for (const [key, messages] of threads) {
+			// Backend returns newest first; keep that order inside the thread.
+			const latest = messages[0]
 			entries.push({
-				key: `communication:${comm.name}`,
+				key: `thread:${key}`,
 				type: "communications",
-				date: comm.communication_date,
-				badge: comm.sent_or_received === "Sent" ? "Sent" : "Received",
-				badgeTheme: comm.sent_or_received === "Sent" ? "blue" : "green",
-				author: comm.sender,
-				sender: comm.sender,
-				recipients: comm.recipients,
-				subject: comm.subject,
-				threadSize: comm.thread_size || 1,
-				communication: comm,
-				body: stripHtml(comm.content),
+				date: latest.communication_date,
+				badge: latest.sent_or_received === "Sent" ? "Sent" : "Received",
+				badgeTheme: latest.sent_or_received === "Sent" ? "blue" : "green",
+				author: latest.sender,
+				sender: latest.sender,
+				recipients: latest.recipients,
+				subject: latest.subject,
+				threadSize: messages.length,
+				threadKey: key,
+				messages,
+				communication: latest,
 			})
 		}
 	}
@@ -707,11 +831,12 @@ function activityDetail(entry) {
 	return entry.body || ""
 }
 
+function entryType(entry) {
+	return FEED_TYPES[entry.type] || FEED_TYPES.activities
+}
+
 function entryIcon(entry) {
-	if (entry.type === "communications") return "mail"
-	if (entry.type === "notes") return "message-square"
-	if (entry.type === "demos") return "monitor"
-	return "git-commit"
+	return entryType(entry).icon
 }
 
 // Resolved server-side by check_website_embeddable (normalized + redirects
@@ -1162,3 +1287,4 @@ watch(
 	}
 )
 </script>
+

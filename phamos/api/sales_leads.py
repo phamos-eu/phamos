@@ -14,6 +14,7 @@ import frappe
 import requests
 from frappe import _
 from frappe.utils import get_datetime, getdate, now_datetime
+from frappe.utils.html_utils import clean_email_html
 
 from phamos.api.department_cockpit import _user_images, _user_label, role_shortlist_users
 from phamos.phamos.page.sales_action_panel.sales_action_panel import LEAD_STATUSES
@@ -1091,6 +1092,11 @@ def get_lead_activity(name):
 		thread_counts[row["thread_key"]] = thread_counts.get(row["thread_key"], 0) + 1
 	for row in communications:
 		row["thread_size"] = thread_counts[row["thread_key"]]
+		# The message as it was actually written, not a flattened transcript of
+		# it. Inbound mail is untrusted HTML, so it goes through Frappe's own
+		# email cleaner (script/style stripped, CSS limited to an allowlist)
+		# before the cockpit renders it.
+		row["content_html"] = clean_email_html(row.get("content") or "")
 
 	return {
 		"notes": _serialize_notes(doc),
