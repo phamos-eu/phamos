@@ -2,8 +2,142 @@
 	<div class="flex h-full min-h-0 w-full">
 		<div v-if="loading" class="flex flex-1 items-center justify-center text-sm text-ink-gray-5">Loading…</div>
 		<template v-else-if="lead">
+			<!-- Master data: company/contact identity + firmographics. Rarely changes; read-only here. -->
+			<section class="w-72 flex-none space-y-4 overflow-y-auto border-r border-outline-gray-2 bg-surface-white p-4 text-sm">
+				<div>
+					<div class="text-[11px] font-semibold uppercase tracking-wide text-ink-gray-6">Company</div>
+					<div class="text-ink-gray-8">{{ lead.company_name || "—" }}</div>
+				</div>
+				<div>
+					<div class="text-[11px] font-semibold uppercase tracking-wide text-ink-gray-6">Website</div>
+					<div class="truncate text-ink-gray-8">{{ lead.website || "—" }}</div>
+				</div>
+				<div>
+					<div class="text-[11px] font-semibold uppercase tracking-wide text-ink-gray-6">Location</div>
+					<div class="text-ink-gray-8">{{ locationLabel }}</div>
+				</div>
+				<div>
+					<div class="text-[11px] font-semibold uppercase tracking-wide text-ink-gray-6">Territory</div>
+					<div class="text-ink-gray-8">{{ lead.territory || "—" }}</div>
+				</div>
+				<div>
+					<div class="text-[11px] font-semibold uppercase tracking-wide text-ink-gray-6">Source</div>
+					<div class="text-ink-gray-8">{{ lead.source || "—" }}</div>
+				</div>
+				<div>
+					<div class="text-[11px] font-semibold uppercase tracking-wide text-ink-gray-6">Industry</div>
+					<div class="text-ink-gray-8">{{ lead.industry || "—" }}</div>
+				</div>
+				<div>
+					<div class="text-[11px] font-semibold uppercase tracking-wide text-ink-gray-6">No. of Employees</div>
+					<div class="text-ink-gray-8">{{ lead.no_of_employees || "—" }}</div>
+				</div>
+				<div>
+					<div class="text-[11px] font-semibold uppercase tracking-wide text-ink-gray-6">Market Segment</div>
+					<div class="text-ink-gray-8">{{ lead.market_segment || "—" }}</div>
+				</div>
+				<div>
+					<div class="text-[11px] font-semibold uppercase tracking-wide text-ink-gray-6">Annual Revenue</div>
+					<div class="text-ink-gray-8">{{ lead.annual_revenue ?? "—" }}</div>
+				</div>
+				<div>
+					<div class="text-[11px] font-semibold uppercase tracking-wide text-ink-gray-6">Request Type</div>
+					<div class="text-ink-gray-8">{{ lead.request_type || "—" }}</div>
+				</div>
+				<a
+					:href="lead.desk_url"
+					class="flex w-full items-center gap-2 rounded-md px-2 py-2 text-sm font-medium text-ink-gray-7 hover:bg-surface-gray-2 hover:text-ink-gray-9"
+				>
+					<FeatherIcon name="external-link" class="h-4 w-4 flex-shrink-0" />
+					<span class="truncate">Open in Desk</span>
+				</a>
+			</section>
+
+			<!-- Communication / Notes / Activities feed — independent show/hide toggles, not exclusive tabs, so any combination (including all three) can be visible at once. -->
+			<section class="flex min-w-0 flex-1 flex-col overflow-hidden bg-surface-gray-1">
+				<div class="flex flex-shrink-0 items-center gap-2 border-b border-outline-gray-2 bg-surface-white px-4 py-2.5">
+					<button
+						v-for="filter in feedFilters"
+						:key="filter.key"
+						type="button"
+						class="rounded-md px-2.5 py-1 text-sm font-medium"
+						:class="
+							activeFilters.has(filter.key)
+								? 'bg-surface-gray-7 text-ink-white'
+								: 'text-ink-gray-6 hover:bg-surface-gray-2 hover:text-ink-gray-9'
+						"
+						:aria-pressed="activeFilters.has(filter.key)"
+						@click="toggleFilter(filter.key)"
+					>
+						{{ filter.label }}
+					</button>
+				</div>
+				<div class="min-h-0 flex-1 overflow-y-auto p-4">
+					<div v-if="activityLoading" class="flex items-center justify-center py-16 text-sm text-ink-gray-5">
+						Loading…
+					</div>
+					<div v-else-if="!activeFilters.size" class="flex items-center justify-center py-16 text-sm text-ink-gray-5">
+						Select Communication, Notes, or Activities to view.
+					</div>
+					<div v-else class="space-y-6">
+						<section v-if="activeFilters.has('communications')">
+							<div class="mb-2 text-[11px] font-semibold uppercase tracking-wide text-ink-gray-6">Communication</div>
+							<div v-if="!communications.length" class="text-sm text-ink-gray-5">No communication logged yet.</div>
+							<div v-else class="space-y-3">
+								<div v-for="comm in communications" :key="comm.name" class="rounded-md border border-outline-gray-2 bg-surface-white px-3 py-2">
+									<div class="mb-1 flex items-center gap-2 text-xs text-ink-gray-5">
+										<Badge
+											:label="comm.sent_or_received === 'Sent' ? 'Sent' : 'Received'"
+											:theme="comm.sent_or_received === 'Sent' ? 'blue' : 'green'"
+											size="sm"
+											variant="subtle"
+										/>
+										<span>{{ formatDatetime(comm.communication_date) }}</span>
+									</div>
+									<div class="text-sm font-medium text-ink-gray-9">{{ comm.subject || "(no subject)" }}</div>
+									<div class="mt-0.5 truncate text-xs text-ink-gray-6">{{ stripHtml(comm.content) }}</div>
+								</div>
+							</div>
+						</section>
+
+						<section v-if="activeFilters.has('notes')">
+							<div class="mb-2 text-[11px] font-semibold uppercase tracking-wide text-ink-gray-6">Notes</div>
+							<div v-if="!notes.length" class="text-sm text-ink-gray-5">No notes yet.</div>
+							<div v-else class="space-y-3">
+								<div v-for="note in notes" :key="note.name" class="rounded-md border border-outline-gray-2 bg-surface-white px-3 py-2">
+									<div class="mb-1 flex items-center gap-2 text-xs text-ink-gray-5">
+										<span class="font-medium text-ink-gray-7">{{ note.added_by_name || note.added_by }}</span>
+										<span>{{ formatDatetime(note.added_on) }}</span>
+									</div>
+									<div class="whitespace-pre-wrap text-sm text-ink-gray-8">{{ stripHtml(note.note) }}</div>
+								</div>
+							</div>
+						</section>
+
+						<section v-if="activeFilters.has('activities')">
+							<div class="mb-2 text-[11px] font-semibold uppercase tracking-wide text-ink-gray-6">Activities</div>
+							<div v-if="!activities.length" class="text-sm text-ink-gray-5">No activity recorded yet.</div>
+							<div v-else class="space-y-3">
+								<div v-for="(activity, index) in activities" :key="index" class="rounded-md border border-outline-gray-2 bg-surface-white px-3 py-2 text-sm">
+									<div class="mb-1 flex items-center gap-2 text-xs text-ink-gray-5">
+										<span class="font-medium text-ink-gray-7">{{ activity.owner || "—" }}</span>
+										<span>{{ formatDatetime(activity.creation) }}</span>
+									</div>
+									<div v-if="activity.kind === 'field_change'" class="text-ink-gray-8">
+										Changed <span class="font-medium">{{ activity.label }}</span> from
+										<span class="font-medium">{{ activity.old || "—" }}</span> to
+										<span class="font-medium">{{ activity.new || "—" }}</span>
+									</div>
+									<div v-else class="text-ink-gray-8">{{ stripHtml(activity.content) }}</div>
+								</div>
+							</div>
+						</section>
+					</div>
+				</div>
+			</section>
+
 			<!-- Transactional data: changes on every follow-up, inline-editable with autosave. -->
-			<section class="flex w-72 flex-none flex-col gap-5 overflow-y-auto border-r border-outline-gray-2 bg-surface-white p-4">
+			<section class="flex w-72 flex-none flex-col gap-5 overflow-y-auto border-l border-outline-gray-2 bg-surface-white p-4">
 				<section>
 					<div class="mb-2 text-[11px] font-semibold uppercase tracking-wide text-ink-gray-6">Status</div>
 					<div class="flex flex-wrap items-center gap-2">
@@ -72,133 +206,6 @@
 				</section>
 
 				<Button variant="subtle" @click="showNoteDialog = true">Add note</Button>
-			</section>
-
-			<!-- Master data: company/contact identity + firmographics. Rarely changes; read-only here. -->
-			<section class="w-72 flex-none space-y-4 overflow-y-auto border-r border-outline-gray-2 bg-surface-white p-4 text-sm">
-				<div>
-					<div class="text-[11px] font-semibold uppercase tracking-wide text-ink-gray-6">Company</div>
-					<div class="text-ink-gray-8">{{ lead.company_name || "—" }}</div>
-				</div>
-				<div>
-					<div class="text-[11px] font-semibold uppercase tracking-wide text-ink-gray-6">Website</div>
-					<div class="truncate text-ink-gray-8">{{ lead.website || "—" }}</div>
-				</div>
-				<div>
-					<div class="text-[11px] font-semibold uppercase tracking-wide text-ink-gray-6">Location</div>
-					<div class="text-ink-gray-8">{{ locationLabel }}</div>
-				</div>
-				<div>
-					<div class="text-[11px] font-semibold uppercase tracking-wide text-ink-gray-6">Territory</div>
-					<div class="text-ink-gray-8">{{ lead.territory || "—" }}</div>
-				</div>
-				<div>
-					<div class="text-[11px] font-semibold uppercase tracking-wide text-ink-gray-6">Source</div>
-					<div class="text-ink-gray-8">{{ lead.source || "—" }}</div>
-				</div>
-				<div>
-					<div class="text-[11px] font-semibold uppercase tracking-wide text-ink-gray-6">Industry</div>
-					<div class="text-ink-gray-8">{{ lead.industry || "—" }}</div>
-				</div>
-				<div>
-					<div class="text-[11px] font-semibold uppercase tracking-wide text-ink-gray-6">No. of Employees</div>
-					<div class="text-ink-gray-8">{{ lead.no_of_employees || "—" }}</div>
-				</div>
-				<div>
-					<div class="text-[11px] font-semibold uppercase tracking-wide text-ink-gray-6">Market Segment</div>
-					<div class="text-ink-gray-8">{{ lead.market_segment || "—" }}</div>
-				</div>
-				<div>
-					<div class="text-[11px] font-semibold uppercase tracking-wide text-ink-gray-6">Annual Revenue</div>
-					<div class="text-ink-gray-8">{{ lead.annual_revenue ?? "—" }}</div>
-				</div>
-				<div>
-					<div class="text-[11px] font-semibold uppercase tracking-wide text-ink-gray-6">Request Type</div>
-					<div class="text-ink-gray-8">{{ lead.request_type || "—" }}</div>
-				</div>
-				<a
-					:href="lead.desk_url"
-					class="flex w-full items-center gap-2 rounded-md px-2 py-2 text-sm font-medium text-ink-gray-7 hover:bg-surface-gray-2 hover:text-ink-gray-9"
-				>
-					<FeatherIcon name="external-link" class="h-4 w-4 flex-shrink-0" />
-					<span class="truncate">Open in Desk</span>
-				</a>
-			</section>
-
-			<!-- Communication / Notes / Activities feed. -->
-			<section class="flex min-w-0 flex-1 flex-col overflow-hidden bg-surface-gray-1">
-				<div class="flex flex-shrink-0 items-center gap-2 border-b border-outline-gray-2 bg-surface-white px-4 py-2.5">
-					<button
-						v-for="tab in tabs"
-						:key="tab.key"
-						type="button"
-						class="rounded-md px-2.5 py-1 text-sm font-medium"
-						:class="
-							activeTab === tab.key
-								? 'bg-surface-gray-7 text-ink-white'
-								: 'text-ink-gray-6 hover:bg-surface-gray-2 hover:text-ink-gray-9'
-						"
-						@click="activeTab = tab.key"
-					>
-						{{ tab.label }}
-					</button>
-				</div>
-				<div class="min-h-0 flex-1 overflow-y-auto p-4">
-					<div v-if="activityLoading" class="flex items-center justify-center py-16 text-sm text-ink-gray-5">
-						Loading…
-					</div>
-					<template v-else>
-						<div v-if="activeTab === 'communications'">
-							<div v-if="!communications.length" class="text-sm text-ink-gray-5">No communication logged yet.</div>
-							<div v-else class="space-y-3">
-								<div v-for="comm in communications" :key="comm.name" class="rounded-md border border-outline-gray-2 bg-surface-white px-3 py-2">
-									<div class="mb-1 flex items-center gap-2 text-xs text-ink-gray-5">
-										<Badge
-											:label="comm.sent_or_received === 'Sent' ? 'Sent' : 'Received'"
-											:theme="comm.sent_or_received === 'Sent' ? 'blue' : 'green'"
-											size="sm"
-											variant="subtle"
-										/>
-										<span>{{ formatDatetime(comm.communication_date) }}</span>
-									</div>
-									<div class="text-sm font-medium text-ink-gray-9">{{ comm.subject || "(no subject)" }}</div>
-									<div class="mt-0.5 truncate text-xs text-ink-gray-6">{{ stripHtml(comm.content) }}</div>
-								</div>
-							</div>
-						</div>
-
-						<div v-else-if="activeTab === 'notes'">
-							<div v-if="!notes.length" class="text-sm text-ink-gray-5">No notes yet.</div>
-							<div v-else class="space-y-3">
-								<div v-for="note in notes" :key="note.name" class="rounded-md border border-outline-gray-2 bg-surface-white px-3 py-2">
-									<div class="mb-1 flex items-center gap-2 text-xs text-ink-gray-5">
-										<span class="font-medium text-ink-gray-7">{{ note.added_by_name || note.added_by }}</span>
-										<span>{{ formatDatetime(note.added_on) }}</span>
-									</div>
-									<div class="whitespace-pre-wrap text-sm text-ink-gray-8">{{ stripHtml(note.note) }}</div>
-								</div>
-							</div>
-						</div>
-
-						<div v-else>
-							<div v-if="!activities.length" class="text-sm text-ink-gray-5">No activity recorded yet.</div>
-							<div v-else class="space-y-3">
-								<div v-for="(activity, index) in activities" :key="index" class="rounded-md border border-outline-gray-2 bg-surface-white px-3 py-2 text-sm">
-									<div class="mb-1 flex items-center gap-2 text-xs text-ink-gray-5">
-										<span class="font-medium text-ink-gray-7">{{ activity.owner || "—" }}</span>
-										<span>{{ formatDatetime(activity.creation) }}</span>
-									</div>
-									<div v-if="activity.kind === 'field_change'" class="text-ink-gray-8">
-										Changed <span class="font-medium">{{ activity.label }}</span> from
-										<span class="font-medium">{{ activity.old || "—" }}</span> to
-										<span class="font-medium">{{ activity.new || "—" }}</span>
-									</div>
-									<div v-else class="text-ink-gray-8">{{ stripHtml(activity.content) }}</div>
-								</div>
-							</div>
-						</div>
-					</template>
-				</div>
 			</section>
 		</template>
 	</div>
@@ -280,13 +287,22 @@ const activityLoading = ref(false)
 const notes = ref([])
 const communications = ref([])
 const activities = ref([])
-const activeTab = ref("communications")
+// Independent show/hide toggles (not exclusive tabs) — any combination,
+// including all three at once, can be visible together.
+const activeFilters = ref(new Set(["communications"]))
 
-const tabs = [
+const feedFilters = [
 	{ key: "communications", label: "Communication" },
 	{ key: "notes", label: "Notes" },
 	{ key: "activities", label: "Activities" },
 ]
+
+function toggleFilter(key) {
+	const next = new Set(activeFilters.value)
+	if (next.has(key)) next.delete(key)
+	else next.add(key)
+	activeFilters.value = next
+}
 
 const hasPrevious = computed(() => props.position > 1)
 const hasNext = computed(() => props.position > 0 && props.position < props.total)
@@ -423,7 +439,6 @@ onBeforeUnmount(() => {
 watch(
 	() => props.name,
 	() => {
-		activeTab.value = "communications"
 		loadAll()
 	}
 )
