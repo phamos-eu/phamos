@@ -86,6 +86,19 @@
 					/>
 				</div>
 
+				<!-- The footer is assembled by the system at send time (Email Account
+				     footer, System Settings' address, the standard footer), so it
+				     can't be edited here — but it does go out, so show it. -->
+				<details v-if="footer" class="rounded border border-outline-gray-2 bg-surface-gray-1 px-2.5 py-1.5">
+					<summary class="cursor-pointer select-none text-xs text-ink-gray-5">
+						Footer added when sent
+					</summary>
+					<div
+						class="mt-1.5 max-h-24 overflow-y-auto border-t border-outline-gray-2 pt-1.5 text-xs text-ink-gray-6 [&_a]:underline"
+						v-html="footer"
+					/>
+				</details>
+
 				<div class="flex flex-wrap items-center gap-1.5">
 					<FileUploader
 						:upload-args="{
@@ -186,6 +199,8 @@ const suggestions = ref([])
 const templates = ref([])
 const selectedTemplate = ref("")
 const attachments = ref([])
+const signature = ref("")
+const footer = ref("")
 /** Which recipient field the chips currently add to. */
 const focusedField = ref("")
 
@@ -259,7 +274,7 @@ async function applyTemplate() {
 		// Templates carry their own subject; keep a subject the user already
 		// typed (a reply's Re: line) rather than overwriting it.
 		if (rendered.subject && !subject.value.trim()) subject.value = rendered.subject
-		content.value = rendered.message || ""
+		content.value = withSignature(rendered.message || "")
 	} catch (e) {
 		error.value = e?.messages?.[0] || e?.message || "Could not load that template"
 	}
@@ -272,10 +287,22 @@ async function loadContext() {
 		})
 		suggestions.value = context.suggestions || []
 		templates.value = context.templates || []
+		signature.value = context.signature || ""
+		footer.value = context.footer || ""
 	} catch (e) {
 		suggestions.value = []
 		templates.value = []
+		signature.value = ""
+		footer.value = ""
 	}
+}
+
+/** The signature is part of the body — editable, and shown where it'll land.
+ *  (The footer isn't: the system adds it at send time, so it's a preview.) */
+function withSignature(html) {
+	const sig = signature.value
+	if (!sig || (html || "").includes(sig)) return html || ""
+	return `${html || ""}<p><br></p>${sig}`
 }
 
 const dialogTitle = computed(() => {
@@ -328,7 +355,7 @@ function draftKey() {
 function stashDraft() {
 	const defaults = defaultValues()
 	const untouched =
-		!content.value.trim() &&
+		content.value === withSignature(defaults.content) &&
 		!attachments.value.length &&
 		!cc.value.trim() &&
 		!bcc.value.trim() &&
@@ -369,8 +396,13 @@ watch(
 		}
 		error.value = ""
 		focusedField.value = ""
-		loadContext()
-		restore(drafts.get(draftKey()) || defaultValues())
+
+		const draft = drafts.get(draftKey())
+		restore(draft || defaultValues())
+		loadContext().then(() => {
+			// A draft already carries whatever the user did with the signature.
+			if (!draft) content.value = withSignature(content.value)
+		})
 	}
 )
 
@@ -398,9 +430,11 @@ async function submit() {
 			// Threads the reply to the original message, not just by subject.
 			in_reply_to: props.mode === "reply" ? props.source?.name : null,
 		})
-		// Sent, so there's nothing left to pick back up.
+		// Sent, so there's nothing left to pick back up. Reset to the defaults
+		// the dialog would open with, so closing doesn't stash them back.
 		drafts.delete(draftKey())
 		restore(defaultValues())
+		content.value = withSignature(content.value)
 		emit("sent")
 		emit("update:modelValue", false)
 	} catch (e) {

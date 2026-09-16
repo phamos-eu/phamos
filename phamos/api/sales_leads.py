@@ -692,10 +692,54 @@ def get_lead_email_context(lead):
 		limit_page_length=100,
 	)
 
+	signature, footer = _email_signature_and_footer()
+
 	return {
 		"suggestions": _contact_suggestions(lead, lead_doc),
 		"templates": templates,
+		"signature": signature,
+		"footer": footer,
 	}
+
+
+def _email_signature_and_footer():
+	"""What gets appended to an outgoing mail, so the dialog can show it.
+
+	Two different things, and they behave differently: the signature is part
+	of the body and the user can edit it, while the footer is assembled by
+	Frappe at send time (Email Account footer, System Settings' address and
+	the standard footer) and can only be previewed.
+	"""
+	from frappe.email.doctype.email_account.email_account import EmailAccount
+	from frappe.email.email_body import get_footer
+
+	email_account = None
+	try:
+		# The same order Frappe resolves an outgoing account in: an account that
+		# appends to Lead, else the default outgoing one. `find_outgoing` wraps
+		# its result in a dict, so go through the two lookups it uses.
+		email_account = EmailAccount.find_one_by_filters(
+			enable_outgoing=1, enable_incoming=1, append_to="Lead"
+		) or EmailAccount.find_default_outgoing()
+	except Exception:
+		# No outgoing account configured is a normal state on a fresh site;
+		# it only means there's no account-level footer to show.
+		pass
+
+	signature = frappe.db.get_value("User", frappe.session.user, "email_signature")
+	if not signature and email_account and email_account.get("add_signature"):
+		signature = email_account.get("signature")
+
+	signature = (signature or "").strip()
+	if signature and "<" not in signature:
+		signature = signature.replace("\n", "<br>")
+
+	try:
+		footer = get_footer(email_account) or ""
+	except Exception:
+		footer = ""
+
+	return signature, footer.strip()
 
 
 @frappe.whitelist()
