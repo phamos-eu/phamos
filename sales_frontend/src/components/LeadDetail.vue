@@ -232,11 +232,14 @@
 						<FeatherIcon :name="filter.icon" class="h-3.5 w-3.5 flex-none" />
 						<span>{{ filter.label }}</span>
 					</button>
-					<span class="ml-auto flex items-center gap-2">
-						<Button variant="subtle" @click="openCompose('new')">New Email</Button>
-						<Button variant="subtle" @click="showNoteDialog = true">Add note</Button>
-						<Button variant="subtle" @click="showDemoDialog = true">Create Demo</Button>
-					</span>
+					<!-- One button rather than one per thing that can be created: the
+					     row is a filter row, and it shouldn't grow with every new type. -->
+					<Dropdown class="ml-auto" :options="createOptions" placement="right">
+						<Button variant="solid" :loading="creating">
+							<template #prefix><FeatherIcon name="plus" class="h-4 w-4" /></template>
+							Create
+						</Button>
+					</Dropdown>
 				</div>
 				<div class="min-h-0 flex-1 overflow-y-auto p-4">
 					<div v-if="activityLoading" class="flex items-center justify-center py-16 text-sm text-ink-gray-5">
@@ -394,7 +397,9 @@
 									</div>
 								</template>
 
-								<template v-else-if="entry.type === 'demos'">
+								<!-- Demos, opportunities and quotations are records elsewhere:
+								     a titled link plus the one line that says where it stands. -->
+								<template v-else-if="['demos', 'opportunities', 'quotations'].includes(entry.type)">
 									<a
 										:href="entry.url"
 										class="text-sm font-medium text-ink-gray-9 underline-offset-2 hover:underline"
@@ -573,7 +578,7 @@
 
 <script setup>
 import { computed, nextTick, onMounted, ref, watch } from "vue"
-import { call, debounce, toast, Badge, DatePicker } from "frappe-ui"
+import { call, debounce, toast, Badge, DatePicker, Dropdown } from "frappe-ui"
 import { formatDate, formatDatetime } from "@spa/utils/datetime"
 import {
 	LEAD_STATUSES,
@@ -609,6 +614,43 @@ const showNoteDialog = ref(false)
 const contacts = ref([])
 const selectedContact = ref(null)
 const showContactDialog = ref(false)
+const creating = ref(false)
+
+/** Icons match the feed types, so the menu and the stream name things alike. */
+const createOptions = computed(() => [
+	{ label: "Email", icon: "mail", onClick: () => openCompose("new") },
+	{ label: "Note", icon: "message-square", onClick: () => (showNoteDialog.value = true) },
+	{ label: "Demo", icon: "monitor", onClick: () => (showDemoDialog.value = true) },
+	{ label: "Opportunity", icon: "target", onClick: createOpportunity },
+	{ label: "Quotation", icon: "file-text", onClick: createQuotation },
+])
+
+/** An Opportunity is valid without items, so it's raised here and opened to fill in. */
+async function createOpportunity() {
+	if (creating.value) return
+	creating.value = true
+	try {
+		const result = await call(`${API}.create_lead_opportunity`, { lead: props.name })
+		loadActivity()
+		toast({ title: `Opportunity ${result.name} created`, icon: "check", iconClasses: "text-ink-green-3" })
+		window.open(result.url, "_blank", "noopener")
+	} catch (e) {
+		toast({
+			title: e?.messages?.[0] || e?.message || "Could not create the opportunity",
+			icon: "x-circle",
+			iconClasses: "text-ink-red-4",
+		})
+	} finally {
+		creating.value = false
+	}
+}
+
+/** A Quotation can't be saved without items, so this hands over to the Desk
+ *  form with the lead already filled in rather than creating something invalid. */
+function createQuotation() {
+	const params = new URLSearchParams({ quotation_to: "Lead", party_name: props.name })
+	window.open(`/app/quotation/new?${params.toString()}`, "_blank", "noopener")
+}
 const composePrefill = ref("")
 const showWebsiteDialog = ref(false)
 const showDemoDialog = ref(false)
@@ -629,6 +671,8 @@ const leadOwner = ref("")
 // Local working copy of the Lead's Next Steps child table; saved as a whole
 // (see set_lead_next_steps) rather than row by row.
 const demos = ref([])
+const opportunities = ref([])
+const quotations = ref([])
 const modules = ref([])
 const plannedStart = ref("")
 const hoursPredictions = ref([])
@@ -692,7 +736,7 @@ const communications = ref([])
 const activities = ref([])
 // Independent show/hide toggles (not exclusive tabs) — any combination,
 // including all three at once, can be visible together.
-const activeFilters = ref(new Set(["communications", "demos"]))
+const activeFilters = ref(new Set(["communications", "demos", "opportunities", "quotations"]))
 
 /**
  * Each entry type owns an icon and a colour, used identically on the filter
@@ -731,6 +775,22 @@ const FEED_TYPES = {
 		off: "text-purple-700 hover:bg-purple-50 dark:text-purple-400",
 		accent: "border-l-purple-500",
 		iconColor: "text-purple-600",
+	},
+	opportunities: {
+		label: "Opportunities",
+		icon: "target",
+		on: "bg-teal-600 text-white",
+		off: "text-teal-700 hover:bg-teal-50 dark:text-teal-400",
+		accent: "border-l-teal-500",
+		iconColor: "text-teal-600",
+	},
+	quotations: {
+		label: "Quotations",
+		icon: "file-text",
+		on: "bg-green-700 text-white",
+		off: "text-green-700 hover:bg-green-50 dark:text-green-400",
+		accent: "border-l-green-600",
+		iconColor: "text-green-700",
 	},
 }
 
@@ -822,6 +882,43 @@ const timeline = computed(() => {
 		}
 	}
 
+	if (activeFilters.value.has("opportunities")) {
+		for (const opportunity of opportunities.value) {
+			entries.push({
+				key: `opportunity:${opportunity.name}`,
+				type: "opportunities",
+				date: opportunity.transaction_date || opportunity.modified,
+				badge: opportunity.status,
+				badgeTheme: "green",
+				subject: opportunity.name,
+				body: [opportunity.sales_stage, formatAmount(opportunity.opportunity_amount, opportunity.currency)]
+					.filter(Boolean)
+					.join(" · "),
+				url: `/app/opportunity/${opportunity.name}`,
+			})
+		}
+	}
+
+	if (activeFilters.value.has("quotations")) {
+		for (const quotation of quotations.value) {
+			entries.push({
+				key: `quotation:${quotation.name}`,
+				type: "quotations",
+				date: quotation.transaction_date || quotation.modified,
+				badge: quotation.status,
+				badgeTheme: quotation.status === "Lost" ? "red" : "green",
+				subject: quotation.name,
+				body: [
+					formatAmount(quotation.grand_total, quotation.currency),
+					quotation.valid_till ? `valid to ${formatDate(quotation.valid_till)}` : "",
+				]
+					.filter(Boolean)
+					.join(" · "),
+				url: `/app/quotation/${quotation.name}`,
+			})
+		}
+	}
+
 	if (activeFilters.value.has("activities")) {
 		activities.value.forEach((activity, index) => {
 			entries.push({
@@ -870,6 +967,21 @@ function activityDetail(entry) {
 	if (activity?.kind === "row_removed") return `Removed: ${activity.summary || "—"}`
 	if (entry.fieldChange) return `${entry.fieldChange.old || "—"} → ${entry.fieldChange.new || "—"}`
 	return entry.body || ""
+}
+
+/** Amounts as the record shows them, or nothing when there's no figure yet. */
+function formatAmount(value, currency) {
+	const amount = Number(value || 0)
+	if (!amount) return ""
+	try {
+		return new Intl.NumberFormat(undefined, {
+			style: "currency",
+			currency: currency || "EUR",
+			maximumFractionDigits: 0,
+		}).format(amount)
+	} catch (e) {
+		return `${amount} ${currency || ""}`.trim()
+	}
 }
 
 function entryType(entry) {
@@ -1027,6 +1139,8 @@ async function loadActivity() {
 		notes.value = data.notes || []
 		communications.value = data.communications || []
 		activities.value = data.activities || []
+		opportunities.value = data.opportunities || []
+		quotations.value = data.quotations || []
 	} catch (e) {
 		toast({
 			title: e?.messages?.[0] || e?.message || "Could not load activity",

@@ -1252,7 +1252,76 @@ def get_lead_activity(name):
 		"notes": _serialize_notes(doc),
 		"communications": communications,
 		"activities": _format_lead_activities(docinfo),
+		"opportunities": _lead_opportunities(doc.name),
+		"quotations": _lead_quotations(doc.name),
 	}
+
+
+def _lead_opportunities(lead):
+	"""Opportunities raised from this Lead — where a follow-up is heading."""
+	if not frappe.has_permission("Opportunity", "read"):
+		return []
+
+	return frappe.get_all(
+		"Opportunity",
+		filters={"opportunity_from": "Lead", "party_name": lead},
+		fields=[
+			"name",
+			"status",
+			"sales_stage",
+			"transaction_date",
+			"opportunity_amount",
+			"currency",
+			"modified",
+		],
+		order_by="transaction_date desc",
+		limit_page_length=20,
+	)
+
+
+def _lead_quotations(lead):
+	"""Quotations sent to this Lead."""
+	if not frappe.has_permission("Quotation", "read"):
+		return []
+
+	return frappe.get_all(
+		"Quotation",
+		filters={"quotation_to": "Lead", "party_name": lead},
+		fields=[
+			"name",
+			"status",
+			"transaction_date",
+			"valid_till",
+			"grand_total",
+			"currency",
+			"docstatus",
+			"modified",
+		],
+		order_by="transaction_date desc",
+		limit_page_length=20,
+	)
+
+
+@frappe.whitelist(methods=["POST"])
+def create_lead_opportunity(lead):
+	"""Raise a draft Opportunity from this Lead.
+
+	Uses ERPNext's own Lead → Opportunity mapping, so the draft carries the
+	same fields Desk's "Create > Opportunity" would. An Opportunity is valid
+	without items, so it can be saved here and picked up in Desk; a Quotation
+	isn't, which is why that one hands straight over to the Desk form.
+	"""
+	_check_lead_access()
+	frappe.has_permission("Opportunity", "create", throw=True)
+
+	lead_doc = frappe.get_doc("Lead", lead)
+	lead_doc.check_permission("read")
+
+	from erpnext.crm.doctype.lead.lead import make_opportunity
+
+	opportunity = make_opportunity(lead)
+	opportunity.insert()
+	return {"name": opportunity.name, "url": f"/app/opportunity/{opportunity.name}"}
 
 
 @frappe.whitelist(methods=["POST"])
