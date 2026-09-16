@@ -19,53 +19,41 @@
 		<template #body-content>
 			<div class="space-y-2.5">
 				<!-- Recipients side by side rather than stacked: the header costs
-				     one row instead of three, leaving the editor room to breathe. -->
+				     one row instead of three, leaving the editor room to breathe.
+				     Each field carries its own chip row underneath, so a chip is
+				     always right where the address it fills is. -->
 				<div class="grid grid-cols-3 gap-3">
-					<EmailRecipientInput
-						v-model="recipients"
-						label="To"
-						placeholder="name@example.com"
-						:lead="lead.name"
-						@focus="focusedField = 'recipients'"
-						@blur="onFieldBlur('recipients')"
-					/>
-					<EmailRecipientInput
-						v-model="cc"
-						label="Cc"
-						:lead="lead.name"
-						@focus="focusedField = 'cc'"
-						@blur="onFieldBlur('cc')"
-					/>
-					<EmailRecipientInput
-						v-model="bcc"
-						label="Bcc"
-						:lead="lead.name"
-						@focus="focusedField = 'bcc'"
-						@blur="onFieldBlur('bcc')"
-					/>
-				</div>
-
-				<!-- Addresses already connected to this lead. Shown only while a
-				     recipient field has focus, so it's clear which field a chip
-				     lands in — but the row keeps its height either way, so the
-				     dialog doesn't jump as focus moves. -->
-				<div
-					class="flex h-6 flex-none items-center gap-1.5 overflow-x-auto whitespace-nowrap"
-					:class="chipsVisible ? '' : 'invisible'"
-				>
-					<template v-if="chipsVisible">
-						<span class="flex-none text-xs text-ink-gray-5">Add to {{ fieldLabels[focusedField] }}:</span>
-						<button
-							v-for="suggestion in availableSuggestions"
-							:key="suggestion.email"
-							type="button"
-							class="flex-none rounded-full border border-dashed border-outline-gray-3 px-2 py-0.5 text-xs text-ink-gray-8 hover:border-outline-gray-4 hover:bg-surface-gray-2"
-							:title="`${suggestion.email} · ${suggestion.source}`"
-							@mousedown.prevent="addRecipient(suggestion.email)"
+					<div v-for="field in recipientFields" :key="field.key">
+						<EmailRecipientInput
+							:model-value="fields[field.key].value"
+							:label="field.label"
+							:placeholder="field.placeholder"
+							:lead="lead.name"
+							@update:model-value="fields[field.key].value = $event"
+							@focus="focusedField = field.key"
+							@blur="onFieldBlur(field.key)"
+						/>
+						<!-- Only while this field has focus, so it's clear where a chip
+						     lands — but the row keeps its height either way, so the
+						     dialog doesn't jump as focus moves. -->
+						<div
+							class="mt-1.5 flex h-6 items-center gap-1.5 overflow-x-auto whitespace-nowrap"
+							:class="focusedField === field.key && availableSuggestions.length ? '' : 'invisible'"
 						>
-							+ {{ suggestion.label }}
-						</button>
-					</template>
+							<template v-if="focusedField === field.key">
+								<button
+									v-for="suggestion in availableSuggestions"
+									:key="suggestion.email"
+									type="button"
+									class="flex-none rounded-full border border-dashed border-outline-gray-3 px-2 py-0.5 text-xs text-ink-gray-8 hover:border-outline-gray-4 hover:bg-surface-gray-2"
+									:title="`${suggestion.email} · ${suggestion.source}`"
+									@mousedown.prevent="addRecipient(suggestion.email)"
+								>
+									+ {{ suggestion.label }}
+								</button>
+							</template>
+						</div>
+					</div>
 				</div>
 
 				<div class="grid gap-3" :class="templateOptions.length > 1 ? 'grid-cols-3' : 'grid-cols-1'">
@@ -174,7 +162,11 @@ const editorMenu = [
 	"Numbered List",
 ]
 
-const fieldLabels = { recipients: "To", cc: "Cc", bcc: "Bcc" }
+const recipientFields = [
+	{ key: "recipients", label: "To", placeholder: "name@example.com" },
+	{ key: "cc", label: "Cc", placeholder: "" },
+	{ key: "bcc", label: "Bcc", placeholder: "" },
+]
 
 const recipients = ref("")
 const cc = ref("")
@@ -208,8 +200,6 @@ const availableSuggestions = computed(() => {
 	)
 	return suggestions.value.filter((s) => !used.has(s.email.toLowerCase()))
 })
-
-const chipsVisible = computed(() => Boolean(focusedField.value) && availableSuggestions.value.length > 0)
 
 function addRecipient(email) {
 	const field = fields[focusedField.value] || recipients
