@@ -1677,18 +1677,22 @@ def _availability_day(day, busy, duration):
 
 
 def _split_gap(start, end, duration):
-	"""Offer a gap as whole slots on the half hour, not one ragged block."""
+	"""Offer a gap as back-to-back slots, not a sliding window.
+
+	Stepping by half an hour would list 08:00, 08:30 and 09:00 for the same
+	morning — near-identical choices that overlap each other, so offering two
+	of them in an email would propose times that clash.
+	"""
 	slots = []
-	step = timedelta(minutes=30)
 	length = timedelta(minutes=duration)
 
 	cursor = start
-	# Start on the next half hour so suggestions read as times people say.
+	# Start on the next half hour, so suggestions read as times people say.
 	if cursor.minute % 30:
 		cursor += timedelta(minutes=30 - (cursor.minute % 30))
 	cursor = cursor.replace(second=0, microsecond=0)
 
 	while cursor + length <= end and len(slots) < 8:
 		slots.append({"starts_on": str(cursor), "ends_on": str(cursor + length)})
-		cursor += step
+		cursor += length
 	return slots
