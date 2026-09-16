@@ -856,6 +856,156 @@ def get_contact_emails(contact):
 	return {"label": label, "emails": emails}
 
 
+def _linked_contact_names(lead):
+	"""Contacts pointing at this Lead, via the Dynamic Link they're joined by."""
+	return frappe.get_all(
+		"Dynamic Link",
+		filters={"link_doctype": "Lead", "link_name": lead, "parenttype": "Contact"},
+		pluck="parent",
+	)
+
+
+def _contact_addresses(doc):
+	"""Every address and number on a Contact, primary one first."""
+	emails = [row.email_id for row in (doc.email_ids or []) if row.email_id]
+	if doc.email_id and doc.email_id not in emails:
+		emails.insert(0, doc.email_id)
+
+	phones = [row.phone for row in (doc.phone_nos or []) if row.phone]
+	for value in (doc.mobile_no, doc.phone):
+		if value and value not in phones:
+			phones.insert(0, value)
+
+	return emails, phones
+
+
+def _serialize_contact(doc, lead_doc):
+	emails, phones = _contact_addresses(doc)
+	lead_email = (lead_doc.email_id or "").strip().casefold()
+	lead_numbers = {_digits(n) for n in (lead_doc.mobile_no, lead_doc.phone) if _digits(n)}
+	full_name = doc.full_name or " ".join(filter(None, [doc.first_name, doc.last_name])) or doc.name
+
+	# "Primary" isn't stored on the Lead — the Lead simply carries a copy of one
+	# person's details. So a Contact is the primary one when those details are
+	# its own.
+	is_primary = bool(
+		(lead_email and lead_email in {e.strip().casefold() for e in emails})
+		or (not lead_email and lead_numbers and lead_numbers & {_digits(p) for p in phones})
+		or (not lead_email and not lead_numbers and full_name == (lead_doc.lead_name or ""))
+	)
+
+	return {
+		"name": doc.name,
+		"full_name": full_name,
+		"salutation": doc.salutation,
+		"designation": doc.designation,
+		"department": doc.department,
+		"company_name": doc.company_name,
+		"status": doc.status,
+		"image": doc.image,
+		"email_id": emails[0] if emails else "",
+		"emails": emails,
+		"phones": phones,
+		"mobile_no": doc.mobile_no,
+		"phone": doc.phone,
+		"is_primary": is_primary,
+	}
+
+
+def _digits(value):
+	return re.sub(r"\D", "", value or "")
+
+
+@frappe.whitelist()
+def get_lead_contacts(lead):
+	"""Contacts linked to this Lead, and whether the Lead's own details are one of them."""
+	_check_lead_access()
+	lead_doc = frappe.get_doc("Lead", lead)
+	lead_doc.check_permission("read")
+
+	contacts = []
+	for name in _linked_contact_names(lead):
+		doc = frappe.get_doc("Contact", name)
+		if doc.has_permission("read"):
+			contacts.append(_serialize_contact(doc, lead_doc))
+
+	contacts.sort(key=lambda c: (not c["is_primary"], c["full_name"].casefold()))
+
+	return {
+		"contacts": contacts,
+		"primary": {
+			"lead_name": lead_doc.lead_name,
+			"email_id": lead_doc.email_id,
+			"phone": lead_doc.phone,
+			"mobile_no": lead_doc.mobile_no,
+		},
+		# False means the details in the header belong to nobody on file.
+		"primary_tracked": any(c["is_primary"] for c in contacts),
+	}
+
+
+@frappe.whitelist(methods=["POST"])
+def set_lead_primary_contact(lead, contact, untracked_action=None):
+	"""Promote a linked Contact to the details the Lead carries.
+
+	The Lead stores a copy of one person's name, email and numbers rather than
+	pointing at a Contact, so promoting someone overwrites that copy. When the
+	details being overwritten aren't held by any Contact, they'd be lost — so
+	the caller is asked what to do first, rather than silently discarding them.
+	"""
+	_check_lead_access()
+	frappe.has_permission("Lead", "write", throw=True)
+
+	lead_doc = frappe.get_doc("Lead", lead)
+	lead_doc.check_permission("write")
+
+	if contact not in _linked_contact_names(lead):
+		frappe.throw(_("That contact is not linked to this lead."))
+
+	contact_doc = frappe.get_doc("Contact", contact)
+	contact_doc.check_permission("read")
+
+	current = {
+		"lead_name": lead_doc.lead_name,
+		"email_id": lead_doc.email_id,
+		"phone": lead_doc.phone,
+		"mobile_no": lead_doc.mobile_no,
+	}
+	has_details = any(current.values())
+	tracked = get_lead_contacts(lead)["primary_tracked"]
+
+	if has_details and not tracked and untracked_action not in ("create", "discard"):
+		return {"needs_decision": True, "current": current}
+
+	if has_details and not tracked and untracked_action == "create":
+		created = lead_doc.create_contact()
+		created.append(
+			"links", {"link_doctype": "Lead", "link_name": lead_doc.name, "link_title": lead_doc.lead_name}
+		)
+		created.save(ignore_permissions=True)
+
+	emails, phones = _contact_addresses(contact_doc)
+	lead_doc.salutation = contact_doc.salutation
+	lead_doc.first_name = contact_doc.first_name
+	lead_doc.middle_name = contact_doc.middle_name
+	lead_doc.last_name = contact_doc.last_name
+	# Recomputed from the name parts in Lead.set_full_name on validate; set it
+	# too so a contact with no first name still leaves the Lead named.
+	lead_doc.lead_name = (
+		contact_doc.full_name
+		or " ".join(filter(None, [contact_doc.first_name, contact_doc.last_name]))
+		or lead_doc.lead_name
+	)
+	if contact_doc.gender:
+		lead_doc.gender = contact_doc.gender
+	lead_doc.email_id = emails[0] if emails else None
+	lead_doc.mobile_no = contact_doc.mobile_no or (phones[0] if phones else None)
+	lead_doc.phone = contact_doc.phone or None
+	lead_doc.save()
+
+	return {"ok": True, "lead": _serialize_lead_detail(frappe.get_doc("Lead", lead))}
+
+
 @frappe.whitelist(methods=["POST"])
 def send_lead_email(
 	lead, recipients, subject, content, cc=None, bcc=None, in_reply_to=None, attachments=None, send=1

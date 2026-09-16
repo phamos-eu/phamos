@@ -75,6 +75,31 @@
 						<FeatherIcon name="mail" class="h-3.5 w-3.5 flex-shrink-0 text-ink-gray-5" />
 						<span class="truncate">{{ lead.email_id }}</span>
 					</button>
+
+					<!-- Everyone else on file at this company. The details to the left are
+					     a copy of one person's; these chips are the rest of them. -->
+					<div v-if="contacts.length" class="flex flex-wrap items-center gap-1.5">
+						<button
+							v-for="contact in contacts"
+							:key="contact.name"
+							type="button"
+							class="flex items-center gap-1 rounded-full border px-2 py-0.5 text-xs"
+							:class="
+								contact.is_primary
+									? 'border-transparent bg-surface-gray-3 font-medium text-ink-gray-9'
+									: 'border-outline-gray-2 text-ink-gray-7 hover:bg-surface-gray-2 hover:text-ink-gray-9'
+							"
+							:title="contact.email_id || contact.full_name"
+							@click="openContact(contact)"
+						>
+							<FeatherIcon
+								v-if="contact.is_primary"
+								name="star"
+								class="h-3 w-3 flex-none text-ink-amber-3"
+							/>
+							<span class="max-w-[10rem] truncate">{{ contact.full_name }}</span>
+						</button>
+					</div>
 				</div>
 				<!-- Capped as a band rather than per field: each field shows as much as it
 				     has, and it's the band as a whole that yields height to the feed. -->
@@ -514,7 +539,18 @@
 		:lead="lead"
 		:mode="composeMode"
 		:source="composeSource"
+		:recipient="composePrefill"
 		@sent="onEmailSent"
+	/>
+
+	<LeadContactDialog
+		v-if="lead && selectedContact"
+		v-model="showContactDialog"
+		:lead="lead"
+		:contact="selectedContact"
+		@changed="onPrimaryContactChanged"
+		@compose="onContactCompose"
+		@call="showNoteDialog = true"
 	/>
 
 	<EditLeadNoteDialog
@@ -553,6 +589,7 @@ import CreateDemoDialog from "./CreateDemoDialog.vue"
 import EditLeadNoteDialog from "./EditLeadNoteDialog.vue"
 import ComposeEmailDialog from "./ComposeEmailDialog.vue"
 import EmailBody from "./EmailBody.vue"
+import LeadContactDialog from "./LeadContactDialog.vue"
 
 const API = "phamos.api.sales_leads"
 const DEMOS_API = "phamos.api.sales_demos"
@@ -569,6 +606,10 @@ const syncing = ref(false)
 const savingStatus = ref(false)
 const saveError = ref("")
 const showNoteDialog = ref(false)
+const contacts = ref([])
+const selectedContact = ref(null)
+const showContactDialog = ref(false)
+const composePrefill = ref("")
 const showWebsiteDialog = ref(false)
 const showDemoDialog = ref(false)
 const showEditNoteDialog = ref(false)
@@ -951,6 +992,34 @@ async function loadDemos() {
 	}
 }
 
+async function loadContacts() {
+	try {
+		const data = await call(`${API}.get_lead_contacts`, { lead: props.name })
+		contacts.value = data.contacts || []
+	} catch (e) {
+		contacts.value = []
+	}
+}
+
+function openContact(contact) {
+	selectedContact.value = contact
+	showContactDialog.value = true
+}
+
+function onContactCompose(email) {
+	showContactDialog.value = false
+	openCompose("new", null, email)
+}
+
+/** The header's details are now someone else's — reload both sides of it. */
+async function onPrimaryContactChanged(updated) {
+	lead.value = { ...lead.value, ...updated }
+	syncFieldsFromLead()
+	await loadContacts()
+	emit("updated", lead.value)
+	loadActivity()
+}
+
 async function loadActivity() {
 	activityLoading.value = true
 	try {
@@ -1242,9 +1311,10 @@ function onDemoCreated() {
 	toast({ title: "Demo created", icon: "check-circle", iconClasses: "text-ink-green-4" })
 }
 
-function openCompose(mode, communication = null) {
+function openCompose(mode, communication = null, recipient = "") {
 	composeMode.value = mode
 	composeSource.value = communication
+	composePrefill.value = recipient
 	showComposeDialog.value = true
 }
 
@@ -1274,6 +1344,7 @@ function loadAll() {
 	loadLead()
 	loadActivity()
 	loadDemos()
+	loadContacts()
 }
 
 onMounted(() => {

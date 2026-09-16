@@ -197,6 +197,8 @@ const props = defineProps({
 	mode: { type: String, default: "new" },
 	/** The communication being replied to / forwarded */
 	source: { type: Object, default: null },
+	/** Address to start a new email to, when it isn't the lead's own. */
+	recipient: { type: String, default: "" },
 })
 
 const emit = defineEmits(["update:modelValue", "sent"])
@@ -398,14 +400,14 @@ function defaultValues() {
 			}</p>${source.content || ""}`,
 		}
 	}
-	return { recipients: props.lead.email_id || "", subject: "", content: "" }
+	return { recipients: props.recipient || props.lead.email_id || "", subject: "", content: "" }
 }
 
 /** One draft per lead + what's being written, so a half-typed reply doesn't
  *  reappear inside a new email. Held in memory for the session, matching how
  *  Desk's own composer keeps its last edited communication. */
 function draftKey() {
-	return [props.lead.name, props.mode, props.source?.name || ""].join("|")
+	return [props.lead.name, props.mode, props.source?.name || props.recipient || ""].join("|")
 }
 
 function stashDraft() {
