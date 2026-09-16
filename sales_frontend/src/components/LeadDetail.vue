@@ -68,6 +68,30 @@
 						<FeatherIcon name="mail" class="h-3.5 w-3.5 flex-shrink-0 text-ink-gray-5" />
 						<span class="truncate">{{ lead.email_id }}</span>
 					</a>
+					<span class="ml-auto flex items-center gap-1.5 text-sm text-ink-gray-6">
+						<span v-if="total" class="mr-1 tabular-nums">{{ position }} of {{ total }}</span>
+						<button
+							type="button"
+							class="rounded p-1.5 hover:bg-surface-gray-2 disabled:opacity-40"
+							:disabled="!hasPrevious"
+							title="Previous"
+							@click="emit('previous')"
+						>
+							<FeatherIcon name="chevron-left" class="h-4 w-4" />
+						</button>
+						<button
+							type="button"
+							class="rounded p-1.5 hover:bg-surface-gray-2 disabled:opacity-40"
+							:disabled="!hasNext"
+							title="Next"
+							@click="emit('next')"
+						>
+							<FeatherIcon name="chevron-right" class="h-4 w-4" />
+						</button>
+						<button type="button" class="rounded p-1.5 hover:bg-surface-gray-2" title="Back to list" @click="emit('close')">
+							<FeatherIcon name="x" class="h-4 w-4" />
+						</button>
+					</span>
 				</div>
 				<div class="flex flex-shrink-0 items-center gap-2 border-b border-outline-gray-2 bg-surface-white px-4 py-2.5">
 					<button
@@ -210,44 +234,11 @@
 		</template>
 	</div>
 
-	<Teleport v-if="chromeHostReady && lead" to="#cockpit-page-chrome">
-		<div class="flex min-w-0 flex-1 items-center gap-3">
-			<span class="truncate text-base font-bold tracking-tight text-ink-gray-9">
-				{{ lead.lead_name || lead.name }}
-			</span>
-			<Badge :label="lead.status" :theme="leadStatusTheme(lead.status)" size="sm" variant="subtle" />
-			<span class="ml-auto flex items-center gap-1.5 text-sm text-ink-gray-6">
-				<span v-if="total" class="mr-1 tabular-nums">{{ position }} of {{ total }}</span>
-				<button
-					type="button"
-					class="rounded p-1.5 hover:bg-surface-gray-2 disabled:opacity-40"
-					:disabled="!hasPrevious"
-					title="Previous"
-					@click="emit('previous')"
-				>
-					<FeatherIcon name="chevron-left" class="h-4 w-4" />
-				</button>
-				<button
-					type="button"
-					class="rounded p-1.5 hover:bg-surface-gray-2 disabled:opacity-40"
-					:disabled="!hasNext"
-					title="Next"
-					@click="emit('next')"
-				>
-					<FeatherIcon name="chevron-right" class="h-4 w-4" />
-				</button>
-				<button type="button" class="rounded p-1.5 hover:bg-surface-gray-2" title="Back to list" @click="emit('close')">
-					<FeatherIcon name="x" class="h-4 w-4" />
-				</button>
-			</span>
-		</div>
-	</Teleport>
-
 	<AddLeadNoteDialog v-if="lead" v-model="showNoteDialog" :lead="lead" @saved="onNoteSaved" />
 </template>
 
 <script setup>
-import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from "vue"
+import { computed, nextTick, onMounted, ref, watch } from "vue"
 import { call, debounce, toast, Badge } from "frappe-ui"
 import {
 	formatForApi,
@@ -256,7 +247,6 @@ import {
 	parseSystemDatetimeToUserDate,
 	toDatetimeLocalValue,
 } from "@spa/utils/datetime"
-import { setPageChromeActive } from "@spa/pageChrome.js"
 import { LEAD_STATUSES, QUALIFICATION_STATUSES, leadStatusTheme } from "@/leadListColumns.js"
 import AddLeadNoteDialog from "./AddLeadNoteDialog.vue"
 
@@ -275,7 +265,6 @@ const loading = ref(false)
 const syncing = ref(false)
 const savingStatus = ref(false)
 const saveError = ref("")
-const chromeHostReady = ref(false)
 const showNoteDialog = ref(false)
 
 const status = ref("")
@@ -416,12 +405,6 @@ function onNoteSaved(updated) {
 	loadActivity()
 }
 
-async function syncChromeHost() {
-	await nextTick()
-	chromeHostReady.value = !!document.getElementById("cockpit-page-chrome")
-	if (chromeHostReady.value) setPageChromeActive(true)
-}
-
 function loadAll() {
 	loadLead()
 	loadActivity()
@@ -429,11 +412,6 @@ function loadAll() {
 
 onMounted(() => {
 	loadAll()
-	syncChromeHost()
-})
-
-onBeforeUnmount(() => {
-	setPageChromeActive(false)
 })
 
 watch(
