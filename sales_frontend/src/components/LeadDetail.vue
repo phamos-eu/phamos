@@ -148,9 +148,6 @@
 						</button>
 					</div>
 				</div>
-				<div class="flex-shrink-0 border-b border-outline-gray-2 bg-surface-white px-4 py-2.5">
-					<LeadModulePicker v-model="modules" @update:model-value="scheduleModulesSave" />
-				</div>
 				<div class="flex flex-shrink-0 items-center gap-2 border-b border-outline-gray-2 bg-surface-white px-4 py-2.5">
 					<button
 						v-for="filter in feedFilters"
@@ -323,6 +320,10 @@
 						</button>
 					</div>
 				</section>
+
+				<!-- Sits with planned start and the hours predictions: what gets
+				     implemented is what those hours are being predicted for. -->
+				<LeadModulePicker v-model="modules" @update:model-value="scheduleModulesSave" />
 
 				<div>
 					<label class="mb-1.5 block text-xs text-ink-gray-5">Lead Owner</label>
