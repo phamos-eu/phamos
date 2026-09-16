@@ -136,6 +136,13 @@
 	</Dialog>
 </template>
 
+<script>
+/** Module scope, so drafts survive the dialog being torn down and rebuilt —
+ *  and are shared by every instance across the cockpit, like Desk's
+ *  `frappe.last_edited_communication`. Session-lived: a page reload clears them. */
+const drafts = new Map()
+</script>
+
 <script setup>
 import { computed, ref, watch } from "vue"
 import { call, FileUploader, TextEditor } from "frappe-ui"
@@ -288,35 +295,82 @@ function threadSubject(value, prefix) {
 	return prefix ? `${prefix}: ${clean}` : clean
 }
 
+/** What the dialog starts from when there's nothing half-written to restore. */
+function defaultValues() {
+	const source = props.source
+	if (props.mode === "reply" && source) {
+		return {
+			recipients: source.sender || props.lead.email_id || "",
+			subject: threadSubject(source.subject, "Re"),
+			content: "",
+		}
+	}
+	if (props.mode === "forward" && source) {
+		return {
+			// Forwarding is the user choosing someone new, so leave To empty.
+			recipients: "",
+			subject: threadSubject(source.subject, "Fwd"),
+			content: `<p><br></p><hr><p>From: ${source.sender || ""}<br>Subject: ${
+				source.subject || ""
+			}</p>${source.content || ""}`,
+		}
+	}
+	return { recipients: props.lead.email_id || "", subject: "", content: "" }
+}
+
+/** One draft per lead + what's being written, so a half-typed reply doesn't
+ *  reappear inside a new email. Held in memory for the session, matching how
+ *  Desk's own composer keeps its last edited communication. */
+function draftKey() {
+	return [props.lead.name, props.mode, props.source?.name || ""].join("|")
+}
+
+function stashDraft() {
+	const defaults = defaultValues()
+	const untouched =
+		!content.value.trim() &&
+		!attachments.value.length &&
+		!cc.value.trim() &&
+		!bcc.value.trim() &&
+		recipients.value === defaults.recipients &&
+		subject.value === defaults.subject
+	if (untouched) {
+		drafts.delete(draftKey())
+		return
+	}
+	drafts.set(draftKey(), {
+		recipients: recipients.value,
+		cc: cc.value,
+		bcc: bcc.value,
+		subject: subject.value,
+		content: content.value,
+		attachments: [...attachments.value],
+		selectedTemplate: selectedTemplate.value,
+	})
+}
+
+function restore(values) {
+	recipients.value = values.recipients ?? ""
+	cc.value = values.cc ?? ""
+	bcc.value = values.bcc ?? ""
+	subject.value = values.subject ?? ""
+	content.value = values.content ?? ""
+	attachments.value = values.attachments ? [...values.attachments] : []
+	selectedTemplate.value = values.selectedTemplate ?? ""
+}
+
 watch(
 	() => props.modelValue,
 	(open) => {
-		if (!open) return
+		if (!open) {
+			// Closing is "not now", not "discard" — pick the message back up on reopen.
+			stashDraft()
+			return
+		}
 		error.value = ""
-		cc.value = ""
-		bcc.value = ""
-		selectedTemplate.value = ""
-		attachments.value = []
 		focusedField.value = ""
 		loadContext()
-
-		const source = props.source
-		if (props.mode === "reply" && source) {
-			recipients.value = source.sender || props.lead.email_id || ""
-			subject.value = threadSubject(source.subject, "Re")
-			content.value = ""
-		} else if (props.mode === "forward" && source) {
-			// Forwarding is the user choosing someone new, so leave To empty.
-			recipients.value = ""
-			subject.value = threadSubject(source.subject, "Fwd")
-			content.value = `<p><br></p><hr><p>From: ${source.sender || ""}<br>Subject: ${
-				source.subject || ""
-			}</p>${source.content || ""}`
-		} else {
-			recipients.value = props.lead.email_id || ""
-			subject.value = ""
-			content.value = ""
-		}
+		restore(drafts.get(draftKey()) || defaultValues())
 	}
 )
 
@@ -344,6 +398,9 @@ async function submit() {
 			// Threads the reply to the original message, not just by subject.
 			in_reply_to: props.mode === "reply" ? props.source?.name : null,
 		})
+		// Sent, so there's nothing left to pick back up.
+		drafts.delete(draftKey())
+		restore(defaultValues())
 		emit("sent")
 		emit("update:modelValue", false)
 	} catch (e) {
