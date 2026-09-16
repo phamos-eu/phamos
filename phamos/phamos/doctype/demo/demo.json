@@ -18,6 +18,7 @@
   "event",
   "section_break_schedule",
   "location",
+  "attendees",
   "proposed_slots",
   "section_break_details",
   "agenda"
@@ -97,6 +98,13 @@
    "fieldname": "location",
    "fieldtype": "Small Text",
    "label": "Location"
+  },
+  {
+   "description": "Who is joining. Kept here rather than only on the calendar event, so reopening a demo says who was invited.",
+   "fieldname": "attendees",
+   "fieldtype": "Table",
+   "label": "Attendees",
+   "options": "Demo Attendee"
   },
   {
    "description": "Dates offered to the customer while the demo isn't pinned down yet.",

@@ -4,6 +4,7 @@
 """Sales Cockpit Demos API — scheduling demos against a Lead."""
 
 import json
+from urllib.parse import urlparse
 
 import frappe
 from frappe import _
@@ -54,8 +55,8 @@ def get_demos(lead=None):
 	return {"items": rows, "truncated": truncated, "statuses": list(DEMO_STATUSES)}
 
 
-def _create_demo_event(demo_subject, lead, lead_doc, starts_on, ends_on, agenda, location, participants):
-	"""Tentative calendar entry holding one proposed slot.
+def _attendee_event_fields(lead, lead_doc, participants):
+	"""Turn a demo's attendees into the three fields an Event needs.
 
 	Invitees who map to a User become Event Participant rows carrying
 	`custom_participation` (which the CalDAV sync turns into REQ/OPT
@@ -63,6 +64,9 @@ def _create_demo_event(demo_subject, lead, lead_doc, starts_on, ends_on, agenda,
 	requires a linked record, so they ride along in the attendee fields,
 	required in TO and optional in CC — the same split the hybrid meeting
 	composer uses.
+
+	Shared by creating a demo and by editing its attendees later, so the two
+	paths can't drift apart.
 	"""
 	rows = [{"reference_doctype": "Lead", "reference_docname": lead, "custom_participation": "Required"}]
 	required = [lead_doc.email_id] if lead_doc.email_id else []
@@ -86,6 +90,13 @@ def _create_demo_event(demo_subject, lead, lead_doc, starts_on, ends_on, agenda,
 		if email in required or email in optional:
 			continue
 		(required if is_required else optional).append(email)
+
+	return rows, required, optional
+
+
+def _create_demo_event(demo_subject, lead, lead_doc, starts_on, ends_on, agenda, location, participants):
+	"""Tentative calendar entry holding one proposed slot."""
+	rows, required, optional = _attendee_event_fields(lead, lead_doc, participants)
 
 	event = frappe.get_doc(
 		{
@@ -147,6 +158,10 @@ def create_demo(lead, subject, slots=None, participants=None, agenda=None, locat
 			"status": "Planned",
 			"agenda": agenda or None,
 			"location": location or None,
+			# Kept on the demo as well as on each slot's event: a demo with
+			# three proposed slots has three events, none of which is the
+			# record of who was invited.
+			"attendees": _attendee_rows(participants),
 		}
 	)
 	demo.insert()
@@ -171,6 +186,65 @@ def create_demo(lead, subject, slots=None, participants=None, agenda=None, locat
 	return _serialize_demo(frappe.get_doc("Demo", demo.name))
 
 
+def _attendee_rows(participants):
+	"""Normalise incoming attendee dicts into Demo Attendee child rows."""
+	rows = []
+	seen = set()
+	for participant in participants or []:
+		email = (participant.get("email") or "").strip()
+		user = (participant.get("user") or "").strip()
+		full_name = (participant.get("full_name") or "").strip()
+		key = email.casefold() or user.casefold() or full_name.casefold()
+		if not key or key in seen:
+			continue
+		seen.add(key)
+		rows.append(
+			{
+				"contact": participant.get("contact") or None,
+				"user": user or None,
+				"full_name": full_name or (email.split("@")[0] if email else user),
+				"email": email or None,
+				"participation": participant.get("participation") or "Required",
+				# One of ours if they're a User; otherwise assume the customer side.
+				"audience": participant.get("audience") or ("Internal" if user else "External"),
+			}
+		)
+	return rows
+
+
+def _serialize_attendees(doc):
+	return [
+		{
+			"name": row.name,
+			"contact": row.contact,
+			"user": row.user,
+			"full_name": row.full_name,
+			"email": row.email,
+			"participation": row.participation,
+			"audience": row.audience,
+		}
+		for row in (doc.get("attendees") or [])
+	]
+
+
+def _meeting_url(location):
+	"""A location that's really a video link, so the UI can offer a Join button.
+
+	The field holds either a street address or a meeting URL — the create
+	dialog writes a Jitsi room into it — so this is what decides which.
+
+	Deliberately just a scheme check, not the SSRF guard used for the lead
+	website preview: nothing is fetched server-side here, the user clicks the
+	link in their own browser, and a self-hosted meeting server on a private
+	address is a perfectly good place to hold a demo.
+	"""
+	value = (location or "").strip()
+	if not value or any(c.isspace() for c in value):
+		return ""
+	parsed = urlparse(value)
+	return value if parsed.scheme in ("http", "https") and parsed.hostname else ""
+
+
 def _serialize_demo(doc):
 	return {
 		"name": doc.name,
@@ -183,6 +257,8 @@ def _serialize_demo(doc):
 		"event": doc.event,
 		"agenda": doc.agenda,
 		"location": doc.location,
+		"meeting_url": _meeting_url(doc.location),
+		"attendees": _serialize_attendees(doc),
 		"proposed_slots": [
 			{
 				"name": row.name,
@@ -194,6 +270,7 @@ def _serialize_demo(doc):
 		],
 		"owner": doc.owner,
 		"owner_name": _user_label(doc.owner),
+		"feedback_count": frappe.db.count("Demo Feedback", {"demo": doc.name}),
 		"desk_url": f"/app/demo/{doc.name}",
 	}
 
@@ -205,3 +282,203 @@ def get_demo(name):
 	doc = frappe.get_doc("Demo", name)
 	doc.check_permission("read")
 	return _serialize_demo(doc)
+
+
+DEMO_EDITABLE_FIELDS = ("subject", "status", "scheduled_on", "ends_on", "location", "agenda")
+
+
+@frappe.whitelist(methods=["POST"])
+def update_demo(name, if_modified=None, **fields):
+	"""Update whitelisted Demo fields, autosave-style.
+
+	`if_modified` is the `modified` timestamp the client last saw; a mismatch
+	means someone else saved since, and the edit is refused rather than
+	silently overwriting them — the same low-friction contract as
+	`sales_leads.update_lead`.
+	"""
+	_check_lead_access()
+	frappe.has_permission("Demo", "write", throw=True)
+
+	doc = frappe.get_doc("Demo", name)
+	doc.check_permission("write")
+
+	if if_modified and str(doc.modified) != str(if_modified):
+		return {"conflict": True, "demo": _serialize_demo(doc)}
+
+	updates = {k: v for k, v in fields.items() if k in DEMO_EDITABLE_FIELDS}
+	if not updates:
+		return {"demo": _serialize_demo(doc)}
+
+	if "status" in updates and updates["status"] not in DEMO_STATUSES:
+		frappe.throw(_("Unknown demo status: {0}").format(updates["status"]))
+
+	for field, value in updates.items():
+		doc.set(field, value if value not in ("", None) else None)
+
+	doc.save()
+	return {"demo": _serialize_demo(frappe.get_doc("Demo", name))}
+
+
+@frappe.whitelist(methods=["POST"])
+def set_demo_attendees(name, rows=None):
+	"""Replace the attendee list and re-sync it onto the demo's calendar events."""
+	_check_lead_access()
+	frappe.has_permission("Demo", "write", throw=True)
+
+	doc = frappe.get_doc("Demo", name)
+	doc.check_permission("write")
+
+	if isinstance(rows, str):
+		rows = json.loads(rows)
+
+	doc.set("attendees", _attendee_rows(rows))
+	doc.save()
+
+	_sync_demo_events(doc)
+	return _serialize_demo(frappe.get_doc("Demo", name))
+
+
+def _sync_demo_events(doc):
+	"""Push the demo's attendees onto every event still holding a slot.
+
+	A demo keeps one tentative event per proposed slot, so a change of
+	invitees has to reach all of them, not just the confirmed one.
+	"""
+	lead_doc = frappe.get_doc("Lead", doc.lead)
+	participants = _serialize_attendees(doc)
+	rows, required, optional = _attendee_event_fields(doc.lead, lead_doc, participants)
+
+	event_names = {row.event for row in (doc.get("proposed_slots") or []) if row.event}
+	if doc.event:
+		event_names.add(doc.event)
+
+	for event_name in event_names:
+		if not frappe.db.exists("Event", event_name):
+			continue
+		event = frappe.get_doc("Event", event_name)
+		event.set("event_participants", rows)
+		event.custom_attendees_to = ", ".join(required)
+		event.custom_attendees_cc = ", ".join(optional)
+		event.save(ignore_permissions=True)
+
+
+@frappe.whitelist(methods=["POST"])
+def confirm_demo_slot(name, slot):
+	"""Settle on one proposed slot and release the others.
+
+	The losing slots' events were only ever holds, so they're deleted rather
+	than left cluttering everyone's calendar.
+	"""
+	_check_lead_access()
+	frappe.has_permission("Demo", "write", throw=True)
+
+	doc = frappe.get_doc("Demo", name)
+	doc.check_permission("write")
+
+	chosen = next((row for row in (doc.get("proposed_slots") or []) if row.name == slot), None)
+	if not chosen:
+		frappe.throw(_("That proposed slot is no longer on this demo."))
+
+	doc.scheduled_on = chosen.starts_on
+	doc.ends_on = chosen.ends_on
+	doc.event = chosen.event
+
+	released = [row for row in doc.proposed_slots if row.name != chosen.name]
+	doc.set("proposed_slots", [chosen])
+	doc.save()
+
+	for row in released:
+		if row.event and frappe.db.exists("Event", row.event):
+			frappe.delete_doc("Event", row.event, ignore_permissions=True, delete_permanently=True)
+
+	return _serialize_demo(frappe.get_doc("Demo", name))
+
+
+def _serialize_feedback(doc):
+	return {
+		"name": doc.name,
+		"demo": doc.demo,
+		"audience": doc.audience,
+		"respondent_name": doc.respondent_name,
+		"contact": doc.contact,
+		"user": doc.user,
+		"notes": doc.notes,
+		"modules": [
+			{"module": row.module, "module_name": row.module_name or row.module}
+			for row in (doc.get("modules") or [])
+		],
+		"owner": doc.owner,
+		"owner_name": _user_label(doc.owner),
+		"modified": doc.modified,
+		"desk_url": f"/app/demo-feedback/{doc.name}",
+	}
+
+
+@frappe.whitelist()
+def get_demo_feedback(demo):
+	"""Every response collected for a demo, internal and external."""
+	_check_lead_access()
+	demo_doc = frappe.get_doc("Demo", demo)
+	demo_doc.check_permission("read")
+
+	names = frappe.get_all(
+		"Demo Feedback", filters={"demo": demo}, order_by="creation asc", pluck="name"
+	)
+	return [_serialize_feedback(frappe.get_doc("Demo Feedback", name)) for name in names]
+
+
+@frappe.whitelist(methods=["POST"])
+def save_demo_feedback(
+	demo,
+	respondent_name,
+	name=None,
+	audience=None,
+	contact=None,
+	user=None,
+	notes=None,
+	modules=None,
+):
+	"""Create or update one respondent's feedback on a demo."""
+	_check_lead_access()
+	demo_doc = frappe.get_doc("Demo", demo)
+	demo_doc.check_permission("read")
+
+	respondent_name = (respondent_name or "").strip()
+	if not respondent_name:
+		frappe.throw(_("A respondent name is required."))
+
+	if isinstance(modules, str):
+		modules = json.loads(modules)
+
+	if name:
+		doc = frappe.get_doc("Demo Feedback", name)
+		doc.check_permission("write")
+		if doc.demo != demo:
+			frappe.throw(_("That feedback belongs to another demo."))
+	else:
+		frappe.has_permission("Demo Feedback", "create", throw=True)
+		doc = frappe.new_doc("Demo Feedback")
+		doc.demo = demo
+
+	doc.respondent_name = respondent_name
+	doc.audience = audience or "Internal"
+	doc.contact = contact or None
+	doc.user = user or None
+	doc.notes = notes or None
+	doc.set(
+		"modules",
+		[{"module": row["module"]} for row in (modules or []) if row.get("module")],
+	)
+	doc.save()
+
+	return _serialize_feedback(frappe.get_doc("Demo Feedback", doc.name))
+
+
+@frappe.whitelist(methods=["POST"])
+def delete_demo_feedback(name):
+	"""Remove one response."""
+	_check_lead_access()
+	doc = frappe.get_doc("Demo Feedback", name)
+	doc.check_permission("delete")
+	frappe.delete_doc("Demo Feedback", name)
+	return {"ok": True}
