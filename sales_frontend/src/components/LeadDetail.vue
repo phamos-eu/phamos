@@ -83,6 +83,22 @@
 						</button>
 					</span>
 				</div>
+				<div class="flex-shrink-0 border-b border-outline-gray-2 bg-surface-white px-4 py-2.5">
+					<label class="mb-1.5 flex items-center gap-1.5 text-xs text-ink-gray-5">
+						<span>Status Comment</span>
+						<!-- Conditionally mandatory on the doctype itself (mandatory_depends_on
+						     eval:doc.status=='Do Not Contact'), so flag it rather than let the
+						     save fail with a bare validation error. -->
+						<span v-if="status === 'Do Not Contact'" class="text-ink-red-4">required</span>
+					</label>
+					<FormControl
+						v-model="statusComment"
+						type="textarea"
+						size="sm"
+						rows="2"
+						placeholder="Reason and comments for this lead's status"
+					/>
+				</div>
 				<div class="flex flex-shrink-0 items-center gap-2 border-b border-outline-gray-2 bg-surface-white px-4 py-2.5">
 					<button
 						v-for="filter in feedFilters"
@@ -186,15 +202,6 @@
 					type="select"
 					size="sm"
 					:options="qualificationOptions"
-				/>
-
-				<FormControl
-					v-if="status === 'Do Not Contact'"
-					v-model="statusComment"
-					label="Status Comment"
-					type="textarea"
-					size="sm"
-					placeholder="Reason for Do Not Contact (required)"
 				/>
 
 				<ErrorMessage :message="saveError" />
