@@ -65,14 +65,16 @@
 						<FeatherIcon name="phone" class="h-3.5 w-3.5 flex-shrink-0 text-ink-gray-5" />
 						<span>{{ number }}</span>
 					</a>
-					<a
+					<button
 						v-if="lead.email_id"
-						:href="mailtoHref"
+						type="button"
 						class="flex items-center gap-1.5 text-sm text-ink-gray-7 hover:text-ink-gray-9"
+						title="Write an email"
+						@click="openCompose('new')"
 					>
 						<FeatherIcon name="mail" class="h-3.5 w-3.5 flex-shrink-0 text-ink-gray-5" />
 						<span class="truncate">{{ lead.email_id }}</span>
-					</a>
+					</button>
 				</div>
 				<div class="grid flex-shrink-0 grid-cols-2 gap-4 border-b border-outline-gray-2 bg-surface-white px-4 py-2.5">
 					<div>
@@ -165,7 +167,7 @@
 						{{ filter.label }}
 					</button>
 					<span class="ml-auto flex items-center gap-2">
-						<Button v-if="lead.email_id" variant="subtle" :link="newEmailHref">New Email</Button>
+						<Button variant="subtle" @click="openCompose('new')">New Email</Button>
 						<Button variant="subtle" @click="showNoteDialog = true">Add note</Button>
 						<Button variant="subtle" @click="showDemoDialog = true">Create Demo</Button>
 					</span>
@@ -204,7 +206,11 @@
 								</span>
 							</div>
 
-							<div v-else class="rounded-md border border-outline-gray-2 bg-surface-white px-3 py-2.5">
+							<div
+								v-else
+								class="rounded-md border border-outline-gray-2 bg-surface-white px-3 py-2.5"
+								:class="entry.threadSize > 1 ? 'border-l-2 border-l-blue-400' : ''"
+							>
 								<div class="mb-1.5 flex items-center gap-2 text-xs text-ink-gray-5">
 									<FeatherIcon :name="entryIcon(entry)" class="h-3.5 w-3.5 flex-none text-ink-gray-5" />
 									<Badge :label="entry.badge" :theme="entry.badgeTheme" size="sm" variant="subtle" />
@@ -212,6 +218,13 @@
 										{{ entry.author }}
 									</span>
 									<span class="whitespace-nowrap">{{ formatDatetime(entry.date) }}</span>
+									<Badge
+										v-if="entry.threadSize > 1"
+										:label="`Thread · ${entry.threadSize}`"
+										theme="blue"
+										size="sm"
+										variant="subtle"
+									/>
 									<button
 										v-if="entry.type === 'notes'"
 										type="button"
@@ -222,20 +235,22 @@
 										<FeatherIcon name="edit-2" class="h-3.5 w-3.5" />
 									</button>
 									<span v-if="entry.type === 'communications'" class="ml-auto flex flex-none items-center gap-1">
-										<a
-											:href="replyHref(entry)"
+										<button
+											type="button"
 											title="Reply"
 											class="rounded p-1 text-ink-gray-6 hover:bg-surface-gray-2 hover:text-ink-gray-9"
+											@click="openCompose('reply', entry.communication)"
 										>
 											<FeatherIcon name="corner-up-left" class="h-3.5 w-3.5" />
-										</a>
-										<a
-											:href="forwardHref(entry)"
+										</button>
+										<button
+											type="button"
 											title="Forward"
 											class="rounded p-1 text-ink-gray-6 hover:bg-surface-gray-2 hover:text-ink-gray-9"
+											@click="openCompose('forward', entry.communication)"
 										>
 											<FeatherIcon name="corner-up-right" class="h-3.5 w-3.5" />
-										</a>
+										</button>
 									</span>
 								</div>
 
@@ -386,6 +401,15 @@
 
 	<CreateDemoDialog v-if="lead" v-model="showDemoDialog" :lead="lead" @created="onDemoCreated" />
 
+	<ComposeEmailDialog
+		v-if="lead"
+		v-model="showComposeDialog"
+		:lead="lead"
+		:mode="composeMode"
+		:source="composeSource"
+		@sent="onEmailSent"
+	/>
+
 	<EditLeadNoteDialog
 		v-if="lead && editingNote"
 		v-model="showEditNoteDialog"
@@ -420,6 +444,7 @@ import LeadModulePicker from "./LeadModulePicker.vue"
 import AddLeadNoteDialog from "./AddLeadNoteDialog.vue"
 import CreateDemoDialog from "./CreateDemoDialog.vue"
 import EditLeadNoteDialog from "./EditLeadNoteDialog.vue"
+import ComposeEmailDialog from "./ComposeEmailDialog.vue"
 
 const API = "phamos.api.sales_leads"
 const DEMOS_API = "phamos.api.sales_demos"
@@ -440,6 +465,9 @@ const showWebsiteDialog = ref(false)
 const showDemoDialog = ref(false)
 const showEditNoteDialog = ref(false)
 const editingNote = ref(null)
+const showComposeDialog = ref(false)
+const composeMode = ref("new")
+const composeSource = ref(null)
 const checkingWebsite = ref(false)
 
 const status = ref("")
@@ -514,6 +542,8 @@ const timeline = computed(() => {
 				sender: comm.sender,
 				recipients: comm.recipients,
 				subject: comm.subject,
+				threadSize: comm.thread_size || 1,
+				communication: comm,
 				body: stripHtml(comm.content),
 			})
 		}
@@ -588,10 +618,6 @@ const requestTypeOptions = computed(() => [
 
 const phoneNumbers = computed(() => [...new Set([lead.value?.mobile_no, lead.value?.phone].filter(Boolean))])
 
-const CRM_MAILBOX = "crm@phamos.eu"
-// mailto: URLs get truncated by some clients, so don't paste a whole thread in.
-const FORWARD_QUOTE_LIMIT = 1500
-
 /** Left column: what was touched. */
 function activityLabel(entry) {
 	return entry.activity?.label || entry.fieldChange?.label || "Update"
@@ -612,44 +638,6 @@ function entryIcon(entry) {
 	if (entry.type === "demos") return "monitor"
 	return "git-commit"
 }
-
-/** Everything composes in the user's own mail client, CC'd to the CRM inbox. */
-function mailto(to, subject, body) {
-	const params = [`cc=${encodeURIComponent(CRM_MAILBOX)}`]
-	if (subject) params.push(`subject=${encodeURIComponent(subject)}`)
-	if (body) params.push(`body=${encodeURIComponent(body)}`)
-	return `mailto:${to || ""}?${params.join("&")}`
-}
-
-/** Keep the thread's subject rather than stacking Re: on Re:. */
-function threadSubject(subject, prefix) {
-	const clean = (subject || "").replace(/^\s*(re|fwd|fw)\s*:\s*/i, "")
-	return `${prefix}: ${clean || lead.value?.lead_name || lead.value?.name || ""}`
-}
-
-function replyHref(entry) {
-	return mailto(entry.sender || lead.value?.email_id, threadSubject(entry.subject, "Re"))
-}
-
-function forwardHref(entry) {
-	const quoted = [
-		"---------- Forwarded message ----------",
-		`From: ${entry.sender || ""}`,
-		`Date: ${formatDatetime(entry.date)}`,
-		`Subject: ${entry.subject || ""}`,
-		"",
-		(entry.body || "").slice(0, FORWARD_QUOTE_LIMIT),
-	].join("\n")
-	// No recipient: forwarding is the user choosing someone new.
-	return mailto("", threadSubject(entry.subject, "Fwd"), quoted)
-}
-
-const newEmailHref = computed(() => mailto(lead.value?.email_id, ""))
-
-const mailtoHref = computed(() => {
-	if (!lead.value) return ""
-	return mailto(lead.value.email_id, threadSubject("", "Re"))
-})
 
 // Resolved server-side by check_website_embeddable (normalized + redirects
 // followed), set only once we know the site will actually render framed.
@@ -1045,6 +1033,18 @@ function onDemoCreated() {
 	loadActivity()
 	loadDemos()
 	toast({ title: "Demo created", icon: "check-circle", iconClasses: "text-ink-green-4" })
+}
+
+function openCompose(mode, communication = null) {
+	composeMode.value = mode
+	composeSource.value = communication
+	showComposeDialog.value = true
+}
+
+function onEmailSent() {
+	// The sent mail is filed against the lead, so it shows up in the feed.
+	loadActivity()
+	toast({ title: "Email sent", icon: "check-circle", iconClasses: "text-ink-green-4" })
 }
 
 function openNoteEditor(entry) {

@@ -613,6 +613,62 @@ def set_lead_hours_predictions(lead, rows=None):
 	return _serialize_hours_predictions(doc)
 
 
+def _thread_key(subject):
+	"""Normalised subject used to group a conversation together.
+
+	Reply/forward prefixes accumulate ("Re: Fwd: Re: ..."), and localised
+	ones are common in German mail clients, so strip them repeatedly until
+	the underlying subject is left.
+	"""
+	clean = (subject or "").strip()
+	while True:
+		stripped = re.sub(r"^\s*(re|fwd|fw|aw|wg)\s*:\s*", "", clean, flags=re.IGNORECASE)
+		if stripped == clean:
+			break
+		clean = stripped
+	return clean.casefold()
+
+
+@frappe.whitelist(methods=["POST"])
+def send_lead_email(lead, recipients, subject, content, cc=None, bcc=None, in_reply_to=None, send=1):
+	"""Send an email from the system, linked to the Lead.
+
+	Goes through Frappe's own `communication.email.make`, so the outgoing
+	message is recorded as a Communication against this Lead and replies
+	thread back to it — which a mailto: handoff can't do, since the mail
+	never passes through the system at all.
+	"""
+	_check_lead_access()
+	frappe.has_permission("Lead", "write", throw=True)
+
+	doc = frappe.get_doc("Lead", lead)
+	doc.check_permission("read")
+
+	recipients = (recipients or "").strip()
+	subject = (subject or "").strip()
+	if not recipients:
+		frappe.throw(_("At least one recipient is required."))
+	if not subject:
+		frappe.throw(_("A subject is required."))
+
+	from frappe.core.doctype.communication.email import make
+
+	result = make(
+		doctype="Lead",
+		name=lead,
+		content=content or "",
+		subject=subject,
+		recipients=recipients,
+		cc=cc or None,
+		bcc=bcc or None,
+		in_reply_to=in_reply_to or None,
+		communication_medium="Email",
+		sent_or_received="Sent",
+		send_email=frappe.utils.cint(send),
+	)
+	return {"name": result.get("name")}
+
+
 @frappe.whitelist(methods=["POST"])
 def update_lead_note(lead, note_name, content):
 	"""Edit an existing note on a Lead.
@@ -743,10 +799,28 @@ def get_lead_activity(name):
 	communications = frappe.get_all(
 		"Communication",
 		filters={"reference_doctype": "Lead", "reference_name": doc.name},
-		fields=["name", "subject", "content", "sent_or_received", "communication_date", "sender", "recipients"],
+		fields=[
+			"name",
+			"subject",
+			"content",
+			"sent_or_received",
+			"communication_date",
+			"sender",
+			"recipients",
+			"cc",
+			"in_reply_to",
+		],
 		order_by="communication_date desc",
 		limit_page_length=20,
 	)
+
+	# Tag each message with its conversation so the UI can show them as one.
+	thread_counts = {}
+	for row in communications:
+		row["thread_key"] = _thread_key(row.subject)
+		thread_counts[row["thread_key"]] = thread_counts.get(row["thread_key"], 0) + 1
+	for row in communications:
+		row["thread_size"] = thread_counts[row["thread_key"]]
 
 	return {
 		"notes": _serialize_notes(doc),
