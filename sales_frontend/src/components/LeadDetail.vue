@@ -48,6 +48,27 @@
 
 			<!-- Communication / Notes / Activities feed — independent show/hide toggles, not exclusive tabs, so any combination (including all three) can be visible at once. -->
 			<section class="flex min-w-0 flex-1 flex-col overflow-hidden bg-surface-gray-1">
+				<div class="flex flex-shrink-0 flex-wrap items-center gap-x-5 gap-y-1.5 border-b border-outline-gray-2 bg-surface-white px-4 py-3">
+					<span class="text-base font-semibold text-ink-gray-9">{{ lead.lead_name || lead.name }}</span>
+					<a
+						v-for="number in phoneNumbers"
+						:key="number"
+						:href="`tel:${number}`"
+						class="flex items-center gap-1.5 text-sm text-ink-gray-7 hover:text-ink-gray-9"
+						@click="showNoteDialog = true"
+					>
+						<FeatherIcon name="phone" class="h-3.5 w-3.5 flex-shrink-0 text-ink-gray-5" />
+						<span>{{ number }}</span>
+					</a>
+					<a
+						v-if="lead.email_id"
+						:href="mailtoHref"
+						class="flex items-center gap-1.5 text-sm text-ink-gray-7 hover:text-ink-gray-9"
+					>
+						<FeatherIcon name="mail" class="h-3.5 w-3.5 flex-shrink-0 text-ink-gray-5" />
+						<span class="truncate">{{ lead.email_id }}</span>
+					</a>
+				</div>
 				<div class="flex flex-shrink-0 items-center gap-2 border-b border-outline-gray-2 bg-surface-white px-4 py-2.5">
 					<button
 						v-for="filter in feedFilters"
@@ -175,28 +196,6 @@
 				/>
 
 				<ErrorMessage :message="saveError" />
-
-				<section class="space-y-2">
-					<div class="text-[11px] font-semibold uppercase tracking-wide text-ink-gray-6">Contact</div>
-					<a
-						v-for="number in phoneNumbers"
-						:key="number"
-						:href="`tel:${number}`"
-						class="flex items-center gap-2 rounded-md border border-outline-gray-2 bg-surface-white px-3 py-2 text-sm text-ink-gray-8 hover:bg-surface-gray-2"
-						@click="showNoteDialog = true"
-					>
-						<FeatherIcon name="phone" class="h-4 w-4 flex-shrink-0 text-ink-gray-5" />
-						<span>{{ number }}</span>
-					</a>
-					<a
-						v-if="lead.email_id"
-						:href="mailtoHref"
-						class="flex items-center gap-2 rounded-md border border-outline-gray-2 bg-surface-white px-3 py-2 text-sm text-ink-gray-8 hover:bg-surface-gray-2"
-					>
-						<FeatherIcon name="mail" class="h-4 w-4 flex-shrink-0 text-ink-gray-5" />
-						<span class="truncate">{{ lead.email_id }}</span>
-					</a>
-				</section>
 
 				<Button variant="subtle" @click="showNoteDialog = true">Add note</Button>
 
