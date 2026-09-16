@@ -32,10 +32,27 @@ LEAD_LIST_FIELDS = [
 	"modified",
 ]
 
-# Fields editable inline from the Follow Ups cockpit's Transactional panel —
-# the things a rep changes on every follow-up. Everything else on Lead is
-# either master data (company/firmographic, read-only here) or system-set.
-LEAD_EDITABLE_FIELDS = ("status", "custom_next_followup", "qualification_status", "custom_status_comment")
+# Fields editable inline from the Follow Ups cockpit — transactional fields
+# a rep changes on every follow-up, plus master-data fields that start out
+# unset and get filled in over time. `qualified_by`/`qualified_on` stay
+# system-set (not in this list) since they're set by Frappe's own qualify
+# flow, not typed in directly.
+LEAD_TRANSACTIONAL_FIELDS = ("status", "custom_next_followup", "qualification_status", "custom_status_comment")
+LEAD_MASTER_FIELDS = (
+	"company_name",
+	"website",
+	"city",
+	"state",
+	"country",
+	"territory",
+	"source",
+	"industry",
+	"no_of_employees",
+	"market_segment",
+	"annual_revenue",
+	"request_type",
+)
+LEAD_EDITABLE_FIELDS = LEAD_TRANSACTIONAL_FIELDS + LEAD_MASTER_FIELDS
 
 LOST_STATUSES = ("Do Not Contact", "Lost Quotation")
 CONVERTED_STATUS = "Converted"
@@ -173,8 +190,27 @@ def get_lead(name):
 
 
 @frappe.whitelist(methods=["POST"])
-def update_lead(name, status=None, custom_next_followup=None, qualification_status=None, custom_status_comment=None, if_modified=None):
-	"""Update whitelisted transactional Lead fields, autosave-style.
+def update_lead(
+	name,
+	status=None,
+	custom_next_followup=None,
+	qualification_status=None,
+	custom_status_comment=None,
+	company_name=None,
+	website=None,
+	city=None,
+	state=None,
+	country=None,
+	territory=None,
+	source=None,
+	industry=None,
+	no_of_employees=None,
+	market_segment=None,
+	annual_revenue=None,
+	request_type=None,
+	if_modified=None,
+):
+	"""Update whitelisted transactional + master-data Lead fields, autosave-style.
 
 	`if_modified` is the `modified` timestamp the client last saw. A
 	mismatch means someone else saved this Lead since the client loaded
@@ -188,6 +224,9 @@ def update_lead(name, status=None, custom_next_followup=None, qualification_stat
 	fires from `doc.save()`; a status change to "Do Not Contact" without
 	`custom_status_comment` in the same call will raise, and the caller
 	should let the Status Comment field pick that up on the next save.
+	`territory`/`source`/`industry`/`market_segment` are Link fields —
+	`doc.save()` will raise if a typed value doesn't match an existing
+	record, surfaced to the caller like any other save error.
 	"""
 	frappe.has_permission("Lead", "write", throw=True)
 	doc = frappe.get_doc("Lead", name)
@@ -199,6 +238,18 @@ def update_lead(name, status=None, custom_next_followup=None, qualification_stat
 		"custom_next_followup": custom_next_followup,
 		"qualification_status": qualification_status,
 		"custom_status_comment": custom_status_comment,
+		"company_name": company_name,
+		"website": website,
+		"city": city,
+		"state": state,
+		"country": country,
+		"territory": territory,
+		"source": source,
+		"industry": industry,
+		"no_of_employees": no_of_employees,
+		"market_segment": market_segment,
+		"annual_revenue": annual_revenue,
+		"request_type": request_type,
 	}
 	updates = {k: v for k, v in fields.items() if v is not None}
 	unknown = set(updates) - set(LEAD_EDITABLE_FIELDS)

@@ -2,48 +2,38 @@
 	<div class="flex h-full min-h-0 w-full">
 		<div v-if="loading" class="flex flex-1 items-center justify-center text-sm text-ink-gray-5">Loading…</div>
 		<template v-else-if="lead">
-			<!-- Master data: company/contact identity + firmographics. Rarely changes; read-only here. -->
-			<section class="w-72 flex-none space-y-4 overflow-y-auto border-r border-outline-gray-2 bg-surface-white p-4 text-sm">
+			<!-- Master data: company/contact identity + firmographics. Rarely changes once set, but editable/fillable-in here. -->
+			<section class="w-72 flex-none space-y-4 overflow-y-auto border-r border-outline-gray-2 bg-surface-white p-4">
+				<FormControl v-model="companyName" label="Company" type="text" size="sm" />
+
 				<div>
-					<div class="text-[11px] font-semibold uppercase tracking-wide text-ink-gray-6">Company</div>
-					<div class="text-ink-gray-8">{{ lead.company_name || "—" }}</div>
+					<label class="mb-1.5 block text-xs text-ink-gray-5">Website</label>
+					<div class="flex items-center gap-1.5">
+						<FormControl v-model="website" type="text" size="sm" placeholder="https://…" class="min-w-0 flex-1" />
+						<button
+							type="button"
+							class="flex-shrink-0 rounded-md border border-outline-gray-2 p-1.5 text-ink-gray-6 hover:bg-surface-gray-2 hover:text-ink-gray-9 disabled:opacity-40"
+							:disabled="!website"
+							title="Open website in a dialog"
+							@click="showWebsiteDialog = true"
+						>
+							<FeatherIcon name="maximize-2" class="h-4 w-4" />
+						</button>
+					</div>
 				</div>
-				<div>
-					<div class="text-[11px] font-semibold uppercase tracking-wide text-ink-gray-6">Website</div>
-					<div class="truncate text-ink-gray-8">{{ lead.website || "—" }}</div>
+
+				<div class="grid grid-cols-2 gap-2">
+					<FormControl v-model="city" label="City" type="text" size="sm" />
+					<FormControl v-model="state" label="State" type="text" size="sm" />
 				</div>
-				<div>
-					<div class="text-[11px] font-semibold uppercase tracking-wide text-ink-gray-6">Location</div>
-					<div class="text-ink-gray-8">{{ locationLabel }}</div>
-				</div>
-				<div>
-					<div class="text-[11px] font-semibold uppercase tracking-wide text-ink-gray-6">Territory</div>
-					<div class="text-ink-gray-8">{{ lead.territory || "—" }}</div>
-				</div>
-				<div>
-					<div class="text-[11px] font-semibold uppercase tracking-wide text-ink-gray-6">Source</div>
-					<div class="text-ink-gray-8">{{ lead.source || "—" }}</div>
-				</div>
-				<div>
-					<div class="text-[11px] font-semibold uppercase tracking-wide text-ink-gray-6">Industry</div>
-					<div class="text-ink-gray-8">{{ lead.industry || "—" }}</div>
-				</div>
-				<div>
-					<div class="text-[11px] font-semibold uppercase tracking-wide text-ink-gray-6">No. of Employees</div>
-					<div class="text-ink-gray-8">{{ lead.no_of_employees || "—" }}</div>
-				</div>
-				<div>
-					<div class="text-[11px] font-semibold uppercase tracking-wide text-ink-gray-6">Market Segment</div>
-					<div class="text-ink-gray-8">{{ lead.market_segment || "—" }}</div>
-				</div>
-				<div>
-					<div class="text-[11px] font-semibold uppercase tracking-wide text-ink-gray-6">Annual Revenue</div>
-					<div class="text-ink-gray-8">{{ lead.annual_revenue ?? "—" }}</div>
-				</div>
-				<div>
-					<div class="text-[11px] font-semibold uppercase tracking-wide text-ink-gray-6">Request Type</div>
-					<div class="text-ink-gray-8">{{ lead.request_type || "—" }}</div>
-				</div>
+				<FormControl v-model="country" label="Country" type="text" size="sm" />
+				<FormControl v-model="territory" label="Territory" type="text" size="sm" />
+				<FormControl v-model="source" label="Source" type="text" size="sm" />
+				<FormControl v-model="industry" label="Industry" type="text" size="sm" />
+				<FormControl v-model="noOfEmployees" label="No. of Employees" type="select" size="sm" :options="noOfEmployeesOptions" />
+				<FormControl v-model="marketSegment" label="Market Segment" type="text" size="sm" />
+				<FormControl v-model="annualRevenue" label="Annual Revenue" type="number" size="sm" />
+				<FormControl v-model="requestType" label="Request Type" type="select" size="sm" :options="requestTypeOptions" />
 			</section>
 
 			<!-- Communication / Notes / Activities feed — independent show/hide toggles, not exclusive tabs, so any combination (including all three) can be visible at once. -->
@@ -235,6 +225,18 @@
 	</div>
 
 	<AddLeadNoteDialog v-if="lead" v-model="showNoteDialog" :lead="lead" @saved="onNoteSaved" />
+
+	<Dialog
+		v-model="showWebsiteDialog"
+		:options="{ title: lead?.company_name || lead?.lead_name || 'Website', size: '5xl' }"
+	>
+		<template #body-content>
+			<p class="mb-2 text-xs text-ink-gray-5">
+				Some sites block embedding and won't load here — use "Open in Desk" or copy the URL if this stays blank.
+			</p>
+			<iframe :src="websiteUrl" class="h-[70vh] w-full rounded-md border border-outline-gray-2" />
+		</template>
+	</Dialog>
 </template>
 
 <script setup>
@@ -247,7 +249,13 @@ import {
 	parseSystemDatetimeToUserDate,
 	toDatetimeLocalValue,
 } from "@spa/utils/datetime"
-import { LEAD_STATUSES, QUALIFICATION_STATUSES, leadStatusTheme } from "@/leadListColumns.js"
+import {
+	LEAD_STATUSES,
+	NO_OF_EMPLOYEES_OPTIONS,
+	QUALIFICATION_STATUSES,
+	REQUEST_TYPE_OPTIONS,
+	leadStatusTheme,
+} from "@/leadListColumns.js"
 import AddLeadNoteDialog from "./AddLeadNoteDialog.vue"
 
 const API = "phamos.api.sales_leads"
@@ -266,11 +274,25 @@ const syncing = ref(false)
 const savingStatus = ref(false)
 const saveError = ref("")
 const showNoteDialog = ref(false)
+const showWebsiteDialog = ref(false)
 
 const status = ref("")
 const nextFollowUpLocal = ref("")
 const qualificationStatus = ref("")
 const statusComment = ref("")
+
+const companyName = ref("")
+const website = ref("")
+const city = ref("")
+const state = ref("")
+const country = ref("")
+const territory = ref("")
+const source = ref("")
+const industry = ref("")
+const noOfEmployees = ref("")
+const marketSegment = ref("")
+const annualRevenue = ref("")
+const requestType = ref("")
 
 const activityLoading = ref(false)
 const notes = ref([])
@@ -301,6 +323,16 @@ const qualificationOptions = computed(() => [
 	...QUALIFICATION_STATUSES.map((q) => ({ label: q, value: q })),
 ])
 
+const noOfEmployeesOptions = computed(() => [
+	{ label: "—", value: "" },
+	...NO_OF_EMPLOYEES_OPTIONS.map((o) => ({ label: o, value: o })),
+])
+
+const requestTypeOptions = computed(() => [
+	{ label: "—", value: "" },
+	...REQUEST_TYPE_OPTIONS.map((o) => ({ label: o, value: o })),
+])
+
 const phoneNumbers = computed(() => [...new Set([lead.value?.mobile_no, lead.value?.phone].filter(Boolean))])
 
 const mailtoHref = computed(() => {
@@ -309,9 +341,12 @@ const mailtoHref = computed(() => {
 	return `mailto:${lead.value.email_id}?cc=crm@phamos.eu&subject=${subject}`
 })
 
-const locationLabel = computed(() => {
-	if (!lead.value) return "—"
-	return [lead.value.city, lead.value.state, lead.value.country].filter(Boolean).join(", ") || "—"
+// Websites are often stored without a protocol; assume https so the iframe
+// has a usable absolute URL rather than resolving relative to this SPA.
+const websiteUrl = computed(() => {
+	const value = (website.value || "").trim()
+	if (!value) return ""
+	return /^https?:\/\//i.test(value) ? value : `https://${value}`
 })
 
 function stripHtml(value) {
@@ -327,6 +362,18 @@ function syncFieldsFromLead() {
 	nextFollowUpLocal.value = toDatetimeLocalValue(parseSystemDatetimeToUserDate(lead.value.custom_next_followup))
 	qualificationStatus.value = lead.value.qualification_status || ""
 	statusComment.value = lead.value.custom_status_comment || ""
+	companyName.value = lead.value.company_name || ""
+	website.value = lead.value.website || ""
+	city.value = lead.value.city || ""
+	state.value = lead.value.state || ""
+	country.value = lead.value.country || ""
+	territory.value = lead.value.territory || ""
+	source.value = lead.value.source || ""
+	industry.value = lead.value.industry || ""
+	noOfEmployees.value = lead.value.no_of_employees || ""
+	marketSegment.value = lead.value.market_segment || ""
+	annualRevenue.value = lead.value.annual_revenue ?? ""
+	requestType.value = lead.value.request_type || ""
 	saveError.value = ""
 	nextTick(() => {
 		syncing.value = false
@@ -372,6 +419,18 @@ async function saveFields() {
 				: "",
 			qualification_status: qualificationStatus.value,
 			custom_status_comment: statusComment.value,
+			company_name: companyName.value,
+			website: website.value,
+			city: city.value,
+			state: state.value,
+			country: country.value,
+			territory: territory.value,
+			source: source.value,
+			industry: industry.value,
+			no_of_employees: noOfEmployees.value,
+			market_segment: marketSegment.value,
+			annual_revenue: annualRevenue.value === "" ? 0 : annualRevenue.value,
+			request_type: requestType.value,
 			if_modified: lead.value.modified,
 		})
 		if (updated.conflict) {
@@ -393,10 +452,30 @@ const scheduleSave = debounce(() => {
 	saveFields()
 }, 500)
 
-watch([status, nextFollowUpLocal, qualificationStatus, statusComment], () => {
-	if (syncing.value) return
-	scheduleSave()
-})
+watch(
+	[
+		status,
+		nextFollowUpLocal,
+		qualificationStatus,
+		statusComment,
+		companyName,
+		website,
+		city,
+		state,
+		country,
+		territory,
+		source,
+		industry,
+		noOfEmployees,
+		marketSegment,
+		annualRevenue,
+		requestType,
+	],
+	() => {
+		if (syncing.value) return
+		scheduleSave()
+	}
+)
 
 function onNoteSaved(updated) {
 	lead.value = { ...lead.value, ...updated }

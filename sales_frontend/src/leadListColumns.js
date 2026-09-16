@@ -24,6 +24,10 @@ export const LEAD_STATUSES = [
 
 export const QUALIFICATION_STATUSES = ["Unqualified", "In Process", "Qualified"]
 
+export const NO_OF_EMPLOYEES_OPTIONS = ["1-10", "11-50", "51-200", "201-500", "501-1000", "1000+"]
+
+export const REQUEST_TYPE_OPTIONS = ["Product Enquiry", "Request for Information", "Suggestions", "Other"]
+
 export const LEAD_STATUS_THEMES = {
 	Lead: "gray",
 	Open: "blue",
