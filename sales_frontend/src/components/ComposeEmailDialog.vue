@@ -89,15 +89,13 @@
 				<!-- The footer is assembled by the system at send time (Email Account
 				     footer, System Settings' address, the standard footer), so it
 				     can't be edited here — but it does go out, so show it. -->
-				<details v-if="footer" class="rounded border border-outline-gray-2 bg-surface-gray-1 px-2.5 py-1.5">
-					<summary class="cursor-pointer select-none text-xs text-ink-gray-5">
-						Footer added when sent
-					</summary>
+				<div v-if="footer" class="rounded border border-outline-gray-2 bg-surface-gray-1 px-2.5 py-1.5">
+					<p class="text-xs text-ink-gray-5">Footer added when sent</p>
 					<div
 						class="mt-1.5 max-h-24 overflow-y-auto border-t border-outline-gray-2 pt-1.5 text-xs text-ink-gray-6 [&_a]:underline"
 						v-html="footer"
 					/>
-				</details>
+				</div>
 
 				<div class="flex flex-wrap items-center gap-1.5">
 					<FileUploader
