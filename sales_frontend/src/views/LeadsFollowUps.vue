@@ -32,6 +32,9 @@
 								:options="followUpSortOption"
 							/>
 						</div>
+						<!-- Next step has no sort or filter of its own; the cell keeps the
+						     toolbar aligned with the rows. -->
+						<div class="flex min-w-0 justify-center text-xs text-ink-gray-5">Next Step</div>
 						<div class="flex min-w-0 justify-center">
 							<ListSortSelector
 								standalone

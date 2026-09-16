@@ -33,6 +33,7 @@ LEAD_LIST_FIELDS = [
 	"email_id",
 	"territory",
 	"custom_next_followup",
+	"custom_status_comment",
 	"creation",
 	"modified",
 ]
@@ -213,12 +214,42 @@ def _is_overdue(next_followup, today_date=None):
 	return getdate(next_followup) < (today_date or getdate())
 
 
-def _serialize_lead_row(row, owner_names, owner_images, today_date):
+def _serialize_lead_row(row, owner_names, owner_images, today_date, next_steps=None):
 	owner = row.get("lead_owner")
 	row["owner_name"] = owner_names.get(owner) or owner
 	row["owner_image"] = owner_images.get(owner) or ""
 	row["overdue"] = _is_overdue(row.get("custom_next_followup"), today_date)
+
+	step = (next_steps or {}).get(row.get("name"))
+	row["next_step"] = step.get("next_step") if step else None
+	row["next_step_date"] = step.get("date") if step else None
+	row["next_step_overdue"] = _is_overdue(step.get("date"), today_date) if step else False
 	return row
+
+
+def _soonest_next_steps(lead_names):
+	"""The single most pressing next step per Lead, for the list view.
+
+	One query for the whole page rather than one per row — the list is the
+	place where an N+1 would actually be felt.
+	"""
+	if not lead_names:
+		return {}
+
+	rows = frappe.get_all(
+		"Lead Next Step",
+		filters={"parent": ["in", lead_names], "parenttype": "Lead"},
+		fields=["parent", "next_step", "date"],
+		# Undated steps last, so a dated one always wins as "what's next".
+		order_by="date is null asc, date asc, idx asc",
+	)
+
+	soonest = {}
+	for row in rows:
+		if not (row.next_step or "").strip():
+			continue
+		soonest.setdefault(row.parent, {"next_step": row.next_step, "date": row.date})
+	return soonest
 
 
 @frappe.whitelist()
@@ -246,7 +277,10 @@ def get_leads():
 	owner_images = dict(zip(owners, _user_images(owners)))
 
 	today_date = getdate()
-	items = [_serialize_lead_row(row, owner_names, owner_images, today_date) for row in rows]
+	next_steps = _soonest_next_steps([r.name for r in rows])
+	items = [
+		_serialize_lead_row(row, owner_names, owner_images, today_date, next_steps) for row in rows
+	]
 
 	return {"items": items, "truncated": truncated, "statuses": LEAD_STATUSES}
 
@@ -403,6 +437,13 @@ def _serialize_lead_detail(doc):
 		"custom_planned_start": doc.custom_planned_start,
 		"hours_predictions": _serialize_hours_predictions(doc),
 		"custom_status_comment": doc.custom_status_comment,
+		# Who last changed the comment and when — Desk shows this alongside the
+		# comment, so the cockpit shouldn't be the surface that drops it.
+		"custom_status_comment_modified_by": doc.custom_status_comment_modified_by,
+		"custom_status_comment_modified_by_name": _user_label(doc.custom_status_comment_modified_by)
+		if doc.custom_status_comment_modified_by
+		else None,
+		"custom_status_comment_modified_date": doc.custom_status_comment_modified_date,
 		"qualification_status": doc.qualification_status,
 		"qualified_by": doc.qualified_by,
 		"qualified_by_name": _user_label(doc.qualified_by) if doc.qualified_by else None,

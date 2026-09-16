@@ -48,6 +48,54 @@ def _follow_ups_section(today_date):
 	}
 
 
+def _next_steps_section(today_date):
+	"""Next steps that have come due, so they're actionable without opening each lead."""
+	steps = frappe.get_all(
+		"Lead Next Step",
+		filters={"parenttype": "Lead", "date": ("<=", today_date)},
+		fields=["parent", "next_step", "date"],
+		order_by="date asc",
+		limit_page_length=TODAY_LIMIT,
+	)
+
+	leads = {
+		row.name: row
+		for row in frappe.get_all(
+			"Lead",
+			filters={
+				"name": ("in", list({s.parent for s in steps})),
+				"disabled": 0,
+				"status": ("not in", ["Converted", "Do Not Contact", "Lost Quotation"]),
+			},
+			fields=["name", "lead_name", "company_name"],
+		)
+	} if steps else {}
+
+	items = []
+	for step in steps:
+		lead = leads.get(step.parent)
+		# A step on a closed or disabled lead isn't work for today.
+		if not lead or not (step.next_step or "").strip():
+			continue
+		overdue = getdate(step.date) < today_date
+		items.append(
+			{
+				"title": step.next_step,
+				"subtitle": lead.lead_name or lead.company_name or lead.name,
+				"meta": _("Overdue") if overdue else _("Today"),
+				"tone": "red" if overdue else "amber",
+				"route": {"name": "LeadDetail", "params": {"name": lead.name}},
+			}
+		)
+
+	return {
+		"key": "next_steps",
+		"title": _("Next steps due"),
+		"empty": _("No next steps due today"),
+		"items": items,
+	}
+
+
 def _demos_section(today_date):
 	"""Demos happening today, plus any still waiting on a date."""
 	scheduled = frappe.get_all(
@@ -112,7 +160,7 @@ def sales_today_sections():
 	_check_lead_access()
 	today_date = getdate(today())
 
-	sections = [_follow_ups_section(today_date)]
+	sections = [_follow_ups_section(today_date), _next_steps_section(today_date)]
 	if frappe.has_permission("Demo", "read"):
 		sections.append(_demos_section(today_date))
 		sections.append(_awaiting_date_section())

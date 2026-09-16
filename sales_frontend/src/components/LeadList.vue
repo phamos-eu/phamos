@@ -13,6 +13,15 @@
 					{{ lead.lead_name || lead.name }}
 				</div>
 				<div v-if="lead.company_name" class="truncate text-xs text-ink-gray-6">{{ lead.company_name }}</div>
+				<!-- Why a lead sits where it does — most often the "Do Not Contact"
+				     reason — without having to open it. -->
+				<div
+					v-if="lead.custom_status_comment"
+					class="truncate text-xs italic text-ink-gray-5"
+					:title="lead.custom_status_comment"
+				>
+					{{ lead.custom_status_comment }}
+				</div>
 			</div>
 			<div class="flex min-w-0 flex-wrap items-center justify-center gap-1.5">
 				<Badge class="whitespace-nowrap" :label="lead.status" :theme="leadStatusTheme(lead.status)" size="sm" variant="subtle" />
@@ -35,6 +44,15 @@
 					variant="subtle"
 				/>
 				<span v-else>{{ formatDate(lead.custom_next_followup) }}</span>
+			</div>
+			<div class="min-w-0 text-center text-xs">
+				<template v-if="lead.next_step">
+					<div class="truncate text-ink-gray-7" :title="lead.next_step">{{ lead.next_step }}</div>
+					<div v-if="lead.next_step_date" :class="lead.next_step_overdue ? 'text-ink-red-4' : 'text-ink-gray-5'">
+						{{ formatDate(lead.next_step_date) }}
+					</div>
+				</template>
+				<span v-else class="text-ink-gray-5">—</span>
 			</div>
 			<div class="min-w-0 text-center text-xs text-ink-gray-6">
 				{{ lead.modified ? formatDate(lead.modified) : "—" }}

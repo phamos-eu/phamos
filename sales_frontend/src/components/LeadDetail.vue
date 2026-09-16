@@ -76,7 +76,11 @@
 						<span class="truncate">{{ lead.email_id }}</span>
 					</button>
 				</div>
-				<div class="grid flex-shrink-0 grid-cols-2 gap-4 border-b border-outline-gray-2 bg-surface-white px-4 py-2.5">
+				<!-- Capped as a band rather than per field: each field shows as much as it
+				     has, and it's the band as a whole that yields height to the feed. -->
+				<div
+					class="grid max-h-[33%] flex-shrink-0 grid-cols-2 gap-4 overflow-y-auto border-b border-outline-gray-2 bg-surface-white px-4 py-2.5"
+				>
 					<div>
 						<label class="mb-1.5 flex items-center gap-1.5 text-xs text-ink-gray-5">
 							<span>Status Comment</span>
@@ -84,32 +88,58 @@
 							     eval:doc.status=='Do Not Contact'), so flag it rather than let the
 							     save fail with a bare validation error. -->
 							<span v-if="status === 'Do Not Contact'" class="text-ink-red-4">required</span>
+							<span v-if="statusCommentStamp" class="ml-auto truncate text-ink-gray-5">
+								{{ statusCommentStamp }}
+							</span>
 						</label>
-						<FormControl
+						<!-- Grows with its content instead of hiding the rest behind a
+						     two-line scroll — a status comment is the one thing on this
+						     record people write paragraphs in. -->
+						<textarea
+							ref="statusCommentEl"
 							v-model="statusComment"
-							type="textarea"
-							size="sm"
 							rows="2"
 							placeholder="Reason and comments for this lead's status"
+							class="form-textarea block max-h-40 w-full resize-none overflow-y-auto rounded border border-outline-gray-2 bg-surface-white px-2 py-1.5 text-base text-ink-gray-8"
+							@input="autoGrowStatusComment"
 						/>
 					</div>
 
 					<div ref="nextStepsRoot" class="min-w-0">
-						<label class="mb-1.5 block text-xs text-ink-gray-5">Next Steps</label>
+						<label class="mb-1.5 flex items-center gap-1.5 text-xs text-ink-gray-5">
+							<span>Next Steps</span>
+							<span
+								v-if="nextSteps.length"
+								class="rounded bg-surface-gray-3 px-1.5 text-xs text-ink-gray-7"
+							>
+								{{ nextSteps.length }}
+							</span>
+							<span v-if="overdueStepCount" class="ml-auto text-ink-red-4">
+								{{ overdueStepCount }} overdue
+							</span>
+						</label>
 						<!--
 							Keyboard-first, mirroring ChecklistEditor: Enter opens a new row
 							*below* the current one, Up/Down walk the rows, Backspace on an
 							empty row removes it. Blank rows are dropped server-side on save.
 						-->
-						<div v-if="nextSteps.length" class="mb-1.5 max-h-24 space-y-1.5 overflow-y-auto pr-1">
-							<div v-for="(step, index) in nextSteps" :key="step.key" class="flex items-center gap-1.5">
+						<!-- Rows read as text and become inputs on focus: quieter to scan,
+						     roughly half the height, and the keyboard model is untouched. -->
+						<div v-if="nextSteps.length" class="mb-1.5 space-y-0.5">
+							<div
+								v-for="(step, index) in visibleSteps"
+								:key="step.key"
+								class="group flex items-center gap-1.5 rounded border border-transparent px-0.5 focus-within:border-outline-gray-2 focus-within:bg-surface-gray-1 hover:border-outline-gray-2"
+								:class="isStepOverdue(step) ? 'border-outline-red-2' : ''"
+							>
 								<input
 									v-model="step.next_step"
 									type="text"
 									placeholder="Next step"
+									:title="step.next_step"
 									:data-step-index="index"
 									data-step-field="next_step"
-									class="form-input h-7 min-w-0 flex-1 rounded border border-outline-gray-2 bg-surface-white px-2 text-sm text-ink-gray-8"
+									class="h-6 min-w-0 flex-1 truncate border-none bg-transparent px-1 text-sm text-ink-gray-8 focus:ring-0"
 									@change="scheduleNextStepsSave"
 									@keydown.enter.prevent="insertStepBelow(index)"
 									@keydown.down.prevent="moveStepFocus(index, 1, 'next_step')"
@@ -119,20 +149,21 @@
 								<span
 									:data-step-index="index"
 									data-step-field="date"
-									class="w-32 flex-none"
+									class="w-28 flex-none"
+									:class="isStepOverdue(step) ? 'text-ink-red-4' : ''"
 									@keydown.down.prevent="moveStepFocus(index, 1, 'date')"
 									@keydown.up.prevent="moveStepFocus(index, -1, 'date')"
 								>
 									<DatePicker
 										:model-value="step.date || ''"
 										placeholder="Date"
-										input-class="h-7 text-xs"
+										input-class="h-6 border-none bg-transparent text-xs focus:ring-0"
 										@update:model-value="(value) => onStepDateChange(step, value)"
 									/>
 								</span>
 								<button
 									type="button"
-									class="flex-none rounded p-1 text-ink-gray-5 hover:bg-surface-gray-2 hover:text-ink-gray-9"
+									class="flex-none rounded p-0.5 text-ink-gray-5 opacity-0 hover:bg-surface-gray-2 hover:text-ink-gray-9 focus-visible:opacity-100 group-focus-within:opacity-100 group-hover:opacity-100"
 									title="Remove"
 									@click="removeNextStep(index)"
 								>
@@ -140,14 +171,25 @@
 								</button>
 							</div>
 						</div>
-						<button
-							type="button"
-							class="flex items-center gap-1 rounded px-1.5 py-0.5 text-xs text-ink-gray-6 hover:bg-surface-gray-2 hover:text-ink-gray-9"
-							@click="addNextStep"
-						>
-							<FeatherIcon name="plus" class="h-3.5 w-3.5" />
-							<span>Add next step</span>
-						</button>
+						<div class="flex items-center gap-3">
+							<!-- An explicit count beats a scrollbar nobody sees. -->
+							<button
+								v-if="nextSteps.length > COLLAPSED_STEPS"
+								type="button"
+								class="rounded px-1.5 py-0.5 text-xs text-ink-gray-6 hover:bg-surface-gray-2 hover:text-ink-gray-9"
+								@click="showAllSteps = !showAllSteps"
+							>
+								{{ showAllSteps ? "Show fewer" : `Show all ${nextSteps.length}` }}
+							</button>
+							<button
+								type="button"
+								class="flex items-center gap-1 rounded px-1.5 py-0.5 text-xs text-ink-gray-6 hover:bg-surface-gray-2 hover:text-ink-gray-9"
+								@click="addNextStep"
+							>
+								<FeatherIcon name="plus" class="h-3.5 w-3.5" />
+								<span>Add next step</span>
+							</button>
+						</div>
 					</div>
 				</div>
 				<div class="flex flex-shrink-0 items-center gap-2 border-b border-outline-gray-2 bg-surface-white px-4 py-2.5">
@@ -431,7 +473,7 @@
 <script setup>
 import { computed, nextTick, onMounted, ref, watch } from "vue"
 import { call, debounce, toast, Badge, DatePicker } from "frappe-ui"
-import { formatDatetime } from "@spa/utils/datetime"
+import { formatDate, formatDatetime } from "@spa/utils/datetime"
 import {
 	LEAD_STATUSES,
 	NO_OF_EMPLOYEES_OPTIONS,
@@ -487,6 +529,39 @@ const predictionsRoot = ref(null)
 const DEFAULT_PREDICTION_MONTHS = 3
 const nextSteps = ref([])
 const nextStepsRoot = ref(null)
+const statusCommentEl = ref(null)
+/** Rows shown before the "Show all" expander takes over. */
+const COLLAPSED_STEPS = 5
+const showAllSteps = ref(false)
+
+const visibleSteps = computed(() =>
+	showAllSteps.value ? nextSteps.value : nextSteps.value.slice(0, COLLAPSED_STEPS)
+)
+
+/** Local midnight, so "today" isn't overdue. */
+function isStepOverdue(step) {
+	if (!step.date) return false
+	const today = new Date()
+	today.setHours(0, 0, 0, 0)
+	return new Date(`${String(step.date).slice(0, 10)}T00:00:00`) < today
+}
+
+const overdueStepCount = computed(() => nextSteps.value.filter(isStepOverdue).length)
+
+const statusCommentStamp = computed(() => {
+	const who = lead.value?.custom_status_comment_modified_by_name
+	const when = lead.value?.custom_status_comment_modified_date
+	if (!who && !when) return ""
+	return [who, when ? formatDate(when) : ""].filter(Boolean).join(" · ")
+})
+
+/** A comment shows all of itself, up to the field's own max height. */
+function autoGrowStatusComment() {
+	const el = statusCommentEl.value
+	if (!el) return
+	el.style.height = "auto"
+	el.style.height = `${el.scrollHeight}px`
+}
 // Stable per-row key so re-sorting moves DOM nodes (and keeps focus with the
 // row) instead of rewriting values in place.
 let nextStepKey = 0
@@ -687,6 +762,8 @@ function syncFieldsFromLead() {
 	nextFollowUp.value = lead.value.custom_next_followup || ""
 	qualificationStatus.value = lead.value.qualification_status || ""
 	statusComment.value = lead.value.custom_status_comment || ""
+	// Size the box to a stored comment on arrival, not after the first keystroke.
+	nextTick(autoGrowStatusComment)
 	leadOwner.value = lead.value.lead_owner || ""
 	plannedStart.value = lead.value.custom_planned_start || ""
 	hoursPredictions.value = (lead.value.hours_predictions || []).map((row) => ({
@@ -973,12 +1050,15 @@ const scheduleHoursSave = debounce(() => {
 }, 500)
 
 function addNextStep() {
+	// Never create a row behind the fold.
+	showAllSteps.value = true
 	nextSteps.value.push({ key: nextStepKey++, next_step: "", date: "" })
 	focusStep(nextSteps.value.length - 1)
 }
 
 /** Enter opens the next row directly below the current one, never above it. */
 function insertStepBelow(index) {
+	showAllSteps.value = true
 	nextSteps.value.splice(index + 1, 0, { key: nextStepKey++, next_step: "", date: "" })
 	focusStep(index + 1)
 }
@@ -986,6 +1066,8 @@ function insertStepBelow(index) {
 function moveStepFocus(index, delta, field) {
 	const target = index + delta
 	if (target < 0 || target >= nextSteps.value.length) return
+	// Walking past the fold opens it rather than dead-ending.
+	if (target >= COLLAPSED_STEPS) showAllSteps.value = true
 	focusStep(target, field)
 }
 
