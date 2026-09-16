@@ -3,10 +3,15 @@
 
 """Sales Cockpit Leads API — Follow Ups list, Lead detail, notes, activity, and pipeline KPIs."""
 
+import ipaddress
 import json
+import re
+import socket
 from datetime import timedelta
+from urllib.parse import urlparse
 
 import frappe
+import requests
 from frappe import _
 from frappe.utils import get_datetime, now_datetime
 
@@ -56,6 +61,125 @@ LEAD_EDITABLE_FIELDS = LEAD_TRANSACTIONAL_FIELDS + LEAD_MASTER_FIELDS
 
 LOST_STATUSES = ("Do Not Contact", "Lost Quotation")
 CONVERTED_STATUS = "Converted"
+
+WEBSITE_CHECK_TIMEOUT = 5
+# Plain browser UA: some sites serve different headers (or refuse outright) to
+# unknown clients, which would make an embeddable site look un-embeddable.
+WEBSITE_CHECK_USER_AGENT = (
+	"Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 "
+	"(KHTML, like Gecko) Chrome/125.0 Safari/537.36"
+)
+
+
+def normalize_website(url):
+	"""Add https:// when the stored value omits a scheme."""
+	url = (url or "").strip()
+	if not url:
+		return ""
+	if not re.match(r"^https?://", url, re.IGNORECASE):
+		url = f"https://{url}"
+	return url
+
+
+def _is_public_http_url(url):
+	"""Reject non-HTTP schemes and anything resolving to a non-public address.
+
+	The URL here comes from user input and is fetched server-side, so this
+	guards against pointing the check at loopback/private infrastructure.
+	"""
+	parsed = urlparse(url)
+	if parsed.scheme not in ("http", "https"):
+		return False
+	if not parsed.hostname:
+		return False
+
+	try:
+		addresses = socket.getaddrinfo(parsed.hostname, None)
+	except (socket.gaierror, UnicodeError):
+		return False
+
+	for address in addresses:
+		try:
+			ip = ipaddress.ip_address(address[4][0])
+		except ValueError:
+			return False
+		if (
+			ip.is_private
+			or ip.is_loopback
+			or ip.is_link_local
+			or ip.is_reserved
+			or ip.is_multicast
+			or ip.is_unspecified
+		):
+			return False
+
+	return True
+
+
+def _frame_ancestors_allow_embedding(csp_header):
+	"""True unless a frame-ancestors directive rules this site out.
+
+	Only a wildcard (or a bare `https:`) source is treated as embeddable —
+	'none'/'self'/an explicit host list all mean our cockpit can't frame it.
+	"""
+	if not csp_header:
+		return True
+
+	for directive in csp_header.split(";"):
+		parts = directive.strip().split()
+		if not parts or parts[0].lower() != "frame-ancestors":
+			continue
+		sources = [p.strip().lower() for p in parts[1:]]
+		return any(source in ("*", "https:", "http:") for source in sources)
+
+	return True
+
+
+@frappe.whitelist()
+def check_website_embeddable(url):
+	"""Report whether a website can be shown in an iframe.
+
+	X-Frame-Options / CSP frame-ancestors can only be read from the response
+	headers, and a browser gives no usable signal when it blocks a frame — so
+	the cockpit asks here first and opens a new tab instead when the answer is
+	no, rather than showing the user an empty dialog.
+	"""
+	_check_lead_access()
+
+	normalized = normalize_website(url)
+	if not normalized or not _is_public_http_url(normalized):
+		return {"url": normalized, "embeddable": False, "reason": "unreachable"}
+
+	headers = {"User-Agent": WEBSITE_CHECK_USER_AGENT}
+	try:
+		response = requests.head(
+			normalized, timeout=WEBSITE_CHECK_TIMEOUT, allow_redirects=True, headers=headers
+		)
+		if response.status_code >= 400:
+			# Plenty of sites don't answer HEAD properly; fall back to GET.
+			response = requests.get(
+				normalized, timeout=WEBSITE_CHECK_TIMEOUT, allow_redirects=True, headers=headers, stream=True
+			)
+			response.close()
+	except requests.RequestException:
+		return {"url": normalized, "embeddable": False, "reason": "unreachable"}
+
+	final_url = response.url or normalized
+	# Re-check after redirects: the first hop being public doesn't mean the last one is.
+	if not _is_public_http_url(final_url):
+		return {"url": normalized, "embeddable": False, "reason": "unreachable"}
+
+	if response.status_code >= 400:
+		return {"url": final_url, "embeddable": False, "reason": "unreachable"}
+
+	x_frame_options = (response.headers.get("X-Frame-Options") or "").strip().lower()
+	if x_frame_options:
+		return {"url": final_url, "embeddable": False, "reason": "blocked"}
+
+	if not _frame_ancestors_allow_embedding(response.headers.get("Content-Security-Policy")):
+		return {"url": final_url, "embeddable": False, "reason": "blocked"}
+
+	return {"url": final_url, "embeddable": True, "reason": ""}
 
 
 def _check_lead_access():
@@ -257,6 +381,9 @@ def update_lead(
 		frappe.throw(_("Invalid Lead field(s): {0}").format(", ".join(sorted(unknown))))
 	if not updates:
 		frappe.throw(_("No fields to update"))
+
+	if "website" in updates:
+		updates["website"] = normalize_website(updates["website"])
 
 	for key, value in updates.items():
 		doc.set(key, value)

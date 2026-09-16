@@ -13,11 +13,11 @@
 						<button
 							type="button"
 							class="flex-shrink-0 rounded-md border border-outline-gray-2 p-1.5 text-ink-gray-6 hover:bg-surface-gray-2 hover:text-ink-gray-9 disabled:opacity-40"
-							:disabled="!website"
-							title="Open website in a dialog"
-							@click="showWebsiteDialog = true"
+							:disabled="!website || checkingWebsite"
+							title="Open website"
+							@click="openWebsite"
 						>
-							<FeatherIcon name="maximize-2" class="h-4 w-4" />
+							<FeatherIcon :name="checkingWebsite ? 'loader' : 'maximize-2'" class="h-4 w-4" />
 						</button>
 					</div>
 				</div>
@@ -107,59 +107,39 @@
 					<div v-else-if="!activeFilters.size" class="flex items-center justify-center py-16 text-sm text-ink-gray-5">
 						Select Communication, Notes, or Activities to view.
 					</div>
-					<div v-else class="space-y-6">
-						<section v-if="activeFilters.has('communications')">
-							<div class="mb-2 text-[11px] font-semibold uppercase tracking-wide text-ink-gray-6">Communication</div>
-							<div v-if="!communications.length" class="text-sm text-ink-gray-5">No communication logged yet.</div>
-							<div v-else class="space-y-3">
-								<div v-for="comm in communications" :key="comm.name" class="rounded-md border border-outline-gray-2 bg-surface-white px-3 py-2">
-									<div class="mb-1 flex items-center gap-2 text-xs text-ink-gray-5">
-										<Badge
-											:label="comm.sent_or_received === 'Sent' ? 'Sent' : 'Received'"
-											:theme="comm.sent_or_received === 'Sent' ? 'blue' : 'green'"
-											size="sm"
-											variant="subtle"
-										/>
-										<span>{{ formatDatetime(comm.communication_date) }}</span>
-									</div>
-									<div class="text-sm font-medium text-ink-gray-9">{{ comm.subject || "(no subject)" }}</div>
-									<div class="mt-0.5 truncate text-xs text-ink-gray-6">{{ stripHtml(comm.content) }}</div>
-								</div>
+					<div v-else-if="!timeline.length" class="flex items-center justify-center py-16 text-sm text-ink-gray-5">
+						Nothing recorded yet.
+					</div>
+					<!-- One chronological stream: the toggles above filter which entry types appear in it. -->
+					<div v-else class="space-y-3">
+						<div
+							v-for="entry in timeline"
+							:key="entry.key"
+							class="rounded-md border border-outline-gray-2 bg-surface-white px-3 py-2"
+						>
+							<div class="mb-1 flex flex-wrap items-center gap-2 text-xs text-ink-gray-5">
+								<Badge :label="entry.badge" :theme="entry.badgeTheme" size="sm" variant="subtle" />
+								<span v-if="entry.author" class="font-medium text-ink-gray-7">{{ entry.author }}</span>
+								<span>{{ formatDatetime(entry.date) }}</span>
 							</div>
-						</section>
 
-						<section v-if="activeFilters.has('notes')">
-							<div class="mb-2 text-[11px] font-semibold uppercase tracking-wide text-ink-gray-6">Notes</div>
-							<div v-if="!notes.length" class="text-sm text-ink-gray-5">No notes yet.</div>
-							<div v-else class="space-y-3">
-								<div v-for="note in notes" :key="note.name" class="rounded-md border border-outline-gray-2 bg-surface-white px-3 py-2">
-									<div class="mb-1 flex items-center gap-2 text-xs text-ink-gray-5">
-										<span class="font-medium text-ink-gray-7">{{ note.added_by_name || note.added_by }}</span>
-										<span>{{ formatDatetime(note.added_on) }}</span>
-									</div>
-									<div class="whitespace-pre-wrap text-sm text-ink-gray-8">{{ stripHtml(note.note) }}</div>
-								</div>
-							</div>
-						</section>
+							<template v-if="entry.type === 'communications'">
+								<div class="text-sm font-medium text-ink-gray-9">{{ entry.subject || "(no subject)" }}</div>
+								<div class="mt-0.5 truncate text-xs text-ink-gray-6">{{ entry.body }}</div>
+							</template>
 
-						<section v-if="activeFilters.has('activities')">
-							<div class="mb-2 text-[11px] font-semibold uppercase tracking-wide text-ink-gray-6">Activities</div>
-							<div v-if="!activities.length" class="text-sm text-ink-gray-5">No activity recorded yet.</div>
-							<div v-else class="space-y-3">
-								<div v-for="(activity, index) in activities" :key="index" class="rounded-md border border-outline-gray-2 bg-surface-white px-3 py-2 text-sm">
-									<div class="mb-1 flex items-center gap-2 text-xs text-ink-gray-5">
-										<span class="font-medium text-ink-gray-7">{{ activity.owner || "—" }}</span>
-										<span>{{ formatDatetime(activity.creation) }}</span>
-									</div>
-									<div v-if="activity.kind === 'field_change'" class="text-ink-gray-8">
-										Changed <span class="font-medium">{{ activity.label }}</span> from
-										<span class="font-medium">{{ activity.old || "—" }}</span> to
-										<span class="font-medium">{{ activity.new || "—" }}</span>
-									</div>
-									<div v-else class="text-ink-gray-8">{{ stripHtml(activity.content) }}</div>
-								</div>
+							<div v-else-if="entry.type === 'notes'" class="whitespace-pre-wrap text-sm text-ink-gray-8">
+								{{ entry.body }}
 							</div>
-						</section>
+
+							<div v-else-if="entry.fieldChange" class="text-sm text-ink-gray-8">
+								Changed <span class="font-medium">{{ entry.fieldChange.label }}</span> from
+								<span class="font-medium">{{ entry.fieldChange.old || "—" }}</span> to
+								<span class="font-medium">{{ entry.fieldChange.new || "—" }}</span>
+							</div>
+
+							<div v-else class="text-sm text-ink-gray-8">{{ entry.body }}</div>
+						</div>
 					</div>
 				</div>
 			</section>
@@ -231,10 +211,7 @@
 		:options="{ title: lead?.company_name || lead?.lead_name || 'Website', size: '5xl' }"
 	>
 		<template #body-content>
-			<p class="mb-2 text-xs text-ink-gray-5">
-				Some sites block embedding and won't load here — use "Open in Desk" or copy the URL if this stays blank.
-			</p>
-			<iframe :src="websiteUrl" class="h-[70vh] w-full rounded-md border border-outline-gray-2" />
+			<iframe :src="websiteDialogUrl" class="h-[70vh] w-full rounded-md border border-outline-gray-2" />
 		</template>
 	</Dialog>
 </template>
@@ -275,6 +252,7 @@ const savingStatus = ref(false)
 const saveError = ref("")
 const showNoteDialog = ref(false)
 const showWebsiteDialog = ref(false)
+const checkingWebsite = ref(false)
 
 const status = ref("")
 const nextFollowUpLocal = ref("")
@@ -315,6 +293,57 @@ function toggleFilter(key) {
 	activeFilters.value = next
 }
 
+/** Communications, notes and activities merged into one chronological stream. */
+const timeline = computed(() => {
+	const entries = []
+
+	if (activeFilters.value.has("communications")) {
+		for (const comm of communications.value) {
+			entries.push({
+				key: `communication:${comm.name}`,
+				type: "communications",
+				date: comm.communication_date,
+				badge: comm.sent_or_received === "Sent" ? "Sent" : "Received",
+				badgeTheme: comm.sent_or_received === "Sent" ? "blue" : "green",
+				author: comm.sender,
+				subject: comm.subject,
+				body: stripHtml(comm.content),
+			})
+		}
+	}
+
+	if (activeFilters.value.has("notes")) {
+		for (const note of notes.value) {
+			entries.push({
+				key: `note:${note.name}`,
+				type: "notes",
+				date: note.added_on,
+				badge: "Note",
+				badgeTheme: "orange",
+				author: note.added_by_name || note.added_by,
+				body: stripHtml(note.note),
+			})
+		}
+	}
+
+	if (activeFilters.value.has("activities")) {
+		activities.value.forEach((activity, index) => {
+			entries.push({
+				key: `activity:${index}`,
+				type: "activities",
+				date: activity.creation,
+				badge: "Activity",
+				badgeTheme: "gray",
+				author: activity.owner,
+				fieldChange: activity.kind === "field_change" ? activity : null,
+				body: stripHtml(activity.content),
+			})
+		})
+	}
+
+	return entries.sort((a, b) => String(b.date || "").localeCompare(String(a.date || "")))
+})
+
 const hasPrevious = computed(() => props.position > 1)
 const hasNext = computed(() => props.position > 0 && props.position < props.total)
 
@@ -341,13 +370,40 @@ const mailtoHref = computed(() => {
 	return `mailto:${lead.value.email_id}?cc=crm@phamos.eu&subject=${subject}`
 })
 
-// Websites are often stored without a protocol; assume https so the iframe
-// has a usable absolute URL rather than resolving relative to this SPA.
-const websiteUrl = computed(() => {
-	const value = (website.value || "").trim()
-	if (!value) return ""
-	return /^https?:\/\//i.test(value) ? value : `https://${value}`
-})
+// Resolved server-side by check_website_embeddable (normalized + redirects
+// followed), set only once we know the site will actually render framed.
+const websiteDialogUrl = ref("")
+
+async function openWebsite() {
+	if (!website.value || checkingWebsite.value) return
+	checkingWebsite.value = true
+	try {
+		const result = await call(`${API}.check_website_embeddable`, { url: website.value })
+		if (result.embeddable) {
+			websiteDialogUrl.value = result.url
+			showWebsiteDialog.value = true
+			return
+		}
+		// Can't be framed (or didn't respond) — open a tab instead of showing a blank dialog.
+		window.open(result.url, "_blank", "noopener")
+		toast({
+			title:
+				result.reason === "blocked"
+					? "This site blocks embedding, so it opened in a new tab."
+					: "Could not reach this site to preview it — opened in a new tab.",
+			icon: "alert-triangle",
+			iconClasses: "text-ink-amber-3",
+		})
+	} catch (e) {
+		toast({
+			title: e?.messages?.[0] || e?.message || "Could not open website",
+			icon: "x-circle",
+			iconClasses: "text-ink-red-4",
+		})
+	} finally {
+		checkingWebsite.value = false
+	}
+}
 
 function stripHtml(value) {
 	return String(value || "")
@@ -386,7 +442,11 @@ async function loadLead() {
 		lead.value = await call(`${API}.get_lead`, { name: props.name })
 		syncFieldsFromLead()
 	} catch (e) {
-		toast.error(e?.messages?.[0] || e?.message || "Could not load lead")
+		toast({
+			title: e?.messages?.[0] || e?.message || "Could not load lead",
+			icon: "x-circle",
+			iconClasses: "text-ink-red-4",
+		})
 	} finally {
 		loading.value = false
 	}
@@ -400,7 +460,11 @@ async function loadActivity() {
 		communications.value = data.communications || []
 		activities.value = data.activities || []
 	} catch (e) {
-		toast.error(e?.messages?.[0] || e?.message || "Could not load activity")
+		toast({
+			title: e?.messages?.[0] || e?.message || "Could not load activity",
+			icon: "x-circle",
+			iconClasses: "text-ink-red-4",
+		})
 	} finally {
 		activityLoading.value = false
 	}
@@ -434,7 +498,11 @@ async function saveFields() {
 			if_modified: lead.value.modified,
 		})
 		if (updated.conflict) {
-			toast.error("Saved — but this Lead was also changed by someone else just now. Check for lost edits.")
+			toast({
+				title: "Saved — but this Lead was also changed by someone else just now. Check for lost edits.",
+				icon: "alert-triangle",
+				iconClasses: "text-ink-amber-3",
+			})
 		}
 		delete updated.conflict
 		lead.value = updated
@@ -442,7 +510,7 @@ async function saveFields() {
 		emit("updated", updated)
 	} catch (e) {
 		saveError.value = e?.messages?.[0] || e?.message || "Could not save lead"
-		toast.error(saveError.value)
+		toast({ title: saveError.value, icon: "x-circle", iconClasses: "text-ink-red-4" })
 	} finally {
 		savingStatus.value = false
 	}
