@@ -268,6 +268,14 @@ def _serialize_notes(doc):
 	return notes
 
 
+def _serialize_next_steps(doc):
+	"""Rows of the Lead's `custom_next_steps` child table, oldest first."""
+	return [
+		{"name": row.name, "next_step": row.next_step, "date": row.date}
+		for row in (doc.get("custom_next_steps") or [])
+	]
+
+
 def _serialize_lead_detail(doc):
 	"""Identity, master-data, and transactional fields — no notes/communications.
 
@@ -311,6 +319,7 @@ def _serialize_lead_detail(doc):
 		"qualified_on": doc.qualified_on,
 		"creation": doc.creation,
 		"modified": doc.modified,
+		"next_steps": _serialize_next_steps(doc),
 		"desk_url": f"/app/lead/{doc.name}",
 	}
 
@@ -412,6 +421,32 @@ def update_lead(
 	result = get_lead(name)
 	result["conflict"] = conflict
 	return result
+
+
+@frappe.whitelist(methods=["POST"])
+def set_lead_next_steps(lead, rows=None):
+	"""Replace the Lead's Next Steps table with `rows`.
+
+	The cockpit edits the table as a whole (add/edit/delete then save), so
+	replacing it wholesale avoids matching up child-row identities; blank
+	rows are dropped rather than failing the required `next_step` field.
+	"""
+	frappe.has_permission("Lead", "write", throw=True)
+	doc = frappe.get_doc("Lead", lead)
+	doc.check_permission("write")
+
+	if isinstance(rows, str):
+		rows = json.loads(rows)
+
+	doc.set("custom_next_steps", [])
+	for row in rows or []:
+		next_step = (row.get("next_step") or "").strip()
+		if not next_step:
+			continue
+		doc.append("custom_next_steps", {"next_step": next_step, "date": row.get("date") or None})
+
+	doc.save()
+	return _serialize_next_steps(doc)
 
 
 def _format_lead_activities(docinfo):

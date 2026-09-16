@@ -83,21 +83,63 @@
 						</button>
 					</span>
 				</div>
-				<div class="flex-shrink-0 border-b border-outline-gray-2 bg-surface-white px-4 py-2.5">
-					<label class="mb-1.5 flex items-center gap-1.5 text-xs text-ink-gray-5">
-						<span>Status Comment</span>
-						<!-- Conditionally mandatory on the doctype itself (mandatory_depends_on
-						     eval:doc.status=='Do Not Contact'), so flag it rather than let the
-						     save fail with a bare validation error. -->
-						<span v-if="status === 'Do Not Contact'" class="text-ink-red-4">required</span>
-					</label>
-					<FormControl
-						v-model="statusComment"
-						type="textarea"
-						size="sm"
-						rows="2"
-						placeholder="Reason and comments for this lead's status"
-					/>
+				<div class="grid flex-shrink-0 grid-cols-2 gap-4 border-b border-outline-gray-2 bg-surface-white px-4 py-2.5">
+					<div>
+						<label class="mb-1.5 flex items-center gap-1.5 text-xs text-ink-gray-5">
+							<span>Status Comment</span>
+							<!-- Conditionally mandatory on the doctype itself (mandatory_depends_on
+							     eval:doc.status=='Do Not Contact'), so flag it rather than let the
+							     save fail with a bare validation error. -->
+							<span v-if="status === 'Do Not Contact'" class="text-ink-red-4">required</span>
+						</label>
+						<FormControl
+							v-model="statusComment"
+							type="textarea"
+							size="sm"
+							rows="2"
+							placeholder="Reason and comments for this lead's status"
+						/>
+					</div>
+
+					<div class="min-w-0">
+						<div class="mb-1.5 flex items-center justify-between gap-2">
+							<label class="text-xs text-ink-gray-5">Next Steps</label>
+							<button
+								type="button"
+								class="flex items-center gap-1 rounded px-1.5 py-0.5 text-xs text-ink-gray-6 hover:bg-surface-gray-2 hover:text-ink-gray-9"
+								@click="addNextStep"
+							>
+								<FeatherIcon name="plus" class="h-3.5 w-3.5" />
+								<span>Add</span>
+							</button>
+						</div>
+						<div v-if="!nextSteps.length" class="text-xs text-ink-gray-5">No next steps yet.</div>
+						<div v-else class="max-h-24 space-y-1.5 overflow-y-auto pr-1">
+							<div v-for="(step, index) in nextSteps" :key="index" class="flex items-center gap-1.5">
+								<input
+									v-model="step.next_step"
+									type="text"
+									placeholder="Next step"
+									class="form-input h-7 min-w-0 flex-1 rounded border border-outline-gray-2 bg-surface-white px-2 text-sm text-ink-gray-8"
+									@change="scheduleNextStepsSave"
+								/>
+								<input
+									v-model="step.date"
+									type="date"
+									class="form-input h-7 w-32 flex-none rounded border border-outline-gray-2 bg-surface-white px-1.5 text-xs text-ink-gray-8"
+									@change="scheduleNextStepsSave"
+								/>
+								<button
+									type="button"
+									class="flex-none rounded p-1 text-ink-gray-5 hover:bg-surface-gray-2 hover:text-ink-gray-9"
+									title="Remove"
+									@click="removeNextStep(index)"
+								>
+									<FeatherIcon name="x" class="h-3.5 w-3.5" />
+								</button>
+							</div>
+						</div>
+					</div>
 				</div>
 				<div class="flex flex-shrink-0 items-center gap-2 border-b border-outline-gray-2 bg-surface-white px-4 py-2.5">
 					<button
@@ -273,6 +315,9 @@ const qualificationStatus = ref("")
 const statusComment = ref("")
 const leadOwner = ref("")
 const owners = ref([])
+// Local working copy of the Lead's Next Steps child table; saved as a whole
+// (see set_lead_next_steps) rather than row by row.
+const nextSteps = ref([])
 
 const companyName = ref("")
 const website = ref("")
@@ -446,6 +491,10 @@ function syncFieldsFromLead() {
 	qualificationStatus.value = lead.value.qualification_status || ""
 	statusComment.value = lead.value.custom_status_comment || ""
 	leadOwner.value = lead.value.lead_owner || ""
+	nextSteps.value = (lead.value.next_steps || []).map((step) => ({
+		next_step: step.next_step || "",
+		date: step.date || "",
+	}))
 	companyName.value = lead.value.company_name || ""
 	website.value = lead.value.website || ""
 	city.value = lead.value.city || ""
@@ -546,6 +595,36 @@ async function saveFields() {
 const scheduleSave = debounce(() => {
 	saveFields()
 }, 500)
+
+async function saveNextSteps() {
+	if (syncing.value || !lead.value) return
+	try {
+		const saved = await call(`${API}.set_lead_next_steps`, {
+			lead: lead.value.name,
+			rows: nextSteps.value.filter((step) => (step.next_step || "").trim()),
+		})
+		lead.value = { ...lead.value, next_steps: saved }
+	} catch (e) {
+		toast({
+			title: e?.messages?.[0] || e?.message || "Could not save next steps",
+			icon: "x-circle",
+			iconClasses: "text-ink-red-4",
+		})
+	}
+}
+
+const scheduleNextStepsSave = debounce(() => {
+	saveNextSteps()
+}, 500)
+
+function addNextStep() {
+	nextSteps.value.push({ next_step: "", date: "" })
+}
+
+function removeNextStep(index) {
+	nextSteps.value.splice(index, 1)
+	saveNextSteps()
+}
 
 watch(
 	[
