@@ -212,6 +212,15 @@
 										{{ entry.author }}
 									</span>
 									<span class="whitespace-nowrap">{{ formatDatetime(entry.date) }}</span>
+									<button
+										v-if="entry.type === 'notes'"
+										type="button"
+										title="Edit note"
+										class="ml-auto flex-none rounded p-1 text-ink-gray-6 hover:bg-surface-gray-2 hover:text-ink-gray-9"
+										@click="openNoteEditor(entry)"
+									>
+										<FeatherIcon name="edit-2" class="h-3.5 w-3.5" />
+									</button>
 									<span v-if="entry.type === 'communications'" class="ml-auto flex flex-none items-center gap-1">
 										<a
 											:href="replyHref(entry)"
@@ -377,6 +386,14 @@
 
 	<CreateDemoDialog v-if="lead" v-model="showDemoDialog" :lead="lead" @created="onDemoCreated" />
 
+	<EditLeadNoteDialog
+		v-if="lead && editingNote"
+		v-model="showEditNoteDialog"
+		:lead="lead"
+		:note="editingNote"
+		@saved="onNoteEdited"
+	/>
+
 	<Dialog
 		v-model="showWebsiteDialog"
 		:options="{ title: lead?.company_name || lead?.lead_name || 'Website', size: '5xl' }"
@@ -402,6 +419,7 @@ import FrappeLink from "@spa/components/FrappeLink.vue"
 import LeadModulePicker from "./LeadModulePicker.vue"
 import AddLeadNoteDialog from "./AddLeadNoteDialog.vue"
 import CreateDemoDialog from "./CreateDemoDialog.vue"
+import EditLeadNoteDialog from "./EditLeadNoteDialog.vue"
 
 const API = "phamos.api.sales_leads"
 const DEMOS_API = "phamos.api.sales_demos"
@@ -420,6 +438,8 @@ const saveError = ref("")
 const showNoteDialog = ref(false)
 const showWebsiteDialog = ref(false)
 const showDemoDialog = ref(false)
+const showEditNoteDialog = ref(false)
+const editingNote = ref(null)
 const checkingWebsite = ref(false)
 
 const status = ref("")
@@ -509,6 +529,7 @@ const timeline = computed(() => {
 				badgeTheme: "orange",
 				author: note.added_by_name || note.added_by,
 				body: stripHtml(note.note),
+				note,
 			})
 		}
 	}
@@ -1024,6 +1045,15 @@ function onDemoCreated() {
 	loadActivity()
 	loadDemos()
 	toast({ title: "Demo created", icon: "check-circle", iconClasses: "text-ink-green-4" })
+}
+
+function openNoteEditor(entry) {
+	editingNote.value = entry.note
+	showEditNoteDialog.value = true
+}
+
+function onNoteEdited(savedNotes) {
+	notes.value = savedNotes || []
 }
 
 function onNoteSaved(updated) {

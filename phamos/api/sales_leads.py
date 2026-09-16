@@ -613,6 +613,29 @@ def set_lead_hours_predictions(lead, rows=None):
 	return _serialize_hours_predictions(doc)
 
 
+@frappe.whitelist(methods=["POST"])
+def update_lead_note(lead, note_name, content):
+	"""Edit an existing note on a Lead.
+
+	Uses ERPNext's own `CRMNote.edit_note` (the mechanism behind the Desk
+	form's note editing) rather than writing the child row directly, so
+	both paths behave the same.
+	"""
+	frappe.has_permission("Lead", "write", throw=True)
+	doc = frappe.get_doc("Lead", lead)
+	doc.check_permission("write")
+
+	content = (content or "").strip()
+	if not content:
+		frappe.throw(_("A note can't be empty."))
+
+	if not any(str(row.name) == str(note_name) for row in (doc.notes or [])):
+		frappe.throw(_("That note is no longer on this lead."))
+
+	doc.edit_note(content, str(note_name))
+	return _serialize_notes(frappe.get_doc("Lead", lead))
+
+
 def _format_lead_activities(docinfo):
 	"""Field-change (Version) and system comment entries, newest first.
 
