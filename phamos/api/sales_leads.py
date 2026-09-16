@@ -515,7 +515,13 @@ def set_lead_hours_predictions(lead, rows=None):
 		hours = row.get("hours")
 		if not month_start or hours in (None, ""):
 			continue
-		doc.append("custom_hours_predictions", {"month_start": month_start, "hours": hours})
+		# Whole hours, rounded here so the stored value and the value echoed
+		# back always agree — MySQL would otherwise silently truncate an Int
+		# column and the caller would render something the DB doesn't hold.
+		doc.append(
+			"custom_hours_predictions",
+			{"month_start": month_start, "hours": int(round(float(hours)))},
+		)
 
 	doc.save()
 	return _serialize_hours_predictions(doc)

@@ -840,7 +840,7 @@ async function saveHoursPredictions() {
 			lead: lead.value.name,
 			rows: hoursPredictions.value
 				.filter((row) => row.hours !== "" && row.hours !== null)
-				.map((row) => ({ month_start: row.month_start, hours: Math.round(Number(row.hours)) || 0 })),
+				.map((row) => ({ month_start: row.month_start, hours: Number(row.hours) || 0 })),
 		})
 		lead.value = { ...lead.value, hours_predictions: saved }
 	} catch (e) {
