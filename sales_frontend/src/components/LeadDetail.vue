@@ -26,12 +26,27 @@
 					<FormControl v-model="city" label="City" type="text" size="sm" />
 					<FormControl v-model="state" label="State" type="text" size="sm" />
 				</div>
-				<FormControl v-model="country" label="Country" type="text" size="sm" />
-				<FormControl v-model="territory" label="Territory" type="text" size="sm" />
-				<FormControl v-model="source" label="Source" type="text" size="sm" />
-				<FormControl v-model="industry" label="Industry" type="text" size="sm" />
+				<div>
+						<label class="mb-1.5 block text-xs text-ink-gray-5">Country</label>
+						<FrappeLink doctype="Country" v-model="country" placeholder="Country" />
+					</div>
+				<div>
+						<label class="mb-1.5 block text-xs text-ink-gray-5">Territory</label>
+						<FrappeLink doctype="Territory" v-model="territory" placeholder="Territory" />
+					</div>
+				<div>
+						<label class="mb-1.5 block text-xs text-ink-gray-5">Source</label>
+						<FrappeLink doctype="Lead Source" v-model="source" placeholder="Source" />
+					</div>
+				<div>
+						<label class="mb-1.5 block text-xs text-ink-gray-5">Industry</label>
+						<FrappeLink doctype="Industry Type" v-model="industry" placeholder="Industry" />
+					</div>
 				<FormControl v-model="noOfEmployees" label="No. of Employees" type="select" size="sm" :options="noOfEmployeesOptions" />
-				<FormControl v-model="marketSegment" label="Market Segment" type="text" size="sm" />
+				<div>
+						<label class="mb-1.5 block text-xs text-ink-gray-5">Market Segment</label>
+						<FrappeLink doctype="Market Segment" v-model="marketSegment" placeholder="Market Segment" />
+					</div>
 				<FormControl v-model="annualRevenue" label="Annual Revenue" type="number" size="sm" />
 				<FormControl v-model="requestType" label="Request Type" type="select" size="sm" :options="requestTypeOptions" />
 			</section>
@@ -292,13 +307,10 @@
 					</div>
 				</section>
 
-				<FormControl
-					v-model="leadOwner"
-					label="Lead Owner"
-					type="select"
-					size="sm"
-					:options="leadOwnerOptions"
-				/>
+				<div>
+					<label class="mb-1.5 block text-xs text-ink-gray-5">Lead Owner</label>
+					<FrappeLink doctype="User" v-model="leadOwner" placeholder="Lead Owner" />
+				</div>
 
 				<FormControl
 					v-model="qualificationStatus"
@@ -365,6 +377,7 @@ import {
 	REQUEST_TYPE_OPTIONS,
 	leadStatusTheme,
 } from "@/leadListColumns.js"
+import FrappeLink from "@spa/components/FrappeLink.vue"
 import AddLeadNoteDialog from "./AddLeadNoteDialog.vue"
 import CreateDemoDialog from "./CreateDemoDialog.vue"
 
@@ -394,7 +407,6 @@ const nextFollowUp = ref("")
 const qualificationStatus = ref("")
 const statusComment = ref("")
 const leadOwner = ref("")
-const owners = ref([])
 // Local working copy of the Lead's Next Steps child table; saved as a whole
 // (see set_lead_next_steps) rather than row by row.
 const demos = ref([])
@@ -498,18 +510,6 @@ const qualificationOptions = computed(() => [
 	{ label: "—", value: "" },
 	...QUALIFICATION_STATUSES.map((q) => ({ label: q, value: q })),
 ])
-
-const leadOwnerOptions = computed(() => {
-	const options = owners.value.map((u) => ({ label: u.full_name || u.name, value: u.name }))
-	const current = lead.value?.lead_owner
-	// Keep the current owner selectable even when they're outside the Sales
-	// shortlist (no longer holds a Sales role, disabled, …); otherwise the
-	// select would show nothing and autosave would quietly reassign the lead.
-	if (current && !options.some((option) => option.value === current)) {
-		options.unshift({ label: lead.value.lead_owner_name || current, value: current })
-	}
-	return [{ label: "—", value: "" }, ...options]
-})
 
 const noOfEmployeesOptions = computed(() => [
 	{ label: "—", value: "" },
@@ -907,18 +907,6 @@ function onNoteSaved(updated) {
 	loadActivity()
 }
 
-async function loadOwners() {
-	try {
-		owners.value = await call(`${API}.get_lead_owners`)
-	} catch (e) {
-		toast({
-			title: e?.messages?.[0] || e?.message || "Could not load lead owners",
-			icon: "x-circle",
-			iconClasses: "text-ink-red-4",
-		})
-	}
-}
-
 function loadAll() {
 	loadLead()
 	loadActivity()
@@ -926,8 +914,6 @@ function loadAll() {
 }
 
 onMounted(() => {
-	// Owner candidates don't change per lead, so they're loaded once.
-	loadOwners()
 	loadAll()
 })
 
