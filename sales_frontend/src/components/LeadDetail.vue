@@ -44,13 +44,6 @@
 					<div class="text-[11px] font-semibold uppercase tracking-wide text-ink-gray-6">Request Type</div>
 					<div class="text-ink-gray-8">{{ lead.request_type || "—" }}</div>
 				</div>
-				<a
-					:href="lead.desk_url"
-					class="flex w-full items-center gap-2 rounded-md px-2 py-2 text-sm font-medium text-ink-gray-7 hover:bg-surface-gray-2 hover:text-ink-gray-9"
-				>
-					<FeatherIcon name="external-link" class="h-4 w-4 flex-shrink-0" />
-					<span class="truncate">Open in Desk</span>
-				</a>
 			</section>
 
 			<!-- Communication / Notes / Activities feed — independent show/hide toggles, not exclusive tabs, so any combination (including all three) can be visible at once. -->
@@ -206,6 +199,14 @@
 				</section>
 
 				<Button variant="subtle" @click="showNoteDialog = true">Add note</Button>
+
+				<a
+					:href="lead.desk_url"
+					class="mt-auto flex w-full items-center gap-2 rounded-md px-2 py-2 text-sm font-medium text-ink-gray-7 hover:bg-surface-gray-2 hover:text-ink-gray-9"
+				>
+					<FeatherIcon name="external-link" class="h-4 w-4 flex-shrink-0" />
+					<span class="truncate">Open in Desk</span>
+				</a>
 			</section>
 		</template>
 	</div>
