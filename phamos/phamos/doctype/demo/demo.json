@@ -16,6 +16,9 @@
   "scheduled_on",
   "ends_on",
   "event",
+  "section_break_schedule",
+  "location",
+  "proposed_slots",
   "section_break_details",
   "agenda"
  ],
@@ -65,6 +68,7 @@
    "options": "Planned\nCompleted\nCancelled"
   },
   {
+   "description": "Set once one of the proposed slots is confirmed.",
    "fieldname": "scheduled_on",
    "fieldtype": "Datetime",
    "in_list_view": 1,
@@ -76,12 +80,30 @@
    "label": "Ends On"
   },
   {
-   "description": "Calendar event created for this demo; synced to the organiser's calendar via the Mailcow integration.",
+   "description": "Calendar event for the confirmed slot.",
    "fieldname": "event",
    "fieldtype": "Link",
    "label": "Event",
    "options": "Event",
    "read_only": 1
+  },
+  {
+   "fieldname": "section_break_schedule",
+   "fieldtype": "Section Break",
+   "label": "Scheduling"
+  },
+  {
+   "description": "Street address, or a video link for an online meeting.",
+   "fieldname": "location",
+   "fieldtype": "Small Text",
+   "label": "Location"
+  },
+  {
+   "description": "Dates offered to the customer while the demo isn't pinned down yet.",
+   "fieldname": "proposed_slots",
+   "fieldtype": "Table",
+   "label": "Proposed Slots",
+   "options": "Demo Proposed Slot"
   },
   {
    "fieldname": "section_break_details",

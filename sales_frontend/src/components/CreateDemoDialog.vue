@@ -44,6 +44,8 @@
 
 					<div v-if="slotsError" class="mt-2 text-xs text-red-600">{{ slotsError }}</div>
 
+					<!-- Click a slot to propose it; several can be offered while the
+					     date isn't settled yet. -->
 					<div v-if="slots.length" class="mt-3 flex flex-wrap gap-2">
 						<button
 							v-for="slot in slots"
@@ -51,20 +53,20 @@
 							type="button"
 							class="rounded-md border px-2.5 py-1 text-xs transition"
 							:class="
-								startsOn === slot.start_local
+								isProposed(slot.start_local)
 									? 'border-transparent bg-surface-gray-7 text-ink-white'
 									: 'border-outline-gray-2 text-ink-gray-7 hover:bg-surface-gray-2'
 							"
-							@click="selectSlot(slot)"
+							@click="toggleSlot(slot)"
 						>
 							{{ slot.label || `${slot.start_local} – ${slot.end_local}` }}
 						</button>
 					</div>
 					<p v-else-if="slotsFetched && !loadingSlots && !slotsError" class="mt-2 text-xs text-ink-gray-5">
-						No free slots found for that day — pick another day, or set the times manually below.
+						No free slots found for that day — pick another day, or add a time manually below.
 					</p>
 
-					<div class="mt-3 grid grid-cols-2 gap-3">
+					<div class="mt-3 grid grid-cols-[1fr_1fr_auto] items-end gap-3">
 						<div>
 							<label class="mb-1.5 block text-xs text-ink-gray-5">Starts On</label>
 							<input
@@ -81,8 +83,56 @@
 								class="form-input block h-8 w-full rounded border border-outline-gray-2 bg-surface-white px-2 text-sm text-ink-gray-8"
 							/>
 						</div>
+						<Button :disabled="!startsOn" @click="addManualProposal">Propose</Button>
+					</div>
+
+					<div class="mt-3">
+						<div class="mb-1.5 text-xs text-ink-gray-5">
+							Proposed dates
+							<span v-if="proposals.length > 1" class="text-ink-gray-6">
+								— the customer picks one
+							</span>
+						</div>
+						<div v-if="!proposals.length" class="text-xs text-ink-gray-5">
+							None yet. Pick a slot above, or add one manually.
+						</div>
+						<div v-else class="space-y-1.5">
+							<div
+								v-for="(proposal, index) in proposals"
+								:key="proposal.starts_on"
+								class="flex items-center gap-2 rounded-md border border-outline-gray-2 px-2.5 py-1.5 text-sm text-ink-gray-8"
+							>
+								<FeatherIcon name="calendar" class="h-3.5 w-3.5 flex-shrink-0 text-ink-gray-5" />
+								<span class="min-w-0 flex-1 truncate">{{ proposalLabel(proposal) }}</span>
+								<button
+									type="button"
+									class="flex-none rounded p-1 text-ink-gray-5 hover:bg-surface-gray-2 hover:text-ink-gray-9"
+									title="Remove"
+									@click="proposals.splice(index, 1)"
+								>
+									<FeatherIcon name="x" class="h-3.5 w-3.5" />
+								</button>
+							</div>
+						</div>
 					</div>
 				</section>
+
+				<div>
+					<label class="mb-1.5 block text-xs text-ink-gray-5">Location</label>
+					<div class="flex items-start gap-1.5">
+						<FormControl
+							v-model="location"
+							type="textarea"
+							size="sm"
+							rows="2"
+							placeholder="Street address, or a video link for an online meeting"
+							class="min-w-0 flex-1"
+						/>
+						<Button title="Generate a video meeting link" @click="generateVideoLink">
+							Video link
+						</Button>
+					</div>
+				</div>
 
 				<!-- Draft-only: the selection isn't persisted (see demoModules.js). -->
 				<section class="rounded-md border border-outline-gray-2 p-3">
@@ -153,7 +203,10 @@ const durationMinutes = ref("60")
 const startsOn = ref("")
 const endsOn = ref("")
 const agenda = ref("")
+const location = ref("")
 const selectedModules = ref([])
+// Several dates can be offered while the demo isn't pinned down yet.
+const proposals = ref([])
 
 const slots = ref([])
 const slotsFetched = ref(false)
@@ -178,7 +231,9 @@ watch(
 		startsOn.value = ""
 		endsOn.value = ""
 		agenda.value = ""
+		location.value = ""
 		selectedModules.value = []
+		proposals.value = []
 		slots.value = []
 		slotsFetched.value = false
 		slotsError.value = ""
@@ -217,15 +272,49 @@ function toInputValue(value) {
 	return (value || "").replace(" ", "T").slice(0, 16)
 }
 
-function selectSlot(slot) {
-	startsOn.value = toInputValue(slot.start_local)
-	endsOn.value = toInputValue(slot.end_local)
-}
-
 /** ...and the backend wants the space-separated form back. */
 function toApiValue(value) {
 	if (!value) return null
 	return `${value.replace("T", " ")}:00`.slice(0, 19)
+}
+
+function sortProposals() {
+	proposals.value.sort((a, b) => String(a.starts_on).localeCompare(String(b.starts_on)))
+}
+
+function isProposed(startLocal) {
+	return proposals.value.some((p) => p.starts_on === startLocal)
+}
+
+function toggleSlot(slot) {
+	const index = proposals.value.findIndex((p) => p.starts_on === slot.start_local)
+	if (index !== -1) {
+		proposals.value.splice(index, 1)
+		return
+	}
+	proposals.value.push({ starts_on: slot.start_local, ends_on: slot.end_local })
+	sortProposals()
+}
+
+function addManualProposal() {
+	const starts = toApiValue(startsOn.value)
+	if (!starts || isProposed(starts)) return
+	proposals.value.push({ starts_on: starts, ends_on: toApiValue(endsOn.value) })
+	sortProposals()
+	startsOn.value = ""
+	endsOn.value = ""
+}
+
+function proposalLabel(proposal) {
+	return proposal.ends_on ? `${proposal.starts_on} – ${proposal.ends_on.slice(11, 16)}` : proposal.starts_on
+}
+
+/** Same throwaway-room scheme the Desk hybrid meeting composer uses. */
+function generateVideoLink() {
+	const chars = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"
+	let room = ""
+	for (let i = 0; i < 15; i++) room += chars[Math.floor(Math.random() * chars.length)]
+	location.value = `https://meet.jit.si/${room}`
 }
 
 async function submit() {
@@ -245,8 +334,8 @@ async function submit() {
 		const demo = await call("phamos.api.sales_demos.create_demo", {
 			lead: props.lead.name,
 			subject: subject.value.trim(),
-			starts_on: toApiValue(startsOn.value),
-			ends_on: toApiValue(endsOn.value),
+			slots: proposals.value,
+			location: location.value.trim() || null,
 			agenda: agendaText || null,
 		})
 		emit("created", demo)

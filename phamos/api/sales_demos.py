@@ -3,6 +3,8 @@
 
 """Sales Cockpit Demos API — scheduling demos against a Lead."""
 
+import json
+
 import frappe
 from frappe import _
 
@@ -20,6 +22,7 @@ DEMO_LIST_FIELDS = [
 	"scheduled_on",
 	"ends_on",
 	"event",
+	"location",
 	"owner",
 	"modified",
 ]
@@ -50,15 +53,40 @@ def get_demos():
 	return {"items": rows, "truncated": truncated, "statuses": list(DEMO_STATUSES)}
 
 
-@frappe.whitelist(methods=["POST"])
-def create_demo(lead, subject, starts_on=None, ends_on=None, agenda=None, location=None):
-	"""Create a Demo for a Lead and, when scheduled, a calendar Event for it.
+def _create_demo_event(demo_subject, lead, lead_doc, starts_on, ends_on, agenda, location):
+	"""Tentative calendar entry holding one proposed slot."""
+	event = frappe.get_doc(
+		{
+			"doctype": "Event",
+			"subject": demo_subject,
+			"event_type": "Private",
+			"starts_on": starts_on,
+			"ends_on": ends_on or None,
+			"description": agenda or "",
+			"location": location or "",
+			"event_participants": [{"reference_doctype": "Lead", "reference_docname": lead}],
+			"custom_attendees_to": lead_doc.email_id or "",
+		}
+	)
+	event.insert()
+	return event.name
 
-	The Event is inserted rather than routed through the hybrid-meeting
-	composer so that scheduling a demo never sends mail on its own — the
-	Event doc_events hooks still sync it to the organiser's calendar, and
-	the Lead is attached as an event participant so the integration can
-	resolve the customer's address when an invite is sent later.
+
+@frappe.whitelist(methods=["POST"])
+def create_demo(lead, subject, slots=None, agenda=None, location=None):
+	"""Create a Demo for a Lead, holding a calendar Event per proposed slot.
+
+	A demo often isn't pinned to one date yet, so `slots` takes any number
+	of `{starts_on, ends_on}` proposals and each gets a tentative Event —
+	the same hold-the-slot approach `mailcow_integration.hybrid_meeting`
+	takes. A single proposal is treated as already settled and populates
+	`scheduled_on`/`event` directly.
+
+	Events are inserted rather than routed through the hybrid-meeting
+	composer so that planning a demo never sends mail on its own — the
+	Event doc_events hooks still sync them to the organiser's calendar, and
+	the Lead is attached as a participant so the integration can resolve
+	the customer's address when an invite is sent later.
 	"""
 	_check_lead_access()
 	frappe.has_permission("Demo", "create", throw=True)
@@ -66,6 +94,10 @@ def create_demo(lead, subject, starts_on=None, ends_on=None, agenda=None, locati
 	subject = (subject or "").strip()
 	if not subject:
 		frappe.throw(_("Subject is required"))
+
+	if isinstance(slots, str):
+		slots = json.loads(slots)
+	slots = [s for s in (slots or []) if s.get("starts_on")]
 
 	lead_doc = frappe.get_doc("Lead", lead)
 	lead_doc.check_permission("read")
@@ -76,32 +108,29 @@ def create_demo(lead, subject, starts_on=None, ends_on=None, agenda=None, locati
 			"subject": subject,
 			"lead": lead,
 			"status": "Planned",
-			"scheduled_on": starts_on or None,
-			"ends_on": ends_on or None,
 			"agenda": agenda or None,
+			"location": location or None,
 		}
 	)
 	demo.insert()
 
-	if starts_on:
-		event = frappe.get_doc(
-			{
-				"doctype": "Event",
-				"subject": subject,
-				"event_type": "Private",
-				"starts_on": starts_on,
-				"ends_on": ends_on or None,
-				"description": agenda or "",
-				"location": location or "",
-				"event_participants": [
-					{"reference_doctype": "Lead", "reference_docname": lead}
-				],
-				"custom_attendees_to": lead_doc.email_id or "",
-			}
+	for slot in sorted(slots, key=lambda s: str(s.get("starts_on"))):
+		event_name = _create_demo_event(
+			subject, lead, lead_doc, slot["starts_on"], slot.get("ends_on"), agenda, location
 		)
-		event.insert()
-		demo.db_set("event", event.name)
+		demo.append(
+			"proposed_slots",
+			{"starts_on": slot["starts_on"], "ends_on": slot.get("ends_on"), "event": event_name},
+		)
 
+	# One proposal is a decision, not a choice to put to the customer.
+	if len(demo.proposed_slots) == 1:
+		only = demo.proposed_slots[0]
+		demo.scheduled_on = only.starts_on
+		demo.ends_on = only.ends_on
+		demo.event = only.event
+
+	demo.save()
 	return _serialize_demo(frappe.get_doc("Demo", demo.name))
 
 
@@ -116,6 +145,16 @@ def _serialize_demo(doc):
 		"ends_on": doc.ends_on,
 		"event": doc.event,
 		"agenda": doc.agenda,
+		"location": doc.location,
+		"proposed_slots": [
+			{
+				"name": row.name,
+				"starts_on": row.starts_on,
+				"ends_on": row.ends_on,
+				"event": row.event,
+			}
+			for row in (doc.get("proposed_slots") or [])
+		],
 		"owner": doc.owner,
 		"owner_name": _user_label(doc.owner),
 		"desk_url": f"/app/demo/{doc.name}",
