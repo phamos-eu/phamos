@@ -268,12 +268,19 @@ def _serialize_notes(doc):
 	return notes
 
 
+def _next_step_sort_key(row):
+	"""Date ascending, undated rows last."""
+	date = row.get("date")
+	return (not date, str(date or ""))
+
+
 def _serialize_next_steps(doc):
-	"""Rows of the Lead's `custom_next_steps` child table, oldest first."""
-	return [
+	"""Rows of the Lead's `custom_next_steps` child table, by date."""
+	rows = [
 		{"name": row.name, "next_step": row.next_step, "date": row.date}
 		for row in (doc.get("custom_next_steps") or [])
 	]
+	return sorted(rows, key=_next_step_sort_key)
 
 
 def _serialize_lead_detail(doc):
@@ -438,12 +445,16 @@ def set_lead_next_steps(lead, rows=None):
 	if isinstance(rows, str):
 		rows = json.loads(rows)
 
+	kept = [row for row in (rows or []) if (row.get("next_step") or "").strip()]
+
 	doc.set("custom_next_steps", [])
-	for row in rows or []:
-		next_step = (row.get("next_step") or "").strip()
-		if not next_step:
-			continue
-		doc.append("custom_next_steps", {"next_step": next_step, "date": row.get("date") or None})
+	# Stored in date order so the table reads chronologically everywhere,
+	# including the Desk grid — not just in the cockpit.
+	for row in sorted(kept, key=_next_step_sort_key):
+		doc.append(
+			"custom_next_steps",
+			{"next_step": row["next_step"].strip(), "date": row.get("date") or None},
+		)
 
 	doc.save()
 	return _serialize_next_steps(doc)

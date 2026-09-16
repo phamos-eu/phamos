@@ -109,7 +109,7 @@
 							empty row removes it. Blank rows are dropped server-side on save.
 						-->
 						<div v-if="nextSteps.length" class="mb-1.5 max-h-24 space-y-1.5 overflow-y-auto pr-1">
-							<div v-for="(step, index) in nextSteps" :key="index" class="flex items-center gap-1.5">
+							<div v-for="(step, index) in nextSteps" :key="step.key" class="flex items-center gap-1.5">
 								<input
 									v-model="step.next_step"
 									type="text"
@@ -123,17 +123,20 @@
 									@keydown.up.prevent="moveStepFocus(index, -1, 'next_step')"
 									@keydown.backspace="onStepBackspace(index, $event)"
 								/>
-								<input
-									v-model="step.date"
-									type="date"
+								<span
 									:data-step-index="index"
 									data-step-field="date"
-									class="form-input h-7 w-32 flex-none rounded border border-outline-gray-2 bg-surface-white px-1.5 text-xs text-ink-gray-8"
-									@change="scheduleNextStepsSave"
-									@keydown.enter.prevent="insertStepBelow(index)"
+									class="w-32 flex-none"
 									@keydown.down.prevent="moveStepFocus(index, 1, 'date')"
 									@keydown.up.prevent="moveStepFocus(index, -1, 'date')"
-								/>
+								>
+									<DatePicker
+										:model-value="step.date || ''"
+										placeholder="Date"
+										input-class="h-7 text-xs"
+										@update:model-value="(value) => onStepDateChange(step, value)"
+									/>
+								</span>
 								<button
 									type="button"
 									class="flex-none rounded p-1 text-ink-gray-5 hover:bg-surface-gray-2 hover:text-ink-gray-9"
@@ -298,7 +301,7 @@
 
 <script setup>
 import { computed, nextTick, onMounted, ref, watch } from "vue"
-import { call, debounce, toast, Badge } from "frappe-ui"
+import { call, debounce, toast, Badge, DatePicker } from "frappe-ui"
 import {
 	formatDatetime,
 } from "@spa/utils/datetime"
@@ -342,6 +345,9 @@ const owners = ref([])
 // (see set_lead_next_steps) rather than row by row.
 const nextSteps = ref([])
 const nextStepsRoot = ref(null)
+// Stable per-row key so re-sorting moves DOM nodes (and keeps focus with the
+// row) instead of rewriting values in place.
+let nextStepKey = 0
 
 const companyName = ref("")
 const website = ref("")
@@ -517,9 +523,11 @@ function syncFieldsFromLead() {
 	statusComment.value = lead.value.custom_status_comment || ""
 	leadOwner.value = lead.value.lead_owner || ""
 	nextSteps.value = (lead.value.next_steps || []).map((step) => ({
+		key: nextStepKey++,
 		next_step: step.next_step || "",
 		date: step.date || "",
 	}))
+	sortNextSteps()
 	companyName.value = lead.value.company_name || ""
 	website.value = lead.value.website || ""
 	city.value = lead.value.city || ""
@@ -626,7 +634,9 @@ async function saveNextSteps() {
 	try {
 		const saved = await call(`${API}.set_lead_next_steps`, {
 			lead: lead.value.name,
-			rows: nextSteps.value.filter((step) => (step.next_step || "").trim()),
+			rows: nextSteps.value
+				.filter((step) => (step.next_step || "").trim())
+				.map((step) => ({ next_step: step.next_step, date: step.date || null })),
 		})
 		lead.value = { ...lead.value, next_steps: saved }
 		// The add/remove lands in the Lead's version history, so refresh the
@@ -645,23 +655,45 @@ const scheduleNextStepsSave = debounce(() => {
 	saveNextSteps()
 }, 500)
 
-/** Focus a row's input by position — rows are keyed by index, so query the DOM. */
+/** Focus a row's input by position. The text cell carries the marker itself;
+ *  the date cell is a wrapper around frappe-ui's DatePicker, so look inside. */
 function focusStep(index, field = "next_step") {
 	nextTick(() => {
-		nextStepsRoot.value
-			?.querySelector(`input[data-step-index="${index}"][data-step-field="${field}"]`)
-			?.focus()
+		const cell = nextStepsRoot.value?.querySelector(
+			`[data-step-index="${index}"][data-step-field="${field}"]`
+		)
+		const input = cell?.matches?.("input") ? cell : cell?.querySelector("input")
+		input?.focus()
 	})
 }
 
+/** Date ascending, undated rows last. */
+function sortNextSteps() {
+	nextSteps.value.sort((a, b) => {
+		if (!a.date && !b.date) return 0
+		if (!a.date) return 1
+		if (!b.date) return -1
+		return String(a.date).localeCompare(String(b.date))
+	})
+}
+
+function onStepDateChange(step, value) {
+	step.date = value || ""
+	// Re-sort once the date is committed (not while typing the text), so rows
+	// don't shuffle under the cursor mid-edit. Rows are keyed, so Vue moves the
+	// existing nodes and focus follows the row rather than the position.
+	sortNextSteps()
+	scheduleNextStepsSave()
+}
+
 function addNextStep() {
-	nextSteps.value.push({ next_step: "", date: "" })
+	nextSteps.value.push({ key: nextStepKey++, next_step: "", date: "" })
 	focusStep(nextSteps.value.length - 1)
 }
 
 /** Enter opens the next row directly below the current one, never above it. */
 function insertStepBelow(index) {
-	nextSteps.value.splice(index + 1, 0, { next_step: "", date: "" })
+	nextSteps.value.splice(index + 1, 0, { key: nextStepKey++, next_step: "", date: "" })
 	focusStep(index + 1)
 }
 
