@@ -629,6 +629,101 @@ def _thread_key(subject):
 	return clean.casefold()
 
 
+def _contact_suggestions(lead, lead_doc):
+	"""Addresses worth offering: the lead itself, its Contacts, and anyone
+	already in the conversation."""
+	found = {}
+
+	def add(email, label, source):
+		email = (email or "").strip()
+		if not email or email.lower() in found:
+			return
+		found[email.lower()] = {"email": email, "label": label or email, "source": source}
+
+	add(lead_doc.email_id, lead_doc.lead_name or lead, "Lead")
+
+	contact_names = frappe.get_all(
+		"Dynamic Link",
+		filters={"link_doctype": "Lead", "link_name": lead, "parenttype": "Contact"},
+		pluck="parent",
+	)
+	if contact_names:
+		for contact in frappe.get_all(
+			"Contact",
+			filters={"name": ("in", contact_names)},
+			fields=["name", "first_name", "last_name", "email_id"],
+		):
+			label = " ".join(filter(None, [contact.first_name, contact.last_name])) or contact.name
+			add(contact.email_id, label, "Contact")
+			for row in frappe.get_all(
+				"Contact Email", filters={"parent": contact.name}, fields=["email_id"]
+			):
+				add(row.email_id, label, "Contact")
+
+	# Anyone already on the thread — the practical source of addresses that
+	# were never captured as Contacts.
+	for comm in frappe.get_all(
+		"Communication",
+		filters={"reference_doctype": "Lead", "reference_name": lead},
+		fields=["sender", "recipients", "cc"],
+		order_by="communication_date desc",
+		limit_page_length=50,
+	):
+		for field in ("sender", "recipients", "cc"):
+			for address in (comm.get(field) or "").split(","):
+				address = address.strip()
+				if address:
+					add(address, address, "Conversation")
+
+	return list(found.values())
+
+
+@frappe.whitelist()
+def get_lead_email_context(lead):
+	"""Suggested recipients and available templates for the compose dialog."""
+	_check_lead_access()
+	lead_doc = frappe.get_doc("Lead", lead)
+	lead_doc.check_permission("read")
+
+	templates = frappe.get_all(
+		"Email Template",
+		fields=["name", "subject"],
+		order_by="name asc",
+		limit_page_length=100,
+	)
+
+	return {
+		"suggestions": _contact_suggestions(lead, lead_doc),
+		"templates": templates,
+	}
+
+
+@frappe.whitelist()
+def render_lead_email_template(lead, template):
+	"""Render an Email Template against this Lead."""
+	_check_lead_access()
+	lead_doc = frappe.get_doc("Lead", lead)
+	lead_doc.check_permission("read")
+
+	from frappe.email.doctype.email_template.email_template import get_email_template
+
+	return get_email_template(template, lead_doc.as_dict())
+
+
+@frappe.whitelist()
+def get_contact_emails(contact):
+	"""Addresses on a Contact, for the 'choose an existing contact' picker."""
+	_check_lead_access()
+	doc = frappe.get_doc("Contact", contact)
+	doc.check_permission("read")
+
+	label = " ".join(filter(None, [doc.first_name, doc.last_name])) or doc.name
+	emails = [row.email_id for row in (doc.email_ids or []) if row.email_id]
+	if doc.email_id and doc.email_id not in emails:
+		emails.insert(0, doc.email_id)
+	return {"label": label, "emails": emails}
+
+
 @frappe.whitelist(methods=["POST"])
 def send_lead_email(lead, recipients, subject, content, cc=None, bcc=None, in_reply_to=None, send=1):
 	"""Send an email from the system, linked to the Lead.
