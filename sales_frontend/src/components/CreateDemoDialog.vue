@@ -2,7 +2,7 @@
 	<Dialog
 		:options="{
 			title: `Create Demo — ${lead.lead_name || lead.name}`,
-			size: '3xl',
+			size: '6xl',
 			actions: [
 				{ label: 'Cancel', variant: 'subtle', onClick: () => emit('update:modelValue', false) },
 				{
@@ -20,6 +20,9 @@
 			<div class="space-y-4">
 				<FormControl v-model="subject" label="Subject" type="text" size="sm" required />
 
+				<!-- Two columns at width so the dialog grows sideways rather than
+				     into a long scroll; stacks again on narrow viewports. -->
+				<div class="grid grid-cols-1 gap-4 lg:grid-cols-2">
 				<section class="rounded-md border border-outline-gray-2 p-3">
 					<div class="mb-2 text-[11px] font-semibold uppercase tracking-wide text-ink-gray-6">
 						Appointment
@@ -96,6 +99,7 @@
 					</div>
 				</section>
 
+				<div class="space-y-4">
 				<section class="rounded-md border border-outline-gray-2 p-3">
 					<div class="mb-2 text-[11px] font-semibold uppercase tracking-wide text-ink-gray-6">
 						Invitees
@@ -178,7 +182,7 @@
 						</span>
 						<span class="text-xs text-ink-gray-5">{{ selectedModules.length }} selected</span>
 					</div>
-					<div class="max-h-48 overflow-y-auto">
+					<div class="max-h-64 overflow-y-auto">
 						<table class="w-full text-sm">
 							<tbody>
 								<tr
@@ -212,6 +216,8 @@
 					rows="3"
 					placeholder="What will be shown, who is attending…"
 				/>
+				</div>
+				</div>
 
 				<ErrorMessage :message="error" />
 			</div>
