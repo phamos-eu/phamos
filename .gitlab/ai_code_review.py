@@ -1,22 +1,6 @@
 #!/usr/bin/env python3
-"""
-Automatic AI code review for GitLab merge requests, using the Anthropic API.
-
-Triggered by .gitlab-ci.yml for merge requests targeting `version-15`.
-Fetches the MR diff via the GitLab API, sends it to Claude for review, and
-posts a single comment on the MR with the findings.
-
-Required environment variables:
-  ANTHROPIC_API_KEY   - Anthropic API key.
-  GITLAB_API_TOKEN    - GitLab token (project/group access token) with `api`
-                         scope and at least Developer role, used to read the
-                         diff and post notes.
-  CI_SERVER_URL, CI_PROJECT_ID, CI_MERGE_REQUEST_IID - provided by GitLab CI
-                         automatically for merge request pipelines.
-
-Optional:
-  ANTHROPIC_MODEL      - defaults to "claude-sonnet-5".
-  AI_REVIEW_MAX_DIFF_CHARS - defaults to 60000; diff is truncated beyond this.
+"""Fetches an MR diff from GitLab and posts a Claude-generated review as an MR comment.
+Invoked by .gitlab-ci.yml's ai_code_review job.
 """
 
 import os
