@@ -14,6 +14,7 @@ from phamos.api.checklist_inbox import (
 	CHECKLIST_INBOX_LIMIT,
 	checklist_owner_query,
 	delete_spa_checklist_item,
+	_readable_checklist_rows,
 	get_checklist_inbox,
 	get_checklist_template,
 )
@@ -156,6 +157,10 @@ class TestGetChecklistInbox(FrappeTestCase):
 				"phamos.api.checklist_inbox._checklist_has_title_field", return_value=False
 			),
 			patch("frappe.get_list", return_value=rows),
+			patch(
+				"phamos.api.checklist_inbox._readable_checklist_rows",
+				side_effect=lambda given: given,
+			),
 			patch("phamos.api.checklist_inbox._item_counts_map", return_value={}),
 		):
 			result = get_checklist_inbox()
@@ -171,9 +176,56 @@ class TestGetChecklistInbox(FrappeTestCase):
 				"phamos.api.checklist_inbox._checklist_has_title_field", return_value=False
 			),
 			patch("frappe.get_list", return_value=rows),
+			patch(
+				"phamos.api.checklist_inbox._readable_checklist_rows",
+				side_effect=lambda given: given,
+			),
 			patch("phamos.api.checklist_inbox._item_counts_map", return_value={}),
 		):
 			result = get_checklist_inbox()
 
 		self.assertTrue(result["truncated"])
 		self.assertEqual(len(result["items"]), CHECKLIST_INBOX_LIMIT)
+
+
+class TestReadableChecklistRows(FrappeTestCase):
+	"""Checklist permissions are role-based and span every department's
+	doctypes, so the inbox has to defer to the record each one hangs off."""
+
+	def test_drops_rows_whose_parent_is_not_readable(self):
+		rows = [
+			{"name": "CHK-1", "document": "Issue", "reference_record": "ISS-mine"},
+			{"name": "CHK-2", "document": "Issue", "reference_record": "ISS-theirs"},
+		]
+		with (
+			patch("frappe.has_permission", return_value=True),
+			patch("frappe.get_list", return_value=["ISS-mine"]),
+		):
+			kept = _readable_checklist_rows(rows)
+
+		self.assertEqual([row["name"] for row in kept], ["CHK-1"])
+
+	def test_drops_everything_when_the_parent_doctype_is_off_limits(self):
+		rows = [{"name": "CHK-1", "document": "Task", "reference_record": "TASK-1"}]
+		with patch("frappe.has_permission", return_value=False):
+			self.assertEqual(_readable_checklist_rows(rows), [])
+
+	def test_keeps_rows_with_no_parent(self):
+		"""A checklist that references nothing has no parent to defer to."""
+		rows = [{"name": "CHK-1", "document": None, "reference_record": None}]
+		with patch("frappe.has_permission", return_value=True):
+			self.assertEqual(_readable_checklist_rows(rows), rows)
+
+	def test_asks_once_per_parent_doctype(self):
+		rows = [
+			{"name": "CHK-1", "document": "Issue", "reference_record": "ISS-1"},
+			{"name": "CHK-2", "document": "Issue", "reference_record": "ISS-2"},
+			{"name": "CHK-3", "document": "Task", "reference_record": "TASK-1"},
+		]
+		with (
+			patch("frappe.has_permission", return_value=True),
+			patch("frappe.get_list", return_value=[]) as get_list,
+		):
+			_readable_checklist_rows(rows)
+
+		self.assertEqual(get_list.call_count, 2)
