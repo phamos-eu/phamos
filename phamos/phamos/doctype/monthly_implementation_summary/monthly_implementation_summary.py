@@ -473,6 +473,7 @@ class MonthlyImplementationSummary(Document):
 			dn_items = {
 				"item_code": so_line.item_code,
 				"item_name": so_line.item_name,
+				"description": so_line.description,
 				"qty": hours,
 				"uom": uom,
 				"stock_uom": stock_uom,
@@ -527,7 +528,18 @@ class MonthlyImplementationSummary(Document):
 				so_item = frappe.db.get_value(
 					"Sales Order Item",
 					so_detail,
-					["name", "item_code", "item_name", "item_group", "stock_uom", "uom", "conversion_factor", "rate", "parent"],
+					[
+						"name",
+						"item_code",
+						"item_name",
+						"description",
+						"item_group",
+						"stock_uom",
+						"uom",
+						"conversion_factor",
+						"rate",
+						"parent",
+					],
 					as_dict=True,
 				)
 			# If no match or SO doesn't align, look up by item_code in the given sales_order
@@ -541,7 +553,18 @@ class MonthlyImplementationSummary(Document):
 					so_item = frappe.db.get_value(
 						"Sales Order Item",
 						so_item_name,
-						["name", "item_code", "item_name", "item_group", "stock_uom", "uom", "conversion_factor", "rate", "parent"],
+						[
+							"name",
+							"item_code",
+							"item_name",
+							"description",
+							"item_group",
+							"stock_uom",
+							"uom",
+							"conversion_factor",
+							"rate",
+							"parent",
+						],
 						as_dict=True,
 					)
 
@@ -557,6 +580,7 @@ class MonthlyImplementationSummary(Document):
 				item_row = {
 					"item_code": ic,
 					"item_name": row.item_name or frappe.db.get_value("Item", ic, "item_name"),
+					"description": (row.description or "").strip(),
 					"item_group": row.item_group,
 					"qty": qty,
 					"stock_uom": stock_uom,
@@ -578,9 +602,17 @@ class MonthlyImplementationSummary(Document):
 			uom = so_item.uom or row.uom
 			stock_uom = so_item.stock_uom or row.stock_uom or uom
 
+			# MIS description is authoritative.
+			# If MIS has no description, use the Sales Order description.
+			# Never fall back to Item Master description.
+			description = (row.description or "").strip()
+			if not description:
+				description = (so_item.description or "").strip()
+
 			item_row = {
 				"item_code": so_item.item_code or ic,
 				"item_name": so_item.item_name or row.item_name or frappe.db.get_value("Item", ic, "item_name"),
+				"description": description,
 				"item_group": so_item.item_group or row.item_group,
 				"qty": qty,
 				"stock_uom": stock_uom,
@@ -867,6 +899,9 @@ def _create_dn_from_sales_order(docname, sales_order, delivery_note_item=None):
 			if item.so_detail:
 				soi = frappe.get_doc("Sales Order Item", item.so_detail)
 
+				# Preserve Sales Order item description
+				item.description = soi.description or ""
+
 				# Force SO values and ignore pricing rule values
 				item.rate = flt(soi.rate)
 				item.net_rate = flt(soi.rate)
@@ -938,6 +973,15 @@ def update_dn_table_in_summary(docname, dn_name, old_dn=None, existing_rows=None
 		suom = item.stock_uom or item.uom
 		uom = item.uom
 		cf = flt(item.conversion_factor, 9) or 1
+		# Preserve Delivery Note/Sales Order description
+		description = item.description or ""
+		if not description and getattr(item, "so_detail", None):
+			description = frappe.db.get_value(
+				"Sales Order Item",
+				item.so_detail,
+				"description",
+			) or ""
+
 		if getattr(item, "so_detail", None):
 			soi = frappe.db.get_value(
 				"Sales Order Item",
@@ -957,6 +1001,7 @@ def update_dn_table_in_summary(docname, dn_name, old_dn=None, existing_rows=None
 			"item_code": icode,
 			"item_name": iname,
 			"item_group": igroup,
+			"description": description,
 			"qty": qty,
 			"stock_uom": suom,
 			"uom": uom,
