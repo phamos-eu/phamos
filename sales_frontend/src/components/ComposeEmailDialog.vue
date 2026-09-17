@@ -50,16 +50,15 @@
 					:class="chipsVisible ? '' : 'invisible'"
 				>
 					<template v-if="chipsVisible">
-						<div class="mb-1 text-xs text-ink-gray-5">
-							Add to <span class="font-medium text-ink-gray-7">{{ focusedLabel }}</span>
-						</div>
-						<div class="flex h-[2.75rem] flex-wrap content-start gap-1.5 overflow-y-auto">
+						<!-- No heading: the space buys a second row of addresses, and the
+						     field a chip lands in is the one the cursor is already in. -->
+						<div class="flex h-full flex-wrap content-start gap-1.5 overflow-y-auto">
 							<button
 								v-for="suggestion in availableSuggestions"
 								:key="suggestion.email"
 								type="button"
 								class="flex max-w-full items-baseline gap-1.5 rounded-full border border-dashed border-outline-gray-3 px-2 py-0.5 text-xs hover:border-outline-gray-4 hover:bg-surface-gray-2"
-								:title="suggestion.source"
+								:title="`Add to ${focusedLabel} · ${suggestion.source}`"
 								@mousedown.prevent="addRecipient(suggestion.email)"
 							>
 								<span class="flex-none text-ink-gray-8">{{ suggestion.label }}</span>
