@@ -268,7 +268,12 @@ watch(
 	(open) => {
 		if (!open) return
 		subject.value = defaultSubject.value
-		day.value = new Date().toISOString().slice(0, 10)
+		// Local date, not toISOString(): that is UTC, so before 02:00 in Berlin
+		// the calendar would open on yesterday.
+		const now = new Date()
+		day.value = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(
+			now.getDate()
+		).padStart(2, "0")}`
 		durationMinutes.value = "60"
 		startsOn.value = ""
 		endsOn.value = ""
@@ -353,8 +358,12 @@ function proposalLabel(proposal) {
 /** Same throwaway-room scheme the Desk hybrid meeting composer uses. */
 function generateVideoLink() {
 	const chars = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"
+	// The room name is the only thing keeping strangers out of the meeting, so
+	// it comes from the CSPRNG rather than Math.random(), whose state is
+	// recoverable from a handful of observed outputs.
+	const bytes = crypto.getRandomValues(new Uint8Array(15))
 	let room = ""
-	for (let i = 0; i < 15; i++) room += chars[Math.floor(Math.random() * chars.length)]
+	for (const byte of bytes) room += chars[byte % chars.length]
 	location.value = `https://meet.jit.si/${room}`
 }
 

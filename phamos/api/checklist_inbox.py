@@ -238,13 +238,61 @@ def _require_checklist_read(name):
 	frappe.has_permission("Checklist", "read", throw=True)
 	doc = frappe.get_doc("Checklist", name)
 	doc.check_permission("read")
+	_check_parent_readable(doc)
 	return doc
+
+
+def _check_parent_readable(doc):
+	"""A checklist is only as readable as the record it hangs off.
+
+	Checklist's own permissions are role-based and span every department's
+	doctypes, so without this a role granted Checklist read could open a
+	checklist attached to a record it has no business seeing. Mirrors the
+	guard `_validate_reference_record` already applies on the create path.
+	"""
+	if not doc.document or not doc.reference_record:
+		return
+	if not frappe.db.exists(doc.document, doc.reference_record):
+		return
+	frappe.get_doc(doc.document, doc.reference_record).check_permission("read")
+
+
+def _readable_checklist_rows(rows):
+	"""Drop rows whose parent record the user can't read.
+
+	Grouped by parent doctype so it stays one query per doctype rather than
+	one per checklist.
+	"""
+	by_doctype = {}
+	for row in rows:
+		if row.get("document") and row.get("reference_record"):
+			by_doctype.setdefault(row["document"], set()).add(row["reference_record"])
+
+	allowed = {}
+	for doctype, names in by_doctype.items():
+		if not frappe.has_permission(doctype, "read"):
+			allowed[doctype] = set()
+			continue
+		allowed[doctype] = set(
+			frappe.get_list(doctype, filters={"name": ["in", list(names)]}, pluck="name")
+		)
+
+	return [
+		row
+		for row in rows
+		if not row.get("document")
+		or not row.get("reference_record")
+		or row["reference_record"] in allowed.get(row["document"], set())
+	]
 
 
 def _require_checklist_write(name):
 	frappe.has_permission("Checklist", "write", throw=True)
 	doc = frappe.get_doc("Checklist", name)
 	doc.check_permission("write")
+	# Reading the parent is the floor for touching its checklist; writing the
+	# checklist of a record you cannot even see is never legitimate.
+	_check_parent_readable(doc)
 	return doc
 
 
@@ -355,7 +403,7 @@ def get_checklist_inbox(include_completed=0):
 		limit_page_length=CHECKLIST_INBOX_LIMIT + 1,
 	)
 	truncated = len(rows) > CHECKLIST_INBOX_LIMIT
-	rows = rows[:CHECKLIST_INBOX_LIMIT]
+	rows = _readable_checklist_rows(rows[:CHECKLIST_INBOX_LIMIT])
 	counts = _item_counts_map([r.name for r in rows])
 	return {
 		"items": [_serialize_row(r, counts) for r in rows],

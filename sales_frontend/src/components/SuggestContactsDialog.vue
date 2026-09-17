@@ -23,7 +23,7 @@
 
 					<div
 						v-for="(person, index) in suggestions"
-						:key="index"
+						:key="person.key"
 						class="rounded-md border border-outline-gray-2 p-3"
 						:class="person.added ? 'bg-surface-gray-1' : ''"
 					>
@@ -96,8 +96,11 @@ async function load() {
 			lead: props.lead.name,
 		})
 		messageCount.value = result.message_count || 0
-		suggestions.value = (result.suggestions || []).map((person) => ({
+		suggestions.value = (result.suggestions || []).map((person, index) => ({
 			...person,
+			// Stable per row: these carry edited form state and get spliced out
+			// one at a time, so an index key would re-bind the rows below.
+			key: `${person.email || person.first_name || ""}:${index}`,
 			saving: false,
 			added: false,
 		}))

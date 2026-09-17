@@ -40,6 +40,23 @@ const contentEl = ref(null)
 const clipped = ref(false)
 const expanded = ref(false)
 
+/** Links in a received mail must not navigate the cockpit away — an unsent
+ *  reply lives only in memory and would go with it. */
+function hardenLinks() {
+	const root = contentEl.value
+	if (!root) return
+	for (const link of root.querySelectorAll("a[href]")) {
+		const href = link.getAttribute("href") || ""
+		// data: URLs in a mail body are a download dressed as a link.
+		if (/^\s*data:/i.test(href)) {
+			link.removeAttribute("href")
+			continue
+		}
+		link.setAttribute("target", "_blank")
+		link.setAttribute("rel", "noopener noreferrer nofollow")
+	}
+}
+
 function measure() {
 	// While expanded the clip is lifted, so there's nothing to compare against —
 	// keep the flag that got us here so "Show less" stays available.
@@ -59,7 +76,10 @@ onMounted(() => {
 		observer = new ResizeObserver(() => measure())
 		if (contentEl.value) observer.observe(contentEl.value)
 	}
-	nextTick(measure)
+	nextTick(() => {
+		hardenLinks()
+		measure()
+	})
 })
 
 onBeforeUnmount(() => observer?.disconnect())
@@ -69,7 +89,10 @@ watch(
 	() => {
 		expanded.value = false
 		clipped.value = false
-		nextTick(measure)
+		nextTick(() => {
+			hardenLinks()
+			measure()
+		})
 	}
 )
 </script>

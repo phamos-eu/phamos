@@ -23,7 +23,7 @@
 				>
 					<FormControl v-model="search" type="text" size="sm" placeholder="Search…" class="w-full min-w-0" />
 					<div class="flex min-w-0 justify-center">
-						<StatusFilter v-model="statusFilter" :statuses="statuses" />
+						<StatusFilter v-model="statusFilter" :statuses="statuses" :themes="DEMO_STATUS_THEMES" />
 					</div>
 					<div class="flex min-w-0 justify-center">
 						<ListSortSelector
@@ -101,7 +101,12 @@ import DemoDetail from "@/components/DemoDetail.vue"
 import StatusFilter from "@spa/components/StatusFilter.vue"
 import ListSortSelector from "@spa/components/ListSortSelector.vue"
 import { formatDate, formatDatetime } from "@spa/utils/datetime"
-import { DEMO_LIST_FILTER_GRID, DEMO_LIST_FILTER_SUBGRID, demoStatusTheme } from "@/demoListColumns.js"
+import {
+	DEMO_LIST_FILTER_GRID,
+	DEMO_LIST_FILTER_SUBGRID,
+	DEMO_STATUS_THEMES,
+	demoStatusTheme,
+} from "@/demoListColumns.js"
 
 const API = "phamos.api.sales_demos"
 

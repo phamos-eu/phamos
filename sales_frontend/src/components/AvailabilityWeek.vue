@@ -101,8 +101,8 @@
 		</div>
 
 		<p class="border-t border-outline-gray-2 px-3 py-1.5 text-[11px] text-ink-gray-5">
-			From this system's calendar entries{{ mailcowNote }}. Pick slots to offer, then add them to the
-			message.
+			From this system's calendar entries, plus your own Mailcow calendar when it is
+			configured. Colleagues' times show as busy without the detail.
 		</p>
 	</div>
 </template>
@@ -126,7 +126,6 @@ const duration = ref("60")
 const days = ref([])
 const loading = ref(false)
 const shownUsers = ref(new Set())
-const mailcowNote = ref("")
 
 function pad(n) {
 	return String(n).padStart(2, "0")
@@ -173,7 +172,12 @@ function toggleUser(name) {
 	shownUsers.value = next
 }
 
+// Clicking through weeks fires overlapping requests; without a token whichever
+// lands last wins, which is not necessarily the week now on screen.
+let loadToken = 0
+
 async function load() {
+	const token = ++loadToken
 	loading.value = true
 	try {
 		const data = await call("phamos.api.sales_leads.get_week_availability", {
@@ -182,11 +186,13 @@ async function load() {
 			users: JSON.stringify([...shownUsers.value]),
 			duration_minutes: duration.value,
 		})
+		if (token !== loadToken) return
 		days.value = data.days || []
 	} catch (e) {
+		if (token !== loadToken) return
 		days.value = []
 	} finally {
-		loading.value = false
+		if (token === loadToken) loading.value = false
 	}
 }
 

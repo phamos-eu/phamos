@@ -613,7 +613,16 @@
 		:options="{ title: lead?.company_name || lead?.lead_name || 'Website', size: '5xl' }"
 	>
 		<template #body-content>
-			<iframe :src="websiteDialogUrl" class="h-[70vh] w-full rounded-md border border-outline-gray-2" />
+			<!-- A lead's website is attacker-supplied whenever leads arrive from a
+			     web form, and passing the embeddability check says only that the
+			     site allows framing, not that it behaves. Sandboxed without
+			     allow-top-navigation so it cannot replace the cockpit. -->
+			<iframe
+				:src="websiteDialogUrl"
+				sandbox="allow-scripts allow-same-origin allow-popups allow-forms"
+				referrerpolicy="no-referrer"
+				class="h-[70vh] w-full rounded-md border border-outline-gray-2"
+			/>
 		</template>
 	</Dialog>
 </template>
@@ -1139,6 +1148,18 @@ function stripHtml(value) {
 		.trim()
 }
 
+/** Pull back the next steps after a save that makes the server add one of its
+ *  own — setting a planned start appends a labelled row server-side. Only then,
+ *  because a blind re-sync would wipe a row being typed. */
+function refreshNextStepsFromLead() {
+	nextSteps.value = (lead.value.next_steps || []).map((step) => ({
+		key: nextStepKey++,
+		next_step: step.next_step,
+		date: step.date,
+	}))
+	sortNextSteps()
+}
+
 function syncFieldsFromLead() {
 	syncing.value = true
 	status.value = lead.value.status || ""
@@ -1257,7 +1278,11 @@ async function loadActivity() {
 	}
 }
 
-async function saveFields() {
+/**
+ * @param {boolean} refreshNextSteps - pull the next steps back afterwards,
+ *   for saves where the server adds a row of its own (a planned start).
+ */
+async function saveFields(refreshNextSteps = false) {
 	if (syncing.value || !lead.value) return
 	saveError.value = ""
 	savingStatus.value = true
@@ -1292,8 +1317,12 @@ async function saveFields() {
 			})
 		}
 		delete updated.conflict
+		// Deliberately not re-syncing the editable fields from the response:
+		// the save is debounced, so anything typed while it was in flight would
+		// be replaced by the older server value — silently, because the sync
+		// guard suppresses the watcher that would save it again.
 		lead.value = updated
-		syncFieldsFromLead()
+		if (refreshNextSteps) refreshNextStepsFromLead()
 		emit("updated", updated)
 	} catch (e) {
 		saveError.value = e?.messages?.[0] || e?.message || "Could not save lead"
@@ -1427,24 +1456,32 @@ async function onPlannedStartChange(value) {
 	plannedStart.value = value || ""
 	// Re-anchor the months when the start moves, but don't discard numbers
 	// already entered for months that still apply.
+	let reanchored = null
 	if (plannedStart.value) {
 		const existing = new Map(hoursPredictions.value.map((r) => [r.month_start, r.hours]))
 		const count = Math.max(hoursPredictions.value.length, DEFAULT_PREDICTION_MONTHS)
-		hoursPredictions.value = Array.from({ length: count }, (_, i) => {
+		reanchored = Array.from({ length: count }, (_, i) => {
 			const month = monthStart(plannedStart.value, i)
 			return { month_start: month, hours: existing.get(month) ?? "" }
 		})
+		hoursPredictions.value = reanchored
 	}
-	await saveFields()
-	saveHoursPredictions()
+	// The planned start makes the server append a next step, so pull those back.
+	await saveFields(true)
+	// Passed explicitly: the save above must never be able to leave the old
+	// months in the ref and have them written back over the new ones.
+	await saveHoursPredictions(reanchored)
 }
 
-async function saveHoursPredictions() {
+/** @param {Array} [rows] - explicit rows, for callers that just rebuilt them
+ *  and must not depend on the ref surviving an intervening save. */
+async function saveHoursPredictions(rows = null) {
 	if (syncing.value || !lead.value) return
 	try {
+		const source = rows || hoursPredictions.value
 		const saved = await call(`${API}.set_lead_hours_predictions`, {
 			lead: lead.value.name,
-			rows: hoursPredictions.value
+			rows: source
 				.filter((row) => row.hours !== "" && row.hours !== null)
 				.map((row) => ({ month_start: row.month_start, hours: Number(row.hours) || 0 })),
 		})

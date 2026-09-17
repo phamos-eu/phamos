@@ -72,6 +72,8 @@ LOST_STATUSES = ("Do Not Contact", "Lost Quotation")
 CONVERTED_STATUS = "Converted"
 
 WEBSITE_CHECK_TIMEOUT = 5
+# Enough for the usual http→https→www chain, few enough to stop a redirect loop.
+WEBSITE_CHECK_MAX_HOPS = 4
 # Plain browser UA: some sites serve different headers (or refuse outright) to
 # unknown clients, which would make an embeddable site look un-embeddable.
 WEBSITE_CHECK_USER_AGENT = (
@@ -159,23 +161,12 @@ def check_website_embeddable(url):
 	if not normalized or not _is_public_http_url(normalized):
 		return {"url": normalized, "embeddable": False, "reason": "unreachable"}
 
-	headers = {"User-Agent": WEBSITE_CHECK_USER_AGENT}
 	try:
-		response = requests.head(
-			normalized, timeout=WEBSITE_CHECK_TIMEOUT, allow_redirects=True, headers=headers
-		)
-		if response.status_code >= 400:
-			# Plenty of sites don't answer HEAD properly; fall back to GET.
-			response = requests.get(
-				normalized, timeout=WEBSITE_CHECK_TIMEOUT, allow_redirects=True, headers=headers, stream=True
-			)
-			response.close()
+		response, final_url = _fetch_for_embedding(normalized)
 	except requests.RequestException:
 		return {"url": normalized, "embeddable": False, "reason": "unreachable"}
 
-	final_url = response.url or normalized
-	# Re-check after redirects: the first hop being public doesn't mean the last one is.
-	if not _is_public_http_url(final_url):
+	if response is None:
 		return {"url": normalized, "embeddable": False, "reason": "unreachable"}
 
 	if response.status_code >= 400:
@@ -189,6 +180,47 @@ def check_website_embeddable(url):
 		return {"url": final_url, "embeddable": False, "reason": "blocked"}
 
 	return {"url": final_url, "embeddable": True, "reason": ""}
+
+
+def _fetch_for_embedding(url):
+	"""Fetch a URL for the embeddability check, validating every hop.
+
+	Redirects are followed by hand rather than by requests: letting requests
+	follow them means the redirected request is already made by the time the
+	final URL can be checked, so a public host redirecting to an internal one
+	would be fetched first and only judged afterwards.
+	"""
+	headers = {"User-Agent": WEBSITE_CHECK_USER_AGENT}
+	current = url
+
+	for _hop in range(WEBSITE_CHECK_MAX_HOPS):
+		if not _is_public_http_url(current):
+			return None, current
+
+		response = requests.head(
+			current, timeout=WEBSITE_CHECK_TIMEOUT, allow_redirects=False, headers=headers
+		)
+		if response.status_code in (405, 501) or response.status_code >= 400:
+			# Plenty of sites don't answer HEAD properly; fall back to GET.
+			response = requests.get(
+				current,
+				timeout=WEBSITE_CHECK_TIMEOUT,
+				allow_redirects=False,
+				headers=headers,
+				stream=True,
+			)
+			response.close()
+
+		if response.is_redirect or response.status_code in (301, 302, 303, 307, 308):
+			location = response.headers.get("Location")
+			if not location:
+				return response, current
+			current = requests.compat.urljoin(current, location)
+			continue
+
+		return response, current
+
+	return None, current
 
 
 def _check_lead_access():
@@ -764,6 +796,7 @@ def get_lead_email_context(lead):
 	lead_doc = frappe.get_doc("Lead", lead)
 	lead_doc.check_permission("read")
 
+	frappe.has_permission("Email Template", "read", throw=True)
 	templates = frappe.get_all(
 		"Email Template",
 		fields=["name", "subject"],
@@ -855,7 +888,10 @@ def search_email_recipients(lead, txt="", limit=10):
 			found[suggestion["email"].casefold()] = suggestion
 
 	if txt and len(found) < limit:
-		like = f"%{txt}%"
+		frappe.has_permission("Contact", "read", throw=True)
+		# Escape LIKE wildcards: an unescaped "%" would match every contact on
+		# the site in one request rather than searching for one.
+		like = "%{0}%".format(txt.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_"))
 		contacts = frappe.get_all(
 			"Contact",
 			or_filters=[
@@ -1029,10 +1065,13 @@ def set_lead_primary_contact(lead, contact, untracked_action=None):
 		return {"needs_decision": True, "current": current}
 
 	if has_details and not tracked and untracked_action == "create":
+		frappe.has_permission("Contact", "create", throw=True)
 		created = lead_doc.create_contact()
 		created.append(
 			"links", {"link_doctype": "Lead", "link_name": lead_doc.name, "link_title": lead_doc.lead_name}
 		)
+		# The link row is the only reason for a second save; permissions were
+		# checked above and ERPNext's own create_contact already inserted it.
 		created.save(ignore_permissions=True)
 
 	emails, phones = _contact_addresses(contact_doc)
@@ -1558,7 +1597,7 @@ def get_week_availability(start, days=None, users=None, duration_minutes=60):
 
 	if isinstance(users, str):
 		users = frappe.parse_json(users)
-	users = [u for u in (users or []) if u] or [frappe.session.user]
+	users = _allowed_availability_users(users)
 
 	busy = _events_busy_blocks(start_date, end_date, users)
 	busy += _mailcow_busy_blocks(start_date, end_date)
@@ -1574,8 +1613,29 @@ def get_week_availability(start, days=None, users=None, duration_minutes=60):
 	}
 
 
+def _allowed_availability_users(users):
+	"""Restrict the calendars that can be queried to the sales shortlist.
+
+	Without this the caller chooses whose calendar to inspect, which turns a
+	scheduling helper into a way of probing any account on the site.
+	"""
+	allowed = {u["name"] for u in role_shortlist_users(LEAD_ROLES)}
+	allowed.add(frappe.session.user)
+
+	chosen = [u for u in (users or []) if u in allowed]
+	return chosen or [frappe.session.user]
+
+
 def _events_busy_blocks(start_date, end_date, users):
-	"""Events in the range that any of the chosen people are on."""
+	"""When the chosen people are busy, as free/busy rather than detail.
+
+	Deliberately `get_all`, which bypasses permissions: Event restricts reads
+	to your own, public, and participating events, so a permission-aware query
+	would show a colleague as free all week. What is disclosed is kept to what
+	free/busy means everywhere else — that someone is busy, and for how long.
+	Only the session user's own events carry their subject; everyone else's
+	read "Busy".
+	"""
 	rows = frappe.get_all(
 		"Event",
 		filters={
@@ -1590,6 +1650,8 @@ def _events_busy_blocks(start_date, end_date, users):
 		return []
 
 	chosen = {u.casefold() for u in users}
+	me = frappe.session.user.casefold()
+
 	participants = frappe.get_all(
 		"Event Participants",
 		filters={"parent": ["in", [r.name for r in rows]], "reference_doctype": "User"},
@@ -1606,7 +1668,7 @@ def _events_busy_blocks(start_date, end_date, users):
 			continue
 		blocks.append(
 			{
-				"subject": row.subject,
+				"subject": row.subject if me in people else _("Busy"),
 				"starts_on": str(row.starts_on),
 				"ends_on": str(row.ends_on or row.starts_on),
 			}

@@ -19,7 +19,7 @@
 			     steps do — a list of people should be scannable first. -->
 			<div
 				v-for="(row, index) in modelValue"
-				:key="index"
+				:key="row.name || row.email || `row-${index}`"
 				class="group flex items-center gap-2 border-b border-outline-gray-1 px-2 py-1.5 last:border-0 focus-within:bg-surface-gray-1"
 			>
 				<div class="min-w-0 flex-1">

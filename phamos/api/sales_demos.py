@@ -8,6 +8,7 @@ from urllib.parse import urlparse
 
 import frappe
 from frappe import _
+from frappe.utils.html_utils import clean_email_html
 
 from phamos.api.department_cockpit import _user_label
 from phamos.api.sales_leads import _check_lead_access
@@ -94,13 +95,20 @@ def _attendee_event_fields(lead, lead_doc, participants):
 	return rows, required, optional
 
 
-def _create_demo_event(demo_subject, lead, lead_doc, starts_on, ends_on, agenda, location, participants):
-	"""Tentative calendar entry holding one proposed slot."""
+def _create_demo_event(
+	demo_subject, lead, lead_doc, starts_on, ends_on, agenda, location, participants, demo=None
+):
+	"""Tentative calendar entry holding one proposed slot.
+
+	Stamped with `custom_demo` so the cockpit can tell its own holds apart from
+	every other event on the site — see `_demo_event_names`.
+	"""
 	rows, required, optional = _attendee_event_fields(lead, lead_doc, participants)
 
 	event = frappe.get_doc(
 		{
 			"doctype": "Event",
+			"custom_demo": demo,
 			"subject": demo_subject,
 			"event_type": "Private",
 			"starts_on": starts_on,
@@ -168,7 +176,15 @@ def create_demo(lead, subject, slots=None, participants=None, agenda=None, locat
 
 	for slot in sorted(slots, key=lambda s: str(s.get("starts_on"))):
 		event_name = _create_demo_event(
-			subject, lead, lead_doc, slot["starts_on"], slot.get("ends_on"), agenda, location, participants
+			subject,
+			lead,
+			lead_doc,
+			slot["starts_on"],
+			slot.get("ends_on"),
+			agenda,
+			location,
+			participants,
+			demo=demo.name,
 		)
 		demo.append(
 			"proposed_slots",
@@ -357,6 +373,10 @@ def _sync_lead_followup(demo):
 		return
 
 	lead = frappe.get_doc("Lead", demo.lead)
+	# Writing the demo is not a licence to write its lead: without this, anyone
+	# who can create a demo against a lead could set that lead's follow-up date
+	# and append a next step to it.
+	lead.check_permission("write")
 	lead.custom_next_followup = demo.next_followup or None
 
 	label = f"Follow up on {demo.name}"
@@ -368,7 +388,7 @@ def _sync_lead_followup(demo):
 		else:
 			lead.append("custom_next_steps", {"next_step": label, "date": demo.next_followup})
 
-	lead.save(ignore_permissions=True)
+	lead.save()
 
 
 @frappe.whitelist(methods=["POST"])
@@ -390,6 +410,30 @@ def set_demo_attendees(name, rows=None):
 	return _serialize_demo(frappe.get_doc("Demo", name))
 
 
+def _demo_event_names(doc):
+	"""Events this demo actually owns.
+
+	`proposed_slots[].event` is read-only in the form but not on the API: a
+	Sales User may write a Demo, so nothing stops a crafted child row naming
+	someone else's event. Without this filter, editing attendees would rewrite
+	that event's invitee list and confirming a slot would delete it outright.
+	Only events stamped with this demo are ever touched.
+	"""
+	claimed = {row.event for row in (doc.get("proposed_slots") or []) if row.event}
+	if doc.event:
+		claimed.add(doc.event)
+	if not claimed:
+		return set()
+
+	return set(
+		frappe.get_all(
+			"Event",
+			filters={"name": ["in", list(claimed)], "custom_demo": doc.name},
+			pluck="name",
+		)
+	)
+
+
 def _sync_demo_events(doc):
 	"""Push the demo's attendees onto every event still holding a slot.
 
@@ -400,13 +444,7 @@ def _sync_demo_events(doc):
 	participants = _serialize_attendees(doc)
 	rows, required, optional = _attendee_event_fields(doc.lead, lead_doc, participants)
 
-	event_names = {row.event for row in (doc.get("proposed_slots") or []) if row.event}
-	if doc.event:
-		event_names.add(doc.event)
-
-	for event_name in event_names:
-		if not frappe.db.exists("Event", event_name):
-			continue
+	for event_name in _demo_event_names(doc):
 		event = frappe.get_doc("Event", event_name)
 		event.set("event_participants", rows)
 		event.custom_attendees_to = ", ".join(required)
@@ -431,6 +469,9 @@ def confirm_demo_slot(name, slot):
 	if not chosen:
 		frappe.throw(_("That proposed slot is no longer on this demo."))
 
+	# Resolved before the table is rewritten, and only events this demo holds.
+	ours = _demo_event_names(doc)
+
 	doc.scheduled_on = chosen.starts_on
 	doc.ends_on = chosen.ends_on
 	doc.event = chosen.event
@@ -440,7 +481,7 @@ def confirm_demo_slot(name, slot):
 	doc.save()
 
 	for row in released:
-		if row.event and frappe.db.exists("Event", row.event):
+		if row.event and row.event in ours:
 			frappe.delete_doc("Event", row.event, ignore_permissions=True, delete_permanently=True)
 
 	return _serialize_demo(frappe.get_doc("Demo", name))
@@ -454,7 +495,10 @@ def _serialize_feedback(doc):
 		"respondent_name": doc.respondent_name,
 		"contact": doc.contact,
 		"user": doc.user,
-		"notes": doc.notes,
+		# Frappe's generic Text Editor sanitising still allows <style>, which in
+		# an unscoped v-html would restyle the whole cockpit. The email cleaner
+		# is the tighter allowlist, and it is what the mail feed already uses.
+		"notes": clean_email_html(doc.notes or ""),
 		"modules": [
 			{"module": row.module, "module_name": row.module_name or row.module}
 			for row in (doc.get("modules") or [])

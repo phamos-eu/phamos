@@ -222,6 +222,7 @@ def create_lead_contact(
 	"""Save an accepted suggestion as a Contact linked to this Lead."""
 	_check_lead_access()
 	frappe.has_permission("Lead", "write", throw=True)
+	frappe.has_permission("Contact", "create", throw=True)
 
 	lead_doc = frappe.get_doc("Lead", lead)
 	lead_doc.check_permission("read")
@@ -230,6 +231,13 @@ def create_lead_contact(
 	email = (email or "").strip()
 	if not first_name and not email:
 		frappe.throw(_("A contact needs at least a name or an email address."))
+
+	# These values started life as model output derived from untrusted email,
+	# so they are validated here rather than trusted because the dialog sent
+	# them: a crafted mail can talk the model into proposing a plausible name
+	# against an address the attacker controls.
+	if email:
+		frappe.utils.validate_email_address(email, throw=True)
 
 	contact = frappe.new_doc("Contact")
 	contact.first_name = first_name or email.split("@")[0]
