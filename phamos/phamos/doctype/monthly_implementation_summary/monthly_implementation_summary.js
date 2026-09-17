@@ -460,7 +460,7 @@ function _mis_render_create_dn_dialog(frm, rows, remaining_billable_hours, times
 				const so = $row.attr("data-so");
 				const so_detail = $row.attr("data-so-detail");
 				const remaining = flt($row.attr("data-remaining"));
-				const hours = flt($row.find(".mis-dn-item-alloc-input").val() || 0);
+				const hours = _mis_parse_manual_number($row.find(".mis-dn-item-alloc-input").val());
 				if (hours < 0 || hours > remaining + 0.0001) {
 					invalid = so_detail;
 					return false;
@@ -540,7 +540,7 @@ function _mis_render_create_dn_dialog(frm, rows, remaining_billable_hours, times
 	dialog.$wrapper.on("input change", ".mis-dn-alloc-input", function() {
 		const so = $(this).attr("data-so");
 		const $items = dialog.$wrapper.find(`.mis-dn-item-row[data-so="${so}"]`);
-		let left = flt($(this).val() || 0);
+		let left = _mis_parse_manual_number($(this).val());
 		$items.each(function() {
 			const remaining = flt($(this).attr("data-remaining"));
 			const alloc = Math.max(0, Math.min(remaining, left));
@@ -555,7 +555,7 @@ function _mis_render_create_dn_dialog(frm, rows, remaining_billable_hours, times
 		const so_total = dialog.$wrapper
 			.find(`.mis-dn-item-row[data-so="${so}"] .mis-dn-item-alloc-input`)
 			.toArray()
-			.reduce((sum, el) => sum + flt($(el).val() || 0), 0);
+			.reduce((sum, el) => sum + _mis_parse_manual_number($(el).val()), 0);
 		dialog.$wrapper.find(`.mis-dn-alloc-input[data-so="${so}"]`).val(flt(so_total, 2));
 	});
 
@@ -664,6 +664,19 @@ function _mis_number(value) {
 	return _mis_escape(format_number(flt(value || 0), null, 2));
 }
 
+function _mis_parse_manual_number(value) {
+	const raw = String(value == null ? "" : value).trim();
+	if (!raw) return 0;
+	const last_sep = Math.max(raw.lastIndexOf("."), raw.lastIndexOf(","));
+	let normalized;
+	if (last_sep === -1) {
+		normalized = raw;
+	} else {
+		normalized = raw.slice(0, last_sep).replace(/[.,]/g, "") + "." + raw.slice(last_sep + 1).replace(/[.,]/g, "");
+	}
+	return flt(normalized);
+}
+
 
 const _MIS_TS_COLUMNS = [
 	{
@@ -714,14 +727,13 @@ const _MIS_TS_COLUMNS = [
 		sortable: true,
 		numeric: true,
 		is_billable_input: true,
-		sort_value: (row, dialog) => flt(_mis_get_billable_override(dialog, row.timesheet, row.billable_hours)),
-		filter_value: (row, dialog) => String(_mis_get_billable_override(dialog, row.timesheet, row.billable_hours)),
+		sort_value: (row, dialog) => _mis_get_billable_override_value(dialog, row.timesheet, row.billable_hours),
+		filter_value: (row, dialog) => String(_mis_get_billable_override_value(dialog, row.timesheet, row.billable_hours)),
 	},
 	{
 		key: "description",
 		label: () => __("Description"),
 		sortable: true,
-		default_hidden: true,
 		html: (row) => _mis_escape(row.description),
 		sort_value: (row) => (row.description || "").toLowerCase(),
 		filter_value: (row) => row.description || "",
@@ -739,6 +751,7 @@ const _MIS_TS_COLUMNS = [
 		key: "delivery_note",
 		label: () => __("Delivery Note"),
 		sortable: true,
+		default_hidden: true,
 		html: (row) => row.delivery_note
 			? `<a href="/app/delivery-note/${encodeURIComponent(row.delivery_note)}" target="_blank">${_mis_escape(row.delivery_note)}</a>`
 			: "",
@@ -770,6 +783,14 @@ function _mis_get_billable_override(dialog, timesheet, fallback) {
 	const overrides = (dialog && dialog.__mis_ts_billable_overrides) || {};
 	if (Object.prototype.hasOwnProperty.call(overrides, timesheet)) {
 		return overrides[timesheet];
+	}
+	return flt(fallback || 0);
+}
+
+function _mis_get_billable_override_value(dialog, timesheet, fallback) {
+	const overrides = (dialog && dialog.__mis_ts_billable_overrides) || {};
+	if (Object.prototype.hasOwnProperty.call(overrides, timesheet)) {
+		return _mis_parse_manual_number(overrides[timesheet]);
 	}
 	return flt(fallback || 0);
 }
@@ -989,7 +1010,7 @@ function _mis_get_billable_updates(dialog) {
 	const originals = dialog.__mis_ts_original_billable || {};
 	dialog.$wrapper.find(".mis-ts-billable-input").each(function () {
 		const timesheet = ($(this).attr("data-timesheet") || "").trim();
-		const billable = flt($(this).val() || 0);
+		const billable = _mis_parse_manual_number($(this).val());
 		const original = flt(originals[timesheet] || 0);
 		if (!timesheet) return;
 		if (Math.abs(billable - original) < 0.0001) return;

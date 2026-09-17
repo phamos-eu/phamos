@@ -155,11 +155,7 @@ class MonthlyImplementationSummary(Document):
 			dn = frappe.get_doc("Delivery Note", dn_name)
 			changed = False
 			for row in rows:
-				target = None
-				if row.so_detail:
-					target = next((it for it in dn.items if it.so_detail == row.so_detail), None)
-				if not target:
-					target = next((it for it in dn.items if it.item_code == row.item_code), None)
+				target = next((it for it in dn.items if it.item_code == row.item_code), None)
 				if not target:
 					continue
 				for fn in ("item_code", "description", "qty", "rate", "amount"):
@@ -1327,8 +1323,6 @@ def _mirror_dn_items_into_mis(docname, dn_name):
 			"amount": item.amount,
 			"expense_account": item.expense_account,
 			"cost_center": item.cost_center,
-			"against_sales_order": item.against_sales_order,
-			"so_detail": item.so_detail,
 			"custom_ref_doc": dn_name,
 		})
 	doc.flags.ignore_permissions = True
