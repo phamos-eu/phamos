@@ -674,7 +674,9 @@ function _mis_parse_manual_number(value) {
 	} else {
 		normalized = raw.slice(0, last_sep).replace(/[.,]/g, "") + "." + raw.slice(last_sep + 1).replace(/[.,]/g, "");
 	}
-	return flt(normalized);
+
+	const input = parseFloat(normalized);
+	return isNaN(input) ? frappe.msgprint(__("Invalid number")) : input;
 }
 
 
