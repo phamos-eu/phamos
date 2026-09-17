@@ -365,12 +365,20 @@ function insertLines(lines) {
 	content.value = at === -1 ? body + html : body.slice(0, at) + html + body.slice(at)
 }
 
+/** The chips stay compact, but a time offered in a mail reads better with the
+ *  day written out — "Thursday, 17.09.2026" is harder to misread than a date. */
+function slotSentence(slot) {
+	const date = new Date(`${slot.starts_on.slice(0, 10)}T00:00:00`)
+	const weekday = date.toLocaleDateString(undefined, { weekday: "long" })
+	return `${weekday}, ${slotLabel(slot)}`
+}
+
 function insertSlot(slot) {
-	insertLines([`<p>${slotLabel(slot)}</p>`])
+	insertLines([`<p>${slotSentence(slot)}</p>`])
 }
 
 function insertAllSlots() {
-	insertLines(pickedSlots.value.map((slot) => `<p>${slotLabel(slot)}</p>`))
+	insertLines(pickedSlots.value.map((slot) => `<p>${slotSentence(slot)}</p>`))
 }
 
 /** The signature is part of the body — editable, and shown where it'll land.
