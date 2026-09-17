@@ -42,15 +42,18 @@
 				     worth of it hid most of them. Which field a chip lands in is
 				     said in words, since position no longer says it. The row
 				     keeps its height either way so the dialog doesn't jump. -->
+				<!-- Fixed height, not a minimum: the number of suggestions varies per
+				     lead and per focused field, and the dialog must not resize under
+				     the user because of it. Overflow scrolls inside. -->
 				<div
-					class="min-h-[3.25rem] rounded border border-outline-gray-2 bg-surface-gray-1 px-2 py-1.5"
+					class="h-[4.5rem] overflow-hidden rounded border border-outline-gray-2 bg-surface-gray-1 px-2 py-1.5"
 					:class="chipsVisible ? '' : 'invisible'"
 				>
 					<template v-if="chipsVisible">
 						<div class="mb-1 text-xs text-ink-gray-5">
 							Add to <span class="font-medium text-ink-gray-7">{{ focusedLabel }}</span>
 						</div>
-						<div class="flex max-h-16 flex-wrap gap-1.5 overflow-y-auto">
+						<div class="flex h-[2.75rem] flex-wrap content-start gap-1.5 overflow-y-auto">
 							<button
 								v-for="suggestion in availableSuggestions"
 								:key="suggestion.email"
