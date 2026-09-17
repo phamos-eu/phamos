@@ -1,0 +1,38 @@
+# =============================================================================
+# AI Code Review
+# =============================================================================
+# Purpose:
+#   Automatically reviews merge requests targeting `version-15` using the
+#   Anthropic (Claude) API, posting findings as a comment on the MR.
+#
+# Required CI/CD variables (Settings > CI/CD > Variables in this project):
+#   ANTHROPIC_API_KEY  - Anthropic API key. Mark as Masked + Protected.
+#   GITLAB_API_TOKEN   - A project/group access token (or personal access
+#                        token) with `api` scope and Developer+ role, used to
+#                        read the MR diff and post the review comment. Mark
+#                        as Masked + Protected.
+#
+# Optional CI/CD variables:
+#   ANTHROPIC_MODEL           - defaults to "claude-sonnet-5"
+#   AI_REVIEW_MAX_DIFF_CHARS  - defaults to 60000
+#   AI_REVIEW_ENABLED         - set to "false" to disable this job entirely
+#                               without touching code (defaults to enabled).
+#
+# Notes:
+#   - Only runs on merge request pipelines whose target branch is version-15.
+#   - Re-running the pipeline updates the same comment instead of spamming
+#     new ones (tracked via a hidden marker in the note body).
+# =============================================================================
+
+stages:
+  - ai-review
+
+ai_code_review:
+  stage: ai-review
+  image: python:3.11-slim
+  rules:
+    - if: '$AI_REVIEW_ENABLED == "false"'
+      when: never
+    - if: '$CI_PIPELINE_SOURCE == "merge_request_event" && $CI_MERGE_REQUEST_TARGET_BRANCH_NAME == "version-15"'
+  script:
+    - python .gitlab/ai_code_review.py
