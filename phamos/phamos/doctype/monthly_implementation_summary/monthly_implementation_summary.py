@@ -975,11 +975,6 @@ def _parse_timesheet_billable_rows(rows):
 
 
 def _set_timesheet_billable_hours(ts_doc, target_billable_hours):
-	"""Update Timesheet Detail billing_hours and hours, then save in draft.
-
-	This keeps billable edits from the MIS dialog in sync with Timesheet worked hours
-	so MIS totals reflect the same value after refresh.
-	"""
 	if cint(ts_doc.docstatus) != 0:
 		frappe.throw(frappe._("Timesheet {0} is not in Draft.").format(frappe.bold(ts_doc.name)))
 
@@ -990,14 +985,26 @@ def _set_timesheet_billable_hours(ts_doc, target_billable_hours):
 	target = max(flt(target_billable_hours), 0)
 	total_hours = flt(sum(flt(getattr(log, "hours", 0)) for log in logs), 2)
 
+	if target > total_hours:
+		frappe.throw(
+			frappe._(
+				"Billable hours ({0}) cannot exceed total hours ({1}) on {2}."
+			).format(frappe.bold(target), frappe.bold(total_hours), frappe.bold(ts_doc.name))
+		)
+
 	if total_hours <= 0:
 		for idx, log in enumerate(logs):
 			bill = target if idx == 0 else 0
 			log.billing_hours = bill
-			log.hours = bill
-			if getattr(log, "from_time", None):
-				log.to_time = add_to_date(log.from_time, hours=bill)
 		ts_doc.save(ignore_permissions=True)
+		ts_doc.reload()
+		total_billable_hours = flt(sum(flt(getattr(log, "billing_hours", 0)) for log in (ts_doc.time_logs or [])), 2)
+		frappe.db.set_value(
+			"Timesheet",
+			ts_doc.name,
+			{"total_billable_hours": total_billable_hours},
+			update_modified=False,
+		)
 		return
 
 	running = 0.0
@@ -1010,18 +1017,14 @@ def _set_timesheet_billable_hours(ts_doc, target_billable_hours):
 			running += bill
 		bill = max(bill, 0)
 		log.billing_hours = bill
-		log.hours = bill
-		if getattr(log, "from_time", None):
-			log.to_time = add_to_date(log.from_time, hours=bill)
 
 	ts_doc.save(ignore_permissions=True)
 	ts_doc.reload()
-	total_hours = flt(sum(flt(getattr(log, "hours", 0)) for log in (ts_doc.time_logs or [])), 2)
 	total_billable_hours = flt(sum(flt(getattr(log, "billing_hours", 0)) for log in (ts_doc.time_logs or [])), 2)
 	frappe.db.set_value(
 		"Timesheet",
 		ts_doc.name,
-		{"total_hours": total_hours, "total_billable_hours": total_billable_hours},
+		{"total_billable_hours": total_billable_hours},
 		update_modified=False,
 	)
 
