@@ -79,19 +79,7 @@ Object.assign(GitLabIssueDashboard.prototype, {
         return `/app/${slug}${query ? "?" + query : ""}`;
     },
 
-    buildCsvExportUrl(params) {
-        const searchParams = new URLSearchParams();
-
-        Object.keys(params || {}).forEach((key) => {
-            const value = params[key];
-            if (value === undefined || value === null || value === "") return;
-            searchParams.set(key, Array.isArray(value) ? JSON.stringify(value) : String(value));
-        });
-
-        return `/api/method/phamos.gitlab_integration.page.gitlab_issue_dashboard.gitlab_issue_dashboard.download_gitlab_issue_drilldown_csv?${searchParams.toString()}`;
-    },
-
-    renderDrilldownBody($body, data, note, showLeadTime, onLoadMore) {
+    renderDrilldownBody($body, data, note, showLeadTime, onLoadMore, showTouchTime, showCycleTime, leadTimeLabel, stateLabel) {
         const rows = (data && data.rows) || [];
         const total = (data && data.total) || 0;
         const projectTitles = (data && data.project_titles) || {};
@@ -111,7 +99,20 @@ Object.assign(GitLabIssueDashboard.prototype, {
         const noteHtml = note
             ? `<div class="text-muted gid-drilldown-note" style="margin-top: 8px;">${frappe.utils.escape_html(note)}</div>`
             : "";
-        const leadTimeHeader = showLeadTime ? `<th class="text-right">${__("Lead Time (days)")}</th>` : "";
+        const stateHeaders = stateLabel
+            ? `<th>${__("Status (then)")}</th><th>${__("Status (now)")}</th>`
+            : `<th>${__("State")}</th>`;
+        const leadTimeHeader = showLeadTime ? `<th class="text-right">${leadTimeLabel || __("Lead Time (days)")}</th>` : "";
+        const touchTimeHeader = showTouchTime ? `<th class="text-right">${__("Touch Time (hrs)")}</th>` : "";
+        const cycleTimeHeader = showCycleTime ? `<th class="text-right">${__("Cycle Time (days)")}</th>` : "";
+        const daysToHours = (value) => Math.round(value * 24 * 100) / 100;
+        const touchSummary = showTouchTime && data && data.touch_time_summary;
+        const cycleSummary = showCycleTime && data && data.cycle_time_summary;
+        const summaryHtml = touchSummary
+            ? `<div class="gid-drilldown-note" style="margin-top: 8px;"><strong>${__("Total")}: ${daysToHours(touchSummary.total_days)} ${__("hrs")} &nbsp;·&nbsp; ${__("Average")}: ${daysToHours(touchSummary.avg_days)} ${__("hrs")}</strong></div>`
+            : cycleSummary
+                ? `<div class="gid-drilldown-note" style="margin-top: 8px;"><strong>${__("Total")}: ${cycleSummary.total_days} ${__("days")} &nbsp;·&nbsp; ${__("Average")}: ${cycleSummary.avg_days} ${__("days")}</strong></div>`
+                : "";
 
         const tableRows = rows.map((row) => {
             const project = frappe.utils.escape_html(projectTitles[row.gitlab_project] || row.gitlab_project || "");
@@ -124,12 +125,25 @@ Object.assign(GitLabIssueDashboard.prototype, {
             const leadTimeCell = showLeadTime
                 ? `<td class="text-right">${row.lead_time_days === null || row.lead_time_days === undefined ? "-" : row.lead_time_days}</td>`
                 : "";
+            const touchTimeCell = showTouchTime
+                ? `<td class="text-right">${row.touch_time_days === null || row.touch_time_days === undefined ? "-" : daysToHours(row.touch_time_days)}</td>`
+                : "";
+            const cycleTimeCell = showCycleTime
+                ? `<td class="text-right">${row.cycle_time_days === null || row.cycle_time_days === undefined ? "-" : row.cycle_time_days}</td>`
+                : "";
+
+            // stateLabel (when given) is the fixed criterion the row was matched on
+            // (e.g. "Open as of April 2026"), which can differ from the ticket's
+            // real current state — show both instead of hiding the current one.
+            const stateCells = stateLabel
+                ? `<td>${frappe.utils.escape_html(stateLabel)}</td><td>${frappe.utils.escape_html(row.state || "")}</td>`
+                : `<td>${frappe.utils.escape_html(row.state || "")}</td>`;
 
             return `
                 <tr>
                     <td>${link}</td>
                     <td>${project}</td>
-                    <td>${frappe.utils.escape_html(row.state || "")}</td>
+                    ${stateCells}
                     <td>${created}</td>
                     <td>${closed}</td>
                     ${leadTimeCell}
@@ -145,7 +159,7 @@ Object.assign(GitLabIssueDashboard.prototype, {
                         <tr>
                             <th>${__("Issue")}</th>
                             <th>${__("Project")}</th>
-                            <th>${__("State")}</th>
+                            ${stateHeaders}
                             <th>${__("Created")}</th>
                             <th>${__("Closed")}</th>
                             ${leadTimeHeader}
@@ -191,15 +205,15 @@ Object.assign(GitLabIssueDashboard.prototype, {
             const tab = tabs.find((t) => t.key === state.activeKey);
             if (!tab) return;
 
-            if (tab.csvExportOnly) {
-                dialog.set_primary_action(__("Export to CSV"), () => {
-                    window.open(this.buildCsvExportUrl(tab.params), "_blank");
-                });
-            } else {
-                dialog.set_primary_action(__("Open in New Tab"), () => {
-                    window.open(this.buildListViewUrl(tab.params), "_blank");
-                });
+            if (tab.noListView) {
+                dialog.get_primary_btn().hide();
+                return;
             }
+
+            dialog.get_primary_btn().show();
+            dialog.set_primary_action(__("Open in New Tab"), () => {
+                window.open(this.buildListViewUrl(tab.params), "_blank");
+            });
         };
 
         const renderTabs = () => {
@@ -226,7 +240,7 @@ Object.assign(GitLabIssueDashboard.prototype, {
 
         const fetchPage = (tab, startAt) => {
             return frappe.call({
-                method: "phamos.gitlab_integration.page.gitlab_issue_dashboard.gitlab_issue_dashboard.get_gitlab_issue_drilldown",
+                method: tab.method || "phamos.gitlab_integration.page.gitlab_issue_dashboard.gitlab_issue_dashboard.get_gitlab_issue_drilldown",
                 args: Object.assign({}, tab.params, { start: startAt }),
             }).then((r) => r.message || { rows: [], total: 0, project_titles: {} });
         };
@@ -236,7 +250,7 @@ Object.assign(GitLabIssueDashboard.prototype, {
             if (!tab) return;
 
             if (state.cache[tab.key]) {
-                this.renderDrilldownBody($body, state.cache[tab.key], tab.note, tab.showLeadTime, () => loadMore(tab));
+                this.renderDrilldownBody($body, state.cache[tab.key], tab.note, tab.showLeadTime, () => loadMore(tab), tab.showTouchTime, tab.showCycleTime, tab.leadTimeLabel, tab.stateLabel);
                 return;
             }
 
@@ -245,7 +259,7 @@ Object.assign(GitLabIssueDashboard.prototype, {
             fetchPage(tab, 0).then((data) => {
                 state.cache[tab.key] = data;
                 if (state.activeKey === tab.key) {
-                    this.renderDrilldownBody($body, data, tab.note, tab.showLeadTime, () => loadMore(tab));
+                    this.renderDrilldownBody($body, data, tab.note, tab.showLeadTime, () => loadMore(tab), tab.showTouchTime, tab.showCycleTime, tab.leadTimeLabel, tab.stateLabel);
                 }
             });
         };
@@ -259,7 +273,7 @@ Object.assign(GitLabIssueDashboard.prototype, {
                 cached.total = data.total;
                 cached.project_titles = Object.assign({}, cached.project_titles, data.project_titles);
                 if (state.activeKey === tab.key) {
-                    this.renderDrilldownBody($body, cached, tab.note, tab.showLeadTime, () => loadMore(tab));
+                    this.renderDrilldownBody($body, cached, tab.note, tab.showLeadTime, () => loadMore(tab), tab.showTouchTime, tab.showCycleTime, tab.leadTimeLabel, tab.stateLabel);
                 }
             });
         };
@@ -367,6 +381,38 @@ Object.assign(GitLabIssueDashboard.prototype, {
             ],
             activeKey: defaultKind,
         });
+    },
+
+    openLifetimeTicketsDrilldown(projects, monthKey) {
+        const filterCtx = this.getFilterContext();
+        const [year, month] = String(monthKey).split("-").map(Number);
+        const monthLabel = this.monthKeyToLabel(monthKey);
+        const method = "phamos.gitlab_integration.page.gitlab_issue_dashboard.gitlab_issue_dashboard.get_lifetime_ticket_drilldown";
+        const note = __("Open = still open as of the end of {0}, even if it has since been closed. \"Status (now)\" shows the ticket's current status so you can verify.", [monthLabel]);
+        const baseParams = { projects: projects || [], issue_scope: filterCtx.issue_scope, year, month };
+
+        this.openDrilldown({
+            title: __("{0} — {1}", [this.getScopeLabel(projects), monthLabel]),
+            tabs: [
+                {
+                    key: "open",
+                    label: __("Open"),
+                    method,
+                    params: Object.assign({}, baseParams, { lifetime_state: "open" }),
+                    noListView: true,
+                    note,
+                    stateLabel: __("Open (as of {0})", [monthLabel]),
+                },
+            ],
+        });
+    },
+
+    handleLifetimeChartSelect(e) {
+        const ctx = this.lifetimeChartContext;
+        if (!ctx) return;
+        const monthKey = ctx.monthKeys[e.index];
+        if (!monthKey) return;
+        this.openLifetimeTicketsDrilldown(ctx.projects || [], monthKey);
     },
 
     handleAgingChartSelect(e) {
