@@ -202,7 +202,7 @@ import { computed, ref, watch } from "vue"
 import { call, FileUploader, TextEditor } from "frappe-ui"
 import EmailRecipientInput from "@/components/EmailRecipientInput.vue"
 import AvailabilityWeek from "@/components/AvailabilityWeek.vue"
-import { formatDate } from "@spa/utils/datetime.js"
+import { formatDate, formatDatetime } from "@spa/utils/datetime.js"
 
 const props = defineProps({
 	modelValue: { type: Boolean, default: false },
@@ -228,6 +228,9 @@ const editorMenu = [
 ]
 
 const FIELD_LABELS = { recipients: "To", cc: "Cc", bcc: "Bcc" }
+
+/** Same marker Frappe's own composer uses to fence off a quoted thread. */
+const QUOTE_SEPARATOR = "<div>---</div>"
 
 const recipientFields = [
 	{ key: "recipients", label: "To", placeholder: "name@example.com" },
@@ -407,8 +410,15 @@ function insertAllSlots() {
  *  (The footer isn't: the system adds it at send time, so it's a preview.) */
 function withSignature(html) {
 	const sig = signature.value
-	if (!sig || (html || "").includes(sig)) return html || ""
-	return `${html || ""}<p><br></p>${sig}`
+	const body = html || ""
+	if (!sig || body.includes(sig)) return body
+	// Above the quoted thread, not under it — a signature below someone else's
+	// message reads as theirs.
+	const quoteAt = body.indexOf(QUOTE_SEPARATOR)
+	if (quoteAt !== -1) {
+		return `${body.slice(0, quoteAt)}<p><br></p>${sig}${body.slice(quoteAt)}`
+	}
+	return `${body}<p><br></p>${sig}`
 }
 
 const dialogTitle = computed(() => {
@@ -428,6 +438,44 @@ function threadSubject(value, prefix) {
 	return prefix ? `${prefix}: ${clean}` : clean
 }
 
+/** The message being answered, quoted the way Desk quotes it.
+ *
+ * Flattened to text inside a blockquote rather than nesting the sender's own
+ * markup, which is what Frappe's own composer does — a reply that carries a
+ * whole HTML mail inside it renders unpredictably in the next client along.
+ * Clipped, because threads grow without limit.
+ */
+function quoteSource(source) {
+	const raw = source.content_html || source.content || ""
+	let text = raw
+		.replace(/<\/div>/g, "<br></div>")
+		.replace(/<\/p>/g, "<br></p>")
+		.replace(/<br\s*\/?>/g, "\n")
+		.replace(/<[^>]+>/g, "")
+	const parser = new DOMParser().parseFromString(text, "text/html")
+	text = (parser.body.textContent || "").replace(/\n{3,}/g, "\n\n").trim()
+
+	let clipped = false
+	if (text.length > 20 * 1024) {
+		text = text.slice(0, 20 * 1024)
+		clipped = true
+	}
+
+	const when = source.communication_date ? formatDatetime(source.communication_date) : ""
+	const escaped = text
+		.replace(/&/g, "&amp;")
+		.replace(/</g, "&lt;")
+		.replace(/>/g, "&gt;")
+		.replace(/\n/g, "<br>")
+
+	return [
+		"<p><br></p>",
+		QUOTE_SEPARATOR,
+		`<p>On ${when}, ${source.sender || "they"} wrote:</p>`,
+		`<blockquote>${escaped}${clipped ? "<div>Message clipped</div>" : ""}</blockquote>`,
+	].join("")
+}
+
 /** What the dialog starts from when there's nothing half-written to restore. */
 function defaultValues() {
 	const source = props.source
@@ -435,7 +483,10 @@ function defaultValues() {
 		return {
 			recipients: source.sender || props.lead.email_id || "",
 			subject: threadSubject(source.subject, "Re"),
-			content: "",
+			// The thread is quoted so the recipient sees what's being answered;
+			// the Communication is still linked by in_reply_to on send, which is
+			// what carries the In-Reply-To header and keeps the thread together.
+			content: quoteSource(source),
 		}
 	}
 	if (props.mode === "forward" && source) {
@@ -443,9 +494,7 @@ function defaultValues() {
 			// Forwarding is the user choosing someone new, so leave To empty.
 			recipients: "",
 			subject: threadSubject(source.subject, "Fwd"),
-			content: `<p><br></p><hr><p>From: ${source.sender || ""}<br>Subject: ${
-				source.subject || ""
-			}</p>${source.content || ""}`,
+			content: quoteSource(source),
 		}
 	}
 	return { recipients: props.recipient || props.lead.email_id || "", subject: "", content: "" }
