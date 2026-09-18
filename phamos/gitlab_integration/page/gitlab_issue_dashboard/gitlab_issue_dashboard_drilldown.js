@@ -338,7 +338,13 @@ Object.assign(GitLabIssueDashboard.prototype, {
 
         this.openDrilldown({
             title,
-            tabs: [{ key: "closed", label: __("Closed Issues"), params, note, csvExportOnly: !!bucket }],
+            tabs: [{
+                key: "closed",
+                label: __("Closed Issues"),
+                params,
+                showLeadTime: true,
+                leadTimeLabel: __("Aging (days)"),
+            }],
         });
     },
 
