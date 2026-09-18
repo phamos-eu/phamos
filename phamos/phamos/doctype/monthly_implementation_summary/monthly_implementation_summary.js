@@ -676,7 +676,7 @@ function _mis_parse_manual_number(value) {
 	}
 
 	const input = parseFloat(normalized);
-	return isNaN(input) ? frappe.msgprint(__("Invalid number")) : input;
+	return isNaN(input) ? 0 : input;
 }
 
 
