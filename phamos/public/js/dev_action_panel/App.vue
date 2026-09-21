@@ -283,11 +283,13 @@ function showTimeLimitDialog(status, onSubmitted) {
   });
 }
 
-async function onStopProjectTimer({ result, percentBillable, activityType }) {
+async function onStopProjectTimer({ result, percentBillable, activityType, manualEndTime }) {
   if (!activeProjectSession.value) return;
+  const args = { name: activeProjectSession.value.name, result, percent_billable: percentBillable, activity_type: activityType };
+  if (manualEndTime) args.manual_end_time = manualEndTime;
   const r = await frappe.call({
     method: "phamos.phamos.page.dev_action_panel.dev_action_panel.stop_timer",
-    args: { name: activeProjectSession.value.name, result, percent_billable: percentBillable, activity_type: activityType },
+    args,
   });
   if (r.message && r.message.exceeds) {
     showTimeLimitDialog(r.message, async () => {
