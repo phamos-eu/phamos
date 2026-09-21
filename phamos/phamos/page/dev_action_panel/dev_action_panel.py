@@ -916,6 +916,21 @@ def get_my_timesheets(from_date=None, to_date=None, offset=0):
             2: "Cancelled",
         }.get(r.docstatus, r.status)
 
+    first_logs = {}
+    names = [r.name for r in results]
+    if names:
+        for d in frappe.get_all(
+            "Timesheet Detail",
+            filters={"parent": ["in", names], "idx": 1},
+            fields=["parent", "from_time", "to_time"],
+        ):
+            first_logs[d.parent] = d
+
+    for r in results:
+        log = first_logs.get(r.name)
+        r["from_time"] = log.from_time if log else None
+        r["to_time"] = log.to_time if log else None
+
     return {
         "timesheets": results,
         "has_more": has_more,
