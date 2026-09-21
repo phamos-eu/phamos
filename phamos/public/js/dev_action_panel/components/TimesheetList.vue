@@ -15,6 +15,18 @@ function getTodayDate() {
 
 const fromDate = ref(getTodayDate());
 const toDate = ref(getTodayDate());
+const search = ref("");
+const sortBy = ref("creation:desc");
+
+const SORT_OPTIONS = [
+  { value: "creation:desc", label: "Newest created" },
+  { value: "creation:asc", label: "Oldest created" },
+  { value: "start_date:desc", label: "Newest date" },
+  { value: "start_date:asc", label: "Oldest date" },
+  { value: "total_hours:desc", label: "Total hours (high–low)" },
+  { value: "total_hours:asc", label: "Total hours (low–high)" },
+  { value: "name:asc", label: "ID A–Z" },
+];
 
 watch([fromDate, toDate], () => {
   loadTimesheets();
@@ -86,6 +98,20 @@ function fmtDate(iso) {
   return frappe.datetime.str_to_user(iso.split(".")[0]);
 }
 
+function fmtTime(datetimeStr) {
+  if (!datetimeStr) return null;
+  const d = new Date(datetimeStr.replace(" ", "T"));
+  if (Number.isNaN(d.getTime())) return null;
+  return d.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+}
+
+function fmtTimeRange(ts) {
+  const from = fmtTime(ts.from_time);
+  const to = fmtTime(ts.to_time);
+  if (!from && !to) return fmtDate(ts.start_date);
+  return `${fmtDate(ts.start_date)} · ${from || "—"}–${to || "—"}`;
+}
+
 function fmtHours(val) {
   const n = parseFloat(val) || 0;
   if (n <= 0) return "0h";
@@ -105,8 +131,44 @@ function openDeskList() {
   frappe.set_route("List", "Timesheet");
 }
 
+const query = computed(() => search.value.trim().toLowerCase());
+
+const filteredTimesheets = computed(() => {
+  let list = timesheets.value;
+  if (query.value) {
+    list = list.filter((t) => {
+      const haystack = [
+        t.name || "",
+        t.project_name || "",
+        t.customer_name || "",
+        t.status_label || "",
+      ]
+        .join(" ")
+        .toLowerCase();
+      return haystack.includes(query.value);
+    });
+  }
+
+  const [field, dir] = sortBy.value.split(":");
+  const factor = dir === "asc" ? 1 : -1;
+  return [...list].sort((a, b) => {
+    let av = a[field];
+    let bv = b[field];
+    if (field === "total_hours") {
+      av = parseFloat(av) || 0;
+      bv = parseFloat(bv) || 0;
+    } else {
+      av = (av || "").toString().toLowerCase();
+      bv = (bv || "").toString().toLowerCase();
+    }
+    if (av < bv) return -1 * factor;
+    if (av > bv) return 1 * factor;
+    return 0;
+  });
+});
+
 const totals = computed(() => {
-  return timesheets.value.reduce(
+  return filteredTimesheets.value.reduce(
     (acc, t) => {
       acc.hours += parseFloat(t.total_hours) || 0;
       acc.billable += parseFloat(t.billable_hours) || 0;
@@ -123,7 +185,7 @@ const totals = computed(() => {
       <div>
         <h2 class="tl__title">My Timesheets</h2>
         <p class="tl__subtitle">
-          {{ timesheets.length }} records ·
+          {{ filteredTimesheets.length }} of {{ timesheets.length }} records ·
           {{ fmtHours(totals.hours) }} total ·
           {{ fmtHours(totals.billable) }} billable
         </p>
@@ -153,6 +215,29 @@ const totals = computed(() => {
           class="tl__filter-input"
         />
       </div>
+      <div class="tl__filter-group tl__filter-group--search">
+        <label class="tl__filter-label">Search</label>
+        <div class="tl__search">
+          <input
+            v-model="search"
+            type="text"
+            class="tl__search-input tl__filter-input"
+            placeholder="Search by ID, project, customer or status..."
+          />
+          <button
+            v-if="search"
+            class="tl__search-clear"
+            title="Clear search"
+            @click="search = ''"
+          >×</button>
+        </div>
+      </div>
+      <div class="tl__filter-group">
+        <label class="tl__filter-label">Sort By</label>
+        <select v-model="sortBy" class="tl__filter-input">
+          <option v-for="opt in SORT_OPTIONS" :key="opt.value" :value="opt.value">{{ opt.label }}</option>
+        </select>
+      </div>
     </div>
 
     <div v-if="loading" class="tl__loading">
@@ -165,9 +250,14 @@ const totals = computed(() => {
       <p class="tl__empty-sub">Start a session from an issue to create your first timesheet.</p>
     </div>
 
+    <div v-else-if="!filteredTimesheets.length" class="tl__empty">
+      <p class="tl__empty-title">No timesheets match your search</p>
+      <p class="tl__empty-sub">Try a different keyword or clear the search above.</p>
+    </div>
+
     <div v-else class="tl__list">
       <div
-        v-for="ts in timesheets"
+        v-for="ts in filteredTimesheets"
         :key="ts.name"
         class="tl__list-item"
         @click="openTimesheet(ts.name)"
@@ -178,7 +268,7 @@ const totals = computed(() => {
             <p class="tl__list-meta">
               <span v-if="ts.project_name" class="tl__list-meta-item">{{ ts.project_name }}</span>
               <span v-if="ts.customer_name" class="tl__list-meta-item">{{ ts.customer_name }}</span>
-              <span class="tl__list-meta-item">{{ fmtDate(ts.creation) }}</span>
+              <span class="tl__list-meta-item">{{ fmtTimeRange(ts) }}</span>
             </p>
           </div>
           <div class="tl__list-right">
@@ -205,7 +295,7 @@ const totals = computed(() => {
           @click="loadMore"
           :disabled="loadingMore"
         >
-          <span v-if="loadingMore" class="tl__load-more-spinner"></span>
+          <span v-if="loadingMore" class="tl__spinner tl__spinner--sm"></span>
           <span v-else>Load more timesheets</span>
         </button>
       </div>
@@ -235,6 +325,7 @@ const totals = computed(() => {
   gap: 12px;
   margin-bottom: 16px;
   align-items: flex-end;
+  flex-wrap: wrap;
 }
 
 .tl__filter-group {
@@ -242,6 +333,41 @@ const totals = computed(() => {
   flex-direction: column;
   gap: 4px;
 }
+
+.tl__filter-group--search {
+  flex: 1;
+  min-width: 220px;
+}
+
+.tl__search {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+
+.tl__search-input {
+  width: 100%;
+  padding: 6px 28px 6px 8px;
+}
+
+.tl__search-clear {
+  position: absolute;
+  right: 6px;
+  width: 18px;
+  height: 18px;
+  border: none;
+  border-radius: 50%;
+  background: var(--text-muted);
+  color: #fff;
+  font-size: 14px;
+  line-height: 1;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.tl__search-clear:hover { background: var(--text-color); }
 
 .tl__filter-label {
   font-size: 12px;
@@ -281,6 +407,7 @@ const totals = computed(() => {
   border: 2px solid var(--border-color); border-top-color: var(--primary);
   animation: tl-spin 0.8s linear infinite;
 }
+.tl__spinner--sm { width: 14px; height: 14px; display: inline-block; }
 @keyframes tl-spin { to { transform: rotate(360deg); } }
 
 .tl__empty {
@@ -290,7 +417,6 @@ const totals = computed(() => {
 .tl__empty-title { font-size: 14px; font-weight: 600; color: var(--text-color); margin: 0 0 6px; }
 .tl__empty-sub { font-size: 13px; color: var(--text-muted); margin: 0; }
 
-.tl__list { }
 .tl__list-item {
   background: var(--card-bg);
   border: 1px solid var(--border-color);
@@ -337,16 +463,6 @@ const totals = computed(() => {
   cursor: not-allowed;
 }
 
-.tl__load-more-spinner {
-  display: inline-block;
-  width: 14px;
-  height: 14px;
-  border: 2px solid var(--border-color);
-  border-top-color: var(--primary);
-  border-radius: 50%;
-  animation: tl-spin 0.8s linear infinite;
-}
-
 .tl__list-content {
   display: flex;
   align-items: flex-start;
@@ -359,7 +475,7 @@ const totals = computed(() => {
   margin: 0 0 4px 0;
   font-size: 14px;
   font-weight: 600;
-  color: var(--primary);
+  color: var(--text-color);
 }
 .tl__list-meta {
   display: flex;
@@ -435,5 +551,9 @@ const totals = computed(() => {
 [data-theme="dark"] .tl__list-badge--submitted {
   background: #007be0;
   color: #f7fbfd;
+}
+
+[data-theme="dark"] .tl__list-title {
+  color: #e2e8f0;
 }
 </style>
