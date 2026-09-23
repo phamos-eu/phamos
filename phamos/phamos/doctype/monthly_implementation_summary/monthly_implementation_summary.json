@@ -33,7 +33,9 @@
     "timesheets",
     "timesheets_table",
     "total_hours",
-    "billable_hours"
+    "billable_hours",
+    "delivered_hours",
+    "remaining_billable_hours"
   ],
   "fields": [
     {
@@ -217,6 +219,22 @@
       "fieldname": "billable_hours",
       "fieldtype": "Float",
       "label": "Billable Hours"
+    },
+    {
+      "allow_on_submit": 1,
+      "description": "Hours already assigned to Delivery Notes created from this MIS's billable hours.",
+      "fieldname": "delivered_hours",
+      "fieldtype": "Float",
+      "label": "Delivered Hours",
+      "read_only": 1
+    },
+    {
+      "allow_on_submit": 1,
+      "description": "Billable Hours - Delivered Hours.",
+      "fieldname": "remaining_billable_hours",
+      "fieldtype": "Float",
+      "label": "Remaining Billable Hours",
+      "read_only": 1
     }
   ],
   "index_web_pages_for_search": 1,
