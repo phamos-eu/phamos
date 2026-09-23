@@ -1,0 +1,28 @@
+{
+	"name": "project-management-spa-ui",
+	"private": true,
+	"version": "0.0.0",
+	"type": "module",
+	"scripts": {
+		"dev": "vite",
+		"serve": "vite preview",
+		"build": "vite build --base=/assets/phamos/project_management/ && yarn copy-html-entry",
+		"copy-html-entry": "cp ../phamos/public/project_management/index.html ../phamos/www/project_management_spa.html"
+	},
+	"dependencies": {
+		"dayjs": "1.11.23",
+		"feather-icons": "^4.29.1",
+		"frappe-gantt": "0.6.1",
+		"frappe-ui": "0.1.105",
+		"vue": "^3.5.12",
+		"vue-router": "^4.3.2"
+	},
+	"devDependencies": {
+		"sass": "1.77.6",
+		"vite": "^5.4.10",
+		"@vitejs/plugin-vue": "^4.4.0",
+		"tailwindcss": "^3.4.3",
+		"postcss": "^8.4.5",
+		"autoprefixer": "^10.4.19"
+	}
+}

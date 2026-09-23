@@ -334,6 +334,17 @@ def _build_review_fields(extracted):
 	return fields
 
 
+def build_review_fields_from_doc(doc):
+	"""Build review dialog fields from current Accounting Receipt values (no re-OCR)."""
+	extracted = {}
+	for meta in get_extractable_fields_meta():
+		fieldname = meta["fieldname"]
+		value = doc.get(fieldname)
+		if value is not None and value != "":
+			extracted[fieldname] = value
+	return _build_review_fields(extracted), extracted
+
+
 @frappe.whitelist()
 def extract_from_pdf_for_review(accounting_receipt_name):
 	"""

@@ -19,6 +19,8 @@ from ..lead_data_import import (
     _sanitize_email,
     _sanitize_phone_list,
     _split_email_values,
+    _rank_and_keep_person_emails,
+    _partition_phones_and_mobiles,
     frappe,
     json,
     re,
@@ -111,15 +113,20 @@ For a business card:
 - company_name must be the organisation/logo/legal entity, not the person's name.
 - Put the person's name in contact_persons.
 - Put the role/title such as "Mediaberaterin" in job_title.
-- Put landline numbers in phones and numbers labelled Mobil/Mobile in mobile_numbers.
+- Put landline numbers in phones and numbers labelled Mobil/Mobile/Handy in mobile_numbers.
+- German mobile prefixes after +49 are 15x, 16x, 17x (example: Mobil +49 (0) 171 1007759 → mobile_numbers ["+491711007759"]). Never rewrite 171 as area code 7121.
+- Prefer compact international phone form without spaces or parentheses (e.g. +4917655591059).
 - Extract the visible postal address and every visible email address.
 - Copy the street, postal code, and city exactly as printed on the card. Never
   replace them with a city/postal code from memory or from the company website.
   If any address part is unreadable, leave that part empty instead of guessing.
-- Copy printed email addresses exactly as shown. Never construct, abbreviate, concatenate, or guess an email from the person's name.
+- Copy printed email addresses exactly as shown (including every letter). Never construct, abbreviate, concatenate, or guess an email from the person's name.
 - Keep a personally addressed card email (for example first.last@company.com) before generic addresses such as info@, post@, or contact@.
 - Pay close attention to small or rotated email text on business cards. If the card shows a person email such as b.roesch@neckaralblive.de, include that exact email before generic company emails.
 Example: if the card shows person "Blanca Rösch" and organisation "RADIO NECKARALB LIVE GmbH & Co. KG", return company_name "RADIO NECKARALB LIVE GmbH & Co. KG" and contact_persons ["Blanca Rösch"].
+Example business card with mobile only:
+  name Maximilian ETTINGER, Mobil +49 (0) 171 1007759, E-Mail maximilian.ettinger@pgub-consult.de
+  → phones [], mobile_numbers ["+491711007759"], emails ["maximilian.ettinger@pgub-consult.de"]
 If it is a directory/listing screenshot, return one object per visible company.
 If it is a partner/supporter/sponsor logo section, return one object per readable logo/company name; use an empty website if no company website is visible.
 If it is a single company website page, return exactly ONE object for the company whose details are shown.
@@ -144,7 +151,7 @@ Format:
     "company_name": "Trigema W. Grupp KG",
     "website": "https://www.trigema.de/en/customer-service/legal/imprint/",
     "emails": ["bestellservice@trigema.de"],
-    "phones": ["+49 (0) 7475/88 - 0"],
+    "phones": ["+497475880"],
     "mobile_numbers": [],
     "contact_persons": [],
     "addresses": ["Josef-Mayer-Str. 31-35, D-72393 Burladingen", "Postfach 100, D-72393 Burladingen"],
@@ -155,8 +162,8 @@ Format:
     "company_name": "RADIO NECKARALB LIVE GmbH & Co. KG",
     "website": "",
     "emails": ["b.roesch@neckaralblive.de"],
-    "phones": ["07121 94 58 900"],
-    "mobile_numbers": ["0172 8243295"],
+    "phones": ["+4971219458900"],
+    "mobile_numbers": ["+491728243295"],
     "contact_persons": ["Blanca Rösch"],
     "addresses": ["Obere Wässere 6-8, 72764 Reutlingen"],
     "job_title": "Mediaberaterin",
@@ -166,7 +173,7 @@ Format:
     "company_name": "Medical Valley Hechingen e.V.",
     "website": "https://medical-valley-hechingen.de/kontakt/kontakt-und-webmail",
     "emails": ["info@medical-valley-hechingen.de"],
-    "phones": ["+49 7471 / 2180 800", "+49 7471 / 9429970"],
+    "phones": ["+4974712180800", "+4974719429970"],
     "mobile_numbers": [],
     "contact_persons": ["Dr. Heiko Zimmermann", "Manuela Holderied"],
     "addresses": ["Zollernstr. 4, 72379 Hechingen"],
@@ -210,12 +217,17 @@ QR URL hints:
                 clean = _sanitize_email(email)
                 if clean and clean not in card_emails:
                     card_emails.append(clean)
-            card_mobile_numbers = _sanitize_phone_list(company.get("mobile_numbers"))
+            card_phones_raw = _sanitize_phone_list(company.get("phones"))
+            card_mobiles_raw = _sanitize_phone_list(company.get("mobile_numbers"))
+            card_phones, card_mobile_numbers = _partition_phones_and_mobiles(
+                card_phones_raw, card_mobiles_raw
+            )
+            company["card_phones"] = card_phones
             company["card_mobile_numbers"] = card_mobile_numbers
-            company["card_phones"] = [
-                phone for phone in _sanitize_phone_list(company.get("phones"))
-                if phone not in card_mobile_numbers
-            ]
+            company["phones"] = card_phones
+            company["phone"] = card_phones[0] if card_phones else ""
+            company["mobile_numbers"] = card_mobile_numbers
+            company["mobile_no"] = card_mobile_numbers[0] if card_mobile_numbers else ""
             company["card_contact_persons"] = _as_unique_list(company.get("contact_persons"))
             company["card_job_title"] = str(company.get("job_title") or "").strip()
         company = _normalize_company_dict(_repair_business_card_company_person_mixup(company))
@@ -349,25 +361,11 @@ def _prioritize_business_card_emails(company):
     if "business_card" not in source_type:
         return company
 
-    contacts = _as_unique_list(company.get("contact_persons") or company.get("contact_person"))
-    website_domain = _domain_from_url(company.get("website"))
-    current_emails = []
-    for email in company.get("emails") or _split_email_values(company.get("email")):
-        clean = _sanitize_email(email)
-        if clean and clean not in current_emails:
-            current_emails.append(clean)
-
     card_emails = []
     for email in company.get("card_emails") or []:
         clean = _sanitize_email(email)
         if clean and clean not in card_emails:
             card_emails.append(clean)
-
-    # Vision-extracted card addresses are direct source evidence. Website
-    # enrichment and name-based guesses must never outrank them.
-    if card_emails:
-        company["emails"] = card_emails
-        company["email"] = card_emails[0]
 
     card_phones = _sanitize_phone_list(company.get("card_phones"))
     card_mobile_numbers = _sanitize_phone_list(company.get("card_mobile_numbers"))
@@ -384,32 +382,34 @@ def _prioritize_business_card_emails(company):
     if company.get("card_job_title"):
         company["job_title"] = company["card_job_title"]
 
+    # Printed card emails are authoritative. Never invent name@domain guesses.
+    # Rank personal first; keep relevant generics from the same card as a
+    # comma-separated set on email / emails.
     if card_emails:
+        company["card_emails"] = card_emails
+        ranked, joined = _rank_and_keep_person_emails(
+            card_emails,
+            job_title=company.get("job_title") or "",
+            card_emails=card_emails,
+        )
+        company["emails"] = ranked
+        company["email"] = joined
         return company
 
-    inferred = []
-    if website_domain:
-        for contact in contacts:
-            local_part = _email_local_part_from_person(contact)
-            if not local_part:
-                continue
-            email = _sanitize_email(f"{local_part}@{website_domain}")
-            if email and email not in inferred:
-                inferred.append(email)
-
-        same_domain = [
-            email for email in current_emails
-            if email.split("@", 1)[1].lower() == website_domain
-        ]
-        current_emails = same_domain or current_emails
-
-    emails = []
-    for email in inferred + current_emails:
-        if email and email not in emails:
-            emails.append(email)
-
-    company["emails"] = emails
-    company["email"] = emails[0] if emails else ""
+    # No printed email on the card: keep whatever non-invented emails remain,
+    # but do not synthesize local-parts from contact names.
+    current_emails = []
+    for email in company.get("emails") or _split_email_values(company.get("email")):
+        clean = _sanitize_email(email)
+        if clean and clean not in current_emails:
+            current_emails.append(clean)
+    ranked, joined = _rank_and_keep_person_emails(
+        current_emails,
+        job_title=company.get("job_title") or "",
+        card_emails=None,
+    )
+    company["emails"] = ranked
+    company["email"] = joined
     return company
 
 

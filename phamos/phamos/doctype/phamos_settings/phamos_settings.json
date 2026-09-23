@@ -53,11 +53,39 @@
   "daily_image_folder",
   "raven_actions_section",
   "execute_raven_thread",
+  "issue_raven_chat_section",
+  "enable_issue_raven_chat",
+  "column_break_issue_raven",
+  "issue_raven_workspace",
   "checklist_tab",
   "checklist_section",
   "checklist_popup",
   "ticketing_tab",
-  "walk_in_customer"
+  "walk_in_customer",
+  "hr_spa_tab",
+  "hr_spa_section",
+  "hr_department",
+  "column_break_hr_spa",
+  "hr_timesheet_project",
+  "pm_spa_tab",
+  "pm_spa_section",
+  "pm_department",
+  "column_break_pm_spa",
+  "pm_timesheet_project",
+  "sales_spa_tab",
+  "sales_spa_section",
+  "sales_department",
+  "column_break_sales_spa",
+  "sales_standard_project",
+  "accounting_spa_tab",
+  "accounting_spa_section",
+  "accounting_department",
+  "column_break_accounting_spa",
+  "accounting_standard_project",
+  "lead_scan_tab",
+  "lead_scan_section",
+  "lead_handoff_auto_create_min_score",
+  "lead_handoff_improve_fields"
  ],
  "fields": [
   {
@@ -315,6 +343,30 @@
    "label": "Test Raven Daily Thread"
   },
   {
+   "fieldname": "issue_raven_chat_section",
+   "fieldtype": "Section Break",
+   "label": "I Own My Work \u2014 Issue Chat"
+  },
+  {
+   "default": "0",
+   "description": "Allow creating a Private Raven channel per Issue and chatting from /i-own-my-work.",
+   "fieldname": "enable_issue_raven_chat",
+   "fieldtype": "Check",
+   "label": "Enable Issue Raven Chat"
+  },
+  {
+   "fieldname": "column_break_issue_raven",
+   "fieldtype": "Column Break"
+  },
+  {
+   "depends_on": "eval:doc.enable_issue_raven_chat == 1",
+   "description": "Workspace used when creating Issue discussion channels. Falls back to the first Raven Workspace if empty.",
+   "fieldname": "issue_raven_workspace",
+   "fieldtype": "Link",
+   "label": "Issue Chat Workspace",
+   "options": "Raven Workspace"
+  },
+  {
    "fieldname": "checklist_tab",
    "fieldtype": "Tab Break",
    "label": "Checklist"
@@ -341,12 +393,149 @@
    "fieldtype": "Link",
    "label": "Walk In Customer",
    "options": "Customer"
+  },
+  {
+   "fieldname": "hr_spa_tab",
+   "fieldtype": "Tab Break",
+   "label": "HR SPA"
+  },
+  {
+   "fieldname": "hr_spa_section",
+   "fieldtype": "Section Break",
+   "label": "HR SPA Settings"
+  },
+  {
+   "description": "Department used to scope Issues (via linked projects) and Tasks in the /hr-cockpit SPA.",
+   "fieldname": "hr_department",
+   "fieldtype": "Link",
+   "label": "HR Department",
+   "options": "Department"
+  },
+  {
+   "fieldname": "column_break_hr_spa",
+   "fieldtype": "Column Break"
+  },
+  {
+   "description": "Default project for the start/stop timesheet timer in the HR SPA.",
+   "fieldname": "hr_timesheet_project",
+   "fieldtype": "Link",
+   "label": "HR Timesheet Project",
+   "options": "Project"
+  },
+  {
+   "fieldname": "pm_spa_tab",
+   "fieldtype": "Tab Break",
+   "label": "Project Management Cockpit"
+  },
+  {
+   "fieldname": "pm_spa_section",
+   "fieldtype": "Section Break",
+   "label": "Project Management Cockpit Settings"
+  },
+  {
+   "description": "Department used to scope Issues (via linked projects) and Tasks in the /project-management-cockpit SPA.",
+   "fieldname": "pm_department",
+   "fieldtype": "Link",
+   "label": "Project Management Department",
+   "options": "Department"
+  },
+  {
+   "fieldname": "column_break_pm_spa",
+   "fieldtype": "Column Break"
+  },
+  {
+   "description": "Default project for the start/stop timesheet timer in the Project Management Cockpit.",
+   "fieldname": "pm_timesheet_project",
+   "fieldtype": "Link",
+   "label": "Project Management Timesheet Project",
+   "options": "Project"
+  },
+  {
+   "fieldname": "sales_spa_tab",
+   "fieldtype": "Tab Break",
+   "label": "Sales SPA"
+  },
+  {
+   "fieldname": "sales_spa_section",
+   "fieldtype": "Section Break",
+   "label": "Sales SPA Settings"
+  },
+  {
+   "description": "Department used to scope Issues (via linked projects) and Tasks in the /sales-cockpit SPA.",
+   "fieldname": "sales_department",
+   "fieldtype": "Link",
+   "label": "Sales Department",
+   "options": "Department"
+  },
+  {
+   "fieldname": "column_break_sales_spa",
+   "fieldtype": "Column Break"
+  },
+  {
+   "description": "Default project for the start/stop timesheet timer and new Issues/Tasks in the Sales SPA.",
+   "fieldname": "sales_standard_project",
+   "fieldtype": "Link",
+   "label": "Sales Standard Project",
+   "options": "Project"
+  },
+  {
+   "fieldname": "accounting_spa_tab",
+   "fieldtype": "Tab Break",
+   "label": "Accounting SPA"
+  },
+  {
+   "fieldname": "accounting_spa_section",
+   "fieldtype": "Section Break",
+   "label": "Accounting SPA Settings"
+  },
+  {
+   "description": "Department used to scope Issues (via linked projects) and Tasks in the /accounting-cockpit SPA.",
+   "fieldname": "accounting_department",
+   "fieldtype": "Link",
+   "label": "Accounting Department",
+   "options": "Department"
+  },
+  {
+   "fieldname": "column_break_accounting_spa",
+   "fieldtype": "Column Break"
+  },
+  {
+   "description": "Default project for the start/stop timesheet timer and new Issues/Tasks in the Accounting SPA (Accounting Cost Center Project).",
+   "fieldname": "accounting_standard_project",
+   "fieldtype": "Link",
+   "label": "Accounting Standard Project",
+   "options": "Project"
+  },
+  {
+   "fieldname": "lead_scan_tab",
+   "fieldtype": "Tab Break",
+   "label": "Lead Scan"
+  },
+  {
+   "fieldname": "lead_scan_section",
+   "fieldtype": "Section Break",
+   "label": "CRM Handoff"
+  },
+  {
+   "default": "95",
+   "description": "After enrichment, automatically create Lead/Contact/Address when readiness score is at least this value and status is Ready (not Possible Duplicate).",
+   "fieldname": "lead_handoff_auto_create_min_score",
+   "fieldtype": "Int",
+   "label": "Auto-create min score",
+   "non_negative": 1
+  },
+  {
+   "description": "Fields shown in the mobile Improve & create dialog. Use Lead Data parent fields or Lead Data Contact / Lead Data Address child fields.",
+   "fieldname": "lead_handoff_improve_fields",
+   "fieldtype": "Table",
+   "label": "Improve Dialog Fields",
+   "options": "Lead Handoff Improve Field"
   }
  ],
  "index_web_pages_for_search": 1,
  "issingle": 1,
  "links": [],
- "modified": "2026-07-08 08:37:16.073881",
+ "modified": "2026-08-25 14:57:25.006749",
  "modified_by": "Administrator",
  "module": "Phamos",
  "name": "phamos Settings",

@@ -1,0 +1,257 @@
+@import "frappe-ui/src/style.css";
+@import "frappe-gantt/dist/frappe-gantt.css";
+
+html,
+body,
+#app {
+	height: 100%;
+}
+
+body {
+	margin: 0;
+	/* frappe-ui tokens are hex; use var(--token) — never rgb(var(--token)) */
+	background: var(--surface-gray-1);
+	color: var(--ink-gray-9);
+}
+
+:root {
+	/* Legacy aliases used by timesheet modals */
+	--card-bg: var(--surface-cards);
+	--border-color: var(--outline-gray-2);
+	--text-color: var(--ink-gray-9);
+	--text-muted: var(--ink-gray-5);
+	--bg-color: var(--surface-gray-1);
+	--control-bg: var(--surface-gray-2);
+	--primary: var(--ink-blue-3);
+	--hr-gantt-header-month-h: 26px;
+	--hr-gantt-header-week-h: 22px;
+	--hr-gantt-header-day-h: 26px;
+}
+
+html[data-theme="dark"] {
+	color-scheme: dark;
+}
+
+/* -------------------------------------------------------------------------- */
+/* Gantt — themed via frappe-ui CSS variables (hex). SVG fill/stroke must use
+   var(--token). rgb(var(--token)) is invalid and paints black. */
+/* -------------------------------------------------------------------------- */
+
+.hr-gantt-wrap {
+	position: relative;
+}
+
+.hr-gantt-wrap .gantt-container {
+	overflow: visible !important;
+}
+
+.hr-gantt-wrap .gantt {
+	display: block;
+}
+
+/* Hide frappe-gantt built-in headers — custom Month / Week / Day rows replace them */
+.hr-gantt-wrap .gantt .grid-header,
+.hr-gantt-wrap .gantt .lower-text,
+.hr-gantt-wrap .gantt .upper-text,
+.hr-gantt-wrap .gantt .today-highlight {
+	display: none;
+}
+
+.hr-gantt-wrap .gantt .grid-background {
+	fill: var(--surface-white);
+}
+
+.hr-gantt-wrap .gantt .grid-row {
+	fill: var(--surface-white);
+}
+
+.hr-gantt-wrap .gantt .grid-row:nth-child(even) {
+	fill: var(--surface-gray-1);
+}
+
+/* Dark: avoid near-black surface-white; use panel gray */
+[data-theme="dark"] .hr-gantt-wrap .gantt .grid-background,
+[data-theme="dark"] .hr-gantt-wrap .gantt .grid-row {
+	fill: var(--surface-gray-1);
+}
+
+[data-theme="dark"] .hr-gantt-wrap .gantt .grid-row:nth-child(even) {
+	fill: var(--surface-gray-2);
+}
+
+.hr-gantt-wrap .gantt .row-line {
+	stroke: var(--outline-gray-2);
+}
+
+.hr-gantt-wrap .gantt .tick {
+	stroke: var(--outline-gray-3);
+}
+
+.hr-gantt-wrap .gantt .bar-wrapper:not([class*="color-"]) .bar {
+	fill: var(--outline-gray-3);
+	stroke: var(--outline-gray-4);
+	stroke-width: 0;
+}
+
+.hr-gantt-wrap .gantt .bar-wrapper:not([class*="color-"]) .bar-progress {
+	fill: var(--surface-gray-5);
+}
+
+.hr-gantt-wrap .gantt .bar-wrapper:not([class*="color-"]):hover .bar,
+.hr-gantt-wrap .gantt .bar-wrapper:not([class*="color-"]).active .bar {
+	fill: var(--outline-gray-4);
+}
+
+.hr-gantt-wrap .gantt .bar-wrapper:not([class*="color-"]):hover .bar-progress,
+.hr-gantt-wrap .gantt .bar-wrapper:not([class*="color-"]).active .bar-progress {
+	fill: var(--surface-gray-6);
+}
+
+.hr-gantt-wrap .gantt .handle {
+	fill: var(--outline-gray-4);
+}
+
+.hr-gantt-wrap .gantt g.arrow path {
+	fill: none;
+	stroke: var(--ink-gray-5);
+	stroke-width: 1.2;
+	stroke-linecap: round;
+	stroke-linejoin: round;
+}
+
+.hr-gantt-today-strip {
+	position: absolute;
+	top: 0;
+	bottom: 0;
+	pointer-events: none;
+	z-index: 1;
+	background: var(--surface-blue-1);
+}
+
+.hr-gantt-today-strip-edge {
+	position: absolute;
+	top: 0;
+	bottom: 0;
+	width: 2px;
+	margin-left: -1px;
+	pointer-events: none;
+	z-index: 3;
+	background: var(--ink-blue-3);
+}
+
+.hr-gantt-wrap .gantt .hr-gantt-today-strip-svg {
+	fill: var(--surface-blue-1);
+	pointer-events: none;
+}
+
+.hr-gantt-wrap .gantt .hr-gantt-today-strip-edge {
+	fill: var(--ink-blue-3);
+	pointer-events: none;
+}
+
+.hr-gantt-wrap .gantt .hr-gantt-selected-row {
+	fill: var(--surface-blue-2);
+	pointer-events: none;
+}
+
+.hr-gantt-list-row:nth-child(even):not(.hr-gantt-list-row--selected) {
+	background: var(--surface-gray-1);
+}
+
+[data-theme="dark"] .hr-gantt-list-row:nth-child(even):not(.hr-gantt-list-row--selected) {
+	background: var(--surface-gray-2);
+}
+
+.hr-gantt-header-row {
+	display: flex;
+	flex: none;
+	border-bottom: 1px solid var(--outline-gray-1);
+}
+
+.hr-gantt-header-row--month {
+	height: var(--hr-gantt-header-month-h);
+	font-size: 12px;
+	font-weight: 600;
+	color: var(--ink-gray-7);
+}
+
+.hr-gantt-header-row--week {
+	height: var(--hr-gantt-header-week-h);
+	font-size: 11px;
+	font-weight: 600;
+	color: var(--ink-gray-5);
+}
+
+.hr-gantt-header-row--day {
+	height: var(--hr-gantt-header-day-h);
+	font-size: 10px;
+	font-weight: 500;
+	color: var(--ink-gray-4);
+}
+
+.hr-gantt-header-cell {
+	flex: none;
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+	border-right: 1px solid var(--outline-gray-1);
+	padding: 0 2px;
+}
+
+.hr-gantt-header-cell--day {
+	font-size: 10px;
+}
+
+.hr-gantt-list-row--selected {
+	background: var(--surface-blue-2);
+	box-shadow: inset 3px 0 0 var(--ink-blue-3);
+}
+
+.hr-gantt-corner,
+.hr-gantt-timeline-controls,
+.hr-gantt-header-spacer,
+.hr-gantt-list-footer {
+	flex-shrink: 0;
+}
+
+.hr-gantt-filter-menu {
+	z-index: 30;
+}
+
+.hr-gantt-header-scroll {
+	scrollbar-width: none;
+}
+
+.hr-gantt-header-scroll::-webkit-scrollbar {
+	display: none;
+}
+
+.hr-gantt-header-cell--clickable {
+	cursor: pointer;
+	border: none;
+	background: transparent;
+	font: inherit;
+	color: inherit;
+}
+
+.hr-gantt-header-cell--clickable:hover {
+	background: color-mix(in srgb, var(--ink-gray-9) 6%, transparent);
+}
+
+.hr-gantt-selection {
+	position: absolute;
+	top: 0;
+	bottom: 0;
+	background: color-mix(in srgb, var(--ink-blue-3) 18%, transparent);
+	border: 1px solid color-mix(in srgb, var(--ink-blue-3) 45%, transparent);
+	pointer-events: none;
+	z-index: 2;
+}
+
+.hr-gantt-header-hit {
+	position: relative;
+	z-index: 2;
+}

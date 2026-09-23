@@ -1,0 +1,354 @@
+<template>
+	<div ref="root">
+		<div v-if="!checklist.items?.length" class="mb-3 text-sm text-gray-500 dark:text-gray-400">
+			No items yet
+		</div>
+
+		<div v-else class="mb-3 space-y-2">
+			<div
+				v-for="item in checklist.items"
+				:key="item.name"
+				class="rounded-lg border bg-white transition dark:bg-gray-900"
+				:class="[
+					expandedItem === item.name
+						? 'border-gray-900 shadow-sm ring-1 ring-gray-900/10 dark:border-gray-200 dark:ring-gray-200/20'
+						: 'cursor-pointer border-gray-200 hover:border-gray-300 hover:bg-gray-50 dark:border-gray-700 dark:hover:border-gray-600 dark:hover:bg-gray-800/60',
+					savingItem === item.name ? 'opacity-60' : '',
+				]"
+				role="button"
+				:tabindex="expandedItem === item.name ? -1 : 0"
+				@click.stop="expand(item)"
+				@keydown.enter.prevent="expand(item)"
+			>
+				<!-- Collapsed -->
+				<div v-if="expandedItem !== item.name" class="flex items-start gap-3 px-3 py-2.5">
+					<div class="min-w-0 flex-1">
+						<div
+							v-if="hasNote(item)"
+							class="prose-sm dark:prose-invert max-w-none text-gray-900 dark:text-gray-100 [&_p]:my-0.5"
+							v-html="item.note"
+						/>
+						<span
+							v-else-if="!(item.description || '').trim()"
+							class="text-sm text-gray-400 dark:text-gray-500"
+						>
+							Click to edit…
+						</span>
+						<a
+							v-if="item.document && item.record"
+							:href="deskRecordUrl(item.document, item.record)"
+							target="_blank"
+							rel="noopener noreferrer"
+							class="mt-1 inline-flex max-w-full items-center gap-1 truncate text-xs font-medium text-ink-gray-7 underline-offset-2 hover:text-ink-gray-9 hover:underline"
+							:title="`Open ${item.document} ${item.record}`"
+							@click.stop
+						>
+							<span class="truncate">{{ item.document }} · {{ item.record }}</span>
+							<FeatherIcon name="external-link" class="h-3 w-3 flex-shrink-0" />
+						</a>
+						<div
+							v-else-if="item.document"
+							class="mt-1 truncate text-xs text-ink-gray-5"
+						>
+							{{ item.document }}
+						</div>
+					</div>
+					<div class="flex-shrink-0 pt-0.5" @click.stop>
+						<input
+							type="checkbox"
+							class="h-5 w-5 rounded-full border-gray-300 text-green-600 focus:ring-green-600 dark:border-gray-600 dark:text-green-500 dark:focus:ring-green-500"
+							:checked="!!item.done"
+							:disabled="savingItem === item.name"
+							@change="saveField(item, 'done', $event.target.checked ? 1 : 0, $event)"
+						/>
+					</div>
+				</div>
+
+				<!-- Expanded -->
+				<div v-else class="space-y-3 px-3 py-3" @click.stop>
+					<div class="flex items-start gap-3">
+						<div class="min-w-0 flex-1">
+							<TextEditor
+								:content="item.note || ''"
+								:fixed-menu="editorMenu"
+								placeholder="Item note…"
+								:editor-class="
+									compact
+										? 'prose-sm dark:prose-invert min-h-[72px] max-h-[180px] overflow-y-auto px-2 py-1.5 border border-gray-200 rounded-md bg-white dark:border-gray-600 dark:bg-gray-800'
+										: 'prose-sm dark:prose-invert min-h-[96px] max-h-[220px] overflow-y-auto px-2 py-1.5 border border-gray-200 rounded-md bg-white dark:border-gray-600 dark:bg-gray-800'
+								"
+								@change="(html) => onNoteChange(item, html)"
+							/>
+						</div>
+						<div class="flex-shrink-0 pt-1" @click.stop>
+							<input
+								type="checkbox"
+								class="h-5 w-5 rounded-full border-gray-300 text-green-600 focus:ring-green-600 dark:border-gray-600 dark:text-green-500 dark:focus:ring-green-500"
+								:checked="!!item.done"
+								:disabled="savingItem === item.name"
+								@change="saveField(item, 'done', $event.target.checked ? 1 : 0, $event)"
+							/>
+						</div>
+					</div>
+					<div class="space-y-1.5 border-t border-gray-100 pt-3 dark:border-gray-800">
+						<label class="block text-[11px] font-medium text-gray-500 dark:text-gray-400">
+							Document
+						</label>
+						<FrappeLink
+							doctype="DocType"
+							:model-value="item.document || ''"
+							placeholder="DocType"
+							:disabled="savingItem === item.name"
+							@update:model-value="(val) => onDocumentChange(item, val)"
+						/>
+						<template v-if="item.document">
+							<label class="mt-2 block text-[11px] font-medium text-gray-500 dark:text-gray-400">
+								Record
+							</label>
+							<div class="flex items-center gap-2">
+								<FrappeLink
+									class="min-w-0 flex-1"
+									:doctype="item.document"
+									:model-value="item.record || ''"
+									placeholder="Record"
+									:disabled="savingItem === item.name"
+									@update:model-value="(val) => saveField(item, 'record', val)"
+								/>
+								<a
+									v-if="item.record"
+									:href="deskRecordUrl(item.document, item.record)"
+									target="_blank"
+									rel="noopener noreferrer"
+									class="flex h-7 w-7 flex-shrink-0 items-center justify-center rounded border border-outline-gray-2 text-ink-gray-6 hover:bg-surface-gray-2 hover:text-ink-gray-9"
+									:title="`Open ${item.document} ${item.record}`"
+									@click.stop
+								>
+									<FeatherIcon name="external-link" class="h-3.5 w-3.5" />
+								</a>
+							</div>
+						</template>
+					</div>
+				</div>
+			</div>
+		</div>
+
+		<div class="flex flex-wrap items-center justify-between gap-2">
+			<Button :loading="adding" size="sm" @click="addItem">Add item</Button>
+			<Button
+				v-if="deskUrl"
+				variant="ghost"
+				theme="gray"
+				size="sm"
+				icon-left="external-link"
+				label="Open in Desk"
+				:link="deskUrl"
+			/>
+		</div>
+	</div>
+</template>
+
+<script setup>
+import { computed, nextTick, onBeforeUnmount, onMounted, ref } from "vue"
+import { call, TextEditor, debounce } from "frappe-ui"
+import FrappeLink from "@spa/components/FrappeLink.vue"
+import { deskRecordUrl } from "@spa/utils/deskUrl.js"
+import { skipTextEditorToolbarTabStops } from "@spa/utils/textEditorFocus.js"
+
+const props = defineProps({
+	checklist: { type: Object, required: true },
+	compact: { type: Boolean, default: false },
+})
+
+const emit = defineEmits(["updated"])
+
+const deskUrl = computed(
+	() => props.checklist.desk_url || (props.checklist.name ? `/app/checklist/${props.checklist.name}` : "")
+)
+
+const API = "phamos.api.checklist_inbox"
+const editorMenu = [
+	"Paragraph",
+	"Bold",
+	"Italic",
+	"Link",
+	"Separator",
+	"Bullet List",
+	"Numbered List",
+]
+
+const root = ref(null)
+const savingItem = ref(null)
+const adding = ref(false)
+const expandedItem = ref(null)
+
+async function focusFirstField() {
+	// The description input is rendered immediately, but wait a tick so the
+	// expanded card (and its input) is actually in the DOM first.
+	for (let i = 0; i < 20; i++) {
+		await nextTick()
+		const input = root.value?.querySelector('input[type="text"]')
+		if (input?.isConnected) {
+			input.focus()
+			return
+		}
+		await new Promise((resolve) => setTimeout(resolve, 20))
+	}
+}
+
+function hasNote(item) {
+	const raw = pendingNotes[item.name] !== undefined ? pendingNotes[item.name] : item.note
+	const note = (raw || "").replace(/<[^>]*>/g, "").replace(/&nbsp;/g, " ").trim()
+	return Boolean(note)
+}
+
+function isEmptyItem(item) {
+	return !hasNote(item) && !(item.document || "").trim() && !(item.record || "").trim()
+}
+
+function findItem(name) {
+	return (props.checklist.items || []).find((row) => row.name === name) || null
+}
+
+async function removeEmptyItem(item) {
+	if (!item?.name || !isEmptyItem(item)) return
+	if (typeof debouncedNoteSave.cancel === "function") {
+		debouncedNoteSave.cancel()
+	}
+	delete pendingNotes[item.name]
+	savingItem.value = item.name
+	try {
+		const updated = await call(`${API}.delete_spa_checklist_item`, {
+			checklist_name: props.checklist.name,
+			item_name: item.name,
+		})
+		emit("updated", updated)
+	} finally {
+		savingItem.value = null
+	}
+}
+
+async function collapse() {
+	const name = expandedItem.value
+	if (!name) return
+	const item = findItem(name)
+	expandedItem.value = null
+	if (item) await removeEmptyItem(item)
+}
+
+async function expand(item) {
+	if (expandedItem.value === item.name) return
+	await collapse()
+	expandedItem.value = item.name
+	skipTextEditorToolbarTabStops(root.value)
+}
+
+async function onDocClick(event) {
+	if (!expandedItem.value || !root.value) return
+	const path = typeof event.composedPath === "function" ? event.composedPath() : []
+	const inside = root.value.contains(event.target) || path.includes(root.value)
+	if (!inside) await collapse()
+}
+
+async function onKeydown(event) {
+	if (event.key === "Escape" && expandedItem.value) {
+		await collapse()
+	}
+}
+
+onMounted(() => {
+	document.addEventListener("click", onDocClick)
+	document.addEventListener("keydown", onKeydown)
+})
+
+onBeforeUnmount(() => {
+	document.removeEventListener("click", onDocClick)
+	document.removeEventListener("keydown", onKeydown)
+})
+
+async function saveField(item, field, value, event = null) {
+	const values = { [field]: value }
+	savingItem.value = item.name
+	try {
+		const updated = await call(`${API}.update_spa_checklist_item`, {
+			checklist_name: props.checklist.name,
+			item_name: item.name,
+			values,
+		})
+		emit("updated", updated)
+	} catch (e) {
+		if (field === "done" && event?.target) {
+			event.target.checked = !value
+		}
+	} finally {
+		savingItem.value = null
+	}
+}
+
+async function onDocumentChange(item, document) {
+	const previousDocument = item.document || ""
+	const previousRecord = item.record || ""
+	const record = document === previousDocument ? previousRecord : ""
+	// Apply locally right away: the Record field only renders once item.document
+	// is set (v-if="item.document"), and it needs to exist before Tab is pressed,
+	// not after this save round-trips.
+	item.document = document
+	item.record = record
+	savingItem.value = item.name
+	try {
+		const updated = await call(`${API}.update_spa_checklist_item`, {
+			checklist_name: props.checklist.name,
+			item_name: item.name,
+			values: { document, record },
+		})
+		emit("updated", updated)
+	} catch (e) {
+		item.document = previousDocument
+		item.record = previousRecord
+	} finally {
+		savingItem.value = null
+	}
+}
+
+const pendingNotes = {}
+
+const debouncedNoteSave = debounce(async (item, note) => {
+	savingItem.value = item.name
+	try {
+		const updated = await call(`${API}.update_spa_checklist_item`, {
+			checklist_name: props.checklist.name,
+			item_name: item.name,
+			values: { note },
+		})
+		emit("updated", updated)
+	} finally {
+		savingItem.value = null
+	}
+}, 500)
+
+function onNoteChange(item, html) {
+	pendingNotes[item.name] = html
+	debouncedNoteSave(item, html)
+}
+
+async function addItem() {
+	adding.value = true
+	let newestName = null
+	try {
+		const updated = await call(`${API}.add_spa_checklist_item`, {
+			checklist_name: props.checklist.name,
+			values: {},
+		})
+		emit("updated", updated)
+		const items = updated?.items || []
+		const newest = items[items.length - 1]
+		newestName = newest?.name || null
+		if (newestName) expandedItem.value = newestName
+	} finally {
+		adding.value = false
+	}
+	if (newestName) {
+		skipTextEditorToolbarTabStops(root.value)
+		await focusFirstField()
+	}
+}
+</script>
