@@ -133,7 +133,8 @@ def _build_drilldown_where(
 		params["to_date"] = getdate(to_date)
 
 	if aging_bucket in {"0_30", "31_90", "gt_90"}:
-		conditions.append("gi.aging_days IS NOT NULL")
+		# aging_days is 0 (not NULL) for open issues, so gate on closed_at instead
+		conditions.append("gi.closed_at IS NOT NULL")
 		if aging_bucket == "0_30":
 			conditions.append("gi.aging_days <= 30")
 		elif aging_bucket == "31_90":
@@ -436,7 +437,6 @@ def _build_flow_rows_and_aging(from_date, to_date, selected_projects, issue_scop
                         SUM(CASE WHEN gi.aging_days > 90 THEN gi.aging_days ELSE 0 END) AS sum_gt_90
         FROM `tabGitLab Issue` gi
         WHERE gi.state = 'closed'
-          AND gi.aging_days IS NOT NULL
                     AND gi.closed_at IS NOT NULL
                     AND DATE(gi.closed_at) BETWEEN %(from_date)s AND %(to_date)s
           AND {project_filter_sql}

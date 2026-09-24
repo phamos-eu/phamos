@@ -75,6 +75,11 @@ Object.assign(GitLabIssueDashboard.prototype, {
             searchParams.set("cycle_time_started_at", JSON.stringify(["is", "set"]));
         }
 
+        if (params.aging_bucket) {
+            // Open issues store aging_days as 0, so only closed issues belong in a bucket
+            searchParams.set("closed_at", JSON.stringify(["is", "set"]));
+        }
+
         if (params.aging_bucket === "0_30") {
             searchParams.set("aging_days", JSON.stringify(["<=", 30]));
         } else if (params.aging_bucket === "31_90") {
