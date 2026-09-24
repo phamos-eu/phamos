@@ -327,7 +327,8 @@ def _get_issue_timestamp_fields(issue):
     return {
         "created_at": created_at,
         "closed_at": closed_at,
-        "aging_days": (closed_at.date() - created_at.date()).days if (closed_at and created_at) else None,
+        # aging_days is an Int column (NOT NULL in DB), so use 0 for open issues
+        "aging_days": (closed_at.date() - created_at.date()).days if (closed_at and created_at) else 0,
     }
 
 
