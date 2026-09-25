@@ -67,6 +67,27 @@ Object.assign(GitLabIssueDashboard.prototype, {
             searchParams.set("state", params.state);
         }
 
+        if (params.require_touch_time) {
+            searchParams.set("total_touch_time", JSON.stringify(["is", "set"]));
+        }
+
+        if (params.require_cycle_time) {
+            searchParams.set("cycle_time_started_at", JSON.stringify(["is", "set"]));
+        }
+
+        if (params.aging_bucket) {
+            // Open issues store aging_days as 0, so only closed issues belong in a bucket
+            searchParams.set("closed_at", JSON.stringify(["is", "set"]));
+        }
+
+        if (params.aging_bucket === "0_30") {
+            searchParams.set("aging_days", JSON.stringify(["<=", 30]));
+        } else if (params.aging_bucket === "31_90") {
+            searchParams.set("aging_days", JSON.stringify(["between", [31, 90]]));
+        } else if (params.aging_bucket === "gt_90") {
+            searchParams.set("aging_days", JSON.stringify([">", 90]));
+        }
+
         if (params.date_field && params.from_date && params.to_date) {
             searchParams.set(params.date_field, JSON.stringify(["between", [params.from_date, params.to_date]]));
         } else if (params.date_field && params.rolling_months) {
@@ -108,11 +129,14 @@ Object.assign(GitLabIssueDashboard.prototype, {
         const daysToHours = (value) => Math.round(value * 24 * 100) / 100;
         const touchSummary = showTouchTime && data && data.touch_time_summary;
         const cycleSummary = showCycleTime && data && data.cycle_time_summary;
+        const leadSummary = showLeadTime && data && data.lead_time_summary;
         const summaryHtml = touchSummary
             ? `<div class="gid-drilldown-note" style="margin-top: 8px;"><strong>${__("Total")}: ${daysToHours(touchSummary.total_days)} ${__("hrs")} &nbsp;·&nbsp; ${__("Average")}: ${daysToHours(touchSummary.avg_days)} ${__("hrs")}</strong></div>`
             : cycleSummary
                 ? `<div class="gid-drilldown-note" style="margin-top: 8px;"><strong>${__("Total")}: ${cycleSummary.total_days} ${__("days")} &nbsp;·&nbsp; ${__("Average")}: ${cycleSummary.avg_days} ${__("days")}</strong></div>`
-                : "";
+                : leadSummary
+                    ? `<div class="gid-drilldown-note" style="margin-top: 8px;"><strong>${__("Total")}: ${leadSummary.total_days} ${__("days")} &nbsp;·&nbsp; ${__("Average")}: ${leadSummary.avg_days} ${__("days")}</strong></div>`
+                    : "";
 
         const tableRows = rows.map((row) => {
             const project = frappe.utils.escape_html(projectTitles[row.gitlab_project] || row.gitlab_project || "");
@@ -147,6 +171,8 @@ Object.assign(GitLabIssueDashboard.prototype, {
                     <td>${created}</td>
                     <td>${closed}</td>
                     ${leadTimeCell}
+                    ${touchTimeCell}
+                    ${cycleTimeCell}
                 </tr>
             `;
         }).join("");
@@ -163,11 +189,14 @@ Object.assign(GitLabIssueDashboard.prototype, {
                             <th>${__("Created")}</th>
                             <th>${__("Closed")}</th>
                             ${leadTimeHeader}
+                            ${touchTimeHeader}
+                            ${cycleTimeHeader}
                         </tr>
                     </thead>
                     <tbody>${tableRows}</tbody>
                 </table>
             </div>
+            ${summaryHtml}
             ${loadMoreHtml}
             ${noteHtml}
         `);
@@ -315,6 +344,82 @@ Object.assign(GitLabIssueDashboard.prototype, {
         });
     },
 
+    openTouchTimeDrilldown(projects, period) {
+        const filterCtx = this.getFilterContext();
+        const periodLabelMap = {
+            filtered: __("Selected Filter Range"),
+            last_month: __("Last Month"),
+            last_3_months: __("Last 3 Months"),
+            last_6_months: __("Last 6 Months"),
+            last_12_months: __("Last 12 Months"),
+        };
+        const rollingMonthsMap = { last_month: 1, last_3_months: 3, last_6_months: 6, last_12_months: 12 };
+
+        const params = {
+            projects,
+            issue_scope: filterCtx.issue_scope,
+            date_field: "closed_at",
+            state: "closed",
+            require_touch_time: true,
+        };
+
+        if (period === "filtered") {
+            params.from_date = filterCtx.from_date;
+            params.to_date = filterCtx.to_date;
+        } else {
+            params.rolling_months = rollingMonthsMap[period];
+        }
+
+        this.openDrilldown({
+            title: __("Touch Time — {0} ({1})", [this.getScopeLabel(projects), periodLabelMap[period] || period]),
+            tabs: [{
+                key: "closed",
+                label: __("Closed Issues"),
+                params,
+                showTouchTime: true,
+                note: __("Only issues with a counted timesheet are shown, matching the average above."),
+            }],
+        });
+    },
+
+    openCycleTimeDrilldown(projects, period) {
+        const filterCtx = this.getFilterContext();
+        const periodLabelMap = {
+            filtered: __("Selected Filter Range"),
+            last_month: __("Last Month"),
+            last_3_months: __("Last 3 Months"),
+            last_6_months: __("Last 6 Months"),
+            last_12_months: __("Last 12 Months"),
+        };
+        const rollingMonthsMap = { last_month: 1, last_3_months: 3, last_6_months: 6, last_12_months: 12 };
+
+        const params = {
+            projects,
+            issue_scope: filterCtx.issue_scope,
+            date_field: "closed_at",
+            state: "closed",
+            require_cycle_time: true,
+        };
+
+        if (period === "filtered") {
+            params.from_date = filterCtx.from_date;
+            params.to_date = filterCtx.to_date;
+        } else {
+            params.rolling_months = rollingMonthsMap[period];
+        }
+
+        this.openDrilldown({
+            title: __("Cycle Time — {0} ({1})", [this.getScopeLabel(projects), periodLabelMap[period] || period]),
+            tabs: [{
+                key: "closed",
+                label: __("Closed Issues"),
+                params,
+                showCycleTime: true,
+                note: __("Only issues with a resolved Cycle Time start are shown, matching the average above."),
+            }],
+        });
+    },
+
     openAgingDrilldown(projects, bucket) {
         const filterCtx = this.getFilterContext();
         const bucketLabelMap = { "0_30": __("0-30 days"), "31_90": __("31-90 days"), gt_90: __(">90 days") };
@@ -332,9 +437,6 @@ Object.assign(GitLabIssueDashboard.prototype, {
         const title = bucket
             ? __("Closed Tickets Aging — {0} ({1})", [this.getScopeLabel(projects), bucketLabelMap[bucket]])
             : __("Closed Tickets — {0}", [this.getScopeLabel(projects)]);
-        const note = bucket
-            ? __("Aging buckets aren't a field on GitLab Issue, so the standard list view can't filter by them. Use \"Load More\" below to page through every matching issue, or \"Export to CSV\" to download the full list.")
-            : null;
 
         this.openDrilldown({
             title,
@@ -357,8 +459,10 @@ Object.assign(GitLabIssueDashboard.prototype, {
             date_field: dateField,
             from_date: filterCtx.from_date,
             to_date: filterCtx.to_date,
-            state: kind === "closed" ? "closed" : "opened",
         };
+        if (kind === "closed") {
+            params.state = "closed";
+        }
         const kindLabel = kind === "closed" ? __("Closed") : __("Opened");
 
         this.openDrilldown({
@@ -373,7 +477,7 @@ Object.assign(GitLabIssueDashboard.prototype, {
         const monthLabel = this.monthKeyToLabel(monthKey);
 
         const openedParams = {
-            projects, issue_scope: filterCtx.issue_scope, date_field: "created_at", from_date, to_date, state: "opened",
+            projects, issue_scope: filterCtx.issue_scope, date_field: "created_at", from_date, to_date,
         };
         const closedParams = {
             projects, issue_scope: filterCtx.issue_scope, date_field: "closed_at", from_date, to_date, state: "closed",

@@ -1,7 +1,5 @@
 from calendar import month_name, monthrange
 from datetime import date
-import csv
-import io
 import json
 import frappe
 from frappe.utils import cint, getdate, nowdate
@@ -18,7 +16,8 @@ def get_gitlab_issue_dashboard_data(projects=None, year=None, from_date=None, to
     flow_rows, aging_map, project_names = _build_flow_rows_and_aging(from_date, to_date, selected_projects, issue_scope)
     project_titles = _get_project_titles(project_names)
     lead_time = _format_lead_time_response(from_date, to_date, selected_projects, issue_scope, compare_to_company)
-    open_now_total = _count_open_now(from_date, to_date, selected_projects, issue_scope)
+    touch_time = _format_touch_time_response(from_date, to_date, selected_projects, issue_scope, compare_to_company)
+    cycle_time = _format_cycle_time_response(from_date, to_date, selected_projects, issue_scope, compare_to_company)
     lifetime_tickets = _build_lifetime_ticket_rows(from_date, to_date, selected_projects, issue_scope)
     company_monthly_flow = []
     company_aging = {}
@@ -40,13 +39,52 @@ def get_gitlab_issue_dashboard_data(projects=None, year=None, from_date=None, to
         "company_monthly_flow": company_monthly_flow,
         "company_aging": company_aging,
         "lead_time": lead_time,
-        "open_now_total": open_now_total,
+        "touch_time": touch_time,
+        "cycle_time": cycle_time,
         "lifetime_tickets": lifetime_tickets,
     }
 
 
 DRILLDOWN_ROW_LIMIT = 200
-DRILLDOWN_EXPORT_ROW_LIMIT = 10000
+
+# Shared with _build_touch_time_kpis: a Timesheet Record counts as long as its
+# parent Timesheet is Draft or Submitted (not Cancelled).
+TOUCH_TIME_SUBQUERY_SQL = """
+    SELECT tr.gitlab_issue, SUM(tr.actual_time) AS touch_seconds
+    FROM `tabTimesheet Record` tr
+    JOIN `tabTimesheet` t ON t.name = tr.timesheet
+    WHERE t.docstatus IN (0, 1) AND tr.gitlab_issue IS NOT NULL
+    GROUP BY tr.gitlab_issue
+"""
+
+# Shared with _build_cycle_time_kpis and its drilldown: Cycle Time ends at
+# to_time (when logged work finished, not when it started — a single Timesheet
+# Record can span several days) of the last qualifying Timesheet Record logged
+# on the issue on/before it closed (same Draft/Submitted, not Cancelled rule as
+# Touch Time and Cycle Time Started At), not at closed_at itself.
+#
+# A Timesheet Record logged after closed_at (e.g. bad/retroactive data) is
+# excluded here by design, which can leave cycle_time_started_at (unbounded)
+# later than this end point. _cycle_time_days_expr() below turns that negative
+# result into NULL rather than reporting a nonsensical negative duration.
+CYCLE_TIME_END_SUBQUERY_SQL = """
+    SELECT tr.gitlab_issue, MAX(tr.to_time) AS cycle_time_ended_at
+    FROM `tabTimesheet Record` tr
+    JOIN `tabTimesheet` t ON t.name = tr.timesheet
+    JOIN `tabGitLab Issue` ce_gi ON ce_gi.name = tr.gitlab_issue
+    WHERE t.docstatus IN (0, 1) AND tr.gitlab_issue IS NOT NULL
+      AND tr.to_time <= ce_gi.closed_at
+    GROUP BY tr.gitlab_issue
+"""
+
+
+def _cycle_time_days_expr(cycle_end_col="cycle_end.cycle_time_ended_at"):
+	"""Cycle Time in days, or NULL when the raw calculation would be negative
+	(a qualifying Timesheet Record was logged after closed_at, so it was
+	excluded from CYCLE_TIME_END_SUBQUERY_SQL but still resolved
+	cycle_time_started_at — see the comment above)."""
+	raw_days = f"TIMESTAMPDIFF(SECOND, gi.cycle_time_started_at, COALESCE({cycle_end_col}, gi.closed_at)) / 86400"
+	return f"CASE WHEN {raw_days} >= 0 THEN {raw_days} ELSE NULL END"
 
 
 def _build_drilldown_where(
@@ -61,10 +99,8 @@ def _build_drilldown_where(
 ):
 	"""Shared WHERE-clause builder for the drilldown table and its CSV export.
 
-	`aging_bucket` (0-30 / 31-90 / >90 days) is a value computed on the fly via
-	DATEDIFF, not a stored column, so it can only be filtered here in SQL — it
-	can never be passed through to the standard GitLab Issue list view URL,
-	which only understands real doctype fields.
+	`aging_bucket` (0-30 / 31-90 / >90 days) filters on gi.aging_days, a stored
+	field kept in sync with DATEDIFF(DATE(closed_at), DATE(created_at)).
 	"""
 	selected_projects = _normalize_projects(projects)
 	issue_scope = _normalize_issue_scope(issue_scope)
@@ -97,16 +133,14 @@ def _build_drilldown_where(
 		params["to_date"] = getdate(to_date)
 
 	if aging_bucket in {"0_30", "31_90", "gt_90"}:
-		conditions.append("gi.created_at IS NOT NULL AND gi.closed_at IS NOT NULL")
+		# aging_days is 0 (not NULL) for open issues, so gate on closed_at instead
+		conditions.append("gi.closed_at IS NOT NULL")
 		if aging_bucket == "0_30":
-			conditions.append("DATEDIFF(DATE(gi.closed_at), DATE(gi.created_at)) <= 30")
+			conditions.append("gi.aging_days <= 30")
 		elif aging_bucket == "31_90":
-			conditions.append(
-				"DATEDIFF(DATE(gi.closed_at), DATE(gi.created_at)) > 30"
-				" AND DATEDIFF(DATE(gi.closed_at), DATE(gi.created_at)) <= 90"
-			)
+			conditions.append("gi.aging_days > 30 AND gi.aging_days <= 90")
 		else:
-			conditions.append("DATEDIFF(DATE(gi.closed_at), DATE(gi.created_at)) > 90")
+			conditions.append("gi.aging_days > 90")
 
 	return " AND ".join(conditions), params, date_field
 
@@ -121,18 +155,27 @@ def get_gitlab_issue_drilldown(
 	rolling_months=None,
 	state=None,
 	aging_bucket=None,
+	require_touch_time=None,
+	require_cycle_time=None,
 	start=0,
 ):
 	"""Returns a page of the individual GitLab Issue rows behind a dashboard card/chart
-	segment, so the UI can show a first-stage popup before linking out to the full list
-	view (or, for filters the list view can't express, paging through everything here)."""
+	segment, so the UI can show a first-stage popup before linking out to the full list view.
+
+	`require_touch_time` / `require_cycle_time` restrict to issues with a counted
+	Timesheet Record / a resolved cycle_time_started_at, matching the population
+	the respective KPI average is built from."""
 	where_sql, params, date_field = _build_drilldown_where(
 		projects, issue_scope, date_field, from_date, to_date, rolling_months, state, aging_bucket
 	)
 	start = max(cint(start), 0)
+	touch_join_sql = f"{'JOIN' if _to_bool(require_touch_time) else 'LEFT JOIN'} ({TOUCH_TIME_SUBQUERY_SQL}) touch ON touch.gitlab_issue = gi.name"
+	cycle_end_join_sql = f"LEFT JOIN ({CYCLE_TIME_END_SUBQUERY_SQL}) cycle_end ON cycle_end.gitlab_issue = gi.name"
+	if _to_bool(require_cycle_time):
+		where_sql = f"{where_sql} AND gi.cycle_time_started_at IS NOT NULL"
 
 	total = frappe.db.sql(
-		f"SELECT COUNT(*) AS total FROM `tabGitLab Issue` gi WHERE {where_sql}",
+		f"SELECT COUNT(*) AS total FROM `tabGitLab Issue` gi {touch_join_sql} WHERE {where_sql}",
 		params,
 		as_dict=True,
 	)[0].total
@@ -149,8 +192,12 @@ def get_gitlab_issue_drilldown(
 			gi.closed_at,
 			gi.assignee,
 			gi.issue_url,
-			DATEDIFF(DATE(gi.closed_at), DATE(gi.created_at)) AS lead_time_days
+			DATEDIFF(DATE(gi.closed_at), DATE(gi.created_at)) AS lead_time_days,
+			ROUND(touch.touch_seconds / 86400, 2) AS touch_time_days,
+			ROUND({_cycle_time_days_expr()}, 2) AS cycle_time_days
 		FROM `tabGitLab Issue` gi
+		{touch_join_sql}
+		{cycle_end_join_sql}
 		WHERE {where_sql}
 		ORDER BY gi.{date_field} DESC
 		LIMIT {DRILLDOWN_ROW_LIMIT}
@@ -162,71 +209,70 @@ def get_gitlab_issue_drilldown(
 
 	project_titles = _get_project_titles(sorted({row.gitlab_project for row in rows if row.gitlab_project}))
 
+	touch_time_summary = None
+	if _to_bool(require_touch_time):
+		summary_row = frappe.db.sql(
+			f"""
+			SELECT SUM(touch.touch_seconds) / 86400 AS total_days, AVG(touch.touch_seconds) / 86400 AS avg_days
+			FROM `tabGitLab Issue` gi
+			{touch_join_sql}
+			WHERE {where_sql}
+			""",
+			params,
+			as_dict=True,
+		)[0]
+		touch_time_summary = {
+			"total_days": _round_avg(summary_row.total_days),
+			"avg_days": _round_avg(summary_row.avg_days),
+		}
+
+	lead_time_summary = None
+	lead_summary_row = frappe.db.sql(
+		f"""
+		SELECT
+			SUM(DATEDIFF(DATE(gi.closed_at), DATE(gi.created_at))) AS total_days,
+			AVG(DATEDIFF(DATE(gi.closed_at), DATE(gi.created_at))) AS avg_days
+		FROM `tabGitLab Issue` gi
+		WHERE {where_sql} AND gi.closed_at IS NOT NULL
+		""",
+		params,
+		as_dict=True,
+	)[0]
+	if lead_summary_row.total_days is not None:
+		lead_time_summary = {
+			"total_days": _round_avg(lead_summary_row.total_days),
+			"avg_days": _round_avg(lead_summary_row.avg_days),
+		}
+
+	cycle_time_summary = None
+	if _to_bool(require_cycle_time):
+		summary_row = frappe.db.sql(
+			f"""
+			SELECT
+				SUM({_cycle_time_days_expr()}) AS total_days,
+				AVG({_cycle_time_days_expr()}) AS avg_days
+			FROM `tabGitLab Issue` gi
+			{cycle_end_join_sql}
+			WHERE {where_sql}
+			""",
+			params,
+			as_dict=True,
+		)[0]
+		cycle_time_summary = {
+			"total_days": _round_avg(summary_row.total_days),
+			"avg_days": _round_avg(summary_row.avg_days),
+		}
+
 	return {
 		"total": int(total or 0),
 		"rows": rows,
 		"start": start,
 		"limit": DRILLDOWN_ROW_LIMIT,
 		"project_titles": project_titles,
+		"touch_time_summary": touch_time_summary,
+		"cycle_time_summary": cycle_time_summary,
+		"lead_time_summary": lead_time_summary,
 	}
-
-
-@frappe.whitelist()
-def download_gitlab_issue_drilldown_csv(
-	projects=None,
-	issue_scope=None,
-	date_field=None,
-	from_date=None,
-	to_date=None,
-	rolling_months=None,
-	state=None,
-	aging_bucket=None,
-):
-	"""CSV export of every row matching a drilldown's filters (not just the on-screen
-	page), for filters like aging_bucket that the standard list view can't apply."""
-	where_sql, params, date_field = _build_drilldown_where(
-		projects, issue_scope, date_field, from_date, to_date, rolling_months, state, aging_bucket
-	)
-
-	rows = frappe.db.sql(
-		f"""
-		SELECT
-			gi.issue_id,
-			gi.title,
-			gi.state,
-			gi.gitlab_project,
-			gi.created_at,
-			gi.closed_at,
-			gi.issue_url,
-			DATEDIFF(DATE(gi.closed_at), DATE(gi.created_at)) AS lead_time_days
-		FROM `tabGitLab Issue` gi
-		WHERE {where_sql}
-		ORDER BY gi.{date_field} DESC
-		LIMIT {DRILLDOWN_EXPORT_ROW_LIMIT}
-		""",
-		params,
-		as_dict=True,
-	)
-
-	project_titles = _get_project_titles(sorted({row.gitlab_project for row in rows if row.gitlab_project}))
-
-	buffer = io.StringIO()
-	writer = csv.writer(buffer)
-	writer.writerow(["Issue", "Project", "State", "Created", "Closed", "Lead Time (days)", "URL"])
-	for row in rows:
-		writer.writerow([
-			row.issue_id or "",
-			project_titles.get(row.gitlab_project, row.gitlab_project or ""),
-			row.state or "",
-			row.created_at or "",
-			row.closed_at or "",
-			row.lead_time_days if row.lead_time_days is not None else "",
-			row.issue_url or "",
-		])
-
-	frappe.response["result"] = buffer.getvalue()
-	frappe.response["type"] = "csv"
-	frappe.response["doctype"] = "GitLab Issue Drilldown"
 
 
 def _to_bool(value):
@@ -340,6 +386,10 @@ def _build_flow_rows_and_aging(from_date, to_date, selected_projects, issue_scop
 
     project_filter_sql = " AND ".join(conditions)
 
+    # Opened is a flow count, same as Closed: every ticket created in the range
+    # counts once toward the month it was created, regardless of its current
+    # state, so a ticket opened and closed in the same or different months is
+    # counted once as opened and once as closed.
     opened_rows = frappe.db.sql(
         f"""
                 SELECT
@@ -350,7 +400,6 @@ def _build_flow_rows_and_aging(from_date, to_date, selected_projects, issue_scop
         FROM `tabGitLab Issue` gi
         WHERE gi.created_at IS NOT NULL
                     AND DATE(gi.created_at) BETWEEN %(from_date)s AND %(to_date)s
-          AND gi.state = 'opened'
           AND {project_filter_sql}
                 GROUP BY gi.gitlab_project, YEAR(gi.created_at), MONTH(gi.created_at)
         """,
@@ -380,12 +429,14 @@ def _build_flow_rows_and_aging(from_date, to_date, selected_projects, issue_scop
         f"""
         SELECT
             gi.gitlab_project,
-                        SUM(CASE WHEN DATEDIFF(DATE(gi.closed_at), DATE(gi.created_at)) <= 30 THEN 1 ELSE 0 END) AS bucket_0_30,
-                        SUM(CASE WHEN DATEDIFF(DATE(gi.closed_at), DATE(gi.created_at)) > 30 AND DATEDIFF(DATE(gi.closed_at), DATE(gi.created_at)) <= 90 THEN 1 ELSE 0 END) AS bucket_31_90,
-                        SUM(CASE WHEN DATEDIFF(DATE(gi.closed_at), DATE(gi.created_at)) > 90 THEN 1 ELSE 0 END) AS bucket_gt_90
+                        SUM(CASE WHEN gi.aging_days <= 30 THEN 1 ELSE 0 END) AS bucket_0_30,
+                        SUM(CASE WHEN gi.aging_days > 30 AND gi.aging_days <= 90 THEN 1 ELSE 0 END) AS bucket_31_90,
+                        SUM(CASE WHEN gi.aging_days > 90 THEN 1 ELSE 0 END) AS bucket_gt_90,
+                        SUM(CASE WHEN gi.aging_days <= 30 THEN gi.aging_days ELSE 0 END) AS sum_0_30,
+                        SUM(CASE WHEN gi.aging_days > 30 AND gi.aging_days <= 90 THEN gi.aging_days ELSE 0 END) AS sum_31_90,
+                        SUM(CASE WHEN gi.aging_days > 90 THEN gi.aging_days ELSE 0 END) AS sum_gt_90
         FROM `tabGitLab Issue` gi
         WHERE gi.state = 'closed'
-          AND gi.created_at IS NOT NULL
                     AND gi.closed_at IS NOT NULL
                     AND DATE(gi.closed_at) BETWEEN %(from_date)s AND %(to_date)s
           AND {project_filter_sql}
@@ -435,48 +486,14 @@ def _build_flow_rows_and_aging(from_date, to_date, selected_projects, issue_scop
             "bucket_0_30": int(row.bucket_0_30 or 0),
             "bucket_31_90": int(row.bucket_31_90 or 0),
             "bucket_gt_90": int(row.bucket_gt_90 or 0),
+            "sum_0_30": float(row.sum_0_30 or 0),
+            "sum_31_90": float(row.sum_31_90 or 0),
+            "sum_gt_90": float(row.sum_gt_90 or 0),
         }
         for row in aging_rows
     }
 
     return flow_rows, aging_map, project_names
-
-
-def _count_open_now(from_date, to_date, selected_projects, issue_scope="both"):
-	"""Counts issues created within the selected range that are still in the
-	'opened' state today — matches the filters used by the Opened Total drill-down,
-	so the KPI card and its popup always agree."""
-	conditions = ["1=1"]
-	params = {
-		"from_date": from_date,
-		"to_date": to_date,
-	}
-
-	if selected_projects:
-		conditions.append("gi.gitlab_project IN %(projects)s")
-		params["projects"] = tuple(selected_projects)
-
-	if issue_scope == "parent":
-		conditions.append("gi.parent_issue IS NULL")
-	elif issue_scope == "child":
-		conditions.append("gi.parent_issue IS NOT NULL")
-
-	project_filter_sql = " AND ".join(conditions)
-
-	row = frappe.db.sql(
-		f"""
-		SELECT COUNT(*) AS total
-		FROM `tabGitLab Issue` gi
-		WHERE gi.state = 'opened'
-		  AND gi.created_at IS NOT NULL
-		  AND DATE(gi.created_at) BETWEEN %(from_date)s AND %(to_date)s
-		  AND {project_filter_sql}
-		""",
-		params,
-		as_dict=True,
-	)
-
-	return int(row[0].total or 0) if row else 0
 
 
 def _build_lifetime_ticket_rows(from_date, to_date, selected_projects, issue_scope="both"):
@@ -879,7 +896,9 @@ def _build_cycle_time_kpis(from_date, to_date, selected_projects, issue_scope="b
     """Cycle Time = days from gi.cycle_time_started_at (the first Timesheet Record
     logged on/after the Cycle Time Trigger Label was set — see
     gitlab_utils.sync_cycle_time_start) to the last qualifying Timesheet Record
-    logged on the issue on/before it closed"""
+    logged on the issue on/before it closed. Negative results (a Timesheet
+    Record logged after closed_at resolved cycle_time_started_at) are treated
+    as NULL — see _cycle_time_days_expr."""
     conditions = ["1=1"]
     params = {}
 
@@ -894,7 +913,7 @@ def _build_cycle_time_kpis(from_date, to_date, selected_projects, issue_scope="b
 
     project_filter_sql = " AND ".join(conditions)
     cycle_end_join = f"LEFT JOIN ({CYCLE_TIME_END_SUBQUERY_SQL}) cycle_end ON cycle_end.gitlab_issue = gi.name"
-    cycle_end_expr = "TIMESTAMPDIFF(SECOND, gi.cycle_time_started_at, COALESCE(cycle_end.cycle_time_ended_at, gi.closed_at)) / 86400"
+    cycle_end_expr = _cycle_time_days_expr()
 
     filtered_params = dict(params)
     filtered_params["from_date"] = from_date
@@ -986,6 +1005,12 @@ def _round_avg(value):
     return round(float(value), 2)
 
 
+def _bucket_avg(total_days, count):
+    if not count:
+        return None
+    return round(total_days / count, 1)
+
+
 def _collect_project_names(opened_rows, closed_rows, aging_rows, selected_projects):
     if selected_projects:
         return selected_projects
@@ -1051,11 +1076,17 @@ def _aggregate_aging_totals(aging_map):
     total_0_30 = sum((row or {}).get("bucket_0_30", 0) for row in aging_map.values())
     total_31_90 = sum((row or {}).get("bucket_31_90", 0) for row in aging_map.values())
     total_gt_90 = sum((row or {}).get("bucket_gt_90", 0) for row in aging_map.values())
+    sum_0_30 = sum((row or {}).get("sum_0_30", 0) for row in aging_map.values())
+    sum_31_90 = sum((row or {}).get("sum_31_90", 0) for row in aging_map.values())
+    sum_gt_90 = sum((row or {}).get("sum_gt_90", 0) for row in aging_map.values())
 
     return {
         "bucket_0_30": int(total_0_30),
         "bucket_31_90": int(total_31_90),
         "bucket_gt_90": int(total_gt_90),
+        "avg_0_30": _bucket_avg(sum_0_30, total_0_30),
+        "avg_31_90": _bucket_avg(sum_31_90, total_31_90),
+        "avg_gt_90": _bucket_avg(sum_gt_90, total_gt_90),
     }
 
 
@@ -1085,17 +1116,26 @@ def _format_aging_response(aging_map, selected_projects, project_names):
     compare_projects = selected_projects or project_names
     project_buckets = []
 
+    empty_values = {
+        "bucket_0_30": 0,
+        "bucket_31_90": 0,
+        "bucket_gt_90": 0,
+        "sum_0_30": 0,
+        "sum_31_90": 0,
+        "sum_gt_90": 0,
+    }
+
     for project in compare_projects:
-        values = aging_map.get(
-            project,
-            {"bucket_0_30": 0, "bucket_31_90": 0, "bucket_gt_90": 0},
-        )
+        values = aging_map.get(project, empty_values)
         project_buckets.append(
             {
                 "project": project,
                 "bucket_0_30": values["bucket_0_30"],
                 "bucket_31_90": values["bucket_31_90"],
                 "bucket_gt_90": values["bucket_gt_90"],
+                "avg_0_30": _bucket_avg(values.get("sum_0_30", 0), values["bucket_0_30"]),
+                "avg_31_90": _bucket_avg(values.get("sum_31_90", 0), values["bucket_31_90"]),
+                "avg_gt_90": _bucket_avg(values.get("sum_gt_90", 0), values["bucket_gt_90"]),
             }
         )
 
@@ -1108,6 +1148,9 @@ def _format_aging_response(aging_map, selected_projects, project_names):
             "bucket_0_30": values["bucket_0_30"],
             "bucket_31_90": values["bucket_31_90"],
             "bucket_gt_90": values["bucket_gt_90"],
+            "avg_0_30": _bucket_avg(values.get("sum_0_30", 0), values["bucket_0_30"]),
+            "avg_31_90": _bucket_avg(values.get("sum_31_90", 0), values["bucket_31_90"]),
+            "avg_gt_90": _bucket_avg(values.get("sum_gt_90", 0), values["bucket_gt_90"]),
             "project_buckets": project_buckets,
         }
 
@@ -1115,6 +1158,9 @@ def _format_aging_response(aging_map, selected_projects, project_names):
         total_0_30 = sum(v["bucket_0_30"] for v in aging_map.values())
         total_31_90 = sum(v["bucket_31_90"] for v in aging_map.values())
         total_gt_90 = sum(v["bucket_gt_90"] for v in aging_map.values())
+        sum_0_30 = sum(v.get("sum_0_30", 0) for v in aging_map.values())
+        sum_31_90 = sum(v.get("sum_31_90", 0) for v in aging_map.values())
+        sum_gt_90 = sum(v.get("sum_gt_90", 0) for v in aging_map.values())
 
         return {
             "mode": "project_compare",
@@ -1122,12 +1168,18 @@ def _format_aging_response(aging_map, selected_projects, project_names):
             "bucket_0_30": total_0_30,
             "bucket_31_90": total_31_90,
             "bucket_gt_90": total_gt_90,
+            "avg_0_30": _bucket_avg(sum_0_30, total_0_30),
+            "avg_31_90": _bucket_avg(sum_31_90, total_31_90),
+            "avg_gt_90": _bucket_avg(sum_gt_90, total_gt_90),
             "project_buckets": project_buckets,
         }
 
     total_0_30 = sum(v["bucket_0_30"] for v in aging_map.values())
     total_31_90 = sum(v["bucket_31_90"] for v in aging_map.values())
     total_gt_90 = sum(v["bucket_gt_90"] for v in aging_map.values())
+    sum_0_30 = sum(v.get("sum_0_30", 0) for v in aging_map.values())
+    sum_31_90 = sum(v.get("sum_31_90", 0) for v in aging_map.values())
+    sum_gt_90 = sum(v.get("sum_gt_90", 0) for v in aging_map.values())
 
     return {
         "mode": "combined",
@@ -1135,5 +1187,8 @@ def _format_aging_response(aging_map, selected_projects, project_names):
         "bucket_0_30": total_0_30,
         "bucket_31_90": total_31_90,
         "bucket_gt_90": total_gt_90,
+        "avg_0_30": _bucket_avg(sum_0_30, total_0_30),
+        "avg_31_90": _bucket_avg(sum_31_90, total_31_90),
+        "avg_gt_90": _bucket_avg(sum_gt_90, total_gt_90),
         "project_buckets": project_buckets,
     }
