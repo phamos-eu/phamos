@@ -81,11 +81,7 @@
   "accounting_spa_section",
   "accounting_department",
   "column_break_accounting_spa",
-  "accounting_standard_project",
-  "lead_scan_tab",
-  "lead_scan_section",
-  "lead_handoff_auto_create_min_score",
-  "lead_handoff_improve_fields"
+  "accounting_standard_project"
  ],
  "fields": [
   {
@@ -505,37 +501,12 @@
    "fieldtype": "Link",
    "label": "Accounting Standard Project",
    "options": "Project"
-  },
-  {
-   "fieldname": "lead_scan_tab",
-   "fieldtype": "Tab Break",
-   "label": "Lead Scan"
-  },
-  {
-   "fieldname": "lead_scan_section",
-   "fieldtype": "Section Break",
-   "label": "CRM Handoff"
-  },
-  {
-   "default": "95",
-   "description": "After enrichment, automatically create Lead/Contact/Address when readiness score is at least this value and status is Ready (not Possible Duplicate).",
-   "fieldname": "lead_handoff_auto_create_min_score",
-   "fieldtype": "Int",
-   "label": "Auto-create min score",
-   "non_negative": 1
-  },
-  {
-   "description": "Fields shown in the mobile Improve & create dialog. Use Lead Data parent fields or Lead Data Contact / Lead Data Address child fields.",
-   "fieldname": "lead_handoff_improve_fields",
-   "fieldtype": "Table",
-   "label": "Improve Dialog Fields",
-   "options": "Lead Handoff Improve Field"
   }
  ],
  "index_web_pages_for_search": 1,
  "issingle": 1,
  "links": [],
- "modified": "2026-08-25 14:57:25.006749",
+ "modified": "2026-09-25 10:16:46.903612",
  "modified_by": "Administrator",
  "module": "Phamos",
  "name": "phamos Settings",
