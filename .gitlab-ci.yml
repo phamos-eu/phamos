@@ -2,7 +2,53 @@
 # Needs CI/CD variables ANTHROPIC_API_KEY and GITLAB_API_TOKEN; set AI_REVIEW_ENABLED=false to disable.
 
 stages:
+  - test
   - ai-review
+
+import_path_tests:
+  stage: test
+  image: python:3.10
+  timeout: 60m
+  rules:
+    - if: '$CI_PIPELINE_SOURCE == "merge_request_event"'
+    - if: '$CI_COMMIT_BRANCH =~ /^(main|develop|version-15|automated-testing)$/'
+  services:
+    - name: mariadb:10.6
+      alias: mariadb
+      variables:
+        MYSQL_ROOT_PASSWORD: root
+        MYSQL_DATABASE: test_frappe
+    - name: redis:alpine
+      alias: redis-cache
+    - name: redis:alpine
+      alias: redis-queue
+  before_script:
+    - apt-get update
+    - apt-get install -y git mariadb-client redis-tools python3-dev libmariadb-dev curl ca-certificates gnupg
+    - curl -fsSL https://deb.nodesource.com/setup_18.x | bash -
+    - apt-get install -y nodejs
+    - pip install --upgrade pip frappe-bench
+  script:
+    - echo "127.0.0.1 test.localhost" >> /etc/hosts
+    - bench init --skip-redis-config-generation --skip-assets --frappe-branch version-15 --python "$(which python)" frappe-bench
+    - mariadb --host mariadb --port 3306 -u root -proot -e "SET GLOBAL character_set_server = 'utf8mb4'"
+    - mariadb --host mariadb --port 3306 -u root -proot -e "SET GLOBAL collation_server = 'utf8mb4_unicode_ci'"
+    - cd frappe-bench
+    - bench get-app payments --branch version-15
+    - bench get-app --branch version-15 --resolve-deps erpnext
+    - bench get-app phamos "$CI_PROJECT_DIR"
+    - bench setup requirements --dev
+    - bench set-config -g db_host mariadb
+    - bench set-config -g db_port 3306
+    - bench set-config -g redis_cache redis://redis-cache:6379
+    - bench set-config -g redis_queue redis://redis-queue:6379
+    - bench set-config -g redis_socketio redis://redis-cache:6379
+    - bench new-site test.localhost --db-root-password root --admin-password admin --mariadb-root-username root --mariadb-root-password root --mariadb-user-host-login-scope='%'
+    - bench --site test.localhost install-app erpnext
+    - bench --site test.localhost set-config allow_tests true
+    - bench --site test.localhost run-tests --module phamos.tests.test_import_paths
+  variables:
+    CI: "true"
 
 ai_code_review:
   stage: ai-review

@@ -1,0 +1,134 @@
+name: Phamos Import Path Tests
+
+on:
+  push:
+    branches: [main, develop, version-15, automated-testing]
+  pull_request:
+    branches: [main, develop, version-15]
+
+permissions:
+  contents: read
+
+jobs:
+  import-paths:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+
+    services:
+      mariadb:
+        image: mariadb:10.6
+        env:
+          MYSQL_ROOT_PASSWORD: root
+          MYSQL_DATABASE: test_frappe
+        ports:
+          - 3306:3306
+        options: >-
+          --health-cmd="mysqladmin ping -proot"
+          --health-interval=10s
+          --health-timeout=5s
+          --health-retries=5
+
+      redis-cache:
+        image: redis:alpine
+        ports:
+          - 6379:6379
+
+      redis-queue:
+        image: redis:alpine
+        ports:
+          - 6380:6379
+
+    steps:
+      - name: Checkout Phamos
+        uses: actions/checkout@v4
+
+      - name: Add to hosts
+        run: echo "127.0.0.1 test.localhost" | sudo tee -a /etc/hosts
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.10"
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "18"
+
+      - name: Install system dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            git \
+            mariadb-client \
+            redis-tools \
+            python3-dev \
+            libmariadb-dev \
+            libmariadb-dev-compat \
+            xvfb \
+            libfontconfig \
+            libxrender1
+
+      - name: Install Frappe Bench
+        run: |
+          pip install --upgrade pip
+          pip install frappe-bench
+
+      - name: Initialize bench
+        run: |
+          bench init \
+            --skip-redis-config-generation \
+            --skip-assets \
+            --frappe-branch version-15 \
+            --python "$(which python)" \
+            frappe-bench
+          mariadb --host 127.0.0.1 --port 3306 -u root -proot -e "SET GLOBAL character_set_server = 'utf8mb4'"
+          mariadb --host 127.0.0.1 --port 3306 -u root -proot -e "SET GLOBAL collation_server = 'utf8mb4_unicode_ci'"
+        env:
+          CI: true
+
+      - name: Get apps
+        working-directory: frappe-bench
+        run: |
+          bench get-app payments --branch version-15
+          bench get-app --branch version-15 --resolve-deps erpnext
+          bench get-app phamos "${GITHUB_WORKSPACE}"
+          bench setup requirements --dev
+
+      - name: Create site and install apps
+        working-directory: frappe-bench
+        run: |
+          bench set-config -g db_host 127.0.0.1
+          bench set-config -g db_port 3306
+          bench set-config -g redis_cache redis://127.0.0.1:6379
+          bench set-config -g redis_queue redis://127.0.0.1:6380
+          bench set-config -g redis_socketio redis://127.0.0.1:6379
+
+          bench new-site test.localhost \
+            --db-root-password root \
+            --admin-password admin \
+            --mariadb-root-username root \
+            --mariadb-root-password root \
+            --mariadb-user-host-login-scope='%'
+
+          bench --site test.localhost install-app erpnext
+          bench --site test.localhost set-config allow_tests true
+
+      - name: Run phamos import path tests
+        working-directory: frappe-bench
+        run: |
+          # Do not install-app phamos: migrate loads every DocType module.
+          # These tests only check that dotted phamos paths still exist.
+          bench --site test.localhost run-tests \
+            --module phamos.tests.test_import_paths
+        env:
+          CI: true
+
+      - name: Test summary
+        if: always()
+        run: |
+          echo "## Phamos import path tests" >> "$GITHUB_STEP_SUMMARY"
+          echo "" >> "$GITHUB_STEP_SUMMARY"
+          echo "- Site: Frappe + ERPNext (phamos on bench, not installed on site)" >> "$GITHUB_STEP_SUMMARY"
+          echo "- Skips \`install-app phamos\` so migrate does not load every DocType" >> "$GITHUB_STEP_SUMMARY"
+          echo "- \`phamos.tests.test_import_paths\` validates phamos dotted paths, imports, hook JS files, and module importability" >> "$GITHUB_STEP_SUMMARY"
