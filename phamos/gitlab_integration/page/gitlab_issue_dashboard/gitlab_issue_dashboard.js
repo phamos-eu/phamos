@@ -390,7 +390,7 @@ class GitLabIssueDashboard {
             <div class="gid-kpi gid-kpi-opened">
                 <small>${__("Total Open")}</small>
                 <strong>${totals}</strong>
-                ${latestMonthLabel ? `<div class="text-muted" style="font-size: 11px;">${__("As of {0} (the latest month in range)", [latestMonthLabel])}</div>` : ""}
+                ${latestMonthLabel ? `<div class="gid-kpi-sub">${__("As of {0} (the latest month in range)", [latestMonthLabel])}</div>` : ""}
             </div>
         `);
 
