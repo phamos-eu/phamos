@@ -109,6 +109,7 @@
 										type="text"
 										size="sm"
 										placeholder="Add a short description…"
+										maxlength="140"
 									/>
 								</div>
 								<TextEditor
