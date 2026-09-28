@@ -378,6 +378,8 @@ class MonthlyImplementationSummary(Document):
 			self.append("sales_order_status_information", t)
 
 	def _create_dn_for_so_hours(self, sales_order, item_allocations, skip_default_stamp=False):
+		from erpnext.selling.doctype.sales_order.sales_order import make_delivery_note
+
 		if not item_allocations:
 			frappe.throw(frappe._("No item hours given for Sales Order {0}.").format(sales_order))
 		customer = frappe.db.get_value("Implementation", self.implementation, "customer")
@@ -386,42 +388,51 @@ class MonthlyImplementationSummary(Document):
 		company = _company_for_customer(customer)
 		if not company:
 			frappe.throw("No Company found. Set default Company in Global Defaults.")
-		dn_items = []
-		total_hours = 0.0
+
+		hours_by_detail = {}
 		for alloc in item_allocations:
-			so_line = frappe.get_doc("Sales Order Item", alloc["so_detail"])
-			if so_line.parent != sales_order:
+			so_detail = alloc["so_detail"]
+			parent = frappe.db.get_value("Sales Order Item", so_detail, "parent")
+			if parent != sales_order:
 				frappe.throw(
-					frappe._("Sales Order Item {0} does not belong to {1}.").format(alloc["so_detail"], sales_order)
+					frappe._("Sales Order Item {0} does not belong to {1}.").format(so_detail, sales_order)
 				)
-			hours = flt(alloc["hours"])
-			rate = flt(so_line.rate)
-			cf = flt(so_line.conversion_factor, 9) or 1
-			dn_items.append({
-				"item_code": so_line.item_code,
-				"item_name": so_line.item_name,
-				"description": so_line.description or "",
-				"qty": hours,
-				"uom": so_line.uom or so_line.stock_uom,
-				"stock_uom": so_line.stock_uom or so_line.uom,
-				"conversion_factor": cf,
-				"rate": rate,
-				"amount": flt(rate * hours, 2),
-				"against_sales_order": sales_order,
-				"so_detail": so_line.name,
-				"allow_zero_valuation_rate": 1,
-				"custom_against_monthly_implementation_summary": self.name,
-			})
+			hours_by_detail[so_detail] = flt(hours_by_detail.get(so_detail, 0)) + flt(alloc["hours"])
+
+		dn = make_delivery_note(sales_order)
+
+		mapped_details = {it.so_detail for it in dn.items}
+		missing = [d for d in hours_by_detail if d not in mapped_details]
+		if missing:
+			frappe.throw(
+				frappe._("Sales Order Item(s) {0} have nothing left to deliver on {1}.").format(
+					", ".join(missing), sales_order
+				)
+			)
+
+		order = {d: i for i, d in enumerate(hours_by_detail)}
+		dn.items = sorted(
+			[it for it in dn.items if it.so_detail in hours_by_detail],
+			key=lambda it: order[it.so_detail],
+		)
+
+		total_hours = 0.0
+		for it in dn.items:
+			hours = flt(hours_by_detail[it.so_detail])
+			cf = flt(it.conversion_factor, 9) or 1
+			it.qty = hours
+			it.stock_qty = flt(hours * cf, 9)
+			it.amount = flt(flt(it.rate) * hours, 2)
+			it.base_amount = flt(flt(it.base_rate) * hours, 2)
+			it.allow_zero_valuation_rate = 1
+			it.custom_against_monthly_implementation_summary = self.name
 			total_hours += hours
-		dn = frappe.get_doc({
-			"doctype": "Delivery Note",
-			"customer": customer,
-			"company": company,
-			"custom_implementation": self.implementation,
-			"selling_price_list": frappe.db.get_value("Sales Order", sales_order, "selling_price_list"),
-			"items": dn_items,
-		})
+
+		dn.customer = customer
+		dn.company = company
+		dn.custom_implementation = self.implementation
 		dn.insert()
+
 		_add_or_update_mis_dn_row(self.name, dn.name, sales_order, total_hours)
 		_mirror_dn_items_into_mis(self.name, dn.name)
 		if not skip_default_stamp:
