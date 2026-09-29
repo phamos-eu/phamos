@@ -500,6 +500,7 @@ Object.assign(GitLabIssueDashboard.prototype, {
         const method = "phamos.gitlab_integration.page.gitlab_issue_dashboard.gitlab_issue_dashboard.get_lifetime_ticket_drilldown";
         const note = __("Open = still open as of the end of {0}, even if it has since been closed. \"Status (now)\" shows the ticket's current status so you can verify.", [monthLabel]);
         const baseParams = { projects: projects || [], issue_scope: filterCtx.issue_scope, year, month };
+        const labelFilter = this.getLifetimeLabelFilter();
 
         this.openDrilldown({
             title: __("{0} — {1}", [this.getScopeLabel(projects), monthLabel]),
@@ -513,7 +514,18 @@ Object.assign(GitLabIssueDashboard.prototype, {
                     note,
                     stateLabel: __("Open (as of {0})", [monthLabel]),
                 },
-            ],
+            ].concat(labelFilter.label_mode ? [
+                {
+                    key: "filtered",
+                    label: this.getLifetimeFilterLabel(),
+                    method,
+                    params: Object.assign({}, baseParams, labelFilter, { lifetime_state: "open" }),
+                    noListView: true,
+                    note,
+                    stateLabel: __("Open (as of {0})", [monthLabel]),
+                },
+            ] : []),
+            activeKey: labelFilter.label_mode ? "filtered" : "open",
         });
     },
 

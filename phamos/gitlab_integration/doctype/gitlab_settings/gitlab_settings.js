@@ -60,6 +60,20 @@ frappe.ui.form.on("GitLab Settings", {
             });
         }, sync_group);
 
+        frm.add_custom_button('Backfill Label History', function () {
+            frappe.confirm(
+                __("Fill the label history for all issues open or closed since 1 January last year? This runs in the background and can take a while."),
+                () => {
+                    frappe.call({
+                        method: 'phamos.gitlab_integration.label_ledger.backfill_label_ledger_background',
+                        callback: function (r) {
+                            frappe.msgprint((r.message && r.message.message) || "Label history backfill queued!");
+                        }
+                    });
+                }
+            );
+        }, sync_group);
+
         let report_group = __("Weekly Customer Report");
 
         frm.add_custom_button('Backfill Issue Comments', function () {

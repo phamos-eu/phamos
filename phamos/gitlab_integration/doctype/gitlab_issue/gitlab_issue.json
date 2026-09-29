@@ -185,9 +185,13 @@
   {
    "link_doctype": "Timesheet Record",
    "link_fieldname": "gitlab_issue"
+  },
+  {
+   "link_doctype": "GitLab Issue Label Ledger",
+   "link_fieldname": "gitlab_issue"
   }
  ],
- "modified": "2026-08-31 10:20:04.836336",
+ "modified": "2026-09-29 10:00:00.000000",
  "modified_by": "Administrator",
  "module": "Gitlab Integration",
  "name": "GitLab Issue",
