@@ -1,0 +1,127 @@
+{
+ "actions": [],
+ "autoname": "hash",
+ "creation": "2026-09-28 10:00:00",
+ "doctype": "DocType",
+ "engine": "InnoDB",
+ "field_order": [
+  "gitlab_issue",
+  "gitlab_project",
+  "label",
+  "column_break_main",
+  "added_at",
+  "removed_at",
+  "section_break_details",
+  "added_by",
+  "removed_by",
+  "column_break_details",
+  "source",
+  "gitlab_event_id"
+ ],
+ "fields": [
+  {
+   "fieldname": "gitlab_issue",
+   "fieldtype": "Link",
+   "in_list_view": 1,
+   "in_standard_filter": 1,
+   "label": "GitLab Issue",
+   "options": "GitLab Issue",
+   "reqd": 1,
+   "search_index": 1
+  },
+  {
+   "fieldname": "gitlab_project",
+   "fieldtype": "Link",
+   "in_standard_filter": 1,
+   "label": "GitLab Project",
+   "options": "GitLab Project",
+   "search_index": 1
+  },
+  {
+   "fieldname": "label",
+   "fieldtype": "Data",
+   "in_list_view": 1,
+   "in_standard_filter": 1,
+   "label": "Label",
+   "reqd": 1,
+   "search_index": 1
+  },
+  {
+   "fieldname": "column_break_main",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "added_at",
+   "fieldtype": "Datetime",
+   "in_list_view": 1,
+   "label": "Added At",
+   "reqd": 1,
+   "search_index": 1
+  },
+  {
+   "description": "Empty means the label is still on the issue.",
+   "fieldname": "removed_at",
+   "fieldtype": "Datetime",
+   "in_list_view": 1,
+   "label": "Removed At",
+   "search_index": 1
+  },
+  {
+   "fieldname": "section_break_details",
+   "fieldtype": "Section Break",
+   "label": "Details"
+  },
+  {
+   "fieldname": "added_by",
+   "fieldtype": "Data",
+   "label": "Added By"
+  },
+  {
+   "fieldname": "removed_by",
+   "fieldtype": "Data",
+   "label": "Removed By"
+  },
+  {
+   "fieldname": "column_break_details",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "source",
+   "fieldtype": "Select",
+   "label": "Source",
+   "options": "Webhook\nSync\nBackfill"
+  },
+  {
+   "fieldname": "gitlab_event_id",
+   "fieldtype": "Data",
+   "label": "GitLab Event ID",
+   "unique": 1
+  }
+ ],
+ "grid_page_length": 50,
+ "index_web_pages_for_search": 1,
+ "links": [],
+ "modified": "2026-09-28 12:00:00.000000",
+ "modified_by": "Administrator",
+ "module": "Gitlab Integration",
+ "name": "GitLab Issue Label Ledger",
+ "naming_rule": "Random",
+ "owner": "Administrator",
+ "permissions": [
+  {
+   "create": 1,
+   "delete": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "System Manager",
+   "write": 1
+  }
+ ],
+ "row_format": "Dynamic",
+ "sort_field": "added_at",
+ "sort_order": "DESC",
+ "states": [],
+ "title_field": "label"
+}
