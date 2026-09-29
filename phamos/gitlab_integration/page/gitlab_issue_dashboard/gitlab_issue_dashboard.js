@@ -249,7 +249,6 @@ class GitLabIssueDashboard {
             this.updateFilterState();
             this.loadData();
         });
-        this.page.set_primary_action(__("Apply Filters"), () => this.loadData());
         this.updateFilterState();
     }
 
