@@ -276,6 +276,9 @@ doc_events = {
         "on_submit": "phamos.phamos.hr.interview_summary.trigger_interview_summary",
         "on_cancel": "phamos.phamos.hr.interview_summary.trigger_interview_summary",
     },
+    "GitLab Issue": {
+        "on_trash": "phamos.gitlab_integration.label_ledger.delete_issue_label_ledger",
+    },
     "Timesheet Record": {
         "on_submit": [
             "phamos.gitlab_integration.gitlab_utils.sync_touch_time_on_timesheet_change",
