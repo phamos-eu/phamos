@@ -538,6 +538,21 @@ class MonthlyImplementationSummary(Document):
 		self.month = months[d0.month - 1]
 		self.year = str(d0.year)
 
+	def set_project_hours_table(self):
+		"""Group the fetched timesheet rows by project and store total billable hours per project."""
+		totals = {}
+		for row in (self.timesheets_table or []):
+			if not row.project:
+				continue
+			totals[row.project] = flt(totals.get(row.project, 0)) + flt(row.billable_hours)
+
+		self.project_hours = []
+		for project, hours in sorted(totals.items()):
+			self.append("project_hours", {
+				"project": project,
+				"billable_hours": flt(hours),
+			})
+
 	def set_timesheets_table(self):
 		if not self.year or not self.month:
 			self.timesheets_table = []
@@ -594,6 +609,8 @@ class MonthlyImplementationSummary(Document):
 					"delivery_note": row.delivery_note or None,
 				},
 			)
+
+		self.set_project_hours_table()
 
 
 def _eligible_so_allocation_rows(doc):
