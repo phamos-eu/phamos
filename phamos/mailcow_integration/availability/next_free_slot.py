@@ -70,10 +70,13 @@ def _subtract_busy_from_window(busy: List[Tuple[datetime, datetime]], window: Tu
 
 
 @frappe.whitelist()
-def free_slots_for_day(day: str,
-                       duration_minutes: int = 60,
-                       time_from: str | None = None,
-                       time_to: str | None = None) -> list[dict]:
+def free_slots_for_day(
+        day: str,
+        duration_minutes: int = 60,
+        time_from: str | None = None,
+        time_to: str | None = None,
+        email_account: str | None = None,
+    ) -> list[dict]:
     """Return up to five free slots for the given date using site/user timezone.
 
     Args:
@@ -116,7 +119,15 @@ def free_slots_for_day(day: str,
     day_start_utc = start_local.astimezone(timezone.utc)
     day_end_utc = end_local.astimezone(timezone.utc)
 
-    user_id = frappe.session.user
+    if email_account:
+        user_id = frappe.db.get_value(
+            "Email Account",
+            email_account,
+            "email_id"
+        )
+
+    else:
+        user_id = frappe.session.user
     busy = fetch_busy_intervals_from_sogo(user_id, day_start_utc, day_end_utc)
     free_blocks = _subtract_busy_from_window(busy, (day_start_utc, day_end_utc))
 
