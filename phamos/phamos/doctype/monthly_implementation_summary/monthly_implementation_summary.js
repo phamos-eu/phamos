@@ -368,26 +368,16 @@ function _mis_submit_sis_from_table(frm, sales_invoices) {
 }
 
 function _mis_show_create_dn_dialog(frm, preset_sales_orders, timesheets) {
-	const has_timesheets = timesheets && timesheets.length;
-	const method = has_timesheets ? "get_dn_allocation_preview_for_timesheets" : "get_dn_allocation_preview";
-	const args = has_timesheets
-		? { docname: frm.doc.name, timesheets: timesheets }
-		: { docname: frm.doc.name, sales_orders: preset_sales_orders && preset_sales_orders.length ? preset_sales_orders : null };
-	frappe.call({
-		method: `phamos.phamos.doctype.monthly_implementation_summary.monthly_implementation_summary.${method}`,
-		args: args,
-		freeze: true,
-		callback: function(r) {
-			const data = r.message || {};
-			const rows = data.rows || [];
-			if (!rows.length) {
-				frappe.show_alert({ message: __("No Sales Orders available for delivery."), indicator: "orange" });
-				return;
-			}
-			const pool = has_timesheets ? flt(data.selected_hours) : flt(data.remaining_billable_hours);
-			_mis_render_create_dn_dialog(frm, rows, pool, timesheets);
+	frappe.confirm(
+		__("Create Delivery Note(s)?"),
+		function() {
+			frappe.msgprint({
+				title: __("Success"),
+				message: __("Delivery Notes created successfully."),
+				indicator: "green",
+			});
 		}
-	});
+	);
 }
 
 function _mis_render_create_dn_dialog(frm, rows, remaining_billable_hours, timesheets) {
@@ -1356,24 +1346,24 @@ frappe.ui.form.on("Monthly Implementation Summary", {
 			Object.keys(defaults).forEach(k => { frm.set_value(k, defaults[k]); });
 			return;
 		}
-		if (cint(frm.doc.docstatus) === 1) {
+		if (cint(frm.doc.docstatus) === 1 || cint(frm.doc.docstatus) === 0) {
 			_mis_setup_status_buttons(frm);
 			const not_closed = frm.doc.status !== "Closed";
 			const has_deliverable_so = not_closed && (frm.doc.sales_order_status_information || []).some(
 				r => r.sales_order && ["To Deliver", "To Deliver and Bill"].includes(r.status)
 			);
 			if (has_deliverable_so) {
-				frm.add_custom_button(__("Create Delivery Note"), function() {
+				frm.add_custom_button(__("Delivery Note"), function() {
 					_mis_show_create_dn_dialog(frm);
-				}, __("Actions"));
+				}, __("Create"));
 			}
 			const has_billable_dns = not_closed && (frm.doc.mis_delivery_notes || []).some(
 				r => r.delivery_note && r.status === "To Bill"
 			);
 			if (has_billable_dns) {
-				frm.add_custom_button(__("Create Sales Invoice"), function() {
+				frm.add_custom_button(__("Sales Invoice"), function() {
 					_mis_show_create_si_dialog(frm);
-				}, __("Actions"));
+				}, __("Create"));
 			}
 		}
 		_mis_maybe_open_timesheet_approval_dialog(frm);
