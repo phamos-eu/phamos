@@ -12,7 +12,7 @@ required_apps = ["erpnext", "hrms"]
 add_to_apps_screen = [
 	{
 		"name": "i_own_my_work",
-		"logo": "/assets/phamos/manifest/i-own-my-work-icon-192.png",
+		"logo": "/assets/frappe/images/frappe-favicon.svg",
 		"title": "I Own My Work",
 		"route": "/i-own-my-work",
 		"has_permission": "phamos.api.i_own_my_work.check_app_permission",
