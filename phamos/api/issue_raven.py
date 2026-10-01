@@ -210,7 +210,7 @@ def _spa_path_for(doctype, name):
 		if department and sales_department and department == sales_department:
 			return f"/sales-cockpit/tasks/{name}"
 		if department and hr_department and department == hr_department:
-			return f"/hr-cockpit/tasks/{name}"
+			return f"/human-resources-cockpit/tasks/{name}"
 		if department and accounting_department and department == accounting_department:
 			return f"/accounting-cockpit/tasks/{name}"
 		if department and pm_department and department == pm_department:
@@ -222,8 +222,8 @@ def _spa_path_for(doctype, name):
 def _spa_open_label(spa_path):
 	if spa_path.startswith("/sales-cockpit"):
 		return _("Open in Sales Cockpit")
-	if spa_path.startswith("/hr-cockpit"):
-		return _("Open in HR Cockpit")
+	if spa_path.startswith("/human-resources-cockpit"):
+		return _("Open in Human Resources Cockpit")
 	if spa_path.startswith("/accounting-cockpit"):
 		return _("Open in Accounting Cockpit")
 	if spa_path.startswith("/project-management-cockpit"):

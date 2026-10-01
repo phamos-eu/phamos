@@ -20,8 +20,8 @@ add_to_apps_screen = [
 	{
 		"name": "hr_spa",
 		"logo": "/assets/frappe/images/frappe-favicon.svg",
-		"title": "HR",
-		"route": "/hr-cockpit",
+		"title": "Human Resources",
+		"route": "/human-resources-cockpit",
 		"has_permission": "phamos.api.hr_spa.check_app_permission",
 	},
 	{
@@ -120,8 +120,8 @@ website_route_rules = [
     {"from_route": "/schedule_interview/<name>", "to_route": "schedule_interview"},
     {"from_route": "/i-own-my-work", "to_route": "i_own_my_work"},
     {"from_route": "/i-own-my-work/<path:app_path>", "to_route": "i_own_my_work"},
-    {"from_route": "/hr-cockpit", "to_route": "hr_spa"},
-    {"from_route": "/hr-cockpit/<path:app_path>", "to_route": "hr_spa"},
+    {"from_route": "/human-resources-cockpit", "to_route": "hr_spa"},
+    {"from_route": "/human-resources-cockpit/<path:app_path>", "to_route": "hr_spa"},
     {"from_route": "/sales-cockpit", "to_route": "sales_spa"},
     {"from_route": "/sales-cockpit/<path:app_path>", "to_route": "sales_spa"},
     {"from_route": "/project-management-cockpit", "to_route": "project_management_spa"},
@@ -130,6 +130,11 @@ website_route_rules = [
     {"from_route": "/accounting-cockpit/<path:app_path>", "to_route": "accounting_spa"},
     {"from_route": "/scan", "to_route": "scan"},
     {"from_route": "/scan/<path:app_path>", "to_route": "scan"},
+]
+
+# The HR cockpit used to live at /hr-cockpit; keep old links (Raven messages, bookmarks) working.
+website_redirects = [
+    {"source": r"/hr-cockpit(/.*)?", "target": r"/human-resources-cockpit\1"},
 ]
 
 

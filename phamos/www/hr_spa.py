@@ -11,7 +11,7 @@ no_cache = 1
 
 def get_context(context):
 	if frappe.session.user == "Guest":
-		frappe.local.flags.redirect_location = "/login?redirect-to=/hr-cockpit"
+		frappe.local.flags.redirect_location = "/login?redirect-to=/human-resources-cockpit"
 		raise frappe.Redirect
 
 	if not check_app_permission():
@@ -34,6 +34,6 @@ def get_context_for_dev():
 
 
 def get_boot():
-	return get_spa_boot("/hr-cockpit")
+	return get_spa_boot("/human-resources-cockpit")
 
 

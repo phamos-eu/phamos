@@ -401,7 +401,7 @@
    "label": "HR SPA Settings"
   },
   {
-   "description": "Department used to scope Issues (via linked projects) and Tasks in the /hr-cockpit SPA.",
+   "description": "Department used to scope Issues (via linked projects) and Tasks in the /human-resources-cockpit SPA.",
    "fieldname": "hr_department",
    "fieldtype": "Link",
    "label": "HR Department",
@@ -506,7 +506,7 @@
  "index_web_pages_for_search": 1,
  "issingle": 1,
  "links": [],
- "modified": "2026-09-25 10:16:46.903612",
+ "modified": "2026-09-30 10:00:00.000000",
  "modified_by": "Administrator",
  "module": "Phamos",
  "name": "phamos Settings",
