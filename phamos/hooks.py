@@ -133,8 +133,11 @@ website_route_rules = [
 ]
 
 # The HR cockpit used to live at /hr-cockpit; keep old links (Raven messages, bookmarks) working.
+# /hr_spa was its www page path; servers keep a stale built hr_spa.html there, which would
+# otherwise render without boot data.
 website_redirects = [
     {"source": r"/hr-cockpit(/.*)?", "target": r"/human-resources-cockpit\1"},
+    {"source": "/hr_spa", "target": "/human-resources-cockpit"},
 ]
 
 

@@ -30,6 +30,7 @@ class TestHumanResourcesCockpitRoute(FrappeTestCase):
 		cases = {
 			"hr-cockpit": "/human-resources-cockpit",
 			"hr-cockpit/tasks/TASK-1": "/human-resources-cockpit/tasks/TASK-1",
+			"hr_spa": "/human-resources-cockpit",
 		}
 		for old, new in cases.items():
 			with self.subTest(path=old):

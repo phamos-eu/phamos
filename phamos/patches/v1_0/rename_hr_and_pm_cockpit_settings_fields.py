@@ -3,7 +3,8 @@
 The cockpits are named after their area everywhere else (sales_, accounting_), so
 hr_* becomes human_resources_* and pm_* becomes project_management_*. The saved
 values move with them; the HR app on the Apps screen is renamed from hr_spa to
-human_resources_spa, so users who picked it as their default app follow along.
+human_resources_spa, so users (and System Settings) that picked it as the default app
+follow along.
 """
 
 import frappe
@@ -21,5 +22,9 @@ def execute():
 	for old, new in FIELDS.items():
 		rename_field("phamos Settings", old, new)
 
-	frappe.db.set_value("User", {"default_app": "hr_spa"}, "default_app", "human_resources_spa")
+	frappe.db.set_value(
+		"User", {"default_app": "hr_spa"}, "default_app", "human_resources_spa", update_modified=False
+	)
+	if frappe.db.get_single_value("System Settings", "default_app") == "hr_spa":
+		frappe.db.set_single_value("System Settings", "default_app", "human_resources_spa")
 	frappe.clear_cache(doctype="phamos Settings")
