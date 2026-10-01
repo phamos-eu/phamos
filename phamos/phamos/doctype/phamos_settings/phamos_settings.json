@@ -62,16 +62,16 @@
   "checklist_popup",
   "ticketing_tab",
   "walk_in_customer",
-  "hr_spa_tab",
-  "hr_spa_section",
-  "hr_department",
-  "column_break_hr_spa",
-  "hr_timesheet_project",
-  "pm_spa_tab",
-  "pm_spa_section",
-  "pm_department",
-  "column_break_pm_spa",
-  "pm_timesheet_project",
+  "human_resources_spa_tab",
+  "human_resources_spa_section",
+  "human_resources_department",
+  "column_break_human_resources_spa",
+  "human_resources_timesheet_project",
+  "project_management_spa_tab",
+  "project_management_spa_section",
+  "project_management_department",
+  "column_break_project_management_spa",
+  "project_management_timesheet_project",
   "sales_spa_tab",
   "sales_spa_section",
   "sales_department",
@@ -395,57 +395,57 @@
    "options": "Customer"
   },
   {
-   "fieldname": "hr_spa_tab",
+   "fieldname": "human_resources_spa_tab",
    "fieldtype": "Tab Break",
-   "label": "HR SPA"
+   "label": "Human Resources Cockpit"
   },
   {
-   "fieldname": "hr_spa_section",
+   "fieldname": "human_resources_spa_section",
    "fieldtype": "Section Break",
-   "label": "HR SPA Settings"
+   "label": "Human Resources Cockpit Settings"
   },
   {
-   "description": "Department used to scope Issues (via linked projects) and Tasks in the /hr-cockpit SPA.",
-   "fieldname": "hr_department",
+   "description": "Department used to scope Issues (via linked projects) and Tasks in the Human Resources Cockpit.",
+   "fieldname": "human_resources_department",
    "fieldtype": "Link",
-   "label": "HR Department",
+   "label": "Human Resources Department",
    "options": "Department"
   },
   {
-   "fieldname": "column_break_hr_spa",
+   "fieldname": "column_break_human_resources_spa",
    "fieldtype": "Column Break"
   },
   {
-   "description": "Default project for the start/stop timesheet timer in the HR SPA.",
-   "fieldname": "hr_timesheet_project",
+   "description": "Default project for the start/stop timesheet timer in the Human Resources Cockpit.",
+   "fieldname": "human_resources_timesheet_project",
    "fieldtype": "Link",
-   "label": "HR Timesheet Project",
+   "label": "Human Resources Timesheet Project",
    "options": "Project"
   },
   {
-   "fieldname": "pm_spa_tab",
+   "fieldname": "project_management_spa_tab",
    "fieldtype": "Tab Break",
    "label": "Project Management Cockpit"
   },
   {
-   "fieldname": "pm_spa_section",
+   "fieldname": "project_management_spa_section",
    "fieldtype": "Section Break",
    "label": "Project Management Cockpit Settings"
   },
   {
    "description": "Department used to scope Issues (via linked projects) and Tasks in the /project-management-cockpit SPA.",
-   "fieldname": "pm_department",
+   "fieldname": "project_management_department",
    "fieldtype": "Link",
    "label": "Project Management Department",
    "options": "Department"
   },
   {
-   "fieldname": "column_break_pm_spa",
+   "fieldname": "column_break_project_management_spa",
    "fieldtype": "Column Break"
   },
   {
    "description": "Default project for the start/stop timesheet timer in the Project Management Cockpit.",
-   "fieldname": "pm_timesheet_project",
+   "fieldname": "project_management_timesheet_project",
    "fieldtype": "Link",
    "label": "Project Management Timesheet Project",
    "options": "Project"
@@ -535,7 +535,7 @@
  "index_web_pages_for_search": 1,
  "issingle": 1,
  "links": [],
- "modified": "2026-08-25 14:57:25.006749",
+ "modified": "2026-10-01 14:00:00.000000",
  "modified_by": "Administrator",
  "module": "Phamos",
  "name": "phamos Settings",
