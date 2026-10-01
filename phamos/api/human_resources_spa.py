@@ -23,7 +23,15 @@ def check_app_permission():
 
 @frappe.whitelist()
 def get_human_resources_settings():
-	"""Return Human Resources cockpit configuration for the frontend."""
+	"""Return the Human Resources cockpit configuration for the frontend.
+
+	Requires read permission on Issue (checked in department_cockpit.get_settings).
+
+	Returns:
+		dict: human_resources_department, human_resources_timesheet_project,
+		human_resources_timesheet_project_name (the project's title) and
+		human_resources_project_count (projects linked to the department).
+	"""
 	return dc.get_settings(CONFIG)
 
 
