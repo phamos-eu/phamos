@@ -181,7 +181,7 @@ function _mis_setup_status_buttons(frm) {
 
 // ── DN creation ─────────────────────────────────────────────────────────────
 
-function _mis_run_create_dn_allocation(frm, allocations, submit_after_create, timesheets) {
+function _mis_run_create_dn_allocation(frm, allocations, submit_after_create, timesheets, project) {
 	const non_zero = allocations.filter(a => (a.items || []).length);
 	if (!non_zero.length) {
 		frappe.show_alert({ message: __("No hours were allocated to any Sales Order."), indicator: "orange" });
@@ -190,8 +190,8 @@ function _mis_run_create_dn_allocation(frm, allocations, submit_after_create, ti
 	const has_timesheets = timesheets && timesheets.length;
 	const method = has_timesheets ? "create_dns_from_timesheet_allocations" : "create_dns_from_allocations";
 	const args = has_timesheets
-		? { docname: frm.doc.name, timesheets: timesheets, allocations: non_zero }
-		: { docname: frm.doc.name, allocations: non_zero };
+		? { docname: frm.doc.name, timesheets: timesheets, project: project, allocations: non_zero }
+		: { docname: frm.doc.name, project: project, allocations: non_zero };
 	return new Promise(function(resolve) {
 		frappe.call({
 			method: `phamos.phamos.doctype.monthly_implementation_summary.monthly_implementation_summary.${method}`,
@@ -367,195 +367,216 @@ function _mis_submit_sis_from_table(frm, sales_invoices) {
 	);
 }
 
-function _mis_show_create_dn_dialog(frm, preset_sales_orders, timesheets) {
-	frappe.confirm(
-		__("Create Delivery Note(s)?"),
-		function() {
-			frappe.msgprint({
-				title: __("Success"),
-				message: __("Delivery Notes created successfully."),
-				indicator: "green",
-			});
-		}
-	);
+function _mis_build_so_items_map(rows) {
+	const map = {};
+	rows.forEach(r => {
+		map[r.sales_order] = { project: r.project || "", items: r.items || [] };
+	});
+	return map;
 }
 
-function _mis_render_create_dn_dialog(frm, rows, remaining_billable_hours, timesheets) {
-	const rows_html = rows.map(r => {
-		const items = r.items || [];
-		const total_hours = flt(items.reduce((sum, it) => sum + flt(it.allocated_hours), 0), 2);
-		const item_rows_html = items.map(it => `
-			<tr class="mis-dn-item-row" data-so="${_mis_escape(r.sales_order)}" data-so-detail="${_mis_escape(it.so_detail)}" data-remaining="${flt(it.remaining_qty)}">
-				<td style="padding-left:24px;">${_mis_escape(it.item_code)}</td>
-				<td style="text-align:right;">${_mis_number(it.remaining_qty)}</td>
-				<td style="text-align:right;">
-					<input
-						type="text"
-						inputmode="decimal"
-						class="mis-dn-item-alloc-input"
-						style="width:100px; text-align:right;"
-						value="${flt(it.allocated_hours)}"
-					>
-				</td>
-			</tr>
-		`).join("");
+function _mis_default_allocation_row(sales_order, so_items_map) {
+	const entry = so_items_map[sales_order] || { project: "", items: [] };
+	return {
+		sales_order,
+		project: entry.project,
+		so_remaining_hrs: flt(entry.items.reduce((s, i) => s + flt(i.remaining_qty), 0), 2),
+		hours: flt(entry.items.reduce((s, i) => s + flt(i.allocated_hours || 0), 0), 2),
+	};
+}
 
-		return `
-			<tr data-so="${_mis_escape(r.sales_order)}" data-so-remaining="${flt(r.so_remaining_hrs)}" data-so-draft-hrs="${flt(r.existing_draft_hours)}">
-				<td>
-					${items.length > 1 ? `<button type="button" class="btn btn-link btn-xs mis-dn-items-toggle" style="padding:0 6px 0 0;">&#9656;</button>` : ""}
-					<a href="/app/sales-order/${encodeURIComponent(r.sales_order || "")}" target="_blank">${_mis_escape(r.sales_order)}</a>
-				</td>
-				<td style="text-align:right;">${_mis_number(r.so_remaining_hrs)}</td>
-				<td style="text-align:right;">
-					<input
-						type="text"
-						inputmode="decimal"
-						class="mis-dn-alloc-input"
-						style="width:100px; text-align:right;"
-						data-so="${_mis_escape(r.sales_order)}"
-						value="${total_hours}"
-					>
-				</td>
-			</tr>
-			<tr class="mis-dn-items-panel" data-so="${_mis_escape(r.sales_order)}" style="display:none;">
-				<td colspan="3" style="padding:0;">
-					<table class="table table-sm" style="margin-bottom:0;">
-						<tbody>${item_rows_html}</tbody>
-					</table>
-				</td>
-			</tr>
-		`;
-	}).join("");
+function _mis_split_hours_across_items(items, hours) {
+	let left = flt(hours);
+	const out = [];
+	for (const item of items) {
+		if (left <= 0) break;
+		const alloc = flt(Math.min(flt(item.remaining_qty), left), 2);
+		if (alloc > 0) {
+			out.push({ so_detail: item.so_detail, hours: alloc });
+			left = flt(left - alloc, 2);
+		}
+	}
+	return out;
+}
 
-	const dialog = new frappe.ui.Dialog({
-		title: __("Create Delivery Note(s)"),
-		fields: [
-			{ fieldname: "so_list_html", fieldtype: "HTML" },
-			{
-				fieldname: "submit_after_create",
-				fieldtype: "Check",
-				label: __("Submit Delivery Note(s) after creation"),
-				default: 0,
-			},
-		],
-		primary_action_label: __("Create"),
-		primary_action: function(values) {
-			const items_by_so = {};
-			let total = 0;
-			let invalid = null;
+function _mis_reset_dn_allocation_row(dialog, rows_data, idx, so_items_map) {
+	const row = rows_data.find(r => r.idx === idx);
+	if (!row) return;
+	Object.assign(row, _mis_default_allocation_row(row.sales_order, so_items_map));
+	dialog.fields_dict.allocations.grid.refresh();
+}
 
-			dialog.$wrapper.find(".mis-dn-item-row").each(function() {
-				const $row = $(this);
-				const so = $row.attr("data-so");
-				const so_detail = $row.attr("data-so-detail");
-				const remaining = flt($row.attr("data-remaining"));
-				const hours = _mis_parse_manual_number($row.find(".mis-dn-item-alloc-input").val());
-				if (hours < 0 || hours > remaining + 0.0001) {
-					invalid = so_detail;
-					return false;
-				}
-				total += hours;
-				if (hours > 0) {
-					(items_by_so[so] = items_by_so[so] || []).push({ so_detail, hours });
-				}
-			});
+function _mis_load_dn_allocation_rows(frm, dialog, project, preset_sales_orders, timesheets, state) {
+	if (!project) return;
+	const method = state.has_timesheets ? "get_dn_allocation_preview_for_timesheets" : "get_dn_allocation_preview";
+	const args = state.has_timesheets
+		? { docname: frm.doc.name, project: project, timesheets: timesheets }
+		: { docname: frm.doc.name, project: project, sales_orders: preset_sales_orders && preset_sales_orders.length ? preset_sales_orders : null };
+	frappe.call({
+		method: `phamos.phamos.doctype.monthly_implementation_summary.monthly_implementation_summary.${method}`,
+		args: args,
+		freeze: true,
+		callback: function(r) {
+			const data = r.message || {};
+			const rows = data.rows || [];
+			const pool = state.has_timesheets ? flt(data.selected_hours) : flt(data.remaining_hours);
 
-			if (invalid) {
-				frappe.show_alert({
-					message: __("Hours for item {0} must be between 0 and its remaining hours.", [invalid]),
-					indicator: "orange",
-				});
-				return;
-			}
-			if (total > remaining_billable_hours + 0.0001) {
-				frappe.show_alert({
-					message: __("Total allocated hours ({0}) exceed remaining billable hours ({1}).", [total, remaining_billable_hours]),
-					indicator: "orange",
-				});
-				return;
-			}
-			const allocations = Object.keys(items_by_so).map(so => ({ sales_order: so, items: items_by_so[so] }));
-			if (!allocations.length) {
-				frappe.show_alert({ message: __("Assign hours to at least one Sales Order."), indicator: "orange" });
+			state.so_items_map = _mis_build_so_items_map(rows);
+			state.draft_hours_by_so = {};
+			rows.forEach(row => { state.draft_hours_by_so[row.sales_order] = flt(row.existing_draft_hours); });
+			dialog.__mis_state = { project, pool };
+
+			state.rows_data.length = 0;
+			rows.forEach(row => state.rows_data.push(_mis_default_allocation_row(row.sales_order, state.so_items_map)));
+			dialog.fields_dict.allocations.grid.refresh();
+
+			const note = state.has_timesheets
+				? `<br>${__("If the selected hours exceed a Sales Order's remaining hours, a separate Delivery Note will be created for the remainder.")}`
+				: "";
+			dialog.get_field("pool_html").$wrapper.html(
+				`<div class="small text-muted">${state.pool_label}: <strong>${_mis_number(pool)}</strong>${note}</div>`
+			);
+		}
+	});
+}
+
+function _mis_show_create_dn_dialog(frm, preset_sales_orders, timesheets) {
+	const has_timesheets = timesheets && timesheets.length;
+	frappe.call({
+		method: "phamos.phamos.doctype.monthly_implementation_summary.monthly_implementation_summary.get_dn_allocation_project_summary",
+		args: { docname: frm.doc.name, timesheets: has_timesheets ? timesheets : null },
+		freeze: true,
+		callback: function(r) {
+			const projects = (r.message && r.message.rows) || [];
+			if (!projects.length) {
+				frappe.show_alert({ message: __("No Project hours available for delivery."), indicator: "orange" });
 				return;
 			}
 
-			const draft_conflicts = [];
-			dialog.$wrapper.find("tr[data-so-draft-hrs]").each(function() {
-				const so = $(this).attr("data-so");
-				const draft_hrs = flt($(this).attr("data-so-draft-hrs"));
-				if (draft_hrs > 0 && items_by_so[so]) {
-					draft_conflicts.push({ sales_order: so, draft_hrs });
-				}
-			});
-
-			const proceed = function() {
-				dialog.hide();
-				_mis_run_create_dn_allocation(frm, allocations, values.submit_after_create, timesheets);
+			const state = {
+				rows_data: [],
+				so_items_map: {},
+				draft_hours_by_so: {},
+				has_timesheets: has_timesheets,
+				pool_label: has_timesheets ? __("Selected Timesheet hours") : __("Remaining billable hours"),
 			};
 
-			if (draft_conflicts.length) {
-				const list = draft_conflicts
-					.map(c => __("{0} (existing draft: {1} hrs)", [c.sales_order, _mis_number(c.draft_hrs)]))
-					.join(", ");
-				frappe.confirm(
-					__("Draft Delivery Note(s) already exist for: {0}. Create new Delivery Note(s) anyway?", [list]),
-					proceed
-				);
-				return;
-			}
+			const dialog = new frappe.ui.Dialog({
+				title: __("Create Delivery Note(s)"),
+				size: "large",
+				fields: [
+					{
+						fieldname: "project",
+						fieldtype: "Link",
+						options: "Project",
+						label: __("Project"),
+						reqd: 1,
+						get_query: () => ({ filters: { name: ["in", projects.map(p => p.project)] } }),
+						onchange: function() {
+							_mis_load_dn_allocation_rows(frm, dialog, this.value, preset_sales_orders, timesheets, state);
+						},
+					},
+					{ fieldname: "pool_html", fieldtype: "HTML" },
+					{
+						fieldname: "allocations",
+						fieldtype: "Table",
+						label: __("Sales Orders"),
+						cannot_add_rows: false,
+						in_place_edit: false,
+						reqd: 1,
+						data: state.rows_data,
+						get_data: () => state.rows_data,
+						fields: [
+							{
+								fieldname: "sales_order",
+								fieldtype: "Link",
+								options: "Sales Order",
+								label: __("Sales Order"),
+								in_list_view: 1,
+								reqd: 1,
+								get_query: () => ({ filters: { name: ["in", Object.keys(state.so_items_map)] } }),
+								onchange: function() {
+									_mis_reset_dn_allocation_row(dialog, state.rows_data, this.doc.idx, state.so_items_map);
+								},
+							},
+							{ fieldname: "project", fieldtype: "Data", label: __("Project"), in_list_view: 1, read_only: 1 },
+							{ fieldname: "so_remaining_hrs", fieldtype: "Float", label: __("Remaining Hrs"), in_list_view: 1, read_only: 1, precision: 2 },
+							{ fieldname: "hours", fieldtype: "Float", label: __("Hours to Deliver"), in_list_view: 1, reqd: 1, precision: 2 },
+						],
+					},
+				],
+				primary_action_label: __("Create"),
+				primary_action: function() {
+					const dstate = dialog.__mis_state;
+					if (!dstate || !dstate.project) {
+						frappe.show_alert({ message: __("Select a Project first."), indicator: "orange" });
+						return;
+					}
+					const items_by_so = {};
+					let total = 0;
+					let invalid = null;
 
-			proceed();
-		},
+					state.rows_data.forEach(row => {
+						if (!row.sales_order) return;
+						const hours = flt(row.hours);
+						if (hours <= 0) return;
+						if (hours > flt(row.so_remaining_hrs) + 0.0001) {
+							invalid = row.sales_order;
+							return;
+						}
+						const entry = state.so_items_map[row.sales_order] || { items: [] };
+						total += hours;
+						items_by_so[row.sales_order] = _mis_split_hours_across_items(entry.items, hours);
+					});
+
+					if (invalid) {
+						frappe.show_alert({
+							message: __("Hours for {0} must be between 0 and its remaining hours.", [invalid]),
+							indicator: "orange",
+						});
+						return;
+					}
+					if (total > dstate.pool + 0.0001) {
+						frappe.show_alert({
+							message: __("Total allocated hours ({0}) exceed remaining hours for this Project ({1}).", [total, dstate.pool]),
+							indicator: "orange",
+						});
+						return;
+					}
+					const allocations = Object.keys(items_by_so).map(so => ({ sales_order: so, items: items_by_so[so] }));
+					if (!allocations.length) {
+						frappe.show_alert({ message: __("Assign hours to at least one Sales Order."), indicator: "orange" });
+						return;
+					}
+
+					const draft_conflicts = Object.keys(items_by_so)
+						.filter(so => flt(state.draft_hours_by_so[so]) > 0)
+						.map(so => ({ sales_order: so, draft_hrs: flt(state.draft_hours_by_so[so]) }));
+
+					const proceed = function() {
+						dialog.hide();
+						_mis_run_create_dn_allocation(frm, allocations, false, timesheets, dstate.project);
+					};
+
+					if (draft_conflicts.length) {
+						const list = draft_conflicts
+							.map(c => __("{0} (existing draft: {1} hrs)", [c.sales_order, _mis_number(c.draft_hrs)]))
+							.join(", ");
+						frappe.confirm(
+							__("Draft Delivery Note(s) already exist for: {0}. Create new Delivery Note(s) anyway?", [list]),
+							proceed
+						);
+						return;
+					}
+
+					proceed();
+				},
+			});
+
+			dialog.show();
+			dialog.set_value("project", projects[0].project);
+		}
 	});
-
-	dialog.get_field("so_list_html").$wrapper.html(`
-		<div class="small text-muted" style="margin-bottom:8px;">
-			${timesheets && timesheets.length ? __("Selected Timesheet hours") : __("Remaining billable hours")}: <strong>${_mis_number(remaining_billable_hours)}</strong>
-			${timesheets && timesheets.length ? `<br>${__("If the selected hours exceed a Sales Order's remaining hours, a separate Delivery Note will be created for the remainder.")}` : ""}
-		</div>
-		<table class="table table-bordered table-hover" style="margin-bottom:0;">
-			<thead>
-				<tr>
-					<th>${__("Sales Order")}</th>
-					<th style="text-align:right;">${__("SO Remaining Hrs")}</th>
-					<th style="text-align:right;">${__("Hours to Deliver")}</th>
-				</tr>
-			</thead>
-			<tbody>${rows_html}</tbody>
-		</table>
-	`);
-
-	dialog.$wrapper.on("input change", ".mis-dn-alloc-input", function() {
-		const so = $(this).attr("data-so");
-		const $items = dialog.$wrapper.find(`.mis-dn-item-row[data-so="${so}"]`);
-		let left = _mis_parse_manual_number($(this).val());
-		$items.each(function() {
-			const remaining = flt($(this).attr("data-remaining"));
-			const alloc = Math.max(0, Math.min(remaining, left));
-			left = flt(left - alloc, 2);
-			$(this).find(".mis-dn-item-alloc-input").val(alloc);
-		});
-	});
-
-	dialog.$wrapper.on("input change", ".mis-dn-item-alloc-input", function() {
-		const $row = $(this).closest(".mis-dn-item-row");
-		const so = $row.attr("data-so");
-		const so_total = dialog.$wrapper
-			.find(`.mis-dn-item-row[data-so="${so}"] .mis-dn-item-alloc-input`)
-			.toArray()
-			.reduce((sum, el) => sum + _mis_parse_manual_number($(el).val()), 0);
-		dialog.$wrapper.find(`.mis-dn-alloc-input[data-so="${so}"]`).val(flt(so_total, 2));
-	});
-
-	dialog.$wrapper.on("click", ".mis-dn-items-toggle", function() {
-		const $panel = $(this).closest("tr").next(".mis-dn-items-panel");
-		$panel.toggle();
-		$(this).html($panel.is(":visible") ? "&#9662;" : "&#9656;");
-	});
-
-	dialog.show();
 }
 
 
@@ -653,22 +674,6 @@ function _mis_escape(value) {
 function _mis_number(value) {
 	return _mis_escape(format_number(flt(value || 0), null, 2));
 }
-
-function _mis_parse_manual_number(value) {
-	const raw = String(value == null ? "" : value).trim();
-	if (!raw) return 0;
-	const last_sep = Math.max(raw.lastIndexOf("."), raw.lastIndexOf(","));
-	let normalized;
-	if (last_sep === -1) {
-		normalized = raw;
-	} else {
-		normalized = raw.slice(0, last_sep).replace(/[.,]/g, "") + "." + raw.slice(last_sep + 1).replace(/[.,]/g, "");
-	}
-
-	const input = parseFloat(normalized);
-	return isNaN(input) ? 0 : input;
-}
-
 
 const _MIS_TS_COLUMNS = [
 	{
@@ -782,7 +787,7 @@ function _mis_get_billable_override(dialog, timesheet, fallback) {
 function _mis_get_billable_override_value(dialog, timesheet, fallback) {
 	const overrides = (dialog && dialog.__mis_ts_billable_overrides) || {};
 	if (Object.prototype.hasOwnProperty.call(overrides, timesheet)) {
-		return _mis_parse_manual_number(overrides[timesheet]);
+		return flt(overrides[timesheet]);
 	}
 	return flt(fallback || 0);
 }
@@ -1002,7 +1007,7 @@ function _mis_get_billable_updates(dialog) {
 	const originals = dialog.__mis_ts_original_billable || {};
 	dialog.$wrapper.find(".mis-ts-billable-input").each(function () {
 		const timesheet = ($(this).attr("data-timesheet") || "").trim();
-		const billable = _mis_parse_manual_number($(this).val());
+		const billable = flt($(this).val());
 		const original = flt(originals[timesheet] || 0);
 		if (!timesheet) return;
 		if (Math.abs(billable - original) < 0.0001) return;
