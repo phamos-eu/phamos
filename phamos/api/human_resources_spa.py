@@ -1,29 +1,29 @@
 # Copyright (c) 2026, phamos.eu and contributors
 # For license information, please see license.txt
 
-"""HR SPA API — department-scoped Issues and Tasks."""
+"""Human Resources cockpit API — department-scoped Issues and Tasks."""
 
 import frappe
 
 from phamos.api import department_cockpit as dc
 
 CONFIG = dc.CockpitConfig(
-	label="HR",
-	department_field="hr_department",
-	project_field="hr_timesheet_project",
+	label="Human Resources",
+	department_field="human_resources_department",
+	project_field="human_resources_timesheet_project",
 	roles=("System Manager", "HR Manager", "HR User"),
-	settings_method_name="get_hr_settings",
+	settings_method_name="get_human_resources_settings",
 )
 
 
 def check_app_permission():
-	"""Show HR SPA on the Apps screen for eligible users."""
+	"""Show the Human Resources cockpit on the Apps screen for eligible users."""
 	return dc.check_app_permission(CONFIG)
 
 
 @frappe.whitelist()
-def get_hr_settings():
-	"""Return HR SPA configuration for the frontend."""
+def get_human_resources_settings():
+	"""Return Human Resources cockpit configuration for the frontend."""
 	return dc.get_settings(CONFIG)
 
 
