@@ -13,6 +13,7 @@
 				<a
 					href="/app"
 					class="rounded-md px-3 py-1.5 text-sm text-gray-600 hover:bg-gray-100"
+					@click.prevent="openDesk()"
 				>
 					Desk
 				</a>
@@ -32,6 +33,7 @@
 
 <script setup>
 import { inject } from "vue"
+import { openDesk } from "@spa/utils/appWindow.js"
 
 const session = inject("$session")
 </script>

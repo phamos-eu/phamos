@@ -84,6 +84,7 @@
 <script setup>
 import { onMounted, ref, watch } from "vue"
 import { useRoute } from "vue-router"
+import { openDesk } from "@spa/utils/appWindow.js"
 
 const props = defineProps({
 	label: { type: String, required: true },
@@ -126,7 +127,7 @@ watch(
 )
 
 function goDesk() {
-	window.location.href = "/app"
+	openDesk()
 }
 
 function toggle() {
