@@ -12,10 +12,13 @@ Object.assign(GitLabIssueDashboard.prototype, {
     getFilterContext() {
         const projects = this.normalizeProjectsValue(this.filters.projects.get_value() || []);
         const { from_date: defaultFromDate, to_date: defaultToDate } = this.getDefaultDateRange();
+        // Snap to full months, matching _resolve_date_range on the server.
+        const from_date = this.computeMonthDateRange((this.filters.from_date.get_value() || defaultFromDate).slice(0, 7)).from_date;
+        const to_date = this.computeMonthDateRange((this.filters.to_date.get_value() || defaultToDate).slice(0, 7)).to_date;
         return {
             projects,
-            from_date: this.filters.from_date.get_value() || defaultFromDate,
-            to_date: this.filters.to_date.get_value() || defaultToDate,
+            from_date,
+            to_date,
             issue_scope: this.normalizeIssueScopeValue(this.filters.issue_scope.get_value()),
         };
     },
