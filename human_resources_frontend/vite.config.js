@@ -25,7 +25,7 @@ export default defineConfig({
 		dedupe: ["dayjs", "vue", "vue-router", "frappe-ui", "frappe-gantt"],
 	},
 	build: {
-		outDir: "../phamos/public/hr",
+		outDir: "../phamos/public/human_resources",
 		emptyOutDir: true,
 		target: "es2015",
 		sourcemap: true,
