@@ -9,8 +9,9 @@ apps can be told apart in the dock and in cmd+tab.
 APPS below is the single source for name, route, colour and symbol; edit it and run
 the script again rather than editing the generated files.
 
-Usage (macOS; needs Pillow, which the bench environment has, and QuickLook to
-render the Feather SVG symbols):
+Usage (macOS; needs Pillow, which the bench environment has, QuickLook to render
+the Feather SVG symbols, and `yarn install` in human_resources_frontend, which
+provides the feather-icons package):
 
 	~/frappe-bench/env/bin/python spa_shared/scripts/generate_app_manifests.py
 
@@ -70,19 +71,10 @@ APPS = [
 		"color": "#6d28d9",
 		"symbol": "clipboard",
 	},
-	{
-		"slug": "i-own-my-work",
-		"name": "I Own My Work",
-		"description": "Your own issues, tasks and checklists",
-		"route": "/i-own-my-work",
-		"color": "#334155",
-		"symbol": "check-circle",
-		# Has no dark mode and a white header bar, unlike the cockpits.
-		"window_color": "#ffffff",
-	},
 ]
 
 RENDER_SIZE = 1024  # symbols are rendered large and scaled down for smooth edges
+SUPERSAMPLE = 4  # icons are drawn this many times larger, then scaled down
 
 
 def render_symbol_mask(symbol, workdir):
@@ -118,8 +110,7 @@ def draw_icon(mask, color, size, symbol_share, corner_share=0.0):
 	Returns:
 		Image: RGBA icon
 	"""
-	scale = RENDER_SIZE // 256 if size <= 256 else 2
-	canvas_size = size * scale
+	canvas_size = size * SUPERSAMPLE
 	tile = Image.new("RGBA", (canvas_size, canvas_size), (0, 0, 0, 0))
 	ImageDraw.Draw(tile).rounded_rectangle(
 		(0, 0, canvas_size - 1, canvas_size - 1), radius=int(canvas_size * corner_share), fill=color
@@ -146,8 +137,8 @@ def build_manifest(app):
 		"start_url": app["route"],
 		"scope": app["route"],
 		"display": "standalone",
-		"background_color": app.get("window_color", LIGHT_BACKGROUND),
-		"theme_color": app.get("window_color", LIGHT_BACKGROUND),
+		"background_color": LIGHT_BACKGROUND,
+		"theme_color": LIGHT_BACKGROUND,
 		"icons": [
 			{"src": f"{base}-icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any"},
 			{"src": f"{base}-icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any"},

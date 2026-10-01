@@ -72,7 +72,7 @@
 				class="flex w-full items-center gap-2 rounded-md px-2 py-2 text-sm font-medium text-ink-gray-6 hover:bg-surface-gray-2 hover:text-ink-gray-9"
 				:class="collapsed ? 'justify-center' : ''"
 				:title="collapsed ? 'Desk' : undefined"
-				@click="goDesk"
+				@click="openDesk()"
 			>
 				<FeatherIcon name="external-link" class="h-4 w-4 flex-shrink-0" />
 				<span v-if="!collapsed" class="truncate">Desk</span>
@@ -125,10 +125,6 @@ watch(
 	},
 	{ immediate: true }
 )
-
-function goDesk() {
-	openDesk()
-}
 
 function toggle() {
 	collapsed.value = !collapsed.value
