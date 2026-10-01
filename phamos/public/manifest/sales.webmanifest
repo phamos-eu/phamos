@@ -1,0 +1,31 @@
+{
+	"id": "/sales-cockpit",
+	"name": "Sales",
+	"short_name": "Sales",
+	"description": "Sales issues, tasks and checklists",
+	"start_url": "/sales-cockpit",
+	"scope": "/sales-cockpit",
+	"display": "standalone",
+	"background_color": "#f8f8f8",
+	"theme_color": "#f8f8f8",
+	"icons": [
+		{
+			"src": "/assets/phamos/manifest/sales-icon-192.png",
+			"sizes": "192x192",
+			"type": "image/png",
+			"purpose": "any"
+		},
+		{
+			"src": "/assets/phamos/manifest/sales-icon-512.png",
+			"sizes": "512x512",
+			"type": "image/png",
+			"purpose": "any"
+		},
+		{
+			"src": "/assets/phamos/manifest/sales-maskable-512.png",
+			"sizes": "512x512",
+			"type": "image/png",
+			"purpose": "maskable"
+		}
+	]
+}
