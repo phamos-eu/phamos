@@ -387,7 +387,8 @@ before_tests = "phamos.install.before_tests"
 # }
 
 override_doctype_dashboards = {
-    "Project": "phamos.custom_scripts.custom_python.project_dashboard.get_project_dashboard_data"
+    "Project": "phamos.custom_scripts.custom_python.project_dashboard.get_project_dashboard_data",
+    "Delivery Note": "phamos.custom_scripts.custom_python.delivery_note_dashboard.get_delivery_note_dashboard_data",
 }
 
 # exempt linked doctypes from being automatically cancelled
