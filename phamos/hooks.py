@@ -104,6 +104,7 @@ doctype_js = {
     "Event": "public/js/event.js",
     "Sales Invoice": "public/js/sales_invoice.js",
     "Customer": "public/js/customer.js",
+    "Delivery Note": "public/js/delivery_note.js",
 
 }
 
