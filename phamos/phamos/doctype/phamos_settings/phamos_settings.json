@@ -82,6 +82,11 @@
   "accounting_department",
   "column_break_accounting_spa",
   "accounting_standard_project",
+  "software_development_spa_tab",
+  "software_development_spa_section",
+  "software_development_department",
+  "column_break_software_development_spa",
+  "software_development_timesheet_project",
   "lead_scan_tab",
   "lead_scan_section",
   "lead_handoff_auto_create_min_score",
@@ -507,6 +512,34 @@
    "options": "Project"
   },
   {
+   "fieldname": "software_development_spa_tab",
+   "fieldtype": "Tab Break",
+   "label": "Software Development Cockpit"
+  },
+  {
+   "fieldname": "software_development_spa_section",
+   "fieldtype": "Section Break",
+   "label": "Software Development Cockpit Settings"
+  },
+  {
+   "description": "Department used to scope Issues (via linked projects) and Tasks in the Software Development Cockpit.",
+   "fieldname": "software_development_department",
+   "fieldtype": "Link",
+   "label": "Software Development Department",
+   "options": "Department"
+  },
+  {
+   "fieldname": "column_break_software_development_spa",
+   "fieldtype": "Column Break"
+  },
+  {
+   "description": "Default project for the start/stop timesheet timer in the Software Development Cockpit.",
+   "fieldname": "software_development_timesheet_project",
+   "fieldtype": "Link",
+   "label": "Software Development Timesheet Project",
+   "options": "Project"
+  },
+  {
    "fieldname": "lead_scan_tab",
    "fieldtype": "Tab Break",
    "label": "Lead Scan"
@@ -535,7 +568,7 @@
  "index_web_pages_for_search": 1,
  "issingle": 1,
  "links": [],
- "modified": "2026-10-01 14:00:00.000000",
+ "modified": "2026-10-02 14:00:00.000000",
  "modified_by": "Administrator",
  "module": "Phamos",
  "name": "phamos Settings",

@@ -46,6 +46,13 @@ add_to_apps_screen = [
 		"has_permission": "phamos.api.accounting_spa.check_app_permission",
 	},
 	{
+		"name": "software_development_spa",
+		"logo": "/assets/phamos/manifest/software-development-icon-192.png",
+		"title": "Software Development",
+		"route": "/software-development-cockpit",
+		"has_permission": "phamos.api.software_development_spa.check_app_permission",
+	},
+	{
 		"name": "scan",
 		"logo": "/assets/phamos/manifest/scan-icon-192.png",
 		"title": "Lead Scan",
@@ -134,6 +141,8 @@ website_route_rules = [
     {"from_route": "/project-management-cockpit/<path:app_path>", "to_route": "project_management_spa"},
     {"from_route": "/accounting-cockpit", "to_route": "accounting_spa"},
     {"from_route": "/accounting-cockpit/<path:app_path>", "to_route": "accounting_spa"},
+    {"from_route": "/software-development-cockpit", "to_route": "software_development_spa"},
+    {"from_route": "/software-development-cockpit/<path:app_path>", "to_route": "software_development_spa"},
     {"from_route": "/scan", "to_route": "scan"},
     {"from_route": "/scan/<path:app_path>", "to_route": "scan"},
 ]
