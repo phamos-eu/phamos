@@ -6,15 +6,23 @@
  "engine": "InnoDB",
  "field_order": [
   "project",
+  "project_title",
   "billable_hours"
  ],
  "fields": [
   {
    "fieldname": "project",
-   "fieldtype": "Link",
+   "fieldtype": "Data",
    "in_list_view": 1,
-   "label": "Project",
-   "options": "Project"
+   "label": "Project ID",
+   "read_only": 1
+  },
+  {
+   "fieldname": "project_title",
+   "fieldtype": "Data",
+   "in_list_view": 1,
+   "label": "Project Title",
+   "read_only": 1
   },
   {
    "fieldname": "billable_hours",

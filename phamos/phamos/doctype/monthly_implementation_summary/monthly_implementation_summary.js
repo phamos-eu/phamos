@@ -1,6 +1,18 @@
 // Copyright (c) 2026, phamos.eu and contributors
 // For license information, please see license.txt
 
+function _mis_format_project_hours_project(value, df, options, doc) {
+	if (!value) return "";
+	const label = doc && doc.project_title ? `${value} - ${doc.project_title}` : value;
+	const href = `/app/project/${encodeURIComponent(value)}`;
+	return `<a href="${href}">${frappe.utils.escape_html(label)}</a>`;
+}
+
+function _mis_set_project_hours_formatter() {
+	const df = frappe.meta.get_docfield("Project Hours", "project");
+	if (df) df.formatter = _mis_format_project_hours_project;
+}
+
 function _mis_hint_reload_timesheets(frm) {
 	if (frm.is_new() || cint(frm.doc.docstatus) !== 0) {
 		return;
