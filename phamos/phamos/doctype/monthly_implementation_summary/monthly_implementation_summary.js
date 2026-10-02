@@ -907,8 +907,8 @@ function _mis_show_timesheet_approval_dialog(frm) {
 					{ fieldname: "date", fieldtype: "Date", label: __("Date"), in_list_view: 1, read_only: 1, columns: 1 },
 					{ fieldname: "employee_name", fieldtype: "Data", label: __("Employee"), in_list_view: 1, read_only: 1, columns: 2 },
 					{ fieldname: "project", fieldtype: "Data", label: __("Project"), in_list_view: 1, read_only: 1, columns: 1 },
-					{ fieldname: "total_hours", fieldtype: "Float", label: __("Total"), in_list_view: 1, read_only: 1, precision: 2, columns: 1 },
-					{ fieldname: "billable_hours", fieldtype: "Float", label: __("Billable"), in_list_view: 1, precision: 2, columns: 1 },
+					{ fieldname: "total_hours", fieldtype: "Float", label: __("Total"), in_list_view: 1, read_only: 1, columns: 1 },
+					{ fieldname: "billable_hours", fieldtype: "Float", label: __("Billable"), in_list_view: 1, columns: 1 },
 					{ fieldname: "description", fieldtype: "Data", label: __("Description"), in_list_view: 1, read_only: 1, columns: 2 },
 					{ fieldname: "rating", fieldtype: "Data", label: __("Rating"), read_only: 1, columns: 1 },
 					{ fieldname: "delivery_note", fieldtype: "Link", options: "Delivery Note", label: __("Delivery Note"), read_only: 1, columns: 2 },
@@ -971,6 +971,7 @@ function _mis_maybe_open_timesheet_approval_dialog(frm) {
 
 frappe.ui.form.on("Monthly Implementation Summary", {
 	onload: function(frm) {
+		_mis_set_project_hours_formatter();
 		// Set year options dynamically: last year, current year, next 2 years
 		const currentYear = new Date().getFullYear();
 		const years = [

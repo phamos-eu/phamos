@@ -1039,40 +1039,27 @@ def _set_timesheet_billable_hours(ts_doc, target_billable_hours):
 		frappe.throw(frappe._("Timesheet {0} has no time logs.").format(frappe.bold(ts_doc.name)))
 
 	target = max(flt(target_billable_hours), 0)
-	total_hours = flt(sum(flt(getattr(log, "hours", 0)) for log in logs), 2)
+	total_hours = flt(sum(flt(getattr(log, "hours", 0)) for log in logs))
 
-	if target > total_hours:
+	if target > total_hours + 0.0001:
 		frappe.throw(
 			frappe._(
 				"Billable hours ({0}) cannot exceed total hours ({1}) on {2}."
 			).format(frappe.bold(target), frappe.bold(total_hours), frappe.bold(ts_doc.name))
 		)
 
-	if total_hours <= 0:
+	if target >= total_hours - 0.0001:
+		for log in logs:
+			log.billing_hours = flt(getattr(log, "hours", 0))
+	else:
+		running = 0.0
 		for idx, log in enumerate(logs):
-			bill = target if idx == 0 else 0
-			log.billing_hours = bill
-		ts_doc.save(ignore_permissions=True)
-		ts_doc.reload()
-		total_billable_hours = flt(sum(flt(getattr(log, "billing_hours", 0)) for log in (ts_doc.time_logs or [])), 2)
-		frappe.db.set_value(
-			"Timesheet",
-			ts_doc.name,
-			{"total_billable_hours": total_billable_hours},
-			update_modified=False,
-		)
-		return
-
-	running = 0.0
-	for idx, log in enumerate(logs):
-		if idx == len(logs) - 1:
-			bill = flt(target - running, 2)
-		else:
-			ratio = flt(getattr(log, "hours", 0)) / total_hours if total_hours else 0
-			bill = flt(target * ratio, 2)
-			running += bill
-		bill = max(bill, 0)
-		log.billing_hours = bill
+			if idx == len(logs) - 1:
+				bill = flt(target - running, 2)
+			else:
+				bill = flt(target * flt(getattr(log, "hours", 0)) / total_hours, 2)
+				running += bill
+			log.billing_hours = min(max(bill, 0), flt(getattr(log, "hours", 0)))
 
 	ts_doc.save(ignore_permissions=True)
 	ts_doc.reload()
