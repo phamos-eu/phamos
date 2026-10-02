@@ -20,14 +20,6 @@ YEAR_MIN = 2000
 YEAR_MAX = 2100
 
 
-def _company_for_customer(customer):
-	return (
-		frappe.db.get_default("company")
-		or frappe.db.get_value("Customer", customer, "customer_primary_company")
-		or frappe.db.get_single_value("Global Defaults", "default_company")
-	)
-
-
 def _so_hour_items(sales_order):
 	if not sales_order:
 		frappe.throw(frappe._("Sales Order is required."))
@@ -336,7 +328,7 @@ class MonthlyImplementationSummary(Document):
 		for o in frappe.get_all(
 			"Sales Order",
 			filters=so_filters,
-			fields=["name", "status", "customer_name"],
+			fields=["name", "status", "customer_name", "project"],
 			order_by="transaction_date desc",
 		):
 			hour_items = _so_hour_items(o.name)
@@ -350,6 +342,7 @@ class MonthlyImplementationSummary(Document):
 				"status": o.status or "",
 				"delivered_total_hrs": _so_row_qty_str(deliv),
 				"remaining_hrs": _so_row_qty_str(rem),
+				"project": o.project or "",
 			}
 
 		if cint(self.docstatus) == 1:
@@ -365,6 +358,8 @@ class MonthlyImplementationSummary(Document):
 					row.so_title = t["so_title"]
 				if (row.status or "") != (t["status"] or ""):
 					row.status = t["status"]
+				if (row.project or "") != (t["project"] or ""):
+					row.project = t["project"]
 				for fn in ("total_hrs", "delivered_total_hrs", "remaining_hrs"):
 					if flt(getattr(row, fn)) != flt(t[fn]):
 						setattr(row, fn, t[fn])
@@ -377,55 +372,30 @@ class MonthlyImplementationSummary(Document):
 		for t in target.values():
 			self.append("sales_order_status_information", t)
 
-	def _create_dn_for_so_hours(self, sales_order, item_allocations, skip_default_stamp=False):
+	def _create_dn_for_so_hours(self, sales_order, item_allocations, project, skip_default_stamp=False):
 		if not item_allocations:
 			frappe.throw(frappe._("No item hours given for Sales Order {0}.").format(sales_order))
-		customer = frappe.db.get_value("Implementation", self.implementation, "customer")
-		if not customer:
-			frappe.throw("Implementation has no Customer.")
-		company = _company_for_customer(customer)
-		if not company:
-			frappe.throw("No Company found. Set default Company in Global Defaults.")
-		dn_items = []
-		total_hours = 0.0
-		for alloc in item_allocations:
-			so_line = frappe.get_doc("Sales Order Item", alloc["so_detail"])
-			if so_line.parent != sales_order:
-				frappe.throw(
-					frappe._("Sales Order Item {0} does not belong to {1}.").format(alloc["so_detail"], sales_order)
-				)
-			hours = flt(alloc["hours"])
-			rate = flt(so_line.rate)
-			cf = flt(so_line.conversion_factor, 9) or 1
-			dn_items.append({
-				"item_code": so_line.item_code,
-				"item_name": so_line.item_name,
-				"description": so_line.description or "",
-				"qty": hours,
-				"uom": so_line.uom or so_line.stock_uom,
-				"stock_uom": so_line.stock_uom or so_line.uom,
-				"conversion_factor": cf,
-				"rate": rate,
-				"amount": flt(rate * hours, 2),
-				"against_sales_order": sales_order,
-				"so_detail": so_line.name,
-				"allow_zero_valuation_rate": 1,
-				"custom_against_monthly_implementation_summary": self.name,
-			})
-			total_hours += hours
-		dn = frappe.get_doc({
-			"doctype": "Delivery Note",
-			"customer": customer,
-			"company": company,
-			"custom_implementation": self.implementation,
-			"selling_price_list": frappe.db.get_value("Sales Order", sales_order, "selling_price_list"),
-			"items": dn_items,
-		})
+		from erpnext.selling.doctype.sales_order.sales_order import make_delivery_note
+
+		hours_by_detail = {a["so_detail"]: flt(a["hours"]) for a in item_allocations}
+		dn = make_delivery_note(sales_order, kwargs={"filtered_children": list(hours_by_detail)})
+		dn.items = [item for item in dn.items if item.so_detail in hours_by_detail]
+		if not dn.items:
+			frappe.throw(frappe._("Could not map any items for Sales Order {0}.").format(sales_order))
+		for item in dn.items:
+			item.qty = hours_by_detail[item.so_detail]
+			item.allow_zero_valuation_rate = 1
+			item.custom_against_monthly_implementation_summary = self.name
+		if not frappe.db.get_value("Sales Order", sales_order, "project"):
+			dn.project = project
+		dn.custom_implementation = self.implementation
+		dn.run_method("calculate_taxes_and_totals")
 		dn.insert()
-		_add_or_update_mis_dn_row(self.name, dn.name, sales_order, total_hours)
+		total_hours = flt(sum(hours_by_detail.values()))
+		_add_or_update_mis_dn_row(self.name, dn.name, sales_order, total_hours, project)
 		_mirror_dn_items_into_mis(self.name, dn.name)
 		if not skip_default_stamp:
-			self._stamp_timesheets_for_delivered_hours(dn.name, total_hours)
+			self._stamp_timesheets_for_delivered_hours(dn.name, total_hours, project)
 		return dn.name
 
 	def _stamp_rows_in_window(self, dn_name, rows, start, end):
@@ -445,12 +415,12 @@ class MonthlyImplementationSummary(Document):
 				continue
 			frappe.db.set_value("Timesheet", ts, "custom_delivery_note", dn_name, update_modified=False)
 
-	def _stamp_timesheets_for_delivered_hours(self, dn_name, hours):
+	def _stamp_timesheets_for_delivered_hours(self, dn_name, hours, project):
 		if not dn_name or flt(hours) <= 0 or not self.timesheets_table:
 			return
-		self._stamp_rows_in_window(
-			dn_name, self.timesheets_table, flt(self.delivered_hours), flt(self.delivered_hours) + flt(hours)
-		)
+		project_rows = [r for r in self.timesheets_table if r.project == project]
+		delivered_for_project = flt(_delivered_hours_by_project(self).get(project, 0))
+		self._stamp_rows_in_window(dn_name, project_rows, delivered_for_project, delivered_for_project + flt(hours))
 
 	def _sync_timesheet_delivery_note_column(self):
 		ts_names = [r.timesheet for r in (self.timesheets_table or []) if r.timesheet]
@@ -613,11 +583,22 @@ class MonthlyImplementationSummary(Document):
 		self.set_project_hours_table()
 
 
-def _eligible_so_allocation_rows(doc):
-	return [
+def _delivered_hours_by_project(doc):
+	totals = {}
+	for r in doc.mis_delivery_notes or []:
+		if r.delivery_note and r.project and (r.status or "") not in ("Draft", "Cancelled"):
+			totals[r.project] = flt(totals.get(r.project, 0)) + flt(r.hours)
+	return totals
+
+
+def _eligible_so_allocation_rows(doc, project=None):
+	rows = [
 		r for r in (doc.sales_order_status_information or [])
 		if r.status in ("To Deliver", "To Deliver and Bill")
 	]
+	if project:
+		rows = [r for r in rows if not r.project or r.project == project]
+	return rows
 
 
 def _parse_allocations(allocations):
@@ -649,10 +630,10 @@ def _existing_draft_dn_hours(doc):
 	return totals
 
 
-def _build_dn_allocation_rows(doc, pool, wanted=None):
+def _build_dn_allocation_rows(doc, pool, wanted=None, project=None):
 	existing_draft_hours = _existing_draft_dn_hours(doc)
 	rows = []
-	for r in _eligible_so_allocation_rows(doc):
+	for r in _eligible_so_allocation_rows(doc, project):
 		if wanted is not None and r.sales_order not in wanted:
 			continue
 		item_rows = []
@@ -673,6 +654,7 @@ def _build_dn_allocation_rows(doc, pool, wanted=None):
 			continue
 		rows.append({
 			"sales_order": r.sales_order,
+			"project": r.project or "",
 			"items": item_rows,
 			"so_remaining_hrs": flt(sum(it["remaining_qty"] for it in item_rows), 2),
 			"existing_draft_hours": flt(existing_draft_hours.get(r.sales_order, 0)),
@@ -680,42 +662,89 @@ def _build_dn_allocation_rows(doc, pool, wanted=None):
 	return rows
 
 
+def _project_hours_row(doc, project):
+	row = next((r for r in (doc.project_hours or []) if r.project == project), None)
+	if not row:
+		frappe.throw(frappe._("Project {0} has no billable hours on this Monthly Implementation Summary.").format(project))
+	return row
+
+
+def _project_remaining_hours(doc, project):
+	row = _project_hours_row(doc, project)
+	delivered = flt(_delivered_hours_by_project(doc).get(project, 0))
+	return flt(flt(row.billable_hours) - delivered, 2)
+
+
 @frappe.whitelist()
-def get_dn_allocation_preview(docname: str, sales_orders=None):
+def get_dn_allocation_project_summary(docname: str, timesheets=None):
 	_require_docname(docname)
 	doc = frappe.get_doc("Monthly Implementation Summary", docname)
-	wanted = set(_parse_timesheet_names(sales_orders)) if sales_orders else None
-	rows = _build_dn_allocation_rows(doc, flt(doc.remaining_billable_hours), wanted)
-	return {"rows": rows, "remaining_billable_hours": flt(doc.remaining_billable_hours)}
+	projects = [r.project for r in (doc.project_hours or []) if r.project]
+	labels = (
+		dict(frappe.get_all("Project", filters={"name": ["in", projects]}, fields=["name", "project_name"], as_list=True))
+		if projects else {}
+	)
+
+	if timesheets:
+		ts_names = set(_parse_timesheet_names(timesheets))
+		totals = {}
+		for r in doc.timesheets_table or []:
+			if r.timesheet in ts_names and r.project:
+				totals[r.project] = flt(totals.get(r.project, 0)) + flt(r.billable_hours)
+		rows = [
+			{"project": p, "project_name": labels.get(p) or p, "hours": flt(h, 2)}
+			for p, h in sorted(totals.items())
+		]
+		return {"rows": rows}
+
+	delivered_by_project = _delivered_hours_by_project(doc)
+	rows = []
+	for r in doc.project_hours or []:
+		if not r.project:
+			continue
+		remaining = flt(flt(r.billable_hours) - flt(delivered_by_project.get(r.project, 0)), 2)
+		if remaining > 0.0001:
+			rows.append({"project": r.project, "project_name": labels.get(r.project) or r.project, "hours": remaining})
+	return {"rows": rows}
 
 
 @frappe.whitelist()
-def get_dn_allocation_preview_for_timesheets(docname: str, timesheets):
+def get_dn_allocation_preview(docname: str, project: str, sales_orders=None):
+	_require_docname(docname)
+	doc = frappe.get_doc("Monthly Implementation Summary", docname)
+	pool = _project_remaining_hours(doc, project)
+	wanted = set(_parse_timesheet_names(sales_orders)) if sales_orders else None
+	rows = _build_dn_allocation_rows(doc, pool, wanted, project)
+	return {"rows": rows, "remaining_hours": pool}
+
+
+@frappe.whitelist()
+def get_dn_allocation_preview_for_timesheets(docname: str, project: str, timesheets):
 	_require_docname(docname)
 	doc = frappe.get_doc("Monthly Implementation Summary", docname)
 	ts_names = set(_parse_timesheet_names(timesheets))
 	selected_hours = flt(
-		sum(flt(r.billable_hours) for r in (doc.timesheets_table or []) if r.timesheet in ts_names), 2
+		sum(
+			flt(r.billable_hours) for r in (doc.timesheets_table or [])
+			if r.timesheet in ts_names and r.project == project
+		),
+		2,
 	)
-	rows = _build_dn_allocation_rows(doc, selected_hours)
-	return {
-		"rows": rows,
-		"remaining_billable_hours": flt(doc.remaining_billable_hours),
-		"selected_hours": selected_hours,
-	}
+	rows = _build_dn_allocation_rows(doc, selected_hours, project=project)
+	return {"rows": rows, "selected_hours": selected_hours}
 
 
-def _create_dns_for_allocations(doc, allocations, pool, stamp_fn=None):
+def _create_dns_for_allocations(doc, allocations, pool, project, stamp_fn=None):
 	"""Shared by create_dns_from_allocations and create_dns_from_timesheet_allocations.
 
-	stamp_fn(dn_name, hours), if given, replaces the default whole-table windowed timesheet stamping.
+	stamp_fn(dn_name, hours), if given, replaces the default per-project windowed timesheet stamping.
 	"""
-	eligible_so = {r.sales_order for r in _eligible_so_allocation_rows(doc)}
+	eligible_so = {r.sales_order for r in _eligible_so_allocation_rows(doc, project)}
 	created = []
 	for a in _parse_allocations(allocations):
 		so = a["sales_order"]
 		if so not in eligible_so:
-			frappe.throw(frappe._("Sales Order {0} is not eligible for delivery.").format(so))
+			frappe.throw(frappe._("Sales Order {0} is not eligible for delivery against Project {1}.").format(so, project))
 		item_remaining = {i.name: flt(i.qty) - flt(i.delivered_qty) for i in _so_hour_items(so)}
 		so_items, so_total = [], 0.0
 		for it in a["items"]:
@@ -734,7 +763,7 @@ def _create_dns_for_allocations(doc, allocations, pool, stamp_fn=None):
 			continue
 		if so_total > pool + 0.0001:
 			frappe.throw(frappe._("Hours for {0} exceed the remaining billable hours ({1}).").format(so, pool))
-		dn_name = doc._create_dn_for_so_hours(so, so_items, skip_default_stamp=bool(stamp_fn))
+		dn_name = doc._create_dn_for_so_hours(so, so_items, project, skip_default_stamp=bool(stamp_fn))
 		if stamp_fn:
 			stamp_fn(dn_name, so_total)
 		created.append(dn_name)
@@ -753,31 +782,32 @@ def _save_after_dn_creation(doc):
 
 
 @frappe.whitelist()
-def create_dns_from_allocations(docname: str, allocations):
+def create_dns_from_allocations(docname: str, project: str, allocations):
 	_require_docname(docname)
 	doc = frappe.get_doc("Monthly Implementation Summary", docname)
 	if doc.status == "Closed":
 		frappe.throw(frappe._("This Monthly Implementation Summary is closed."))
 
-	created = _create_dns_for_allocations(doc, allocations, flt(doc.remaining_billable_hours))
+	pool = _project_remaining_hours(doc, project)
+	created = _create_dns_for_allocations(doc, allocations, pool, project)
 	if created:
 		_save_after_dn_creation(doc)
 	return {"status": "ok", "created": created}
 
 
 @frappe.whitelist()
-def create_dns_from_timesheet_allocations(docname: str, timesheets, allocations):
+def create_dns_from_timesheet_allocations(docname: str, timesheets, project: str, allocations):
 	"""Same allocation flow as create_dns_from_allocations, but the pool is the selected Timesheets'
-	own billable hours, and only those Timesheets are stamped with the created Delivery Note(s)."""
+	own billable hours (for that Project), and only those Timesheets are stamped with the created Delivery Note(s)."""
 	_require_docname(docname)
 	doc = frappe.get_doc("Monthly Implementation Summary", docname)
 	if doc.status == "Closed":
 		frappe.throw(frappe._("This Monthly Implementation Summary is closed."))
 
 	ts_names = set(_parse_timesheet_names(timesheets))
-	selected_rows = [r for r in (doc.timesheets_table or []) if r.timesheet in ts_names]
+	selected_rows = [r for r in (doc.timesheets_table or []) if r.timesheet in ts_names and r.project == project]
 	if not selected_rows:
-		frappe.throw(frappe._("No Timesheets selected."))
+		frappe.throw(frappe._("No Timesheets selected for Project {0}.").format(project))
 	pool = flt(sum(flt(r.billable_hours) for r in selected_rows), 2)
 
 	cursor = {"pos": 0.0}
@@ -786,13 +816,13 @@ def create_dns_from_timesheet_allocations(docname: str, timesheets, allocations)
 		doc._stamp_rows_in_window(dn_name, selected_rows, cursor["pos"], cursor["pos"] + hours)
 		cursor["pos"] += hours
 
-	created = _create_dns_for_allocations(doc, allocations, pool, stamp_fn=stamp)
+	created = _create_dns_for_allocations(doc, allocations, pool, project, stamp_fn=stamp)
 	if created:
 		_save_after_dn_creation(doc)
 	return {"status": "ok", "created": created}
 
 
-def _add_or_update_mis_dn_row(docname, dn_name, sales_order=None, hours=None):
+def _add_or_update_mis_dn_row(docname, dn_name, sales_order=None, hours=None, project=None):
 	if not docname or not dn_name:
 		return
 	dn_doc = frappe.get_doc("Delivery Note", dn_name)
@@ -811,6 +841,8 @@ def _add_or_update_mis_dn_row(docname, dn_name, sales_order=None, hours=None):
 	}
 	if hours is not None:
 		data["hours"] = flt(hours, 2)
+	if project is not None:
+		data["project"] = project
 	if existing:
 		for k, v in data.items():
 			setattr(existing, k, v)
