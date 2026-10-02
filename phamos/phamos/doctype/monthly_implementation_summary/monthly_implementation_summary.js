@@ -676,348 +676,18 @@ function _mis_number(value) {
 	return _mis_escape(format_number(flt(value || 0), null, 2));
 }
 
-const _MIS_TS_COLUMNS = [
-	{
-		key: "timesheet",
-		label: () => __("Timesheet"),
-		sortable: true,
-		locked: true,
-		html: (row) => `<a href="/app/timesheet/${encodeURIComponent(row.timesheet || "")}" target="_blank">${_mis_escape(row.timesheet)}</a>`,
-		sort_value: (row) => (row.timesheet || "").toLowerCase(),
-		filter_value: (row) => row.timesheet || "",
-	},
-	{
-		key: "date",
-		label: () => __("Date"),
-		sortable: true,
-		html: (row) => _mis_escape(row.date),
-		sort_value: (row) => row.date || "",
-		filter_value: (row) => row.date || "",
-	},
-	{
-		key: "employee_name",
-		label: () => __("Employee"),
-		sortable: true,
-		html: (row) => _mis_escape(row.employee_name),
-		sort_value: (row) => (row.employee_name || "").toLowerCase(),
-		filter_value: (row) => row.employee_name || "",
-	},
-	{
-		key: "project",
-		label: () => __("Project"),
-		sortable: true,
-		html: (row) => _mis_escape(row.project),
-		sort_value: (row) => (row.project || "").toLowerCase(),
-		filter_value: (row) => row.project || "",
-	},
-	{
-		key: "total_hours",
-		label: () => __("Total"),
-		sortable: true,
-		numeric: true,
-		html: (row) => _mis_number(row.total_hours),
-		sort_value: (row) => flt(row.total_hours || 0),
-		filter_value: (row) => String(row.total_hours || ""),
-	},
-	{
-		key: "billable_hours",
-		label: () => __("Billable"),
-		sortable: true,
-		numeric: true,
-		is_billable_input: true,
-		sort_value: (row, dialog) => _mis_get_billable_override_value(dialog, row.timesheet, row.billable_hours),
-		filter_value: (row, dialog) => String(_mis_get_billable_override_value(dialog, row.timesheet, row.billable_hours)),
-	},
-	{
-		key: "description",
-		label: () => __("Description"),
-		sortable: true,
-		html: (row) => _mis_escape(row.description),
-		sort_value: (row) => (row.description || "").toLowerCase(),
-		filter_value: (row) => row.description || "",
-	},
-	{
-		key: "rating",
-		label: () => __("Rating"),
-		sortable: true,
-		default_hidden: true,
-		html: (row) => _mis_escape(row.rating),
-		sort_value: (row) => (row.rating || "").toLowerCase(),
-		filter_value: (row) => row.rating || "",
-	},
-	{
-		key: "delivery_note",
-		label: () => __("Delivery Note"),
-		sortable: true,
-		default_hidden: true,
-		html: (row) => row.delivery_note
-			? `<a href="/app/delivery-note/${encodeURIComponent(row.delivery_note)}" target="_blank">${_mis_escape(row.delivery_note)}</a>`
-			: "",
-		sort_value: (row) => (row.delivery_note || "").toLowerCase(),
-		filter_value: (row) => row.delivery_note || "",
-	},
-	{
-		key: "status",
-		label: () => __("Status"),
-		sortable: true,
-		is_status: true,
-		sort_value: (row) => (row.status || "").toLowerCase(),
-		filter_value: (row) => row.status || "",
-	},
-];
-
-function _mis_ts_col_is_visible(dialog, col) {
-	if (col.locked) return true;
-	const visible = dialog.__mis_ts_visible_columns || {};
-	if (Object.prototype.hasOwnProperty.call(visible, col.key)) return !!visible[col.key];
-	return !col.default_hidden;
-}
-
-function _mis_visible_ts_columns(dialog) {
-	return _MIS_TS_COLUMNS.filter((col) => _mis_ts_col_is_visible(dialog, col));
-}
-
-function _mis_get_billable_override(dialog, timesheet, fallback) {
-	const overrides = (dialog && dialog.__mis_ts_billable_overrides) || {};
-	if (Object.prototype.hasOwnProperty.call(overrides, timesheet)) {
-		return overrides[timesheet];
-	}
-	return flt(fallback || 0);
-}
-
-function _mis_get_billable_override_value(dialog, timesheet, fallback) {
-	const overrides = (dialog && dialog.__mis_ts_billable_overrides) || {};
-	if (Object.prototype.hasOwnProperty.call(overrides, timesheet)) {
-		return flt(overrides[timesheet]);
-	}
-	return flt(fallback || 0);
-}
-
-function _mis_timesheet_row_html(dialog, row, columns) {
-	const pending = _mis_is_timesheet_pending(row);
-	const can_select = pending && row.timesheet;
-	const badge_class = pending ? "orange" : "green";
-	const badge_label = pending ? __("Pending") : __("Approved");
-	const selected = (dialog.__mis_ts_selected || new Set()).has(row.timesheet);
-
-	const cells = columns
-		.map((col) => {
-			const css = col.numeric ? ' class="mis-ts-col-num"' : "";
-			if (col.is_billable_input) {
-				const value = _mis_get_billable_override(dialog, row.timesheet, row.billable_hours);
-				return `<td${css} data-column="${col.key}">
-					<input
-						type="text"
-						inputmode="decimal"
-						class="mis-ts-billable-input"
-						data-timesheet="${_mis_escape(row.timesheet)}"
-						value="${_mis_escape(value)}"
-						style="width:92px; text-align:right;"
-					>
-				</td>`;
-			}
-			if (col.is_status) {
-				return `<td data-column="${col.key}"><span class="indicator-pill ${badge_class}">${badge_label}</span></td>`;
-			}
-			return `<td${css} data-column="${col.key}">${col.html(row)}</td>`;
-		})
-		.join("");
-
-	return `
-		<tr>
-			<td class="mis-ts-col-check">
-				<input type="checkbox" class="mis-ts-select" data-timesheet="${_mis_escape(row.timesheet)}" ${can_select ? "" : "disabled"} ${selected ? "checked" : ""}>
-			</td>
-			${cells}
-			<td class="mis-ts-col-gear"></td>
-		</tr>
-	`;
-}
-
-function _mis_render_timesheet_approval_table(dialog, rows) {
-	const html_field = dialog.get_field("timesheet_approval_html");
-	if (!html_field || !html_field.$wrapper) return;
-
-	const columns = _mis_visible_ts_columns(dialog);
-	const sort = dialog.__mis_ts_sort || {};
-
-	let display_rows = [...(rows || [])];
-	if (sort.column) {
-		const col = _MIS_TS_COLUMNS.find((c) => c.key === sort.column);
-		if (col) {
-			display_rows.sort((a, b) => {
-				const av = col.sort_value(a, dialog);
-				const bv = col.sort_value(b, dialog);
-				if (av < bv) return sort.direction === "desc" ? 1 : -1;
-				if (av > bv) return sort.direction === "desc" ? -1 : 1;
-				return 0;
-			});
-		}
-	} else {
-		display_rows.sort(
-			(a, b) =>
-				flt(_mis_get_billable_override(dialog, b.timesheet, b.billable_hours)) -
-				flt(_mis_get_billable_override(dialog, a.timesheet, a.billable_hours))
-		);
-	}
-
-	const table_rows = display_rows.map((row) => _mis_timesheet_row_html(dialog, row, columns)).join("");
-
-	const header_cells = columns
-		.map((col) => {
-			const css = col.numeric ? ' class="mis-ts-col-num"' : "";
-			if (!col.sortable) {
-				return `<th${css}>${col.label()}</th>`;
-			}
-			const arrow = sort.column === col.key ? (sort.direction === "desc" ? " &#9660;" : " &#9650;") : "";
-			return `<th${css} data-sort-column="${col.key}" style="cursor:pointer; user-select:none;">${col.label()}${arrow}</th>`;
-		})
-		.join("");
-
-	const filters = dialog.__mis_ts_column_filters || {};
-	const filter_cells = columns
-		.map(
-			(col) => `
-				<th>
-					<input
-						type="text"
-						class="form-control input-sm mis-ts-column-filter"
-						data-column="${col.key}"
-						value="${_mis_escape(filters[col.key] || "")}"
-					>
-				</th>
-			`
-		)
-		.join("");
-
-	const gear_options = _MIS_TS_COLUMNS.filter((c) => !c.locked)
-		.map((col) => {
-			const checked = _mis_ts_col_is_visible(dialog, col) ? "checked" : "";
-			return `
-				<label class="mis-ts-gear-option">
-					<input type="checkbox" class="mis-ts-column-toggle" data-column="${col.key}" ${checked}>
-					${col.label()}
-				</label>
-			`;
-		})
-		.join("");
-
-	html_field.$wrapper.html(`
-		<style>
-			.mis-ts-wrap .mis-ts-note { margin-bottom: 8px; }
-			.mis-ts-wrap .mis-ts-col-check { width: 36px; text-align: center; }
-			.mis-ts-wrap .mis-ts-col-num { text-align: right; }
-			.mis-ts-wrap .mis-ts-col-gear { width: 34px; text-align: center; position: relative; }
-			.mis-ts-wrap table { margin-bottom: 0; border: 1px solid var(--border-color); }
-			.mis-ts-wrap .mis-ts-column-filter-row th { background: var(--bg-color); padding: 4px; }
-			.mis-ts-wrap .mis-ts-column-filter { width: 100%; font-size: 12px; }
-			.mis-ts-wrap .mis-ts-gear-btn {
-				display: inline-flex;
-				align-items: center;
-				justify-content: center;
-				width: 22px;
-				height: 22px;
-				border-radius: 4px;
-				cursor: pointer;
-				color: var(--text-muted);
-			}
-			.mis-ts-wrap .mis-ts-gear-btn:hover { background: var(--bg-color); color: var(--text-color); }
-			.mis-ts-wrap .mis-ts-gear-panel {
-				display: none;
-				position: absolute;
-				right: 0;
-				top: 100%;
-				z-index: 10;
-				text-align: left;
-				background: var(--fg-color, var(--bg-color));
-				border: 1px solid var(--border-color);
-				border-radius: 6px;
-				padding: 6px 4px;
-				box-shadow: var(--shadow-md, 0 2px 8px rgba(0,0,0,.25));
-				min-width: 170px;
-			}
-			.mis-ts-wrap .mis-ts-gear-panel-title {
-				font-size: 11px;
-				text-transform: uppercase;
-				color: var(--text-muted);
-				padding: 4px 10px;
-			}
-			.mis-ts-wrap .mis-ts-gear-option {
-				display: flex;
-				align-items: center;
-				gap: 8px;
-				font-weight: 400;
-				padding: 5px 10px;
-				margin: 0;
-				border-radius: 4px;
-				cursor: pointer;
-			}
-			.mis-ts-wrap .mis-ts-gear-option:hover { background: var(--bg-color); }
-		</style>
-		<div class="mis-ts-wrap">
-		<div class="small text-muted mis-ts-note">
-			${__("Review and submit pending timesheets for this MIS period.")}
-		</div>
-		<table class="table table-bordered table-hover">
-			<thead>
-				<tr>
-					<th class="mis-ts-col-check"><input type="checkbox" id="mis-ts-select-all"></th>
-					${header_cells}
-					<th class="mis-ts-col-gear">
-						<span class="mis-ts-gear-btn" id="mis-ts-gear-btn" title="${__("Pick Columns")}">${frappe.utils.icon("setting-gear", "sm")}</span>
-						<div class="mis-ts-gear-panel" id="mis-ts-gear-panel" style="${dialog.__mis_ts_gear_open ? "display:block;" : ""}">
-							<div class="mis-ts-gear-panel-title">${__("Pick Columns")}</div>
-							${gear_options}
-						</div>
-					</th>
-				</tr>
-				<tr class="mis-ts-column-filter-row">
-					<th></th>
-					${filter_cells}
-					<th></th>
-				</tr>
-			</thead>
-			<tbody>
-				${table_rows || `<tr><td colspan="${columns.length + 2}" class="text-muted text-center">${__("No timesheets found.")}</td></tr>`}
-			</tbody>
-		</table>
-		</div>
-	`);
-}
-
-
-function _mis_render_timesheet_loading_state(dialog) {
-	const html_field = dialog.get_field("timesheet_approval_html");
-	if (!html_field || !html_field.$wrapper) return;
-	html_field.$wrapper.html(
-		`<div class="small text-muted" style="padding:16px 6px;">${__("Loading timesheets...")}</div>`
-	);
-}
-
 function _mis_get_selected_timesheets(dialog) {
-	const selected = [];
-	dialog.$wrapper.find(".mis-ts-select:checked").each(function () {
-		const ts = $(this).attr("data-timesheet");
-		if (ts) selected.push(ts);
-	});
-	return selected;
+	return dialog.fields_dict.timesheet_approval.grid
+		.get_selected_children()
+		.map((row) => row.timesheet)
+		.filter(Boolean);
 }
 
 function _mis_get_billable_updates(dialog) {
-	const updates = [];
 	const originals = dialog.__mis_ts_original_billable || {};
-	dialog.$wrapper.find(".mis-ts-billable-input").each(function () {
-		const timesheet = ($(this).attr("data-timesheet") || "").trim();
-		const billable = flt($(this).val());
-		const original = flt(originals[timesheet] || 0);
-		if (!timesheet) return;
-		if (Math.abs(billable - original) < 0.0001) return;
-		updates.push({
-			timesheet,
-			billable_hours: billable,
-		});
-	});
-	return updates;
+	return dialog.__mis_ts_rows
+		.filter((row) => row.timesheet && Math.abs(flt(row.billable_hours) - flt(originals[row.timesheet])) >= 0.0001)
+		.map((row) => ({ timesheet: row.timesheet, billable_hours: flt(row.billable_hours) }));
 }
 
 function _mis_save_billable_changes(frm, dialog) {
@@ -1108,117 +778,81 @@ function _mis_submit_selected_timesheets(frm, dialog) {
 		return frm.reload_doc().then(() => true);
 	});
 }
-function _mis_apply_ts_column_filters(dialog) {
-	const filters = dialog.__mis_ts_column_filters || {};
-	const active_columns = Object.keys(filters).filter((k) => filters[k]);
-
-	dialog.$wrapper.find(".mis-ts-wrap tbody tr").each(function () {
-		const $row = $(this);
-		if (!$row.find(".mis-ts-select").length) return;
-
-		const matches = active_columns.every((column) => {
-			let value;
-			if (column === "billable_hours") {
-				value = String($row.find(".mis-ts-billable-input").val() || "");
-			} else {
-				value = String($row.find(`td[data-column="${column}"]`).text() || "");
-			}
-			return value.trim().toLowerCase().includes(filters[column]);
-		});
-
-		$row.toggle(matches);
-	});
+function _mis_fit_ts_column_widths(grid) {
+	const shown = grid.docfields.filter((df) => cint(df.in_list_view));
+	shown.forEach((df) => { df.columns = df.default_columns; });
+	let total = shown.reduce((sum, df) => sum + df.columns, 0);
+	// The grid drops columns once widths add up to more than 10
+	while (total > 10) {
+		const widest = shown.reduce((a, b) => (b.columns > a.columns ? b : a));
+		if (widest.columns <= 1) break;
+		widest.columns -= 1;
+		total -= 1;
+	}
 }
 
-function _mis_rerender_ts_table(frm, dialog) {
-	_mis_render_timesheet_approval_table(dialog, dialog.__mis_ts_rows);
-	_mis_bind_timesheet_approval_dialog_events(frm, dialog);
-	_mis_apply_ts_column_filters(dialog);
+function _mis_setup_ts_column_picker(grid) {
+	grid.docfields.forEach((df) => { df.default_columns = df.columns; });
+	const open_picker = () => {
+		const picker = new frappe.ui.Dialog({
+			title: __("Pick Columns"),
+			fields: [{
+				fieldname: "columns",
+				fieldtype: "MultiCheck",
+				columns: 2,
+				options: grid.docfields.map((df) => ({
+					label: df.label,
+					value: df.fieldname,
+					checked: cint(df.in_list_view),
+				})),
+			}],
+			primary_action_label: __("Update"),
+			primary_action: (values) => {
+				const chosen = values.columns || [];
+				if (!chosen.length) return;
+				grid.docfields.forEach((df) => { df.in_list_view = chosen.includes(df.fieldname) ? 1 : 0; });
+				_mis_fit_ts_column_widths(grid);
+				grid.reset_grid();
+				picker.hide();
+			},
+		});
+		picker.show();
+	};
+
+	// The native gear cell is empty for grids outside a form, so the gear is placed in it after each header build
+	const make_head = grid.make_head.bind(grid);
+	grid.make_head = function () {
+		make_head();
+		const $cell = grid.header_row && grid.header_row.configure_columns_button;
+		if (!$cell || $cell.children().length) return;
+		$cell
+			.css({ cursor: "pointer", display: "flex", justifyContent: "center" })
+			.attr("title", __("Pick Columns"))
+			.html(`<a>${frappe.utils.icon("setting-gear", "sm", "", "filter: opacity(0.5)")}</a>`)
+			.on("click", open_picker);
+	};
+	grid.refresh();
 }
 
-function _mis_bind_timesheet_approval_dialog_events(frm, dialog) {
-
-	dialog.$wrapper.off("change", "#mis-ts-select-all");
-	dialog.$wrapper.on("change", "#mis-ts-select-all", function () {
-		const checked = !!$(this).is(":checked");
-		dialog.__mis_ts_selected = dialog.__mis_ts_selected || new Set();
-		dialog.$wrapper.find(".mis-ts-select:not(:disabled)").filter(":visible").each(function () {
-			$(this).prop("checked", checked);
-			const ts = $(this).attr("data-timesheet");
-			if (!ts) return;
-			if (checked) dialog.__mis_ts_selected.add(ts);
-			else dialog.__mis_ts_selected.delete(ts);
-		});
-	});
-
-	dialog.$wrapper.off("change", ".mis-ts-select");
-	dialog.$wrapper.on("change", ".mis-ts-select", function () {
-		const ts = $(this).attr("data-timesheet");
-		if (!ts) return;
-		dialog.__mis_ts_selected = dialog.__mis_ts_selected || new Set();
-		if ($(this).is(":checked")) dialog.__mis_ts_selected.add(ts);
-		else dialog.__mis_ts_selected.delete(ts);
-	});
-
-	dialog.$wrapper.off("input", ".mis-ts-billable-input");
-	dialog.$wrapper.on("input", ".mis-ts-billable-input", function () {
-		const ts = $(this).attr("data-timesheet");
-		if (!ts) return;
-		dialog.__mis_ts_billable_overrides = dialog.__mis_ts_billable_overrides || {};
-		dialog.__mis_ts_billable_overrides[ts] = $(this).val();
-	});
-
-	dialog.$wrapper.off("click", "[data-sort-column]");
-	dialog.$wrapper.on("click", "[data-sort-column]", function () {
-		const column = $(this).attr("data-sort-column");
-		const current = dialog.__mis_ts_sort || {};
-		let direction = "asc";
-		if (current.column === column) {
-			direction = current.direction === "asc" ? "desc" : current.direction === "desc" ? null : "asc";
-		}
-		dialog.__mis_ts_sort = direction ? { column, direction } : {};
-		_mis_rerender_ts_table(frm, dialog);
-	});
-
-
-	dialog.$wrapper.off("input", ".mis-ts-column-filter");
-	dialog.$wrapper.on("input", ".mis-ts-column-filter", function () {
-		const column = $(this).attr("data-column");
-		const value = String($(this).val() || "").trim().toLowerCase();
-		dialog.__mis_ts_column_filters = dialog.__mis_ts_column_filters || {};
-		if (value) dialog.__mis_ts_column_filters[column] = value;
-		else delete dialog.__mis_ts_column_filters[column];
-		_mis_apply_ts_column_filters(dialog);
-	});
-
-
-	dialog.$wrapper.off("click", "#mis-ts-gear-btn");
-	dialog.$wrapper.on("click", "#mis-ts-gear-btn", function (e) {
-		e.stopPropagation();
-		dialog.__mis_ts_gear_open = !dialog.__mis_ts_gear_open;
-		dialog.$wrapper.find("#mis-ts-gear-panel").toggle(dialog.__mis_ts_gear_open);
-	});
-
-	dialog.$wrapper.off("change", ".mis-ts-column-toggle");
-	dialog.$wrapper.on("change", ".mis-ts-column-toggle", function () {
-		const column = $(this).attr("data-column");
-		dialog.__mis_ts_visible_columns = dialog.__mis_ts_visible_columns || {};
-		dialog.__mis_ts_visible_columns[column] = $(this).is(":checked");
-		dialog.__mis_ts_gear_open = true;
-		_mis_rerender_ts_table(frm, dialog);
-	});
-
-	dialog.$wrapper.off("click.mis-ts-gear-outside");
-	dialog.$wrapper.on("click.mis-ts-gear-outside", function (e) {
-		if (!$(e.target).closest("#mis-ts-gear-btn, .mis-ts-gear-panel").length) {
-			dialog.__mis_ts_gear_open = false;
-			dialog.$wrapper.find("#mis-ts-gear-panel").hide();
-		}
+function _mis_bind_ts_header_sort(grid, rows) {
+	let sort = {};
+	grid.wrapper.on("click", ".grid-heading-row .grid-row:not(.filter-row) [data-fieldname]", function () {
+		const df = $(this).data("df");
+		if (!df) return;
+		const direction = sort.fieldname === df.fieldname && sort.direction === "asc" ? "desc" : "asc";
+		sort = { fieldname: df.fieldname, direction };
+		const factor = direction === "asc" ? 1 : -1;
+		const is_number = df.fieldtype === "Float";
+		rows.sort((a, b) =>
+			factor * (is_number
+				? flt(a[df.fieldname]) - flt(b[df.fieldname])
+				: String(a[df.fieldname] || "").localeCompare(String(b[df.fieldname] || "")))
+		);
+		grid.refresh();
 	});
 }
 
 function _mis_load_timesheet_approval_rows(frm, dialog) {
-	_mis_render_timesheet_loading_state(dialog);
 	return frappe.call({
 		method: "phamos.phamos.doctype.monthly_implementation_summary.monthly_implementation_summary.get_timesheet_approval_rows",
 		args: {
@@ -1226,25 +860,49 @@ function _mis_load_timesheet_approval_rows(frm, dialog) {
 		},
 		freeze: false,
 	}).then((r) => {
-		dialog.__mis_ts_rows = (r && r.message) || [];
+		const rows = (r && r.message) || [];
 		dialog.__mis_ts_original_billable = {};
-		dialog.__mis_ts_billable_overrides = {};
-		dialog.__mis_ts_rows.forEach((row) => {
-			if (row && row.timesheet) {
-				dialog.__mis_ts_original_billable[row.timesheet] = flt(row.billable_hours || 0);
+		rows.forEach((row) => {
+			if (row.timesheet) {
+				dialog.__mis_ts_original_billable[row.timesheet] = flt(row.billable_hours);
 			}
 		});
-		_mis_rerender_ts_table(frm, dialog);
+		dialog.__mis_ts_rows.length = 0;
+		rows.sort((a, b) => flt(b.billable_hours) - flt(a.billable_hours));
+		rows.forEach((row) => dialog.__mis_ts_rows.push(row));
+		dialog.fields_dict.timesheet_approval.grid.refresh();
 	});
 }
 
 function _mis_show_timesheet_approval_dialog(frm) {
+	const rows = [];
 	const dialog = new frappe.ui.Dialog({
 		title: __("Timesheet Approval"),
-		fields: [{
-			fieldname: "timesheet_approval_html",
-			fieldtype: "HTML",
-		}],
+		size: "extra-large",
+		fields: [
+			{
+				fieldname: "timesheet_approval",
+				fieldtype: "Table",
+				label: __("Timesheets"),
+				description: __("Review and submit pending timesheets for this MIS period."),
+				cannot_add_rows: true,
+				cannot_delete_rows: true,
+				in_place_edit: false,
+				data: rows,
+				get_data: () => rows,
+				fields: [
+					{ fieldname: "timesheet", fieldtype: "Link", options: "Timesheet", label: __("Timesheet"), in_list_view: 1, read_only: 1, columns: 2 },
+					{ fieldname: "date", fieldtype: "Date", label: __("Date"), in_list_view: 1, read_only: 1, columns: 1 },
+					{ fieldname: "employee_name", fieldtype: "Data", label: __("Employee"), in_list_view: 1, read_only: 1, columns: 2 },
+					{ fieldname: "project", fieldtype: "Data", label: __("Project"), in_list_view: 1, read_only: 1, columns: 1 },
+					{ fieldname: "total_hours", fieldtype: "Float", label: __("Total"), in_list_view: 1, read_only: 1, precision: 2, columns: 1 },
+					{ fieldname: "billable_hours", fieldtype: "Float", label: __("Billable"), in_list_view: 1, precision: 2, columns: 1 },
+					{ fieldname: "description", fieldtype: "Data", label: __("Description"), in_list_view: 1, read_only: 1, columns: 2 },
+					{ fieldname: "rating", fieldtype: "Data", label: __("Rating"), read_only: 1, columns: 1 },
+					{ fieldname: "delivery_note", fieldtype: "Link", options: "Delivery Note", label: __("Delivery Note"), read_only: 1, columns: 2 },
+				],
+			},
+		],
 		primary_action_label: __("Save"),
 		secondary_action_label: __("Submit"),
 		secondary_action: () => {
@@ -1257,22 +915,14 @@ function _mis_show_timesheet_approval_dialog(frm) {
 		},
 	});
 
-	dialog.__mis_ts_selected = new Set();
-	dialog.__mis_ts_billable_overrides = {};
-	dialog.__mis_ts_column_filters = {};
-	dialog.__mis_ts_sort = {};
-	dialog.__mis_ts_visible_columns = {};
-	dialog.__mis_ts_gear_open = false;
+	dialog.__mis_ts_rows = rows;
+	dialog.__mis_ts_original_billable = {};
+	const grid = dialog.fields_dict.timesheet_approval.grid;
+	// A grid inside a dialog has no meta; this shows the column search row at any row count
+	grid.meta = { editable_grid: 1, rows_threshold_for_grid_search: 1 };
+	_mis_bind_ts_header_sort(grid, rows);
+	_mis_setup_ts_column_picker(grid);
 	dialog.show();
-	dialog.$wrapper.find(".modal-dialog").css("max-width", "1180px");
-	const $footer = dialog.$wrapper.find(".modal-footer");
-	const $action_btns = $footer.find(".btn-primary, .btn-secondary, .btn-default");
-	$action_btns.css({
-		background: "#111",
-		color: "#fff",
-		borderColor: "#111",
-		fontWeight: "700",
-	});
 	_mis_load_timesheet_approval_rows(frm, dialog);
 }
 
@@ -1439,4 +1089,3 @@ frappe.ui.form.on("Delivery Note Item", {
 		mis_recalculate_dn_item_row(frm, cdt, cdn);
 	},
 });
-
