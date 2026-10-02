@@ -18,29 +18,29 @@ add_to_apps_screen = [
 		"has_permission": "phamos.api.i_own_my_work.check_app_permission",
 	},
 	{
-		"name": "hr_spa",
-		"logo": "/assets/frappe/images/frappe-favicon.svg",
-		"title": "HR",
-		"route": "/hr-cockpit",
-		"has_permission": "phamos.api.hr_spa.check_app_permission",
+		"name": "human_resources_spa",
+		"logo": "/assets/phamos/manifest/human-resources-icon-192.png",
+		"title": "Human Resources",
+		"route": "/human-resources-cockpit",
+		"has_permission": "phamos.api.human_resources_spa.check_app_permission",
 	},
 	{
 		"name": "sales_spa",
-		"logo": "/assets/frappe/images/frappe-favicon.svg",
+		"logo": "/assets/phamos/manifest/sales-icon-192.png",
 		"title": "Sales",
 		"route": "/sales-cockpit",
 		"has_permission": "phamos.api.sales_spa.check_app_permission",
 	},
 	{
 		"name": "project_management_spa",
-		"logo": "/assets/frappe/images/frappe-favicon.svg",
+		"logo": "/assets/phamos/manifest/project-management-icon-192.png",
 		"title": "Project Management Cockpit",
 		"route": "/project-management-cockpit",
 		"has_permission": "phamos.api.project_management_spa.check_app_permission",
 	},
 	{
 		"name": "accounting_spa",
-		"logo": "/assets/frappe/images/frappe-favicon.svg",
+		"logo": "/assets/phamos/manifest/accounting-icon-192.png",
 		"title": "Accounting",
 		"route": "/accounting-cockpit",
 		"has_permission": "phamos.api.accounting_spa.check_app_permission",
@@ -120,8 +120,8 @@ website_route_rules = [
     {"from_route": "/schedule_interview/<name>", "to_route": "schedule_interview"},
     {"from_route": "/i-own-my-work", "to_route": "i_own_my_work"},
     {"from_route": "/i-own-my-work/<path:app_path>", "to_route": "i_own_my_work"},
-    {"from_route": "/hr-cockpit", "to_route": "hr_spa"},
-    {"from_route": "/hr-cockpit/<path:app_path>", "to_route": "hr_spa"},
+    {"from_route": "/human-resources-cockpit", "to_route": "human_resources_spa"},
+    {"from_route": "/human-resources-cockpit/<path:app_path>", "to_route": "human_resources_spa"},
     {"from_route": "/sales-cockpit", "to_route": "sales_spa"},
     {"from_route": "/sales-cockpit/<path:app_path>", "to_route": "sales_spa"},
     {"from_route": "/project-management-cockpit", "to_route": "project_management_spa"},
@@ -130,6 +130,14 @@ website_route_rules = [
     {"from_route": "/accounting-cockpit/<path:app_path>", "to_route": "accounting_spa"},
     {"from_route": "/scan", "to_route": "scan"},
     {"from_route": "/scan/<path:app_path>", "to_route": "scan"},
+]
+
+# The HR cockpit used to live at /hr-cockpit; keep old links (Raven messages, bookmarks) working.
+# /hr_spa was its www page path; servers keep a stale built hr_spa.html there, which would
+# otherwise render without boot data.
+website_redirects = [
+    {"source": r"/hr-cockpit(/.*)?", "target": r"/human-resources-cockpit\1"},
+    {"source": "/hr_spa", "target": "/human-resources-cockpit"},
 ]
 
 
