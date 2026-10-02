@@ -516,10 +516,17 @@ class MonthlyImplementationSummary(Document):
 				continue
 			totals[row.project] = flt(totals.get(row.project, 0)) + flt(row.billable_hours)
 
+		titles = dict(
+			frappe.get_all(
+				"Project", filters={"name": ["in", list(totals.keys())]}, fields=["name", "project_name"], as_list=True
+			)
+		) if totals else {}
+
 		self.project_hours = []
 		for project, hours in sorted(totals.items()):
 			self.append("project_hours", {
 				"project": project,
+				"project_title": titles.get(project, ""),
 				"billable_hours": flt(hours),
 			})
 
