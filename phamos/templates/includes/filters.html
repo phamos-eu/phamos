@@ -1,0 +1,36 @@
+{% set search_placeholder = _("Name suchen...") %}
+<div class="tile-grid-filters" data-tile-filters>
+	<div class="tile-filters-head">
+		<div class="tile-filters-title">{{ _("Filter") }}</div>
+		<button type="button" class="btn btn-sm tile-filters-clear" data-tile-filters-clear>{{ _("Alles leeren") }}</button>
+	</div>
+	<div class="tile-filters-body">
+		<div class="tile-filters-group">
+			<input type="search" class="form-control tile-filters-search" data-tile-search placeholder="{{ search_placeholder }}">
+		</div>
+		{% for facet in filter_facets %}
+		<div class="tile-filters-group">
+			<div class="tile-filters-group-title">{{ facet.label }}</div>
+			{% if facet.type == "range" %}
+			{% for option in facet.options %}
+			<div class="tile-filters-option">
+				<label>
+					<input type="radio" name="{{ facet.key }}" value="{{ option.value }}" data-tile-facet="{{ facet.key }}">
+					{{ option.label }}
+				</label>
+			</div>
+			{% endfor %}
+			{% else %}
+			{% for option in facet.options %}
+			<div class="tile-filters-option">
+				<label>
+					<input type="checkbox" value="{{ option }}" data-tile-facet="{{ facet.key }}">
+					{{ option }}
+				</label>
+			</div>
+			{% endfor %}
+			{% endif %}
+		</div>
+		{% endfor %}
+	</div>
+</div>

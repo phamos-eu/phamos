@@ -1,0 +1,119 @@
+[
+ {
+  "doctype": "Website Person",
+  "full_name": "Wolfram Schmidt",
+  "position": "Gesch\u00e4ftsf\u00fchrer",
+  "department": "Management",
+  "years_at_phamos": 8,
+  "sort_order": 1,
+  "published": 1
+ },
+ {
+  "doctype": "Website Person",
+  "full_name": "Philipp Gutstein",
+  "position": "Head of HR & Projektleiter",
+  "department": "Human Resources",
+  "years_at_phamos": 6,
+  "sort_order": 2,
+  "published": 1
+ },
+ {
+  "doctype": "Website Person",
+  "full_name": "Roque Vera",
+  "position": "Head of Software Development",
+  "department": "Software Development",
+  "years_at_phamos": 5,
+  "sort_order": 3,
+  "published": 1
+ },
+ {
+  "doctype": "Website Person",
+  "full_name": "Furqan Asghar",
+  "position": "Softwareentwickler",
+  "department": "Software Development",
+  "years_at_phamos": 4,
+  "sort_order": 4,
+  "published": 1
+ },
+ {
+  "doctype": "Website Person",
+  "full_name": "Robera Workneh",
+  "position": "Software Developer",
+  "department": "Software Development",
+  "years_at_phamos": 3,
+  "sort_order": 5,
+  "published": 1
+ },
+ {
+  "doctype": "Website Person",
+  "full_name": "Muhammad Ali Baig",
+  "position": "Software Developer",
+  "department": "Software Development",
+  "years_at_phamos": 3,
+  "sort_order": 6,
+  "published": 1
+ },
+ {
+  "doctype": "Website Person",
+  "full_name": "Sonali Narkar",
+  "position": "Software Developer",
+  "department": "Software Development",
+  "years_at_phamos": 3,
+  "sort_order": 7,
+  "published": 1
+ },
+ {
+  "doctype": "Website Person",
+  "full_name": "Gunther Schmidt",
+  "position": "Head of Project Management",
+  "department": "Project Management",
+  "years_at_phamos": 4,
+  "sort_order": 8,
+  "published": 1
+ },
+ {
+  "doctype": "Website Person",
+  "full_name": "Simon Peter Wanyama",
+  "position": "Software Developer",
+  "department": "Software Development",
+  "years_at_phamos": 2,
+  "sort_order": 9,
+  "published": 1
+ },
+ {
+  "doctype": "Website Person",
+  "full_name": "Kamal Singh",
+  "position": "Software Developer",
+  "department": "Software Development",
+  "years_at_phamos": 2,
+  "sort_order": 10,
+  "published": 1
+ },
+ {
+  "doctype": "Website Person",
+  "full_name": "Kalsoom Akhtar",
+  "position": "Software Developer",
+  "department": "Software Development",
+  "years_at_phamos": 2,
+  "sort_order": 11,
+  "published": 1
+ },
+ {
+  "doctype": "Website Person",
+  "full_name": "Rainer Kloker",
+  "position": "Project Manager",
+  "department": "Project Management",
+  "years_at_phamos": 3,
+  "sort_order": 12,
+  "published": 1
+ },
+ {
+  "doctype": "Website Person",
+  "full_name": "Celia Lohner",
+  "position": "Project Manager",
+  "department": "Project Management",
+  "years_at_phamos": 1,
+  "sort_order": 13,
+  "published": 1
+ }
+]

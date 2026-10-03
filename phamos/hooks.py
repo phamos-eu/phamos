@@ -77,10 +77,10 @@ app_include_js = [
 
 # include js, css files in header of web template
 # web_include_css = "/assets/phamos/css/phamos.css"
-# web_include_js = "/assets/phamos/js/phamos.js"
+web_include_js = ["/assets/phamos/js/tile_filters.js"]
 
 # include custom scss in every website theme (without file extension ".scss")
-# website_theme_scss = "phamos/public/scss/website"
+website_theme_scss = "phamos/public/scss/website"
 
 # include js, css files in header of web form
 # webform_include_js = {"doctype": "public/js/doctype.js"}
@@ -136,6 +136,7 @@ website_route_rules = [
     {"from_route": "/accounting-cockpit/<path:app_path>", "to_route": "accounting_spa"},
     {"from_route": "/scan", "to_route": "scan"},
     {"from_route": "/scan/<path:app_path>", "to_route": "scan"},
+    {"from_route": "/people", "to_route": "people"},
 ]
 
 # The HR cockpit used to live at /hr-cockpit; keep old links (Raven messages, bookmarks) working.
@@ -332,6 +333,11 @@ fixtures = [
     {"dt": "Property Setter", "filters": [
         [
             "module", "=", "Phamos"
+        ]
+    ]},
+    {"dt": "Website Person", "filters": [
+        [
+            "published", "=", 1
         ]
     ]},
     {"dt": "Email Template", "filters": [

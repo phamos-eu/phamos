@@ -1,0 +1,30 @@
+{% extends "templates/base.html" %}
+{% from "phamos/templates/includes/tile_grid.html" import tile_grid %}
+{% block title %}{{ title }}{% endblock %}
+{% block content %}
+<div class="people-page">
+	<div class="page-head">
+		<h1>{{ _("People") }}</h1>
+		<p class="page-intro">
+			{{ _("Hinter phamos steht ein internationales Team aus engagierten Fachleuten, das seit vielen Jahren mit tiefem ERPNext-Know-how Unternehmen dabei unterstützt, ihre Prozesse zu optimieren und digital zu wachsen.") }}
+		</p>
+	</div>
+	<div class="tile-grid-layout">
+		<aside class="tile-grid-sidebar">
+			{% include "phamos/templates/includes/filters.html" %}
+		</aside>
+		<div class="tile-grid-main">
+			<div class="tile-grid-toolbar">
+				<span class="tile-grid-result-count" data-tile-result-count>{{ people | length }} {{ _("Ergebnisse") }}</span>
+			</div>
+			{% set items = people %}
+			{{ tile_grid(items) }}
+		</div>
+	</div>
+	<div class="people-cta section-card">
+		<h2>{{ _("Werde Teil von phamos") }}</h2>
+		<p>{{ _("Gestalte mit uns die Zukunft von phamos – werde Teil unseres Teams und hilf uns, den Mittelstand zu digitalisieren.") }}</p>
+		<a class="btn btn-primary" href="/jobs">{{ _("Zu den Stellenangeboten") }}</a>
+	</div>
+</div>
+{% endblock %}
