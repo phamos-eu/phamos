@@ -1,0 +1,198 @@
+// Copyright (c) 2026, phamos.eu and contributors
+// For license information, please see license.txt
+//
+// Shared tile/grid website components.
+
+$tile-radius: 12px;
+$tile-border: 1px solid var(--border-color, #d1d1d1);
+$tile-bg: #ffffff;
+$tile-bg-muted: #f3f3f3;
+
+.tile-grid-layout {
+	display: flex;
+	gap: 2rem;
+	align-items: flex-start;
+}
+
+.tile-grid-sidebar {
+	flex: 0 0 16rem;
+	position: sticky;
+	top: 6rem;
+}
+
+.tile-grid-main {
+	flex: 1;
+	min-width: 0;
+}
+
+.tile-grid {
+	display: grid;
+	grid-template-columns: repeat(auto-fill, minmax(15rem, 1fr));
+	gap: 1.5rem;
+}
+
+.tile-card {
+	background: $tile-bg;
+	border: $tile-border;
+	border-radius: $tile-radius;
+	overflow: hidden;
+	transition: box-shadow 0.15s ease, transform 0.15s ease;
+
+	&:hover {
+		box-shadow: 0 4px 16px rgba(0, 0, 0, 0.08);
+		transform: translateY(-2px);
+	}
+}
+
+.tile-card-photo {
+	aspect-ratio: 1 / 1;
+	background: $tile-bg-muted;
+	overflow: hidden;
+
+	img {
+		width: 100%;
+		height: 100%;
+		object-fit: cover;
+		display: block;
+	}
+}
+
+.tile-card-photo-placeholder {
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	height: 100%;
+	font-size: 3rem;
+	font-weight: 600;
+	color: #8a8a8a;
+}
+
+.tile-card-body {
+	padding: 1rem;
+}
+
+.tile-card-title {
+	font-weight: 600;
+	font-size: 1.1rem;
+}
+
+.tile-card-subtitle {
+	color: #6b6b6b;
+	margin-top: 0.25rem;
+}
+
+.tile-card-stats {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 0.5rem;
+	margin-top: 0.75rem;
+}
+
+.tile-card-chip {
+	display: inline-flex;
+	align-items: center;
+	background: $tile-bg-muted;
+	border-radius: 999px;
+	padding: 0.25rem 0.75rem;
+	font-size: 0.8rem;
+	color: #333;
+
+	&.tile-card-chip-stat {
+		font-variant-numeric: tabular-nums;
+	}
+}
+
+.tile-grid-toolbar {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	margin-bottom: 1rem;
+}
+
+.tile-grid-result-count {
+	color: #6b6b6b;
+	font-size: 0.9rem;
+}
+
+.tile-grid-no-results {
+	margin: 3rem 0;
+	text-align: center;
+	color: #6b6b6b;
+}
+
+// Filter panel
+
+.tile-grid-filters {
+	background: $tile-bg;
+	border: $tile-border;
+	border-radius: $tile-radius;
+	overflow: hidden;
+}
+
+.tile-filters-head {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	padding: 0.85rem 1rem;
+	border-bottom: $tile-border;
+}
+
+.tile-filters-title {
+	font-weight: 600;
+}
+
+.tile-filters-clear {
+	font-size: 0.8rem;
+}
+
+.tile-filters-body {
+	padding: 1rem;
+	display: flex;
+	flex-direction: column;
+	gap: 1.25rem;
+}
+
+.tile-filters-group-title {
+	font-weight: 600;
+	font-size: 0.9rem;
+	margin-bottom: 0.5rem;
+}
+
+.tile-filters-option {
+	padding: 0.2rem 0;
+
+	label {
+		display: flex;
+		align-items: center;
+		gap: 0.5rem;
+		margin: 0;
+		font-size: 0.9rem;
+		cursor: pointer;
+	}
+}
+
+// CTA block
+
+.people-cta.section-card {
+	margin-top: 3rem;
+	padding: 2rem;
+	border: $tile-border;
+	border-radius: $tile-radius;
+	text-align: center;
+
+	.btn {
+		margin-top: 1rem;
+	}
+}
+
+@media (max-width: 991px) {
+	.tile-grid-layout {
+		flex-direction: column;
+	}
+
+	.tile-grid-sidebar {
+		flex: 1 1 auto;
+		position: static;
+		width: 100%;
+	}
+}

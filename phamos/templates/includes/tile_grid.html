@@ -1,0 +1,7 @@
+{% from "phamos/templates/includes/tile_card.html" import tile_card %}
+<div class="tile-grid" data-tile-grid data-no-results-text="{{ _('Keine Ergebnisse') }}">
+	{% for item in items %}
+	{{ tile_card(item) }}
+	{% endfor %}
+</div>
+<div class="tile-grid-no-results" data-tile-grid-no-results hidden>{{ _("Keine Ergebnisse") }}</div>
