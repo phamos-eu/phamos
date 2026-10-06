@@ -21,33 +21,40 @@ from phamos.phamos.doctype.timesheet_record.timesheet_record import compute_time
 def _find_gitlab_issues_in_text(*text_fields):
     """Scan text for GitLab URLs and return (child_issue_name, parent_issue_name).
 
-    URL classification:
-      - /-/work_items/N  →  child issue
-      - /-/issues/N      →  parent issue
+    GitLab now uses /-/work_items/N for both parent and child tasks, so the URL
+    path is not used to classify. Each URL is matched to a synced GitLab Issue:
+      - Parent Issue set   →  child task: (issue, issue.parent_issue)
+      - Parent Issue empty →  parent task: (None, issue)
 
-    Rules:
-      - Child found: child = child, parent = child.parent_issue from DB (None if unset)
-      - Only parent found: both = parent (same issue fills both slots)
-      - Neither found: (None, None)
+    The first child task found wins; otherwise the first parent task found.
+    URLs whose GitLab Issue is not synced yet are ignored.
     """
     text = " ".join(t for t in text_fields if t)
     text = html.unescape(strip_html(text))
 
-    child_issue = None
-    parent_issue = None
+    parent_only = None
 
     for url in re.findall(r'https?://[^\s"\'<>]+/-/(?:issues|work_items)/\d+', text):
-        if "/-/work_items/" in url and child_issue is None:
-            child_issue = frappe.db.get_value("GitLab Issue", {"issue_url": url}, "name")
-        elif "/-/issues/" in url and parent_issue is None:
-            parent_issue = frappe.db.get_value("GitLab Issue", {"issue_url": url}, "name")
+        issue = _get_gitlab_issue_by_url(url)
+        if not issue:
+            continue
+        if issue.parent_issue:
+            return issue.name, issue.parent_issue
+        if parent_only is None:
+            parent_only = issue.name
 
-    if child_issue:
-        resolved_parent = frappe.db.get_value("GitLab Issue", child_issue, "parent_issue") or None
-        return child_issue, resolved_parent
-    elif parent_issue:
-        return parent_issue, parent_issue
-    return None, None
+    return None, parent_only
+
+
+def _get_gitlab_issue_by_url(url):
+    """Find a GitLab Issue by URL, accepting either the /-/issues/ or /-/work_items/ form."""
+    variants = [url, url.replace("/-/work_items/", "/-/issues/"), url.replace("/-/issues/", "/-/work_items/")]
+    return frappe.db.get_value(
+        "GitLab Issue",
+        {"issue_url": ["in", list(dict.fromkeys(variants))]},
+        ["name", "parent_issue"],
+        as_dict=True,
+    )
 
 
 def _resolve_gitlab_parent(child_issue_name):
