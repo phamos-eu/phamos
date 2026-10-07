@@ -1,0 +1,252 @@
+{
+ "actions": [],
+ "allow_rename": 1,
+ "autoname": "SWP-.#####",
+ "creation": "2026-10-07 18:00:00.000000",
+ "description": "Public profile of a stakeholder (customer, partner, …): named with approval, otherwise anonymous.",
+ "doctype": "DocType",
+ "editable_grid": 1,
+ "engine": "InnoDB",
+ "field_order": [
+  "stakeholder_section",
+  "stakeholder_type",
+  "party_type",
+  "party",
+  "stakeholder_col",
+  "party_name",
+  "industry",
+  "website",
+  "region",
+  "approval_section",
+  "naming_approved",
+  "naming_approval_date",
+  "approval_col",
+  "key_person",
+  "account_manager",
+  "stakeholder_website_section",
+  "published",
+  "route",
+  "sort_order",
+  "stakeholder_website_col",
+  "image",
+  "stakeholder_en_section",
+  "summary_en",
+  "description_en",
+  "stakeholder_de_section",
+  "summary_de",
+  "description_de"
+ ],
+ "fields": [
+  {
+   "description": "A customer, partner (or later another kind of stakeholder) of phamos. One doctype, one website section per type: /de/kunden, /de/partner.",
+   "fieldname": "stakeholder_section",
+   "fieldtype": "Section Break",
+   "label": "Stakeholder"
+  },
+  {
+   "default": "Customer",
+   "fieldname": "stakeholder_type",
+   "fieldtype": "Select",
+   "in_list_view": 1,
+   "in_standard_filter": 1,
+   "label": "Stakeholder Type",
+   "options": "Customer\nPartner",
+   "reqd": 1
+  },
+  {
+   "description": "Customer, Supplier or Sales Partner.",
+   "fieldname": "party_type",
+   "fieldtype": "Link",
+   "in_standard_filter": 1,
+   "label": "Party Type",
+   "options": "DocType",
+   "reqd": 1
+  },
+  {
+   "fieldname": "party",
+   "fieldtype": "Dynamic Link",
+   "in_list_view": 1,
+   "label": "Party",
+   "options": "party_type",
+   "reqd": 1
+  },
+  {
+   "fieldname": "stakeholder_col",
+   "fieldtype": "Column Break"
+  },
+  {
+   "bold": 1,
+   "description": "Mirrored from the party.",
+   "fieldname": "party_name",
+   "fieldtype": "Data",
+   "in_list_view": 1,
+   "label": "Name",
+   "read_only": 1
+  },
+  {
+   "description": "Mirrored from the Customer; set by hand for other parties.",
+   "fieldname": "industry",
+   "fieldtype": "Link",
+   "in_standard_filter": 1,
+   "label": "Industry",
+   "options": "Industry Type"
+  },
+  {
+   "description": "Mirrored from the party.",
+   "fieldname": "website",
+   "fieldtype": "Data",
+   "label": "Website",
+   "read_only": 1
+  },
+  {
+   "description": "e.g. DACH",
+   "fieldname": "region",
+   "fieldtype": "Data",
+   "label": "Region"
+  },
+  {
+   "description": "Without the stakeholder's approval the page is published anonymously: no name, logo, website or their people, and a neutral URL.",
+   "fieldname": "approval_section",
+   "fieldtype": "Section Break",
+   "label": "Naming Approval"
+  },
+  {
+   "default": "0",
+   "fieldname": "naming_approved",
+   "fieldtype": "Check",
+   "label": "Approved to Be Named"
+  },
+  {
+   "depends_on": "naming_approved",
+   "fieldname": "naming_approval_date",
+   "fieldtype": "Date",
+   "label": "Approval Date",
+   "mandatory_depends_on": "naming_approved"
+  },
+  {
+   "fieldname": "approval_col",
+   "fieldtype": "Column Break"
+  },
+  {
+   "description": "Their contact shown in the page sidebar (a Person Web Profile of this party). Hidden on anonymous pages.",
+   "fieldname": "key_person",
+   "fieldtype": "Link",
+   "label": "Key Contact",
+   "options": "Person Web Profile"
+  },
+  {
+   "description": "The phamos person responsible, shown next to the key contact.",
+   "fieldname": "account_manager",
+   "fieldtype": "Link",
+   "label": "Account Manager (phamos)",
+   "options": "Employee"
+  },
+  {
+   "fieldname": "stakeholder_website_section",
+   "fieldtype": "Section Break",
+   "label": "Website"
+  },
+  {
+   "default": "0",
+   "fieldname": "published",
+   "fieldtype": "Check",
+   "in_list_view": 1,
+   "in_standard_filter": 1,
+   "label": "Published"
+  },
+  {
+   "description": "URL slug, generated from the title if empty. Same slug in both languages.",
+   "fieldname": "route",
+   "fieldtype": "Data",
+   "label": "Route",
+   "unique": 1
+  },
+  {
+   "default": "0",
+   "fieldname": "sort_order",
+   "fieldtype": "Int",
+   "label": "Sort Order"
+  },
+  {
+   "fieldname": "stakeholder_website_col",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "image",
+   "fieldtype": "Attach Image",
+   "label": "Logo"
+  },
+  {
+   "fieldname": "stakeholder_en_section",
+   "fieldtype": "Section Break",
+   "label": "English"
+  },
+  {
+   "description": "One answer-first sentence shown on tiles and at the top of the profile.",
+   "fieldname": "summary_en",
+   "fieldtype": "Small Text",
+   "label": "Summary (EN)"
+  },
+  {
+   "fieldname": "description_en",
+   "fieldtype": "Text Editor",
+   "label": "Description (EN)"
+  },
+  {
+   "fieldname": "stakeholder_de_section",
+   "fieldtype": "Section Break",
+   "label": "Deutsch"
+  },
+  {
+   "fieldname": "summary_de",
+   "fieldtype": "Small Text",
+   "label": "Summary (DE)"
+  },
+  {
+   "fieldname": "description_de",
+   "fieldtype": "Text Editor",
+   "label": "Description (DE)"
+  }
+ ],
+ "index_web_pages_for_search": 0,
+ "istable": 0,
+ "links": [],
+ "modified": "2026-10-07 18:00:00.000000",
+ "modified_by": "Administrator",
+ "module": "Phamos",
+ "name": "Stakeholder Web Profile",
+ "owner": "Administrator",
+ "permissions": [
+  {
+   "create": 1,
+   "delete": 1,
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "System Manager",
+   "share": 1,
+   "write": 1
+  },
+  {
+   "create": 1,
+   "delete": 1,
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "Website Manager",
+   "share": 1,
+   "write": 1
+  }
+ ],
+ "search_fields": "party_name,industry",
+ "show_title_field_in_link": 1,
+ "sort_field": "modified",
+ "sort_order": "DESC",
+ "states": [],
+ "title_field": "party_name",
+ "track_changes": 1
+}
