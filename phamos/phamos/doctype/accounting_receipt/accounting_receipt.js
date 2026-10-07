@@ -128,17 +128,8 @@ frappe.ui.form.on("Accounting Receipt", {
         if (!frm.fields_dict || !frm.fields_dict.pdf_attachment_choice) return;
 
         frappe.call({
-            method: "frappe.client.get_list",
-            args: {
-                doctype: "File",
-                fields: ["name", "file_name", "file_url", "file_size", "creation"],
-                filters: {
-                    attached_to_doctype: "Accounting Receipt",
-                    attached_to_name: frm.doc.name,
-                },
-                order_by: "creation desc",
-                limit_page_length: 50,
-            },
+            method: "phamos.phamos.doctype.accounting_receipt.accounting_receipt.get_attached_files",
+            args: { accounting_receipt_name: frm.doc.name },
             callback: function (r) {
                 var files = (r && r.message) || [];
                 var pdf_urls = files

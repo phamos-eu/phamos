@@ -67,7 +67,16 @@
 				<!-- Expanded -->
 				<div v-else class="space-y-3 px-3 py-3" @click.stop>
 					<div class="flex items-start gap-3">
-						<div class="min-w-0 flex-1">
+						<div class="min-w-0 flex-1 space-y-2">
+							<input
+								type="text"
+								class="w-full rounded-md border border-gray-300 bg-white px-2 py-1.5 text-sm text-gray-900 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-100"
+								:value="item.description || ''"
+								:disabled="savingItem === item.name"
+								placeholder="Short description"
+								maxlength="140"
+								@change="saveField(item, 'description', $event.target.value)"
+							/>
 							<TextEditor
 								:content="item.note || ''"
 								:fixed-menu="editorMenu"

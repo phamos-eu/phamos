@@ -32,3 +32,6 @@ phamos.patches.v1_0.backfill_gitlab_issue_touch_time  #123
 phamos.patches.v1_0.backfill_gitlab_issue_aging_days #123
 phamos.patches.v1_0.backfill_gitlab_cycle_start_label #123
 phamos.patches.v1_0.recompute_gitlab_cycle_time_started_at #123
+
+phamos.patches.v1_0.backfill_checklist_owner
+phamos.patches.v1_0.rename_hr_and_pm_cockpit_settings_fields

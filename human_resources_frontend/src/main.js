@@ -37,7 +37,7 @@ async function mountApp() {
 	try {
 		if (import.meta.env.DEV) {
 			const values = await frappeRequest({
-				url: "/api/method/phamos.www.hr_spa.get_context_for_dev",
+				url: "/api/method/phamos.www.human_resources_spa.get_context_for_dev",
 			})
 			if (!window.frappe) window.frappe = {}
 			window.frappe.boot = values

@@ -160,6 +160,29 @@ def sync_attachment_from_files(doc, event=None):
 
 
 @frappe.whitelist()
+def get_attached_files(accounting_receipt_name):
+	"""Return the Files attached to an Accounting Receipt, newest first.
+
+	Used by the form to fill the `pdf_attachment_choice` options. Querying File
+	directly from the client (frappe.client.get_list) depends on File doctype
+	permissions and fails with 403 for some users (phamos/phamos#1429). Instead,
+	read access to the receipt is the gate: whoever can open the receipt may see
+	its attachments, the same rule Frappe applies to the form sidebar.
+	"""
+	frappe.has_permission("Accounting Receipt", "read", doc=accounting_receipt_name, throw=True)
+	return frappe.get_all(
+		"File",
+		filters={
+			"attached_to_doctype": "Accounting Receipt",
+			"attached_to_name": accounting_receipt_name,
+		},
+		fields=["file_name", "file_url"],
+		order_by="creation desc",
+		limit_page_length=50,
+	)
+
+
+@frappe.whitelist()
 def send_to_datev(accounting_receipt_name):
 	"""
 	Send Accounting Receipt PDF to DATEV via Email Queue.

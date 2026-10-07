@@ -1,7 +1,7 @@
 <template>
 	<CockpitShell :title="pageTitle" :subtitle="pageSubtitle">
 		<template #sidebar>
-			<CockpitSidebar label="HR" storage-key="hr-spa-sidebar-collapsed" :items="navItems" />
+			<CockpitSidebar label="Human Resources" storage-key="human-resources-spa-sidebar-collapsed" :items="navItems" />
 		</template>
 	</CockpitShell>
 </template>
