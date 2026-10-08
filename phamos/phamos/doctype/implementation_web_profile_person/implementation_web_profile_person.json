@@ -1,0 +1,61 @@
+{
+ "actions": [],
+ "allow_rename": 0,
+ "autoname": null,
+ "creation": "2026-10-07 18:00:00.000000",
+ "description": "",
+ "doctype": "DocType",
+ "editable_grid": 1,
+ "engine": "InnoDB",
+ "field_order": [
+  "person",
+  "role_en",
+  "role_de",
+  "key_person"
+ ],
+ "fields": [
+  {
+   "fieldname": "person",
+   "fieldtype": "Link",
+   "in_list_view": 1,
+   "label": "Person",
+   "options": "Person Web Profile",
+   "reqd": 1
+  },
+  {
+   "description": "e.g. Project manager",
+   "fieldname": "role_en",
+   "fieldtype": "Data",
+   "in_list_view": 1,
+   "label": "Role (EN)"
+  },
+  {
+   "fieldname": "role_de",
+   "fieldtype": "Data",
+   "in_list_view": 1,
+   "label": "Role (DE)"
+  },
+  {
+   "columns": 1,
+   "default": "0",
+   "description": "Shown in the page sidebar. Tick one per side: the phamos implementation manager and the customer's manager.",
+   "fieldname": "key_person",
+   "fieldtype": "Check",
+   "in_list_view": 1,
+   "label": "Key Person"
+  }
+ ],
+ "index_web_pages_for_search": 0,
+ "istable": 1,
+ "links": [],
+ "modified": "2026-10-08 10:00:00.000000",
+ "modified_by": "Administrator",
+ "module": "Phamos",
+ "name": "Implementation Web Profile Person",
+ "owner": "Administrator",
+ "permissions": [],
+ "sort_field": "modified",
+ "sort_order": "DESC",
+ "states": [],
+ "track_changes": 0
+}

@@ -1,0 +1,375 @@
+{
+ "actions": [],
+ "allow_rename": 1,
+ "autoname": "PWP-.#####",
+ "creation": "2026-10-07 18:00:00.000000",
+ "description": "Public /people profile of a person: an Employee, or a contact of a Customer, Supplier or other party.",
+ "doctype": "DocType",
+ "editable_grid": 1,
+ "engine": "InnoDB",
+ "field_order": [
+  "party_section",
+  "party_type",
+  "party",
+  "contact",
+  "party_col",
+  "full_name",
+  "designation",
+  "company_name",
+  "status",
+  "employment_section",
+  "department",
+  "employment_col",
+  "date_of_joining",
+  "relieving_date",
+  "website_section",
+  "published",
+  "route",
+  "sort_order",
+  "website_col",
+  "image",
+  "consent_section",
+  "publication_consent",
+  "publication_consent_date",
+  "alumni_consent",
+  "alumni_consent_date",
+  "consent_col",
+  "contact_consent",
+  "contact_consent_date",
+  "email_id",
+  "expertise_section",
+  "modules",
+  "expertise_col",
+  "languages",
+  "bio_en_section",
+  "summary_en",
+  "bio_en",
+  "bio_de_section",
+  "summary_de",
+  "bio_de",
+  "links_section",
+  "profile_links",
+  "legacy_section",
+  "legacy_bio",
+  "legacy_email"
+ ],
+ "fields": [
+  {
+   "description": "Who is this? An Employee, or a contact person of a Customer, Supplier or other party.",
+   "fieldname": "party_section",
+   "fieldtype": "Section Break",
+   "label": "Person"
+  },
+  {
+   "description": "Employee, Customer, Supplier or Sales Partner.",
+   "fieldname": "party_type",
+   "fieldtype": "Link",
+   "in_list_view": 1,
+   "in_standard_filter": 1,
+   "label": "Party Type",
+   "options": "DocType",
+   "reqd": 1
+  },
+  {
+   "fieldname": "party",
+   "fieldtype": "Dynamic Link",
+   "in_standard_filter": 1,
+   "label": "Party",
+   "options": "party_type",
+   "reqd": 1
+  },
+  {
+   "description": "The person. Required for customers, suppliers and partners; optional for employees (used for the contact form address).",
+   "fieldname": "contact",
+   "fieldtype": "Link",
+   "label": "Contact",
+   "mandatory_depends_on": "eval:doc.party_type && doc.party_type!='Employee'",
+   "options": "Contact"
+  },
+  {
+   "fieldname": "party_col",
+   "fieldtype": "Column Break"
+  },
+  {
+   "bold": 1,
+   "fieldname": "full_name",
+   "fieldtype": "Data",
+   "in_list_view": 1,
+   "label": "Full Name",
+   "read_only": 1
+  },
+  {
+   "fieldname": "designation",
+   "fieldtype": "Data",
+   "in_standard_filter": 1,
+   "label": "Designation",
+   "read_only": 1
+  },
+  {
+   "fieldname": "company_name",
+   "fieldtype": "Data",
+   "in_standard_filter": 1,
+   "label": "Organization",
+   "read_only": 1
+  },
+  {
+   "fieldname": "status",
+   "fieldtype": "Data",
+   "in_list_view": 1,
+   "label": "Status",
+   "read_only": 1
+  },
+  {
+   "collapsible": 0,
+   "depends_on": "eval:doc.party_type=='Employee'",
+   "fieldname": "employment_section",
+   "fieldtype": "Section Break",
+   "label": "Employment (mirrored from Employee)"
+  },
+  {
+   "fieldname": "department",
+   "fieldtype": "Link",
+   "label": "Department",
+   "options": "Department",
+   "read_only": 1
+  },
+  {
+   "fieldname": "employment_col",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "date_of_joining",
+   "fieldtype": "Date",
+   "label": "Date of Joining",
+   "read_only": 1
+  },
+  {
+   "fieldname": "relieving_date",
+   "fieldtype": "Date",
+   "label": "Relieving Date",
+   "read_only": 1
+  },
+  {
+   "fieldname": "website_section",
+   "fieldtype": "Section Break",
+   "label": "Website"
+  },
+  {
+   "default": "0",
+   "fieldname": "published",
+   "fieldtype": "Check",
+   "in_list_view": 1,
+   "in_standard_filter": 1,
+   "label": "Published"
+  },
+  {
+   "description": "URL slug, generated from the name if empty. Same slug in both languages.",
+   "fieldname": "route",
+   "fieldtype": "Data",
+   "label": "Route",
+   "unique": 1
+  },
+  {
+   "default": "0",
+   "fieldname": "sort_order",
+   "fieldtype": "Int",
+   "label": "Sort Order"
+  },
+  {
+   "fieldname": "website_col",
+   "fieldtype": "Column Break"
+  },
+  {
+   "description": "Website photo, kept separate from HR or CRM photos.",
+   "fieldname": "image",
+   "fieldtype": "Attach Image",
+   "label": "Profile Image"
+  },
+  {
+   "description": "Every consent is stored with its date. Without publication consent an external person cannot be published.",
+   "fieldname": "consent_section",
+   "fieldtype": "Section Break",
+   "label": "Consent"
+  },
+  {
+   "default": "0",
+   "depends_on": "eval:doc.party_type && doc.party_type!='Employee'",
+   "fieldname": "publication_consent",
+   "fieldtype": "Check",
+   "label": "Consents to Public Profile"
+  },
+  {
+   "depends_on": "publication_consent",
+   "fieldname": "publication_consent_date",
+   "fieldtype": "Date",
+   "label": "Publication Consent Date",
+   "mandatory_depends_on": "publication_consent"
+  },
+  {
+   "default": "0",
+   "depends_on": "eval:doc.party_type=='Employee' && doc.status=='Left'",
+   "description": "Without it the alumni profile stays anonymous: name, photo, bio and contact hidden; designation, department and time at phamos stay.",
+   "fieldname": "alumni_consent",
+   "fieldtype": "Check",
+   "label": "Consents to Named Alumni Profile"
+  },
+  {
+   "depends_on": "alumni_consent",
+   "fieldname": "alumni_consent_date",
+   "fieldtype": "Date",
+   "label": "Alumni Consent Date",
+   "mandatory_depends_on": "alumni_consent"
+  },
+  {
+   "fieldname": "consent_col",
+   "fieldtype": "Column Break"
+  },
+  {
+   "default": "0",
+   "description": "Shows a contact form on the profile. Messages are forwarded by email; the address is never shown.",
+   "fieldname": "contact_consent",
+   "fieldtype": "Check",
+   "label": "May Be Contacted via the Website"
+  },
+  {
+   "depends_on": "contact_consent",
+   "fieldname": "contact_consent_date",
+   "fieldtype": "Date",
+   "label": "Contact Consent Date",
+   "mandatory_depends_on": "contact_consent"
+  },
+  {
+   "description": "Mirrored from the Contact (or the Employee's email). Never shown on the website.",
+   "fieldname": "email_id",
+   "fieldtype": "Data",
+   "label": "Forwarding Email",
+   "options": "Email",
+   "read_only": 1
+  },
+  {
+   "fieldname": "expertise_section",
+   "fieldtype": "Section Break",
+   "label": "Expertise and Languages"
+  },
+  {
+   "fieldname": "modules",
+   "fieldtype": "Table",
+   "label": "Module Expertise",
+   "options": "Web Profile Module"
+  },
+  {
+   "fieldname": "expertise_col",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "languages",
+   "fieldtype": "Table",
+   "label": "Languages",
+   "options": "Web Profile Language"
+  },
+  {
+   "fieldname": "bio_en_section",
+   "fieldtype": "Section Break",
+   "label": "English"
+  },
+  {
+   "description": "One answer-first sentence shown at the top of the profile.",
+   "fieldname": "summary_en",
+   "fieldtype": "Small Text",
+   "label": "Summary (EN)"
+  },
+  {
+   "fieldname": "bio_en",
+   "fieldtype": "Text Editor",
+   "label": "Biography (EN)"
+  },
+  {
+   "fieldname": "bio_de_section",
+   "fieldtype": "Section Break",
+   "label": "Deutsch"
+  },
+  {
+   "fieldname": "summary_de",
+   "fieldtype": "Small Text",
+   "label": "Summary (DE)"
+  },
+  {
+   "fieldname": "bio_de",
+   "fieldtype": "Text Editor",
+   "label": "Biography (DE)"
+  },
+  {
+   "collapsible": 0,
+   "fieldname": "links_section",
+   "fieldtype": "Section Break",
+   "label": "Social Profiles"
+  },
+  {
+   "description": "Shown as icons on this person's cards (not on anonymous alumni profiles).",
+   "fieldname": "profile_links",
+   "fieldtype": "Table",
+   "label": "Social Profiles",
+   "options": "Employee Profile-Social Media"
+  },
+  {
+   "collapsible": 1,
+   "description": "Values from the old Employee Profile, kept for reference after the migration.",
+   "fieldname": "legacy_section",
+   "fieldtype": "Section Break",
+   "label": "Legacy (2023 Employee Profile)"
+  },
+  {
+   "fieldname": "legacy_bio",
+   "fieldtype": "Small Text",
+   "label": "Old Biography",
+   "read_only": 1
+  },
+  {
+   "fieldname": "legacy_email",
+   "fieldtype": "Data",
+   "label": "Old Email",
+   "read_only": 1
+  }
+ ],
+ "index_web_pages_for_search": 0,
+ "istable": 0,
+ "links": [],
+ "modified": "2026-10-07 18:00:00.000000",
+ "modified_by": "Administrator",
+ "module": "Phamos",
+ "name": "Person Web Profile",
+ "owner": "Administrator",
+ "permissions": [
+  {
+   "create": 1,
+   "delete": 1,
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "System Manager",
+   "share": 1,
+   "write": 1
+  },
+  {
+   "create": 1,
+   "delete": 1,
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "Website Manager",
+   "share": 1,
+   "write": 1
+  }
+ ],
+ "search_fields": "full_name,designation,company_name",
+ "show_title_field_in_link": 1,
+ "sort_field": "modified",
+ "sort_order": "DESC",
+ "states": [],
+ "title_field": "full_name",
+ "track_changes": 1
+}

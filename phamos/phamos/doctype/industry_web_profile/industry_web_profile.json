@@ -1,0 +1,178 @@
+{
+ "actions": [],
+ "allow_rename": 1,
+ "autoname": "field:industry",
+ "creation": "2026-10-07 18:00:00.000000",
+ "description": "Public /industries profile of an Industry Type.",
+ "doctype": "DocType",
+ "editable_grid": 1,
+ "engine": "InnoDB",
+ "field_order": [
+  "source_section",
+  "industry",
+  "title_de",
+  "source_col",
+  "key_person",
+  "modules",
+  "industry_website_section",
+  "published",
+  "route",
+  "sort_order",
+  "industry_website_col",
+  "image",
+  "industry_en_section",
+  "summary_en",
+  "description_en",
+  "industry_de_section",
+  "summary_de",
+  "description_de"
+ ],
+ "fields": [
+  {
+   "fieldname": "source_section",
+   "fieldtype": "Section Break",
+   "label": "Mirrored from Industry Type"
+  },
+  {
+   "bold": 1,
+   "fieldname": "industry",
+   "fieldtype": "Link",
+   "in_list_view": 1,
+   "label": "Industry Type",
+   "options": "Industry Type",
+   "reqd": 1,
+   "unique": 1
+  },
+  {
+   "description": "German display name; the English name is the Industry Type.",
+   "fieldname": "title_de",
+   "fieldtype": "Data",
+   "label": "Name (DE)"
+  },
+  {
+   "fieldname": "source_col",
+   "fieldtype": "Column Break"
+  },
+  {
+   "description": "Shown in the page sidebar as the contact for this topic.",
+   "fieldname": "key_person",
+   "fieldtype": "Link",
+   "label": "Key Person",
+   "options": "Person Web Profile"
+  },
+  {
+   "fieldname": "modules",
+   "fieldtype": "Table",
+   "label": "Relevant Modules",
+   "options": "Web Profile Module"
+  },
+  {
+   "fieldname": "industry_website_section",
+   "fieldtype": "Section Break",
+   "label": "Website"
+  },
+  {
+   "default": "0",
+   "fieldname": "published",
+   "fieldtype": "Check",
+   "in_list_view": 1,
+   "in_standard_filter": 1,
+   "label": "Published"
+  },
+  {
+   "description": "URL slug, generated from the title if empty. Same slug in both languages.",
+   "fieldname": "route",
+   "fieldtype": "Data",
+   "label": "Route",
+   "unique": 1
+  },
+  {
+   "default": "0",
+   "fieldname": "sort_order",
+   "fieldtype": "Int",
+   "label": "Sort Order"
+  },
+  {
+   "fieldname": "industry_website_col",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "image",
+   "fieldtype": "Attach Image",
+   "label": "Image"
+  },
+  {
+   "fieldname": "industry_en_section",
+   "fieldtype": "Section Break",
+   "label": "English"
+  },
+  {
+   "description": "One answer-first sentence shown on tiles and at the top of the profile.",
+   "fieldname": "summary_en",
+   "fieldtype": "Small Text",
+   "label": "Summary (EN)"
+  },
+  {
+   "fieldname": "description_en",
+   "fieldtype": "Text Editor",
+   "label": "Description (EN)"
+  },
+  {
+   "fieldname": "industry_de_section",
+   "fieldtype": "Section Break",
+   "label": "Deutsch"
+  },
+  {
+   "fieldname": "summary_de",
+   "fieldtype": "Small Text",
+   "label": "Summary (DE)"
+  },
+  {
+   "fieldname": "description_de",
+   "fieldtype": "Text Editor",
+   "label": "Description (DE)"
+  }
+ ],
+ "index_web_pages_for_search": 0,
+ "istable": 0,
+ "links": [],
+ "modified": "2026-10-08 10:00:00.000000",
+ "modified_by": "Administrator",
+ "module": "Phamos",
+ "name": "Industry Web Profile",
+ "naming_rule": "By fieldname",
+ "owner": "Administrator",
+ "permissions": [
+  {
+   "create": 1,
+   "delete": 1,
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "System Manager",
+   "share": 1,
+   "write": 1
+  },
+  {
+   "create": 1,
+   "delete": 1,
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "Website Manager",
+   "share": 1,
+   "write": 1
+  }
+ ],
+ "search_fields": "industry",
+ "show_title_field_in_link": 1,
+ "sort_field": "modified",
+ "sort_order": "DESC",
+ "states": [],
+ "title_field": "industry",
+ "track_changes": 1
+}

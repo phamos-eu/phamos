@@ -1,0 +1,87 @@
+{
+ "actions": [],
+ "allow_rename": 1,
+ "autoname": null,
+ "creation": "2026-10-07 18:00:00.000000",
+ "description": "Settings for the public Web Profile pages (phamos/phamos#1492).",
+ "doctype": "DocType",
+ "editable_grid": 1,
+ "engine": "InnoDB",
+ "field_order": [
+  "contact_section",
+  "sales_contact",
+  "contact_col",
+  "sales_contact_role_en",
+  "sales_contact_role_de"
+ ],
+ "fields": [
+  {
+   "description": "Shown in the sidebar of every Web Profile detail page where no single person can be identified (e.g. a module or industry without a key person).",
+   "fieldname": "contact_section",
+   "fieldtype": "Section Break",
+   "label": "Sales Contact"
+  },
+  {
+   "description": "A published phamos person (Person Web Profile of an Employee).",
+   "fieldname": "sales_contact",
+   "fieldtype": "Link",
+   "label": "Sales Contact",
+   "options": "Person Web Profile",
+   "reqd": 0
+  },
+  {
+   "fieldname": "contact_col",
+   "fieldtype": "Column Break"
+  },
+  {
+   "default": "Sales · phamos",
+   "fieldname": "sales_contact_role_en",
+   "fieldtype": "Data",
+   "label": "Role Label (EN)"
+  },
+  {
+   "default": "Vertrieb · phamos",
+   "fieldname": "sales_contact_role_de",
+   "fieldtype": "Data",
+   "label": "Role Label (DE)"
+  }
+ ],
+ "index_web_pages_for_search": 0,
+ "issingle": 1,
+ "istable": 0,
+ "links": [],
+ "modified": "2026-10-07 18:00:00.000000",
+ "modified_by": "Administrator",
+ "module": "Phamos",
+ "name": "Web Profile Settings",
+ "owner": "Administrator",
+ "permissions": [
+  {
+   "create": 1,
+   "delete": 1,
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "System Manager",
+   "share": 1,
+   "write": 1
+  },
+  {
+   "create": 1,
+   "delete": 1,
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "Website Manager",
+   "share": 1,
+   "write": 1
+  }
+ ],
+ "sort_order": "DESC",
+ "states": [],
+ "track_changes": 1
+}

@@ -80,6 +80,7 @@ app_include_js = [
     "/assets/phamos/js/team_daily_schedule.js",
     "/assets/phamos/js/frappe_list_bulk_edit_override.js",  # Fixes null-label crash in bulk edit
     "checklist_dialog.bundle.js",  # Linked Checklists dialog (hashed bundle, see above)
+    "web_profile_form.bundle.js",  # Web Profile forms: missing-translation hint, preview link
 ]
 
 
@@ -251,7 +252,10 @@ doc_events = {
         "validate": "phamos.events.team_daily_schedule.validate_schedule_rows",
         "after_save": "phamos.phamos.doctype.team.team.create_team_capacity_ledger_entry",
         "after_insert": "phamos.events.team_daily_schedule.sync_events_from_parent",
-        "on_update": "phamos.events.team_daily_schedule.sync_events_from_parent",
+        "on_update": [
+            "phamos.events.team_daily_schedule.sync_events_from_parent",
+            "phamos.web_profile.mirror.push_to_profiles",
+        ],
         "on_trash": "phamos.events.team_daily_schedule.cleanup_events_on_parent_trash"
     },
     "Communication": {
@@ -285,8 +289,20 @@ doc_events = {
         "on_cancel": "phamos.phamos.doctype.monthly_implementation_summary.monthly_implementation_summary.sync_mis_status_for_source_doc",
     },
     "Customer": {
-        "on_update": "phamos.gitlab_integration.gitlab_group_utils.update_gitlab_avatar_on_customer"
+        "on_update": [
+            "phamos.gitlab_integration.gitlab_group_utils.update_gitlab_avatar_on_customer",
+            "phamos.web_profile.mirror.push_to_profiles",
+        ]
     },
+    "Implementation": {"on_update": "phamos.web_profile.mirror.push_to_profiles"},
+    # Mirror facts onto the Web Profiles (phamos/phamos#1492).
+    "Employee": {"on_update": "phamos.web_profile.mirror.push_to_profiles"},
+    "Contact": {"on_update": "phamos.web_profile.mirror.push_to_profiles"},
+    "Supplier": {"on_update": "phamos.web_profile.mirror.push_to_profiles"},
+    "Sales Partner": {"on_update": "phamos.web_profile.mirror.push_to_profiles"},
+    "Workspace": {"on_update": "phamos.web_profile.mirror.push_to_profiles"},
+    "Department": {"on_update": "phamos.web_profile.mirror.push_to_profiles"},
+    "Implementation Module": {"on_update": "phamos.web_profile.mirror.push_to_profiles"},
     "Interview Feedback": {
         "on_update": "phamos.phamos.hr.interview_summary.trigger_interview_summary",
         "on_submit": "phamos.phamos.hr.interview_summary.trigger_interview_summary",
