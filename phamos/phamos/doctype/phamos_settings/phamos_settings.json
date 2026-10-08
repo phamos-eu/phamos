@@ -7,7 +7,6 @@
  "editable_grid": 1,
  "engine": "InnoDB",
  "field_order": [
-  "phamos_team",
   "feedback_dialog_box_settings_section",
   "from_time",
   "till_time",
@@ -89,12 +88,6 @@
   "lead_handoff_improve_fields"
  ],
  "fields": [
-  {
-   "fieldname": "phamos_team",
-   "fieldtype": "Table",
-   "label": "Phamos Team",
-   "options": "Phamos Team"
-  },
   {
    "fieldname": "feedback_dialog_box_settings_section",
    "fieldtype": "Section Break",
@@ -544,7 +537,7 @@
  "index_web_pages_for_search": 1,
  "issingle": 1,
  "links": [],
- "modified": "2026-10-08 12:00:00.000000",
+ "modified": "2026-10-08 19:00:00.000000",
  "modified_by": "Administrator",
  "module": "Phamos",
  "name": "phamos Settings",
