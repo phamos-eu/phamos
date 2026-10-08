@@ -18,6 +18,7 @@
   "website",
   "region",
   "approval_section",
+  "publish_as",
   "naming_approved",
   "naming_approval_date",
   "approval_col",
@@ -101,13 +102,25 @@
    "label": "Region"
   },
   {
-   "description": "Without the stakeholder's approval the page is published anonymously: no name, logo, website or their people, and a neutral URL.",
+   "description": "Anonymous pages show no name, logo, website or their people, use a neutral URL, and may not name the stakeholder in their texts. Named pages need the recorded approval.",
    "fieldname": "approval_section",
    "fieldtype": "Section Break",
-   "label": "Naming Approval"
+   "label": "Naming"
+  },
+  {
+   "default": "Anonymous",
+   "description": "Anonymous is always allowed. Named needs the stakeholder's approval below. Switching a named page to Anonymous retires its named URL (410).",
+   "fieldname": "publish_as",
+   "fieldtype": "Select",
+   "in_list_view": 1,
+   "in_standard_filter": 1,
+   "label": "Publish As",
+   "options": "Anonymous\nNamed",
+   "reqd": 1
   },
   {
    "default": "0",
+   "description": "The stakeholder agreed to be named on the website (keep the written approval).",
    "fieldname": "naming_approved",
    "fieldtype": "Check",
    "label": "Approved to Be Named"
@@ -173,7 +186,7 @@
    "label": "Logo"
   },
   {
-   "description": "One row per website language (Deutsch, English, …). A language without a row shows the German text, otherwise any other row. Summary: one answer-first sentence shown on tiles and at the top of the page. Content: the main text of the page.",
+   "description": "One row per website language (Deutsch, English, …). A language without a row shows the German text, otherwise any other row. Title: only for anonymous pages, the neutral public title in this language, e.g. 'Mittelständischer Maschinenbauer' (empty: '<Industry> company, <Region>'). Summary: one answer-first sentence shown on tiles and at the top of the page. Content: the main text of the page.",
    "fieldname": "content_section",
    "fieldtype": "Section Break",
    "label": "Website Texts"
@@ -188,7 +201,7 @@
  "index_web_pages_for_search": 0,
  "istable": 0,
  "links": [],
- "modified": "2026-10-08 14:00:00.000000",
+ "modified": "2026-10-08 16:00:00.000000",
  "modified_by": "Administrator",
  "module": "Phamos",
  "name": "Stakeholder Web Profile",
