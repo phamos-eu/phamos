@@ -9,8 +9,7 @@
  "engine": "InnoDB",
  "field_order": [
   "person",
-  "role_en",
-  "role_de",
+  "role",
   "key_person"
  ],
  "fields": [
@@ -23,17 +22,11 @@
    "reqd": 1
   },
   {
-   "description": "e.g. Project manager",
-   "fieldname": "role_en",
+   "description": "In English, e.g. 'Project manager'. The German label comes from the Translation list (Translation doctype) or the app translations.",
+   "fieldname": "role",
    "fieldtype": "Data",
    "in_list_view": 1,
-   "label": "Role (EN)"
-  },
-  {
-   "fieldname": "role_de",
-   "fieldtype": "Data",
-   "in_list_view": 1,
-   "label": "Role (DE)"
+   "label": "Role"
   },
   {
    "columns": 1,
@@ -48,7 +41,7 @@
  "index_web_pages_for_search": 0,
  "istable": 1,
  "links": [],
- "modified": "2026-10-08 10:00:00.000000",
+ "modified": "2026-10-08 14:00:00.000000",
  "modified_by": "Administrator",
  "module": "Phamos",
  "name": "Implementation Web Profile Person",

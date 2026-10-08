@@ -41,12 +41,8 @@
   "modules",
   "expertise_col",
   "languages",
-  "bio_en_section",
-  "summary_en",
-  "bio_en",
-  "bio_de_section",
-  "summary_de",
-  "bio_de",
+  "content_section",
+  "translations",
   "links_section",
   "profile_links",
   "legacy_section",
@@ -268,35 +264,16 @@
    "options": "Web Profile Language"
   },
   {
-   "fieldname": "bio_en_section",
+   "description": "One row per website language (Deutsch, English, …). A language without a row shows the German text, otherwise any other row. Summary: one answer-first sentence shown on tiles and at the top of the page. Content: the biography.",
+   "fieldname": "content_section",
    "fieldtype": "Section Break",
-   "label": "English"
+   "label": "Website Texts"
   },
   {
-   "description": "One answer-first sentence shown at the top of the profile.",
-   "fieldname": "summary_en",
-   "fieldtype": "Small Text",
-   "label": "Summary (EN)"
-  },
-  {
-   "fieldname": "bio_en",
-   "fieldtype": "Text Editor",
-   "label": "Biography (EN)"
-  },
-  {
-   "fieldname": "bio_de_section",
-   "fieldtype": "Section Break",
-   "label": "Deutsch"
-  },
-  {
-   "fieldname": "summary_de",
-   "fieldtype": "Small Text",
-   "label": "Summary (DE)"
-  },
-  {
-   "fieldname": "bio_de",
-   "fieldtype": "Text Editor",
-   "label": "Biography (DE)"
+   "fieldname": "translations",
+   "fieldtype": "Table",
+   "label": "Texts per Language",
+   "options": "Web Profile Content"
   },
   {
    "collapsible": 0,
@@ -334,7 +311,7 @@
  "index_web_pages_for_search": 0,
  "istable": 0,
  "links": [],
- "modified": "2026-10-07 18:00:00.000000",
+ "modified": "2026-10-08 14:00:00.000000",
  "modified_by": "Administrator",
  "module": "Phamos",
  "name": "Person Web Profile",

@@ -1,5 +1,5 @@
 // Desk helpers for every "<Source> Web Profile" form (phamos/phamos#1492):
-// a visible hint when a DE/EN text has only one language, and a link to the public page.
+// a visible hint when a website language has no text row, and a link to the public page.
 (function () {
 	const SECTIONS = {
 		"Person Web Profile": { en: "people", de: "personen" },
@@ -10,21 +10,15 @@
 		"Industry Web Profile": { en: "industries", de: "branchen" },
 		"Stakeholder Web Profile": { en: "customers", de: "kunden", Partner: { en: "partners", de: "partner" } },
 	};
-	const TEXT_FIELDS = ["title", "summary", "description", "bio"];
+	// Website languages, German first (keep in sync with phamos/web_profile/i18n.py LANGUAGES).
+	const LANGUAGES = { de: "Deutsch", en: "English" };
 
-	const isEmpty = (value) => !value || !String(value).replace(/<[^>]*>/g, "").trim();
-
+	// Site languages without a row in the "Texts per Language" table (Web Profile Content).
 	function missingTranslations(frm) {
-		const missing = [];
-		for (const base of TEXT_FIELDS) {
-			const en = frm.fields_dict[`${base}_en`];
-			const de = frm.fields_dict[`${base}_de`];
-			if (!en || !de) continue;
-			const hasEn = !isEmpty(frm.doc[`${base}_en`]);
-			const hasDe = !isEmpty(frm.doc[`${base}_de`]);
-			if (hasEn !== hasDe) missing.push(hasEn ? de.df.label : en.df.label);
-		}
-		return missing;
+		const present = new Set((frm.doc.translations || []).map((row) => row.language));
+		return Object.entries(LANGUAGES)
+			.filter(([code]) => !present.has(code))
+			.map(([, label]) => label);
 	}
 
 	// Person Web Profile: pick a party (Employee, Customer, Supplier, Sales Partner), then the
@@ -77,7 +71,7 @@
 				const missing = missingTranslations(frm);
 				frm.set_intro(
 					missing.length
-						? __("Missing translation: {0}. The other language is shown instead.", [missing.join(", ")])
+						? __("Missing translation: {0}. The German text (or another language) is shown instead.", [missing.join(", ")])
 						: "",
 					"orange"
 				);

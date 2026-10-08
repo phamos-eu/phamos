@@ -1,7 +1,7 @@
 """Turn the renamed Employee Profile records into Person Web Profiles of party type Employee.
 
 Old columns stay in the table (Frappe never drops columns): employee -> party, profile_image ->
-image, bio -> bio_en (+ legacy_bio), email_id -> legacy_email. Mirrored facts are refreshed from
+image, bio -> English text row (+ legacy_bio), email_id -> legacy_email. Mirrored facts are refreshed from
 the Employee. Nothing is published by this patch; editors decide per profile.
 """
 
@@ -29,9 +29,11 @@ def execute():
 			doc.image = row.profile_image
 		if row.get("bio"):
 			doc.legacy_bio = row.bio
-			doc.bio_en = doc.bio_en or row.bio
+			if not any(t.language == "en" for t in doc.get("translations") or []):
+				doc.append("translations", {"language": "en", "content": row.bio})
 		if row.get("email_id"):
 			doc.legacy_email = row.email_id
 		refresh_mirrored_fields(doc)
 		doc.set_route()
 		doc.db_update()
+		doc.update_child_table("translations")
