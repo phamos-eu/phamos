@@ -18,6 +18,7 @@ execute:from phamos.patches.v1_0.fix_mis_status_for_existing_records_v2 import c
 phamos.patches.v1_0.migrate_person_web_profile_from_employee_profile
 phamos.patches.v1_0.move_web_profile_texts_to_content_rows
 phamos.patches.v1_0.set_stakeholder_publish_as
+phamos.patches.v1_0.set_stakeholder_anonymous_route
 phamos.patches.v1_0.update_parent_okrs_is_group
 phamos.patches.v1_0.set_timesheet_record_colors #123
 phamos.patches.v1_0.clear_synthetic_layout_field_labels
