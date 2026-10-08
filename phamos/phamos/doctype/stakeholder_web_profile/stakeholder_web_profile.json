@@ -28,6 +28,7 @@
   "published",
   "route",
   "anonymous_route",
+  "anonymous_route_published",
   "sort_order",
   "stakeholder_website_col",
   "image",
@@ -172,11 +173,22 @@
    "unique": 1
   },
   {
-   "description": "URL slug while Publish As is Anonymous, e.g. 'mittelstaendischer-maschinenbauer'. Generated once from the German text title, else industry and region; never contains the stakeholder's name. Route above is the named URL.",
+   "description": "URL slug of the anonymous page, e.g. 'mittelstaendischer-maschinenbauer'. Generated once at creation from the German text title, else industry and region, and kept for good; never contains the stakeholder's name. Used while Publish As is Anonymous; Route above is the named URL.",
    "fieldname": "anonymous_route",
    "fieldtype": "Data",
    "label": "Anonymous Route",
+   "no_copy": 1,
    "unique": 1
+  },
+  {
+   "default": "0",
+   "description": "Set once the anonymous page has been public. Only then does its URL redirect to the named page after a switch to Named.",
+   "fieldname": "anonymous_route_published",
+   "fieldtype": "Check",
+   "hidden": 1,
+   "label": "Anonymous Route Published",
+   "no_copy": 1,
+   "read_only": 1
   },
   {
    "default": "0",
@@ -209,7 +221,7 @@
  "index_web_pages_for_search": 0,
  "istable": 0,
  "links": [],
- "modified": "2026-10-08 17:00:00.000000",
+ "modified": "2026-10-08 18:00:00.000000",
  "modified_by": "Administrator",
  "module": "Phamos",
  "name": "Stakeholder Web Profile",
