@@ -24,7 +24,10 @@
   "relieving_date",
   "website_section",
   "published",
+  "publish_as",
   "route",
+  "anonymous_route",
+  "anonymous_route_published",
   "sort_order",
   "website_col",
   "image",
@@ -159,11 +162,41 @@
    "label": "Published"
   },
   {
-   "description": "URL slug, generated from the name if empty. Same slug in both languages.",
+   "default": "Named",
+   "description": "Named needs the fitting consent: none for active employees, the named alumni consent for former employees, the public profile consent for customer and partner contacts. Without it the page is anonymous automatically. Anonymous: designation only, no name, photo, texts, socials or contact form; not indexed by search engines.",
+   "fieldname": "publish_as",
+   "fieldtype": "Select",
+   "in_list_view": 1,
+   "in_standard_filter": 1,
+   "label": "Publish As",
+   "options": "Named\nAnonymous",
+   "reqd": 1
+  },
+  {
+   "description": "URL slug of the named page: first name + initial of the surname, e.g. 'wolfram-s'. Generated once at creation; must not contain the surname. Same slug in both languages.",
    "fieldname": "route",
    "fieldtype": "Data",
    "label": "Route",
    "unique": 1
+  },
+  {
+   "description": "URL slug of the anonymous page: a random code, generated once at creation and never derived from the name.",
+   "fieldname": "anonymous_route",
+   "fieldtype": "Data",
+   "label": "Anonymous Route",
+   "no_copy": 1,
+   "read_only": 1,
+   "unique": 1
+  },
+  {
+   "default": "0",
+   "description": "Set once the anonymous page has been public. Only then does its URL redirect to the named page after a switch to Named.",
+   "fieldname": "anonymous_route_published",
+   "fieldtype": "Check",
+   "hidden": 1,
+   "label": "Anonymous Route Published",
+   "no_copy": 1,
+   "read_only": 1
   },
   {
    "default": "0",
@@ -311,7 +344,7 @@
  "index_web_pages_for_search": 0,
  "istable": 0,
  "links": [],
- "modified": "2026-10-08 14:00:00.000000",
+ "modified": "2026-10-08 18:00:00.000000",
  "modified_by": "Administrator",
  "module": "Phamos",
  "name": "Person Web Profile",
