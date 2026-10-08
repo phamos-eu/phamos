@@ -29,12 +29,8 @@
   "sort_order",
   "stakeholder_website_col",
   "image",
-  "stakeholder_en_section",
-  "summary_en",
-  "description_en",
-  "stakeholder_de_section",
-  "summary_de",
-  "description_de"
+  "content_section",
+  "translations"
  ],
  "fields": [
   {
@@ -177,41 +173,22 @@
    "label": "Logo"
   },
   {
-   "fieldname": "stakeholder_en_section",
+   "description": "One row per website language (Deutsch, English, …). A language without a row shows the German text, otherwise any other row. Summary: one answer-first sentence shown on tiles and at the top of the page. Content: the main text of the page.",
+   "fieldname": "content_section",
    "fieldtype": "Section Break",
-   "label": "English"
+   "label": "Website Texts"
   },
   {
-   "description": "One answer-first sentence shown on tiles and at the top of the profile.",
-   "fieldname": "summary_en",
-   "fieldtype": "Small Text",
-   "label": "Summary (EN)"
-  },
-  {
-   "fieldname": "description_en",
-   "fieldtype": "Text Editor",
-   "label": "Description (EN)"
-  },
-  {
-   "fieldname": "stakeholder_de_section",
-   "fieldtype": "Section Break",
-   "label": "Deutsch"
-  },
-  {
-   "fieldname": "summary_de",
-   "fieldtype": "Small Text",
-   "label": "Summary (DE)"
-  },
-  {
-   "fieldname": "description_de",
-   "fieldtype": "Text Editor",
-   "label": "Description (DE)"
+   "fieldname": "translations",
+   "fieldtype": "Table",
+   "label": "Texts per Language",
+   "options": "Web Profile Content"
   }
  ],
  "index_web_pages_for_search": 0,
  "istable": 0,
  "links": [],
- "modified": "2026-10-07 18:00:00.000000",
+ "modified": "2026-10-08 14:00:00.000000",
  "modified_by": "Administrator",
  "module": "Phamos",
  "name": "Stakeholder Web Profile",

@@ -25,8 +25,6 @@
   "customer_approved",
   "customer_approval_date",
   "approval_col",
-  "title_en",
-  "title_de",
   "region",
   "implementation_website_section",
   "published",
@@ -34,12 +32,8 @@
   "sort_order",
   "implementation_website_col",
   "image",
-  "implementation_en_section",
-  "summary_en",
-  "description_en",
-  "implementation_de_section",
-  "summary_de",
-  "description_de"
+  "content_section",
+  "translations"
  ],
  "fields": [
   {
@@ -156,17 +150,6 @@
    "fieldtype": "Column Break"
   },
   {
-   "description": "Case title, e.g. 'ERP rollout for a growing manufacturer'.",
-   "fieldname": "title_en",
-   "fieldtype": "Data",
-   "label": "Public Title (EN)"
-  },
-  {
-   "fieldname": "title_de",
-   "fieldtype": "Data",
-   "label": "Public Title (DE)"
-  },
-  {
    "description": "Shown on anonymous cases, e.g. DACH.",
    "fieldname": "region",
    "fieldtype": "Data",
@@ -208,41 +191,22 @@
    "label": "Image"
   },
   {
-   "fieldname": "implementation_en_section",
+   "description": "One row per website language (Deutsch, English, …). A language without a row shows the German text, otherwise any other row. Title: the public case title, e.g. 'ERP rollout for a growing manufacturer'. Summary: one answer-first sentence shown on tiles and at the top of the page. Content: the main text of the page.",
+   "fieldname": "content_section",
    "fieldtype": "Section Break",
-   "label": "English"
+   "label": "Website Texts"
   },
   {
-   "description": "One answer-first sentence shown on tiles and at the top of the profile.",
-   "fieldname": "summary_en",
-   "fieldtype": "Small Text",
-   "label": "Summary (EN)"
-  },
-  {
-   "fieldname": "description_en",
-   "fieldtype": "Text Editor",
-   "label": "Case Story (EN)"
-  },
-  {
-   "fieldname": "implementation_de_section",
-   "fieldtype": "Section Break",
-   "label": "Deutsch"
-  },
-  {
-   "fieldname": "summary_de",
-   "fieldtype": "Small Text",
-   "label": "Summary (DE)"
-  },
-  {
-   "fieldname": "description_de",
-   "fieldtype": "Text Editor",
-   "label": "Case Story (DE)"
+   "fieldname": "translations",
+   "fieldtype": "Table",
+   "label": "Texts per Language",
+   "options": "Web Profile Content"
   }
  ],
  "index_web_pages_for_search": 0,
  "istable": 0,
  "links": [],
- "modified": "2026-10-07 18:00:00.000000",
+ "modified": "2026-10-08 14:00:00.000000",
  "modified_by": "Administrator",
  "module": "Phamos",
  "name": "Implementation Web Profile",
@@ -274,11 +238,11 @@
    "write": 1
   }
  ],
- "search_fields": "title_en,customer",
+ "search_fields": "implementation,customer",
  "show_title_field_in_link": 1,
  "sort_field": "modified",
  "sort_order": "DESC",
  "states": [],
- "title_field": "title_en",
+ "title_field": "implementation",
  "track_changes": 1
 }
