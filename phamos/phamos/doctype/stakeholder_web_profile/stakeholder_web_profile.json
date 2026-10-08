@@ -27,6 +27,7 @@
   "stakeholder_website_section",
   "published",
   "route",
+  "anonymous_route",
   "sort_order",
   "stakeholder_website_col",
   "image",
@@ -171,6 +172,13 @@
    "unique": 1
   },
   {
+   "description": "URL slug while Publish As is Anonymous, e.g. 'mittelstaendischer-maschinenbauer'. Generated once from the German text title, else industry and region; never contains the stakeholder's name. Route above is the named URL.",
+   "fieldname": "anonymous_route",
+   "fieldtype": "Data",
+   "label": "Anonymous Route",
+   "unique": 1
+  },
+  {
    "default": "0",
    "fieldname": "sort_order",
    "fieldtype": "Int",
@@ -201,7 +209,7 @@
  "index_web_pages_for_search": 0,
  "istable": 0,
  "links": [],
- "modified": "2026-10-08 16:00:00.000000",
+ "modified": "2026-10-08 17:00:00.000000",
  "modified_by": "Administrator",
  "module": "Phamos",
  "name": "Stakeholder Web Profile",
