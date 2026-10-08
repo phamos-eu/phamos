@@ -1,0 +1,173 @@
+{
+ "actions": [],
+ "allow_rename": 1,
+ "autoname": "field:department",
+ "creation": "2026-10-07 18:00:00.000000",
+ "description": "Public /departments profile of a Department.",
+ "doctype": "DocType",
+ "editable_grid": 1,
+ "engine": "InnoDB",
+ "field_order": [
+  "source_section",
+  "department",
+  "department_name",
+  "source_col",
+  "lead",
+  "department_website_section",
+  "published",
+  "route",
+  "sort_order",
+  "department_website_col",
+  "image",
+  "department_en_section",
+  "summary_en",
+  "description_en",
+  "department_de_section",
+  "summary_de",
+  "description_de"
+ ],
+ "fields": [
+  {
+   "fieldname": "source_section",
+   "fieldtype": "Section Break",
+   "label": "Mirrored from Department"
+  },
+  {
+   "fieldname": "department",
+   "fieldtype": "Link",
+   "in_list_view": 1,
+   "label": "Department",
+   "options": "Department",
+   "reqd": 1,
+   "unique": 1
+  },
+  {
+   "bold": 1,
+   "fetch_from": "department.department_name",
+   "fieldname": "department_name",
+   "fieldtype": "Data",
+   "in_list_view": 1,
+   "label": "Department Name",
+   "read_only": 1
+  },
+  {
+   "fieldname": "source_col",
+   "fieldtype": "Column Break"
+  },
+  {
+   "description": "Shown as a link to the lead's Employee Web Profile (anonymised automatically for alumni).",
+   "fieldname": "lead",
+   "fieldtype": "Link",
+   "label": "Lead",
+   "options": "Employee"
+  },
+  {
+   "fieldname": "department_website_section",
+   "fieldtype": "Section Break",
+   "label": "Website"
+  },
+  {
+   "default": "0",
+   "fieldname": "published",
+   "fieldtype": "Check",
+   "in_list_view": 1,
+   "in_standard_filter": 1,
+   "label": "Published"
+  },
+  {
+   "description": "URL slug, generated from the title if empty. Same slug in both languages.",
+   "fieldname": "route",
+   "fieldtype": "Data",
+   "label": "Route",
+   "unique": 1
+  },
+  {
+   "default": "0",
+   "fieldname": "sort_order",
+   "fieldtype": "Int",
+   "label": "Sort Order"
+  },
+  {
+   "fieldname": "department_website_col",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "image",
+   "fieldtype": "Attach Image",
+   "label": "Image"
+  },
+  {
+   "fieldname": "department_en_section",
+   "fieldtype": "Section Break",
+   "label": "English"
+  },
+  {
+   "description": "One answer-first sentence shown on tiles and at the top of the profile.",
+   "fieldname": "summary_en",
+   "fieldtype": "Small Text",
+   "label": "Summary (EN)"
+  },
+  {
+   "fieldname": "description_en",
+   "fieldtype": "Text Editor",
+   "label": "Description (EN)"
+  },
+  {
+   "fieldname": "department_de_section",
+   "fieldtype": "Section Break",
+   "label": "Deutsch"
+  },
+  {
+   "fieldname": "summary_de",
+   "fieldtype": "Small Text",
+   "label": "Summary (DE)"
+  },
+  {
+   "fieldname": "description_de",
+   "fieldtype": "Text Editor",
+   "label": "Description (DE)"
+  }
+ ],
+ "index_web_pages_for_search": 0,
+ "istable": 0,
+ "links": [],
+ "modified": "2026-10-07 18:00:00.000000",
+ "modified_by": "Administrator",
+ "module": "Phamos",
+ "name": "Department Web Profile",
+ "naming_rule": "By fieldname",
+ "owner": "Administrator",
+ "permissions": [
+  {
+   "create": 1,
+   "delete": 1,
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "System Manager",
+   "share": 1,
+   "write": 1
+  },
+  {
+   "create": 1,
+   "delete": 1,
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "Website Manager",
+   "share": 1,
+   "write": 1
+  }
+ ],
+ "search_fields": "department_name",
+ "show_title_field_in_link": 1,
+ "sort_field": "modified",
+ "sort_order": "DESC",
+ "states": [],
+ "title_field": "department_name",
+ "track_changes": 1
+}

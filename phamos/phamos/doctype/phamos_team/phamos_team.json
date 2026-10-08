@@ -35,8 +35,8 @@
    "fieldname": "employee_profile",
    "fieldtype": "Link",
    "in_list_view": 1,
-   "label": "Employee Profile",
-   "options": "Employee Profile",
+   "label": "Person Web Profile",
+   "options": "Person Web Profile",
    "reqd": 1
   },
   {
@@ -47,14 +47,14 @@
    "reqd": 1
   },
   {
-   "fetch_from": "employee_profile.employee_name",
+   "fetch_from": "employee_profile.full_name",
    "fieldname": "employee_name",
    "fieldtype": "Data",
    "label": "Employee Name",
    "reqd": 1
   },
   {
-   "fetch_from": "employee_profile.profile_image",
+   "fetch_from": "employee_profile.image",
    "fieldname": "image_link",
    "fieldtype": "Data",
    "label": "Image Link",

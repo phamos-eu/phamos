@@ -1,4 +1,5 @@
 [pre_model_sync]
+phamos.patches.v1_0.rename_employee_profile_to_person_web_profile
 phamos.patches.v1_0.add_custom_fields_for_employee #1235
 phamos.patches.v1_0.add_property_for_timesheet_record #12334567
 phamos.patches.v1_0.add_custom_fields_for_project #1234567890
@@ -14,6 +15,7 @@ execute:from phamos.patches.v1_0.fix_mis_status_for_existing_records_v2 import c
 
 
 [post_model_sync]
+phamos.patches.v1_0.migrate_person_web_profile_from_employee_profile
 phamos.patches.v1_0.update_parent_okrs_is_group
 phamos.patches.v1_0.set_timesheet_record_colors #123
 phamos.patches.v1_0.clear_synthetic_layout_field_labels

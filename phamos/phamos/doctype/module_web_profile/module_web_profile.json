@@ -1,0 +1,204 @@
+{
+ "actions": [],
+ "allow_rename": 1,
+ "autoname": "field:module",
+ "creation": "2026-10-07 18:00:00.000000",
+ "description": "Public /modules profile of an Implementation Module.",
+ "doctype": "DocType",
+ "editable_grid": 1,
+ "engine": "InnoDB",
+ "field_order": [
+  "source_section",
+  "module",
+  "module_name",
+  "workspace",
+  "icon",
+  "source_col",
+  "key_person",
+  "complexity",
+  "typical_duration",
+  "module_website_section",
+  "published",
+  "route",
+  "sort_order",
+  "module_website_col",
+  "image",
+  "module_en_section",
+  "summary_en",
+  "description_en",
+  "module_de_section",
+  "summary_de",
+  "description_de"
+ ],
+ "fields": [
+  {
+   "fieldname": "source_section",
+   "fieldtype": "Section Break",
+   "label": "Mirrored from Implementation Module"
+  },
+  {
+   "fieldname": "module",
+   "fieldtype": "Link",
+   "in_list_view": 1,
+   "label": "Implementation Module",
+   "options": "Implementation Module",
+   "reqd": 1,
+   "unique": 1
+  },
+  {
+   "bold": 1,
+   "fetch_from": "module.module_name",
+   "fieldname": "module_name",
+   "fieldtype": "Data",
+   "in_list_view": 1,
+   "label": "Module Name",
+   "read_only": 1
+  },
+  {
+   "description": "The ERPNext workspace this module corresponds to. Its official icon is used on the website.",
+   "fieldname": "workspace",
+   "fieldtype": "Link",
+   "label": "ERPNext Workspace",
+   "options": "Workspace"
+  },
+  {
+   "description": "Mirrored from the Workspace.",
+   "fieldname": "icon",
+   "fieldtype": "Data",
+   "label": "Icon",
+   "read_only": 1
+  },
+  {
+   "fieldname": "source_col",
+   "fieldtype": "Column Break"
+  },
+  {
+   "description": "Shown in the page sidebar as the contact for this topic.",
+   "fieldname": "key_person",
+   "fieldtype": "Link",
+   "label": "Key Person",
+   "options": "Person Web Profile"
+  },
+  {
+   "fieldname": "complexity",
+   "fieldtype": "Select",
+   "in_standard_filter": 1,
+   "label": "Complexity",
+   "options": "\nLow\nMedium\nHigh\nCritical"
+  },
+  {
+   "description": "e.g. 4-6 weeks",
+   "fieldname": "typical_duration",
+   "fieldtype": "Data",
+   "label": "Typical Duration"
+  },
+  {
+   "fieldname": "module_website_section",
+   "fieldtype": "Section Break",
+   "label": "Website"
+  },
+  {
+   "default": "0",
+   "fieldname": "published",
+   "fieldtype": "Check",
+   "in_list_view": 1,
+   "in_standard_filter": 1,
+   "label": "Published"
+  },
+  {
+   "description": "URL slug, generated from the title if empty. Same slug in both languages.",
+   "fieldname": "route",
+   "fieldtype": "Data",
+   "label": "Route",
+   "unique": 1
+  },
+  {
+   "default": "0",
+   "fieldname": "sort_order",
+   "fieldtype": "Int",
+   "label": "Sort Order"
+  },
+  {
+   "fieldname": "module_website_col",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "image",
+   "fieldtype": "Attach Image",
+   "label": "Image"
+  },
+  {
+   "fieldname": "module_en_section",
+   "fieldtype": "Section Break",
+   "label": "English"
+  },
+  {
+   "description": "One answer-first sentence shown on tiles and at the top of the profile.",
+   "fieldname": "summary_en",
+   "fieldtype": "Small Text",
+   "label": "Subtitle (EN)"
+  },
+  {
+   "fieldname": "description_en",
+   "fieldtype": "Text Editor",
+   "label": "Description (EN)"
+  },
+  {
+   "fieldname": "module_de_section",
+   "fieldtype": "Section Break",
+   "label": "Deutsch"
+  },
+  {
+   "fieldname": "summary_de",
+   "fieldtype": "Small Text",
+   "label": "Subtitle (DE)"
+  },
+  {
+   "fieldname": "description_de",
+   "fieldtype": "Text Editor",
+   "label": "Description (DE)"
+  }
+ ],
+ "index_web_pages_for_search": 0,
+ "istable": 0,
+ "links": [],
+ "modified": "2026-10-08 12:00:00.000000",
+ "modified_by": "Administrator",
+ "module": "Phamos",
+ "name": "Module Web Profile",
+ "naming_rule": "By fieldname",
+ "owner": "Administrator",
+ "permissions": [
+  {
+   "create": 1,
+   "delete": 1,
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "System Manager",
+   "share": 1,
+   "write": 1
+  },
+  {
+   "create": 1,
+   "delete": 1,
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "Website Manager",
+   "share": 1,
+   "write": 1
+  }
+ ],
+ "search_fields": "module_name",
+ "show_title_field_in_link": 1,
+ "sort_field": "modified",
+ "sort_order": "DESC",
+ "states": [],
+ "title_field": "module_name",
+ "track_changes": 1
+}
