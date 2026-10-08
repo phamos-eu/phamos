@@ -48,16 +48,16 @@ class StakeholderWebProfile(WebProfileDocument):
 				frappe.throw(_("Row {0} ({1}) mentions \"{2}\". An anonymous page must not name the stakeholder: remove it from the text or publish as Named.").format(row.idx, row.language, term))
 
 	def set_anonymous_route(self):
-		"""Neutral, stable URL slug of the anonymous page (phamos/phamos#1507): generated once while the
-		profile is anonymous, editable, never containing the stakeholder's name."""
+		"""Neutral, stable URL slug of the anonymous page (phamos/phamos#1507, #1508): generated once at
+		creation for every profile, editable, never containing the stakeholder's name."""
+		if self.published and self.publish_as != "Named":
+			self.anonymous_route_published = 1  # the anonymous URL is public from now on
 		if self.anonymous_route:
 			self.anonymous_route = slugify(self.anonymous_route)
 			if self.names_stakeholder(self.anonymous_route):
 				frappe.throw(_("The anonymous route \"{0}\" names the stakeholder. Choose a neutral one or leave it empty to generate it.").format(self.anonymous_route))
 			if self.route_taken(self.anonymous_route):
 				frappe.throw(_("The anonymous route \"{0}\" is already used by another stakeholder page.").format(self.anonymous_route))
-			return
-		if self.publish_as == "Named":
 			return
 		base = next((slug for slug in self.anonymous_route_candidates() if slug and not self.names_stakeholder(slug)),
 			TYPE_SLUGS.get(self.stakeholder_type, "stakeholder"))
