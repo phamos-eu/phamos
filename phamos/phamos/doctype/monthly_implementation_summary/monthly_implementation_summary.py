@@ -20,6 +20,10 @@ YEAR_MIN = 2000
 YEAR_MAX = 2100
 
 
+def _get_hour_uom():
+	return frappe.db.get_single_value("Phamos Settings", "hour_uom") or "Hour"
+
+
 def _so_hour_items(sales_order):
 	if not sales_order:
 		frappe.throw(frappe._("Sales Order is required."))
@@ -32,14 +36,22 @@ def _so_hour_items(sales_order):
 	)
 	if not items:
 		frappe.throw(frappe._("Sales Order {0} has no items.").format(sales_order))
+	hour_uom = _get_hour_uom()
 	hour_items = [
 		i for i in items
-		if (i.uom or "").strip() == "Hour" or (i.stock_uom or "").strip() == "Hour"
+		if (i.uom or "").strip() == hour_uom or (i.stock_uom or "").strip() == hour_uom
 	]
 	if hour_items:
 		return hour_items
 	if len(items) == 1:
 		return items
+	frappe.msgprint(
+		frappe._("Sales Order {0} has no items with UOM {1}; its hours are counted as 0.").format(
+			sales_order, frappe.bold(hour_uom)
+		),
+		indicator="orange",
+		alert=True,
+	)
 	return []
 
 

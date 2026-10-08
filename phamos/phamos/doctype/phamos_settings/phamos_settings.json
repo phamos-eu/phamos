@@ -37,6 +37,7 @@
   "monthly_implementation_summary_tab",
   "year",
   "month",
+  "hour_uom",
   "execute_scheduled_job",
   "raven_daily_thread_settings_tab",
   "enable_raven_daily_thread",
@@ -250,6 +251,14 @@
    "fieldname": "year",
    "fieldtype": "Select",
    "label": "Year"
+  },
+  {
+   "default": "Hour",
+   "description": "UOM of Sales Order items that count as implementation hours (Total hours in Sales Order Status Information and Delivery Note creation).",
+   "fieldname": "hour_uom",
+   "fieldtype": "Link",
+   "label": "Hour UOM",
+   "options": "UOM"
   },
   {
    "description": "Manually run the job that creates Monthly Implementation Summaries for open Implementations with timesheets in the selected Month and Year (same logic as the scheduled task).",
@@ -535,7 +544,7 @@
  "index_web_pages_for_search": 1,
  "issingle": 1,
  "links": [],
- "modified": "2026-10-01 14:00:00.000000",
+ "modified": "2026-10-08 12:00:00.000000",
  "modified_by": "Administrator",
  "module": "Phamos",
  "name": "phamos Settings",
