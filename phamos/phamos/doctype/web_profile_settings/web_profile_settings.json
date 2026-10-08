@@ -11,8 +11,7 @@
   "contact_section",
   "sales_contact",
   "contact_col",
-  "sales_contact_role_en",
-  "sales_contact_role_de"
+  "sales_contact_role"
  ],
  "fields": [
   {
@@ -35,22 +34,17 @@
   },
   {
    "default": "Sales · phamos",
-   "fieldname": "sales_contact_role_en",
+   "description": "In English. The German label comes from the Translation list (Translation doctype) or the app translations.",
+   "fieldname": "sales_contact_role",
    "fieldtype": "Data",
-   "label": "Role Label (EN)"
-  },
-  {
-   "default": "Vertrieb · phamos",
-   "fieldname": "sales_contact_role_de",
-   "fieldtype": "Data",
-   "label": "Role Label (DE)"
+   "label": "Role Label"
   }
  ],
  "index_web_pages_for_search": 0,
  "issingle": 1,
  "istable": 0,
  "links": [],
- "modified": "2026-10-07 18:00:00.000000",
+ "modified": "2026-10-08 14:00:00.000000",
  "modified_by": "Administrator",
  "module": "Phamos",
  "name": "Web Profile Settings",
