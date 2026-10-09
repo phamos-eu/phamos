@@ -307,3 +307,6 @@ Row {0}: there is already a text row for language {1}.,Zeile {0}: Für die Sprac
 "The anonymous route ""{0}"" is already used by another stakeholder page.",Die anonyme Route „{0}“ wird bereits von einer anderen Stakeholder-Seite verwendet.
 "The route ""{0}"" contains the surname. Use the first name and the initial of the surname, e.g. ""{1}"".","Die Route „{0}“ enthält den Nachnamen. Verwenden Sie den Vornamen und den Anfangsbuchstaben des Nachnamens, z. B. „{1}“."
 "The route ""{0}"" is already used by another person.",Die Route „{0}“ wird bereits von einer anderen Person verwendet.
+Translation Of,Übersetzung von
+"Page language. Use routes de/… and en/… so navbar, footer and language picker can switch.","Sprache der Seite. Routen de/… und en/… verwenden, damit Navigation, Fußzeile und Sprachauswahl umschalten können."
+"For the English page: the German page it translates.","Für die englische Seite: die deutsche Seite, die sie übersetzt."
