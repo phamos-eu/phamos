@@ -62,6 +62,10 @@ def submit(section, slug, lang, sender_name, sender_email, message, phone=None, 
 	if not item:
 		frappe.throw(_("This page can't be contacted through the website."), frappe.PermissionError)
 
+	if section == "people" and item.masked:
+		# An anonymous person can't be contacted, not even through phamos (phamos/phamos#1509).
+		frappe.throw(_("This person can't be contacted through the website."), frappe.PermissionError)
+
 	visitor = frappe._dict(name=sender_name, email=sender_email, phone=phone, message=message)
 	person = item if section == "people" else None
 	if person and person.data["party_type"] != "Employee":

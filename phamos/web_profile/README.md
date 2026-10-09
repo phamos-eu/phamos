@@ -52,4 +52,10 @@ bench --site dev.localhost execute phamos.web_profile.demo.seed   # developer si
 bench --site dev.localhost set-config web_profile_page_size 4      # see load-on-scroll with few records
 ```
 
+Tests (privacy, URL and contact rules; needs `allow_tests` in the site config):
+
+```bash
+bench --site dev.localhost run-tests --module phamos.tests.test_web_profile
+```
+
 Known gaps: profiles are not yet in `sitemap.xml`, and `llms.txt` is not generated yet (tracked in #1492).

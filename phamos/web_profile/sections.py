@@ -272,16 +272,20 @@ def _profile_map(doctype, link_field, title_field):
 	}
 
 
-def _stakeholder_pages(lang):
-	"""{(party_type, party): page} for published Stakeholder Web Profiles, with the website section of
-	their type. Anonymous pages (Publish As "Anonymous", or no approval to be named) get a neutral slug
-	and title; only named pages may be linked from named content."""
+def _stakeholder_pages(lang, published_only=True):
+	"""{(party_type, party): page} for Stakeholder Web Profiles (published ones by default), with the
+	website section of their type. Anonymous pages (Publish As "Anonymous", or no approval to be named)
+	get a neutral slug and title; only named pages may be linked from named content.
+
+	``published_only=False`` also returns unpublished profiles (``page.published`` is then False): an
+	anonymous stakeholder must not be named through its people even before its own page goes live."""
 	industry_titles = _industry_titles(lang)
 	section_of = {SECTIONS[s]["stakeholder_type"]: s for s in STAKEHOLDER_SECTIONS}
 	pages = {}
-	for r in attach_texts("Stakeholder Web Profile", frappe.get_all("Stakeholder Web Profile", filters={"published": 1},
+	for r in attach_texts("Stakeholder Web Profile", frappe.get_all("Stakeholder Web Profile",
+			filters={"published": 1} if published_only else None,
 			fields=["name", "stakeholder_type", "party_type", "party", "party_name", "publish_as", "naming_approved",
-				"industry", "region", "route", "anonymous_route", "anonymous_route_published"])):
+				"industry", "region", "route", "anonymous_route", "anonymous_route_published", "published"])):
 		if r.stakeholder_type not in section_of:
 			continue
 		named = r.publish_as == "Named" and bool(r.naming_approved)  # approval is checked on save too
@@ -295,6 +299,7 @@ def _stakeholder_pages(lang):
 			name=r.name,
 			section=section_of[r.stakeholder_type],
 			named=named,
+			published=bool(r.published),
 			# Anonymous: the stored neutral slug (phamos/phamos#1507); the computed one only for records saved before it.
 			slug=r.route if named else r.anonymous_route or prefix + "-" + "-".join(filter(None, [slugify(r.industry), short_hash(r.name, 4)])),
 			named_slug=r.route,
@@ -353,7 +358,7 @@ def load_people(lang):
 	person_modules = _children("Web Profile Module", "Person Web Profile", "module")
 	person_languages = _children("Web Profile Language", "Person Web Profile", "language")
 	memberships = _team_memberships()
-	stakeholder_pages = {k: p for k, p in _stakeholder_pages(lang).items() if p.named}
+	stakeholder_pages = _stakeholder_pages(lang, published_only=False)
 	links = {}
 	for row in frappe.get_all("Employee Profile-Social Media", filters={"parenttype": "Person Web Profile"},
 			fields=["parent", "platform", "description", "profile_link"], order_by="idx asc"):
@@ -373,6 +378,14 @@ def load_people(lang):
 		# Same rule as PersonWebProfile.shown_named (phamos/phamos#1509).
 		masked = r.publish_as == "Anonymous" or (alumni and not r.alumni_consent)
 		designation = _(r.designation) if r.designation else ""
+		# The organization of an external person. If its stakeholder page is anonymous, the person shows
+		# that page's neutral title and links to its anonymous URL, so the stakeholder is never named
+		# through its people.
+		organization, organization_url = (r.company_name if not employee else None), None
+		page = stakeholder_pages.get((r.party_type, r.party)) if not employee else None
+		if page:
+			organization = page.title if not page.named else organization
+			organization_url = item_url(page.section, page.slug, lang) if page.published else None
 		if masked:
 			# The random anonymous route; the hash only for records saved before it existed.
 			slug = r.anonymous_route or f"former-colleague-{short_hash(r.name)}"
@@ -380,7 +393,7 @@ def load_people(lang):
 				(_("Customer contact") if r.party_type == "Customer" else _("Partner contact"))
 			item = _item("people", r, lang, title, slug, subtitle=designation, masked=True, named_slug=r.route)
 		else:
-			subtitle = designation if employee else " · ".join(filter(None, [designation, r.company_name]))
+			subtitle = designation if employee else " · ".join(filter(None, [designation, organization]))
 			item = _item("people", r, lang, r.full_name, r.route, subtitle=subtitle, image=r.image)
 			if r.anonymous_route_published:
 				item["anonymous_slug"] = r.anonymous_route  # former anonymous URL redirects here
@@ -389,9 +402,9 @@ def load_people(lang):
 		_facet(item, "status", status, "")
 		# Recommended order without a filter: our team, then customers and partners, then alumni.
 		item["sort"]["manual"] = [{"current": 0, "partners": 1, "alumni": 2}[status], *item["sort"]["manual"]]
-		if not employee and r.company_name:
-			_facet(item, "organization", slugify(r.company_name), r.company_name)
-			item["chips"].append(r.company_name)
+		if organization:
+			_facet(item, "organization", slugify(organization), organization)
+			item["chips"].append(organization)
 			item["badge"] = _(PARTY_BADGES.get(r.party_type, "Partner"))
 		dept = departments.get(r.department) if employee else None
 		if dept:
@@ -415,7 +428,7 @@ def load_people(lang):
 		item["socials"] = [] if masked else links.get(r.name, [])  # anonymous alumni never show socials
 		item["sort"]["tenure"] = -(years or 0)
 		item["search"] = " ".join(filter(None, [None if masked else r.full_name, designation,
-			None if employee else r.company_name])).lower()
+			organization])).lower()
 		if alumni:
 			item["badge"] = _("Alumni")
 		if not masked:
@@ -424,15 +437,15 @@ def load_people(lang):
 		item["data"] = {
 			"party_type": r.party_type,
 			"party": r.party,
-			"organization": r.company_name,
-			"organization_url": item_url(stakeholder_pages[(r.party_type, r.party)].section,
-				stakeholder_pages[(r.party_type, r.party)].slug, lang) if (r.party_type, r.party) in stakeholder_pages else None,
+			"organization": organization,
+			"organization_url": organization_url,
 			"years": years,
 			"alumni": alumni,
 			# Only a flag reaches the page; the address stays on the server (see contact.py).
 			# phamos people take requests through the CRM (Opportunity); external people need their
 			# consent and a forwarding address. See contact.py.
-			"contactable": (employee and not alumni) or bool(r.contact_consent and r.email_id and not masked),
+			# Anonymous people are never contactable, not even through phamos (phamos/phamos#1509).
+			"contactable": not masked and ((employee and not alumni) or bool(r.contact_consent and r.email_id)),
 			"first_name": (r.full_name or "").split(" ")[0] if not masked else "",
 			"start_year": getdate(r.date_of_joining).year if r.date_of_joining else None,
 			"end_year": getdate(r.relieving_date).year if (alumni and r.relieving_date) else None,
@@ -849,7 +862,8 @@ def build_profile(item, lang):
 		if employee and not item.data.get("alumni"):
 			add_related(_("Teammates"), _("The people {0} works with every day in the same team.").format(first),
 				"people", facet="team", values=item.facets.get("team"), exclude=item.slug, current_only=True)
-		cta = None if item.data.get("contactable") else contact_dialog(item, lang, _("Start a conversation"))
+		# Own contact button when contactable; none at all on anonymous profiles.
+		cta = None if item.data.get("contactable") or item.masked else contact_dialog(item, lang, _("Start a conversation"))
 		employer = ORGANIZATION if employee else {"@type": "Organization", "name": item.data.get("organization")}
 		schema = None if item.masked else {"@type": "Person", "name": item.title, "jobTitle": designation or None,
 			"worksFor" if not item.data.get("alumni") else "alumniOf": employer}
