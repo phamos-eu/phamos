@@ -1,25 +1,42 @@
-{#- Overrides frappe/templates/includes/footer/footer_info.html: Frappe's footer info plus the
-    shared contact dialog of the Web Profile pages, so contact buttons work on every page
-    (phamos/phamos#1500). The company block like a DIN 5008 letter footer follows in #1502. -#}
+{#- Overrides frappe/templates/includes/footer/footer_info.html (phamos/phamos#1502).
+    Company data like a DIN 5008 letter footer, from ERPNext (phamos.web_profile.chrome.company_footer):
+    address · contact · register / VAT ID · bank (IBAN masked, no tax number). Also hosts the shared
+    contact dialog, so contact buttons work on every page. -#}
 {%- from "phamos/templates/web_profile/macros.html" import contact_dialog_markup with context -%}
-<div class="footer-info">
-	<div class="row">
-		<div class="footer-col-left col-sm-6 col-12">
-			{% if copyright %}
-			&copy; {{ copyright }}
-			{% endif %}
-			{% if footer_address %}
-			{% if copyright %}<br>{% endif %}
-			{{ footer_address }}
-			{% endif %}
+{%- set f = wp_company_footer or {} -%}
+<div class="footer-info wp-company-footer">
+	{%- if f.name %}
+	<div class="wp-company-cols">
+		<div class="wp-company-col">
+			<strong>{{ f.name | e }}</strong>
+			{%- for line in f.address_lines %}<br>{{ line | e }}{% endfor %}
 		</div>
-		<div class="footer-col-right col-sm-6 col-12 footer-powered">
-			{%- if footer_powered -%}
-				{{ footer_powered }}
-			{%- else -%}
-				{% include "templates/includes/footer/footer_powered.html" %}
-			{%- endif -%}
+		<div class="wp-company-col">
+			<strong>{{ _("Contact") }}</strong>
+			{%- if f.phone %}<br><a href="tel:{{ f.phone | replace(' ', '') | e }}">{{ f.phone | e }}</a>{% endif %}
+			{%- if f.email %}<br><a href="mailto:{{ f.email | e }}">{{ f.email | e }}</a>{% endif %}
+			{%- if f.website %}<br><a href="{{ f.website | e }}">{{ f.website | replace('https://', '') | replace('http://', '') | trim('/') | e }}</a>{% endif %}
 		</div>
+		<div class="wp-company-col">
+			{%- for line in f.register_lines %}{% if not loop.first %}<br>{% endif %}{{ line | e }}{% endfor %}
+			{%- if f.tax_id %}{% if f.register_lines %}<br>{% endif %}{{ _("VAT ID") }}: {{ f.tax_id | e }}{% endif %}
+		</div>
+		{%- if f.bank %}
+		<div class="wp-company-col">
+			<strong>{{ f.bank.name | e }}</strong>
+			<br>IBAN: {{ f.bank.iban | e }}
+			{%- if f.bank.bic %}<br>BIC: {{ f.bank.bic | e }}{% endif %}
+		</div>
+		{%- endif %}
+	</div>
+	{%- elif footer_address %}
+	<div>{{ footer_address }}</div>
+	{%- endif %}
+	<div class="wp-company-bottom">
+		<span>{% if copyright %}&copy; {{ copyright }}{% endif %}</span>
+		<span class="footer-powered">
+			{%- if footer_powered -%}{{ footer_powered }}{%- else -%}{% include "templates/includes/footer/footer_powered.html" %}{%- endif -%}
+		</span>
 	</div>
 </div>
 <div class="wp-dialog-host">{{ contact_dialog_markup(wp_lang or lang or "de") }}</div>
