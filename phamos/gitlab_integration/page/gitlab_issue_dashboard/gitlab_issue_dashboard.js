@@ -42,7 +42,10 @@ class GitLabIssueDashboard {
         this.$applyBtn = root.find("#gid-apply-filters");
         this.$resetBtn = root.find("#gid-reset-filters");
         this.$leadTimeKpis = root.find("#lead-time-kpis");
+        this.$touchTimeKpis = root.find("#touch-time-kpis");
+        this.$cycleTimeKpis = root.find("#cycle-time-kpis");
         this.$agingKpis = root.find("#aging-kpis");
+        this.$agingProjectKpis = root.find("#aging-project-kpis");
         this.$agingChart = root.find("#aging-chart");
         this.$flowKpis = root.find("#flow-kpis");
         this.$flowChart = root.find("#flow-chart");
@@ -340,6 +343,8 @@ class GitLabIssueDashboard {
             this.updateFilterState();
             this.renderLifetimeTicketsChart();
             this.renderLeadTimeKpis();
+            this.renderTouchTimeKpis();
+            this.renderCycleTimeKpis();
             this.renderAgingChart();
             this.renderFlowChart();
             this.renderFlowTable();
@@ -385,7 +390,7 @@ class GitLabIssueDashboard {
             <div class="gid-kpi gid-kpi-opened">
                 <small>${__("Total Open")}</small>
                 <strong>${totals}</strong>
-                ${latestMonthLabel ? `<div class="text-muted" style="font-size: 11px;">${__("As of {0} (the latest month in range)", [latestMonthLabel])}</div>` : ""}
+                ${latestMonthLabel ? `<div class="gid-kpi-sub">${__("As of {0} (the latest month in range)", [latestMonthLabel])}</div>` : ""}
             </div>
         `);
 
@@ -488,10 +493,12 @@ class GitLabIssueDashboard {
 
         let html = "";
 
-        if (mode === "single" && leadTime.company) {
+        if (mode === "single") {
             const projectTitle = projectTitles[leadTime.project] || leadTime.project || __("Project");
             html += buildRow(projectTitle, leadTime, leadTime.project);
-            html += buildRow(__("Company"), leadTime.company, null);
+            if (leadTime.company) {
+                html += buildRow(__("Company"), leadTime.company, null);
+            }
         } else if (mode === "project_compare" && (leadTime.project_lead_times || []).length) {
             leadTime.project_lead_times.forEach((row) => {
                 const title = projectTitles[row.project] || row.project || __("Project");
@@ -510,6 +517,160 @@ class GitLabIssueDashboard {
         });
     }
 
+    renderTouchTimeKpis() {
+        const touchTime = (this.currentData && this.currentData.touch_time) || {};
+        const leadTime = (this.currentData && this.currentData.lead_time) || {};
+        const mode = touchTime.mode || "combined";
+        const projectTitles = (this.currentData && this.currentData.project_titles) || {};
+
+        const formatHours = (value) => {
+            if (value === null || value === undefined) return __("N/A");
+            return __("{0} hrs", [Math.round(value * 24 * 100) / 100]);
+        };
+
+        const formatPct = (touchValue, leadValue) => {
+            if (touchValue === null || touchValue === undefined) return null;
+            if (!leadValue) return null;
+            return Math.round((touchValue / leadValue) * 1000) / 10;
+        };
+
+        const buildRow = (label, data, leadData, projectId) => {
+            const rolling = (data && data.rolling) || {};
+            const leadRolling = (leadData && leadData.rolling) || {};
+            const labelHtml = label
+                ? `<div class="gid-lead-row-label">${frappe.utils.escape_html(label)}</div>`
+                : "";
+            const projAttr = projectId ? frappe.utils.escape_html(projectId) : "";
+            const kpi = (period, title, value, leadValue, extraClass) => {
+                const pct = formatPct(value, leadValue);
+                const pctHtml = pct !== null
+                    ? `<div class="gid-kpi-sub">${__("{0}% of Lead Time", [pct])}</div>`
+                    : "";
+                return `
+                    <div class="gid-kpi ${extraClass} gid-clickable" data-drill="touch_time" data-project="${projAttr}" data-period="${period}">
+                        <small>${title}</small><strong>${formatHours(value)}</strong>
+                        ${pctHtml}
+                    </div>
+                `;
+            };
+            return `
+                <div class="gid-lead-row">
+                    ${labelHtml}
+                    <div class="gid-kpi-row gid-kpi-row-lead">
+                        ${kpi("filtered", __("Selected Filter Avg"), data ? data.filtered : null, leadData ? leadData.filtered : null, "gid-kpi-touch-main")}
+                        ${kpi("last_month", __("Last Month"), rolling.last_month, leadRolling.last_month, "gid-kpi-touch")}
+                        ${kpi("last_3_months", __("Last 3 Months"), rolling.last_3_months, leadRolling.last_3_months, "gid-kpi-touch")}
+                        ${kpi("last_6_months", __("Last 6 Months"), rolling.last_6_months, leadRolling.last_6_months, "gid-kpi-touch")}
+                        ${kpi("last_12_months", __("Last 12 Months"), rolling.last_12_months, leadRolling.last_12_months, "gid-kpi-touch")}
+                    </div>
+                </div>
+            `;
+        };
+
+        let html = "";
+
+        if (mode === "single") {
+            const projectTitle = projectTitles[touchTime.project] || touchTime.project || __("Project");
+            html += buildRow(projectTitle, touchTime, leadTime, touchTime.project);
+            if (touchTime.company) {
+                html += buildRow(__("Company"), touchTime.company, leadTime.company, null);
+            }
+        } else if (mode === "project_compare" && (touchTime.project_touch_times || []).length) {
+            touchTime.project_touch_times.forEach((row) => {
+                const title = projectTitles[row.project] || row.project || __("Project");
+                const leadRow = (leadTime.project_lead_times || []).find((t) => t.project === row.project);
+                html += buildRow(title, row, leadRow, row.project);
+            });
+        } else {
+            html += buildRow(null, touchTime, leadTime, null);
+        }
+
+        this.$touchTimeKpis.html(html);
+        this.$touchTimeKpis.off("click", ".gid-kpi").on("click", ".gid-kpi", (e) => {
+            const $el = $(e.currentTarget);
+            const project = $el.attr("data-project");
+            const period = $el.attr("data-period");
+            this.openTouchTimeDrilldown(project ? [project] : [], period);
+        });
+    }
+
+    renderCycleTimeKpis() {
+        const cycleTime = (this.currentData && this.currentData.cycle_time) || {};
+        const leadTime = (this.currentData && this.currentData.lead_time) || {};
+        const mode = cycleTime.mode || "combined";
+        const projectTitles = (this.currentData && this.currentData.project_titles) || {};
+
+        const formatDays = (value) => {
+            if (value === null || value === undefined) return __("N/A");
+            return __("{0} days", [value]);
+        };
+
+        const formatPct = (cycleValue, leadValue) => {
+            if (cycleValue === null || cycleValue === undefined) return null;
+            if (!leadValue) return null;
+            return Math.round((cycleValue / leadValue) * 1000) / 10;
+        };
+
+        const buildRow = (label, data, leadData, projectId) => {
+            const rolling = (data && data.rolling) || {};
+            const leadRolling = (leadData && leadData.rolling) || {};
+            const labelHtml = label
+                ? `<div class="gid-lead-row-label">${frappe.utils.escape_html(label)}</div>`
+                : "";
+            const projAttr = projectId ? frappe.utils.escape_html(projectId) : "";
+            const kpi = (period, title, value, leadValue, extraClass) => {
+                const pct = formatPct(value, leadValue);
+                const pctHtml = pct !== null
+                    ? `<div class="gid-kpi-sub">${__("{0}% of Lead Time", [pct])}</div>`
+                    : "";
+                return `
+                    <div class="gid-kpi ${extraClass} gid-clickable" data-drill="cycle_time" data-project="${projAttr}" data-period="${period}">
+                        <small>${title}</small><strong>${formatDays(value)}</strong>
+                        ${pctHtml}
+                    </div>
+                `;
+            };
+            return `
+                <div class="gid-lead-row">
+                    ${labelHtml}
+                    <div class="gid-kpi-row gid-kpi-row-lead">
+                        ${kpi("filtered", __("Selected Filter Avg"), data ? data.filtered : null, leadData ? leadData.filtered : null, "gid-kpi-cycle-main")}
+                        ${kpi("last_month", __("Last Month"), rolling.last_month, leadRolling.last_month, "gid-kpi-cycle")}
+                        ${kpi("last_3_months", __("Last 3 Months"), rolling.last_3_months, leadRolling.last_3_months, "gid-kpi-cycle")}
+                        ${kpi("last_6_months", __("Last 6 Months"), rolling.last_6_months, leadRolling.last_6_months, "gid-kpi-cycle")}
+                        ${kpi("last_12_months", __("Last 12 Months"), rolling.last_12_months, leadRolling.last_12_months, "gid-kpi-cycle")}
+                    </div>
+                </div>
+            `;
+        };
+
+        let html = "";
+
+        if (mode === "single") {
+            const projectTitle = projectTitles[cycleTime.project] || cycleTime.project || __("Project");
+            html += buildRow(projectTitle, cycleTime, leadTime, cycleTime.project);
+            if (cycleTime.company) {
+                html += buildRow(__("Company"), cycleTime.company, leadTime.company, null);
+            }
+        } else if (mode === "project_compare" && (cycleTime.project_cycle_times || []).length) {
+            cycleTime.project_cycle_times.forEach((row) => {
+                const title = projectTitles[row.project] || row.project || __("Project");
+                const leadRow = (leadTime.project_lead_times || []).find((t) => t.project === row.project);
+                html += buildRow(title, row, leadRow, row.project);
+            });
+        } else {
+            html += buildRow(null, cycleTime, leadTime, null);
+        }
+
+        this.$cycleTimeKpis.html(html);
+        this.$cycleTimeKpis.off("click", ".gid-kpi").on("click", ".gid-kpi", (e) => {
+            const $el = $(e.currentTarget);
+            const project = $el.attr("data-project");
+            const period = $el.attr("data-period");
+            this.openCycleTimeDrilldown(project ? [project] : [], period);
+        });
+    }
+
     renderAgingChart() {
         this.destroyChart(this.agingChart);
         this.agingChart = null;
@@ -523,6 +684,7 @@ class GitLabIssueDashboard {
         const selectedProjects = (this.currentData && this.currentData.projects) || [];
         const compareSingleProject = compareToCompany && selectedProjects.length === 1;
         const projectBuckets = aging.project_buckets || [];
+        const isComparing = compareSingleProject || (aging.mode === "project_compare" && projectBuckets.length > 1);
         const projectTitles = (this.currentData && this.currentData.project_titles) || {};
         const agingColors = this.getChartColors("aging");
         const values = [
@@ -536,14 +698,64 @@ class GitLabIssueDashboard {
             companyAging.bucket_gt_90 || 0,
         ];
 
-        this.$agingKpis.html(`
-            <div class="gid-kpi gid-kpi-green gid-clickable" data-bucket="0_30"><small>${__("0-30 days")}</small><strong>${values[0]}</strong></div>
-            <div class="gid-kpi gid-kpi-amber gid-clickable" data-bucket="31_90"><small>${__("31-90 days")}</small><strong>${values[1]}</strong></div>
-            <div class="gid-kpi gid-kpi-red gid-clickable" data-bucket="gt_90"><small>${__(">90 days")}</small><strong>${values[2]}</strong></div>
-        `);
-        this.$agingKpis.off("click", ".gid-kpi").on("click", ".gid-kpi", (e) => {
-            const bucket = $(e.currentTarget).attr("data-bucket");
-            this.openAgingDrilldown(selectedProjects, bucket);
+        const avgAgeHtml = (value) => {
+            if (value === null || value === undefined) return "";
+            return `<div class="gid-kpi-sub">${__("{0} days on average", [value])}</div>`;
+        };
+
+        if (isComparing) {
+            this.$agingKpis.empty().hide();
+        } else {
+            this.$agingKpis.show().html(`
+                <div class="gid-kpi gid-kpi-green gid-clickable" data-bucket="0_30"><small>${__("0-30 days")}</small><strong>${values[0]}</strong>${avgAgeHtml(aging.avg_0_30)}</div>
+                <div class="gid-kpi gid-kpi-amber gid-clickable" data-bucket="31_90"><small>${__("31-90 days")}</small><strong>${values[1]}</strong>${avgAgeHtml(aging.avg_31_90)}</div>
+                <div class="gid-kpi gid-kpi-red gid-clickable" data-bucket="gt_90"><small>${__(">90 days")}</small><strong>${values[2]}</strong>${avgAgeHtml(aging.avg_gt_90)}</div>
+            `);
+            this.$agingKpis.off("click", ".gid-kpi").on("click", ".gid-kpi", (e) => {
+                const bucket = $(e.currentTarget).attr("data-bucket");
+                this.openAgingDrilldown(selectedProjects, bucket);
+            });
+        }
+
+        const buildAgingRow = (title, projectId, rowValues, rowAvgs) => {
+            const projAttr = projectId ? frappe.utils.escape_html(projectId) : "";
+            return `
+                <div class="gid-lead-row">
+                    <div class="gid-lead-row-label">${frappe.utils.escape_html(title)}</div>
+                    <div class="gid-kpi-row">
+                        <div class="gid-kpi gid-kpi-green gid-clickable" data-project="${projAttr}" data-bucket="0_30">
+                            <small>${__("0-30 days")}</small><strong>${rowValues[0] || 0}</strong>${avgAgeHtml(rowAvgs[0])}
+                        </div>
+                        <div class="gid-kpi gid-kpi-amber gid-clickable" data-project="${projAttr}" data-bucket="31_90">
+                            <small>${__("31-90 days")}</small><strong>${rowValues[1] || 0}</strong>${avgAgeHtml(rowAvgs[1])}
+                        </div>
+                        <div class="gid-kpi gid-kpi-red gid-clickable" data-project="${projAttr}" data-bucket="gt_90">
+                            <small>${__(">90 days")}</small><strong>${rowValues[2] || 0}</strong>${avgAgeHtml(rowAvgs[2])}
+                        </div>
+                    </div>
+                </div>
+            `;
+        };
+
+        let projectRowsHtml = "";
+        if (compareSingleProject) {
+            const selectedProject = selectedProjects[0];
+            const selectedTitle = projectTitles[selectedProject] || selectedProject || __("Project");
+            projectRowsHtml += buildAgingRow(selectedTitle, selectedProject, values, [aging.avg_0_30, aging.avg_31_90, aging.avg_gt_90]);
+            projectRowsHtml += buildAgingRow(__("Company"), null, companyValues, [companyAging.avg_0_30, companyAging.avg_31_90, companyAging.avg_gt_90]);
+        } else if (aging.mode === "project_compare" && projectBuckets.length > 1) {
+            projectBuckets.forEach((row) => {
+                const title = projectTitles[row.project] || row.project || __("Project");
+                projectRowsHtml += buildAgingRow(title, row.project, [row.bucket_0_30, row.bucket_31_90, row.bucket_gt_90], [row.avg_0_30, row.avg_31_90, row.avg_gt_90]);
+            });
+        }
+
+        this.$agingProjectKpis.html(projectRowsHtml);
+        this.$agingProjectKpis.off("click", ".gid-kpi").on("click", ".gid-kpi", (e) => {
+            const $el = $(e.currentTarget);
+            const project = $el.attr("data-project");
+            const bucket = $el.attr("data-bucket");
+            this.openAgingDrilldown(project ? [project] : [], bucket);
         });
 
         if (compareSingleProject) {
@@ -698,12 +910,8 @@ class GitLabIssueDashboard {
             acc.closed += row.closed || 0;
             return acc;
         }, { opened: 0, closed: 0 });
-        const openNowTotal = (this.currentData && this.currentData.open_now_total !== undefined)
-            ? this.currentData.open_now_total
-            : totals.opened;
-
         this.$flowKpis.html(`
-            <div class="gid-kpi gid-kpi-opened gid-clickable" data-flow-kind="opened"><small>${__("Opened Total")}</small><strong>${openNowTotal}</strong></div>
+            <div class="gid-kpi gid-kpi-opened gid-clickable" data-flow-kind="opened"><small>${__("Opened Total")}</small><strong>${totals.opened}</strong></div>
             <div class="gid-kpi gid-kpi-closed gid-clickable" data-flow-kind="closed"><small>${__("Closed Total")}</small><strong>${totals.closed}</strong></div>
         `);
         this.$flowKpis.off("click", ".gid-kpi").on("click", ".gid-kpi", (e) => {
