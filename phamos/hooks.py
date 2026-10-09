@@ -79,6 +79,10 @@ app_include_js = [
 # include js, css files in header of web template
 # web_include_css = "/assets/phamos/css/phamos.css"
 # web_include_js = "/assets/phamos/js/phamos.js"
+# Web Profile pages (/de|en/people, ...); scoped to .wp-page / [data-wp-listing]. Bundled by
+# `bench build` so the URLs carry a content hash and browsers never keep a stale copy.
+web_include_css = ["web_profile.bundle.css"]
+web_include_js = ["web_profile.bundle.js"]
 
 # include custom scss in every website theme (without file extension ".scss")
 # website_theme_scss = "phamos/public/scss/website"
@@ -138,6 +142,29 @@ website_route_rules = [
     {"from_route": "/scan", "to_route": "scan"},
     {"from_route": "/scan/<path:app_path>", "to_route": "scan"},
 ]
+
+# Web Profile sections (phamos/phamos#1492): one listing + one profile page per section and
+# language, served by www/web_profile/{listing,profile}. Keep in sync with web_profile/sections.py.
+_WEB_PROFILE_SLUGS = {
+    "people": {"en": "people", "de": "personen"},
+    "departments": {"en": "departments", "de": "abteilungen"},
+    "teams": {"en": "teams", "de": "teams"},
+    "modules": {"en": "modules", "de": "module"},
+    "implementations": {"en": "implementations", "de": "implementierungen"},
+    "industries": {"en": "industries", "de": "branchen"},
+    "customers": {"en": "customers", "de": "kunden"},
+    "partners": {"en": "partners", "de": "partner"},
+}
+for _section, _slugs in _WEB_PROFILE_SLUGS.items():
+    for _lang, _slug in _slugs.items():
+        website_route_rules += [
+            {"from_route": f"/{_lang}/{_slug}", "to_route": "web_profile/listing",
+             "defaults": {"section": _section, "lang": _lang}},
+            {"from_route": f"/{_lang}/{_slug}/<slug>", "to_route": "web_profile/profile",
+             "defaults": {"section": _section, "lang": _lang}},
+        ]
+# Old URLs of the sections are redirected with Website Route Redirect records (Website Settings)
+# when a section goes live, not in code (phamos/phamos#1492).
 
 # The HR cockpit used to live at /hr-cockpit; keep old links (Raven messages, bookmarks) working.
 # /hr_spa was its www page path; servers keep a stale built hr_spa.html there, which would
