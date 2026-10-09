@@ -17,7 +17,7 @@ from frappe.utils import getdate
 from phamos.web_profile.i18n import localized
 from phamos.web_profile.icons import flag_url, module_icon
 from phamos.web_profile.socials import detect_platform, normalize_url, social_link
-from phamos.web_profile.utils import initials, short_hash, slugify
+from phamos.web_profile.utils import initials, slugify
 
 ORGANIZATION = {"@type": "Organization", "name": "phamos GmbH", "url": "https://phamos.eu"}
 CACHE_KEY = "web_profile_items"
@@ -180,24 +180,16 @@ def get_items(section, lang):
 
 
 def find_item(section, slug, lang):
-	"""(item, gone): ``gone`` is True when the slug is a retired named URL of an anonymised record.
-	The former anonymous URL of a now named stakeholder returns its item (the caller redirects)."""
-	for item in get_items(section, lang):
-		if item.slug == slug:
-			return item, False
-		if item.masked and item.named_slug == slug:
-			return None, True
-		if not item.masked and item.get("anonymous_slug") == slug:
-			return item, False
-	return None, False
+	"""The published item with this URL slug, or None. Every record has one neutral URL from its
+	creation, the same for its named and anonymous page (phamos/phamos#1512)."""
+	return next((item for item in get_items(section, lang) if item.slug == slug), None)
 
 
-def _item(section, record, lang, title, slug, *, subtitle="", image=None, masked=False, named_slug=None):
+def _item(section, record, lang, title, slug, *, subtitle="", image=None, masked=False):
 	return {
 		"section": section,
 		"name": record.name,
 		"slug": slug,
-		"named_slug": named_slug,
 		"url": item_url(section, slug, lang),
 		"title": title,
 		"subtitle": subtitle,
@@ -275,7 +267,8 @@ def _profile_map(doctype, link_field, title_field):
 def _stakeholder_pages(lang, published_only=True):
 	"""{(party_type, party): page} for Stakeholder Web Profiles (published ones by default), with the
 	website section of their type. Anonymous pages (Publish As "Anonymous", or no approval to be named)
-	get a neutral slug and title; only named pages may be linked from named content.
+	get a neutral title; the URL (route) is neutral for every page. Only named pages may be linked from
+	named content.
 
 	``published_only=False`` also returns unpublished profiles (``page.published`` is then False): an
 	anonymous stakeholder must not be named through its people even before its own page goes live."""
@@ -285,7 +278,7 @@ def _stakeholder_pages(lang, published_only=True):
 	for r in attach_texts("Stakeholder Web Profile", frappe.get_all("Stakeholder Web Profile",
 			filters={"published": 1} if published_only else None,
 			fields=["name", "stakeholder_type", "party_type", "party", "party_name", "publish_as", "naming_approved",
-				"industry", "region", "route", "anonymous_route", "anonymous_route_published", "published"])):
+				"industry", "region", "route", "published"])):
 		if r.stakeholder_type not in section_of:
 			continue
 		named = r.publish_as == "Named" and bool(r.naming_approved)  # approval is checked on save too
@@ -294,17 +287,12 @@ def _stakeholder_pages(lang, published_only=True):
 		if not named:
 			# Editors may write a better neutral title as the row title (e.g. "Mittelständischer Maschinenbauer").
 			descriptor = localized(r, "title", lang, fallback=False) or descriptor
-		prefix = r.stakeholder_type.lower()
 		pages[(r.party_type, r.party)] = frappe._dict(
 			name=r.name,
 			section=section_of[r.stakeholder_type],
 			named=named,
 			published=bool(r.published),
-			# Anonymous: the stored neutral slug (phamos/phamos#1507); the computed one only for records saved before it.
-			slug=r.route if named else r.anonymous_route or prefix + "-" + "-".join(filter(None, [slugify(r.industry), short_hash(r.name, 4)])),
-			named_slug=r.route,
-			# Only an anonymous URL that was ever public redirects to the named page (phamos/phamos#1508).
-			anonymous_slug=r.anonymous_route if r.anonymous_route_published else None,
+			slug=r.route,
 			title=r.party_name if named else descriptor,
 			descriptor=descriptor,
 		)
@@ -349,7 +337,7 @@ def load_people(lang):
 		filters={"published": 1},
 		fields=["name", "party_type", "party", "full_name", "status", "designation", "company_name", "department",
 			"date_of_joining", "relieving_date", "publication_consent", "alumni_consent", "contact_consent",
-			"email_id", "route", "image", "sort_order", "publish_as", "anonymous_route", "anonymous_route_published"],
+			"email_id", "route", "image", "sort_order", "publish_as"],
 	))
 	departments = _profile_map("Department Web Profile", "department", "department_name")
 	teams = _profile_map("Team Web Profile", "team", "team_name")
@@ -379,24 +367,20 @@ def load_people(lang):
 		masked = r.publish_as == "Anonymous" or (alumni and not r.alumni_consent)
 		designation = _(r.designation) if r.designation else ""
 		# The organization of an external person. If its stakeholder page is anonymous, the person shows
-		# that page's neutral title and links to its anonymous URL, so the stakeholder is never named
-		# through its people.
+		# that page's neutral title (and links to the page, whose URL is neutral anyway), so the
+		# stakeholder is never named through its people.
 		organization, organization_url = (r.company_name if not employee else None), None
 		page = stakeholder_pages.get((r.party_type, r.party)) if not employee else None
 		if page:
 			organization = page.title if not page.named else organization
 			organization_url = item_url(page.section, page.slug, lang) if page.published else None
 		if masked:
-			# The random anonymous route; the hash only for records saved before it existed.
-			slug = r.anonymous_route or f"former-colleague-{short_hash(r.name)}"
 			title = (_("Former colleague") if alumni else _("Team member")) if employee else \
 				(_("Customer contact") if r.party_type == "Customer" else _("Partner contact"))
-			item = _item("people", r, lang, title, slug, subtitle=designation, masked=True, named_slug=r.route)
+			item = _item("people", r, lang, title, r.route, subtitle=designation, masked=True)
 		else:
 			subtitle = designation if employee else " · ".join(filter(None, [designation, organization]))
 			item = _item("people", r, lang, r.full_name, r.route, subtitle=subtitle, image=r.image)
-			if r.anonymous_route_published:
-				item["anonymous_slug"] = r.anonymous_route  # former anonymous URL redirects here
 
 		status = "alumni" if alumni else "current" if employee else "partners"
 		_facet(item, "status", status, "")
@@ -548,9 +532,8 @@ def load_implementations(lang):
 		descriptor = ", ".join(filter(None, [_("{0} company").format(industry_label) if industry_label else _("Company"), r.region]))
 		title = localized(r, "title", lang) or (descriptor if masked else r.customer)
 		if masked:
-			slug = "case-" + "-".join(filter(None, [slugify(r.industry), str(year or "")])) + f"-{short_hash(r.name, 4)}"
-			item = _item("implementations", r, lang, title, slug, subtitle="" if title == descriptor else descriptor,
-				masked=True, named_slug=r.route)
+			item = _item("implementations", r, lang, title, r.route, subtitle="" if title == descriptor else descriptor,
+				masked=True)
 		else:
 			item = _item("implementations", r, lang, title, r.route, subtitle=r.customer, image=r.image)
 		if r.industry in industries:
@@ -629,10 +612,7 @@ def load_stakeholders(section, lang):
 				"region", "key_person", "account_manager"])):
 		page = pages[(r.party_type, r.party)]
 		masked = not page.named
-		item = _item(section, r, lang, page.title, page.slug, image=r.image, masked=masked,
-			named_slug=page.named_slug if masked else None)
-		if not masked and page.anonymous_slug:
-			item["anonymous_slug"] = page.anonymous_slug  # old anonymous URL redirects to the named page
+		item = _item(section, r, lang, page.title, page.slug, image=r.image, masked=masked)
 		# Named page: the customer's named projects. Anonymous page: only their anonymous projects.
 		projects = [i for i in implementations
 			if r.party_type == "Customer" and i.data.get("_customer") == r.party and i.masked == masked]

@@ -4,18 +4,9 @@
 {% from "phamos/templates/web_profile/macros.html" import head_tags, breadcrumbs, avatar, tile, contact_button, socials with context %}
 
 {% block title %}{{ title | e }}{% endblock %}
-{% block meta_block %}{{ super() }}{% if not gone %}{{ head_tags() }}{% else %}<meta name="robots" content="noindex">{% endif %}{% endblock %}
+{% block meta_block %}{{ super() }}{{ head_tags() }}{% endblock %}
 
 {% block content %}
-{%- if gone %}
-<main class="wp-page">
-	<div class="wp-empty wp-gone">
-		<h1 class="wp-empty-title">{{ _("This profile is no longer available") }}</h1>
-		<p>{{ _("The page was removed at the request of the person or customer it described.") }}</p>
-		<a class="wp-button" href="{{ list_url | e }}">{{ _("Browse all {0}").format(section_title) | e }}</a>
-	</div>
-</main>
-{%- else %}
 <main class="wp-page wp-profile wp-section-{{ section }}">
 	<div class="wp-page-head-top">
 		{{ breadcrumbs(crumbs) }}
@@ -110,5 +101,4 @@
 	</div>
 	</div>
 </main>
-{%- endif %}
 {% endblock %}

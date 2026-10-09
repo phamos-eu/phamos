@@ -1,7 +1,7 @@
 # Copyright (c) 2026, phamos.eu and contributors
 # For license information, please see license.txt
 
-"""Privacy, URL and contact rules of the Web Profile pages (phamos/phamos#1492, #1505–#1509).
+"""Privacy, URL and contact rules of the Web Profile pages (phamos/phamos#1492, #1505–#1512).
 
 Integration tests: they create their own Employee, Customer, Contact and Web Profiles and roll
 everything back afterwards. Run with
@@ -106,20 +106,15 @@ class TestWebProfile(FrappeTestCase):
 
 	# --- person URLs -------------------------------------------------------------------------------
 
-	def test_person_route_is_first_name_and_initial(self):
-		self.assertEqual(self.person.route, "testa-w")
-		self.assertTrue(self.person.anonymous_route.startswith("p-"))
+	def test_person_route_is_a_neutral_code(self):
+		self.assertRegex(self.person.route, r"^p-[a-z2-9]{5}$")
+		self.assertNotIn("testa", self.person.route)
 
-	def test_person_route_with_surname_is_refused(self):
-		doc = frappe.get_doc("Person Web Profile", self.person.name)
-		doc.route = "testa-webprofil"
-		self.assertRaises(frappe.ValidationError, doc.save)
-
-	def test_duplicate_short_route_gets_a_suffix(self):
-		other = frappe.new_doc("Person Web Profile")
-		other.full_name = "Testa Weber"
-		other.set_route()
-		self.assertEqual(other.route, "testa-w-2")
+	def test_person_route_with_a_name_is_refused(self):
+		for route in ("testa-w", "webprofil"):
+			doc = frappe.get_doc("Person Web Profile", self.person.name)
+			doc.route = route
+			self.assertRaises(frappe.ValidationError, doc.save)
 
 	# --- anonymous people --------------------------------------------------------------------------
 
@@ -133,7 +128,6 @@ class TestWebProfile(FrappeTestCase):
 		doc = self._make_anonymous()
 		item = _person_item(doc.name)
 		self.assertTrue(item.masked)
-		self.assertEqual(item.slug, doc.anonymous_route)
 		self.assertNotIn("Testa", item.title)
 		self.assertIsNone(item.image)
 		self.assertFalse(item.data["contactable"])
@@ -143,17 +137,18 @@ class TestWebProfile(FrappeTestCase):
 		self.assertTrue(all(not card["contact"] for card in profile["key_people"]))
 		self.assertIsNone(profile["schema"])
 
-	def test_named_url_of_anonymous_person_is_gone(self):
+	def test_url_stays_the_same_when_a_person_becomes_anonymous(self):
+		route = self.person.route
 		doc = self._make_anonymous()
+		self.assertEqual(doc.route, route)
 		_reset_items()
-		item, gone = find_item("people", doc.route, "en")
-		self.assertIsNone(item)
-		self.assertTrue(gone)
+		item = find_item("people", route, "en")
+		self.assertTrue(item and item.masked)
 
 	def test_contact_request_to_anonymous_person_is_refused(self):
 		doc = self._make_anonymous()
 		_reset_items()
-		self.assertRaises(frappe.PermissionError, self._submit, doc.anonymous_route)
+		self.assertRaises(frappe.PermissionError, self._submit, doc.route)
 
 	# --- external people and anonymous stakeholders ------------------------------------------------
 
@@ -165,7 +160,7 @@ class TestWebProfile(FrappeTestCase):
 		self.assertNotIn(CUSTOMER.lower(), item.search)
 		self.assertNotIn(CUSTOMER, item.subtitle)
 		stakeholder = frappe.get_doc("Stakeholder Web Profile", self.stakeholder.name)
-		self.assertEqual(item.data["organization_url"], f"/en/customers/{stakeholder.anonymous_route}")
+		self.assertEqual(item.data["organization_url"], f"/en/customers/{stakeholder.route}")
 
 	def test_named_stakeholder_is_shown_with_its_name(self):
 		frappe.db.set_value("Stakeholder Web Profile", self.stakeholder.name,
@@ -184,12 +179,19 @@ class TestWebProfile(FrappeTestCase):
 		doc.append("translations", {"language": "de", "summary": "WP Test Kunde führt ERPNext ein."})
 		self.assertRaises(frappe.ValidationError, doc.save)
 
-	def test_anonymous_stakeholder_route_never_names_it(self):
+	def test_stakeholder_route_never_names_it(self):
 		doc = frappe.get_doc("Stakeholder Web Profile", self.stakeholder.name)
-		self.assertTrue(doc.anonymous_route)
-		self.assertNotIn("kunde", doc.anonymous_route)
-		doc.anonymous_route = "wp-test-kunde-dach"
+		self.assertTrue(doc.route)
+		self.assertNotIn("kunde", doc.route)
+		doc.route = "wp-test-kunde-dach"
 		self.assertRaises(frappe.ValidationError, doc.save)
+
+	def test_stakeholder_url_stays_the_same_when_named(self):
+		route = self.stakeholder.route
+		doc = frappe.get_doc("Stakeholder Web Profile", self.stakeholder.name)
+		doc.update({"publish_as": "Named", "naming_approved": 1, "naming_approval_date": nowdate()})
+		doc.save(ignore_permissions=True)
+		self.assertEqual(doc.route, route)
 
 	# --- contact workflow --------------------------------------------------------------------------
 

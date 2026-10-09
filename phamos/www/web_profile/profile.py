@@ -5,8 +5,8 @@
 
 Same skeleton for every section: breadcrumb, header, facts strip, answer-first summary + body,
 related tile sections and one call to action. What fills it comes from sections.build_profile.
-Anonymised records (alumni without consent, unapproved customers) answer their old named URL
-with 410 Gone so search engines drop the name.
+Every record has one neutral URL from its creation, also when it is shown anonymously
+(phamos/phamos#1512); an unpublished record is not found.
 """
 
 import frappe
@@ -20,23 +20,9 @@ from phamos.web_profile.sections import build_profile, find_item, item_url, sect
 def get_context(context):
 	section, lang = init_page(context)
 	slug = frappe.form_dict.get("slug")
-	item, gone = find_item(section, slug, lang)
-	if item and item.slug != slug:
-		# Former anonymous URL of a stakeholder that is named now (phamos/phamos#1507).
-		frappe.flags.redirect_location = item.url
-		raise frappe.Redirect(301)
-	if gone:
-		frappe.local.response["http_status_code"] = 410
-		context.http_status_code = 410
+	item = find_item(section, slug, lang)
 	if not item:
-		if not gone:
-			raise frappe.PageDoesNotExistError
-		context.gone = True
-		context.list_url = section_url(section, lang)
-		context.section_title = _(context.section_config["title"])
-		context.title = _("This profile is no longer available")
-		context.metatags = {"robots": "noindex"}
-		return
+		raise frappe.PageDoesNotExistError
 
 	profile = build_profile(item, lang)
 	context.item = item

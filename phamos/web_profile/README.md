@@ -21,10 +21,10 @@ Old URLs of the current site are redirected with *Website Route Redirect* record
 goes live, not in code. Routes are generated in `hooks.py` (`_WEB_PROFILE_SLUGS`); keep them in sync
 with `sections.py`.
 
-URLs are created once, when a record is created, and stay true for its lifetime (#1507–#1509):
-people get first name + initial of the surname (`wolfram-s`) and a random anonymous code
-(`p-7k3fq`); stakeholders get a neutral anonymous route next to their named one. A retired named
-URL answers 410; a former anonymous URL that was public redirects to the named page.
+Every record gets one URL when it is created and keeps it for good; it never exposes personal or
+confidential data (#1512): people get a random code (`p-7k3fq`), customers and partners a neutral
+slug (`handel-dach`), implementations industry + start year (`fertigung-2023`). Switching between
+named and anonymous changes only what the page shows, never its URL. Unpublished pages are not found.
 
 ## How it fits together
 

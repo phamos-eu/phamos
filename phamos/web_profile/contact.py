@@ -58,7 +58,7 @@ def submit(section, slug, lang, sender_name, sender_email, message, phone=None, 
 		_create_opportunity(item, person, frappe._dict(name=sender_name, email=sender_email, phone=phone, message=message))
 		return {"ok": True, "flow": "opportunity"}
 
-	item, _gone = find_item(section, slug, lang) if section in SECTIONS else (None, False)
+	item = find_item(section, slug, lang) if section in SECTIONS else None
 	if not item:
 		frappe.throw(_("This page can't be contacted through the website."), frappe.PermissionError)
 
