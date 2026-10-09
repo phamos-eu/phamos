@@ -1,0 +1,80 @@
+{#- Listing page shared by every Web Profile section. Context: listing.py. Works without JavaScript
+    (plain GET form + page links); /assets/phamos/js/web_profile.js only enhances it. -#}
+{% extends "templates/base.html" %}
+{% from "phamos/templates/web_profile/macros.html" import head_tags, breadcrumbs, tile, facet_group with context %}
+
+{% block title %}{{ title | e }}{% endblock %}
+{% block meta_block %}{{ super() }}{{ head_tags() }}{% endblock %}
+
+{% block content %}
+{%- set toggles = listing.facets | selectattr("type", "equalto", "toggle") | list -%}
+{%- set filters = listing.facets | rejectattr("type", "equalto", "toggle") | list -%}
+<main class="wp-page wp-section-{{ section }}" data-wp-listing>
+	<header class="wp-page-head">
+		<div class="wp-page-head-top">
+			{{ breadcrumbs(crumbs) }}
+		</div>
+		<div class="wp-page-head-main">
+			<div>
+				<h1>{{ section_title | e }}</h1>
+				<p class="wp-intro">{{ section_intro | e }}</p>
+			</div>
+			{%- for facet in toggles %}{{ facet_group(facet) }}{% endfor %}
+		</div>
+	</header>
+
+	<div class="wp-layout">
+		<aside class="wp-sidebar" id="wp-filters" data-wp-sidebar aria-label="{{ _('Filters') }}">
+			<form id="wp-form" class="wp-filters" method="get" action="{{ list_url | e }}" data-wp-form>
+				{#- Only the phone drawer needs a header (its close button). -#}
+				<div class="wp-filters-head wp-only-mobile">
+					<button type="button" class="wp-icon-button" data-wp-close-filters aria-label="{{ _('Close filters') }}">×</button>
+				</div>
+				{%- for facet in filters %}{{ facet_group(facet) }}{% endfor %}
+				<noscript><button type="submit" class="wp-button">{{ _("Apply filters") }}</button></noscript>
+			</form>
+		</aside>
+
+		<section class="wp-results" aria-labelledby="wp-result-count" data-wp-results>
+			{#- One row above the results: search (part of the filter form via form="wp-form"), count, sort. -#}
+			<div class="wp-toolbar">
+				{#- Phones only: opens the filter drawer (on desktop the filters are always visible). -#}
+				<button type="button" class="wp-button wp-only-mobile wp-open-filters" data-wp-open-filters aria-controls="wp-filters">{{ _("Filters") }}</button>
+				<div class="wp-searchbar" role="search">
+					<label class="wp-visually-hidden" for="wp-search">{{ search_placeholder | e }}</label>
+					<input id="wp-search" class="wp-search" type="search" name="q" form="wp-form" value="{{ listing.params.q | e }}" placeholder="{{ search_placeholder | e }}" autocomplete="off" data-wp-search>
+				</div>
+
+				{#- Not shown, but announced to screen readers when the results change. -#}
+				<p id="wp-result-count" class="wp-visually-hidden" aria-live="polite">{{ listing.count_label | e }}</p>
+				<label class="wp-sort">
+					<span class="wp-visually-hidden">{{ _("Sort") }}</span>
+					<select name="sort" form="wp-form" data-wp-sort data-wp-default-for="sort" data-wp-default="{{ listing.default_sort }}">
+						{%- for sort in listing.sorts %}
+						<option value="{{ sort.value }}"{% if sort.selected %} selected{% endif %}>{{ sort.label | e }}</option>
+						{%- endfor %}
+					</select>
+				</label>
+			</div>
+
+			{%- if listing.results %}
+			<ul class="wp-grid" data-wp-grid>
+				{%- for item in listing.results %}{{ tile(item) }}{% endfor %}
+			</ul>
+			{%- else %}
+			<div class="wp-empty">
+				<p class="wp-empty-title">{{ _("No matches for these filters") }}</p>
+				<p>{{ _("Remove a filter or search for something else.") }}</p>
+				<a class="wp-button" href="{{ listing.clear_url | e }}" data-wp-nav>{{ _("Clear all filters") }}</a>
+			</div>
+			{%- endif %}
+
+			<nav class="wp-pagination" aria-label="{{ _('Pages') }}" data-wp-pagination>
+				{%- if listing.prev_url %}<a class="wp-button" href="{{ listing.prev_url | e }}" rel="prev">{{ _("Previous page") }}</a>{% endif %}
+				{%- if listing.pages > 1 %}<span class="wp-page-info">{{ _("Page {0} of {1}").format(listing.page, listing.pages) }}</span>{% endif %}
+				{%- if listing.next_url %}<a class="wp-button" href="{{ listing.next_url | e }}" rel="next" data-wp-next data-wp-load-more-label="{{ _('Load more') }}">{{ _("Next page") }}</a>{% endif %}
+			</nav>
+		</section>
+	</div>
+</main>
+{% endblock %}
