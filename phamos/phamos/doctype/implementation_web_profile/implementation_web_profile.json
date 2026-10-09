@@ -169,10 +169,11 @@
    "label": "Published"
   },
   {
-   "description": "URL slug, generated from the title if empty. Same slug in both languages.",
+   "description": "URL slug, neutral and the same for named and anonymous case studies, e.g. 'fertigung-2023'. Generated once at creation from industry and start year; never contains the customer's name.",
    "fieldname": "route",
    "fieldtype": "Data",
    "label": "Route",
+   "no_copy": 1,
    "unique": 1
   },
   {
@@ -206,7 +207,7 @@
  "index_web_pages_for_search": 0,
  "istable": 0,
  "links": [],
- "modified": "2026-10-08 14:00:00.000000",
+ "modified": "2026-10-09 16:00:00.000000",
  "modified_by": "Administrator",
  "module": "Phamos",
  "name": "Implementation Web Profile",

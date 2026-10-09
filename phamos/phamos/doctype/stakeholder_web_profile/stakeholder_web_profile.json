@@ -27,8 +27,6 @@
   "stakeholder_website_section",
   "published",
   "route",
-  "anonymous_route",
-  "anonymous_route_published",
   "sort_order",
   "stakeholder_website_col",
   "image",
@@ -111,7 +109,7 @@
   },
   {
    "default": "Anonymous",
-   "description": "Anonymous is always allowed. Named needs the stakeholder's approval below. Switching a named page to Anonymous retires its named URL (410).",
+   "description": "Anonymous is always allowed. Named needs the stakeholder's approval below. The URL stays the same either way.",
    "fieldname": "publish_as",
    "fieldtype": "Select",
    "in_list_view": 1,
@@ -166,29 +164,12 @@
    "label": "Published"
   },
   {
-   "description": "URL slug, generated from the title if empty. Same slug in both languages.",
+   "description": "URL slug, neutral and the same for named and anonymous pages, e.g. 'mittelstaendischer-maschinenbauer'. Generated once at creation from the German text title, else industry and region; never contains the stakeholder's name or domain.",
    "fieldname": "route",
    "fieldtype": "Data",
    "label": "Route",
-   "unique": 1
-  },
-  {
-   "description": "URL slug of the anonymous page, e.g. 'mittelstaendischer-maschinenbauer'. Generated once at creation from the German text title, else industry and region, and kept for good; never contains the stakeholder's name. Used while Publish As is Anonymous; Route above is the named URL.",
-   "fieldname": "anonymous_route",
-   "fieldtype": "Data",
-   "label": "Anonymous Route",
    "no_copy": 1,
    "unique": 1
-  },
-  {
-   "default": "0",
-   "description": "Set once the anonymous page has been public. Only then does its URL redirect to the named page after a switch to Named.",
-   "fieldname": "anonymous_route_published",
-   "fieldtype": "Check",
-   "hidden": 1,
-   "label": "Anonymous Route Published",
-   "no_copy": 1,
-   "read_only": 1
   },
   {
    "default": "0",
@@ -206,7 +187,7 @@
    "label": "Logo"
   },
   {
-   "description": "One row per website language (Deutsch, English, …). A language without a row shows the German text, otherwise any other row. Title: only for anonymous pages, the neutral public title in this language, e.g. 'Mittelständischer Maschinenbauer' (empty: '<Industry> company, <Region>'). Summary: one answer-first sentence shown on tiles and at the top of the page. Content: the main text of the page.",
+   "description": "One row per website language (Deutsch, English, …). A language without a row shows the German text, otherwise any other row. Title: only for anonymous pages, the neutral public title in this language, e.g. 'Mittelständischer Maschinenbauer' (empty: '<Industry> company, <Region>'); the German title also gives the URL. Summary: one answer-first sentence shown on tiles and at the top of the page. Content: the main text of the page.",
    "fieldname": "content_section",
    "fieldtype": "Section Break",
    "label": "Website Texts"
@@ -221,7 +202,7 @@
  "index_web_pages_for_search": 0,
  "istable": 0,
  "links": [],
- "modified": "2026-10-08 18:00:00.000000",
+ "modified": "2026-10-09 16:00:00.000000",
  "modified_by": "Administrator",
  "module": "Phamos",
  "name": "Stakeholder Web Profile",
