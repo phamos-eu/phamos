@@ -737,27 +737,7 @@ def get_dn_allocation_preview(docname: str, project: str, sales_orders=None):
 	return {"rows": rows, "remaining_hours": pool}
 
 
-@frappe.whitelist()
-def get_dn_allocation_preview_for_timesheets(docname: str, project: str, timesheets):
-	_require_docname(docname)
-	doc = frappe.get_doc("Monthly Implementation Summary", docname)
-	ts_names = set(_parse_timesheet_names(timesheets))
-	selected_hours = flt(
-		sum(
-			flt(r.billable_hours) for r in (doc.timesheets_table or [])
-			if r.timesheet in ts_names and r.project == project
-		),
-		2,
-	)
-	rows = _build_dn_allocation_rows(doc, selected_hours, project=project)
-	return {"rows": rows, "selected_hours": selected_hours}
-
-
 def _create_dns_for_allocations(doc, allocations, pool, project, stamp_fn=None):
-	"""Shared by create_dns_from_allocations and create_dns_from_timesheet_allocations.
-
-	stamp_fn(dn_name, hours), if given, replaces the default per-project windowed timesheet stamping.
-	"""
 	eligible_so = {r.sales_order for r in _eligible_so_allocation_rows(doc, project)}
 	created = []
 	for a in _parse_allocations(allocations):
@@ -809,33 +789,6 @@ def create_dns_from_allocations(docname: str, project: str, allocations):
 
 	pool = _project_remaining_hours(doc, project)
 	created = _create_dns_for_allocations(doc, allocations, pool, project)
-	if created:
-		_save_after_dn_creation(doc)
-	return {"status": "ok", "created": created}
-
-
-@frappe.whitelist()
-def create_dns_from_timesheet_allocations(docname: str, timesheets, project: str, allocations):
-	"""Same allocation flow as create_dns_from_allocations, but the pool is the selected Timesheets'
-	own billable hours (for that Project), and only those Timesheets are stamped with the created Delivery Note(s)."""
-	_require_docname(docname)
-	doc = frappe.get_doc("Monthly Implementation Summary", docname)
-	if doc.status == "Closed":
-		frappe.throw(frappe._("This Monthly Implementation Summary is closed."))
-
-	ts_names = set(_parse_timesheet_names(timesheets))
-	selected_rows = [r for r in (doc.timesheets_table or []) if r.timesheet in ts_names and r.project == project]
-	if not selected_rows:
-		frappe.throw(frappe._("No Timesheets selected for Project {0}.").format(project))
-	pool = flt(sum(flt(r.billable_hours) for r in selected_rows), 2)
-
-	cursor = {"pos": 0.0}
-
-	def stamp(dn_name, hours):
-		doc._stamp_rows_in_window(dn_name, selected_rows, cursor["pos"], cursor["pos"] + hours)
-		cursor["pos"] += hours
-
-	created = _create_dns_for_allocations(doc, allocations, pool, project, stamp_fn=stamp)
 	if created:
 		_save_after_dn_creation(doc)
 	return {"status": "ok", "created": created}

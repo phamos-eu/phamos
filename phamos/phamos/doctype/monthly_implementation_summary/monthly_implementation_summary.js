@@ -58,53 +58,6 @@ function _mis_inject_grid_button(grid, css_class, label, should_show_fn, click_f
 	});
 }
 
-function _mis_setup_so_table_create_dn_btn(frm) {
-	const field = frm.fields_dict.sales_order_status_information;
-	if (!field || !field.grid) return;
-
-	_mis_inject_grid_button(
-		field.grid,
-		"mis-create-dn-btn",
-		__("Create Delivery Note"),
-		function(selected) {
-			return !frm.is_new() && !frm.is_dirty() &&
-				selected.some(r => ["To Deliver", "To Deliver and Bill"].includes(r.status));
-		},
-		function(selected) {
-			const deliverable = selected
-				.filter(r => ["To Deliver", "To Deliver and Bill"].includes(r.status))
-				.map(r => r.sales_order);
-			if (!deliverable.length) {
-				frappe.show_alert({ message: __("No Sales Orders with deliverable status selected."), indicator: "orange" });
-				return;
-			}
-			_mis_show_create_dn_dialog(frm, deliverable);
-		}
-	);
-}
-
-function _mis_setup_ts_table_create_dn_btn(frm) {
-	const field = frm.fields_dict.timesheets_table;
-	if (!field || !field.grid) return;
-
-	_mis_inject_grid_button(
-		field.grid,
-		"mis-ts-create-dn-btn",
-		__("Create Delivery Note"),
-		function(selected) {
-			return !frm.is_new() && !frm.is_dirty() && selected.length > 0;
-		},
-		function(selected) {
-			const timesheets = selected.map(r => r.timesheet).filter(Boolean);
-			if (!timesheets.length) {
-				frappe.show_alert({ message: __("Selected rows have no Timesheet."), indicator: "orange" });
-				return;
-			}
-			_mis_show_create_dn_dialog(frm, null, timesheets);
-		}
-	);
-}
-
 function _mis_setup_dn_table_submit_btn(frm) {
 	const field = frm.fields_dict.mis_delivery_notes;
 	if (!field || !field.grid) return;
@@ -157,8 +110,6 @@ function _mis_setup_si_table_submit_btn(frm) {
 
 function _mis_setup_grid_action_buttons(frm) {
 	if (frm.doc.status === "Closed") return;
-	_mis_setup_so_table_create_dn_btn(frm);
-	_mis_setup_ts_table_create_dn_btn(frm);
 	_mis_setup_dn_table_submit_btn(frm);
 	_mis_setup_si_table_submit_btn(frm);
 }
@@ -193,21 +144,16 @@ function _mis_setup_status_buttons(frm) {
 
 // ── DN creation ─────────────────────────────────────────────────────────────
 
-function _mis_run_create_dn_allocation(frm, allocations, submit_after_create, timesheets, project) {
+function _mis_run_create_dn_allocation(frm, allocations, submit_after_create, project) {
 	const non_zero = allocations.filter(a => (a.items || []).length);
 	if (!non_zero.length) {
 		frappe.show_alert({ message: __("No hours were allocated to any Sales Order."), indicator: "orange" });
 		return Promise.resolve();
 	}
-	const has_timesheets = timesheets && timesheets.length;
-	const method = has_timesheets ? "create_dns_from_timesheet_allocations" : "create_dns_from_allocations";
-	const args = has_timesheets
-		? { docname: frm.doc.name, timesheets: timesheets, project: project, allocations: non_zero }
-		: { docname: frm.doc.name, project: project, allocations: non_zero };
 	return new Promise(function(resolve) {
 		frappe.call({
-			method: `phamos.phamos.doctype.monthly_implementation_summary.monthly_implementation_summary.${method}`,
-			args: args,
+			method: "phamos.phamos.doctype.monthly_implementation_summary.monthly_implementation_summary.create_dns_from_allocations",
+			args: { docname: frm.doc.name, project: project, allocations: non_zero },
 			freeze: true,
 			freeze_message: __("Creating Delivery Note(s)..."),
 			callback: function(r) {
@@ -249,7 +195,6 @@ function _mis_run_create_dn_allocation(frm, allocations, submit_after_create, ti
 }
 
 // ── SI creation ─────────────────────────────────────────────────────────────
-
 
 function _mis_run_create_si(frm, delivery_notes, submit_after_create) {
 	const created = [];
@@ -418,20 +363,16 @@ function _mis_reset_dn_allocation_row(dialog, rows_data, idx, so_items_map) {
 	dialog.fields_dict.allocations.grid.refresh();
 }
 
-function _mis_load_dn_allocation_rows(frm, dialog, project, preset_sales_orders, timesheets, state) {
+function _mis_load_dn_allocation_rows(frm, dialog, project, state) {
 	if (!project) return;
-	const method = state.has_timesheets ? "get_dn_allocation_preview_for_timesheets" : "get_dn_allocation_preview";
-	const args = state.has_timesheets
-		? { docname: frm.doc.name, project: project, timesheets: timesheets }
-		: { docname: frm.doc.name, project: project, sales_orders: preset_sales_orders && preset_sales_orders.length ? preset_sales_orders : null };
 	frappe.call({
-		method: `phamos.phamos.doctype.monthly_implementation_summary.monthly_implementation_summary.${method}`,
-		args: args,
+		method: "phamos.phamos.doctype.monthly_implementation_summary.monthly_implementation_summary.get_dn_allocation_preview",
+		args: { docname: frm.doc.name, project: project, sales_orders: null },
 		freeze: true,
 		callback: function(r) {
 			const data = r.message || {};
 			const rows = data.rows || [];
-			const pool = state.has_timesheets ? flt(data.selected_hours) : flt(data.remaining_hours);
+			const pool = flt(data.remaining_hours);
 
 			state.so_items_map = _mis_build_so_items_map(rows);
 			state.draft_hours_by_so = {};
@@ -442,21 +383,17 @@ function _mis_load_dn_allocation_rows(frm, dialog, project, preset_sales_orders,
 			rows.forEach(row => state.rows_data.push(_mis_default_allocation_row(row.sales_order, state.so_items_map)));
 			dialog.fields_dict.allocations.grid.refresh();
 
-			const note = state.has_timesheets
-				? `<br>${__("If the selected hours exceed a Sales Order's remaining hours, a separate Delivery Note will be created for the remainder.")}`
-				: "";
 			dialog.get_field("pool_html").$wrapper.html(
-				`<div class="small text-muted">${state.pool_label}: <strong>${_mis_number(pool)}</strong>${note}</div>`
+				`<div class="small text-muted">${__("Remaining billable hours")}: <strong>${_mis_number(pool)}</strong></div>`
 			);
 		}
 	});
 }
 
-function _mis_show_create_dn_dialog(frm, preset_sales_orders, timesheets) {
-	const has_timesheets = timesheets && timesheets.length;
+function _mis_show_create_dn_dialog(frm) {
 	frappe.call({
 		method: "phamos.phamos.doctype.monthly_implementation_summary.monthly_implementation_summary.get_dn_allocation_project_summary",
-		args: { docname: frm.doc.name, timesheets: has_timesheets ? timesheets : null },
+		args: { docname: frm.doc.name, timesheets: null },
 		freeze: true,
 		callback: function(r) {
 			const projects = (r.message && r.message.rows) || [];
@@ -469,8 +406,6 @@ function _mis_show_create_dn_dialog(frm, preset_sales_orders, timesheets) {
 				rows_data: [],
 				so_items_map: {},
 				draft_hours_by_so: {},
-				has_timesheets: has_timesheets,
-				pool_label: has_timesheets ? __("Selected Timesheet hours") : __("Remaining billable hours"),
 			};
 
 			const dialog = new frappe.ui.Dialog({
@@ -485,7 +420,7 @@ function _mis_show_create_dn_dialog(frm, preset_sales_orders, timesheets) {
 						reqd: 1,
 						get_query: () => ({ filters: { name: ["in", projects.map(p => p.project)] } }),
 						onchange: function() {
-							_mis_load_dn_allocation_rows(frm, dialog, this.value, preset_sales_orders, timesheets, state);
+							_mis_load_dn_allocation_rows(frm, dialog, this.value, state);
 						},
 					},
 					{ fieldname: "pool_html", fieldtype: "HTML" },
@@ -568,7 +503,7 @@ function _mis_show_create_dn_dialog(frm, preset_sales_orders, timesheets) {
 
 					const proceed = function() {
 						dialog.hide();
-						_mis_run_create_dn_allocation(frm, allocations, false, timesheets, dstate.project);
+						_mis_run_create_dn_allocation(frm, allocations, false, dstate.project);
 					};
 
 					if (draft_conflicts.length) {
@@ -591,7 +526,6 @@ function _mis_show_create_dn_dialog(frm, preset_sales_orders, timesheets) {
 		}
 	});
 }
-
 
 function _mis_show_create_si_dialog(frm) {
 	const eligible = (frm.doc.mis_delivery_notes || []).filter(
