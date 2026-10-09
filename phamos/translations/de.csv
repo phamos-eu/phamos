@@ -4,3 +4,306 @@ Open in Accounting Cockpit,Im Accounting-Cockpit öffnen
 Open in Project Management Cockpit,Im Projektmanagement-Cockpit öffnen
 Open in Desk,Im Desk öffnen
 Open in I Own My Work,In I Own My Work öffnen
+People,Personen
+Departments,Abteilungen
+Modules,Module
+Implementations,Implementierungen
+Industries,Branchen
+"An international team of ERPNext specialists, plus the colleagues who shaped phamos before.","Ein internationales Team aus ERPNext-Spezialistinnen und -Spezialisten – und die Kolleginnen und Kollegen, die phamos vorher geprägt haben."
+Small specialist departments that stay close to customers.,"Kleine Fachabteilungen, die nah an unseren Kunden bleiben."
+Delivery teams that take an implementation from first workshop to go-live.,"Projektteams, die eine Implementierung vom ersten Workshop bis zum Go-live begleiten."
+"The ERPNext modules we introduce, step by step and one module at a time.","Die ERPNext-Module, die wir einführen – Schritt für Schritt, ein Modul nach dem anderen."
+ERPNext projects we have delivered or are delivering right now.,"ERPNext-Implementierungen, die wir umgesetzt haben oder gerade umsetzen."
+"Industries we know well, and the modules that matter most in each.","Branchen, die wir gut kennen, und die Module, auf die es dort ankommt."
+person,Person
+people,Personen
+department,Abteilung
+departments,Abteilungen
+team,Team
+teams,Teams
+module,Modul
+modules,Module
+implementation,Implementierung
+implementations,Implementierungen
+industry,Branche
+industries,Branchen
+Search name or role,Name oder Rolle suchen
+Search departments,Abteilungen durchsuchen
+Search teams,Teams durchsuchen
+Search modules,Module durchsuchen
+Search implementations,Implementierungen durchsuchen
+Search industries,Branchen durchsuchen
+Current,Aktuell
+Department,Abteilung
+Designation,Position
+Module expertise,Modul-Expertise
+Time at phamos,Bei phamos
+Under 2 years,Unter 2 Jahre
+2–5 years,2–5 Jahre
+5+ years,5+ Jahre
+Language,Sprache
+Recommended,Empfohlen
+Largest first,Größte zuerst
+Newest first,Neueste zuerst
+Department size,Abteilungsgröße
+1–3 people,1–3 Personen
+4–9 people,4–9 Personen
+10+ people,10+ Personen
+Team size,Teamgröße
+1–3 members,1–3 Mitglieder
+4–6 members,4–6 Mitglieder
+7+ members,7+ Mitglieder
+Founded,Gegründet
+Complexity,Komplexität
+Low,Gering
+Medium,Mittel
+High,Hoch
+Critical,Kritisch
+Industry,Branche
+Module,Modul
+Start year,Startjahr
+Former colleague,Ehemaliges Teammitglied
+1 year,1 Jahr
+{0} years,{0} Jahre
+{0} people,{0} Personen
+1 person,1 Person
+{0} members,{0} Mitglieder
+1 member,1 Mitglied
+Founded {0},Gegründet {0}
+{0} company,Unternehmen ({0})
+Company,Unternehmen
+Completed,Abgeschlossen
+Ongoing,Laufend
+{0} modules,{0} Module
+1 module,1 Modul
+Languages,Sprachen
+Teammates,Teamkolleginnen und -kollegen
+Start a conversation,Gespräch beginnen
+Lead,Leitung
+People in this department,Personen in dieser Abteilung
+View open roles,Offene Stellen ansehen
+Team lead,Teamleitung
+Members,Mitglieder
+Typical duration,Typische Dauer
+Experts,Expertinnen und Experten
+Talk to us about this module,Sprechen Sie mit uns über dieses Modul
+Started,Gestartet
+Modules in this project,Module in dieser Implementierung
+Similar implementations,Ähnliche Implementierungen
+Talk to us about your project,Sprechen Sie mit uns über Ihr Projekt
+Relevant modules,Relevante Module
+Talk to us about your industry,Sprechen Sie mit uns über Ihre Branche
+Home,Startseite
+Breadcrumb,Brotkrümelnavigation
+Filters,Filter
+Clear all,Alle zurücksetzen
+Close filters,Filter schließen
+Apply filters,Filter anwenden
+Sort,Sortierung
+Active filters,Aktive Filter
+Remove filter,Filter entfernen
+No matches for these filters,Keine Treffer für diese Filter
+Remove a filter or search for something else.,Entfernen Sie einen Filter oder suchen Sie nach etwas anderem.
+Clear all filters,Alle Filter zurücksetzen
+Pages,Seiten
+Previous page,Vorherige Seite
+Page {0} of {1},Seite {0} von {1}
+Next page,Nächste Seite
+Load more,Mehr laden
+This profile is no longer available,Dieses Profil ist nicht mehr verfügbar
+The page was removed at the request of the person or customer it described.,Die Seite wurde auf Wunsch der beschriebenen Person bzw. des Kunden entfernt.
+Browse all {0},Alle {0} ansehen
+All {0},Alle {0}
+About,Über
+See all,Alle ansehen
+This former colleague chose not to be named. Their role and time at phamos are shown without personal details.,Dieses ehemalige Teammitglied möchte nicht namentlich genannt werden. Rolle und Zeit bei phamos werden ohne persönliche Angaben gezeigt.
+The customer is not named. This case study describes the project without identifying details.,Der Kunde wird nicht genannt. Diese Fallstudie beschreibt die Implementierung ohne identifizierende Angaben.
+Missing translation: {0}. The other language is shown instead.,Fehlende Übersetzung: {0}. Stattdessen wird die andere Sprache angezeigt.
+View on Website,Auf der Website ansehen
+Former colleagues,Ehemalige
+English,Englisch
+Less than a year,Weniger als ein Jahr
+Current team,Aktuelles Team
+Our team,Unser Team
+Customers & partners,Kunden & Partner
+Organization,Organisation
+Partner,Partner
+"The people behind our projects: our team, former colleagues, and the customers and partners we work with eye to eye.","Die Menschen hinter unseren Projekten: unser Team, ehemalige Kolleginnen und Kollegen und die Kunden und Partner, mit denen wir auf Augenhöhe arbeiten."
+Send {0} a message,{0} eine Nachricht senden
+People on this project,Personen in dieser Implementierung
+Your message is forwarded by email and {0} replies to you directly. Their address stays private.,Ihre Nachricht wird per E-Mail weitergeleitet und {0} antwortet Ihnen direkt. Die Adresse bleibt privat.
+Your name,Ihr Name
+Your email,Ihre E-Mail-Adresse
+Message,Nachricht
+"I agree that phamos forwards my name, email address and message to {0}.","Ich bin einverstanden, dass phamos meinen Namen, meine E-Mail-Adresse und meine Nachricht an {0} weiterleitet."
+Send message,Nachricht senden
+Sending…,Wird gesendet …
+Thank you. Your message is on its way.,Danke. Ihre Nachricht ist unterwegs.
+Your message could not be sent. Please try again later.,Ihre Nachricht konnte nicht gesendet werden. Bitte versuchen Sie es später erneut.
+The contact form needs JavaScript. You can also write to post@phamos.eu.,Das Kontaktformular benötigt JavaScript. Sie können auch an post@phamos.eu schreiben.
+Please enter your name and a message.,Bitte geben Sie Ihren Namen und eine Nachricht ein.
+Please enter a valid email address.,Bitte geben Sie eine gültige E-Mail-Adresse ein.
+Please keep your message under {0} characters.,Bitte halten Sie Ihre Nachricht unter {0} Zeichen.
+Please agree that we pass your message on.,Bitte stimmen Sie der Weiterleitung Ihrer Nachricht zu.
+This person can't be contacted through the website.,Diese Person kann nicht über die Website kontaktiert werden.
+Message from {0} via phamos.eu,Nachricht von {0} über phamos.eu
+{0} wrote to you through your profile on phamos.eu:,{0} hat Ihnen über Ihr Profil auf phamos.eu geschrieben:
+Reply to this email to answer {0} directly ({1}).,"Antworten Sie auf diese E-Mail, um {0} direkt zu antworten ({1})."
+You receive this because you agreed to be contactable via your profile: {0},"Sie erhalten diese Nachricht, weil Sie zugestimmt haben, über Ihr Profil kontaktiert zu werden: {0}"
+{0} can only be published with their recorded consent to a public profile.,{0} kann nur mit dokumentierter Zustimmung zu einem öffentlichen Profil veröffentlicht werden.
+Contact via the website needs a forwarding email. Add an email to the Contact or Employee.,Für die Kontaktaufnahme über die Website wird eine Weiterleitungsadresse benötigt. Hinterlegen Sie eine E-Mail-Adresse am Kontakt oder Mitarbeiter.
+{0} already has a Person Web Profile: {1},{0} hat bereits ein Person Web Profile: {1}
+Party Type must be one of: {0},Party Type muss eines davon sein: {0}
+Contact {0} is not linked to {1} {2}.,Kontakt {0} ist nicht mit {1} {2} verknüpft.
+Relationship,Beziehung
+Key people,Ansprechpersonen
+Head of department,Abteilungsleitung
+Your contact,Ihre Ansprechperson
+Key Person,Ansprechperson
+Contact {0},{0} kontaktieren
+Contact phamos,phamos kontaktieren
+Close,Schließen
+Phone (optional),Telefon (optional)
+Send request,Anfrage senden
+Thank you. Your request is on its way and we will get back to you.,"Danke. Ihre Anfrage ist unterwegs, wir melden uns bei Ihnen."
+Your request could not be sent. Please try again later.,Ihre Anfrage konnte nicht gesendet werden. Bitte versuchen Sie es später erneut.
+"Please fill in your name, a valid email address and a message, and tick the consent box.","Bitte geben Sie Ihren Namen, eine gültige E-Mail-Adresse und eine Nachricht ein und bestätigen Sie die Einwilligung."
+"Your request is forwarded to {0} by email, who replies to you directly. Their address stays private.","Ihre Anfrage wird per E-Mail an {0} weitergeleitet, die Antwort kommt direkt an Sie. Die Adresse bleibt privat."
+"I agree that phamos forwards my name, contact details and message to {0}.","Ich bin einverstanden, dass phamos meinen Namen, meine Kontaktdaten und meine Nachricht an {0} weiterleitet."
+{0} receives your request at phamos and gets back to you.,{0} erhält Ihre Anfrage bei phamos und meldet sich bei Ihnen.
+"I agree that phamos stores my name, contact details and message to answer my request.","Ich bin einverstanden, dass phamos meinen Namen, meine Kontaktdaten und meine Nachricht speichert, um meine Anfrage zu beantworten."
+Tell us what you need. The right person at phamos gets back to you.,"Sagen Sie uns, was Sie brauchen. Die passende Person bei phamos meldet sich bei Ihnen."
+Please enter a valid phone number or leave it empty.,Bitte geben Sie eine gültige Telefonnummer ein oder lassen Sie das Feld leer.
+This page can't be contacted through the website.,Über diese Seite ist keine Kontaktaufnahme möglich.
+Website: {0},Website: {0}
+Request from the website page {0}:,Anfrage von der Website-Seite {0}:
+Name: {0},Name: {0}
+Email: {0},E-Mail: {0}
+Phone: {0},Telefon: {0}
+Addressed to: {0},Gerichtet an: {0}
+Page: {0},Seite: {0}
+Reply to this email to answer {0} directly. You receive this because you agreed to be contactable via your profile on phamos.eu.,"Antworten Sie auf diese E-Mail, um {0} direkt zu antworten. Sie erhalten diese Nachricht, weil Sie zugestimmt haben, über Ihr Profil auf phamos.eu kontaktiert zu werden."
+{0} and {1},{0} und {1}
+A former colleague who worked at phamos as {0} for {1}.,"Ein ehemaliges Teammitglied, das {1} als {0} bei phamos gearbeitet hat."
+{0} works at phamos as {1}.,{0} arbeitet bei phamos als {1}.
+{0} worked at phamos as {1} for {2}.,{0} hat {2} als {1} bei phamos gearbeitet.
+Department: {0}.,Abteilung: {0}.
+{0} is part of {1}.,{0} gehört zu {1}.
+{0} is {1} at {2} and works with phamos on eye level.,{0} ist {1} bei {2} und arbeitet mit phamos auf Augenhöhe zusammen.
+Areas of ERPNext expertise: {0}.,ERPNext-Schwerpunkte: {0}.
+The ERPNext modules {0} knows well. Each module page explains what the module covers and who else at phamos works with it.,"Die ERPNext-Module, die {0} gut kennt. Jede Modulseite erklärt, was das Modul abdeckt und wer bei phamos noch damit arbeitet."
+"Projects {0} has worked on, with the industry, team and modules of each.","Implementierungen, an denen {0} mitgearbeitet hat, jeweils mit Branche, Team und Modulen."
+The people {0} works with every day in the same team.,"Die Menschen, mit denen {0} täglich im selben Team arbeitet."
+The {0} department at phamos has {1} and is led by {2}.,Die Abteilung {0} bei phamos hat {1} und wird von {2} geleitet.
+its department head,der Abteilungsleitung
+"Everyone currently working in {0}. Open a profile to see their expertise, team and projects.","Alle, die aktuell in {0} arbeiten. Öffnen Sie ein Profil, um Expertise, Team und Implementierungen zu sehen."
+{0} is a delivery team at phamos with {1}.,{0} ist ein Projektteam bei phamos mit {1}.
+The team is led by {0}.,Das Team wird von {0} geleitet.
+It was founded in {0}.,Es wurde {0} gegründet.
+The team has delivered {0} implementations documented on this site.,"Das Team hat {0} Implementierungen umgesetzt, die auf dieser Website dokumentiert sind."
+The people in {0}. Together they take an implementation from the first workshop to go-live.,Die Menschen in {0}. Gemeinsam begleiten sie eine Implementierung vom ersten Workshop bis zum Go-live.
+"Projects delivered by {0}, with the industry and modules of each.","Implementierungen von {0}, jeweils mit Branche und Modulen."
+Experts at phamos,Expertinnen und Experten bei phamos
+"{0} is an ERPNext module that phamos introduces step by step, together with the people who will use it.","{0} ist ein ERPNext-Modul, das phamos Schritt für Schritt einführt – gemeinsam mit den Menschen, die damit arbeiten werden."
+A typical introduction takes {0}; the complexity is {1}.,Eine typische Einführung dauert {0}; die Komplexität ist {1}.
+"{0} people at phamos work with {1}, and it is part of {2} implementations on this site.",{0} Personen bei phamos arbeiten mit {1}; das Modul ist Teil von {2} Implementierungen auf dieser Website.
+It matters especially in {0}.,Besonders wichtig ist es in den Branchen {0}.
+phamos people with hands-on experience in {0}.,Menschen bei phamos mit praktischer Erfahrung in {0}.
+Projects in which {0} was introduced.,"Implementierungen, in denen {0} eingeführt wurde."
+Industries where {0} plays a central role.,"Branchen, in denen {0} eine zentrale Rolle spielt."
+"An ERPNext implementation for {0}, started in {1}.","Eine ERPNext-Implementierung für {0}, gestartet {1}."
+Modules introduced: {0}.,Eingeführte Module: {0}.
+Delivered by {0}.,Umgesetzt von {0}.
+Status: {0}.,Status: {0}.
+"The people who shaped this project, from phamos and from the customer's side, working together on eye level.","Die Menschen, die diese Implementierung geprägt haben – von phamos und auf Kundenseite, gemeinsam auf Augenhöhe."
+The ERPNext modules introduced in this project.,"Die ERPNext-Module, die in dieser Implementierung eingeführt wurden."
+Other projects in the same industry.,Weitere Implementierungen in derselben Branche.
+phamos introduces ERPNext for companies in {0}.,phamos führt ERPNext für Unternehmen der Branche {0} ein.
+The modules that matter most here are {0}.,Am wichtigsten sind hier die Module {0}.
+{0} implementations in this industry are documented on this site.,{0} Implementierungen aus dieser Branche sind auf dieser Website dokumentiert.
+The ERPNext modules that matter most in {0}.,"Die ERPNext-Module, auf die es in der Branche {0} ankommt."
+Projects we delivered in {0}.,"Implementierungen, die wir in der Branche {0} umgesetzt haben."
+About {0},Über {0}
+this former colleague,dieses ehemalige Teammitglied
+{0} is part of the {1}.,{0} gehört zum {1}.
+"An ERPNext implementation for an unnamed customer ({0}), started in {1}.","Eine ERPNext-Implementierung für einen nicht genannten Kunden ({0}), gestartet {1}."
+"The phamos people who worked on this project. The customer is not named, so the customer's team is not shown either.","Die Menschen von phamos, die an dieser Implementierung gearbeitet haben. Der Kunde wird nicht genannt, daher wird auch das Team des Kunden nicht gezeigt."
+Customers,Kunden
+"Companies we work with on eye level, and the ERPNext projects we delivered together.","Unternehmen, mit denen wir auf Augenhöhe zusammenarbeiten, und die ERPNext-Implementierungen, die wir gemeinsam umgesetzt haben."
+customer,Kunde
+customers,Kunden
+Search customers,Kunden durchsuchen
+Customer since,Kunde seit
+Since {0},Seit {0}
+{0} implementations,{0} Implementierungen
+1 implementation,1 Implementierung
+Key contact,Ansprechperson
+Account manager · phamos,Kundenbetreuung · phamos
+Companies in {0} that work with phamos and agreed to be named.,"Unternehmen der Branche {0}, die mit phamos arbeiten und genannt werden möchten."
+Region,Region
+Website,Website
+{0} is a phamos customer{1}.,{0} ist Kunde von phamos{1}.
+ in {0}, in der Branche {0}
+"Since {0}, phamos and {1} have worked together on {2}.",Seit {0} arbeiten phamos und {1} gemeinsam an {2}.
+People at {0},Menschen bei {0}
+"The people at {0} who work with phamos, on eye level.","Die Menschen bei {0}, die mit phamos auf Augenhöhe zusammenarbeiten."
+Projects phamos delivered for {0}.,"Implementierungen, die phamos für {0} umgesetzt hat."
+More customers in {0},Weitere Kunden: {0}
+Other companies in the same industry that work with phamos.,"Weitere Unternehmen derselben Branche, die mit phamos arbeiten."
+Sections,Bereiche
+Customer,Kunde
+{0} can only be published with the customer's recorded approval to be named.,{0} kann nur mit dokumentierter Zustimmung des Kunden zur Nennung veröffentlicht werden.
+The key contact must be a Person Web Profile of {0}.,Die Ansprechperson muss ein Person Web Profile von {0} sein.
+An ERPNext implementation for a customer who is not named here.,"Eine ERPNext-Implementierung für einen Kunden, der hier nicht genannt wird."
+An ERPNext implementation for {0}.,Eine ERPNext-Implementierung für {0}.
+A phamos customer that is not named here. Its projects are shown without identifying details.,"Ein Kunde von phamos, der hier nicht genannt wird. Seine Implementierungen werden ohne identifizierende Angaben gezeigt."
+Projects phamos delivered for this customer.,"Implementierungen, die phamos für diesen Kunden umgesetzt hat."
+Sales · phamos,Vertrieb · phamos
+{0}: minimum,{0}: Minimum
+{0}: maximum,{0}: Maximum
+years,Jahre
+members,Mitglieder
+Search people,Personen durchsuchen
+{0} filters active,{0} Filter aktiv
+No filters active,Keine Filter aktiv
+Partners,Partner
+partner,Partner
+partners,Partner
+Search partners,Partner durchsuchen
+"Companies we work with as partners: technology, hosting and implementation partners.","Unternehmen, mit denen wir als Partner arbeiten: Technologie-, Hosting- und Implementierungspartner."
+A phamos partner that is not named here.,"Ein Partner von phamos, der hier nicht genannt wird."
+{0} is a phamos partner{1}.,{0} ist Partner von phamos{1}.
+More partners in {0},Weitere Partner: {0}
+Talk to us about a partnership,Sprechen Sie mit uns über eine Partnerschaft
+{0} already has a {1} profile: {2},{0} hat bereits ein Profil als {1}: {2}
+Custom App,Eigene App
+Services,Leistungen
+References,Referenzen
+Partnerships,Partnerschaften
+Pricing,Preise
+Contact,Kontakt
+Help & Support,Hilfe & Support
+Documentation,Dokumentation
+Help Articles,Hilfe-Artikel
+Social Media,Social Media
+About us,Über uns
+About phamos,Über phamos
+People at phamos,Menschen bei phamos
+Imprint,Impressum
+Privacy,Datenschutz
+Terms and Conditions,AGB
+Job Openings,Stellenangebote
+Privacy policy,Datenschutzerklärung
+VAT ID,USt-IdNr.
+Timesheet,Zeiterfassung
+Team member,Teammitglied
+Customer contact,Ansprechperson beim Kunden
+Partner contact,Ansprechperson beim Partner
+Missing translation: {0}. The German text (or another language) is shown instead.,Fehlende Übersetzung: {0}. Stattdessen wird der deutsche Text (oder eine andere Sprache) angezeigt.
+Row {0}: there is already a text row for language {1}.,Zeile {0}: Für die Sprache {1} gibt es bereits eine Textzeile.
+{0} can only be published named with their recorded approval to be named.,{0} kann nur mit dokumentierter Zustimmung zur Nennung namentlich veröffentlicht werden.
+"Row {0} ({1}) mentions ""{2}"". An anonymous page must not name the stakeholder: remove it from the text or publish as Named.",Zeile {0} ({1}) nennt „{2}“. Eine anonyme Seite darf den Stakeholder nicht nennen: Entfernen Sie den Namen aus dem Text oder veröffentlichen Sie namentlich.
+"The anonymous route ""{0}"" names the stakeholder. Choose a neutral one or leave it empty to generate it.","Die anonyme Route „{0}“ nennt den Stakeholder. Wählen Sie eine neutrale Route oder lassen Sie das Feld leer, damit sie erzeugt wird."
+"The anonymous route ""{0}"" is already used by another stakeholder page.",Die anonyme Route „{0}“ wird bereits von einer anderen Stakeholder-Seite verwendet.
+"The route ""{0}"" contains the surname. Use the first name and the initial of the surname, e.g. ""{1}"".","Die Route „{0}“ enthält den Nachnamen. Verwenden Sie den Vornamen und den Anfangsbuchstaben des Nachnamens, z. B. „{1}“."
+"The route ""{0}"" is already used by another person.",Die Route „{0}“ wird bereits von einer anderen Person verwendet.
