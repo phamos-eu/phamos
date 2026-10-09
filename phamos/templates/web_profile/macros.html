@@ -1,0 +1,151 @@
+{#- Shared building blocks of every Web Profile page (listing + profile). Frappe's Jinja does not
+    autoescape, so every value that comes from the database is passed through `| e`. -#}
+
+{% macro head_tags() -%}
+	<link rel="canonical" href="{{ canonical_url | e }}">
+	{%- for alt in alternate_links %}
+	<link rel="alternate" hreflang="{{ alt.lang }}" href="{{ alt.url | e }}">
+	{%- endfor %}
+	{%- if metatags and metatags.robots %}
+	<meta name="robots" content="{{ metatags.robots }}">
+	{%- endif %}
+	<script type="application/ld+json">{{ jsonld }}</script>
+{%- endmacro %}
+
+{% macro breadcrumbs(crumbs) -%}
+<nav class="wp-breadcrumbs" aria-label="{{ _('Breadcrumb') }}">
+	<ol>
+		{%- for crumb in crumbs %}
+		<li>{% if loop.last %}<span aria-current="page">{{ crumb.label | e }}</span>{% else %}<a href="{{ crumb.url | e }}">{{ crumb.label | e }}</a>{% endif %}</li>
+		{%- endfor %}
+	</ol>
+</nav>
+{%- endmacro %}
+
+{% macro avatar(item, size="md") -%}
+<span class="wp-avatar wp-avatar-{{ size }} wp-avatar-{{ item.section }}{% if item.masked %} wp-avatar-masked{% endif %}" aria-hidden="true">
+	{%- if item.image -%}
+	<img src="{{ item.image | e }}" alt="" loading="lazy" width="{{ 96 if size == 'lg' else 40 }}" height="{{ 96 if size == 'lg' else 40 }}">
+	{%- elif item.icon -%}
+	{#- Official ERPNext workspace icon from the Frappe sprite (web_profile/icons.py). -#}
+	<svg class="wp-icon" viewBox="0 0 24 24" focusable="false"><use href="{{ item.icon | e }}"></use></svg>
+	{%- else -%}
+	{{ item.initials | e }}
+	{%- endif -%}
+</span>
+{%- endmacro %}
+
+{#- Social profile icons (Person Web Profile > Social Profiles). Separate links, so inside a card they
+    sit above its stretched link. -#}
+{% macro socials(links) -%}
+{%- if links %}
+<span class="wp-socials">
+	{%- for link in links %}<a href="{{ link.url | e }}" rel="noopener me" target="_blank" title="{{ link.label | e }}" aria-label="{{ link.label | e }}"><svg viewBox="0 0 24 24" focusable="false" aria-hidden="true"><use href="{{ link.icon }}"></use></svg></a>{% endfor -%}
+</span>
+{%- endif %}
+{%- endmacro %}
+
+{#- One card. Used by listing grids and by every "related" section on profile pages. The whole card is
+    clickable (stretched title link); social icons are links of their own on top. -#}
+{% macro tile(item, heading="h2") -%}
+<li class="wp-tile-item" data-wp-item>
+	<div class="wp-tile{% if item.masked %} wp-tile-masked{% endif %}">
+		<span class="wp-tile-head">
+			{{ avatar(item) }}
+			{%- if item.badge %}<span class="wp-badge">{{ item.badge | e }}</span>{% endif %}
+		</span>
+		<{{ heading }} class="wp-tile-title"><a class="wp-stretched-link" href="{{ item.url | e }}">{{ item.title | e }}</a></{{ heading }}>
+		{%- if item.subtitle %}<span class="wp-tile-subtitle">{{ item.subtitle | e }}</span>{% endif %}
+		{%- if item.chips %}
+		<span class="wp-chips">
+			{%- for chip in item.chips %}<span class="wp-chip">{{ chip | e }}</span>{% endfor -%}
+		</span>
+		{%- endif %}
+		{{ socials(item.socials) }}
+	</div>
+</li>
+{%- endmacro %}
+
+{% macro facet_group(facet) -%}
+{%- if facet.type == "toggle" -%}
+<fieldset class="wp-toggle" data-wp-toggle data-wp-default-for="{{ facet.key }}" data-wp-default="{{ facet.default | e }}">
+	<legend class="wp-visually-hidden">{{ facet.label | e }}</legend>
+	{%- for option in facet.options %}
+	<label class="wp-toggle-option">
+		<input type="radio" form="wp-form" name="{{ facet.key }}" value="{{ option.value | e }}"{% if option.checked %} checked{% endif %} data-wp-input>
+		<span>{{ option.label | e }} <span class="wp-count">{{ option.count }}</span></span>
+	</label>
+	{%- endfor %}
+</fieldset>
+{%- elif facet.type == "range" -%}
+{#- Numbers: one slider with a min and a max handle. Plain range inputs, so it also works as a normal
+    form without JavaScript; web_profile.bundle.js keeps the handles apart and shows the values. -#}
+<fieldset class="wp-facet wp-range" data-wp-facet="{{ facet.key }}" data-wp-range data-min="{{ facet.min }}" data-max="{{ facet.max }}">
+	<legend class="wp-facet-title">{{ facet.label | e }}{% if facet.unit %} ({{ facet.unit | e }}){% endif %}</legend>
+	<div class="wp-range-slider" style="--low: {{ ((facet.low - facet.min) * 100 / (facet.max - facet.min)) | round(2) }}%; --high: {{ ((facet.high - facet.min) * 100 / (facet.max - facet.min)) | round(2) }}%;">
+		<input type="range" name="{{ facet.key }}_min" min="{{ facet.min }}" max="{{ facet.max }}" step="1" value="{{ facet.low }}"
+			aria-label="{{ _('{0}: minimum').format(facet.label) | e }}" data-wp-input data-wp-range-input="low"
+			data-wp-default-for="{{ facet.key }}_min" data-wp-default="{{ facet.min }}">
+		<input type="range" name="{{ facet.key }}_max" min="{{ facet.min }}" max="{{ facet.max }}" step="1" value="{{ facet.high }}"
+			aria-label="{{ _('{0}: maximum').format(facet.label) | e }}" data-wp-input data-wp-range-input="high"
+			data-wp-default-for="{{ facet.key }}_max" data-wp-default="{{ facet.max }}">
+	</div>
+	{#- The numbers under the handles are the selected values (updated while dragging). -#}
+	<div class="wp-range-bounds" aria-hidden="true"><span data-wp-range-low>{{ facet.low }}</span><span data-wp-range-high>{{ facet.high }}</span></div>
+</fieldset>
+{%- else -%}
+<fieldset class="wp-facet" data-wp-facet="{{ facet.key }}">
+	<legend class="wp-facet-title">{{ facet.label | e }}</legend>
+	<div class="wp-facet-options{% if facet.scroll %} wp-facet-scroll{% endif %}"{% if facet.scroll %} tabindex="0"{% endif %}>
+		{%- for option in facet.options %}
+		<label class="wp-check{% if not option.count and not option.checked %} wp-check-empty{% endif %}">
+			<input type="checkbox" name="{{ facet.key }}" value="{{ option.value | e }}"{% if option.checked %} checked{% endif %} data-wp-input>
+			<span class="wp-check-label">{% if option.flag %}<img class="wp-flag" src="{{ option.flag }}" alt="" width="20" height="15">{% endif %}{{ option.label | e }}</span>
+			{#- Only options that match the current filter set show a number (ERPNext "Connections" count). -#}
+			{%- if option.count %}<span class="wp-count">{{ option.count }}</span>{% endif %}
+		</label>
+		{%- endfor %}
+	</div>
+</fieldset>
+{%- endif -%}
+{%- endmacro %}
+
+{#- Opens the shared contact dialog. `c` comes from sections.contact_dialog(); the server decides the
+    workflow (Opportunity for phamos, forwarded request for external people) from section + slug. -#}
+{% macro contact_button(c, classes="wp-button") -%}
+<button type="button" class="{{ classes }}" data-wp-contact-open data-section="{{ c.section }}" data-slug="{{ c.slug | e }}"
+	data-title="{{ c.title | e }}" data-intro="{{ c.intro | e }}" data-consent="{{ c.consent | e }}" aria-haspopup="dialog">{{ c.label | e }}</button>
+{%- endmacro %}
+
+{% macro contact_dialog_markup(lang) -%}
+<dialog class="wp-dialog" id="wp-contact-dialog" aria-labelledby="wp-dialog-title" data-wp-contact-dialog
+	data-default-title="{{ _('Contact phamos') }}" data-default-intro="{{ _('Tell us what you need. The right person at phamos gets back to you.') }}"
+	data-default-consent="{{ _('I agree that phamos stores my name, contact details and message to answer my request.') }}">
+	<form class="wp-contact-form" method="post" action="/api/method/phamos.web_profile.contact.submit" data-wp-contact novalidate>
+		<div class="wp-dialog-head">
+			<h2 id="wp-dialog-title" data-wp-dialog-title></h2>
+			<button type="button" class="wp-icon-button" data-wp-dialog-close aria-label="{{ _('Close') }}">×</button>
+		</div>
+		<p class="wp-contact-intro" data-wp-dialog-intro></p>
+		<input type="hidden" name="section">
+		<input type="hidden" name="slug">
+		<input type="hidden" name="lang" value="{{ lang }}">
+		<label class="wp-honeypot" aria-hidden="true">Website <input type="text" name="website" tabindex="-1" autocomplete="off"></label>
+		<div class="wp-contact-row">
+			<label>{{ _("Your name") }}<input type="text" name="sender_name" required maxlength="140" autocomplete="name"></label>
+			<label>{{ _("Your email") }}<input type="email" name="sender_email" required maxlength="140" autocomplete="email"></label>
+		</div>
+		<label>{{ _("Phone (optional)") }}<input type="tel" name="phone" maxlength="40" autocomplete="tel" placeholder="+49 …"></label>
+		<label>{{ _("Message") }}<textarea name="message" required maxlength="4000" rows="5"></textarea></label>
+		<label class="wp-check wp-contact-consent"><input type="checkbox" name="privacy_consent" value="1" required>
+			<span><span data-wp-dialog-consent></span> <a href="{{ '/en/privacy' if lang == 'en' else '/de/datenschutz' }}" target="_blank">{{ _("Privacy policy") }}</a></span></label>
+		<div class="wp-contact-actions">
+			<button type="submit" class="wp-button wp-button-primary">{{ _("Send request") }}</button>
+			<p class="wp-contact-status" role="status" data-wp-contact-status
+				data-sending="{{ _('Sending…') }}" data-sent="{{ _('Thank you. Your request is on its way and we will get back to you.') }}"
+				data-failed="{{ _('Your request could not be sent. Please try again later.') }}"
+				data-invalid="{{ _('Please fill in your name, a valid email address and a message, and tick the consent box.') }}"></p>
+		</div>
+	</form>
+</dialog>
+{%- endmacro %}

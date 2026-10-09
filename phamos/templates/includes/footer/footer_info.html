@@ -1,0 +1,25 @@
+{#- Overrides frappe/templates/includes/footer/footer_info.html: Frappe's footer info plus the
+    shared contact dialog of the Web Profile pages, so contact buttons work on every page
+    (phamos/phamos#1500). The company block like a DIN 5008 letter footer follows in #1502. -#}
+{%- from "phamos/templates/web_profile/macros.html" import contact_dialog_markup with context -%}
+<div class="footer-info">
+	<div class="row">
+		<div class="footer-col-left col-sm-6 col-12">
+			{% if copyright %}
+			&copy; {{ copyright }}
+			{% endif %}
+			{% if footer_address %}
+			{% if copyright %}<br>{% endif %}
+			{{ footer_address }}
+			{% endif %}
+		</div>
+		<div class="footer-col-right col-sm-6 col-12 footer-powered">
+			{%- if footer_powered -%}
+				{{ footer_powered }}
+			{%- else -%}
+				{% include "templates/includes/footer/footer_powered.html" %}
+			{%- endif -%}
+		</div>
+	</div>
+</div>
+<div class="wp-dialog-host">{{ contact_dialog_markup(wp_lang or lang or "de") }}</div>

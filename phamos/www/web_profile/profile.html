@@ -1,0 +1,104 @@
+{#- Profile page shared by every Web Profile section. Context: profile.py (data from
+    sections.build_profile). Fixed skeleton: breadcrumb, header, facts, summary + body, related, CTA. -#}
+{% extends "templates/base.html" %}
+{% from "phamos/templates/web_profile/macros.html" import head_tags, breadcrumbs, avatar, tile, contact_button, socials with context %}
+
+{% block title %}{{ title | e }}{% endblock %}
+{% block meta_block %}{{ super() }}{{ head_tags() }}{% endblock %}
+
+{% block content %}
+<main class="wp-page wp-profile wp-section-{{ section }}">
+	<div class="wp-page-head-top">
+		{{ breadcrumbs(crumbs) }}
+	</div>
+
+	<div class="wp-profile-layout">
+	<header class="wp-profile-head">
+		{%- if section not in ("people", "departments") %}{{ avatar(item, "lg") }}{% endif %}
+		<div>
+			{%- if item.badge %}<span class="wp-badge">{{ item.badge | e }}</span>{% endif %}
+			<h1>{{ item.title | e }}</h1>
+			{%- if item.subtitle and profile.show_subtitle %}<p class="wp-profile-subtitle">{{ item.subtitle | e }}</p>{% endif %}
+		</div>
+	</header>
+
+	{#- Sticky sidebar: the person this page is about (or its lead / managers / contact). -#}
+	<aside class="wp-profile-aside{% if profile.key_people | length > 1 %} wp-aside-multi{% endif %}" aria-label="{{ _('Key people') }}">
+		{%- for card in profile.key_people %}
+		{%- set person = card.person %}
+		{#- Framed cards are always clickable as a whole: another person's card links to their profile
+		    (stretched link, the contact button stays clickable on top). On a person's own page there is
+		    nothing to link to, so photo and name sit directly on the page without a frame. -#}
+		<div class="wp-person-card{% if person.url != item.url %} wp-person-card-link{% endif %}">
+			<span class="wp-person-photo{% if person.masked %} wp-avatar-masked{% endif %}" aria-hidden="true">
+				{%- if person.image %}<img src="{{ person.image | e }}" alt="" width="280" height="280">{% else %}{{ person.initials | e }}{% endif -%}
+			</span>
+			<div class="wp-person-card-body">
+				{#- On the person's own page name and role are already the page title. -#}
+				{%- if person.url != item.url %}
+				{%- if card.role %}<span class="wp-person-role">{{ card.role | e }}</span>{% endif %}
+				<a class="wp-person-name wp-stretched-link" href="{{ person.url | e }}">{{ person.title | e }}</a>
+				{%- endif %}
+				{%- if card.contact %}{{ contact_button(card.contact, "wp-button wp-button-sm wp-person-contact") }}{% endif %}
+				{{ socials(person.socials) }}
+			</div>
+		</div>
+		{%- endfor %}
+		{%- if profile.facts %}
+		<dl class="wp-stats">
+			{%- for fact in profile.facts %}
+			<div class="wp-stat">
+				<dt>{{ fact.label | e }}</dt>
+				{#- Design rule: clickable = card (link cards), not clickable = chip. No underlined links. -#}
+				<dd>
+					{%- if fact.flags -%}
+					{%- for f in fact.flags %}<span class="wp-chip wp-chip-value">{% if f.flag %}<img class="wp-flag" src="{{ f.flag }}" alt="" width="20" height="15">{% endif %}{{ f.label | e }}</span>{% endfor -%}
+					{%- elif fact.links -%}
+					{%- for link in fact.links %}<a class="wp-link-card" href="{{ link.url | e }}"{% if link.external %} rel="noopener" target="_blank"{% endif %}><span>{{ link.value | e }}</span><span class="wp-link-card-arrow" aria-hidden="true">{{ "↗" if link.external else "›" }}</span></a>{% endfor -%}
+					{%- else -%}<span class="wp-chip wp-chip-value">{{ fact.value | e }}</span>{%- endif -%}
+				</dd>
+			</div>
+			{%- endfor %}
+		</dl>
+		{%- endif %}
+		{%- if profile.cta and profile.cta.dialog %}
+		{{ contact_button(profile.cta, "wp-button wp-aside-cta" + ("" if profile.key_people else " wp-button-primary")) }}
+		{%- elif profile.cta %}
+		<a class="wp-button wp-aside-cta" href="{{ profile.cta.url | e }}">{{ profile.cta.label | e }}</a>
+		{%- endif %}
+	</aside>
+
+	<div class="wp-profile-main">
+
+
+	{%- if item.masked %}
+	<p class="wp-note">{{ _("This former colleague chose not to be named. Their role and time at phamos are shown without personal details.") if section == "people" else _("The customer is not named. This case study describes the project without identifying details.") }}</p>
+	{%- endif %}
+
+	{#- Text first (SEO / AI answer engines): editor summary, an overview written from the record's
+	    facts (sections.build_profile), then the editor's long text. -#}
+	<section class="wp-prose" aria-labelledby="wp-about">
+		<h2 id="wp-about">{{ _("About {0}").format(item.title) | e }}</h2>
+		{%- if item.summary and item.summary != item.subtitle %}<p class="wp-lead">{{ item.summary | e }}</p>{% endif %}
+		{%- if profile.overview %}<p class="wp-overview">{{ profile.overview | e }}</p>{% endif %}
+		{#- Text Editor HTML, sanitised by Frappe on save and written by website editors. -#}
+		{%- if item.body %}<div class="wp-body">{{ item.body }}</div>{% endif %}
+	</section>
+
+	{%- for block in profile.related %}
+	<section class="wp-related" aria-labelledby="wp-related-{{ loop.index }}">
+		<div class="wp-related-head">
+			<h2 id="wp-related-{{ loop.index }}">{{ block.title | e }}</h2>
+			{%- if block.see_all %}<a class="wp-link" href="{{ block.see_all | e }}">{{ _("See all") }} <span aria-hidden="true">↗</span></a>{% endif %}
+		</div>
+		{%- if block.intro %}<p class="wp-section-intro">{{ block.intro | e }}</p>{% endif %}
+		<ul class="wp-grid wp-grid-compact">
+			{%- for related in block.tiles %}{{ tile(related, heading="h3") }}{% endfor %}
+		</ul>
+	</section>
+	{%- endfor %}
+
+	</div>
+	</div>
+</main>
+{% endblock %}
