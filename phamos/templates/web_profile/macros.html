@@ -117,9 +117,10 @@
 {%- endmacro %}
 
 {#- Opens the shared contact dialog. `c` comes from sections.contact_dialog(); the server decides the
-    workflow (Opportunity for phamos, forwarded request for external people) from section + slug. -#}
-{% macro contact_button(c, classes="wp-button") -%}
-<button type="button" class="{{ classes }}" data-wp-contact-open data-section="{{ c.section }}" data-slug="{{ c.slug | e }}"
+    workflow (Opportunity for phamos, forwarded request for external people) from section + slug.
+    Every contact button looks the same: the black primary button. `classes` only places it. -#}
+{% macro contact_button(c, classes="") -%}
+<button type="button" class="wp-button wp-button-primary{% if classes %} {{ classes }}{% endif %}" data-wp-contact-open data-section="{{ c.section }}" data-slug="{{ c.slug | e }}"
 	data-title="{{ c.title | e }}" data-intro="{{ c.intro | e }}" data-consent="{{ c.consent | e }}" aria-haspopup="dialog">{{ c.label | e }}</button>
 {%- endmacro %}
 
