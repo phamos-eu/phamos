@@ -311,3 +311,10 @@ Experience with Frappe / ERPNext,Erfahrung mit Frappe / ERPNext
 Working with Frappe / ERPNext Since,Arbeitet mit Frappe / ERPNext seit
 "Year the person started working with Frappe / ERPNext, e.g. 2016. The website shows the years from it (for alumni up to their leaving date) and offers it as a filter.","Jahr, seit dem die Person mit Frappe / ERPNext arbeitet, z. B. 2016. Die Website zeigt daraus die Jahre (bei Alumni bis zum Austritt) und bietet sie als Filter an."
 "Working with Frappe / ERPNext Since must be a year between 2008 and {0}, e.g. 2016.","„Arbeitet mit Frappe / ERPNext seit“ muss ein Jahr zwischen 2008 und {0} sein, z. B. 2016."
+{0}–{1} weeks,{0}–{1} Wochen
+{0} weeks,{0} Wochen
+Germany,Deutschland
+Austria,Österreich
+Switzerland,Schweiz
+India,Indien
+Europe,Europa
