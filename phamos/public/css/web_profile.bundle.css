@@ -225,7 +225,10 @@
 .wp-profile-main { padding-bottom: 64px; }
 .wp-profile-layout > .wp-profile-head { grid-area: head; }
 .wp-profile-main { grid-area: main; min-width: 0; }
-.wp-profile-aside { grid-area: aside; position: sticky; top: 24px; max-height: calc(100vh - 48px); overflow-y: auto; overscroll-behavior: contain; display: flex; flex-direction: column; gap: 16px; margin-top: 12px; }
+/* Pinned like the listing columns (pinColumns in web_profile.bundle.js): no inner scrollbar. */
+.wp-profile-aside { grid-area: aside; position: sticky; top: var(--wp-aside-top, 24px); bottom: var(--wp-aside-bottom, auto);
+	align-self: var(--wp-aside-align, start); margin-top: var(--wp-aside-before, 12px); margin-bottom: var(--wp-aside-after, 64px);
+	display: flex; flex-direction: column; gap: 16px; }
 .wp-person-card { position: relative; }
 .wp-person-card .wp-person-photo { border-radius: var(--wp-radius); overflow: hidden; }
 /* Clickable person card: framed, the whole card links to the profile. */
@@ -351,7 +354,7 @@ body .footer-info a { color: #6b6b6b; }
 	.wp-profile-head { flex-wrap: wrap; }
 	/* On phones the key person follows the title instead of sitting at the end of the page. */
 	.wp-profile-layout { grid-template-columns: minmax(0, 1fr); grid-template-areas: "head" "aside" "main"; }
-	.wp-profile-aside { position: static; max-height: none; overflow: visible; margin: 0 0 24px; }
+	.wp-profile-aside { position: static; align-self: auto; margin: 0 0 24px; }
 	/* Text first on phones too: key person under the title, stats and call to action after the text. */
 	.wp-profile-layout { display: flex; flex-direction: column; min-height: 0; padding-bottom: 48px; }
 	.wp-profile-main { padding-bottom: 0; }

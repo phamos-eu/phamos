@@ -5,6 +5,85 @@
 // Frappe's standard language picker (navbar, Website Settings > Show Language Picker) on Web Profile
 // pages: the language lives in the URL (/de/..., /en/...), so the picker offers the page's language
 // versions (from its hreflang links) and opens the matching URL instead of only reloading.
+// Side-by-side columns that stay in view while the other one scrolls (listing filters and results,
+// the profile sidebar). A column taller than the window moves with the page until its end
+// (scrolling down) or its start (scrolling up) is in view, then stays pinned; one that fits stays
+// pinned at the top. The browser does the pinning: sticky with top and bottom limits
+// (--wp-<name>-top / -bottom). When the scroll direction changes, the column's place in its grid
+// area is set to where it is now, so it moves on from there instead of waiting or jumping.
+// Scrolling down it hangs from the top of the area (margin above), scrolling up it stands on its
+// bottom (margin below): a sticky element keeps its margins inside the area, so a margin on the side
+// it moves towards would block it. A column that fills its area simply scrolls.
+// columns: [{ selector, name, top, bottom (gaps to the window edges), before, after (resting
+// margins, default 0 / 64 = the gap to the footer) }]; the CSS reads the variables.
+function pinColumns(columns) {
+	const style = document.documentElement.style;
+	const set = (column, key, value) => {
+		const prop = `--wp-${column.name}-${key}`;
+		if (style.getPropertyValue(prop) !== value) style.setProperty(prop, value);
+	};
+	const element = (column) => {
+		const el = document.querySelector(column.selector);
+		return el && getComputedStyle(el).position === "sticky" ? el : null; // static on phones
+	};
+	const fits = (column, el) => el.offsetHeight + column.top + column.bottom <= window.innerHeight;
+	const place = (column, align, before, after) => {
+		set(column, "align", align);
+		set(column, "before", before + "px");
+		set(column, "after", after + "px");
+	};
+	for (const column of columns) {
+		column.before = column.before || 0;
+		column.after = column.after ?? 64;
+	}
+	// Limits follow the column's height (other filters, more results loaded, window resized).
+	const measure = () => {
+		for (const column of columns) {
+			const el = element(column);
+			if (!el) continue;
+			const tall = !fits(column, el);
+			set(column, "top", (tall ? window.innerHeight - el.offsetHeight - column.bottom : column.top) + "px");
+			set(column, "bottom", tall ? window.innerHeight - el.offsetHeight - column.top + "px" : "auto");
+			if (!tall) place(column, "start", column.before, column.after);
+		}
+	};
+	let lastY = window.scrollY;
+	let direction = 0;
+	let frame = 0;
+	const onScroll = () => {
+		frame = 0;
+		measure();
+		const y = window.scrollY;
+		const now = Math.sign(y - lastY);
+		lastY = y;
+		if (!now || now === direction) return;
+		direction = now;
+		for (const column of columns) {
+			const el = element(column);
+			if (!el || fits(column, el)) continue;
+			const area = el.parentElement.getBoundingClientRect();
+			const pad = getComputedStyle(el.parentElement);
+			const rect = el.getBoundingClientRect();
+			if (now > 0) {
+				const above = Math.floor(rect.top - area.top - parseFloat(pad.paddingTop));
+				place(column, "start", Math.max(column.before, above), column.after);
+			} else {
+				const below = Math.floor(area.bottom - parseFloat(pad.paddingBottom) - rect.bottom);
+				place(column, "end", 0, Math.max(column.after, below));
+			}
+		}
+	};
+	window.addEventListener("scroll", () => { if (!frame) frame = requestAnimationFrame(onScroll); }, { passive: true });
+	window.addEventListener("resize", measure);
+	measure();
+	return { measure };
+}
+
+// Profile pages: the sidebar (key people, facts, contact) stays in view next to the text.
+if (document.querySelector(".wp-profile-aside")) {
+	pinColumns([{ selector: ".wp-profile-aside", name: "aside", top: 24, bottom: 24, before: 12 }]);
+}
+
 (function () {
 	const alternates = {};
 	for (const link of document.querySelectorAll('link[rel="alternate"][hreflang]')) {
@@ -287,76 +366,10 @@
 		high.addEventListener("input", () => update(high));
 	}
 
-	// Both columns (filters, results) stay in view while the other one scrolls. A column taller than
-	// the window moves with the page until its end (scrolling down) or its start (scrolling up) is in
-	// view, then stays pinned. The browser does the pinning: sticky with top and bottom limits
-	// (--wp-<column>-top / -bottom). When the direction changes, the column's place in the row is
-	// set to where it is now, so it moves on from there instead of waiting or jumping. Scrolling
-	// down it hangs from the top of the row (margin above), scrolling up it stands on its bottom
-	// (margin below): a sticky element keeps its margins inside the row, so a margin on the side it
-	// moves towards would block it. The taller column fills the row and simply scrolls.
-	function pinColumns() {
-		const FOOTER_GAP = 64; // margin below both columns (web_profile.bundle.css)
-		const columns = [
-			{ selector: "[data-wp-sidebar]", name: "sidebar", top: 12, bottom: 12 },
-			{ selector: "[data-wp-results]", name: "results", top: 0, bottom: 12 }, // search bar at the very top
-		];
-		const style = document.documentElement.style;
-		const set = (column, key, value) => {
-			const prop = `--wp-${column.name}-${key}`;
-			if (style.getPropertyValue(prop) !== value) style.setProperty(prop, value);
-		};
-		const element = (column) => {
-			const el = $(column.selector);
-			return el && getComputedStyle(el).position === "sticky" ? el : null; // static on phones
-		};
-		const fits = (column, el) => el.offsetHeight + column.top + column.bottom <= window.innerHeight;
-		const place = (column, align, before, after) => {
-			set(column, "align", align);
-			set(column, "before", before + "px");
-			set(column, "after", after + "px");
-		};
-		// Limits follow the column's height (other filters, more results loaded, window resized).
-		const measure = () => {
-			for (const column of columns) {
-				const el = element(column);
-				if (!el) continue;
-				const tall = !fits(column, el);
-				set(column, "top", (tall ? window.innerHeight - el.offsetHeight - column.bottom : column.top) + "px");
-				set(column, "bottom", tall ? window.innerHeight - el.offsetHeight - column.top + "px" : "auto");
-				if (!tall) place(column, "start", 0, FOOTER_GAP);
-			}
-		};
-		let lastY = window.scrollY;
-		let direction = 0;
-		let frame = 0;
-		const onScroll = () => {
-			frame = 0;
-			measure();
-			const y = window.scrollY;
-			const now = Math.sign(y - lastY);
-			lastY = y;
-			if (!now || now === direction) return;
-			direction = now;
-			for (const column of columns) {
-				const el = element(column);
-				if (!el || fits(column, el)) continue;
-				const row = el.parentElement.getBoundingClientRect();
-				const pad = getComputedStyle(el.parentElement);
-				const rect = el.getBoundingClientRect();
-				if (now > 0) {
-					place(column, "start", Math.max(0, Math.floor(rect.top - row.top - parseFloat(pad.paddingTop))), FOOTER_GAP);
-				} else {
-					place(column, "end", 0, Math.max(FOOTER_GAP, Math.floor(row.bottom - parseFloat(pad.paddingBottom) - rect.bottom)));
-				}
-			}
-		};
-		window.addEventListener("scroll", () => { if (!frame) frame = requestAnimationFrame(onScroll); }, { passive: true });
-		window.addEventListener("resize", measure);
-		measure();
-		return { measure };
-	}
-	const columns = pinColumns();
+	const columns = pinColumns([
+		{ selector: "[data-wp-sidebar]", name: "sidebar", top: 12, bottom: 12 },
+		{ selector: "[data-wp-results]", name: "results", top: 0, bottom: 12 }, // search bar at the very top
+	]);
 
 	function setDrawer(open) {
 		document.documentElement.classList.toggle("wp-filters-open", open);
