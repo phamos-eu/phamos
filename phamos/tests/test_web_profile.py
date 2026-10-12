@@ -10,7 +10,7 @@ everything back afterwards. Run with
 
 import frappe
 from frappe.tests.utils import FrappeTestCase
-from frappe.utils import add_years, nowdate
+from frappe.utils import add_years, getdate, nowdate
 
 from phamos.web_profile import contact
 from phamos.web_profile.i18n import localized
@@ -114,6 +114,29 @@ class TestWebProfile(FrappeTestCase):
 		for route in ("testa-w", "webprofil"):
 			doc = frappe.get_doc("Person Web Profile", self.person.name)
 			doc.route = route
+			self.assertRaises(frappe.ValidationError, doc.save)
+
+	# --- Frappe / ERPNext experience (#1527) -------------------------------------------------------
+
+	def test_experience_years_come_from_the_start_year(self):
+		doc = frappe.get_doc("Person Web Profile", self.person.name)
+		doc.frappe_experience_since = getdate().year - 5
+		doc.save(ignore_permissions=True)
+		item = _person_item(doc.name)
+		self.assertEqual(item.numbers["experience"], 5)
+		# Two year chips, each saying what it counts.
+		self.assertIn("5 years Frappe/ERPNext", item.chips)
+		self.assertIn("3 years at phamos", item.chips)
+
+	def test_alumni_experience_counts_up_to_the_leaving_date(self):
+		frappe.db.set_value("Person Web Profile", self.person.name, {
+			"status": "Left", "relieving_date": add_years(nowdate(), -2), "frappe_experience_since": getdate().year - 6})
+		self.assertEqual(_person_item(self.person.name).numbers["experience"], 4)
+
+	def test_experience_since_must_be_a_plausible_year(self):
+		for year in (1999, getdate().year + 1):
+			doc = frappe.get_doc("Person Web Profile", self.person.name)
+			doc.frappe_experience_since = year
 			self.assertRaises(frappe.ValidationError, doc.save)
 
 	# --- anonymous people --------------------------------------------------------------------------

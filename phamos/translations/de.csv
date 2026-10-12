@@ -37,7 +37,7 @@ Current,Aktuell
 Department,Abteilung
 Designation,Position
 Module expertise,Modul-Expertise
-Time at phamos,Bei phamos
+Time at phamos,Zeit bei phamos
 Under 2 years,Unter 2 Jahre
 2–5 years,2–5 Jahre
 5+ years,5+ Jahre
@@ -304,3 +304,10 @@ Row {0}: there is already a text row for language {1}.,Zeile {0}: Für die Sprac
 Translation Of,Übersetzung von
 "Page language. Use routes de/… and en/… so navbar, footer and language picker can switch.","Sprache der Seite. Routen de/… und en/… verwenden, damit Navigation, Fußzeile und Sprachauswahl umschalten können."
 "For the English page: the German page it translates.","Für die englische Seite: die deutsche Seite, die sie übersetzt."
+{0} at phamos,{0} bei phamos
+{0} Frappe/ERPNext,{0} Frappe/ERPNext
+Experience with Frappe / ERPNext,Erfahrung mit Frappe / ERPNext
+(since {0}),(seit {0})
+Working with Frappe / ERPNext Since,Arbeitet mit Frappe / ERPNext seit
+"Year the person started working with Frappe / ERPNext, e.g. 2016. The website shows the years from it (for alumni up to their leaving date) and offers it as a filter.","Jahr, seit dem die Person mit Frappe / ERPNext arbeitet, z. B. 2016. Die Website zeigt daraus die Jahre (bei Alumni bis zum Austritt) und bietet sie als Filter an."
+"Working with Frappe / ERPNext Since must be a year between 2008 and {0}, e.g. 2016.","„Arbeitet mit Frappe / ERPNext seit“ muss ein Jahr zwischen 2008 und {0} sein, z. B. 2016."

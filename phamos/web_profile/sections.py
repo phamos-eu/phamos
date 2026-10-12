@@ -41,6 +41,7 @@ SECTIONS = {
 			{"key": "designation", "label": "Designation", "type": "multi"},
 			{"key": "module", "label": "Module expertise", "type": "multi"},
 			{"key": "tenure", "label": "Time at phamos", "type": "range", "unit": "years"},
+			{"key": "experience", "label": "Experience with Frappe / ERPNext", "type": "range", "unit": "years"},
 			{"key": "language", "label": "Language", "type": "multi"},
 		],
 		"sorts": [("manual", "Recommended"), ("name", "Name A–Z"), ("tenure", "Time at phamos")],
@@ -312,6 +313,14 @@ def _years_label(years):
 	return _("1 year") if years == 1 else _("{0} years").format(years)
 
 
+def _experience_years(since, until=None):
+	"""Years of Frappe / ERPNext experience from the start year on the profile (phamos/phamos#1527):
+	up to today, for alumni up to their leaving date. None without a start year."""
+	if not since:
+		return None
+	return max(0, getdate(until or date.today()).year - since)
+
+
 # --- loaders --------------------------------------------------------------------------------------
 
 
@@ -337,7 +346,7 @@ def load_people(lang):
 		filters={"published": 1},
 		fields=["name", "party_type", "party", "full_name", "status", "designation", "company_name", "department",
 			"date_of_joining", "relieving_date", "publication_consent", "alumni_consent", "contact_consent",
-			"email_id", "route", "image", "sort_order", "publish_as"],
+			"email_id", "route", "image", "sort_order", "publish_as", "frappe_experience_since"],
 	))
 	departments = _profile_map("Department Web Profile", "department", "department_name")
 	teams = _profile_map("Team Web Profile", "team", "team_name")
@@ -405,7 +414,12 @@ def load_people(lang):
 		years = _years_between(r.date_of_joining, r.relieving_date if alumni else None) if employee else None
 		if years is not None:
 			item["numbers"]["tenure"] = years
-			item["chips"].append(_years_label(years))
+			# Two year chips on one card: each says what it counts (phamos/phamos#1527).
+			item["chips"].append(_("{0} at phamos").format(_years_label(years)))
+		experience = _experience_years(r.frappe_experience_since, r.relieving_date if alumni else None)
+		if experience is not None:
+			item["numbers"]["experience"] = experience
+			item["chips"].append(_("{0} Frappe/ERPNext").format(_years_label(experience)))
 		for code in person_languages.get(r.name, []):
 			_facet(item, "language", code, _(languages.get(code) or code))
 
@@ -434,6 +448,8 @@ def load_people(lang):
 			"first_name": (r.full_name or "").split(" ")[0] if not masked else "",
 			"start_year": getdate(r.date_of_joining).year if r.date_of_joining else None,
 			"end_year": getdate(r.relieving_date).year if (alumni and r.relieving_date) else None,
+			"experience": experience,
+			"experience_since": r.frappe_experience_since,
 		}
 		items.append(item)
 	return items
@@ -818,6 +834,9 @@ def build_profile(item, lang):
 		if item.data.get("years") is not None:
 			span = f" ({item.data['start_year']}–{item.data['end_year']})" if item.data.get("end_year") and not item.masked else ""
 			facts.append({"label": _("Time at phamos"), "value": _years_label(item.data["years"]) + span})
+		if item.data.get("experience") is not None:
+			since = "" if item.masked else " " + _("(since {0})").format(item.data["experience_since"])
+			facts.append({"label": _("Experience with Frappe / ERPNext"), "value": _years_label(item.data["experience"]) + since})
 		langs = [{"label": item.labels["language"][v], "flag": flag_url(v)} for v in item.facets.get("language", [])]
 		if langs:
 			facts.append({"label": _("Languages"), "value": ", ".join(lang_["label"] for lang_ in langs), "flags": langs})
