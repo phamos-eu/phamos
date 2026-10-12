@@ -428,8 +428,9 @@ def load_people(lang):
 			# Only a flag reaches the page; the address stays on the server (see contact.py).
 			# phamos people take requests through the CRM (Opportunity); external people need their
 			# consent and a forwarding address. See contact.py.
-			# Anonymous people are never contactable, not even through phamos (phamos/phamos#1509).
-			"contactable": not masked and ((employee and not alumni) or bool(r.contact_consent and r.email_id)),
+			# Anonymous people and alumni are never contactable, not even through phamos
+			# (phamos/phamos#1509, #1523).
+			"contactable": not masked and not alumni and (employee or bool(r.contact_consent and r.email_id)),
 			"first_name": (r.full_name or "").split(" ")[0] if not masked else "",
 			"start_year": getdate(r.date_of_joining).year if r.date_of_joining else None,
 			"end_year": getdate(r.relieving_date).year if (alumni and r.relieving_date) else None,
@@ -688,29 +689,26 @@ def related(section, lang, *, facet=None, values=None, slugs=None, exclude=None,
 	return matches, see_all
 
 
-def contact_dialog(target, lang, label=None):
-	"""Button + dialog texts for the shared contact workflow (phamos.web_profile.contact.submit).
-	The server decides the actual workflow again from section + slug; these texts only explain it."""
-	person = target if target.section == "people" and target.data.get("contactable") else None
-	external = bool(person and person.data["party_type"] != "Employee")
-	name = person.data["first_name"] if person else None
-	if external:
+def contact_dialog(person, lang):
+	"""Button + dialog texts for contacting a person (phamos.web_profile.contact.submit), or None.
+	Every contact button on the profile pages goes to a named, contactable person ("Contact Anna"):
+	there are no general page buttons (phamos/phamos#1523). The server checks the person again."""
+	if not (person and person.section == "people" and person.data.get("contactable")):
+		return None
+	name = person.data["first_name"]
+	if person.data["party_type"] != "Employee":
 		intro = _("Your request is forwarded to {0} by email, who replies to you directly. Their address stays private.").format(name)
 		consent = _("I agree that phamos forwards my name, contact details and message to {0}.").format(person.title)
-	elif person:
+	else:
 		intro = _("{0} receives your request at phamos and gets back to you.").format(name)
 		consent = _("I agree that phamos stores my name, contact details and message to answer my request.")
-	else:
-		intro = _("Tell us what you need. The right person at phamos gets back to you.")
-		consent = _("I agree that phamos stores my name, contact details and message to answer my request.")
 	return {
-		"label": label or _("Contact {0}").format(name),
-		"title": _("Contact {0}").format(name) if person else (label or _("Contact phamos")),
+		"label": _("Contact {0}").format(name),
+		"title": _("Contact {0}").format(name),
 		"intro": intro,
 		"consent": consent,
-		"section": target.section,
-		"slug": target.slug,
-		"dialog": True,
+		"section": person.section,
+		"slug": person.slug,
 	}
 
 
@@ -736,7 +734,7 @@ def key_people(item, lang):
 	def add(person, role):
 		if person and all(c["person"].name != person.name for c in cards):
 			cards.append({"person": person, "role": role,
-				"contact": contact_dialog(person, lang) if person.data.get("contactable") else None})
+				"contact": contact_dialog(person, lang)})
 
 	if section == "people":
 		add(item, item.subtitle)
@@ -842,8 +840,6 @@ def build_profile(item, lang):
 		if employee and not item.data.get("alumni"):
 			add_related(_("Teammates"), _("The people {0} works with every day in the same team.").format(first),
 				"people", facet="team", values=item.facets.get("team"), exclude=item.slug, current_only=True)
-		# Own contact button when contactable; none at all on anonymous profiles.
-		cta = None if item.data.get("contactable") or item.masked else contact_dialog(item, lang, _("Start a conversation"))
 		employer = ORGANIZATION if employee else {"@type": "Organization", "name": item.data.get("organization")}
 		schema = None if item.masked else {"@type": "Person", "name": item.title, "jobTitle": designation or None,
 			"worksFor" if not item.data.get("alumni") else "alumniOf": employer}
@@ -870,7 +866,6 @@ def build_profile(item, lang):
 			"people", facet="team", values=[item.slug], current_only=True)
 		add_related(_("Implementations"), _("Projects delivered by {0}, with the industry and modules of each.").format(item.title),
 			"implementations", facet="team", values=[item.slug])
-		cta = contact_dialog(item, lang, _("Start a conversation"))
 		schema = {"@type": "Organization", "name": item.title, "parentOrganization": ORGANIZATION}
 
 	elif section == "modules":
@@ -886,7 +881,6 @@ def build_profile(item, lang):
 			"industries", facet="module", values=[item.slug])
 		add_related(_("Experts"), _("phamos people with hands-on experience in {0}.").format(item.title),
 			"people", facet="module", values=[item.slug], current_only=True)
-		cta = contact_dialog(item, lang, _("Talk to us about this module"))
 		schema = {"@type": "Service", "name": item.title, "serviceType": "ERPNext implementation", "provider": ORGANIZATION}
 
 	elif section == "implementations":
@@ -916,7 +910,6 @@ def build_profile(item, lang):
 			sections.append({"title": _("People on this project"), "count": len(on_project), "see_all": None, "tiles": on_project,
 				"intro": _("The phamos people who worked on this project. The customer is not named, so the customer's team is not shown either.") if item.masked
 					else _("The people who shaped this project, from phamos and from the customer's side, working together on eye level.")})
-		cta = contact_dialog(item, lang, _("Talk to us about your project"))
 		schema = {"@type": "CreativeWork", "name": item.title, "genre": "Case study", "author": ORGANIZATION}
 		if item.data.get("customer"):
 			schema["about"] = {"@type": "Organization", "name": item.data["customer"]}
@@ -950,7 +943,6 @@ def build_profile(item, lang):
 			add_related((_("More partners in {0}") if partner else _("More customers in {0}")).format(industry),
 				_("Other companies in the same industry that work with phamos."),
 				section, facet="industry", values=[item.data["industry"][0]], exclude=item.slug)
-		cta = contact_dialog(item, lang, _("Talk to us about a partnership") if partner else _("Talk to us about your project"))
 		schema = None if item.masked else {"@type": "Organization", "name": item.title, "url": item.data.get("website") or None}
 
 	else:  # industries
@@ -961,7 +953,6 @@ def build_profile(item, lang):
 			"implementations", facet="industry", values=[item.slug])
 		add_related(_("Customers"), _("Companies in {0} that work with phamos and agreed to be named.").format(item.title),
 			"customers", facet="industry", values=[item.slug])
-		cta = contact_dialog(item, lang, _("Talk to us about your industry"))
 		schema = {"@type": "Thing", "name": item.title}
 
 	facts = [f for f in facts if f.get("value") or f.get("links")]
@@ -975,7 +966,6 @@ def _dedupe(item, profile):
 	- Key people in the sidebar are not repeated in the card sections; empty sections disappear.
 	- Cards don't repeat the page they are on (no "Nordwerk" chip on Nordwerk's page).
 	- The generated overview is a fallback for pages without editor text.
-	- One contact action per person: no generic "Talk to us" next to a contact button.
 	- The header subtitle is dropped when the sidebar shows the same facts as cards/chips.
 	"""
 	key_names = {card["person"].name for card in profile["key_people"]}
@@ -996,7 +986,5 @@ def _dedupe(item, profile):
 
 	if item.body:
 		profile["overview"] = ""
-	if any(card.get("contact") for card in profile["key_people"]) and (profile["cta"] or {}).get("dialog"):
-		profile["cta"] = None
 	profile["show_subtitle"] = not (item.section in STAKEHOLDER_SECTIONS or (item.section == "implementations" and item.data.get("customer_link")))
 	return profile

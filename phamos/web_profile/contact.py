@@ -1,12 +1,13 @@
-"""One contact workflow behind every "contact" button on the Web Profile pages.
+"""One contact workflow behind every "contact" button on the website.
 
-The visitor always fills in the same dialog (name, email, optional phone, message). What happens
-next depends on who they contact:
+Profile pages only have person buttons ("Contact Anna"); anonymous people and alumni can't be
+contacted at all (phamos/phamos#1509, #1523). The visitor always fills in the same dialog (name,
+email, optional phone, message). What happens next depends on who they contact:
 
-- a phamos person, or a page-level button ("Talk to us about this module"): the ERPNext
-  /contact concept. The visitor becomes a Lead (or is matched to an existing Customer by email)
-  and an Opportunity is created with the message as Communication, owned by and assigned to the
-  phamos person when they have a user account.
+- a phamos person, or the general contact form of the contact Web Page (section "contact", goes to
+  the sales contact): the ERPNext /contact concept. The visitor becomes a Lead (or is matched to an
+  existing Customer by email) and an Opportunity is created with the message as Communication,
+  owned by and assigned to the phamos person when they have a user account.
 - an external person (customer, supplier, partner) who consented to be contacted: the message is
   recorded on their Person Web Profile and forwarded to them by email. Their address never
   reaches the page.
@@ -21,7 +22,7 @@ from frappe import _
 from frappe.rate_limiter import rate_limit
 from frappe.utils import escape_html, validate_email_address
 
-from phamos.web_profile.sections import SECTIONS, find_item, key_people
+from phamos.web_profile.sections import find_item
 
 MAX_MESSAGE = 4000
 PHONE = re.compile(r"[0-9 +()./-]{5,40}")
@@ -58,29 +59,17 @@ def submit(section, slug, lang, sender_name, sender_email, message, phone=None, 
 		_create_opportunity(item, person, frappe._dict(name=sender_name, email=sender_email, phone=phone, message=message))
 		return {"ok": True, "flow": "opportunity"}
 
-	item = find_item(section, slug, lang) if section in SECTIONS else None
-	if not item:
-		frappe.throw(_("This page can't be contacted through the website."), frappe.PermissionError)
-
-	if section == "people" and item.masked:
-		# An anonymous person can't be contacted, not even through phamos (phamos/phamos#1509).
+	# Only people can be contacted from the profile pages, and only when their profile allows it:
+	# never anonymous people or alumni, external people only with their consent (sections.py).
+	item = find_item("people", slug, lang) if section == "people" else None
+	if not item or not item.data.get("contactable"):
 		frappe.throw(_("This person can't be contacted through the website."), frappe.PermissionError)
 
 	visitor = frappe._dict(name=sender_name, email=sender_email, phone=phone, message=message)
-	person = item if section == "people" else None
-	if person and person.data["party_type"] != "Employee":
-		if not person.data.get("contactable"):
-			frappe.throw(_("This person can't be contacted through the website."), frappe.PermissionError)
-		_relay_to_external(person, visitor)
+	if item.data["party_type"] != "Employee":
+		_relay_to_external(item, visitor)
 		return {"ok": True, "flow": "relay"}
-
-	if person and not person.data.get("contactable"):
-		person = None  # e.g. alumni: the request goes to phamos in general
-	if not person:
-		# Page-level request: route it to the page's phamos key person, if there is one.
-		person = next((c["person"] for c in key_people(item, lang)
-			if c["person"].data["party_type"] == "Employee" and c["person"].data.get("contactable")), None)
-	_create_opportunity(item, person, visitor)
+	_create_opportunity(item, item, visitor)
 	return {"ok": True, "flow": "opportunity"}
 
 

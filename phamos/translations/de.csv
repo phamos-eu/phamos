@@ -108,7 +108,6 @@ Ongoing,Laufend
 1 module,1 Modul
 Languages,Sprachen
 Teammates,Teamkolleginnen und -kollegen
-Start a conversation,Gespräch beginnen
 Lead,Leitung
 People in this department,Personen in dieser Abteilung
 View open roles,Offene Stellen ansehen
@@ -116,13 +115,10 @@ Team lead,Teamleitung
 Members,Mitglieder
 Typical duration,Typische Dauer
 Experts,Expertinnen und Experten
-Talk to us about this module,Sprechen Sie mit uns über dieses Modul
 Started,Gestartet
 Modules in this project,Module in dieser Implementierung
 Similar implementations,Ähnliche Implementierungen
-Talk to us about your project,Sprechen Sie mit uns über Ihr Projekt
 Relevant modules,Relevante Module
-Talk to us about your industry,Sprechen Sie mit uns über Ihre Branche
 Home,Startseite
 Breadcrumb,Brotkrümelnavigation
 Filters,Filter
@@ -304,7 +300,6 @@ Search partners,Partner durchsuchen
 A phamos partner that is not named here.,"Ein Partner von phamos, der hier nicht genannt wird."
 {0} is a phamos partner{1}.,{0} ist Partner von phamos{1}.
 More partners in {0},Weitere Partner: {0}
-Talk to us about a partnership,Sprechen Sie mit uns über eine Partnerschaft
 {0} already has a {1} profile: {2},{0} hat bereits ein Profil als {1}: {2}
 Custom App,Eigene App
 Services,Leistungen
