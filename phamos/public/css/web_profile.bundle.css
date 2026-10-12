@@ -178,9 +178,9 @@
 .wp-avatar-xl img { object-position: 50% 30%; }
 .wp-tile-head-photo { position: relative; justify-content: center; margin: 4px 0 14px; }
 .wp-silhouette { width: 45%; height: 45%; fill: currentColor; }
-/* Name, role, chips and social icons centred under the photo. */
+/* Name, role and chips centred under the photo. */
 .wp-tile-person { text-align: center; }
-.wp-tile-person .wp-chips, .wp-tile-person .wp-socials { justify-content: center; }
+.wp-tile-person .wp-chips { justify-content: center; }
 .wp-avatar:not(.wp-avatar-people) { border-radius: var(--wp-radius-sm); }
 .wp-avatar-masked { color: #9a9a9a; background: #f5f5f5; }
 
