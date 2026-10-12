@@ -84,11 +84,18 @@
 	/* Taller than the window, so the pinned filters stay in view even with only a few results
 	   (and in low windows, where the filter list itself fills the window). */
 	min-height: calc(100vh + 160px); }
-/* Filters stay in view and scroll on their own, independent of the results (all listing pages). */
-.wp-sidebar { position: sticky; top: 12px; max-height: calc(100vh - 24px); overflow-y: auto; overscroll-behavior: contain;
-	padding-right: 8px; padding-top: 12px; scrollbar-width: thin; scrollbar-color: #d4d4d4 transparent; }
-.wp-sidebar::-webkit-scrollbar { width: 6px; }
-.wp-sidebar::-webkit-scrollbar-thumb { background: #d4d4d4; border-radius: 3px; }
+/* Both columns of a listing page (filters, results with the search bar) stay in view while the
+   other one scrolls. A column taller than the window scrolls with the page until its end (scrolling
+   down) or start (scrolling up) is in view and stays pinned there: no inner scrollbar, so the wheel
+   never gets stuck. The variables are set by web_profile.bundle.js (pinColumns); without it both
+   columns pin at the top. The bottom margin keeps both columns clear of the footer. */
+.wp-sidebar, .wp-results { position: sticky; }
+.wp-sidebar { top: var(--wp-sidebar-top, 12px); bottom: var(--wp-sidebar-bottom, auto);
+	align-self: var(--wp-sidebar-align, start); margin-top: var(--wp-sidebar-before, 0px);
+	margin-bottom: var(--wp-sidebar-after, 64px); padding-right: 8px; padding-top: 12px; }
+.wp-results { top: var(--wp-results-top, 0px); bottom: var(--wp-results-bottom, auto);
+	align-self: var(--wp-results-align, start); margin-top: var(--wp-results-before, 0px);
+	margin-bottom: var(--wp-results-after, 64px); }
 .wp-filters { display: flex; flex-direction: column; gap: 18px; }
 .wp-filters-head { display: flex; justify-content: flex-end; }
 .wp-filters-title { font-weight: 600; }
@@ -135,12 +142,6 @@
 .wp-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(210px, 1fr)); gap: 12px; list-style: none; margin: 0; padding: 0; }
 .wp-grid-compact { grid-template-columns: repeat(auto-fill, minmax(190px, 1fr)); }
 .wp-results.wp-loading { opacity: 0.55; transition: opacity 0.15s; }
-/* The results column runs to the bottom of the layout, so the pinned search bar stays in view
-   until the footer, even with only a few results. */
-/* The spacing above the footer sits inside the columns, not on the layout: a pinned element can only
-   move within its layout's content box, so this keeps it pinned right up to the footer. */
-.wp-results { align-self: stretch; }
-.wp-results::after { content: ""; display: block; height: 64px; }  /* spacer, not padding: the pinned search bar may use it */
 
 .wp-tile { position: relative; display: flex; flex-direction: column; gap: 4px; height: 100%; padding: 14px; border: 1px solid var(--wp-line); border-radius: var(--wp-radius); background: var(--wp-surface); box-shadow: var(--wp-shadow-sm); transition: border-color 0.15s, box-shadow 0.15s, transform 0.15s; }
 .wp-tile:hover { border-color: #cfcfcf; box-shadow: var(--wp-shadow-md); transform: translateY(-1px); }
@@ -328,7 +329,9 @@ body .footer-info a { color: #6b6b6b; }
 /* --- mobile: filters become a drawer once JavaScript is available ------------------------------- */
 @media (max-width: 860px) {
 	.wp-layout { grid-template-columns: minmax(0, 1fr); gap: 20px; min-height: 0; }
-	.wp-sidebar { position: static; max-height: none; overflow: visible; padding-right: 0; }
+	.wp-sidebar, .wp-results { position: static; align-self: auto; margin: 0; }
+	.wp-sidebar { padding-right: 0; }
+	.wp-results { margin-bottom: 64px; }
 	.wp-page-head-main { flex-direction: column; align-items: flex-start; gap: 16px; }
 	.wp-js .wp-only-mobile { display: inline-flex !important; }
 	.wp-js .wp-sidebar { position: fixed; inset: 0 auto 0 0; z-index: 1040; width: min(320px, 88vw); padding: 20px 16px; overflow-y: auto; background: var(--wp-surface); box-shadow: 0 0 40px rgb(0 0 0 / 18%); transform: translateX(-105%); transition: transform 0.2s ease; }
