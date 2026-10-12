@@ -8,6 +8,7 @@ Privacy is applied here, once, before anything reaches a template: anonymous alu
 unapproved customers never carry a name, photo or named URL in their item.
 """
 
+import re
 from datetime import date
 
 import frappe
@@ -284,7 +285,7 @@ def _stakeholder_pages(lang, published_only=True):
 			continue
 		named = r.publish_as == "Named" and bool(r.naming_approved)  # approval is checked on save too
 		industry = industry_titles.get(r.industry) or _(r.industry) if r.industry else ""
-		descriptor = ", ".join(filter(None, [_("{0} company").format(industry) if industry else _("Company"), r.region]))
+		descriptor = ", ".join(filter(None, [_("{0} company").format(industry) if industry else _("Company"), _region(r.region)]))
 		if not named:
 			# Editors may write a better neutral title as the row title (e.g. "Mittelständischer Maschinenbauer").
 			descriptor = localized(r, "title", lang, fallback=False) or descriptor
@@ -311,6 +312,32 @@ def _years_label(years):
 	if years == 0:
 		return _("Less than a year")
 	return _("1 year") if years == 1 else _("{0} years").format(years)
+
+
+def _period(start, end=None):
+	"""How long something went on, written the same way for every fact (phamos/phamos#1528):
+	"(since 2018)" while it goes on, "(2020–2024)" once it ended."""
+	if not start:
+		return ""
+	return f"({start}–{end})" if end else _("(since {0})").format(start)
+
+
+DURATION = re.compile(r"^\s*(\d+)\s*(?:[–-]\s*(\d+)\s*)?weeks?\s*$", re.IGNORECASE)
+
+
+def _duration(text):
+	"""A module's typical duration in the page language: "3–6 weeks" becomes "3–6 Wochen" on German
+	pages. Anything else is shown as the editor wrote it."""
+	match = DURATION.match(text or "")
+	if not match:
+		return text
+	low, high = match.groups()
+	return _("{0}–{1} weeks").format(low, high) if high else _("{0} weeks").format(low)
+
+
+def _region(value):
+	"""Region names in the page language ("Germany" → "Deutschland"); "DACH" stays as it is."""
+	return _(value) if value else ""
 
 
 def _experience_years(since, until=None):
@@ -512,7 +539,7 @@ def load_modules(lang):
 			_facet(item, "complexity", r.complexity, _(r.complexity))
 			item["chips"].append(_(r.complexity))
 		if r.typical_duration:
-			item["chips"].append(r.typical_duration)
+			item["chips"].append(_duration(r.typical_duration))
 		for industry in module_industries.get(r.name, []):
 			if industry in industries:
 				label = industry_titles.get(industry) or _(industry)
@@ -520,7 +547,7 @@ def load_modules(lang):
 		item["search"] = item["title"].lower()
 		item["summary"] = localized(r, "summary", lang)
 		item["body"] = localized(r, "content", lang)
-		item["data"] = {"complexity": r.complexity, "duration": r.typical_duration, "key_person": r.key_person}
+		item["data"] = {"complexity": r.complexity, "duration": _duration(r.typical_duration), "key_person": r.key_person}
 		items.append(item)
 	return items
 
@@ -546,7 +573,7 @@ def load_implementations(lang):
 		industry_label = industry_titles.get(r.industry) or _(r.industry) if r.industry else ""
 		year = getdate(r.start_date).year if r.start_date else None
 		masked = not r.customer_approved
-		descriptor = ", ".join(filter(None, [_("{0} company").format(industry_label) if industry_label else _("Company"), r.region]))
+		descriptor = ", ".join(filter(None, [_("{0} company").format(industry_label) if industry_label else _("Company"), _region(r.region)]))
 		title = localized(r, "title", lang) or (descriptor if masked else r.customer)
 		if masked:
 			item = _item("implementations", r, lang, title, r.route, subtitle="" if title == descriptor else descriptor,
@@ -651,14 +678,14 @@ def load_stakeholders(section, lang):
 		elif industry_label:
 			item["chips"].append(industry_label)
 		item["sort"]["newest"] = -(since or 0)
-		item["search"] = " ".join(filter(None, [page.title, industry_label, r.region])).lower()
+		item["search"] = " ".join(filter(None, [page.title, industry_label, r.region, _region(r.region)])).lower()
 		item["summary"] = localized(r, "summary", lang)
 		item["body"] = localized(r, "content", lang)
 		item["data"] = {
 			"customer": None if masked else r.party,
 			"stakeholder_type": SECTIONS[section]["stakeholder_type"],
 			"website": None if masked else r.website,
-			"region": r.region, "since": since,
+			"region": _region(r.region), "since": since,
 			"projects": [p.slug for p in projects],
 			# Their people would reveal an anonymous stakeholder through their organization.
 			"people": [] if masked else [p.slug for p in people
@@ -831,12 +858,14 @@ def build_profile(item, lang):
 				"links": [{"value": item.data["organization"], "url": url}] if url else None})
 		facts += [{"label": _("Department"), "links": facet_links("department", "departments")}]
 		facts += [{"label": _("Team"), "links": facet_links("team", "teams")}]
+		# Both year facts read the same way: "8 Jahre (seit 2018)", "4 Jahre (2020–2024)". Anonymous
+		# profiles show the years only, no start or end year.
 		if item.data.get("years") is not None:
-			span = f" ({item.data['start_year']}–{item.data['end_year']})" if item.data.get("end_year") and not item.masked else ""
-			facts.append({"label": _("Time at phamos"), "value": _years_label(item.data["years"]) + span})
+			span = "" if item.masked else _period(item.data["start_year"], item.data["end_year"])
+			facts.append({"label": _("Time at phamos"), "value": " ".join(filter(None, [_years_label(item.data["years"]), span]))})
 		if item.data.get("experience") is not None:
-			since = "" if item.masked else " " + _("(since {0})").format(item.data["experience_since"])
-			facts.append({"label": _("Experience with Frappe / ERPNext"), "value": _years_label(item.data["experience"]) + since})
+			span = "" if item.masked else _period(item.data["experience_since"], item.data["end_year"])
+			facts.append({"label": _("Experience with Frappe / ERPNext"), "value": " ".join(filter(None, [_years_label(item.data["experience"]), span]))})
 		langs = [{"label": item.labels["language"][v], "flag": flag_url(v)} for v in item.facets.get("language", [])]
 		if langs:
 			facts.append({"label": _("Languages"), "value": ", ".join(lang_["label"] for lang_ in langs), "flags": langs})

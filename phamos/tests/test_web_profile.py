@@ -139,6 +139,24 @@ class TestWebProfile(FrappeTestCase):
 			doc.frappe_experience_since = year
 			self.assertRaises(frappe.ValidationError, doc.save)
 
+	def test_year_facts_on_the_detail_page_read_the_same_way(self):
+		doc = frappe.get_doc("Person Web Profile", self.person.name)
+		doc.frappe_experience_since = getdate().year - 5
+		doc.save(ignore_permissions=True)
+		facts = {f["label"]: f["value"] for f in build_profile(_person_item(doc.name), "en")["facts"]}
+		joined = getdate(add_years(nowdate(), -3)).year
+		self.assertEqual(facts["Time at phamos"], f"3 years (since {joined})")
+		self.assertEqual(facts["Experience with Frappe / ERPNext"], f"5 years (since {getdate().year - 5})")
+
+	def test_durations_follow_the_page_language(self):
+		from phamos.web_profile.sections import _duration
+
+		self.assertEqual(_duration("3–6 weeks"), "3–6 weeks")
+		self.assertEqual(_duration("3-6 Weeks"), "3–6 weeks")
+		self.assertEqual(_duration("about a month"), "about a month")  # free text stays as written
+		frappe.local.lang = "de"
+		self.assertEqual(_duration("3–6 weeks"), "3–6 Wochen")
+
 	# --- anonymous people --------------------------------------------------------------------------
 
 	def _make_anonymous(self):
