@@ -58,12 +58,15 @@
 		{#- People cards show the face: a large round photo (initials or silhouette without one). -#}
 		<span class="wp-tile-head{% if item.section == 'people' %} wp-tile-head-photo{% endif %}">
 			{{ avatar(item, "xl" if item.section == "people" else "md") }}
-			{%- if item.badge %}<span class="wp-badge">{{ item.badge | e }}</span>{% endif %}
+			{%- if item.badge and item.section != "people" %}<span class="wp-badge">{{ item.badge | e }}</span>{% endif %}
 		</span>
 		<{{ heading }} class="wp-tile-title"><a class="wp-stretched-link" href="{{ item.url | e }}">{{ item.title | e }}</a></{{ heading }}>
 		{%- if item.subtitle %}<span class="wp-tile-subtitle">{{ item.subtitle | e }}</span>{% endif %}
-		{%- if item.chips %}
+		{#- On people cards the badge (Alumni, Kunde, Partner) is the first chip: nothing sits on the photo. -#}
+		{%- set badge_chip = item.badge if item.section == "people" else None %}
+		{%- if item.chips or badge_chip %}
 		<span class="wp-chips">
+			{%- if badge_chip %}<span class="wp-chip">{{ badge_chip | e }}</span>{% endif -%}
 			{%- for chip in item.chips %}<span class="wp-chip">{{ chip | e }}</span>{% endfor -%}
 		</span>
 		{%- endif %}
