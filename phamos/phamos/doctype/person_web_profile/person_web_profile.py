@@ -5,6 +5,7 @@ import secrets
 
 import frappe
 from frappe import _
+from frappe.utils import getdate
 
 from phamos.web_profile.document import WebProfileDocument
 from phamos.web_profile.socials import detect_platform, normalize_url
@@ -25,6 +26,7 @@ class PersonWebProfile(WebProfileDocument):
 		self.validate_unique_person()
 		self.validate_consents()
 		self.validate_social_links()
+		self.validate_experience_since()
 
 	def set_route(self):
 		"""One URL: a random code, generated once at creation. It never contains the name and never
@@ -45,6 +47,13 @@ class PersonWebProfile(WebProfileDocument):
 		existing = frappe.db.get_value("Person Web Profile", filters)
 		if existing:
 			frappe.throw(_("{0} already has a Person Web Profile: {1}").format(self.full_name or self.party, existing))
+
+	def validate_experience_since(self):
+		"""A start year, not a number of years: the website calculates the years, so the value never
+		goes stale (phamos/phamos#1527). Frappe / ERPNext exist since 2008."""
+		year = self.frappe_experience_since
+		if year and not 2008 <= year <= getdate().year:
+			frappe.throw(_("Working with Frappe / ERPNext Since must be a year between 2008 and {0}, e.g. 2016.").format(getdate().year))
 
 	def validate_social_links(self):
 		for row in self.profile_links:
