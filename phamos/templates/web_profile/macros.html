@@ -22,10 +22,15 @@
 </nav>
 {%- endmacro %}
 
+{#- size: md (40px), lg (96px), xl (round photo across most of a people card). -#}
 {% macro avatar(item, size="md") -%}
+{%- set px = {"md": 40, "lg": 96, "xl": 192}[size] -%}
 <span class="wp-avatar wp-avatar-{{ size }} wp-avatar-{{ item.section }}{% if item.masked %} wp-avatar-masked{% endif %}" aria-hidden="true">
 	{%- if item.image -%}
-	<img src="{{ item.image | e }}" alt="" loading="lazy" width="{{ 96 if size == 'lg' else 40 }}" height="{{ 96 if size == 'lg' else 40 }}">
+	<img src="{{ item.image | e }}" alt="" loading="lazy" width="{{ px }}" height="{{ px }}">
+	{%- elif item.masked and item.section == "people" -%}
+	{#- Anonymous people: a neutral silhouette, never initials (they could hint at who it is). -#}
+	<svg class="wp-silhouette" viewBox="0 0 24 24" focusable="false"><circle cx="12" cy="8" r="4.2"/><path d="M3.5 21c.6-4.4 4.1-7 8.5-7s7.9 2.6 8.5 7z"/></svg>
 	{%- elif item.icon -%}
 	{#- Official ERPNext workspace icon from the Frappe sprite (web_profile/icons.py). -#}
 	<svg class="wp-icon" viewBox="0 0 24 24" focusable="false"><use href="{{ item.icon | e }}"></use></svg>
@@ -49,9 +54,10 @@
     clickable (stretched title link); social icons are links of their own on top. -#}
 {% macro tile(item, heading="h2") -%}
 <li class="wp-tile-item" data-wp-item>
-	<div class="wp-tile{% if item.masked %} wp-tile-masked{% endif %}">
-		<span class="wp-tile-head">
-			{{ avatar(item) }}
+	<div class="wp-tile{% if item.section == 'people' %} wp-tile-person{% endif %}{% if item.masked %} wp-tile-masked{% endif %}">
+		{#- People cards show the face: a large round photo (initials or silhouette without one). -#}
+		<span class="wp-tile-head{% if item.section == 'people' %} wp-tile-head-photo{% endif %}">
+			{{ avatar(item, "xl" if item.section == "people" else "md") }}
 			{%- if item.badge %}<span class="wp-badge">{{ item.badge | e }}</span>{% endif %}
 		</span>
 		<{{ heading }} class="wp-tile-title"><a class="wp-stretched-link" href="{{ item.url | e }}">{{ item.title | e }}</a></{{ heading }}>
