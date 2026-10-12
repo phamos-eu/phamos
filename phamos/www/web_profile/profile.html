@@ -31,7 +31,9 @@
 		    nothing to link to, so photo and name sit directly on the page without a frame. -#}
 		<div class="wp-person-card{% if person.url != item.url %} wp-person-card-link{% endif %}">
 			<span class="wp-person-photo{% if person.masked %} wp-avatar-masked{% endif %}" aria-hidden="true">
-				{%- if person.image %}<img src="{{ person.image | e }}" alt="" width="280" height="280">{% else %}{{ person.initials | e }}{% endif -%}
+				{%- if person.image %}<img src="{{ person.image | e }}" alt="" width="280" height="280">
+				{%- elif person.masked %}<svg class="wp-silhouette" viewBox="0 0 24 24" focusable="false"><circle cx="12" cy="8" r="4.2"/><path d="M3.5 21c.6-4.4 4.1-7 8.5-7s7.9 2.6 8.5 7z"/></svg>
+				{%- else %}{{ person.initials | e }}{% endif -%}
 			</span>
 			<div class="wp-person-card-body">
 				{#- On the person's own page name and role are already the page title. -#}
