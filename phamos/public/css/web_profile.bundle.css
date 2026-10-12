@@ -177,7 +177,6 @@
 .wp-avatar-xl { width: 72%; height: auto; aspect-ratio: 1; font-size: 36px; }
 .wp-avatar-xl img { object-position: 50% 30%; }
 .wp-tile-head-photo { position: relative; justify-content: center; margin: 4px 0 14px; }
-.wp-tile-head-photo .wp-badge { position: absolute; top: 0; right: 0; }
 .wp-silhouette { width: 45%; height: 45%; fill: currentColor; }
 /* Name, role, chips and social icons centred under the photo. */
 .wp-tile-person { text-align: center; }
