@@ -193,6 +193,33 @@ class TestWebProfile(FrappeTestCase):
 		doc.save(ignore_permissions=True)
 		self.assertEqual(doc.route, route)
 
+	# --- contact buttons: only named, contactable people ------------------------------------------
+
+	def test_alumni_cannot_be_contacted_even_with_consent(self):
+		frappe.db.set_value("Person Web Profile", self.person.name, {
+			"status": "Left", "relieving_date": nowdate(), "alumni_consent": 1, "alumni_consent_date": nowdate(),
+			"contact_consent": 1, "contact_consent_date": nowdate(), "email_id": "testa@example.com"})
+		item = _person_item(self.person.name)
+		self.assertFalse(item.masked)  # named alumni with consent
+		self.assertFalse(item.data["contactable"])
+		profile = build_profile(item, "en")
+		self.assertIsNone(profile["cta"])
+		self.assertTrue(all(not card["contact"] for card in profile["key_people"]))
+		self.assertRaises(frappe.PermissionError, self._submit, self.person.route)
+
+	def test_profile_pages_only_have_person_contact_buttons(self):
+		_reset_items()
+		item = find_item("customers", self.stakeholder.route, "en")
+		profile = build_profile(item, "en")
+		self.assertFalse(profile["cta"] and not profile["cta"].get("url"))  # a link at most, never a dialog
+		for card in profile["key_people"]:
+			if card["contact"]:
+				self.assertEqual(card["contact"]["section"], "people")
+				self.assertTrue(card["contact"]["label"].startswith("Contact "))
+
+	def test_contact_request_for_a_page_is_refused(self):
+		self.assertRaises(frappe.PermissionError, self._submit, self.stakeholder.route, section="customers")
+
 	# --- contact workflow --------------------------------------------------------------------------
 
 	def test_contact_request_needs_consent(self):

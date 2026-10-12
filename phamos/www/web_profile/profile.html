@@ -63,9 +63,8 @@
 			{%- endfor %}
 		</dl>
 		{%- endif %}
-		{%- if profile.cta and profile.cta.dialog %}
-		{{ contact_button(profile.cta, "wp-aside-cta") }}
-		{%- elif profile.cta %}
+		{#- Contact happens only through the key people's buttons; this is a plain link (e.g. open roles). -#}
+		{%- if profile.cta %}
 		<a class="wp-button wp-aside-cta" href="{{ profile.cta.url | e }}">{{ profile.cta.label | e }}</a>
 		{%- endif %}
 	</aside>
