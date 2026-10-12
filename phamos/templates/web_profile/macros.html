@@ -51,7 +51,7 @@
 {%- endmacro %}
 
 {#- One card. Used by listing grids and by every "related" section on profile pages. The whole card is
-    clickable (stretched title link); social icons are links of their own on top. -#}
+    clickable (stretched title link). -#}
 {% macro tile(item, heading="h2") -%}
 <li class="wp-tile-item" data-wp-item>
 	<div class="wp-tile{% if item.section == 'people' %} wp-tile-person{% endif %}{% if item.masked %} wp-tile-masked{% endif %}">
@@ -70,7 +70,8 @@
 			{%- for chip in item.chips %}<span class="wp-chip">{{ chip | e }}</span>{% endfor -%}
 		</span>
 		{%- endif %}
-		{{ socials(item.socials) }}
+		{#- Besides image and name a card only shows what can be filtered: no social or website icons
+		    (they stay on the detail page, phamos/phamos#1526). -#}
 	</div>
 </li>
 {%- endmacro %}
