@@ -41,7 +41,7 @@
 				{%- if card.role %}<span class="wp-person-role">{{ card.role | e }}</span>{% endif %}
 				<a class="wp-person-name wp-stretched-link" href="{{ person.url | e }}">{{ person.title | e }}</a>
 				{%- endif %}
-				{%- if card.contact %}{{ contact_button(card.contact, "wp-button wp-button-sm wp-person-contact") }}{% endif %}
+				{%- if card.contact %}{{ contact_button(card.contact, "wp-person-contact") }}{% endif %}
 				{{ socials(person.socials) }}
 			</div>
 		</div>
@@ -64,7 +64,7 @@
 		</dl>
 		{%- endif %}
 		{%- if profile.cta and profile.cta.dialog %}
-		{{ contact_button(profile.cta, "wp-button wp-aside-cta" + ("" if profile.key_people else " wp-button-primary")) }}
+		{{ contact_button(profile.cta, "wp-aside-cta") }}
 		{%- elif profile.cta %}
 		<a class="wp-button wp-aside-cta" href="{{ profile.cta.url | e }}">{{ profile.cta.label | e }}</a>
 		{%- endif %}
