@@ -39,6 +39,7 @@
   "contact_consent_date",
   "email_id",
   "expertise_section",
+  "frappe_experience_since",
   "modules",
   "expertise_col",
   "languages",
@@ -262,6 +263,13 @@
    "label": "Expertise and Languages"
   },
   {
+   "description": "Year the person started working with Frappe / ERPNext, e.g. 2016. The website shows the years from it (for alumni up to their leaving date) and offers it as a filter.",
+   "fieldname": "frappe_experience_since",
+   "fieldtype": "Int",
+   "label": "Working with Frappe / ERPNext Since",
+   "non_negative": 1
+  },
+  {
    "fieldname": "modules",
    "fieldtype": "Table",
    "label": "Module Expertise",
@@ -325,7 +333,7 @@
  "index_web_pages_for_search": 0,
  "istable": 0,
  "links": [],
- "modified": "2026-10-09 16:00:00.000000",
+ "modified": "2026-10-12 17:00:00.000000",
  "modified_by": "Administrator",
  "module": "Phamos",
  "name": "Person Web Profile",
