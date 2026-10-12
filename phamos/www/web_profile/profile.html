@@ -77,14 +77,16 @@
 	{%- endif %}
 
 	{#- Text first (SEO / AI answer engines): editor summary, an overview written from the record's
-	    facts (sections.build_profile), then the editor's long text. -#}
-	<section class="wp-prose" aria-labelledby="wp-about">
-		<h2 id="wp-about">{{ _("About {0}").format(item.title) | e }}</h2>
+	    facts (sections.build_profile), then the editor's long text. No "About …" heading: the page
+	    title already names the page, and editors set any further headings in the text itself. -#}
+	{%- if (item.summary and item.summary != item.subtitle) or profile.overview or item.body %}
+	<section class="wp-prose">
 		{%- if item.summary and item.summary != item.subtitle %}<p class="wp-lead">{{ item.summary | e }}</p>{% endif %}
 		{%- if profile.overview %}<p class="wp-overview">{{ profile.overview | e }}</p>{% endif %}
 		{#- Text Editor HTML, sanitised by Frappe on save and written by website editors. -#}
 		{%- if item.body %}<div class="wp-body">{{ item.body }}</div>{% endif %}
 	</section>
+	{%- endif %}
 
 	{%- for block in profile.related %}
 	<section class="wp-related" aria-labelledby="wp-related-{{ loop.index }}">
