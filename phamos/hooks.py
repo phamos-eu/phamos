@@ -189,7 +189,10 @@ get_website_user_home_page = "phamos.website.get_website_user_home_page"
 
 on_login = ["phamos.website.on_login"]
 
-update_website_context = ["phamos.website.update_website_context"]
+update_website_context = [
+    "phamos.website.update_website_context",
+    "phamos.web_profile.chrome.update_website_context",  # language-aware navbar/footer, DIN 5008 footer
+]
 
 # Generators
 # ----------
@@ -213,6 +216,7 @@ after_install = "phamos.setup.ops_inbox.ensure_ops_inbox_setup"
 
 after_migrate = [
 	"phamos.setup.ops_inbox.ensure_ops_inbox_setup",
+	"phamos.web_profile.setup.after_migrate",  # Web Page "Language" / "Translation Of" fields
 ]
 
 # Uninstallation
