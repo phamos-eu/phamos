@@ -3,7 +3,7 @@
  *
  * A lock is held while another user has the field focused. It is released
  * when they leave the field; if their tab closes or loses connection the
- * server drops it once the last heartbeat expires (at most 90 s).
+ * server drops it once the last heartbeat expires (at most 30 s).
  */
 
 export function lockHolder(lock) {
@@ -24,7 +24,7 @@ export function lockHeadline(lock, fieldLabel = "this field") {
 /** Why it is blocked and when it unblocks. */
 export function lockExplanation(lock, now = Date.now()) {
 	const seconds = secondsUntilExpiry(lock, now)
-	const automatic = seconds === null ? "within 90 s" : `in ${seconds} s`
+	const automatic = seconds === null ? "within 30 s" : `in ${seconds} s`
 	return (
 		"Read-only for you, so your edits and theirs don't overwrite each other. " +
 		`Unlocks when they leave the field, or automatically ${automatic} if their window was closed.`
