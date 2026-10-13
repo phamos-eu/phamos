@@ -22,7 +22,7 @@ class TestUpdateIssue(FrappeTestCase):
 
 	def tearDown(self):
 		frappe.set_user("Administrator")
-		frappe.cache().delete_value(presence._lock_key("Issue", self.issue.name))
+		presence.clear_field_locks("Issue", self.issue.name)
 		frappe.db.rollback()
 
 	def test_partial_update_leaves_other_fields_alone(self):

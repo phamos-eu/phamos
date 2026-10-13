@@ -325,7 +325,14 @@ export function useAutosaveDoc(options) {
 
 	/** Put the last saved value back (e.g. Escape in a text input). */
 	function revert(field) {
-		draft[field] = lastSynced[field]
+		withApplying(() => {
+			draft[field] = lastSynced[field]
+		})
+		// Nothing to save if that was the only change; don't flash "Saved".
+		if (!refreshDirty().length && status.value === "pending") {
+			scheduler.cancel()
+			status.value = "idle"
+		}
 	}
 
 	function syncedValue(field) {
@@ -411,11 +418,14 @@ export function useAutosaveDoc(options) {
 		scheduler.cancel()
 		const snapshot = buildSnapshot()
 		if (!snapshot) return
-		const { method, args } = request(
-			snapshot.name,
-			snapshot.payload,
-			useModified ? knownModified.get(snapshot.name) || snapshot.modified : undefined
-		)
+		// While a normal save is still in flight its new `modified` is unknown;
+		// sending the old one would make this last request fail with a timestamp
+		// conflict after the page is gone. Only changed fields are sent and the
+		// field lock protects them, so skip the timestamp check in that case.
+		const modified = runner.isRunning()
+			? undefined
+			: knownModified.get(snapshot.name) || snapshot.modified
+		const { method, args } = request(snapshot.name, snapshot.payload, useModified ? modified : undefined)
 		callKeepalive(method, args)
 		for (const f of snapshot.names) lastSynced[f] = snapshot.sent[f]
 		refreshDirty()

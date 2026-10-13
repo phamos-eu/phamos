@@ -12,7 +12,6 @@ from frappe.utils import get_datetime, get_fullname
 
 ACTIVE_STATUSES = ("Open", "Replied", "On Hold", "Resolved")
 ALLOWED_STATUSES = ("Open", "Replied", "On Hold", "Resolved", "Closed")
-ISSUE_EDITABLE_FIELDS = ("subject", "description", "priority", "issue_type", "project")
 LIST_FIELDS = [
 	"name",
 	"subject",
