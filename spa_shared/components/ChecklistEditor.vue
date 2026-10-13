@@ -90,6 +90,7 @@
 								v-model="autosave.draft.note"
 								:fixed-menu="editorMenu"
 								:locked-by="locks.lockedBy(lockField('note', item))"
+								field-label="this note"
 								placeholder="Item note…"
 								:editor-class="
 									compact
@@ -176,6 +177,7 @@ import { useAutosaveDoc } from "@spa/composables/useAutosaveDoc.js"
 import { useDocRealtime } from "@spa/composables/useDocRealtime.js"
 import { useFieldLocks } from "@spa/composables/useFieldLocks.js"
 import { compareModified, isEmptyHtml } from "@spa/utils/autosaveCore.js"
+import { lockMessage } from "@spa/utils/fieldLockText.js"
 import { deskRecordUrl } from "@spa/utils/deskUrl.js"
 import { skipTextEditorToolbarTabStops } from "@spa/utils/textEditorFocus.js"
 
@@ -294,7 +296,7 @@ function lockField(field, item) {
 
 function lockTitle(field, item) {
 	const lock = locks.lockedBy(lockField(field, item))
-	return lock ? `${lock.full_name || lock.user} is editing this field` : ""
+	return lock ? lockMessage(lock, "this description") : ""
 }
 
 async function onFieldFocus(field, item) {

@@ -44,7 +44,13 @@ export function useFieldLocks({ doctype, name, realtime, onReleased, enabled = (
 		const field = lock.fieldname
 		if (lock.action === "released") return drop(field)
 		clearExpiry(field)
-		locks[field] = { user: lock.user, full_name: lock.full_name, user_image: lock.user_image }
+		locks[field] = {
+			user: lock.user,
+			full_name: lock.full_name,
+			user_image: lock.user_image,
+			// Local time at which the server drops the lock without a heartbeat.
+			expiresAt: Date.now() + Math.max(0, lock.expires_in || 0) * 1000,
+		}
 		expiryTimers[field] = setTimeout(() => drop(field), Math.max(1, lock.expires_in || 0) * 1000)
 	}
 

@@ -9,16 +9,20 @@
 		<!-- Takes the toolbar's place while another user holds the field lock. -->
 		<div
 			v-if="lockedBy"
-			class="flex w-full flex-shrink-0 items-center gap-1.5 rounded-t-lg border border-outline-amber-1 bg-surface-amber-1 px-2 py-1 text-xs text-ink-amber-3"
-			:title="`${lockedBy.full_name || lockedBy.user} is editing this field`"
+			class="flex w-full flex-shrink-0 items-start gap-2 rounded-t-lg border border-outline-amber-1 bg-surface-amber-1 px-2 py-1.5 text-xs text-ink-amber-3"
+			role="status"
 		>
 			<UserAvatar
+				class="mt-px"
 				size="xs"
 				:name="lockedBy.user"
 				:label="lockedBy.full_name"
 				:image="lockedBy.user_image"
 			/>
-			<span class="truncate">{{ lockedBy.full_name || lockedBy.user }} is editing…</span>
+			<div class="min-w-0">
+				<div class="font-semibold">{{ lockHeadline(lockedBy, fieldLabel) }}</div>
+				<div class="mt-0.5 leading-snug">{{ lockExplanation(lockedBy, now) }}</div>
+			</div>
 		</div>
 		<TextEditor
 			ref="editorRef"
@@ -50,6 +54,7 @@ import { computed, onBeforeUnmount, ref, watch } from "vue"
 import { TextEditor } from "frappe-ui"
 import UserAvatar from "@spa/components/UserAvatar.vue"
 import { normalizeHtml } from "@spa/utils/autosaveCore.js"
+import { lockExplanation, lockHeadline } from "@spa/utils/fieldLockText.js"
 
 defineOptions({ inheritAttrs: false })
 
@@ -60,8 +65,10 @@ const props = defineProps({
 	placeholder: { type: [String, Function], default: "" },
 	editorClass: { type: [String, Array, Object], default: "" },
 	editorRootClass: { type: [String, Array, Object], default: "" },
-	/** { user, full_name, user_image } of another user holding the field lock */
+	/** { user, full_name, user_image, expiresAt } of another user holding the field lock */
 	lockedBy: { type: Object, default: null },
+	/** Used in the lock notice: "<name> is editing <fieldLabel>" */
+	fieldLabel: { type: String, default: "this field" },
 })
 
 const emit = defineEmits(["update:modelValue", "focus", "blur"])
@@ -99,11 +106,22 @@ watch(
 	}
 )
 
+// Ticks once a second while locked so the automatic-unlock countdown is live.
+const now = ref(Date.now())
+let clock = null
+
 watch(
 	() => props.lockedBy,
 	(lock) => {
 		if (lock && focused.value) editor.value?.commands?.blur?.()
-	}
+		clearInterval(clock)
+		clock = null
+		if (lock) {
+			now.value = Date.now()
+			clock = setInterval(() => (now.value = Date.now()), 1000)
+		}
+	},
+	{ immediate: true }
 )
 
 function onFocusIn() {
@@ -127,6 +145,7 @@ function onFocusOut() {
 
 onBeforeUnmount(() => {
 	clearTimeout(blurTimer)
+	clearInterval(clock)
 	if (focused.value) emit("blur")
 })
 
