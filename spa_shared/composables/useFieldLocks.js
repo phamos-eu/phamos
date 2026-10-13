@@ -102,7 +102,15 @@ export function useFieldLocks({ doctype, name, realtime, onReleased, enabled = (
 			stopHeartbeat(field)
 			heartbeats[field] = setInterval(() => {
 				call(`${API}.acquire_field_lock`, { doctype, name: docname, fieldname: field })
-					.then((r) => apply(r?.lock))
+					.then((r) => {
+						apply(r?.lock)
+						// Lost it (e.g. expired during a network gap and someone
+						// else took it): stop renewing; the editor turns read-only.
+						if (r && !r.ok) {
+							stopHeartbeat(field)
+							mine.delete(field)
+						}
+					})
 					.catch(() => {})
 			}, HEARTBEAT_MS)
 			return true

@@ -379,8 +379,22 @@ async function startEditSubject() {
 		})
 		return
 	}
+	autosave.setFocused("subject", true)
+	// Two people can click the subject at the same moment; only the one who
+	// gets the lock may edit it.
+	if (!(await locks.acquire("subject"))) {
+		autosave.setFocused("subject", false)
+		if (subjectLock.value) {
+			toast({
+				title: lockHeadline(subjectLock.value, "the subject"),
+				text: lockExplanation(subjectLock.value),
+				icon: "lock",
+				iconClasses: "text-ink-amber-3",
+			})
+		}
+		return
+	}
 	editingSubject.value = true
-	onFieldFocus("subject")
 	await nextTick()
 	subjectInput.value?.focus?.()
 }
