@@ -4,8 +4,8 @@
 """Presence helpers for the cockpit SPAs: user cards and soft field locks.
 
 A soft field lock says "this user is typing in this field right now". It lives
-in Redis only (never in the database), expires on its own after LOCK_TTL seconds
-without a heartbeat, and every change is pushed to everyone who has the document
+in Redis only (never in the database) as one key per field, is taken atomically,
+expires on its own after LOCK_TTL seconds without a heartbeat, and every change is pushed to everyone who has the document
 open through Frappe's realtime document room (`doc_subscribe`).
 
 The locks are advisory for the SPA editors and enforced by the cockpit save
@@ -14,7 +14,6 @@ overwrite a field somebody else is editing. Desk is not affected.
 """
 
 import re
-import time
 
 import frappe
 from frappe import _
@@ -36,8 +35,41 @@ class FieldLockedError(frappe.ValidationError):
 	"""Raised when a save touches a field another user currently holds a lock on."""
 
 
-def _lock_key(doctype, name):
-	return f"cockpit_field_locks|{doctype}|{name}"
+# Each lock is its own Redis key holding the user id, with a TTL. A per-document
+# set indexes which fields have a key, so locks can be listed without SCAN.
+# Check-and-write runs as a Lua script: Redis executes it atomically, so two
+# users focusing the same field at the same moment cannot both get the lock.
+_ACQUIRE_SCRIPT = """
+local holder = redis.call('GET', KEYS[1])
+if holder and holder ~= ARGV[1] then return holder end
+redis.call('SET', KEYS[1], ARGV[1], 'EX', tonumber(ARGV[2]))
+redis.call('SADD', KEYS[2], ARGV[3])
+redis.call('EXPIRE', KEYS[2], tonumber(ARGV[2]) * 2)
+return ARGV[1]
+"""
+
+# Delete only if the caller still holds the lock (it may have expired and been
+# taken by someone else in the meantime).
+_RELEASE_SCRIPT = """
+if redis.call('GET', KEYS[1]) == ARGV[1] then
+	redis.call('DEL', KEYS[1])
+	redis.call('SREM', KEYS[2], ARGV[2])
+	return 1
+end
+return 0
+"""
+
+
+def _field_key(doctype, name, fieldname):
+	return frappe.cache().make_key(f"cockpit_field_lock|{doctype}|{name}|{fieldname}")
+
+
+def _index_key(doctype, name):
+	return frappe.cache().make_key(f"cockpit_field_lock_index|{doctype}|{name}")
+
+
+def _decode(value):
+	return value.decode() if isinstance(value, bytes) else value
 
 
 def _validate_target(doctype, name, fieldname=None, ptype="write"):
@@ -50,37 +82,44 @@ def _validate_target(doctype, name, fieldname=None, ptype="write"):
 	frappe.has_permission(doctype, ptype, doc=name, throw=True)
 
 
-def _read_locks(doctype, name):
-	"""Return {fieldname: lock} for live locks and drop expired ones."""
-	cache = frappe.cache()
-	key = _lock_key(doctype, name)
-	try:
-		raw = cache.hgetall(key) or {}
-	except Exception:
-		return {}
+def _read_locks(doctype, name, fieldnames=None):
+	"""Return {fieldname: {"user", "expires_in"}} for live locks.
 
-	now = time.time()
-	live = {}
-	for field, lock in raw.items():
-		field = field.decode() if isinstance(field, bytes) else field
-		if not isinstance(lock, dict) or (lock.get("expires_at") or 0) <= now:
-			cache.hdel(key, field)
-			continue
-		live[field] = lock
-	return live
+	Without `fieldnames` all indexed fields of the document are read; index
+	entries whose key has expired are removed on the way.
+	"""
+	cache = frappe.cache()
+	index = _index_key(doctype, name)
+	try:
+		if fieldnames is None:
+			fieldnames = [_decode(f) for f in cache.execute_command("SMEMBERS", index)]
+		live = {}
+		for field in fieldnames:
+			key = _field_key(doctype, name, field)
+			user = _decode(cache.execute_command("GET", key))
+			if not user:
+				cache.execute_command("SREM", index, field)
+				continue
+			ttl_ms = cache.execute_command("PTTL", key) or 0
+			live[field] = {"user": user, "expires_in": max(0, round(ttl_ms / 1000))}
+		return live
+	except Exception:
+		# Redis unavailable: locks are advisory, so fail open rather than block saves.
+		frappe.log_error(title="Cockpit field locks: Redis unavailable")
+		return {}
 
 
 def _serialize_lock(doctype, name, fieldname, lock, action):
-	expires_at = (lock or {}).get("expires_at") or 0
+	user = (lock or {}).get("user")
 	return {
 		"doctype": doctype,
 		"name": name,
 		"fieldname": fieldname,
 		"action": action,
-		"user": (lock or {}).get("user"),
-		"full_name": (lock or {}).get("full_name"),
-		"user_image": (lock or {}).get("user_image"),
-		"expires_in": max(0, round(expires_at - time.time())),
+		"user": user,
+		"full_name": (get_fullname(user) or user) if user else None,
+		"user_image": (frappe.db.get_value("User", user, "user_image") or "") if user else "",
+		"expires_in": (lock or {}).get("expires_in", 0),
 	}
 
 
@@ -102,26 +141,29 @@ def acquire_field_lock(doctype, name, fieldname):
 	"""
 	_validate_target(doctype, name, fieldname)
 	user = frappe.session.user
-	locks = _read_locks(doctype, name)
-	current = locks.get(fieldname)
-	if current and current.get("user") != user:
+	try:
+		holder = _decode(
+			frappe.cache().eval(
+				_ACQUIRE_SCRIPT,
+				2,
+				_field_key(doctype, name, fieldname),
+				_index_key(doctype, name),
+				user,
+				LOCK_TTL,
+				fieldname,
+			)
+		)
+	except Exception:
+		frappe.log_error(title="Cockpit field locks: Redis unavailable")
+		return {"ok": True, "lock": None}
+
+	if holder != user:
+		current = _read_locks(doctype, name, [fieldname]).get(fieldname) or {"user": holder}
 		return {"ok": False, "lock": _serialize_lock(doctype, name, fieldname, current, "locked")}
 
-	lock = {
-		"user": user,
-		"full_name": get_fullname(user) or user,
-		"user_image": frappe.db.get_value("User", user, "user_image") or "",
-		"expires_at": time.time() + LOCK_TTL,
-	}
-	cache = frappe.cache()
-	key = _lock_key(doctype, name)
-	cache.hset(key, fieldname, lock)
-	try:
-		cache.expire(cache.make_key(key), LOCK_TTL * 2)
-	except Exception:
-		pass
-
-	payload = _serialize_lock(doctype, name, fieldname, lock, "locked")
+	payload = _serialize_lock(
+		doctype, name, fieldname, {"user": user, "expires_in": LOCK_TTL}, "locked"
+	)
 	_publish(payload)
 	return {"ok": True, "lock": payload}
 
@@ -130,12 +172,23 @@ def acquire_field_lock(doctype, name, fieldname):
 def release_field_lock(doctype, name, fieldname):
 	"""Release the caller's lock on one field. Releasing someone else's lock is a no-op."""
 	_validate_target(doctype, name, fieldname, ptype="read")
-	current = _read_locks(doctype, name).get(fieldname)
-	if not current or current.get("user") != frappe.session.user:
+	user = frappe.session.user
+	try:
+		released = frappe.cache().eval(
+			_RELEASE_SCRIPT,
+			2,
+			_field_key(doctype, name, fieldname),
+			_index_key(doctype, name),
+			user,
+			fieldname,
+		)
+	except Exception:
+		frappe.log_error(title="Cockpit field locks: Redis unavailable")
+		return {"ok": False}
+	if not released:
 		return {"ok": False}
 
-	frappe.cache().hdel(_lock_key(doctype, name), fieldname)
-	_publish(_serialize_lock(doctype, name, fieldname, current, "released"))
+	_publish(_serialize_lock(doctype, name, fieldname, {"user": user}, "released"))
 	return {"ok": True}
 
 
@@ -154,18 +207,25 @@ def assert_fields_unlocked(doctype, name, fieldnames):
 	fieldnames = [f for f in (fieldnames or []) if f]
 	if not fieldnames:
 		return
-	locks = _read_locks(doctype, name)
 	user = frappe.session.user
-	for field in fieldnames:
-		lock = locks.get(field)
-		if lock and lock.get("user") != user:
+	for lock in _read_locks(doctype, name, fieldnames).values():
+		if lock["user"] != user:
 			frappe.throw(
 				_("{0} is editing this field right now. Try again when they are done.").format(
-					lock.get("full_name") or lock.get("user")
+					get_fullname(lock["user"]) or lock["user"]
 				),
 				FieldLockedError,
 				title=_("Field is being edited"),
 			)
+
+
+def clear_field_locks(doctype, name):
+	"""Drop every lock on a document (tests and manual clean-up)."""
+	cache = frappe.cache()
+	index = _index_key(doctype, name)
+	for field in cache.execute_command("SMEMBERS", index) or []:
+		cache.execute_command("DEL", _field_key(doctype, name, _decode(field)))
+	cache.execute_command("DEL", index)
 
 
 @frappe.whitelist()
