@@ -4,7 +4,7 @@
 		<template v-else-if="demo">
 			<!-- The appointment itself: what it is, when, and where to join. -->
 			<section class="w-72 flex-none space-y-4 overflow-y-auto border-r border-outline-gray-2 bg-surface-white p-4">
-				<FormControl v-model="subject" label="Subject" type="text" size="sm" />
+				<FormControl v-model="autosave.draft.subject" label="Subject" type="text" size="sm" />
 
 				<div>
 					<label class="mb-1.5 block text-xs text-ink-gray-5">Lead</label>
@@ -19,7 +19,7 @@
 				<div>
 					<label class="mb-1.5 block text-xs text-ink-gray-5">Scheduled</label>
 					<input
-						v-model="scheduledOn"
+						v-model="autosave.draft.scheduled_on"
 						type="datetime-local"
 						class="form-input block h-8 w-full rounded border border-outline-gray-2 bg-surface-white px-2 text-sm text-ink-gray-8"
 					/>
@@ -27,7 +27,7 @@
 				<div>
 					<label class="mb-1.5 block text-xs text-ink-gray-5">Ends</label>
 					<input
-						v-model="endsOn"
+						v-model="autosave.draft.ends_on"
 						type="datetime-local"
 						class="form-input block h-8 w-full rounded border border-outline-gray-2 bg-surface-white px-2 text-sm text-ink-gray-8"
 					/>
@@ -36,7 +36,7 @@
 				<div>
 					<label class="mb-1.5 block text-xs text-ink-gray-5">Next Follow Up</label>
 					<DatePicker
-						:model-value="nextFollowup"
+						:model-value="autosave.draft.next_followup"
 						placeholder="Date"
 						@update:model-value="onFollowupChange"
 					/>
@@ -45,7 +45,7 @@
 
 				<div>
 					<label class="mb-1.5 block text-xs text-ink-gray-5">Location or meeting link</label>
-					<FormControl v-model="location" type="textarea" rows="2" size="sm" />
+					<FormControl v-model="autosave.draft.location" type="textarea" rows="2" size="sm" />
 					<!-- Only when the field really holds a URL — it doubles as a street address. -->
 					<a
 						v-if="demo.meeting_url"
@@ -61,7 +61,7 @@
 
 				<div>
 					<label class="mb-1.5 block text-xs text-ink-gray-5">Nextcloud Link</label>
-					<FormControl v-model="nextcloudLink" type="text" size="sm" placeholder="https://…" />
+					<FormControl v-model="autosave.draft.nextcloud_link" type="text" size="sm" placeholder="https://…" />
 					<a
 						v-if="demo.nextcloud_url"
 						:href="demo.nextcloud_url"
@@ -76,7 +76,7 @@
 
 				<div>
 					<label class="mb-1.5 block text-xs text-ink-gray-5">Agenda</label>
-					<FormControl v-model="agenda" type="textarea" rows="4" size="sm" />
+					<FormControl v-model="autosave.draft.agenda" type="textarea" rows="4" size="sm" />
 				</div>
 			</section>
 
@@ -88,6 +88,7 @@
 						{{ formatDatetime(demo.scheduled_on) }}
 					</span>
 					<span v-else class="text-sm text-ink-amber-3">Not scheduled yet</span>
+					<DocSyncBanner class="ml-auto" :autosave="autosave" />
 				</div>
 
 				<div class="min-h-0 flex-1 space-y-4 overflow-y-auto p-4">
@@ -185,14 +186,14 @@
 							:key="s"
 							type="button"
 							class="rounded-full disabled:opacity-50"
-							:disabled="saving"
+							:disabled="autosave.saving"
 							@click="setStatus(s)"
 						>
 							<Badge
 								:label="s"
 								:theme="demoStatusTheme(s)"
 								size="sm"
-								:variant="status === s ? 'solid' : 'subtle'"
+								:variant="autosave.draft.status === s ? 'solid' : 'subtle'"
 							/>
 						</button>
 					</div>
@@ -235,7 +236,7 @@
 					:allow-create="demo.status !== 'Cancelled'"
 				/>
 
-				<ErrorMessage :message="error" />
+				<ErrorMessage :message="shownError" />
 
 				<a
 					:href="demo.desk_url"
@@ -259,10 +260,12 @@
 </template>
 
 <script setup>
-import { onMounted, ref, watch } from "vue"
+import { computed, onMounted, ref, watch } from "vue"
 import { RouterLink } from "vue-router"
-import { call, debounce, toast, Badge, DatePicker } from "frappe-ui"
+import { call, toast, Badge, DatePicker } from "frappe-ui"
 import { formatDatetime } from "@spa/utils/datetime"
+import DocSyncBanner from "@spa/components/DocSyncBanner.vue"
+import { useAutosaveDoc } from "@spa/composables/useAutosaveDoc.js"
 import LinkedChecklistsSection from "@spa/components/LinkedChecklistsSection.vue"
 import DemoAttendeeEditor from "./DemoAttendeeEditor.vue"
 import DemoFeedbackDialog from "./DemoFeedbackDialog.vue"
@@ -277,7 +280,6 @@ const props = defineProps({
 const emit = defineEmits(["close", "updated"])
 
 const loading = ref(false)
-const saving = ref(false)
 const error = ref("")
 const demo = ref(null)
 const feedback = ref([])
@@ -285,18 +287,6 @@ const attendees = ref([])
 const confirming = ref("")
 const showFeedbackDialog = ref(false)
 const editingFeedback = ref(null)
-
-const subject = ref("")
-const scheduledOn = ref("")
-const endsOn = ref("")
-const location = ref("")
-const agenda = ref("")
-const status = ref("")
-const nextFollowup = ref("")
-const nextcloudLink = ref("")
-
-/** Guards the watcher while fields are being filled from the server. */
-const syncing = ref(false)
 
 /** Datetime-local wants 'YYYY-MM-DDTHH:mm'; the API speaks the stored format. */
 function toInputValue(value) {
@@ -307,25 +297,61 @@ function toApiValue(value) {
 	return value ? `${String(value).replace("T", " ")}:00`.slice(0, 19) : null
 }
 
-function syncFields() {
-	syncing.value = true
-	subject.value = demo.value.subject || ""
-	scheduledOn.value = toInputValue(demo.value.scheduled_on)
-	endsOn.value = toInputValue(demo.value.ends_on)
-	location.value = demo.value.location || ""
-	agenda.value = demo.value.agenda || ""
-	status.value = demo.value.status || ""
-	nextFollowup.value = demo.value.next_followup || ""
-	nextcloudLink.value = demo.value.nextcloud_link || ""
-	attendees.value = demo.value.attendees || []
-	setTimeout(() => (syncing.value = false), 0)
-}
+const orNull = (value) => value || null
+
+// Shared cockpit autosave (GitLab #1426): typing is never overwritten by a
+// save response, and `update_demo`'s conflict reply merges instead of
+// discarding the edit.
+const autosave = useAutosaveDoc({
+	doc: () => demo.value,
+	fields: {
+		subject: { kind: "text", label: "Subject" },
+		scheduled_on: { kind: "datetime", fromServer: toInputValue, toServer: toApiValue, label: "Scheduled" },
+		ends_on: { kind: "datetime", fromServer: toInputValue, toServer: toApiValue, label: "Ends" },
+		location: { kind: "text", label: "Location" },
+		agenda: { kind: "text", label: "Agenda" },
+		nextcloud_link: { kind: "text", toServer: orNull, label: "Nextcloud Link" },
+		// Saved immediately: it also moves the lead's follow-up.
+		next_followup: { kind: "date", immediate: true, toServer: orNull, label: "Next Follow Up" },
+		status: { kind: "select", immediate: true, label: "Status" },
+	},
+	request: (name, payload, modified) => ({
+		method: `${API}.update_demo`,
+		args: { name, if_modified: modified, ...payload },
+	}),
+	parse: (result) => {
+		if (result?.conflict) {
+			const conflict = new Error("This demo changed elsewhere")
+			conflict.exc_type = "TimestampMismatchError"
+			conflict.latest = result.demo
+			throw conflict
+		}
+		return result.demo
+	},
+	fetch: (name) => call(`${API}.get_demo`, { name }),
+	readonly: () => !demo.value,
+	onSaved: (updated) => {
+		if (updated?.name === demo.value?.name) demo.value = updated
+		emit("updated", updated)
+	},
+	onError: (message) => toast({ title: message, icon: "x-circle", iconClasses: "text-ink-red-4" }),
+})
+
+const shownError = computed(
+	() => error.value || (["error", "blocked"].includes(autosave.status) ? autosave.error : "")
+)
+
+watch(
+	() => demo.value?.attendees,
+	(rows) => {
+		attendees.value = rows || []
+	}
+)
 
 async function loadDemo() {
 	loading.value = true
 	try {
 		demo.value = await call(`${API}.get_demo`, { name: props.name })
-		syncFields()
 	} catch (e) {
 		error.value = e?.messages?.[0] || e?.message || "Could not load the demo"
 	} finally {
@@ -341,56 +367,12 @@ async function loadFeedback() {
 	}
 }
 
-async function saveFields(extra = {}) {
-	if (!demo.value) return
-	saving.value = true
-	error.value = ""
-	try {
-		const result = await call(`${API}.update_demo`, {
-			name: props.name,
-			if_modified: demo.value.modified,
-			subject: subject.value,
-			scheduled_on: toApiValue(scheduledOn.value),
-			ends_on: toApiValue(endsOn.value),
-			location: location.value,
-			agenda: agenda.value,
-			status: status.value,
-			next_followup: nextFollowup.value || null,
-			nextcloud_link: nextcloudLink.value || null,
-			...extra,
-		})
-		if (result.conflict) {
-			toast({
-				title: "This demo changed elsewhere — reloading",
-				icon: "alert-triangle",
-				iconClasses: "text-ink-amber-3",
-			})
-			demo.value = result.demo
-			syncFields()
-			return
-		}
-		demo.value = result.demo
-		syncFields()
-		emit("updated", demo.value)
-	} catch (e) {
-		error.value = e?.messages?.[0] || e?.message || "Could not save"
-	} finally {
-		saving.value = false
-	}
-}
-
-const scheduleSave = debounce(() => saveFields(), 500)
-
-/** Saved immediately: it also moves the lead's follow-up, so it shouldn't
- *  sit in a debounce waiting for another keystroke. */
 function onFollowupChange(value) {
-	nextFollowup.value = value || ""
-	saveFields({ next_followup: value || null })
+	autosave.draft.next_followup = value || ""
 }
 
 function setStatus(value) {
-	status.value = value
-	saveFields({ status: value })
+	autosave.draft.status = value
 }
 
 async function saveAttendees(rows) {
@@ -400,7 +382,6 @@ async function saveAttendees(rows) {
 			name: props.name,
 			rows: JSON.stringify(rows),
 		})
-		syncFields()
 	} catch (e) {
 		error.value = e?.messages?.[0] || e?.message || "Could not save the attendees"
 	}
@@ -410,8 +391,8 @@ async function confirmSlot(slot) {
 	confirming.value = slot.name
 	error.value = ""
 	try {
+		await autosave.flush()
 		demo.value = await call(`${API}.confirm_demo_slot`, { name: props.name, slot: slot.name })
-		syncFields()
 		emit("updated", demo.value)
 	} catch (e) {
 		error.value = e?.messages?.[0] || e?.message || "Could not confirm the slot"
@@ -433,11 +414,6 @@ async function removeFeedback(entry) {
 		error.value = e?.messages?.[0] || e?.message || "Could not delete the feedback"
 	}
 }
-
-watch([subject, scheduledOn, endsOn, location, agenda, nextcloudLink], () => {
-	if (syncing.value || !demo.value) return
-	scheduleSave()
-})
 
 watch(
 	() => props.name,

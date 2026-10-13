@@ -6,6 +6,7 @@
 	"scripts": {
 		"dev": "vite",
 		"serve": "vite preview",
+		"test": "vitest run",
 		"build": "vite build --base=/assets/phamos/frontend/ && yarn copy-html-entry",
 		"copy-html-entry": "cp ../phamos/public/frontend/index.html ../phamos/www/i_own_my_work.html"
 	},
@@ -21,6 +22,7 @@
 		"autoprefixer": "^10.4.19",
 		"postcss": "^8.4.5",
 		"tailwindcss": "^3.4.3",
-		"vite": "^5.4.10"
+		"vite": "^5.4.10",
+		"vitest": "^2.1.9"
 	}
 }
