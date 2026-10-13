@@ -6,7 +6,7 @@
 				<input
 					v-if="editingSubject"
 					ref="subjectInput"
-					v-model="subject"
+					v-model="autosave.draft.subject"
 					type="text"
 					class="ml-1.5 min-w-0 flex-1 border-0 bg-transparent p-0 font-bold tracking-tight text-ink-gray-9 outline-none ring-0 focus:ring-0"
 					placeholder="Subject"
@@ -18,14 +18,28 @@
 					v-else
 					type="button"
 					class="ml-1.5 min-w-0 flex-1 truncate rounded-sm text-left font-bold text-ink-gray-9 hover:bg-surface-gray-2"
+					:title="subjectLock ? lockMessage(subjectLock, 'the subject') : ''"
 					@click="startEditSubject"
 				>
-					{{ subject.trim() || "Untitled" }}
+					<FeatherIcon
+						v-if="subjectLock"
+						name="lock"
+						class="mr-1 inline h-3.5 w-3.5 align-[-2px] text-ink-amber-3"
+					/>
+					{{ autosave.draft.subject.trim() || "Untitled" }}
 				</button>
+				<div class="ml-auto flex flex-shrink-0 items-center gap-2 pl-3">
+					<DocSyncBanner :autosave="autosave" />
+					<DocViewers :viewers="viewers" />
+				</div>
 			</div>
 		</Teleport>
 
 		<div class="flex min-h-0 flex-1 flex-col gap-5 overflow-y-auto p-4">
+			<div v-if="!chromeHostReady" class="flex items-center justify-end gap-2">
+				<DocSyncBanner :autosave="autosave" />
+				<DocViewers :viewers="viewers" />
+			</div>
 			<section>
 				<div class="mb-2 flex items-center justify-between gap-2">
 					<div class="text-[11px] font-semibold uppercase tracking-wide text-ink-gray-6">
@@ -75,23 +89,27 @@
 			<section class="space-y-3">
 				<div class="w-full">
 					<label class="mb-1.5 block text-xs text-ink-gray-5">Description</label>
-					<TextEditor
-						:content="description"
+					<RichTextField
+						:key="task.name"
+						v-model="autosave.draft.description"
 						:fixed-menu="editorMenu"
+						:locked-by="locks.lockedBy('description')"
+					field-label="the description"
 						placeholder="Task details…"
 						editor-class="prose-sm dark:prose-invert max-w-none w-full min-h-[120px] max-h-[240px] overflow-y-auto px-3 py-2 border border-t-0 border-outline-gray-2 rounded-b-lg bg-surface-white dark:bg-surface-gray-2"
-						@change="(html) => (description = html)"
+						@focus="onFieldFocus('description')"
+						@blur="onFieldBlur('description')"
 					/>
 				</div>
 				<FormControl
-					v-model="priority"
+					v-model="autosave.draft.priority"
 					label="Priority"
 					type="select"
 					size="sm"
 					:options="priorityOptions"
 				/>
 				<FormControl
-					v-model="project"
+					v-model="autosave.draft.project"
 					label="Project"
 					type="select"
 					size="sm"
@@ -100,7 +118,7 @@
 				<div>
 					<label class="mb-1.5 block text-xs text-ink-gray-5">Expected start</label>
 					<DatePicker
-						v-model="expStartDate"
+						v-model="autosave.draft.exp_start_date"
 						placeholder="Start date"
 						class="w-full"
 						:formatter="formatDate"
@@ -109,7 +127,7 @@
 				<div>
 					<label class="mb-1.5 block text-xs text-ink-gray-5">Expected end</label>
 					<DatePicker
-						v-model="expEndDate"
+						v-model="autosave.draft.exp_end_date"
 						placeholder="End date"
 						class="w-full"
 						:formatter="formatDate"
@@ -124,7 +142,7 @@
 					</div>
 					<input
 						id="task-progress"
-						v-model.number="progress"
+						v-model.number="autosave.draft.progress"
 						type="range"
 						min="0"
 						max="100"
@@ -152,7 +170,7 @@
 			<LinkedChecklistsSection
 				document="Task"
 				:reference-record="task.name"
-				:reference-title="subject || task.subject"
+				:reference-title="autosave.draft.subject || task.subject"
 			/>
 
 			<section>
@@ -189,8 +207,15 @@
 <script setup>
 import { computed, nextTick, onMounted, onBeforeUnmount, ref, watch } from "vue"
 import { useRouter } from "vue-router"
-import { Badge, call, DatePicker, debounce, TextEditor, toast } from "frappe-ui"
+import { Badge, call, DatePicker, FeatherIcon, toast } from "frappe-ui"
 import AssigneePicker from "@spa/components/AssigneePicker.vue"
+import DocSyncBanner from "@spa/components/DocSyncBanner.vue"
+import DocViewers from "@spa/components/DocViewers.vue"
+import RichTextField from "@spa/components/RichTextField.vue"
+import { useAutosaveDoc } from "@spa/composables/useAutosaveDoc.js"
+import { useDocRealtime } from "@spa/composables/useDocRealtime.js"
+import { useFieldLocks } from "@spa/composables/useFieldLocks.js"
+import { lockExplanation, lockHeadline, lockMessage } from "@spa/utils/fieldLockText.js"
 import LinkedChecklistsSection from "@spa/components/LinkedChecklistsSection.vue"
 import { formatDate } from "@spa/utils/datetime.js"
 import { setPageChromeActive } from "@spa/pageChrome.js"
@@ -228,25 +253,69 @@ const editorMenu = [
 
 const chromeHostReady = ref(false)
 const status = ref(props.task.status)
-const subject = ref(props.task.subject || "")
-const description = ref(props.task.description || "")
-const priority = ref(props.task.priority || "")
-const project = ref(props.task.project || "")
-const expStartDate = ref(props.task.exp_start_date || "")
-const expEndDate = ref(props.task.exp_end_date || "")
-const progress = ref(Number(props.task.progress ?? 0))
 const assignees = ref([...(props.task.assignees || [])])
 const savingStatus = ref(false)
-const savingFields = ref(false)
-const fieldError = ref("")
-const syncing = ref(false)
 const editingSubject = ref(false)
 const subjectInput = ref(null)
-const subjectBeforeEdit = ref("")
 
-const progressLabel = computed(() =>
-	Math.min(100, Math.max(0, Math.round(Number(progress.value) || 0)))
-)
+function clampProgress(value) {
+	return Math.min(100, Math.max(0, Math.round(Number(value) || 0)))
+}
+
+// Editable fields live in the autosave draft; server payloads (save responses,
+// Gantt drags, realtime refreshes) never overwrite a field being edited.
+const autosave = useAutosaveDoc({
+	doc: () => props.task,
+	fields: {
+		subject: { kind: "text", trim: true, required: true, label: "Subject" },
+		description: { kind: "html", label: "Description" },
+		priority: { kind: "select", immediate: true, label: "Priority" },
+		project: { kind: "select", immediate: true, label: "Project" },
+		exp_start_date: { kind: "date", immediate: true, label: "Expected start" },
+		exp_end_date: { kind: "date", immediate: true, label: "Expected end" },
+		progress: { kind: "number", toServer: clampProgress, label: "Progress" },
+	},
+	request: (name, payload, modified) => ({
+		method: `${API.value}.update_task`,
+		args: { name, ...payload, modified },
+	}),
+	fetch: (name) => call(`${API.value}.get_task`, { name }),
+	onSaved: (task) => emit("updated", task),
+	onRemoteApplied: (task) => emit("updated", task),
+	onError: (message) => toast({ title: message, icon: "x-circle", iconClasses: "text-ink-red-4" }),
+})
+
+const fieldError = computed(() => (autosave.status === "error" ? autosave.error : ""))
+const progressLabel = computed(() => clampProgress(autosave.draft.progress))
+
+const realtime = useDocRealtime({
+	doctype: "Task",
+	name: () => props.task.name,
+	onDocUpdate: (modified) => autosave.noteRemoteModified(modified),
+})
+const viewers = realtime.viewers
+
+const locks = useFieldLocks({
+	doctype: "Task",
+	name: () => props.task.name,
+	realtime,
+	onReleased: () => {
+		if (autosave.status === "blocked") autosave.flush()
+	},
+})
+const subjectLock = computed(() => locks.lockedBy("subject"))
+
+async function onFieldFocus(field) {
+	autosave.setFocused(field, true)
+	await locks.acquire(field)
+}
+
+async function onFieldBlur(field) {
+	const docname = props.task.name
+	// Release the lock only once the server has everything typed in the field.
+	await autosave.setFocused(field, false)
+	locks.release(field, { docname })
+}
 
 function statusTheme(s) {
 	const map = {
@@ -301,7 +370,30 @@ async function syncChromeHost() {
 }
 
 async function startEditSubject() {
-	subjectBeforeEdit.value = subject.value
+	if (subjectLock.value) {
+		toast({
+			title: lockHeadline(subjectLock.value, "the subject"),
+			text: lockExplanation(subjectLock.value),
+			icon: "lock",
+			iconClasses: "text-ink-amber-3",
+		})
+		return
+	}
+	autosave.setFocused("subject", true)
+	// Two people can click the subject at the same moment; only the one who
+	// gets the lock may edit it.
+	if (!(await locks.acquire("subject"))) {
+		autosave.setFocused("subject", false)
+		if (subjectLock.value) {
+			toast({
+				title: lockHeadline(subjectLock.value, "the subject"),
+				text: lockExplanation(subjectLock.value),
+				icon: "lock",
+				iconClasses: "text-ink-amber-3",
+			})
+		}
+		return
+	}
 	editingSubject.value = true
 	await nextTick()
 	subjectInput.value?.focus?.()
@@ -310,14 +402,14 @@ async function startEditSubject() {
 function finishEditSubject() {
 	if (!editingSubject.value) return
 	editingSubject.value = false
-	if (!subject.value.trim()) {
-		subject.value = subjectBeforeEdit.value || props.task.subject || ""
-	}
+	if (!autosave.draft.subject.trim()) autosave.revert("subject")
+	onFieldBlur("subject")
 }
 
 function cancelEditSubject() {
-	subject.value = subjectBeforeEdit.value
+	autosave.revert("subject")
 	editingSubject.value = false
+	onFieldBlur("subject")
 }
 
 onMounted(syncChromeHost)
@@ -329,115 +421,27 @@ onBeforeUnmount(() => {
 watch(
 	() => props.task,
 	(task) => {
-		syncing.value = true
+		// Status and assignees are saved by their own endpoints and always
+		// follow the server.
 		status.value = task.status
-		subject.value = task.subject || ""
-		description.value = task.description || ""
-		priority.value = task.priority || ""
-		project.value = task.project || ""
-		expStartDate.value = task.exp_start_date || ""
-		expEndDate.value = task.exp_end_date || ""
-		progress.value = Number(task.progress ?? 0)
 		assignees.value = [...(task.assignees || [])]
-		fieldError.value = ""
-		editingSubject.value = false
-		nextTick(() => {
-			syncing.value = false
-		})
 		syncChromeHost()
 	},
 	{ deep: true }
 )
 
-function isEmptyHtml(html) {
-	if (!html) return true
-	const text = String(html)
-		.replace(/<img[^>]*>/gi, "img")
-		.replace(/<[^>]+>/g, "")
-		.replace(/&nbsp;/g, " ")
-		.trim()
-	return !text
-}
-
-function normalizedDescription() {
-	return isEmptyHtml(description.value) ? "" : description.value
-}
-
-function fieldsDirty() {
-	const task = props.task
-	return (
-		subject.value.trim() !== (task.subject || "").trim() ||
-		normalizedDescription() !== (task.description || "") ||
-		(priority.value || "") !== (task.priority || "") ||
-		(project.value || "") !== (task.project || "") ||
-		String(expStartDate.value || "") !== String(task.exp_start_date || "") ||
-		String(expEndDate.value || "") !== String(task.exp_end_date || "") ||
-		Number(progress.value || 0) !== Number(task.progress ?? 0)
-	)
-}
-
-async function saveFields() {
-	if (syncing.value || savingFields.value) return
-	if (!subject.value.trim()) {
-		fieldError.value = "Subject is required"
-		return
+watch(
+	() => props.task.name,
+	() => {
+		editingSubject.value = false
 	}
-	if (!fieldsDirty()) return
-
-	fieldError.value = ""
-	savingFields.value = true
-	try {
-		const updated = await call(`${API.value}.update_task`, {
-			name: props.task.name,
-			subject: subject.value.trim(),
-			description: normalizedDescription(),
-			priority: priority.value || "",
-			project: project.value || "",
-			exp_start_date: expStartDate.value || "",
-			exp_end_date: expEndDate.value || "",
-			progress: progressLabel.value,
-			modified: props.task.modified,
-		})
-		emit("updated", updated)
-	} catch (e) {
-		if (e?.exc_type === "TimestampMismatchError") {
-			await reloadAfterConflict()
-		} else {
-			fieldError.value = e?.messages?.[0] || e?.message || "Could not save task"
-			toast({ title: fieldError.value, icon: "x-circle", iconClasses: "text-ink-red-4" })
-		}
-	} finally {
-		savingFields.value = false
-	}
-}
-
-async function reloadAfterConflict() {
-	toast({
-		title: "Someone else changed this task. Reloading the latest version — your last change wasn't saved.",
-		icon: "alert-triangle",
-		iconClasses: "text-ink-amber-3",
-	})
-	try {
-		const latest = await call(`${API.value}.get_task`, { name: props.task.name })
-		emit("updated", latest)
-	} catch (e) {
-		// Reload failed too; the user can still retry the edit manually.
-	}
-}
-
-const scheduleSave = debounce(() => {
-	saveFields()
-}, 500)
-
-watch([subject, description, priority, project, expStartDate, expEndDate, progress], () => {
-	if (syncing.value) return
-	scheduleSave()
-})
+)
 
 async function changeStatus(next) {
 	if (next === props.task.status) return
 	savingStatus.value = true
 	try {
+		await autosave.flush()
 		const updated = await call(`${API.value}.update_task_status`, {
 			name: props.task.name,
 			status: next,
@@ -459,6 +463,8 @@ function onAssigneesUpdated(updated) {
 	assignees.value = [...(updated.assignees || [])]
 	emit("updated", updated)
 }
+
+defineExpose({ flush: () => autosave.flush() })
 
 function goToSourceIssue() {
 	const name = props.task.issue

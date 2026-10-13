@@ -51,6 +51,22 @@ bench --site [your-site] run-tests --app phamos --module phamos.okr_addon.doctyp
 bench --site [your-site] run-tests --app phamos --module phamos.okr_addon.doctype.kr.test_kr
 ```
 
+### Frontend unit tests
+
+Pure helpers shared by all cockpit SPAs (`spa_shared/**/*.test.js`, e.g. the
+autosave core behind Issue/Task/checklist editing) run with Vitest from the
+`frontend/` package:
+
+```bash
+# From the phamos app directory
+yarn test:spa
+
+# or directly
+cd frontend && yarn test
+```
+
+Keep tested modules free of DOM and Vue imports so they run in Node.
+
 ### Known Issues
 
 **Running all tests together:**

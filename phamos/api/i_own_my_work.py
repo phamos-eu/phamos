@@ -8,7 +8,7 @@ from frappe import _
 from frappe.desk.form.assign_to import add as add_assignment
 from frappe.desk.form.assign_to import remove as remove_assignment
 from frappe.desk.form.load import get_assignments
-from frappe.utils import get_fullname
+from frappe.utils import get_datetime, get_fullname
 
 ACTIVE_STATUSES = ("Open", "Replied", "On Hold", "Resolved")
 ALLOWED_STATUSES = ("Open", "Replied", "On Hold", "Resolved", "Closed")
@@ -226,6 +226,8 @@ def get_issue(name):
 		"owner_name": _user_label(doc.owner),
 		"raised_by": doc.raised_by,
 		"modified": doc.modified,
+		"modified_by": doc.modified_by,
+		"modified_by_name": _user_label(doc.modified_by),
 		"creation": doc.creation,
 		"opening_date": getattr(doc, "opening_date", None),
 		"assignees": assignees,
@@ -331,6 +333,47 @@ def create_issue(
 			}
 		)
 
+	return get_issue(doc.name)
+
+
+@frappe.whitelist(methods=["POST"])
+def update_issue(
+	name, subject=None, description=None, priority=None, issue_type=None, project=None, modified=None
+):
+	"""Update editable Issue fields. Only the fields passed are written.
+
+	`modified` is the timestamp the client last saw; when given, Frappe raises
+	TimestampMismatchError if somebody else saved the Issue in the meantime.
+	"""
+	frappe.has_permission("Issue", "write", throw=True)
+	doc = frappe.get_doc("Issue", name)
+	doc.check_permission("write")
+
+	updates = {
+		key: value
+		for key, value in {
+			"subject": subject,
+			"description": description,
+			"priority": priority,
+			"issue_type": issue_type,
+			"project": project,
+		}.items()
+		if value is not None
+	}
+	if "subject" in updates:
+		updates["subject"] = (updates["subject"] or "").strip()
+		if not updates["subject"]:
+			frappe.throw(_("Subject is required"))
+
+	from phamos.api.presence import assert_fields_unlocked
+
+	assert_fields_unlocked("Issue", doc.name, list(updates))
+
+	for key, value in updates.items():
+		doc.set(key, value)
+	if modified:
+		doc.modified = get_datetime(modified)
+	doc.save()
 	return get_issue(doc.name)
 
 
