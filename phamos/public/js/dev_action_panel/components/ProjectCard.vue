@@ -1,5 +1,6 @@
 <script setup>
 import { ref, computed } from "vue";
+import DateTimePicker from "./DateTimePicker.vue";
 
 const props = defineProps({
   project: Object,
@@ -21,7 +22,27 @@ const expectedHours = ref(1);
 const stopResult = ref("");
 const stopBillable = ref(100);
 const stopActivityType = ref("");
+const stopEndTimeDate = ref(new Date());
+const stopEndTimeModified = ref(false);
 const activityTypes = ["Working Alone", "Working with Customer", "Working With Team"];
+
+const dateFormat = frappe.boot?.sysdefaults?.date_format || "dd.mm.yyyy";
+const timeFormat = frappe.boot?.sysdefaults?.time_format || "HH:mm:ss";
+const userTz = frappe.boot?.time_zone?.user || frappe.boot?.sysdefaults?.time_zone || "";
+
+function formatForApi(date) {
+  if (!date) return null;
+  const pad = n => String(n).padStart(2, "0");
+  const localStr = `${date.getFullYear()}-${pad(date.getMonth()+1)}-${pad(date.getDate())} ${pad(date.getHours())}:${pad(date.getMinutes())}:00`;
+  const uTz = frappe.boot?.time_zone?.user;
+  const sTz = frappe.boot?.time_zone?.system;
+  if (uTz && sTz && typeof moment !== "undefined" && moment.tz) {
+    try { return moment.tz(localStr, uTz).tz(sTz).format("YYYY-MM-DD HH:mm:ss"); } catch(e) {}
+  }
+  return localStr;
+}
+
+function onStopEndTimeChange(date) { stopEndTimeDate.value = date; stopEndTimeModified.value = true; }
 
 const isActive = computed(() => props.activeProjectSession?.project === props.project.name);
 const sessionState = computed(() => isActive.value ? props.activeProjectSession?.session_state : null);
@@ -59,7 +80,11 @@ async function toggleSessions() {
 }
 
 function openStart() { panel.value = panel.value === "start" ? null : "start"; }
-function openStop()  { panel.value = panel.value === "stop"  ? null : "stop"; }
+function openStop()  {
+  panel.value = panel.value === "stop" ? null : "stop";
+  stopEndTimeDate.value = new Date();
+  stopEndTimeModified.value = false;
+}
 function closePanel() { panel.value = null; }
 
 function confirmStart() {
@@ -76,7 +101,9 @@ function confirmStart() {
 function confirmStop() {
   if (!stopResult.value.trim()) { frappe.msgprint(__("Please describe what you accomplished.")); return; }
   if (!stopActivityType.value) { frappe.msgprint(__("Please select an Activity Type.")); return; }
-  emit("stop", { result: stopResult.value.trim(), percentBillable: stopBillable.value, activityType: stopActivityType.value });
+  const payload = { result: stopResult.value.trim(), percentBillable: stopBillable.value, activityType: stopActivityType.value };
+  if (stopEndTimeModified.value) payload.manualEndTime = formatForApi(stopEndTimeDate.value);
+  emit("stop", payload);
   panel.value = null;
   stopResult.value = "";
   stopActivityType.value = "";
@@ -240,6 +267,10 @@ function onStopKey(e)  { if (e.key === "Escape") closePanel(); if (e.key === "En
                 <option :value="25">25%</option>
                 <option :value="0">0% — Internal</option>
               </select>
+            </div>
+            <div class="pc__panel-field pc__panel-field--grow">
+              <label class="pc__panel-label">End time <span class="pc__panel-optional">{{ userTz }}</span></label>
+              <DateTimePicker :model-value="stopEndTimeDate" :date-format="dateFormat" :time-format="timeFormat" :auto-update="!stopEndTimeModified" @update:model-value="onStopEndTimeChange" />
             </div>
             <div class="pc__panel-actions pc__panel-actions--end">
               <button class="pc__panel-btn pc__panel-btn--ghost" @click="closePanel">Cancel</button>
@@ -421,6 +452,7 @@ function onStopKey(e)  { if (e.key === "Escape") closePanel(); if (e.key === "En
 .pc__panel-field--grow { flex: 1; min-width: 0; }
 .pc__panel-label { font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; color: var(--text-muted); }
 .pc__panel-required { color: var(--red-600, #dc2626); }
+.pc__panel-optional { font-size: 10px; font-weight: 400; color: var(--text-muted); text-transform: none; letter-spacing: 0; }
 .pc__panel-input-row { display: flex; align-items: center; gap: 8px; }
 .pc__panel-input {
   border: 1px solid var(--border-color); border-radius: 6px;

@@ -11,6 +11,13 @@
   "event",
   "repeat_this_event",
   "repeat_on",
+  "monday",
+  "tuesday",
+  "wednesday",
+  "thursday",
+  "friday",
+  "saturday",
+  "sunday",
   "repeat_till",
   "column_break_uloa",
   "description",
@@ -65,6 +72,48 @@
     "depends_on": "eval:doc.repeat_this_event",
     "options": "\nDaily\nWeekly\nMonthly\nYearly",
     "in_list_view": 1
+  },
+  {
+    "depends_on": "eval:doc.repeat_this_event && doc.repeat_on==\"Weekly\"",
+    "fieldname": "monday",
+    "fieldtype": "Check",
+    "label": "Monday"
+  },
+  {
+    "depends_on": "eval:doc.repeat_this_event && doc.repeat_on==\"Weekly\"",
+    "fieldname": "tuesday",
+    "fieldtype": "Check",
+    "label": "Tuesday"
+  },
+  {
+    "depends_on": "eval:doc.repeat_this_event && doc.repeat_on==\"Weekly\"",
+    "fieldname": "wednesday",
+    "fieldtype": "Check",
+    "label": "Wednesday"
+  },
+  {
+    "depends_on": "eval:doc.repeat_this_event && doc.repeat_on==\"Weekly\"",
+    "fieldname": "thursday",
+    "fieldtype": "Check",
+    "label": "Thursday"
+  },
+  {
+    "depends_on": "eval:doc.repeat_this_event && doc.repeat_on==\"Weekly\"",
+    "fieldname": "friday",
+    "fieldtype": "Check",
+    "label": "Friday"
+  },
+  {
+    "depends_on": "eval:doc.repeat_this_event && doc.repeat_on==\"Weekly\"",
+    "fieldname": "saturday",
+    "fieldtype": "Check",
+    "label": "Saturday"
+  },
+  {
+    "depends_on": "eval:doc.repeat_this_event && doc.repeat_on==\"Weekly\"",
+    "fieldname": "sunday",
+    "fieldtype": "Check",
+    "label": "Sunday"
   },
   {
     "depends_on": "eval:doc.repeat_this_event",

@@ -1,0 +1,31 @@
+{
+	"id": "/project-management-cockpit",
+	"name": "Project Management",
+	"short_name": "Project Management",
+	"description": "Project Management issues, tasks and implementations",
+	"start_url": "/project-management-cockpit",
+	"scope": "/project-management-cockpit",
+	"display": "standalone",
+	"background_color": "#f8f8f8",
+	"theme_color": "#f8f8f8",
+	"icons": [
+		{
+			"src": "/assets/phamos/manifest/project-management-icon-192.png",
+			"sizes": "192x192",
+			"type": "image/png",
+			"purpose": "any"
+		},
+		{
+			"src": "/assets/phamos/manifest/project-management-icon-512.png",
+			"sizes": "512x512",
+			"type": "image/png",
+			"purpose": "any"
+		},
+		{
+			"src": "/assets/phamos/manifest/project-management-maskable-512.png",
+			"sizes": "512x512",
+			"type": "image/png",
+			"purpose": "maskable"
+		}
+	]
+}

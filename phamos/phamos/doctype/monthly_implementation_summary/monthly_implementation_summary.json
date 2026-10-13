@@ -30,6 +30,7 @@
     "timesheets_tab",
     "year",
     "month",
+    "project_hours",
     "timesheets",
     "timesheets_table",
     "total_hours",
@@ -235,12 +236,18 @@
       "fieldtype": "Float",
       "label": "Remaining Billable Hours",
       "read_only": 1
+    },
+    {
+      "fieldname": "project_hours",
+      "fieldtype": "Table",
+      "label": "Project Hours",
+      "options": "Project Hours"
     }
   ],
   "index_web_pages_for_search": 1,
   "is_submittable": 1,
   "links": [],
-  "modified": "2026-09-08 12:00:00.000000",
+  "modified": "2026-09-30 12:00:00.000000",
   "modified_by": "Administrator",
   "module": "Phamos",
   "name": "Monthly Implementation Summary",

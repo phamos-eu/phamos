@@ -155,6 +155,7 @@ function show_free_slots_dialog_for_row(frm, row, cdt, cdn) {
 				duration_minutes: values.duration,
 				time_from,
 				time_to,
+				email_account: row.email_account,
 			},
 			freeze: true,
 			freeze_message: __('Finding free slots...'),

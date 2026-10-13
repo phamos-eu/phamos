@@ -8,6 +8,7 @@
  "field_order": [
   "delivery_note",
   "sales_order",
+  "project",
   "hours",
   "status",
   "grand_total",
@@ -30,6 +31,16 @@
    "in_list_view": 1,
    "label": "Sales Order",
    "options": "Sales Order",
+   "read_only": 1
+  },
+  {
+   "allow_on_submit": 1,
+   "description": "Project pool this Delivery Note's hours were allocated from.",
+   "fieldname": "project",
+   "fieldtype": "Link",
+   "in_list_view": 1,
+   "label": "Project",
+   "options": "Project",
    "read_only": 1
   },
   {

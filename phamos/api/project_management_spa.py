@@ -16,8 +16,8 @@ from phamos.api import department_cockpit as dc
 
 CONFIG = dc.CockpitConfig(
 	label="Project Management",
-	department_field="pm_department",
-	project_field="pm_timesheet_project",
+	department_field="project_management_department",
+	project_field="project_management_timesheet_project",
 	roles=("System Manager", "Projects Manager", "Projects User"),
 	settings_method_name="get_pm_settings",
 )

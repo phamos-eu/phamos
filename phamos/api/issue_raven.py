@@ -204,16 +204,16 @@ def _spa_path_for(doctype, name):
 	if doctype == "Task":
 		department = frappe.db.get_value("Task", name, "department")
 		sales_department = _settings_dept("sales_department")
-		hr_department = _settings_dept("hr_department")
+		human_resources_department = _settings_dept("human_resources_department")
 		accounting_department = _settings_dept("accounting_department")
-		pm_department = _settings_dept("pm_department")
+		project_management_department = _settings_dept("project_management_department")
 		if department and sales_department and department == sales_department:
 			return f"/sales-cockpit/tasks/{name}"
-		if department and hr_department and department == hr_department:
-			return f"/hr-cockpit/tasks/{name}"
+		if department and human_resources_department and department == human_resources_department:
+			return f"/human-resources-cockpit/tasks/{name}"
 		if department and accounting_department and department == accounting_department:
 			return f"/accounting-cockpit/tasks/{name}"
-		if department and pm_department and department == pm_department:
+		if department and project_management_department and department == project_management_department:
 			return f"/project-management-cockpit/tasks/{name}"
 		return f"/app/task/{name}"
 	return f"/i-own-my-work/issues/{name}"
@@ -222,8 +222,8 @@ def _spa_path_for(doctype, name):
 def _spa_open_label(spa_path):
 	if spa_path.startswith("/sales-cockpit"):
 		return _("Open in Sales Cockpit")
-	if spa_path.startswith("/hr-cockpit"):
-		return _("Open in HR Cockpit")
+	if spa_path.startswith("/human-resources-cockpit"):
+		return _("Open in Human Resources Cockpit")
 	if spa_path.startswith("/accounting-cockpit"):
 		return _("Open in Accounting Cockpit")
 	if spa_path.startswith("/project-management-cockpit"):

@@ -1,0 +1,31 @@
+{
+	"id": "/accounting-cockpit",
+	"name": "Accounting",
+	"short_name": "Accounting",
+	"description": "Accounting issues, tasks and receipts",
+	"start_url": "/accounting-cockpit",
+	"scope": "/accounting-cockpit",
+	"display": "standalone",
+	"background_color": "#f8f8f8",
+	"theme_color": "#f8f8f8",
+	"icons": [
+		{
+			"src": "/assets/phamos/manifest/accounting-icon-192.png",
+			"sizes": "192x192",
+			"type": "image/png",
+			"purpose": "any"
+		},
+		{
+			"src": "/assets/phamos/manifest/accounting-icon-512.png",
+			"sizes": "512x512",
+			"type": "image/png",
+			"purpose": "any"
+		},
+		{
+			"src": "/assets/phamos/manifest/accounting-maskable-512.png",
+			"sizes": "512x512",
+			"type": "image/png",
+			"purpose": "maskable"
+		}
+	]
+}

@@ -14,6 +14,7 @@
   "status",
   "delivered_total_hrs",
   "remaining_hrs",
+  "project",
   "test"
  ],
  "fields": [
@@ -77,6 +78,16 @@
    "fieldname": "remaining_hrs",
    "fieldtype": "Float",
    "label": "Remaining Hrs",
+   "read_only": 1
+  },
+  {
+   "allow_on_submit": 1,
+   "fetch_from": "sales_order.project",
+   "fieldname": "project",
+   "fieldtype": "Link",
+   "in_list_view": 1,
+   "label": "Project",
+   "options": "Project",
    "read_only": 1
   },
   {

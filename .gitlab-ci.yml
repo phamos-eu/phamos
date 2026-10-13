@@ -1,0 +1,15 @@
+# Reviews MRs targeting version-15 with Claude and posts findings as an MR comment.
+# Needs CI/CD variables ANTHROPIC_API_KEY and GITLAB_API_TOKEN; set AI_REVIEW_ENABLED=false to disable.
+
+stages:
+  - ai-review
+
+ai_code_review:
+  stage: ai-review
+  image: python:3.10-slim
+  rules:
+    - if: '$AI_REVIEW_ENABLED == "false"'
+      when: never
+    - if: '$CI_PIPELINE_SOURCE == "merge_request_event" && $CI_MERGE_REQUEST_TARGET_BRANCH_NAME == "version-15"'
+  script:
+    - python .gitlab/ai_code_review.py

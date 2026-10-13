@@ -3,9 +3,9 @@ export default {
 	label: "Project Management",
 	slug: "pm",
 	basePath: "/project-management-cockpit",
-	departmentField: "pm_department",
+	departmentField: "project_management_department",
 	settingsMethod: "get_pm_settings",
-	projectField: "pm_timesheet_project",
-	projectNameField: "pm_timesheet_project_name",
+	projectField: "project_management_timesheet_project",
+	projectNameField: "project_management_timesheet_project_name",
 	barColorStyleId: "pm-gantt-bar-colors",
 }

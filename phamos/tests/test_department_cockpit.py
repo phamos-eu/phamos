@@ -27,8 +27,8 @@ from phamos.api.department_cockpit import (
 
 HR = CockpitConfig(
 	label="HR",
-	department_field="hr_department",
-	project_field="hr_timesheet_project",
+	department_field="human_resources_department",
+	project_field="human_resources_timesheet_project",
 	roles=("HR Manager", "HR User"),
 )
 

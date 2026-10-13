@@ -1,0 +1,31 @@
+{
+	"id": "/human-resources-cockpit",
+	"name": "Human Resources",
+	"short_name": "Human Resources",
+	"description": "Human Resources issues, tasks and checklists",
+	"start_url": "/human-resources-cockpit",
+	"scope": "/human-resources-cockpit",
+	"display": "standalone",
+	"background_color": "#f8f8f8",
+	"theme_color": "#f8f8f8",
+	"icons": [
+		{
+			"src": "/assets/phamos/manifest/human-resources-icon-192.png",
+			"sizes": "192x192",
+			"type": "image/png",
+			"purpose": "any"
+		},
+		{
+			"src": "/assets/phamos/manifest/human-resources-icon-512.png",
+			"sizes": "512x512",
+			"type": "image/png",
+			"purpose": "any"
+		},
+		{
+			"src": "/assets/phamos/manifest/human-resources-maskable-512.png",
+			"sizes": "512x512",
+			"type": "image/png",
+			"purpose": "maskable"
+		}
+	]
+}

@@ -1,8 +1,6 @@
-import html
-import re
-
 import frappe
-from frappe.utils import strip_html
+
+from phamos.phamos.page.project_action_panel.project_action_panel import _find_gitlab_issues_in_text
 
 
 def execute():
@@ -77,23 +75,3 @@ def execute():
 		f"{updated_ts} Timesheets"
 	)
 
-
-def _find_gitlab_issues_in_text(*text_fields):
-	text = " ".join(t for t in text_fields if t)
-	text = html.unescape(strip_html(text))
-
-	child_issue = None
-	parent_issue = None
-
-	for url in re.findall(r'https?://[^\s"\'<>]+/-/(?:issues|work_items)/\d+', text):
-		if "/-/work_items/" in url and child_issue is None:
-			child_issue = frappe.db.get_value("GitLab Issue", {"issue_url": url}, "name")
-		elif "/-/issues/" in url and parent_issue is None:
-			parent_issue = frappe.db.get_value("GitLab Issue", {"issue_url": url}, "name")
-
-	if child_issue:
-		resolved_parent = frappe.db.get_value("GitLab Issue", child_issue, "parent_issue") or None
-		return child_issue, resolved_parent
-	elif parent_issue:
-		return parent_issue, parent_issue
-	return None, None

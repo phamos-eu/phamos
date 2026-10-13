@@ -236,39 +236,74 @@ def _ensure_row_description_for_sync(doc, row):
     # Keep description canonical before building ICS so Mailcow always receives latest source URL block.
     return _ensure_description_has_source_url(doc, row)
 
-
 def _row_recurrence_rule(row) -> str | None:
+    """Map Team Daily Schedule repeat fields to RFC5545 RRULE."""
     if not row or not row.get("repeat_this_event"):
         return None
 
     repeat_on = (row.get("repeat_on") or "").strip().lower()
+    
     freq = {
         "daily": "DAILY",
         "weekly": "WEEKLY",
         "monthly": "MONTHLY",
         "yearly": "YEARLY",
     }.get(repeat_on)
+
     if not freq:
         return None
 
     parts: list[str] = [f"FREQ={freq}"]
 
-    if freq == "WEEKLY" and row.get("start"):
-        try:
-            weekday = get_datetime(row.get("start")).weekday()
-            byday = ["MO", "TU", "WE", "TH", "FR", "SA", "SU"][weekday]
-            parts.append(f"BYDAY={byday}")
-        except Exception:
-            pass
+    if freq == "WEEKLY":
+        weekday_flags = [
+            ("monday", "MO"),
+            ("tuesday", "TU"),
+            ("wednesday", "WE"),
+            ("thursday", "TH"),
+            ("friday", "FR"),
+            ("saturday", "SA"),
+            ("sunday", "SU"),
+        ]
+
+        selected_days = [
+            abbr
+            for fieldname, abbr in weekday_flags
+            if row.get(fieldname)
+        ]
+
+        # Fallback: if no weekday checkbox is selected,
+        # use the weekday of the event start.
+        if not selected_days and row.get("start"):
+            try:
+                weekday = get_datetime(row.get("start")).weekday()
+
+                selected_days = [
+                    ["MO", "TU", "WE", "TH", "FR", "SA", "SU"][weekday]
+                ]
+            except Exception:
+                selected_days = []
+
+        if selected_days:
+            parts.append(
+                f"BYDAY={','.join(selected_days)}"
+            )
 
     if row.get("repeat_till"):
         try:
-            until_date = get_datetime(row.get("repeat_till"))
-            parts.append(f"UNTIL={until_date.strftime('%Y%m%d')}T235959Z")
+            until_date = get_datetime(
+                row.get("repeat_till")
+            )
+
+            parts.append(
+                f"UNTIL={until_date.strftime('%Y%m%d')}T235959Z"
+            )
+
         except Exception:
             pass
 
     return ";".join(parts)
+
 
 
 def _build_ics(row, uid: str, seq: int, organizer: str) -> str:
