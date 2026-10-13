@@ -18,6 +18,7 @@
 					:editable="!isClosed"
 					:fixed-menu="editorMenu"
 					:locked-by="locks.lockedBy('description')"
+					field-label="the description"
 					placeholder="What needs to be discussed or resolved?"
 					editor-class="prose-sm dark:prose-invert max-w-none w-full min-h-full flex-1 px-3 py-2 border border-t-0 border-gray-300 rounded-b-lg bg-white dark:border-gray-600 dark:bg-gray-800"
 					@focus="onFieldFocus('description')"
@@ -47,7 +48,7 @@
 				type="button"
 				class="ml-1.5 min-w-0 flex-1 truncate rounded-sm text-left font-bold text-gray-900 dark:text-gray-100"
 				:class="isClosed ? 'cursor-default' : 'hover:bg-gray-50 dark:hover:bg-gray-800/60'"
-				:title="subjectLock ? `${subjectLock.full_name || subjectLock.user} is editing the subject` : ''"
+				:title="subjectLock ? lockMessage(subjectLock, 'the subject') : ''"
 				@click="startEditSubject"
 			>
 				<FeatherIcon
@@ -272,6 +273,7 @@ import RichTextField from "@spa/components/RichTextField.vue"
 import { useAutosaveDoc } from "@spa/composables/useAutosaveDoc.js"
 import { useDocRealtime } from "@spa/composables/useDocRealtime.js"
 import { useFieldLocks } from "@spa/composables/useFieldLocks.js"
+import { lockExplanation, lockHeadline, lockMessage } from "@spa/utils/fieldLockText.js"
 import ConvertToTaskDialog from "@spa/components/ConvertToTaskDialog.vue"
 import SchedulePreview from "@spa/components/SchedulePreview.vue"
 import { setPageChromeActive } from "@spa/pageChrome.js"
@@ -407,7 +409,8 @@ async function startEditSubject() {
 	if (isClosed.value) return
 	if (subjectLock.value) {
 		toast({
-			title: `${subjectLock.value.full_name || subjectLock.value.user} is editing the subject`,
+			title: lockHeadline(subjectLock.value, "the subject"),
+			text: lockExplanation(subjectLock.value),
 			icon: "lock",
 			iconClasses: "text-ink-amber-3",
 		})
