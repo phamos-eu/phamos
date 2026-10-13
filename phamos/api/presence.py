@@ -20,7 +20,8 @@ import frappe
 from frappe import _
 from frappe.utils import get_fullname
 
-LOCK_TTL = 90
+# Seconds a lock survives without a heartbeat (the client renews every 10 s).
+LOCK_TTL = 30
 LOCK_EVENT = "cockpit_field_lock"
 MAX_USER_CARDS = 50
 
