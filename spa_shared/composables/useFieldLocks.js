@@ -5,12 +5,13 @@ import { callKeepalive } from "@spa/utils/keepaliveCall.js"
 
 const API = "phamos.api.presence"
 const LOCK_EVENT = "cockpit_field_lock"
-const HEARTBEAT_MS = 30000
+// Well under the server's 30 s LOCK_TTL, so one lost heartbeat never drops an active lock.
+const HEARTBEAT_MS = 10000
 
 /**
  * Soft field locks: while a user edits a text field, everyone else sees
  * "<name> is editing…" and the field is read-only for them. Locks expire on
- * the server after 90 s without a heartbeat, so a closed tab never blocks a
+ * the server after 30 s without a heartbeat, so a closed tab never blocks a
  * field for long. Changes arrive through the document's realtime room.
  *
  *   const locks = useFieldLocks({ doctype: "Issue", name: () => issue.name, realtime })
