@@ -278,7 +278,9 @@ async function onCreated(issue) {
 }
 
 async function onIssueUpdated(issue) {
-	selectedIssue.value = issue
+	// Saves finish after the user may have opened another record; a late
+	// response must not switch the detail view back.
+	if (issue?.name === selectedName.value) selectedIssue.value = issue
 	await loadInbox()
 }
 

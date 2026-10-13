@@ -1,16 +1,27 @@
 <template>
 	<div class="flex h-full min-h-0 w-full flex-1 flex-col overflow-hidden p-5 text-gray-900 dark:text-gray-100">
 		<section class="flex min-h-[50%] flex-1 flex-col">
+			<div
+				v-if="!chromeHostReady"
+				class="mb-2 flex flex-shrink-0 items-center justify-end gap-2"
+			>
+				<DocSyncBanner :autosave="autosave" />
+				<DocViewers :viewers="viewers" />
+			</div>
 			<label class="mb-1.5 block flex-shrink-0 text-xs text-ink-gray-5">Description</label>
 			<div class="flex min-h-0 flex-1 flex-col" :class="{ 'pointer-events-none opacity-80': isClosed }">
-				<TextEditor
-					class="flex h-full min-h-0 flex-1 flex-col [&]:h-full [&_.ProseMirror]:min-h-full [&_.ProseMirror]:flex-1 [&_.ProseMirror]:overflow-y-auto"
-					:content="description"
+				<RichTextField
+					:key="issue.name"
+					v-model="autosave.draft.description"
+					class="flex h-full min-h-0 flex-1 flex-col"
+					editor-root-class="flex h-full min-h-0 flex-1 flex-col [&_.ProseMirror]:min-h-full [&_.ProseMirror]:flex-1 [&_.ProseMirror]:overflow-y-auto"
 					:editable="!isClosed"
-					:fixed-menu="isClosed ? false : editorMenu"
+					:fixed-menu="editorMenu"
+					:locked-by="locks.lockedBy('description')"
 					placeholder="What needs to be discussed or resolved?"
 					editor-class="prose-sm dark:prose-invert max-w-none w-full min-h-full flex-1 px-3 py-2 border border-t-0 border-gray-300 rounded-b-lg bg-white dark:border-gray-600 dark:bg-gray-800"
-					@change="(html) => (description = html)"
+					@focus="onFieldFocus('description')"
+					@blur="onFieldBlur('description')"
 				/>
 			</div>
 			<ErrorMessage class="mt-2 flex-shrink-0" :message="fieldError" />
@@ -23,7 +34,7 @@
 			<input
 				v-if="editingSubject && !isClosed"
 				ref="subjectInput"
-				v-model="subject"
+				v-model="autosave.draft.subject"
 				type="text"
 				class="ml-1.5 min-w-0 flex-1 border-0 bg-transparent p-0 font-bold tracking-tight text-gray-900 outline-none ring-0 focus:ring-0 dark:text-gray-100"
 				placeholder="Subject"
@@ -36,10 +47,20 @@
 				type="button"
 				class="ml-1.5 min-w-0 flex-1 truncate rounded-sm text-left font-bold text-gray-900 dark:text-gray-100"
 				:class="isClosed ? 'cursor-default' : 'hover:bg-gray-50 dark:hover:bg-gray-800/60'"
+				:title="subjectLock ? `${subjectLock.full_name || subjectLock.user} is editing the subject` : ''"
 				@click="startEditSubject"
 			>
-				{{ subject.trim() || "Untitled" }}
+				<FeatherIcon
+					v-if="subjectLock"
+					name="lock"
+					class="mr-1 inline h-3.5 w-3.5 align-[-2px] text-ink-amber-3"
+				/>
+				{{ autosave.draft.subject.trim() || "Untitled" }}
 			</button>
+			<div class="ml-auto flex flex-shrink-0 items-center gap-2 pl-3">
+				<DocSyncBanner :autosave="autosave" />
+				<DocViewers :viewers="viewers" />
+			</div>
 		</div>
 	</Teleport>
 
@@ -84,7 +105,7 @@
 
 				<section class="space-y-3">
 					<FormControl
-						v-model="priority"
+						v-model="autosave.draft.priority"
 						label="Priority"
 						type="select"
 						size="sm"
@@ -92,7 +113,7 @@
 						:options="priorityOptions"
 					/>
 					<FormControl
-						v-model="issueType"
+						v-model="autosave.draft.issue_type"
 						label="Issue Type"
 						type="select"
 						size="sm"
@@ -100,7 +121,7 @@
 						:options="issueTypeOptions"
 					/>
 					<FormControl
-						v-model="project"
+						v-model="autosave.draft.project"
 						label="Project"
 						type="select"
 						size="sm"
@@ -243,8 +264,14 @@
 <script setup>
 import { computed, nextTick, onMounted, onBeforeUnmount, ref, watch } from "vue"
 import { useRouter } from "vue-router"
-import { call, debounce, Dialog, TextEditor, toast, Badge } from "frappe-ui"
+import { call, Dialog, FeatherIcon, toast, Badge } from "frappe-ui"
 import AssigneePicker from "@spa/components/AssigneePicker.vue"
+import DocSyncBanner from "@spa/components/DocSyncBanner.vue"
+import DocViewers from "@spa/components/DocViewers.vue"
+import RichTextField from "@spa/components/RichTextField.vue"
+import { useAutosaveDoc } from "@spa/composables/useAutosaveDoc.js"
+import { useDocRealtime } from "@spa/composables/useDocRealtime.js"
+import { useFieldLocks } from "@spa/composables/useFieldLocks.js"
 import ConvertToTaskDialog from "@spa/components/ConvertToTaskDialog.vue"
 import SchedulePreview from "@spa/components/SchedulePreview.vue"
 import { setPageChromeActive } from "@spa/pageChrome.js"
@@ -317,24 +344,77 @@ function statusStrongClass(status) {
 }
 
 const status = ref(props.issue.status)
-const subject = ref(props.issue.subject || "")
-const description = ref(props.issue.description || "")
-const priority = ref(props.issue.priority || "")
-const issueType = ref(props.issue.issue_type || "")
-const project = ref(props.issue.project || "")
 const assignees = ref([...(props.issue.assignees || [])])
 const savingStatus = ref(false)
-const savingFields = ref(false)
-const fieldError = ref("")
-const syncing = ref(false)
 const editingSubject = ref(false)
 const subjectInput = ref(null)
-const subjectBeforeEdit = ref("")
+
+// Editable fields live in the autosave draft; server payloads (save responses,
+// parent reloads, realtime refreshes) never overwrite a field being edited.
+const autosave = useAutosaveDoc({
+	doc: () => props.issue,
+	fields: {
+		subject: { kind: "text", trim: true, required: true, label: "Subject" },
+		description: { kind: "html", label: "Description" },
+		priority: { kind: "select", immediate: true, label: "Priority" },
+		issue_type: { kind: "select", immediate: true, label: "Issue Type" },
+		project: { kind: "select", immediate: true, label: "Project" },
+	},
+	request: (name, payload, modified) => ({
+		method: `${API.value}.update_issue`,
+		args: { name, ...payload, modified },
+	}),
+	fetch: (name) => call(`${API.value}.get_issue`, { name }),
+	readonly: () => isClosed.value,
+	onSaved: (issue) => emit("updated", issue),
+	onRemoteApplied: (issue) => emit("updated", issue),
+	onError: (message) => toast({ title: message, icon: "x-circle", iconClasses: "text-ink-red-4" }),
+})
+
+const fieldError = computed(() => (autosave.status === "error" ? autosave.error : ""))
+
+const realtime = useDocRealtime({
+	doctype: "Issue",
+	name: () => props.issue.name,
+	onDocUpdate: (modified) => autosave.noteRemoteModified(modified),
+})
+const viewers = realtime.viewers
+
+const locks = useFieldLocks({
+	doctype: "Issue",
+	name: () => props.issue.name,
+	realtime,
+	enabled: () => !isClosed.value,
+	onReleased: () => {
+		if (autosave.status === "blocked") autosave.flush()
+	},
+})
+const subjectLock = computed(() => locks.lockedBy("subject"))
+
+async function onFieldFocus(field) {
+	autosave.setFocused(field, true)
+	if (!isClosed.value) await locks.acquire(field)
+}
+
+async function onFieldBlur(field) {
+	const docname = props.issue.name
+	// Release the lock only once the server has everything typed in the field.
+	await autosave.setFocused(field, false)
+	locks.release(field, { docname })
+}
 
 async function startEditSubject() {
 	if (isClosed.value) return
-	subjectBeforeEdit.value = subject.value
+	if (subjectLock.value) {
+		toast({
+			title: `${subjectLock.value.full_name || subjectLock.value.user} is editing the subject`,
+			icon: "lock",
+			iconClasses: "text-ink-amber-3",
+		})
+		return
+	}
 	editingSubject.value = true
+	onFieldFocus("subject")
 	await nextTick()
 	subjectInput.value?.focus?.()
 }
@@ -342,14 +422,14 @@ async function startEditSubject() {
 function finishEditSubject() {
 	if (!editingSubject.value) return
 	editingSubject.value = false
-	if (!subject.value.trim()) {
-		subject.value = subjectBeforeEdit.value || props.issue.subject || ""
-	}
+	if (!autosave.draft.subject.trim()) autosave.revert("subject")
+	onFieldBlur("subject")
 }
 
 function cancelEditSubject() {
-	subject.value = subjectBeforeEdit.value
+	autosave.revert("subject")
 	editingSubject.value = false
+	onFieldBlur("subject")
 }
 
 const assigneeDetails = computed(() => {
@@ -397,22 +477,20 @@ onBeforeUnmount(() => {
 watch(
 	() => props.issue,
 	(issue) => {
-		syncing.value = true
+		// Status and assignees are saved by their own endpoints and not
+		// autosaved, so they always follow the server.
 		status.value = issue.status
-		subject.value = issue.subject || ""
-		description.value = issue.description || ""
-		priority.value = issue.priority || ""
-		issueType.value = issue.issue_type || ""
-		project.value = issue.project || ""
 		assignees.value = [...(issue.assignees || [])]
-		fieldError.value = ""
-		editingSubject.value = false
-		nextTick(() => {
-			syncing.value = false
-		})
 		syncPropertiesHost()
 	},
 	{ deep: true }
+)
+
+watch(
+	() => props.issue.name,
+	() => {
+		editingSubject.value = false
+	}
 )
 
 watch(
@@ -433,72 +511,12 @@ watch(
 	{ immediate: true }
 )
 
-function isEmptyHtml(html) {
-	if (!html) return true
-	const text = String(html)
-		.replace(/<img[^>]*>/gi, "img")
-		.replace(/<[^>]+>/g, "")
-		.replace(/&nbsp;/g, " ")
-		.trim()
-	return !text
-}
-
-function normalizedDescription() {
-	return isEmptyHtml(description.value) ? "" : description.value
-}
-
-function fieldsDirty() {
-	const issue = props.issue
-	return (
-		subject.value.trim() !== (issue.subject || "").trim() ||
-		normalizedDescription() !== (issue.description || "") ||
-		(priority.value || "") !== (issue.priority || "") ||
-		(issueType.value || "") !== (issue.issue_type || "") ||
-		(project.value || "") !== (issue.project || "")
-	)
-}
-
-async function saveFields() {
-	if (syncing.value || savingFields.value || isClosed.value) return
-	if (!subject.value.trim()) {
-		fieldError.value = "Subject is required"
-		return
-	}
-	if (!fieldsDirty()) return
-
-	fieldError.value = ""
-	savingFields.value = true
-	try {
-		const updated = await call(`${API.value}.update_issue`, {
-			name: props.issue.name,
-			subject: subject.value.trim(),
-			description: normalizedDescription(),
-			priority: priority.value || "",
-			issue_type: issueType.value || "",
-			project: project.value || "",
-		})
-		emit("updated", updated)
-	} catch (e) {
-		fieldError.value = e?.messages?.[0] || e?.message || "Could not save issue"
-		toast.error(fieldError.value)
-	} finally {
-		savingFields.value = false
-	}
-}
-
-const scheduleSave = debounce(() => {
-	saveFields()
-}, 500)
-
-watch([subject, description, priority, issueType, project], () => {
-	if (syncing.value || isClosed.value) return
-	scheduleSave()
-})
-
 async function changeStatus(next) {
 	if (next === props.issue.status) return
 	savingStatus.value = true
 	try {
+		// Save pending text first: a Closed issue is read-only afterwards.
+		await autosave.flush()
 		const updated = await call(`${API.value}.update_status`, {
 			name: props.issue.name,
 			status: next,
@@ -506,7 +524,11 @@ async function changeStatus(next) {
 		status.value = updated.status
 		emit("updated", updated)
 	} catch (e) {
-		toast.error(e?.messages?.[0] || e?.message || "Could not update status")
+		toast({
+			title: e?.messages?.[0] || e?.message || "Could not update status",
+			icon: "x-circle",
+			iconClasses: "text-ink-red-4",
+		})
 	} finally {
 		savingStatus.value = false
 	}
@@ -541,12 +563,18 @@ function goToIssueListAfterConvert() {
 	emit("close")
 }
 
+defineExpose({ flush: () => autosave.flush() })
+
 function onConverted(result) {
 	const task = result?.task
 	postConvertTaskName.value = task?.name || ""
 	showConvertedNotice.value = false
 	showPostConvertChoice.value = true
 	emit("converted", result)
-	toast.success(task?.name ? `Converted to ${task.name}` : "Converted to Task")
+	toast({
+		title: task?.name ? `Converted to ${task.name}` : "Converted to Task",
+		icon: "check-circle",
+		iconClasses: "text-ink-green-4",
+	})
 }
 </script>
