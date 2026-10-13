@@ -18,7 +18,7 @@
 					v-else
 					type="button"
 					class="ml-1.5 min-w-0 flex-1 truncate rounded-sm text-left font-bold text-ink-gray-9 hover:bg-surface-gray-2"
-					:title="subjectLock ? `${subjectLock.full_name || subjectLock.user} is editing the subject` : ''"
+					:title="subjectLock ? lockMessage(subjectLock, 'the subject') : ''"
 					@click="startEditSubject"
 				>
 					<FeatherIcon
@@ -94,6 +94,7 @@
 						v-model="autosave.draft.description"
 						:fixed-menu="editorMenu"
 						:locked-by="locks.lockedBy('description')"
+					field-label="the description"
 						placeholder="Task details…"
 						editor-class="prose-sm dark:prose-invert max-w-none w-full min-h-[120px] max-h-[240px] overflow-y-auto px-3 py-2 border border-t-0 border-outline-gray-2 rounded-b-lg bg-surface-white dark:bg-surface-gray-2"
 						@focus="onFieldFocus('description')"
@@ -214,6 +215,7 @@ import RichTextField from "@spa/components/RichTextField.vue"
 import { useAutosaveDoc } from "@spa/composables/useAutosaveDoc.js"
 import { useDocRealtime } from "@spa/composables/useDocRealtime.js"
 import { useFieldLocks } from "@spa/composables/useFieldLocks.js"
+import { lockExplanation, lockHeadline, lockMessage } from "@spa/utils/fieldLockText.js"
 import LinkedChecklistsSection from "@spa/components/LinkedChecklistsSection.vue"
 import { formatDate } from "@spa/utils/datetime.js"
 import { setPageChromeActive } from "@spa/pageChrome.js"
@@ -370,7 +372,8 @@ async function syncChromeHost() {
 async function startEditSubject() {
 	if (subjectLock.value) {
 		toast({
-			title: `${subjectLock.value.full_name || subjectLock.value.user} is editing the subject`,
+			title: lockHeadline(subjectLock.value, "the subject"),
+			text: lockExplanation(subjectLock.value),
 			icon: "lock",
 			iconClasses: "text-ink-amber-3",
 		})
