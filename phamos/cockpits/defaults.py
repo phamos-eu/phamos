@@ -34,3 +34,17 @@ DROP_REASONS = ("Not needed any more", "Done elsewhere", "Out of date", "Other")
 # days from today (overdue included). Each quadrant shows at most MATRIX_LIMIT ToDos.
 URGENT_WORKING_DAYS = 2
 MATRIX_LIMIT = 15
+
+# Focus mode (#1556). A session holds 1..FOCUS_MAX_TODOS ToDos; its length is a preset, any
+# value up to FOCUS_MAX_MINUTES, or 0 for a stopwatch (ended after STOPWATCH_MAX_MINUTES).
+# A timed session expires FOCUS_GRACE_MINUTES after its planned end. Leaving is free during the
+# first FOCUS_FREE_EXIT_SECONDS; afterwards the button waits BREAK_OUT_BASE_SECONDS, doubling
+# with every break-out that day, at most BREAK_OUT_MAX_SECONDS. Friction, never a lock.
+FOCUS_MAX_TODOS = 5
+FOCUS_PRESETS = (25, 50)
+FOCUS_MAX_MINUTES = 180
+STOPWATCH_MAX_MINUTES = 240
+FOCUS_GRACE_MINUTES = 15
+FOCUS_FREE_EXIT_SECONDS = 60
+BREAK_OUT_BASE_SECONDS = 10
+BREAK_OUT_MAX_SECONDS = 160
