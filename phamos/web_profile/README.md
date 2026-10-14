@@ -61,4 +61,22 @@ bench --site dev.localhost run-tests --module phamos.tests.test_web_profile
 bench --site dev.localhost run-tests --module phamos.tests.test_web_profile_chrome
 ```
 
+## Go-live of a section (by data)
+
+Every section goes live with Frappe's own tools: *Website Route Redirect* rows (Website Settings) for
+its old URLs, and its old Web Pages unpublished (#1492, step 5). `golive.py` does that from the plan in
+`golive_plans/<section>.py` (people, departments, teams, modules, implementations, industries,
+customers, partners, content). New URLs are looked up on the site that runs it.
+
+```bash
+bench --site <site> execute phamos.web_profile.golive.run --kwargs '{"section": "people"}'               # dry run: report only
+bench --site <site> execute phamos.web_profile.golive.run --kwargs '{"section": "people", "dry_run": 0}'
+bench --site <site> execute phamos.web_profile.golive.rollback --kwargs '{"section": "people", "dry_run": 0}'
+```
+
+Running it twice changes nothing; a redirect someone set up differently is reported, not changed.
+Rollback removes exactly the plan's redirects and republishes the pages the run unpublished. Old
+URLs only lead to profiles that show a name; anonymous people, customers and cases are never reached
+from an old named URL.
+
 Known gaps: profiles are not yet in `sitemap.xml`, and `llms.txt` is not generated yet (tracked in #1492).
