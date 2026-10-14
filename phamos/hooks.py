@@ -253,10 +253,12 @@ after_migrate = [
 # Personal Cockpit focus sessions are private, System Managers included (#1556).
 permission_query_conditions = {
 	"Focus Session": "phamos.cockpits.permissions.focus_session_query",
+	"ToDo Challenge": "phamos.cockpits.permissions.todo_challenge_query",
 }
 
 has_permission = {
 	"Focus Session": "phamos.cockpits.permissions.focus_session_has_permission",
+	"ToDo Challenge": "phamos.cockpits.permissions.todo_challenge_has_permission",
 }
 
 # DocType Class
@@ -423,6 +425,8 @@ scheduler_events = {
         "phamos.bookstack_integration.sync.sync_all_instances",
         # MIS: auto-close open summaries once every linked SO/DN is fully delivered and billed
         "phamos.phamos.doctype.monthly_implementation_summary.monthly_implementation_summary.auto_close_fulfilled_mis",
+        # Personal Cockpit: settle yesterday in running ToDo challenges (#1557)
+        "phamos.api.personal_challenges.evaluate_all_challenges",
     ],
     "weekly": [
         # Personal Cockpit: checklists left behind by ToDos deleted without hooks (#1554)
@@ -518,6 +522,7 @@ override_doctype_dashboards = {
 # Personal Cockpit focus sessions belong to their user: exported and deleted with the user's data.
 user_data_fields = [
 	{"doctype": "Focus Session", "filter_by": "user", "redact_fields": ["break_out_reason"]},
+	{"doctype": "ToDo Challenge", "filter_by": "user", "redact_fields": ["title"]},
 ]
 
 # Authentication and authorization

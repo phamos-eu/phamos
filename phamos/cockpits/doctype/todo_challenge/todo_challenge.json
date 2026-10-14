@@ -1,0 +1,149 @@
+{
+ "actions": [],
+ "creation": "2026-10-15 00:30:00.000000",
+ "doctype": "DocType",
+ "engine": "InnoDB",
+ "field_order": [
+  "user",
+  "title",
+  "kind",
+  "target_per_day",
+  "status",
+  "column_break_dates",
+  "start_date",
+  "working_days",
+  "end_date",
+  "jokers_allowed",
+  "baseline_per_day",
+  "ended_on",
+  "section_days",
+  "days"
+ ],
+ "fields": [
+  {
+   "fieldname": "user",
+   "fieldtype": "Link",
+   "label": "User",
+   "options": "User",
+   "reqd": 1,
+   "in_list_view": 1,
+   "in_standard_filter": 1,
+   "read_only": 1,
+   "search_index": 1
+  },
+  {
+   "fieldname": "title",
+   "fieldtype": "Data",
+   "label": "Title",
+   "in_list_view": 1
+  },
+  {
+   "fieldname": "kind",
+   "fieldtype": "Select",
+   "label": "Kind",
+   "options": "Closes per day\nImportant per day",
+   "default": "Closes per day",
+   "read_only": 1
+  },
+  {
+   "fieldname": "target_per_day",
+   "fieldtype": "Int",
+   "label": "Target per Day",
+   "read_only": 1
+  },
+  {
+   "fieldname": "status",
+   "fieldtype": "Select",
+   "label": "Status",
+   "options": "Active\nCompleted\nEnded",
+   "default": "Active",
+   "in_list_view": 1,
+   "in_standard_filter": 1,
+   "read_only": 1,
+   "search_index": 1
+  },
+  {
+   "fieldname": "column_break_dates",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "start_date",
+   "fieldtype": "Date",
+   "label": "Start Date",
+   "read_only": 1
+  },
+  {
+   "fieldname": "working_days",
+   "fieldtype": "Int",
+   "label": "Working Days",
+   "read_only": 1
+  },
+  {
+   "fieldname": "end_date",
+   "fieldtype": "Date",
+   "label": "End Date",
+   "read_only": 1,
+   "description": "The last working day of the challenge."
+  },
+  {
+   "fieldname": "jokers_allowed",
+   "fieldtype": "Int",
+   "label": "Jokers",
+   "read_only": 1
+  },
+  {
+   "fieldname": "baseline_per_day",
+   "fieldtype": "Float",
+   "label": "Baseline per Day",
+   "read_only": 1,
+   "precision": "1",
+   "description": "Median closes per working day before the start."
+  },
+  {
+   "fieldname": "ended_on",
+   "fieldtype": "Date",
+   "label": "Ended On",
+   "read_only": 1
+  },
+  {
+   "fieldname": "section_days",
+   "fieldtype": "Section Break",
+   "label": "Days"
+  },
+  {
+   "fieldname": "days",
+   "fieldtype": "Table",
+   "label": "Days",
+   "options": "ToDo Challenge Day",
+   "read_only": 1
+  }
+ ],
+ "links": [],
+ "modified": "2026-10-15 00:30:00.000000",
+ "modified_by": "Administrator",
+ "module": "Cockpits",
+ "name": "ToDo Challenge",
+ "owner": "Administrator",
+ "sort_field": "creation",
+ "sort_order": "DESC",
+ "states": [],
+ "autoname": "hash",
+ "naming_rule": "Random",
+ "title_field": "title",
+ "track_changes": 0,
+ "description": "A self-set ToDo target of the Personal Cockpit (#1557). Private: only the user sees their own challenges.",
+ "permissions": [
+  {
+   "role": "System Manager",
+   "read": 1,
+   "write": 1,
+   "create": 1,
+   "delete": 1,
+   "report": 1,
+   "export": 1,
+   "print": 1,
+   "email": 1,
+   "share": 1
+  }
+ ]
+}
