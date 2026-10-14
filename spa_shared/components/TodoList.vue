@@ -29,12 +29,20 @@
 			</button>
 
 			<div class="min-w-0 flex-1">
-				<div
-					class="truncate text-sm"
-					:class="todo.status === 'Closed' ? 'text-ink-gray-5 line-through' : 'font-medium text-ink-gray-9'"
-					:title="todo.summary"
-				>
-					{{ todo.summary || "(no description)" }}
+				<div class="flex min-w-0 items-center gap-1.5">
+					<FeatherIcon
+						v-if="todo.important"
+						name="star"
+						class="h-3.5 w-3.5 flex-none text-ink-amber-3"
+						aria-label="Important"
+					/>
+					<div
+						class="truncate text-sm"
+						:class="todo.status === 'Closed' ? 'text-ink-gray-5 line-through' : 'font-medium text-ink-gray-9'"
+						:title="todo.summary"
+					>
+						{{ todo.summary || "(no description)" }}
+					</div>
 				</div>
 				<div v-if="todo.reference_type" class="mt-1 flex min-w-0 items-center gap-1 text-xs text-ink-gray-5">
 					<span class="flex-none">{{ todo.reference_type }}</span>
@@ -57,6 +65,14 @@
 					:class="todo.overdue ? 'font-medium text-ink-red-4' : 'text-ink-gray-5'"
 				>
 					{{ dueLabel(todo) }}
+					<span
+						v-if="todo.reschedule_count"
+						class="ml-1"
+						:class="todo.reschedule_count >= 3 ? 'font-medium text-ink-red-3' : 'text-ink-gray-5'"
+						:title="`Postponed ${todo.reschedule_count} times`"
+					>
+						↻ {{ todo.reschedule_count }}
+					</span>
 				</span>
 				<Badge :label="todo.priority" :theme="todoPriorityTheme(todo.priority)" size="sm" variant="subtle" />
 			</div>
