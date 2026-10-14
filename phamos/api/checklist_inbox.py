@@ -1,7 +1,7 @@
 # Copyright (c) 2026, phamos.eu and contributors
 # For license information, please see license.txt
 
-"""Checklist inbox APIs for I Own My Work SPA."""
+"""Checklist APIs shared by the cockpit SPAs."""
 
 import frappe
 from frappe import _

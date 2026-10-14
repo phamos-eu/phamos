@@ -1,10 +1,5 @@
-Open in Sales Cockpit,Im Sales-Cockpit öffnen
-Open in Human Resources Cockpit,Im Human-Resources-Cockpit öffnen
-Open in Accounting Cockpit,Im Accounting-Cockpit öffnen
-Open in Project Management Cockpit,Im Projektmanagement-Cockpit öffnen
 Open in Software Development Cockpit,Im Softwareentwicklungs-Cockpit öffnen
 Open in Desk,Im Desk öffnen
-Open in I Own My Work,In I Own My Work öffnen
 Assigned To,Zugewiesen an
 Due Date,Fälligkeitsdatum
 Due in (Days),Fällig in (Tagen)
@@ -332,7 +327,7 @@ Row {0}: there is already a text row for language {1}.,Zeile {0}: Für die Sprac
 "The route ""{0}"" is already used by another person.",Die Route „{0}“ wird bereits von einer anderen Person verwendet.
 Translation Of,Übersetzung von
 "Page language. Use routes de/… and en/… so navbar, footer and language picker can switch.","Sprache der Seite. Routen de/… und en/… verwenden, damit Navigation, Fußzeile und Sprachauswahl umschalten können."
-"For the English page: the German page it translates.","Für die englische Seite: die deutsche Seite, die sie übersetzt."
+For the English page: the German page it translates.,"Für die englische Seite: die deutsche Seite, die sie übersetzt."
 Time at phamos,Zeit bei phamos
 {0} at phamos,{0} bei phamos
 {0} Frappe/ERPNext,{0} Frappe/ERPNext
@@ -349,7 +344,7 @@ Switzerland,Schweiz
 India,Indien
 Europe,Europa
 Edit page,Seite bearbeiten
-"This page is raw HTML. Page Builder blocks (or Rich Text) are easier to edit and keep the site's design.","Diese Seite ist reines HTML. Page-Builder-Blöcke (oder Rich Text) lassen sich leichter bearbeiten und halten das Design der Website ein."
+This page is raw HTML. Page Builder blocks (or Rich Text) are easier to edit and keep the site's design.,Diese Seite ist reines HTML. Page-Builder-Blöcke (oder Rich Text) lassen sich leichter bearbeiten und halten das Design der Website ein.
 Missing translation: {0}.,Fehlende Übersetzung: {0}.
 This page changed after its {0} version ({1}): check the translation.,Diese Seite wurde nach ihrer Fassung auf {0} ({1}) geändert: Übersetzung prüfen.
 The German page changed after this one: check the translation.,Die deutsche Seite wurde nach dieser geändert: Übersetzung prüfen.
@@ -680,7 +675,7 @@ Event {0} has no Item Tax Template for its tickets.,Die Veranstaltung {0} hat ke
 The ticket price has changed in the meantime. Please check your order again.,Der Ticketpreis hat sich inzwischen geändert. Bitte prüfen Sie Ihre Bestellung erneut.
 Event order total differs from the confirmed total,Gesamtbetrag der Veranstaltungsbestellung weicht vom bestätigten Betrag ab
 "Please enter a name only, without web or email addresses.",Bitte geben Sie nur einen Namen ein – ohne Web- oder E-Mail-Adressen.
-"Don't know about this booking? Simply reply to this email and we'll remove your address.","Sie wissen nichts von dieser Buchung? Antworten Sie einfach auf diese E-Mail, und wir entfernen Ihre Adresse."
+Don't know about this booking? Simply reply to this email and we'll remove your address.,"Sie wissen nichts von dieser Buchung? Antworten Sie einfach auf diese E-Mail, und wir entfernen Ihre Adresse."
 Ticket mail not sent: daily limit of {0} reached for this event.,Ticket-E-Mail nicht gesendet: Tageslimit von {0} für diese Veranstaltung erreicht.
 Event ticket mails: daily limit reached,Ticket-E-Mails der Veranstaltung: Tageslimit erreicht
 Send Ticket,Ticket senden
@@ -700,7 +695,7 @@ Rate Includes Tax,Preis inkl. Steuer
 Confirmed Total,Bestätigter Gesamtbetrag
 Sales Order and Invoice,Auftrag und Rechnung
 Ordered On,Bestellt am
-"Computed from the tickets' payment status.",Wird aus dem Zahlungsstatus der Tickets berechnet.
+Computed from the tickets' payment status.,Wird aus dem Zahlungsstatus der Tickets berechnet.
 "The Sales Order line rate: gross if the prices include tax, else net.","Der Positionspreis im Auftrag: brutto, wenn die Preise Steuer enthalten, sonst netto."
 The total the buyer saw and confirmed.,"Der Gesamtbetrag, den der Käufer gesehen und bestätigt hat."
 Create Sales Order,Auftrag erstellen
@@ -721,7 +716,7 @@ choose the Customer in the order,Kunden in der Bestellung wählen
 Please choose a Customer.,Bitte einen Kunden wählen.
 The buyer of {0} is not linked to a Lead.,Der Käufer von {0} ist mit keinem Lead verknüpft.
 Unknown choice {0}.,Unbekannte Auswahl {0}.
-"Event Ticket Order {0} was ordered with the VAT ID {1}; the Customer keeps {2}.","Ticketbestellung {0} wurde mit der USt-IdNr. {1} bestellt; der Kunde behält {2}."
+Event Ticket Order {0} was ordered with the VAT ID {1}; the Customer keeps {2}.,Ticketbestellung {0} wurde mit der USt-IdNr. {1} bestellt; der Kunde behält {2}.
 Total differs from the confirmed total ({0} vs {1}): check the tax template,Gesamtbetrag weicht vom bestätigten Gesamtbetrag ab ({0} statt {1}): Steuervorlage prüfen
 Total differs,Gesamtbetrag weicht ab
 Attendee,Teilnehmer
@@ -729,17 +724,17 @@ The ticket order from the website this document was created from. Set automatica
 The ticket holder this line is billed for. Set automatically.,"Der Ticketinhaber, für den diese Position berechnet wird. Wird automatisch gesetzt."
 Attendee {0} is already on Sales Order {1},Teilnehmer {0} steht bereits auf Auftrag {1}
 A ticket can only be on one line of the Sales Order.,Ein Ticket kann nur auf einer Position des Auftrags stehen.
-"Order Reference (legacy)","Bestellreferenz (Altbestand)"
-"The order this ticket belongs to. Set for all orders since phamos/phamos#1717.","Die Bestellung, zu der dieses Ticket gehört. Gesetzt für alle Bestellungen seit phamos/phamos#1717."
+Order Reference (legacy),Bestellreferenz (Altbestand)
+The order this ticket belongs to. Set for all orders since phamos/phamos#1717.,"Die Bestellung, zu der dieses Ticket gehört. Gesetzt für alle Bestellungen seit phamos/phamos#1717."
 "Only for registrations before phamos/phamos#1717, which have no Event Ticket Order: groups the attendees of one old order (its Sales Order, a booking number or an import id).","Nur für Anmeldungen vor phamos/phamos#1717, die keine Ticketbestellung haben: fasst die Teilnehmer einer alten Bestellung zusammen (ihr Auftrag, eine Buchungsnummer oder eine Import-ID)."
 Website orders cannot be changed.,Website-Bestellungen können nicht geändert werden.
 Event Ticket Order {0} has a Sales Order and can no longer be changed.,Ticketbestellung {0} hat einen Auftrag und kann nicht mehr geändert werden.
 The event of an order with tickets cannot be changed.,Die Veranstaltung einer Bestellung mit Tickets kann nicht geändert werden.
 "Website: ordered on the website, read-only. Desk: created by hand in the desk (phamos/phamos#1730).","Website: auf der Website bestellt, schreibgeschützt. Desk: von Hand im Desk angelegt (phamos/phamos#1730)."
 "The price row of the event. On desk orders it fills the rate, which can still be changed.","Die Preiszeile der Veranstaltung. Bei Desk-Bestellungen füllt sie den Preis, der noch geändert werden kann."
-"The tickets of the order that are not cancelled (desk orders: kept up to date until the Sales Order).","Die nicht stornierten Tickets der Bestellung (Desk-Bestellungen: bis zum Auftrag aktuell gehalten)."
-"The total the buyer saw and confirmed; on desk orders computed from the price and the tickets.","Der Gesamtbetrag, den der Käufer gesehen und bestätigt hat; bei Desk-Bestellungen aus Preis und Tickets berechnet."
-"Desk orders: the first save also creates the buyer's own ticket.","Desk-Bestellungen: das erste Speichern legt auch das eigene Ticket des Käufers an."
+The tickets of the order that are not cancelled (desk orders: kept up to date until the Sales Order).,Die nicht stornierten Tickets der Bestellung (Desk-Bestellungen: bis zum Auftrag aktuell gehalten).
+The total the buyer saw and confirmed; on desk orders computed from the price and the tickets.,"Der Gesamtbetrag, den der Käufer gesehen und bestätigt hat; bei Desk-Bestellungen aus Preis und Tickets berechnet."
+Desk orders: the first save also creates the buyer's own ticket.,Desk-Bestellungen: das erste Speichern legt auch das eigene Ticket des Käufers an.
 Event {0} has no ticket price.,Veranstaltung {0} hat keinen Ticketpreis.
 already on Sales Order {0},bereits auf Auftrag {0}
 Implementation Specific,Implementierungsspezifisch

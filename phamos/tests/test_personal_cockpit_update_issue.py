@@ -1,7 +1,11 @@
 # Copyright (c) 2026, phamos.eu and contributors
 # For license information, please see license.txt
 
-"""`i_own_my_work.update_issue`: the autosave endpoint of the I Own My Work inbox (GitLab #1426)."""
+"""`personal_cockpit.update_issue`: Issue autosave in the Personal Cockpit (GitLab #1426, #1456).
+
+The Issues are created by Administrator, so the personal scope admits them through the
+owner fallback; the lock test acts as another user and is admitted as an assignee.
+"""
 
 from unittest.mock import patch
 
@@ -9,7 +13,7 @@ import frappe
 from frappe.tests.utils import FrappeTestCase
 
 from phamos.api import presence
-from phamos.api.i_own_my_work import get_issue, update_issue
+from phamos.api.personal_cockpit import get_issue, update_issue
 from phamos.api.presence import FieldLockedError, acquire_field_lock
 
 
@@ -53,6 +57,7 @@ class TestUpdateIssue(FrappeTestCase):
 		with (
 			patch("frappe.has_permission", return_value=True),
 			patch("frappe.model.document.Document.check_permission"),
+			patch("phamos.api.department_cockpit._is_assigned", return_value=True),
 		):
 			with self.assertRaises(FieldLockedError):
 				update_issue(self.issue.name, description="<p>theirs</p>")

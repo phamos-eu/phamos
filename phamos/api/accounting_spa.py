@@ -11,7 +11,7 @@ from frappe.desk.form.load import get_assignments
 from frappe.utils import flt, get_fullname
 
 from phamos.api import department_cockpit as dc
-from phamos.api.i_own_my_work import _parse_assignees, _parse_list
+from phamos.api.issue_common import _parse_assignees, _parse_list
 
 CONFIG = dc.CockpitConfig(
 	label="Accounting",
