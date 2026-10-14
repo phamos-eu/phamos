@@ -55,14 +55,14 @@ bench --site [your-site] run-tests --app phamos --module phamos.okr_addon.doctyp
 
 Pure helpers shared by all cockpit SPAs (`spa_shared/**/*.test.js`, e.g. the
 autosave core behind Issue/Task/checklist editing) run with Vitest from the
-`frontend/` package:
+`personal_frontend/` package, the only cockpit package with `vitest` installed:
 
 ```bash
 # From the phamos app directory
 yarn test:spa
 
 # or directly
-cd frontend && yarn test
+cd personal_frontend && yarn test
 ```
 
 Keep tested modules free of DOM and Vue imports so they run in Node.
@@ -118,7 +118,7 @@ If you encounter `LinkValidationError` for missing records:
 
 ### CI/CD Tests
 
-The GitHub Actions workflow (`.github/workflows/test.yml`) automatically:
+The GitHub Actions workflow (`.github/workflows/ci.yml`, which calls `foundation.yml`) automatically:
 1. Sets up MariaDB and Redis
 2. Installs Frappe Bench
 3. Installs ERPNext and HRMS

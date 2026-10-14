@@ -1,7 +1,12 @@
 # Copyright (c) 2026, phamos.eu and contributors
 # For license information, please see license.txt
 
-"""Shared department cockpit API — Issues, Tasks, inbox, and timesheet settings."""
+"""Shared cockpit engine — Issues, Tasks, Checklists and timesheet settings.
+
+Every cockpit is a CockpitConfig: department cockpits are scoped to a Department
+from phamos Settings, the Personal Cockpit (scope="personal") to the records
+assigned to the session user through ToDo.
+"""
 
 from dataclasses import dataclass
 from datetime import timedelta
@@ -16,18 +21,17 @@ from frappe.utils import get_datetime, get_fullname, now_datetime
 from frappe.desk.form.assign_to import add as add_assignment
 from frappe.desk.form.assign_to import remove as remove_assignment
 
-from phamos.api.i_own_my_work import (
+from phamos.api.issue_common import (
 	LIST_FIELDS,
 	_parse_assignees,
 	_parse_list,
-	_serialize_issue_row,
 	_status_filters,
 	enrich_issue_rows_for_search,
 )
-from phamos.api.i_own_my_work import create_issue as _create_issue
-from phamos.api.i_own_my_work import get_form_options as _base_form_options
-from phamos.api.i_own_my_work import set_assignees as _set_assignees
-from phamos.api.i_own_my_work import update_status as _update_status
+from phamos.api.issue_common import create_issue as _create_issue
+from phamos.api.issue_common import get_form_options as _base_form_options
+from phamos.api.issue_common import set_assignees as _set_assignees
+from phamos.api.issue_common import update_status as _update_status
 from phamos.api.presence import assert_fields_unlocked
 
 ISSUE_EDITABLE_FIELDS = ("subject", "description", "priority", "issue_type", "project")
@@ -73,16 +77,27 @@ CHECKLIST_LIST_LIMIT = 1000
 # trip; this cap is what stops that from being truly unbounded.
 ISSUE_LIST_LIMIT = 1000
 
+COCKPIT_SCOPES = ("department", "personal")
+
 
 @dataclass(frozen=True)
 class CockpitConfig:
-	"""Per-department cockpit configuration bound to phamos Settings fields."""
+	"""Cockpit configuration: department-scoped (phamos Settings fields) or personal."""
 
 	label: str
 	department_field: str
 	project_field: str
 	roles: tuple
 	settings_method_name: str = ""
+	scope: str = "department"
+
+	def __post_init__(self):
+		if self.scope not in COCKPIT_SCOPES:
+			raise ValueError(f"Unknown cockpit scope: {self.scope}")
+
+	@property
+	def is_personal(self) -> bool:
+		return self.scope == "personal"
 
 	@property
 	def project_name_key(self) -> str:
@@ -101,11 +116,61 @@ def _user_label(user):
 
 
 def _get_department(config: CockpitConfig):
+	if not config.department_field:
+		return None
 	return frappe.db.get_single_value("phamos Settings", config.department_field)
 
 
 def _get_project(config: CockpitConfig):
+	if not config.project_field:
+		return None
 	return frappe.db.get_single_value("phamos Settings", config.project_field)
+
+
+def _personal_reference_names():
+	"""Issue and Task names referenced by the session user's open ToDos (assignments)."""
+	rows = frappe.get_all(
+		"ToDo",
+		filters={
+			"allocated_to": frappe.session.user,
+			"status": "Open",
+			"reference_type": ("in", ("Issue", "Task")),
+		},
+		fields=["reference_type", "reference_name"],
+		limit_page_length=0,
+	)
+	names = {"Issue": [], "Task": []}
+	for row in rows:
+		if row.reference_name and row.reference_name not in names[row.reference_type]:
+			names[row.reference_type].append(row.reference_name)
+	return names
+
+
+def _is_assigned(doctype, name):
+	return bool(
+		frappe.db.exists(
+			"ToDo",
+			{
+				"reference_type": doctype,
+				"reference_name": name,
+				"allocated_to": frappe.session.user,
+				"status": "Open",
+			},
+		)
+	)
+
+
+def _personal_in_scope(doctype, doc):
+	"""Personal detail/write gate: assigned to me, or created by me.
+
+	Lists show assigned records only; the owner fallback keeps create flows and
+	"remove myself" working before or after the assignment ToDo exists.
+	"""
+	return doc.owner == frappe.session.user or _is_assigned(doctype, doc.name)
+
+
+def _project_department(project):
+	return frappe.db.get_value("Project", project, "department") if project else None
 
 
 def _get_project_names(config: CockpitConfig, department=None):
@@ -121,6 +186,10 @@ def _get_project_names(config: CockpitConfig, department=None):
 
 
 def _issue_or_filters(config: CockpitConfig, department=None):
+	if config.is_personal:
+		names = _personal_reference_names()["Issue"]
+		return [["name", "in", names]] if names else []
+
 	department = department or _get_department(config)
 	if not department:
 		return []
@@ -135,6 +204,9 @@ def _issue_or_filters(config: CockpitConfig, department=None):
 
 
 def _issue_in_scope(config: CockpitConfig, doc):
+	if config.is_personal:
+		return _personal_in_scope("Issue", doc)
+
 	department = _get_department(config)
 	if not department:
 		return False
@@ -152,12 +224,16 @@ def _issue_in_scope(config: CockpitConfig, doc):
 
 def _ensure_issue_in_scope(config: CockpitConfig, doc):
 	if not _issue_in_scope(config, doc):
+		if config.is_personal:
+			frappe.throw(_("This issue is not assigned to you."))
 		frappe.throw(
 			_("This issue is not in the {0} department scope.").format(config.label)
 		)
 
 
 def _require_department(config: CockpitConfig):
+	if config.is_personal:
+		return None
 	department = _get_department(config)
 	if not department:
 		frappe.throw(
@@ -168,6 +244,8 @@ def _require_department(config: CockpitConfig):
 
 
 def validate_project(config: CockpitConfig, project):
+	if config.is_personal:
+		return
 	if not project:
 		frappe.throw(_("Project is required for {0} issues.").format(config.label))
 	department = _require_department(config)
@@ -190,6 +268,9 @@ def check_app_permission(config: CockpitConfig, extra_doctypes=()):
 	if user_type == "Website User":
 		return False
 
+	if config.is_personal:
+		return True
+
 	roles = set(frappe.get_roles())
 	if roles & set(config.roles):
 		return True
@@ -210,6 +291,9 @@ def get_settings(config: CockpitConfig, read_permission: Optional[Callable[[], N
 		read_permission()
 	else:
 		frappe.has_permission("Issue", "read", throw=True)
+
+	if config.is_personal:
+		return {}
 
 	department = _get_department(config)
 	project = _get_project(config)
@@ -237,13 +321,16 @@ def get_timesheet_project_tasks(config: CockpitConfig, project=None):
 
 	validate_project(config, project)
 
+	filters = {
+		"project": project,
+		"status": ("not in", ["Cancelled", "Template", "Completed"]),
+	}
+	if department:
+		filters["department"] = department
+
 	return frappe.get_list(
 		"Task",
-		filters={
-			"department": department,
-			"project": project,
-			"status": ("not in", ["Cancelled", "Template", "Completed"]),
-		},
+		filters=filters,
 		fields=["name", "subject"],
 		order_by="modified desc",
 		limit_page_length=200,
@@ -432,8 +519,13 @@ def get_issue(config: CockpitConfig, name):
 
 
 def get_form_options(config: CockpitConfig):
-	"""Form options scoped to the configured department."""
+	"""Form options scoped to the configured department (all open projects when personal)."""
 	frappe.has_permission("Issue", "read", throw=True)
+	if config.is_personal:
+		options = _base_form_options(project_filters={"status": "Open"})
+		options["shortlist_users"] = _role_shortlist_users(config)
+		return options
+
 	department = _require_department(config)
 
 	options = _base_form_options()
@@ -446,9 +538,6 @@ def get_form_options(config: CockpitConfig):
 		options["projects"] = [p for p in options.get("projects", []) if p["name"] in project_names]
 	options[config.department_field] = department
 	options[config.project_field] = _get_project(config)
-	# Cockpits use a role shortlist + search_link; do not ship the full user dump.
-	options.pop("users", None)
-	options.pop("chat", None)
 	options["shortlist_users"] = _role_shortlist_users(config)
 	return options
 
@@ -504,8 +593,19 @@ def create_issue(
 	project=None,
 	department=None,
 ):
-	"""Create a department-scoped Issue."""
+	"""Create a department-scoped Issue (personal: assigned to me unless told otherwise)."""
 	frappe.has_permission("Issue", "create", throw=True)
+	if config.is_personal:
+		return _create_issue(
+			subject=subject,
+			description=description,
+			priority=priority,
+			issue_type=issue_type,
+			assign_to=_parse_list(assign_to) or [frappe.session.user],
+			project=project,
+			department=department,
+		)
+
 	configured_department = _require_department(config)
 
 	if not project:
@@ -603,7 +703,13 @@ def get_tasks(config: CockpitConfig, include_completed=0):
 	department = _require_department(config)
 	include_completed = frappe.utils.cint(include_completed)
 
-	filters = [["department", "=", department]]
+	if config.is_personal:
+		names = _personal_reference_names()["Task"]
+		if not names:
+			return []
+		filters = [["name", "in", names]]
+	else:
+		filters = [["department", "=", department]]
 	if not include_completed:
 		filters.append(["status", "not in", ["Cancelled", "Template", "Completed"]])
 
@@ -624,9 +730,17 @@ def get_task(config: CockpitConfig, name):
 
 	doc = frappe.get_doc("Task", name)
 	doc.check_permission("read")
-	if doc.department != department:
+	if config.is_personal:
+		if not _personal_in_scope("Task", doc):
+			frappe.throw(_("This task is not assigned to you."))
+	elif doc.department != department:
 		frappe.throw(_("This task is not in the {0} department.").format(config.label))
 
+	return _serialize_task_detail(doc)
+
+
+def _serialize_task_detail(doc):
+	"""Build SPA task detail payload from an already-loaded Task doc."""
 	assignees = [a.get("owner") for a in get_assignments("Task", doc.name)]
 	issue_name = doc.issue or None
 
@@ -658,6 +772,10 @@ def get_task(config: CockpitConfig, name):
 
 def _department_checklist_references(config: CockpitConfig, department):
 	"""Return parent Issue and Task names defining this cockpit's Checklist scope."""
+	if config.is_personal:
+		names = _personal_reference_names()
+		return names["Issue"], names["Task"]
+
 	department = _require_department(config)
 
 	issue_names = []
@@ -691,6 +809,17 @@ def _department_checklist_rows(config, fields, filters=None, limit=10000):
 		for row in frappe.get_list(
 			"Checklist",
 			filters={**filters, "document": document, "reference_record": ("in", names)},
+			fields=fields,
+			order_by="modified desc",
+			limit_page_length=limit,
+		):
+			merged[row.name] = row
+
+	if config.is_personal:
+		# Checklists I own count as mine, wherever they are attached.
+		for row in frappe.get_list(
+			"Checklist",
+			filters={**filters, "checklist_owner": frappe.session.user},
 			fields=fields,
 			order_by="modified desc",
 			limit_page_length=limit,
@@ -863,6 +992,8 @@ def create_checklist(
 	issue_names, task_names = _department_checklist_references(config, department)
 	allowed = {"Issue": set(issue_names), "Task": set(task_names)}
 	if document not in allowed or reference_record not in allowed[document]:
+		if config.is_personal:
+			frappe.throw(_("Select one of your Issues or Tasks."))
 		frappe.throw(_("Select an Issue or Task in the {0} department.").format(config.label))
 
 	from phamos.api.checklist_inbox import create_spa_checklist
@@ -947,12 +1078,15 @@ def create_task(
 	if not subject:
 		frappe.throw(_("Subject is required"))
 
-	if not department:
-		department = configured_department
-	if department != configured_department:
-		frappe.throw(
-			_("Task department must match {0} department in phamos Settings.").format(config.label)
-		)
+	if config.is_personal:
+		department = department or _project_department(project)
+	else:
+		if not department:
+			department = configured_department
+		if department != configured_department:
+			frappe.throw(
+				_("Task department must match {0} department in phamos Settings.").format(config.label)
+			)
 
 	if not project:
 		project = _get_project(config)
@@ -977,6 +1111,15 @@ def create_task(
 	if exp_end_date:
 		doc.exp_end_date = exp_end_date
 	doc.insert()
+	if config.is_personal:
+		add_assignment(
+			{
+				"doctype": "Task",
+				"name": doc.name,
+				"assign_to": [frappe.session.user],
+				"description": subject,
+			}
+		)
 	return get_task(config, doc.name)
 
 
@@ -1064,7 +1207,7 @@ def create_task_from_issue(
 		project = _get_project(config)
 
 	# Task.department is stock; Issue may only be in scope via project.
-	department = configured_department
+	department = _project_department(project) if config.is_personal else configured_department
 
 	doc = frappe.get_doc(
 		{
@@ -1185,6 +1328,9 @@ def set_task_assignees(config: CockpitConfig, name, users=None):
 			}
 		)
 
+	if config.is_personal:
+		# The caller may just have removed themself; the entry gate already ran.
+		return _serialize_task_detail(frappe.get_doc("Task", name))
 	return get_task(config, name)
 
 

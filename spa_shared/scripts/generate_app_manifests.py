@@ -71,6 +71,14 @@ APPS = [
 		"color": "#6d28d9",
 		"symbol": "clipboard",
 	},
+	{
+		"slug": "personal",
+		"name": "Personal Cockpit",
+		"description": "Issues, tasks and checklists assigned to me",
+		"route": "/personal-cockpit",
+		"color": "#0e7490",
+		"symbol": "user",
+	},
 ]
 
 RENDER_SIZE = 1024  # symbols are rendered large and scaled down for smooth edges

@@ -94,8 +94,11 @@ const filteredTasks = computed(() => {
 async function loadOptions() {
 	try {
 		formOptions.value = await call(`${API}.get_form_options`)
-		const dept = formOptions.value[spaConfig.departmentField]
-		configError.value = dept ? "" : `Configure ${spaConfig.label} Department in phamos Settings.`
+		// Department cockpits need their department configured; the Personal Cockpit has none.
+		const needsDepartment = Boolean(spaConfig.departmentField)
+		const dept = needsDepartment ? formOptions.value[spaConfig.departmentField] : ""
+		configError.value =
+			needsDepartment && !dept ? `Configure ${spaConfig.label} Department in phamos Settings.` : ""
 	} catch (e) {
 		configError.value = e?.messages?.[0] || e?.message || `Could not load ${spaConfig.label} settings`
 	}

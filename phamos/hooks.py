@@ -11,11 +11,11 @@ required_apps = ["erpnext", "hrms"]
 
 add_to_apps_screen = [
 	{
-		"name": "i_own_my_work",
-		"logo": "/assets/frappe/images/frappe-favicon.svg",
-		"title": "I Own My Work",
-		"route": "/i-own-my-work",
-		"has_permission": "phamos.api.i_own_my_work.check_app_permission",
+		"name": "personal_cockpit",
+		"logo": "/assets/phamos/manifest/personal-icon-192.png",
+		"title": "Personal Cockpit",
+		"route": "/personal-cockpit",
+		"has_permission": "phamos.api.personal_cockpit.check_app_permission",
 	},
 	{
 		"name": "human_resources_spa",
@@ -129,8 +129,8 @@ override_doctype_class = {
 
 website_route_rules = [
     {"from_route": "/schedule_interview/<name>", "to_route": "schedule_interview"},
-    {"from_route": "/i-own-my-work", "to_route": "i_own_my_work"},
-    {"from_route": "/i-own-my-work/<path:app_path>", "to_route": "i_own_my_work"},
+    {"from_route": "/personal-cockpit", "to_route": "personal_cockpit"},
+    {"from_route": "/personal-cockpit/<path:app_path>", "to_route": "personal_cockpit"},
     {"from_route": "/human-resources-cockpit", "to_route": "human_resources_spa"},
     {"from_route": "/human-resources-cockpit/<path:app_path>", "to_route": "human_resources_spa"},
     {"from_route": "/sales-cockpit", "to_route": "sales_spa"},
@@ -169,9 +169,15 @@ for _section, _slugs in _WEB_PROFILE_SLUGS.items():
 # The HR cockpit used to live at /hr-cockpit; keep old links (Raven messages, bookmarks) working.
 # /hr_spa was its www page path; servers keep a stale built hr_spa.html there, which would
 # otherwise render without boot data.
+# I Own My Work (/i-own-my-work) was replaced by the Personal Cockpit (phamos/phamos#1456).
+# Its only deep route was /issue/<name>; Raven messages linked /issues/<name>. The first
+# matching rule wins, so the specific rule comes first. /i_own_my_work was its www page path.
 website_redirects = [
     {"source": r"/hr-cockpit(/.*)?", "target": r"/human-resources-cockpit\1"},
     {"source": "/hr_spa", "target": "/human-resources-cockpit"},
+    {"source": r"/i-own-my-work/issues?/(.+)", "target": r"/personal-cockpit/issues/list/\1"},
+    {"source": r"/i-own-my-work(/.*)?", "target": r"/personal-cockpit\1"},
+    {"source": "/i_own_my_work", "target": "/personal-cockpit"},
 ]
 
 

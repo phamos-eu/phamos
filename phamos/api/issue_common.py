@@ -1,6 +1,13 @@
 # Copyright (c) 2026, phamos.eu and contributors
 # For license information, please see license.txt
 
+"""Issue helpers shared by every cockpit API.
+
+Nothing here is whitelisted: each cockpit exposes scoped wrappers
+(phamos.api.department_cockpit and the per-cockpit modules) that check
+the cockpit's scope before calling these.
+"""
+
 import json
 
 import frappe
@@ -8,7 +15,7 @@ from frappe import _
 from frappe.desk.form.assign_to import add as add_assignment
 from frappe.desk.form.assign_to import remove as remove_assignment
 from frappe.desk.form.load import get_assignments
-from frappe.utils import get_datetime, get_fullname
+from frappe.utils import get_fullname
 
 ACTIVE_STATUSES = ("Open", "Replied", "On Hold", "Resolved")
 ALLOWED_STATUSES = ("Open", "Replied", "On Hold", "Resolved", "Closed")
@@ -28,24 +35,6 @@ LIST_FIELDS = [
 	"description",
 	"_assign",
 ]
-
-
-def check_app_permission():
-	"""Show I Own My Work on the Apps screen for eligible users."""
-	if frappe.session.user in (None, "Guest"):
-		return False
-	if frappe.session.user == "Administrator":
-		return True
-
-	user_type = frappe.get_cached_value("User", frappe.session.user, "user_type")
-	if user_type == "Website User":
-		return False
-
-	roles = set(frappe.get_roles())
-	if roles & {"System Manager", "Ops User", "Support Team"}:
-		return True
-
-	return frappe.has_permission("Issue", ptype="read")
 
 
 def _parse_list(value):
@@ -153,59 +142,13 @@ def enrich_issue_rows_for_search(rows):
 		row["checklist_search"] = search_map.get(row["name"], "")
 	return serialized
 
-
 def _status_filters(include_closed):
 	if include_closed:
 		return []
 	return [["status", "in", list(ACTIVE_STATUSES)]]
 
 
-@frappe.whitelist()
-def get_inbox(view="assigned", include_closed=0):
-	"""Return Issues for the current user: assigned | created."""
-	frappe.has_permission("Issue", "read", throw=True)
 
-	view = (view or "assigned").lower()
-	include_closed = frappe.utils.cint(include_closed)
-	user = frappe.session.user
-	filters = _status_filters(include_closed)
-
-	if view == "created":
-		filters.append(["owner", "=", user])
-		rows = frappe.get_list(
-			"Issue",
-			filters=filters,
-			fields=LIST_FIELDS,
-			order_by="modified desc",
-			limit_page_length=200,
-		)
-	else:
-		todos = frappe.get_all(
-			"ToDo",
-			filters={
-				"reference_type": "Issue",
-				"allocated_to": user,
-				"status": ("not in", ("Cancelled", "Closed")),
-			},
-			fields=["reference_name"],
-			limit_page_length=500,
-		)
-		names = list({t.reference_name for t in todos if t.reference_name})
-		if not names:
-			return []
-		filters.append(["name", "in", names])
-		rows = frappe.get_list(
-			"Issue",
-			filters=filters,
-			fields=LIST_FIELDS,
-			order_by="modified desc",
-			limit_page_length=200,
-		)
-
-	return enrich_issue_rows_for_search(rows)
-
-
-@frappe.whitelist()
 def get_issue(name):
 	"""Return Issue detail + assignees for the SPA."""
 	frappe.has_permission("Issue", "read", throw=True)
@@ -236,28 +179,16 @@ def get_issue(name):
 	}
 
 
-@frappe.whitelist()
-def get_form_options():
-	"""Priorities, issue types, and active users for create/edit forms."""
+def get_form_options(project_filters=None):
+	"""Priorities, issue types, departments and projects for create/edit forms.
+
+	`project_filters` narrows the Project list (the Personal Cockpit passes open
+	projects only); department cockpits narrow it further themselves.
+	"""
 	frappe.has_permission("Issue", "read", throw=True)
 
-	priorities = frappe.get_all(
-		"Issue Priority",
-		fields=["name"],
-		order_by="name asc",
-	)
-	issue_types = frappe.get_all(
-		"Issue Type",
-		fields=["name"],
-		order_by="name asc",
-	)
-	users = frappe.get_all(
-		"User",
-		filters={"enabled": 1, "user_type": "System User", "name": ("!=", "Guest")},
-		fields=["name", "full_name"],
-		order_by="full_name asc",
-		limit_page_length=500,
-	)
+	priorities = frappe.get_all("Issue Priority", fields=["name"], order_by="name asc")
+	issue_types = frappe.get_all("Issue Type", fields=["name"], order_by="name asc")
 	departments = []
 	if frappe.db.exists("DocType", "Department"):
 		departments = frappe.get_all(
@@ -269,6 +200,7 @@ def get_form_options():
 		)
 	projects = frappe.get_all(
 		"Project",
+		filters=project_filters or {},
 		fields=["name", "project_name"],
 		order_by="modified desc",
 		limit_page_length=500,
@@ -276,16 +208,11 @@ def get_form_options():
 	return {
 		"priorities": [p.name for p in priorities],
 		"issue_types": [t.name for t in issue_types],
-		"users": [{"name": u.name, "full_name": u.full_name or u.name} for u in users],
 		"departments": [d.name for d in departments],
-		"projects": [
-			{"name": p.name, "project_name": p.project_name or p.name} for p in projects
-		],
-		"chat": get_chat_settings(),
+		"projects": [{"name": p.name, "project_name": p.project_name or p.name} for p in projects],
 	}
 
 
-@frappe.whitelist()
 def create_issue(
 	subject,
 	description=None,
@@ -336,48 +263,6 @@ def create_issue(
 	return get_issue(doc.name)
 
 
-@frappe.whitelist(methods=["POST"])
-def update_issue(
-	name, subject=None, description=None, priority=None, issue_type=None, project=None, modified=None
-):
-	"""Update editable Issue fields. Only the fields passed are written.
-
-	`modified` is the timestamp the client last saw; when given, Frappe raises
-	TimestampMismatchError if somebody else saved the Issue in the meantime.
-	"""
-	frappe.has_permission("Issue", "write", throw=True)
-	doc = frappe.get_doc("Issue", name)
-	doc.check_permission("write")
-
-	updates = {
-		key: value
-		for key, value in {
-			"subject": subject,
-			"description": description,
-			"priority": priority,
-			"issue_type": issue_type,
-			"project": project,
-		}.items()
-		if value is not None
-	}
-	if "subject" in updates:
-		updates["subject"] = (updates["subject"] or "").strip()
-		if not updates["subject"]:
-			frappe.throw(_("Subject is required"))
-
-	from phamos.api.presence import assert_fields_unlocked
-
-	assert_fields_unlocked("Issue", doc.name, list(updates))
-
-	for key, value in updates.items():
-		doc.set(key, value)
-	if modified:
-		doc.modified = get_datetime(modified)
-	doc.save()
-	return get_issue(doc.name)
-
-
-@frappe.whitelist()
 def update_status(name, status):
 	"""Update Issue status (internal status set)."""
 	frappe.has_permission("Issue", "write", throw=True)
@@ -393,7 +278,6 @@ def update_status(name, status):
 	return get_issue(doc.name)
 
 
-@frappe.whitelist()
 def set_assignees(name, users=None):
 	"""Replace Issue assignees with the given user list."""
 	frappe.has_permission("Issue", "write", throw=True)
@@ -418,49 +302,4 @@ def set_assignees(name, users=None):
 			}
 		)
 
-	# Keep Issue Raven channel members in sync with assignees (soft-dep)
-	try:
-		from phamos.api.issue_raven import sync_issue_channel_members
-
-		sync_issue_channel_members(name)
-	except Exception:
-		frappe.log_error(frappe.get_traceback(), f"Issue Raven member sync failed: {name}")
-
 	return get_issue(name)
-
-
-@frappe.whitelist()
-def get_chat_settings():
-	"""SPA soft-dependency flags for Issue Raven chat."""
-	from phamos.api.issue_raven import get_chat_feature_flags
-
-	return get_chat_feature_flags()
-
-
-# Re-export Raven chat APIs for a stable SPA method prefix
-from phamos.api.issue_raven import (  # noqa: E402, F401
-	ensure_document_channel,
-	ensure_issue_channel,
-	get_chat_messages,
-	get_document_chat,
-	get_issue_chat,
-	get_raven_users_for_invite,
-	get_thread,
-	invite_to_document_channel,
-	invite_to_issue_channel,
-	open_or_create_thread,
-	send_chat_message,
-)
-
-# Checklist APIs used by LinkedChecklistsSection in Issue detail, and by the
-# ChecklistInbox view (get_checklist_inbox) — without this re-export,
-# `phamos.api.i_own_my_work.get_checklist_inbox` (what the frontend calls)
-# doesn't resolve to anything.
-from phamos.api.checklist_inbox import (  # noqa: E402, F401
-	add_spa_checklist_item,
-	create_spa_checklist,
-	get_checklist,
-	get_checklist_inbox,
-	get_checklists_for_reference,
-	update_spa_checklist_item,
-)

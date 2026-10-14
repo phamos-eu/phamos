@@ -46,3 +46,4 @@ phamos.patches.v1_0.backfill_timesheets_detail_to_time #1328
 phamos.patches.v1_0.recompute_gitlab_cycle_time_started_at #123
 phamos.patches.v1_0.rename_hr_and_pm_cockpit_settings_fields
 phamos.patches.v1_0.delete_phamos_team_doctype
+phamos.patches.v1_0.retire_i_own_my_work_default_app
