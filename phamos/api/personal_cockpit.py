@@ -15,6 +15,7 @@ from phamos.api import personal_todo_dashboard
 from phamos.api import personal_todo_matrix
 from phamos.api import personal_focus
 from phamos.api import personal_challenges
+from phamos.api import personal_day_plan
 
 CONFIG = dc.CockpitConfig(
 	label="Personal Cockpit",
@@ -452,3 +453,44 @@ def create_challenge(kind, target_per_day, working_days=10, start_date=None, tit
 @frappe.whitelist(methods=["POST"])
 def end_challenge(name):
 	return personal_challenges.end_challenge(name)
+
+
+# My Day (phamos/phamos#1559) — logic in phamos.api.personal_day_plan.
+
+
+@frappe.whitelist()
+def get_day_plan(date=None):
+	"""My plan for a day (today by default) with candidates, capacity and calibration."""
+	return personal_day_plan.get_day_plan(date=date)
+
+
+@frappe.whitelist()
+def get_day_state():
+	return personal_day_plan.get_day_state()
+
+
+@frappe.whitelist(methods=["POST"])
+def add_to_day(todo, date=None):
+	return personal_day_plan.add_to_day(todo, date=date)
+
+
+@frappe.whitelist(methods=["POST"])
+def remove_from_day(todo, date=None):
+	return personal_day_plan.remove_from_day(todo, date=date)
+
+
+@frappe.whitelist(methods=["POST"])
+def move_in_day(todo, direction, date=None):
+	return personal_day_plan.move_in_day(todo, direction, date=date)
+
+
+@frappe.whitelist(methods=["POST"])
+def start_day(date=None):
+	"""Fix today's plan; ToDos added later count as spontaneous."""
+	return personal_day_plan.start_day(date=date)
+
+
+@frappe.whitelist(methods=["POST"])
+def shutdown_day(decisions=None, reflection=None, date=None):
+	"""Close the day with a decision for every open ToDo on the plan."""
+	return personal_day_plan.shutdown_day(decisions=decisions, reflection=reflection, date=date)
