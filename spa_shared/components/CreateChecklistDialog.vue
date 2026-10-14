@@ -29,7 +29,7 @@
 							v-model="selectedDocument"
 							type="select"
 							size="sm"
-							:options="['Issue', 'Task']"
+							:options="doctypes"
 						/>
 					</div>
 					<div>
@@ -153,6 +153,8 @@ import { computed, nextTick, ref, watch } from "vue"
 import { call, TextEditor } from "frappe-ui"
 import ChecklistTemplatePicker from "@spa/components/ChecklistTemplatePicker.vue"
 import FrappeLink from "@spa/components/FrappeLink.vue"
+import { session } from "@spa/session.js"
+import spaConfig from "@/config"
 import { skipTextEditorToolbarTabStops } from "@spa/utils/textEditorFocus.js"
 
 const props = defineProps({
@@ -162,6 +164,8 @@ const props = defineProps({
 	referenceTitle: { type: String, default: "" },
 	createMethod: { type: String, default: "phamos.api.checklist_inbox.create_spa_checklist" },
 	referenceQuery: { type: String, default: "" },
+	// Reference types offered when the dialog is opened without a fixed record.
+	doctypes: { type: Array, default: () => ["Issue", "Task"] },
 })
 
 const emit = defineEmits(["update:modelValue", "created"])
@@ -218,6 +222,11 @@ function isEmptyHtml(html) {
 	return !text
 }
 
+// In the Personal Cockpit a new checklist is mine unless I pick someone else.
+function defaultOwner() {
+	return spaConfig.personal && session.user ? session.user : ""
+}
+
 function resetForm() {
 	nextId = 1
 	descriptionHosts.clear()
@@ -226,7 +235,7 @@ function resetForm() {
 	selectedDocument.value = props.document || "Issue"
 	selectedReferenceRecord.value = props.referenceRecord || ""
 	title.value = (props.referenceTitle || "").trim()
-	checklistOwner.value = ""
+	checklistOwner.value = defaultOwner()
 	rows.value = [emptyRow()]
 	noteEditorKey.value += 1
 	error.value = ""
@@ -237,7 +246,7 @@ function applyBlankItems() {
 	nextId = 1
 	descriptionHosts.clear()
 	title.value = (props.referenceTitle || "").trim()
-	checklistOwner.value = ""
+	checklistOwner.value = defaultOwner()
 	rows.value = [emptyRow()]
 	noteEditorKey.value += 1
 }
@@ -255,7 +264,7 @@ async function applyTemplate(name) {
 		nextId = 1
 		descriptionHosts.clear()
 		title.value = (template.title || "").trim() || (props.referenceTitle || "").trim()
-		checklistOwner.value = template.checklist_template_owner || ""
+		checklistOwner.value = template.checklist_template_owner || defaultOwner()
 		const items = template.items || []
 		rows.value = items.length
 			? items.map((item) => emptyRow(item))

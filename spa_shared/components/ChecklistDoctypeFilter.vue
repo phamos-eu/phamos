@@ -18,7 +18,7 @@
 			:title="`Show only checklists on a ${doctype}`"
 			@click="toggle(doctype)"
 		>
-			<FeatherIcon :name="doctype === 'Issue' ? 'inbox' : 'check-square'" class="h-3.5 w-3.5" />
+			<FeatherIcon :name="ICONS[doctype] || 'file'" class="h-3.5 w-3.5" />
 			{{ doctype }}
 		</button>
 	</div>
@@ -34,6 +34,8 @@ const props = defineProps({
 })
 
 const emit = defineEmits(["update:modelValue"])
+
+const ICONS = { Issue: "inbox", Task: "check-square", ToDo: "check-circle" }
 
 const selected = computed(() => new Set(props.modelValue || []))
 
