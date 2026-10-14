@@ -60,7 +60,7 @@
 						class="flex flex-col items-start justify-center gap-2 rounded-lg border border-dashed border-outline-gray-3 p-5"
 					>
 						<p class="text-sm text-ink-gray-7">
-							{{ challenges.active.length ? "Add a second target for important ToDos?" : "Want a target? Something like “close 2 a day for 10 days”." }}
+							{{ challenges.active.length ? "Add a second target? Two at most keeps it light." : "Want a target? Something like “close 2 a day for 10 days”." }}
 						</p>
 						<p class="text-xs text-ink-gray-5">Optional and private. Your own history suggests the number.</p>
 						<Button size="sm" @click="showCreateChallenge = true">Set a target</Button>
@@ -92,6 +92,7 @@
 								</button>
 								<FeatherIcon v-if="todo.important" name="star" class="mt-0.5 h-3.5 w-3.5 flex-none text-ink-amber-3" />
 								<span v-if="todo.quick_win" class="flex-none text-xs text-ink-gray-5">quick win</span>
+								<span v-if="dayPlanned" class="flex-none text-xs text-ink-gray-5">{{ todo.planned ? "planned" : "spontaneous" }}</span>
 							</li>
 						</ul>
 						<p v-else class="text-sm text-ink-gray-5">Nothing closed yet today.</p>
@@ -239,15 +240,27 @@ const closureRows = computed(() => {
 		{ label: "…of these, quick wins (under 15 min)", value: c.quick_wins || 0, theme: "gray" },
 		{ label: "Dropped", value: c.dropped || 0, theme: "red" },
 	]
+	if (c.planned) {
+		rows.splice(2, 0, { label: "…planned in My Day", value: c.planned, theme: "green" })
+	}
 	if (c.by_others) rows.push({ label: "Closed or removed by others", value: c.by_others, theme: "gray" })
 	return rows
 })
+
+// Only talk about planned vs spontaneous once the user plans days at all (#1561).
+const dayPlanned = computed(() => Boolean(dayState.value && dayState.value.status !== "None"))
 
 const doneTodayText = computed(() => {
 	const done = data.value?.today.done || []
 	if (!done.length) return data.value?.today.dropped ? `${data.value.today.dropped} dropped so far.` : "A first one sets the tone."
 	const important = done.filter((t) => t.important).length
-	return important ? `${done.length} done, ${important} of them important.` : `${done.length} done.`
+	const parts = [`${done.length} done`]
+	if (dayPlanned.value) {
+		const planned = done.filter((t) => t.planned).length
+		parts.push(`${planned} planned, ${done.length - planned} spontaneous`)
+	}
+	if (important) parts.push(`${important} important`)
+	return `${parts.join(" · ")}.`
 })
 
 function compare(key, kind = "number") {

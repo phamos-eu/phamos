@@ -107,7 +107,7 @@ class TestToDoChallenges(FrappeTestCase):
 		self.assertEqual((data["jokers_allowed"], data["jokers_left"]), (2, 0))
 		self.assertEqual((data["current_streak"], data["best_streak"]), (0, 6))
 		self.assertEqual(data["today"]["closes"], 1)
-		self.assertEqual(data["today"]["repair"]["closes_needed"], 3)
+		self.assertEqual(data["today"]["repair"]["needs"], {"closes": 3})
 		self.assertTrue(data["welcome_back"])
 		self.assertEqual(str(data["end_date"]), "2026-10-16")
 

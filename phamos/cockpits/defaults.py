@@ -54,7 +54,7 @@ BREAK_OUT_MAX_SECONDS = 160
 # is repaired by closing target + shortfall on the next working day. A challenge ends as
 # "Completed" or "Ended", never "Failed". The suggestion is the median closes per working day
 # over BASELINE_WORKING_DAYS × SUGGESTION_STRETCH, between 1 and MAX_TARGET_PER_DAY.
-CHALLENGE_KINDS = ("Closes per day", "Important per day")
+CHALLENGE_KINDS = ("Closes per day", "Important per day", "Planned and spontaneous")
 CHALLENGE_LENGTHS = (5, 10, 20)
 JOKER_EVERY_DAYS = 5
 MAX_JOKERS = 2
@@ -74,3 +74,8 @@ FREEZE_HOUR = 10
 ROLLOVER_DECIDE = 3
 CALIBRATION_DAYS = 90
 CALIBRATION_MIN_SAMPLES = 5
+
+# Planned vs spontaneous (#1561): a closed ToDo is "planned" when it was on that day's plan when
+# the plan was fixed (or on a plan that was never fixed); everything else is "spontaneous".
+# Quick wins count as spontaneous for that challenge kind, at most SPONTANEOUS_MICRO_MAX a day.
+SPONTANEOUS_MICRO_MAX = 2
