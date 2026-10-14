@@ -22,10 +22,12 @@ work items below were agreed on 2026-10-14; the first step (#1540, together with
 
 | Work item | Content | State |
 |---|---|---|
-| #1540 | Scaffold with my Issues, Tasks, Checklists; shared helpers in `issue_common.py`; personal scope in `department_cockpit.py` | implemented on this branch |
-| #1456 | Retire I Own My Work and the cockpit Raven chat; redirects | implemented on this branch |
-| #1541 | ToDo list, detail, create, close | open |
-| #1542 | Today view | open |
+| #1540 | Scaffold with my Issues, Tasks, Checklists; shared helpers in `issue_common.py`; personal scope in `department_cockpit.py` | MR !929 |
+| #1456 | Retire I Own My Work and the cockpit Raven chat; redirects | MR !929 |
+| #1541 | ToDo list, detail, create, close (`phamos/api/personal_todos.py`, `TodosInbox.vue`), list at ToDos → List | MR into develop after !929 |
+| #1553–#1561 | ToDo dashboard, checklists on ToDos, Eisenhower, focus mode, challenges, Mailcow fixes, My Day, calendar placement, planned vs spontaneous | planned, see `docs/personal-cockpit-todo-plan.md` |
+| #1562 | Opt-in pilot and evaluation | planned |
+| #1542 | Cross-type "due today" view (re-scoped) | after the ToDo programme |
 | #1543 | Contacts on ToDos | open |
 | #1544 | Time tracking | open, after #1549 |
 | #1545 | CalDAV ToDo sync not registered | open |
