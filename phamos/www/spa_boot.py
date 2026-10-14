@@ -1,7 +1,7 @@
 # Copyright (c) 2026, phamos.eu and contributors
 # For license information, please see license.txt
 
-"""Shared boot payload helpers for department / I Own My Work SPAs."""
+"""Shared boot payload helpers for the cockpit SPAs."""
 
 import frappe
 from frappe.utils import cint, get_system_timezone

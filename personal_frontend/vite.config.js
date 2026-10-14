@@ -5,7 +5,7 @@ import fs from "fs"
 
 export default defineConfig({
 	server: {
-		port: 8081,
+		port: 8087,
 		proxy: getProxyOptions(),
 		allowedHosts: true,
 	},
@@ -14,15 +14,18 @@ export default defineConfig({
 		alias: {
 			"@": path.resolve(__dirname, "src"),
 			"@spa": path.resolve(__dirname, "../spa_shared"),
+			"frappe-gantt/src/gantt.scss": path.resolve(__dirname, "../spa_shared/lib/empty.scss"),
+			// Resolve shared deps from this SPA's node_modules (spa_shared is outside root)
 			vue: path.resolve(__dirname, "node_modules/vue"),
 			"frappe-ui": path.resolve(__dirname, "node_modules/frappe-ui"),
+			"frappe-gantt": path.resolve(__dirname, "node_modules/frappe-gantt"),
 			"vue-router": path.resolve(__dirname, "node_modules/vue-router"),
 			dayjs: path.resolve(__dirname, "node_modules/dayjs"),
 		},
-		dedupe: ["dayjs", "vue", "vue-router", "frappe-ui"],
+		dedupe: ["dayjs", "vue", "vue-router", "frappe-ui", "frappe-gantt"],
 	},
 	build: {
-		outDir: "../phamos/public/frontend",
+		outDir: "../phamos/public/personal",
 		emptyOutDir: true,
 		target: "es2015",
 		sourcemap: true,
@@ -35,7 +38,7 @@ export default defineConfig({
 		},
 	},
 	optimizeDeps: {
-		include: ["frappe-ui > feather-icons", "tailwind.config.js"],
+		include: ["frappe-ui > feather-icons", "tailwind.config.js", "frappe-gantt"],
 	},
 })
 

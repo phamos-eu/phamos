@@ -185,7 +185,7 @@
 					:class="[compact ? 'col-span-4' : 'col-span-7', 'flex min-h-72 flex-col items-center justify-center gap-2 text-center']"
 				>
 					<p class="font-medium text-ink-gray-9">No checklists found</p>
-					<p class="text-sm text-ink-gray-5">Clear filters or create a checklist for an HR Issue or Task.</p>
+					<p class="text-sm text-ink-gray-5">Clear filters or create a checklist for an Issue or Task in {{ spaConfig.label }}.</p>
 					<Button class="mt-2" @click="showCreate = true">Create a checklist</Button>
 				</div>
 			</div>
