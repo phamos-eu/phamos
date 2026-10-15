@@ -11,6 +11,7 @@ import frappe
 
 from phamos.api import department_cockpit as dc
 from phamos.api import personal_todos
+from phamos.api import personal_todo_dashboard
 
 CONFIG = dc.CockpitConfig(
 	label="Personal Cockpit",
@@ -315,10 +316,18 @@ def create_todo(description, date=None, priority=None, reference_type=None, refe
 
 
 @frappe.whitelist(methods=["POST"])
-def update_todo(name, description=None, date=None, priority=None, modified=None):
-	"""Update description, due date or priority of one of my ToDos."""
+def update_todo(
+	name, description=None, date=None, priority=None, modified=None, important=None, estimate_minutes=None
+):
+	"""Update description, due date, priority, importance or estimate of one of my ToDos."""
 	return personal_todos.update_todo(
-		name, description=description, date=date, priority=priority, modified=modified
+		name,
+		description=description,
+		date=date,
+		priority=priority,
+		modified=modified,
+		important=important,
+		estimate_minutes=estimate_minutes,
 	)
 
 
@@ -332,3 +341,18 @@ def close_todo(name):
 def reopen_todo(name):
 	"""Reopen one of my closed ToDos."""
 	return personal_todos.set_status(name, "Open")
+
+
+# ToDo dashboard and decisions (phamos/phamos#1553).
+
+
+@frappe.whitelist()
+def get_todo_dashboard(period=30):
+	"""Open vs closed ratio, backlog flow, lead time, age and stale ToDos for the session user."""
+	return personal_todo_dashboard.get_todo_dashboard(period=period)
+
+
+@frappe.whitelist(methods=["POST"])
+def decide_todo(name, action, date=None, reason=None):
+	"""Decide on one of my ToDos: today, later this week, a chosen date, or drop (with a reason)."""
+	return personal_todos.decide_todo(name, action, date=date, reason=reason)

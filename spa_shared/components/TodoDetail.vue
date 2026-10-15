@@ -85,6 +85,29 @@
 					:disabled="readonly"
 				/>
 			</div>
+			<div class="grid grid-cols-2 gap-3">
+				<FormControl
+					v-model="draft.estimate"
+					label="Estimate"
+					type="select"
+					size="sm"
+					:options="ESTIMATE_OPTIONS"
+					:disabled="readonly"
+				/>
+				<div class="flex items-end pb-1.5">
+					<Switch v-model="draft.important" label="Important to me" :disabled="readonly" />
+				</div>
+			</div>
+			<div
+				v-if="todo.resume_note"
+				class="rounded-md border border-outline-gray-2 px-3 py-2 text-sm text-ink-gray-8"
+			>
+				<div class="text-xs text-ink-gray-5">Where to pick up</div>
+				<div class="mt-0.5 whitespace-pre-line">{{ todo.resume_note }}</div>
+			</div>
+			<p v-if="todo.reschedule_count" class="text-xs text-ink-gray-5">
+				Postponed {{ todo.reschedule_count }}×<template v-if="todo.first_due_date && todo.first_due_date !== todo.date">, first due {{ formatDate(todo.first_due_date) }}</template>.
+			</p>
 			<p v-if="todo.overdue && draft.date === todo.date" class="text-xs text-ink-gray-5">
 				This ToDo is overdue. A new due date must be today or later.
 			</p>
@@ -107,8 +130,8 @@
 
 <script setup>
 import { computed, reactive, ref, watch } from "vue"
-import { Badge, call, TextEditor, toast } from "frappe-ui"
-import { formatDatetime, todayIsoInUserTz } from "@spa/utils/datetime.js"
+import { Badge, call, Switch, TextEditor, toast } from "frappe-ui"
+import { formatDate, formatDatetime, todayIsoInUserTz } from "@spa/utils/datetime.js"
 import { isEmptyHtml, normalizeHtml } from "@spa/utils/autosaveCore.js"
 import { TODO_PRIORITIES } from "@spa/utils/todoSort.js"
 import { session } from "@spa/session.js"
@@ -124,7 +147,15 @@ const API = spaConfig.api
 const currentUser = session.user
 const editorMenu = [["Paragraph", "Heading 2", "Heading 3"], ["Bold", "Italic"], ["Bullet List", "Numbered List"]]
 
-const draft = reactive({ description: "", date: "", priority: "Medium" })
+const ESTIMATE_OPTIONS = [
+	{ label: "No estimate", value: "" },
+	...[15, 30, 45, 60, 90, 120, 180, 240].map((minutes) => ({
+		label: minutes < 60 ? `${minutes} min` : `${minutes / 60} h`,
+		value: String(minutes),
+	})),
+]
+
+const draft = reactive({ description: "", date: "", priority: "Medium", estimate: "", important: false })
 const saving = ref(false)
 const toggling = ref(false)
 const error = ref("")
@@ -136,13 +167,17 @@ const dirty = computed(
 	() =>
 		normalizeHtml(draft.description) !== normalizeHtml(props.todo.description) ||
 		(draft.date || "") !== (props.todo.date || "") ||
-		draft.priority !== props.todo.priority
+		draft.priority !== props.todo.priority ||
+		draft.estimate !== String(props.todo.estimate_minutes || "") ||
+		draft.important !== Boolean(props.todo.important)
 )
 
 function reset() {
 	draft.description = props.todo.description || ""
 	draft.date = props.todo.date || ""
 	draft.priority = props.todo.priority || "Medium"
+	draft.estimate = String(props.todo.estimate_minutes || "")
+	draft.important = Boolean(props.todo.important)
 	error.value = ""
 }
 
@@ -165,6 +200,8 @@ async function save() {
 			description: draft.description,
 			date: draft.date || "",
 			priority: draft.priority,
+			important: draft.important ? 1 : 0,
+			estimate_minutes: draft.estimate ? Number(draft.estimate) : 0,
 			modified: props.todo.modified,
 		})
 		emit("updated", updated)
