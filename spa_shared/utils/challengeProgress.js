@@ -22,14 +22,21 @@ export function todayText(challenge, formatDate = (d) => d) {
 	if (challenge.not_started) return `Starts ${formatDate(challenge.start_date)}.`
 	const today = challenge.today || {}
 	if (!today.in_schedule) return "Day off today. It does not count either way."
-	if (today.remaining <= 0) return "Today counts. Nice work."
+	if (today.met ?? today.remaining <= 0) return "Today counts. Nice work."
+	if (challenge.split) {
+		return `Today: ${today.planned} of ${challenge.target_planned} planned, ${today.spontaneous} of ${challenge.target_spontaneous} spontaneous.`
+	}
 	return `Today: ${today.closes} of ${today.target} closed, ${today.remaining} to go.`
 }
 
 export function repairText(challenge) {
 	const repair = challenge.today?.repair
-	if (!repair || challenge.today.closes >= repair.closes_needed) return ""
-	return `Close ${repair.closes_needed} today and the day before counts too.`
+	if (!repair || repair.reached) return ""
+	const needs = repair.needs || {}
+	if (challenge.split) {
+		return `Close ${needs.planned} planned and ${needs.spontaneous} spontaneous today and the day before counts too.`
+	}
+	return `Close ${needs.closes} today and the day before counts too.`
 }
 
 export function welcomeText(challenge) {
@@ -68,6 +75,10 @@ export function isCounted(result) {
 
 export function suggestionText(suggestion) {
 	if (!suggestion) return ""
+	if (suggestion.kind === "Planned and spontaneous") {
+		if (!suggestion.baseline_per_day) return "Plan your day in My Day first; then planned closes start to count."
+		return `You close about ${suggestion.baseline_planned} planned and ${suggestion.baseline_spontaneous} spontaneous a day.`
+	}
 	const base = suggestion.baseline_per_day
 	if (!base) return "On most working days you closed none so far. Start small: one a day is a real habit."
 	return `You close about ${base} a day. ${suggestion.suggested} is a good stretch.`

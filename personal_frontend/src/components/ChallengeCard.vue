@@ -42,7 +42,7 @@
 				:key="day.date"
 				class="h-3.5 w-3.5 rounded-sm"
 				:style="dayStyle(day)"
-				:title="`${formatDate(day.date)}: ${dayState(day.result).label}${day.closes != null ? ` (${day.closes} closed)` : ''}`"
+				:title="dayTitle(day)"
 			/>
 		</ol>
 	</section>
@@ -84,8 +84,16 @@ const TONES = {
 	upcoming: "background: var(--surface-gray-3)",
 }
 
+function dayTitle(day) {
+	let detail = ""
+	if (day.closes != null) {
+		detail = props.challenge.split ? ` (${day.planned} planned, ${day.spontaneous} spontaneous)` : ` (${day.closes} closed)`
+	}
+	return `${formatDate(day.date)}: ${dayState(day.result).label}${detail}`
+}
+
 function dayStyle(day) {
-	if (day.result === "Today" && day.closes >= day.target) return `${TONES.met}; box-shadow: inset 0 0 0 2px var(--ink-gray-7)`
+	if (day.result === "Today" && (day.met ?? day.closes >= day.target)) return `${TONES.met}; box-shadow: inset 0 0 0 2px var(--ink-gray-7)`
 	return TONES[dayState(day.result).tone]
 }
 </script>

@@ -200,6 +200,29 @@ def get_day_plan(date=None):
 	}
 
 
+def planned_pairs(user, start, end):
+	"""{(date, todo)} of ToDos that were planned on their day (#1561).
+
+	An item is planned when it was on the plan at the moment the plan was fixed (start of the
+	day or FREEZE_HOUR). On a plan that was never fixed every item counts as planned.
+	"""
+	rows = frappe.db.sql(
+		"""
+		select p.`date`, i.`todo`
+		from `tabDay Plan` p
+		join `tabDay Plan Item` i on i.`parent` = p.`name` and i.`parenttype` = 'Day Plan'
+		where p.`user` = %(user)s
+			and p.`date` between %(start)s and %(end)s
+			and (
+				coalesce(p.`frozen_at`, p.`confirmed_at`) is null
+				or i.`added_at` <= coalesce(p.`frozen_at`, p.`confirmed_at`)
+			)
+		""",
+		{"user": user, "start": getdate(start), "end": getdate(end)},
+	)
+	return {(getdate(day), todo) for day, todo in rows}
+
+
 def get_day_state():
 	"""Small summary for the dashboard's call to action."""
 	name = _plan_name(today())

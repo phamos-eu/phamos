@@ -444,9 +444,17 @@ def suggest_challenge(kind="Closes per day"):
 
 
 @frappe.whitelist(methods=["POST"])
-def create_challenge(kind, target_per_day, working_days=10, start_date=None, title=None):
+def create_challenge(
+	kind, target_per_day=None, working_days=10, start_date=None, title=None, target_planned=None, target_spontaneous=None
+):
 	return personal_challenges.create_challenge(
-		kind, target_per_day, working_days=working_days, start_date=start_date, title=title
+		kind,
+		target_per_day,
+		working_days=working_days,
+		start_date=start_date,
+		title=title,
+		target_planned=target_planned,
+		target_spontaneous=target_spontaneous,
 	)
 
 

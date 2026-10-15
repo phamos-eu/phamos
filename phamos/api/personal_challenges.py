@@ -29,6 +29,7 @@ from phamos.cockpits.defaults import (
 	MAX_JOKERS,
 	MAX_TARGET_PER_DAY,
 	MICRO_MINUTES,
+	SPONTANEOUS_MICRO_MAX,
 	SUGGESTION_MAX,
 	SUGGESTION_STRETCH,
 )
@@ -36,6 +37,7 @@ from phamos.cockpits.workdays import MAX_SEARCH_DAYS, days_off, is_working_day
 
 DOCTYPE = "ToDo Challenge"
 COUNTED = ("Met", "Joker", "Repaired")
+SPLIT = "Planned and spontaneous"
 
 
 # working days and closes
@@ -97,6 +99,82 @@ def closes_by_day(user, start, end, kind=CHALLENGE_KINDS[0]):
 	return {getdate(row.day): cint(row.closes) for row in rows}
 
 
+def split_by_day(user, start, end):
+	"""{date: {"planned": p, "spontaneous": s}} of the user's closes (#1561).
+
+	Planned: on that day's plan when it was fixed. Spontaneous: the rest; quick wins (created and
+	closed within MICRO_MINUTES) count as spontaneous too, but at most SPONTANEOUS_MICRO_MAX a day.
+	"""
+	from phamos.api.personal_day_plan import planned_pairs
+
+	if not frappe.get_meta("ToDo").has_field("cockpit_closed_on"):
+		return {}
+	rows = frappe.db.sql(
+		"""
+		select `name`, date(`cockpit_closed_on`) as day,
+			timestampdiff(minute, `creation`, `cockpit_closed_on`) < %(micro)s as quick
+		from `tabToDo`
+		where `allocated_to` = %(user)s
+			and `cockpit_closed_by` = %(user)s
+			and `status` = 'Closed'
+			and `cockpit_closed_on` >= %(start)s
+			and `cockpit_closed_on` < %(end)s
+		""",
+		{"user": user, "start": getdate(start), "end": add_days(getdate(end), 1), "micro": MICRO_MINUTES},
+		as_dict=True,
+	)
+	planned = planned_pairs(user, start, end)
+	days = {}
+	quick_used = {}
+	for row in rows:
+		day = getdate(row.day)
+		counts = days.setdefault(day, {"planned": 0, "spontaneous": 0})
+		if (day, row.name) in planned:
+			counts["planned"] += 1
+		elif row.quick:
+			if quick_used.get(day, 0) < SPONTANEOUS_MICRO_MAX:
+				quick_used[day] = quick_used.get(day, 0) + 1
+				counts["spontaneous"] += 1
+		else:
+			counts["spontaneous"] += 1
+	return days
+
+
+def day_counts(doc, start, end):
+	"""{date: {"closes", "planned", "spontaneous"}} as the challenge counts them."""
+	if doc.kind == SPLIT:
+		return {
+			day: {"closes": c["planned"] + c["spontaneous"], **c}
+			for day, c in split_by_day(doc.user, start, end).items()
+		}
+	return {day: {"closes": n, "planned": 0, "spontaneous": 0} for day, n in closes_by_day(doc.user, start, end, doc.kind).items()}
+
+
+EMPTY = {"closes": 0, "planned": 0, "spontaneous": 0}
+
+
+def is_met(doc, counts):
+	if doc.kind == SPLIT:
+		return counts["planned"] >= cint(doc.target_planned) and counts["spontaneous"] >= cint(doc.target_spontaneous)
+	return counts["closes"] >= cint(doc.target_per_day)
+
+
+def repair_needs(doc, row):
+	"""What the next working day must reach to repair a missed day."""
+	if doc.kind == SPLIT:
+		tp, ts = cint(doc.target_planned), cint(doc.target_spontaneous)
+		return {
+			"planned": tp + max(tp - cint(row.planned_closes), 0),
+			"spontaneous": ts + max(ts - cint(row.spontaneous_closes), 0),
+		}
+	target = cint(doc.target_per_day)
+	return {"closes": target + max(target - cint(row.closes), 0)}
+
+
+def reaches(counts, needs):
+	return all(counts.get(key, 0) >= value for key, value in needs.items())
+
+
 def jokers_for(working_days):
 	return min(MAX_JOKERS, max(1, cint(working_days) // JOKER_EVERY_DAYS))
 
@@ -112,31 +190,41 @@ def evaluate(doc, on=None):
 	schedule = working_days_from(doc.start_date, cint(doc.working_days), doc.user)
 	if not schedule:
 		return False
-	closes = closes_by_day(doc.user, schedule[0], min(schedule[-1], on), doc.kind)
+	counts = day_counts(doc, schedule[0], min(schedule[-1], on))
 	target = cint(doc.target_per_day)
 	rows = {getdate(row.date): row for row in doc.days}
 	jokers_used = sum(1 for row in doc.days if row.result == "Joker")
 	changed = False
 
+	def day_row(day, result):
+		c = counts.get(day, EMPTY)
+		return {
+			"date": day,
+			"closes": c["closes"],
+			"planned_closes": c["planned"],
+			"spontaneous_closes": c["spontaneous"],
+			"target": target,
+			"result": result,
+		}
+
 	for day in schedule:
 		if day >= on or day in rows:
 			continue
-		count = closes.get(day, 0)
-		if count >= target:
+		if is_met(doc, counts.get(day, EMPTY)):
 			result = "Met"
 		elif jokers_used < cint(doc.jokers_allowed):
 			result, jokers_used = "Joker", jokers_used + 1
 		else:
 			result = "Missed"
-		rows[day] = doc.append("days", {"date": day, "closes": count, "target": target, "result": result})
+		rows[day] = doc.append("days", day_row(day, result))
 		changed = True
 
-	# A missed day is repaired by closing target + shortfall on the next working day, once that day is over.
+	# A missed day is repaired when the next working day also makes up the shortfall, once that day is over.
 	for index, day in enumerate(schedule[:-1]):
 		row = rows.get(day)
 		following = schedule[index + 1]
 		if row and row.result == "Missed" and following < on:
-			if closes.get(following, 0) >= target + (target - cint(row.closes)):
+			if reaches(counts.get(following, EMPTY), repair_needs(doc, row)):
 				row.result = "Repaired"
 				changed = True
 
@@ -146,8 +234,8 @@ def evaluate(doc, on=None):
 		doc.status = "Ended" if missed else "Completed"
 		doc.ended_on = last
 		changed = True
-	elif last == on and not missed and closes.get(on, 0) >= target and all(d in rows for d in schedule[:-1]):
-		doc.append("days", {"date": on, "closes": closes.get(on, 0), "target": target, "result": "Met"})
+	elif last == on and not missed and is_met(doc, counts.get(on, EMPTY)) and all(d in rows for d in schedule[:-1]):
+		doc.append("days", day_row(on, "Met"))
 		doc.status = "Completed"
 		doc.ended_on = on
 		changed = True
@@ -175,22 +263,32 @@ def serialize(doc, on=None):
 	schedule = working_days_from(doc.start_date, cint(doc.working_days), doc.user)
 	target = cint(doc.target_per_day)
 	rows = {getdate(row.date): row for row in doc.days}
-	live = closes_by_day(doc.user, on, on, doc.kind).get(on, 0) if doc.status == "Active" else 0
+	live = day_counts(doc, on, on).get(on, EMPTY) if doc.status == "Active" else EMPTY
 	in_schedule_today = on in schedule and on not in rows
+	met_today = in_schedule_today and is_met(doc, live)
 
 	days = []
 	for day in schedule:
 		row = rows.get(day)
 		if row:
-			days.append({"date": day, "closes": cint(row.closes), "target": target, "result": row.result})
+			days.append(
+				{
+					"date": day,
+					"closes": cint(row.closes),
+					"planned": cint(row.planned_closes),
+					"spontaneous": cint(row.spontaneous_closes),
+					"target": target,
+					"result": row.result,
+				}
+			)
 		elif day == on and doc.status == "Active":
-			days.append({"date": day, "closes": live, "target": target, "result": "Today"})
+			days.append({"date": day, "closes": live["closes"], "planned": live["planned"], "spontaneous": live["spontaneous"], "target": target, "result": "Today", "met": met_today})
 		else:
 			days.append({"date": day, "closes": None, "target": target, "result": "Upcoming"})
 
 	settled = [d["result"] for d in days if d["result"] in COUNTED or d["result"] == "Missed"]
-	current, best = _streaks(settled + (["Met"] if in_schedule_today and live >= target else []))
-	counted = sum(1 for d in days if d["result"] in COUNTED) + (1 if in_schedule_today and live >= target else 0)
+	current, best = _streaks(settled + (["Met"] if met_today else []))
+	counted = sum(1 for d in days if d["result"] in COUNTED) + (1 if met_today else 0)
 	jokers_used = sum(1 for d in days if d["result"] == "Joker")
 
 	repair = None
@@ -198,15 +296,25 @@ def serialize(doc, on=None):
 		index = schedule.index(on)
 		previous = rows.get(schedule[index - 1]) if index else None
 		if previous and previous.result == "Missed":
-			repair = {"date": previous.date, "closes_needed": target + (target - cint(previous.closes))}
+			needs = repair_needs(doc, previous)
+			repair = {"date": previous.date, "needs": needs, "reached": reaches(live, needs)}
 
+	split = doc.kind == SPLIT
+	remaining = (
+		max(cint(doc.target_planned) - live["planned"], 0) + max(cint(doc.target_spontaneous) - live["spontaneous"], 0)
+		if split
+		else max(target - live["closes"], 0)
+	)
 	last_settled = settled[-1] if settled else None
 	return {
 		"name": doc.name,
 		"title": doc.title,
 		"kind": doc.kind,
+		"split": split,
 		"status": doc.status,
 		"target_per_day": target,
+		"target_planned": cint(doc.target_planned),
+		"target_spontaneous": cint(doc.target_spontaneous),
 		"start_date": getdate(doc.start_date),
 		"end_date": getdate(doc.end_date),
 		"ended_on": doc.ended_on,
@@ -219,9 +327,12 @@ def serialize(doc, on=None):
 		"best_streak": best,
 		"today": {
 			"in_schedule": in_schedule_today,
-			"closes": live,
+			"closes": live["closes"],
+			"planned": live["planned"],
+			"spontaneous": live["spontaneous"],
 			"target": target,
-			"remaining": max(target - live, 0),
+			"remaining": remaining,
+			"met": met_today,
 			"repair": repair,
 		},
 		"welcome_back": last_settled in ("Missed", "Joker") and in_schedule_today,
@@ -267,22 +378,34 @@ def next_monday(on=None):
 	return on + timedelta(days=(7 - on.weekday()) % 7 or 7)
 
 
+def _stretch(baseline):
+	return min(max(round(baseline * SUGGESTION_STRETCH), 1), SUGGESTION_MAX)
+
+
 def suggest_challenge(kind=CHALLENGE_KINDS[0]):
-	"""A target from my own history: median closes per working day × 1.2, between 1 and 5."""
+	"""A target from my own history: median per working day × 1.2, between 1 and 5."""
 	if kind not in CHALLENGE_KINDS:
 		frappe.throw(_("Unknown kind: {0}").format(kind))
 	user = frappe.session.user
 	on = getdate(today())
 	window = working_days_before(on, BASELINE_WORKING_DAYS, user)
-	baseline = 0.0
-	if window:
+	baseline = planned = spontaneous = 0.0
+	if window and kind == SPLIT:
+		split = split_by_day(user, window[0], window[-1])
+		planned = float(statistics.median(split.get(day, {}).get("planned", 0) for day in window))
+		spontaneous = float(statistics.median(split.get(day, {}).get("spontaneous", 0) for day in window))
+		baseline = planned + spontaneous
+	elif window:
 		closes = closes_by_day(user, window[0], window[-1], kind)
 		baseline = float(statistics.median(closes.get(day, 0) for day in window))
-	suggested = min(max(round(baseline * SUGGESTION_STRETCH), 1), SUGGESTION_MAX)
 	return {
 		"kind": kind,
 		"baseline_per_day": round(baseline, 1),
-		"suggested": suggested,
+		"suggested": _stretch(baseline),
+		"baseline_planned": round(planned, 1),
+		"baseline_spontaneous": round(spontaneous, 1),
+		"suggested_planned": _stretch(planned),
+		"suggested_spontaneous": _stretch(spontaneous),
 		"today": on,
 		"today_is_working_day": is_working_day(on, days_off(user, on, on)),
 		"next_monday": next_monday(on),
@@ -292,16 +415,27 @@ def suggest_challenge(kind=CHALLENGE_KINDS[0]):
 	}
 
 
-def default_title(kind, target, working_days):
+def default_title(kind, target, working_days, planned=0, spontaneous=0):
+	if kind == SPLIT:
+		return _("{0} planned + {1} spontaneous a day for {2} working days").format(planned, spontaneous, working_days)
 	if kind == "Important per day":
 		return _("{0} important a day for {1} working days").format(target, working_days)
 	return _("Close {0} a day for {1} working days").format(target, working_days)
 
 
-def create_challenge(kind, target_per_day, working_days=10, start_date=None, title=None):
+def create_challenge(
+	kind, target_per_day=None, working_days=10, start_date=None, title=None, target_planned=None, target_spontaneous=None
+):
 	if kind not in CHALLENGE_KINDS:
 		frappe.throw(_("Unknown kind: {0}").format(kind))
-	target = cint(target_per_day)
+	planned = spontaneous = 0
+	if kind == SPLIT:
+		planned, spontaneous = cint(target_planned), cint(target_spontaneous)
+		if planned < 0 or spontaneous < 0 or planned + spontaneous < 1:
+			frappe.throw(_("Pick at least one planned or spontaneous ToDo a day."))
+		target = planned + spontaneous
+	else:
+		target = cint(target_per_day)
 	if target < 1 or target > MAX_TARGET_PER_DAY:
 		frappe.throw(_("Pick a target between 1 and {0} a day.").format(MAX_TARGET_PER_DAY))
 	working_days = cint(working_days)
@@ -322,9 +456,11 @@ def create_challenge(kind, target_per_day, working_days=10, start_date=None, tit
 		{
 			"doctype": DOCTYPE,
 			"user": user,
-			"title": (title or "").strip()[:140] or default_title(kind, target, working_days),
+			"title": (title or "").strip()[:140] or default_title(kind, target, working_days, planned, spontaneous),
 			"kind": kind,
 			"target_per_day": target,
+			"target_planned": planned,
+			"target_spontaneous": spontaneous,
 			"status": "Active",
 			"start_date": schedule[0],
 			"working_days": working_days,

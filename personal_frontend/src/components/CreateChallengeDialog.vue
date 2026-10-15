@@ -10,7 +10,17 @@
 					Private to you. Weekends, holidays and leave do not count. Jokers cover a day that slips.
 				</p>
 				<FormControl v-model="kind" type="select" size="sm" label="What counts" :options="KIND_OPTIONS" />
-				<div>
+				<div v-if="kind === 'Planned and spontaneous'">
+					<div class="grid grid-cols-2 gap-3">
+						<FormControl v-model="targetPlanned" type="number" size="sm" label="Planned a day" :min="0" :max="10" />
+						<FormControl v-model="targetSpontaneous" type="number" size="sm" label="Spontaneous a day" :min="0" :max="10" />
+					</div>
+					<p class="mt-1 text-xs text-ink-gray-5">
+						Planned: on your My Day plan when you start the day. Spontaneous: everything else you close.
+					</p>
+					<p class="mt-1 text-xs text-ink-gray-5">{{ suggestionLine }}</p>
+				</div>
+				<div v-else>
 					<FormControl
 						v-model="target"
 						type="number"
@@ -31,7 +41,11 @@
 					<p class="mt-1 text-xs text-ink-gray-5">A Monday is a good fresh start.</p>
 				</div>
 				<p class="text-xs text-ink-gray-5">
-					Quick wins closed within 15 minutes of creating them and dropped ToDos do not count.
+					{{
+						kind === "Planned and spontaneous"
+							? "Quick wins (closed within 15 minutes of creating them) count as spontaneous, at most two a day. Dropped ToDos do not count."
+							: "Quick wins closed within 15 minutes of creating them and dropped ToDos do not count."
+					}}
 				</p>
 				<ErrorMessage :message="error" />
 				<div class="flex justify-end gap-2">
@@ -57,6 +71,7 @@ const API = spaConfig.api
 const KIND_OPTIONS = [
 	{ label: "Closed ToDos", value: "Closes per day" },
 	{ label: "Closed important ToDos", value: "Important per day" },
+	{ label: "Planned and spontaneous closes", value: "Planned and spontaneous" },
 ]
 const LENGTH_BUTTONS = [
 	{ label: "5 days", value: "5" },
@@ -66,13 +81,22 @@ const LENGTH_BUTTONS = [
 
 const kind = ref("Closes per day")
 const target = ref(2)
+const targetPlanned = ref(2)
+const targetSpontaneous = ref(1)
 const length = ref("10")
 const start = ref("monday")
 const suggestion = ref(null)
 const error = ref("")
 const saving = ref(false)
 
-const validTarget = computed(() => Number(target.value) >= 1 && Number(target.value) <= (suggestion.value?.max_target || 10))
+const validTarget = computed(() => {
+	const max = suggestion.value?.max_target || 10
+	if (kind.value === "Planned and spontaneous") {
+		const sum = Number(targetPlanned.value) + Number(targetSpontaneous.value)
+		return Number(targetPlanned.value) >= 0 && Number(targetSpontaneous.value) >= 0 && sum >= 1 && sum <= max
+	}
+	return Number(target.value) >= 1 && Number(target.value) <= max
+})
 const suggestionLine = computed(() => suggestionText(suggestion.value))
 const startButtons = computed(() => {
 	const buttons = [{ label: `Monday ${formatDate(suggestion.value?.next_monday)}`, value: "monday" }]
@@ -85,6 +109,8 @@ async function loadSuggestion() {
 	try {
 		suggestion.value = await call(`${API}.suggest_challenge`, { kind: kind.value })
 		target.value = suggestion.value.suggested
+		targetPlanned.value = suggestion.value.suggested_planned
+		targetSpontaneous.value = suggestion.value.suggested_spontaneous
 	} catch (e) {
 		error.value = e?.messages?.[0] || e?.message || "Could not load your history"
 	}
@@ -97,6 +123,8 @@ async function create() {
 		const created = await call(`${API}.create_challenge`, {
 			kind: kind.value,
 			target_per_day: Number(target.value),
+			target_planned: Number(targetPlanned.value),
+			target_spontaneous: Number(targetSpontaneous.value),
 			working_days: Number(length.value),
 			start_date: start.value === "today" ? suggestion.value.today : suggestion.value.next_monday,
 		})
