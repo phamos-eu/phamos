@@ -22,6 +22,7 @@ const navItems = [
 		match: ["Todos"],
 		children: [
 			{ name: "TodosList", label: "List", icon: "list", match: ["TodosList", "TodoDetail"] },
+			{ name: "TodosMatrix", label: "Matrix", icon: "grid", match: ["TodosMatrix"] },
 		],
 	},
 	{
@@ -59,7 +60,7 @@ const navItems = [
 ]
 
 const pageTitle = computed(() => {
-	if (["Todos", "TodosList", "TodoDetail"].includes(route.name)) return "My ToDos"
+	if (["Todos", "TodosList", "TodoDetail", "TodosMatrix"].includes(route.name)) return "My ToDos"
 	if (["Tasks", "TasksGantt", "TaskDetail"].includes(route.name)) return "My Tasks"
 	if (["ChecklistsHome", "Checklists", "ChecklistDetail"].includes(route.name)) return "My Checklists"
 	return "My Issues"

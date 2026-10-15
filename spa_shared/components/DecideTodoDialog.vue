@@ -120,7 +120,7 @@ const facts = computed(() => {
 	if (!todo) return ""
 	const parts = []
 	if (todo.age_days != null) parts.push(`${ageLabel(todo.age_days)} old`)
-	else if (todo.creation) parts.push(`created ${formatDate(todo.creation)}`)
+	else if (todo.creation) parts.push(`created ${formatDate(String(todo.creation).slice(0, 10))}`)
 	if (todo.date) parts.push(`${todo.overdue ? "overdue since" : "due"} ${formatDate(todo.date)}`)
 	if (todo.reschedule_count) parts.push(`postponed ${todo.reschedule_count}×`)
 	if (todo.first_due_date && todo.first_due_date !== todo.date) parts.push(`first due ${formatDate(todo.first_due_date)}`)
