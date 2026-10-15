@@ -19,6 +19,18 @@
 					aria-label="Which ToDos to show"
 				/>
 				<span class="text-xs text-ink-gray-5">{{ countLabel }}</span>
+				<button
+					v-if="staleCount"
+					type="button"
+					class="rounded-full px-2 py-0.5 text-xs transition"
+					:class="staleOnly ? 'bg-surface-gray-7 text-ink-white' : 'bg-surface-gray-2 text-ink-gray-7 hover:bg-surface-gray-3'"
+					:aria-pressed="staleOnly"
+					title="Overdue for more than two weeks, or postponed three times or more"
+					@click="staleOnly = !staleOnly"
+				>
+					Stale ({{ staleCount }})
+				</button>
+				<Button v-if="staleOnly && staleCount" size="sm" @click="decideStale">Decide all</Button>
 				<Button class="ml-auto" variant="solid" @click="showCreate = true">New ToDo</Button>
 			</div>
 
@@ -49,6 +61,7 @@
 		</section>
 
 		<CreateTodoDialog v-model="showCreate" @created="onCreated" />
+		<DecideTodoDialog v-model="showDecide" :todos="decideQueue" @decided="({ todo }) => applyUpdate(todo)" />
 	</div>
 </template>
 
@@ -60,6 +73,8 @@ import InboxStatusFilter from "@spa/components/InboxStatusFilter.vue"
 import TodoList from "@spa/components/TodoList.vue"
 import TodoDetail from "@spa/components/TodoDetail.vue"
 import CreateTodoDialog from "@spa/components/CreateTodoDialog.vue"
+import DecideTodoDialog from "@spa/components/DecideTodoDialog.vue"
+import { useUserRealtime } from "@spa/composables/useUserRealtime.js"
 import { matchesTodo, sortTodos } from "@spa/utils/todoSort.js"
 import spaConfig from "@/config"
 
@@ -82,7 +97,18 @@ const selected = ref(null)
 const detailError = ref("")
 
 const selectedName = computed(() => props.name || "")
-const filtered = computed(() => todos.value.filter((todo) => matchesTodo(todo, search.value)))
+const staleOnly = ref(false)
+const showDecide = ref(false)
+const decideQueue = ref([])
+const staleCount = computed(() => todos.value.filter((todo) => todo.stale).length)
+const filtered = computed(() =>
+	todos.value.filter((todo) => (!staleOnly.value || todo.stale) && matchesTodo(todo, search.value))
+)
+
+function decideStale() {
+	decideQueue.value = todos.value.filter((todo) => todo.stale)
+	showDecide.value = true
+}
 const countLabel = computed(() => {
 	const open = todos.value.filter((t) => t.status === "Open")
 	const overdue = open.filter((t) => t.overdue).length
@@ -135,7 +161,7 @@ function closeDetail() {
 /** Put a changed ToDo back into the list, keeping the agreed order and the done filter. */
 function applyUpdate(todo) {
 	const others = todos.value.filter((t) => t.name !== todo.name)
-	const keep = todo.status === "Open" || includeClosed.value
+	const keep = todo.status === "Open" || (includeClosed.value && todo.status === "Closed")
 	todos.value = sortTodos(keep ? [...others, todo] : others)
 	if (todo.name === selectedName.value) selected.value = todo
 }
@@ -162,6 +188,14 @@ function onCreated(todo) {
 }
 
 watch(includeClosed, loadTodos)
+watch(staleCount, (count) => {
+	if (!count) staleOnly.value = false
+})
+// Another tab, Desk or an assigner changed one of my ToDos: refresh the list.
+useUserRealtime("cockpit_todos_changed", async () => {
+	await loadTodos()
+	await loadSelected()
+})
 watch(() => route.params.name, loadSelected)
 
 onMounted(async () => {

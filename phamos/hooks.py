@@ -234,7 +234,7 @@ after_install = "phamos.setup.ops_inbox.ensure_ops_inbox_setup"
 after_migrate = [
 	"phamos.setup.ops_inbox.ensure_ops_inbox_setup",
 	"phamos.web_profile.setup.after_migrate",  # Web Page "Language" / "Translation Of" fields
-	"phamos.cockpits.setup.after_migrate",  # Task Owner on Task (#1751)
+	"phamos.cockpits.setup.after_migrate",  # Task Owner on Task (#1751), ToDo fields of the Personal Cockpit (#1553)
 	"phamos.marketing.setup.after_migrate",  # Lead Source "Event" for event registrations
 ]
 
@@ -283,10 +283,19 @@ after_migrate = [
 # }
 
 doc_events = {
+	# Personal Cockpit: closed-on stamp, reschedule count, per-user refresh (#1553).
 	# Closing or rescheduling a checklist item's ToDo updates the item (#1625).
 	"ToDo": {
-		"on_update": "phamos.phamos.doctype.checklist.checklist_assignment.sync_item_from_todo",
-		"on_trash": "phamos.phamos.doctype.checklist.checklist_assignment.clear_item_todo_link",
+		"before_insert": "phamos.cockpits.todo_hooks.before_insert",
+		"validate": "phamos.cockpits.todo_hooks.validate",
+		"on_update": [
+			"phamos.cockpits.todo_hooks.on_update",
+			"phamos.phamos.doctype.checklist.checklist_assignment.sync_item_from_todo",
+		],
+		"on_trash": [
+			"phamos.cockpits.todo_hooks.on_trash",
+			"phamos.phamos.doctype.checklist.checklist_assignment.clear_item_todo_link",
+		],
 	},
 	"Event": {
 		"after_insert": "phamos.mailcow_integration.caldav.sync_event.on_upsert",
