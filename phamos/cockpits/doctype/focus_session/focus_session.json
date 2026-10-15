@@ -1,0 +1,141 @@
+{
+ "actions": [],
+ "creation": "2026-10-14 23:30:00.000000",
+ "doctype": "DocType",
+ "engine": "InnoDB",
+ "field_order": [
+  "user",
+  "status",
+  "outcome",
+  "column_break_timing",
+  "started_at",
+  "planned_minutes",
+  "planned_end",
+  "ended_at",
+  "section_items",
+  "current_todo",
+  "items",
+  "section_break_out",
+  "break_out_reason"
+ ],
+ "fields": [
+  {
+   "fieldname": "user",
+   "fieldtype": "Link",
+   "label": "User",
+   "options": "User",
+   "reqd": 1,
+   "in_list_view": 1,
+   "in_standard_filter": 1,
+   "read_only": 1,
+   "search_index": 1
+  },
+  {
+   "fieldname": "status",
+   "fieldtype": "Select",
+   "label": "Status",
+   "options": "Active\nEnded",
+   "default": "Active",
+   "in_list_view": 1,
+   "in_standard_filter": 1,
+   "read_only": 1,
+   "search_index": 1
+  },
+  {
+   "fieldname": "outcome",
+   "fieldtype": "Select",
+   "label": "Outcome",
+   "options": "\nCompleted\nBroke out\nExpired",
+   "in_list_view": 1,
+   "read_only": 1
+  },
+  {
+   "fieldname": "column_break_timing",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "started_at",
+   "fieldtype": "Datetime",
+   "label": "Started At",
+   "read_only": 1
+  },
+  {
+   "fieldname": "planned_minutes",
+   "fieldtype": "Int",
+   "label": "Planned Minutes",
+   "read_only": 1,
+   "description": "0 = stopwatch, no planned end."
+  },
+  {
+   "fieldname": "planned_end",
+   "fieldtype": "Datetime",
+   "label": "Planned End",
+   "read_only": 1
+  },
+  {
+   "fieldname": "ended_at",
+   "fieldtype": "Datetime",
+   "label": "Ended At",
+   "read_only": 1
+  },
+  {
+   "fieldname": "section_items",
+   "fieldtype": "Section Break",
+   "label": "ToDos"
+  },
+  {
+   "fieldname": "current_todo",
+   "fieldtype": "Link",
+   "label": "Current ToDo",
+   "options": "ToDo",
+   "read_only": 1
+  },
+  {
+   "fieldname": "items",
+   "fieldtype": "Table",
+   "label": "ToDos",
+   "options": "Focus Session Item",
+   "read_only": 1
+  },
+  {
+   "fieldname": "section_break_out",
+   "fieldtype": "Section Break",
+   "label": "Break-out",
+   "collapsible": 1
+  },
+  {
+   "fieldname": "break_out_reason",
+   "fieldtype": "Small Text",
+   "label": "Reason",
+   "read_only": 1
+  }
+ ],
+ "links": [],
+ "modified": "2026-10-14 23:30:00.000000",
+ "modified_by": "Administrator",
+ "module": "Cockpits",
+ "name": "Focus Session",
+ "owner": "Administrator",
+ "sort_field": "creation",
+ "sort_order": "DESC",
+ "states": [],
+ "autoname": "hash",
+ "naming_rule": "Random",
+ "title_field": "user",
+ "track_changes": 0,
+ "description": "A focus session of the Personal Cockpit (#1556). Private: only the user sees their own sessions.",
+ "permissions": [
+  {
+   "role": "System Manager",
+   "read": 1,
+   "write": 1,
+   "create": 1,
+   "delete": 1,
+   "report": 1,
+   "export": 1,
+   "print": 1,
+   "email": 1,
+   "share": 1
+  }
+ ]
+}

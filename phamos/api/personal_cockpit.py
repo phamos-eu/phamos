@@ -13,6 +13,7 @@ from phamos.api import department_cockpit as dc
 from phamos.api import personal_todos
 from phamos.api import personal_todo_dashboard
 from phamos.api import personal_todo_matrix
+from phamos.api import personal_focus
 
 CONFIG = dc.CockpitConfig(
 	label="Personal Cockpit",
@@ -372,3 +373,54 @@ def get_todo_matrix(scope="week"):
 def set_todo_quadrant(name, quadrant, date=None, payoff_note=None):
 	"""Move one of my ToDos into a quadrant (sets the important flag and, if needed, the date)."""
 	return personal_todo_matrix.set_quadrant(name, quadrant, date=date, payoff_note=payoff_note)
+
+
+# Focus mode (phamos/phamos#1556) — logic in phamos.api.personal_focus.
+
+
+@frappe.whitelist()
+def get_active_focus():
+	"""My running focus session, or None."""
+	return personal_focus.get_active_focus()
+
+
+@frappe.whitelist()
+def get_focus_options():
+	return personal_focus.get_focus_options()
+
+
+@frappe.whitelist()
+def get_focus_session(name):
+	return personal_focus.get_focus_session(name)
+
+
+@frappe.whitelist()
+def get_focus_history(limit=10):
+	return personal_focus.get_focus_history(limit=limit)
+
+
+@frappe.whitelist(methods=["POST"])
+def start_focus(todos, minutes=25):
+	"""Lock in 1–5 of my open ToDos for `minutes` (0 = stopwatch)."""
+	return personal_focus.start_focus(todos, minutes=minutes)
+
+
+@frappe.whitelist(methods=["POST"])
+def focus_switch(todo):
+	return personal_focus.focus_switch(todo)
+
+
+@frappe.whitelist(methods=["POST"])
+def focus_mark_done(todo):
+	return personal_focus.focus_mark_done(todo)
+
+
+@frappe.whitelist(methods=["POST"])
+def focus_park(todo, resume_note=None):
+	return personal_focus.focus_park(todo, resume_note=resume_note)
+
+
+@frappe.whitelist(methods=["POST"])
+def end_focus(outcome="Broke out", reason=None, resume_note=None):
+	"""End my focus session. Always allowed."""
+	return personal_focus.end_focus(outcome=outcome, reason=reason, resume_note=resume_note)
