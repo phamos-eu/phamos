@@ -13,9 +13,10 @@ import re
 
 import frappe
 from frappe import _
-from frappe.utils import cint, get_datetime, getdate, strip_html, today
+from frappe.utils import add_days, cint, get_datetime, getdate, strip_html, today
 
 from phamos.api.issue_common import _user_label
+from phamos.cockpits.defaults import DROP_REASONS, STALE_DAYS, STALE_RESCHEDULES
 
 PRIORITY_ORDER = {"High": 0, "Medium": 1, "Low": 2}
 OPEN_STATUSES = ("Open",)
@@ -43,6 +44,24 @@ CREATE_REFERENCE_TYPES = (
 	"Contact",
 )
 SUMMARY_LENGTH = 140
+# Fields the Cockpits module adds to ToDo (#1553); read only when they exist on the site.
+COCKPIT_FIELDS = [
+	"cockpit_closed_on",
+	"cockpit_closed_by",
+	"cockpit_important",
+	"cockpit_first_due_date",
+	"cockpit_reschedule_count",
+	"cockpit_estimate_minutes",
+	"cockpit_actual_minutes",
+	"cockpit_resume_note",
+]
+DECIDE_ACTIONS = ("today", "later_this_week", "plan", "drop")
+
+
+def todo_fields():
+	"""TODO_FIELDS plus the cockpit fields that exist (they are created on migrate)."""
+	meta = frappe.get_meta("ToDo")
+	return TODO_FIELDS + [f for f in COCKPIT_FIELDS if meta.has_field(f)]
 
 
 BLOCK_END = re.compile(r"</(p|div|li|h[1-6]|blockquote|pre)>|<br\s*/?>", re.IGNORECASE)
@@ -108,7 +127,26 @@ def _serialize(row, titles):
 		"creation": row.get("creation"),
 		"modified": row.get("modified"),
 		"desk_url": _desk_url("ToDo", row.get("name")),
+		"important": bool(row.get("cockpit_important")),
+		"reschedule_count": row.get("cockpit_reschedule_count") or 0,
+		"first_due_date": row.get("cockpit_first_due_date"),
+		"estimate_minutes": row.get("cockpit_estimate_minutes"),
+		"actual_minutes": row.get("cockpit_actual_minutes") or 0,
+		"resume_note": row.get("cockpit_resume_note") or "",
+		"closed_on": row.get("cockpit_closed_on"),
+		"stale": is_stale(row),
 	}
+
+
+def is_stale(row, on=None):
+	"""Open and either overdue by more than STALE_DAYS or postponed STALE_RESCHEDULES times."""
+	if row.get("status") != "Open":
+		return False
+	on = getdate(on or today())
+	date = row.get("date")
+	if date and getdate(date) < add_days(on, -STALE_DAYS):
+		return True
+	return (row.get("cockpit_reschedule_count") or 0) >= STALE_RESCHEDULES
 
 
 def sort_key(row):
@@ -140,7 +178,7 @@ def get_my_todos(include_closed=0):
 	rows = frappe.get_list(
 		"ToDo",
 		filters={"allocated_to": frappe.session.user, "status": ("in", statuses)},
-		fields=TODO_FIELDS,
+		fields=todo_fields(),
 		limit_page_length=0,
 	)
 	titles = _reference_titles(rows)
@@ -196,7 +234,9 @@ def create_todo(description, date=None, priority=None, reference_type=None, refe
 	return get_todo(doc.name)
 
 
-def update_todo(name, description=None, date=None, priority=None, modified=None):
+def update_todo(
+	name, description=None, date=None, priority=None, modified=None, important=None, estimate_minutes=None
+):
 	"""Update description, due date or priority of one of my ToDos.
 
 	The reference is read-only here. A due date may only be moved to today or later;
@@ -218,6 +258,13 @@ def update_todo(name, description=None, date=None, priority=None, modified=None)
 		if priority not in PRIORITY_ORDER:
 			frappe.throw(_("Invalid priority: {0}").format(priority))
 		doc.priority = priority
+	if important is not None and doc.meta.has_field("cockpit_important"):
+		doc.cockpit_important = cint(important)
+	if estimate_minutes is not None and doc.meta.has_field("cockpit_estimate_minutes"):
+		minutes = cint(estimate_minutes)
+		if minutes < 0 or minutes > 24 * 60:
+			frappe.throw(_("The estimate must be between 0 and 1440 minutes."))
+		doc.cockpit_estimate_minutes = minutes or None
 
 	if modified:
 		doc.modified = get_datetime(modified)
@@ -238,4 +285,51 @@ def set_status(name, status):
 	if doc.status != status:
 		doc.status = status
 		doc.save()
+	return get_todo(doc.name)
+
+
+def later_this_week(on=None):
+	"""Friday of this week from Monday to Thursday; otherwise the next Tuesday."""
+	on = getdate(on or today())
+	weekday = on.weekday()  # Monday = 0
+	if weekday < 4:
+		return add_days(on, 4 - weekday)
+	return add_days(on, 8 - weekday)
+
+
+def decide_todo(name, action, date=None, reason=None):
+	"""Force a decision on a ToDo instead of letting it roll over silently.
+
+	today: due today. later_this_week: Friday (or next Tuesday from Friday on).
+	plan: a chosen date (today or later). drop: status Cancelled with a reason, shown as
+	"dropped" (a decision, not a failure). Moving a date later counts as a reschedule.
+	"""
+	if action not in DECIDE_ACTIONS:
+		frappe.throw(_("Unknown decision: {0}").format(action))
+	doc = _get_my_todo(name)
+	doc.check_permission("write")
+	if doc.status != "Open":
+		frappe.throw(_("Only open ToDos can be decided on."))
+
+	if action == "drop":
+		reason = (reason or "").strip()
+		if not reason:
+			frappe.throw(_("Please give a reason for dropping this ToDo."))
+		doc.status = "Cancelled"
+		doc.save()
+		label = reason if reason in DROP_REASONS else reason[:280]
+		doc.add_comment("Info", _("Dropped in the Personal Cockpit: {0}").format(label))
+		return get_todo(doc.name)
+
+	if action == "today":
+		new_date = getdate(today())
+	elif action == "later_this_week":
+		new_date = later_this_week()
+	else:
+		if not date:
+			frappe.throw(_("Please pick a date."))
+		_validate_date(date)
+		new_date = getdate(date)
+	doc.date = new_date
+	doc.save()
 	return get_todo(doc.name)

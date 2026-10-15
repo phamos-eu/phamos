@@ -223,6 +223,7 @@ after_install = "phamos.setup.ops_inbox.ensure_ops_inbox_setup"
 after_migrate = [
 	"phamos.setup.ops_inbox.ensure_ops_inbox_setup",
 	"phamos.web_profile.setup.after_migrate",  # Web Page "Language" / "Translation Of" fields
+	"phamos.cockpits.setup.after_migrate",  # ToDo fields of the Personal Cockpit (#1553)
 ]
 
 # Uninstallation
@@ -270,6 +271,13 @@ after_migrate = [
 # }
 
 doc_events = {
+	# Personal Cockpit: closed-on stamp, reschedule count, per-user refresh (#1553).
+	"ToDo": {
+		"before_insert": "phamos.cockpits.todo_hooks.before_insert",
+		"validate": "phamos.cockpits.todo_hooks.validate",
+		"on_update": "phamos.cockpits.todo_hooks.on_update",
+		"on_trash": "phamos.cockpits.todo_hooks.on_trash",
+	},
 	"Event": {
 		"after_insert": "phamos.mailcow_integration.caldav.sync_event.on_upsert",
         "on_update": "phamos.mailcow_integration.caldav.sync_event.on_upsert",
