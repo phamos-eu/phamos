@@ -24,6 +24,14 @@ const base = {
 	today: { in_schedule: true, closes: 1, target: 2, remaining: 1, repair: null },
 }
 
+const split = {
+	...base,
+	split: true,
+	target_planned: 2,
+	target_spontaneous: 1,
+	today: { in_schedule: true, closes: 2, planned: 1, spontaneous: 1, target: 3, remaining: 1, met: false, repair: null },
+}
+
 describe("challenge progress", () => {
 	it("counts up until half, then counts down", () => {
 		expect(progressText(base)).toBe("3 of 10 days done")
@@ -39,10 +47,15 @@ describe("challenge progress", () => {
 		expect(todayText({ ...base, not_started: true })).toBe("Starts 2026-10-19.")
 	})
 
+	it("splits today into planned and spontaneous", () => {
+		expect(todayText(split)).toBe("Today: 1 of 2 planned, 1 of 1 spontaneous.")
+		expect(todayText({ ...split, today: { ...split.today, met: true } })).toBe("Today counts. Nice work.")
+	})
+
 	it("offers the repair only while it is still open", () => {
-		const repairing = { ...base, today: { ...base.today, repair: { closes_needed: 3 } } }
+		const repairing = { ...base, today: { ...base.today, repair: { needs: { closes: 3 }, reached: false } } }
 		expect(repairText(repairing)).toBe("Close 3 today and the day before counts too.")
-		expect(repairText({ ...repairing, today: { ...repairing.today, closes: 3 } })).toBe("")
+		expect(repairText({ ...repairing, today: { ...repairing.today, repair: { needs: { closes: 3 }, reached: true } } })).toBe("")
 	})
 
 	it("shows a streak only from two days on", () => {
@@ -58,7 +71,9 @@ describe("challenge progress", () => {
 			{ ...base, status: "Ended", counted_days: 2 },
 			{ ...base, status: "Completed", counted_days: 10 },
 			{ ...base, today: { in_schedule: false } },
-			{ ...base, today: { ...base.today, repair: { closes_needed: 4 } } },
+			{ ...base, today: { ...base.today, repair: { needs: { closes: 4 }, reached: false } } },
+			{ ...split, today: { ...split.today, repair: { needs: { planned: 2, spontaneous: 1 }, reached: false } } },
+			split,
 		]
 		const texts = cases.flatMap((c) => [
 			progressText(c),
@@ -70,7 +85,12 @@ describe("challenge progress", () => {
 			finishedText(c),
 		])
 		texts.push(...["Met", "Repaired", "Joker", "Missed", "Today", "Upcoming"].map((r) => dayState(r).label))
-		texts.push(suggestionText({ baseline_per_day: 0 }), suggestionText({ baseline_per_day: 1.5, suggested: 2 }))
+		texts.push(
+			suggestionText({ baseline_per_day: 0 }),
+			suggestionText({ baseline_per_day: 1.5, suggested: 2 }),
+			suggestionText({ kind: "Planned and spontaneous", baseline_per_day: 0 }),
+			suggestionText({ kind: "Planned and spontaneous", baseline_per_day: 2, baseline_planned: 1, baseline_spontaneous: 1 }),
+		)
 		for (const text of texts) expect(text).not.toMatch(forbidden)
 	})
 })

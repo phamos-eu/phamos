@@ -8,6 +8,8 @@
   "title",
   "kind",
   "target_per_day",
+  "target_planned",
+  "target_spontaneous",
   "status",
   "column_break_dates",
   "start_date",
@@ -41,7 +43,7 @@
    "fieldname": "kind",
    "fieldtype": "Select",
    "label": "Kind",
-   "options": "Closes per day\nImportant per day",
+   "options": "Closes per day\nImportant per day\nPlanned and spontaneous",
    "default": "Closes per day",
    "read_only": 1
   },
@@ -49,7 +51,22 @@
    "fieldname": "target_per_day",
    "fieldtype": "Int",
    "label": "Target per Day",
-   "read_only": 1
+   "read_only": 1,
+   "description": "For \"Planned and spontaneous\": the sum of both targets."
+  },
+  {
+   "fieldname": "target_planned",
+   "fieldtype": "Int",
+   "label": "Planned per Day",
+   "read_only": 1,
+   "depends_on": "eval:doc.kind=='Planned and spontaneous'"
+  },
+  {
+   "fieldname": "target_spontaneous",
+   "fieldtype": "Int",
+   "label": "Spontaneous per Day",
+   "read_only": 1,
+   "depends_on": "eval:doc.kind=='Planned and spontaneous'"
   },
   {
    "fieldname": "status",
@@ -119,7 +136,7 @@
   }
  ],
  "links": [],
- "modified": "2026-10-15 00:30:00.000000",
+ "modified": "2026-10-15 01:30:00.000000",
  "modified_by": "Administrator",
  "module": "Cockpits",
  "name": "ToDo Challenge",

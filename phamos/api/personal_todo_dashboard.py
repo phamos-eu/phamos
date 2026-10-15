@@ -128,6 +128,14 @@ def get_todo_dashboard(period=30):
 		and dm.in_window(r.get("cockpit_closed_on"), start, now)
 	]
 
+	# Planned vs spontaneous (#1561): planned = on that day's plan when it was fixed.
+	planned = _planned_pairs(start, now)
+
+	def is_planned(row):
+		return (getdate(row["cockpit_closed_on"]), row["name"]) in planned
+
+	planned_closed = [r for r in mine_closed if is_planned(r)]
+
 	oldest = sorted(open_rows, key=lambda r: get_datetime(r["creation"]))[:OLDEST_LIMIT]
 	stale = sorted(
 		(r for r in open_rows if personal_todos.is_stale(r, now)),
@@ -171,6 +179,8 @@ def get_todo_dashboard(period=30):
 			"other": len(mine_closed) - len(important),
 			"quick_wins": len(micro),
 			"by_others": len(by_others),
+			"planned": len(planned_closed),
+			"spontaneous": len(mine_closed) - len(planned_closed),
 		},
 		"today": {
 			"done": [
@@ -180,12 +190,21 @@ def get_todo_dashboard(period=30):
 					"closed_on": r["cockpit_closed_on"],
 					"important": bool(r.get("cockpit_important")),
 					"quick_win": _minutes_between(r["creation"], r["cockpit_closed_on"]) < MICRO_MINUTES,
+					"planned": is_planned(r),
 				}
 				for r in done_today
 			],
 			"dropped": dropped_today,
 		},
 	}
+
+
+def _planned_pairs(start, end):
+	if not frappe.db.table_exists("Day Plan Item"):
+		return set()
+	from phamos.api.personal_day_plan import planned_pairs
+
+	return planned_pairs(frappe.session.user, getdate(start), getdate(end))
 
 
 def _round(value):
