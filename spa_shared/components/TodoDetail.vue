@@ -112,6 +112,14 @@
 				This ToDo is overdue. A new due date must be today or later.
 			</p>
 
+			<LinkedChecklistsSection
+				:key="todo.name"
+				document="ToDo"
+				:reference-record="todo.name"
+				:reference-title="todo.summary"
+				:allow-create="todo.status === 'Open'"
+			/>
+
 			<div class="text-xs text-ink-gray-5">
 				<span v-if="todo.assigned_by && todo.assigned_by !== currentUser">
 					Assigned by {{ todo.assigned_by_name }} ·
@@ -131,6 +139,7 @@
 <script setup>
 import { computed, reactive, ref, watch } from "vue"
 import { Badge, call, Switch, TextEditor, toast } from "frappe-ui"
+import LinkedChecklistsSection from "@spa/components/LinkedChecklistsSection.vue"
 import { formatDate, formatDatetime, todayIsoInUserTz } from "@spa/utils/datetime.js"
 import { isEmptyHtml, normalizeHtml } from "@spa/utils/autosaveCore.js"
 import { TODO_PRIORITIES } from "@spa/utils/todoSort.js"

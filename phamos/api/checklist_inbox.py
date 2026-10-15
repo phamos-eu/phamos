@@ -8,7 +8,7 @@ from frappe import _
 from frappe.model import no_value_fields, table_fields
 from frappe.utils import cint, cstr, get_fullname
 
-CHECKLIST_REFERENCE_DOCTYPES = ("Issue", "Task", "Project", "Lead", "Opportunity", "Customer")
+CHECKLIST_REFERENCE_DOCTYPES = ("Issue", "Task", "Project", "Lead", "Opportunity", "Customer", "ToDo")
 TEMPLATE_DOCTYPE = "Checklist Template"
 
 # Row cap for get_checklist_inbox (no real pagination yet — see
@@ -477,6 +477,10 @@ def _resolve_checklist_title(name, document, reference_record):
 		title = (frappe.db.get_value("Issue", reference_record, "subject") or "").strip()
 	if not title and document == "Task":
 		title = (frappe.db.get_value("Task", reference_record, "subject") or "").strip()
+	if not title and document == "ToDo":
+		from phamos.api.personal_todos import _summary
+
+		title = _summary(frappe.db.get_value("ToDo", reference_record, "description"))
 	if not title:
 		frappe.throw(_("Checklist title is required"))
 	return title

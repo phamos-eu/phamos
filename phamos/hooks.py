@@ -415,6 +415,10 @@ scheduler_events = {
         # MIS: auto-close open summaries once every linked SO/DN is fully delivered and billed
         "phamos.phamos.doctype.monthly_implementation_summary.monthly_implementation_summary.auto_close_fulfilled_mis",
     ],
+    "weekly": [
+        # Personal Cockpit: checklists left behind by ToDos deleted without hooks (#1554)
+        "phamos.cockpits.maintenance.cleanup_orphan_todo_checklists",
+    ],
     "monthly": [
         "phamos.api.send_monthly_comment_summary"
     ],
