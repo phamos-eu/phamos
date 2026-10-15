@@ -1,5 +1,5 @@
 <template>
-	<section class="mb-5">
+	<section v-if="!unavailable" class="mb-5">
 		<div class="mb-2 text-[11px] font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400">
 			Checklists
 		</div>
@@ -95,6 +95,9 @@ const expanded = reactive({})
 const details = reactive({})
 const detailLoading = reactive({})
 const showCreate = ref(false)
+// The user cannot read checklists (permissions are granted per site): hide the section
+// instead of showing an empty one with a create button that would fail.
+const unavailable = ref(false)
 
 function statusTheme(status) {
 	if (status === "Completed") return "green"
@@ -126,6 +129,12 @@ async function loadSummaries() {
 		})
 		const toLoad = applyDefaultExpansion(summaries.value)
 		await Promise.all(toLoad.map((name) => loadDetail(name)))
+	} catch (e) {
+		if (e?.exc_type === "PermissionError" || /PermissionError/.test(e?.message || "")) {
+			unavailable.value = true
+			return
+		}
+		throw e
 	} finally {
 		loading.value = false
 	}

@@ -444,6 +444,10 @@ scheduler_events = {
         # Event tickets: payment status for payments booked without hooks
         "phamos.marketing.billing.sync_payment_status",
     ],
+    "weekly": [
+        # Personal Cockpit: checklists left behind by ToDos deleted without hooks (#1554)
+        "phamos.cockpits.maintenance.cleanup_orphan_todo_checklists",
+    ],
     "monthly": [
         "phamos.api.send_monthly_comment_summary"
     ],
