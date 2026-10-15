@@ -1,0 +1,86 @@
+{
+ "actions": [],
+ "creation": "2026-10-14 23:30:00.000000",
+ "doctype": "DocType",
+ "engine": "InnoDB",
+ "field_order": [
+  "todo",
+  "summary",
+  "started_at",
+  "actual_minutes",
+  "done",
+  "done_at",
+  "parked",
+  "resume_note"
+ ],
+ "fields": [
+  {
+   "fieldname": "todo",
+   "fieldtype": "Link",
+   "label": "ToDo",
+   "options": "ToDo",
+   "in_list_view": 1,
+   "reqd": 1
+  },
+  {
+   "fieldname": "summary",
+   "fieldtype": "Data",
+   "label": "Summary",
+   "in_list_view": 1,
+   "read_only": 1
+  },
+  {
+   "fieldname": "started_at",
+   "fieldtype": "Datetime",
+   "label": "Current Since",
+   "read_only": 1,
+   "description": "Set while this ToDo is the one in focus."
+  },
+  {
+   "fieldname": "actual_minutes",
+   "fieldtype": "Int",
+   "label": "Minutes in Focus",
+   "in_list_view": 1,
+   "read_only": 1
+  },
+  {
+   "fieldname": "done",
+   "fieldtype": "Check",
+   "label": "Done",
+   "in_list_view": 1,
+   "read_only": 1
+  },
+  {
+   "fieldname": "done_at",
+   "fieldtype": "Datetime",
+   "label": "Done At",
+   "read_only": 1
+  },
+  {
+   "fieldname": "parked",
+   "fieldtype": "Check",
+   "label": "Parked",
+   "in_list_view": 1,
+   "read_only": 1
+  },
+  {
+   "fieldname": "resume_note",
+   "fieldtype": "Small Text",
+   "label": "Where to Pick Up",
+   "read_only": 1
+  }
+ ],
+ "links": [],
+ "modified": "2026-10-14 23:30:00.000000",
+ "modified_by": "Administrator",
+ "module": "Cockpits",
+ "name": "Focus Session Item",
+ "owner": "Administrator",
+ "sort_field": "creation",
+ "sort_order": "DESC",
+ "states": [],
+ "istable": 1,
+ "editable_grid": 1,
+ "permissions": [],
+ "track_changes": 0
+}

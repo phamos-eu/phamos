@@ -6,6 +6,10 @@
 				<div class="flex items-center gap-2">
 					<TabButtons v-model="period" :buttons="PERIOD_BUTTONS" />
 					<Button variant="subtle" @click="router.push({ name: 'TodosList' })">Open the list</Button>
+					<Button variant="solid" @click="showStartFocus = true">
+						<template #prefix><FeatherIcon name="target" class="h-4 w-4" /></template>
+						Start focus
+					</Button>
 				</div>
 			</div>
 
@@ -122,6 +126,7 @@
 		</div>
 
 		<DecideTodoDialog v-model="showDecide" :todos="decideQueue" @decided="scheduleReload" />
+		<StartFocusDialog v-model="showStartFocus" :preselect="focusPreselect" />
 	</div>
 </template>
 
@@ -130,6 +135,7 @@ import { computed, onMounted, ref, watch } from "vue"
 import { useRouter } from "vue-router"
 import { call, TabButtons } from "frappe-ui"
 import DecideTodoDialog from "@spa/components/DecideTodoDialog.vue"
+import StartFocusDialog from "@/components/StartFocusDialog.vue"
 import HorizontalBars from "@spa/components/dashboard/HorizontalBars.vue"
 import PeriodBars from "@spa/components/dashboard/PeriodBars.vue"
 import StatCard from "@spa/components/dashboard/StatCard.vue"
@@ -152,6 +158,9 @@ const error = ref("")
 const period = ref(readPeriod())
 const showDecide = ref(false)
 const decideQueue = ref([])
+const showStartFocus = ref(false)
+// Suggest the oldest stale ToDos first: focus is the strongest way to finally close them.
+const focusPreselect = computed(() => (data.value?.stale || []).slice(0, 3).map((todo) => todo.name))
 
 const current = computed(() => data.value?.windows?.current || {})
 const previous = computed(() => data.value?.windows?.previous || {})

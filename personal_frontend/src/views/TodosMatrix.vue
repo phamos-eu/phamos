@@ -6,7 +6,13 @@
 					Pick the few that matter. Drag a ToDo, or focus it and press 1–4.
 					<span v-if="data">Urgent means due by {{ formatDate(data.urgent_until) }}.</span>
 				</p>
-				<TabButtons v-model="scope" :buttons="SCOPE_BUTTONS" />
+				<div class="flex items-center gap-2">
+					<TabButtons v-model="scope" :buttons="SCOPE_BUTTONS" />
+					<Button v-if="bucket('do').total" variant="solid" @click="showStartFocus = true">
+						<template #prefix><FeatherIcon name="target" class="h-4 w-4" /></template>
+						Focus on “Do now”
+					</Button>
+				</div>
 			</div>
 
 			<div v-if="error" class="rounded-lg border border-outline-gray-2 bg-surface-red-1 p-4 text-sm text-ink-red-4">
@@ -169,6 +175,10 @@
 		</Dialog>
 
 		<DecideTodoDialog v-model="showDecide" :todos="decideQueue" @decided="load" />
+		<StartFocusDialog
+			v-model="showStartFocus"
+			:preselect="bucket('do').items.map((todo) => todo.name)"
+		/>
 	</div>
 </template>
 
@@ -177,6 +187,7 @@ import { computed, onMounted, ref, watch } from "vue"
 import { useRouter } from "vue-router"
 import { call, TabButtons, toast } from "frappe-ui"
 import DecideTodoDialog from "@spa/components/DecideTodoDialog.vue"
+import StartFocusDialog from "@/components/StartFocusDialog.vue"
 import { useUserRealtime } from "@spa/composables/useUserRealtime.js"
 import { pluralize } from "@spa/utils/dashboardFormat.js"
 import { formatDate } from "@spa/utils/datetime.js"
@@ -224,6 +235,7 @@ const moveError = ref("")
 const moving = ref(false)
 
 const showDecide = ref(false)
+const showStartFocus = ref(false)
 const decideQueue = ref([])
 
 const moveTitle = computed(() => (pending.value ? `Move to ${quadrant(pending.value.target).label}` : "Move"))
