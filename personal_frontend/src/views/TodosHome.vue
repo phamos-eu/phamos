@@ -47,6 +47,26 @@
 					/>
 				</section>
 
+				<section class="grid grid-cols-1 gap-5 xl:grid-cols-2" aria-label="Targets">
+					<ChallengeCard
+						v-for="challenge in challenges.active"
+						:key="challenge.name"
+						:challenge="challenge"
+						@end="endChallenge"
+					/>
+					<ChallengeCard v-if="!challenges.active.length && recentFinished" :challenge="recentFinished" />
+					<div
+						v-if="challenges.active.length < 2"
+						class="flex flex-col items-start justify-center gap-2 rounded-lg border border-dashed border-outline-gray-3 p-5"
+					>
+						<p class="text-sm text-ink-gray-7">
+							{{ challenges.active.length ? "Add a second target for important ToDos?" : "Want a target? Something like “close 2 a day for 10 days”." }}
+						</p>
+						<p class="text-xs text-ink-gray-5">Optional and private. Your own history suggests the number.</p>
+						<Button size="sm" @click="showCreateChallenge = true">Set a target</Button>
+					</div>
+				</section>
+
 				<section class="grid grid-cols-1 gap-5 xl:grid-cols-3">
 					<div class="xl:col-span-2">
 						<PeriodBars
@@ -127,6 +147,7 @@
 
 		<DecideTodoDialog v-model="showDecide" :todos="decideQueue" @decided="scheduleReload" />
 		<StartFocusDialog v-model="showStartFocus" :preselect="focusPreselect" />
+		<CreateChallengeDialog v-model="showCreateChallenge" @created="loadChallenges" />
 	</div>
 </template>
 
@@ -136,6 +157,8 @@ import { useRouter } from "vue-router"
 import { call, TabButtons } from "frappe-ui"
 import DecideTodoDialog from "@spa/components/DecideTodoDialog.vue"
 import StartFocusDialog from "@/components/StartFocusDialog.vue"
+import ChallengeCard from "@/components/ChallengeCard.vue"
+import CreateChallengeDialog from "@/components/CreateChallengeDialog.vue"
 import HorizontalBars from "@spa/components/dashboard/HorizontalBars.vue"
 import PeriodBars from "@spa/components/dashboard/PeriodBars.vue"
 import StatCard from "@spa/components/dashboard/StatCard.vue"
@@ -159,6 +182,15 @@ const period = ref(readPeriod())
 const showDecide = ref(false)
 const decideQueue = ref([])
 const showStartFocus = ref(false)
+const showCreateChallenge = ref(false)
+const challenges = ref({ active: [], recent: [] })
+// A challenge that finished in the last week stays visible until a new one starts.
+const recentFinished = computed(() => {
+	const last = challenges.value.recent?.[0]
+	if (!last?.ended_on) return null
+	const days = (Date.now() - new Date(String(last.ended_on)).getTime()) / 86400000
+	return days <= 7 ? last : null
+})
 // Suggest the oldest stale ToDos first: focus is the strongest way to finally close them.
 const focusPreselect = computed(() => (data.value?.stale || []).slice(0, 3).map((todo) => todo.name))
 
@@ -236,6 +268,23 @@ async function load() {
 }
 
 let reloadTimer = null
+async function loadChallenges() {
+	try {
+		challenges.value = await call(`${API}.get_challenges`)
+	} catch {
+		challenges.value = { active: [], recent: [] }
+	}
+}
+
+async function endChallenge(challenge) {
+	if (!window.confirm(`End “${challenge.title}” now? The days so far stay counted.`)) return
+	try {
+		await call(`${API}.end_challenge`, { name: challenge.name })
+	} finally {
+		loadChallenges()
+	}
+}
+
 function scheduleReload() {
 	clearTimeout(reloadTimer)
 	reloadTimer = setTimeout(load, 300)
@@ -259,6 +308,12 @@ watch(period, (value) => {
 	load()
 })
 
-useUserRealtime("cockpit_todos_changed", load)
-onMounted(load)
+useUserRealtime("cockpit_todos_changed", () => {
+	load()
+	loadChallenges()
+})
+onMounted(() => {
+	load()
+	loadChallenges()
+})
 </script>
