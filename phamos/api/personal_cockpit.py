@@ -12,6 +12,7 @@ import frappe
 from phamos.api import department_cockpit as dc
 from phamos.api import personal_todos
 from phamos.api import personal_todo_dashboard
+from phamos.api import personal_todo_matrix
 
 CONFIG = dc.CockpitConfig(
 	label="Personal Cockpit",
@@ -356,3 +357,18 @@ def get_todo_dashboard(period=30):
 def decide_todo(name, action, date=None, reason=None):
 	"""Decide on one of my ToDos: today, later this week, a chosen date, or drop (with a reason)."""
 	return personal_todos.decide_todo(name, action, date=date, reason=reason)
+
+
+# Eisenhower matrix (phamos/phamos#1555) — logic in phamos.api.personal_todo_matrix.
+
+
+@frappe.whitelist()
+def get_todo_matrix(scope="week"):
+	"""Return my open ToDos sorted into the four Eisenhower quadrants."""
+	return personal_todo_matrix.get_matrix(scope=scope)
+
+
+@frappe.whitelist(methods=["POST"])
+def set_todo_quadrant(name, quadrant, date=None, payoff_note=None):
+	"""Move one of my ToDos into a quadrant (sets the important flag and, if needed, the date)."""
+	return personal_todo_matrix.set_quadrant(name, quadrant, date=date, payoff_note=payoff_note)

@@ -29,3 +29,8 @@ AGE_BUCKETS = (
 )
 
 DROP_REASONS = ("Not needed any more", "Done elsewhere", "Out of date", "Other")
+
+# Eisenhower matrix (#1555): a dated ToDo is urgent when it is due within this many working
+# days from today (overdue included). Each quadrant shows at most MATRIX_LIMIT ToDos.
+URGENT_WORKING_DAYS = 2
+MATRIX_LIMIT = 15
