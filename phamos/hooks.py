@@ -254,11 +254,13 @@ after_migrate = [
 permission_query_conditions = {
 	"Focus Session": "phamos.cockpits.permissions.focus_session_query",
 	"ToDo Challenge": "phamos.cockpits.permissions.todo_challenge_query",
+	"Day Plan": "phamos.cockpits.permissions.day_plan_query",
 }
 
 has_permission = {
 	"Focus Session": "phamos.cockpits.permissions.focus_session_has_permission",
 	"ToDo Challenge": "phamos.cockpits.permissions.todo_challenge_has_permission",
+	"Day Plan": "phamos.cockpits.permissions.day_plan_has_permission",
 }
 
 # DocType Class
@@ -448,6 +450,10 @@ scheduler_events = {
         "*/5 * * * *": [
             "phamos.api.personal_focus.expire_focus_sessions",
         ],
+        # Personal Cockpit: fix today's day plans that were never started (#1559).
+        "0 10 * * *": [
+            "phamos.api.personal_day_plan.freeze_day_plans",
+        ],
     },
 }
 
@@ -523,6 +529,7 @@ override_doctype_dashboards = {
 user_data_fields = [
 	{"doctype": "Focus Session", "filter_by": "user", "redact_fields": ["break_out_reason"]},
 	{"doctype": "ToDo Challenge", "filter_by": "user", "redact_fields": ["title"]},
+	{"doctype": "Day Plan", "filter_by": "user", "redact_fields": ["reflection"]},
 ]
 
 # Authentication and authorization

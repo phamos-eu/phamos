@@ -62,3 +62,15 @@ MAX_TARGET_PER_DAY = 10
 BASELINE_WORKING_DAYS = 20
 SUGGESTION_STRETCH = 1.2
 SUGGESTION_MAX = 5
+
+# My Day (#1559): plan few. A soft cap of MY_DAY_CAP ToDos and CAPACITY_MINUTES of estimated
+# work; ToDos without an estimate count as DEFAULT_ESTIMATE_MINUTES. The plan is fixed
+# ("planned") when the user starts the day, or at FREEZE_HOUR if they never do. A ToDo carried
+# over ROLLOVER_DECIDE times asks for a decision.
+MY_DAY_CAP = 6
+CAPACITY_MINUTES = 330
+DEFAULT_ESTIMATE_MINUTES = 30
+FREEZE_HOUR = 10
+ROLLOVER_DECIDE = 3
+CALIBRATION_DAYS = 90
+CALIBRATION_MIN_SAMPLES = 5

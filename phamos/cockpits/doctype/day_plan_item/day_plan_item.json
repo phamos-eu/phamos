@@ -1,0 +1,92 @@
+{
+ "actions": [],
+ "creation": "2026-10-15 01:00:00.000000",
+ "doctype": "DocType",
+ "engine": "InnoDB",
+ "field_order": [
+  "todo",
+  "summary",
+  "added_at",
+  "estimate_minutes",
+  "important_at_plan",
+  "carried_over",
+  "rollover_count",
+  "outcome",
+  "moved_to"
+ ],
+ "fields": [
+  {
+   "fieldname": "todo",
+   "fieldtype": "Link",
+   "label": "ToDo",
+   "options": "ToDo",
+   "reqd": 1,
+   "in_list_view": 1
+  },
+  {
+   "fieldname": "summary",
+   "fieldtype": "Data",
+   "label": "Summary",
+   "in_list_view": 1,
+   "read_only": 1
+  },
+  {
+   "fieldname": "added_at",
+   "fieldtype": "Datetime",
+   "label": "Added At",
+   "read_only": 1
+  },
+  {
+   "fieldname": "estimate_minutes",
+   "fieldtype": "Int",
+   "label": "Estimate (Minutes)",
+   "read_only": 1
+  },
+  {
+   "fieldname": "important_at_plan",
+   "fieldtype": "Check",
+   "label": "Important When Planned",
+   "read_only": 1
+  },
+  {
+   "fieldname": "carried_over",
+   "fieldtype": "Check",
+   "label": "Carried Over",
+   "read_only": 1
+  },
+  {
+   "fieldname": "rollover_count",
+   "fieldtype": "Int",
+   "label": "Times Carried Over",
+   "read_only": 1
+  },
+  {
+   "fieldname": "outcome",
+   "fieldtype": "Select",
+   "label": "Outcome",
+   "options": "Open\nDone\nMoved\nDropped",
+   "default": "Open",
+   "in_list_view": 1,
+   "read_only": 1
+  },
+  {
+   "fieldname": "moved_to",
+   "fieldtype": "Date",
+   "label": "Moved To",
+   "read_only": 1
+  }
+ ],
+ "links": [],
+ "modified": "2026-10-15 01:00:00.000000",
+ "modified_by": "Administrator",
+ "module": "Cockpits",
+ "name": "Day Plan Item",
+ "owner": "Administrator",
+ "sort_field": "creation",
+ "sort_order": "DESC",
+ "states": [],
+ "istable": 1,
+ "editable_grid": 1,
+ "permissions": [],
+ "track_changes": 0
+}
