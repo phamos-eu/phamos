@@ -48,3 +48,17 @@ FOCUS_GRACE_MINUTES = 15
 FOCUS_FREE_EXIT_SECONDS = 60
 BREAK_OUT_BASE_SECONDS = 10
 BREAK_OUT_MAX_SECONDS = 160
+
+# Challenges (#1557): self-set, opt-in targets. Jokers cover missed days (one per
+# JOKER_EVERY_DAYS working days, at least one, at most MAX_JOKERS); a missed day without a joker
+# is repaired by closing target + shortfall on the next working day. A challenge ends as
+# "Completed" or "Ended", never "Failed". The suggestion is the median closes per working day
+# over BASELINE_WORKING_DAYS × SUGGESTION_STRETCH, between 1 and MAX_TARGET_PER_DAY.
+CHALLENGE_KINDS = ("Closes per day", "Important per day")
+CHALLENGE_LENGTHS = (5, 10, 20)
+JOKER_EVERY_DAYS = 5
+MAX_JOKERS = 2
+MAX_TARGET_PER_DAY = 10
+BASELINE_WORKING_DAYS = 20
+SUGGESTION_STRETCH = 1.2
+SUGGESTION_MAX = 5

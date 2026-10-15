@@ -265,10 +265,12 @@ after_migrate = [
 # Personal Cockpit focus sessions are private, System Managers included (#1556).
 permission_query_conditions = {
 	"Focus Session": "phamos.cockpits.permissions.focus_session_query",
+	"ToDo Challenge": "phamos.cockpits.permissions.todo_challenge_query",
 }
 
 has_permission = {
 	"Focus Session": "phamos.cockpits.permissions.focus_session_has_permission",
+	"ToDo Challenge": "phamos.cockpits.permissions.todo_challenge_has_permission",
 }
 
 # DocType Class
@@ -452,6 +454,8 @@ scheduler_events = {
         "phamos.phamos.doctype.monthly_implementation_summary.monthly_implementation_summary.auto_close_fulfilled_mis",
         # Event tickets: payment status for payments booked without hooks
         "phamos.marketing.billing.sync_payment_status",
+        # Personal Cockpit: settle yesterday in running ToDo challenges (#1557)
+        "phamos.api.personal_challenges.evaluate_all_challenges",
     ],
     "weekly": [
         # Personal Cockpit: checklists left behind by ToDos deleted without hooks (#1554)
@@ -550,6 +554,7 @@ user_data_fields = [
 	{"doctype": "Attendee", "filter_by": "email", "redact_fields": ["first_name", "last_name", "full_name",
 		"phone", "company_name", "job_title", "notes", "follow_up_notes"]},
 	{"doctype": "Focus Session", "filter_by": "user", "redact_fields": ["break_out_reason"]},
+	{"doctype": "ToDo Challenge", "filter_by": "user", "redact_fields": ["title"]},
 ]
 
 # Authentication and authorization

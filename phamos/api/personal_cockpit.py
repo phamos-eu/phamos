@@ -14,6 +14,7 @@ from phamos.api import personal_todos
 from phamos.api import personal_todo_dashboard
 from phamos.api import personal_todo_matrix
 from phamos.api import personal_focus
+from phamos.api import personal_challenges
 
 CONFIG = dc.CockpitConfig(
 	label="Personal Cockpit",
@@ -424,3 +425,30 @@ def focus_park(todo, resume_note=None):
 def end_focus(outcome="Broke out", reason=None, resume_note=None):
 	"""End my focus session. Always allowed."""
 	return personal_focus.end_focus(outcome=outcome, reason=reason, resume_note=resume_note)
+
+
+# ToDo challenges (phamos/phamos#1557) — logic in phamos.api.personal_challenges.
+
+
+@frappe.whitelist()
+def get_challenges():
+	"""My running challenges with today's progress, and the latest finished ones."""
+	return personal_challenges.get_challenges()
+
+
+@frappe.whitelist()
+def suggest_challenge(kind="Closes per day"):
+	"""A target from my own history (median closes per working day × 1.2)."""
+	return personal_challenges.suggest_challenge(kind=kind)
+
+
+@frappe.whitelist(methods=["POST"])
+def create_challenge(kind, target_per_day, working_days=10, start_date=None, title=None):
+	return personal_challenges.create_challenge(
+		kind, target_per_day, working_days=working_days, start_date=start_date, title=title
+	)
+
+
+@frappe.whitelist(methods=["POST"])
+def end_challenge(name):
+	return personal_challenges.end_challenge(name)
