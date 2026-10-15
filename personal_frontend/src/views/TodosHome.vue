@@ -5,7 +5,7 @@
 				<p class="text-sm text-ink-gray-6">{{ headline }}</p>
 				<div class="flex items-center gap-2">
 					<TabButtons v-model="period" :buttons="PERIOD_BUTTONS" />
-					<Button variant="subtle" @click="router.push({ name: 'TodosList' })">Open the list</Button>
+					<Button variant="subtle" @click="router.push({ name: 'TodosPlan' })">{{ dayButton }}</Button>
 					<Button variant="solid" @click="showStartFocus = true">
 						<template #prefix><FeatherIcon name="target" class="h-4 w-4" /></template>
 						Start focus
@@ -183,6 +183,14 @@ const showDecide = ref(false)
 const decideQueue = ref([])
 const showStartFocus = ref(false)
 const showCreateChallenge = ref(false)
+const dayState = ref(null)
+// The one next step for the day: plan it, follow it, or see it closed (#1559).
+const dayButton = computed(() => {
+	const state = dayState.value
+	if (!state || state.status === "None" || (state.status === "Draft" && !state.planned)) return "Plan my day"
+	if (state.status === "Closed") return "Day done"
+	return `My day: ${state.done} of ${state.planned} done`
+})
 const challenges = ref({ active: [], recent: [] })
 // A challenge that finished in the last week stays visible until a new one starts.
 const recentFinished = computed(() => {
@@ -268,6 +276,14 @@ async function load() {
 }
 
 let reloadTimer = null
+async function loadDayState() {
+	try {
+		dayState.value = await call(`${API}.get_day_state`)
+	} catch {
+		dayState.value = null
+	}
+}
+
 async function loadChallenges() {
 	try {
 		challenges.value = await call(`${API}.get_challenges`)
@@ -311,9 +327,11 @@ watch(period, (value) => {
 useUserRealtime("cockpit_todos_changed", () => {
 	load()
 	loadChallenges()
+	loadDayState()
 })
 onMounted(() => {
 	load()
 	loadChallenges()
+	loadDayState()
 })
 </script>

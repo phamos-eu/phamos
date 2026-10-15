@@ -74,6 +74,8 @@ def on_trash(doc, method=None):
 	if frappe.db.table_exists("Focus Session Item"):
 		frappe.db.set_value("Focus Session", {"current_todo": doc.name}, "current_todo", None)
 		frappe.db.delete("Focus Session Item", {"todo": doc.name})
+	if frappe.db.table_exists("Day Plan Item"):
+		frappe.db.delete("Day Plan Item", {"todo": doc.name})
 	if doc.allocated_to:
 		frappe.publish_realtime(REALTIME_EVENT, {"name": doc.name}, user=doc.allocated_to, after_commit=True)
 
