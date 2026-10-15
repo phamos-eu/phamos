@@ -13,12 +13,18 @@ from frappe.custom.doctype.property_setter.property_setter import make_property_
 
 from phamos.cockpits.defaults import MODULE
 
+# Convention: custom fields on standard doctypes live in one section "Implementation Specific",
+# the last section of the doctype's main tab, so they never split a standard section.
+IMPLEMENTATION_SECTION = "custom_implementation_specific"
+# The section used to be called "Personal Cockpit" (fieldname cockpit_section, never released).
+OBSOLETE_TODO_FIELDS = ("cockpit_section",)
+
 TODO_FIELDS = [
 	{
-		"fieldname": "cockpit_section",
-		"label": "Personal Cockpit",
+		"fieldname": IMPLEMENTATION_SECTION,
+		"label": "Implementation Specific",
 		"fieldtype": "Section Break",
-		"insert_after": "allocated_to",
+		"insert_after": "assignment_rule",
 		"collapsible": 1,
 	},
 	{
@@ -27,7 +33,7 @@ TODO_FIELDS = [
 		"fieldtype": "Datetime",
 		"read_only": 1,
 		"no_copy": 1,
-		"insert_after": "cockpit_section",
+		"insert_after": IMPLEMENTATION_SECTION,
 		"description": "When the ToDo was closed or cancelled. Set automatically.",
 	},
 	{
@@ -101,6 +107,9 @@ def ensure_module():
 
 def ensure_todo_fields():
 	ensure_module()
+	for fieldname in OBSOLETE_TODO_FIELDS:
+		if frappe.db.exists("Custom Field", {"dt": "ToDo", "fieldname": fieldname}):
+			frappe.delete_doc("Custom Field", f"ToDo-{fieldname}", ignore_permissions=True, force=True)
 	create_custom_fields({"ToDo": [{**field, "module": MODULE} for field in TODO_FIELDS]}, update=True)
 	# A ToDo without a due date stays undated. Frappe's default "Today" made every ToDo
 	# created without a date look due today. Assignments still pass today explicitly.
