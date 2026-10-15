@@ -250,6 +250,15 @@ after_migrate = [
 #	"Event": "frappe.desk.doctype.event.event.has_permission",
 # }
 
+# Personal Cockpit focus sessions are private, System Managers included (#1556).
+permission_query_conditions = {
+	"Focus Session": "phamos.cockpits.permissions.focus_session_query",
+}
+
+has_permission = {
+	"Focus Session": "phamos.cockpits.permissions.focus_session_has_permission",
+}
+
 # DocType Class
 # ---------------
 # Override standard doctype classes
@@ -431,6 +440,10 @@ scheduler_events = {
         "30 */2 * * *": [
             "phamos.gitlab_integration.gitlab_utils.sync_gitlab_data_background",
         ],
+        # Personal Cockpit: end focus sessions that ran past their limit (#1556).
+        "*/5 * * * *": [
+            "phamos.api.personal_focus.expire_focus_sessions",
+        ],
     },
 }
 
@@ -501,6 +514,11 @@ override_doctype_dashboards = {
 #		"doctype": "{doctype_4}"
 #	}
 # ]
+
+# Personal Cockpit focus sessions belong to their user: exported and deleted with the user's data.
+user_data_fields = [
+	{"doctype": "Focus Session", "filter_by": "user", "redact_fields": ["break_out_reason"]},
+]
 
 # Authentication and authorization
 # --------------------------------

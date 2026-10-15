@@ -65,11 +65,15 @@ def on_update(doc, method=None):
 
 
 def on_trash(doc, method=None):
-	"""Remove the ToDo's checklists first, so deleting it does not fail on the link."""
+	"""Remove the ToDo's checklists and focus rows first, so deleting it does not fail on the link."""
 	for name in frappe.get_all(
 		"Checklist", filters={"document": "ToDo", "reference_record": doc.name}, pluck="name"
 	):
 		frappe.delete_doc("Checklist", name, ignore_permissions=True, force=True)
+	# Focus sessions keep their history, without the deleted ToDo (#1556).
+	if frappe.db.table_exists("Focus Session Item"):
+		frappe.db.set_value("Focus Session", {"current_todo": doc.name}, "current_todo", None)
+		frappe.db.delete("Focus Session Item", {"todo": doc.name})
 	if doc.allocated_to:
 		frappe.publish_realtime(REALTIME_EVENT, {"name": doc.name}, user=doc.allocated_to, after_commit=True)
 
