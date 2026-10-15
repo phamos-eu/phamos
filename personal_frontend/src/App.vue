@@ -16,6 +16,15 @@ const route = useRoute()
 
 const navItems = [
 	{
+		name: "Todos",
+		label: "ToDos",
+		icon: "check-circle",
+		match: ["Todos"],
+		children: [
+			{ name: "TodosList", label: "List", icon: "list", match: ["TodosList", "TodoDetail"] },
+		],
+	},
+	{
 		name: "Issues",
 		label: "Issues",
 		icon: "inbox",
@@ -50,6 +59,7 @@ const navItems = [
 ]
 
 const pageTitle = computed(() => {
+	if (["Todos", "TodosList", "TodoDetail"].includes(route.name)) return "My ToDos"
 	if (["Tasks", "TasksGantt", "TaskDetail"].includes(route.name)) return "My Tasks"
 	if (["ChecklistsHome", "Checklists", "ChecklistDetail"].includes(route.name)) return "My Checklists"
 	return "My Issues"

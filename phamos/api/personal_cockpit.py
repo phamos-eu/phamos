@@ -10,6 +10,7 @@ unchanged; the personal scope lives in department_cockpit (scope="personal").
 import frappe
 
 from phamos.api import department_cockpit as dc
+from phamos.api import personal_todos
 
 CONFIG = dc.CockpitConfig(
 	label="Personal Cockpit",
@@ -278,3 +279,56 @@ def create_task_from_issue(
 def add_task_dependency(name, depends_on):
 	"""Add a predecessor dependency to a Task (Gantt link mode)."""
 	return dc.add_task_dependency(CONFIG, name, depends_on)
+
+
+# ToDos (phamos/phamos#1541) — logic in phamos.api.personal_todos.
+
+
+@frappe.whitelist()
+def get_my_todos(include_closed=0):
+	"""Return my ToDos sorted by due date, then priority (High first)."""
+	return personal_todos.get_my_todos(include_closed=include_closed)
+
+
+@frappe.whitelist()
+def get_todo(name):
+	"""Return one of my ToDos."""
+	return personal_todos.get_todo(name)
+
+
+@frappe.whitelist()
+def get_todo_reference_types():
+	"""Reference types offered when creating a ToDo."""
+	return personal_todos.get_reference_types()
+
+
+@frappe.whitelist(methods=["POST"])
+def create_todo(description, date=None, priority=None, reference_type=None, reference_name=None):
+	"""Create a ToDo for me, optionally referencing a record."""
+	return personal_todos.create_todo(
+		description,
+		date=date,
+		priority=priority,
+		reference_type=reference_type,
+		reference_name=reference_name,
+	)
+
+
+@frappe.whitelist(methods=["POST"])
+def update_todo(name, description=None, date=None, priority=None, modified=None):
+	"""Update description, due date or priority of one of my ToDos."""
+	return personal_todos.update_todo(
+		name, description=description, date=date, priority=priority, modified=modified
+	)
+
+
+@frappe.whitelist(methods=["POST"])
+def close_todo(name):
+	"""Mark one of my ToDos as done."""
+	return personal_todos.set_status(name, "Closed")
+
+
+@frappe.whitelist(methods=["POST"])
+def reopen_todo(name):
+	"""Reopen one of my closed ToDos."""
+	return personal_todos.set_status(name, "Open")
