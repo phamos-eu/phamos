@@ -14,7 +14,10 @@ from frappe.custom.doctype.property_setter.property_setter import make_property_
 from phamos.cockpits.defaults import MODULE
 
 # Convention: custom fields on standard doctypes live in one section "Implementation Specific",
-# the last section of the doctype's main tab, so they never split a standard section.
+# the very first section of the form, never collapsed: they matter most to this implementation's
+# users. An empty insert_after puts the section above every standard field. This works because
+# ToDo starts with a Section Break; a doctype that starts with a Tab Break or a plain field needs
+# the section after that Tab Break, or a closing Section Break, so no standard field is swallowed.
 IMPLEMENTATION_SECTION = "custom_implementation_specific"
 # The section used to be called "Personal Cockpit" (fieldname cockpit_section, never released).
 OBSOLETE_TODO_FIELDS = ("cockpit_section",)
@@ -24,8 +27,8 @@ TODO_FIELDS = [
 		"fieldname": IMPLEMENTATION_SECTION,
 		"label": "Implementation Specific",
 		"fieldtype": "Section Break",
-		"insert_after": "assignment_rule",
-		"collapsible": 1,
+		"insert_after": "",
+		"collapsible": 0,
 	},
 	{
 		"fieldname": "cockpit_closed_on",
