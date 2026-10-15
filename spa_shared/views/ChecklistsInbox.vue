@@ -51,7 +51,7 @@
 						<StatusFilter v-model="statusFilter" :statuses="CHECKLIST_STATUSES" />
 					</div>
 					<div class="flex min-w-0 justify-center">
-						<ChecklistDoctypeFilter v-model="doctypeFilter" />
+						<ChecklistDoctypeFilter v-model="doctypeFilter" :doctypes="referenceDoctypes" />
 					</div>
 					<div class="flex min-w-0 justify-center">
 						<ListSortSelector
@@ -207,6 +207,7 @@
 			v-model="showCreate"
 			:create-method="`${API}.create_checklist`"
 			:reference-query="`${API}.checklist_reference_query`"
+			:doctypes="referenceDoctypes"
 			@created="onCreated"
 		/>
 	</div>
@@ -237,6 +238,8 @@ import { deskRecordUrl } from "@spa/utils/deskUrl.js"
 import spaConfig from "@/config"
 
 const API = spaConfig.api
+// The Personal Cockpit also attaches checklists to ToDos (#1554).
+const referenceDoctypes = spaConfig.personal ? ["Issue", "Task", "ToDo"] : ["Issue", "Task"]
 const CHECKLIST_API = "phamos.api.checklist_inbox"
 const route = useRoute()
 const router = useRouter()

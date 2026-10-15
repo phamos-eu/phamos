@@ -146,6 +146,16 @@ def _personal_reference_names():
 	return names
 
 
+def _personal_todo_names():
+	"""My ToDos that can carry checklists: allocated to me and not cancelled."""
+	return frappe.get_all(
+		"ToDo",
+		filters={"allocated_to": frappe.session.user, "status": ("!=", "Cancelled")},
+		pluck="name",
+		limit_page_length=0,
+	)
+
+
 def _is_assigned(doctype, name):
 	return bool(
 		frappe.db.exists(
@@ -816,6 +826,16 @@ def _department_checklist_rows(config, fields, filters=None, limit=10000):
 			merged[row.name] = row
 
 	if config.is_personal:
+		todo_names = _personal_todo_names()
+		if todo_names:
+			for row in frappe.get_list(
+				"Checklist",
+				filters={**filters, "document": "ToDo", "reference_record": ("in", todo_names)},
+				fields=fields,
+				order_by="modified desc",
+				limit_page_length=limit,
+			):
+				merged[row.name] = row
 		# Checklists I own count as mine, wherever they are attached.
 		for row in frappe.get_list(
 			"Checklist",
@@ -991,6 +1011,8 @@ def create_checklist(
 	department = _require_department(config)
 	issue_names, task_names = _department_checklist_references(config, department)
 	allowed = {"Issue": set(issue_names), "Task": set(task_names)}
+	if config.is_personal:
+		allowed["ToDo"] = set(_personal_todo_names())
 	if document not in allowed or reference_record not in allowed[document]:
 		if config.is_personal:
 			frappe.throw(_("Select one of your Issues or Tasks."))
@@ -1013,6 +1035,8 @@ def checklist_reference_query(config, doctype, txt, searchfield, start, page_len
 	department = _require_department(config)
 	issue_names, task_names = _department_checklist_references(config, department)
 	allowed = {"Issue": issue_names, "Task": task_names}
+	if config.is_personal and doctype == "ToDo":
+		return _todo_reference_query(txt, start, page_len)
 	if doctype not in allowed or not allowed[doctype]:
 		return []
 
@@ -1030,6 +1054,21 @@ def checklist_reference_query(config, doctype, txt, searchfield, start, page_len
 		limit_page_length=frappe.utils.cint(page_len),
 		as_list=True,
 	)
+
+
+def _todo_reference_query(txt, start, page_len):
+	"""Search my open ToDos by their text, for the "New checklist" dialog."""
+	from phamos.api.personal_todos import _summary
+
+	rows = frappe.get_list(
+		"ToDo",
+		filters={"allocated_to": frappe.session.user, "status": "Open", "description": ("like", f"%{txt}%")},
+		fields=["name", "description"],
+		order_by="modified desc",
+		limit_start=frappe.utils.cint(start),
+		limit_page_length=frappe.utils.cint(page_len),
+	)
+	return [[row.name, _summary(row.description)] for row in rows]
 
 
 def update_task_status(config: CockpitConfig, name, status):
