@@ -173,6 +173,23 @@ class TestTicketing(FrappeTestCase):
 		self.assertEqual(mail["reference_name"], result["reference"])
 		self.assertTrue(any(a["fname"].endswith(".ics") for a in mail["attachments"]))
 
+	def test_ticket_holders_with_email_get_their_own_ticket(self, enqueue):
+		companions = [{"full_name": "Max Mit Mail", "email": "max@ticket.example"}, {"full_name": "Ohne Mail"}]
+		self.order(companions=companions)
+		jobs = [c.kwargs for c in enqueue.call_args_list]
+		# The buyer's confirmation (all tickets) plus one ticket for the companion with an email.
+		self.assertEqual([j["recipient"] for j in jobs if "recipient" in j], ["erika@ticket.example"])
+		tickets = [j for j in jobs if j.get("attendee")]
+		self.assertEqual(len(tickets), 1)
+		self.assertEqual(frappe.db.get_value("Attendee", tickets[0]["attendee"], "email"), "max@ticket.example")
+		job_args = {k: v for k, v in tickets[0].items() if k not in ("enqueue_after_commit", "queue", "timeout", "now")}
+		with patch("frappe.sendmail") as sendmail:
+			ticketing.send_ticket(**job_args)
+		mail = sendmail.call_args.kwargs
+		self.assertEqual(mail["recipients"], ["max@ticket.example"])
+		self.assertEqual(mail["template"], "event_ticket")
+		self.assertTrue(any(a["fname"].endswith(".ics") for a in mail["attachments"]))
+
 	def test_offer(self, enqueue):
 		offer = ticketing.offer(self.event.name)
 		self.assertTrue(offer.sale_open)

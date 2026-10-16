@@ -331,7 +331,7 @@
 					<button type="button" class="wp-button wp-button-sm" data-wp-add-person>+ {{ _("Add person") }}</button>
 					{%- if not t.free %}<span class="wp-people-total"><span>{{ _("Total") }}</span> <strong data-wp-people-total></strong></span>{% endif %}
 				</div>
-				<p class="wp-legal" data-wp-people-hint>{{ _("Tickets go to your email unless you add one for a person.") }}</p>
+				<p class="wp-legal" data-wp-people-hint>{{ _("You receive all tickets. With an email, a person also gets their own.") }}</p>
 				<p class="wp-legal" data-wp-people-max hidden>{{ _("At most {0} tickets per order.").format(t.max_per_order) }}</p>
 			</div>
 			<input type="hidden" name="qty" value="1" data-wp-qty>

@@ -366,6 +366,11 @@ def _register(event, contact, attends, companions, billing_data, source, lang, e
 	frappe.enqueue("phamos.marketing.ticketing.send_order_confirmation", enqueue_after_commit=True,
 		event_name=doc.name, reference=reference, reference_doctype=reference_doctype, recipient=main.email,
 		buyer_name=main.full_name, lang=lang)
+	# The main contact gets every ticket (above); a ticket holder with an email of their own also gets theirs.
+	for att in docs:
+		if not att.is_buyer and att.email and att.email != main.email:
+			frappe.enqueue("phamos.marketing.ticketing.send_ticket", enqueue_after_commit=True,
+				attendee=att.name, buyer_name=main.full_name, lang=lang)
 	return {"ok": True, "reference": reference, "reference_doctype": reference_doctype, "attendees": len(docs),
 		"paid": paid, "tickets_to": main.email, "consent_token": consent_token(reference), "pdf_url": pdf_url}
 
@@ -438,3 +443,31 @@ def send_order_confirmation(event_name, reference, recipient, reference_doctype=
 		reference_doctype=reference_doctype if order else "Marketing Content",
 		reference_name=reference if order else event,
 	)
+
+
+def send_ticket(attendee, buyer_name=None, lang="de"):
+	"""A ticket holder's own ticket: name, event, date, venue and the calendar file. No prices and no
+	billing details: those belong to the buyer, who got the full confirmation with every ticket."""
+	from phamos.marketing.web import build_ics
+	from phamos.web_profile.sections import find_item
+
+	att = frappe.get_doc("Attendee", attendee)
+	if not att.email:
+		return
+	doc = frappe.get_doc("Marketing Content", att.event)
+	frappe.local.lang = lang if lang in ("de", "en") else "de"
+	item = find_item("events", doc.route, frappe.local.lang) if doc.published else None
+	attachments = [{"fname": f"{item.slug}.ics", "fcontent": build_ics(item)}] if item and doc.starts_on else []
+	frappe.sendmail(
+		recipients=[att.email],
+		attachments=attachments,
+		subject=_("Your ticket for {0}").format(doc.title),
+		template="event_ticket",
+		args={"event": doc, "attendee": att, "buyer_name": buyer_name, "reference": att.order_reference,
+			"event_url": frappe.utils.get_url(item.url) if item else None,
+			"privacy_url": frappe.utils.get_url("/en/privacy" if lang == "en" else "/de/datenschutz"),
+			"imprint_url": frappe.utils.get_url("/en/imprint" if lang == "en" else "/de/impressum")},
+		reference_doctype="Attendee",
+		reference_name=att.name,
+	)
+

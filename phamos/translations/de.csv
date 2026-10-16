@@ -542,6 +542,7 @@ Tickets go to your email unless you add one for a person.,"Die Tickets gehen an 
 Event date,Termin
 Tickets to,Tickets an
 Order: {0},Bestellung: {0}
+Order number,Bestellnummer
 Registration: {0},Anmeldung: {0}
 Pos.,Pos.
 Description,Bezeichnung
@@ -581,3 +582,10 @@ Back to the event,Zurück zur Veranstaltung
 All events,Alle Veranstaltungen
 Your order as PDF,Ihre Bestellung als PDF
 Ticket,Ticket
+"You receive all tickets. With an email, a person also gets their own.",Sie erhalten alle Tickets. Mit E-Mail-Adresse bekommt eine Person zusätzlich ihr eigenes.
+You receive all tickets. Ticket holders with an email address listed above also receive their own ticket.,Sie erhalten alle Tickets. Ticketinhaber mit oben genannter E-Mail-Adresse erhalten zusätzlich ihr eigenes Ticket.
+Your ticket for {0},Ihr Ticket für {0}
+{0} booked a ticket for you for {1}.,{0} hat für Sie ein Ticket für {1} gebucht.
+Here is your ticket for {0}.,Hier ist Ihr Ticket für {0}.
+Questions? Simply reply to this email.,Fragen? Antworten Sie einfach auf diese E-Mail.
+You receive this email because your email address was given for this ticket.,"Sie erhalten diese E-Mail, weil Ihre E-Mail-Adresse für dieses Ticket angegeben wurde."

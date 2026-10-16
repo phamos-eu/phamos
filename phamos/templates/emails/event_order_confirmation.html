@@ -24,7 +24,7 @@
 	<li>{{ row.full_name | e }}{% if row.ticket_type and order %} ({{ row.ticket_type | e }}){% endif %}{% if row.email and row.email != recipient %}, {{ row.email | e }}{% endif %}</li>
 	{%- endfor %}
 </ul>
-<p>{{ _("All tickets and information about the event are sent to {0}.").format(recipient | e) }}</p>
+<p>{{ _("You receive all tickets. Ticket holders with an email address listed above also receive their own ticket.") if attendees | selectattr("email") | rejectattr("email", "equalto", recipient) | list else _("All tickets and information about the event are sent to {0}.").format(recipient | e) }}</p>
 
 {%- if order %}
 <table cellpadding="4" style="border-collapse:collapse">
