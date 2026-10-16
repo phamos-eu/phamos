@@ -13,6 +13,7 @@
 		@focus="focused = true; emit('focus')"
 		@blur="onBlur"
 		@keydown.enter.prevent
+		@keydown="onKeydown"
 		@paste="onPaste"
 	></div>
 </template>
@@ -50,6 +51,18 @@ function onBlur() {
 	focused.value = false
 	render(props.modelValue)
 	emit("blur")
+}
+
+function onKeydown(event) {
+	// Select-all selects this field's text, like in an <input>.
+	if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === "a") {
+		event.preventDefault()
+		const range = document.createRange()
+		range.selectNodeContents(el.value)
+		const selection = window.getSelection()
+		selection.removeAllRanges()
+		selection.addRange(range)
+	}
 }
 
 function onPaste(event) {
