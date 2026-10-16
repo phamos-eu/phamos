@@ -351,6 +351,7 @@ def extract_from_pdf_for_review(accounting_receipt_name):
 	Extract data from PDF and return it for user review (no update).
 	Returns { ok, extracted, fields } where fields = [ { fieldname, label, fieldtype, value } ] for the dialog.
 	"""
+	frappe.has_permission("Accounting Receipt", "write", doc=accounting_receipt_name, throw=True)
 	extracted, err = _extract_from_pdf_only(accounting_receipt_name)
 	if err:
 		if err.get("reason") == "error":
@@ -366,6 +367,7 @@ def extract_from_pdf_now(accounting_receipt_name):
 	Run PDF extraction synchronously and return result (for debugging / manual "Extract from PDF" button).
 	Returns dict with ok, reason, updated, skipped, and on error: message or traceback.
 	"""
+	frappe.has_permission("Accounting Receipt", "write", doc=accounting_receipt_name, throw=True)
 	result = extract_from_pdf_and_update_ar(accounting_receipt_name)
 	# If exception was logged, include link to Error Log
 	if not result.get("ok") and result.get("reason") == "error":

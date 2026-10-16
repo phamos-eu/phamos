@@ -70,6 +70,8 @@
 				:extract-error-message="extractErrorMessage"
 				@close="closeReceipt"
 				@review-correct="onReviewCorrect"
+				@run-extract="runExtract"
+				@send-to-datev="sendToDatev"
 			/>
 		</aside>
 
@@ -201,37 +203,64 @@ function startExtractPolling(name) {
 	pollTimer = setInterval(() => pollExtractStatus(name), POLL_INTERVAL_MS)
 }
 
-async function startBackgroundExtract(receipt) {
+async function showExtractState(receipt) {
+	// Opening a receipt only shows the extraction state; it never starts a new run,
+	// because a run overwrites the values a human may have corrected.
 	if (!receipt?.has_pdf) {
-		extractStatus.value = "idle"
-		extractUpdatedCount.value = 0
-		extractErrorMessage.value = ""
+		applyExtractStatus({ status: "idle" })
 		return
 	}
-
 	const current = await call(`${API}.get_receipt_extract_status`, { name: receipt.name })
 	applyExtractStatus(current)
-	if (current.status === "running") {
-		startExtractPolling(receipt.name)
+	if (current.status === "running") startExtractPolling(receipt.name)
+}
+
+async function runExtract() {
+	const receipt = selectedReceipt.value
+	if (!receipt?.has_pdf) return
+	try {
+		const res = await call(`${API}.enqueue_receipt_pdf_extract`, { name: receipt.name })
+		if (res?.queued || res?.reason === "already_running") {
+			extractStatus.value = "running"
+			startExtractPolling(receipt.name)
+		}
+	} catch (e) {
+		toast({
+			title: e?.messages?.[0] || e?.message || "Could not start the extraction",
+			icon: "x-circle",
+			iconClasses: "text-ink-red-4",
+		})
+	}
+}
+
+async function sendToDatev() {
+	const receipt = selectedReceipt.value
+	if (!receipt) return
+	const info = await call("phamos.phamos.doctype.accounting_receipt.accounting_receipt.get_datev_send_info", {
+		accounting_receipt_name: receipt.name,
+	})
+	if (!info?.ok || !info.recipient || !info.pdf_url) {
+		toast({
+			title: info?.message || (!info?.recipient ? "No DATEV recipient is configured." : "PDF attachment is missing."),
+			icon: "x-circle",
+			iconClasses: "text-ink-red-4",
+		})
 		return
 	}
-
-	const res = await call(`${API}.enqueue_receipt_pdf_extract`, { name: receipt.name })
-	if (res?.queued) {
-		extractStatus.value = "running"
-		startExtractPolling(receipt.name)
-		return
-	}
-
-	if (res?.reason === "already_running") {
-		extractStatus.value = "running"
-		startExtractPolling(receipt.name)
-		return
-	}
-
-	if (res?.reason === "no_attachment") {
-		extractStatus.value = "idle"
-	}
+	const question = info.already_sent
+		? `Already sent on ${info.sent_at} by ${info.sent_by}. Send ${info.pdf_name} to ${info.recipient} again?`
+		: `Send ${info.pdf_name} to ${info.recipient}?`
+	if (!window.confirm(question)) return
+	const res = await call("phamos.phamos.doctype.accounting_receipt.accounting_receipt.send_to_datev", {
+		accounting_receipt_name: receipt.name,
+	})
+	toast({
+		title: res?.message || (res?.ok ? "Queued for DATEV." : "Sending failed."),
+		icon: res?.ok ? "check-circle" : "x-circle",
+		iconClasses: res?.ok ? "text-ink-green-3" : "text-ink-red-4",
+	})
+	await loadReceipts()
+	await refreshSelectedReceipt()
 }
 
 async function loadReceipts() {
@@ -259,7 +288,7 @@ async function openReceipt(name) {
 	detailLoading.value = true
 	try {
 		selectedReceipt.value = await call(`${API}.get_receipt`, { name })
-		await startBackgroundExtract(selectedReceipt.value)
+		await showExtractState(selectedReceipt.value)
 	} finally {
 		detailLoading.value = false
 	}
@@ -286,6 +315,11 @@ async function onKanbanStatusChange({ name, status }) {
 		await loadReceipts()
 		if (selectedName.value === name) selectedReceipt.value = updated
 	} catch (e) {
+		toast({
+			title: e?.messages?.[0] || e?.message || "Could not move the receipt",
+			icon: "x-circle",
+			iconClasses: "text-ink-red-4",
+		})
 		await loadReceipts()
 	}
 }

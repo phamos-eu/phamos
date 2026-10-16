@@ -80,11 +80,27 @@
 					{{ extractErrorMessage }}
 				</span>
 				<span v-else class="text-gray-500 dark:text-gray-400">
-					PDF attached — extraction will start automatically.
+					PDF attached. "Read PDF with AI" fills the fields from it and replaces their current values.
 				</span>
 			</div>
 
-			<div class="flex flex-col gap-2 sm:flex-row">
+			<div class="flex flex-col flex-wrap gap-2 sm:flex-row">
+				<button
+					type="button"
+					class="inline-flex items-center justify-center rounded-md border border-gray-300 px-3 py-2 text-sm font-medium text-gray-800 hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-50 dark:border-gray-600 dark:text-gray-200 dark:hover:bg-gray-800"
+					:disabled="!receipt.has_pdf || extractStatus === 'running'"
+					@click="emit('run-extract')"
+				>
+					Read PDF with AI
+				</button>
+				<button
+					type="button"
+					class="inline-flex items-center justify-center rounded-md border border-gray-300 px-3 py-2 text-sm font-medium text-gray-800 hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-50 dark:border-gray-600 dark:text-gray-200 dark:hover:bg-gray-800"
+					:disabled="!receipt.has_pdf"
+					@click="emit('send-to-datev')"
+				>
+					{{ receipt.sent_to_datev ? "Resend to DATEV" : "Send to DATEV" }}
+				</button>
 				<button
 					type="button"
 					class="inline-flex items-center justify-center rounded-md border border-gray-300 px-3 py-2 text-sm font-medium text-gray-800 hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-50 dark:border-gray-600 dark:text-gray-200 dark:hover:bg-gray-800"
@@ -132,7 +148,7 @@ const props = defineProps({
 	extractErrorMessage: { type: String, default: "" },
 })
 
-const emit = defineEmits(["close", "review-correct"])
+const emit = defineEmits(["close", "review-correct", "run-extract", "send-to-datev"])
 
 const pdfUrl = computed(() => {
 	const url = (props.receipt?.attachment || "").trim()

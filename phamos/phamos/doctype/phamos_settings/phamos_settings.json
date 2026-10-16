@@ -81,7 +81,15 @@
   "lead_scan_tab",
   "lead_scan_section",
   "lead_handoff_auto_create_min_score",
-  "lead_handoff_improve_fields"
+  "lead_handoff_improve_fields",
+  "accounting_receipt_tab",
+  "datev_section",
+  "datev_recipients",
+  "datev_note_templates",
+  "ai_accountant_section",
+  "ai_accountant_enabled",
+  "column_break_ai_accountant",
+  "ai_accountant_user"
  ],
  "fields": [
   {
@@ -504,12 +512,58 @@
    "fieldtype": "Table",
    "label": "Improve Dialog Fields",
    "options": "Lead Handoff Improve Field"
+  },
+  {
+   "fieldname": "accounting_receipt_tab",
+   "fieldtype": "Tab Break",
+   "label": "Accounting Receipt"
+  },
+  {
+   "fieldname": "datev_section",
+   "fieldtype": "Section Break",
+   "label": "DATEV Upload"
+  },
+  {
+   "fieldname": "datev_recipients",
+   "fieldtype": "Table",
+   "label": "DATEV Recipients",
+   "options": "DATEV Recipient",
+   "description": "DATEV upload addresses. A receipt goes to the row whose Receipt Types contain its type, otherwise to the default row."
+  },
+  {
+   "fieldname": "datev_note_templates",
+   "fieldtype": "Small Text",
+   "label": "DATEV Note Templates",
+   "description": "Text blocks for the note stamped on the PDF for the accounting office. Separate blocks with a line containing only ---; the first line of a block is its label. Placeholders: {project}, {cost_center}, {supplier_name}, {sum}."
+  },
+  {
+   "fieldname": "ai_accountant_section",
+   "fieldtype": "Section Break",
+   "label": "AI Accountant"
+  },
+  {
+   "default": "0",
+   "fieldname": "ai_accountant_enabled",
+   "fieldtype": "Check",
+   "label": "Enable AI Accountant",
+   "description": "Lets the AI Accountant process incoming receipts automatically. Keep this off until the decision rules are tested."
+  },
+  {
+   "fieldname": "column_break_ai_accountant",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "ai_accountant_user",
+   "fieldtype": "Link",
+   "label": "AI Accountant User",
+   "options": "User",
+   "description": "System user the AI Accountant works as, so its changes are separated from human corrections in the document history."
   }
  ],
  "index_web_pages_for_search": 1,
  "issingle": 1,
  "links": [],
- "modified": "2026-10-14 10:00:00.000000",
+ "modified": "2026-10-16 12:00:00.000000",
  "modified_by": "Administrator",
  "module": "Phamos",
  "name": "phamos Settings",
