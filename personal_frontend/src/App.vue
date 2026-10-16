@@ -19,17 +19,22 @@
 				</div>
 			</div>
 		</template>
+		<template #header-actions>
+			<CheckinButton />
+		</template>
 	</CockpitShell>
 </template>
 
 <script setup>
-import { computed, onMounted, watch } from "vue"
+import { computed, onBeforeUnmount, onMounted, watch } from "vue"
 import { useRoute, useRouter } from "vue-router"
 import CockpitShell from "@spa/components/CockpitShell.vue"
 import CockpitSidebar from "@spa/components/CockpitSidebar.vue"
 import { useUserRealtime } from "@spa/composables/useUserRealtime.js"
 import { parseServerTime } from "@spa/utils/focusRules.js"
 import { focus, loadFocus } from "./focusStore.js"
+import { checkin, loadCheckin } from "./checkinStore.js"
+import CheckinButton from "./components/CheckinButton.vue"
 
 const route = useRoute()
 const router = useRouter()
@@ -53,9 +58,35 @@ watch(
 	}
 )
 
-onMounted(loadFocus)
+// Check-ins (#1571): live from other tabs, the HRMS app and Desk, and again when the tab returns.
+useUserRealtime("cockpit_checkin_changed", loadCheckin, { debounceMs: 300 })
 
-const navItems = [
+function onVisible() {
+	if (document.visibilityState === "visible") loadCheckin()
+}
+
+onMounted(() => {
+	loadFocus()
+	loadCheckin()
+	document.addEventListener("visibilitychange", onVisible)
+})
+onBeforeUnmount(() => document.removeEventListener("visibilitychange", onVisible))
+
+// Check-ins (#1571) appear for users with an active Employee only.
+const CHECKIN_ITEM = {
+	name: "Checkins",
+	label: "Check-ins",
+	icon: "clock",
+	match: ["Checkins"],
+	children: [{ name: "CheckinsList", label: "List", icon: "list", match: ["CheckinsList"] }],
+}
+const navItems = computed(() => {
+	const items = [...BASE_ITEMS]
+	if (checkin.state?.available && checkin.state.employee) items.splice(1, 0, CHECKIN_ITEM)
+	return items
+})
+
+const BASE_ITEMS = [
 	{
 		name: "Todos",
 		label: "ToDos",
@@ -103,6 +134,7 @@ const navItems = [
 
 const pageTitle = computed(() => {
 	if (route.name === "TodosFocus") return "Focus"
+	if (["Checkins", "CheckinsList"].includes(route.name)) return "My Check-ins"
 	if (["Todos", "TodosList", "TodoDetail", "TodosMatrix", "TodosPlan"].includes(route.name)) return "My ToDos"
 	if (["Tasks", "TasksGantt", "TaskDetail"].includes(route.name)) return "My Tasks"
 	if (["ChecklistsHome", "Checklists", "ChecklistDetail"].includes(route.name)) return "My Checklists"

@@ -16,6 +16,7 @@ from phamos.api import personal_todo_matrix
 from phamos.api import personal_focus
 from phamos.api import personal_challenges
 from phamos.api import personal_day_plan
+from phamos.api import personal_checkin
 
 CONFIG = dc.CockpitConfig(
 	label="Personal Cockpit",
@@ -502,3 +503,36 @@ def start_day(date=None):
 def shutdown_day(decisions=None, reflection=None, date=None):
 	"""Close the day with a decision for every open ToDo on the plan."""
 	return personal_day_plan.shutdown_day(decisions=decisions, reflection=reflection, date=date)
+
+
+# Check-in and check-out (phamos/phamos#1571) — logic in phamos.api.personal_checkin.
+
+
+@frappe.whitelist()
+def get_checkin_state():
+	"""My last check-in, the next action (IN/OUT) and today's logs with worked minutes."""
+	return personal_checkin.get_checkin_state()
+
+
+@frappe.whitelist(methods=["POST"])
+def add_checkin(log_type, latitude=None, longitude=None):
+	"""Check in or out now (server time). Refused when it is not the expected next action."""
+	return personal_checkin.add_checkin(log_type, latitude=latitude, longitude=longitude)
+
+
+@frappe.whitelist(methods=["POST"])
+def revoke_checkin(name):
+	"""Undo a check-in I made moments ago."""
+	return personal_checkin.revoke_checkin(name)
+
+
+@frappe.whitelist()
+def get_checkin_dashboard(period=30):
+	"""Worked time per day, typical start and end, and days without a check-out."""
+	return personal_checkin.get_checkin_dashboard(period=period)
+
+
+@frappe.whitelist()
+def get_my_checkins(start=0, page_length=100):
+	"""All my check-ins, newest first, a page at a time."""
+	return personal_checkin.get_my_checkins(start=start, page_length=page_length)

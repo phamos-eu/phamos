@@ -3,6 +3,8 @@ import ChecklistsHome from "@spa/views/ChecklistsHome.vue"
 import TodosInbox from "./views/TodosInbox.vue"
 import TodosHome from "./views/TodosHome.vue"
 import TodosMatrix from "./views/TodosMatrix.vue"
+import CheckinsHome from "./views/CheckinsHome.vue"
+import CheckinsList from "./views/CheckinsList.vue"
 import TodosPlan from "./views/TodosPlan.vue"
 import spaConfig from "./config"
 import TodosFocus from "./views/TodosFocus.vue"
@@ -19,6 +21,8 @@ const router = createSpaRouter({
 		{ path: "/todos/focus", name: "TodosFocus", component: TodosFocus },
 		{ path: "/todos/plan/:date?", name: "TodosPlan", component: TodosPlan },
 		{ path: "/checklists/home", name: "ChecklistsHome", component: ChecklistsHome },
+		{ path: "/checkins", name: "Checkins", component: CheckinsHome },
+		{ path: "/checkins/list", name: "CheckinsList", component: CheckinsList },
 	],
 })
 

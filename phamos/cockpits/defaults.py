@@ -79,3 +79,10 @@ CALIBRATION_MIN_SAMPLES = 5
 # the plan was fixed (or on a plan that was never fixed); everything else is "spontaneous".
 # Quick wins count as spontaneous for that challenge kind, at most SPONTANEOUS_MICRO_MAX a day.
 SPONTANEOUS_MICRO_MAX = 2
+
+# Check-in and check-out (#1571). Logs made in the Personal Cockpit carry CHECKIN_DEVICE_ID. After a
+# log the cockpit offers an undo for CHECKIN_UNDO_SECONDS; the server accepts a revoke for
+# CHECKIN_REVOKE_SECONDS, which leaves room for a slow network or a second tab.
+CHECKIN_DEVICE_ID = "Personal Cockpit"
+CHECKIN_UNDO_SECONDS = 10
+CHECKIN_REVOKE_SECONDS = 60

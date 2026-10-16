@@ -209,7 +209,8 @@
 <script setup>
 import { computed, onBeforeUnmount, onMounted, ref, watch } from "vue"
 import { useRouter } from "vue-router"
-import { call, TextEditor, toast } from "frappe-ui"
+import { call, TextEditor } from "frappe-ui"
+import { notify } from "@spa/utils/notify.js"
 import LinkedChecklistsSection from "@spa/components/LinkedChecklistsSection.vue"
 import { pluralize } from "@spa/utils/dashboardFormat.js"
 import { formatDate, formatDatetime } from "@spa/utils/datetime.js"
@@ -331,7 +332,7 @@ async function act(kind, method, args) {
 		return true
 	} catch (e) {
 		dialogError.value = errorText(e, "That did not work")
-		if (!showPark.value && !showBreakOut.value) toast.error(dialogError.value)
+		if (!showPark.value && !showBreakOut.value) notify.error(dialogError.value)
 		return false
 	} finally {
 		acting.value = ""
@@ -352,7 +353,7 @@ async function markDone() {
 	const name = current.value.todo
 	if (await act("done", "focus_mark_done", { todo: name })) {
 		detail.value = null
-		toast.success("Done. One less.")
+		notify.success("Done. One less.")
 	}
 }
 
@@ -402,9 +403,9 @@ async function capture() {
 	try {
 		await call(`${API}.create_todo`, { description: text })
 		captureText.value = ""
-		toast.success("Captured for later.")
+		notify.success("Captured for later.")
 	} catch (e) {
-		toast.error(errorText(e, "Could not capture the ToDo"))
+		notify.error(errorText(e, "Could not capture the ToDo"))
 	} finally {
 		capturing.value = false
 	}
