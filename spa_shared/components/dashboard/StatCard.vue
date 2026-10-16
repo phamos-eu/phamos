@@ -6,6 +6,7 @@
 		<div v-if="lines.length" class="mt-3 space-y-1 text-xs text-ink-gray-6">
 			<div v-for="line in lines" :key="line">{{ line }}</div>
 		</div>
+		<slot />
 	</div>
 </template>
 

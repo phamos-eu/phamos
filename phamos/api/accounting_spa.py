@@ -11,6 +11,7 @@ from frappe.desk.form.load import get_assignments
 from frappe.utils import flt, get_fullname
 
 from phamos.api import department_cockpit as dc
+from phamos.api.accounting_stats import can_read_statistics
 from phamos.api.issue_common import _parse_assignees, _parse_list
 
 CONFIG = dc.CockpitConfig(
@@ -63,6 +64,7 @@ def get_accounting_settings():
 	"""Return Accounting SPA configuration for the frontend."""
 	settings = dc.get_settings(CONFIG, read_permission=_accounting_settings_permission)
 	settings["can_read_monthly_implementation_summary"] = 1 if _can_read_mis() else 0
+	settings["can_read_statistics"] = 1 if can_read_statistics() else 0
 	return settings
 
 

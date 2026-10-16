@@ -20,6 +20,7 @@ import spaConfig from "./config"
 
 const route = useRoute()
 const canReadMis = ref(false)
+const canReadStatistics = ref(false)
 
 const baseNavItems = [
 	{
@@ -56,10 +57,16 @@ const misNavItem = {
 	match: ["MisList", "MisDetail"],
 }
 
-const navItems = computed(() => {
-	if (!canReadMis.value) return baseNavItems
-	return [...baseNavItems, misNavItem]
-})
+const statisticsNavItems = [
+	{ name: "PaymentsCalendar", label: "Payment calendar", icon: "calendar", match: ["PaymentsCalendar"] },
+	{ name: "ReceiptStatistics", label: "Statistics", icon: "bar-chart", match: ["ReceiptStatistics"] },
+]
+
+const navItems = computed(() => [
+	...baseNavItems,
+	...(canReadStatistics.value ? statisticsNavItems : []),
+	...(canReadMis.value ? [misNavItem] : []),
+])
 
 const pageTitle = computed(() => {
 	if (route.name === "Tasks" || route.name === "TasksGantt" || route.name === "TaskDetail") {
@@ -67,6 +74,8 @@ const pageTitle = computed(() => {
 	}
 	if (route.name === "Checklists" || route.name === "ChecklistDetail") return "Checklists"
 	if (route.name === "Receipts" || route.name === "ReceiptDetail") return "Receipts"
+	if (route.name === "PaymentsCalendar") return "Payment calendar"
+	if (route.name === "ReceiptStatistics") return "Statistics"
 	if (route.name === "MisList" || route.name === "MisDetail") {
 		return "Monthly Implementation Summary"
 	}
@@ -86,6 +95,12 @@ const pageSubtitle = computed(() => {
 	if (route.name === "Receipts" || route.name === "ReceiptDetail") {
 		return "Accounting receipts — review, decide payment, send to DATEV"
 	}
+	if (route.name === "PaymentsCalendar") {
+		return "Approved receipts and open Payment Requests by due date"
+	}
+	if (route.name === "ReceiptStatistics") {
+		return "Receipts, booked expense, peaks and what is still to pay"
+	}
 	if (route.name === "MisList" || route.name === "MisDetail") {
 		return "Monthly Implementation Summary records"
 	}
@@ -99,8 +114,10 @@ onMounted(async () => {
 	try {
 		const settings = await call(`${spaConfig.api}.${spaConfig.settingsMethod}`)
 		canReadMis.value = Boolean(settings?.can_read_monthly_implementation_summary)
+		canReadStatistics.value = Boolean(settings?.can_read_statistics)
 	} catch {
 		canReadMis.value = false
+		canReadStatistics.value = false
 	}
 })
 </script>
