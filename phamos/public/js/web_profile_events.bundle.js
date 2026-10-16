@@ -536,30 +536,79 @@
 		});
 	}
 
-	// --- create reminder: up to three dates, one calendar file --------------------------------------------
+	// --- create reminder: chips (before the event) and own dates, up to three, one calendar file ------------
 	const reminderDialog = document.querySelector("[data-wp-reminder-dialog]");
 	if (reminderDialog) {
 		const form = reminderDialog.querySelector("[data-wp-reminder-form]");
 		const status = form.querySelector("[data-wp-reminder-status]");
-		const inputs = [...form.querySelectorAll("[data-wp-reminder-at]")];
-		const local = (date) => new Date(date.getTime() - date.getTimezoneOffset() * 60000).toISOString().slice(0, 16);
+		const submit = form.querySelector("[data-wp-reminder-submit]");
+		const own = form.querySelector("[data-wp-reminder-own]");
+		const addButton = form.querySelector("[data-wp-reminder-add]");
+		const template = form.querySelector("[data-wp-reminder-row]");
+		const offsets = [...form.querySelectorAll("[data-wp-reminder-offset]")];
+		const max = parseInt(form.dataset.max || "3", 10);
+		const start = form.dataset.startsOn ? new Date(form.dataset.startsOn) : null;
+		const OFFSET_MS = { P7D: 7 * 864e5, P1D: 864e5, PT2H: 2 * 36e5 };
+		const pad = (n) => String(n).padStart(2, "0");
+		const localDate = (d) => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+		const local = (d) => `${localDate(d)}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
 		try { form.querySelector("[data-wp-reminder-tz]").value = Intl.DateTimeFormat().resolvedOptions().timeZone || ""; } catch (e) { /* old browser */ }
+
+		const rows = () => [...own.querySelectorAll(".wp-reminder-row")];
+		const chosen = () => offsets.filter((o) => o.checked).length + rows().length;
+		function moments() {
+			const list = offsets.filter((o) => o.checked).map((o) => new Date(start.getTime() - OFFSET_MS[o.value]));
+			for (const row of rows()) {
+				const date = row.querySelector("[data-wp-reminder-date]").value;
+				const time = row.querySelector("[data-wp-reminder-time]").value || "09:00";
+				if (date) list.push(new Date(`${date}T${time}`));
+			}
+			return list;
+		}
+		function refresh() {
+			const n = chosen();
+			const now = Date.now();
+			// A chip whose moment has passed cannot be picked; at three choices nothing more can be added.
+			offsets.forEach((o) => {
+				const past = !start || start.getTime() - OFFSET_MS[o.value] <= now;
+				o.disabled = past || (!o.checked && n >= max);
+				o.closest(".wp-reminder-chip").classList.toggle("wp-disabled", o.disabled);
+			});
+			addButton.hidden = n >= max;
+			const list = moments();
+			const valid = list.length > 0 && list.length === n && list.every((d) => d.getTime() > now && (!start || d < start));
+			submit.disabled = !valid;
+			status.classList.toggle("wp-error", n > 0 && !valid);
+			status.textContent = !n ? "" : valid ? status.dataset.count.replace("{0}", n) : status.dataset.invalid;
+		}
+		function addRow() {
+			if (chosen() >= max) return;
+			const row = template.content.firstElementChild.cloneNode(true);
+			const date = row.querySelector("[data-wp-reminder-date]");
+			date.min = localDate(new Date());
+			if (start) date.max = localDate(start);
+			own.appendChild(row);
+			refresh();
+			date.focus();
+		}
+		addButton.addEventListener("click", addRow);
+		own.addEventListener("click", (event) => {
+			const remove = event.target.closest("[data-wp-reminder-remove]");
+			if (remove) { remove.closest(".wp-reminder-row").remove(); refresh(); }
+		});
+		form.addEventListener("input", refresh);
+		form.addEventListener("change", refresh);
 		wireDialog(reminderDialog, "reminder", () => {
-			status.textContent = "";
-			const now = local(new Date());
-			inputs.forEach((input) => (input.min = now));
-			setTimeout(() => inputs[0].focus(), 0);
+			offsets.forEach((o) => (o.checked = false));
+			own.replaceChildren();
+			refresh();
 		});
 		form.addEventListener("submit", (event) => {
 			event.preventDefault();
-			const dates = inputs.map((input) => input.value).filter(Boolean);
-			if (!dates.length || inputs.some((input) => !input.checkValidity())) {
-				status.classList.add("wp-error");
-				status.textContent = status.dataset.invalid;
-				return;
-			}
+			refresh();
+			if (submit.disabled) return;
 			const params = new URLSearchParams({ event: form.elements.event.value, lang: form.elements.lang.value,
-				tz: form.elements.tz.value, at: dates.join(",") });
+				tz: form.elements.tz.value, at: moments().map(local).join(",") });
 			window.location.href = `${form.action}?${params}`;
 			reminderDialog.close();
 		});

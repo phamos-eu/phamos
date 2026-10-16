@@ -480,26 +480,39 @@
 </dialog>
 {%- endmacro %}
 
-{#- "Create reminder": up to three dates; phamos.marketing.web.reminders returns one ICS file with one
-    calendar entry (and alarm) per date. Plain GET form, so it downloads without JavaScript too. -#}
+{#- "Create reminder": up to three moments, picked as chips (a week, a day, two hours before) or as
+    own date and time; phamos.marketing.web.reminders returns one ICS file with one entry (and alarm)
+    per moment. -#}
 {% macro reminder_dialog_markup(item, lang) -%}
 <dialog class="wp-dialog" id="wp-reminder-dialog" aria-labelledby="wp-reminder-title" data-wp-reminder-dialog>
-	<form class="wp-contact-form" method="get" action="/api/method/phamos.marketing.web.reminders" data-wp-reminder-form>
+	<form class="wp-contact-form wp-reminder" method="get" action="/api/method/phamos.marketing.web.reminders" data-wp-reminder-form
+		data-starts-on="{{ (item.data.starts_on or '') | e }}" data-max="3">
 		<div class="wp-dialog-head">
 			<h2 id="wp-reminder-title">{{ _("Create reminder") }}</h2>
 			<button type="button" class="wp-icon-button" data-wp-dialog-close aria-label="{{ _('Close') }}">×</button>
 		</div>
-		<p class="wp-contact-intro">{{ _("Up to three dates. You get a calendar file with one reminder each.") }}</p>
+		<p class="wp-contact-intro">{{ _("Pick up to three. You get one calendar file.") }}</p>
 		<input type="hidden" name="event" value="{{ item.slug | e }}">
 		<input type="hidden" name="lang" value="{{ lang }}">
 		<input type="hidden" name="tz" value="" data-wp-reminder-tz>
-		{%- for i in range(1, 4) %}
-		<label>{{ _("Reminder {0}").format(i) }}<input type="datetime-local" name="at" data-wp-reminder-at{% if i == 1 %} required{% endif %}
-			{%- if item.data.starts_on %} max="{{ item.data.starts_on[:16] }}"{% endif %}></label>
-		{%- endfor %}
+		<div class="wp-reminder-chips" role="group" aria-label="{{ _('Before the event') }}">
+			{%- for key, label in [("P7D", _("1 week before")), ("P1D", _("1 day before")), ("PT2H", _("2 hours before"))] %}
+			<label class="wp-reminder-chip"><input type="checkbox" value="{{ key }}" data-wp-reminder-offset><span>{{ label }}</span></label>
+			{%- endfor %}
+		</div>
+		<ol class="wp-reminder-own" data-wp-reminder-own></ol>
+		<button type="button" class="wp-button wp-button-sm wp-reminder-add" data-wp-reminder-add>+ {{ _("Own date") }}</button>
+		<template data-wp-reminder-row>
+			<li class="wp-reminder-row">
+				<label><span class="wp-visually-hidden">{{ _("Date") }}</span><input type="date" data-wp-reminder-date required></label>
+				<label><span class="wp-visually-hidden">{{ _("Time") }}</span><input type="time" data-wp-reminder-time value="09:00" required step="300"></label>
+				<button type="button" class="wp-icon-button" data-wp-reminder-remove aria-label="{{ _('Remove') }}">×</button>
+			</li>
+		</template>
 		<div class="wp-contact-actions">
-			<button type="submit" class="wp-button wp-button-primary">{{ _("Download calendar file") }}</button>
-			<p class="wp-contact-status" role="status" data-wp-reminder-status data-invalid="{{ _('Please pick at least one date before the event.') }}"></p>
+			<button type="submit" class="wp-button wp-button-primary" data-wp-reminder-submit disabled>{{ _("Download calendar file") }}</button>
+			<p class="wp-contact-status" role="status" data-wp-reminder-status data-count="{{ _('{0} of 3 selected') }}"
+				data-invalid="{{ _('Please pick dates before the event.') }}"></p>
 		</div>
 	</form>
 </dialog>
