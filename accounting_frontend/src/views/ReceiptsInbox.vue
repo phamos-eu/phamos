@@ -28,6 +28,21 @@
 						placeholder="Search…"
 						class="h-8 w-44 rounded-md border border-gray-300 bg-white px-2 text-sm dark:border-gray-600 dark:bg-gray-800 dark:text-gray-200"
 					/>
+					<button
+						type="button"
+						class="inline-flex h-8 items-center rounded-md border border-gray-300 px-3 text-sm font-medium text-gray-800 hover:bg-gray-50 dark:border-gray-600 dark:text-gray-200 dark:hover:bg-gray-800"
+						@click="fileInput?.click()"
+					>
+						Upload
+					</button>
+					<input
+						ref="fileInput"
+						type="file"
+						multiple
+						accept=".pdf,.eml,application/pdf,message/rfc822"
+						class="hidden"
+						@change="onPickFiles"
+					/>
 					<a
 						href="/app/accounting-receipt/new"
 						class="inline-flex h-8 items-center rounded-md bg-gray-900 px-3 text-sm font-medium text-white hover:bg-gray-800 dark:bg-gray-100 dark:text-gray-900 dark:hover:bg-white"
@@ -37,6 +52,13 @@
 				</div>
 			</div>
 
+			<div
+				v-if="dropNotice"
+				class="flex items-start justify-between gap-3 border-b border-outline-gray-2 bg-surface-amber-1 px-5 py-2 text-sm text-ink-amber-3"
+			>
+				<span>{{ dropNotice }}</span>
+				<button type="button" class="text-xs text-ink-gray-5 hover:text-ink-gray-8" @click="dropNotice = ''">Close</button>
+			</div>
 			<ReceiptUploadList :uploads="uploads" @open="openReceipt" @force="forceUpload" @clear="uploads = []" />
 			<div
 				v-if="configError"
@@ -109,7 +131,7 @@ import ReceiptDetailPanel from "../components/ReceiptDetailPanel.vue"
 import ReceiptExtractReviewDialog from "../components/ReceiptExtractReviewDialog.vue"
 import ReceiptKanban from "../components/ReceiptKanban.vue"
 import ReceiptUploadList from "../components/ReceiptUploadList.vue"
-import { droppedMailLink, isExternalDrag, isReceiptFile, uploadReceiptFile } from "../receiptUpload"
+import { droppedFiles, droppedMailLink, isExternalDrag, isReceiptFile, uploadReceiptFile } from "../receiptUpload"
 
 const API = "phamos.api.accounting_spa"
 const POLL_INTERVAL_MS = 2000
@@ -133,6 +155,7 @@ const reviewState = ref(null)
 
 const fileInput = ref(null)
 const dropActive = ref(false)
+const dropNotice = ref("")
 const uploads = ref([])
 let dragDepth = 0
 let uploadSeq = 0
@@ -315,13 +338,13 @@ function onDropFiles(event) {
 	event.preventDefault()
 	dragDepth = 0
 	dropActive.value = false
-	const files = Array.from(event.dataTransfer.files || [])
+	dropNotice.value = ""
+	const files = droppedFiles(event)
 	if (!files.length) {
-		if (droppedMailLink(event)) {
-			failToast("Apple Mail passed only a link to the message. Drag the mail to the Desktop first, then drop the .eml file here.")
-		} else {
-			failToast("Nothing to upload. Drop PDF files or e-mails (.eml).")
-		}
+		const types = Array.from(event.dataTransfer?.types || []).join(", ") || "nothing"
+		dropNotice.value = droppedMailLink(event)
+			? "Apple Mail handed over only a link to the message, not the mail itself. Drag the mail (or its PDF) to the Desktop first, then drop that file here."
+			: `The drop contained no file the browser can read (received: ${types}). Drag the file from Finder or the Desktop, or use Upload.`
 		return
 	}
 	startUploads(files)
@@ -334,8 +357,10 @@ function onPickFiles(event) {
 
 function startUploads(files) {
 	const accepted = files.filter(isReceiptFile)
-	const rejected = files.length - accepted.length
-	if (rejected) failToast(`${rejected} file(s) skipped: only PDFs and e-mails (.eml) are accepted.`)
+	const rejected = files.filter((file) => !isReceiptFile(file)).map((file) => file.name)
+	if (rejected.length) {
+		dropNotice.value = `Skipped ${rejected.join(", ")}: only PDFs and e-mails (.eml) create receipts.`
+	}
 	for (const file of accepted) runUpload(file, false)
 }
 

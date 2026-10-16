@@ -18,10 +18,13 @@
 				<router-view />
 			</main>
 		</div>
+		<!-- frappe-ui renders toast() messages only where this container is mounted -->
+		<Toasts />
 	</div>
 </template>
 
 <script setup>
+import { Toasts } from "frappe-ui"
 import { pageChrome } from "@spa/pageChrome.js"
 
 defineProps({

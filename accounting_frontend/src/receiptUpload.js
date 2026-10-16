@@ -20,6 +20,18 @@ export function isExternalDrag(event) {
 	return types.length > 0 && !types.includes(RECEIPT_CARD_DRAG_TYPE)
 }
 
+// Files of a drop. Some sources fill only the item list, not dataTransfer.files.
+export function droppedFiles(event) {
+	const dt = event?.dataTransfer
+	if (!dt) return []
+	const files = Array.from(dt.files || [])
+	if (files.length) return files
+	return Array.from(dt.items || [])
+		.filter((item) => item.kind === "file")
+		.map((item) => item.getAsFile())
+		.filter(Boolean)
+}
+
 // Apple Mail sometimes hands over only a "message:" link instead of the mail itself.
 export function droppedMailLink(event) {
 	const dt = event?.dataTransfer
