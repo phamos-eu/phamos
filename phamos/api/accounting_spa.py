@@ -544,8 +544,22 @@ def get_receipt(name):
 			"total_taxes": doc.total_taxes,
 			"supplier_tax_id": doc.supplier_tax_id,
 			"supplier_iban": doc.supplier_iban,
+			"payment_reference": doc.payment_reference,
+			"payment_date": doc.payment_date,
+			"project": doc.project,
+			"cost_center": doc.cost_center,
+			"company": doc.company,
 			"items": [
-				{"item_name": i.item_name, "qty": i.qty, "rate": i.rate, "amount": i.amount, "tax_rate": i.tax_rate}
+				{
+					"name": i.name,
+					"item_name": i.item_name,
+					"qty": i.qty,
+					"rate": i.rate,
+					"amount": i.amount,
+					"tax_rate": i.tax_rate,
+					"item_code": i.item_code,
+					"expense_account": i.expense_account,
+				}
 				for i in doc.items
 			],
 			"ai": _ai_block(doc),

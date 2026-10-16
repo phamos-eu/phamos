@@ -103,6 +103,7 @@
 				:extract-updated-count="extractUpdatedCount"
 				:extract-error-message="extractErrorMessage"
 				@close="closeReceipt"
+				@updated="onReceiptUpdated"
 				@review-correct="onReviewCorrect"
 				@run-extract="runExtract(false)"
 				@rerun-extract="runExtract(true)"
@@ -498,6 +499,11 @@ async function onKanbanStatusChange({ name, status }) {
 
 function onReviewCorrect() {
 	if (selectedReceipt.value?.name) showReview.value = true
+}
+
+function onReceiptUpdated(receipt) {
+	if (receipt?.name && receipt.name === selectedName.value) selectedReceipt.value = receipt
+	loadReceipts({ quiet: true })
 }
 
 async function onReviewApplied() {
