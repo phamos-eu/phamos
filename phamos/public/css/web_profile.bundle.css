@@ -555,15 +555,12 @@ body .footer-grouped-links .footer-child-item, body .footer-grouped-links .foote
 .wp-invoice-items .wp-summary-total td { padding-top: 6px; border-top: 1px solid var(--wp-ink); font-weight: 700; font-size: 14px; }
 .wp-invoice-note { margin: 0; color: var(--wp-ink-2); font-size: 13px; }
 .wp-invoice .wp-link-button { align-self: flex-start; }
+.wp-success-invoice .wp-invoice { margin: 4px 0 6px; }
+.wp-success-invoice + .wp-legal { margin: 0 0 4px; }
 .wp-busy { position: relative; color: transparent !important; pointer-events: none; }
 .wp-busy::after { content: ""; position: absolute; inset: 0; margin: auto; width: 16px; height: 16px; border-radius: 50%;
 	border: 2px solid currentColor; border-color: var(--wp-on-primary) transparent var(--wp-on-primary) transparent; animation: wp-spin 0.8s linear infinite; }
 @keyframes wp-spin { to { transform: rotate(360deg); } }
-.wp-print-frame { position: fixed; right: 0; bottom: 0; width: 0; height: 0; border: 0; visibility: hidden; }
-.wp-print-body { margin: 0; padding: 18mm 20mm; font-family: Inter, InterVariable, -apple-system, "Segoe UI", Roboto, sans-serif; color: #171717; font-size: 13px; }
-.wp-print-body .wp-invoice { border: 0; box-shadow: none; padding: 0; }
-.wp-print-body .wp-invoice-head { margin-top: 27mm; }  /* DIN 5008 form B: address field 45 mm from the top */
-.wp-print-body .wp-no-print { display: none; }
 @media (max-width: 640px) {
 	.wp-invoice { padding: 14px; }
 	.wp-invoice-head { grid-template-columns: 1fr; gap: 12px; }

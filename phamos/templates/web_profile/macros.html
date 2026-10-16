@@ -374,8 +374,8 @@
 		{%- endif %}
 
 		{#- Step 3: the order laid out like a DIN 5008 letter (address field left, information block right,
-		    subject, item table, totals with VAT, payment), the legal notices and the one button. "Print"
-		    prints just this sheet: a preview of the order PDF the buyer receives. -#}
+		    subject, item table, totals with VAT, payment), the legal notices and the one button. After the
+		    order the same sheet is shown again as the confirmation, with the order number. -#}
 		<fieldset class="wp-fieldset" data-wp-step="3" hidden>
 			<legend class="wp-visually-hidden">{{ _("Review") }}</legend>
 			<article class="wp-invoice" data-wp-invoice>
@@ -386,6 +386,7 @@
 						<button type="button" class="wp-link-button wp-no-print" data-wp-goto="{{ 1 if t.free else 2 }}">{{ _("Change") }}</button>
 					</div>
 					<dl class="wp-invoice-info">
+						<dt data-wp-invoice-number hidden>{{ _("Order number") }}</dt><dd data-wp-invoice-number hidden></dd>
 						<dt>{{ _("Date") }}</dt><dd>{{ t.today | e }}</dd>
 						<dt>{{ _("Event date") }}</dt><dd>{{ item.data.when.line | e }}</dd>
 						{%- if venue %}<dt>{{ _("Venue") }}</dt><dd>{{ venue | e }}</dd>{% endif %}
@@ -421,7 +422,6 @@
 
 		<div class="wp-contact-actions wp-checkout-actions" data-wp-ticket-actions>
 			<button type="button" class="wp-button" data-wp-back hidden>{{ _("Back") }}</button>
-			<button type="button" class="wp-button" data-wp-print hidden>{{ _("Print") }}</button>
 			<button type="button" class="wp-button wp-button-primary" data-wp-next>{{ _("Continue") }}</button>
 			<button type="submit" class="wp-button wp-button-primary" data-wp-submit hidden>{{ _("Register") if t.free else _("Order with obligation to pay") }}</button>
 			<p class="wp-contact-status" role="status" data-wp-ticket-status data-sending="{{ _('Sending…') }}"
@@ -434,6 +434,8 @@
 			<p class="wp-success-title"><strong>{{ _("Thank you!") }}</strong> <span data-wp-ticket-reference></span></p>
 			<p>{{ _("Confirmation sent to {0}.").format('<strong data-wp-ticket-email></strong>') }}{% if not t.free %} {{ _("The invoice follows by email.") }}{% endif %}
 				<a class="wp-link-card wp-link-card-inline" href="#" target="_blank" rel="noopener" data-wp-ticket-pdf hidden><span>{{ _("Order as PDF") }}</span><span class="wp-link-card-arrow" aria-hidden="true">↓</span></a></p>
+			<div class="wp-success-invoice" data-wp-success-invoice></div>
+			<p class="wp-legal">{{ _("You will receive this by email.") }}</p>
 			<div class="wp-optional" data-wp-optional>
 				<h3>{{ _("Optional") }}</h3>
 				<label class="wp-switch"><input type="checkbox" name="newsletter" value="1"><span class="wp-switch-track" aria-hidden="true"></span><span class="wp-switch-text">{{ _("Event updates by email") }}<small>{{ _("Schedule, reminders, material. You confirm by link first.") }}</small></span></label>

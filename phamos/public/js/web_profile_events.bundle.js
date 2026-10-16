@@ -70,7 +70,6 @@
 		const holdText = $("[data-wp-hold-text]");
 		const holdClock = $("[data-wp-hold-clock]");
 		const holdLabel = holdText.textContent;
-		const printButton = $("[data-wp-print]");
 		const back = $("[data-wp-back]");
 		const next = $("[data-wp-next]");
 		const submit = $("[data-wp-submit]");
@@ -253,7 +252,6 @@
 			back.hidden = index === 0;
 			next.hidden = index === steps.length - 1;
 			submit.hidden = index !== steps.length - 1;
-			printButton.hidden = index !== steps.length - 1;
 			submit.disabled = false;
 			status.textContent = "";
 			status.classList.remove("wp-error");
@@ -307,26 +305,17 @@
 			$("[data-wp-summary-total]").textContent = money.format(total);
 		}
 
-		// "Print": just the order sheet, in a frame with the page's styles (a preview of the order PDF).
-		function printInvoice() {
-			const frame = document.createElement("iframe");
-			frame.className = "wp-print-frame";
-			frame.setAttribute("aria-hidden", "true");
-			document.body.appendChild(frame);
-			const styles = [...document.querySelectorAll('link[rel="stylesheet"], style')].map((el) => el.outerHTML).join("");
-			const doc = frame.contentDocument;
-			doc.open();
-			doc.write(`<!doctype html><html lang="${form.dataset.lang}"><head><meta charset="utf-8"><title>${document.title}</title>${styles}<style>@page { size: A4; margin: 0; }</style></head>`
-				+ `<body class="wp-print-body">${$("[data-wp-invoice]").outerHTML}</body></html>`);
-			doc.close();
-			const run = () => {
-				frame.contentWindow.focus();
-				frame.contentWindow.print();
-				setTimeout(() => frame.remove(), 1000);
-			};
-			if (doc.readyState === "complete") setTimeout(run, 300); else frame.addEventListener("load", run);
+		// After the order: the same sheet as confirmation, with the order number and without "Change" links.
+		function showConfirmationSheet(reference) {
+			const sheet = $("[data-wp-invoice]").cloneNode(true);
+			sheet.removeAttribute("data-wp-invoice");
+			sheet.querySelectorAll(".wp-no-print").forEach((el) => el.remove());
+			sheet.querySelectorAll("[data-wp-invoice-number]").forEach((el) => {
+				el.hidden = !reference;
+				if (el.tagName === "DD") el.textContent = reference || "";
+			});
+			$("[data-wp-success-invoice]").replaceChildren(sheet);
 		}
-		printButton.addEventListener("click", printInvoice);
 
 		function resetForm() {
 			form.reset();
@@ -341,6 +330,7 @@
 			$("[data-wp-consents-save]").disabled = false;
 			$("[data-wp-consents-status]").textContent = "";
 			$("[data-wp-ticket-pdf]").hidden = true;
+			$("[data-wp-success-invoice]").replaceChildren();
 			back.disabled = false;
 			renderCompanions();
 			show(0);
@@ -468,6 +458,7 @@
 				$("[data-wp-ticket-actions]").hidden = true;
 				const success = $("[data-wp-ticket-success]");
 				success.querySelector("[data-wp-ticket-reference]").textContent = result.reference || "";
+				showConfirmationSheet(result.reference);
 				success.querySelector("[data-wp-ticket-email]").textContent = result.tickets_to || value("contact_email");
 				const pdf = success.querySelector("[data-wp-ticket-pdf]");
 				pdf.hidden = !result.pdf_url;

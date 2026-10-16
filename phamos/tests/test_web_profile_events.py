@@ -401,7 +401,8 @@ class TestWebProfileEvents(FrappeTestCase):
 	def test_dialog_round5_markup(self):
 		frappe.set_user("Guest")
 		html = get_html_for_route(f"/en/events/{self.event.route}")
-		for marker in ("data-wp-hold-clock", "wp-step-no", "data-wp-invoice", "data-wp-print", "wp-switch-track",
+		for marker in ("data-wp-hold-clock", "wp-step-no", "data-wp-invoice", "data-wp-success-invoice", "wp-switch-track",
 				"data-wp-ticket-pdf", "data-wp-reminder-dialog", "wp-interest-yes"):
 			self.assertIn(marker, html)
+		self.assertNotIn("data-wp-print", html)
 
