@@ -1,0 +1,515 @@
+{
+ "actions": [],
+ "autoname": "ATT-.YYYY.-.#####",
+ "creation": "2026-03-25 00:00:00.000000",
+ "doctype": "DocType",
+ "engine": "InnoDB",
+ "field_order": [
+  "section_event",
+  "event",
+  "role",
+  "vip",
+  "ticket_type",
+  "column_break_event",
+  "status",
+  "source",
+  "registered_on",
+  "language",
+  "section_person",
+  "salutation",
+  "first_name",
+  "last_name",
+  "full_name",
+  "column_break_person",
+  "email",
+  "phone",
+  "company_name",
+  "job_title",
+  "section_crm",
+  "crm_status",
+  "contact",
+  "column_break_crm",
+  "lead",
+  "customer",
+  "section_order",
+  "order_reference",
+  "is_buyer",
+  "billing_customer",
+  "payment_status",
+  "terms_version",
+  "column_break_order",
+  "quotation",
+  "quotation_item",
+  "sales_order",
+  "sales_order_item",
+  "sales_invoice",
+  "section_attendance",
+  "checked_in_on",
+  "column_break_attendance",
+  "checked_in_by",
+  "section_consents",
+  "terms_accepted",
+  "terms_accepted_on",
+  "privacy_consent",
+  "privacy_consent_on",
+  "newsletter_consent",
+  "newsletter_consent_on",
+  "share_with_attendees_consent",
+  "share_with_attendees_consent_on",
+  "public_listing_consent",
+  "public_listing_consent_on",
+  "section_follow_up",
+  "follow_up_status",
+  "follow_up_on",
+  "column_break_follow_up",
+  "follow_up_notes",
+  "section_notes",
+  "notes",
+  "number_of_attendees"
+ ],
+ "fields": [
+  {
+   "fieldname": "section_event",
+   "fieldtype": "Section Break",
+   "label": "Event"
+  },
+  {
+   "fieldname": "event",
+   "fieldtype": "Link",
+   "label": "Event",
+   "options": "Marketing Content",
+   "reqd": 1,
+   "in_list_view": 1,
+   "in_standard_filter": 1
+  },
+  {
+   "fieldname": "role",
+   "fieldtype": "Select",
+   "label": "Role",
+   "options": "Guest\nSpeaker\nSponsor\nPartner\nEmployee\nPress\nOther",
+   "default": "Guest",
+   "in_list_view": 1,
+   "in_standard_filter": 1
+  },
+  {
+   "fieldname": "vip",
+   "fieldtype": "Check",
+   "label": "VIP",
+   "default": "0",
+   "in_standard_filter": 1
+  },
+  {
+   "fieldname": "ticket_type",
+   "fieldtype": "Select",
+   "label": "Ticket Type",
+   "options": "\nRegular\nEarly Bird\nFree\nComplimentary"
+  },
+  {
+   "fieldname": "column_break_event",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "status",
+   "fieldtype": "Select",
+   "label": "Status",
+   "options": "Invited\nRegistered\nConfirmed\nWaitlisted\nAttended\nNo Show\nCancelled",
+   "default": "Registered",
+   "in_list_view": 1,
+   "in_standard_filter": 1
+  },
+  {
+   "fieldname": "source",
+   "fieldtype": "Select",
+   "label": "Source",
+   "options": "\nWebsite\nEmail\nManual\nImport\nInvitation",
+   "default": "Manual"
+  },
+  {
+   "fieldname": "registered_on",
+   "fieldtype": "Datetime",
+   "label": "Registered On",
+   "read_only": 1
+  },
+  {
+   "fieldname": "language",
+   "fieldtype": "Select",
+   "label": "Language",
+   "options": "\nde\nen"
+  },
+  {
+   "fieldname": "section_person",
+   "fieldtype": "Section Break",
+   "label": "Person"
+  },
+  {
+   "fieldname": "salutation",
+   "fieldtype": "Link",
+   "label": "Salutation",
+   "options": "Salutation"
+  },
+  {
+   "fieldname": "first_name",
+   "fieldtype": "Data",
+   "label": "First Name",
+   "reqd": 1
+  },
+  {
+   "fieldname": "last_name",
+   "fieldtype": "Data",
+   "label": "Last Name"
+  },
+  {
+   "fieldname": "full_name",
+   "fieldtype": "Data",
+   "label": "Full Name",
+   "read_only": 1,
+   "in_list_view": 1,
+   "bold": 1
+  },
+  {
+   "fieldname": "column_break_person",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "email",
+   "fieldtype": "Data",
+   "label": "Email",
+   "options": "Email",
+   "reqd": 1,
+   "in_list_view": 1,
+   "in_standard_filter": 1,
+   "search_index": 1
+  },
+  {
+   "fieldname": "phone",
+   "fieldtype": "Data",
+   "label": "Phone",
+   "options": "Phone"
+  },
+  {
+   "fieldname": "company_name",
+   "fieldtype": "Data",
+   "label": "Company",
+   "in_list_view": 1
+  },
+  {
+   "fieldname": "job_title",
+   "fieldtype": "Data",
+   "label": "Job Title"
+  },
+  {
+   "fieldname": "section_crm",
+   "fieldtype": "Section Break",
+   "label": "CRM",
+   "description": "Set by \"Link to CRM\": the person's Contact and either their Lead or the Customer they belong to."
+  },
+  {
+   "fieldname": "crm_status",
+   "fieldtype": "Select",
+   "label": "CRM Status",
+   "options": "Unlinked\nLinked\nNeeds Review",
+   "default": "Unlinked",
+   "read_only": 1,
+   "in_standard_filter": 1
+  },
+  {
+   "fieldname": "contact",
+   "fieldtype": "Link",
+   "label": "Contact",
+   "options": "Contact"
+  },
+  {
+   "fieldname": "column_break_crm",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "lead",
+   "fieldtype": "Link",
+   "label": "Lead",
+   "options": "Lead"
+  },
+  {
+   "fieldname": "customer",
+   "fieldtype": "Link",
+   "label": "Customer",
+   "options": "Customer"
+  },
+  {
+   "fieldname": "section_order",
+   "fieldtype": "Section Break",
+   "label": "Order and Billing"
+  },
+  {
+   "fieldname": "order_reference",
+   "fieldtype": "Data",
+   "label": "Order Reference",
+   "read_only": 1,
+   "description": "Groups the attendees of one order: the Quotation for website orders, a booking number for free events, the order id for imports."
+  },
+  {
+   "fieldname": "is_buyer",
+   "fieldtype": "Check",
+   "label": "Buyer",
+   "default": "0",
+   "description": "The person who placed and pays the order."
+  },
+  {
+   "fieldname": "billing_customer",
+   "fieldtype": "Link",
+   "label": "Billing Customer",
+   "options": "Customer",
+   "read_only": 1
+  },
+  {
+   "fieldname": "payment_status",
+   "fieldtype": "Select",
+   "label": "Payment Status",
+   "options": "Not Required\nPending\nQuoted\nOrdered\nInvoiced\nPaid\nCancelled",
+   "default": "Pending",
+   "read_only": 1,
+   "in_list_view": 1,
+   "in_standard_filter": 1
+  },
+  {
+   "fieldname": "terms_version",
+   "fieldtype": "Data",
+   "label": "Accepted Terms",
+   "read_only": 1
+  },
+  {
+   "fieldname": "column_break_order",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "quotation",
+   "fieldtype": "Link",
+   "label": "Quotation",
+   "options": "Quotation",
+   "read_only": 1
+  },
+  {
+   "fieldname": "quotation_item",
+   "fieldtype": "Data",
+   "label": "Quotation Item",
+   "hidden": 1,
+   "read_only": 1
+  },
+  {
+   "fieldname": "sales_order",
+   "fieldtype": "Link",
+   "label": "Sales Order",
+   "options": "Sales Order",
+   "read_only": 1
+  },
+  {
+   "fieldname": "sales_order_item",
+   "fieldtype": "Data",
+   "label": "Sales Order Item",
+   "hidden": 1,
+   "read_only": 1
+  },
+  {
+   "fieldname": "sales_invoice",
+   "fieldtype": "Link",
+   "label": "Sales Invoice",
+   "options": "Sales Invoice",
+   "read_only": 1
+  },
+  {
+   "fieldname": "section_attendance",
+   "fieldtype": "Section Break",
+   "label": "Attendance"
+  },
+  {
+   "fieldname": "checked_in_on",
+   "fieldtype": "Datetime",
+   "label": "Checked In On",
+   "read_only": 1
+  },
+  {
+   "fieldname": "column_break_attendance",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "checked_in_by",
+   "fieldtype": "Link",
+   "label": "Checked In By",
+   "options": "User",
+   "read_only": 1
+  },
+  {
+   "fieldname": "section_consents",
+   "fieldtype": "Section Break",
+   "label": "Consents",
+   "description": "Every consent is stored with the moment it was given."
+  },
+  {
+   "fieldname": "terms_accepted",
+   "fieldtype": "Check",
+   "label": "Terms accepted",
+   "default": "0"
+  },
+  {
+   "fieldname": "terms_accepted_on",
+   "fieldtype": "Datetime",
+   "label": "Terms accepted on",
+   "read_only": 1,
+   "depends_on": "eval:doc.terms_accepted"
+  },
+  {
+   "fieldname": "privacy_consent",
+   "fieldtype": "Check",
+   "label": "Privacy policy accepted",
+   "default": "0"
+  },
+  {
+   "fieldname": "privacy_consent_on",
+   "fieldtype": "Datetime",
+   "label": "Privacy policy accepted on",
+   "read_only": 1,
+   "depends_on": "eval:doc.privacy_consent"
+  },
+  {
+   "fieldname": "newsletter_consent",
+   "fieldtype": "Check",
+   "label": "Newsletter",
+   "default": "0"
+  },
+  {
+   "fieldname": "newsletter_consent_on",
+   "fieldtype": "Datetime",
+   "label": "Newsletter on",
+   "read_only": 1,
+   "depends_on": "eval:doc.newsletter_consent"
+  },
+  {
+   "fieldname": "share_with_attendees_consent",
+   "fieldtype": "Check",
+   "label": "May be contacted by other attendees",
+   "default": "0"
+  },
+  {
+   "fieldname": "share_with_attendees_consent_on",
+   "fieldtype": "Datetime",
+   "label": "May be contacted by other attendees on",
+   "read_only": 1,
+   "depends_on": "eval:doc.share_with_attendees_consent"
+  },
+  {
+   "fieldname": "public_listing_consent",
+   "fieldtype": "Check",
+   "label": "May be listed publicly as attendee",
+   "default": "0"
+  },
+  {
+   "fieldname": "public_listing_consent_on",
+   "fieldtype": "Datetime",
+   "label": "May be listed publicly as attendee on",
+   "read_only": 1,
+   "depends_on": "eval:doc.public_listing_consent"
+  },
+  {
+   "fieldname": "section_follow_up",
+   "fieldtype": "Section Break",
+   "label": "Follow-up"
+  },
+  {
+   "fieldname": "follow_up_status",
+   "fieldtype": "Select",
+   "label": "Follow-up Status",
+   "options": "\nPending\nDone\nNot Needed",
+   "in_standard_filter": 1
+  },
+  {
+   "fieldname": "follow_up_on",
+   "fieldtype": "Date",
+   "label": "Follow-up On"
+  },
+  {
+   "fieldname": "column_break_follow_up",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "follow_up_notes",
+   "fieldtype": "Small Text",
+   "label": "Follow-up Notes"
+  },
+  {
+   "fieldname": "section_notes",
+   "fieldtype": "Section Break",
+   "label": "Notes"
+  },
+  {
+   "fieldname": "notes",
+   "fieldtype": "Small Text",
+   "label": "Notes"
+  },
+  {
+   "fieldname": "number_of_attendees",
+   "fieldtype": "Int",
+   "label": "Legacy: Number of Attendees",
+   "hidden": 1,
+   "read_only": 1
+  }
+ ],
+ "links": [],
+ "modified": "2026-10-16 12:00:00.000000",
+ "modified_by": "Administrator",
+ "module": "Marketing",
+ "name": "Attendee",
+ "naming_rule": "Expression (old style)",
+ "owner": "Administrator",
+ "permissions": [
+  {
+   "role": "System Manager",
+   "read": 1,
+   "report": 1,
+   "export": 1,
+   "create": 1,
+   "write": 1,
+   "delete": 1,
+   "email": 1,
+   "print": 1,
+   "share": 1,
+   "import": 1
+  },
+  {
+   "role": "Sales Manager",
+   "read": 1,
+   "report": 1,
+   "export": 1,
+   "create": 1,
+   "write": 1,
+   "delete": 1,
+   "email": 1,
+   "print": 1,
+   "share": 1,
+   "import": 1
+  },
+  {
+   "role": "Sales User",
+   "read": 1,
+   "report": 1,
+   "export": 1,
+   "create": 1,
+   "write": 1,
+   "email": 1,
+   "print": 1
+  },
+  {
+   "role": "Website Manager",
+   "read": 1,
+   "report": 1,
+   "export": 1,
+   "create": 1,
+   "write": 1
+  }
+ ],
+ "search_fields": "full_name,email,company_name",
+ "show_title_field_in_link": 1,
+ "title_field": "full_name",
+ "sort_field": "registered_on",
+ "sort_order": "DESC",
+ "states": [],
+ "track_changes": 1
+}

@@ -1,0 +1,27 @@
+{#- Order confirmation for an event registration (phamos.marketing.ticketing.send_order_confirmation).
+    Rendered in the buyer's language: frappe.local.lang is set before rendering. -#}
+<p>{{ _("Thank you for your registration for {0}.").format(event.title | e) }}</p>
+<p>
+	<strong>{{ _("Reference") }}:</strong> {{ reference | e }}<br>
+	{%- if event.starts_on %}
+	<strong>{{ _("Date") }}:</strong> {{ frappe.utils.format_datetime(event.starts_on, "dd.MM.yyyy HH:mm") }}<br>
+	{%- elif event.date_note %}
+	<strong>{{ _("Date") }}:</strong> {{ event.date_note | e }}<br>
+	{%- endif %}
+	{%- if event.location or event.city %}
+	<strong>{{ _("Venue") }}:</strong> {{ [event.location, event.city] | select | join(", ") | e }}
+	{%- endif %}
+</p>
+<p><strong>{{ _("Tickets") }}:</strong></p>
+<ul>
+	{%- for row in attendees %}
+	<li>{{ row.full_name | e }} ({{ row.email | e }})</li>
+	{%- endfor %}
+</ul>
+{%- if paid %}
+<p>{{ _("Total incl. VAT: {0}").format(frappe.utils.fmt_money(total, currency=pricing.currency)) }}</p>
+<p>{{ _("We confirm your order and send you the invoice by email. Your tickets are valid once the invoice is paid.") }}</p>
+{%- else %}
+<p>{{ _("Your registration is confirmed. We look forward to seeing you.") }}</p>
+{%- endif %}
+<p>{{ _("If something is wrong or you cannot come, simply reply to this email.") }}</p>

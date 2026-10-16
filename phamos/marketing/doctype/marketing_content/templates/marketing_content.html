@@ -872,7 +872,7 @@ frappe.ready(function () {
   if (currentVote) applyActiveState(currentVote);
 
   frappe.call({
-    method: "phamos.phamos.doctype.marketing_content.marketing_content.get_interest_counts",
+    method: "phamos.marketing.doctype.marketing_content.marketing_content.get_interest_counts",
     args: { event_name: eventName },
     callback: function (r) {
       if (r.message) updateCounts(r.message);
@@ -887,7 +887,7 @@ frappe.ready(function () {
       localStorage.setItem(storageKey, response);
       applyActiveState(response);
       frappe.call({
-        method: "phamos.phamos.doctype.marketing_content.marketing_content.submit_interest",
+        method: "phamos.marketing.doctype.marketing_content.marketing_content.submit_interest",
         args: { event_name: eventName, response: response, previous_response: prev },
         callback: function (r) {
           if (r.message && r.message.status === "ok") updateCounts(r.message.counts);
@@ -916,12 +916,12 @@ frappe.ready(function () {
     subscribeMsg.textContent = "Subscribing...";
     subscribeMsg.className = "pe-subscribe-msg";
     frappe.call({
-      method: "phamos.phamos.doctype.marketing_content.marketing_content.subscribe_to_event",
+      method: "phamos.marketing.doctype.marketing_content.marketing_content.subscribe_to_event",
       args: { event_name: eventName, email: email },
       callback: function (r) {
         subscribeBtn.disabled = false;
         if (r.message && r.message.status === "ok") {
-          var okText = "✓ Subscribed with " + r.message.email;
+          var okText = "Almost done: please confirm via the link we sent to " + r.message.email;
           if (r.message.raw_email) {
             okText += " (corrected from " + r.message.raw_email + ")";
           }
@@ -995,7 +995,7 @@ frappe.ready(function () {
     if (!ticketInfo) {
       renderLoading();
       frappe.call({
-        method: "phamos.phamos.doctype.marketing_content.marketing_content.get_ticket_info",
+        method: "phamos.marketing.doctype.marketing_content.marketing_content.get_ticket_info",
         args: { event_name: eventName },
         callback: function(r) {
           ticketInfo = r.message;
@@ -1303,11 +1303,25 @@ frappe.ready(function () {
       html += '</div>';
     }
 
+    html += '<label class="pe-check-row">';
+    html += '  <input type="checkbox" id="s3-consent"' + (state.consent ? " checked" : "") + '>';
+    html += '  <span>I accept the terms and conditions and agree that phamos stores my details to handle this order (<a href="/de/datenschutz" target="_blank">privacy policy</a>).</span>';
+    html += '</label>';
+    html += '<label class="pe-check-row">';
+    html += '  <input type="checkbox" id="s3-newsletter"' + (state.newsletter ? " checked" : "") + '>';
+    html += '  <span>Keep me posted about this event by email (optional).</span>';
+    html += '</label>';
+
     modalBody.innerHTML = html;
     btnBack.style.display = "inline-block";
     btnNext.style.display = "inline-block";
     btnNext.textContent = "Confirm Order";
-    btnNext.disabled = false;
+    btnNext.disabled = !state.consent;
+    modalBody.querySelector("#s3-consent").onchange = function() {
+      state.consent = this.checked;
+      btnNext.disabled = !this.checked;
+    };
+    modalBody.querySelector("#s3-newsletter").onchange = function() { state.newsletter = this.checked; };
 
     btnBack.onclick = function() {
       renderStep(state.needs_invoice ? 2 : 1);
@@ -1336,16 +1350,17 @@ frappe.ready(function () {
     }
 
     frappe.call({
-      method: "phamos.phamos.doctype.marketing_content.marketing_content.create_ticket_order",
+      method: "phamos.marketing.doctype.marketing_content.marketing_content.create_ticket_order",
       args: {
         event_name:   eventName,
         attendees:    JSON.stringify(state.attendees.slice(0, state.qty)),
         qty:          state.qty,
         invoice_data: invoiceData ? JSON.stringify(invoiceData) : null,
+        consents:     JSON.stringify({terms: state.consent ? 1 : 0, privacy: state.consent ? 1 : 0, newsletter: state.newsletter ? 1 : 0}),
       },
       callback: function(r) {
-        if (r.message && r.message.sales_order) {
-          renderSuccess(r.message.sales_order);
+        if (r.message && (r.message.reference || r.message.sales_order)) {
+          renderSuccess(r.message.reference || r.message.sales_order);
         } else {
           btnNext.disabled = false;
           btnNext.textContent = "Confirm Order";
@@ -1368,7 +1383,7 @@ frappe.ready(function () {
       '<div class="pe-success">' +
       '  <div class="pe-success-icon"><svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="9 12 11 14 15 10"/></svg></div>' +
       '  <div class="pe-success-title">Order Received!</div>' +
-      '  <div class="pe-success-msg">Your order has been submitted. Our team will review it and reach out with payment details and confirmation.</div>' +
+      '  <div class="pe-success-msg">Your order has been received. We confirm it by email and send you the invoice.</div>' +
       '  <div class="pe-success-so">Order: ' + frappe.utils.escape_html(soName) + '</div>' +
       '</div>';
     btnBack.style.display = "none";

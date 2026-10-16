@@ -51,7 +51,17 @@
   "ticket_item",
   "tc_name",
   "column_break_srnt",
-  "item_tax_template"
+  "item_tax_template",
+  "section_ticket_sale",
+  "ticket_sales_from",
+  "ticket_sales_until",
+  "column_break_ticket_sale",
+  "selling_price_list",
+  "max_attendees_per_order",
+  "section_sales",
+  "campaign",
+  "column_break_sales",
+  "project"
  ],
  "fields": [
   {
@@ -250,7 +260,7 @@
    "default": "0",
    "fieldname": "registration_open",
    "fieldtype": "Check",
-   "label": "Registration Open",
+   "label": "Registration / Ticket Sale Open",
    "no_copy": 1
   },
   {
@@ -306,7 +316,7 @@
    "label": "Ticket Configuration"
   },
   {
-   "description": "ERPNext Item used for ticket sales. Price and tax info are read from this item.",
+   "description": "ERPNext Item sold as ticket (non-stock). Empty: the event is free and registrations get no order.",
    "fieldname": "ticket_item",
    "fieldtype": "Link",
    "label": "Ticket Item",
@@ -327,27 +337,73 @@
    "fieldtype": "Link",
    "label": "Item Tax Template",
    "options": "Item Tax Template"
+  },
+  {
+   "fieldname": "section_ticket_sale",
+   "fieldtype": "Section Break",
+   "label": "Ticket Sale"
+  },
+  {
+   "fieldname": "ticket_sales_from",
+   "fieldtype": "Datetime",
+   "label": "Ticket Sale Opens",
+   "description": "Empty: as soon as Registration Open is ticked."
+  },
+  {
+   "fieldname": "ticket_sales_until",
+   "fieldtype": "Datetime",
+   "label": "Ticket Sale Closes",
+   "description": "Empty: at the start of the event."
+  },
+  {
+   "fieldname": "column_break_ticket_sale",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "selling_price_list",
+   "fieldtype": "Link",
+   "label": "Price List",
+   "options": "Price List",
+   "description": "The ticket price is taken from this price list (default: Selling Settings)."
+  },
+  {
+   "default": "10",
+   "fieldname": "max_attendees_per_order",
+   "fieldtype": "Int",
+   "label": "Max Tickets per Order"
+  },
+  {
+   "fieldname": "section_sales",
+   "fieldtype": "Section Break",
+   "label": "Sales"
+  },
+  {
+   "fieldname": "campaign",
+   "fieldtype": "Link",
+   "label": "Campaign",
+   "options": "Campaign",
+   "read_only": 1,
+   "no_copy": 1,
+   "description": "Created with the first registration; set on every Lead, Quotation, Sales Order and Invoice of this event."
+  },
+  {
+   "fieldname": "column_break_sales",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "project",
+   "fieldtype": "Link",
+   "label": "Project",
+   "options": "Project",
+   "description": "Optional: Sales Orders and Invoices of the tickets are booked on this project (financial monitoring)."
   }
  ],
  "has_web_view": 1,
  "is_published_field": "published",
- "links": [
-  {
-   "link_doctype": "Checklist",
-   "link_fieldname": "reference_record"
-  },
-  {
-   "link_doctype": "Newsletter",
-   "link_fieldname": "custom_marketing_content"
-  },
-  {
-   "link_doctype": "Marketing Event Registration",
-   "link_fieldname": "event"
-  }
- ],
- "modified": "2026-07-02 12:15:12.535620",
+ "links": [],
+ "modified": "2026-10-16 12:00:00.000000",
  "modified_by": "Administrator",
- "module": "Phamos",
+ "module": "Marketing",
  "name": "Marketing Content",
  "naming_rule": "Expression",
  "owner": "Administrator",
