@@ -80,11 +80,52 @@
 					{{ extractErrorMessage }}
 				</span>
 				<span v-else class="text-gray-500 dark:text-gray-400">
-					PDF attached — extraction will start automatically.
+					PDF attached. "Read PDF with AI" fills the fields from it and replaces their current values.
 				</span>
 			</div>
 
-			<div class="flex flex-col gap-2 sm:flex-row">
+			<div>
+				<label class="text-xs text-gray-500 dark:text-gray-400" for="receipt-note">
+					Note for the accounting office
+				</label>
+				<textarea
+					id="receipt-note"
+					v-model="noteDraft"
+					rows="4"
+					placeholder="e.g. Guests: Anna Muster (Kunde X), Wolfram Schmidt · Project PROJ-0042 · Cost center Sales"
+					class="mt-1 w-full rounded-md border border-gray-300 bg-white px-2 py-1.5 text-sm text-gray-900 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-100"
+					@blur="saveNoteIfChanged"
+				/>
+				<p class="text-xs text-gray-500 dark:text-gray-400">
+					Printed on top of the PDF sent to DATEV. Saved when you leave the field.
+				</p>
+			</div>
+
+			<div class="flex flex-col flex-wrap gap-2 sm:flex-row">
+				<button
+					type="button"
+					class="inline-flex items-center justify-center rounded-md border border-gray-300 px-3 py-2 text-sm font-medium text-gray-800 hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-50 dark:border-gray-600 dark:text-gray-200 dark:hover:bg-gray-800"
+					:disabled="!receipt.has_pdf || extractStatus === 'running'"
+					@click="emit('run-extract')"
+				>
+					Read PDF with AI
+				</button>
+				<button
+					type="button"
+					class="inline-flex items-center justify-center rounded-md border border-gray-300 px-3 py-2 text-sm font-medium text-gray-800 hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-50 dark:border-gray-600 dark:text-gray-200 dark:hover:bg-gray-800"
+					:disabled="!receipt.has_pdf"
+					@click="emit('send-to-datev')"
+				>
+					{{ receipt.sent_to_datev ? "Resend to DATEV" : "Send to DATEV" }}
+				</button>
+				<button
+					type="button"
+					class="inline-flex items-center justify-center rounded-md border border-gray-300 px-3 py-2 text-sm font-medium text-gray-800 hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-50 dark:border-gray-600 dark:text-gray-200 dark:hover:bg-gray-800"
+					:disabled="!receipt.has_pdf"
+					@click="emit('preview-datev')"
+				>
+					Preview DATEV PDF
+				</button>
 				<button
 					type="button"
 					class="inline-flex items-center justify-center rounded-md border border-gray-300 px-3 py-2 text-sm font-medium text-gray-800 hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-50 dark:border-gray-600 dark:text-gray-200 dark:hover:bg-gray-800"
@@ -123,7 +164,7 @@
 </template>
 
 <script setup>
-import { computed } from "vue"
+import { computed, ref, watch } from "vue"
 
 const props = defineProps({
 	receipt: { type: Object, required: true },
@@ -132,7 +173,21 @@ const props = defineProps({
 	extractErrorMessage: { type: String, default: "" },
 })
 
-const emit = defineEmits(["close", "review-correct"])
+const emit = defineEmits(["close", "review-correct", "run-extract", "send-to-datev", "save-note", "preview-datev"])
+
+const noteDraft = ref("")
+watch(
+	() => [props.receipt?.name, props.receipt?.note_text],
+	() => {
+		noteDraft.value = props.receipt?.note_text || ""
+	},
+	{ immediate: true }
+)
+
+function saveNoteIfChanged() {
+	if ((noteDraft.value || "").trim() === (props.receipt?.note_text || "").trim()) return
+	emit("save-note", noteDraft.value)
+}
 
 const pdfUrl = computed(() => {
 	const url = (props.receipt?.attachment || "").trim()

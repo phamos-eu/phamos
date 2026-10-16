@@ -556,8 +556,8 @@ frappe.ui.form.on("Accounting Receipt", {
     },
 
     getFileExtension: function (filename) {
-        // Get extension of the file
-        return filename.split('.').pop();
+        // Get extension of the file; receipts without attachment have none
+        return (filename || "").split('.').pop().toLowerCase();
     },
 
     is_return: function (frm) {

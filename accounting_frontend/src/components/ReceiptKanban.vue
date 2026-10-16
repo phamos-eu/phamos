@@ -74,6 +74,7 @@
 <script setup>
 import { computed } from "vue"
 import { formatDate } from "@spa/utils/datetime"
+import { RECEIPT_CARD_DRAG_TYPE } from "../receiptUpload"
 
 const COLUMNS = [
 	"Inbox",
@@ -114,10 +115,12 @@ function formatSum(receipt) {
 
 function onDragStart(receipt, event) {
 	event.dataTransfer.setData("text/plain", receipt.name)
+	event.dataTransfer.setData(RECEIPT_CARD_DRAG_TYPE, receipt.name)
 	event.dataTransfer.effectAllowed = "move"
 }
 
 function onDrop(col, event) {
+	if (!Array.from(event.dataTransfer.types || []).includes(RECEIPT_CARD_DRAG_TYPE)) return
 	const name = event.dataTransfer.getData("text/plain")
 	if (!name) return
 	const receipt = props.receipts.find((r) => r.name === name)

@@ -10,6 +10,7 @@ from frappe.desk.form.assign_to import remove as remove_assignment
 from frappe.desk.form.load import get_assignments
 from frappe.utils import flt, get_fullname
 
+from phamos.accounting.pdf_stamp import note_to_lines
 from phamos.api import department_cockpit as dc
 from phamos.api.issue_common import _parse_assignees, _parse_list
 
@@ -436,8 +437,14 @@ RECEIPT_LIST_FIELDS = [
 	"supplier",
 	"supplier_name",
 	"receipt_type",
+	"attachment",
 	"modified",
 ]
+
+# A drop on these columns would claim something that did not happen, so the board refuses it.
+RECEIPT_STATUSES_NOT_DROPPABLE = {
+	"Sent to DATEV": "Use Send to DATEV in the receipt panel; dropping a card does not send the e-mail.",
+}
 
 
 def _derive_receipt_status(row):
@@ -477,11 +484,16 @@ def _serialize_receipt_row(row):
 
 
 def _apply_receipt_status_flags(doc, status):
-	"""Update kanban status without deriving payment flags from column position."""
+	"""Move the receipt to a kanban column.
+
+	Dropping on Paid records the payment (today unless a payment date is already set).
+	Leaving Paid does not clear is_paid: a payment that happened stays recorded.
+	"""
 	doc.status = status
-	if status == "Sent to DATEV":
-		doc.sent_to_datev = 1
-	# is_paid is not toggled by drag — use an explicit paid action elsewhere.
+	if status == "Paid":
+		doc.is_paid = 1
+		if not doc.payment_date:
+			doc.payment_date = frappe.utils.today()
 
 
 @frappe.whitelist()
@@ -492,6 +504,7 @@ def get_receipts():
 	rows = frappe.get_list(
 		"Accounting Receipt",
 		fields=RECEIPT_LIST_FIELDS,
+		filters={"status": ("!=", "Cancelled")},
 		order_by="posting_date desc, modified desc",
 		limit_page_length=500,
 	)
@@ -504,7 +517,7 @@ def get_receipt(name):
 	frappe.has_permission("Accounting Receipt", "read", throw=True)
 	doc = frappe.get_doc("Accounting Receipt", name)
 	doc.check_permission("read")
-	return _serialize_receipt_row(
+	row = _serialize_receipt_row(
 		{
 			"name": doc.name,
 			"title": doc.title,
@@ -522,6 +535,8 @@ def get_receipt(name):
 			"attachment": doc.attachment or "",
 		}
 	)
+	row["note_text"] = "\n".join(note_to_lines(doc.note))
+	return row
 
 
 @frappe.whitelist(methods=["POST"])
@@ -531,6 +546,8 @@ def update_receipt_status(name, status):
 	status = (status or "").strip()
 	if status not in RECEIPT_KANBAN_STATUSES:
 		frappe.throw(_("Invalid status: {0}").format(status))
+	if status in RECEIPT_STATUSES_NOT_DROPPABLE:
+		frappe.throw(_(RECEIPT_STATUSES_NOT_DROPPABLE[status]))
 
 	doc = frappe.get_doc("Accounting Receipt", name)
 	doc.check_permission("write")

@@ -230,6 +230,7 @@ after_migrate = [
 	"phamos.setup.ops_inbox.ensure_ops_inbox_setup",
 	"phamos.web_profile.setup.after_migrate",  # Web Page "Language" / "Translation Of" fields
 	"phamos.cockpits.setup.after_migrate",  # ToDo fields of the Personal Cockpit (#1553)
+	"phamos.setup.accounting_receipt.ensure_accounting_receipt_setup",  # AI Accountant role, user, bot
 	"phamos.marketing.setup.after_migrate",  # Lead Source "Event" for event registrations
 ]
 

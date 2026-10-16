@@ -12,6 +12,7 @@
   "title",
   "posting_date",
   "status",
+  "cancel_reason",
   "receipt_type",
   "receipt_attached",
   "pdf_attachment_choice",
@@ -71,13 +72,12 @@
    "label": "General Section"
   },
   {
-   "description": "This is a human readable name of the receipt. It is auto set when the Accounting Receipt is created by E-Mail-inbox",
+   "description": "Human readable name of the receipt. Set from the e-mail subject when the receipt comes from the inbox; it does not need to be unique.",
    "fieldname": "title",
    "fieldtype": "Data",
    "in_list_view": 1,
    "label": "Title",
-   "reqd": 1,
-   "unique": 1
+   "reqd": 1
   },
   {
    "description": "This is the date of the receipt",
@@ -88,10 +88,16 @@
    "label": "Date"
   },
   {
+   "default": "Inbox",
    "fieldname": "status",
-   "fieldtype": "Data",
-   "hidden": 1,
-   "label": "Status"
+   "fieldtype": "Select",
+   "in_list_view": 1,
+   "in_standard_filter": 1,
+   "label": "Status",
+   "no_copy": 1,
+   "options": "Inbox\nNeeds Decision\nApproved to Pay\nDo Not Pay\nSent to DATEV\nPaid\nCancelled",
+   "read_only": 1,
+   "search_index": 1
   },
   {
    "fieldname": "receipt_type",
@@ -136,7 +142,8 @@
   {
    "fieldname": "note",
    "fieldtype": "Text Editor",
-   "label": "Note"
+   "label": "Note for the Accounting Office",
+   "description": "Printed on top of the PDF sent to DATEV, e.g. the guests of a business meal, a project number or a cost center. Never filled by the AI."
   },
   {
    "fieldname": "purchase_section_section",
@@ -191,7 +198,8 @@
    "default": "0",
    "fieldname": "is_paid",
    "fieldtype": "Check",
-   "label": "Is Paid"
+   "label": "Is Paid",
+   "search_index": 1
   },
   {
    "fieldname": "mode_of_payment",
@@ -283,7 +291,8 @@
    "fieldname": "sent_to_datev",
    "fieldtype": "Check",
    "label": "Sent to DATEV",
-   "no_copy": 1
+   "no_copy": 1,
+   "search_index": 1
   },
   {
    "fieldname": "column_break_datev_audit",
@@ -389,11 +398,20 @@
    "fieldname": "pdf_attachment_choice",
    "fieldtype": "Select",
    "label": "PDF Attachment (Select)"
+  },
+  {
+   "depends_on": "eval:doc.status == \"Cancelled\"",
+   "fieldname": "cancel_reason",
+   "fieldtype": "Select",
+   "label": "Cancel Reason",
+   "mandatory_depends_on": "eval:doc.status == \"Cancelled\"",
+   "no_copy": 1,
+   "options": "\nDuplicate\nMerged\nNot a voucher\nOther"
   }
  ],
  "index_web_pages_for_search": 1,
  "links": [],
- "modified": "2026-04-30 13:30:31.878140",
+ "modified": "2026-10-16 15:00:00.000000",
  "modified_by": "Administrator",
  "module": "Phamos",
  "name": "Accounting Receipt",
@@ -401,16 +419,45 @@
  "owner": "Administrator",
  "permissions": [
   {
-   "create": 1,
-   "delete": 1,
    "email": 1,
    "export": 1,
    "print": 1,
    "read": 1,
    "report": 1,
-   "role": "System Manager",
    "share": 1,
-   "write": 1
+   "write": 1,
+   "create": 1,
+   "delete": 1,
+   "role": "System Manager"
+  },
+  {
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "share": 1,
+   "write": 1,
+   "create": 1,
+   "delete": 1,
+   "role": "Accounts Manager"
+  },
+  {
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "share": 1,
+   "write": 1,
+   "create": 1,
+   "role": "Accounts User"
+  },
+  {
+   "read": 1,
+   "write": 1,
+   "create": 1,
+   "role": "AI Accountant"
   }
  ],
  "row_format": "Dynamic",
