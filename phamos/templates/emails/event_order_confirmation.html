@@ -1,27 +1,55 @@
-{#- Order confirmation for an event registration (phamos.marketing.ticketing.send_order_confirmation).
-    Rendered in the buyer's language: frappe.local.lang is set before rendering. -#}
-<p>{{ _("Thank you for your registration for {0}.").format(event.title | e) }}</p>
-<p>
-	<strong>{{ _("Reference") }}:</strong> {{ reference | e }}<br>
-	{%- if event.starts_on %}
-	<strong>{{ _("Date") }}:</strong> {{ frappe.utils.format_datetime(event.starts_on, "dd.MM.yyyy HH:mm") }}<br>
-	{%- elif event.date_note %}
-	<strong>{{ _("Date") }}:</strong> {{ event.date_note | e }}<br>
-	{%- endif %}
+{#- Order / registration confirmation (phamos.marketing.ticketing.send_order_confirmation).
+    Rendered in the buyer's language (frappe.local.lang). § 312i BGB: confirms receipt without delay and
+    hands over the contract terms; the terms PDF is attached, else they are printed at the end. -#}
+{%- set when = frappe.utils.format_datetime(event.starts_on, "dd.MM.yyyy HH:mm") if event.starts_on else (event.date_note or "") -%}
+<p>{{ _("Hello {0},").format(buyer_name | e) if buyer_name else _("Hello,") }}</p>
+{%- if order %}
+<p>{{ _("thank you for your order. We have received it and hereby accept it. This email confirms your binding order of tickets for {0}.").format(event.title | e) }}</p>
+{%- else %}
+<p>{{ _("thank you for your registration for {0}. Your place is confirmed.").format(event.title | e) }}</p>
+{%- endif %}
+
+<table cellpadding="4" style="border-collapse:collapse">
+	<tr><td><strong>{{ _("Reference") }}</strong></td><td>{{ reference | e }}</td></tr>
+	<tr><td><strong>{{ _("Event") }}</strong></td><td>{{ event.title | e }}</td></tr>
+	<tr><td><strong>{{ _("Date") }}</strong></td><td>{{ when | e }}</td></tr>
 	{%- if event.location or event.city %}
-	<strong>{{ _("Venue") }}:</strong> {{ [event.location, event.city] | select | join(", ") | e }}
+	<tr><td><strong>{{ _("Venue") }}</strong></td><td>{{ [event.location, event.city] | select | join(", ") | e }}</td></tr>
 	{%- endif %}
-</p>
-<p><strong>{{ _("Tickets") }}:</strong></p>
+</table>
+
+<p><strong>{{ _("Tickets") }}</strong></p>
 <ul>
 	{%- for row in attendees %}
-	<li>{{ row.full_name | e }} ({{ row.email | e }})</li>
+	<li>{{ row.full_name | e }}{% if row.ticket_type and order %} ({{ row.ticket_type | e }}){% endif %}{% if row.email and row.email != recipient %}, {{ row.email | e }}{% endif %}</li>
 	{%- endfor %}
 </ul>
-{%- if paid %}
-<p>{{ _("Total incl. VAT: {0}").format(frappe.utils.fmt_money(total, currency=pricing.currency)) }}</p>
-<p>{{ _("We confirm your order and send you the invoice by email. Your tickets are valid once the invoice is paid.") }}</p>
-{%- else %}
-<p>{{ _("Your registration is confirmed. We look forward to seeing you.") }}</p>
+<p>{{ _("All tickets and information about the event are sent to {0}.").format(recipient | e) }}</p>
+
+{%- if order %}
+<table cellpadding="4" style="border-collapse:collapse">
+	{%- for item in order.items %}
+	<tr><td>{{ item.description | e }}</td><td style="text-align:right">{{ frappe.utils.fmt_money(item.amount, currency=order.currency) }}</td></tr>
+	{%- endfor %}
+	{%- for tax in order.taxes %}
+	<tr><td>{{ _("incl. {0}").format(tax.description | e) if tax.included_in_print_rate else tax.description | e }} ({{ tax.rate }} %)</td><td style="text-align:right">{{ frappe.utils.fmt_money(tax.tax_amount, currency=order.currency) }}</td></tr>
+	{%- endfor %}
+	<tr><td><strong>{{ _("Total incl. VAT") }}</strong></td><td style="text-align:right"><strong>{{ frappe.utils.fmt_money(order.grand_total, currency=order.currency) }}</strong></td></tr>
+</table>
+{%- if address %}
+<p><strong>{{ _("Billing address") }}</strong><br>{{ address }}</p>
 {%- endif %}
-<p>{{ _("If something is wrong or you cannot come, simply reply to this email.") }}</p>
+<p><strong>{{ _("Payment") }}:</strong> {{ _("by invoice. You receive the invoice by email; please pay within 14 days of the invoice date.") }}</p>
+<p><strong>{{ _("Right of withdrawal") }}:</strong> {{ _("There is no right of withdrawal for tickets to leisure events on a specific date (§ 312g (2) no. 9 BGB). If you cannot attend, please reply to this email.") }}</p>
+{%- endif %}
+
+<p>{{ _("Add the event to your calendar with the attached file.") }}{% if event_url %} {{ _("Event page") }}: <a href="{{ event_url }}">{{ event_url }}</a>{% endif %}</p>
+<p>{{ _("Questions or changes? Simply reply to this email.") }}</p>
+<p style="font-size:12px;color:#6b6b6b">
+	{{ _("The terms and conditions of this event are attached to this email.") if not terms_html else _("The terms and conditions of this event are printed below.") }}
+	<a href="{{ privacy_url }}">{{ _("Privacy policy") }}</a> · <a href="{{ imprint_url }}">{{ _("Imprint") }}</a>
+</p>
+{%- if terms_html %}
+<hr>
+<div style="font-size:12px">{{ terms_html }}</div>
+{%- endif %}

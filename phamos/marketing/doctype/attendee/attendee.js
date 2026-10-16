@@ -15,6 +15,10 @@ frappe.ui.form.on("Attendee", {
 			frm.add_custom_button(__("Create Sales Invoice"), () =>
 				phamos_attendee.call("create_sales_invoices", { names: [frm.doc.name] }, frm), group);
 		}
+		if (!frm.doc.opportunity && (frm.doc.customer || frm.doc.lead)) {
+			frm.add_custom_button(__("Create Opportunity"), () =>
+				phamos_attendee.call("create_opportunities", { names: [frm.doc.name] }, frm), group);
+		}
 		for (const status of ["Attended", "No Show"]) {
 			if (frm.doc.status !== status) {
 				frm.add_custom_button(__(status), () =>
@@ -30,14 +34,14 @@ frappe.ui.form.on("Attendee", {
 
 window.phamos_attendee = {
 	payment_colour(status) {
-		return { Paid: "green", Invoiced: "orange", Ordered: "blue", Quoted: "yellow", Pending: "red",
+		return { Paid: "green", Invoiced: "orange", Ordered: "blue", Pending: "red",
 			Cancelled: "gray", "Not Required": "gray" }[status] || "gray";
 	},
 
 	call(method, args, frm) {
 		return frappe.call({ method: `${ATTENDEE_API}.${method}`, args, freeze: true }).then((r) => {
 			const m = r.message || {};
-			const docs = m.sales_orders || m.sales_invoices || [];
+			const docs = m.sales_orders || m.sales_invoices || m.opportunities || [];
 			frappe.show_alert({ message: docs.length ? __("Created: {0}", [docs.join(", ")]) : __("Done"), indicator: "green" });
 			frm ? frm.reload_doc() : cur_list && cur_list.refresh();
 			return m;

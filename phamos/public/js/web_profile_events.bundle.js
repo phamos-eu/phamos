@@ -35,126 +35,203 @@
 		dialog.addEventListener("close", () => opener && opener.focus());
 	}
 
-	// --- tickets ---------------------------------------------------------------------------------------
+	// --- tickets: three steps, then the optional questions ----------------------------------------------
 	const ticketDialog = document.querySelector("[data-wp-ticket-dialog]");
 	if (ticketDialog) {
 		const form = ticketDialog.querySelector("[data-wp-ticket-form]");
-		const qty = form.querySelector("[data-wp-qty]");
-		const rows = form.querySelector("[data-wp-attendees]");
-		const template = form.querySelector("[data-wp-attendee-row]");
-		const billing = form.querySelector("[data-wp-billing]");
-		const companyBox = form.querySelector("[data-wp-company]");
-		const status = form.querySelector("[data-wp-ticket-status]");
-		const submit = form.querySelector("button[type=submit]");
+		const $ = (selector) => form.querySelector(selector);
+		const steps = [...form.querySelectorAll("[data-wp-step]")];
+		const labels = [...form.querySelectorAll("[data-wp-step-label]")];
+		const qty = $("[data-wp-qty]");
+		const attends = $("[data-wp-attends]");
+		const companions = $("[data-wp-companions]");
+		const template = $("[data-wp-companion-row]");
+		const status = $("[data-wp-ticket-status]");
+		const back = $("[data-wp-back]");
+		const next = $("[data-wp-next]");
+		const submit = $("[data-wp-submit]");
+		const toggle = $("[data-wp-company-toggle]");
 		const free = form.dataset.free === "1";
 		const gross = parseFloat(form.dataset.gross || "0");
 		const taxRate = parseFloat(form.dataset.taxRate || "0");
 		const max = parseInt(form.dataset.max || "10", 10);
 		const money = new Intl.NumberFormat(form.dataset.lang === "de" ? "de-DE" : "en-GB",
 			{ style: "currency", currency: form.dataset.currency || "EUR" });
+		let current = 0;
+		let order = null; // {reference, token} after a successful order
 
-		function count() {
-			return Math.min(Math.max(parseInt(qty.value || "1", 10) || 1, 1), max);
+		const count = () => Math.min(Math.max(parseInt(qty.value || "1", 10) || 1, 1), max);
+		const value = (name) => (form.elements[name] ? String(form.elements[name].value || "").trim() : "");
+
+		function renderCompanions() {
+			// Ticket holders besides the contact (all of them when the contact does not attend).
+			const wanted = count() - (attends.checked ? 1 : 0);
+			while (companions.children.length < wanted) companions.appendChild(template.content.firstElementChild.cloneNode(true));
+			while (companions.children.length > wanted) companions.lastElementChild.remove();
+			[...companions.children].forEach((row, i) => {
+				row.querySelector("[data-wp-companion-label]").textContent = `${template.content.querySelector("[data-wp-companion-label]").textContent} ${i + (attends.checked ? 2 : 1)}`;
+			});
+			$("[data-wp-companions-block]").hidden = wanted < 1;
 		}
 
-		function renderRows() {
-			const wanted = count();
-			while (rows.children.length < wanted) rows.appendChild(template.content.firstElementChild.cloneNode(true));
-			while (rows.children.length > wanted) rows.lastElementChild.remove();
-			renderSummary();
+		function holders() {
+			const list = attends.checked ? [{ full_name: value("contact_name"), email: value("contact_email") }] : [];
+			for (const row of companions.children) {
+				list.push({
+					full_name: row.querySelector('[data-field="full_name"]').value.trim(),
+					email: row.querySelector('[data-field="email"]').value.trim(),
+				});
+			}
+			return list;
 		}
 
-		function people() {
-			return [...rows.children].map((row) => ({
-				full_name: row.querySelector('[data-field="full_name"]').value.trim(),
-				email: row.querySelector('[data-field="email"]').value.trim(),
-			}));
+		function show(index) {
+			current = index;
+			steps.forEach((step, i) => (step.hidden = i !== index));
+			labels.forEach((label, i) => {
+				label.toggleAttribute("aria-current", i === index);
+				label.classList.toggle("wp-step-done", i < index);
+			});
+			back.hidden = index === 0;
+			next.hidden = index === steps.length - 1;
+			submit.hidden = index !== steps.length - 1;
+			submit.disabled = false;
+			status.textContent = "";
+			status.classList.remove("wp-error");
+			if (index === steps.length - 1) renderSummary();
+			const focus = steps[index].querySelector("input:not([type=hidden]):not([type=checkbox]), select");
+			if (focus) setTimeout(() => focus.focus(), 0);
+		}
+
+		function valid(step) {
+			const fields = [...step.querySelectorAll("input, select")].filter((f) => !f.closest("[hidden]"));
+			const bad = fields.find((f) => !f.checkValidity());
+			if (bad) {
+				status.classList.add("wp-error");
+				status.textContent = status.dataset.invalid;
+				bad.reportValidity();
+				return false;
+			}
+			return true;
 		}
 
 		function renderSummary() {
-			const list = form.querySelector("[data-wp-summary-people]");
-			if (!list) return;
-			list.replaceChildren(...people().map((p, i) => {
+			const people = holders();
+			$("[data-wp-summary-people]").replaceChildren(...people.map((p) => {
 				const li = document.createElement("li");
-				li.textContent = p.full_name || `Ticket ${i + 1}`;
+				li.textContent = p.email && p.email !== value("contact_email") ? `${p.full_name} (${p.email})` : p.full_name;
 				return li;
 			}));
-			const n = count();
+			$("[data-wp-summary-email]").textContent = value("contact_email");
+			if (free) return;
+			const lines = [value("is_company") && toggle.checked ? value("company") : "", value("billing_name"),
+				value("address_line1"), `${value("postcode")} ${value("city")}`, form.elements.country.selectedOptions[0]?.textContent || "",
+				value("vat_id") && toggle.checked ? value("vat_id") : ""].filter(Boolean);
+			$("[data-wp-summary-billing]").replaceChildren(...lines.flatMap((line, i) => (i ? [document.createElement("br"), line] : [line])));
+			const n = people.length;
 			const total = gross * n;
-			const tax = total - total / (1 + taxRate / 100);
-			form.querySelector("[data-wp-summary-line]").textContent = `${n} × ${money.format(gross)}`;
-			form.querySelector("[data-wp-summary-net]").textContent = money.format(total);
-			form.querySelector("[data-wp-summary-tax]").textContent = money.format(tax);
-			form.querySelector("[data-wp-summary-total]").textContent = money.format(total);
+			const title = form.dataset.priceTitle ? ` (${form.dataset.priceTitle})` : "";
+			$("[data-wp-summary-line]").textContent = `${n} × ${money.format(gross)}${title}`;
+			$("[data-wp-summary-amount]").textContent = money.format(total);
+			$("[data-wp-summary-tax]").textContent = money.format(total - total / (1 + taxRate / 100));
+			$("[data-wp-summary-total]").textContent = money.format(total);
 		}
 
-		qty.addEventListener("input", renderRows);
-		rows.addEventListener("input", renderSummary);
-		// The first ticket holder fills the billing name and email unless they were changed by hand.
-		rows.addEventListener("change", () => {
-			const first = people()[0] || {};
-			for (const [field, value] of [["billing_name", first.full_name], ["billing_email", first.email]]) {
-				const input = form.elements[field];
-				if (input && (!input.value || input.dataset.auto === "1")) {
-					input.value = value || "";
-					input.dataset.auto = "1";
-				}
-			}
-		});
-		["billing_name", "billing_email"].forEach((f) => form.elements[f] && form.elements[f].addEventListener("input", (e) => (e.target.dataset.auto = "0")));
-		const toggle = form.querySelector("[data-wp-company-toggle]");
+		qty.addEventListener("input", renderCompanions);
+		attends.addEventListener("change", renderCompanions);
 		if (toggle) {
 			toggle.addEventListener("change", () => {
-				companyBox.hidden = !toggle.checked;
+				$("[data-wp-company]").hidden = !toggle.checked;
 				form.elements.company.required = toggle.checked;
 			});
 		}
+		next.addEventListener("click", () => {
+			if (!valid(steps[current])) return;
+			if (current === 0 && !free) {
+				// The billing step starts with the contact's name and email.
+				for (const [field, source] of [["billing_name", "contact_name"], ["billing_email", "contact_email"]]) {
+					if (!value(field)) form.elements[field].value = value(source);
+				}
+			}
+			show(current + 1);
+		});
+		back.addEventListener("click", () => show(current - 1));
+		form.querySelectorAll("[data-wp-goto]").forEach((button) => button.addEventListener("click", () => {
+			const target = steps.findIndex((step) => step.dataset.wpStep === button.dataset.wpGoto);
+			if (target >= 0) show(target);
+		}));
+		form.querySelectorAll("[data-wp-terms-open]").forEach((link) => link.addEventListener("click", (event) => {
+			event.preventDefault();
+			const terms = form.querySelector("#wp-terms");
+			if (terms) { terms.open = true; terms.scrollIntoView({ block: "nearest" }); }
+		}));
 
 		wireDialog(ticketDialog, "tickets", () => {
-			status.textContent = "";
-			status.classList.remove("wp-error");
-			if (!rows.children.length) renderRows();
-			setTimeout(() => qty.focus(), 0);
+			if (order) return; // keep the thank-you panel after an order
+			renderCompanions();
+			show(0);
 		});
 
 		form.addEventListener("submit", async (event) => {
 			event.preventDefault();
-			status.classList.remove("wp-error");
-			if (!form.checkValidity()) {
-				status.classList.add("wp-error");
-				status.textContent = status.dataset.invalid;
-				form.reportValidity();
-				return;
-			}
+			if (current !== steps.length - 1) return next.click();
+			const people = holders();
 			const body = new FormData();
 			for (const name of ["event", "lang", "website"]) body.append(name, form.elements[name].value);
-			body.append("qty", String(count()));
-			body.append("attendees", JSON.stringify(people()));
+			body.append("contact", JSON.stringify({ full_name: value("contact_name"), email: value("contact_email"), phone: value("phone") }));
+			body.append("attends", attends.checked ? "1" : "0");
+			body.append("companions", JSON.stringify(people.slice(attends.checked ? 1 : 0)));
 			if (!free) {
-				const v = (name) => (form.elements[name] ? form.elements[name].value.trim() : "");
 				body.append("billing", JSON.stringify({
-					full_name: v("billing_name"), email: v("billing_email"), phone: v("phone"),
-					is_company: toggle && toggle.checked ? 1 : 0, company: v("company"), vat_id: v("vat_id"),
-					address_line1: v("address_line1"), postcode: v("postcode"), city: v("city"), country: v("country"),
+					full_name: value("billing_name"), email: value("billing_email"), phone: value("phone"),
+					is_company: toggle && toggle.checked ? 1 : 0, company: value("company"), vat_id: value("vat_id"),
+					address_line1: value("address_line1"), postcode: value("postcode"), city: value("city"), country: value("country"),
 				}));
+				body.append("expected_total", (gross * people.length).toFixed(2));
 			}
-			const consents = {};
-			for (const name of ["terms", "privacy", "newsletter", "attendee_contact", "public_listing"]) {
-				consents[name] = form.elements[name].checked ? 1 : 0;
-			}
-			body.append("consents", JSON.stringify(consents));
 			submit.disabled = true;
+			back.disabled = true;
+			status.classList.remove("wp-error");
 			status.textContent = status.dataset.sending;
 			try {
 				const result = await post(form, body);
-				form.querySelectorAll("fieldset, .wp-consents, [data-wp-ticket-actions]").forEach((el) => (el.hidden = true));
-				const success = form.querySelector("[data-wp-ticket-success]");
+				order = { reference: result.reference, token: result.token };
+				steps.forEach((step) => (step.hidden = true));
+				$("[data-wp-steps]").hidden = true;
+				$("[data-wp-ticket-actions]").hidden = true;
+				const success = $("[data-wp-ticket-success]");
 				success.querySelector("[data-wp-ticket-reference]").textContent = result.reference || "";
+				success.querySelector("[data-wp-ticket-email]").textContent = result.tickets_to || value("contact_email");
 				success.hidden = false;
 			} catch (error) {
 				submit.disabled = false;
+				back.disabled = false;
 				status.classList.add("wp-error");
 				status.textContent = error.message || status.dataset.failed;
+			}
+		});
+
+		const consentStatus = $("[data-wp-consents-status]");
+		$("[data-wp-consents-save]").addEventListener("click", async (event) => {
+			if (!order) return;
+			const button = event.currentTarget;
+			const consents = {};
+			for (const name of ["newsletter", "attendee_contact", "public_listing"]) consents[name] = form.elements[name].checked ? 1 : 0;
+			const body = new FormData();
+			body.append("event", form.elements.event.value);
+			body.append("lang", form.elements.lang.value);
+			body.append("reference", order.reference);
+			body.append("token", order.token);
+			body.append("consents", JSON.stringify(consents));
+			button.disabled = true;
+			try {
+				const result = await post({ action: form.dataset.consentAction }, body);
+				consentStatus.classList.remove("wp-error");
+				consentStatus.textContent = result.status === "confirmation_sent" ? consentStatus.dataset.optin : consentStatus.dataset.saved;
+			} catch (error) {
+				button.disabled = false;
+				consentStatus.classList.add("wp-error");
+				consentStatus.textContent = error.message || consentStatus.dataset.failed;
 			}
 		});
 	}

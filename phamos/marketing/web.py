@@ -57,24 +57,24 @@ def _text(value, required=False, label=None, limit=MAX_TEXT):
 	return value[:limit]
 
 
-def _attendees(raw):
+def _person(raw, email_required, label):
+	person = raw if isinstance(raw, dict) else {}
+	name = _text(person.get("full_name"), True, label)
+	if len(name) < 2:
+		frappe.throw(_("Please enter the full name: {0}").format(label))
+	email = (person.get("email") or "").strip()
+	if email_required or email:
+		email = normalize_email(email)
+	return {"full_name": name, "email": email, "phone": _text(person.get("phone"), limit=40)}
+
+
+def _companions(raw):
 	people = _json(raw, [])
-	if not isinstance(people, list) or not people:
-		frappe.throw(_("Please add at least one ticket holder."))
-	if len(people) > MAX_ATTENDEES_PER_ORDER:
+	if not isinstance(people, list):
+		frappe.throw(_("Invalid request."))
+	if len(people) >= MAX_ATTENDEES_PER_ORDER:
 		frappe.throw(_("At most {0} tickets per order.").format(MAX_ATTENDEES_PER_ORDER))
-	result, seen = [], set()
-	for person in people:
-		person = person if isinstance(person, dict) else {}
-		name = _text(person.get("full_name"), True, _("Name"))
-		if len(name) < 2:
-			frappe.throw(_("Please enter the full name of every ticket holder."))
-		email = normalize_email(person.get("email"))
-		if email in seen:
-			frappe.throw(_("Every ticket needs its own email address."))
-		seen.add(email)
-		result.append({"full_name": name, "email": email})
-	return result
+	return [_person(p, False, _("Ticket holder {0}").format(i + 2)) for i, p in enumerate(people)]
 
 
 def _billing(raw, free):
@@ -109,19 +109,12 @@ def _billing(raw, free):
 	return result
 
 
-def _consents(raw):
-	consents = _json(raw, {})
-	consents = consents if isinstance(consents, dict) else {}
-	values = {key: cint(consents.get(key)) for key in ("terms", "privacy", "newsletter", "attendee_contact",
-		"public_listing")}
-	if not values["terms"] or not values["privacy"]:
-		frappe.throw(_("Please accept the terms and the privacy policy."))
-	return values
-
-
 @frappe.whitelist(allow_guest=True, methods=["POST"])
 @rate_limit(limit=5, seconds=60 * 60)
-def order_tickets(event, lang, attendees, qty=None, billing=None, consents=None, website=None):
+def order_tickets(event, lang, contact, attends=1, companions=None, billing=None, expected_total=None, website=None):
+	"""The binding order ("Zahlungspflichtig bestellen"). No consent checkboxes: the order is a contract
+	(Art. 6 (1) b GDPR), the terms apply through the notice above the button; the optional marketing
+	questions come afterwards (``save_consents``)."""
 	if website:
 		return {"ok": True}  # honeypot: hidden from people, filled in by bots
 	lang = _lang(lang)
@@ -129,19 +122,38 @@ def order_tickets(event, lang, attendees, qty=None, billing=None, consents=None,
 	offer = item.data.get("offer")
 	if not offer or not offer.get("sale_open"):
 		frappe.throw(_("Ticket sales for this event are closed."))
-	people = _attendees(attendees)
-	if qty is not None and cint(qty) != len(people):
-		frappe.throw(_("The number of tickets does not match the ticket holders."))
+	main = _person(_json(contact, {}), True, _("Your name"))
+	others = _companions(companions)
+	if not cint(attends) and not others:
+		frappe.throw(_("Please add at least one ticket holder."))
 	billing_data = _billing(billing, offer.get("free"))
-	consent_values = _consents(consents)
-
-	result = ticketing.register_attendees(item.name, people, billing_data=billing_data, consents=consent_values,
-		source="Website", lang=lang)
+	result = ticketing.register_attendees(item.name, main, attends=cint(attends), companions=others,
+		billing_data=billing_data, source="Website", lang=lang,
+		expected_total=None if offer.get("free") or expected_total in (None, "") else expected_total)
 	clear_items()
-	if consent_values["newsletter"] and item.data.get("has_newsletter"):
-		_start_double_opt_in((billing_data or people[0])["email"], item.name)
 	return {"ok": True, "reference": result["reference"], "reference_doctype": result["reference_doctype"],
-		"free": bool(offer.get("free"))}
+		"free": bool(offer.get("free")), "tickets_to": result["tickets_to"], "token": result["consent_token"]}
+
+
+@frappe.whitelist(allow_guest=True, methods=["POST"])
+@rate_limit(limit=10, seconds=60 * 60)
+def save_consents(event, lang, reference, token, consents=None, website=None):
+	"""The three optional questions after the order, signed with the token the order returned."""
+	if website:
+		return {"ok": True}
+	lang = _lang(lang)
+	item = _event(event, lang)
+	reference = (reference or "").strip()
+	if not ticketing.verify_consent_token(reference, token) or not frappe.db.exists("Attendee",
+			{"event": item.name, "order_reference": reference}):
+		frappe.throw(_("This link has expired. You can still subscribe on the event page."), frappe.PermissionError)
+	values = _json(consents, {})
+	values = {key: cint(values.get(key)) for key in ("newsletter", "attendee_contact", "public_listing")}
+	email = ticketing.save_consents(reference, values, event=item.name)
+	status = "saved"
+	if values["newsletter"] and email and item.data.get("has_newsletter"):
+		status = _start_double_opt_in(email, item.name)
+	return {"ok": True, "status": status}
 
 
 @frappe.whitelist(allow_guest=True, methods=["POST"])

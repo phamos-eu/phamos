@@ -1013,6 +1013,10 @@ def build_profile(item, lang):
 			"people", slugs=item.data.get("people", []))
 		add_related(_("Implementations"), _("Projects phamos delivered for this customer.") if item.masked
 			else _("Projects phamos delivered for {0}.").format(item.title), "implementations", slugs=item.data["projects"])
+		if not item.masked:
+			# Events this stakeholder sponsors or organizes (only named stakeholders are linked from events).
+			event_slugs = [e.slug for e in get_items("events", lang) if item.name in e.data.get("stakeholders", [])]
+			add_related(_("Events"), _("Events {0} sponsors or organizes.").format(item.title), "events", slugs=event_slugs)
 		if item.data.get("industry"):
 			add_related((_("More partners in {0}") if partner else _("More customers in {0}")).format(industry),
 				_("Other companies in the same industry that work with phamos."),

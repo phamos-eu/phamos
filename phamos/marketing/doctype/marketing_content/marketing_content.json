@@ -26,18 +26,17 @@
   "description",
   "translations",
   "section_organizer",
-  "organizer_logo",
+  "organizer_is_phamos",
+  "organizer",
   "organizer_name",
-  "organizer_email",
+  "organizer_logo",
   "organizer_website_link",
+  "organizer_email",
   "column_break_organizer",
   "contact_person",
   "contact_person_email",
   "contact_person_phone",
   "contact_profile",
-  "section_registration",
-  "registration_open",
-  "max_attendees",
   "section_speakers",
   "speakers",
   "section_sponsors",
@@ -45,16 +44,22 @@
   "section_responses",
   "email_group",
   "tab_ticketing",
-  "ticket_item",
-  "tc_name",
-  "column_break_srnt",
-  "item_tax_template",
-  "section_ticket_sale",
+  "section_ticket_registration",
+  "registration_open",
+  "max_attendees",
+  "max_attendees_per_order",
+  "column_break_registration",
   "ticket_sales_from",
   "ticket_sales_until",
-  "column_break_ticket_sale",
-  "selling_price_list",
-  "max_attendees_per_order",
+  "section_ticket_sale",
+  "ticket_item",
+  "ticket_price_includes_tax",
+  "column_break_srnt",
+  "item_tax_template",
+  "tc_name",
+  "section_ticket_prices",
+  "ticket_prices",
+  "ticket_price_summary",
   "section_sales",
   "campaign",
   "column_break_sales",
@@ -194,28 +199,48 @@
    "label": "Organizer"
   },
   {
-   "description": "Small logo shown on the event page beside the organizer name",
-   "fieldname": "organizer_logo",
-   "fieldtype": "Attach Image",
-   "label": "Organizer Logo"
+   "fieldname": "organizer_is_phamos",
+   "fieldtype": "Check",
+   "label": "phamos organizes this event",
+   "default": "1"
+  },
+  {
+   "fieldname": "organizer",
+   "fieldtype": "Link",
+   "label": "Organizer",
+   "options": "Stakeholder Web Profile",
+   "depends_on": "eval:!doc.organizer_is_phamos",
+   "mandatory_depends_on": "eval:!doc.organizer_is_phamos",
+   "description": "The organizing company. Named on the website only when its profile is published and approved to be named."
   },
   {
    "fieldname": "organizer_name",
    "fieldtype": "Data",
-   "label": "Organizer Name"
+   "label": "Organizer Name",
+   "depends_on": "eval:!doc.organizer_is_phamos && !doc.organizer",
+   "description": "Legacy: use Organizer (Stakeholder Web Profile) instead."
+  },
+  {
+   "description": "Legacy: use Organizer (Stakeholder Web Profile) instead.",
+   "fieldname": "organizer_logo",
+   "fieldtype": "Attach Image",
+   "label": "Organizer Logo",
+   "depends_on": "eval:!doc.organizer_is_phamos && !doc.organizer"
+  },
+  {
+   "description": "Legacy: use Organizer (Stakeholder Web Profile) instead.",
+   "fieldname": "organizer_website_link",
+   "fieldtype": "Data",
+   "label": "Organizer Website Link",
+   "options": "URL",
+   "depends_on": "eval:!doc.organizer_is_phamos && !doc.organizer"
   },
   {
    "fieldname": "organizer_email",
    "fieldtype": "Data",
    "label": "Organizer Email",
-   "options": "Email"
-  },
-  {
-   "description": "Public website of the organizing company or person",
-   "fieldname": "organizer_website_link",
-   "fieldtype": "Data",
-   "label": "Organizer Website Link",
-   "options": "URL"
+   "options": "Email",
+   "description": "Internal, not shown on the website."
   },
   {
    "fieldname": "column_break_organizer",
@@ -247,25 +272,6 @@
    "label": "Contact on the Website",
    "options": "Person Web Profile",
    "description": "Shown in the page sidebar with the contact dialog; requests become Opportunities assigned to this person."
-  },
-  {
-   "fieldname": "section_registration",
-   "fieldtype": "Section Break",
-   "label": "Registration"
-  },
-  {
-   "default": "0",
-   "fieldname": "registration_open",
-   "fieldtype": "Check",
-   "label": "Registration / Ticket Sale Open",
-   "no_copy": 1
-  },
-  {
-   "description": "Leave 0 for unlimited",
-   "fieldname": "max_attendees",
-   "fieldtype": "Int",
-   "label": "Max Attendees",
-   "no_copy": 1
   },
   {
    "fieldname": "section_speakers",
@@ -304,35 +310,37 @@
   {
    "fieldname": "tab_ticketing",
    "fieldtype": "Tab Break",
-   "label": "Ticket Configuration"
+   "label": "Tickets & Sales"
   },
   {
-   "description": "ERPNext Item sold as ticket (non-stock). Empty: the event is free and registrations get no order.",
-   "fieldname": "ticket_item",
-   "fieldtype": "Link",
-   "label": "Ticket Item",
-   "options": "Item"
-  },
-  {
-   "fieldname": "tc_name",
-   "fieldtype": "Link",
-   "label": "Terms and Conditions",
-   "options": "Terms and Conditions"
-  },
-  {
-   "fieldname": "column_break_srnt",
-   "fieldtype": "Column Break"
-  },
-  {
-   "fieldname": "item_tax_template",
-   "fieldtype": "Link",
-   "label": "Item Tax Template",
-   "options": "Item Tax Template"
-  },
-  {
-   "fieldname": "section_ticket_sale",
+   "fieldname": "section_ticket_registration",
    "fieldtype": "Section Break",
-   "label": "Ticket Sale"
+   "label": "Registration"
+  },
+  {
+   "default": "0",
+   "fieldname": "registration_open",
+   "fieldtype": "Check",
+   "label": "Registration / Ticket Sale Open",
+   "no_copy": 1,
+   "description": "Master switch for the ticket sale and free registrations."
+  },
+  {
+   "description": "Leave 0 for unlimited",
+   "fieldname": "max_attendees",
+   "fieldtype": "Int",
+   "label": "Max Attendees",
+   "no_copy": 1
+  },
+  {
+   "default": "10",
+   "fieldname": "max_attendees_per_order",
+   "fieldtype": "Int",
+   "label": "Max Tickets per Order"
+  },
+  {
+   "fieldname": "column_break_registration",
+   "fieldtype": "Column Break"
   },
   {
    "fieldname": "ticket_sales_from",
@@ -347,21 +355,59 @@
    "description": "Empty: at the start of the event."
   },
   {
-   "fieldname": "column_break_ticket_sale",
+   "fieldname": "section_ticket_sale",
+   "fieldtype": "Section Break",
+   "label": "Ticket"
+  },
+  {
+   "description": "Non-stock service item used on the order lines. Prices come from the table below.",
+   "fieldname": "ticket_item",
+   "fieldtype": "Link",
+   "label": "Ticket Item",
+   "options": "Item"
+  },
+  {
+   "fieldname": "ticket_price_includes_tax",
+   "fieldtype": "Check",
+   "label": "Prices include VAT",
+   "default": "1",
+   "description": "Prices below are gross (what a consumer pays). Untick to enter net prices."
+  },
+  {
+   "fieldname": "column_break_srnt",
    "fieldtype": "Column Break"
   },
   {
-   "fieldname": "selling_price_list",
+   "fieldname": "item_tax_template",
    "fieldtype": "Link",
-   "label": "Price List",
-   "options": "Price List",
-   "description": "The ticket price is taken from this price list (default: Selling Settings)."
+   "label": "Item Tax Template",
+   "options": "Item Tax Template"
   },
   {
-   "default": "10",
-   "fieldname": "max_attendees_per_order",
-   "fieldtype": "Int",
-   "label": "Max Tickets per Order"
+   "fieldname": "tc_name",
+   "fieldtype": "Link",
+   "label": "Terms and Conditions",
+   "options": "Terms and Conditions"
+  },
+  {
+   "fieldname": "section_ticket_prices",
+   "fieldtype": "Section Break",
+   "label": "Prices",
+   "depends_on": "ticket_item"
+  },
+  {
+   "fieldname": "ticket_prices",
+   "fieldtype": "Table",
+   "label": "Ticket Prices",
+   "options": "Marketing Event Ticket Price",
+   "description": "First matching row wins: its window contains the order time and its quota is not used up. E.g. Early Bird (until 30 Nov, 30 tickets), then Regular."
+  },
+  {
+   "fieldname": "ticket_price_summary",
+   "fieldtype": "Small Text",
+   "label": "Price Overview",
+   "read_only": 1,
+   "no_copy": 1
   },
   {
    "fieldname": "section_sales",
@@ -390,7 +436,7 @@
   }
  ],
  "links": [],
- "modified": "2026-10-16 18:00:00.000000",
+ "modified": "2026-10-17 09:00:00.000000",
  "modified_by": "Administrator",
  "module": "Marketing",
  "name": "Marketing Content",

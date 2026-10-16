@@ -89,21 +89,10 @@ def create_sales_orders(names, customer=None, submit=0):
 		if not party:
 			frappe.throw(_("{0}: no Customer yet. Run \"Create Customer(s)\" first or choose a Customer.").format(
 				_buyer(group).full_name))
-		quotation = next((d.quotation for d in group if d.quotation), None)
-		if quotation and frappe.db.get_value("Quotation", quotation, "docstatus") == 1:
-			so = billing.make_sales_order_from_quotation(quotation, customer=party, submit=submit)
-		else:
-			event = frappe.get_doc("Marketing Content", group[0].event)
-			so = billing.create_sales_order(event, group, party, submit=submit)
+		event = frappe.get_doc("Marketing Content", group[0].event)
+		so = billing.create_sales_order(event, group, party, submit=submit)
 		orders.append(so.name)
 	return {"sales_orders": orders, "skipped": skipped}
-
-
-@frappe.whitelist(methods=["POST"])
-def create_sales_order_from_quotation(quotation, customer=None, submit=0):
-	_require("Sales Order", "create")
-	so = billing.make_sales_order_from_quotation(quotation, customer=customer, submit=frappe.utils.cint(submit))
-	return {"sales_order": so.name}
 
 
 @frappe.whitelist(methods=["POST"])
@@ -147,3 +136,55 @@ def attendee_summary(event):
 def create_campaign(event):
 	frappe.has_permission("Marketing Content", "write", event, throw=True)
 	return crm.get_or_create_campaign(frappe.get_doc("Marketing Content", event))
+
+
+@frappe.whitelist(methods=["POST"])
+def create_opportunities(names):
+	"""One Opportunity per attendee after the follow-up call showed real interest (none at registration:
+	a ticket is a closed sale, an Opportunity a deal someone works on)."""
+	_require("Attendee", "write")
+	_require("Opportunity", "create")
+	created, skipped = [], []
+	for name in _names(names):
+		att = frappe.get_doc("Attendee", name)
+		party_type, party = ("Customer", att.customer) if att.customer else ("Lead", att.lead) if att.lead else (None, None)
+		if att.opportunity or not party:
+			skipped.append(name)
+			continue
+		event = frappe.get_doc("Marketing Content", att.event)
+		opportunity = frappe.get_doc({
+			"doctype": "Opportunity",
+			"opportunity_from": party_type,
+			"party_name": party,
+			"title": _("Follow-up {0}: {1}").format(event.title, att.full_name)[:140],
+			"contact_person": att.contact,
+			"contact_email": att.email,
+			"source": crm.ensure_lead_source(),
+			"campaign": crm.get_or_create_campaign(event),
+			"opportunity_owner": frappe.session.user,
+			"status": "Open",
+		})
+		opportunity.insert()
+		opportunity.add_comment("Comment", _("Created from attendee {0} of {1}.").format(att.name, event.title))
+		frappe.db.set_value("Attendee", name, {"opportunity": opportunity.name, "follow_up_status": "Done"})
+		created.append(opportunity.name)
+	return {"opportunities": created, "skipped": skipped}
+
+
+@frappe.whitelist(methods=["POST"])
+def create_ticket_item(event):
+	"""A non-stock service item for the event's tickets, set as its Ticket Item."""
+	frappe.has_permission("Marketing Content", "write", event, throw=True)
+	_require("Item", "create")
+	doc = frappe.get_doc("Marketing Content", event)
+	if doc.ticket_item:
+		return doc.ticket_item
+	group = "Services" if frappe.db.exists("Item Group", {"name": "Services", "is_group": 0}) else \
+		frappe.db.get_value("Item Group", {"is_group": 0}, "name", order_by="lft asc")
+	item = frappe.get_doc({"doctype": "Item", "item_code": f"TICKET-{doc.route or doc.name}"[:140].upper(),
+		"item_name": _("Ticket {0}").format(doc.title)[:140], "item_group": group, "stock_uom": "Nos",
+		"is_stock_item": 0, "include_item_in_manufacturing": 0, "is_sales_item": 1, "is_purchase_item": 0,
+		"description": _("Ticket for {0}").format(doc.title)})
+	item.insert()
+	doc.db_set("ticket_item", item.name)
+	return item.name

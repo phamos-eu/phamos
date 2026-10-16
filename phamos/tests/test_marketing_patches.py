@@ -3,7 +3,12 @@
 import frappe
 from frappe.tests.utils import FrappeTestCase
 
-from phamos.patches.v1_0 import migrate_attendee_legacy_data, rename_marketing_event_registration_to_attendee
+from phamos.patches.v1_0 import (
+	migrate_attendee_legacy_data,
+	migrate_event_stakeholders,
+	rename_marketing_event_registration_to_attendee,
+	set_event_ticket_prices,
+)
 from phamos.tests.marketing_fixtures import ensure_company, make_event
 
 
@@ -38,3 +43,20 @@ class TestMarketingPatches(FrappeTestCase):
 		frappe.db.set_value("Attendee", name, "source", "Import")
 		migrate_attendee_legacy_data.execute()
 		self.assertEqual(frappe.db.get_value("Attendee", name, "source"), "Import")
+
+	def test_ticket_prices_from_item_price(self):
+		event = make_event("Patch Price Event")
+		frappe.db.delete("Marketing Event Ticket Price", {"parent": event.name})
+		set_event_ticket_prices.execute()
+		rows = frappe.get_all("Marketing Event Ticket Price", filters={"parent": event.name}, fields=["title", "rate"])
+		self.assertEqual([(r.title, r.rate) for r in rows], [("Regular", 100)])  # the fixture's Item Price (net)
+		self.assertEqual(frappe.db.get_value("Marketing Content", event.name, "ticket_price_includes_tax"), 0)
+		set_event_ticket_prices.execute()
+		self.assertEqual(frappe.db.count("Marketing Event Ticket Price", {"parent": event.name}), 1)
+
+	def test_organizer_flag(self):
+		ours = make_event("Patch Ours Event", paid=False, organizer_name="phamos GmbH")
+		theirs = make_event("Patch Theirs Event", paid=False, organizer_name="Some Association e.V.")
+		migrate_event_stakeholders.execute()
+		self.assertEqual(frappe.db.get_value("Marketing Content", ours.name, "organizer_is_phamos"), 1)
+		self.assertEqual(frappe.db.get_value("Marketing Content", theirs.name, "organizer_is_phamos"), 0)

@@ -31,6 +31,7 @@
   "column_break_crm",
   "lead",
   "customer",
+  "opportunity",
   "section_order",
   "order_reference",
   "is_buyer",
@@ -38,8 +39,6 @@
   "payment_status",
   "terms_version",
   "column_break_order",
-  "quotation",
-  "quotation_item",
   "sales_order",
   "sales_order_item",
   "sales_invoice",
@@ -100,9 +99,9 @@
   },
   {
    "fieldname": "ticket_type",
-   "fieldtype": "Select",
+   "fieldtype": "Data",
    "label": "Ticket Type",
-   "options": "\nRegular\nEarly Bird\nFree\nComplimentary"
+   "description": "Price row of the order (e.g. Early Bird, Regular) or Free / Complimentary."
   },
   {
    "fieldname": "column_break_event",
@@ -175,10 +174,10 @@
    "fieldtype": "Data",
    "label": "Email",
    "options": "Email",
-   "reqd": 1,
    "in_list_view": 1,
    "in_standard_filter": 1,
-   "search_index": 1
+   "search_index": 1,
+   "description": "Optional for companions: tickets and information go to the buyer's email."
   },
   {
    "fieldname": "phone",
@@ -235,6 +234,13 @@
    "options": "Customer"
   },
   {
+   "fieldname": "opportunity",
+   "fieldtype": "Link",
+   "label": "Opportunity",
+   "options": "Opportunity",
+   "read_only": 1
+  },
+  {
    "fieldname": "section_order",
    "fieldtype": "Section Break",
    "label": "Order and Billing"
@@ -264,7 +270,7 @@
    "fieldname": "payment_status",
    "fieldtype": "Select",
    "label": "Payment Status",
-   "options": "Not Required\nPending\nQuoted\nOrdered\nInvoiced\nPaid\nCancelled",
+   "options": "Not Required\nPending\nOrdered\nInvoiced\nPaid\nCancelled",
    "default": "Pending",
    "read_only": 1,
    "in_list_view": 1,
@@ -279,20 +285,6 @@
   {
    "fieldname": "column_break_order",
    "fieldtype": "Column Break"
-  },
-  {
-   "fieldname": "quotation",
-   "fieldtype": "Link",
-   "label": "Quotation",
-   "options": "Quotation",
-   "read_only": 1
-  },
-  {
-   "fieldname": "quotation_item",
-   "fieldtype": "Data",
-   "label": "Quotation Item",
-   "hidden": 1,
-   "read_only": 1
   },
   {
    "fieldname": "sales_order",
@@ -453,7 +445,7 @@
   }
  ],
  "links": [],
- "modified": "2026-10-16 12:00:00.000000",
+ "modified": "2026-10-17 09:00:00.000000",
  "modified_by": "Administrator",
  "module": "Marketing",
  "name": "Attendee",

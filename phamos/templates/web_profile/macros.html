@@ -204,7 +204,8 @@
 {%- if actions %}
 <div class="wp-actions">
 	{%- for action in actions %}
-	{%- if action.note %}<span class="wp-chip wp-chip-value">{{ action.label | e }}</span>
+	{%- if action.hint %}<p class="wp-action-hint">{{ action.label | e }}</p>
+	{%- elif action.note %}<span class="wp-chip wp-chip-value">{{ action.label | e }}</span>
 	{%- elif action.dialog %}<button type="button" class="wp-button{% if action.primary %} wp-button-primary{% endif %}" data-wp-dialog-open="{{ action.dialog }}" aria-haspopup="dialog">{{ action.label | e }}</button>
 	{%- else %}<a class="wp-button" href="{{ action.url | e }}"{% if action.download %} download{% endif %}>{{ action.label | e }}</a>{% endif %}
 	{%- endfor %}
@@ -223,8 +224,9 @@
 	{%- if block.kind == "logos" %}
 	<ul class="wp-logos">
 		{%- for entry in block.entries %}
-		<li>{%- if entry.url %}<a class="wp-logo-card" href="{{ entry.url | e }}" rel="noopener" target="_blank">{% if entry.image %}<img src="{{ entry.image | e }}" alt="{{ entry.title | e }}" loading="lazy">{% else %}{{ entry.title | e }}{% endif %}</a>
-			{%- else %}<span class="wp-chip wp-chip-value">{{ entry.title | e }}</span>{% endif -%}</li>
+		<li class="wp-logo-item">{%- if entry.url %}<a class="wp-logo-card" href="{{ entry.url | e }}"{% if entry.external %} rel="noopener" target="_blank"{% endif %}>{% if entry.image %}<img src="{{ entry.image | e }}" alt="{{ entry.title | e }}" loading="lazy">{% else %}{{ entry.title | e }}{% endif %}</a>
+			{%- else %}<span class="wp-chip wp-chip-value">{{ entry.title | e }}</span>{% endif -%}
+			{%- if entry.subtitle %}<span class="wp-logo-label">{{ entry.subtitle | e }}</span>{% endif -%}</li>
 		{%- endfor %}
 	</ul>
 	{%- else %}
@@ -245,44 +247,65 @@
 {%- endfor %}
 {%- endmacro %}
 
-{#- Ticket order (phamos.marketing.web.order_tickets). Prices come from the server; the script only
-    multiplies them for the summary. Every buyer is invoiced, so the billing address is always asked. -#}
+{#- Ticket order (phamos.marketing.web.order_tickets) in three steps. Legal frame (DE/EU consumer orders):
+    the summary and total come right before the button (§ 312j (2) BGB), the button says
+    "Zahlungspflichtig bestellen" (§ 312j (3)), every step can be corrected (§ 312i (1) no. 1), the terms
+    apply through the notice above the button (§ 305 (2)), there is no right of withdrawal for events on a
+    fixed date (§ 312g (2) no. 9). Marketing questions come only after the order (optional, explained). -#}
 {% macro ticket_dialog_markup(item, t, lang) -%}
+{%- set privacy_url = '/en/privacy' if lang == 'en' else '/de/datenschutz' -%}
 <dialog class="wp-dialog wp-dialog-wide" id="wp-ticket-dialog" aria-labelledby="wp-ticket-title" data-wp-ticket-dialog>
-	<form class="wp-contact-form" method="post" action="/api/method/phamos.marketing.web.order_tickets" data-wp-ticket-form novalidate
+	<form class="wp-contact-form wp-checkout" method="post" action="/api/method/phamos.marketing.web.order_tickets" data-wp-ticket-form novalidate
 		data-gross="{{ t.gross }}" data-currency="{{ t.currency or 'EUR' }}" data-free="{{ 1 if t.free else 0 }}" data-max="{{ t.max_per_order }}"
-		data-lang="{{ lang }}" data-tax-rate="{{ t.tax_rate }}">
+		data-lang="{{ lang }}" data-tax-rate="{{ t.tax_rate }}" data-price-title="{{ (t.price_title or '') | e }}"
+		data-consent-action="/api/method/phamos.marketing.web.save_consents">
 		<div class="wp-dialog-head">
 			<h2 id="wp-ticket-title">{{ _("Register for {0}").format(item.title | e) if t.free else _("Tickets for {0}").format(item.title | e) }}</h2>
 			<button type="button" class="wp-icon-button" data-wp-dialog-close aria-label="{{ _('Close') }}">×</button>
 		</div>
+		<ol class="wp-steps" data-wp-steps>
+			<li data-wp-step-label="1" aria-current="step">{{ _("Tickets") }}</li>
+			{%- if not t.free %}<li data-wp-step-label="2">{{ _("Billing") }}</li>{% endif %}
+			<li data-wp-step-label="3">{{ _("Review and order") if not t.free else _("Review and register") }}</li>
+		</ol>
 		<input type="hidden" name="event" value="{{ item.slug | e }}">
 		<input type="hidden" name="lang" value="{{ lang }}">
 		<label class="wp-honeypot" aria-hidden="true">Website <input type="text" name="website" tabindex="-1" autocomplete="off"></label>
 
-		<fieldset class="wp-fieldset">
-			<legend>{{ _("Tickets") }}</legend>
+		{#- Step 1: who orders, who comes. -#}
+		<fieldset class="wp-fieldset" data-wp-step="1">
+			<legend class="wp-visually-hidden">{{ _("Tickets") }}</legend>
+			<div class="wp-contact-row">
+				<label>{{ _("Your name") }}<input type="text" name="contact_name" required maxlength="140" autocomplete="name"></label>
+				<label>{{ _("Your email") }}<input type="email" name="contact_email" required maxlength="140" autocomplete="email"></label>
+			</div>
+			<label class="wp-check wp-contact-consent"><input type="checkbox" name="attends" value="1" checked data-wp-attends>
+				<span>{{ _("I attend myself") }}</span></label>
 			<label class="wp-qty">{{ _("Number of tickets") }}
 				<input type="number" name="qty" min="1" max="{{ t.max_per_order }}" value="1" required data-wp-qty></label>
-			<ol class="wp-attendee-rows" data-wp-attendees></ol>
-			<template data-wp-attendee-row>
+			<div data-wp-companions-block hidden>
+				<p class="wp-legal">{{ _("All tickets and information go to your email address. Add an email for a ticket holder only if they should receive it directly.") }}</p>
+				<ol class="wp-attendee-rows" data-wp-companions></ol>
+			</div>
+			<template data-wp-companion-row>
 				<li class="wp-contact-row">
-					<label>{{ _("Name") }}<input type="text" data-field="full_name" required maxlength="140" autocomplete="name"></label>
-					<label>{{ _("Email") }}<input type="email" data-field="email" required maxlength="140" autocomplete="email"></label>
+					<label><span data-wp-companion-label>{{ _("Ticket holder") }}</span><input type="text" data-field="full_name" required maxlength="140" autocomplete="off"></label>
+					<label>{{ _("Email (optional)") }}<input type="email" data-field="email" maxlength="140" autocomplete="off"></label>
 				</li>
 			</template>
 		</fieldset>
 
-		<fieldset class="wp-fieldset" data-wp-billing{% if t.free %} hidden disabled{% endif %}>
-			<legend>{{ _("Billing address") }}</legend>
-			<p class="wp-contact-intro">{{ _("Every order is invoiced. The invoice goes to this address.") }}</p>
+		{#- Step 2: invoice address (paid events). -#}
+		{%- if not t.free %}
+		<fieldset class="wp-fieldset" data-wp-step="2" hidden>
+			<legend class="wp-visually-hidden">{{ _("Billing address") }}</legend>
 			<label class="wp-check wp-contact-consent"><input type="checkbox" name="is_company" value="1" data-wp-company-toggle> <span>{{ _("Order as a company") }}</span></label>
 			<div class="wp-contact-row" data-wp-company hidden>
 				<label>{{ _("Company") }}<input type="text" name="company" maxlength="140" autocomplete="organization"></label>
 				<label>{{ _("VAT ID (optional)") }}<input type="text" name="vat_id" maxlength="20" placeholder="DE123456789"></label>
 			</div>
 			<div class="wp-contact-row">
-				<label>{{ _("Name") }}<input type="text" name="billing_name" required maxlength="140" autocomplete="name"></label>
+				<label>{{ _("Name on the invoice") }}<input type="text" name="billing_name" required maxlength="140" autocomplete="name"></label>
 				<label>{{ _("Email for the invoice") }}<input type="email" name="billing_email" required maxlength="140" autocomplete="email"></label>
 			</div>
 			<label>{{ _("Street and number") }}<input type="text" name="address_line1" required maxlength="140" autocomplete="address-line1"></label>
@@ -297,42 +320,70 @@
 				<label>{{ _("Phone (optional)") }}<input type="tel" name="phone" maxlength="40" autocomplete="tel" placeholder="+49 …"></label>
 			</div>
 		</fieldset>
-
-		{%- if not t.free %}
-		<fieldset class="wp-fieldset">
-			<legend>{{ _("Your order") }}</legend>
-			<ul class="wp-summary-people" data-wp-summary-people></ul>
-			<table class="wp-summary">
-				<tr><td data-wp-summary-line></td><td data-wp-summary-net></td></tr>
-				<tr><td>{{ _("incl. {0} % VAT").format(t.tax_rate | round(2) | string | replace(".0", "")) }}</td><td data-wp-summary-tax></td></tr>
-				<tr class="wp-summary-total"><td>{{ _("Total") }}</td><td data-wp-summary-total></td></tr>
-			</table>
-		</fieldset>
 		{%- endif %}
 
-		<div class="wp-consents">
-			<label class="wp-check wp-contact-consent"><input type="checkbox" name="terms" value="1" required>
-				<span>{{ _("I accept the terms and conditions of this event.") }}{% if t.terms_html %} <details class="wp-terms"><summary>{{ _("Read the terms") }}</summary><div class="wp-body">{{ t.terms_html }}</div></details>{% endif %}</span></label>
-			<label class="wp-check wp-contact-consent"><input type="checkbox" name="privacy" value="1" required>
-				<span>{{ _("I agree that phamos stores my details and those of the ticket holders to handle this order.") }} <a href="{{ '/en/privacy' if lang == 'en' else '/de/datenschutz' }}" target="_blank">{{ _("Privacy policy") }}</a></span></label>
-			<label class="wp-check wp-contact-consent"><input type="checkbox" name="newsletter" value="1">
-				<span>{{ _("Keep me posted about this event by email (optional; you confirm your address first).") }}</span></label>
-			<label class="wp-check wp-contact-consent"><input type="checkbox" name="attendee_contact" value="1">
-				<span>{{ _("Other attendees may contact me after the event (optional).") }}</span></label>
-			<label class="wp-check wp-contact-consent"><input type="checkbox" name="public_listing" value="1">
-				<span>{{ _("My name and company may be listed publicly as attendee (optional).") }}</span></label>
-		</div>
+		{#- Step 3: everything once more, the legal notices and the one button. -#}
+		<fieldset class="wp-fieldset" data-wp-step="3" hidden>
+			<legend class="wp-visually-hidden">{{ _("Review") }}</legend>
+			<dl class="wp-summary-dl">
+				<dt>{{ _("Event") }}</dt><dd>{{ item.title | e }}<br><span class="wp-legal">{{ item.data.when.line | e }}{% if item.data.location or item.data.city %} · {{ [item.data.location, item.data.city] | select | join(", ") | e }}{% endif %}</span></dd>
+				<dt>{{ _("Tickets") }} <button type="button" class="wp-link-button" data-wp-goto="1">{{ _("Change") }}</button></dt><dd><ul class="wp-summary-people" data-wp-summary-people></ul></dd>
+				<dt>{{ _("Tickets and information to") }}</dt><dd data-wp-summary-email></dd>
+				{%- if not t.free %}
+				<dt>{{ _("Billing address") }} <button type="button" class="wp-link-button" data-wp-goto="2">{{ _("Change") }}</button></dt><dd data-wp-summary-billing></dd>
+				<dt>{{ _("Price") }}</dt><dd>
+					<table class="wp-summary">
+						<tr><td data-wp-summary-line></td><td data-wp-summary-amount></td></tr>
+						<tr><td>{{ _("incl. {0} % VAT").format(t.tax_rate | round(2) | string | replace(".0", "")) }}</td><td data-wp-summary-tax></td></tr>
+						<tr class="wp-summary-total"><td>{{ _("Total") }}</td><td data-wp-summary-total></td></tr>
+					</table></dd>
+				<dt>{{ _("Payment") }}</dt><dd>{{ _("By invoice. You receive the invoice by email and pay within 14 days of the invoice date.") }}</dd>
+				{%- endif %}
+			</dl>
+			<div class="wp-legal">
+				{%- if not t.free %}
+				<p>{{ _("By clicking \"Order with obligation to pay\" you place a binding order. Our {0} apply.").format(
+					'<a href="#wp-terms" data-wp-terms-open>' ~ _("terms and conditions") ~ '</a>' if t.terms_html else _("terms and conditions")) }}
+				{{ _("There is no right of withdrawal for tickets to leisure events on a specific date (§ 312g (2) no. 9 BGB).") }}</p>
+				{%- else %}
+				<p>{{ _("By clicking \"Register\" your registration is binding.") }}{% if t.terms_html %} {{ _("Our {0} apply.").format('<a href="#wp-terms" data-wp-terms-open>' ~ _("terms and conditions") ~ '</a>') }}{% endif %}</p>
+				{%- endif %}
+				<p>{{ _("We use your details and those of the ticket holders only to handle this order and the event.") }} <a href="{{ privacy_url }}" target="_blank">{{ _("Privacy policy") }}</a></p>
+				<details class="wp-terms" id="wp-order-notes"><summary>{{ _("About the order process") }}</summary>
+					<p>{{ _("You can correct your entries with \"Back\" or \"Change\" until you order. The contract language is German or English. We store the contract text and send it to you with the order confirmation, including the terms and conditions.") }}</p></details>
+				{%- if t.terms_html %}
+				<details class="wp-terms" id="wp-terms"><summary>{{ _("Terms and conditions") }}</summary><div class="wp-body">{{ t.terms_html }}</div></details>
+				{%- endif %}
+			</div>
+		</fieldset>
 
-		<div class="wp-contact-actions" data-wp-ticket-actions>
-			<button type="submit" class="wp-button wp-button-primary">{{ _("Register") if t.free else _("Order with obligation to pay") }}</button>
+		<div class="wp-contact-actions wp-checkout-actions" data-wp-ticket-actions>
+			<button type="button" class="wp-button" data-wp-back hidden>{{ _("Back") }}</button>
+			<button type="button" class="wp-button wp-button-primary" data-wp-next>{{ _("Continue") }}</button>
+			<button type="submit" class="wp-button wp-button-primary" data-wp-submit hidden>{{ _("Register") if t.free else _("Order with obligation to pay") }}</button>
 			<p class="wp-contact-status" role="status" data-wp-ticket-status data-sending="{{ _('Sending…') }}"
 				data-failed="{{ _('Your order could not be sent. Please try again later.') }}"
-				data-invalid="{{ _('Please fill in all required fields with valid values and accept the terms and the privacy policy.') }}"></p>
+				data-invalid="{{ _('Please fill in the marked fields.') }}"></p>
 		</div>
+
+		{#- After the order: done. Then three optional questions, each with why. -#}
 		<div class="wp-ticket-success" data-wp-ticket-success hidden>
-			<p><strong>{{ _("Thank you!") }}</strong> {{ _("Your reference:") }} <span data-wp-ticket-reference></span></p>
-			<p>{{ _("You are registered. A confirmation is on its way to your inbox.") if t.free else _("phamos confirms your order by email and sends you the invoice.") }}</p>
-			<button type="button" class="wp-button" data-wp-dialog-close>{{ _("Close") }}</button>
+			<p class="wp-success-title"><strong>{{ _("Thank you!") }}</strong> {{ _("Your reference:") }} <span data-wp-ticket-reference></span></p>
+			<p>{{ _("The confirmation is on its way to {0}.").format('<strong data-wp-ticket-email></strong>') }}{% if not t.free %} {{ _("The invoice follows by email.") }}{% endif %}</p>
+			<div class="wp-optional" data-wp-optional>
+				<h3>{{ _("Three optional questions") }}</h3>
+				<p class="wp-legal">{{ _("Your order is complete. If you like, tell us what else we may do. You can change this at any time.") }}</p>
+				<label class="wp-switch"><input type="checkbox" name="newsletter" value="1"><span>{{ _("Updates about this event by email") }}<small>{{ _("Schedule, reminders and material afterwards. You confirm your address with a link first.") }}</small></span></label>
+				<label class="wp-switch"><input type="checkbox" name="attendee_contact" value="1"><span>{{ _("Other attendees may contact me") }}<small>{{ _("After the event, phamos passes on requests from other attendees. Your email address is never shown.") }}</small></span></label>
+				<label class="wp-switch"><input type="checkbox" name="public_listing" value="1"><span>{{ _("List me as attendee") }}<small>{{ _("Your name and company may appear in the list of attendees on the event page.") }}</small></span></label>
+				<div class="wp-contact-actions">
+					<button type="button" class="wp-button wp-button-primary" data-wp-consents-save>{{ _("Save") }}</button>
+					<button type="button" class="wp-button" data-wp-dialog-close>{{ _("No, thanks") }}</button>
+					<p class="wp-contact-status" role="status" data-wp-consents-status data-saved="{{ _('Saved. Thank you!') }}"
+						data-optin="{{ _('Saved. Please confirm your email with the link we just sent you.') }}"
+						data-failed="{{ _('That did not work. Please try again later.') }}"></p>
+				</div>
+			</div>
 		</div>
 	</form>
 </dialog>

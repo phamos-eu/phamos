@@ -344,10 +344,6 @@ doc_events = {
         "on_cancel": ["phamos.phamos.doctype.monthly_implementation_summary.monthly_implementation_summary.sync_mis_status_for_source_doc", "phamos.marketing.billing.on_sales_order_cancel"],
         "on_trash": "phamos.marketing.billing.on_sales_order_cancel",
     },
-    "Quotation": {
-        "on_cancel": "phamos.marketing.billing.on_quotation_cancel",
-        "on_trash": "phamos.marketing.billing.on_quotation_cancel",
-    },
     "Payment Entry": {
         "on_submit": "phamos.marketing.billing.on_payment_entry_change",
         "on_cancel": "phamos.marketing.billing.on_payment_entry_change",

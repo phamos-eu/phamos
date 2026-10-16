@@ -27,7 +27,7 @@ class Attendee(Document):
 			self.payment_status = "Not Required"
 
 	def validate(self):
-		self.email = normalize_email(self.email)
+		self.email = normalize_email(self.email) if (self.email or "").strip() else None
 		self.first_name = (self.first_name or "").strip()
 		self.last_name = (self.last_name or "").strip()
 		self.full_name = join_name(self.first_name, self.last_name)
@@ -36,7 +36,7 @@ class Attendee(Document):
 		self.check_duplicate()
 
 	def has_order(self):
-		return bool(self.quotation or self.sales_order or self.sales_invoice)
+		return bool(self.sales_order or self.sales_invoice)
 
 	def stamp_consents(self):
 		now = now_datetime()
@@ -52,7 +52,7 @@ class Attendee(Document):
 			self.checked_in_by = frappe.session.user if frappe.session.user != "Guest" else None
 
 	def check_duplicate(self):
-		if self.status == "Cancelled":
+		if self.status == "Cancelled" or not self.email:
 			return
 		other = frappe.db.get_value("Attendee", {
 			"event": self.event,

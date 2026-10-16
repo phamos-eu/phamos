@@ -41,13 +41,29 @@ def make_ticket_item(rate=100):
 	return TICKET_ITEM
 
 
-def make_event(title=EVENT_TITLE, paid=True, **kwargs):
+def ensure_vat_template():
+	"""An Item Tax Template with 19 % on the company's first tax account (created once)."""
+	name = frappe.db.get_value("Item Tax Template", {"title": "Test Ticket VAT 19"})
+	if name:
+		return name
+	company = frappe.defaults.get_global_default("company")
+	account = frappe.db.get_value("Account", {"company": company, "account_type": "Tax", "is_group": 0}) or \
+		frappe.db.get_value("Account", {"company": company, "root_type": "Liability", "is_group": 0})
+	return frappe.get_doc({"doctype": "Item Tax Template", "title": "Test Ticket VAT 19", "company": company,
+		"taxes": [{"tax_type": account, "tax_rate": 19}]}).insert(ignore_permissions=True).name
+
+
+def make_event(title=EVENT_TITLE, paid=True, prices=None, **kwargs):
+	"""Published, open event. ``prices``: rows for the Ticket Prices table (default one "Regular" at 119 gross)."""
 	values = {
 		"doctype": "Marketing Content", "title": title, "event_type": "Meetup", "status": "Upcoming",
 		"starts_on": add_days(now_datetime(), 30), "ends_on": add_days(now_datetime(), 30),
 		"published": 1, "registration_open": 1, "city": "Reutlingen", "location": "Test Venue",
-		"ticket_item": make_ticket_item() if paid else None,
+		"organizer_is_phamos": 1,
 	}
+	if paid:
+		values.update(ticket_item=make_ticket_item(), item_tax_template=ensure_vat_template(), ticket_price_includes_tax=1,
+			ticket_prices=prices or [{"title": "Regular", "rate": 119}])
 	values.update(kwargs)
 	name = frappe.db.get_value("Marketing Content", {"title": values["title"]})
 	if name:
@@ -74,7 +90,9 @@ def make_customer(name, email=None):
 	return name
 
 
-CONSENTS = {"terms": 1, "privacy": 1}
+CONTACT = {"full_name": "Erika Mustermann", "email": "erika@ticket.example"}
+BILLING = {"full_name": "Erika Mustermann", "email": "erika@ticket.example", "address_line1": "Hauptstr. 1",
+	"postcode": "72764", "city": "Reutlingen", "country": "Germany"}
 
 
 @contextmanager

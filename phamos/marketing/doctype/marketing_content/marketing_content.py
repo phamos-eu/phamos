@@ -10,7 +10,7 @@ Texts per language live in the "Web Profile Content" table, the URL slug is set 
 
 import frappe
 from frappe import _
-from frappe.utils import get_url
+from frappe.utils import flt, get_url
 
 from phamos.web_profile.document import WebProfileDocument
 
@@ -21,6 +21,7 @@ class MarketingContent(WebProfileDocument):
 	def validate(self):
 		# No refresh_mirrored_fields (WebProfileDocument.validate): there is no source record to mirror.
 		self.validate_dates()
+		self.validate_tickets()
 		self.validate_translations()
 		self.set_route()
 
@@ -31,6 +32,29 @@ class MarketingContent(WebProfileDocument):
 			frappe.throw(_("Set either a confirmed Start Date or a Date Note, not both."))
 		if self.starts_on and self.ends_on and self.ends_on < self.starts_on:
 			frappe.throw(_("The event cannot end before it starts."))
+
+	def validate_tickets(self):
+		"""Prices live on the event (Ticket Prices table); a ticket sale needs a date (no right of withdrawal
+		for leisure events on a specific date, § 312g (2) no. 9 BGB) and at least one price."""
+		from phamos.marketing.billing import price_summary
+
+		if self.organizer_is_phamos:
+			self.organizer = None
+		titles = [row.title.strip() for row in self.ticket_prices or []]
+		if len(set(titles)) != len(titles):
+			frappe.throw(_("Every ticket price needs its own title."))
+		for row in self.ticket_prices or []:
+			row.title = row.title.strip()
+			if flt(row.rate) <= 0:
+				frappe.throw(_("Row {0}: the ticket price must be greater than 0.").format(row.idx))
+			if row.valid_from and row.valid_until and row.valid_until < row.valid_from:
+				frappe.throw(_("Row {0}: the price ends before it starts.").format(row.idx))
+		if self.ticket_item:
+			if not self.ticket_prices:
+				frappe.throw(_("Please add at least one ticket price (Tickets & Sales tab)."))
+			if self.registration_open and not self.starts_on:
+				frappe.throw(_("Tickets can only be sold for events with a start date."))
+		self.ticket_price_summary = price_summary(self) if self.ticket_item else None
 
 	def on_update(self):
 		super().on_update()

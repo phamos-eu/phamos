@@ -457,3 +457,37 @@ body .footer-grouped-links .footer-child-item, body .footer-grouped-links .foote
 @media (max-width: 640px) {
 	.wp-contact-row { grid-template-columns: 1fr; }
 }
+/* Checkout steps (round 2): stepper, summary, legal notes, optional questions after the order */
+.wp-action-hint { margin: -2px 0 4px; color: var(--wp-muted); font-size: 13px; line-height: 1.4; text-align: center; }
+.wp-logo-item { display: flex; flex-direction: column; align-items: center; gap: 4px; }
+.wp-logo-label { color: var(--wp-muted); font-size: 12px; }
+.wp-steps { display: flex; gap: 6px; margin: 4px 0 4px; padding: 0; list-style: none; counter-reset: wp-step; font-size: 13px; }
+.wp-steps li { flex: 1; padding: 6px 8px; border-radius: 8px; background: var(--wp-surface-2); color: var(--wp-muted); counter-increment: wp-step; }
+.wp-steps li::before { content: counter(wp-step) "  "; font-weight: 600; }
+.wp-steps li[aria-current] { background: var(--wp-primary); color: var(--wp-on-primary); font-weight: 600; }
+.wp-steps li.wp-step-done { color: var(--wp-ink); }
+.wp-steps[hidden] { display: none; }
+.wp-checkout .wp-fieldset { min-height: 120px; }
+.wp-checkout-actions { justify-content: flex-end; }
+.wp-checkout-actions .wp-contact-status { flex-basis: 100%; text-align: right; }
+.wp-summary-dl { display: grid; grid-template-columns: 180px minmax(0, 1fr); gap: 8px 16px; margin: 0; }
+.wp-summary-dl dt { font-weight: 600; font-size: 13px; color: var(--wp-ink-2); }
+.wp-summary-dl dd { margin: 0; }
+.wp-link-button { display: block; margin-top: 2px; padding: 0; border: 0; background: none; color: var(--wp-focus); font: inherit; font-size: 12px; font-weight: 400; cursor: pointer; }
+.wp-legal { color: var(--wp-muted); font-size: 12.5px; line-height: 1.5; }
+.wp-legal p { margin: 0 0 6px; }
+.wp-legal a { color: inherit; text-decoration: underline; }
+.wp-optional { margin-top: 16px; padding: 14px; border-radius: var(--wp-radius); background: var(--wp-surface-2); display: flex; flex-direction: column; gap: 10px; }
+.wp-optional h3 { margin: 0; font-size: 15px; }
+.wp-switch { display: flex; align-items: flex-start; gap: 10px; cursor: pointer; font-weight: 500; }
+.wp-switch input { width: 34px; height: 20px; margin: 1px 0 0; flex-shrink: 0; appearance: none; border-radius: 999px; background: #d4d4d4; position: relative; transition: background 0.15s; cursor: pointer; }
+.wp-switch input::after { content: ""; position: absolute; top: 2px; left: 2px; width: 16px; height: 16px; border-radius: 50%; background: #fff; transition: left 0.15s; }
+.wp-switch input:checked { background: var(--wp-primary); }
+.wp-switch input:checked::after { left: 16px; }
+.wp-switch small { display: block; margin-top: 2px; color: var(--wp-muted); font-weight: 400; font-size: 12.5px; }
+.wp-success-title { font-size: 16px; }
+@media (max-width: 640px) {
+	.wp-summary-dl { grid-template-columns: 1fr; gap: 2px; }
+	.wp-summary-dl dd { margin-bottom: 8px; }
+	.wp-steps li { font-size: 12px; }
+}

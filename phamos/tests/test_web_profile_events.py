@@ -18,11 +18,11 @@ from phamos.web_profile.sections import build_profile, find_item, get_items
 
 GROUP = "Events: Test Updates"
 ALLOWED_DATA = {"starts_on", "ends_on", "date_note", "when", "upcoming", "cancelled", "location", "city", "map_url",
-	"organizer", "key_person", "speakers", "sponsors", "offer", "has_newsletter", "terms", "languages", "ics"}
-ATTENDEES = json.dumps([{"full_name": "Web Guest", "email": "web.guest@example.com"}])
+	"organizer", "stakeholders", "key_person", "speakers", "sponsors", "offer", "has_newsletter", "terms", "languages", "ics"}
+CONTACT = json.dumps({"full_name": "Web Guest", "email": "web.guest@example.com"})
+COMPANIONS = json.dumps([{"full_name": "Plus One", "email": ""}])
 BILLING = json.dumps({"full_name": "Web Guest", "email": "web.guest@example.com", "address_line1": "Weg 1",
 	"postcode": "72764", "city": "Reutlingen", "country": "Germany"})
-CONSENTS = json.dumps({"terms": 1, "privacy": 1})
 
 
 def reset_items():
@@ -42,6 +42,7 @@ class TestWebProfileEvents(FrappeTestCase):
 
 	def setUp(self):
 		frappe.set_user("Administrator")
+		frappe.local.request = None  # page renders leave a request behind, which switches rate limits on
 		frappe.db.savepoint("events_web_test")
 		self.event = make_event("Web Test Event", email_group=GROUP, organizer_email="hidden-organizer@example.com",
 			contact_person_email="hidden-contact@example.com", subtitle="A test", max_attendees=20,
@@ -125,7 +126,7 @@ class TestWebProfileEvents(FrappeTestCase):
 	# --- guest endpoints ---------------------------------------------------------------------------------
 
 	def order(self, **kwargs):
-		args = dict(event=self.event.route, lang="en", attendees=ATTENDEES, qty=1, billing=BILLING, consents=CONSENTS)
+		args = dict(event=self.event.route, lang="en", contact=CONTACT, attends=1, companions=COMPANIONS, billing=BILLING)
 		args.update(kwargs)
 		frappe.set_user("Guest")
 		try:
@@ -133,29 +134,52 @@ class TestWebProfileEvents(FrappeTestCase):
 		finally:
 			frappe.set_user("Administrator")
 
-	@patch("phamos.marketing.web.ticketing.register_attendees", return_value={"reference": "QTN-1", "reference_doctype": "Quotation"})
+	@patch("phamos.marketing.web.ticketing.register_attendees", return_value={"reference": "SO-1",
+		"reference_doctype": "Sales Order", "tickets_to": "web.guest@example.com", "consent_token": "t"})
 	def test_order_validation(self, register):
 		self.assertEqual(self.order(website="bot")["ok"], True)
 		register.assert_not_called()
-		for bad in (dict(consents=json.dumps({"terms": 1})), dict(qty=2),
-				dict(attendees=json.dumps([{"full_name": "X Y", "email": "bad@example.com/"}])),
-				dict(attendees=json.dumps([{"full_name": "A A", "email": "a@example.com"}, {"full_name": "B B", "email": "a@example.com"}]), qty=2),
+		for bad in (dict(contact=json.dumps({"full_name": "No Mail"})),
+				dict(contact=json.dumps({"full_name": "X Y", "email": "bad@example.com/"})),
+				dict(companions=json.dumps([{"full_name": "B", "email": ""}])),
+				dict(companions=json.dumps([{"full_name": "Bad Mail", "email": "nope"}])),
+				dict(attends=0, companions="[]"),
 				dict(billing=None), dict(billing=json.dumps({**json.loads(BILLING), "is_company": 1})),
+				dict(billing=json.dumps({**json.loads(BILLING), "country": "Atlantis"})),
 				dict(event=self.hidden.route)):
 			self.assertRaises(frappe.ValidationError, self.order, **bad)
 		register.assert_not_called()
-		result = self.order()
-		self.assertEqual(result["reference"], "QTN-1")
+		result = self.order(expected_total="238.00")
+		self.assertEqual((result["reference"], result["tickets_to"], result["token"]), ("SO-1", "web.guest@example.com", "t"))
 		args = register.call_args
 		self.assertEqual(args.args[0], self.event.name)
+		self.assertEqual(args.kwargs["companions"], [{"full_name": "Plus One", "email": "", "phone": ""}])
 		self.assertEqual(args.kwargs["billing_data"]["country"], "Germany")
+		self.assertEqual(args.kwargs["expected_total"], "238.00")
 
 	def test_order_end_to_end_as_guest(self):
 		with patch("frappe.enqueue"):
-			result = self.order()
-		self.assertEqual(result["reference_doctype"], "Quotation")
-		self.assertEqual(frappe.db.get_value("Quotation", result["reference"], "docstatus"), 1)
+			result = self.order(expected_total="238.00")
+		self.assertEqual(result["reference_doctype"], "Sales Order")
+		self.assertEqual(frappe.db.get_value("Sales Order", result["reference"], "docstatus"), 1)
 		self.assertEqual(frappe.db.get_value("Attendee", {"email": "web.guest@example.com"}, "event"), self.event.name)
+		self.assertEqual(frappe.db.count("Attendee", {"event": self.event.name, "order_reference": result["reference"]}), 2)
+
+		# The optional questions afterwards, signed with the returned token.
+		frappe.set_user("Guest")
+		try:
+			with patch("frappe.sendmail") as sendmail:
+				saved = web.save_consents(self.event.route, "en", result["reference"], result["token"],
+					json.dumps({"newsletter": 1, "attendee_contact": 1}))
+			self.assertEqual(saved["status"], "confirmation_sent")
+			sendmail.assert_called_once()
+			self.assertRaises(frappe.PermissionError, web.save_consents, self.event.route, "en", result["reference"],
+				"1.forged", json.dumps({"newsletter": 1}))
+		finally:
+			frappe.set_user("Administrator")
+		buyer = frappe.get_all("Attendee", filters={"order_reference": result["reference"], "is_buyer": 1},
+			fields=["newsletter_consent", "share_with_attendees_consent", "public_listing_consent"])[0]
+		self.assertEqual((buyer.newsletter_consent, buyer.share_with_attendees_consent, buyer.public_listing_consent), (1, 1, 0))
 
 	def test_closed_sale_is_refused(self):
 		self.event.registration_open = 0
@@ -173,8 +197,8 @@ class TestWebProfileEvents(FrappeTestCase):
 		frappe.form_dict.cmd = cmd
 		try:
 			for _i in range(5):
-				web.order_tickets(self.event.route, "en", ATTENDEES, website="bot")
-			self.assertRaises(frappe.RateLimitExceededError, web.order_tickets, self.event.route, "en", ATTENDEES,
+				web.order_tickets(self.event.route, "en", CONTACT, website="bot")
+			self.assertRaises(frappe.RateLimitExceededError, web.order_tickets, self.event.route, "en", CONTACT,
 				website="bot")
 		finally:
 			frappe.cache.delete(key)
@@ -212,3 +236,51 @@ class TestWebProfileEvents(FrappeTestCase):
 		self.assertEqual(plan["events/web-test-event-old"], f"/de/veranstaltungen/{self.event.route}")
 		self.assertEqual(plan["event-registration"], "/de/veranstaltungen")
 		self.assertEqual(plan[f"events/{self.hidden.route}"], "/de/veranstaltungen")
+
+	def test_price_note_and_early_bird_ladder(self):
+		event = make_event("Web Early Bird Event", prices=[
+			{"title": "Early Bird", "rate": 59.5, "quota": 30, "valid_until": add_days(now_datetime(), 10)},
+			{"title": "Regular", "rate": 119}])
+		reset_items()
+		profile = build_profile(self.item(event), "en")
+		hint = next(a for a in profile["actions"] if a.get("hint"))["label"]
+		self.assertIn("Early Bird", hint)
+		self.assertIn("30 left at this price", hint)
+		self.assertIn("then", hint)
+		self.assertEqual(profile["ticket"]["price_title"], "Early Bird")
+
+	def test_dialog_has_the_legal_notices(self):
+		frappe.set_user("Guest")
+		html = get_html_for_route(f"/en/events/{self.event.route}")
+		self.assertIn("Order with obligation to pay", html)
+		self.assertIn("312g", html)
+		self.assertIn("data-wp-step=\"3\"", html)
+		self.assertNotIn('name="terms"', html)  # no checkbox before the order
+
+	def test_sponsor_and_organizer_as_named_stakeholders(self):
+		from phamos.tests.marketing_fixtures import make_customer
+
+		party = make_customer("Sponsor Test GmbH")
+		named = frappe.get_doc({"doctype": "Stakeholder Web Profile", "stakeholder_type": "Partner", "party_type": "Customer",
+			"party": party, "publish_as": "Named", "naming_approved": 1, "naming_approval_date": frappe.utils.nowdate(),
+			"published": 1}).insert(ignore_permissions=True)
+		hidden_party = make_customer("Secret Sponsor GmbH")
+		anonymous = frappe.get_doc({"doctype": "Stakeholder Web Profile", "stakeholder_type": "Partner",
+			"party_type": "Customer", "party": hidden_party, "publish_as": "Anonymous", "published": 1}).insert(
+			ignore_permissions=True)
+		self.event.reload()
+		self.event.organizer_is_phamos = 0
+		self.event.organizer = named.name
+		self.event.append("sponsors", {"published": 1, "stakeholder": named.name, "sponsor_label": "Gold"})
+		self.event.append("sponsors", {"published": 1, "stakeholder": anonymous.name})
+		self.event.save()
+		reset_items()
+		item = self.item()
+		self.assertEqual([s["name"] for s in item.data["sponsors"]], ["Sponsor Test GmbH"])
+		self.assertTrue(item.data["sponsors"][0]["url"].startswith("/en/partners/"))
+		self.assertEqual(item.data["organizer"]["name"], "Sponsor Test GmbH")
+		self.assertNotIn("Secret Sponsor", json.dumps(item, default=str))
+		self.assertEqual(item.data["stakeholders"], [named.name])
+		partner = find_item("partners", named.route, "en")
+		titles = [block["title"] for block in build_profile(partner, "en")["related"]]
+		self.assertIn("Events", titles)

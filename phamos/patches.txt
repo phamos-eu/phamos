@@ -52,3 +52,5 @@ phamos.patches.v1_0.delete_marketing_event_response_doctype
 phamos.patches.v1_0.retire_event_registration_web_form
 phamos.patches.v1_0.migrate_attendee_legacy_data
 phamos.patches.v1_0.move_marketing_content_to_web_profile
+phamos.patches.v1_0.set_event_ticket_prices
+phamos.patches.v1_0.migrate_event_stakeholders

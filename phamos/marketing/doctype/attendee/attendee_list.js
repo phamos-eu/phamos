@@ -24,7 +24,7 @@ frappe.listview_settings["Attendee"] = {
 			if (!names.length) return frappe.msgprint(__("Please select attendees first."));
 			frappe.call({ method: `${api}.${method}`, args: { names, ...extra }, freeze: true }).then((r) => {
 				const m = r.message || {};
-				const created = m.sales_orders || m.sales_invoices || (m.results || []).map((x) => x.customer).filter(Boolean);
+				const created = m.sales_orders || m.sales_invoices || m.opportunities || (m.results || []).map((x) => x.customer).filter(Boolean);
 				frappe.msgprint(created && created.length ? __("Done: {0}", [created.join(", ")]) : __("Done"));
 				if (m.skipped && m.skipped.length) frappe.show_alert(__("Skipped: {0}", [m.skipped.join(", ")]));
 				listview.refresh();
@@ -35,12 +35,13 @@ frappe.listview_settings["Attendee"] = {
 		listview.page.add_inner_button(__("Create Customer(s)"), () => run("create_customers"), group);
 		listview.page.add_inner_button(__("Create Sales Order(s)"), () => run("create_sales_orders"), group);
 		listview.page.add_inner_button(__("Create Sales Invoice(s)"), () => run("create_sales_invoices"), group);
+		listview.page.add_inner_button(__("Create Opportunities"), () => run("create_opportunities"), group);
 		listview.page.add_inner_button(__("Mark Attended"), () => run("set_attendance", { status: "Attended" }), group);
 		listview.page.add_inner_button(__("Mark No Show"), () => run("set_attendance", { status: "No Show" }), group);
 	},
 };
 
 function phamos_attendee_list_colour(status) {
-	return { Paid: "green", Invoiced: "orange", Ordered: "blue", Quoted: "yellow", Pending: "red",
+	return { Paid: "green", Invoiced: "orange", Ordered: "blue", Pending: "red",
 		Cancelled: "gray", "Not Required": "gray" }[status] || "gray";
 }

@@ -28,6 +28,12 @@ class TestAttendee(FrappeTestCase):
 		self.assertEqual(att.full_name, "Anna Muster")
 		self.assertTrue(att.registered_on)
 
+	def test_email_is_optional_for_companions(self):
+		first = make_attendee(self.event, None, "Plus", "One")
+		second = make_attendee(self.event, "", "Plus", "Two")
+		self.assertIsNone(first.email)
+		self.assertIsNone(second.email)
+
 	def test_invalid_email_is_rejected(self):
 		self.assertRaises(frappe.ValidationError, make_attendee, self.event, "anna@example.com/")
 

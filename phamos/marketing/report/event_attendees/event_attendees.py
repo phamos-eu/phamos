@@ -15,7 +15,7 @@ def execute(filters=None):
 		conditions["vip"] = 1
 	rows = frappe.get_list("Attendee", filters=conditions, fields=[
 		"name", "event", "full_name", "email", "phone", "company_name", "job_title", "role", "vip", "status",
-		"payment_status", "crm_status", "customer", "lead", "contact", "quotation", "sales_order",
+		"payment_status", "crm_status", "customer", "lead", "contact", "opportunity", "sales_order",
 		"sales_invoice", "follow_up_status", "follow_up_on", "follow_up_notes", "_assign",
 	], order_by="company_name asc, full_name asc", limit_page_length=0)
 	for row in rows:
@@ -41,7 +41,7 @@ def columns():
 		col("customer", "Customer", "Link", "Customer", 150),
 		col("lead", "Lead", "Link", "Lead"),
 		col("contact", "Contact", "Link", "Contact"),
-		col("quotation", "Quotation", "Link", "Quotation"),
+		col("opportunity", "Opportunity", "Link", "Opportunity"),
 		col("sales_order", "Sales Order", "Link", "Sales Order"),
 		col("sales_invoice", "Sales Invoice", "Link", "Sales Invoice"),
 		col("follow_up_status", "Follow-up", width=100),

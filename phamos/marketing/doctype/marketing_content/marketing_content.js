@@ -1,8 +1,22 @@
 // Marketing Content (event): attendee counts, attendee list and report, campaign, newsletter.
 
+const NAMED_STAKEHOLDERS = { filters: { published: 1, publish_as: "Named", naming_approved: 1 } };
+
 frappe.ui.form.on("Marketing Content", {
+	setup(frm) {
+		// Only stakeholders that may be named on the website (published, approved to be named).
+		frm.set_query("organizer", () => NAMED_STAKEHOLDERS);
+		frm.set_query("stakeholder", "sponsors", () => NAMED_STAKEHOLDERS);
+		frm.set_query("ticket_item", () => ({ filters: { is_stock_item: 0, is_sales_item: 1, disabled: 0 } }));
+	},
+
 	refresh(frm) {
 		if (frm.is_new()) return;
+		if (!frm.doc.ticket_item) {
+			frm.add_custom_button(__("Ticket Item"), () =>
+				frappe.call({ method: "phamos.marketing.api.create_ticket_item", args: { event: frm.doc.name } })
+					.then(() => frm.reload_doc()), __("Create"));
+		}
 
 		frappe.call({ method: "phamos.marketing.api.attendee_summary", args: { event: frm.doc.name } }).then((r) => {
 			const c = r.message || {};
@@ -33,5 +47,9 @@ frappe.ui.form.on("Marketing Content", {
 				args: { event_name: frm.doc.name },
 			}).then((r) => r.message && frappe.set_route("Form", "Newsletter", r.message));
 		}, __("Create"));
+	},
+
+	organizer_is_phamos(frm) {
+		if (frm.doc.organizer_is_phamos) frm.set_value("organizer", null);
 	},
 });

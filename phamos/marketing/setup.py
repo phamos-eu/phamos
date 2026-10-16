@@ -1,11 +1,13 @@
 """Idempotent setup of the Marketing module (``after_migrate``).
 
 - Lead Source "Event" for registrations.
-- Role "Event Ticketing" + user ``TICKETING_USER``: website orders run as this user instead of Guest,
-  because ERPNext reads the ticket Item with the session user's permissions while validating the
-  Quotation (``get_item_details`` → ``item.check_permission``). The role can only read the master data
-  a quotation needs; it cannot read customers, leads, accounts or any transaction. The user has no
-  password and never logs in (phamos/phamos#1180: no Administrator elevation any more).
+- Role "Event Ticketing" + user ``TICKETING_USER``: website orders run as this user instead of Guest.
+  Every document is inserted with ``ignore_permissions``, but ERPNext checks two things with the session
+  user's own permissions while validating a Sales Order or Sales Invoice: read on the Item
+  (``get_item_details`` → ``item.check_permission``) and select on the receivable Account
+  (``erpnext/accounts/party.py: account_perm_check``). The role grants the read-only master data those
+  paths touch and select on Account; it cannot write anything. The user has no password and never logs
+  in (phamos/phamos#1180: no Administrator elevation).
 """
 
 import frappe
@@ -18,7 +20,7 @@ TICKETING_USER = "event-ticketing@phamos.invalid"
 # What ERPNext reads with the session user's permissions while validating a Quotation: the item and
 # its price, the party (Lead or Customer: get_lead_details / get_party_details) and, for a Customer,
 # the receivable Account (account_perm_check accepts "select"). Nothing is writable.
-TICKETING_READ = ("Item", "Item Price", "Price List", "UOM", "Item Tax Template", "Currency", "Lead", "Customer",
+TICKETING_READ = ("Item", "Item Price", "Price List", "UOM", "Item Tax Template", "Currency", "Customer",
 	"Contact", "Address", "Company", "Customer Group", "Territory", "Terms and Conditions")
 TICKETING_SELECT = ("Account",)
 
@@ -41,6 +43,10 @@ def ensure_ticketing_user():
 			add_permission(doctype, TICKETING_ROLE, permlevel=0, ptype="select")
 		update_permission_property(doctype, TICKETING_ROLE, 0, "select", 1, validate=False)
 		update_permission_property(doctype, TICKETING_ROLE, 0, "read", 0, validate=False)
+	# Buyers get no Lead any more (round 2): the role does not need to read Leads.
+	if frappe.db.exists("Custom DocPerm", {"parent": "Lead", "role": TICKETING_ROLE}):
+		frappe.db.delete("Custom DocPerm", {"parent": "Lead", "role": TICKETING_ROLE})
+		frappe.clear_cache(doctype="Lead")
 	if not frappe.db.exists("User", TICKETING_USER):
 		user = frappe.get_doc({
 			"doctype": "User", "email": TICKETING_USER, "first_name": "Event Ticketing", "user_type": "Website User",

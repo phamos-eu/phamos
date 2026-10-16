@@ -1,4 +1,4 @@
-"""Website orders: validation, CRM records, Attendees and the Quotation, all as Guest.
+"""Website orders: validation, Customer + submitted Sales Order, prices over time, all as Guest.
 
 bench --site <site> run-tests --module phamos.tests.test_marketing_ticketing
 """
@@ -7,16 +7,13 @@ from unittest.mock import patch
 
 import frappe
 from frappe.tests.utils import FrappeTestCase
-from frappe.utils import add_days, now_datetime
+from frappe.utils import add_days, flt, now_datetime
 
-from phamos.marketing import ticketing
-from phamos.tests.marketing_fixtures import CONSENTS, as_guest, ensure_company, make_attendee, make_customer, make_event
+from phamos.marketing import billing, ticketing
+from phamos.tests.marketing_fixtures import BILLING, CONTACT, as_guest, ensure_company, make_attendee, make_customer, make_event
 
-ATTENDEES = [{"full_name": "Erika Mustermann", "email": "erika@ticket.example"},
-	{"full_name": "Max Mustermann", "email": "max@ticket.example"}]
-BILLING = {"is_company": 1, "company": "Ticket Test GmbH", "full_name": "Erika Mustermann",
-	"email": "erika@ticket.example", "address_line1": "Hauptstr. 1", "postcode": "72764", "city": "Reutlingen",
-	"country": "Germany"}
+COMPANIONS = [{"full_name": "Max Mustermann", "email": ""}]
+COMPANY_BILLING = {**BILLING, "is_company": 1, "company": "Ticket Test GmbH", "vat_id": "DE123456789"}
 
 
 @patch("frappe.enqueue")
@@ -36,48 +33,96 @@ class TestTicketing(FrappeTestCase):
 		frappe.set_user("Administrator")
 		frappe.db.rollback(save_point="ticketing_test")
 
-	def order(self, attendees=ATTENDEES, billing=BILLING, consents=CONSENTS, event=None):
+	def order(self, contact=CONTACT, attends=1, companions=COMPANIONS, billing_data=COMPANY_BILLING, event=None, **kwargs):
 		with as_guest():
-			return ticketing.register_attendees((event or self.event).name, attendees, billing_data=billing,
-				consents=consents)
+			return ticketing.register_attendees((event or self.event).name, contact, attends=attends,
+				companions=companions, billing_data=billing_data, **kwargs)
 
-	def test_company_order_creates_lead_attendees_and_submitted_quotation(self, enqueue):
+	def test_company_order_creates_customer_and_submitted_sales_order(self, enqueue):
 		result = self.order()
 		self.assertEqual(frappe.session.user, "Administrator")
-		self.assertEqual(result["reference_doctype"], "Quotation")
-		qtn = frappe.get_doc("Quotation", result["reference"])
-		self.assertEqual(qtn.docstatus, 1)
-		self.assertEqual(qtn.quotation_to, "Lead")
-		self.assertEqual(qtn.order_type, "Shopping Cart")
-		self.assertEqual(len(qtn.items), 2)
-		self.assertEqual(len({row.description for row in qtn.items}), 2)
-		self.assertEqual(frappe.db.get_value("Lead", qtn.party_name, "company_name"), "Ticket Test GmbH")
-		attendees = frappe.get_all("Attendee", filters={"quotation": qtn.name},
-			fields=["email", "payment_status", "is_buyer", "contact", "quotation_item", "terms_accepted_on"])
-		self.assertEqual(len(attendees), 2)
-		self.assertTrue(all(a.payment_status == "Quoted" and a.contact and a.quotation_item and a.terms_accepted_on
-			for a in attendees))
-		self.assertEqual([a.email for a in attendees if a.is_buyer], ["erika@ticket.example"])
-		self.assertTrue(frappe.db.exists("Dynamic Link", {"parenttype": "Address", "link_doctype": "Lead",
-			"link_name": qtn.party_name}))
+		self.assertEqual(result["reference_doctype"], "Sales Order")
+		self.assertTrue(ticketing.verify_consent_token(result["reference"], result["consent_token"]))
+		so = frappe.get_doc("Sales Order", result["reference"])
+		self.assertEqual(so.docstatus, 1)
+		self.assertEqual(so.order_type, "Shopping Cart")
+		self.assertEqual(len(so.items), 2)
+		self.assertEqual(len({row.description for row in so.items}), 2)
+		self.assertIn("(Regular)", so.items[0].description)
+		# 119 gross incl. 19 % VAT per ticket: the consumer pays exactly the advertised price.
+		self.assertEqual(flt(so.grand_total, 2), 238.0)
+		self.assertEqual(flt(so.net_total, 2), 200.0)
+		customer = frappe.get_doc("Customer", so.customer)
+		self.assertEqual((customer.customer_type, customer.customer_name, customer.tax_id),
+			("Company", "Ticket Test GmbH", "DE123456789"))
+		self.assertTrue(customer.customer_primary_contact and customer.customer_primary_address)
+		self.assertEqual(so.customer_address, customer.customer_primary_address)
+		self.assertFalse(frappe.db.exists("Lead", {"email_id": "erika@ticket.example"}))
+		rows = frappe.get_all("Attendee", filters={"sales_order": so.name},
+			fields=["email", "payment_status", "is_buyer", "contact", "crm_status", "terms_accepted", "ticket_type", "notes"],
+			order_by="creation asc")
+		self.assertEqual([r.payment_status for r in rows], ["Ordered", "Ordered"])
+		self.assertEqual([r.ticket_type for r in rows], ["Regular", "Regular"])
+		self.assertTrue(all(r.terms_accepted for r in rows))
+		buyer, companion = rows
+		self.assertTrue(buyer.is_buyer and buyer.contact)
+		self.assertFalse(companion.email or companion.contact)
+		self.assertEqual(companion.crm_status, "Unlinked")
+		self.assertIn("erika@ticket.example", companion.notes)
 		enqueue.assert_called_once()
 
-	def test_known_customer_gets_the_quotation(self, enqueue):
-		make_customer("Known Ticket Customer AG", "erika@ticket.example")
-		result = self.order(billing=None)
-		qtn = frappe.get_doc("Quotation", result["reference"])
-		self.assertEqual((qtn.quotation_to, qtn.party_name), ("Customer", "Known Ticket Customer AG"))
+	def test_private_buyer_is_an_individual_customer(self, enqueue):
+		result = self.order(billing_data=BILLING, companions=[])
+		customer = frappe.db.get_value("Sales Order", result["reference"], "customer")
+		self.assertEqual(frappe.db.get_value("Customer", customer, "customer_type"), "Individual")
 
-	def test_free_event_books_without_quotation(self, enqueue):
+	def test_known_customer_is_reused(self, enqueue):
+		make_customer("Known Ticket Customer AG", "erika@ticket.example")
+		result = self.order()
+		self.assertEqual(frappe.db.get_value("Sales Order", result["reference"], "customer"), "Known Ticket Customer AG")
+		self.assertFalse(frappe.db.exists("Customer", {"customer_name": "Ticket Test GmbH"}))
+
+	def test_company_name_match_needs_review(self, enqueue):
+		make_customer("Ticket Test GmbH")
+		result = self.order()
+		buyer = frappe.get_all("Attendee", filters={"sales_order": result["reference"], "is_buyer": 1},
+			fields=["crm_status", "customer"])[0]
+		self.assertEqual(buyer.crm_status, "Needs Review")
+		self.assertNotEqual(buyer.customer, "Ticket Test GmbH")
+
+	def test_contact_who_does_not_attend(self, enqueue):
+		result = self.order(attends=0, companions=[{"full_name": "Colleague One", "email": "colleague@ticket.example"}])
+		rows = frappe.get_all("Attendee", filters={"sales_order": result["reference"]}, fields=["email", "is_buyer", "customer"])
+		self.assertEqual([r.email for r in rows], ["colleague@ticket.example"])
+		self.assertFalse(rows[0].is_buyer)
+		# A companion of a company order belongs to the company.
+		self.assertEqual(rows[0].customer, frappe.db.get_value("Sales Order", result["reference"], "customer"))
+
+	def test_early_bird_then_regular(self, enqueue):
+		event = make_event("Early Bird Test Event", prices=[
+			{"title": "Early Bird", "rate": 59.5, "quota": 2, "valid_until": add_days(now_datetime(), 10)},
+			{"title": "Regular", "rate": 119}])
+		self.assertEqual(billing.get_ticket_pricing(event, 1).price_title, "Early Bird")
+		# Two early-bird tickets fit, three do not: the order gets the next price row.
+		self.assertEqual(billing.get_ticket_pricing(event, 3).price_title, "Regular")
+		first = self.order(event=event, billing_data=BILLING, expected_total=119)
+		self.assertEqual(flt(frappe.db.get_value("Sales Order", first["reference"], "grand_total"), 2), 119.0)
+		# The quota is used up: the next buyer pays the regular price, and a stale total is refused.
+		self.assertEqual(billing.get_ticket_pricing(event, 1).price_title, "Regular")
+		self.assertRaises(frappe.ValidationError, self.order, event=event, contact={"full_name": "Late Bird",
+			"email": "late@ticket.example"}, companions=[], billing_data={**BILLING, "email": "late@ticket.example"},
+			expected_total=59.5)
+		# After the early-bird window everybody pays the regular price.
+		later = billing.get_ticket_pricing(event, 1, now=add_days(now_datetime(), 11))
+		self.assertEqual(later.price_title, "Regular")
+
+	def test_free_event_books_without_order(self, enqueue):
 		free = make_event("Free Test Event", paid=False)
-		result = self.order(event=free, billing=None)
+		result = self.order(event=free, billing_data=None)
 		self.assertEqual(result["reference_doctype"], "Attendee")
 		self.assertTrue(result["reference"].startswith("BK-"))
 		self.assertEqual(set(frappe.get_all("Attendee", filters={"event": free.name}, pluck="payment_status")),
 			{"Not Required"})
-
-	def test_consents_are_required(self, enqueue):
-		self.assertRaises(frappe.ValidationError, self.order, consents={"terms": 1})
 
 	def test_closed_sale_is_refused(self, enqueue):
 		for values in ({"registration_open": 0}, {"published": 0}, {"status": "Completed"},
@@ -95,17 +140,28 @@ class TestTicketing(FrappeTestCase):
 		self.assertRaises(frappe.ValidationError, self.order)  # 4 + 2 > 5
 		frappe.db.rollback(save_point="ticketing_test")
 		self.event = make_event(max_attendees=5)
-		self.assertRaises(frappe.ValidationError, self.order, attendees=[ATTENDEES[0], ATTENDEES[0]])
+		self.assertRaises(frappe.ValidationError, self.order, companions=[{"full_name": "Twin", "email": CONTACT["email"]}])
 		make_attendee(self.event.name, "erika@ticket.example")
 		self.assertRaises(frappe.ValidationError, self.order)
 
 	def test_bad_email_is_refused(self, enqueue):
-		self.assertRaises(frappe.ValidationError, self.order,
-			attendees=[{"full_name": "Bad", "email": "bad@example.com/"}], billing=None)
+		self.assertRaises(frappe.ValidationError, self.order, contact={"full_name": "Bad", "email": "bad@example.com/"})
+
+	def test_save_consents(self, enqueue):
+		result = self.order()
+		email = ticketing.save_consents(result["reference"], {"newsletter": 1, "public_listing": 1})
+		self.assertEqual(email, "erika@ticket.example")
+		buyer = frappe.get_all("Attendee", filters={"sales_order": result["reference"], "is_buyer": 1},
+			fields=["newsletter_consent", "newsletter_consent_on", "public_listing_consent", "share_with_attendees_consent"])[0]
+		self.assertTrue(buyer.newsletter_consent and buyer.newsletter_consent_on and buyer.public_listing_consent)
+		self.assertFalse(buyer.share_with_attendees_consent)
+		self.assertFalse(ticketing.verify_consent_token(result["reference"], "1.forged"))
+		self.assertFalse(ticketing.verify_consent_token("SAL-ORD-OTHER", result["consent_token"]))
 
 	def test_offer(self, enqueue):
 		offer = ticketing.offer(self.event.name)
 		self.assertTrue(offer.sale_open)
 		self.assertFalse(offer.free)
 		self.assertEqual(offer.spots_left, 5)
-		self.assertEqual(offer.net, 100)
+		self.assertEqual((offer.gross, offer.net, offer.price_title), (119, 100, "Regular"))
+		self.assertEqual(len(offer.prices), 1)

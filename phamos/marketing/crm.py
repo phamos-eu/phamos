@@ -6,10 +6,10 @@ Rules (phamos/phamos#1169):
 2. Else a Lead with the email exists: reuse it (a Converted Lead brings its Customer).
 3. Else, when allowed, create a Lead (source "Event", the event's Campaign) and its Contact.
 
-A Customer is never created here for website requests: ERPNext creates it when a phamos person turns
-the Quotation into a Sales Order (or from the desk with ``ensure_customer_for_order``). A company name
-that matches a Customer without an email link is only a hint (``crm_status`` "Needs Review"): a person
-decides, so no duplicate or wrong Customer is created.
+Paid website orders create the buyer's Customer directly (``ensure_customer``): the click on
+"Zahlungspflichtig bestellen" makes them a customer. ``resolve_party`` itself never creates a Customer.
+A company name that matches a Customer without an email link is only a hint (``crm_status`` "Needs
+Review"): a person decides, so no wrong Customer is reused.
 """
 
 import re
@@ -195,11 +195,11 @@ def create_address(*, title, address_line1, city, country, pincode="", address_l
 
 
 def resolve_party(*, email, first_name, last_name="", company_name="", phone="", job_title="", salutation="",
-		event=None, create=True, link_to_lead=None):
+		event=None, create=True, link_to_lead=None, link_to_customer=None):
 	"""Contact + Lead or Customer for one person (rules in the module docstring).
 
-	``link_to_lead``: the buyer's Lead for companions of a company order; their Contacts are linked to it,
-	so ERPNext moves them to the Customer when the Lead is converted.
+	``link_to_customer``: the buying company for companions of a company order: their Contact is linked to
+	that Customer and they get no Lead of their own. ``link_to_lead``: the same for a buyer who is a Lead.
 	"""
 	found = find_party(email, company_name)
 	result = frappe._dict(contact=found.contact, lead=found.lead, customer=found.customer, created=[],
@@ -214,6 +214,8 @@ def resolve_party(*, email, first_name, last_name="", company_name="", phone="",
 		phone=phone, job_title=job_title, salutation=salutation)
 	campaign = get_or_create_campaign(event) if event is not None else None
 
+	if link_to_customer and not result.customer:
+		result.customer = link_to_customer
 	if not result.customer and not result.lead and not link_to_lead:
 		result.lead = create_lead(campaign=campaign, **person)
 		result.created.append(("Lead", result.lead))
@@ -272,3 +274,82 @@ def ensure_customer_for_order(buyer, group=()):
 	customer.customer_type = "Company" if buyer.company_name else "Individual"
 	customer.insert()
 	return customer.name
+
+
+def ensure_customer(buyer, event=None, lang=None):
+	"""The Customer that pays a website order, with its Contact and billing Address.
+
+	``buyer``: first_name, last_name, email, phone, company_name, is_company, vat_id, address_line1/2,
+	postcode, city, country. A Contact with the buyer's email that belongs to exactly one Customer means the
+	buyer is known: that Customer is reused (an Address is added only when it has none). Otherwise a
+	Customer is created – type Company with a company name, else Individual – together with the buyer's
+	Contact and the billing Address. Buyers get no Lead: they bought, they are customers.
+
+	The Customer gets no email/phone/address fields of its own, so ERPNext does not create a second
+	Contact or Address (customer.py create_primary_contact / create_primary_address).
+
+	Returns {customer, contact, address, created, review}; ``review`` names an existing Customer whose name
+	matches the company without an email link (a possible duplicate for a person to merge).
+	"""
+	found = find_party(buyer.email, buyer.company_name if buyer.is_company else None)
+	result = frappe._dict(customer=found.customer, contact=found.contact, address=None, created=False, review=None)
+	if result.customer:
+		result.address = frappe.db.get_value("Customer", result.customer, "customer_primary_address") or \
+			_any_address(result.customer)
+		if not result.address and buyer.address_line1:
+			result.address = create_address(title=_address_title(buyer), address_line1=buyer.address_line1,
+				address_line2=buyer.address_line2, city=buyer.city, pincode=buyer.postcode, country=buyer.country,
+				email=buyer.email, phone=buyer.phone, links=[("Customer", result.customer)])
+		if not result.contact:
+			result.contact = create_contact(email=buyer.email, first_name=buyer.first_name, last_name=buyer.last_name,
+				company_name=buyer.company_name, phone=buyer.phone, links=[("Customer", result.customer)])
+		else:
+			ensure_contact_links(result.contact, [("Customer", result.customer)])
+		return result
+
+	if found.confidence == "review":
+		result.review = found.company_match or (found.customers[0] if found.customers else None)
+	settings = frappe.db.get_singles_dict("Selling Settings")
+	customer = frappe.get_doc({
+		"doctype": "Customer",
+		"customer_name": (buyer.company_name if buyer.is_company else join_name(buyer.first_name, buyer.last_name))[:140],
+		"customer_type": "Company" if buyer.is_company else "Individual",
+		"customer_group": _leaf("Customer Group", settings.get("customer_group")),
+		"territory": _leaf("Territory", settings.get("territory")),
+		"tax_id": buyer.vat_id or None,
+		"language": lang if lang in ("de", "en") else None,
+	})
+	customer.insert(ignore_permissions=True)
+	result.customer, result.created = customer.name, True
+	if result.contact:
+		ensure_contact_links(result.contact, [("Customer", customer.name)])
+	else:
+		result.contact = create_contact(email=buyer.email, first_name=buyer.first_name, last_name=buyer.last_name,
+			company_name=buyer.company_name, phone=buyer.phone, links=[("Customer", customer.name)])
+	if buyer.address_line1:
+		result.address = create_address(title=_address_title(buyer), address_line1=buyer.address_line1,
+			address_line2=buyer.address_line2, city=buyer.city, pincode=buyer.postcode, country=buyer.country,
+			email=buyer.email, phone=buyer.phone, links=[("Customer", customer.name)])
+	frappe.db.set_value("Customer", customer.name, {"customer_primary_contact": result.contact,
+		"customer_primary_address": result.address}, update_modified=False)
+	if result.review:
+		customer.add_comment("Comment", _("Possible duplicate of Customer {0}: created by a website order with the same "
+			"company name but an unknown email address. Merge by renaming if it is the same company.").format(result.review))
+	return result
+
+
+def _address_title(buyer):
+	return buyer.company_name or join_name(buyer.first_name, buyer.last_name) or buyer.email
+
+
+def _any_address(customer):
+	return frappe.db.get_value("Dynamic Link", {"parenttype": "Address", "link_doctype": "Customer",
+		"link_name": customer}, "parent")
+
+
+def _leaf(doctype, preferred):
+	"""``preferred`` when it is a leaf (ERPNext refuses group nodes), else the first leaf."""
+	if preferred and not frappe.db.get_value(doctype, preferred, "is_group"):
+		return preferred
+	return frappe.db.get_value(doctype, {"is_group": 0}, "name", order_by="lft asc")
+
