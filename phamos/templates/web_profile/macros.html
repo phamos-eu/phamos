@@ -303,16 +303,35 @@
 			</div>
 			<label class="wp-check wp-contact-consent"><input type="checkbox" name="attends" value="1" checked data-wp-attends>
 				<span>{{ _("I attend myself") }}</span></label>
-			<label class="wp-qty">{{ _("Number of tickets") }}
-				<input type="number" name="qty" min="1" max="{{ t.max_per_order }}" value="1" required data-wp-qty></label>
-			<div data-wp-companions-block hidden>
-				<p class="wp-legal">{{ _("All tickets and information go to your email address. Add an email for a ticket holder only if they should receive it directly.") }}</p>
-				<ol class="wp-attendee-rows" data-wp-companions></ol>
+			<div class="wp-people" data-wp-people>
+				<div class="wp-people-head" aria-hidden="true">
+					<span>#</span><span>{{ _("Name") }}</span><span>{{ _("Email (optional)") }}</span>
+					{%- if not t.free %}<span class="wp-people-price">{{ _("Price") }}</span>{% endif %}<span></span>
+				</div>
+				<ol class="wp-people-rows" data-wp-people-rows>
+					<li class="wp-people-row wp-people-self" data-wp-self>
+						<span class="wp-people-no">1</span>
+						<span class="wp-people-name" data-wp-self-name></span>
+						<span class="wp-people-email" data-wp-self-email></span>
+						{%- if not t.free %}<span class="wp-people-price" data-wp-row-price></span>{% endif %}
+						<span class="wp-people-tag">{{ _("You") }}</span>
+					</li>
+				</ol>
+				<div class="wp-people-foot">
+					<button type="button" class="wp-button wp-button-sm" data-wp-add-person>+ {{ _("Add person") }}</button>
+					{%- if not t.free %}<span class="wp-people-total"><span>{{ _("Total") }}</span> <strong data-wp-people-total></strong></span>{% endif %}
+				</div>
+				<p class="wp-legal" data-wp-people-hint>{{ _("All tickets and information go to your email address. Add an email for a ticket holder only if they should receive it directly.") }}</p>
+				<p class="wp-legal" data-wp-people-max hidden>{{ _("At most {0} tickets per order.").format(t.max_per_order) }}</p>
 			</div>
+			<input type="hidden" name="qty" value="1" data-wp-qty>
 			<template data-wp-companion-row>
-				<li class="wp-contact-row">
-					<label><span data-wp-companion-label>{{ _("Ticket holder") }}</span><input type="text" data-field="full_name" required maxlength="140" autocomplete="off"></label>
-					<label>{{ _("Email (optional)") }}<input type="email" data-field="email" maxlength="140" autocomplete="off"></label>
+				<li class="wp-people-row">
+					<span class="wp-people-no" data-wp-companion-label></span>
+					<label class="wp-people-name"><span class="wp-visually-hidden">{{ _("Name") }}</span><input type="text" data-field="full_name" required maxlength="140" autocomplete="off" placeholder="{{ _('Name') }}"></label>
+					<label class="wp-people-email"><span class="wp-visually-hidden">{{ _("Email (optional)") }}</span><input type="email" data-field="email" maxlength="140" autocomplete="off" placeholder="{{ _('Email (optional)') }}"></label>
+					{%- if not t.free %}<span class="wp-people-price" data-wp-row-price></span>{% endif %}
+					<button type="button" class="wp-icon-button wp-people-remove" data-wp-remove-person aria-label="{{ _('Remove') }}">×</button>
 				</li>
 			</template>
 		</fieldset>

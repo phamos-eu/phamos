@@ -498,9 +498,41 @@ body .footer-grouped-links .footer-child-item, body .footer-grouped-links .foote
 .wp-interest { margin: 4px 0 20px; display: flex; flex-direction: column; gap: 6px; }
 .wp-interest-title { margin: 0; font-weight: 600; font-size: 13px; }
 .wp-interest-options { display: flex; gap: 6px; }
-.wp-interest-option { flex: 1; justify-content: center; cursor: pointer; border: 1px solid var(--wp-line); background: var(--wp-surface); font: inherit; font-size: 13px; }
-.wp-interest-option[aria-pressed="true"] { background: var(--wp-primary); border-color: var(--wp-primary); color: var(--wp-on-primary); }
-.wp-interest-option[aria-pressed="true"] .wp-count { color: var(--wp-on-primary); }
+/* Interest buttons: transparent and inheriting the text colour, so they work on light and dark pages;
+   each answer has its own soft glow (yes green, maybe blue, no red). */
+.wp-interest-option { --glow: 120 120 120; flex: 1; justify-content: center; gap: 6px; cursor: pointer; font: inherit; font-size: 13px;
+	color: inherit; background: transparent; border: 1px solid rgb(var(--glow) / 35%); transition: box-shadow 0.15s, background 0.15s, border-color 0.15s; }
+.wp-interest-option[data-response="yes"] { --glow: 22 163 74; }
+.wp-interest-option[data-response="maybe"] { --glow: 37 99 235; }
+.wp-interest-option[data-response="no"] { --glow: 220 38 38; }
+.wp-interest-option:hover { border-color: rgb(var(--glow) / 60%); box-shadow: 0 0 10px rgb(var(--glow) / 25%); }
+.wp-interest-option[aria-pressed="true"] { background: rgb(var(--glow) / 14%); border-color: rgb(var(--glow) / 75%);
+	box-shadow: 0 0 0 3px rgb(var(--glow) / 15%), 0 0 14px rgb(var(--glow) / 40%); font-weight: 600; }
+.wp-interest-option .wp-count { color: inherit; opacity: 0.75; background: transparent; }
 .wp-hold { margin: 0; padding: 6px 10px; border-radius: 8px; background: var(--wp-surface-2); color: var(--wp-ink-2); font-size: 12.5px; }
 .wp-hold.wp-error { background: #fdecea; color: #b42318; }
 .wp-hold[hidden] { display: none; }
+/* Ticket holders as an item table: you, then one row per further person; + adds, × removes. */
+.wp-people { display: flex; flex-direction: column; gap: 6px; }
+.wp-people-head, .wp-people-row { display: grid; grid-template-columns: 24px minmax(0, 1.2fr) minmax(0, 1.4fr) 90px 32px; gap: 8px; align-items: center; }
+.wp-people-head:not(:has(.wp-people-price)), .wp-people-row:not(:has([data-wp-row-price])) { grid-template-columns: 24px minmax(0, 1.2fr) minmax(0, 1.4fr) 32px; }
+.wp-people-head { padding: 0 8px; color: var(--wp-muted); font-size: 12px; font-weight: 600; }
+.wp-people-rows { display: flex; flex-direction: column; gap: 6px; margin: 0; padding: 0; list-style: none; }
+.wp-people-row { padding: 6px 8px; border: 1px solid var(--wp-line); border-radius: 8px; }
+.wp-people-row[hidden] { display: none; }
+.wp-people-self { background: rgb(128 128 128 / 6%); }
+.wp-people-no { color: var(--wp-muted); font-size: 12px; text-align: center; font-variant-numeric: tabular-nums; }
+.wp-people-name, .wp-people-email { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.wp-people-row input { width: 100%; padding: 5px 8px; border: 1px solid var(--wp-line); border-radius: var(--wp-radius-sm); background: transparent; color: inherit; font: inherit; }
+.wp-people-price { text-align: right; font-variant-numeric: tabular-nums; }
+.wp-people-tag { color: var(--wp-muted); font-size: 11px; text-align: center; }
+.wp-people-remove { font-size: 18px; }
+.wp-people-foot { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.wp-people-total { font-variant-numeric: tabular-nums; }
+@media (max-width: 640px) {
+	.wp-people-head { display: none; }
+	.wp-people-row, .wp-people-row:not(:has([data-wp-row-price])) { grid-template-columns: 20px minmax(0, 1fr) 28px; }
+	.wp-people-email { grid-column: 2; }
+	.wp-people-price, .wp-people-tag { grid-column: 3; grid-row: 1; }
+	.wp-people-remove { grid-column: 3; grid-row: 1; }
+}

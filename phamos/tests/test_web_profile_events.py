@@ -256,6 +256,8 @@ class TestWebProfileEvents(FrappeTestCase):
 		self.assertIn("Order with obligation to pay", html)
 		self.assertIn("312g", html)
 		self.assertIn("data-wp-step=\"3\"", html)
+		self.assertIn("data-wp-add-person", html)  # ticket holders as a table with "+ Add person"
+		self.assertIn('data-response="maybe"', html)
 		self.assertNotIn('name="terms"', html)  # no checkbox before the order
 
 	def test_sponsor_and_organizer_as_named_stakeholders(self):

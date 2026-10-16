@@ -44,7 +44,9 @@
 		const labels = [...form.querySelectorAll("[data-wp-step-label]")];
 		const qty = $("[data-wp-qty]");
 		const attends = $("[data-wp-attends]");
-		const companions = $("[data-wp-companions]");
+		const companions = $("[data-wp-people-rows]");
+		const selfRow = $("[data-wp-self]");
+		const addButton = $("[data-wp-add-person]");
 		const template = $("[data-wp-companion-row]");
 		const status = $("[data-wp-ticket-status]");
 		const holdNote = $("[data-wp-hold]");
@@ -67,7 +69,8 @@
 		let expiresAt = 0;
 		let holdTimer = null;
 
-		const count = () => Math.min(Math.max(parseInt(qty.value || "1", 10) || 1, 1), max);
+		const companionRows = () => [...companions.querySelectorAll(".wp-people-row:not([data-wp-self])")];
+		const count = () => (attends.checked ? 1 : 0) + companionRows().length;
 		const value = (name) => (form.elements[name] ? String(form.elements[name].value || "").trim() : "");
 		const storage = {
 			get() { try { return JSON.parse(localStorage.getItem(draftKey) || "null"); } catch (e) { return null; } },
@@ -75,21 +78,38 @@
 			clear() { try { localStorage.removeItem(draftKey); } catch (e) { /* private mode */ } },
 		};
 
+		function addRow(values = {}) {
+			if (count() >= max) return null;
+			const row = template.content.firstElementChild.cloneNode(true);
+			row.querySelector('[data-field="full_name"]').value = values.full_name || "";
+			row.querySelector('[data-field="email"]').value = values.email || "";
+			companions.appendChild(row);
+			return row;
+		}
+
+		// The person table: you (when attending) plus one row per further ticket holder.
 		function renderCompanions() {
-			// Ticket holders besides the contact (all of them when the contact does not attend).
-			const wanted = count() - (attends.checked ? 1 : 0);
-			while (companions.children.length < wanted) companions.appendChild(template.content.firstElementChild.cloneNode(true));
-			while (companions.children.length > wanted) companions.lastElementChild.remove();
-			const base = template.content.querySelector("[data-wp-companion-label]").textContent;
-			[...companions.children].forEach((row, i) => {
-				row.querySelector("[data-wp-companion-label]").textContent = `${base} ${i + (attends.checked ? 2 : 1)}`;
+			if (!count()) addRow(); // somebody needs a ticket
+			selfRow.hidden = !attends.checked;
+			selfRow.querySelector("[data-wp-self-name]").textContent = value("contact_name") || "–";
+			selfRow.querySelector("[data-wp-self-email]").textContent = value("contact_email");
+			const rows = [...(attends.checked ? [selfRow] : []), ...companionRows()];
+			rows.forEach((row, i) => {
+				row.querySelector(".wp-people-no").textContent = String(i + 1);
+				const price = row.querySelector("[data-wp-row-price]");
+				if (price) price.textContent = money.format(gross);
 			});
-			$("[data-wp-companions-block]").hidden = wanted < 1;
+			const n = rows.length;
+			qty.value = String(n);
+			addButton.disabled = n >= max;
+			$("[data-wp-people-max]").hidden = n < max;
+			const total = $("[data-wp-people-total]");
+			if (total) total.textContent = money.format(gross * n);
 		}
 
 		function holders() {
 			const list = attends.checked ? [{ full_name: value("contact_name"), email: value("contact_email") }] : [];
-			for (const row of companions.children) {
+			for (const row of companionRows()) {
 				list.push({
 					full_name: row.querySelector('[data-field="full_name"]').value.trim(),
 					email: row.querySelector('[data-field="email"]').value.trim(),
@@ -112,7 +132,7 @@
 					if (el) fields[name] = el.type === "checkbox" ? el.checked : el.value;
 				}
 				storage.set({ ts: Date.now(), holdId, step: current, attends: attends.checked, fields,
-					companions: [...companions.children].map((row) => ({
+					companions: companionRows().map((row) => ({
 						full_name: row.querySelector('[data-field="full_name"]').value,
 						email: row.querySelector('[data-field="email"]').value })) });
 			}, 400);
@@ -129,11 +149,9 @@
 				if (el.type === "checkbox") el.checked = !!val; else el.value = val;
 			}
 			if (toggle) { $("[data-wp-company]").hidden = !toggle.checked; form.elements.company.required = toggle.checked; }
+			companionRows().forEach((row) => row.remove());
+			(draft.companions || []).forEach((c) => addRow(c));
 			renderCompanions();
-			(draft.companions || []).forEach((c, i) => {
-				const row = companions.children[i];
-				if (row) { row.querySelector('[data-field="full_name"]').value = c.full_name || ""; row.querySelector('[data-field="email"]').value = c.email || ""; }
-			});
 			current = Math.min(draft.step || 0, steps.length - 1);
 			return true;
 		}
@@ -163,6 +181,7 @@
 					// Another price row applies to this number of tickets (e.g. the early-bird quota is used up).
 					gross = result.gross;
 					form.dataset.priceTitle = result.price_title || "";
+					renderCompanions();
 				}
 				const until = new Date(expiresAt).toLocaleTimeString(locale, { hour: "2-digit", minute: "2-digit" });
 				showHold(holdNote.dataset.text.replace("{0}", until));
@@ -239,7 +258,7 @@
 			order = null;
 			holdId = newId();
 			gross = parseFloat(form.dataset.gross || "0");
-			companions.replaceChildren();
+			companionRows().forEach((row) => row.remove());
 			if (toggle) $("[data-wp-company]").hidden = true;
 			$("[data-wp-steps]").hidden = false;
 			$("[data-wp-ticket-actions]").hidden = false;
@@ -251,8 +270,23 @@
 			show(0);
 		}
 
-		qty.addEventListener("input", () => { renderCompanions(); hold(); });
+		addButton.addEventListener("click", () => {
+			const row = addRow();
+			renderCompanions();
+			hold();
+			saveDraft();
+			if (row) row.querySelector('[data-field="full_name"]').focus();
+		});
+		companions.addEventListener("click", (event) => {
+			const remove = event.target.closest("[data-wp-remove-person]");
+			if (!remove) return;
+			remove.closest(".wp-people-row").remove();
+			renderCompanions();
+			hold();
+			saveDraft();
+		});
 		attends.addEventListener("change", () => { renderCompanions(); hold(); });
+		for (const name of ["contact_name", "contact_email"]) form.elements[name].addEventListener("input", renderCompanions);
 		form.addEventListener("input", saveDraft);
 		form.addEventListener("change", saveDraft);
 		if (toggle) {
