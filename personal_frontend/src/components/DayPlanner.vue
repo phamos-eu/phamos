@@ -1,6 +1,8 @@
 <template>
-	<div class="h-full min-h-0 overflow-y-auto bg-surface-gray-1 p-5">
-		<div class="mx-auto flex max-w-6xl flex-col gap-5">
+	<!-- The planner of one day (#1559); the My Day timeline (#1573) shows it for today and on demand
+	     for future days. -->
+	<div>
+		<div class="flex flex-col gap-5">
 			<div v-if="error" class="rounded-lg border border-outline-gray-2 bg-surface-red-1 p-4 text-sm text-ink-red-4">
 				{{ error }}
 			</div>
@@ -158,7 +160,7 @@
 
 <script setup>
 import { computed, onMounted, ref, watch } from "vue"
-import { useRoute, useRouter } from "vue-router"
+import { useRouter } from "vue-router"
 import { call } from "frappe-ui"
 import { notify } from "@spa/utils/notify.js"
 import DecideTodoDialog from "@spa/components/DecideTodoDialog.vue"
@@ -178,7 +180,6 @@ const RITUAL = [
 	"Start the day",
 ]
 
-const route = useRoute()
 const router = useRouter()
 const plan = ref(null)
 const error = ref("")
@@ -187,7 +188,12 @@ const showShutdown = ref(false)
 const showDecide = ref(false)
 const decideQueue = ref([])
 
-const date = computed(() => route.params.date || null)
+const props = defineProps({
+	// YYYY-MM-DD; empty means today.
+	date: { type: String, default: "" },
+})
+const emit = defineEmits(["open-date", "changed"])
+const date = computed(() => props.date || null)
 const isToday = computed(() => plan.value && String(plan.value.date) === String(plan.value.today))
 const activeItems = computed(() => (plan.value?.items || []).filter((i) => !["Moved", "Dropped"].includes(i.outcome)))
 const openItems = computed(() => activeItems.value.filter((i) => i.outcome === "Open"))
@@ -252,6 +258,7 @@ function errorText(e, fallback) {
 
 function apply(result) {
 	plan.value = result
+	emit("changed", result)
 }
 
 async function load() {
@@ -308,7 +315,7 @@ function decide(todo) {
 }
 
 function openDate(value) {
-	router.push({ name: "TodosPlan", params: { date: String(value) } })
+	emit("open-date", String(value))
 }
 
 watch(date, load)
