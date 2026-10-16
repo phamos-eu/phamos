@@ -350,9 +350,9 @@ doc_events = {
     },
     # Seats left and sale state are cached with the event items: refresh them when attendees change.
     "Attendee": {
-        "after_insert": "phamos.web_profile.sections.clear_items",
-        "on_update": "phamos.web_profile.sections.clear_items",
-        "on_trash": "phamos.web_profile.sections.clear_items",
+        "after_insert": "phamos.web_profile.sections.clear_events",
+        "on_update": "phamos.web_profile.sections.clear_events",
+        "on_trash": "phamos.web_profile.sections.clear_events",
     },
     "Lead": {
         "before_insert": "phamos.marketing.billing.lead_before_insert",

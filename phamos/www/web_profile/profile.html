@@ -1,7 +1,7 @@
 {#- Profile page shared by every Web Profile section. Context: profile.py (data from
     sections.build_profile). Fixed skeleton: breadcrumb, header, facts, summary + body, related, CTA. -#}
 {% extends "templates/base.html" %}
-{% from "phamos/templates/web_profile/macros.html" import head_tags, breadcrumbs, avatar, tile, contact_button, socials, profile_hero, profile_actions, profile_blocks, ticket_dialog_markup, subscribe_dialog_markup with context %}
+{% from "phamos/templates/web_profile/macros.html" import head_tags, breadcrumbs, avatar, tile, contact_button, socials, profile_hero, profile_actions, profile_blocks, interest_block, ticket_dialog_markup, subscribe_dialog_markup with context %}
 
 {% block title %}{{ title | e }}{% endblock %}
 {% block meta_block %}{{ super() }}{{ head_tags() }}{% endblock %}
@@ -28,6 +28,7 @@
 	<aside class="wp-profile-aside{% if profile.key_people | length > 1 %} wp-aside-multi{% endif %}" aria-label="{{ _('Key people') }}">
 		{#- Events: the page's own actions come first; then the key person's contact button is not black. -#}
 		{{ profile_actions(profile.actions, support_email) }}
+		{{ interest_block(item, profile.interest, lang) }}
 		{%- for card in profile.key_people %}
 		{%- set person = card.person %}
 		{#- Framed cards are always clickable as a whole: another person's card links to their profile

@@ -82,13 +82,19 @@ def _gross_net(rate, inclusive, tax_rate):
 	return flt(rate * (1 + tax_rate / 100), 2), rate
 
 
-def price_ladder(event_doc, now=None):
-	"""All price rows with gross, net, remaining quota and whether they can still be sold, in table order."""
+def price_ladder(event_doc, now=None, exclude_hold=None):
+	"""All price rows with gross, net, remaining quota and whether they can still be sold, in table order.
+	Seats other visitors hold right now (20-minute holds, ``ticketing.hold_seats``) count against the quota."""
+	from phamos.marketing.ticketing import active_holds
+
 	now = get_datetime(now or now_datetime())
 	taxes = tax_rows(event_doc)
 	tax_rate = sum(flt(r.tax_rate) for r in taxes)
 	inclusive = cint(event_doc.get("ticket_price_includes_tax"))
 	sold = sold_per_price(event_doc.name) if event_doc.get("name") else {}
+	for hold in (active_holds(event_doc.name, exclude=exclude_hold) if event_doc.get("name") else {}).values():
+		if hold.get("price_title"):
+			sold[hold["price_title"]] = cint(sold.get(hold["price_title"])) + cint(hold.get("qty"))
 	ladder = []
 	for row in event_doc.get("ticket_prices") or []:
 		gross, net = _gross_net(row.rate, inclusive, tax_rate)
@@ -102,21 +108,21 @@ def price_ladder(event_doc, now=None):
 	return ladder
 
 
-def select_price(event_doc, qty=1, now=None):
+def select_price(event_doc, qty=1, now=None, exclude_hold=None):
 	"""The price row an order of ``qty`` tickets gets now, or None when no row can take it."""
-	for row in price_ladder(event_doc, now):
+	for row in price_ladder(event_doc, now, exclude_hold=exclude_hold):
 		if row.available and (row.remaining is None or row.remaining >= qty):
 			return row
 	return None
 
 
-def get_ticket_pricing(event_doc, qty=1, now=None):
+def get_ticket_pricing(event_doc, qty=1, now=None, exclude_hold=None):
 	"""Everything an order line needs, for the price row that applies now; None for free events or when
 	nothing can be sold (no price row, sold out, windows over)."""
 	item_code = event_doc.get("ticket_item")
 	if not item_code:
 		return None
-	price = select_price(event_doc, qty, now)
+	price = select_price(event_doc, qty, now, exclude_hold=exclude_hold)
 	if not price:
 		return None
 	taxes = tax_rows(event_doc)

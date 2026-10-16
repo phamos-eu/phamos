@@ -51,6 +51,13 @@
   "column_break_registration",
   "ticket_sales_from",
   "ticket_sales_until",
+  "show_bookings_publicly",
+  "section_interest",
+  "going_count",
+  "column_break_interest",
+  "maybe_count",
+  "column_break_interest_2",
+  "not_going_count",
   "section_ticket_sale",
   "ticket_item",
   "ticket_price_includes_tax",
@@ -356,6 +363,51 @@
    "description": "Empty: at the start of the event."
   },
   {
+   "fieldname": "show_bookings_publicly",
+   "fieldtype": "Check",
+   "label": "Show bookings on the website",
+   "default": "1",
+   "description": "\"32 of 60 seats taken\" on the event page and the event card (counts only, no names)."
+  },
+  {
+   "fieldname": "section_interest",
+   "fieldtype": "Section Break",
+   "label": "Interest (Yes / Maybe / No on the website)",
+   "collapsible": 1
+  },
+  {
+   "fieldname": "going_count",
+   "fieldtype": "Int",
+   "label": "Yes",
+   "default": "0",
+   "read_only": 1,
+   "no_copy": 1
+  },
+  {
+   "fieldname": "column_break_interest",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "maybe_count",
+   "fieldtype": "Int",
+   "label": "Maybe",
+   "default": "0",
+   "read_only": 1,
+   "no_copy": 1
+  },
+  {
+   "fieldname": "column_break_interest_2",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "not_going_count",
+   "fieldtype": "Int",
+   "label": "No",
+   "default": "0",
+   "read_only": 1,
+   "no_copy": 1
+  },
+  {
    "fieldname": "section_ticket_sale",
    "fieldtype": "Section Break",
    "label": "Ticket"
@@ -445,7 +497,7 @@
   }
  ],
  "links": [],
- "modified": "2026-10-17 10:00:00.000000",
+ "modified": "2026-10-17 12:00:00.000000",
  "modified_by": "Administrator",
  "module": "Marketing",
  "name": "Marketing Content",

@@ -31,6 +31,8 @@ class TestTicketing(FrappeTestCase):
 
 	def tearDown(self):
 		frappe.set_user("Administrator")
+		for name in frappe.get_all("Marketing Content", pluck="name"):
+			frappe.cache.delete_value(ticketing._holds_key(name))  # holds live in Redis, not in the rollback
 		frappe.db.rollback(save_point="ticketing_test")
 
 	def order(self, contact=CONTACT, attends=1, companions=COMPANIONS, billing_data=COMPANY_BILLING, event=None, **kwargs):
@@ -178,3 +180,25 @@ class TestTicketing(FrappeTestCase):
 		self.assertEqual(offer.spots_left, 5)
 		self.assertEqual((offer.gross, offer.net, offer.price_title), (119, 100, "Regular"))
 		self.assertEqual(len(offer.prices), 1)
+
+	def test_holds_reserve_seats_and_prices(self, enqueue):
+		event = make_event("Hold Test Event", max_attendees=3, prices=[
+			{"title": "Early Bird", "rate": 59.5, "quota": 2}, {"title": "Regular", "rate": 119}])
+		first = ticketing.hold_seats(event, "hold-aaaaaaaa", 2)
+		self.assertTrue(first["ok"])
+		self.assertEqual(first["price_title"], "Early Bird")
+		self.assertEqual(first["spots_left"], 1)
+		# The two early-bird seats are held: the next visitor gets the regular price and one seat at most.
+		self.assertEqual(ticketing.offer(event.name).spots_left, 1)
+		second = ticketing.hold_seats(event, "hold-bbbbbbbb", 1)
+		self.assertEqual(second["price_title"], "Regular")
+		self.assertFalse(ticketing.hold_seats(event, "hold-cccccccc", 1)["ok"])  # 2 + 1 held = capacity
+		# The holder orders: its own hold does not block it, and is released afterwards.
+		result = self.order(event=event, billing_data=BILLING, hold_id="hold-aaaaaaaa", expected_total=119)
+		self.assertEqual(frappe.db.get_value("Sales Order", result["reference"], "grand_total"), 119)
+		self.assertNotIn("hold-aaaaaaaa", ticketing.active_holds(event.name))
+		# An expired hold counts for nothing.
+		frappe.cache.hset(ticketing._holds_key(event.name), "hold-bbbbbbbb", {"qty": 1, "price_title": "Regular",
+			"expires": 0})
+		self.assertEqual(ticketing.held_seats(event.name), 0)
+		self.assertEqual(ticketing.offer(event.name).spots_left, 1)

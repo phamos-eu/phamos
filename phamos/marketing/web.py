@@ -19,7 +19,7 @@ from phamos.marketing import ticketing
 from phamos.marketing.defaults import MAX_ATTENDEES_PER_ORDER
 from phamos.marketing.utils import normalize_email
 from phamos.web_profile.i18n import DEFAULT_LANGUAGE, LANGUAGES
-from phamos.web_profile.sections import clear_items, find_item
+from phamos.web_profile.sections import clear_section, find_item
 
 PHONE = re.compile(r"[0-9 +()./-]{5,40}")
 VAT_ID = re.compile(r"[A-Z]{2}[A-Z0-9]{2,13}")
@@ -111,7 +111,8 @@ def _billing(raw, free):
 
 @frappe.whitelist(allow_guest=True, methods=["POST"])
 @rate_limit(limit=5, seconds=60 * 60)
-def order_tickets(event, lang, contact, attends=1, companions=None, billing=None, expected_total=None, website=None):
+def order_tickets(event, lang, contact, attends=1, companions=None, billing=None, expected_total=None, hold_id=None,
+		website=None):
 	"""The binding order ("Zahlungspflichtig bestellen"). No consent checkboxes: the order is a contract
 	(Art. 6 (1) b GDPR), the terms apply through the notice above the button; the optional marketing
 	questions come afterwards (``save_consents``)."""
@@ -129,10 +130,56 @@ def order_tickets(event, lang, contact, attends=1, companions=None, billing=None
 	billing_data = _billing(billing, offer.get("free"))
 	result = ticketing.register_attendees(item.name, main, attends=cint(attends), companions=others,
 		billing_data=billing_data, source="Website", lang=lang,
-		expected_total=None if offer.get("free") or expected_total in (None, "") else expected_total)
-	clear_items()
+		expected_total=None if offer.get("free") or expected_total in (None, "") else expected_total,
+		hold_id=_hold_id(hold_id, required=False))
+	clear_section("events")
 	return {"ok": True, "reference": result["reference"], "reference_doctype": result["reference_doctype"],
 		"free": bool(offer.get("free")), "tickets_to": result["tickets_to"], "token": result["consent_token"]}
+
+
+HOLD_ID = re.compile(r"[A-Za-z0-9-]{8,64}")
+INTEREST = {"yes": "going_count", "maybe": "maybe_count", "no": "not_going_count"}
+
+
+def _hold_id(value, required=True):
+	value = (value or "").strip()
+	if not value and not required:
+		return None
+	if not HOLD_ID.fullmatch(value):
+		frappe.throw(_("Invalid request."))
+	return value
+
+
+@frappe.whitelist(allow_guest=True, methods=["POST"])
+@rate_limit(limit=60, seconds=60 * 60)
+def hold(event, lang, hold_id, qty=1):
+	"""Reserve seats and their price for 20 minutes while the visitor fills in the order (renewed per call)."""
+	lang = _lang(lang)
+	item = _event(event, lang)
+	limit = cint((item.data.get("offer") or {}).get("max_per_order")) or MAX_ATTENDEES_PER_ORDER
+	qty = min(max(1, cint(qty)), max(limit, 1))
+	return ticketing.hold_seats(frappe.get_doc("Marketing Content", item.name), _hold_id(hold_id), qty)
+
+
+@frappe.whitelist(allow_guest=True, methods=["POST"])
+@rate_limit(limit=20, seconds=60 * 60)
+def interest(event, lang, response, previous=None, website=None):
+	"""Anonymous Yes / Maybe / No: counts only, no personal data (gauges interest before tickets are sold)."""
+	if website:
+		return {"ok": True}
+	item = _event(event, _lang(lang))
+	if response not in INTEREST or (previous and previous not in INTEREST):
+		frappe.throw(_("Invalid request."))
+	if previous and previous != response:
+		field = INTEREST[previous]
+		frappe.db.sql(f"update `tabMarketing Content` set `{field}` = greatest(0, coalesce(`{field}`, 0) - 1) where name = %s",
+			item.name)
+	if previous != response:
+		field = INTEREST[response]
+		frappe.db.sql(f"update `tabMarketing Content` set `{field}` = coalesce(`{field}`, 0) + 1 where name = %s", item.name)
+	clear_section("events")
+	counts = frappe.db.get_value("Marketing Content", item.name, list(INTEREST.values()), as_dict=True)
+	return {"ok": True, "counts": {key: cint(counts[field]) for key, field in INTEREST.items()}}
 
 
 @frappe.whitelist(allow_guest=True, methods=["POST"])

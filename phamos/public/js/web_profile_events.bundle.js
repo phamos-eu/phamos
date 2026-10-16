@@ -35,7 +35,7 @@
 		dialog.addEventListener("close", () => opener && opener.focus());
 	}
 
-	// --- tickets: three steps, then the optional questions ----------------------------------------------
+	// --- tickets: three steps, a 20-minute hold, then the optional questions ------------------------------
 	const ticketDialog = document.querySelector("[data-wp-ticket-dialog]");
 	if (ticketDialog) {
 		const form = ticketDialog.querySelector("[data-wp-ticket-form]");
@@ -47,29 +47,42 @@
 		const companions = $("[data-wp-companions]");
 		const template = $("[data-wp-companion-row]");
 		const status = $("[data-wp-ticket-status]");
+		const holdNote = $("[data-wp-hold]");
 		const back = $("[data-wp-back]");
 		const next = $("[data-wp-next]");
 		const submit = $("[data-wp-submit]");
 		const toggle = $("[data-wp-company-toggle]");
 		const free = form.dataset.free === "1";
-		const gross = parseFloat(form.dataset.gross || "0");
 		const taxRate = parseFloat(form.dataset.taxRate || "0");
 		const max = parseInt(form.dataset.max || "10", 10);
-		const money = new Intl.NumberFormat(form.dataset.lang === "de" ? "de-DE" : "en-GB",
-			{ style: "currency", currency: form.dataset.currency || "EUR" });
+		const windowMs = parseInt(form.dataset.holdMinutes || "20", 10) * 60 * 1000;
+		const draftKey = `wp-ticket:${form.elements.event.value}`;
+		const locale = form.dataset.lang === "de" ? "de-DE" : "en-GB";
+		const money = new Intl.NumberFormat(locale, { style: "currency", currency: form.dataset.currency || "EUR" });
+		const newId = () => (window.crypto && crypto.randomUUID ? crypto.randomUUID() : `h-${Date.now()}-${Math.random().toString(36).slice(2)}`);
+		let gross = parseFloat(form.dataset.gross || "0");
 		let current = 0;
 		let order = null; // {reference, token} after a successful order
+		let holdId = newId();
+		let expiresAt = 0;
+		let holdTimer = null;
 
 		const count = () => Math.min(Math.max(parseInt(qty.value || "1", 10) || 1, 1), max);
 		const value = (name) => (form.elements[name] ? String(form.elements[name].value || "").trim() : "");
+		const storage = {
+			get() { try { return JSON.parse(localStorage.getItem(draftKey) || "null"); } catch (e) { return null; } },
+			set(data) { try { localStorage.setItem(draftKey, JSON.stringify(data)); } catch (e) { /* private mode */ } },
+			clear() { try { localStorage.removeItem(draftKey); } catch (e) { /* private mode */ } },
+		};
 
 		function renderCompanions() {
 			// Ticket holders besides the contact (all of them when the contact does not attend).
 			const wanted = count() - (attends.checked ? 1 : 0);
 			while (companions.children.length < wanted) companions.appendChild(template.content.firstElementChild.cloneNode(true));
 			while (companions.children.length > wanted) companions.lastElementChild.remove();
+			const base = template.content.querySelector("[data-wp-companion-label]").textContent;
 			[...companions.children].forEach((row, i) => {
-				row.querySelector("[data-wp-companion-label]").textContent = `${template.content.querySelector("[data-wp-companion-label]").textContent} ${i + (attends.checked ? 2 : 1)}`;
+				row.querySelector("[data-wp-companion-label]").textContent = `${base} ${i + (attends.checked ? 2 : 1)}`;
 			});
 			$("[data-wp-companions-block]").hidden = wanted < 1;
 		}
@@ -83,6 +96,90 @@
 				});
 			}
 			return list;
+		}
+
+		// --- the draft: entries survive a reload or a closed dialog for 20 minutes -----------------------
+		const draftFields = ["contact_name", "contact_email", "qty", "is_company", "company", "vat_id", "billing_name",
+			"billing_email", "address_line1", "postcode", "city", "country", "phone"];
+		let saveTimer = null;
+		function saveDraft() {
+			if (order) return;
+			clearTimeout(saveTimer);
+			saveTimer = setTimeout(() => {
+				const fields = {};
+				for (const name of draftFields) {
+					const el = form.elements[name];
+					if (el) fields[name] = el.type === "checkbox" ? el.checked : el.value;
+				}
+				storage.set({ ts: Date.now(), holdId, step: current, attends: attends.checked, fields,
+					companions: [...companions.children].map((row) => ({
+						full_name: row.querySelector('[data-field="full_name"]').value,
+						email: row.querySelector('[data-field="email"]').value })) });
+			}, 400);
+		}
+		function restoreDraft() {
+			const draft = storage.get();
+			if (!draft) return false;
+			if (Date.now() - draft.ts > windowMs) { storage.clear(); return false; }
+			holdId = draft.holdId || holdId;
+			attends.checked = draft.attends !== false;
+			for (const [name, val] of Object.entries(draft.fields || {})) {
+				const el = form.elements[name];
+				if (!el) continue;
+				if (el.type === "checkbox") el.checked = !!val; else el.value = val;
+			}
+			if (toggle) { $("[data-wp-company]").hidden = !toggle.checked; form.elements.company.required = toggle.checked; }
+			renderCompanions();
+			(draft.companions || []).forEach((c, i) => {
+				const row = companions.children[i];
+				if (row) { row.querySelector('[data-field="full_name"]').value = c.full_name || ""; row.querySelector('[data-field="email"]').value = c.email || ""; }
+			});
+			current = Math.min(draft.step || 0, steps.length - 1);
+			return true;
+		}
+
+		// --- the hold: seats and their price for 20 minutes --------------------------------------------
+		function showHold(text, error) {
+			holdNote.hidden = !text;
+			holdNote.textContent = text || "";
+			holdNote.classList.toggle("wp-error", !!error);
+		}
+		async function hold() {
+			if (order) return;
+			const body = new FormData();
+			body.append("event", form.elements.event.value);
+			body.append("lang", form.elements.lang.value);
+			body.append("hold_id", holdId);
+			body.append("qty", String(holders().length || count()));
+			try {
+				const result = await post({ action: form.dataset.holdAction }, body);
+				if (!result.ok) {
+					expiresAt = 0;
+					showHold(holdNote.dataset.soldout, true);
+					return false;
+				}
+				expiresAt = result.expires;
+				if (!free && result.gross && Math.abs(result.gross - gross) > 0.001) {
+					// Another price row applies to this number of tickets (e.g. the early-bird quota is used up).
+					gross = result.gross;
+					form.dataset.priceTitle = result.price_title || "";
+				}
+				const until = new Date(expiresAt).toLocaleTimeString(locale, { hour: "2-digit", minute: "2-digit" });
+				showHold(holdNote.dataset.text.replace("{0}", until));
+				clearTimeout(holdTimer);
+				holdTimer = setTimeout(expire, Math.max(0, expiresAt - Date.now()));
+				return true;
+			} catch (error) {
+				return true; // the order re-checks everything; a failed hold must not block the visitor
+			}
+		}
+		function expire() {
+			if (order) return;
+			// Time is up: the entries are thrown away, seats and prices are checked again.
+			expiresAt = 0;
+			storage.clear();
+			resetForm();
+			showHold(holdNote.dataset.expired, true);
 		}
 
 		function show(index) {
@@ -124,9 +221,9 @@
 			}));
 			$("[data-wp-summary-email]").textContent = value("contact_email");
 			if (free) return;
-			const lines = [value("is_company") && toggle.checked ? value("company") : "", value("billing_name"),
+			const lines = [toggle && toggle.checked ? value("company") : "", value("billing_name"),
 				value("address_line1"), `${value("postcode")} ${value("city")}`, form.elements.country.selectedOptions[0]?.textContent || "",
-				value("vat_id") && toggle.checked ? value("vat_id") : ""].filter(Boolean);
+				toggle && toggle.checked ? value("vat_id") : ""].filter(Boolean);
 			$("[data-wp-summary-billing]").replaceChildren(...lines.flatMap((line, i) => (i ? [document.createElement("br"), line] : [line])));
 			const n = people.length;
 			const total = gross * n;
@@ -137,16 +234,38 @@
 			$("[data-wp-summary-total]").textContent = money.format(total);
 		}
 
-		qty.addEventListener("input", renderCompanions);
-		attends.addEventListener("change", renderCompanions);
+		function resetForm() {
+			form.reset();
+			order = null;
+			holdId = newId();
+			gross = parseFloat(form.dataset.gross || "0");
+			companions.replaceChildren();
+			if (toggle) $("[data-wp-company]").hidden = true;
+			$("[data-wp-steps]").hidden = false;
+			$("[data-wp-ticket-actions]").hidden = false;
+			$("[data-wp-ticket-success]").hidden = true;
+			$("[data-wp-consents-save]").disabled = false;
+			$("[data-wp-consents-status]").textContent = "";
+			back.disabled = false;
+			renderCompanions();
+			show(0);
+		}
+
+		qty.addEventListener("input", () => { renderCompanions(); hold(); });
+		attends.addEventListener("change", () => { renderCompanions(); hold(); });
+		form.addEventListener("input", saveDraft);
+		form.addEventListener("change", saveDraft);
 		if (toggle) {
 			toggle.addEventListener("change", () => {
 				$("[data-wp-company]").hidden = !toggle.checked;
 				form.elements.company.required = toggle.checked;
 			});
 		}
-		next.addEventListener("click", () => {
+		next.addEventListener("click", async () => {
 			if (!valid(steps[current])) return;
+			if (!expiresAt || Date.now() > expiresAt) {
+				if (!(await hold())) return;
+			}
 			if (current === 0 && !free) {
 				// The billing step starts with the contact's name and email.
 				for (const [field, source] of [["billing_name", "contact_name"], ["billing_email", "contact_email"]]) {
@@ -154,6 +273,7 @@
 				}
 			}
 			show(current + 1);
+			saveDraft();
 		});
 		back.addEventListener("click", () => show(current - 1));
 		form.querySelectorAll("[data-wp-goto]").forEach((button) => button.addEventListener("click", () => {
@@ -167,20 +287,36 @@
 		}));
 
 		wireDialog(ticketDialog, "tickets", () => {
-			if (order) return; // keep the thank-you panel after an order
-			renderCompanions();
-			show(0);
+			if (order) return;
+			const restored = !rows_started() && restoreDraft();
+			if (!restored) renderCompanions();
+			show(current);
+			hold().then(() => {
+				if (restored && expiresAt) showHold(`${holdNote.dataset.restored} ${holdNote.textContent}`);
+			});
+		});
+		function rows_started() {
+			return !!(value("contact_name") || value("contact_email"));
+		}
+		// After an order, closing the dialog starts afresh; before, the entries stay (and the draft).
+		ticketDialog.addEventListener("close", () => {
+			if (order) { storage.clear(); resetForm(); showHold(""); }
 		});
 
 		form.addEventListener("submit", async (event) => {
 			event.preventDefault();
 			if (current !== steps.length - 1) return next.click();
+			if (!expiresAt || Date.now() > expiresAt) {
+				if (!(await hold())) return;
+				renderSummary();
+			}
 			const people = holders();
 			const body = new FormData();
 			for (const name of ["event", "lang", "website"]) body.append(name, form.elements[name].value);
 			body.append("contact", JSON.stringify({ full_name: value("contact_name"), email: value("contact_email"), phone: value("phone") }));
 			body.append("attends", attends.checked ? "1" : "0");
 			body.append("companions", JSON.stringify(people.slice(attends.checked ? 1 : 0)));
+			body.append("hold_id", holdId);
 			if (!free) {
 				body.append("billing", JSON.stringify({
 					full_name: value("billing_name"), email: value("billing_email"), phone: value("phone"),
@@ -196,6 +332,9 @@
 			try {
 				const result = await post(form, body);
 				order = { reference: result.reference, token: result.token };
+				storage.clear();
+				clearTimeout(holdTimer);
+				showHold("");
 				steps.forEach((step) => (step.hidden = true));
 				$("[data-wp-steps]").hidden = true;
 				$("[data-wp-ticket-actions]").hidden = true;
@@ -227,12 +366,47 @@
 			try {
 				const result = await post({ action: form.dataset.consentAction }, body);
 				consentStatus.classList.remove("wp-error");
-				consentStatus.textContent = result.status === "confirmation_sent" ? consentStatus.dataset.optin : consentStatus.dataset.saved;
+				const optin = result.status === "confirmation_sent";
+				consentStatus.textContent = optin ? consentStatus.dataset.optin : consentStatus.dataset.saved;
+				// Done: close after the visitor could read the confirmation (longer when an email is on its way).
+				setTimeout(() => ticketDialog.open && ticketDialog.close(), optin ? 2500 : 1200);
 			} catch (error) {
 				button.disabled = false;
 				consentStatus.classList.add("wp-error");
 				consentStatus.textContent = error.message || consentStatus.dataset.failed;
 			}
+		});
+	}
+
+	// --- interest: Yes / Maybe / No, remembered in this browser ----------------------------------------
+	const interest = document.querySelector("[data-wp-interest]");
+	if (interest) {
+		const key = `wp-interest:${interest.dataset.event}`;
+		const read = () => { try { return localStorage.getItem(key); } catch (e) { return null; } };
+		const write = (v) => { try { localStorage.setItem(key, v); } catch (e) { /* private mode */ } };
+		const mark = (choice) => interest.querySelectorAll("[data-response]").forEach((b) =>
+			b.setAttribute("aria-pressed", b.dataset.response === choice ? "true" : "false"));
+		mark(read());
+		interest.addEventListener("click", async (event) => {
+			const button = event.target.closest("[data-response]");
+			if (!button) return;
+			const previous = read();
+			const response = button.dataset.response;
+			if (previous === response) return;
+			const body = new FormData();
+			body.append("event", interest.dataset.event);
+			body.append("lang", interest.dataset.lang);
+			body.append("response", response);
+			if (previous) body.append("previous", previous);
+			try {
+				const result = await post({ action: interest.dataset.action }, body);
+				write(response);
+				mark(response);
+				for (const [k, n] of Object.entries(result.counts || {})) {
+					const el = interest.querySelector(`[data-count="${k}"]`);
+					if (el) el.textContent = n;
+				}
+			} catch (error) { /* rate limit or offline: nothing to do */ }
 		});
 	}
 

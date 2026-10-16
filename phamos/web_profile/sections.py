@@ -728,6 +728,19 @@ LOADERS = {
 }
 
 
+def clear_section(section):
+	"""Drop the cached items of one section (both languages) and their search texts."""
+	frappe.local.web_profile_items = None
+	for lang in ("de", "en"):
+		for field in (f"{section}:{lang}", f"search:{section}:{lang}"):
+			frappe.cache.hdel(CACHE_KEY, field)
+
+
+def clear_events(*args, **kwargs):
+	"""doc_events hook for Attendee: seats and bookings on the event pages changed."""
+	clear_section("events")
+
+
 def clear_items(*args, **kwargs):
 	"""Drop the cached items (doc_events hook, e.g. after an Attendee changes the seats left)."""
 	frappe.local.web_profile_items = None
@@ -1045,7 +1058,7 @@ def build_profile(item, lang):
 	profile = {"facts": facts, "overview": " ".join(o for o in overview if o), "related": sections, "cta": cta,
 		"schema": schema, "key_people": key_people(item, lang),
 		# Events only (phamos.web_profile.events.build); empty for every other section.
-		"hero": None, "actions": [], "blocks": [], "ticket": None, "notice": None}
+		"hero": None, "actions": [], "blocks": [], "ticket": None, "notice": None, "interest": None}
 	if section == "events":
 		profile.update(extra)
 	return _dedupe(item, profile)

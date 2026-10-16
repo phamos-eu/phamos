@@ -18,7 +18,8 @@ from phamos.web_profile.sections import build_profile, find_item, get_items
 
 GROUP = "Events: Test Updates"
 ALLOWED_DATA = {"starts_on", "ends_on", "date_note", "when", "upcoming", "cancelled", "location", "city", "map_url",
-	"organizer", "stakeholders", "key_person", "speakers", "sponsors", "offer", "has_newsletter", "terms", "languages", "ics"}
+	"organizer", "stakeholders", "key_person", "speakers", "sponsors", "offer", "interest", "has_newsletter", "terms",
+	"languages", "ics"}
 CONTACT = json.dumps({"full_name": "Web Guest", "email": "web.guest@example.com"})
 COMPANIONS = json.dumps([{"full_name": "Plus One", "email": ""}])
 BILLING = json.dumps({"full_name": "Web Guest", "email": "web.guest@example.com", "address_line1": "Weg 1",
@@ -284,3 +285,45 @@ class TestWebProfileEvents(FrappeTestCase):
 		partner = find_item("partners", named.route, "en")
 		titles = [block["title"] for block in build_profile(partner, "en")["related"]]
 		self.assertIn("Events", titles)
+
+	def test_interest_counts(self):
+		frappe.set_user("Guest")
+		try:
+			self.assertEqual(web.interest(self.event.route, "en", "yes")["counts"], {"yes": 1, "maybe": 0, "no": 0})
+			self.assertEqual(web.interest(self.event.route, "en", "maybe", previous="yes")["counts"], {"yes": 0, "maybe": 1, "no": 0})
+			self.assertRaises(frappe.ValidationError, web.interest, self.event.route, "en", "perhaps")
+		finally:
+			frappe.set_user("Administrator")
+		reset_items()
+		self.assertEqual(self.item().data["interest"], {"yes": 0, "maybe": 1, "no": 0})
+		self.assertEqual(build_profile(self.item(), "en")["interest"]["maybe"], 1)
+
+	def test_bookings_shown_publicly(self):
+		from phamos.tests.marketing_fixtures import make_attendee
+
+		for i in range(3):
+			make_attendee(self.event.name, f"booked{i}@example.com")
+		reset_items()
+		item = self.item()
+		self.assertIn("3/20 booked", item.chips)
+		bookings = next(a for a in build_profile(item, "en")["actions"] if a.get("bookings"))
+		self.assertEqual((bookings["label"], bookings["percent"]), ("3 of 20 seats taken", 15))
+		self.event.reload()
+		self.event.show_bookings_publicly = 0
+		self.event.save()
+		reset_items()
+		self.assertFalse([a for a in build_profile(self.item(), "en")["actions"] if a.get("bookings")])
+		self.assertNotIn("3/20 booked", self.item().chips)
+
+	def test_hold_endpoint(self):
+		frappe.set_user("Guest")
+		try:
+			result = web.hold(self.event.route, "en", "hold-web-test-1", 2)
+			self.assertTrue(result["ok"])
+			self.assertGreater(result["expires"], frappe.utils.now_datetime().timestamp() * 1000)
+			self.assertRaises(frappe.ValidationError, web.hold, self.event.route, "en", "bad id!", 1)
+		finally:
+			frappe.set_user("Administrator")
+			from phamos.marketing import ticketing
+
+			frappe.cache.delete_value(ticketing._holds_key(self.event.name))

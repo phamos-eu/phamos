@@ -12,6 +12,7 @@ from contextlib import contextmanager
 
 import hashlib
 import hmac
+import time
 
 import frappe
 from frappe import _
@@ -45,8 +46,75 @@ def ticketing_session():
 		frappe.set_user("Guest")
 
 
-def seats_taken(event):
+# --- 20-minute holds: seats (and their price) reserved while a visitor fills in the order -------------
+
+HOLD_MINUTES = 20
+
+
+def _holds_key(event):
+	return f"event_holds:{event}"
+
+
+def active_holds(event, exclude=None):
+	"""{hold id: {qty, price_title, expires}} of unexpired holds; expired ones are removed on the way."""
+	now = time.time()
+	holds = {}
+	try:
+		raw = frappe.cache.hgetall(_holds_key(event))
+	except Exception:
+		return holds
+	for key, hold in raw.items():
+		key = key.decode() if isinstance(key, bytes) else key
+		if hold.get("expires", 0) < now:
+			frappe.cache.hdel(_holds_key(event), key)
+		elif key != exclude:
+			holds[key] = hold
+	return holds
+
+
+def held_seats(event, exclude=None, price_title=None):
+	return sum(cint(h.get("qty")) for h in active_holds(event, exclude).values()
+		if price_title is None or h.get("price_title") == price_title)
+
+
+def release_hold(event, hold_id):
+	if hold_id:
+		frappe.cache.hdel(_holds_key(event), hold_id)
+
+
+def hold_seats(event_doc, hold_id, qty):
+	"""Reserve ``qty`` seats (and the price that applies to them) for 20 minutes; renewed on every call.
+
+	Returns {ok, expires (ms since epoch), price_title, gross, spots_left, max_per_order} or {ok: False, reason}.
+	"""
+	qty = max(1, cint(qty))
+	is_open, reason = sale_state(event_doc, exclude_hold=hold_id)
+	if not is_open:
+		release_hold(event_doc.name, hold_id)
+		return {"ok": False, "reason": reason}
+	capacity = cint(event_doc.max_attendees)
+	taken = seats_taken(event_doc.name, exclude_hold=hold_id)
+	if capacity and taken + qty > capacity:
+		return {"ok": False, "reason": "sold_out", "spots_left": max(0, capacity - taken)}
+	pricing = billing.get_ticket_pricing(event_doc, qty, exclude_hold=hold_id) if event_doc.get("ticket_item") else None
+	if event_doc.get("ticket_item") and not pricing:
+		return {"ok": False, "reason": "sold_out"}
+	expires = time.time() + HOLD_MINUTES * 60
+	frappe.cache.hset(_holds_key(event_doc.name), hold_id, {"qty": qty, "expires": expires,
+		"price_title": pricing.price_title if pricing else None})
+	return {"ok": True, "expires": int(expires * 1000), "minutes": HOLD_MINUTES,
+		"price_title": pricing.price_title if pricing else None, "gross": pricing.gross if pricing else 0,
+		"spots_left": max(0, capacity - taken - qty) if capacity else None}
+
+
+def booked_seats(event):
+	"""Seats of registered attendees (no holds): what the page may show as "booked"."""
 	return frappe.db.count("Attendee", {"event": event, "status": ["in", SEAT_STATUSES]})
+
+
+def seats_taken(event, exclude_hold=None):
+	"""Booked seats plus the seats other visitors hold right now."""
+	return booked_seats(event) + held_seats(event, exclude=exclude_hold)
 
 
 def attendee_counts(event):
@@ -61,7 +129,7 @@ def attendee_counts(event):
 	}
 
 
-def sale_state(doc, now=None):
+def sale_state(doc, now=None, exclude_hold=None):
 	"""(open, reason): reason is None or one of closed, not_started, ended, sold_out, cancelled, no_price."""
 	now = get_datetime(now or now_datetime())
 	if doc.status == "Cancelled":
@@ -73,10 +141,10 @@ def sale_state(doc, now=None):
 	until = doc.get("ticket_sales_until") or doc.get("starts_on")
 	if until and now > get_datetime(until):
 		return False, "ended"
-	if cint(doc.max_attendees) and seats_taken(doc.name) >= cint(doc.max_attendees):
+	if cint(doc.max_attendees) and seats_taken(doc.name, exclude_hold) >= cint(doc.max_attendees):
 		return False, "sold_out"
-	if doc.get("ticket_item") and not billing.select_price(doc, 1, now):
-		ladder = billing.price_ladder(doc, now)
+	if doc.get("ticket_item") and not billing.select_price(doc, 1, now, exclude_hold=exclude_hold):
+		ladder = billing.price_ladder(doc, now, exclude_hold=exclude_hold)
 		if not ladder:
 			return False, "no_price"
 		if any(row.upcoming for row in ladder):
@@ -124,6 +192,8 @@ def offer(event_name):
 		spots_left=spots_left,
 		max_per_order=min(limit, spots_left if spots_left is not None else limit) or 0,
 		terms=doc.get("tc_name"),
+		booked=booked_seats(doc.name),
+		show_bookings=bool(cint(doc.get("show_bookings_publicly"))),
 	)
 
 
@@ -184,7 +254,7 @@ def _clean_billing(raw, contact):
 
 
 def register_attendees(event, contact, attends=True, companions=None, billing_data=None, source="Website", lang="de",
-		expected_total=None):
+		expected_total=None, hold_id=None):
 	"""Validate and book an order for ``event`` (Marketing Content name).
 
 	``contact``: the person who orders ({full_name | first_name + last_name, email, phone}); ``attends``:
@@ -196,12 +266,14 @@ def register_attendees(event, contact, attends=True, companions=None, billing_da
 	Returns {ok, reference, reference_doctype, attendees, paid, tickets_to, consent_token}.
 	"""
 	with ticketing_session():
-		return _register(event, contact, attends, companions, billing_data, source, lang, expected_total)
+		result = _register(event, contact, attends, companions, billing_data, source, lang, expected_total, hold_id)
+	release_hold(event, hold_id)
+	return result
 
 
-def _register(event, contact, attends, companions, billing_data, source, lang, expected_total):
+def _register(event, contact, attends, companions, billing_data, source, lang, expected_total, hold_id=None):
 	doc = frappe.get_doc("Marketing Content", event)
-	is_open, reason = sale_state(doc)
+	is_open, reason = sale_state(doc, exclude_hold=hold_id)
 	if not is_open:
 		frappe.throw(_("Sorry, registration for this event is not possible ({0}).").format(_(reason)))
 
@@ -220,11 +292,12 @@ def _register(event, contact, attends, companions, billing_data, source, lang, e
 		"status": ["!=", "Cancelled"]}, pluck="email") if emails else []
 	if existing:
 		frappe.throw(_("Already registered for this event: {0}").format(", ".join(existing)))
-	if cint(doc.max_attendees) and seats_taken(doc.name) + len(people) > cint(doc.max_attendees):
-		frappe.throw(_("Only {0} seats are left.").format(max(0, cint(doc.max_attendees) - seats_taken(doc.name))))
+	taken = seats_taken(doc.name, exclude_hold=hold_id)
+	if cint(doc.max_attendees) and taken + len(people) > cint(doc.max_attendees):
+		frappe.throw(_("Only {0} seats are left.").format(max(0, cint(doc.max_attendees) - taken)))
 
 	paid = bool(doc.get("ticket_item"))
-	pricing = billing.get_ticket_pricing(doc, len(people)) if paid else None
+	pricing = billing.get_ticket_pricing(doc, len(people), exclude_hold=hold_id) if paid else None
 	if paid and not pricing:
 		frappe.throw(_("There are not enough tickets left at one price for this order. Please order fewer tickets."))
 	if pricing and expected_total is not None and abs(flt(expected_total) - flt(pricing.gross * len(people), 2)) > 0.01:

@@ -13,7 +13,7 @@ import frappe
 from babel.dates import format_date, format_time
 from babel.numbers import format_currency
 from frappe import _
-from frappe.utils import get_datetime, get_system_timezone, get_url, getdate, now_datetime, nowdate
+from frappe.utils import cint, get_datetime, get_system_timezone, get_url, getdate, now_datetime, nowdate
 
 from phamos.web_profile.i18n import localized
 from phamos.web_profile.socials import normalize_url
@@ -21,7 +21,7 @@ from phamos.web_profile.utils import slugify
 
 FIELDS = ["name", "title", "subtitle", "event_type", "status", "date_note", "starts_on", "ends_on", "route", "image",
 	"location", "city", "map_link", "organizer_is_phamos", "organizer", "organizer_name", "organizer_logo",
-	"organizer_website_link", "contact_profile",
+	"organizer_website_link", "contact_profile", "going_count", "maybe_count", "not_going_count", "show_bookings_publicly",
 	"registration_open", "max_attendees", "ticket_item", "tc_name", "email_group"]
 DATE_FORMAT = {"de": "EEEE, d. MMMM y", "en": "EEEE, d MMMM y"}
 SHORT_DATE = {"de": "d. MMM y", "en": "d MMM y"}
@@ -130,6 +130,9 @@ def load_events(lang):
 		if r.city:
 			_facet(item, "city", slugify(r.city), r.city)
 		chip, badge = availability(r, offer)
+		if offer and cint(r.show_bookings_publicly) and cint(offer.get("booked")) and chip not in (_("Sold out"), _("Cancelled")):
+			capacity = cint(offer.get("capacity"))
+			chip = _("{0}/{1} booked").format(offer["booked"], capacity) if capacity else _("{0} booked").format(offer["booked"])
 		item["chips"] = [c for c in (_(r.event_type) if r.event_type else None, r.city, chip) if c]
 		if badge:
 			item["badge"] = badge
@@ -158,6 +161,8 @@ def load_events(lang):
 				"person_slug": person_slugs.get(s.person)} for s in speakers.get(r.name, [])],
 			"sponsors": event_sponsors,
 			"offer": _public_offer(offer, lang) if upcoming and r.status != "Cancelled" else None,
+			"interest": {"yes": cint(r.going_count), "maybe": cint(r.maybe_count), "no": cint(r.not_going_count)}
+				if upcoming and r.status != "Cancelled" else None,
 			"has_newsletter": bool(r.email_group) and upcoming,
 			"terms": r.tc_name,
 			"languages": sorted(r.texts),
@@ -222,6 +227,9 @@ def _public_offer(offer, lang):
 		"sale_open": offer["sale_open"], "reason": offer["reason"], "spots_left": offer["spots_left"],
 		"max_per_order": offer["max_per_order"],
 		"sale_until": _iso(offer["sale_until"]) if offer.get("sale_until") else None,
+		"capacity": offer.get("capacity"),
+		# Public booking count (setting on the event): attendees only, never names.
+		"booked": cint(offer.get("booked")) if offer.get("show_bookings") else None,
 	}
 
 
@@ -261,6 +269,12 @@ def build(item, lang):
 	if offer and offer["sale_open"]:
 		actions.append({"label": _("Register") if offer["free"] else _("Buy ticket"), "dialog": "tickets", "primary": True})
 		actions.append({"label": price_note(offer), "hint": True})
+	if offer and offer.get("booked"):
+		capacity = cint(offer.get("capacity"))
+		label = _("{0} of {1} seats taken").format(offer["booked"], capacity) if capacity else \
+			_("{0} registrations").format(offer["booked"])
+		actions.append({"label": label, "bookings": True,
+			"percent": min(100, round(100 * offer["booked"] / capacity)) if capacity else None})
 	elif offer and d["upcoming"]:
 		reason = {"sold_out": _("Sold out"), "not_started": _("Ticket sale has not started yet"),
 			"ended": _("Ticket sale has ended")}.get(offer.get("reason"))
@@ -316,7 +330,7 @@ def build(item, lang):
 	if d.get("languages") and lang not in d["languages"]:
 		notice = _("This event is described in English only.") if "en" in d["languages"] else _("This event is described in German only.")
 	return {"facts": facts, "overview": " ".join(overview), "schema": schema, "hero": hero, "actions": actions,
-		"blocks": blocks, "ticket": ticket, "notice": notice}
+		"blocks": blocks, "ticket": ticket, "notice": notice, "interest": d.get("interest")}
 
 
 def price_note(offer):

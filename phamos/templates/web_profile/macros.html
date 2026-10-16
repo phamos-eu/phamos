@@ -204,7 +204,8 @@
 {%- if actions %}
 <div class="wp-actions">
 	{%- for action in actions %}
-	{%- if action.hint %}<p class="wp-action-hint">{{ action.label | e }}</p>
+	{%- if action.bookings %}<div class="wp-bookings">{% if action.percent is not none %}<span class="wp-bookings-bar" aria-hidden="true"><span style="width: {{ action.percent }}%"></span></span>{% endif %}<span>{{ action.label | e }}</span></div>
+	{%- elif action.hint %}<p class="wp-action-hint">{{ action.label | e }}</p>
 	{%- elif action.note %}<span class="wp-chip wp-chip-value">{{ action.label | e }}</span>
 	{%- elif action.dialog %}<button type="button" class="wp-button{% if action.primary %} wp-button-primary{% endif %}" data-wp-dialog-open="{{ action.dialog }}" aria-haspopup="dialog">{{ action.label | e }}</button>
 	{%- else %}<a class="wp-button" href="{{ action.url | e }}"{% if action.download %} download{% endif %}>{{ action.label | e }}</a>{% endif %}
@@ -212,6 +213,21 @@
 	{%- if support_email and actions | selectattr("dialog") | list %}
 	<noscript><p class="wp-note">{{ _("Ordering needs JavaScript. Please write to {0} instead.").format('<a href="mailto:' ~ (support_email | e) ~ '">' ~ (support_email | e) ~ '</a>') }}</p></noscript>
 	{%- endif %}
+</div>
+{%- endif %}
+{%- endmacro %}
+
+{#- Anonymous interest before tickets are sold (phamos.marketing.web.interest): counts only. -#}
+{% macro interest_block(item, interest, lang) -%}
+{%- if interest %}
+<div class="wp-interest" data-wp-interest data-event="{{ item.slug | e }}" data-lang="{{ lang }}" data-action="/api/method/phamos.marketing.web.interest">
+	<p class="wp-interest-title">{{ _("Are you coming?") }}</p>
+	<div class="wp-interest-options" role="group" aria-label="{{ _('Are you coming?') }}">
+		{%- for key, label in [("yes", _("Yes")), ("maybe", _("Maybe")), ("no", _("No"))] %}
+		<button type="button" class="wp-chip wp-interest-option" data-response="{{ key }}" aria-pressed="false">{{ label }} <span class="wp-count" data-count="{{ key }}">{{ interest[key] }}</span></button>
+		{%- endfor %}
+	</div>
+	<p class="wp-legal">{{ _("Anonymous: we only count the answers.") }}</p>
 </div>
 {%- endif %}
 {%- endmacro %}
@@ -258,11 +274,17 @@
 	<form class="wp-contact-form wp-checkout" method="post" action="/api/method/phamos.marketing.web.order_tickets" data-wp-ticket-form novalidate
 		data-gross="{{ t.gross }}" data-currency="{{ t.currency or 'EUR' }}" data-free="{{ 1 if t.free else 0 }}" data-max="{{ t.max_per_order }}"
 		data-lang="{{ lang }}" data-tax-rate="{{ t.tax_rate }}" data-price-title="{{ (t.price_title or '') | e }}"
-		data-consent-action="/api/method/phamos.marketing.web.save_consents">
+		data-consent-action="/api/method/phamos.marketing.web.save_consents"
+		data-hold-action="/api/method/phamos.marketing.web.hold"
+		data-hold-minutes="20">
 		<div class="wp-dialog-head">
 			<h2 id="wp-ticket-title">{{ _("Register for {0}").format(item.title | e) if t.free else _("Tickets for {0}").format(item.title | e) }}</h2>
 			<button type="button" class="wp-icon-button" data-wp-dialog-close aria-label="{{ _('Close') }}">×</button>
 		</div>
+		<p class="wp-hold" data-wp-hold hidden data-text="{{ _('Your seats and price are reserved until {0}.') }}"
+			data-expired="{{ _('Time is up: seats and prices are checked again when you continue.') }}"
+			data-soldout="{{ _('Sorry, there are not enough seats left for this number of tickets.') }}"
+			data-restored="{{ _('Your entries from a moment ago were restored.') }}"></p>
 		<ol class="wp-steps" data-wp-steps>
 			<li data-wp-step-label="1" aria-current="step">{{ _("Tickets") }}</li>
 			{%- if not t.free %}<li data-wp-step-label="2">{{ _("Billing") }}</li>{% endif %}

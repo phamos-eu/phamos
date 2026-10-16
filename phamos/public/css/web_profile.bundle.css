@@ -491,3 +491,16 @@ body .footer-grouped-links .footer-child-item, body .footer-grouped-links .foote
 	.wp-summary-dl dd { margin-bottom: 8px; }
 	.wp-steps li { font-size: 12px; }
 }
+/* Round 3: public bookings, interest, 20-minute hold */
+.wp-bookings { display: flex; flex-direction: column; gap: 4px; margin: 0 0 4px; color: var(--wp-muted); font-size: 13px; text-align: center; }
+.wp-bookings-bar { display: block; height: 6px; border-radius: 999px; background: var(--wp-surface-3); overflow: hidden; }
+.wp-bookings-bar > span { display: block; height: 100%; border-radius: 999px; background: var(--wp-primary); }
+.wp-interest { margin: 4px 0 20px; display: flex; flex-direction: column; gap: 6px; }
+.wp-interest-title { margin: 0; font-weight: 600; font-size: 13px; }
+.wp-interest-options { display: flex; gap: 6px; }
+.wp-interest-option { flex: 1; justify-content: center; cursor: pointer; border: 1px solid var(--wp-line); background: var(--wp-surface); font: inherit; font-size: 13px; }
+.wp-interest-option[aria-pressed="true"] { background: var(--wp-primary); border-color: var(--wp-primary); color: var(--wp-on-primary); }
+.wp-interest-option[aria-pressed="true"] .wp-count { color: var(--wp-on-primary); }
+.wp-hold { margin: 0; padding: 6px 10px; border-radius: 8px; background: var(--wp-surface-2); color: var(--wp-ink-2); font-size: 12.5px; }
+.wp-hold.wp-error { background: #fdecea; color: #b42318; }
+.wp-hold[hidden] { display: none; }
