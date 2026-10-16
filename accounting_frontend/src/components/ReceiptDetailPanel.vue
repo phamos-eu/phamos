@@ -169,45 +169,44 @@
 				<table v-else class="w-full text-sm">
 					<thead>
 						<tr class="text-left text-[11px] uppercase tracking-wide text-ink-gray-5">
-							<th class="py-1 pr-2">Description</th>
-							<th class="w-44 py-1 pr-2">Category</th>
-							<th class="w-16 py-1 pr-2 text-right">Qty</th>
-							<th class="w-24 py-1 pr-2 text-right">Rate</th>
-							<th class="w-24 py-1 pr-2 text-right">Amount</th>
-							<th class="w-16 py-1 pr-2 text-right">Tax %</th>
+							<th class="py-1 pr-2">Description · category</th>
+							<th class="w-14 py-1 pr-2 text-right">Qty</th>
+							<th class="w-20 py-1 pr-2 text-right">Rate</th>
+							<th class="w-20 py-1 pr-2 text-right">Amount</th>
+							<th class="w-14 py-1 pr-2 text-right">Tax %</th>
 							<th class="w-6"></th>
 						</tr>
 					</thead>
 					<tbody>
 						<tr v-for="(item, i) in autosave.draft.items" :key="item.name || `new-${i}`" class="border-t border-outline-gray-1">
-							<td class="py-1 pr-2">
+							<td class="py-1 pr-2 align-top">
 								<input :value="item.item_name" :disabled="readonly" class="cell" @change="setItem(i, 'item_name', $event.target.value)" />
-							</td>
-							<td class="py-1 pr-2">
-								<select
-									:value="item.item_code || ''"
-									:disabled="readonly"
-									class="cell"
-									:title="accountLabel(item)"
-									@change="setItem(i, 'item_code', $event.target.value)"
-								>
-									<option value="">— choose —</option>
-									<option v-for="c in categories" :key="c.item_code" :value="c.item_code">{{ c.item_name }}</option>
-								</select>
-								<div class="truncate px-1 text-[11px]" :class="accountLabel(item) ? 'text-ink-gray-5' : 'text-ink-amber-3'">
-									{{ accountLabel(item) || "no account" }}
+								<div class="mt-0.5 flex min-w-0 items-center gap-2">
+									<select
+										:value="item.item_code || ''"
+										:disabled="readonly"
+										class="cell h-6 max-w-[14rem] text-xs"
+										:class="item.item_code ? '' : 'text-ink-amber-3'"
+										@change="setItem(i, 'item_code', $event.target.value)"
+									>
+										<option value="">— choose category —</option>
+										<option v-for="c in categories" :key="c.item_code" :value="c.item_code">{{ c.item_name }}</option>
+									</select>
+									<span class="truncate text-[11px]" :class="accountLabel(item) ? 'text-ink-gray-5' : 'text-ink-amber-3'" :title="accountLabel(item)">
+										{{ accountLabel(item) || "no account" }}
+									</span>
 								</div>
 							</td>
-							<td class="py-1 pr-2">
+							<td class="py-1 pr-2 align-top">
 								<input :value="item.qty" type="number" step="any" :disabled="readonly" class="cell text-right" @change="setItem(i, 'qty', $event.target.value)" />
 							</td>
-							<td class="py-1 pr-2">
+							<td class="py-1 pr-2 align-top">
 								<input :value="item.rate" type="number" step="0.01" :disabled="readonly" class="cell text-right" @change="setItem(i, 'rate', $event.target.value)" />
 							</td>
-							<td class="py-1 pr-2">
+							<td class="py-1 pr-2 align-top">
 								<input :value="item.amount" type="number" step="0.01" :disabled="readonly" class="cell text-right" @change="setItem(i, 'amount', $event.target.value)" />
 							</td>
-							<td class="py-1 pr-2">
+							<td class="py-1 pr-2 align-top">
 								<input :value="item.tax_rate" type="number" step="any" :disabled="readonly" class="cell text-right" @change="setItem(i, 'tax_rate', $event.target.value)" />
 							</td>
 							<td class="py-1 text-right">
@@ -217,7 +216,7 @@
 					</tbody>
 					<tfoot>
 						<tr class="border-t border-outline-gray-2 text-ink-gray-6">
-							<td class="py-1 pr-2" colspan="4">Lines total</td>
+							<td class="py-1 pr-2" colspan="3">Lines total</td>
 							<td class="py-1 pr-2 text-right tabular-nums" :class="linesMismatch ? 'text-ink-amber-3' : ''" :title="linesMismatch ? 'Differs from the net total' : ''">
 								{{ money(linesTotal) }}
 							</td>
