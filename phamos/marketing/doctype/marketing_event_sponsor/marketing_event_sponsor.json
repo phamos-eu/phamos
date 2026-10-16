@@ -1,0 +1,80 @@
+{
+ "actions": [],
+ "creation": "2026-06-08 11:57:28.166351",
+ "doctype": "DocType",
+ "editable_grid": 1,
+ "engine": "InnoDB",
+ "field_order": [
+  "published",
+  "stakeholder",
+  "sponsor_label",
+  "sponsor_name",
+  "logo",
+  "url",
+  "additional_information"
+ ],
+ "fields": [
+  {
+   "default": "0",
+   "fieldname": "published",
+   "fieldtype": "Check",
+   "in_list_view": 1,
+   "label": "Published"
+  },
+  {
+   "fieldname": "stakeholder",
+   "fieldtype": "Link",
+   "label": "Stakeholder",
+   "options": "Stakeholder Web Profile",
+   "in_list_view": 1,
+   "description": "Shown with logo and link to its profile when that profile is published and approved to be named."
+  },
+  {
+   "fieldname": "sponsor_label",
+   "fieldtype": "Data",
+   "label": "Sponsorship",
+   "in_list_view": 1,
+   "description": "Optional, e.g. Gold, Catering."
+  },
+  {
+   "fieldname": "sponsor_name",
+   "fieldtype": "Data",
+   "in_list_view": 0,
+   "label": "Sponsor Name",
+   "depends_on": "eval:!doc.stakeholder",
+   "description": "Legacy: only used without a Stakeholder."
+  },
+  {
+   "fieldname": "logo",
+   "fieldtype": "Attach Image",
+   "label": "Logo",
+   "depends_on": "eval:!doc.stakeholder",
+   "description": "Legacy: only used without a Stakeholder."
+  },
+  {
+   "fieldname": "url",
+   "fieldtype": "Data",
+   "in_list_view": 0,
+   "label": "URL",
+   "depends_on": "eval:!doc.stakeholder",
+   "description": "Legacy: only used without a Stakeholder."
+  },
+  {
+   "fieldname": "additional_information",
+   "fieldtype": "Text Editor",
+   "label": "Additional Information"
+  }
+ ],
+ "istable": 1,
+ "links": [],
+ "modified": "2026-10-17 09:00:00.000000",
+ "modified_by": "Administrator",
+ "module": "Marketing",
+ "name": "Marketing Event Sponsor",
+ "owner": "Administrator",
+ "permissions": [],
+ "row_format": "Dynamic",
+ "sort_field": "creation",
+ "sort_order": "DESC",
+ "states": []
+}

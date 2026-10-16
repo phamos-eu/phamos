@@ -313,3 +313,288 @@ Austria,Österreich
 Switzerland,Schweiz
 India,Indien
 Europe,Europa
+Events,Veranstaltungen
+"Workshops, meetups and webinars around ERPNext: where to meet phamos next, on site and online.","Workshops, Meetups und Webinare rund um ERPNext: wo Sie phamos als Nächstes treffen, vor Ort und online."
+Search events,Veranstaltungen durchsuchen
+When,Wann
+Upcoming,Demnächst
+Past,Vergangen
+All,Alle
+Type,Art
+City,Stadt
+Date,Datum
+event,Veranstaltung
+events,Veranstaltungen
+Workshop,Workshop
+Conference,Konferenz
+Webinar,Webinar
+Training,Schulung
+Meetup,Meetup
+Hackathon,Hackathon
+Team Building,Teambuilding
+Seminar,Seminar
+Networking,Networking
+Product Launch,Produktvorstellung
+Town Hall,Town Hall
+Social Event,Gesellschaftliches Event
+Free,Kostenlos
+Tickets available,Tickets verfügbar
+Sold out,Ausverkauft
+Cancelled,Abgesagt
+Ticket sale opens soon,Ticketverkauf startet bald
+Ticket sale has not started yet,Der Ticketverkauf hat noch nicht begonnen
+Ticket sale has ended,Der Ticketverkauf ist beendet
+Buy ticket,Ticket kaufen
+Register,Anmelden
+Keep me posted,Auf dem Laufenden bleiben
+Add to calendar,Zum Kalender hinzufügen
+Speakers,Referentinnen und Referenten
+Sponsors,Sponsoren
+Time,Uhrzeit
+Venue,Veranstaltungsort
+Price,Preis
+{0} incl. VAT,{0} inkl. MwSt.
+Seats left,Freie Plätze
+Organizer,Veranstalter
+More events,Weitere Veranstaltungen
+Other upcoming events by phamos.,Weitere anstehende Veranstaltungen von phamos.
+Your contact for this event,Ihre Ansprechperson für diese Veranstaltung
+This event has been cancelled.,Diese Veranstaltung wurde abgesagt.
+This event is described in English only.,Diese Veranstaltung ist nur auf Englisch beschrieben.
+This event is described in German only.,Diese Veranstaltung ist nur auf Deutsch beschrieben.
+"Thank you, your email address is confirmed. You will receive the updates.","Danke, Ihre E-Mail-Adresse ist bestätigt. Sie erhalten die Neuigkeiten."
+Register for {0},Anmeldung zu {0}
+Tickets for {0},Tickets für {0}
+Tickets,Tickets
+Number of tickets,Anzahl Tickets
+Name,Name
+Email,E-Mail
+Billing address,Rechnungsadresse
+Every order is invoiced. The invoice goes to this address.,Jede Bestellung wird in Rechnung gestellt. Die Rechnung geht an diese Adresse.
+Order as a company,Als Firma bestellen
+VAT ID (optional),USt-IdNr. (optional)
+Email for the invoice,E-Mail für die Rechnung
+Street and number,Straße und Hausnummer
+Postcode,PLZ
+Country,Land
+Your order,Ihre Bestellung
+incl. {0} % VAT,inkl. {0} % MwSt.
+Total,Gesamt
+I accept the terms and conditions of this event.,Ich akzeptiere die Teilnahmebedingungen dieser Veranstaltung.
+Read the terms,Bedingungen lesen
+I agree that phamos stores my details and those of the ticket holders to handle this order.,"Ich bin einverstanden, dass phamos meine Angaben und die der Ticketinhaber zur Abwicklung dieser Bestellung speichert."
+Keep me posted about this event by email (optional; you confirm your address first).,Neuigkeiten zu dieser Veranstaltung per E-Mail (optional; Sie bestätigen Ihre Adresse zuerst).
+Other attendees may contact me after the event (optional).,Andere Teilnehmende dürfen mich nach der Veranstaltung kontaktieren (optional).
+My name and company may be listed publicly as attendee (optional).,Mein Name und meine Firma dürfen öffentlich als Teilnehmende genannt werden (optional).
+Order with obligation to pay,Zahlungspflichtig bestellen
+Your order could not be sent. Please try again later.,Ihre Bestellung konnte nicht gesendet werden. Bitte versuchen Sie es später erneut.
+Please fill in all required fields with valid values and accept the terms and the privacy policy.,Bitte füllen Sie alle Pflichtfelder korrekt aus und akzeptieren Sie die Bedingungen und die Datenschutzerklärung.
+Thank you!,Vielen Dank!
+Your reference:,Ihre Referenz:
+You are registered. A confirmation is on its way to your inbox.,Sie sind angemeldet. Eine Bestätigung ist unterwegs in Ihr Postfach.
+phamos confirms your order by email and sends you the invoice.,phamos bestätigt Ihre Bestellung per E-Mail und sendet Ihnen die Rechnung.
+"We send you updates about {0}: schedule, reminders and follow-up material. You confirm your address by email first.","Wir senden Ihnen Neuigkeiten zu {0}: Ablauf, Erinnerungen und Material danach. Sie bestätigen Ihre Adresse zuerst per E-Mail."
+I agree that phamos stores my email address to send me these updates. I can unsubscribe at any time.,"Ich bin einverstanden, dass phamos meine E-Mail-Adresse für diese Neuigkeiten speichert. Ich kann mich jederzeit abmelden."
+Send confirmation email,Bestätigungs-E-Mail senden
+Almost done: please confirm with the link we just sent you.,"Fast geschafft: Bitte bestätigen Sie über den Link, den wir Ihnen gerade gesendet haben."
+This address already receives the updates.,Diese Adresse erhält die Neuigkeiten bereits.
+That did not work. Please try again later.,Das hat nicht geklappt. Bitte versuchen Sie es später erneut.
+Please enter a valid email address and tick the consent box.,Bitte geben Sie eine gültige E-Mail-Adresse ein und setzen Sie den Haken bei der Einwilligung.
+Ordering needs JavaScript. Please write to {0} instead.,Die Bestellung benötigt JavaScript. Bitte schreiben Sie stattdessen an {0}.
+This event is not available.,Diese Veranstaltung ist nicht verfügbar.
+Ticket sales for this event are closed.,Der Ticketverkauf für diese Veranstaltung ist geschlossen.
+Please add at least one ticket holder.,Bitte geben Sie mindestens einen Ticketinhaber an.
+At most {0} tickets per order.,Höchstens {0} Tickets pro Bestellung.
+Please enter the full name of every ticket holder.,Bitte geben Sie den vollständigen Namen jedes Ticketinhabers an.
+Every ticket needs its own email address.,Jedes Ticket braucht eine eigene E-Mail-Adresse.
+Please fill in the billing details.,Bitte füllen Sie die Rechnungsdaten aus.
+Please fill in: {0},Bitte ausfüllen: {0}
+Please enter the company name for the invoice.,Bitte geben Sie den Firmennamen für die Rechnung an.
+Please enter a valid VAT ID (e.g. DE123456789) or leave it empty.,Bitte geben Sie eine gültige USt-IdNr. ein (z. B. DE123456789) oder lassen Sie das Feld leer.
+Please choose a country.,Bitte wählen Sie ein Land.
+Please accept the terms and the privacy policy.,Bitte akzeptieren Sie die Bedingungen und die Datenschutzerklärung.
+The number of tickets does not match the ticket holders.,Die Anzahl der Tickets passt nicht zu den Ticketinhabern.
+This event has no updates by email.,Für diese Veranstaltung gibt es keine Neuigkeiten per E-Mail.
+Please agree that we store your email address for these updates.,"Bitte stimmen Sie zu, dass wir Ihre E-Mail-Adresse für diese Neuigkeiten speichern."
+Only {0} seats are left.,Es sind nur noch {0} Plätze frei.
+Already registered for this event: {0},Bereits für diese Veranstaltung angemeldet: {0}
+Your registration {0} for {1},Ihre Anmeldung {0} für {1}
+Thank you for your registration for {0}.,Vielen Dank für Ihre Anmeldung zu {0}.
+Reference,Referenz
+Total incl. VAT: {0},Gesamt inkl. MwSt.: {0}
+We confirm your order and send you the invoice by email. Your tickets are valid once the invoice is paid.,"Wir bestätigen Ihre Bestellung und senden Ihnen die Rechnung per E-Mail. Ihre Tickets gelten, sobald die Rechnung bezahlt ist."
+Your registration is confirmed. We look forward to seeing you.,Ihre Anmeldung ist bestätigt. Wir freuen uns auf Sie.
+"If something is wrong or you cannot come, simply reply to this email.","Wenn etwas nicht stimmt oder Sie nicht kommen können, antworten Sie einfach auf diese E-Mail."
+Billing,Rechnung
+Review and order,Prüfen und bestellen
+Review and register,Prüfen und anmelden
+I attend myself,Ich nehme selbst teil
+All tickets and information go to your email address. Add an email for a ticket holder only if they should receive it directly.,"Alle Tickets und Informationen gehen an Ihre E-Mail-Adresse. Geben Sie eine E-Mail für einen Ticketinhaber nur an, wenn er sie direkt erhalten soll."
+Ticket holder,Ticketinhaber
+Email (optional),E-Mail (optional)
+Name on the invoice,Name auf der Rechnung
+Review,Prüfen
+Event,Veranstaltung
+Change,Ändern
+Tickets and information to,Tickets und Informationen an
+Payment,Zahlung
+By invoice. You receive the invoice by email and pay within 14 days of the invoice date.,Auf Rechnung. Sie erhalten die Rechnung per E-Mail und zahlen innerhalb von 14 Tagen ab Rechnungsdatum.
+"By clicking ""Order with obligation to pay"" you place a binding order. Our {0} apply.","Mit Klick auf „Zahlungspflichtig bestellen"" geben Sie eine verbindliche Bestellung ab. Es gelten unsere {0}."
+terms and conditions,Teilnahmebedingungen
+There is no right of withdrawal for tickets to leisure events on a specific date (§ 312g (2) no. 9 BGB).,Für Tickets zu Freizeitveranstaltungen mit festem Termin besteht kein Widerrufsrecht (§ 312g Abs. 2 Nr. 9 BGB).
+"By clicking ""Register"" your registration is binding.","Mit Klick auf „Anmelden"" ist Ihre Anmeldung verbindlich."
+Our {0} apply.,Es gelten unsere {0}.
+We use your details and those of the ticket holders only to handle this order and the event.,Wir verwenden Ihre Angaben und die der Ticketinhaber nur zur Abwicklung dieser Bestellung und der Veranstaltung.
+About the order process,Hinweise zum Bestellvorgang
+"You can correct your entries with ""Back"" or ""Change"" until you order. The contract language is German or English. We store the contract text and send it to you with the order confirmation, including the terms and conditions.","Bis zur Bestellung können Sie Ihre Angaben mit „Zurück"" oder „Ändern"" korrigieren. Vertragssprache ist Deutsch oder Englisch. Wir speichern den Vertragstext und senden ihn Ihnen mit der Bestellbestätigung, einschließlich der Teilnahmebedingungen."
+Terms and conditions,Teilnahmebedingungen
+Back,Zurück
+Continue,Weiter
+The confirmation is on its way to {0}.,Die Bestätigung ist unterwegs an {0}.
+The invoice follows by email.,Die Rechnung folgt per E-Mail.
+Three optional questions,Drei freiwillige Fragen
+"Your order is complete. If you like, tell us what else we may do. You can change this at any time.","Ihre Bestellung ist abgeschlossen. Wenn Sie möchten, sagen Sie uns, was wir darüber hinaus dürfen. Sie können das jederzeit ändern."
+Updates about this event by email,Neuigkeiten zu dieser Veranstaltung per E-Mail
+"Schedule, reminders and material afterwards. You confirm your address with a link first.","Ablauf, Erinnerungen und Material danach. Sie bestätigen Ihre Adresse zuerst über einen Link."
+Other attendees may contact me,Andere Teilnehmende dürfen mich kontaktieren
+"After the event, phamos passes on requests from other attendees. Your email address is never shown.",Nach der Veranstaltung leitet phamos Anfragen anderer Teilnehmender an Sie weiter. Ihre E-Mail-Adresse wird nie angezeigt.
+List me as attendee,Mich als Teilnehmende nennen
+Your name and company may appear in the list of attendees on the event page.,Ihr Name und Ihre Firma dürfen in der Teilnehmerliste auf der Veranstaltungsseite erscheinen.
+Save,Speichern
+"No, thanks","Nein, danke"
+"Hello {0},","Hallo {0},"
+"Hello,","Hallo,"
+thank you for your order. We have received it and hereby accept it. This email confirms your binding order of tickets for {0}.,vielen Dank für Ihre Bestellung. Wir haben sie erhalten und nehmen sie hiermit an. Diese E-Mail bestätigt Ihre verbindliche Bestellung von Tickets für {0}.
+thank you for your registration for {0}. Your place is confirmed.,vielen Dank für Ihre Anmeldung zu {0}. Ihr Platz ist bestätigt.
+All tickets and information about the event are sent to {0}.,Alle Tickets und Informationen zur Veranstaltung gehen an {0}.
+incl. {0},inkl. {0}
+Total incl. VAT,Gesamt inkl. MwSt.
+by invoice. You receive the invoice by email; please pay within 14 days of the invoice date.,auf Rechnung. Sie erhalten die Rechnung per E-Mail; bitte zahlen Sie innerhalb von 14 Tagen ab Rechnungsdatum.
+Right of withdrawal,Widerrufsrecht
+"There is no right of withdrawal for tickets to leisure events on a specific date (§ 312g (2) no. 9 BGB). If you cannot attend, please reply to this email.","Für Tickets zu Freizeitveranstaltungen mit festem Termin besteht kein Widerrufsrecht (§ 312g Abs. 2 Nr. 9 BGB). Wenn Sie nicht teilnehmen können, antworten Sie bitte auf diese E-Mail."
+Add the event to your calendar with the attached file.,Mit der angehängten Datei tragen Sie die Veranstaltung in Ihren Kalender ein.
+Event page,Veranstaltungsseite
+Questions or changes? Simply reply to this email.,Fragen oder Änderungen? Antworten Sie einfach auf diese E-Mail.
+The terms and conditions of this event are attached to this email.,Die Teilnahmebedingungen dieser Veranstaltung sind dieser E-Mail angehängt.
+The terms and conditions of this event are printed below.,Die Teilnahmebedingungen dieser Veranstaltung stehen unten.
+{0}: {1} in {2}.,{0}: {1} in {2}.
+online,online
+{0}: {1}.,{0}: {1}.
+{0} until {1},{0} bis {1}
+{0} left at this price,noch {0} zu diesem Preis
+then {0},danach {0}
+{0} seats left,noch {0} Plätze frei
+Invalid request.,Ungültige Anfrage.
+Please enter the full name: {0},Bitte geben Sie den vollständigen Namen an: {0}
+Ticket holder {0},Ticketinhaber {0}
+This link has expired. You can still subscribe on the event page.,Dieser Link ist abgelaufen. Sie können sich weiterhin auf der Veranstaltungsseite anmelden.
+This event has no date yet.,Für diese Veranstaltung gibt es noch keinen Termin.
+Please enter a name for every ticket.,Bitte geben Sie für jedes Ticket einen Namen an.
+"Sorry, registration for this event is not possible ({0}).",Eine Anmeldung zu dieser Veranstaltung ist leider nicht möglich ({0}).
+Two tickets have the same email address. Leave the email of a companion empty instead.,Zwei Tickets haben dieselbe E-Mail-Adresse. Lassen Sie die E-Mail einer Begleitperson stattdessen leer.
+There are not enough tickets left at one price for this order. Please order fewer tickets.,Für diese Bestellung sind zu einem Preis nicht mehr genug Tickets übrig. Bitte bestellen Sie weniger Tickets.
+The ticket price has changed in the meantime ({0}). Please check your order again.,Der Ticketpreis hat sich inzwischen geändert ({0}). Bitte prüfen Sie Ihre Bestellung erneut.
+Price changed,Preis geändert
+Tickets and information go to {0}.,Tickets und Informationen gehen an {0}.
+Order confirmation {0}: {1},Bestellbestätigung {0}: {1}
+Terms,AGB
+Please add at least one ticket price (Tickets & Sales tab).,Bitte legen Sie mindestens einen Ticketpreis an (Reiter Tickets & Verkauf).
+Tickets can only be sold for events with a start date.,Tickets können nur für Veranstaltungen mit Starttermin verkauft werden.
+Every ticket price needs its own title.,Jeder Ticketpreis braucht eine eigene Bezeichnung.
+Row {0}: the ticket price must be greater than 0.,Zeile {0}: Der Ticketpreis muss größer als 0 sein.
+Row {0}: the price ends before it starts.,"Zeile {0}: Der Preis endet, bevor er beginnt."
+Events {0} sponsors or organizes.,"Veranstaltungen, die {0} unterstützt oder ausrichtet."
+Follow-up {0}: {1},Nachfassen {0}: {1}
+Created from attendee {0} of {1}.,Aus Teilnehmenden {0} von {1} erstellt.
+Ticket {0},Ticket {0}
+Ticket for {0},Ticket für {0}
+Please fill in the marked fields.,Bitte füllen Sie die markierten Felder aus.
+Saved. Thank you!,Gespeichert. Danke!
+Saved. Please confirm your email with the link we just sent you.,"Gespeichert. Bitte bestätigen Sie Ihre E-Mail über den Link, den wir Ihnen gerade gesendet haben."
+Are you coming?,Kommen Sie?
+Yes,Ja
+Maybe,Vielleicht
+No,Nein
+Anonymous: we only count the answers.,Anonym: Wir zählen nur die Antworten.
+Your seats and price are reserved until {0}.,Ihre Plätze und Ihr Preis sind bis {0} Uhr für Sie reserviert.
+Time is up: seats and prices are checked again when you continue.,Die Zeit ist abgelaufen: Plätze und Preise werden beim Weitermachen neu geprüft.
+"Sorry, there are not enough seats left for this number of tickets.",Leider sind für diese Anzahl Tickets nicht mehr genug Plätze frei.
+Your entries from a moment ago were restored.,Ihre Angaben von eben wurden wiederhergestellt.
+{0}/{1} booked,{0}/{1} gebucht
+{0} booked,{0} gebucht
+{0} of {1} seats taken,{0} von {1} Plätzen vergeben
+{0} registrations,{0} Anmeldungen
+Show bookings on the website,Buchungen auf der Website zeigen
+Add person,Person hinzufügen
+You,Sie
+Remove,Entfernen
+Register for free,Kostenlos anmelden
+Buy from {0},Kaufen ab {0}
+incl. VAT,inkl. MwSt.
+Create reminder,Erinnerung erstellen
+{0} left,noch {0}
+anonymous,anonym
+Reserved for you,Für Sie reserviert
+Time is up. Seats and prices are checked again.,Die Zeit ist abgelaufen. Plätze und Preise werden neu geprüft.
+Not enough seats left for this number of tickets.,Für diese Anzahl Tickets sind nicht mehr genug Plätze frei.
+Entries restored.,Eingaben wiederhergestellt.
+Tickets go to your email unless you add one for a person.,"Die Tickets gehen an Ihre E-Mail-Adresse, außer Sie geben für eine Person eine eigene an."
+Event date,Termin
+Tickets to,Tickets an
+Order: {0},Bestellung: {0}
+Order number,Bestellnummer
+Registration: {0},Anmeldung: {0}
+Pos.,Pos.
+Description,Bezeichnung
+Qty,Menge
+Unit price,Einzelpreis
+Amount,Betrag
+Net,Netto
+VAT {0} %,MwSt. {0} %
+Change tickets,Tickets ändern
+"Payment by invoice, due within 14 days.","Zahlung per Rechnung, fällig innerhalb von 14 Tagen."
+"Clicking ""Order with obligation to pay"" places a binding order under our {0}. No right of withdrawal: the event is on a fixed date (§ 312g (2) no. 9 BGB).",Mit Klick auf „Zahlungspflichtig bestellen“ bestellen Sie verbindlich zu unseren {0}. Kein Widerrufsrecht: Die Veranstaltung findet an einem festen Termin statt (§ 312g Abs. 2 Nr. 9 BGB).
+"Clicking ""Register"" makes your registration binding.",Mit Klick auf „Anmelden“ melden Sie sich verbindlich an.
+"Correct your entries with ""Back"" or ""Change"" until you order. Contract language: German or English. We store the contract text and email it to you with the terms.",Bis zur Bestellung können Sie Ihre Eingaben mit „Zurück“ oder „Ändern“ korrigieren. Vertragssprache: Deutsch oder Englisch. Wir speichern den Vertragstext und senden ihn Ihnen mit den AGB per E-Mail.
+Print,Drucken
+Confirmation sent to {0}.,Bestätigung an {0} gesendet.
+Optional,Optional
+Event updates by email,Neuigkeiten zur Veranstaltung per E-Mail
+"Schedule, reminders, material. You confirm by link first.","Ablauf, Erinnerungen, Unterlagen. Sie bestätigen zuerst per Link."
+Through phamos. Your email stays hidden.,Über phamos. Ihre E-Mail-Adresse bleibt verborgen.
+Name and company on the event page.,Name und Firma auf der Veranstaltungsseite.
+Saved. Please confirm your email with the link we sent you.,"Gespeichert. Bitte bestätigen Sie Ihre E-Mail-Adresse über den Link, den wir Ihnen geschickt haben."
+"Schedule, reminders and material for {0}. You confirm by email first.","Ablauf, Erinnerungen und Unterlagen zu {0}. Sie bestätigen zuerst per E-Mail."
+phamos may store my email for these updates. Unsubscribe any time.,phamos darf meine E-Mail-Adresse für diese Neuigkeiten speichern. Abmeldung jederzeit möglich.
+Almost done: please confirm with the link we sent you.,"Fast geschafft: Bitte bestätigen Sie über den Link, den wir Ihnen geschickt haben."
+Up to three dates. You get a calendar file with one reminder each.,Bis zu drei Termine. Sie erhalten eine Kalenderdatei mit je einer Erinnerung.
+Reminder {0},Erinnerung {0}
+Download calendar file,Kalenderdatei herunterladen
+Please pick at least one date before the event.,Bitte wählen Sie mindestens einen Termin vor der Veranstaltung.
+Reminder: {0},Erinnerung: {0}
+reminder,erinnerung
+Subscription confirmed,Anmeldung bestätigt
+"You will receive updates about {0}: schedule, reminders and material.","Sie erhalten Neuigkeiten zu {0}: Ablauf, Erinnerungen und Unterlagen."
+Your email address is confirmed. You will receive the updates.,Ihre E-Mail-Adresse ist bestätigt. Sie erhalten die Neuigkeiten.
+Every email has a link to unsubscribe.,Jede E-Mail enthält einen Link zur Abmeldung.
+Back to the event,Zurück zur Veranstaltung
+All events,Alle Veranstaltungen
+Ticket,Ticket
+"You receive all tickets. With an email, a person also gets their own.",Sie erhalten alle Tickets. Mit E-Mail-Adresse bekommt eine Person zusätzlich ihr eigenes.
+You receive all tickets. Ticket holders with an email address listed above also receive their own ticket.,Sie erhalten alle Tickets. Ticketinhaber mit oben genannter E-Mail-Adresse erhalten zusätzlich ihr eigenes Ticket.
+Your ticket for {0},Ihr Ticket für {0}
+{0} booked a ticket for you for {1}.,{0} hat für Sie ein Ticket für {1} gebucht.
+Here is your ticket for {0}.,Hier ist Ihr Ticket für {0}.
+Questions? Simply reply to this email.,Fragen? Antworten Sie einfach auf diese E-Mail.
+You receive this email because your email address was given for this ticket.,"Sie erhalten diese E-Mail, weil Ihre E-Mail-Adresse für dieses Ticket angegeben wurde."
+You will receive this by email.,Sie erhalten diese Bestellung auch per E-Mail.
+Pick up to three. You get one calendar file.,Bis zu drei wählen. Sie erhalten eine Kalenderdatei.
+Before the event,Vor der Veranstaltung
+Own date,Eigener Termin
+{0} of 3 selected,{0} von 3 gewählt
+Please pick dates before the event.,Bitte wählen Sie Termine vor der Veranstaltung.
+6 weeks before,6 Wochen vorher
+4 weeks before,4 Wochen vorher
+2 weeks before,2 Wochen vorher
+The event is less than two weeks away. Pick your own date.,Die Veranstaltung ist weniger als zwei Wochen entfernt. Wählen Sie einen eigenen Termin.
+Period,Zeitraum

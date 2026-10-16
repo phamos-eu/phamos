@@ -4,3 +4,4 @@ Mailcow Integration
 Gitlab Integration
 Bookstack Integration
 Cockpits
+Marketing

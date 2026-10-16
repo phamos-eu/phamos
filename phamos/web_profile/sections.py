@@ -15,6 +15,7 @@ import frappe
 from frappe import _
 from frappe.utils import getdate
 
+from phamos.web_profile.events import load_events, month_span
 from phamos.web_profile.i18n import localized
 from phamos.web_profile.icons import flag_url, module_icon
 from phamos.web_profile.socials import detect_platform, normalize_url, social_link
@@ -145,6 +146,25 @@ SECTIONS = {
 }
 
 # Website sections backed by the Stakeholder Web Profile (one per stakeholder type).
+SECTIONS["events"] = {
+	"doctype": "Marketing Content",
+	"slugs": {"en": "events", "de": "veranstaltungen"},
+	"title": "Events",
+	"intro": "Workshops, meetups and webinars around ERPNext: where to meet phamos next, on site and online.",
+	"noun": ("event", "events"),
+	"search_placeholder": "Search events",
+	"facets": [
+		{"key": "when", "label": "When", "type": "toggle", "default": "upcoming",
+			"options": [("upcoming", "Upcoming"), ("past", "Past"), ("all", "All")]},
+		{"key": "event_type", "label": "Type", "type": "multi"},
+		{"key": "city", "label": "City", "type": "multi"},
+		# Months as numbers (year * 12 + month - 1), shown as "Okt. 2026"; the span is a calendar window
+		# that follows the When toggle (events.month_span).
+		{"key": "month", "label": "Period", "type": "range", "format": "month", "bounds": "view", "span": month_span},
+	],
+	"sorts": [("date", "Date"), ("name", "Name A–Z")],
+}
+
 STAKEHOLDER_SECTIONS = ("customers", "partners")
 
 
@@ -707,7 +727,27 @@ LOADERS = {
 	"industries": load_industries,
 	"customers": lambda lang: load_stakeholders("customers", lang),
 	"partners": lambda lang: load_stakeholders("partners", lang),
+	"events": load_events,
 }
+
+
+def clear_section(section):
+	"""Drop the cached items of one section (both languages) and their search texts."""
+	frappe.local.web_profile_items = None
+	for lang in ("de", "en"):
+		for field in (f"{section}:{lang}", f"search:{section}:{lang}"):
+			frappe.cache.hdel(CACHE_KEY, field)
+
+
+def clear_events(*args, **kwargs):
+	"""doc_events hook for Attendee: seats and bookings on the event pages changed."""
+	clear_section("events")
+
+
+def clear_items(*args, **kwargs):
+	"""Drop the cached items (doc_events hook, e.g. after an Attendee changes the seats left)."""
+	frappe.local.web_profile_items = None
+	frappe.cache.delete_value(CACHE_KEY)
 
 
 # --- profile pages --------------------------------------------------------------------------------
@@ -799,6 +839,8 @@ def key_people(item, lang):
 			(p for p in get_items("people", lang) if p.slug in item.data.get("people", [])), None)
 		add(contact, " · ".join(filter(None, [_("Key contact"), item.title])))
 		add(_person_by_employee(item.data.get("account_manager"), lang), _("Account manager · phamos"))
+	elif section == "events":
+		add(_person_by_name(item.data.get("key_person"), lang), _("Your contact for this event"))
 	else:  # modules, industries
 		add(_person_by_name(item.data.get("key_person"), lang), _("Your contact"))
 
@@ -987,11 +1029,23 @@ def build_profile(item, lang):
 			"people", slugs=item.data.get("people", []))
 		add_related(_("Implementations"), _("Projects phamos delivered for this customer.") if item.masked
 			else _("Projects phamos delivered for {0}.").format(item.title), "implementations", slugs=item.data["projects"])
+		if not item.masked:
+			# Events this stakeholder sponsors or organizes (only named stakeholders are linked from events).
+			event_slugs = [e.slug for e in get_items("events", lang) if item.name in e.data.get("stakeholders", [])]
+			add_related(_("Events"), _("Events {0} sponsors or organizes.").format(item.title), "events", slugs=event_slugs)
 		if item.data.get("industry"):
 			add_related((_("More partners in {0}") if partner else _("More customers in {0}")).format(industry),
 				_("Other companies in the same industry that work with phamos."),
 				section, facet="industry", values=[item.data["industry"][0]], exclude=item.slug)
 		schema = None if item.masked else {"@type": "Organization", "name": item.title, "url": item.data.get("website") or None}
+
+	elif section == "events":
+		from phamos.web_profile.events import build as build_event
+
+		extra = build_event(item, lang)
+		facts, overview, schema = extra.pop("facts"), [extra.pop("overview")], extra.pop("schema")
+		add_related(_("More events"), _("Other upcoming events by phamos."), "events", facet="when",
+			values=["upcoming"], exclude=item.slug)
 
 	else:  # industries
 		overview = [_("phamos introduces ERPNext for companies in {0}.").format(item.title)]
@@ -1004,8 +1058,13 @@ def build_profile(item, lang):
 		schema = {"@type": "Thing", "name": item.title}
 
 	facts = [f for f in facts if f.get("value") or f.get("links")]
-	return _dedupe(item, {"facts": facts, "overview": " ".join(overview), "related": sections, "cta": cta,
-		"schema": schema, "key_people": key_people(item, lang)})
+	profile = {"facts": facts, "overview": " ".join(o for o in overview if o), "related": sections, "cta": cta,
+		"schema": schema, "key_people": key_people(item, lang),
+		# Events only (phamos.web_profile.events.build); empty for every other section.
+		"hero": None, "actions": [], "blocks": [], "ticket": None, "notice": None, "interest": None}
+	if section == "events":
+		profile.update(extra)
+	return _dedupe(item, profile)
 
 
 def _dedupe(item, profile):
