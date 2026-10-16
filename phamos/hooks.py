@@ -298,6 +298,12 @@ doc_events = {
 		"on_update": "phamos.cockpits.todo_hooks.on_update",
 		"on_trash": "phamos.cockpits.todo_hooks.on_trash",
 	},
+	# Personal Cockpit check-ins: live updates to the employee's own user (#1571). Never fires
+	# on sites without HRMS, since the doctype does not exist there.
+	"Employee Checkin": {
+		"on_update": "phamos.cockpits.checkin_hooks.on_update",
+		"on_trash": "phamos.cockpits.checkin_hooks.on_trash",
+	},
 	"Event": {
 		# on_update also runs after insert; an after_insert hook here pushed every new Event twice.
 		"on_update": "phamos.mailcow_integration.caldav.sync_event.on_upsert",
