@@ -1,8 +1,9 @@
 """Move the DATEV upload addresses from Accounting Receipt field defaults to phamos Settings.
 
 Until now every receipt carried two read-only address fields: one for incoming invoices and
-one for receipts of type "Sonstiges". The settings table keeps that routing: the invoice
-address is the default, the second address takes "Sonstiges". Runs only while the table is
+one for all other documents ("Sonstiges"). The settings table keeps that routing: invoices,
+credit notes and receipts go to the invoice address (the default), everything else to the
+second address. Runs only while the table is
 empty, so addresses edited in the settings are never overwritten.
 """
 
@@ -22,13 +23,13 @@ def execute():
 		{
 			"label": "Eingangsrechnungen",
 			"email": LEGACY_INVOICE_ADDRESS,
-			"receipt_types": "Purchase Invoice, Journal Entry, Payment",
+			"receipt_types": "Invoice, Credit Note, Receipt",
 			"is_default": 1,
 		},
 	)
 	settings.append(
 		"datev_recipients",
-		{"label": "Sonstiges", "email": LEGACY_OTHER_ADDRESS, "receipt_types": "Sonstiges", "is_default": 0},
+		{"label": "Sonstiges", "email": LEGACY_OTHER_ADDRESS, "receipt_types": "Tax Notice, Contract, Reminder, Statement, Other", "is_default": 0},
 	)
 	settings.flags.ignore_mandatory = True
 	settings.save(ignore_permissions=True)

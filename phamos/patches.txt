@@ -52,6 +52,7 @@ phamos.patches.v1_0.retire_i_own_my_work_default_app
 phamos.patches.v1_0.backfill_todo_cockpit_fields #1553
 phamos.patches.v1_0.convert_accounting_receipt_status
 phamos.patches.v1_0.seed_datev_recipients
+phamos.patches.v1_0.move_ai_prompt_rules_to_ai_skill
 phamos.patches.v1_0.delete_marketing_event_response_doctype
 phamos.patches.v1_0.retire_event_registration_web_form
 phamos.patches.v1_0.migrate_attendee_legacy_data
@@ -59,3 +60,4 @@ phamos.patches.v1_0.move_marketing_content_to_web_profile
 phamos.patches.v1_0.set_event_ticket_prices
 phamos.patches.v1_0.migrate_event_stakeholders
 phamos.patches.v1_0.set_event_subscription_welcome_url
+phamos.patches.v1_0.merge_document_kind_into_receipt_type

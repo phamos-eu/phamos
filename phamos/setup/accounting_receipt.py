@@ -13,15 +13,62 @@ AI_ACCOUNTANT_ROLE = "AI Accountant"
 AI_ACCOUNTANT_EMAIL = "ai-accountant@phamos.eu"
 AI_ACCOUNTANT_NAME = "AI Accountant"
 SETTINGS_DOCTYPE = "phamos Settings"
+ACCOUNTING_AGENT = "Accounting Agent"
+ACCOUNTING_HANDLERS = "phamos.ai_agents.agents.accounting"
+EXTRACT_SKILL_NAME = "Read receipt"
 
 
 def ensure_accounting_receipt_setup():
-	"""Create the role, the AI user, its Raven bot and the Issue link field."""
+	"""Create the role, the AI user, its Raven bot, the Accounting Agent and the Issue link field."""
 	ensure_role()
 	user = ensure_ai_user()
 	ensure_raven_bot()
 	_remember_ai_user(user)
+	ensure_accounting_agent()
 	ensure_issue_accounting_receipt_field()
+
+
+def ensure_accounting_agent():
+	"""The AI Accountant as an AI Agent with its first skill: reading the receipt PDF."""
+	if not frappe.db.exists("AI Agent", ACCOUNTING_AGENT):
+		frappe.get_doc(
+			{
+				"doctype": "AI Agent",
+				"agent_name": ACCOUNTING_AGENT,
+				"enabled": 1,
+				"applies_to_doctype": "Accounting Receipt",
+				"handler_module": ACCOUNTING_HANDLERS,
+				"user": frappe.db.get_single_value(SETTINGS_DOCTYPE, "ai_accountant_user") or AI_ACCOUNTANT_EMAIL,
+				"raven_bot": AI_ACCOUNTANT_NAME if frappe.db.exists("Raven Bot", AI_ACCOUNTANT_NAME) else None,
+				"run_on_insert": 1,
+				"run_on_fields": "attachment",
+				"description": "Reads incoming receipts and prepares them for the accounting team.",
+			}
+		).insert(ignore_permissions=True)
+	return ensure_extract_skill()
+
+
+def ensure_extract_skill():
+	"""Name of the agent's general (not supplier specific) PDF reading skill."""
+	existing = frappe.db.get_value(
+		"AI Skill", {"agent": ACCOUNTING_AGENT, "handler": "extract_document", "party": ("is", "not set")}, "name"
+	)
+	if existing:
+		return existing
+	skill = frappe.get_doc(
+		{
+			"doctype": "AI Skill",
+			"skill_name": EXTRACT_SKILL_NAME,
+			"agent": ACCOUNTING_AGENT,
+			"enabled": 1,
+			"phase": "Extract",
+			"order": 10,
+			"handler": "extract_document",
+			"on_fail": "Stop Run",
+			"description": "Reads the PDF with Mistral and fills empty fields of the receipt, including item lines.",
+		}
+	).insert(ignore_permissions=True)
+	return skill.name
 
 
 def ensure_role():

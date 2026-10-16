@@ -49,7 +49,7 @@ def files_of(receipt):
 class TestReceiptIntake(FrappeTestCase):
 	def setUp(self):
 		frappe.set_user("Administrator")
-		self.enqueue = patch.object(ar_module.frappe, "enqueue").start()
+		self.enqueue = patch("phamos.ai_agents.runner.enqueue_run").start()
 
 	def tearDown(self):
 		patch.stopall()
@@ -143,7 +143,7 @@ class TestDatevStamp(FrappeTestCase):
 		self.assertIn("Hinweis für die Buchhaltung", reader.pages[0].extract_text())
 
 	def test_send_to_datev_sends_the_stamped_copy(self):
-		with patch.object(ar_module.frappe, "enqueue"):
+		with patch("phamos.ai_agents.runner.enqueue_run"):
 			name = intake.create_receipts_from_file("bewirtung.pdf", blank_pdf())[0]["receipt"]
 		frappe.db.set_value("Accounting Receipt", name, "note", "<p>Gäste: Anna Muster</p>")
 		with patch.object(ar_module, "resolve_datev_recipient", return_value="up@datev.test"), \
@@ -160,7 +160,7 @@ class TestDatevStamp(FrappeTestCase):
 		self.assertEqual(len([f for f in files_of(name) if f.startswith(f"{name}-DATEV")]), 1)
 
 	def test_send_without_note_sends_the_original(self):
-		with patch.object(ar_module.frappe, "enqueue"):
+		with patch("phamos.ai_agents.runner.enqueue_run"):
 			name = intake.create_receipts_from_file("plain.pdf", blank_pdf())[0]["receipt"]
 		with patch.object(ar_module, "resolve_datev_recipient", return_value="up@datev.test"), \
 			patch.object(ar_module.frappe, "sendmail") as sendmail:

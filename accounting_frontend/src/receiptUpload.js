@@ -1,8 +1,5 @@
 // Upload of receipts (PDFs and e-mails) from the board. Pure helpers + the upload call.
 
-// Cards dragged inside the board carry this type, so the drop zone can ignore them.
-export const RECEIPT_CARD_DRAG_TYPE = "application/x-phamos-receipt"
-
 const UPLOAD_METHOD = "phamos.api.accounting_receipts.create_receipts_from_upload"
 
 export function isReceiptFile(file) {
@@ -17,7 +14,7 @@ export function isReceiptFile(file) {
 
 export function isExternalDrag(event) {
 	const types = Array.from(event?.dataTransfer?.types || [])
-	return types.length > 0 && !types.includes(RECEIPT_CARD_DRAG_TYPE)
+	return types.length > 0
 }
 
 // Files of a drop. Some sources fill only the item list, not dataTransfer.files.

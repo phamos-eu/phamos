@@ -53,8 +53,8 @@ class TestConvertStatus(FrappeTestCase):
 
 class TestDatevRecipient(FrappeTestCase):
 	ROWS = [
-		frappe._dict(email="invoices@datev.test", receipt_types="Purchase Invoice, Payment", is_default=1),
-		frappe._dict(email="other@datev.test", receipt_types="Sonstiges", is_default=0),
+		frappe._dict(email="invoices@datev.test", receipt_types="Invoice, Credit Note, Receipt", is_default=1),
+		frappe._dict(email="other@datev.test", receipt_types="Tax Notice, Contract, Reminder, Statement, Other", is_default=0),
 	]
 
 	def _resolve(self, receipt_type, rows):
@@ -64,19 +64,19 @@ class TestDatevRecipient(FrappeTestCase):
 			return ar_module.resolve_datev_recipient(doc)
 
 	def test_type_match_wins(self):
-		self.assertEqual(self._resolve("Sonstiges", self.ROWS), "other@datev.test")
-		self.assertEqual(self._resolve("purchase invoice", self.ROWS), "invoices@datev.test")
+		self.assertEqual(self._resolve("Reminder", self.ROWS), "other@datev.test")
+		self.assertEqual(self._resolve("invoice", self.ROWS), "invoices@datev.test")
 
 	def test_default_row_for_unlisted_or_empty_type(self):
-		self.assertEqual(self._resolve("Journal Entry", self.ROWS), "invoices@datev.test")
+		self.assertEqual(self._resolve("Unknown type", self.ROWS), "invoices@datev.test")
 		self.assertEqual(self._resolve("", self.ROWS), "invoices@datev.test")
 
 	def test_no_default_row_means_no_recipient(self):
-		self.assertIsNone(self._resolve("Journal Entry", [self.ROWS[1]]))
+		self.assertIsNone(self._resolve("Invoice", [self.ROWS[1]]))
 
 	def test_empty_table_falls_back_to_legacy_fields(self):
-		self.assertEqual(self._resolve("Sonstiges", []), "legacy-2@datev.test")
-		self.assertEqual(self._resolve("Purchase Invoice", []), "legacy-1@datev.test")
+		self.assertEqual(self._resolve("Contract", []), "legacy-2@datev.test")
+		self.assertEqual(self._resolve("Invoice", []), "legacy-1@datev.test")
 
 
 class TestAccountingReceiptInbox(FrappeTestCase):
@@ -100,7 +100,7 @@ class TestAccountingReceiptInbox(FrappeTestCase):
 	def test_sync_never_replaces_a_chosen_attachment(self):
 		doc = _make_receipt(attachment="/private/files/chosen.pdf")
 		with patch.object(ar_module, "_first_attached_pdf", return_value="/private/files/other.pdf") as first, \
-			patch.object(ar_module.frappe, "enqueue") as enqueue:
+			patch("phamos.ai_agents.runner.enqueue_run") as enqueue:
 			ar_module._sync_attachment_field(doc.name)
 		first.assert_not_called()
 		enqueue.assert_not_called()
@@ -109,7 +109,7 @@ class TestAccountingReceiptInbox(FrappeTestCase):
 	def test_sync_fills_an_empty_attachment_and_queues_extraction(self):
 		doc = _make_receipt()
 		with patch.object(ar_module, "_first_attached_pdf", return_value="/private/files/first.pdf"), \
-			patch.object(ar_module.frappe, "enqueue") as enqueue:
+			patch("phamos.ai_agents.runner.enqueue_run") as enqueue:
 			ar_module._sync_attachment_field(doc.name)
 		self.assertEqual(frappe.db.get_value("Accounting Receipt", doc.name, "attachment"), "/private/files/first.pdf")
 		enqueue.assert_called_once()
@@ -174,3 +174,16 @@ class TestAccountingReceiptSetup(FrappeTestCase):
 		self.assertTrue(frappe.get_meta("Issue").has_field("accounting_receipt"))
 		if "raven" in frappe.get_installed_apps():
 			self.assertTrue(frappe.db.exists("Raven Bot", "AI Accountant"))
+
+
+class TestReceiptTypeMerge(FrappeTestCase):
+	def test_document_kind_wins_and_old_types_are_mapped(self):
+		from phamos.patches.v1_0.merge_document_kind_into_receipt_type import new_receipt_type
+
+		self.assertEqual(new_receipt_type("Purchase Invoice", "Reminder"), "Reminder")
+		self.assertEqual(new_receipt_type("Purchase Invoice"), "Invoice")
+		self.assertEqual(new_receipt_type("Sonstiges"), "Other")
+		self.assertEqual(new_receipt_type("Journal Entry"), "Receipt")
+		self.assertEqual(new_receipt_type("Payment", None), "Receipt")
+		self.assertEqual(new_receipt_type("Invoice"), "Invoice")
+		self.assertEqual(new_receipt_type(None, None), "")
