@@ -8,7 +8,7 @@ The older receipt endpoints still live in phamos.api.accounting_spa and move her
 
 import frappe
 from frappe import _
-from frappe.utils import cint, cstr, flt, get_datetime
+from frappe.utils import cint, cstr, flt, get_datetime, getdate
 
 from phamos.accounting.intake import IntakeError, create_receipts_from_file
 from phamos.accounting.pdf_stamp import note_to_html, note_to_lines
@@ -406,3 +406,198 @@ def _bank_for(iban, bank_name=None):
 	if not frappe.db.exists("Bank", name):
 		frappe.get_doc({"doctype": "Bank", "bank_name": name}).insert(ignore_permissions=True)
 	return name
+
+
+# --- Work queue and list ------------------------------------------------------------------
+
+QUEUE_SECTIONS = (
+	("decide", "Needs your decision"),
+	("ready", "Ready to send"),
+	("waiting", "Waiting for payment"),
+	("problems", "Problems"),
+)
+QUEUE_FIELDS = [
+	"name", "title", "status", "receipt_type", "posting_date", "due_date", "sum", "currency",
+	"sum_in_company_currency", "supplier", "supplier_name", "supplier_reference", "attachment",
+	"is_paid", "sent_to_datev", "ai_run", "ai_confidence", "ai_summary", "creation", "modified",
+]
+READY_MIN_CONFIDENCE = 90
+OPEN_STATUSES = ("Inbox", "Needs Decision")
+
+
+def next_action(row, run):
+	"""(section, reasons) for one receipt; section None means nothing left to do.
+
+	run: {"status", "flags"} of the receipt's latest AI run, or None.
+	"""
+	if row.status == "Cancelled":
+		return None, []
+	reasons = []
+	if not cstr(row.attachment).lower().endswith(".pdf"):
+		return "problems", [_("No PDF attached")]
+	if run and run.get("status") == "Failed":
+		return "problems", [_("The AI could not read the PDF")]
+	if row.is_paid and row.sent_to_datev:
+		return None, []
+
+	if row.status in OPEN_STATUSES:
+		flags = [f for f in (run or {}).get("flags") or [] if f.get("severity") in ("warn", "block")]
+		reasons = [f.get("message") for f in flags if f.get("message")]
+		if not run:
+			reasons.append(_("Not read by the AI yet"))
+		if not row.supplier:
+			reasons.append(_("No supplier"))
+		if not flt(row.sum):
+			reasons.append(_("No amount"))
+		if not row.posting_date:
+			reasons.append(_("No date"))
+		if run and flt(row.ai_confidence) and flt(row.ai_confidence) < READY_MIN_CONFIDENCE:
+			reasons.append(_("The AI is unsure ({0} %)").format(round(flt(row.ai_confidence))))
+		if row.receipt_type in ("Contract", "Reminder", "Statement"):
+			reasons.append(_("{0}: not a voucher").format(_(row.receipt_type)))
+		reasons = list(dict.fromkeys(reasons))
+		if reasons:
+			return "decide", reasons
+		return ("waiting", []) if row.sent_to_datev else ("ready", [])
+
+	if not row.sent_to_datev:
+		return "ready", []
+	if row.status in ("Approved to Pay", "Sent to DATEV") and not row.is_paid:
+		return "waiting", []
+	return None, []
+
+
+def _latest_runs(run_names):
+	if not run_names:
+		return {}
+	rows = frappe.get_all(
+		"AI Agent Run", filters={"name": ("in", list(run_names))}, fields=["name", "status", "run_flags"]
+	)
+	return {r.name: {"status": r.status, "flags": frappe.parse_json(r.run_flags or "[]") or []} for r in rows}
+
+
+def _queue_row(row, section, reasons, today):
+	overdue_days = None
+	if row.due_date:
+		overdue_days = (getdate(today) - getdate(row.due_date)).days
+	return {
+		"name": row.name,
+		"title": row.title,
+		"status": row.status,
+		"receipt_type": row.receipt_type,
+		"posting_date": row.posting_date,
+		"due_date": row.due_date,
+		"overdue_days": overdue_days if overdue_days and overdue_days > 0 else 0,
+		"sum": row.sum,
+		"currency": row.currency,
+		"supplier": row.supplier,
+		"supplier_name": row.supplier_name,
+		"supplier_reference": row.supplier_reference,
+		"is_paid": 1 if row.is_paid else 0,
+		"sent_to_datev": 1 if row.sent_to_datev else 0,
+		"ai_confidence": row.ai_confidence,
+		"ai_summary": row.ai_summary,
+		"reason": reasons[0] if reasons else "",
+		"reasons": reasons,
+		"section": section,
+	}
+
+
+def _sort_key(item):
+	"""Overdue first, then due soon, then larger amounts, then older receipts."""
+	due = getdate(item["due_date"]) if item["due_date"] else None
+	return (
+		0 if item["overdue_days"] else 1,
+		due or getdate("2999-12-31"),
+		-flt(item["sum"]),
+		str(item["posting_date"] or ""),
+	)
+
+
+@frappe.whitelist(methods=["POST"])
+def get_receipt_queue():
+	"""Receipts that need something, grouped by what happens next."""
+	frappe.has_permission("Accounting Receipt", "read", throw=True)
+	rows = frappe.get_list(
+		"Accounting Receipt",
+		fields=QUEUE_FIELDS,
+		filters={"status": ("!=", "Cancelled")},
+		order_by="creation asc",
+		limit_page_length=2000,
+	)
+	runs = _latest_runs({r.ai_run for r in rows if r.ai_run})
+	today = frappe.utils.today()
+	grouped = {key: [] for key, _label in QUEUE_SECTIONS}
+	for row in rows:
+		section, reasons = next_action(row, runs.get(row.ai_run))
+		if section:
+			grouped[section].append(_queue_row(row, section, reasons, today))
+	sections = []
+	for key, label in QUEUE_SECTIONS:
+		items = sorted(grouped[key], key=_sort_key)
+		sections.append({"key": key, "title": _(label), "count": len(items), "items": items})
+	waiting = grouped["waiting"]
+	return {
+		"sections": sections,
+		"counts": {key: len(grouped[key]) for key, _label in QUEUE_SECTIONS},
+		"overdue": sum(1 for item in waiting if item["overdue_days"]),
+	}
+
+
+@frappe.whitelist(methods=["POST"])
+def list_receipts(search=None, from_date=None, to_date=None, status=None, supplier=None, receipt_type=None,
+		sort="posting_date", order="desc", limit=500):
+	"""All receipts with filters, for the searchable list. Returns {items, total, truncated}."""
+	frappe.has_permission("Accounting Receipt", "read", throw=True)
+	filters = []
+	if from_date:
+		filters.append(["posting_date", ">=", from_date])
+	if to_date:
+		filters.append(["posting_date", "<=", to_date])
+	statuses = frappe.parse_json(status) if isinstance(status, str) and status.startswith("[") else status
+	if statuses:
+		filters.append(["status", "in", statuses if isinstance(statuses, list) else [statuses]])
+	if supplier:
+		filters.append(["supplier", "=", supplier])
+	if receipt_type:
+		filters.append(["receipt_type", "=", receipt_type])
+	or_filters = None
+	if cstr(search).strip():
+		like = f"%{cstr(search).strip()}%"
+		or_filters = [["title", "like", like], ["supplier_name", "like", like], ["supplier_reference", "like", like], ["name", "like", like]]
+	sort = sort if sort in ("posting_date", "due_date", "sum_in_company_currency", "modified", "creation") else "posting_date"
+	order = "asc" if order == "asc" else "desc"
+	limit = min(cint(limit) or 500, 2000)
+	rows = frappe.get_list(
+		"Accounting Receipt",
+		fields=QUEUE_FIELDS,
+		filters=filters,
+		or_filters=or_filters,
+		order_by=f"{sort} {order}, creation desc",
+		limit_page_length=limit + 1,
+	)
+	truncated = len(rows) > limit
+	rows = rows[:limit]
+	runs = _latest_runs({r.ai_run for r in rows if r.ai_run})
+	today = frappe.utils.today()
+	items = []
+	for row in rows:
+		section, reasons = next_action(row, runs.get(row.ai_run))
+		items.append(_queue_row(row, section, reasons, today))
+	return {"items": items, "truncated": truncated, "total": frappe.db.count("Accounting Receipt", filters=filters) if not or_filters else None}
+
+
+@frappe.whitelist(methods=["POST"])
+def send_receipts_to_datev(names):
+	"""Send several receipts to DATEV. Returns {"sent": [...], "failed": [{name, message}]}."""
+	from phamos.phamos.doctype.accounting_receipt.accounting_receipt import send_to_datev
+
+	names = frappe.parse_json(names) if isinstance(names, str) else (names or [])
+	sent, failed = [], []
+	for name in names[:50]:
+		try:
+			result = send_to_datev(name)
+		except frappe.PermissionError:
+			result = {"ok": False, "message": _("Not permitted")}
+		(sent.append(name) if result.get("ok") else failed.append({"name": name, "message": result.get("message")}))
+	return {"sent": sent, "failed": failed}

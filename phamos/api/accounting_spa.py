@@ -441,9 +441,9 @@ RECEIPT_LIST_FIELDS = [
 	"modified",
 ]
 
-# A drop on these columns would claim something that did not happen, so the board refuses it.
+# Setting this status directly would claim a send that did not happen.
 RECEIPT_STATUSES_NOT_DROPPABLE = {
-	"Sent to DATEV": "Use Send to DATEV in the receipt panel; dropping a card does not send the e-mail.",
+	"Sent to DATEV": "Use Send to DATEV; the status follows when the e-mail is queued.",
 }
 
 

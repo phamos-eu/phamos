@@ -46,7 +46,16 @@ const baseNavItems = [
 		icon: "list",
 		match: ["Checklists", "ChecklistDetail"],
 	},
-	{ name: "Receipts", label: "Receipts", icon: "file-text", match: ["Receipts", "ReceiptDetail"] },
+	{
+		name: "Receipts",
+		label: "Receipts",
+		icon: "file-text",
+		match: ["Receipts", "ReceiptDetail"],
+		children: [
+			{ name: "Receipts", label: "Queue", icon: "inbox", match: ["Receipts", "ReceiptDetail"] },
+			{ name: "ReceiptsAll", label: "All receipts", icon: "list", match: ["ReceiptsAll"] },
+		],
+	},
 ]
 
 const misNavItem = {
@@ -67,6 +76,7 @@ const pageTitle = computed(() => {
 	}
 	if (route.name === "Checklists" || route.name === "ChecklistDetail") return "Checklists"
 	if (route.name === "Receipts" || route.name === "ReceiptDetail") return "Receipts"
+	if (route.name === "ReceiptsAll") return "All receipts"
 	if (route.name === "MisList" || route.name === "MisDetail") {
 		return "Monthly Implementation Summary"
 	}
@@ -84,8 +94,9 @@ const pageSubtitle = computed(() => {
 		return "Checklists linked to Accounting issues and tasks"
 	}
 	if (route.name === "Receipts" || route.name === "ReceiptDetail") {
-		return "Accounting receipts — review, decide payment, send to DATEV"
+		return "What needs to happen next: decide, send to DATEV, wait for payment"
 	}
+	if (route.name === "ReceiptsAll") return "Search and filter every receipt"
 	if (route.name === "MisList" || route.name === "MisDetail") {
 		return "Monthly Implementation Summary records"
 	}
