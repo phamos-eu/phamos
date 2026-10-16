@@ -31,7 +31,6 @@
 					Stale ({{ staleCount }})
 				</button>
 				<Button v-if="staleOnly && staleCount" size="sm" @click="decideStale">Decide all</Button>
-				<Button class="ml-auto" variant="solid" @click="showCreate = true">New ToDo</Button>
 			</div>
 
 			<div v-if="error" class="flex flex-1 items-center justify-center px-6 text-sm text-red-600">

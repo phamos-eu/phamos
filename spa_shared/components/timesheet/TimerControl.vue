@@ -3,6 +3,7 @@
 		<!-- Idle -->
 		<template v-if="!session">
 			<Button
+				v-if="startButton"
 				size="sm"
 				variant="ghost"
 				:disabled="!state.can_start"
@@ -111,6 +112,12 @@ import StartTimerDialog from "./StartTimerDialog.vue"
 import StopTimerDialog from "./StopTimerDialog.vue"
 import TimeLimitDialog from "./TimeLimitDialog.vue"
 
+defineProps({
+	// Show "Start timer" while idle. Off when the cockpit starts timers from a Create menu
+	// (requestTimerStart); running, paused and blocked states are always shown.
+	startButton: { type: Boolean, default: true },
+})
+
 const API = spaConfig.api
 const tick = ref(Date.now())
 const busy = ref("")
@@ -200,6 +207,17 @@ function onResumed(next, withBreak) {
 	setTimer(next)
 	if (withBreak) notify.success("Break logged, timer running again")
 }
+
+// A request from elsewhere (a Create menu) to start a timer.
+watch(
+	() => timer.startRequest,
+	() => {
+		if (state.value?.can_start) showStart.value = true
+		else if (session.value) notify.error("A timer is already running. Stop it first.")
+		else if (state.value?.blocking_drafts?.length) notify.error(blockTitle.value)
+		else notify.error("Timers need an active Employee linked to your user.")
+	}
+)
 
 // A request from elsewhere (the check-out guard) to stop the running timer.
 watch(
