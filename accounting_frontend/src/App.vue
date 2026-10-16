@@ -50,6 +50,20 @@ const baseNavItems = [
 	{ name: "Receipts", label: "Receipts", icon: "file-text", match: ["Receipts", "ReceiptDetail"] },
 ]
 
+// With statistics access, Receipts opens into List / Payment calendar / Statistics.
+// The group header matches no route itself, so only the active child is highlighted.
+const receiptsGroup = {
+	name: "Receipts",
+	label: "Receipts",
+	icon: "file-text",
+	match: [],
+	children: [
+		{ name: "Receipts", label: "List", icon: "list", match: ["Receipts", "ReceiptDetail"] },
+		{ name: "PaymentsCalendar", label: "Payment calendar", icon: "calendar", match: ["PaymentsCalendar"] },
+		{ name: "ReceiptStatistics", label: "Statistics", icon: "bar-chart", match: ["ReceiptStatistics"] },
+	],
+}
+
 const misNavItem = {
 	name: "MisList",
 	label: "Monthly Implementation Summary",
@@ -57,14 +71,8 @@ const misNavItem = {
 	match: ["MisList", "MisDetail"],
 }
 
-const statisticsNavItems = [
-	{ name: "PaymentsCalendar", label: "Payment calendar", icon: "calendar", match: ["PaymentsCalendar"] },
-	{ name: "ReceiptStatistics", label: "Statistics", icon: "bar-chart", match: ["ReceiptStatistics"] },
-]
-
 const navItems = computed(() => [
-	...baseNavItems,
-	...(canReadStatistics.value ? statisticsNavItems : []),
+	...baseNavItems.map((item) => (item.name === "Receipts" && canReadStatistics.value ? receiptsGroup : item)),
 	...(canReadMis.value ? [misNavItem] : []),
 ])
 
