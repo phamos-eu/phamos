@@ -3,7 +3,8 @@
 // while the session is running, the same way the Developer Action Panel counts.
 import { secondsBetween } from "./focusRules.js"
 
-export const MIN_EXPECTED_HOURS = 0.25
+export const MIN_EXPECTED_MINUTES = 15
+export const MIN_BREAK_MINUTES = 1
 
 export function liveElapsed(session, secondsSinceLoad = 0) {
 	if (!session) return 0
@@ -44,9 +45,17 @@ export function isOverBudget(session, elapsed) {
 	return Boolean(session?.expected_time) && elapsed > session.expected_time
 }
 
-// Expected time is entered in hours (0.25 steps, like the Developer Action Panel).
-export function hoursToSeconds(hours) {
-	const value = Number(String(hours).replace(",", "."))
-	if (!Number.isFinite(value) || value < MIN_EXPECTED_HOURS) return null
-	return Math.round(value * 3600)
+// Expected time is entered in minutes.
+export function minutesToSeconds(minutes, min = MIN_EXPECTED_MINUTES) {
+	const value = Number(String(minutes).replace(",", "."))
+	if (!Number.isFinite(value) || value < min) return null
+	return Math.round(value * 60)
+}
+
+// The clock counts down from the target: { text: "00:42:13", over: false } and once the target
+// is passed { text: "+00:05:12", over: true }. Without a target it counts up.
+export function countdown(targetSeconds, elapsedSeconds) {
+	if (!targetSeconds) return { text: formatClock(elapsedSeconds), over: false }
+	const rest = targetSeconds - elapsedSeconds
+	return rest >= 0 ? { text: formatClock(rest), over: false } : { text: `+${formatClock(-rest)}`, over: true }
 }
