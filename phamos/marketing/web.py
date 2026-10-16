@@ -313,8 +313,9 @@ def build_reminders_ics(item, moments):
 		entry = Event()
 		entry.add("uid", f"{item.name}-reminder-{moment.astimezone(pytz.utc):%Y%m%dT%H%M}@phamos.eu")
 		entry.add("dtstamp", site_tz.localize(now_datetime()).astimezone(pytz.utc))
-		entry.add("dtstart", moment)
-		entry.add("dtend", moment + timedelta(minutes=15))
+		# In UTC: no VTIMEZONE needed, every calendar app reads it the same way.
+		entry.add("dtstart", moment.astimezone(pytz.utc))
+		entry.add("dtend", moment.astimezone(pytz.utc) + timedelta(minutes=15))
 		entry.add("summary", _("Reminder: {0}").format(item.title))
 		entry.add("description", "\n\n".join(filter(None, [when.get("line"), get_url(item.url)])))
 		entry.add("url", get_url(item.url))
