@@ -599,3 +599,13 @@ def notify_timer_account_manager(name):
 @frappe.whitelist(methods=["POST"])
 def discard_timer_draft(name):
 	return personal_timer.discard_draft(name)
+@frappe.whitelist()
+def get_checkin_dashboard(period=30):
+	"""Worked time per day, typical start and end, and days without a check-out."""
+	return personal_checkin.get_checkin_dashboard(period=period)
+
+
+@frappe.whitelist()
+def get_my_checkins(start=0, page_length=100):
+	"""All my check-ins, newest first, a page at a time."""
+	return personal_checkin.get_my_checkins(start=start, page_length=page_length)

@@ -15,9 +15,11 @@ Everything degrades to "not available" when HRMS is not installed or the user ha
 active Employee.
 """
 
+from datetime import timedelta
+
 import frappe
 from frappe import _
-from frappe.utils import cint, get_datetime, getdate, now_datetime, time_diff_in_seconds, today
+from frappe.utils import add_days, cint, get_datetime, getdate, now_datetime, time_diff_in_seconds, today
 
 from phamos.cockpits.defaults import CHECKIN_DEVICE_ID, CHECKIN_REVOKE_SECONDS, CHECKIN_UNDO_SECONDS
 from phamos.cockpits.workdays import _employee
@@ -25,6 +27,8 @@ from phamos.cockpits.workdays import _employee
 DOCTYPE = "Employee Checkin"
 LOG_TYPES = ("IN", "OUT")
 LOG_FIELDS = ["name", "log_type", "time", "device_id", "owner", "attendance"]
+DASHBOARD_PERIODS = (7, 30, 90)
+LIST_PAGE = 100
 
 
 def available():
@@ -42,8 +46,9 @@ def next_action(last):
 	return "OUT" if last and last.get("log_type") == "IN" else "IN"
 
 
-def worked_minutes(logs, now):
-	"""Minutes between IN and OUT pairs, in time order; an open IN counts until `now`.
+def worked_minutes(logs, now=None):
+	"""Minutes between IN and OUT pairs, in time order; an open IN counts until `now` (and not
+	at all without `now`, e.g. a past day whose check-out is missing).
 
 	An OUT without an IN before it (e.g. the IN was yesterday) is ignored.
 	"""
@@ -56,7 +61,7 @@ def worked_minutes(logs, now):
 		elif log.get("log_type") == "OUT" and open_in is not None:
 			total += max(time_diff_in_seconds(log["time"], open_in), 0)
 			open_in = None
-	if open_in is not None:
+	if open_in is not None and now is not None:
 		total += max(time_diff_in_seconds(now, open_in), 0)
 	return int(total // 60)
 
@@ -172,3 +177,88 @@ def revoke_checkin(name):
 		frappe.throw(_("This check-in can no longer be revoked. Please ask HR to correct it."))
 	frappe.delete_doc(DOCTYPE, name)
 	return get_checkin_state()
+
+
+def _minute_of_day(value):
+	value = get_datetime(value)
+	return value.hour * 60 + value.minute
+
+
+def day_summaries(logs, now, today_date):
+	"""Per day: first IN, last OUT, worked minutes, and whether the check-out is missing."""
+	by_day = {}
+	for log in sorted(logs, key=lambda log: get_datetime(log["time"])):
+		by_day.setdefault(getdate(log["time"]), []).append(log)
+	days = []
+	for day, day_logs in sorted(by_day.items()):
+		ins = [log for log in day_logs if log["log_type"] == "IN"]
+		outs = [log for log in day_logs if log["log_type"] == "OUT"]
+		is_today = day == today_date
+		days.append(
+			{
+				"date": day,
+				"first_in": ins[0]["time"] if ins else None,
+				"last_out": outs[-1]["time"] if outs else None,
+				"worked_minutes": worked_minutes(day_logs, now if is_today else None),
+				"logs": len(day_logs),
+				"missing_out": day_logs[-1]["log_type"] == "IN" and not is_today,
+			}
+		)
+	return days
+
+
+def _average(values):
+	values = [v for v in values if v is not None]
+	return round(sum(values) / len(values)) if values else None
+
+
+def get_checkin_dashboard(period=30):
+	"""My check-in figures for the last `period` days (7, 30 or 90), today included."""
+	period = cint(period) or 30
+	if period not in DASHBOARD_PERIODS:
+		frappe.throw(_("Period must be one of {0} days.").format(", ".join(map(str, DASHBOARD_PERIODS))))
+	state = get_checkin_state()
+	result = {"period": period, "state": state, "days": [], "totals": None}
+	if not state["employee"]:
+		return result
+
+	now = state["server_now"]
+	today_date = getdate(today())
+	start = add_days(today_date, -(period - 1))
+	logs = frappe.get_all(
+		DOCTYPE,
+		filters={"employee": state["employee"], "time": (">=", get_datetime(start))},
+		fields=["name", "log_type", "time"],
+		order_by="time asc",
+	)
+	days = day_summaries(logs, now, today_date)
+	worked = [d for d in days if d["worked_minutes"]]
+	week_start = today_date - timedelta(days=today_date.weekday())
+	result["days"] = days
+	result["totals"] = {
+		"worked_minutes": sum(d["worked_minutes"] for d in days),
+		"days_worked": len(worked),
+		"average_minutes": _average([d["worked_minutes"] for d in worked]),
+		"average_start": _average([_minute_of_day(d["first_in"]) for d in days if d["first_in"]]),
+		"average_end": _average([_minute_of_day(d["last_out"]) for d in days if d["last_out"] and not d["missing_out"]]),
+		"week_minutes": sum(d["worked_minutes"] for d in days if d["date"] >= week_start),
+		"missing_out": [d for d in days if d["missing_out"]],
+	}
+	return result
+
+
+def get_my_checkins(start=0, page_length=LIST_PAGE):
+	"""All my check-ins, newest first, a page at a time."""
+	state_employee = _employee(frappe.session.user) if available() else None
+	if not state_employee:
+		return {"employee": None, "logs": [], "has_more": False}
+	start, page_length = max(cint(start), 0), min(max(cint(page_length), 1), 500)
+	rows = frappe.get_all(
+		DOCTYPE,
+		filters={"employee": state_employee},
+		fields=["name", "log_type", "time", "device_id", "shift", "attendance", "skip_auto_attendance"],
+		order_by="time desc, creation desc",
+		start=start,
+		page_length=page_length + 1,
+	)
+	return {"employee": state_employee, "logs": rows[:page_length], "has_more": len(rows) > page_length}

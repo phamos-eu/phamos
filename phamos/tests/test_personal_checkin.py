@@ -9,7 +9,7 @@ from unittest.mock import patch
 
 import frappe
 from frappe.tests.utils import FrappeTestCase
-from frappe.utils import add_days, get_datetime, now_datetime, today
+from frappe.utils import add_days, get_datetime, getdate, now_datetime, today
 
 from phamos.api import personal_checkin as checkin
 from phamos.api import personal_cockpit as pc
@@ -179,3 +179,35 @@ class TestPersonalCheckin(FrappeTestCase):
 			self.assertEqual((state["available"], state["employee"], state["can_checkin"]), (False, None, False))
 			with self.assertRaises(frappe.ValidationError):
 				pc.add_checkin("IN")
+
+
+	def test_dashboard_summarises_the_days(self):
+		day1 = add_days(today(), -2)
+		day2 = add_days(today(), -1)
+		for log_type, time in (("IN", f"{day1} 08:00:00"), ("OUT", f"{day1} 16:00:00"), ("IN", f"{day2} 09:00:00")):
+			self._log(log_type, time)
+		frappe.set_user(USER)
+		data = pc.get_checkin_dashboard(7)
+		days = {str(d["date"]): d for d in data["days"]}
+		self.assertEqual(days[str(getdate(day1))]["worked_minutes"], 8 * 60)
+		self.assertTrue(days[str(getdate(day2))]["missing_out"])
+		self.assertEqual(days[str(getdate(day2))]["worked_minutes"], 0)  # never counted to "now"
+		totals = data["totals"]
+		self.assertEqual((totals["worked_minutes"], totals["days_worked"]), (8 * 60, 1))
+		self.assertEqual((totals["average_start"], totals["average_end"]), (8 * 60 + 30, 16 * 60))
+		self.assertEqual([str(d["date"]) for d in totals["missing_out"]], [str(getdate(day2))])
+		with self.assertRaises(frappe.ValidationError):
+			pc.get_checkin_dashboard(12)
+
+	def test_list_pages_through_my_logs_only(self):
+		for hour in range(8, 13):
+			self._log("IN" if hour % 2 == 0 else "OUT", f"{add_days(today(), -1)} {hour:02d}:00:00")
+		self._log("IN", now_datetime(), employee=self.other_employee)
+		frappe.set_user(USER)
+		first = pc.get_my_checkins(0, 3)
+		self.assertEqual(len(first["logs"]), 3)
+		self.assertTrue(first["has_more"])
+		rest = pc.get_my_checkins(3, 3)
+		self.assertEqual((len(rest["logs"]), rest["has_more"]), (2, False))
+		frappe.set_user(NO_EMPLOYEE)
+		self.assertEqual(pc.get_my_checkins()["logs"], [])

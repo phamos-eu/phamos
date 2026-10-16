@@ -8,11 +8,7 @@
 					:inert="locked || undefined"
 					:aria-hidden="locked || undefined"
 				>
-					<CockpitSidebar label="Personal Cockpit" storage-key="personal-cockpit-sidebar-collapsed" :items="navItems">
-						<template #footer="{ collapsed }">
-							<CheckinToday :collapsed="collapsed" />
-						</template>
-					</CockpitSidebar>
+					<CockpitSidebar label="Personal Cockpit" storage-key="personal-cockpit-sidebar-collapsed" :items="navItems" />
 				</div>
 				<div
 					v-if="locked"
@@ -39,9 +35,8 @@ import CockpitSidebar from "@spa/components/CockpitSidebar.vue"
 import { useUserRealtime } from "@spa/composables/useUserRealtime.js"
 import { parseServerTime } from "@spa/utils/focusRules.js"
 import { focus, loadFocus } from "./focusStore.js"
-import { loadCheckin } from "./checkinStore.js"
+import { checkin, loadCheckin } from "./checkinStore.js"
 import CheckinButton from "./components/CheckinButton.vue"
-import CheckinToday from "./components/CheckinToday.vue"
 import CheckoutGuardDialog from "./components/CheckoutGuardDialog.vue"
 import TimerControl from "@spa/components/timesheet/TimerControl.vue"
 import { activeSession, loadTimer, requestTimerStop } from "@spa/timerStore.js"
@@ -107,7 +102,21 @@ onMounted(() => {
 })
 onBeforeUnmount(() => document.removeEventListener("visibilitychange", onVisible))
 
-const navItems = [
+// Check-ins (#1571) appear for users with an active Employee only.
+const CHECKIN_ITEM = {
+	name: "Checkins",
+	label: "Check-ins",
+	icon: "clock",
+	match: ["Checkins"],
+	children: [{ name: "CheckinsList", label: "List", icon: "list", match: ["CheckinsList"] }],
+}
+const navItems = computed(() => {
+	const items = [...BASE_ITEMS]
+	if (checkin.state?.available && checkin.state.employee) items.splice(1, 0, CHECKIN_ITEM)
+	return items
+})
+
+const BASE_ITEMS = [
 	{
 		name: "Todos",
 		label: "ToDos",
@@ -155,6 +164,7 @@ const navItems = [
 
 const pageTitle = computed(() => {
 	if (route.name === "TodosFocus") return "Focus"
+	if (["Checkins", "CheckinsList"].includes(route.name)) return "My Check-ins"
 	if (["Todos", "TodosList", "TodoDetail", "TodosMatrix", "TodosPlan"].includes(route.name)) return "My ToDos"
 	if (["Tasks", "TasksGantt", "TaskDetail"].includes(route.name)) return "My Tasks"
 	if (["ChecklistsHome", "Checklists", "ChecklistDetail"].includes(route.name)) return "My Checklists"
