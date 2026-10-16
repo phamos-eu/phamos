@@ -169,7 +169,9 @@ def build_listing(section, lang):
 		if facet["type"] == "range":
 			pool = in_toggle_view if facet.get("bounds") == "view" else items
 			values = [i.numbers[facet["key"]] for i in pool if i.numbers.get(facet["key"]) is not None]
-			if values:
+			if facet.get("span"):
+				bounds[facet["key"]] = tuple(facet["span"](values, selected))  # e.g. a calendar window
+			elif values:
 				bounds[facet["key"]] = (min(values), max(values))
 	for key in list(ranges):
 		low, high = ranges[key]
@@ -196,7 +198,7 @@ def build_listing(section, lang):
 		if facet["type"] == "range":
 			span = bounds.get(key)
 			in_view = [i.numbers[key] for i in base if i.numbers.get(key) is not None]
-			if not span or span[0] == span[1] or (not in_view and key not in ranges):
+			if not span or span[0] == span[1] or (not in_view and key not in ranges and not facet.get("span")):
 				continue  # nothing to slide in this view
 			low, high = ranges.get(key, span)
 			labels = [range_label(facet, v, lang) for v in range(span[0], span[1] + 1)] if facet.get("format") else None

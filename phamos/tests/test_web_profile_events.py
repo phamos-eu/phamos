@@ -415,9 +415,10 @@ class TestWebProfileEvents(FrappeTestCase):
 		try:
 			# Upcoming (default): the slider spans only upcoming months.
 			set_request(method="GET", path="/en/events")
-			facet = next((f for f in build_listing("events", "en")["facets"] if f["key"] == "month"), None)
-			if facet:
-				self.assertGreaterEqual(facet["min"], next_month)
+			facet = next(f for f in build_listing("events", "en")["facets"] if f["key"] == "month")
+			today = frappe.utils.getdate()
+			self.assertEqual(facet["min"], today.year * 12 + today.month - 1)  # from this month
+			self.assertGreaterEqual(facet["max"], facet["min"] + 11)  # at least a year ahead
 			# All events, limited to the past event's month.
 			set_request(method="GET", path=f"/en/events?when=all&month_min={past_month}&month_max={past_month}")
 			listing = build_listing("events", "en")

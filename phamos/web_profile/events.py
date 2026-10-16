@@ -174,6 +174,17 @@ def load_events(lang):
 	return items
 
 
+def month_span(values, selected):
+	"""Span of the "Period" slider: a calendar window around today (next 12 months for upcoming events,
+	last 12 for past ones, both for all), widened to every event in view."""
+	today = getdate(nowdate())
+	now = today.year * 12 + today.month - 1
+	when = (selected.get("when") or ["upcoming"])[0]
+	low = now if when == "upcoming" else now - 11
+	high = now if when == "past" else now + 11
+	return min([low, *values]), max([high, *values])
+
+
 def _named_stakeholders(lang):
 	"""{Stakeholder Web Profile name: {title, logo, url, website}} of published profiles that may be named.
 	Anonymous stakeholders are never named through an event (phamos/phamos#1492 privacy rule)."""

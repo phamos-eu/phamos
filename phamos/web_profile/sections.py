@@ -15,7 +15,7 @@ import frappe
 from frappe import _
 from frappe.utils import getdate
 
-from phamos.web_profile.events import load_events
+from phamos.web_profile.events import load_events, month_span
 from phamos.web_profile.i18n import localized
 from phamos.web_profile.icons import flag_url, module_icon
 from phamos.web_profile.socials import detect_platform, normalize_url, social_link
@@ -158,8 +158,9 @@ SECTIONS["events"] = {
 			"options": [("upcoming", "Upcoming"), ("past", "Past"), ("all", "All")]},
 		{"key": "event_type", "label": "Type", "type": "multi"},
 		{"key": "city", "label": "City", "type": "multi"},
-		# Months as numbers (year * 12 + month - 1), shown as "Okt. 2026"; the span follows the When toggle.
-		{"key": "month", "label": "Period", "type": "range", "format": "month", "bounds": "view"},
+		# Months as numbers (year * 12 + month - 1), shown as "Okt. 2026"; the span is a calendar window
+		# that follows the When toggle (events.month_span).
+		{"key": "month", "label": "Period", "type": "range", "format": "month", "bounds": "view", "span": month_span},
 	],
 	"sorts": [("date", "Date"), ("name", "Name A–Z")],
 }
