@@ -53,6 +53,19 @@ def ensure_vat_template():
 		"taxes": [{"tax_type": account, "tax_rate": 19}]}).insert(ignore_permissions=True).name
 
 
+def ensure_sales_taxes_template():
+	"""A Sales Taxes and Charges Template with the VAT account at rate 0 (the German pattern: the Item Tax
+	Template sets the rate per account)."""
+	name = frappe.db.get_value("Sales Taxes and Charges Template", {"title": "Test Ticket Domestic"})
+	if name:
+		return name
+	company = frappe.defaults.get_global_default("company")
+	account = frappe.db.get_value("Item Tax Template Detail", {"parent": ensure_vat_template()}, "tax_type")
+	return frappe.get_doc({"doctype": "Sales Taxes and Charges Template", "title": "Test Ticket Domestic", "company": company,
+		"taxes": [{"charge_type": "On Net Total", "account_head": account, "rate": 0, "description": "VAT"}]}).insert(
+		ignore_permissions=True).name
+
+
 def make_event(title=EVENT_TITLE, paid=True, prices=None, **kwargs):
 	"""Published, open event. ``prices``: rows for the Ticket Prices table (default one "Regular" at 119 gross)."""
 	values = {
@@ -62,7 +75,8 @@ def make_event(title=EVENT_TITLE, paid=True, prices=None, **kwargs):
 		"organizer_is_phamos": 1,
 	}
 	if paid:
-		values.update(ticket_item=make_ticket_item(), item_tax_template=ensure_vat_template(), ticket_price_includes_tax=1,
+		values.update(ticket_item=make_ticket_item(), item_tax_template=ensure_vat_template(),
+			taxes_and_charges=ensure_sales_taxes_template(), ticket_price_includes_tax=1,
 			ticket_prices=prices or [{"title": "Regular", "rate": 119}])
 	values.update(kwargs)
 	name = frappe.db.get_value("Marketing Content", {"title": values["title"]})

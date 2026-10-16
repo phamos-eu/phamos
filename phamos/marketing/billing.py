@@ -32,11 +32,40 @@ def company_currency():
 	return frappe.get_cached_value("Company", default_company(), "default_currency") or "EUR"
 
 
+def sales_taxes_template(event_doc):
+	"""The event's Sales Taxes and Charges Template, else the company default."""
+	if event_doc.get("taxes_and_charges"):
+		return event_doc.taxes_and_charges
+	return frappe.db.get_value("Sales Taxes and Charges Template", {"company": default_company(), "is_default": 1,
+		"disabled": 0})
+
+
 def tax_rows(event_doc):
-	if not event_doc.get("item_tax_template"):
-		return []
-	return frappe.get_all("Item Tax Template Detail", filters={"parent": event_doc.item_tax_template,
-		"tax_rate": [">", 0]}, fields=["tax_type", "tax_rate"], order_by="idx asc")
+	"""The tax rows of a ticket order, each with the rate that applies to the ticket.
+
+	As ERPNext computes it: the Sales Taxes and Charges Template says which accounts apply (German chart:
+	"Umsatzsteuer 7 %" and "Umsatzsteuer 19 %"), the Item Tax Template sets the rate per account (19 % on
+	one, not applicable on the other). Without a sales template the Item Tax Template rows are used as
+	they are (only sensible for a template with a single output-tax account).
+	"""
+	item_rates = {}
+	if event_doc.get("item_tax_template"):
+		for row in frappe.get_all("Item Tax Template Detail", filters={"parent": event_doc.item_tax_template},
+				fields=["tax_type", "tax_rate", "not_applicable"]):
+			item_rates[row.tax_type] = 0 if row.not_applicable else flt(row.tax_rate)
+	template = sales_taxes_template(event_doc)
+	rows = []
+	if template:
+		for row in frappe.get_all("Sales Taxes and Charges", filters={"parenttype": "Sales Taxes and Charges Template",
+				"parent": template, "charge_type": "On Net Total"}, fields=["account_head", "description", "rate"],
+				order_by="idx asc"):
+			rate = item_rates.get(row.account_head, flt(row.rate))
+			rows.append(frappe._dict(tax_type=row.account_head, description=row.description or row.account_head,
+				tax_rate=rate, template_rate=flt(row.rate)))
+	else:
+		rows = [frappe._dict(tax_type=account, description=account, tax_rate=rate, template_rate=rate)
+			for account, rate in item_rates.items() if rate]
+	return rows
 
 
 def sold_per_price(event_name):
@@ -97,6 +126,7 @@ def get_ticket_pricing(event_doc, qty=1, now=None):
 		gross=price.gross, net=price.net, inclusive=inclusive, tax_rows=taxes,
 		tax_rate=sum(flt(r.tax_rate) for r in taxes), currency=company_currency(),
 		item_tax_template=event_doc.get("item_tax_template"), tc_name=event_doc.get("tc_name"),
+		taxes_and_charges=sales_taxes_template(event_doc),
 		price_list=frappe.db.get_single_value("Selling Settings", "selling_price_list") or "Standard Selling")
 
 
@@ -133,9 +163,12 @@ def _append_lines(doc, pricing, attendees):
 			"delivery_date": doc.get("delivery_date"),
 		})
 	cost_center = frappe.get_cached_value("Company", doc.company, "cost_center")
+	doc.taxes_and_charges = pricing.taxes_and_charges
 	for row in pricing.tax_rows:
-		doc.append("taxes", {"charge_type": "On Net Total", "account_head": row.tax_type, "rate": row.tax_rate,
-			"description": row.tax_type, "cost_center": cost_center,
+		# The row keeps the template's rate; ERPNext applies the Item Tax Template rate per line (item_tax_rate).
+		doc.append("taxes", {"charge_type": "On Net Total", "account_head": row.tax_type,
+			"rate": row.template_rate if pricing.taxes_and_charges else row.tax_rate,
+			"description": row.description, "cost_center": cost_center,
 			"included_in_print_rate": 1 if pricing.inclusive else 0})
 
 

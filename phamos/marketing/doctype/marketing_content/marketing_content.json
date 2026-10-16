@@ -56,6 +56,7 @@
   "ticket_price_includes_tax",
   "column_break_srnt",
   "item_tax_template",
+  "taxes_and_charges",
   "tc_name",
   "section_ticket_prices",
   "ticket_prices",
@@ -381,7 +382,15 @@
    "fieldname": "item_tax_template",
    "fieldtype": "Link",
    "label": "Item Tax Template",
-   "options": "Item Tax Template"
+   "options": "Item Tax Template",
+   "description": "Rate per tax account for the tickets (e.g. 19 %)."
+  },
+  {
+   "fieldname": "taxes_and_charges",
+   "fieldtype": "Link",
+   "label": "Sales Taxes Template",
+   "options": "Sales Taxes and Charges Template",
+   "description": "Which tax accounts apply to ticket orders. Empty: the company's default template. The Item Tax Template sets the rate per account (e.g. 19 %)."
   },
   {
    "fieldname": "tc_name",
@@ -436,7 +445,7 @@
   }
  ],
  "links": [],
- "modified": "2026-10-17 09:00:00.000000",
+ "modified": "2026-10-17 10:00:00.000000",
  "modified_by": "Administrator",
  "module": "Marketing",
  "name": "Marketing Content",
