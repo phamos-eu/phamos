@@ -263,7 +263,7 @@ def register_attendees(event, contact, attends=True, companions=None, billing_da
 	events). ``expected_total``: the total the buyer saw; the order is refused when the price changed in
 	between (e.g. the early-bird quota ran out).
 
-	Returns {ok, reference, reference_doctype, attendees, paid, tickets_to, consent_token, pdf_url}.
+	Returns {ok, reference, reference_doctype, attendees, paid, tickets_to, consent_token}.
 	"""
 	with ticketing_session():
 		result = _register(event, contact, attends, companions, billing_data, source, lang, expected_total, hold_id)
@@ -354,9 +354,7 @@ def _register(event, contact, attends, companions, billing_data, source, lang, e
 		so = billing.create_sales_order(doc, docs, customer, pricing=pricing, submit=True, contact=buyer_contact,
 			address=party.address, email=buyer.email, lang=lang)
 		reference, reference_doctype = so.name, "Sales Order"
-		pdf_url = billing.order_pdf_url(so, lang)
 	else:
-		pdf_url = None
 		reference, reference_doctype = frappe.model.naming.make_autoname(FREE_BOOKING_SERIES), "Attendee"
 		for att in docs:
 			frappe.db.set_value("Attendee", att.name, "order_reference", reference, update_modified=False)
@@ -372,7 +370,7 @@ def _register(event, contact, attends, companions, billing_data, source, lang, e
 			frappe.enqueue("phamos.marketing.ticketing.send_ticket", enqueue_after_commit=True,
 				attendee=att.name, buyer_name=main.full_name, lang=lang)
 	return {"ok": True, "reference": reference, "reference_doctype": reference_doctype, "attendees": len(docs),
-		"paid": paid, "tickets_to": main.email, "consent_token": consent_token(reference), "pdf_url": pdf_url}
+		"paid": paid, "tickets_to": main.email, "consent_token": consent_token(reference)}
 
 
 def save_consents(reference, consents, event=None):
@@ -434,7 +432,6 @@ def send_order_confirmation(event_name, reference, recipient, reference_doctype=
 		template="event_order_confirmation",
 		args={"event": doc, "reference": reference, "attendees": attendees, "order": order, "address": address,
 			"buyer_name": buyer_name, "recipient": recipient,
-			"pdf_url": billing.order_pdf_url(order, frappe.local.lang) if order else None,
 			"terms_attached": any(a["fname"].endswith(".pdf") for a in attachments),
 			"terms_html": terms_html if not any(a["fname"].endswith(".pdf") for a in attachments) else None,
 			"event_url": frappe.utils.get_url(item.url) if item else None,

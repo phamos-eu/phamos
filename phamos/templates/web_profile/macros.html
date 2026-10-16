@@ -433,8 +433,7 @@
 		{#- After the order. Then three optional questions; "Save" closes at once and confirms in a toast. -#}
 		<div class="wp-ticket-success" data-wp-ticket-success hidden>
 			<p class="wp-success-title"><strong>{{ _("Thank you!") }}</strong> <span data-wp-ticket-reference></span></p>
-			<p>{{ _("Confirmation sent to {0}.").format('<strong data-wp-ticket-email></strong>') }}{% if not t.free %} {{ _("The invoice follows by email.") }}{% endif %}
-				<a class="wp-link-card wp-link-card-inline" href="#" target="_blank" rel="noopener" data-wp-ticket-pdf hidden><span>{{ _("Order as PDF") }}</span><span class="wp-link-card-arrow" aria-hidden="true">↓</span></a></p>
+			<p>{{ _("Confirmation sent to {0}.").format('<strong data-wp-ticket-email></strong>') }}{% if not t.free %} {{ _("The invoice follows by email.") }}{% endif %}</p>
 			<div class="wp-success-invoice" data-wp-success-invoice></div>
 			<p class="wp-legal">{{ _("You will receive this by email.") }}</p>
 			<div class="wp-optional" data-wp-optional>

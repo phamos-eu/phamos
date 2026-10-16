@@ -329,16 +329,3 @@ def lead_before_insert(doc, method=None):
 	if doc.flags.ignore_permissions and getattr(doc, "contact_doc", None):
 		doc.contact_doc.flags.ignore_permissions = True
 
-
-def order_pdf_url(so, lang="de"):
-	"""Link to the Sales Order PDF that works without a login (Document Share Key, valid 90 days after the
-	event): shown after the order on the website and in the confirmation email."""
-	from urllib.parse import urlencode
-
-	from frappe.utils import add_days, get_url, getdate, nowdate
-
-	until = add_days(max(getdate(so.delivery_date or nowdate()), getdate(nowdate())), 90)
-	key = so.get_document_share_key(expires_on=until)
-	query = urlencode({"doctype": "Sales Order", "name": so.name, "key": key, "language": lang})
-	return get_url(f"/api/method/frappe.utils.print_format.download_pdf?{query}")
-

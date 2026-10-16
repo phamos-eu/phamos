@@ -165,11 +165,6 @@ class TestWebProfileEvents(FrappeTestCase):
 		self.assertEqual(frappe.db.get_value("Sales Order", result["reference"], "docstatus"), 1)
 		self.assertEqual(frappe.db.get_value("Attendee", {"email": "web.guest@example.com"}, "event"), self.event.name)
 		self.assertEqual(frappe.db.count("Attendee", {"event": self.event.name, "order_reference": result["reference"]}), 2)
-		# The order PDF opens without a login (Document Share Key).
-		self.assertIn("frappe.utils.print_format.download_pdf", result["pdf_url"])
-		self.assertIn("key=", result["pdf_url"])
-		self.assertTrue(frappe.db.exists("Document Share Key", {"reference_doctype": "Sales Order",
-			"reference_docname": result["reference"]}))
 
 		# The optional questions afterwards, signed with the returned token.
 		frappe.set_user("Guest")
@@ -402,7 +397,7 @@ class TestWebProfileEvents(FrappeTestCase):
 		frappe.set_user("Guest")
 		html = get_html_for_route(f"/en/events/{self.event.route}")
 		for marker in ("data-wp-hold-clock", "wp-step-no", "data-wp-invoice", "data-wp-success-invoice", "wp-switch-track",
-				"data-wp-ticket-pdf", "data-wp-reminder-dialog", "wp-interest-yes"):
+				"data-wp-reminder-dialog", "wp-interest-yes"):
 			self.assertIn(marker, html)
 		self.assertNotIn("data-wp-print", html)
 

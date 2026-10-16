@@ -329,7 +329,6 @@
 			$("[data-wp-ticket-success]").hidden = true;
 			$("[data-wp-consents-save]").disabled = false;
 			$("[data-wp-consents-status]").textContent = "";
-			$("[data-wp-ticket-pdf]").hidden = true;
 			$("[data-wp-success-invoice]").replaceChildren();
 			back.disabled = false;
 			renderCompanions();
@@ -460,9 +459,6 @@
 				success.querySelector("[data-wp-ticket-reference]").textContent = result.reference || "";
 				showConfirmationSheet(result.reference);
 				success.querySelector("[data-wp-ticket-email]").textContent = result.tickets_to || value("contact_email");
-				const pdf = success.querySelector("[data-wp-ticket-pdf]");
-				pdf.hidden = !result.pdf_url;
-				if (result.pdf_url) pdf.href = result.pdf_url;
 				success.hidden = false;
 			} catch (error) {
 				submit.disabled = false;

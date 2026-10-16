@@ -134,8 +134,7 @@ def order_tickets(event, lang, contact, attends=1, companions=None, billing=None
 		hold_id=_hold_id(hold_id, required=False))
 	clear_section("events")
 	return {"ok": True, "reference": result["reference"], "reference_doctype": result["reference_doctype"],
-		"free": bool(offer.get("free")), "tickets_to": result["tickets_to"], "token": result["consent_token"],
-		"pdf_url": result.get("pdf_url")}
+		"free": bool(offer.get("free")), "tickets_to": result["tickets_to"], "token": result["consent_token"]}
 
 
 HOLD_ID = re.compile(r"[A-Za-z0-9-]{8,64}")
