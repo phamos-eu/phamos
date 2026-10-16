@@ -24,7 +24,15 @@ def get_context(context):
 	if not item:
 		raise frappe.PageDoesNotExistError
 
+	if section == "events" and frappe.form_dict.get("subscribed") == "1":
+		# Old confirmation links (welcome_url before the confirmation page existed).
+		from phamos.marketing.doctype.marketing_content.marketing_content import subscription_confirmed_url
+
+		frappe.flags.redirect_location = subscription_confirmed_url(slug, lang)
+		raise frappe.Redirect
 	profile = build_profile(item, lang)
+	context.support_email = frappe.db.get_value("Company", frappe.defaults.get_global_default("company"), "email") \
+		if section == "events" else None
 	context.item = item
 	context.profile = profile
 	context.section_title = _(context.section_config["title"])

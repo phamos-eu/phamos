@@ -13,12 +13,15 @@
 						</div>
 					</template>
 				</div>
+				<div v-if="$slots['header-actions']" class="ml-auto flex flex-shrink-0 items-center gap-2 pl-3">
+					<slot name="header-actions" />
+				</div>
 			</header>
-			<main class="min-h-0 flex-1 overflow-hidden bg-surface-gray-1">
+			<main id="cockpit-main" class="min-h-0 flex-1 overflow-hidden bg-surface-gray-1">
 				<router-view />
 			</main>
 		</div>
-		<!-- frappe-ui renders toast() messages only where this container is mounted -->
+		<!-- One toast host for the whole cockpit; without it frappe-ui toast() calls show nothing. -->
 		<Toasts />
 	</div>
 </template>

@@ -34,8 +34,8 @@ def calendar_item_url(base_url: str, email: str, uid: str) -> str:
     base = base_url.rstrip("/")
     return f"{base}/SOGo/dav/{email}/Calendar/personal/{uid}.ics"
 
-def put_ics(uid: str, ics: str, acting_user_id: str):
-    s = settings()
+def calendar_email(acting_user_id: str | None) -> str:
+    """Mailbox of the calendar owner: the given user, else the session user."""
     email = None
     if acting_user_id:
         email = frappe.db.get_value("User", acting_user_id, "email") or acting_user_id
@@ -43,13 +43,27 @@ def put_ics(uid: str, ics: str, acting_user_id: str):
         email = organizer_email()
     if not email:
         raise CalDAVError("Could not determine the calendar owner email.")
+    return email
+
+def put_ics(uid: str, ics: str, acting_user_id: str, create_only: bool = False):
+    """Create or update a calendar object.
+
+    `create_only` sends `If-None-Match: *`, so SOGo refuses to overwrite an existing object with
+    the same UID. Use it only for the first push of a UID this system generated; updates must
+    go without it, or SOGo answers 412 and the change never arrives (#1558).
+    """
+    s = settings()
+    email = calendar_email(acting_user_id)
     pw = dav_password(email)
     if not pw:
         raise CalDAVError(f"No DAV app password is configured for {email}.")
     url = calendar_item_url(s.base_url, email, uid)
+    headers = {"Content-Type": "text/calendar"}
+    if create_only:
+        headers["If-None-Match"] = "*"
     r = requests.put(
         url, data=ics.encode("utf-8"),
-        headers={"Content-Type": "text/calendar", "If-None-Match": "*"},
+        headers=headers,
         auth=(email, pw),
         timeout=30
     )
@@ -57,10 +71,10 @@ def put_ics(uid: str, ics: str, acting_user_id: str):
         raise CalDAVError(f"SOGo calendar update failed ({r.status_code}): {r.text[:500]}")
     return {"uid": uid, "calendar_user": acting_user_id, "email": email}
 
-def delete_ics(uid: str):
+def delete_ics(uid: str, acting_user_id: str | None = None):
+    """Delete a calendar object from the owner's calendar (not the session user's, #1558)."""
     s = settings()
-    email = organizer_email()
-    if not email: return
+    email = calendar_email(acting_user_id)
     pw = dav_password(email)
     if not pw: return
     url = calendar_item_url(s.base_url, email, uid)

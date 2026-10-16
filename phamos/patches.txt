@@ -12,7 +12,7 @@ phamos.patches.v1_0.migrate_measurable_to_kr
 phamos.patches.v1_0.set_project_name_in_timesheet
 phamos.patches.v1_0.fix_implementation_null_hrs
 execute:from phamos.patches.v1_0.fix_mis_status_for_existing_records_v2 import capture_legacy_links; capture_legacy_links()
-
+phamos.patches.v1_0.rename_marketing_event_registration_to_attendee
 
 phamos.patches.v1_0.create_ai_accountant_role
 
@@ -52,3 +52,10 @@ phamos.patches.v1_0.retire_i_own_my_work_default_app
 phamos.patches.v1_0.backfill_todo_cockpit_fields #1553
 phamos.patches.v1_0.convert_accounting_receipt_status
 phamos.patches.v1_0.seed_datev_recipients
+phamos.patches.v1_0.delete_marketing_event_response_doctype
+phamos.patches.v1_0.retire_event_registration_web_form
+phamos.patches.v1_0.migrate_attendee_legacy_data
+phamos.patches.v1_0.move_marketing_content_to_web_profile
+phamos.patches.v1_0.set_event_ticket_prices
+phamos.patches.v1_0.migrate_event_stakeholders
+phamos.patches.v1_0.set_event_subscription_welcome_url

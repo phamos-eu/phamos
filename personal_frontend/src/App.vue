@@ -19,17 +19,31 @@
 				</div>
 			</div>
 		</template>
+		<template #header-actions>
+			<PageSearch />
+			<TimerControl :start-button="false" />
+			<CheckinButton />
+			<CreateMenu :before-checkout="beforeCheckout" />
+			<CheckoutGuardDialog v-model="showGuard" @choose="onGuardChoice" />
+		</template>
 	</CockpitShell>
 </template>
 
 <script setup>
-import { computed, onMounted, watch } from "vue"
+import { computed, onBeforeUnmount, onMounted, ref, watch } from "vue"
 import { useRoute, useRouter } from "vue-router"
 import CockpitShell from "@spa/components/CockpitShell.vue"
 import CockpitSidebar from "@spa/components/CockpitSidebar.vue"
 import { useUserRealtime } from "@spa/composables/useUserRealtime.js"
 import { parseServerTime } from "@spa/utils/focusRules.js"
 import { focus, loadFocus } from "./focusStore.js"
+import { checkin, loadCheckin } from "./checkinStore.js"
+import CheckinButton from "./components/CheckinButton.vue"
+import CheckoutGuardDialog from "./components/CheckoutGuardDialog.vue"
+import CreateMenu from "./components/CreateMenu.vue"
+import PageSearch from "@spa/components/PageSearch.vue"
+import TimerControl from "@spa/components/timesheet/TimerControl.vue"
+import { activeSession, loadTimer, requestTimerStop } from "@spa/timerStore.js"
 
 const route = useRoute()
 const router = useRouter()
@@ -53,9 +67,60 @@ watch(
 	}
 )
 
-onMounted(loadFocus)
+// Check-ins (#1571) and the timesheet timer (#1572): live from other tabs, the HRMS app, the
+// Action Panels and Desk, and again when the tab returns.
+useUserRealtime("cockpit_checkin_changed", loadCheckin, { debounceMs: 300 })
+useUserRealtime("cockpit_timer_changed", loadTimer, { debounceMs: 300 })
 
-const navItems = [
+function onVisible() {
+	if (document.visibilityState !== "visible") return
+	loadCheckin()
+	loadTimer()
+}
+
+// Checking out while a timer runs offers to stop it first (decision of 2026-10-16).
+const showGuard = ref(false)
+let guardResolve = null
+
+async function beforeCheckout() {
+	await loadTimer()
+	if (!activeSession()) return true
+	showGuard.value = true
+	return new Promise((resolve) => (guardResolve = resolve))
+}
+
+async function onGuardChoice(choice) {
+	const resolve = guardResolve
+	guardResolve = null
+	if (!resolve) return
+	if (choice === "anyway") return resolve(true)
+	if (choice === "stop") return resolve(await requestTimerStop())
+	resolve(false)
+}
+
+onMounted(() => {
+	loadFocus()
+	loadCheckin()
+	loadTimer()
+	document.addEventListener("visibilitychange", onVisible)
+})
+onBeforeUnmount(() => document.removeEventListener("visibilitychange", onVisible))
+
+// Check-ins (#1571) appear for users with an active Employee only.
+const CHECKIN_ITEM = {
+	name: "Checkins",
+	label: "Check-ins",
+	icon: "clock",
+	match: ["Checkins"],
+	children: [{ name: "CheckinsList", label: "List", icon: "list", match: ["CheckinsList"] }],
+}
+const navItems = computed(() => {
+	const items = [...BASE_ITEMS]
+	if (checkin.state?.available && checkin.state.employee) items.splice(1, 0, CHECKIN_ITEM)
+	return items
+})
+
+const BASE_ITEMS = [
 	{
 		name: "Todos",
 		label: "ToDos",
@@ -103,6 +168,7 @@ const navItems = [
 
 const pageTitle = computed(() => {
 	if (route.name === "TodosFocus") return "Focus"
+	if (["Checkins", "CheckinsList"].includes(route.name)) return "My Check-ins"
 	if (["Todos", "TodosList", "TodoDetail", "TodosMatrix", "TodosPlan"].includes(route.name)) return "My ToDos"
 	if (["Tasks", "TasksGantt", "TaskDetail"].includes(route.name)) return "My Tasks"
 	if (["ChecklistsHome", "Checklists", "ChecklistDetail"].includes(route.name)) return "My Checklists"
