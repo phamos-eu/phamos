@@ -220,7 +220,6 @@ update_website_context = [
 #	"methods": "phamos.utils.jinja_methods",
 #	"filters": "phamos.utils.jinja_filters"
 # }
-jinja = {"methods": ["phamos.marketing.billing.event_order_print_context"]}
 
 # Installation
 # ------------
