@@ -230,6 +230,20 @@ def resolve_expense_account(item_code, company):
 	)
 
 
+def category_for_account(expense_account, company):
+	"""The one category whose expense account (for the company) is this account, else None."""
+	if not expense_account:
+		return None
+	rows = frappe.get_all(
+		"Item Default",
+		filters={"parenttype": "Item", "company": company, "expense_account": expense_account},
+		pluck="parent",
+	)
+	group = expense_group()
+	matches = [r for r in set(rows) if frappe.db.get_value("Item", r, ["item_group", "disabled"]) == (group, 0)]
+	return matches[0] if len(matches) == 1 else None
+
+
 def item_tax_template_for_rate(rate, company):
 	"""Item Tax Template of the company whose highest rate equals the line's tax rate."""
 	if rate is None or rate == "":

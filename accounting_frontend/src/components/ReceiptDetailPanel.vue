@@ -169,7 +169,7 @@
 				<table v-else class="w-full text-sm">
 					<thead>
 						<tr class="text-left text-[11px] uppercase tracking-wide text-ink-gray-5">
-							<th class="py-1 pr-2">Description · category</th>
+							<th class="py-1 pr-2">Description · expense account</th>
 							<th class="w-14 py-1 pr-2 text-right">Qty</th>
 							<th class="w-20 py-1 pr-2 text-right">Rate</th>
 							<th class="w-20 py-1 pr-2 text-right">Amount</th>
@@ -182,18 +182,17 @@
 							<td class="py-1 pr-2 align-top">
 								<input :value="item.item_name" :disabled="readonly" class="cell" @change="setItem(i, 'item_name', $event.target.value)" />
 								<div class="mt-0.5 min-w-0">
-									<select
-										:value="item.item_code || ''"
+									<FrappeLink
+										:model-value="item.expense_account || ''"
+										doctype="Account"
+										:filters="accountFilters"
 										:disabled="readonly"
-										class="cell !h-7 !py-0 text-xs"
-										:class="item.item_code ? '' : 'text-ink-amber-3'"
-										@change="setItem(i, 'item_code', $event.target.value)"
-									>
-										<option value="">— choose category —</option>
-										<option v-for="c in categories" :key="c.item_code" :value="c.item_code">{{ c.item_name }}</option>
-									</select>
-									<div class="truncate px-1 text-[11px]" :class="accountLabel(item) ? 'text-ink-gray-5' : 'text-ink-amber-3'" :title="accountLabel(item)">
-										{{ accountLabel(item) || "no category yet, so no account" }}
+										placeholder="Expense account"
+										@update:model-value="(value) => setItem(i, 'expense_account', value)"
+									/>
+									<div class="truncate px-1 text-[11px]" :class="item.expense_account ? 'text-ink-gray-5' : 'text-ink-amber-3'">
+										<template v-if="!item.expense_account">no expense account yet</template>
+										<template v-else-if="categoryName(item)">Category: {{ categoryName(item) }}</template>
 									</div>
 								</div>
 							</td>
@@ -401,17 +400,22 @@ async function loadCategories() {
 }
 loadCategories()
 
-function accountLabel(item) {
-	const category = categories.value.find((c) => c.item_code === item.item_code)
-	if (item.expense_account && (!category || category.expense_account !== item.expense_account)) return item.expense_account
-	if (category?.account_number) return `${category.account_number} ${category.account_name}`
-	return item.expense_account || ""
+// Leaf expense accounts of the receipt's company: what a purchase line can be booked on.
+const accountFilters = computed(() => ({
+	root_type: "Expense",
+	is_group: 0,
+	disabled: 0,
+	...(props.receipt?.company ? { company: props.receipt.company } : {}),
+}))
+
+function categoryName(item) {
+	return categories.value.find((c) => c.item_code === item.item_code)?.item_name || ""
 }
 
 const invoiceHint = computed(() => {
 	if (!autosave.draft.supplier) return "Set the supplier first."
 	if (!autosave.draft.items.length) return "Add item lines first."
-	if (autosave.draft.items.some((row) => !accountLabel(row))) return "Every line needs a category."
+	if (autosave.draft.items.some((row) => !row.expense_account)) return "Every line needs an expense account."
 	return ""
 })
 
@@ -441,8 +445,8 @@ function setItem(index, field, raw) {
 	autosave.draft.items = autosave.draft.items.map((row, i) => {
 		if (i !== index) return row
 		const next = { ...row, [field]: value }
-		// A new category brings its own expense account (set by the server).
-		if (field === "item_code") next.expense_account = null
+		// The server sets the category that belongs to the chosen account.
+		if (field === "expense_account") next.item_code = null
 		if (field === "qty" || field === "rate") next.amount = round2(Number(next.qty || 0) * Number(next.rate || 0))
 		return next
 	})

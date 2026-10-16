@@ -94,6 +94,24 @@ class TestCategories(CategoryTestCase):
 		self.assertEqual(frappe.db.get_value("Accounting Receipt Item", row.name, "expense_account"), self.account("6810"))
 
 
+	def test_chosen_account_brings_its_category(self):
+		doc = self.receipt([{"item_name": "Domain phamos.eu", "qty": 1, "rate": 12, "amount": 12, "expense_account": self.account("6810")}])
+		self.assertEqual(doc.items[0].item_code, "Hosting & Cloud")
+		self.assertEqual(categories.category_for_account(self.account("6810"), self.company), "Hosting & Cloud")
+
+	def test_account_without_single_category_leaves_the_category_empty(self):
+		doc = self.receipt([{"item_name": "Sonderposten", "qty": 1, "rate": 5, "amount": 5, "expense_account": self.account("6450")}])
+		self.assertFalse(doc.items[0].item_code)
+		self.assertEqual(doc.items[0].expense_account, self.account("6450"))
+
+	def test_changing_the_account_replaces_a_mismatching_category(self):
+		doc = self.receipt([{"item_name": "Handy", "qty": 1, "rate": 40, "amount": 40, "item_code": "Telekommunikation"}])
+		row = doc.items[0]
+		api.update_receipt(doc.name, items=[{"name": row.name, "item_name": "Handy", "qty": 1, "rate": 40,
+			"item_code": None, "expense_account": self.account("6815")}])
+		self.assertEqual(frappe.db.get_value("Accounting Receipt Item", row.name, "item_code"), "Bürobedarf")
+
+
 class TestPurchaseInvoiceFromLines(CategoryTestCase):
 	def test_invoice_lines_accounts_tax_template_and_header(self):
 		doc = self.receipt(
@@ -121,10 +139,10 @@ class TestPurchaseInvoiceFromLines(CategoryTestCase):
 			branching.make_purchase_invoice(doc)
 
 	def test_line_with_own_account_needs_no_category(self):
-		doc = self.receipt([{"item_name": "Sonderposten", "qty": 1, "rate": 10, "amount": 10, "expense_account": self.account("6300")}])
+		doc = self.receipt([{"item_name": "Sonderposten", "qty": 1, "rate": 10, "amount": 10, "expense_account": self.account("6450")}])
 		pi = branching.make_purchase_invoice(doc)
 		self.assertFalse(pi.items[0].item_code)
-		self.assertEqual(pi.items[0].expense_account, self.account("6300"))
+		self.assertEqual(pi.items[0].expense_account, self.account("6450"))
 
 	def test_total_difference_is_reported_and_second_invoice_refused(self):
 		doc = self.receipt([{"item_name": "Server", "qty": 1, "rate": 100, "amount": 100, "item_code": "Hosting & Cloud"}], sum=500)

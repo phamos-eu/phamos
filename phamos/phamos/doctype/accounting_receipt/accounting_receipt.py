@@ -58,12 +58,20 @@ class AccountingReceipt(Document):
 				self.sum_in_company_currency = float(self.sum) * float(rate)
 
 	def set_item_accounts(self):
-		"""Lines with a category but no expense account take the category's account."""
-		from phamos.accounting.categories import resolve_expense_account
+		"""Keep a line's expense account and category in step.
+
+		The account is what people pick; the category follows it when exactly one category
+		uses that account (so Purchase Invoice lines carry it). A line with only a category
+		takes the category's account.
+		"""
+		from phamos.accounting.categories import category_for_account, resolve_expense_account
 
 		company = self.company or get_default_company()
 		for row in self.get("items") or []:
-			if row.item_code and not row.expense_account:
+			if row.expense_account:
+				if not row.item_code or resolve_expense_account(row.item_code, company) != row.expense_account:
+					row.item_code = category_for_account(row.expense_account, company)
+			elif row.item_code:
 				row.expense_account = resolve_expense_account(row.item_code, company)
 
 	@frappe.whitelist()
