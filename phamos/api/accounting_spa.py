@@ -10,6 +10,7 @@ from frappe.desk.form.assign_to import remove as remove_assignment
 from frappe.desk.form.load import get_assignments
 from frappe.utils import flt, get_fullname
 
+from phamos.accounting.pdf_stamp import note_to_lines
 from phamos.api import department_cockpit as dc
 from phamos.api.issue_common import _parse_assignees, _parse_list
 
@@ -516,7 +517,7 @@ def get_receipt(name):
 	frappe.has_permission("Accounting Receipt", "read", throw=True)
 	doc = frappe.get_doc("Accounting Receipt", name)
 	doc.check_permission("read")
-	return _serialize_receipt_row(
+	row = _serialize_receipt_row(
 		{
 			"name": doc.name,
 			"title": doc.title,
@@ -534,6 +535,8 @@ def get_receipt(name):
 			"attachment": doc.attachment or "",
 		}
 	)
+	row["note_text"] = "\n".join(note_to_lines(doc.note))
+	return row
 
 
 @frappe.whitelist(methods=["POST"])

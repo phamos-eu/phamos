@@ -8,6 +8,7 @@ from frappe import _
 from frappe.desk.form.load import get_attachments, get_communications
 from frappe.model.document import Document
 from frappe.utils import now, today
+from frappe.utils.file_manager import get_file, save_file
 
 SETTINGS_DOCTYPE = "phamos Settings"
 # Statuses a successful DATEV send moves on to "Sent to DATEV". Paid and Cancelled stay.
@@ -256,6 +257,52 @@ def _datev_pdf_url(doc):
 	return _first_attached_pdf(doc.name)
 
 
+DATEV_FILE_SUFFIX = "-DATEV.pdf"
+
+
+def build_datev_pdf(doc, pdf_file_url):
+	"""PDF that goes to DATEV: the original, or a stamped copy when the receipt has a note.
+
+	The stamped copy is kept as an attachment "<receipt>-DATEV.pdf" (previous copies are
+	replaced; Frappe may add a suffix to the stored name) so everyone can see what the
+	accounting office received.
+	Returns (attachment dict for frappe.sendmail, file_url of the stamped copy or None).
+	"""
+	from phamos.accounting.pdf_stamp import note_to_lines, stamp_pdf
+
+	lines = note_to_lines(doc.note)
+	if not lines:
+		return {"file_url": pdf_file_url}, None
+	try:
+		_, original = get_file(pdf_file_url)
+		stamped, _mode = stamp_pdf(original, doc.name, lines)
+	except Exception:
+		frappe.log_error(title=_("DATEV note could not be stamped"), message=frappe.get_traceback())
+		return {"file_url": pdf_file_url}, None
+
+	file_name = f"{doc.name}{DATEV_FILE_SUFFIX}"
+	for old in frappe.get_all(
+		"File",
+		filters={"attached_to_doctype": "Accounting Receipt", "attached_to_name": doc.name, "file_name": ["like", f"{doc.name}-DATEV%.pdf"]},
+		pluck="name",
+	):
+		frappe.delete_doc("File", old, ignore_permissions=True)
+	saved = save_file(file_name, stamped, "Accounting Receipt", doc.name, is_private=1)
+	return {"fname": file_name, "fcontent": stamped}, saved.file_url
+
+
+@frappe.whitelist(methods=["POST"])
+def preview_datev_pdf(accounting_receipt_name):
+	"""Build the PDF DATEV would receive, without sending, and return its URL."""
+	frappe.has_permission("Accounting Receipt", "write", doc=accounting_receipt_name, throw=True)
+	doc = frappe.get_doc("Accounting Receipt", accounting_receipt_name)
+	pdf_file_url = _datev_pdf_url(doc)
+	if not pdf_file_url or not pdf_file_url.lower().endswith(".pdf"):
+		frappe.throw(_("PDF attachment is missing."))
+	_attachment, stamped_url = build_datev_pdf(doc, pdf_file_url)
+	return {"file_url": stamped_url or pdf_file_url, "stamped": bool(stamped_url)}
+
+
 @frappe.whitelist()
 def send_to_datev(accounting_receipt_name):
 	"""
@@ -314,11 +361,12 @@ def send_to_datev(accounting_receipt_name):
 
 	# Send email via Frappe Email Queue
 	try:
+		attachment, _stamped_url = build_datev_pdf(doc, pdf_file_url)
 		frappe.sendmail(
 			recipients=[recipient],
 			subject=subject,
 			message=message,
-			attachments=[{"file_url": pdf_file_url}],
+			attachments=[attachment],
 			reference_doctype="Accounting Receipt",
 			reference_name=doc.name,
 			send_after=None,

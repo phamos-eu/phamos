@@ -25,6 +25,7 @@ SKIP_FIELDNAMES = {
 	"title",  # email subject / inbox; do not overwrite from PDF or AI extract
 	"is_paid",  # payment status: not from supplier PDF / AI
 	"total_billing_hours",  # timesheet billing: not from supplier PDF / AI
+	"note",  # note for the accounting office, written by humans only
 }
 
 
@@ -79,8 +80,6 @@ def get_extraction_key_map():
 		"vendor": "supplier",
 		"reference": "supplier_reference",
 		"invoice_number": "supplier_reference",
-		"notes": "note",
-		"description": "note",
 		"billing_amount": "total_billing_amount",
 		"exchange_rate": "conversion_rate",
 	}

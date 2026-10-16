@@ -142,7 +142,8 @@
   {
    "fieldname": "note",
    "fieldtype": "Text Editor",
-   "label": "Note"
+   "label": "Note for the Accounting Office",
+   "description": "Printed on top of the PDF sent to DATEV, e.g. the guests of a business meal, a project number or a cost center. Never filled by the AI."
   },
   {
    "fieldname": "purchase_section_section",
@@ -410,7 +411,7 @@
  ],
  "index_web_pages_for_search": 1,
  "links": [],
- "modified": "2026-10-16 12:00:00.000000",
+ "modified": "2026-10-16 15:00:00.000000",
  "modified_by": "Administrator",
  "module": "Phamos",
  "name": "Accounting Receipt",
