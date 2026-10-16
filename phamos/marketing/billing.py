@@ -339,6 +339,57 @@ def order_pdf_url(so, lang="de"):
 
 	until = add_days(max(getdate(so.delivery_date or nowdate()), getdate(nowdate())), 90)
 	key = so.get_document_share_key(expires_on=until)
-	query = urlencode({"doctype": "Sales Order", "name": so.name, "key": key, "language": lang})
+	query = urlencode({"doctype": "Sales Order", "name": so.name, "format": ORDER_PRINT_FORMAT, "no_letterhead": 1,
+		"key": key, "language": lang})
 	return get_url(f"/api/method/frappe.utils.print_format.download_pdf?{query}")
 
+
+
+# --- print format ---------------------------------------------------------------------------------------
+
+ORDER_PRINT_FORMAT = "Event Order"
+
+
+def event_order_print_context(doc):
+	"""What the print format "Event Order" (a DIN 5008 letter like the website's review step) needs beyond the
+	Sales Order: sender line, company footer, the event (date, venue) and one VAT line per tax row with an
+	amount. Registered as a Jinja method in hooks.py."""
+	import json
+
+	from babel.dates import format_date
+
+	from phamos.web_profile.chrome import company_footer
+	from phamos.web_profile.events import LOCALES, when
+
+	lang = "de" if (frappe.local.lang or "de").startswith("de") else "en"
+	company = company_footer()
+	event_name = frappe.db.get_value("Attendee", {"sales_order": doc.name}, "event")
+	event = frappe.db.get_value("Marketing Content", event_name, ["title", "starts_on", "ends_on", "date_note", "location",
+		"city"], as_dict=True) if event_name else None
+	vat = []
+	for row in doc.get("taxes") or []:
+		if not flt(row.tax_amount):
+			continue
+		rate = flt(row.rate)
+		try:
+			# The rate ERPNext actually applied (Item Tax Template), not the template row's rate.
+			rates = {flt(v[0]) for v in json.loads(row.item_wise_tax_detail or "{}").values() if flt(v[1])}
+			rate = rates.pop() if len(rates) == 1 else rate
+		except (ValueError, TypeError, IndexError, KeyError):
+			pass
+		vat.append(frappe._dict(rate=f"{rate:g}", amount=row.tax_amount))
+	names = [doc.customer_name or doc.customer]
+	contact = doc.get("contact_display") or (frappe.db.get_value("Contact", doc.contact_person, "full_name")
+		if doc.get("contact_person") else None)
+	if contact and contact not in names:
+		names.append(contact)
+	return frappe._dict(
+		date=format_date(getdate(doc.transaction_date), "d. MMMM y" if lang == "de" else "d MMMM y", locale=LOCALES[lang]),
+		recipient=names,
+		sender=" · ".join(filter(None, [company.get("name"), *(company.get("address_lines") or [])])),
+		company=company,
+		event_title=event.title if event else None,
+		event_date=when(event, lang)["line"] if event else None,
+		venue=", ".join(filter(None, [event.location, event.city])) if event else None,
+		vat=vat,
+	)

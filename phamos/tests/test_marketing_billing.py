@@ -99,3 +99,17 @@ class TestBilling(FrappeTestCase):
 	def test_price_summary(self, enqueue):
 		self.assertIn("Regular", billing.price_summary(self.event))
 		self.assertIn("119", self.event.ticket_price_summary)
+
+	def test_event_order_print_format(self, enqueue):
+		so = frappe.get_doc("Sales Order", self.web_order())
+		self.assertIn("format=Event+Order", billing.order_pdf_url(so, "de"))
+		lang = frappe.local.lang
+		try:
+			frappe.local.lang = "de"
+			html = frappe.get_print("Sales Order", so.name, billing.ORDER_PRINT_FORMAT, as_pdf=0, no_letterhead=1)
+		finally:
+			frappe.local.lang = lang
+		for part in ["eo-sender", "Bestellung: Billing Test Event", so.name, "Test Venue, Reutlingen", "bill@billing.example",
+				"Billing Test GmbH<br>Bill Buyer<br>", "Colleague One", "Einzelpreis", "Netto", "MwSt. 19 %", "Zahlung per Rechnung", "footer-html"]:
+			self.assertIn(part, html)
+		self.assertIn("238", html)
