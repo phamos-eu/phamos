@@ -371,6 +371,9 @@ doc_events = {
         "on_trash": "phamos.gitlab_integration.label_ledger.delete_issue_label_ledger",
     },
     "Timesheet Record": {
+        # Personal Cockpit timer: live updates to the employee's own user (#1572).
+        "on_change": "phamos.cockpits.timer_hooks.on_change",
+        "on_trash": "phamos.cockpits.timer_hooks.on_trash",
         "on_submit": [
             "phamos.gitlab_integration.gitlab_utils.sync_touch_time_on_timesheet_change",
             "phamos.gitlab_integration.gitlab_utils.sync_cycle_time_start_on_timesheet_change",
