@@ -158,6 +158,8 @@ SECTIONS["events"] = {
 			"options": [("upcoming", "Upcoming"), ("past", "Past"), ("all", "All")]},
 		{"key": "event_type", "label": "Type", "type": "multi"},
 		{"key": "city", "label": "City", "type": "multi"},
+		# Months as numbers (year * 12 + month - 1), shown as "Okt. 2026"; the span follows the When toggle.
+		{"key": "month", "label": "Period", "type": "range", "format": "month", "bounds": "view"},
 	],
 	"sorts": [("date", "Date"), ("name", "Name A–Z")],
 }

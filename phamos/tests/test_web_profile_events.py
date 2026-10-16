@@ -406,3 +406,28 @@ class TestWebProfileEvents(FrappeTestCase):
 			self.assertIn(marker, html)
 		self.assertNotIn("data-wp-print", html)
 
+	def test_period_slider_by_month(self):
+		from phamos.web_profile.listing import build_listing
+
+		past_month = self.item(self.past).numbers["month"]
+		next_month = self.item().numbers["month"]
+		self.assertLess(past_month, next_month)
+		try:
+			# Upcoming (default): the slider spans only upcoming months.
+			set_request(method="GET", path="/en/events")
+			facet = next((f for f in build_listing("events", "en")["facets"] if f["key"] == "month"), None)
+			if facet:
+				self.assertGreaterEqual(facet["min"], next_month)
+			# All events, limited to the past event's month.
+			set_request(method="GET", path=f"/en/events?when=all&month_min={past_month}&month_max={past_month}")
+			listing = build_listing("events", "en")
+			names = [i.name for i in listing["results"]]
+			self.assertIn(self.past.name, names)
+			self.assertNotIn(self.event.name, names)
+			facet = next(f for f in listing["facets"] if f["key"] == "month")
+			self.assertEqual(len(facet["labels"]), facet["max"] - facet["min"] + 1)
+			self.assertRegex(facet["low_label"], r"\d{4}")
+			self.assertTrue(any("Period" in chip["label"] for chip in listing["active_filters"]))
+		finally:
+			frappe.local.request = None
+

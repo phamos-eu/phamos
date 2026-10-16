@@ -92,7 +92,8 @@
 {%- elif facet.type == "range" -%}
 {#- Numbers: one slider with a min and a max handle. Plain range inputs, so it also works as a normal
     form without JavaScript; web_profile.bundle.js keeps the handles apart and shows the values. -#}
-<fieldset class="wp-facet wp-range" data-wp-facet="{{ facet.key }}" data-wp-range data-min="{{ facet.min }}" data-max="{{ facet.max }}">
+<fieldset class="wp-facet wp-range" data-wp-facet="{{ facet.key }}" data-wp-range data-min="{{ facet.min }}" data-max="{{ facet.max }}"
+	{%- if facet.labels %} data-labels="{{ facet.labels | tojson | e }}"{% endif %}>
 	<legend class="wp-facet-title">{{ facet.label | e }}{% if facet.unit %} ({{ facet.unit | e }}){% endif %}</legend>
 	<div class="wp-range-slider" style="--low: {{ ((facet.low - facet.min) * 100 / (facet.max - facet.min)) | round(2) }}%; --high: {{ ((facet.high - facet.min) * 100 / (facet.max - facet.min)) | round(2) }}%;">
 		<input type="range" name="{{ facet.key }}_min" min="{{ facet.min }}" max="{{ facet.max }}" step="1" value="{{ facet.low }}"
@@ -103,7 +104,7 @@
 			data-wp-default-for="{{ facet.key }}_max" data-wp-default="{{ facet.max }}">
 	</div>
 	{#- The numbers under the handles are the selected values (updated while dragging). -#}
-	<div class="wp-range-bounds" aria-hidden="true"><span data-wp-range-low>{{ facet.low }}</span><span data-wp-range-high>{{ facet.high }}</span></div>
+	<div class="wp-range-bounds" aria-hidden="true"><span data-wp-range-low>{{ facet.low_label if facet.low_label is defined else facet.low }}</span><span data-wp-range-high>{{ facet.high_label if facet.high_label is defined else facet.high }}</span></div>
 </fieldset>
 {%- else -%}
 <fieldset class="wp-facet" data-wp-facet="{{ facet.key }}">

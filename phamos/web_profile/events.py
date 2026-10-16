@@ -137,6 +137,8 @@ def load_events(lang):
 		if badge:
 			item["badge"] = badge
 		start = getdate(r.starts_on) if r.starts_on else None
+		if start:
+			item["numbers"]["month"] = start.year * 12 + start.month - 1  # the "Period" slider, by month
 		# Upcoming first, soonest on top; then past events, most recent on top; open dates after upcoming.
 		if upcoming:
 			days = (start - today).days if start else 10**5

@@ -22,6 +22,17 @@ PAGE_SIZE = 24  # override per site with `bench set-config web_profile_page_size
 SCROLL_FACET_THRESHOLD = 8  # facets with more options render in a scrolling box
 
 
+def range_label(facet, value, lang):
+	"""Display value of a slider position: month numbers (year * 12 + month - 1) as "Okt. 2026"."""
+	if facet.get("format") == "month":
+		from datetime import date
+
+		from babel.dates import format_date
+
+		return format_date(date(value // 12, value % 12 + 1, 1), "MMM y", locale="de_DE" if lang == "de" else "en_GB")
+	return value
+
+
 def read_params(section):
 	"""Selected facet values, search, sort and page from the request (repeated keys allowed)."""
 	args = frappe.request.args if getattr(frappe.local, "request", None) else {}
@@ -149,11 +160,15 @@ def build_listing(section, lang):
 	items = get_items(section, lang)
 	selected, q, ranges = params["selected"], params["q"], params["ranges"]
 
-	# Slider bounds come from all records; a range covering the full span is no filter at all.
+	# Slider bounds come from all records (or, with "bounds": "view", from the records the toggles show,
+	# e.g. only upcoming events); a range covering the full span is no filter at all.
+	toggles = {f["key"]: selected[f["key"]] for f in config["facets"] if f["type"] == "toggle" and f["key"] in selected}
+	in_toggle_view = [i for i in items if _matches(i, toggles, "")]
 	bounds = {}
 	for facet in config["facets"]:
 		if facet["type"] == "range":
-			values = [i.numbers[facet["key"]] for i in items if i.numbers.get(facet["key"]) is not None]
+			pool = in_toggle_view if facet.get("bounds") == "view" else items
+			values = [i.numbers[facet["key"]] for i in pool if i.numbers.get(facet["key"]) is not None]
 			if values:
 				bounds[facet["key"]] = (min(values), max(values))
 	for key in list(ranges):
@@ -184,11 +199,15 @@ def build_listing(section, lang):
 			if not span or span[0] == span[1] or (not in_view and key not in ranges):
 				continue  # nothing to slide in this view
 			low, high = ranges.get(key, span)
+			labels = [range_label(facet, v, lang) for v in range(span[0], span[1] + 1)] if facet.get("format") else None
 			facets.append({
 				"key": key, "label": _(facet["label"]), "type": "range",
 				"min": span[0], "max": span[1], "low": low, "high": high,
 				"unit": _(facet["unit"]) if facet.get("unit") else "",
 				"active": key in ranges,
+				"labels": labels,
+				"low_label": labels[low - span[0]] if labels else low,
+				"high_label": labels[high - span[0]] if labels else high,
 			})
 			continue
 		if facet.get("options"):
@@ -234,8 +253,8 @@ def build_listing(section, lang):
 		if facet["type"] == "range":
 			if facet["active"]:
 				active_filters.append({
-					"label": f"{facet['label']}: " + (str(facet["low"]) if facet["low"] == facet["high"]
-						else f"{facet['low']}–{facet['high']}") + (f" {facet['unit']}" if facet["unit"] else ""),
+					"label": f"{facet['label']}: " + (str(facet["low_label"]) if facet["low"] == facet["high"]
+						else f"{facet['low_label']}–{facet['high_label']}") + (f" {facet['unit']}" if facet["unit"] else ""),
 					"url": section_url(section, lang) + _query(section, params, **{f"{facet['key']}_min": None,
 						f"{facet['key']}_max": None, "page": 1}),
 				})
