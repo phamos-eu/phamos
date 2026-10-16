@@ -7,6 +7,8 @@ export const PAD_MINUTES = 15
 export const GAP_COLLAPSE_MINUTES = 30
 export const GAP_ROW_PX = 28
 export const MIN_BLOCK_PX = 6
+// Labels of points (check-ins, ToDos) are one line; closer points are pushed apart.
+export const POINT_ROW_PX = 22
 const DAY_MINUTES = 24 * 60
 
 const pad = (n) => String(n).padStart(2, "0")
@@ -97,10 +99,19 @@ export function layoutDay(events, { now = null } = {}) {
 				height: Math.max((block.end - block.start) * PX_PER_MINUTE, MIN_BLOCK_PX),
 			}
 		})
+		// Points at nearly the same time would overlap: keep at least POINT_ROW_PX between them,
+		// starting half a row below the span's top, and grow the span when they need the room.
+		let previous = POINT_ROW_PX / 2 - POINT_ROW_PX
 		const points = inSpan
 			.filter((e) => e.kind === "point")
 			.sort((a, b) => a.start - b.start)
-			.map((point) => ({ ...point, top: (point.start - span.start) * PX_PER_MINUTE }))
+			.map((point) => {
+				const exact = (point.start - span.start) * PX_PER_MINUTE
+				const top = Math.max(exact, previous + POINT_ROW_PX)
+				previous = top
+				return { ...point, top, exactTop: exact, shifted: top !== exact }
+			})
+		const height = Math.max((span.end - span.start) * PX_PER_MINUTE, points.length ? previous + POINT_ROW_PX / 2 : 0)
 		const hours = []
 		for (let m = Math.ceil(span.start / 60) * 60; m <= span.end; m += 60) {
 			hours.push({ label: hourLabel(m), top: (m - span.start) * PX_PER_MINUTE })
@@ -109,7 +120,7 @@ export function layoutDay(events, { now = null } = {}) {
 			kind: "span",
 			start: span.start,
 			end: span.end,
-			height: (span.end - span.start) * PX_PER_MINUTE,
+			height,
 			blocks: placed,
 			points,
 			hours,

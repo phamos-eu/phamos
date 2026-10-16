@@ -15,6 +15,7 @@
 					:events="eventsByDay[date] || []"
 					:today="today"
 					:now-minute="nowMinute"
+					:active="date === activeDate"
 					@open-date="goTo"
 					@changed="reloadAround(today)"
 				/>
@@ -63,7 +64,29 @@ const loadingEarlier = ref(false)
 const loadingLater = ref(false)
 const error = ref("")
 const now = ref(new Date())
+const activeDate = ref("")
 let ticker = null
+let scrollFrame = 0
+
+// The day whose section is at the top of the view; its date is shown larger.
+function updateActiveDate() {
+	scrollFrame = 0
+	const el = scroller.value
+	if (!el) return
+	const top = el.getBoundingClientRect().top + 4
+	for (const section of el.querySelectorAll("section[id^='day-']")) {
+		const rect = section.getBoundingClientRect()
+		if (rect.top <= top && rect.bottom > top) {
+			activeDate.value = section.id.slice(4)
+			return
+		}
+	}
+	activeDate.value = ""
+}
+
+function onScroll() {
+	if (!scrollFrame) scrollFrame = requestAnimationFrame(updateActiveDate)
+}
 
 const lastFuture = computed(() => addDays(today.value, FUTURE_DAYS))
 const nowMinute = computed(() => minuteOfDay(now.value))
@@ -191,6 +214,7 @@ const sentinels = useScrollSentinels(scroller, topSentinel, bottomSentinel, { on
 async function scrollToDate(date) {
 	await nextTick()
 	document.getElementById(`day-${date}`)?.scrollIntoView({ block: "start" })
+	updateActiveDate()
 }
 
 async function start(center) {
@@ -247,9 +271,12 @@ onMounted(() => {
 		today.value = todayIsoInUserTz()
 	}, 60000)
 	window.addEventListener("keydown", onKeydown)
+	scroller.value?.addEventListener("scroll", onScroll, { passive: true })
 })
 onBeforeUnmount(() => {
 	clearInterval(ticker)
 	window.removeEventListener("keydown", onKeydown)
+	scroller.value?.removeEventListener("scroll", onScroll)
+	if (scrollFrame) cancelAnimationFrame(scrollFrame)
 })
 </script>

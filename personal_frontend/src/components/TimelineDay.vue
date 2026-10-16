@@ -1,18 +1,20 @@
 <template>
-	<section :id="`day-${date}`" class="scroll-mt-0">
-		<!-- Sticky day header -->
-		<header
-			class="sticky top-0 z-[1] -mx-5 flex items-center justify-between border-b border-outline-gray-2 bg-surface-gray-1 px-5 py-2"
-			:class="compact ? 'py-1' : ''"
+	<section :id="`day-${date}`" class="flex gap-4 border-b border-outline-gray-2" :class="compact ? 'py-1' : ''">
+		<!-- Date column: stays at the top while the day scrolls by -->
+		<aside
+			class="sticky top-0 z-[1] w-36 flex-none self-start pr-1 transition-all"
+			:class="[compact ? 'py-0.5' : 'py-3', isToday ? 'text-ink-blue-3' : active ? 'text-ink-gray-9' : 'text-ink-gray-6']"
 		>
-			<h2 class="text-sm font-semibold" :class="isToday ? 'text-ink-gray-9' : 'text-ink-gray-7'">
-				{{ title }}
-				<span v-if="isToday" class="ml-2 rounded bg-surface-gray-7 px-1.5 py-0.5 text-xs font-medium text-ink-white">Today</span>
-			</h2>
-			<span v-if="summary" class="text-xs text-ink-gray-5">{{ summary }}</span>
-		</header>
+			<div class="font-semibold leading-tight transition-all" :class="active || isToday ? 'text-xl' : 'text-sm'">
+				{{ weekday }}
+			</div>
+			<div class="transition-all" :class="active || isToday ? 'text-sm' : 'text-xs'">{{ formatDate(date) }}</div>
+			<span v-if="isToday" class="mt-1 inline-block rounded bg-surface-blue-2 px-1.5 py-0.5 text-xs font-medium text-ink-blue-3">Today</span>
+			<div v-if="summary && !compact" class="mt-1 text-xs text-ink-gray-5">{{ summary }}</div>
+		</aside>
 
-		<div v-if="!compact" class="space-y-3 py-3">
+		<p v-if="compact" class="py-0.5 text-xs text-ink-gray-5">{{ summary }}</p>
+		<div v-else class="min-w-0 flex-1 space-y-3 py-3" :class="isToday ? 'rounded-lg' : ''">
 			<!-- Plan card -->
 			<DayPlanner v-if="isToday || plannerOpen" :date="isToday ? '' : date" @open-date="emit('open-date', $event)" @changed="emit('changed')" />
 			<button
@@ -64,7 +66,13 @@
 							<span v-if="block.height >= 18" class="block truncate font-medium">{{ block.log.project_name }}</span>
 							<span v-if="block.height >= 34" class="block truncate">{{ block.kind === "break" ? "Break" : block.log.goal }}</span>
 						</button>
-						<!-- check-ins and ToDos -->
+						<!-- check-ins and ToDos; a point pushed down for room keeps a tick at its exact time -->
+						<span
+							v-for="point in row.points.filter((p) => p.shifted)"
+							:key="`tick-${point.id}`"
+							class="absolute right-0 h-px w-2 bg-outline-gray-4"
+							:style="{ top: `${point.exactTop}px` }"
+						/>
 						<button
 							v-for="point in row.points"
 							:key="point.id"
@@ -105,7 +113,6 @@
 					</div>
 				</div>
 			</div>
-			<p v-else-if="!isFuture && !isToday && !day.plan" class="text-xs text-ink-gray-5">Nothing recorded.</p>
 		</div>
 	</section>
 </template>
@@ -126,6 +133,8 @@ const props = defineProps({
 	events: { type: Array, default: () => [] },
 	today: { type: String, required: true },
 	nowMinute: { type: Number, default: null },
+	// The day at the top of the view while scrolling: its date is shown larger.
+	active: { type: Boolean, default: false },
 })
 const emit = defineEmits(["open-date", "changed"])
 
@@ -138,10 +147,7 @@ const isFuture = computed(() => props.date > props.today)
 // Past days with nothing at all, and future days without a plan, collapse to one line.
 const compact = computed(() => !isToday.value && !isFuture.value && !props.events.length && !props.day.plan)
 const layout = computed(() => (isFuture.value ? { rows: [] } : layoutDay(props.events, { now: isToday.value ? props.nowMinute : null })))
-const title = computed(() => {
-	const d = new Date(`${props.date}T12:00:00`)
-	return `${d.toLocaleDateString([], { weekday: "long" })} ${formatDate(props.date)}`
-})
+const weekday = computed(() => new Date(`${props.date}T12:00:00`).toLocaleDateString([], { weekday: "long" }))
 const planCount = computed(() => {
 	const c = props.day.plan?.counts || {}
 	return (c.done || 0) + (c.moved || 0) + (c.dropped || 0) + (c.open || 0)

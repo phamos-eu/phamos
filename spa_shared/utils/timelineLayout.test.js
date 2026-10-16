@@ -1,5 +1,5 @@
 // Run with `yarn test:spa` (vitest globals, see personal_frontend/vitest.config.js).
-import { formatGap, GAP_ROW_PX, layoutDay, PX_PER_MINUTE, splitIntoDays } from "./timelineLayout.js"
+import { formatGap, GAP_ROW_PX, layoutDay, POINT_ROW_PX, PX_PER_MINUTE, splitIntoDays } from "./timelineLayout.js"
 
 const at = (day, hh, mm = 0) => new Date(2026, 9, day, hh, mm)
 
@@ -59,6 +59,18 @@ describe("timeline layout", () => {
 	it("keeps a point on its own day", () => {
 		const days = splitIntoDays([{ id: "in", kind: "point", start: at(12, 8), end: null }], at(14, 9))
 		expect(Object.keys(days)).toEqual(["2026-10-12"])
+	})
+
+	it("pushes points that are close in time apart", () => {
+		const { rows } = layoutDay([
+			{ id: "a", kind: "point", start: 23 * 60 + 1, end: 23 * 60 + 1 },
+			{ id: "b", kind: "point", start: 23 * 60 + 3, end: 23 * 60 + 3 },
+			{ id: "c", kind: "point", start: 23 * 60 + 3, end: 23 * 60 + 3 },
+		])
+		const tops = rows[0].points.map((p) => p.top)
+		expect(tops[1] - tops[0]).toBeGreaterThanOrEqual(POINT_ROW_PX)
+		expect(tops[2] - tops[1]).toBeGreaterThanOrEqual(POINT_ROW_PX)
+		expect(rows[0].height).toBeGreaterThanOrEqual(tops[2] + POINT_ROW_PX / 2)
 	})
 
 	it("labels gaps", () => {
