@@ -82,12 +82,41 @@ def release_hold(event, hold_id):
 		frappe.cache.hdel(_holds_key(event), hold_id)
 
 
+def _hold_client():
+	"""Who holds: a hash of the visitor's IP address (kept 20 minutes in Redis, never the address itself).
+	None outside a web request (desk, tests, jobs)."""
+	ip = getattr(frappe.local, "request_ip", None)
+	if not ip:
+		return None
+	return hashlib.sha256(f"{frappe.local.site}|{ip}".encode()).hexdigest()[:16]
+
+
+def _limit_client_holds(event_doc, hold_id, qty, client):
+	"""One visitor holds at most one order's worth of seats (the event's tickets per order). A hold costs
+	nothing and its id is chosen by the browser, so without this one script could keep the whole event
+	"sold out". A new hold pushes out the same visitor's oldest ones; two colleagues behind one office
+	router still each get a hold as long as they stay within one order's worth together, and the order
+	itself re-checks the seats either way."""
+	if not client:
+		return
+	limit = cint(event_doc.get("max_attendees_per_order")) or MAX_ATTENDEES_PER_ORDER
+	own = sorted(((key, h) for key, h in active_holds(event_doc.name, exclude=hold_id).items()
+		if h.get("client") == client), key=lambda kh: kh[1].get("expires", 0))
+	held = sum(cint(h.get("qty")) for _key, h in own)
+	while own and held + qty > limit:
+		key, h = own.pop(0)
+		release_hold(event_doc.name, key)
+		held -= cint(h.get("qty"))
+
+
 def hold_seats(event_doc, hold_id, qty):
 	"""Reserve ``qty`` seats (and the price that applies to them) for 20 minutes; renewed on every call.
 
 	Returns {ok, expires (ms since epoch), price_title, gross, spots_left, max_per_order} or {ok: False, reason}.
 	"""
 	qty = max(1, cint(qty))
+	client = _hold_client()
+	_limit_client_holds(event_doc, hold_id, qty, client)
 	is_open, reason = sale_state(event_doc, exclude_hold=hold_id)
 	if not is_open:
 		release_hold(event_doc.name, hold_id)
@@ -101,7 +130,7 @@ def hold_seats(event_doc, hold_id, qty):
 		return {"ok": False, "reason": "sold_out"}
 	expires = time.time() + HOLD_MINUTES * 60
 	frappe.cache.hset(_holds_key(event_doc.name), hold_id, {"qty": qty, "expires": expires,
-		"price_title": pricing.price_title if pricing else None})
+		"price_title": pricing.price_title if pricing else None, "client": client})
 	return {"ok": True, "expires": int(expires * 1000), "minutes": HOLD_MINUTES,
 		"price_title": pricing.price_title if pricing else None, "gross": pricing.gross if pricing else 0,
 		"spots_left": max(0, capacity - taken - qty) if capacity else None}
@@ -347,7 +376,7 @@ def _register(event, contact, attends, companions, billing_data, source, lang, e
 	if paid and party.review:
 		for att in docs:
 			if att.is_buyer:
-				att.add_comment("Comment", _("Possible duplicate Customer: {0} has the same company name as {1}.").format(
+				att.add_comment("Comment", _("Possible duplicate Customer: {0} has the same email address or company name as {1}.").format(
 					customer, party.review))
 
 	if paid:
@@ -405,11 +434,15 @@ def send_order_confirmation(event_name, reference, recipient, reference_doctype=
 	attendees = frappe.get_all("Attendee", filters={"event": event, "order_reference": reference},
 		fields=["full_name", "email", "ticket_type"], order_by="creation asc")
 	order = frappe.get_doc("Sales Order", reference) if reference_doctype == "Sales Order" else None
+	# Plain lines, escaped by the template: the address was typed by an anonymous buyer, and Frappe's
+	# rendered address display (get_address_display) is HTML that keeps tags such as <a href>.
 	address = None
 	if order and order.customer_address:
-		from frappe.contacts.doctype.address.address import get_address_display
-
-		address = get_address_display(order.customer_address)
+		a = frappe.db.get_value("Address", order.customer_address,
+			["address_line1", "address_line2", "pincode", "city", "country"], as_dict=True) or {}
+		address = [line for line in (a.get("address_line1"), a.get("address_line2"),
+			" ".join(filter(None, [a.get("pincode"), a.get("city")])), _(a["country"]) if a.get("country") else None)
+			if line]
 	attachments = []
 	item = find_item("events", doc.route, frappe.local.lang) if doc.published else None
 	if item and doc.starts_on:

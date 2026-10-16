@@ -3,6 +3,7 @@
 bench --site <site> run-tests --module phamos.tests.test_marketing_ticketing
 """
 
+import json
 from unittest.mock import patch
 
 import frappe
@@ -78,11 +79,37 @@ class TestTicketing(FrappeTestCase):
 		customer = frappe.db.get_value("Sales Order", result["reference"], "customer")
 		self.assertEqual(frappe.db.get_value("Customer", customer, "customer_type"), "Individual")
 
-	def test_known_customer_is_reused(self, enqueue):
-		make_customer("Known Ticket Customer AG", "erika@ticket.example")
+	def test_known_email_never_uses_the_existing_customer(self, enqueue):
+		# An anonymous order with a known customer's email must not land on that Customer, nor reveal its
+		# stored address or VAT ID: a new Customer is created and flagged for review instead.
+		known = make_customer("Known Ticket Customer AG", "erika@ticket.example")
+		frappe.db.set_value("Customer", known, "tax_id", "DE999999999")
+		secret = frappe.get_doc({"doctype": "Address", "address_title": known, "address_type": "Billing",
+			"address_line1": "Geheimweg 7", "city": "Stuttgart", "country": "Germany",
+			"links": [{"link_doctype": "Customer", "link_name": known}]}).insert(ignore_permissions=True)
+		frappe.db.set_value("Customer", known, "customer_primary_address", secret.name)
+		existing_contact = frappe.db.get_value("Contact Email", {"email_id": "erika@ticket.example"}, "parent")
+		links_before = frappe.get_all("Dynamic Link", filters={"parenttype": "Contact", "parent": existing_contact},
+			pluck="link_name")
+
 		result = self.order()
-		self.assertEqual(frappe.db.get_value("Sales Order", result["reference"], "customer"), "Known Ticket Customer AG")
-		self.assertFalse(frappe.db.exists("Customer", {"customer_name": "Ticket Test GmbH"}))
+		so = frappe.get_doc("Sales Order", result["reference"])
+		self.assertNotEqual(so.customer, known)
+		self.assertNotEqual(so.customer_address, secret.name)
+		self.assertEqual(frappe.db.get_value("Address", so.customer_address, "address_line1"), "Hauptstr. 1")
+		self.assertNotEqual(so.tax_id, "DE999999999")
+		buyer = frappe.get_all("Attendee", filters={"sales_order": so.name, "is_buyer": 1}, fields=["crm_status"])[0]
+		self.assertEqual(buyer.crm_status, "Needs Review")
+		self.assertTrue(frappe.db.exists("Comment", {"reference_doctype": "Customer", "reference_name": so.customer,
+			"content": ["like", f"%{known}%"]}))
+		# The existing Contact is left alone.
+		self.assertEqual(frappe.get_all("Dynamic Link", filters={"parenttype": "Contact", "parent": existing_contact},
+			pluck="link_name"), links_before)
+
+		with patch("frappe.sendmail") as sendmail:
+			ticketing.send_order_confirmation(event_name=self.event.name, reference=so.name,
+				recipient="erika@ticket.example", buyer_name="Erika Mustermann", lang="en")
+		self.assertNotIn("Geheimweg", json.dumps(sendmail.call_args.kwargs["args"], default=str))
 
 	def test_company_name_match_needs_review(self, enqueue):
 		make_customer("Ticket Test GmbH")
@@ -189,6 +216,37 @@ class TestTicketing(FrappeTestCase):
 		self.assertEqual(mail["recipients"], ["max@ticket.example"])
 		self.assertEqual(mail["template"], "event_ticket")
 		self.assertTrue(any(a["fname"].endswith(".ics") for a in mail["attachments"]))
+
+	def test_one_visitor_cannot_hold_more_than_one_order(self, enqueue):
+		event = make_event("Hold Limit Event", max_attendees=50, max_attendees_per_order=4)
+		try:
+			frappe.local.request_ip = "203.0.113.9"
+			self.assertTrue(ticketing.hold_seats(event, "hold-limit-a", 3)["ok"])
+			self.assertTrue(ticketing.hold_seats(event, "hold-limit-b", 3)["ok"])
+			# Together 6 > 4 per order: the visitor's older hold made room for the new one.
+			self.assertEqual(set(ticketing.active_holds(event.name)), {"hold-limit-b"})
+			for i in range(30):  # a script with fresh hold ids gets no further
+				ticketing.hold_seats(event, f"hold-limit-x{i:02d}", 4)
+			self.assertEqual(ticketing.held_seats(event.name), 4)
+			# Another visitor is not affected.
+			frappe.local.request_ip = "198.51.100.4"
+			self.assertTrue(ticketing.hold_seats(event, "hold-limit-c", 2)["ok"])
+			self.assertEqual(ticketing.held_seats(event.name), 6)
+		finally:
+			frappe.local.request_ip = None
+
+	def test_confirmation_escapes_the_typed_address(self, enqueue):
+		# The buyer is anonymous: markup in the address must not reach the email as HTML (phishing link
+		# sent from phamos' own mail server).
+		link = '<a href="https://evil.example">Pay here</a>'
+		result = self.order(billing_data={**BILLING, "address_line1": f"Hauptstr. 1 {link}"}, companions=[])
+		with patch("frappe.sendmail") as sendmail:
+			ticketing.send_order_confirmation(event_name=self.event.name, reference=result["reference"],
+				recipient="erika@ticket.example", buyer_name="Erika Mustermann", lang="en")
+		mail = sendmail.call_args.kwargs
+		html = frappe.render_template(f"templates/emails/{mail['template']}.html", mail["args"])
+		self.assertNotIn('href="https://evil.example"', html)
+		self.assertIn("Hauptstr. 1", html)
 
 	def test_offer(self, enqueue):
 		offer = ticketing.offer(self.event.name)

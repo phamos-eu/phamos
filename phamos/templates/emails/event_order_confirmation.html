@@ -37,7 +37,7 @@
 	<tr><td><strong>{{ _("Total incl. VAT") }}</strong></td><td style="text-align:right"><strong>{{ frappe.utils.fmt_money(order.grand_total, currency=order.currency) }}</strong></td></tr>
 </table>
 {%- if address %}
-<p><strong>{{ _("Billing address") }}</strong><br>{{ order.customer_name | e }}<br>{{ address }}{% if order.tax_id %}<br>{{ _("VAT ID") }}: {{ order.tax_id | e }}{% endif %}</p>
+<p><strong>{{ _("Billing address") }}</strong><br>{{ order.customer_name | e }}{% for line in address %}<br>{{ line | e }}{% endfor %}{% if order.tax_id %}<br>{{ _("VAT ID") }}: {{ order.tax_id | e }}{% endif %}</p>
 {%- endif %}
 <p><strong>{{ _("Payment") }}:</strong> {{ _("by invoice. You receive the invoice by email; please pay within 14 days of the invoice date.") }}</p>
 <p><strong>{{ _("Right of withdrawal") }}:</strong> {{ _("There is no right of withdrawal for tickets to leisure events on a specific date (§ 312g (2) no. 9 BGB). If you cannot attend, please reply to this email.") }}</p>

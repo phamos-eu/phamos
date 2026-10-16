@@ -280,35 +280,22 @@ def ensure_customer(buyer, event=None, lang=None):
 	"""The Customer that pays a website order, with its Contact and billing Address.
 
 	``buyer``: first_name, last_name, email, phone, company_name, is_company, vat_id, address_line1/2,
-	postcode, city, country. A Contact with the buyer's email that belongs to exactly one Customer means the
-	buyer is known: that Customer is reused (an Address is added only when it has none). Otherwise a
-	Customer is created – type Company with a company name, else Individual – together with the buyer's
-	Contact and the billing Address. Buyers get no Lead: they bought, they are customers.
+	postcode, city, country. A website order is anonymous: anyone can type any email address. So it never
+	reuses an existing Customer, Contact or Address (that would let a stranger order on a known customer's
+	account and read its stored address and VAT ID in the confirmation). It always creates a Customer –
+	type Company with a company name, else Individual – with its own Contact and the billing Address as
+	typed. When the email or the company name matches an existing Customer, the new one is flagged for
+	review so a person can merge them (rename into the existing Customer). Buyers get no Lead.
 
 	The Customer gets no email/phone/address fields of its own, so ERPNext does not create a second
 	Contact or Address (customer.py create_primary_contact / create_primary_address).
 
-	Returns {customer, contact, address, created, review}; ``review`` names an existing Customer whose name
-	matches the company without an email link (a possible duplicate for a person to merge).
+	Returns {customer, contact, address, created, review}; ``review`` names the existing Customer the new
+	one possibly duplicates.
 	"""
 	found = find_party(buyer.email, buyer.company_name if buyer.is_company else None)
-	result = frappe._dict(customer=found.customer, contact=found.contact, address=None, created=False, review=None)
-	if result.customer:
-		result.address = frappe.db.get_value("Customer", result.customer, "customer_primary_address") or \
-			_any_address(result.customer)
-		if not result.address and buyer.address_line1:
-			result.address = create_address(title=_address_title(buyer), address_line1=buyer.address_line1,
-				address_line2=buyer.address_line2, city=buyer.city, pincode=buyer.postcode, country=buyer.country,
-				email=buyer.email, phone=buyer.phone, links=[("Customer", result.customer)])
-		if not result.contact:
-			result.contact = create_contact(email=buyer.email, first_name=buyer.first_name, last_name=buyer.last_name,
-				company_name=buyer.company_name, phone=buyer.phone, links=[("Customer", result.customer)])
-		else:
-			ensure_contact_links(result.contact, [("Customer", result.customer)])
-		return result
-
-	if found.confidence == "review":
-		result.review = found.company_match or (found.customers[0] if found.customers else None)
+	result = frappe._dict(customer=None, contact=None, address=None, created=False,
+		review=found.customer or found.company_match or (found.customers[0] if found.customers else None))
 	settings = frappe.db.get_singles_dict("Selling Settings")
 	customer = frappe.get_doc({
 		"doctype": "Customer",
@@ -321,11 +308,9 @@ def ensure_customer(buyer, event=None, lang=None):
 	})
 	customer.insert(ignore_permissions=True)
 	result.customer, result.created = customer.name, True
-	if result.contact:
-		ensure_contact_links(result.contact, [("Customer", customer.name)])
-	else:
-		result.contact = create_contact(email=buyer.email, first_name=buyer.first_name, last_name=buyer.last_name,
-			company_name=buyer.company_name, phone=buyer.phone, links=[("Customer", customer.name)])
+	# Always a Contact of its own: an existing Contact with this email is never touched.
+	result.contact = create_contact(email=buyer.email, first_name=buyer.first_name, last_name=buyer.last_name,
+		company_name=buyer.company_name, phone=buyer.phone, links=[("Customer", customer.name)])
 	if buyer.address_line1:
 		result.address = create_address(title=_address_title(buyer), address_line1=buyer.address_line1,
 			address_line2=buyer.address_line2, city=buyer.city, pincode=buyer.postcode, country=buyer.country,
@@ -334,17 +319,14 @@ def ensure_customer(buyer, event=None, lang=None):
 		"customer_primary_address": result.address}, update_modified=False)
 	if result.review:
 		customer.add_comment("Comment", _("Possible duplicate of Customer {0}: created by a website order with the same "
-			"company name but an unknown email address. Merge by renaming if it is the same company.").format(result.review))
+			"email address or company name. Website orders never use an existing Customer, because the email "
+			"address is not verified. Merge by renaming if it is the same customer.").format(result.review))
 	return result
 
 
 def _address_title(buyer):
 	return buyer.company_name or join_name(buyer.first_name, buyer.last_name) or buyer.email
 
-
-def _any_address(customer):
-	return frappe.db.get_value("Dynamic Link", {"parenttype": "Address", "link_doctype": "Customer",
-		"link_name": customer}, "parent")
 
 
 def _leaf(doctype, preferred):
