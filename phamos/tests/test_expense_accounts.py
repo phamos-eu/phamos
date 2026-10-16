@@ -115,6 +115,16 @@ class TestPurchaseInvoiceFromLines(AccountTestCase):
 		self.assertEqual(frappe.db.get_value("Accounting Receipt", doc.name, "purchase_invoice"), pi.name)
 		self.assertEqual(pi.docstatus, 0)
 
+	def test_fractional_quantity_becomes_one_unit_and_submits(self):
+		doc = self.receipt([{"item_name": "Entwicklung Oktober", "qty": 50.08, "rate": 28, "amount": 1402.24, "tax_rate": 0,
+			"expense_account": self.account("6303")}])
+		pi = branching.make_purchase_invoice(doc)
+		self.assertEqual((pi.items[0].qty, pi.items[0].rate), (1, 1402.24))
+		self.assertEqual(pi.items[0].description, "Entwicklung Oktober (50.08 × 28.00)")
+		pi.submit()
+		gl = frappe.get_all("GL Entry", filters={"voucher_no": pi.name, "account": self.account("6303")}, pluck="debit")
+		self.assertEqual(gl, [1402.24])
+
 	def test_line_without_account_is_refused(self):
 		doc = self.receipt([{"item_name": "Mystery line", "qty": 1, "rate": 10, "amount": 10}])
 		with self.assertRaises(branching.LineWithoutAccount):

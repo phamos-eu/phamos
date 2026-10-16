@@ -61,12 +61,12 @@ def make_purchase_invoice(receipt, submit=False):
 		if not account:
 			missing.append(f"{idx}. {line.item_name}")
 			continue
-		qty = flt(line.qty) or 1
+		qty, rate, description = _quantity(line)
 		row = {
 			"item_name": line.item_name,
-			"description": line.item_name,
+			"description": description,
 			"qty": -abs(qty) if receipt.is_return else qty,
-			"rate": flt(line.rate) or (flt(line.amount) / qty if qty else 0),
+			"rate": rate,
 			"uom": "Nos",
 			"conversion_factor": 1,
 			"expense_account": account,
@@ -90,7 +90,7 @@ def make_purchase_invoice(receipt, submit=False):
 	for row, line in zip(pi.items, receipt.items):
 		row.expense_account = line.expense_account
 		row.item_name = line.item_name
-		row.description = line.item_name
+		row.description = _quantity(line)[2]
 	if not pi.get("taxes"):
 		pi.set_taxes()
 	pi.calculate_taxes_and_totals()
@@ -110,6 +110,21 @@ def make_purchase_invoice(receipt, submit=False):
 		pi.submit()
 	pi.flags.receipt_warnings = warnings
 	return pi
+
+
+def _quantity(line):
+	"""(qty, rate, description) for the invoice line.
+
+	Lines carry no unit, and the invoice uses "Nos", which only allows whole numbers.
+	A fractional quantity (50.08 hours, 37.5 litres) therefore goes on the invoice as one
+	unit at the line amount, with the original quantity and rate kept in the description.
+	"""
+	qty = abs(flt(line.qty)) or 1
+	rate = flt(line.rate) or (flt(line.amount) / qty if qty else 0)
+	if qty == int(qty):
+		return qty, rate, line.item_name
+	amount = flt(line.amount) or flt(qty * rate, 2)
+	return 1, amount, f"{line.item_name} ({qty:g} × {rate:.2f})"
 
 
 def _template_rates(template):
