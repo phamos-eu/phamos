@@ -243,6 +243,7 @@
 		}
 
 		function show(index) {
+			index = Math.max(0, Math.min(index, steps.length - 1));
 			current = index;
 			steps.forEach((step, i) => (step.hidden = i !== index));
 			labels.forEach((label, i) => {
@@ -370,21 +371,31 @@
 				form.elements.company.required = toggle.checked;
 			});
 		}
+		// One step at a time: a second click while the seats are being checked must not skip a step.
+		let advancing = false;
 		next.addEventListener("click", async () => {
-			if (!valid(steps[current])) return;
-			if (!expiresAt || Date.now() > expiresAt) {
-				if (!(await hold())) return;
-			}
-			if (current === 0 && !free) {
-				// The billing step starts with the contact's name and email.
-				for (const [field, source] of [["billing_name", "contact_name"], ["billing_email", "contact_email"]]) {
-					if (!value(field)) form.elements[field].value = value(source);
+			if (advancing || current >= steps.length - 1 || !valid(steps[current])) return;
+			advancing = true;
+			next.disabled = true;
+			const from = current;
+			try {
+				if (!expiresAt || Date.now() > expiresAt) {
+					if (!(await hold())) return;
 				}
+				if (from === 0 && !free) {
+					// The billing step starts with the contact's name and email.
+					for (const [field, source] of [["billing_name", "contact_name"], ["billing_email", "contact_email"]]) {
+						if (!value(field)) form.elements[field].value = value(source);
+					}
+				}
+				if (current === from) show(from + 1);
+				saveDraft();
+			} finally {
+				advancing = false;
+				next.disabled = false;
 			}
-			show(current + 1);
-			saveDraft();
 		});
-		back.addEventListener("click", () => show(current - 1));
+		back.addEventListener("click", () => current > 0 && show(current - 1));
 		form.querySelectorAll("[data-wp-goto]").forEach((button) => button.addEventListener("click", () => {
 			const target = steps.findIndex((step) => step.dataset.wpStep === button.dataset.wpGoto);
 			if (target >= 0) show(target);
