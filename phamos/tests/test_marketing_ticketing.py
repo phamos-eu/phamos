@@ -246,6 +246,7 @@ class TestTicketing(FrappeTestCase):
 		mail = sendmail.call_args.kwargs
 		html = frappe.render_template(f"templates/emails/{mail['template']}.html", mail["args"])
 		self.assertNotIn('href="https://evil.example"', html)
+		self.assertIn("&lt;a href=", html)  # the markup reached the template and was escaped there
 		self.assertIn("Hauptstr. 1", html)
 
 	def test_offer(self, enqueue):
