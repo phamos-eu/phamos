@@ -21,13 +21,9 @@
 		</template>
 		<template #header-actions>
 			<PageSearch />
-			<Button size="sm" variant="solid" @click="showCreateTodo = true">
-				<template #prefix><FeatherIcon name="plus" class="h-4 w-4" /></template>
-				New ToDo
-			</Button>
-			<CreateTodoDialog v-model="showCreateTodo" @created="onTodoCreated" />
-			<TimerControl />
-			<CheckinButton :before-checkout="beforeCheckout" />
+			<TimerControl :start-button="false" />
+			<CheckinButton />
+			<CreateMenu :before-checkout="beforeCheckout" />
 			<CheckoutGuardDialog v-model="showGuard" @choose="onGuardChoice" />
 		</template>
 	</CockpitShell>
@@ -44,9 +40,8 @@ import { focus, loadFocus } from "./focusStore.js"
 import { checkin, loadCheckin } from "./checkinStore.js"
 import CheckinButton from "./components/CheckinButton.vue"
 import CheckoutGuardDialog from "./components/CheckoutGuardDialog.vue"
-import CreateTodoDialog from "@spa/components/CreateTodoDialog.vue"
+import CreateMenu from "./components/CreateMenu.vue"
 import PageSearch from "@spa/components/PageSearch.vue"
-import { notify } from "@spa/utils/notify.js"
 import TimerControl from "@spa/components/timesheet/TimerControl.vue"
 import { activeSession, loadTimer, requestTimerStop } from "@spa/timerStore.js"
 
@@ -81,13 +76,6 @@ function onVisible() {
 	if (document.visibilityState !== "visible") return
 	loadCheckin()
 	loadTimer()
-}
-
-// New ToDo from anywhere (#1592): created, then opened in the list.
-const showCreateTodo = ref(false)
-function onTodoCreated(todo) {
-	notify.success("ToDo created")
-	if (todo?.name) router.push({ name: "TodoDetail", params: { name: todo.name } })
 }
 
 // Checking out while a timer runs offers to stop it first (decision of 2026-10-16).

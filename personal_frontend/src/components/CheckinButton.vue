@@ -1,3 +1,5 @@
+<!-- Check-in status in the top bar (#1571): "in since 08:02" and, right after a check-in or out,
+     the undo ring. Checking in and out itself is in the Create menu. -->
 <template>
 	<div v-if="usable" class="flex items-center gap-2">
 		<span
@@ -17,24 +19,13 @@
 			@undo="revoke"
 			@expired="checkin.pending = null"
 		/>
-		<Button
-			v-else
-			size="sm"
-			variant="subtle"
-			:loading="busy"
-			:aria-label="`${action.label} now`"
-			@click="run"
-		>
-			<template #prefix><FeatherIcon :name="action.icon" class="h-4 w-4" /></template>
-			{{ action.label }}
-		</Button>
 	</div>
 </template>
 
 <script setup>
-import { computed, onBeforeUnmount, onMounted, ref } from "vue"
+import { computed, onBeforeUnmount, onMounted } from "vue"
 import { call } from "frappe-ui"
-import { actionLabel, caption, isUndoKey } from "@spa/utils/checkinSummary.js"
+import { caption, isUndoKey } from "@spa/utils/checkinSummary.js"
 import { formatTime as formatTimeFull, parseSystemDatetimeToUserDate } from "@spa/utils/datetime.js"
 import { notify } from "@spa/utils/notify.js"
 import spaConfig from "@/config"
@@ -43,18 +34,10 @@ import UndoRing from "./UndoRing.vue"
 
 // Hours and minutes only; the system time format may include seconds.
 const formatTime = (value) => formatTimeFull(value).slice(0, 5)
-const props = defineProps({
-	// Optional guard before checking out (the timer asks to be stopped first). Resolves to false
-	// to cancel the check-out.
-	beforeCheckout: { type: Function, default: null },
-})
-
 const API = spaConfig.api
-const busy = ref(false)
 
 const state = computed(() => checkin.state)
 const usable = computed(() => checkinUsable(state.value))
-const action = computed(() => actionLabel(state.value))
 const captionText = computed(() => caption(state.value, formatTime, formatDay))
 const undoLabel = computed(() => {
 	const pending = checkin.pending
@@ -70,44 +53,6 @@ function formatDay(value) {
 
 function errorText(e, fallback) {
 	return e?.messages?.[0] || e?.message || fallback
-}
-
-function currentPosition() {
-	return new Promise((resolve, reject) => {
-		if (!navigator.geolocation) {
-			reject(new Error("This browser cannot share its location."))
-			return
-		}
-		navigator.geolocation.getCurrentPosition(
-			(position) => resolve(position.coords),
-			() => reject(new Error("Please allow location access to check in.")),
-			{ enableHighAccuracy: true, timeout: 10000 }
-		)
-	})
-}
-
-async function run() {
-	if (busy.value || !state.value) return
-	const logType = state.value.next_action
-	if (logType === "OUT" && props.beforeCheckout && !(await props.beforeCheckout())) return
-	busy.value = true
-	try {
-		const args = { log_type: logType }
-		if (state.value.geolocation_required) {
-			const coords = await currentPosition()
-			args.latitude = coords.latitude
-			args.longitude = coords.longitude
-		}
-		const result = await call(`${API}.add_checkin`, args)
-		setCheckin(result.state)
-		checkin.pending = result.state.can_revoke ? { ...result.log } : null
-		notify.success(`${logType === "IN" ? "Checked in" : "Checked out"} at ${formatTime(result.log.time)}`)
-	} catch (e) {
-		notify.error(errorText(e, "That did not work"))
-		loadCheckin()
-	} finally {
-		busy.value = false
-	}
 }
 
 async function revoke() {
