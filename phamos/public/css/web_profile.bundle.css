@@ -608,3 +608,8 @@ body .footer-grouped-links .footer-child-item, body .footer-grouped-links .foote
 .wp-confirmed-actions .wp-button { width: auto; }
 
 .wp-confirmed-card h1 { font-size: 24px !important; line-height: 1.25; }
+/* Phones: the event's actions and interest question follow the title, full width. */
+@media (max-width: 860px) {
+	.wp-profile-aside > .wp-actions, .wp-profile-aside > .wp-interest { order: 1; align-self: stretch; }
+	.wp-profile-aside > .wp-actions + .wp-interest { margin-top: 0; }
+}
