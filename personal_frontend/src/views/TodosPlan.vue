@@ -1,10 +1,11 @@
 <template>
-	<!-- My Day as a timeline (#1573): one axis through the days, earlier above, later below. -->
+	<!-- My Day as a timeline (#1573): the days run from the future at the top, through today, into
+	     the past below. Within a day the hours read from morning to evening. -->
 	<div class="relative h-full min-h-0">
 		<div ref="scroller" class="h-full min-h-0 overflow-y-auto bg-surface-gray-1">
 			<div class="mx-auto max-w-5xl px-5 pb-16">
 				<div ref="topSentinel" class="py-3 text-center text-xs text-ink-gray-5">
-					{{ loadingEarlier ? "Loading earlier days…" : hasEarlier ? "" : "Nothing earlier." }}
+					{{ loadingLater ? "Loading later days…" : to >= lastFuture ? "Plan further ahead in the list." : "" }}
 				</div>
 				<div v-if="error" class="mb-3 rounded-lg border border-outline-gray-2 bg-surface-red-1 p-3 text-sm text-ink-red-4">{{ error }}</div>
 				<TimelineDay
@@ -20,7 +21,7 @@
 					@changed="reloadAround(today)"
 				/>
 				<div ref="bottomSentinel" class="py-6 text-center text-xs text-ink-gray-5">
-					{{ to >= lastFuture ? "Plan further ahead in the list." : "" }}
+					{{ loadingEarlier ? "Loading earlier days…" : hasEarlier ? "" : "Nothing earlier." }}
 				</div>
 			</div>
 		</div>
@@ -93,7 +94,7 @@ const nowMinute = computed(() => minuteOfDay(now.value))
 const dates = computed(() => {
 	const list = []
 	if (!from.value || !to.value) return list
-	for (let d = from.value; d <= to.value; d = addDays(d, 1)) list.push(d)
+	for (let d = to.value; d >= from.value; d = addDays(d, -1)) list.push(d) // newest first
 	return list
 })
 
@@ -177,15 +178,11 @@ async function fetchRange(start, end) {
 async function loadEarlier() {
 	if (loadingEarlier.value || !hasEarlier.value || !from.value) return
 	loadingEarlier.value = true
-	const el = scroller.value
-	const before = el ? el.scrollHeight - el.scrollTop : 0
 	try {
 		const start = addDays(from.value, -STEP)
 		const first = await fetchRange(start, addDays(from.value, -1))
 		hasEarlier.value = first.has_earlier
 		from.value = start
-		await nextTick()
-		if (el) el.scrollTop = el.scrollHeight - before // keep what the user looks at in place
 	} catch (e) {
 		error.value = e?.messages?.[0] || e?.message || "Could not load earlier days"
 	} finally {
@@ -197,10 +194,14 @@ async function loadEarlier() {
 async function loadLater() {
 	if (loadingLater.value || !to.value || to.value >= lastFuture.value) return
 	loadingLater.value = true
+	const el = scroller.value
+	const before = el ? el.scrollHeight - el.scrollTop : 0
 	try {
 		const end = addDays(to.value, STEP) < lastFuture.value ? addDays(to.value, STEP) : lastFuture.value
 		await fetchRange(addDays(to.value, 1), end)
 		to.value = end
+		await nextTick()
+		if (el) el.scrollTop = el.scrollHeight - before // keep what the user looks at in place
 	} catch (e) {
 		error.value = e?.messages?.[0] || e?.message || "Could not load later days"
 	} finally {
@@ -209,7 +210,7 @@ async function loadLater() {
 	}
 }
 
-const sentinels = useScrollSentinels(scroller, topSentinel, bottomSentinel, { onTop: loadEarlier, onBottom: loadLater })
+const sentinels = useScrollSentinels(scroller, topSentinel, bottomSentinel, { onTop: loadLater, onBottom: loadEarlier })
 
 async function scrollToDate(date) {
 	await nextTick()
