@@ -181,20 +181,20 @@
 						<tr v-for="(item, i) in autosave.draft.items" :key="item.name || `new-${i}`" class="border-t border-outline-gray-1">
 							<td class="py-1 pr-2 align-top">
 								<input :value="item.item_name" :disabled="readonly" class="cell" @change="setItem(i, 'item_name', $event.target.value)" />
-								<div class="mt-0.5 flex min-w-0 items-center gap-2">
+								<div class="mt-0.5 min-w-0">
 									<select
 										:value="item.item_code || ''"
 										:disabled="readonly"
-										class="cell h-6 max-w-[14rem] text-xs"
+										class="cell !h-7 !py-0 text-xs"
 										:class="item.item_code ? '' : 'text-ink-amber-3'"
 										@change="setItem(i, 'item_code', $event.target.value)"
 									>
 										<option value="">— choose category —</option>
 										<option v-for="c in categories" :key="c.item_code" :value="c.item_code">{{ c.item_name }}</option>
 									</select>
-									<span class="truncate text-[11px]" :class="accountLabel(item) ? 'text-ink-gray-5' : 'text-ink-amber-3'" :title="accountLabel(item)">
-										{{ accountLabel(item) || "no account" }}
-									</span>
+									<div class="truncate px-1 text-[11px]" :class="accountLabel(item) ? 'text-ink-gray-5' : 'text-ink-amber-3'" :title="accountLabel(item)">
+										{{ accountLabel(item) || "no category yet, so no account" }}
+									</div>
 								</div>
 							</td>
 							<td class="py-1 pr-2 align-top">
