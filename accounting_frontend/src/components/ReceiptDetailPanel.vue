@@ -85,9 +85,10 @@
 							{{ candidate.supplier_name || candidate.supplier }} · {{ candidate.score }} %
 						</button>
 						<button
-							v-if="options.can_create_supplier"
 							type="button"
-							class="rounded-full bg-surface-gray-7 px-2.5 py-0.5 text-xs font-medium text-ink-white hover:opacity-90"
+							class="rounded-full bg-surface-gray-7 px-2.5 py-0.5 text-xs font-medium text-ink-white hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-40"
+							:disabled="!options.can_create_supplier"
+							:title="options.can_create_supplier ? '' : 'Creating suppliers needs the Purchase Master Manager role'"
 							@click="showCreateSupplier = true"
 						>
 							+ Create supplier
