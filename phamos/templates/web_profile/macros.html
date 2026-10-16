@@ -500,6 +500,7 @@
 			<label class="wp-reminder-chip"><input type="checkbox" value="{{ key }}" data-wp-reminder-offset><span>{{ label }}</span></label>
 			{%- endfor %}
 		</div>
+		<p class="wp-legal" data-wp-reminder-soon hidden>{{ _("The event is less than two weeks away. Pick your own date.") }}</p>
 		<ol class="wp-reminder-own" data-wp-reminder-own></ol>
 		<button type="button" class="wp-button wp-button-sm wp-reminder-add" data-wp-reminder-add>+ {{ _("Own date") }}</button>
 		<template data-wp-reminder-row>

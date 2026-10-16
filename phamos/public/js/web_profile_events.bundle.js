@@ -555,6 +555,9 @@
 		try { form.querySelector("[data-wp-reminder-tz]").value = Intl.DateTimeFormat().resolvedOptions().timeZone || ""; } catch (e) { /* old browser */ }
 
 		const rows = () => [...own.querySelectorAll(".wp-reminder-row")];
+		const isPast = (o) => !start || start.getTime() - OFFSET_MS[o.value] <= Date.now();
+		const chips = form.querySelector(".wp-reminder-chips");
+		const soon = form.querySelector("[data-wp-reminder-soon]");
 		const chosen = () => offsets.filter((o) => o.checked).length + rows().length;
 		function moments() {
 			const list = offsets.filter((o) => o.checked).map((o) => new Date(start.getTime() - OFFSET_MS[o.value]));
@@ -570,9 +573,11 @@
 			const now = Date.now();
 			// A chip whose moment has passed cannot be picked; at three choices nothing more can be added.
 			offsets.forEach((o) => {
-				const past = !start || start.getTime() - OFFSET_MS[o.value] <= now;
-				o.disabled = past || (!o.checked && n >= max);
-				o.closest(".wp-reminder-chip").classList.toggle("wp-disabled", o.disabled);
+				const chip = o.closest(".wp-reminder-chip");
+				chip.hidden = isPast(o); // a moment that has passed is not offered at all
+				if (chip.hidden) o.checked = false;
+				o.disabled = chip.hidden || (!o.checked && n >= max);
+				chip.classList.toggle("wp-disabled", o.disabled);
 			});
 			addButton.hidden = n >= max;
 			const list = moments();
@@ -601,7 +606,12 @@
 		wireDialog(reminderDialog, "reminder", () => {
 			offsets.forEach((o) => (o.checked = false));
 			own.replaceChildren();
+			// Too close to the event for any quick choice: say so and start with an own date.
+			const none = offsets.every(isPast);
+			chips.hidden = none;
+			soon.hidden = !none || !start;
 			refresh();
+			if (none) addRow();
 		});
 		form.addEventListener("submit", (event) => {
 			event.preventDefault();

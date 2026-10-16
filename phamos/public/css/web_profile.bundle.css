@@ -621,6 +621,7 @@ body .footer-grouped-links .footer-child-item, body .footer-grouped-links .foote
 .wp-reminder-chip input:checked + span::before { content: "✓"; margin-right: 6px; font-size: 12px; }
 .wp-reminder-chip input:focus-visible + span { outline: 2px solid var(--wp-focus); outline-offset: 2px; }
 .wp-reminder-chip.wp-disabled { cursor: not-allowed; }
+.wp-reminder-chip[hidden], .wp-reminder-chips[hidden] { display: none; }
 .wp-reminder-chip.wp-disabled span { opacity: 0.45; }
 .wp-reminder-own { display: flex; flex-direction: column; gap: 8px; margin: 0; padding: 0; list-style: none; }
 .wp-reminder-own:empty { display: none; }
