@@ -14,11 +14,14 @@
   "status",
   "cancel_reason",
   "receipt_type",
+  "document_kind",
   "receipt_attached",
   "pdf_attachment_choice",
   "attachment",
   "supplier_reference",
   "sum",
+  "net_total",
+  "total_taxes",
   "currency",
   "conversion_rate",
   "sum_in_company_currency",
@@ -30,9 +33,13 @@
   "item",
   "column_break_pvwrj",
   "supplier_name",
+  "supplier_tax_id",
+  "supplier_iban",
   "purchase_invoice",
   "is_return",
   "return_against",
+  "items_section",
+  "items",
   "time_sheet_list_section",
   "timesheets",
   "section_break_emmu",
@@ -48,6 +55,7 @@
   "due_date",
   "payment_entry",
   "payment_date",
+  "payment_reference",
   "accounting_dimensions_section",
   "project",
   "column_break_lzli4",
@@ -60,6 +68,14 @@
   "datev_sent_by",
   "datev_sent_at",
   "datev_email_queue_ref",
+  "ai_tab",
+  "ai_summary",
+  "ai_confidence",
+  "column_break_ai",
+  "ai_run",
+  "ai_document_hash",
+  "ai_document_section",
+  "ai_document_text",
   "admin_tab",
   "naming_series",
   "uploaded_by",
@@ -407,11 +423,112 @@
    "mandatory_depends_on": "eval:doc.status == \"Cancelled\"",
    "no_copy": 1,
    "options": "\nDuplicate\nMerged\nNot a voucher\nOther"
+  },
+  {
+   "fieldname": "document_kind",
+   "fieldtype": "Select",
+   "label": "Document Kind",
+   "options": "\nInvoice\nCredit Note\nReceipt\nTax Notice\nContract\nReminder\nStatement\nOther",
+   "description": "What the document is, as read by the AI. Contracts, reminders and statements are not vouchers."
+  },
+  {
+   "fieldname": "net_total",
+   "fieldtype": "Currency",
+   "label": "Net Total",
+   "options": "currency"
+  },
+  {
+   "fieldname": "total_taxes",
+   "fieldtype": "Currency",
+   "label": "Total Taxes",
+   "options": "currency"
+  },
+  {
+   "fieldname": "supplier_tax_id",
+   "fieldtype": "Data",
+   "label": "Supplier Tax ID",
+   "description": "VAT ID or tax number printed on the document."
+  },
+  {
+   "fieldname": "supplier_iban",
+   "fieldtype": "Data",
+   "label": "Supplier IBAN",
+   "description": "Bank account printed on the document."
+  },
+  {
+   "fieldname": "items_section",
+   "fieldtype": "Section Break",
+   "label": "Items"
+  },
+  {
+   "fieldname": "items",
+   "fieldtype": "Table",
+   "label": "Items",
+   "options": "Accounting Receipt Item"
+  },
+  {
+   "fieldname": "payment_reference",
+   "fieldtype": "Data",
+   "label": "Payment Reference",
+   "description": "Reference to quote on the transfer (Verwendungszweck)."
+  },
+  {
+   "fieldname": "ai_tab",
+   "fieldtype": "Tab Break",
+   "label": "AI"
+  },
+  {
+   "fieldname": "ai_summary",
+   "fieldtype": "Small Text",
+   "label": "AI Summary",
+   "read_only": 1,
+   "no_copy": 1
+  },
+  {
+   "fieldname": "ai_confidence",
+   "fieldtype": "Percent",
+   "label": "AI Confidence",
+   "read_only": 1,
+   "no_copy": 1
+  },
+  {
+   "fieldname": "column_break_ai",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "ai_run",
+   "fieldtype": "Link",
+   "label": "Last AI Run",
+   "options": "AI Agent Run",
+   "read_only": 1,
+   "no_copy": 1
+  },
+  {
+   "fieldname": "ai_document_hash",
+   "fieldtype": "Data",
+   "label": "Document Hash",
+   "read_only": 1,
+   "no_copy": 1,
+   "hidden": 1
+  },
+  {
+   "fieldname": "ai_document_section",
+   "fieldtype": "Section Break",
+   "label": "Document Text (OCR)",
+   "collapsible": 1
+  },
+  {
+   "fieldname": "ai_document_text",
+   "fieldtype": "Long Text",
+   "label": "Document Text",
+   "read_only": 1,
+   "no_copy": 1,
+   "description": "Text the AI read from the PDF. Kept so later runs and corrections do not need to read the PDF again."
   }
  ],
  "index_web_pages_for_search": 1,
  "links": [],
- "modified": "2026-10-16 15:00:00.000000",
+ "modified": "2026-10-16 13:00:00.000000",
  "modified_by": "Administrator",
  "module": "Phamos",
  "name": "Accounting Receipt",

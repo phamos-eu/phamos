@@ -52,3 +52,4 @@ phamos.patches.v1_0.retire_i_own_my_work_default_app
 phamos.patches.v1_0.backfill_todo_cockpit_fields #1553
 phamos.patches.v1_0.convert_accounting_receipt_status
 phamos.patches.v1_0.seed_datev_recipients
+phamos.patches.v1_0.move_ai_prompt_rules_to_ai_skill

@@ -59,6 +59,41 @@
 				</span>
 			</div>
 
+			<div v-if="receipt.ai?.summary || receipt.ai?.flags?.length" class="rounded-md border border-outline-gray-2 bg-surface-gray-1 px-3 py-2 text-sm">
+				<div class="flex items-center justify-between gap-2">
+					<span class="font-medium text-ink-gray-8">{{ receipt.ai.summary || "AI reading" }}</span>
+					<span
+						v-if="receipt.ai.confidence"
+						class="rounded px-1.5 py-0.5 text-xs font-medium"
+						:class="confidenceClass(receipt.ai.confidence)"
+						title="How sure the AI is about number, date, supplier and amount"
+					>
+						AI {{ Math.round(receipt.ai.confidence) }} %
+					</span>
+				</div>
+				<ul v-if="receipt.ai.flags?.length" class="mt-1 space-y-0.5">
+					<li v-for="(flag, i) in receipt.ai.flags" :key="i" :class="flag.severity === 'block' ? 'text-ink-red-4' : flag.severity === 'warn' ? 'text-ink-amber-3' : 'text-ink-gray-6'">
+						{{ flag.message }}
+					</li>
+				</ul>
+			</div>
+
+			<div v-if="receipt.items?.length" class="text-sm">
+				<p class="mb-1 text-xs text-gray-500 dark:text-gray-400">Items</p>
+				<table class="w-full">
+					<tbody>
+						<tr v-for="(item, i) in receipt.items" :key="i" class="border-t border-outline-gray-1">
+							<td class="py-1 pr-2 text-ink-gray-8">{{ item.qty }} × {{ item.item_name }}</td>
+							<td class="py-1 text-right tabular-nums text-ink-gray-9">{{ money(item.amount) }}</td>
+						</tr>
+						<tr v-if="receipt.net_total || receipt.total_taxes" class="border-t border-outline-gray-2 text-ink-gray-6">
+							<td class="py-1 pr-2">Net · Tax</td>
+							<td class="py-1 text-right tabular-nums">{{ money(receipt.net_total) }} · {{ money(receipt.total_taxes) }}</td>
+						</tr>
+					</tbody>
+				</table>
+			</div>
+
 			<div v-if="receipt.has_pdf" class="rounded-md border border-gray-200 px-3 py-2 text-sm dark:border-gray-700">
 				<span
 					v-if="extractStatus === 'running'"
@@ -70,8 +105,8 @@
 					v-else-if="extractStatus === 'done'"
 					class="text-green-700 dark:text-green-400"
 				>
-					Fields updated from PDF
-					<span v-if="extractUpdatedCount"> ({{ extractUpdatedCount }} fields)</span>
+					Read by the AI
+					<span v-if="extractUpdatedCount"> · {{ extractUpdatedCount }} empty field(s) filled</span>
 				</span>
 				<span
 					v-else-if="extractStatus === 'failed'"
@@ -80,7 +115,7 @@
 					{{ extractErrorMessage }}
 				</span>
 				<span v-else class="text-gray-500 dark:text-gray-400">
-					PDF attached. "Read PDF with AI" fills the fields from it and replaces their current values.
+					PDF attached. "Read PDF with AI" fills empty fields; your values stay.
 				</span>
 			</div>
 
@@ -113,6 +148,15 @@
 				<button
 					type="button"
 					class="inline-flex items-center justify-center rounded-md border border-gray-300 px-3 py-2 text-sm font-medium text-gray-800 hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-50 dark:border-gray-600 dark:text-gray-200 dark:hover:bg-gray-800"
+					:disabled="!receipt.has_pdf || extractStatus === 'running'"
+					title="Read the PDF again and replace the values on the receipt"
+					@click="emit('rerun-extract')"
+				>
+					Read again &amp; replace
+				</button>
+				<button
+					type="button"
+					class="inline-flex items-center justify-center rounded-md border border-gray-300 px-3 py-2 text-sm font-medium text-gray-800 hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-50 dark:border-gray-600 dark:text-gray-200 dark:hover:bg-gray-800"
 					:disabled="!receipt.has_pdf"
 					@click="emit('send-to-datev')"
 				>
@@ -132,7 +176,7 @@
 					:disabled="!receipt.has_pdf || extractStatus === 'running'"
 					@click="emit('review-correct')"
 				>
-					Review &amp; correct
+					Compare with AI
 				</button>
 				<a
 					:href="receipt.desk_url"
@@ -173,7 +217,7 @@ const props = defineProps({
 	extractErrorMessage: { type: String, default: "" },
 })
 
-const emit = defineEmits(["close", "review-correct", "run-extract", "send-to-datev", "save-note", "preview-datev"])
+const emit = defineEmits(["close", "review-correct", "run-extract", "rerun-extract", "send-to-datev", "save-note", "preview-datev"])
 
 const noteDraft = ref("")
 watch(
@@ -194,6 +238,19 @@ const pdfUrl = computed(() => {
 	if (!url || !url.toLowerCase().endsWith(".pdf")) return ""
 	return url.startsWith("http") ? url : `${window.location.origin}${url}`
 })
+
+function confidenceClass(value) {
+	if (value >= 90) return "bg-surface-green-2 text-ink-green-3"
+	if (value >= 60) return "bg-surface-amber-2 text-ink-amber-3"
+	return "bg-surface-red-2 text-ink-red-4"
+}
+
+function money(value) {
+	if (value == null || value === "") return "—"
+	const n = Number(value)
+	const formatted = Number.isFinite(n) ? n.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : String(value)
+	return props.receipt?.currency ? `${formatted} ${props.receipt.currency}` : formatted
+}
 
 function formatSum(receipt) {
 	const amount = receipt.sum

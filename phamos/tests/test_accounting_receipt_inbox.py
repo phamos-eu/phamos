@@ -100,7 +100,7 @@ class TestAccountingReceiptInbox(FrappeTestCase):
 	def test_sync_never_replaces_a_chosen_attachment(self):
 		doc = _make_receipt(attachment="/private/files/chosen.pdf")
 		with patch.object(ar_module, "_first_attached_pdf", return_value="/private/files/other.pdf") as first, \
-			patch.object(ar_module.frappe, "enqueue") as enqueue:
+			patch("phamos.ai_agents.runner.enqueue_run") as enqueue:
 			ar_module._sync_attachment_field(doc.name)
 		first.assert_not_called()
 		enqueue.assert_not_called()
@@ -109,7 +109,7 @@ class TestAccountingReceiptInbox(FrappeTestCase):
 	def test_sync_fills_an_empty_attachment_and_queues_extraction(self):
 		doc = _make_receipt()
 		with patch.object(ar_module, "_first_attached_pdf", return_value="/private/files/first.pdf"), \
-			patch.object(ar_module.frappe, "enqueue") as enqueue:
+			patch("phamos.ai_agents.runner.enqueue_run") as enqueue:
 			ar_module._sync_attachment_field(doc.name)
 		self.assertEqual(frappe.db.get_value("Accounting Receipt", doc.name, "attachment"), "/private/files/first.pdf")
 		enqueue.assert_called_once()

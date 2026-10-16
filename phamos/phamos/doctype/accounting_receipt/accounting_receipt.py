@@ -175,17 +175,11 @@ def _sync_attachment_field(accounting_receipt_name):
 	if not first:
 		return
 	frappe.db.set_value("Accounting Receipt", accounting_receipt_name, "attachment", first)
-	# Auto-extract from PDF (runs in background; no on_update when we only db_set)
+	# The AI Accountant reads the new PDF in the background (fills empty fields only).
 	try:
-		from phamos.phamos.doctype.accounting_receipt.mistral_pdf import extract_from_pdf_and_update_ar
+		from phamos.ai_agents.runner import enqueue_run
 
-		frappe.enqueue(
-			extract_from_pdf_and_update_ar,
-			queue="default",
-			timeout=300,
-			accounting_receipt_name=accounting_receipt_name,
-			enqueue_after_commit=True,
-		)
+		enqueue_run("Accounting Receipt", accounting_receipt_name, trigger="Field Change")
 	except Exception:
 		frappe.log_error(title=_("Queue Accounting Receipt extraction failed"), message=frappe.get_traceback())
 

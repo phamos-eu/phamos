@@ -104,20 +104,19 @@
 				:extract-error-message="extractErrorMessage"
 				@close="closeReceipt"
 				@review-correct="onReviewCorrect"
-				@run-extract="runExtract"
+				@run-extract="runExtract(false)"
+				@rerun-extract="runExtract(true)"
 				@send-to-datev="sendToDatev"
 				@save-note="saveNote"
 				@preview-datev="previewDatev"
 			/>
 		</aside>
 
-		<ReceiptExtractReviewDialog
-			v-if="reviewState"
+		<ExtractDiffDialog
+			v-if="selectedReceipt"
 			v-model="showReview"
-			:receipt-name="reviewState.receiptName"
-			:fields="reviewState.fields"
-			:extracted="reviewState.extracted"
-			:attachment-url="reviewState.attachmentUrl"
+			:receipt-name="selectedReceipt.name"
+			:attachment-url="selectedReceipt.attachment || ''"
 			@applied="onReviewApplied"
 		/>
 	</div>
@@ -128,7 +127,7 @@ import { computed, onBeforeUnmount, onMounted, ref, watch } from "vue"
 import { useRoute, useRouter } from "vue-router"
 import { call, toast } from "frappe-ui"
 import ReceiptDetailPanel from "../components/ReceiptDetailPanel.vue"
-import ReceiptExtractReviewDialog from "../components/ReceiptExtractReviewDialog.vue"
+import ExtractDiffDialog from "../components/ExtractDiffDialog.vue"
 import ReceiptKanban from "../components/ReceiptKanban.vue"
 import ReceiptUploadList from "../components/ReceiptUploadList.vue"
 import { droppedFiles, droppedMailLink, isExternalDrag, isReceiptFile, uploadReceiptFile } from "../receiptUpload"
@@ -151,7 +150,6 @@ const extractStatus = ref("idle")
 const extractUpdatedCount = ref(0)
 const extractErrorMessage = ref("")
 const showReview = ref(false)
-const reviewState = ref(null)
 
 const fileInput = ref(null)
 const dropActive = ref(false)
@@ -261,11 +259,12 @@ async function showExtractState(receipt) {
 	if (current.status === "running") startExtractPolling(receipt.name)
 }
 
-async function runExtract() {
+async function runExtract(overwrite = false) {
 	const receipt = selectedReceipt.value
 	if (!receipt?.has_pdf) return
+	if (overwrite && !window.confirm("Read the PDF again and replace the values on this receipt with what the AI reads?")) return
 	try {
-		const res = await call(`${API}.enqueue_receipt_pdf_extract`, { name: receipt.name })
+		const res = await call(`${API}.enqueue_receipt_pdf_extract`, { name: receipt.name, overwrite: overwrite ? 1 : 0 })
 		if (res?.queued || res?.reason === "already_running") {
 			extractStatus.value = "running"
 			startExtractPolling(receipt.name)
@@ -473,7 +472,6 @@ function closeReceipt() {
 	selectedName.value = null
 	selectedReceipt.value = null
 	showReview.value = false
-	reviewState.value = null
 	extractStatus.value = "idle"
 	router.replace({ name: "Receipts" })
 }
@@ -498,32 +496,8 @@ async function onKanbanStatusChange({ name, status }) {
 	}
 }
 
-async function onReviewCorrect() {
-	if (!selectedReceipt.value?.name || !selectedReceipt.value?.has_pdf) return
-	try {
-		const res = await call(`${API}.get_receipt_review_fields`, { name: selectedReceipt.value.name })
-		if (!res?.ok || !res.fields?.length) {
-			toast({
-				title: "No fields available for review.",
-				icon: "info",
-				iconClasses: "text-ink-gray-5",
-			})
-			return
-		}
-		reviewState.value = {
-			receiptName: selectedReceipt.value.name,
-			fields: res.fields,
-			extracted: res.extracted || {},
-			attachmentUrl: selectedReceipt.value.attachment || "",
-		}
-		showReview.value = true
-	} catch (e) {
-		toast({
-			title: e?.messages?.[0] || e?.message || "Could not load review fields",
-			icon: "x-circle",
-			iconClasses: "text-ink-red-4",
-		})
-	}
+function onReviewCorrect() {
+	if (selectedReceipt.value?.name) showReview.value = true
 }
 
 async function onReviewApplied() {
@@ -531,9 +505,6 @@ async function onReviewApplied() {
 	await refreshSelectedReceipt()
 }
 
-watch(showReview, (open) => {
-	if (!open) reviewState.value = null
-})
 
 watch(
 	() => route.params.name,
@@ -544,7 +515,6 @@ watch(
 			selectedName.value = null
 			selectedReceipt.value = null
 			showReview.value = false
-			reviewState.value = null
 		}
 	}
 )
