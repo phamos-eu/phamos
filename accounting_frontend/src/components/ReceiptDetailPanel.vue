@@ -160,13 +160,17 @@
 			<section>
 				<div class="mb-1.5 flex items-center justify-between">
 					<h3 class="text-xs font-semibold uppercase tracking-wide text-ink-gray-5">Items</h3>
-					<button v-if="!readonly" type="button" class="text-xs text-ink-gray-6 hover:text-ink-gray-9" @click="addItem">+ Add line</button>
+					<div class="flex items-center gap-3">
+						<button v-if="categoryInfo.can_create" type="button" class="text-xs text-ink-gray-6 hover:text-ink-gray-9" @click="showNewCategory = true">+ New category</button>
+						<button v-if="!readonly" type="button" class="text-xs text-ink-gray-6 hover:text-ink-gray-9" @click="addItem">+ Add line</button>
+					</div>
 				</div>
 				<p v-if="!autosave.draft.items.length" class="text-sm text-ink-gray-5">No item lines yet.</p>
 				<table v-else class="w-full text-sm">
 					<thead>
 						<tr class="text-left text-[11px] uppercase tracking-wide text-ink-gray-5">
 							<th class="py-1 pr-2">Description</th>
+							<th class="w-44 py-1 pr-2">Category</th>
 							<th class="w-16 py-1 pr-2 text-right">Qty</th>
 							<th class="w-24 py-1 pr-2 text-right">Rate</th>
 							<th class="w-24 py-1 pr-2 text-right">Amount</th>
@@ -178,6 +182,21 @@
 						<tr v-for="(item, i) in autosave.draft.items" :key="item.name || `new-${i}`" class="border-t border-outline-gray-1">
 							<td class="py-1 pr-2">
 								<input :value="item.item_name" :disabled="readonly" class="cell" @change="setItem(i, 'item_name', $event.target.value)" />
+							</td>
+							<td class="py-1 pr-2">
+								<select
+									:value="item.item_code || ''"
+									:disabled="readonly"
+									class="cell"
+									:title="accountLabel(item)"
+									@change="setItem(i, 'item_code', $event.target.value)"
+								>
+									<option value="">— choose —</option>
+									<option v-for="c in categories" :key="c.item_code" :value="c.item_code">{{ c.item_name }}</option>
+								</select>
+								<div class="truncate px-1 text-[11px]" :class="accountLabel(item) ? 'text-ink-gray-5' : 'text-ink-amber-3'">
+									{{ accountLabel(item) || "no account" }}
+								</div>
 							</td>
 							<td class="py-1 pr-2">
 								<input :value="item.qty" type="number" step="any" :disabled="readonly" class="cell text-right" @change="setItem(i, 'qty', $event.target.value)" />
@@ -198,7 +217,7 @@
 					</tbody>
 					<tfoot>
 						<tr class="border-t border-outline-gray-2 text-ink-gray-6">
-							<td class="py-1 pr-2" colspan="3">Lines total</td>
+							<td class="py-1 pr-2" colspan="4">Lines total</td>
 							<td class="py-1 pr-2 text-right tabular-nums" :class="linesMismatch ? 'text-ink-amber-3' : ''" :title="linesMismatch ? 'Differs from the net total' : ''">
 								{{ money(linesTotal) }}
 							</td>
@@ -206,6 +225,27 @@
 						</tr>
 					</tfoot>
 				</table>
+			</section>
+
+			<!-- Purchase Invoice -->
+			<section class="flex flex-wrap items-center gap-2 text-sm">
+				<h3 class="text-xs font-semibold uppercase tracking-wide text-ink-gray-5">Purchase Invoice</h3>
+				<a v-if="receipt.purchase_invoice" :href="`/app/purchase-invoice/${receipt.purchase_invoice}`" target="_blank" class="text-ink-blue-3 underline">
+					{{ receipt.purchase_invoice }}
+				</a>
+				<span v-if="receipt.purchase_invoice_status" class="rounded bg-surface-gray-2 px-1.5 py-0.5 text-xs text-ink-gray-7">{{ receipt.purchase_invoice_status }}</span>
+				<template v-if="!receipt.purchase_invoice">
+					<button
+						type="button"
+						class="btn"
+						:disabled="readonly || creatingInvoice || !autosave.draft.supplier || !autosave.draft.items.length"
+						:title="invoiceHint"
+						@click="createInvoice"
+					>
+						{{ creatingInvoice ? "Creating…" : "Create Purchase Invoice" }}
+					</button>
+					<span class="text-xs text-ink-gray-5">{{ invoiceHint }}</span>
+				</template>
 			</section>
 
 			<!-- Note -->
@@ -243,6 +283,7 @@
 			<iframe v-else :src="pdfUrl" type="application/pdf" class="min-h-[480px] flex-1 rounded-md border border-outline-gray-2 bg-surface-gray-2" />
 		</div>
 
+		<NewCategoryDialog v-if="showNewCategory" v-model="showNewCategory" :company="receipt.company" @created="onCategoryCreated" />
 		<CreateSupplierDialog
 			v-if="showCreateSupplier"
 			v-model="showCreateSupplier"
@@ -260,6 +301,7 @@ import DocSyncBanner from "@spa/components/DocSyncBanner.vue"
 import FrappeLink from "@spa/components/FrappeLink.vue"
 import { useAutosaveDoc } from "@spa/composables/useAutosaveDoc.js"
 import CreateSupplierDialog from "./CreateSupplierDialog.vue"
+import NewCategoryDialog from "./NewCategoryDialog.vue"
 
 const API = "phamos.api.accounting_receipts"
 
@@ -345,6 +387,54 @@ function onSupplierCreated(receipt) {
 	emit("updated", receipt)
 }
 
+// --- categories and Purchase Invoice ---------------------------------------------------
+const categoryInfo = ref({ categories: [], can_create: 0 })
+const categories = computed(() => categoryInfo.value.categories || [])
+const showNewCategory = ref(false)
+const creatingInvoice = ref(false)
+
+async function loadCategories() {
+	try {
+		categoryInfo.value = await call(`${API}.get_expense_categories`, { company: props.receipt?.company })
+	} catch (e) {
+		categoryInfo.value = { categories: [], can_create: 0 }
+	}
+}
+loadCategories()
+
+function accountLabel(item) {
+	const category = categories.value.find((c) => c.item_code === item.item_code)
+	if (item.expense_account && (!category || category.expense_account !== item.expense_account)) return item.expense_account
+	if (category?.account_number) return `${category.account_number} ${category.account_name}`
+	return item.expense_account || ""
+}
+
+const invoiceHint = computed(() => {
+	if (!autosave.draft.supplier) return "Set the supplier first."
+	if (!autosave.draft.items.length) return "Add item lines first."
+	if (autosave.draft.items.some((row) => !accountLabel(row))) return "Every line needs a category."
+	return ""
+})
+
+async function onCategoryCreated() {
+	await loadCategories()
+}
+
+async function createInvoice() {
+	creatingInvoice.value = true
+	try {
+		await autosave.flush()
+		const res = await call(`${API}.make_purchase_invoice`, { name: props.receipt.name })
+		toast({ title: `Purchase Invoice ${res.purchase_invoice} created (draft)`, icon: "check-circle", iconClasses: "text-ink-green-3" })
+		for (const warning of res.warnings || []) toast({ title: warning, icon: "alert-triangle", iconClasses: "text-ink-amber-3" })
+		emit("updated", res.receipt)
+	} catch (e) {
+		toast({ title: e?.messages?.[0] || e?.message || "Could not create the Purchase Invoice", icon: "x-circle", iconClasses: "text-ink-red-4" })
+	} finally {
+		creatingInvoice.value = false
+	}
+}
+
 // --- items ----------------------------------------------------------------------------
 function setItem(index, field, raw) {
 	const numeric = ["qty", "rate", "amount", "tax_rate"].includes(field)
@@ -352,6 +442,8 @@ function setItem(index, field, raw) {
 	autosave.draft.items = autosave.draft.items.map((row, i) => {
 		if (i !== index) return row
 		const next = { ...row, [field]: value }
+		// A new category brings its own expense account (set by the server).
+		if (field === "item_code") next.expense_account = null
 		if (field === "qty" || field === "rate") next.amount = round2(Number(next.qty || 0) * Number(next.rate || 0))
 		return next
 	})

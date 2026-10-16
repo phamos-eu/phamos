@@ -33,6 +33,7 @@ class AccountingReceipt(Document):
 			self.due_date = None
 		if self.status != "Cancelled":
 			self.cancel_reason = None
+		self.set_item_accounts()
 
 		company = self.company or get_default_company()
 		if not company or not self.currency:
@@ -56,6 +57,15 @@ class AccountingReceipt(Document):
 			if self.sum:
 				self.sum_in_company_currency = float(self.sum) * float(rate)
 
+	def set_item_accounts(self):
+		"""Lines with a category but no expense account take the category's account."""
+		from phamos.accounting.categories import resolve_expense_account
+
+		company = self.company or get_default_company()
+		for row in self.get("items") or []:
+			if row.item_code and not row.expense_account:
+				row.expense_account = resolve_expense_account(row.item_code, company)
+
 	@frappe.whitelist()
 	def make_purchase_invoice(self):
 		"""Create a draft Purchase Invoice from this receipt.
@@ -65,6 +75,10 @@ class AccountingReceipt(Document):
 		"""
 		self.check_permission("write")
 		frappe.has_permission("Purchase Invoice", "create", throw=True)
+		if self.get("items"):
+			from phamos.accounting.branching import make_purchase_invoice
+
+			return make_purchase_invoice(self)
 		is_return = bool(self.is_return)
 
 		pi = frappe.new_doc("Purchase Invoice")

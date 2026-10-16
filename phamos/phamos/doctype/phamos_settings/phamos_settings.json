@@ -89,7 +89,8 @@
   "ai_accountant_section",
   "ai_accountant_enabled",
   "column_break_ai_accountant",
-  "ai_accountant_user"
+  "ai_accountant_user",
+  "ai_expense_item_group"
  ],
  "fields": [
   {
@@ -558,12 +559,19 @@
    "label": "AI Accountant User",
    "options": "User",
    "description": "System user the AI Accountant works as, so its changes are separated from human corrections in the document history."
+  },
+  {
+   "fieldname": "ai_expense_item_group",
+   "fieldtype": "Link",
+   "label": "Expense Category Group",
+   "options": "Item Group",
+   "description": "Item Group whose Items are the expense categories receipt lines are assigned to. Each category's Item Default sets the expense account."
   }
  ],
  "index_web_pages_for_search": 1,
  "issingle": 1,
  "links": [],
- "modified": "2026-10-16 12:00:00.000000",
+ "modified": "2026-10-17 09:00:00.000000",
  "modified_by": "Administrator",
  "module": "Phamos",
  "name": "phamos Settings",

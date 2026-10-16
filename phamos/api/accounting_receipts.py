@@ -232,6 +232,12 @@ def _set_items(doc, rows):
 		if not flt(values.get("amount")):
 			values["amount"] = values["qty"] * values["rate"]
 		row = existing.get(incoming.get("name"))
+		if row and "item_code" in values and values["item_code"] != row.item_code:
+			# A new category brings its own account unless the account was chosen by hand.
+			if not values.get("expense_account") or values.get("expense_account") == row.expense_account:
+				values["expense_account"] = None
+		elif not row and values.get("item_code") and "expense_account" not in incoming:
+			values["expense_account"] = None
 		if row:
 			row.update(values)
 			doc.append("items", row)
@@ -601,3 +607,52 @@ def send_receipts_to_datev(names):
 			result = {"ok": False, "message": _("Not permitted")}
 		(sent.append(name) if result.get("ok") else failed.append({"name": name, "message": result.get("message")}))
 	return {"sent": sent, "failed": failed}
+
+
+# --- Expense categories and Purchase Invoices ---------------------------------------------
+
+
+def _company(company=None):
+	return company or frappe.defaults.get_user_default("company") or frappe.defaults.get_global_default("company")
+
+
+@frappe.whitelist(methods=["POST"])
+def get_expense_categories(company=None):
+	"""Categories for the item-line picker, with their expense accounts."""
+	frappe.has_permission("Accounting Receipt", "read", throw=True)
+	from phamos.accounting.categories import expense_categories, expense_group
+
+	roles = set(frappe.get_roles())
+	return {
+		"group": expense_group(),
+		"categories": expense_categories(_company(company)),
+		"can_create": 1 if roles & {"System Manager", "Accounts Manager"} else 0,
+	}
+
+
+@frappe.whitelist(methods=["POST"])
+def create_expense_category(name, expense_account, keywords=None, company=None):
+	"""New category (Item in the expense group with its expense account). Accounts Manager only."""
+	from phamos.accounting.categories import create_expense_category as create
+
+	return {"item_code": create(name, expense_account, _company(company), keywords)}
+
+
+@frappe.whitelist(methods=["POST"])
+def make_purchase_invoice(name, submit=0):
+	"""Create the Purchase Invoice from the receipt's lines (draft unless submit=1)."""
+	from phamos.accounting.branching import make_purchase_invoice as build
+	from phamos.api.accounting_spa import get_receipt
+
+	doc = frappe.get_doc("Accounting Receipt", name)
+	doc.check_permission("write")
+	frappe.has_permission("Purchase Invoice", "create", throw=True)
+	pi = build(doc, submit=cint(submit))
+	return {
+		"purchase_invoice": pi.name,
+		"docstatus": pi.docstatus,
+		"grand_total": pi.grand_total,
+		"warnings": pi.flags.receipt_warnings or [],
+		"desk_url": f"/app/purchase-invoice/{pi.name}",
+		"receipt": get_receipt(name),
+	}
