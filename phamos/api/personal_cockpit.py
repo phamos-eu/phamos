@@ -561,14 +561,17 @@ def start_timer(project, expected_seconds, goal, task=None, manual_start_time=No
 
 
 @frappe.whitelist(methods=["POST"])
-def pause_timer(name):
-	return personal_timer.pause_timer(name)
+def pause_timer(name, break_goal=None, break_expected_seconds=None):
+	"""Pause my timer for a break with a goal and an estimate."""
+	return personal_timer.pause_timer(name, break_goal=break_goal, break_expected_seconds=break_expected_seconds)
 
 
 @frappe.whitelist(methods=["POST"])
-def resume_timer(name, break_project=None, break_goal=None, break_result=None, break_activity_type=None, break_percent_billable=0):
+def resume_timer(name, track_break=0, break_project=None, break_goal=None, break_result=None, break_activity_type=None, break_percent_billable=0):
+	"""Resume; track_break logs the break as its own record, otherwise it is dropped."""
 	return personal_timer.resume_timer(
 		name,
+		track_break=track_break,
 		break_project=break_project,
 		break_goal=break_goal,
 		break_result=break_result,
@@ -606,3 +609,13 @@ def discard_timer_draft(name):
 def get_timeline(from_date, to_date):
 	"""My check-ins, time logs, closed ToDos and day plans for up to 31 days."""
 	return personal_timeline.get_timeline(from_date, to_date)
+@frappe.whitelist()
+def get_checkin_dashboard(period=30):
+	"""Worked time per day, typical start and end, and days without a check-out."""
+	return personal_checkin.get_checkin_dashboard(period=period)
+
+
+@frappe.whitelist()
+def get_my_checkins(start=0, page_length=100):
+	"""All my check-ins, newest first, a page at a time."""
+	return personal_checkin.get_my_checkins(start=start, page_length=page_length)

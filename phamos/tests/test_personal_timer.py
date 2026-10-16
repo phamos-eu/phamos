@@ -114,30 +114,50 @@ class TestPersonalTimer(FrappeTestCase):
 		with self.assertRaises(frappe.ValidationError):
 			self._start(project=self.other_project)
 
-	def test_pause_and_resume(self):
-		name = self._start()["session"]["name"]
-		paused = pc.pause_timer(name)["session"]
-		self.assertEqual(paused["state"], "paused")
-		self.assertTrue(paused["break_from"])
-		self.assertEqual(pc.resume_timer(name)["session"]["state"], "running")
-		self.assertEqual(len(frappe.get_doc("Timesheet Record", name).item), 3)
+	def _pause(self, name, goal="Coffee with the team", minutes=15):
+		return pc.pause_timer(name, break_goal=goal, break_expected_seconds=minutes * 60)
 
-	def test_resume_can_log_the_break(self):
+	def test_pause_asks_for_goal_and_estimate(self):
 		name = self._start()["session"]["name"]
-		pc.pause_timer(name)
+		with self.assertRaises(frappe.ValidationError):
+			pc.pause_timer(name)
+		with self.assertRaises(frappe.ValidationError):
+			pc.pause_timer(name, break_goal="Coffee", break_expected_seconds=10)
+		paused = self._pause(name)["session"]
+		self.assertEqual((paused["state"], paused["break_goal"], paused["break_expected"]), ("paused", "Coffee with the team", 900))
+		self.assertTrue(paused["break_from"])
+
+	def test_resume_without_tracking_drops_the_break(self):
+		name = self._start()["session"]["name"]
+		self._pause(name)
+		running = pc.resume_timer(name)["session"]
+		self.assertEqual((running["state"], running["break_goal"]), ("running", None))
+		self.assertIsNone(timer._break_plan(name))
+		self.assertEqual(len(frappe.get_doc("Timesheet Record", name).item), 3)
+		self.assertFalse(frappe.db.exists("Timesheet Record", {"employee": self.employee, "docstatus": 1}))
+
+	def test_resume_can_track_the_break(self):
+		name = self._start()["session"]["name"]
+		self._pause(name, goal="Customer call", minutes=20)
+		with self.assertRaises(frappe.ValidationError):
+			pc.resume_timer(name, track_break=1, break_project=self.other_project)  # result missing
 		pc.resume_timer(
 			name,
+			track_break=1,
 			break_project=self.other_project,
-			break_goal="Customer call",
 			break_result="Agreed on the scope",
 			break_activity_type="TM Development",
 		)
 		breaks = frappe.get_all(
 			"Timesheet Record",
 			filters={"employee": self.employee, "project": self.other_project, "docstatus": 1},
-			fields=["goal", "result", "percent_billable"],
+			fields=["goal", "result", "percent_billable", "expected_time"],
 		)
-		self.assertEqual([(b.goal, b.result, b.percent_billable) for b in breaks], [("Customer call", "Agreed on the scope", "0")])
+		self.assertEqual(
+			[(b.goal, b.result, b.percent_billable, b.expected_time) for b in breaks],
+			[("Customer call", "Agreed on the scope", "0", 1200)],
+		)
+		self.assertIsNone(timer._break_plan(name))
 
 	def test_stop_submits_and_creates_the_erpnext_timesheet(self):
 		name = self._start()["session"]["name"]
@@ -167,7 +187,7 @@ class TestPersonalTimer(FrappeTestCase):
 		name = self._start(user=OTHER)["session"]["name"]
 		frappe.set_user(USER)
 		for call in (
-			lambda: pc.pause_timer(name),
+			lambda: self._pause(name),
 			lambda: pc.resume_timer(name),
 			lambda: pc.stop_timer(name, "Hijacked", activity_type="TM Development"),
 			lambda: pc.continue_timer_with_available_hours(name),

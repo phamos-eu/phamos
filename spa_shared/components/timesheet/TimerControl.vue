@@ -37,16 +37,10 @@
 					<button
 						type="button"
 						class="flex h-7 items-center gap-2 rounded px-2 text-sm hover:bg-surface-gray-2"
-						:aria-label="`${session.state === 'running' ? 'Timer running' : 'Timer paused'}, ${clock}, ${session.project_name}`"
+						:aria-label="clockLabel"
 						@click="togglePopover"
 					>
-						<span
-							class="font-mono tabular-nums"
-							:class="session.state === 'running' ? 'text-ink-green-3' : 'text-ink-amber-3'"
-							role="timer"
-						>
-							{{ clock }}
-						</span>
+						<span class="font-mono tabular-nums" :class="clockClass" role="timer">{{ clock }}</span>
 						<span class="hidden max-w-[12rem] truncate text-ink-gray-7 md:inline">{{ session.project_name }}</span>
 					</button>
 				</template>
@@ -57,10 +51,12 @@
 						<div v-if="session.task_subject" class="text-xs text-ink-gray-5">Task: {{ session.task_subject }}</div>
 						<div v-if="session.gitlab_issue_title" class="text-xs text-ink-gray-5">Issue: {{ session.gitlab_issue_title }}</div>
 						<div class="flex justify-between text-xs text-ink-gray-6">
-							<span>Started {{ formatTime(session.from_time) }}</span>
+							<span>Started {{ formatTime(session.from_time) }} · {{ formatMinutes(elapsed) }} worked</span>
 							<span :class="over ? 'text-ink-red-4' : ''">{{ budget }}</span>
 						</div>
-						<div v-if="session.state === 'paused'" class="text-xs text-ink-amber-4">On a break for {{ breakText }}</div>
+						<div v-if="session.state === 'paused'" class="text-xs text-ink-amber-4">
+							Break: {{ session.break_goal || "break" }}, {{ breakText }} so far
+						</div>
 						<button type="button" class="text-xs text-ink-gray-5 hover:underline" @click="openDesk(session.desk_url)">
 							Open the record in Desk ↗
 						</button>
@@ -74,8 +70,7 @@
 				class="flex h-7 w-7 items-center justify-center rounded text-ink-gray-6 hover:bg-surface-gray-2 hover:text-ink-gray-9 disabled:opacity-50"
 				aria-label="Pause the timer"
 				title="Pause"
-				:disabled="busy === 'pause'"
-				@click="pause"
+				@click="showPause = true"
 			>
 				<FeatherIcon name="pause" class="h-4 w-4" />
 			</button>
@@ -95,6 +90,7 @@
 			@stopped="onStopped"
 			@limit="onLimit"
 		/>
+		<PauseDialog v-model="showPause" :session="session" @paused="setTimer" />
 		<BreakDialog v-model="showBreak" :session="session" :break-seconds="breakSeconds" @resumed="onResumed" />
 		<TimeLimitDialog v-model="showLimit" :session="session" @done="onLimitDone" />
 	</div>
@@ -106,10 +102,11 @@ import { call, Popover } from "frappe-ui"
 import { openDesk } from "@spa/utils/appWindow.js"
 import { formatTime as formatTimeFull } from "@spa/utils/datetime.js"
 import { notify } from "@spa/utils/notify.js"
-import { budgetText, formatClock, formatMinutes, isOverBudget, liveBreak, liveElapsed } from "@spa/utils/timerClock.js"
+import { budgetText, countdown, formatMinutes, isOverBudget, liveBreak, liveElapsed } from "@spa/utils/timerClock.js"
 import { setTimer, timer, loadTimer } from "@spa/timerStore.js"
 import spaConfig from "@/config"
 import BreakDialog from "./BreakDialog.vue"
+import PauseDialog from "./PauseDialog.vue"
 import StartTimerDialog from "./StartTimerDialog.vue"
 import StopTimerDialog from "./StopTimerDialog.vue"
 import TimeLimitDialog from "./TimeLimitDialog.vue"
@@ -120,6 +117,7 @@ const busy = ref("")
 const showStart = ref(false)
 const showStop = ref(false)
 const showBreak = ref(false)
+const showPause = ref(false)
 const showLimit = ref(false)
 let ticker = null
 
@@ -128,7 +126,22 @@ const state = computed(() => timer.state)
 const session = computed(() => state.value?.session || null)
 const sinceLoad = computed(() => (tick.value - timer.loadedAt) / 1000)
 const elapsed = computed(() => liveElapsed(session.value, sinceLoad.value))
-const clock = computed(() => formatClock(elapsed.value))
+// Counts down from the target: the session's expected time, or the break's estimate while paused.
+const clockState = computed(() =>
+	session.value?.state === "paused"
+		? countdown(session.value.break_expected, breakSeconds.value)
+		: countdown(session.value?.expected_time, elapsed.value)
+)
+const clock = computed(() => clockState.value.text)
+const clockClass = computed(() => {
+	if (clockState.value.over) return "text-ink-red-4"
+	return session.value?.state === "running" ? "text-ink-green-3" : "text-ink-amber-3"
+})
+const clockLabel = computed(() => {
+	const what = session.value?.state === "running" ? "Timer" : "Break"
+	const rest = clockState.value.over ? `over by ${clock.value.slice(1)}` : `${clock.value} left`
+	return `${what} running, ${rest}, ${session.value?.project_name || ""}`
+})
 const budget = computed(() => budgetText(session.value, elapsed.value))
 const over = computed(() => isOverBudget(session.value, elapsed.value))
 const breakSeconds = computed(() => liveBreak(session.value, state.value?.server_now, sinceLoad.value))
@@ -140,18 +153,6 @@ const blockTitle = computed(() => {
 
 function errorText(e, fallback) {
 	return e?.messages?.[0] || e?.message || fallback
-}
-
-async function pause() {
-	busy.value = "pause"
-	try {
-		setTimer(await call(`${API}.pause_timer`, { name: session.value.name }))
-	} catch (e) {
-		notify.error(errorText(e, "Could not pause the timer"))
-		loadTimer()
-	} finally {
-		busy.value = ""
-	}
 }
 
 async function discard(draft) {

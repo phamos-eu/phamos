@@ -16,6 +16,8 @@ needs on top:
 - the project picker data (my projects, recent ones, search) and the project's task rule.
 """
 
+import json
+
 import frappe
 from frappe import _
 from frappe.utils import cint, get_datetime, now_datetime
@@ -33,6 +35,28 @@ RECENT_PROJECTS = 5
 TASK_RULE_FIELD = "task_in_timesheet_record"
 TASK_HIDDEN, TASK_OPTIONAL, TASK_MANDATORY = "Task is hidden", "Task is optional", "Task is mandatory"
 BILLABLE_OPTIONS = ("0", "25", "50", "75", "100")
+MIN_BREAK_SECONDS = 60
+# The goal and estimate of a running break are kept as a private user default per record until
+# the break ends; the Timesheet Record has no place for them before it is decided to track it.
+BREAK_KEY = "cockpit_timer_break:{}"
+
+
+def _break_plan(name):
+	raw = frappe.defaults.get_user_default(BREAK_KEY.format(name))
+	if not raw:
+		return None
+	try:
+		return json.loads(raw)
+	except ValueError:
+		return None
+
+
+def _set_break_plan(name, plan):
+	key = BREAK_KEY.format(name)
+	if plan:
+		frappe.defaults.set_user_default(key, json.dumps(plan))
+	else:
+		frappe.defaults.clear_user_default(key)
 
 
 # who and what
@@ -85,6 +109,7 @@ def _session():
 	project = frappe.db.get_value(
 		"Project", doc.project, ["project_name", "percent_billable"], as_dict=True
 	) or frappe._dict()
+	plan = _break_plan(doc.name)
 	return {
 		"name": doc.name,
 		"kind": "issue" if doc.gitlab_issue else "project",
@@ -106,6 +131,8 @@ def _session():
 		"gitlab_issue": doc.gitlab_issue,
 		"gitlab_issue_title": frappe.db.get_value("GitLab Issue", doc.gitlab_issue, "title") if doc.gitlab_issue else None,
 		"limit": limit,
+		"break_goal": (plan or {}).get("goal") if state == "paused" else None,
+		"break_expected": cint((plan or {}).get("expected_seconds")) if state == "paused" else 0,
 		"desk_url": f"/app/timesheet-record/{doc.name}",
 	}
 
@@ -258,30 +285,46 @@ def start_timer(project, expected_seconds, goal, task=None, manual_start_time=No
 	return get_timer_state()
 
 
-def pause_timer(name):
+def pause_timer(name, break_goal=None, break_expected_seconds=None):
+	"""Pause; the break's goal and estimate are kept until resume decides whether to track it."""
 	_own_record(name)
+	goal = (break_goal or "").strip()
+	expected = cint(break_expected_seconds)
+	if not goal:
+		frappe.throw(_("Please say what the break is for."))
+	if expected < MIN_BREAK_SECONDS:
+		frappe.throw(_("Please estimate the break, at least one minute."))
 	dap.pause_timer(name)
+	_set_break_plan(name, {"goal": goal[:500], "expected_seconds": expected})
 	return get_timer_state()
 
 
-def resume_timer(name, break_project=None, break_goal=None, break_result=None, break_activity_type=None, break_percent_billable=0):
-	"""Resume; with break details the break is first logged as its own submitted record."""
+def resume_timer(name, track_break=0, break_project=None, break_goal=None, break_result=None, break_activity_type=None, break_percent_billable=0):
+	"""Resume. With `track_break` the break becomes its own submitted record (goal and estimate
+	from the pause, unless given again); without it the break's goal and estimate are dropped."""
 	doc = _own_record(name)
-	if break_project:
+	plan = _break_plan(name) or {}
+	if cint(track_break):
 		break_from = next((row.from_time for row in reversed(doc.item) if not row.to_time), None)
 		if not break_from:
 			frappe.throw(_("There is no open break to log."))
-		if not ((break_goal or "").strip() and (break_result or "").strip()):
+		goal = (break_goal or plan.get("goal") or "").strip()
+		if not break_project:
+			frappe.throw(_("Please pick the project the break belongs to."))
+		if not (goal and (break_result or "").strip()):
 			frappe.throw(_("Please describe the break's goal and result."))
-		dap.create_break_timesheet(
+		logged = dap.create_break_timesheet(
 			from_time=break_from,
 			project=break_project,
-			goal=break_goal.strip(),
+			goal=goal,
 			result=break_result.strip(),
 			percent_billable=break_percent_billable,
 			activity_type=break_activity_type or None,
 		)
+		if cint(plan.get("expected_seconds")):
+			frappe.db.set_value(DOCTYPE, logged["name"], "expected_time", cint(plan["expected_seconds"]))
 	dap.resume_timer(name)
+	_set_break_plan(name, None)
 	return get_timer_state()
 
 
@@ -297,6 +340,7 @@ def stop_timer(name, result, percent_billable=100, activity_type=None, manual_en
 	open_from = next((row.from_time for row in reversed(doc.item) if not row.to_time), None)
 	if manual_end_time and open_from and get_datetime(manual_end_time) < get_datetime(open_from):
 		frappe.throw(_("The end time cannot be before the start of the current segment."))
+	_set_break_plan(name, None)  # a break still open at stop is not tracked
 	outcome = dap.stop_timer(
 		name,
 		result,

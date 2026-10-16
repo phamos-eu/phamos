@@ -1,5 +1,5 @@
 // Run with `yarn test:spa` (vitest globals, see personal_frontend/vitest.config.js).
-import { budgetText, formatClock, formatMinutes, hoursToSeconds, isOverBudget, liveBreak, liveElapsed } from "./timerClock.js"
+import { budgetText, countdown, formatClock, formatMinutes, isOverBudget, liveBreak, liveElapsed, minutesToSeconds } from "./timerClock.js"
 
 const running = { state: "running", elapsed_seconds: 600, expected_time: 3600 }
 
@@ -31,10 +31,18 @@ describe("timer clock", () => {
 		expect(formatMinutes(20)).toBe("under a minute")
 	})
 
-	it("parses expected hours with a 15 minute minimum", () => {
-		expect(hoursToSeconds(1)).toBe(3600)
-		expect(hoursToSeconds("0,5")).toBe(1800)
-		expect(hoursToSeconds(0.1)).toBeNull()
-		expect(hoursToSeconds("abc")).toBeNull()
+	it("parses expected minutes with a minimum", () => {
+		expect(minutesToSeconds(60)).toBe(3600)
+		expect(minutesToSeconds("45")).toBe(2700)
+		expect(minutesToSeconds(10)).toBeNull()
+		expect(minutesToSeconds(5, 1)).toBe(300)
+		expect(minutesToSeconds("abc")).toBeNull()
+	})
+
+	it("counts down from the target and then shows the overtime", () => {
+		expect(countdown(3600, 600)).toEqual({ text: "00:50:00", over: false })
+		expect(countdown(3600, 3600)).toEqual({ text: "00:00:00", over: false })
+		expect(countdown(3600, 3912)).toEqual({ text: "+00:05:12", over: true })
+		expect(countdown(0, 75)).toEqual({ text: "00:01:15", over: false })
 	})
 })

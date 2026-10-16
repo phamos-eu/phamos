@@ -48,7 +48,7 @@
 				/>
 
 				<div class="grid grid-cols-2 gap-3">
-					<FormControl v-model="hours" type="number" size="sm" label="Expected hours" :step="0.25" :min="0.25" />
+					<FormControl v-model="minutes" type="number" size="sm" label="Expected minutes" :step="15" :min="15" />
 					<FormControl v-model="startTime" type="datetime-local" size="sm" label="Start" @input="startEdited = true" />
 				</div>
 				<FormControl
@@ -75,7 +75,7 @@
 import { computed, onBeforeUnmount, ref, watch } from "vue"
 import { call } from "frappe-ui"
 import { formatForApi, parseDatetimeLocalValue, toDatetimeLocalValue } from "@spa/utils/datetime.js"
-import { hoursToSeconds } from "@spa/utils/timerClock.js"
+import { minutesToSeconds } from "@spa/utils/timerClock.js"
 import spaConfig from "@/config"
 
 const props = defineProps({ modelValue: { type: Boolean, default: false } })
@@ -89,7 +89,7 @@ const loading = ref(false)
 const project = ref(null)
 const info = ref(null)
 const task = ref("")
-const hours = ref(1)
+const minutes = ref(60)
 const goal = ref("")
 const startTime = ref(toDatetimeLocalValue(new Date()))
 const startEdited = ref(false)
@@ -122,7 +122,7 @@ async function open() {
 	project.value = null
 	info.value = null
 	task.value = ""
-	hours.value = 1
+	minutes.value = 60
 	goal.value = ""
 	search.value = ""
 	startEdited.value = false
@@ -157,10 +157,10 @@ function clearProject() {
 
 async function submit() {
 	error.value = ""
-	const expected = hoursToSeconds(hours.value)
+	const expected = minutesToSeconds(minutes.value)
 	if (!project.value) return (error.value = "Please pick a project.")
 	if (info.value?.task_rule === "Task is mandatory" && !task.value) return (error.value = "This project needs a task.")
-	if (!expected) return (error.value = "Minimum expected time is 15 minutes (0.25 h).")
+	if (!expected) return (error.value = "Minimum expected time is 15 minutes.")
 	if (!goal.value.trim()) return (error.value = "Please describe the goal.")
 	const args = { project: project.value.name, expected_seconds: expected, goal: goal.value.trim(), task: task.value || null }
 	if (startEdited.value) {

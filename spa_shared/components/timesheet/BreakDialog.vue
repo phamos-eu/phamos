@@ -1,18 +1,19 @@
 <template>
 	<Dialog
 		:model-value="modelValue"
-		:options="{ title: logging ? 'Log the break' : 'Log break time?', size: logging ? 'lg' : 'md' }"
+		:options="{ title: logging ? 'Track the break' : 'Track this break?', size: logging ? 'lg' : 'md' }"
 		@update:model-value="emit('update:modelValue', $event)"
 	>
 		<template #body-content>
 			<div v-if="!logging" class="space-y-4" @keydown.enter.prevent="logging = true">
 				<p class="text-sm text-ink-gray-7">
-					The break lasted {{ breakText }}. Log it as its own timesheet record, for example a call for another
-					customer?
+					“{{ session?.break_goal || "Break" }}” took {{ breakText }}<template v-if="session?.break_expected">
+					of the {{ estimateText }} you estimated</template>. Track it as its own timesheet record?
 				</p>
+				<p class="text-xs text-ink-gray-5">If not, the goal and estimate of the break are dropped.</p>
 				<div class="flex justify-end gap-2">
-					<Button variant="ghost" :loading="saving" @click="resume(false)">No, just resume</Button>
-					<Button variant="solid" @click="logging = true">Yes, log it</Button>
+					<Button variant="ghost" :loading="saving" @click="resume(false)">No, drop it and resume</Button>
+					<Button variant="solid" @click="logging = true">Yes, track it</Button>
 				</div>
 			</div>
 			<form v-else class="space-y-4" @submit.prevent="resume(true)" @keydown.enter.ctrl.prevent="resume(true)" @keydown.enter.meta.prevent="resume(true)">
@@ -60,6 +61,7 @@ const error = ref("")
 const saving = ref(false)
 
 const breakText = computed(() => formatMinutes(props.breakSeconds))
+const estimateText = computed(() => formatMinutes(props.session?.break_expected || 0))
 const projectOptions = computed(() => [
 	{ label: "Pick a project", value: "" },
 	...projects.value.map((row) => ({ label: row.project_name || row.name, value: row.name })),
@@ -69,7 +71,7 @@ const activityOptions = computed(() => activityTypes.value.map((name) => ({ labe
 async function open() {
 	logging.value = false
 	error.value = ""
-	goal.value = ""
+	goal.value = props.session?.break_goal || ""
 	result.value = ""
 	billable.value = "0"
 	project.value = props.session?.project || ""
@@ -95,6 +97,7 @@ async function resume(withBreak) {
 		if (!project.value) return (error.value = "Please pick a project.")
 		if (!goal.value.trim() || !result.value.trim()) return (error.value = "Please fill in the goal and what happened.")
 		Object.assign(args, {
+			track_break: 1,
 			break_project: project.value,
 			break_goal: goal.value.trim(),
 			break_result: result.value.trim(),
