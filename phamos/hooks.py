@@ -292,8 +292,8 @@ doc_events = {
 		"on_trash": "phamos.cockpits.todo_hooks.on_trash",
 	},
 	"Event": {
-		"after_insert": "phamos.mailcow_integration.caldav.sync_event.on_upsert",
-        "on_update": "phamos.mailcow_integration.caldav.sync_event.on_upsert",
+		# on_update also runs after insert; an after_insert hook here pushed every new Event twice.
+		"on_update": "phamos.mailcow_integration.caldav.sync_event.on_upsert",
 		"on_trash": "phamos.mailcow_integration.caldav.sync_event.on_delete",
 	},
     "Team": {
