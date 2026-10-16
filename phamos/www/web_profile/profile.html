@@ -1,7 +1,7 @@
 {#- Profile page shared by every Web Profile section. Context: profile.py (data from
     sections.build_profile). Fixed skeleton: breadcrumb, header, facts, summary + body, related, CTA. -#}
 {% extends "templates/base.html" %}
-{% from "phamos/templates/web_profile/macros.html" import head_tags, breadcrumbs, avatar, tile, contact_button, socials with context %}
+{% from "phamos/templates/web_profile/macros.html" import head_tags, breadcrumbs, avatar, tile, contact_button, socials, profile_hero, profile_actions, profile_blocks, ticket_dialog_markup, subscribe_dialog_markup with context %}
 
 {% block title %}{{ title | e }}{% endblock %}
 {% block meta_block %}{{ super() }}{{ head_tags() }}{% endblock %}
@@ -13,6 +13,7 @@
 	</div>
 
 	<div class="wp-profile-layout">
+	{%- if profile.hero %}{{ profile_hero(item, profile.hero) }}{% else %}
 	<header class="wp-profile-head">
 		{%- if section not in ("people", "departments") %}{{ avatar(item, "lg") }}{% endif %}
 		<div>
@@ -21,9 +22,12 @@
 			{%- if item.subtitle and profile.show_subtitle %}<p class="wp-profile-subtitle">{{ item.subtitle | e }}</p>{% endif %}
 		</div>
 	</header>
+	{%- endif %}
 
 	{#- Sticky sidebar: the person this page is about (or its lead / managers / contact). -#}
 	<aside class="wp-profile-aside{% if profile.key_people | length > 1 %} wp-aside-multi{% endif %}" aria-label="{{ _('Key people') }}">
+		{#- Events: the page's own actions come first; then the key person's contact button is not black. -#}
+		{{ profile_actions(profile.actions, support_email) }}
 		{%- for card in profile.key_people %}
 		{%- set person = card.person %}
 		{#- Framed cards are always clickable as a whole: another person's card links to their profile
@@ -41,7 +45,7 @@
 				{%- if card.role %}<span class="wp-person-role">{{ card.role | e }}</span>{% endif %}
 				<a class="wp-person-name wp-stretched-link" href="{{ person.url | e }}">{{ person.title | e }}</a>
 				{%- endif %}
-				{%- if card.contact %}{{ contact_button(card.contact, "wp-person-contact") }}{% endif %}
+				{%- if card.contact %}{{ contact_button(card.contact, "wp-person-contact", primary=not profile.actions) }}{% endif %}
 				{{ socials(person.socials) }}
 			</div>
 		</div>
@@ -72,6 +76,8 @@
 	<div class="wp-profile-main">
 
 
+	{%- if subscribed %}<p class="wp-note">{{ _("Thank you, your email address is confirmed. You will receive the updates.") }}</p>{% endif %}
+	{%- if profile.notice %}<p class="wp-note">{{ profile.notice | e }}</p>{% endif %}
 	{%- if item.masked %}
 	<p class="wp-note">{{ _("This former colleague chose not to be named. Their role and time at phamos are shown without personal details.") if section == "people" else _("The customer is not named. This case study describes the project without identifying details.") }}</p>
 	{%- endif %}
@@ -88,6 +94,8 @@
 	</section>
 	{%- endif %}
 
+	{{ profile_blocks(profile.blocks) }}
+
 	{%- for block in profile.related %}
 	<section class="wp-related" aria-labelledby="wp-related-{{ loop.index }}">
 		<div class="wp-related-head">
@@ -103,5 +111,9 @@
 
 	</div>
 	</div>
+	{%- if profile.ticket %}{{ ticket_dialog_markup(item, profile.ticket, lang) }}{% endif %}
+	{%- if profile.actions | selectattr("dialog", "equalto", "subscribe") | list %}{{ subscribe_dialog_markup(item, lang) }}{% endif %}
 </main>
 {% endblock %}
+
+{% block script %}{{ super() }}{% if section == "events" %}{{ include_script("web_profile_events.bundle.js") }}{% endif %}{% endblock %}

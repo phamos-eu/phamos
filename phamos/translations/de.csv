@@ -313,3 +313,115 @@ Austria,Österreich
 Switzerland,Schweiz
 India,Indien
 Europe,Europa
+Events,Veranstaltungen
+"Workshops, meetups and webinars around ERPNext: where to meet phamos next, on site and online.","Workshops, Meetups und Webinare rund um ERPNext: wo Sie phamos als Nächstes treffen, vor Ort und online."
+Search events,Veranstaltungen durchsuchen
+When,Wann
+Upcoming,Demnächst
+Past,Vergangen
+All,Alle
+Type,Art
+City,Stadt
+Date,Datum
+event,Veranstaltung
+events,Veranstaltungen
+Workshop,Workshop
+Conference,Konferenz
+Webinar,Webinar
+Training,Schulung
+Meetup,Meetup
+Hackathon,Hackathon
+Team Building,Teambuilding
+Seminar,Seminar
+Networking,Networking
+Product Launch,Produktvorstellung
+Town Hall,Town Hall
+Social Event,Gesellschaftliches Event
+Free,Kostenlos
+Tickets available,Tickets verfügbar
+Sold out,Ausverkauft
+Cancelled,Abgesagt
+Ticket sale opens soon,Ticketverkauf startet bald
+Ticket sale has not started yet,Der Ticketverkauf hat noch nicht begonnen
+Ticket sale has ended,Der Ticketverkauf ist beendet
+Buy ticket,Ticket kaufen
+Register,Anmelden
+Keep me posted,Auf dem Laufenden bleiben
+Add to calendar,Zum Kalender hinzufügen
+Speakers,Referentinnen und Referenten
+Sponsors,Sponsoren
+Time,Uhrzeit
+Venue,Veranstaltungsort
+Price,Preis
+{0} incl. VAT,{0} inkl. MwSt.
+Seats left,Freie Plätze
+Organizer,Veranstalter
+More events,Weitere Veranstaltungen
+Other upcoming events by phamos.,Weitere anstehende Veranstaltungen von phamos.
+Your contact for this event,Ihre Ansprechperson für diese Veranstaltung
+This event has been cancelled.,Diese Veranstaltung wurde abgesagt.
+This event is described in English only.,Diese Veranstaltung ist nur auf Englisch beschrieben.
+This event is described in German only.,Diese Veranstaltung ist nur auf Deutsch beschrieben.
+"Thank you, your email address is confirmed. You will receive the updates.","Danke, Ihre E-Mail-Adresse ist bestätigt. Sie erhalten die Neuigkeiten."
+Register for {0},Anmeldung zu {0}
+Tickets for {0},Tickets für {0}
+Tickets,Tickets
+Number of tickets,Anzahl Tickets
+Name,Name
+Email,E-Mail
+Billing address,Rechnungsadresse
+Every order is invoiced. The invoice goes to this address.,Jede Bestellung wird in Rechnung gestellt. Die Rechnung geht an diese Adresse.
+Order as a company,Als Firma bestellen
+VAT ID (optional),USt-IdNr. (optional)
+Email for the invoice,E-Mail für die Rechnung
+Street and number,Straße und Hausnummer
+Postcode,PLZ
+Country,Land
+Your order,Ihre Bestellung
+incl. {0} % VAT,inkl. {0} % MwSt.
+Total,Gesamt
+I accept the terms and conditions of this event.,Ich akzeptiere die Teilnahmebedingungen dieser Veranstaltung.
+Read the terms,Bedingungen lesen
+I agree that phamos stores my details and those of the ticket holders to handle this order.,"Ich bin einverstanden, dass phamos meine Angaben und die der Ticketinhaber zur Abwicklung dieser Bestellung speichert."
+Keep me posted about this event by email (optional; you confirm your address first).,Neuigkeiten zu dieser Veranstaltung per E-Mail (optional; Sie bestätigen Ihre Adresse zuerst).
+Other attendees may contact me after the event (optional).,Andere Teilnehmende dürfen mich nach der Veranstaltung kontaktieren (optional).
+My name and company may be listed publicly as attendee (optional).,Mein Name und meine Firma dürfen öffentlich als Teilnehmende genannt werden (optional).
+Order with obligation to pay,Zahlungspflichtig bestellen
+Your order could not be sent. Please try again later.,Ihre Bestellung konnte nicht gesendet werden. Bitte versuchen Sie es später erneut.
+Please fill in all required fields with valid values and accept the terms and the privacy policy.,Bitte füllen Sie alle Pflichtfelder korrekt aus und akzeptieren Sie die Bedingungen und die Datenschutzerklärung.
+Thank you!,Vielen Dank!
+Your reference:,Ihre Referenz:
+You are registered. A confirmation is on its way to your inbox.,Sie sind angemeldet. Eine Bestätigung ist unterwegs in Ihr Postfach.
+phamos confirms your order by email and sends you the invoice.,phamos bestätigt Ihre Bestellung per E-Mail und sendet Ihnen die Rechnung.
+"We send you updates about {0}: schedule, reminders and follow-up material. You confirm your address by email first.","Wir senden Ihnen Neuigkeiten zu {0}: Ablauf, Erinnerungen und Material danach. Sie bestätigen Ihre Adresse zuerst per E-Mail."
+I agree that phamos stores my email address to send me these updates. I can unsubscribe at any time.,"Ich bin einverstanden, dass phamos meine E-Mail-Adresse für diese Neuigkeiten speichert. Ich kann mich jederzeit abmelden."
+Send confirmation email,Bestätigungs-E-Mail senden
+Almost done: please confirm with the link we just sent you.,"Fast geschafft: Bitte bestätigen Sie über den Link, den wir Ihnen gerade gesendet haben."
+This address already receives the updates.,Diese Adresse erhält die Neuigkeiten bereits.
+That did not work. Please try again later.,Das hat nicht geklappt. Bitte versuchen Sie es später erneut.
+Please enter a valid email address and tick the consent box.,Bitte geben Sie eine gültige E-Mail-Adresse ein und setzen Sie den Haken bei der Einwilligung.
+Ordering needs JavaScript. Please write to {0} instead.,Die Bestellung benötigt JavaScript. Bitte schreiben Sie stattdessen an {0}.
+This event is not available.,Diese Veranstaltung ist nicht verfügbar.
+Ticket sales for this event are closed.,Der Ticketverkauf für diese Veranstaltung ist geschlossen.
+Please add at least one ticket holder.,Bitte geben Sie mindestens einen Ticketinhaber an.
+At most {0} tickets per order.,Höchstens {0} Tickets pro Bestellung.
+Please enter the full name of every ticket holder.,Bitte geben Sie den vollständigen Namen jedes Ticketinhabers an.
+Every ticket needs its own email address.,Jedes Ticket braucht eine eigene E-Mail-Adresse.
+Please fill in the billing details.,Bitte füllen Sie die Rechnungsdaten aus.
+Please fill in: {0},Bitte ausfüllen: {0}
+Please enter the company name for the invoice.,Bitte geben Sie den Firmennamen für die Rechnung an.
+Please enter a valid VAT ID (e.g. DE123456789) or leave it empty.,Bitte geben Sie eine gültige USt-IdNr. ein (z. B. DE123456789) oder lassen Sie das Feld leer.
+Please choose a country.,Bitte wählen Sie ein Land.
+Please accept the terms and the privacy policy.,Bitte akzeptieren Sie die Bedingungen und die Datenschutzerklärung.
+The number of tickets does not match the ticket holders.,Die Anzahl der Tickets passt nicht zu den Ticketinhabern.
+This event has no updates by email.,Für diese Veranstaltung gibt es keine Neuigkeiten per E-Mail.
+Please agree that we store your email address for these updates.,"Bitte stimmen Sie zu, dass wir Ihre E-Mail-Adresse für diese Neuigkeiten speichern."
+Only {0} seats are left.,Es sind nur noch {0} Plätze frei.
+Already registered for this event: {0},Bereits für diese Veranstaltung angemeldet: {0}
+Your registration {0} for {1},Ihre Anmeldung {0} für {1}
+Thank you for your registration for {0}.,Vielen Dank für Ihre Anmeldung zu {0}.
+Reference,Referenz
+Total incl. VAT: {0},Gesamt inkl. MwSt.: {0}
+We confirm your order and send you the invoice by email. Your tickets are valid once the invoice is paid.,"Wir bestätigen Ihre Bestellung und senden Ihnen die Rechnung per E-Mail. Ihre Tickets gelten, sobald die Rechnung bezahlt ist."
+Your registration is confirmed. We look forward to seeing you.,Ihre Anmeldung ist bestätigt. Wir freuen uns auf Sie.
+"If something is wrong or you cannot come, simply reply to this email.","Wenn etwas nicht stimmt oder Sie nicht kommen können, antworten Sie einfach auf diese E-Mail."

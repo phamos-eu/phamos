@@ -25,6 +25,9 @@ def get_context(context):
 		raise frappe.PageDoesNotExistError
 
 	profile = build_profile(item, lang)
+	context.subscribed = section == "events" and frappe.form_dict.get("subscribed") == "1"
+	context.support_email = frappe.db.get_value("Company", frappe.defaults.get_global_default("company"), "email") \
+		if section == "events" else None
 	context.item = item
 	context.profile = profile
 	context.section_title = _(context.section_config["title"])

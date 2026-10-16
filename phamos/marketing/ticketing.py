@@ -246,8 +246,17 @@ def send_order_confirmation(event, reference, recipient, lang="de"):
 	attendees = frappe.get_all("Attendee", filters={"event": event, "order_reference": reference},
 		fields=["full_name", "email"], order_by="creation asc")
 	pricing = billing.get_ticket_pricing(doc)
+	attachments = []
+	if doc.starts_on and doc.published:
+		from phamos.marketing.web import build_ics
+		from phamos.web_profile.sections import find_item
+
+		item = find_item("events", doc.route, frappe.local.lang)
+		if item:
+			attachments.append({"fname": f"{item.slug}.ics", "fcontent": build_ics(item)})
 	frappe.sendmail(
 		recipients=[recipient],
+		attachments=attachments,
 		subject=_("Your registration {0} for {1}").format(reference, doc.title),
 		template="event_order_confirmation",
 		args={"event": doc, "reference": reference, "attendees": attendees, "paid": bool(pricing),

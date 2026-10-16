@@ -96,6 +96,12 @@ def search_texts(section, lang):
 					parts += [tile.title, tile.subtitle, *tile.chips]
 			for card in profile["key_people"]:
 				parts += [card["person"].title, card.get("role") or ""]
+			for block in profile.get("blocks") or []:
+				parts += [block["title"]]
+				for entry in block["entries"]:
+					parts += [entry["title"], entry.get("subtitle") or "", frappe.utils.strip_html(entry.get("body") or "")]
+			for line in (profile.get("hero") or {}).get("lines", []):
+				parts.append(line.get("text") or "")
 			texts[item.name] = _fold(" ".join(str(p) for p in parts if p))
 		frappe.cache.hset(CACHE_KEY, field, texts)
 		frappe.cache.expire(CACHE_KEY, CACHE_SECONDS)

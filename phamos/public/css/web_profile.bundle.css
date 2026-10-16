@@ -407,3 +407,53 @@ body .footer-grouped-links .footer-child-item { margin: 0; }
 /* Content Web Pages: same width and gutter as the Web Profile pages. */
 body .web-page-content, body main .page_content { max-width: 1680px; }
 body .footer-grouped-links .footer-child-item, body .footer-grouped-links .footer-child-item a { white-space: normal; overflow-wrap: anywhere; line-height: 1.4; }
+
+/* --- events (phamos.web_profile.events) ------------------------------------------------------------ */
+/* Cards: cover on top (16:9), date line, title, chips. Not clickable things stay chips or rows. */
+.wp-tile-event { padding: 0 0 14px; overflow: hidden; gap: 6px; }
+.wp-tile-event > :not(.wp-tile-cover) { padding: 0 14px; }
+.wp-tile-cover { position: relative; display: block; aspect-ratio: 16 / 9; margin-bottom: 8px; background: var(--wp-surface-3); }
+.wp-tile-cover img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.wp-tile-cover-date { display: flex; align-items: center; justify-content: center; height: 100%; color: var(--wp-muted); font-size: 18px; font-weight: 600; }
+.wp-tile-cover .wp-badge { position: absolute; top: 10px; left: 10px; background: var(--wp-surface); }
+.wp-event-head { flex-direction: column; align-items: stretch; gap: 16px; }
+.wp-profile-cover { width: 100%; max-height: 420px; object-fit: cover; border-radius: var(--wp-radius); }
+.wp-event-meta { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 16px; margin: 8px 0 0; color: var(--wp-ink-2); font-size: 15px; }
+.wp-link-card-inline { display: inline-flex; padding: 4px 10px; }
+.wp-actions { display: flex; flex-direction: column; gap: 8px; margin-bottom: 20px; }
+.wp-actions .wp-button { width: 100%; height: 38px; }
+.wp-actions .wp-chip { justify-content: center; }
+.wp-rows { display: flex; flex-direction: column; gap: 16px; list-style: none; margin: 0; padding: 0; }
+.wp-row { position: relative; display: grid; grid-template-columns: 56px minmax(0, 1fr); gap: 14px; align-items: start; }
+.wp-row-link { padding: 12px; border: 1px solid var(--wp-line); border-radius: var(--wp-radius); background: var(--wp-surface); box-shadow: var(--wp-shadow-sm); }
+.wp-row-link:hover { border-color: #cfcfcf; box-shadow: var(--wp-shadow-md); }
+.wp-row-photo { width: 56px; height: 56px; border-radius: 50%; overflow: hidden; background: var(--wp-surface-3); }
+.wp-row-photo img { width: 100%; height: 100%; object-fit: cover; }
+.wp-row-title { font-weight: 600; color: var(--wp-ink); }
+.wp-row-body { margin-top: 2px; color: var(--wp-ink-2); font-size: 14px; }
+.wp-row-body p { margin: 0 0 4px; }
+.wp-logos { display: flex; flex-wrap: wrap; gap: 12px; list-style: none; margin: 0; padding: 0; }
+.wp-logo-card { display: flex; align-items: center; justify-content: center; width: 160px; height: 80px; padding: 12px; border: 1px solid var(--wp-line); border-radius: var(--wp-radius); background: var(--wp-surface); box-shadow: var(--wp-shadow-sm); color: var(--wp-ink); font-weight: 600; }
+.wp-logo-card:hover { border-color: #cfcfcf; box-shadow: var(--wp-shadow-md); }
+.wp-logo-card img { max-width: 100%; max-height: 100%; object-fit: contain; }
+/* Ticket dialog */
+.wp-dialog-wide { width: min(720px, calc(100vw - 32px)); }
+.wp-fieldset { display: flex; flex-direction: column; gap: 10px; margin: 0; padding: 0; border: 0; }
+.wp-fieldset[hidden] { display: none; }
+.wp-fieldset legend { margin-bottom: 6px; padding: 0; font-weight: 600; font-size: 14px; }
+.wp-qty { display: flex; align-items: center; gap: 10px; font-size: 13px; font-weight: 500; }
+.wp-qty input { width: 80px; padding: 6px 8px; border: 1px solid var(--wp-line); border-radius: var(--wp-radius-sm); font: inherit; }
+.wp-attendee-rows { display: flex; flex-direction: column; gap: 10px; margin: 0; padding: 0 0 0 18px; }
+.wp-contact-form select { width: 100%; padding: 7px 10px; border: 1px solid var(--wp-line); border-radius: var(--wp-radius-sm); background: var(--wp-surface); font: inherit; }
+.wp-summary-people { margin: 0; padding-left: 18px; color: var(--wp-ink-2); }
+.wp-summary { width: 100%; border-collapse: collapse; font-variant-numeric: tabular-nums; }
+.wp-summary td { padding: 3px 0; }
+.wp-summary td:last-child { text-align: right; }
+.wp-summary-total td { padding-top: 8px; font-weight: 600; }
+.wp-consents { display: flex; flex-direction: column; gap: 4px; }
+.wp-terms summary { cursor: pointer; color: var(--wp-muted); }
+.wp-terms .wp-body { max-height: 220px; overflow-y: auto; margin-top: 6px; padding: 10px; background: var(--wp-surface-2); border-radius: var(--wp-radius-sm); font-size: 13px; }
+.wp-ticket-success p { margin: 0 0 10px; }
+@media (max-width: 640px) {
+	.wp-contact-row { grid-template-columns: 1fr; }
+}

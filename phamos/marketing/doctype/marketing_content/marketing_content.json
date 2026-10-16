@@ -1,6 +1,5 @@
 {
  "actions": [],
- "allow_guest_to_view": 1,
  "autoname": "MKT-CONTENT-.YYYY.-.#####",
  "creation": "2026-03-25 00:00:00",
  "doctype": "DocType",
@@ -16,6 +15,7 @@
   "ends_on",
   "published",
   "route",
+  "legacy_route",
   "section_location",
   "location",
   "city",
@@ -24,6 +24,7 @@
   "image",
   "intro",
   "description",
+  "translations",
   "section_organizer",
   "organizer_logo",
   "organizer_name",
@@ -33,10 +34,7 @@
   "contact_person",
   "contact_person_email",
   "contact_person_phone",
-  "section_counts",
-  "going_count",
-  "maybe_count",
-  "not_going_count",
+  "contact_profile",
   "section_registration",
   "registration_open",
   "max_attendees",
@@ -45,7 +43,6 @@
   "section_sponsors",
   "sponsors",
   "section_responses",
-  "subscription_description",
   "email_group",
   "tab_ticketing",
   "ticket_item",
@@ -126,7 +123,16 @@
    "fieldtype": "Data",
    "label": "Route",
    "no_copy": 1,
-   "unique": 1
+   "unique": 1,
+   "description": "URL slug: /de/veranstaltungen/<route> and /en/events/<route>. Set once from the title."
+  },
+  {
+   "fieldname": "legacy_route",
+   "fieldtype": "Data",
+   "label": "Old Route",
+   "hidden": 1,
+   "read_only": 1,
+   "no_copy": 1
   },
   {
    "fieldname": "section_location",
@@ -162,12 +168,25 @@
   {
    "fieldname": "intro",
    "fieldtype": "Small Text",
-   "label": "Intro / Tagline"
+   "label": "Intro / Tagline",
+   "hidden": 1,
+   "read_only": 1,
+   "description": "Legacy: moved into Texts per Language. Removed in a later release."
   },
   {
    "fieldname": "description",
    "fieldtype": "Text Editor",
-   "label": "Description"
+   "label": "Description",
+   "hidden": 1,
+   "read_only": 1,
+   "description": "Legacy: moved into Texts per Language. Removed in a later release."
+  },
+  {
+   "fieldname": "translations",
+   "fieldtype": "Table",
+   "label": "Texts per Language",
+   "options": "Web Profile Content",
+   "description": "One row per language: title, summary (tile and lead paragraph) and content (long text) of the event page."
   },
   {
    "fieldname": "section_organizer",
@@ -203,7 +222,7 @@
    "fieldtype": "Column Break"
   },
   {
-   "description": "Name of the person attendees can reach out to",
+   "description": "Internal: who handles this event. Not shown on the website (use Contact on the Website).",
    "fieldname": "contact_person",
    "fieldtype": "Data",
    "label": "Contact Person"
@@ -223,33 +242,11 @@
    "options": "Phone"
   },
   {
-   "fieldname": "section_counts",
-   "fieldtype": "Section Break",
-   "label": "Interest Counts"
-  },
-  {
-   "default": "0",
-   "fieldname": "going_count",
-   "fieldtype": "Int",
-   "label": "Interested (Yes)",
-   "no_copy": 1,
-   "read_only": 1
-  },
-  {
-   "default": "0",
-   "fieldname": "maybe_count",
-   "fieldtype": "Int",
-   "label": "Maybe",
-   "no_copy": 1,
-   "read_only": 1
-  },
-  {
-   "default": "0",
-   "fieldname": "not_going_count",
-   "fieldtype": "Int",
-   "label": "Not Interested (No)",
-   "no_copy": 1,
-   "read_only": 1
+   "fieldname": "contact_profile",
+   "fieldtype": "Link",
+   "label": "Contact on the Website",
+   "options": "Person Web Profile",
+   "description": "Shown in the page sidebar with the contact dialog; requests become Opportunities assigned to this person."
   },
   {
    "fieldname": "section_registration",
@@ -295,20 +292,14 @@
   {
    "fieldname": "section_responses",
    "fieldtype": "Section Break",
-   "label": "Email Subscriptions"
-  },
-  {
-   "default": "Get notified about event updates, schedule changes, and reminders straight to your inbox.",
-   "description": "Text shown below the 'Stay Updated' heading on the event page. Clear to hide it.",
-   "fieldname": "subscription_description",
-   "fieldtype": "Small Text",
-   "label": "Subscription Description"
+   "label": "Updates by Email"
   },
   {
    "fieldname": "email_group",
    "fieldtype": "Link",
    "label": "Email Group",
-   "options": "Email Group"
+   "options": "Email Group",
+   "description": "Visitors who click \"Keep me posted\" join this group after confirming their address (double opt-in). Give it a title that may be shown to them."
   },
   {
    "fieldname": "tab_ticketing",
@@ -398,10 +389,8 @@
    "description": "Optional: Sales Orders and Invoices of the tickets are booked on this project (financial monitoring)."
   }
  ],
- "has_web_view": 1,
- "is_published_field": "published",
  "links": [],
- "modified": "2026-10-16 12:00:00.000000",
+ "modified": "2026-10-16 18:00:00.000000",
  "modified_by": "Administrator",
  "module": "Marketing",
  "name": "Marketing Content",
@@ -431,14 +420,6 @@
    "role": "Website Manager",
    "share": 1,
    "write": 1
-  },
-  {
-   "read": 1,
-   "role": "Guest"
-  },
-  {
-   "read": 1,
-   "role": "All"
   }
  ],
  "row_format": "Dynamic",

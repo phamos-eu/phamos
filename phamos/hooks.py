@@ -154,6 +154,7 @@ _WEB_PROFILE_SLUGS = {
     "industries": {"en": "industries", "de": "branchen"},
     "customers": {"en": "customers", "de": "kunden"},
     "partners": {"en": "partners", "de": "partner"},
+    "events": {"en": "events", "de": "veranstaltungen"},  # Marketing Content (phamos.web_profile.events)
 }
 for _section, _slugs in _WEB_PROFILE_SLUGS.items():
     for _lang, _slug in _slugs.items():
@@ -351,6 +352,12 @@ doc_events = {
         "on_submit": "phamos.marketing.billing.on_payment_entry_change",
         "on_cancel": "phamos.marketing.billing.on_payment_entry_change",
     },
+    # Seats left and sale state are cached with the event items: refresh them when attendees change.
+    "Attendee": {
+        "after_insert": "phamos.web_profile.sections.clear_items",
+        "on_update": "phamos.web_profile.sections.clear_items",
+        "on_trash": "phamos.web_profile.sections.clear_items",
+    },
     "Lead": {
         "before_insert": "phamos.marketing.billing.lead_before_insert",
     },
@@ -430,7 +437,7 @@ fixtures = [
     ]},
     {"dt": "Email Template", "filters": [
         [
-            "name", "in", ["Interview Confirmation"]
+            "name", "in", ["Interview Confirmation", "Event Subscription Confirmation"]
         ]
     ]}
 ]
