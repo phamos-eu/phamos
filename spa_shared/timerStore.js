@@ -11,6 +11,8 @@ export const timer = reactive({
 	loadedAt: 0,
 	// Set by requestTimerStop(): the control opens its stop dialog and resolves when done.
 	stopRequest: null,
+	// Bumped by requestTimerStart(): the control opens its start dialog (e.g. from a Create menu).
+	startRequest: 0,
 })
 
 let inflight = null
@@ -42,4 +44,8 @@ export function requestTimerStop() {
 	return new Promise((resolve) => {
 		timer.stopRequest = { resolve }
 	})
+}
+
+export function requestTimerStart() {
+	timer.startRequest += 1
 }

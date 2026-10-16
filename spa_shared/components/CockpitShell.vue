@@ -17,7 +17,7 @@
 					<slot name="header-actions" />
 				</div>
 			</header>
-			<main class="min-h-0 flex-1 overflow-hidden bg-surface-gray-1">
+			<main id="cockpit-main" class="min-h-0 flex-1 overflow-hidden bg-surface-gray-1">
 				<router-view />
 			</main>
 		</div>

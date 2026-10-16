@@ -20,8 +20,10 @@
 			</div>
 		</template>
 		<template #header-actions>
-			<TimerControl />
-			<CheckinButton :before-checkout="beforeCheckout" />
+			<PageSearch />
+			<TimerControl :start-button="false" />
+			<CheckinButton />
+			<CreateMenu :before-checkout="beforeCheckout" />
 			<CheckoutGuardDialog v-model="showGuard" @choose="onGuardChoice" />
 		</template>
 	</CockpitShell>
@@ -38,6 +40,8 @@ import { focus, loadFocus } from "./focusStore.js"
 import { checkin, loadCheckin } from "./checkinStore.js"
 import CheckinButton from "./components/CheckinButton.vue"
 import CheckoutGuardDialog from "./components/CheckoutGuardDialog.vue"
+import CreateMenu from "./components/CreateMenu.vue"
+import PageSearch from "@spa/components/PageSearch.vue"
 import TimerControl from "@spa/components/timesheet/TimerControl.vue"
 import { activeSession, loadTimer, requestTimerStop } from "@spa/timerStore.js"
 
