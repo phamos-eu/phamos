@@ -230,6 +230,7 @@ after_migrate = [
 	"phamos.setup.ops_inbox.ensure_ops_inbox_setup",
 	"phamos.web_profile.setup.after_migrate",  # Web Page "Language" / "Translation Of" fields
 	"phamos.cockpits.setup.after_migrate",  # ToDo fields of the Personal Cockpit (#1553)
+	"phamos.setup.accounting_receipt.ensure_accounting_receipt_setup",  # AI Accountant role, user, bot
 	"phamos.marketing.setup.after_migrate",  # Lead Source "Event" for event registrations
 ]
 
@@ -297,6 +298,12 @@ doc_events = {
 		"validate": "phamos.cockpits.todo_hooks.validate",
 		"on_update": "phamos.cockpits.todo_hooks.on_update",
 		"on_trash": "phamos.cockpits.todo_hooks.on_trash",
+	},
+	# Personal Cockpit check-ins: live updates to the employee's own user (#1571). Never fires
+	# on sites without HRMS, since the doctype does not exist there.
+	"Employee Checkin": {
+		"on_update": "phamos.cockpits.checkin_hooks.on_update",
+		"on_trash": "phamos.cockpits.checkin_hooks.on_trash",
 	},
 	"Event": {
 		# on_update also runs after insert; an after_insert hook here pushed every new Event twice.
@@ -391,6 +398,9 @@ doc_events = {
         "on_trash": "phamos.gitlab_integration.label_ledger.delete_issue_label_ledger",
     },
     "Timesheet Record": {
+        # Personal Cockpit timer: live updates to the employee's own user (#1572).
+        "on_change": "phamos.cockpits.timer_hooks.on_change",
+        "on_trash": "phamos.cockpits.timer_hooks.on_trash",
         "on_submit": [
             "phamos.gitlab_integration.gitlab_utils.sync_touch_time_on_timesheet_change",
             "phamos.gitlab_integration.gitlab_utils.sync_cycle_time_start_on_timesheet_change",

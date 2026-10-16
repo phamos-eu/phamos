@@ -73,8 +73,8 @@ frappe.ui.form.on("Accounting Receipt", {
         frm.events.refresh_pdf_attachment_choices(frm);
 
         // Quick access to AI Prompt Configuration
-        frm.page.add_menu_item(__("AI Prompt Config"), function () {
-            frappe.set_route("Form", "AI Prompt Configuration");
+        frm.page.add_menu_item(__("AI Skills"), function () {
+            frappe.set_route("List", "AI Skill", { agent: "Accounting Agent" });
         });
 
         // Fetch PDF (Mistral) - show review popup, then apply on Proceed
@@ -556,8 +556,8 @@ frappe.ui.form.on("Accounting Receipt", {
     },
 
     getFileExtension: function (filename) {
-        // Get extension of the file
-        return filename.split('.').pop();
+        // Get extension of the file; receipts without attachment have none
+        return (filename || "").split('.').pop().toLowerCase();
     },
 
     is_return: function (frm) {

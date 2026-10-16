@@ -5,6 +5,8 @@ import {
 	createCoalescedRunner,
 	createSaveScheduler,
 	fieldEquals,
+	fromServerValue,
+	isEmptyValue,
 	isEmptyHtml,
 	mergeServerDoc,
 	normalizeHtml,
@@ -210,5 +212,26 @@ describe("createCoalescedRunner", () => {
 		// One for the original call, exactly one follow-up for the two extra calls.
 		expect(calls).toEqual([0, 1])
 		expect(runner.isRunning()).toBe(false)
+	})
+})
+
+describe("json kind (child table rows)", () => {
+	const def = { kind: "json" }
+	it("compares by value, not identity", () => {
+		expect(fieldEquals(def, [{ a: 1 }], [{ a: 1 }])).toBe(true)
+		expect(fieldEquals(def, [{ a: 1 }], [{ a: 2 }])).toBe(false)
+		expect(fieldEquals(def, null, undefined)).toBe(true)
+	})
+	it("copies server values so edits never touch the server copy", () => {
+		const server = [{ qty: 1 }]
+		const local = fromServerValue(def, server)
+		local[0].qty = 5
+		expect(server[0].qty).toBe(1)
+		expect(fromServerValue(def, null)).toEqual([])
+	})
+	it("treats an empty list as empty", () => {
+		expect(isEmptyValue(def, [])).toBe(true)
+		expect(isEmptyValue(def, [{}])).toBe(false)
+		expect(toServerValue(def, undefined)).toEqual([])
 	})
 })

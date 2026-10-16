@@ -1,0 +1,250 @@
+{
+ "actions": [],
+ "creation": "2026-10-16 13:00:00.000000",
+ "doctype": "DocType",
+ "engine": "InnoDB",
+ "autoname": "AIR-.YYYY.-.#####",
+ "field_order": [
+  "agent",
+  "reference_doctype",
+  "reference_name",
+  "column_break_main",
+  "status",
+  "trigger",
+  "mode",
+  "triggered_by",
+  "result_section",
+  "summary",
+  "decision",
+  "confidence",
+  "column_break_result",
+  "phase",
+  "fields_set",
+  "error",
+  "details_section",
+  "run_flags",
+  "steps",
+  "analysis",
+  "timing_section",
+  "started_at",
+  "finished_at",
+  "column_break_timing",
+  "duration",
+  "llm_model",
+  "llm_calls"
+ ],
+ "fields": [
+  {
+   "fieldname": "agent",
+   "fieldtype": "Link",
+   "label": "Agent",
+   "options": "AI Agent",
+   "in_list_view": 1,
+   "in_standard_filter": 1,
+   "read_only": 1
+  },
+  {
+   "fieldname": "reference_doctype",
+   "fieldtype": "Link",
+   "label": "Reference Type",
+   "options": "DocType",
+   "read_only": 1
+  },
+  {
+   "fieldname": "reference_name",
+   "fieldtype": "Dynamic Link",
+   "label": "Reference",
+   "options": "reference_doctype",
+   "in_list_view": 1,
+   "in_standard_filter": 1,
+   "read_only": 1,
+   "search_index": 1
+  },
+  {
+   "fieldname": "column_break_main",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "status",
+   "fieldtype": "Select",
+   "label": "Status",
+   "options": "Queued\nRunning\nCompleted\nFailed",
+   "default": "Queued",
+   "in_list_view": 1,
+   "in_standard_filter": 1,
+   "read_only": 1
+  },
+  {
+   "fieldname": "trigger",
+   "fieldtype": "Select",
+   "label": "Trigger",
+   "options": "Insert\nField Change\nManual\nScheduled",
+   "read_only": 1
+  },
+  {
+   "fieldname": "mode",
+   "fieldtype": "Select",
+   "label": "Mode",
+   "options": "Fill Empty\nOverwrite",
+   "default": "Fill Empty",
+   "read_only": 1,
+   "description": "Fill Empty never replaces values that are already set."
+  },
+  {
+   "fieldname": "triggered_by",
+   "fieldtype": "Link",
+   "label": "Triggered By",
+   "options": "User",
+   "read_only": 1
+  },
+  {
+   "fieldname": "result_section",
+   "fieldtype": "Section Break",
+   "label": "Result"
+  },
+  {
+   "fieldname": "summary",
+   "fieldtype": "Small Text",
+   "label": "Summary",
+   "read_only": 1
+  },
+  {
+   "fieldname": "decision",
+   "fieldtype": "Data",
+   "label": "Decision",
+   "read_only": 1
+  },
+  {
+   "fieldname": "confidence",
+   "fieldtype": "Percent",
+   "label": "Confidence",
+   "read_only": 1
+  },
+  {
+   "fieldname": "column_break_result",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "phase",
+   "fieldtype": "Data",
+   "label": "Last Phase",
+   "read_only": 1
+  },
+  {
+   "fieldname": "fields_set",
+   "fieldtype": "Small Text",
+   "label": "Fields Set",
+   "read_only": 1
+  },
+  {
+   "fieldname": "error",
+   "fieldtype": "Small Text",
+   "label": "Error",
+   "read_only": 1
+  },
+  {
+   "fieldname": "details_section",
+   "fieldtype": "Section Break",
+   "label": "Details",
+   "collapsible": 1
+  },
+  {
+   "fieldname": "run_flags",
+   "fieldtype": "JSON",
+   "label": "Flags",
+   "read_only": 1
+  },
+  {
+   "fieldname": "steps",
+   "fieldtype": "JSON",
+   "label": "Steps",
+   "read_only": 1
+  },
+  {
+   "fieldname": "analysis",
+   "fieldtype": "JSON",
+   "label": "Analysis",
+   "read_only": 1
+  },
+  {
+   "fieldname": "timing_section",
+   "fieldtype": "Section Break",
+   "label": "Timing",
+   "collapsible": 1
+  },
+  {
+   "fieldname": "started_at",
+   "fieldtype": "Datetime",
+   "label": "Started",
+   "read_only": 1
+  },
+  {
+   "fieldname": "finished_at",
+   "fieldtype": "Datetime",
+   "label": "Finished",
+   "read_only": 1
+  },
+  {
+   "fieldname": "column_break_timing",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "duration",
+   "fieldtype": "Float",
+   "label": "Duration (s)",
+   "read_only": 1
+  },
+  {
+   "fieldname": "llm_model",
+   "fieldtype": "Data",
+   "label": "LLM Model",
+   "read_only": 1
+  },
+  {
+   "fieldname": "llm_calls",
+   "fieldtype": "Int",
+   "label": "LLM Calls",
+   "read_only": 1
+  }
+ ],
+ "links": [],
+ "modified": "2026-10-16 13:00:00.000000",
+ "modified_by": "Administrator",
+ "module": "AI Agents",
+ "name": "AI Agent Run",
+ "owner": "Administrator",
+ "naming_rule": "Expression (old style)",
+ "permissions": [
+  {
+   "role": "System Manager",
+   "read": 1,
+   "write": 1,
+   "create": 1,
+   "delete": 1,
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "report": 1,
+   "share": 1
+  },
+  {
+   "role": "Accounts Manager",
+   "read": 1,
+   "report": 1,
+   "export": 1
+  },
+  {
+   "role": "Accounts User",
+   "read": 1
+  },
+  {
+   "role": "AI Accountant",
+   "read": 1,
+   "write": 1,
+   "create": 1
+  }
+ ],
+ "sort_field": "modified",
+ "sort_order": "DESC",
+ "states": []
+}

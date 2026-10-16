@@ -2,7 +2,9 @@ import { createSpaRouter } from "@spa/router.js"
 import spaConfig from "./config"
 import MonthlyImplementationSummariesInbox from "./views/MonthlyImplementationSummariesInbox.vue"
 import PaymentsCalendar from "./views/PaymentsCalendar.vue"
-import ReceiptsInbox from "./views/ReceiptsInbox.vue"
+import ReceiptReview from "./views/ReceiptReview.vue"
+import ReceiptsList from "./views/ReceiptsList.vue"
+import ReceiptsQueue from "./views/ReceiptsQueue.vue"
 import ReceiptStatistics from "./views/ReceiptStatistics.vue"
 
 export default createSpaRouter({
@@ -12,7 +14,12 @@ export default createSpaRouter({
 		{
 			path: "/receipts",
 			name: "Receipts",
-			component: ReceiptsInbox,
+			component: ReceiptsQueue,
+		},
+		{
+			path: "/receipts/all",
+			name: "ReceiptsAll",
+			component: ReceiptsList,
 		},
 		{
 			path: "/receipts/calendar",
@@ -27,7 +34,7 @@ export default createSpaRouter({
 		{
 			path: "/receipts/:name",
 			name: "ReceiptDetail",
-			component: ReceiptsInbox,
+			component: ReceiptReview,
 			props: true,
 		},
 		{

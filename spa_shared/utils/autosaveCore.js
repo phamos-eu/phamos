@@ -5,7 +5,9 @@
  * DOM-free and Vue-free so they can be unit-tested (see autosaveCore.test.js).
  *
  * Field definitions (`defs`) map a fieldname to:
- *   kind:       "text" | "html" | "select" | "number" | "date" | "datetime"
+ *   kind:       "text" | "html" | "select" | "number" | "date" | "datetime" | "json"
+ *               ("json": arrays/objects such as child table rows; compared by value.
+ *               Replace the value to change it, the draft is watched shallowly.)
  *   trim:       compare/send trimmed text (text only)
  *   required:   refuse to save an empty value
  *   immediate:  save right away instead of after the debounce (selects, dates)
@@ -54,6 +56,7 @@ function blank(v) {
 export function fieldEquals(def, a, b) {
 	const kind = def?.kind || "text"
 	if (kind === "html") return normalizeHtml(a) === normalizeHtml(b)
+	if (kind === "json") return JSON.stringify(a ?? null) === JSON.stringify(b ?? null)
 	if (kind === "number") return Number(a || 0) === Number(b || 0)
 	if (kind === "text" && def?.trim) return String(blank(a)).trim() === String(blank(b)).trim()
 	return String(blank(a)) === String(blank(b))
@@ -62,12 +65,14 @@ export function fieldEquals(def, a, b) {
 export function fromServerValue(def, value) {
 	if (def?.fromServer) return def.fromServer(value)
 	if (def?.kind === "number") return Number(value ?? 0)
+	if (def?.kind === "json") return value == null ? [] : JSON.parse(JSON.stringify(value))
 	return blank(value)
 }
 
 export function toServerValue(def, value) {
 	if (def?.toServer) return def.toServer(value)
 	if (def?.kind === "html") return isEmptyHtml(value) ? "" : value
+	if (def?.kind === "json") return value ?? []
 	if (def?.kind === "text" && def?.trim) return String(blank(value)).trim()
 	if (def?.kind === "number") return Number(value || 0)
 	return blank(value)
@@ -75,6 +80,7 @@ export function toServerValue(def, value) {
 
 export function isEmptyValue(def, value) {
 	if (def?.kind === "html") return isEmptyHtml(value)
+	if (def?.kind === "json") return value == null || (Array.isArray(value) && !value.length)
 	return !String(blank(value)).trim()
 }
 

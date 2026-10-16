@@ -10,6 +10,7 @@ from frappe.desk.form.assign_to import remove as remove_assignment
 from frappe.desk.form.load import get_assignments
 from frappe.utils import flt, get_fullname
 
+from phamos.accounting.pdf_stamp import note_to_lines
 from phamos.api import department_cockpit as dc
 from phamos.api.accounting_stats import can_read_statistics
 from phamos.api.issue_common import _parse_assignees, _parse_list
@@ -438,8 +439,14 @@ RECEIPT_LIST_FIELDS = [
 	"supplier",
 	"supplier_name",
 	"receipt_type",
+	"attachment",
 	"modified",
 ]
+
+# Setting this status directly would claim a send that did not happen.
+RECEIPT_STATUSES_NOT_DROPPABLE = {
+	"Sent to DATEV": "Use Send to DATEV; the status follows when the e-mail is queued.",
+}
 
 
 def _derive_receipt_status(row):
@@ -479,11 +486,16 @@ def _serialize_receipt_row(row):
 
 
 def _apply_receipt_status_flags(doc, status):
-	"""Update kanban status without deriving payment flags from column position."""
+	"""Move the receipt to a kanban column.
+
+	Dropping on Paid records the payment (today unless a payment date is already set).
+	Leaving Paid does not clear is_paid: a payment that happened stays recorded.
+	"""
 	doc.status = status
-	if status == "Sent to DATEV":
-		doc.sent_to_datev = 1
-	# is_paid is not toggled by drag — use an explicit paid action elsewhere.
+	if status == "Paid":
+		doc.is_paid = 1
+		if not doc.payment_date:
+			doc.payment_date = frappe.utils.today()
 
 
 @frappe.whitelist()
@@ -494,6 +506,7 @@ def get_receipts():
 	rows = frappe.get_list(
 		"Accounting Receipt",
 		fields=RECEIPT_LIST_FIELDS,
+		filters={"status": ("!=", "Cancelled")},
 		order_by="posting_date desc, modified desc",
 		limit_page_length=500,
 	)
@@ -506,7 +519,7 @@ def get_receipt(name):
 	frappe.has_permission("Accounting Receipt", "read", throw=True)
 	doc = frappe.get_doc("Accounting Receipt", name)
 	doc.check_permission("read")
-	return _serialize_receipt_row(
+	row = _serialize_receipt_row(
 		{
 			"name": doc.name,
 			"title": doc.title,
@@ -524,6 +537,45 @@ def get_receipt(name):
 			"attachment": doc.attachment or "",
 		}
 	)
+	row["note_text"] = "\n".join(note_to_lines(doc.note))
+	row.update(
+		{
+			"due_date": doc.due_date,
+			"net_total": doc.net_total,
+			"total_taxes": doc.total_taxes,
+			"supplier_tax_id": doc.supplier_tax_id,
+			"supplier_iban": doc.supplier_iban,
+			"payment_reference": doc.payment_reference,
+			"payment_date": doc.payment_date,
+			"project": doc.project,
+			"cost_center": doc.cost_center,
+			"company": doc.company,
+			"items": [
+				{
+					"name": i.name,
+					"item_name": i.item_name,
+					"qty": i.qty,
+					"rate": i.rate,
+					"amount": i.amount,
+					"tax_rate": i.tax_rate,
+					"item_code": i.item_code,
+					"expense_account": i.expense_account,
+				}
+				for i in doc.items
+			],
+			"ai": _ai_block(doc),
+		}
+	)
+	return row
+
+
+def _ai_block(doc):
+	"""Summary, confidence and flags of the receipt's latest AI run."""
+	flags = []
+	if doc.ai_run:
+		raw = frappe.db.get_value("AI Agent Run", doc.ai_run, "run_flags")
+		flags = frappe.parse_json(raw or "[]") or []
+	return {"run": doc.ai_run, "summary": doc.ai_summary, "confidence": doc.ai_confidence, "flags": flags}
 
 
 @frappe.whitelist(methods=["POST"])
@@ -533,6 +585,8 @@ def update_receipt_status(name, status):
 	status = (status or "").strip()
 	if status not in RECEIPT_KANBAN_STATUSES:
 		frappe.throw(_("Invalid status: {0}").format(status))
+	if status in RECEIPT_STATUSES_NOT_DROPPABLE:
+		frappe.throw(_(RECEIPT_STATUSES_NOT_DROPPABLE[status]))
 
 	doc = frappe.get_doc("Accounting Receipt", name)
 	doc.check_permission("write")
@@ -541,123 +595,51 @@ def update_receipt_status(name, status):
 	return get_receipt(name)
 
 
-EXTRACT_CACHE_TTL = 3600
+RUN_STATUS_TO_EXTRACT_STATE = {"Queued": "running", "Running": "running", "Completed": "done", "Failed": "failed"}
 
 
-def _receipt_extract_cache_key(name):
-	return f"accounting_receipt_extract:{name}"
+def _extract_state(name):
+	"""Extraction state of a receipt from its latest AI Agent Run."""
+	from phamos.ai_agents.runner import latest_run
 
-
-def _set_receipt_extract_status(name, payload):
-	frappe.cache.set_value(_receipt_extract_cache_key(name), payload, expires_in_sec=EXTRACT_CACHE_TTL)
-
-
-def _get_receipt_extract_status(name):
-	return frappe.cache.get_value(_receipt_extract_cache_key(name)) or {"status": "idle"}
-
-
-def _receipt_extract_lock_key(name):
-	return frappe.cache.make_key(f"accounting_receipt_extract_lock:{name}")
-
-
-def _acquire_receipt_extract_lock(name):
-	"""Atomic set-if-absent; True only for the caller that wins the race."""
-	return bool(
-		frappe.cache.set(_receipt_extract_lock_key(name), b"1", nx=True, ex=EXTRACT_CACHE_TTL)
+	run_name = latest_run("Accounting Receipt", name)
+	if not run_name:
+		return {"status": "idle"}
+	run = frappe.db.get_value(
+		"AI Agent Run", run_name, ["name", "status", "fields_set", "error", "summary", "confidence"], as_dict=True
 	)
-
-
-def _release_receipt_extract_lock(name):
-	frappe.cache.delete(_receipt_extract_lock_key(name))
-
-
-def _run_receipt_pdf_extract_job(accounting_receipt_name):
-	from phamos.phamos.doctype.accounting_receipt.mistral_pdf import extract_from_pdf_and_update_ar
-
-	try:
-		result = extract_from_pdf_and_update_ar(accounting_receipt_name)
-		if result.get("ok"):
-			_set_receipt_extract_status(
-				accounting_receipt_name,
-				{
-					"status": "done",
-					"updated": result.get("updated") or [],
-					"skipped": result.get("skipped") or [],
-				},
-			)
-		else:
-			_set_receipt_extract_status(
-				accounting_receipt_name,
-				{
-					"status": "failed",
-					"reason": result.get("reason"),
-					"message": result.get("message"),
-				},
-			)
-	except Exception as e:
-		_set_receipt_extract_status(
-			accounting_receipt_name,
-			{"status": "failed", "reason": "error", "message": str(e)},
-		)
-	finally:
-		# Terminal state reached: allow the receipt to be re-extracted immediately.
-		_release_receipt_extract_lock(accounting_receipt_name)
+	return {
+		"status": RUN_STATUS_TO_EXTRACT_STATE.get(run.status, "idle"),
+		"run": run.name,
+		"updated": [f.strip() for f in (run.fields_set or "").split(",") if f.strip()],
+		"message": run.error,
+		"summary": run.summary,
+		"confidence": run.confidence,
+	}
 
 
 @frappe.whitelist(methods=["POST"])
-def enqueue_receipt_pdf_extract(name):
-	"""Queue background PDF extraction + auto-apply for a receipt opened in the SPA."""
+def enqueue_receipt_pdf_extract(name, overwrite=0):
+	"""Queue the AI Accountant for a receipt. Fills empty fields; overwrite=1 replaces values."""
 	frappe.has_permission("Accounting Receipt", "write", throw=True)
 	doc = frappe.get_doc("Accounting Receipt", name)
 	doc.check_permission("write")
-
-	attachment = (doc.attachment or "").strip()
-	if not attachment or not attachment.lower().endswith(".pdf"):
+	if not (doc.attachment or "").strip().lower().endswith(".pdf"):
 		return {"queued": False, "reason": "no_attachment"}
 
-	# Atomic claim: two concurrent callers can no longer both enqueue the same extract.
-	if not _acquire_receipt_extract_lock(name):
-		return {
-			"queued": False,
-			"reason": "already_running",
-			"status": _get_receipt_extract_status(name),
-		}
+	from phamos.ai_agents.runner import enqueue_run
 
-	try:
-		_set_receipt_extract_status(
-			name,
-			{"status": "running", "started_at": frappe.utils.now()},
-		)
-		frappe.enqueue(
-			_run_receipt_pdf_extract_job,
-			queue="default",
-			timeout=300,
-			accounting_receipt_name=name,
-			enqueue_after_commit=True,
-		)
-	except Exception:
-		_release_receipt_extract_lock(name)
-		raise
-
-	return {"queued": True, "status": {"status": "running"}}
+	result = enqueue_run(
+		"Accounting Receipt", name, trigger="Manual", mode="Overwrite" if frappe.utils.cint(overwrite) else "Fill Empty"
+	)
+	if not result.get("queued") and result.get("reason") == "no_agent":
+		frappe.throw(_("No enabled AI Agent works on Accounting Receipts."))
+	return {**result, "status": _extract_state(name)}
 
 
 @frappe.whitelist()
 def get_receipt_extract_status(name):
-	"""Return background PDF extraction status for SPA polling."""
+	"""Extraction state for the cockpit (from the latest AI Agent Run)."""
 	frappe.has_permission("Accounting Receipt", "read", throw=True)
 	frappe.get_doc("Accounting Receipt", name).check_permission("read")
-	return _get_receipt_extract_status(name)
-
-
-@frappe.whitelist()
-def get_receipt_review_fields(name):
-	"""Return review-dialog field payload from current receipt values (no re-OCR)."""
-	frappe.has_permission("Accounting Receipt", "read", throw=True)
-	doc = frappe.get_doc("Accounting Receipt", name)
-	doc.check_permission("read")
-
-	from phamos.phamos.doctype.accounting_receipt.mistral_pdf import build_review_fields_from_doc
-
-	fields, extracted = build_review_fields_from_doc(doc)
-	return {"ok": True, "fields": fields, "extracted": extracted}
+	return _extract_state(name)

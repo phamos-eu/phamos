@@ -1,0 +1,155 @@
+{
+ "actions": [],
+ "creation": "2026-10-16 13:00:00.000000",
+ "doctype": "DocType",
+ "engine": "InnoDB",
+ "autoname": "field:agent_name",
+ "field_order": [
+  "agent_name",
+  "enabled",
+  "applies_to_doctype",
+  "column_break_main",
+  "user",
+  "raven_bot",
+  "default_recipient_user",
+  "behaviour_section",
+  "handler_module",
+  "llm_model",
+  "column_break_behaviour",
+  "run_on_insert",
+  "run_on_fields",
+  "description"
+ ],
+ "fields": [
+  {
+   "fieldname": "agent_name",
+   "fieldtype": "Data",
+   "label": "Agent Name",
+   "reqd": 1,
+   "unique": 1,
+   "in_list_view": 1
+  },
+  {
+   "fieldname": "enabled",
+   "fieldtype": "Check",
+   "label": "Enabled",
+   "default": "1",
+   "in_list_view": 1
+  },
+  {
+   "fieldname": "applies_to_doctype",
+   "fieldtype": "Link",
+   "label": "Applies To",
+   "options": "DocType",
+   "reqd": 1,
+   "in_list_view": 1,
+   "description": "The document type this agent works on, e.g. Accounting Receipt, Lead or Issue."
+  },
+  {
+   "fieldname": "column_break_main",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "user",
+   "fieldtype": "Link",
+   "label": "Works As User",
+   "options": "User",
+   "reqd": 1,
+   "description": "Runs execute as this user, so the document history separates the agent's changes from human corrections."
+  },
+  {
+   "fieldname": "raven_bot",
+   "fieldtype": "Link",
+   "label": "Raven Bot",
+   "options": "Raven Bot",
+   "description": "Bot the agent uses to ask humans."
+  },
+  {
+   "fieldname": "default_recipient_user",
+   "fieldtype": "Link",
+   "label": "Ask By Default",
+   "options": "User",
+   "description": "Who gets the agent's questions when the document has no assignee."
+  },
+  {
+   "fieldname": "behaviour_section",
+   "fieldtype": "Section Break",
+   "label": "Behaviour"
+  },
+  {
+   "fieldname": "handler_module",
+   "fieldtype": "Data",
+   "label": "Handler Module",
+   "reqd": 1,
+   "description": "Python module with the agent's skill handlers (developer setting), e.g. phamos.ai_agents.agents.accounting."
+  },
+  {
+   "fieldname": "llm_model",
+   "fieldtype": "Data",
+   "label": "LLM Model",
+   "description": "Chat model for this agent. Empty: the Mistral model from phamos Settings."
+  },
+  {
+   "fieldname": "column_break_behaviour",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "run_on_insert",
+   "fieldtype": "Check",
+   "label": "Run On New Documents",
+   "default": "0"
+  },
+  {
+   "fieldname": "run_on_fields",
+   "fieldtype": "Data",
+   "label": "Run When These Fields Change",
+   "description": "Comma separated field names, e.g. attachment."
+  },
+  {
+   "fieldname": "description",
+   "fieldtype": "Small Text",
+   "label": "Description"
+  }
+ ],
+ "links": [],
+ "modified": "2026-10-16 13:00:00.000000",
+ "modified_by": "Administrator",
+ "module": "AI Agents",
+ "name": "AI Agent",
+ "owner": "Administrator",
+ "naming_rule": "By fieldname",
+ "permissions": [
+  {
+   "role": "System Manager",
+   "read": 1,
+   "write": 1,
+   "create": 1,
+   "delete": 1,
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "report": 1,
+   "share": 1
+  },
+  {
+   "role": "Accounts Manager",
+   "read": 1,
+   "write": 1,
+   "create": 1,
+   "delete": 1,
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "report": 1,
+   "share": 1
+  },
+  {
+   "role": "Accounts User",
+   "read": 1
+  }
+ ],
+ "sort_field": "modified",
+ "sort_order": "DESC",
+ "states": [],
+ "track_changes": 1
+}

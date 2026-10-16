@@ -16,6 +16,9 @@ from phamos.api import personal_todo_matrix
 from phamos.api import personal_focus
 from phamos.api import personal_challenges
 from phamos.api import personal_day_plan
+from phamos.api import personal_checkin
+from phamos.api import personal_timer
+from phamos.api import personal_timeline
 
 CONFIG = dc.CockpitConfig(
 	label="Personal Cockpit",
@@ -502,3 +505,117 @@ def start_day(date=None):
 def shutdown_day(decisions=None, reflection=None, date=None):
 	"""Close the day with a decision for every open ToDo on the plan."""
 	return personal_day_plan.shutdown_day(decisions=decisions, reflection=reflection, date=date)
+
+
+# Check-in and check-out (phamos/phamos#1571) — logic in phamos.api.personal_checkin.
+
+
+@frappe.whitelist()
+def get_checkin_state():
+	"""My last check-in, the next action (IN/OUT) and today's logs with worked minutes."""
+	return personal_checkin.get_checkin_state()
+
+
+@frappe.whitelist(methods=["POST"])
+def add_checkin(log_type, latitude=None, longitude=None):
+	"""Check in or out now (server time). Refused when it is not the expected next action."""
+	return personal_checkin.add_checkin(log_type, latitude=latitude, longitude=longitude)
+
+
+@frappe.whitelist(methods=["POST"])
+def revoke_checkin(name):
+	"""Undo a check-in I made moments ago."""
+	return personal_checkin.revoke_checkin(name)
+
+
+# Timesheet timer (phamos/phamos#1572) — logic in phamos.api.personal_timer, on top of the
+# Developer Action Panel functions; every call checks that the record is mine.
+
+
+@frappe.whitelist()
+def get_timer_state():
+	"""My running or paused timer, or what blocks starting one."""
+	return personal_timer.get_timer_state()
+
+
+@frappe.whitelist()
+def get_timer_options():
+	"""My projects, recent projects and activity types for the start and stop dialogs."""
+	return personal_timer.get_timer_options()
+
+
+@frappe.whitelist()
+def search_timer_projects(txt=""):
+	return personal_timer.search_timer_projects(txt)
+
+
+@frappe.whitelist()
+def get_timer_project_info(project):
+	"""Task rule, open tasks and default billable share of a project."""
+	return personal_timer.get_timer_project_info(project)
+
+
+@frappe.whitelist(methods=["POST"])
+def start_timer(project, expected_seconds, goal, task=None, manual_start_time=None):
+	return personal_timer.start_timer(project, expected_seconds, goal, task=task, manual_start_time=manual_start_time)
+
+
+@frappe.whitelist(methods=["POST"])
+def pause_timer(name, break_goal=None, break_expected_seconds=None):
+	"""Pause my timer for a break with a goal and an estimate."""
+	return personal_timer.pause_timer(name, break_goal=break_goal, break_expected_seconds=break_expected_seconds)
+
+
+@frappe.whitelist(methods=["POST"])
+def resume_timer(name, track_break=0, break_project=None, break_goal=None, break_result=None, break_activity_type=None, break_percent_billable=0):
+	"""Resume; track_break logs the break as its own record, otherwise it is dropped."""
+	return personal_timer.resume_timer(
+		name,
+		track_break=track_break,
+		break_project=break_project,
+		break_goal=break_goal,
+		break_result=break_result,
+		break_activity_type=break_activity_type,
+		break_percent_billable=break_percent_billable,
+	)
+
+
+@frappe.whitelist(methods=["POST"])
+def stop_timer(name, result, percent_billable=100, activity_type=None, manual_end_time=None):
+	return personal_timer.stop_timer(
+		name, result, percent_billable=percent_billable, activity_type=activity_type, manual_end_time=manual_end_time
+	)
+
+
+@frappe.whitelist(methods=["POST"])
+def continue_timer_with_available_hours(name):
+	return personal_timer.continue_with_available_hours(name)
+
+
+@frappe.whitelist(methods=["POST"])
+def notify_timer_account_manager(name):
+	return personal_timer.notify_account_manager(name)
+
+
+@frappe.whitelist(methods=["POST"])
+def discard_timer_draft(name):
+	return personal_timer.discard_draft(name)
+
+
+# My Day timeline (phamos/phamos#1573) — logic in phamos.api.personal_timeline.
+
+
+@frappe.whitelist()
+def get_timeline(from_date, to_date):
+	"""My check-ins, time logs, closed ToDos and day plans for up to 31 days."""
+	return personal_timeline.get_timeline(from_date, to_date)
+@frappe.whitelist()
+def get_checkin_dashboard(period=30):
+	"""Worked time per day, typical start and end, and days without a check-out."""
+	return personal_checkin.get_checkin_dashboard(period=period)
+
+
+@frappe.whitelist()
+def get_my_checkins(start=0, page_length=100):
+	"""All my check-ins, newest first, a page at a time."""
+	return personal_checkin.get_my_checkins(start=start, page_length=page_length)
