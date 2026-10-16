@@ -18,6 +18,7 @@ from phamos.api import personal_challenges
 from phamos.api import personal_day_plan
 from phamos.api import personal_checkin
 from phamos.api import personal_timer
+from phamos.api import personal_timeline
 
 CONFIG = dc.CockpitConfig(
 	label="Personal Cockpit",
@@ -599,6 +600,15 @@ def notify_timer_account_manager(name):
 @frappe.whitelist(methods=["POST"])
 def discard_timer_draft(name):
 	return personal_timer.discard_draft(name)
+
+
+# My Day timeline (phamos/phamos#1573) — logic in phamos.api.personal_timeline.
+
+
+@frappe.whitelist()
+def get_timeline(from_date, to_date):
+	"""My check-ins, time logs, closed ToDos and day plans for up to 31 days."""
+	return personal_timeline.get_timeline(from_date, to_date)
 @frappe.whitelist()
 def get_checkin_dashboard(period=30):
 	"""Worked time per day, typical start and end, and days without a check-out."""
