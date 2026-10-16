@@ -382,7 +382,7 @@
    "label": "Event Ticketing"
   },
   {
-   "description": "Used as the default Customer for ticket Sales Orders when no invoice/company details are given (individual, no-invoice purchases).",
+   "description": "Legacy: not used since event tickets are ordered by Attendees (every buyer becomes a Customer). Remove after the July 2026 backfill.",
    "fieldname": "walk_in_customer",
    "fieldtype": "Link",
    "label": "Walk In Customer",
