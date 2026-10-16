@@ -287,8 +287,9 @@ def _register(event, contact, attends, companions, billing_data, source, lang, e
 			frappe.db.set_value("Attendee", att.name, "order_reference", reference, update_modified=False)
 
 	# Enqueued inside the service session: the job runs as the service user (background_jobs.enqueue).
+	# Not "event=": frappe.enqueue has a parameter of that name and would swallow it.
 	frappe.enqueue("phamos.marketing.ticketing.send_order_confirmation", enqueue_after_commit=True,
-		event=doc.name, reference=reference, reference_doctype=reference_doctype, recipient=main.email,
+		event_name=doc.name, reference=reference, reference_doctype=reference_doctype, recipient=main.email,
 		buyer_name=main.full_name, lang=lang)
 	return {"ok": True, "reference": reference, "reference_doctype": reference_doctype, "attendees": len(docs),
 		"paid": paid, "tickets_to": main.email, "consent_token": consent_token(reference)}
@@ -313,10 +314,13 @@ def save_consents(reference, consents, event=None):
 	return frappe.db.get_value("Sales Order", reference, "contact_email")
 
 
-def send_order_confirmation(event, reference, recipient, reference_doctype="Sales Order", buyer_name=None, lang="de"):
+def send_order_confirmation(event_name, reference, recipient, reference_doctype="Sales Order", buyer_name=None,
+		lang="de"):
 	"""Order or registration confirmation (§ 312i BGB: confirmation without delay, terms storable)."""
 	from phamos.marketing.web import build_ics
 	from phamos.web_profile.sections import find_item
+
+	event = event_name
 
 	doc = frappe.get_doc("Marketing Content", event)
 	frappe.local.lang = lang if lang in ("de", "en") else "de"
