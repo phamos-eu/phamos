@@ -548,7 +548,7 @@
 		const offsets = [...form.querySelectorAll("[data-wp-reminder-offset]")];
 		const max = parseInt(form.dataset.max || "3", 10);
 		const start = form.dataset.startsOn ? new Date(form.dataset.startsOn) : null;
-		const OFFSET_MS = { P7D: 7 * 864e5, P1D: 864e5, PT2H: 2 * 36e5 };
+		const OFFSET_MS = { P6W: 42 * 864e5, P4W: 28 * 864e5, P2W: 14 * 864e5 };
 		const pad = (n) => String(n).padStart(2, "0");
 		const localDate = (d) => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
 		const local = (d) => `${localDate(d)}T${pad(d.getHours())}:${pad(d.getMinutes())}`;

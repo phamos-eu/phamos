@@ -480,7 +480,7 @@
 </dialog>
 {%- endmacro %}
 
-{#- "Create reminder": up to three moments, picked as chips (a week, a day, two hours before) or as
+{#- "Create reminder": up to three moments, picked as chips (6, 4 or 2 weeks before) or as
     own date and time; phamos.marketing.web.reminders returns one ICS file with one entry (and alarm)
     per moment. -#}
 {% macro reminder_dialog_markup(item, lang) -%}
@@ -496,7 +496,7 @@
 		<input type="hidden" name="lang" value="{{ lang }}">
 		<input type="hidden" name="tz" value="" data-wp-reminder-tz>
 		<div class="wp-reminder-chips" role="group" aria-label="{{ _('Before the event') }}">
-			{%- for key, label in [("P7D", _("1 week before")), ("P1D", _("1 day before")), ("PT2H", _("2 hours before"))] %}
+			{%- for key, label in [("P6W", _("6 weeks before")), ("P4W", _("4 weeks before")), ("P2W", _("2 weeks before"))] %}
 			<label class="wp-reminder-chip"><input type="checkbox" value="{{ key }}" data-wp-reminder-offset><span>{{ label }}</span></label>
 			{%- endfor %}
 		</div>
