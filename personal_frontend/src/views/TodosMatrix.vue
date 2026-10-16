@@ -185,7 +185,8 @@
 <script setup>
 import { computed, onMounted, ref, watch } from "vue"
 import { useRouter } from "vue-router"
-import { call, TabButtons, toast } from "frappe-ui"
+import { call, TabButtons } from "frappe-ui"
+import { notify } from "@spa/utils/notify.js"
 import DecideTodoDialog from "@spa/components/DecideTodoDialog.vue"
 import StartFocusDialog from "@/components/StartFocusDialog.vue"
 import { useUserRealtime } from "@spa/composables/useUserRealtime.js"
@@ -286,10 +287,10 @@ async function close(todo) {
 	busy.value = { ...busy.value, [todo.name]: true }
 	try {
 		await call(`${API}.close_todo`, { name: todo.name })
-		toast.success("Done. One less.")
+		notify.success("Done. One less.")
 		await load()
 	} catch (e) {
-		toast.error(e?.messages?.[0] || e?.message || "Could not close the ToDo")
+		notify.error(e?.messages?.[0] || e?.message || "Could not close the ToDo")
 	} finally {
 		const { [todo.name]: _, ...rest } = busy.value
 		busy.value = rest
@@ -328,7 +329,7 @@ async function applyMove() {
 	} catch (e) {
 		const message = e?.messages?.[0] || e?.message || "Could not move the ToDo"
 		if (showMove.value) moveError.value = message
-		else toast.error(message)
+		else notify.error(message)
 	} finally {
 		moving.value = false
 		const { [todo.name]: _, ...rest } = busy.value

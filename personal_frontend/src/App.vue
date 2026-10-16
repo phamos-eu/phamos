@@ -8,7 +8,11 @@
 					:inert="locked || undefined"
 					:aria-hidden="locked || undefined"
 				>
-					<CockpitSidebar label="Personal Cockpit" storage-key="personal-cockpit-sidebar-collapsed" :items="navItems" />
+					<CockpitSidebar label="Personal Cockpit" storage-key="personal-cockpit-sidebar-collapsed" :items="navItems">
+						<template #footer="{ collapsed }">
+							<CheckinToday :collapsed="collapsed" />
+						</template>
+					</CockpitSidebar>
 				</div>
 				<div
 					v-if="locked"
@@ -19,17 +23,23 @@
 				</div>
 			</div>
 		</template>
+		<template #header-actions>
+			<CheckinButton />
+		</template>
 	</CockpitShell>
 </template>
 
 <script setup>
-import { computed, onMounted, watch } from "vue"
+import { computed, onBeforeUnmount, onMounted, watch } from "vue"
 import { useRoute, useRouter } from "vue-router"
 import CockpitShell from "@spa/components/CockpitShell.vue"
 import CockpitSidebar from "@spa/components/CockpitSidebar.vue"
 import { useUserRealtime } from "@spa/composables/useUserRealtime.js"
 import { parseServerTime } from "@spa/utils/focusRules.js"
 import { focus, loadFocus } from "./focusStore.js"
+import { loadCheckin } from "./checkinStore.js"
+import CheckinButton from "./components/CheckinButton.vue"
+import CheckinToday from "./components/CheckinToday.vue"
 
 const route = useRoute()
 const router = useRouter()
@@ -53,7 +63,19 @@ watch(
 	}
 )
 
-onMounted(loadFocus)
+// Check-ins (#1571): live from other tabs, the HRMS app and Desk, and again when the tab returns.
+useUserRealtime("cockpit_checkin_changed", loadCheckin, { debounceMs: 300 })
+
+function onVisible() {
+	if (document.visibilityState === "visible") loadCheckin()
+}
+
+onMounted(() => {
+	loadFocus()
+	loadCheckin()
+	document.addEventListener("visibilitychange", onVisible)
+})
+onBeforeUnmount(() => document.removeEventListener("visibilitychange", onVisible))
 
 const navItems = [
 	{
