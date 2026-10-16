@@ -478,7 +478,7 @@ def _latest_runs(run_names):
 
 def _queue_row(row, section, reasons, today):
 	overdue_days = None
-	if row.due_date:
+	if row.due_date and not row.is_paid and row.status not in ("Do Not Pay", "Cancelled"):
 		overdue_days = (getdate(today) - getdate(row.due_date)).days
 	return {
 		"name": row.name,

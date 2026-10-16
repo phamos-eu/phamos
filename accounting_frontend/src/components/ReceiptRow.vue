@@ -55,7 +55,7 @@ function confidenceClass(value) {
 function statusText(item) {
 	const parts = [item.status]
 	if (item.sent_to_datev) parts.push("sent to DATEV")
-	if (item.is_paid) parts.push("paid")
+	if (item.is_paid && item.status !== "Paid") parts.push("paid")
 	return parts.join(" · ")
 }
 </script>

@@ -103,3 +103,11 @@ class TestQueueAndList(FrappeTestCase):
 		):
 			result = api.send_receipts_to_datev(["AR-1", "AR-2"])
 		self.assertEqual(result, {"sent": ["AR-1"], "failed": [{"name": "AR-2", "message": "PDF missing"}]})
+
+	def test_paid_receipts_are_never_overdue(self):
+		item = api._queue_row(row(status="Paid", is_paid=1, due_date="2020-01-01", title="t", supplier_name="S",
+			supplier_reference="R", currency="EUR", ai_summary=""), None, [], "2026-10-16")
+		self.assertEqual(item["overdue_days"], 0)
+		open_item = api._queue_row(row(due_date="2026-10-10", title="t", supplier_name="S", supplier_reference="R",
+			currency="EUR", ai_summary=""), "decide", [], "2026-10-16")
+		self.assertEqual(open_item["overdue_days"], 6)
