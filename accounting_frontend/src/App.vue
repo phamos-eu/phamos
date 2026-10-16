@@ -20,6 +20,7 @@ import spaConfig from "./config"
 
 const route = useRoute()
 const canReadMis = ref(false)
+const canReadStatistics = ref(false)
 
 const baseNavItems = [
 	{
@@ -58,6 +59,27 @@ const baseNavItems = [
 	},
 ]
 
+// With statistics access, Receipts opens on the statistics overview (like Issues opens on
+// its overview); its existing sub-pages (or the list) and the payment calendar sit below.
+const paymentsCalendarNavItem = {
+	name: "PaymentsCalendar",
+	label: "Payment calendar",
+	icon: "calendar",
+	match: ["PaymentsCalendar"],
+}
+
+function withStatistics(receiptsItem) {
+	const children = receiptsItem.children?.length
+		? receiptsItem.children
+		: [{ name: receiptsItem.name, label: "List", icon: "list", match: receiptsItem.match }]
+	return {
+		...receiptsItem,
+		name: "ReceiptStatistics",
+		match: ["ReceiptStatistics"],
+		children: [...children, paymentsCalendarNavItem],
+	}
+}
+
 const misNavItem = {
 	name: "MisList",
 	label: "Monthly Implementation Summary",
@@ -65,10 +87,10 @@ const misNavItem = {
 	match: ["MisList", "MisDetail"],
 }
 
-const navItems = computed(() => {
-	if (!canReadMis.value) return baseNavItems
-	return [...baseNavItems, misNavItem]
-})
+const navItems = computed(() => [
+	...baseNavItems.map((item) => (item.name === "Receipts" && canReadStatistics.value ? withStatistics(item) : item)),
+	...(canReadMis.value ? [misNavItem] : []),
+])
 
 const pageTitle = computed(() => {
 	if (route.name === "Tasks" || route.name === "TasksGantt" || route.name === "TaskDetail") {
@@ -76,6 +98,8 @@ const pageTitle = computed(() => {
 	}
 	if (route.name === "Checklists" || route.name === "ChecklistDetail") return "Checklists"
 	if (route.name === "Receipts" || route.name === "ReceiptDetail") return "Receipts"
+	if (route.name === "PaymentsCalendar") return "Payment calendar"
+	if (route.name === "ReceiptStatistics") return "Receipts"
 	if (route.name === "ReceiptsAll") return "All receipts"
 	if (route.name === "MisList" || route.name === "MisDetail") {
 		return "Monthly Implementation Summary"
@@ -96,6 +120,12 @@ const pageSubtitle = computed(() => {
 	if (route.name === "Receipts" || route.name === "ReceiptDetail") {
 		return "What needs to happen next: decide, send to DATEV, wait for payment"
 	}
+	if (route.name === "PaymentsCalendar") {
+		return "Approved receipts and open Payment Requests by due date"
+	}
+	if (route.name === "ReceiptStatistics") {
+		return "Receipts, booked expense, peaks and what is still to pay"
+	}
 	if (route.name === "ReceiptsAll") return "Search and filter every receipt"
 	if (route.name === "MisList" || route.name === "MisDetail") {
 		return "Monthly Implementation Summary records"
@@ -110,8 +140,10 @@ onMounted(async () => {
 	try {
 		const settings = await call(`${spaConfig.api}.${spaConfig.settingsMethod}`)
 		canReadMis.value = Boolean(settings?.can_read_monthly_implementation_summary)
+		canReadStatistics.value = Boolean(settings?.can_read_statistics)
 	} catch {
 		canReadMis.value = false
+		canReadStatistics.value = false
 	}
 })
 </script>

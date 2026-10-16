@@ -8,14 +8,24 @@
 			class="grid h-48 items-end gap-2 border-b border-outline-gray-2 px-2"
 			:style="{ gridTemplateColumns: `repeat(${Math.max(periods.length, 1)}, minmax(0, 1fr))` }"
 		>
-			<div v-for="period in periods" :key="period.label" class="flex h-full min-w-0 flex-col justify-end gap-1">
+			<div
+				v-for="(period, periodIndex) in periods"
+				:key="period.key ?? period.label"
+				:role="selectable ? 'button' : undefined"
+				:tabindex="selectable ? 0 : undefined"
+				class="flex h-full min-w-0 flex-col justify-end gap-1"
+				:class="selectable ? 'cursor-pointer rounded-t hover:bg-surface-gray-1 focus-visible:outline focus-visible:outline-2 focus-visible:outline-outline-gray-4' : ''"
+				@click="selectable && emit('select', period, periodIndex)"
+				@keydown.enter.prevent="selectable && emit('select', period, periodIndex)"
+				@keydown.space.prevent="selectable && emit('select', period, periodIndex)"
+			>
 				<div class="flex flex-1 items-end justify-center gap-1">
 					<div
 						v-for="(value, index) in period.values"
 						:key="index"
 						class="w-2 rounded-t"
 						:style="{ height: `${barHeight(value, max)}%`, background: SERIES_COLORS[index] }"
-						:title="`${value} ${series[index]?.label || ''}`.trim()"
+						:title="`${format ? format(value, index) : value} ${series[index]?.label || ''}`.trim()"
 					/>
 				</div>
 				<div class="truncate text-center text-[10px] text-ink-gray-5">{{ period.label }}</div>
@@ -48,7 +58,13 @@ const props = defineProps({
 	periods: { type: Array, default: () => [] },
 	series: { type: Array, default: () => [] },
 	note: { type: String, default: "" },
+	// Optional (value, seriesIndex) => string for the bar tooltips.
+	format: { type: Function, default: null },
+	// Periods become keyboard-focusable buttons that emit `select` with (period, index) (drill-down).
+	selectable: { type: Boolean, default: false },
 })
+
+const emit = defineEmits(["select"])
 
 const SERIES_COLORS = ["var(--ink-blue-3)", "var(--ink-green-3)", "var(--ink-amber-3)", "var(--ink-gray-4)"]
 
