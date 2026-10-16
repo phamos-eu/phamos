@@ -27,11 +27,14 @@ from phamos.phamos.doctype.accounting_receipt.data_extract import _parse_german_
 DOCTYPE = "Accounting Receipt"
 MAX_DOCUMENT_CHARS = 20000
 LOW_CONFIDENCE = 0.7
-DOCUMENT_KINDS = ("Invoice", "Credit Note", "Receipt", "Tax Notice", "Contract", "Reminder", "Statement", "Other")
+RECEIPT_TYPES = ("Invoice", "Credit Note", "Receipt", "Tax Notice", "Contract", "Reminder", "Statement", "Other")
 
 # key in the AI answer -> (receipt field, description for the prompt)
 HEADER_FIELDS = {
-	"document_kind": ("document_kind", f"one of: {', '.join(DOCUMENT_KINDS)}"),
+	"receipt_type": (
+		"receipt_type",
+		f"what the document is, one of: {', '.join(RECEIPT_TYPES)} (Receipt = till/card receipt, e.g. fuel or restaurant)",
+	),
 	"invoice_number": (
 		"supplier_reference",
 		"the number of this invoice or receipt as issued by the supplier (labels like Rechnungsnummer, Rechnungs-Nr., "
@@ -174,7 +177,7 @@ def map_answer(answer, doc):
 			value = _find_supplier(cstr(raw).strip(), answer.get("supplier_tax_id"), doc.company)
 		if fieldname == "currency" and not frappe.db.exists("Currency", value):
 			value = None
-		if fieldname == "document_kind" and value not in DOCUMENT_KINDS:
+		if fieldname == "receipt_type" and value not in RECEIPT_TYPES:
 			value = "Other"
 		if value not in (None, ""):
 			values[fieldname] = value
@@ -230,7 +233,7 @@ def apply_values(doc, values, items, overwrite=False, replaceable=()):
 
 
 def summarize(doc):
-	parts = [doc.document_kind or _("Document")]
+	parts = [doc.receipt_type or _("Document")]
 	if doc.supplier_name or doc.supplier:
 		parts.append(_("from {0}").format(doc.supplier_name or doc.supplier))
 	text = " ".join(parts)

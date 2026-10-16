@@ -14,7 +14,6 @@
   "status",
   "cancel_reason",
   "receipt_type",
-  "document_kind",
   "receipt_attached",
   "pdf_attachment_choice",
   "attachment",
@@ -119,7 +118,9 @@
    "fieldname": "receipt_type",
    "fieldtype": "Select",
    "label": "Receipt Type",
-   "options": "\nPurchase Invoice\nSonstiges\nJournal Entry\nPayment"
+   "options": "\nInvoice\nCredit Note\nReceipt\nTax Notice\nContract\nReminder\nStatement\nOther",
+   "in_standard_filter": 1,
+   "description": "What the document is. Read by the AI; decides the DATEV upload address (phamos Settings > DATEV Recipients). Contracts, reminders and statements are not vouchers."
   },
   {
    "fieldname": "receipt_attached",
@@ -295,10 +296,10 @@
   },
   {
    "default": "8b013751-c088-48a9-a998-1745463f94a0@uploadmail.datev.de",
-   "depends_on": "eval:doc.receipt_type == \"Sonstiges\"",
+   "depends_on": "eval:![\"Invoice\",\"Credit Note\",\"Receipt\",\"\"].includes(doc.receipt_type || \"\")",
    "fieldname": "datev_mail_recipient_2",
    "fieldtype": "Data",
-   "label": "DATEV Mail Recipient (Sonstiges)",
+   "label": "DATEV Mail Recipient (Other documents)",
    "options": "Mail",
    "read_only": 1
   },
@@ -425,13 +426,6 @@
    "options": "\nDuplicate\nMerged\nNot a voucher\nOther"
   },
   {
-   "fieldname": "document_kind",
-   "fieldtype": "Select",
-   "label": "Document Kind",
-   "options": "\nInvoice\nCredit Note\nReceipt\nTax Notice\nContract\nReminder\nStatement\nOther",
-   "description": "What the document is, as read by the AI. Contracts, reminders and statements are not vouchers."
-  },
-  {
    "fieldname": "net_total",
    "fieldtype": "Currency",
    "label": "Net Total",
@@ -528,7 +522,7 @@
  ],
  "index_web_pages_for_search": 1,
  "links": [],
- "modified": "2026-10-16 13:00:00.000000",
+ "modified": "2026-10-16 23:00:00.000000",
  "modified_by": "Administrator",
  "module": "Phamos",
  "name": "Accounting Receipt",

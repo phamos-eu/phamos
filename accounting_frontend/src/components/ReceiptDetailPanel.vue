@@ -135,13 +135,6 @@
 					</select>
 				</label>
 				<label class="field">
-					<span>Document kind</span>
-					<select v-model="autosave.draft.document_kind" :disabled="readonly" class="input">
-						<option value="">—</option>
-						<option v-for="o in options.document_kinds" :key="o" :value="o">{{ o }}</option>
-					</select>
-				</label>
-				<label class="field">
 					<span>Project</span>
 					<FrappeLink v-model="autosave.draft.project" doctype="Project" :disabled="readonly" />
 				</label>
@@ -303,7 +296,6 @@ const autosave = useAutosaveDoc({
 		total_taxes: { kind: "number", label: "Tax" },
 		currency: { kind: "select", immediate: true, label: "Currency" },
 		receipt_type: { kind: "select", immediate: true, label: "Receipt type" },
-		document_kind: { kind: "select", immediate: true, label: "Document kind" },
 		project: { kind: "select", immediate: true, label: "Project" },
 		cost_center: { kind: "select", immediate: true, label: "Cost center" },
 		payment_reference: { kind: "text", trim: true, label: "Payment reference" },
@@ -331,7 +323,7 @@ const saveStateText = computed(() => {
 const saveStateClass = computed(() => (autosave.status === "error" ? "text-ink-red-4" : "text-ink-gray-5"))
 
 // --- options and supplier suggestions -------------------------------------------------
-const options = ref({ receipt_types: [], document_kinds: [], can_create_supplier: 0 })
+const options = ref({ receipt_types: [], can_create_supplier: 0 })
 call(`${API}.get_receipt_form_options`).then((res) => (options.value = res || options.value))
 
 const suggestions = ref(null)

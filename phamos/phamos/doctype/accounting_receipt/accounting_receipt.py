@@ -239,7 +239,7 @@ def resolve_datev_recipient(doc):
 	if rows:
 		return None
 
-	if doc.receipt_type == "Sonstiges" and doc.get("datev_mail_recipient_2"):
+	if doc.receipt_type not in ("", None, "Invoice", "Credit Note", "Receipt") and doc.get("datev_mail_recipient_2"):
 		return doc.datev_mail_recipient_2
 	return doc.get("datev_mail_recipient") or None
 

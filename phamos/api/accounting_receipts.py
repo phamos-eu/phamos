@@ -154,7 +154,6 @@ RECEIPT_EDITABLE_FIELDS = (
 	"posting_date",
 	"due_date",
 	"receipt_type",
-	"document_kind",
 	"supplier",
 	"supplier_reference",
 	"sum",
@@ -184,7 +183,6 @@ def get_receipt_form_options():
 	company = frappe.defaults.get_user_default("company") or frappe.db.get_single_value("Global Defaults", "default_company")
 	return {
 		"receipt_types": options("receipt_type"),
-		"document_kinds": options("document_kind"),
 		"company": company,
 		"company_currency": company and frappe.get_cached_value("Company", company, "default_currency"),
 		"can_create_supplier": 1 if frappe.has_permission("Supplier", "create") else 0,

@@ -538,7 +538,6 @@ def get_receipt(name):
 	row["note_text"] = "\n".join(note_to_lines(doc.note))
 	row.update(
 		{
-			"document_kind": doc.document_kind,
 			"due_date": doc.due_date,
 			"net_total": doc.net_total,
 			"total_taxes": doc.total_taxes,

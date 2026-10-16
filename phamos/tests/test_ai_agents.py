@@ -19,7 +19,7 @@ from phamos.tests.test_accounting_receipt_intake import blank_pdf
 
 SUPPLIER = "AI Test Lieferant GmbH"
 ANSWER = {
-	"document_kind": "Invoice",
+	"receipt_type": "Invoice",
 	"invoice_number": "RE-2026-100",
 	"invoice_date": "2026-10-01",
 	"due_date": "2026-10-15",
