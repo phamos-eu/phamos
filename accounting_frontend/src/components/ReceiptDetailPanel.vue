@@ -1,5 +1,5 @@
 <template>
-	<div class="flex min-h-0 flex-1 flex-col lg:flex-row">
+	<div class="flex min-h-0 flex-1 flex-col overflow-y-auto lg:flex-row lg:overflow-hidden">
 		<div
 			class="flex min-w-0 flex-col gap-4 overflow-y-auto border-b border-outline-gray-2 p-5 lg:w-3/5 lg:flex-none lg:border-b-0 lg:border-r"
 		>
