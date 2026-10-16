@@ -13,6 +13,7 @@ from collections import defaultdict
 from datetime import timedelta
 
 import frappe
+from erpnext.setup.utils import get_exchange_rate
 from frappe import _
 from frappe.utils import cint, flt, getdate, today
 
@@ -63,6 +64,10 @@ def _resolve_company(company):
 		company = frappe.db.get_value("Company", {}, "name", order_by="creation asc")
 	if not company or not frappe.db.exists("Company", company):
 		frappe.throw(_("No company found"))
+	# The queries below aggregate with raw SQL, which skips User Permissions; checking the
+	# Company document applies them, so a user limited to one company cannot read another.
+	if not frappe.has_permission("Company", "read", doc=company):
+		frappe.throw(_("Not permitted to see figures of {0}").format(company), frappe.PermissionError)
 	return company
 
 
@@ -163,31 +168,51 @@ def _ai_rows(company, since):
 
 
 def _payment_request_rows(company):
-	"""Open outward Payment Requests with the due date of their Purchase Invoice when there is one."""
+	"""Open outward Payment Requests that no Accounting Receipt represents yet.
+
+	A request is represented when it points at a receipt itself or at a receipt's
+	Purchase Invoice; the receipt is then the calendar entry. The due date comes from the
+	Purchase Invoice when there is one.
+	"""
 	if not frappe.has_permission("Payment Request", "read"):
 		return []
 	return frappe.db.sql(
 		"""
 		select pr.name, pr.status, pr.party_type, pr.party, pr.party_name, pr.reference_doctype,
 			pr.reference_name, pr.transaction_date, pr.grand_total, pr.currency,
-			pi.due_date as invoice_due_date, pi.supplier as invoice_supplier, pi.supplier_name as invoice_supplier_name
+			pi.due_date as invoice_due_date, pi.supplier as invoice_supplier, pi.supplier_name as invoice_supplier_name,
+			pi.currency as invoice_currency, pi.conversion_rate as invoice_conversion_rate
 		from `tabPayment Request` pr
 		left join `tabPurchase Invoice` pi
 			on pr.reference_doctype = 'Purchase Invoice' and pi.name = pr.reference_name
 		where pr.company = %(company)s and pr.docstatus < 2 and pr.payment_request_type = 'Outward'
 			and ifnull(pr.status, '') not in %(closed)s
+			and not exists (
+				select 1 from `tabAccounting Receipt` r
+				where (pr.reference_doctype = 'Accounting Receipt' and r.name = pr.reference_name)
+					or (pr.reference_doctype = 'Purchase Invoice' and r.purchase_invoice = pr.reference_name)
+			)
 		""",
 		{"company": company, "closed": CLOSED_PAYMENT_REQUEST_STATUSES},
 		as_dict=True,
 	)
 
 
-def _receipt_references(company):
-	"""(doctype, name) pairs a Payment Request may point at when a receipt already represents it."""
-	rows = frappe.get_all(RECEIPT, filters={"company": company}, fields=["name", "purchase_invoice"])
-	refs = {(RECEIPT, row.name) for row in rows}
-	refs |= {("Purchase Invoice", row.purchase_invoice) for row in rows if row.purchase_invoice}
-	return refs
+def payment_request_amount(row, company_currency):
+	"""A Payment Request's grand total in company currency.
+
+	Requests carry only their own currency, so a USD request is converted with its Purchase
+	Invoice's rate when the invoice is in the same currency, else with the exchange rate of
+	the request date.
+	"""
+	amount = flt(row.get("grand_total"))
+	currency = row.get("currency")
+	if not currency or currency == company_currency:
+		return amount
+	if row.get("invoice_currency") == currency and flt(row.get("invoice_conversion_rate")):
+		return amount * flt(row["invoice_conversion_rate"])
+	rate = get_exchange_rate(currency, company_currency, row.get("transaction_date"))
+	return amount * flt(rate or 1)
 
 
 # --- dashboard -----------------------------------------------------------------------
@@ -376,6 +401,7 @@ def get_receipt_dashboard(company=None, months=12):
 	months = min(max(cint(months) or 12, 3), 24)
 	today_date = getdate(today())
 	cache_key = f"phamos:accounting_stats:{company}:{months}:{today_date}"
+	# expires=True: without it get_value pins a miss (None) in the request-local cache.
 	cached = frappe.cache.get_value(cache_key, expires=True)
 	if cached:
 		return cached
@@ -421,7 +447,7 @@ def _receipt_item(row, today_date):
 	}
 
 
-def _payment_request_item(row, today_date):
+def _payment_request_item(row, today_date, company_currency):
 	due = getdate(row.get("invoice_due_date") or row.get("transaction_date"))
 	return {
 		"kind": "payment_request",
@@ -430,7 +456,7 @@ def _payment_request_item(row, today_date):
 		"reference": row.get("reference_name"),
 		"supplier": row.get("invoice_supplier") or (row.get("party") if row.get("party_type") == "Supplier" else None),
 		"date": str(due) if due else None,
-		"amount": flt(row.get("grand_total"), 2),
+		"amount": flt(payment_request_amount(row, company_currency), 2),
 		"document_amount": flt(row.get("grand_total"), 2),
 		"currency": row.get("currency"),
 		"status": row.get("status"),
@@ -439,15 +465,11 @@ def _payment_request_item(row, today_date):
 	}
 
 
-def build_calendar(*, from_date, to_date, today_date, receipt_rows, payment_request_rows, receipt_refs, currency):
+def build_calendar(*, from_date, to_date, today_date, receipt_rows, payment_request_rows, currency):
 	"""Group open payables into days and ISO weeks of [from_date, to_date]; overdue and undated apart."""
 	from_date, to_date, today_date = getdate(from_date), getdate(to_date), getdate(today_date)
 	all_items = [_receipt_item(row, today_date) for row in receipt_rows]
-	all_items += [
-		_payment_request_item(row, today_date)
-		for row in payment_request_rows
-		if (row.get("reference_doctype"), row.get("reference_name")) not in receipt_refs
-	]
+	all_items += [_payment_request_item(row, today_date, currency) for row in payment_request_rows]
 
 	items, undated, overdue_items = [], [], []
 	for item in all_items:
@@ -515,6 +537,5 @@ def get_payment_calendar(from_date, to_date, company=None):
 		today_date=today(),
 		receipt_rows=_open_receipt_rows(company),
 		payment_request_rows=_payment_request_rows(company),
-		receipt_refs=_receipt_references(company),
 		currency=frappe.get_cached_value("Company", company, "default_currency"),
 	)

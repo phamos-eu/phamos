@@ -239,6 +239,76 @@ class TestSettingsFlag(FrappeTestCase):
 			self.assertEqual(accounting_spa.get_accounting_settings()["can_read_statistics"], 0)
 
 
+class TestCompanyAccess(FrappeTestCase):
+	def test_endpoints_respect_company_permission(self):
+		frappe.set_user("Administrator")
+		company = frappe.db.get_value("Company", {}, "name")
+		if not company:
+			self.skipTest("needs a company")
+		denied = lambda doctype, *args, **kwargs: doctype != "Company"  # noqa: E731
+		with patch.object(stats.frappe, "has_permission", side_effect=denied):
+			with self.assertRaises(frappe.PermissionError):
+				stats.get_receipt_dashboard(company=company)
+			with self.assertRaises(frappe.PermissionError):
+				stats.get_payment_calendar("2026-10-01", "2026-10-31", company=company)
+
+
+class TestPaymentRequestAmount(FrappeTestCase):
+	def test_same_currency_is_unchanged(self):
+		self.assertEqual(stats.payment_request_amount({"grand_total": 120, "currency": "EUR"}, "EUR"), 120)
+
+	def test_uses_the_invoice_rate_when_the_currencies_match(self):
+		row = {"grand_total": 100, "currency": "USD", "invoice_currency": "USD", "invoice_conversion_rate": 0.9}
+		with patch.object(stats, "get_exchange_rate") as rate:
+			self.assertAlmostEqual(stats.payment_request_amount(row, "EUR"), 90)
+		rate.assert_not_called()
+
+	def test_falls_back_to_the_exchange_rate_of_the_request_date(self):
+		row = {"grand_total": 100, "currency": "USD", "transaction_date": date(2026, 10, 1)}
+		with patch.object(stats, "get_exchange_rate", return_value=0.8) as rate:
+			self.assertAlmostEqual(stats.payment_request_amount(row, "EUR"), 80)
+		rate.assert_called_once_with("USD", "EUR", date(2026, 10, 1))
+
+	def test_calendar_totals_are_in_company_currency(self):
+		row = {"name": "PR-USD", "party_name": "Wise", "reference_doctype": "Purchase Invoice", "reference_name": "PI-7",
+		       "transaction_date": date(2026, 10, 1), "invoice_due_date": date(2026, 10, 20), "grand_total": 100,
+		       "currency": "USD", "invoice_currency": "USD", "invoice_conversion_rate": 0.9, "status": "Initiated"}
+		result = stats.build_calendar(
+			from_date=date(2026, 10, 1), to_date=date(2026, 10, 31), today_date=date(2026, 10, 16),
+			receipt_rows=[], payment_request_rows=[row], currency="EUR",
+		)
+		self.assertEqual((result["items"][0]["amount"], result["items"][0]["document_amount"]), (90, 100))
+		self.assertEqual(result["totals"]["amount"], 90)
+
+
+class TestPaymentRequestQuery(FrappeTestCase):
+	"""Requests already represented by a receipt are left out by the query itself."""
+
+	def setUp(self):
+		frappe.set_user("Administrator")
+		self.company = frappe.db.get_value("Company", {}, "name")
+		if not self.company:
+			self.skipTest("needs a company")
+		self.addCleanup(frappe.db.rollback)
+		frappe.get_doc({"doctype": "Accounting Receipt", "name": "TEST-STATS-AR-1", "company": self.company,
+		                "status": "Approved to Pay", "purchase_invoice": "TEST-STATS-PI-1"}).db_insert()
+		frappe.get_doc({"doctype": "Accounting Receipt", "name": "TEST-STATS-AR-2", "company": self.company,
+		                "status": "Approved to Pay"}).db_insert()
+		for name, doctype, reference in (
+			("TEST-STATS-PR-VIA-PI", "Purchase Invoice", "TEST-STATS-PI-1"),
+			("TEST-STATS-PR-VIA-AR", "Accounting Receipt", "TEST-STATS-AR-2"),
+			("TEST-STATS-PR-OWN", "Purchase Invoice", "TEST-STATS-PI-2"),
+		):
+			frappe.get_doc({"doctype": "Payment Request", "name": name, "company": self.company, "docstatus": 1,
+			                "payment_request_type": "Outward", "status": "Initiated", "reference_doctype": doctype,
+			                "reference_name": reference, "grand_total": 10, "currency": "EUR",
+			                "transaction_date": "2026-10-01"}).db_insert()
+
+	def test_requests_with_a_receipt_are_left_out(self):
+		names = {row.name for row in stats._payment_request_rows(self.company) if row.name.startswith("TEST-STATS-")}
+		self.assertEqual(names, {"TEST-STATS-PR-OWN"})
+
+
 class TestPaymentCalendar(FrappeTestCase):
 	def test_grouping(self):
 		receipts = [
@@ -251,8 +321,6 @@ class TestPaymentCalendar(FrappeTestCase):
 		payment_requests = [
 			{"name": "PR-1", "party_type": None, "party": None, "party_name": None, "invoice_supplier": "S1", "invoice_supplier_name": "Wise", "reference_doctype": "Purchase Invoice",
 			 "reference_name": "PI-9", "transaction_date": date(2026, 10, 1), "invoice_due_date": date(2026, 10, 27), "grand_total": 70, "status": "Initiated"},
-			{"name": "PR-2", "party_type": "Supplier", "party": "S2", "party_name": "Telekom", "reference_doctype": "Purchase Invoice",
-			 "reference_name": "PI-1", "transaction_date": date(2026, 10, 1), "invoice_due_date": date(2026, 10, 20), "grand_total": 50, "status": "Initiated"},
 		]
 		result = stats.build_calendar(
 			from_date=date(2026, 10, 1),
@@ -260,7 +328,6 @@ class TestPaymentCalendar(FrappeTestCase):
 			today_date=date(2026, 10, 16),
 			receipt_rows=receipts,
 			payment_request_rows=payment_requests,
-			receipt_refs={("Purchase Invoice", "PI-1")},
 			currency="EUR",
 		)
 		self.assertEqual([i["name"] for i in result["items"]], ["AR-3", "AR-2", "AR-1", "PR-1"])
