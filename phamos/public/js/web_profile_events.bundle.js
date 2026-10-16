@@ -299,9 +299,17 @@
 			return !!(value("contact_name") || value("contact_email"));
 		}
 		// After an order, closing the dialog starts afresh; before, the entries stay (and the draft).
-		ticketDialog.addEventListener("close", () => {
-			if (order) { storage.clear(); resetForm(); showHold(""); }
-		});
+		// Called directly as well: the "close" event can arrive late (or not at all) in background tabs.
+		function finishOrder() {
+			if (!order) return;
+			if (ticketDialog.open) ticketDialog.close();
+			storage.clear();
+			resetForm();
+			showHold("");
+		}
+		ticketDialog.addEventListener("close", finishOrder);
+		$("[data-wp-ticket-success]").querySelectorAll("[data-wp-dialog-close]").forEach((button) =>
+			button.addEventListener("click", finishOrder));
 
 		form.addEventListener("submit", async (event) => {
 			event.preventDefault();
@@ -369,7 +377,7 @@
 				const optin = result.status === "confirmation_sent";
 				consentStatus.textContent = optin ? consentStatus.dataset.optin : consentStatus.dataset.saved;
 				// Done: close after the visitor could read the confirmation (longer when an email is on its way).
-				setTimeout(() => ticketDialog.open && ticketDialog.close(), optin ? 2500 : 1200);
+				setTimeout(finishOrder, optin ? 2500 : 1200);
 			} catch (error) {
 				button.disabled = false;
 				consentStatus.classList.add("wp-error");
