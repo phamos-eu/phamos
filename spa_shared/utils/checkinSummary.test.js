@@ -1,5 +1,5 @@
 // Run with `yarn test:spa` (vitest globals, see personal_frontend/vitest.config.js).
-import { actionLabel, caption, formatWorked, isUndoKey, liveWorkedMinutes, todayRows } from "./checkinSummary.js"
+import { actionLabel, caption, formatWorked, isUndoKey, liveWorkedMinutes, worked } from "./checkinSummary.js"
 
 const checkedIn = {
 	next_action: "OUT",
@@ -46,11 +46,6 @@ describe("check-in summary", () => {
 		expect(caption({ last: null }, time, day)).toBe("not checked in yet")
 	})
 
-	it("marks the open check-in as running", () => {
-		expect(todayRows(checkedIn).map((row) => row.running)).toEqual([false, false, true])
-		expect(todayRows({ ...checkedIn, next_action: "IN" }).some((row) => row.running)).toBe(false)
-	})
-
 	it("treats Ctrl/Cmd+Z outside text fields as undo", () => {
 		const div = { tagName: "DIV" }
 		expect(isUndoKey({ ctrlKey: true, key: "z", target: div })).toBe(true)
@@ -59,5 +54,18 @@ describe("check-in summary", () => {
 		expect(isUndoKey({ ctrlKey: true, key: "z", target: { tagName: "INPUT" } })).toBe(false)
 		expect(isUndoKey({ ctrlKey: true, key: "z", target: { tagName: "DIV", isContentEditable: true } })).toBe(false)
 		expect(isUndoKey({ key: "z", target: div })).toBe(false)
+	})
+})
+
+describe("worked time of a day", () => {
+	const logs = [
+		{ log_type: "OUT", time: "2026-10-16 07:00:00" },
+		{ log_type: "IN", time: "2026-10-16 08:00:00" },
+		{ log_type: "OUT", time: "2026-10-16 12:00:00" },
+		{ log_type: "IN", time: "2026-10-16 13:00:00" },
+	]
+	it("pairs IN and OUT and counts an open IN only until now", () => {
+		expect(worked(logs)).toBe(240)
+		expect(worked(logs, new Date("2026-10-16T14:30:00"))).toBe(330)
 	})
 })

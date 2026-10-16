@@ -32,15 +32,6 @@ export function caption(state, formatTime, formatDay) {
 	return `${last.log_type === "IN" ? "in" : "out"} since ${when}`
 }
 
-// Today's logs as rows for the sidebar; the last IN without an OUT is marked as running.
-export function todayRows(state) {
-	const logs = state?.today?.logs || []
-	return logs.map((log, index) => ({
-		...log,
-		running: log.log_type === "IN" && index === logs.length - 1 && state.next_action === "OUT",
-	}))
-}
-
 // Ctrl/Cmd+Z outside text fields revokes a pending check-in.
 export function isUndoKey(event) {
 	if (!(event.ctrlKey || event.metaKey) || event.shiftKey || event.altKey) return false
@@ -48,4 +39,21 @@ export function isUndoKey(event) {
 	const target = event.target
 	const tag = target?.tagName
 	return !(tag === "INPUT" || tag === "TEXTAREA" || tag === "SELECT" || target?.isContentEditable)
+}
+
+// Minutes between IN and OUT pairs of one day's logs (in time order); an open IN counts until
+// `now` (a Date) and not at all without it. Mirrors personal_checkin.worked_minutes.
+export function worked(logs, now = null) {
+	let total = 0
+	let openIn = null
+	const toDate = (value) => new Date(String(value).replace(" ", "T"))
+	for (const log of logs) {
+		if (log.log_type === "IN" && openIn === null) openIn = toDate(log.time)
+		else if (log.log_type === "OUT" && openIn !== null) {
+			total += Math.max(toDate(log.time) - openIn, 0)
+			openIn = null
+		}
+	}
+	if (openIn !== null && now) total += Math.max(now - openIn, 0)
+	return Math.floor(total / 60000)
 }

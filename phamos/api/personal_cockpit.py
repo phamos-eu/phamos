@@ -524,3 +524,15 @@ def add_checkin(log_type, latitude=None, longitude=None):
 def revoke_checkin(name):
 	"""Undo a check-in I made moments ago."""
 	return personal_checkin.revoke_checkin(name)
+
+
+@frappe.whitelist()
+def get_checkin_dashboard(period=30):
+	"""Worked time per day, typical start and end, and days without a check-out."""
+	return personal_checkin.get_checkin_dashboard(period=period)
+
+
+@frappe.whitelist()
+def get_my_checkins(start=0, page_length=100):
+	"""All my check-ins, newest first, a page at a time."""
+	return personal_checkin.get_my_checkins(start=start, page_length=page_length)

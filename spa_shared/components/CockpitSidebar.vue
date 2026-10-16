@@ -67,7 +67,6 @@
 		</nav>
 
 		<div class="mt-auto flex-shrink-0 border-t border-outline-gray-2 p-2">
-			<slot name="footer" :collapsed="collapsed" />
 			<button
 				type="button"
 				class="flex w-full items-center gap-2 rounded-md px-2 py-2 text-sm font-medium text-ink-gray-6 hover:bg-surface-gray-2 hover:text-ink-gray-9"
