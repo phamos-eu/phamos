@@ -152,7 +152,7 @@
 				</label>
 				<label class="field sm:col-span-2">
 					<span>Supplier IBAN</span>
-					<input v-model="autosave.draft.supplier_iban" :disabled="readonly" class="input" />
+					<PlainTextField v-model="autosave.draft.supplier_iban" :disabled="readonly" label="Supplier IBAN" />
 				</label>
 			</section>
 
@@ -297,6 +297,7 @@ import { computed, ref, watch } from "vue"
 import { call, toast } from "frappe-ui"
 import DocSyncBanner from "@spa/components/DocSyncBanner.vue"
 import FrappeLink from "@spa/components/FrappeLink.vue"
+import PlainTextField from "@spa/components/PlainTextField.vue"
 import { useAutosaveDoc } from "@spa/composables/useAutosaveDoc.js"
 import CreateSupplierDialog from "./CreateSupplierDialog.vue"
 import NewCategoryDialog from "./NewCategoryDialog.vue"

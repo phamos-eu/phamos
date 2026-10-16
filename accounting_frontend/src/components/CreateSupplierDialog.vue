@@ -53,7 +53,7 @@
 				</label>
 				<label class="field">
 					<span>IBAN</span>
-					<input v-model="form.iban" class="input" />
+					<PlainTextField v-model="form.iban" label="IBAN" />
 				</label>
 				<label class="field">
 					<span>Bank name</span>
@@ -69,6 +69,7 @@
 import { reactive, ref } from "vue"
 import { call, Dialog } from "frappe-ui"
 import FrappeLink from "@spa/components/FrappeLink.vue"
+import PlainTextField from "@spa/components/PlainTextField.vue"
 
 const props = defineProps({
 	modelValue: { type: Boolean, default: false },
