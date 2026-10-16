@@ -581,10 +581,12 @@
 			});
 			addButton.hidden = n >= max;
 			const list = moments();
-			const valid = list.length > 0 && list.length === n && list.every((d) => d.getTime() > now && (!start || d < start));
+			const wrong = list.some((d) => d.getTime() <= now || (start && d >= start));
+			const valid = list.length > 0 && list.length === n && !wrong;
 			submit.disabled = !valid;
-			status.classList.toggle("wp-error", n > 0 && !valid);
-			status.textContent = !n ? "" : valid ? status.dataset.count.replace("{0}", n) : status.dataset.invalid;
+			// Only a date that is filled in and wrong is an error; an empty row just keeps the button off.
+			status.classList.toggle("wp-error", wrong);
+			status.textContent = wrong ? status.dataset.invalid : valid ? status.dataset.count.replace("{0}", n) : "";
 		}
 		function addRow() {
 			if (chosen() >= max) return;
