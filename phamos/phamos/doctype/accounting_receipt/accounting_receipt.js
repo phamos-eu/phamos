@@ -60,15 +60,12 @@ frappe.ui.form.on("Accounting Receipt", {
             frm.page.set_inner_btn_group_as_primary(__("Create"));
         }
 
-        // Item lines pick expense categories (Items of the expense group), never products
-        frm.set_query("item_code", "items", function () {
-            return { filters: { item_group: frm._expense_item_group || "Expense Categories", disabled: 0 } };
+        // Item lines are booked on expense accounts of the receipt's company
+        frm.set_query("expense_account", "items", function () {
+            const filters = { root_type: "Expense", is_group: 0, disabled: 0 };
+            if (frm.doc.company) filters.company = frm.doc.company;
+            return { filters: filters };
         });
-        if (!frm._expense_item_group) {
-            frappe.db.get_single_value("phamos Settings", "ai_expense_item_group").then(function (group) {
-                frm._expense_item_group = group || "Expense Categories";
-            });
-        }
 
         // Filter return_against by same supplier
         frm.set_query("return_against", function () {

@@ -3,9 +3,8 @@
 
 """Create the ERPNext documents a receipt branches into. Here: the Purchase Invoice.
 
-Each item line becomes an invoice line. A line with a category (Item) gets the
-category's expense account through ERPNext; a line without category needs an expense
-account of its own. The tax rate the AI read selects the Item Tax Template (0 / 7 / 19 %);
+Each item line becomes an invoice line without an Item: description, quantity, rate and
+the line's expense account. A line without an expense account stops the invoice. The tax rate the AI read selects the Item Tax Template (0 / 7 / 19 %);
 the header uses the company's default purchase tax template.
 """
 
@@ -16,7 +15,7 @@ from erpnext import get_default_company
 from frappe import _
 from frappe.utils import flt
 
-from phamos.accounting.categories import item_tax_template_for_rate, resolve_expense_account
+from phamos.accounting.expense_accounts import item_tax_template_for_rate
 
 TOTAL_TOLERANCE = 0.02
 
@@ -58,7 +57,7 @@ def make_purchase_invoice(receipt, submit=False):
 
 	missing = []
 	for idx, line in enumerate(receipt.items, 1):
-		account = line.expense_account or resolve_expense_account(line.item_code, company)
+		account = line.expense_account
 		if not account:
 			missing.append(f"{idx}. {line.item_name}")
 			continue
@@ -74,9 +73,6 @@ def make_purchase_invoice(receipt, submit=False):
 			"cost_center": line.cost_center or receipt.cost_center,
 			"project": line.project or receipt.project,
 		}
-		if line.item_code:
-			row["item_code"] = line.item_code
-			row["uom"] = frappe.db.get_value("Item", line.item_code, "stock_uom") or "Nos"
 		template = item_tax_template_for_rate(line.tax_rate, company)
 		if template:
 			row["item_tax_template"] = template
@@ -85,14 +81,14 @@ def make_purchase_invoice(receipt, submit=False):
 
 	if missing:
 		frappe.throw(
-			_("These lines need a category or an expense account: {0}").format(", ".join(missing)),
+			_("These lines need an expense account: {0}").format(", ".join(missing)),
 			LineWithoutAccount,
 		)
 
 	pi.set_missing_values()
-	# set_missing_values fills item details from the category; keep the line's own account and rate.
-	for row, line in zip(pi.items, [l for l in receipt.items]):
-		row.expense_account = line.expense_account or resolve_expense_account(line.item_code, company)
+	# set_missing_values may fill defaults; the line's own account and text win.
+	for row, line in zip(pi.items, receipt.items):
+		row.expense_account = line.expense_account
 		row.item_name = line.item_name
 		row.description = line.item_name
 	if not pi.get("taxes"):

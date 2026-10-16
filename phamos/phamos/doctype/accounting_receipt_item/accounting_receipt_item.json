@@ -66,14 +66,16 @@
    "fieldtype": "Link",
    "label": "Item",
    "options": "Item",
-   "in_list_view": 1,
-   "columns": 2
+   "hidden": 1,
+   "description": "Not used: lines are booked on their expense account."
   },
   {
    "fieldname": "expense_account",
    "fieldtype": "Link",
    "label": "Expense Account",
-   "options": "Account"
+   "options": "Account",
+   "in_list_view": 1,
+   "columns": 2
   },
   {
    "fieldname": "cost_center",
@@ -96,7 +98,7 @@
  ],
  "istable": 1,
  "links": [],
- "modified": "2026-10-16 13:00:00.000000",
+ "modified": "2026-10-17 12:00:00.000000",
  "modified_by": "Administrator",
  "module": "Phamos",
  "name": "Accounting Receipt Item",

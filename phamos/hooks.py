@@ -329,7 +329,7 @@ doc_events = {
     "Raven Message": {
 		"after_insert": "phamos.events.raven_bot.handle_lead_option_reply"
 	},
-    "Item": {"on_update": "phamos.accounting.categories.clear_category_cache"},
+    "Account": {"on_update": "phamos.accounting.expense_accounts.clear_account_cache"},
     "Accounting Receipt": {
         "after_insert": [
             "phamos.phamos.doctype.accounting_receipt.accounting_receipt.sync_attachment_from_files",

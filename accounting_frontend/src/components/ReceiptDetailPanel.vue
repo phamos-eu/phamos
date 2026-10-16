@@ -160,10 +160,7 @@
 			<section>
 				<div class="mb-1.5 flex items-center justify-between">
 					<h3 class="text-xs font-semibold uppercase tracking-wide text-ink-gray-5">Items</h3>
-					<div class="flex items-center gap-3">
-						<button v-if="categoryInfo.can_create" type="button" class="text-xs text-ink-gray-6 hover:text-ink-gray-9" @click="showNewCategory = true">+ New category</button>
-						<button v-if="!readonly" type="button" class="text-xs text-ink-gray-6 hover:text-ink-gray-9" @click="addItem">+ Add line</button>
-					</div>
+					<button v-if="!readonly" type="button" class="text-xs text-ink-gray-6 hover:text-ink-gray-9" @click="addItem">+ Add line</button>
 				</div>
 				<p v-if="!autosave.draft.items.length" class="text-sm text-ink-gray-5">No item lines yet.</p>
 				<table v-else class="w-full text-sm">
@@ -190,10 +187,7 @@
 										placeholder="Expense account"
 										@update:model-value="(value) => setItem(i, 'expense_account', value)"
 									/>
-									<div class="truncate px-1 text-[11px]" :class="item.expense_account ? 'text-ink-gray-5' : 'text-ink-amber-3'">
-										<template v-if="!item.expense_account">no expense account yet</template>
-										<template v-else-if="categoryName(item)">Category: {{ categoryName(item) }}</template>
-									</div>
+									<div v-if="!item.expense_account" class="truncate px-1 text-[11px] text-ink-amber-3">no expense account yet</div>
 								</div>
 							</td>
 							<td class="py-1 pr-2 align-top">
@@ -281,7 +275,6 @@
 			<iframe v-else :src="pdfUrl" type="application/pdf" class="min-h-[480px] flex-1 rounded-md border border-outline-gray-2 bg-surface-gray-2" />
 		</div>
 
-		<NewCategoryDialog v-if="showNewCategory" v-model="showNewCategory" :company="receipt.company" @created="onCategoryCreated" />
 		<CreateSupplierDialog
 			v-if="showCreateSupplier"
 			v-model="showCreateSupplier"
@@ -300,7 +293,6 @@ import FrappeLink from "@spa/components/FrappeLink.vue"
 import PlainTextField from "@spa/components/PlainTextField.vue"
 import { useAutosaveDoc } from "@spa/composables/useAutosaveDoc.js"
 import CreateSupplierDialog from "./CreateSupplierDialog.vue"
-import NewCategoryDialog from "./NewCategoryDialog.vue"
 
 const API = "phamos.api.accounting_receipts"
 
@@ -386,20 +378,8 @@ function onSupplierCreated(receipt) {
 	emit("updated", receipt)
 }
 
-// --- categories and Purchase Invoice ---------------------------------------------------
-const categoryInfo = ref({ categories: [], can_create: 0 })
-const categories = computed(() => categoryInfo.value.categories || [])
-const showNewCategory = ref(false)
+// --- expense accounts and Purchase Invoice ----------------------------------------------
 const creatingInvoice = ref(false)
-
-async function loadCategories() {
-	try {
-		categoryInfo.value = await call(`${API}.get_expense_categories`, { company: props.receipt?.company })
-	} catch (e) {
-		categoryInfo.value = { categories: [], can_create: 0 }
-	}
-}
-loadCategories()
 
 // Leaf expense accounts of the receipt's company: what a purchase line can be booked on.
 const accountFilters = computed(() => ({
@@ -409,20 +389,12 @@ const accountFilters = computed(() => ({
 	...(props.receipt?.company ? { company: props.receipt.company } : {}),
 }))
 
-function categoryName(item) {
-	return categories.value.find((c) => c.item_code === item.item_code)?.item_name || ""
-}
-
 const invoiceHint = computed(() => {
 	if (!autosave.draft.supplier) return "Set the supplier first."
 	if (!autosave.draft.items.length) return "Add item lines first."
 	if (autosave.draft.items.some((row) => !row.expense_account)) return "Every line needs an expense account."
 	return ""
 })
-
-async function onCategoryCreated() {
-	await loadCategories()
-}
 
 async function createInvoice() {
 	creatingInvoice.value = true
@@ -446,8 +418,6 @@ function setItem(index, field, raw) {
 	autosave.draft.items = autosave.draft.items.map((row, i) => {
 		if (i !== index) return row
 		const next = { ...row, [field]: value }
-		// The server sets the category that belongs to the chosen account.
-		if (field === "expense_account") next.item_code = null
 		if (field === "qty" || field === "rate") next.amount = round2(Number(next.qty || 0) * Number(next.rate || 0))
 		return next
 	})

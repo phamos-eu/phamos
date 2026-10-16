@@ -560,7 +560,6 @@ def get_receipt(name):
 					"rate": i.rate,
 					"amount": i.amount,
 					"tax_rate": i.tax_rate,
-					"item_code": i.item_code,
 					"expense_account": i.expense_account,
 				}
 				for i in doc.items
