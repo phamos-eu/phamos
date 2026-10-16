@@ -1,7 +1,7 @@
 {#- Profile page shared by every Web Profile section. Context: profile.py (data from
     sections.build_profile). Fixed skeleton: breadcrumb, header, facts, summary + body, related, CTA. -#}
 {% extends "templates/base.html" %}
-{% from "phamos/templates/web_profile/macros.html" import head_tags, breadcrumbs, avatar, tile, contact_button, socials, profile_hero, profile_actions, profile_blocks, interest_block, ticket_dialog_markup, subscribe_dialog_markup with context %}
+{% from "phamos/templates/web_profile/macros.html" import head_tags, breadcrumbs, avatar, tile, contact_button, socials, profile_hero, profile_actions, profile_blocks, interest_block, ticket_dialog_markup, subscribe_dialog_markup, reminder_dialog_markup with context %}
 
 {% block title %}{{ title | e }}{% endblock %}
 {% block meta_block %}{{ super() }}{{ head_tags() }}{% endblock %}
@@ -27,8 +27,9 @@
 	{#- Sticky sidebar: the person this page is about (or its lead / managers / contact). -#}
 	<aside class="wp-profile-aside{% if profile.key_people | length > 1 %} wp-aside-multi{% endif %}" aria-label="{{ _('Key people') }}">
 		{#- Events: the page's own actions come first; then the key person's contact button is not black. -#}
-		{{ profile_actions(profile.actions, support_email) }}
+		{{ profile_actions(profile.actions | rejectattr("secondary") | list, support_email) }}
 		{{ interest_block(item, profile.interest, lang) }}
+		{{ profile_actions(profile.actions | selectattr("secondary") | list) }}
 		{%- for card in profile.key_people %}
 		{%- set person = card.person %}
 		{#- Framed cards are always clickable as a whole: another person's card links to their profile
@@ -77,7 +78,6 @@
 	<div class="wp-profile-main">
 
 
-	{%- if subscribed %}<p class="wp-note">{{ _("Thank you, your email address is confirmed. You will receive the updates.") }}</p>{% endif %}
 	{%- if profile.notice %}<p class="wp-note">{{ profile.notice | e }}</p>{% endif %}
 	{%- if item.masked %}
 	<p class="wp-note">{{ _("This former colleague chose not to be named. Their role and time at phamos are shown without personal details.") if section == "people" else _("The customer is not named. This case study describes the project without identifying details.") }}</p>
@@ -114,6 +114,7 @@
 	</div>
 	{%- if profile.ticket %}{{ ticket_dialog_markup(item, profile.ticket, lang) }}{% endif %}
 	{%- if profile.actions | selectattr("dialog", "equalto", "subscribe") | list %}{{ subscribe_dialog_markup(item, lang) }}{% endif %}
+	{%- if profile.actions | selectattr("dialog", "equalto", "reminder") | list %}{{ reminder_dialog_markup(item, lang) }}{% endif %}
 </main>
 {% endblock %}
 

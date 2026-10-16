@@ -528,3 +528,56 @@ Show bookings on the website,Buchungen auf der Website zeigen
 Add person,Person hinzufügen
 You,Sie
 Remove,Entfernen
+Register for free,Kostenlos anmelden
+Buy from {0},Kaufen ab {0}
+incl. VAT,inkl. MwSt.
+Create reminder,Erinnerung erstellen
+{0} left,noch {0}
+anonymous,anonym
+Reserved for you,Für Sie reserviert
+Time is up. Seats and prices are checked again.,Die Zeit ist abgelaufen. Plätze und Preise werden neu geprüft.
+Not enough seats left for this number of tickets.,Für diese Anzahl Tickets sind nicht mehr genug Plätze frei.
+Entries restored.,Eingaben wiederhergestellt.
+Tickets go to your email unless you add one for a person.,"Die Tickets gehen an Ihre E-Mail-Adresse, außer Sie geben für eine Person eine eigene an."
+Event date,Termin
+Tickets to,Tickets an
+Order: {0},Bestellung: {0}
+Registration: {0},Anmeldung: {0}
+Pos.,Pos.
+Description,Bezeichnung
+Qty,Menge
+Unit price,Einzelpreis
+Amount,Betrag
+Net,Netto
+VAT {0} %,MwSt. {0} %
+Change tickets,Tickets ändern
+"Payment by invoice, due within 14 days.","Zahlung per Rechnung, fällig innerhalb von 14 Tagen."
+"Clicking ""Order with obligation to pay"" places a binding order under our {0}. No right of withdrawal: the event is on a fixed date (§ 312g (2) no. 9 BGB).",Mit Klick auf „Zahlungspflichtig bestellen“ bestellen Sie verbindlich zu unseren {0}. Kein Widerrufsrecht: Die Veranstaltung findet an einem festen Termin statt (§ 312g Abs. 2 Nr. 9 BGB).
+"Clicking ""Register"" makes your registration binding.",Mit Klick auf „Anmelden“ melden Sie sich verbindlich an.
+"Correct your entries with ""Back"" or ""Change"" until you order. Contract language: German or English. We store the contract text and email it to you with the terms.",Bis zur Bestellung können Sie Ihre Eingaben mit „Zurück“ oder „Ändern“ korrigieren. Vertragssprache: Deutsch oder Englisch. Wir speichern den Vertragstext und senden ihn Ihnen mit den AGB per E-Mail.
+Print,Drucken
+Confirmation sent to {0}.,Bestätigung an {0} gesendet.
+Order as PDF,Bestellung als PDF
+Optional,Optional
+Event updates by email,Neuigkeiten zur Veranstaltung per E-Mail
+"Schedule, reminders, material. You confirm by link first.","Ablauf, Erinnerungen, Unterlagen. Sie bestätigen zuerst per Link."
+Through phamos. Your email stays hidden.,Über phamos. Ihre E-Mail-Adresse bleibt verborgen.
+Name and company on the event page.,Name und Firma auf der Veranstaltungsseite.
+Saved. Please confirm your email with the link we sent you.,"Gespeichert. Bitte bestätigen Sie Ihre E-Mail-Adresse über den Link, den wir Ihnen geschickt haben."
+"Schedule, reminders and material for {0}. You confirm by email first.","Ablauf, Erinnerungen und Unterlagen zu {0}. Sie bestätigen zuerst per E-Mail."
+phamos may store my email for these updates. Unsubscribe any time.,phamos darf meine E-Mail-Adresse für diese Neuigkeiten speichern. Abmeldung jederzeit möglich.
+Almost done: please confirm with the link we sent you.,"Fast geschafft: Bitte bestätigen Sie über den Link, den wir Ihnen geschickt haben."
+Up to three dates. You get a calendar file with one reminder each.,Bis zu drei Termine. Sie erhalten eine Kalenderdatei mit je einer Erinnerung.
+Reminder {0},Erinnerung {0}
+Download calendar file,Kalenderdatei herunterladen
+Please pick at least one date before the event.,Bitte wählen Sie mindestens einen Termin vor der Veranstaltung.
+Reminder: {0},Erinnerung: {0}
+reminder,erinnerung
+Subscription confirmed,Anmeldung bestätigt
+"You will receive updates about {0}: schedule, reminders and material.","Sie erhalten Neuigkeiten zu {0}: Ablauf, Erinnerungen und Unterlagen."
+Your email address is confirmed. You will receive the updates.,Ihre E-Mail-Adresse ist bestätigt. Sie erhalten die Neuigkeiten.
+Every email has a link to unsubscribe.,Jede E-Mail enthält einen Link zur Abmeldung.
+Back to the event,Zurück zur Veranstaltung
+All events,Alle Veranstaltungen
+Your order as PDF,Ihre Bestellung als PDF
+Ticket,Ticket

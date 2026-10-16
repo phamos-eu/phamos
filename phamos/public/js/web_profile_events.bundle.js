@@ -35,6 +35,23 @@
 		dialog.addEventListener("close", () => opener && opener.focus());
 	}
 
+	// A short message at the bottom of the page, for things that happen after a dialog closed.
+	function toast(text, error) {
+		let box = document.querySelector("[data-wp-toast]");
+		if (!box) {
+			box = document.createElement("div");
+			box.className = "wp-toast";
+			box.setAttribute("role", "status");
+			box.dataset.wpToast = "";
+			document.body.appendChild(box);
+		}
+		box.textContent = text;
+		box.classList.toggle("wp-error", !!error);
+		box.classList.add("wp-toast-show");
+		clearTimeout(box._timer);
+		box._timer = setTimeout(() => box.classList.remove("wp-toast-show"), 6000);
+	}
+
 	// --- tickets: three steps, a 20-minute hold, then the optional questions ------------------------------
 	const ticketDialog = document.querySelector("[data-wp-ticket-dialog]");
 	if (ticketDialog) {
@@ -50,6 +67,10 @@
 		const template = $("[data-wp-companion-row]");
 		const status = $("[data-wp-ticket-status]");
 		const holdNote = $("[data-wp-hold]");
+		const holdText = $("[data-wp-hold-text]");
+		const holdClock = $("[data-wp-hold-clock]");
+		const holdLabel = holdText.textContent;
+		const printButton = $("[data-wp-print]");
 		const back = $("[data-wp-back]");
 		const next = $("[data-wp-next]");
 		const submit = $("[data-wp-submit]");
@@ -67,7 +88,7 @@
 		let order = null; // {reference, token} after a successful order
 		let holdId = newId();
 		let expiresAt = 0;
-		let holdTimer = null;
+		let holdTimer = null; // one tick per second while a hold runs
 
 		const companionRows = () => [...companions.querySelectorAll(".wp-people-row:not([data-wp-self])")];
 		const count = () => (attends.checked ? 1 : 0) + companionRows().length;
@@ -157,10 +178,29 @@
 		}
 
 		// --- the hold: seats and their price for 20 minutes --------------------------------------------
+		// Either the countdown ("Reserved for you 19:42") or a message instead of it.
 		function showHold(text, error) {
 			holdNote.hidden = !text;
-			holdNote.textContent = text || "";
+			holdText.textContent = text || "";
+			holdClock.hidden = true;
 			holdNote.classList.toggle("wp-error", !!error);
+		}
+		function tick() {
+			const left = Math.max(0, expiresAt - Date.now());
+			if (!left) return expire();
+			const minutes = Math.floor(left / 60000);
+			const seconds = Math.floor((left % 60000) / 1000);
+			holdClock.textContent = `${minutes}:${String(seconds).padStart(2, "0")}`;
+			holdNote.classList.toggle("wp-hold-ending", left < 2 * 60 * 1000);
+		}
+		function startClock(prefix) {
+			holdNote.hidden = false;
+			holdNote.classList.remove("wp-error");
+			holdText.textContent = prefix ? `${prefix} ${holdLabel}` : holdLabel;
+			holdClock.hidden = false;
+			clearInterval(holdTimer);
+			tick();
+			holdTimer = setInterval(tick, 1000);
 		}
 		async function hold() {
 			if (order) return;
@@ -172,6 +212,7 @@
 			try {
 				const result = await post({ action: form.dataset.holdAction }, body);
 				if (!result.ok) {
+					clearInterval(holdTimer);
 					expiresAt = 0;
 					showHold(holdNote.dataset.soldout, true);
 					return false;
@@ -183,16 +224,16 @@
 					form.dataset.priceTitle = result.price_title || "";
 					renderCompanions();
 				}
-				const until = new Date(expiresAt).toLocaleTimeString(locale, { hour: "2-digit", minute: "2-digit" });
-				showHold(holdNote.dataset.text.replace("{0}", until));
-				clearTimeout(holdTimer);
-				holdTimer = setTimeout(expire, Math.max(0, expiresAt - Date.now()));
+				startClock(restoredNote);
+				restoredNote = "";
 				return true;
 			} catch (error) {
 				return true; // the order re-checks everything; a failed hold must not block the visitor
 			}
 		}
+		let restoredNote = "";
 		function expire() {
+			clearInterval(holdTimer);
 			if (order) return;
 			// Time is up: the entries are thrown away, seats and prices are checked again.
 			expiresAt = 0;
@@ -211,6 +252,7 @@
 			back.hidden = index === 0;
 			next.hidden = index === steps.length - 1;
 			submit.hidden = index !== steps.length - 1;
+			printButton.hidden = index !== steps.length - 1;
 			submit.disabled = false;
 			status.textContent = "";
 			status.classList.remove("wp-error");
@@ -231,27 +273,59 @@
 			return true;
 		}
 
+		// The review step reads like the order document: address field, item table, net, VAT, total.
+		const cell = (text, className) => {
+			const td = document.createElement("td");
+			td.textContent = text;
+			if (className) td.className = className;
+			return td;
+		};
 		function renderSummary() {
 			const people = holders();
-			$("[data-wp-summary-people]").replaceChildren(...people.map((p) => {
-				const li = document.createElement("li");
-				li.textContent = p.email && p.email !== value("contact_email") ? `${p.full_name} (${p.email})` : p.full_name;
-				return li;
-			}));
 			$("[data-wp-summary-email]").textContent = value("contact_email");
-			if (free) return;
-			const lines = [toggle && toggle.checked ? value("company") : "", value("billing_name"),
-				value("address_line1"), `${value("postcode")} ${value("city")}`, form.elements.country.selectedOptions[0]?.textContent || "",
-				toggle && toggle.checked ? value("vat_id") : ""].filter(Boolean);
-			$("[data-wp-summary-billing]").replaceChildren(...lines.flatMap((line, i) => (i ? [document.createElement("br"), line] : [line])));
-			const n = people.length;
-			const total = gross * n;
+			const address = free
+				? [value("contact_name"), value("contact_email")]
+				: [toggle && toggle.checked ? value("company") : "", value("billing_name"), value("address_line1"),
+					`${value("postcode")} ${value("city")}`, form.elements.country.selectedOptions[0]?.textContent || "",
+					toggle && toggle.checked && value("vat_id") ? `${form.dataset.lang === "de" ? "USt-IdNr." : "VAT ID"} ${value("vat_id")}` : ""];
+			$("[data-wp-summary-billing]").replaceChildren(...address.filter(Boolean).flatMap((line, i) =>
+				(i ? [document.createElement("br"), line] : [line])));
 			const title = form.dataset.priceTitle ? ` (${form.dataset.priceTitle})` : "";
-			$("[data-wp-summary-line]").textContent = `${n} × ${money.format(gross)}${title}`;
-			$("[data-wp-summary-amount]").textContent = money.format(total);
-			$("[data-wp-summary-tax]").textContent = money.format(total - total / (1 + taxRate / 100));
+			$("[data-wp-invoice-rows]").replaceChildren(...people.map((p, i) => {
+				const tr = document.createElement("tr");
+				const name = p.email && p.email !== value("contact_email") ? `${p.full_name} (${p.email})` : p.full_name;
+				tr.append(cell(String(i + 1), "wp-num"), cell(`${form.dataset.itemName}${title}: ${name}`));
+				if (!free) tr.append(cell("1", "wp-num"), cell(money.format(gross), "wp-num"), cell(money.format(gross), "wp-num"));
+				return tr;
+			}));
+			if (free) return;
+			const total = gross * people.length;
+			const net = total / (1 + taxRate / 100);
+			$("[data-wp-summary-net]").textContent = money.format(net);
+			$("[data-wp-summary-tax]").textContent = money.format(total - net);
 			$("[data-wp-summary-total]").textContent = money.format(total);
 		}
+
+		// "Print": just the order sheet, in a frame with the page's styles (a preview of the order PDF).
+		function printInvoice() {
+			const frame = document.createElement("iframe");
+			frame.className = "wp-print-frame";
+			frame.setAttribute("aria-hidden", "true");
+			document.body.appendChild(frame);
+			const styles = [...document.querySelectorAll('link[rel="stylesheet"], style')].map((el) => el.outerHTML).join("");
+			const doc = frame.contentDocument;
+			doc.open();
+			doc.write(`<!doctype html><html lang="${form.dataset.lang}"><head><meta charset="utf-8"><title>${document.title}</title>${styles}<style>@page { size: A4; margin: 0; }</style></head>`
+				+ `<body class="wp-print-body">${$("[data-wp-invoice]").outerHTML}</body></html>`);
+			doc.close();
+			const run = () => {
+				frame.contentWindow.focus();
+				frame.contentWindow.print();
+				setTimeout(() => frame.remove(), 1000);
+			};
+			if (doc.readyState === "complete") setTimeout(run, 300); else frame.addEventListener("load", run);
+		}
+		printButton.addEventListener("click", printInvoice);
 
 		function resetForm() {
 			form.reset();
@@ -265,6 +339,7 @@
 			$("[data-wp-ticket-success]").hidden = true;
 			$("[data-wp-consents-save]").disabled = false;
 			$("[data-wp-consents-status]").textContent = "";
+			$("[data-wp-ticket-pdf]").hidden = true;
 			back.disabled = false;
 			renderCompanions();
 			show(0);
@@ -325,9 +400,8 @@
 			const restored = !rows_started() && restoreDraft();
 			if (!restored) renderCompanions();
 			show(current);
-			hold().then(() => {
-				if (restored && expiresAt) showHold(`${holdNote.dataset.restored} ${holdNote.textContent}`);
-			});
+			restoredNote = restored ? holdNote.dataset.restored : "";
+			hold();
 		});
 		function rows_started() {
 			return !!(value("contact_name") || value("contact_email"));
@@ -369,13 +443,14 @@
 			}
 			submit.disabled = true;
 			back.disabled = true;
+			submit.classList.add("wp-busy");
 			status.classList.remove("wp-error");
 			status.textContent = status.dataset.sending;
 			try {
 				const result = await post(form, body);
 				order = { reference: result.reference, token: result.token };
 				storage.clear();
-				clearTimeout(holdTimer);
+				clearInterval(holdTimer);
 				showHold("");
 				steps.forEach((step) => (step.hidden = true));
 				$("[data-wp-steps]").hidden = true;
@@ -383,12 +458,17 @@
 				const success = $("[data-wp-ticket-success]");
 				success.querySelector("[data-wp-ticket-reference]").textContent = result.reference || "";
 				success.querySelector("[data-wp-ticket-email]").textContent = result.tickets_to || value("contact_email");
+				const pdf = success.querySelector("[data-wp-ticket-pdf]");
+				pdf.hidden = !result.pdf_url;
+				if (result.pdf_url) pdf.href = result.pdf_url;
 				success.hidden = false;
 			} catch (error) {
 				submit.disabled = false;
 				back.disabled = false;
 				status.classList.add("wp-error");
 				status.textContent = error.message || status.dataset.failed;
+			} finally {
+				submit.classList.remove("wp-busy");
 			}
 		});
 
@@ -405,14 +485,16 @@
 			body.append("token", order.token);
 			body.append("consents", JSON.stringify(consents));
 			button.disabled = true;
+			button.classList.add("wp-busy");
 			try {
 				const result = await post({ action: form.dataset.consentAction }, body);
-				consentStatus.classList.remove("wp-error");
 				const optin = result.status === "confirmation_sent";
-				consentStatus.textContent = optin ? consentStatus.dataset.optin : consentStatus.dataset.saved;
-				// Done: close after the visitor could read the confirmation (longer when an email is on its way).
-				setTimeout(finishOrder, optin ? 2500 : 1200);
+				// Done: the dialog closes at once, the page confirms in a toast.
+				const message = optin ? consentStatus.dataset.optin : consentStatus.dataset.saved;
+				finishOrder();
+				toast(message);
 			} catch (error) {
+				button.classList.remove("wp-busy");
 				button.disabled = false;
 				consentStatus.classList.add("wp-error");
 				consentStatus.textContent = error.message || consentStatus.dataset.failed;
@@ -449,6 +531,35 @@
 					if (el) el.textContent = n;
 				}
 			} catch (error) { /* rate limit or offline: nothing to do */ }
+		});
+	}
+
+	// --- create reminder: up to three dates, one calendar file --------------------------------------------
+	const reminderDialog = document.querySelector("[data-wp-reminder-dialog]");
+	if (reminderDialog) {
+		const form = reminderDialog.querySelector("[data-wp-reminder-form]");
+		const status = form.querySelector("[data-wp-reminder-status]");
+		const inputs = [...form.querySelectorAll("[data-wp-reminder-at]")];
+		const local = (date) => new Date(date.getTime() - date.getTimezoneOffset() * 60000).toISOString().slice(0, 16);
+		try { form.querySelector("[data-wp-reminder-tz]").value = Intl.DateTimeFormat().resolvedOptions().timeZone || ""; } catch (e) { /* old browser */ }
+		wireDialog(reminderDialog, "reminder", () => {
+			status.textContent = "";
+			const now = local(new Date());
+			inputs.forEach((input) => (input.min = now));
+			setTimeout(() => inputs[0].focus(), 0);
+		});
+		form.addEventListener("submit", (event) => {
+			event.preventDefault();
+			const dates = inputs.map((input) => input.value).filter(Boolean);
+			if (!dates.length || inputs.some((input) => !input.checkValidity())) {
+				status.classList.add("wp-error");
+				status.textContent = status.dataset.invalid;
+				return;
+			}
+			const params = new URLSearchParams({ event: form.elements.event.value, lang: form.elements.lang.value,
+				tz: form.elements.tz.value, at: dates.join(",") });
+			window.location.href = `${form.action}?${params}`;
+			reminderDialog.close();
 		});
 	}
 

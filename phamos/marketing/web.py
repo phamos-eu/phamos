@@ -8,7 +8,7 @@ among the published items, never by a document name sent by the browser. The ord
 
 import json
 import re
-from datetime import timedelta
+from datetime import datetime, timedelta, timezone
 
 import frappe
 from frappe import _
@@ -134,7 +134,8 @@ def order_tickets(event, lang, contact, attends=1, companions=None, billing=None
 		hold_id=_hold_id(hold_id, required=False))
 	clear_section("events")
 	return {"ok": True, "reference": result["reference"], "reference_doctype": result["reference_doctype"],
-		"free": bool(offer.get("free")), "tickets_to": result["tickets_to"], "token": result["consent_token"]}
+		"free": bool(offer.get("free")), "tickets_to": result["tickets_to"], "token": result["consent_token"],
+		"pdf_url": result.get("pdf_url")}
 
 
 HOLD_ID = re.compile(r"[A-Za-z0-9-]{8,64}")
@@ -249,6 +250,82 @@ def ics(event, lang=DEFAULT_LANGUAGE):
 		"content_type": "text/calendar; charset=utf-8",
 		"display_content_as": "attachment",
 	})
+
+
+MAX_REMINDERS = 3
+
+
+@frappe.whitelist(allow_guest=True, methods=["GET"])
+@rate_limit(limit=30, seconds=60 * 60)
+def reminders(event, lang=DEFAULT_LANGUAGE, at=None, tz=None):
+	""""Create reminder": a calendar file with one short entry (with an alarm) per chosen date, up to three.
+	``at`` is a comma-separated list of local "YYYY-MM-DDTHH:MM" values in the visitor's time zone ``tz``."""
+	lang = _lang(lang)
+	item = _event(event, lang)
+	if not item.data.get("ics"):
+		frappe.throw(_("This event has no date yet."), frappe.DoesNotExistError)
+	moments = parse_reminders(at, tz)
+	if not moments:
+		frappe.throw(_("Please pick at least one date before the event."))
+	frappe.response.update({
+		"type": "download",
+		"filename": f"{item.slug}-{_('reminder')}.ics",
+		"filecontent": build_reminders_ics(item, moments),
+		"content_type": "text/calendar; charset=utf-8",
+		"display_content_as": "attachment",
+	})
+
+
+def parse_reminders(at, tz=None):
+	"""Up to three aware datetimes from local values; unknown time zones fall back to the site's."""
+	import pytz
+
+	try:
+		zone = pytz.timezone(tz) if tz else pytz.timezone(get_system_timezone())
+	except pytz.UnknownTimeZoneError:
+		zone = pytz.timezone(get_system_timezone())
+	now = datetime.now(timezone.utc)
+	moments = []
+	for raw in str(at or "").split(",")[: MAX_REMINDERS * 2]:
+		raw = raw.strip()
+		if not re.fullmatch(r"\d{4}-\d{2}-\d{2}T\d{2}:\d{2}(:\d{2})?", raw):
+			continue
+		try:
+			moment = zone.localize(get_datetime(raw.replace("T", " ")))
+		except Exception:
+			continue
+		if moment > now and moment not in moments:
+			moments.append(moment)
+	return sorted(moments)[:MAX_REMINDERS]
+
+
+def build_reminders_ics(item, moments):
+	import pytz
+	from icalendar import Alarm, Calendar, Event
+
+	site_tz = pytz.timezone(get_system_timezone())
+	when = item.data.get("when") or {}
+	cal = Calendar()
+	cal.add("prodid", "-//phamos//Events//DE")
+	cal.add("version", "2.0")
+	cal.add("method", "PUBLISH")
+	for i, moment in enumerate(moments, 1):
+		entry = Event()
+		entry.add("uid", f"{item.name}-reminder-{moment.astimezone(pytz.utc):%Y%m%dT%H%M}@phamos.eu")
+		entry.add("dtstamp", site_tz.localize(now_datetime()).astimezone(pytz.utc))
+		entry.add("dtstart", moment)
+		entry.add("dtend", moment + timedelta(minutes=15))
+		entry.add("summary", _("Reminder: {0}").format(item.title))
+		entry.add("description", "\n\n".join(filter(None, [when.get("line"), get_url(item.url)])))
+		entry.add("url", get_url(item.url))
+		entry.add("transp", "TRANSPARENT")  # a reminder, not a meeting: does not block the calendar
+		alarm = Alarm()
+		alarm.add("action", "DISPLAY")
+		alarm.add("description", _("Reminder: {0}").format(item.title))
+		alarm.add("trigger", timedelta(0))
+		entry.add_component(alarm)
+		cal.add_component(entry)
+	return cal.to_ical()
 
 
 def build_ics(item):

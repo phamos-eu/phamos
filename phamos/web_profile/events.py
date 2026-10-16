@@ -13,7 +13,7 @@ import frappe
 from babel.dates import format_date, format_time
 from babel.numbers import format_currency
 from frappe import _
-from frappe.utils import cint, get_datetime, get_system_timezone, get_url, getdate, now_datetime, nowdate
+from frappe.utils import cint, get_datetime, strip_html, get_system_timezone, get_url, getdate, now_datetime, nowdate
 
 from phamos.web_profile.i18n import localized
 from phamos.web_profile.socials import normalize_url
@@ -265,37 +265,53 @@ def build(item, lang):
 		overview.append(_("{0}: {1} in {2}.").format(item.title, d["when"]["line"], d.get("city") or d.get("location") or _("online"))
 			if d.get("city") or d.get("location") else _("{0}: {1}.").format(item.title, d["when"]["line"]))
 
+	# Sidebar, in this order: the buy button with its price, what is special about the price, bookings;
+	# then (template) the interest question; then the secondary actions.
 	actions = []
 	if offer and offer["sale_open"]:
-		actions.append({"label": _("Register") if offer["free"] else _("Buy ticket"), "dialog": "tickets", "primary": True})
-		actions.append({"label": price_note(offer), "hint": True})
+		actions.append({"label": _("Register for free") if offer["free"] else _("Buy from {0}").format(offer["price_label"]),
+			"dialog": "tickets", "primary": True, "sub": None if offer["free"] else _("incl. VAT")})
+		note = price_note(offer)
+		if note:
+			actions.append({"label": note, "hint": True})
+	elif offer and d["upcoming"]:
+		reason = {"sold_out": _("Sold out"), "not_started": _("Ticket sale has not started yet"),
+			"ended": _("Ticket sale has ended")}.get(offer.get("reason"))
+		if reason:
+			actions.append({"label": reason, "note": True})
 	if offer and offer.get("booked"):
 		capacity = cint(offer.get("capacity"))
 		label = _("{0} of {1} seats taken").format(offer["booked"], capacity) if capacity else \
 			_("{0} registrations").format(offer["booked"])
 		actions.append({"label": label, "bookings": True,
 			"percent": min(100, round(100 * offer["booked"] / capacity)) if capacity else None})
-	elif offer and d["upcoming"]:
-		reason = {"sold_out": _("Sold out"), "not_started": _("Ticket sale has not started yet"),
-			"ended": _("Ticket sale has ended")}.get(offer.get("reason"))
-		if reason:
-			actions.append({"label": reason, "note": True})
-	if d.get("has_newsletter"):
-		actions.append({"label": _("Keep me posted"), "dialog": "subscribe"})
 	if d.get("ics"):
-		actions.append({"label": _("Add to calendar"), "download": True,
+		actions.append({"label": _("Add to calendar"), "download": True, "secondary": True, "pair": True,
 			"url": f"/api/method/phamos.marketing.web.ics?event={item.slug}&lang={lang}"})
+		if d["upcoming"]:
+			actions.append({"label": _("Create reminder"), "dialog": "reminder", "secondary": True, "pair": True})
+	if d.get("has_newsletter"):
+		actions.append({"label": _("Keep me posted"), "dialog": "subscribe", "secondary": True})
 
 	blocks = []
 	if d.get("speakers"):
-		blocks.append({"kind": "people", "title": _("Speakers"), "entries": [
-			{"title": s["name"], "subtitle": "", "image": s["image"], "body": s["topic"],
-				"url": item_url("people", s["person_slug"], lang) if s.get("person_slug") else None}
-			for s in d["speakers"]]})
+		from phamos.web_profile.sections import get_items
+
+		people = {p.slug: p for p in get_items("people", lang)} if any(sp.get("person_slug") for sp in d["speakers"]) else {}
+		entries = []
+		for sp in d["speakers"]:
+			person = people.get(sp.get("person_slug"))
+			if person and person.masked:
+				person = None  # an anonymous profile is never tied to a named speaker
+			entries.append({"title": sp["name"] or (person.title if person else ""), "subtitle": strip_html(sp["topic"] or "")[:120],
+				"image": sp["image"] or (person.image if person else None), "url": person.url if person else None,
+				"initials": "".join(w[0] for w in (sp["name"] or "?").split()[:2]).upper()})
+		blocks.append({"kind": "people", "title": _("Speakers"), "entries": entries})
 	if d.get("sponsors"):
 		blocks.append({"kind": "logos", "title": _("Sponsors"), "entries": [
 			{"title": s["name"], "image": s["logo"], "url": s.get("url"), "external": s.get("external"),
-				"subtitle": s.get("label"), "body": s.get("info")} for s in d["sponsors"]]})
+				"subtitle": s.get("label"), "initials": "".join(w[0] for w in (s["name"] or "?").split()[:2]).upper()}
+			for s in d["sponsors"]]})
 
 	hero = {"image": item.image, "badge": item.get("badge"), "lines": [
 		{"kind": "when", "text": d["when"]["line"], "datetime": d.get("starts_on")},
@@ -324,7 +340,12 @@ def build(item, lang):
 	ticket = None
 	if offer and offer["sale_open"]:
 		terms_html = frappe.db.get_value("Terms and Conditions", d["terms"], "terms") if d.get("terms") else None
-		ticket = {**offer, "terms_html": terms_html, "countries": _countries(lang)}
+		from phamos.web_profile.chrome import company_footer
+
+		company = company_footer()
+		ticket = {**offer, "terms_html": terms_html, "countries": _countries(lang),
+			"sender": " · ".join(filter(None, [company.get("name"), *(company.get("address_lines") or [])])),
+			"today": format_date(getdate(nowdate()), "d. MMMM y" if lang == "de" else "d MMMM y", locale=LOCALES[lang])}
 
 	notice = None
 	if d.get("languages") and lang not in d["languages"]:
@@ -334,24 +355,21 @@ def build(item, lang):
 
 
 def price_note(offer):
-	""""149,00 € incl. VAT · Early Bird until 30 Nov 2026 · 12 left at this price · then 199,00 €"."""
+	""""Early Bird until 30 Nov 2026 · 12 left · then 199,00 €" (the price itself is on the button)."""
 	if offer["free"]:
-		parts = [_("Free")]
-	else:
-		parts = [_("{0} incl. VAT").format(offer["price_label"])]
-		prices = offer.get("prices") or []
-		index = next((i for i, p in enumerate(prices) if p["title"] == offer.get("price_title")), None)
-		if index is not None and len(prices) > 1:
-			current = prices[index]
-			parts.append(_("{0} until {1}").format(current["title"], current["until"]) if current.get("until")
-				else current["title"])
-			if current.get("remaining") is not None:
-				parts.append(_("{0} left at this price").format(current["remaining"]))
-			following = next((p for p in prices[index + 1:] if p.get("remaining") != 0), None)
-			if following:
-				parts.append(_("then {0}").format(following["price_label"]))
-	if offer.get("spots_left") is not None:
-		parts.append(_("{0} seats left").format(offer["spots_left"]))
+		return ""
+	parts = []
+	prices = offer.get("prices") or []
+	index = next((i for i, p in enumerate(prices) if p["title"] == offer.get("price_title")), None)
+	if index is not None and len(prices) > 1:
+		current = prices[index]
+		parts.append(_("{0} until {1}").format(current["title"], current["until"]) if current.get("until")
+			else current["title"])
+		if current.get("remaining") is not None:
+			parts.append(_("{0} left").format(current["remaining"]))
+		following = next((p for p in prices[index + 1:] if p.get("remaining") != 0), None)
+		if following:
+			parts.append(_("then {0}").format(following["price_label"]))
 	return " · ".join(parts)
 
 

@@ -164,6 +164,11 @@ for _section, _slugs in _WEB_PROFILE_SLUGS.items():
             {"from_route": f"/{_lang}/{_slug}/<slug>", "to_route": "web_profile/profile",
              "defaults": {"section": _section, "lang": _lang}},
         ]
+# Landing page of the newsletter double opt-in (Email Group "welcome_url", Marketing Content).
+SUBSCRIPTION_CONFIRMED_ROUTES = {"de": "de/anmeldung-bestaetigt", "en": "en/subscription-confirmed"}
+for _lang, _route in SUBSCRIPTION_CONFIRMED_ROUTES.items():
+    website_route_rules.append({"from_route": f"/{_route}", "to_route": "web_profile/subscribed",
+        "defaults": {"section": "events", "lang": _lang}})
 # Old URLs of the sections are redirected with Website Route Redirect records (Website Settings)
 # when a section goes live, not in code (phamos/phamos#1492).
 

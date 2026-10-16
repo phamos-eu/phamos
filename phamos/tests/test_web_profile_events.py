@@ -165,6 +165,11 @@ class TestWebProfileEvents(FrappeTestCase):
 		self.assertEqual(frappe.db.get_value("Sales Order", result["reference"], "docstatus"), 1)
 		self.assertEqual(frappe.db.get_value("Attendee", {"email": "web.guest@example.com"}, "event"), self.event.name)
 		self.assertEqual(frappe.db.count("Attendee", {"event": self.event.name, "order_reference": result["reference"]}), 2)
+		# The order PDF opens without a login (Document Share Key).
+		self.assertIn("frappe.utils.print_format.download_pdf", result["pdf_url"])
+		self.assertIn("key=", result["pdf_url"])
+		self.assertTrue(frappe.db.exists("Document Share Key", {"reference_doctype": "Sales Order",
+			"reference_docname": result["reference"]}))
 
 		# The optional questions afterwards, signed with the returned token.
 		frappe.set_user("Guest")
@@ -246,7 +251,7 @@ class TestWebProfileEvents(FrappeTestCase):
 		profile = build_profile(self.item(event), "en")
 		hint = next(a for a in profile["actions"] if a.get("hint"))["label"]
 		self.assertIn("Early Bird", hint)
-		self.assertIn("30 left at this price", hint)
+		self.assertIn("30 left", hint)
 		self.assertIn("then", hint)
 		self.assertEqual(profile["ticket"]["price_title"], "Early Bird")
 
@@ -329,3 +334,74 @@ class TestWebProfileEvents(FrappeTestCase):
 			from phamos.marketing import ticketing
 
 			frappe.cache.delete_value(ticketing._holds_key(self.event.name))
+
+	def test_sidebar_order_and_buy_button_with_price(self):
+		profile = build_profile(self.item(), "en")
+		actions = profile["actions"]
+		buy = actions[0]
+		self.assertTrue(buy["primary"])
+		self.assertTrue(buy["label"].startswith("Buy from "))
+		self.assertIn("119", buy["label"])
+		self.assertEqual(buy["sub"], "incl. VAT")
+		self.assertEqual([a["label"] for a in actions if a.get("pair")], ["Add to calendar", "Create reminder"])
+		self.assertTrue(all(a.get("secondary") for a in actions if a.get("pair") or a.get("dialog") == "subscribe"))
+		# Secondary actions come after the main group.
+		first_secondary = next(i for i, a in enumerate(actions) if a.get("secondary"))
+		self.assertFalse([a for a in actions[first_secondary:] if not a.get("secondary")])
+
+	def test_sold_out_note_shows_with_bookings(self):
+		from phamos.tests.marketing_fixtures import make_attendee
+
+		self.event.reload()
+		self.event.max_attendees = 2
+		self.event.save()
+		for i in range(2):
+			make_attendee(self.event.name, f"full{i}@example.com")
+		reset_items()
+		actions = build_profile(self.item(), "en")["actions"]
+		self.assertIn("Sold out", [a["label"] for a in actions if a.get("note")])
+		self.assertTrue([a for a in actions if a.get("bookings")])
+
+	def test_speakers_and_sponsors_are_cards(self):
+		profile = build_profile(self.item(), "en")
+		speakers = next(b for b in profile["blocks"] if b["kind"] == "people")
+		self.assertEqual(speakers["entries"][0]["title"], "Speaker Searchable")
+		self.assertEqual(speakers["entries"][0]["subtitle"], "Keynote")
+		self.assertEqual(speakers["entries"][0]["initials"], "SS")
+		frappe.set_user("Guest")
+		html = get_html_for_route(f"/en/events/{self.event.route}")
+		self.assertIn("wp-tile-person", html)
+		self.assertNotIn("wp-rows", html)
+
+	def test_reminders(self):
+		future = add_days(now_datetime(), 3)
+		at = ",".join([future.strftime("%Y-%m-%dT09:00"), future.strftime("%Y-%m-%dT09:00"),
+			add_days(future, 1).strftime("%Y-%m-%dT18:30"), "2001-01-01T10:00", "nonsense"])
+		web.reminders(self.event.route, "en", at=at, tz="Europe/Berlin")
+		self.assertEqual(frappe.response["type"], "download")
+		content = frappe.response["filecontent"].decode()
+		self.assertEqual(content.count("BEGIN:VEVENT"), 2)  # duplicate and past dates dropped
+		self.assertEqual(content.count("BEGIN:VALARM"), 2)
+		self.assertIn("SUMMARY:Reminder: Web Test Event", content)
+		self.assertRaises(frappe.ValidationError, web.reminders, self.event.route, "en", at="2001-01-01T10:00")
+		self.assertEqual(len(web.parse_reminders(",".join(
+			add_days(future, i).strftime("%Y-%m-%dT10:00") for i in range(5)), "Not/AZone")), 3)
+
+	def test_subscription_confirmed_page(self):
+		self.assertEqual(frappe.db.get_value("Email Group", GROUP, "welcome_url"),
+			frappe.utils.get_url(f"/de/anmeldung-bestaetigt?event={self.event.route}"))
+		frappe.set_user("Guest")
+		frappe.form_dict.event = self.event.route  # page renders in tests don't parse the query string
+		html = get_html_for_route(f"/en/subscription-confirmed?event={self.event.route}")
+		self.assertIn("Subscription confirmed", html)
+		self.assertIn("Web Test Event", html)
+		self.assertIn("Back to the event", html)
+		self.assertIn("noindex", html)
+
+	def test_dialog_round5_markup(self):
+		frappe.set_user("Guest")
+		html = get_html_for_route(f"/en/events/{self.event.route}")
+		for marker in ("data-wp-hold-clock", "wp-step-no", "data-wp-invoice", "data-wp-print", "wp-switch-track",
+				"data-wp-ticket-pdf", "data-wp-reminder-dialog", "wp-interest-yes"):
+			self.assertIn(marker, html)
+

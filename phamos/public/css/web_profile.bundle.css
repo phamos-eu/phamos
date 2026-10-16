@@ -423,19 +423,6 @@ body .footer-grouped-links .footer-child-item, body .footer-grouped-links .foote
 .wp-actions { display: flex; flex-direction: column; gap: 8px; margin-bottom: 20px; }
 .wp-actions .wp-button { width: 100%; height: 38px; }
 .wp-actions .wp-chip { justify-content: center; }
-.wp-rows { display: flex; flex-direction: column; gap: 16px; list-style: none; margin: 0; padding: 0; }
-.wp-row { position: relative; display: grid; grid-template-columns: 56px minmax(0, 1fr); gap: 14px; align-items: start; }
-.wp-row-link { padding: 12px; border: 1px solid var(--wp-line); border-radius: var(--wp-radius); background: var(--wp-surface); box-shadow: var(--wp-shadow-sm); }
-.wp-row-link:hover { border-color: #cfcfcf; box-shadow: var(--wp-shadow-md); }
-.wp-row-photo { width: 56px; height: 56px; border-radius: 50%; overflow: hidden; background: var(--wp-surface-3); }
-.wp-row-photo img { width: 100%; height: 100%; object-fit: cover; }
-.wp-row-title { font-weight: 600; color: var(--wp-ink); }
-.wp-row-body { margin-top: 2px; color: var(--wp-ink-2); font-size: 14px; }
-.wp-row-body p { margin: 0 0 4px; }
-.wp-logos { display: flex; flex-wrap: wrap; gap: 12px; list-style: none; margin: 0; padding: 0; }
-.wp-logo-card { display: flex; align-items: center; justify-content: center; width: 160px; height: 80px; padding: 12px; border: 1px solid var(--wp-line); border-radius: var(--wp-radius); background: var(--wp-surface); box-shadow: var(--wp-shadow-sm); color: var(--wp-ink); font-weight: 600; }
-.wp-logo-card:hover { border-color: #cfcfcf; box-shadow: var(--wp-shadow-md); }
-.wp-logo-card img { max-width: 100%; max-height: 100%; object-fit: contain; }
 /* Ticket dialog */
 .wp-dialog-wide { width: min(720px, calc(100vw - 32px)); }
 .wp-fieldset { display: flex; flex-direction: column; gap: 10px; margin: 0; padding: 0; border: 0; }
@@ -445,11 +432,6 @@ body .footer-grouped-links .footer-child-item, body .footer-grouped-links .foote
 .wp-qty input { width: 80px; padding: 6px 8px; border: 1px solid var(--wp-line); border-radius: var(--wp-radius-sm); font: inherit; }
 .wp-attendee-rows { display: flex; flex-direction: column; gap: 10px; margin: 0; padding: 0 0 0 18px; }
 .wp-contact-form select { width: 100%; padding: 7px 10px; border: 1px solid var(--wp-line); border-radius: var(--wp-radius-sm); background: var(--wp-surface); font: inherit; }
-.wp-summary-people { margin: 0; padding-left: 18px; color: var(--wp-ink-2); }
-.wp-summary { width: 100%; border-collapse: collapse; font-variant-numeric: tabular-nums; }
-.wp-summary td { padding: 3px 0; }
-.wp-summary td:last-child { text-align: right; }
-.wp-summary-total td { padding-top: 8px; font-weight: 600; }
 .wp-consents { display: flex; flex-direction: column; gap: 4px; }
 .wp-terms summary { cursor: pointer; color: var(--wp-muted); }
 .wp-terms .wp-body { max-height: 220px; overflow-y: auto; margin-top: 6px; padding: 10px; background: var(--wp-surface-2); border-radius: var(--wp-radius-sm); font-size: 13px; }
@@ -459,37 +441,17 @@ body .footer-grouped-links .footer-child-item, body .footer-grouped-links .foote
 }
 /* Checkout steps (round 2): stepper, summary, legal notes, optional questions after the order */
 .wp-action-hint { margin: -2px 0 4px; color: var(--wp-muted); font-size: 13px; line-height: 1.4; text-align: center; }
-.wp-logo-item { display: flex; flex-direction: column; align-items: center; gap: 4px; }
-.wp-logo-label { color: var(--wp-muted); font-size: 12px; }
-.wp-steps { display: flex; gap: 6px; margin: 4px 0 4px; padding: 0; list-style: none; counter-reset: wp-step; font-size: 13px; }
-.wp-steps li { flex: 1; padding: 6px 8px; border-radius: 8px; background: var(--wp-surface-2); color: var(--wp-muted); counter-increment: wp-step; }
-.wp-steps li::before { content: counter(wp-step) "  "; font-weight: 600; }
-.wp-steps li[aria-current] { background: var(--wp-primary); color: var(--wp-on-primary); font-weight: 600; }
-.wp-steps li.wp-step-done { color: var(--wp-ink); }
-.wp-steps[hidden] { display: none; }
 .wp-checkout .wp-fieldset { min-height: 120px; }
 .wp-checkout-actions { justify-content: flex-end; }
 .wp-checkout-actions .wp-contact-status { flex-basis: 100%; text-align: right; }
-.wp-summary-dl { display: grid; grid-template-columns: 180px minmax(0, 1fr); gap: 8px 16px; margin: 0; }
-.wp-summary-dl dt { font-weight: 600; font-size: 13px; color: var(--wp-ink-2); }
-.wp-summary-dl dd { margin: 0; }
 .wp-link-button { display: block; margin-top: 2px; padding: 0; border: 0; background: none; color: var(--wp-focus); font: inherit; font-size: 12px; font-weight: 400; cursor: pointer; }
 .wp-legal { color: var(--wp-muted); font-size: 12.5px; line-height: 1.5; }
 .wp-legal p { margin: 0 0 6px; }
 .wp-legal a { color: inherit; text-decoration: underline; }
 .wp-optional { margin-top: 16px; padding: 14px; border-radius: var(--wp-radius); background: var(--wp-surface-2); display: flex; flex-direction: column; gap: 10px; }
 .wp-optional h3 { margin: 0; font-size: 15px; }
-.wp-switch { display: flex; align-items: flex-start; gap: 10px; cursor: pointer; font-weight: 500; }
-.wp-switch input { width: 34px; height: 20px; margin: 1px 0 0; flex-shrink: 0; appearance: none; border-radius: 999px; background: #d4d4d4; position: relative; transition: background 0.15s; cursor: pointer; }
-.wp-switch input::after { content: ""; position: absolute; top: 2px; left: 2px; width: 16px; height: 16px; border-radius: 50%; background: #fff; transition: left 0.15s; }
-.wp-switch input:checked { background: var(--wp-primary); }
-.wp-switch input:checked::after { left: 16px; }
-.wp-switch small { display: block; margin-top: 2px; color: var(--wp-muted); font-weight: 400; font-size: 12.5px; }
 .wp-success-title { font-size: 16px; }
 @media (max-width: 640px) {
-	.wp-summary-dl { grid-template-columns: 1fr; gap: 2px; }
-	.wp-summary-dl dd { margin-bottom: 8px; }
-	.wp-steps li { font-size: 12px; }
 }
 /* Round 3: public bookings, interest, 20-minute hold */
 .wp-bookings { display: flex; flex-direction: column; gap: 4px; margin: 0 0 4px; color: var(--wp-muted); font-size: 13px; text-align: center; }
@@ -497,18 +459,6 @@ body .footer-grouped-links .footer-child-item, body .footer-grouped-links .foote
 .wp-bookings-bar > span { display: block; height: 100%; border-radius: 999px; background: var(--wp-primary); }
 .wp-interest { margin: 4px 0 20px; display: flex; flex-direction: column; gap: 6px; }
 .wp-interest-title { margin: 0; font-weight: 600; font-size: 13px; }
-.wp-interest-options { display: flex; gap: 6px; }
-/* Interest buttons: transparent and inheriting the text colour, so they work on light and dark pages;
-   each answer has its own soft glow (yes green, maybe blue, no red). */
-.wp-interest-option { --glow: 120 120 120; flex: 1; justify-content: center; gap: 6px; cursor: pointer; font: inherit; font-size: 13px;
-	color: inherit; background: transparent; border: 1px solid rgb(var(--glow) / 35%); transition: box-shadow 0.15s, background 0.15s, border-color 0.15s; }
-.wp-interest-option[data-response="yes"] { --glow: 22 163 74; }
-.wp-interest-option[data-response="maybe"] { --glow: 37 99 235; }
-.wp-interest-option[data-response="no"] { --glow: 220 38 38; }
-.wp-interest-option:hover { border-color: rgb(var(--glow) / 60%); box-shadow: 0 0 10px rgb(var(--glow) / 25%); }
-.wp-interest-option[aria-pressed="true"] { background: rgb(var(--glow) / 14%); border-color: rgb(var(--glow) / 75%);
-	box-shadow: 0 0 0 3px rgb(var(--glow) / 15%), 0 0 14px rgb(var(--glow) / 40%); font-weight: 600; }
-.wp-interest-option .wp-count { color: inherit; opacity: 0.75; background: transparent; }
 .wp-hold { margin: 0; padding: 6px 10px; border-radius: 8px; background: var(--wp-surface-2); color: var(--wp-ink-2); font-size: 12.5px; }
 .wp-hold.wp-error { background: #fdecea; color: #b42318; }
 .wp-hold[hidden] { display: none; }
@@ -536,3 +486,124 @@ body .footer-grouped-links .footer-child-item, body .footer-grouped-links .foote
 	.wp-people-price, .wp-people-tag { grid-column: 3; grid-row: 1; }
 	.wp-people-remove { grid-column: 3; grid-row: 1; }
 }
+
+/* --- Round 5: sidebar, countdown, chevron steps, order sheet, switches, cards, toast ------------------- */
+/* Sidebar: the buy button carries its price; calendar and reminder side by side. */
+.wp-actions .wp-button-buy { flex-direction: column; gap: 1px; height: auto; min-height: 46px; padding: 7px 14px; }
+.wp-button-buy span { font-weight: 600; font-size: 15px; }
+.wp-button-buy small { font-size: 11.5px; font-weight: 400; opacity: 0.75; }
+.wp-action-pair { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.wp-action-pair .wp-button { padding: 0 8px; font-size: 13px; }
+.wp-actions + .wp-interest { margin-top: -6px; }
+
+/* Interest: each answer in its own colour, always visible; the chosen one glows. */
+.wp-interest-options { display: flex; gap: 6px; }
+.wp-interest-option { --glow: 120 120 120; --tone: #383838; flex: 1; display: inline-flex; align-items: center; justify-content: center; gap: 6px;
+	height: 32px; padding: 0 8px; border-radius: 999px; border: 1px solid rgb(var(--glow) / 45%); background: rgb(var(--glow) / 9%);
+	color: var(--tone); font: inherit; font-size: 13px; font-weight: 500; cursor: pointer;
+	transition: box-shadow 0.15s, background 0.15s, border-color 0.15s; }
+.wp-interest-yes { --glow: 22 163 74; --tone: #15803d; }
+.wp-interest-maybe { --glow: 37 99 235; --tone: #1d4ed8; }
+.wp-interest-no { --glow: 220 38 38; --tone: #b91c1c; }
+.wp-interest-option:hover { background: rgb(var(--glow) / 15%); box-shadow: 0 0 10px rgb(var(--glow) / 30%); }
+.wp-interest-option[aria-pressed="true"] { background: rgb(var(--glow) / 22%); border-color: rgb(var(--glow)); font-weight: 600;
+	box-shadow: 0 0 0 3px rgb(var(--glow) / 22%), 0 0 16px rgb(var(--glow) / 55%); }
+.wp-interest-option .wp-count { padding: 0; color: inherit; background: transparent; opacity: 0.8; font-variant-numeric: tabular-nums; }
+.wp-interest-title .wp-legal { font-weight: 400; }
+
+/* Chevron steps: a process bar; done steps keep a check-like tone. */
+.wp-steps { display: flex; margin: 4px 0; padding: 0; list-style: none; font-size: 13px; }
+.wp-steps[hidden] { display: none; }
+.wp-steps li { position: relative; flex: 1; display: flex; align-items: center; justify-content: center; gap: 6px; height: 34px;
+	padding: 0 10px 0 22px; background: var(--wp-surface-3); color: var(--wp-muted); font-weight: 500;
+	clip-path: polygon(0 0, calc(100% - 12px) 0, 100% 50%, calc(100% - 12px) 100%, 0 100%, 12px 50%); margin-right: -8px; }
+.wp-steps li:first-child { padding-left: 12px; border-radius: 8px 0 0 8px; clip-path: polygon(0 0, calc(100% - 12px) 0, 100% 50%, calc(100% - 12px) 100%, 0 100%); }
+.wp-steps li:last-child { margin-right: 0; border-radius: 0 8px 8px 0; clip-path: polygon(0 0, 100% 0, 100% 100%, 0 100%, 12px 50%); }
+.wp-steps li[aria-current] { background: var(--wp-primary); color: var(--wp-on-primary); font-weight: 600; }
+.wp-steps li.wp-step-done { background: #e4e4e4; color: var(--wp-ink); }
+.wp-step-no { display: inline-grid; place-items: center; width: 18px; height: 18px; border-radius: 50%; background: rgb(0 0 0 / 8%); font-size: 11px; font-weight: 600; }
+.wp-steps li[aria-current] .wp-step-no { background: rgb(255 255 255 / 20%); }
+.wp-steps li.wp-step-done .wp-step-no { font-size: 0; }
+.wp-steps li.wp-step-done .wp-step-no::after { content: "✓"; font-size: 11px; }
+
+/* Countdown of the hold */
+.wp-hold { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin: 0; padding: 6px 10px; border-radius: 8px;
+	background: var(--wp-surface-2); color: var(--wp-ink-2); font-size: 12.5px; }
+.wp-hold[hidden], .wp-hold-clock[hidden] { display: none; }
+.wp-hold-clock { font-variant-numeric: tabular-nums; font-size: 14px; }
+.wp-hold.wp-hold-ending { background: #fff4e5; color: #9a4b00; }
+.wp-hold.wp-error { background: #fdecea; color: #b42318; }
+
+/* The order sheet (review step), laid out like a DIN 5008 letter. */
+.wp-invoice { display: flex; flex-direction: column; gap: 14px; padding: 20px 22px; border: 1px solid var(--wp-line); border-radius: var(--wp-radius);
+	background: var(--wp-surface); box-shadow: var(--wp-shadow-sm); font-variant-numeric: tabular-nums; }
+.wp-invoice-head { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 240px); gap: 20px; }
+.wp-invoice-sender { margin: 0 0 6px; padding-bottom: 2px; border-bottom: 1px solid var(--wp-line); color: var(--wp-muted); font-size: 10.5px; }
+.wp-invoice-address address { font-style: normal; line-height: 1.45; }
+.wp-invoice-info { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 2px 12px; margin: 0; font-size: 12.5px; }
+.wp-invoice-info dt { color: var(--wp-muted); }
+.wp-invoice-info dd { margin: 0; overflow-wrap: anywhere; }
+.wp-invoice-subject { font-size: 15px !important; }
+.wp-invoice-items { width: 100%; border-collapse: collapse; font-size: 13px; }
+.wp-invoice-items th { padding: 6px 6px; border-bottom: 1px solid var(--wp-ink); text-align: left; font-size: 12px; font-weight: 600; color: var(--wp-ink-2); }
+.wp-invoice-items td { padding: 6px 6px; border-bottom: 1px solid var(--wp-line-soft); vertical-align: top; }
+.wp-invoice-items th:first-child, .wp-invoice-items td:first-child { width: 36px; }
+.wp-invoice-items th:nth-child(n+3), .wp-invoice-items .wp-num { text-align: right; white-space: nowrap; }
+.wp-invoice-items td:first-child { text-align: left; }
+.wp-invoice-items tfoot td { border: 0; padding: 3px 6px; text-align: right; }
+.wp-invoice-items tfoot tr:first-child td { padding-top: 10px; }
+.wp-invoice-items .wp-summary-total td { padding-top: 6px; border-top: 1px solid var(--wp-ink); font-weight: 700; font-size: 14px; }
+.wp-invoice-note { margin: 0; color: var(--wp-ink-2); font-size: 13px; }
+.wp-invoice .wp-link-button { align-self: flex-start; }
+.wp-busy { position: relative; color: transparent !important; pointer-events: none; }
+.wp-busy::after { content: ""; position: absolute; inset: 0; margin: auto; width: 16px; height: 16px; border-radius: 50%;
+	border: 2px solid currentColor; border-color: var(--wp-on-primary) transparent var(--wp-on-primary) transparent; animation: wp-spin 0.8s linear infinite; }
+@keyframes wp-spin { to { transform: rotate(360deg); } }
+.wp-print-frame { position: fixed; right: 0; bottom: 0; width: 0; height: 0; border: 0; visibility: hidden; }
+.wp-print-body { margin: 0; padding: 18mm 20mm; font-family: Inter, InterVariable, -apple-system, "Segoe UI", Roboto, sans-serif; color: #171717; font-size: 13px; }
+.wp-print-body .wp-invoice { border: 0; box-shadow: none; padding: 0; }
+.wp-print-body .wp-invoice-head { margin-top: 27mm; }  /* DIN 5008 form B: address field 45 mm from the top */
+.wp-print-body .wp-no-print { display: none; }
+@media (max-width: 640px) {
+	.wp-invoice { padding: 14px; }
+	.wp-invoice-head { grid-template-columns: 1fr; gap: 12px; }
+	.wp-invoice-items th:nth-child(3), .wp-invoice-items td:nth-child(3), .wp-invoice-items th:nth-child(4), .wp-invoice-items td:nth-child(4) { display: none; }
+	.wp-invoice-items tfoot td[colspan] { text-align: right; }
+	.wp-steps li { font-size: 12px; padding-left: 18px; }
+	.wp-steps li:first-child { padding-left: 8px; }
+}
+
+/* Switches after the order: the real checkbox is hidden; the track is a span (the website theme styles
+   every checkbox, which squashed the old switch). */
+.wp-switch { position: relative; display: flex; align-items: flex-start; gap: 10px; cursor: pointer; font-weight: 500; }
+.wp-page .wp-switch input[type="checkbox"], .wp-switch input[type="checkbox"] { position: absolute; opacity: 0; width: 1px; height: 1px; margin: 0; pointer-events: none; }
+.wp-switch-track { position: relative; flex-shrink: 0; width: 36px; height: 20px; margin-top: 1px; border-radius: 999px; background: #d4d4d4; transition: background 0.15s; }
+.wp-switch-track::after { content: ""; position: absolute; top: 2px; left: 2px; width: 16px; height: 16px; border-radius: 50%; background: #fff;
+	box-shadow: 0 1px 2px rgb(0 0 0 / 20%); transition: transform 0.15s; }
+.wp-switch input:checked + .wp-switch-track { background: var(--wp-primary); }
+.wp-switch input:checked + .wp-switch-track::after { transform: translateX(16px); }
+.wp-switch input:focus-visible + .wp-switch-track { outline: 2px solid var(--wp-focus); outline-offset: 2px; }
+.wp-switch-text small { display: block; margin-top: 1px; color: var(--wp-muted); font-weight: 400; font-size: 12.5px; }
+
+/* Speaker and sponsor cards (same card as /people); a card without a page is not clickable. */
+.wp-tile-static:hover { border-color: var(--wp-line); box-shadow: var(--wp-shadow-sm); transform: none; }
+.wp-tile-sponsor { align-items: center; text-align: center; }
+.wp-sponsor-logo { display: flex; align-items: center; justify-content: center; width: 100%; height: 96px; margin: 4px 0 10px; }
+.wp-sponsor-logo img { max-width: 80%; max-height: 100%; object-fit: contain; }
+.wp-tile-sponsor .wp-chips { justify-content: center; }
+.wp-grid-sponsors { grid-template-columns: repeat(auto-fill, minmax(170px, 1fr)); }
+
+/* Toast and confirmation page */
+.wp-toast { position: fixed; left: 50%; bottom: 24px; z-index: 1000; max-width: min(520px, calc(100vw - 32px)); padding: 10px 16px; border-radius: 10px;
+	background: #171717; color: #fff; font-size: 14px; box-shadow: 0 8px 24px rgb(0 0 0 / 20%);
+	transform: translate(-50%, 20px); opacity: 0; pointer-events: none; transition: opacity 0.2s, transform 0.2s; }
+.wp-toast-show { opacity: 1; transform: translate(-50%, 0); }
+.wp-toast.wp-error { background: #b42318; }
+.wp-confirmed { display: grid; place-items: center; min-height: 60vh; }
+.wp-confirmed-card { max-width: 520px; padding: 32px; border: 1px solid var(--wp-line); border-radius: var(--wp-radius); background: var(--wp-surface);
+	box-shadow: var(--wp-shadow-sm); text-align: center; display: flex; flex-direction: column; gap: 10px; align-items: center; }
+.wp-confirmed-card p { margin: 0; }
+.wp-confirmed-icon { display: inline-grid; place-items: center; width: 48px; height: 48px; border-radius: 50%; background: rgb(22 163 74 / 12%); color: #15803d; font-size: 24px; font-weight: 700; }
+.wp-confirmed-actions { flex-direction: row; justify-content: center; margin: 8px 0 0; }
+.wp-confirmed-actions .wp-button { width: auto; }
+

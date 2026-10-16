@@ -67,8 +67,6 @@ class MarketingContent(WebProfileDocument):
 		"""
 		if not self.email_group or not self.route:
 			return
-		from phamos.web_profile.sections import item_url
-
 		group = frappe.db.get_value("Email Group", self.email_group,
 			["confirmation_email_template", "welcome_url", "add_query_parameters"], as_dict=True)
 		if not group:
@@ -76,12 +74,22 @@ class MarketingContent(WebProfileDocument):
 		values = {}
 		if not group.confirmation_email_template and frappe.db.exists("Email Template", CONFIRMATION_TEMPLATE):
 			values["confirmation_email_template"] = CONFIRMATION_TEMPLATE
-		if not group.welcome_url:
-			values["welcome_url"] = get_url(item_url("events", self.route, "de")) + "?subscribed=1"
+		url = subscription_confirmed_url(self.route)
+		# Empty, or the old "event page ?subscribed=1" target: the confirmation page explains what happened.
+		if not group.welcome_url or group.welcome_url.endswith("?subscribed=1"):
+			values["welcome_url"] = url
 		if group.add_query_parameters:
 			values["add_query_parameters"] = 0
 		if values:
 			frappe.db.set_value("Email Group", self.email_group, values)
+
+
+def subscription_confirmed_url(route, lang="de"):
+	from urllib.parse import urlencode
+
+	from phamos.hooks import SUBSCRIPTION_CONFIRMED_ROUTES
+
+	return get_url(f"/{SUBSCRIPTION_CONFIRMED_ROUTES[lang]}?{urlencode({'event': route})}")
 
 
 @frappe.whitelist()

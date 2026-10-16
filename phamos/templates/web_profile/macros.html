@@ -199,66 +199,73 @@
 </header>
 {%- endmacro %}
 
-{#- The page's actions: one black button (ticket), the rest plain. A closed sale shows why as a chip. -#}
+{#- The page's actions. Primary group: the buy button with its price, the price hint, the bookings bar or
+    why the sale is closed. Secondary group (after the interest question): calendar and reminder side by
+    side, then "Keep me posted". -#}
+{% macro action_button(action) -%}
+{%- if action.dialog %}<button type="button" class="wp-button{% if action.primary %} wp-button-primary wp-button-buy{% endif %}" data-wp-dialog-open="{{ action.dialog }}" aria-haspopup="dialog"><span>{{ action.label | e }}</span>{% if action.sub %}<small>{{ action.sub | e }}</small>{% endif %}</button>
+{%- else %}<a class="wp-button" href="{{ action.url | e }}"{% if action.download %} download{% endif %}>{{ action.label | e }}</a>{% endif %}
+{%- endmacro %}
+
 {% macro profile_actions(actions, support_email=None) -%}
 {%- if actions %}
+{%- set pair = actions | selectattr("pair") | list %}
 <div class="wp-actions">
-	{%- for action in actions %}
+	{%- if pair %}<div class="wp-action-pair">{% for action in pair %}{{ action_button(action) }}{% endfor %}</div>{% endif %}
+	{%- for action in actions if not action.pair %}
 	{%- if action.bookings %}<div class="wp-bookings">{% if action.percent is not none %}<span class="wp-bookings-bar" aria-hidden="true"><span style="width: {{ action.percent }}%"></span></span>{% endif %}<span>{{ action.label | e }}</span></div>
 	{%- elif action.hint %}<p class="wp-action-hint">{{ action.label | e }}</p>
 	{%- elif action.note %}<span class="wp-chip wp-chip-value">{{ action.label | e }}</span>
-	{%- elif action.dialog %}<button type="button" class="wp-button{% if action.primary %} wp-button-primary{% endif %}" data-wp-dialog-open="{{ action.dialog }}" aria-haspopup="dialog">{{ action.label | e }}</button>
-	{%- else %}<a class="wp-button" href="{{ action.url | e }}"{% if action.download %} download{% endif %}>{{ action.label | e }}</a>{% endif %}
+	{%- else %}{{ action_button(action) }}{% endif %}
 	{%- endfor %}
-	{%- if support_email and actions | selectattr("dialog") | list %}
+	{%- if support_email and actions | selectattr("dialog", "equalto", "tickets") | list %}
 	<noscript><p class="wp-note">{{ _("Ordering needs JavaScript. Please write to {0} instead.").format('<a href="mailto:' ~ (support_email | e) ~ '">' ~ (support_email | e) ~ '</a>') }}</p></noscript>
 	{%- endif %}
 </div>
 {%- endif %}
 {%- endmacro %}
 
-{#- Anonymous interest before tickets are sold (phamos.marketing.web.interest): counts only. -#}
+{#- Anonymous interest (phamos.marketing.web.interest): counts only. -#}
 {% macro interest_block(item, interest, lang) -%}
 {%- if interest %}
 <div class="wp-interest" data-wp-interest data-event="{{ item.slug | e }}" data-lang="{{ lang }}" data-action="/api/method/phamos.marketing.web.interest">
-	<p class="wp-interest-title">{{ _("Are you coming?") }}</p>
+	<p class="wp-interest-title">{{ _("Are you coming?") }} <span class="wp-legal">{{ _("anonymous") }}</span></p>
 	<div class="wp-interest-options" role="group" aria-label="{{ _('Are you coming?') }}">
 		{%- for key, label in [("yes", _("Yes")), ("maybe", _("Maybe")), ("no", _("No"))] %}
-		<button type="button" class="wp-chip wp-interest-option" data-response="{{ key }}" aria-pressed="false">{{ label }} <span class="wp-count" data-count="{{ key }}">{{ interest[key] }}</span></button>
+		<button type="button" class="wp-interest-option wp-interest-{{ key }}" data-response="{{ key }}" aria-pressed="false">{{ label }} <span class="wp-count" data-count="{{ key }}">{{ interest[key] }}</span></button>
 		{%- endfor %}
 	</div>
-	<p class="wp-legal">{{ _("Anonymous: we only count the answers.") }}</p>
 </div>
 {%- endif %}
 {%- endmacro %}
 
-{#- Speakers (rows, cards when linked to a profile) and sponsors (logo cards with a website, else chips). -#}
+{#- Speakers as people cards (same card as /people: round photo, name, topic; clickable when linked to a
+    person profile) and sponsors as logo cards (clickable when the stakeholder has a page). -#}
 {% macro profile_blocks(blocks) -%}
 {%- for block in blocks %}
 <section class="wp-related" aria-labelledby="wp-block-{{ loop.index }}">
 	<div class="wp-related-head"><h2 id="wp-block-{{ loop.index }}">{{ block.title | e }}</h2></div>
-	{%- if block.kind == "logos" %}
-	<ul class="wp-logos">
+	<ul class="wp-grid wp-grid-compact{% if block.kind == 'logos' %} wp-grid-sponsors{% endif %}">
 		{%- for entry in block.entries %}
-		<li class="wp-logo-item">{%- if entry.url %}<a class="wp-logo-card" href="{{ entry.url | e }}"{% if entry.external %} rel="noopener" target="_blank"{% endif %}>{% if entry.image %}<img src="{{ entry.image | e }}" alt="{{ entry.title | e }}" loading="lazy">{% else %}{{ entry.title | e }}{% endif %}</a>
-			{%- else %}<span class="wp-chip wp-chip-value">{{ entry.title | e }}</span>{% endif -%}
-			{%- if entry.subtitle %}<span class="wp-logo-label">{{ entry.subtitle | e }}</span>{% endif -%}</li>
-		{%- endfor %}
-	</ul>
-	{%- else %}
-	<ul class="wp-rows">
-		{%- for entry in block.entries %}
-		<li class="wp-row{% if entry.url %} wp-row-link{% endif %}">
-			<span class="wp-row-photo" aria-hidden="true">{% if entry.image %}<img src="{{ entry.image | e }}" alt="" loading="lazy" width="56" height="56">{% endif %}</span>
-			<div>
-				{%- if entry.url %}<a class="wp-row-title wp-stretched-link" href="{{ entry.url | e }}">{{ entry.title | e }}</a>{% else %}<span class="wp-row-title">{{ entry.title | e }}</span>{% endif %}
-				{#- Text Editor HTML of the speaker table, written by website editors (sanitised on save). -#}
-				{%- if entry.body %}<div class="wp-row-body">{{ entry.body }}</div>{% endif %}
+		<li class="wp-tile-item">
+			{%- if block.kind == "logos" %}
+			<div class="wp-tile wp-tile-sponsor{% if not entry.url %} wp-tile-static{% endif %}">
+				<span class="wp-sponsor-logo" aria-hidden="true">{% if entry.image %}<img src="{{ entry.image | e }}" alt="" loading="lazy">{% else %}<span class="wp-avatar wp-avatar-md">{{ entry.initials | e }}</span>{% endif %}</span>
+				<h3 class="wp-tile-title">{% if entry.url %}<a class="wp-stretched-link" href="{{ entry.url | e }}"{% if entry.external %} rel="noopener" target="_blank"{% endif %}>{{ entry.title | e }}</a>{% else %}{{ entry.title | e }}{% endif %}</h3>
+				{%- if entry.subtitle %}<span class="wp-chips"><span class="wp-chip">{{ entry.subtitle | e }}</span></span>{% endif %}
 			</div>
+			{%- else %}
+			<div class="wp-tile wp-tile-person{% if not entry.url %} wp-tile-static{% endif %}">
+				<span class="wp-tile-head wp-tile-head-photo">
+					<span class="wp-avatar wp-avatar-xl wp-avatar-people" aria-hidden="true">{% if entry.image %}<img src="{{ entry.image | e }}" alt="" loading="lazy" width="192" height="192">{% else %}{{ entry.initials | e }}{% endif %}</span>
+				</span>
+				<h3 class="wp-tile-title">{% if entry.url %}<a class="wp-stretched-link" href="{{ entry.url | e }}">{{ entry.title | e }}</a>{% else %}{{ entry.title | e }}{% endif %}</h3>
+				{%- if entry.subtitle %}<span class="wp-tile-subtitle">{{ entry.subtitle | e }}</span>{% endif %}
+			</div>
+			{%- endif %}
 		</li>
 		{%- endfor %}
 	</ul>
-	{%- endif %}
 </section>
 {%- endfor %}
 {%- endmacro %}
@@ -270,26 +277,29 @@
     fixed date (§ 312g (2) no. 9). Marketing questions come only after the order (optional, explained). -#}
 {% macro ticket_dialog_markup(item, t, lang) -%}
 {%- set privacy_url = '/en/privacy' if lang == 'en' else '/de/datenschutz' -%}
+{%- set venue = [item.data.location, item.data.city] | select | join(", ") -%}
+{%- set terms = ('<a href="#wp-terms" data-wp-terms-open>' ~ _("terms and conditions") ~ '</a>') if t.terms_html else _("terms and conditions") -%}
 <dialog class="wp-dialog wp-dialog-wide" id="wp-ticket-dialog" aria-labelledby="wp-ticket-title" data-wp-ticket-dialog>
 	<form class="wp-contact-form wp-checkout" method="post" action="/api/method/phamos.marketing.web.order_tickets" data-wp-ticket-form novalidate
 		data-gross="{{ t.gross }}" data-currency="{{ t.currency or 'EUR' }}" data-free="{{ 1 if t.free else 0 }}" data-max="{{ t.max_per_order }}"
 		data-lang="{{ lang }}" data-tax-rate="{{ t.tax_rate }}" data-price-title="{{ (t.price_title or '') | e }}"
+		data-item-name="{{ (t.item_name or _('Ticket')) | e }}"
 		data-consent-action="/api/method/phamos.marketing.web.save_consents"
 		data-hold-action="/api/method/phamos.marketing.web.hold"
 		data-hold-minutes="20">
 		<div class="wp-dialog-head">
-			<h2 id="wp-ticket-title">{{ _("Register for {0}").format(item.title | e) if t.free else _("Tickets for {0}").format(item.title | e) }}</h2>
+			<h2 id="wp-ticket-title">{{ item.title | e }}</h2>
 			<button type="button" class="wp-icon-button" data-wp-dialog-close aria-label="{{ _('Close') }}">×</button>
 		</div>
-		<p class="wp-hold" data-wp-hold hidden data-text="{{ _('Your seats and price are reserved until {0}.') }}"
-			data-expired="{{ _('Time is up: seats and prices are checked again when you continue.') }}"
-			data-soldout="{{ _('Sorry, there are not enough seats left for this number of tickets.') }}"
-			data-restored="{{ _('Your entries from a moment ago were restored.') }}"></p>
 		<ol class="wp-steps" data-wp-steps>
-			<li data-wp-step-label="1" aria-current="step">{{ _("Tickets") }}</li>
-			{%- if not t.free %}<li data-wp-step-label="2">{{ _("Billing") }}</li>{% endif %}
-			<li data-wp-step-label="3">{{ _("Review and order") if not t.free else _("Review and register") }}</li>
+			<li data-wp-step-label="1" aria-current="step"><span class="wp-step-no">1</span>{{ _("Tickets") }}</li>
+			{%- if not t.free %}<li data-wp-step-label="2"><span class="wp-step-no">2</span>{{ _("Billing") }}</li>{% endif %}
+			<li data-wp-step-label="3"><span class="wp-step-no">{{ 2 if t.free else 3 }}</span>{{ _("Review") }}</li>
 		</ol>
+		{#- Seats and price are held for 20 minutes; the clock counts down. -#}
+		<p class="wp-hold" data-wp-hold hidden data-expired="{{ _('Time is up. Seats and prices are checked again.') }}"
+			data-soldout="{{ _('Not enough seats left for this number of tickets.') }}"
+			data-restored="{{ _('Entries restored.') }}"><span data-wp-hold-text>{{ _("Reserved for you") }}</span> <strong class="wp-hold-clock" data-wp-hold-clock></strong></p>
 		<input type="hidden" name="event" value="{{ item.slug | e }}">
 		<input type="hidden" name="lang" value="{{ lang }}">
 		<label class="wp-honeypot" aria-hidden="true">Website <input type="text" name="website" tabindex="-1" autocomplete="off"></label>
@@ -321,7 +331,7 @@
 					<button type="button" class="wp-button wp-button-sm" data-wp-add-person>+ {{ _("Add person") }}</button>
 					{%- if not t.free %}<span class="wp-people-total"><span>{{ _("Total") }}</span> <strong data-wp-people-total></strong></span>{% endif %}
 				</div>
-				<p class="wp-legal" data-wp-people-hint>{{ _("All tickets and information go to your email address. Add an email for a ticket holder only if they should receive it directly.") }}</p>
+				<p class="wp-legal" data-wp-people-hint>{{ _("Tickets go to your email unless you add one for a person.") }}</p>
 				<p class="wp-legal" data-wp-people-max hidden>{{ _("At most {0} tickets per order.").format(t.max_per_order) }}</p>
 			</div>
 			<input type="hidden" name="qty" value="1" data-wp-qty>
@@ -363,35 +373,46 @@
 		</fieldset>
 		{%- endif %}
 
-		{#- Step 3: everything once more, the legal notices and the one button. -#}
+		{#- Step 3: the order laid out like a DIN 5008 letter (address field left, information block right,
+		    subject, item table, totals with VAT, payment), the legal notices and the one button. "Print"
+		    prints just this sheet: a preview of the order PDF the buyer receives. -#}
 		<fieldset class="wp-fieldset" data-wp-step="3" hidden>
 			<legend class="wp-visually-hidden">{{ _("Review") }}</legend>
-			<dl class="wp-summary-dl">
-				<dt>{{ _("Event") }}</dt><dd>{{ item.title | e }}<br><span class="wp-legal">{{ item.data.when.line | e }}{% if item.data.location or item.data.city %} · {{ [item.data.location, item.data.city] | select | join(", ") | e }}{% endif %}</span></dd>
-				<dt>{{ _("Tickets") }} <button type="button" class="wp-link-button" data-wp-goto="1">{{ _("Change") }}</button></dt><dd><ul class="wp-summary-people" data-wp-summary-people></ul></dd>
-				<dt>{{ _("Tickets and information to") }}</dt><dd data-wp-summary-email></dd>
-				{%- if not t.free %}
-				<dt>{{ _("Billing address") }} <button type="button" class="wp-link-button" data-wp-goto="2">{{ _("Change") }}</button></dt><dd data-wp-summary-billing></dd>
-				<dt>{{ _("Price") }}</dt><dd>
-					<table class="wp-summary">
-						<tr><td data-wp-summary-line></td><td data-wp-summary-amount></td></tr>
-						<tr><td>{{ _("incl. {0} % VAT").format(t.tax_rate | round(2) | string | replace(".0", "")) }}</td><td data-wp-summary-tax></td></tr>
-						<tr class="wp-summary-total"><td>{{ _("Total") }}</td><td data-wp-summary-total></td></tr>
-					</table></dd>
-				<dt>{{ _("Payment") }}</dt><dd>{{ _("By invoice. You receive the invoice by email and pay within 14 days of the invoice date.") }}</dd>
-				{%- endif %}
-			</dl>
+			<article class="wp-invoice" data-wp-invoice>
+				<div class="wp-invoice-head">
+					<div class="wp-invoice-address">
+						{%- if t.sender %}<p class="wp-invoice-sender">{{ t.sender | e }}</p>{% endif %}
+						<address data-wp-summary-billing></address>
+						<button type="button" class="wp-link-button wp-no-print" data-wp-goto="{{ 1 if t.free else 2 }}">{{ _("Change") }}</button>
+					</div>
+					<dl class="wp-invoice-info">
+						<dt>{{ _("Date") }}</dt><dd>{{ t.today | e }}</dd>
+						<dt>{{ _("Event date") }}</dt><dd>{{ item.data.when.line | e }}</dd>
+						{%- if venue %}<dt>{{ _("Venue") }}</dt><dd>{{ venue | e }}</dd>{% endif %}
+						<dt>{{ _("Tickets to") }}</dt><dd data-wp-summary-email></dd>
+					</dl>
+				</div>
+				<h3 class="wp-invoice-subject">{{ (_("Order: {0}") if not t.free else _("Registration: {0}")).format(item.title | e) }}</h3>
+				<table class="wp-invoice-items">
+					<thead><tr><th>{{ _("Pos.") }}</th><th>{{ _("Description") }}</th>{% if not t.free %}<th>{{ _("Qty") }}</th><th>{{ _("Unit price") }}</th><th>{{ _("Amount") }}</th>{% endif %}</tr></thead>
+					<tbody data-wp-invoice-rows></tbody>
+					{%- if not t.free %}
+					<tfoot>
+						<tr><td colspan="4">{{ _("Net") }}</td><td data-wp-summary-net></td></tr>
+						<tr><td colspan="4">{{ _("VAT {0} %").format(t.tax_rate | round(2) | string | replace(".0", "")) }}</td><td data-wp-summary-tax></td></tr>
+						<tr class="wp-summary-total"><td colspan="4">{{ _("Total") }}</td><td data-wp-summary-total></td></tr>
+					</tfoot>
+					{%- endif %}
+				</table>
+				<button type="button" class="wp-link-button wp-no-print" data-wp-goto="1">{{ _("Change tickets") }}</button>
+				{%- if not t.free %}<p class="wp-invoice-note">{{ _("Payment by invoice, due within 14 days.") }}</p>{% endif %}
+			</article>
 			<div class="wp-legal">
-				{%- if not t.free %}
-				<p>{{ _("By clicking \"Order with obligation to pay\" you place a binding order. Our {0} apply.").format(
-					'<a href="#wp-terms" data-wp-terms-open>' ~ _("terms and conditions") ~ '</a>' if t.terms_html else _("terms and conditions")) }}
-				{{ _("There is no right of withdrawal for tickets to leisure events on a specific date (§ 312g (2) no. 9 BGB).") }}</p>
-				{%- else %}
-				<p>{{ _("By clicking \"Register\" your registration is binding.") }}{% if t.terms_html %} {{ _("Our {0} apply.").format('<a href="#wp-terms" data-wp-terms-open>' ~ _("terms and conditions") ~ '</a>') }}{% endif %}</p>
-				{%- endif %}
-				<p>{{ _("We use your details and those of the ticket holders only to handle this order and the event.") }} <a href="{{ privacy_url }}" target="_blank">{{ _("Privacy policy") }}</a></p>
+				<p>{%- if not t.free %}{{ _("Clicking \"Order with obligation to pay\" places a binding order under our {0}. No right of withdrawal: the event is on a fixed date (§ 312g (2) no. 9 BGB).").format(terms) }}
+				{%- else %}{{ _("Clicking \"Register\" makes your registration binding.") }}{% if t.terms_html %} {{ _("Our {0} apply.").format(terms) }}{% endif %}{% endif %}
+				<a href="{{ privacy_url }}" target="_blank">{{ _("Privacy policy") }}</a></p>
 				<details class="wp-terms" id="wp-order-notes"><summary>{{ _("About the order process") }}</summary>
-					<p>{{ _("You can correct your entries with \"Back\" or \"Change\" until you order. The contract language is German or English. We store the contract text and send it to you with the order confirmation, including the terms and conditions.") }}</p></details>
+					<p>{{ _("Correct your entries with \"Back\" or \"Change\" until you order. Contract language: German or English. We store the contract text and email it to you with the terms.") }}</p></details>
 				{%- if t.terms_html %}
 				<details class="wp-terms" id="wp-terms"><summary>{{ _("Terms and conditions") }}</summary><div class="wp-body">{{ t.terms_html }}</div></details>
 				{%- endif %}
@@ -400,6 +421,7 @@
 
 		<div class="wp-contact-actions wp-checkout-actions" data-wp-ticket-actions>
 			<button type="button" class="wp-button" data-wp-back hidden>{{ _("Back") }}</button>
+			<button type="button" class="wp-button" data-wp-print hidden>{{ _("Print") }}</button>
 			<button type="button" class="wp-button wp-button-primary" data-wp-next>{{ _("Continue") }}</button>
 			<button type="submit" class="wp-button wp-button-primary" data-wp-submit hidden>{{ _("Register") if t.free else _("Order with obligation to pay") }}</button>
 			<p class="wp-contact-status" role="status" data-wp-ticket-status data-sending="{{ _('Sending…') }}"
@@ -407,21 +429,21 @@
 				data-invalid="{{ _('Please fill in the marked fields.') }}"></p>
 		</div>
 
-		{#- After the order: done. Then three optional questions, each with why. -#}
+		{#- After the order. Then three optional questions; "Save" closes at once and confirms in a toast. -#}
 		<div class="wp-ticket-success" data-wp-ticket-success hidden>
-			<p class="wp-success-title"><strong>{{ _("Thank you!") }}</strong> {{ _("Your reference:") }} <span data-wp-ticket-reference></span></p>
-			<p>{{ _("The confirmation is on its way to {0}.").format('<strong data-wp-ticket-email></strong>') }}{% if not t.free %} {{ _("The invoice follows by email.") }}{% endif %}</p>
+			<p class="wp-success-title"><strong>{{ _("Thank you!") }}</strong> <span data-wp-ticket-reference></span></p>
+			<p>{{ _("Confirmation sent to {0}.").format('<strong data-wp-ticket-email></strong>') }}{% if not t.free %} {{ _("The invoice follows by email.") }}{% endif %}
+				<a class="wp-link-card wp-link-card-inline" href="#" target="_blank" rel="noopener" data-wp-ticket-pdf hidden><span>{{ _("Order as PDF") }}</span><span class="wp-link-card-arrow" aria-hidden="true">↓</span></a></p>
 			<div class="wp-optional" data-wp-optional>
-				<h3>{{ _("Three optional questions") }}</h3>
-				<p class="wp-legal">{{ _("Your order is complete. If you like, tell us what else we may do. You can change this at any time.") }}</p>
-				<label class="wp-switch"><input type="checkbox" name="newsletter" value="1"><span>{{ _("Updates about this event by email") }}<small>{{ _("Schedule, reminders and material afterwards. You confirm your address with a link first.") }}</small></span></label>
-				<label class="wp-switch"><input type="checkbox" name="attendee_contact" value="1"><span>{{ _("Other attendees may contact me") }}<small>{{ _("After the event, phamos passes on requests from other attendees. Your email address is never shown.") }}</small></span></label>
-				<label class="wp-switch"><input type="checkbox" name="public_listing" value="1"><span>{{ _("List me as attendee") }}<small>{{ _("Your name and company may appear in the list of attendees on the event page.") }}</small></span></label>
+				<h3>{{ _("Optional") }}</h3>
+				<label class="wp-switch"><input type="checkbox" name="newsletter" value="1"><span class="wp-switch-track" aria-hidden="true"></span><span class="wp-switch-text">{{ _("Event updates by email") }}<small>{{ _("Schedule, reminders, material. You confirm by link first.") }}</small></span></label>
+				<label class="wp-switch"><input type="checkbox" name="attendee_contact" value="1"><span class="wp-switch-track" aria-hidden="true"></span><span class="wp-switch-text">{{ _("Other attendees may contact me") }}<small>{{ _("Through phamos. Your email stays hidden.") }}</small></span></label>
+				<label class="wp-switch"><input type="checkbox" name="public_listing" value="1"><span class="wp-switch-track" aria-hidden="true"></span><span class="wp-switch-text">{{ _("List me as attendee") }}<small>{{ _("Name and company on the event page.") }}</small></span></label>
 				<div class="wp-contact-actions">
 					<button type="button" class="wp-button wp-button-primary" data-wp-consents-save>{{ _("Save") }}</button>
 					<button type="button" class="wp-button" data-wp-dialog-close>{{ _("No, thanks") }}</button>
 					<p class="wp-contact-status" role="status" data-wp-consents-status data-saved="{{ _('Saved. Thank you!') }}"
-						data-optin="{{ _('Saved. Please confirm your email with the link we just sent you.') }}"
+						data-optin="{{ _('Saved. Please confirm your email with the link we sent you.') }}"
 						data-failed="{{ _('That did not work. Please try again later.') }}"></p>
 				</div>
 			</div>
@@ -437,20 +459,45 @@
 			<h2 id="wp-subscribe-title">{{ _("Keep me posted") }}</h2>
 			<button type="button" class="wp-icon-button" data-wp-dialog-close aria-label="{{ _('Close') }}">×</button>
 		</div>
-		<p class="wp-contact-intro">{{ _("We send you updates about {0}: schedule, reminders and follow-up material. You confirm your address by email first.").format(item.title | e) }}</p>
+		<p class="wp-contact-intro">{{ _("Schedule, reminders and material for {0}. You confirm by email first.").format(item.title | e) }}</p>
 		<input type="hidden" name="event" value="{{ item.slug | e }}">
 		<input type="hidden" name="lang" value="{{ lang }}">
 		<label class="wp-honeypot" aria-hidden="true">Website <input type="text" name="website" tabindex="-1" autocomplete="off"></label>
 		<label>{{ _("Your email") }}<input type="email" name="email" required maxlength="140" autocomplete="email"></label>
 		<label class="wp-check wp-contact-consent"><input type="checkbox" name="privacy_consent" value="1" required>
-			<span>{{ _("I agree that phamos stores my email address to send me these updates. I can unsubscribe at any time.") }} <a href="{{ '/en/privacy' if lang == 'en' else '/de/datenschutz' }}" target="_blank">{{ _("Privacy policy") }}</a></span></label>
+			<span>{{ _("phamos may store my email for these updates. Unsubscribe any time.") }} <a href="{{ '/en/privacy' if lang == 'en' else '/de/datenschutz' }}" target="_blank">{{ _("Privacy policy") }}</a></span></label>
 		<div class="wp-contact-actions">
 			<button type="submit" class="wp-button wp-button-primary">{{ _("Send confirmation email") }}</button>
 			<p class="wp-contact-status" role="status" data-wp-subscribe-status data-sending="{{ _('Sending…') }}"
-				data-sent="{{ _('Almost done: please confirm with the link we just sent you.') }}"
+				data-sent="{{ _('Almost done: please confirm with the link we sent you.') }}"
 				data-already="{{ _('This address already receives the updates.') }}"
 				data-failed="{{ _('That did not work. Please try again later.') }}"
 				data-invalid="{{ _('Please enter a valid email address and tick the consent box.') }}"></p>
+		</div>
+	</form>
+</dialog>
+{%- endmacro %}
+
+{#- "Create reminder": up to three dates; phamos.marketing.web.reminders returns one ICS file with one
+    calendar entry (and alarm) per date. Plain GET form, so it downloads without JavaScript too. -#}
+{% macro reminder_dialog_markup(item, lang) -%}
+<dialog class="wp-dialog" id="wp-reminder-dialog" aria-labelledby="wp-reminder-title" data-wp-reminder-dialog>
+	<form class="wp-contact-form" method="get" action="/api/method/phamos.marketing.web.reminders" data-wp-reminder-form>
+		<div class="wp-dialog-head">
+			<h2 id="wp-reminder-title">{{ _("Create reminder") }}</h2>
+			<button type="button" class="wp-icon-button" data-wp-dialog-close aria-label="{{ _('Close') }}">×</button>
+		</div>
+		<p class="wp-contact-intro">{{ _("Up to three dates. You get a calendar file with one reminder each.") }}</p>
+		<input type="hidden" name="event" value="{{ item.slug | e }}">
+		<input type="hidden" name="lang" value="{{ lang }}">
+		<input type="hidden" name="tz" value="" data-wp-reminder-tz>
+		{%- for i in range(1, 4) %}
+		<label>{{ _("Reminder {0}").format(i) }}<input type="datetime-local" name="at" data-wp-reminder-at{% if i == 1 %} required{% endif %}
+			{%- if item.data.starts_on %} max="{{ item.data.starts_on[:16] }}"{% endif %}></label>
+		{%- endfor %}
+		<div class="wp-contact-actions">
+			<button type="submit" class="wp-button wp-button-primary">{{ _("Download calendar file") }}</button>
+			<p class="wp-contact-status" role="status" data-wp-reminder-status data-invalid="{{ _('Please pick at least one date before the event.') }}"></p>
 		</div>
 	</form>
 </dialog>
