@@ -50,17 +50,16 @@ const baseNavItems = [
 	{ name: "Receipts", label: "Receipts", icon: "file-text", match: ["Receipts", "ReceiptDetail"] },
 ]
 
-// With statistics access, Receipts opens into List / Payment calendar / Statistics.
-// The group header matches no route itself, so only the active child is highlighted.
+// With statistics access, Receipts opens on the statistics overview (like Issues opens
+// on its overview) and holds List and Payment calendar as children.
 const receiptsGroup = {
-	name: "Receipts",
+	name: "ReceiptStatistics",
 	label: "Receipts",
 	icon: "file-text",
-	match: [],
+	match: ["ReceiptStatistics"],
 	children: [
 		{ name: "Receipts", label: "List", icon: "list", match: ["Receipts", "ReceiptDetail"] },
 		{ name: "PaymentsCalendar", label: "Payment calendar", icon: "calendar", match: ["PaymentsCalendar"] },
-		{ name: "ReceiptStatistics", label: "Statistics", icon: "bar-chart", match: ["ReceiptStatistics"] },
 	],
 }
 
@@ -83,7 +82,7 @@ const pageTitle = computed(() => {
 	if (route.name === "Checklists" || route.name === "ChecklistDetail") return "Checklists"
 	if (route.name === "Receipts" || route.name === "ReceiptDetail") return "Receipts"
 	if (route.name === "PaymentsCalendar") return "Payment calendar"
-	if (route.name === "ReceiptStatistics") return "Statistics"
+	if (route.name === "ReceiptStatistics") return "Receipts"
 	if (route.name === "MisList" || route.name === "MisDetail") {
 		return "Monthly Implementation Summary"
 	}
