@@ -179,13 +179,13 @@ def _sogo_put(uid: str, subject: str, start_iso: str, end_iso: str, description:
         organizer_email = None
     ics = _ics(uid, subject, start_iso, end_iso, description, location, seq=seq, status=status, organizer=organizer_email)
     # Delegate to client, which sets headers and auth correctly
-    _put_ics(uid, ics, acting_user_id=owner)
+    _put_ics(uid, ics, acting_user_id=owner, create_only=True)
 
 
 def _sogo_delete(uid: str, organizer_user: str | None = None):
     # Reuse client helper for delete as well
     try:
-        _delete_ics(uid)
+        _delete_ics(uid, acting_user_id=organizer_user)
     except Exception:
         # client helper already logs; keep non-fatal
         pass
@@ -323,7 +323,11 @@ def create_proposals_and_send_email(payload: str):
             "custom_attendees_to": recipients,  # Optional attendees
             "custom_attendees_cc": data.get("cc") or "",  # Optional attendees
             "custom_attendees_bcc": data.get("bcc") or "",  # Optional attendees (hidden)
-        }).insert(ignore_permissions=True)
+        })
+        # The tentative SOGo entry was written above without attendees; pushing this Event now
+        # would replace it with attendees for every proposal. The confirmation pushes the chosen one.
+        ev.flags.skip_mailcow_push = True
+        ev.insert(ignore_permissions=True)
         created_events.append(ev.name)
 
         # Format strings for email link labels

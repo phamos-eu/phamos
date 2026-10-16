@@ -349,13 +349,19 @@ if (document.querySelector(".wp-profile-aside")) {
 		const low = range.querySelector('[data-wp-range-input="low"]');
 		const high = range.querySelector('[data-wp-range-input="high"]');
 		const slider = range.querySelector(".wp-range-slider");
+		// Sliders over months etc. carry display labels, one per position from min to max.
+		let labels = null;
+		try { labels = range.dataset.labels ? JSON.parse(range.dataset.labels) : null; } catch (e) { labels = null; }
+		const show = (v) => (labels ? labels[Number(v) - min] ?? v : v);
 		const update = (moved) => {
 			if (Number(low.value) > Number(high.value)) {
 				if (moved === low) high.value = low.value;
 				else low.value = high.value;
 			}
-			range.querySelector("[data-wp-range-low]").textContent = low.value;
-			range.querySelector("[data-wp-range-high]").textContent = high.value;
+			range.querySelector("[data-wp-range-low]").textContent = show(low.value);
+			range.querySelector("[data-wp-range-high]").textContent = show(high.value);
+			low.setAttribute("aria-valuetext", String(show(low.value)));
+			high.setAttribute("aria-valuetext", String(show(high.value)));
 			const pct = (v) => ((Number(v) - min) * 100) / (max - min);
 			slider.style.setProperty("--low", pct(low.value) + "%");
 			slider.style.setProperty("--high", pct(high.value) + "%");

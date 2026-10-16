@@ -14,6 +14,7 @@ TITLE_FIELDS = {
 	"Team Web Profile": "team_name",
 	"Module Web Profile": "module_name",
 	"Industry Web Profile": "industry",
+	"Marketing Content": "title",
 }
 
 

@@ -15,6 +15,7 @@ from datetime import datetime, timedelta, date
 from .client import put_ics, delete_ics, organizer_email, dav_password
 from .ics import vevent
 from ..utils import get_site_timezone
+from frappe.utils import get_datetime
 from dateutil.rrule import rrulestr
 
 
@@ -257,15 +258,49 @@ def _event_recurrence_rule(doc) -> str | None:
 
 	return ";".join(parts)
 
-def on_upsert(doc, method=None):
-	# auto_sync = frappe.db.get_value("Mailcow Settings", "auto_sync_events")
+SYNC_ERROR_FIELD = "custom_mailcow_sync_error"
 
+
+def on_upsert(doc, method=None):
+	"""Event on_update (also runs after insert): push to the owner's SOGo calendar.
+
+	The push runs in a background job after the commit, so saving an Event never waits for
+	SOGo and a rolled-back save pushes nothing. `doc.flags.mailcow_sync_now` pushes in the
+	request instead (manual sync, tests); `doc.flags.skip_mailcow_push` skips the push for
+	Events whose calendar object was just written or read by us (pull, hybrid proposals).
+	"""
+	if doc.flags.skip_mailcow_push:
+		return
+	if doc.flags.mailcow_sync_now:
+		push_event(doc.name)
+		return
+	frappe.enqueue(
+		"phamos.mailcow_integration.caldav.sync_event.push_event",
+		queue="short",
+		enqueue_after_commit=True,
+		event_name=doc.name,
+	)
+
+
+def push_event(event_name: str) -> str | None:
+	"""Build the ICS for an Event and upsert it in its owner's calendar.
+
+	Returns the error message, or None on success. The message is also kept on the Event
+	(`custom_mailcow_sync_error`), so a missing DAV password is visible instead of only
+	landing in the Error Log.
+	"""
+	if not frappe.db.exists("Event", event_name):
+		return None
+	doc = frappe.get_doc("Event", event_name)
+	error = None
 	try:
 		sync_uid = _resolve_sync_uid(doc)
+		# Only a UID we generated from the Event name and never pushed is new for SOGo; stored
+		# and marker UIDs may already exist there and must be updated, not refused.
+		create_only = not doc.get("custom_mailcow_synched") and sync_uid == doc.name
 
 		# bump sequence to force client refresh
 		seq = int(doc.get("custom_mailcow_seq") or 0) + 1
-		doc.db_set("custom_mailcow_seq", seq, notify=False)
 
 		# Extract attendees from custom fields if available
 		attendees_to = doc.get("custom_attendees_to") or ""
@@ -274,7 +309,7 @@ def on_upsert(doc, method=None):
 		participant_emails = _collect_event_participant_emails(doc)
 		participant_roles = _collect_event_participant_roles(doc)
 		attendees_to = _merge_attendees(attendees_to, participant_emails)
-		
+
 		# Use the standard Event.location field.
 		location = _event_location(doc)
 		recurrence_rule = _event_recurrence_rule(doc)
@@ -293,20 +328,44 @@ def on_upsert(doc, method=None):
 			attendee_role_map=participant_roles,
 			recurrence_rule=recurrence_rule,
 		)
-		put_ics(sync_uid, ics, acting_user_id=doc.owner)
-		doc.db_set("custom_mailcow_uid", sync_uid, notify=False)
-		doc.db_set("custom_mailcow_synched", 1, notify=False)
+		put_ics(sync_uid, ics, acting_user_id=doc.owner, create_only=create_only)
+		values = {
+			"custom_mailcow_seq": seq,
+			"custom_mailcow_uid": sync_uid,
+			"custom_mailcow_synched": 1,
+		}
 	except Exception as e:
+		error = str(e) or e.__class__.__name__
 		frappe.log_error(frappe.get_traceback(), "Event CalDAV Sync Error")
+		values = {}
+	if frappe.get_meta("Event").has_field(SYNC_ERROR_FIELD):
+		values[SYNC_ERROR_FIELD] = (error or "")[:1000]
+	if values:
+		frappe.db.set_value("Event", doc.name, values, update_modified=False)
+	return error
+
 
 def on_delete(doc, method=None):
-	try:
-		uid = (doc.get("custom_mailcow_uid") or "").strip() or _uid_from_description_marker(doc.get("description"))
-		if uid and _uid_belongs_to_other_event(uid, doc.get("name")):
-			# Safety: don't delete a calendar object that is still referenced by another Event.
-			return
+	"""Event on_trash: remove the object from the owner's calendar after the commit."""
+	uid = (doc.get("custom_mailcow_uid") or "").strip() or _uid_from_description_marker(doc.get("description"))
+	if uid and _uid_belongs_to_other_event(uid, doc.get("name")):
+		# Safety: don't delete a calendar object that is still referenced by another Event.
+		return
+	kwargs = {"uid": uid or doc.name, "owner": doc.owner}
+	if doc.flags.mailcow_sync_now:
+		delete_event_object(**kwargs)
+		return
+	frappe.enqueue(
+		"phamos.mailcow_integration.caldav.sync_event.delete_event_object",
+		queue="short",
+		enqueue_after_commit=True,
+		**kwargs,
+	)
 
-		delete_ics(uid or doc.name)
+
+def delete_event_object(uid: str, owner: str):
+	try:
+		delete_ics(uid, acting_user_id=owner)
 	except Exception:
 		frappe.log_error(frappe.get_traceback(), "Event CalDAV Delete Error")
 
@@ -315,8 +374,9 @@ def on_delete(doc, method=None):
 def manual_sync_event(event_name: str):
 	"""Manually sync a single Event by name (docname)"""
 	doc = frappe.get_doc("Event", event_name)
-	on_upsert(doc)
-	return {"status": "ok", "event": event_name}
+	doc.check_permission("write")
+	error = push_event(doc.name)
+	return {"status": "error" if error else "ok", "event": event_name, "error": error}
 
 
 @frappe.whitelist()
@@ -420,6 +480,7 @@ def pull_events(start: str, end: str) -> list[dict]:
 				doc.description = desc
 				_set_event_location(doc, loc)
 				doc.custom_mailcow_etag = etag
+				doc.flags.skip_mailcow_push = True  # came from SOGo; pushing back would be lossy
 				doc.save()
 			else:
 				event_payload = {
@@ -438,6 +499,7 @@ def pull_events(start: str, end: str) -> list[dict]:
 				if event_meta.has_field("location"):
 					event_payload["location"] = loc
 				doc = frappe.get_doc(event_payload)
+				doc.flags.skip_mailcow_push = True  # came from SOGo; pushing back would be lossy
 				doc.insert()
 
 			events.append({

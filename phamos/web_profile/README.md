@@ -14,6 +14,7 @@ Design decisions: phamos/phamos#1492 (foundation) and the section issues #1487, 
 | Industries | Industry Web Profile | Industry Type | `/en/industries` | `/de/branchen` |
 | Customers | Stakeholder Web Profile (type Customer) | Customer / Supplier / Sales Partner | `/en/customers` | `/de/kunden` |
 | Partners | Stakeholder Web Profile (type Partner) | Customer / Supplier / Sales Partner | `/en/partners` | `/de/partner` |
+| Events | Marketing Content (the public record itself, nothing mirrored) | — | `/en/events` | `/de/veranstaltungen` |
 
 Each section has a listing (`/<lang>/<slug>`) and a profile per record (`/<lang>/<slug>/<route>`).
 The record's route is the same in both languages. German is the default language (x-default).
@@ -41,6 +42,15 @@ named and anonymous changes only what the page shows, never its URL. Unpublished
 - `public/js/web_profile.bundle.js`: optional enhancement (no-reload filters, load on scroll, mobile drawer, contact dialog). Pages work without it.
 - `public/js/web_profile_form.bundle.js`: desk forms show missing translations and "View on Website".
 
+## Events
+
+`events.py` loads published Marketing Content and builds the event page: hero, actions (one black
+button: buy ticket or register), speakers and sponsors, JSON-LD `Event` with `offers`. `item.data` is an
+allow-list: no organizer or contact email, no Email Group, no attendee data. Ordering and "Keep me
+posted" are `phamos/marketing/web.py` (POST, rate limit, honeypot, consents) on top of
+`phamos.marketing.ticketing`; the dialogs are macros in `macros.html` and `public/js/web_profile_events.bundle.js`
+(loaded on event pages only). "Keep me posted" uses Frappe's double opt-in with the event's Email Group.
+
 ## Adding a section
 
 1. Create `<Source> Web Profile` (base class `WebProfileDocument`; website fields: published, route, image, sort_order, the `translations` table "Web Profile Content").
@@ -66,7 +76,7 @@ bench --site dev.localhost run-tests --module phamos.tests.test_web_profile_chro
 Every section goes live with Frappe's own tools: *Website Route Redirect* rows (Website Settings) for
 its old URLs, and its old Web Pages unpublished (#1492, step 5). `golive.py` does that from the plan in
 `golive_plans/<section>.py` (people, departments, teams, modules, implementations, industries,
-customers, partners, content). New URLs are looked up on the site that runs it.
+customers, partners, content, events). New URLs are looked up on the site that runs it.
 
 ```bash
 bench --site <site> execute phamos.web_profile.golive.run --kwargs '{"section": "people"}'               # dry run: report only

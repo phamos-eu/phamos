@@ -1,0 +1,25 @@
+{#- Landing page of the newsletter double opt-in. Context: subscribed.py. -#}
+{% extends "templates/base.html" %}
+{% from "phamos/templates/web_profile/macros.html" import head_tags with context %}
+
+{% block title %}{{ title | e }}{% endblock %}
+{% block meta_block %}{{ super() }}{{ head_tags() }}{% endblock %}
+
+{% block content %}
+<main class="wp-page wp-confirmed">
+	<div class="wp-confirmed-card">
+		<span class="wp-confirmed-icon" aria-hidden="true">✓</span>
+		<h1>{{ _("Subscription confirmed") }}</h1>
+		{%- if item %}
+		<p>{{ _("You will receive updates about {0}: schedule, reminders and material.").format('<strong>' ~ (item.title | e) ~ '</strong>') }}</p>
+		{%- else %}
+		<p>{{ _("Your email address is confirmed. You will receive the updates.") }}</p>
+		{%- endif %}
+		<p class="wp-legal">{{ _("Every email has a link to unsubscribe.") }}</p>
+		<div class="wp-actions wp-confirmed-actions">
+			{%- if item %}<a class="wp-button wp-button-primary" href="{{ item.url | e }}">{{ _("Back to the event") }}</a>{% endif %}
+			<a class="wp-button" href="{{ events_url | e }}">{{ _("All events") }}</a>
+		</div>
+	</div>
+</main>
+{% endblock %}

@@ -154,6 +154,7 @@ _WEB_PROFILE_SLUGS = {
     "industries": {"en": "industries", "de": "branchen"},
     "customers": {"en": "customers", "de": "kunden"},
     "partners": {"en": "partners", "de": "partner"},
+    "events": {"en": "events", "de": "veranstaltungen"},  # Marketing Content (phamos.web_profile.events)
 }
 for _section, _slugs in _WEB_PROFILE_SLUGS.items():
     for _lang, _slug in _slugs.items():
@@ -163,6 +164,11 @@ for _section, _slugs in _WEB_PROFILE_SLUGS.items():
             {"from_route": f"/{_lang}/{_slug}/<slug>", "to_route": "web_profile/profile",
              "defaults": {"section": _section, "lang": _lang}},
         ]
+# Landing page of the newsletter double opt-in (Email Group "welcome_url", Marketing Content).
+SUBSCRIPTION_CONFIRMED_ROUTES = {"de": "de/anmeldung-bestaetigt", "en": "en/subscription-confirmed"}
+for _lang, _route in SUBSCRIPTION_CONFIRMED_ROUTES.items():
+    website_route_rules.append({"from_route": f"/{_route}", "to_route": "web_profile/subscribed",
+        "defaults": {"section": "events", "lang": _lang}})
 # Old URLs of the sections are redirected with Website Route Redirect records (Website Settings)
 # when a section goes live, not in code (phamos/phamos#1492).
 
@@ -225,6 +231,7 @@ after_migrate = [
 	"phamos.web_profile.setup.after_migrate",  # Web Page "Language" / "Translation Of" fields
 	"phamos.cockpits.setup.after_migrate",  # ToDo fields of the Personal Cockpit (#1553)
 	"phamos.setup.accounting_receipt.ensure_accounting_receipt_setup",  # AI Accountant role, user, bot
+	"phamos.marketing.setup.after_migrate",  # Lead Source "Event" for event registrations
 ]
 
 # Uninstallation
@@ -292,9 +299,15 @@ doc_events = {
 		"on_update": "phamos.cockpits.todo_hooks.on_update",
 		"on_trash": "phamos.cockpits.todo_hooks.on_trash",
 	},
+	# Personal Cockpit check-ins: live updates to the employee's own user (#1571). Never fires
+	# on sites without HRMS, since the doctype does not exist there.
+	"Employee Checkin": {
+		"on_update": "phamos.cockpits.checkin_hooks.on_update",
+		"on_trash": "phamos.cockpits.checkin_hooks.on_trash",
+	},
 	"Event": {
-		"after_insert": "phamos.mailcow_integration.caldav.sync_event.on_upsert",
-        "on_update": "phamos.mailcow_integration.caldav.sync_event.on_upsert",
+		# on_update also runs after insert; an after_insert hook here pushed every new Event twice.
+		"on_update": "phamos.mailcow_integration.caldav.sync_event.on_upsert",
 		"on_trash": "phamos.mailcow_integration.caldav.sync_event.on_delete",
 	},
     "Team": {
@@ -327,15 +340,34 @@ doc_events = {
         "on_update_after_submit": "phamos.phamos.doctype.monthly_implementation_summary.monthly_implementation_summary.sync_mis_status_for_source_doc",
         "on_cancel": "phamos.phamos.doctype.monthly_implementation_summary.monthly_implementation_summary.sync_mis_status_for_source_doc",
     },
+    # Event tickets: Attendee links and payment status (phamos.marketing.billing). Payments reach an
+    # invoice through db_set only, so its on_change is the trigger that catches them.
     "Sales Invoice": {
-        "on_submit": "phamos.phamos.doctype.monthly_implementation_summary.monthly_implementation_summary.sync_mis_status_for_source_doc",
-        "on_update_after_submit": "phamos.phamos.doctype.monthly_implementation_summary.monthly_implementation_summary.sync_mis_status_for_source_doc",
-        "on_cancel": "phamos.phamos.doctype.monthly_implementation_summary.monthly_implementation_summary.sync_mis_status_for_source_doc",
+        "on_submit": ["phamos.phamos.doctype.monthly_implementation_summary.monthly_implementation_summary.sync_mis_status_for_source_doc", "phamos.marketing.billing.on_sales_invoice_change"],
+        "on_update_after_submit": ["phamos.phamos.doctype.monthly_implementation_summary.monthly_implementation_summary.sync_mis_status_for_source_doc", "phamos.marketing.billing.on_sales_invoice_change"],
+        "on_cancel": ["phamos.phamos.doctype.monthly_implementation_summary.monthly_implementation_summary.sync_mis_status_for_source_doc", "phamos.marketing.billing.on_sales_invoice_change"],
+        "on_change": "phamos.marketing.billing.on_sales_invoice_change",
+        "on_trash": "phamos.marketing.billing.on_sales_invoice_trash",
     },
     "Sales Order": {
-        "on_submit": "phamos.phamos.doctype.monthly_implementation_summary.monthly_implementation_summary.sync_mis_status_for_source_doc",
+        "on_update": "phamos.marketing.billing.on_sales_order_update",
+        "on_submit": ["phamos.phamos.doctype.monthly_implementation_summary.monthly_implementation_summary.sync_mis_status_for_source_doc", "phamos.marketing.billing.on_sales_order_submit"],
         "on_update_after_submit": "phamos.phamos.doctype.monthly_implementation_summary.monthly_implementation_summary.sync_mis_status_for_source_doc",
-        "on_cancel": "phamos.phamos.doctype.monthly_implementation_summary.monthly_implementation_summary.sync_mis_status_for_source_doc",
+        "on_cancel": ["phamos.phamos.doctype.monthly_implementation_summary.monthly_implementation_summary.sync_mis_status_for_source_doc", "phamos.marketing.billing.on_sales_order_cancel"],
+        "on_trash": "phamos.marketing.billing.on_sales_order_cancel",
+    },
+    "Payment Entry": {
+        "on_submit": "phamos.marketing.billing.on_payment_entry_change",
+        "on_cancel": "phamos.marketing.billing.on_payment_entry_change",
+    },
+    # Seats left and sale state are cached with the event items: refresh them when attendees change.
+    "Attendee": {
+        "after_insert": "phamos.web_profile.sections.clear_events",
+        "on_update": "phamos.web_profile.sections.clear_events",
+        "on_trash": "phamos.web_profile.sections.clear_events",
+    },
+    "Lead": {
+        "before_insert": "phamos.marketing.billing.lead_before_insert",
     },
     "Customer": {
         "on_update": [
@@ -366,6 +398,9 @@ doc_events = {
         "on_trash": "phamos.gitlab_integration.label_ledger.delete_issue_label_ledger",
     },
     "Timesheet Record": {
+        # Personal Cockpit timer: live updates to the employee's own user (#1572).
+        "on_change": "phamos.cockpits.timer_hooks.on_change",
+        "on_trash": "phamos.cockpits.timer_hooks.on_trash",
         "on_submit": [
             "phamos.gitlab_integration.gitlab_utils.sync_touch_time_on_timesheet_change",
             "phamos.gitlab_integration.gitlab_utils.sync_cycle_time_start_on_timesheet_change",
@@ -413,7 +448,7 @@ fixtures = [
     ]},
     {"dt": "Email Template", "filters": [
         [
-            "name", "in", ["Interview Confirmation"]
+            "name", "in", ["Interview Confirmation", "Event Subscription Confirmation"]
         ]
     ]}
 ]
@@ -430,6 +465,8 @@ scheduler_events = {
         "phamos.phamos.doctype.monthly_implementation_summary.monthly_implementation_summary.auto_close_fulfilled_mis",
         # Personal Cockpit: settle yesterday in running ToDo challenges (#1557)
         "phamos.api.personal_challenges.evaluate_all_challenges",
+        # Event tickets: payment status for payments booked without hooks
+        "phamos.marketing.billing.sync_payment_status",
     ],
     "weekly": [
         # Personal Cockpit: checklists left behind by ToDos deleted without hooks (#1554)
@@ -531,6 +568,9 @@ user_data_fields = [
 	{"doctype": "Focus Session", "filter_by": "user", "redact_fields": ["break_out_reason"]},
 	{"doctype": "ToDo Challenge", "filter_by": "user", "redact_fields": ["title"]},
 	{"doctype": "Day Plan", "filter_by": "user", "redact_fields": ["reflection"]},
+	# Event attendees are matched by their email address (they have no user account).
+	{"doctype": "Attendee", "filter_by": "email", "redact_fields": ["first_name", "last_name", "full_name",
+		"phone", "company_name", "job_title", "notes", "follow_up_notes"]},
 ]
 
 # Authentication and authorization

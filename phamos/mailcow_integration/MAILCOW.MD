@@ -158,7 +158,7 @@ This is the actual flow reflected in `hybrid_meeting.py`, `caldav/client.py`, `c
 		- Includes: `hybrid_meeting_composer.js` globally for Desk.
 		- doctype_js: Event (event.js), User (mailcow_user.js), among others.
 		- doctype_list_js: Event list (event_list.js).
-		- doc_events on Event: after_insert/on_update → `caldav/sync_event.on_upsert`, on_trash → `caldav/sync_event.on_delete`.
+		- doc_events on Event: on_update (also runs after insert) → `caldav/sync_event.on_upsert`, on_trash → `caldav/sync_event.on_delete`.
 
 ---
 
@@ -227,7 +227,10 @@ Confirmation flow:
 
 - Outbound (ERPNext → Mailcow):
 	- Event hooks (`hooks.py`) call `caldav/sync_event.on_upsert` on new/updated Events and `on_delete` when deleted.
-	- The hook builds an ICS (`caldav/ics.vevent`) and uses `caldav/client.put_ics`/`delete_ics` to sync with SOGo, using the session user’s DAV password from “Mailcow DAV Password”.
+	- Both enqueue a background job after the commit (`push_event`, `delete_event_object`); `doc.flags.mailcow_sync_now` runs them in the request (manual sync, tests), `doc.flags.skip_mailcow_push` skips the push (Events pulled from SOGo, hybrid meeting proposals).
+	- The job builds an ICS (`caldav/ics.vevent`) and uses `caldav/client.put_ics`/`delete_ics` with the **Event owner's** mailbox and DAV password from “Mailcow DAV Password”.
+	- `put_ics` sends `If-None-Match: *` only for the first push of a UID generated from the Event name (`create_only`); every later push is an update. Before #1558 every update was refused by SOGo (412).
+	- A failed push is stored on the Event in “Calendar Sync Error” (`custom_mailcow_sync_error`) and cleared by the next successful push.
 
 - Proposals (Hybrid):
 	- `hybrid_meeting.py` creates Tentative SOGo entries per proposal (no attendees to avoid auto‑invites), plus ERPNext Events with group/UID markers.

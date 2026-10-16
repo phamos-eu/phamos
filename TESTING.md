@@ -51,6 +51,16 @@ bench --site [your-site] run-tests --app phamos --module phamos.okr_addon.doctyp
 bench --site [your-site] run-tests --app phamos --module phamos.okr_addon.doctype.kr.test_kr
 ```
 
+### Marketing: events, attendees, tickets
+
+The Marketing tests bootstrap a company with ERPNext's test setup when the site has none:
+
+```bash
+for module in test_marketing_attendee test_marketing_crm test_marketing_ticketing test_marketing_billing test_marketing_patches test_web_profile_events; do
+  bench --site [your-site] run-tests --app phamos --module phamos.tests.$module
+done
+```
+
 ### Frontend unit tests
 
 Pure helpers shared by all cockpit SPAs (`spa_shared/**/*.test.js`, e.g. the
