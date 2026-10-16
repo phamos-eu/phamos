@@ -31,13 +31,13 @@
 	{%- for item in order.items %}
 	<tr><td>{{ item.description | e }}</td><td style="text-align:right">{{ frappe.utils.fmt_money(item.amount, currency=order.currency) }}</td></tr>
 	{%- endfor %}
-	{%- for tax in order.taxes %}
-	<tr><td>{{ _("incl. {0}").format(tax.description | e) if tax.included_in_print_rate else tax.description | e }} ({{ tax.rate }} %)</td><td style="text-align:right">{{ frappe.utils.fmt_money(tax.tax_amount, currency=order.currency) }}</td></tr>
+	{%- for tax in order.taxes if tax.tax_amount %}
+	<tr><td>{{ _("incl. {0}").format(tax.description | e) if tax.included_in_print_rate else tax.description | e }}</td><td style="text-align:right">{{ frappe.utils.fmt_money(tax.tax_amount, currency=order.currency) }}</td></tr>
 	{%- endfor %}
 	<tr><td><strong>{{ _("Total incl. VAT") }}</strong></td><td style="text-align:right"><strong>{{ frappe.utils.fmt_money(order.grand_total, currency=order.currency) }}</strong></td></tr>
 </table>
 {%- if address %}
-<p><strong>{{ _("Billing address") }}</strong><br>{{ address }}</p>
+<p><strong>{{ _("Billing address") }}</strong><br>{{ order.customer_name | e }}<br>{{ address }}{% if order.tax_id %}<br>{{ _("VAT ID") }}: {{ order.tax_id | e }}{% endif %}</p>
 {%- endif %}
 <p><strong>{{ _("Payment") }}:</strong> {{ _("by invoice. You receive the invoice by email; please pay within 14 days of the invoice date.") }}</p>
 <p><strong>{{ _("Right of withdrawal") }}:</strong> {{ _("There is no right of withdrawal for tickets to leisure events on a specific date (§ 312g (2) no. 9 BGB). If you cannot attend, please reply to this email.") }}</p>
@@ -46,7 +46,8 @@
 <p>{{ _("Add the event to your calendar with the attached file.") }}{% if event_url %} {{ _("Event page") }}: <a href="{{ event_url }}">{{ event_url }}</a>{% endif %}</p>
 <p>{{ _("Questions or changes? Simply reply to this email.") }}</p>
 <p style="font-size:12px;color:#6b6b6b">
-	{{ _("The terms and conditions of this event are attached to this email.") if not terms_html else _("The terms and conditions of this event are printed below.") }}
+	{%- if terms_attached %}{{ _("The terms and conditions of this event are attached to this email.") }}
+	{%- elif terms_html %}{{ _("The terms and conditions of this event are printed below.") }}{% endif %}
 	<a href="{{ privacy_url }}">{{ _("Privacy policy") }}</a> · <a href="{{ imprint_url }}">{{ _("Imprint") }}</a>
 </p>
 {%- if terms_html %}

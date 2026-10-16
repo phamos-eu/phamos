@@ -353,8 +353,9 @@ def send_order_confirmation(event_name, reference, recipient, reference_doctype=
 		subject=subject,
 		template="event_order_confirmation",
 		args={"event": doc, "reference": reference, "attendees": attendees, "order": order, "address": address,
-			"buyer_name": buyer_name, "recipient": recipient, "terms_html": terms_html if not any(
-				a["fname"].endswith(".pdf") for a in attachments) else None,
+			"buyer_name": buyer_name, "recipient": recipient,
+			"terms_attached": any(a["fname"].endswith(".pdf") for a in attachments),
+			"terms_html": terms_html if not any(a["fname"].endswith(".pdf") for a in attachments) else None,
 			"event_url": frappe.utils.get_url(item.url) if item else None,
 			"privacy_url": frappe.utils.get_url("/en/privacy" if lang == "en" else "/de/datenschutz"),
 			"imprint_url": frappe.utils.get_url("/en/imprint" if lang == "en" else "/de/impressum")},
