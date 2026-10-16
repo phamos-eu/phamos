@@ -159,7 +159,8 @@
 <script setup>
 import { computed, onMounted, ref, watch } from "vue"
 import { useRoute, useRouter } from "vue-router"
-import { call, toast } from "frappe-ui"
+import { call } from "frappe-ui"
+import { notify } from "@spa/utils/notify.js"
 import DecideTodoDialog from "@spa/components/DecideTodoDialog.vue"
 import { useUserRealtime } from "@spa/composables/useUserRealtime.js"
 import { pluralize } from "@spa/utils/dashboardFormat.js"
@@ -266,9 +267,9 @@ async function run(key, method, args, message) {
 	busy.value = key
 	try {
 		apply(await call(`${API}.${method}`, { ...args, date: date.value }))
-		if (message) toast.success(message)
+		if (message) notify.success(message)
 	} catch (e) {
-		toast.error(errorText(e, "That did not work"))
+		notify.error(errorText(e, "That did not work"))
 	} finally {
 		busy.value = ""
 	}
@@ -283,10 +284,10 @@ async function close(item) {
 	busy.value = item.todo
 	try {
 		await call(`${API}.close_todo`, { name: item.todo })
-		toast.success("Done. One less.")
+		notify.success("Done. One less.")
 		await load()
 	} catch (e) {
-		toast.error(errorText(e, "Could not close the ToDo"))
+		notify.error(errorText(e, "Could not close the ToDo"))
 	} finally {
 		busy.value = ""
 	}
@@ -297,7 +298,7 @@ async function setEstimate(item, value) {
 		await call(`${API}.update_todo`, { name: item.todo, estimate_minutes: Number(value) || 0 })
 		await load()
 	} catch (e) {
-		toast.error(errorText(e, "Could not save the estimate"))
+		notify.error(errorText(e, "Could not save the estimate"))
 	}
 }
 
