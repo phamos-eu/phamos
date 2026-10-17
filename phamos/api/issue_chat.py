@@ -62,9 +62,6 @@ def channel_url(workspace, channel_id):
 	return f"/raven/{quote(workspace, safe='')}/{quote(channel_id, safe='')}"
 
 
-def dm_url(channel_id):
-	return f"/raven/dm-channel/{quote(channel_id, safe='')}"
-
 
 def find_channel(doctype, name):
 	if not is_raven_installed():
@@ -572,34 +569,6 @@ def _unread_chat_details(channel, titles, unread, thread_stats, last_activity):
 		if not chat["last_sender"] or (last_activity and thread_last == last_activity):
 			chat["last_sender"] = threads[0]["last_sender"] or chat["last_sender"]
 	return chat
-
-
-def start_dm(doc, user):
-	"""Open the Raven DM with `user`, post a link to the record, and return its URL.
-
-	The link is posted only when `user` may read the record (`linked` says whether it was) and
-	the DM's last message is not already a link to it, so clicking "Message" twice does not
-	repeat it.
-	"""
-	_require_chat_doctype(doc.doctype)
-	_require_enabled()
-	from raven.api.raven_channel import create_direct_message_channel
-
-	channel_id = create_direct_message_channel(user)
-	# The link and the record's title only go to someone who may open the record; for anyone
-	# else the DM opens as it is (review of #1616).
-	if not frappe.has_permission(doc.doctype, "read", doc=doc.name, user=user):
-		return {"channel_id": channel_id, "url": dm_url(channel_id), "linked": False}
-	last = frappe.get_all(
-		"Raven Message",
-		filters={"channel_id": channel_id, "message_type": ("!=", "System")},
-		fields=["link_doctype", "link_document"],
-		order_by="creation desc",
-		limit=1,
-	)
-	if not last or (last[0].link_doctype, last[0].link_document) != (doc.doctype, doc.name):
-		_post_link_message(channel_id, doc, _("About {0}: {1}").format(doc.name, _doc_title(doc)))
-	return {"channel_id": channel_id, "url": dm_url(channel_id), "linked": True}
 
 
 # --- Hooks -----------------------------------------------------------------------------------

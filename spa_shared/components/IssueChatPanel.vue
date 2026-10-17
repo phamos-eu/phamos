@@ -43,35 +43,38 @@
 				>
 					{{ __("Not in the chat, since they have no Raven account: {0}", [skippedUsers.map((u) => u.full_name || u.user).join(", ")]) }}
 				</p>
-				<!-- Replies in threads, which Raven's channel view does not mark (#1623). -->
-				<div
-					v-if="url && threads.length"
-					class="flex-shrink-0 border-b border-outline-gray-2 bg-surface-blue-1 px-3 py-1.5 text-xs"
-				>
-					<button
-						type="button"
-						class="flex w-full items-center gap-1.5 font-medium text-ink-blue-3 hover:underline"
-						:aria-expanded="threads.length > 1 ? String(threadListOpen) : undefined"
-						@click="onThreadHint"
-					>
-						<FeatherIcon name="corner-down-right" class="h-3.5 w-3.5 flex-none" />
-						<span class="truncate">{{ threadHint }}</span>
-						<FeatherIcon
-							v-if="threads.length > 1"
-							:name="threadListOpen ? 'chevron-up' : 'chevron-down'"
-							class="ml-auto h-3.5 w-3.5 flex-none"
-						/>
-					</button>
-					<ul v-if="threadListOpen && threads.length > 1" class="mt-1 space-y-0.5">
+				<!-- Replies in threads, which Raven's channel view does not mark (#1623). Drawn like Raven's
+				     "New messages" divider: a thin blue line with a subtle blue badge in the middle. -->
+				<div v-if="url && threads.length" class="flex-shrink-0 border-b border-outline-gray-1 px-4 py-2">
+					<div class="flex items-center gap-2">
+						<span class="h-px flex-1 bg-surface-blue-2" aria-hidden="true" />
+						<button
+							type="button"
+							class="inline-flex h-5 items-center gap-1 rounded-full bg-surface-blue-2 px-1.5 text-xs font-medium text-ink-blue-3 hover:bg-surface-blue-1"
+							:aria-expanded="threads.length > 1 ? String(threadListOpen) : undefined"
+							@click="onThreadHint"
+						>
+							<FeatherIcon name="corner-down-right" class="h-3 w-3 flex-none" />
+							{{ threadHint }}
+							<FeatherIcon
+								v-if="threads.length > 1"
+								:name="threadListOpen ? 'chevron-up' : 'chevron-down'"
+								class="h-3 w-3 flex-none"
+							/>
+						</button>
+						<span class="h-px flex-1 bg-surface-blue-2" aria-hidden="true" />
+					</div>
+					<ul v-if="threadListOpen && threads.length > 1" class="mt-2 space-y-0.5">
 						<li v-for="thread in threads" :key="thread.thread_id">
 							<button
 								type="button"
-								class="flex w-full items-center gap-2 rounded px-2 py-1 text-left text-ink-gray-8 hover:bg-surface-blue-2"
+								class="flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-left text-sm hover:bg-surface-gray-2"
 								@click="openThread(thread.thread_id)"
 							>
-								<span class="min-w-0 flex-1 truncate">{{ thread.preview || __("Thread") }}</span>
-								<span class="flex-none text-ink-gray-5">
-									{{ thread.last_sender ? `${thread.last_sender} · ` : "" }}{{ thread.unread }}
+								<span class="min-w-0 flex-1 truncate font-semibold text-ink-gray-8">{{ thread.preview || __("Thread") }}</span>
+								<span v-if="thread.last_sender" class="flex-none truncate text-xs text-ink-gray-5">{{ thread.last_sender }}</span>
+								<span class="inline-flex h-5 flex-none items-center rounded-full bg-surface-blue-2 px-1.5 text-xs font-medium text-ink-blue-3">
+									{{ __("{0} new", [thread.unread]) }}
 								</span>
 							</button>
 						</li>
