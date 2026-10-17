@@ -54,8 +54,11 @@ def _count_by(rows, key, order=None, empty_label="—"):
 	for row in rows:
 		label = row.get(key) or empty_label
 		counts[label] = counts.get(label, 0) + 1
-	labels = order or sorted(counts, key=lambda label: -counts[label])
-	return [{"label": label, "value": counts[label]} for label in labels if counts.get(label)]
+	# Known labels in their order first; anything else (e.g. a custom status) follows, largest
+	# first, so the bars always add up to the total (#1609).
+	known = [label for label in (order or []) if counts.get(label)]
+	rest = sorted((label for label in counts if label not in known), key=lambda label: -counts[label])
+	return [{"label": label, "value": counts[label]} for label in known + rest]
 
 
 def _days_since(value, day):

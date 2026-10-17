@@ -137,3 +137,14 @@ class TestPersonalWorkDashboard(FrappeTestCase):
 	def test_no_employee_means_no_hours(self):
 		frappe.set_user(OTHER)
 		self.assertIsNone(pc.get_task_dashboard()["hours"])
+
+	def test_statuses_outside_the_order_still_show(self):
+		rows = [{"status": "Open"}, {"status": "Waiting for Customer"}, {"status": "Waiting for Customer"}, {"status": None}]
+		self.assertEqual(
+			wd._count_by(rows, "status", order=["Open", "Replied"]),
+			[
+				{"label": "Open", "value": 1},
+				{"label": "Waiting for Customer", "value": 2},
+				{"label": "—", "value": 1},
+			],
+		)
