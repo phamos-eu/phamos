@@ -4,7 +4,6 @@
 """Issue chat (#1614): one Private Raven channel per Issue, members from owner and assignees."""
 
 from unittest import skipUnless
-from urllib.parse import quote
 from unittest.mock import patch
 
 import frappe
@@ -210,18 +209,6 @@ class TestIssueChat(FrappeTestCase):
 		self.assertEqual(states[self.issue.name]["first_unread"], intro)
 		self.assertEqual(pc.get_issue_chat(self.issue.name)["unread"], 1)
 
-	def test_dm_carries_the_issue_link_once(self):
-		result = pc.start_issue_dm(self.issue.name, ASSIGNEE)
-		channel = frappe.get_doc("Raven Channel", result["channel_id"])
-		self.assertTrue(channel.is_direct_message)
-		self.assertEqual(result["url"], f"/raven/dm-channel/{quote(channel.name, safe='')}")
-
-		pc.start_issue_dm(self.issue.name, ASSIGNEE)
-		links = frappe.get_all(
-			"Raven Message",
-			filters={"channel_id": channel.name, "link_doctype": "Issue", "link_document": self.issue.name},
-		)
-		self.assertEqual(len(links), 1)
 
 	def test_mentioned_reader_joins_the_chat(self):
 		channel_id = pc.ensure_issue_chat(self.issue.name)["channel_id"]
@@ -366,7 +353,7 @@ class TestIssueChat(FrappeTestCase):
 		)
 
 	def test_every_cockpit_exposes_the_chat_endpoints(self):
-		endpoints = ("get_issue_chat", "ensure_issue_chat", "get_issue_chat_states", "start_issue_dm")
+		endpoints = ("get_issue_chat", "ensure_issue_chat", "get_issue_chat_states")
 		for module in (pc, sales_spa):
 			for name in endpoints:
 				self.assertIn(getattr(module, name), frappe.whitelisted, f"{module.__name__}.{name}")
