@@ -25,6 +25,11 @@
   "run_flags",
   "steps",
   "analysis",
+  "feedback_section",
+  "outcome",
+  "corrected_by",
+  "feedback_collected_at",
+  "corrections",
   "timing_section",
   "started_at",
   "finished_at",
@@ -205,10 +210,45 @@
    "fieldtype": "Int",
    "label": "LLM Calls",
    "read_only": 1
+  },
+  {
+   "fieldname": "feedback_section",
+   "fieldtype": "Section Break",
+   "label": "Feedback",
+   "collapsible": 1
+  },
+  {
+   "fieldname": "outcome",
+   "fieldtype": "Select",
+   "label": "Outcome",
+   "options": "\nAccepted\nCorrected",
+   "read_only": 1,
+   "in_standard_filter": 1,
+   "description": "Corrected: a person changed a value the AI set. Accepted: the document was approved, sent or paid without such a change."
+  },
+  {
+   "fieldname": "corrected_by",
+   "fieldtype": "Link",
+   "label": "Corrected By",
+   "options": "User",
+   "read_only": 1
+  },
+  {
+   "fieldname": "feedback_collected_at",
+   "fieldtype": "Datetime",
+   "label": "Feedback Collected At",
+   "read_only": 1
+  },
+  {
+   "fieldname": "corrections",
+   "fieldtype": "JSON",
+   "label": "Corrections",
+   "read_only": 1,
+   "description": "[{field, ai_value, human_value, user, at}]"
   }
  ],
  "links": [],
- "modified": "2026-10-16 13:00:00.000000",
+ "modified": "2026-10-17 22:00:00.000000",
  "modified_by": "Administrator",
  "module": "AI Agents",
  "name": "AI Agent Run",

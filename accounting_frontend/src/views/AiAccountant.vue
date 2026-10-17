@@ -60,6 +60,70 @@
 			</div>
 		</div>
 
+		<!-- Learning -->
+		<div v-else-if="tab === 'learning'" class="min-h-0 flex-1 overflow-y-auto p-5 text-sm">
+			<p v-if="!learning" class="text-ink-gray-5">Loading…</p>
+			<div v-else class="mx-auto flex max-w-5xl flex-col gap-6">
+				<p class="text-ink-gray-6">
+					In the last {{ learning.days }} days people corrected values in {{ learning.corrected_runs }} of {{ learning.runs }} AI runs.
+					<template v-if="Object.keys(learning.by_field).length">
+						Most often:
+						{{ Object.entries(learning.by_field).sort((a, b) => b[1] - a[1]).map(([f, n]) => `${fieldLabel(f)} (${n})`).join(", ") }}.
+					</template>
+				</p>
+
+				<section>
+					<h3 class="mb-2 text-xs font-semibold uppercase tracking-wide text-ink-gray-5">Suggested rules</h3>
+					<p v-if="!learning.suggestions.length" class="text-ink-gray-5">
+						No suggestions. When someone corrects the invoice number, a date or an amount the AI read, a rule for that supplier is suggested here.
+					</p>
+					<div v-for="s in learning.suggestions" :key="s.name" class="mb-2 rounded-md border border-outline-gray-2 p-3">
+						<div class="flex flex-wrap items-center gap-2">
+							<span class="font-medium text-ink-gray-9">{{ s.skill_name }}</span>
+							<span class="rounded bg-surface-gray-2 px-1.5 py-0.5 text-[11px] text-ink-gray-7">{{ s.occurrences || 1 }}×</span>
+							<span class="ml-auto flex gap-2" v-if="learning.can_write">
+								<button type="button" class="btn" @click="dismiss(s)">Dismiss</button>
+								<button type="button" class="btn-primary" @click="accept(s)">Use this rule</button>
+							</span>
+						</div>
+						<p v-for="(rule, i) in s.rules" :key="i" class="mt-1 text-ink-gray-8">
+							<span class="text-ink-gray-5">{{ rule.case_description }}:</span> {{ rule.action }}
+							<span class="block text-xs text-ink-gray-5">{{ rule.reason }}</span>
+						</p>
+					</div>
+				</section>
+
+				<section>
+					<h3 class="mb-2 text-xs font-semibold uppercase tracking-wide text-ink-gray-5">Corrections</h3>
+					<p v-if="!learning.corrections.length" class="text-ink-gray-5">No corrections yet.</p>
+					<table v-else class="w-full text-sm">
+						<thead>
+							<tr class="text-left text-[11px] uppercase tracking-wide text-ink-gray-5">
+								<th class="py-1 pr-2">Receipt</th>
+								<th class="py-1 pr-2">Supplier</th>
+								<th class="py-1 pr-2">Field</th>
+								<th class="py-1 pr-2">AI read</th>
+								<th class="py-1 pr-2">Corrected to</th>
+								<th class="py-1">By</th>
+							</tr>
+						</thead>
+						<tbody>
+							<tr v-for="(c, i) in learning.corrections" :key="i" class="border-t border-outline-gray-1">
+								<td class="py-1 pr-2">
+									<router-link :to="{ name: 'ReceiptDetail', params: { name: c.reference_name } }" class="text-ink-blue-3 underline">{{ c.reference_name }}</router-link>
+								</td>
+								<td class="truncate py-1 pr-2">{{ c.supplier || "–" }}</td>
+								<td class="py-1 pr-2">{{ fieldLabel(c.field) }}</td>
+								<td class="py-1 pr-2 text-ink-red-4">{{ c.ai_value ?? "–" }}</td>
+								<td class="py-1 pr-2 text-ink-green-3">{{ c.human_value ?? "–" }}</td>
+								<td class="py-1 text-ink-gray-6">{{ c.user_name }}</td>
+							</tr>
+						</tbody>
+					</table>
+				</section>
+			</div>
+		</div>
+
 		<!-- Runs -->
 		<div v-else class="flex min-h-0 flex-1 flex-col lg:flex-row">
 			<div class="min-h-0 overflow-y-auto border-b border-outline-gray-2 lg:w-[34rem] lg:flex-none lg:border-b-0 lg:border-r">
@@ -154,8 +218,9 @@ const router = useRouter()
 const tabs = [
 	{ key: "skills", label: "Skills" },
 	{ key: "runs", label: "Runs" },
+	{ key: "learning", label: "Learning" },
 ]
-const tab = computed(() => (route.query.tab === "runs" ? "runs" : "skills"))
+const tab = computed(() => (["runs", "learning"].includes(route.query.tab) ? route.query.tab : "skills"))
 const selectedSkill = computed(() => route.query.skill || "")
 const selectedRun = computed(() => route.query.run || "")
 
@@ -236,6 +301,56 @@ watch(
 	},
 	{ immediate: true }
 )
+
+// --- learning ---
+const learning = ref(null)
+
+async function loadLearning() {
+	try {
+		learning.value = await call(`${API}.get_learning`, { doctype: "Accounting Receipt" })
+	} catch (e) {
+		toast({ title: e?.messages?.[0] || e?.message || "Could not load what the AI learned", icon: "x-circle", iconClasses: "text-ink-red-4" })
+	}
+}
+watch(tab, (value) => value === "learning" && loadLearning(), { immediate: true })
+
+async function accept(suggestion) {
+	try {
+		await call(`${API}.accept_suggestion`, { name: suggestion.name })
+		toast({ title: `Rule on: ${suggestion.skill_name}`, icon: "check-circle", iconClasses: "text-ink-green-3" })
+		await Promise.all([loadLearning(), loadOverview()])
+	} catch (e) {
+		toast({ title: e?.messages?.[0] || e?.message || "Could not use the rule", icon: "x-circle", iconClasses: "text-ink-red-4" })
+	}
+}
+
+async function dismiss(suggestion) {
+	try {
+		await call(`${API}.dismiss_suggestion`, { name: suggestion.name })
+		await loadLearning()
+	} catch (e) {
+		toast({ title: e?.messages?.[0] || e?.message || "Could not dismiss the suggestion", icon: "x-circle", iconClasses: "text-ink-red-4" })
+	}
+}
+
+const FIELD_LABELS = {
+	supplier_reference: "Invoice number",
+	posting_date: "Invoice date",
+	due_date: "Due date",
+	sum: "Total",
+	net_total: "Net",
+	total_taxes: "Tax",
+	supplier: "Supplier",
+	currency: "Currency",
+	receipt_type: "Receipt type",
+	supplier_tax_id: "VAT ID",
+	supplier_iban: "IBAN",
+	payment_reference: "Payment reference",
+}
+
+function fieldLabel(field) {
+	return FIELD_LABELS[field] || field
+}
 
 function decisionLabel(decision) {
 	return { auto_datev: "→ DATEV", approve_to_pay: "→ approve", needs_human: "→ person", not_a_voucher: "→ not a voucher" }[decision] || decision
