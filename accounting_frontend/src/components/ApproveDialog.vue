@@ -46,14 +46,17 @@
 					<span v-if="options.payment_request">Payment Request {{ options.payment_request }} already exists</span>
 					<span v-else>Create a Payment Request</span>
 				</label>
-				<p v-if="form.create_payment_request && !options.payment_request" class="text-xs" :class="options.supplier_bank_account ? 'text-ink-gray-5' : 'text-ink-amber-3'">
-					<template v-if="options.supplier_bank_account">
-						Pays to {{ options.supplier_iban || options.supplier_bank_account }}.
-					</template>
-					<template v-else>
-						The supplier has no bank account in ERPNext, so the Payment Request has no IBAN to pay to{{ options.receipt_iban ? ` (the receipt shows ${options.receipt_iban})` : "" }}.
-					</template>
-				</p>
+				<template v-if="form.create_payment_request && !options.payment_request">
+					<p v-if="options.supplier_bank_account" class="text-xs text-ink-gray-5">Pays to {{ options.supplier_iban || options.supplier_bank_account }}.</p>
+					<label v-else-if="options.receipt_iban_valid" class="flex items-start gap-2 text-xs">
+						<input v-model="form.save_supplier_iban" type="checkbox" class="mt-0.5" />
+						<span>Save {{ options.receipt_iban }} from the receipt as the supplier's bank account, so the Payment Request pays there.</span>
+					</label>
+					<p v-else class="text-xs text-ink-amber-3">
+						The supplier has no bank account in ERPNext, so the Payment Request has no IBAN to pay to.
+						{{ options.receipt_iban ? `The receipt's IBAN ${options.receipt_iban} is not valid.` : "Add the IBAN to the receipt to save it here." }}
+					</p>
+				</template>
 			</div>
 		</template>
 	</Dialog>
@@ -75,7 +78,7 @@ const emit = defineEmits(["update:modelValue", "approved"])
 
 const options = ref(null)
 const saving = ref(false)
-const form = reactive({ bank_account: null, mode_of_payment: null, due_date: null, create_payment_request: true })
+const form = reactive({ bank_account: null, mode_of_payment: null, due_date: null, create_payment_request: true, save_supplier_iban: true })
 
 const amountText = computed(() => {
 	const amount = options.value?.outstanding_amount ?? props.receipt.sum
@@ -97,6 +100,7 @@ async function load() {
 			mode_of_payment: res.mode_of_payment,
 			due_date: res.due_date,
 			create_payment_request: !res.payment_request && !!res.can_create_payment_request,
+			save_supplier_iban: !res.supplier_bank_account && !!res.receipt_iban_valid,
 		})
 	} catch (e) {
 		toast({ title: e?.messages?.[0] || e?.message || "Could not load the approval options", icon: "x-circle", iconClasses: "text-ink-red-4" })
@@ -120,6 +124,7 @@ async function submit() {
 			mode_of_payment: form.mode_of_payment,
 			due_date: form.due_date,
 			create_payment_request: form.create_payment_request ? 1 : 0,
+			save_supplier_iban: form.save_supplier_iban && !options.value.supplier_bank_account ? 1 : 0,
 		})
 		emit("update:modelValue", false)
 		emit("approved", res)

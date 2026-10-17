@@ -118,6 +118,7 @@ class TestSuppliers(FrappeTestCase):
 		self.assertTrue(supplier.supplier_primary_address)
 		account = frappe.get_doc("Bank Account", {"party": supplier.name})
 		self.assertEqual(account.iban, "DE89370400440532013000")
+		self.assertEqual(account.is_default, 1)
 		self.assertEqual(account.bank, "BLZ 37040044")
 		self.assertEqual(frappe.db.get_value("Accounting Receipt", doc.name, "supplier"), supplier.name)
 

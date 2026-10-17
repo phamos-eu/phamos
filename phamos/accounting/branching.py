@@ -163,13 +163,6 @@ def company_bank_accounts(company):
 	)
 
 
-def supplier_bank_account(supplier):
-	"""The supplier's bank account ERPNext puts on the Payment Request (the creditor's IBAN)."""
-	from erpnext.accounts.doctype.bank_account.bank_account import get_party_bank_account
-
-	return get_party_bank_account("Supplier", supplier) if supplier else None
-
-
 def make_payment_request(receipt, mode_of_payment=None, bank_account=None):
 	"""Submitted outward Payment Request for the receipt's submitted Purchase Invoice.
 

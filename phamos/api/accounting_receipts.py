@@ -377,19 +377,10 @@ def create_supplier_from_receipt(name, supplier_name, supplier_group=None, tax_c
 		).insert()
 		supplier.db_set("supplier_primary_address", address.name, update_modified=False)
 
-	iban = cstr(iban).replace(" ", "").upper()
-	if iban:
-		frappe.get_doc(
-			{
-				"doctype": "Bank Account",
-				"account_name": supplier_name,
-				"bank": _bank_for(iban, bank_name),
-				"party_type": "Supplier",
-				"party": supplier.name,
-				"iban": iban,
-				"is_company_account": 0,
-			}
-		).insert()
+	if cstr(iban).strip():
+		from phamos.accounting.supplier_bank import ensure_supplier_bank_account
+
+		ensure_supplier_bank_account(supplier.name, iban, bank_name, account_name=supplier_name)
 
 	doc.reload()
 	doc.supplier = supplier.name
@@ -397,15 +388,6 @@ def create_supplier_from_receipt(name, supplier_name, supplier_group=None, tax_c
 		doc.supplier_tax_id = cstr(tax_id).replace(" ", "")
 	doc.save()
 	return get_receipt(name)
-
-
-def _bank_for(iban, bank_name=None):
-	"""Bank record for a supplier account: the given name, else one named after the German
-	bank code (BLZ) in the IBAN, else after the IBAN country."""
-	name = cstr(bank_name).strip() or (f"BLZ {iban[4:12]}" if iban.startswith("DE") and len(iban) >= 12 else f"Bank {iban[:2]}")
-	if not frappe.db.exists("Bank", name):
-		frappe.get_doc({"doctype": "Bank", "bank_name": name}).insert(ignore_permissions=True)
-	return name
 
 
 # --- Work queue and list ------------------------------------------------------------------
@@ -618,7 +600,8 @@ def suggest_accounts(name):
 def get_approval_options(name):
 	"""What the approve dialog offers: company bank accounts, modes of payment, the due date,
 	and whether the supplier has the bank account the Payment Request needs."""
-	from phamos.accounting.branching import company_bank_accounts, open_payment_request, supplier_bank_account
+	from phamos.accounting.branching import company_bank_accounts, open_payment_request
+	from phamos.accounting.supplier_bank import any_account, is_valid_iban, normalize_iban
 	from phamos.phamos.doctype.accounting_receipt.accounting_receipt import submitted_purchase_invoice
 
 	doc = frappe.get_doc("Accounting Receipt", name)
@@ -627,7 +610,7 @@ def get_approval_options(name):
 	pi = submitted_purchase_invoice(doc)
 	pi_values = frappe.db.get_value("Purchase Invoice", pi, ["due_date", "outstanding_amount", "grand_total", "currency"], as_dict=True) if pi else {}
 	accounts = company_bank_accounts(company)
-	supplier_account = supplier_bank_account(doc.supplier)
+	supplier_account = any_account(doc.supplier)
 	return {
 		"purchase_invoice": pi,
 		"outstanding_amount": pi_values.get("outstanding_amount"),
@@ -635,32 +618,35 @@ def get_approval_options(name):
 		"due_date": str(doc.due_date or pi_values.get("due_date") or "") or None,
 		"bank_accounts": accounts,
 		"bank_account": doc.bank_account or (accounts[0].name if accounts else None),
-		"modes_of_payment": frappe.get_all("Mode of Payment", filters={"enabled": 1, "type": ("in", ("Bank", "General"))}, pluck="name", order_by="name"),
+		"modes_of_payment": frappe.get_all("Mode of Payment", filters={"enabled": 1}, pluck="name", order_by="name"),
 		"mode_of_payment": doc.mode_of_payment or ("Wire Transfer" if frappe.db.exists("Mode of Payment", "Wire Transfer") else None),
 		"supplier_bank_account": supplier_account,
 		"supplier_iban": frappe.db.get_value("Bank Account", supplier_account, "iban") if supplier_account else None,
-		"receipt_iban": doc.supplier_iban,
+		"receipt_iban": normalize_iban(doc.supplier_iban) or None,
+		"receipt_iban_valid": 1 if doc.supplier_iban and is_valid_iban(doc.supplier_iban) else 0,
+		"supplier": doc.supplier,
+		"is_paid": doc.is_paid,
+		"payment_date": str(doc.payment_date) if doc.payment_date else None,
 		"payment_request": open_payment_request(doc),
 		"can_create_payment_request": 1 if frappe.has_permission("Payment Request", "create") else 0,
 	}
 
 
 @frappe.whitelist(methods=["POST"])
-def approve_receipt(name, bank_account=None, mode_of_payment=None, due_date=None, create_payment_request=1):
+def approve_receipt(name, bank_account=None, mode_of_payment=None, due_date=None, create_payment_request=1,
+		save_supplier_iban=0):
 	"""Approve to pay: store how and when it is paid, set the status and create the
-	Payment Request for the submitted Purchase Invoice. All or nothing."""
+	Payment Request for the submitted Purchase Invoice. All or nothing.
+
+	With save_supplier_iban the receipt's IBAN becomes the supplier's (default) Bank
+	Account first, so the Payment Request knows where to pay to."""
 	from phamos.accounting.branching import make_payment_request, open_payment_request
+	from phamos.accounting import supplier_bank
 	from phamos.api.accounting_spa import get_receipt
 
 	doc = frappe.get_doc("Accounting Receipt", name)
 	doc.check_permission("write")
-	if bank_account:
-		company = doc.company or frappe.defaults.get_global_default("company")
-		account = frappe.db.get_value("Bank Account", bank_account, ["is_company_account", "company", "account"], as_dict=True)
-		if not account or not account.is_company_account or account.company != company:
-			frappe.throw(_("{0} is not a bank account of {1}.").format(bank_account, company))
-		doc.bank_account = bank_account
-		doc.payment_account = account.account
+	_set_paying_account(doc, bank_account)
 	if mode_of_payment:
 		doc.mode_of_payment = mode_of_payment
 	if due_date:
@@ -669,8 +655,46 @@ def approve_receipt(name, bank_account=None, mode_of_payment=None, due_date=None
 	doc.save()
 	payment_request = open_payment_request(doc)
 	if cint(create_payment_request) and not payment_request:
+		if cint(save_supplier_iban) and doc.supplier_iban:
+			supplier_bank.ensure_supplier_bank_account(doc.supplier, doc.supplier_iban)
+		elif not supplier_bank.default_account(doc.supplier) and supplier_bank.any_account(doc.supplier):
+			# The supplier has an account that is not marked default; ERPNext would ignore it.
+			existing = supplier_bank.any_account(doc.supplier)
+			supplier_bank.ensure_supplier_bank_account(doc.supplier, frappe.db.get_value("Bank Account", existing, "iban"))
 		payment_request = make_payment_request(doc, mode_of_payment=doc.mode_of_payment, bank_account=doc.bank_account).name
 	return {"payment_request": payment_request, "receipt": get_receipt(name)}
+
+
+def _set_paying_account(doc, bank_account):
+	"""Store one of the company's own bank accounts (and its ledger account) on the receipt."""
+	if not bank_account:
+		return
+	company = doc.company or frappe.defaults.get_global_default("company")
+	account = frappe.db.get_value("Bank Account", bank_account, ["is_company_account", "company", "account"], as_dict=True)
+	if not account or not account.is_company_account or account.company != company:
+		frappe.throw(_("{0} is not a bank account of {1}.").format(bank_account, company))
+	doc.bank_account = bank_account
+	doc.payment_account = account.account
+
+
+@frappe.whitelist(methods=["POST"])
+def mark_receipt_paid(name, payment_date=None, mode_of_payment=None, bank_account=None, cancel_payment_request=1):
+	"""Already paid (card, direct debit, PayPal, privately): record when and how, set the
+	status to Paid and cancel a Payment Request that is no longer needed."""
+	from phamos.accounting.branching import cancel_payment_request as cancel_request
+	from phamos.api.accounting_spa import get_receipt
+
+	doc = frappe.get_doc("Accounting Receipt", name)
+	doc.check_permission("write")
+	_set_paying_account(doc, bank_account)
+	doc.is_paid = 1
+	doc.payment_date = payment_date or doc.payment_date or frappe.utils.today()
+	if mode_of_payment:
+		doc.mode_of_payment = mode_of_payment
+	doc.status = "Paid"
+	doc.save()
+	cancelled = cancel_request(doc) if cint(cancel_payment_request) else None
+	return {"cancelled_payment_request": cancelled, "receipt": get_receipt(name)}
 
 
 @frappe.whitelist(methods=["POST"])
