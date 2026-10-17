@@ -118,11 +118,6 @@ def get_issue_chat_states(names):
 	return dc.get_issue_chat_states(names)
 
 
-@frappe.whitelist(methods=["POST"])
-def start_issue_dm(name, user):
-	"""Open the Raven DM with a user, carrying a link to an Issue in HR scope."""
-	return dc.start_issue_dm(CONFIG, name, user)
-
 
 @frappe.whitelist(methods=["POST"])
 def update_issue(name, subject=None, description=None, priority=None, issue_type=None, project=None):

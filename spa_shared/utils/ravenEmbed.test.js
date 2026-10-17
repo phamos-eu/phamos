@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest"
-import { classifyPath } from "./ravenEmbed.js"
+import { classifyPath, threadIdFromHref } from "./ravenEmbed.js"
 
 const CHANNEL = "/raven/Issues/issues-issue-iss-2026-00044"
 
@@ -33,5 +33,14 @@ describe("Raven embed paths", () => {
 		expect(classifyPath("/personal-cockpit/issues/list/ISS-1", CHANNEL)).toBe("outside")
 		expect(classifyPath("/ravenous", CHANNEL)).toBe("outside")
 		expect(classifyPath("/app/issue/ISS-1", CHANNEL)).toBe("outside")
+	})
+})
+
+describe("Raven thread links", () => {
+	it("reads the thread id from a pill's link", () => {
+		expect(threadIdFromHref("/raven/Issues/issues-issue-iss-1/thread/tlj581p2hq")).toBe("tlj581p2hq")
+		expect(threadIdFromHref("/raven/Issues/c/thread/abc?message_id=abc")).toBe("abc")
+		expect(threadIdFromHref("/raven/Issues/c")).toBe("")
+		expect(threadIdFromHref(null)).toBe("")
 	})
 })
