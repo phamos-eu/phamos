@@ -1,0 +1,237 @@
+{
+ "actions": [],
+ "autoname": "ACA-.#####",
+ "creation": "2026-10-17 14:00:00.000000",
+ "doctype": "DocType",
+ "engine": "InnoDB",
+ "field_order": [
+  "company",
+  "supplier",
+  "pattern",
+  "sample_description",
+  "column_break_target",
+  "expense_account",
+  "cost_center",
+  "disabled",
+  "validation_section",
+  "validation",
+  "origin",
+  "reference",
+  "column_break_validation",
+  "validated_by",
+  "validated_at",
+  "validation_note",
+  "usage_section",
+  "hits",
+  "misses",
+  "column_break_usage",
+  "last_used",
+  "last_receipt"
+ ],
+ "fields": [
+  {
+   "fieldname": "company",
+   "fieldtype": "Link",
+   "label": "Company",
+   "options": "Company",
+   "reqd": 1,
+   "in_standard_filter": 1
+  },
+  {
+   "fieldname": "supplier",
+   "fieldtype": "Link",
+   "label": "Supplier",
+   "options": "Supplier",
+   "in_list_view": 1,
+   "in_standard_filter": 1,
+   "description": "Empty: applies to every supplier."
+  },
+  {
+   "fieldname": "pattern",
+   "fieldtype": "Data",
+   "label": "Pattern",
+   "in_list_view": 1,
+   "search_index": 1,
+   "read_only": 1,
+   "description": "The normalized description that is matched. Set from the sample description."
+  },
+  {
+   "fieldname": "sample_description",
+   "fieldtype": "Data",
+   "label": "Sample Description",
+   "reqd": 1,
+   "length": 140
+  },
+  {
+   "fieldname": "column_break_target",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "expense_account",
+   "fieldtype": "Link",
+   "label": "Expense Account",
+   "options": "Account",
+   "reqd": 1,
+   "in_list_view": 1,
+   "in_standard_filter": 1
+  },
+  {
+   "fieldname": "cost_center",
+   "fieldtype": "Link",
+   "label": "Cost Center",
+   "options": "Cost Center"
+  },
+  {
+   "fieldname": "disabled",
+   "fieldtype": "Check",
+   "label": "Disabled",
+   "default": "0"
+  },
+  {
+   "fieldname": "validation_section",
+   "fieldtype": "Section Break",
+   "label": "Validation"
+  },
+  {
+   "fieldname": "validation",
+   "fieldtype": "Select",
+   "label": "Validation",
+   "options": "AI\nConfirmed\nOfficially Validated",
+   "default": "AI",
+   "in_list_view": 1,
+   "in_standard_filter": 1,
+   "description": "AI: proposed by the AI. Confirmed: chosen or accepted by a person. Officially Validated: checked by the accounting office."
+  },
+  {
+   "fieldname": "origin",
+   "fieldtype": "Select",
+   "label": "Origin",
+   "options": "History\nAI\nHuman\nOffice\nReference",
+   "default": "Human",
+   "in_standard_filter": 1
+  },
+  {
+   "fieldname": "reference",
+   "fieldtype": "Data",
+   "label": "Reference",
+   "description": "Where the entry came from, for example an external list."
+  },
+  {
+   "fieldname": "column_break_validation",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "validated_by",
+   "fieldtype": "Link",
+   "label": "Validated By",
+   "options": "User",
+   "read_only": 1
+  },
+  {
+   "fieldname": "validated_at",
+   "fieldtype": "Datetime",
+   "label": "Validated At",
+   "read_only": 1
+  },
+  {
+   "fieldname": "validation_note",
+   "fieldtype": "Small Text",
+   "label": "Validation Note"
+  },
+  {
+   "fieldname": "usage_section",
+   "fieldtype": "Section Break",
+   "label": "Usage"
+  },
+  {
+   "fieldname": "hits",
+   "fieldtype": "Int",
+   "label": "Hits",
+   "read_only": 1,
+   "default": "0",
+   "description": "Times the account was used or accepted for this pattern."
+  },
+  {
+   "fieldname": "misses",
+   "fieldtype": "Int",
+   "label": "Misses",
+   "read_only": 1,
+   "default": "0",
+   "description": "Times a person replaced the account this entry proposed."
+  },
+  {
+   "fieldname": "column_break_usage",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "last_used",
+   "fieldtype": "Date",
+   "label": "Last Used",
+   "read_only": 1
+  },
+  {
+   "fieldname": "last_receipt",
+   "fieldtype": "Link",
+   "label": "Last Receipt",
+   "options": "Accounting Receipt",
+   "read_only": 1
+  }
+ ],
+ "index_web_pages_for_search": 0,
+ "links": [],
+ "modified": "2026-10-17 14:00:00.000000",
+ "modified_by": "Administrator",
+ "module": "Phamos",
+ "name": "Account Assignment",
+ "naming_rule": "Expression (old style)",
+ "owner": "Administrator",
+ "permissions": [
+  {
+   "role": "System Manager",
+   "read": 1,
+   "report": 1,
+   "export": 1,
+   "print": 1,
+   "email": 1,
+   "share": 1,
+   "write": 1,
+   "create": 1,
+   "delete": 1
+  },
+  {
+   "role": "Accounts Manager",
+   "read": 1,
+   "report": 1,
+   "export": 1,
+   "print": 1,
+   "email": 1,
+   "share": 1,
+   "write": 1,
+   "create": 1,
+   "delete": 1
+  },
+  {
+   "role": "Accounts User",
+   "read": 1,
+   "report": 1,
+   "export": 1,
+   "print": 1,
+   "email": 1,
+   "share": 1,
+   "write": 1,
+   "create": 1
+  },
+  {
+   "role": "AI Accountant",
+   "read": 1
+  }
+ ],
+ "search_fields": "sample_description,expense_account",
+ "show_title_field_in_link": 0,
+ "sort_field": "modified",
+ "sort_order": "DESC",
+ "states": [],
+ "title_field": "sample_description",
+ "track_changes": 1,
+ "description": "What the AI Accountant learned: which expense account a kind of receipt line goes to."
+}

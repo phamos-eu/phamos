@@ -607,6 +607,14 @@ def send_receipts_to_datev(names):
 
 
 @frappe.whitelist(methods=["POST"])
+def suggest_accounts(name):
+	"""Propose expense accounts for the receipt's lines that have none (library, then Mistral)."""
+	from phamos.accounting.classify import suggest_accounts as suggest
+
+	return suggest(name)
+
+
+@frappe.whitelist(methods=["POST"])
 def make_purchase_invoice(name, submit=0):
 	"""Create the Purchase Invoice from the receipt's lines (draft unless submit=1)."""
 	from phamos.accounting.branching import make_purchase_invoice as build

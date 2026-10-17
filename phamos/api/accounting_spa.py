@@ -561,6 +561,13 @@ def get_receipt(name):
 					"amount": i.amount,
 					"tax_rate": i.tax_rate,
 					"expense_account": i.expense_account,
+					"assignment_source": i.assignment_source,
+					"assignment": i.assignment,
+					"assignment_validation": frappe.db.get_value("Account Assignment", i.assignment, "validation") if i.assignment else None,
+					"ai_expense_account": i.ai_expense_account,
+					"ai_confidence": i.ai_confidence,
+					"ai_reason": i.ai_reason,
+					"ai_candidates": frappe.parse_json(i.ai_candidates) if i.ai_candidates else [],
 				}
 				for i in doc.items
 			],

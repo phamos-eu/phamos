@@ -160,7 +160,19 @@
 			<section>
 				<div class="mb-1.5 flex items-center justify-between">
 					<h3 class="text-xs font-semibold uppercase tracking-wide text-ink-gray-5">Items</h3>
-					<button v-if="!readonly" type="button" class="text-xs text-ink-gray-6 hover:text-ink-gray-9" @click="addItem">+ Add line</button>
+					<div class="flex items-center gap-3">
+						<button
+							v-if="!readonly && openLines"
+							type="button"
+							class="text-xs text-ink-gray-6 hover:text-ink-gray-9 disabled:opacity-50"
+							:disabled="suggesting"
+							title="Library first, then the AI, for lines without an expense account"
+							@click="suggestAccounts"
+						>
+							{{ suggesting ? "Suggesting…" : `Suggest accounts (${openLines})` }}
+						</button>
+						<button v-if="!readonly" type="button" class="text-xs text-ink-gray-6 hover:text-ink-gray-9" @click="addItem">+ Add line</button>
+					</div>
 				</div>
 				<p v-if="!autosave.draft.items.length" class="text-sm text-ink-gray-5">No item lines yet.</p>
 				<table v-else class="w-full text-sm">
@@ -187,7 +199,24 @@
 										placeholder="Expense account"
 										@update:model-value="(value) => setItem(i, 'expense_account', value)"
 									/>
-									<div v-if="!item.expense_account" class="truncate px-1 text-[11px] text-ink-amber-3">no expense account yet</div>
+									<div v-if="!item.expense_account && item.ai_candidates?.length" class="flex flex-wrap items-center gap-1 px-1 pt-0.5 text-[11px]">
+										<span class="text-ink-amber-3" :title="item.ai_reason || ''">Not sure:</span>
+										<button
+											v-for="c in item.ai_candidates"
+											:key="c.account"
+											type="button"
+											class="rounded border border-outline-gray-2 px-1.5 py-px text-ink-gray-7 hover:border-outline-gray-4 hover:text-ink-gray-9"
+											:title="c.reason"
+											:disabled="readonly"
+											@click="setItem(i, 'expense_account', c.account)"
+										>
+											{{ accountLabel(c.account) }} · {{ c.score }} %
+										</button>
+									</div>
+									<div v-else-if="!item.expense_account" class="truncate px-1 text-[11px] text-ink-amber-3" :title="item.ai_reason || ''">no expense account yet</div>
+									<div v-else-if="sourceBadge(item)" class="truncate px-1 text-[11px]" :class="sourceBadge(item).class" :title="item.ai_reason || ''">
+										{{ sourceBadge(item).text }}
+									</div>
 								</div>
 							</td>
 							<td class="py-1 pr-2 align-top">
@@ -380,6 +409,46 @@ function onSupplierCreated(receipt) {
 
 // --- expense accounts and Purchase Invoice ----------------------------------------------
 const creatingInvoice = ref(false)
+const suggesting = ref(false)
+const openLines = computed(() => autosave.draft.items.filter((row) => !row.expense_account).length)
+
+function accountLabel(account) {
+	// "6805 - Telefon - P" → "6805 - Telefon"
+	return (account || "").replace(/ - [^-]+$/, "")
+}
+
+// Where a line's account came from, while it is still the one the library or the AI set.
+function sourceBadge(item) {
+	if (!item.assignment_source || item.assignment_source === "Human") return null
+	if (item.expense_account !== item.ai_expense_account) return null
+	const score = Math.round(Number(item.ai_confidence || 0))
+	const sure = score >= 90
+	const text = {
+		Library: `Library${item.assignment_validation && item.assignment_validation !== "AI" ? ` ✓ ${item.assignment_validation}` : ""} · ${score} %`,
+		"Supplier History": `Supplier's usual account · ${score} %`,
+		AI: `AI proposal · ${score} %`,
+	}[item.assignment_source]
+	return { text, class: sure ? "text-ink-green-3" : "text-ink-amber-3" }
+}
+
+async function suggestAccounts() {
+	suggesting.value = true
+	try {
+		await autosave.flush()
+		const res = await call(`${API}.suggest_accounts`, { name: props.receipt.name })
+		const { assigned, unclear } = res.result || {}
+		toast({
+			title: unclear ? `${assigned} lines assigned, ${unclear} need your choice` : `${assigned} lines assigned`,
+			icon: unclear ? "alert-triangle" : "check-circle",
+			iconClasses: unclear ? "text-ink-amber-3" : "text-ink-green-3",
+		})
+		emit("updated", res.receipt)
+	} catch (e) {
+		toast({ title: e?.messages?.[0] || e?.message || "Could not suggest accounts", icon: "x-circle", iconClasses: "text-ink-red-4" })
+	} finally {
+		suggesting.value = false
+	}
+}
 
 // Leaf expense accounts of the receipt's company: what a purchase line can be booked on.
 const accountFilters = computed(() => ({

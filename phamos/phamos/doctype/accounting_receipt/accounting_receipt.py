@@ -56,6 +56,16 @@ class AccountingReceipt(Document):
 			if self.sum:
 				self.sum_in_company_currency = float(self.sum) * float(rate)
 
+	def before_save(self):
+		from phamos.accounting.library import mark_human_choices
+
+		mark_human_choices(self)
+
+	def on_update(self):
+		from phamos.accounting.library import learn_from_receipt
+
+		learn_from_receipt(self)
+
 	@frappe.whitelist()
 	def make_purchase_invoice(self):
 		"""Create a draft Purchase Invoice from this receipt.
