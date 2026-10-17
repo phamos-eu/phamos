@@ -7,7 +7,7 @@
 				v-model="query"
 				type="search"
 				class="h-7 w-40 rounded border-none bg-surface-gray-2 pl-7 pr-14 text-sm text-ink-gray-8 placeholder-ink-gray-4 focus:bg-surface-gray-3 focus:ring-0 lg:w-56"
-				placeholder="Search this page  /"
+				placeholder="Search  /"
 				aria-label="Search this page"
 				@keydown.enter.prevent="step($event.shiftKey ? -1 : 1)"
 				@keydown.esc.prevent="clear"

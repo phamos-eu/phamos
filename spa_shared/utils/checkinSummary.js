@@ -28,7 +28,10 @@ export function actionLabel(state) {
 export function caption(state, formatTime, formatDay) {
 	const last = state?.last
 	if (!last) return "not checked in yet"
-	const when = state.stale_in ? `${formatDay(last.time)} ${formatTime(last.time)}` : formatTime(last.time)
+	// The day is shown whenever the last log is not one of today's (e.g. a Thursday check-out seen
+	// on Saturday), not only for a check-in left open.
+	const fromToday = !state.stale_in && (state.today?.logs || []).some((log) => log.name === last.name)
+	const when = fromToday ? formatTime(last.time) : `${formatDay(last.time)} ${formatTime(last.time)}`
 	return `${last.log_type === "IN" ? "in" : "out"} since ${when}`
 }
 
