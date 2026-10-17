@@ -615,6 +615,65 @@ def suggest_accounts(name):
 
 
 @frappe.whitelist(methods=["POST"])
+def get_approval_options(name):
+	"""What the approve dialog offers: company bank accounts, modes of payment, the due date,
+	and whether the supplier has the bank account the Payment Request needs."""
+	from phamos.accounting.branching import company_bank_accounts, open_payment_request, supplier_bank_account
+	from phamos.phamos.doctype.accounting_receipt.accounting_receipt import submitted_purchase_invoice
+
+	doc = frappe.get_doc("Accounting Receipt", name)
+	doc.check_permission("read")
+	company = doc.company or frappe.defaults.get_global_default("company")
+	pi = submitted_purchase_invoice(doc)
+	pi_values = frappe.db.get_value("Purchase Invoice", pi, ["due_date", "outstanding_amount", "grand_total", "currency"], as_dict=True) if pi else {}
+	accounts = company_bank_accounts(company)
+	supplier_account = supplier_bank_account(doc.supplier)
+	return {
+		"purchase_invoice": pi,
+		"outstanding_amount": pi_values.get("outstanding_amount"),
+		"currency": pi_values.get("currency") or doc.currency,
+		"due_date": str(doc.due_date or pi_values.get("due_date") or "") or None,
+		"bank_accounts": accounts,
+		"bank_account": doc.bank_account or (accounts[0].name if accounts else None),
+		"modes_of_payment": frappe.get_all("Mode of Payment", filters={"enabled": 1, "type": ("in", ("Bank", "General"))}, pluck="name", order_by="name"),
+		"mode_of_payment": doc.mode_of_payment or ("Wire Transfer" if frappe.db.exists("Mode of Payment", "Wire Transfer") else None),
+		"supplier_bank_account": supplier_account,
+		"supplier_iban": frappe.db.get_value("Bank Account", supplier_account, "iban") if supplier_account else None,
+		"receipt_iban": doc.supplier_iban,
+		"payment_request": open_payment_request(doc),
+		"can_create_payment_request": 1 if frappe.has_permission("Payment Request", "create") else 0,
+	}
+
+
+@frappe.whitelist(methods=["POST"])
+def approve_receipt(name, bank_account=None, mode_of_payment=None, due_date=None, create_payment_request=1):
+	"""Approve to pay: store how and when it is paid, set the status and create the
+	Payment Request for the submitted Purchase Invoice. All or nothing."""
+	from phamos.accounting.branching import make_payment_request, open_payment_request
+	from phamos.api.accounting_spa import get_receipt
+
+	doc = frappe.get_doc("Accounting Receipt", name)
+	doc.check_permission("write")
+	if bank_account:
+		company = doc.company or frappe.defaults.get_global_default("company")
+		account = frappe.db.get_value("Bank Account", bank_account, ["is_company_account", "company", "account"], as_dict=True)
+		if not account or not account.is_company_account or account.company != company:
+			frappe.throw(_("{0} is not a bank account of {1}.").format(bank_account, company))
+		doc.bank_account = bank_account
+		doc.payment_account = account.account
+	if mode_of_payment:
+		doc.mode_of_payment = mode_of_payment
+	if due_date:
+		doc.due_date = due_date
+	doc.status = "Approved to Pay"
+	doc.save()
+	payment_request = open_payment_request(doc)
+	if cint(create_payment_request) and not payment_request:
+		payment_request = make_payment_request(doc, mode_of_payment=doc.mode_of_payment, bank_account=doc.bank_account).name
+	return {"payment_request": payment_request, "receipt": get_receipt(name)}
+
+
+@frappe.whitelist(methods=["POST"])
 def submit_purchase_invoice(name):
 	"""Submit the receipt's draft Purchase Invoice (needed before approving to pay)."""
 	from phamos.api.accounting_spa import get_receipt

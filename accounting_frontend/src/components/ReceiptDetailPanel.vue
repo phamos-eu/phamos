@@ -255,6 +255,11 @@
 					{{ receipt.purchase_invoice }}
 				</a>
 				<span v-if="receipt.purchase_invoice_status" class="rounded bg-surface-gray-2 px-1.5 py-0.5 text-xs text-ink-gray-7">{{ receipt.purchase_invoice_status }}</span>
+				<template v-if="receipt.payment_request">
+					<span class="text-ink-gray-4">·</span>
+					<a :href="`/app/payment-request/${receipt.payment_request}`" target="_blank" class="text-ink-blue-3 underline">{{ receipt.payment_request }}</a>
+					<span v-if="receipt.payment_request_status" class="rounded bg-surface-gray-2 px-1.5 py-0.5 text-xs text-ink-gray-7">{{ receipt.payment_request_status }}</span>
+				</template>
 				<template v-if="receipt.purchase_invoice && receipt.purchase_invoice_docstatus === 0">
 					<button type="button" class="btn" :disabled="readonly || submittingInvoice" @click="submitInvoice">
 						{{ submittingInvoice ? "Submitting…" : "Submit invoice" }}

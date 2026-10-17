@@ -14,7 +14,7 @@ from phamos.api import accounting_receipts, accounting_spa
 SUPPLIER = "Approval Test Lieferant GmbH"
 
 
-class TestApproveNeedsSubmittedInvoice(FrappeTestCase):
+class ApprovalTestCase(FrappeTestCase):
 	def setUp(self):
 		frappe.set_user("Administrator")
 		self.company = next(
@@ -46,6 +46,7 @@ class TestApproveNeedsSubmittedInvoice(FrappeTestCase):
 			}
 		).insert(ignore_permissions=True)
 
+class TestApproveNeedsSubmittedInvoice(ApprovalTestCase):
 	def test_without_invoice_approval_is_refused(self):
 		doc = self.receipt()
 		with self.assertRaises(frappe.ValidationError):
@@ -83,3 +84,68 @@ class TestApproveNeedsSubmittedInvoice(FrappeTestCase):
 		doc = self.receipt()
 		with self.assertRaises(frappe.ValidationError):
 			accounting_receipts.submit_purchase_invoice(doc.name)
+
+
+class TestApproveCreatesPaymentRequest(ApprovalTestCase):
+	def setUp(self):
+		super().setUp()
+		if not frappe.db.exists("Bank", "Approval Test Bank"):
+			frappe.get_doc({"doctype": "Bank", "bank_name": "Approval Test Bank"}).insert(ignore_permissions=True)
+		used = frappe.get_all("Bank Account", filters={"account": ("is", "set")}, pluck="account")
+		gl = frappe.db.get_value("Account", {"company": self.company, "account_type": "Bank", "is_group": 0,
+			"name": ("not in", used or [""])}, "name")
+		if not gl:
+			raise unittest.SkipTest("needs a bank ledger account that no Bank Account uses yet")
+		self.bank_account = frappe.get_doc(
+			{
+				"doctype": "Bank Account",
+				"account_name": "Approval Test Konto",
+				"bank": "Approval Test Bank",
+				"is_company_account": 1,
+				"company": self.company,
+				"account": gl,
+				"iban": "DE89370400440532013000",
+			}
+		).insert(ignore_permissions=True)
+
+	def approved_receipt_with_invoice(self):
+		doc = self.receipt()
+		branching.make_purchase_invoice(doc).submit()
+		return doc
+
+	def test_approve_creates_a_submitted_outward_payment_request(self):
+		doc = self.approved_receipt_with_invoice()
+		options = accounting_receipts.get_approval_options(doc.name)
+		self.assertIn(self.bank_account.name, [a.name for a in options["bank_accounts"]])
+		result = accounting_receipts.approve_receipt(doc.name, bank_account=self.bank_account.name, mode_of_payment="Wire Transfer",
+			due_date="2026-10-20")
+		pr = frappe.get_doc("Payment Request", result["payment_request"])
+		self.assertEqual((pr.docstatus, pr.payment_request_type, pr.status), (1, "Outward", "Initiated"))
+		self.assertEqual((pr.reference_doctype, pr.party), ("Purchase Invoice", SUPPLIER))
+		self.assertEqual(pr.grand_total, 10)
+		self.assertIn("Approval Test Konto", pr.message)
+		self.assertIn("RE-APP-1", pr.subject)
+		receipt = result["receipt"]
+		self.assertEqual((receipt["status"], receipt["payment_request"], receipt["bank_account"]), ("Approved to Pay", pr.name, self.bank_account.name))
+		self.assertEqual(frappe.db.get_value("Accounting Receipt", doc.name, "payment_account"), self.bank_account.account)
+		again = accounting_receipts.approve_receipt(doc.name, create_payment_request=1)
+		self.assertEqual(again["payment_request"], pr.name)
+		self.assertEqual(frappe.db.count("Payment Request", {"reference_name": pr.reference_name, "docstatus": 1}), 1)
+
+	def test_dont_pay_cancels_the_open_payment_request(self):
+		doc = self.approved_receipt_with_invoice()
+		pr = accounting_receipts.approve_receipt(doc.name, bank_account=self.bank_account.name)["payment_request"]
+		accounting_spa.update_receipt_status(doc.name, "Do Not Pay")
+		self.assertEqual(frappe.db.get_value("Payment Request", pr, ["docstatus", "status"]), (2, "Cancelled"))
+
+	def test_approval_without_invoice_creates_nothing(self):
+		doc = self.receipt()
+		with self.assertRaises(frappe.ValidationError):
+			accounting_receipts.approve_receipt(doc.name, bank_account=self.bank_account.name)
+		self.assertFalse(frappe.db.get_value("Accounting Receipt", doc.name, "payment_request"))
+
+	def test_paying_from_another_companys_account_is_refused(self):
+		doc = self.approved_receipt_with_invoice()
+		self.bank_account.db_set("is_company_account", 0)
+		with self.assertRaises(frappe.ValidationError):
+			accounting_receipts.approve_receipt(doc.name, bank_account=self.bank_account.name)
