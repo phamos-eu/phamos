@@ -1239,7 +1239,6 @@ Open in Raven,In Raven öffnen
 "Open this chat in Raven, in a new window",Diesen Chat in Raven in einem neuen Fenster öffnen
 Close the chat,Chat schließen
 "Not in the chat, since they have no Raven account: {0}","Nicht im Chat, da ohne Raven-Konto: {0}"
-{0} unread,{0} ungelesen
 Start chat,Chat starten
 Join chat,Chat beitreten
 Chat,Chat
@@ -1254,8 +1253,6 @@ Read the chat of this closed Issue (C),Den Chat dieser geschlossenen Anfrage les
 {0} converted this Issue to Task {1}.,{0} hat diese Anfrage in die Aufgabe {1} umgewandelt.
 About {0},Über {0}
 "Opens your Raven chat with {0} in a new window, with a link to {1}.","Öffnet Ihren Raven-Chat mit {0} in einem neuen Fenster, mit einem Link zu {1}."
-1 unread message in the chat,1 ungelesene Nachricht im Chat
-{0} unread messages in the chat,{0} ungelesene Nachrichten im Chat
 Chat (read-only),Chat (nur lesen)
 Open the chat,Chat öffnen
 Loading the chat…,Chat wird geladen …
@@ -1263,3 +1260,7 @@ No chat for this Issue yet.,Zu dieser Anfrage gibt es noch keinen Chat.
 "Start one with the people on this Issue. Messages also show up in Raven, linked to the Issue.","Starten Sie einen mit den Beteiligten dieser Anfrage. Die Nachrichten erscheinen auch in Raven, verknüpft mit der Anfrage."
 You are not in this chat yet.,Sie sind noch nicht in diesem Chat.
 Go to the chat,Zum Chat
+1 unread in the chat,1 ungelesen im Chat
+{0} unread in the chat,{0} ungelesen im Chat
+1 new reply in threads,1 neue Antwort in Threads
+{0} new replies in threads,{0} neue Antworten in Threads

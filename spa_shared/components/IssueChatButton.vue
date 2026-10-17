@@ -12,12 +12,13 @@
 		>
 			<template #prefix><FeatherIcon name="message-circle" class="h-3.5 w-3.5" /></template>
 			{{ buttonLabel }}
-			<template v-if="state.unread" #suffix>
+			<template v-if="unreadTotal" #suffix>
 				<span
-					class="ml-0.5 inline-flex h-4 min-w-[1rem] items-center justify-center rounded-full bg-surface-red-5 px-1 text-[10px] font-semibold text-ink-white"
-					:aria-label="__('{0} unread', [state.unread])"
+					class="ml-0.5 inline-flex h-4 min-w-[1rem] items-center justify-center gap-0.5 rounded-full bg-surface-red-5 px-1 text-[10px] font-semibold text-ink-white"
+					:aria-label="unreadSummary(state)"
 				>
-					{{ state.unread > 99 ? "99+" : state.unread }}
+					{{ unreadTotal > 99 ? "99+" : unreadTotal }}
+					<FeatherIcon v-if="state.unread_threads" name="corner-down-right" class="h-2.5 w-2.5" />
 				</span>
 			</template>
 		</Button>
@@ -65,6 +66,8 @@ import { sessionUser } from "@spa/session.js"
 import { __ } from "@spa/utils/i18n.js"
 import { dialogOpen, insideOverlay, isPlainKey, isTypingTarget } from "@spa/utils/shortcuts.js"
 import { chatChanged, issueChatStore } from "@spa/issueChatStore.js"
+import { useUserRealtime } from "@spa/composables/useUserRealtime.js"
+import { totalUnread, unreadSummary } from "@spa/utils/chatUnread.js"
 
 const props = defineProps({
 	issueName: { type: String, required: true },
@@ -74,7 +77,7 @@ const props = defineProps({
 	api: { type: String, required: true },
 })
 
-const EMPTY = { enabled: false, channel_id: null, url: null, is_member: false, archived: false, unread: 0, skipped_users: [] }
+const EMPTY = { enabled: false, channel_id: null, url: null, is_member: false, archived: false, unread: 0, unread_threads: 0, skipped_users: [] }
 const state = ref({ ...EMPTY })
 const busy = ref(false)
 const drawerOpen = ref(false)
@@ -82,6 +85,7 @@ const buttonRef = ref(null)
 const panelRef = ref(null)
 const loading = ref(true)
 const docked = computed(() => Boolean(panelRef.value?.inColumn))
+const unreadTotal = computed(() => totalUnread(state.value))
 
 const buttonLabel = computed(() => {
 	if (!state.value.channel_id) return __("Start chat")
@@ -91,8 +95,11 @@ const buttonLabel = computed(() => {
 const buttonTitle = computed(() => {
 	if (!state.value.channel_id) return __("Start a Raven chat with the people on this Issue (C)")
 	if (!state.value.is_member) return __("Join the Raven chat of this Issue (C)")
-	if (state.value.archived) return __("Read the chat of this closed Issue (C)")
-	return __("Open the Raven chat of this Issue (C)")
+	const base = state.value.archived
+		? __("Read the chat of this closed Issue (C)")
+		: __("Open the Raven chat of this Issue (C)")
+	const unread = unreadSummary(state.value)
+	return unread ? `${base} · ${unread}` : base
 })
 
 function errorText(e) {
@@ -159,7 +166,7 @@ async function onClick() {
 		return refresh()
 	}
 	if (!(await ensure())) return
-	// Raven marks the channel read once it is open.
+	// Raven marks the channel read once it is open (its threads stay unread until opened).
 	state.value = { ...state.value, unread: 0 }
 	drawerOpen.value = true
 	chatChanged()
@@ -194,6 +201,11 @@ realtime.on("message_created", (data) => {
 	if (data?.sender === sessionUser()) return
 	clearTimeout(refreshTimer)
 	refreshTimer = setTimeout(refresh, 300)
+})
+
+// A reply in a thread the user takes part in: Raven tells that user directly (#1623).
+useUserRealtime("raven:unread_thread_count_updated", () => {
+	if (!docked.value && state.value.is_member) refresh()
 })
 
 function onKeydown(event) {

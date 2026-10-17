@@ -166,6 +166,40 @@ def _unread_counts(channel_ids):
 	return {row.channel_id: row.unread for row in rows}
 
 
+def _unread_thread_counts(channel_ids):
+	"""Unread replies per chat in the threads of that chat the session user takes part in.
+
+	Raven's own rule (raven.api.threads.get_unread_threads): per-thread last visit, no System
+	messages, not counting the user's own. Raven shows these only on its Threads page, which the
+	embedded chat hides, so the cockpit badges count them (#1623).
+	"""
+	raven_user = _raven_user(frappe.session.user)
+	if not raven_user or not channel_ids:
+		return {}
+	thread = frappe.qb.DocType("Raven Channel")
+	root = frappe.qb.DocType("Raven Message")
+	member = frappe.qb.DocType("Raven Channel Member")
+	reply = frappe.qb.DocType("Raven Message", alias="reply")
+	rows = (
+		frappe.qb.from_(thread)
+		# A thread channel is named after the message it hangs off, which sits in the chat.
+		.join(root)
+		.on(root.name == thread.name)
+		.join(member)
+		.on((member.channel_id == thread.name) & (member.user_id == raven_user))
+		.join(reply)
+		.on(reply.channel_id == thread.name)
+		.select(root.channel_id, Count(reply.name).as_("unread"))
+		.where(thread.is_thread == 1)
+		.where(root.channel_id.isin(list(channel_ids)))
+		.where(reply.creation > member.last_visit)
+		.where(reply.message_type != "System")
+		.where(reply.owner != frappe.session.user)
+		.groupby(root.channel_id)
+	).run(as_dict=True)
+	return {row.channel_id: row.unread for row in rows}
+
+
 def _member_channels(channel_ids):
 	raven_user = _raven_user(frappe.session.user)
 	if not raven_user or not channel_ids:
@@ -190,6 +224,7 @@ def get_chat(doc):
 		"is_member": False,
 		"archived": False,
 		"unread": 0,
+		"unread_threads": 0,
 		"skipped_users": [],
 	}
 	if not state["enabled"]:
@@ -211,6 +246,7 @@ def get_chat(doc):
 		archived=bool(channel.is_archived),
 		is_member=channel.name in _member_channels([channel.name]),
 		unread=_unread_counts([channel.name]).get(channel.name, 0),
+		unread_threads=_unread_thread_counts([channel.name]).get(channel.name, 0),
 	)
 	return state
 
@@ -287,7 +323,8 @@ def _post_link_message(channel_id, doc, text):
 
 
 def get_chat_states(doctype, names):
-	"""Batched chat state for list views: {name: {channel_id, is_member, unread}}.
+	"""Batched chat state for list views: {name: {channel_id, is_member, archived, unread,
+	unread_threads}}.
 
 	Only records the session user may read and that have a chat are returned.
 	"""
@@ -314,12 +351,14 @@ def get_chat_states(doctype, names):
 	channel_ids = [c.name for c in channels]
 	members = _member_channels(channel_ids)
 	unread = _unread_counts(channel_ids)
+	unread_threads = _unread_thread_counts(channel_ids)
 	return {
 		c.linked_document: {
 			"channel_id": c.name,
 			"is_member": c.name in members,
 			"archived": bool(c.is_archived),
 			"unread": unread.get(c.name, 0),
+			"unread_threads": unread_threads.get(c.name, 0),
 		}
 		for c in channels
 	}

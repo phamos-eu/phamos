@@ -304,6 +304,34 @@ class TestIssueChat(FrappeTestCase):
 		).insert()
 		self.assertTrue(any(f"converted this Issue to Task {task.name}" in t for t in _system_lines(channel_id)))
 
+	def test_unread_thread_replies_are_counted(self):
+		from raven.api.threads import create_thread
+
+		channel_id = pc.ensure_issue_chat(self.issue.name)["channel_id"]
+		root = _send(channel_id, "A side topic")
+		# The assignee starts the thread on the owner's message: both take part in it.
+		frappe.set_user(ASSIGNEE)
+		thread_id = create_thread(root.name)["thread_id"]
+		_send(thread_id, "a reply")
+		_send(thread_id, "and another one")
+		_send(thread_id, "<b>one more</b>")
+
+		frappe.set_user(OWNER)
+		frappe.db.set_value(
+			"Raven Channel Member",
+			{"channel_id": thread_id, "user_id": OWNER},
+			"last_visit",
+			"2000-01-01 00:00:00",
+		)
+		self.assertEqual(pc.get_issue_chat(self.issue.name)["unread_threads"], 3)
+		states = pc.get_issue_chat_states(frappe.as_json([self.issue.name]))
+		self.assertEqual(states[self.issue.name]["unread_threads"], 3)
+
+		# Someone who is not in the thread has nothing unread there.
+		frappe.set_user(LATECOMER)
+		pc_state = issue_chat.get_chat(frappe.get_doc("Issue", self.issue.name))
+		self.assertEqual(pc_state["unread_threads"], 0)
+
 	def test_raven_links_open_the_matching_cockpit(self):
 		self.assertEqual(
 			issue_chat.document_link("Issue", self.issue.name),
