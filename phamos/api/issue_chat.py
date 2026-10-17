@@ -253,6 +253,30 @@ def _unread_threads(channel_id, limit=50):
 	return result
 
 
+def _first_unread_message(channel_id):
+	"""The oldest message in a chat the session user has not read yet, or None: where the chat
+	opens when it is opened from a list (#1617)."""
+	raven_user = _raven_user(frappe.session.user)
+	last_visit = raven_user and frappe.db.get_value(
+		"Raven Channel Member", {"channel_id": channel_id, "user_id": raven_user}, "last_visit"
+	)
+	if not last_visit:
+		return None
+	rows = frappe.get_all(
+		"Raven Message",
+		filters={
+			"channel_id": channel_id,
+			"creation": (">", last_visit),
+			"message_type": ("!=", "System"),
+			"owner": ("!=", frappe.session.user),
+		},
+		pluck="name",
+		order_by="creation asc",
+		limit=1,
+	)
+	return rows[0] if rows else None
+
+
 def _member_channels(channel_ids):
 	raven_user = _raven_user(frappe.session.user)
 	if not raven_user or not channel_ids:
@@ -380,7 +404,7 @@ def _post_link_message(channel_id, doc, text):
 
 def get_chat_states(doctype, names):
 	"""Batched chat state for list views: {name: {channel_id, is_member, archived, unread,
-	unread_threads}}.
+	unread_threads, first_unread, first_unread_thread}}.
 
 	Only records the session user may read and that have a chat are returned.
 	"""
@@ -408,16 +432,26 @@ def get_chat_states(doctype, names):
 	members = _member_channels(channel_ids)
 	unread = _unread_counts(channel_ids)
 	unread_threads = _unread_thread_counts(channel_ids)
-	return {
-		c.linked_document: {
+	states = {}
+	for c in channels:
+		state = {
 			"channel_id": c.name,
 			"is_member": c.name in members,
 			"archived": bool(c.is_archived),
 			"unread": unread.get(c.name, 0),
 			"unread_threads": unread_threads.get(c.name, 0),
+			# Where the chat opens from the list: the first new message, else the thread with
+			# the newest unread reply (#1617).
+			"first_unread": None,
+			"first_unread_thread": None,
 		}
-		for c in channels
-	}
+		if state["unread"]:
+			state["first_unread"] = _first_unread_message(c.name)
+		elif state["unread_threads"]:
+			threads = _unread_threads(c.name, limit=1)
+			state["first_unread_thread"] = threads[0]["thread_id"] if threads else None
+		states[c.linked_document] = state
+	return states
 
 
 def start_dm(doc, user):

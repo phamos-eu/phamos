@@ -284,13 +284,47 @@ function onFrameLoad() {
 		return
 	}
 	removeGuard = installGuard(win, channelPath(frameUrl.value), onLeave, onThreadOpened)
+	if (pendingTarget) {
+		const target = pendingTarget
+		pendingTarget = null
+		focusTarget(target)
+	}
+}
+
+// Where the chat should land once Raven is ready (set before the frame finished loading).
+let pendingTarget = null
+
+function targetPath(target) {
+	let path = channelPath(props.url)
+	if (target?.threadId) path += `/thread/${encodeURIComponent(target.threadId)}`
+	if (target?.messageId) path += `?message_id=${encodeURIComponent(target.messageId)}`
+	return path
+}
+
+/**
+ * Go to a message or thread of this chat: { messageId, threadId }. Raven's `?message_id=`
+ * scrolls to the message and highlights it; a thread opens in its panel.
+ */
+function focusTarget(target) {
+	if (!target || (!target.messageId && !target.threadId) || !props.url) return
+	const win = frame.value?.contentWindow
+	if (!frameReady || !win) {
+		pendingTarget = target
+		return
+	}
+	try {
+		win.history.pushState(null, "", targetPath(target))
+		win.dispatchEvent(new win.PopStateEvent("popstate", { state: null }))
+	} catch (e) {
+		// The chat still shows; only the jump is lost.
+	}
 }
 
 /** Put the keyboard into the chat (the "C" shortcut while the column is shown). */
 function focus() {
 	frame.value?.contentWindow?.focus()
 }
-defineExpose({ focus, inColumn })
+defineExpose({ focus, focusTarget, inColumn })
 
 onBeforeUnmount(() => {
 	removeGuard?.()
