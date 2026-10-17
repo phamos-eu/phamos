@@ -23,7 +23,8 @@
 			<PageSearch />
 			<TimerControl :start-button="false" />
 			<CheckinButton />
-			<CreateMenu :before-checkout="beforeCheckout" />
+			<CreateMenu ref="createMenu" :before-checkout="beforeCheckout" />
+			<CockpitShortcuts @create="createMenu?.open()" />
 			<CheckoutGuardDialog v-model="showGuard" @choose="onGuardChoice" />
 		</template>
 	</CockpitShell>
@@ -41,6 +42,7 @@ import { checkin, loadCheckin } from "./checkinStore.js"
 import { hasContracts, loadMyContracts } from "./contractStore.js"
 import CheckinButton from "./components/CheckinButton.vue"
 import CheckoutGuardDialog from "./components/CheckoutGuardDialog.vue"
+import CockpitShortcuts from "./components/CockpitShortcuts.vue"
 import CreateMenu from "./components/CreateMenu.vue"
 import PageSearch from "@spa/components/PageSearch.vue"
 import TimerControl from "@spa/components/timesheet/TimerControl.vue"
@@ -48,6 +50,7 @@ import { activeSession, loadTimer, requestTimerStop } from "@spa/timerStore.js"
 
 const route = useRoute()
 const router = useRouter()
+const createMenu = ref(null)
 
 // Focus mode (#1556): while a session runs, the sidebar is dimmed and unreachable.
 const locked = computed(() => Boolean(focus.session))

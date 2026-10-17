@@ -90,9 +90,10 @@
 						v-for="row in filtered"
 						:key="row.name"
 						type="button"
+						data-list-item
 						:class="[
 							listSubgridClass,
-							'border-b border-outline-gray-1 py-3 text-left hover:bg-surface-gray-2',
+							'border-b border-outline-gray-1 py-3 text-left hover:bg-surface-gray-2 focus:outline-none focus-visible:bg-surface-gray-3',
 							row.name === selectedName
 								? 'bg-surface-gray-2 shadow-[inset_3px_0_0_0_var(--outline-gray-4)]'
 								: '',

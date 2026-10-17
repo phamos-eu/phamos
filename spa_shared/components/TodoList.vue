@@ -5,6 +5,7 @@
 			:key="todo.name"
 			role="button"
 			tabindex="0"
+			data-list-item
 			:class="[
 				'flex items-start gap-3 border-b border-outline-gray-1 px-1 py-3 text-left hover:bg-surface-gray-2 focus:outline-none focus-visible:bg-surface-gray-2',
 				todo.name === selectedName ? 'bg-surface-gray-2 shadow-[inset_3px_0_0_0_var(--outline-gray-4)]' : '',
