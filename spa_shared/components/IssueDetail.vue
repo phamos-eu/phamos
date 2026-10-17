@@ -8,17 +8,17 @@
 				<DocSyncBanner :autosave="autosave" />
 				<DocViewers :viewers="viewers" />
 			</div>
-			<label class="mb-1.5 block flex-shrink-0 text-xs text-ink-gray-5">Description</label>
 			<div class="flex min-h-0 flex-1 flex-col" :class="{ 'pointer-events-none opacity-80': isClosed }">
 				<RichTextField
 					:key="issue.name"
 					v-model="autosave.draft.description"
 					class="flex h-full min-h-0 flex-1 flex-col"
-					editor-root-class="flex h-full min-h-0 flex-1 flex-col [&_.ProseMirror]:min-h-full [&_.ProseMirror]:flex-1 [&_.ProseMirror]:overflow-y-auto"
+					editor-root-class="flex h-full min-h-0 flex-1 flex-col [&_div:has(>.ProseMirror)]:flex [&_div:has(>.ProseMirror)]:min-h-0 [&_div:has(>.ProseMirror)]:flex-1 [&_div:has(>.ProseMirror)]:flex-col [&_.ProseMirror]:min-h-full [&_.ProseMirror]:flex-1 [&_.ProseMirror]:overflow-y-auto"
 					:editable="!isClosed"
 					:fixed-menu="editorMenu"
 					:locked-by="locks.lockedBy('description')"
 					field-label="the description"
+					scroll-hint
 					placeholder="What needs to be discussed or resolved?"
 					editor-class="prose-sm dark:prose-invert max-w-none w-full min-h-full flex-1 px-3 py-2 border border-t-0 border-gray-300 rounded-b-lg bg-white dark:border-gray-600 dark:bg-gray-800"
 					@focus="onFieldFocus('description')"
