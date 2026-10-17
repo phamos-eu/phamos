@@ -362,6 +362,52 @@ def sync_assignee(doc, method=None):
 		frappe.log_error(title=f"Issue chat: could not add {doc.allocated_to} to {channel.name}")
 
 
+def add_mentioned_members(doc, method=None):
+	"""Raven Message validate: people mentioned in an Issue chat (or one of its threads) join it.
+
+	Runs after Raven has read the mentions from the HTML and before the insert, so Raven's own
+	after_insert already treats them as members: it notifies them and adds them to the thread
+	(it only adds people who are in the parent channel). Only people who can read the record
+	are added; for anyone else Raven's "isn't in this channel" warning stays (#1620).
+	"""
+	if not doc.get("mentions") or doc.message_type == "System" or not is_enabled():
+		return
+	channel = _chat_channel_of(doc.channel_id)
+	if not channel:
+		return
+	members = set(
+		frappe.get_all("Raven Channel Member", filters={"channel_id": channel.name}, pluck="user_id")
+	)
+	users = []
+	for raven_user in dict.fromkeys(m.user for m in doc.mentions if m.user):
+		if raven_user in members:
+			continue
+		user = frappe.db.get_value("Raven User", {"name": raven_user, "type": "User", "enabled": 1}, "user")
+		if user and frappe.has_permission(
+			channel.linked_doctype, "read", doc=channel.linked_document, user=user
+		):
+			users.append(user)
+	if not users:
+		return
+	try:
+		_ensure_members(channel, users)
+	except Exception:
+		frappe.log_error(title=f"Issue chat: could not add mentioned users to {channel.name}")
+
+
+def _chat_channel_of(channel_id):
+	"""The record chat a channel belongs to: itself, or the parent channel of a thread."""
+	fields = ["name", "workspace", "linked_doctype", "linked_document", "is_thread", "is_direct_message"]
+	channel = frappe.db.get_value("Raven Channel", channel_id, fields, as_dict=True)
+	if channel and channel.is_thread:
+		# A thread channel is named after the message it hangs off.
+		parent_id = frappe.db.get_value("Raven Message", channel_id, "channel_id")
+		channel = frappe.db.get_value("Raven Channel", parent_id, fields, as_dict=True) if parent_id else None
+	if not channel or channel.is_direct_message or channel.linked_doctype not in CHAT_DOCTYPES:
+		return None
+	return channel
+
+
 def document_link(doctype, docname):
 	"""raven_document_link_override: Raven opens Issue links in the matching cockpit."""
 	if doctype != "Issue":
