@@ -16,6 +16,7 @@ SETTINGS_DOCTYPE = "phamos Settings"
 ACCOUNTING_AGENT = "Accounting Agent"
 ACCOUNTING_HANDLERS = "phamos.ai_agents.agents.accounting"
 EXTRACT_SKILL_NAME = "Read receipt"
+CLASSIFY_SKILL_NAME = "Propose expense accounts"
 
 
 def ensure_accounting_receipt_setup():
@@ -48,6 +49,7 @@ def ensure_accounting_agent():
 				"description": "Reads incoming receipts and prepares them for the accounting team.",
 			}
 		).insert(ignore_permissions=True)
+	ensure_classify_skill()
 	return ensure_extract_skill()
 
 
@@ -72,6 +74,33 @@ def ensure_extract_skill():
 		}
 	).insert(ignore_permissions=True)
 	return skill.name
+
+
+def ensure_classify_skill():
+	"""The general skill that proposes each line's expense account (library first, then Mistral)."""
+	existing = frappe.db.get_value(
+		"AI Skill", {"agent": ACCOUNTING_AGENT, "handler": "classify_lines", "party": ("is", "not set")}, "name"
+	)
+	if existing:
+		return existing
+	from phamos.accounting.classify import DEFAULT_PARAMS
+
+	return frappe.get_doc(
+		{
+			"doctype": "AI Skill",
+			"skill_name": CLASSIFY_SKILL_NAME,
+			"agent": ACCOUNTING_AGENT,
+			"enabled": 1,
+			"phase": "Classify",
+			"order": 10,
+			"handler": "classify_lines",
+			"on_fail": "Continue",
+			"params": frappe.as_json(DEFAULT_PARAMS),
+			"description": "Proposes the expense account of each line without one: the assignment library first, then the "
+			"supplier's usual account, then Mistral choosing among the accounts offered to the AI. Unsure lines stay "
+			"empty with candidates for a person.",
+		}
+	).insert(ignore_permissions=True).name
 
 
 def ensure_role():

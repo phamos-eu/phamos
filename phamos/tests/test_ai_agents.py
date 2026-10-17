@@ -39,6 +39,8 @@ class AgentTestCase(FrappeTestCase):
 	def setUp(self):
 		frappe.set_user("Administrator")
 		ensure_accounting_receipt_setup()
+		# These tests are about reading the PDF; the account proposal has its own tests.
+		frappe.db.set_value("AI Skill", {"agent": ACCOUNTING_AGENT, "handler": "classify_lines"}, "enabled", 0)
 		if not frappe.db.exists("Supplier", SUPPLIER):
 			frappe.get_doc({"doctype": "Supplier", "supplier_name": SUPPLIER, "supplier_group": "Services"}).insert(
 				ignore_permissions=True
@@ -78,6 +80,25 @@ class TestExtractionRun(AgentTestCase):
 		self.assertAlmostEqual(doc.ai_confidence, 95.8, places=1)
 		self.assertIn("supplier_reference", run.fields_set)
 		self.assertEqual(run.llm_calls, 2)
+
+	def test_after_reading_the_lines_get_an_expense_account(self):
+		from phamos.accounting import expense_accounts
+
+		receipt = self.receipt()
+		company = frappe.db.get_value("Accounting Receipt", receipt.name, "company")
+		if expense_accounts.chart_family(company) != "SKR04":
+			self.skipTest("needs an SKR04 company")
+		expense_accounts.seed_expense_accounts(company, check_permission=False)
+		frappe.db.set_value("AI Skill", {"agent": ACCOUNTING_AGENT, "handler": "classify_lines"}, "enabled", 1)
+		proposal = {"lines": [{"index": 1, "account_number": "6303", "confidence": 0.9, "reason": "Beratung ist Fremdleistung"}]}
+		self.chat.side_effect = lambda prompt, *a, **k: (
+			(proposal if prompt.startswith("Assign each invoice line") else dict(ANSWER)), "mistral-test"
+		)
+		run, doc = self.run_agent(receipt)
+		steps = {s["phase"]: s["status"] for s in json.loads(run.steps)}
+		self.assertEqual(steps.get("Classify"), "Passed")
+		self.assertEqual(frappe.db.get_value("Account", doc.items[0].expense_account, "account_number"), "6303")
+		self.assertEqual(doc.items[0].assignment_source, "AI")
 
 	def test_values_a_human_set_are_kept(self):
 		_run, doc = self.run_agent(self.receipt(supplier_reference="MY-REF", sum=50))

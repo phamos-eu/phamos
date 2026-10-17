@@ -330,6 +330,7 @@ doc_events = {
 		"after_insert": "phamos.events.raven_bot.handle_lead_option_reply"
 	},
     "Account": {"on_update": "phamos.accounting.expense_accounts.clear_account_cache"},
+    "Purchase Invoice": {"on_submit": "phamos.accounting.library.learn_from_purchase_invoice"},
     "Accounting Receipt": {
         "after_insert": [
             "phamos.phamos.doctype.accounting_receipt.accounting_receipt.sync_attachment_from_files",
