@@ -13,7 +13,7 @@
 			<button
 				type="button"
 				class="rounded p-1.5 text-ink-gray-5 hover:bg-surface-gray-2 hover:text-ink-gray-8"
-				:title="collapsed ? 'Expand' : 'Collapse'"
+				:title="collapsed ? __('Expand') : __('Collapse')"
 				@click="toggle"
 			>
 				<FeatherIcon :name="collapsed ? 'chevrons-right' : 'chevrons-left'" class="h-4 w-4" />
@@ -71,11 +71,11 @@
 				type="button"
 				class="flex w-full items-center gap-2 rounded-md px-2 py-2 text-sm font-medium text-ink-gray-6 hover:bg-surface-gray-2 hover:text-ink-gray-9"
 				:class="collapsed ? 'justify-center' : ''"
-				:title="collapsed ? 'Desk' : undefined"
+				:title="collapsed ? __('Desk') : undefined"
 				@click="openDesk()"
 			>
 				<FeatherIcon name="external-link" class="h-4 w-4 flex-shrink-0" />
-				<span v-if="!collapsed" class="truncate">Desk</span>
+				<span v-if="!collapsed" class="truncate">{{ __("Desk") }}</span>
 			</button>
 		</div>
 	</aside>
@@ -85,6 +85,7 @@
 import { onMounted, ref, watch } from "vue"
 import { useRoute } from "vue-router"
 import { openDesk } from "@spa/utils/appWindow.js"
+import { __ } from "@spa/utils/i18n.js"
 
 const props = defineProps({
 	label: { type: String, required: true },

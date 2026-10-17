@@ -1,7 +1,7 @@
 <template>
 	<Dialog
 		:model-value="modelValue"
-		:options="{ title: 'Stop timer', size: 'lg' }"
+		:options="{ title: __('Stop timer'), size: 'lg' }"
 		@update:model-value="emit('update:modelValue', $event)"
 	>
 		<template #body-content>
@@ -14,20 +14,20 @@
 					v-model="result"
 					type="textarea"
 					size="sm"
-					label="What did you accomplish? *"
-					placeholder="Sent to the customer the next day."
+					:label="__('What did you accomplish?') + ' *'"
+					:placeholder="__('Sent to the customer the next day.')"
 				/>
 				<div class="grid grid-cols-2 gap-3">
-					<FormControl v-model="activityType" type="select" size="sm" label="Activity type *" :options="activityOptions" />
-					<FormControl v-model="billable" type="select" size="sm" label="Billable" :options="BILLABLE" />
+					<FormControl v-model="activityType" type="select" size="sm" :label="__('Activity type') + ' *'" :options="activityOptions" />
+					<FormControl v-model="billable" type="select" size="sm" :label="__('Billable')" :options="billableOptions" />
 				</div>
-				<FormControl v-model="endTime" type="datetime-local" size="sm" label="End" @input="endEdited = true" />
+				<FormControl v-model="endTime" type="datetime-local" size="sm" :label="__('End')" @input="endEdited = true" />
 				<ErrorMessage :message="error" />
 				<div class="flex items-center justify-between gap-2">
-					<span class="text-xs text-ink-gray-5">Ctrl+Enter stops</span>
+					<span class="text-xs text-ink-gray-5">{{ __("Ctrl+Enter stops") }}</span>
 					<div class="flex gap-2">
-						<Button variant="ghost" @click="emit('update:modelValue', false)">Cancel</Button>
-						<Button variant="solid" type="submit" :loading="saving">Stop and submit</Button>
+						<Button variant="ghost" @click="emit('update:modelValue', false)">{{ __("Cancel") }}</Button>
+						<Button variant="solid" type="submit" :loading="saving">{{ __("Stop and submit") }}</Button>
 					</div>
 				</div>
 			</form>
@@ -39,6 +39,7 @@
 import { computed, onBeforeUnmount, ref, watch } from "vue"
 import { call } from "frappe-ui"
 import { formatForApi, parseDatetimeLocalValue, parseSystemDatetimeToUserDate, toDatetimeLocalValue } from "@spa/utils/datetime.js"
+import { __ } from "@spa/utils/i18n.js"
 import spaConfig from "@/config"
 
 const props = defineProps({
@@ -66,8 +67,9 @@ const error = ref("")
 const saving = ref(false)
 let liveTimer = null
 
+const billableOptions = computed(() => BILLABLE.map((row) => ({ ...row, label: __(row.label) })))
 const activityOptions = computed(() => [
-	{ label: "Pick an activity type", value: "" },
+	{ label: __("Pick an activity type"), value: "" },
 	...activityTypes.value.map((name) => ({ label: name, value: name })),
 ])
 
@@ -96,8 +98,8 @@ async function open() {
 
 async function submit() {
 	error.value = ""
-	if (!result.value.trim()) return (error.value = "Please describe what you accomplished.")
-	if (!activityType.value) return (error.value = "Please pick an activity type.")
+	if (!result.value.trim()) return (error.value = __("Please describe what you accomplished."))
+	if (!activityType.value) return (error.value = __("Please pick an activity type."))
 	const args = {
 		name: props.session.name,
 		result: result.value.trim(),
@@ -107,7 +109,7 @@ async function submit() {
 	if (endEdited.value) {
 		const end = parseDatetimeLocalValue(endTime.value)
 		const segmentStart = parseSystemDatetimeToUserDate(String(props.session.open_row_from || ""))
-		if (end && segmentStart && end < segmentStart) return (error.value = "The end cannot be before the current segment started.")
+		if (end && segmentStart && end < segmentStart) return (error.value = __("The end cannot be before the current segment started."))
 		if (end) args.manual_end_time = formatForApi(end)
 	}
 	saving.value = true
@@ -117,7 +119,7 @@ async function submit() {
 		if (response.outcome?.exceeds) emit("limit", response)
 		else emit("stopped", response)
 	} catch (e) {
-		error.value = errorText(e, "Could not stop the timer")
+		error.value = errorText(e, __("Could not stop the timer"))
 	} finally {
 		saving.value = false
 	}

@@ -2,6 +2,7 @@
 // only when there is at least one submitted contract to show.
 import { reactive } from "vue"
 import { call } from "frappe-ui"
+import { __ } from "@spa/utils/i18n.js"
 import spaConfig from "./config"
 
 export const myContracts = reactive({ data: null, loaded: false, error: "" })
@@ -17,7 +18,7 @@ export function loadMyContracts() {
 			})
 			.catch((e) => {
 				myContracts.data = null
-				myContracts.error = e?.message || "Could not load your contracts"
+				myContracts.error = e?.message || __("Could not load your contracts")
 			})
 			.finally(() => {
 				myContracts.loaded = true

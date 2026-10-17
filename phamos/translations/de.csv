@@ -599,3 +599,630 @@ Please pick dates before the event.,Bitte wählen Sie Termine vor der Veranstalt
 2 weeks before,2 Wochen vorher
 The event is less than two weeks away. Pick your own date.,Die Veranstaltung ist weniger als zwei Wochen entfernt. Wählen Sie einen eigenen Termin.
 Period,Zeitraum
+{0} of {1} done,{0} von {1} erledigt
+Leave focus,Fokus verlassen
+"Time is up. Finish the step you are on, then mark it done or park it with a note.",Die Zeit ist um. Schließen Sie den aktuellen Schritt ab und markieren Sie ihn dann als erledigt oder stellen Sie ihn mit einer Notiz zurück.
+Now,Jetzt
+{0} on this ToDo,{0} an diesem ToDo
+estimate {0},geschätzt {0}
+due {0},fällig {0}
+Where you left off,Wo Sie aufgehört haben
+Done,Erledigt
+Park it,Zurückstellen
+Everything here is done or parked.,Alles hier ist erledigt oder zurückgestellt.
+"Pick a parked ToDo to continue, or end the session.",Wählen Sie ein zurückgestelltes ToDo zum Weitermachen oder beenden Sie die Sitzung.
+End the session,Sitzung beenden
+In this session,In dieser Sitzung
+parked · {0},zurückgestellt · {0}
+Capture for later,Für später notieren
+A thought or a new task: write it down and stay on track.,Ein Gedanke oder eine neue Aufgabe: notieren Sie sie und bleiben Sie dran.
+New ToDo…,Neues ToDo…
+Add,Hinzufügen
+Back to the dashboard,Zurück zum Dashboard
+Another session,Weitere Sitzung
+Focus on a few ToDos,Auf wenige ToDos fokussieren
+"Choose up to five ToDos and a length. Until you finish or leave, the cockpit shows only them. Leaving is always possible.","Wählen Sie bis zu fünf ToDos und eine Dauer. Bis Sie fertig sind oder abbrechen, zeigt das Cockpit nur diese an. Abbrechen ist jederzeit möglich."
+Start a focus session,Fokus-Sitzung starten
+Recent sessions,Letzte Sitzungen
+Park this ToDo,Dieses ToDo zurückstellen
+Where will you pick it up?,Wo machen Sie weiter?
+"The next concrete step, so restarting is easy.","Der nächste konkrete Schritt, damit der Wiedereinstieg leichtfällt."
+Cancel,Abbrechen
+Park and continue,Zurückstellen und weiter
+Leave focus?,Fokus verlassen?
+"You just started, so leaving costs nothing.","Sie haben gerade erst begonnen, ein Abbruch kostet also nichts."
+"Before you go: why, and where will you pick up? Your note is kept on the ToDo.","Bevor Sie gehen: Warum, und wo machen Sie weiter? Ihre Notiz wird am ToDo gespeichert."
+Why leave now?,Warum jetzt abbrechen?
+Where to pick up,Wo weitermachen
+Next step for “{0}”,Nächster Schritt für „{0}“
+Stay focused,Fokussiert bleiben
+Leave in {0} s,Verlassen in {0} s
+in focus,im Fokus
+time is up,Zeit ist um
+left,übrig
+{0} in focus,{0} im Fokus
+"{0}, time is up","{0}, Zeit ist um"
+Session complete.,Sitzung abgeschlossen.
+Session ended. Good progress.,Sitzung beendet. Guter Fortschritt.
+Session ended.,Sitzung beendet.
+1 ToDo done in {0}.,1 ToDo erledigt in {0}.
+{0} ToDos done in {1}.,{0} ToDos erledigt in {1}.
+{0} min,{0} Min.
+{0} h {1} min,{0} Std. {1} Min.
+{0} h,{0} Std.
+That did not work,Das hat nicht funktioniert
+Done. One less.,Erledigt. Eins weniger.
+Captured for later.,Für später notiert.
+Could not capture the ToDo,Das ToDo konnte nicht notiert werden
+Something urgent came up,Etwas Dringendes ist dazwischengekommen
+A meeting starts,Ein Meeting beginnt
+Wrong ToDos picked,Falsche ToDos gewählt
+Need a break,Pause nötig
+Other,Sonstiges
+completed,abgeschlossen
+left early,vorzeitig verlassen
+timed out,Zeit abgelaufen
+"Pick the few that matter. Drag a ToDo, or focus it and press 1–4.","Wählen Sie die wenigen, die zählen. Ziehen Sie ein ToDo oder wählen Sie es aus und drücken Sie 1–4."
+Urgent means due by {0}.,Dringend heißt fällig bis {0}.
+Focus on “Do now”,Fokus auf „Sofort erledigen“
+Loading your matrix…,Ihre Matrix wird geladen…
+Urgent,Dringend
+Not urgent,Nicht dringend
+"{0}. Press 1 to 4 to move, Enter to open.","{0}. Mit 1 bis 4 verschieben, mit Enter öffnen."
+Mark {0} as done,{0} als erledigt markieren
+overdue since {0},überfällig seit {0}
+no due date,kein Fälligkeitsdatum
+Postponed {0} times,{0}-mal verschoben
+Decide on {0},Über {0} entscheiden
+Decide,Entscheiden
+{0} more in the list,{0} weitere in der Liste
+1 ToDo is due after this week and not marked important.,1 ToDo ist erst nach dieser Woche fällig und nicht als wichtig markiert.
+{0} ToDos are due after this week and not marked important.,{0} ToDos sind erst nach dieser Woche fällig und nicht als wichtig markiert.
+Show all open,Alle offenen anzeigen
+New due date,Neues Fälligkeitsdatum
+"Not urgent means due after {0}. The deadline moves, it does not disappear.","Nicht dringend heißt fällig nach {0}. Die Frist verschiebt sich, sie verschwindet nicht."
+Due on,Fällig am
+What happens if this isn't done this week?,"Was passiert, wenn das diese Woche nicht erledigt wird?"
+Optional. Kept as a comment on the ToDo.,Optional. Wird als Kommentar am ToDo gespeichert.
+Drop it instead,Stattdessen verwerfen
+Move to {0},Verschieben nach „{0}“
+Move,Verschieben
+Could not load your matrix,Ihre Matrix konnte nicht geladen werden
+Could not close the ToDo,Das ToDo konnte nicht geschlossen werden
+Could not move the ToDo,Das ToDo konnte nicht verschoben werden
+This week,Diese Woche
+All open,Alle offenen
+Important,Wichtig
+Not important,Nicht wichtig
+Nothing on fire. Good.,Nichts brennt. Gut.
+Drag what matters most here and give it a day.,Ziehen Sie das Wichtigste hierher und geben Sie ihm einen Tag.
+Nothing urgent that someone else could do.,"Nichts Dringendes, das jemand anderes erledigen könnte."
+Nothing to let go of.,Nichts loszulassen.
+Do now,Sofort erledigen
+Important and urgent,Wichtig und dringend
+Schedule,Einplanen
+"Important, not urgent: give it a day","Wichtig, nicht dringend: geben Sie ihm einen Tag"
+Hand off or batch,Abgeben oder bündeln
+"Urgent, not important","Dringend, nicht wichtig"
+Drop or let go,Verwerfen oder loslassen
+Neither important nor urgent,Weder wichtig noch dringend
+Start focus,Fokus starten
+Loading your ToDos…,Ihre ToDos werden geladen…
+Open now,Jetzt offen
+{0} need a decision,{0} brauchen eine Entscheidung
+Nothing stale,Nichts liegengeblieben
+{0} vs {1} days ago,{0} ggü. vor {1} Tagen
+Closed,Geschlossen
+in the last {0} days,in den letzten {0} Tagen
+{0} vs the {1} days before,{0} ggü. den {1} Tagen davor
+Dropped,Verworfen
+decided not to do,bewusst nicht erledigt
+Closed vs open,Geschlossen vs. offen
+{0}% closed,{0} % geschlossen
+{0} closed · {1} still open,{0} geschlossen · {1} noch offen
+Targets,Ziele
+Add a second target? Two at most keeps it light.,Ein zweites Ziel hinzufügen? Höchstens zwei halten es leicht.
+Want a target? Something like “close 2 a day for 10 days”.,"Ein Ziel gefällig? Zum Beispiel „2 pro Tag schließen, 10 Tage lang“."
+Optional and private. Your own history suggests the number.,Optional und privat. Ihr bisheriger Verlauf schlägt die Zahl vor.
+Set a target,Ziel setzen
+Created vs closed,Erstellt vs. geschlossen
+Created,Erstellt
+Number under a bar: how the backlog changed,Zahl unter einem Balken: Veränderung des Rückstands
+Done today,Heute erledigt
+quick win,schneller Erfolg
+planned,geplant
+spontaneous,spontan
+Nothing closed yet today.,Heute noch nichts geschlossen.
+Oldest open,Älteste offene
+"Do it, give it a day, or drop it.","Erledigen, einplanen oder verwerfen."
+Decide all stale ({0}),Über alle liegengebliebenen entscheiden ({0})
+{0} old,{0} alt
+overdue,überfällig
+No open ToDos. Well done.,Keine offenen ToDos. Gut gemacht.
+Age of open ToDos,Alter offener ToDos
+Closed in this period,In diesem Zeitraum geschlossen
+Plan my day,Meinen Tag planen
+Day done,Tag erledigt
+My day: {0} of {1} done,Mein Tag: {0} von {1} erledigt
+Your ToDos at a glance.,Ihre ToDos auf einen Blick.
+No open ToDos.,Keine offenen ToDos.
+{0} closed today,{0} heute geschlossen
+1 ToDo needs a decision,1 ToDo braucht eine Entscheidung
+{0} ToDos need a decision,{0} ToDos brauchen eine Entscheidung
+Lead times appear once you close ToDos.,"Durchlaufzeiten erscheinen, sobald Sie ToDos schließen."
+"Half of your closed ToDos took {0} or less, 85% took {1} or less.","Die Hälfte Ihrer geschlossenen ToDos dauerte {0} oder weniger, 85 % dauerten {1} oder weniger."
+"…of these, quick wins (under 15 min)",…davon schnelle Erfolge (unter 15 min)
+…planned in My Day,…geplant in Mein Tag
+Closed or removed by others,Von anderen geschlossen oder entfernt
+{0} dropped so far.,Bisher {0} verworfen.
+A first one sets the tone.,Das erste gibt den Ton an.
+{0} done,{0} erledigt
+"{0} planned, {1} spontaneous","{0} geplant, {1} spontan"
+{0} important,{0} wichtig
+Could not load the ToDo dashboard,Das ToDo-Dashboard konnte nicht geladen werden
+End “{0}” now? The days so far stay counted.,„{0}“ jetzt beenden? Die bisherigen Tage bleiben gezählt.
+7 days,7 Tage
+30 days,30 Tage
+90 days,90 Tage
+Search ToDos and references…,ToDos und Referenzen durchsuchen…
+Open,Offen
+Include done,Erledigte einbeziehen
+Which ToDos to show,Welche ToDos angezeigt werden
+"Overdue for more than two weeks, or postponed three times or more",Seit mehr als zwei Wochen überfällig oder mindestens dreimal verschoben
+Stale ({0}),Liegengeblieben ({0})
+Decide all,Über alle entscheiden
+Loading…,Wird geladen …
+No matching ToDos,Keine passenden ToDos
+Nothing on your list,Nichts auf Ihrer Liste
+Try another search.,Versuchen Sie eine andere Suche.
+"ToDos assigned to you, and the ones you create here, show up in this list.","ToDos, die Ihnen zugewiesen sind, und die, die Sie hier erstellen, erscheinen in dieser Liste."
+Create a ToDo,ToDo erstellen
+{0} open · {1} overdue,{0} offen · {1} überfällig
+{0} open,{0} offen
+Could not load your ToDos,Ihre ToDos konnten nicht geladen werden
+Could not open this ToDo,Dieses ToDo konnte nicht geöffnet werden
+Marked as done,Als erledigt markiert
+Could not change the ToDo,Das ToDo konnte nicht geändert werden
+Loading your day…,Ihr Tag wird geladen…
+Start the day,Tag starten
+Shut down,Abschließen
+{0} of at most {1} ToDos,{0} von höchstens {1} ToDos
+More than fits. Move something to another day or drop it: a short plan you finish beats a long one you carry.,"Mehr als hineinpasst. Verschieben Sie etwas auf einen anderen Tag oder lassen Sie es fallen: Ein kurzer Plan, den Sie schaffen, ist besser als ein langer, den Sie mitschleppen."
+Done for the day.,Feierabend.
+Everything open has a next step. You can let work go now.,Alles Offene hat einen nächsten Schritt. Sie können die Arbeit jetzt loslassen.
+Look at {0},{0} ansehen
+Today,Heute
+"Nothing planned yet. Pick a few from the right, the ones that would make this day a good one.","Noch nichts geplant. Wählen Sie rechts ein paar aus, die diesen Tag zu einem guten machen würden."
+Carried over {0} times,{0}-mal übertragen
+added later,später hinzugefügt
+moved to {0},verschoben auf {0}
+dropped,fallen gelassen
+Estimate for {0},Schätzung für {0}
+no estimate,keine Schätzung
+Move {0} up,{0} nach oben verschieben
+Move {0} down,{0} nach unten verschieben
+Remove {0} from the plan,{0} aus dem Plan entfernen
+Worth considering,Einen Blick wert
+"Nothing overdue, due or flagged.","Nichts überfällig, fällig oder markiert."
+Pick from the list if you like.,Wählen Sie bei Bedarf aus der Liste.
+Not finished {0} times,{0}-mal nicht erledigt
+"Today, {0} {1}","Heute, {0} {1}"
+Shut down.,Abgeschlossen.
+{0} of {1} done. Shut down when you stop working.,"{0} von {1} erledigt. Schließen Sie den Tag ab, wenn Sie aufhören zu arbeiten."
+The plan was fixed at 10:00. Start the day whenever you are ready.,"Der Plan wurde um 10:00 festgeschrieben. Starten Sie den Tag, wann immer Sie bereit sind."
+Plan ahead. You start the day on the day itself.,Planen Sie voraus. Den Tag starten Sie am Tag selbst.
+"Plan a few ToDos, then start the day.",Planen Sie ein paar ToDos und starten Sie dann den Tag.
+{0} of {1} for ToDos,{0} von {1} für ToDos
+{0} of {1} for ToDos (1 ToDo without estimate counted as {2} min),{0} von {1} für ToDos (1 ToDo ohne Schätzung mit {2} Min. gezählt)
+{0} of {1} for ToDos ({2} ToDos without estimate counted as {3} min),{0} von {1} für ToDos ({2} ToDos ohne Schätzung mit je {3} Min. gezählt)
+In focus your ToDos took {0}× your estimate. Plan with some room.,Im Fokus brauchten Ihre ToDos das {0}-Fache Ihrer Schätzung. Planen Sie mit etwas Puffer.
+In focus your ToDos took {0}× your estimate. You may plan a little more.,Im Fokus brauchten Ihre ToDos das {0}-Fache Ihrer Schätzung. Sie können etwas mehr einplanen.
+1 ToDo done,1 ToDo erledigt
+{0} ToDos done,{0} ToDos erledigt
+{0} moved,{0} verschoben
+{0} dropped,{0} fallen gelassen
+Could not load your day,Ihr Tag konnte nicht geladen werden
+Day started. Go for the first one.,Tag gestartet. Packen Sie das erste an.
+Could not save the estimate,Die Schätzung konnte nicht gespeichert werden
+Loading later days…,Spätere Tage werden geladen…
+Plan further ahead in the list.,Weiter im Voraus planen Sie in der Liste.
+Loading earlier days…,Frühere Tage werden geladen…
+Nothing earlier.,Nichts früher.
+Jump to today (T),Zu heute springen (T)
+Checked in,Eingecheckt
+Checked out,Ausgecheckt
+Check-in · {0},Eingestempelt · {0}
+Check-out · {0},Ausgestempelt · {0}
+Check-in,Einstempeln
+Check-out,Ausstempeln
+Planned: {0},Geplant: {0}
+Spontaneous: {0},Spontan: {0}
+Could not load earlier days,Frühere Tage konnten nicht geladen werden
+Could not load later days,Spätere Tage konnten nicht geladen werden
+Could not load your days,Ihre Tage konnten nicht geladen werden
+Planned: 1 ToDo. Open the plan,Geplant: 1 ToDo. Plan öffnen
+Planned: {0} ToDos. Open the plan,Geplant: {0} ToDos. Plan öffnen
+Plan this day,Diesen Tag planen
+This day was never shut down.,Dieser Tag wurde nie abgeschlossen.
+{0} without entries,{0} ohne Einträge
+Break,Pause
+now,jetzt
+break,Pause
+work,Arbeit
+{0} % billable,{0} % abrechenbar
+running,läuft
+Desk,Desk
+{0} left open,{0} offen geblieben
+Plan: {0}.,Plan: {0}.
+{0} logged,{0} erfasst
+nothing recorded,nichts erfasst
+Shut down the day,Tag abschließen
+Nothing from the plan. Some days are like that.,Nichts aus dem Plan. Manche Tage sind so.
+Still open: when is the next step?,Noch offen: Wann ist der nächste Schritt?
+New date,Neues Datum
+Why drop it,Warum fallen lassen
+"One line about today (optional, only for you)","Eine Zeile zu heute (optional, nur für Sie)"
+"What went well, what got in the way?","Was lief gut, was stand im Weg?"
+Not yet,Noch nicht
+Done for the day,Tag abschließen
+Could not shut down the day,Der Tag konnte nicht abgeschlossen werden
+Set yourself a target,Setzen Sie sich ein Ziel
+"Private to you. Weekends, holidays and leave do not count. Jokers cover a day that slips.","Nur für Sie sichtbar. Wochenenden, Feiertage und Abwesenheiten zählen nicht. Joker decken einen verpatzten Tag ab."
+What counts,Was zählt
+Planned a day,Geplant pro Tag
+Spontaneous a day,Spontan pro Tag
+Planned: on your My Day plan when you start the day. Spontaneous: everything else you close.,"Geplant: steht auf Ihrem Plan in „Mein Tag“, wenn Sie den Tag starten. Spontan: alles andere, was Sie schließen."
+Important ToDos a day,Wichtige ToDos pro Tag
+ToDos closed a day,Geschlossene ToDos pro Tag
+For how many working days,Für wie viele Arbeitstage
+Start,Start
+A Monday is a good fresh start.,Ein Montag ist ein guter Neuanfang.
+"Quick wins (closed within 15 minutes of creating them) count as spontaneous, at most two a day. Dropped ToDos do not count.","Schnelle Erfolge (innerhalb von 15 Minuten nach dem Anlegen geschlossen) zählen als spontan, höchstens zwei pro Tag. Fallen gelassene ToDos zählen nicht."
+Quick wins closed within 15 minutes of creating them and dropped ToDos do not count.,Schnelle Erfolge (innerhalb von 15 Minuten nach dem Anlegen geschlossen) und fallen gelassene ToDos zählen nicht.
+Start the challenge,Ziel starten
+Monday {0},"Montag, {0}"
+Could not load your history,Ihr Verlauf konnte nicht geladen werden
+Could not start the challenge,Das Ziel konnte nicht gestartet werden
+"Pick up to {0} ToDos. Until you finish or leave, the cockpit shows only these.","Wählen Sie bis zu {0} ToDos. Bis Sie fertig sind oder abbrechen, zeigt das Cockpit nur diese."
+"ToDos, in the order you want to do them","ToDos in der Reihenfolge, in der Sie sie erledigen wollen"
+{0} of {1},{0} von {1}
+No open ToDos. Create one first.,Keine offenen ToDos. Legen Sie zuerst eins an.
+important,wichtig
+How long,Wie lange
+Stopwatch,Stoppuhr
+No end time. The session ends when you are done or leave.,"Keine Endzeit. Die Sitzung endet, wenn Sie fertig sind oder abbrechen."
+A timer runs; when it is up you finish your current step and wrap up.,"Ein Timer läuft; wenn er abgelaufen ist, beenden Sie den aktuellen Schritt und schließen ab."
+Could not start the focus session,Die Fokus-Sitzung konnte nicht gestartet werden
+Challenge options,Ziel-Optionen
+Days of the challenge,Tage des Ziels
+End this challenge,Dieses Ziel beenden
+"{0}: {1} ({2} planned, {3} spontaneous)","{0}: {1} ({2} geplant, {3} spontan)"
+{0}: {1} ({2} closed),{0}: {1} ({2} geschlossen)
+Look at what was left last time,"Ansehen, was beim letzten Mal übrig blieb"
+"Pick a few, at most six","Ein paar auswählen, höchstens sechs"
+Estimate them,Schätzen
+Check that they fit,"Prüfen, ob alles hineinpasst"
+Not finished last time,Beim letzten Mal nicht erledigt
+Overdue,Überfällig
+Due today,Heute fällig
+Important to you,Wichtig für Sie
+Due this week,Diese Woche fällig
+Tomorrow,Morgen
+Later this week,Später diese Woche
+Pick a date,Datum wählen
+Drop,Fallen lassen
+Keep open,Offen lassen
+Not needed any more,Nicht mehr nötig
+Done elsewhere,Anderswo erledigt
+Out of date,Veraltet
+Closed ToDos,Geschlossene ToDos
+Closed important ToDos,Geschlossene wichtige ToDos
+Planned and spontaneous closes,Geplante und spontane Abschlüsse
+5 days,5 Tage
+10 days,10 Tage
+20 days,20 Tage
+under a minute,unter einer Minute
+{0} over,{0} überschritten
+Start timer,Timer starten
+Discard the empty draft {0},Den leeren Entwurf {0} verwerfen
+Discard draft,Entwurf verwerfen
+Time limit,Zeitlimit
+Task: {0},Aufgabe: {0}
+Issue: {0},Anfrage: {0}
+Started {0} · {1} worked,Gestartet {0} · {1} gearbeitet
+"Break: {0}, {1} so far","Pause: {0}, bisher {1}"
+Open the record in Desk,Datensatz im Desk öffnen
+Pause the timer,Timer pausieren
+Pause,Pause
+Resume the timer,Timer fortsetzen
+Resume,Fortsetzen
+Stop the timer,Timer stoppen
+Stop,Stoppen
+"Timer running, over by {0}, {1}","Timer läuft, {0} überschritten, {1}"
+"Break running, over by {0}, {1}","Pause läuft, {0} überschritten, {1}"
+"Timer running, {0} left, {1}","Timer läuft, noch {0}, {1}"
+"Break running, {0} left, {1}","Pause läuft, noch {0}, {1}"
+Finish or discard the empty draft {0} first,Schließen Sie zuerst den leeren Entwurf {0} ab oder verwerfen Sie ihn
+Start a timesheet timer,Einen Zeiterfassungs-Timer starten
+Draft {0} discarded,Entwurf {0} verworfen
+Could not discard the draft,Der Entwurf konnte nicht verworfen werden
+Timer started on {0},Timer für {0} gestartet
+Timer started,Timer gestartet
+"Timer stopped, {0} submitted","Timer gestoppt, {0} gebucht"
+"Timer stopped, record submitted","Timer gestoppt, Datensatz gebucht"
+Submitted with the available hours,Mit den verfügbaren Stunden gebucht
+Account manager notified,Kundenbetreuer benachrichtigt
+"Break logged, timer running again","Pause erfasst, Timer läuft wieder"
+A timer is already running. Stop it first.,Es läuft bereits ein Timer. Stoppen Sie ihn zuerst.
+Timers need an active Employee linked to your user.,Für Timer muss Ihrem Benutzer ein aktiver Mitarbeiter zugeordnet sein.
+Project,Projekt
+Search all open projects…,Alle offenen Projekte durchsuchen…
+Open projects,Offene Projekte
+My projects,Meine Projekte
+Recent,Zuletzt verwendet
+Loading projects…,Projekte werden geladen…
+No open project found.,Kein offenes Projekt gefunden.
+Task,Aufgabe
+Expected minutes,Geplante Minuten
+Goal,Ziel
+What will you accomplish? Shared with the customer the next day.,Was werden Sie erreichen? Wird am nächsten Tag mit dem Kunden geteilt.
+Ctrl+Enter starts,Strg+Enter startet
+Pick a task,Aufgabe auswählen
+No task,Keine Aufgabe
+Could not load your projects,Ihre Projekte konnten nicht geladen werden
+Could not load the project,Das Projekt konnte nicht geladen werden
+Please pick a project.,Bitte wählen Sie ein Projekt.
+This project needs a task.,Für dieses Projekt ist eine Aufgabe erforderlich.
+Minimum expected time is 15 minutes.,Die geplante Zeit beträgt mindestens 15 Minuten.
+Please describe the goal.,Bitte beschreiben Sie das Ziel.
+Could not start the timer,Der Timer konnte nicht gestartet werden
+Stop timer,Timer stoppen
+What did you accomplish?,Was haben Sie erreicht?
+Sent to the customer the next day.,Wird am nächsten Tag an den Kunden gesendet.
+Activity type,Aktivitätsart
+Billable,Abrechenbar
+0 % (internal),0 % (intern)
+End,Ende
+Ctrl+Enter stops,Strg+Enter stoppt
+Stop and submit,Stoppen und buchen
+Pick an activity type,Aktivitätsart auswählen
+Please describe what you accomplished.,"Bitte beschreiben Sie, was Sie erreicht haben."
+Please pick an activity type.,Bitte wählen Sie eine Aktivitätsart.
+The end cannot be before the current segment started.,Das Ende darf nicht vor dem Beginn des aktuellen Abschnitts liegen.
+Could not stop the timer,Der Timer konnte nicht gestoppt werden
+Track the break,Pause erfassen
+Track this break?,Diese Pause erfassen?
+“{0}” took {1} of the {2} you estimated. Track it as its own timesheet record?,„{0}“ hat {1} der geschätzten {2} gedauert. Als eigenen Zeiterfassungs-Datensatz erfassen?
+“{0}” took {1}. Track it as its own timesheet record?,„{0}“ hat {1} gedauert. Als eigenen Zeiterfassungs-Datensatz erfassen?
+"If not, the goal and estimate of the break are dropped.",Andernfalls werden Ziel und Schätzung der Pause verworfen.
+"No, drop it and resume","Nein, verwerfen und fortsetzen"
+"Yes, track it","Ja, erfassen"
+What happened?,Was ist passiert?
+Log break and resume,Pause erfassen und fortsetzen
+Pick a project,Projekt auswählen
+Please fill in the goal and what happened.,Bitte geben Sie das Ziel an und was passiert ist.
+Could not resume the timer,Der Timer konnte nicht fortgesetzt werden
+Pause for a break,Pause einlegen
+What is the break for?,Wofür ist die Pause?
+"Lunch, a call, coffee with the team…","Mittagessen, ein Anruf, Kaffee mit dem Team…"
+Estimated minutes,Geschätzte Minuten
+When you resume you decide whether the break is tracked as its own record.,"Beim Fortsetzen entscheiden Sie, ob die Pause als eigener Datensatz erfasst wird."
+Keep working,Weiterarbeiten
+Please say what the break is for.,"Bitte geben Sie an, wofür die Pause ist."
+Please estimate the break in minutes.,Bitte schätzen Sie die Pause in Minuten.
+Could not pause the timer,Der Timer konnte nicht pausiert werden
+Implementation time limit reached,Zeitlimit der Implementierung erreicht
+"This session needs {0} billable, but only {1} of {2} are left for this implementation. The record is saved and waits for your decision.","Diese Sitzung benötigt {0} abrechenbar, aber von {2} sind für diese Implementierung nur noch {1} übrig. Der Datensatz ist gespeichert und wartet auf Ihre Entscheidung."
+Continue with the available hours,Mit den verfügbaren Stunden fortfahren
+Notify the account manager,Kundenbetreuer benachrichtigen
+Decide later,Später entscheiden
+Continue keeps your times and lowers the billable share so it fits. Notify sends the account manager an email and leaves the record as it is.,"Fortfahren behält Ihre Zeiten bei und senkt den abrechenbaren Anteil, sodass er passt. Benachrichtigen sendet dem Kundenbetreuer eine E-Mail und lässt den Datensatz unverändert."
+A timer is still running,Ein Timer läuft noch
+"{0} · {1}. Stop it before you check out, so it does not run on overnight?","{0} · {1}. Vor dem Ausstempeln stoppen, damit er nicht über Nacht weiterläuft?"
+Stop timer and check out,Timer stoppen und ausstempeln
+Check out anyway,Trotzdem ausstempeln
+Search,Suchen
+Search this page,Diese Seite durchsuchen
+Previous match,Vorheriger Treffer
+Next match,Nächster Treffer
+Expand,Erweitern
+Collapse,Zuklappen
+Personal Cockpit,Persönliches Cockpit
+ToDos,ToDos
+My Day,Mein Tag
+List,Liste
+Matrix,Matrix
+Issues,Anfragen
+Tasks,Aufgaben
+Gantt,Gantt
+Checklists,Checklisten
+Check-ins,Stempelzeiten
+My Contract,Mein Vertrag
+Focus,Fokus
+My ToDos,Meine ToDos
+Dashboard,Dashboard
+My Check-ins,Meine Stempelzeiten
+My Issues,Meine Anfragen
+My Tasks,Meine Aufgaben
+My Checklists,Meine Checklisten
+In focus. Leave from the focus view.,Im Fokus. Verlassen Sie ihn über die Fokusansicht.
+In focus until {0}. Leave from the focus view.,Im Fokus bis {0}. Verlassen Sie ihn über die Fokusansicht.
+Create something new,Etwas Neues erstellen
+Create,Erstellen
+ToDo created,ToDo erstellt
+Issue created,Anfrage erstellt
+Task created,Aufgabe erstellt
+Checklist created,Checkliste erstellt
+ToDo,ToDo
+Issue,Anfrage
+Checklist,Checkliste
+Timesheet timer,Zeiterfassungs-Timer
+Focus session,Fokussitzung
+Target,Ziel
+Work,Arbeit
+Help,Hilfe
+Keyboard shortcuts,Tastenkürzel
+Target set,Ziel gesetzt
+Everywhere,Überall
+Next or previous match,Nächster oder vorheriger Treffer
+Move through a list,Durch eine Liste bewegen
+Open the focused row,Markierte Zeile öffnen
+Revoke a fresh check-in or check-out,Gerade erfolgtes Ein- oder Ausstempeln zurücknehmen
+Show these shortcuts,Diese Tastenkürzel anzeigen
+Jump to today,Zu heute springen
+Move the focused ToDo to quadrant 1–4,Markiertes ToDo in Quadrant 1–4 verschieben
+Open the focused ToDo,Markiertes ToDo öffnen
+Dialogs,Dialoge
+Save or confirm,Speichern oder bestätigen
+or,oder
+Undo,Rückgängig
+Revoke the check-in at {0} (Ctrl+Z),Einstempeln um {0} zurücknehmen (Ctrl+Z)
+Revoke the check-out at {0} (Ctrl+Z),Ausstempeln um {0} zurücknehmen (Ctrl+Z)
+Check-in revoked,Einstempeln zurückgenommen
+Check-out revoked,Ausstempeln zurückgenommen
+Could not revoke it,Konnte nicht zurückgenommen werden
+This browser cannot share its location.,Dieser Browser kann seinen Standort nicht teilen.
+Please allow location access to check in.,"Bitte erlauben Sie den Standortzugriff, um einzustempeln."
+Checked in at {0},Eingestempelt um {0}
+Checked out at {0},Ausgestempelt um {0}
+Could not load your contracts,Ihre Verträge konnten nicht geladen werden
+Check out,Ausstempeln
+Check in,Einstempeln
+not checked in yet,noch nicht eingestempelt
+in since {0},eingestempelt seit {0}
+out since {0},ausgestempelt seit {0}
+No comparison,Kein Vergleich
+{0}pp,{0} PP
+{0}d,{0} T
+New,Neu
+No change,Keine Änderung
+today,heute
+{0} day,{0} Tag
+{0} days,{0} Tage
+Nothing to show yet.,Noch nichts anzuzeigen.
+Loading your Tasks…,Ihre Aufgaben werden geladen …
+My hours this week,Meine Stunden diese Woche
+Today {0},Heute {0}
+This month {0},Diesen Monat {0}
+Next due,Als Nächstes fällig
+No open Task has an end date.,Keine offene Aufgabe hat ein Enddatum.
+overdue · {0},überfällig · {0}
+Open by status,Offen nach Status
+No open Tasks.,Keine offenen Aufgaben.
+Time used of the estimate,Verbrauchte Zeit der Schätzung
+{0} of {1} · {2} %,{0} von {1} · {2} %
+None of your open Tasks has an expected time.,Keine Ihrer offenen Aufgaben hat eine erwartete Zeit.
+Past the expected end date,Nach dem erwarteten Enddatum
+Due soon,Bald fällig
+In the next {0} days,In den nächsten {0} Tagen
+Assigned to me,Mir zugewiesen
+In the last {0} days,In den letzten {0} Tagen
+Could not load your Tasks,Ihre Aufgaben konnten nicht geladen werden
+Loading your Issues…,Ihre Anfragen werden geladen …
+Open by age,Offen nach Alter
+Open by priority,Offen nach Priorität
+No open Issues.,Keine offenen Anfragen.
+Oldest open Issues,Älteste offene Anfragen
+Nothing open. Good.,Nichts offen. Gut.
+Waiting on me,Wartet auf mich
+Status Open: the next step is mine,Status Offen: Der nächste Schritt liegt bei mir
+Waiting on others,Wartet auf andere
+Replied or On Hold,Beantwortet oder Zurückgestellt
+Oldest: {0},Älteste: {0}
+Resolved,Gelöst
+Could not load your Issues,Ihre Anfragen konnten nicht geladen werden
+Check-ins need an active Employee linked to your user. Please ask HR.,"Stempelzeiten erfordern einen aktiven Mitarbeiter, der mit Ihrem Benutzer verknüpft ist. Bitte wenden Sie sich an HR."
+Last {0} days,Letzte {0} Tage
+{0} days · this week {1},{0} Tage · diese Woche {1}
+Average day,Durchschnittlicher Tag
+on days with check-ins,an Tagen mit Stempelzeiten
+Typical day,Typischer Tag
+average first check-in and last check-out,durchschnittliches erstes Einstempeln und letztes Ausstempeln
+Worked time,Arbeitszeit
+"Hours per week, from check-in to check-out","Stunden pro Woche, vom Einstempeln bis zum Ausstempeln"
+"Hours per day, from check-in to check-out","Stunden pro Tag, vom Einstempeln bis zum Ausstempeln"
+Hours,Stunden
+Days without a check-out,Tage ohne Ausstempeln
+These days do not count as worked time. HR can add the missing check-out.,Diese Tage zählen nicht als Arbeitszeit. HR kann das fehlende Ausstempeln nachtragen.
+checked in {0},eingestempelt {0}
+Your check-ins and worked time.,Ihre Stempelzeiten und Arbeitszeit.
+"Checked in, {0}.","Eingestempelt, {0}."
+Checked out.,Ausgestempelt.
+Could not load your check-ins,Ihre Stempelzeiten konnten nicht geladen werden
+No check-ins yet.,Noch keine Stempelzeiten.
+no check-out,kein Ausstempeln
+In,Ein
+Out,Aus
+Counted for attendance,Für die Anwesenheit gezählt
+attendance,Anwesenheit
+Load older check-ins,Ältere Stempelzeiten laden
+Loading your contract…,Ihr Vertrag wird geladen …
+There is no contract for you yet. HR adds it once it is signed.,"Für Sie gibt es noch keinen Vertrag. HR trägt ihn ein, sobald er unterschrieben ist."
+Current contract,Aktueller Vertrag
+No contract is in force today.,Heute ist kein Vertrag in Kraft.
+Upcoming changes,Anstehende Änderungen
+From {0},Ab {0}
+{0} · {1} per week · {2} per month,{0} · {1} pro Woche · {2} pro Monat
+History,Verlauf
+Something looks wrong? Ask HR to record a change.,"Stimmt etwas nicht? Bitten Sie HR, eine Änderung zu erfassen."
+FTE,VZÄ
+Hours per week,Stunden pro Woche
+Monthly gross,Monatlich brutto
+Yearly gross at 100 %,Jährlich brutto bei 100 %
+0–7 days,0–7 Tage
+8–14 days,8–14 Tage
+15–30 days,15–30 Tage
+31–90 days,31–90 Tage
+90+ days,90+ Tage
+Mon,Mo
+Tue,Di
+Wed,Mi
+Thu,Do
+Fri,Fr
+Sat,Sa
+Sun,So
+W{0},KW {0}
+Replied,Beantwortet
+On Hold,Zurückgestellt
+Working,In Arbeit
+Pending Review,Prüfung ausstehend
+No priority,Keine Priorität
+All days done,Alle Tage geschafft
+{0} of 1 day done,{0} von 1 Tag geschafft
+{0} of {1} days done,{0} von {1} Tagen geschafft
+1 day to go,Noch 1 Tag
+{0} days to go,Noch {0} Tage
+Starts {0}.,Beginnt am {0}.
+Day off today. It does not count either way.,Heute ist frei. Der Tag zählt so oder so nicht.
+Today counts. Nice work.,Heute zählt. Gut gemacht.
+"Today: {0} of {1} planned, {2} of {3} spontaneous.","Heute: {0} von {1} geplant, {2} von {3} spontan."
+"Today: {0} of {1} closed, {2} to go.","Heute: {0} von {1} erledigt, noch {2}."
+Close {0} planned and {1} spontaneous today and the day before counts too.,"Erledigen Sie heute {0} geplante und {1} spontane, dann zählt auch der Vortag."
+Close {0} today and the day before counts too.,"Erledigen Sie heute {0}, dann zählt auch der Vortag."
+Welcome back. Today is a fresh day.,Willkommen zurück. Heute ist ein neuer Tag.
+1 joker in reserve for a day that slips.,"1 Joker in Reserve für einen Tag, der nicht klappt."
+{0} jokers in reserve for a day that slips.,"{0} Joker in Reserve für einen Tag, der nicht klappt."
+No jokers left. A day that slips can still be made up on the next one.,Keine Joker mehr. Ein verpasster Tag lässt sich am nächsten noch nachholen.
+{0} days in a row,{0} Tage in Folge
+Completed: all {0} days counted.,Abgeschlossen: alle {0} Tage gezählt.
+Ended with {0} of 1 day counted. Each of them is real progress.,Beendet mit {0} von 1 Tag gezählt. Jeder davon ist echter Fortschritt.
+Ended with {0} of {1} days counted. Each of them is real progress.,Beendet mit {0} von {1} Tagen gezählt. Jeder davon ist echter Fortschritt.
+counted,gezählt
+made up the next day,am Folgetag nachgeholt
+covered by a joker,mit Joker abgedeckt
+not counted,nicht gezählt
+upcoming,kommt noch
+Plan your day in My Day first; then planned closes start to count.,Planen Sie Ihren Tag zuerst in „Mein Tag“; dann zählen geplante Erledigungen.
+You close about {0} planned and {1} spontaneous a day.,Sie erledigen etwa {0} geplante und {1} spontane pro Tag.
+On most working days you closed none so far. Start small: one a day is a real habit.,An den meisten Arbeitstagen haben Sie bisher keine erledigt. Fangen Sie klein an: eine am Tag ist schon eine echte Gewohnheit.
+You close about {0} a day. {1} is a good stretch.,Sie erledigen etwa {0} pro Tag. {1} ist eine gute Steigerung.
+Loading checklist dashboard…,Checklisten-Dashboard wird geladen …
+{0} vs previous 90 days,{0} ggü. den 90 Tagen davor
+{0} vs same period last year,{0} ggü. dem Vorjahreszeitraum
+Created and completed,Erstellt und abgeschlossen
+Monthly throughput for the last 12 months,Monatlicher Durchsatz der letzten 12 Monate
+Open by owner,Offen nach Verantwortlichem
+Aging of open checklists,Alter offener Checklisten
+Completion rate,Abschlussquote
+Median completion,Mittlere Dauer bis Abschluss
+Could not load checklist dashboard,Checklisten-Dashboard konnte nicht geladen werden

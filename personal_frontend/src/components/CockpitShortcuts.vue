@@ -1,15 +1,15 @@
 <template>
-	<Dialog v-model="shortcuts.open" :options="{ title: 'Keyboard shortcuts', size: 'lg' }">
+	<Dialog v-model="shortcuts.open" :options="{ title: __('Keyboard shortcuts'), size: 'lg' }">
 		<template #body-content>
 			<div class="space-y-5">
 				<section v-for="group in GROUPS" :key="group.title">
-					<h3 class="mb-2 text-xs font-medium uppercase tracking-wide text-ink-gray-5">{{ group.title }}</h3>
+					<h3 class="mb-2 text-xs font-medium uppercase tracking-wide text-ink-gray-5">{{ __(group.title) }}</h3>
 					<dl class="divide-y divide-outline-gray-1">
 						<div v-for="row in group.rows" :key="row.what" class="flex items-center justify-between gap-4 py-1.5 text-sm">
-							<dt class="text-ink-gray-8">{{ row.what }}</dt>
+							<dt class="text-ink-gray-8">{{ __(row.what) }}</dt>
 							<dd class="flex flex-none items-center gap-1">
 								<template v-for="(key, index) in row.keys" :key="key">
-									<span v-if="index" class="text-xs text-ink-gray-4">or</span>
+									<span v-if="index" class="text-xs text-ink-gray-4">{{ __("or") }}</span>
 									<kbd class="rounded border border-outline-gray-2 bg-surface-gray-2 px-1.5 py-0.5 font-mono text-xs text-ink-gray-7">
 										{{ key }}
 									</kbd>

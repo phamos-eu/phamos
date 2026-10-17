@@ -1,23 +1,23 @@
 <template>
 	<Dialog
 		:model-value="modelValue"
-		:options="{ title: 'Start a focus session', size: 'xl' }"
+		:options="{ title: __('Start a focus session'), size: 'xl' }"
 		@update:model-value="emit('update:modelValue', $event)"
 	>
 		<template #body-content>
 			<div class="space-y-4">
 				<p class="text-sm text-ink-gray-6">
-					Pick up to {{ maxTodos }} ToDos. Until you finish or leave, the cockpit shows only these.
+					{{ __("Pick up to {0} ToDos. Until you finish or leave, the cockpit shows only these.", [maxTodos]) }}
 				</p>
 
 				<div>
 					<div class="mb-1.5 flex items-center justify-between text-xs text-ink-gray-5">
-						<span>ToDos, in the order you want to do them</span>
-						<span>{{ selected.length }} of {{ maxTodos }}</span>
+						<span>{{ __("ToDos, in the order you want to do them") }}</span>
+						<span>{{ __("{0} of {1}", [selected.length, maxTodos]) }}</span>
 					</div>
-					<div v-if="loading" class="py-6 text-center text-sm text-ink-gray-5">Loading your ToDos…</div>
+					<div v-if="loading" class="py-6 text-center text-sm text-ink-gray-5">{{ __("Loading your ToDos…") }}</div>
 					<p v-else-if="!candidates.length" class="py-6 text-center text-sm text-ink-gray-5">
-						No open ToDos. Create one first.
+						{{ __("No open ToDos. Create one first.") }}
 					</p>
 					<ul v-else class="max-h-72 space-y-1 overflow-y-auto pr-1">
 						<li v-for="todo in candidates" :key="todo.name">
@@ -38,9 +38,9 @@
 								<span class="min-w-0 flex-1">
 									<span class="block truncate text-ink-gray-9">{{ todo.summary || todo.name }}</span>
 									<span class="flex gap-2 text-xs text-ink-gray-5">
-										<span v-if="todo.important" class="text-ink-amber-3">★ important</span>
-										<span v-if="todo.date" :class="todo.overdue ? 'text-ink-red-3' : ''">due {{ formatDate(todo.date) }}</span>
-										<span v-if="todo.estimate_minutes">~{{ todo.estimate_minutes }} min</span>
+										<span v-if="todo.important" class="text-ink-amber-3">★ {{ __("important") }}</span>
+										<span v-if="todo.date" :class="todo.overdue ? 'text-ink-red-3' : ''">{{ __("due {0}", [formatDate(todo.date)]) }}</span>
+										<span v-if="todo.estimate_minutes">~{{ __("{0} min", [todo.estimate_minutes]) }}</span>
 									</span>
 								</span>
 							</label>
@@ -49,16 +49,16 @@
 				</div>
 
 				<div>
-					<label class="mb-1.5 block text-xs text-ink-gray-5">How long</label>
+					<label class="mb-1.5 block text-xs text-ink-gray-5">{{ __("How long") }}</label>
 					<TabButtons v-model="length" :buttons="lengthButtons" />
 					<p class="mt-1 text-xs text-ink-gray-5">{{ lengthHint }}</p>
 				</div>
 
 				<ErrorMessage :message="error" />
 				<div class="flex justify-end gap-2">
-					<Button variant="ghost" @click="emit('update:modelValue', false)">Cancel</Button>
+					<Button variant="ghost" @click="emit('update:modelValue', false)">{{ __("Cancel") }}</Button>
 					<Button variant="solid" :disabled="!selected.length" :loading="starting" @click="start">
-						Start focus
+						{{ __("Start focus") }}
 					</Button>
 				</div>
 			</div>
@@ -71,6 +71,7 @@ import { computed, ref, watch } from "vue"
 import { useRouter } from "vue-router"
 import { call, TabButtons } from "frappe-ui"
 import { formatDate } from "@spa/utils/datetime.js"
+import { __ } from "@spa/utils/i18n.js"
 import spaConfig from "@/config"
 import { setFocus } from "@/focusStore.js"
 
@@ -93,13 +94,13 @@ const length = ref("25")
 
 const maxTodos = computed(() => options.value.max_todos || 5)
 const lengthButtons = computed(() => [
-	...(options.value.presets || [25, 50]).map((m) => ({ label: `${m} min`, value: String(m) })),
-	{ label: "Stopwatch", value: "0" },
+	...(options.value.presets || [25, 50]).map((m) => ({ label: __("{0} min", [m]), value: String(m) })),
+	{ label: __("Stopwatch"), value: "0" },
 ])
 const lengthHint = computed(() =>
 	length.value === "0"
-		? "No end time. The session ends when you are done or leave."
-		: "A timer runs; when it is up you finish your current step and wrap up."
+		? __("No end time. The session ends when you are done or leave.")
+		: __("A timer runs; when it is up you finish your current step and wrap up.")
 )
 
 function isDisabled(todo) {
@@ -132,7 +133,7 @@ async function load() {
 		const open = new Set(todos.map((t) => t.name))
 		selected.value = props.preselect.filter((name) => open.has(name)).slice(0, maxTodos.value)
 	} catch (e) {
-		error.value = e?.messages?.[0] || e?.message || "Could not load your ToDos"
+		error.value = e?.messages?.[0] || e?.message || __("Could not load your ToDos")
 	} finally {
 		loading.value = false
 	}
@@ -147,7 +148,7 @@ async function start() {
 		emit("update:modelValue", false)
 		router.push({ name: "TodosFocus" })
 	} catch (e) {
-		error.value = e?.messages?.[0] || e?.message || "Could not start the focus session"
+		error.value = e?.messages?.[0] || e?.message || __("Could not start the focus session")
 	} finally {
 		starting.value = false
 	}

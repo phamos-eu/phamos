@@ -11,24 +11,24 @@
 				@click="showStart = true"
 			>
 				<template #prefix><FeatherIcon name="play" class="h-4 w-4" /></template>
-				Start timer
+				{{ __("Start timer") }}
 			</Button>
 			<Button
 				v-if="state.blocking_drafts?.length"
 				size="sm"
 				variant="ghost"
-				:title="`Discard the empty draft ${state.blocking_drafts[0].name}`"
+				:title="__('Discard the empty draft {0}', [state.blocking_drafts[0].name])"
 				:loading="busy === 'discard'"
 				@click="discard(state.blocking_drafts[0])"
 			>
-				Discard draft
+				{{ __("Discard draft") }}
 			</Button>
 		</template>
 
 		<!-- Waiting for the time-limit decision -->
 		<Button v-else-if="session.state === 'limit_exceeded'" size="sm" variant="subtle" theme="orange" @click="showLimit = true">
 			<template #prefix><FeatherIcon name="alert-triangle" class="h-4 w-4" /></template>
-			Time limit
+			{{ __("Time limit") }}
 		</Button>
 
 		<!-- Running or paused -->
@@ -49,17 +49,17 @@
 					<div class="w-72 space-y-2 p-3 text-sm">
 						<div class="font-medium text-ink-gray-9">{{ session.project_name }}</div>
 						<div class="text-ink-gray-7">{{ session.goal }}</div>
-						<div v-if="session.task_subject" class="text-xs text-ink-gray-5">Task: {{ session.task_subject }}</div>
-						<div v-if="session.gitlab_issue_title" class="text-xs text-ink-gray-5">Issue: {{ session.gitlab_issue_title }}</div>
+						<div v-if="session.task_subject" class="text-xs text-ink-gray-5">{{ __("Task: {0}", [session.task_subject]) }}</div>
+						<div v-if="session.gitlab_issue_title" class="text-xs text-ink-gray-5">{{ __("Issue: {0}", [session.gitlab_issue_title]) }}</div>
 						<div class="flex justify-between text-xs text-ink-gray-6">
-							<span>Started {{ formatTime(session.from_time) }} · {{ formatMinutes(elapsed) }} worked</span>
+							<span>{{ __("Started {0} · {1} worked", [formatTime(session.from_time), formatMinutes(elapsed)]) }}</span>
 							<span :class="over ? 'text-ink-red-4' : ''">{{ budget }}</span>
 						</div>
 						<div v-if="session.state === 'paused'" class="text-xs text-ink-amber-4">
-							Break: {{ session.break_goal || "break" }}, {{ breakText }} so far
+							{{ __("Break: {0}, {1} so far", [session.break_goal || __("break"), breakText]) }}
 						</div>
 						<button type="button" class="text-xs text-ink-gray-5 hover:underline" @click="openDesk(session.desk_url)">
-							Open the record in Desk ↗
+							{{ __("Open the record in Desk") }} ↗
 						</button>
 					</div>
 				</template>
@@ -69,16 +69,16 @@
 				v-if="session.state === 'running'"
 				type="button"
 				class="flex h-7 w-7 items-center justify-center rounded text-ink-gray-6 hover:bg-surface-gray-2 hover:text-ink-gray-9 disabled:opacity-50"
-				aria-label="Pause the timer"
-				title="Pause"
+				:aria-label="__('Pause the timer')"
+				:title="__('Pause')"
 				@click="showPause = true"
 			>
 				<FeatherIcon name="pause" class="h-4 w-4" />
 			</button>
-			<button v-else type="button" class="flex h-7 w-7 items-center justify-center rounded text-ink-gray-6 hover:bg-surface-gray-2 hover:text-ink-gray-9 disabled:opacity-50" aria-label="Resume the timer" title="Resume" @click="showBreak = true">
+			<button v-else type="button" class="flex h-7 w-7 items-center justify-center rounded text-ink-gray-6 hover:bg-surface-gray-2 hover:text-ink-gray-9 disabled:opacity-50" :aria-label="__('Resume the timer')" :title="__('Resume')" @click="showBreak = true">
 				<FeatherIcon name="play" class="h-4 w-4" />
 			</button>
-			<button type="button" class="flex h-7 w-7 items-center justify-center rounded text-ink-gray-6 hover:bg-surface-gray-2 hover:text-ink-gray-9 disabled:opacity-50" aria-label="Stop the timer" title="Stop" @click="showStop = true">
+			<button type="button" class="flex h-7 w-7 items-center justify-center rounded text-ink-gray-6 hover:bg-surface-gray-2 hover:text-ink-gray-9 disabled:opacity-50" :aria-label="__('Stop the timer')" :title="__('Stop')" @click="showStop = true">
 				<FeatherIcon name="square" class="h-4 w-4" />
 			</button>
 		</template>
@@ -102,6 +102,7 @@ import { computed, onBeforeUnmount, onMounted, ref, watch } from "vue"
 import { call, Popover } from "frappe-ui"
 import { openDesk } from "@spa/utils/appWindow.js"
 import { formatTime as formatTimeFull } from "@spa/utils/datetime.js"
+import { __ } from "@spa/utils/i18n.js"
 import { notify } from "@spa/utils/notify.js"
 import { budgetText, countdown, formatMinutes, isOverBudget, liveBreak, liveElapsed } from "@spa/utils/timerClock.js"
 import { setTimer, timer, loadTimer } from "@spa/timerStore.js"
@@ -145,9 +146,13 @@ const clockClass = computed(() => {
 	return session.value?.state === "running" ? "text-ink-green-3" : "text-ink-amber-3"
 })
 const clockLabel = computed(() => {
-	const what = session.value?.state === "running" ? "Timer" : "Break"
-	const rest = clockState.value.over ? `over by ${clock.value.slice(1)}` : `${clock.value} left`
-	return `${what} running, ${rest}, ${session.value?.project_name || ""}`
+	const project = session.value?.project_name || ""
+	const running = session.value?.state === "running"
+	if (clockState.value.over) {
+		const by = clock.value.slice(1)
+		return running ? __("Timer running, over by {0}, {1}", [by, project]) : __("Break running, over by {0}, {1}", [by, project])
+	}
+	return running ? __("Timer running, {0} left, {1}", [clock.value, project]) : __("Break running, {0} left, {1}", [clock.value, project])
 })
 const budget = computed(() => budgetText(session.value, elapsed.value))
 const over = computed(() => isOverBudget(session.value, elapsed.value))
@@ -155,7 +160,7 @@ const breakSeconds = computed(() => liveBreak(session.value, state.value?.server
 const breakText = computed(() => formatMinutes(breakSeconds.value))
 const blockTitle = computed(() => {
 	const draft = state.value?.blocking_drafts?.[0]
-	return draft ? `Finish or discard the empty draft ${draft.name} first` : "Start a timesheet timer"
+	return draft ? __("Finish or discard the empty draft {0} first", [draft.name]) : __("Start a timesheet timer")
 })
 
 function errorText(e, fallback) {
@@ -166,9 +171,9 @@ async function discard(draft) {
 	busy.value = "discard"
 	try {
 		setTimer(await call(`${API}.discard_timer_draft`, { name: draft.name }))
-		notify.success(`Draft ${draft.name} discarded`)
+		notify.success(__("Draft {0} discarded", [draft.name]))
 	} catch (e) {
-		notify.error(errorText(e, "Could not discard the draft"))
+		notify.error(errorText(e, __("Could not discard the draft")))
 	} finally {
 		busy.value = ""
 	}
@@ -183,12 +188,12 @@ function settleStopRequest(stopped) {
 
 function onStarted(next) {
 	setTimer(next)
-	notify.success(`Timer started on ${next.session?.project_name || "the project"}`)
+	notify.success(next.session?.project_name ? __("Timer started on {0}", [next.session.project_name]) : __("Timer started"))
 }
 
 function onStopped(response) {
 	setTimer(response.state)
-	notify.success(`Timer stopped, ${response.outcome?.name || "record"} submitted`)
+	notify.success(response.outcome?.name ? __("Timer stopped, {0} submitted", [response.outcome.name]) : __("Timer stopped, record submitted"))
 	settleStopRequest(true)
 }
 
@@ -200,12 +205,12 @@ function onLimit(response) {
 
 function onLimitDone(next, kind) {
 	setTimer(next)
-	notify.success(kind === "continue" ? "Submitted with the available hours" : "Account manager notified")
+	notify.success(kind === "continue" ? __("Submitted with the available hours") : __("Account manager notified"))
 }
 
 function onResumed(next, withBreak) {
 	setTimer(next)
-	if (withBreak) notify.success("Break logged, timer running again")
+	if (withBreak) notify.success(__("Break logged, timer running again"))
 }
 
 // A request from elsewhere (a Create menu) to start a timer.
@@ -213,9 +218,9 @@ watch(
 	() => timer.startRequest,
 	() => {
 		if (state.value?.can_start) showStart.value = true
-		else if (session.value) notify.error("A timer is already running. Stop it first.")
+		else if (session.value) notify.error(__("A timer is already running. Stop it first."))
 		else if (state.value?.blocking_drafts?.length) notify.error(blockTitle.value)
-		else notify.error("Timers need an active Employee linked to your user.")
+		else notify.error(__("Timers need an active Employee linked to your user."))
 	}
 )
 
