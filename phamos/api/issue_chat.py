@@ -61,9 +61,6 @@ def channel_url(workspace, channel_id):
 	return f"/raven/{quote(workspace, safe='')}/{quote(channel_id, safe='')}"
 
 
-def dm_url(channel_id):
-	return f"/raven/dm-channel/{quote(channel_id, safe='')}"
-
 
 def find_channel(doctype, name):
 	if not is_raven_installed():
@@ -419,28 +416,6 @@ def get_chat_states(doctype, names):
 		for c in channels
 	}
 
-
-def start_dm(doc, user):
-	"""Open the Raven DM with `user`, post a link to the record, and return its URL.
-
-	The link is posted only when the DM's last message is not already a link to this record,
-	so clicking "Message" twice does not repeat it.
-	"""
-	_require_chat_doctype(doc.doctype)
-	_require_enabled()
-	from raven.api.raven_channel import create_direct_message_channel
-
-	channel_id = create_direct_message_channel(user)
-	last = frappe.get_all(
-		"Raven Message",
-		filters={"channel_id": channel_id, "message_type": ("!=", "System")},
-		fields=["link_doctype", "link_document"],
-		order_by="creation desc",
-		limit=1,
-	)
-	if not last or (last[0].link_doctype, last[0].link_document) != (doc.doctype, doc.name):
-		_post_link_message(channel_id, doc, _("About {0}: {1}").format(doc.name, _doc_title(doc)))
-	return {"channel_id": channel_id, "url": dm_url(channel_id)}
 
 
 # --- Hooks -----------------------------------------------------------------------------------

@@ -10,20 +10,13 @@
 				:key="user.name"
 				class="inline-flex items-center gap-1 rounded-full bg-surface-gray-3 py-0.5 pl-1 pr-1 text-xs font-medium text-ink-gray-9"
 			>
-				<UserPopover
-					:user="user"
-					:document-name="documentName"
-					:api-prefix="apiPrefix"
-					:messageable="messageable"
-				>
-					<Avatar
-						size="xs"
-						shape="circle"
-						:image="user.user_image || undefined"
-						:label="user.full_name || user.name"
-					/>
-					<span class="pl-1">{{ user.full_name || user.name }}</span>
-				</UserPopover>
+				<Avatar
+					size="xs"
+					shape="circle"
+					:image="user.user_image || undefined"
+					:label="user.full_name || user.name"
+				/>
+				<span class="pl-0.5">{{ user.full_name || user.name }}</span>
 				<button
 					v-if="!readonly"
 					type="button"
@@ -82,7 +75,6 @@
 <script setup>
 import { computed, nextTick, ref, watch } from "vue"
 import { Autocomplete, Avatar, call, createResource, debounce, toast } from "frappe-ui"
-import UserPopover from "@spa/components/UserPopover.vue"
 
 const props = defineProps({
 	modelValue: { type: Array, default: () => [] },
@@ -95,8 +87,6 @@ const props = defineProps({
 	/** Issue uses set_assignees; Task uses set_task_assignees */
 	methodName: { type: String, default: "set_assignees" },
 	readonly: { type: Boolean, default: false },
-	/** Chips open a person card with "Message" (Raven DM linked to the document, #1616) */
-	messageable: { type: Boolean, default: false },
 })
 
 const emit = defineEmits(["update:modelValue", "updated"])
