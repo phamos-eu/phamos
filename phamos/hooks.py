@@ -384,7 +384,13 @@ doc_events = {
         ],
     },
     # Mirror facts onto the Web Profiles (phamos/phamos#1492).
-    "Employee": {"on_update": "phamos.web_profile.mirror.push_to_profiles"},
+    "Employee": {
+        "on_update": [
+            "phamos.web_profile.mirror.push_to_profiles",
+            # Employment Contract: a leaver's open contract ends on the relieving date (#1596)
+            "phamos.phamos.doctype.employment_contract.employment_contract.cap_contracts_at_relieving_date",
+        ]
+    },
     "Contact": {"on_update": "phamos.web_profile.mirror.push_to_profiles"},
     "Supplier": {"on_update": "phamos.web_profile.mirror.push_to_profiles"},
     "Sales Partner": {"on_update": "phamos.web_profile.mirror.push_to_profiles"},
@@ -469,6 +475,8 @@ scheduler_events = {
         "phamos.api.personal_challenges.evaluate_all_challenges",
         # Event tickets: payment status for payments booked without hooks
         "phamos.marketing.billing.sync_payment_status",
+        # Employment Contract: Upcoming -> Active -> Expired as dates pass (#1596)
+        "phamos.phamos.doctype.employment_contract.employment_contract.update_contract_statuses",
     ],
     "weekly": [
         # Personal Cockpit: checklists left behind by ToDos deleted without hooks (#1554)
@@ -520,6 +528,7 @@ before_tests = "phamos.install.before_tests"
 override_doctype_dashboards = {
     "Project": "phamos.custom_scripts.custom_python.project_dashboard.get_project_dashboard_data",
     "Delivery Note": "phamos.custom_scripts.custom_python.delivery_note_dashboard.get_delivery_note_dashboard_data",
+    "Employee": "phamos.custom_scripts.custom_python.employee_dashboard.get_employee_dashboard_data",
 }
 
 # exempt linked doctypes from being automatically cancelled
