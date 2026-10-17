@@ -103,8 +103,10 @@ def get_settings(supplier):
 	doc = frappe.get_doc("Supplier", supplier)
 	doc.check_permission("read")
 	ensure_fields()
-	return {"supplier": doc.name, "supplier_name": doc.supplier_name, "can_write": 1 if doc.has_permission("write") else 0,
-		**{key: doc.get(field) for field, key in FIELDS.items()}}
+	values = {key: doc.get(field) for field, key in FIELDS.items()}
+	values["amount_tolerance_pct"] = values["amount_tolerance_pct"] or None  # an empty Percent reads as 0
+	values["auto_datev"] = values["auto_datev"] or "Default"
+	return {"supplier": doc.name, "supplier_name": doc.supplier_name, "can_write": 1 if doc.has_permission("write") else 0, **values}
 
 
 @frappe.whitelist(methods=["POST"])
