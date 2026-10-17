@@ -251,9 +251,19 @@
 				</table>
 			</section>
 
-			<!-- Purchase Invoice -->
+			<!-- Booking: Purchase Invoice, Expense Claim or Journal Entry -->
 			<section class="flex flex-wrap items-center gap-2 text-sm">
-				<h3 class="text-xs font-semibold uppercase tracking-wide text-ink-gray-5">Purchase Invoice</h3>
+				<h3 class="text-xs font-semibold uppercase tracking-wide text-ink-gray-5">Booking</h3>
+				<template v-if="activeExpenseClaim">
+					<span class="text-ink-gray-6">Expense Claim</span>
+					<a :href="`/app/expense-claim/${receipt.expense_claim}`" target="_blank" class="text-ink-blue-3 underline">{{ receipt.expense_claim }}</a>
+					<span v-if="receipt.expense_claim_status" class="rounded bg-surface-gray-2 px-1.5 py-0.5 text-xs text-ink-gray-7">{{ receipt.expense_claim_status }}</span>
+				</template>
+				<template v-if="activeJournalEntry">
+					<span class="text-ink-gray-6">Journal Entry</span>
+					<a :href="`/app/journal-entry/${receipt.journal_entry}`" target="_blank" class="text-ink-blue-3 underline">{{ receipt.journal_entry }}</a>
+					<span class="rounded bg-surface-gray-2 px-1.5 py-0.5 text-xs text-ink-gray-7">{{ receipt.journal_entry_docstatus === 1 ? "Submitted" : "Draft" }}</span>
+				</template>
 				<a v-if="receipt.purchase_invoice" :href="`/app/purchase-invoice/${receipt.purchase_invoice}`" target="_blank" class="text-ink-blue-3 underline">
 					{{ receipt.purchase_invoice }}
 				</a>
@@ -269,7 +279,7 @@
 					</button>
 					<span class="text-xs text-ink-gray-5">Submit it to approve the receipt to pay.</span>
 				</template>
-				<template v-if="!receipt.purchase_invoice || receipt.purchase_invoice_docstatus === 2">
+				<template v-if="!activeExpenseClaim && !activeJournalEntry && (!receipt.purchase_invoice || receipt.purchase_invoice_docstatus === 2)">
 					<button
 						type="button"
 						class="btn"
@@ -278,6 +288,12 @@
 						@click="createInvoice"
 					>
 						{{ creatingInvoice ? "Creating…" : "Create Purchase Invoice" }}
+					</button>
+					<button type="button" class="btn" :disabled="readonly || !autosave.draft.items.length" title="An employee paid privately" @click="openBooking('expense_claim')">
+						Expense Claim…
+					</button>
+					<button type="button" class="btn" :disabled="readonly || !autosave.draft.items.length" title="No supplier invoice: tax notice, bank fees, card statement" @click="openBooking('journal_entry')">
+						Journal Entry…
 					</button>
 					<span class="text-xs text-ink-gray-5">{{ invoiceHint }}</span>
 				</template>
@@ -318,6 +334,7 @@
 			<iframe v-else :src="pdfUrl" type="application/pdf" class="min-h-[480px] flex-1 rounded-md border border-outline-gray-2 bg-surface-gray-2" />
 		</div>
 
+		<BookingDialog v-if="bookingKind" :model-value="!!bookingKind" :kind="bookingKind" :receipt="receipt" @update:model-value="(open) => !open && (bookingKind = null)" @booked="onBooked" />
 		<CreateSupplierDialog
 			v-if="showCreateSupplier"
 			v-model="showCreateSupplier"
@@ -335,6 +352,7 @@ import DocSyncBanner from "@spa/components/DocSyncBanner.vue"
 import FrappeLink from "@spa/components/FrappeLink.vue"
 import PlainTextField from "@spa/components/PlainTextField.vue"
 import { useAutosaveDoc } from "@spa/composables/useAutosaveDoc.js"
+import BookingDialog from "./BookingDialog.vue"
 import CreateSupplierDialog from "./CreateSupplierDialog.vue"
 
 const API = "phamos.api.accounting_receipts"
@@ -491,6 +509,23 @@ const invoiceHint = computed(() => {
 })
 
 const submittingInvoice = ref(false)
+
+// --- Expense Claim and Journal Entry ------------------------------------------------------
+const bookingKind = ref(null)
+const activeExpenseClaim = computed(() => props.receipt?.expense_claim && props.receipt.expense_claim_status !== "Cancelled")
+const activeJournalEntry = computed(() => props.receipt?.journal_entry && props.receipt.journal_entry_docstatus !== 2)
+
+async function openBooking(kind) {
+	await autosave.flush()
+	bookingKind.value = kind
+}
+
+function onBooked(res) {
+	const name = res.expense_claim || res.journal_entry
+	toast({ title: `${res.expense_claim ? "Expense Claim" : "Journal Entry"} ${name} created (draft)`, icon: "check-circle", iconClasses: "text-ink-green-3" })
+	for (const warning of res.warnings || []) toast({ title: warning, icon: "alert-triangle", iconClasses: "text-ink-amber-3" })
+	emit("updated", res.receipt)
+}
 
 async function submitInvoice() {
 	if (!window.confirm(`Submit Purchase Invoice ${props.receipt.purchase_invoice}? It is booked and can then only be cancelled.`)) return
