@@ -17,9 +17,10 @@
 				</span>
 			</template>
 		</Button>
-		<IssueChatDrawer
+		<IssueChatPanel
 			v-if="state.url"
 			v-model:open="drawerOpen"
+			:record-name="issueName"
 			:url="state.url"
 			:title="`${issueName}: ${subject || ''}`"
 			:skipped-users="state.skipped_users || []"
@@ -34,7 +35,7 @@
 // follows Raven's message_created events in the channel's document room.
 import { computed, onBeforeUnmount, onMounted, ref, watch } from "vue"
 import { Button, call, FeatherIcon, toast } from "frappe-ui"
-import IssueChatDrawer from "@spa/components/IssueChatDrawer.vue"
+import IssueChatPanel from "@spa/components/IssueChatPanel.vue"
 import { useDocRealtime } from "@spa/composables/useDocRealtime.js"
 import { sessionUser } from "@spa/session.js"
 import { __ } from "@spa/utils/i18n.js"
