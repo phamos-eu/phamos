@@ -44,13 +44,14 @@
 					{{ __("Not in the chat, since they have no Raven account: {0}", [skippedUsers.map((u) => u.full_name || u.user).join(", ")]) }}
 				</p>
 				<!-- Replies in threads, which Raven's channel view does not mark (#1623). Drawn like Raven's
-				     "New messages" divider, with Raven's red unread badge in the middle. -->
+				     "New messages" divider (blue line, subtle blue badge); each single thread in the list
+				     carries Raven's red unread chip, like the thread pills in the chat. -->
 				<div v-if="url && threads.length" class="flex-shrink-0 border-b border-outline-gray-1 px-4 py-2">
 					<div class="flex items-center gap-2">
-						<span class="h-px flex-1 bg-red-200 dark:bg-red-900" aria-hidden="true" />
+						<span class="h-px flex-1 bg-surface-blue-2" aria-hidden="true" />
 						<button
 							type="button"
-							class="inline-flex h-5 items-center gap-1 rounded-full bg-surface-red-5 px-2 text-xs font-semibold text-ink-white hover:opacity-90"
+							class="inline-flex h-5 items-center gap-1 rounded-full bg-surface-blue-2 px-1.5 text-xs font-medium text-ink-blue-3 hover:bg-surface-blue-1"
 							:aria-expanded="threads.length > 1 ? String(threadListOpen) : undefined"
 							@click="onThreadHint"
 						>
@@ -62,7 +63,7 @@
 								class="h-3 w-3 flex-none"
 							/>
 						</button>
-						<span class="h-px flex-1 bg-red-200 dark:bg-red-900" aria-hidden="true" />
+						<span class="h-px flex-1 bg-surface-blue-2" aria-hidden="true" />
 					</div>
 					<ul v-if="threadListOpen && threads.length > 1" class="mt-2 space-y-0.5">
 						<li v-for="thread in threads" :key="thread.thread_id">
