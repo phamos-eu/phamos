@@ -40,6 +40,9 @@
 						AI {{ Math.round(receipt.ai.confidence) }} %
 					</span>
 				</div>
+				<p v-if="decisionText" class="mt-0.5 text-xs font-medium" :class="receipt.ai.decision === 'needs_human' || receipt.ai.decision === 'not_a_voucher' ? 'text-ink-amber-3' : 'text-ink-green-3'">
+					{{ decisionText }}
+				</p>
 				<ul v-if="receipt.ai.flags?.length" class="mt-1 space-y-0.5">
 					<li
 						v-for="(flag, i) in receipt.ai.flags"
@@ -417,6 +420,17 @@ function onSupplierCreated(receipt) {
 	toast({ title: `Supplier ${receipt.supplier_name || receipt.supplier} created`, icon: "check-circle", iconClasses: "text-ink-green-3" })
 	emit("updated", receipt)
 }
+
+// --- the AI's decision ------------------------------------------------------------------
+const decisionText = computed(
+	() =>
+		({
+			auto_datev: "Suggestion: paid and all clear, send to DATEV",
+			approve_to_pay: "Suggestion: all clear, approve to pay",
+			needs_human: "Needs your decision, see the points below",
+			not_a_voucher: "Not a voucher: decide what to do with it",
+		})[props.receipt?.ai?.decision] || ""
+)
 
 // --- expense accounts and Purchase Invoice ----------------------------------------------
 const creatingInvoice = ref(false)
