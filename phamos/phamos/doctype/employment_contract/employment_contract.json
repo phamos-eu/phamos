@@ -1,0 +1,267 @@
+{
+ "actions": [],
+ "allow_rename": 0,
+ "autoname": "format:EC-{employee}-{####}",
+ "naming_rule": "Expression",
+ "creation": "2026-10-17 12:00:00",
+ "modified": "2026-10-17 12:00:00",
+ "modified_by": "Administrator",
+ "owner": "Administrator",
+ "doctype": "DocType",
+ "engine": "InnoDB",
+ "module": "Phamos",
+ "name": "Employment Contract",
+ "description": "Working time (FTE) and pay agreed with an employee or external, valid for a date range. Each change is a new submitted record.",
+ "is_submittable": 1,
+ "track_changes": 1,
+ "title_field": "employee_name",
+ "show_title_field_in_link": 0,
+ "search_fields": "employee_name,contract_type,status",
+ "field_order": [
+  "employee",
+  "employee_name",
+  "company",
+  "column_break_type",
+  "contract_type",
+  "status",
+  "section_break_validity",
+  "effective_from",
+  "column_break_validity",
+  "valid_until",
+  "superseded_by",
+  "section_break_fte",
+  "fte_percentage",
+  "full_time_hours_per_week",
+  "column_break_fte",
+  "weekly_hours",
+  "section_break_pay",
+  "currency",
+  "yearly_gross_full_time",
+  "monthly_amount",
+  "column_break_pay",
+  "monthly_gross",
+  "expense_account",
+  "section_break_notes",
+  "notes",
+  "amended_from"
+ ],
+ "fields": [
+  {
+   "fieldname": "employee",
+   "fieldtype": "Link",
+   "label": "Employee",
+   "options": "Employee",
+   "reqd": 1,
+   "in_list_view": 1,
+   "in_standard_filter": 1,
+   "search_index": 1
+  },
+  {
+   "fieldname": "employee_name",
+   "fieldtype": "Data",
+   "label": "Employee Name",
+   "fetch_from": "employee.employee_name",
+   "read_only": 1,
+   "in_list_view": 1
+  },
+  {
+   "fieldname": "company",
+   "fieldtype": "Link",
+   "label": "Company",
+   "options": "Company",
+   "reqd": 1,
+   "fetch_from": "employee.company",
+   "fetch_if_empty": 1
+  },
+  {
+   "fieldname": "column_break_type",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "contract_type",
+   "fieldtype": "Select",
+   "label": "Contract Type",
+   "options": "Employed\nExternal",
+   "default": "Employed",
+   "reqd": 1,
+   "in_list_view": 1,
+   "in_standard_filter": 1
+  },
+  {
+   "fieldname": "status",
+   "fieldtype": "Select",
+   "label": "Status",
+   "options": "Draft\nUpcoming\nActive\nExpired\nCancelled",
+   "default": "Draft",
+   "read_only": 1,
+   "no_copy": 1,
+   "in_list_view": 1,
+   "in_standard_filter": 1
+  },
+  {
+   "fieldname": "section_break_validity",
+   "fieldtype": "Section Break",
+   "label": "Validity"
+  },
+  {
+   "fieldname": "effective_from",
+   "fieldtype": "Date",
+   "label": "Effective From",
+   "reqd": 1,
+   "in_list_view": 1
+  },
+  {
+   "fieldname": "column_break_validity",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "valid_until",
+   "fieldtype": "Date",
+   "label": "Valid Until",
+   "description": "Leave empty for an open-ended contract. Submitting a later contract closes it automatically."
+  },
+  {
+   "fieldname": "superseded_by",
+   "fieldtype": "Link",
+   "label": "Superseded By",
+   "options": "Employment Contract",
+   "read_only": 1,
+   "no_copy": 1,
+   "depends_on": "superseded_by"
+  },
+  {
+   "fieldname": "section_break_fte",
+   "fieldtype": "Section Break",
+   "label": "Working Time"
+  },
+  {
+   "fieldname": "fte_percentage",
+   "fieldtype": "Percent",
+   "label": "FTE %",
+   "reqd": 1,
+   "in_list_view": 1
+  },
+  {
+   "fieldname": "full_time_hours_per_week",
+   "fieldtype": "Float",
+   "label": "Full-Time Hours per Week",
+   "default": "40",
+   "reqd": 1
+  },
+  {
+   "fieldname": "column_break_fte",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "weekly_hours",
+   "fieldtype": "Float",
+   "label": "Weekly Hours",
+   "read_only": 1,
+   "description": "FTE % × full-time hours per week"
+  },
+  {
+   "fieldname": "section_break_pay",
+   "fieldtype": "Section Break",
+   "label": "Pay"
+  },
+  {
+   "fieldname": "currency",
+   "fieldtype": "Link",
+   "label": "Currency",
+   "options": "Currency",
+   "reqd": 1,
+   "fetch_from": "company.default_currency",
+   "fetch_if_empty": 1
+  },
+  {
+   "fieldname": "yearly_gross_full_time",
+   "fieldtype": "Currency",
+   "label": "Yearly Gross at 100 % FTE",
+   "options": "currency",
+   "depends_on": "eval:doc.contract_type=='Employed'",
+   "mandatory_depends_on": "eval:doc.contract_type=='Employed'"
+  },
+  {
+   "fieldname": "monthly_amount",
+   "fieldtype": "Currency",
+   "label": "Agreed Monthly Amount",
+   "options": "currency",
+   "depends_on": "eval:doc.contract_type=='External'",
+   "mandatory_depends_on": "eval:doc.contract_type=='External'"
+  },
+  {
+   "fieldname": "column_break_pay",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "monthly_gross",
+   "fieldtype": "Currency",
+   "label": "Monthly Gross",
+   "options": "currency",
+   "read_only": 1,
+   "description": "Employed: yearly gross × FTE % ÷ 12. External: the agreed monthly amount."
+  },
+  {
+   "fieldname": "expense_account",
+   "fieldtype": "Link",
+   "label": "Expense Account",
+   "options": "Account"
+  },
+  {
+   "fieldname": "section_break_notes",
+   "fieldtype": "Section Break"
+  },
+  {
+   "fieldname": "notes",
+   "fieldtype": "Small Text",
+   "label": "Notes"
+  },
+  {
+   "fieldname": "amended_from",
+   "fieldtype": "Link",
+   "label": "Amended From",
+   "options": "Employment Contract",
+   "read_only": 1,
+   "no_copy": 1,
+   "print_hide": 1,
+   "search_index": 1
+  }
+ ],
+ "permissions": [
+  {
+   "role": "HR Manager",
+   "read": 1,
+   "write": 1,
+   "create": 1,
+   "delete": 1,
+   "submit": 1,
+   "cancel": 1,
+   "amend": 1,
+   "report": 1,
+   "export": 1,
+   "print": 1,
+   "email": 1,
+   "share": 1
+  },
+  {
+   "role": "System Manager",
+   "read": 1,
+   "write": 1,
+   "create": 1,
+   "delete": 1,
+   "submit": 1,
+   "cancel": 1,
+   "amend": 1,
+   "report": 1,
+   "export": 1,
+   "print": 1,
+   "email": 1,
+   "share": 1
+  }
+ ],
+ "links": [],
+ "states": [],
+ "row_format": "Dynamic",
+ "sort_field": "effective_from",
+ "sort_order": "DESC"
+}

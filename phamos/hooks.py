@@ -469,6 +469,8 @@ scheduler_events = {
         "phamos.api.personal_challenges.evaluate_all_challenges",
         # Event tickets: payment status for payments booked without hooks
         "phamos.marketing.billing.sync_payment_status",
+        # Employment Contract: Upcoming -> Active -> Expired as dates pass (#1596)
+        "phamos.phamos.doctype.employment_contract.employment_contract.update_contract_statuses",
     ],
     "weekly": [
         # Personal Cockpit: checklists left behind by ToDos deleted without hooks (#1554)
