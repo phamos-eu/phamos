@@ -5,6 +5,7 @@ import TasksHome from "@spa/views/TasksHome.vue"
 import TasksInbox from "@spa/views/TasksInbox.vue"
 import ChecklistsInbox from "@spa/views/ChecklistsInbox.vue"
 import { session } from "@spa/session.js"
+import { withOwnRoutes } from "@spa/utils/routes.js"
 
 /** Issues + Tasks + Checklists routes shared by every department cockpit. */
 export const coreRoutes = [
@@ -60,7 +61,8 @@ export const coreRoutes = [
 export function createSpaRouter({ config, routes = [], rootRedirect = "/issues/list" }) {
 	const router = createRouter({
 		history: createWebHistory(config.basePath),
-		routes: [{ path: "/", redirect: rootRedirect }, ...coreRoutes, ...routes],
+		// A cockpit route with the name of a shared one replaces it (#1604).
+		routes: [{ path: "/", redirect: rootRedirect }, ...withOwnRoutes(coreRoutes, routes)],
 	})
 
 	router.beforeEach((to, _from, next) => {
