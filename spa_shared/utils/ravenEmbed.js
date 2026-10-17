@@ -13,22 +13,24 @@ export const RAVEN_EMBED_STYLE_ID = "phamos-raven-embed"
 export const RAVEN_EMBED_CSS = `
 /* Thread pills ("3 replies") with new replies for the user (#1623): Raven does not mark them.
    Styled like Raven's own unread cues: the pill reads as unread (darker, semibold, like an unread
-   channel in its sidebar) and carries Raven's subtle blue badge, the one of its "New messages"
-   divider (Badge variant="subtle" theme="blue" size="md"). Raven's tokens follow its theme. */
+   channel in its sidebar) and carries Raven's red unread badge (PrimarySidebar's UnreadBadge:
+   surface-red-6, ink-base text, ink-red-1 in dark mode). Raven's tokens follow its theme. */
 a[data-phamos-unread] { color: var(--ink-gray-8) !important; font-weight: 600; }
 a[data-phamos-unread]::after {
 	content: attr(data-phamos-unread);
 	display: inline-flex;
 	align-items: center;
-	height: 1.25rem;
+	height: 1rem;
 	padding: 0 0.375rem;
 	border-radius: 9999px;
-	background: var(--surface-blue-2);
-	color: var(--ink-blue-8);
-	font-size: var(--text-xs);
-	font-weight: 500;
+	background: var(--surface-red-6);
+	color: var(--ink-base);
+	font-size: 10px;
+	font-weight: 600;
+	line-height: 1;
 	white-space: nowrap;
 }
+.dark a[data-phamos-unread]::after { color: var(--ink-red-1); }
 @media (min-width: 768px) {
 	/* Channel list next to the chat */
 	[class*="md:w-(--sidebar-width)"] { display: none !important; }
