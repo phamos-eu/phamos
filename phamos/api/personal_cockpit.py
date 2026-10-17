@@ -121,14 +121,6 @@ def ensure_issue_chat(name):
 
 
 @frappe.whitelist()
-def get_unread_issue_chats(limit=5):
-	"""The Issue chats I am in with unread messages or thread replies (My Day, #1618)."""
-	from phamos.api import issue_chat
-
-	return issue_chat.get_unread_chats("Issue", limit=frappe.utils.cint(limit) or 5)
-
-
-@frappe.whitelist()
 def get_issue_chat_states(names):
 	"""Return the chat state per Issue for list views."""
 	return dc.get_issue_chat_states(names)
