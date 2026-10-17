@@ -18,6 +18,7 @@
 					:fixed-menu="editorMenu"
 					:locked-by="locks.lockedBy('description')"
 					field-label="the description"
+					scroll-hint
 					placeholder="What needs to be discussed or resolved?"
 					editor-class="prose-sm dark:prose-invert max-w-none w-full min-h-full flex-1 px-3 py-2 border border-t-0 border-gray-300 rounded-b-lg bg-white dark:border-gray-600 dark:bg-gray-800"
 					@focus="onFieldFocus('description')"
