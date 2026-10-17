@@ -7,6 +7,7 @@
 			>
 				<DocSyncBanner :autosave="autosave" />
 				<DocViewers :viewers="viewers" />
+				<IssueChatButton :issue-name="issue.name" :subject="issue.subject" :api="API" />
 			</div>
 			<label class="mb-1.5 block flex-shrink-0 text-xs text-ink-gray-5">Description</label>
 			<div class="flex min-h-0 flex-1 flex-col" :class="{ 'pointer-events-none opacity-80': isClosed }">
@@ -61,6 +62,7 @@
 			<div class="ml-auto flex flex-shrink-0 items-center gap-2 pl-3">
 				<DocSyncBanner :autosave="autosave" />
 				<DocViewers :viewers="viewers" />
+				<IssueChatButton :issue-name="issue.name" :subject="issue.subject" :api="API" />
 			</div>
 		</div>
 	</Teleport>
@@ -269,6 +271,7 @@ import { call, Dialog, FeatherIcon, toast, Badge } from "frappe-ui"
 import AssigneePicker from "@spa/components/AssigneePicker.vue"
 import DocSyncBanner from "@spa/components/DocSyncBanner.vue"
 import DocViewers from "@spa/components/DocViewers.vue"
+import IssueChatButton from "@spa/components/IssueChatButton.vue"
 import RichTextField from "@spa/components/RichTextField.vue"
 import { useAutosaveDoc } from "@spa/composables/useAutosaveDoc.js"
 import { useDocRealtime } from "@spa/composables/useDocRealtime.js"
