@@ -334,6 +334,8 @@ doc_events = {
         "after_insert": "phamos.events.lead_data.notify_lead_data_created_via_raven_dm"
     },
     "Raven Message": {
+		# Mentioned people join the Issue chat before Raven notifies them (#1620).
+		"validate": "phamos.api.issue_chat.add_mentioned_members",
 		"after_insert": "phamos.events.raven_bot.handle_lead_option_reply"
 	},
     "Account": {"on_update": "phamos.accounting.expense_accounts.clear_account_cache"},
