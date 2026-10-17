@@ -38,6 +38,7 @@ import { useUserRealtime } from "@spa/composables/useUserRealtime.js"
 import { parseServerTime } from "@spa/utils/focusRules.js"
 import { focus, loadFocus } from "./focusStore.js"
 import { checkin, loadCheckin } from "./checkinStore.js"
+import { hasContracts, loadMyContracts } from "./contractStore.js"
 import CheckinButton from "./components/CheckinButton.vue"
 import CheckoutGuardDialog from "./components/CheckoutGuardDialog.vue"
 import CreateMenu from "./components/CreateMenu.vue"
@@ -101,6 +102,7 @@ async function onGuardChoice(choice) {
 onMounted(() => {
 	loadFocus()
 	loadCheckin()
+	loadMyContracts()
 	loadTimer()
 	document.addEventListener("visibilitychange", onVisible)
 })
@@ -114,9 +116,12 @@ const CHECKIN_ITEM = {
 	match: ["Checkins"],
 	children: [{ name: "CheckinsList", label: "List", icon: "list", match: ["CheckinsList"] }],
 }
+// My Contract (#1600) appears once HR has submitted at least one contract for this user.
+const CONTRACT_ITEM = { name: "MyContract", label: "My Contract", icon: "file-text", match: ["MyContract"] }
 const navItems = computed(() => {
 	const items = [...BASE_ITEMS]
 	if (checkin.state?.available && checkin.state.employee) items.splice(1, 0, CHECKIN_ITEM)
+	if (hasContracts()) items.push(CONTRACT_ITEM)
 	return items
 })
 
@@ -169,6 +174,7 @@ const BASE_ITEMS = [
 const pageTitle = computed(() => {
 	if (route.name === "TodosFocus") return "Focus"
 	if (["Checkins", "CheckinsList"].includes(route.name)) return "My Check-ins"
+	if (route.name === "MyContract") return "My Contract"
 	if (["Todos", "TodosList", "TodoDetail", "TodosMatrix", "TodosPlan"].includes(route.name)) return "My ToDos"
 	if (["Tasks", "TasksGantt", "TaskDetail"].includes(route.name)) return "My Tasks"
 	if (["ChecklistsHome", "Checklists", "ChecklistDetail"].includes(route.name)) return "My Checklists"

@@ -17,6 +17,7 @@ from phamos.api import personal_focus
 from phamos.api import personal_challenges
 from phamos.api import personal_day_plan
 from phamos.api import personal_checkin
+from phamos.api import personal_contracts
 from phamos.api import personal_timer
 from phamos.api import personal_timeline
 
@@ -619,3 +620,12 @@ def get_checkin_dashboard(period=30):
 def get_my_checkins(start=0, page_length=100):
 	"""All my check-ins, newest first, a page at a time."""
 	return personal_checkin.get_my_checkins(start=start, page_length=page_length)
+
+
+# My Employment Contracts (phamos/phamos#1600) — logic in phamos.api.personal_contracts.
+
+
+@frappe.whitelist()
+def get_my_contracts():
+	"""My own submitted contracts: the one in force, upcoming changes and the history."""
+	return personal_contracts.get_my_contracts()
