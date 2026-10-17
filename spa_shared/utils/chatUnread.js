@@ -17,3 +17,14 @@ export function unreadSummary(state) {
 	else if (threads) parts.push(__("{0} new replies in threads", [threads]))
 	return parts.join(" · ")
 }
+
+/**
+ * Whether one of Raven's unread events ({ type, channel_id, sent_by }) concerns chats we show:
+ * not our own message, and a thread reply (Raven sends those only to the participants) or a
+ * message in one of `channelIds`.
+ */
+export function concernsChats(event, channelIds, me) {
+	if (!event || (me && event.sent_by === me)) return false
+	if (event.type === "thread") return true
+	return Boolean(event.channel_id) && channelIds.has(event.channel_id)
+}
