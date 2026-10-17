@@ -5,9 +5,13 @@
 			<div v-else-if="loading" class="flex min-h-64 items-center justify-center text-sm text-ink-gray-5">Loading your Tasks…</div>
 			<template v-else>
 				<section class="grid grid-cols-1 gap-3 md:grid-cols-2" :class="data.hours ? 'xl:grid-cols-5' : 'xl:grid-cols-4'">
-					<RouterLink v-for="stat in stats" :key="stat.key" :to="{ name: 'TasksGantt' }" class="rounded-lg focus-visible:outline focus-visible:outline-2 focus-visible:outline-outline-gray-4">
-						<StatCard :label="stat.label" :value="stat.value" :hint="stat.hint" class="h-full hover:border-outline-gray-3" />
-					</RouterLink>
+					<template v-for="stat in stats" :key="stat.key">
+						<!-- Only tiles about open work lead to the list, which shows open records only (#1611). -->
+						<RouterLink v-if="stat.linked" :to="{ name: 'TasksGantt' }" class="rounded-lg focus-visible:outline focus-visible:outline-2 focus-visible:outline-outline-gray-4">
+							<StatCard :label="stat.label" :value="stat.value" :hint="stat.hint" class="h-full hover:border-outline-gray-3" />
+						</RouterLink>
+						<StatCard v-else :label="stat.label" :value="stat.value" :hint="stat.hint" />
+					</template>
 					<StatCard
 						v-if="data.hours"
 						label="My hours this week"
@@ -81,9 +85,9 @@ function hours(value) {
 const stats = computed(() => {
 	const t = data.value.totals || {}
 	return [
-		{ key: "overdue", label: "Overdue", value: t.overdue ?? 0, hint: "Past the expected end date" },
-		{ key: "due_soon", label: "Due soon", value: t.due_soon ?? 0, hint: `In the next ${data.value.due_soon_days} days` },
-		{ key: "open", label: "Open now", value: t.open ?? 0, hint: "Assigned to me" },
+		{ key: "overdue", linked: true, label: "Overdue", value: t.overdue ?? 0, hint: "Past the expected end date" },
+		{ key: "due_soon", linked: true, label: "Due soon", value: t.due_soon ?? 0, hint: `In the next ${data.value.due_soon_days} days` },
+		{ key: "open", linked: true, label: "Open now", value: t.open ?? 0, hint: "Assigned to me" },
 		{ key: "completed", label: "Completed", value: t.completed_recently ?? 0, hint: `In the last ${data.value.recent_days} days` },
 	]
 })
