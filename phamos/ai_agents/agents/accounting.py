@@ -14,6 +14,27 @@ SKILLS = {
 }
 
 
+def _param_fields():
+	from phamos.accounting import classify, decide
+
+	return {
+		"classify_lines": (classify.PARAM_FIELDS, classify.DEFAULT_PARAMS),
+		"decide_receipt": (decide.PARAM_FIELDS, decide.DEFAULT_PARAMS),
+	}
+
+
+def param_fields(handler):
+	"""(fields, defaults) the cockpit's skill editor shows for a handler's params."""
+	return _param_fields().get(handler, ([], {}))
+
+
+def dry_run(handler, doc, params, prompt_rules):
+	"""What the skill would do on this receipt with these settings; writes nothing."""
+	from phamos.accounting import dry_run as runs
+
+	return runs.dry_run(handler, doc, params, prompt_rules)
+
+
 def get_party(doc):
 	return ("Supplier", doc.supplier) if doc.get("supplier") else None
 

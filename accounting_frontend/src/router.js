@@ -1,5 +1,6 @@
 import { createSpaRouter } from "@spa/router.js"
 import spaConfig from "./config"
+import AiAccountant from "./views/AiAccountant.vue"
 import MonthlyImplementationSummariesInbox from "./views/MonthlyImplementationSummariesInbox.vue"
 import PaymentsCalendar from "./views/PaymentsCalendar.vue"
 import ReceiptReview from "./views/ReceiptReview.vue"
@@ -36,6 +37,11 @@ export default createSpaRouter({
 			name: "ReceiptDetail",
 			component: ReceiptReview,
 			props: true,
+		},
+		{
+			path: "/ai-accountant",
+			name: "AiAccountant",
+			component: AiAccountant,
 		},
 		{
 			path: "/monthly-implementation-summaries",

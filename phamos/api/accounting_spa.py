@@ -66,6 +66,7 @@ def get_accounting_settings():
 	settings = dc.get_settings(CONFIG, read_permission=_accounting_settings_permission)
 	settings["can_read_monthly_implementation_summary"] = 1 if _can_read_mis() else 0
 	settings["can_read_statistics"] = 1 if can_read_statistics() else 0
+	settings["can_read_ai_skills"] = 1 if frappe.has_permission("AI Skill", "read") else 0
 	return settings
 
 
