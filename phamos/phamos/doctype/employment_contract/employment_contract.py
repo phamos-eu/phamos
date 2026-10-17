@@ -42,6 +42,9 @@ class EmploymentContract(Document):
 
 	def on_cancel(self):
 		self.db_set("status", "Cancelled")
+		# The continuation links back to this record, so it goes first; otherwise the
+		# restored predecessor would stop where the continuation starts.
+		self.cancel_continuations()
 		self.restore_superseded()
 
 	def validate_dates(self):
@@ -138,6 +141,44 @@ class EmploymentContract(Document):
 		)
 		for name in predecessors:
 			close_contract(name, add_days(self.effective_from, -1), superseded_by=self.name)
+			if self.valid_until:
+				self.continue_after_temporary_change(name)
+
+	def continue_after_temporary_change(self, predecessor):
+		"""Resume the open-ended terms once a fixed-term change ends.
+
+		A temporary change (e.g. part-time from March to April) replaces an open-ended
+		contract only for its own period. Without a continuation the employee would have
+		no contract after Valid Until, and capacity and cost would drop to zero.
+		"""
+		start = add_days(self.valid_until, 1)
+		relieving_date = frappe.db.get_value("Employee", self.employee, "relieving_date")
+		if relieving_date and getdate(start) > getdate(relieving_date):
+			return
+
+		continuation = frappe.copy_doc(frappe.get_doc("Employment Contract", predecessor))
+		continuation.update(
+			{
+				"effective_from": start,
+				"valid_until": None,
+				"continuation_of": self.name,
+				"notes": _("Continues {0} after the temporary change {1}.").format(predecessor, self.name),
+			}
+		)
+		continuation.insert()
+		continuation.submit()
+		frappe.msgprint(
+			_("{0} resumes the earlier terms from {1}.").format(
+				get_link_to_form("Employment Contract", continuation.name), frappe.format(start, "Date")
+			),
+			alert=True,
+		)
+
+	def cancel_continuations(self):
+		for name in frappe.get_all(
+			"Employment Contract", filters={"continuation_of": self.name, "docstatus": 1}, pluck="name"
+		):
+			frappe.get_doc("Employment Contract", name).cancel()
 
 	def restore_superseded(self):
 		"""Undo what submitting this record did to the contract it superseded.
@@ -257,3 +298,44 @@ def get_contract_history(employee):
 		fields=list(HISTORY_FIELDS),
 		order_by="effective_from desc, creation desc",
 	)
+
+
+def cap_contracts_at_relieving_date(employee, method=None):
+	"""Employee on_update: end open contracts on the relieving date.
+
+	Leaving is recorded on the Employee, not on the contract. Without this, a leaver's
+	open-ended contract would stay Active and keep counting towards FTE and cost.
+	Runs for whoever saves the Employee (often an HR User without contract access), so
+	it writes with db.set_value; it only ever shortens contracts, never extends them.
+	"""
+	if not employee.relieving_date:
+		return
+	relieving_date = getdate(employee.relieving_date)
+	contracts = frappe.get_all(
+		"Employment Contract",
+		filters={"employee": employee.name, "docstatus": 1},
+		fields=["name", "effective_from", "valid_until"],
+	)
+	for contract in contracts:
+		if getdate(contract.effective_from) > relieving_date:
+			frappe.msgprint(
+				_("{0} starts after the relieving date. Cancel it if it no longer applies.").format(
+					get_link_to_form("Employment Contract", contract.name)
+				),
+				indicator="orange",
+				alert=True,
+			)
+			continue
+		if contract.valid_until and getdate(contract.valid_until) <= relieving_date:
+			continue
+		frappe.db.set_value(
+			"Employment Contract",
+			contract.name,
+			{
+				"valid_until": relieving_date,
+				"status": compute_status(1, contract.effective_from, relieving_date),
+			},
+		)
+		frappe.get_doc("Employment Contract", contract.name).add_comment(
+			"Info", _("Ended on the employee's relieving date {0}.").format(frappe.format(relieving_date, "Date"))
+		)

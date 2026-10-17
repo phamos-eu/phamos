@@ -66,9 +66,13 @@ export function firstOfNextMonth() {
 	return `${next.getFullYear()}-${pad(next.getMonth() + 1)}-01`
 }
 
+/**
+ * Plain text of a server error. Frappe messages contain HTML (links, bold); DOMParser
+ * builds an inert document, so markup in the message can't run scripts or load images
+ * the way innerHTML on a detached element can.
+ */
 export function errorMessage(error, fallback) {
-	const raw = error?.messages?.[0] || error?.message || fallback
-	const div = document.createElement("div")
-	div.innerHTML = raw
-	return div.textContent || fallback
+	const raw = String(error?.messages?.[0] || error?.message || fallback)
+	const text = new DOMParser().parseFromString(raw, "text/html").body.textContent
+	return text?.trim() || fallback
 }

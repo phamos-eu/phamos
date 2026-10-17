@@ -132,3 +132,45 @@ class TestEmploymentContract(FrappeTestCase):
 		doc = self.contract("2025-01-01", submit=False)
 		self.assertEqual(str(doc.valid_until), "2025-12-31")
 		self.assertRaises(frappe.ValidationError, self.contract, "2026-02-01", submit=False)
+
+	def test_temporary_change_resumes_open_terms(self):
+		original = self.contract("2025-01-01", fte_percentage=100)
+		temporary = self.contract("2025-03-01", "2025-04-30", fte_percentage=50)
+		original.reload()
+		self.assertEqual(str(original.valid_until), "2025-02-28")
+
+		continuation = frappe.get_doc("Employment Contract", {"continuation_of": temporary.name, "docstatus": 1})
+		self.assertEqual(str(continuation.effective_from), "2025-05-01")
+		self.assertIsNone(continuation.valid_until)
+		self.assertEqual(continuation.fte_percentage, 100)
+		self.assertEqual(get_active_contract(self.employee, "2025-03-15").fte_percentage, 50)
+		self.assertEqual(get_active_contract(self.employee, "2025-06-01").fte_percentage, 100)
+
+	def test_cancelling_temporary_change_reopens_original(self):
+		original = self.contract("2025-01-01", fte_percentage=100)
+		temporary = self.contract("2025-03-01", "2025-04-30", fte_percentage=50)
+		continuation = frappe.db.get_value("Employment Contract", {"continuation_of": temporary.name}, "name")
+		temporary.reload()
+		temporary.cancel()
+		original.reload()
+		self.assertEqual(frappe.db.get_value("Employment Contract", continuation, "docstatus"), 2)
+		self.assertIsNone(original.valid_until)
+		self.assertIsNone(original.superseded_by)
+
+	def test_no_continuation_after_relieving_date(self):
+		self.contract("2025-01-01")
+		frappe.db.set_value("Employee", self.employee, "relieving_date", "2025-04-30")
+		temporary = self.contract("2025-03-01", "2025-04-30", fte_percentage=50)
+		self.assertFalse(frappe.db.exists("Employment Contract", {"continuation_of": temporary.name}))
+
+	def test_relieving_date_ends_open_contract(self):
+		open_contract = self.contract("2025-01-01")
+		later = self.contract("2026-01-01")  # starts after the relieving date: left alone
+		employee = frappe.get_doc("Employee", self.employee)
+		employee.relieving_date = "2025-09-30"
+		employee.save(ignore_permissions=True)
+
+		open_contract.reload()
+		self.assertEqual(str(open_contract.valid_until), "2025-09-30")
+		self.assertEqual(open_contract.status, "Expired")
+		self.assertIsNone(frappe.db.get_value("Employment Contract", later.name, "valid_until"))

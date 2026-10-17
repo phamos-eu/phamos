@@ -384,7 +384,13 @@ doc_events = {
         ],
     },
     # Mirror facts onto the Web Profiles (phamos/phamos#1492).
-    "Employee": {"on_update": "phamos.web_profile.mirror.push_to_profiles"},
+    "Employee": {
+        "on_update": [
+            "phamos.web_profile.mirror.push_to_profiles",
+            # Employment Contract: a leaver's open contract ends on the relieving date (#1596)
+            "phamos.phamos.doctype.employment_contract.employment_contract.cap_contracts_at_relieving_date",
+        ]
+    },
     "Contact": {"on_update": "phamos.web_profile.mirror.push_to_profiles"},
     "Supplier": {"on_update": "phamos.web_profile.mirror.push_to_profiles"},
     "Sales Partner": {"on_update": "phamos.web_profile.mirror.push_to_profiles"},

@@ -4,7 +4,7 @@
  "autoname": "format:EC-{employee}-{####}",
  "naming_rule": "Expression",
  "creation": "2026-10-17 12:00:00",
- "modified": "2026-10-17 14:00:00",
+ "modified": "2026-10-17 16:00:00",
  "modified_by": "Administrator",
  "owner": "Administrator",
  "doctype": "DocType",
@@ -26,6 +26,7 @@
   "effective_from",
   "valid_until",
   "superseded_by",
+  "continuation_of",
   "status",
   "section_break_terms",
   "fte_percentage",
@@ -106,6 +107,16 @@
    "read_only": 1,
    "no_copy": 1,
    "depends_on": "superseded_by"
+  },
+  {
+   "fieldname": "continuation_of",
+   "fieldtype": "Link",
+   "label": "Continuation Of",
+   "options": "Employment Contract",
+   "read_only": 1,
+   "no_copy": 1,
+   "depends_on": "continuation_of",
+   "description": "Created automatically to resume the earlier terms after this temporary change."
   },
   {
    "fieldname": "status",
