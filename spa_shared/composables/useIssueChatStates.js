@@ -2,6 +2,8 @@ import { onBeforeUnmount, onMounted, ref, unref, watch } from "vue"
 import { call } from "frappe-ui"
 import { issueChatStore } from "@spa/issueChatStore.js"
 import { useRavenUnreadEvents } from "@spa/composables/useRavenUnreadEvents.js"
+import { sessionUser } from "@spa/session.js"
+import { concernsChats } from "@spa/utils/chatUnread.js"
 import spaConfig from "@/config"
 
 /**
@@ -45,7 +47,11 @@ export function useIssueChatStates(issues) {
 
 	watch(() => names().join("|"), schedule, { immediate: true })
 	watch(() => issueChatStore.version, schedule)
-	useRavenUnreadEvents(schedule)
+	// Raven's channel events cover every channel on the site: reload only for the listed chats.
+	useRavenUnreadEvents(schedule, {
+		concerns: (event) =>
+			concernsChats(event, new Set(Object.values(states.value).map((s) => s.channel_id)), sessionUser()),
+	})
 	onMounted(() => window.addEventListener("focus", schedule))
 	onBeforeUnmount(() => {
 		clearTimeout(timer)

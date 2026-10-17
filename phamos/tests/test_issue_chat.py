@@ -358,6 +358,32 @@ class TestIssueChat(FrappeTestCase):
 		self.issue.save()
 		self.assertEqual(pc.get_unread_issue_chats()["total"], 0)
 
+
+	def test_unread_chats_are_capped_and_newest_first(self):
+		older = pc.ensure_issue_chat(self.issue.name)["channel_id"]
+		second = frappe.get_doc(
+			{"doctype": "Issue", "subject": "Issue chat test 2", "raised_by": OWNER}
+		).insert()
+		newer = pc.ensure_issue_chat(second.name)["channel_id"]
+
+		frappe.set_user(ASSIGNEE)
+		_send(older, "older news")
+		frappe.db.set_value("Raven Channel", older, "last_message_timestamp", "2026-01-01 10:00:00")
+		frappe.set_user("Administrator")
+		_ensure_user(ASSIGNEE)  # still a reader
+		frappe.set_user(ASSIGNEE)
+		frappe.get_doc(
+			{"doctype": "Raven Channel Member", "channel_id": newer, "user_id": ASSIGNEE}
+		).insert(ignore_permissions=True) if ASSIGNEE not in _members(newer) else None
+		_send(newer, "newer news")
+
+		frappe.set_user(OWNER)
+		result = pc.get_unread_issue_chats(limit="1")
+		self.assertEqual(result["total"], 2)
+		self.assertEqual([c["name"] for c in result["chats"]], [second.name])
+		self.assertLessEqual({older, newer}, set(result["channel_ids"]))
+		self.assertEqual(pc.get_unread_issue_chats(limit="not a number")["total"], 2)
+
 	def test_raven_links_open_the_matching_cockpit(self):
 		self.assertEqual(
 			issue_chat.document_link("Issue", self.issue.name),
