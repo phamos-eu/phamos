@@ -201,6 +201,12 @@ class TestIssueChat(FrappeTestCase):
 		self.assertEqual(states[self.issue.name]["channel_id"], channel_id)
 		self.assertTrue(states[self.issue.name]["is_member"])
 		self.assertEqual(states[self.issue.name]["unread"], 1)  # the intro message
+		intro = frappe.get_all(
+			"Raven Message",
+			filters={"channel_id": channel_id, "message_type": ("!=", "System")},
+			pluck="name",
+		)[0]
+		self.assertEqual(states[self.issue.name]["first_unread"], intro)
 		self.assertEqual(pc.get_issue_chat(self.issue.name)["unread"], 1)
 
 
@@ -319,6 +325,9 @@ class TestIssueChat(FrappeTestCase):
 		self.assertTrue(state["threads"][0]["last_sender"])
 		states = pc.get_issue_chat_states(frappe.as_json([self.issue.name]))
 		self.assertEqual(states[self.issue.name]["unread_threads"], 3)
+		# Nothing new in the chat itself: the list opens the thread.
+		self.assertIsNone(states[self.issue.name]["first_unread"])
+		self.assertEqual(states[self.issue.name]["first_unread_thread"], thread_id)
 
 		# Someone who is not in the thread has nothing unread there.
 		frappe.set_user(LATECOMER)
