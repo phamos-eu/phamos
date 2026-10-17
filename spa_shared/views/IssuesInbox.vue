@@ -98,46 +98,66 @@
 			class="order-4 flex w-72 flex-none flex-col overflow-hidden border-l border-outline-gray-2 bg-surface-white"
 		/>
 
+		<!-- The chat column (#1615). Before IssueDetail in the DOM so the chat panel can teleport
+		     into it; shown from lg on while the selected Issue's chat is open. No border: the frame
+		     needs all 768px, or Raven switches to its touch layout (#1613). -->
 		<aside
 			v-if="selectedName"
-			class="order-2 flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden border-r border-gray-200 bg-white dark:border-gray-800 dark:bg-gray-900"
-		>
-			<div
-				v-if="detailLoading && !selectedIssue"
-				class="flex flex-1 items-center justify-center text-sm text-gray-500 dark:text-gray-400"
-			>
-				Loading…
-			</div>
-			<IssueDetail
-				v-else-if="selectedIssue"
-				:issue="selectedIssue"
-				:options="formOptions"
-				:api-prefix="API"
-				@close="closeIssue"
-				@updated="onIssueUpdated"
-				@converted="onIssueConverted"
-			/>
-		</aside>
+			v-show="chatColumnOpen"
+			id="issue-chat-host"
+			class="order-3 hidden w-[768px] flex-none flex-col overflow-hidden lg:flex"
+		/>
 
-		<aside
+		<!-- Description and Checklists side by side; stacked while the chat column is open. -->
+		<div
 			v-if="selectedName"
-			class="order-3 flex min-w-0 flex-1 flex-col overflow-y-auto border-r border-gray-200 bg-white px-5 py-4 dark:border-gray-800 dark:bg-gray-900"
+			class="order-2 flex min-h-0 min-w-0 flex-1"
+			:class="chatColumnOpen ? 'flex-row lg:flex-col' : 'flex-row'"
 		>
-			<div
-				v-if="detailLoading && !selectedIssue"
-				class="flex flex-1 items-center justify-center text-sm text-gray-500 dark:text-gray-400"
+			<aside
+				class="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden border-r border-gray-200 bg-white dark:border-gray-800 dark:bg-gray-900"
 			>
-				Loading checklists…
-			</div>
-			<LinkedChecklistsSection
-				v-else-if="selectedIssue"
-				:key="selectedIssue.name"
-				document="Issue"
-				:reference-record="selectedIssue.name"
-				:reference-title="selectedIssue.subject"
-				:allow-create="selectedIssue.status !== 'Closed'"
-			/>
-		</aside>
+				<div
+					v-if="detailLoading && !selectedIssue"
+					class="flex flex-1 items-center justify-center text-sm text-gray-500 dark:text-gray-400"
+				>
+					Loading…
+				</div>
+				<IssueDetail
+					v-else-if="selectedIssue"
+					:issue="selectedIssue"
+					:options="formOptions"
+					:api-prefix="API"
+					@close="closeIssue"
+					@updated="onIssueUpdated"
+					@converted="onIssueConverted"
+				/>
+			</aside>
+
+			<aside
+				class="flex min-w-0 flex-col overflow-y-auto border-r border-gray-200 bg-white px-5 py-4 dark:border-gray-800 dark:bg-gray-900"
+				:class="
+					chatColumnOpen
+						? 'w-80 flex-none lg:max-h-[45%] lg:w-auto lg:border-t'
+						: 'w-80 flex-none'
+				"
+			>
+				<div
+					v-if="detailLoading && !selectedIssue"
+					class="flex flex-1 items-center justify-center text-sm text-gray-500 dark:text-gray-400"
+				>
+					Loading checklists…
+				</div>
+				<LinkedChecklistsSection
+					v-else-if="selectedIssue"
+					:key="selectedIssue.name"
+					document="Issue"
+					:reference-record="selectedIssue.name"
+					:reference-title="selectedIssue.subject"
+					:allow-create="selectedIssue.status !== 'Closed'"
+				/>
+			</aside>
+		</div>
 
 		<CreateIssueDialog v-model="showCreate" :options="formOptions" @created="onCreated" />
 	</div>
@@ -148,6 +168,7 @@ import { computed, onMounted, ref, watch } from "vue"
 import { useRoute, useRouter } from "vue-router"
 import { call } from "frappe-ui"
 import IssueDetail from "@spa/components/IssueDetail.vue"
+import { issueChatStore } from "@spa/issueChatStore.js"
 import IssueList from "@spa/components/IssueList.vue"
 import CreateIssueDialog from "@spa/components/CreateIssueDialog.vue"
 import LinkedChecklistsSection from "@spa/components/LinkedChecklistsSection.vue"
@@ -176,6 +197,8 @@ const issues = ref([])
 const truncated = ref(false)
 const showCreate = ref(false)
 const selectedName = ref(null)
+// The selected Issue's chat is open: show its column and stack Description and Checklists.
+const chatColumnOpen = computed(() => Boolean(selectedName.value) && issueChatStore.openFor === selectedName.value)
 const selectedIssue = ref(null)
 const detailLoading = ref(false)
 const formOptions = ref({

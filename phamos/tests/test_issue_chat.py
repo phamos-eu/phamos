@@ -4,7 +4,6 @@
 """Issue chat (#1614): one Private Raven channel per Issue, members from owner and assignees."""
 
 from unittest import skipUnless
-from urllib.parse import quote
 from unittest.mock import patch
 
 import frappe
@@ -204,18 +203,6 @@ class TestIssueChat(FrappeTestCase):
 		self.assertEqual(states[self.issue.name]["unread"], 1)  # the intro message
 		self.assertEqual(pc.get_issue_chat(self.issue.name)["unread"], 1)
 
-	def test_dm_carries_the_issue_link_once(self):
-		result = pc.start_issue_dm(self.issue.name, ASSIGNEE)
-		channel = frappe.get_doc("Raven Channel", result["channel_id"])
-		self.assertTrue(channel.is_direct_message)
-		self.assertEqual(result["url"], f"/raven/dm-channel/{quote(channel.name, safe='')}")
-
-		pc.start_issue_dm(self.issue.name, ASSIGNEE)
-		links = frappe.get_all(
-			"Raven Message",
-			filters={"channel_id": channel.name, "link_doctype": "Issue", "link_document": self.issue.name},
-		)
-		self.assertEqual(len(links), 1)
 
 	def test_mentioned_reader_joins_the_chat(self):
 		channel_id = pc.ensure_issue_chat(self.issue.name)["channel_id"]
@@ -304,6 +291,40 @@ class TestIssueChat(FrappeTestCase):
 		).insert()
 		self.assertTrue(any(f"converted this Issue to Task {task.name}" in t for t in _system_lines(channel_id)))
 
+	def test_unread_thread_replies_are_counted(self):
+		from raven.api.threads import create_thread
+
+		channel_id = pc.ensure_issue_chat(self.issue.name)["channel_id"]
+		root = _send(channel_id, "A side topic")
+		# The assignee starts the thread on the owner's message: both take part in it.
+		frappe.set_user(ASSIGNEE)
+		thread_id = create_thread(root.name)["thread_id"]
+		_send(thread_id, "a reply")
+		_send(thread_id, "and another one")
+		_send(thread_id, "<b>one more</b>")
+
+		frappe.set_user(OWNER)
+		frappe.db.set_value(
+			"Raven Channel Member",
+			{"channel_id": thread_id, "user_id": OWNER},
+			"last_visit",
+			"2000-01-01 00:00:00",
+		)
+		state = pc.get_issue_chat(self.issue.name)
+		self.assertEqual(state["unread_threads"], 3)
+		self.assertEqual(len(state["threads"]), 1)
+		self.assertEqual(state["threads"][0]["thread_id"], thread_id)
+		self.assertEqual(state["threads"][0]["unread"], 3)
+		self.assertEqual(state["threads"][0]["preview"], "A side topic")
+		self.assertTrue(state["threads"][0]["last_sender"])
+		states = pc.get_issue_chat_states(frappe.as_json([self.issue.name]))
+		self.assertEqual(states[self.issue.name]["unread_threads"], 3)
+
+		# Someone who is not in the thread has nothing unread there.
+		frappe.set_user(LATECOMER)
+		pc_state = issue_chat.get_chat(frappe.get_doc("Issue", self.issue.name))
+		self.assertEqual(pc_state["unread_threads"], 0)
+
 	def test_raven_links_open_the_matching_cockpit(self):
 		self.assertEqual(
 			issue_chat.document_link("Issue", self.issue.name),
@@ -323,7 +344,7 @@ class TestIssueChat(FrappeTestCase):
 		)
 
 	def test_every_cockpit_exposes_the_chat_endpoints(self):
-		endpoints = ("get_issue_chat", "ensure_issue_chat", "get_issue_chat_states", "start_issue_dm")
+		endpoints = ("get_issue_chat", "ensure_issue_chat", "get_issue_chat_states")
 		for module in (pc, sales_spa):
 			for name in endpoints:
 				self.assertIn(getattr(module, name), frappe.whitelisted, f"{module.__name__}.{name}")

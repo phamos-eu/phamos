@@ -1233,13 +1233,11 @@ Chats are not available for {0}.,Für {0} sind keine Chats verfügbar.
 No Raven Workspace found. Create one in Raven first.,Kein Raven-Arbeitsbereich gefunden. Legen Sie zuerst einen in Raven an.
 You need to be a Raven user to chat.,"Sie müssen Raven-Benutzer sein, um zu chatten."
 Chat about {0}: {1},Chat zu {0}: {1}
-About {0}: {1},Zu {0}: {1}
 Chat about {0},Chat zu {0}
 Open in Raven,In Raven öffnen
 "Open this chat in Raven, in a new window",Diesen Chat in Raven in einem neuen Fenster öffnen
 Close the chat,Chat schließen
 "Not in the chat, since they have no Raven account: {0}","Nicht im Chat, da ohne Raven-Konto: {0}"
-{0} unread,{0} ungelesen
 Start chat,Chat starten
 Join chat,Chat beitreten
 Chat,Chat
@@ -1247,9 +1245,21 @@ Start a Raven chat with the people on this Issue (C),Einen Raven-Chat mit den Be
 Join the Raven chat of this Issue (C),Dem Raven-Chat dieser Anfrage beitreten (C)
 Open the Raven chat of this Issue (C),Den Raven-Chat dieser Anfrage öffnen (C)
 Something went wrong,Etwas ist schiefgelaufen
-Open or close the chat,Chat öffnen oder schließen
 Read the chat of this closed Issue (C),Den Chat dieser geschlossenen Anfrage lesen (C)
 {0} assigned {1}.,{0} hat {1} zugewiesen.
 {0} unassigned {1}.,{0} hat die Zuweisung von {1} entfernt.
 {0} set the status to {1}.,{0} hat den Status auf {1} gesetzt.
 {0} converted this Issue to Task {1}.,{0} hat diese Anfrage in die Aufgabe {1} umgewandelt.
+Chat (read-only),Chat (nur lesen)
+Open the chat,Chat öffnen
+Loading the chat…,Chat wird geladen …
+No chat for this Issue yet.,Zu dieser Anfrage gibt es noch keinen Chat.
+"Start one with the people on this Issue. Messages also show up in Raven, linked to the Issue.","Starten Sie einen mit den Beteiligten dieser Anfrage. Die Nachrichten erscheinen auch in Raven, verknüpft mit der Anfrage."
+You are not in this chat yet.,Sie sind noch nicht in diesem Chat.
+Go to the chat,Zum Chat
+1 unread in the chat,1 ungelesen im Chat
+{0} unread in the chat,{0} ungelesen im Chat
+1 new reply in threads,1 neue Antwort in Threads
+{0} new replies in threads,{0} neue Antworten in Threads
+Thread,Thread
+{0} new,{0} neu

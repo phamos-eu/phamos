@@ -11,6 +11,26 @@
 export const RAVEN_EMBED_STYLE_ID = "phamos-raven-embed"
 
 export const RAVEN_EMBED_CSS = `
+/* Thread pills ("3 replies") with new replies for the user (#1623): Raven does not mark them.
+   Styled like Raven's own unread cues: the pill reads as unread (darker, semibold, like an unread
+   channel in its sidebar) and carries Raven's red unread badge (PrimarySidebar's UnreadBadge:
+   surface-red-6, ink-base text, ink-red-1 in dark mode). Raven's tokens follow its theme. */
+a[data-phamos-unread] { color: var(--ink-gray-8) !important; font-weight: 600; }
+a[data-phamos-unread]::after {
+	content: attr(data-phamos-unread);
+	display: inline-flex;
+	align-items: center;
+	height: 1rem;
+	padding: 0 0.375rem;
+	border-radius: 9999px;
+	background: var(--surface-red-6);
+	color: var(--ink-base);
+	font-size: 10px;
+	font-weight: 600;
+	line-height: 1;
+	white-space: nowrap;
+}
+.dark a[data-phamos-unread]::after { color: var(--ink-red-1); }
 @media (min-width: 768px) {
 	/* Channel list next to the chat */
 	[class*="md:w-(--sidebar-width)"] { display: none !important; }
@@ -61,11 +81,12 @@ export function injectEmbedStyle(doc) {
 /**
  * Keep the frame on its channel. Raven routes with history.pushState/replaceState (react-router)
  * and its Back button uses history.back(), so wrapping both and listening to popstate sees every
- * move. A move away is undone and handed to `onLeave(kind, href)`.
+ * move. A move away is undone and handed to `onLeave(kind, href)`; opening one of the channel's
+ * threads (from the hint or Raven's own pill) calls `onThread(threadId)`.
  * Link clicks to non-Raven pages are caught before the frame navigates.
  * @returns {() => void} removes the guard
  */
-export function installGuard(win, channelPath, onLeave) {
+export function installGuard(win, channelPath, onLeave, onThread = null) {
 	const history = win.history
 	const originals = { pushState: history.pushState, replaceState: history.replaceState }
 	let lastAllowed = win.location.pathname + win.location.search
@@ -82,7 +103,10 @@ export function installGuard(win, channelPath, onLeave) {
 		win.clearTimeout(homeTimer)
 		const kind = classifyPath(win.location.pathname, channelPath)
 		if (kind === "channel") {
+			const before = lastAllowed
 			lastAllowed = win.location.pathname + win.location.search
+			const thread = threadIdFromHref(win.location.pathname)
+			if (thread && thread !== threadIdFromHref(before)) onThread?.(thread)
 			return
 		}
 		// Raven's mobile layout repairs a cold start by replacing the entry with the workspace
@@ -128,4 +152,53 @@ export function installGuard(win, channelPath, onLeave) {
 		win.removeEventListener("popstate", onPopState)
 		win.document.removeEventListener("click", onClick, true)
 	}
+}
+
+const THREAD_ROUTE = /\/thread\/([^/?#]+)/
+
+/** The thread id a Raven thread link points to, or "". */
+export function threadIdFromHref(href) {
+	const match = THREAD_ROUTE.exec(href || "")
+	return match ? decode(match[1]) : ""
+}
+
+/**
+ * Mark Raven's thread pills that have new replies (#1623): `data-phamos-unread` carries the
+ * label the CSS shows ("2 new"). Pills without new replies lose the mark.
+ * @param {Document} doc the frame's document
+ * @param {Object<string, string>} labels thread id → label, for threads with new replies
+ */
+export function markUnreadThreads(doc, labels) {
+	for (const link of doc.querySelectorAll('a[href*="/thread/"]')) {
+		const label = labels[threadIdFromHref(link.getAttribute("href"))]
+		if (label) {
+			if (link.getAttribute("data-phamos-unread") !== label) link.setAttribute("data-phamos-unread", label)
+		} else if (link.hasAttribute("data-phamos-unread")) {
+			link.removeAttribute("data-phamos-unread")
+		}
+	}
+}
+
+/**
+ * Keep the marks while Raven renders messages (its list renders as you scroll). `getLabels`
+ * is read on every pass, so callers just change what it returns and call the returned
+ * `refresh`.
+ * @returns {{ refresh: () => void, stop: () => void }}
+ */
+export function watchThreadMarks(doc, getLabels) {
+	let scheduled = false
+	const win = doc.defaultView
+	const run = () => {
+		scheduled = false
+		markUnreadThreads(doc, getLabels())
+	}
+	const schedule = () => {
+		if (scheduled) return
+		scheduled = true
+		win.requestAnimationFrame(run)
+	}
+	const observer = new win.MutationObserver(schedule)
+	observer.observe(doc.body, { childList: true, subtree: true })
+	schedule()
+	return { refresh: schedule, stop: () => observer.disconnect() }
 }

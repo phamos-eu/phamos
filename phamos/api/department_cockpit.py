@@ -548,10 +548,6 @@ def get_issue_chat_states(names):
 	return issue_chat.get_chat_states("Issue", names)
 
 
-def start_issue_dm(config: CockpitConfig, name, user):
-	"""Open the Raven DM with a user, carrying a link to an Issue in scope."""
-	return issue_chat.start_dm(_get_scoped_issue(config, name), user)
-
 
 def get_form_options(config: CockpitConfig):
 	"""Form options scoped to the configured department (all open projects when personal)."""
