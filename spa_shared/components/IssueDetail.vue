@@ -8,13 +8,12 @@
 				<DocSyncBanner :autosave="autosave" />
 				<DocViewers :viewers="viewers" :document-name="issue.name" :api-prefix="API" :messageable="!!issue.chat_enabled" />
 			</div>
-			<label class="mb-1.5 block flex-shrink-0 text-xs text-ink-gray-5">Description</label>
 			<div class="flex min-h-0 flex-1 flex-col" :class="{ 'pointer-events-none opacity-80': isClosed }">
 				<RichTextField
 					:key="issue.name"
 					v-model="autosave.draft.description"
 					class="flex h-full min-h-0 flex-1 flex-col"
-					editor-root-class="flex h-full min-h-0 flex-1 flex-col [&_.ProseMirror]:min-h-full [&_.ProseMirror]:flex-1 [&_.ProseMirror]:overflow-y-auto"
+					editor-root-class="flex h-full min-h-0 flex-1 flex-col [&_div:has(>.ProseMirror)]:flex [&_div:has(>.ProseMirror)]:min-h-0 [&_div:has(>.ProseMirror)]:flex-1 [&_div:has(>.ProseMirror)]:flex-col [&_.ProseMirror]:min-h-full [&_.ProseMirror]:flex-1 [&_.ProseMirror]:overflow-y-auto"
 					:editable="!isClosed"
 					:fixed-menu="editorMenu"
 					:locked-by="locks.lockedBy('description')"
