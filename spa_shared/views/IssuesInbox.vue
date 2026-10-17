@@ -34,6 +34,7 @@
 						placeholder="Search…"
 						class="w-full min-w-0"
 					/>
+					<div class="text-center text-xs font-medium text-ink-gray-5">{{ __("Chat") }}</div>
 					<div class="flex min-w-0 justify-center">
 						<PriorityFilter
 							v-model="priorityFilter"
@@ -80,7 +81,7 @@
 				/>
 				<div
 					v-else
-					class="col-span-6 flex flex-1 flex-col items-center justify-center gap-2 px-6 py-16 text-center"
+					class="col-span-7 flex flex-1 flex-col items-center justify-center gap-2 px-6 py-16 text-center"
 				>
 					<p class="font-medium text-ink-gray-9">No {{ spaConfig.label }} issues found</p>
 					<p class="max-w-sm text-sm text-ink-gray-6">
@@ -169,6 +170,7 @@ import { useRoute, useRouter } from "vue-router"
 import { call } from "frappe-ui"
 import IssueDetail from "@spa/components/IssueDetail.vue"
 import { issueChatStore } from "@spa/issueChatStore.js"
+import { __ } from "@spa/utils/i18n.js"
 import IssueList from "@spa/components/IssueList.vue"
 import CreateIssueDialog from "@spa/components/CreateIssueDialog.vue"
 import LinkedChecklistsSection from "@spa/components/LinkedChecklistsSection.vue"
