@@ -58,9 +58,12 @@ export const coreRoutes = [
  * any cockpit-specific routes, and the login guard.
  */
 export function createSpaRouter({ config, routes = [], rootRedirect = "/issues/list" }) {
+	// A cockpit route with the name of a shared one replaces it (e.g. the Personal Cockpit's own
+	// Issues and Tasks start pages, #1604).
+	const own = new Set(routes.map((route) => route.name).filter(Boolean))
 	const router = createRouter({
 		history: createWebHistory(config.basePath),
-		routes: [{ path: "/", redirect: rootRedirect }, ...coreRoutes, ...routes],
+		routes: [{ path: "/", redirect: rootRedirect }, ...coreRoutes.filter((route) => !own.has(route.name)), ...routes],
 	})
 
 	router.beforeEach((to, _from, next) => {
