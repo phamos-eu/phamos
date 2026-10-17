@@ -10,7 +10,7 @@
 				<button type="button" class="btn" :disabled="!canApprove || busy" :title="approveHint" @click="approve">
 					Approve to pay
 				</button>
-				<button type="button" class="btn" :disabled="!detail.receipt.value || busy" title="Already paid, e.g. by card or direct debit (p)" @click="decide('Paid', 'Marked as paid')">
+				<button type="button" class="btn" :disabled="!detail.receipt.value || busy" title="Already paid, e.g. by card or direct debit (p)" @click="openPaid">
 					Already paid
 				</button>
 				<button type="button" class="btn" :disabled="!detail.receipt.value || busy" title="Don't pay (x)" @click="decide('Do Not Pay', 'Marked: do not pay')">
@@ -48,6 +48,7 @@
 			@applied="detail.refresh"
 		/>
 		<ApproveDialog v-if="detail.receipt.value && showApprove" v-model="showApprove" :receipt="detail.receipt.value" @approved="onApproved" />
+		<PaidDialog v-if="detail.receipt.value && showPaid" v-model="showPaid" :receipt="detail.receipt.value" @paid="onPaid" />
 	</div>
 </template>
 
@@ -57,6 +58,7 @@ import { useRouter } from "vue-router"
 import { call, toast } from "frappe-ui"
 import ApproveDialog from "../components/ApproveDialog.vue"
 import ExtractDiffDialog from "../components/ExtractDiffDialog.vue"
+import PaidDialog from "../components/PaidDialog.vue"
 import ReceiptDetailPanel from "../components/ReceiptDetailPanel.vue"
 import { useReceiptDetail } from "../composables/useReceiptDetail"
 import { getReviewOrder, neighbours, setReviewOrder } from "../reviewOrder"
@@ -135,6 +137,24 @@ async function onApproved(res) {
 	await next()
 }
 
+const showPaid = ref(false)
+
+async function openPaid() {
+	if (!detail.receipt.value) return
+	await flushEdits()
+	showPaid.value = true
+}
+
+async function onPaid(res) {
+	detail.setReceipt(res.receipt)
+	toast({
+		title: res.cancelled_payment_request ? `Marked as paid · Payment Request ${res.cancelled_payment_request} cancelled` : "Marked as paid",
+		icon: "check-circle",
+		iconClasses: "text-ink-green-3",
+	})
+	await next()
+}
+
 async function decide(status, label) {
 	busy.value = true
 	try {
@@ -168,7 +188,7 @@ function onKey(event) {
 		j: () => go(position.value.next),
 		k: () => go(position.value.previous),
 		a: approve,
-		p: () => decide("Paid", "Marked as paid"),
+		p: openPaid,
 		x: () => decide("Do Not Pay", "Marked: do not pay"),
 		d: () => sendAndNext(),
 	}

@@ -149,3 +149,73 @@ class TestApproveCreatesPaymentRequest(ApprovalTestCase):
 		self.bank_account.db_set("is_company_account", 0)
 		with self.assertRaises(frappe.ValidationError):
 			accounting_receipts.approve_receipt(doc.name, bank_account=self.bank_account.name)
+
+
+class TestSupplierBankAccount(unittest.TestCase):
+	def test_iban_check(self):
+		from phamos.accounting.supplier_bank import is_valid_iban
+
+		self.assertTrue(is_valid_iban("DE89 3704 0044 0532 0130 00"))
+		self.assertTrue(is_valid_iban("GB82WEST12345698765432"))
+		self.assertFalse(is_valid_iban("DE89370400440532013001"))
+		self.assertFalse(is_valid_iban("not an iban"))
+
+
+class TestPayableRequestsAndPaid(TestApproveCreatesPaymentRequest):
+	# Reuse the setUp of the Payment Request tests without running them again.
+	test_approve_creates_a_submitted_outward_payment_request = None
+	test_dont_pay_cancels_the_open_payment_request = None
+	test_approval_without_invoice_creates_nothing = None
+	test_paying_from_another_companys_account_is_refused = None
+
+	def supplier_accounts(self):
+		return frappe.get_all("Bank Account", filters={"party_type": "Supplier", "party": SUPPLIER},
+			fields=["name", "iban", "is_default"])
+
+	def test_ensure_creates_the_default_account_once(self):
+		from phamos.accounting.supplier_bank import ensure_supplier_bank_account
+
+		frappe.db.delete("Bank Account", {"party_type": "Supplier", "party": SUPPLIER})
+		first = ensure_supplier_bank_account(SUPPLIER, "DE89 3704 0044 0532 0130 00")
+		self.assertEqual(ensure_supplier_bank_account(SUPPLIER, "DE89370400440532013000"), first)
+		second = ensure_supplier_bank_account(SUPPLIER, "GB82WEST12345698765432")
+		defaults = {a.name: a.is_default for a in self.supplier_accounts()}
+		self.assertEqual((defaults[first], defaults[second]), (1, 0))
+		with self.assertRaises(frappe.ValidationError):
+			ensure_supplier_bank_account(SUPPLIER, "DE00123")
+
+	def test_approve_can_save_the_receipt_iban_for_the_payment_request(self):
+		frappe.db.delete("Bank Account", {"party_type": "Supplier", "party": SUPPLIER})
+		doc = self.approved_receipt_with_invoice()
+		doc.db_set("supplier_iban", "DE89 3704 0044 0532 0130 00")
+		options = accounting_receipts.get_approval_options(doc.name)
+		self.assertEqual((options["supplier_bank_account"], options["receipt_iban_valid"]), (None, 1))
+		pr = accounting_receipts.approve_receipt(doc.name, bank_account=self.bank_account.name, save_supplier_iban=1)["payment_request"]
+		account = frappe.db.get_value("Payment Request", pr, "bank_account")
+		self.assertEqual(frappe.db.get_value("Bank Account", account, ["party", "iban", "is_default"]), (SUPPLIER, "DE89370400440532013000", 1))
+
+	def test_a_supplier_account_that_is_not_default_is_used_anyway(self):
+		frappe.db.delete("Bank Account", {"party_type": "Supplier", "party": SUPPLIER})
+		frappe.get_doc({"doctype": "Bank Account", "account_name": "Old", "bank": "Approval Test Bank", "party_type": "Supplier",
+			"party": SUPPLIER, "iban": "GB82WEST12345698765432", "is_default": 0}).insert(ignore_permissions=True)
+		doc = self.approved_receipt_with_invoice()
+		pr = accounting_receipts.approve_receipt(doc.name, bank_account=self.bank_account.name)["payment_request"]
+		self.assertEqual(frappe.db.get_value("Bank Account", frappe.db.get_value("Payment Request", pr, "bank_account"), "iban"),
+			"GB82WEST12345698765432")
+
+	def test_already_paid_records_how_and_cancels_the_request(self):
+		doc = self.approved_receipt_with_invoice()
+		pr = accounting_receipts.approve_receipt(doc.name, bank_account=self.bank_account.name)["payment_request"]
+		result = accounting_receipts.mark_receipt_paid(doc.name, payment_date="2026-10-05", mode_of_payment="Credit Card",
+			bank_account=self.bank_account.name)
+		self.assertEqual(result["cancelled_payment_request"], pr)
+		self.assertEqual(frappe.db.get_value("Payment Request", pr, "status"), "Cancelled")
+		values = frappe.db.get_value("Accounting Receipt", doc.name, ["status", "is_paid", "mode_of_payment", "bank_account"], as_dict=True)
+		self.assertEqual((values.status, values.is_paid, values.mode_of_payment, values.bank_account),
+			("Paid", 1, "Credit Card", self.bank_account.name))
+		self.assertEqual(str(frappe.db.get_value("Accounting Receipt", doc.name, "payment_date")), "2026-10-05")
+
+	def test_already_paid_without_details_uses_today(self):
+		doc = self.receipt()
+		accounting_receipts.mark_receipt_paid(doc.name)
+		self.assertEqual(str(frappe.db.get_value("Accounting Receipt", doc.name, "payment_date")), frappe.utils.today())
