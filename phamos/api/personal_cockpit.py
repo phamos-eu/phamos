@@ -19,6 +19,7 @@ from phamos.api import personal_day_plan
 from phamos.api import personal_checkin
 from phamos.api import personal_timer
 from phamos.api import personal_timeline
+from phamos.api import personal_work_dashboard
 
 CONFIG = dc.CockpitConfig(
 	label="Personal Cockpit",
@@ -619,3 +620,15 @@ def get_checkin_dashboard(period=30):
 def get_my_checkins(start=0, page_length=100):
 	"""All my check-ins, newest first, a page at a time."""
 	return personal_checkin.get_my_checkins(start=start, page_length=page_length)
+
+
+@frappe.whitelist()
+def get_issue_dashboard():
+	"""Numbers about my Issues (#1604)."""
+	return personal_work_dashboard.get_issue_dashboard()
+
+
+@frappe.whitelist()
+def get_task_dashboard():
+	"""Numbers about my Tasks and my hours (#1604)."""
+	return personal_work_dashboard.get_task_dashboard()
