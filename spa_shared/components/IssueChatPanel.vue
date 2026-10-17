@@ -108,7 +108,7 @@ import { computed, onBeforeUnmount, onMounted, ref, watch } from "vue"
 import { useRouter } from "vue-router"
 import { Button, FeatherIcon } from "frappe-ui"
 import { __ } from "@spa/utils/i18n.js"
-import { injectEmbedStyle, installGuard } from "@spa/utils/ravenEmbed.js"
+import { injectEmbedStyle, installGuard, watchThreadMarks } from "@spa/utils/ravenEmbed.js"
 import { issueChatStore } from "@spa/issueChatStore.js"
 
 const props = defineProps({
@@ -182,11 +182,23 @@ function switchChannel(url) {
 		removeGuard = null
 		win.History.prototype.pushState.call(win.history, null, "", channelPath(url))
 		win.dispatchEvent(new win.PopStateEvent("popstate", { state: null }))
-		removeGuard = installGuard(win, channelPath(url), onLeave)
+		removeGuard = installGuard(win, channelPath(url), onLeave, onThreadOpened)
 	} catch (e) {
 		frameReady = false
 		frameUrl.value = url // fall back to loading it
 	}
+}
+
+// Thread pills with new replies get a mark inside the frame (#1623).
+let threadMarks = null
+const threadLabels = computed(() =>
+	Object.fromEntries(props.threads.map((t) => [t.thread_id, __("{0} new", [t.unread])]))
+)
+watch(threadLabels, () => threadMarks?.refresh())
+
+function startThreadMarks(doc) {
+	threadMarks?.stop()
+	threadMarks = doc?.body ? watchThreadMarks(doc, () => threadLabels.value) : null
 }
 
 const threadListOpen = ref(false)
@@ -220,6 +232,10 @@ function openThread(threadId) {
 		return
 	}
 	threadListOpen.value = false
+}
+
+// A thread of this chat opened in the frame, from the hint or Raven's own pill.
+function onThreadOpened(threadId) {
 	emit("thread-opened", threadId)
 }
 
@@ -260,13 +276,14 @@ function onFrameLoad() {
 	}
 	if (!doc) return
 	injectEmbedStyle(doc)
+	startThreadMarks(doc)
 	frameReady = true
 	if (props.url && channelPath(props.url) !== channelPath(frameUrl.value)) {
 		// The record changed while Raven was still loading.
 		switchChannel(props.url)
 		return
 	}
-	removeGuard = installGuard(win, channelPath(frameUrl.value), onLeave)
+	removeGuard = installGuard(win, channelPath(frameUrl.value), onLeave, onThreadOpened)
 }
 
 /** Put the keyboard into the chat (the "C" shortcut while the column is shown). */
@@ -277,6 +294,7 @@ defineExpose({ focus, inColumn })
 
 onBeforeUnmount(() => {
 	removeGuard?.()
+	threadMarks?.stop()
 	wide?.removeEventListener("change", updatePlacement)
 	if (issueChatStore.openFor === props.recordName) issueChatStore.openFor = null
 })

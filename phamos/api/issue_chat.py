@@ -200,9 +200,10 @@ def _unread_thread_counts(channel_ids):
 	return {row.channel_id: row.unread for row in rows}
 
 
-def _unread_threads(channel_id, limit=10):
+def _unread_threads(channel_id, limit=50):
 	"""The threads of one chat with unread replies for the session user, newest reply first:
-	[{thread_id, unread, preview, last_sender}] for the hint above the chat (#1623)."""
+	[{thread_id, unread, preview, last_sender}] for the hint above the chat and the marks on the
+	thread pills (#1623)."""
 	raven_user = _raven_user(frappe.session.user)
 	if not raven_user:
 		return []
