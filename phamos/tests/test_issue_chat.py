@@ -113,6 +113,7 @@ class TestIssueChat(FrappeTestCase):
 		)
 		self.assertEqual(state["url"], f"/raven/{WORKSPACE}/{channel.name}")
 		self.assertTrue(state["is_member"])
+		self.assertEqual(state["unread"], 0)  # their own intro message
 
 		intro = frappe.get_all(
 			"Raven Message",

@@ -137,7 +137,8 @@ def _ensure_members(channel, users, admin=None):
 
 
 def _unread_counts(channel_ids):
-	"""Unread messages per channel for the session user, from their last visit (as Raven counts)."""
+	"""Unread messages per channel for the session user since their last visit, not counting their
+	own (the intro message of a chat they just started would otherwise count)."""
 	raven_user = _raven_user(frappe.session.user)
 	if not raven_user or not channel_ids:
 		return {}
@@ -152,6 +153,7 @@ def _unread_counts(channel_ids):
 		.where(member.channel_id.isin(list(channel_ids)))
 		.where(message.creation > member.last_visit)
 		.where(message.message_type != "System")
+		.where(message.owner != frappe.session.user)
 		.groupby(member.channel_id)
 	).run(as_dict=True)
 	return {row.channel_id: row.unread for row in rows}
