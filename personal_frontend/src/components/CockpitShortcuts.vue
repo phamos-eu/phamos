@@ -60,7 +60,7 @@ const GROUPS = [
 	},
 	{
 		title: "Issue",
-		rows: [{ what: "Open or close the chat", keys: ["C"] }],
+		rows: [{ what: "Go to the chat", keys: ["C"] }],
 	},
 	{
 		title: "Dialogs",
