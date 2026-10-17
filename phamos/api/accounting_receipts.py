@@ -725,13 +725,23 @@ def get_booking_options(name):
 		"employee": branching.employee_for(doc),
 		"expense_types": frappe.get_all("Expense Claim Type", pluck="name", order_by="name") if frappe.db.exists("DocType", "Expense Claim Type") else [],
 		"expense_type": branching.default_expense_type() if frappe.db.exists("DocType", "Expense Claim Type") else None,
-		"credit_account": doc.payment_account or (bank_accounts[0].name if bank_accounts else None),
+		"credit_account": doc.payment_account or _default_bank_ledger(company, bank_accounts),
 		"credit_accounts": bank_accounts,
 		"split": split,
 		"split_error": split_error,
 		"can_expense_claim": 1 if frappe.db.exists("DocType", "Expense Claim") and frappe.has_permission("Expense Claim", "create") else 0,
 		"can_journal_entry": 1 if frappe.has_permission("Journal Entry", "create") else 0,
 	}
+
+
+def _default_bank_ledger(company, ledgers):
+	"""Ledger of the company's default bank account, else the first bank (not cash) ledger."""
+	account = frappe.db.get_value("Bank Account", {"company": company, "is_company_account": 1, "disabled": 0,
+		"account": ("is", "set")}, "account", order_by="is_default desc, creation asc")
+	if account:
+		return account
+	banks = [row.name for row in ledgers if row.account_type == "Bank"]
+	return banks[0] if banks else (ledgers[0].name if ledgers else None)
 
 
 @frappe.whitelist(methods=["POST"])

@@ -162,3 +162,4 @@ class TestJournalEntry(BookingTestCase):
 		options = accounting_receipts.get_booking_options(doc.name)
 		self.assertEqual(options["split"]["total"], 11.9)
 		self.assertTrue(options["credit_accounts"])
+		self.assertEqual(frappe.db.get_value("Account", options["credit_account"], "account_type"), "Bank")
