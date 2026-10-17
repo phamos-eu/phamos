@@ -28,7 +28,7 @@
 // through lists, "?" opens this overview. Page-specific shortcuts stay with their pages and are
 // only listed here, so there is one place to find them all.
 import { onBeforeUnmount, onMounted } from "vue"
-import { insideOverlay, isCreateKey, isPlainKey, isTypingTarget, listDirection, nextListIndex } from "@spa/utils/shortcuts.js"
+import { dialogOpen, insideOverlay, isCreateKey, isPlainKey, isTypingTarget, listDirection, nextListIndex } from "@spa/utils/shortcuts.js"
 import { shortcuts } from "@/shortcutsStore.js"
 
 const emit = defineEmits(["create"])
@@ -87,13 +87,15 @@ function moveInList(direction) {
 function onKeydown(event) {
 	if (event.defaultPrevented) return
 	const target = event.target
+	// Dialogs, menus and popovers own their keys; nothing here acts behind them (#1608).
+	if (insideOverlay(target) || dialogOpen()) return
 	if (isCreateKey(event)) {
-		// Ctrl+B also works from a field: it never types a character.
+		// Ctrl+B also works from a field on the page: it never types a character.
 		event.preventDefault()
 		emit("create")
 		return
 	}
-	if (isTypingTarget(target) || insideOverlay(target) || shortcuts.open) return
+	if (isTypingTarget(target)) return
 	if (event.key === "?" && isPlainKey(event)) {
 		event.preventDefault()
 		shortcuts.open = true

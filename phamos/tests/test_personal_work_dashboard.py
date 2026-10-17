@@ -137,3 +137,27 @@ class TestPersonalWorkDashboard(FrappeTestCase):
 	def test_no_employee_means_no_hours(self):
 		frappe.set_user(OTHER)
 		self.assertIsNone(pc.get_task_dashboard()["hours"])
+
+	def test_statuses_outside_the_order_still_show(self):
+		rows = [{"status": "Open"}, {"status": "Waiting for Customer"}, {"status": "Waiting for Customer"}, {"status": None}]
+		self.assertEqual(
+			wd._count_by(rows, "status", order=["Open", "Replied"]),
+			[
+				{"label": "Open", "value": 1},
+				{"label": "Waiting for Customer", "value": 2},
+				{"label": "—", "value": 1},
+			],
+		)
+
+	def test_only_the_cockpit_wrappers_are_endpoints(self):
+		self.assertIn(pc.get_issue_dashboard, frappe.whitelisted)
+		self.assertIn(pc.get_task_dashboard, frappe.whitelisted)
+		self.assertNotIn(wd.get_issue_dashboard, frappe.whitelisted)
+		self.assertNotIn(wd.get_task_dashboard, frappe.whitelisted)
+
+	def test_due_soon_is_today_and_the_next_six_days(self):
+		self._task("WD due today", exp_end_date=self.day)
+		self._task("WD due on day seven", exp_end_date=add_days(self.day, wd.DUE_SOON_DAYS - 1))
+		self._task("WD due on day eight", exp_end_date=add_days(self.day, wd.DUE_SOON_DAYS))
+		frappe.set_user(USER)
+		self.assertEqual(pc.get_task_dashboard()["totals"]["due_soon"], 2)

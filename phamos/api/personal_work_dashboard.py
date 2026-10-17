@@ -9,6 +9,9 @@ look at closed assignments, because closing an Issue or Task usually closes its 
 
 My hours come from my submitted Timesheet Records (`actual_time`, the worked time without
 breaks, which is also what goes into the ERPNext Timesheet). The running timer is not counted.
+
+Not whitelisted here: the `personal_cockpit` wrappers are the only endpoints, as for the other
+personal modules (#1610).
 """
 
 from datetime import datetime, time, timedelta
@@ -54,15 +57,17 @@ def _count_by(rows, key, order=None, empty_label="—"):
 	for row in rows:
 		label = row.get(key) or empty_label
 		counts[label] = counts.get(label, 0) + 1
-	labels = order or sorted(counts, key=lambda label: -counts[label])
-	return [{"label": label, "value": counts[label]} for label in labels if counts.get(label)]
+	# Known labels in their order first; anything else (e.g. a custom status) follows, largest
+	# first, so the bars always add up to the total (#1609).
+	known = [label for label in (order or []) if counts.get(label)]
+	rest = sorted((label for label in counts if label not in known), key=lambda label: -counts[label])
+	return [{"label": label, "value": counts[label]} for label in known + rest]
 
 
 def _days_since(value, day):
 	return (day - getdate(value)).days if value else None
 
 
-@frappe.whitelist()
 def get_issue_dashboard():
 	"""Numbers about my Issues: what waits on me, what waits on others, how old the open ones are."""
 	day = getdate(today())
@@ -132,11 +137,13 @@ def _my_hours(day):
 	week_start = getdate(get_first_day_of_week(day))
 	month_start = getdate(get_first_day(day))
 	per_day = _hours(employee, datetime.combine(min(week_start, month_start), time.min))
-	total = lambda since: round(sum(hours for key, hours in per_day.items() if key >= since), 2)  # noqa: E731
+
+	def total(since):
+		return round(sum(hours for key, hours in per_day.items() if key >= since), 2)
+
 	return {"today": total(day), "week": total(week_start), "month": total(month_start)}
 
 
-@frappe.whitelist()
 def get_task_dashboard():
 	"""Numbers about my Tasks: what is overdue or due soon, what I finished, my hours, effort vs plan."""
 	day = getdate(today())
@@ -157,7 +164,8 @@ def get_task_dashboard():
 		for row in _load("Task", _my_references("Task", include_closed=True), fields)
 		if row.status == "Completed" and row.completed_on and getdate(row.completed_on) > since
 	]
-	soon_end = day + timedelta(days=DUE_SOON_DAYS)
+	# Today and the following days: DUE_SOON_DAYS dates in all, as the tile says (#1612).
+	soon_end = day + timedelta(days=DUE_SOON_DAYS - 1)
 	overdue = [row for row in open_rows if row.exp_end_date and getdate(row.exp_end_date) < day]
 	due_soon = [row for row in open_rows if row.exp_end_date and day <= getdate(row.exp_end_date) <= soon_end]
 	next_due = sorted(
