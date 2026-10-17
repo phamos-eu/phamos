@@ -1255,3 +1255,7 @@ Read the chat of this closed Issue (C),Den Chat dieser geschlossenen Anfrage les
 {0} converted this Issue to Task {1}.,{0} hat diese Anfrage in die Aufgabe {1} umgewandelt.
 About {0},Über {0}
 "Opens your Raven chat with {0} in a new window, with a link to {1}.","Öffnet Ihren Raven-Chat mit {0} in einem neuen Fenster, mit einem Link zu {1}."
+1 unread message in the chat,1 ungelesene Nachricht im Chat
+{0} unread messages in the chat,{0} ungelesene Nachrichten im Chat
+Chat (read-only),Chat (nur lesen)
+Open the chat,Chat öffnen

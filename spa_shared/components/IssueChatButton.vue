@@ -1,6 +1,7 @@
 <template>
 	<template v-if="state.enabled">
 		<Button
+			ref="buttonRef"
 			:variant="state.is_member ? 'subtle' : 'outline'"
 			:loading="busy"
 			:title="buttonTitle"
@@ -24,7 +25,7 @@
 			:url="state.url"
 			:title="`${issueName}: ${subject || ''}`"
 			:skipped-users="state.skipped_users || []"
-			@closed="refresh"
+			@closed="onPanelClosed"
 		/>
 	</template>
 </template>
@@ -33,13 +34,14 @@
 // "Chat" on an Issue (#1615): shows whether the Issue has a Raven chat and how many messages are
 // unread, starts or joins it, and opens it in the drawer. "C" toggles the drawer. The unread count
 // follows Raven's message_created events in the channel's document room.
-import { computed, onBeforeUnmount, onMounted, ref, watch } from "vue"
+import { computed, nextTick, onBeforeUnmount, onDeactivated, onMounted, ref, watch } from "vue"
 import { Button, call, FeatherIcon, toast } from "frappe-ui"
 import IssueChatPanel from "@spa/components/IssueChatPanel.vue"
 import { useDocRealtime } from "@spa/composables/useDocRealtime.js"
 import { sessionUser } from "@spa/session.js"
 import { __ } from "@spa/utils/i18n.js"
 import { dialogOpen, insideOverlay, isPlainKey, isTypingTarget } from "@spa/utils/shortcuts.js"
+import { chatChanged, issueChatStore, requestChatOpen } from "@spa/issueChatStore.js"
 
 const props = defineProps({
 	issueName: { type: String, required: true },
@@ -53,6 +55,7 @@ const EMPTY = { enabled: false, channel_id: null, url: null, is_member: false, a
 const state = ref({ ...EMPTY })
 const busy = ref(false)
 const drawerOpen = ref(false)
+const buttonRef = ref(null)
 
 const buttonLabel = computed(() => {
 	if (!state.value.channel_id) return __("Start chat")
@@ -74,16 +77,37 @@ async function refresh() {
 	const name = props.issueName
 	try {
 		const result = await call(`${props.api}.get_issue_chat`, { name })
-		if (name === props.issueName) state.value = { ...EMPTY, ...result }
+		if (name !== props.issueName) return
+		state.value = { ...EMPTY, ...result }
+		honourOpenRequest()
 	} catch (e) {
 		// The chat is an add-on to the Issue; without it the button just stays hidden.
 		if (name === props.issueName) state.value = { ...EMPTY }
 	}
 }
 
+// The chat icon in a list asked for this Issue's chat (issueChatStore.openRequest).
+function onPanelClosed() {
+	chatChanged()
+	refresh()
+}
+
+async function honourOpenRequest() {
+	// Wait for this Issue's state; refresh() calls again once it is loaded.
+	if (issueChatStore.openRequest !== props.issueName || !state.value.channel_id) return
+	// Only the button on the page takes it, not a kept-alive or swapped-out copy.
+	await nextTick()
+	const el = buttonRef.value?.$el
+	if (!el?.isConnected || el.offsetParent === null) return
+	if (issueChatStore.openRequest !== props.issueName) return
+	issueChatStore.openRequest = null
+	if (!drawerOpen.value) onClick()
+}
+
 async function onClick() {
 	if (drawerOpen.value) {
 		drawerOpen.value = false
+		chatChanged()
 		return refresh()
 	}
 	if (!state.value.channel_id || !state.value.is_member) {
@@ -100,7 +124,10 @@ async function onClick() {
 	// Raven marks the channel read once it is open.
 	state.value = { ...state.value, unread: 0 }
 	drawerOpen.value = true
+	chatChanged()
 }
+
+watch(() => issueChatStore.openRequest, honourOpenRequest)
 
 watch(
 	() => props.issueName,
@@ -138,7 +165,13 @@ function onKeydown(event) {
 }
 
 onMounted(() => window.addEventListener("keydown", onKeydown))
+onDeactivated(() => {
+	drawerOpen.value = false
+})
 onBeforeUnmount(() => {
+	// IssueDetail swaps this button from its own header row into the page header once that is
+	// ready; an open chat carries over to the new instance.
+	if (drawerOpen.value) requestChatOpen(props.issueName)
 	window.removeEventListener("keydown", onKeydown)
 	clearTimeout(refreshTimer)
 })
