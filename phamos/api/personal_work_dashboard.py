@@ -137,7 +137,10 @@ def _my_hours(day):
 	week_start = getdate(get_first_day_of_week(day))
 	month_start = getdate(get_first_day(day))
 	per_day = _hours(employee, datetime.combine(min(week_start, month_start), time.min))
-	total = lambda since: round(sum(hours for key, hours in per_day.items() if key >= since), 2)  # noqa: E731
+
+	def total(since):
+		return round(sum(hours for key, hours in per_day.items() if key >= since), 2)
+
 	return {"today": total(day), "week": total(week_start), "month": total(month_start)}
 
 
@@ -161,7 +164,8 @@ def get_task_dashboard():
 		for row in _load("Task", _my_references("Task", include_closed=True), fields)
 		if row.status == "Completed" and row.completed_on and getdate(row.completed_on) > since
 	]
-	soon_end = day + timedelta(days=DUE_SOON_DAYS)
+	# Today and the following days: DUE_SOON_DAYS dates in all, as the tile says (#1612).
+	soon_end = day + timedelta(days=DUE_SOON_DAYS - 1)
 	overdue = [row for row in open_rows if row.exp_end_date and getdate(row.exp_end_date) < day]
 	due_soon = [row for row in open_rows if row.exp_end_date and day <= getdate(row.exp_end_date) <= soon_end]
 	next_due = sorted(

@@ -154,3 +154,10 @@ class TestPersonalWorkDashboard(FrappeTestCase):
 		self.assertIn(pc.get_task_dashboard, frappe.whitelisted)
 		self.assertNotIn(wd.get_issue_dashboard, frappe.whitelisted)
 		self.assertNotIn(wd.get_task_dashboard, frappe.whitelisted)
+
+	def test_due_soon_is_today_and_the_next_six_days(self):
+		self._task("WD due today", exp_end_date=self.day)
+		self._task("WD due on day seven", exp_end_date=add_days(self.day, wd.DUE_SOON_DAYS - 1))
+		self._task("WD due on day eight", exp_end_date=add_days(self.day, wd.DUE_SOON_DAYS))
+		frappe.set_user(USER)
+		self.assertEqual(pc.get_task_dashboard()["totals"]["due_soon"], 2)
