@@ -9,7 +9,8 @@
 			v-for="task in tasks"
 			:key="task.name"
 			type="button"
-			class="block w-full border-b border-gray-100 px-5 py-3 text-left hover:bg-gray-50 dark:border-gray-800 dark:hover:bg-gray-800/60"
+			data-list-item
+			class="block w-full border-b border-gray-100 px-5 py-3 text-left hover:bg-gray-50 focus:outline-none focus-visible:bg-gray-100 dark:border-gray-800 dark:hover:bg-gray-800/60 dark:focus-visible:bg-gray-800"
 			:class="{
 				'bg-gray-50 shadow-[inset_3px_0_0_0_#111827] dark:bg-gray-800 dark:shadow-[inset_3px_0_0_0_#f3f4f6]':
 					task.name === selectedName,
