@@ -27,8 +27,9 @@
 		>
 			<template v-if="alignWithFilters && !compact">
 				<div class="min-w-0">
-					<div class="text-xs font-semibold text-ink-gray-6">
+					<div class="flex items-center gap-1.5 text-xs font-semibold text-ink-gray-6">
 						{{ issue.name }}
+						<IssueChatIndicator :issue-name="issue.name" :state="chatStates[issue.name]" @open="emit('select', $event)" />
 					</div>
 					<div
 						class="truncate text-sm font-medium text-ink-gray-9"
@@ -81,6 +82,7 @@
 					<span v-if="!compact" class="text-xs font-semibold text-ink-gray-6">
 						{{ issue.name }}
 					</span>
+					<IssueChatIndicator :issue-name="issue.name" :state="chatStates[issue.name]" @open="emit('select', $event)" />
 					<Badge
 						v-if="issue.converted_task"
 						class="whitespace-nowrap"
@@ -145,7 +147,10 @@
 </template>
 
 <script setup>
+import { toRef } from "vue"
 import { Badge } from "frappe-ui"
+import IssueChatIndicator from "@spa/components/IssueChatIndicator.vue"
+import { useIssueChatStates } from "@spa/composables/useIssueChatStates.js"
 import { ISSUE_LIST_FILTER_SUBGRID } from "@spa/issueListColumns.js"
 import { formatDate, formatIssueAge } from "@spa/utils/datetime"
 
@@ -159,6 +164,7 @@ const props = defineProps({
 })
 
 const emit = defineEmits(["select"])
+const chatStates = useIssueChatStates(toRef(props, "issues"))
 
 function creationValue(issue) {
 	const raw = issue.creation || issue.opening_date || ""

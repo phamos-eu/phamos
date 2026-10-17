@@ -7,7 +7,6 @@
 			>
 				<DocSyncBanner :autosave="autosave" />
 				<DocViewers :viewers="viewers" :document-name="issue.name" :api-prefix="API" :messageable="!!issue.chat_enabled" />
-				<IssueChatButton :issue-name="issue.name" :subject="issue.subject" :status="status" :api="API" />
 			</div>
 			<label class="mb-1.5 block flex-shrink-0 text-xs text-ink-gray-5">Description</label>
 			<div class="flex min-h-0 flex-1 flex-col" :class="{ 'pointer-events-none opacity-80': isClosed }">

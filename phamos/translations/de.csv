@@ -1247,7 +1247,6 @@ Start a Raven chat with the people on this Issue (C),Einen Raven-Chat mit den Be
 Join the Raven chat of this Issue (C),Dem Raven-Chat dieser Anfrage beitreten (C)
 Open the Raven chat of this Issue (C),Den Raven-Chat dieser Anfrage öffnen (C)
 Something went wrong,Etwas ist schiefgelaufen
-Open or close the chat,Chat öffnen oder schließen
 Read the chat of this closed Issue (C),Den Chat dieser geschlossenen Anfrage lesen (C)
 {0} assigned {1}.,{0} hat {1} zugewiesen.
 {0} unassigned {1}.,{0} hat die Zuweisung von {1} entfernt.
@@ -1255,3 +1254,12 @@ Read the chat of this closed Issue (C),Den Chat dieser geschlossenen Anfrage les
 {0} converted this Issue to Task {1}.,{0} hat diese Anfrage in die Aufgabe {1} umgewandelt.
 About {0},Über {0}
 "Opens your Raven chat with {0} in a new window, with a link to {1}.","Öffnet Ihren Raven-Chat mit {0} in einem neuen Fenster, mit einem Link zu {1}."
+1 unread message in the chat,1 ungelesene Nachricht im Chat
+{0} unread messages in the chat,{0} ungelesene Nachrichten im Chat
+Chat (read-only),Chat (nur lesen)
+Open the chat,Chat öffnen
+Loading the chat…,Chat wird geladen …
+No chat for this Issue yet.,Zu dieser Anfrage gibt es noch keinen Chat.
+"Start one with the people on this Issue. Messages also show up in Raven, linked to the Issue.","Starten Sie einen mit den Beteiligten dieser Anfrage. Die Nachrichten erscheinen auch in Raven, verknüpft mit der Anfrage."
+You are not in this chat yet.,Sie sind noch nicht in diesem Chat.
+Go to the chat,Zum Chat
