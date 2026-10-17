@@ -57,16 +57,14 @@
 <script setup>
 // The chat of an Issue (#1615). From lg on it is a column of the Issue view that is always there:
 // the chat itself, or "Start chat" / "Join chat". Below lg this button shows whether there is a
-// chat and how many messages are unread, and opens it as an overlay. "C" toggles the overlay, or
-// puts the keyboard into the column. The unread count follows Raven's message_created events in
-// the channel's document room.
-import { computed, nextTick, onBeforeUnmount, onDeactivated, onMounted, ref, watch } from "vue"
+// chat and how many messages are unread, and opens it as an overlay. The unread count follows
+// Raven's message_created events in the channel's document room.
+import { computed, nextTick, onBeforeUnmount, onDeactivated, ref, watch } from "vue"
 import { Button, call, FeatherIcon, toast } from "frappe-ui"
 import IssueChatPanel from "@spa/components/IssueChatPanel.vue"
 import { useDocRealtime } from "@spa/composables/useDocRealtime.js"
 import { sessionUser } from "@spa/session.js"
 import { __ } from "@spa/utils/i18n.js"
-import { dialogOpen, insideOverlay, isPlainKey, isTypingTarget } from "@spa/utils/shortcuts.js"
 import { chatChanged, issueChatStore } from "@spa/issueChatStore.js"
 import { useUserRealtime } from "@spa/composables/useUserRealtime.js"
 import { totalUnread, unreadSummary } from "@spa/utils/chatUnread.js"
@@ -95,11 +93,11 @@ const buttonLabel = computed(() => {
 	return __("Chat")
 })
 const buttonTitle = computed(() => {
-	if (!state.value.channel_id) return __("Start a Raven chat with the people on this Issue (C)")
-	if (!state.value.is_member) return __("Join the Raven chat of this Issue (C)")
+	if (!state.value.channel_id) return __("Start a Raven chat with the people on this Issue")
+	if (!state.value.is_member) return __("Join the Raven chat of this Issue")
 	const base = state.value.archived
-		? __("Read the chat of this closed Issue (C)")
-		: __("Open the Raven chat of this Issue (C)")
+		? __("Read the chat of this closed Issue")
+		: __("Open the Raven chat of this Issue")
 	const unread = unreadSummary(state.value)
 	return unread ? `${base} · ${unread}` : base
 })
@@ -238,21 +236,8 @@ useUserRealtime("raven:unread_thread_count_updated", () => {
 	if (state.value.is_member) refresh()
 })
 
-function onKeydown(event) {
-	if (event.defaultPrevented || !state.value.enabled) return
-	if (event.key.toLowerCase() !== "c" || !isPlainKey(event) || event.shiftKey) return
-	if (isTypingTarget(event.target) || insideOverlay(event.target) || dialogOpen()) return
-	event.preventDefault()
-	if (docked.value) panelRef.value?.focus()
-	else onClick()
-}
-
-onMounted(() => window.addEventListener("keydown", onKeydown))
 onDeactivated(() => {
 	drawerOpen.value = false
 })
-onBeforeUnmount(() => {
-	window.removeEventListener("keydown", onKeydown)
-	clearTimeout(refreshTimer)
-})
+onBeforeUnmount(() => clearTimeout(refreshTimer))
 </script>
