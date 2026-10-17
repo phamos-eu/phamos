@@ -61,7 +61,7 @@ def get_ai_skills(doctype="Accounting Receipt"):
 	stats = _skill_stats(agent.name)
 	skills = frappe.get_all(
 		"AI Skill",
-		filters={"agent": agent.name},
+		filters={"agent": agent.name, "origin": ("!=", "Suggested")},
 		fields=["name", "skill_name", "phase", "order", "enabled", "handler", "party_doctype", "party", "origin",
 			"description", "modified"],
 		order_by="`order` asc, creation asc",
@@ -238,3 +238,69 @@ def get_agent_run(name):
 		"flags": _parse(run.run_flags, []) or [],
 		"classification": analysis.get("classification") or [],
 	}
+
+
+# --- Learning: corrections and suggested rules ---------------------------------------------
+
+
+@frappe.whitelist(methods=["POST"])
+def get_learning(doctype="Accounting Receipt", days=90):
+	"""Open rule suggestions and recent corrections people made to what the AI set."""
+	frappe.has_permission("AI Skill", "read", throw=True)
+	agent = _agent(doctype)
+	suggestions = frappe.get_all(
+		"AI Skill",
+		filters={"agent": agent.name, "origin": "Suggested", "dismissed": 0},
+		fields=["name", "skill_name", "party_doctype", "party", "occurrences", "source_run", "description", "modified"],
+		order_by="occurrences desc, modified desc",
+	)
+	for row in suggestions:
+		rules = frappe.get_all("AI Prompt Rule", filters={"parent": row.name, "parenttype": "AI Skill"},
+			fields=["case_description", "action", "reason"], order_by="idx asc")
+		row["rules"] = rules
+		row["source_reference"] = frappe.db.get_value("AI Agent Run", row.source_run, "reference_name") if row.source_run else None
+	runs = frappe.get_all(
+		"AI Agent Run",
+		filters={"agent": agent.name, "outcome": "Corrected", "creation": (">=", add_days(now_datetime(), -cint(days)))},
+		fields=["name", "reference_name", "corrections", "corrected_by"],
+		order_by="creation desc",
+		limit_page_length=300,
+	)
+	corrections = []
+	for run in runs:
+		supplier = frappe.db.get_value(agent.applies_to_doctype, run.reference_name, "supplier") if run.reference_name else None
+		for c in _parse(run.corrections, []) or []:
+			corrections.append({**c, "run": run.name, "reference_name": run.reference_name, "supplier": supplier,
+				"user_name": frappe.utils.get_fullname(c.get("user") or run.corrected_by)})
+	by_field = {}
+	for c in corrections:
+		by_field[c["field"]] = by_field.get(c["field"], 0) + 1
+	completed = frappe.db.count("AI Agent Run", {"agent": agent.name, "status": "Completed",
+		"creation": (">=", add_days(now_datetime(), -cint(days)))})
+	return {
+		"suggestions": suggestions,
+		"corrections": corrections,
+		"by_field": by_field,
+		"runs": completed,
+		"corrected_runs": len(runs),
+		"days": cint(days),
+		"can_write": 1 if frappe.has_permission("AI Skill", "write") else 0,
+	}
+
+
+@frappe.whitelist(methods=["POST"])
+def accept_suggestion(name):
+	"""Turn a suggested rule on: it applies to this supplier's documents from now on."""
+	from phamos.accounting import feedback
+
+	feedback.accept_suggestion(name)
+	return get_ai_skill(name)
+
+
+@frappe.whitelist(methods=["POST"])
+def dismiss_suggestion(name):
+	"""Reject a suggested rule; the same suggestion is not made again."""
+	from phamos.accounting import feedback
+
+	feedback.dismiss_suggestion(name)
+	return {"name": name, "dismissed": 1}

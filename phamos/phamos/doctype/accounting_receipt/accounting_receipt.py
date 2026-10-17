@@ -84,6 +84,10 @@ class AccountingReceipt(Document):
 		from phamos.accounting.library import learn_from_receipt
 
 		learn_from_receipt(self)
+		if self.get("ai_run"):
+			from phamos.accounting import feedback
+
+			feedback.collect(self)
 		if self.status == "Do Not Pay" and self.has_value_changed("status"):
 			from phamos.accounting.branching import cancel_payment_request
 
