@@ -1233,7 +1233,6 @@ Chats are not available for {0}.,Für {0} sind keine Chats verfügbar.
 No Raven Workspace found. Create one in Raven first.,Kein Raven-Arbeitsbereich gefunden. Legen Sie zuerst einen in Raven an.
 You need to be a Raven user to chat.,"Sie müssen Raven-Benutzer sein, um zu chatten."
 Chat about {0}: {1},Chat zu {0}: {1}
-About {0}: {1},Zu {0}: {1}
 Chat about {0},Chat zu {0}
 Open in Raven,In Raven öffnen
 "Open this chat in Raven, in a new window",Diesen Chat in Raven in einem neuen Fenster öffnen
@@ -1251,8 +1250,6 @@ Read the chat of this closed Issue (C),Den Chat dieser geschlossenen Anfrage les
 {0} unassigned {1}.,{0} hat die Zuweisung von {1} entfernt.
 {0} set the status to {1}.,{0} hat den Status auf {1} gesetzt.
 {0} converted this Issue to Task {1}.,{0} hat diese Anfrage in die Aufgabe {1} umgewandelt.
-About {0},Über {0}
-"Opens your Raven chat with {0} in a new window, with a link to {1}.","Öffnet Ihren Raven-Chat mit {0} in einem neuen Fenster, mit einem Link zu {1}."
 Chat (read-only),Chat (nur lesen)
 Open the chat,Chat öffnen
 Loading the chat…,Chat wird geladen …

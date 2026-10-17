@@ -513,7 +513,6 @@ def _serialize_issue_detail(doc):
 		"assignee_names": [_user_label(u) for u in assignees],
 		"assignee_images": _user_images(assignees),
 		"converted_task": _converted_task_for_issue(doc.name),
-		"chat_enabled": issue_chat.is_enabled(),
 		"desk_url": f"/app/issue/{doc.name}",
 	}
 
@@ -548,10 +547,6 @@ def get_issue_chat_states(names):
 	"""Chat state per Issue for list views (readable Issues with a chat only)."""
 	return issue_chat.get_chat_states("Issue", names)
 
-
-def start_issue_dm(config: CockpitConfig, name, user):
-	"""Open the Raven DM with a user, carrying a link to an Issue in scope."""
-	return issue_chat.start_dm(_get_scoped_issue(config, name), user)
 
 
 def get_form_options(config: CockpitConfig):
