@@ -148,3 +148,9 @@ class TestPersonalWorkDashboard(FrappeTestCase):
 				{"label": "—", "value": 1},
 			],
 		)
+
+	def test_only_the_cockpit_wrappers_are_endpoints(self):
+		self.assertIn(pc.get_issue_dashboard, frappe.whitelisted)
+		self.assertIn(pc.get_task_dashboard, frappe.whitelisted)
+		self.assertNotIn(wd.get_issue_dashboard, frappe.whitelisted)
+		self.assertNotIn(wd.get_task_dashboard, frappe.whitelisted)

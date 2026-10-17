@@ -9,6 +9,9 @@ look at closed assignments, because closing an Issue or Task usually closes its 
 
 My hours come from my submitted Timesheet Records (`actual_time`, the worked time without
 breaks, which is also what goes into the ERPNext Timesheet). The running timer is not counted.
+
+Not whitelisted here: the `personal_cockpit` wrappers are the only endpoints, as for the other
+personal modules (#1610).
 """
 
 from datetime import datetime, time, timedelta
@@ -65,7 +68,6 @@ def _days_since(value, day):
 	return (day - getdate(value)).days if value else None
 
 
-@frappe.whitelist()
 def get_issue_dashboard():
 	"""Numbers about my Issues: what waits on me, what waits on others, how old the open ones are."""
 	day = getdate(today())
@@ -139,7 +141,6 @@ def _my_hours(day):
 	return {"today": total(day), "week": total(week_start), "month": total(month_start)}
 
 
-@frappe.whitelist()
 def get_task_dashboard():
 	"""Numbers about my Tasks: what is overdue or due soon, what I finished, my hours, effort vs plan."""
 	day = getdate(today())
