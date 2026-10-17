@@ -110,7 +110,8 @@ class TestEmploymentContract(FrappeTestCase):
 		self.assertIsNone(get_active_contract(self.employee, "2024-12-31"))
 		self.assertEqual(get_active_contract(self.employee, "2025-02-15").fte_percentage, 50)
 		self.assertEqual(get_active_contract(self.employee, "2025-05-01").fte_percentage, 70)
-		self.assertIsNone(get_active_contract(self.employee, "2025-07-15"))
+		# After the fixed-term change the earlier 50 % terms resume until the September contract.
+		self.assertEqual(get_active_contract(self.employee, "2025-07-15").fte_percentage, 50)
 		self.assertEqual(get_active_contract(self.employee, "2030-01-01").fte_percentage, 100)
 		self.assertNotIn("yearly_gross_full_time", get_active_contract(self.employee, "2025-02-15"))
 
