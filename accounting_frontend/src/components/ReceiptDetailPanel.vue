@@ -469,6 +469,7 @@ function sourceBadge(item) {
 	const text = {
 		Library: `Library${item.assignment_validation && item.assignment_validation !== "AI" ? ` ✓ ${item.assignment_validation}` : ""} · ${score} %`,
 		"Supplier History": `Supplier's usual account · ${score} %`,
+		"Supplier Default": `Supplier's default account · ${score} %`,
 		AI: `AI proposal · ${score} %`,
 	}[item.assignment_source]
 	return { text, class: sure ? "text-ink-green-3" : "text-ink-amber-3" }

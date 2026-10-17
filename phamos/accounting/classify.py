@@ -32,6 +32,7 @@ DEFAULT_PARAMS = {
 	"max_llm_lines": 30,
 }
 LLM_MAX_CONFIDENCE = 90
+SUPPLIER_DEFAULT_SCORE = 88
 
 # What the cockpit's skill editor shows for this skill's params.
 PARAM_FIELDS = [
@@ -74,9 +75,16 @@ def run_classify_skill(ctx, skill):
 
 def classify_receipt(doc, params=None, model=None, save=True):
 	"""Fill the expense account of open lines. Returns a summary with per-line reasons."""
+	from phamos.accounting import supplier_settings
+
 	params = params or dict(DEFAULT_PARAMS)
 	company = doc.company or frappe.defaults.get_global_default("company")
 	entries = library.entries(company)
+	supplier = supplier_settings.get(doc.supplier)
+	cost_center_set = False
+	if supplier.get("cost_center") and not doc.cost_center:
+		doc.cost_center = supplier["cost_center"]
+		cost_center_set = True
 	open_rows = [row for row in doc.get("items") or [] if not row.expense_account and cstr(row.item_name).strip()]
 	report, pending = {}, []
 
@@ -87,6 +95,10 @@ def classify_receipt(doc, params=None, model=None, save=True):
 			_assign(row, top["account"], top["source"], top["score"], top["reason"], entry=top.get("entry"),
 				cost_center=top.get("cost_center"))
 			report[row.name] = _line_report(row, top["source"], top["score"], top["reason"], candidates)
+		elif supplier.get("expense_account") and (not top or top["score"] < SUPPLIER_DEFAULT_SCORE):
+			reason = _("The default expense account of {0}.").format(doc.get("supplier_name") or doc.supplier)
+			_assign(row, supplier["expense_account"], "Supplier Default", SUPPLIER_DEFAULT_SCORE, reason)
+			report[row.name] = _line_report(row, "Supplier Default", SUPPLIER_DEFAULT_SCORE, reason, candidates)
 		else:
 			pending.append((row, candidates))
 
@@ -123,7 +135,7 @@ def classify_receipt(doc, params=None, model=None, save=True):
 			"message": _("Which expense account fits \"{0}\"?").format(row.item_name)})
 
 	assigned = len(open_rows) - len(pending)
-	if save and open_rows:
+	if save and (open_rows or cost_center_set):
 		doc.save(ignore_version=False)
 	scores = [r["score"] for r in report.values()]
 	return {
