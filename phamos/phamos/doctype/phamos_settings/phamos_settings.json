@@ -53,6 +53,10 @@
   "daily_image_folder",
   "raven_actions_section",
   "execute_raven_thread",
+  "issue_chat_section",
+  "enable_issue_chat",
+  "column_break_issue_chat",
+  "issue_chat_workspace",
   "checklist_tab",
   "checklist_section",
   "checklist_popup",
@@ -349,6 +353,30 @@
    "label": "Test Raven Daily Thread"
   },
   {
+   "fieldname": "issue_chat_section",
+   "fieldtype": "Section Break",
+   "label": "Issue Chat"
+  },
+  {
+   "default": "0",
+   "description": "Allow a Private Raven channel per Issue, opened from the cockpits.",
+   "fieldname": "enable_issue_chat",
+   "fieldtype": "Check",
+   "label": "Enable Issue Chat"
+  },
+  {
+   "fieldname": "column_break_issue_chat",
+   "fieldtype": "Column Break"
+  },
+  {
+   "depends_on": "eval:doc.enable_issue_chat == 1",
+   "description": "Raven Workspace of the Issue chats. Falls back to the first Raven Workspace if empty.",
+   "fieldname": "issue_chat_workspace",
+   "fieldtype": "Link",
+   "label": "Issue Chat Workspace",
+   "options": "Raven Workspace"
+  },
+  {
    "fieldname": "checklist_tab",
    "fieldtype": "Tab Break",
    "label": "Checklist"
@@ -563,7 +591,7 @@
  "index_web_pages_for_search": 1,
  "issingle": 1,
  "links": [],
- "modified": "2026-10-16 12:00:00.000000",
+ "modified": "2026-10-17 12:00:00.000000",
  "modified_by": "Administrator",
  "module": "Phamos",
  "name": "phamos Settings",

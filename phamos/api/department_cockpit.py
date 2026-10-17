@@ -21,6 +21,7 @@ from frappe.utils import get_datetime, get_fullname, now_datetime
 from frappe.desk.form.assign_to import add as add_assignment
 from frappe.desk.form.assign_to import remove as remove_assignment
 
+from phamos.api import issue_chat
 from phamos.api.issue_common import (
 	LIST_FIELDS,
 	_parse_assignees,
@@ -516,16 +517,40 @@ def _serialize_issue_detail(doc):
 	}
 
 
-def get_issue(config: CockpitConfig, name):
-	"""Return Issue detail if it belongs to department scope."""
+def _get_scoped_issue(config: CockpitConfig, name):
+	"""Load an Issue the session user may read in this cockpit, or throw."""
 	frappe.has_permission("Issue", "read", throw=True)
 	_require_department(config)
 
 	doc = frappe.get_doc("Issue", name)
 	doc.check_permission("read")
 	_ensure_issue_in_scope(config, doc)
+	return doc
 
-	return _serialize_issue_detail(doc)
+
+def get_issue(config: CockpitConfig, name):
+	"""Return Issue detail if it belongs to department scope."""
+	return _serialize_issue_detail(_get_scoped_issue(config, name))
+
+
+def get_issue_chat(config: CockpitConfig, name):
+	"""Chat state of an Issue in scope: channel, membership, unread count (#1614)."""
+	return issue_chat.get_chat(_get_scoped_issue(config, name))
+
+
+def ensure_issue_chat(config: CockpitConfig, name):
+	"""Start or join the chat of an Issue in scope."""
+	return issue_chat.ensure_chat(_get_scoped_issue(config, name))
+
+
+def get_issue_chat_states(names):
+	"""Chat state per Issue for list views (readable Issues with a chat only)."""
+	return issue_chat.get_chat_states("Issue", names)
+
+
+def start_issue_dm(config: CockpitConfig, name, user):
+	"""Open the Raven DM with a user, carrying a link to an Issue in scope."""
+	return issue_chat.start_dm(_get_scoped_issue(config, name), user)
 
 
 def get_form_options(config: CockpitConfig):
