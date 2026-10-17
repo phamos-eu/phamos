@@ -1,22 +1,22 @@
 <template>
 	<div ref="root">
 		<Dropdown :options="groups" placement="right">
-			<Button size="sm" variant="solid" aria-label="Create something new">
+			<Button size="sm" variant="solid" :aria-label="__('Create something new')">
 				<template #prefix><FeatherIcon name="plus" class="h-4 w-4" /></template>
-				Create
+				{{ __("Create") }}
 				<template #suffix><FeatherIcon name="chevron-down" class="h-3.5 w-3.5" /></template>
 			</Button>
 		</Dropdown>
 
-		<CreateTodoDialog v-model="open.todo" @created="(doc) => opened('ToDo created', 'TodoDetail', doc)" />
-		<CreateIssueDialog v-model="open.issue" :options="formOptions" @created="(doc) => opened('Issue created', 'IssueDetail', doc)" />
-		<CreateTaskDialog v-model="open.task" :options="formOptions" @created="(doc) => opened('Task created', 'TaskDetail', doc)" />
+		<CreateTodoDialog v-model="open.todo" @created="(doc) => opened(__('ToDo created'), 'TodoDetail', doc)" />
+		<CreateIssueDialog v-model="open.issue" :options="formOptions" @created="(doc) => opened(__('Issue created'), 'IssueDetail', doc)" />
+		<CreateTaskDialog v-model="open.task" :options="formOptions" @created="(doc) => opened(__('Task created'), 'TaskDetail', doc)" />
 		<CreateChecklistDialog
 			v-model="open.checklist"
 			:create-method="`${API}.create_checklist`"
 			:reference-query="`${API}.checklist_reference_query`"
 			:doctypes="['Issue', 'Task', 'ToDo']"
-			@created="(doc) => opened('Checklist created', 'ChecklistDetail', doc)"
+			@created="(doc) => opened(__('Checklist created'), 'ChecklistDetail', doc)"
 		/>
 		<StartFocusDialog v-model="open.focus" />
 		<CreateChallengeDialog v-model="open.challenge" @created="onChallenge" />
@@ -37,6 +37,7 @@ import CreateTodoDialog from "@spa/components/CreateTodoDialog.vue"
 import { requestTimerStart, timer } from "@spa/timerStore.js"
 import { shortcuts } from "@/shortcutsStore.js"
 import { notify } from "@spa/utils/notify.js"
+import { __ } from "@spa/utils/i18n.js"
 import spaConfig from "@/config"
 import { checkin, checkInOrOut, checkinUsable } from "@/checkinStore.js"
 import CreateChallengeDialog from "./CreateChallengeDialog.vue"
@@ -56,32 +57,32 @@ let optionsLoaded = false
 
 const groups = computed(() => {
 	const work = [
-		{ label: "ToDo", icon: "check-circle", onClick: () => (open.todo = true) },
-		{ label: "Issue", icon: "inbox", onClick: () => (open.issue = true) },
-		{ label: "Task", icon: "check-square", onClick: () => (open.task = true) },
-		{ label: "Checklist", icon: "list", onClick: () => (open.checklist = true) },
+		{ label: __("ToDo"), icon: "check-circle", onClick: () => (open.todo = true) },
+		{ label: __("Issue"), icon: "inbox", onClick: () => (open.issue = true) },
+		{ label: __("Task"), icon: "check-square", onClick: () => (open.task = true) },
+		{ label: __("Checklist"), icon: "list", onClick: () => (open.checklist = true) },
 	]
 	const time = []
 	if (timer.state?.available && !timer.state.session) {
-		time.push({ label: "Timesheet timer", icon: "play", onClick: requestTimerStart })
+		time.push({ label: __("Timesheet timer"), icon: "play", onClick: requestTimerStart })
 	}
 	if (checkinUsable(checkin.state)) {
 		const out = checkin.state.next_action === "OUT"
 		time.push({
-			label: out ? "Check-out" : "Check-in",
+			label: out ? __("Check-out") : __("Check-in"),
 			icon: out ? "log-out" : "log-in",
 			onClick: () => checkInOrOut(props.beforeCheckout),
 		})
 	}
 	const focus = [
-		{ label: "Focus session", icon: "target", onClick: () => (open.focus = true) },
-		{ label: "Target", icon: "award", onClick: () => (open.challenge = true) },
+		{ label: __("Focus session"), icon: "target", onClick: () => (open.focus = true) },
+		{ label: __("Target"), icon: "award", onClick: () => (open.challenge = true) },
 	]
 	return [
-		{ group: "Work", items: work },
-		...(time.length ? [{ group: "Time", items: time }] : []),
-		{ group: "Focus", items: focus },
-		{ group: "Help", items: [{ label: "Keyboard shortcuts  ?", icon: "command", onClick: () => (shortcuts.open = true) }] },
+		{ group: __("Work"), items: work },
+		...(time.length ? [{ group: __("Time"), items: time }] : []),
+		{ group: __("Focus"), items: focus },
+		{ group: __("Help"), items: [{ label: `${__("Keyboard shortcuts")}  ?`, icon: "command", onClick: () => (shortcuts.open = true) }] },
 	]
 })
 
@@ -101,7 +102,7 @@ function opened(message, routeName, doc) {
 }
 
 function onChallenge() {
-	notify.success("Target set")
+	notify.success(__("Target set"))
 	router.push({ name: "Todos" })
 }
 

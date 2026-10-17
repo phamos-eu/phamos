@@ -5,7 +5,7 @@
 		<div ref="scroller" class="h-full min-h-0 overflow-y-auto bg-surface-gray-1">
 			<div class="mx-auto max-w-5xl px-5 pb-16">
 				<div ref="topSentinel" class="py-3 text-center text-xs text-ink-gray-5">
-					{{ loadingLater ? "Loading later days…" : to >= lastFuture ? "Plan further ahead in the list." : "" }}
+					{{ loadingLater ? __("Loading later days…") : to >= lastFuture ? __("Plan further ahead in the list.") : "" }}
 				</div>
 				<div v-if="error" class="mb-3 rounded-lg border border-outline-gray-2 bg-surface-red-1 p-3 text-sm text-ink-red-4">{{ error }}</div>
 				<TimelineDay
@@ -21,13 +21,13 @@
 					@changed="reloadAround(today)"
 				/>
 				<div ref="bottomSentinel" class="py-6 text-center text-xs text-ink-gray-5">
-					{{ loadingEarlier ? "Loading earlier days…" : hasEarlier ? "" : "Nothing earlier." }}
+					{{ loadingEarlier ? __("Loading earlier days…") : hasEarlier ? "" : __("Nothing earlier.") }}
 				</div>
 			</div>
 		</div>
-		<Button class="absolute bottom-5 right-5 shadow" variant="solid" title="Jump to today (T)" @click="goTo(today)">
+		<Button class="absolute bottom-5 right-5 shadow" variant="solid" :title="__('Jump to today (T)')" @click="goTo(today)">
 			<template #prefix><FeatherIcon name="crosshair" class="h-4 w-4" /></template>
-			Today
+			{{ __("Today") }}
 		</Button>
 	</div>
 </template>
@@ -40,6 +40,7 @@ import { useScrollSentinels } from "@spa/composables/useScrollSentinels.js"
 import { useUserRealtime } from "@spa/composables/useUserRealtime.js"
 import { parseSystemDatetimeToUserDate, todayIsoInUserTz } from "@spa/utils/datetime.js"
 import { dayKey, minuteOfDay, splitIntoDays } from "@spa/utils/timelineLayout.js"
+import { __ } from "@spa/utils/i18n.js"
 import spaConfig from "@/config"
 import TimelineDay from "@/components/TimelineDay.vue"
 
@@ -119,10 +120,12 @@ const eventsByDay = computed(() => {
 				type: "checkin",
 				start: local(c.time),
 				end: null,
-				label: c.log_type === "IN" ? "Checked in" : "Checked out",
+				label: c.log_type === "IN" ? __("Checked in") : __("Checked out"),
 				icon: c.log_type === "IN" ? "log-in" : "log-out",
 				iconClass: c.log_type === "IN" ? "text-ink-green-3" : "text-ink-gray-5",
-				title: `${c.log_type === "IN" ? "Check-in" : "Check-out"}${c.device_id ? ` · ${c.device_id}` : ""}`,
+				title: c.device_id
+					? c.log_type === "IN" ? __("Check-in · {0}", [c.device_id]) : __("Check-out · {0}", [c.device_id])
+					: c.log_type === "IN" ? __("Check-in") : __("Check-out"),
 			})
 		}
 		for (const t of day.todos_done || []) {
@@ -137,7 +140,7 @@ const eventsByDay = computed(() => {
 				icon: "check",
 				iconClass: "text-ink-green-3",
 				important: t.important,
-				title: `${t.planned ? "Planned" : "Spontaneous"}: ${t.summary}`,
+				title: t.planned ? __("Planned: {0}", [t.summary]) : __("Spontaneous: {0}", [t.summary]),
 			})
 		}
 	}
@@ -184,7 +187,7 @@ async function loadEarlier() {
 		hasEarlier.value = first.has_earlier
 		from.value = start
 	} catch (e) {
-		error.value = e?.messages?.[0] || e?.message || "Could not load earlier days"
+		error.value = e?.messages?.[0] || e?.message || __("Could not load earlier days")
 	} finally {
 		loadingEarlier.value = false
 		sentinels.recheck()
@@ -203,7 +206,7 @@ async function loadLater() {
 		await nextTick()
 		if (el) el.scrollTop = el.scrollHeight - before // keep what the user looks at in place
 	} catch (e) {
-		error.value = e?.messages?.[0] || e?.message || "Could not load later days"
+		error.value = e?.messages?.[0] || e?.message || __("Could not load later days")
 	} finally {
 		loadingLater.value = false
 		sentinels.recheck()
@@ -231,7 +234,7 @@ async function start(center) {
 		to.value = end
 		await scrollToDate(center)
 	} catch (e) {
-		error.value = e?.messages?.[0] || e?.message || "Could not load your days"
+		error.value = e?.messages?.[0] || e?.message || __("Could not load your days")
 	}
 }
 

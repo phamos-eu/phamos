@@ -6,9 +6,9 @@
 				ref="input"
 				v-model="query"
 				type="search"
-				class="h-7 w-40 rounded border-none bg-surface-gray-2 pl-7 pr-14 text-sm text-ink-gray-8 placeholder-ink-gray-4 focus:bg-surface-gray-3 focus:ring-0 lg:w-56"
-				placeholder="Search  /"
-				aria-label="Search this page"
+				class="page-search-input h-7 w-40 rounded border-none bg-surface-gray-2 pl-7 pr-14 text-sm text-ink-gray-8 placeholder-ink-gray-4 focus:bg-surface-gray-3 focus:ring-0 lg:w-56"
+				:placeholder="__('Search') + '  /'"
+				:aria-label="__('Search this page')"
 				@keydown.enter.prevent="step($event.shiftKey ? -1 : 1)"
 				@keydown.esc.prevent="clear"
 			/>
@@ -17,10 +17,10 @@
 			</span>
 		</div>
 		<template v-if="total > 1">
-			<button type="button" class="flex h-7 w-6 items-center justify-center rounded text-ink-gray-5 hover:bg-surface-gray-2" aria-label="Previous match" @click="step(-1)">
+			<button type="button" class="flex h-7 w-6 items-center justify-center rounded text-ink-gray-5 hover:bg-surface-gray-2" :aria-label="__('Previous match')" @click="step(-1)">
 				<FeatherIcon name="chevron-up" class="h-4 w-4" />
 			</button>
-			<button type="button" class="flex h-7 w-6 items-center justify-center rounded text-ink-gray-5 hover:bg-surface-gray-2" aria-label="Next match" @click="step(1)">
+			<button type="button" class="flex h-7 w-6 items-center justify-center rounded text-ink-gray-5 hover:bg-surface-gray-2" :aria-label="__('Next match')" @click="step(1)">
 				<FeatherIcon name="chevron-down" class="h-4 w-4" />
 			</button>
 		</template>
@@ -33,6 +33,7 @@
 // updates) is searched as it arrives.
 import { nextTick, onBeforeUnmount, onMounted, ref, watch } from "vue"
 import { useRoute } from "vue-router"
+import { __ } from "@spa/utils/i18n.js"
 import { findMatches, stepIndex } from "@spa/utils/textSearch.js"
 
 const ROOT_ID = "cockpit-main"
@@ -168,7 +169,7 @@ onBeforeUnmount(() => {
 
 <style>
 /* The counter sits where the browser draws its clear button; Esc clears instead. */
-input[aria-label="Search this page"]::-webkit-search-cancel-button {
+.page-search-input::-webkit-search-cancel-button {
 	display: none;
 }
 ::highlight(cockpit-search) {

@@ -8,7 +8,7 @@
 					:inert="locked || undefined"
 					:aria-hidden="locked || undefined"
 				>
-					<CockpitSidebar label="Personal Cockpit" storage-key="personal-cockpit-sidebar-collapsed" :items="navItems" />
+					<CockpitSidebar :label="__('Personal Cockpit')" storage-key="personal-cockpit-sidebar-collapsed" :items="navItems" />
 				</div>
 				<div
 					v-if="locked"
@@ -37,6 +37,8 @@ import CockpitShell from "@spa/components/CockpitShell.vue"
 import CockpitSidebar from "@spa/components/CockpitSidebar.vue"
 import { useUserRealtime } from "@spa/composables/useUserRealtime.js"
 import { parseServerTime } from "@spa/utils/focusRules.js"
+import { clockTime } from "@spa/utils/datetime.js"
+import { __ } from "@spa/utils/i18n.js"
 import { focus, loadFocus } from "./focusStore.js"
 import { checkin, loadCheckin } from "./checkinStore.js"
 import { hasContracts, loadMyContracts } from "./contractStore.js"
@@ -56,9 +58,8 @@ const createMenu = ref(null)
 const locked = computed(() => Boolean(focus.session))
 const lockLabel = computed(() => {
 	const end = parseServerTime(focus.session?.planned_end)
-	if (!end) return "In focus. Leave from the focus view."
-	const time = end.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })
-	return `In focus until ${time}. Leave from the focus view.`
+	if (!end) return __("In focus. Leave from the focus view.")
+	return __("In focus until {0}. Leave from the focus view.", [clockTime(end)])
 })
 
 useUserRealtime("cockpit_focus_changed", loadFocus, { debounceMs: 200 })
@@ -125,8 +126,14 @@ const navItems = computed(() => {
 	const items = [...BASE_ITEMS]
 	if (checkin.state?.available && checkin.state.employee) items.splice(1, 0, CHECKIN_ITEM)
 	if (hasContracts()) items.push(CONTRACT_ITEM)
-	return items
+	return items.map(translateItem)
 })
+
+function translateItem(item) {
+	const translated = { ...item, label: __(item.label) }
+	if (item.children) translated.children = item.children.map(translateItem)
+	return translated
+}
 
 const BASE_ITEMS = [
 	{
@@ -195,5 +202,7 @@ const PAGE_TITLES = {
 	Checklists: ["My Checklists", "List"],
 	ChecklistDetail: ["My Checklists", "List"],
 }
-const pageTitle = computed(() => (PAGE_TITLES[route.name] || ["Personal Cockpit"]).join(" · "))
+const pageTitle = computed(
+	() => (PAGE_TITLES[route.name] || ["Personal Cockpit"]).map((part) => __(part)).join(" · ")
+)
 </script>

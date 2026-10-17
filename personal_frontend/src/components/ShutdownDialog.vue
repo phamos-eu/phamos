@@ -1,14 +1,14 @@
 <template>
 	<Dialog
 		:model-value="modelValue"
-		:options="{ title: 'Shut down the day', size: '2xl' }"
+		:options="{ title: __('Shut down the day'), size: '2xl' }"
 		@update:model-value="emit('update:modelValue', $event)"
 	>
 		<template #body-content>
 			<div class="space-y-5">
 				<section>
-					<h3 class="mb-1 text-sm font-semibold text-ink-gray-9">Done today</h3>
-					<p v-if="!done.length" class="text-sm text-ink-gray-5">Nothing from the plan. Some days are like that.</p>
+					<h3 class="mb-1 text-sm font-semibold text-ink-gray-9">{{ __("Done today") }}</h3>
+					<p v-if="!done.length" class="text-sm text-ink-gray-5">{{ __("Nothing from the plan. Some days are like that.") }}</p>
 					<ul class="space-y-0.5 text-sm text-ink-gray-7">
 						<li v-for="item in done" :key="item.todo" class="flex gap-2">
 							<FeatherIcon name="check" class="mt-0.5 h-4 w-4 flex-none text-ink-green-3" />{{ item.summary }}
@@ -17,27 +17,27 @@
 				</section>
 
 				<section v-if="open.length">
-					<h3 class="mb-1 text-sm font-semibold text-ink-gray-9">Still open: when is the next step?</h3>
+					<h3 class="mb-1 text-sm font-semibold text-ink-gray-9">{{ __("Still open: when is the next step?") }}</h3>
 					<ul class="space-y-3">
 						<li v-for="item in open" :key="item.todo" class="rounded-md border border-outline-gray-2 p-3">
 							<div class="mb-2 text-sm text-ink-gray-9">{{ item.summary }}</div>
 							<div class="flex flex-wrap items-center gap-2">
-								<TabButtons v-model="choices[item.todo].action" :buttons="ACTIONS" />
+								<TabButtons v-model="choices[item.todo].action" :buttons="actionButtons" />
 								<FormControl
 									v-if="choices[item.todo].action === 'plan'"
 									v-model="choices[item.todo].date"
 									type="date"
 									size="sm"
 									:min="plan.today"
-									aria-label="New date"
+									:aria-label="__('New date')"
 								/>
 								<FormControl
 									v-if="choices[item.todo].action === 'drop'"
 									v-model="choices[item.todo].reason"
 									type="select"
 									size="sm"
-									:options="DROP_REASONS"
-									aria-label="Why drop it"
+									:options="dropReasonOptions"
+									:aria-label="__('Why drop it')"
 								/>
 							</div>
 						</li>
@@ -48,13 +48,13 @@
 					v-model="reflection"
 					type="text"
 					size="sm"
-					label="One line about today (optional, only for you)"
-					placeholder="What went well, what got in the way?"
+					:label="__('One line about today (optional, only for you)')"
+					:placeholder="__('What went well, what got in the way?')"
 				/>
 				<ErrorMessage :message="error" />
 				<div class="flex justify-end gap-2">
-					<Button variant="ghost" @click="emit('update:modelValue', false)">Not yet</Button>
-					<Button variant="solid" :loading="saving" :disabled="!complete" @click="submit">Done for the day</Button>
+					<Button variant="ghost" @click="emit('update:modelValue', false)">{{ __("Not yet") }}</Button>
+					<Button variant="solid" :loading="saving" :disabled="!complete" @click="submit">{{ __("Done for the day") }}</Button>
 				</div>
 			</div>
 		</template>
@@ -64,6 +64,7 @@
 <script setup>
 import { computed, reactive, ref, watch } from "vue"
 import { call, TabButtons } from "frappe-ui"
+import { __ } from "@spa/utils/i18n.js"
 import spaConfig from "@/config"
 
 const props = defineProps({
@@ -80,6 +81,10 @@ const ACTIONS = [
 	{ label: "Keep open", value: "keep" },
 ]
 const DROP_REASONS = ["Not needed any more", "Done elsewhere", "Out of date", "Other"]
+
+// Labels translated at render time; values stay English (they go to the API).
+const actionButtons = computed(() => ACTIONS.map((a) => ({ ...a, label: __(a.label) })))
+const dropReasonOptions = computed(() => DROP_REASONS.map((r) => ({ label: __(r), value: r })))
 
 const choices = reactive({})
 const reflection = ref("")
@@ -117,7 +122,7 @@ async function submit() {
 		emit("done", result)
 		emit("update:modelValue", false)
 	} catch (e) {
-		error.value = e?.messages?.[0] || e?.message || "Could not shut down the day"
+		error.value = e?.messages?.[0] || e?.message || __("Could not shut down the day")
 	} finally {
 		saving.value = false
 	}
