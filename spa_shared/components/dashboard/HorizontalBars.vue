@@ -1,7 +1,7 @@
 <template>
 	<section class="rounded-lg border border-outline-gray-2 bg-surface-white p-5">
 		<h2 class="mb-4 text-base font-semibold text-ink-gray-9">{{ title }}</h2>
-		<p v-if="!rows.length" class="text-sm text-ink-gray-5">{{ emptyText }}</p>
+		<p v-if="!rows.length" class="text-sm text-ink-gray-5">{{ emptyText || __("Nothing to show yet.") }}</p>
 		<div v-else class="space-y-3">
 			<div
 				v-for="row in rows"
@@ -30,11 +30,12 @@
 
 <script setup>
 import { computed } from "vue"
+import { __ } from "@spa/utils/i18n.js"
 
 const props = defineProps({
 	title: { type: String, required: true },
 	rows: { type: Array, default: () => [] },
-	emptyText: { type: String, default: "Nothing to show yet." },
+	emptyText: { type: String, default: "" },
 	// Optional (value, row) => string for the number shown next to the label.
 	format: { type: Function, default: null },
 	// Rows become keyboard-focusable buttons that emit `select` with the row (drill-down).

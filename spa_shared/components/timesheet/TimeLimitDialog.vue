@@ -1,26 +1,33 @@
 <template>
 	<Dialog
 		:model-value="modelValue"
-		:options="{ title: 'Implementation time limit reached', size: 'md' }"
+		:options="{ title: __('Implementation time limit reached'), size: 'md' }"
 		@update:model-value="emit('update:modelValue', $event)"
 	>
 		<template #body-content>
 			<div v-if="session" class="space-y-4">
 				<p class="text-sm text-ink-gray-7">
-					This session needs {{ hours(limit.requested_hours) }} billable, but only {{ hours(limit.remaining_hours) }} of
-					{{ hours(limit.limit_hours) }} are left for this implementation. The record is saved and waits for your decision.
+					{{
+						__(
+							"This session needs {0} billable, but only {1} of {2} are left for this implementation. The record is saved and waits for your decision.",
+							[hours(limit.requested_hours), hours(limit.remaining_hours), hours(limit.limit_hours)]
+						)
+					}}
 				</p>
 				<ErrorMessage :message="error" />
 				<div class="flex flex-col gap-2">
 					<Button variant="solid" :loading="busy === 'continue'" @click="act('continue')">
-						Continue with the available hours
+						{{ __("Continue with the available hours") }}
 					</Button>
-					<Button :loading="busy === 'notify'" @click="act('notify')">Notify the account manager</Button>
-					<Button variant="ghost" @click="emit('update:modelValue', false)">Decide later</Button>
+					<Button :loading="busy === 'notify'" @click="act('notify')">{{ __("Notify the account manager") }}</Button>
+					<Button variant="ghost" @click="emit('update:modelValue', false)">{{ __("Decide later") }}</Button>
 				</div>
 				<p class="text-xs text-ink-gray-5">
-					Continue keeps your times and lowers the billable share so it fits. Notify sends the account manager an email
-					and leaves the record as it is.
+					{{
+						__(
+							"Continue keeps your times and lowers the billable share so it fits. Notify sends the account manager an email and leaves the record as it is."
+						)
+					}}
 				</p>
 			</div>
 		</template>
@@ -30,6 +37,7 @@
 <script setup>
 import { computed, ref } from "vue"
 import { call } from "frappe-ui"
+import { __ } from "@spa/utils/i18n.js"
 import spaConfig from "@/config"
 
 const props = defineProps({
@@ -45,7 +53,7 @@ const limit = computed(() => props.session?.limit || {})
 
 function hours(value) {
 	const number = Number(value || 0)
-	return `${Math.round(number * 100) / 100} h`
+	return __("{0} h", [Math.round(number * 100) / 100])
 }
 
 async function act(kind) {
@@ -57,7 +65,7 @@ async function act(kind) {
 		emit("done", state, kind)
 		emit("update:modelValue", false)
 	} catch (e) {
-		error.value = e?.messages?.[0] || e?.message || "That did not work"
+		error.value = e?.messages?.[0] || e?.message || __("That did not work")
 	} finally {
 		busy.value = ""
 	}

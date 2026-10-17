@@ -1,5 +1,6 @@
 // Check-in state as the Personal Cockpit shows it (#1571). The server sends the state with its
 // own clock (`server_now`); between reloads the worked time is advanced locally once a minute.
+import { __ } from "./i18n.js"
 
 // Minutes worked today, `elapsedSeconds` after the state was loaded.
 export function liveWorkedMinutes(state, elapsedSeconds = 0) {
@@ -12,27 +13,27 @@ export function formatWorked(minutes) {
 	const total = Math.max(0, Math.round(minutes || 0))
 	const h = Math.floor(total / 60)
 	const m = total % 60
-	if (!h) return `${m} min`
-	return m ? `${h} h ${m} min` : `${h} h`
+	if (!h) return __("{0} min", [m])
+	return m ? __("{0} h {1} min", [h, m]) : __("{0} h", [h])
 }
 
 // The button label and icon for the next action.
 export function actionLabel(state) {
 	return state?.next_action === "OUT"
-		? { label: "Check out", icon: "log-out" }
-		: { label: "Check in", icon: "log-in" }
+		? { label: __("Check out"), icon: "log-out" }
+		: { label: __("Check in"), icon: "log-in" }
 }
 
 // "in since 08:02", "out since 12:01", "in since Tue 17:40" for a check-in left open on an
 // earlier day. `formatTime` and `formatDay` turn a server datetime into display text.
 export function caption(state, formatTime, formatDay) {
 	const last = state?.last
-	if (!last) return "not checked in yet"
+	if (!last) return __("not checked in yet")
 	// The day is shown whenever the last log is not one of today's (e.g. a Thursday check-out seen
 	// on Saturday), not only for a check-in left open.
 	const fromToday = !state.stale_in && (state.today?.logs || []).some((log) => log.name === last.name)
 	const when = fromToday ? formatTime(last.time) : `${formatDay(last.time)} ${formatTime(last.time)}`
-	return `${last.log_type === "IN" ? "in" : "out"} since ${when}`
+	return last.log_type === "IN" ? __("in since {0}", [when]) : __("out since {0}", [when])
 }
 
 // Ctrl/Cmd+Z outside text fields revokes a pending check-in.

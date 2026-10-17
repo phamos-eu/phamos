@@ -2,6 +2,8 @@
 // time with something in it is drawn to scale and empty time is squeezed. Pure functions; times
 // are local Date objects (convert server datetimes with parseSystemDatetimeToUserDate first).
 
+import { __ } from "./i18n.js"
+
 export const PX_PER_MINUTE = 2
 export const PAD_MINUTES = 15
 export const GAP_COLLAPSE_MINUTES = 30
@@ -135,6 +137,6 @@ export function formatGap(minutes) {
 	const total = Math.round(minutes)
 	const h = Math.floor(total / 60)
 	const m = total % 60
-	if (!h) return `${m} min`
-	return m ? `${h} h ${m} min` : `${h} h`
+	if (!h) return __("{0} min", [m])
+	return m ? __("{0} h {1} min", [h, m]) : __("{0} h", [h])
 }

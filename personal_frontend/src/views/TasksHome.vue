@@ -2,7 +2,7 @@
 	<div class="h-full min-h-0 overflow-y-auto bg-surface-gray-1 p-5">
 		<div class="mx-auto flex max-w-7xl flex-col gap-5">
 			<div v-if="error" class="rounded-lg border border-outline-gray-2 bg-surface-red-1 p-4 text-sm text-ink-red-4">{{ error }}</div>
-			<div v-else-if="loading" class="flex min-h-64 items-center justify-center text-sm text-ink-gray-5">Loading your Tasks…</div>
+			<div v-else-if="loading" class="flex min-h-64 items-center justify-center text-sm text-ink-gray-5">{{ __("Loading your Tasks…") }}</div>
 			<template v-else>
 				<section class="grid grid-cols-1 gap-3 md:grid-cols-2" :class="data.hours ? 'xl:grid-cols-5' : 'xl:grid-cols-4'">
 					<RouterLink v-for="stat in stats" :key="stat.key" :to="{ name: 'TasksGantt' }" class="rounded-lg focus-visible:outline focus-visible:outline-2 focus-visible:outline-outline-gray-4">
@@ -10,16 +10,16 @@
 					</RouterLink>
 					<StatCard
 						v-if="data.hours"
-						label="My hours this week"
+						:label="__('My hours this week')"
 						:value="hours(data.hours.week)"
-						:lines="[`Today ${hours(data.hours.today)}`, `This month ${hours(data.hours.month)}`]"
+						:lines="[__('Today {0}', [hours(data.hours.today)]), __('This month {0}', [hours(data.hours.month)])]"
 					/>
 				</section>
 
 				<div class="grid grid-cols-1 gap-5 xl:grid-cols-3">
 					<section class="rounded-lg border border-outline-gray-2 bg-surface-white p-5 xl:col-span-2">
-						<h2 class="mb-3 text-base font-semibold text-ink-gray-9">Next due</h2>
-						<p v-if="!data.next_due.length" class="text-sm text-ink-gray-5">No open Task has an end date.</p>
+						<h2 class="mb-3 text-base font-semibold text-ink-gray-9">{{ __("Next due") }}</h2>
+						<p v-if="!data.next_due.length" class="text-sm text-ink-gray-5">{{ __("No open Task has an end date.") }}</p>
 						<ul v-else class="divide-y divide-outline-gray-1">
 							<li v-for="task in data.next_due" :key="task.name">
 								<RouterLink
@@ -30,20 +30,20 @@
 									<span class="w-28 flex-none whitespace-nowrap text-xs text-ink-gray-5">{{ task.name }}</span>
 									<span class="min-w-0 flex-1 truncate text-ink-gray-8">{{ task.subject }}</span>
 									<span class="flex-none text-xs tabular-nums" :class="task.overdue ? 'font-medium text-ink-red-4' : 'text-ink-gray-6'">
-										{{ task.overdue ? "overdue · " : "" }}{{ formatDate(task.exp_end_date) }}
+										{{ task.overdue ? __("overdue · {0}", [formatDate(task.exp_end_date)]) : formatDate(task.exp_end_date) }}
 									</span>
 								</RouterLink>
 							</li>
 						</ul>
 					</section>
-					<HorizontalBars title="Open by status" :rows="data.by_status" empty-text="No open Tasks." />
+					<HorizontalBars :title="__('Open by status')" :rows="data.by_status" :empty-text="__('No open Tasks.')" />
 				</div>
 
 				<HorizontalBars
-					title="Time used of the estimate"
+					:title="__('Time used of the estimate')"
 					:rows="data.effort"
-					:format="(value, row) => `${hours(row.actual)} of ${hours(row.expected)} · ${value} %`"
-					empty-text="None of your open Tasks has an expected time."
+					:format="(value, row) => __('{0} of {1} · {2} %', [hours(row.actual), hours(row.expected), value])"
+					:empty-text="__('None of your open Tasks has an expected time.')"
 					selectable
 					@select="(row) => router.push({ name: 'TaskDetail', params: { name: row.name } })"
 				/>
@@ -62,6 +62,7 @@ import HorizontalBars from "@spa/components/dashboard/HorizontalBars.vue"
 import StatCard from "@spa/components/dashboard/StatCard.vue"
 import { useUserRealtime } from "@spa/composables/useUserRealtime.js"
 import { formatDate } from "@spa/utils/datetime.js"
+import { __ } from "@spa/utils/i18n.js"
 import spaConfig from "@/config"
 
 const router = useRouter()
@@ -74,17 +75,17 @@ function hours(value) {
 	const minutes = Math.round((Number(value) || 0) * 60)
 	const h = Math.floor(minutes / 60)
 	const m = minutes % 60
-	if (!h) return `${m} min`
-	return m ? `${h} h ${m} min` : `${h} h`
+	if (!h) return __("{0} min", [m])
+	return m ? __("{0} h {1} min", [h, m]) : __("{0} h", [h])
 }
 
 const stats = computed(() => {
 	const t = data.value.totals || {}
 	return [
-		{ key: "overdue", label: "Overdue", value: t.overdue ?? 0, hint: "Past the expected end date" },
-		{ key: "due_soon", label: "Due soon", value: t.due_soon ?? 0, hint: `In the next ${data.value.due_soon_days} days` },
-		{ key: "open", label: "Open now", value: t.open ?? 0, hint: "Assigned to me" },
-		{ key: "completed", label: "Completed", value: t.completed_recently ?? 0, hint: `In the last ${data.value.recent_days} days` },
+		{ key: "overdue", label: __("Overdue"), value: t.overdue ?? 0, hint: __("Past the expected end date") },
+		{ key: "due_soon", label: __("Due soon"), value: t.due_soon ?? 0, hint: __("In the next {0} days", [data.value.due_soon_days]) },
+		{ key: "open", label: __("Open now"), value: t.open ?? 0, hint: __("Assigned to me") },
+		{ key: "completed", label: __("Completed"), value: t.completed_recently ?? 0, hint: __("In the last {0} days", [data.value.recent_days]) },
 	]
 })
 
@@ -93,7 +94,7 @@ async function load() {
 		data.value = await call(`${spaConfig.api}.get_task_dashboard`)
 		error.value = ""
 	} catch (e) {
-		error.value = e?.messages?.[0] || e?.message || "Could not load your Tasks"
+		error.value = e?.messages?.[0] || e?.message || __("Could not load your Tasks")
 	} finally {
 		loading.value = false
 	}
