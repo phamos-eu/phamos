@@ -31,7 +31,10 @@
 						@dragstart="onDragStart(issue, $event)"
 						@click="emit('select', issue.name)"
 					>
-						<div class="mb-1 text-[11px] font-semibold text-gray-500 dark:text-gray-400">{{ issue.name }}</div>
+						<div class="mb-1 flex items-center justify-between gap-1 text-[11px] font-semibold text-gray-500 dark:text-gray-400">
+							{{ issue.name }}
+							<IssueChatIndicator :issue-name="issue.name" :state="chatStates[issue.name]" @open="emit('select', $event)" />
+						</div>
 						<div class="mb-1 text-sm font-medium leading-snug text-gray-900 dark:text-gray-100">
 							{{ issue.subject }}
 						</div>
@@ -50,7 +53,9 @@
 </template>
 
 <script setup>
-import { computed } from "vue"
+import { computed, toRef } from "vue"
+import IssueChatIndicator from "@spa/components/IssueChatIndicator.vue"
+import { useIssueChatStates } from "@spa/composables/useIssueChatStates.js"
 
 const COLUMNS = ["Open", "Replied", "On Hold", "Resolved", "Closed"]
 
@@ -60,6 +65,7 @@ const props = defineProps({
 })
 
 const emit = defineEmits(["select", "status-change"])
+const chatStates = useIssueChatStates(toRef(props, "issues"))
 
 const columns = COLUMNS
 
