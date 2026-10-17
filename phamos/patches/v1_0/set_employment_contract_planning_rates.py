@@ -6,17 +6,20 @@ Only touches rows without a rate, so it is safe to run twice.
 """
 
 import frappe
+from frappe.query_builder.functions import IfNull
 from frappe.utils import flt
 
 from phamos.phamos.doctype.employment_contract.employment_contract import get_planning_rate
 
 
 def execute():
-	for row in frappe.get_all(
-		"Employment Contract",
-		filters={"conversion_rate": ("in", (0, None))},
-		fields=["name", "company", "currency", "effective_from", "monthly_gross"],
-	):
+	contract = frappe.qb.DocType("Employment Contract")
+	rows = (
+		frappe.qb.from_(contract)
+		.select(contract.name, contract.company, contract.currency, contract.effective_from, contract.monthly_gross)
+		.where(IfNull(contract.conversion_rate, 0) == 0)
+	).run(as_dict=True)
+	for row in rows:
 		company_currency = frappe.get_cached_value("Company", row.company, "default_currency")
 		currency = row.currency or company_currency
 		rate = 1 if currency == company_currency else get_planning_rate(currency, company_currency, row.effective_from)

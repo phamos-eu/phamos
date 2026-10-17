@@ -209,7 +209,12 @@ class TestEmploymentContract(FrappeTestCase):
 		self.assertAlmostEqual(doc.base_monthly_gross, 2250)
 
 		# A newer daily rate must not move an existing contract's numbers.
-		self.exchange_rate(foreign, company_currency, "2030-03-01", 1.1)
+		frappe.db.set_value(
+			"Currency Exchange",
+			{"date": "2030-03-01", "from_currency": foreign, "to_currency": company_currency},
+			"exchange_rate",
+			1.1,
+		)
 		doc.save()
 		self.assertAlmostEqual(doc.conversion_rate, 0.9)
 
