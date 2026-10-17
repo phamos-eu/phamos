@@ -1,15 +1,15 @@
 import { onBeforeUnmount, onMounted, ref, unref, watch } from "vue"
 import { call } from "frappe-ui"
 import { issueChatStore } from "@spa/issueChatStore.js"
-import { useUserRealtime } from "@spa/composables/useUserRealtime.js"
+import { useRavenUnreadEvents } from "@spa/composables/useRavenUnreadEvents.js"
 import spaConfig from "@/config"
 
 /**
  * Chat state per Issue for a list (#1617): { [name]: { channel_id, is_member, archived, unread,
  * unread_threads } },
  * only for Issues that have a chat. One call per list; reloads when the listed Issues change,
- * when a chat was read or changed (issueChatStore.version), when Raven reports a new thread reply
- * for the user (#1623), and when the window gets focus again.
+ * when a chat was read or changed (issueChatStore.version), when Raven reports new unread
+ * messages or thread replies (#1618, #1623), and when the window gets focus again.
  * Empty when the Issue chat is off.
  * @param {import("vue").Ref<Array>|Array} issues
  */
@@ -45,7 +45,7 @@ export function useIssueChatStates(issues) {
 
 	watch(() => names().join("|"), schedule, { immediate: true })
 	watch(() => issueChatStore.version, schedule)
-	useUserRealtime("raven:unread_thread_count_updated", schedule)
+	useRavenUnreadEvents(schedule)
 	onMounted(() => window.addEventListener("focus", schedule))
 	onBeforeUnmount(() => {
 		clearTimeout(timer)

@@ -451,6 +451,105 @@ def get_chat_states(doctype, names):
 	return states
 
 
+def get_unread_chats(doctype="Issue", limit=5):
+	"""The record chats the session user is in with unread messages or thread replies, newest
+	activity first (#1618): {"total": n, "chats": [{name, subject, unread, unread_threads,
+	last_sender, last_activity, first_unread, first_unread_thread}]}. Only records the user may
+	read; archived chats (closed Issues) are left out."""
+	_require_chat_doctype(doctype)
+	empty = {"total": 0, "chats": []}
+	raven_user = _raven_user(frappe.session.user)
+	if not is_enabled() or not raven_user:
+		return empty
+	member_of = frappe.get_all(
+		"Raven Channel Member", filters={"user_id": raven_user}, pluck="channel_id", limit_page_length=0
+	)
+	if not member_of:
+		return empty
+	channels = frappe.get_all(
+		"Raven Channel",
+		filters={
+			"name": ("in", member_of),
+			"linked_doctype": doctype,
+			"is_archived": 0,
+			"is_thread": 0,
+			"is_direct_message": 0,
+		},
+		fields=["name", "linked_document"],
+		limit_page_length=0,
+	)
+	if not channels:
+		return empty
+	ids = [c.name for c in channels]
+	unread = _unread_counts(ids)
+	unread_threads = _unread_thread_counts(ids)
+	pending = [c for c in channels if unread.get(c.name) or unread_threads.get(c.name)]
+	if not pending:
+		return empty
+	readable = set(
+		frappe.get_list(
+			doctype,
+			filters={"name": ("in", [c.linked_document for c in pending])},
+			pluck="name",
+			limit_page_length=0,
+		)
+	)
+	pending = [c for c in pending if c.linked_document in readable]
+	title_field = "subject" if frappe.get_meta(doctype).has_field("subject") else "name"
+	titles = dict(
+		frappe.get_all(
+			doctype,
+			filters={"name": ("in", [c.linked_document for c in pending])},
+			fields=["name", title_field],
+			as_list=True,
+			limit_page_length=0,
+		)
+	) if pending else {}
+
+	chats = []
+	for c in pending:
+		chat = {
+			"name": c.linked_document,
+			"subject": titles.get(c.linked_document) or c.linked_document,
+			"unread": unread.get(c.name, 0),
+			"unread_threads": unread_threads.get(c.name, 0),
+			"last_sender": "",
+			"last_activity": None,
+			"first_unread": None,
+			"first_unread_thread": None,
+		}
+		if chat["unread"]:
+			chat["first_unread"] = _first_unread_message(c.name)
+			last = frappe.get_all(
+				"Raven Message",
+				filters={
+					"channel_id": c.name,
+					"message_type": ("!=", "System"),
+					"owner": ("!=", frappe.session.user),
+				},
+				fields=["owner", "creation"],
+				order_by="creation desc",
+				limit=1,
+			)
+			if last:
+				chat["last_sender"] = _display_name(last[0].owner)
+				chat["last_activity"] = last[0].creation
+		threads = _unread_threads(c.name, limit=1) if chat["unread_threads"] else []
+		if threads:
+			if not chat["first_unread"]:
+				chat["first_unread_thread"] = threads[0]["thread_id"]
+			last_reply = frappe.db.get_value(
+				"Raven Message",
+				{"channel_id": threads[0]["thread_id"], "message_type": ("!=", "System")},
+				"max(creation)",
+			)
+			if last_reply and (not chat["last_activity"] or last_reply > chat["last_activity"]):
+				chat["last_activity"] = last_reply
+				chat["last_sender"] = threads[0]["last_sender"] or chat["last_sender"]
+		chats.append(chat)
+	chats.sort(key=lambda chat: chat["last_activity"] or "", reverse=True)
+	return {"total": len(chats), "chats": chats[: int(limit or 5)]}
+
 
 # --- Hooks -----------------------------------------------------------------------------------
 
