@@ -84,6 +84,12 @@ class AccountingReceipt(Document):
 		from phamos.accounting.library import learn_from_receipt
 
 		learn_from_receipt(self)
+		if self.status == "Do Not Pay" and self.has_value_changed("status"):
+			from phamos.accounting.branching import cancel_payment_request
+
+			cancelled = cancel_payment_request(self)
+			if cancelled:
+				frappe.msgprint(_("Payment Request {0} was cancelled.").format(cancelled), alert=True)
 
 	@frappe.whitelist()
 	def make_purchase_invoice(self):

@@ -35,6 +35,7 @@
   "supplier_tax_id",
   "supplier_iban",
   "purchase_invoice",
+  "payment_request",
   "is_return",
   "return_against",
   "items_section",
@@ -518,11 +519,20 @@
    "read_only": 1,
    "no_copy": 1,
    "description": "Text the AI read from the PDF. Kept so later runs and corrections do not need to read the PDF again."
+  },
+  {
+   "fieldname": "payment_request",
+   "fieldtype": "Link",
+   "label": "Payment Request",
+   "options": "Payment Request",
+   "read_only": 1,
+   "no_copy": 1,
+   "description": "Created when the receipt is approved to pay."
   }
  ],
  "index_web_pages_for_search": 1,
  "links": [],
- "modified": "2026-10-16 23:00:00.000000",
+ "modified": "2026-10-17 16:00:00.000000",
  "modified_by": "Administrator",
  "module": "Phamos",
  "name": "Accounting Receipt",

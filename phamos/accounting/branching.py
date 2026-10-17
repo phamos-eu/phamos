@@ -146,3 +146,96 @@ def _attach_pdf(receipt, pi):
 			"attached_to_name": pi.name,
 		}
 	).insert(ignore_permissions=True)
+
+
+# --- Payment Request ----------------------------------------------------------------------
+
+OPEN_PAYMENT_REQUEST_STATUSES = ("Draft", "Initiated", "Requested")
+
+
+def company_bank_accounts(company):
+	"""The company's own bank accounts a receipt can be paid from."""
+	return frappe.get_all(
+		"Bank Account",
+		filters={"is_company_account": 1, "company": company, "disabled": 0},
+		fields=["name", "account_name", "bank", "account", "iban", "is_default"],
+		order_by="is_default desc, account_name asc",
+	)
+
+
+def supplier_bank_account(supplier):
+	"""The supplier's bank account ERPNext puts on the Payment Request (the creditor's IBAN)."""
+	from erpnext.accounts.doctype.bank_account.bank_account import get_party_bank_account
+
+	return get_party_bank_account("Supplier", supplier) if supplier else None
+
+
+def make_payment_request(receipt, mode_of_payment=None, bank_account=None):
+	"""Submitted outward Payment Request for the receipt's submitted Purchase Invoice.
+
+	The paying company account and the due date are kept on the receipt and repeated in
+	the request's subject and message, because a Payment Request has no fields for them.
+	"""
+	from erpnext.accounts.doctype.payment_request.payment_request import make_payment_request as erpnext_make
+
+	from phamos.phamos.doctype.accounting_receipt.accounting_receipt import submitted_purchase_invoice
+
+	pi_name = submitted_purchase_invoice(receipt)
+	if not pi_name:
+		frappe.throw(_("A Payment Request needs a submitted Purchase Invoice."))
+	existing = open_payment_request(receipt)
+	if existing:
+		frappe.throw(_("This receipt already has Payment Request {0}.").format(existing))
+	pi = frappe.get_doc("Purchase Invoice", pi_name)
+	if flt(pi.outstanding_amount) <= 0:
+		frappe.throw(_("Purchase Invoice {0} has nothing left to pay.").format(pi.name))
+
+	pr = erpnext_make(
+		dt="Purchase Invoice",
+		dn=pi.name,
+		party_type="Supplier",
+		party=pi.supplier,
+		party_name=pi.supplier_name,
+		mode_of_payment=mode_of_payment,
+		mute_email=1,
+		submit_doc=1,
+		return_doc=1,
+	)
+	pay_from = frappe.db.get_value("Bank Account", bank_account, ["account_name", "iban"], as_dict=True) if bank_account else None
+	due = frappe.format(receipt.due_date, {"fieldtype": "Date"}) if receipt.due_date else _("no due date")
+	subject = _("Pay {0} {1} by {2}").format(pi.supplier_name, receipt.supplier_reference or pi.name, due)
+	lines = [
+		subject,
+		_("Receipt: {0}").format(receipt.name),
+		_("Purchase Invoice: {0}").format(pi.name),
+	]
+	if pay_from:
+		lines.append(_("Pay from: {0} {1}").format(pay_from.account_name, pay_from.iban or ""))
+	if receipt.payment_reference:
+		lines.append(_("Payment reference: {0}").format(receipt.payment_reference))
+	pr.db_set({"subject": subject[:140], "message": "\n".join(lines)}, update_modified=False)
+	receipt.db_set("payment_request", pr.name)
+	return pr
+
+
+def open_payment_request(receipt):
+	"""The receipt's Payment Request while it is still open (not paid, not cancelled)."""
+	name = receipt.get("payment_request")
+	if name and frappe.db.get_value("Payment Request", name, "status") in OPEN_PAYMENT_REQUEST_STATUSES:
+		return name
+	return None
+
+
+def cancel_payment_request(receipt):
+	"""Cancel the receipt's open Payment Request (when it is not paid after all). Returns its name."""
+	name = open_payment_request(receipt)
+	if not name:
+		return None
+	pr = frappe.get_doc("Payment Request", name)
+	pr.flags.ignore_permissions = True
+	if pr.docstatus == 1:
+		pr.cancel()
+	elif pr.docstatus == 0:
+		pr.delete(ignore_permissions=True)
+		receipt.db_set("payment_request", None)
+	return name

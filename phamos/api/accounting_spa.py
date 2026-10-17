@@ -553,6 +553,10 @@ def get_receipt(name):
 			"purchase_invoice": doc.purchase_invoice,
 			"purchase_invoice_status": frappe.db.get_value("Purchase Invoice", doc.purchase_invoice, "status") if doc.purchase_invoice else None,
 			"purchase_invoice_docstatus": frappe.db.get_value("Purchase Invoice", doc.purchase_invoice, "docstatus") if doc.purchase_invoice else None,
+			"payment_request": doc.payment_request,
+			"payment_request_status": frappe.db.get_value("Payment Request", doc.payment_request, "status") if doc.payment_request else None,
+			"mode_of_payment": doc.mode_of_payment,
+			"bank_account": doc.bank_account,
 			"items": [
 				{
 					"name": i.name,

@@ -47,6 +47,7 @@
 			:attachment-url="detail.receipt.value.attachment || ''"
 			@applied="detail.refresh"
 		/>
+		<ApproveDialog v-if="detail.receipt.value && showApprove" v-model="showApprove" :receipt="detail.receipt.value" @approved="onApproved" />
 	</div>
 </template>
 
@@ -54,6 +55,7 @@
 import { computed, onBeforeUnmount, onMounted, ref, watch } from "vue"
 import { useRouter } from "vue-router"
 import { call, toast } from "frappe-ui"
+import ApproveDialog from "../components/ApproveDialog.vue"
 import ExtractDiffDialog from "../components/ExtractDiffDialog.vue"
 import ReceiptDetailPanel from "../components/ReceiptDetailPanel.vue"
 import { useReceiptDetail } from "../composables/useReceiptDetail"
@@ -112,9 +114,25 @@ const approveHint = computed(() => {
 	return "Create and submit the Purchase Invoice first"
 })
 
-function approve() {
-	if (canApprove.value) return decide("Approved to Pay", "Approved to pay")
-	toast({ title: approveHint.value, icon: "alert-triangle", iconClasses: "text-ink-amber-3" })
+const showApprove = ref(false)
+
+async function approve() {
+	if (!canApprove.value) {
+		toast({ title: approveHint.value, icon: "alert-triangle", iconClasses: "text-ink-amber-3" })
+		return
+	}
+	await flushEdits()
+	showApprove.value = true
+}
+
+async function onApproved(res) {
+	detail.setReceipt(res.receipt)
+	toast({
+		title: res.payment_request ? `Approved · Payment Request ${res.payment_request}` : "Approved to pay",
+		icon: "check-circle",
+		iconClasses: "text-ink-green-3",
+	})
+	await next()
 }
 
 async function decide(status, label) {
