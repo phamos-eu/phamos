@@ -231,3 +231,29 @@ def update_contract_statuses():
 		status = compute_status(1, contract.effective_from, contract.valid_until)
 		if status != contract.status:
 			frappe.db.set_value("Employment Contract", contract.name, "status", status, update_modified=False)
+
+
+HISTORY_FIELDS = (
+	"name",
+	"docstatus",
+	"status",
+	"contract_type",
+	"effective_from",
+	"valid_until",
+	"fte_percentage",
+	"weekly_hours",
+	"monthly_gross",
+	"currency",
+)
+
+
+@frappe.whitelist()
+def get_contract_history(employee):
+	"""All draft and submitted contracts of one employee, newest first."""
+	frappe.has_permission("Employment Contract", "read", throw=True)
+	return frappe.get_list(
+		"Employment Contract",
+		filters={"employee": employee, "docstatus": ("<", 2)},
+		fields=list(HISTORY_FIELDS),
+		order_by="effective_from desc, creation desc",
+	)

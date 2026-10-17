@@ -4,7 +4,7 @@
  "autoname": "format:EC-{employee}-{####}",
  "naming_rule": "Expression",
  "creation": "2026-10-17 12:00:00",
- "modified": "2026-10-17 12:00:00",
+ "modified": "2026-10-17 14:00:00",
  "modified_by": "Administrator",
  "owner": "Administrator",
  "doctype": "DocType",
@@ -21,26 +21,24 @@
   "employee",
   "employee_name",
   "company",
-  "column_break_type",
   "contract_type",
-  "status",
-  "section_break_validity",
+  "column_break_header",
   "effective_from",
-  "column_break_validity",
   "valid_until",
   "superseded_by",
-  "section_break_fte",
+  "status",
+  "section_break_terms",
   "fte_percentage",
   "full_time_hours_per_week",
-  "column_break_fte",
   "weekly_hours",
-  "section_break_pay",
+  "column_break_terms",
   "currency",
   "yearly_gross_full_time",
   "monthly_amount",
-  "column_break_pay",
   "monthly_gross",
   "expense_account",
+  "section_break_history",
+  "contract_history",
   "section_break_notes",
   "notes",
   "amended_from"
@@ -74,10 +72,6 @@
    "fetch_if_empty": 1
   },
   {
-   "fieldname": "column_break_type",
-   "fieldtype": "Column Break"
-  },
-  {
    "fieldname": "contract_type",
    "fieldtype": "Select",
    "label": "Contract Type",
@@ -88,20 +82,8 @@
    "in_standard_filter": 1
   },
   {
-   "fieldname": "status",
-   "fieldtype": "Select",
-   "label": "Status",
-   "options": "Draft\nUpcoming\nActive\nExpired\nCancelled",
-   "default": "Draft",
-   "read_only": 1,
-   "no_copy": 1,
-   "in_list_view": 1,
-   "in_standard_filter": 1
-  },
-  {
-   "fieldname": "section_break_validity",
-   "fieldtype": "Section Break",
-   "label": "Validity"
+   "fieldname": "column_break_header",
+   "fieldtype": "Column Break"
   },
   {
    "fieldname": "effective_from",
@@ -109,10 +91,6 @@
    "label": "Effective From",
    "reqd": 1,
    "in_list_view": 1
-  },
-  {
-   "fieldname": "column_break_validity",
-   "fieldtype": "Column Break"
   },
   {
    "fieldname": "valid_until",
@@ -130,9 +108,21 @@
    "depends_on": "superseded_by"
   },
   {
-   "fieldname": "section_break_fte",
+   "fieldname": "status",
+   "fieldtype": "Select",
+   "label": "Status",
+   "options": "Draft\nUpcoming\nActive\nExpired\nCancelled",
+   "default": "Draft",
+   "read_only": 1,
+   "no_copy": 1,
+   "in_list_view": 1,
+   "in_standard_filter": 1,
+   "hidden": 1
+  },
+  {
+   "fieldname": "section_break_terms",
    "fieldtype": "Section Break",
-   "label": "Working Time"
+   "label": "Working Time & Pay"
   },
   {
    "fieldname": "fte_percentage",
@@ -149,10 +139,6 @@
    "reqd": 1
   },
   {
-   "fieldname": "column_break_fte",
-   "fieldtype": "Column Break"
-  },
-  {
    "fieldname": "weekly_hours",
    "fieldtype": "Float",
    "label": "Weekly Hours",
@@ -160,9 +146,8 @@
    "description": "FTE % × full-time hours per week"
   },
   {
-   "fieldname": "section_break_pay",
-   "fieldtype": "Section Break",
-   "label": "Pay"
+   "fieldname": "column_break_terms",
+   "fieldtype": "Column Break"
   },
   {
    "fieldname": "currency",
@@ -176,10 +161,11 @@
   {
    "fieldname": "yearly_gross_full_time",
    "fieldtype": "Currency",
-   "label": "Yearly Gross at 100 % FTE",
+   "label": "Yearly Gross (100 %)",
    "options": "currency",
    "depends_on": "eval:doc.contract_type=='Employed'",
-   "mandatory_depends_on": "eval:doc.contract_type=='Employed'"
+   "mandatory_depends_on": "eval:doc.contract_type=='Employed'",
+   "description": "What the person would earn at full time. The monthly gross is scaled by FTE %."
   },
   {
    "fieldname": "monthly_amount",
@@ -188,10 +174,6 @@
    "options": "currency",
    "depends_on": "eval:doc.contract_type=='External'",
    "mandatory_depends_on": "eval:doc.contract_type=='External'"
-  },
-  {
-   "fieldname": "column_break_pay",
-   "fieldtype": "Column Break"
   },
   {
    "fieldname": "monthly_gross",
@@ -208,8 +190,22 @@
    "options": "Account"
   },
   {
+   "fieldname": "section_break_history",
+   "fieldtype": "Section Break",
+   "label": "Contract History",
+   "depends_on": "eval:!doc.__islocal"
+  },
+  {
+   "fieldname": "contract_history",
+   "fieldtype": "HTML",
+   "label": "Contract History"
+  },
+  {
    "fieldname": "section_break_notes",
-   "fieldtype": "Section Break"
+   "fieldtype": "Section Break",
+   "label": "Notes",
+   "collapsible": 1,
+   "collapsible_depends_on": "notes"
   },
   {
    "fieldname": "notes",
