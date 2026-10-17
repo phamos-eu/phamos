@@ -59,6 +59,7 @@
 									:ref="(el) => setCardRef(todo.name, el)"
 									draggable="true"
 									tabindex="0"
+									data-list-item
 									class="group flex items-start gap-2 rounded-md border border-outline-gray-1 bg-surface-gray-1 px-2.5 py-2 text-sm outline-none focus:border-outline-gray-4 focus:bg-surface-gray-2"
 									:class="busy[todo.name] ? 'opacity-50' : 'cursor-grab'"
 									:aria-label="`${todo.summary}. Press 1 to 4 to move, Enter to open.`"
