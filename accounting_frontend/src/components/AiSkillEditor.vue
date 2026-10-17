@@ -4,7 +4,7 @@
 		<div class="flex flex-wrap items-center gap-3">
 			<input v-model="draft.skill_name" :disabled="!canWrite" class="input min-w-0 flex-1 text-base font-medium" />
 			<label class="flex items-center gap-2 text-ink-gray-7">
-				<input v-model="draft.enabled" type="checkbox" :disabled="!canWrite" />
+				<input v-model="draft.enabled" type="checkbox" :true-value="1" :false-value="0" :disabled="!canWrite" />
 				Enabled
 			</label>
 			<button type="button" class="btn-primary" :disabled="!canWrite || !dirty || saving" @click="save">
