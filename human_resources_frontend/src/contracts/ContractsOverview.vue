@@ -27,7 +27,7 @@
 					<StatCard
 						label="Monthly personnel cost"
 						:value="data.monthly_cost.length ? formatMoney(data.monthly_cost[0].amount, data.monthly_cost[0].currency) : '—'"
-						hint="Gross of contracts in force today"
+						hint="Gross in company currency at each contract's planning rate"
 						:lines="data.monthly_cost.slice(1).map((c) => `+ ${formatMoney(c.amount, c.currency)}`)"
 					/>
 					<StatCard

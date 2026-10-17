@@ -82,8 +82,30 @@
 					/>
 				</div>
 
+				<div class="grid grid-cols-1 gap-3 sm:grid-cols-3">
+					<div>
+						<label class="mb-1.5 block text-xs text-ink-gray-5">Currency</label>
+						<FrappeLink doctype="Currency" v-model="form.currency" placeholder="Currency" />
+					</div>
+					<FormControl
+						v-if="foreignCurrency"
+						v-model="form.conversion_rate"
+						:label="`Planning rate: 1 ${form.currency} in ${form.company_currency}`"
+						type="number"
+						size="sm"
+						step="any"
+						required
+					/>
+					<p v-if="foreignCurrency" class="self-end pb-1.5 text-xs text-ink-gray-5">
+						Fixed for this contract, so forecasts don't move with daily rates.
+					</p>
+				</div>
+
 				<div class="rounded-md bg-surface-gray-2 px-3 py-2 text-sm text-ink-gray-8 tabular-nums">
 					{{ formatHours(weeklyHours) }} per week · {{ formatMoney(monthlyGross, form.currency) }} per month
+					<span v-if="foreignCurrency">
+						≈ {{ formatMoney(monthlyGross * Number(form.conversion_rate || 0), form.company_currency) }}
+					</span>
 				</div>
 
 				<div class="grid grid-cols-1 gap-3 sm:grid-cols-2">
@@ -127,6 +149,8 @@ const TERM_FIELDS = [
 	"employee",
 	"company",
 	"currency",
+	"company_currency",
+	"conversion_rate",
 	"contract_type",
 	"fte_percentage",
 	"full_time_hours_per_week",
@@ -141,6 +165,8 @@ const saving = ref("")
 const error = ref("")
 const existingHint = ref("")
 const formEl = ref(null)
+// True while the form is being filled from props, so the currency watcher doesn't replace a stored rate.
+let resetting = false
 
 const dialogTitle = computed(
 	() => ({ new: "New employment contract", change: "Record change", edit: "Edit draft contract" })[props.mode]
@@ -149,6 +175,40 @@ const dialogTitle = computed(
 const weeklyHours = computed(
 	() => (Number(form.fte_percentage || 0) * Number(form.full_time_hours_per_week || 0)) / 100
 )
+const foreignCurrency = computed(
+	() => Boolean(form.currency && form.company_currency && form.currency !== form.company_currency)
+)
+
+// Default planning rate from Currency Exchange: replaced when the currency changes,
+// filled for a new date only while empty, so a typed rate is kept.
+async function loadPlanningRate(replace) {
+	if (!form.company || !form.currency) return
+	if (!replace && Number(form.conversion_rate)) return
+	try {
+		const result = await call(
+			"phamos.phamos.doctype.employment_contract.employment_contract.get_planning_exchange_rate",
+			{ currency: form.currency, company: form.company, on_date: form.effective_from || null }
+		)
+		form.company_currency = result.company_currency
+		form.conversion_rate = result.rate || ""
+	} catch (e) {
+		error.value = errorMessage(e, "Could not load the exchange rate")
+	}
+}
+
+watch(
+	() => form.currency,
+	(currency, previous) => {
+		if (props.modelValue && !resetting && currency !== previous) loadPlanningRate(true)
+	}
+)
+watch(
+	() => form.effective_from,
+	() => {
+		if (props.modelValue && !resetting && foreignCurrency.value) loadPlanningRate(false)
+	}
+)
+
 const monthlyGross = computed(() =>
 	form.contract_type === "External"
 		? Number(form.monthly_amount || 0)
@@ -156,11 +216,14 @@ const monthlyGross = computed(() =>
 )
 
 function reset() {
+	resetting = true
 	for (const key of Object.keys(form)) delete form[key]
 	Object.assign(form, {
 		employee: props.employee || "",
 		company: "",
 		currency: "",
+		company_currency: "",
+		conversion_rate: "",
 		contract_type: "Employed",
 		effective_from: "",
 		valid_until: "",
@@ -182,6 +245,8 @@ function reset() {
 			const next = firstOfNextMonth()
 			form.effective_from = next > src.effective_from ? next : ""
 			form.notes = ""
+			// A new contract takes the planning rate of its own start date.
+			if (form.currency !== form.company_currency) form.conversion_rate = ""
 		}
 	}
 	error.value = ""
@@ -193,17 +258,19 @@ watch(
 	async (open) => {
 		if (!open) return
 		reset()
-		if (form.employee && props.mode === "new") await loadEmployeeDefaults(form.employee)
 		await nextTick()
+		resetting = false
 		const selector = props.mode === "new" ? "button, input" : 'input[type="date"]'
 		formEl.value?.querySelector(selector)?.focus()
+		if (form.employee && props.mode === "new") await loadEmployeeDefaults(form.employee)
+		if (foreignCurrency.value && !Number(form.conversion_rate)) await loadPlanningRate(false)
 	}
 )
 
 watch(
 	() => form.employee,
 	(employee, previous) => {
-		if (props.mode === "new" && employee && employee !== previous) loadEmployeeDefaults(employee)
+		if (props.mode === "new" && !resetting && employee && employee !== previous) loadEmployeeDefaults(employee)
 	}
 )
 
@@ -212,6 +279,7 @@ async function loadEmployeeDefaults(employee) {
 		const defaults = await call(`${CONTRACTS_API}.get_employee_defaults`, { employee })
 		form.company = defaults.company || ""
 		form.currency = defaults.currency || ""
+		form.company_currency = defaults.currency || ""
 		existingHint.value = defaults.latest
 			? `Already has contract ${defaults.latest.name}. Use "Record change" on it to change hours or pay.`
 			: ""

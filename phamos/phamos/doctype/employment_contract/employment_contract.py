@@ -32,6 +32,7 @@ class EmploymentContract(Document):
 		self.validate_dates()
 		self.validate_fte()
 		self.calculate_amounts()
+		self.set_company_currency_amounts()
 		self.validate_expense_account()
 		self.validate_no_overlap()
 		self.status = compute_status(self.docstatus, self.effective_from, self.valid_until)
@@ -84,6 +85,30 @@ class EmploymentContract(Document):
 				flt(self.yearly_gross_full_time) * flt(self.fte_percentage) / 100 / 12,
 				self.precision("monthly_gross"),
 			)
+
+	def set_company_currency_amounts(self):
+		"""Convert the monthly gross into company currency at the contract's planning rate.
+
+		The rate is filled from Currency Exchange on Effective From only while it is empty and
+		is never refreshed afterwards: forecasts add up base_monthly_gross, and they must not
+		move because a daily exchange rate did. A new rate comes with a new contract.
+		"""
+		self.company_currency = frappe.get_cached_value("Company", self.company, "default_currency")
+		if not self.currency:
+			self.currency = self.company_currency
+		if self.currency == self.company_currency:
+			self.conversion_rate = 1
+		elif flt(self.conversion_rate) <= 0:
+			self.conversion_rate = get_planning_rate(self.currency, self.company_currency, self.effective_from)
+			if not self.conversion_rate:
+				frappe.throw(
+					_("No exchange rate from {0} to {1} found for {2}. Enter the Planning Exchange Rate.").format(
+						self.currency, self.company_currency, frappe.format(self.effective_from, "Date")
+					)
+				)
+		self.base_monthly_gross = flt(
+			flt(self.monthly_gross) * flt(self.conversion_rate), self.precision("base_monthly_gross")
+		)
 
 	def validate_expense_account(self):
 		if not self.expense_account:
@@ -223,6 +248,26 @@ def close_contract(name, valid_until, superseded_by):
 		)
 
 
+def get_planning_rate(from_currency, to_currency, on_date):
+	"""Default planning rate: ERPNext's own lookup (Currency Exchange records first)."""
+	if from_currency == to_currency:
+		return 1
+	from erpnext.setup.utils import get_exchange_rate
+
+	return flt(get_exchange_rate(from_currency, to_currency, on_date))
+
+
+@frappe.whitelist()
+def get_planning_exchange_rate(currency, company, on_date=None):
+	"""Company currency and the default planning rate for a contract form or dialog."""
+	frappe.has_permission("Employment Contract", "read", throw=True)
+	company_currency = frappe.get_cached_value("Company", company, "default_currency")
+	return {
+		"company_currency": company_currency,
+		"rate": get_planning_rate(currency, company_currency, on_date or nowdate()) if currency else 1,
+	}
+
+
 def compute_status(docstatus, effective_from, valid_until, on_date=None):
 	if docstatus == 0:
 		return "Draft"
@@ -285,6 +330,8 @@ HISTORY_FIELDS = (
 	"weekly_hours",
 	"monthly_gross",
 	"currency",
+	"base_monthly_gross",
+	"company_currency",
 )
 
 

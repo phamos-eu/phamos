@@ -4,7 +4,7 @@
  "autoname": "format:EC-{employee}-{####}",
  "naming_rule": "Expression",
  "creation": "2026-10-17 12:00:00",
- "modified": "2026-10-17 16:00:00",
+ "modified": "2026-10-17 18:00:00",
  "modified_by": "Administrator",
  "owner": "Administrator",
  "doctype": "DocType",
@@ -34,9 +34,12 @@
   "weekly_hours",
   "column_break_terms",
   "currency",
+  "company_currency",
+  "conversion_rate",
   "yearly_gross_full_time",
   "monthly_amount",
   "monthly_gross",
+  "base_monthly_gross",
   "expense_account",
   "section_break_history",
   "contract_history",
@@ -170,6 +173,24 @@
    "fetch_if_empty": 1
   },
   {
+   "fieldname": "company_currency",
+   "fieldtype": "Link",
+   "label": "Company Currency",
+   "options": "Currency",
+   "read_only": 1,
+   "fetch_from": "company.default_currency",
+   "depends_on": "eval:doc.currency && doc.company_currency && doc.currency != doc.company_currency"
+  },
+  {
+   "fieldname": "conversion_rate",
+   "fieldtype": "Float",
+   "label": "Planning Exchange Rate",
+   "precision": "9",
+   "depends_on": "eval:doc.currency && doc.company_currency && doc.currency != doc.company_currency",
+   "mandatory_depends_on": "eval:doc.currency && doc.company_currency && doc.currency != doc.company_currency",
+   "description": "1 unit of the contract currency in company currency. Taken from Currency Exchange on Effective From and then kept fixed, so forecasts do not move with daily rates."
+  },
+  {
    "fieldname": "yearly_gross_full_time",
    "fieldtype": "Currency",
    "label": "Yearly Gross (100 %)",
@@ -193,6 +214,15 @@
    "options": "currency",
    "read_only": 1,
    "description": "Employed: yearly gross × FTE % ÷ 12. External: the agreed monthly amount."
+  },
+  {
+   "fieldname": "base_monthly_gross",
+   "fieldtype": "Currency",
+   "label": "Monthly Gross (Company Currency)",
+   "options": "company_currency",
+   "read_only": 1,
+   "depends_on": "eval:doc.currency && doc.company_currency && doc.currency != doc.company_currency",
+   "description": "Monthly gross × planning exchange rate. Personnel cost forecasts add up this amount."
   },
   {
    "fieldname": "expense_account",

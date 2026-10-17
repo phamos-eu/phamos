@@ -175,3 +175,67 @@ class TestEmploymentContract(FrappeTestCase):
 		self.assertEqual(str(open_contract.valid_until), "2025-09-30")
 		self.assertEqual(open_contract.status, "Expired")
 		self.assertIsNone(frappe.db.get_value("Employment Contract", later.name, "valid_until"))
+
+	# Planning exchange rate (#1601)
+
+	def foreign_currency(self):
+		company_currency = frappe.get_cached_value("Company", self.company, "default_currency")
+		return "USD" if company_currency != "USD" else "EUR", company_currency
+
+	def exchange_rate(self, from_currency, to_currency, date, rate):
+		frappe.get_doc(
+			{
+				"doctype": "Currency Exchange",
+				"date": date,
+				"from_currency": from_currency,
+				"to_currency": to_currency,
+				"exchange_rate": rate,
+				"for_buying": 1,
+				"for_selling": 1,
+			}
+		).insert(ignore_permissions=True)
+
+	def test_company_currency_contract_has_rate_one(self):
+		doc = self.contract("2030-01-01", submit=False)
+		self.assertEqual(doc.conversion_rate, 1)
+		self.assertEqual(doc.base_monthly_gross, doc.monthly_gross)
+
+	def test_foreign_currency_takes_rate_from_currency_exchange_and_keeps_it(self):
+		foreign, company_currency = self.foreign_currency()
+		self.exchange_rate(foreign, company_currency, "2030-03-01", 0.9)
+		doc = self.contract("2030-03-01", submit=False, currency=foreign)
+		self.assertEqual(doc.company_currency, company_currency)
+		self.assertAlmostEqual(doc.conversion_rate, 0.9)
+		self.assertAlmostEqual(doc.base_monthly_gross, 2250)
+
+		# A newer daily rate must not move an existing contract's numbers.
+		frappe.db.set_value(
+			"Currency Exchange",
+			{"date": "2030-03-01", "from_currency": foreign, "to_currency": company_currency},
+			"exchange_rate",
+			1.1,
+		)
+		doc.save()
+		self.assertAlmostEqual(doc.conversion_rate, 0.9)
+
+	def test_typed_planning_rate_is_kept(self):
+		foreign, company_currency = self.foreign_currency()
+		self.exchange_rate(foreign, company_currency, "2030-03-01", 0.9)
+		doc = self.contract("2030-03-01", submit=False, currency=foreign, conversion_rate=0.8)
+		self.assertAlmostEqual(doc.conversion_rate, 0.8)
+		self.assertAlmostEqual(doc.base_monthly_gross, 2000)
+
+	def test_missing_rate_is_rejected(self):
+		foreign, _ = self.foreign_currency()
+		frappe.db.set_single_value("Currency Exchange Settings", "disabled", 1)  # no online lookup in tests
+		self.assertRaises(frappe.ValidationError, self.contract, "2031-07-01", submit=False, currency=foreign)
+
+	def test_patch_fills_rates_of_existing_contracts(self):
+		from phamos.patches.v1_0.set_employment_contract_planning_rates import execute
+
+		doc = self.contract("2030-01-01")
+		frappe.db.set_value("Employment Contract", doc.name, {"conversion_rate": 0, "base_monthly_gross": 0})
+		execute()
+		doc.reload()
+		self.assertEqual(doc.conversion_rate, 1)
+		self.assertEqual(doc.base_monthly_gross, 2500)
