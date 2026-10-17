@@ -39,9 +39,12 @@ describe("check-in summary", () => {
 
 	it("describes the last log, with the day when it is from an earlier day", () => {
 		expect(caption(checkedIn, time, day)).toBe("in since 13:00")
-		expect(caption({ ...checkedIn, last: { log_type: "OUT", time: "2026-10-16 12:00:00" } }, time, day)).toBe(
+		expect(caption({ ...checkedIn, last: { name: "A1", log_type: "OUT", time: "2026-10-16 12:00:00" } }, time, day)).toBe(
 			"out since 12:00"
 		)
+		// A check-out from an earlier day names the day, too.
+		const earlierOut = { ...checkedIn, today: { logs: [] }, last: { name: "Z", log_type: "OUT", time: "2026-10-15 17:46:00" } }
+		expect(caption(earlierOut, time, day)).toBe("out since Thu 17:46")
 		expect(caption({ ...checkedIn, stale_in: true }, time, day)).toBe("in since Thu 13:00")
 		expect(caption({ last: null }, time, day)).toBe("not checked in yet")
 	})
