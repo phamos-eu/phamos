@@ -13,7 +13,7 @@ import { ensureFocusLoaded } from "./focusStore.js"
 
 const router = createSpaRouter({
 	config: spaConfig,
-	rootRedirect: "/todos",
+	rootRedirect: "/todos/plan", // My Day answers "what do I do now" (#1602)
 	routes: [
 		{ path: "/todos", name: "Todos", component: TodosHome },
 		{ path: "/todos/list", name: "TodosList", component: TodosInbox },

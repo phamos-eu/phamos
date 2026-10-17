@@ -5,7 +5,6 @@
 				<p class="text-sm text-ink-gray-6" aria-live="polite">{{ headline }}</p>
 				<div class="flex items-center gap-2">
 					<TabButtons v-model="period" :buttons="PERIOD_BUTTONS" />
-					<Button variant="subtle" @click="router.push({ name: 'CheckinsList' })">All check-ins</Button>
 				</div>
 			</div>
 
@@ -52,7 +51,6 @@
 
 <script setup>
 import { computed, onBeforeUnmount, onMounted, ref, watch } from "vue"
-import { useRouter } from "vue-router"
 import { call, TabButtons } from "frappe-ui"
 import PeriodBars from "@spa/components/dashboard/PeriodBars.vue"
 import StatCard from "@spa/components/dashboard/StatCard.vue"
@@ -64,7 +62,6 @@ import spaConfig from "@/config"
 const PERIOD_KEY = "personal-checkins-period"
 const PERIOD_BUTTONS = [7, 30, 90].map((value) => ({ label: `${value} days`, value }))
 
-const router = useRouter()
 const data = ref(null)
 const error = ref("")
 const period = ref(readPeriod())

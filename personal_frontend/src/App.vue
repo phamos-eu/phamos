@@ -163,7 +163,7 @@ const BASE_ITEMS = [
 		children: [
 			{
 				name: "Checklists",
-				label: "Checklists",
+				label: "List",
 				icon: "list",
 				match: ["Checklists", "ChecklistDetail"],
 			},
@@ -171,13 +171,26 @@ const BASE_ITEMS = [
 	},
 ]
 
-const pageTitle = computed(() => {
-	if (route.name === "TodosFocus") return "Focus"
-	if (["Checkins", "CheckinsList"].includes(route.name)) return "My Check-ins"
-	if (route.name === "MyContract") return "My Contract"
-	if (["Todos", "TodosList", "TodoDetail", "TodosMatrix", "TodosPlan"].includes(route.name)) return "My ToDos"
-	if (["Tasks", "TasksGantt", "TaskDetail"].includes(route.name)) return "My Tasks"
-	if (["ChecklistsHome", "Checklists", "ChecklistDetail"].includes(route.name)) return "My Checklists"
-	return "My Issues"
-})
+// Section and page, so the title says where you are without looking at the sidebar.
+const PAGE_TITLES = {
+	TodosFocus: ["Focus"],
+	Todos: ["My ToDos", "Dashboard"],
+	TodosPlan: ["My ToDos", "My Day"],
+	TodosList: ["My ToDos", "List"],
+	TodoDetail: ["My ToDos", "List"],
+	TodosMatrix: ["My ToDos", "Matrix"],
+	Checkins: ["My Check-ins", "Dashboard"],
+	CheckinsList: ["My Check-ins", "List"],
+	MyContract: ["My Contract"],
+	Issues: ["My Issues", "Dashboard"],
+	IssuesList: ["My Issues", "List"],
+	IssueDetail: ["My Issues", "List"],
+	Tasks: ["My Tasks", "Dashboard"],
+	TasksGantt: ["My Tasks", "Gantt"],
+	TaskDetail: ["My Tasks", "Gantt"],
+	ChecklistsHome: ["My Checklists", "Dashboard"],
+	Checklists: ["My Checklists", "List"],
+	ChecklistDetail: ["My Checklists", "List"],
+}
+const pageTitle = computed(() => (PAGE_TITLES[route.name] || ["Personal Cockpit"]).join(" · "))
 </script>
