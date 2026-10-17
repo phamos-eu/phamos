@@ -1,5 +1,5 @@
 <template>
-	<div>
+	<div ref="root">
 		<Dropdown :options="groups" placement="right">
 			<Button size="sm" variant="solid" aria-label="Create something new">
 				<template #prefix><FeatherIcon name="plus" class="h-4 w-4" /></template>
@@ -35,6 +35,7 @@ import CreateIssueDialog from "@spa/components/CreateIssueDialog.vue"
 import CreateTaskDialog from "@spa/components/CreateTaskDialog.vue"
 import CreateTodoDialog from "@spa/components/CreateTodoDialog.vue"
 import { requestTimerStart, timer } from "@spa/timerStore.js"
+import { shortcuts } from "@/shortcutsStore.js"
 import { notify } from "@spa/utils/notify.js"
 import spaConfig from "@/config"
 import { checkin, checkInOrOut, checkinUsable } from "@/checkinStore.js"
@@ -48,6 +49,7 @@ const props = defineProps({
 
 const API = spaConfig.api
 const router = useRouter()
+const root = ref(null)
 const open = reactive({ todo: false, issue: false, task: false, checklist: false, focus: false, challenge: false })
 const formOptions = ref({ priorities: [], issue_types: [], shortlist_users: [], departments: [], projects: [] })
 let optionsLoaded = false
@@ -79,6 +81,7 @@ const groups = computed(() => {
 		{ group: "Work", items: work },
 		...(time.length ? [{ group: "Time", items: time }] : []),
 		{ group: "Focus", items: focus },
+		{ group: "Help", items: [{ label: "Keyboard shortcuts  ?", icon: "command", onClick: () => (shortcuts.open = true) }] },
 	]
 })
 
@@ -101,6 +104,16 @@ function onChallenge() {
 	notify.success("Target set")
 	router.push({ name: "Todos" })
 }
+
+// Ctrl/Cmd+B (#1603): open the menu with the first entry focused, as ArrowDown on its button does
+// (Headless UI's MenuButton opens on ArrowDown and moves focus into the menu).
+function openMenu() {
+	const button = root.value?.querySelector('[id^="headlessui-menu-button"]')
+	if (!button) return
+	button.focus()
+	button.dispatchEvent(new KeyboardEvent("keydown", { key: "ArrowDown", bubbles: true }))
+}
+defineExpose({ open: openMenu })
 
 watch(
 	() => open.issue || open.task,

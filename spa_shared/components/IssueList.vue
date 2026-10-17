@@ -10,7 +10,8 @@
 			v-for="issue in issues"
 			:key="issue.name"
 			type="button"
-			class="border-b border-outline-gray-1 text-left hover:bg-surface-gray-2"
+			data-list-item
+			class="border-b border-outline-gray-1 text-left hover:bg-surface-gray-2 focus:outline-none focus-visible:bg-surface-gray-3"
 			:class="[
 				alignWithFilters && !compact
 					? [ISSUE_LIST_FILTER_SUBGRID, 'py-3']
