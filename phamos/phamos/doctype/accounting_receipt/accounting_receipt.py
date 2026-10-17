@@ -15,6 +15,13 @@ SETTINGS_DOCTYPE = "phamos Settings"
 STATUSES_ADVANCED_BY_DATEV_SEND = ("Inbox", "Needs Decision", "Approved to Pay", "Do Not Pay")
 
 
+def submitted_purchase_invoice(doc):
+	"""The receipt's Purchase Invoice if it is submitted, else None."""
+	if doc.get("purchase_invoice") and frappe.db.get_value("Purchase Invoice", doc.purchase_invoice, "docstatus") == 1:
+		return doc.purchase_invoice
+	return None
+
+
 class AccountingReceipt(Document):
 	def before_insert(self):
 		self.sent_to_datev = 0
@@ -33,6 +40,7 @@ class AccountingReceipt(Document):
 			self.due_date = None
 		if self.status != "Cancelled":
 			self.cancel_reason = None
+		self.validate_approval()
 
 		company = self.company or get_default_company()
 		if not company or not self.currency:
@@ -55,6 +63,17 @@ class AccountingReceipt(Document):
 			self.conversion_rate = rate
 			if self.sum:
 				self.sum_in_company_currency = float(self.sum) * float(rate)
+
+	def validate_approval(self):
+		"""Approving to pay needs a submitted Purchase Invoice: that is what gets paid, and
+		ERPNext only creates Payment Requests against submitted invoices."""
+		if self.status != "Approved to Pay" or not self.has_value_changed("status"):
+			return
+		if not submitted_purchase_invoice(self):
+			frappe.throw(
+				_("Approve to pay needs a submitted Purchase Invoice. Create the Purchase Invoice and submit it first."),
+				title=_("No submitted Purchase Invoice"),
+			)
 
 	def before_save(self):
 		from phamos.accounting.library import mark_human_choices

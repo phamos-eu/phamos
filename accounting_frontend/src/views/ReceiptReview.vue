@@ -7,7 +7,7 @@
 			<button type="button" class="btn" :disabled="!position.previous" title="Previous (k)" @click="go(position.previous)">‹</button>
 			<button type="button" class="btn" :disabled="!position.next" title="Skip to next (j)" @click="go(position.next)">Skip ›</button>
 			<div class="ml-auto flex flex-wrap items-center gap-2">
-				<button type="button" class="btn" :disabled="!detail.receipt.value || busy" title="Approve to pay (a)" @click="decide('Approved to Pay', 'Approved to pay')">
+				<button type="button" class="btn" :disabled="!canApprove || busy" :title="approveHint" @click="approve">
 					Approve to pay
 				</button>
 				<button type="button" class="btn" :disabled="!detail.receipt.value || busy" title="Already paid, e.g. by card or direct debit (p)" @click="decide('Paid', 'Marked as paid')">
@@ -53,7 +53,7 @@
 <script setup>
 import { computed, onBeforeUnmount, onMounted, ref, watch } from "vue"
 import { useRouter } from "vue-router"
-import { call } from "frappe-ui"
+import { call, toast } from "frappe-ui"
 import ExtractDiffDialog from "../components/ExtractDiffDialog.vue"
 import ReceiptDetailPanel from "../components/ReceiptDetailPanel.vue"
 import { useReceiptDetail } from "../composables/useReceiptDetail"
@@ -103,6 +103,20 @@ async function next() {
 	else back()
 }
 
+// Approving to pay needs a submitted Purchase Invoice; the server enforces the same rule.
+const canApprove = computed(() => detail.receipt.value?.purchase_invoice_docstatus === 1)
+const approveHint = computed(() => {
+	const receipt = detail.receipt.value
+	if (canApprove.value) return "Approve to pay (a)"
+	if (receipt?.purchase_invoice) return "Submit the Purchase Invoice first"
+	return "Create and submit the Purchase Invoice first"
+})
+
+function approve() {
+	if (canApprove.value) return decide("Approved to Pay", "Approved to pay")
+	toast({ title: approveHint.value, icon: "alert-triangle", iconClasses: "text-ink-amber-3" })
+}
+
 async function decide(status, label) {
 	busy.value = true
 	try {
@@ -135,7 +149,7 @@ function onKey(event) {
 	const actions = {
 		j: () => go(position.value.next),
 		k: () => go(position.value.previous),
-		a: () => decide("Approved to Pay", "Approved to pay"),
+		a: approve,
 		p: () => decide("Paid", "Marked as paid"),
 		x: () => decide("Do Not Pay", "Marked: do not pay"),
 		d: () => sendAndNext(),
