@@ -1253,3 +1253,5 @@ Read the chat of this closed Issue (C),Den Chat dieser geschlossenen Anfrage les
 {0} unassigned {1}.,{0} hat die Zuweisung von {1} entfernt.
 {0} set the status to {1}.,{0} hat den Status auf {1} gesetzt.
 {0} converted this Issue to Task {1}.,{0} hat diese Anfrage in die Aufgabe {1} umgewandelt.
+About {0},Über {0}
+"Opens your Raven chat with {0} in a new window, with a link to {1}.","Öffnet Ihren Raven-Chat mit {0} in einem neuen Fenster, mit einem Link zu {1}."

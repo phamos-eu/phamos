@@ -6,7 +6,7 @@
 				class="mb-2 flex flex-shrink-0 items-center justify-end gap-2"
 			>
 				<DocSyncBanner :autosave="autosave" />
-				<DocViewers :viewers="viewers" />
+				<DocViewers :viewers="viewers" :document-name="issue.name" :api-prefix="API" :messageable="!!issue.chat_enabled" />
 				<IssueChatButton :issue-name="issue.name" :subject="issue.subject" :status="status" :api="API" />
 			</div>
 			<label class="mb-1.5 block flex-shrink-0 text-xs text-ink-gray-5">Description</label>
@@ -61,7 +61,7 @@
 			</button>
 			<div class="ml-auto flex flex-shrink-0 items-center gap-2 pl-3">
 				<DocSyncBanner :autosave="autosave" />
-				<DocViewers :viewers="viewers" />
+				<DocViewers :viewers="viewers" :document-name="issue.name" :api-prefix="API" :messageable="!!issue.chat_enabled" />
 				<IssueChatButton :issue-name="issue.name" :subject="issue.subject" :status="status" :api="API" />
 			</div>
 		</div>
@@ -141,6 +141,7 @@
 						:api-prefix="API"
 						:document-name="issue.name"
 						:readonly="isClosed"
+						:messageable="!!issue.chat_enabled"
 						method-name="set_assignees"
 						@updated="onAssigneesUpdated"
 					/>

@@ -513,6 +513,7 @@ def _serialize_issue_detail(doc):
 		"assignee_names": [_user_label(u) for u in assignees],
 		"assignee_images": _user_images(assignees),
 		"converted_task": _converted_task_for_issue(doc.name),
+		"chat_enabled": issue_chat.is_enabled(),
 		"desk_url": f"/app/issue/{doc.name}",
 	}
 
