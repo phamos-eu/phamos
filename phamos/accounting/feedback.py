@@ -20,7 +20,7 @@ import re
 
 import frappe
 from frappe import _
-from frappe.utils import cstr, flt, getdate, now_datetime
+from frappe.utils import cint, cstr, flt, getdate, now_datetime
 
 LEARNED_FIELDS = (
 	"supplier_reference", "posting_date", "due_date", "sum", "net_total", "total_taxes", "supplier",
@@ -68,9 +68,11 @@ def ai_user():
 	return frappe.db.get_single_value("phamos Settings", "ai_accountant_user")
 
 
-def collect(doc):
-	"""After a person saved a receipt: record corrections on its latest run and suggest rules."""
-	if not doc.get("ai_run") or frappe.session.user == ai_user():
+def collect(doc, user=None):
+	"""After a person saved a receipt: record corrections on its latest run and suggest rules.
+	`user` is who made the change (default: the session user)."""
+	user = user or frappe.session.user
+	if not doc.get("ai_run") or user == ai_user():
 		return None
 	run = frappe.get_doc("AI Agent Run", doc.ai_run)
 	if run.status != "Completed":
@@ -80,12 +82,12 @@ def collect(doc):
 	now = now_datetime()
 	for c in found:
 		old = previous.get(c["field"])
-		c["user"] = old["user"] if old and old.get("human_value") == c["human_value"] else frappe.session.user
+		c["user"] = old["user"] if old and old.get("human_value") == c["human_value"] else user
 		c["at"] = old["at"] if old and old.get("human_value") == c["human_value"] else str(now)
 	new = [c for c in found if c["field"] not in previous or previous[c["field"]].get("human_value") != c["human_value"]]
 	values = {"corrections": frappe.as_json(found) if found else None, "feedback_collected_at": now}
 	if found:
-		values.update(outcome="Corrected", corrected_by=frappe.session.user)
+		values.update(outcome="Corrected", corrected_by=user)
 	elif doc.status in DONE_STATUSES:
 		values["outcome"] = "Accepted"
 	else:
@@ -94,6 +96,22 @@ def collect(doc):
 	for c in new:
 		suggest_rule(doc, run, c)
 	return found
+
+
+@frappe.whitelist(methods=["POST"])
+def backfill(days=365):
+	"""One-time: check receipts read by the AI in the last `days` for corrections made
+	before this feature existed. The receipt's last editor counts as the one who corrected.
+	Safe to run again (corrections already recorded are not counted twice)."""
+	frappe.only_for(("System Manager", "Accounts Manager"))
+	since = frappe.utils.add_days(frappe.utils.nowdate(), -cint(days))
+	names = frappe.get_all("Accounting Receipt", filters={"ai_run": ("is", "set"), "modified": (">=", since)}, pluck="name")
+	corrected = 0
+	for name in names:
+		doc = frappe.get_doc("Accounting Receipt", name)
+		if collect(doc, user=doc.modified_by):
+			corrected += 1
+	return {"receipts": len(names), "corrected": corrected}
 
 
 # --- suggested reading rules ----------------------------------------------------------------

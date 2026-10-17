@@ -155,3 +155,12 @@ class TestFeedback(FrappeTestCase):
 		self.assertGreaterEqual(learning["by_field"]["supplier_reference"], 1)
 		self.assertIn(self.suggestion().name, [s.name for s in learning["suggestions"]])
 		self.assertNotIn(self.suggestion().name, [s.name for s in ai_skills.get_ai_skills()["skills"]])
+
+	def test_backfill_finds_earlier_corrections_once(self):
+		doc, _ = self.read_receipt()
+		doc.db_set("supplier_reference", "98765")  # corrected before feedback existed
+		first = feedback.backfill(days=30)
+		self.assertGreaterEqual(first["corrected"], 1)
+		self.assertEqual(frappe.db.get_value("AI Agent Run", doc.ai_run, "outcome"), "Corrected")
+		feedback.backfill(days=30)
+		self.assertEqual(self.suggestion().occurrences, 1)
