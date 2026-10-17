@@ -1248,3 +1248,8 @@ Join the Raven chat of this Issue (C),Dem Raven-Chat dieser Anfrage beitreten (C
 Open the Raven chat of this Issue (C),Den Raven-Chat dieser Anfrage öffnen (C)
 Something went wrong,Etwas ist schiefgelaufen
 Open or close the chat,Chat öffnen oder schließen
+Read the chat of this closed Issue (C),Den Chat dieser geschlossenen Anfrage lesen (C)
+{0} assigned {1}.,{0} hat {1} zugewiesen.
+{0} unassigned {1}.,{0} hat die Zuweisung von {1} entfernt.
+{0} set the status to {1}.,{0} hat den Status auf {1} gesetzt.
+{0} converted this Issue to Task {1}.,{0} hat diese Anfrage in die Aufgabe {1} umgewandelt.
