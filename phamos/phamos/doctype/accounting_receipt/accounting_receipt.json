@@ -36,6 +36,9 @@
   "supplier_iban",
   "purchase_invoice",
   "payment_request",
+  "employee",
+  "expense_claim",
+  "journal_entry",
   "is_return",
   "return_against",
   "items_section",
@@ -539,11 +542,34 @@
    "no_copy": 1,
    "in_standard_filter": 1,
    "description": "What the AI suggests after its checks: send to DATEV (paid), approve to pay, a person decides, or not a voucher."
+  },
+  {
+   "fieldname": "employee",
+   "fieldtype": "Link",
+   "label": "Paid by Employee",
+   "options": "Employee",
+   "description": "The employee who paid privately; an Expense Claim reimburses them."
+  },
+  {
+   "fieldname": "expense_claim",
+   "fieldtype": "Link",
+   "label": "Expense Claim",
+   "options": "Expense Claim",
+   "read_only": 1,
+   "no_copy": 1
+  },
+  {
+   "fieldname": "journal_entry",
+   "fieldtype": "Link",
+   "label": "Journal Entry",
+   "options": "Journal Entry",
+   "read_only": 1,
+   "no_copy": 1
   }
  ],
  "index_web_pages_for_search": 1,
  "links": [],
- "modified": "2026-10-17 18:00:00.000000",
+ "modified": "2026-10-17 20:00:00.000000",
  "modified_by": "Administrator",
  "module": "Phamos",
  "name": "Accounting Receipt",

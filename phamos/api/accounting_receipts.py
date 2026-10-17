@@ -707,6 +707,71 @@ def mark_receipt_paid(name, payment_date=None, mode_of_payment=None, bank_accoun
 
 
 @frappe.whitelist(methods=["POST"])
+def get_booking_options(name):
+	"""Defaults for booking a receipt as Expense Claim or Journal Entry."""
+	from phamos.accounting import branching
+
+	doc = frappe.get_doc("Accounting Receipt", name)
+	doc.check_permission("read")
+	company = doc.company or frappe.defaults.get_global_default("company")
+	bank_accounts = frappe.get_all("Account", filters={"company": company, "account_type": ("in", ("Bank", "Cash")),
+		"is_group": 0, "disabled": 0}, fields=["name", "account_type"], order_by="name")
+	try:
+		split = branching.net_lines_and_taxes(doc, company)
+		split_error = None
+	except frappe.ValidationError as e:
+		split, split_error = None, str(e)
+	return {
+		"employee": branching.employee_for(doc),
+		"expense_types": frappe.get_all("Expense Claim Type", pluck="name", order_by="name") if frappe.db.exists("DocType", "Expense Claim Type") else [],
+		"expense_type": branching.default_expense_type() if frappe.db.exists("DocType", "Expense Claim Type") else None,
+		"credit_account": doc.payment_account or _default_bank_ledger(company, bank_accounts),
+		"credit_accounts": bank_accounts,
+		"split": split,
+		"split_error": split_error,
+		"can_expense_claim": 1 if frappe.db.exists("DocType", "Expense Claim") and frappe.has_permission("Expense Claim", "create") else 0,
+		"can_journal_entry": 1 if frappe.has_permission("Journal Entry", "create") else 0,
+	}
+
+
+def _default_bank_ledger(company, ledgers):
+	"""Ledger of the company's default bank account, else the first bank (not cash) ledger."""
+	account = frappe.db.get_value("Bank Account", {"company": company, "is_company_account": 1, "disabled": 0,
+		"account": ("is", "set")}, "account", order_by="is_default desc, creation asc")
+	if account:
+		return account
+	banks = [row.name for row in ledgers if row.account_type == "Bank"]
+	return banks[0] if banks else (ledgers[0].name if ledgers else None)
+
+
+@frappe.whitelist(methods=["POST"])
+def make_expense_claim(name, employee=None, expense_type=None):
+	"""Draft Expense Claim for a receipt an employee paid privately."""
+	from phamos.accounting.branching import make_expense_claim as build
+	from phamos.api.accounting_spa import get_receipt
+
+	doc = frappe.get_doc("Accounting Receipt", name)
+	doc.check_permission("write")
+	frappe.has_permission("Expense Claim", "create", throw=True)
+	claim = build(doc, employee=employee, expense_type=expense_type)
+	return {"expense_claim": claim.name, "warnings": claim.flags.receipt_warnings or [],
+		"desk_url": f"/app/expense-claim/{claim.name}", "receipt": get_receipt(name)}
+
+
+@frappe.whitelist(methods=["POST"])
+def make_journal_entry(name, credit_account=None):
+	"""Draft Journal Entry for a receipt without a supplier invoice."""
+	from phamos.accounting.branching import make_journal_entry as build
+	from phamos.api.accounting_spa import get_receipt
+
+	doc = frappe.get_doc("Accounting Receipt", name)
+	doc.check_permission("write")
+	frappe.has_permission("Journal Entry", "create", throw=True)
+	je = build(doc, credit_account)
+	return {"journal_entry": je.name, "desk_url": f"/app/journal-entry/{je.name}", "receipt": get_receipt(name)}
+
+
+@frappe.whitelist(methods=["POST"])
 def submit_purchase_invoice(name):
 	"""Submit the receipt's draft Purchase Invoice (needed before approving to pay)."""
 	from phamos.api.accounting_spa import get_receipt
