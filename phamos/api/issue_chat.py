@@ -68,17 +68,19 @@ def dm_url(channel_id):
 def find_channel(doctype, name):
 	if not is_raven_installed():
 		return None
+	# An archived chat still belongs to its record (#1622): finding it keeps "Start chat" from
+	# creating a second one for a closed Issue.
 	return frappe.db.get_value(
 		"Raven Channel",
 		{
 			"linked_doctype": doctype,
 			"linked_document": name,
-			"is_archived": 0,
 			"is_thread": 0,
 			"is_direct_message": 0,
 		},
-		["name", "workspace"],
+		["name", "workspace", "is_archived"],
 		as_dict=True,
+		order_by="is_archived asc, creation asc",
 	)
 
 
@@ -104,8 +106,11 @@ def _resolve_workspace():
 	return workspaces[0]
 
 
-def _ensure_members(channel, users, admin=None):
-	"""Add the users to the channel and its workspace; return the users without a Raven user."""
+def _ensure_members(channel, users, admin=None, silent=False):
+	"""Add the users to the channel and its workspace; return the users without a Raven user.
+
+	`silent` skips Raven's "X added Y" line, for callers that post their own.
+	"""
 	existing = set(
 		frappe.get_all("Raven Channel Member", filters={"channel_id": channel.name}, pluck="user_id")
 	)
@@ -124,14 +129,16 @@ def _ensure_members(channel, users, admin=None):
 			).insert(ignore_permissions=True)
 		if raven_user in existing:
 			continue
-		frappe.get_doc(
+		member = frappe.get_doc(
 			{
 				"doctype": "Raven Channel Member",
 				"channel_id": channel.name,
 				"user_id": raven_user,
 				"is_admin": int(user == admin),
 			}
-		).insert(ignore_permissions=True)
+		)
+		member.flags.ignore_system_message = silent
+		member.insert(ignore_permissions=True)
 		existing.add(raven_user)
 	return skipped
 
@@ -181,6 +188,7 @@ def get_chat(doc):
 		"workspace": None,
 		"url": None,
 		"is_member": False,
+		"archived": False,
 		"unread": 0,
 		"skipped_users": [],
 	}
@@ -200,6 +208,7 @@ def get_chat(doc):
 		channel_id=channel.name,
 		workspace=channel.workspace,
 		url=channel_url(channel.workspace, channel.name),
+		archived=bool(channel.is_archived),
 		is_member=channel.name in _member_channels([channel.name]),
 		unread=_unread_counts([channel.name]).get(channel.name, 0),
 	)
@@ -296,11 +305,11 @@ def get_chat_states(doctype, names):
 		filters={
 			"linked_doctype": doctype,
 			"linked_document": ("in", readable),
-			"is_archived": 0,
 			"is_thread": 0,
 			"is_direct_message": 0,
 		},
-		fields=["name", "linked_document"],
+		fields=["name", "linked_document", "is_archived"],
+		order_by="is_archived desc",  # a live chat wins over an archived one below
 	)
 	channel_ids = [c.name for c in channels]
 	members = _member_channels(channel_ids)
@@ -309,6 +318,7 @@ def get_chat_states(doctype, names):
 		c.linked_document: {
 			"channel_id": c.name,
 			"is_member": c.name in members,
+			"archived": bool(c.is_archived),
 			"unread": unread.get(c.name, 0),
 		}
 		for c in channels
@@ -342,24 +352,95 @@ def start_dm(doc, user):
 
 
 def sync_assignee(doc, method=None):
-	"""ToDo on_update: a new assignee of a record with a chat joins it (#1614).
+	"""ToDo on_update: assignments of a record with a chat show up in it (#1614, #1621).
 
-	Never removes anyone; never blocks the assignment when Raven fails.
+	A new assignee joins the chat, with one "assigned" line instead of Raven's "added" one.
+	Unassigning posts a line and keeps them in the chat. Closing a ToDo (the work is done, or
+	the record was closed) posts nothing. Never blocks the assignment when Raven fails.
 	"""
-	if doc.reference_type not in CHAT_DOCTYPES or doc.status != "Open" or not doc.allocated_to:
+	if doc.reference_type not in CHAT_DOCTYPES or not doc.allocated_to:
 		return
 	before = doc.get_doc_before_save()
-	if before and before.status == "Open" and before.allocated_to == doc.allocated_to:
-		return
-	if not is_enabled():
+	was_open = bool(before and before.status == "Open" and before.allocated_to == doc.allocated_to)
+	assigned = doc.status == "Open" and not was_open
+	unassigned = doc.status == "Cancelled" and was_open
+	if not (assigned or unassigned) or not is_enabled():
 		return
 	channel = find_channel(doc.reference_type, doc.reference_name)
 	if not channel:
 		return
+	actor, person = _display_name(frappe.session.user), _display_name(doc.allocated_to)
 	try:
-		_ensure_members(channel, [doc.allocated_to])
+		if assigned:
+			_ensure_members(channel, [doc.allocated_to], silent=True)
+			_post_system_message(channel.name, _("{0} assigned {1}.").format(actor, person))
+		else:
+			_post_system_message(channel.name, _("{0} unassigned {1}.").format(actor, person))
 	except Exception:
-		frappe.log_error(title=f"Issue chat: could not add {doc.allocated_to} to {channel.name}")
+		frappe.log_error(title=f"Issue chat: could not post the assignment of {doc.allocated_to}")
+
+
+def on_issue_update(doc, method=None):
+	"""Issue on_update: status changes show up in its chat; Closed archives it, reopening brings
+	it back (#1621, #1622). Never blocks the save when Raven fails."""
+	before = doc.get_doc_before_save()
+	if not before or before.status == doc.status or not is_enabled():
+		return
+	channel = find_channel(doc.doctype, doc.name)
+	if not channel:
+		return
+	try:
+		if before.status == "Closed" and channel.is_archived:
+			_set_archived(channel.name, False)
+		_post_system_message(
+			channel.name,
+			_("{0} set the status to {1}.").format(_display_name(frappe.session.user), _(doc.status)),
+		)
+		if doc.status == "Closed" and not channel.is_archived:
+			_set_archived(channel.name, True)
+	except Exception:
+		frappe.log_error(title=f"Issue chat: could not follow the status of {doc.name}")
+
+
+def on_task_insert(doc, method=None):
+	"""Task after_insert: an Issue converted to this Task says so in its chat (#1621)."""
+	issue = doc.get("issue")
+	if not issue or not is_enabled():
+		return
+	channel = find_channel("Issue", issue)
+	if not channel or channel.is_archived:
+		return
+	try:
+		_post_system_message(
+			channel.name,
+			_("{0} converted this Issue to Task {1}.").format(_display_name(frappe.session.user), doc.name),
+		)
+	except Exception:
+		frappe.log_error(title=f"Issue chat: could not post the conversion of {issue}")
+
+
+def _display_name(user):
+	"""The name Raven shows for the user, so our lines match Raven's own."""
+	return frappe.db.get_value("Raven User", {"user": user}, "full_name") or get_fullname(user)
+
+
+def _post_system_message(channel_id, text):
+	"""A grey Raven System line: shown to everyone, counted as unread by nobody."""
+	frappe.get_doc(
+		{"doctype": "Raven Message", "channel_id": channel_id, "message_type": "System", "text": text}
+	).insert(ignore_permissions=True)
+
+
+def _set_archived(channel_id, archived):
+	"""Archive or restore a chat. Raven's own save only lets channel admins do this, while the
+	record's status is what decides here, so the flag is written directly."""
+	frappe.db.set_value("Raven Channel", channel_id, "is_archived", int(archived))
+	frappe.clear_document_cache("Raven Channel", channel_id)
+	from raven.utils import get_raven_room
+
+	frappe.publish_realtime(
+		"channel_list_updated", {"channel_id": channel_id}, room=get_raven_room(), after_commit=True
+	)
 
 
 def add_mentioned_members(doc, method=None):

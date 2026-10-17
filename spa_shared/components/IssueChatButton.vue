@@ -43,10 +43,12 @@ import { dialogOpen, insideOverlay, isPlainKey, isTypingTarget } from "@spa/util
 const props = defineProps({
 	issueName: { type: String, required: true },
 	subject: { type: String, default: "" },
+	// Closing or reopening the Issue archives or restores its chat (#1622).
+	status: { type: String, default: "" },
 	api: { type: String, required: true },
 })
 
-const EMPTY = { enabled: false, channel_id: null, url: null, is_member: false, unread: 0, skipped_users: [] }
+const EMPTY = { enabled: false, channel_id: null, url: null, is_member: false, archived: false, unread: 0, skipped_users: [] }
 const state = ref({ ...EMPTY })
 const busy = ref(false)
 const drawerOpen = ref(false)
@@ -59,6 +61,7 @@ const buttonLabel = computed(() => {
 const buttonTitle = computed(() => {
 	if (!state.value.channel_id) return __("Start a Raven chat with the people on this Issue (C)")
 	if (!state.value.is_member) return __("Join the Raven chat of this Issue (C)")
+	if (state.value.archived) return __("Read the chat of this closed Issue (C)")
 	return __("Open the Raven chat of this Issue (C)")
 })
 
@@ -106,6 +109,13 @@ watch(
 		refresh()
 	},
 	{ immediate: true }
+)
+
+watch(
+	() => props.status,
+	(now, before) => {
+		if (before && now !== before) refresh()
+	}
 )
 
 const channelId = computed(() => (state.value.is_member ? state.value.channel_id : null))

@@ -53,6 +53,15 @@ def _send(channel_id, html):
 	return send_message(channel_id=channel_id, text=f"<p>{html}</p>")
 
 
+def _system_lines(channel_id):
+	return frappe.get_all(
+		"Raven Message",
+		filters={"channel_id": channel_id, "message_type": "System"},
+		pluck="text",
+		order_by="creation asc",
+	)
+
+
 def _members(channel_id):
 	return set(
 		frappe.get_all("Raven Channel Member", filters={"channel_id": channel_id}, pluck="user_id")
@@ -245,6 +254,55 @@ class TestIssueChat(FrappeTestCase):
 		).insert(ignore_permissions=True)
 		_send(other.name, f"{_mention(LATECOMER)} hi")
 		self.assertNotIn(LATECOMER, _members(other.name))
+
+	def test_status_change_is_posted(self):
+		channel_id = pc.ensure_issue_chat(self.issue.name)["channel_id"]
+		self.issue.reload()
+		self.issue.status = "On Hold"
+		self.issue.save()
+		self.assertTrue(any("set the status to On Hold" in t for t in _system_lines(channel_id)))
+		self.assertFalse(frappe.db.get_value("Raven Channel", channel_id, "is_archived"))
+
+	def test_closing_archives_and_reopening_restores(self):
+		channel_id = pc.ensure_issue_chat(self.issue.name)["channel_id"]
+		self.issue.reload()
+		self.issue.status = "Closed"
+		self.issue.save()
+		self.assertTrue(frappe.db.get_value("Raven Channel", channel_id, "is_archived"))
+		state = pc.get_issue_chat(self.issue.name)
+		self.assertTrue(state["archived"])
+		# Starting again finds the archived chat instead of creating a second one.
+		self.assertEqual(pc.ensure_issue_chat(self.issue.name)["channel_id"], channel_id)
+
+		self.issue.reload()
+		self.issue.status = "Open"
+		self.issue.save()
+		self.assertFalse(frappe.db.get_value("Raven Channel", channel_id, "is_archived"))
+		lines = _system_lines(channel_id)
+		self.assertTrue(any("set the status to Closed" in t for t in lines))
+		self.assertTrue(any("set the status to Open" in t for t in lines))
+
+	def test_assignments_are_posted_once(self):
+		channel_id = pc.ensure_issue_chat(self.issue.name)["channel_id"]
+		before = len(_system_lines(channel_id))
+
+		self._assign(LATECOMER)
+		new_lines = _system_lines(channel_id)[before:]
+		self.assertEqual(len(new_lines), 1, new_lines)  # no extra "added" line from Raven
+		self.assertIn("assigned", new_lines[0])
+		self.assertIn(LATECOMER, _members(channel_id))
+
+		remove_assignment("Issue", self.issue.name, LATECOMER)
+		self.assertIn("unassigned", _system_lines(channel_id)[-1])
+		self.assertIn(LATECOMER, _members(channel_id))
+
+	def test_conversion_to_task_is_posted(self):
+		channel_id = pc.ensure_issue_chat(self.issue.name)["channel_id"]
+		frappe.set_user("Administrator")
+		task = frappe.get_doc(
+			{"doctype": "Task", "subject": "From the chat test", "issue": self.issue.name}
+		).insert()
+		self.assertTrue(any(f"converted this Issue to Task {task.name}" in t for t in _system_lines(channel_id)))
 
 	def test_raven_links_open_the_matching_cockpit(self):
 		self.assertEqual(
