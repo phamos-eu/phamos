@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest"
-import { insideOverlay, isCreateKey, isTypingTarget, listDirection, nextListIndex } from "./shortcuts.js"
+import { dialogOpen, insideOverlay, isCreateKey, isTypingTarget, listDirection, nextListIndex } from "./shortcuts.js"
 
 describe("cockpit shortcuts", () => {
 	it("leaves fields alone", () => {
@@ -14,6 +14,11 @@ describe("cockpit shortcuts", () => {
 		expect(insideOverlay({ closest: (sel) => (sel.includes("dialog") ? {} : null) })).toBe(true)
 		expect(insideOverlay({ closest: () => null })).toBe(false)
 		expect(insideOverlay(null)).toBe(false)
+		// frappe-ui popovers have no role; they live in #frappeui-popper-root.
+		expect(insideOverlay({ closest: (sel) => (sel.includes("#frappeui-popper-root") ? {} : null) })).toBe(true)
+		expect(dialogOpen({ querySelector: () => ({}) })).toBe(true)
+		expect(dialogOpen({ querySelector: () => null })).toBe(false)
+		expect(dialogOpen(null)).toBe(false)
 	})
 
 	it("opens Create on Ctrl/Cmd+B only", () => {
