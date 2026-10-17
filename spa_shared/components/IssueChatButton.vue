@@ -29,7 +29,9 @@
 			:url="state.is_member ? state.url || '' : ''"
 			:title="`${issueName}: ${subject || ''}`"
 			:skipped-users="state.is_member ? state.skipped_users || [] : []"
+			:threads="state.is_member ? state.threads || [] : []"
 			@closed="onPanelClosed"
+			@thread-opened="onThreadOpened"
 		>
 			<template #placeholder>
 				<FeatherIcon name="message-circle" class="h-8 w-8 text-ink-gray-4" />
@@ -77,7 +79,7 @@ const props = defineProps({
 	api: { type: String, required: true },
 })
 
-const EMPTY = { enabled: false, channel_id: null, url: null, is_member: false, archived: false, unread: 0, unread_threads: 0, skipped_users: [] }
+const EMPTY = { enabled: false, channel_id: null, url: null, is_member: false, archived: false, unread: 0, unread_threads: 0, threads: [], skipped_users: [] }
 const state = ref({ ...EMPTY })
 const busy = ref(false)
 const drawerOpen = ref(false)
@@ -119,6 +121,23 @@ async function refresh() {
 	} finally {
 		if (name === props.issueName) loading.value = false
 	}
+}
+
+// The user is reading that thread now: drop it from the hint at once. Raven saves the read mark
+// a little later (debounced, as the user scrolls), so the server is asked again after a while;
+// if Raven did not record the visit, the thread comes back.
+function onThreadOpened(threadId) {
+	const opened = (state.value.threads || []).find((t) => t.thread_id === threadId)
+	if (opened) {
+		state.value = {
+			...state.value,
+			threads: state.value.threads.filter((t) => t.thread_id !== threadId),
+			unread_threads: Math.max(0, (state.value.unread_threads || 0) - (opened.unread || 0)),
+		}
+	}
+	clearTimeout(refreshTimer)
+	refreshTimer = setTimeout(refresh, 5000)
+	chatChanged()
 }
 
 function onPanelClosed() {
@@ -205,7 +224,7 @@ realtime.on("message_created", (data) => {
 
 // A reply in a thread the user takes part in: Raven tells that user directly (#1623).
 useUserRealtime("raven:unread_thread_count_updated", () => {
-	if (!docked.value && state.value.is_member) refresh()
+	if (state.value.is_member) refresh()
 })
 
 function onKeydown(event) {

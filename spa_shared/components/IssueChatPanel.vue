@@ -43,6 +43,40 @@
 				>
 					{{ __("Not in the chat, since they have no Raven account: {0}", [skippedUsers.map((u) => u.full_name || u.user).join(", ")]) }}
 				</p>
+				<!-- Replies in threads, which Raven's channel view does not mark (#1623). -->
+				<div
+					v-if="url && threads.length"
+					class="flex-shrink-0 border-b border-outline-gray-2 bg-surface-blue-1 px-3 py-1.5 text-xs"
+				>
+					<button
+						type="button"
+						class="flex w-full items-center gap-1.5 font-medium text-ink-blue-3 hover:underline"
+						:aria-expanded="threads.length > 1 ? String(threadListOpen) : undefined"
+						@click="onThreadHint"
+					>
+						<FeatherIcon name="corner-down-right" class="h-3.5 w-3.5 flex-none" />
+						<span class="truncate">{{ threadHint }}</span>
+						<FeatherIcon
+							v-if="threads.length > 1"
+							:name="threadListOpen ? 'chevron-up' : 'chevron-down'"
+							class="ml-auto h-3.5 w-3.5 flex-none"
+						/>
+					</button>
+					<ul v-if="threadListOpen && threads.length > 1" class="mt-1 space-y-0.5">
+						<li v-for="thread in threads" :key="thread.thread_id">
+							<button
+								type="button"
+								class="flex w-full items-center gap-2 rounded px-2 py-1 text-left text-ink-gray-8 hover:bg-surface-blue-2"
+								@click="openThread(thread.thread_id)"
+							>
+								<span class="min-w-0 flex-1 truncate">{{ thread.preview || __("Thread") }}</span>
+								<span class="flex-none text-ink-gray-5">
+									{{ thread.last_sender ? `${thread.last_sender} · ` : "" }}{{ thread.unread }}
+								</span>
+							</button>
+						</li>
+					</ul>
+				</div>
 				<iframe
 					v-if="frameUrl"
 					v-show="url"
@@ -86,8 +120,10 @@ const props = defineProps({
 	skippedUsers: { type: Array, default: () => [] },
 	/** The record the chat belongs to; IssuesInbox shows the chat column for it */
 	recordName: { type: String, default: "" },
+	/** Threads with unread replies: [{ thread_id, unread, preview, last_sender }] */
+	threads: { type: Array, default: () => [] },
 })
-const emit = defineEmits(["update:open", "closed"])
+const emit = defineEmits(["update:open", "closed", "thread-opened"])
 
 const router = useRouter()
 const frame = ref(null)
@@ -151,6 +187,40 @@ function switchChannel(url) {
 		frameReady = false
 		frameUrl.value = url // fall back to loading it
 	}
+}
+
+const threadListOpen = ref(false)
+const threadReplies = computed(() => props.threads.reduce((sum, t) => sum + (t.unread || 0), 0))
+const threadHint = computed(() =>
+	threadReplies.value === 1
+		? __("1 new reply in threads")
+		: __("{0} new replies in threads", [threadReplies.value])
+)
+watch(
+	() => props.threads.length,
+	(count) => {
+		if (count < 2) threadListOpen.value = false
+	}
+)
+
+function onThreadHint() {
+	if (props.threads.length === 1) openThread(props.threads[0].thread_id)
+	else threadListOpen.value = !threadListOpen.value
+}
+
+// Open a thread of this chat inside the frame: a route Raven knows and the guard allows, so its
+// router opens the thread panel, which marks the thread read.
+function openThread(threadId) {
+	const win = frame.value?.contentWindow
+	if (!win || !props.url) return
+	try {
+		win.history.pushState(null, "", `${channelPath(props.url)}/thread/${encodeURIComponent(threadId)}`)
+		win.dispatchEvent(new win.PopStateEvent("popstate", { state: null }))
+	} catch (e) {
+		return
+	}
+	threadListOpen.value = false
+	emit("thread-opened", threadId)
 }
 
 function close() {

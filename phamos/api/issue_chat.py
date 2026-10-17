@@ -18,8 +18,8 @@ from urllib.parse import quote
 import frappe
 from frappe import _
 from frappe.desk.form.load import get_assignments
-from frappe.query_builder.functions import Count
-from frappe.utils import cint, escape_html, get_fullname
+from frappe.query_builder.functions import Count, Max
+from frappe.utils import cint, escape_html, get_fullname, strip_html_tags
 
 CHAT_DOCTYPES = ("Issue",)
 
@@ -200,6 +200,58 @@ def _unread_thread_counts(channel_ids):
 	return {row.channel_id: row.unread for row in rows}
 
 
+def _unread_threads(channel_id, limit=10):
+	"""The threads of one chat with unread replies for the session user, newest reply first:
+	[{thread_id, unread, preview, last_sender}] for the hint above the chat (#1623)."""
+	raven_user = _raven_user(frappe.session.user)
+	if not raven_user:
+		return []
+	thread = frappe.qb.DocType("Raven Channel")
+	root = frappe.qb.DocType("Raven Message")
+	member = frappe.qb.DocType("Raven Channel Member")
+	reply = frappe.qb.DocType("Raven Message", alias="reply")
+	rows = (
+		frappe.qb.from_(thread)
+		.join(root)
+		.on(root.name == thread.name)
+		.join(member)
+		.on((member.channel_id == thread.name) & (member.user_id == raven_user))
+		.join(reply)
+		.on(reply.channel_id == thread.name)
+		.select(
+			thread.name.as_("thread_id"),
+			root.text.as_("root_text"),
+			Count(reply.name).as_("unread"),
+			Max(reply.creation).as_("last_reply"),
+		)
+		.where(thread.is_thread == 1)
+		.where(root.channel_id == channel_id)
+		.where(reply.creation > member.last_visit)
+		.where(reply.message_type != "System")
+		.where(reply.owner != frappe.session.user)
+		.groupby(thread.name, root.text)
+		.orderby(Max(reply.creation), order=frappe.qb.desc)
+		.limit(limit)
+	).run(as_dict=True)
+	result = []
+	for row in rows:
+		last_owner = frappe.db.get_value(
+			"Raven Message",
+			{"channel_id": row.thread_id, "creation": row.last_reply},
+			"owner",
+		)
+		preview = strip_html_tags(row.root_text or "").strip()
+		result.append(
+			{
+				"thread_id": row.thread_id,
+				"unread": row.unread,
+				"preview": (preview[:80] + "…") if len(preview) > 80 else preview,
+				"last_sender": _display_name(last_owner) if last_owner else "",
+			}
+		)
+	return result
+
+
 def _member_channels(channel_ids):
 	raven_user = _raven_user(frappe.session.user)
 	if not raven_user or not channel_ids:
@@ -225,6 +277,7 @@ def get_chat(doc):
 		"archived": False,
 		"unread": 0,
 		"unread_threads": 0,
+		"threads": [],
 		"skipped_users": [],
 	}
 	if not state["enabled"]:
@@ -248,6 +301,8 @@ def get_chat(doc):
 		unread=_unread_counts([channel.name]).get(channel.name, 0),
 		unread_threads=_unread_thread_counts([channel.name]).get(channel.name, 0),
 	)
+	if state["unread_threads"]:
+		state["threads"] = _unread_threads(channel.name)
 	return state
 
 

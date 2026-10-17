@@ -323,7 +323,13 @@ class TestIssueChat(FrappeTestCase):
 			"last_visit",
 			"2000-01-01 00:00:00",
 		)
-		self.assertEqual(pc.get_issue_chat(self.issue.name)["unread_threads"], 3)
+		state = pc.get_issue_chat(self.issue.name)
+		self.assertEqual(state["unread_threads"], 3)
+		self.assertEqual(len(state["threads"]), 1)
+		self.assertEqual(state["threads"][0]["thread_id"], thread_id)
+		self.assertEqual(state["threads"][0]["unread"], 3)
+		self.assertEqual(state["threads"][0]["preview"], "A side topic")
+		self.assertTrue(state["threads"][0]["last_sender"])
 		states = pc.get_issue_chat_states(frappe.as_json([self.issue.name]))
 		self.assertEqual(states[self.issue.name]["unread_threads"], 3)
 
