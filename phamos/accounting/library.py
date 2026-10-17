@@ -226,7 +226,7 @@ def record_miss(company, supplier, description, account):
 
 # --- receipts ------------------------------------------------------------------------------
 
-AI_SOURCES = ("Library", "Supplier History", "AI")
+AI_SOURCES = ("Library", "Supplier History", "Supplier Default", "AI")
 CONFIRMING_STATUSES = ("Approved to Pay", "Sent to DATEV", "Paid")
 
 

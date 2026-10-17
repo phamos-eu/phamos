@@ -79,7 +79,12 @@ def run_decide_skill(ctx, skill):
 
 def evaluate(doc, params=None, extraction=None, earlier_flags=None):
 	"""{decision, confidence, flags, summary, paid, history} for a receipt. Changes nothing."""
-	params = params or dict(DEFAULT_PARAMS)
+	from phamos.accounting import supplier_settings
+
+	params = dict(params or DEFAULT_PARAMS)
+	supplier = supplier_settings.get(doc.supplier)
+	if supplier.get("amount_tolerance_pct"):
+		params["amount_tolerance_pct"] = supplier["amount_tolerance_pct"]
 	flags = []
 
 	def flag(code, severity, message, field=None):
@@ -117,12 +122,18 @@ def evaluate(doc, params=None, extraction=None, earlier_flags=None):
 	for code, severity, message in duplicates(doc, params):
 		flag(code, severity, message, "supplier_reference")
 
+	if supplier.get("always_review"):
+		flag("supplier_review", "warn", _("{0}: always checked by a person.").format(doc.get("supplier_name") or doc.supplier), "supplier")
+
 	# --- paid?
-	paid = bool(doc.is_paid) or cstr(extraction.get("payment_status") if extraction else "").lower() in PAID_WORDS
+	says_paid = cstr(extraction.get("payment_status") if extraction else "").lower() in PAID_WORDS
+	paid_by_mode = supplier_settings.is_paid_by_mode(supplier)
+	paid = bool(doc.is_paid) or says_paid or paid_by_mode
 	if paid and not doc.is_paid:
-		how = cstr((extraction or {}).get("paid_with"))
+		how = cstr((extraction or {}).get("paid_with")) or (supplier.get("payment_mode") if paid_by_mode else "")
+		message = _("The receipt says it is paid{0}.") if says_paid else _("This supplier is paid by {0}; nothing to transfer.")
 		flags.append({"code": "says_paid", "severity": "info", "field": "is_paid",
-			"message": _("The receipt says it is paid{0}.").format(f" ({how})" if how else "")})
+			"message": message.format(f" ({how})" if says_paid and how else how)})
 
 	all_flags = list(earlier_flags or []) + flags
 	blocks = sum(1 for f in all_flags if f.get("severity") == "block")
@@ -142,6 +153,7 @@ def evaluate(doc, params=None, extraction=None, earlier_flags=None):
 		"flags": flags,
 		"paid": paid,
 		"history": history,
+		"auto_datev": supplier.get("auto_datev"),
 		"summary": summary_of(decision, blocks + warns),
 	}
 
@@ -228,8 +240,10 @@ def apply_decision(doc, result, params):
 	if doc.status == "Inbox":
 		values["status"] = "Needs Decision"
 	doc.db_set(values, update_modified=False)
+	supplier_choice = result.get("auto_datev")  # Allow / Never / None (follow the skill)
+	allowed = supplier_choice == "Allow" or (supplier_choice != "Never" and cint(params.get("auto_datev")))
 	if (
-		cint(params.get("auto_datev"))
+		allowed
 		and result["decision"] == "auto_datev"
 		and result["confidence"] >= flt(params["auto_datev_min_confidence"])
 		and not doc.sent_to_datev

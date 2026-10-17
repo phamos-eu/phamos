@@ -29,8 +29,10 @@ def ensure_accounting_receipt_setup():
 	ensure_accounting_agent()
 	ensure_issue_accounting_receipt_field()
 	from phamos.accounting.expense_accounts import ensure_expense_account_setup
+	from phamos.accounting.supplier_settings import ensure_fields as ensure_supplier_ai_fields
 
 	ensure_expense_account_setup()
+	ensure_supplier_ai_fields()
 
 
 def ensure_accounting_agent():

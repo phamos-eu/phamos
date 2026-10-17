@@ -124,6 +124,76 @@
 			</div>
 		</div>
 
+		<!-- Suppliers -->
+		<div v-else-if="tab === 'suppliers'" class="flex min-h-0 flex-1 flex-col lg:flex-row">
+			<div class="min-h-0 overflow-y-auto border-b border-outline-gray-2 lg:w-96 lg:flex-none lg:border-b-0 lg:border-r">
+				<div class="px-5 py-3">
+					<FrappeLink :model-value="''" doctype="Supplier" placeholder="Set up a supplier…" @update:model-value="(v) => v && setQuery({ supplier: v })" />
+				</div>
+				<p class="px-5 text-xs text-ink-gray-5">Suppliers with their own AI settings. Everything else follows the skills.</p>
+				<p v-if="supplierRows === null" class="px-5 pt-2 text-sm text-ink-gray-5">Loading…</p>
+				<p v-else-if="!supplierRows.length" class="px-5 pt-2 text-sm text-ink-gray-5">No supplier has its own settings yet.</p>
+				<button
+					v-for="row in supplierRows || []"
+					:key="row.supplier"
+					type="button"
+					class="block w-full border-t border-outline-gray-1 px-5 py-2 text-left text-sm"
+					:class="selectedSupplier === row.supplier ? 'bg-surface-gray-3' : 'hover:bg-surface-gray-2'"
+					@click="setQuery({ supplier: row.supplier })"
+				>
+					<span class="block truncate font-medium text-ink-gray-9">{{ row.supplier_name || row.supplier }}</span>
+					<span class="block truncate text-xs text-ink-gray-5">{{ supplierSummary(row) }}</span>
+				</button>
+			</div>
+			<div class="min-h-0 flex-1 overflow-y-auto p-5 text-sm">
+				<p v-if="!selectedSupplier" class="text-ink-gray-5">Pick or search a supplier.</p>
+				<p v-else-if="!supplierForm" class="text-ink-gray-5">Loading…</p>
+				<div v-else class="flex max-w-2xl flex-col gap-4">
+					<h2 class="text-base font-medium">{{ supplierForm.supplier_name || supplierForm.supplier }}</h2>
+					<label class="flex items-start gap-2">
+						<input v-model="supplierForm.always_review" type="checkbox" :true-value="1" :false-value="0" :disabled="!supplierForm.can_write" class="mt-0.5" />
+						<span>Always needs a person<span class="block text-xs text-ink-gray-5">The AI never marks this supplier's receipts as ready on its own.</span></span>
+					</label>
+					<div class="grid grid-cols-1 gap-3 sm:grid-cols-2">
+						<label class="field">
+							<span>Send to DATEV automatically</span>
+							<select v-model="supplierForm.auto_datev" :disabled="!supplierForm.can_write" class="input">
+								<option value="Default">As set in the skill</option>
+								<option value="Allow">Yes, when paid and clear</option>
+								<option value="Never">Never</option>
+							</select>
+						</label>
+						<label class="field">
+							<span>Paid by</span>
+							<select v-model="supplierForm.payment_mode" :disabled="!supplierForm.can_write" class="input">
+								<option :value="null">Not set</option>
+								<option v-for="mode in ['Bank Transfer', 'Direct Debit', 'Credit Card', 'PayPal']" :key="mode" :value="mode">{{ mode }}</option>
+							</select>
+							<span class="text-xs text-ink-gray-5">Direct debit, card or PayPal: receipts count as paid.</span>
+						</label>
+						<label class="field">
+							<span>Usual amount ± (%)</span>
+							<input v-model.number="supplierForm.amount_tolerance_pct" type="number" min="0" max="500" :disabled="!supplierForm.can_write" class="input" placeholder="As set in the skill" />
+						</label>
+						<label class="field">
+							<span>Default cost center</span>
+							<FrappeLink v-model="supplierForm.cost_center" doctype="Cost Center" :filters="{ is_group: 0 }" :disabled="!supplierForm.can_write" />
+						</label>
+						<label class="field sm:col-span-2">
+							<span>Default expense account</span>
+							<FrappeLink v-model="supplierForm.expense_account" doctype="Account" :filters="{ root_type: 'Expense', is_group: 0, disabled: 0 }" :disabled="!supplierForm.can_write" />
+							<span class="text-xs text-ink-gray-5">For lines the assignment library has no answer for, before Mistral is asked.</span>
+						</label>
+					</div>
+					<div>
+						<button type="button" class="btn-primary" :disabled="!supplierForm.can_write || savingSupplier" @click="saveSupplier">
+							{{ savingSupplier ? "Saving…" : "Save" }}
+						</button>
+					</div>
+				</div>
+			</div>
+		</div>
+
 		<!-- Runs -->
 		<div v-else class="flex min-h-0 flex-1 flex-col lg:flex-row">
 			<div class="min-h-0 overflow-y-auto border-b border-outline-gray-2 lg:w-[34rem] lg:flex-none lg:border-b-0 lg:border-r">
@@ -209,6 +279,7 @@
 import { computed, ref, watch } from "vue"
 import { useRoute, useRouter } from "vue-router"
 import { call, toast } from "frappe-ui"
+import FrappeLink from "@spa/components/FrappeLink.vue"
 import AiSkillEditor from "../components/AiSkillEditor.vue"
 
 const API = "phamos.api.ai_skills"
@@ -219,8 +290,9 @@ const tabs = [
 	{ key: "skills", label: "Skills" },
 	{ key: "runs", label: "Runs" },
 	{ key: "learning", label: "Learning" },
+	{ key: "suppliers", label: "Suppliers" },
 ]
-const tab = computed(() => (["runs", "learning"].includes(route.query.tab) ? route.query.tab : "skills"))
+const tab = computed(() => (["runs", "learning", "suppliers"].includes(route.query.tab) ? route.query.tab : "skills"))
 const selectedSkill = computed(() => route.query.skill || "")
 const selectedRun = computed(() => route.query.run || "")
 
@@ -350,6 +422,66 @@ const FIELD_LABELS = {
 
 function fieldLabel(field) {
 	return FIELD_LABELS[field] || field
+}
+
+// --- suppliers ---
+const SUPPLIER_API = "phamos.accounting.supplier_settings"
+const selectedSupplier = computed(() => route.query.supplier || "")
+const supplierRows = ref(null)
+const supplierForm = ref(null)
+const savingSupplier = ref(false)
+
+async function loadSupplierRows() {
+	try {
+		supplierRows.value = await call(`${SUPPLIER_API}.list_settings`)
+	} catch (e) {
+		supplierRows.value = []
+		toast({ title: e?.messages?.[0] || e?.message || "Could not load the supplier settings", icon: "x-circle", iconClasses: "text-ink-red-4" })
+	}
+}
+watch(tab, (value) => value === "suppliers" && loadSupplierRows(), { immediate: true })
+watch(
+	[tab, selectedSupplier],
+	async ([t, supplier]) => {
+		supplierForm.value = null
+		if (t !== "suppliers" || !supplier) return
+		try {
+			const res = await call(`${SUPPLIER_API}.get_settings`, { supplier })
+			supplierForm.value = { ...res, auto_datev: res.auto_datev || "Default", always_review: res.always_review ? 1 : 0 }
+		} catch (e) {
+			toast({ title: e?.messages?.[0] || e?.message || "Could not load the supplier", icon: "x-circle", iconClasses: "text-ink-red-4" })
+		}
+	},
+	{ immediate: true }
+)
+
+async function saveSupplier() {
+	savingSupplier.value = true
+	try {
+		const { supplier, always_review, auto_datev, amount_tolerance_pct, payment_mode, expense_account, cost_center } = supplierForm.value
+		const res = await call(`${SUPPLIER_API}.save_settings`, {
+			supplier,
+			values: { always_review, auto_datev, amount_tolerance_pct, payment_mode, expense_account, cost_center },
+		})
+		supplierForm.value = { ...res, auto_datev: res.auto_datev || "Default", always_review: res.always_review ? 1 : 0 }
+		toast({ title: "Supplier settings saved", icon: "check-circle", iconClasses: "text-ink-green-3" })
+		await loadSupplierRows()
+	} catch (e) {
+		toast({ title: e?.messages?.[0] || e?.message || "Could not save", icon: "x-circle", iconClasses: "text-ink-red-4" })
+	} finally {
+		savingSupplier.value = false
+	}
+}
+
+function supplierSummary(row) {
+	return [
+		row.always_review ? "always a person" : "",
+		row.auto_datev === "Allow" ? "DATEV automatically" : row.auto_datev === "Never" ? "never DATEV automatically" : "",
+		row.payment_mode ? `paid by ${row.payment_mode}` : "",
+		row.amount_tolerance_pct ? `± ${row.amount_tolerance_pct} %` : "",
+		row.expense_account ? (row.expense_account || "").replace(/ - [^-]+$/, "") : "",
+		row.cost_center ? (row.cost_center || "").replace(/ - [^-]+$/, "") : "",
+	].filter(Boolean).join(" · ")
 }
 
 function decisionLabel(decision) {
