@@ -615,6 +615,23 @@ def suggest_accounts(name):
 
 
 @frappe.whitelist(methods=["POST"])
+def submit_purchase_invoice(name):
+	"""Submit the receipt's draft Purchase Invoice (needed before approving to pay)."""
+	from phamos.api.accounting_spa import get_receipt
+
+	receipt = frappe.get_doc("Accounting Receipt", name)
+	receipt.check_permission("write")
+	if not receipt.purchase_invoice:
+		frappe.throw(_("This receipt has no Purchase Invoice yet."))
+	pi = frappe.get_doc("Purchase Invoice", receipt.purchase_invoice)
+	if pi.docstatus != 0:
+		frappe.throw(_("Purchase Invoice {0} is not a draft.").format(pi.name))
+	pi.check_permission("submit")
+	pi.submit()
+	return {"purchase_invoice": pi.name, "receipt": get_receipt(name)}
+
+
+@frappe.whitelist(methods=["POST"])
 def make_purchase_invoice(name, submit=0):
 	"""Create the Purchase Invoice from the receipt's lines (draft unless submit=1)."""
 	from phamos.accounting.branching import make_purchase_invoice as build

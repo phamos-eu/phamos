@@ -255,7 +255,13 @@
 					{{ receipt.purchase_invoice }}
 				</a>
 				<span v-if="receipt.purchase_invoice_status" class="rounded bg-surface-gray-2 px-1.5 py-0.5 text-xs text-ink-gray-7">{{ receipt.purchase_invoice_status }}</span>
-				<template v-if="!receipt.purchase_invoice">
+				<template v-if="receipt.purchase_invoice && receipt.purchase_invoice_docstatus === 0">
+					<button type="button" class="btn" :disabled="readonly || submittingInvoice" @click="submitInvoice">
+						{{ submittingInvoice ? "Submitting…" : "Submit invoice" }}
+					</button>
+					<span class="text-xs text-ink-gray-5">Submit it to approve the receipt to pay.</span>
+				</template>
+				<template v-if="!receipt.purchase_invoice || receipt.purchase_invoice_docstatus === 2">
 					<button
 						type="button"
 						class="btn"
@@ -464,6 +470,23 @@ const invoiceHint = computed(() => {
 	if (autosave.draft.items.some((row) => !row.expense_account)) return "Every line needs an expense account."
 	return ""
 })
+
+const submittingInvoice = ref(false)
+
+async function submitInvoice() {
+	if (!window.confirm(`Submit Purchase Invoice ${props.receipt.purchase_invoice}? It is booked and can then only be cancelled.`)) return
+	submittingInvoice.value = true
+	try {
+		await autosave.flush()
+		const res = await call(`${API}.submit_purchase_invoice`, { name: props.receipt.name })
+		toast({ title: `Purchase Invoice ${res.purchase_invoice} submitted`, icon: "check-circle", iconClasses: "text-ink-green-3" })
+		emit("updated", res.receipt)
+	} catch (e) {
+		toast({ title: e?.messages?.[0] || e?.message || "Could not submit the Purchase Invoice", icon: "x-circle", iconClasses: "text-ink-red-4" })
+	} finally {
+		submittingInvoice.value = false
+	}
+}
 
 async function createInvoice() {
 	creatingInvoice.value = true

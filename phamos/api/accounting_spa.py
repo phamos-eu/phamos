@@ -552,6 +552,7 @@ def get_receipt(name):
 			"company": doc.company,
 			"purchase_invoice": doc.purchase_invoice,
 			"purchase_invoice_status": frappe.db.get_value("Purchase Invoice", doc.purchase_invoice, "status") if doc.purchase_invoice else None,
+			"purchase_invoice_docstatus": frappe.db.get_value("Purchase Invoice", doc.purchase_invoice, "docstatus") if doc.purchase_invoice else None,
 			"items": [
 				{
 					"name": i.name,
