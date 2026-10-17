@@ -5,9 +5,13 @@
 			<div v-else-if="loading" class="flex min-h-64 items-center justify-center text-sm text-ink-gray-5">Loading your Issues…</div>
 			<template v-else>
 				<section class="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-4">
-					<RouterLink v-for="stat in stats" :key="stat.key" :to="{ name: 'IssuesList' }" class="rounded-lg focus-visible:outline focus-visible:outline-2 focus-visible:outline-outline-gray-4">
-						<StatCard :label="stat.label" :value="stat.value" :hint="stat.hint" class="h-full hover:border-outline-gray-3" />
-					</RouterLink>
+					<template v-for="stat in stats" :key="stat.key">
+						<!-- Only tiles about open work lead to the list, which shows open records only (#1611). -->
+						<RouterLink v-if="stat.linked" :to="{ name: 'IssuesList' }" class="rounded-lg focus-visible:outline focus-visible:outline-2 focus-visible:outline-outline-gray-4">
+							<StatCard :label="stat.label" :value="stat.value" :hint="stat.hint" class="h-full hover:border-outline-gray-3" />
+						</RouterLink>
+						<StatCard v-else :label="stat.label" :value="stat.value" :hint="stat.hint" />
+					</template>
 				</section>
 
 				<div class="grid grid-cols-1 gap-5 xl:grid-cols-3">
@@ -58,9 +62,9 @@ const days = (value) => (value == null ? "—" : value === 1 ? "1 day" : `${valu
 const stats = computed(() => {
 	const t = data.value.totals || {}
 	return [
-		{ key: "waiting_on_me", label: "Waiting on me", value: t.waiting_on_me ?? 0, hint: "Status Open: the next step is mine" },
-		{ key: "waiting_on_others", label: "Waiting on others", value: t.waiting_on_others ?? 0, hint: "Replied or On Hold" },
-		{ key: "open", label: "Open now", value: t.open ?? 0, hint: t.oldest_days == null ? "" : `Oldest: ${days(t.oldest_days)}` },
+		{ key: "waiting_on_me", linked: true, label: "Waiting on me", value: t.waiting_on_me ?? 0, hint: "Status Open: the next step is mine" },
+		{ key: "waiting_on_others", linked: true, label: "Waiting on others", value: t.waiting_on_others ?? 0, hint: "Replied or On Hold" },
+		{ key: "open", linked: true, label: "Open now", value: t.open ?? 0, hint: t.oldest_days == null ? "" : `Oldest: ${days(t.oldest_days)}` },
 		{ key: "resolved", label: "Resolved", value: t.resolved_recently ?? 0, hint: `In the last ${data.value.recent_days} days` },
 	]
 })
