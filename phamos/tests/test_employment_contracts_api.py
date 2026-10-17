@@ -106,3 +106,14 @@ class TestEmploymentContractsApi(FrappeTestCase):
 	def test_employee_dashboard_lists_contracts(self):
 		data = get_employee_dashboard_data({"transactions": []})
 		self.assertIn("Employment Contract", data["transactions"][0]["items"])
+
+	def test_monthly_cost_is_in_company_currency_at_planning_rate(self):
+		company_currency = frappe.get_cached_value("Company", self.company, "default_currency")
+		foreign = "USD" if company_currency != "USD" else "EUR"
+		start = add_days(nowdate(), -10)
+		before = {c["currency"]: c["amount"] for c in api.get_overview()["monthly_cost"]}
+		self.save(effective_from=start, currency=foreign, conversion_rate=0.5)
+
+		after = {c["currency"]: c["amount"] for c in api.get_overview()["monthly_cost"]}
+		self.assertNotIn(foreign, after)
+		self.assertAlmostEqual(after[company_currency] - before.get(company_currency, 0), 1250)

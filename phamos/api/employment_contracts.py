@@ -33,6 +33,9 @@ LIST_FIELDS = (
 	"yearly_gross_full_time",
 	"monthly_amount",
 	"monthly_gross",
+	"company_currency",
+	"conversion_rate",
+	"base_monthly_gross",
 	"expense_account",
 	"notes",
 )
@@ -47,6 +50,7 @@ EDITABLE_FIELDS = (
 	"currency",
 	"yearly_gross_full_time",
 	"monthly_amount",
+	"conversion_rate",
 	"expense_account",
 	"notes",
 )
@@ -76,9 +80,12 @@ def get_overview():
 		key=lambda c: c.valid_until,
 	)
 
+	# Company currency at each contract's fixed planning rate, so the total does not move
+	# with daily exchange rates. Grouped per company currency for multi-company sites.
 	costs = {}
 	for contract in active:
-		costs[contract.currency] = costs.get(contract.currency, 0) + flt(contract.monthly_gross)
+		currency = contract.company_currency or contract.currency
+		costs[currency] = costs.get(currency, 0) + flt(contract.base_monthly_gross)
 
 	covered = {c.employee for c in active} | {c.employee for c in upcoming}
 	without_contract = [
