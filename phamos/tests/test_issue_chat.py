@@ -20,6 +20,7 @@ OWNER = "issue-chat-owner@example.com"
 ASSIGNEE = "issue-chat-assignee@example.com"
 LATECOMER = "issue-chat-latecomer@example.com"
 OUTSIDER = "issue-chat-outsider@example.com"  # no Raven role
+NO_READER = "issue-chat-noreader@example.com"  # Raven user who cannot read Issues
 WORKSPACE = "issue-chat-test"
 
 # Issue needs Support Team; Raven creates the Raven User for the "Raven User" role.
@@ -42,6 +43,16 @@ def _ensure_user(email, roles=ROLES):
 	return email
 
 
+def _mention(user):
+	return f'<span class="mention" data-type="userMention" data-id="{user}" data-label="{user}">@{user}</span>'
+
+
+def _send(channel_id, html):
+	from raven.api.raven_message import send_message
+
+	return send_message(channel_id=channel_id, text=f"<p>{html}</p>")
+
+
 def _members(channel_id):
 	return set(
 		frappe.get_all("Raven Channel Member", filters={"channel_id": channel_id}, pluck="user_id")
@@ -61,6 +72,7 @@ class TestIssueChat(FrappeTestCase):
 		_ensure_user(OUTSIDER, roles=("Support Team",))
 		# Raven may auto-add every System User (Raven Settings); this one must have no Raven user.
 		frappe.db.delete("Raven User", {"user": OUTSIDER})
+		_ensure_user(NO_READER, roles=("Raven User",))
 		if not frappe.db.exists("Raven Workspace", WORKSPACE):
 			frappe.get_doc(
 				{"doctype": "Raven Workspace", "workspace_name": WORKSPACE, "type": "Private"}
@@ -195,6 +207,44 @@ class TestIssueChat(FrappeTestCase):
 			filters={"channel_id": channel.name, "link_doctype": "Issue", "link_document": self.issue.name},
 		)
 		self.assertEqual(len(links), 1)
+
+	def test_mentioned_reader_joins_the_chat(self):
+		channel_id = pc.ensure_issue_chat(self.issue.name)["channel_id"]
+		self.assertNotIn(LATECOMER, _members(channel_id))
+
+		_send(channel_id, f"{_mention(LATECOMER)} can you have a look?")
+		self.assertIn(LATECOMER, _members(channel_id))
+		self.assertTrue(
+			frappe.db.exists("Raven Workspace Member", {"user": LATECOMER, "workspace": WORKSPACE})
+		)
+
+	def test_mention_in_a_thread_adds_to_chat_and_thread(self):
+		from raven.api.threads import create_thread
+
+		channel_id = pc.ensure_issue_chat(self.issue.name)["channel_id"]
+		root = _send(channel_id, "Start of a side topic")
+		thread_id = create_thread(root.name)["thread_id"]
+
+		_send(thread_id, f"{_mention(LATECOMER)} this one is for you")
+		self.assertIn(LATECOMER, _members(channel_id))
+		self.assertIn(LATECOMER, _members(thread_id))
+
+	def test_mention_of_someone_who_cannot_read_the_issue_adds_nobody(self):
+		channel_id = pc.ensure_issue_chat(self.issue.name)["channel_id"]
+		_send(channel_id, f"{_mention(NO_READER)} FYI")
+		self.assertNotIn(NO_READER, _members(channel_id))
+
+	def test_mentions_outside_issue_chats_are_left_to_raven(self):
+		other = frappe.get_doc(
+			{
+				"doctype": "Raven Channel",
+				"channel_name": "issue-chat-test-plain",
+				"type": "Private",
+				"workspace": WORKSPACE,
+			}
+		).insert(ignore_permissions=True)
+		_send(other.name, f"{_mention(LATECOMER)} hi")
+		self.assertNotIn(LATECOMER, _members(other.name))
 
 	def test_raven_links_open_the_matching_cockpit(self):
 		self.assertEqual(
