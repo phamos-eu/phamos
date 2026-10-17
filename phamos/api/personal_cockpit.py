@@ -20,6 +20,7 @@ from phamos.api import personal_checkin
 from phamos.api import personal_contracts
 from phamos.api import personal_timer
 from phamos.api import personal_timeline
+from phamos.api import personal_work_dashboard
 
 CONFIG = dc.CockpitConfig(
 	label="Personal Cockpit",
@@ -629,3 +630,15 @@ def get_my_checkins(start=0, page_length=100):
 def get_my_contracts():
 	"""My own submitted contracts: the one in force, upcoming changes and the history."""
 	return personal_contracts.get_my_contracts()
+
+
+@frappe.whitelist()
+def get_issue_dashboard():
+	"""Numbers about my Issues (#1604)."""
+	return personal_work_dashboard.get_issue_dashboard()
+
+
+@frappe.whitelist()
+def get_task_dashboard():
+	"""Numbers about my Tasks and my hours (#1604)."""
+	return personal_work_dashboard.get_task_dashboard()
