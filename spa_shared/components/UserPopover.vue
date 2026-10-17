@@ -72,6 +72,12 @@ async function message(close) {
 		if (win) win.location.href = result.url
 		else window.open(result.url, "_blank")
 		close()
+		if (!result.linked) {
+			toast({
+				title: __("{0} cannot open {1}, so the chat opens without the link.", [label.value, props.documentName]),
+				icon: "info",
+			})
+		}
 	} catch (e) {
 		win?.close()
 		toast({ title: e?.messages?.[0] || e?.message || __("Something went wrong"), icon: "x-circle", iconClasses: "text-ink-red-4" })
