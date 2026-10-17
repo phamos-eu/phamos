@@ -320,11 +320,7 @@ function focusTarget(target) {
 	}
 }
 
-/** Put the keyboard into the chat (the "C" shortcut while the column is shown). */
-function focus() {
-	frame.value?.contentWindow?.focus()
-}
-defineExpose({ focus, focusTarget, inColumn })
+defineExpose({ focusTarget, inColumn })
 
 onBeforeUnmount(() => {
 	removeGuard?.()
