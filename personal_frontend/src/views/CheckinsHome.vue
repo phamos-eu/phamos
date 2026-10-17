@@ -4,43 +4,43 @@
 			<div class="flex flex-wrap items-center justify-between gap-3">
 				<p class="text-sm text-ink-gray-6" aria-live="polite">{{ headline }}</p>
 				<div class="flex items-center gap-2">
-					<TabButtons v-model="period" :buttons="PERIOD_BUTTONS" />
+					<TabButtons v-model="period" :buttons="periodButtons" />
 				</div>
 			</div>
 
 			<div v-if="error" class="rounded-lg border border-outline-gray-2 bg-surface-red-1 p-4 text-sm text-ink-red-4">
 				{{ error }}
 			</div>
-			<div v-else-if="!data" class="flex min-h-64 items-center justify-center text-sm text-ink-gray-5">Loading…</div>
+			<div v-else-if="!data" class="flex min-h-64 items-center justify-center text-sm text-ink-gray-5">{{ __("Loading…") }}</div>
 			<div v-else-if="!data.state.employee" class="rounded-lg border border-outline-gray-2 bg-surface-white p-5 text-sm text-ink-gray-6">
-				Check-ins need an active Employee linked to your user. Please ask HR.
+				{{ __("Check-ins need an active Employee linked to your user. Please ask HR.") }}
 			</div>
 			<template v-else>
 				<section class="grid grid-cols-2 gap-3 xl:grid-cols-4">
-					<StatCard label="Today" :value="formatWorked(todayMinutes)" :hint="todayHint" />
+					<StatCard :label="__('Today')" :value="formatWorked(todayMinutes)" :hint="todayHint" />
 					<StatCard
-						:label="`Last ${period} days`"
+						:label="__('Last {0} days', [period])"
 						:value="formatWorked(totals.worked_minutes)"
-						:hint="`${totals.days_worked} days · this week ${formatWorked(totals.week_minutes)}`"
+						:hint="__('{0} days · this week {1}', [totals.days_worked, formatWorked(totals.week_minutes)])"
 					/>
-					<StatCard label="Average day" :value="totals.average_minutes == null ? '—' : formatWorked(totals.average_minutes)" hint="on days with check-ins" />
-					<StatCard label="Typical day" :value="typicalDay" hint="average first check-in and last check-out" />
+					<StatCard :label="__('Average day')" :value="totals.average_minutes == null ? '—' : formatWorked(totals.average_minutes)" :hint="__('on days with check-ins')" />
+					<StatCard :label="__('Typical day')" :value="typicalDay" :hint="__('average first check-in and last check-out')" />
 				</section>
 
 				<PeriodBars
-					title="Worked time"
-					:subtitle="period === 90 ? 'Hours per week, from check-in to check-out' : 'Hours per day, from check-in to check-out'"
+					:title="__('Worked time')"
+					:subtitle="period === 90 ? __('Hours per week, from check-in to check-out') : __('Hours per day, from check-in to check-out')"
 					:periods="bars"
-					:series="[{ label: 'Hours' }]"
+					:series="[{ label: __('Hours') }]"
 				/>
 
 				<section v-if="totals.missing_out.length" class="rounded-lg border border-outline-gray-2 bg-surface-white p-5">
-					<h2 class="text-base font-semibold text-ink-gray-9">Days without a check-out</h2>
-					<p class="mb-3 text-sm text-ink-gray-5">These days do not count as worked time. HR can add the missing check-out.</p>
+					<h2 class="text-base font-semibold text-ink-gray-9">{{ __("Days without a check-out") }}</h2>
+					<p class="mb-3 text-sm text-ink-gray-5">{{ __("These days do not count as worked time. HR can add the missing check-out.") }}</p>
 					<ul class="divide-y divide-outline-gray-1 text-sm">
 						<li v-for="day in totals.missing_out" :key="day.date" class="flex items-center justify-between py-2">
 							<span class="text-ink-gray-8">{{ dayLabel(day.date) }}</span>
-							<span class="text-ink-gray-5">checked in {{ shortTime(day.first_in) }}</span>
+							<span class="text-ink-gray-5">{{ __("checked in {0}", [shortTime(day.first_in)]) }}</span>
 						</li>
 					</ul>
 				</section>
@@ -56,11 +56,12 @@ import PeriodBars from "@spa/components/dashboard/PeriodBars.vue"
 import StatCard from "@spa/components/dashboard/StatCard.vue"
 import { useUserRealtime } from "@spa/composables/useUserRealtime.js"
 import { caption, formatWorked, liveWorkedMinutes } from "@spa/utils/checkinSummary.js"
-import { formatDate, formatTime } from "@spa/utils/datetime.js"
+import { formatDate, formatTime, userLocale, weekdayName } from "@spa/utils/datetime.js"
+import { __ } from "@spa/utils/i18n.js"
 import spaConfig from "@/config"
 
 const PERIOD_KEY = "personal-checkins-period"
-const PERIOD_BUTTONS = [7, 30, 90].map((value) => ({ label: `${value} days`, value }))
+const PERIOD_BUTTONS = [7, 30, 90].map((value) => ({ label: "{0} days", value }))
 
 const data = ref(null)
 const error = ref("")
@@ -69,14 +70,18 @@ const loadedAt = ref(Date.now())
 const tick = ref(Date.now())
 let ticker = null
 
+const periodButtons = computed(() => PERIOD_BUTTONS.map((button) => ({ ...button, label: __(button.label, [button.value]) })))
+
 const shortTime = (value) => (value ? formatTime(value).slice(0, 5) : "—")
 const totals = computed(() => data.value?.totals || {})
 const todayMinutes = computed(() => liveWorkedMinutes(data.value?.state, (tick.value - loadedAt.value) / 1000))
 const todayHint = computed(() => caption(data.value?.state, shortTime, (v) => formatDate(String(v).slice(0, 10))))
 const headline = computed(() => {
 	const state = data.value?.state
-	if (!state?.employee) return "Your check-ins and worked time."
-	return state.next_action === "OUT" ? `Checked in, ${caption(state, shortTime, (v) => formatDate(String(v).slice(0, 10)))}.` : "Checked out."
+	if (!state?.employee) return __("Your check-ins and worked time.")
+	return state.next_action === "OUT"
+		? __("Checked in, {0}.", [caption(state, shortTime, (v) => formatDate(String(v).slice(0, 10)))])
+		: __("Checked out.")
 })
 const typicalDay = computed(() => {
 	const { average_start: start, average_end: end } = totals.value
@@ -96,13 +101,13 @@ const bars = computed(() => {
 	}
 	if (period.value !== 90) {
 		// 30 bars only have room for the day of the month.
-		const label = (d) => (period.value === 7 ? d.toLocaleDateString([], { weekday: "short", day: "numeric" }) : String(d.getDate()))
+		const label = (d) => (period.value === 7 ? d.toLocaleDateString(userLocale(), { weekday: "short", day: "numeric" }) : String(d.getDate()))
 		return rows.map((r) => ({ label: label(r.date), values: [round1(r.minutes / 60)] }))
 	}
 	const weeks = []
 	for (const r of rows) {
 		const monday = new Date(r.date.getFullYear(), r.date.getMonth(), r.date.getDate() - ((r.date.getDay() + 6) % 7))
-		const label = monday.toLocaleDateString([], { day: "numeric", month: "short" })
+		const label = monday.toLocaleDateString(userLocale(), { day: "numeric", month: "short" })
 		if (!weeks.length || weeks[weeks.length - 1].label !== label) weeks.push({ label, minutes: 0 })
 		weeks[weeks.length - 1].minutes += r.minutes
 	}
@@ -115,7 +120,7 @@ function round1(value) {
 
 function dayLabel(value) {
 	const d = new Date(`${String(value).slice(0, 10)}T12:00:00`)
-	return `${d.toLocaleDateString([], { weekday: "long" })} ${formatDate(String(value).slice(0, 10))}`
+	return `${weekdayName(d)} ${formatDate(String(value).slice(0, 10))}`
 }
 
 function readPeriod() {
@@ -133,7 +138,7 @@ async function load() {
 		loadedAt.value = Date.now()
 		error.value = ""
 	} catch (e) {
-		error.value = e?.messages?.[0] || e?.message || "Could not load your check-ins"
+		error.value = e?.messages?.[0] || e?.message || __("Could not load your check-ins")
 	}
 }
 

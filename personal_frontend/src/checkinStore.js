@@ -4,6 +4,7 @@ import { reactive } from "vue"
 import { call } from "frappe-ui"
 import { formatTime } from "@spa/utils/datetime.js"
 import { notify } from "@spa/utils/notify.js"
+import { __ } from "@spa/utils/i18n.js"
 import spaConfig from "./config"
 
 export const checkin = reactive({
@@ -42,12 +43,12 @@ export function checkinUsable(state = checkin.state) {
 function currentPosition() {
 	return new Promise((resolve, reject) => {
 		if (!navigator.geolocation) {
-			reject(new Error("This browser cannot share its location."))
+			reject(new Error(__("This browser cannot share its location.")))
 			return
 		}
 		navigator.geolocation.getCurrentPosition(
 			(position) => resolve(position.coords),
-			() => reject(new Error("Please allow location access to check in.")),
+			() => reject(new Error(__("Please allow location access to check in."))),
 			{ enableHighAccuracy: true, timeout: 10000 }
 		)
 	})
@@ -71,9 +72,10 @@ export async function checkInOrOut(beforeCheckout = null) {
 		const result = await call(`${spaConfig.api}.add_checkin`, args)
 		setCheckin(result.state)
 		checkin.pending = result.state.can_revoke ? { ...result.log } : null
-		notify.success(`${logType === "IN" ? "Checked in" : "Checked out"} at ${formatTime(result.log.time).slice(0, 5)}`)
+		const time = formatTime(result.log.time).slice(0, 5)
+		notify.success(logType === "IN" ? __("Checked in at {0}", [time]) : __("Checked out at {0}", [time]))
 	} catch (e) {
-		notify.error(e?.messages?.[0] || e?.message || "That did not work")
+		notify.error(e?.messages?.[0] || e?.message || __("That did not work"))
 		loadCheckin()
 	} finally {
 		checkin.busy = false

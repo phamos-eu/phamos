@@ -16,6 +16,7 @@ import {
 import App from "./App.vue"
 import router from "./router"
 import { session } from "@spa/session.js"
+import { i18n } from "@spa/utils/i18n.js"
 
 setConfig("resourceFetcher", frappeRequest)
 syncThemeFromMediaPreference()
@@ -23,6 +24,7 @@ syncThemeFromMediaPreference()
 const app = createApp(App)
 app.use(FrappeUI)
 app.use(router)
+app.use(i18n)
 
 app.component("Button", Button)
 app.component("Dialog", Dialog)

@@ -17,6 +17,7 @@ personal modules (#1610).
 from datetime import datetime, time, timedelta
 
 import frappe
+from frappe import _
 from frappe.utils import flt, get_first_day, get_first_day_of_week, getdate, now_datetime, today
 
 from phamos.api import dashboard_metrics as dm
@@ -61,7 +62,8 @@ def _count_by(rows, key, order=None, empty_label="—"):
 	# first, so the bars always add up to the total (#1609).
 	known = [label for label in (order or []) if counts.get(label)]
 	rest = sorted((label for label in counts if label not in known), key=lambda label: -counts[label])
-	return [{"label": label, "value": counts[label]} for label in known + rest]
+	# Ordered by the raw value, shown translated (statuses and priorities are Frappe/ERPNext words).
+	return [{"label": _(label), "value": counts[label]} for label in known + rest]
 
 
 def _days_since(value, day):

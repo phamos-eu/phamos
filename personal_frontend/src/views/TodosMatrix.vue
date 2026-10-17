@@ -3,14 +3,14 @@
 		<div class="mx-auto flex max-w-7xl flex-col gap-4">
 			<div class="flex flex-wrap items-center justify-between gap-3">
 				<p class="text-sm text-ink-gray-6">
-					Pick the few that matter. Drag a ToDo, or focus it and press 1–4.
-					<span v-if="data">Urgent means due by {{ formatDate(data.urgent_until) }}.</span>
+					{{ __("Pick the few that matter. Drag a ToDo, or focus it and press 1–4.") }}
+					<span v-if="data">{{ __("Urgent means due by {0}.", [formatDate(data.urgent_until)]) }}</span>
 				</p>
 				<div class="flex items-center gap-2">
-					<TabButtons v-model="scope" :buttons="SCOPE_BUTTONS" />
+					<TabButtons v-model="scope" :buttons="SCOPE_BUTTONS.map((button) => ({ ...button, label: __(button.label) }))" />
 					<Button v-if="bucket('do').total" variant="solid" @click="showStartFocus = true">
 						<template #prefix><FeatherIcon name="target" class="h-4 w-4" /></template>
-						Focus on “Do now”
+						{{ __("Focus on “Do now”") }}
 					</Button>
 				</div>
 			</div>
@@ -19,25 +19,25 @@
 				{{ error }}
 			</div>
 			<div v-else-if="loading && !data" class="flex min-h-64 items-center justify-center text-sm text-ink-gray-5">
-				Loading your matrix…
+				{{ __("Loading your matrix…") }}
 			</div>
 			<template v-else-if="data">
 				<div class="grid grid-cols-[auto_minmax(0,1fr)_minmax(0,1fr)] gap-3">
 					<div />
-					<div class="text-center text-xs font-medium uppercase tracking-wide text-ink-gray-5">Urgent</div>
-					<div class="text-center text-xs font-medium uppercase tracking-wide text-ink-gray-5">Not urgent</div>
+					<div class="text-center text-xs font-medium uppercase tracking-wide text-ink-gray-5">{{ __("Urgent") }}</div>
+					<div class="text-center text-xs font-medium uppercase tracking-wide text-ink-gray-5">{{ __("Not urgent") }}</div>
 					<template v-for="row in ROWS" :key="row.label">
 						<div
 							class="flex items-center text-xs font-medium uppercase tracking-wide text-ink-gray-5 [writing-mode:vertical-rl] rotate-180"
 						>
-							{{ row.label }}
+							{{ __(row.label) }}
 						</div>
 						<section
 							v-for="q in row.quadrants"
 							:key="q.key"
 							class="flex min-h-56 min-w-0 flex-col rounded-lg border bg-surface-white p-4 transition"
 							:class="dropTarget === q.key ? 'border-outline-gray-5 ring-2 ring-outline-gray-3' : 'border-outline-gray-2'"
-							:aria-label="`${q.label}: ${q.hint}`"
+							:aria-label="`${__(q.label)}: ${__(q.hint)}`"
 							@dragover.prevent="dropTarget = q.key"
 							@dragleave="dropTarget === q.key && (dropTarget = '')"
 							@drop.prevent="onDrop(q.key)"
@@ -45,9 +45,9 @@
 							<header class="mb-3 flex items-baseline justify-between gap-2">
 								<div>
 									<h2 class="text-base font-semibold" :class="TITLE_CLASS[q.key]">
-										<span class="mr-1 text-xs text-ink-gray-4">{{ q.shortcut }}</span>{{ q.label }}
+										<span class="mr-1 text-xs text-ink-gray-4">{{ q.shortcut }}</span>{{ __(q.label) }}
 									</h2>
-									<p class="text-xs text-ink-gray-5">{{ q.hint }}</p>
+									<p class="text-xs text-ink-gray-5">{{ __(q.hint) }}</p>
 								</div>
 								<span class="text-sm text-ink-gray-6">{{ bucket(q.key).total }}</span>
 							</header>
@@ -62,7 +62,7 @@
 									data-list-item
 									class="group flex items-start gap-2 rounded-md border border-outline-gray-1 bg-surface-gray-1 px-2.5 py-2 text-sm outline-none focus:border-outline-gray-4 focus:bg-surface-gray-2"
 									:class="busy[todo.name] ? 'opacity-50' : 'cursor-grab'"
-									:aria-label="`${todo.summary}. Press 1 to 4 to move, Enter to open.`"
+									:aria-label="__('{0}. Press 1 to 4 to move, Enter to open.', [todo.summary])"
 									@dragstart="onDragStart($event, todo, q.key)"
 									@dragend="dragging = null; dropTarget = ''"
 									@keydown="onCardKey($event, todo)"
@@ -70,7 +70,7 @@
 									<input
 										type="checkbox"
 										class="mt-0.5 h-4 w-4 flex-none rounded border-outline-gray-3"
-										:aria-label="`Mark ${todo.summary} as done`"
+										:aria-label="__('Mark {0} as done', [todo.summary])"
 										:disabled="busy[todo.name]"
 										@click.stop="close(todo)"
 									/>
@@ -85,14 +85,14 @@
 										</button>
 										<div class="mt-0.5 flex flex-wrap gap-x-2 text-xs text-ink-gray-5">
 											<span v-if="todo.date" :class="todo.overdue ? 'text-ink-red-3' : ''">
-												{{ todo.overdue ? "overdue since" : "due" }} {{ formatDate(todo.date) }}
+												{{ todo.overdue ? __("overdue since {0}", [formatDate(todo.date)]) : __("due {0}", [formatDate(todo.date)]) }}
 											</span>
-											<span v-else>no due date</span>
+											<span v-else>{{ __("no due date") }}</span>
 											<span v-if="todo.estimate_minutes">~{{ estimateLabel(todo.estimate_minutes) }}</span>
 											<span
 												v-if="todo.reschedule_count"
 												:class="todo.reschedule_count >= 3 ? 'text-ink-red-3' : ''"
-												:title="`Postponed ${todo.reschedule_count} times`"
+												:title="__('Postponed {0} times', [todo.reschedule_count])"
 											>
 												↻ {{ todo.reschedule_count }}
 											</span>
@@ -102,14 +102,14 @@
 										size="sm"
 										variant="ghost"
 										class="hidden group-hover:inline-flex group-focus:inline-flex"
-										:aria-label="`Decide on ${todo.summary}`"
+										:aria-label="__('Decide on {0}', [todo.summary])"
 										@click.stop="decide(todo)"
 									>
-										Decide
+										{{ __("Decide") }}
 									</Button>
 								</li>
 							</ul>
-							<p v-else class="text-sm text-ink-gray-5">{{ EMPTY[q.key] }}</p>
+							<p v-else class="text-sm text-ink-gray-5">{{ __(EMPTY[q.key]) }}</p>
 
 							<button
 								v-if="bucket(q.key).total > bucket(q.key).items.length"
@@ -117,14 +117,18 @@
 								class="mt-2 self-start text-xs text-ink-gray-6 hover:underline"
 								@click="router.push({ name: 'TodosList' })"
 							>
-								{{ bucket(q.key).total - bucket(q.key).items.length }} more in the list
+								{{ __("{0} more in the list", [bucket(q.key).total - bucket(q.key).items.length]) }}
 							</button>
 						</section>
 					</template>
 				</div>
 				<p v-if="data.out_of_scope && scope === 'week'" class="text-xs text-ink-gray-5">
-					{{ pluralize(data.out_of_scope, "ToDo is", "ToDos are") }} due after this week and not marked important.
-					<button type="button" class="hover:underline" @click="scope = 'all'">Show all open</button>
+					{{
+						data.out_of_scope === 1
+							? __("1 ToDo is due after this week and not marked important.")
+							: __("{0} ToDos are due after this week and not marked important.", [data.out_of_scope])
+					}}
+					<button type="button" class="hover:underline" @click="scope = 'all'">{{ __("Show all open") }}</button>
 				</p>
 			</template>
 		</div>
@@ -140,16 +144,16 @@
 						v-model="moveDate"
 						type="date"
 						size="sm"
-						label="New due date"
+						:label="__('New due date')"
 						:min="data.next_after_urgent"
-						:description="`Not urgent means due after ${formatDate(data.urgent_until)}. The deadline moves, it does not disappear.`"
+						:description="__('Not urgent means due after {0}. The deadline moves, it does not disappear.', [formatDate(data.urgent_until)])"
 					/>
 					<FormControl
 						v-if="pending.needs.dueSoon"
 						v-model="moveDate"
 						type="date"
 						size="sm"
-						label="Due on"
+						:label="__('Due on')"
 						:min="data.today"
 						:max="data.urgent_until"
 					/>
@@ -158,17 +162,17 @@
 						v-model="payoffNote"
 						type="textarea"
 						size="sm"
-						label="What happens if this isn't done this week?"
-						placeholder="Optional. Kept as a comment on the ToDo."
+						:label="__('What happens if this isn\'t done this week?')"
+						:placeholder="__('Optional. Kept as a comment on the ToDo.')"
 					/>
 					<ErrorMessage :message="moveError" />
 					<div class="flex justify-end gap-2">
 						<Button v-if="pending.target === 'eliminate'" class="mr-auto" variant="subtle" @click="dropInstead">
-							Drop it instead
+							{{ __("Drop it instead") }}
 						</Button>
-						<Button variant="ghost" @click="showMove = false">Cancel</Button>
+						<Button variant="ghost" @click="showMove = false">{{ __("Cancel") }}</Button>
 						<Button variant="solid" :loading="moving" :disabled="pending.needs.laterDate && !moveDate" @click="applyMove">
-							Move to {{ quadrant(pending.target).label }}
+							{{ __("Move to {0}", [__(quadrant(pending.target).label)]) }}
 						</Button>
 					</div>
 				</div>
@@ -191,8 +195,8 @@ import { notify } from "@spa/utils/notify.js"
 import DecideTodoDialog from "@spa/components/DecideTodoDialog.vue"
 import StartFocusDialog from "@/components/StartFocusDialog.vue"
 import { useUserRealtime } from "@spa/composables/useUserRealtime.js"
-import { pluralize } from "@spa/utils/dashboardFormat.js"
 import { formatDate } from "@spa/utils/datetime.js"
+import { __ } from "@spa/utils/i18n.js"
 import { moveNeeds, quadrant, quadrantForShortcut } from "@spa/utils/eisenhower.js"
 import spaConfig from "@/config"
 
@@ -240,7 +244,7 @@ const showDecide = ref(false)
 const showStartFocus = ref(false)
 const decideQueue = ref([])
 
-const moveTitle = computed(() => (pending.value ? `Move to ${quadrant(pending.value.target).label}` : "Move"))
+const moveTitle = computed(() => (pending.value ? __("Move to {0}", [__(quadrant(pending.value.target).label)]) : __("Move")))
 
 function readScope() {
 	try {
@@ -260,7 +264,7 @@ function setCardRef(name, el) {
 }
 
 function estimateLabel(minutes) {
-	return minutes >= 60 ? `${Math.round((minutes / 60) * 10) / 10} h` : `${minutes} min`
+	return minutes >= 60 ? __("{0} h", [Math.round((minutes / 60) * 10) / 10]) : __("{0} min", [minutes])
 }
 
 async function load() {
@@ -269,7 +273,7 @@ async function load() {
 	try {
 		data.value = await call(`${API}.get_todo_matrix`, { scope: scope.value })
 	} catch (e) {
-		error.value = e?.messages?.[0] || e?.message || "Could not load your matrix"
+		error.value = e?.messages?.[0] || e?.message || __("Could not load your matrix")
 	} finally {
 		loading.value = false
 	}
@@ -288,10 +292,10 @@ async function close(todo) {
 	busy.value = { ...busy.value, [todo.name]: true }
 	try {
 		await call(`${API}.close_todo`, { name: todo.name })
-		notify.success("Done. One less.")
+		notify.success(__("Done. One less."))
 		await load()
 	} catch (e) {
-		notify.error(e?.messages?.[0] || e?.message || "Could not close the ToDo")
+		notify.error(e?.messages?.[0] || e?.message || __("Could not close the ToDo"))
 	} finally {
 		const { [todo.name]: _, ...rest } = busy.value
 		busy.value = rest
@@ -328,7 +332,7 @@ async function applyMove() {
 		await load()
 		cardRefs.get(todo.name)?.focus()
 	} catch (e) {
-		const message = e?.messages?.[0] || e?.message || "Could not move the ToDo"
+		const message = e?.messages?.[0] || e?.message || __("Could not move the ToDo")
 		if (showMove.value) moveError.value = message
 		else notify.error(message)
 	} finally {

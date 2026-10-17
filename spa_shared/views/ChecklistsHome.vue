@@ -5,7 +5,7 @@
 				{{ error }}
 			</div>
 			<div v-else-if="loading" class="flex min-h-64 items-center justify-center text-sm text-ink-gray-5">
-				Loading checklist dashboard…
+				{{ __("Loading checklist dashboard…") }}
 			</div>
 			<template v-else>
 				<section class="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-5">
@@ -15,23 +15,23 @@
 						:label="stat.label"
 						:value="stat.value"
 						:lines="[
-							`${comparison(stat, 'previous')} vs previous 90 days`,
-							`${comparison(stat, 'year_ago')} vs same period last year`,
+							__('{0} vs previous 90 days', [comparison(stat, 'previous')]),
+							__('{0} vs same period last year', [comparison(stat, 'year_ago')]),
 						]"
 					/>
 				</section>
 
 				<PeriodBars
-					title="Created and completed"
-					subtitle="Monthly throughput for the last 12 months"
+					:title="__('Created and completed')"
+					:subtitle="__('Monthly throughput for the last 12 months')"
 					:periods="monthlyPeriods"
-					:series="[{ label: 'Created' }, { label: 'Completed' }]"
+					:series="[{ label: __('Created') }, { label: __('Completed') }]"
 				/>
 
 				<div class="grid grid-cols-1 gap-5 xl:grid-cols-3">
-					<HorizontalBars title="Open by status" :rows="dashboard.status" />
-					<HorizontalBars title="Open by owner" :rows="dashboard.owners" />
-					<HorizontalBars title="Aging of open checklists" :rows="dashboard.aging" />
+					<HorizontalBars :title="__('Open by status')" :rows="dashboard.status" />
+					<HorizontalBars :title="__('Open by owner')" :rows="dashboard.owners" />
+					<HorizontalBars :title="__('Aging of open checklists')" :rows="dashboard.aging" />
 				</div>
 			</template>
 		</div>
@@ -45,6 +45,7 @@ import HorizontalBars from "@spa/components/dashboard/HorizontalBars.vue"
 import PeriodBars from "@spa/components/dashboard/PeriodBars.vue"
 import StatCard from "@spa/components/dashboard/StatCard.vue"
 import { formatComparison } from "@spa/utils/dashboardFormat.js"
+import { __ } from "@spa/utils/i18n.js"
 import spaConfig from "@/config"
 
 const loading = ref(true)
@@ -54,19 +55,19 @@ const dashboard = ref({ windows: {}, monthly: [], status: [], owners: [], aging:
 const stats = computed(() => {
 	const current = dashboard.value.windows?.current || {}
 	return [
-		{ key: "created", label: "Created", value: current.created ?? 0, kind: "number" },
-		{ key: "completed", label: "Completed", value: current.completed ?? 0, kind: "number" },
-		{ key: "open", label: "Open now", value: current.open ?? 0, kind: "level" },
+		{ key: "created", label: __("Created"), value: current.created ?? 0, kind: "number" },
+		{ key: "completed", label: __("Completed"), value: current.completed ?? 0, kind: "number" },
+		{ key: "open", label: __("Open now"), value: current.open ?? 0, kind: "level" },
 		{
 			key: "completion_rate",
-			label: "Completion rate",
+			label: __("Completion rate"),
 			value: `${current.completion_rate ?? 0}%`,
 			kind: "percent",
 		},
 		{
 			key: "median_days",
-			label: "Median completion",
-			value: current.median_days == null ? "—" : `${current.median_days}d`,
+			label: __("Median completion"),
+			value: current.median_days == null ? "—" : __("{0}d", [current.median_days]),
 			kind: "days",
 		},
 	]
@@ -91,7 +92,7 @@ onMounted(async () => {
 	try {
 		dashboard.value = await call(`${spaConfig.api}.get_checklist_dashboard`)
 	} catch (e) {
-		error.value = e?.messages?.[0] || e?.message || "Could not load checklist dashboard"
+		error.value = e?.messages?.[0] || e?.message || __("Could not load checklist dashboard")
 	} finally {
 		loading.value = false
 	}

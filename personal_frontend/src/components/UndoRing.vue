@@ -2,8 +2,8 @@
 	<button
 		type="button"
 		class="relative flex h-7 items-center gap-1.5 rounded px-1.5 text-sm text-ink-gray-8 hover:bg-surface-gray-2"
-		:aria-label="label"
-		:title="label"
+		:aria-label="label || __('Undo')"
+		:title="label || __('Undo')"
 		@click="emit('undo')"
 	>
 		<svg class="h-6 w-6 -rotate-90" viewBox="0 0 24 24" aria-hidden="true">
@@ -22,7 +22,7 @@
 				{{ remaining }}
 			</text>
 		</svg>
-		<span>Undo</span>
+		<span>{{ __("Undo") }}</span>
 	</button>
 </template>
 
@@ -31,7 +31,7 @@ import { onBeforeUnmount, onMounted, ref } from "vue"
 
 const props = defineProps({
 	seconds: { type: Number, default: 10 },
-	label: { type: String, default: "Undo" },
+	label: { type: String, default: "" },
 })
 const emit = defineEmits(["undo", "expired"])
 

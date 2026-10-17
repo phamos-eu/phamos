@@ -9,7 +9,7 @@
 				{{ weekday }}
 			</div>
 			<div class="transition-all" :class="active || isToday ? 'text-sm' : 'text-xs'">{{ formatDate(date) }}</div>
-			<span v-if="isToday" class="mt-1 inline-block rounded bg-surface-blue-2 px-1.5 py-0.5 text-xs font-medium text-ink-blue-3">Today</span>
+			<span v-if="isToday" class="mt-1 inline-block rounded bg-surface-blue-2 px-1.5 py-0.5 text-xs font-medium text-ink-blue-3">{{ __("Today") }}</span>
 			<div v-if="summary && !compact" class="mt-1 text-xs text-ink-gray-5">{{ summary }}</div>
 		</aside>
 
@@ -23,12 +23,12 @@
 				class="w-full rounded-lg border border-dashed border-outline-gray-3 px-4 py-2 text-left text-sm text-ink-gray-6 hover:bg-surface-gray-2"
 				@click="plannerOpen = true"
 			>
-				{{ day.plan ? `Planned: ${planCount} ToDos. Open the plan` : "Plan this day" }}
+				{{ day.plan ? (planCount === 1 ? __("Planned: 1 ToDo. Open the plan") : __("Planned: {0} ToDos. Open the plan", [planCount])) : __("Plan this day") }}
 			</button>
 			<div v-else-if="day.plan" class="rounded-lg border border-outline-gray-2 bg-surface-white px-4 py-3 text-sm">
 				<div class="text-ink-gray-8">{{ journalText }}</div>
 				<p v-if="day.plan.reflection" class="mt-1 italic text-ink-gray-6">“{{ day.plan.reflection }}”</p>
-				<p v-if="day.plan.status !== 'Closed'" class="mt-1 text-xs text-ink-gray-5">This day was never shut down.</p>
+				<p v-if="day.plan.status !== 'Closed'" class="mt-1 text-xs text-ink-gray-5">{{ __("This day was never shut down.") }}</p>
 			</div>
 
 			<!-- Time axis -->
@@ -40,7 +40,7 @@
 						:style="{ height: `${row.height}px` }"
 					>
 						<span class="w-12 tabular-nums">{{ minuteLabel(row.start) }}</span>
-						<span>· {{ formatGap(row.minutes) }} without entries ·</span>
+						<span>· {{ __("{0} without entries", [formatGap(row.minutes)]) }} ·</span>
 					</div>
 					<div v-else class="relative" :style="{ height: `${row.height}px` }">
 						<!-- hour ticks -->
@@ -64,7 +64,7 @@
 							@click="selected = selected?.id === block.id ? null : block"
 						>
 							<span v-if="block.height >= 18" class="block truncate font-medium">{{ block.log.project_name }}</span>
-							<span v-if="block.height >= 34" class="block truncate">{{ block.kind === "break" ? "Break" : block.log.goal }}</span>
+							<span v-if="block.height >= 34" class="block truncate">{{ block.kind === "break" ? __("Break") : block.log.goal }}</span>
 						</button>
 						<!-- check-ins and ToDos; a point pushed down for room keeps a tick at its exact time -->
 						<span
@@ -89,7 +89,7 @@
 						</button>
 						<!-- now -->
 						<div v-if="row.nowTop !== null" class="pointer-events-none absolute inset-x-0 border-t-2 border-ink-red-3" :style="{ top: `${row.nowTop}px` }">
-							<span class="absolute -top-2.5 left-14 rounded bg-surface-red-2 px-1 text-[10px] text-ink-red-4">now</span>
+							<span class="absolute -top-2.5 left-14 rounded bg-surface-red-2 px-1 text-[10px] text-ink-red-4">{{ __("now") }}</span>
 						</div>
 					</div>
 				</template>
@@ -101,14 +101,14 @@
 							<div class="text-ink-gray-7">{{ selected.log.goal }}</div>
 							<div v-if="selected.log.result" class="mt-1 text-ink-gray-6">{{ selected.log.result }}</div>
 							<div class="mt-1 text-xs text-ink-gray-5">
-								{{ minuteLabel(selected.start) }} – {{ selected.running ? "now" : minuteLabel(selected.end) }}
-								· {{ selected.kind === "break" ? "break" : selected.log.activity_type || "work" }}
-								<template v-if="selected.kind !== 'break' && selected.log.docstatus === 1">· {{ selected.log.percent_billable }} % billable</template>
-								<template v-if="selected.log.docstatus === 0">· running</template>
+								{{ minuteLabel(selected.start) }} – {{ selected.running ? __("now") : minuteLabel(selected.end) }}
+								· {{ selected.kind === "break" ? __("break") : selected.log.activity_type || __("work") }}
+								<template v-if="selected.kind !== 'break' && selected.log.docstatus === 1">· {{ __("{0} % billable", [selected.log.percent_billable]) }}</template>
+								<template v-if="selected.log.docstatus === 0">· {{ __("running") }}</template>
 							</div>
 						</div>
 						<button type="button" class="text-xs text-ink-gray-5 hover:underline" @click="openDesk(deskRecordUrl('Timesheet Record', selected.log.name))">
-							Desk ↗
+							{{ __("Desk") }} ↗
 						</button>
 					</div>
 				</div>
@@ -121,7 +121,8 @@
 import { computed, ref } from "vue"
 import { useRouter } from "vue-router"
 import { openDesk } from "@spa/utils/appWindow.js"
-import { formatDate } from "@spa/utils/datetime.js"
+import { formatDate, weekdayName } from "@spa/utils/datetime.js"
+import { __ } from "@spa/utils/i18n.js"
 import { deskRecordUrl } from "@spa/utils/deskUrl.js"
 import { formatGap, layoutDay } from "@spa/utils/timelineLayout.js"
 import DayPlanner from "./DayPlanner.vue"
@@ -147,26 +148,26 @@ const isFuture = computed(() => props.date > props.today)
 // Past days with nothing at all, and future days without a plan, collapse to one line.
 const compact = computed(() => !isToday.value && !isFuture.value && !props.events.length && !props.day.plan)
 const layout = computed(() => (isFuture.value ? { rows: [] } : layoutDay(props.events, { now: isToday.value ? props.nowMinute : null })))
-const weekday = computed(() => new Date(`${props.date}T12:00:00`).toLocaleDateString([], { weekday: "long" }))
+const weekday = computed(() => weekdayName(props.date, "long"))
 const planCount = computed(() => {
 	const c = props.day.plan?.counts || {}
 	return (c.done || 0) + (c.moved || 0) + (c.dropped || 0) + (c.open || 0)
 })
 const journalText = computed(() => {
 	const c = props.day.plan?.counts || {}
-	const parts = [`${c.done || 0} done`]
-	if (c.moved) parts.push(`${c.moved} moved`)
-	if (c.dropped) parts.push(`${c.dropped} dropped`)
-	if (c.open) parts.push(`${c.open} left open`)
-	return `Plan: ${parts.join(", ")}.`
+	const parts = [__("{0} done", [c.done || 0])]
+	if (c.moved) parts.push(__("{0} moved", [c.moved]))
+	if (c.dropped) parts.push(__("{0} dropped", [c.dropped]))
+	if (c.open) parts.push(__("{0} left open", [c.open]))
+	return __("Plan: {0}.", [parts.join(", ")])
 })
 const summary = computed(() => {
 	const worked = props.events.filter((e) => e.kind === "work").reduce((sum, e) => sum + (e.end - e.start), 0)
 	const done = props.events.filter((e) => e.type === "todo").length
 	const parts = []
-	if (worked) parts.push(`${formatGap(worked)} logged`)
-	if (done) parts.push(`${done} ToDo${done === 1 ? "" : "s"} done`)
-	if (compact.value && !parts.length) return isFuture.value ? "" : "nothing recorded"
+	if (worked) parts.push(__("{0} logged", [formatGap(worked)]))
+	if (done) parts.push(done === 1 ? __("1 ToDo done") : __("{0} ToDos done", [done]))
+	if (compact.value && !parts.length) return isFuture.value ? "" : __("nothing recorded")
 	return parts.join(" · ")
 })
 
@@ -187,8 +188,8 @@ function blockStyle(block, lanes) {
 }
 
 function blockTitle(block) {
-	const what = block.kind === "break" ? "Break" : block.log.goal
-	return `${minuteLabel(block.start)}–${block.running ? "now" : minuteLabel(block.end)} ${block.log.project_name}: ${what}`
+	const what = block.kind === "break" ? __("Break") : block.log.goal
+	return `${minuteLabel(block.start)}–${block.running ? __("now") : minuteLabel(block.end)} ${block.log.project_name}: ${what}`
 }
 
 function openPoint(point) {

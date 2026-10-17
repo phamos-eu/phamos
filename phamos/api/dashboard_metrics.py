@@ -10,6 +10,7 @@ helpers serve ToDos (cockpit_closed_on) and later other records.
 import math
 from datetime import timedelta
 
+from frappe import _
 from frappe.utils import get_datetime
 
 
@@ -44,7 +45,8 @@ def percentile(values, p):
 
 def age_buckets(rows, now, buckets, created_field="creation"):
 	"""Count rows per age bucket ((label, min_days, max_days or None), ...)."""
-	result = [{"label": label, "value": 0} for label, _min, _max in buckets]
+	# Labels go out translated (#1605); the buckets are matched by position, never by label.
+	result = [{"label": _(label), "value": 0} for label, _min, _max in buckets]
 	for row in rows:
 		created = _dt(row.get(created_field))
 		if not created:
@@ -62,7 +64,8 @@ def period_windows(now, days):
 	end = now.replace(hour=0, minute=0, second=0, microsecond=0) + timedelta(days=1)
 	if days <= 7:
 		return [
-			(start.strftime("%a"), start, start + timedelta(days=1))
+			# strftime gives the English abbreviation; it is translated like any other label (#1605).
+			(_(start.strftime("%a")), start, start + timedelta(days=1))
 			for start in (end - timedelta(days=offset) for offset in range(days, 0, -1))
 		]
 	weeks = math.ceil(days / 7)
@@ -71,5 +74,5 @@ def period_windows(now, days):
 	windows = []
 	for offset in range(weeks - 1, -1, -1):
 		start = monday - timedelta(weeks=offset)
-		windows.append((f"W{start.isocalendar()[1]}", start, min(start + timedelta(days=7), end)))
+		windows.append((_("W{0}").format(start.isocalendar()[1]), start, min(start + timedelta(days=7), end)))
 	return windows

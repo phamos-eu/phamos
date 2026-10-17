@@ -26,7 +26,8 @@
 import { computed, onBeforeUnmount, onMounted } from "vue"
 import { call } from "frappe-ui"
 import { caption, isUndoKey } from "@spa/utils/checkinSummary.js"
-import { formatTime as formatTimeFull, parseSystemDatetimeToUserDate } from "@spa/utils/datetime.js"
+import { formatTime as formatTimeFull, parseSystemDatetimeToUserDate, weekdayName } from "@spa/utils/datetime.js"
+import { __ } from "@spa/utils/i18n.js"
 import { notify } from "@spa/utils/notify.js"
 import spaConfig from "@/config"
 import { checkin, checkinUsable, loadCheckin, setCheckin } from "@/checkinStore.js"
@@ -41,14 +42,16 @@ const usable = computed(() => checkinUsable(state.value))
 const captionText = computed(() => caption(state.value, formatTime, formatDay))
 const undoLabel = computed(() => {
 	const pending = checkin.pending
-	if (!pending) return "Undo"
-	const what = pending.log_type === "IN" ? "check-in" : "check-out"
-	return `Revoke the ${what} at ${formatTime(pending.time)} (Ctrl+Z)`
+	if (!pending) return __("Undo")
+	const time = formatTime(pending.time)
+	return pending.log_type === "IN"
+		? __("Revoke the check-in at {0} (Ctrl+Z)", [time])
+		: __("Revoke the check-out at {0} (Ctrl+Z)", [time])
 })
 
 function formatDay(value) {
 	const date = parseSystemDatetimeToUserDate(String(value))
-	return date ? date.toLocaleDateString([], { weekday: "short" }) : ""
+	return date ? weekdayName(date, "short") : ""
 }
 
 function errorText(e, fallback) {
@@ -61,9 +64,9 @@ async function revoke() {
 	checkin.pending = null
 	try {
 		setCheckin(await call(`${API}.revoke_checkin`, { name: pending.name }))
-		notify.success(pending.log_type === "IN" ? "Check-in revoked" : "Check-out revoked")
+		notify.success(pending.log_type === "IN" ? __("Check-in revoked") : __("Check-out revoked"))
 	} catch (e) {
-		notify.error(errorText(e, "Could not revoke it"))
+		notify.error(errorText(e, __("Could not revoke it")))
 		loadCheckin()
 	}
 }

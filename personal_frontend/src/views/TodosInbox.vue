@@ -9,14 +9,14 @@
 					v-model="search"
 					type="text"
 					size="sm"
-					placeholder="Search ToDos and references…"
+					:placeholder="__('Search ToDos and references…')"
 					class="w-full min-w-0 max-w-xs"
 				/>
 				<InboxStatusFilter
 					v-model="includeClosed"
-					active-label="Open"
-					include-label="Include done"
-					aria-label="Which ToDos to show"
+					:active-label="__('Open')"
+					:include-label="__('Include done')"
+					:aria-label="__('Which ToDos to show')"
 				/>
 				<span class="text-xs text-ink-gray-5">{{ countLabel }}</span>
 				<button
@@ -25,26 +25,30 @@
 					class="rounded-full px-2 py-0.5 text-xs transition"
 					:class="staleOnly ? 'bg-surface-gray-7 text-ink-white' : 'bg-surface-gray-2 text-ink-gray-7 hover:bg-surface-gray-3'"
 					:aria-pressed="staleOnly"
-					title="Overdue for more than two weeks, or postponed three times or more"
+					:title="__('Overdue for more than two weeks, or postponed three times or more')"
 					@click="staleOnly = !staleOnly"
 				>
-					Stale ({{ staleCount }})
+					{{ __("Stale ({0})", [staleCount]) }}
 				</button>
-				<Button v-if="staleOnly && staleCount" size="sm" @click="decideStale">Decide all</Button>
+				<Button v-if="staleOnly && staleCount" size="sm" @click="decideStale">{{ __("Decide all") }}</Button>
 			</div>
 
 			<div v-if="error" class="flex flex-1 items-center justify-center px-6 text-sm text-red-600">
 				{{ error }}
 			</div>
 			<div v-else-if="loading && !todos.length" class="flex flex-1 items-center justify-center text-sm text-ink-gray-5">
-				Loading…
+				{{ __("Loading…") }}
 			</div>
 			<div v-else-if="!filtered.length" class="flex flex-1 flex-col items-center justify-center gap-2 px-6 text-center">
-				<p class="font-medium text-ink-gray-9">{{ search ? "No matching ToDos" : "Nothing on your list" }}</p>
+				<p class="font-medium text-ink-gray-9">{{ search ? __("No matching ToDos") : __("Nothing on your list") }}</p>
 				<p class="text-sm text-ink-gray-5">
-					{{ search ? "Try another search." : "ToDos assigned to you, and the ones you create here, show up in this list." }}
+					{{
+						search
+							? __("Try another search.")
+							: __("ToDos assigned to you, and the ones you create here, show up in this list.")
+					}}
 				</p>
-				<Button v-if="!search" class="mt-2" @click="showCreate = true">Create a ToDo</Button>
+				<Button v-if="!search" class="mt-2" @click="showCreate = true">{{ __("Create a ToDo") }}</Button>
 			</div>
 			<div v-else class="min-h-0 flex-1 overflow-y-auto px-4">
 				<TodoList :todos="filtered" :selected-name="selectedName" :busy="busy" @select="openTodo" @toggle="toggle" />
@@ -56,7 +60,7 @@
 			<div v-else-if="detailError" class="flex h-full items-center justify-center px-6 text-sm text-red-600">
 				{{ detailError }}
 			</div>
-			<div v-else class="flex h-full items-center justify-center text-sm text-ink-gray-5">Loading…</div>
+			<div v-else class="flex h-full items-center justify-center text-sm text-ink-gray-5">{{ __("Loading…") }}</div>
 		</section>
 
 		<CreateTodoDialog v-model="showCreate" @created="onCreated" />
@@ -75,6 +79,7 @@ import CreateTodoDialog from "@spa/components/CreateTodoDialog.vue"
 import DecideTodoDialog from "@spa/components/DecideTodoDialog.vue"
 import { useUserRealtime } from "@spa/composables/useUserRealtime.js"
 import { matchesTodo, sortTodos } from "@spa/utils/todoSort.js"
+import { __ } from "@spa/utils/i18n.js"
 import spaConfig from "@/config"
 
 const props = defineProps({
@@ -111,7 +116,7 @@ function decideStale() {
 const countLabel = computed(() => {
 	const open = todos.value.filter((t) => t.status === "Open")
 	const overdue = open.filter((t) => t.overdue).length
-	return overdue ? `${open.length} open · ${overdue} overdue` : `${open.length} open`
+	return overdue ? __("{0} open · {1} overdue", [open.length, overdue]) : __("{0} open", [open.length])
 })
 
 function message(e, fallback) {
@@ -124,7 +129,7 @@ async function loadTodos() {
 	try {
 		todos.value = await call(`${API}.get_my_todos`, { include_closed: includeClosed.value ? 1 : 0 })
 	} catch (e) {
-		error.value = message(e, "Could not load your ToDos")
+		error.value = message(e, __("Could not load your ToDos"))
 	} finally {
 		loading.value = false
 	}
@@ -145,7 +150,7 @@ async function loadSelected() {
 	try {
 		selected.value = await call(`${API}.get_todo`, { name: selectedName.value })
 	} catch (e) {
-		detailError.value = message(e, "Could not open this ToDo")
+		detailError.value = message(e, __("Could not open this ToDo"))
 	}
 }
 
@@ -172,10 +177,10 @@ async function toggle(todo) {
 		const updated = await call(`${API}.${method}`, { name: todo.name })
 		applyUpdate(updated)
 		if (updated.status === "Closed") {
-			toast({ title: "Marked as done", icon: "check-circle", iconClasses: "text-ink-green-4" })
+			toast({ title: __("Marked as done"), icon: "check-circle", iconClasses: "text-ink-green-4" })
 		}
 	} catch (e) {
-		toast({ title: message(e, "Could not change the ToDo"), icon: "x-circle", iconClasses: "text-ink-red-4" })
+		toast({ title: message(e, __("Could not change the ToDo")), icon: "x-circle", iconClasses: "text-ink-red-4" })
 	} finally {
 		busy.value = ""
 	}

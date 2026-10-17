@@ -2,6 +2,7 @@
 // break start, its own `server_now`); between reloads the clock is advanced locally, and only
 // while the session is running, the same way the Developer Action Panel counts.
 import { secondsBetween } from "./focusRules.js"
+import { __ } from "./i18n.js"
 
 export const MIN_EXPECTED_MINUTES = 15
 export const MIN_BREAK_MINUTES = 1
@@ -26,11 +27,11 @@ export function formatClock(seconds) {
 
 export function formatMinutes(seconds) {
 	const minutes = Math.round(Math.abs(seconds) / 60)
-	if (minutes === 0) return "under a minute"
-	if (minutes < 60) return `${minutes} min`
+	if (minutes === 0) return __("under a minute")
+	if (minutes < 60) return __("{0} min", [minutes])
 	const h = Math.floor(minutes / 60)
 	const m = minutes % 60
-	return m ? `${h} h ${m} min` : `${h} h`
+	return m ? __("{0} h {1} min", [h, m]) : __("{0} h", [h])
 }
 
 // "12 min left" or "8 min over" against the expected time; empty without one.
@@ -38,7 +39,7 @@ export function budgetText(session, elapsed) {
 	const expected = session?.expected_time || 0
 	if (!expected) return ""
 	const rest = expected - elapsed
-	return rest >= 0 ? `${formatMinutes(rest)} left` : `${formatMinutes(rest)} over`
+	return rest >= 0 ? __("{0} left", [formatMinutes(rest)]) : __("{0} over", [formatMinutes(rest)])
 }
 
 export function isOverBudget(session, elapsed) {

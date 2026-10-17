@@ -18,7 +18,7 @@
 				<div class="flex items-start justify-between gap-2">
 					<h2 class="text-base font-semibold text-ink-gray-9">{{ challenge.title }}</h2>
 					<Dropdown v-if="challenge.status === 'Active'" :options="menu" placement="right">
-						<Button variant="ghost" size="sm" aria-label="Challenge options">
+						<Button variant="ghost" size="sm" :aria-label="__('Challenge options')">
 							<FeatherIcon name="more-horizontal" class="h-4 w-4" />
 						</Button>
 					</Dropdown>
@@ -36,7 +36,7 @@
 			</div>
 		</div>
 
-		<ol class="mt-4 flex flex-wrap gap-1" aria-label="Days of the challenge">
+		<ol class="mt-4 flex flex-wrap gap-1" :aria-label="__('Days of the challenge')">
 			<li
 				v-for="day in challenge.days"
 				:key="day.date"
@@ -52,6 +52,7 @@
 import { computed } from "vue"
 import { Dropdown } from "frappe-ui"
 import { formatDate } from "@spa/utils/datetime.js"
+import { __ } from "@spa/utils/i18n.js"
 import {
 	dayState,
 	finishedText,
@@ -74,7 +75,7 @@ const dash = computed(() => ringFraction(props.challenge) * CIRCUMFERENCE)
 const streak = computed(() => streakText(props.challenge))
 const welcome = computed(() => welcomeText(props.challenge))
 const repair = computed(() => repairText(props.challenge))
-const menu = [{ label: "End this challenge", icon: "flag", onClick: () => emit("end", props.challenge) }]
+const menu = computed(() => [{ label: __("End this challenge"), icon: "flag", onClick: () => emit("end", props.challenge) }])
 
 const TONES = {
 	met: "background: var(--ink-green-3)",
@@ -85,11 +86,12 @@ const TONES = {
 }
 
 function dayTitle(day) {
-	let detail = ""
-	if (day.closes != null) {
-		detail = props.challenge.split ? ` (${day.planned} planned, ${day.spontaneous} spontaneous)` : ` (${day.closes} closed)`
-	}
-	return `${formatDate(day.date)}: ${dayState(day.result).label}${detail}`
+	const date = formatDate(day.date)
+	const state = dayState(day.result).label
+	if (day.closes == null) return `${date}: ${state}`
+	return props.challenge.split
+		? __("{0}: {1} ({2} planned, {3} spontaneous)", [date, state, day.planned, day.spontaneous])
+		: __("{0}: {1} ({2} closed)", [date, state, day.closes])
 }
 
 function dayStyle(day) {
