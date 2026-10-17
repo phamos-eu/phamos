@@ -27,9 +27,8 @@
 		>
 			<template v-if="alignWithFilters && !compact">
 				<div class="min-w-0">
-					<div class="flex items-center gap-1.5 text-xs font-semibold text-ink-gray-6">
+					<div class="text-xs font-semibold text-ink-gray-6">
 						{{ issue.name }}
-						<IssueChatIndicator :issue-name="issue.name" :state="chatStates[issue.name]" @open="emit('select', $event)" />
 					</div>
 					<div
 						class="truncate text-sm font-medium text-ink-gray-9"
@@ -43,6 +42,14 @@
 					>
 						{{ metaParts(issue).join(" · ") }}
 					</div>
+				</div>
+				<div class="flex min-w-0 justify-center">
+					<IssueChatIndicator
+						size="lg"
+						:issue-name="issue.name"
+						:state="chatStates[issue.name]"
+						@open="emit('select', $event)"
+					/>
 				</div>
 				<div class="flex min-w-0 justify-center">
 					<Badge

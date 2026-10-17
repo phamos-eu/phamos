@@ -149,8 +149,16 @@ function onPanelClosed() {
 async function honourOpenRequest() {
 	// Wait for this Issue's state; refresh() calls again once it is loaded.
 	if (issueChatStore.openRequest !== props.issueName || !state.value.channel_id) return
+	// Let the panel mount first: only then is it known whether the chat is a column.
+	await nextTick()
+	if (issueChatStore.openRequest !== props.issueName) return
+	const target = issueChatStore.openTarget
 	if (docked.value) {
-		issueChatStore.openRequest = null // the column already shows it
+		// The column already shows the chat; go to the message the list pointed at.
+		issueChatStore.openRequest = null
+		issueChatStore.openTarget = null
+		await nextTick()
+		panelRef.value?.focusTarget(target)
 		return
 	}
 	// Only the button on the page takes it, not a kept-alive copy.
@@ -159,7 +167,10 @@ async function honourOpenRequest() {
 	if (!el?.isConnected || el.offsetParent === null) return
 	if (issueChatStore.openRequest !== props.issueName) return
 	issueChatStore.openRequest = null
-	if (!drawerOpen.value) onClick()
+	issueChatStore.openTarget = null
+	if (!drawerOpen.value) await onClick()
+	await nextTick()
+	panelRef.value?.focusTarget(target)
 }
 
 /** Start or join the chat; true when the user is in it afterwards. */
