@@ -65,6 +65,10 @@ class AccountingReceipt(Document):
 		"""
 		self.check_permission("write")
 		frappe.has_permission("Purchase Invoice", "create", throw=True)
+		if self.get("items"):
+			from phamos.accounting.branching import make_purchase_invoice
+
+			return make_purchase_invoice(self)
 		is_return = bool(self.is_return)
 
 		pi = frappe.new_doc("Purchase Invoice")

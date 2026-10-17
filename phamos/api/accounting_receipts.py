@@ -168,7 +168,7 @@ RECEIPT_EDITABLE_FIELDS = (
 	"payment_date",
 	"items",
 )
-ITEM_EDITABLE_FIELDS = ("item_name", "qty", "rate", "amount", "tax_rate", "item_code", "expense_account", "cost_center", "project")
+ITEM_EDITABLE_FIELDS = ("item_name", "qty", "rate", "amount", "tax_rate", "expense_account", "cost_center", "project")
 
 
 @frappe.whitelist(methods=["POST"])
@@ -601,3 +601,26 @@ def send_receipts_to_datev(names):
 			result = {"ok": False, "message": _("Not permitted")}
 		(sent.append(name) if result.get("ok") else failed.append({"name": name, "message": result.get("message")}))
 	return {"sent": sent, "failed": failed}
+
+
+# --- Purchase Invoices ---------------------------------------------------------------------
+
+
+@frappe.whitelist(methods=["POST"])
+def make_purchase_invoice(name, submit=0):
+	"""Create the Purchase Invoice from the receipt's lines (draft unless submit=1)."""
+	from phamos.accounting.branching import make_purchase_invoice as build
+	from phamos.api.accounting_spa import get_receipt
+
+	doc = frappe.get_doc("Accounting Receipt", name)
+	doc.check_permission("write")
+	frappe.has_permission("Purchase Invoice", "create", throw=True)
+	pi = build(doc, submit=cint(submit))
+	return {
+		"purchase_invoice": pi.name,
+		"docstatus": pi.docstatus,
+		"grand_total": pi.grand_total,
+		"warnings": pi.flags.receipt_warnings or [],
+		"desk_url": f"/app/purchase-invoice/{pi.name}",
+		"receipt": get_receipt(name),
+	}

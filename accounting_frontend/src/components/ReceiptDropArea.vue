@@ -1,5 +1,5 @@
 <template>
-	<div class="relative flex min-h-0 flex-1 flex-col" v-on="up.handlers">
+	<div class="relative flex h-full min-h-0 flex-col" v-on="up.handlers">
 		<div
 			v-if="up.dropActive.value"
 			class="pointer-events-none absolute inset-2 z-20 flex flex-col items-center justify-center gap-1 rounded-lg border-2 border-dashed border-ink-blue-3 bg-surface-white/90 text-center"

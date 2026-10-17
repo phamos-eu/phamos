@@ -60,6 +60,13 @@ frappe.ui.form.on("Accounting Receipt", {
             frm.page.set_inner_btn_group_as_primary(__("Create"));
         }
 
+        // Item lines are booked on expense accounts of the receipt's company
+        frm.set_query("expense_account", "items", function () {
+            const filters = { root_type: "Expense", is_group: 0, disabled: 0 };
+            if (frm.doc.company) filters.company = frm.doc.company;
+            return { filters: filters };
+        });
+
         // Filter return_against by same supplier
         frm.set_query("return_against", function () {
             return { filters: { supplier: frm.doc.supplier || "", is_return: 0 } };

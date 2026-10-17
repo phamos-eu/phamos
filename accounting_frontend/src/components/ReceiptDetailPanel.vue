@@ -1,5 +1,5 @@
 <template>
-	<div class="flex min-h-0 flex-1 flex-col lg:flex-row">
+	<div class="flex min-h-0 flex-1 flex-col overflow-y-auto lg:flex-row lg:overflow-hidden">
 		<div
 			class="flex min-w-0 flex-col gap-4 overflow-y-auto border-b border-outline-gray-2 p-5 lg:w-3/5 lg:flex-none lg:border-b-0 lg:border-r"
 		>
@@ -152,7 +152,7 @@
 				</label>
 				<label class="field sm:col-span-2">
 					<span>Supplier IBAN</span>
-					<input v-model="autosave.draft.supplier_iban" :disabled="readonly" class="input" />
+					<PlainTextField v-model="autosave.draft.supplier_iban" :disabled="readonly" label="Supplier IBAN" />
 				</label>
 			</section>
 
@@ -166,29 +166,40 @@
 				<table v-else class="w-full text-sm">
 					<thead>
 						<tr class="text-left text-[11px] uppercase tracking-wide text-ink-gray-5">
-							<th class="py-1 pr-2">Description</th>
-							<th class="w-16 py-1 pr-2 text-right">Qty</th>
-							<th class="w-24 py-1 pr-2 text-right">Rate</th>
-							<th class="w-24 py-1 pr-2 text-right">Amount</th>
-							<th class="w-16 py-1 pr-2 text-right">Tax %</th>
+							<th class="py-1 pr-2">Description · expense account</th>
+							<th class="w-14 py-1 pr-2 text-right">Qty</th>
+							<th class="w-20 py-1 pr-2 text-right">Rate</th>
+							<th class="w-20 py-1 pr-2 text-right">Amount</th>
+							<th class="w-14 py-1 pr-2 text-right">Tax %</th>
 							<th class="w-6"></th>
 						</tr>
 					</thead>
 					<tbody>
 						<tr v-for="(item, i) in autosave.draft.items" :key="item.name || `new-${i}`" class="border-t border-outline-gray-1">
-							<td class="py-1 pr-2">
+							<td class="py-1 pr-2 align-top">
 								<input :value="item.item_name" :disabled="readonly" class="cell" @change="setItem(i, 'item_name', $event.target.value)" />
+								<div class="mt-0.5 min-w-0">
+									<FrappeLink
+										:model-value="item.expense_account || ''"
+										doctype="Account"
+										:filters="accountFilters"
+										:disabled="readonly"
+										placeholder="Expense account"
+										@update:model-value="(value) => setItem(i, 'expense_account', value)"
+									/>
+									<div v-if="!item.expense_account" class="truncate px-1 text-[11px] text-ink-amber-3">no expense account yet</div>
+								</div>
 							</td>
-							<td class="py-1 pr-2">
+							<td class="py-1 pr-2 align-top">
 								<input :value="item.qty" type="number" step="any" :disabled="readonly" class="cell text-right" @change="setItem(i, 'qty', $event.target.value)" />
 							</td>
-							<td class="py-1 pr-2">
+							<td class="py-1 pr-2 align-top">
 								<input :value="item.rate" type="number" step="0.01" :disabled="readonly" class="cell text-right" @change="setItem(i, 'rate', $event.target.value)" />
 							</td>
-							<td class="py-1 pr-2">
+							<td class="py-1 pr-2 align-top">
 								<input :value="item.amount" type="number" step="0.01" :disabled="readonly" class="cell text-right" @change="setItem(i, 'amount', $event.target.value)" />
 							</td>
-							<td class="py-1 pr-2">
+							<td class="py-1 pr-2 align-top">
 								<input :value="item.tax_rate" type="number" step="any" :disabled="readonly" class="cell text-right" @change="setItem(i, 'tax_rate', $event.target.value)" />
 							</td>
 							<td class="py-1 text-right">
@@ -206,6 +217,27 @@
 						</tr>
 					</tfoot>
 				</table>
+			</section>
+
+			<!-- Purchase Invoice -->
+			<section class="flex flex-wrap items-center gap-2 text-sm">
+				<h3 class="text-xs font-semibold uppercase tracking-wide text-ink-gray-5">Purchase Invoice</h3>
+				<a v-if="receipt.purchase_invoice" :href="`/app/purchase-invoice/${receipt.purchase_invoice}`" target="_blank" class="text-ink-blue-3 underline">
+					{{ receipt.purchase_invoice }}
+				</a>
+				<span v-if="receipt.purchase_invoice_status" class="rounded bg-surface-gray-2 px-1.5 py-0.5 text-xs text-ink-gray-7">{{ receipt.purchase_invoice_status }}</span>
+				<template v-if="!receipt.purchase_invoice">
+					<button
+						type="button"
+						class="btn"
+						:disabled="readonly || creatingInvoice || !autosave.draft.supplier || !autosave.draft.items.length"
+						:title="invoiceHint"
+						@click="createInvoice"
+					>
+						{{ creatingInvoice ? "Creating…" : "Create Purchase Invoice" }}
+					</button>
+					<span class="text-xs text-ink-gray-5">{{ invoiceHint }}</span>
+				</template>
 			</section>
 
 			<!-- Note -->
@@ -258,6 +290,7 @@ import { computed, ref, watch } from "vue"
 import { call, toast } from "frappe-ui"
 import DocSyncBanner from "@spa/components/DocSyncBanner.vue"
 import FrappeLink from "@spa/components/FrappeLink.vue"
+import PlainTextField from "@spa/components/PlainTextField.vue"
 import { useAutosaveDoc } from "@spa/composables/useAutosaveDoc.js"
 import CreateSupplierDialog from "./CreateSupplierDialog.vue"
 
@@ -343,6 +376,39 @@ watch(() => [props.receipt?.name, props.receipt?.supplier, props.receipt?.ai?.ru
 function onSupplierCreated(receipt) {
 	toast({ title: `Supplier ${receipt.supplier_name || receipt.supplier} created`, icon: "check-circle", iconClasses: "text-ink-green-3" })
 	emit("updated", receipt)
+}
+
+// --- expense accounts and Purchase Invoice ----------------------------------------------
+const creatingInvoice = ref(false)
+
+// Leaf expense accounts of the receipt's company: what a purchase line can be booked on.
+const accountFilters = computed(() => ({
+	root_type: "Expense",
+	is_group: 0,
+	disabled: 0,
+	...(props.receipt?.company ? { company: props.receipt.company } : {}),
+}))
+
+const invoiceHint = computed(() => {
+	if (!autosave.draft.supplier) return "Set the supplier first."
+	if (!autosave.draft.items.length) return "Add item lines first."
+	if (autosave.draft.items.some((row) => !row.expense_account)) return "Every line needs an expense account."
+	return ""
+})
+
+async function createInvoice() {
+	creatingInvoice.value = true
+	try {
+		await autosave.flush()
+		const res = await call(`${API}.make_purchase_invoice`, { name: props.receipt.name })
+		toast({ title: `Purchase Invoice ${res.purchase_invoice} created (draft)`, icon: "check-circle", iconClasses: "text-ink-green-3" })
+		for (const warning of res.warnings || []) toast({ title: warning, icon: "alert-triangle", iconClasses: "text-ink-amber-3" })
+		emit("updated", res.receipt)
+	} catch (e) {
+		toast({ title: e?.messages?.[0] || e?.message || "Could not create the Purchase Invoice", icon: "x-circle", iconClasses: "text-ink-red-4" })
+	} finally {
+		creatingInvoice.value = false
+	}
 }
 
 // --- items ----------------------------------------------------------------------------
