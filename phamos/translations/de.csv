@@ -1559,3 +1559,11 @@ There is no contract for you yet. HR adds it once it is signed.,"Für Sie gibt e
 Upcoming changes,Anstehende Änderungen
 Yearly gross at 100 %,Jährlich brutto bei 100 %
 {0} · {1} per week · {2} per month,{0} · {1} pro Woche · {2} pro Monat
+Raven is not installed on this site.,Raven ist auf dieser Site nicht installiert.
+Chat unavailable,Chat nicht verfügbar
+Issue Chat is disabled in phamos Settings.,Der Anfrage-Chat ist in den phamos-Einstellungen deaktiviert.
+Chats are not available for {0}.,Für {0} sind keine Chats verfügbar.
+No Raven Workspace found. Create one in Raven first.,Kein Raven-Arbeitsbereich gefunden. Legen Sie zuerst einen in Raven an.
+You need to be a Raven user to chat.,"Sie müssen Raven-Benutzer sein, um zu chatten."
+Chat about {0}: {1},Chat zu {0}: {1}
+About {0}: {1},Zu {0}: {1}

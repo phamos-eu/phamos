@@ -1,0 +1,387 @@
+# Copyright (c) 2026, phamos.eu and contributors
+# For license information, please see license.txt
+
+"""Issue chat: one Private Raven channel per Issue, opened from the cockpits (#1614, #1548).
+
+Raven's own UI shows the chat; this module only links a channel to the record (Raven's
+`linked_doctype` / `linked_document`), keeps its members in step with the record's owner and
+assignees (add-only: nobody is removed when unassigned) and reports unread counts.
+
+Reading the record is what grants the chat. Callers check that first (the cockpit wrappers in
+`department_cockpit`, or `get_list` for the batched states), so the Raven records below are
+written with `ignore_permissions`. Raven is a soft dependency: without it every state says
+`enabled: False` and the hooks do nothing.
+"""
+
+from urllib.parse import quote
+
+import frappe
+from frappe import _
+from frappe.desk.form.load import get_assignments
+from frappe.query_builder.functions import Count
+from frappe.utils import cint, escape_html, get_fullname
+
+CHAT_DOCTYPES = ("Issue",)
+
+# Department settings field → cockpit route. Raven's Issue links open the Issue in the first
+# cockpit whose department matches, otherwise in the Personal Cockpit.
+COCKPIT_PATHS = (
+	("sales_department", "/sales-cockpit"),
+	("human_resources_department", "/human-resources-cockpit"),
+	("accounting_department", "/accounting-cockpit"),
+	("project_management_department", "/project-management-cockpit"),
+)
+PERSONAL_COCKPIT_PATH = "/personal-cockpit"
+
+
+def is_raven_installed():
+	return "raven" in frappe.get_installed_apps()
+
+
+def is_enabled():
+	return is_raven_installed() and bool(
+		cint(frappe.db.get_single_value("phamos Settings", "enable_issue_chat"))
+	)
+
+
+def _require_enabled():
+	if not is_raven_installed():
+		frappe.throw(_("Raven is not installed on this site."), title=_("Chat unavailable"))
+	if not is_enabled():
+		frappe.throw(_("Issue Chat is disabled in phamos Settings."), title=_("Chat unavailable"))
+
+
+def _require_chat_doctype(doctype):
+	if doctype not in CHAT_DOCTYPES:
+		frappe.throw(_("Chats are not available for {0}.").format(_(doctype)))
+
+
+# Raven v3 web routes (apps/web/src/App.tsx), encoded as Raven's own links encode them.
+def channel_url(workspace, channel_id):
+	return f"/raven/{quote(workspace, safe='')}/{quote(channel_id, safe='')}"
+
+
+def dm_url(channel_id):
+	return f"/raven/dm-channel/{quote(channel_id, safe='')}"
+
+
+def find_channel(doctype, name):
+	if not is_raven_installed():
+		return None
+	return frappe.db.get_value(
+		"Raven Channel",
+		{
+			"linked_doctype": doctype,
+			"linked_document": name,
+			"is_archived": 0,
+			"is_thread": 0,
+			"is_direct_message": 0,
+		},
+		["name", "workspace"],
+		as_dict=True,
+	)
+
+
+def _raven_user(user):
+	if not user or user == "Guest":
+		return None
+	# Raven keeps the record but disables it when the user loses the "Raven User" role.
+	return frappe.db.get_value("Raven User", {"user": user, "type": "User", "enabled": 1}, "name")
+
+
+def _record_users(doc):
+	users = [doc.owner] + [row.get("owner") for row in get_assignments(doc.doctype, doc.name)]
+	return list(dict.fromkeys(u for u in users if u and u != "Guest"))
+
+
+def _resolve_workspace():
+	workspace = frappe.db.get_single_value("phamos Settings", "issue_chat_workspace")
+	if workspace and frappe.db.exists("Raven Workspace", workspace):
+		return workspace
+	workspaces = frappe.get_all("Raven Workspace", pluck="name", order_by="creation asc", limit=1)
+	if not workspaces:
+		frappe.throw(_("No Raven Workspace found. Create one in Raven first."))
+	return workspaces[0]
+
+
+def _ensure_members(channel, users, admin=None):
+	"""Add the users to the channel and its workspace; return the users without a Raven user."""
+	existing = set(
+		frappe.get_all("Raven Channel Member", filters={"channel_id": channel.name}, pluck="user_id")
+	)
+	skipped = []
+	for user in users:
+		raven_user = _raven_user(user)
+		if not raven_user:
+			skipped.append(user)
+			continue
+		# Raven only lists a workspace's channels to its members (#1308).
+		if not frappe.db.exists(
+			"Raven Workspace Member", {"user": raven_user, "workspace": channel.workspace}
+		):
+			frappe.get_doc(
+				{"doctype": "Raven Workspace Member", "user": raven_user, "workspace": channel.workspace}
+			).insert(ignore_permissions=True)
+		if raven_user in existing:
+			continue
+		frappe.get_doc(
+			{
+				"doctype": "Raven Channel Member",
+				"channel_id": channel.name,
+				"user_id": raven_user,
+				"is_admin": int(user == admin),
+			}
+		).insert(ignore_permissions=True)
+		existing.add(raven_user)
+	return skipped
+
+
+def _unread_counts(channel_ids):
+	"""Unread messages per channel for the session user since their last visit, not counting their
+	own (the intro message of a chat they just started would otherwise count)."""
+	raven_user = _raven_user(frappe.session.user)
+	if not raven_user or not channel_ids:
+		return {}
+	member = frappe.qb.DocType("Raven Channel Member")
+	message = frappe.qb.DocType("Raven Message")
+	rows = (
+		frappe.qb.from_(member)
+		.join(message)
+		.on(message.channel_id == member.channel_id)
+		.select(member.channel_id, Count(message.name).as_("unread"))
+		.where(member.user_id == raven_user)
+		.where(member.channel_id.isin(list(channel_ids)))
+		.where(message.creation > member.last_visit)
+		.where(message.message_type != "System")
+		.where(message.owner != frappe.session.user)
+		.groupby(member.channel_id)
+	).run(as_dict=True)
+	return {row.channel_id: row.unread for row in rows}
+
+
+def _member_channels(channel_ids):
+	raven_user = _raven_user(frappe.session.user)
+	if not raven_user or not channel_ids:
+		return set()
+	return set(
+		frappe.get_all(
+			"Raven Channel Member",
+			filters={"channel_id": ("in", list(channel_ids)), "user_id": raven_user},
+			pluck="channel_id",
+		)
+	)
+
+
+def get_chat(doc):
+	"""Chat state of a record the caller may read (no chat yet: `channel_id` is None)."""
+	_require_chat_doctype(doc.doctype)
+	state = {
+		"enabled": is_enabled(),
+		"channel_id": None,
+		"workspace": None,
+		"url": None,
+		"is_member": False,
+		"unread": 0,
+		"skipped_users": [],
+	}
+	if not state["enabled"]:
+		return state
+
+	state["skipped_users"] = [
+		{"user": user, "full_name": get_fullname(user)}
+		for user in _record_users(doc)
+		if not _raven_user(user)
+	]
+	channel = find_channel(doc.doctype, doc.name)
+	if not channel:
+		return state
+
+	state.update(
+		channel_id=channel.name,
+		workspace=channel.workspace,
+		url=channel_url(channel.workspace, channel.name),
+		is_member=channel.name in _member_channels([channel.name]),
+		unread=_unread_counts([channel.name]).get(channel.name, 0),
+	)
+	return state
+
+
+def ensure_chat(doc):
+	"""Get or create the record's chat and make the session user, owner and assignees members.
+
+	"Start chat" and "Join chat" both end here, so it is safe to call again.
+	"""
+	_require_chat_doctype(doc.doctype)
+	_require_enabled()
+	if not _raven_user(frappe.session.user):
+		frappe.throw(_("You need to be a Raven user to chat."))
+
+	channel = find_channel(doc.doctype, doc.name)
+	created = False
+	if not channel:
+		channel = _create_channel(doc)
+		created = True
+
+	users = [frappe.session.user] + _record_users(doc)
+	_ensure_members(channel, users, admin=frappe.session.user if created else None)
+	if created:
+		_post_link_message(
+			channel.name,
+			doc,
+			_("Chat about {0}: {1}").format(doc.name, _doc_title(doc)),
+		)
+	return get_chat(doc)
+
+
+def _create_channel(doc):
+	workspace = _resolve_workspace()
+	channel = frappe.get_doc(
+		{
+			"doctype": "Raven Channel",
+			"channel_name": f"{doc.doctype}-{doc.name}",
+			"channel_description": f"{doc.name}: {_doc_title(doc)}"[:140],
+			"type": "Private",
+			"workspace": workspace,
+			"linked_doctype": doc.doctype,
+			"linked_document": doc.name,
+		}
+	)
+	# Members are added by _ensure_members, with the creator as admin.
+	channel.flags.do_not_add_member = True
+	try:
+		channel.insert(ignore_permissions=True)
+	except (frappe.DuplicateEntryError, frappe.ValidationError):
+		# Someone else created it a moment ago.
+		existing = find_channel(doc.doctype, doc.name)
+		if not existing:
+			raise
+		return existing
+	return frappe._dict(name=channel.name, workspace=channel.workspace)
+
+
+def _doc_title(doc):
+	return doc.get("subject") or doc.name
+
+
+def _post_link_message(channel_id, doc, text):
+	"""Post a Raven document-link message (Raven renders it as a card for the record)."""
+	frappe.get_doc(
+		{
+			"doctype": "Raven Message",
+			"channel_id": channel_id,
+			"message_type": "Text",
+			"text": f"<p>{escape_html(text)}</p>",
+			"link_doctype": doc.doctype,
+			"link_document": doc.name,
+		}
+	).insert(ignore_permissions=True)
+
+
+def get_chat_states(doctype, names):
+	"""Batched chat state for list views: {name: {channel_id, is_member, unread}}.
+
+	Only records the session user may read and that have a chat are returned.
+	"""
+	_require_chat_doctype(doctype)
+	names = frappe.parse_json(names) if isinstance(names, str) else names
+	if not is_enabled() or not names:
+		return {}
+	readable = frappe.get_list(
+		doctype, filters={"name": ("in", list(names))}, pluck="name", limit_page_length=0
+	)
+	if not readable:
+		return {}
+	channels = frappe.get_all(
+		"Raven Channel",
+		filters={
+			"linked_doctype": doctype,
+			"linked_document": ("in", readable),
+			"is_archived": 0,
+			"is_thread": 0,
+			"is_direct_message": 0,
+		},
+		fields=["name", "linked_document"],
+	)
+	channel_ids = [c.name for c in channels]
+	members = _member_channels(channel_ids)
+	unread = _unread_counts(channel_ids)
+	return {
+		c.linked_document: {
+			"channel_id": c.name,
+			"is_member": c.name in members,
+			"unread": unread.get(c.name, 0),
+		}
+		for c in channels
+	}
+
+
+def start_dm(doc, user):
+	"""Open the Raven DM with `user`, post a link to the record, and return its URL.
+
+	The link is posted only when the DM's last message is not already a link to this record,
+	so clicking "Message" twice does not repeat it.
+	"""
+	_require_chat_doctype(doc.doctype)
+	_require_enabled()
+	from raven.api.raven_channel import create_direct_message_channel
+
+	channel_id = create_direct_message_channel(user)
+	last = frappe.get_all(
+		"Raven Message",
+		filters={"channel_id": channel_id, "message_type": ("!=", "System")},
+		fields=["link_doctype", "link_document"],
+		order_by="creation desc",
+		limit=1,
+	)
+	if not last or (last[0].link_doctype, last[0].link_document) != (doc.doctype, doc.name):
+		_post_link_message(channel_id, doc, _("About {0}: {1}").format(doc.name, _doc_title(doc)))
+	return {"channel_id": channel_id, "url": dm_url(channel_id)}
+
+
+# --- Hooks -----------------------------------------------------------------------------------
+
+
+def sync_assignee(doc, method=None):
+	"""ToDo on_update: a new assignee of a record with a chat joins it (#1614).
+
+	Never removes anyone; never blocks the assignment when Raven fails.
+	"""
+	if doc.reference_type not in CHAT_DOCTYPES or doc.status != "Open" or not doc.allocated_to:
+		return
+	before = doc.get_doc_before_save()
+	if before and before.status == "Open" and before.allocated_to == doc.allocated_to:
+		return
+	if not is_enabled():
+		return
+	channel = find_channel(doc.reference_type, doc.reference_name)
+	if not channel:
+		return
+	try:
+		_ensure_members(channel, [doc.allocated_to])
+	except Exception:
+		frappe.log_error(title=f"Issue chat: could not add {doc.allocated_to} to {channel.name}")
+
+
+def document_link(doctype, docname):
+	"""raven_document_link_override: Raven opens Issue links in the matching cockpit."""
+	if doctype != "Issue":
+		return None
+	return f"{issue_cockpit_path(docname)}/issues/list/{docname}"
+
+
+def issue_cockpit_path(name):
+	fields = ["project"]
+	if frappe.get_meta("Issue").has_field("custom_department"):
+		fields.append("custom_department")
+	issue = frappe.db.get_value("Issue", name, fields, as_dict=True) or frappe._dict()
+	department = issue.get("custom_department")
+	if not department and issue.project:
+		department = frappe.db.get_value("Project", issue.project, "department")
+	if department:
+		settings_meta = frappe.get_meta("phamos Settings")
+		for fieldname, path in COCKPIT_PATHS:
+			if settings_meta.has_field(fieldname) and (
+				frappe.db.get_single_value("phamos Settings", fieldname) == department
+			):
+				return path
+	return PERSONAL_COCKPIT_PATH

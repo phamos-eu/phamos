@@ -302,6 +302,9 @@ has_permission = {
 #	}
 # }
 
+# Raven opens its Issue links in the matching cockpit instead of Desk (#1614).
+raven_document_link_override = "phamos.api.issue_chat.document_link"
+
 doc_events = {
 	# Personal Cockpit: closed-on stamp, reschedule count, per-user refresh (#1553).
 	# Closing or rescheduling a checklist item's ToDo updates the item (#1625).
@@ -310,6 +313,8 @@ doc_events = {
 		"validate": "phamos.cockpits.todo_hooks.validate",
 		"on_update": [
 			"phamos.cockpits.todo_hooks.on_update",
+			# New assignees of an Issue join its Raven chat (#1614).
+			"phamos.api.issue_chat.sync_assignee",
 			"phamos.phamos.doctype.checklist.checklist_assignment.sync_item_from_todo",
 		],
 		"on_trash": [
