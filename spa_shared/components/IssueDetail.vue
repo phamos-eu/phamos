@@ -6,7 +6,7 @@
 				class="mb-2 flex flex-shrink-0 items-center justify-end gap-2"
 			>
 				<DocSyncBanner :autosave="autosave" />
-				<DocViewers :viewers="viewers" :document-name="issue.name" :api-prefix="API" :messageable="!!issue.chat_enabled" />
+				<DocViewers :viewers="viewers" />
 			</div>
 			<div class="flex min-h-0 flex-1 flex-col" :class="{ 'pointer-events-none opacity-80': isClosed }">
 				<RichTextField
@@ -60,7 +60,7 @@
 			</button>
 			<div class="ml-auto flex flex-shrink-0 items-center gap-2 pl-3">
 				<DocSyncBanner :autosave="autosave" />
-				<DocViewers :viewers="viewers" :document-name="issue.name" :api-prefix="API" :messageable="!!issue.chat_enabled" />
+				<DocViewers :viewers="viewers" />
 				<IssueChatButton :issue-name="issue.name" :subject="issue.subject" :status="status" :api="API" />
 			</div>
 		</div>
@@ -140,7 +140,6 @@
 						:api-prefix="API"
 						:document-name="issue.name"
 						:readonly="isClosed"
-						:messageable="!!issue.chat_enabled"
 						method-name="set_assignees"
 						@updated="onAssigneesUpdated"
 					/>
