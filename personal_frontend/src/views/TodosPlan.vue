@@ -3,6 +3,10 @@
 	     the past below. Within a day the hours read from morning to evening. -->
 	<div class="relative h-full min-h-0">
 		<div ref="scroller" class="h-full min-h-0 overflow-y-auto bg-surface-gray-1">
+			<!-- Unread Issue chats stay in view while the days scroll by (#1618). -->
+			<div class="sticky top-0 z-10 mx-auto max-w-5xl px-5 pt-3 empty:hidden">
+				<UnreadIssueChats />
+			</div>
 			<div class="mx-auto max-w-5xl px-5 pb-16">
 				<div ref="topSentinel" class="py-3 text-center text-xs text-ink-gray-5">
 					{{ loadingLater ? __("Loading later days…") : to >= lastFuture ? __("Plan further ahead in the list.") : "" }}
@@ -43,6 +47,7 @@ import { dayKey, minuteOfDay, splitIntoDays } from "@spa/utils/timelineLayout.js
 import { __ } from "@spa/utils/i18n.js"
 import spaConfig from "@/config"
 import TimelineDay from "@/components/TimelineDay.vue"
+import UnreadIssueChats from "@/components/UnreadIssueChats.vue"
 
 const API = spaConfig.api
 const AROUND = 3
