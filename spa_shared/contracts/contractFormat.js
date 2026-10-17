@@ -38,6 +38,14 @@ export function formatNumber(value) {
 	return numberFormat.format(Number(value))
 }
 
+const rateFormat = new Intl.NumberFormat(undefined, { maximumSignificantDigits: 6 })
+
+/** Exchange rates need significant digits, not two decimals (1 KES = 0.00702 EUR). */
+export function formatRate(value) {
+	if (value == null || value === "") return "—"
+	return rateFormat.format(Number(value))
+}
+
 export function formatPercent(value) {
 	return value == null ? "—" : `${formatNumber(value)} %`
 }

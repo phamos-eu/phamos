@@ -64,6 +64,7 @@ import {
 	errorMessage,
 	formatHours,
 	formatMoney,
+	formatRate,
 	formatPercent,
 	formatPeriod,
 } from "@spa/contracts/contractFormat.js"
@@ -83,6 +84,10 @@ const facts = computed(() => {
 	]
 	if (c.contract_type === "Employed") {
 		list.push({ label: "Yearly gross (100 %)", value: formatMoney(c.yearly_gross_full_time, c.currency) })
+	}
+	if (c.company_currency && c.currency !== c.company_currency) {
+		list.push({ label: "Planning rate", value: `1 ${c.currency} = ${formatRate(c.conversion_rate)} ${c.company_currency}` })
+		list.push({ label: `Monthly gross (${c.company_currency})`, value: formatMoney(c.base_monthly_gross, c.company_currency) })
 	}
 	list.push({ label: "Company", value: c.company || "—" })
 	list.push({ label: "Expense account", value: c.expense_account || "—" })
