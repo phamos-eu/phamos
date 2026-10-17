@@ -149,7 +149,7 @@ def evaluate(doc, params=None, extraction=None, earlier_flags=None):
 def summary_of(decision, problems):
 	return {
 		"not_a_voucher": _("Not a voucher; a person decides."),
-		"needs_human": _("Needs a decision: {0} points to check.").format(problems),
+		"needs_human": _("Needs a decision: 1 point to check.") if problems == 1 else _("Needs a decision: {0} points to check.").format(problems),
 		"auto_datev": _("All clear and paid: ready to send to DATEV."),
 		"approve_to_pay": _("All clear: ready to approve to pay."),
 	}[decision]
