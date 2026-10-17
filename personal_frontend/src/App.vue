@@ -43,6 +43,7 @@ import { focus, loadFocus } from "./focusStore.js"
 import { checkin, loadCheckin } from "./checkinStore.js"
 import { hasLeaveAccess, loadMyLeave } from "./leaveStore.js"
 import { CHECKINS, MY_DAY } from "./features.js"
+import { hasContracts, loadMyContracts } from "./contractStore.js"
 import CheckinButton from "./components/CheckinButton.vue"
 import CheckoutGuardDialog from "./components/CheckoutGuardDialog.vue"
 import CockpitShortcuts from "./components/CockpitShortcuts.vue"
@@ -108,6 +109,7 @@ onMounted(() => {
 	loadFocus()
 	if (CHECKINS) loadCheckin()
 	loadMyLeave()
+	loadMyContracts()
 	loadTimer()
 	document.addEventListener("visibilitychange", onVisible)
 })
@@ -121,6 +123,8 @@ const CHECKIN_ITEM = {
 	match: ["Checkins"],
 	children: [{ name: "CheckinsList", label: "List", icon: "list", match: ["CheckinsList"] }],
 }
+// My Contract (#1600) appears once HR has submitted at least one contract for this user.
+const CONTRACT_ITEM = { name: "MyContract", label: "My Contract", icon: "file-text", match: ["MyContract"] }
 // My Leave (#1714) appears for users with an active Employee record.
 const LEAVE_ITEM = { name: "MyLeave", label: "My Leave", icon: "umbrella", match: ["MyLeave", "MyLeaveDetail"] }
 const navItems = computed(() => {
@@ -129,6 +133,7 @@ const navItems = computed(() => {
 	)
 	if (CHECKINS && checkin.state?.available && checkin.state.employee) items.splice(1, 0, CHECKIN_ITEM)
 	if (hasLeaveAccess()) items.push(LEAVE_ITEM)
+	if (hasContracts()) items.push(CONTRACT_ITEM)
 	return items.map(translateItem)
 })
 
@@ -198,6 +203,7 @@ const PAGE_TITLES = {
 	CheckinsList: ["My Check-ins", "List"],
 	MyLeave: ["My Leave"],
 	MyLeaveDetail: ["My Leave"],
+	MyContract: ["My Contract"],
 	Ideas: ["My Ideas"],
 	IdeaDetail: ["My Ideas"],
 	IdeaWrite: ["My Ideas", "Writing"],

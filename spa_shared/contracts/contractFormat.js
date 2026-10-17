@@ -1,4 +1,6 @@
-// Formatting and constants for the Employment Contracts pages of the HR cockpit.
+// Formatting and constants for Employment Contracts, shared by the HR and Personal cockpits.
+
+import { formatDate as formatSystemDate } from "@spa/utils/datetime.js"
 
 export const CONTRACTS_API = "phamos.api.employment_contracts"
 
@@ -44,13 +46,9 @@ export function formatHours(value) {
 	return value == null ? "—" : `${formatNumber(value)} h`
 }
 
-const dateFormat = new Intl.DateTimeFormat(undefined, { dateStyle: "medium" })
-
-/** "2026-10-20" → localized date, without a timezone shift. */
+/** "2026-10-20" → the site's date format, without a timezone shift. */
 export function formatDate(value) {
-	if (!value) return ""
-	const [y, m, d] = String(value).split("-").map(Number)
-	return dateFormat.format(new Date(y, m - 1, d))
+	return value ? formatSystemDate(value) : ""
 }
 
 export function formatPeriod(contract) {

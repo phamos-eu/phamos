@@ -117,7 +117,7 @@ import {
 	formatMoney,
 	formatNumber,
 	formatPercent,
-} from "./contractFormat.js"
+} from "@spa/contracts/contractFormat.js"
 import { useContractAccess } from "./useContractAccess.js"
 
 const router = useRouter()

@@ -36,38 +36,12 @@
 			<p v-if="contract.notes" class="mt-4 whitespace-pre-line text-sm text-ink-gray-8">{{ contract.notes }}</p>
 
 			<h3 class="mb-2 mt-6 text-sm font-semibold text-ink-gray-9">History</h3>
-			<div class="overflow-x-auto rounded-md border border-outline-gray-2">
-				<table class="w-full text-sm">
-					<thead class="bg-surface-gray-1 text-xs text-ink-gray-5">
-						<tr>
-							<th class="px-3 py-2 text-left font-medium">Period</th>
-							<th class="px-3 py-2 text-left font-medium">Type</th>
-							<th class="px-3 py-2 text-right font-medium">FTE</th>
-							<th class="px-3 py-2 text-right font-medium">Weekly</th>
-							<th class="px-3 py-2 text-right font-medium">Monthly gross</th>
-							<th class="px-3 py-2 text-left font-medium">Status</th>
-						</tr>
-					</thead>
-					<tbody>
-						<tr
-							v-for="row in contract.history"
-							:key="row.name"
-							tabindex="0"
-							class="cursor-pointer border-t border-outline-gray-1 hover:bg-surface-gray-2 focus:bg-surface-gray-2 focus:outline-none"
-							:class="{ 'bg-surface-gray-2 font-semibold': row.name === contract.name }"
-							@click="emit('open', row.name)"
-							@keydown.enter="emit('open', row.name)"
-						>
-							<td class="px-3 py-2 text-ink-gray-9">{{ formatPeriod(row) }}</td>
-							<td class="px-3 py-2 text-ink-gray-8">{{ row.contract_type }}</td>
-							<td class="px-3 py-2 text-right tabular-nums">{{ formatPercent(row.fte_percentage) }}</td>
-							<td class="px-3 py-2 text-right tabular-nums">{{ formatHours(row.weekly_hours) }}</td>
-							<td class="px-3 py-2 text-right tabular-nums">{{ formatMoney(row.monthly_gross, row.currency) }}</td>
-							<td class="px-3 py-2"><ContractStatusBadge :status="row.status" /></td>
-						</tr>
-					</tbody>
-				</table>
-			</div>
+			<ContractHistoryTable
+				:rows="contract.history"
+				:current-name="contract.name"
+				clickable
+				@open="(name) => emit('open', name)"
+			/>
 
 			<a
 				:href="contract.desk_url"
@@ -83,7 +57,8 @@
 <script setup>
 import { computed, ref } from "vue"
 import { call, toast } from "frappe-ui"
-import ContractStatusBadge from "./ContractStatusBadge.vue"
+import ContractHistoryTable from "@spa/contracts/ContractHistoryTable.vue"
+import ContractStatusBadge from "@spa/contracts/ContractStatusBadge.vue"
 import {
 	CONTRACTS_API,
 	errorMessage,
@@ -91,7 +66,7 @@ import {
 	formatMoney,
 	formatPercent,
 	formatPeriod,
-} from "./contractFormat.js"
+} from "@spa/contracts/contractFormat.js"
 
 const props = defineProps({ contract: { type: Object, required: true } })
 const emit = defineEmits(["close", "change", "edit", "open", "updated"])

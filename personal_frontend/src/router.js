@@ -5,6 +5,7 @@ import TodosHome from "./views/TodosHome.vue"
 import TodosMatrix from "./views/TodosMatrix.vue"
 import CheckinsHome from "./views/CheckinsHome.vue"
 import CheckinsList from "./views/CheckinsList.vue"
+import MyContract from "./views/MyContract.vue"
 import MyLeave from "./views/MyLeave.vue"
 import Ideas from "./views/Ideas.vue"
 import IdeaDetail from "./views/IdeaDetail.vue"
@@ -46,6 +47,8 @@ const router = createSpaRouter({
 					{ path: "/checkins/list", name: "CheckinsList", component: CheckinsList },
 				]
 			: []),
+		// My Contract (#1600)
+		{ path: "/contract", name: "MyContract", component: MyContract },
 		// My Leave (#1714)
 		{ path: "/leave", name: "MyLeave", component: MyLeave },
 		{ path: "/leave/:name", name: "MyLeaveDetail", component: MyLeave, props: true },

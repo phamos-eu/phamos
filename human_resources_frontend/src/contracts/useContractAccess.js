@@ -1,6 +1,6 @@
 import { ref } from "vue"
 import { call } from "frappe-ui"
-import { CONTRACTS_API } from "./contractFormat.js"
+import { CONTRACTS_API } from "@spa/contracts/contractFormat.js"
 
 // Loaded once per page: the Contracts section is only for users who may read Employment Contracts.
 const access = ref({ can_read: false, can_create: false, loaded: false })

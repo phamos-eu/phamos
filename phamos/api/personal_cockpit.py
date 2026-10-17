@@ -17,6 +17,7 @@ from phamos.api import personal_focus
 from phamos.api import personal_challenges
 from phamos.api import personal_day_plan
 from phamos.api import personal_checkin
+from phamos.api import personal_contracts
 from phamos.api import personal_ideas
 from phamos.api import personal_leave
 from phamos.api import personal_timer
@@ -757,3 +758,12 @@ def complete_idea_writing_session(
 def capture_side_idea(parent, text, name=None):
 	"""A thought caught while writing becomes a child idea."""
 	return personal_ideas.capture_side_idea(parent, text, name=name)
+
+
+# My Employment Contracts (phamos/phamos#1600) — logic in phamos.api.personal_contracts.
+
+
+@frappe.whitelist()
+def get_my_contracts():
+	"""My own submitted contracts: the one in force, upcoming changes and the history."""
+	return personal_contracts.get_my_contracts()
