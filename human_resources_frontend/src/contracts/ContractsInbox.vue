@@ -111,7 +111,7 @@ import { useRoute, useRouter } from "vue-router"
 import { call } from "frappe-ui"
 import ContractDetail from "./ContractDetail.vue"
 import ContractDialog from "./ContractDialog.vue"
-import ContractStatusBadge from "./ContractStatusBadge.vue"
+import ContractStatusBadge from "@spa/contracts/ContractStatusBadge.vue"
 import {
 	CONTRACT_GRID,
 	CONTRACT_STATUSES,
@@ -122,7 +122,7 @@ import {
 	formatMoney,
 	formatPercent,
 	formatPeriod,
-} from "./contractFormat.js"
+} from "@spa/contracts/contractFormat.js"
 import { useContractAccess } from "./useContractAccess.js"
 
 const route = useRoute()

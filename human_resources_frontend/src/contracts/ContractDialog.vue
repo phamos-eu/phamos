@@ -111,7 +111,7 @@
 import { computed, nextTick, reactive, ref, watch } from "vue"
 import { call, toast } from "frappe-ui"
 import FrappeLink from "@spa/components/FrappeLink.vue"
-import { CONTRACTS_API, errorMessage, firstOfNextMonth, formatHours, formatMoney } from "./contractFormat.js"
+import { CONTRACTS_API, errorMessage, firstOfNextMonth, formatHours, formatMoney } from "@spa/contracts/contractFormat.js"
 
 const props = defineProps({
 	modelValue: { type: Boolean, default: false },
