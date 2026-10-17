@@ -33,6 +33,18 @@ DEFAULT_PARAMS = {
 }
 LLM_MAX_CONFIDENCE = 90
 
+# What the cockpit's skill editor shows for this skill's params.
+PARAM_FIELDS = [
+	{"key": "auto_apply_score", "label": "Assign at score", "type": "int", "min": 50, "max": 100,
+		"help": "A library match at or above this score sets the account without asking."},
+	{"key": "match_score", "label": "Similar description from", "type": "int", "min": 50, "max": 100,
+		"help": "How similar (0-100) a description must be to count as a library match."},
+	{"key": "use_llm", "label": "Ask Mistral when the library has no answer", "type": "check"},
+	{"key": "llm_min_confidence", "label": "Accept Mistral from", "type": "int", "min": 0, "max": 100,
+		"help": "Mistral's own confidence (%) needed before its account is set."},
+	{"key": "max_llm_lines", "label": "Lines per Mistral call", "type": "int", "min": 1, "max": 100},
+]
+
 
 def params_of(skill=None):
 	params = dict(DEFAULT_PARAMS)

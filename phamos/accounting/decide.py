@@ -38,6 +38,18 @@ DEFAULT_PARAMS = {
 	"auto_datev": 0,
 	"auto_datev_min_confidence": 90,
 }
+# What the cockpit's skill editor shows for this skill's params.
+PARAM_FIELDS = [
+	{"key": "min_history", "label": "Known supplier from", "type": "int", "min": 0, "max": 50,
+		"help": "Earlier receipts or invoices a supplier needs before it counts as known."},
+	{"key": "history_months", "label": "History (months)", "type": "int", "min": 1, "max": 60},
+	{"key": "amount_tolerance_pct", "label": "Usual amount ± (%)", "type": "int", "min": 0, "max": 500,
+		"help": "How far an amount may be from the supplier's median before it is unusual."},
+	{"key": "duplicate_days", "label": "Same amount within (days)", "type": "int", "min": 0, "max": 60},
+	{"key": "auto_datev", "label": "Send paid, clear receipts to DATEV automatically", "type": "check",
+		"help": "Off: the AI only suggests it. On: it sends without asking."},
+	{"key": "auto_datev_min_confidence", "label": "Send automatically from (%)", "type": "int", "min": 50, "max": 100},
+]
 DONE_STATUSES = ("Approved to Pay", "Sent to DATEV", "Paid")
 NOT_A_VOUCHER = ("Contract", "Reminder", "Statement")
 PAID_WORDS = ("paid", "bezahlt")
