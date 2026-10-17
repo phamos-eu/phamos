@@ -299,21 +299,35 @@ def learn_from_purchase_invoice(doc, method=None):
 
 
 @frappe.whitelist(methods=["POST"])
-def rebuild_from_history(company=None, months=36):
-	"""Fill the library from submitted Purchase Invoices of the last `months`.
+def rebuild_from_history(company=None, months=36, include_invoices=1, include_receipts=1):
+	"""Fill the library from the past `months`: submitted Purchase Invoices and the accounts
+	people already chose on receipt lines.
 
-	Idempotent: an entry's hits become at least the number of invoice lines behind it, so
-	running it twice does not double count. Receipt lines are not touched."""
+	Idempotent: an invoice-based entry's hits become at least the number of invoice lines
+	behind it, and each receipt line is learned once (its learned account is remembered),
+	so running it twice does not double count. Invoices made from a receipt are skipped;
+	their receipt lines count instead."""
 	frappe.only_for(("System Manager", "Accounts Manager"))
 	company = company or frappe.defaults.get_global_default("company")
 	since = add_months(getdate(nowdate()), -cint(months))
+	result = {"invoice_lines": 0, "receipt_lines": 0, "created": 0, "updated": 0}
+	if cint(include_invoices):
+		_rebuild_from_invoices(company, since, result)
+	if cint(include_receipts):
+		_rebuild_from_receipts(company, since, result)
+	return result
+
+
+def _rebuild_from_invoices(company, since, result):
 	rows = frappe.db.sql(
 		"""select pi.supplier, pii.item_name, pii.description, pii.expense_account, pii.cost_center
 		from `tabPurchase Invoice Item` pii join `tabPurchase Invoice` pi on pi.name = pii.parent
-		where pi.docstatus = 1 and pi.company = %s and pi.posting_date >= %s and ifnull(pii.expense_account, '') != ''""",
+		where pi.docstatus = 1 and pi.company = %s and pi.posting_date >= %s and ifnull(pii.expense_account, '') != ''
+		and not exists (select 1 from `tabAccounting Receipt` ar where ar.purchase_invoice = pi.name)""",
 		(company, since),
 		as_dict=True,
 	)
+	result["invoice_lines"] = len(rows)
 	counts = {}
 	for row in rows:
 		pattern = normalize_description(line_description(row))
@@ -322,15 +336,35 @@ def rebuild_from_history(company=None, months=36):
 		key = (row.supplier, pattern, row.expense_account)
 		entry = counts.setdefault(key, {"hits": 0, "description": line_description(row), "cost_center": row.cost_center})
 		entry["hits"] += 1
-	created = updated = 0
 	for (supplier, pattern, account), info in counts.items():
-		name = frappe.db.get_value(DOCTYPE, _key(company, supplier, pattern, account), ["name", "hits", "validation"], as_dict=True)
-		if name:
-			values = {"hits": max(cint(name.hits), info["hits"])}
-			if VALIDATION_RANK[name.validation] < 1:
+		existing = frappe.db.get_value(DOCTYPE, _key(company, supplier, pattern, account), ["name", "hits", "validation"], as_dict=True)
+		if existing:
+			values = {"hits": max(cint(existing.hits), info["hits"])}
+			if VALIDATION_RANK[existing.validation] < 1:
 				values["validation"] = "Confirmed"
-			frappe.db.set_value(DOCTYPE, name.name, values)
-			updated += 1
+			frappe.db.set_value(DOCTYPE, existing.name, values)
+			result["updated"] += 1
 		elif learn(company, supplier, info["description"], account, info["cost_center"], "Confirmed", "History", hits=info["hits"]):
-			created += 1
-	return {"invoice_lines": len(rows), "created": created, "updated": updated}
+			result["created"] += 1
+
+
+def _rebuild_from_receipts(company, since, result):
+	"""Lines whose account a person chose (or that were chosen before the library existed)."""
+	rows = frappe.db.sql(
+		"""select ari.name, ari.item_name, ari.expense_account, ari.cost_center, ar.name as receipt, ar.supplier,
+			ar.cost_center as receipt_cost_center
+		from `tabAccounting Receipt Item` ari join `tabAccounting Receipt` ar on ar.name = ari.parent
+		where ar.company = %s and ifnull(ar.posting_date, date(ar.creation)) >= %s and ar.status != 'Cancelled'
+		and ifnull(ari.expense_account, '') != '' and ifnull(ari.assignment_source, '') in ('', 'Human')
+		and ifnull(ari.learned_account, '') != ari.expense_account""",
+		(company, since),
+		as_dict=True,
+	)
+	for row in rows:
+		before = frappe.db.count(DOCTYPE, {"company": company})
+		if learn(company, row.supplier, row.item_name, row.expense_account, row.cost_center or row.receipt_cost_center,
+				validation="Confirmed", origin="Human", receipt=row.receipt):
+			frappe.db.set_value("Accounting Receipt Item", row.name, {"learned_account": row.expense_account,
+				"assignment_source": "Human"}, update_modified=False)
+			result["receipt_lines"] += 1
+			result["created" if frappe.db.count(DOCTYPE, {"company": company}) > before else "updated"] += 1
