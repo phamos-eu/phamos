@@ -7,9 +7,18 @@ export function isTypingTarget(target) {
 	return tag === "INPUT" || tag === "TEXTAREA" || tag === "SELECT" || Boolean(target?.isContentEditable)
 }
 
-// True when the event comes from inside an open dialog or menu, which own their keys.
+// Dialogs, menus, listboxes and frappe-ui popovers (rendered into #frappeui-popper-root, without
+// a role) own their keys.
+const OVERLAY = '[role="dialog"], [role="menu"], [role="listbox"], #frappeui-popper-root'
+
+// True when the event comes from inside an overlay.
 export function insideOverlay(target) {
-	return Boolean(target?.closest?.('[role="dialog"], [role="menu"], [role="listbox"]'))
+	return Boolean(target?.closest?.(OVERLAY))
+}
+
+// True while a dialog is open anywhere on the page, wherever focus is (#1608).
+export function dialogOpen(root = typeof document !== "undefined" ? document : null) {
+	return Boolean(root?.querySelector?.('[role="dialog"]'))
 }
 
 // Plain key without Ctrl, Cmd or Alt (Shift is allowed: "?" needs it).
