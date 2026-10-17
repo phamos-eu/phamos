@@ -59,6 +59,10 @@ const GROUPS = [
 		],
 	},
 	{
+		title: "Issue",
+		rows: [{ what: "Open or close the chat", keys: ["C"] }],
+	},
+	{
 		title: "Dialogs",
 		rows: [
 			{ what: "Save or confirm", keys: [`${MOD}+Enter`] },

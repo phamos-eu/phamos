@@ -1234,3 +1234,17 @@ No Raven Workspace found. Create one in Raven first.,Kein Raven-Arbeitsbereich g
 You need to be a Raven user to chat.,"Sie müssen Raven-Benutzer sein, um zu chatten."
 Chat about {0}: {1},Chat zu {0}: {1}
 About {0}: {1},Zu {0}: {1}
+Chat about {0},Chat zu {0}
+Open in Raven,In Raven öffnen
+"Open this chat in Raven, in a new window",Diesen Chat in Raven in einem neuen Fenster öffnen
+Close the chat,Chat schließen
+"Not in the chat, since they have no Raven account: {0}","Nicht im Chat, da ohne Raven-Konto: {0}"
+{0} unread,{0} ungelesen
+Start chat,Chat starten
+Join chat,Chat beitreten
+Chat,Chat
+Start a Raven chat with the people on this Issue (C),Einen Raven-Chat mit den Beteiligten dieser Anfrage starten (C)
+Join the Raven chat of this Issue (C),Dem Raven-Chat dieser Anfrage beitreten (C)
+Open the Raven chat of this Issue (C),Den Raven-Chat dieser Anfrage öffnen (C)
+Something went wrong,Etwas ist schiefgelaufen
+Open or close the chat,Chat öffnen oder schließen
