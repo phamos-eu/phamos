@@ -4,11 +4,13 @@
 """Skill handlers of the AI Accountant (agent "Accounting Agent" on Accounting Receipt)."""
 
 from phamos.accounting.classify import run_classify_skill
+from phamos.accounting.decide import run_decide_skill
 from phamos.accounting.extraction import run_extract_skill
 
 SKILLS = {
 	"extract_document": run_extract_skill,
 	"classify_lines": run_classify_skill,
+	"decide_receipt": run_decide_skill,
 }
 
 

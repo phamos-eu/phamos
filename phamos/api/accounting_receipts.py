@@ -401,7 +401,7 @@ QUEUE_SECTIONS = (
 QUEUE_FIELDS = [
 	"name", "title", "status", "receipt_type", "posting_date", "due_date", "sum", "currency",
 	"sum_in_company_currency", "supplier", "supplier_name", "supplier_reference", "attachment",
-	"is_paid", "sent_to_datev", "ai_run", "ai_confidence", "ai_summary", "creation", "modified",
+	"is_paid", "sent_to_datev", "ai_run", "ai_confidence", "ai_summary", "ai_decision", "creation", "modified",
 ]
 READY_MIN_CONFIDENCE = 90
 OPEN_STATUSES = ("Inbox", "Needs Decision")
@@ -482,7 +482,16 @@ def _queue_row(row, section, reasons, today):
 		"reason": reasons[0] if reasons else "",
 		"reasons": reasons,
 		"section": section,
+		"ai_decision": row.ai_decision,
+		"suggestion": DECISION_SUGGESTIONS.get(row.ai_decision, "") if section in ("ready", "decide") else "",
 	}
+
+
+DECISION_SUGGESTIONS = {
+	"auto_datev": "AI: paid and clear, send to DATEV",
+	"approve_to_pay": "AI: clear, approve to pay",
+	"not_a_voucher": "AI: not a voucher",
+}
 
 
 def _sort_key(item):

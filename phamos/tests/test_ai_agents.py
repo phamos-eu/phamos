@@ -40,7 +40,8 @@ class AgentTestCase(FrappeTestCase):
 		frappe.set_user("Administrator")
 		ensure_accounting_receipt_setup()
 		# These tests are about reading the PDF; the account proposal has its own tests.
-		frappe.db.set_value("AI Skill", {"agent": ACCOUNTING_AGENT, "handler": "classify_lines"}, "enabled", 0)
+		for handler in ("classify_lines", "decide_receipt"):
+			frappe.db.set_value("AI Skill", {"agent": ACCOUNTING_AGENT, "handler": handler}, "enabled", 0)
 		if not frappe.db.exists("Supplier", SUPPLIER):
 			frappe.get_doc({"doctype": "Supplier", "supplier_name": SUPPLIER, "supplier_group": "Services"}).insert(
 				ignore_permissions=True

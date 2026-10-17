@@ -71,6 +71,7 @@
   "ai_tab",
   "ai_summary",
   "ai_confidence",
+  "ai_decision",
   "column_break_ai",
   "ai_run",
   "ai_document_hash",
@@ -528,11 +529,21 @@
    "read_only": 1,
    "no_copy": 1,
    "description": "Created when the receipt is approved to pay."
+  },
+  {
+   "fieldname": "ai_decision",
+   "fieldtype": "Select",
+   "label": "AI Decision",
+   "options": "\nauto_datev\napprove_to_pay\nneeds_human\nnot_a_voucher",
+   "read_only": 1,
+   "no_copy": 1,
+   "in_standard_filter": 1,
+   "description": "What the AI suggests after its checks: send to DATEV (paid), approve to pay, a person decides, or not a voucher."
   }
  ],
  "index_web_pages_for_search": 1,
  "links": [],
- "modified": "2026-10-17 16:00:00.000000",
+ "modified": "2026-10-17 18:00:00.000000",
  "modified_by": "Administrator",
  "module": "Phamos",
  "name": "Accounting Receipt",

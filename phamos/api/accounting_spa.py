@@ -588,7 +588,8 @@ def _ai_block(doc):
 	if doc.ai_run:
 		raw = frappe.db.get_value("AI Agent Run", doc.ai_run, "run_flags")
 		flags = frappe.parse_json(raw or "[]") or []
-	return {"run": doc.ai_run, "summary": doc.ai_summary, "confidence": doc.ai_confidence, "flags": flags}
+	return {"run": doc.ai_run, "summary": doc.ai_summary, "confidence": doc.ai_confidence, "flags": flags,
+		"decision": doc.get("ai_decision")}
 
 
 @frappe.whitelist(methods=["POST"])

@@ -24,7 +24,7 @@
 				{{ Math.round(item.ai_confidence) }} %
 			</span>
 			<span class="truncate text-xs" :class="item.reason ? 'text-ink-amber-3' : 'text-ink-gray-5'" :title="(item.reasons || []).join(' · ')">
-				{{ item.reason || statusText(item) }}
+				{{ item.reason || item.suggestion || statusText(item) }}
 			</span>
 		</div>
 	</button>
