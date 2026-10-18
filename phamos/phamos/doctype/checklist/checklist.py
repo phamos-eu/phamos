@@ -75,56 +75,6 @@ class Checklist(Document):
 
 
 @frappe.whitelist()
-def get_checklist_details(checklist_name):
-	checklist = frappe.get_doc("Checklist", checklist_name)
-	checklist.check_permission("read")
-
-	items = []
-	for row in checklist.checklist_items:
-		items.append(
-			{
-				"name": row.name,
-				"idx": row.idx,
-				"done": row.done,
-				"description": row.description,
-				"note": row.note,
-				"document": row.document,
-				"record": row.record,
-				"assigned_to": row.assigned_to,
-				"due_date": row.due_date,
-			}
-		)
-
-	return {
-		"name": checklist.name,
-		"status": checklist.status,
-		"completion_percentage": checklist.completion_percentage or 0,
-		"checklist_owner": checklist.checklist_owner,
-		"due_date": checklist.due_date,
-		"items": items,
-	}
-
-
-@frappe.whitelist()
-def get_linked_checklists(doctype, name):
-	return frappe.get_all(
-		"Checklist",
-		filters={
-			"document": doctype,
-			"reference_record": name,
-		},
-		fields=[
-			"name",
-			"status",
-			"completion_percentage",
-			"checklist_owner",
-			"due_date",
-		],
-		order_by="modified desc",
-	)
-
-
-@frappe.whitelist()
 def update_checklist_item(checklist_name, item_name, values):
 	if isinstance(values, str):
 		values = frappe.parse_json(values)
