@@ -60,7 +60,8 @@ add_to_apps_screen = [
 # include js, css files in header of desk.html
 app_include_css = [
     "/assets/phamos/css/sales_order_kpi.css",
-    "/assets/phamos/css/dark_mode_fix.css"
+    "/assets/phamos/css/dark_mode_fix.css",
+    "checklist_dialog.bundle.css",  # hashed, so a new version is not served from browser cache
 ]
 # app_include_js = "/assets/phamos/js/phamos.js"
 
@@ -71,7 +72,7 @@ app_include_js = [
     "/assets/phamos/js/hybrid_meeting_composer.js",
     "/assets/phamos/js/team_daily_schedule.js",
     "/assets/phamos/js/frappe_list_bulk_edit_override.js",  # Fixes null-label crash in bulk edit
-    "/assets/phamos/js/checklist_dialog.js",
+    "checklist_dialog.bundle.js",  # Linked Checklists dialog (hashed bundle, see above)
 ]
 
 
