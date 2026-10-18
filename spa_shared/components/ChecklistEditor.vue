@@ -52,6 +52,26 @@
 						>
 							{{ item.document }}
 						</div>
+						<div
+							v-if="item.assigned_to || item.due_date"
+							class="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-ink-gray-5"
+						>
+							<span v-if="item.assigned_to" class="inline-flex min-w-0 items-center gap-1" title="Assigned to">
+								<UserAvatar
+									:name="item.assigned_to"
+									:label="item.assigned_to_name || item.assigned_to"
+									size="xs"
+								/>
+								<span class="truncate">{{ item.assigned_to_name || item.assigned_to }}</span>
+							</span>
+							<span
+								v-if="item.due_date"
+								:class="isOverdue(item) ? 'font-medium text-red-600 dark:text-red-400' : ''"
+								:title="isOverdue(item) ? 'Overdue' : 'Due date'"
+							>
+								{{ formatDate(item.due_date) }}
+							</span>
+						</div>
 					</div>
 					<div class="flex-shrink-0 pt-0.5" @click.stop>
 						<input
@@ -137,6 +157,33 @@
 							</div>
 						</template>
 					</div>
+					<div class="grid grid-cols-2 gap-3 border-t border-gray-100 pt-3 dark:border-gray-800">
+						<div class="min-w-0 space-y-1.5">
+							<label class="block text-[11px] font-medium text-gray-500 dark:text-gray-400">
+								Assigned to
+							</label>
+							<FrappeLink
+								doctype="User"
+								query="phamos.api.checklist_inbox.checklist_owner_query"
+								:model-value="item.assigned_to || ''"
+								placeholder="User"
+								:disabled="savingItem === item.name"
+								@update:model-value="(val) => onAssignedToChange(item, val)"
+							/>
+						</div>
+						<div class="min-w-0 space-y-1.5">
+							<label class="block text-[11px] font-medium text-gray-500 dark:text-gray-400">
+								Due date
+							</label>
+							<FormControl
+								type="date"
+								size="sm"
+								:model-value="item.due_date || ''"
+								:disabled="savingItem === item.name"
+								@update:model-value="(val) => onDueDateChange(item, val)"
+							/>
+						</div>
+					</div>
 				</div>
 			</div>
 		</div>
@@ -158,9 +205,11 @@
 
 <script setup>
 import { computed, nextTick, onBeforeUnmount, onMounted, ref } from "vue"
-import { call, TextEditor, debounce } from "frappe-ui"
+import { call, FormControl, TextEditor, debounce } from "frappe-ui"
 import FrappeLink from "@spa/components/FrappeLink.vue"
+import UserAvatar from "@spa/components/UserAvatar.vue"
 import { deskRecordUrl } from "@spa/utils/deskUrl.js"
+import { formatDate, todayIsoInUserTz } from "@spa/utils/datetime.js"
 import { skipTextEditorToolbarTabStops } from "@spa/utils/textEditorFocus.js"
 
 const props = defineProps({
@@ -211,7 +260,13 @@ function hasNote(item) {
 }
 
 function isEmptyItem(item) {
-	return !hasNote(item) && !(item.document || "").trim() && !(item.record || "").trim()
+	return (
+		!hasNote(item) &&
+		!(item.document || "").trim() &&
+		!(item.record || "").trim() &&
+		!item.assigned_to &&
+		!item.due_date
+	)
 }
 
 function findItem(name) {
@@ -337,6 +392,21 @@ const debouncedNoteSave = debounce(async (item, note) => {
 function onNoteChange(item, html) {
 	pendingNotes[item.name] = html
 	debouncedNoteSave(item, html)
+}
+
+// Assignee and due date of an item (#1625): the assignee gets a ToDo for it.
+function isOverdue(item) {
+	return !item.done && !!item.due_date && item.due_date < todayIsoInUserTz()
+}
+
+async function onAssignedToChange(item, user) {
+	if ((user || "") === (item.assigned_to || "")) return
+	await saveField(item, "assigned_to", user || "")
+}
+
+async function onDueDateChange(item, date) {
+	if ((date || "") === (item.due_date || "")) return
+	await saveField(item, "due_date", date || "")
 }
 
 async function addItem() {

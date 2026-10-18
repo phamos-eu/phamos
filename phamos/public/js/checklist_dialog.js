@@ -250,6 +250,8 @@ function build_checklist_items_table(checklistName, items) {
 			const safeNote = frappe.utils.escape_html(item.note || "");
 			const safeDocument = frappe.utils.escape_html(item.document || "");
 			const safeRecord = frappe.utils.escape_html(item.record || "");
+			const safeAssignedTo = frappe.utils.escape_html(item.assigned_to || "");
+			const safeDueDate = frappe.utils.escape_html(item.due_date || "");
 
 			return `
 				<tr
@@ -258,6 +260,8 @@ function build_checklist_items_table(checklistName, items) {
 					data-item-name="${escapedItemName}"
 					data-document="${safeDocument}"
 					data-record="${safeRecord}"
+					data-assigned-to="${safeAssignedTo}"
+					data-due-date="${safeDueDate}"
 				>
 					<td style="width:70px;">
 						<input
@@ -291,6 +295,12 @@ function build_checklist_items_table(checklistName, items) {
 					<td style="width:220px;">
 						<div class="checklist-item-record-link"></div>
 					</td>
+					<td style="width:200px;">
+						<div class="checklist-item-assigned-to"></div>
+					</td>
+					<td style="width:140px;">
+						<div class="checklist-item-due-date"></div>
+					</td>
 				</tr>
 			`;
 		})
@@ -306,6 +316,8 @@ function build_checklist_items_table(checklistName, items) {
 						<th>${__("Description / Note")}</th>
 						<th>${__("Document")}</th>
 						<th>${__("Record")}</th>
+						<th>${__("Assigned To")}</th>
+						<th>${__("Due Date")}</th>
 					</tr>
 				</thead>
 				<tbody>
@@ -523,6 +535,51 @@ function initialize_checklist_link_controls($container, $wrapper, frm) {
 				recordControl.$input
 			);
 		});
+
+		// Assignee (employees only, as checked on save) and due date (#1625).
+		const assignedToControl = create_checklist_link_control($row.find(".checklist-item-assigned-to"), {
+			label: __("Assigned To"),
+			options: "User",
+			placeholder: __("User"),
+			value: ($row.attr("data-assigned-to") || "").trim(),
+		});
+		assignedToControl.df.get_query = () => ({ query: "phamos.api.checklist_inbox.checklist_owner_query" });
+
+		assignedToControl.$input.on("change awesomplete-selectcomplete", () => {
+			save_checklist_item_changes(
+				$wrapper,
+				frm,
+				checklistName,
+				itemName,
+				{ assigned_to: (assignedToControl.get_value() || "").trim() },
+				assignedToControl.$input
+			);
+		});
+
+		const dueDateControl = frappe.ui.form.make_control({
+			parent: $row.find(".checklist-item-due-date").get(0),
+			df: {
+				fieldtype: "Date",
+				label: __("Due Date"),
+				change: () => {
+					const due_date = dueDateControl.get_value() || "";
+					if (due_date === ($row.attr("data-due-date") || "")) {
+						return;
+					}
+					$row.attr("data-due-date", due_date);
+					save_checklist_item_changes(
+						$wrapper,
+						frm,
+						checklistName,
+						itemName,
+						{ due_date },
+						dueDateControl.$input
+					);
+				},
+			},
+			render_input: true,
+		});
+		dueDateControl.set_value(($row.attr("data-due-date") || "").trim());
 	});
 }
 
