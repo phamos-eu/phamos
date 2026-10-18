@@ -16,7 +16,10 @@ class ChecklistTemplate(Document):
 def create_checklist_from_template(
 	template_name, title=None, reference_record=None, checklist_owner=None
 ):
-	"""Snapshot template items into a new Checklist. Reference Record is optional."""
+	"""Snapshot template items into a new Checklist owned by `checklist_owner` (required).
+
+	Reference Record is optional. Returns the name of the new Checklist.
+	"""
 	if not template_name:
 		frappe.throw(_("Checklist Template is required"))
 

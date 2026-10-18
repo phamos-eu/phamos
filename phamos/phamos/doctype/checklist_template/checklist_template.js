@@ -43,7 +43,7 @@ function show_create_checklist_dialog(frm) {
 			label: __("Checklist Owner"),
 			options: "User",
 			reqd: 1,
-			"link_filters": "[[\"User\",\"role\",\"=\",\"Employee\"]]",
+			link_filters: JSON.stringify([["User", "role", "=", "Employee"]]),
 		},
 	];
 
