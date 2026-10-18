@@ -11,7 +11,12 @@
   "column_break_uxrc",
   "description",
   "note",
-  "done"
+  "done",
+  "section_break_assignment",
+  "assigned_to",
+  "column_break_assignment",
+  "due_date",
+  "todo"
  ],
  "fields": [
   {
@@ -48,13 +53,44 @@
    "fieldname": "done",
    "fieldtype": "Check",
    "label": "Done"
+  },
+  {
+   "fieldname": "section_break_assignment",
+   "fieldtype": "Section Break"
+  },
+  {
+   "description": "Gets a ToDo for this item. Ticking the item closes the ToDo and closing the ToDo ticks the item.",
+   "fieldname": "assigned_to",
+   "fieldtype": "Link",
+   "in_list_view": 1,
+   "label": "Assigned To",
+   "options": "User"
+  },
+  {
+   "fieldname": "column_break_assignment",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "due_date",
+   "fieldtype": "Date",
+   "in_list_view": 1,
+   "label": "Due Date"
+  },
+  {
+   "fieldname": "todo",
+   "fieldtype": "Link",
+   "hidden": 1,
+   "label": "ToDo",
+   "no_copy": 1,
+   "options": "ToDo",
+   "read_only": 1
   }
  ],
  "grid_page_length": 50,
  "index_web_pages_for_search": 1,
  "istable": 1,
  "links": [],
- "modified": "2026-09-04 14:10:00.000000",
+ "modified": "2026-10-18 12:00:00.000000",
  "modified_by": "Administrator",
  "module": "Phamos",
  "name": "Checklist Items",

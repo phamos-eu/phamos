@@ -3,6 +3,11 @@
 
 frappe.ui.form.on("Checklist Template", {
 	setup(frm) {
+		// Item assignees are employees only (#1625), like on the Checklist itself.
+		frm.set_query("assigned_to", "checklist_template_items", () => ({
+			query: "phamos.api.checklist_inbox.checklist_owner_query",
+		}));
+
 		// Hide Connections "+" for Checklist — create only via "Create Checklist"
 		// so items are snapshotted from the template instead of an empty Quick Entry.
 		frm.can_make_methods = {

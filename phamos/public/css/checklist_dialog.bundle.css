@@ -143,6 +143,33 @@
 	text-decoration: underline;
 }
 
+/* Assignee and due date under the item text (#1625). */
+.phamos-checklist-dialog .pcl-item-meta {
+	display: flex;
+	flex-wrap: wrap;
+	align-items: center;
+	gap: var(--padding-sm);
+	margin-top: 4px;
+	font-size: var(--text-sm);
+	color: var(--text-muted);
+}
+
+.phamos-checklist-dialog .pcl-assignee {
+	display: inline-flex;
+	align-items: center;
+	gap: 4px;
+}
+
+.phamos-checklist-dialog .pcl-due.overdue {
+	color: var(--red-600);
+	font-weight: 500;
+}
+
+.phamos-checklist-dialog .pcl-links.pcl-assignment {
+	border-top: none;
+	padding-top: 0;
+}
+
 /* Round "done" checkbox, green when ticked, as in the cockpit. */
 .phamos-checklist-dialog input.pcl-done {
 	flex-shrink: 0;

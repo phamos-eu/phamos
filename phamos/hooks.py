@@ -304,8 +304,13 @@ doc_events = {
 			"phamos.cockpits.todo_hooks.on_update",
 			# New assignees of an Issue join its Raven chat (#1614).
 			"phamos.api.issue_chat.sync_assignee",
+			# Closing or rescheduling a checklist item's ToDo updates the item (#1625).
+			"phamos.phamos.doctype.checklist.checklist_assignment.sync_item_from_todo",
 		],
-		"on_trash": "phamos.cockpits.todo_hooks.on_trash",
+		"on_trash": [
+			"phamos.cockpits.todo_hooks.on_trash",
+			"phamos.phamos.doctype.checklist.checklist_assignment.clear_item_todo_link",
+		],
 	},
 	# Personal Cockpit check-ins: live updates to the employee's own user (#1571). Never fires
 	# on sites without HRMS, since the doctype does not exist there.

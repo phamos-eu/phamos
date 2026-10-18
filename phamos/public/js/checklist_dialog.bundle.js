@@ -168,7 +168,7 @@
 				if (
 					$target.closest($editing).length ||
 					$target.closest(".pcl-item").length ||
-					$target.closest(".awesomplete, .ql-tooltip, .ql-picker").length
+					$target.closest(".awesomplete, .ql-tooltip, .ql-picker, .datepicker").length
 				) {
 					return;
 				}
@@ -296,6 +296,7 @@
 			} else if (item.document) {
 				text += `<div class="pcl-item-doctype">${frappe.utils.escape_html(__(item.document))}</div>`;
 			}
+			text += this.assignment_html(item);
 
 			return `
 				<div class="pcl-item collapsed${this.can_write ? " editable" : ""}"
@@ -308,6 +309,26 @@
 					</div>
 				</div>
 			`;
+		}
+
+		// Assignee and due date of an item (#1625); overdue when open and due before today.
+		assignment_html(item) {
+			const parts = [];
+			if (item.assigned_to) {
+				parts.push(`
+					<span class="pcl-assignee" title="${__("Assigned To")}">
+						${frappe.avatar(item.assigned_to, "avatar-xs")}
+						<span>${frappe.utils.escape_html(item.assigned_to_name || item.assigned_to)}</span>
+					</span>`);
+			}
+			if (item.due_date) {
+				const overdue = !item.done && item.due_date < frappe.datetime.get_today();
+				parts.push(`
+					<span class="pcl-due${overdue ? " overdue" : ""}" title="${overdue ? __("Overdue") : __("Due Date")}">
+						${frappe.utils.escape_html(frappe.datetime.str_to_user(item.due_date))}
+					</span>`);
+			}
+			return parts.length ? `<div class="pcl-item-meta">${parts.join("")}</div>` : "";
 		}
 
 		done_checkbox_html(item) {
@@ -415,6 +436,10 @@
 					<div class="pcl-document"></div>
 					<div class="pcl-record"></div>
 				</div>
+				<div class="pcl-links pcl-assignment">
+					<div class="pcl-assigned-to"></div>
+					<div class="pcl-due-date"></div>
+				</div>
 			`);
 
 			const note = frappe.ui.form.make_control({
@@ -455,10 +480,41 @@
 			record.set_value(item.record || "");
 			$item.find(".pcl-record").toggle(!!item.document);
 
-			this.editing = { checklist, item: item_name, controls: { note, document, record } };
+			const assigned_to = frappe.ui.form.make_control({
+				parent: $item.find(".pcl-assigned-to").get(0),
+				df: {
+					fieldtype: "Link",
+					fieldname: "assigned_to",
+					label: __("Assigned To"),
+					options: "User",
+					// Employees only, like the server check in checklist_assignment.py.
+					get_query: () => ({ query: "phamos.api.checklist_inbox.checklist_owner_query" }),
+				},
+				render_input: true,
+			});
+			assigned_to.set_value(item.assigned_to || "");
+
+			const due_date = frappe.ui.form.make_control({
+				parent: $item.find(".pcl-due-date").get(0),
+				df: {
+					fieldtype: "Date",
+					fieldname: "due_date",
+					label: __("Due Date"),
+					change: () => this.on_due_date_change(),
+				},
+				render_input: true,
+			});
+			due_date.set_value(item.due_date || "");
+
+			this.editing = {
+				checklist,
+				item: item_name,
+				controls: { note, document, record, assigned_to, due_date },
+			};
 
 			document.$input.on("change awesomplete-selectcomplete", () => this.on_document_change());
 			record.$input.on("change awesomplete-selectcomplete", () => this.on_record_change());
+			assigned_to.$input.on("change awesomplete-selectcomplete", () => this.on_assigned_to_change());
 
 			if (focus) {
 				$item.find(".pcl-description").trigger("focus");
@@ -560,6 +616,34 @@
 			await this.save_item(checklist, item, { record });
 		}
 
+		async on_assigned_to_change() {
+			if (!this.editing) {
+				return;
+			}
+			const { checklist, item, controls } = this.editing;
+			const row = this.find_item(checklist, item);
+			const assigned_to = (controls.assigned_to.get_value() || "").trim();
+			if (!row || assigned_to === (row.assigned_to || "")) {
+				return;
+			}
+			row.assigned_to = assigned_to;
+			await this.save_item(checklist, item, { assigned_to });
+		}
+
+		async on_due_date_change() {
+			if (!this.editing) {
+				return;
+			}
+			const { checklist, item, controls } = this.editing;
+			const row = this.find_item(checklist, item);
+			const due_date = controls.due_date.get_value() || "";
+			if (!row || due_date === (row.due_date || "")) {
+				return;
+			}
+			row.due_date = due_date;
+			await this.save_item(checklist, item, { due_date });
+		}
+
 		async save_done(checklist, item, $input) {
 			const done = $input.prop("checked") ? 1 : 0;
 			$input.prop("disabled", true);
@@ -632,7 +716,9 @@
 			!(item.description || "").trim() &&
 			is_empty_html(item.note) &&
 			!(item.document || "").trim() &&
-			!(item.record || "").trim()
+			!(item.record || "").trim() &&
+			!item.assigned_to &&
+			!item.due_date
 		);
 	}
 
