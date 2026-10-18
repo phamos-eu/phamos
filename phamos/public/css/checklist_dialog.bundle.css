@@ -1,0 +1,240 @@
+/* Linked Checklists dialog on Desk forms (checklist_dialog.bundle.js). Same look as the cockpit's
+   LinkedChecklistsSection / ChecklistEditor, built on Desk's theme variables for dark mode. */
+
+.phamos-checklist-dialog .pcl-list {
+	display: flex;
+	flex-direction: column;
+	gap: var(--padding-sm);
+}
+
+.phamos-checklist-dialog .pcl-card {
+	border: 1px solid var(--border-color);
+	border-radius: var(--border-radius-md);
+	background: var(--card-bg);
+}
+
+.phamos-checklist-dialog .pcl-card-header {
+	display: flex;
+	align-items: center;
+	gap: var(--padding-xs);
+	width: 100%;
+	padding: 6px 8px;
+	border: 0;
+	border-radius: var(--border-radius-md);
+	background: transparent;
+	text-align: left;
+	color: var(--text-color);
+}
+
+.phamos-checklist-dialog .pcl-card-header:hover {
+	background: var(--subtle-fg);
+}
+
+.phamos-checklist-dialog .pcl-chevron {
+	display: inline-flex;
+	color: var(--text-muted);
+	transition: transform 0.15s ease;
+}
+
+.phamos-checklist-dialog .pcl-card.open .pcl-chevron {
+	transform: rotate(90deg);
+}
+
+.phamos-checklist-dialog .pcl-card-title {
+	flex: 1;
+	min-width: 0;
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+	font-size: var(--text-md);
+	font-weight: 500;
+}
+
+.phamos-checklist-dialog .pcl-card-body:not(:empty) {
+	padding: var(--padding-sm) var(--padding-md) var(--padding-md);
+	border-top: 1px solid var(--border-color);
+}
+
+.phamos-checklist-dialog .pcl-items {
+	display: flex;
+	flex-direction: column;
+	gap: var(--padding-sm);
+	margin-bottom: var(--padding-sm);
+}
+
+.phamos-checklist-dialog .pcl-item {
+	border: 1px solid var(--border-color);
+	border-radius: var(--border-radius-lg);
+	background: var(--card-bg);
+	padding: 10px 12px;
+	transition: border-color 0.15s ease, background-color 0.15s ease;
+}
+
+.phamos-checklist-dialog .pcl-item.collapsed.editable {
+	cursor: pointer;
+}
+
+.phamos-checklist-dialog .pcl-item.collapsed.editable:hover {
+	border-color: var(--gray-400);
+	background: var(--subtle-fg);
+}
+
+.phamos-checklist-dialog .pcl-item.expanded {
+	border-color: var(--text-color);
+	box-shadow: var(--shadow-sm);
+}
+
+.phamos-checklist-dialog .pcl-item-row {
+	display: flex;
+	align-items: flex-start;
+	gap: var(--padding-sm);
+}
+
+.phamos-checklist-dialog .pcl-item-text,
+.phamos-checklist-dialog .pcl-item-editor {
+	flex: 1;
+	min-width: 0;
+}
+
+.phamos-checklist-dialog .pcl-item-description {
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+	font-weight: 500;
+	color: var(--text-color);
+}
+
+.phamos-checklist-dialog .pcl-item-note {
+	color: var(--text-color);
+}
+
+.phamos-checklist-dialog .pcl-item-note.secondary {
+	margin-top: 2px;
+	color: var(--text-muted);
+}
+
+.phamos-checklist-dialog .pcl-item-note p {
+	margin: 2px 0;
+}
+
+.phamos-checklist-dialog .pcl-placeholder,
+.phamos-checklist-dialog .pcl-muted,
+.phamos-checklist-dialog .pcl-empty {
+	color: var(--text-light);
+}
+
+.phamos-checklist-dialog .pcl-item-link,
+.phamos-checklist-dialog .pcl-item-doctype {
+	display: inline-flex;
+	align-items: center;
+	gap: 4px;
+	max-width: 100%;
+	margin-top: 4px;
+	font-size: var(--text-sm);
+	color: var(--text-muted);
+}
+
+.phamos-checklist-dialog .pcl-item-link {
+	font-weight: 500;
+}
+
+.phamos-checklist-dialog .pcl-item-link:hover {
+	color: var(--text-color);
+	text-decoration: underline;
+}
+
+/* Assignee and due date under the item text (#1625). */
+.phamos-checklist-dialog .pcl-item-meta {
+	display: flex;
+	flex-wrap: wrap;
+	align-items: center;
+	gap: var(--padding-sm);
+	margin-top: 4px;
+	font-size: var(--text-sm);
+	color: var(--text-muted);
+}
+
+.phamos-checklist-dialog .pcl-assignee {
+	display: inline-flex;
+	align-items: center;
+	gap: 4px;
+}
+
+.phamos-checklist-dialog .pcl-due.overdue {
+	color: var(--red-600);
+	font-weight: 500;
+}
+
+.phamos-checklist-dialog .pcl-links.pcl-assignment {
+	border-top: none;
+	padding-top: 0;
+}
+
+/* Round "done" checkbox, green when ticked, as in the cockpit. */
+.phamos-checklist-dialog input.pcl-done {
+	flex-shrink: 0;
+	/* Desk sizes checkboxes with a fixed width; min-* wins over it. */
+	width: 20px;
+	min-width: 20px;
+	height: 20px;
+	min-height: 20px;
+	margin: 1px 0 0;
+	border-radius: 50%;
+}
+
+.phamos-checklist-dialog input.pcl-done:checked {
+	background-color: var(--green-600);
+	border-color: var(--green-600);
+}
+
+.phamos-checklist-dialog .pcl-item-editor .pcl-description {
+	margin-bottom: var(--padding-sm);
+}
+
+.phamos-checklist-dialog .pcl-note .frappe-control {
+	margin-bottom: 0;
+}
+
+.phamos-checklist-dialog .pcl-note .control-label {
+	display: none;
+}
+
+.phamos-checklist-dialog .pcl-note .ql-container .ql-editor {
+	/* Desk gives the editor a fixed height; let it grow with the note instead. */
+	height: auto;
+	min-height: 72px;
+	max-height: 180px;
+	overflow-y: auto;
+}
+
+.phamos-checklist-dialog .pcl-links {
+	display: grid;
+	grid-template-columns: 1fr 1fr;
+	gap: var(--padding-sm);
+	margin-top: var(--padding-sm);
+	padding-top: var(--padding-sm);
+	border-top: 1px solid var(--border-color);
+}
+
+.phamos-checklist-dialog .pcl-links .frappe-control {
+	margin-bottom: 0;
+}
+
+.phamos-checklist-dialog .pcl-card-footer {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	gap: var(--padding-sm);
+}
+
+.phamos-checklist-dialog .pcl-open-desk {
+	display: inline-flex;
+	align-items: center;
+	gap: 4px;
+	font-size: var(--text-sm);
+	color: var(--text-muted);
+}
+
+.phamos-checklist-dialog .pcl-open-desk:hover {
+	color: var(--text-color);
+}
