@@ -227,6 +227,11 @@ after_migrate = [
 # }
 
 doc_events = {
+	# Closing or rescheduling a checklist item's ToDo updates the item (#1625).
+	"ToDo": {
+		"on_update": "phamos.phamos.doctype.checklist.checklist_assignment.sync_item_from_todo",
+		"on_trash": "phamos.phamos.doctype.checklist.checklist_assignment.clear_item_todo_link",
+	},
 	"Event": {
 		"after_insert": "phamos.mailcow_integration.caldav.sync_event.on_upsert",
         "on_update": "phamos.mailcow_integration.caldav.sync_event.on_upsert",
