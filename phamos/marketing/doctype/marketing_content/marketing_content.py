@@ -93,13 +93,6 @@ def subscription_confirmed_url(route, lang="de"):
 
 
 @frappe.whitelist()
-def get_linked_checklists(doctype, name):
-	from phamos.phamos.doctype.checklist.checklist import get_linked_checklists as _get
-
-	return _get(doctype, name)
-
-
-@frappe.whitelist()
 def create_newsletter_for_event(event_name):
 	doc = frappe.get_doc("Marketing Content", event_name)
 	doc.check_permission("read")
