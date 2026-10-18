@@ -1264,3 +1264,16 @@ Thread,Thread
 {0} new,{0} neu
 More below,Mehr darunter
 Scroll to see the rest of the text,"Scrollen, um den restlichen Text zu sehen"
+New checklist,Neue Checkliste
+No checklists linked yet.,Noch keine Checklisten verknüpft.
+Loading items…,Punkte werden geladen …
+No items yet,Noch keine Punkte
+Add item,Punkt hinzufügen
+Click to edit…,Zum Bearbeiten klicken …
+No description,Keine Beschreibung
+Short description,Kurzbeschreibung
+Item note…,Notiz zum Punkt …
+Record,Datensatz
+Not Started,Nicht begonnen
+Failed to load checklist items,Checklistenpunkte konnten nicht geladen werden
+Failed to save checklist item,Checklistenpunkt konnte nicht gespeichert werden
