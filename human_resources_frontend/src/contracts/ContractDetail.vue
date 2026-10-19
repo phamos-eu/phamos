@@ -62,8 +62,10 @@ import ContractStatusBadge from "@spa/contracts/ContractStatusBadge.vue"
 import {
 	CONTRACTS_API,
 	errorMessage,
+	formatDays,
 	formatHours,
 	formatMoney,
+	formatNumber,
 	formatRate,
 	formatPercent,
 	formatPeriod,
@@ -84,6 +86,13 @@ const facts = computed(() => {
 	]
 	if (c.contract_type === "Employed") {
 		list.push({ label: "Yearly gross (100 %)", value: formatMoney(c.yearly_gross_full_time, c.currency) })
+		list.push({
+			label: "Leave per year",
+			value: `${formatDays(c.leave_days_per_year)} at ${formatNumber(c.working_days_per_week)} days / week`,
+		})
+		if (c.leave_days_for_period !== c.leave_days_per_year) {
+			list.push({ label: "Leave for this contract", value: formatDays(c.leave_days_for_period) })
+		}
 	}
 	if (c.company_currency && c.currency !== c.company_currency) {
 		list.push({ label: "Planning rate", value: `1 ${c.currency} = ${formatRate(c.conversion_rate)} ${c.company_currency}` })

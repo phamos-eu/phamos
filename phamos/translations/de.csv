@@ -1288,3 +1288,6 @@ Gets a ToDo for this item. Ticking the item closes the ToDo and closing the ToDo
 "Due date of the item, counted in days from the day the checklist is created. Leave 0 for no due date.","Fälligkeit des Punkts in Tagen ab dem Tag, an dem die Checkliste erstellt wird. 0 bedeutet kein Fälligkeitsdatum."
 The latest due date of the checklist items.,Das späteste Fälligkeitsdatum der Checklistenpunkte.
 Checklist items can only be assigned to enabled users with the Employee role: {0},Checklistenpunkte können nur aktiven Benutzern mit der Rolle Mitarbeiter zugewiesen werden: {0}
+Leave days per year,Urlaubstage pro Jahr
+Leave days for this contract,Urlaubstage für diesen Vertrag
+{0} at {1} days per week,{0} bei {1} Tagen pro Woche

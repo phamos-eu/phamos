@@ -1,6 +1,7 @@
 // Formatting and constants for Employment Contracts, shared by the HR and Personal cockpits.
 
 import { formatDate as formatSystemDate } from "@spa/utils/datetime.js"
+import { __ } from "@spa/utils/i18n.js"
 
 export const CONTRACTS_API = "phamos.api.employment_contracts"
 
@@ -52,6 +53,38 @@ export function formatPercent(value) {
 
 export function formatHours(value) {
 	return value == null ? "—" : `${formatNumber(value)} h`
+}
+
+export function formatDays(value) {
+	return value == null ? "—" : __("{0} days", [formatNumber(value)])
+}
+
+/** A fraction of at least half a day rounds up to a whole day (BUrlG § 5 (2)); a smaller one stays. */
+function roundLeaveDays(days) {
+	const whole = Math.floor(days + 1e-9)
+	return days - whole >= 0.5 - 1e-9 ? whole + 1 : Math.round(days * 100) / 100
+}
+
+/** Full-time leave days (five-day week) converted to the contract's working days. */
+export function leaveDaysPerYear(fullTimeLeaveDays, workingDaysPerWeek) {
+	return roundLeaveDays((Number(fullTimeLeaveDays || 0) * Number(workingDaysPerWeek || 0)) / 5)
+}
+
+/** Pro rata for a contract shorter than a year: 1/12 per full month. Mirrors employment_contract.py. */
+export function prorateLeaveDays(yearly, effectiveFrom, validUntil) {
+	if (!effectiveFrom || !validUntil) return yearly
+	const toUtc = (value) => {
+		const [y, m, d] = value.split("-").map(Number)
+		return new Date(Date.UTC(y, m - 1, d))
+	}
+	const start = toUtc(effectiveFrom)
+	// Valid Until is the last day of the contract, so full months run up to the day after.
+	const end = toUtc(validUntil)
+	end.setUTCDate(end.getUTCDate() + 1)
+	let months = (end.getUTCFullYear() - start.getUTCFullYear()) * 12 + (end.getUTCMonth() - start.getUTCMonth())
+	if (end.getUTCDate() < start.getUTCDate()) months -= 1
+	if (months >= 12) return yearly
+	return roundLeaveDays((yearly * Math.max(months, 0)) / 12)
 }
 
 /** "2026-10-20" → the site's date format, without a timezone shift. */

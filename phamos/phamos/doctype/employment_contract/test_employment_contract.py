@@ -8,7 +8,10 @@ from frappe.tests.utils import FrappeTestCase
 
 from phamos.phamos.doctype.employment_contract.employment_contract import (
 	compute_status,
+	full_months,
 	get_active_contract,
+	prorate_leave_days,
+	round_leave_days,
 	update_contract_statuses,
 )
 
@@ -48,6 +51,8 @@ class TestEmploymentContract(FrappeTestCase):
 				"contract_type": "Employed",
 				"effective_from": effective_from,
 				"valid_until": valid_until,
+				# The company's own currency, so no exchange rate is needed unless a test sets one.
+				"currency": frappe.get_cached_value("Company", self.company, "default_currency"),
 				"fte_percentage": 50,
 				"yearly_gross_full_time": 60000,
 				**values,
@@ -72,6 +77,55 @@ class TestEmploymentContract(FrappeTestCase):
 	def test_fte_must_be_in_range(self):
 		self.assertRaises(frappe.ValidationError, self.contract, "2030-01-01", submit=False, fte_percentage=0)
 		self.assertRaises(frappe.ValidationError, self.contract, "2030-01-01", submit=False, fte_percentage=120)
+
+	def test_leave_days_follow_working_days_not_fte(self):
+		doc = self.contract("2030-01-01", submit=False)
+		self.assertEqual(doc.working_days_per_week, 5)
+		self.assertEqual(doc.full_time_leave_days, 30)
+		self.assertEqual(doc.leave_days_per_year, 30)  # 50 % FTE on five shorter days
+		self.assertEqual(doc.leave_days_for_period, 30)
+
+		doc = self.contract("2030-01-01", submit=False, working_days_per_week=4)
+		self.assertEqual(doc.leave_days_per_year, 24)
+
+		doc = self.contract("2030-01-01", submit=False, working_days_per_week=3, full_time_leave_days=28)
+		self.assertEqual(doc.leave_days_per_year, 17)  # 16.8 rounds up
+
+	def test_leave_days_pro_rata_for_contract_shorter_than_a_year(self):
+		doc = self.contract("2030-03-01", "2030-08-31", submit=False)
+		self.assertEqual(doc.leave_days_for_period, 15)
+		doc = self.contract("2030-01-01", "2030-12-31", submit=False, working_days_per_week=4)
+		self.assertEqual(doc.leave_days_for_period, 24)
+
+	def test_leave_days_rules(self):
+		self.assertEqual(full_months("2030-01-15", "2030-03-14"), 2)
+		self.assertEqual(full_months("2030-01-15", "2030-03-13"), 1)
+		self.assertEqual(full_months("2030-02-01", "2030-02-27"), 0)
+		self.assertEqual(round_leave_days(12.5), 13)
+		self.assertEqual(round_leave_days(12.4), 12.4)
+		self.assertEqual(prorate_leave_days(24, "2030-01-01", "2030-07-31"), 14)  # 24 × 7/12
+		self.assertEqual(prorate_leave_days(24, "2030-01-01", None), 24)
+
+	def test_external_has_no_leave_days(self):
+		doc = self.contract("2030-01-01", submit=False, contract_type="External", monthly_amount=4000)
+		self.assertEqual(doc.leave_days_per_year, 0)
+		self.assertEqual(doc.leave_days_for_period, 0)
+
+	def test_working_days_must_be_in_range(self):
+		self.assertRaises(frappe.ValidationError, self.contract, "2030-01-01", submit=False, working_days_per_week=8)
+
+	def test_closing_a_contract_prorates_its_leave(self):
+		original = self.contract("2025-01-01")
+		self.contract("2025-07-01")
+		original.reload()
+		self.assertEqual(str(original.valid_until), "2025-06-30")
+		self.assertEqual(original.leave_days_for_period, 15)
+
+		employee = frappe.get_doc("Employee", self.employee)
+		employee.relieving_date = "2025-10-31"
+		employee.save(ignore_permissions=True)
+		later = frappe.get_doc("Employment Contract", {"employee": self.employee, "effective_from": "2025-07-01"})
+		self.assertEqual(later.leave_days_for_period, 10)  # four full months
 
 	def test_new_contract_closes_open_predecessor(self):
 		first = self.contract("2025-01-01")
@@ -229,6 +283,23 @@ class TestEmploymentContract(FrappeTestCase):
 		foreign, _ = self.foreign_currency()
 		frappe.db.set_single_value("Currency Exchange Settings", "disabled", 1)  # no online lookup in tests
 		self.assertRaises(frappe.ValidationError, self.contract, "2031-07-01", submit=False, currency=foreign)
+
+	def test_patch_fills_leave_days_of_existing_contracts(self):
+		from phamos.patches.v1_0.set_employment_contract_leave_days import execute
+
+		employed = self.contract("2030-01-01", "2030-06-30", working_days_per_week=4)
+		external = self.contract("2031-01-01", contract_type="External", monthly_amount=4000)
+		# What migrate leaves behind: column defaults, but no derived values.
+		frappe.db.set_value("Employment Contract", employed.name, {"leave_days_per_year": 0, "leave_days_for_period": 0})
+		frappe.db.set_value("Employment Contract", external.name, {"working_days_per_week": 5, "full_time_leave_days": 30})
+		execute()
+		execute()  # safe to run twice
+
+		employed.reload()
+		self.assertEqual(employed.leave_days_per_year, 24)
+		self.assertEqual(employed.leave_days_for_period, 12)
+		external.reload()
+		self.assertEqual((external.working_days_per_week, external.full_time_leave_days), (0, 0))
 
 	def test_patch_fills_rates_of_existing_contracts(self):
 		from phamos.patches.v1_0.set_employment_contract_planning_rates import execute
