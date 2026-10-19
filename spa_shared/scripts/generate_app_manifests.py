@@ -72,6 +72,14 @@ APPS = [
 		"symbol": "clipboard",
 	},
 	{
+		"slug": "software-development",
+		"name": "Software Development",
+		"description": "Software Development issues, tasks and checklists",
+		"route": "/software-development-cockpit",
+		"color": "#334155",
+		"symbol": "code",
+	},
+	{
 		"slug": "personal",
 		"name": "Personal Cockpit",
 		"description": "Issues, tasks and checklists assigned to me",

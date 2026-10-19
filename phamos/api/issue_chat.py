@@ -30,6 +30,7 @@ COCKPIT_PATHS = (
 	("human_resources_department", "/human-resources-cockpit"),
 	("accounting_department", "/accounting-cockpit"),
 	("project_management_department", "/project-management-cockpit"),
+	("software_development_department", "/software-development-cockpit"),
 )
 PERSONAL_COCKPIT_PATH = "/personal-cockpit"
 
