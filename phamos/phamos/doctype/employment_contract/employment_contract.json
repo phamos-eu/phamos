@@ -4,7 +4,7 @@
  "autoname": "format:EC-{employee}-{####}",
  "naming_rule": "Expression",
  "creation": "2026-10-17 12:00:00",
- "modified": "2026-10-17 18:00:00",
+ "modified": "2026-10-19 18:00:00",
  "modified_by": "Administrator",
  "owner": "Administrator",
  "doctype": "DocType",
@@ -32,6 +32,10 @@
   "fte_percentage",
   "full_time_hours_per_week",
   "weekly_hours",
+  "working_days_per_week",
+  "full_time_leave_days",
+  "leave_days_per_year",
+  "leave_days_for_period",
   "column_break_terms",
   "currency",
   "company_currency",
@@ -158,6 +162,38 @@
    "label": "Weekly Hours",
    "read_only": 1,
    "description": "FTE % × full-time hours per week"
+  },
+  {
+   "fieldname": "working_days_per_week",
+   "fieldtype": "Float",
+   "label": "Working Days per Week",
+   "default": "5",
+   "depends_on": "eval:doc.contract_type!==\"External\"",
+   "description": "Days worked in a normal week; leave days follow these, not FTE %"
+  },
+  {
+   "fieldname": "full_time_leave_days",
+   "fieldtype": "Float",
+   "label": "Leave Days per Year (Full-Time)",
+   "default": "30",
+   "depends_on": "eval:doc.contract_type!==\"External\"",
+   "description": "Yearly leave in working days for a five-day week"
+  },
+  {
+   "fieldname": "leave_days_per_year",
+   "fieldtype": "Float",
+   "label": "Leave Days per Year",
+   "read_only": 1,
+   "depends_on": "eval:doc.contract_type!==\"External\"",
+   "description": "Full-time leave days × working days per week ÷ 5"
+  },
+  {
+   "fieldname": "leave_days_for_period",
+   "fieldtype": "Float",
+   "label": "Leave Days for Contract Period",
+   "read_only": 1,
+   "depends_on": "eval:doc.contract_type!==\"External\"",
+   "description": "Pro rata if the contract runs less than a year: 1/12 per full month. Otherwise the yearly days."
   },
   {
    "fieldname": "column_break_terms",

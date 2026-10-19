@@ -9,12 +9,17 @@ Capacity code should read contracts through ``get_active_contract``, which never
 returns salary fields.
 """
 
+import math
+
 import frappe
+from dateutil.relativedelta import relativedelta
 from frappe import _
 from frappe.model.document import Document
 from frappe.utils import add_days, flt, get_link_to_form, getdate, nowdate
 
 OPEN_END = "9999-12-31"
+# Full-time leave days are agreed for a five-day week.
+FULL_TIME_DAYS_PER_WEEK = 5
 CAPACITY_FIELDS = (
 	"name",
 	"employee",
@@ -32,6 +37,7 @@ class EmploymentContract(Document):
 		self.validate_dates()
 		self.validate_fte()
 		self.calculate_amounts()
+		self.calculate_leave_days()
 		self.set_company_currency_amounts()
 		self.validate_expense_account()
 		self.validate_no_overlap()
@@ -85,6 +91,29 @@ class EmploymentContract(Document):
 				flt(self.yearly_gross_full_time) * flt(self.fte_percentage) / 100 / 12,
 				self.precision("monthly_gross"),
 			)
+
+	def calculate_leave_days(self):
+		"""Convert the full-time leave days to this contract's working days, then pro rata.
+
+		Externals have no leave entitlement. Leave is agreed in working days, so it follows
+		the days worked per week, not FTE: 5 days of 6.4 hours keep the full 30 days.
+		"""
+		if self.contract_type == "External":
+			self.working_days_per_week = 0
+			self.full_time_leave_days = 0
+			self.leave_days_per_year = 0
+			self.leave_days_for_period = 0
+			return
+
+		if not flt(self.working_days_per_week):
+			self.working_days_per_week = FULL_TIME_DAYS_PER_WEEK
+		if not 0 < flt(self.working_days_per_week) <= 7:
+			frappe.throw(_("Working Days per Week must be greater than 0 and at most 7."))
+		if not 0 <= flt(self.full_time_leave_days) <= 365:
+			frappe.throw(_("Leave Days per Year (Full-Time) must be between 0 and 365."))
+
+		self.leave_days_per_year = get_leave_days_per_year(self.full_time_leave_days, self.working_days_per_week)
+		self.leave_days_for_period = prorate_leave_days(self.leave_days_per_year, self.effective_from, self.valid_until)
 
 	def set_company_currency_amounts(self):
 		"""Convert the monthly gross into company currency at the contract's planning rate.
@@ -232,20 +261,57 @@ class EmploymentContract(Document):
 
 
 def close_contract(name, valid_until, superseded_by):
-	effective_from = frappe.db.get_value("Employment Contract", name, "effective_from")
+	contract = frappe.db.get_value(
+		"Employment Contract", name, ["effective_from", "leave_days_per_year"], as_dict=True
+	)
 	frappe.db.set_value(
 		"Employment Contract",
 		name,
 		{
 			"valid_until": valid_until,
 			"superseded_by": superseded_by,
-			"status": compute_status(1, effective_from, valid_until),
+			"status": compute_status(1, contract.effective_from, valid_until),
+			"leave_days_for_period": prorate_leave_days(
+				contract.leave_days_per_year, contract.effective_from, valid_until
+			),
 		},
 	)
 	if superseded_by:
 		frappe.get_doc("Employment Contract", name).add_comment(
 			"Info", _("Superseded by {0}.").format(get_link_to_form("Employment Contract", superseded_by))
 		)
+
+
+def get_leave_days_per_year(full_time_leave_days, working_days_per_week):
+	"""Full-time leave days converted to the working days per week of a contract."""
+	return round_leave_days(flt(full_time_leave_days) * flt(working_days_per_week) / FULL_TIME_DAYS_PER_WEEK)
+
+
+def prorate_leave_days(leave_days_per_year, effective_from, valid_until):
+	"""Leave for a contract that runs less than a year: 1/12 per full month (BUrlG § 5).
+
+	Open-ended contracts and those of a year or more keep the yearly days; how much of
+	them falls into a calendar year is up to the Leave Allocation.
+	"""
+	if not valid_until:
+		return flt(leave_days_per_year)
+	months = full_months(effective_from, valid_until)
+	if months >= 12:
+		return flt(leave_days_per_year)
+	return round_leave_days(flt(leave_days_per_year) * months / 12)
+
+
+def full_months(effective_from, valid_until):
+	"""Full months from Effective From through Valid Until, both days included."""
+	delta = relativedelta(getdate(add_days(valid_until, 1)), getdate(effective_from))
+	return delta.years * 12 + delta.months
+
+
+def round_leave_days(days):
+	"""A fraction of at least half a day rounds up to a whole day (BUrlG § 5 (2)); a smaller one stays."""
+	days = flt(days, 6)
+	whole = math.floor(days)
+	return whole + 1 if days - whole >= 0.5 else flt(days, 2)
 
 
 def get_planning_rate(from_currency, to_currency, on_date):
@@ -361,7 +427,7 @@ def cap_contracts_at_relieving_date(employee, method=None):
 	contracts = frappe.get_all(
 		"Employment Contract",
 		filters={"employee": employee.name, "docstatus": 1},
-		fields=["name", "effective_from", "valid_until"],
+		fields=["name", "effective_from", "valid_until", "leave_days_per_year"],
 	)
 	for contract in contracts:
 		if getdate(contract.effective_from) > relieving_date:
@@ -381,6 +447,9 @@ def cap_contracts_at_relieving_date(employee, method=None):
 			{
 				"valid_until": relieving_date,
 				"status": compute_status(1, contract.effective_from, relieving_date),
+				"leave_days_for_period": prorate_leave_days(
+					contract.leave_days_per_year, contract.effective_from, relieving_date
+				),
 			},
 		)
 		frappe.get_doc("Employment Contract", contract.name).add_comment(

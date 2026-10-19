@@ -37,6 +37,9 @@ frappe.ui.form.on("Employment Contract", {
 	monthly_amount: (frm) => calculate(frm),
 	contract_type: (frm) => calculate(frm),
 	conversion_rate: (frm) => calculate(frm),
+	working_days_per_week: (frm) => calculate(frm),
+	full_time_leave_days: (frm) => calculate(frm),
+	valid_until: (frm) => calculate(frm),
 	company(frm) {
 		frm.set_value("expense_account", null);
 		set_planning_rate(frm, true);
@@ -45,6 +48,7 @@ frappe.ui.form.on("Employment Contract", {
 		set_planning_rate(frm, true);
 	},
 	effective_from(frm) {
+		calculate(frm);
 		// Keep a rate the user typed; only fill one that is still empty.
 		set_planning_rate(frm, false);
 	},
@@ -63,6 +67,35 @@ function calculate(frm) {
 			: (flt(frm.doc.yearly_gross_full_time) * fte) / 100 / 12;
 	frm.set_value("monthly_gross", monthly);
 	frm.set_value("base_monthly_gross", monthly * (flt(frm.doc.conversion_rate) || 1));
+
+	if (frm.doc.contract_type === "External") return;
+	const yearly = round_leave_days(
+		(flt(frm.doc.full_time_leave_days) * flt(frm.doc.working_days_per_week)) / 5
+	);
+	frm.set_value("leave_days_per_year", yearly);
+	frm.set_value("leave_days_for_period", prorate_leave_days(yearly, frm.doc.effective_from, frm.doc.valid_until));
+}
+
+// Same rules as prorate_leave_days and round_leave_days in employment_contract.py.
+function prorate_leave_days(yearly, effective_from, valid_until) {
+	if (!valid_until || !effective_from) return yearly;
+	// Count like relativedelta, not moment's diff: moment anchors on month ends.
+	const to_date = (value) => {
+		const [y, m, d] = value.split("-").map(Number);
+		return new Date(y, m - 1, d);
+	};
+	const start = to_date(effective_from);
+	// Valid Until is the last day of the contract, so full months run up to the day after.
+	const end = to_date(valid_until);
+	end.setDate(end.getDate() + 1);
+	let months = (end.getFullYear() - start.getFullYear()) * 12 + (end.getMonth() - start.getMonth());
+	if (end.getDate() < start.getDate()) months -= 1;
+	return months >= 12 ? yearly : round_leave_days((yearly * Math.max(months, 0)) / 12);
+}
+
+function round_leave_days(days) {
+	const whole = Math.floor(days + 1e-9);
+	return days - whole >= 0.5 - 1e-9 ? whole + 1 : flt(days, 2);
 }
 
 // Default planning rate from Currency Exchange; the server keeps it fixed once saved.
