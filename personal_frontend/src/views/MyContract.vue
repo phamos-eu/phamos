@@ -63,7 +63,15 @@
 import { computed, onMounted } from "vue"
 import ContractHistoryTable from "@spa/contracts/ContractHistoryTable.vue"
 import ContractStatusBadge from "@spa/contracts/ContractStatusBadge.vue"
-import { formatDate, formatHours, formatMoney, formatPercent, formatPeriod } from "@spa/contracts/contractFormat.js"
+import {
+	formatDate,
+	formatDays,
+	formatHours,
+	formatMoney,
+	formatNumber,
+	formatPercent,
+	formatPeriod,
+} from "@spa/contracts/contractFormat.js"
 import { __ } from "@spa/utils/i18n.js"
 import { loadMyContracts, myContracts } from "../contractStore.js"
 
@@ -78,6 +86,16 @@ function facts(contract) {
 	]
 	if (contract.contract_type === "Employed") {
 		list.push({ label: __("Yearly gross at 100 %"), value: formatMoney(contract.yearly_gross_full_time, contract.currency) })
+		list.push({
+			label: __("Leave days per year"),
+			value: __("{0} at {1} days per week", [
+				formatDays(contract.leave_days_per_year),
+				formatNumber(contract.working_days_per_week),
+			]),
+		})
+		if (contract.leave_days_for_period !== contract.leave_days_per_year) {
+			list.push({ label: __("Leave days for this contract"), value: formatDays(contract.leave_days_for_period) })
+		}
 	}
 	return list
 }

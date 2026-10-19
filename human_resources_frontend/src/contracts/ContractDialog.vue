@@ -82,6 +82,26 @@
 					/>
 				</div>
 
+				<div v-if="form.contract_type !== 'External'" class="grid grid-cols-1 gap-3 sm:grid-cols-3">
+					<FormControl
+						v-model="form.working_days_per_week"
+						label="Working days / week"
+						type="number"
+						size="sm"
+						min="0.5"
+						max="7"
+						step="0.5"
+					/>
+					<FormControl
+						v-model="form.full_time_leave_days"
+						label="Leave days / year (full-time)"
+						type="number"
+						size="sm"
+						min="0"
+						step="0.5"
+					/>
+				</div>
+
 				<div class="grid grid-cols-1 gap-3 sm:grid-cols-3">
 					<div>
 						<label class="mb-1.5 block text-xs text-ink-gray-5">Currency</label>
@@ -105,6 +125,12 @@
 					{{ formatHours(weeklyHours) }} per week · {{ formatMoney(monthlyGross, form.currency) }} per month
 					<span v-if="foreignCurrency">
 						≈ {{ formatMoney(monthlyGross * Number(form.conversion_rate || 0), form.company_currency) }}
+					</span>
+					<span v-if="form.contract_type !== 'External'">
+						· {{ formatDays(leaveDays.yearly) }} leave per year
+						<template v-if="leaveDays.period !== leaveDays.yearly">
+							({{ formatDays(leaveDays.period) }} for this contract)
+						</template>
 					</span>
 				</div>
 
@@ -133,7 +159,16 @@
 import { computed, nextTick, reactive, ref, watch } from "vue"
 import { call, toast } from "frappe-ui"
 import FrappeLink from "@spa/components/FrappeLink.vue"
-import { CONTRACTS_API, errorMessage, firstOfNextMonth, formatHours, formatMoney } from "@spa/contracts/contractFormat.js"
+import {
+	CONTRACTS_API,
+	errorMessage,
+	firstOfNextMonth,
+	formatDays,
+	formatHours,
+	formatMoney,
+	leaveDaysPerYear,
+	prorateLeaveDays,
+} from "@spa/contracts/contractFormat.js"
 
 const props = defineProps({
 	modelValue: { type: Boolean, default: false },
@@ -154,6 +189,8 @@ const TERM_FIELDS = [
 	"contract_type",
 	"fte_percentage",
 	"full_time_hours_per_week",
+	"working_days_per_week",
+	"full_time_leave_days",
 	"yearly_gross_full_time",
 	"monthly_amount",
 	"expense_account",
@@ -175,6 +212,11 @@ const dialogTitle = computed(
 const weeklyHours = computed(
 	() => (Number(form.fte_percentage || 0) * Number(form.full_time_hours_per_week || 0)) / 100
 )
+// Preview only; the server recomputes leave days on save.
+const leaveDays = computed(() => {
+	const yearly = leaveDaysPerYear(form.full_time_leave_days, form.working_days_per_week)
+	return { yearly, period: prorateLeaveDays(yearly, form.effective_from, form.valid_until) }
+})
 const foreignCurrency = computed(
 	() => Boolean(form.currency && form.company_currency && form.currency !== form.company_currency)
 )
@@ -229,6 +271,8 @@ function reset() {
 		valid_until: "",
 		fte_percentage: 100,
 		full_time_hours_per_week: 40,
+		working_days_per_week: 5,
+		full_time_leave_days: 30,
 		yearly_gross_full_time: "",
 		monthly_amount: "",
 		expense_account: "",
