@@ -59,6 +59,26 @@
 						>
 							{{ item.document }}
 						</div>
+						<div
+							v-if="item.assigned_to || item.due_date"
+							class="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-ink-gray-5"
+						>
+							<span v-if="item.assigned_to" class="inline-flex min-w-0 items-center gap-1" title="Assigned to">
+								<UserAvatar
+									:name="item.assigned_to"
+									:label="item.assigned_to_name || item.assigned_to"
+									size="xs"
+								/>
+								<span class="truncate">{{ item.assigned_to_name || item.assigned_to }}</span>
+							</span>
+							<span
+								v-if="item.due_date"
+								:class="isOverdue(item) ? 'font-medium text-red-600 dark:text-red-400' : ''"
+								:title="isOverdue(item) ? 'Overdue' : 'Due date'"
+							>
+								{{ formatDate(item.due_date) }}
+							</span>
+						</div>
 					</div>
 					<div class="flex-shrink-0 pt-0.5" @click.stop>
 						<input
@@ -76,23 +96,29 @@
 					<div class="flex items-start gap-3">
 						<div class="min-w-0 flex-1 space-y-2">
 							<input
+								v-model="autosave.draft.description"
 								type="text"
-								class="w-full rounded-md border border-gray-300 bg-white px-2 py-1.5 text-sm text-gray-900 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-100"
-								:value="item.description || ''"
-								:disabled="savingItem === item.name"
+								class="w-full rounded-md border border-gray-300 bg-white px-2 py-1.5 text-sm text-gray-900 disabled:opacity-60 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-100"
+								:disabled="savingItem === item.name || !!locks.lockedBy(lockField('description', item))"
+								:title="lockTitle('description', item)"
 								placeholder="Short description"
-								@change="saveField(item, 'description', $event.target.value)"
+								@focus="onFieldFocus('description', item)"
+								@blur="onFieldBlur('description', item)"
 							/>
-							<TextEditor
-								:content="item.note || ''"
+							<RichTextField
+								:key="item.name"
+								v-model="autosave.draft.note"
 								:fixed-menu="editorMenu"
+								:locked-by="locks.lockedBy(lockField('note', item))"
+								field-label="this note"
 								placeholder="Item note…"
 								:editor-class="
 									compact
 										? 'prose-sm dark:prose-invert min-h-[72px] max-h-[180px] overflow-y-auto px-2 py-1.5 border border-gray-200 rounded-md bg-white dark:border-gray-600 dark:bg-gray-800'
 										: 'prose-sm dark:prose-invert min-h-[96px] max-h-[220px] overflow-y-auto px-2 py-1.5 border border-gray-200 rounded-md bg-white dark:border-gray-600 dark:bg-gray-800'
 								"
-								@change="(html) => onNoteChange(item, html)"
+								@focus="onFieldFocus('note', item)"
+								@blur="onFieldBlur('note', item)"
 							/>
 						</div>
 						<div class="flex-shrink-0 pt-1" @click.stop>
@@ -143,6 +169,33 @@
 							</div>
 						</template>
 					</div>
+					<div class="grid grid-cols-2 gap-3 border-t border-gray-100 pt-3 dark:border-gray-800">
+						<div class="min-w-0 space-y-1.5">
+							<label class="block text-[11px] font-medium text-gray-500 dark:text-gray-400">
+								Assigned to
+							</label>
+							<FrappeLink
+								doctype="User"
+								query="phamos.api.checklist_inbox.checklist_owner_query"
+								:model-value="item.assigned_to || ''"
+								placeholder="User"
+								:disabled="savingItem === item.name"
+								@update:model-value="(val) => onAssignedToChange(item, val)"
+							/>
+						</div>
+						<div class="min-w-0 space-y-1.5">
+							<label class="block text-[11px] font-medium text-gray-500 dark:text-gray-400">
+								Due date
+							</label>
+							<FormControl
+								type="date"
+								size="sm"
+								:model-value="item.due_date || ''"
+								:disabled="savingItem === item.name"
+								@update:model-value="(val) => onDueDateChange(item, val)"
+							/>
+						</div>
+					</div>
 				</div>
 			</div>
 		</div>
@@ -164,9 +217,17 @@
 
 <script setup>
 import { computed, nextTick, onBeforeUnmount, onMounted, ref } from "vue"
-import { call, TextEditor, debounce } from "frappe-ui"
+import { call, FormControl } from "frappe-ui"
 import FrappeLink from "@spa/components/FrappeLink.vue"
+import UserAvatar from "@spa/components/UserAvatar.vue"
+import RichTextField from "@spa/components/RichTextField.vue"
+import { useAutosaveDoc } from "@spa/composables/useAutosaveDoc.js"
+import { useDocRealtime } from "@spa/composables/useDocRealtime.js"
+import { useFieldLocks } from "@spa/composables/useFieldLocks.js"
+import { compareModified, isEmptyHtml } from "@spa/utils/autosaveCore.js"
+import { lockMessage } from "@spa/utils/fieldLockText.js"
 import { deskRecordUrl } from "@spa/utils/deskUrl.js"
+import { formatDate, todayIsoInUserTz } from "@spa/utils/datetime.js"
 import { skipTextEditorToolbarTabStops } from "@spa/utils/textEditorFocus.js"
 
 const props = defineProps({
@@ -210,18 +271,125 @@ async function focusFirstField() {
 	}
 }
 
+// The expanded item's description and note autosave like the Issue/Task
+// fields (GitLab #1426). The autosave key combines checklist and item so a
+// save that finishes after switching checklists still targets the right one.
+const KEY_SEPARATOR = "::"
+
+function itemKey(itemName) {
+	return `${props.checklist.name}${KEY_SEPARATOR}${itemName}`
+}
+
+function splitKey(key) {
+	const at = key.indexOf(KEY_SEPARATOR)
+	return { checklistName: key.slice(0, at), itemName: key.slice(at + KEY_SEPARATOR.length) }
+}
+
+function itemDoc(checklist, itemName, key) {
+	const item = (checklist?.items || []).find((row) => row.name === itemName)
+	if (!item) return null
+	return {
+		name: key,
+		description: item.description || "",
+		note: item.note || "",
+		modified: checklist.modified,
+		modified_by: checklist.modified_by,
+		modified_by_name: checklist.modified_by_name,
+	}
+}
+
+const autosave = useAutosaveDoc({
+	doc: () => (expandedItem.value ? itemDoc(props.checklist, expandedItem.value, itemKey(expandedItem.value)) : null),
+	fields: {
+		description: { kind: "text", label: "Description" },
+		note: { kind: "html", label: "Note" },
+	},
+	// update_checklist_item retries on its own; items carry no timestamp lock.
+	useModified: false,
+	request: (key, payload) => {
+		const { checklistName, itemName } = splitKey(key)
+		return {
+			method: `${API}.update_spa_checklist_item`,
+			args: { checklist_name: checklistName, item_name: itemName, values: payload },
+		}
+	},
+	parse: (checklist, key) => {
+		emit("updated", checklist)
+		return itemDoc(checklist, splitKey(key).itemName, key) || { name: key }
+	},
+	fetch: async (key) => {
+		const checklist = await call(`${API}.get_checklist`, { name: splitKey(key).checklistName })
+		return itemDoc(checklist, splitKey(key).itemName, key)
+	},
+	readonly: () => !expandedItem.value,
+})
+
+const realtime = useDocRealtime({
+	doctype: "Checklist",
+	name: () => props.checklist.name,
+	onDocUpdate: onRemoteUpdate,
+})
+
+const locks = useFieldLocks({
+	doctype: "Checklist",
+	name: () => props.checklist.name,
+	realtime,
+	onReleased: () => {
+		if (autosave.status === "blocked") autosave.flush()
+	},
+})
+
+function lockField(field, item) {
+	return `${field}:${item.name}`
+}
+
+function lockTitle(field, item) {
+	const lock = locks.lockedBy(lockField(field, item))
+	return lock ? lockMessage(lock, "this description") : ""
+}
+
+async function onFieldFocus(field, item) {
+	autosave.setFocused(field, true)
+	await locks.acquire(lockField(field, item))
+}
+
+async function onFieldBlur(field, item) {
+	const docname = props.checklist.name
+	await autosave.setFocused(field, false)
+	locks.release(lockField(field, item), { docname })
+}
+
+async function onRemoteUpdate(modified) {
+	if (compareModified(modified, props.checklist.modified) <= 0) return
+	const name = props.checklist.name
+	try {
+		const latest = await call(`${API}.get_checklist`, { name })
+		// The parent replaces `checklist`; the autosave merge keeps whatever the
+		// user is typing in the expanded item.
+		if (latest?.name === props.checklist.name) emit("updated", latest)
+	} catch (e) {
+		// Ignore; the next save or reload brings the latest state.
+	}
+}
+
 function hasNote(item) {
-	const raw = pendingNotes[item.name] !== undefined ? pendingNotes[item.name] : item.note
-	const note = (raw || "").replace(/<[^>]*>/g, "").replace(/&nbsp;/g, " ").trim()
-	return Boolean(note)
+	const live = expandedItem.value === item.name && autosave.currentName === itemKey(item.name)
+	return !isEmptyHtml(live ? autosave.draft.note : item.note)
+}
+
+function itemDescription(item) {
+	const live = expandedItem.value === item.name && autosave.currentName === itemKey(item.name)
+	return live ? autosave.draft.description : item.description
 }
 
 function isEmptyItem(item) {
 	return (
 		!hasNote(item) &&
-		!(item.description || "").trim() &&
+		!(itemDescription(item) || "").trim() &&
 		!(item.document || "").trim() &&
-		!(item.record || "").trim()
+		!(item.record || "").trim() &&
+		!item.assigned_to &&
+		!item.due_date
 	)
 }
 
@@ -231,10 +399,6 @@ function findItem(name) {
 
 async function removeEmptyItem(item) {
 	if (!item?.name || !isEmptyItem(item)) return
-	if (typeof debouncedNoteSave.cancel === "function") {
-		debouncedNoteSave.cancel()
-	}
-	delete pendingNotes[item.name]
 	savingItem.value = item.name
 	try {
 		const updated = await call(`${API}.delete_spa_checklist_item`, {
@@ -250,6 +414,10 @@ async function removeEmptyItem(item) {
 async function collapse() {
 	const name = expandedItem.value
 	if (!name) return
+	// Save what was typed before the item closes (and before deciding whether
+	// it is empty), then read the item back from the refreshed checklist.
+	await autosave.flush()
+	await nextTick()
 	const item = findItem(name)
 	expandedItem.value = null
 	if (item) await removeEmptyItem(item)
@@ -287,6 +455,7 @@ onBeforeUnmount(() => {
 
 async function saveField(item, field, value, event = null) {
 	const values = { [field]: value }
+	await autosave.flush()
 	savingItem.value = item.name
 	try {
 		const updated = await call(`${API}.update_spa_checklist_item`, {
@@ -313,6 +482,7 @@ async function onDocumentChange(item, document) {
 	// not after this save round-trips.
 	item.document = document
 	item.record = record
+	await autosave.flush()
 	savingItem.value = item.name
 	try {
 		const updated = await call(`${API}.update_spa_checklist_item`, {
@@ -329,25 +499,19 @@ async function onDocumentChange(item, document) {
 	}
 }
 
-const pendingNotes = {}
+// Assignee and due date of an item (#1625): the assignee gets a ToDo for it.
+function isOverdue(item) {
+	return !item.done && !!item.due_date && item.due_date < todayIsoInUserTz()
+}
 
-const debouncedNoteSave = debounce(async (item, note) => {
-	savingItem.value = item.name
-	try {
-		const updated = await call(`${API}.update_spa_checklist_item`, {
-			checklist_name: props.checklist.name,
-			item_name: item.name,
-			values: { note },
-		})
-		emit("updated", updated)
-	} finally {
-		savingItem.value = null
-	}
-}, 500)
+async function onAssignedToChange(item, user) {
+	if ((user || "") === (item.assigned_to || "")) return
+	await saveField(item, "assigned_to", user || "")
+}
 
-function onNoteChange(item, html) {
-	pendingNotes[item.name] = html
-	debouncedNoteSave(item, html)
+async function onDueDateChange(item, date) {
+	if ((date || "") === (item.due_date || "")) return
+	await saveField(item, "due_date", date || "")
 }
 
 async function addItem() {

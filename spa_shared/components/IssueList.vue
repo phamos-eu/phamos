@@ -10,7 +10,8 @@
 			v-for="issue in issues"
 			:key="issue.name"
 			type="button"
-			class="border-b border-outline-gray-1 text-left hover:bg-surface-gray-2"
+			data-list-item
+			class="border-b border-outline-gray-1 text-left hover:bg-surface-gray-2 focus:outline-none focus-visible:bg-surface-gray-3"
 			:class="[
 				alignWithFilters && !compact
 					? [ISSUE_LIST_FILTER_SUBGRID, 'py-3']
@@ -41,6 +42,14 @@
 					>
 						{{ metaParts(issue).join(" · ") }}
 					</div>
+				</div>
+				<div class="flex min-w-0 justify-center">
+					<IssueChatIndicator
+						size="lg"
+						:issue-name="issue.name"
+						:state="chatStates[issue.name]"
+						@open="emit('select', $event)"
+					/>
 				</div>
 				<div class="flex min-w-0 justify-center">
 					<Badge
@@ -80,6 +89,7 @@
 					<span v-if="!compact" class="text-xs font-semibold text-ink-gray-6">
 						{{ issue.name }}
 					</span>
+					<IssueChatIndicator :issue-name="issue.name" :state="chatStates[issue.name]" @open="emit('select', $event)" />
 					<Badge
 						v-if="issue.converted_task"
 						class="whitespace-nowrap"
@@ -144,7 +154,10 @@
 </template>
 
 <script setup>
+import { toRef } from "vue"
 import { Badge } from "frappe-ui"
+import IssueChatIndicator from "@spa/components/IssueChatIndicator.vue"
+import { useIssueChatStates } from "@spa/composables/useIssueChatStates.js"
 import { ISSUE_LIST_FILTER_SUBGRID } from "@spa/issueListColumns.js"
 import { formatDate, formatIssueAge } from "@spa/utils/datetime"
 
@@ -158,6 +171,7 @@ const props = defineProps({
 })
 
 const emit = defineEmits(["select"])
+const chatStates = useIssueChatStates(toRef(props, "issues"))
 
 function creationValue(issue) {
 	const raw = issue.creation || issue.opening_date || ""

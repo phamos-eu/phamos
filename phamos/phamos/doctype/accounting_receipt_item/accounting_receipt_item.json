@@ -1,0 +1,173 @@
+{
+ "actions": [],
+ "creation": "2026-10-16 13:00:00.000000",
+ "doctype": "DocType",
+ "engine": "InnoDB",
+ "editable_grid": 1,
+ "field_order": [
+  "item_name",
+  "qty",
+  "rate",
+  "amount",
+  "tax_rate",
+  "column_break_item",
+  "item_code",
+  "expense_account",
+  "cost_center",
+  "project",
+  "ai_confidence",
+  "assignment_section",
+  "assignment_source",
+  "assignment",
+  "ai_reason",
+  "column_break_assignment",
+  "ai_expense_account",
+  "ai_candidates",
+  "learned_account"
+ ],
+ "fields": [
+  {
+   "fieldname": "item_name",
+   "fieldtype": "Data",
+   "label": "Description",
+   "reqd": 1,
+   "in_list_view": 1,
+   "columns": 4
+  },
+  {
+   "fieldname": "qty",
+   "fieldtype": "Float",
+   "label": "Qty",
+   "default": "1",
+   "in_list_view": 1,
+   "columns": 1
+  },
+  {
+   "fieldname": "rate",
+   "fieldtype": "Currency",
+   "label": "Rate",
+   "options": "currency",
+   "in_list_view": 1,
+   "columns": 1
+  },
+  {
+   "fieldname": "amount",
+   "fieldtype": "Currency",
+   "label": "Amount",
+   "options": "currency",
+   "in_list_view": 1,
+   "columns": 1
+  },
+  {
+   "fieldname": "tax_rate",
+   "fieldtype": "Percent",
+   "label": "Tax %",
+   "in_list_view": 1,
+   "columns": 1
+  },
+  {
+   "fieldname": "column_break_item",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "item_code",
+   "fieldtype": "Link",
+   "label": "Item",
+   "options": "Item",
+   "hidden": 1,
+   "description": "Not used: lines are booked on their expense account."
+  },
+  {
+   "fieldname": "expense_account",
+   "fieldtype": "Link",
+   "label": "Expense Account",
+   "options": "Account",
+   "in_list_view": 1,
+   "columns": 2
+  },
+  {
+   "fieldname": "cost_center",
+   "fieldtype": "Link",
+   "label": "Cost Center",
+   "options": "Cost Center"
+  },
+  {
+   "fieldname": "project",
+   "fieldtype": "Link",
+   "label": "Project",
+   "options": "Project"
+  },
+  {
+   "fieldname": "ai_confidence",
+   "fieldtype": "Percent",
+   "label": "AI Confidence",
+   "read_only": 1
+  },
+  {
+   "fieldname": "assignment_section",
+   "fieldtype": "Section Break",
+   "label": "Account Assignment",
+   "collapsible": 1
+  },
+  {
+   "fieldname": "assignment_source",
+   "fieldtype": "Select",
+   "label": "Account Source",
+   "options": "\nLibrary\nSupplier History\nSupplier Default\nAI\nHuman",
+   "read_only": 1,
+   "description": "Who chose the expense account: the library, the supplier's history, the AI (Mistral) or a person."
+  },
+  {
+   "fieldname": "assignment",
+   "fieldtype": "Link",
+   "label": "Library Entry",
+   "options": "Account Assignment",
+   "read_only": 1
+  },
+  {
+   "fieldname": "ai_reason",
+   "fieldtype": "Small Text",
+   "label": "Why this account",
+   "read_only": 1
+  },
+  {
+   "fieldname": "column_break_assignment",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "ai_expense_account",
+   "fieldtype": "Link",
+   "label": "Account the AI Proposed",
+   "options": "Account",
+   "read_only": 1
+  },
+  {
+   "fieldname": "ai_candidates",
+   "fieldtype": "Small Text",
+   "label": "Candidates",
+   "read_only": 1,
+   "hidden": 1,
+   "description": "JSON list of accounts the AI considered when it was unsure."
+  },
+  {
+   "fieldname": "learned_account",
+   "fieldtype": "Link",
+   "label": "Learned Account",
+   "options": "Account",
+   "read_only": 1,
+   "hidden": 1,
+   "description": "The account last written to the library for this line, so a line is learned once."
+  }
+ ],
+ "istable": 1,
+ "links": [],
+ "modified": "2026-10-17 23:00:00.000000",
+ "modified_by": "Administrator",
+ "module": "Phamos",
+ "name": "Accounting Receipt Item",
+ "owner": "Administrator",
+ "permissions": [],
+ "sort_field": "modified",
+ "sort_order": "DESC",
+ "states": []
+}

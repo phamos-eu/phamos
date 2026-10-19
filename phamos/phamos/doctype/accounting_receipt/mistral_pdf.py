@@ -1,291 +1,53 @@
 # Copyright (c) 2025, phamos.eu and contributors
-# Extract data from Accounting Receipt PDF attachment via Mistral OCR + chat and update the doc.
+# For license information, please see license.txt
 
-import base64
-import json
-import os
+"""Entry points kept for the Desk form and older callers.
+
+The work is done by the AI Accountant (phamos.ai_agents, phamos.accounting.extraction):
+runs are logged as AI Agent Run, run as the AI user and only fill empty fields.
+"""
 
 import frappe
 from frappe import _
-from frappe.utils import cstr, get_files_path
+from frappe.utils import cstr
 
-from .data_extract import (
-	get_extraction_key_map,
-	get_extractable_fields_meta,
-	get_extraction_schema_for_prompt,
-	update_accounting_receipt_from_extracted,
-)
+from phamos.ai_agents.llm import get_mistral_settings
 
-MISTRAL_OCR_MODEL = "mistral-ocr-latest"
-# Chat model: must be a chat/completion model, NOT an OCR model
-MISTRAL_CHAT_MODEL_DEFAULT = "mistral-small-latest"
-MISTRAL_BASE_URL = "https://api.mistral.ai/v1"
-MISTRAL_OCR_BASE_URL = "https://api.mistral.ai/v1"
+from .data_extract import get_extractable_fields_meta, get_extraction_key_map
+
+DOCTYPE = "Accounting Receipt"
 
 
 def _get_phamos_settings():
-	"""Return Mistral config from Phamos Settings. Returns None if not configured."""
-	try:
-		settings = frappe.get_single("phamos Settings")
-		# Password field is encrypted in DB; must use get_password() for the real key
-		api_key = settings.get_password("mistral_api_key") if settings.get("mistral_api_key") else None
-		if not api_key or not api_key.strip():
-			return None
-		return {
-			"api_key": api_key.strip(),
-			"model": getattr(settings, "mistral_model", None) or "mistral-small-latest",
-			"base_url": (getattr(settings, "mistral_base_url", None) or "").strip() or MISTRAL_BASE_URL,
-		}
-	except Exception:
-		return None
-
-
-def _get_pdf_path_from_attachment(attachment_file_url):
-	"""
-	Resolve attachment file_url (e.g. /files/xxx.pdf or /private/files/xxx.pdf) to filesystem path.
-	Returns None if not found or not a file.
-	"""
-	if not attachment_file_url or not attachment_file_url.strip():
-		return None
-	url = attachment_file_url.strip()
-	# Handle full URL (e.g. https://site/files/xxx.pdf) - take path after host
-	if "://" in url:
-		from urllib.parse import urlparse
-		url = urlparse(url).path or url
-	if not url.lower().endswith(".pdf"):
-		return None
-	# Normalize: remove leading slash
-	url = url.lstrip("/")
-	if url.startswith("private/files/"):
-		rest = url.replace("private/files/", "", 1)
-		path = get_files_path(*rest.split("/"), is_private=1)
-	elif url.startswith("files/"):
-		rest = url.replace("files/", "", 1)
-		path = get_files_path(*rest.split("/"))
-	else:
-		# Just filename
-		path = get_files_path(url)
-	if path and os.path.isfile(path):
-		return path
-	return None
-
-
-def _read_pdf_as_base64(pdf_path):
-	"""Read PDF file and return base64 string."""
-	with open(pdf_path, "rb") as f:
-		return base64.b64encode(f.read()).decode("utf-8")
-
-
-def _call_mistral_ocr(api_key, base_url, pdf_base64):
-	"""Call Mistral OCR API; return markdown text from the document."""
-	import requests
-
-	url = f"{base_url.rstrip('/')}/ocr"
-	headers = {
-		"Authorization": f"Bearer {api_key}",
-		"Content-Type": "application/json",
-	}
-	payload = {
-		"model": MISTRAL_OCR_MODEL,
-		"document": {
-			"type": "document_url",
-			"document_url": f"data:application/pdf;base64,{pdf_base64}",
-		},
-	}
-	resp = requests.post(url, json=payload, headers=headers, timeout=120)
-	if not resp.ok:
-		body = resp.text[:500] if resp.text else ""
-		raise Exception(f"Mistral OCR failed ({resp.status_code}): {body}")
-	data = resp.json()
-	# Response has pages[].markdown; concatenate
-	markdown_parts = []
-	for page in data.get("pages") or []:
-		markdown_parts.append(page.get("markdown") or "")
-	return "\n\n".join(markdown_parts)
-
-
-def _get_prompt_rules():
-	"""Load enabled AI Prompt Rules from AI Prompt Configuration, sorted by order."""
-	try:
-		config = frappe.get_single("AI Prompt Configuration")
-		rules = sorted(
-			[r for r in (config.get("rules") or []) if r.get("enabled")],
-			key=lambda r: (r.get("order") or 0),
-		)
-		return rules
-	except Exception:
-		return []
-
-
-def _call_mistral_chat_extract(api_key, base_url, model, document_markdown):
-	"""Ask Mistral to return a JSON object with Accounting Receipt fields from the document text."""
-	import requests
-
-	# OCR models (e.g. mistral-ocr-latest) are not valid for Chat API; use a chat model
-	if not model or "ocr" in (model or "").lower():
-		model = MISTRAL_CHAT_MODEL_DEFAULT
-
-	schema = get_extraction_schema_for_prompt()
-	field_list = ", ".join([f'"{m["key"]}" (for {m["label"]})' for m in schema])
-	address_keys = "address_line1, address_line2, city, state, country, pincode"
-
-	rules = _get_prompt_rules()
-	rules_block = ""
-	if rules:
-		lines = [f"{i + 1}. Case: {r.get('case_description', '').strip()}\n   Action: {r.get('action', '').strip()}"
-			for i, r in enumerate(rules)]
-		rules_block = "\n\nAdditional extraction rules — apply these in order:\n" + "\n".join(lines)
-
-	prompt = f"""You are extracting structured data from a receipt/invoice document. The following text was extracted from a PDF via OCR.
-
-Return a JSON object with keys matching these field names (use the key in quotes): {field_list}.
-If the document contains a vendor/supplier address, also include these optional keys: {address_keys}.
-Use only the keys listed (plus the optional address keys when present). For dates use YYYY-MM-DD. For numbers: this document uses German locale formatting where comma (,) is the decimal separator and period (.) is the thousands separator — always convert to a standard decimal number before outputting (e.g. "520,03" → 520.03, "1.234,56" → 1234.56, "52.003,00" → 52003.0). Output no currency symbols. For missing values omit the key.
-Output nothing else except the JSON object.{rules_block}
-
-Document text:
----
-{document_markdown[:12000]}
----"""
-
-	url = f"{base_url.rstrip('/')}/chat/completions"
-	headers = {
-		"Authorization": f"Bearer {api_key}",
-		"Content-Type": "application/json",
-	}
-	payload = {
-		"model": model,
-		"messages": [{"role": "user", "content": prompt}],
-		"response_format": {"type": "json_object"},
-	}
-	resp = requests.post(url, json=payload, headers=headers, timeout=60)
-	if not resp.ok:
-		body = resp.text[:500] if resp.text else ""
-		raise Exception(f"Mistral Chat failed ({resp.status_code}): {body}")
-	data = resp.json()
-	content = (data.get("choices") or [{}])[0].get("message", {}).get("content") or "{}"
-	return json.loads(content)
+	"""Mistral settings {api_key, model, base_url} or None. Used by several features."""
+	return get_mistral_settings()
 
 
 def extract_from_pdf_and_update_ar(accounting_receipt_name):
-	"""
-	Main entry: get Accounting Receipt attachment, run Mistral OCR + chat, apply extracted data.
-	Called from hook or background job. Logs errors; does not raise.
-	"""
+	"""Run the AI Accountant on a receipt now. Returns {ok, reason, updated, message}."""
+	from phamos.ai_agents.runner import run_now
+
 	try:
-		doc = frappe.get_doc("Accounting Receipt", accounting_receipt_name)
-		attachment_url = doc.get("attachment")
-		if not attachment_url:
-			return {"ok": False, "reason": "no_attachment"}
-
-		pdf_path = _get_pdf_path_from_attachment(attachment_url)
-		if not pdf_path:
-			frappe.log_error(
-				title=_("Data extract: PDF path not found"),
-				message=f"attachment={attachment_url}",
-			)
-			return {"ok": False, "reason": "pdf_not_found"}
-
-		settings = _get_phamos_settings()
-		if not settings:
-			frappe.log_error(
-				title=_("Data extract: Mistral not configured"),
-				message="Phamos Settings > Data Extract: set Mistral API Key",
-			)
-			return {"ok": False, "reason": "mistral_not_configured"}
-
-		pdf_b64 = _read_pdf_as_base64(pdf_path)
-		# Use same base URL as Chat when set (e.g. proxy); else default OCR endpoint
-		ocr_base = (settings.get("base_url") or "").strip() or MISTRAL_OCR_BASE_URL
-		if not ocr_base.endswith("/v1"):
-			ocr_base = ocr_base.rstrip("/") + "/v1" if ocr_base else MISTRAL_OCR_BASE_URL
-		markdown = _call_mistral_ocr(
-			settings["api_key"],
-			ocr_base,
-			pdf_b64,
-		)
-		if not (markdown or "").strip():
-			return {"ok": False, "reason": "ocr_empty"}
-
-		extracted = _call_mistral_chat_extract(
-			settings["api_key"],
-			settings["base_url"],
-			settings["model"],
-			markdown,
-		)
-		result = update_accounting_receipt_from_extracted(accounting_receipt_name, extracted)
-		return {"ok": True, "updated": result.get("updated", []), "skipped": result.get("skipped", [])}
+		run = run_now(DOCTYPE, accounting_receipt_name, trigger="Manual")
 	except Exception as e:
-		tb = frappe.get_traceback()
-		frappe.log_error(title=_("Data extract from PDF failed"), message=tb)
-		msg = str(e)
-		# Explain DNS/network errors so user knows it's environment, not config
-		if "nodename nor servname" in msg or "Failed to resolve" in msg or "NameResolutionError" in msg or "ConnectionError" in type(e).__name__ or isinstance(e, OSError):
-			msg = _("Cannot reach Mistral API (network/DNS error). Check: 1) Internet connection, 2) DNS can resolve api.mistral.ai, 3) Firewall allows HTTPS to Mistral. If you use a proxy, set Base URL in Phamos Settings > Data Extract.")
-		return {"ok": False, "reason": "error", "message": msg, "traceback": tb}
+		return {"ok": False, "reason": "error", "message": str(e)}
+	if run.status != "Completed":
+		return {"ok": False, "reason": "error", "message": run.error, "run": run.name}
+	return {"ok": True, "updated": [f.strip() for f in (run.fields_set or "").split(",") if f.strip()], "run": run.name}
 
 
 def run_auto_extract_if_attachment(doc, event=None):
-	"""
-	Call from Accounting Receipt after_insert / on_update.
-	If attachment is set (and changed on update), enqueue extraction so fields auto-update.
-	"""
-	if not doc.get("attachment"):
+	"""after_insert: queue the AI Accountant when the receipt arrives with a PDF."""
+	if not (doc.get("attachment") or "").lower().endswith(".pdf"):
 		return
-	# On update: only run if attachment just changed
-	if event == "on_update":
-		old = doc.get_doc_before_save()
-		if old and old.get("attachment") == doc.get("attachment"):
-			return
-	frappe.enqueue(
-		extract_from_pdf_and_update_ar,
-		queue="default",
-		timeout=300,
-		accounting_receipt_name=doc.name,
-		enqueue_after_commit=True,
-	)
+	from phamos.ai_agents.runner import enqueue_run
 
-
-def _extract_from_pdf_only(accounting_receipt_name):
-	"""
-	Run OCR + Mistral chat and return extracted dict. Does NOT update the doc.
-	Returns (extracted_dict, None) on success or (None, error_result_dict) on failure.
-	"""
-	doc = frappe.get_doc("Accounting Receipt", accounting_receipt_name)
-	attachment_url = doc.get("attachment")
-	if not attachment_url:
-		return None, {"ok": False, "reason": "no_attachment"}
-	pdf_path = _get_pdf_path_from_attachment(attachment_url)
-	if not pdf_path:
-		return None, {"ok": False, "reason": "pdf_not_found"}
-	settings = _get_phamos_settings()
-	if not settings:
-		return None, {"ok": False, "reason": "mistral_not_configured"}
-	pdf_b64 = _read_pdf_as_base64(pdf_path)
-	ocr_base = (settings.get("base_url") or "").strip() or MISTRAL_OCR_BASE_URL
-	if not ocr_base.endswith("/v1"):
-		ocr_base = ocr_base.rstrip("/") + "/v1" if ocr_base else MISTRAL_OCR_BASE_URL
-	try:
-		markdown = _call_mistral_ocr(settings["api_key"], ocr_base, pdf_b64)
-	except Exception as e:
-		tb = frappe.get_traceback()
-		frappe.log_error(title=_("Data extract from PDF failed"), message=tb)
-		return None, {"ok": False, "reason": "error", "message": str(e)}
-	if not (markdown or "").strip():
-		return None, {"ok": False, "reason": "ocr_empty"}
-	try:
-		extracted = _call_mistral_chat_extract(
-			settings["api_key"], settings["base_url"], settings["model"], markdown
-		)
-	except Exception as e:
-		tb = frappe.get_traceback()
-		frappe.log_error(title=_("Data extract from PDF failed"), message=tb)
-		return None, {"ok": False, "reason": "error", "message": str(e)}
-	return extracted, None
+	enqueue_run(DOCTYPE, doc.name, trigger="Insert")
 
 
 def _value_for_field_from_extracted(fieldname, extracted, key_map):
 	"""Resolve value for one meta field from extracted dict (by fieldname or any key that maps to it)."""
+
 	def norm(k):
 		if not k or not isinstance(k, str):
 			return None
@@ -293,10 +55,8 @@ def _value_for_field_from_extracted(fieldname, extracted, key_map):
 
 	if not extracted:
 		return None
-	# Direct match by fieldname
 	if fieldname in extracted and extracted[fieldname] not in (None, ""):
 		return extracted[fieldname]
-	# Any extracted key that maps to this fieldname (key_map has fieldname, label norm, aliases)
 	for raw_key, value in extracted.items():
 		if value is None or value == "":
 			continue
@@ -307,16 +67,10 @@ def _value_for_field_from_extracted(fieldname, extracted, key_map):
 
 
 def _build_review_fields(extracted):
-	"""
-	Build list of { fieldname, label, fieldtype, options, value } for dialog.
-	Uses ALL extractable Accounting Receipt meta fields so nothing is missed;
-	values are filled from extracted where we can match (by fieldname or key_map).
-	"""
+	"""Fields for the Desk review dialog: every extractable field, filled where the AI found a value."""
 	key_map = get_extraction_key_map()
-	meta_list = get_extractable_fields_meta()
-
 	fields = []
-	for meta in meta_list:
+	for meta in get_extractable_fields_meta():
 		fieldname = meta["fieldname"]
 		value = _value_for_field_from_extracted(fieldname, extracted, key_map)
 		if value is not None and meta["fieldtype"] in ("Currency", "Float", "Int"):
@@ -324,50 +78,40 @@ def _build_review_fields(extracted):
 				value = float(value) if not isinstance(value, (int, float)) else value
 			except (ValueError, TypeError):
 				pass
-		fields.append({
-			"fieldname": fieldname,
-			"label": meta["label"],
-			"fieldtype": meta["fieldtype"],
-			"options": meta.get("options"),
-			"value": value,
-		})
+		if hasattr(value, "isoformat"):
+			value = value.isoformat()
+		fields.append(
+			{
+				"fieldname": fieldname,
+				"label": meta["label"],
+				"fieldtype": meta["fieldtype"],
+				"options": meta.get("options"),
+				"value": value,
+			}
+		)
 	return fields
-
-
-def build_review_fields_from_doc(doc):
-	"""Build review dialog fields from current Accounting Receipt values (no re-OCR)."""
-	extracted = {}
-	for meta in get_extractable_fields_meta():
-		fieldname = meta["fieldname"]
-		value = doc.get(fieldname)
-		if value is not None and value != "":
-			extracted[fieldname] = value
-	return _build_review_fields(extracted), extracted
 
 
 @frappe.whitelist()
 def extract_from_pdf_for_review(accounting_receipt_name):
-	"""
-	Extract data from PDF and return it for user review (no update).
-	Returns { ok, extracted, fields } where fields = [ { fieldname, label, fieldtype, value } ] for the dialog.
-	"""
-	extracted, err = _extract_from_pdf_only(accounting_receipt_name)
-	if err:
-		if err.get("reason") == "error":
-			err["hint"] = _("Check Error Log for details")
-		return err
-	fields = _build_review_fields(extracted)
-	return {"ok": True, "extracted": extracted, "fields": fields}
+	"""Read the PDF and return the values for the Desk review dialog, without saving."""
+	frappe.has_permission(DOCTYPE, "write", doc=accounting_receipt_name, throw=True)
+	from phamos.accounting.extraction import extract_values
+
+	doc = frappe.get_doc(DOCTYPE, accounting_receipt_name)
+	try:
+		extracted = extract_values(doc)
+	except Exception as e:
+		frappe.log_error(title=_("Data extract from PDF failed"), message=frappe.get_traceback())
+		return {"ok": False, "reason": "error", "message": str(e), "hint": _("Check Error Log for details")}
+	if extracted is None:
+		return {"ok": False, "reason": "no_attachment"}
+	extracted = {k: (v.isoformat() if hasattr(v, "isoformat") else v) for k, v in extracted.items()}
+	return {"ok": True, "extracted": extracted, "fields": _build_review_fields(extracted)}
 
 
 @frappe.whitelist()
 def extract_from_pdf_now(accounting_receipt_name):
-	"""
-	Run PDF extraction synchronously and return result (for debugging / manual "Extract from PDF" button).
-	Returns dict with ok, reason, updated, skipped, and on error: message or traceback.
-	"""
-	result = extract_from_pdf_and_update_ar(accounting_receipt_name)
-	# If exception was logged, include link to Error Log
-	if not result.get("ok") and result.get("reason") == "error":
-		result["hint"] = _("Check Error Log for details")
-	return result
+	"""Run the AI Accountant synchronously (debugging)."""
+	frappe.has_permission(DOCTYPE, "write", doc=accounting_receipt_name, throw=True)
+	return extract_from_pdf_and_update_ar(accounting_receipt_name)

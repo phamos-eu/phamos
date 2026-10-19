@@ -51,7 +51,7 @@
 						<StatusFilter v-model="statusFilter" :statuses="CHECKLIST_STATUSES" />
 					</div>
 					<div class="flex min-w-0 justify-center">
-						<ChecklistDoctypeFilter v-model="doctypeFilter" />
+						<ChecklistDoctypeFilter v-model="doctypeFilter" :doctypes="referenceDoctypes" />
 					</div>
 					<div class="flex min-w-0 justify-center">
 						<ListSortSelector
@@ -90,9 +90,10 @@
 						v-for="row in filtered"
 						:key="row.name"
 						type="button"
+						data-list-item
 						:class="[
 							listSubgridClass,
-							'border-b border-outline-gray-1 py-3 text-left hover:bg-surface-gray-2',
+							'border-b border-outline-gray-1 py-3 text-left hover:bg-surface-gray-2 focus:outline-none focus-visible:bg-surface-gray-3',
 							row.name === selectedName
 								? 'bg-surface-gray-2 shadow-[inset_3px_0_0_0_var(--outline-gray-4)]'
 								: '',
@@ -185,7 +186,7 @@
 					:class="[compact ? 'col-span-4' : 'col-span-7', 'flex min-h-72 flex-col items-center justify-center gap-2 text-center']"
 				>
 					<p class="font-medium text-ink-gray-9">No checklists found</p>
-					<p class="text-sm text-ink-gray-5">Clear filters or create a checklist for an HR Issue or Task.</p>
+					<p class="text-sm text-ink-gray-5">Clear filters or create a checklist for an Issue or Task in {{ spaConfig.label }}.</p>
 					<Button class="mt-2" @click="showCreate = true">Create a checklist</Button>
 				</div>
 			</div>
@@ -207,6 +208,7 @@
 			v-model="showCreate"
 			:create-method="`${API}.create_checklist`"
 			:reference-query="`${API}.checklist_reference_query`"
+			:doctypes="referenceDoctypes"
 			@created="onCreated"
 		/>
 	</div>
@@ -237,6 +239,8 @@ import { deskRecordUrl } from "@spa/utils/deskUrl.js"
 import spaConfig from "@/config"
 
 const API = spaConfig.api
+// The Personal Cockpit also attaches checklists to ToDos (#1554).
+const referenceDoctypes = spaConfig.personal ? ["Issue", "Task", "ToDo"] : ["Issue", "Task"]
 const CHECKLIST_API = "phamos.api.checklist_inbox"
 const route = useRoute()
 const router = useRouter()
@@ -357,7 +361,8 @@ function closeChecklist() {
 }
 
 async function onUpdated(checklist) {
-	selected.value = checklist
+	// Item saves can finish after another checklist was opened.
+	if (checklist?.name && checklist.name === selected.value?.name) selected.value = checklist
 	await loadInbox()
 }
 

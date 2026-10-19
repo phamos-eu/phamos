@@ -3,3 +3,6 @@ OKR Addon
 Mailcow Integration
 Gitlab Integration
 Bookstack Integration
+Cockpits
+AI Agents
+Marketing

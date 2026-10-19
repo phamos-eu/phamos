@@ -119,6 +119,7 @@ def update_customer_comment(ts_name, comment=None, custom_rating=None):
     # Update fields in Timesheet
     if comment is not None:
         ts.db_set("customer_comment", comment)
+        _set_gitlab_urls_from_comment(ts, comment)
     if custom_rating is not None:
         ts.db_set("custom_rating", custom_rating)
 
@@ -130,6 +131,21 @@ def update_customer_comment(ts_name, comment=None, custom_rating=None):
     return {
         "message": "Comment sent for Review successfully.",
     }
+
+
+def _set_gitlab_urls_from_comment(ts, comment):
+    """Fill the Timesheet's GitLab child/parent URL columns from links in the comment.
+
+    Only empty columns are filled. Links are classified via the synced GitLab Issue.
+    """
+    from phamos.phamos.page.project_action_panel.project_action_panel import _find_gitlab_issues_in_text
+
+    child_issue, parent_issue = _find_gitlab_issues_in_text(comment)
+
+    if child_issue and not ts.custom_gitlab_child_issue_url:
+        ts.db_set("custom_gitlab_child_issue_url", frappe.db.get_value("GitLab Issue", child_issue, "issue_url"))
+    if parent_issue and not ts.custom_gitlab_parent_issue_url:
+        ts.db_set("custom_gitlab_parent_issue_url", frappe.db.get_value("GitLab Issue", parent_issue, "issue_url"))
 
 
 def get_customer_for_user(user):

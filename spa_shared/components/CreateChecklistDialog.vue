@@ -29,7 +29,7 @@
 							v-model="selectedDocument"
 							type="select"
 							size="sm"
-							:options="['Issue', 'Task']"
+							:options="doctypes"
 						/>
 					</div>
 					<div>
@@ -133,6 +133,21 @@
 										:disabled="!row.document"
 									/>
 								</div>
+								<!-- Assignee gets a ToDo for the item (#1625). -->
+								<div class="grid grid-cols-2 gap-2">
+									<FrappeLink
+										doctype="User"
+										query="phamos.api.checklist_inbox.checklist_owner_query"
+										v-model="row.assigned_to"
+										placeholder="Assign to…"
+									/>
+									<FormControl
+										v-model="row.due_date"
+										type="date"
+										size="sm"
+										title="Due date"
+									/>
+								</div>
 							</div>
 						</div>
 					</div>
@@ -153,6 +168,8 @@ import { computed, nextTick, ref, watch } from "vue"
 import { call, TextEditor } from "frappe-ui"
 import ChecklistTemplatePicker from "@spa/components/ChecklistTemplatePicker.vue"
 import FrappeLink from "@spa/components/FrappeLink.vue"
+import { session } from "@spa/session.js"
+import spaConfig from "@/config"
 import { skipTextEditorToolbarTabStops } from "@spa/utils/textEditorFocus.js"
 
 const props = defineProps({
@@ -162,6 +179,8 @@ const props = defineProps({
 	referenceTitle: { type: String, default: "" },
 	createMethod: { type: String, default: "phamos.api.checklist_inbox.create_spa_checklist" },
 	referenceQuery: { type: String, default: "" },
+	// Reference types offered when the dialog is opened without a fixed record.
+	doctypes: { type: Array, default: () => ["Issue", "Task"] },
 })
 
 const emit = defineEmits(["update:modelValue", "created"])
@@ -205,6 +224,8 @@ function emptyRow(seed = {}) {
 		note: seed.note || "",
 		document: seed.document || "",
 		record: seed.record || "",
+		assigned_to: seed.assigned_to || "",
+		due_date: seed.due_date || "",
 	}
 }
 
@@ -218,6 +239,11 @@ function isEmptyHtml(html) {
 	return !text
 }
 
+// In the Personal Cockpit a new checklist is mine unless I pick someone else.
+function defaultOwner() {
+	return spaConfig.personal && session.user ? session.user : ""
+}
+
 function resetForm() {
 	nextId = 1
 	descriptionHosts.clear()
@@ -226,7 +252,7 @@ function resetForm() {
 	selectedDocument.value = props.document || "Issue"
 	selectedReferenceRecord.value = props.referenceRecord || ""
 	title.value = (props.referenceTitle || "").trim()
-	checklistOwner.value = ""
+	checklistOwner.value = defaultOwner()
 	rows.value = [emptyRow()]
 	noteEditorKey.value += 1
 	error.value = ""
@@ -237,7 +263,7 @@ function applyBlankItems() {
 	nextId = 1
 	descriptionHosts.clear()
 	title.value = (props.referenceTitle || "").trim()
-	checklistOwner.value = ""
+	checklistOwner.value = defaultOwner()
 	rows.value = [emptyRow()]
 	noteEditorKey.value += 1
 }
@@ -255,7 +281,7 @@ async function applyTemplate(name) {
 		nextId = 1
 		descriptionHosts.clear()
 		title.value = (template.title || "").trim() || (props.referenceTitle || "").trim()
-		checklistOwner.value = template.checklist_template_owner || ""
+		checklistOwner.value = template.checklist_template_owner || defaultOwner()
 		const items = template.items || []
 		rows.value = items.length
 			? items.map((item) => emptyRow(item))
@@ -309,9 +335,14 @@ function buildItems() {
 				note,
 				document: row.document || null,
 				record: row.record || null,
+				assigned_to: row.assigned_to || null,
+				due_date: row.due_date || null,
 			}
 		})
-		.filter((row) => row.description || row.note || row.document || row.record)
+		.filter(
+			(row) =>
+				row.description || row.note || row.document || row.record || row.assigned_to || row.due_date
+		)
 }
 
 async function submit() {

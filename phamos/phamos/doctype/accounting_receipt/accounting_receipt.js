@@ -60,6 +60,13 @@ frappe.ui.form.on("Accounting Receipt", {
             frm.page.set_inner_btn_group_as_primary(__("Create"));
         }
 
+        // Item lines are booked on expense accounts of the receipt's company
+        frm.set_query("expense_account", "items", function () {
+            const filters = { root_type: "Expense", is_group: 0, disabled: 0 };
+            if (frm.doc.company) filters.company = frm.doc.company;
+            return { filters: filters };
+        });
+
         // Filter return_against by same supplier
         frm.set_query("return_against", function () {
             return { filters: { supplier: frm.doc.supplier || "", is_return: 0 } };
@@ -73,8 +80,8 @@ frappe.ui.form.on("Accounting Receipt", {
         frm.events.refresh_pdf_attachment_choices(frm);
 
         // Quick access to AI Prompt Configuration
-        frm.page.add_menu_item(__("AI Prompt Config"), function () {
-            frappe.set_route("Form", "AI Prompt Configuration");
+        frm.page.add_menu_item(__("AI Skills"), function () {
+            frappe.set_route("List", "AI Skill", { agent: "Accounting Agent" });
         });
 
         // Fetch PDF (Mistral) - show review popup, then apply on Proceed
@@ -556,8 +563,8 @@ frappe.ui.form.on("Accounting Receipt", {
     },
 
     getFileExtension: function (filename) {
-        // Get extension of the file
-        return filename.split('.').pop();
+        // Get extension of the file; receipts without attachment have none
+        return (filename || "").split('.').pop().toLowerCase();
     },
 
     is_return: function (frm) {

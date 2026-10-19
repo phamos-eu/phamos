@@ -29,6 +29,7 @@ FRONTENDS = {
 	"accounting_frontend": "/accounting-cockpit",
 	"project_management_frontend": "/project-management-cockpit",
 	"software_development_frontend": "/software-development-cockpit",
+	"personal_frontend": "/personal-cockpit",
 	"scan_frontend": "/scan",
 }
 

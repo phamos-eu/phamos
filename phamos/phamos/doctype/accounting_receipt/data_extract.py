@@ -25,6 +25,7 @@ SKIP_FIELDNAMES = {
 	"title",  # email subject / inbox; do not overwrite from PDF or AI extract
 	"is_paid",  # payment status: not from supplier PDF / AI
 	"total_billing_hours",  # timesheet billing: not from supplier PDF / AI
+	"note",  # note for the accounting office, written by humans only
 }
 
 
@@ -79,8 +80,6 @@ def get_extraction_key_map():
 		"vendor": "supplier",
 		"reference": "supplier_reference",
 		"invoice_number": "supplier_reference",
-		"notes": "note",
-		"description": "note",
 		"billing_amount": "total_billing_amount",
 		"exchange_rate": "conversion_rate",
 	}
@@ -253,6 +252,7 @@ def get_extraction_schema_for_prompt():
 @frappe.whitelist()
 def get_accounting_receipt_extraction_meta():
 	"""API: Return extractable fields meta and key map for building Mistral prompts."""
+	frappe.has_permission(DOCTYPE, "read", throw=True)
 	return {
 		"fields": get_extractable_fields_meta(),
 		"key_map": get_extraction_key_map(),
@@ -289,6 +289,7 @@ def resolve_link_values(link_list):
 	link_list: list of { "fieldname", "doctype", "value" }.
 	Returns dict of fieldname -> resolved doc name (or None if not found).
 	"""
+	frappe.has_permission(DOCTYPE, "read", throw=True)
 	if isinstance(link_list, str):
 		link_list = json.loads(link_list or "[]")
 	out = {}
@@ -307,6 +308,7 @@ def apply_extracted_data(accounting_receipt_name, extracted_data):
 	API: Apply extracted key-value data to an Accounting Receipt.
 	extracted_data can be a JSON string or dict.
 	"""
+	frappe.has_permission(DOCTYPE, "write", doc=accounting_receipt_name, throw=True)
 	if isinstance(extracted_data, str):
 		extracted_data = json.loads(extracted_data)
 	return update_accounting_receipt_from_extracted(accounting_receipt_name, extracted_data)
@@ -327,6 +329,7 @@ def create_address_for_supplier(supplier, address_data):
 	city, state, country, pincode (any key normalized to these names).
 	Returns the new Address name or None if no address fields present.
 	"""
+	frappe.has_permission("Address", "create", throw=True)
 	if not supplier or not frappe.db.exists("Supplier", supplier):
 		return None
 	if isinstance(address_data, str):
@@ -377,6 +380,7 @@ def create_supplier_with_address(supplier_name, address_data, tax_category=None)
 	address_data: optional dict with address_line1, city, country, etc.
 	Returns the new Supplier name. If supplier_name already exists (by name or supplier_name), returns that.
 	"""
+	frappe.has_permission("Supplier", "create", throw=True)
 	if not supplier_name or not cstr(supplier_name).strip():
 		return None
 	supplier_name = cstr(supplier_name).strip()

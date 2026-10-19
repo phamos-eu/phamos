@@ -1,7 +1,1290 @@
-Open in Sales Cockpit,Im Sales-Cockpit öffnen
-Open in Human Resources Cockpit,Im Human-Resources-Cockpit öffnen
-Open in Accounting Cockpit,Im Accounting-Cockpit öffnen
-Open in Project Management Cockpit,Im Projektmanagement-Cockpit öffnen
-Open in Software Development Cockpit,Im Softwareentwicklungs-Cockpit öffnen
 Open in Desk,Im Desk öffnen
-Open in I Own My Work,In I Own My Work öffnen
+People,Personen
+Departments,Abteilungen
+Modules,Module
+Implementations,Implementierungen
+Industries,Branchen
+"An international team of ERPNext specialists, plus the colleagues who shaped phamos before.","Ein internationales Team aus ERPNext-Spezialistinnen und -Spezialisten – und die Kolleginnen und Kollegen, die phamos vorher geprägt haben."
+Small specialist departments that stay close to customers.,"Kleine Fachabteilungen, die nah an unseren Kunden bleiben."
+Delivery teams that take an implementation from first workshop to go-live.,"Projektteams, die eine Implementierung vom ersten Workshop bis zum Go-live begleiten."
+"The ERPNext modules we introduce, step by step and one module at a time.","Die ERPNext-Module, die wir einführen – Schritt für Schritt, ein Modul nach dem anderen."
+ERPNext projects we have delivered or are delivering right now.,"ERPNext-Implementierungen, die wir umgesetzt haben oder gerade umsetzen."
+"Industries we know well, and the modules that matter most in each.","Branchen, die wir gut kennen, und die Module, auf die es dort ankommt."
+person,Person
+people,Personen
+department,Abteilung
+departments,Abteilungen
+team,Team
+teams,Teams
+module,Modul
+modules,Module
+implementation,Implementierung
+implementations,Implementierungen
+industry,Branche
+industries,Branchen
+Search name or role,Name oder Rolle suchen
+Search departments,Abteilungen durchsuchen
+Search teams,Teams durchsuchen
+Search modules,Module durchsuchen
+Search implementations,Implementierungen durchsuchen
+Search industries,Branchen durchsuchen
+Current,Aktuell
+Department,Abteilung
+Designation,Position
+Module expertise,Modul-Expertise
+Time at phamos,Zeit bei phamos
+Under 2 years,Unter 2 Jahre
+2–5 years,2–5 Jahre
+5+ years,5+ Jahre
+Language,Sprache
+Recommended,Empfohlen
+Largest first,Größte zuerst
+Newest first,Neueste zuerst
+Department size,Abteilungsgröße
+1–3 people,1–3 Personen
+4–9 people,4–9 Personen
+10+ people,10+ Personen
+Team size,Teamgröße
+1–3 members,1–3 Mitglieder
+4–6 members,4–6 Mitglieder
+7+ members,7+ Mitglieder
+Founded,Gegründet
+Complexity,Komplexität
+Low,Gering
+Medium,Mittel
+High,Hoch
+Critical,Kritisch
+Industry,Branche
+Module,Modul
+Start year,Startjahr
+Former colleague,Ehemaliges Teammitglied
+1 year,1 Jahr
+{0} years,{0} Jahre
+{0} people,{0} Personen
+1 person,1 Person
+{0} members,{0} Mitglieder
+1 member,1 Mitglied
+Founded {0},Gegründet {0}
+{0} company,Unternehmen ({0})
+Company,Unternehmen
+Completed,Abgeschlossen
+Ongoing,Laufend
+{0} modules,{0} Module
+1 module,1 Modul
+Languages,Sprachen
+Teammates,Teamkolleginnen und -kollegen
+Lead,Leitung
+People in this department,Personen in dieser Abteilung
+View open roles,Offene Stellen ansehen
+Team lead,Teamleitung
+Members,Mitglieder
+Typical duration,Typische Dauer
+Experts,Expertinnen und Experten
+Started,Gestartet
+Modules in this project,Module in dieser Implementierung
+Similar implementations,Ähnliche Implementierungen
+Relevant modules,Relevante Module
+Home,Startseite
+Breadcrumb,Brotkrümelnavigation
+Filters,Filter
+Clear all,Alle zurücksetzen
+Close filters,Filter schließen
+Apply filters,Filter anwenden
+Sort,Sortierung
+Active filters,Aktive Filter
+Remove filter,Filter entfernen
+No matches for these filters,Keine Treffer für diese Filter
+Remove a filter or search for something else.,Entfernen Sie einen Filter oder suchen Sie nach etwas anderem.
+Clear all filters,Alle Filter zurücksetzen
+Pages,Seiten
+Previous page,Vorherige Seite
+Page {0} of {1},Seite {0} von {1}
+Next page,Nächste Seite
+Load more,Mehr laden
+This profile is no longer available,Dieses Profil ist nicht mehr verfügbar
+The page was removed at the request of the person or customer it described.,Die Seite wurde auf Wunsch der beschriebenen Person bzw. des Kunden entfernt.
+Browse all {0},Alle {0} ansehen
+All {0},Alle {0}
+About,Über
+See all,Alle ansehen
+This former colleague chose not to be named. Their role and time at phamos are shown without personal details.,Dieses ehemalige Teammitglied möchte nicht namentlich genannt werden. Rolle und Zeit bei phamos werden ohne persönliche Angaben gezeigt.
+The customer is not named. This case study describes the project without identifying details.,Der Kunde wird nicht genannt. Diese Fallstudie beschreibt die Implementierung ohne identifizierende Angaben.
+Missing translation: {0}. The other language is shown instead.,Fehlende Übersetzung: {0}. Stattdessen wird die andere Sprache angezeigt.
+View on Website,Auf der Website ansehen
+Former colleagues,Ehemalige
+English,Englisch
+Less than a year,Weniger als ein Jahr
+Current team,Aktuelles Team
+Our team,Unser Team
+Customers & partners,Kunden & Partner
+Organization,Organisation
+Partner,Partner
+"The people behind our projects: our team, former colleagues, and the customers and partners we work with eye to eye.","Die Menschen hinter unseren Projekten: unser Team, ehemalige Kolleginnen und Kollegen und die Kunden und Partner, mit denen wir auf Augenhöhe arbeiten."
+Send {0} a message,{0} eine Nachricht senden
+People on this project,Personen in dieser Implementierung
+Your message is forwarded by email and {0} replies to you directly. Their address stays private.,Ihre Nachricht wird per E-Mail weitergeleitet und {0} antwortet Ihnen direkt. Die Adresse bleibt privat.
+Your name,Ihr Name
+Your email,Ihre E-Mail-Adresse
+Message,Nachricht
+"I agree that phamos forwards my name, email address and message to {0}.","Ich bin einverstanden, dass phamos meinen Namen, meine E-Mail-Adresse und meine Nachricht an {0} weiterleitet."
+Send message,Nachricht senden
+Sending…,Wird gesendet …
+Thank you. Your message is on its way.,Danke. Ihre Nachricht ist unterwegs.
+Your message could not be sent. Please try again later.,Ihre Nachricht konnte nicht gesendet werden. Bitte versuchen Sie es später erneut.
+The contact form needs JavaScript. You can also write to post@phamos.eu.,Das Kontaktformular benötigt JavaScript. Sie können auch an post@phamos.eu schreiben.
+Please enter your name and a message.,Bitte geben Sie Ihren Namen und eine Nachricht ein.
+Please enter a valid email address.,Bitte geben Sie eine gültige E-Mail-Adresse ein.
+Please keep your message under {0} characters.,Bitte halten Sie Ihre Nachricht unter {0} Zeichen.
+Please agree that we pass your message on.,Bitte stimmen Sie der Weiterleitung Ihrer Nachricht zu.
+This person can't be contacted through the website.,Diese Person kann nicht über die Website kontaktiert werden.
+Message from {0} via phamos.eu,Nachricht von {0} über phamos.eu
+{0} wrote to you through your profile on phamos.eu:,{0} hat Ihnen über Ihr Profil auf phamos.eu geschrieben:
+Reply to this email to answer {0} directly ({1}).,"Antworten Sie auf diese E-Mail, um {0} direkt zu antworten ({1})."
+You receive this because you agreed to be contactable via your profile: {0},"Sie erhalten diese Nachricht, weil Sie zugestimmt haben, über Ihr Profil kontaktiert zu werden: {0}"
+{0} can only be published with their recorded consent to a public profile.,{0} kann nur mit dokumentierter Zustimmung zu einem öffentlichen Profil veröffentlicht werden.
+Contact via the website needs a forwarding email. Add an email to the Contact or Employee.,Für die Kontaktaufnahme über die Website wird eine Weiterleitungsadresse benötigt. Hinterlegen Sie eine E-Mail-Adresse am Kontakt oder Mitarbeiter.
+{0} already has a Person Web Profile: {1},{0} hat bereits ein Person Web Profile: {1}
+Party Type must be one of: {0},Party Type muss eines davon sein: {0}
+Contact {0} is not linked to {1} {2}.,Kontakt {0} ist nicht mit {1} {2} verknüpft.
+Relationship,Beziehung
+Key people,Ansprechpersonen
+Head of department,Abteilungsleitung
+Your contact,Ihre Ansprechperson
+Key Person,Ansprechperson
+Contact {0},{0} kontaktieren
+Contact phamos,phamos kontaktieren
+Close,Schließen
+Phone (optional),Telefon (optional)
+Send request,Anfrage senden
+Thank you. Your request is on its way and we will get back to you.,"Danke. Ihre Anfrage ist unterwegs, wir melden uns bei Ihnen."
+Your request could not be sent. Please try again later.,Ihre Anfrage konnte nicht gesendet werden. Bitte versuchen Sie es später erneut.
+"Please fill in your name, a valid email address and a message, and tick the consent box.","Bitte geben Sie Ihren Namen, eine gültige E-Mail-Adresse und eine Nachricht ein und bestätigen Sie die Einwilligung."
+"Your request is forwarded to {0} by email, who replies to you directly. Their address stays private.","Ihre Anfrage wird per E-Mail an {0} weitergeleitet, die Antwort kommt direkt an Sie. Die Adresse bleibt privat."
+"I agree that phamos forwards my name, contact details and message to {0}.","Ich bin einverstanden, dass phamos meinen Namen, meine Kontaktdaten und meine Nachricht an {0} weiterleitet."
+{0} receives your request at phamos and gets back to you.,{0} erhält Ihre Anfrage bei phamos und meldet sich bei Ihnen.
+"I agree that phamos stores my name, contact details and message to answer my request.","Ich bin einverstanden, dass phamos meinen Namen, meine Kontaktdaten und meine Nachricht speichert, um meine Anfrage zu beantworten."
+Tell us what you need. The right person at phamos gets back to you.,"Sagen Sie uns, was Sie brauchen. Die passende Person bei phamos meldet sich bei Ihnen."
+Please enter a valid phone number or leave it empty.,Bitte geben Sie eine gültige Telefonnummer ein oder lassen Sie das Feld leer.
+This page can't be contacted through the website.,Über diese Seite ist keine Kontaktaufnahme möglich.
+Website: {0},Website: {0}
+Request from the website page {0}:,Anfrage von der Website-Seite {0}:
+Name: {0},Name: {0}
+Email: {0},E-Mail: {0}
+Phone: {0},Telefon: {0}
+Addressed to: {0},Gerichtet an: {0}
+Page: {0},Seite: {0}
+Reply to this email to answer {0} directly. You receive this because you agreed to be contactable via your profile on phamos.eu.,"Antworten Sie auf diese E-Mail, um {0} direkt zu antworten. Sie erhalten diese Nachricht, weil Sie zugestimmt haben, über Ihr Profil auf phamos.eu kontaktiert zu werden."
+{0} and {1},{0} und {1}
+A former colleague who worked at phamos as {0} for {1}.,"Ein ehemaliges Teammitglied, das {1} als {0} bei phamos gearbeitet hat."
+{0} works at phamos as {1}.,{0} arbeitet bei phamos als {1}.
+{0} worked at phamos as {1} for {2}.,{0} hat {2} als {1} bei phamos gearbeitet.
+Department: {0}.,Abteilung: {0}.
+{0} is part of {1}.,{0} gehört zu {1}.
+{0} is {1} at {2} and works with phamos on eye level.,{0} ist {1} bei {2} und arbeitet mit phamos auf Augenhöhe zusammen.
+Areas of ERPNext expertise: {0}.,ERPNext-Schwerpunkte: {0}.
+The ERPNext modules {0} knows well. Each module page explains what the module covers and who else at phamos works with it.,"Die ERPNext-Module, die {0} gut kennt. Jede Modulseite erklärt, was das Modul abdeckt und wer bei phamos noch damit arbeitet."
+"Projects {0} has worked on, with the industry, team and modules of each.","Implementierungen, an denen {0} mitgearbeitet hat, jeweils mit Branche, Team und Modulen."
+The people {0} works with every day in the same team.,"Die Menschen, mit denen {0} täglich im selben Team arbeitet."
+The {0} department at phamos has {1} and is led by {2}.,Die Abteilung {0} bei phamos hat {1} und wird von {2} geleitet.
+its department head,der Abteilungsleitung
+"Everyone currently working in {0}. Open a profile to see their expertise, team and projects.","Alle, die aktuell in {0} arbeiten. Öffnen Sie ein Profil, um Expertise, Team und Implementierungen zu sehen."
+{0} is a delivery team at phamos with {1}.,{0} ist ein Projektteam bei phamos mit {1}.
+The team is led by {0}.,Das Team wird von {0} geleitet.
+It was founded in {0}.,Es wurde {0} gegründet.
+The team has delivered {0} implementations documented on this site.,"Das Team hat {0} Implementierungen umgesetzt, die auf dieser Website dokumentiert sind."
+The people in {0}. Together they take an implementation from the first workshop to go-live.,Die Menschen in {0}. Gemeinsam begleiten sie eine Implementierung vom ersten Workshop bis zum Go-live.
+"Projects delivered by {0}, with the industry and modules of each.","Implementierungen von {0}, jeweils mit Branche und Modulen."
+Experts at phamos,Expertinnen und Experten bei phamos
+"{0} is an ERPNext module that phamos introduces step by step, together with the people who will use it.","{0} ist ein ERPNext-Modul, das phamos Schritt für Schritt einführt – gemeinsam mit den Menschen, die damit arbeiten werden."
+A typical introduction takes {0}; the complexity is {1}.,Eine typische Einführung dauert {0}; die Komplexität ist {1}.
+"{0} people at phamos work with {1}, and it is part of {2} implementations on this site.",{0} Personen bei phamos arbeiten mit {1}; das Modul ist Teil von {2} Implementierungen auf dieser Website.
+It matters especially in {0}.,Besonders wichtig ist es in den Branchen {0}.
+phamos people with hands-on experience in {0}.,Menschen bei phamos mit praktischer Erfahrung in {0}.
+Projects in which {0} was introduced.,"Implementierungen, in denen {0} eingeführt wurde."
+Industries where {0} plays a central role.,"Branchen, in denen {0} eine zentrale Rolle spielt."
+"An ERPNext implementation for {0}, started in {1}.","Eine ERPNext-Implementierung für {0}, gestartet {1}."
+Modules introduced: {0}.,Eingeführte Module: {0}.
+Delivered by {0}.,Umgesetzt von {0}.
+Status: {0}.,Status: {0}.
+"The people who shaped this project, from phamos and from the customer's side, working together on eye level.","Die Menschen, die diese Implementierung geprägt haben – von phamos und auf Kundenseite, gemeinsam auf Augenhöhe."
+The ERPNext modules introduced in this project.,"Die ERPNext-Module, die in dieser Implementierung eingeführt wurden."
+Other projects in the same industry.,Weitere Implementierungen in derselben Branche.
+phamos introduces ERPNext for companies in {0}.,phamos führt ERPNext für Unternehmen der Branche {0} ein.
+The modules that matter most here are {0}.,Am wichtigsten sind hier die Module {0}.
+{0} implementations in this industry are documented on this site.,{0} Implementierungen aus dieser Branche sind auf dieser Website dokumentiert.
+The ERPNext modules that matter most in {0}.,"Die ERPNext-Module, auf die es in der Branche {0} ankommt."
+Projects we delivered in {0}.,"Implementierungen, die wir in der Branche {0} umgesetzt haben."
+this former colleague,dieses ehemalige Teammitglied
+{0} is part of the {1}.,{0} gehört zum {1}.
+"An ERPNext implementation for an unnamed customer ({0}), started in {1}.","Eine ERPNext-Implementierung für einen nicht genannten Kunden ({0}), gestartet {1}."
+"The phamos people who worked on this project. The customer is not named, so the customer's team is not shown either.","Die Menschen von phamos, die an dieser Implementierung gearbeitet haben. Der Kunde wird nicht genannt, daher wird auch das Team des Kunden nicht gezeigt."
+Customers,Kunden
+"Companies we work with on eye level, and the ERPNext projects we delivered together.","Unternehmen, mit denen wir auf Augenhöhe zusammenarbeiten, und die ERPNext-Implementierungen, die wir gemeinsam umgesetzt haben."
+customer,Kunde
+customers,Kunden
+Search customers,Kunden durchsuchen
+Customer since,Kunde seit
+Since {0},Seit {0}
+{0} implementations,{0} Implementierungen
+1 implementation,1 Implementierung
+Key contact,Ansprechperson
+Account manager · phamos,Kundenbetreuung · phamos
+Companies in {0} that work with phamos and agreed to be named.,"Unternehmen der Branche {0}, die mit phamos arbeiten und genannt werden möchten."
+Region,Region
+Website,Website
+{0} is a phamos customer{1}.,{0} ist Kunde von phamos{1}.
+ in {0}, in der Branche {0}
+"Since {0}, phamos and {1} have worked together on {2}.",Seit {0} arbeiten phamos und {1} gemeinsam an {2}.
+People at {0},Menschen bei {0}
+"The people at {0} who work with phamos, on eye level.","Die Menschen bei {0}, die mit phamos auf Augenhöhe zusammenarbeiten."
+Projects phamos delivered for {0}.,"Implementierungen, die phamos für {0} umgesetzt hat."
+More customers in {0},Weitere Kunden: {0}
+Other companies in the same industry that work with phamos.,"Weitere Unternehmen derselben Branche, die mit phamos arbeiten."
+Sections,Bereiche
+Customer,Kunde
+{0} can only be published with the customer's recorded approval to be named.,{0} kann nur mit dokumentierter Zustimmung des Kunden zur Nennung veröffentlicht werden.
+The key contact must be a Person Web Profile of {0}.,Die Ansprechperson muss ein Person Web Profile von {0} sein.
+An ERPNext implementation for a customer who is not named here.,"Eine ERPNext-Implementierung für einen Kunden, der hier nicht genannt wird."
+An ERPNext implementation for {0}.,Eine ERPNext-Implementierung für {0}.
+A phamos customer that is not named here. Its projects are shown without identifying details.,"Ein Kunde von phamos, der hier nicht genannt wird. Seine Implementierungen werden ohne identifizierende Angaben gezeigt."
+Projects phamos delivered for this customer.,"Implementierungen, die phamos für diesen Kunden umgesetzt hat."
+Sales · phamos,Vertrieb · phamos
+{0}: minimum,{0}: Minimum
+{0}: maximum,{0}: Maximum
+years,Jahre
+members,Mitglieder
+Search people,Personen durchsuchen
+{0} filters active,{0} Filter aktiv
+No filters active,Keine Filter aktiv
+Partners,Partner
+partner,Partner
+partners,Partner
+Search partners,Partner durchsuchen
+"Companies we work with as partners: technology, hosting and implementation partners.","Unternehmen, mit denen wir als Partner arbeiten: Technologie-, Hosting- und Implementierungspartner."
+A phamos partner that is not named here.,"Ein Partner von phamos, der hier nicht genannt wird."
+{0} is a phamos partner{1}.,{0} ist Partner von phamos{1}.
+More partners in {0},Weitere Partner: {0}
+{0} already has a {1} profile: {2},{0} hat bereits ein Profil als {1}: {2}
+Custom App,Eigene App
+Services,Leistungen
+References,Referenzen
+Partnerships,Partnerschaften
+Pricing,Preise
+Contact,Kontakt
+Help & Support,Hilfe & Support
+Documentation,Dokumentation
+Help Articles,Hilfe-Artikel
+Social Media,Social Media
+About us,Über uns
+About phamos,Über phamos
+People at phamos,Menschen bei phamos
+Imprint,Impressum
+Privacy,Datenschutz
+Terms and Conditions,AGB
+Job Openings,Stellenangebote
+Privacy policy,Datenschutzerklärung
+VAT ID,USt-IdNr.
+Timesheet,Zeiterfassung
+Team member,Teammitglied
+Customer contact,Ansprechperson beim Kunden
+Partner contact,Ansprechperson beim Partner
+Missing translation: {0}. The German text (or another language) is shown instead.,Fehlende Übersetzung: {0}. Stattdessen wird der deutsche Text (oder eine andere Sprache) angezeigt.
+Row {0}: there is already a text row for language {1}.,Zeile {0}: Für die Sprache {1} gibt es bereits eine Textzeile.
+{0} can only be published named with their recorded approval to be named.,{0} kann nur mit dokumentierter Zustimmung zur Nennung namentlich veröffentlicht werden.
+"Row {0} ({1}) mentions ""{2}"". An anonymous page must not name the stakeholder: remove it from the text or publish as Named.",Zeile {0} ({1}) nennt „{2}“. Eine anonyme Seite darf den Stakeholder nicht nennen: Entfernen Sie den Namen aus dem Text oder veröffentlichen Sie namentlich.
+"The anonymous route ""{0}"" names the stakeholder. Choose a neutral one or leave it empty to generate it.","Die anonyme Route „{0}“ nennt den Stakeholder. Wählen Sie eine neutrale Route oder lassen Sie das Feld leer, damit sie erzeugt wird."
+"The anonymous route ""{0}"" is already used by another stakeholder page.",Die anonyme Route „{0}“ wird bereits von einer anderen Stakeholder-Seite verwendet.
+"The route ""{0}"" contains the surname. Use the first name and the initial of the surname, e.g. ""{1}"".","Die Route „{0}“ enthält den Nachnamen. Verwenden Sie den Vornamen und den Anfangsbuchstaben des Nachnamens, z. B. „{1}“."
+"The route ""{0}"" is already used by another person.",Die Route „{0}“ wird bereits von einer anderen Person verwendet.
+Translation Of,Übersetzung von
+"Page language. Use routes de/… and en/… so navbar, footer and language picker can switch.","Sprache der Seite. Routen de/… und en/… verwenden, damit Navigation, Fußzeile und Sprachauswahl umschalten können."
+"For the English page: the German page it translates.","Für die englische Seite: die deutsche Seite, die sie übersetzt."
+{0} at phamos,{0} bei phamos
+{0} Frappe/ERPNext,{0} Frappe/ERPNext
+Experience with Frappe / ERPNext,Erfahrung mit Frappe / ERPNext
+(since {0}),(seit {0})
+Working with Frappe / ERPNext Since,Arbeitet mit Frappe / ERPNext seit
+"Year the person started working with Frappe / ERPNext, e.g. 2016. The website shows the years from it (for alumni up to their leaving date) and offers it as a filter.","Jahr, seit dem die Person mit Frappe / ERPNext arbeitet, z. B. 2016. Die Website zeigt daraus die Jahre (bei Alumni bis zum Austritt) und bietet sie als Filter an."
+"Working with Frappe / ERPNext Since must be a year between 2008 and {0}, e.g. 2016.","„Arbeitet mit Frappe / ERPNext seit“ muss ein Jahr zwischen 2008 und {0} sein, z. B. 2016."
+{0}–{1} weeks,{0}–{1} Wochen
+{0} weeks,{0} Wochen
+Germany,Deutschland
+Austria,Österreich
+Switzerland,Schweiz
+India,Indien
+Europe,Europa
+Note for the accounting office,Hinweis für die Buchhaltung
+Events,Veranstaltungen
+"Workshops, meetups and webinars around ERPNext: where to meet phamos next, on site and online.","Workshops, Meetups und Webinare rund um ERPNext: wo Sie phamos als Nächstes treffen, vor Ort und online."
+Search events,Veranstaltungen durchsuchen
+When,Wann
+Upcoming,Demnächst
+Past,Vergangen
+All,Alle
+Type,Art
+City,Stadt
+Date,Datum
+event,Veranstaltung
+events,Veranstaltungen
+Workshop,Workshop
+Conference,Konferenz
+Webinar,Webinar
+Training,Schulung
+Meetup,Meetup
+Hackathon,Hackathon
+Team Building,Teambuilding
+Seminar,Seminar
+Networking,Networking
+Product Launch,Produktvorstellung
+Town Hall,Town Hall
+Social Event,Gesellschaftliches Event
+Free,Kostenlos
+Tickets available,Tickets verfügbar
+Sold out,Ausverkauft
+Cancelled,Abgesagt
+Ticket sale opens soon,Ticketverkauf startet bald
+Ticket sale has not started yet,Der Ticketverkauf hat noch nicht begonnen
+Ticket sale has ended,Der Ticketverkauf ist beendet
+Buy ticket,Ticket kaufen
+Register,Anmelden
+Keep me posted,Auf dem Laufenden bleiben
+Add to calendar,Zum Kalender hinzufügen
+Speakers,Referentinnen und Referenten
+Sponsors,Sponsoren
+Time,Uhrzeit
+Venue,Veranstaltungsort
+Price,Preis
+{0} incl. VAT,{0} inkl. MwSt.
+Seats left,Freie Plätze
+Organizer,Veranstalter
+More events,Weitere Veranstaltungen
+Other upcoming events by phamos.,Weitere anstehende Veranstaltungen von phamos.
+Your contact for this event,Ihre Ansprechperson für diese Veranstaltung
+This event has been cancelled.,Diese Veranstaltung wurde abgesagt.
+This event is described in English only.,Diese Veranstaltung ist nur auf Englisch beschrieben.
+This event is described in German only.,Diese Veranstaltung ist nur auf Deutsch beschrieben.
+"Thank you, your email address is confirmed. You will receive the updates.","Danke, Ihre E-Mail-Adresse ist bestätigt. Sie erhalten die Neuigkeiten."
+Register for {0},Anmeldung zu {0}
+Tickets for {0},Tickets für {0}
+Tickets,Tickets
+Number of tickets,Anzahl Tickets
+Name,Name
+Email,E-Mail
+Billing address,Rechnungsadresse
+Every order is invoiced. The invoice goes to this address.,Jede Bestellung wird in Rechnung gestellt. Die Rechnung geht an diese Adresse.
+Order as a company,Als Firma bestellen
+VAT ID (optional),USt-IdNr. (optional)
+Email for the invoice,E-Mail für die Rechnung
+Street and number,Straße und Hausnummer
+Postcode,PLZ
+Country,Land
+Your order,Ihre Bestellung
+incl. {0} % VAT,inkl. {0} % MwSt.
+Total,Gesamt
+I accept the terms and conditions of this event.,Ich akzeptiere die Teilnahmebedingungen dieser Veranstaltung.
+Read the terms,Bedingungen lesen
+I agree that phamos stores my details and those of the ticket holders to handle this order.,"Ich bin einverstanden, dass phamos meine Angaben und die der Ticketinhaber zur Abwicklung dieser Bestellung speichert."
+Keep me posted about this event by email (optional; you confirm your address first).,Neuigkeiten zu dieser Veranstaltung per E-Mail (optional; Sie bestätigen Ihre Adresse zuerst).
+Other attendees may contact me after the event (optional).,Andere Teilnehmende dürfen mich nach der Veranstaltung kontaktieren (optional).
+My name and company may be listed publicly as attendee (optional).,Mein Name und meine Firma dürfen öffentlich als Teilnehmende genannt werden (optional).
+Order with obligation to pay,Zahlungspflichtig bestellen
+Your order could not be sent. Please try again later.,Ihre Bestellung konnte nicht gesendet werden. Bitte versuchen Sie es später erneut.
+Please fill in all required fields with valid values and accept the terms and the privacy policy.,Bitte füllen Sie alle Pflichtfelder korrekt aus und akzeptieren Sie die Bedingungen und die Datenschutzerklärung.
+Thank you!,Vielen Dank!
+Your reference:,Ihre Referenz:
+You are registered. A confirmation is on its way to your inbox.,Sie sind angemeldet. Eine Bestätigung ist unterwegs in Ihr Postfach.
+phamos confirms your order by email and sends you the invoice.,phamos bestätigt Ihre Bestellung per E-Mail und sendet Ihnen die Rechnung.
+"We send you updates about {0}: schedule, reminders and follow-up material. You confirm your address by email first.","Wir senden Ihnen Neuigkeiten zu {0}: Ablauf, Erinnerungen und Material danach. Sie bestätigen Ihre Adresse zuerst per E-Mail."
+I agree that phamos stores my email address to send me these updates. I can unsubscribe at any time.,"Ich bin einverstanden, dass phamos meine E-Mail-Adresse für diese Neuigkeiten speichert. Ich kann mich jederzeit abmelden."
+Send confirmation email,Bestätigungs-E-Mail senden
+Almost done: please confirm with the link we just sent you.,"Fast geschafft: Bitte bestätigen Sie über den Link, den wir Ihnen gerade gesendet haben."
+This address already receives the updates.,Diese Adresse erhält die Neuigkeiten bereits.
+That did not work. Please try again later.,Das hat nicht geklappt. Bitte versuchen Sie es später erneut.
+Please enter a valid email address and tick the consent box.,Bitte geben Sie eine gültige E-Mail-Adresse ein und setzen Sie den Haken bei der Einwilligung.
+Ordering needs JavaScript. Please write to {0} instead.,Die Bestellung benötigt JavaScript. Bitte schreiben Sie stattdessen an {0}.
+This event is not available.,Diese Veranstaltung ist nicht verfügbar.
+Ticket sales for this event are closed.,Der Ticketverkauf für diese Veranstaltung ist geschlossen.
+Please add at least one ticket holder.,Bitte geben Sie mindestens einen Ticketinhaber an.
+At most {0} tickets per order.,Höchstens {0} Tickets pro Bestellung.
+Please enter the full name of every ticket holder.,Bitte geben Sie den vollständigen Namen jedes Ticketinhabers an.
+Every ticket needs its own email address.,Jedes Ticket braucht eine eigene E-Mail-Adresse.
+Please fill in the billing details.,Bitte füllen Sie die Rechnungsdaten aus.
+Please fill in: {0},Bitte ausfüllen: {0}
+Please enter the company name for the invoice.,Bitte geben Sie den Firmennamen für die Rechnung an.
+Please enter a valid VAT ID (e.g. DE123456789) or leave it empty.,Bitte geben Sie eine gültige USt-IdNr. ein (z. B. DE123456789) oder lassen Sie das Feld leer.
+Please choose a country.,Bitte wählen Sie ein Land.
+Please accept the terms and the privacy policy.,Bitte akzeptieren Sie die Bedingungen und die Datenschutzerklärung.
+The number of tickets does not match the ticket holders.,Die Anzahl der Tickets passt nicht zu den Ticketinhabern.
+This event has no updates by email.,Für diese Veranstaltung gibt es keine Neuigkeiten per E-Mail.
+Please agree that we store your email address for these updates.,"Bitte stimmen Sie zu, dass wir Ihre E-Mail-Adresse für diese Neuigkeiten speichern."
+Only {0} seats are left.,Es sind nur noch {0} Plätze frei.
+Already registered for this event: {0},Bereits für diese Veranstaltung angemeldet: {0}
+Your registration {0} for {1},Ihre Anmeldung {0} für {1}
+Thank you for your registration for {0}.,Vielen Dank für Ihre Anmeldung zu {0}.
+Reference,Referenz
+Total incl. VAT: {0},Gesamt inkl. MwSt.: {0}
+We confirm your order and send you the invoice by email. Your tickets are valid once the invoice is paid.,"Wir bestätigen Ihre Bestellung und senden Ihnen die Rechnung per E-Mail. Ihre Tickets gelten, sobald die Rechnung bezahlt ist."
+Your registration is confirmed. We look forward to seeing you.,Ihre Anmeldung ist bestätigt. Wir freuen uns auf Sie.
+"If something is wrong or you cannot come, simply reply to this email.","Wenn etwas nicht stimmt oder Sie nicht kommen können, antworten Sie einfach auf diese E-Mail."
+Billing,Rechnung
+Review and order,Prüfen und bestellen
+Review and register,Prüfen und anmelden
+I attend myself,Ich nehme selbst teil
+All tickets and information go to your email address. Add an email for a ticket holder only if they should receive it directly.,"Alle Tickets und Informationen gehen an Ihre E-Mail-Adresse. Geben Sie eine E-Mail für einen Ticketinhaber nur an, wenn er sie direkt erhalten soll."
+Ticket holder,Ticketinhaber
+Email (optional),E-Mail (optional)
+Name on the invoice,Name auf der Rechnung
+Review,Prüfen
+Event,Veranstaltung
+Change,Ändern
+Tickets and information to,Tickets und Informationen an
+Payment,Zahlung
+By invoice. You receive the invoice by email and pay within 14 days of the invoice date.,Auf Rechnung. Sie erhalten die Rechnung per E-Mail und zahlen innerhalb von 14 Tagen ab Rechnungsdatum.
+"By clicking ""Order with obligation to pay"" you place a binding order. Our {0} apply.","Mit Klick auf „Zahlungspflichtig bestellen"" geben Sie eine verbindliche Bestellung ab. Es gelten unsere {0}."
+terms and conditions,Teilnahmebedingungen
+There is no right of withdrawal for tickets to leisure events on a specific date (§ 312g (2) no. 9 BGB).,Für Tickets zu Freizeitveranstaltungen mit festem Termin besteht kein Widerrufsrecht (§ 312g Abs. 2 Nr. 9 BGB).
+"By clicking ""Register"" your registration is binding.","Mit Klick auf „Anmelden"" ist Ihre Anmeldung verbindlich."
+Our {0} apply.,Es gelten unsere {0}.
+We use your details and those of the ticket holders only to handle this order and the event.,Wir verwenden Ihre Angaben und die der Ticketinhaber nur zur Abwicklung dieser Bestellung und der Veranstaltung.
+About the order process,Hinweise zum Bestellvorgang
+"You can correct your entries with ""Back"" or ""Change"" until you order. The contract language is German or English. We store the contract text and send it to you with the order confirmation, including the terms and conditions.","Bis zur Bestellung können Sie Ihre Angaben mit „Zurück"" oder „Ändern"" korrigieren. Vertragssprache ist Deutsch oder Englisch. Wir speichern den Vertragstext und senden ihn Ihnen mit der Bestellbestätigung, einschließlich der Teilnahmebedingungen."
+Terms and conditions,Teilnahmebedingungen
+Back,Zurück
+Continue,Weiter
+The confirmation is on its way to {0}.,Die Bestätigung ist unterwegs an {0}.
+The invoice follows by email.,Die Rechnung folgt per E-Mail.
+Three optional questions,Drei freiwillige Fragen
+"Your order is complete. If you like, tell us what else we may do. You can change this at any time.","Ihre Bestellung ist abgeschlossen. Wenn Sie möchten, sagen Sie uns, was wir darüber hinaus dürfen. Sie können das jederzeit ändern."
+Updates about this event by email,Neuigkeiten zu dieser Veranstaltung per E-Mail
+"Schedule, reminders and material afterwards. You confirm your address with a link first.","Ablauf, Erinnerungen und Material danach. Sie bestätigen Ihre Adresse zuerst über einen Link."
+Other attendees may contact me,Andere Teilnehmende dürfen mich kontaktieren
+"After the event, phamos passes on requests from other attendees. Your email address is never shown.",Nach der Veranstaltung leitet phamos Anfragen anderer Teilnehmender an Sie weiter. Ihre E-Mail-Adresse wird nie angezeigt.
+List me as attendee,Mich als Teilnehmende nennen
+Your name and company may appear in the list of attendees on the event page.,Ihr Name und Ihre Firma dürfen in der Teilnehmerliste auf der Veranstaltungsseite erscheinen.
+Save,Speichern
+"No, thanks","Nein, danke"
+"Hello {0},","Hallo {0},"
+"Hello,","Hallo,"
+thank you for your order. We have received it and hereby accept it. This email confirms your binding order of tickets for {0}.,vielen Dank für Ihre Bestellung. Wir haben sie erhalten und nehmen sie hiermit an. Diese E-Mail bestätigt Ihre verbindliche Bestellung von Tickets für {0}.
+thank you for your registration for {0}. Your place is confirmed.,vielen Dank für Ihre Anmeldung zu {0}. Ihr Platz ist bestätigt.
+All tickets and information about the event are sent to {0}.,Alle Tickets und Informationen zur Veranstaltung gehen an {0}.
+incl. {0},inkl. {0}
+Total incl. VAT,Gesamt inkl. MwSt.
+by invoice. You receive the invoice by email; please pay within 14 days of the invoice date.,auf Rechnung. Sie erhalten die Rechnung per E-Mail; bitte zahlen Sie innerhalb von 14 Tagen ab Rechnungsdatum.
+Right of withdrawal,Widerrufsrecht
+"There is no right of withdrawal for tickets to leisure events on a specific date (§ 312g (2) no. 9 BGB). If you cannot attend, please reply to this email.","Für Tickets zu Freizeitveranstaltungen mit festem Termin besteht kein Widerrufsrecht (§ 312g Abs. 2 Nr. 9 BGB). Wenn Sie nicht teilnehmen können, antworten Sie bitte auf diese E-Mail."
+Add the event to your calendar with the attached file.,Mit der angehängten Datei tragen Sie die Veranstaltung in Ihren Kalender ein.
+Event page,Veranstaltungsseite
+Questions or changes? Simply reply to this email.,Fragen oder Änderungen? Antworten Sie einfach auf diese E-Mail.
+The terms and conditions of this event are attached to this email.,Die Teilnahmebedingungen dieser Veranstaltung sind dieser E-Mail angehängt.
+The terms and conditions of this event are printed below.,Die Teilnahmebedingungen dieser Veranstaltung stehen unten.
+{0}: {1} in {2}.,{0}: {1} in {2}.
+online,online
+{0}: {1}.,{0}: {1}.
+{0} until {1},{0} bis {1}
+{0} left at this price,noch {0} zu diesem Preis
+then {0},danach {0}
+{0} seats left,noch {0} Plätze frei
+Invalid request.,Ungültige Anfrage.
+Please enter the full name: {0},Bitte geben Sie den vollständigen Namen an: {0}
+Ticket holder {0},Ticketinhaber {0}
+This link has expired. You can still subscribe on the event page.,Dieser Link ist abgelaufen. Sie können sich weiterhin auf der Veranstaltungsseite anmelden.
+This event has no date yet.,Für diese Veranstaltung gibt es noch keinen Termin.
+Please enter a name for every ticket.,Bitte geben Sie für jedes Ticket einen Namen an.
+"Sorry, registration for this event is not possible ({0}).",Eine Anmeldung zu dieser Veranstaltung ist leider nicht möglich ({0}).
+Two tickets have the same email address. Leave the email of a companion empty instead.,Zwei Tickets haben dieselbe E-Mail-Adresse. Lassen Sie die E-Mail einer Begleitperson stattdessen leer.
+There are not enough tickets left at one price for this order. Please order fewer tickets.,Für diese Bestellung sind zu einem Preis nicht mehr genug Tickets übrig. Bitte bestellen Sie weniger Tickets.
+The ticket price has changed in the meantime ({0}). Please check your order again.,Der Ticketpreis hat sich inzwischen geändert ({0}). Bitte prüfen Sie Ihre Bestellung erneut.
+Price changed,Preis geändert
+Tickets and information go to {0}.,Tickets und Informationen gehen an {0}.
+Order confirmation {0}: {1},Bestellbestätigung {0}: {1}
+Terms,AGB
+Please add at least one ticket price (Tickets & Sales tab).,Bitte legen Sie mindestens einen Ticketpreis an (Reiter Tickets & Verkauf).
+Tickets can only be sold for events with a start date.,Tickets können nur für Veranstaltungen mit Starttermin verkauft werden.
+Every ticket price needs its own title.,Jeder Ticketpreis braucht eine eigene Bezeichnung.
+Row {0}: the ticket price must be greater than 0.,Zeile {0}: Der Ticketpreis muss größer als 0 sein.
+Row {0}: the price ends before it starts.,"Zeile {0}: Der Preis endet, bevor er beginnt."
+Events {0} sponsors or organizes.,"Veranstaltungen, die {0} unterstützt oder ausrichtet."
+Follow-up {0}: {1},Nachfassen {0}: {1}
+Created from attendee {0} of {1}.,Aus Teilnehmenden {0} von {1} erstellt.
+Ticket {0},Ticket {0}
+Ticket for {0},Ticket für {0}
+Please fill in the marked fields.,Bitte füllen Sie die markierten Felder aus.
+Saved. Thank you!,Gespeichert. Danke!
+Saved. Please confirm your email with the link we just sent you.,"Gespeichert. Bitte bestätigen Sie Ihre E-Mail über den Link, den wir Ihnen gerade gesendet haben."
+Are you coming?,Kommen Sie?
+Yes,Ja
+Maybe,Vielleicht
+No,Nein
+Anonymous: we only count the answers.,Anonym: Wir zählen nur die Antworten.
+Your seats and price are reserved until {0}.,Ihre Plätze und Ihr Preis sind bis {0} Uhr für Sie reserviert.
+Time is up: seats and prices are checked again when you continue.,Die Zeit ist abgelaufen: Plätze und Preise werden beim Weitermachen neu geprüft.
+"Sorry, there are not enough seats left for this number of tickets.",Leider sind für diese Anzahl Tickets nicht mehr genug Plätze frei.
+Your entries from a moment ago were restored.,Ihre Angaben von eben wurden wiederhergestellt.
+{0}/{1} booked,{0}/{1} gebucht
+{0} booked,{0} gebucht
+{0} of {1} seats taken,{0} von {1} Plätzen vergeben
+{0} registrations,{0} Anmeldungen
+Show bookings on the website,Buchungen auf der Website zeigen
+Add person,Person hinzufügen
+You,Sie
+Remove,Entfernen
+Register for free,Kostenlos anmelden
+Buy from {0},Kaufen ab {0}
+incl. VAT,inkl. MwSt.
+Create reminder,Erinnerung erstellen
+{0} left,noch {0}
+anonymous,anonym
+Reserved for you,Für Sie reserviert
+Time is up. Seats and prices are checked again.,Die Zeit ist abgelaufen. Plätze und Preise werden neu geprüft.
+Not enough seats left for this number of tickets.,Für diese Anzahl Tickets sind nicht mehr genug Plätze frei.
+Entries restored.,Eingaben wiederhergestellt.
+Tickets go to your email unless you add one for a person.,"Die Tickets gehen an Ihre E-Mail-Adresse, außer Sie geben für eine Person eine eigene an."
+Event date,Termin
+Tickets to,Tickets an
+Order: {0},Bestellung: {0}
+Order number,Bestellnummer
+Registration: {0},Anmeldung: {0}
+Pos.,Pos.
+Description,Bezeichnung
+Qty,Menge
+Unit price,Einzelpreis
+Amount,Betrag
+Net,Netto
+VAT {0} %,MwSt. {0} %
+Change tickets,Tickets ändern
+"Payment by invoice, due within 14 days.","Zahlung per Rechnung, fällig innerhalb von 14 Tagen."
+"Clicking ""Order with obligation to pay"" places a binding order under our {0}. No right of withdrawal: the event is on a fixed date (§ 312g (2) no. 9 BGB).",Mit Klick auf „Zahlungspflichtig bestellen“ bestellen Sie verbindlich zu unseren {0}. Kein Widerrufsrecht: Die Veranstaltung findet an einem festen Termin statt (§ 312g Abs. 2 Nr. 9 BGB).
+"Clicking ""Register"" makes your registration binding.",Mit Klick auf „Anmelden“ melden Sie sich verbindlich an.
+"Correct your entries with ""Back"" or ""Change"" until you order. Contract language: German or English. We store the contract text and email it to you with the terms.",Bis zur Bestellung können Sie Ihre Eingaben mit „Zurück“ oder „Ändern“ korrigieren. Vertragssprache: Deutsch oder Englisch. Wir speichern den Vertragstext und senden ihn Ihnen mit den AGB per E-Mail.
+Print,Drucken
+Confirmation sent to {0}.,Bestätigung an {0} gesendet.
+Optional,Optional
+Event updates by email,Neuigkeiten zur Veranstaltung per E-Mail
+"Schedule, reminders, material. You confirm by link first.","Ablauf, Erinnerungen, Unterlagen. Sie bestätigen zuerst per Link."
+Through phamos. Your email stays hidden.,Über phamos. Ihre E-Mail-Adresse bleibt verborgen.
+Name and company on the event page.,Name und Firma auf der Veranstaltungsseite.
+Saved. Please confirm your email with the link we sent you.,"Gespeichert. Bitte bestätigen Sie Ihre E-Mail-Adresse über den Link, den wir Ihnen geschickt haben."
+"Schedule, reminders and material for {0}. You confirm by email first.","Ablauf, Erinnerungen und Unterlagen zu {0}. Sie bestätigen zuerst per E-Mail."
+phamos may store my email for these updates. Unsubscribe any time.,phamos darf meine E-Mail-Adresse für diese Neuigkeiten speichern. Abmeldung jederzeit möglich.
+Almost done: please confirm with the link we sent you.,"Fast geschafft: Bitte bestätigen Sie über den Link, den wir Ihnen geschickt haben."
+Up to three dates. You get a calendar file with one reminder each.,Bis zu drei Termine. Sie erhalten eine Kalenderdatei mit je einer Erinnerung.
+Reminder {0},Erinnerung {0}
+Download calendar file,Kalenderdatei herunterladen
+Please pick at least one date before the event.,Bitte wählen Sie mindestens einen Termin vor der Veranstaltung.
+Reminder: {0},Erinnerung: {0}
+reminder,erinnerung
+Subscription confirmed,Anmeldung bestätigt
+"You will receive updates about {0}: schedule, reminders and material.","Sie erhalten Neuigkeiten zu {0}: Ablauf, Erinnerungen und Unterlagen."
+Your email address is confirmed. You will receive the updates.,Ihre E-Mail-Adresse ist bestätigt. Sie erhalten die Neuigkeiten.
+Every email has a link to unsubscribe.,Jede E-Mail enthält einen Link zur Abmeldung.
+Back to the event,Zurück zur Veranstaltung
+All events,Alle Veranstaltungen
+Ticket,Ticket
+"You receive all tickets. With an email, a person also gets their own.",Sie erhalten alle Tickets. Mit E-Mail-Adresse bekommt eine Person zusätzlich ihr eigenes.
+You receive all tickets. Ticket holders with an email address listed above also receive their own ticket.,Sie erhalten alle Tickets. Ticketinhaber mit oben genannter E-Mail-Adresse erhalten zusätzlich ihr eigenes Ticket.
+Your ticket for {0},Ihr Ticket für {0}
+{0} booked a ticket for you for {1}.,{0} hat für Sie ein Ticket für {1} gebucht.
+Here is your ticket for {0}.,Hier ist Ihr Ticket für {0}.
+Questions? Simply reply to this email.,Fragen? Antworten Sie einfach auf diese E-Mail.
+You receive this email because your email address was given for this ticket.,"Sie erhalten diese E-Mail, weil Ihre E-Mail-Adresse für dieses Ticket angegeben wurde."
+You will receive this by email.,Sie erhalten diese Bestellung auch per E-Mail.
+Pick up to three. You get one calendar file.,Bis zu drei wählen. Sie erhalten eine Kalenderdatei.
+Before the event,Vor der Veranstaltung
+Own date,Eigener Termin
+{0} of 3 selected,{0} von 3 gewählt
+Please pick dates before the event.,Bitte wählen Sie Termine vor der Veranstaltung.
+6 weeks before,6 Wochen vorher
+4 weeks before,4 Wochen vorher
+2 weeks before,2 Wochen vorher
+The event is less than two weeks away. Pick your own date.,Die Veranstaltung ist weniger als zwei Wochen entfernt. Wählen Sie einen eigenen Termin.
+Period,Zeitraum
+{0} of {1} done,{0} von {1} erledigt
+Leave focus,Fokus verlassen
+"Time is up. Finish the step you are on, then mark it done or park it with a note.",Die Zeit ist um. Schließen Sie den aktuellen Schritt ab und markieren Sie ihn dann als erledigt oder stellen Sie ihn mit einer Notiz zurück.
+Now,Jetzt
+{0} on this ToDo,{0} an diesem ToDo
+estimate {0},geschätzt {0}
+due {0},fällig {0}
+Where you left off,Wo Sie aufgehört haben
+Done,Erledigt
+Park it,Zurückstellen
+Everything here is done or parked.,Alles hier ist erledigt oder zurückgestellt.
+"Pick a parked ToDo to continue, or end the session.",Wählen Sie ein zurückgestelltes ToDo zum Weitermachen oder beenden Sie die Sitzung.
+End the session,Sitzung beenden
+In this session,In dieser Sitzung
+parked · {0},zurückgestellt · {0}
+Capture for later,Für später notieren
+A thought or a new task: write it down and stay on track.,Ein Gedanke oder eine neue Aufgabe: notieren Sie sie und bleiben Sie dran.
+New ToDo…,Neues ToDo…
+Add,Hinzufügen
+Back to the dashboard,Zurück zum Dashboard
+Another session,Weitere Sitzung
+Focus on a few ToDos,Auf wenige ToDos fokussieren
+"Choose up to five ToDos and a length. Until you finish or leave, the cockpit shows only them. Leaving is always possible.","Wählen Sie bis zu fünf ToDos und eine Dauer. Bis Sie fertig sind oder abbrechen, zeigt das Cockpit nur diese an. Abbrechen ist jederzeit möglich."
+Start a focus session,Fokus-Sitzung starten
+Recent sessions,Letzte Sitzungen
+Park this ToDo,Dieses ToDo zurückstellen
+Where will you pick it up?,Wo machen Sie weiter?
+"The next concrete step, so restarting is easy.","Der nächste konkrete Schritt, damit der Wiedereinstieg leichtfällt."
+Cancel,Abbrechen
+Park and continue,Zurückstellen und weiter
+Leave focus?,Fokus verlassen?
+"You just started, so leaving costs nothing.","Sie haben gerade erst begonnen, ein Abbruch kostet also nichts."
+"Before you go: why, and where will you pick up? Your note is kept on the ToDo.","Bevor Sie gehen: Warum, und wo machen Sie weiter? Ihre Notiz wird am ToDo gespeichert."
+Why leave now?,Warum jetzt abbrechen?
+Where to pick up,Wo weitermachen
+Next step for “{0}”,Nächster Schritt für „{0}“
+Stay focused,Fokussiert bleiben
+Leave in {0} s,Verlassen in {0} s
+in focus,im Fokus
+time is up,Zeit ist um
+left,übrig
+{0} in focus,{0} im Fokus
+"{0}, time is up","{0}, Zeit ist um"
+Session complete.,Sitzung abgeschlossen.
+Session ended. Good progress.,Sitzung beendet. Guter Fortschritt.
+Session ended.,Sitzung beendet.
+1 ToDo done in {0}.,1 ToDo erledigt in {0}.
+{0} ToDos done in {1}.,{0} ToDos erledigt in {1}.
+{0} min,{0} Min.
+{0} h {1} min,{0} Std. {1} Min.
+{0} h,{0} Std.
+That did not work,Das hat nicht funktioniert
+Done. One less.,Erledigt. Eins weniger.
+Captured for later.,Für später notiert.
+Could not capture the ToDo,Das ToDo konnte nicht notiert werden
+Something urgent came up,Etwas Dringendes ist dazwischengekommen
+A meeting starts,Ein Meeting beginnt
+Wrong ToDos picked,Falsche ToDos gewählt
+Need a break,Pause nötig
+Other,Sonstiges
+completed,abgeschlossen
+left early,vorzeitig verlassen
+timed out,Zeit abgelaufen
+"Pick the few that matter. Drag a ToDo, or focus it and press 1–4.","Wählen Sie die wenigen, die zählen. Ziehen Sie ein ToDo oder wählen Sie es aus und drücken Sie 1–4."
+Urgent means due by {0}.,Dringend heißt fällig bis {0}.
+Focus on “Do now”,Fokus auf „Sofort erledigen“
+Loading your matrix…,Ihre Matrix wird geladen…
+Urgent,Dringend
+Not urgent,Nicht dringend
+"{0}. Press 1 to 4 to move, Enter to open.","{0}. Mit 1 bis 4 verschieben, mit Enter öffnen."
+Mark {0} as done,{0} als erledigt markieren
+overdue since {0},überfällig seit {0}
+no due date,kein Fälligkeitsdatum
+Postponed {0} times,{0}-mal verschoben
+Decide on {0},Über {0} entscheiden
+Decide,Entscheiden
+{0} more in the list,{0} weitere in der Liste
+1 ToDo is due after this week and not marked important.,1 ToDo ist erst nach dieser Woche fällig und nicht als wichtig markiert.
+{0} ToDos are due after this week and not marked important.,{0} ToDos sind erst nach dieser Woche fällig und nicht als wichtig markiert.
+Show all open,Alle offenen anzeigen
+New due date,Neues Fälligkeitsdatum
+"Not urgent means due after {0}. The deadline moves, it does not disappear.","Nicht dringend heißt fällig nach {0}. Die Frist verschiebt sich, sie verschwindet nicht."
+Due on,Fällig am
+What happens if this isn't done this week?,"Was passiert, wenn das diese Woche nicht erledigt wird?"
+Optional. Kept as a comment on the ToDo.,Optional. Wird als Kommentar am ToDo gespeichert.
+Drop it instead,Stattdessen verwerfen
+Move to {0},Verschieben nach „{0}“
+Move,Verschieben
+Could not load your matrix,Ihre Matrix konnte nicht geladen werden
+Could not close the ToDo,Das ToDo konnte nicht geschlossen werden
+Could not move the ToDo,Das ToDo konnte nicht verschoben werden
+This week,Diese Woche
+All open,Alle offenen
+Important,Wichtig
+Not important,Nicht wichtig
+Nothing on fire. Good.,Nichts brennt. Gut.
+Drag what matters most here and give it a day.,Ziehen Sie das Wichtigste hierher und geben Sie ihm einen Tag.
+Nothing urgent that someone else could do.,"Nichts Dringendes, das jemand anderes erledigen könnte."
+Nothing to let go of.,Nichts loszulassen.
+Do now,Sofort erledigen
+Important and urgent,Wichtig und dringend
+Schedule,Einplanen
+"Important, not urgent: give it a day","Wichtig, nicht dringend: geben Sie ihm einen Tag"
+Hand off or batch,Abgeben oder bündeln
+"Urgent, not important","Dringend, nicht wichtig"
+Drop or let go,Verwerfen oder loslassen
+Neither important nor urgent,Weder wichtig noch dringend
+Start focus,Fokus starten
+Loading your ToDos…,Ihre ToDos werden geladen…
+Open now,Jetzt offen
+{0} need a decision,{0} brauchen eine Entscheidung
+Nothing stale,Nichts liegengeblieben
+{0} vs {1} days ago,{0} ggü. vor {1} Tagen
+Closed,Geschlossen
+in the last {0} days,in den letzten {0} Tagen
+{0} vs the {1} days before,{0} ggü. den {1} Tagen davor
+Dropped,Verworfen
+decided not to do,bewusst nicht erledigt
+Closed vs open,Geschlossen vs. offen
+{0}% closed,{0} % geschlossen
+{0} closed · {1} still open,{0} geschlossen · {1} noch offen
+Targets,Ziele
+Add a second target? Two at most keeps it light.,Ein zweites Ziel hinzufügen? Höchstens zwei halten es leicht.
+Want a target? Something like “close 2 a day for 10 days”.,"Ein Ziel gefällig? Zum Beispiel „2 pro Tag schließen, 10 Tage lang“."
+Optional and private. Your own history suggests the number.,Optional und privat. Ihr bisheriger Verlauf schlägt die Zahl vor.
+Set a target,Ziel setzen
+Created vs closed,Erstellt vs. geschlossen
+Created,Erstellt
+Number under a bar: how the backlog changed,Zahl unter einem Balken: Veränderung des Rückstands
+Done today,Heute erledigt
+quick win,schneller Erfolg
+planned,geplant
+spontaneous,spontan
+Nothing closed yet today.,Heute noch nichts geschlossen.
+Oldest open,Älteste offene
+"Do it, give it a day, or drop it.","Erledigen, einplanen oder verwerfen."
+Decide all stale ({0}),Über alle liegengebliebenen entscheiden ({0})
+{0} old,{0} alt
+overdue,überfällig
+No open ToDos. Well done.,Keine offenen ToDos. Gut gemacht.
+Age of open ToDos,Alter offener ToDos
+Closed in this period,In diesem Zeitraum geschlossen
+Plan my day,Meinen Tag planen
+Day done,Tag erledigt
+My day: {0} of {1} done,Mein Tag: {0} von {1} erledigt
+Your ToDos at a glance.,Ihre ToDos auf einen Blick.
+No open ToDos.,Keine offenen ToDos.
+{0} closed today,{0} heute geschlossen
+1 ToDo needs a decision,1 ToDo braucht eine Entscheidung
+{0} ToDos need a decision,{0} ToDos brauchen eine Entscheidung
+Lead times appear once you close ToDos.,"Durchlaufzeiten erscheinen, sobald Sie ToDos schließen."
+"Half of your closed ToDos took {0} or less, 85% took {1} or less.","Die Hälfte Ihrer geschlossenen ToDos dauerte {0} oder weniger, 85 % dauerten {1} oder weniger."
+"…of these, quick wins (under 15 min)",…davon schnelle Erfolge (unter 15 min)
+…planned in My Day,…geplant in Mein Tag
+Closed or removed by others,Von anderen geschlossen oder entfernt
+{0} dropped so far.,Bisher {0} verworfen.
+A first one sets the tone.,Das erste gibt den Ton an.
+{0} done,{0} erledigt
+"{0} planned, {1} spontaneous","{0} geplant, {1} spontan"
+{0} important,{0} wichtig
+Could not load the ToDo dashboard,Das ToDo-Dashboard konnte nicht geladen werden
+End “{0}” now? The days so far stay counted.,„{0}“ jetzt beenden? Die bisherigen Tage bleiben gezählt.
+7 days,7 Tage
+30 days,30 Tage
+90 days,90 Tage
+Search ToDos and references…,ToDos und Referenzen durchsuchen…
+Open,Offen
+Include done,Erledigte einbeziehen
+Which ToDos to show,Welche ToDos angezeigt werden
+"Overdue for more than two weeks, or postponed three times or more",Seit mehr als zwei Wochen überfällig oder mindestens dreimal verschoben
+Stale ({0}),Liegengeblieben ({0})
+Decide all,Über alle entscheiden
+Loading…,Wird geladen …
+No matching ToDos,Keine passenden ToDos
+Nothing on your list,Nichts auf Ihrer Liste
+Try another search.,Versuchen Sie eine andere Suche.
+"ToDos assigned to you, and the ones you create here, show up in this list.","ToDos, die Ihnen zugewiesen sind, und die, die Sie hier erstellen, erscheinen in dieser Liste."
+Create a ToDo,ToDo erstellen
+{0} open · {1} overdue,{0} offen · {1} überfällig
+{0} open,{0} offen
+Could not load your ToDos,Ihre ToDos konnten nicht geladen werden
+Could not open this ToDo,Dieses ToDo konnte nicht geöffnet werden
+Marked as done,Als erledigt markiert
+Could not change the ToDo,Das ToDo konnte nicht geändert werden
+Loading your day…,Ihr Tag wird geladen…
+Start the day,Tag starten
+Shut down,Abschließen
+{0} of at most {1} ToDos,{0} von höchstens {1} ToDos
+More than fits. Move something to another day or drop it: a short plan you finish beats a long one you carry.,"Mehr als hineinpasst. Verschieben Sie etwas auf einen anderen Tag oder lassen Sie es fallen: Ein kurzer Plan, den Sie schaffen, ist besser als ein langer, den Sie mitschleppen."
+Done for the day.,Feierabend.
+Everything open has a next step. You can let work go now.,Alles Offene hat einen nächsten Schritt. Sie können die Arbeit jetzt loslassen.
+Look at {0},{0} ansehen
+Today,Heute
+"Nothing planned yet. Pick a few from the right, the ones that would make this day a good one.","Noch nichts geplant. Wählen Sie rechts ein paar aus, die diesen Tag zu einem guten machen würden."
+Carried over {0} times,{0}-mal übertragen
+added later,später hinzugefügt
+moved to {0},verschoben auf {0}
+dropped,fallen gelassen
+Estimate for {0},Schätzung für {0}
+no estimate,keine Schätzung
+Move {0} up,{0} nach oben verschieben
+Move {0} down,{0} nach unten verschieben
+Remove {0} from the plan,{0} aus dem Plan entfernen
+Worth considering,Einen Blick wert
+"Nothing overdue, due or flagged.","Nichts überfällig, fällig oder markiert."
+Pick from the list if you like.,Wählen Sie bei Bedarf aus der Liste.
+Not finished {0} times,{0}-mal nicht erledigt
+"Today, {0} {1}","Heute, {0} {1}"
+Shut down.,Abgeschlossen.
+{0} of {1} done. Shut down when you stop working.,"{0} von {1} erledigt. Schließen Sie den Tag ab, wenn Sie aufhören zu arbeiten."
+The plan was fixed at 10:00. Start the day whenever you are ready.,"Der Plan wurde um 10:00 festgeschrieben. Starten Sie den Tag, wann immer Sie bereit sind."
+Plan ahead. You start the day on the day itself.,Planen Sie voraus. Den Tag starten Sie am Tag selbst.
+"Plan a few ToDos, then start the day.",Planen Sie ein paar ToDos und starten Sie dann den Tag.
+{0} of {1} for ToDos,{0} von {1} für ToDos
+{0} of {1} for ToDos (1 ToDo without estimate counted as {2} min),{0} von {1} für ToDos (1 ToDo ohne Schätzung mit {2} Min. gezählt)
+{0} of {1} for ToDos ({2} ToDos without estimate counted as {3} min),{0} von {1} für ToDos ({2} ToDos ohne Schätzung mit je {3} Min. gezählt)
+In focus your ToDos took {0}× your estimate. Plan with some room.,Im Fokus brauchten Ihre ToDos das {0}-Fache Ihrer Schätzung. Planen Sie mit etwas Puffer.
+In focus your ToDos took {0}× your estimate. You may plan a little more.,Im Fokus brauchten Ihre ToDos das {0}-Fache Ihrer Schätzung. Sie können etwas mehr einplanen.
+1 ToDo done,1 ToDo erledigt
+{0} ToDos done,{0} ToDos erledigt
+{0} moved,{0} verschoben
+{0} dropped,{0} fallen gelassen
+Could not load your day,Ihr Tag konnte nicht geladen werden
+Day started. Go for the first one.,Tag gestartet. Packen Sie das erste an.
+Could not save the estimate,Die Schätzung konnte nicht gespeichert werden
+Loading later days…,Spätere Tage werden geladen…
+Plan further ahead in the list.,Weiter im Voraus planen Sie in der Liste.
+Loading earlier days…,Frühere Tage werden geladen…
+Nothing earlier.,Nichts früher.
+Jump to today (T),Zu heute springen (T)
+Checked in,Eingecheckt
+Checked out,Ausgecheckt
+Check-in · {0},Eingestempelt · {0}
+Check-out · {0},Ausgestempelt · {0}
+Check-in,Einstempeln
+Check-out,Ausstempeln
+Planned: {0},Geplant: {0}
+Spontaneous: {0},Spontan: {0}
+Could not load earlier days,Frühere Tage konnten nicht geladen werden
+Could not load later days,Spätere Tage konnten nicht geladen werden
+Could not load your days,Ihre Tage konnten nicht geladen werden
+Planned: 1 ToDo. Open the plan,Geplant: 1 ToDo. Plan öffnen
+Planned: {0} ToDos. Open the plan,Geplant: {0} ToDos. Plan öffnen
+Plan this day,Diesen Tag planen
+This day was never shut down.,Dieser Tag wurde nie abgeschlossen.
+{0} without entries,{0} ohne Einträge
+Break,Pause
+now,jetzt
+break,Pause
+work,Arbeit
+{0} % billable,{0} % abrechenbar
+running,läuft
+Desk,Desk
+{0} left open,{0} offen geblieben
+Plan: {0}.,Plan: {0}.
+{0} logged,{0} erfasst
+nothing recorded,nichts erfasst
+Shut down the day,Tag abschließen
+Nothing from the plan. Some days are like that.,Nichts aus dem Plan. Manche Tage sind so.
+Still open: when is the next step?,Noch offen: Wann ist der nächste Schritt?
+New date,Neues Datum
+Why drop it,Warum fallen lassen
+"One line about today (optional, only for you)","Eine Zeile zu heute (optional, nur für Sie)"
+"What went well, what got in the way?","Was lief gut, was stand im Weg?"
+Not yet,Noch nicht
+Done for the day,Tag abschließen
+Could not shut down the day,Der Tag konnte nicht abgeschlossen werden
+Set yourself a target,Setzen Sie sich ein Ziel
+"Private to you. Weekends, holidays and leave do not count. Jokers cover a day that slips.","Nur für Sie sichtbar. Wochenenden, Feiertage und Abwesenheiten zählen nicht. Joker decken einen verpatzten Tag ab."
+What counts,Was zählt
+Planned a day,Geplant pro Tag
+Spontaneous a day,Spontan pro Tag
+Planned: on your My Day plan when you start the day. Spontaneous: everything else you close.,"Geplant: steht auf Ihrem Plan in „Mein Tag“, wenn Sie den Tag starten. Spontan: alles andere, was Sie schließen."
+Important ToDos a day,Wichtige ToDos pro Tag
+ToDos closed a day,Geschlossene ToDos pro Tag
+For how many working days,Für wie viele Arbeitstage
+Start,Start
+A Monday is a good fresh start.,Ein Montag ist ein guter Neuanfang.
+"Quick wins (closed within 15 minutes of creating them) count as spontaneous, at most two a day. Dropped ToDos do not count.","Schnelle Erfolge (innerhalb von 15 Minuten nach dem Anlegen geschlossen) zählen als spontan, höchstens zwei pro Tag. Fallen gelassene ToDos zählen nicht."
+Quick wins closed within 15 minutes of creating them and dropped ToDos do not count.,Schnelle Erfolge (innerhalb von 15 Minuten nach dem Anlegen geschlossen) und fallen gelassene ToDos zählen nicht.
+Start the challenge,Ziel starten
+Monday {0},"Montag, {0}"
+Could not load your history,Ihr Verlauf konnte nicht geladen werden
+Could not start the challenge,Das Ziel konnte nicht gestartet werden
+"Pick up to {0} ToDos. Until you finish or leave, the cockpit shows only these.","Wählen Sie bis zu {0} ToDos. Bis Sie fertig sind oder abbrechen, zeigt das Cockpit nur diese."
+"ToDos, in the order you want to do them","ToDos in der Reihenfolge, in der Sie sie erledigen wollen"
+{0} of {1},{0} von {1}
+No open ToDos. Create one first.,Keine offenen ToDos. Legen Sie zuerst eins an.
+important,wichtig
+How long,Wie lange
+Stopwatch,Stoppuhr
+No end time. The session ends when you are done or leave.,"Keine Endzeit. Die Sitzung endet, wenn Sie fertig sind oder abbrechen."
+A timer runs; when it is up you finish your current step and wrap up.,"Ein Timer läuft; wenn er abgelaufen ist, beenden Sie den aktuellen Schritt und schließen ab."
+Could not start the focus session,Die Fokus-Sitzung konnte nicht gestartet werden
+Challenge options,Ziel-Optionen
+Days of the challenge,Tage des Ziels
+End this challenge,Dieses Ziel beenden
+"{0}: {1} ({2} planned, {3} spontaneous)","{0}: {1} ({2} geplant, {3} spontan)"
+{0}: {1} ({2} closed),{0}: {1} ({2} geschlossen)
+Look at what was left last time,"Ansehen, was beim letzten Mal übrig blieb"
+"Pick a few, at most six","Ein paar auswählen, höchstens sechs"
+Estimate them,Schätzen
+Check that they fit,"Prüfen, ob alles hineinpasst"
+Not finished last time,Beim letzten Mal nicht erledigt
+Overdue,Überfällig
+Due today,Heute fällig
+Important to you,Wichtig für Sie
+Due this week,Diese Woche fällig
+Tomorrow,Morgen
+Later this week,Später diese Woche
+Pick a date,Datum wählen
+Drop,Fallen lassen
+Keep open,Offen lassen
+Not needed any more,Nicht mehr nötig
+Done elsewhere,Anderswo erledigt
+Out of date,Veraltet
+Closed ToDos,Geschlossene ToDos
+Closed important ToDos,Geschlossene wichtige ToDos
+Planned and spontaneous closes,Geplante und spontane Abschlüsse
+5 days,5 Tage
+10 days,10 Tage
+20 days,20 Tage
+under a minute,unter einer Minute
+{0} over,{0} überschritten
+Start timer,Timer starten
+Discard the empty draft {0},Den leeren Entwurf {0} verwerfen
+Discard draft,Entwurf verwerfen
+Time limit,Zeitlimit
+Task: {0},Aufgabe: {0}
+Issue: {0},Anfrage: {0}
+Started {0} · {1} worked,Gestartet {0} · {1} gearbeitet
+"Break: {0}, {1} so far","Pause: {0}, bisher {1}"
+Open the record in Desk,Datensatz im Desk öffnen
+Pause the timer,Timer pausieren
+Pause,Pause
+Resume the timer,Timer fortsetzen
+Resume,Fortsetzen
+Stop the timer,Timer stoppen
+Stop,Stoppen
+"Timer running, over by {0}, {1}","Timer läuft, {0} überschritten, {1}"
+"Break running, over by {0}, {1}","Pause läuft, {0} überschritten, {1}"
+"Timer running, {0} left, {1}","Timer läuft, noch {0}, {1}"
+"Break running, {0} left, {1}","Pause läuft, noch {0}, {1}"
+Finish or discard the empty draft {0} first,Schließen Sie zuerst den leeren Entwurf {0} ab oder verwerfen Sie ihn
+Start a timesheet timer,Einen Zeiterfassungs-Timer starten
+Draft {0} discarded,Entwurf {0} verworfen
+Could not discard the draft,Der Entwurf konnte nicht verworfen werden
+Timer started on {0},Timer für {0} gestartet
+Timer started,Timer gestartet
+"Timer stopped, {0} submitted","Timer gestoppt, {0} gebucht"
+"Timer stopped, record submitted","Timer gestoppt, Datensatz gebucht"
+Submitted with the available hours,Mit den verfügbaren Stunden gebucht
+Account manager notified,Kundenbetreuer benachrichtigt
+"Break logged, timer running again","Pause erfasst, Timer läuft wieder"
+A timer is already running. Stop it first.,Es läuft bereits ein Timer. Stoppen Sie ihn zuerst.
+Timers need an active Employee linked to your user.,Für Timer muss Ihrem Benutzer ein aktiver Mitarbeiter zugeordnet sein.
+Project,Projekt
+Search all open projects…,Alle offenen Projekte durchsuchen…
+Open projects,Offene Projekte
+My projects,Meine Projekte
+Recent,Zuletzt verwendet
+Loading projects…,Projekte werden geladen…
+No open project found.,Kein offenes Projekt gefunden.
+Task,Aufgabe
+Expected minutes,Geplante Minuten
+Goal,Ziel
+What will you accomplish? Shared with the customer the next day.,Was werden Sie erreichen? Wird am nächsten Tag mit dem Kunden geteilt.
+Ctrl+Enter starts,Strg+Enter startet
+Pick a task,Aufgabe auswählen
+No task,Keine Aufgabe
+Could not load your projects,Ihre Projekte konnten nicht geladen werden
+Could not load the project,Das Projekt konnte nicht geladen werden
+Please pick a project.,Bitte wählen Sie ein Projekt.
+This project needs a task.,Für dieses Projekt ist eine Aufgabe erforderlich.
+Minimum expected time is 15 minutes.,Die geplante Zeit beträgt mindestens 15 Minuten.
+Please describe the goal.,Bitte beschreiben Sie das Ziel.
+Could not start the timer,Der Timer konnte nicht gestartet werden
+Stop timer,Timer stoppen
+What did you accomplish?,Was haben Sie erreicht?
+Sent to the customer the next day.,Wird am nächsten Tag an den Kunden gesendet.
+Activity type,Aktivitätsart
+Billable,Abrechenbar
+0 % (internal),0 % (intern)
+End,Ende
+Ctrl+Enter stops,Strg+Enter stoppt
+Stop and submit,Stoppen und buchen
+Pick an activity type,Aktivitätsart auswählen
+Please describe what you accomplished.,"Bitte beschreiben Sie, was Sie erreicht haben."
+Please pick an activity type.,Bitte wählen Sie eine Aktivitätsart.
+The end cannot be before the current segment started.,Das Ende darf nicht vor dem Beginn des aktuellen Abschnitts liegen.
+Could not stop the timer,Der Timer konnte nicht gestoppt werden
+Track the break,Pause erfassen
+Track this break?,Diese Pause erfassen?
+“{0}” took {1} of the {2} you estimated. Track it as its own timesheet record?,„{0}“ hat {1} der geschätzten {2} gedauert. Als eigenen Zeiterfassungs-Datensatz erfassen?
+“{0}” took {1}. Track it as its own timesheet record?,„{0}“ hat {1} gedauert. Als eigenen Zeiterfassungs-Datensatz erfassen?
+"If not, the goal and estimate of the break are dropped.",Andernfalls werden Ziel und Schätzung der Pause verworfen.
+"No, drop it and resume","Nein, verwerfen und fortsetzen"
+"Yes, track it","Ja, erfassen"
+What happened?,Was ist passiert?
+Log break and resume,Pause erfassen und fortsetzen
+Pick a project,Projekt auswählen
+Please fill in the goal and what happened.,Bitte geben Sie das Ziel an und was passiert ist.
+Could not resume the timer,Der Timer konnte nicht fortgesetzt werden
+Pause for a break,Pause einlegen
+What is the break for?,Wofür ist die Pause?
+"Lunch, a call, coffee with the team…","Mittagessen, ein Anruf, Kaffee mit dem Team…"
+Estimated minutes,Geschätzte Minuten
+When you resume you decide whether the break is tracked as its own record.,"Beim Fortsetzen entscheiden Sie, ob die Pause als eigener Datensatz erfasst wird."
+Keep working,Weiterarbeiten
+Please say what the break is for.,"Bitte geben Sie an, wofür die Pause ist."
+Please estimate the break in minutes.,Bitte schätzen Sie die Pause in Minuten.
+Could not pause the timer,Der Timer konnte nicht pausiert werden
+Implementation time limit reached,Zeitlimit der Implementierung erreicht
+"This session needs {0} billable, but only {1} of {2} are left for this implementation. The record is saved and waits for your decision.","Diese Sitzung benötigt {0} abrechenbar, aber von {2} sind für diese Implementierung nur noch {1} übrig. Der Datensatz ist gespeichert und wartet auf Ihre Entscheidung."
+Continue with the available hours,Mit den verfügbaren Stunden fortfahren
+Notify the account manager,Kundenbetreuer benachrichtigen
+Decide later,Später entscheiden
+Continue keeps your times and lowers the billable share so it fits. Notify sends the account manager an email and leaves the record as it is.,"Fortfahren behält Ihre Zeiten bei und senkt den abrechenbaren Anteil, sodass er passt. Benachrichtigen sendet dem Kundenbetreuer eine E-Mail und lässt den Datensatz unverändert."
+A timer is still running,Ein Timer läuft noch
+"{0} · {1}. Stop it before you check out, so it does not run on overnight?","{0} · {1}. Vor dem Ausstempeln stoppen, damit er nicht über Nacht weiterläuft?"
+Stop timer and check out,Timer stoppen und ausstempeln
+Check out anyway,Trotzdem ausstempeln
+Search,Suchen
+Search this page,Diese Seite durchsuchen
+Previous match,Vorheriger Treffer
+Next match,Nächster Treffer
+Expand,Erweitern
+Collapse,Zuklappen
+Personal Cockpit,Persönliches Cockpit
+ToDos,ToDos
+My Day,Mein Tag
+List,Liste
+Matrix,Matrix
+Issues,Anfragen
+Tasks,Aufgaben
+Gantt,Gantt
+Checklists,Checklisten
+Check-ins,Stempelzeiten
+My Contract,Mein Vertrag
+Focus,Fokus
+My ToDos,Meine ToDos
+Dashboard,Dashboard
+My Check-ins,Meine Stempelzeiten
+My Issues,Meine Anfragen
+My Tasks,Meine Aufgaben
+My Checklists,Meine Checklisten
+In focus. Leave from the focus view.,Im Fokus. Verlassen Sie ihn über die Fokusansicht.
+In focus until {0}. Leave from the focus view.,Im Fokus bis {0}. Verlassen Sie ihn über die Fokusansicht.
+Create something new,Etwas Neues erstellen
+Create,Erstellen
+ToDo created,ToDo erstellt
+Issue created,Anfrage erstellt
+Task created,Aufgabe erstellt
+Checklist created,Checkliste erstellt
+ToDo,ToDo
+Issue,Anfrage
+Checklist,Checkliste
+Timesheet timer,Zeiterfassungs-Timer
+Focus session,Fokussitzung
+Target,Ziel
+Work,Arbeit
+Help,Hilfe
+Keyboard shortcuts,Tastenkürzel
+Target set,Ziel gesetzt
+Everywhere,Überall
+Next or previous match,Nächster oder vorheriger Treffer
+Move through a list,Durch eine Liste bewegen
+Open the focused row,Markierte Zeile öffnen
+Revoke a fresh check-in or check-out,Gerade erfolgtes Ein- oder Ausstempeln zurücknehmen
+Show these shortcuts,Diese Tastenkürzel anzeigen
+Jump to today,Zu heute springen
+Move the focused ToDo to quadrant 1–4,Markiertes ToDo in Quadrant 1–4 verschieben
+Open the focused ToDo,Markiertes ToDo öffnen
+Dialogs,Dialoge
+Save or confirm,Speichern oder bestätigen
+or,oder
+Undo,Rückgängig
+Revoke the check-in at {0} (Ctrl+Z),Einstempeln um {0} zurücknehmen (Ctrl+Z)
+Revoke the check-out at {0} (Ctrl+Z),Ausstempeln um {0} zurücknehmen (Ctrl+Z)
+Check-in revoked,Einstempeln zurückgenommen
+Check-out revoked,Ausstempeln zurückgenommen
+Could not revoke it,Konnte nicht zurückgenommen werden
+This browser cannot share its location.,Dieser Browser kann seinen Standort nicht teilen.
+Please allow location access to check in.,"Bitte erlauben Sie den Standortzugriff, um einzustempeln."
+Checked in at {0},Eingestempelt um {0}
+Checked out at {0},Ausgestempelt um {0}
+Could not load your contracts,Ihre Verträge konnten nicht geladen werden
+Check out,Ausstempeln
+Check in,Einstempeln
+not checked in yet,noch nicht eingestempelt
+in since {0},eingestempelt seit {0}
+out since {0},ausgestempelt seit {0}
+No comparison,Kein Vergleich
+{0}pp,{0} PP
+{0}d,{0} T
+New,Neu
+No change,Keine Änderung
+today,heute
+{0} day,{0} Tag
+{0} days,{0} Tage
+Nothing to show yet.,Noch nichts anzuzeigen.
+Loading your Tasks…,Ihre Aufgaben werden geladen …
+My hours this week,Meine Stunden diese Woche
+Today {0},Heute {0}
+This month {0},Diesen Monat {0}
+Next due,Als Nächstes fällig
+No open Task has an end date.,Keine offene Aufgabe hat ein Enddatum.
+overdue · {0},überfällig · {0}
+Open by status,Offen nach Status
+No open Tasks.,Keine offenen Aufgaben.
+Time used of the estimate,Verbrauchte Zeit der Schätzung
+{0} of {1} · {2} %,{0} von {1} · {2} %
+None of your open Tasks has an expected time.,Keine Ihrer offenen Aufgaben hat eine erwartete Zeit.
+Past the expected end date,Nach dem erwarteten Enddatum
+Due soon,Bald fällig
+In the next {0} days,In den nächsten {0} Tagen
+Assigned to me,Mir zugewiesen
+In the last {0} days,In den letzten {0} Tagen
+Could not load your Tasks,Ihre Aufgaben konnten nicht geladen werden
+Loading your Issues…,Ihre Anfragen werden geladen …
+Open by age,Offen nach Alter
+Open by priority,Offen nach Priorität
+No open Issues.,Keine offenen Anfragen.
+Oldest open Issues,Älteste offene Anfragen
+Nothing open. Good.,Nichts offen. Gut.
+Waiting on me,Wartet auf mich
+Status Open: the next step is mine,Status Offen: Der nächste Schritt liegt bei mir
+Waiting on others,Wartet auf andere
+Replied or On Hold,Beantwortet oder Zurückgestellt
+Oldest: {0},Älteste: {0}
+Resolved,Gelöst
+Could not load your Issues,Ihre Anfragen konnten nicht geladen werden
+Check-ins need an active Employee linked to your user. Please ask HR.,"Stempelzeiten erfordern einen aktiven Mitarbeiter, der mit Ihrem Benutzer verknüpft ist. Bitte wenden Sie sich an HR."
+Last {0} days,Letzte {0} Tage
+{0} days · this week {1},{0} Tage · diese Woche {1}
+Average day,Durchschnittlicher Tag
+on days with check-ins,an Tagen mit Stempelzeiten
+Typical day,Typischer Tag
+average first check-in and last check-out,durchschnittliches erstes Einstempeln und letztes Ausstempeln
+Worked time,Arbeitszeit
+"Hours per week, from check-in to check-out","Stunden pro Woche, vom Einstempeln bis zum Ausstempeln"
+"Hours per day, from check-in to check-out","Stunden pro Tag, vom Einstempeln bis zum Ausstempeln"
+Hours,Stunden
+Days without a check-out,Tage ohne Ausstempeln
+These days do not count as worked time. HR can add the missing check-out.,Diese Tage zählen nicht als Arbeitszeit. HR kann das fehlende Ausstempeln nachtragen.
+checked in {0},eingestempelt {0}
+Your check-ins and worked time.,Ihre Stempelzeiten und Arbeitszeit.
+"Checked in, {0}.","Eingestempelt, {0}."
+Checked out.,Ausgestempelt.
+Could not load your check-ins,Ihre Stempelzeiten konnten nicht geladen werden
+No check-ins yet.,Noch keine Stempelzeiten.
+no check-out,kein Ausstempeln
+In,Ein
+Out,Aus
+Counted for attendance,Für die Anwesenheit gezählt
+attendance,Anwesenheit
+Load older check-ins,Ältere Stempelzeiten laden
+Loading your contract…,Ihr Vertrag wird geladen …
+There is no contract for you yet. HR adds it once it is signed.,"Für Sie gibt es noch keinen Vertrag. HR trägt ihn ein, sobald er unterschrieben ist."
+Current contract,Aktueller Vertrag
+No contract is in force today.,Heute ist kein Vertrag in Kraft.
+Upcoming changes,Anstehende Änderungen
+From {0},Ab {0}
+{0} · {1} per week · {2} per month,{0} · {1} pro Woche · {2} pro Monat
+History,Verlauf
+Something looks wrong? Ask HR to record a change.,"Stimmt etwas nicht? Bitten Sie HR, eine Änderung zu erfassen."
+FTE,VZÄ
+Hours per week,Stunden pro Woche
+Monthly gross,Monatlich brutto
+Yearly gross at 100 %,Jährlich brutto bei 100 %
+0–7 days,0–7 Tage
+8–14 days,8–14 Tage
+15–30 days,15–30 Tage
+31–90 days,31–90 Tage
+90+ days,90+ Tage
+Mon,Mo
+Tue,Di
+Wed,Mi
+Thu,Do
+Fri,Fr
+Sat,Sa
+Sun,So
+W{0},KW {0}
+Replied,Beantwortet
+On Hold,Zurückgestellt
+Working,In Arbeit
+Pending Review,Prüfung ausstehend
+No priority,Keine Priorität
+All days done,Alle Tage geschafft
+{0} of 1 day done,{0} von 1 Tag geschafft
+{0} of {1} days done,{0} von {1} Tagen geschafft
+1 day to go,Noch 1 Tag
+{0} days to go,Noch {0} Tage
+Starts {0}.,Beginnt am {0}.
+Day off today. It does not count either way.,Heute ist frei. Der Tag zählt so oder so nicht.
+Today counts. Nice work.,Heute zählt. Gut gemacht.
+"Today: {0} of {1} planned, {2} of {3} spontaneous.","Heute: {0} von {1} geplant, {2} von {3} spontan."
+"Today: {0} of {1} closed, {2} to go.","Heute: {0} von {1} erledigt, noch {2}."
+Close {0} planned and {1} spontaneous today and the day before counts too.,"Erledigen Sie heute {0} geplante und {1} spontane, dann zählt auch der Vortag."
+Close {0} today and the day before counts too.,"Erledigen Sie heute {0}, dann zählt auch der Vortag."
+Welcome back. Today is a fresh day.,Willkommen zurück. Heute ist ein neuer Tag.
+1 joker in reserve for a day that slips.,"1 Joker in Reserve für einen Tag, der nicht klappt."
+{0} jokers in reserve for a day that slips.,"{0} Joker in Reserve für einen Tag, der nicht klappt."
+No jokers left. A day that slips can still be made up on the next one.,Keine Joker mehr. Ein verpasster Tag lässt sich am nächsten noch nachholen.
+{0} days in a row,{0} Tage in Folge
+Completed: all {0} days counted.,Abgeschlossen: alle {0} Tage gezählt.
+Ended with {0} of 1 day counted. Each of them is real progress.,Beendet mit {0} von 1 Tag gezählt. Jeder davon ist echter Fortschritt.
+Ended with {0} of {1} days counted. Each of them is real progress.,Beendet mit {0} von {1} Tagen gezählt. Jeder davon ist echter Fortschritt.
+counted,gezählt
+made up the next day,am Folgetag nachgeholt
+covered by a joker,mit Joker abgedeckt
+not counted,nicht gezählt
+upcoming,kommt noch
+Plan your day in My Day first; then planned closes start to count.,Planen Sie Ihren Tag zuerst in „Mein Tag“; dann zählen geplante Erledigungen.
+You close about {0} planned and {1} spontaneous a day.,Sie erledigen etwa {0} geplante und {1} spontane pro Tag.
+On most working days you closed none so far. Start small: one a day is a real habit.,An den meisten Arbeitstagen haben Sie bisher keine erledigt. Fangen Sie klein an: eine am Tag ist schon eine echte Gewohnheit.
+You close about {0} a day. {1} is a good stretch.,Sie erledigen etwa {0} pro Tag. {1} ist eine gute Steigerung.
+Loading checklist dashboard…,Checklisten-Dashboard wird geladen …
+{0} vs previous 90 days,{0} ggü. den 90 Tagen davor
+{0} vs same period last year,{0} ggü. dem Vorjahreszeitraum
+Created and completed,Erstellt und abgeschlossen
+Monthly throughput for the last 12 months,Monatlicher Durchsatz der letzten 12 Monate
+Open by owner,Offen nach Verantwortlichem
+Aging of open checklists,Alter offener Checklisten
+Completion rate,Abschlussquote
+Median completion,Mittlere Dauer bis Abschluss
+Could not load checklist dashboard,Checklisten-Dashboard konnte nicht geladen werden
+Raven is not installed on this site.,Raven ist auf dieser Site nicht installiert.
+Chat unavailable,Chat nicht verfügbar
+Issue Chat is disabled in phamos Settings.,Der Anfrage-Chat ist in den phamos-Einstellungen deaktiviert.
+Chats are not available for {0}.,Für {0} sind keine Chats verfügbar.
+No Raven Workspace found. Create one in Raven first.,Kein Raven-Arbeitsbereich gefunden. Legen Sie zuerst einen in Raven an.
+You need to be a Raven user to chat.,"Sie müssen Raven-Benutzer sein, um zu chatten."
+Chat about {0}: {1},Chat zu {0}: {1}
+Chat about {0},Chat zu {0}
+Open in Raven,In Raven öffnen
+"Open this chat in Raven, in a new window",Diesen Chat in Raven in einem neuen Fenster öffnen
+Close the chat,Chat schließen
+"Not in the chat, since they have no Raven account: {0}","Nicht im Chat, da ohne Raven-Konto: {0}"
+Start chat,Chat starten
+Join chat,Chat beitreten
+Chat,Chat
+Start a Raven chat with the people on this Issue,Einen Raven-Chat mit den Beteiligten dieser Anfrage starten
+Join the Raven chat of this Issue,Dem Raven-Chat dieser Anfrage beitreten
+Open the Raven chat of this Issue,Den Raven-Chat dieser Anfrage öffnen
+Something went wrong,Etwas ist schiefgelaufen
+Read the chat of this closed Issue,Den Chat dieser geschlossenen Anfrage lesen
+{0} assigned {1}.,{0} hat {1} zugewiesen.
+{0} unassigned {1}.,{0} hat die Zuweisung von {1} entfernt.
+{0} set the status to {1}.,{0} hat den Status auf {1} gesetzt.
+{0} converted this Issue to Task {1}.,{0} hat diese Anfrage in die Aufgabe {1} umgewandelt.
+Chat (read-only),Chat (nur lesen)
+Open the chat,Chat öffnen
+Loading the chat…,Chat wird geladen …
+No chat for this Issue yet.,Zu dieser Anfrage gibt es noch keinen Chat.
+"Start one with the people on this Issue. Messages also show up in Raven, linked to the Issue.","Starten Sie einen mit den Beteiligten dieser Anfrage. Die Nachrichten erscheinen auch in Raven, verknüpft mit der Anfrage."
+You are not in this chat yet.,Sie sind noch nicht in diesem Chat.
+1 unread in the chat,1 ungelesen im Chat
+{0} unread in the chat,{0} ungelesen im Chat
+1 new reply in threads,1 neue Antwort in Threads
+{0} new replies in threads,{0} neue Antworten in Threads
+Thread,Thread
+{0} new,{0} neu
+More below,Mehr darunter
+Scroll to see the rest of the text,"Scrollen, um den restlichen Text zu sehen"
+New checklist,Neue Checkliste
+No checklists linked yet.,Noch keine Checklisten verknüpft.
+Loading items…,Punkte werden geladen …
+No items yet,Noch keine Punkte
+Add item,Punkt hinzufügen
+Click to edit…,Zum Bearbeiten klicken …
+No description,Keine Beschreibung
+Short description,Kurzbeschreibung
+Item note…,Notiz zum Punkt …
+Record,Datensatz
+Not Started,Nicht begonnen
+Failed to load checklist items,Checklistenpunkte konnten nicht geladen werden
+Failed to save checklist item,Checklistenpunkt konnte nicht gespeichert werden
+Assigned To,Zugewiesen an
+Due Date,Fälligkeitsdatum
+Due in (Days),Fällig in (Tagen)
+Checklist item,Checklistenpunkt
+Shared With Through Assignment,Durch Zuweisung freigegeben für
+Only the checklist owner or users with edit rights on checklists can assign items,Nur der Checklisten-Verantwortliche oder Benutzer mit Bearbeitungsrechten für Checklisten können Punkte zuweisen
+"Document sharing is disabled, so {0} could not open this checklist. Assign someone with access to checklists.","Die Dokumentfreigabe ist deaktiviert, daher könnte {0} diese Checkliste nicht öffnen. Bitte weisen Sie jemanden mit Zugriff auf Checklisten zu."
+Gets a ToDo for this item. Ticking the item closes the ToDo and closing the ToDo ticks the item.,"Erhält ein ToDo für diesen Punkt. Das Abhaken des Punkts schließt das ToDo, und das Schließen des ToDos hakt den Punkt ab."
+"Due date of the item, counted in days from the day the checklist is created. Leave 0 for no due date.","Fälligkeit des Punkts in Tagen ab dem Tag, an dem die Checkliste erstellt wird. 0 bedeutet kein Fälligkeitsdatum."
+The latest due date of the checklist items.,Das späteste Fälligkeitsdatum der Checklistenpunkte.
+Checklist items can only be assigned to enabled users with the Employee role: {0},Checklistenpunkte können nur aktiven Benutzern mit der Rolle Mitarbeiter zugewiesen werden: {0}

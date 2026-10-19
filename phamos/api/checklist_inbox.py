@@ -1,14 +1,16 @@
 # Copyright (c) 2026, phamos.eu and contributors
 # For license information, please see license.txt
 
-"""Checklist inbox APIs for I Own My Work SPA."""
+"""Checklist APIs shared by the cockpit SPAs."""
 
 import frappe
 from frappe import _
 from frappe.model import no_value_fields, table_fields
-from frappe.utils import cint, cstr
+from frappe.utils import cint, cstr, get_fullname
 
-CHECKLIST_REFERENCE_DOCTYPES = ("Issue", "Task", "Project", "Lead", "Opportunity", "Customer")
+from phamos.phamos.doctype.checklist_template.checklist_template import template_item_due_date
+
+CHECKLIST_REFERENCE_DOCTYPES = ("Issue", "Task", "Project", "Lead", "Opportunity", "Customer", "ToDo")
 TEMPLATE_DOCTYPE = "Checklist Template"
 
 # Row cap for get_checklist_inbox (no real pagination yet — see
@@ -214,7 +216,7 @@ def get_checklist_template(document, name):
 	items = frappe.get_all(
 		"Checklist Template Item",
 		filters={"parent": name, "parenttype": "Checklist Template"},
-		fields=["description", "note", "document", "record", "idx"],
+		fields=["description", "note", "document", "record", "assigned_to", "due_in_days", "idx"],
 		order_by="idx asc",
 	)
 	return {
@@ -228,6 +230,9 @@ def get_checklist_template(document, name):
 				"note": item.note or "",
 				"document": item.document,
 				"record": item.record,
+				"assigned_to": item.assigned_to,
+				"assigned_to_name": get_fullname(item.assigned_to) if item.assigned_to else "",
+				"due_date": template_item_due_date(item),
 			}
 			for item in items
 		],
@@ -278,13 +283,15 @@ def _item_search_map(checklist_names):
 	rows = frappe.get_all(
 		"Checklist Items",
 		filters={"parent": ("in", list(checklist_names)), "parenttype": "Checklist"},
-		fields=["parent", "description", "note", "document", "record"],
+		fields=["parent", "description", "note", "document", "record", "assigned_to"],
 		limit_page_length=0,
 	)
 	for row in rows:
 		search[row.parent].extend(
 			cstr(row.get(field)) for field in ("description", "note", "document", "record") if row.get(field)
 		)
+		if row.assigned_to:
+			search[row.parent].append(get_fullname(row.assigned_to) or row.assigned_to)
 	return {name: " ".join(values) for name, values in search.items()}
 
 
@@ -378,6 +385,9 @@ def get_checklist(name):
 				"note": row.note or "",
 				"document": row.document,
 				"record": row.record,
+				"assigned_to": row.assigned_to,
+				"assigned_to_name": get_fullname(row.assigned_to) if row.assigned_to else "",
+				"due_date": row.due_date,
 			}
 		)
 	done_count = sum(1 for i in items if i["done"])
@@ -388,7 +398,10 @@ def get_checklist(name):
 		"completion_percentage": doc.completion_percentage or 0,
 		"document": doc.document,
 		"reference_record": doc.reference_record,
+		"due_date": doc.get("due_date"),
 		"modified": doc.modified,
+		"modified_by": doc.modified_by,
+		"modified_by_name": get_fullname(doc.modified_by) or doc.modified_by,
 		"owner": doc.owner,
 		"done_count": done_count,
 		"total_count": len(items),
@@ -401,7 +414,18 @@ def get_checklist(name):
 def update_spa_checklist_item(checklist_name, item_name, values):
 	"""Update a checklist item and return full SPA checklist payload."""
 	_require_checklist_write(checklist_name)
+	from phamos.api.presence import assert_fields_unlocked
 	from phamos.phamos.doctype.checklist.checklist import update_checklist_item
+
+	if isinstance(values, str):
+		values = frappe.parse_json(values)
+	if isinstance(values, dict):
+		# Item text fields are locked per row as "<field>:<item name>".
+		assert_fields_unlocked(
+			"Checklist",
+			checklist_name,
+			[f"{field}:{item_name}" for field in ("description", "note") if field in values],
+		)
 
 	update_checklist_item(checklist_name, item_name, values)
 	return get_checklist(checklist_name)
@@ -464,6 +488,10 @@ def _resolve_checklist_title(name, document, reference_record):
 		title = (frappe.db.get_value("Issue", reference_record, "subject") or "").strip()
 	if not title and document == "Task":
 		title = (frappe.db.get_value("Task", reference_record, "subject") or "").strip()
+	if not title and document == "ToDo":
+		from phamos.api.personal_todos import _summary
+
+		title = _summary(frappe.db.get_value("ToDo", reference_record, "description"))
 	if not title:
 		frappe.throw(_("Checklist title is required"))
 	return title
@@ -549,6 +577,8 @@ def create_spa_checklist(
 				"note": item.get("note") or "",
 				"document": item.get("document") or None,
 				"record": item.get("record") or None,
+				"assigned_to": item.get("assigned_to") or None,
+				"due_date": item.get("due_date") or None,
 			},
 		)
 
@@ -575,6 +605,8 @@ def add_spa_checklist_item(checklist_name, values=None):
 			"note": values.get("note") or "",
 			"document": values.get("document") or None,
 			"record": values.get("record") or None,
+			"assigned_to": values.get("assigned_to") or None,
+			"due_date": values.get("due_date") or None,
 		},
 	)
 	doc.save()

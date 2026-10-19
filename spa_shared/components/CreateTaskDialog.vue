@@ -147,8 +147,9 @@ watch(
 		expStartDate.value = ""
 		expEndDate.value = ""
 		error.value = ""
-		project.value =
-			props.options[spaConfig.projectField] || props.options.projects?.[0]?.name || ""
+		project.value = spaConfig.projectField
+			? props.options[spaConfig.projectField] || props.options.projects?.[0]?.name || ""
+			: ""
 		const priorities = props.options.priorities || []
 		priority.value = priorities.includes("Medium") ? "Medium" : priorities[0] || ""
 	}

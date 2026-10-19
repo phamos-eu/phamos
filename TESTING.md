@@ -51,6 +51,32 @@ bench --site [your-site] run-tests --app phamos --module phamos.okr_addon.doctyp
 bench --site [your-site] run-tests --app phamos --module phamos.okr_addon.doctype.kr.test_kr
 ```
 
+### Marketing: events, attendees, tickets
+
+The Marketing tests bootstrap a company with ERPNext's test setup when the site has none:
+
+```bash
+for module in test_marketing_attendee test_marketing_crm test_marketing_ticketing test_marketing_billing test_marketing_patches test_web_profile_events; do
+  bench --site [your-site] run-tests --app phamos --module phamos.tests.$module
+done
+```
+
+### Frontend unit tests
+
+Pure helpers shared by all cockpit SPAs (`spa_shared/**/*.test.js`, e.g. the
+autosave core behind Issue/Task/checklist editing) run with Vitest from the
+`personal_frontend/` package, the only cockpit package with `vitest` installed:
+
+```bash
+# From the phamos app directory
+yarn test:spa
+
+# or directly
+cd personal_frontend && yarn test
+```
+
+Keep tested modules free of DOM and Vue imports so they run in Node.
+
 ### Known Issues
 
 **Running all tests together:**
@@ -102,7 +128,7 @@ If you encounter `LinkValidationError` for missing records:
 
 ### CI/CD Tests
 
-The GitHub Actions workflow (`.github/workflows/test.yml`) automatically:
+The GitHub Actions workflow (`.github/workflows/ci.yml`, which calls `foundation.yml`) automatically:
 1. Sets up MariaDB and Redis
 2. Installs Frappe Bench
 3. Installs ERPNext and HRMS
