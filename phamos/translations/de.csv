@@ -4,3 +4,32 @@ Open in Accounting Cockpit,Im Accounting-Cockpit öffnen
 Open in Project Management Cockpit,Im Projektmanagement-Cockpit öffnen
 Open in Desk,Im Desk öffnen
 Open in I Own My Work,In I Own My Work öffnen
+Assigned To,Zugewiesen an
+Due Date,Fälligkeitsdatum
+Due in (Days),Fällig in (Tagen)
+Overdue,Überfällig
+Checklist,Checkliste
+Checklist item,Checklistenpunkt
+User,Benutzer
+Shared With Through Assignment,Durch Zuweisung freigegeben für
+Only the checklist owner or users with edit rights on checklists can assign items,Nur der Checklisten-Verantwortliche oder Benutzer mit Bearbeitungsrechten für Checklisten können Punkte zuweisen
+"Document sharing is disabled, so {0} could not open this checklist. Assign someone with access to checklists.","Die Dokumentfreigabe ist deaktiviert, daher könnte {0} diese Checkliste nicht öffnen. Bitte weisen Sie jemanden mit Zugriff auf Checklisten zu."
+Gets a ToDo for this item. Ticking the item closes the ToDo and closing the ToDo ticks the item.,"Erhält ein ToDo für diesen Punkt. Das Abhaken des Punkts schließt das ToDo, und das Schließen des ToDos hakt den Punkt ab."
+"Due date of the item, counted in days from the day the checklist is created. Leave 0 for no due date.","Fälligkeit des Punkts in Tagen ab dem Tag, an dem die Checkliste erstellt wird. 0 bedeutet kein Fälligkeitsdatum."
+The latest due date of the checklist items.,Das späteste Fälligkeitsdatum der Checklistenpunkte.
+Checklist items can only be assigned to enabled users with the Employee role: {0},Checklistenpunkte können nur aktiven Benutzern mit der Rolle Mitarbeiter zugewiesen werden: {0}
+New checklist,Neue Checkliste
+No checklists linked yet.,Noch keine Checklisten verknüpft.
+Loading items…,Punkte werden geladen …
+No items yet,Noch keine Punkte
+Add item,Punkt hinzufügen
+Click to edit…,Zum Bearbeiten klicken …
+No description,Keine Beschreibung
+Short description,Kurzbeschreibung
+Item note…,Notiz zum Punkt …
+Record,Datensatz
+Not Started,Nicht begonnen
+Failed to load checklist items,Checklistenpunkte konnten nicht geladen werden
+Failed to save checklist item,Checklistenpunkt konnte nicht gespeichert werden
+Checklists,Checklisten
+Done,Erledigt
