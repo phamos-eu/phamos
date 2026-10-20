@@ -13,3 +13,10 @@ ai_code_review:
     - if: '$CI_PIPELINE_SOURCE == "merge_request_event" && $CI_MERGE_REQUEST_TARGET_BRANCH_NAME == "version-15"'
   script:
     - python .gitlab/ai_code_review.py
+
+hello-runner:
+  image: alpine:latest
+  tags: [hetzner]
+  script:
+    - echo "Running on $(uname -m)"   # should print aarch64
+    - cat /etc/os-release
