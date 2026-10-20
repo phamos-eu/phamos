@@ -67,7 +67,7 @@ frappe.ui.form.on("GitLab Settings", {
                     frappe.call({
                         method: 'phamos.gitlab_integration.label_ledger.backfill_label_ledger_background',
                         callback: function (r) {
-                            frappe.msgprint((r.message && r.message.message) || "Label history backfill queued!");
+                            frappe.msgprint((r.message && r.message.message) || __("Label history backfill queued!"));
                         }
                     });
                 }

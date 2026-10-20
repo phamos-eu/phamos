@@ -501,6 +501,7 @@ def _build_flow_rows_and_aging(from_date, to_date, selected_projects, issue_scop
 @frappe.whitelist()
 def get_lifetime_tickets(projects=None, from_date=None, to_date=None, issue_scope=None, labels=None, label_mode=None):
 	"""Lifetime Tickets on its own, so changing its label filter doesn't reload the whole dashboard."""
+	frappe.has_permission("GitLab Issue", "read", throw=True)
 	from_date, to_date = _resolve_date_range(from_date, to_date, None)
 	return _build_lifetime_ticket_rows(
 		from_date, to_date, _normalize_projects(projects), _normalize_issue_scope(issue_scope), labels, label_mode
@@ -511,6 +512,7 @@ def get_lifetime_tickets(projects=None, from_date=None, to_date=None, issue_scop
 def get_lifetime_label_options(txt=None):
 	"""Labels for the Lifetime Tickets filter: every label the ledger has seen
 	plus the synced GitLab Labels, since neither list is complete on its own."""
+	frappe.has_permission("GitLab Issue", "read", throw=True)
 	txt = f"%{txt or ''}%"
 	labels = set(
 		frappe.get_all("GitLab Issue Label Ledger", filters={"label": ["like", txt]}, pluck="label", distinct=True)
@@ -527,76 +529,49 @@ def _normalize_label_filter(labels, label_mode):
 	return labels, label_mode
 
 
-def _label_at_month_end_sql(label_mode):
+def _label_at_month_end_sql(label_mode, month_end_sql="%(month_end)s"):
 	"""Only Show / Exclude condition for a ticket that carried one of %(labels)s
-	at the end of %(month_end)s, taken from the GitLab Issue Label Ledger."""
-	exists_sql = """EXISTS (
+	at the end of month_end_sql, taken from the GitLab Issue Label Ledger."""
+	exists_sql = f"""EXISTS (
 		SELECT 1 FROM `tabGitLab Issue Label Ledger` lil
 		WHERE lil.gitlab_issue = gi.name
 		  AND lil.label IN %(labels)s
-		  AND DATE(lil.added_at) <= %(month_end)s
-		  AND (lil.removed_at IS NULL OR DATE(lil.removed_at) > %(month_end)s)
+		  AND DATE(lil.added_at) <= {month_end_sql}
+		  AND (lil.removed_at IS NULL OR DATE(lil.removed_at) > {month_end_sql})
 	)"""
 	return exists_sql if label_mode == "only" else f"NOT {exists_sql}"
 
 
-def _build_labelled_lifetime_ticket_rows(from_date, to_date, project_filter_sql, params, labels, label_mode):
-	"""Lifetime Tickets with a label filter. Whether a ticket had a label depends
-	on the month, so each month's open count is taken on its own instead of
-	carried forward like the unfiltered running total."""
-	label_sql = _label_at_month_end_sql(label_mode)
-	open_map = {}
-	closed_map = {}
-	project_set = set()
-	month_ends = []
-	for year_no, month_no in _month_sequence(from_date, to_date):
+def _build_labelled_open_totals(from_date, to_date, project_filter_sql, params, labels, label_mode):
+	"""{(project, month_key): open count} with a label filter. Whether a ticket
+	had a label depends on the month, so each month is counted on its own
+	instead of carried forward like the unfiltered running total."""
+	month_params = {}
+	month_selects = []
+	for index, (year_no, month_no) in enumerate(_month_sequence(from_date, to_date)):
 		# The last month stops at to_date, same as the unfiltered running total
-		month_end = min(date(year_no, month_no, monthrange(year_no, month_no)[1]), to_date)
-		month_ends.append((year_no, month_no))
-		rows = frappe.db.sql(
-			f"""
-			SELECT
-				gi.gitlab_project,
-				SUM(NOT {LIFETIME_CLOSED_BY_MONTH_END_SQL}) AS open_total,
-				SUM({LIFETIME_CLOSED_BY_MONTH_END_SQL}) AS closed_total
-			FROM `tabGitLab Issue` gi
-			WHERE gi.created_at IS NOT NULL
-			  AND DATE(gi.created_at) <= %(month_end)s
-			  AND {project_filter_sql}
-			  AND {label_sql}
-			GROUP BY gi.gitlab_project
-			""",
-			dict(params, month_end=month_end, labels=tuple(labels)),
-			as_dict=True,
-		)
-		for row in rows:
-			project_set.add(row.gitlab_project)
-			open_map[(row.gitlab_project, year_no, month_no)] = int(row.open_total or 0)
-			closed_map[(row.gitlab_project, year_no, month_no)] = int(row.closed_total or 0)
+		month_params[f"month_end_{index}"] = min(date(year_no, month_no, monthrange(year_no, month_no)[1]), to_date)
+		month_params[f"month_key_{index}"] = f"{year_no}-{month_no:02d}"
+		month_selects.append(f"SELECT %(month_end_{index})s AS month_end, %(month_key_{index})s AS month_key")
+	if not month_selects:
+		return {}
 
-	project_names = params.get("projects") or sorted(p for p in project_set if p)
-	lifetime_rows = []
-	for project in project_names:
-		for month_order, (year_no, month_no) in enumerate(month_ends, start=1):
-			lifetime_rows.append(
-				{
-					"gitlab_project": project,
-					"month_key": f"{year_no}-{month_no:02d}",
-					"year_no": year_no,
-					"month_no": month_no,
-					"month_order": month_order,
-					"month": f"{month_name[month_no]} {year_no}",
-					"open_total": open_map.get((project, year_no, month_no), 0),
-					"closed_total": closed_map.get((project, year_no, month_no), 0),
-				}
-			)
-	return lifetime_rows
-
-
-# Same rule as the unfiltered running total: closed only once state is closed
-LIFETIME_CLOSED_BY_MONTH_END_SQL = (
-	"(gi.state = 'closed' AND gi.closed_at IS NOT NULL AND DATE(gi.closed_at) <= %(month_end)s)"
-)
+	rows = frappe.db.sql(
+		f"""
+		SELECT gi.gitlab_project, me.month_key, COUNT(*) AS open_total
+		FROM ({" UNION ALL ".join(month_selects)}) me
+		JOIN `tabGitLab Issue` gi
+		  ON gi.created_at IS NOT NULL
+		 AND DATE(gi.created_at) <= me.month_end
+		WHERE {project_filter_sql}
+		  AND NOT (gi.state = 'closed' AND gi.closed_at IS NOT NULL AND DATE(gi.closed_at) <= me.month_end)
+		  AND {_label_at_month_end_sql(label_mode, "me.month_end")}
+		GROUP BY gi.gitlab_project, me.month_key
+		""",
+		dict(params, labels=tuple(labels), **month_params),
+		as_dict=True,
+	)
+	return {(row.gitlab_project, row.month_key): int(row.open_total or 0) for row in rows}
 
 
 def _build_lifetime_ticket_rows(from_date, to_date, selected_projects, issue_scope="both", labels=None, label_mode=None):
@@ -706,12 +681,9 @@ def _build_lifetime_ticket_rows(from_date, to_date, selected_projects, issue_sco
 	# second bar next to the unfiltered Open bar
 	labels, label_mode = _normalize_label_filter(labels, label_mode)
 	if label_mode:
-		filtered_open = {
-			(row["gitlab_project"], row["month_key"]): row["open_total"]
-			for row in _build_labelled_lifetime_ticket_rows(
-				from_date, to_date, project_filter_sql, params, labels, label_mode
-			)
-		}
+		filtered_open = _build_labelled_open_totals(
+			from_date, to_date, project_filter_sql, params, labels, label_mode
+		)
 		for row in lifetime_rows:
 			row["filtered_open_total"] = filtered_open.get((row["gitlab_project"], row["month_key"]), 0)
 

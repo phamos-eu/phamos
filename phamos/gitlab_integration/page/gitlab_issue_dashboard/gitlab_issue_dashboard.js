@@ -343,14 +343,16 @@ class GitLabIssueDashboard {
         // No labels picked = no filter, so the mode alone never hides tickets
         const mode = rawMode === __("Exclude") ? "exclude" : "only";
         const labels = this.normalizeProjectsValue(this.filters.lifetime_labels.get_value() || []);
-        return mode && labels.length ? { labels, label_mode: mode } : { labels: [], label_mode: "" };
+        return labels.length ? { labels, label_mode: mode } : { labels: [], label_mode: "" };
     }
 
     async loadLifetimeTickets() {
         // Skip while controls are still being set up, before the first full load
-        if (!this.currentData) return;
+        if (!this.currentData || !this.appliedFilterContext) return;
 
-        const { projects, from_date, to_date, issue_scope } = this.getFilterContext();
+        // The label filter applies on its own, but Project/Date/Scope only on
+        // Apply, so reuse the values the dashboard was last loaded with
+        const { projects, from_date, to_date, issue_scope } = this.appliedFilterContext;
         const labelFilter = this.getLifetimeLabelFilter();
         const requestKey = JSON.stringify([projects, from_date, to_date, issue_scope, labelFilter]);
         if (requestKey === this.lastLifetimeRequestKey) return;
@@ -403,6 +405,7 @@ class GitLabIssueDashboard {
             });
 
             this.currentData = response.message || {};
+            this.appliedFilterContext = { projects, from_date, to_date, issue_scope };
             this.lastLifetimeRequestKey = JSON.stringify([projects, from_date, to_date, issue_scope, this.getLifetimeLabelFilter()]);
             this.compareToCompany = !!this.currentData.compare_to_company;
             this.$compareCompanyToggle.prop("checked", this.compareToCompany);
@@ -430,6 +433,12 @@ class GitLabIssueDashboard {
         if (chart && typeof chart.destroy === "function") {
             chart.destroy();
         }
+    }
+
+    // Frappe Charts only accepts 6-digit hex, so mix with white instead of adding alpha
+    lightenHex(hex, amount) {
+        const channels = [1, 3, 5].map((i) => parseInt(hex.slice(i, i + 2), 16));
+        return `#${channels.map((c) => Math.round(c + (255 - c) * amount).toString(16).padStart(2, "0")).join("")}`;
     }
 
     getLifetimeFilterLabel() {
@@ -527,7 +536,7 @@ class GitLabIssueDashboard {
                 if (filterLabel) {
                     // Same hue, lighter, so each project's pair stays recognisable
                     datasets.push({ name: `${projectName} (${filterLabel})`, values: monthValues(projectFilteredMap, project) });
-                    chartColors.push(`${color}80`);
+                    chartColors.push(this.lightenHex(color, 0.5));
                 }
             });
 

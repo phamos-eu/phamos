@@ -420,11 +420,12 @@ def get_issue_parent(project_path, issue_iid):
         return None
 
 
-def get_label_events_for_project_issue(project_id, issue_iid):
+def get_label_events_for_project_issue(project_id, issue_iid, strict=False):
     """Fetch every label add/remove event GitLab recorded for this issue via its
     Resource Label Events API — lets us find exactly when a label was first
     added straight from GitLab, without depending on our webhook having caught
-    it live."""
+    it live. With strict=True a failed page raises instead of returning the
+    events fetched so far, for callers that treat the result as the full history."""
     settings = frappe.get_single("GitLab Settings")
     base_url = settings.gitlab_url.rstrip("/")
     headers = get_gitlab_headers()
@@ -439,6 +440,11 @@ def get_label_events_for_project_issue(project_id, issue_iid):
             timeout=30,
         )
         if resp.status_code != 200:
+            if strict:
+                resp.raise_for_status()
+                raise frappe.ValidationError(
+                    f"GitLab label events returned {resp.status_code} for issue {issue_iid}"
+                )
             break
 
         data = resp.json()

@@ -1,7 +1,10 @@
 # Copyright (c) 2026, phamos.eu and contributors
 # For license information, please see license.txt
 
+from datetime import datetime
+
 import frappe
+from frappe import _
 from frappe.utils import getdate, today
 
 from phamos.gitlab_integration.gitlab_utils import (
@@ -63,9 +66,11 @@ def sync_issue_label_ledger(issue_doc_name, source="Sync"):
 	if not project_id:
 		return 0
 
-	intervals = _build_label_intervals(
-		get_label_events_for_project_issue(project_id, issue.issue_id)
-	)
+	# strict: a partial history (rate limit / 5xx mid-pagination) would look
+	# like labels that were never removed
+	events = get_label_events_for_project_issue(project_id, issue.issue_id, strict=True)
+	intervals = _build_label_intervals(events)
+	interval_ids = {interval["gitlab_event_id"] for interval in intervals}
 
 	existing = {
 		row.gitlab_event_id: row
@@ -77,10 +82,24 @@ def sync_issue_label_ledger(issue_doc_name, source="Sync"):
 	}
 
 	changed = 0
+	for row in existing.values():
+		# GitLab blanks the label on every event of a deleted label, so its
+		# open rows never get a matching remove and must be closed here
+		if not row.removed_at and row.gitlab_event_id not in interval_ids:
+			frappe.db.set_value(
+				LEDGER_DOCTYPE,
+				row.name,
+				{"removed_at": _deleted_label_removed_at(events, row), "removed_by": ""},
+			)
+			changed += 1
+
 	for interval in intervals:
 		row = existing.get(interval["gitlab_event_id"])
 		if row:
-			if row.removed_at != interval["removed_at"] or (row.removed_by or "") != interval["removed_by"]:
+			# A closed row never reopens: a re-add is a new event and a new row
+			if row.removed_at:
+				continue
+			if interval["removed_at"]:
 				frappe.db.set_value(
 					LEDGER_DOCTYPE,
 					row.name,
@@ -105,6 +124,19 @@ def sync_issue_label_ledger(issue_doc_name, source="Sync"):
 		changed += 1
 
 	return changed
+
+
+def _deleted_label_removed_at(events, row):
+	"""First label-less remove event after the row was added, else now (UTC,
+	like GitLab's timestamps)."""
+	removed = sorted(
+		event_time
+		for event in events
+		if event.get("action") == "remove" and not (event.get("label") or {}).get("name")
+		for event_time in [_parse_gitlab_datetime(event.get("created_at"))]
+		if event_time and event_time >= row.added_at
+	)
+	return removed[0] if removed else datetime.utcnow()
 
 
 def label_ledger_needs_sync(issue_doc_name, current_labels, recently_updated=False):
@@ -180,7 +212,7 @@ def backfill_label_ledger(project_name=None, limit=None, since=None):
 
 		frappe.db.commit()
 
-	return f"Label history filled for {synced} of {len(issues)} issues"
+	return _("Label history filled for {0} of {1} issues").format(synced, len(issues))
 
 
 def _backfill_label_ledger_and_notify(project_name, notify_user):
@@ -200,4 +232,4 @@ def backfill_label_ledger_background(project_name=None):
 		project_name=project_name,
 		notify_user=frappe.session.user,
 	)
-	return {"status": "queued", "message": "Label history backfill queued as background job"}
+	return {"status": "queued", "message": _("Label history backfill queued as background job")}
