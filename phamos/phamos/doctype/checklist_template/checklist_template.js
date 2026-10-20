@@ -3,6 +3,11 @@
 
 frappe.ui.form.on("Checklist Template", {
 	setup(frm) {
+		// Item assignees are employees only (#1625), like on the Checklist itself.
+		frm.set_query("assigned_to", "checklist_template_items", () => ({
+			query: "phamos.api.checklist_inbox.checklist_owner_query",
+		}));
+
 		// Hide Connections "+" for Checklist — create only via "Create Checklist"
 		// so items are snapshotted from the template instead of an empty Quick Entry.
 		frm.can_make_methods = {
@@ -37,6 +42,14 @@ function show_create_checklist_dialog(frm) {
 			options: frm.doc.document,
 			description: __("Optional. Leave empty to create without linking a specific record."),
 		},
+		{
+			fieldname: "checklist_owner",
+			fieldtype: "Link",
+			label: __("Checklist Owner"),
+			options: "User",
+			reqd: 1,
+			link_filters: JSON.stringify([["User", "role", "=", "Employee"]]),
+		},
 	];
 
 	const dialog = new frappe.ui.Dialog({
@@ -51,6 +64,7 @@ function show_create_checklist_dialog(frm) {
 					template_name: frm.doc.name,
 					title: values.title,
 					reference_record: values.reference_record || null,
+					checklist_owner: values.checklist_owner,
 				},
 				freeze: true,
 				freeze_message: __("Creating Checklist..."),

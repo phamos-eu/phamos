@@ -207,6 +207,7 @@ def _spa_path_for(doctype, name):
 		human_resources_department = _settings_dept("human_resources_department")
 		accounting_department = _settings_dept("accounting_department")
 		project_management_department = _settings_dept("project_management_department")
+		software_development_department = _settings_dept("software_development_department")
 		if department and sales_department and department == sales_department:
 			return f"/sales-cockpit/tasks/{name}"
 		if department and human_resources_department and department == human_resources_department:
@@ -215,6 +216,8 @@ def _spa_path_for(doctype, name):
 			return f"/accounting-cockpit/tasks/{name}"
 		if department and project_management_department and department == project_management_department:
 			return f"/project-management-cockpit/tasks/{name}"
+		if department and software_development_department and department == software_development_department:
+			return f"/software-development-cockpit/tasks/{name}"
 		return f"/app/task/{name}"
 	return f"/i-own-my-work/issues/{name}"
 
@@ -228,6 +231,8 @@ def _spa_open_label(spa_path):
 		return _("Open in Accounting Cockpit")
 	if spa_path.startswith("/project-management-cockpit"):
 		return _("Open in Project Management Cockpit")
+	if spa_path.startswith("/software-development-cockpit"):
+		return _("Open in Software Development Cockpit")
 	if spa_path.startswith("/app/"):
 		return _("Open in Desk")
 	return _("Open in I Own My Work")

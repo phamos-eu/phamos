@@ -13,9 +13,11 @@
   "checklist_template",
   "column_break_wvig",
   "checklist_owner",
+  "due_date",
   "status",
   "completion_percentage",
   "completed_on",
+  "assignment_shared_with",
   "section_break_hnfc",
   "checklist_items"
  ],
@@ -96,12 +98,30 @@
    "hidden": 1,
    "label": "Completed On",
    "read_only": 1
+  },
+  {
+   "description": "The latest due date of the checklist items.",
+   "fieldname": "due_date",
+   "fieldtype": "Date",
+   "in_list_view": 1,
+   "in_standard_filter": 1,
+   "label": "Due Date",
+   "read_only": 1
+  },
+  {
+   "description": "Users this checklist was shared with because an item was assigned to them. Only these shares are removed again when the assignment ends.",
+   "fieldname": "assignment_shared_with",
+   "fieldtype": "Small Text",
+   "hidden": 1,
+   "label": "Shared With Through Assignment",
+   "no_copy": 1,
+   "read_only": 1
   }
  ],
  "grid_page_length": 50,
  "index_web_pages_for_search": 1,
  "links": [],
- "modified": "2026-09-04 14:00:00.000000",
+ "modified": "2026-10-18 18:00:00.000000",
  "modified_by": "Administrator",
  "module": "Phamos",
  "name": "Checklist",

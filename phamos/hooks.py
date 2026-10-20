@@ -46,6 +46,13 @@ add_to_apps_screen = [
 		"has_permission": "phamos.api.accounting_spa.check_app_permission",
 	},
 	{
+		"name": "software_development_spa",
+		"logo": "/assets/phamos/manifest/software-development-icon-192.png",
+		"title": "Software Development",
+		"route": "/software-development-cockpit",
+		"has_permission": "phamos.api.software_development_spa.check_app_permission",
+	},
+	{
 		"name": "scan",
 		"logo": "/assets/phamos/manifest/scan-icon-192.png",
 		"title": "Lead Scan",
@@ -60,7 +67,8 @@ add_to_apps_screen = [
 # include js, css files in header of desk.html
 app_include_css = [
     "/assets/phamos/css/sales_order_kpi.css",
-    "/assets/phamos/css/dark_mode_fix.css"
+    "/assets/phamos/css/dark_mode_fix.css",
+    "checklist_dialog.bundle.css",  # hashed, so a new version is not served from browser cache
 ]
 # app_include_js = "/assets/phamos/js/phamos.js"
 
@@ -71,7 +79,7 @@ app_include_js = [
     "/assets/phamos/js/hybrid_meeting_composer.js",
     "/assets/phamos/js/team_daily_schedule.js",
     "/assets/phamos/js/frappe_list_bulk_edit_override.js",  # Fixes null-label crash in bulk edit
-    "/assets/phamos/js/checklist_dialog.js",
+    "checklist_dialog.bundle.js",  # Linked Checklists dialog (hashed bundle, see above)
 ]
 
 
@@ -129,6 +137,8 @@ website_route_rules = [
     {"from_route": "/project-management-cockpit/<path:app_path>", "to_route": "project_management_spa"},
     {"from_route": "/accounting-cockpit", "to_route": "accounting_spa"},
     {"from_route": "/accounting-cockpit/<path:app_path>", "to_route": "accounting_spa"},
+    {"from_route": "/software-development-cockpit", "to_route": "software_development_spa"},
+    {"from_route": "/software-development-cockpit/<path:app_path>", "to_route": "software_development_spa"},
     {"from_route": "/scan", "to_route": "scan"},
     {"from_route": "/scan/<path:app_path>", "to_route": "scan"},
 ]
@@ -227,6 +237,11 @@ after_migrate = [
 # }
 
 doc_events = {
+	# Closing or rescheduling a checklist item's ToDo updates the item (#1625).
+	"ToDo": {
+		"on_update": "phamos.phamos.doctype.checklist.checklist_assignment.sync_item_from_todo",
+		"on_trash": "phamos.phamos.doctype.checklist.checklist_assignment.clear_item_todo_link",
+	},
 	"Event": {
 		"after_insert": "phamos.mailcow_integration.caldav.sync_event.on_upsert",
         "on_update": "phamos.mailcow_integration.caldav.sync_event.on_upsert",
