@@ -2,15 +2,16 @@
 	"name": "phamos",
 	"private": true,
 	"scripts": {
-		"install:frontends": "cd frontend && yarn install --check-files && cd ../human_resources_frontend && yarn install --check-files && cd ../sales_frontend && yarn install --check-files && cd ../accounting_frontend && yarn install --check-files && cd ../project_management_frontend && yarn install --check-files && cd ../scan_frontend && yarn install --check-files",
+		"install:frontends": "cd frontend && yarn install --check-files && cd ../human_resources_frontend && yarn install --check-files && cd ../sales_frontend && yarn install --check-files && cd ../accounting_frontend && yarn install --check-files && cd ../project_management_frontend && yarn install --check-files && cd ../software_development_frontend && yarn install --check-files && cd ../scan_frontend && yarn install --check-files",
 		"postinstall": "yarn install:frontends",
 		"dev": "cd frontend && yarn dev",
 		"dev:human-resources": "cd human_resources_frontend && yarn dev",
 		"dev:sales": "cd sales_frontend && yarn dev",
 		"dev:accounting": "cd accounting_frontend && yarn dev",
 		"dev:pm": "cd project_management_frontend && yarn dev",
+		"dev:software-development": "cd software_development_frontend && yarn dev",
 		"dev:scan": "cd scan_frontend && yarn dev",
-		"build": "yarn install:frontends && cd frontend && yarn build && cd ../human_resources_frontend && yarn build && cd ../sales_frontend && yarn build && cd ../accounting_frontend && yarn build && cd ../project_management_frontend && yarn build && cd ../scan_frontend && yarn build",
+		"build": "yarn install:frontends && cd frontend && yarn build && cd ../human_resources_frontend && yarn build && cd ../sales_frontend && yarn build && cd ../accounting_frontend && yarn build && cd ../project_management_frontend && yarn build && cd ../software_development_frontend && yarn build && cd ../scan_frontend && yarn build",
 		"build:scan": "cd scan_frontend && yarn build"
 	}
 }

@@ -134,6 +134,21 @@
 										:disabled="!row.document"
 									/>
 								</div>
+								<!-- Assignee gets a ToDo for the item (#1625). -->
+								<div class="grid grid-cols-2 gap-2">
+									<FrappeLink
+										doctype="User"
+										query="phamos.api.checklist_inbox.checklist_owner_query"
+										v-model="row.assigned_to"
+										placeholder="Assign to…"
+									/>
+									<FormControl
+										v-model="row.due_date"
+										type="date"
+										size="sm"
+										title="Due date"
+									/>
+								</div>
 							</div>
 						</div>
 					</div>
@@ -206,6 +221,8 @@ function emptyRow(seed = {}) {
 		note: seed.note || "",
 		document: seed.document || "",
 		record: seed.record || "",
+		assigned_to: seed.assigned_to || "",
+		due_date: seed.due_date || "",
 	}
 }
 
@@ -313,9 +330,14 @@ function buildItems() {
 				note,
 				document: row.document || null,
 				record: row.record || null,
+				assigned_to: row.assigned_to || null,
+				due_date: row.due_date || null,
 			}
 		})
-		.filter((row) => row.description || row.note || row.document || row.record)
+		.filter(
+			(row) =>
+				row.description || row.note || row.document || row.record || row.assigned_to || row.due_date
+		)
 }
 
 async function submit() {
