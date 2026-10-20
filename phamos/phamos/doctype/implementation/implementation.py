@@ -387,7 +387,7 @@ class Implementation(Document):
 	
 
 	def add_status_history(self):
-		if frappe.flags.in_stakeholder_meeting_submit:
+		if frappe.flags.in_stakeholder_meeting_submit or frappe.flags.in_stakeholder_meeting_cancel:
 			return
 
 		date = today()

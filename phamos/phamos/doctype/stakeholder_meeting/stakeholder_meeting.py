@@ -1,12 +1,16 @@
 # Copyright (c) 2026, phamos.eu and contributors
 # For license information, please see license.txt
 
+import json
+
 import frappe
 from frappe.model.document import Document
-from frappe.utils import formatdate
+from frappe.utils import cint, formatdate
 
 from phamos.phamos.doctype.implementation.implementation import compute_next_review_due
-from phamos.phamos.doctype.implementation_chapter.implementation_chapter import create_revision_snapshot
+from phamos.phamos.doctype.implementation_chapter.implementation_chapter import (
+	create_revision_snapshot,
+)
 
 ATTENDEE_ORGANISATIONS = ("Internal", "Customer")
 CHAPTER_REVIEW_STATUSES = ("Planned", "In Progress", "Blocked")
@@ -16,12 +20,76 @@ PROPOSED_CONTENT_REQUIRED = (
 	"proposed_planned_start",
 	"proposed_target_date",
 )
+# Chapter fields a submit may change, restored from submit_snapshot on cancel.
+CHAPTER_SNAPSHOT_FIELDS = (
+	"status",
+	"current_level",
+	"target_level",
+	"current_revision",
+	"last_meeting",
+	"last_reviewed_on",
+	"decision",
+	"decision_description",
+	"chapter_title",
+	"chapter_introduction",
+	"full_chapter_description",
+	"planned_start",
+	"target_date",
+)
+IMPLEMENTATION_SNAPSHOT_FIELDS = ("last_stakeholder_meeting", "last_reviewed_on", "next_review_due")
 
 
 class StakeholderMeeting(Document):
 	def before_insert(self):
 		self.seed_attendees_from_implementation()
 		self.seed_chapter_reviews_from_implementation()
+
+	def validate(self):
+		self.validate_chapter_reviews()
+
+	def validate_chapter_reviews(self):
+		"""Each Chapter may be reviewed once per meeting and must belong to this
+		meeting's Implementation. Rows the chair added by hand get the same
+		snapshot a seeded row would have, so submit can tell what was changed in
+		the meeting."""
+		seen = set()
+		for row in self.chapter_reviews:
+			if row.chapter in seen:
+				frappe.throw(frappe._("Chapter {0} is reviewed more than once.").format(row.chapter))
+			seen.add(row.chapter)
+
+			chapter = frappe.db.get_value(
+				"Implementation Chapter",
+				row.chapter,
+				[
+					"name",
+					"implementation",
+					"chapter_title",
+					"current_revision",
+					"status",
+					"current_level",
+					"target_level",
+					"planned_start",
+					"target_date",
+					"last_meeting",
+					"last_reviewed_on",
+				],
+				as_dict=True,
+			)
+			if not chapter:
+				continue
+			if chapter.implementation != self.implementation:
+				frappe.throw(
+					frappe._("Chapter {0} does not belong to Implementation {1}.").format(
+						row.chapter, self.implementation
+					)
+				)
+
+			if self.docstatus == 0 and not row.chapter_status_before:
+				if not row.current_level and not row.target_level:
+					row.current_level = chapter.current_level
+					row.target_level = chapter.target_level
+				row.update(self.get_chapter_review_snapshot(chapter))
 
 	def before_submit(self):
 		missing = [row.chapter_title or row.chapter for row in self.chapter_reviews if not row.progress]
@@ -69,6 +137,61 @@ class StakeholderMeeting(Document):
 		finally:
 			frappe.flags.in_stakeholder_meeting_submit = False
 
+	def before_cancel(self):
+		"""Cancelling restores what this meeting's submit overwrote, which is only
+		correct while no later meeting has built on top of it."""
+		last_meeting = frappe.db.get_value("Implementation", self.implementation, "last_stakeholder_meeting")
+		if last_meeting and last_meeting != self.name:
+			frappe.throw(
+				frappe._("Please cancel the later Stakeholder Meeting {0} first.").format(
+					frappe.utils.get_link_to_form("Stakeholder Meeting", last_meeting)
+				)
+			)
+
+		for row in self.chapter_reviews:
+			chapter_last_meeting = frappe.db.get_value("Implementation Chapter", row.chapter, "last_meeting")
+			if chapter_last_meeting and chapter_last_meeting != self.name:
+				frappe.throw(
+					frappe._("Chapter {0} was reviewed again in {1}. Please cancel that meeting first.").format(
+						row.chapter, frappe.utils.get_link_to_form("Stakeholder Meeting", chapter_last_meeting)
+					)
+				)
+
+	def on_cancel(self):
+		"""Undo this meeting's submit: put each Chapter and the Implementation back
+		the way they were and delete the Revisions it created."""
+		frappe.flags.in_stakeholder_meeting_cancel = True
+		try:
+			self.revert_chapter_reviews()
+			self.revert_implementation_review_cadence()
+		finally:
+			frappe.flags.in_stakeholder_meeting_cancel = False
+
+	def revert_chapter_reviews(self):
+		for row in reversed(self.chapter_reviews):
+			if not row.submit_snapshot:
+				continue
+
+			chapter = frappe.get_doc("Implementation Chapter", row.chapter)
+			chapter.update(json.loads(row.submit_snapshot))
+			chapter.save(ignore_permissions=True)
+
+			if row.previous_revision:
+				created_revision = row.current_revision
+				row.db_set(
+					{"current_revision": row.previous_revision, "previous_revision": None},
+					update_modified=False,
+				)
+				frappe.delete_doc("Implementation Chapter Revision", created_revision, ignore_permissions=True)
+
+	def revert_implementation_review_cadence(self):
+		if not self.implementation_snapshot:
+			return
+
+		implementation = frappe.get_doc("Implementation", self.implementation)
+		implementation.update(json.loads(self.implementation_snapshot))
+		implementation.save(ignore_permissions=True)
+
 	def sync_chapter_reviews_to_chapters(self):
 		created_revisions = []
 		for row in self.chapter_reviews:
@@ -76,11 +199,21 @@ class StakeholderMeeting(Document):
 				continue
 
 			chapter = frappe.get_doc("Implementation Chapter", row.chapter)
-			level_changed = (
-				row.current_level != chapter.current_level or row.target_level != chapter.target_level
+			row.db_set(
+				"submit_snapshot",
+				frappe.as_json({fieldname: chapter.get(fieldname) for fieldname in CHAPTER_SNAPSHOT_FIELDS}),
+				update_modified=False,
 			)
-			chapter.current_level = row.current_level
-			chapter.target_level = row.target_level
+
+			# Only push a level the chair actually changed in this meeting, so a newer
+			# live edit on the Chapter isn't overwritten by the value seeded at creation.
+			levels_before = (cint(chapter.current_level), cint(chapter.target_level))
+			if cint(row.current_level) != cint(row.current_level_before):
+				chapter.current_level = row.current_level
+			if cint(row.target_level) != cint(row.target_level_before):
+				chapter.target_level = row.target_level
+			level_changed = (cint(chapter.current_level), cint(chapter.target_level)) != levels_before
+
 			if row.chapter_status_after:
 				chapter.status = row.chapter_status_after
 			chapter.last_meeting = self.name
@@ -90,15 +223,15 @@ class StakeholderMeeting(Document):
 			if row.decision_description:
 				chapter.decision_description = row.decision_description
 
-			new_revision_name = None
 			if row.scope_change:
-				new_revision_name = self.create_chapter_revision_from_row(chapter, row)
 				chapter.chapter_title = row.proposed_chapter_title
 				chapter.chapter_introduction = row.proposed_chapter_introduction
 				chapter.full_chapter_description = row.proposed_full_chapter_description
 				chapter.planned_start = row.proposed_planned_start
 				chapter.target_date = row.proposed_target_date
-			elif level_changed:
+
+			new_revision_name = None
+			if row.scope_change or level_changed:
 				new_revision_name = create_revision_snapshot(chapter).name
 
 			if new_revision_name:
@@ -126,6 +259,13 @@ class StakeholderMeeting(Document):
 			return
 
 		implementation = frappe.get_doc("Implementation", self.implementation)
+		self.db_set(
+			"implementation_snapshot",
+			frappe.as_json(
+				{fieldname: implementation.get(fieldname) for fieldname in IMPLEMENTATION_SNAPSHOT_FIELDS}
+			),
+			update_modified=False,
+		)
 		implementation.last_stakeholder_meeting = self.name
 		implementation.last_reviewed_on = self.meeting_date
 		if implementation.review_cadence:
@@ -152,32 +292,6 @@ class StakeholderMeeting(Document):
 			title=frappe._("Chapter Revisions Created"),
 			indicator="green",
 		)
-
-	def create_chapter_revision_from_row(self, chapter, row):
-		"""Freeze this Chapter Review row's proposed content as the next
-		immutable Chapter Revision. Mirrors set_as_planned()'s revision creation,
-		but sourced from the agreed proposal captured in this meeting instead of
-		the Chapter's own (locked) fields."""
-		next_revision_number = (
-			frappe.db.count("Implementation Chapter Revision", {"implementation_chapter": chapter.name}) + 1
-		)
-		revision = frappe.get_doc(
-			{
-				"doctype": "Implementation Chapter Revision",
-				"implementation_chapter": chapter.name,
-				"revision_number": next_revision_number,
-				"status": chapter.status,
-				"target_level": chapter.target_level,
-				"current_level": chapter.current_level,
-				"chapter_title": row.proposed_chapter_title,
-				"chapter_introduction": row.proposed_chapter_introduction,
-				"full_chapter_description": row.proposed_full_chapter_description,
-				"planned_start": row.proposed_planned_start,
-				"target_date": row.proposed_target_date,
-			}
-		)
-		revision.insert(ignore_permissions=True)
-		return revision.name
 
 	def seed_attendees_from_implementation(self):
 		"""Snapshot the Implementation's Internal and Customer stakeholders as
@@ -229,22 +343,30 @@ class StakeholderMeeting(Document):
 			],
 		)
 		for chapter in chapters:
-			drift_detected, drift_details = self.detect_chapter_drift(chapter)
 			self.append(
 				"chapter_reviews",
 				{
 					"chapter": chapter.name,
-					"chapter_title": chapter.chapter_title,
-					"current_revision": chapter.current_revision,
-					"chapter_status_before": chapter.status,
 					"current_level": chapter.current_level,
 					"target_level": chapter.target_level,
-					"planned_start": chapter.planned_start,
-					"target_date": chapter.target_date,
-					"drift_detected": drift_detected,
-					"drift_details": drift_details,
+					**self.get_chapter_review_snapshot(chapter),
 				},
 			)
+
+	def get_chapter_review_snapshot(self, chapter):
+		"""The Chapter's state going into this meeting, as stored on its review row."""
+		drift_detected, drift_details = self.detect_chapter_drift(chapter)
+		return {
+			"chapter_title": chapter.chapter_title,
+			"current_revision": chapter.current_revision,
+			"chapter_status_before": chapter.status,
+			"current_level_before": chapter.current_level,
+			"target_level_before": chapter.target_level,
+			"planned_start": chapter.planned_start,
+			"target_date": chapter.target_date,
+			"drift_detected": drift_detected,
+			"drift_details": drift_details,
+		}
 
 	def detect_chapter_drift(self, chapter):
 		"""Compare this Chapter's live levels, status, and planned dates to the
