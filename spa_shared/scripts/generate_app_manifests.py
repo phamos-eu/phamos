@@ -71,6 +71,14 @@ APPS = [
 		"color": "#6d28d9",
 		"symbol": "clipboard",
 	},
+	{
+		"slug": "software-development",
+		"name": "Software Development",
+		"description": "Software Development issues, tasks and checklists",
+		"route": "/software-development-cockpit",
+		"color": "#334155",
+		"symbol": "code",
+	},
 ]
 
 RENDER_SIZE = 1024  # symbols are rendered large and scaled down for smooth edges
