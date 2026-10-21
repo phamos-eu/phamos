@@ -21,7 +21,8 @@
   "team_website_col",
   "image",
   "content_section",
-  "translations"
+  "translations",
+  "mirrored_values"
  ],
  "fields": [
   {
@@ -42,11 +43,11 @@
   {
    "bold": 1,
    "fetch_from": "team.team_name",
+   "fetch_if_empty": 1,
    "fieldname": "team_name",
    "fieldtype": "Data",
    "in_list_view": 1,
-   "label": "Team Name",
-   "read_only": 1
+   "label": "Team Name"
   },
   {
    "fieldname": "source_col",
@@ -54,11 +55,11 @@
   },
   {
    "fetch_from": "team.team_lead",
+   "fetch_if_empty": 1,
    "fieldname": "team_lead",
    "fieldtype": "Link",
    "label": "Team Lead",
-   "options": "Employee",
-   "read_only": 1
+   "options": "Employee"
   },
   {
    "fieldname": "founded",
@@ -111,12 +112,22 @@
    "fieldtype": "Table",
    "label": "Texts per Language",
    "options": "Web Profile Content"
+  },
+  {
+   "fieldname": "mirrored_values",
+   "fieldtype": "Code",
+   "hidden": 1,
+   "label": "Mirrored Values",
+   "no_copy": 1,
+   "options": "JSON",
+   "print_hide": 1,
+   "read_only": 1
   }
  ],
  "index_web_pages_for_search": 0,
  "istable": 0,
  "links": [],
- "modified": "2026-10-08 14:00:00.000000",
+ "modified": "2026-10-21 12:00:00.000000",
  "modified_by": "Administrator",
  "module": "Phamos",
  "name": "Team Web Profile",

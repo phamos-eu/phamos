@@ -33,7 +33,8 @@
   "implementation_website_col",
   "image",
   "content_section",
-  "translations"
+  "translations",
+  "mirrored_values"
  ],
  "fields": [
   {
@@ -53,19 +54,19 @@
   },
   {
    "fetch_from": "implementation.customer",
+   "fetch_if_empty": 1,
    "fieldname": "customer",
    "fieldtype": "Link",
    "label": "Customer",
-   "options": "Customer",
-   "read_only": 1
+   "options": "Customer"
   },
   {
    "fetch_from": "implementation.status",
+   "fetch_if_empty": 1,
    "fieldname": "implementation_status",
    "fieldtype": "Data",
    "in_standard_filter": 1,
-   "label": "Status",
-   "read_only": 1
+   "label": "Status"
   },
   {
    "fieldname": "source_col_1",
@@ -73,26 +74,26 @@
   },
   {
    "fetch_from": "implementation.team",
+   "fetch_if_empty": 1,
    "fieldname": "team",
    "fieldtype": "Link",
    "label": "Team",
-   "options": "Team",
-   "read_only": 1
+   "options": "Team"
   },
   {
    "fetch_from": "implementation.department",
+   "fetch_if_empty": 1,
    "fieldname": "department",
    "fieldtype": "Link",
    "label": "Department",
-   "options": "Department",
-   "read_only": 1
+   "options": "Department"
   },
   {
    "fetch_from": "implementation.start_date",
+   "fetch_if_empty": 1,
    "fieldname": "start_date",
    "fieldtype": "Date",
-   "label": "Start Date",
-   "read_only": 1
+   "label": "Start Date"
   },
   {
    "fieldname": "source_col_2",
@@ -103,16 +104,14 @@
    "fieldname": "industry",
    "fieldtype": "Link",
    "label": "Industry",
-   "options": "Industry Type",
-   "read_only": 1
+   "options": "Industry Type"
   },
   {
    "description": "Mirrored from the Implementation's modules (where a Module Web Profile exists).",
    "fieldname": "modules",
    "fieldtype": "Table",
    "label": "Modules",
-   "options": "Web Profile Module",
-   "read_only": 1
+   "options": "Web Profile Module"
   },
   {
    "description": "Both sides, eye to eye. Customer-side people are only shown when the customer approved naming.",
@@ -202,12 +201,22 @@
    "fieldtype": "Table",
    "label": "Texts per Language",
    "options": "Web Profile Content"
+  },
+  {
+   "fieldname": "mirrored_values",
+   "fieldtype": "Code",
+   "hidden": 1,
+   "label": "Mirrored Values",
+   "no_copy": 1,
+   "options": "JSON",
+   "print_hide": 1,
+   "read_only": 1
   }
  ],
  "index_web_pages_for_search": 0,
  "istable": 0,
  "links": [],
- "modified": "2026-10-09 16:00:00.000000",
+ "modified": "2026-10-21 12:00:00.000000",
  "modified_by": "Administrator",
  "module": "Phamos",
  "name": "Implementation Web Profile",

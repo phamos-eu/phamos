@@ -36,7 +36,7 @@ named and anonymous changes only what the page shows, never its URL. Unpublished
 - `contact.py`: the one contact workflow behind every contact button (shared dialog). phamos people and page-level requests become Lead/Customer + Opportunity (assigned to the phamos person if they have a user); consenting external people get the request forwarded by email, recorded on their profile.
 - `chrome.py` (#1502): runs on every website page (`update_website_context`). Sets the page language (Web Profile route or the Web Page "Language" field), swaps navbar/footer links kept in Website Settings with German URLs to the page language, fills the footer groups "Module"/"Branchen" with the published profiles, and builds the DIN 5008 company footer (`templates/includes/footer/footer_info.html`; IBAN masked, no tax number).
 - `setup.py`: Web Page custom fields "Language" and "Translation Of" (`after_migrate`). Translate a Web Page by creating the English page with route `en/…` and pointing "Translation Of" to the German one.
-- `mirror.py`: read-only facts copied from the source records (on profile save and on source `on_update`).
+- `mirror.py`: facts copied from the source records (on profile save and on source `on_update`); a value edited on the profile is kept until it is cleared.
 - `www/web_profile/{listing,profile}.{py,html}` + `templates/web_profile/macros.html`: one listing and one profile template for every section.
 - `public/css/web_profile.bundle.css`: design option C; brand colours are the `--wp-*` tokens at the top. Clickable = card, not clickable = chip.
 - `public/js/web_profile.bundle.js`: optional enhancement (no-reload filters, load on scroll, mobile drawer, contact dialog). Pages work without it.
