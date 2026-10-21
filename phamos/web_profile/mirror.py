@@ -1,9 +1,15 @@
 """Mirror facts from internal source records onto their Web Profiles.
 
-Mirrored fields are read-only on the profile. They are refreshed whenever the profile is saved
-(``WebProfileDocument.validate``) and pushed whenever a source record is saved (``on_update``
-doc events in hooks.py), so form saves, Data Import and API updates all propagate.
+Mirrored fields are refreshed whenever the profile is saved (``WebProfileDocument.validate``) and
+pushed whenever a source record is saved (``on_update`` doc events in hooks.py), so form saves,
+Data Import and API updates all propagate.
+
+Mirrored fields stay editable (phamos/phamos#1531): a value typed on the profile wins over the
+source until it is cleared again. ``mirrored_values`` remembers what was mirrored last, so a field
+that still holds that value (or nothing) follows the source and an edited one is left alone.
 """
+
+import json
 
 import frappe
 from frappe import _
@@ -39,35 +45,59 @@ PERSON_FIELDS = ("full_name", "designation", "company_name", "status", "departme
 
 
 def refresh_mirrored_fields(profile):
-	"""Copy the mirrored facts from the source record(s) onto ``profile`` (no save)."""
+	"""Copy the mirrored facts from the source record(s) onto ``profile`` (no save), except where
+	someone edited a field on the profile."""
+	values = _source_values(profile)
+	if values is None:
+		return
+	plain = {field: _plain(value) for field, value in values.items()}
+	# Profiles saved before #1531 have no memory yet: treat what they hold as mirrored.
+	last = json.loads(profile.mirrored_values) if profile.get("mirrored_values") \
+		else {field: _plain(profile.get(field)) for field in values}
+	for field, value in values.items():
+		current = _plain(profile.get(field))
+		if current is None or current == last.get(field):
+			profile.set(field, [{"module": m} for m in value] if field == "modules" else value)
+	profile.mirrored_values = json.dumps(plain, sort_keys=True)
+
+
+def _plain(value):
+	"""Comparable, JSON-safe form of a field value: None when empty, module names for a table."""
+	if isinstance(value, list):
+		return [row if isinstance(row, str) else row.get("module") for row in value] or None
+	return None if value in (None, "") else str(value)
+
+
+def _source_values(profile):
+	"""{profile field: value from the source record(s)}, or None when there is no source."""
 	if profile.doctype == "Person Web Profile":
-		return _refresh_person(profile)
+		return _person_values(profile)
 	if profile.doctype == "Stakeholder Web Profile":
-		return _refresh_stakeholder(profile)
+		return _stakeholder_values(profile)
 
 	link_field, source_doctype, field_map = MIRRORS[profile.doctype]
 	source_name = profile.get(link_field)
 	if not source_name or not field_map:
-		return
+		return None
 
-	values = frappe.db.get_value(source_doctype, source_name, list(field_map.values()), as_dict=True) or {}
-	for target, source in field_map.items():
-		profile.set(target, values.get(source))
+	source = frappe.db.get_value(source_doctype, source_name, list(field_map.values()), as_dict=True) or {}
+	values = {target: source.get(field) for target, field in field_map.items()}
 
 	if profile.doctype == "Implementation Web Profile":
-		_refresh_implementation_extras(profile)
+		values.update(_implementation_extras(profile))
 	if profile.doctype == "Module Web Profile":
 		# Official ERPNext icon of the module's workspace (see web_profile/icons.py).
-		profile.icon = frappe.db.get_value("Workspace", profile.workspace, "icon") if profile.workspace else None
+		values["icon"] = frappe.db.get_value("Workspace", profile.workspace, "icon") if profile.workspace else None
+	return values
 
 
-def _refresh_person(profile):
+def _person_values(profile):
 	"""Employee: facts from the Employee. Anyone else: the person from the Contact, the
 	organization from the party. Field names follow the Contact/Employee fields they come from."""
 	if profile.party_type and profile.party_type not in PERSON_PARTY_TYPES:
 		frappe.throw(_("Party Type must be one of: {0}").format(", ".join(PERSON_PARTY_TYPES)))
 	if not profile.party_type or not profile.party:
-		return
+		return None
 
 	contact = (
 		frappe.db.get_value("Contact", profile.contact,
@@ -101,29 +131,30 @@ def _refresh_person(profile):
 			"status": "Active",
 			"email_id": contact.email_id,
 		})
-	for field, value in values.items():
-		profile.set(field, value)
+	return values
 
 
-def _refresh_stakeholder(profile):
+def _stakeholder_values(profile):
 	"""Name and website from the party; the industry from the Customer (set by hand for others)."""
 	if profile.party_type and profile.party_type not in PARTY_NAME_FIELDS:
 		frappe.throw(_("Party Type must be one of: {0}").format(", ".join(PARTY_NAME_FIELDS)))
 	if not profile.party_type or not profile.party:
-		return
-	values = frappe.db.get_value(profile.party_type, profile.party,
+		return None
+	party = frappe.db.get_value(profile.party_type, profile.party,
 		[PARTY_NAME_FIELDS[profile.party_type], PARTY_WEBSITE_FIELDS[profile.party_type]], as_dict=True) or {}
-	profile.party_name = values.get(PARTY_NAME_FIELDS[profile.party_type])
-	profile.website = values.get(PARTY_WEBSITE_FIELDS[profile.party_type])
-	if profile.party_type == "Customer":
-		profile.industry = frappe.db.get_value("Customer", profile.party, "industry") or profile.industry
+	values = {
+		"party_name": party.get(PARTY_NAME_FIELDS[profile.party_type]),
+		"website": party.get(PARTY_WEBSITE_FIELDS[profile.party_type]),
+	}
+	industry = frappe.db.get_value("Customer", profile.party, "industry") if profile.party_type == "Customer" else None
+	if industry:
+		values["industry"] = industry
+	return values
 
 
-def _refresh_implementation_extras(profile):
+def _implementation_extras(profile):
 	"""Industry via the Customer; modules via the Implementation's module table."""
-	profile.industry = (
-		frappe.db.get_value("Customer", profile.customer, "industry") if profile.customer else None
-	)
+	industry = frappe.db.get_value("Customer", profile.customer, "industry") if profile.customer else None
 	module_names = frappe.get_all(
 		"Implementation Item",
 		filters={"parent": profile.implementation, "parenttype": "Implementation"},
@@ -132,7 +163,7 @@ def _refresh_implementation_extras(profile):
 	)
 	# Module Web Profiles are named after their Implementation Module (autoname field:module).
 	existing = set(frappe.get_all("Module Web Profile", filters={"name": ["in", module_names or [""]]}, pluck="name"))
-	profile.set("modules", [{"module": m} for m in dict.fromkeys(module_names) if m in existing])
+	return {"industry": industry, "modules": [m for m in dict.fromkeys(module_names) if m in existing]}
 
 
 def _targets(doc):
