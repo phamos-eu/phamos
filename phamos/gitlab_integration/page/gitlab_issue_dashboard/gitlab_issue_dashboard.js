@@ -52,6 +52,8 @@ class GitLabIssueDashboard {
         this.$flowTable = root.find("#flow-table");
         this.$lifetimeTicketsKpis = root.find("#lifetime-tickets-kpis");
         this.$lifetimeTicketsChart = root.find("#lifetime-tickets-chart");
+        this.$lifetimeLabelMode = root.find("#lifetime-label-mode");
+        this.$lifetimeLabels = root.find("#lifetime-labels");
 
         this.agingChartContext = null;
         this.flowChartContext = null;
@@ -207,9 +209,38 @@ class GitLabIssueDashboard {
             render_input: true,
         });
 
+        this.filters.lifetime_label_mode = frappe.ui.form.make_control({
+            parent: this.$lifetimeLabelMode,
+            df: {
+                label: __("Label Filter"),
+                fieldname: "lifetime_label_mode",
+                fieldtype: "Select",
+                options: `${__("Only Show")}\n${__("Exclude")}`,
+                default: __("Only Show"),
+                onchange: () => this.loadLifetimeTickets(),
+            },
+            render_input: true,
+        });
+
+        this.filters.lifetime_labels = frappe.ui.form.make_control({
+            parent: this.$lifetimeLabels,
+            df: {
+                label: __("Labels"),
+                fieldname: "lifetime_labels",
+                fieldtype: "MultiSelectList",
+                get_data: (txt) => frappe.xcall(
+                    "phamos.gitlab_integration.page.gitlab_issue_dashboard.gitlab_issue_dashboard.get_lifetime_label_options",
+                    { txt }
+                ),
+                onchange: () => this.loadLifetimeTickets(),
+            },
+            render_input: true,
+        });
+
         this.filters.from_date.set_value(defaultRange.from_date);
         this.filters.to_date.set_value(defaultRange.to_date);
         this.filters.issue_scope.set_value(__("Both"));
+        this.filters.lifetime_label_mode.set_value(__("Only Show"));
 
         this.$applyBtn.on("click", () => this.loadData());
         this.$resetBtn.on("click", () => this.resetFilters());
@@ -218,7 +249,6 @@ class GitLabIssueDashboard {
             this.updateFilterState();
             this.loadData();
         });
-        this.page.set_primary_action(__("Apply Filters"), () => this.loadData());
         this.updateFilterState();
     }
 
@@ -228,6 +258,8 @@ class GitLabIssueDashboard {
         this.filters.issue_scope.set_value(__("Both"));
         this.filters.from_date.set_value(defaultRange.from_date);
         this.filters.to_date.set_value(defaultRange.to_date);
+        this.filters.lifetime_labels.set_value([]);
+        this.filters.lifetime_label_mode.set_value(__("Only Show"));
         this.compareToCompany = false;
         this.$compareCompanyToggle.prop("checked", false);
         this.updateFilterState();
@@ -306,6 +338,41 @@ class GitLabIssueDashboard {
         return "both";
     }
 
+    getLifetimeLabelFilter() {
+        const rawMode = (this.filters.lifetime_label_mode.get_value() || "").toString();
+        // No labels picked = no filter, so the mode alone never hides tickets
+        const mode = rawMode === __("Exclude") ? "exclude" : "only";
+        const labels = this.normalizeProjectsValue(this.filters.lifetime_labels.get_value() || []);
+        return labels.length ? { labels, label_mode: mode } : { labels: [], label_mode: "" };
+    }
+
+    async loadLifetimeTickets() {
+        // Skip while controls are still being set up, before the first full load
+        if (!this.currentData || !this.appliedFilterContext) return;
+
+        // The label filter applies on its own, but Project/Date/Scope only on
+        // Apply, so reuse the values the dashboard was last loaded with
+        const { projects, from_date, to_date, issue_scope } = this.appliedFilterContext;
+        const labelFilter = this.getLifetimeLabelFilter();
+        const requestKey = JSON.stringify([projects, from_date, to_date, issue_scope, labelFilter]);
+        if (requestKey === this.lastLifetimeRequestKey) return;
+        this.lastLifetimeRequestKey = requestKey;
+
+        try {
+            const response = await frappe.call({
+                method: "phamos.gitlab_integration.page.gitlab_issue_dashboard.gitlab_issue_dashboard.get_lifetime_tickets",
+                args: Object.assign({ projects, from_date, to_date, issue_scope }, labelFilter),
+            });
+            // A newer filter change has already been requested
+            if (requestKey !== this.lastLifetimeRequestKey) return;
+            this.currentData.lifetime_tickets = response.message || [];
+            this.renderLifetimeTicketsChart();
+        } catch (error) {
+            this.lastLifetimeRequestKey = null;
+            console.error(error);
+        }
+    }
+
     async loadData() {
         try {
             frappe.dom.freeze(__("Loading dashboard..."));
@@ -328,16 +395,18 @@ class GitLabIssueDashboard {
 
             const response = await frappe.call({
                 method: "phamos.gitlab_integration.page.gitlab_issue_dashboard.gitlab_issue_dashboard.get_gitlab_issue_dashboard_data",
-                args: {
+                args: Object.assign({
                     projects,
                     from_date,
                     to_date,
                     issue_scope,
                     compare_to_company,
-                },
+                }, (({ labels, label_mode }) => ({ lifetime_labels: labels, lifetime_label_mode: label_mode }))(this.getLifetimeLabelFilter())),
             });
 
             this.currentData = response.message || {};
+            this.appliedFilterContext = { projects, from_date, to_date, issue_scope };
+            this.lastLifetimeRequestKey = JSON.stringify([projects, from_date, to_date, issue_scope, this.getLifetimeLabelFilter()]);
             this.compareToCompany = !!this.currentData.compare_to_company;
             this.$compareCompanyToggle.prop("checked", this.compareToCompany);
             this.updateFilterState();
@@ -366,6 +435,21 @@ class GitLabIssueDashboard {
         }
     }
 
+    // Frappe Charts only accepts 6-digit hex, so mix with white instead of adding alpha
+    lightenHex(hex, amount) {
+        const channels = [1, 3, 5].map((i) => parseInt(hex.slice(i, i + 2), 16));
+        return `#${channels.map((c) => Math.round(c + (255 - c) * amount).toString(16).padStart(2, "0")).join("")}`;
+    }
+
+    getLifetimeFilterLabel() {
+        const { labels, label_mode } = this.getLifetimeLabelFilter();
+        if (!label_mode) return "";
+        const labelText = labels.join(", ");
+        return label_mode === "only"
+            ? __("Only: {0}", [labelText])
+            : __("Excluding: {0}", [labelText]);
+    }
+
     renderLifetimeTicketsChart() {
         this.destroyChart(this.lifetimeTicketsChart);
         this.lifetimeTicketsChart = null;
@@ -377,6 +461,11 @@ class GitLabIssueDashboard {
         const selectedProjects = (this.currentData && this.currentData.projects) || [];
         const projectTitles = (this.currentData && this.currentData.project_titles) || {};
         const flowColors = this.getChartColors("flow");
+        const filteredColor = this.getChartColors("aging")[1];
+        // Rows only carry filtered_open_total while a label filter is active
+        const filterLabel = rows.some((row) => row.filtered_open_total !== undefined)
+            ? this.getLifetimeFilterLabel()
+            : "";
 
         // open_total is now a running snapshot per month, not a per-month cohort,
         // so "Total Open" sums only the latest month's rows (one per project)
@@ -384,14 +473,24 @@ class GitLabIssueDashboard {
         const latestOrder = rows.reduce((max, row) => Math.max(max, row.month_order || 0), 0);
         const latestRows = rows.filter((row) => (row.month_order || 0) === latestOrder);
         const totals = latestRows.reduce((acc, row) => acc + (row.open_total || 0), 0);
+        const filteredTotals = latestRows.reduce((acc, row) => acc + (row.filtered_open_total || 0), 0);
         const latestMonthLabel = latestRows.length ? (latestRows[0].month || latestRows[0].month_key) : "";
+        const asOfNote = latestMonthLabel
+            ? `<div class="gid-kpi-sub">${__("As of {0} (the latest month in range)", [latestMonthLabel])}</div>`
+            : "";
 
         this.$lifetimeTicketsKpis.html(`
             <div class="gid-kpi gid-kpi-opened">
                 <small>${__("Total Open")}</small>
                 <strong>${totals}</strong>
-                ${latestMonthLabel ? `<div class="gid-kpi-sub">${__("As of {0} (the latest month in range)", [latestMonthLabel])}</div>` : ""}
+                ${asOfNote}
             </div>
+            ${filterLabel ? `
+            <div class="gid-kpi gid-kpi-amber">
+                <small>${frappe.utils.escape_html(filterLabel)}</small>
+                <strong>${filteredTotals}</strong>
+                ${asOfNote}
+            </div>` : ""}
         `);
 
         if (!rows.length) {
@@ -416,18 +515,30 @@ class GitLabIssueDashboard {
         // Show project-wise bars for multi-project comparison instead of summing into one total.
         if (selectedProjects.length > 1) {
             const projectMonthMap = {};
+            const projectFilteredMap = {};
             rows.forEach((row) => {
                 if (!projectMonthMap[row.gitlab_project]) projectMonthMap[row.gitlab_project] = {};
+                if (!projectFilteredMap[row.gitlab_project]) projectFilteredMap[row.gitlab_project] = {};
                 projectMonthMap[row.gitlab_project][row.month_key] = row.open_total || 0;
+                projectFilteredMap[row.gitlab_project][row.month_key] = row.filtered_open_total || 0;
             });
 
             const comparePalette = ["#1976d2", "#ef6c00", "#00897b", "#3949ab", "#43a047", "#8e24aa", "#c62828", "#f9a825"];
+            const monthValues = (map, project) => sortedMonthKeys.map((monthKey) => (map[project] ? (map[project][monthKey] || 0) : 0));
 
-            const datasets = selectedProjects.map((project) => ({
-                name: projectTitles[project] || project || "",
-                values: sortedMonthKeys.map((monthKey) => (projectMonthMap[project] ? (projectMonthMap[project][monthKey] || 0) : 0)),
-            }));
-            const chartColors = selectedProjects.map((_, index) => comparePalette[index % comparePalette.length]);
+            const datasets = [];
+            const chartColors = [];
+            selectedProjects.forEach((project, index) => {
+                const projectName = projectTitles[project] || project || "";
+                const color = comparePalette[index % comparePalette.length];
+                datasets.push({ name: projectName, values: monthValues(projectMonthMap, project) });
+                chartColors.push(color);
+                if (filterLabel) {
+                    // Same hue, lighter, so each project's pair stays recognisable
+                    datasets.push({ name: `${projectName} (${filterLabel})`, values: monthValues(projectFilteredMap, project) });
+                    chartColors.push(this.lightenHex(color, 0.5));
+                }
+            });
 
             this.lifetimeTicketsChart = new frappe.Chart(this.$lifetimeTicketsChart[0], {
                 title: __("Lifetime Tickets - Open - Project Comparison"),
@@ -441,18 +552,25 @@ class GitLabIssueDashboard {
         }
 
         const monthAgg = {};
+        const filteredAgg = {};
         rows.forEach((row) => {
             monthAgg[row.month_key] = (monthAgg[row.month_key] || 0) + (row.open_total || 0);
+            filteredAgg[row.month_key] = (filteredAgg[row.month_key] || 0) + (row.filtered_open_total || 0);
         });
-        const openValues = sortedMonthKeys.map((monthKey) => monthAgg[monthKey] || 0);
+        const datasets = [{ name: __("Open"), values: sortedMonthKeys.map((monthKey) => monthAgg[monthKey] || 0) }];
+        const colors = [flowColors[0]];
+        if (filterLabel) {
+            datasets.push({ name: filterLabel, values: sortedMonthKeys.map((monthKey) => filteredAgg[monthKey] || 0) });
+            colors.push(filteredColor);
+        }
 
         this.lifetimeTicketsChart = new frappe.Chart(this.$lifetimeTicketsChart[0], {
             title: __("Lifetime Tickets - Open"),
-            data: { labels, datasets: [{ name: __("Open"), values: openValues }] },
+            data: { labels, datasets },
             type: "bar",
             height: 300,
             isNavigable: 1,
-            colors: [flowColors[0]],
+            colors,
         });
     }
 
