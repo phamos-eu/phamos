@@ -288,17 +288,21 @@ def _heading(section):
 
 def _subtitle(hero, notes):
 	"""The template prints the subtitle as it is: inline HTML (bold, line breaks) stays, text blocks
-	(paragraphs, lists from a Rich Text editor) become plain lines."""
+	(paragraphs, lists from a Rich Text editor) become lines with a blank line between."""
 	subtitle = hero.select_one(".hero-subtitle")
 	if not subtitle:
 		return ""
 	if subtitle.find(["p", "ul", "ol", "div"]):
-		notes.append(f"hero {_text(hero.select_one('.hero-title'))!r}: subtitle had paragraphs, kept as lines")
-		return "<br>".join(_text(p) for p in subtitle.find_all(["p", "li"]) if _text(p))
+		notes.append(f"hero {_text(hero.select_one('.hero-title'))!r}: subtitle had paragraphs, kept with blank lines between")
+		return "<br><br>".join(_inline(p) for p in subtitle.find_all(["p", "li"]) if _text(p))
 	for tag in subtitle.find_all(["b", "strong"]):
 		if not _text(tag):
 			tag.unwrap()
-	return re.sub(r"\s+", " ", subtitle.decode_contents()).strip()
+	return _inline(subtitle)
+
+
+def _inline(element):
+	return re.sub(r"\s+", " ", element.decode_contents()).strip()
 
 
 def _buttons(links):

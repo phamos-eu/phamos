@@ -69,7 +69,7 @@
 
 	// Content Web Pages (phamos/phamos#1539): one page per language, the English one points to the
 	// German one with "Translation Of" (#1502). The form says which translation is missing or older
-	// than its German page, and creates the English page as a copy of the German one.
+	// than its German page, and creates a missing translation as a copy of the German page.
 	async function webPageHints(frm) {
 		const hints = [];
 		if (frm.doc.content_type === "HTML") {
@@ -83,8 +83,10 @@
 			for (const [code, label] of Object.entries(LANGUAGES)) {
 				if (code === "de") continue;
 				const page = translations.find((row) => row.language === code);
-				if (!page) hints.push(__("Missing translation: {0}.", [__(label)]));
-				else if (page.modified < frm.doc.modified) hints.push(__("This page changed after its {0} version ({1}): check the translation.", [__(label), page.name]));
+				if (!page) {
+					hints.push(__("Missing translation: {0}.", [__(label)]));
+					frm.add_custom_button(__(label), () => createTranslation(frm, code), __("Create Translation"));
+				} else if (page.modified < frm.doc.modified) hints.push(__("This page changed after its {0} version ({1}): check the translation.", [__(label), page.name]));
 			}
 		} else if (frm.doc.language && frm.doc.translation_of) {
 			const master = await frappe.db.get_value("Web Page", frm.doc.translation_of, "modified");
@@ -114,15 +116,7 @@
 	frappe.ui.form.on("Web Page", {
 		refresh(frm) {
 			if (frm.is_new()) return;
-			webPageHints(frm);
-			if (frm.doc.published && frm.doc.route) {
-				frm.add_custom_button(__("View on Website"), () => window.open(`/${frm.doc.route}`, "_blank"));
-			}
-			if (frm.doc.language === "de") {
-				for (const lang of Object.keys(LANGUAGES).filter((code) => code !== "de")) {
-					frm.add_custom_button(__(LANGUAGES[lang]), () => createTranslation(frm, lang), __("Create Translation"));
-				}
-			}
+			webPageHints(frm);  // Frappe's sidebar already links "See on Website"
 		},
 	});
 
