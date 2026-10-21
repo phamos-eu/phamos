@@ -37,9 +37,19 @@ def update_website_context(context):
 		"wp_company_footer": company_footer(),
 		"wp_lang": lang,
 	}
-	if context.get("doc") and getattr(context.doc, "doctype", None) == "Web Page" and context.doc.get("language"):
-		values["head_include"] = (context.get("head_include") or "") + _web_page_alternates(context.doc)
+	if context.get("doc") and getattr(context.doc, "doctype", None) == "Web Page":
+		head = _edit_link_meta(context.doc)
+		if context.doc.get("language"):
+			head += _web_page_alternates(context.doc)
+		values["head_include"] = (context.get("head_include") or "") + head
 	return values
+
+
+def _edit_link_meta(page):
+	"""The page's name for the "Edit page" link (web_profile.bundle.js). Frappe caches the page for every
+	visitor alike, so the link itself is added in the browser, only for Desk users."""
+	name = frappe.utils.escape_html(page.name)
+	return f'<meta name="wp-web-page" content="{name}" data-edit-label="{frappe.utils.escape_html(_("Edit page"))}">\n'
 
 
 # --- language --------------------------------------------------------------------------------------

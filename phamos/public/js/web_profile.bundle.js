@@ -472,3 +472,16 @@ function languageBanner(alternates, pageLang) {
 
 	bind();
 })();
+
+// "Edit page" on content Web Pages (phamos/phamos#1539): Desk users get a link to the page's form.
+// The page is cached for every visitor alike, so the server only names the page (meta wp-web-page)
+// and the link is added here; the Desk still checks who may edit.
+(function () {
+	const meta = document.querySelector('meta[name="wp-web-page"]');
+	if (!meta || !/(^|;\s*)system_user=yes/.test(document.cookie)) return;
+	const link = document.createElement("a");
+	link.className = "wp-edit-page";
+	link.href = `/app/web-page/${encodeURIComponent(meta.content)}`;
+	link.textContent = meta.dataset.editLabel || "Edit page";
+	document.body.appendChild(link);
+})();

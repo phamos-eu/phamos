@@ -56,7 +56,7 @@ bench --site [your-site] run-tests --app phamos --module phamos.okr_addon.doctyp
 The Marketing tests bootstrap a company with ERPNext's test setup when the site has none:
 
 ```bash
-for module in test_marketing_attendee test_marketing_crm test_marketing_ticketing test_marketing_billing test_marketing_patches test_web_profile_events; do
+for module in test_marketing_attendee test_marketing_crm test_marketing_ticketing test_marketing_billing test_marketing_patches test_web_profile_events test_web_page_editing; do
   bench --site [your-site] run-tests --app phamos --module phamos.tests.$module
 done
 ```

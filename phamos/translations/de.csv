@@ -1300,3 +1300,10 @@ This partner contact chose not to be named. Their role is shown without personal
 this team member,dieses Teammitglied
 A team member who has worked at phamos as {0} for {1}.,"Ein Teammitglied, das bereits {1} als {0} bei phamos arbeitet."
 This team member chose not to be named. Their role and time at phamos are shown without personal details.,Dieses Teammitglied möchte nicht namentlich genannt werden. Rolle und Zeit bei phamos werden ohne persönliche Angaben gezeigt.
+Edit page,Seite bearbeiten
+"This page is raw HTML. Page Builder blocks (or Rich Text) are easier to edit and keep the site's design.","Diese Seite ist reines HTML. Page-Builder-Blöcke (oder Rich Text) lassen sich leichter bearbeiten und halten das Design der Website ein."
+Missing translation: {0}.,Fehlende Übersetzung: {0}.
+This page changed after its {0} version ({1}): check the translation.,Diese Seite wurde nach ihrer Fassung auf {0} ({1}) geändert: Übersetzung prüfen.
+The German page changed after this one: check the translation.,Die deutsche Seite wurde nach dieser geändert: Übersetzung prüfen.
+Create {0} version,Fassung auf {0} erstellen
+Create Translation,Übersetzung erstellen
