@@ -5,7 +5,7 @@ import json
 
 import frappe
 from frappe.model.document import Document
-from frappe.utils import cint, formatdate
+from frappe.utils import cint, formatdate, getdate
 
 from phamos.phamos.doctype.implementation.implementation import compute_next_review_due
 from phamos.phamos.doctype.implementation_chapter.implementation_chapter import (
@@ -100,6 +100,19 @@ class StakeholderMeeting(Document):
 				)
 			)
 		self.validate_proposed_content_for_scope_changes()
+		self.validate_not_dated_before_last_meeting()
+
+	def validate_not_dated_before_last_meeting(self):
+		"""Review dates on the Implementation and its Chapters come from the last
+		submitted meeting, and cancelling follows submit order, so meetings must be
+		submitted in date order."""
+		last_reviewed_on = frappe.db.get_value("Implementation", self.implementation, "last_reviewed_on")
+		if last_reviewed_on and getdate(self.meeting_date) < getdate(last_reviewed_on):
+			frappe.throw(
+				frappe._("Meeting Date cannot be before the last submitted meeting on {0}.").format(
+					formatdate(last_reviewed_on)
+				)
+			)
 
 	def validate_proposed_content_for_scope_changes(self):
 		"""A Chapter Review flagged with Scope Change must have its proposed
@@ -156,6 +169,32 @@ class StakeholderMeeting(Document):
 						row.chapter, frappe.utils.get_link_to_form("Stakeholder Meeting", chapter_last_meeting)
 					)
 				)
+			self.validate_unchanged_since_submit(
+				"Implementation Chapter", row.chapter, row.submit_snapshot, CHAPTER_SNAPSHOT_FIELDS
+			)
+
+		self.validate_unchanged_since_submit(
+			"Implementation", self.implementation, self.implementation_snapshot, IMPLEMENTATION_SNAPSHOT_FIELDS
+		)
+
+	def validate_unchanged_since_submit(self, doctype, name, snapshot, fieldnames):
+		"""Cancel writes back the values from before submit. Refuse when one of them
+		was edited after submit, instead of silently wiping that edit."""
+		after = json.loads(snapshot).get("after") if snapshot else None
+		if not after:
+			return
+
+		live = get_db_snapshot(doctype, name, fieldnames)
+		meta = frappe.get_meta(doctype)
+		changed = [
+			meta.get_label(fieldname) for fieldname in fieldnames if live.get(fieldname) != after.get(fieldname)
+		]
+		if changed:
+			frappe.throw(
+				frappe._(
+					"{0} was edited after this meeting was submitted ({1}). Please undo those edits before cancelling."
+				).format(frappe.utils.get_link_to_form(doctype, name), ", ".join(changed))
+			)
 
 	def on_cancel(self):
 		"""Undo this meeting's submit: put each Chapter and the Implementation back
@@ -173,7 +212,7 @@ class StakeholderMeeting(Document):
 				continue
 
 			chapter = frappe.get_doc("Implementation Chapter", row.chapter)
-			chapter.update(json.loads(row.submit_snapshot))
+			chapter.update(get_snapshot_before(row.submit_snapshot))
 			chapter.save(ignore_permissions=True)
 
 			if row.previous_revision:
@@ -189,7 +228,7 @@ class StakeholderMeeting(Document):
 			return
 
 		implementation = frappe.get_doc("Implementation", self.implementation)
-		implementation.update(json.loads(self.implementation_snapshot))
+		implementation.update(get_snapshot_before(self.implementation_snapshot))
 		implementation.save(ignore_permissions=True)
 
 	def sync_chapter_reviews_to_chapters(self):
@@ -199,18 +238,15 @@ class StakeholderMeeting(Document):
 				continue
 
 			chapter = frappe.get_doc("Implementation Chapter", row.chapter)
-			row.db_set(
-				"submit_snapshot",
-				frappe.as_json({fieldname: chapter.get(fieldname) for fieldname in CHAPTER_SNAPSHOT_FIELDS}),
-				update_modified=False,
-			)
+			snapshot_before = get_db_snapshot("Implementation Chapter", row.chapter, CHAPTER_SNAPSHOT_FIELDS)
 
 			# Only push a level the chair actually changed in this meeting, so a newer
 			# live edit on the Chapter isn't overwritten by the value seeded at creation.
+			# A cleared level saves as 0 and is ignored rather than wiping the Chapter's level.
 			levels_before = (cint(chapter.current_level), cint(chapter.target_level))
-			if cint(row.current_level) != cint(row.current_level_before):
+			if cint(row.current_level) and cint(row.current_level) != cint(row.current_level_before):
 				chapter.current_level = row.current_level
-			if cint(row.target_level) != cint(row.target_level_before):
+			if cint(row.target_level) and cint(row.target_level) != cint(row.target_level_before):
 				chapter.target_level = row.target_level
 			level_changed = (cint(chapter.current_level), cint(chapter.target_level)) != levels_before
 
@@ -239,12 +275,18 @@ class StakeholderMeeting(Document):
 
 			chapter.save(ignore_permissions=True)
 
-			if new_revision_name:
-				row.db_set(
-					{"previous_revision": row.current_revision, "current_revision": new_revision_name},
-					update_modified=False,
+			row_updates = {
+				"submit_snapshot": frappe.as_json(
+					{
+						"before": snapshot_before,
+						"after": get_db_snapshot("Implementation Chapter", row.chapter, CHAPTER_SNAPSHOT_FIELDS),
+					}
 				)
+			}
+			if new_revision_name:
+				row_updates.update(previous_revision=row.current_revision, current_revision=new_revision_name)
 				created_revisions.append((chapter.name, new_revision_name))
+			row.db_set(row_updates, update_modified=False)
 
 		self.notify_created_revisions(created_revisions)
 
@@ -259,13 +301,7 @@ class StakeholderMeeting(Document):
 			return
 
 		implementation = frappe.get_doc("Implementation", self.implementation)
-		self.db_set(
-			"implementation_snapshot",
-			frappe.as_json(
-				{fieldname: implementation.get(fieldname) for fieldname in IMPLEMENTATION_SNAPSHOT_FIELDS}
-			),
-			update_modified=False,
-		)
+		snapshot_before = get_db_snapshot("Implementation", self.implementation, IMPLEMENTATION_SNAPSHOT_FIELDS)
 		implementation.last_stakeholder_meeting = self.name
 		implementation.last_reviewed_on = self.meeting_date
 		if implementation.review_cadence:
@@ -273,6 +309,17 @@ class StakeholderMeeting(Document):
 				self.meeting_date, implementation.review_cadence
 			)
 		implementation.save(ignore_permissions=True)
+
+		self.db_set(
+			"implementation_snapshot",
+			frappe.as_json(
+				{
+					"before": snapshot_before,
+					"after": get_db_snapshot("Implementation", self.implementation, IMPLEMENTATION_SNAPSHOT_FIELDS),
+				}
+			),
+			update_modified=False,
+		)
 
 	def notify_created_revisions(self, created_revisions):
 		"""Tell the chair what this submit actually created, with links, instead
@@ -431,3 +478,14 @@ class StakeholderMeeting(Document):
 			else frappe._("Changed since the last submitted meeting:")
 		)
 		return 1, heading + " " + "; ".join(changes)
+
+
+def get_db_snapshot(doctype, name, fieldnames):
+	"""Stored field values, round-tripped through JSON so they compare equal to a saved snapshot."""
+	return json.loads(frappe.as_json(frappe.db.get_value(doctype, name, list(fieldnames), as_dict=True)))
+
+
+def get_snapshot_before(snapshot):
+	snapshot = json.loads(snapshot)
+	# Meetings submitted before the snapshot held both sides stored only the "before" values.
+	return snapshot.get("before", snapshot)

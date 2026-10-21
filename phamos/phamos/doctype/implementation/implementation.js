@@ -88,7 +88,7 @@ frappe.ui.form.on("Implementation", {
         frm.trigger("append_implementation_chapters_to_modules");
         frm.trigger("render_review_cadence_indicator");
 
-        if (!frm.is_new()) {
+        if (!frm.is_new() && frappe.model.can_create("Stakeholder Meeting")) {
             frm.add_custom_button(__("Create Meeting"), () => {
                 frappe.new_doc("Stakeholder Meeting", {
                     implementation: frm.doc.name,

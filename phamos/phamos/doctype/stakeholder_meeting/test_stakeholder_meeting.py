@@ -200,3 +200,40 @@ class TestStakeholderMeeting(FrappeTestCase):
 		self.assertEqual(revisions[2].progress, "On Track")
 		self.assertEqual(revisions[2].decision, "Yes")
 		self.assertTrue(revisions[2].is_current)
+
+	def test_submit_rejects_meeting_dated_before_last_meeting(self):
+		later = make_meeting(self.implementation.name, meeting_date="2026-03-01")
+		set_progress(later)
+		later.submit()
+
+		earlier = make_meeting(self.implementation.name, meeting_date="2026-02-01")
+		set_progress(earlier)
+		self.assertRaises(frappe.ValidationError, earlier.submit)
+
+	def test_cleared_level_keeps_chapter_level(self):
+		meeting = make_meeting(self.implementation.name)
+		set_progress(meeting, current_level=None)
+		meeting.submit()
+
+		self.chapter.reload()
+		self.assertEqual(self.chapter.current_level, 1)
+		self.assertEqual(self.chapter.current_revision, meeting.chapter_reviews[0].current_revision)
+
+	def test_cancel_blocked_when_chapter_edited_after_submit(self):
+		meeting = make_meeting(self.implementation.name)
+		set_progress(meeting, current_level=2)
+		meeting.submit()
+
+		self.chapter.reload()
+		self.chapter.status = "Blocked"
+		self.chapter.save()
+
+		meeting.reload()
+		self.assertRaises(frappe.ValidationError, meeting.cancel)
+
+		self.chapter.reload()
+		self.chapter.status = "Planned"
+		self.chapter.save()
+		meeting.reload()
+		meeting.cancel()
+		self.assertEqual(frappe.db.get_value("Implementation Chapter", self.chapter.name, "current_level"), 1)

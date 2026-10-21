@@ -35,3 +35,4 @@ phamos.patches.v1_0.recompute_gitlab_cycle_time_started_at #123
 
 phamos.patches.v1_0.backfill_checklist_owner
 phamos.patches.v1_0.rename_hr_and_pm_cockpit_settings_fields
+phamos.patches.v1_0.backfill_chapter_revision_status_and_levels
