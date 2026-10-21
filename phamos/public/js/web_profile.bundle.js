@@ -84,6 +84,69 @@ if (document.querySelector(".wp-profile-aside")) {
 	pinColumns([{ selector: ".wp-profile-aside", name: "aside", top: 24, bottom: 24, before: 12 }]);
 }
 
+// The visitor's language choice, read by Frappe for guests (frappe.translate) and by the banner below.
+function rememberLanguage(lang) {
+	document.cookie = `preferred_language=${lang}; path=/; max-age=${60 * 60 * 24 * 365}; samesite=lax`;
+}
+
+// Language banner (phamos/phamos#1498): a visitor whose browser prefers another language that this
+// page exists in is offered that version once, at the top of the page. "Continue" opens the same
+// page in that language, "Stay" (or Esc) keeps this one; either choice is remembered in the
+// preferred_language cookie and the banner does not come back. Never a redirect: crawlers and
+// shared links always get the URL they asked for. An overlay, so nothing below it moves.
+const BANNER_TEXTS = {
+	de: { label: "Sprache", message: "Diese Seite gibt es auch auf Deutsch.", go: "Weiter auf Deutsch", stay: "Auf Deutsch bleiben" },
+	en: { label: "Language", message: "This page is also available in English.", go: "Continue in English", stay: "Stay in English" },
+};
+
+function languageBanner(alternates, pageLang) {
+	pageLang = pageLang.split("-")[0];
+	if (/(^|;\s*)preferred_language=/.test(document.cookie)) return;  // already chosen, here or in the picker
+	if (/bot|crawl|spider|slurp|facebookexternalhit|lighthouse/i.test(navigator.userAgent)) return;
+	// The visitor's first browser language we have a version of; none, or this page's, means no banner.
+	let lang = null;
+	for (const code of (navigator.languages || [navigator.language]).map((l) => l.toLowerCase().split("-")[0])) {
+		if (code === pageLang) return;
+		if (alternates[code] && BANNER_TEXTS[code]) {
+			lang = code;
+			break;
+		}
+	}
+	if (!lang || !BANNER_TEXTS[pageLang]) return;
+
+	// The offer is in the visitor's language, "stay" in the page's, so both readers understand theirs.
+	const texts = BANNER_TEXTS[lang];
+	const banner = document.createElement("div");
+	banner.className = "wp-lang-banner";
+	banner.setAttribute("role", "region");
+	banner.setAttribute("aria-label", texts.label);
+	banner.lang = lang;
+	banner.innerHTML = `<p></p><div class="wp-lang-banner-actions">
+		<a class="wp-button wp-button-sm wp-button-primary" data-wp-lang-go></a>
+		<button type="button" class="wp-button wp-button-sm" data-wp-lang-stay></button></div>`;
+	banner.querySelector("p").textContent = texts.message;
+	const go = banner.querySelector("[data-wp-lang-go]");
+	go.textContent = texts.go;
+	go.href = alternates[lang];
+	go.hreflang = lang;
+	const stay = banner.querySelector("[data-wp-lang-stay]");
+	stay.textContent = BANNER_TEXTS[pageLang].stay;
+	stay.lang = pageLang;
+
+	const onKey = (event) => {
+		if (event.key === "Escape") close();
+	};
+	const close = () => {
+		rememberLanguage(pageLang);
+		banner.remove();
+		document.removeEventListener("keydown", onKey);
+	};
+	go.addEventListener("click", () => rememberLanguage(lang));
+	stay.addEventListener("click", close);
+	document.addEventListener("keydown", onKey);
+	document.body.prepend(banner);  // first in the tab order
+}
+
 (function () {
 	const alternates = {};
 	for (const link of document.querySelectorAll('link[rel="alternate"][hreflang]')) {
@@ -97,9 +160,11 @@ if (document.querySelector(".wp-profile-aside")) {
 		const select = event.target.closest("#language-switcher select");
 		if (!select || !alternates[select.value]) return;
 		event.stopPropagation();
-		document.cookie = `preferred_language=${select.value}; path=/`;
+		rememberLanguage(select.value);
 		window.location.href = alternates[select.value];
 	}, true);
+
+	languageBanner(alternates, pageLang);
 
 	// Frappe fills the options asynchronously; keep only this page's languages, current one selected.
 	const select = document.querySelector("#language-switcher select");

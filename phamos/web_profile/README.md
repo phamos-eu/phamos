@@ -39,7 +39,7 @@ named and anonymous changes only what the page shows, never its URL. Unpublished
 - `mirror.py`: read-only facts copied from the source records (on profile save and on source `on_update`).
 - `www/web_profile/{listing,profile}.{py,html}` + `templates/web_profile/macros.html`: one listing and one profile template for every section.
 - `public/css/web_profile.bundle.css`: design option C; brand colours are the `--wp-*` tokens at the top. Clickable = card, not clickable = chip.
-- `public/js/web_profile.bundle.js`: optional enhancement (no-reload filters, load on scroll, mobile drawer, contact dialog). Pages work without it.
+- `public/js/web_profile.bundle.js`: optional enhancement (no-reload filters, load on scroll, mobile drawer, contact dialog, language banner offering the browser's language once). Pages work without it.
 - `public/js/web_profile_form.bundle.js`: desk forms show missing translations and "View on Website".
 
 ## Events
