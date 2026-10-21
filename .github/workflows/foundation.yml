@@ -207,7 +207,7 @@ jobs:
         bench --site test.localhost run-tests --app phamos --module phamos.okr_addon.doctype.okr_team.test_okr_team
 
         echo "Running Marketing (events, attendees, tickets) tests..."
-        for module in test_marketing_attendee test_marketing_crm test_marketing_ticketing test_marketing_billing test_marketing_patches test_web_profile_events; do
+        for module in test_marketing_attendee test_marketing_crm test_marketing_ticketing test_marketing_billing test_marketing_patches test_web_profile_events test_web_page_editing; do
           bench --site test.localhost run-tests --app phamos --module phamos.tests.$module
         done
 

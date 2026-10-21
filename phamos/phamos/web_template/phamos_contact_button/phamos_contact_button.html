@@ -1,0 +1,13 @@
+{#- Text with the black contact button: opens the shared contact dialog (phamos.web_profile.contact,
+    dialog markup in the footer). Without a label the button says "Send message". -#}
+<div class="wp-contact-block{{ ' text-center' if align == 'Center' else '' }}">
+	{%- if title %}
+	<h2 class="section-title">{{ _(title) }}</h2>
+	{%- endif %}
+	{%- if content %}
+	<div class="from-markdown">{{ frappe.utils.md_to_html(_(content)) }}</div>
+	{%- endif %}
+	<button type="button" class="wp-button wp-button-primary" data-wp-contact-open data-section="contact" data-slug="general">
+		{{- _(button_label) if button_label else _("Send message") -}}
+	</button>
+</div>

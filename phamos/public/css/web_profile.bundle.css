@@ -650,3 +650,11 @@ body .footer-grouped-links .footer-child-item, body .footer-grouped-links .foote
 	.wp-lang-banner p, .wp-lang-banner-actions { width: 100%; }
 	.wp-lang-banner-actions .wp-button { flex: 1; height: 36px; }
 }
+
+/* Content Web Pages (phamos/phamos#1539): "phamos Contact Button" block and the "Edit page" link
+ * for Desk users (web_profile.bundle.js), top right under the navbar, above the language banner. */
+.wp-contact-block .from-markdown { margin-bottom: 16px; }
+.wp-edit-page { position: fixed; top: 72px; right: 16px; z-index: 1040; padding: 6px 12px; border: 1px solid var(--wp-line); border-radius: var(--wp-radius-sm);
+	background: var(--wp-surface); color: var(--wp-ink); box-shadow: var(--wp-shadow-sm); font-size: 13px; text-decoration: none; }
+.wp-edit-page:hover { background: var(--wp-surface-2); color: var(--wp-ink); text-decoration: none; }
+.wp-edit-page:focus-visible { outline: 2px solid var(--wp-focus); outline-offset: 2px; }
