@@ -1,0 +1,258 @@
+{
+ "actions": [],
+ "allow_rename": 1,
+ "autoname": "field:implementation",
+ "creation": "2026-10-07 18:00:00.000000",
+ "description": "Public /implementations case study of an Implementation (customer named only with approval).",
+ "doctype": "DocType",
+ "editable_grid": 1,
+ "engine": "InnoDB",
+ "field_order": [
+  "source_section",
+  "implementation",
+  "customer",
+  "implementation_status",
+  "source_col_1",
+  "team",
+  "department",
+  "start_date",
+  "source_col_2",
+  "industry",
+  "modules",
+  "people_section",
+  "people",
+  "approval_section",
+  "customer_approved",
+  "customer_approval_date",
+  "approval_col",
+  "region",
+  "implementation_website_section",
+  "published",
+  "route",
+  "sort_order",
+  "implementation_website_col",
+  "image",
+  "content_section",
+  "translations",
+  "mirrored_values"
+ ],
+ "fields": [
+  {
+   "description": "Only marketing-safe facts are mirrored. Hours, billing, forecasts and stakeholders are never read.",
+   "fieldname": "source_section",
+   "fieldtype": "Section Break",
+   "label": "Mirrored from Implementation"
+  },
+  {
+   "fieldname": "implementation",
+   "fieldtype": "Link",
+   "in_list_view": 1,
+   "label": "Implementation",
+   "options": "Implementation",
+   "reqd": 1,
+   "unique": 1
+  },
+  {
+   "fetch_from": "implementation.customer",
+   "fetch_if_empty": 1,
+   "fieldname": "customer",
+   "fieldtype": "Link",
+   "label": "Customer",
+   "options": "Customer"
+  },
+  {
+   "fetch_from": "implementation.status",
+   "fetch_if_empty": 1,
+   "fieldname": "implementation_status",
+   "fieldtype": "Data",
+   "in_standard_filter": 1,
+   "label": "Status"
+  },
+  {
+   "fieldname": "source_col_1",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fetch_from": "implementation.team",
+   "fetch_if_empty": 1,
+   "fieldname": "team",
+   "fieldtype": "Link",
+   "label": "Team",
+   "options": "Team"
+  },
+  {
+   "fetch_from": "implementation.department",
+   "fetch_if_empty": 1,
+   "fieldname": "department",
+   "fieldtype": "Link",
+   "label": "Department",
+   "options": "Department"
+  },
+  {
+   "fetch_from": "implementation.start_date",
+   "fetch_if_empty": 1,
+   "fieldname": "start_date",
+   "fieldtype": "Date",
+   "label": "Start Date"
+  },
+  {
+   "fieldname": "source_col_2",
+   "fieldtype": "Column Break"
+  },
+  {
+   "description": "Mirrored from the Customer's industry.",
+   "fieldname": "industry",
+   "fieldtype": "Link",
+   "label": "Industry",
+   "options": "Industry Type"
+  },
+  {
+   "description": "Mirrored from the Implementation's modules (where a Module Web Profile exists).",
+   "fieldname": "modules",
+   "fieldtype": "Table",
+   "label": "Modules",
+   "options": "Web Profile Module"
+  },
+  {
+   "description": "Both sides, eye to eye. Customer-side people are only shown when the customer approved naming.",
+   "fieldname": "people_section",
+   "fieldtype": "Section Break",
+   "label": "People on this Project"
+  },
+  {
+   "fieldname": "people",
+   "fieldtype": "Table",
+   "label": "People",
+   "options": "Implementation Web Profile Person"
+  },
+  {
+   "description": "Without approval the page is an anonymous case study: no customer name, neutral URL.",
+   "fieldname": "approval_section",
+   "fieldtype": "Section Break",
+   "label": "Customer Approval"
+  },
+  {
+   "default": "0",
+   "fieldname": "customer_approved",
+   "fieldtype": "Check",
+   "label": "Customer Approved Naming"
+  },
+  {
+   "depends_on": "customer_approved",
+   "fieldname": "customer_approval_date",
+   "fieldtype": "Date",
+   "label": "Approval Date",
+   "mandatory_depends_on": "customer_approved"
+  },
+  {
+   "fieldname": "approval_col",
+   "fieldtype": "Column Break"
+  },
+  {
+   "description": "Shown on anonymous cases, e.g. DACH.",
+   "fieldname": "region",
+   "fieldtype": "Data",
+   "label": "Region"
+  },
+  {
+   "fieldname": "implementation_website_section",
+   "fieldtype": "Section Break",
+   "label": "Website"
+  },
+  {
+   "default": "0",
+   "fieldname": "published",
+   "fieldtype": "Check",
+   "in_list_view": 1,
+   "in_standard_filter": 1,
+   "label": "Published"
+  },
+  {
+   "description": "URL slug, neutral and the same for named and anonymous case studies, e.g. 'fertigung-2023'. Generated once at creation from industry and start year; never contains the customer's name.",
+   "fieldname": "route",
+   "fieldtype": "Data",
+   "label": "Route",
+   "no_copy": 1,
+   "unique": 1
+  },
+  {
+   "default": "0",
+   "fieldname": "sort_order",
+   "fieldtype": "Int",
+   "label": "Sort Order"
+  },
+  {
+   "fieldname": "implementation_website_col",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "image",
+   "fieldtype": "Attach Image",
+   "label": "Image"
+  },
+  {
+   "description": "One row per website language (Deutsch, English, …). A language without a row shows the German text, otherwise any other row. Title: the public case title, e.g. 'ERP rollout for a growing manufacturer'. Summary: one answer-first sentence shown on tiles and at the top of the page. Content: the main text of the page.",
+   "fieldname": "content_section",
+   "fieldtype": "Section Break",
+   "label": "Website Texts"
+  },
+  {
+   "fieldname": "translations",
+   "fieldtype": "Table",
+   "label": "Texts per Language",
+   "options": "Web Profile Content"
+  },
+  {
+   "fieldname": "mirrored_values",
+   "fieldtype": "Code",
+   "hidden": 1,
+   "label": "Mirrored Values",
+   "no_copy": 1,
+   "options": "JSON",
+   "print_hide": 1,
+   "read_only": 1
+  }
+ ],
+ "index_web_pages_for_search": 0,
+ "istable": 0,
+ "links": [],
+ "modified": "2026-10-21 12:00:00.000000",
+ "modified_by": "Administrator",
+ "module": "Phamos",
+ "name": "Implementation Web Profile",
+ "naming_rule": "By fieldname",
+ "owner": "Administrator",
+ "permissions": [
+  {
+   "create": 1,
+   "delete": 1,
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "System Manager",
+   "share": 1,
+   "write": 1
+  },
+  {
+   "create": 1,
+   "delete": 1,
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "Website Manager",
+   "share": 1,
+   "write": 1
+  }
+ ],
+ "search_fields": "implementation,customer",
+ "show_title_field_in_link": 1,
+ "sort_field": "modified",
+ "sort_order": "DESC",
+ "states": [],
+ "title_field": "implementation",
+ "track_changes": 1
+}

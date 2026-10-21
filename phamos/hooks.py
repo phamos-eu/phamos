@@ -46,6 +46,13 @@ add_to_apps_screen = [
 		"has_permission": "phamos.api.accounting_spa.check_app_permission",
 	},
 	{
+		"name": "software_development_spa",
+		"logo": "/assets/phamos/manifest/software-development-icon-192.png",
+		"title": "Software Development",
+		"route": "/software-development-cockpit",
+		"has_permission": "phamos.api.software_development_spa.check_app_permission",
+	},
+	{
 		"name": "scan",
 		"logo": "/assets/phamos/manifest/scan-icon-192.png",
 		"title": "Lead Scan",
@@ -60,7 +67,8 @@ add_to_apps_screen = [
 # include js, css files in header of desk.html
 app_include_css = [
     "/assets/phamos/css/sales_order_kpi.css",
-    "/assets/phamos/css/dark_mode_fix.css"
+    "/assets/phamos/css/dark_mode_fix.css",
+    "checklist_dialog.bundle.css",  # hashed, so a new version is not served from browser cache
 ]
 # app_include_js = "/assets/phamos/js/phamos.js"
 
@@ -71,13 +79,18 @@ app_include_js = [
     "/assets/phamos/js/hybrid_meeting_composer.js",
     "/assets/phamos/js/team_daily_schedule.js",
     "/assets/phamos/js/frappe_list_bulk_edit_override.js",  # Fixes null-label crash in bulk edit
-    "/assets/phamos/js/checklist_dialog.js",
+    "checklist_dialog.bundle.js",  # Linked Checklists dialog (hashed bundle, see above)
+    "web_profile_form.bundle.js",  # Web Profile forms: missing-translation hint, preview link
 ]
 
 
 # include js, css files in header of web template
 # web_include_css = "/assets/phamos/css/phamos.css"
 # web_include_js = "/assets/phamos/js/phamos.js"
+# Web Profile pages (/de|en/people, ...); scoped to .wp-page / [data-wp-listing]. Bundled by
+# `bench build` so the URLs carry a content hash and browsers never keep a stale copy.
+web_include_css = ["web_profile.bundle.css"]
+web_include_js = ["web_profile.bundle.js"]
 
 # include custom scss in every website theme (without file extension ".scss")
 # website_theme_scss = "phamos/public/scss/website"
@@ -129,9 +142,34 @@ website_route_rules = [
     {"from_route": "/project-management-cockpit/<path:app_path>", "to_route": "project_management_spa"},
     {"from_route": "/accounting-cockpit", "to_route": "accounting_spa"},
     {"from_route": "/accounting-cockpit/<path:app_path>", "to_route": "accounting_spa"},
+    {"from_route": "/software-development-cockpit", "to_route": "software_development_spa"},
+    {"from_route": "/software-development-cockpit/<path:app_path>", "to_route": "software_development_spa"},
     {"from_route": "/scan", "to_route": "scan"},
     {"from_route": "/scan/<path:app_path>", "to_route": "scan"},
 ]
+
+# Web Profile sections (phamos/phamos#1492): one listing + one profile page per section and
+# language, served by www/web_profile/{listing,profile}. Keep in sync with web_profile/sections.py.
+_WEB_PROFILE_SLUGS = {
+    "people": {"en": "people", "de": "personen"},
+    "departments": {"en": "departments", "de": "abteilungen"},
+    "teams": {"en": "teams", "de": "teams"},
+    "modules": {"en": "modules", "de": "module"},
+    "implementations": {"en": "implementations", "de": "implementierungen"},
+    "industries": {"en": "industries", "de": "branchen"},
+    "customers": {"en": "customers", "de": "kunden"},
+    "partners": {"en": "partners", "de": "partner"},
+}
+for _section, _slugs in _WEB_PROFILE_SLUGS.items():
+    for _lang, _slug in _slugs.items():
+        website_route_rules += [
+            {"from_route": f"/{_lang}/{_slug}", "to_route": "web_profile/listing",
+             "defaults": {"section": _section, "lang": _lang}},
+            {"from_route": f"/{_lang}/{_slug}/<slug>", "to_route": "web_profile/profile",
+             "defaults": {"section": _section, "lang": _lang}},
+        ]
+# Old URLs of the sections are redirected with Website Route Redirect records (Website Settings)
+# when a section goes live, not in code (phamos/phamos#1492).
 
 # The HR cockpit used to live at /hr-cockpit; keep old links (Raven messages, bookmarks) working.
 # /hr_spa was its www page path; servers keep a stale built hr_spa.html there, which would
@@ -156,7 +194,10 @@ get_website_user_home_page = "phamos.website.get_website_user_home_page"
 
 on_login = ["phamos.website.on_login"]
 
-update_website_context = ["phamos.website.update_website_context"]
+update_website_context = [
+    "phamos.website.update_website_context",
+    "phamos.web_profile.chrome.update_website_context",  # language-aware navbar/footer, DIN 5008 footer
+]
 
 # Generators
 # ----------
@@ -180,6 +221,7 @@ after_install = "phamos.setup.ops_inbox.ensure_ops_inbox_setup"
 
 after_migrate = [
 	"phamos.setup.ops_inbox.ensure_ops_inbox_setup",
+	"phamos.web_profile.setup.after_migrate",  # Web Page "Language" / "Translation Of" fields
 ]
 
 # Uninstallation
@@ -227,6 +269,11 @@ after_migrate = [
 # }
 
 doc_events = {
+	# Closing or rescheduling a checklist item's ToDo updates the item (#1625).
+	"ToDo": {
+		"on_update": "phamos.phamos.doctype.checklist.checklist_assignment.sync_item_from_todo",
+		"on_trash": "phamos.phamos.doctype.checklist.checklist_assignment.clear_item_todo_link",
+	},
 	"Event": {
 		"after_insert": "phamos.mailcow_integration.caldav.sync_event.on_upsert",
         "on_update": "phamos.mailcow_integration.caldav.sync_event.on_upsert",
@@ -236,7 +283,10 @@ doc_events = {
         "validate": "phamos.events.team_daily_schedule.validate_schedule_rows",
         "after_save": "phamos.phamos.doctype.team.team.create_team_capacity_ledger_entry",
         "after_insert": "phamos.events.team_daily_schedule.sync_events_from_parent",
-        "on_update": "phamos.events.team_daily_schedule.sync_events_from_parent",
+        "on_update": [
+            "phamos.events.team_daily_schedule.sync_events_from_parent",
+            "phamos.web_profile.mirror.push_to_profiles",
+        ],
         "on_trash": "phamos.events.team_daily_schedule.cleanup_events_on_parent_trash"
     },
     "Communication": {
@@ -270,12 +320,27 @@ doc_events = {
         "on_cancel": "phamos.phamos.doctype.monthly_implementation_summary.monthly_implementation_summary.sync_mis_status_for_source_doc",
     },
     "Customer": {
-        "on_update": "phamos.gitlab_integration.gitlab_group_utils.update_gitlab_avatar_on_customer"
+        "on_update": [
+            "phamos.gitlab_integration.gitlab_group_utils.update_gitlab_avatar_on_customer",
+            "phamos.web_profile.mirror.push_to_profiles",
+        ]
     },
+    "Implementation": {"on_update": "phamos.web_profile.mirror.push_to_profiles"},
+    # Mirror facts onto the Web Profiles (phamos/phamos#1492).
+    "Employee": {"on_update": "phamos.web_profile.mirror.push_to_profiles"},
+    "Contact": {"on_update": "phamos.web_profile.mirror.push_to_profiles"},
+    "Supplier": {"on_update": "phamos.web_profile.mirror.push_to_profiles"},
+    "Sales Partner": {"on_update": "phamos.web_profile.mirror.push_to_profiles"},
+    "Workspace": {"on_update": "phamos.web_profile.mirror.push_to_profiles"},
+    "Department": {"on_update": "phamos.web_profile.mirror.push_to_profiles"},
+    "Implementation Module": {"on_update": "phamos.web_profile.mirror.push_to_profiles"},
     "Interview Feedback": {
         "on_update": "phamos.phamos.hr.interview_summary.trigger_interview_summary",
         "on_submit": "phamos.phamos.hr.interview_summary.trigger_interview_summary",
         "on_cancel": "phamos.phamos.hr.interview_summary.trigger_interview_summary",
+    },
+    "GitLab Issue": {
+        "on_trash": "phamos.gitlab_integration.label_ledger.delete_issue_label_ledger",
     },
     "Timesheet Record": {
         "on_submit": [
