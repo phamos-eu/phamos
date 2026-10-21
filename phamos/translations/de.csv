@@ -286,7 +286,6 @@ Privacy policy,Datenschutzerklärung
 VAT ID,USt-IdNr.
 Timesheet,Zeiterfassung
 Team member,Teammitglied
-Customer contact,Ansprechperson beim Kunden
 Partner contact,Ansprechperson beim Partner
 Missing translation: {0}. The German text (or another language) is shown instead.,Fehlende Übersetzung: {0}. Stattdessen wird der deutsche Text (oder eine andere Sprache) angezeigt.
 Row {0}: there is already a text row for language {1}.,Zeile {0}: Für die Sprache {1} gibt es bereits eine Textzeile.
@@ -1291,3 +1290,13 @@ Checklist items can only be assigned to enabled users with the Employee role: {0
 Leave days per year,Urlaubstage pro Jahr
 Leave days for this contract,Urlaubstage für diesen Vertrag
 {0} at {1} days per week,{0} bei {1} Tagen pro Woche
+Former customer,Ehemaliger Kunde
+this former customer,dieser ehemalige Kunde
+"A former customer of phamos, working as {0}.","Ein ehemaliger Kunde von phamos, tätig als {0}."
+This former customer chose not to be named. Their role is shown without personal details.,Dieser ehemalige Kunde möchte nicht namentlich genannt werden. Die Rolle wird ohne persönliche Angaben gezeigt.
+this partner contact,diese Ansprechperson beim Partner
+"A partner contact who works with phamos, working as {0}.","Eine Ansprechperson beim Partner, die mit phamos zusammenarbeitet, tätig als {0}."
+This partner contact chose not to be named. Their role is shown without personal details.,Diese Ansprechperson beim Partner möchte nicht namentlich genannt werden. Die Rolle wird ohne persönliche Angaben gezeigt.
+this team member,dieses Teammitglied
+A team member who has worked at phamos as {0} for {1}.,"Ein Teammitglied, das bereits {1} als {0} bei phamos arbeitet."
+This team member chose not to be named. Their role and time at phamos are shown without personal details.,Dieses Teammitglied möchte nicht namentlich genannt werden. Rolle und Zeit bei phamos werden ohne persönliche Angaben gezeigt.

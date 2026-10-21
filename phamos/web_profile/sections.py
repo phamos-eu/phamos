@@ -432,7 +432,7 @@ def load_people(lang):
 			organization_url = item_url(page.section, page.slug, lang) if page.published else None
 		if masked:
 			title = (_("Former colleague") if alumni else _("Team member")) if employee else \
-				(_("Customer contact") if r.party_type == "Customer" else _("Partner contact"))
+				(_("Former customer") if r.party_type == "Customer" else _("Partner contact"))
 			item = _item("people", r, lang, title, r.route, subtitle=designation, masked=True)
 		else:
 			# Roles are typed freely on the profile and replace the designation (phamos/phamos#1531).
@@ -875,6 +875,26 @@ def _labels(item, key):
 	return [item.labels.get(key, {}).get(v, v) for v in item.facets.get(key, [])]
 
 
+def _anonymous_person(item):
+	"""How an anonymous person is described: only alumni are former colleagues; current team members,
+	customer and partner contacts get their own wording, so nothing false is said about them."""
+	if item.data["party_type"] != "Employee":
+		if item.data["party_type"] == "Customer":
+			return frappe._dict(first=_("this former customer"),
+				overview=_("A former customer of phamos, working as {0}."),
+				note=_("This former customer chose not to be named. Their role is shown without personal details."))
+		return frappe._dict(first=_("this partner contact"),
+			overview=_("A partner contact who works with phamos, working as {0}."),
+			note=_("This partner contact chose not to be named. Their role is shown without personal details."))
+	if item.data.get("alumni"):
+		return frappe._dict(first=_("this former colleague"),
+			overview=_("A former colleague who worked at phamos as {0} for {1}."),
+			note=_("This former colleague chose not to be named. Their role and time at phamos are shown without personal details."))
+	return frappe._dict(first=_("this team member"),
+		overview=_("A team member who has worked at phamos as {0} for {1}."),
+		note=_("This team member chose not to be named. Their role and time at phamos are shown without personal details."))
+
+
 def build_profile(item, lang):
 	"""Stats, overview text, related sections (each with an introduction), CTA and schema.org type.
 
@@ -883,7 +903,8 @@ def build_profile(item, lang):
 	records never get identifying details in it.
 	"""
 	section, facts, sections, cta = item.section, [], [], None
-	first = _("this former colleague") if item.masked and section == "people" else (item.data.get("first_name") or item.title)
+	anonymous = _anonymous_person(item) if item.masked and section == "people" else None
+	first = anonymous.first if anonymous else (item.data.get("first_name") or item.title)
 
 	def add_related(title, intro, section_key, **kwargs):
 		matches, see_all = related(section_key, lang, **kwargs)
@@ -917,7 +938,7 @@ def build_profile(item, lang):
 
 		designation, modules = _join(_labels(item, "designation")), _join(_labels(item, "module"))
 		if item.masked:
-			overview = [_("A former colleague who worked at phamos as {0} for {1}.").format(designation, _years_label(item.data["years"] or 0))]
+			overview = [anonymous.overview.format(designation, _years_label(item.data["years"] or 0))]
 		elif employee:
 			overview = [_("{0} works at phamos as {1}.").format(item.title, designation) if not item.data.get("alumni")
 				else _("{0} worked at phamos as {1} for {2}.").format(item.title, designation, _years_label(item.data["years"] or 0))]
@@ -1064,7 +1085,8 @@ def build_profile(item, lang):
 	profile = {"facts": facts, "overview": " ".join(o for o in overview if o), "related": sections, "cta": cta,
 		"schema": schema, "key_people": key_people(item, lang),
 		# Events only (phamos.web_profile.events.build); empty for every other section.
-		"hero": None, "actions": [], "blocks": [], "ticket": None, "notice": None, "interest": None}
+		"hero": None, "actions": [], "blocks": [], "ticket": None, "notice": None, "interest": None,
+		"anonymous_note": anonymous.note if anonymous else None}
 	if section == "events":
 		profile.update(extra)
 	return _dedupe(item, profile)
