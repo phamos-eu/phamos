@@ -31,7 +31,8 @@
   "stakeholder_website_col",
   "image",
   "content_section",
-  "translations"
+  "translations",
+  "mirrored_values"
  ],
  "fields": [
   {
@@ -77,8 +78,7 @@
    "fieldname": "party_name",
    "fieldtype": "Data",
    "in_list_view": 1,
-   "label": "Name",
-   "read_only": 1
+   "label": "Name"
   },
   {
    "description": "Mirrored from the Customer; set by hand for other parties.",
@@ -92,8 +92,7 @@
    "description": "Mirrored from the party.",
    "fieldname": "website",
    "fieldtype": "Data",
-   "label": "Website",
-   "read_only": 1
+   "label": "Website"
   },
   {
    "description": "e.g. DACH",
@@ -197,12 +196,22 @@
    "fieldtype": "Table",
    "label": "Texts per Language",
    "options": "Web Profile Content"
+  },
+  {
+   "fieldname": "mirrored_values",
+   "fieldtype": "Code",
+   "hidden": 1,
+   "label": "Mirrored Values",
+   "no_copy": 1,
+   "options": "JSON",
+   "print_hide": 1,
+   "read_only": 1
   }
  ],
  "index_web_pages_for_search": 0,
  "istable": 0,
  "links": [],
- "modified": "2026-10-09 16:00:00.000000",
+ "modified": "2026-10-21 12:00:00.000000",
  "modified_by": "Administrator",
  "module": "Phamos",
  "name": "Stakeholder Web Profile",

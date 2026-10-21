@@ -371,7 +371,7 @@ def load_people(lang):
 	records = attach_texts("Person Web Profile", frappe.get_all(
 		"Person Web Profile",
 		filters={"published": 1},
-		fields=["name", "party_type", "party", "full_name", "status", "designation", "company_name", "department",
+		fields=["name", "party_type", "party", "full_name", "status", "designation", "roles", "company_name", "department",
 			"date_of_joining", "relieving_date", "publication_consent", "alumni_consent", "contact_consent",
 			"email_id", "route", "image", "sort_order", "publish_as", "frappe_experience_since"],
 	))
@@ -415,7 +415,10 @@ def load_people(lang):
 				(_("Customer contact") if r.party_type == "Customer" else _("Partner contact"))
 			item = _item("people", r, lang, title, r.route, subtitle=designation, masked=True)
 		else:
-			subtitle = designation if employee else " · ".join(filter(None, [designation, organization]))
+			# Roles are typed freely on the profile and replace the designation (phamos/phamos#1531).
+			# Anonymous profiles keep the plain designation: a role like "Head of …" names the person.
+			role = r.roles.strip() if r.roles else designation
+			subtitle = role if employee else " · ".join(filter(None, [role, organization]))
 			item = _item("people", r, lang, r.full_name, r.route, subtitle=subtitle, image=r.image)
 
 		status = "alumni" if alumni else "current" if employee else "partners"
@@ -453,7 +456,7 @@ def load_people(lang):
 		item["socials"] = [] if masked else links.get(r.name, [])  # anonymous alumni never show socials
 		item["sort"]["tenure"] = -(years or 0)
 		item["search"] = " ".join(filter(None, [None if masked else r.full_name, designation,
-			organization])).lower()
+			None if masked else r.roles, organization])).lower()
 		if alumni:
 			item["badge"] = _("Alumni")
 		if not masked:
