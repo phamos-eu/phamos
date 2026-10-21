@@ -178,6 +178,25 @@ class TestWebProfile(FrappeTestCase):
 		self.assertTrue(all(not card["contact"] for card in profile["key_people"]))
 		self.assertIsNone(profile["schema"])
 
+	def test_anonymous_people_are_described_by_who_they_are(self):
+		# Only alumni are former colleagues: a current team member and a customer contact are not.
+		self._make_anonymous()
+		item = _person_item(self.person.name)
+		self.assertEqual(item.title, "Team member")
+		profile = build_profile(item, "en")
+		self.assertTrue(profile["overview"].startswith("A team member"))
+		self.assertTrue(profile["anonymous_note"].startswith("This team member"))
+
+		doc = frappe.get_doc("Person Web Profile", self.external.name)
+		doc.publish_as = "Anonymous"
+		doc.save(ignore_permissions=True)
+		item = _person_item(doc.name)
+		self.assertEqual(item.title, "Former customer")
+		profile = build_profile(item, "en")
+		self.assertTrue(profile["overview"].startswith("A former customer"))
+		self.assertTrue(profile["anonymous_note"].startswith("This former customer"))
+		self.assertNotIn("colleague", profile["overview"] + profile["anonymous_note"])
+
 	def test_url_stays_the_same_when_a_person_becomes_anonymous(self):
 		route = self.person.route
 		doc = self._make_anonymous()

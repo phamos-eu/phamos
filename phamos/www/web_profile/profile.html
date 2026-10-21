@@ -73,7 +73,7 @@
 
 
 	{%- if item.masked %}
-	<p class="wp-note">{{ _("This former colleague chose not to be named. Their role and time at phamos are shown without personal details.") if section == "people" else _("The customer is not named. This case study describes the project without identifying details.") }}</p>
+	<p class="wp-note">{{ profile.anonymous_note | e if section == "people" else _("The customer is not named. This case study describes the project without identifying details.") }}</p>
 	{%- endif %}
 
 	{#- Text first (SEO / AI answer engines): editor summary, an overview written from the record's
