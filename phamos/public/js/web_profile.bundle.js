@@ -86,14 +86,16 @@ if (document.querySelector(".wp-profile-aside")) {
 
 // The visitor's language choice, read by Frappe for guests (frappe.translate) and by the banner below.
 function rememberLanguage(lang) {
-	document.cookie = `preferred_language=${lang}; path=/; max-age=${60 * 60 * 24 * 365}; samesite=lax`;
+	const secure = location.protocol === "https:" ? "; secure" : "";
+	document.cookie = `preferred_language=${lang}; path=/; max-age=${60 * 60 * 24 * 365}; samesite=lax${secure}`;
 }
 
 // Language banner (phamos/phamos#1498): a visitor whose browser prefers another language that this
-// page exists in is offered that version once, at the top of the page. "Continue" opens the same
-// page in that language, "Stay" (or Esc) keeps this one; either choice is remembered in the
-// preferred_language cookie and the banner does not come back. Never a redirect: crawlers and
-// shared links always get the URL they asked for. An overlay, so nothing below it moves.
+// page exists in is offered that version once. "Continue" opens the same page in that language,
+// "Stay" (or Esc) keeps this one; either choice is remembered in the preferred_language cookie and
+// the banner does not come back. Never a redirect: crawlers and shared links always get the URL
+// they asked for. It overlays the bottom of the window: at the top it would cover the navbar, and
+// pushing the page down would move content the visitor may already see (the script runs late).
 const BANNER_TEXTS = {
 	de: { label: "Sprache", message: "Diese Seite gibt es auch auf Deutsch.", go: "Weiter auf Deutsch", stay: "Auf Deutsch bleiben" },
 	en: { label: "Language", message: "This page is also available in English.", go: "Continue in English", stay: "Stay in English" },
@@ -103,6 +105,9 @@ function languageBanner(alternates, pageLang) {
 	pageLang = pageLang.split("-")[0];
 	if (/(^|;\s*)preferred_language=/.test(document.cookie)) return;  // already chosen, here or in the picker
 	if (/bot|crawl|spider|slurp|facebookexternalhit|lighthouse/i.test(navigator.userAgent)) return;
+	// Logged-in users get their language from their User record, not from the cookie.
+	const user = (document.cookie.match(/(?:^|;\s*)user_id=([^;]*)/) || [])[1];
+	if (user && decodeURIComponent(user) !== "Guest") return;
 	// The visitor's first browser language we have a version of; none, or this page's, means no banner.
 	let lang = null;
 	for (const code of (navigator.languages || [navigator.language]).map((l) => l.toLowerCase().split("-")[0])) {
@@ -133,8 +138,11 @@ function languageBanner(alternates, pageLang) {
 	stay.textContent = BANNER_TEXTS[pageLang].stay;
 	stay.lang = pageLang;
 
+	// Esc is also how the contact dialog and the filter drawer close; then it is not an answer here.
 	const onKey = (event) => {
-		if (event.key === "Escape") close();
+		if (event.key !== "Escape" || event.defaultPrevented) return;
+		if (document.querySelector("dialog[open]") || document.documentElement.classList.contains("wp-filters-open")) return;
+		close();
 	};
 	const close = () => {
 		rememberLanguage(pageLang);
@@ -144,7 +152,7 @@ function languageBanner(alternates, pageLang) {
 	go.addEventListener("click", () => rememberLanguage(lang));
 	stay.addEventListener("click", close);
 	document.addEventListener("keydown", onKey);
-	document.body.prepend(banner);  // first in the tab order
+	document.body.prepend(banner);  // first in the tab order, although it is shown at the bottom
 }
 
 (function () {

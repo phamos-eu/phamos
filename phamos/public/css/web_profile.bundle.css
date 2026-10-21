@@ -636,16 +636,16 @@ body .footer-grouped-links .footer-child-item, body .footer-grouped-links .foote
 .wp-reminder .wp-contact-status.wp-error { color: #b42318; }
 
 
-/* Language banner (phamos/phamos#1498, web_profile.bundle.js): fixed over the top of the page, so
- * showing or closing it never moves the content. */
-.wp-lang-banner { position: fixed; inset: 0 0 auto; z-index: 1050; display: flex; flex-wrap: wrap; align-items: center; justify-content: center; gap: 8px 16px;
-	padding: calc(10px + env(safe-area-inset-top, 0px)) 16px 10px; border-bottom: 1px solid var(--wp-line); background: var(--wp-surface-2); color: var(--wp-ink);
-	box-shadow: var(--wp-shadow-md); font-family: Inter, InterVariable, -apple-system, "Segoe UI", Roboto, sans-serif; font-size: 14px; line-height: 1.4;
+/* Language banner (phamos/phamos#1498, web_profile.bundle.js): fixed over the bottom of the window,
+ * so it neither covers the navbar nor moves the content when it appears or closes. */
+.wp-lang-banner { position: fixed; inset: auto 0 0; z-index: 1050; display: flex; flex-wrap: wrap; align-items: center; justify-content: center; gap: 8px 16px;
+	padding: 10px 16px calc(10px + env(safe-area-inset-bottom, 0px)); border-top: 1px solid var(--wp-line); background: var(--wp-surface-2); color: var(--wp-ink);
+	box-shadow: 0 -4px 14px rgb(0 0 0 / 7%); font-family: Inter, InterVariable, -apple-system, "Segoe UI", Roboto, sans-serif; font-size: 14px; line-height: 1.4;
 	animation: wp-lang-banner-in 0.2s ease-out; }
 .wp-lang-banner p { margin: 0; }
 .wp-lang-banner-actions { display: flex; flex-wrap: wrap; gap: 8px; }
 .wp-lang-banner .wp-button:focus-visible { outline: 2px solid var(--wp-focus); outline-offset: 2px; }
-@keyframes wp-lang-banner-in { from { transform: translateY(-100%); } }
+@keyframes wp-lang-banner-in { from { transform: translateY(100%); } }
 @media (prefers-reduced-motion: reduce) { .wp-lang-banner { animation: none; } }
 /* Phones: text above, the two buttons side by side at full width. */
 @media (max-width: 575px) {
