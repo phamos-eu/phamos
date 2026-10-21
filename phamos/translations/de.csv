@@ -1291,3 +1291,10 @@ Checklist items can only be assigned to enabled users with the Employee role: {0
 Leave days per year,Urlaubstage pro Jahr
 Leave days for this contract,Urlaubstage für diesen Vertrag
 {0} at {1} days per week,{0} bei {1} Tagen pro Woche
+Edit page,Seite bearbeiten
+"This page is raw HTML. Page Builder blocks (or Rich Text) are easier to edit and keep the site's design.","Diese Seite ist reines HTML. Page-Builder-Blöcke (oder Rich Text) lassen sich leichter bearbeiten und halten das Design der Website ein."
+Missing translation: {0}.,Fehlende Übersetzung: {0}.
+This page changed after its {0} version ({1}): check the translation.,Diese Seite wurde nach ihrer Fassung auf {0} ({1}) geändert: Übersetzung prüfen.
+The German page changed after this one: check the translation.,Die deutsche Seite wurde nach dieser geändert: Übersetzung prüfen.
+Create {0} version,Fassung auf {0} erstellen
+Create Translation,Übersetzung erstellen

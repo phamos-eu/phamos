@@ -36,11 +36,36 @@ named and anonymous changes only what the page shows, never its URL. Unpublished
 - `contact.py`: the one contact workflow behind every contact button (shared dialog). phamos people and page-level requests become Lead/Customer + Opportunity (assigned to the phamos person if they have a user); consenting external people get the request forwarded by email, recorded on their profile.
 - `chrome.py` (#1502): runs on every website page (`update_website_context`). Sets the page language (Web Profile route or the Web Page "Language" field), swaps navbar/footer links kept in Website Settings with German URLs to the page language, fills the footer groups "Module"/"Branchen" with the published profiles, and builds the DIN 5008 company footer (`templates/includes/footer/footer_info.html`; IBAN masked, no tax number).
 - `setup.py`: Web Page custom fields "Language" and "Translation Of" (`after_migrate`). Translate a Web Page by creating the English page with route `en/…` and pointing "Translation Of" to the German one.
+- `page_builder.py` (#1539): one-time conversion of the content Web Pages from HTML to Page Builder blocks / Rich Text (see below).
 - `mirror.py`: read-only facts copied from the source records (on profile save and on source `on_update`).
 - `www/web_profile/{listing,profile}.{py,html}` + `templates/web_profile/macros.html`: one listing and one profile template for every section.
 - `public/css/web_profile.bundle.css`: design option C; brand colours are the `--wp-*` tokens at the top. Clickable = card, not clickable = chip.
 - `public/js/web_profile.bundle.js`: optional enhancement (no-reload filters, load on scroll, mobile drawer, contact dialog, language banner offering the browser's language once). Pages work without it.
-- `public/js/web_profile_form.bundle.js`: desk forms show missing translations and "View on Website".
+- `public/js/web_profile_form.bundle.js`: desk forms show missing translations and "View on Website"; on Web Pages also translations older than the German page and "Create Translation".
+
+## Content Web Pages (editable in the Desk)
+
+The content pages (Leistungen, Preise, Kontakt, Über uns, Impressum, …) are ordinary Web Pages, one per
+language (`de/…`, `en/…`, *Translation Of*). Their content lives **only in the database**: no fixtures,
+no patches, no `web_page` folder in a module (Frappe syncs those on every migrate and would overwrite
+Desk edits). Code may only change `published` and add redirects (`golive.py`). `tests/test_web_page_editing.py`
+guards this.
+
+- Layout pages use *Page Builder* with Frappe's standard Web Templates (Hero, Section with Cards, …) and
+  "phamos Contact Button" (`phamos/web_template/`, opens the shared contact dialog). Editors fill in
+  fields; the design stays in code.
+- Legal pages (Impressum, Datenschutz, AGB) are *Rich Text*, edited by their owner.
+- Web Page tracks changes: every save is a Version that can be compared and undone.
+- Desk users see "Edit page" on the website (added in the browser: Frappe caches the page for everyone).
+
+The pages from the old site were stored as rendered HTML. `page_builder.py` turns them back into blocks
+once (only pages that are still HTML, so it never overwrites an edit; the old HTML stays in the page):
+
+```bash
+bench --site <site> execute phamos.web_profile.page_builder.convert                        # dry run: report only
+bench --site <site> execute phamos.web_profile.page_builder.convert --kwargs '{"dry_run": 0}'
+bench --site <site> execute phamos.web_profile.page_builder.rollback --kwargs '{"dry_run": 0}'
+```
 
 ## Events
 
@@ -69,6 +94,7 @@ Tests (privacy, URL and contact rules; needs `allow_tests` in the site config):
 ```bash
 bench --site dev.localhost run-tests --module phamos.tests.test_web_profile
 bench --site dev.localhost run-tests --module phamos.tests.test_web_profile_chrome
+bench --site dev.localhost run-tests --module phamos.tests.test_web_page_editing
 ```
 
 ## Go-live of a section (by data)

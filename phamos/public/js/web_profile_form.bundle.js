@@ -1,5 +1,6 @@
 // Desk helpers for every "<Source> Web Profile" form (phamos/phamos#1492):
 // a visible hint when a website language has no text row, and a link to the public page.
+// Also the content Web Pages (#1539): translation hints and "Create Translation".
 (function () {
 	const SECTIONS = {
 		"Person Web Profile": { en: "people", de: "personen" },
@@ -63,6 +64,65 @@
 		},
 		naming_approved(frm) {
 			if (frm.doc.naming_approved && !frm.doc.naming_approval_date) frm.set_value("naming_approval_date", frappe.datetime.get_today());
+		},
+	});
+
+	// Content Web Pages (phamos/phamos#1539): one page per language, the English one points to the
+	// German one with "Translation Of" (#1502). The form says which translation is missing or older
+	// than its German page, and creates the English page as a copy of the German one.
+	async function webPageHints(frm) {
+		const hints = [];
+		if (frm.doc.content_type === "HTML") {
+			hints.push(__("This page is raw HTML. Page Builder blocks (or Rich Text) are easier to edit and keep the site's design."));
+		}
+		if (frm.doc.language === "de") {
+			const translations = await frappe.db.get_list("Web Page", {
+				filters: { translation_of: frm.doc.name },
+				fields: ["name", "language", "modified"],
+			});
+			for (const [code, label] of Object.entries(LANGUAGES)) {
+				if (code === "de") continue;
+				const page = translations.find((row) => row.language === code);
+				if (!page) hints.push(__("Missing translation: {0}.", [__(label)]));
+				else if (page.modified < frm.doc.modified) hints.push(__("This page changed after its {0} version ({1}): check the translation.", [__(label), page.name]));
+			}
+		} else if (frm.doc.language && frm.doc.translation_of) {
+			const master = await frappe.db.get_value("Web Page", frm.doc.translation_of, "modified");
+			const modified = master.message && master.message.modified;
+			if (modified && modified > frm.doc.modified) hints.push(__("The German page changed after this one: check the translation."));
+		}
+		frm.set_intro(hints.join("<br>"), "orange");
+	}
+
+	function createTranslation(frm, lang) {
+		const rest = (frm.doc.route || "").replace(/^de\//, "");
+		frappe.prompt(
+			[
+				{ fieldname: "title", fieldtype: "Data", label: __("Title"), reqd: 1, default: frm.doc.title },
+				{ fieldname: "route", fieldtype: "Data", label: __("Route"), reqd: 1, default: `${lang}/${rest}` },
+			],
+			(values) => {
+				const page = frappe.model.copy_doc(frm.doc);
+				Object.assign(page, values, { language: lang, translation_of: frm.doc.name, published: 0 });
+				frappe.set_route("Form", "Web Page", page.name);
+			},
+			__("Create {0} version", [__(LANGUAGES[lang])]),
+			__("Create")
+		);
+	}
+
+	frappe.ui.form.on("Web Page", {
+		refresh(frm) {
+			if (frm.is_new()) return;
+			webPageHints(frm);
+			if (frm.doc.published && frm.doc.route) {
+				frm.add_custom_button(__("View on Website"), () => window.open(`/${frm.doc.route}`, "_blank"));
+			}
+			if (frm.doc.language === "de") {
+				for (const lang of Object.keys(LANGUAGES).filter((code) => code !== "de")) {
+					frm.add_custom_button(__(LANGUAGES[lang]), () => createTranslation(frm, lang), __("Create Translation"));
+				}
+			}
 		},
 	});
 
