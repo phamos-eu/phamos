@@ -11,11 +11,11 @@ Object.assign(GitLabIssueDashboard.prototype, {
 
     getFilterContext() {
         const projects = this.normalizeProjectsValue(this.filters.projects.get_value() || []);
-        const { from_date: defaultFromDate, to_date: defaultToDate } = this.getDefaultDateRange();
+        const { from_date, to_date } = this.getSelectedDateRange();
         return {
             projects,
-            from_date: this.filters.from_date.get_value() || defaultFromDate,
-            to_date: this.filters.to_date.get_value() || defaultToDate,
+            from_date,
+            to_date,
             issue_scope: this.normalizeIssueScopeValue(this.filters.issue_scope.get_value()),
         };
     },

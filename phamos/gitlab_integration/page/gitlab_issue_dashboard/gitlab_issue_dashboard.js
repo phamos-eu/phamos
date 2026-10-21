@@ -268,9 +268,7 @@ class GitLabIssueDashboard {
 
     updateFilterState() {
         const projects = this.normalizeProjectsValue(this.filters.projects.get_value() || []);
-        const { from_date: defaultFromDate, to_date: defaultToDate } = this.getDefaultDateRange();
-        const fromDate = this.filters.from_date.get_value() || defaultFromDate;
-        const toDate = this.filters.to_date.get_value() || defaultToDate;
+        const { from_date: fromDate, to_date: toDate } = this.getSelectedDateRange();
         const issueScope = this.normalizeIssueScopeValue(this.filters.issue_scope.get_value());
         const issueScopeLabelMap = {
             both: __("Both"),
@@ -378,20 +376,9 @@ class GitLabIssueDashboard {
             frappe.dom.freeze(__("Loading dashboard..."));
 
             const projects = this.normalizeProjectsValue(this.filters.projects.get_value() || []);
-            const { from_date: defaultFromDate, to_date: defaultToDate } = this.getDefaultDateRange();
-            const from_date = this.filters.from_date.get_value() || defaultFromDate;
-            const to_date = this.filters.to_date.get_value() || defaultToDate;
+            const { from_date, to_date } = this.getSelectedDateRange();
             const issue_scope = this.normalizeIssueScopeValue(this.filters.issue_scope.get_value());
             const compare_to_company = this.compareToCompany && projects.length === 1;
-
-            if (from_date > to_date) {
-                frappe.msgprint({
-                    title: __("Invalid Date Range"),
-                    message: __("From Date cannot be after To Date."),
-                    indicator: "orange",
-                });
-                return;
-            }
 
             const response = await frappe.call({
                 method: "phamos.gitlab_integration.page.gitlab_issue_dashboard.gitlab_issue_dashboard.get_gitlab_issue_dashboard_data",
@@ -1533,6 +1520,22 @@ class GitLabIssueDashboard {
         return {
             from_date: this.formatDate(fromDate),
             to_date: this.formatDate(toDate),
+        };
+    }
+
+    // Mirrors _resolve_date_range on the server: swap reversed dates, then snap to full months.
+    getSelectedDateRange() {
+        const defaultRange = this.getDefaultDateRange();
+        let fromDate = this.filters.from_date.get_value() || defaultRange.from_date;
+        let toDate = this.filters.to_date.get_value() || defaultRange.to_date;
+
+        if (fromDate > toDate) {
+            [fromDate, toDate] = [toDate, fromDate];
+        }
+
+        return {
+            from_date: this.computeMonthDateRange(fromDate.slice(0, 7)).from_date,
+            to_date: this.computeMonthDateRange(toDate.slice(0, 7)).to_date,
         };
     }
 

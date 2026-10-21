@@ -344,6 +344,10 @@ def _resolve_date_range(from_date, to_date, year):
     if start_date > end_date:
         start_date, end_date = end_date, start_date
 
+    # Charts are grouped by month, so any month touched by the range counts in full.
+    start_date = start_date.replace(day=1)
+    end_date = end_date.replace(day=monthrange(end_date.year, end_date.month)[1])
+
     return start_date, end_date
 
 
