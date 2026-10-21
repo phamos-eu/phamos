@@ -6,7 +6,7 @@ import json
 import hashlib
 import hmac
 import time
-from datetime import datetime
+from datetime import datetime, timedelta
 
 
 def _set_gitlab_issue_value_with_retry(name, data, max_retries=3):
@@ -420,11 +420,12 @@ def get_issue_parent(project_path, issue_iid):
         return None
 
 
-def get_label_events_for_project_issue(project_id, issue_iid):
+def get_label_events_for_project_issue(project_id, issue_iid, strict=False):
     """Fetch every label add/remove event GitLab recorded for this issue via its
     Resource Label Events API — lets us find exactly when a label was first
     added straight from GitLab, without depending on our webhook having caught
-    it live."""
+    it live. With strict=True a failed page raises instead of returning the
+    events fetched so far, for callers that treat the result as the full history."""
     settings = frappe.get_single("GitLab Settings")
     base_url = settings.gitlab_url.rstrip("/")
     headers = get_gitlab_headers()
@@ -439,6 +440,11 @@ def get_label_events_for_project_issue(project_id, issue_iid):
             timeout=30,
         )
         if resp.status_code != 200:
+            if strict:
+                resp.raise_for_status()
+                raise frappe.ValidationError(
+                    f"GitLab label events returned {resp.status_code} for issue {issue_iid}"
+                )
             break
 
         data = resp.json()
@@ -503,6 +509,32 @@ def sync_cycle_start_label_from_gitlab(issue_doc_name):
     _set_gitlab_issue_value_with_retry(issue_doc_name, {"cycle_start_label_set_at": added_at})
     sync_cycle_time_start(issue_doc_name)
     return True
+
+
+# Wider than the 2-hourly sync interval so one failed run doesn't leave a gap
+_LABEL_LEDGER_RECENT_WINDOW = timedelta(hours=6)
+
+
+def _sync_label_ledger_safely(issue_doc_name, issue):
+    """Regular-sync safety net for the GitLab Issue Label Ledger. The GitLab
+    calls run as their own background job so they never stretch this sync past
+    its timeout, and a failure is logged on its own so the issue still syncs."""
+    from phamos.gitlab_integration.label_ledger import (
+        enqueue_issue_label_ledger_sync,
+        label_ledger_needs_sync,
+    )
+
+    # GitLab timestamps are UTC, so compare against UTC now
+    updated_at = _parse_gitlab_datetime(issue.get("updated_at"))
+    recently_updated = bool(
+        updated_at and updated_at >= datetime.utcnow() - _LABEL_LEDGER_RECENT_WINDOW
+    )
+
+    try:
+        if label_ledger_needs_sync(issue_doc_name, issue.get("labels", []), recently_updated):
+            enqueue_issue_label_ledger_sync(issue_doc_name, source="Sync")
+    except Exception:
+        frappe.log_error(frappe.get_traceback(), f"Label Ledger Sync Failed - {issue_doc_name}")
 
 
 def get_milestones_for_project(project_id):
@@ -646,6 +678,8 @@ def sync_all_issues():
                         # GitLab's label event history still has the original add.
                         sync_cycle_start_label_from_gitlab(gitlab_issue_doc.name)
 
+                    _sync_label_ledger_safely(gitlab_issue_doc.name, issue)
+
                 except Exception as ex:
                     frappe.log_error(
                         title="GitLab Issue Sync Error",
@@ -785,6 +819,8 @@ def sync_issues_for_project(project_name):
                     # (e.g. "Ready for Production") by the time we re-sync, but
                     # GitLab's label event history still has the original add.
                     sync_cycle_start_label_from_gitlab(doc.name)
+
+                _sync_label_ledger_safely(doc.name, issue)
 
             except Exception:
                 frappe.log_error(
@@ -1161,6 +1197,18 @@ def _handle_issue_webhook(payload):
                 _stamp_prod_labels_on_change(existing, labels_list)
                 _stamp_cycle_start_label_on_change(existing, labels_list)
                 _set_gitlab_issue_value_with_retry(existing, data)
+
+    # No labels_list guard — removing the last label must still close its ledger row
+    if action == "open" or "labels" in (payload.get("changes") or {}):
+        from phamos.gitlab_integration.label_ledger import enqueue_issue_label_ledger_sync
+
+        issue_doc_name = frappe.db.get_value(
+            "GitLab Issue",
+            {"issue_id": issue_iid, "gitlab_project": project_doc_name},
+            "name"
+        )
+        if issue_doc_name:
+            enqueue_issue_label_ledger_sync(issue_doc_name)
 
     frappe.db.commit()
 
