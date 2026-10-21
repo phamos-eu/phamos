@@ -166,7 +166,9 @@ async function onTaskCreated(name) {
 }
 
 async function onTaskUpdated(task) {
-	selectedTask.value = task
+	// Saves finish after the user may have opened another record; a late
+	// response must not switch the detail view back.
+	if (task?.name === selectedName.value) selectedTask.value = task
 	await loadTasks()
 }
 

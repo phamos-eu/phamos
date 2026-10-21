@@ -28,6 +28,7 @@ from phamos.api.i_own_my_work import create_issue as _create_issue
 from phamos.api.i_own_my_work import get_form_options as _base_form_options
 from phamos.api.i_own_my_work import set_assignees as _set_assignees
 from phamos.api.i_own_my_work import update_status as _update_status
+from phamos.api.presence import assert_fields_unlocked
 
 ISSUE_EDITABLE_FIELDS = ("subject", "description", "priority", "issue_type", "project")
 TASK_EDITABLE_FIELDS = (
@@ -393,6 +394,8 @@ def _serialize_issue_detail(doc):
 		"owner_name": _user_label(doc.owner),
 		"raised_by": doc.raised_by,
 		"modified": doc.modified,
+		"modified_by": doc.modified_by,
+		"modified_by_name": _user_label(doc.modified_by),
 		"creation": doc.creation,
 		"opening_date": getattr(doc, "opening_date", None),
 		"assignees": assignees,
@@ -545,6 +548,8 @@ def update_issue(config: CockpitConfig, name, **fields):
 	if "project" in updates and updates["project"]:
 		validate_project(config, updates["project"])
 
+	assert_fields_unlocked("Issue", doc.name, list(updates))
+
 	for key, value in updates.items():
 		doc.set(key, value)
 
@@ -624,6 +629,8 @@ def get_task(config: CockpitConfig, name):
 		"owner": doc.owner,
 		"owner_name": _user_label(doc.owner),
 		"modified": doc.modified,
+		"modified_by": doc.modified_by,
+		"modified_by_name": _user_label(doc.modified_by),
 		"assignees": assignees,
 		"assignee_names": [_user_label(u) for u in assignees],
 		"assignee_images": _user_images(assignees),
@@ -1120,6 +1127,8 @@ def update_task(config: CockpitConfig, name, **fields):
 
 	if "progress" in updates and updates["progress"] is not None:
 		updates["progress"] = frappe.utils.flt(updates["progress"])
+
+	assert_fields_unlocked("Task", doc.name, list(updates))
 
 	for key, value in updates.items():
 		doc.set(key, value)

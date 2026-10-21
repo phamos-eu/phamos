@@ -195,7 +195,8 @@ function closeChecklist() {
 }
 
 async function onUpdated(checklist) {
-	selected.value = checklist
+	// Item saves can finish after another checklist was opened.
+	if (checklist?.name && checklist.name === selected.value?.name) selected.value = checklist
 	await loadInbox()
 }
 

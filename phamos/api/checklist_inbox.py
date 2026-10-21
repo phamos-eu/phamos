@@ -379,6 +379,8 @@ def get_checklist(name):
 		"reference_record": doc.reference_record,
 		"due_date": doc.get("due_date"),
 		"modified": doc.modified,
+		"modified_by": doc.modified_by,
+		"modified_by_name": get_fullname(doc.modified_by) or doc.modified_by,
 		"owner": doc.owner,
 		"done_count": done_count,
 		"total_count": len(items),
@@ -391,7 +393,18 @@ def get_checklist(name):
 def update_spa_checklist_item(checklist_name, item_name, values):
 	"""Update a checklist item and return full SPA checklist payload."""
 	_require_checklist_write(checklist_name)
+	from phamos.api.presence import assert_fields_unlocked
 	from phamos.phamos.doctype.checklist.checklist import update_checklist_item
+
+	if isinstance(values, str):
+		values = frappe.parse_json(values)
+	if isinstance(values, dict):
+		# Item text fields are locked per row as "<field>:<item name>".
+		assert_fields_unlocked(
+			"Checklist",
+			checklist_name,
+			[f"{field}:{item_name}" for field in ("description", "note") if field in values],
+		)
 
 	update_checklist_item(checklist_name, item_name, values)
 	return get_checklist(checklist_name)
