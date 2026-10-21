@@ -500,27 +500,6 @@ async function onDocumentChange(item, document) {
 	}
 }
 
-const pendingNotes = {}
-
-const debouncedNoteSave = debounce(async (item, note) => {
-	savingItem.value = item.name
-	try {
-		const updated = await call(`${API}.update_spa_checklist_item`, {
-			checklist_name: props.checklist.name,
-			item_name: item.name,
-			values: { note },
-		})
-		emit("updated", updated)
-	} finally {
-		savingItem.value = null
-	}
-}, 500)
-
-function onNoteChange(item, html) {
-	pendingNotes[item.name] = html
-	debouncedNoteSave(item, html)
-}
-
 // Assignee and due date of an item (#1625): the assignee gets a ToDo for it.
 function isOverdue(item) {
 	return !item.done && !!item.due_date && item.due_date < todayIsoInUserTz()
