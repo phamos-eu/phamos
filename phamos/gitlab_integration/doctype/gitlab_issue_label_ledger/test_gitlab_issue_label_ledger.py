@@ -117,7 +117,7 @@ class TestSyncIssueLabelLedger(FrappeTestCase):
 			for row in frappe.get_all(
 				label_ledger.LEDGER_DOCTYPE,
 				filters={"gitlab_issue": self.ISSUE},
-				fields=["gitlab_event_id", "removed_at"],
+				fields=["gitlab_event_id", "label", "removed_at"],
 			)
 		}
 
@@ -146,3 +146,17 @@ class TestSyncIssueLabelLedger(FrappeTestCase):
 		self._insert_row("1", "bug", datetime(2026, 1, 1, 10))
 		self.assertRaises(frappe.ValidationError, self._sync, error=frappe.ValidationError)
 		self.assertIsNone(self._rows()["1"].removed_at)
+
+	def test_renamed_label_updates_open_and_closed_rows(self):
+		self._insert_row("1", "bug", datetime(2026, 1, 1, 10), datetime(2026, 1, 2, 10))
+		self._insert_row("3", "bug", datetime(2026, 1, 3, 10))
+		self._sync(
+			[
+				_event(1, "add", "type::bug", "2026-01-01T10:00:00Z"),
+				_event(2, "remove", "type::bug", "2026-01-02T10:00:00Z"),
+				_event(3, "add", "type::bug", "2026-01-03T10:00:00Z"),
+			]
+		)
+		rows = self._rows()
+		self.assertEqual((rows["1"].label, rows["3"].label), ("type::bug", "type::bug"))
+		self.assertFalse(label_ledger.label_ledger_needs_sync(self.ISSUE, ["type::bug"]))

@@ -96,15 +96,15 @@ def sync_issue_label_ledger(issue_doc_name, source="Sync"):
 	for interval in intervals:
 		row = existing.get(interval["gitlab_event_id"])
 		if row:
+			updates = {}
+			# GitLab returns a renamed label's current name on all its events
+			if row.label != interval["label"]:
+				updates["label"] = interval["label"]
 			# A closed row never reopens: a re-add is a new event and a new row
-			if row.removed_at:
-				continue
-			if interval["removed_at"]:
-				frappe.db.set_value(
-					LEDGER_DOCTYPE,
-					row.name,
-					{"removed_at": interval["removed_at"], "removed_by": interval["removed_by"]},
-				)
+			if not row.removed_at and interval["removed_at"]:
+				updates.update(removed_at=interval["removed_at"], removed_by=interval["removed_by"])
+			if updates:
+				frappe.db.set_value(LEDGER_DOCTYPE, row.name, updates)
 				changed += 1
 			continue
 
