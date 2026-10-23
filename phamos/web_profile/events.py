@@ -323,7 +323,8 @@ def build(item, lang):
 	if d.get("sponsors"):
 		blocks.append({"kind": "logos", "title": _("Sponsors"), "entries": [
 			{"title": s["name"], "image": s["logo"], "url": s.get("url"), "external": s.get("external"),
-				"subtitle": s.get("label"), "initials": "".join(w[0] for w in (s["name"] or "?").split()[:2]).upper()}
+				"subtitle": s.get("label"), "initials": "".join(w[0] for w in (s["name"] or "?").split()[:2]).upper(),
+				"info": strip_html(s.get("info") or "").strip()}
 			for s in d["sponsors"]]})
 
 	hero = {"image": item.image, "badge": item.get("badge"), "lines": [
