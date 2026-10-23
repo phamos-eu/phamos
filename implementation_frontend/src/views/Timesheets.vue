@@ -263,7 +263,8 @@ function formatHours(value) {
 	const minutes = Math.round(Number(value) * 60)
 	const h = Math.floor(minutes / 60)
 	const m = minutes % 60
-	return m ? `${h} h ${m} min` : `${h} h`
+	if (!m) return `${h} h`
+	return h ? `${h} h ${m} min` : `${m} min`
 }
 
 function formatDate(value) {

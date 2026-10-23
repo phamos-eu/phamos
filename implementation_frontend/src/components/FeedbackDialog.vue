@@ -54,8 +54,8 @@
 
 <script setup>
 import { computed, ref, watch } from "vue"
-import { toast } from "frappe-ui"
 import { __ } from "@spa/utils/i18n.js"
+import { notifySuccess } from "@spa/utils/notify.js"
 import { giveFeedback } from "../timesheetStore.js"
 
 const props = defineProps({
@@ -93,7 +93,7 @@ async function submit() {
 	error.value = ""
 	try {
 		await giveFeedback(props.timesheet.name, rating.value, comment.value)
-		toast.success(__("Thank you. We will review your feedback."))
+		notifySuccess(__("Thank you. We will review your feedback."))
 		emit("saved")
 		close()
 	} catch (e) {
