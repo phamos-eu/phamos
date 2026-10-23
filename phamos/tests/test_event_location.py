@@ -77,6 +77,18 @@ class TestEventLocation(FrappeTestCase):
 	def test_mode_defaults_to_in_person(self):
 		self.assertEqual(make_event("Location Default Event").attendance_mode, "In person")
 
+	def test_online_event_switched_back_to_in_person(self):
+		event = self.online_event()
+		event.update({"attendance_mode": "In person", "location": "Rathaus", "street": "Marktplatz 1",
+			"postal_code": "72764", "city": "Reutlingen"})
+		with patch("phamos.marketing.location._search", return_value=FOUND):
+			event.save()
+		self.assertEqual(event.country, frappe.db.get_default("country"))
+		self.assertAlmostEqual(event.latitude, 48.4914, places=4)
+		item = self.item(event)
+		self.assertFalse(item.data["online"])
+		self.assertEqual(item.data["location"], "Rathaus")
+
 	# --- map pin ----------------------------------------------------------------------------------------
 
 	def test_address_is_looked_up_once_and_a_set_pin_is_kept(self):
@@ -95,9 +107,32 @@ class TestEventLocation(FrappeTestCase):
 
 	def test_lookup_failure_does_not_block_saving(self):
 		with patch("phamos.marketing.location._search", side_effect=OSError("offline")):
-			event = make_event("Location In Person Event", location="Rathaus", city="Nowhere")
+			event = make_event("Location In Person Event", location="Rathaus", street="Weg 1", city="Nowhere")
 		self.assertFalse(event.geolocation)
 		self.assertFalse(event.latitude)
+
+	def test_no_lookup_without_a_street(self):
+		# The city alone would pin the town centre, and a set pin is never moved again.
+		with patch("phamos.marketing.location._search", return_value=FOUND) as search:
+			event = make_event("Location In Person Event", location="Rathaus", city="Reutlingen")
+		search.assert_not_called()
+		self.assertFalse(event.geolocation)
+
+	def test_no_lookup_during_imports(self):
+		frappe.flags.in_import = True
+		try:
+			with patch("phamos.marketing.location._search", return_value=FOUND) as search:
+				event = make_event("Location In Person Event", location="Rathaus", street="Marktplatz 1", city="Reutlingen")
+		finally:
+			frappe.flags.in_import = False
+		search.assert_not_called()
+		self.assertFalse(event.geolocation)
+
+	def test_one_lookup_per_second_for_the_whole_bench(self):
+		frappe.cache.delete(location.NOMINATIM_TURN_KEY)
+		self.assertTrue(location._wait_for_turn())
+		self.assertFalse(location._wait_for_turn(max_wait=0.2))  # the turn is taken for one second
+		frappe.cache.delete(location.NOMINATIM_TURN_KEY)
 
 	def test_find_on_map(self):
 		with patch("phamos.marketing.location._search", return_value=FOUND):
@@ -182,14 +217,28 @@ class TestEventLocation(FrappeTestCase):
 	def test_patch_sets_mode_and_reads_old_map_links(self):
 		online = make_event("Location Patch Online", location="Venue")
 		in_person = make_event("Location Patch In Person", location="Rathaus")
+		named_like_a_site = make_event("Location Patch Site Name", location="Venue")
 		frappe.db.set_value("Marketing Content", online.name, {"location": LINK, "attendance_mode": None})
 		frappe.db.set_value("Marketing Content", in_person.name, "attendance_mode", None)
+		frappe.db.set_value("Marketing Content", named_like_a_site.name, {"location": "www.hotel-example.de",
+			"attendance_mode": None})
 		has_map_link = frappe.db.has_column("Marketing Content", "map_link")
 		if has_map_link:
 			frappe.db.sql("update `tabMarketing Content` set map_link=%s where name=%s",
 				("https://www.openstreetmap.org/?mlat=48.4914&mlon=9.2043", in_person.name))
 		set_event_attendance_mode.execute()
-		self.assertEqual(frappe.db.get_value("Marketing Content", online.name, "attendance_mode"), "Online")
-		self.assertEqual(frappe.db.get_value("Marketing Content", in_person.name, "attendance_mode"), "In person")
+
+		mode = lambda event: frappe.db.get_value("Marketing Content", event.name, "attendance_mode")
+		self.assertEqual(mode(online), "Online")
+		self.assertEqual(mode(in_person), "In person")
+		self.assertEqual(mode(named_like_a_site), "In person")  # only a real link makes an event online
+		self.assertEqual(frappe.db.get_value("Marketing Content", online.name, "city"), "Reutlingen")  # nothing erased
 		if has_map_link:
 			self.assertAlmostEqual(frappe.db.get_value("Marketing Content", in_person.name, "latitude"), 48.4914, places=4)
+
+		# Run again after an editor set the pin: the pin stays.
+		frappe.db.set_value("Marketing Content", in_person.name, {"geolocation": location.point(48.5, 9.21),
+			"latitude": 48.5, "longitude": 9.21})
+		set_event_attendance_mode.execute()
+		self.assertEqual(frappe.db.get_value("Marketing Content", in_person.name, "latitude"), 48.5)
+		self.assertEqual(mode(online), "Online")

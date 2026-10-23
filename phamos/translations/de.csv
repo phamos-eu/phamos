@@ -664,7 +664,7 @@ Join online: {0},Online teilnehmen: {0}
 "{0}: {1}, online.","{0}: {1}, online."
 Not found,Nicht gefunden
 "In person: the venue's name, e.g. ""Hotel Adlon, Saal 2"". Online: the meeting link (https://…). The link is only sent to registered attendees, never shown on the website.","Vor Ort: der Name des Veranstaltungsorts, z. B. „Hotel Adlon, Saal 2“. Online: der Link zum Meeting (https://…). Der Link geht nur an angemeldete Teilnehmende und erscheint nie auf der Website."
-Looks the address up on OpenStreetMap and sets the pin. Drag the pin to the exact entrance if needed.,Sucht die Adresse bei OpenStreetMap und setzt die Markierung. Bei Bedarf die Markierung auf den genauen Eingang ziehen.
+"Looks the address up on OpenStreetMap and sets the pin. To move it to the exact entrance, click the map's edit tool (Edit layers), drag the pin and click Save.","Sucht die Adresse bei OpenStreetMap und setzt die Markierung. Zum Verschieben auf den genauen Eingang das Bearbeiten-Werkzeug der Karte (Edit layers) anklicken, die Markierung ziehen und auf Save klicken."
 "The meeting link (https://…). It is only sent to registered attendees, never shown on the website.",Der Link zum Meeting (https://…). Er geht nur an angemeldete Teilnehmende und erscheint nie auf der Website.
 "The venue's name, e.g. ""Hotel Adlon, Saal 2"". The address goes below.","Der Name des Veranstaltungsorts, z. B. „Hotel Adlon, Saal 2“. Die Adresse steht darunter."
 Please enter the address first.,Bitte zuerst die Adresse eingeben.
