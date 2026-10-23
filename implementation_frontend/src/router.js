@@ -13,7 +13,7 @@ const sections = [
 	{ path: "issues", name: "Issues", issue: "#1679, #1680" },
 	{ path: "commercials", name: "Commercials", issue: "#1681, #1685" },
 	{ path: "planning", name: "Planning", issue: "#1693, #1694" },
-	{ path: "team", name: "Team", issue: "#1684" },
+	{ path: "team", name: "Team", label: "Contact & Team", issue: "#1684" },
 	{ path: "links", name: "Links", issue: "#1682" },
 ]
 
@@ -27,7 +27,7 @@ const router = createRouter({
 			path: `/:implementation/${s.path}`,
 			name: s.name,
 			component: ComingSoon,
-			props: (route) => ({ implementation: route.params.implementation, section: s.name, issue: s.issue }),
+			props: (route) => ({ implementation: route.params.implementation, section: s.label || s.name, issue: s.issue }),
 		})),
 	],
 })
