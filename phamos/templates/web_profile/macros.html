@@ -286,7 +286,7 @@
     fixed date (§ 312g (2) no. 9). Marketing questions come only after the order (optional, explained). -#}
 {% macro ticket_dialog_markup(item, t, lang) -%}
 {%- set privacy_url = '/en/privacy' if lang == 'en' else '/de/datenschutz' -%}
-{%- set venue = [item.data.location, item.data.city] | select | join(", ") -%}
+{%- set venue = _("Online") if item.data.online else [item.data.location, item.data.city] | select | join(", ") -%}
 {%- set terms = ('<a href="#wp-terms" data-wp-terms-open>' ~ _("terms and conditions") ~ '</a>') if t.terms_html else _("terms and conditions") -%}
 <dialog class="wp-dialog wp-dialog-wide" id="wp-ticket-dialog" aria-labelledby="wp-ticket-title" data-wp-ticket-dialog>
 	<form class="wp-contact-form wp-checkout" method="post" action="/api/method/phamos.marketing.web.order_tickets" data-wp-ticket-form novalidate

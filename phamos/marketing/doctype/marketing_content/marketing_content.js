@@ -11,6 +11,7 @@ frappe.ui.form.on("Marketing Content", {
 	},
 
 	refresh(frm) {
+		set_location_hint(frm);
 		if (frm.is_new()) return;
 		if (!frm.doc.ticket_item) {
 			frm.add_custom_button(__("Ticket Item"), () =>
@@ -52,4 +53,44 @@ frappe.ui.form.on("Marketing Content", {
 	organizer_is_phamos(frm) {
 		if (frm.doc.organizer_is_phamos) frm.set_value("organizer", null);
 	},
+
+	attendance_mode(frm) {
+		set_location_hint(frm);
+	},
+
+	// The address is looked up on OpenStreetMap (Nominatim) by the server; the pin can then be dragged.
+	find_on_map(frm) {
+		const { street, postal_code, city, country } = frm.doc;
+		if (!street && !postal_code && !city) {
+			frappe.msgprint(__("Please enter the address first."));
+			return;
+		}
+		frappe.call({
+			method: "phamos.marketing.location.find_on_map",
+			args: { street, postal_code, city, country },
+			freeze: true,
+			freeze_message: __("Looking up the address…"),
+		}).then((r) => {
+			const found = r.message;
+			if (!found) return;
+			frm.set_value("geolocation", JSON.stringify({ type: "FeatureCollection", features: [{ type: "Feature",
+				properties: {}, geometry: { type: "Point", coordinates: [found.longitude, found.latitude] } }] }));
+			frappe.show_alert({ message: __("Pin set: {0}", [found.label || ""]), indicator: "green" });
+		});
+	},
+
+	geolocation(frm) {
+		// The pin was set or dragged: keep the plain numbers in step (the server does the same on save).
+		const point = ((JSON.parse(frm.doc.geolocation || "{}").features || [])
+			.find((f) => f.geometry && f.geometry.type === "Point") || {}).geometry;
+		frm.set_value({ latitude: point ? point.coordinates[1] : null, longitude: point ? point.coordinates[0] : null });
+	},
 });
+
+function set_location_hint(frm) {
+	const online = frm.doc.attendance_mode === "Online";
+	frm.set_df_property("location", "description", online
+		? __("The meeting link (https://…). It is only sent to registered attendees, never shown on the website.")
+		: __("The venue's name, e.g. \"Hotel Adlon, Saal 2\". The address goes below."));
+	frm.set_df_property("location", "placeholder", online ? "https://" : "");
+}

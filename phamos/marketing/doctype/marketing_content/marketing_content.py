@@ -21,6 +21,7 @@ class MarketingContent(WebProfileDocument):
 	def validate(self):
 		# No refresh_mirrored_fields (WebProfileDocument.validate): there is no source record to mirror.
 		self.validate_dates()
+		self.validate_location()
 		self.validate_tickets()
 		self.validate_translations()
 		self.set_route()
@@ -32,6 +33,37 @@ class MarketingContent(WebProfileDocument):
 			frappe.throw(_("Set either a confirmed Start Date or a Date Note, not both."))
 		if self.starts_on and self.ends_on and self.ends_on < self.starts_on:
 			frappe.throw(_("The event cannot end before it starts."))
+
+	def validate_location(self):
+		"""Online: ``location`` is the meeting link, there is no address. In person: ``location`` is the venue,
+		the pin comes from the address unless one is set (phamos/phamos#1665)."""
+		from phamos.marketing import location
+
+		self.attendance_mode = self.attendance_mode or location.IN_PERSON
+		self.location = (self.location or "").strip() or None
+		if location.is_online(self):
+			if not location.is_https_url(self.location):
+				frappe.throw(_("For an online event, enter the meeting link in Venue / Video Link. It must start with https://."))
+			for field in (*location.ADDRESS_FIELDS, "geolocation", "latitude", "longitude"):
+				self.set(field, None)
+			if self.published and not (self.registration_open or self.ticket_item):
+				frappe.msgprint(_("The video link is never shown on the website, only sent to registered attendees. "
+					"Open the registration so people can get it."), indicator="orange", alert=True)
+			return
+
+		if location.looks_like_url(self.location):
+			frappe.throw(_("Venue / Video Link holds a link. For an online event, set Attendance to Online."))
+		if not self.country and any(self.get(f) for f in ("street", "postal_code", "city")):
+			self.country = frappe.db.get_default("country")
+		if not self.geolocation:
+			found = location.geocode(self.street, self.postal_code, self.city, self.country)
+			if found:
+				self.geolocation = location.point(found["latitude"], found["longitude"])
+		elif not self.is_new() and not self.has_value_changed("geolocation") and any(
+				self.has_value_changed(f) for f in location.ADDRESS_FIELDS):
+			frappe.msgprint(_("The address changed but the map pin did not. Use Find on Map to move the pin."),
+				indicator="orange", alert=True)
+		self.latitude, self.longitude = location.coordinates(self.geolocation)
 
 	def validate_tickets(self):
 		"""Prices live on the event (Ticket Prices table); a ticket sale needs a date (no right of withdrawal
