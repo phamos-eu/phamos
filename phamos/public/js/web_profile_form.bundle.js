@@ -10,6 +10,7 @@
 		"Implementation Web Profile": { en: "implementations", de: "implementierungen" },
 		"Industry Web Profile": { en: "industries", de: "branchen" },
 		"Stakeholder Web Profile": { en: "customers", de: "kunden", Partner: { en: "partners", de: "partner" } },
+		"Marketing Content": { en: "events", de: "veranstaltungen" },
 	};
 	// Website languages, German first (keep in sync with phamos/web_profile/i18n.py LANGUAGES).
 	const LANGUAGES = { de: "Deutsch", en: "English" };

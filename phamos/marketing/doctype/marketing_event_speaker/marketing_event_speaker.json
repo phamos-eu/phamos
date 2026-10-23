@@ -1,0 +1,60 @@
+{
+ "actions": [],
+ "creation": "2026-06-08 00:00:00",
+ "doctype": "DocType",
+ "editable_grid": 1,
+ "engine": "InnoDB",
+ "field_order": [
+  "published",
+  "full_name",
+  "person",
+  "image",
+  "topic"
+ ],
+ "fields": [
+  {
+   "default": "0",
+   "fieldname": "published",
+   "fieldtype": "Check",
+   "in_list_view": 1,
+   "label": "Published"
+  },
+  {
+   "fieldname": "full_name",
+   "fieldtype": "Data",
+   "in_list_view": 1,
+   "label": "Full Name",
+   "reqd": 1
+  },
+  {
+   "fieldname": "person",
+   "fieldtype": "Link",
+   "label": "Web Profile",
+   "options": "Person Web Profile",
+   "in_list_view": 1,
+   "description": "Optional: links the speaker to their profile page (shown as a card)."
+  },
+  {
+   "fieldname": "image",
+   "fieldtype": "Attach Image",
+   "label": "Image"
+  },
+  {
+   "fieldname": "topic",
+   "fieldtype": "Text Editor",
+   "label": "Topic"
+  }
+ ],
+ "istable": 1,
+ "links": [],
+ "modified": "2026-10-16 18:00:00.000000",
+ "modified_by": "Administrator",
+ "module": "Marketing",
+ "name": "Marketing Event Speaker",
+ "owner": "Administrator",
+ "permissions": [],
+ "row_format": "Dynamic",
+ "sort_field": "creation",
+ "sort_order": "DESC",
+ "states": []
+}
