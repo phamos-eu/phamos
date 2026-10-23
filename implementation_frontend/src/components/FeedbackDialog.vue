@@ -53,7 +53,7 @@
 </template>
 
 <script setup>
-import { computed, ref, watch } from "vue"
+import { ref, watch } from "vue"
 import { __ } from "@spa/utils/i18n.js"
 import { notifySuccess } from "@spa/utils/notify.js"
 import { giveFeedback } from "../timesheetStore.js"
@@ -68,11 +68,14 @@ const rating = ref(0)
 const comment = ref("")
 const error = ref("")
 const saving = ref(false)
-const readOnly = computed(() => (props.timesheet?.custom_rating || 0) > 0)
+// Set when the dialog opens, so it does not flip to "under review" while it closes after saving.
+const readOnly = ref(false)
 
 watch(
 	() => [props.modelValue, props.timesheet?.name],
 	() => {
+		if (!props.modelValue) return
+		readOnly.value = (props.timesheet?.custom_rating || 0) > 0
 		rating.value = props.timesheet?.custom_rating || 0
 		comment.value = props.timesheet?.customer_comment || ""
 		error.value = ""
