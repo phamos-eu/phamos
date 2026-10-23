@@ -7,8 +7,6 @@
 {% block meta_block %}{{ super() }}{{ head_tags() }}{% endblock %}
 
 {% block content %}
-{%- set toggles = listing.facets | selectattr("type", "equalto", "toggle") | list -%}
-{%- set filters = listing.facets | rejectattr("type", "equalto", "toggle") | list -%}
 <main class="wp-page wp-section-{{ section }}" data-wp-listing>
 	<header class="wp-page-head">
 		<div class="wp-page-head-top">
@@ -19,7 +17,6 @@
 				<h1>{{ section_title | e }}</h1>
 				<p class="wp-intro">{{ section_intro | e }}</p>
 			</div>
-			{%- for facet in toggles %}{{ facet_group(facet) }}{% endfor %}
 		</div>
 	</header>
 
@@ -30,7 +27,7 @@
 				<div class="wp-filters-head wp-only-mobile">
 					<button type="button" class="wp-icon-button" data-wp-close-filters aria-label="{{ _('Close filters') }}">×</button>
 				</div>
-				{%- for facet in filters %}{{ facet_group(facet) }}{% endfor %}
+				{%- for facet in listing.facets %}{{ facet_group(facet) }}{% endfor %}
 				<noscript><button type="submit" class="wp-button">{{ _("Apply filters") }}</button></noscript>
 			</form>
 		</aside>
