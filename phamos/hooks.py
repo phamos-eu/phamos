@@ -59,6 +59,13 @@ add_to_apps_screen = [
 		"route": "/scan",
 		"has_permission": "phamos.api.scan.check_app_permission",
 	},
+	{
+		"name": "implementation_cockpit",
+		"logo": "/assets/phamos/manifest/implementation-icon-192.png",
+		"title": "Implementation Cockpit",
+		"route": "/implementation-cockpit",
+		"has_permission": "phamos.api.implementation_cockpit.check_app_permission",
+	},
 ]
 
 # Includes in <head>
@@ -149,6 +156,8 @@ website_route_rules = [
     {"from_route": "/accounting-cockpit/<path:app_path>", "to_route": "accounting_spa"},
     {"from_route": "/software-development-cockpit", "to_route": "software_development_spa"},
     {"from_route": "/software-development-cockpit/<path:app_path>", "to_route": "software_development_spa"},
+    {"from_route": "/implementation-cockpit", "to_route": "implementation_cockpit"},
+    {"from_route": "/implementation-cockpit/<path:app_path>", "to_route": "implementation_cockpit"},
     {"from_route": "/scan", "to_route": "scan"},
     {"from_route": "/scan/<path:app_path>", "to_route": "scan"},
 ]

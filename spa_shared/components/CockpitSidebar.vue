@@ -3,7 +3,10 @@
 		class="flex h-full flex-none flex-col border-r border-outline-gray-2 bg-surface-white transition-[width] dark:bg-surface-gray-1"
 		:class="collapsed ? 'w-14' : 'w-52'"
 	>
+		<!-- A cockpit can replace the label row (#1672: customer and implementation picker). -->
+		<slot v-if="$slots.header" name="header" :collapsed="collapsed" :toggle="toggle" />
 		<div
+			v-else
 			class="flex h-12 flex-shrink-0 items-center border-b border-outline-gray-2 px-3"
 			:class="collapsed ? 'justify-center' : 'justify-between'"
 		>
@@ -66,7 +69,9 @@
 			<slot :collapsed="collapsed" :expand="expand" />
 		</nav>
 
-		<div class="mt-auto flex-shrink-0 border-t border-outline-gray-2 p-2">
+		<!-- Website users have no Desk; their cockpit puts its own footer here (#1671). -->
+		<slot v-if="$slots.footer" name="footer" :collapsed="collapsed" />
+		<div v-else class="mt-auto flex-shrink-0 border-t border-outline-gray-2 p-2">
 			<button
 				type="button"
 				class="flex w-full items-center gap-2 rounded-md px-2 py-2 text-sm font-medium text-ink-gray-6 hover:bg-surface-gray-2 hover:text-ink-gray-9"

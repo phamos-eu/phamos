@@ -19,6 +19,7 @@ phamos/public/project_management
 phamos/public/software_development
 phamos/public/personal
 phamos/public/scan
+phamos/public/implementation
 phamos/www/human_resources_spa.html
 phamos/www/sales_spa.html
 phamos/www/accounting_spa.html
@@ -26,3 +27,4 @@ phamos/www/project_management_spa.html
 phamos/www/software_development_spa.html
 phamos/www/personal_cockpit.html
 phamos/www/scan.html
+phamos/www/implementation_cockpit.html
