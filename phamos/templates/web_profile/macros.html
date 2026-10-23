@@ -80,14 +80,18 @@
 
 {% macro facet_group(facet) -%}
 {%- if facet.type == "toggle" -%}
-<fieldset class="wp-toggle" data-wp-toggle data-wp-default-for="{{ facet.key }}" data-wp-default="{{ facet.default | e }}">
-	<legend class="wp-visually-hidden">{{ facet.label | e }}</legend>
-	{%- for option in facet.options %}
-	<label class="wp-toggle-option">
-		<input type="radio" form="wp-form" name="{{ facet.key }}" value="{{ option.value | e }}"{% if option.checked %} checked{% endif %} data-wp-input>
-		<span>{{ option.label | e }} <span class="wp-count">{{ option.count }}</span></span>
-	</label>
-	{%- endfor %}
+{#- One of a few (e.g. Upcoming / Past / All): a radio group shown like the other filter groups (#1667). -#}
+<fieldset class="wp-facet" data-wp-facet="{{ facet.key }}" data-wp-default-for="{{ facet.key }}" data-wp-default="{{ facet.default | e }}">
+	<legend class="wp-facet-title">{{ facet.label | e }}</legend>
+	<div class="wp-facet-options">
+		{%- for option in facet.options %}
+		<label class="wp-check">
+			<input type="radio" name="{{ facet.key }}" value="{{ option.value | e }}"{% if option.checked %} checked{% endif %} data-wp-input>
+			<span class="wp-check-label">{{ option.label | e }}</span>
+			{%- if option.count %}<span class="wp-count">{{ option.count }}</span>{% endif %}
+		</label>
+		{%- endfor %}
+	</div>
 </fieldset>
 {%- elif facet.type == "range" -%}
 {#- Numbers: one slider with a min and a max handle. Plain range inputs, so it also works as a normal
