@@ -1,7 +1,9 @@
 # Copyright (c) 2026, phamos.eu and contributors
 # For license information, please see license.txt
 
-"""Event → Mailcow (SOGo) calendar sync (#1558). SOGo is replaced by patched `requests` calls."""
+"""Event → Mailcow (SOGo) calendar sync (#1558) and the milestone-68 groundwork: all-day
+events, STATUS, URL, METHOD, the owner as organizer, `pull_event_slots` all-day flag and timeout,
+and the slot cache. SOGo is replaced by patched `requests` calls."""
 
 from types import SimpleNamespace
 from unittest.mock import MagicMock, patch
@@ -11,6 +13,7 @@ from frappe.tests.utils import FrappeTestCase
 
 from phamos.mailcow_integration.caldav import client
 from phamos.mailcow_integration.caldav import sync_event
+from phamos.mailcow_integration.caldav import slot_cache
 
 OWNER = "mc-owner@example.com"
 OTHER = "mc-other@example.com"
@@ -30,6 +33,63 @@ def _response(status):
 	return SimpleNamespace(status_code=status, text="")
 
 
+def _ensure_status_field():
+	"""The fixture adds `custom_mailcow_status`; a test site that has not migrated it yet gets it here."""
+	if frappe.get_meta("Event").has_field("custom_mailcow_status"):
+		return
+	from frappe.custom.doctype.custom_field.custom_field import create_custom_fields
+
+	create_custom_fields(
+		{
+			"Event": [
+				{
+					"fieldname": "custom_mailcow_status",
+					"label": "Calendar Status",
+					"fieldtype": "Select",
+					"options": "\nCONFIRMED\nTENTATIVE",
+					"insert_after": "custom_mailcow_sync_error",
+					"hidden": 1,
+					"read_only": 1,
+					"no_copy": 1,
+				}
+			]
+		},
+		ignore_validate=True,
+	)
+	frappe.clear_cache(doctype="Event")
+
+
+MULTISTATUS = """<?xml version="1.0" encoding="utf-8"?>
+<D:multistatus xmlns:D="DAV:" xmlns:C="urn:ietf:params:xml:ns:caldav">
+<D:response><D:href>/SOGo/dav/x/Calendar/personal/leave-1.ics</D:href><D:propstat><D:prop>
+<C:calendar-data>BEGIN:VCALENDAR
+VERSION:2.0
+PRODID:-//test//EN
+BEGIN:VEVENT
+UID:leave-1
+DTSTAMP:20261001T000000Z
+DTSTART;VALUE=DATE:20261103
+DTEND;VALUE=DATE:20261106
+SUMMARY:Leave: Vacation
+END:VEVENT
+END:VCALENDAR
+</C:calendar-data></D:prop><D:status>HTTP/1.1 200 OK</D:status></D:propstat></D:response>
+<D:response><D:href>/SOGo/dav/x/Calendar/personal/meet-1.ics</D:href><D:propstat><D:prop>
+<C:calendar-data>BEGIN:VCALENDAR
+VERSION:2.0
+PRODID:-//test//EN
+BEGIN:VEVENT
+UID:meet-1
+DTSTAMP:20261001T000000Z
+DTSTART:20261104T090000Z
+DTEND:20261104T100000Z
+SUMMARY:Standup
+END:VEVENT
+END:VCALENDAR
+</C:calendar-data></D:prop><D:status>HTTP/1.1 200 OK</D:status></D:propstat></D:response>
+</D:multistatus>"""
+
+
 class TestMailcowEventSync(FrappeTestCase):
 	def setUp(self):
 		frappe.set_user("Administrator")
@@ -42,10 +102,15 @@ class TestMailcowEventSync(FrappeTestCase):
 			patch.object(client.requests, "put", self.put),
 			patch.object(client.requests, "delete", self.delete),
 			patch.object(client, "settings", lambda: SimpleNamespace(base_url=BASE_URL)),
+			patch.object(sync_event, "settings", lambda: SimpleNamespace(base_url=BASE_URL)),
 			patch.object(client, "dav_password", lambda email: self.passwords.get(email)),
+			# pull_event_slots looks the password up through its own module namespace
+			patch.object(sync_event, "dav_password", lambda email: self.passwords.get(email)),
 		):
 			patcher.start()
 			self.addCleanup(patcher.stop)
+		_ensure_status_field()
+		slot_cache.invalidate(OWNER)
 
 	def tearDown(self):
 		frappe.set_user("Administrator")
@@ -163,3 +228,96 @@ class TestMailcowEventSync(FrappeTestCase):
 			}
 		)
 		self.assertEqual(sync_event._event_recurrence_rule(doc), "FREQ=WEEKLY;BYDAY=WE")
+
+	# --- milestone 68, Phase 0: all-day, status, url, method, organizer ---------------------
+
+	def _body(self):
+		return self.put.call_args.kwargs["data"].decode("utf-8")
+
+	def test_all_day_event_uses_date_values_with_an_exclusive_end(self):
+		self._event(all_day=1, starts_on="2026-11-03 00:00:00", ends_on="2026-11-05 23:59:59")
+		body = self._body()
+		self.assertIn("DTSTART;VALUE=DATE:20261103", body)
+		self.assertIn("DTEND;VALUE=DATE:20261106", body)
+		self.assertNotIn("TZID", body)
+
+	def test_timed_event_keeps_tzid_values(self):
+		self._event()
+		body = self._body()
+		self.assertIn("DTSTART;TZID=", body)
+		self.assertNotIn("VALUE=DATE", body)
+
+	def test_status_url_and_method_without_attendees(self):
+		doc = self._event(
+			custom_mailcow_status="TENTATIVE", reference_doctype="User", reference_docname=OWNER
+		)
+		frappe.db.set_value("Event", doc.name, "custom_mailcow_status", "TENTATIVE", update_modified=False)
+		sync_event.push_event(doc.name)
+		body = self._body()
+		self.assertIn("STATUS:TENTATIVE", body)
+		self.assertIn("METHOD:PUBLISH", body)
+		self.assertIn(f"URL:{frappe.utils.get_url_to_form('User', OWNER)}", body)
+
+	def test_default_status_is_confirmed_and_attendees_make_it_a_request(self):
+		self._event(custom_attendees_to=OTHER)
+		body = self._body()
+		self.assertIn("STATUS:CONFIRMED", body)
+		self.assertIn("METHOD:REQUEST", body)
+		self.assertIn(f"ATTENDEE;ROLE=OPT-PARTICIPANT;PARTSTAT=NEEDS-ACTION;RSVP=TRUE:mailto:{OTHER}", body)
+		self.assertNotIn("URL:", body)
+
+	def test_organizer_is_the_owner_in_a_queued_push(self):
+		doc = self._event()
+		frappe.set_user("Administrator")  # the worker that runs the queued job
+		sync_event.push_event(doc.name)
+		self.assertIn(f"ORGANIZER;CN={OWNER}:mailto:{OWNER}", self._body())
+		self.assertNotIn("Administrator", self._body())
+
+	# --- pull_event_slots: all-day flag and timeout, slot cache ----------------------------
+
+	def _report(self, status=207, content=MULTISTATUS):
+		return MagicMock(return_value=SimpleNamespace(status_code=status, content=content.encode("utf-8"), text=content))
+
+	def test_pull_event_slots_marks_all_day_and_forwards_the_timeout(self):
+		frappe.set_user(OWNER)
+		report = self._report()
+		with patch("requests.request", report):
+			slots = sync_event.pull_event_slots("2026-11-02T00:00:00", "2026-11-08T00:00:00", timeout=8)
+		self.assertEqual(report.call_args.kwargs["timeout"], 8)
+		by_uid = {s["uid"]: s for s in slots}
+		self.assertTrue(by_uid["leave-1"]["all_day"])
+		self.assertFalse(by_uid["meet-1"]["all_day"])
+		self.assertEqual(by_uid["leave-1"]["start_date"], "2026-11-03")
+		self.assertEqual(by_uid["leave-1"]["end_date"], "2026-11-05")  # DTEND 6 Nov is exclusive
+		self.assertIsNone(by_uid["meet-1"]["start_date"])
+
+	def test_pull_event_slots_timeout_is_clamped(self):
+		frappe.set_user(OWNER)
+		report = self._report()
+		with patch("requests.request", report):
+			sync_event.pull_event_slots("2026-11-02T00:00:00", "2026-11-08T00:00:00", timeout="0")
+		self.assertEqual(report.call_args.kwargs["timeout"], 30)
+
+	def test_slot_cache_reuses_one_report_until_refreshed_or_invalidated(self):
+		frappe.set_user(OWNER)
+		report = self._report()
+		args = (OWNER, "2026-11-02T00:00:00", "2026-11-08T00:00:00")
+		with patch("requests.request", report):
+			first = slot_cache.get_slots(*args)
+			slot_cache.get_slots(*args)
+			self.assertEqual(report.call_count, 1)
+			slot_cache.get_slots(*args, refresh=True)
+			self.assertEqual(report.call_count, 2)
+			slot_cache.invalidate(OWNER)
+			slot_cache.get_slots(*args)
+			self.assertEqual(report.call_count, 3)
+		self.assertEqual([s["uid"] for s in first], ["leave-1", "meet-1"])
+
+	def test_a_push_drops_the_owners_cached_slots(self):
+		frappe.set_user(OWNER)
+		args = (OWNER, "2026-11-02T00:00:00", "2026-11-08T00:00:00")
+		with patch("requests.request", self._report()):
+			slot_cache.get_slots(*args)
+		self.assertIsNotNone(frappe.cache.get_value(slot_cache._key(*args), expires=True))
+		self._event()  # pushes to OWNER's calendar
+		self.assertIsNone(frappe.cache.get_value(slot_cache._key(*args), expires=True))
