@@ -450,7 +450,7 @@ def send_order_confirmation(event_name, reference, recipient, reference_doctype=
 	attachments = []
 	item = find_item("events", doc.route, frappe.local.lang) if doc.published else None
 	if item and doc.starts_on:
-		attachments.append({"fname": f"{item.slug}.ics", "fcontent": build_ics(item)})
+		attachments.append({"fname": f"{item.slug}.ics", "fcontent": build_ics(item, for_attendee=True)})
 	terms_html = frappe.db.get_value("Terms and Conditions", doc.tc_name, "terms") if doc.tc_name else None
 	if terms_html:
 		try:
@@ -467,7 +467,7 @@ def send_order_confirmation(event_name, reference, recipient, reference_doctype=
 		attachments=attachments,
 		subject=subject,
 		template="event_order_confirmation",
-		args={"event": doc, "reference": reference, "attendees": attendees, "order": order, "address": address,
+		args={"event": doc, "venue": venue(doc), "reference": reference, "attendees": attendees, "order": order, "address": address,
 			"buyer_name": buyer_name, "recipient": recipient,
 			"terms_attached": any(a["fname"].endswith(".pdf") for a in attachments),
 			"terms_html": terms_html if not any(a["fname"].endswith(".pdf") for a in attachments) else None,
@@ -477,6 +477,17 @@ def send_order_confirmation(event_name, reference, recipient, reference_doctype=
 		reference_doctype=reference_doctype if order else "Marketing Content",
 		reference_name=reference if order else event,
 	)
+
+
+def venue(doc):
+	"""Where the event takes place, for the emails: the meeting link of an online event (attendees only),
+	else the address as plain text (the email program decides whether it opens a map)."""
+	from phamos.marketing.location import address_line, is_online
+
+	if is_online(doc):
+		return {"online": True, "link": doc.location}
+	text = address_line(doc)
+	return {"text": text} if text else None
 
 
 def send_ticket(attendee, buyer_name=None, lang="de"):
@@ -491,13 +502,13 @@ def send_ticket(attendee, buyer_name=None, lang="de"):
 	doc = frappe.get_doc("Marketing Content", att.event)
 	frappe.local.lang = lang if lang in ("de", "en") else "de"
 	item = find_item("events", doc.route, frappe.local.lang) if doc.published else None
-	attachments = [{"fname": f"{item.slug}.ics", "fcontent": build_ics(item)}] if item and doc.starts_on else []
+	attachments = [{"fname": f"{item.slug}.ics", "fcontent": build_ics(item, for_attendee=True)}] if item and doc.starts_on else []
 	frappe.sendmail(
 		recipients=[att.email],
 		attachments=attachments,
 		subject=_("Your ticket for {0}").format(doc.title),
 		template="event_ticket",
-		args={"event": doc, "attendee": att, "buyer_name": buyer_name, "reference": att.order_reference,
+		args={"event": doc, "venue": venue(doc), "attendee": att, "buyer_name": buyer_name, "reference": att.order_reference,
 			"event_url": frappe.utils.get_url(item.url) if item else None,
 			"privacy_url": frappe.utils.get_url("/en/privacy" if lang == "en" else "/de/datenschutz"),
 			"imprint_url": frappe.utils.get_url("/en/imprint" if lang == "en" else "/de/impressum")},

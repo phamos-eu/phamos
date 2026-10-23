@@ -15,12 +15,13 @@ from babel.numbers import format_currency
 from frappe import _
 from frappe.utils import cint, get_datetime, strip_html, get_system_timezone, get_url, getdate, now_datetime, nowdate
 
+from phamos.marketing.location import address_line, is_online
 from phamos.web_profile.i18n import localized
 from phamos.web_profile.socials import normalize_url
 from phamos.web_profile.utils import slugify
 
 FIELDS = ["name", "title", "subtitle", "event_type", "status", "date_note", "starts_on", "ends_on", "route", "image",
-	"location", "city", "map_link", "organizer_is_phamos", "organizer", "organizer_name", "organizer_logo",
+	"attendance_mode", "location", "street", "postal_code", "city", "country", "latitude", "longitude", "organizer_is_phamos", "organizer", "organizer_name", "organizer_logo",
 	"organizer_website_link", "contact_profile", "going_count", "maybe_count", "not_going_count", "show_bookings_publicly",
 	"registration_open", "max_attendees", "ticket_item", "tc_name", "email_group"]
 DATE_FORMAT = {"de": "EEEE, d. MMMM y", "en": "EEEE, d MMMM y"}
@@ -127,13 +128,17 @@ def load_events(lang):
 		_facet(item, "when", "all", "")
 		if r.event_type:
 			_facet(item, "event_type", slugify(r.event_type), _(r.event_type))
-		if r.city:
+		online = is_online(r)
+		place = _("Online") if online else r.city
+		if online:
+			_facet(item, "city", "online", place)
+		elif r.city:
 			_facet(item, "city", slugify(r.city), r.city)
 		chip, badge = availability(r, offer)
 		if offer and cint(r.show_bookings_publicly) and cint(offer.get("booked")) and chip not in (_("Sold out"), _("Cancelled")):
 			capacity = cint(offer.get("capacity"))
 			chip = _("{0}/{1} booked").format(offer["booked"], capacity) if capacity else _("{0} booked").format(offer["booked"])
-		item["chips"] = [c for c in (_(r.event_type) if r.event_type else None, r.city, chip) if c]
+		item["chips"] = [c for c in (_(r.event_type) if r.event_type else None, place, chip) if c]
 		if badge:
 			item["badge"] = badge
 		start = getdate(r.starts_on) if r.starts_on else None
@@ -147,13 +152,18 @@ def load_events(lang):
 			item["sort"]["date"] = [1, (today - start).days if start else 10**5, title.lower()]
 		organizer = _organizer(r, stakeholders)
 		event_sponsors = [s for s in (_sponsor(row, stakeholders) for row in sponsors.get(r.name, [])) if s]
-		item["search"] = " ".join(filter(None, [title, r.subtitle, r.city, r.location, organizer.get("name"),
+		# The meeting link of an online event is private: it is neither searchable nor in the item data.
+		item["search"] = " ".join(filter(None, [title, r.subtitle, place, None if online else r.location, organizer.get("name"),
 			*(s["name"] for s in event_sponsors),
 			*(s.full_name for s in speakers.get(r.name, []))])).lower()
 		item["data"] = {
 			"starts_on": _iso(r.starts_on), "ends_on": _iso(r.ends_on), "date_note": r.date_note,
 			"when": w, "upcoming": upcoming, "cancelled": r.status == "Cancelled",
-			"location": r.location, "city": r.city, "map_url": normalize_url(r.map_link),
+			"online": online, "location": None if online else r.location,
+			# In person: the address and the map pin (the map view, phamos/phamos#1666, reads these).
+			**({} if online else {"street": r.street, "postal_code": r.postal_code, "city": r.city,
+				"country": r.country, "latitude": r.latitude if r.latitude or r.longitude else None,
+				"longitude": r.longitude if r.latitude or r.longitude else None}),
 			"organizer": organizer,
 			# Named stakeholders (sponsor or organizer): their profile pages list this event.
 			"stakeholders": sorted({s["stakeholder"] for s in event_sponsors if s.get("stakeholder")}
@@ -275,7 +285,8 @@ def build(item, lang):
 	if d.get("cancelled"):
 		overview.append(_("This event has been cancelled."))
 	elif d["when"]["date"]:
-		overview.append(_("{0}: {1} in {2}.").format(item.title, d["when"]["line"], d.get("city") or d.get("location") or _("online"))
+		overview.append(_("{0}: {1}, online.").format(item.title, d["when"]["line"]) if d.get("online")
+			else _("{0}: {1} in {2}.").format(item.title, d["when"]["line"], d.get("city") or d.get("location"))
 			if d.get("city") or d.get("location") else _("{0}: {1}.").format(item.title, d["when"]["line"]))
 
 	# Sidebar, in this order: the buy button with its price, what is special about the price, bookings;
@@ -328,16 +339,15 @@ def build(item, lang):
 
 	hero = {"image": item.image, "badge": item.get("badge"), "lines": [
 		{"kind": "when", "text": d["when"]["line"], "datetime": d.get("starts_on")},
-		{"kind": "where", "text": ", ".join(filter(None, [d.get("location"), d.get("city")])), "url": d.get("map_url")},
+		# Plain text: whether an address opens a map app is the visitor's device's and settings' choice.
+		{"kind": "where", "text": _("Online") if d.get("online") else address_line(d)},
 	]}
 
 	schema = None
 	if d.get("starts_on"):
-		place = {"@type": "Place", "name": d.get("location") or d.get("city"),
-			"address": {"@type": "PostalAddress", "addressLocality": d.get("city")}}
 		schema = {"@type": "Event", "name": item.title, "startDate": d["starts_on"], "endDate": d.get("ends_on") or d["starts_on"],
 			"eventStatus": "https://schema.org/EventCancelled" if d.get("cancelled") else "https://schema.org/EventScheduled",
-			"eventAttendanceMode": "https://schema.org/OfflineEventAttendanceMode", "location": place,
+			**_schema_location(d, item),
 			"organizer": ORGANIZATION if org.get("phamos") or not org.get("name") else {"@type": "Organization",
 				"name": org["name"], "url": org.get("website") or (get_url(org["url"]) if org.get("url") else None)},
 			"performer": [{"@type": "Person", "name": s["name"]} for s in d.get("speakers") or []] or None,
@@ -365,6 +375,22 @@ def build(item, lang):
 		notice = _("This event is described in English only.") if "en" in d["languages"] else _("This event is described in German only.")
 	return {"facts": facts, "overview": " ".join(overview), "schema": schema, "hero": hero, "actions": actions,
 		"blocks": blocks, "ticket": ticket, "notice": notice, "interest": d.get("interest")}
+
+
+def _schema_location(d, item):
+	"""Online: a virtual location pointing to the event page (never the meeting link). In person: the place
+	with its postal address and coordinates."""
+	if d.get("online"):
+		return {"eventAttendanceMode": "https://schema.org/OnlineEventAttendanceMode",
+			"location": {"@type": "VirtualLocation", "url": get_url(item.url)}}
+	address = {"@type": "PostalAddress", "streetAddress": d.get("street"), "postalCode": d.get("postal_code"),
+		"addressLocality": d.get("city"),
+		"addressCountry": (frappe.db.get_value("Country", d["country"], "code") or "").upper() if d.get("country") else None}
+	place = {"@type": "Place", "name": d.get("location") or d.get("city"),
+		"address": {k: v for k, v in address.items() if v}}
+	if d.get("latitude") is not None:
+		place["geo"] = {"@type": "GeoCoordinates", "latitude": d["latitude"], "longitude": d["longitude"]}
+	return {"eventAttendanceMode": "https://schema.org/OfflineEventAttendanceMode", "location": place}
 
 
 def price_note(offer):

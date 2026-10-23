@@ -8,8 +8,10 @@
 	{%- if reference %}<tr><td><strong>{{ _("Reference") }}</strong></td><td>{{ reference | e }}</td></tr>{% endif %}
 	<tr><td><strong>{{ _("Event") }}</strong></td><td>{{ event.title | e }}</td></tr>
 	<tr><td><strong>{{ _("Date") }}</strong></td><td>{{ when | e }}</td></tr>
-	{%- if event.location or event.city %}
-	<tr><td><strong>{{ _("Venue") }}</strong></td><td>{{ [event.location, event.city] | select | join(", ") | e }}</td></tr>
+	{%- if venue and venue.online %}
+	<tr><td><strong>{{ _("Venue") }}</strong></td><td>{{ _("Online") }}: <a href="{{ venue.link | e }}">{{ venue.link | e }}</a></td></tr>
+	{%- elif venue %}
+	<tr><td><strong>{{ _("Venue") }}</strong></td><td>{{ venue.text | e }}</td></tr>
 	{%- endif %}
 </table>
 
