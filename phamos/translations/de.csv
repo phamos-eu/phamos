@@ -417,7 +417,8 @@ The number of tickets does not match the ticket holders.,Die Anzahl der Tickets 
 This event has no updates by email.,Für diese Veranstaltung gibt es keine Neuigkeiten per E-Mail.
 Please agree that we store your email address for these updates.,"Bitte stimmen Sie zu, dass wir Ihre E-Mail-Adresse für diese Neuigkeiten speichern."
 Only {0} seats are left.,Es sind nur noch {0} Plätze frei.
-Already registered for this event: {0},Bereits für diese Veranstaltung angemeldet: {0}
+"One of these email addresses is already registered for this event. Please check the addresses, or leave a ticket holder's email empty.",Eine dieser E-Mail-Adressen ist bereits für diese Veranstaltung angemeldet. Bitte prüfen Sie die Adressen oder lassen Sie die E-Mail-Adresse eines Ticketinhabers leer.
+"Possible match: {0}. Not linked automatically: the email address of a website order is not verified. Check it, then use ""Link to CRM"".",Mögliche Übereinstimmung: {0}. Nicht automatisch verknüpft: Die E-Mail-Adresse einer Website-Bestellung ist nicht bestätigt. Bitte prüfen und dann „Link to CRM“ verwenden.
 Your registration {0} for {1},Ihre Anmeldung {0} für {1}
 Thank you for your registration for {0}.,Vielen Dank für Ihre Anmeldung zu {0}.
 Reference,Referenz

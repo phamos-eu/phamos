@@ -10,6 +10,11 @@ Paid website orders create the buyer's Customer directly (``ensure_customer``): 
 "Zahlungspflichtig bestellen" makes them a customer. ``resolve_party`` itself never creates a Customer.
 A company name that matches a Customer without an email link is only a hint (``crm_status`` "Needs
 Review"): a person decides, so no wrong Customer is reused.
+
+Rules 1 and 2 apply to verified emails only (Desk, ``link_attendee``). A website order is anonymous and
+its email addresses are not verified (``resolve_party(verified=False)``): an existing Contact, Lead or
+Customer is never reused or changed, so nobody can attach a stranger's Contact to their own Customer or
+book in a known customer's name. A match only sets "Needs Review" with a note; a person links it.
 """
 
 import re
@@ -195,16 +200,21 @@ def create_address(*, title, address_line1, city, country, pincode="", address_l
 
 
 def resolve_party(*, email, first_name, last_name="", company_name="", phone="", job_title="", salutation="",
-		event=None, create=True, link_to_lead=None, link_to_customer=None):
+		event=None, create=True, link_to_lead=None, link_to_customer=None, verified=True):
 	"""Contact + Lead or Customer for one person (rules in the module docstring).
 
 	``link_to_customer``: the buying company for companions of a company order: their Contact is linked to
 	that Customer and they get no Lead of their own. ``link_to_lead``: the same for a buyer who is a Lead.
+	``verified``: False for email addresses typed on the website; then existing records are only reported
+	(``review_note``), never reused or changed.
 	"""
 	found = find_party(email, company_name)
+	if not verified and (found.contact or found.lead or found.customers):
+		return frappe._dict(contact=None, lead=None, customer=link_to_customer, created=[], crm_status="Needs Review",
+			suggestions=found.suggestions, review_note=_review_note(found))
 	result = frappe._dict(contact=found.contact, lead=found.lead, customer=found.customer, created=[],
 		crm_status="Linked" if found.confidence == "strong" else "Needs Review" if found.confidence == "review"
-		else "Unlinked", suggestions=found.suggestions)
+		else "Unlinked", suggestions=found.suggestions, review_note=None)
 	if not create:
 		if found.contact or found.lead:
 			result.crm_status = result.crm_status if result.crm_status != "Unlinked" else "Linked"
@@ -234,6 +244,15 @@ def resolve_party(*, email, first_name, last_name="", company_name="", phone="",
 	if result.crm_status == "Unlinked":
 		result.crm_status = "Linked"
 	return result
+
+
+def _review_note(found):
+	"""What a website order's email matches in the CRM, for the person who links it."""
+	parts = [f"{_('Contact')} {found.contact}" if found.contact else None,
+		f"{_('Lead')} {found.lead}" if found.lead else None,
+		*(f"{_('Customer')} {c}" for c in found.customers or [])]
+	return _("Possible match: {0}. Not linked automatically: the email address of a website order is not "
+		"verified. Check it, then use \"Link to CRM\".").format(", ".join(filter(None, parts)))
 
 
 def link_attendee(attendee, create=True):
