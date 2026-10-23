@@ -5,6 +5,8 @@ import { allImplementations, defaultImplementation, loadScope, rememberImplement
 import Overview from "./views/Overview.vue"
 import ComingSoon from "./views/ComingSoon.vue"
 import Timesheets from "./views/Timesheets.vue"
+import SalesOrders from "./views/SalesOrders.vue"
+import Links from "./views/Links.vue"
 import NoImplementation from "./views/NoImplementation.vue"
 
 // Every page belongs to one implementation, so it is part of the URL: links into the cockpit
@@ -12,10 +14,8 @@ import NoImplementation from "./views/NoImplementation.vue"
 const sections = [
 	{ path: "milestones", name: "Milestones", issue: "#1679" },
 	{ path: "issues", name: "Issues", issue: "#1679, #1680" },
-	{ path: "commercials", name: "Commercials", issue: "#1681" },
 	{ path: "planning", name: "Planning", issue: "#1693, #1694" },
 	{ path: "team", name: "Team", label: "Contact & Team", issue: "#1684" },
-	{ path: "links", name: "Links", issue: "#1682" },
 ]
 
 const router = createRouter({
@@ -25,6 +25,9 @@ const router = createRouter({
 		{ path: "/:implementation", redirect: (to) => ({ name: "Overview", params: to.params }) },
 		{ path: "/:implementation/overview", name: "Overview", component: Overview, props: true },
 		{ path: "/:implementation/timesheets", name: "Timesheets", component: Timesheets, props: true },
+		// The other two tabs of /timesheet, as they are today; reworked in #1681 and #1682.
+		{ path: "/:implementation/sales-orders", name: "SalesOrders", component: SalesOrders, props: true },
+		{ path: "/:implementation/links", name: "Links", component: Links, props: true },
 		...sections.map((s) => ({
 			path: `/:implementation/${s.path}`,
 			name: s.name,

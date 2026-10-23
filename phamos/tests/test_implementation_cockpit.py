@@ -101,6 +101,36 @@ def _timesheet(name, project, customer, start_date, hours, billable, rating=0, a
 	return name
 
 
+def _sales_order(name, implementation, customer, qty, delivered, status="To Deliver and Bill", docstatus=1):
+	frappe.get_doc(
+		{
+			"doctype": "Sales Order",
+			"name": name,
+			"customer": customer,
+			"customer_name": customer,
+			"custom_implementation": implementation,
+			"transaction_date": "2026-03-01",
+			"delivery_date": "2026-06-30",
+			"status": status,
+			"total_qty": qty,
+			"docstatus": docstatus,
+		}
+	).db_insert()
+	frappe.get_doc(
+		{
+			"doctype": "Sales Order Item",
+			"parent": name,
+			"parenttype": "Sales Order",
+			"parentfield": "items",
+			"idx": 1,
+			"item_code": "Consulting",
+			"qty": qty,
+			"delivered_qty": delivered,
+		}
+	).db_insert()
+	return name
+
+
 class TestImplementationCockpit(FrappeTestCase):
 	@classmethod
 	def setUpClass(cls):
@@ -143,6 +173,18 @@ class TestImplementationCockpit(FrappeTestCase):
 		cls.ts_rated = _timesheet(PREFIX + "TS 3", own_project, own, "2026-05-20", 2, 0, rating=3)
 		cls.ts_other_impl = _timesheet(PREFIX + "TS 4", other_impl_project, own, "2026-05-12", 5, 5)
 		cls.ts_foreign = _timesheet(PREFIX + "TS 5", foreign_project, other, "2026-05-12", 7, 7)
+
+		cls.so_open = _sales_order(PREFIX + "SO 1", cls.by_contact, own, 100, 40)
+		cls.so_done = _sales_order(PREFIX + "SO 2", cls.by_contact, own, 20, 20, status="Completed")
+		cls.so_draft = _sales_order(PREFIX + "SO 3", cls.by_contact, own, 50, 0, docstatus=0)
+		cls.so_other = _sales_order(PREFIX + "SO 4", cls.by_email, own, 30, 0)
+		frappe.db.set_value(
+			"Implementation",
+			cls.by_contact,
+			"links",
+			'<p><a href="https://test.example.com">Test system</a><script>alert(1)</script></p>',
+			update_modified=False,
+		)
 
 	def tearDown(self):
 		frappe.set_user("Administrator")
@@ -259,3 +301,26 @@ class TestImplementationCockpit(FrappeTestCase):
 		self.assertEqual(values.customer_comment, "Please check the hours on 3 March")
 		self.assertIsNotNone(values.custom_customer_comment_timestamp)
 		self.assertEqual(values.custom_daily_comment_report_sent, 0)
+
+	def test_sales_orders_are_scoped_and_summed(self):
+		frappe.set_user(USER)
+		data = ic.get_sales_orders(self.by_contact)
+		self.assertEqual({o["name"] for o in data["sales_orders"]}, {self.so_open, self.so_done})
+		summary = data["summary"]
+		self.assertEqual(summary["total_so_hrs"], 120)
+		self.assertEqual(summary["delivered_hrs"], 60)
+		self.assertEqual(summary["open_so_count"], 1)
+		self.assertEqual(summary["total_so_count"], 2)
+		self.assertNotIn("grand_total", data["sales_orders"][0])
+		open_order = next(o for o in data["sales_orders"] if o["name"] == self.so_open)
+		self.assertEqual(open_order["remaining_hrs"], 60)
+		with self.assertRaises(frappe.PermissionError):
+			ic.get_sales_orders(self.foreign)
+
+	def test_links_are_sanitized(self):
+		frappe.set_user(USER)
+		html = ic.get_links(self.by_contact)["html"]
+		self.assertIn("https://test.example.com", html)
+		self.assertNotIn("<script", html)
+		with self.assertRaises(frappe.PermissionError):
+			ic.get_links(self.hidden)

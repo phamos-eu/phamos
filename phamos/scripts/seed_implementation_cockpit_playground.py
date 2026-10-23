@@ -74,6 +74,7 @@ def run():
 		for impl in spec["implementations"]:
 			_ensure_implementation(impl, customer, manager, contact if spec["shared_with_user"] else None)
 			_ensure_timesheets(impl["name"], customer)
+			_ensure_sales_orders(impl["name"], customer)
 	frappe.db.commit()
 	print(f"Seeded. Customer user: {CUSTOMER_USER} (use Impersonate on the User in Desk).")
 	print("Open http://dev.localhost:8000/implementation-cockpit")
@@ -155,6 +156,7 @@ def _ensure_implementation(spec, customer, manager, contact):
 		"notes": spec.get("notes"),
 		"show_on_customer_portal": spec.get("show_on_customer_portal", 1),
 		"account_manager": manager,
+		"links": LINKS_HTML,
 		"start_date": add_days(today(), -400),
 	}
 	if frappe.db.exists("Implementation", spec["name"]):
@@ -263,5 +265,64 @@ def _ensure_timesheets(implementation, customer):
 				"billing_hours": billable,
 				"is_billable": 1 if billable else 0,
 				"project": project,
+			}
+		).db_insert()
+
+
+LINKS_HTML = (
+	"<p><strong>Systems</strong></p><ul>"
+	'<li><a href="https://example.com/production">Production system</a></li>'
+	'<li><a href="https://example.com/test">Test system – try fixes here first</a></li></ul>'
+	"<p><strong>Documentation and code</strong></p><ul>"
+	'<li><a href="https://example.com/docs">Handbook and how-tos</a></li>'
+	'<li><a href="https://example.com/gitlab">GitLab board of this implementation</a></li></ul>'
+)
+
+SALES_ORDERS = [
+	# (hours, delivered, status, months ago)
+	(120, 120, "Completed", 10),
+	(200, 86, "To Deliver and Bill", 4),
+	(40, 0, "To Deliver and Bill", 1),
+]
+
+
+def _ensure_sales_orders(implementation, customer):
+	"""Submitted Sales Orders with delivered hours, inserted without validation (no Item setup)."""
+	from frappe.utils import add_months
+
+	tag = zlib.crc32(implementation.encode()) % 1000
+	for i, (hours, delivered, status, months_ago) in enumerate(SALES_ORDERS, start=1):
+		name = f"{SEED_TAG} SO-{tag:03d}-{i}"
+		frappe.db.delete("Sales Order Item", {"parent": name})
+		frappe.db.delete("Sales Order", name)
+		ordered = add_months(today(), -months_ago)
+		frappe.get_doc(
+			{
+				"doctype": "Sales Order",
+				"name": name,
+				"customer": customer,
+				"customer_name": customer,
+				"custom_implementation": implementation,
+				"company": frappe.db.get_single_value("Global Defaults", "default_company"),
+				"transaction_date": ordered,
+				"delivery_date": add_months(ordered, 3),
+				"status": status,
+				"total_qty": hours,
+				"per_delivered": round(delivered / hours * 100, 2),
+				"docstatus": 1,
+			}
+		).db_insert()
+		frappe.get_doc(
+			{
+				"doctype": "Sales Order Item",
+				"parent": name,
+				"parenttype": "Sales Order",
+				"parentfield": "items",
+				"idx": 1,
+				"item_code": "Consulting",
+				"item_name": "Consulting hours",
+				"qty": hours,
+				"delivered_qty": delivered,
+				"uom": "Hour",
 			}
 		).db_insert()

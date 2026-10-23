@@ -39,7 +39,7 @@ const navItems = computed(() =>
 				{ name: "Milestones", label: __("Milestones"), icon: "flag" },
 				{ name: "Issues", label: __("Issues"), icon: "inbox" },
 				{ name: "Timesheets", label: __("Timesheets"), icon: "clock" },
-				{ name: "Commercials", label: __("Commercials"), icon: "file-text" },
+				{ name: "SalesOrders", label: __("Sales Orders"), icon: "file-text" },
 				{ name: "Planning", label: __("Planning"), icon: "calendar" },
 				{ name: "Team", label: __("Contact & Team"), icon: "users" },
 				{ name: "Links", label: __("Links"), icon: "link" },

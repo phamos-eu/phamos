@@ -17,8 +17,9 @@ users, so they see what the customer sees.
 import frappe
 from frappe import _
 from frappe.query_builder import Order
-from frappe.query_builder.functions import Count
+from frappe.query_builder.functions import Count, Sum
 from frappe.utils import add_days, add_months, cint, flt, getdate, now_datetime, today
+from frappe.utils.html_utils import sanitize_html
 
 # Fields of Implementation the cockpit may send. Anything else stays on the server.
 OVERVIEW_FIELDS = (
@@ -428,3 +429,100 @@ def set_timesheet_feedback(implementation, timesheet, rating, comment=None):
 	if comment:
 		_set_gitlab_urls_from_comment(doc, comment)
 	return {"name": timesheet, "custom_rating": rating, "customer_comment": comment}
+
+
+# Sales Orders and Links: the other two tabs of /timesheet, scoped to one Implementation.
+
+
+@frappe.whitelist()
+def get_sales_orders(implementation):
+	"""Submitted Sales Orders of the Implementation with delivered and remaining hours.
+
+	Same figures as the portal's get_customer_sales_order_status, for one Implementation. Hours
+	only: amounts wait for the role views (#1673).
+	"""
+	_require_implementation(implementation)
+	so = frappe.qb.DocType("Sales Order")
+	orders = (
+		frappe.qb.from_(so)
+		.select(
+			so.name,
+			so.customer_name.as_("title"),
+			so.status,
+			so.total_qty.as_("total_hrs"),
+			so.transaction_date,
+			so.delivery_date,
+			so.per_delivered,
+			so.per_billed,
+		)
+		.where(so.custom_implementation == implementation)
+		.where(so.docstatus == 1)
+		.where(so.status != "Cancelled")
+		.orderby(so.transaction_date, order=Order.desc)
+		.run(as_dict=True)
+	)
+
+	delivered = {}
+	if orders:
+		soi = frappe.qb.DocType("Sales Order Item")
+		delivered = dict(
+			frappe.qb.from_(soi)
+			.select(soi.parent, Sum(soi.delivered_qty))
+			.where(soi.parent.isin([o.name for o in orders]))
+			.groupby(soi.parent)
+			.run()
+		)
+
+	total_so_hrs = total_delivered = 0.0
+	open_count = 0
+	for order in orders:
+		order.total_hrs = flt(order.total_hrs)
+		order.delivered_hrs = flt(delivered.get(order.name))
+		order.remaining_hrs = order.total_hrs - order.delivered_hrs
+		total_so_hrs += order.total_hrs
+		total_delivered += order.delivered_hrs
+		if order.status not in ("Completed", "Closed"):
+			open_count += 1
+
+	timesheet_hrs = _billable_hours_not_delivered(implementation)
+	return {
+		"sales_orders": orders,
+		"summary": {
+			"total_so_hrs": total_so_hrs,
+			"delivered_hrs": total_delivered,
+			"timesheet_hrs": timesheet_hrs,
+			"remaining_hrs": total_so_hrs - (total_delivered + timesheet_hrs),
+			"open_so_count": open_count,
+			"total_so_count": len(orders),
+		},
+	}
+
+
+def _billable_hours_not_delivered(implementation):
+	"""Billable draft Timesheet hours not yet on a Delivery Note (as the Implementation computes it)."""
+	projects = _implementation_projects(implementation)
+	if not projects:
+		return 0.0
+	ts = frappe.qb.DocType("Timesheet")
+	td = frappe.qb.DocType("Timesheet Detail")
+	result = (
+		frappe.qb.from_(ts)
+		.join(td)
+		.on(td.parent == ts.name)
+		.select(Sum(td.hours))
+		.where(td.is_billable == 1)
+		.where(ts.docstatus == 0)
+		.where(td.project.isin(projects))
+		.where(td.custom_implementation == implementation)
+		.where(ts.custom_delivery_note.isnull())
+		.run()
+	)
+	return flt(result[0][0]) if result else 0.0
+
+
+@frappe.whitelist()
+def get_links(implementation):
+	"""The Implementation's links (today a Text Editor field) as sanitized HTML; a table follows in #1682."""
+	_require_implementation(implementation)
+	html = frappe.db.get_value("Implementation", implementation, "links") or ""
+	return {"html": sanitize_html(html, linkify=True, always_sanitize=True)}
