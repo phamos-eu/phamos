@@ -81,8 +81,13 @@ frappe.ui.form.on("Marketing Content", {
 
 	geolocation(frm) {
 		// The pin was set or dragged: keep the plain numbers in step (the server does the same on save).
-		const point = ((JSON.parse(frm.doc.geolocation || "{}").features || [])
-			.find((f) => f.geometry && f.geometry.type === "Point") || {}).geometry;
+		let features = [];
+		try {
+			features = JSON.parse(frm.doc.geolocation || "{}").features || [];
+		} catch (e) {
+			// Not GeoJSON: no point to read; the server checks the value again on save.
+		}
+		const point = (features.find((f) => f.geometry && f.geometry.type === "Point") || {}).geometry;
 		frm.set_value({ latitude: point ? point.coordinates[1] : null, longitude: point ? point.coordinates[0] : null });
 	},
 });

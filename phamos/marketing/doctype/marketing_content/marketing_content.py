@@ -56,9 +56,12 @@ class MarketingContent(WebProfileDocument):
 		if not self.country and any(self.get(f) for f in ("street", "postal_code", "city")):
 			self.country = frappe.db.get_default("country")
 		if not self.geolocation:
-			found = location.geocode(self.street, self.postal_code, self.city, self.country)
-			if found:
-				self.geolocation = location.point(found["latitude"], found["longitude"])
+			# Only with a street: a lookup of the city alone would pin the town centre, and a set pin is never
+			# moved again. Never during imports, patches or migrate: one request per second would stall them.
+			if self.street and not (frappe.flags.in_import or frappe.flags.in_patch or frappe.flags.in_migrate):
+				found = location.geocode(self.street, self.postal_code, self.city, self.country)
+				if found:
+					self.geolocation = location.point(found["latitude"], found["longitude"])
 		elif not self.is_new() and not self.has_value_changed("geolocation") and any(
 				self.has_value_changed(f) for f in location.ADDRESS_FIELDS):
 			frappe.msgprint(_("The address changed but the map pin did not. Use Find on Map to move the pin."),
