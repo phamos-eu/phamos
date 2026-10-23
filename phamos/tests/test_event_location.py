@@ -107,9 +107,9 @@ class TestEventLocation(FrappeTestCase):
 
 	def test_map_links(self):
 		links = location.map_links(48.4914, 9.2043, "Rathaus Reutlingen")
-		self.assertEqual(links["osm"], "https://www.openstreetmap.org/?mlat=48.491400&mlon=9.204300#map=18/48.491400/9.204300")
+		self.assertEqual(set(links), {"geo", "osm"})  # no app chosen for the visitor
 		self.assertEqual(links["geo"], "geo:48.491400,9.204300?q=48.491400,9.204300(Rathaus%20Reutlingen)")
-		self.assertTrue(links["apple"].startswith("https://maps.apple.com/?ll=48.491400%2C9.204300&q=Rathaus"))
+		self.assertEqual(links["osm"], "https://www.openstreetmap.org/?mlat=48.491400&mlon=9.204300#map=18/48.491400/9.204300")
 		self.assertIsNone(location.map_links(None, None))
 
 	def test_coordinates_from_old_map_links(self):
@@ -161,8 +161,8 @@ class TestEventLocation(FrappeTestCase):
 
 		frappe.set_user("Guest")
 		html = get_html_for_route(f"/en/events/{event.route}")
-		self.assertIn("data-wp-maps", html)
-		self.assertIn("geo:48.491400,9.204300", html)
+		self.assertIn('href="geo:48.491400,9.204300', html)
+		self.assertIn("openstreetmap.org/?mlat=48.491400", html)
 
 	# --- calendar file and emails -----------------------------------------------------------------------
 
