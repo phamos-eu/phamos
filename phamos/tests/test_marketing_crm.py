@@ -61,6 +61,27 @@ class TestMarketingCrm(FrappeTestCase):
 		self.assertEqual(found.company_match, "Review Maschinenbau GmbH")
 		self.assertIsNone(found.customer)
 
+	def test_unverified_email_never_reuses_or_changes_existing_records(self):
+		make_customer("Unverified Kunde GmbH", "known@crm-kunde.example")
+		contact = crm.contact_for_email("known@crm-kunde.example")
+		lead = crm.resolve_party(email="lead@crm-kunde.example", first_name="Known", event=self.event).lead
+		for email in ("known@crm-kunde.example", "lead@crm-kunde.example"):
+			result = crm.resolve_party(email=email, first_name="Stranger", company_name="Fremd GmbH", event=self.event,
+				link_to_customer="Some Order Customer", verified=False)
+			self.assertEqual((result.contact, result.lead, result.created), (None, None, []))
+			self.assertEqual(result.customer, "Some Order Customer")  # the order's own Customer only
+			self.assertEqual(result.crm_status, "Needs Review")
+			self.assertIn("Possible match", result.review_note)
+		self.assertEqual(frappe.get_all("Dynamic Link", filters={"parenttype": "Contact", "parent": contact},
+			pluck="link_name"), ["Unverified Kunde GmbH"])
+		self.assertFalse(frappe.db.get_value("Lead", lead, "company_name"))
+
+	def test_unverified_new_email_still_becomes_lead(self):
+		result = crm.resolve_party(email="brand.new@example.com", first_name="Brand", event=self.event, verified=False)
+		self.assertTrue(result.lead and result.contact)
+		self.assertEqual(result.crm_status, "Linked")
+		self.assertIsNone(result.review_note)
+
 	def test_link_attendee_stores_links(self):
 		att = make_attendee(self.event.name, "linkme@example.com", "Link", "Me")
 		crm.link_attendee(att.name)
