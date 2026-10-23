@@ -265,6 +265,7 @@ def _ensure_timesheets(implementation, customer):
 				"billing_hours": billable,
 				"is_billable": 1 if billable else 0,
 				"project": project,
+				"custom_implementation": implementation,
 			}
 		).db_insert()
 

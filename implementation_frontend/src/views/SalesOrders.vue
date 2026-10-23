@@ -20,13 +20,13 @@
 			<section v-if="summary && summary.total_so_hrs > 0" class="rounded-lg border border-outline-gray-2 bg-surface-white p-4">
 				<div class="text-xs font-medium uppercase tracking-wide text-ink-gray-5">{{ __("Ordered hours") }}</div>
 				<div class="mt-3 flex h-3 overflow-hidden rounded-full bg-surface-gray-2" role="img" :aria-label="barLabel">
-					<div class="bg-ink-blue-3" :style="{ width: share(summary.delivered_hrs) }" />
-					<div class="bg-ink-amber-3" :style="{ width: share(summary.timesheet_hrs) }" />
+					<div :style="{ width: share(summary.delivered_hrs), background: 'var(--ink-blue-3)' }" />
+					<div :style="{ width: share(summary.timesheet_hrs), background: 'var(--ink-amber-3)' }" />
 				</div>
 				<div class="mt-2 flex flex-wrap gap-4 text-xs text-ink-gray-6">
-					<span class="flex items-center gap-1.5"><span class="h-2 w-2 rounded-full bg-ink-blue-3" />{{ __("Delivered") }}</span>
-					<span class="flex items-center gap-1.5"><span class="h-2 w-2 rounded-full bg-ink-amber-3" />{{ __("Booked, not yet delivered") }}</span>
-					<span class="flex items-center gap-1.5"><span class="h-2 w-2 rounded-full bg-surface-gray-4" />{{ __("Remaining") }}</span>
+					<span class="flex items-center gap-1.5"><span class="h-2 w-2 rounded-full" style="background: var(--ink-blue-3)" />{{ __("Delivered") }}</span>
+					<span class="flex items-center gap-1.5"><span class="h-2 w-2 rounded-full" style="background: var(--ink-amber-3)" />{{ __("Booked, not yet delivered") }}</span>
+					<span class="flex items-center gap-1.5"><span class="h-2 w-2 rounded-full bg-surface-gray-3" />{{ __("Remaining") }}</span>
 				</div>
 			</section>
 
@@ -69,7 +69,7 @@
 							<span class="text-right tabular-nums text-ink-gray-8">{{ hours(so.remaining_hrs) }}</span>
 							<span class="flex items-center gap-2">
 								<span class="h-1.5 flex-1 overflow-hidden rounded-full bg-surface-gray-2">
-									<span class="block h-full rounded-full bg-ink-gray-7" :style="{ width: `${Math.min(progress(so), 100)}%` }" />
+									<span class="block h-full rounded-full" :style="{ width: `${Math.min(progress(so), 100)}%`, background: 'var(--ink-gray-7)' }" />
 								</span>
 								<span class="w-10 text-right text-xs tabular-nums text-ink-gray-6">{{ progress(so) }}%</span>
 							</span>
