@@ -173,6 +173,42 @@ class TestTicketing(FrappeTestCase):
 		make_attendee(self.event.name, "erika@ticket.example")
 		self.assertRaises(frappe.ValidationError, self.order)
 
+	def test_duplicate_message_names_no_address(self, enqueue):
+		make_attendee(self.event.name, "erika@ticket.example")
+		with self.assertRaises(frappe.ValidationError) as raised:
+			self.order()
+		self.assertNotIn("erika@ticket.example", str(raised.exception))
+
+	def test_order_locks_the_event_row(self, enqueue):
+		with patch("frappe.get_doc", wraps=frappe.get_doc) as get_doc:
+			self.order()
+		self.assertIn((("Marketing Content", self.event.name), {"for_update": True}),
+			[(c.args, c.kwargs) for c in get_doc.call_args_list])
+
+	def test_free_order_never_uses_a_known_contact(self, enqueue):
+		known = make_customer("Known Free Customer AG", "erika@ticket.example")
+		contact = frappe.db.get_value("Contact Email", {"email_id": "erika@ticket.example"}, "parent")
+		free = make_event("Free Known Event", paid=False)
+		self.order(event=free, billing_data=None, companions=[])
+		att = frappe.get_all("Attendee", filters={"event": free.name}, fields=["name", "contact", "customer", "crm_status"])[0]
+		self.assertEqual((att.contact, att.customer, att.crm_status), (None, None, "Needs Review"))
+		self.assertTrue(frappe.db.exists("Comment", {"reference_doctype": "Attendee", "reference_name": att.name,
+			"content": ["like", f"%{contact}%"]}))
+		self.assertEqual(frappe.get_all("Dynamic Link", filters={"parenttype": "Contact", "parent": contact},
+			pluck="link_name"), [known])
+
+	def test_companion_contact_is_never_linked_to_the_buyers_customer(self, enqueue):
+		known = make_customer("Known Companion Customer AG", "colleague@ticket.example")
+		contact = frappe.db.get_value("Contact Email", {"email_id": "colleague@ticket.example"}, "parent")
+		result = self.order(companions=[{"full_name": "Colleague Known", "email": "colleague@ticket.example"}])
+		row = frappe.get_all("Attendee", filters={"sales_order": result["reference"], "is_buyer": 0},
+			fields=["contact", "crm_status", "customer"])[0]
+		self.assertEqual((row.contact, row.crm_status), (None, "Needs Review"))
+		self.assertEqual(row.customer, frappe.db.get_value("Sales Order", result["reference"], "customer"))
+		# The submitted order did not touch the existing Contact either.
+		self.assertEqual(frappe.get_all("Dynamic Link", filters={"parenttype": "Contact", "parent": contact},
+			pluck="link_name"), [known])
+
 	def test_bad_email_is_refused(self, enqueue):
 		self.assertRaises(frappe.ValidationError, self.order, contact={"full_name": "Bad", "email": "bad@example.com/"})
 

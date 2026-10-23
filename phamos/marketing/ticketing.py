@@ -301,7 +301,9 @@ def register_attendees(event, contact, attends=True, companions=None, billing_da
 
 
 def _register(event, contact, attends, companions, billing_data, source, lang, expected_total, hold_id=None):
-	doc = frappe.get_doc("Marketing Content", event)
+	# Row lock until the request commits: two orders placed at the same moment are booked one after the
+	# other, so the seat and price-quota checks below always see the other order's attendees.
+	doc = frappe.get_doc("Marketing Content", event, for_update=True)
 	is_open, reason = sale_state(doc, exclude_hold=hold_id)
 	if not is_open:
 		frappe.throw(_("Sorry, registration for this event is not possible ({0}).").format(_(reason)))
@@ -317,10 +319,10 @@ def _register(event, contact, attends, companions, billing_data, source, lang, e
 	emails = [p.email for p in people if p.email]
 	if len(set(emails)) != len(emails):
 		frappe.throw(_("Two tickets have the same email address. Leave the email of a companion empty instead."))
-	existing = frappe.get_all("Attendee", filters={"event": doc.name, "email": ["in", emails],
-		"status": ["!=", "Cancelled"]}, pluck="email") if emails else []
-	if existing:
-		frappe.throw(_("Already registered for this event: {0}").format(", ".join(existing)))
+	# The message names no address: anyone can type any email, and it must not tell them who is registered.
+	if emails and frappe.db.exists("Attendee", {"event": doc.name, "email": ["in", emails], "status": ["!=", "Cancelled"]}):
+		frappe.throw(_("One of these email addresses is already registered for this event. Please check the "
+			"addresses, or leave a ticket holder's email empty."))
 	taken = seats_taken(doc.name, exclude_hold=hold_id)
 	if cint(doc.max_attendees) and taken + len(people) > cint(doc.max_attendees):
 		frappe.throw(_("Only {0} seats are left.").format(max(0, cint(doc.max_attendees) - taken)))
@@ -343,7 +345,7 @@ def _register(event, contact, attends, companions, billing_data, source, lang, e
 	else:
 		buyer = main
 		buyer_links = crm.resolve_party(email=main.email, first_name=main.first_name, last_name=main.last_name,
-			phone=main.phone, event=doc)
+			phone=main.phone, event=doc, verified=False)
 		customer = buyer_links.customer
 
 	docs = []
@@ -356,7 +358,7 @@ def _register(event, contact, attends, companions, billing_data, source, lang, e
 		else:
 			links = crm.resolve_party(email=person.email, first_name=person.first_name, last_name=person.last_name,
 				company_name=buyer.company_name if paid and buyer.is_company else "", event=doc,
-				link_to_customer=customer if paid and buyer.is_company else None)
+				link_to_customer=customer if paid and buyer.is_company else None, verified=False)
 		att = frappe.get_doc({
 			"doctype": "Attendee", "event": doc.name, "role": "Guest", "status": "Registered", "source": source,
 			"language": lang if lang in ("de", "en") else None, "registered_on": now,
@@ -372,6 +374,8 @@ def _register(event, contact, attends, companions, billing_data, source, lang, e
 			"notes": _("Tickets and information go to {0}.").format(main.email) if not person.email else None,
 		})
 		att.insert(ignore_permissions=True)
+		if links.get("review_note"):
+			att.add_comment("Comment", links.review_note)
 		docs.append(att)
 	if paid and party.review:
 		for att in docs:
