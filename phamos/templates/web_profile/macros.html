@@ -193,6 +193,9 @@
 				{%- if line.kind == "when" %}<time{% if line.datetime %} datetime="{{ line.datetime | e }}"{% endif %}>{{ line.text | e }}</time>
 				{%- elif line.url %}<a class="wp-link-card wp-link-card-inline" href="{{ line.url | e }}" rel="noopener" target="_blank"><span>{{ line.text | e }}</span><span class="wp-link-card-arrow" aria-hidden="true">↗</span></a>
 				{%- else %}{{ line.text | e }}{% endif -%}
+				{#- "Open in maps": OpenStreetMap without JavaScript; the events script switches to the device's map app. -#}
+				{%- if line.maps %} <a class="wp-link-card wp-link-card-inline" href="{{ line.maps.osm | e }}" rel="noopener" target="_blank"
+					data-wp-maps data-geo="{{ line.maps.geo | e }}" data-apple="{{ line.maps.apple | e }}"><span>{{ _("Open in maps") }}</span><span class="wp-link-card-arrow" aria-hidden="true">↗</span></a>{% endif -%}
 			</span>
 			{%- endfor %}
 		</p>
@@ -282,7 +285,7 @@
     fixed date (§ 312g (2) no. 9). Marketing questions come only after the order (optional, explained). -#}
 {% macro ticket_dialog_markup(item, t, lang) -%}
 {%- set privacy_url = '/en/privacy' if lang == 'en' else '/de/datenschutz' -%}
-{%- set venue = [item.data.location, item.data.city] | select | join(", ") -%}
+{%- set venue = _("Online") if item.data.online else [item.data.location, item.data.city] | select | join(", ") -%}
 {%- set terms = ('<a href="#wp-terms" data-wp-terms-open>' ~ _("terms and conditions") ~ '</a>') if t.terms_html else _("terms and conditions") -%}
 <dialog class="wp-dialog wp-dialog-wide" id="wp-ticket-dialog" aria-labelledby="wp-ticket-title" data-wp-ticket-dialog>
 	<form class="wp-contact-form wp-checkout" method="post" action="/api/method/phamos.marketing.web.order_tickets" data-wp-ticket-form novalidate

@@ -17,9 +17,17 @@
   "route",
   "legacy_route",
   "section_location",
+  "attendance_mode",
   "location",
+  "street",
+  "postal_code",
   "city",
-  "map_link",
+  "country",
+  "find_on_map",
+  "column_break_location",
+  "geolocation",
+  "latitude",
+  "longitude",
   "section_media",
   "image",
   "intro",
@@ -153,20 +161,77 @@
    "label": "Location"
   },
   {
-   "fieldname": "location",
-   "fieldtype": "Data",
-   "label": "Venue / Location"
+   "default": "In person",
+   "fieldname": "attendance_mode",
+   "fieldtype": "Select",
+   "in_list_view": 1,
+   "in_standard_filter": 1,
+   "label": "Attendance",
+   "options": "In person\nOnline"
   },
   {
+   "description": "In person: the venue's name, e.g. \"Hotel Adlon, Saal 2\". Online: the meeting link (https://…). The link is only sent to registered attendees, never shown on the website.",
+   "fieldname": "location",
+   "fieldtype": "Data",
+   "label": "Venue / Video Link"
+  },
+  {
+   "depends_on": "eval:doc.attendance_mode!=='Online'",
+   "fieldname": "street",
+   "fieldtype": "Data",
+   "label": "Street"
+  },
+  {
+   "depends_on": "eval:doc.attendance_mode!=='Online'",
+   "fieldname": "postal_code",
+   "fieldtype": "Data",
+   "label": "Postal Code"
+  },
+  {
+   "depends_on": "eval:doc.attendance_mode!=='Online'",
    "fieldname": "city",
    "fieldtype": "Data",
    "label": "City"
   },
   {
-   "description": "Google Maps or OpenStreetMap share URL",
-   "fieldname": "map_link",
-   "fieldtype": "Data",
-   "label": "Map Link"
+   "depends_on": "eval:doc.attendance_mode!=='Online'",
+   "fieldname": "country",
+   "fieldtype": "Link",
+   "label": "Country",
+   "options": "Country"
+  },
+  {
+   "depends_on": "eval:doc.attendance_mode!=='Online'",
+   "description": "Looks the address up on OpenStreetMap and sets the pin. Drag the pin to the exact entrance if needed.",
+   "fieldname": "find_on_map",
+   "fieldtype": "Button",
+   "label": "Find on Map"
+  },
+  {
+   "fieldname": "column_break_location",
+   "fieldtype": "Column Break"
+  },
+  {
+   "depends_on": "eval:doc.attendance_mode!=='Online'",
+   "fieldname": "geolocation",
+   "fieldtype": "Geolocation",
+   "label": "Map Pin"
+  },
+  {
+   "depends_on": "eval:doc.attendance_mode!=='Online'",
+   "fieldname": "latitude",
+   "fieldtype": "Float",
+   "label": "Latitude",
+   "precision": "7",
+   "read_only": 1
+  },
+  {
+   "depends_on": "eval:doc.attendance_mode!=='Online'",
+   "fieldname": "longitude",
+   "fieldtype": "Float",
+   "label": "Longitude",
+   "precision": "7",
+   "read_only": 1
   },
   {
    "fieldname": "section_media",
@@ -497,7 +562,7 @@
   }
  ],
  "links": [],
- "modified": "2026-10-17 12:00:00.000000",
+ "modified": "2026-10-23 16:00:00.000000",
  "modified_by": "Administrator",
  "module": "Marketing",
  "name": "Marketing Content",

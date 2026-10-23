@@ -653,4 +653,19 @@
 			}
 		});
 	}
+
+	// --- open in maps ---------------------------------------------------------------------------------
+	// The link opens OpenStreetMap; on Android a geo: link lets the system open the default map app,
+	// on iPhone, iPad and Mac the Apple Maps link opens Apple Maps.
+	const ua = navigator.userAgent;
+	const apple = /iPhone|iPad|iPod|Macintosh/.test(ua);
+	const android = /Android/.test(ua);
+	document.querySelectorAll("[data-wp-maps]").forEach((link) => {
+		if (android && link.dataset.geo) {
+			link.href = link.dataset.geo;
+			link.removeAttribute("target");
+		} else if (apple && link.dataset.apple) {
+			link.href = link.dataset.apple;
+		}
+	});
 })();
