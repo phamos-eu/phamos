@@ -25,6 +25,8 @@ HTTPS = re.compile(r"^https://[^\s/?#]+\.[^\s/?#]+\S*$", re.IGNORECASE)
 ADDRESS_FIELDS = ("street", "postal_code", "city", "country")
 NOMINATIM_URL = "https://nominatim.openstreetmap.org"
 NOMINATIM_INTERVAL = 1.0  # seconds between requests (Nominatim usage policy)
+NOMINATIM_WAIT = 5.0  # longest a save waits for its turn before giving up on the lookup
+NOMINATIM_TURN_KEY = "phamos:nominatim_turn"  # not site-prefixed on purpose: shared by all sites
 
 
 def is_online(doc):
@@ -116,12 +118,14 @@ def geocode(street=None, postal_code=None, city=None, country=None):
 
 
 def _search(params):
-	"""Nominatim's /search. Tests never reach the network: they patch this function."""
+	"""Nominatim's /search. Tests never reach the network: every test module that saves an event would
+	otherwise call it, so it answers "nothing found" in tests unless a test patches it."""
 	import requests
 
 	if frappe.flags.in_test:
 		return []
-	_wait_for_turn()
+	if not _wait_for_turn():
+		raise TimeoutError("Nominatim: no free turn within the waiting time")
 	response = requests.get(f"{(frappe.conf.get('nominatim_url') or NOMINATIM_URL).rstrip('/')}/search",
 		params=params, timeout=8,
 		headers={"User-Agent": f"phamos-events/1.0 ({frappe.utils.get_url()})", "Accept-Language": "de,en"})
@@ -129,13 +133,16 @@ def _search(params):
 	return response.json()
 
 
-def _wait_for_turn():
-	key = "phamos:nominatim_last_request"
-	last = flt(frappe.cache.get_value(key))
-	wait = last + NOMINATIM_INTERVAL - time.time()
-	if wait > 0:
-		time.sleep(min(wait, NOMINATIM_INTERVAL))
-	frappe.cache.set_value(key, time.time(), expires_in_sec=60)
+def _wait_for_turn(max_wait=NOMINATIM_WAIT):
+	"""At most one request per second for every site on this bench (Nominatim counts per server): a Redis
+	key that lives one second is the turn. Setting it is atomic (SET NX), so of two workers asking at the
+	same moment only one goes; the other waits. False when no turn came up within ``max_wait`` seconds."""
+	deadline = time.monotonic() + max_wait
+	while not frappe.cache.set(NOMINATIM_TURN_KEY, 1, nx=True, px=int(NOMINATIM_INTERVAL * 1000)):
+		if time.monotonic() >= deadline:
+			return False
+		time.sleep(0.1)
+	return True
 
 
 @frappe.whitelist()

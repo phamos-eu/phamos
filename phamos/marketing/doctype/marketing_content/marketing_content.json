@@ -202,7 +202,7 @@
   },
   {
    "depends_on": "eval:doc.attendance_mode!=='Online'",
-   "description": "Looks the address up on OpenStreetMap and sets the pin. Drag the pin to the exact entrance if needed.",
+   "description": "Looks the address up on OpenStreetMap and sets the pin. To move it to the exact entrance, click the map's edit tool (Edit layers), drag the pin and click Save.",
    "fieldname": "find_on_map",
    "fieldtype": "Button",
    "label": "Find on Map"
@@ -562,7 +562,7 @@
   }
  ],
  "links": [],
- "modified": "2026-10-23 16:00:00.000000",
+ "modified": "2026-10-23 19:00:00.000000",
  "modified_by": "Administrator",
  "module": "Marketing",
  "name": "Marketing Content",
