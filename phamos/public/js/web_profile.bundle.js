@@ -301,7 +301,7 @@ function languageBanner(alternates, pageLang) {
 		return new DOMParser().parseFromString(await response.text(), "text/html");
 	}
 
-	// Swap results, filters and the header toggle for the server-rendered state of `url`.
+	// Swap results and filters for the server-rendered state of `url`.
 	async function navigate(url, { push = true } = {}) {
 		const results = $("[data-wp-results]");
 		results.classList.add("wp-loading");
@@ -314,8 +314,6 @@ function languageBanner(alternates, pageLang) {
 			results.replaceWith($("[data-wp-results]", doc));
 			const scrollTop = ($(".wp-facet-scroll") || {}).scrollTop;
 			$("[data-wp-sidebar]").replaceWith($("[data-wp-sidebar]", doc));
-			const toggle = $("[data-wp-toggle]");
-			if (toggle) toggle.replaceWith($("[data-wp-toggle]", doc));
 			document.title = doc.title;
 
 			const newSearch = $("[data-wp-search]");
