@@ -650,3 +650,28 @@ Please pick dates before the event.,Bitte wählen Sie Termine vor der Veranstalt
 2 weeks before,2 Wochen vorher
 The event is less than two weeks away. Pick your own date.,Die Veranstaltung ist weniger als zwei Wochen entfernt. Wählen Sie einen eigenen Termin.
 Period,Zeitraum
+Attendance,Teilnahme
+In person,Vor Ort
+Online,Online
+Venue / Video Link,Veranstaltungsort / Videolink
+Street,Straße
+Postal Code,Postleitzahl
+Find on Map,Auf Karte suchen
+Map Pin,Kartenmarkierung
+Latitude,Breitengrad
+Longitude,Längengrad
+Join online: {0},Online teilnehmen: {0}
+"{0}: {1}, online.","{0}: {1}, online."
+Not found,Nicht gefunden
+"In person: the venue's name, e.g. ""Hotel Adlon, Saal 2"". Online: the meeting link (https://…). The link is only sent to registered attendees, never shown on the website.","Vor Ort: der Name des Veranstaltungsorts, z. B. „Hotel Adlon, Saal 2“. Online: der Link zum Meeting (https://…). Der Link geht nur an angemeldete Teilnehmende und erscheint nie auf der Website."
+Looks the address up on OpenStreetMap and sets the pin. Drag the pin to the exact entrance if needed.,Sucht die Adresse bei OpenStreetMap und setzt die Markierung. Bei Bedarf die Markierung auf den genauen Eingang ziehen.
+"The meeting link (https://…). It is only sent to registered attendees, never shown on the website.",Der Link zum Meeting (https://…). Er geht nur an angemeldete Teilnehmende und erscheint nie auf der Website.
+"The venue's name, e.g. ""Hotel Adlon, Saal 2"". The address goes below.","Der Name des Veranstaltungsorts, z. B. „Hotel Adlon, Saal 2“. Die Adresse steht darunter."
+Please enter the address first.,Bitte zuerst die Adresse eingeben.
+Looking up the address…,Adresse wird gesucht …
+Pin set: {0},Markierung gesetzt: {0}
+"For an online event, enter the meeting link in Venue / Video Link. It must start with https://.",Bei einer Online-Veranstaltung gehört der Link zum Meeting in „Veranstaltungsort / Videolink“. Er muss mit https:// beginnen.
+"The video link is never shown on the website, only sent to registered attendees. Open the registration so people can get it.","Der Videolink erscheint nie auf der Website, er geht nur an angemeldete Teilnehmende. Bitte die Anmeldung öffnen, damit man ihn bekommen kann."
+"Venue / Video Link holds a link. For an online event, set Attendance to Online.",„Veranstaltungsort / Videolink“ enthält einen Link. Für eine Online-Veranstaltung bitte „Teilnahme“ auf „Online“ stellen.
+The address changed but the map pin did not. Use Find on Map to move the pin.,"Die Adresse wurde geändert, die Kartenmarkierung nicht. Mit „Auf Karte suchen“ die Markierung verschieben."
+"This address was not found on OpenStreetMap. Please check it, or set the pin on the map by hand.",Diese Adresse wurde bei OpenStreetMap nicht gefunden. Bitte prüfen oder die Markierung von Hand auf der Karte setzen.

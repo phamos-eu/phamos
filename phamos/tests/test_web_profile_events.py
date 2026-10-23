@@ -17,7 +17,8 @@ from phamos.web_profile.listing import search_texts
 from phamos.web_profile.sections import build_profile, find_item, get_items
 
 GROUP = "Events: Test Updates"
-ALLOWED_DATA = {"starts_on", "ends_on", "date_note", "when", "upcoming", "cancelled", "location", "city", "map_url",
+ALLOWED_DATA = {"starts_on", "ends_on", "date_note", "when", "upcoming", "cancelled", "online", "location", "street",
+	"postal_code", "city", "country", "latitude", "longitude",
 	"organizer", "stakeholders", "key_person", "speakers", "sponsors", "offer", "interest", "has_newsletter", "terms",
 	"languages", "ics"}
 CONTACT = json.dumps({"full_name": "Web Guest", "email": "web.guest@example.com"})

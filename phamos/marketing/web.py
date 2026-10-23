@@ -328,12 +328,16 @@ def build_reminders_ics(item, moments):
 	return cal.to_ical()
 
 
-def build_ics(item):
-	"""A public calendar entry (METHOD:PUBLISH): no organizer, no attendees."""
+def build_ics(item, for_attendee=False):
+	"""A calendar entry (METHOD:PUBLISH): no organizer, no attendees. ``LOCATION`` is the venue's address
+	(with ``GEO`` when the pin is set) or, for an online event, "Online"; the meeting link itself only goes
+	into the file attached to a ticket or order email (``for_attendee``)."""
 	import pytz
 	from icalendar import Calendar, Event
 
-	record = frappe.db.get_value("Marketing Content", item.name, ["starts_on", "ends_on"], as_dict=True)
+	from phamos.marketing.location import address_line
+
+	record = frappe.db.get_value("Marketing Content", item.name, ["starts_on", "ends_on", "location"], as_dict=True)
 	tz = pytz.timezone(get_system_timezone())
 	start = tz.localize(get_datetime(record.starts_on))
 	end = tz.localize(get_datetime(record.ends_on)) if record.ends_on else start + timedelta(hours=1)
@@ -348,10 +352,15 @@ def build_ics(item):
 	entry.add("dtstart", start)
 	entry.add("dtend", end)
 	entry.add("summary", item.title)
-	where = ", ".join(filter(None, [item.data.get("location"), item.data.get("city")]))
+	d = item.data
+	link = record.location if d.get("online") and for_attendee else None
+	where = link or (_("Online") if d.get("online") else address_line(d))
 	if where:
 		entry.add("location", where)
-	entry.add("description", "\n\n".join(filter(None, [item.summary, get_url(item.url)])))
+	if d.get("latitude") is not None and d.get("longitude") is not None:
+		entry.add("geo", (d["latitude"], d["longitude"]))
+	entry.add("description", "\n\n".join(filter(None, [item.summary,
+		_("Join online: {0}").format(link) if link else None, get_url(item.url)])))
 	entry.add("url", get_url(item.url))
 	cal.add_component(entry)
 	return cal.to_ical()
