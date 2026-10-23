@@ -15,7 +15,7 @@ from babel.numbers import format_currency
 from frappe import _
 from frappe.utils import cint, get_datetime, strip_html, get_system_timezone, get_url, getdate, now_datetime, nowdate
 
-from phamos.marketing.location import address_line, is_online, map_links
+from phamos.marketing.location import address_line, is_online
 from phamos.web_profile.i18n import localized
 from phamos.web_profile.socials import normalize_url
 from phamos.web_profile.utils import slugify
@@ -340,8 +340,8 @@ def build(item, lang):
 
 	hero = {"image": item.image, "badge": item.get("badge"), "lines": [
 		{"kind": "when", "text": d["when"]["line"], "datetime": d.get("starts_on")},
-		{"kind": "where", "text": _("Online")} if d.get("online") else {"kind": "where", "text": address_line(d),
-			"maps": map_links(d.get("latitude"), d.get("longitude"), d.get("location") or address_line(d))},
+		# Plain text: whether an address opens a map app is the visitor's device's and settings' choice.
+		{"kind": "where", "text": _("Online") if d.get("online") else address_line(d)},
 	]}
 
 	schema = None

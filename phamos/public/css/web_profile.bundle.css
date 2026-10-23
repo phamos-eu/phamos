@@ -420,7 +420,6 @@ body .footer-grouped-links .footer-child-item, body .footer-grouped-links .foote
 .wp-profile-cover { width: 100%; max-height: 420px; object-fit: cover; border-radius: var(--wp-radius); }
 .wp-event-meta { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 16px; margin: 8px 0 0; color: var(--wp-ink-2); font-size: 15px; }
 .wp-link-card-inline { display: inline-flex; padding: 4px 10px; }
-.wp-event-meta-alt { margin-left: 8px; color: var(--wp-ink-2); font-size: 13px; }
 .wp-actions { display: flex; flex-direction: column; gap: 8px; margin-bottom: 20px; }
 .wp-actions .wp-button { width: 100%; height: 38px; }
 .wp-actions .wp-chip { justify-content: center; }

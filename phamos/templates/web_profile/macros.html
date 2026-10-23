@@ -193,10 +193,6 @@
 				{%- if line.kind == "when" %}<time{% if line.datetime %} datetime="{{ line.datetime | e }}"{% endif %}>{{ line.text | e }}</time>
 				{%- elif line.url %}<a class="wp-link-card wp-link-card-inline" href="{{ line.url | e }}" rel="noopener" target="_blank"><span>{{ line.text | e }}</span><span class="wp-link-card-arrow" aria-hidden="true">↗</span></a>
 				{%- else %}{{ line.text | e }}{% endif -%}
-				{#- "Open in maps" is a geo: link, like mailto: for email: the visitor's own map app opens it.
-				    OpenStreetMap in the browser is the fallback for devices without one (iPhone, Mac). -#}
-				{%- if line.maps %} <a class="wp-link-card wp-link-card-inline" href="{{ line.maps.geo | e }}" data-wp-maps><span>{{ _("Open in maps") }}</span><span class="wp-link-card-arrow" aria-hidden="true">↗</span></a>
-				<a class="wp-event-meta-alt" href="{{ line.maps.osm | e }}" rel="noopener" target="_blank">{{ _("or on OpenStreetMap") }}</a>{% endif -%}
 			</span>
 			{%- endfor %}
 		</p>

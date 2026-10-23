@@ -105,13 +105,6 @@ class TestEventLocation(FrappeTestCase):
 		with patch("phamos.marketing.location._search", return_value=[]):
 			self.assertRaises(frappe.ValidationError, location.find_on_map, city="Nowhere")
 
-	def test_map_links(self):
-		links = location.map_links(48.4914, 9.2043, "Rathaus Reutlingen")
-		self.assertEqual(set(links), {"geo", "osm"})  # no app chosen for the visitor
-		self.assertEqual(links["geo"], "geo:48.491400,9.204300?q=48.491400,9.204300(Rathaus%20Reutlingen)")
-		self.assertEqual(links["osm"], "https://www.openstreetmap.org/?mlat=48.491400&mlon=9.204300#map=18/48.491400/9.204300")
-		self.assertIsNone(location.map_links(None, None))
-
 	def test_coordinates_from_old_map_links(self):
 		for url, expected in (
 				("https://www.openstreetmap.org/?mlat=48.4914&mlon=9.2043#map=17/48.49/9.20", (48.4914, 9.2043)),
@@ -142,9 +135,8 @@ class TestEventLocation(FrappeTestCase):
 		frappe.set_user("Guest")
 		html = get_html_for_route(f"/en/events/{event.route}")
 		self.assertNotIn("meet.example.com", html)
-		self.assertNotIn("data-wp-maps", html)
 
-	def test_in_person_event_has_address_pin_and_maps_button(self):
+	def test_in_person_event_has_address_and_pin_but_no_map_links(self):
 		event = self.in_person_event()
 		item = self.item(event)
 		self.assertFalse(item.data["online"])
@@ -152,8 +144,8 @@ class TestEventLocation(FrappeTestCase):
 
 		profile = build_profile(item, "en")
 		where = next(line for line in profile["hero"]["lines"] if line["kind"] == "where")
-		self.assertEqual(where["text"], "Rathaus, Marktplatz 1, 72764 Reutlingen")
-		self.assertIn("mlat=48.491400", where["maps"]["osm"])
+		self.assertEqual(where, {"kind": "where", "text": "Rathaus, Marktplatz 1, 72764 Reutlingen"})
+		self.assertAlmostEqual(item.data["latitude"], 48.4914, places=4)  # for the map view (#1666)
 		place = profile["schema"]["location"]
 		self.assertEqual(place["address"]["streetAddress"], "Marktplatz 1")
 		self.assertEqual(place["address"]["addressCountry"], "DE")
@@ -161,8 +153,10 @@ class TestEventLocation(FrappeTestCase):
 
 		frappe.set_user("Guest")
 		html = get_html_for_route(f"/en/events/{event.route}")
-		self.assertIn('href="geo:48.491400,9.204300', html)
-		self.assertIn("openstreetmap.org/?mlat=48.491400", html)
+		self.assertIn("Rathaus, Marktplatz 1, 72764 Reutlingen", html)
+		# Which map app an address opens in is the visitor's choice: we link to none.
+		for link in ("geo:", "openstreetmap.org/?mlat", "maps.apple.com", "google.com/maps"):
+			self.assertNotIn(link, html)
 
 	# --- calendar file and emails -----------------------------------------------------------------------
 
@@ -181,9 +175,7 @@ class TestEventLocation(FrappeTestCase):
 
 	def test_email_venue(self):
 		self.assertEqual(ticketing.venue(self.online_event()), {"online": True, "link": LINK})
-		venue = ticketing.venue(self.in_person_event())
-		self.assertEqual(venue["text"], "Rathaus, Marktplatz 1, 72764 Reutlingen")
-		self.assertIn("openstreetmap.org", venue["maps_url"])
+		self.assertEqual(ticketing.venue(self.in_person_event()), {"text": "Rathaus, Marktplatz 1, 72764 Reutlingen"})
 
 	# --- patch ------------------------------------------------------------------------------------------
 

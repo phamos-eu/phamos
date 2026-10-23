@@ -481,16 +481,13 @@ def send_order_confirmation(event_name, reference, recipient, reference_doctype=
 
 def venue(doc):
 	"""Where the event takes place, for the emails: the meeting link of an online event (attendees only),
-	else the address with a map link."""
-	from phamos.marketing.location import address_line, is_online, map_links
+	else the address as plain text (the email program decides whether it opens a map)."""
+	from phamos.marketing.location import address_line, is_online
 
 	if is_online(doc):
 		return {"online": True, "link": doc.location}
 	text = address_line(doc)
-	if not text:
-		return None
-	links = map_links(doc.latitude, doc.longitude) if doc.latitude or doc.longitude else None
-	return {"text": text, "maps_url": links["osm"] if links else None}
+	return {"text": text} if text else None
 
 
 def send_ticket(attendee, buyer_name=None, lang="de"):

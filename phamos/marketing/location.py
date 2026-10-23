@@ -12,7 +12,7 @@ file), never the website's item data.
 import json
 import re
 import time
-from urllib.parse import quote, unquote
+from urllib.parse import unquote
 
 import frappe
 from frappe import _
@@ -46,21 +46,6 @@ def address_line(doc, with_venue=True):
 		doc.get("street"),
 		" ".join(filter(None, [doc.get("postal_code"), doc.get("city")])),
 	]))
-
-
-def map_links(latitude, longitude, label=None):
-	"""``geo`` is the place as a ``geo:`` URI (RFC 5870), the map counterpart of ``mailto:`` and ``tel:``:
-	the operating system or browser opens it in whatever map app the visitor chose. The ``?q=lat,lon(label)``
-	part puts a named pin on the map in apps that read it (Android's convention). ``osm`` is the web map,
-	for devices without a ``geo:`` handler and for emails."""
-	if latitude is None or longitude is None:
-		return None
-	lat, lon = f"{flt(latitude):.6f}", f"{flt(longitude):.6f}"
-	name = (label or "").strip()
-	return {
-		"geo": f"geo:{lat},{lon}?q={lat},{lon}" + (f"({quote(name)})" if name else ""),
-		"osm": f"https://www.openstreetmap.org/?mlat={lat}&mlon={lon}#map=18/{lat}/{lon}",
-	}
 
 
 # --- map pin ----------------------------------------------------------------------------------------------

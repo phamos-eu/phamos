@@ -16,7 +16,7 @@
 	{%- if venue and venue.online %}
 	<tr><td><strong>{{ _("Venue") }}</strong></td><td>{{ _("Online") }}: <a href="{{ venue.link | e }}">{{ venue.link | e }}</a></td></tr>
 	{%- elif venue %}
-	<tr><td><strong>{{ _("Venue") }}</strong></td><td>{{ venue.text | e }}{% if venue.maps_url %} · <a href="{{ venue.maps_url | e }}">{{ _("Open in maps") }}</a>{% endif %}</td></tr>
+	<tr><td><strong>{{ _("Venue") }}</strong></td><td>{{ venue.text | e }}</td></tr>
 	{%- endif %}
 </table>
 
