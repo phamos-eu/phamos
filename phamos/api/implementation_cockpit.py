@@ -16,6 +16,9 @@ users, so they see what the customer sees.
 
 import frappe
 from frappe import _
+from frappe.query_builder import Order
+from frappe.query_builder.functions import Count
+from frappe.utils import add_days, add_months, cint, flt, getdate, now_datetime, today
 
 # Fields of Implementation the cockpit may send. Anything else stays on the server.
 OVERVIEW_FIELDS = (
@@ -204,3 +207,224 @@ def _phase_label(maturity_level):
 		return None
 	label = maturity_level.split(" - ", 1)[1].split(".", 1)[0]
 	return label.removesuffix(" Phase").strip()
+
+
+# Timesheets (#1685): what the /timesheet portal shows, scoped to one Implementation.
+
+TIMESHEET_SORT_FIELDS = {
+	"name": "name",
+	"start_date": "start_date",
+	"employee_name": "employee_name",
+	"billing_status": "custom_billing_status",
+	"total_hours": "total_hours",
+	"billable_hours": "total_billable_hours",
+	"rating": "custom_rating",
+}
+MAX_PAGE_LENGTH = 500
+MAX_EXPORT_ROWS = 10000
+
+
+def _implementation_projects(implementation):
+	"""Projects of the Implementation, the same way Monthly Implementation Summary finds them."""
+	return frappe.get_all("Project", filters={"custom_implementation": implementation}, pluck="name")
+
+
+def _timesheet_query(implementation, from_date=None, to_date=None, project=None):
+	"""Base query on Timesheet for one Implementation, or None when it has no projects.
+
+	Timesheet.custom_implementation is copied in on save and goes stale, so the scope comes from
+	the projects; the customer is a second guard.
+	"""
+	_require_implementation(implementation)
+	projects = _implementation_projects(implementation)
+	if project:
+		projects = [p for p in projects if p == project]
+	if not projects:
+		return None
+	customer = frappe.db.get_value("Implementation", implementation, "customer")
+	ts = frappe.qb.DocType("Timesheet")
+	query = (
+		frappe.qb.from_(ts)
+		.where(ts.docstatus.isin([0, 1]))
+		.where(ts.parent_project.isin(projects))
+		.where(ts.customer == customer)
+	)
+	if from_date:
+		query = query.where(ts.start_date >= getdate(from_date))
+	if to_date:
+		query = query.where(ts.start_date <= getdate(to_date))
+	return query, ts
+
+
+def _timesheet_rows(query, ts, sort_by=None, sort_order=None, start=0, page_length=20):
+	field = TIMESHEET_SORT_FIELDS.get(sort_by, "start_date")
+	order = Order.asc if sort_order == "asc" else Order.desc
+	rows = (
+		query.select(
+			ts.name,
+			ts.start_date,
+			ts.employee_name,
+			ts.custom_billing_status,
+			ts.total_hours,
+			ts.total_billable_hours,
+			ts.project_name,
+			ts.parent_project,
+			ts.custom_rating,
+			ts.customer_comment,
+		)
+		.orderby(ts[field], order=order)
+		.orderby(ts.name, order=order)
+		.limit(page_length)
+		.offset(start)
+		.run(as_dict=True)
+	)
+	_add_first_time_log(rows)
+	return rows
+
+
+def _add_first_time_log(rows):
+	"""Activity type and description of each Timesheet's first time log, as the portal shows."""
+	if not rows:
+		return
+	td = frappe.qb.DocType("Timesheet Detail")
+	logs = (
+		frappe.qb.from_(td)
+		.select(td.parent, td.activity_type, td.description, td.idx)
+		.where(td.parenttype == "Timesheet")
+		.where(td.parent.isin([r.name for r in rows]))
+		.orderby(td.idx)
+		.run(as_dict=True)
+	)
+	first = {}
+	for log in logs:
+		first.setdefault(log.parent, log)
+	for row in rows:
+		log = first.get(row.name) or {}
+		row["activity_type"] = log.get("activity_type")
+		row["related_issue"] = log.get("description")
+
+
+@frappe.whitelist()
+def get_timesheet_filters(implementation):
+	"""Projects to filter by, and the default range (the last 6 months, as on /timesheet)."""
+	_require_implementation(implementation)
+	projects = frappe.get_all(
+		"Project",
+		filters={"custom_implementation": implementation},
+		fields=["name", "project_name"],
+		order_by="project_name asc",
+	)
+	return {
+		"projects": projects,
+		"default_from": add_months(today(), -6),
+		"default_to": today(),
+	}
+
+
+@frappe.whitelist()
+def get_timesheets(
+	implementation, from_date=None, to_date=None, project=None, start=0, page_length=20, sort_by=None, sort_order=None
+):
+	base = _timesheet_query(implementation, from_date, to_date, project)
+	if not base:
+		return {"timesheets": [], "total": 0}
+	query, ts = base
+	total = query.select(Count(ts.name)).run()[0][0]
+	page_length = min(max(cint(page_length), 1), MAX_PAGE_LENGTH)
+	rows = _timesheet_rows(query, ts, sort_by, sort_order, max(cint(start), 0), page_length)
+	return {"timesheets": rows, "total": total}
+
+
+@frappe.whitelist()
+def export_timesheets(implementation, from_date=None, to_date=None, project=None, sort_by=None, sort_order=None):
+	"""Every row of the filter for the CSV download (the client writes the file)."""
+	base = _timesheet_query(implementation, from_date, to_date, project)
+	if not base:
+		return []
+	query, ts = base
+	return _timesheet_rows(query, ts, sort_by, sort_order, 0, MAX_EXPORT_ROWS)
+
+
+@frappe.whitelist()
+def get_timesheet_summary(implementation, from_date=None, to_date=None, project=None, group_by="month"):
+	"""Totals and hours per week or month; every period of the range is present, empty ones too."""
+	group_by = "week" if group_by == "week" else "month"
+	base = _timesheet_query(implementation, from_date, to_date, project)
+	rows = []
+	if base:
+		query, ts = base
+		rows = query.select(ts.start_date, ts.total_hours, ts.total_billable_hours).run(as_dict=True)
+
+	hours = sum(flt(r.total_hours) for r in rows)
+	billable = sum(flt(r.total_billable_hours) for r in rows)
+	buckets = {}
+	for r in rows:
+		key = _period_start(r.start_date, group_by)
+		bucket = buckets.setdefault(key, [0.0, 0.0])
+		bucket[0] += flt(r.total_hours)
+		bucket[1] += flt(r.total_billable_hours)
+
+	dates = [r.start_date for r in rows]
+	first = getdate(from_date) if from_date else (min(dates) if dates else None)
+	last = getdate(to_date) if to_date else (max(dates) if dates else None)
+	periods = []
+	if first and last:
+		key = _period_start(first, group_by)
+		end = _period_start(last, group_by)
+		while key <= end:
+			total, bill = buckets.get(key, (0.0, 0.0))
+			periods.append({"start": key, "hours": round(total, 2), "billable": round(bill, 2)})
+			key = add_days(key, 7) if group_by == "week" else add_months(key, 1)
+
+	return {
+		"hours": round(hours, 2),
+		"billable_hours": round(billable, 2),
+		"non_billable_hours": round(hours - billable, 2),
+		"count": len(rows),
+		"group_by": group_by,
+		"periods": periods,
+	}
+
+
+def _period_start(value, group_by):
+	day = getdate(value)
+	if group_by == "week":
+		return add_days(day, -day.weekday())  # Monday
+	return day.replace(day=1)
+
+
+@frappe.whitelist(methods=["POST"])
+def set_timesheet_feedback(implementation, timesheet, rating, comment=None):
+	"""Rating (1-5) and comment on a Timesheet, once, as the portal's "Give Feedback" did.
+
+	Writes the same fields as phamos.api.update_customer_comment, so the daily comment summary
+	(send_daily_timesheet_comment_summary) picks it up unchanged.
+	"""
+	base = _timesheet_query(implementation)
+	if not base:
+		frappe.throw(_("This timesheet does not belong to the implementation."), frappe.PermissionError)
+	query, ts = base
+	if not query.select(ts.name).where(ts.name == timesheet).run():
+		frappe.throw(_("This timesheet does not belong to the implementation."), frappe.PermissionError)
+
+	rating = cint(rating)
+	if rating < 1 or rating > 5:
+		frappe.throw(_("Please give a rating from 1 to 5."))
+	if cint(frappe.db.get_value("Timesheet", timesheet, "custom_rating")) > 0:
+		frappe.throw(_("Feedback for this timesheet was already given and is under review."))
+
+	from phamos.api import _set_gitlab_urls_from_comment
+
+	doc = frappe.get_doc("Timesheet", timesheet)
+	comment = (comment or "").strip()
+	doc.db_set(
+		{
+			"customer_comment": comment,
+			"custom_rating": rating,
+			"custom_customer_comment_timestamp": now_datetime(),
+			"custom_daily_comment_report_sent": 0,
+		}
+	)
+	if comment:
+		_set_gitlab_urls_from_comment(doc, comment)
+	return {"name": timesheet, "custom_rating": rating, "customer_comment": comment}

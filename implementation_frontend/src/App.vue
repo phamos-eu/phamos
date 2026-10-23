@@ -38,6 +38,7 @@ const navItems = computed(() =>
 				{ name: "Overview", label: __("Overview"), icon: "grid" },
 				{ name: "Milestones", label: __("Milestones"), icon: "flag" },
 				{ name: "Issues", label: __("Issues"), icon: "inbox" },
+				{ name: "Timesheets", label: __("Timesheets"), icon: "clock" },
 				{ name: "Commercials", label: __("Commercials"), icon: "file-text" },
 				{ name: "Planning", label: __("Planning"), icon: "calendar" },
 				{ name: "Team", label: __("Contact & Team"), icon: "users" },

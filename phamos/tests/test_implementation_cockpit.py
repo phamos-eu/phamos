@@ -54,6 +54,53 @@ def _implementation(name, customer, show=1, stakeholder_email=None, stakeholder_
 	return name
 
 
+def _project(name, implementation, customer):
+	frappe.get_doc(
+		{
+			"doctype": "Project",
+			"name": name,
+			"project_name": name,
+			"custom_implementation": implementation,
+			"customer": customer,
+			"status": "Open",
+		}
+	).db_insert()
+	return name
+
+
+def _timesheet(name, project, customer, start_date, hours, billable, rating=0, activity="Development"):
+	frappe.get_doc(
+		{
+			"doctype": "Timesheet",
+			"name": name,
+			"customer": customer,
+			"parent_project": project,
+			"project_name": project,
+			"start_date": start_date,
+			"end_date": start_date,
+			"employee_name": "IC Tester",
+			"total_hours": hours,
+			"total_billable_hours": billable,
+			"custom_rating": rating,
+			"docstatus": 0,
+		}
+	).db_insert()
+	frappe.get_doc(
+		{
+			"doctype": "Timesheet Detail",
+			"parent": name,
+			"parenttype": "Timesheet",
+			"parentfield": "time_logs",
+			"idx": 1,
+			"activity_type": activity,
+			"description": f"Work on {name}",
+			"hours": hours,
+			"project": project,
+		}
+	).db_insert()
+	return name
+
+
 class TestImplementationCockpit(FrappeTestCase):
 	@classmethod
 	def setUpClass(cls):
@@ -87,6 +134,15 @@ class TestImplementationCockpit(FrappeTestCase):
 		cls.by_email = _implementation(PREFIX + "By Email", own, stakeholder_email=USER)
 		cls.hidden = _implementation(PREFIX + "Not On Portal", own, show=0, stakeholder_email=USER)
 		cls.foreign = _implementation(PREFIX + "Other Customer", other, stakeholder_email="x@example.com")
+
+		own_project = _project(PREFIX + "Core Project", cls.by_contact, own)
+		other_impl_project = _project(PREFIX + "Webshop Project", cls.by_email, own)
+		foreign_project = _project(PREFIX + "Foreign Project", cls.foreign, other)
+		cls.ts_march = _timesheet(PREFIX + "TS 1", own_project, own, "2026-03-03", 8, 6)
+		cls.ts_may = _timesheet(PREFIX + "TS 2", own_project, own, "2026-05-12", 4, 4)
+		cls.ts_rated = _timesheet(PREFIX + "TS 3", own_project, own, "2026-05-20", 2, 0, rating=3)
+		cls.ts_other_impl = _timesheet(PREFIX + "TS 4", other_impl_project, own, "2026-05-12", 5, 5)
+		cls.ts_foreign = _timesheet(PREFIX + "TS 5", foreign_project, other, "2026-05-12", 7, 7)
 
 	def tearDown(self):
 		frappe.set_user("Administrator")
@@ -139,3 +195,67 @@ class TestImplementationCockpit(FrappeTestCase):
 		self.assertEqual(ic._phase_number("2 - Initial Development Phase. Initial development"), 2)
 		self.assertIsNone(ic._phase_label(None))
 		self.assertIsNone(ic._phase_number(""))
+
+	def test_timesheets_are_scoped_to_the_implementation(self):
+		frappe.set_user(USER)
+		result = ic.get_timesheets(self.by_contact, from_date="2026-01-01", to_date="2026-12-31")
+		names = {r["name"] for r in result["timesheets"]}
+		self.assertEqual(names, {self.ts_march, self.ts_may, self.ts_rated})
+		self.assertEqual(result["total"], 3)
+		first = next(r for r in result["timesheets"] if r["name"] == self.ts_march)
+		self.assertEqual(first["activity_type"], "Development")
+		self.assertEqual(first["related_issue"], f"Work on {self.ts_march}")
+
+	def test_timesheets_of_other_customers_are_unreachable(self):
+		frappe.set_user(USER)
+		with self.assertRaises(frappe.PermissionError):
+			ic.get_timesheets(self.foreign)
+		# A project of another implementation does not widen the scope.
+		result = ic.get_timesheets(self.by_contact, project=PREFIX + "Foreign Project")
+		self.assertEqual(result["total"], 0)
+
+	def test_malicious_parameters_do_not_widen_the_result(self):
+		frappe.set_user(USER)
+		result = ic.get_timesheets(
+			self.by_contact,
+			project="x' OR '1'='1",
+			sort_by="name; DROP TABLE tabTimesheet",
+			page_length="5 OFFSET 0 UNION SELECT 1",
+			start="-3",
+		)
+		self.assertEqual(result["total"], 0)
+		result = ic.get_timesheets(self.by_contact, sort_by="evil", page_length="1")
+		self.assertEqual(len(result["timesheets"]), 1)
+		self.assertEqual(result["total"], 3)
+
+	def test_summary_totals_and_empty_periods(self):
+		frappe.set_user(USER)
+		summary = ic.get_timesheet_summary(self.by_contact, from_date="2026-03-01", to_date="2026-05-31")
+		self.assertEqual(summary["hours"], 14)
+		self.assertEqual(summary["billable_hours"], 10)
+		self.assertEqual(summary["non_billable_hours"], 4)
+		self.assertEqual([str(p["start"]) for p in summary["periods"]], ["2026-03-01", "2026-04-01", "2026-05-01"])
+		self.assertEqual([p["hours"] for p in summary["periods"]], [8, 0, 6])
+		weeks = ic.get_timesheet_summary(self.by_contact, from_date="2026-05-11", to_date="2026-05-24", group_by="week")
+		self.assertEqual([str(p["start"]) for p in weeks["periods"]], ["2026-05-11", "2026-05-18"])
+
+	def test_feedback_is_checked_and_given_once(self):
+		frappe.set_user(USER)
+		with self.assertRaises(frappe.PermissionError):
+			ic.set_timesheet_feedback(self.by_contact, self.ts_other_impl, 4, "not mine")
+		with self.assertRaises(frappe.ValidationError):
+			ic.set_timesheet_feedback(self.by_contact, self.ts_march, 7, "too high")
+		with self.assertRaises(frappe.ValidationError):
+			ic.set_timesheet_feedback(self.by_contact, self.ts_rated, 4, "second time")
+
+		ic.set_timesheet_feedback(self.by_contact, self.ts_march, 4, "Please check the hours on 3 March")
+		values = frappe.db.get_value(
+			"Timesheet",
+			self.ts_march,
+			["custom_rating", "customer_comment", "custom_customer_comment_timestamp", "custom_daily_comment_report_sent"],
+			as_dict=True,
+		)
+		self.assertEqual(values.custom_rating, 4)
+		self.assertEqual(values.customer_comment, "Please check the hours on 3 March")
+		self.assertIsNotNone(values.custom_customer_comment_timestamp)
+		self.assertEqual(values.custom_daily_comment_report_sent, 0)

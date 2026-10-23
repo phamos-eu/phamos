@@ -4,6 +4,7 @@ import spaConfig from "./config"
 import { allImplementations, defaultImplementation, loadScope, rememberImplementation } from "./scopeStore.js"
 import Overview from "./views/Overview.vue"
 import ComingSoon from "./views/ComingSoon.vue"
+import Timesheets from "./views/Timesheets.vue"
 import NoImplementation from "./views/NoImplementation.vue"
 
 // Every page belongs to one implementation, so it is part of the URL: links into the cockpit
@@ -11,7 +12,7 @@ import NoImplementation from "./views/NoImplementation.vue"
 const sections = [
 	{ path: "milestones", name: "Milestones", issue: "#1679" },
 	{ path: "issues", name: "Issues", issue: "#1679, #1680" },
-	{ path: "commercials", name: "Commercials", issue: "#1681, #1685" },
+	{ path: "commercials", name: "Commercials", issue: "#1681" },
 	{ path: "planning", name: "Planning", issue: "#1693, #1694" },
 	{ path: "team", name: "Team", label: "Contact & Team", issue: "#1684" },
 	{ path: "links", name: "Links", issue: "#1682" },
@@ -23,6 +24,7 @@ const router = createRouter({
 		{ path: "/", name: "Home", component: NoImplementation },
 		{ path: "/:implementation", redirect: (to) => ({ name: "Overview", params: to.params }) },
 		{ path: "/:implementation/overview", name: "Overview", component: Overview, props: true },
+		{ path: "/:implementation/timesheets", name: "Timesheets", component: Timesheets, props: true },
 		...sections.map((s) => ({
 			path: `/:implementation/${s.path}`,
 			name: s.name,

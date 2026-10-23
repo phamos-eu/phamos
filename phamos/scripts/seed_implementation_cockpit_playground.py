@@ -6,8 +6,11 @@
 # The customer user has no password: open the User in Desk as Administrator and use
 # "Impersonate" to see the cockpit as that customer.
 
+import random
+import zlib
+
 import frappe
-from frappe.utils import add_days, today
+from frappe.utils import add_days, getdate, today
 
 SEED_TAG = "IC-SEED"
 CUSTOMER_USER = "ic-seed-customer@example.com"
@@ -70,6 +73,7 @@ def run():
 			_link_contact(contact, customer)
 		for impl in spec["implementations"]:
 			_ensure_implementation(impl, customer, manager, contact if spec["shared_with_user"] else None)
+			_ensure_timesheets(impl["name"], customer)
 	frappe.db.commit()
 	print(f"Seeded. Customer user: {CUSTOMER_USER} (use Impersonate on the User in Desk).")
 	print("Open http://dev.localhost:8000/implementation-cockpit")
@@ -174,5 +178,90 @@ def _ensure_implementation(spec, customer, manager, contact):
 				"email": CUSTOMER_USER,
 				"stakeholder_organisation": "Customer",
 				"stakeholder_type": "Sponsor",
+			}
+		).db_insert()
+
+
+ACTIVITIES = ["Development", "Testing", "Meeting", "Support", "Documentation"]
+BILLING = ["Billed", "Billed", "Not Billed", "In Question"]
+WORK = [
+	"#1702 Pick list prints the wrong bin location",
+	"#1688 Scanner skips serial numbers on goods receipt",
+	"#1695 DATEV export: cost centre per line",
+	"Weekly meeting with the customer team",
+	"#1709 Monthly sales report per region",
+	"Support: user could not post a stock entry",
+]
+
+
+def _ensure_timesheets(implementation, customer):
+	"""One Project per seeded Implementation and about 30 Timesheets over the last 6 months.
+
+	Inserted with db_insert (no costing or validation), so no Activity Cost or salary setup is
+	needed; the cockpit only reads the header fields and the first time log.
+	"""
+	project = f"{implementation} Project"
+	if not frappe.db.exists("Project", project):
+		frappe.get_doc(
+			{
+				"doctype": "Project",
+				"name": project,
+				"project_name": project,
+				"customer": customer,
+				"custom_implementation": implementation,
+				"status": "Open",
+				"company": frappe.db.get_single_value("Global Defaults", "default_company"),
+			}
+		).db_insert()
+
+	for name in frappe.get_all("Timesheet", filters={"parent_project": project, "name": ["like", f"{SEED_TAG}%"]}, pluck="name"):
+		frappe.db.delete("Timesheet Detail", {"parent": name})
+		frappe.db.delete("Timesheet", name)
+
+	employees = frappe.get_all("Employee", filters={"status": "Active"}, fields=["name", "employee_name"], limit=4)
+	if not employees:
+		return
+	rng = random.Random(implementation)  # same data on every run
+	start = getdate(add_days(today(), -180))
+	for i in range(30):
+		day = add_days(start, rng.randint(0, 178))
+		hours = rng.choice([1, 2, 2.5, 3, 4, 6, 8])
+		billable = hours if rng.random() > 0.3 else round(hours * rng.choice([0, 0.5]), 2)
+		employee = rng.choice(employees)
+		name = f"{SEED_TAG} TS-{zlib.crc32(implementation.encode()) % 1000:03d}-{i + 1:02d}"
+		rated = i in (3, 11)
+		frappe.get_doc(
+			{
+				"doctype": "Timesheet",
+				"name": name,
+				"customer": customer,
+				"parent_project": project,
+				"project_name": project,
+				"custom_implementation": implementation,
+				"employee": employee.name,
+				"employee_name": employee.employee_name,
+				"start_date": day,
+				"end_date": day,
+				"total_hours": hours,
+				"total_billable_hours": billable,
+				"custom_billing_status": rng.choice(BILLING),
+				"custom_rating": 2 if rated else 0,
+				"customer_comment": "Please check, this looks like two hours too many." if rated else None,
+				"docstatus": 0,
+			}
+		).db_insert()
+		frappe.get_doc(
+			{
+				"doctype": "Timesheet Detail",
+				"parent": name,
+				"parenttype": "Timesheet",
+				"parentfield": "time_logs",
+				"idx": 1,
+				"activity_type": rng.choice(ACTIVITIES),
+				"description": rng.choice(WORK),
+				"hours": hours,
+				"billing_hours": billable,
+				"is_billable": 1 if billable else 0,
+				"project": project,
 			}
 		).db_insert()
