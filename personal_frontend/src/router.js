@@ -6,6 +6,7 @@ import TodosMatrix from "./views/TodosMatrix.vue"
 import CheckinsHome from "./views/CheckinsHome.vue"
 import CheckinsList from "./views/CheckinsList.vue"
 import MyContract from "./views/MyContract.vue"
+import MyLeave from "./views/MyLeave.vue"
 import IssuesHome from "./views/IssuesHome.vue"
 import TasksHome from "./views/TasksHome.vue"
 import TodosPlan from "./views/TodosPlan.vue"
@@ -27,6 +28,9 @@ const router = createSpaRouter({
 		{ path: "/checkins", name: "Checkins", component: CheckinsHome },
 		{ path: "/checkins/list", name: "CheckinsList", component: CheckinsList },
 		{ path: "/contract", name: "MyContract", component: MyContract },
+		// My Leave (#1714)
+		{ path: "/leave", name: "MyLeave", component: MyLeave },
+		{ path: "/leave/:name", name: "MyLeaveDetail", component: MyLeave, props: true },
 		// Own start pages for Issues and Tasks (#1604); they replace the shared empty ones.
 		{ path: "/issues", name: "Issues", component: IssuesHome },
 		{ path: "/tasks", name: "Tasks", component: TasksHome },
