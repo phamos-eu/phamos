@@ -26,20 +26,6 @@ REFERENCE = "Leave Application"
 EVENT_COLOR = "#FFC53D"
 PUSH_METHOD = "phamos.mailcow_integration.caldav.sync_event.push_event"
 DELETE_METHOD = "phamos.mailcow_integration.caldav.sync_event.delete_event_object"
-# Event fields this module owns; anything else on the Event is left alone.
-MANAGED_FIELDS = (
-	"subject",
-	"all_day",
-	"starts_on",
-	"ends_on",
-	"event_type",
-	"send_reminder",
-	"color",
-	"reference_doctype",
-	"reference_docname",
-	"description",
-	"custom_mailcow_status",
-)
 
 
 def _employee_user(employee: str | None) -> str | None:
