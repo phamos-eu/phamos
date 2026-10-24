@@ -12,10 +12,11 @@ from datetime import datetime
 import pytz
 from email.utils import getaddresses
 from datetime import datetime, timedelta, date
-from .client import put_ics, delete_ics, organizer_email, dav_password
+from .client import put_ics, delete_ics, organizer_email, dav_password, settings
 from .ics import vevent
+from . import slot_cache
 from ..utils import get_site_timezone
-from frappe.utils import get_datetime
+from frappe.utils import cint, get_datetime, get_url_to_form
 from dateutil.rrule import rrulestr
 
 
@@ -261,6 +262,28 @@ def _event_recurrence_rule(doc) -> str | None:
 SYNC_ERROR_FIELD = "custom_mailcow_sync_error"
 
 
+def _owner_email(owner: str | None) -> str | None:
+	"""Mailbox of the Event owner.
+
+	A queued push runs as Administrator, so the session user must never stand in for the
+	organizer or the cache key (milestone 68, Phase 0).
+	"""
+	if not owner:
+		return None
+	return frappe.db.get_value("User", owner, "email") or owner
+
+
+def _reference_url(doc) -> str | None:
+	"""Desk URL of the record the Event was created for, shown as a link in SOGo."""
+	if doc.get("reference_doctype") and doc.get("reference_docname"):
+		return get_url_to_form(doc.reference_doctype, doc.reference_docname)
+	return None
+
+
+def _invalidate_slot_cache(owner: str | None):
+	slot_cache.invalidate(_owner_email(owner))
+
+
 def on_upsert(doc, method=None):
 	"""Event on_update (also runs after insert): push to the owner's SOGo calendar.
 
@@ -326,9 +349,14 @@ def push_event(event_name: str) -> str | None:
 			attendees_cc=attendees_cc,
 			attendees_bcc=attendees_bcc,
 			attendee_role_map=participant_roles,
+			organizer_email=_owner_email(doc.owner),
 			recurrence_rule=recurrence_rule,
+			all_day=bool(doc.get("all_day")),
+			status=doc.get("custom_mailcow_status") or "CONFIRMED",
+			url=_reference_url(doc),
 		)
 		put_ics(sync_uid, ics, acting_user_id=doc.owner, create_only=create_only)
+		_invalidate_slot_cache(doc.owner)
 		values = {
 			"custom_mailcow_seq": seq,
 			"custom_mailcow_uid": sync_uid,
@@ -366,6 +394,7 @@ def on_delete(doc, method=None):
 def delete_event_object(uid: str, owner: str):
 	try:
 		delete_ics(uid, acting_user_id=owner)
+		_invalidate_slot_cache(owner)
 	except Exception:
 		frappe.log_error(frappe.get_traceback(), "Event CalDAV Delete Error")
 
@@ -515,9 +544,12 @@ def pull_events(start: str, end: str) -> list[dict]:
 
 
 @frappe.whitelist()
-def pull_event_slots(start: str, end: str) -> list[dict]:
+def pull_event_slots(start: str, end: str, timeout: int = 30) -> list[dict]:
 	"""
 	Read events from Mailcow/SOGo CalDAV for the current user.
+
+	- `timeout` (seconds, 1 to 120) bounds the CalDAV REPORT; the cockpit passes a short one.
+	- Every slot carries `all_day` (True for VALUE=DATE events).
 
 	- Does NOT create/update ERPNext Events.
 	- Supports normal VEVENTs.
@@ -543,7 +575,8 @@ def pull_event_slots(start: str, end: str) -> list[dict]:
 
 	# CONFIG
 
-	s = frappe.get_single("Mailcow Settings")
+	s = settings()
+	timeout = min(max(cint(timeout) or 30, 1), 120)
 
 	# Use the current user's organizer email.
 	EMAIL = organizer_email()
@@ -582,6 +615,23 @@ def pull_event_slots(start: str, end: str) -> list[dict]:
 		frappe.throw(
 			"Date range too large; max 90 days"
 		)
+
+	# ALL-DAY DATES
+
+	def all_day_fields(all_day, start_utc, end_utc):
+		"""`start_date` / `end_date` (inclusive, local) of an all-day event; None for timed ones.
+
+		All-day events were localised at the site's midnight, so converting back gives the
+		calendar date; the iCal DTEND is exclusive, hence the minus one day.
+		"""
+		if not all_day:
+			return {"start_date": None, "end_date": None}
+		site_tz = pytz.timezone(get_site_timezone())
+		first = start_utc.astimezone(site_tz).date()
+		last = end_utc.astimezone(site_tz).date() - timedelta(days=1)
+		if last < first:
+			last = first
+		return {"start_date": first.isoformat(), "end_date": last.isoformat()}
 
 	# UTC HELPER
 
@@ -802,6 +852,12 @@ def pull_event_slots(start: str, end: str) -> list[dict]:
 
 			raw_start = dtstart_prop.dt
 
+			# VALUE=DATE means an all-day event; keep the flag for the cockpit calendar.
+			is_all_day = (
+				isinstance(raw_start, datetime.date)
+				and not isinstance(raw_start, datetime.datetime)
+			)
+
 			if (
 				isinstance(
 					raw_start,
@@ -969,6 +1025,10 @@ def pull_event_slots(start: str, end: str) -> list[dict]:
 					"description": desc,
 
 					"location": loc,
+
+					"all_day": is_all_day,
+
+					**all_day_fields(is_all_day, dtstart_utc, dtend_utc),
 				})
 
 				continue
@@ -1082,6 +1142,10 @@ def pull_event_slots(start: str, end: str) -> list[dict]:
 					"description": desc,
 
 					"location": loc,
+
+					"all_day": is_all_day,
+
+					**all_day_fields(is_all_day, occurrence_utc, occurrence_end_utc),
 				})
 
 		return parsed_slots
@@ -1154,7 +1218,7 @@ def pull_event_slots(start: str, end: str) -> list[dict]:
 			data=query_xml.encode(
 				"utf-8"
 			),
-			timeout=30,
+			timeout=timeout,
 		)
 
 	except Exception:
