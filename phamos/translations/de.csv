@@ -674,3 +674,8 @@ Pin set: {0},Markierung gesetzt: {0}
 "Venue / Video Link holds a link. For an online event, set Attendance to Online.",„Veranstaltungsort / Videolink“ enthält einen Link. Für eine Online-Veranstaltung bitte „Teilnahme“ auf „Online“ stellen.
 The address changed but the map pin did not. Use Find on Map to move the pin.,"Die Adresse wurde geändert, die Kartenmarkierung nicht. Mit „Auf Karte suchen“ die Markierung verschieben."
 "This address was not found on OpenStreetMap. Please check it, or set the pin on the map by hand.",Diese Adresse wurde bei OpenStreetMap nicht gefunden. Bitte prüfen oder die Markierung von Hand auf der Karte setzen.
+Please choose the Item Tax Template for the tickets before opening ticket sales.,"Bitte wählen Sie die Artikelsteuervorlage für die Tickets, bevor Sie den Ticketverkauf öffnen."
+{0} {1} belongs to another company than {2}.,{0} {1} gehört zu einem anderen Unternehmen als {2}.
+Event {0} has no Item Tax Template for its tickets.,Die Veranstaltung {0} hat keine Artikelsteuervorlage für ihre Tickets.
+The ticket price has changed in the meantime. Please check your order again.,Der Ticketpreis hat sich inzwischen geändert. Bitte prüfen Sie Ihre Bestellung erneut.
+Event order total differs from the confirmed total,Gesamtbetrag der Veranstaltungsbestellung weicht vom bestätigten Betrag ab

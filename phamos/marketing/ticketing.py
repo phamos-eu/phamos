@@ -114,7 +114,8 @@ def _limit_client_holds(event_doc, hold_id, qty, client):
 def hold_seats(event_doc, hold_id, qty):
 	"""Reserve ``qty`` seats (and the price that applies to them) for 20 minutes; renewed on every call.
 
-	Returns {ok, expires (ms since epoch), price_title, gross, spots_left, max_per_order} or {ok: False, reason}.
+	Returns {ok, expires (ms since epoch), minutes, price_title, gross, total, net_total, tax_total, spots_left}
+	or {ok: False, reason}. ``total`` is what an order of ``qty`` tickets costs (``billing.order_total``).
 	"""
 	qty = max(1, cint(qty))
 	client = _hold_client()
@@ -133,8 +134,10 @@ def hold_seats(event_doc, hold_id, qty):
 	expires = time.time() + HOLD_MINUTES * 60
 	frappe.cache.hset(_holds_key(event_doc.name), hold_id, {"qty": qty, "expires": expires,
 		"price_title": pricing.price_title if pricing else None, "client": client})
+	totals = billing.order_total(pricing, qty) if pricing else frappe._dict(net_total=0, tax_total=0, total=0)
 	return {"ok": True, "expires": int(expires * 1000), "minutes": HOLD_MINUTES,
 		"price_title": pricing.price_title if pricing else None, "gross": pricing.gross if pricing else 0,
+		"qty": qty, "total": totals.total, "net_total": totals.net_total, "tax_total": totals.tax_total,
 		"spots_left": max(0, capacity - taken - qty) if capacity else None}
 
 
@@ -170,13 +173,16 @@ def attendee_counts(event):
 
 
 def sale_state(doc, now=None, exclude_hold=None, for_update=False):
-	"""(open, reason): reason is None or one of closed, not_started, ended, sold_out, cancelled, no_price.
+	"""(open, reason): reason is None or one of closed, no_tax_template, not_started, ended, sold_out,
+	cancelled, no_price.
 	``for_update``: count with locking reads (see ``booked_seats``)."""
 	now = get_datetime(now or now_datetime())
 	if doc.status == "Cancelled":
 		return False, "cancelled"
 	if not doc.published or doc.status not in OPEN_EVENT_STATUSES or not doc.registration_open:
 		return False, "closed"
+	if doc.get("ticket_item") and not doc.get("item_tax_template"):
+		return False, "no_tax_template"  # phamos/phamos#1710: no sale before the tax rate is known
 	if doc.get("ticket_sales_from") and now < get_datetime(doc.ticket_sales_from):
 		return False, "not_started"
 	until = doc.get("ticket_sales_until") or doc.get("starts_on")
@@ -204,7 +210,8 @@ def offer(event_name):
 		return None
 	doc = frappe.get_doc("Marketing Content", event_name)
 	paid = bool(doc.get("ticket_item"))
-	pricing = billing.get_ticket_pricing(doc) if paid else None
+	# Without an Item Tax Template there is no price to show (and get_ticket_pricing would refuse).
+	pricing = billing.get_ticket_pricing(doc) if paid and doc.get("item_tax_template") else None
 	is_open, reason = sale_state(doc)
 	capacity = cint(doc.max_attendees) or None
 	spots_left = max(0, capacity - seats_taken(doc.name)) if capacity else None
@@ -216,7 +223,7 @@ def offer(event_name):
 			limit = min(limit, current.remaining)
 	ladder = [{"title": r.title, "gross": r.gross, "net": r.net, "remaining": r.remaining, "quota": r.quota,
 		"valid_until": r.valid_until, "valid_from": r.valid_from, "available": r.available, "ended": r.ended,
-		"upcoming": r.upcoming} for r in billing.price_ladder(doc)] if paid else []
+		"upcoming": r.upcoming} for r in billing.price_ladder(doc)] if pricing else []
 	return frappe._dict(
 		free=not paid,
 		item_name=pricing.item_name if pricing else None,
@@ -388,7 +395,8 @@ def _register(event, contact, attends, companions, billing_data, source, lang, e
 	pricing = billing.get_ticket_pricing(doc, len(people), exclude_hold=hold_id, for_update=True) if paid else None
 	if paid and not pricing:
 		frappe.throw(_("There are not enough tickets left at one price for this order. Please order fewer tickets."))
-	if pricing and expected_total is not None and abs(flt(expected_total) - flt(pricing.gross * len(people), 2)) > 0.01:
+	confirmed_total = billing.order_total(pricing, len(people)).total if pricing else None
+	if pricing and expected_total is not None and abs(flt(expected_total) - confirmed_total) >= 0.005:
 		frappe.throw(_("The ticket price has changed in the meantime ({0}). Please check your order again.").format(
 			pricing.price_title), title=_("Price changed"))
 
@@ -442,7 +450,7 @@ def _register(event, contact, attends, companions, billing_data, source, lang, e
 
 	if paid:
 		so = billing.create_sales_order(doc, docs, customer, pricing=pricing, submit=True, contact=buyer_contact,
-			address=party.address, email=buyer.email, lang=lang)
+			address=party.address, email=buyer.email, lang=lang, confirmed_total=confirmed_total)
 		reference, reference_doctype = so.name, "Sales Order"
 	else:
 		reference, reference_doctype = frappe.model.naming.make_autoname(FREE_BOOKING_SERIES), "Attendee"
