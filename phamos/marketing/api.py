@@ -115,6 +115,20 @@ def create_sales_invoices(names=None, sales_orders=None, submit=0):
 
 
 @frappe.whitelist(methods=["POST"])
+def send_ticket(name):
+	"""Desk "Send Ticket": the ticket mail for this Attendee now, also above the daily limit (phamos/phamos#1704)."""
+	doc = frappe.get_doc("Attendee", name)
+	doc.check_permission("write")
+	if not doc.email:
+		frappe.throw(_("This attendee has no email address."))
+	buyer = frappe.db.get_value("Attendee", {"order_reference": doc.order_reference, "is_buyer": 1},
+		["first_name", "last_name"], as_dict=True) if doc.order_reference and not doc.is_buyer else None
+	buyer_name = " ".join(filter(None, [buyer.first_name, buyer.last_name])) if buyer else None
+	ticketing.send_ticket(doc.name, buyer_name=buyer_name, lang=doc.language or "de", ignore_limit=True)
+	return {"sent_to": doc.email}
+
+
+@frappe.whitelist(methods=["POST"])
 def set_attendance(names, status):
 	_require("Attendee", "write")
 	if status not in ("Attended", "No Show", "Registered", "Confirmed", "Cancelled"):
