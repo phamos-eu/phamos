@@ -384,6 +384,9 @@ def _register(event, contact, attends, companions, billing_data, source, lang, e
 	if len(set(emails)) != len(emails):
 		frappe.throw(_("Two tickets have the same email address. Leave the email of a companion empty instead."))
 	# The message names no address: anyone can type any email, and it must not tell them who is registered.
+	# It still says that one of the typed addresses is registered. That is accepted: a probe of an address
+	# that is not registered books a real ticket for that person and mails them, so nobody can test addresses
+	# unnoticed (plus 5 orders per hour per IP; phamos/phamos#1702).
 	if emails and frappe.db.exists("Attendee", {"event": doc.name, "email": ["in", emails], "status": ["!=", "Cancelled"]}):
 		frappe.throw(_("One of these email addresses is already registered for this event. Please check the "
 			"addresses, or leave a ticket holder's email empty."))

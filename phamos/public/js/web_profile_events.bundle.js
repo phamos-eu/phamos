@@ -695,8 +695,8 @@ import { createLatest, expiryFromNow } from "./web_profile/hold_clock.js";
 			submit.disabled = true;
 			status.textContent = status.dataset.sending;
 			try {
-				const result = await post(form, new FormData(form));
-				status.textContent = result.status === "already" ? status.dataset.already : status.dataset.sent;
+				await post(form, new FormData(form));
+				status.textContent = status.dataset.sent;
 			} catch (error) {
 				submit.disabled = false;
 				status.classList.add("wp-error");
