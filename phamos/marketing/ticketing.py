@@ -415,14 +415,15 @@ def _register(event, contact, attends, companions, billing_data, source, lang, e
 	now = now_datetime()
 	if paid:
 		buyer = _clean_billing(billing_data, main)
-		party = crm.ensure_customer(buyer, doc, lang)
+		# The website order runs as the service user and may create these records (phamos/phamos#1709).
+		party = crm.ensure_customer(buyer, doc, lang, ignore_permissions=True)
 		customer, buyer_contact = party.customer, party.contact
 		buyer_links = frappe._dict(contact=buyer_contact, lead=None, customer=customer,
 			crm_status="Needs Review" if party.review else "Linked")
 	else:
 		buyer = main
 		buyer_links = crm.resolve_party(email=main.email, first_name=main.first_name, last_name=main.last_name,
-			phone=main.phone, event=doc, verified=False)
+			phone=main.phone, event=doc, verified=False, ignore_permissions=True)
 		customer = buyer_links.customer
 
 	docs = []
@@ -435,7 +436,7 @@ def _register(event, contact, attends, companions, billing_data, source, lang, e
 		else:
 			links = crm.resolve_party(email=person.email, first_name=person.first_name, last_name=person.last_name,
 				company_name=buyer.company_name if paid and buyer.is_company else "", event=doc,
-				link_to_customer=customer if paid and buyer.is_company else None, verified=False)
+				link_to_customer=customer if paid and buyer.is_company else None, verified=False, ignore_permissions=True)
 		att = frappe.get_doc({
 			"doctype": "Attendee", "event": doc.name, "role": "Guest", "status": "Registered", "source": source,
 			"language": lang if lang in ("de", "en") else None, "registered_on": now,
@@ -462,7 +463,7 @@ def _register(event, contact, attends, companions, billing_data, source, lang, e
 
 	if paid:
 		so = billing.create_sales_order(doc, docs, customer, pricing=pricing, submit=True, contact=buyer_contact,
-			address=party.address, email=buyer.email, lang=lang, confirmed_total=confirmed_total)
+			address=party.address, email=buyer.email, lang=lang, confirmed_total=confirmed_total, ignore_permissions=True)
 		reference, reference_doctype = so.name, "Sales Order"
 	else:
 		reference, reference_doctype = frappe.model.naming.make_autoname(FREE_BOOKING_SERIES), "Attendee"

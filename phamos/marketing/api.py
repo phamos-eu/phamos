@@ -1,4 +1,19 @@
-"""Desk actions on Attendees (list bulk actions and form buttons). POST only, permission-checked."""
+"""Desk actions on Attendees (list bulk actions and form buttons). POST only, permission-checked.
+
+Every action checks each Attendee it changes and runs with the user's own rights on the records it creates
+(phamos/phamos#1709). Rights per action, so staff roles can be checked:
+
+| Action | Needs |
+|---|---|
+| ``crm_matches`` | Attendee read (that row) |
+| ``link_to_crm`` | Attendee write (each row); with create: Contact create, Lead create if a Lead is made; Contact write to add links; with ``customer``: Customer read (that one) |
+| ``create_customers`` | Attendee write (each row), Customer create, Contact write |
+| ``create_sales_orders`` | Attendee write (each row), Sales Order create (+ submit), Customer read (the party) |
+| ``create_sales_invoices`` | Attendee write (each row of those orders), Sales Invoice create (+ submit) |
+| ``create_opportunities`` | Attendee write (each row), Opportunity create |
+| ``set_attendance`` | Attendee write (each row) |
+| ``send_ticket`` | Attendee write (that row) |
+"""
 
 import json
 
@@ -19,6 +34,22 @@ def _names(names):
 
 def _require(doctype, ptype):
 	frappe.has_permission(doctype, ptype, throw=True)
+
+
+def _attendees_for(names, ptype="write"):
+	"""The Attendees, each checked for ``ptype`` (a doctype-level check is not enough: User Permissions or
+	sharing can allow some rows and not others)."""
+	docs = [frappe.get_doc("Attendee", name) for name in _names(names)]
+	for doc in docs:
+		doc.check_permission(ptype)
+	return docs
+
+
+def _readable_customer(customer):
+	if not frappe.db.exists("Customer", customer):
+		frappe.throw(_("Customer {0} does not exist.").format(customer))
+	frappe.has_permission("Customer", "read", customer, throw=True)
+	return customer
 
 
 def _groups(docs):
@@ -45,25 +76,29 @@ def crm_matches(name):
 
 @frappe.whitelist(methods=["POST"])
 def link_to_crm(names, create=1, customer=None):
-	_require("Attendee", "write")
+	docs = _attendees_for(names)
+	if customer:
+		_readable_customer(customer)
 	results = []
-	for name in _names(names):
+	for doc in docs:
 		if customer:
-			result = crm.link_attendee(name, create=True)
+			result = crm.link_attendee(doc.name, create=True)
 			crm.ensure_contact_links(result["contact"], [("Customer", customer)])
-			frappe.db.set_value("Attendee", name, {"customer": customer, "crm_status": "Linked"})
+			doc.reload()
+			doc.customer, doc.crm_status = customer, "Linked"
+			doc.save()
 			results.append({**result, "customer": customer})
 		else:
-			results.append(crm.link_attendee(name, create=frappe.utils.cint(create)))
+			results.append(crm.link_attendee(doc.name, create=frappe.utils.cint(create)))
 	return {"count": len(results), "results": results}
 
 
 @frappe.whitelist(methods=["POST"])
 def create_customers(names):
-	_require("Attendee", "write")
+	docs = _attendees_for(names)
 	_require("Customer", "create")
 	done = []
-	for group in _groups([frappe.get_doc("Attendee", n) for n in _names(names)]):
+	for group in _groups(docs):
 		buyer = _buyer(group)
 		customer = crm.ensure_customer_for_order(buyer, group)
 		for doc in group:
@@ -75,12 +110,11 @@ def create_customers(names):
 
 @frappe.whitelist(methods=["POST"])
 def create_sales_orders(names, customer=None, submit=0):
-	_require("Attendee", "write")
+	docs = _attendees_for(names)
 	_require("Sales Order", "create")
 	submit = frappe.utils.cint(submit)
 	if submit:
 		_require("Sales Order", "submit")
-	docs = [frappe.get_doc("Attendee", n) for n in _names(names)]
 	skipped = [d.name for d in docs if d.sales_order or d.payment_status == "Not Required"]
 	docs = [d for d in docs if d.name not in skipped]
 	orders = []
@@ -89,8 +123,9 @@ def create_sales_orders(names, customer=None, submit=0):
 		if not party:
 			frappe.throw(_("{0}: no Customer yet. Run \"Create Customer(s)\" first or choose a Customer.").format(
 				_buyer(group).full_name))
+		_readable_customer(party)
 		event = frappe.get_doc("Marketing Content", group[0].event)
-		so = billing.create_sales_order(event, group, party, submit=submit)
+		so = billing.create_sales_order(event, group, party, submit=submit)  # with the user's own rights
 		orders.append(so.name)
 	return {"sales_orders": orders, "skipped": skipped}
 
@@ -103,13 +138,15 @@ def create_sales_invoices(names=None, sales_orders=None, submit=0):
 		_require("Sales Invoice", "submit")
 	orders = json.loads(sales_orders) if isinstance(sales_orders, str) else (sales_orders or [])
 	if names:
-		orders += frappe.get_all("Attendee", filters={"name": ["in", _names(names)], "sales_order": ["is", "set"],
-			"sales_invoice": ["in", ["", None]]}, pluck="sales_order", distinct=True)
+		orders += [d.sales_order for d in _attendees_for(names) if d.sales_order and not d.sales_invoice]
 	invoices, skipped = [], []
 	for so in dict.fromkeys(orders):
-		if frappe.db.get_value("Sales Order", so, "docstatus") != 1:
+		# Only event orders, and only with write on each of their attendees.
+		attendees = frappe.get_all("Attendee", filters={"sales_order": so}, pluck="name")
+		if not attendees or frappe.db.get_value("Sales Order", so, "docstatus") != 1:
 			skipped.append(so)
 			continue
+		_attendees_for(attendees)
 		invoices.append(billing.make_sales_invoice(so, submit=submit).name)
 	return {"sales_invoices": invoices, "skipped": skipped}
 
@@ -130,11 +167,9 @@ def send_ticket(name):
 
 @frappe.whitelist(methods=["POST"])
 def set_attendance(names, status):
-	_require("Attendee", "write")
 	if status not in ("Attended", "No Show", "Registered", "Confirmed", "Cancelled"):
 		frappe.throw(_("Invalid status"))
-	for name in _names(names):
-		doc = frappe.get_doc("Attendee", name)
+	for doc in _attendees_for(names):
 		doc.status = status
 		doc.save()
 	return {"count": len(_names(names))}
@@ -156,11 +191,11 @@ def create_campaign(event):
 def create_opportunities(names):
 	"""One Opportunity per attendee after the follow-up call showed real interest (none at registration:
 	a ticket is a closed sale, an Opportunity a deal someone works on)."""
-	_require("Attendee", "write")
+	docs = _attendees_for(names)
 	_require("Opportunity", "create")
 	created, skipped = [], []
-	for name in _names(names):
-		att = frappe.get_doc("Attendee", name)
+	for att in docs:
+		name = att.name
 		party_type, party = ("Customer", att.customer) if att.customer else ("Lead", att.lead) if att.lead else (None, None)
 		if att.opportunity or not party:
 			skipped.append(name)
