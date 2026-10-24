@@ -253,6 +253,41 @@ class TestTicketing(FrappeTestCase):
 		self.assertEqual(frappe.db.count("Attendee", {"event": self.event.name, "order_key": key}), 2)
 		self.assertEqual(result["reference_doctype"], "Sales Order")
 
+	def test_logged_in_website_user_orders_as_the_service_user(self, enqueue):
+		# phamos/phamos#1712: a portal user has no Item or Account rights of their own.
+		portal = "portal.buyer@ticket.example"
+		if not frappe.db.exists("User", portal):
+			frappe.get_doc({"doctype": "User", "email": portal, "first_name": "Portal", "user_type": "Website User",
+				"send_welcome_email": 0}).insert(ignore_permissions=True)
+		frappe.set_user(portal)
+		result = ticketing.register_attendees(self.event.name, CONTACT, companions=[], billing_data=COMPANY_BILLING)
+		self.assertEqual(frappe.session.user, portal)  # switched back after the order
+		frappe.set_user("Administrator")
+		from phamos.marketing.setup import TICKETING_USER
+
+		self.assertEqual(frappe.db.get_value("Sales Order", result["reference"], "owner"), TICKETING_USER)
+		buyer = frappe.db.get_value("Attendee", {"sales_order": result["reference"], "is_buyer": 1})
+		self.assertTrue(frappe.db.exists("Comment", {"reference_doctype": "Attendee", "reference_name": buyer,
+			"content": ["like", f"%{portal}%"]}))
+
+	def test_staff_keep_their_session_and_guests_get_no_comment(self, enqueue):
+		seen = []
+		real = ticketing._register
+
+		def spy(*args, **kwargs):
+			seen.append(frappe.session.user)
+			return real(*args, **kwargs)
+
+		with patch.object(ticketing, "_register", side_effect=spy):
+			ticketing.register_attendees(self.event.name, CONTACT, companions=[], billing_data=COMPANY_BILLING)
+			result = self.order(contact={"full_name": "Guest Buyer", "email": "guest.buyer@ticket.example"}, companions=[])
+		from phamos.marketing.setup import TICKETING_USER
+
+		self.assertEqual(seen, ["Administrator", TICKETING_USER])
+		buyer = frappe.db.get_value("Attendee", {"sales_order": result["reference"], "is_buyer": 1})
+		self.assertFalse(frappe.db.exists("Comment", {"reference_doctype": "Attendee", "reference_name": buyer,
+			"content": ["like", "%Ordered while logged in%"]}))
+
 	def test_order_locks_the_event_row(self, enqueue):
 		with patch("frappe.get_doc", wraps=frappe.get_doc) as get_doc:
 			self.order()
