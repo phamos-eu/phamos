@@ -618,20 +618,20 @@ def pull_event_slots(start: str, end: str, timeout: int = 30) -> list[dict]:
 
 	# ALL-DAY DATES
 
-	def all_day_dates(all_day, start_utc, end_utc):
-		"""Inclusive local dates of an all-day event, or (None, None) for timed ones.
+	def all_day_fields(all_day, start_utc, end_utc):
+		"""`start_date` / `end_date` (inclusive, local) of an all-day event; None for timed ones.
 
 		All-day events were localised at the site's midnight, so converting back gives the
 		calendar date; the iCal DTEND is exclusive, hence the minus one day.
 		"""
 		if not all_day:
-			return None, None
+			return {"start_date": None, "end_date": None}
 		site_tz = pytz.timezone(get_site_timezone())
 		first = start_utc.astimezone(site_tz).date()
 		last = end_utc.astimezone(site_tz).date() - timedelta(days=1)
 		if last < first:
 			last = first
-		return first.isoformat(), last.isoformat()
+		return {"start_date": first.isoformat(), "end_date": last.isoformat()}
 
 	# UTC HELPER
 
@@ -1028,9 +1028,7 @@ def pull_event_slots(start: str, end: str, timeout: int = 30) -> list[dict]:
 
 					"all_day": is_all_day,
 
-					"start_date": all_day_dates(is_all_day, dtstart_utc, dtend_utc)[0],
-
-					"end_date": all_day_dates(is_all_day, dtstart_utc, dtend_utc)[1],
+					**all_day_fields(is_all_day, dtstart_utc, dtend_utc),
 				})
 
 				continue
@@ -1147,9 +1145,7 @@ def pull_event_slots(start: str, end: str, timeout: int = 30) -> list[dict]:
 
 					"all_day": is_all_day,
 
-					"start_date": all_day_dates(is_all_day, occurrence_utc, occurrence_end_utc)[0],
-
-					"end_date": all_day_dates(is_all_day, occurrence_utc, occurrence_end_utc)[1],
+					**all_day_fields(is_all_day, occurrence_utc, occurrence_end_utc),
 				})
 
 		return parsed_slots
