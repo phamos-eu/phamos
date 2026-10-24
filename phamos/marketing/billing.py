@@ -215,11 +215,12 @@ def _append_lines(doc, pricing, attendees):
 
 
 def create_sales_order(event_doc, attendees, customer, *, pricing=None, submit=False, contact=None, address=None,
-		email=None, lang=None, confirmed_total=None):
+		email=None, lang=None, confirmed_total=None, ignore_permissions=False):
 	"""Sales Order with one line per attendee. Website orders (as the service user) and desk orders use it.
 
 	``pricing`` is the price the buyer saw and confirmed; without it the price that applies now is used.
 	``confirmed_total``: the total the buyer confirmed; the order is refused if ERPNext computes another one.
+	``ignore_permissions``: only for website orders (service user); desk orders run with the user's rights.
 	Attendees get ``sales_order`` / ``sales_order_item`` / ``billing_customer`` / ``order_reference``.
 	"""
 	from phamos.marketing.crm import ensure_lead_source, get_or_create_campaign
@@ -248,7 +249,7 @@ def create_sales_order(event_doc, attendees, customer, *, pricing=None, submit=F
 	if pricing.tc_name:
 		so.tc_name = pricing.tc_name
 	_append_lines(so, pricing, attendees)
-	so.flags.ignore_permissions = True
+	so.flags.ignore_permissions = ignore_permissions
 	so.insert()
 	if confirmed_total is not None and abs(flt(so.grand_total) - flt(confirmed_total)) >= 0.005:
 		# Must never happen once order_total matches ERPNext; if it does, nobody pays another amount than
@@ -366,7 +367,8 @@ def on_sales_order_submit(doc, method=None):
 			fields=["name", "contact", "is_buyer", "customer"]):
 		# A company pays for everybody it sends; a private buyer pays only for themself as a customer.
 		if customer_type == "Company" or att.is_buyer or len(names) == 1:
-			ensure_contact_links(att.contact, [("Customer", doc.customer)])
+			# Follow-up link of a submit the user was allowed to do: not checked again on the Contact.
+			ensure_contact_links(att.contact, [("Customer", doc.customer)], ignore_permissions=True)
 			if not att.customer:
 				# Without a Contact (companion without email) the person is not in the CRM yet.
 				values = {"customer": doc.customer}
