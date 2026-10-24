@@ -301,13 +301,18 @@ def _set(names, values):
 
 
 def on_sales_order_update(doc, method=None):
-	"""Keep the Attendee links when a person edits the order (e.g. changes the Customer of a draft)."""
-	for row in doc.items:
-		names = _attendees({"sales_order_item": row.name})
-		values = {"sales_order": doc.name, "billing_customer": doc.customer}
-		if doc.docstatus == 1:
-			values["payment_status"] = "Ordered"
-		_set(names, values)
+	"""Keep the Attendee links when a person edits the order (e.g. changes the Customer of a draft).
+
+	Runs on every Sales Order save: one query for all lines, and nothing more for orders without
+	attendees (phamos/phamos#1707)."""
+	lines = [row.name for row in doc.items if row.name]
+	names = _attendees({"sales_order_item": ["in", lines]}) if lines else []
+	if not names:
+		return
+	values = {"sales_order": doc.name, "billing_customer": doc.customer}
+	if doc.docstatus == 1:
+		values["payment_status"] = "Ordered"
+	_set(names, values)
 
 
 def on_sales_order_submit(doc, method=None):
