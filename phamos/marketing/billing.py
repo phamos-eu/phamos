@@ -140,6 +140,25 @@ def get_ticket_pricing(event_doc, qty=1, now=None, exclude_hold=None, for_update
 	price = select_price(event_doc, qty, now, exclude_hold=exclude_hold, for_update=for_update)
 	if not price:
 		return None
+	return _pricing(event_doc, price)
+
+
+def pricing_for_attendee(event_doc, attendee):
+	"""Desk orders: the price of the attendee's own row, at its current rate. Quotas and sale windows do not
+	apply, the seat was given at registration (phamos/phamos#1711). An attendee without a matching row
+	(empty, "Free" on a now paid event, a renamed or deleted row) gets the row that applies now, else the
+	last one; such attendees count against no quota, so they cannot push themselves to the next row."""
+	if not event_doc.get("item_tax_template"):
+		frappe.throw(_("Event {0} has no Item Tax Template for its tickets.").format(event_doc.get("title") or event_doc.name))
+	ladder = price_ladder(event_doc)
+	if not ladder:
+		frappe.throw(_("{0}: no ticket price can be found for event {1}.").format(attendee.full_name, event_doc.title))
+	own = next((row for row in ladder if row.title == attendee.ticket_type), None)
+	return _pricing(event_doc, own or select_price(event_doc, 1) or ladder[-1]), bool(own)
+
+
+def _pricing(event_doc, price):
+	item_code = event_doc.get("ticket_item")
 	taxes = tax_rows(event_doc)
 	inclusive = cint(event_doc.get("ticket_price_includes_tax"))
 	item_name = frappe.db.get_value("Item", item_code, "item_name") or item_code
@@ -188,17 +207,20 @@ def line_description(item_name, price_title, full_name):
 	return f"{item_name} ({price_title}) – {full_name}" if price_title else f"{item_name} – {full_name}"
 
 
-def _append_lines(doc, pricing, attendees):
-	line_rate = pricing.gross if pricing.inclusive else pricing.net
-	for att in attendees:
+def _append_lines(doc, priced):
+	"""One line per attendee: ``priced`` is [(attendee, pricing)]. The taxes come from the event, so they are
+	the same for every pricing."""
+	pricing = priced[0][1]
+	for att, line_pricing in priced:
+		line_rate = line_pricing.gross if line_pricing.inclusive else line_pricing.net
 		doc.append("items", {
-			"item_code": pricing.item_code,
+			"item_code": line_pricing.item_code,
 			"qty": 1,
 			"rate": line_rate,
 			"price_list_rate": line_rate,
-			"description": line_description(pricing.item_name, pricing.price_title, att.full_name),
+			"description": line_description(line_pricing.item_name, line_pricing.price_title, att.full_name),
 			"additional_notes": "\n".join(filter(None, [att.full_name, att.email])),
-			"item_tax_template": pricing.item_tax_template,
+			"item_tax_template": line_pricing.item_tax_template,
 			"delivery_date": doc.get("delivery_date"),
 		})
 	cost_center = frappe.get_cached_value("Company", doc.company, "cost_center")
@@ -218,16 +240,23 @@ def create_sales_order(event_doc, attendees, customer, *, pricing=None, submit=F
 		email=None, lang=None, confirmed_total=None, ignore_permissions=False):
 	"""Sales Order with one line per attendee. Website orders (as the service user) and desk orders use it.
 
-	``pricing`` is the price the buyer saw and confirmed; without it the price that applies now is used.
+	``pricing`` is the price the buyer saw and confirmed (website orders). Without it (desk orders) every
+	attendee is billed at their own price row (``pricing_for_attendee``).
 	``confirmed_total``: the total the buyer confirmed; the order is refused if ERPNext computes another one.
 	``ignore_permissions``: only for website orders (service user); desk orders run with the user's rights.
 	Attendees get ``sales_order`` / ``sales_order_item`` / ``billing_customer`` / ``order_reference``.
 	"""
 	from phamos.marketing.crm import ensure_lead_source, get_or_create_campaign
 
-	pricing = pricing or get_ticket_pricing(event_doc, len(attendees))
-	if not pricing:
-		frappe.throw(_("No ticket price can be sold for event {0} right now.").format(event_doc.title))
+	if pricing:
+		priced, keeps_type = [(att, pricing) for att in attendees], {att.name: False for att in attendees}
+	else:
+		priced, keeps_type = [], {}
+		for att in attendees:
+			att_pricing, own = pricing_for_attendee(event_doc, att)
+			priced.append((att, att_pricing))
+			keeps_type[att.name] = own
+	pricing = priced[0][1]
 	so = frappe.new_doc("Sales Order")
 	so.customer = customer
 	so.company = default_company()
@@ -248,7 +277,7 @@ def create_sales_order(event_doc, attendees, customer, *, pricing=None, submit=F
 		so.language = lang
 	if pricing.tc_name:
 		so.tc_name = pricing.tc_name
-	_append_lines(so, pricing, attendees)
+	_append_lines(so, priced)
 	so.flags.ignore_permissions = ignore_permissions
 	so.insert()
 	if confirmed_total is not None and abs(flt(so.grand_total) - flt(confirmed_total)) >= 0.005:
@@ -259,10 +288,12 @@ def create_sales_order(event_doc, attendees, customer, *, pricing=None, submit=F
 			reference_doctype="Marketing Content", reference_name=event_doc.name, defer_insert=True)
 		frappe.throw(_("The ticket price has changed in the meantime. Please check your order again."),
 			title=_("Price changed"))
-	for att, row in zip(attendees, so.items):
-		frappe.db.set_value("Attendee", att.name, {"sales_order": so.name, "sales_order_item": row.name,
-			"billing_customer": customer, "order_reference": att.order_reference or so.name, "ticket_type": pricing.price_title,
-			"payment_status": "Ordered" if submit else "Pending"}, update_modified=False)
+	for (att, att_pricing), row in zip(priced, so.items):
+		values = {"sales_order": so.name, "sales_order_item": row.name, "billing_customer": customer,
+			"order_reference": att.order_reference or so.name, "payment_status": "Ordered" if submit else "Pending"}
+		if not keeps_type[att.name]:
+			values["ticket_type"] = att_pricing.price_title  # an attendee's own price row is never overwritten
+		frappe.db.set_value("Attendee", att.name, values, update_modified=False)
 	if submit:
 		so.submit()
 	return so

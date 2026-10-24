@@ -11,7 +11,7 @@ from frappe.tests.utils import FrappeTestCase
 
 from phamos.marketing import billing, crm, ticketing
 from phamos.marketing.api import create_customers, create_opportunities, create_sales_invoices, create_sales_orders
-from phamos.tests.marketing_fixtures import BILLING, as_guest, ensure_company, make_attendee, make_event
+from phamos.tests.marketing_fixtures import BILLING, as_guest, ensure_company, make_attendee, make_customer, make_event
 
 
 def statuses(**filters):
@@ -153,6 +153,40 @@ class TestBilling(FrappeTestCase):
 		frappe.db.set_value("Attendee", {"sales_order": so_name}, "payment_status", "Invoiced")
 		billing.sync_payment_status()
 		self.assertEqual(self.rows(so_name), expected)
+
+	# --- desk orders bill each attendee at their own price (phamos/phamos#1711) -------------------------------
+
+	def desk_order(self, event, attendees):
+		customer = make_customer("Desk Price Kunde AG")
+		so = frappe.get_doc("Sales Order", create_sales_orders([a.name for a in attendees], customer=customer)["sales_orders"][0])
+		return {row.name: row.rate for row in so.items}, so
+
+	def early_bird_event(self, **row):
+		return make_event("Desk Price Event", prices=[{"title": "Early Bird", "rate": 59.5, "quota": 2, **row},
+			{"title": "Regular", "rate": 119}])
+
+	def test_desk_order_keeps_the_early_bird_price_the_attendees_filled(self, enqueue):
+		event = self.early_bird_event()
+		people = [make_attendee(event.name, f"early{i}@desk.example", ticket_type="Early Bird") for i in range(2)]
+		rates, so = self.desk_order(event, people)
+		self.assertEqual(set(rates.values()), {59.5})  # before: the quota counted them, so Regular
+		self.assertEqual(set(frappe.get_all("Attendee", filters={"sales_order": so.name}, pluck="ticket_type")), {"Early Bird"})
+
+	def test_desk_order_after_the_sale_window(self, enqueue):
+		event = self.early_bird_event(valid_until=frappe.utils.add_days(frappe.utils.now_datetime(), -1))
+		person = make_attendee(event.name, "late@desk.example", ticket_type="Early Bird")
+		rates, _so = self.desk_order(event, [person])
+		self.assertEqual(list(rates.values()), [59.5])
+
+	def test_unknown_ticket_type_gets_the_current_price(self, enqueue):
+		event = self.early_bird_event()
+		# One order (same order reference), so both land on one Sales Order.
+		known = make_attendee(event.name, "known@desk.example", ticket_type="Regular", order_reference="DESK-1")
+		unknown = make_attendee(event.name, "unknown@desk.example", ticket_type="Old Name", order_reference="DESK-1")
+		_rates, so = self.desk_order(event, [known, unknown])
+		self.assertEqual(sorted(row.rate for row in so.items), [59.5, 119])  # one order, two rates
+		self.assertEqual(frappe.db.get_value("Attendee", unknown.name, "ticket_type"), "Early Bird")
+		self.assertEqual(frappe.db.get_value("Attendee", known.name, "ticket_type"), "Regular")
 
 	def test_opportunities_on_demand(self, enqueue):
 		so_name = self.web_order()
