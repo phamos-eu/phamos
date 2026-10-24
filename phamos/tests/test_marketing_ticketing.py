@@ -3,6 +3,8 @@
 bench --site <site> run-tests --module phamos.tests.test_marketing_ticketing
 """
 
+import hashlib
+import hmac
 import json
 from unittest.mock import patch
 
@@ -222,6 +224,19 @@ class TestTicketing(FrappeTestCase):
 		self.assertFalse(buyer.share_with_attendees_consent)
 		self.assertFalse(ticketing.verify_consent_token(result["reference"], "1.forged"))
 		self.assertFalse(ticketing.verify_consent_token("SAL-ORD-OTHER", result["consent_token"]))
+
+	def test_consent_token_is_never_signed_with_the_site_name(self, enqueue):
+		# phamos/phamos#1705: without an encryption key the site name (public) must not become the key.
+		exp = int(add_days(now_datetime(), 1).timestamp())
+		message = f"event-consent|SAL-ORD-TEST|{exp}".encode()
+		forged = f"{exp}.{hmac.new(frappe.local.site.encode(), message, hashlib.sha256).hexdigest()}"
+		with patch.dict(frappe.local.conf), patch("frappe.installer.update_site_config") as update_site_config:
+			frappe.local.conf.pop("encryption_key", None)
+			self.assertFalse(ticketing.verify_consent_token("SAL-ORD-TEST", forged))
+			update_site_config.assert_called_once()  # a key is created and stored instead
+			token = ticketing.consent_token("SAL-ORD-TEST")
+			self.assertTrue(ticketing.verify_consent_token("SAL-ORD-TEST", token))
+			self.assertFalse(ticketing.verify_consent_token("SAL-ORD-TEST", f"{exp + 1}.{token.split('.', 1)[1]}"))
 
 	def test_confirmation_job_arguments_and_email(self, enqueue):
 		result = self.order()
