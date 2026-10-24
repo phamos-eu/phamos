@@ -230,9 +230,10 @@ def _start_double_opt_in(email, event_name):
 	group = frappe.db.get_value("Marketing Content", event_name, "email_group")
 	if not group:
 		return "no_group"
-	if frappe.db.exists("Email Group Member", {"email_group": group, "email": email, "unsubscribed": 0}):
-		return "already"
-	getattr(frappe_subscribe, "__wrapped__", frappe_subscribe)(email, group)
+	# The same answer for a member and a new address, and nothing is sent to a member: a stranger must not
+	# be able to find out who receives the updates (phamos/phamos#1702).
+	if not frappe.db.exists("Email Group Member", {"email_group": group, "email": email, "unsubscribed": 0}):
+		getattr(frappe_subscribe, "__wrapped__", frappe_subscribe)(email, group)
 	return "confirmation_sent"
 
 

@@ -221,7 +221,10 @@ class TestWebProfileEvents(FrappeTestCase):
 		self.assertFalse(frappe.db.exists("Email Group Member", {"email_group": GROUP, "email": "fan@example.com"}))
 		frappe.get_doc({"doctype": "Email Group Member", "email_group": GROUP, "email": "fan@example.com"}).insert(
 			ignore_permissions=True)
-		self.assertEqual(web.subscribe(self.event.route, "en", "fan@example.com", privacy_consent=1)["status"], "already")
+		# A member gets the same answer as a new address, and no mail (phamos/phamos#1702).
+		sendmail.reset_mock()
+		self.assertEqual(web.subscribe(self.event.route, "en", "fan@example.com", privacy_consent=1), result)
+		sendmail.assert_not_called()
 
 	def test_ics(self):
 		web.ics(self.event.route, "en")
