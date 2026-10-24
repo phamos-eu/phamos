@@ -678,3 +678,10 @@ Please choose the Item Tax Template for the tickets before opening ticket sales.
 Event {0} has no Item Tax Template for its tickets.,Die Veranstaltung {0} hat keine Artikelsteuervorlage für ihre Tickets.
 The ticket price has changed in the meantime. Please check your order again.,Der Ticketpreis hat sich inzwischen geändert. Bitte prüfen Sie Ihre Bestellung erneut.
 Event order total differs from the confirmed total,Gesamtbetrag der Veranstaltungsbestellung weicht vom bestätigten Betrag ab
+"Please enter a name only, without web or email addresses.",Bitte geben Sie nur einen Namen ein – ohne Web- oder E-Mail-Adressen.
+"Don't know about this booking? Simply reply to this email and we'll remove your address.","Sie wissen nichts von dieser Buchung? Antworten Sie einfach auf diese E-Mail, und wir entfernen Ihre Adresse."
+Ticket mail not sent: daily limit of {0} reached for this event.,Ticket-E-Mail nicht gesendet: Tageslimit von {0} für diese Veranstaltung erreicht.
+Event ticket mails: daily limit reached,Ticket-E-Mails der Veranstaltung: Tageslimit erreicht
+Send Ticket,Ticket senden
+Ticket sent to {0},Ticket gesendet an {0}
+This attendee has no email address.,Dieser Teilnehmer hat keine E-Mail-Adresse.

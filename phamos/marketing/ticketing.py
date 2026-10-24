@@ -12,12 +12,13 @@ from contextlib import contextmanager
 
 import hashlib
 import hmac
+import re
 import time
 
 import frappe
 from frappe import _
 from frappe.query_builder.functions import Count
-from frappe.utils import add_to_date, cint, flt, get_datetime, now_datetime
+from frappe.utils import add_to_date, cint, flt, get_datetime, now_datetime, nowdate
 from frappe.utils.password import get_encryption_key
 
 from phamos.marketing import billing, crm
@@ -275,6 +276,11 @@ def _sign(reference, exp):
 # --- the order -------------------------------------------------------------------------------------------
 
 
+# A web or email address inside a name: "://", "www.", "@", or a domain-like word (a letter, a dot, then two or
+# more letters: "evil.example"). "Dr. Müller" and "J. R. R. Tolkien" pass: a space or a single letter follows.
+LINK_IN_NAME = re.compile(r"://|www\.|@|[^\W\d_]\.[^\W\d_]{2,}", re.IGNORECASE)
+
+
 def _clean_person(raw, email_required=True):
 	raw = frappe._dict(raw or {})
 	first, last = (raw.get("first_name") or "").strip(), (raw.get("last_name") or "").strip()
@@ -282,6 +288,9 @@ def _clean_person(raw, email_required=True):
 		first, last = split_name((raw.get("full_name") or "").strip())
 	if not first:
 		frappe.throw(_("Please enter a name for every ticket."))
+	# Names reach strangers' inboxes ("<buyer> booked a ticket for you"): no links (phamos/phamos#1704).
+	if any(LINK_IN_NAME.search(value) for value in (first, last, raw.get("full_name") or "")):
+		frappe.throw(_("Please enter a name only, without web or email addresses."))
 	email = normalize_email(raw.get("email")) if (email_required or (raw.get("email") or "").strip()) else ""
 	return frappe._dict(first_name=first[:140], last_name=last[:140], email=email,
 		full_name=" ".join(filter(None, [first, last]))[:140],
@@ -558,14 +567,40 @@ def venue(doc):
 	return {"text": text} if text else None
 
 
-def send_ticket(attendee, buyer_name=None, lang="de"):
+TICKET_MAIL_DAILY_LIMIT = 200
+
+
+def _ticket_mail_allowed(att):
+	"""At most ``event_ticket_mail_daily_limit`` (site config, default 200) companion ticket mails per event and
+	day: the addresses are nobody's confirmed ones, so a script must not turn orders into a mail relay
+	(phamos/phamos#1704). Above the limit the mail is not sent; staff see why and can send it from the desk."""
+	limit = cint(frappe.conf.get("event_ticket_mail_daily_limit")) or TICKET_MAIL_DAILY_LIMIT
+	key = frappe.cache.make_key(f"event_ticket_mails:{att.event}:{nowdate()}")
+	sent = frappe.cache.incr(key)
+	if sent == 1:
+		frappe.cache.expire(key, 2 * 24 * 60 * 60)
+	if sent <= limit:
+		return True
+	att.add_comment("Comment", _("Ticket mail not sent: daily limit of {0} reached for this event.").format(limit))
+	if sent == limit + 1:
+		frappe.log_error(title=_("Event ticket mails: daily limit reached"),
+			message=f"Event {att.event}: more than {limit} companion ticket mails today.",
+			reference_doctype="Marketing Content", reference_name=att.event)
+	return False
+
+
+def send_ticket(attendee, buyer_name=None, lang="de", ignore_limit=False):
 	"""A ticket holder's own ticket: name, event, date, venue and the calendar file. No prices and no
-	billing details: those belong to the buyer, who got the full confirmation with every ticket."""
+	billing details: those belong to the buyer, who got the full confirmation with every ticket.
+
+	``ignore_limit``: sent by staff from the desk ("Send Ticket"), not counted against the daily limit."""
 	from phamos.marketing.web import build_ics
 	from phamos.web_profile.sections import find_item
 
 	att = frappe.get_doc("Attendee", attendee)
 	if not att.email:
+		return
+	if not ignore_limit and not _ticket_mail_allowed(att):
 		return
 	doc = frappe.get_doc("Marketing Content", att.event)
 	frappe.local.lang = lang if lang in ("de", "en") else "de"

@@ -310,6 +310,60 @@ class TestTicketing(FrappeTestCase):
 			self.assertTrue(ticketing.verify_consent_token("SAL-ORD-TEST", token))
 			self.assertFalse(ticketing.verify_consent_token("SAL-ORD-TEST", f"{exp + 1}.{token.split('.', 1)[1]}"))
 
+	def test_names_with_links_are_refused(self, enqueue):
+		# phamos/phamos#1704: names reach strangers' inboxes, so they must not carry links.
+		for name in ("visit evil.example", "Max www.x.de", "Erika https://x", "me@evil.example", "St.Pauli"):
+			self.assertRaises(frappe.ValidationError, ticketing._clean_person, {"full_name": name, "email": ""}, False)
+		for name in ("Dr. Müller", "J. R. R. Tolkien", "Anne-Marie O'Neill", "Ph.D. Erika Muster"):
+			self.assertEqual(ticketing._clean_person({"full_name": name, "email": ""}, False).full_name, name)
+		self.assertRaises(frappe.ValidationError, self.order, companions=[{"full_name": "visit evil.example", "email": ""}])
+
+	def test_companion_ticket_mails_have_a_daily_limit(self, enqueue):
+		from phamos.marketing import api
+
+		key = frappe.cache.make_key(f"event_ticket_mails:{self.event.name}:{frappe.utils.nowdate()}")
+		frappe.cache.delete(key)
+		people = [make_attendee(self.event.name, f"guest{i}@ticket.example") for i in range(3)]
+		try:
+			with patch.dict(frappe.conf, {"event_ticket_mail_daily_limit": 2}), patch("frappe.sendmail") as sendmail, \
+					patch("frappe.log_error") as log_error:
+				for att in people:
+					ticketing.send_ticket(att.name, buyer_name="Erika", lang="en")
+				self.assertEqual(sendmail.call_count, 2)
+				log_error.assert_called_once()
+				self.assertTrue(frappe.db.exists("Comment", {"reference_doctype": "Attendee",
+					"reference_name": people[2].name, "content": ["like", "%daily limit of 2%"]}))
+				self.assertGreater(frappe.cache.ttl(key), 0)
+				# Staff can send it anyway from the desk.
+				self.assertEqual(api.send_ticket(people[2].name), {"sent_to": "guest2@ticket.example"})
+				self.assertEqual(sendmail.call_count, 3)
+		finally:
+			frappe.cache.delete(key)
+
+	def test_send_ticket_needs_write_on_that_attendee(self, enqueue):
+		from phamos.marketing import api
+
+		att = make_attendee(self.event.name, "guest@ticket.example")
+		if not frappe.db.exists("User", "no-rights@ticket.example"):
+			frappe.get_doc({"doctype": "User", "email": "no-rights@ticket.example", "first_name": "No Rights",
+				"send_welcome_email": 0}).insert(ignore_permissions=True)
+		frappe.set_user("no-rights@ticket.example")
+		with patch("frappe.sendmail") as sendmail:
+			self.assertRaises(frappe.PermissionError, api.send_ticket, att.name)
+		sendmail.assert_not_called()
+
+	def test_ticket_mail_has_the_opt_out_line(self, enqueue):
+		att = make_attendee(self.event.name, "guest@ticket.example")
+		context = {"event": self.event, "venue": None, "attendee": att, "buyer_name": "Erika", "reference": None,
+			"event_url": None, "privacy_url": "", "imprint_url": ""}
+		lang = frappe.local.lang
+		try:
+			for code, text in (("en", "know about this booking? Simply reply"), ("de", "Sie wissen nichts von dieser Buchung?")):
+				frappe.local.lang = code
+				self.assertIn(text, frappe.render_template("templates/emails/event_ticket.html", context))
+		finally:
+			frappe.local.lang = lang
+
 	def test_confirmation_job_arguments_and_email(self, enqueue):
 		result = self.order()
 		kwargs = enqueue.call_args.kwargs
