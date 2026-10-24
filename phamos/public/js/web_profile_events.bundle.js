@@ -88,6 +88,10 @@ import { createLatest, expiryFromNow } from "./web_profile/hold_clock.js";
 		const newId = () => (crypto.randomUUID ? crypto.randomUUID()
 			: Array.from(crypto.getRandomValues(new Uint8Array(16)), (b) => b.toString(16).padStart(2, "0")).join(""));
 		let gross = parseFloat(form.dataset.gross || "0");
+		// The server's totals for the last reserved number of tickets, computed as the Sales Order computes
+		// them (phamos/phamos#1710): {qty, total, net_total, tax_total}. The page shows and confirms these.
+		let totals = null;
+		const totalsFor = (n) => (totals && totals.qty === n ? totals : null);
 		let current = 0;
 		let order = null; // {reference, token} after a successful order
 		let holdId = newId();
@@ -129,7 +133,7 @@ import { createLatest, expiryFromNow } from "./web_profile/hold_clock.js";
 			addButton.disabled = n >= max;
 			$("[data-wp-people-max]").hidden = n < max;
 			const total = $("[data-wp-people-total]");
-			if (total) total.textContent = money.format(gross * n);
+			if (total) total.textContent = money.format(totalsFor(n) ? totalsFor(n).total : gross * n);
 		}
 
 		function holders() {
@@ -245,10 +249,13 @@ import { createLatest, expiryFromNow } from "./web_profile/hold_clock.js";
 				}
 				// Relative to the visitor's clock: it may differ from the server's by minutes.
 				expiresAt = expiryFromNow(result.minutes || windowMs / 60000);
-				if (!free && result.gross && Math.abs(result.gross - gross) > 0.001) {
-					// Another price row applies to this number of tickets (e.g. the early-bird quota is used up).
-					gross = result.gross;
-					form.dataset.priceTitle = result.price_title || "";
+				if (!free) {
+					totals = { qty: result.qty, total: result.total, net_total: result.net_total, tax_total: result.tax_total };
+					if (result.gross && Math.abs(result.gross - gross) > 0.001) {
+						// Another price row applies to this number of tickets (e.g. the early-bird quota is used up).
+						gross = result.gross;
+						form.dataset.priceTitle = result.price_title || "";
+					}
 					renderCompanions();
 				}
 				startClock(restoredNote);
@@ -325,10 +332,11 @@ import { createLatest, expiryFromNow } from "./web_profile/hold_clock.js";
 				return tr;
 			}));
 			if (free) return;
-			const total = gross * people.length;
-			const net = total / (1 + taxRate / 100);
+			const server = totalsFor(people.length);
+			const total = server ? server.total : gross * people.length;
+			const net = server ? server.net_total : total / (1 + taxRate / 100);
 			$("[data-wp-summary-net]").textContent = money.format(net);
-			$("[data-wp-summary-tax]").textContent = money.format(total - net);
+			$("[data-wp-summary-tax]").textContent = money.format(server ? server.tax_total : total - net);
 			$("[data-wp-summary-total]").textContent = money.format(total);
 		}
 
@@ -349,6 +357,7 @@ import { createLatest, expiryFromNow } from "./web_profile/hold_clock.js";
 			order = null;
 			holdId = newId();
 			gross = parseFloat(form.dataset.gross || "0");
+			totals = null;
 			companionRows().forEach((row) => row.remove());
 			if (toggle) $("[data-wp-company]").hidden = true;
 			$("[data-wp-steps]").hidden = false;
@@ -482,7 +491,8 @@ import { createLatest, expiryFromNow } from "./web_profile/hold_clock.js";
 					is_company: toggle && toggle.checked ? 1 : 0, company: value("company"), vat_id: value("vat_id"),
 					address_line1: value("address_line1"), postcode: value("postcode"), city: value("city"), country: value("country"),
 				}));
-				body.append("expected_total", (gross * people.length).toFixed(2));
+				const server = totalsFor(people.length);
+				body.append("expected_total", (server ? server.total : gross * people.length).toFixed(2));
 			}
 			submit.classList.add("wp-busy");
 			status.classList.remove("wp-error");
