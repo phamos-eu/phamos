@@ -160,7 +160,7 @@ import {
 } from "@spa/utils/leaveFormat.js"
 import spaConfig from "@/config"
 import ApplyLeaveDialog from "../components/ApplyLeaveDialog.vue"
-import { loadMyLeave, myLeave } from "../leaveStore.js"
+import { loadMyLeave, loadMyLeaveBalance, myLeave } from "../leaveStore.js"
 
 const props = defineProps({ name: { type: String, default: "" } })
 
@@ -213,7 +213,7 @@ function openApply(row = null) {
 
 async function onSaved(doc) {
 	notify.success(editing.value ? __("Leave saved") : __("Leave handed in"))
-	await loadMyLeave()
+	await reload()
 	if (doc?.name) router.push({ name: "MyLeaveDetail", params: { name: doc.name } })
 }
 
@@ -223,7 +223,7 @@ async function withdraw(row) {
 	try {
 		await call(`${spaConfig.api}.withdraw_leave`, { name: row.name })
 		notify.success(__("Leave withdrawn"))
-		await loadMyLeave()
+		await reload()
 		close()
 	} catch (e) {
 		notify.error(__("Could not withdraw the leave"), e?.messages?.[0] || e?.message || "")
@@ -232,18 +232,23 @@ async function withdraw(row) {
 	}
 }
 
+function reload() {
+	return Promise.all([loadMyLeave(), loadMyLeaveBalance()])
+}
+
+// "Leave" in the Create menu arrives as ?new=1; open the dialog and drop the query, so a
+// reload does not open it again.
+function openFromQuery() {
+	if (!route.query.new) return
+	openApply()
+	router.replace({ query: {} })
+}
+
 onMounted(() => {
-	loadMyLeave()
-	if (route.query.new) openApply()
+	reload()
+	openFromQuery()
 })
 
-// the Create menu opens the dialog through ?new=1 while the page is already shown
-watch(
-	() => route.query.new,
-	(value) => {
-		if (!value) return
-		openApply()
-		router.replace({ query: {} })
-	}
-)
+// the same while the page is already shown
+watch(() => route.query.new, openFromQuery)
 </script>
