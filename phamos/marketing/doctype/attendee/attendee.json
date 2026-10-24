@@ -79,7 +79,8 @@
    "options": "Marketing Content",
    "reqd": 1,
    "in_list_view": 1,
-   "in_standard_filter": 1
+   "in_standard_filter": 1,
+   "search_index": 1
   },
   {
    "fieldname": "role",
@@ -445,7 +446,7 @@
   }
  ],
  "links": [],
- "modified": "2026-10-17 09:00:00.000000",
+ "modified": "2026-10-24 09:00:00.000000",
  "modified_by": "Administrator",
  "module": "Marketing",
  "name": "Attendee",

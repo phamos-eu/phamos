@@ -17,6 +17,7 @@ so ``on_sales_invoice_change`` is hooked on ``on_change``.
 
 import frappe
 from frappe import _
+from frappe.query_builder.functions import Count
 from frappe.utils import cint, flt, get_datetime, getdate, now_datetime, nowdate
 
 from phamos.marketing.defaults import LEAD_SOURCE, SEAT_STATUSES
@@ -68,11 +69,18 @@ def tax_rows(event_doc):
 	return rows
 
 
-def sold_per_price(event_name):
-	"""{price title: seats taken} for the event (cancelled attendees do not count)."""
-	rows = frappe.get_all("Attendee", filters={"event": event_name, "status": ["in", SEAT_STATUSES]},
-		fields=["ticket_type", "count(name) as n"], group_by="ticket_type")
-	return {r.ticket_type: r.n for r in rows}
+def sold_per_price(event_name, for_update=False):
+	"""{price title: seats taken} for the event (cancelled attendees do not count).
+
+	``for_update``: a locking read, which sees the latest committed rows instead of the transaction's
+	snapshot. The order uses it after locking the event row (``ticketing._register``).
+	"""
+	attendee = frappe.qb.DocType("Attendee")
+	query = (frappe.qb.from_(attendee).select(attendee.ticket_type, Count("*"))
+		.where((attendee.event == event_name) & attendee.status.isin(SEAT_STATUSES)).groupby(attendee.ticket_type))
+	if for_update:
+		query = query.for_update()
+	return {ticket_type: n for ticket_type, n in query.run()}
 
 
 def _gross_net(rate, inclusive, tax_rate):
@@ -82,7 +90,7 @@ def _gross_net(rate, inclusive, tax_rate):
 	return flt(rate * (1 + tax_rate / 100), 2), rate
 
 
-def price_ladder(event_doc, now=None, exclude_hold=None):
+def price_ladder(event_doc, now=None, exclude_hold=None, for_update=False):
 	"""All price rows with gross, net, remaining quota and whether they can still be sold, in table order.
 	Seats other visitors hold right now (20-minute holds, ``ticketing.hold_seats``) count against the quota."""
 	from phamos.marketing.ticketing import active_holds
@@ -91,7 +99,7 @@ def price_ladder(event_doc, now=None, exclude_hold=None):
 	taxes = tax_rows(event_doc)
 	tax_rate = sum(flt(r.tax_rate) for r in taxes)
 	inclusive = cint(event_doc.get("ticket_price_includes_tax"))
-	sold = sold_per_price(event_doc.name) if event_doc.get("name") else {}
+	sold = sold_per_price(event_doc.name, for_update=for_update) if event_doc.get("name") else {}
 	for hold in (active_holds(event_doc.name, exclude=exclude_hold) if event_doc.get("name") else {}).values():
 		if hold.get("price_title"):
 			sold[hold["price_title"]] = cint(sold.get(hold["price_title"])) + cint(hold.get("qty"))
@@ -108,21 +116,21 @@ def price_ladder(event_doc, now=None, exclude_hold=None):
 	return ladder
 
 
-def select_price(event_doc, qty=1, now=None, exclude_hold=None):
+def select_price(event_doc, qty=1, now=None, exclude_hold=None, for_update=False):
 	"""The price row an order of ``qty`` tickets gets now, or None when no row can take it."""
-	for row in price_ladder(event_doc, now, exclude_hold=exclude_hold):
+	for row in price_ladder(event_doc, now, exclude_hold=exclude_hold, for_update=for_update):
 		if row.available and (row.remaining is None or row.remaining >= qty):
 			return row
 	return None
 
 
-def get_ticket_pricing(event_doc, qty=1, now=None, exclude_hold=None):
+def get_ticket_pricing(event_doc, qty=1, now=None, exclude_hold=None, for_update=False):
 	"""Everything an order line needs, for the price row that applies now; None for free events or when
 	nothing can be sold (no price row, sold out, windows over)."""
 	item_code = event_doc.get("ticket_item")
 	if not item_code:
 		return None
-	price = select_price(event_doc, qty, now, exclude_hold=exclude_hold)
+	price = select_price(event_doc, qty, now, exclude_hold=exclude_hold, for_update=for_update)
 	if not price:
 		return None
 	taxes = tax_rows(event_doc)

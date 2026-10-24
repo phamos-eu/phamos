@@ -36,6 +36,7 @@ class TestTicketing(FrappeTestCase):
 		frappe.set_user("Administrator")
 		for name in frappe.get_all("Marketing Content", pluck="name"):
 			frappe.cache.delete_value(ticketing._holds_key(name))  # holds live in Redis, not in the rollback
+		frappe.db.after_commit.reset()  # a savepoint rollback keeps queued after-commit callbacks
 		frappe.db.rollback(save_point="ticketing_test")
 
 	def order(self, contact=CONTACT, attends=1, companions=COMPANIONS, billing_data=COMPANY_BILLING, event=None, **kwargs):
@@ -181,6 +182,22 @@ class TestTicketing(FrappeTestCase):
 			self.order()
 		self.assertNotIn("erika@ticket.example", str(raised.exception))
 
+	def test_hold_is_released_only_after_commit(self, enqueue):
+		self.assertTrue(ticketing.hold_seats(self.event, "hold-commit-1", 2)["ok"])
+		self.order(hold_id="hold-commit-1")
+		# Until the attendees are committed, the held seats must still count (phamos/phamos#1699).
+		self.assertIn("hold-commit-1", ticketing.active_holds(self.event.name))
+		frappe.db.after_commit.run()
+		self.assertNotIn("hold-commit-1", ticketing.active_holds(self.event.name))
+
+	def test_failed_order_keeps_its_hold(self, enqueue):
+		self.assertTrue(ticketing.hold_seats(self.event, "hold-failed-1", 1)["ok"])
+		for i in range(4):
+			make_attendee(self.event.name, f"seat{i}@ticket.example")
+		self.assertRaises(frappe.ValidationError, self.order, hold_id="hold-failed-1")  # 2 tickets, 1 seat left
+		frappe.db.after_commit.run()
+		self.assertIn("hold-failed-1", ticketing.active_holds(self.event.name))
+
 	def test_order_locks_the_event_row(self, enqueue):
 		with patch("frappe.get_doc", wraps=frappe.get_doc) as get_doc:
 			self.order()
@@ -320,12 +337,73 @@ class TestTicketing(FrappeTestCase):
 		second = ticketing.hold_seats(event, "hold-bbbbbbbb", 1)
 		self.assertEqual(second["price_title"], "Regular")
 		self.assertFalse(ticketing.hold_seats(event, "hold-cccccccc", 1)["ok"])  # 2 + 1 held = capacity
-		# The holder orders: its own hold does not block it, and is released afterwards.
+		# The holder orders: its own hold does not block it, and is released after the commit.
 		result = self.order(event=event, billing_data=BILLING, hold_id="hold-aaaaaaaa", expected_total=119)
 		self.assertEqual(frappe.db.get_value("Sales Order", result["reference"], "grand_total"), 119)
+		frappe.db.after_commit.run()
 		self.assertNotIn("hold-aaaaaaaa", ticketing.active_holds(event.name))
 		# An expired hold counts for nothing.
 		frappe.cache.hset(ticketing._holds_key(event.name), "hold-bbbbbbbb", {"qty": 1, "price_title": "Regular",
 			"expires": 0})
 		self.assertEqual(ticketing.held_seats(event.name), 0)
 		self.assertEqual(ticketing.offer(event.name).spots_left, 1)
+
+
+@patch("frappe.enqueue")
+class TestOrderConcurrency(FrappeTestCase):
+	"""Two database connections: an order must see what another order committed while it waited for the
+	event lock (phamos/phamos#1699). These tests commit, so they clean up after themselves."""
+
+	FREE_TITLE = "Concurrency Test Free Event"
+	PAID_TITLE = "Concurrency Test Paid Event"
+
+	@classmethod
+	def setUpClass(cls):
+		super().setUpClass()
+		frappe.set_user("Administrator")
+		ensure_company()
+		frappe.db.commit()
+
+	def tearDown(self):
+		frappe.set_user("Administrator")
+		frappe.db.rollback()
+		for title in (self.FREE_TITLE, self.PAID_TITLE):
+			for name in frappe.get_all("Marketing Content", filters={"title": title}, pluck="name"):
+				frappe.db.delete("Attendee", {"event": name})
+				frappe.cache.delete_value(ticketing._holds_key(name))
+				frappe.delete_doc("Marketing Content", name, force=True, ignore_permissions=True)
+		frappe.db.commit()
+
+	def open_snapshot(self, event):
+		"""The order request's first plain read (the page data), before it takes the event lock."""
+		frappe.db.sql("select name from `tabMarketing Content` where name = %s", event)
+
+	def book_elsewhere(self, event, email, **kwargs):
+		primary = frappe.local.db
+		with self.secondary_connection():
+			make_attendee(event, email, **kwargs)
+			frappe.db.commit()
+		# FrappeTestCase.secondary_connection leaves the new connection active after its first use.
+		frappe.local.db = primary
+
+	def test_order_sees_a_seat_booked_while_it_waited(self, enqueue):
+		event = make_event(self.FREE_TITLE, paid=False, max_attendees=1)
+		frappe.db.commit()
+		self.open_snapshot(event.name)
+		self.book_elsewhere(event.name, "first@ticket.example")
+		with as_guest(), self.assertRaises(frappe.ValidationError):
+			ticketing.register_attendees(event.name, CONTACT, attends=1, companions=[])
+		frappe.db.rollback()
+		self.assertEqual(frappe.db.count("Attendee", {"event": event.name}), 1)
+
+	def test_price_quota_sees_a_ticket_booked_while_it_waited(self, enqueue):
+		event = make_event(self.PAID_TITLE, max_attendees=10, prices=[
+			{"title": "Early Bird", "rate": 99, "quota": 1}, {"title": "Regular", "rate": 119}])
+		frappe.db.commit()
+		self.open_snapshot(event.name)
+		self.book_elsewhere(event.name, "first@ticket.example", ticket_type="Early Bird")
+		doc = frappe.get_doc("Marketing Content", event.name, for_update=True)
+		# A plain read still sees the snapshot: the early-bird ticket looks free.
+		self.assertEqual(billing.get_ticket_pricing(doc).price_title, "Early Bird")
+		self.assertEqual(billing.get_ticket_pricing(doc, for_update=True).price_title, "Regular")
+		self.assertEqual(ticketing.sale_state(doc, for_update=True), (True, None))
