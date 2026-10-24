@@ -277,14 +277,54 @@ def make_sales_invoice(sales_order, submit=False):
 	return si
 
 
-def payment_status_for_invoice(si):
-	if si.docstatus != 1:
-		return "Ordered"
-	if si.status == "Credit Note Issued":
-		return "Cancelled"
-	if si.status == "Paid" or flt(si.outstanding_amount) <= 0:
-		return "Paid"
-	return "Invoiced"
+def payment_status_for_lines(lines):
+	"""{Sales Order line: (sales_invoice, payment_status)} from the submitted invoices and credit notes of
+	these order lines (one line per attendee). Lines without a submitted invoice are left out.
+
+	Per line (phamos/phamos#1706): the latest regular invoice whose line is not fully credited is the current
+	one: "Paid" when its outstanding is 0 or less, else "Invoiced". If every regular invoice of the line was
+	credited, the line is "Credited" and keeps pointing at the latest original invoice, never the credit note.
+	So a correction (credit note, then a new invoice) ends with the new invoice. Drafts never count.
+	"""
+	if not lines:
+		return {}
+	si, item = frappe.qb.DocType("Sales Invoice"), frappe.qb.DocType("Sales Invoice Item")
+	rows = (frappe.qb.from_(item).join(si).on(item.parent == si.name)
+		.select(item.so_detail, item.qty, si.name, si.is_return, si.return_against, si.outstanding_amount, si.creation)
+		.where(item.so_detail.isin(list(lines)) & (si.docstatus == 1)).orderby(si.creation).run(as_dict=True))
+	result = {}
+	for line in lines:
+		own = [r for r in rows if r.so_detail == line]
+		credited = {}
+		for r in own:
+			if r.is_return and r.return_against:
+				credited[r.return_against] = credited.get(r.return_against, 0) + flt(r.qty)
+		regular = [r for r in own if not r.is_return]
+		if not regular:
+			continue
+		current = [r for r in regular if flt(r.qty) + credited.get(r.name, 0) > 0]
+		if current:
+			invoice = current[-1]
+			result[line] = (invoice.name, "Paid" if flt(invoice.outstanding_amount) <= 0 else "Invoiced")
+		else:
+			result[line] = (regular[-1].name, "Credited")
+	return result
+
+
+def refresh_payment_status(lines):
+	"""Recompute ``sales_invoice`` and ``payment_status`` of the Attendees of these Sales Order lines."""
+	lines = [line for line in dict.fromkeys(lines) if line]
+	if not lines:
+		return
+	attendees = frappe.get_all("Attendee", filters={"sales_order_item": ["in", lines]},
+		fields=["name", "sales_order_item"])
+	if not attendees:
+		return
+	state = payment_status_for_lines({a.sales_order_item for a in attendees})
+	for att in attendees:
+		invoice, status = state.get(att.sales_order_item, (None, "Ordered"))
+		frappe.db.set_value("Attendee", att.name, {"sales_invoice": invoice, "payment_status": status},
+			update_modified=False)
 
 
 # --- hooks ----------------------------------------------------------------------------------------------
@@ -343,19 +383,18 @@ def on_sales_order_cancel(doc, method=None):
 
 
 def on_sales_invoice_change(doc, method=None):
-	so_rows = [row.so_detail for row in doc.items if row.get("so_detail")]
-	names = _attendees({"sales_order_item": ["in", so_rows]}) if so_rows else []
-	names = list(dict.fromkeys(names + _attendees({"sales_invoice": doc.name})))
-	if not names:
-		return
-	if doc.docstatus == 2:
-		_set(names, {"sales_invoice": None, "payment_status": "Ordered"})
-	else:
-		_set(names, {"sales_invoice": doc.name, "payment_status": payment_status_for_invoice(doc)})
+	"""Hooked on ``on_change`` only: it runs once after every save, submit and cancel, and also when a payment
+	or credit note changes the invoice through ``db_set`` (which runs ``on_change`` as well)."""
+	lines = [row.so_detail for row in doc.items if row.get("so_detail")]
+	if doc.get("is_return") and doc.get("return_against"):
+		lines += frappe.get_all("Sales Invoice Item", filters={"parent": doc.return_against}, pluck="so_detail")
+	lines += frappe.get_all("Attendee", filters={"sales_invoice": doc.name}, pluck="sales_order_item")
+	refresh_payment_status(lines)
 
 
 def on_sales_invoice_trash(doc, method=None):
-	_set(_attendees({"sales_invoice": doc.name}), {"sales_invoice": None, "payment_status": "Ordered"})
+	# A draft being deleted: the attendees fall back to their other (submitted) invoices, if any.
+	refresh_payment_status(frappe.get_all("Attendee", filters={"sales_invoice": doc.name}, pluck="sales_order_item"))
 
 
 def on_payment_entry_change(doc, method=None):
@@ -366,9 +405,8 @@ def on_payment_entry_change(doc, method=None):
 
 def sync_payment_status():
 	"""Daily safety net for payments booked in ways that bypass the hooks."""
-	for si in frappe.get_all("Attendee", filters={"sales_invoice": ["is", "set"],
-			"payment_status": ["not in", ["Paid", "Cancelled"]]}, pluck="sales_invoice", distinct=True):
-		on_sales_invoice_change(frappe.get_doc("Sales Invoice", si))
+	refresh_payment_status(frappe.get_all("Attendee", filters={"sales_order_item": ["is", "set"],
+		"payment_status": ["in", ["Ordered", "Invoiced"]]}, pluck="sales_order_item"))
 
 
 def lead_before_insert(doc, method=None):

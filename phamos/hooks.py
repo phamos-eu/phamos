@@ -316,12 +316,13 @@ doc_events = {
         "on_update_after_submit": "phamos.phamos.doctype.monthly_implementation_summary.monthly_implementation_summary.sync_mis_status_for_source_doc",
         "on_cancel": "phamos.phamos.doctype.monthly_implementation_summary.monthly_implementation_summary.sync_mis_status_for_source_doc",
     },
-    # Event tickets: Attendee links and payment status (phamos.marketing.billing). Payments reach an
-    # invoice through db_set only, so its on_change is the trigger that catches them.
+    # Event tickets: Attendee links and payment status (phamos.marketing.billing). Only on_change: it runs
+    # once after every save, submit and cancel, and payments reach an invoice through db_set, which runs
+    # on_change too. Hooking on_submit etc. as well ran the handler twice (phamos/phamos#1706).
     "Sales Invoice": {
-        "on_submit": ["phamos.phamos.doctype.monthly_implementation_summary.monthly_implementation_summary.sync_mis_status_for_source_doc", "phamos.marketing.billing.on_sales_invoice_change"],
-        "on_update_after_submit": ["phamos.phamos.doctype.monthly_implementation_summary.monthly_implementation_summary.sync_mis_status_for_source_doc", "phamos.marketing.billing.on_sales_invoice_change"],
-        "on_cancel": ["phamos.phamos.doctype.monthly_implementation_summary.monthly_implementation_summary.sync_mis_status_for_source_doc", "phamos.marketing.billing.on_sales_invoice_change"],
+        "on_submit": "phamos.phamos.doctype.monthly_implementation_summary.monthly_implementation_summary.sync_mis_status_for_source_doc",
+        "on_update_after_submit": "phamos.phamos.doctype.monthly_implementation_summary.monthly_implementation_summary.sync_mis_status_for_source_doc",
+        "on_cancel": "phamos.phamos.doctype.monthly_implementation_summary.monthly_implementation_summary.sync_mis_status_for_source_doc",
         "on_change": "phamos.marketing.billing.on_sales_invoice_change",
         "on_trash": "phamos.marketing.billing.on_sales_invoice_trash",
     },
