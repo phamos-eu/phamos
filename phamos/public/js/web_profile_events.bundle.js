@@ -555,8 +555,16 @@ import { createLatest, expiryFromNow } from "./web_profile/hold_clock.js";
 	const interest = document.querySelector("[data-wp-interest]");
 	if (interest) {
 		const key = `wp-interest:${interest.dataset.event}`;
-		const read = () => { try { return localStorage.getItem(key); } catch (e) { return null; } };
-		const write = (v) => { try { localStorage.setItem(key, v); } catch (e) { /* private mode */ } };
+		const read = (k = key) => { try { return localStorage.getItem(k); } catch (e) { return null; } };
+		const write = (v, k = key) => { try { localStorage.setItem(k, v); } catch (e) { /* private mode */ } };
+		// An anonymous random id for this browser: the server keeps each voter's answer and only takes back
+		// that one when the answer changes (phamos/phamos#1703). Without storage every page load is a new voter.
+		let voter = read("wp-voter");
+		if (!voter) {
+			voter = crypto.randomUUID ? crypto.randomUUID()
+				: Array.from(crypto.getRandomValues(new Uint8Array(16)), (b) => b.toString(16).padStart(2, "0")).join("");
+			write(voter, "wp-voter");
+		}
 		const mark = (choice) => interest.querySelectorAll("[data-response]").forEach((b) =>
 			b.setAttribute("aria-pressed", b.dataset.response === choice ? "true" : "false"));
 		mark(read());
@@ -570,7 +578,7 @@ import { createLatest, expiryFromNow } from "./web_profile/hold_clock.js";
 			body.append("event", interest.dataset.event);
 			body.append("lang", interest.dataset.lang);
 			body.append("response", response);
-			if (previous) body.append("previous", previous);
+			body.append("voter", voter);
 			try {
 				const result = await post({ action: interest.dataset.action }, body);
 				write(response);
