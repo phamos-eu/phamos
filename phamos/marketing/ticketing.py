@@ -16,6 +16,7 @@ import time
 
 import frappe
 from frappe import _
+from frappe.query_builder.functions import Count
 from frappe.utils import add_to_date, cint, flt, get_datetime, now_datetime
 from frappe.utils.password import get_encryption_key
 
@@ -137,14 +138,23 @@ def hold_seats(event_doc, hold_id, qty):
 		"spots_left": max(0, capacity - taken - qty) if capacity else None}
 
 
-def booked_seats(event):
-	"""Seats of registered attendees (no holds): what the page may show as "booked"."""
-	return frappe.db.count("Attendee", {"event": event, "status": ["in", SEAT_STATUSES]})
+def booked_seats(event, for_update=False):
+	"""Seats of registered attendees (no holds): what the page may show as "booked".
+
+	``for_update``: a locking read, which sees the latest committed rows instead of the transaction's
+	snapshot. The order uses it after locking the event row (``_register``).
+	"""
+	attendee = frappe.qb.DocType("Attendee")
+	query = (frappe.qb.from_(attendee).select(Count("*"))
+		.where((attendee.event == event) & attendee.status.isin(SEAT_STATUSES)))
+	if for_update:
+		query = query.for_update()
+	return query.run()[0][0]
 
 
-def seats_taken(event, exclude_hold=None):
+def seats_taken(event, exclude_hold=None, for_update=False):
 	"""Booked seats plus the seats other visitors hold right now."""
-	return booked_seats(event) + held_seats(event, exclude=exclude_hold)
+	return booked_seats(event, for_update=for_update) + held_seats(event, exclude=exclude_hold)
 
 
 def attendee_counts(event):
@@ -159,8 +169,9 @@ def attendee_counts(event):
 	}
 
 
-def sale_state(doc, now=None, exclude_hold=None):
-	"""(open, reason): reason is None or one of closed, not_started, ended, sold_out, cancelled, no_price."""
+def sale_state(doc, now=None, exclude_hold=None, for_update=False):
+	"""(open, reason): reason is None or one of closed, not_started, ended, sold_out, cancelled, no_price.
+	``for_update``: count with locking reads (see ``booked_seats``)."""
 	now = get_datetime(now or now_datetime())
 	if doc.status == "Cancelled":
 		return False, "cancelled"
@@ -171,10 +182,10 @@ def sale_state(doc, now=None, exclude_hold=None):
 	until = doc.get("ticket_sales_until") or doc.get("starts_on")
 	if until and now > get_datetime(until):
 		return False, "ended"
-	if cint(doc.max_attendees) and seats_taken(doc.name, exclude_hold) >= cint(doc.max_attendees):
+	if cint(doc.max_attendees) and seats_taken(doc.name, exclude_hold, for_update=for_update) >= cint(doc.max_attendees):
 		return False, "sold_out"
-	if doc.get("ticket_item") and not billing.select_price(doc, 1, now, exclude_hold=exclude_hold):
-		ladder = billing.price_ladder(doc, now, exclude_hold=exclude_hold)
+	if doc.get("ticket_item") and not billing.select_price(doc, 1, now, exclude_hold=exclude_hold, for_update=for_update):
+		ladder = billing.price_ladder(doc, now, exclude_hold=exclude_hold, for_update=for_update)
 		if not ladder:
 			return False, "no_price"
 		if any(row.upcoming for row in ladder):
@@ -299,15 +310,21 @@ def register_attendees(event, contact, attends=True, companions=None, billing_da
 	"""
 	with ticketing_session():
 		result = _register(event, contact, attends, companions, billing_data, source, lang, expected_total, hold_id)
-	release_hold(event, hold_id)
+	# Only once the attendees are committed: until then the held seats must still count as taken. A failed
+	# order keeps its hold until it expires.
+	if hold_id:
+		frappe.db.after_commit.add(lambda: release_hold(event, hold_id))
 	return result
 
 
 def _register(event, contact, attends, companions, billing_data, source, lang, expected_total, hold_id=None):
 	# Row lock until the request commits: two orders placed at the same moment are booked one after the
-	# other, so the seat and price-quota checks below always see the other order's attendees.
+	# other. The lock alone is not enough: under REPEATABLE READ, plain reads after it still see the snapshot
+	# of the request's first read (the page data, before the lock), so another order that committed while
+	# this one waited would be missed. Every count in the order path below this line must therefore use
+	# for_update=True, a locking read of the latest committed rows (phamos/phamos#1699).
 	doc = frappe.get_doc("Marketing Content", event, for_update=True)
-	is_open, reason = sale_state(doc, exclude_hold=hold_id)
+	is_open, reason = sale_state(doc, exclude_hold=hold_id, for_update=True)
 	if not is_open:
 		frappe.throw(_("Sorry, registration for this event is not possible ({0}).").format(_(reason)))
 
@@ -326,12 +343,12 @@ def _register(event, contact, attends, companions, billing_data, source, lang, e
 	if emails and frappe.db.exists("Attendee", {"event": doc.name, "email": ["in", emails], "status": ["!=", "Cancelled"]}):
 		frappe.throw(_("One of these email addresses is already registered for this event. Please check the "
 			"addresses, or leave a ticket holder's email empty."))
-	taken = seats_taken(doc.name, exclude_hold=hold_id)
+	taken = seats_taken(doc.name, exclude_hold=hold_id, for_update=True)
 	if cint(doc.max_attendees) and taken + len(people) > cint(doc.max_attendees):
 		frappe.throw(_("Only {0} seats are left.").format(max(0, cint(doc.max_attendees) - taken)))
 
 	paid = bool(doc.get("ticket_item"))
-	pricing = billing.get_ticket_pricing(doc, len(people), exclude_hold=hold_id) if paid else None
+	pricing = billing.get_ticket_pricing(doc, len(people), exclude_hold=hold_id, for_update=True) if paid else None
 	if paid and not pricing:
 		frappe.throw(_("There are not enough tickets left at one price for this order. Please order fewer tickets."))
 	if pricing and expected_total is not None and abs(flt(expected_total) - flt(pricing.gross * len(people), 2)) > 0.01:
