@@ -6,6 +6,7 @@ among the published items, never by a document name sent by the browser. The ord
 ``phamos.marketing.ticketing.register_attendees``, which validates everything again.
 """
 
+import hashlib
 import json
 import re
 from datetime import datetime, timedelta, timezone
@@ -139,6 +140,7 @@ def order_tickets(event, lang, contact, attends=1, companions=None, billing=None
 
 HOLD_ID = re.compile(r"[A-Za-z0-9-]{8,64}")
 INTEREST = {"yes": "going_count", "maybe": "maybe_count", "no": "not_going_count"}
+VOTER_ID = re.compile(r"[A-Za-z0-9-]{32,64}")
 
 
 def _hold_id(value, required=True):
@@ -163,23 +165,46 @@ def hold(event, lang, hold_id, qty=1):
 
 @frappe.whitelist(allow_guest=True, methods=["POST"])
 @rate_limit(limit=20, seconds=60 * 60)
-def interest(event, lang, response, previous=None, website=None):
-	"""Anonymous Yes / Maybe / No: counts only, no personal data (gauges interest before tickets are sold)."""
+def interest(event, lang, response, voter=None, previous=None, website=None):
+	"""Anonymous Yes / Maybe / No: counts only, no personal data (gauges interest before tickets are sold).
+
+	``voter``: a random id the browser keeps. The server stores each voter's current answer and only ever takes
+	back that stored answer, never one the browser names: ``previous`` is ignored (phamos/phamos#1703).
+	"""
 	if website:
 		return {"ok": True}
 	item = _event(event, _lang(lang))
-	if response not in INTEREST or (previous and previous not in INTEREST):
+	if response not in INTEREST or not VOTER_ID.fullmatch((voter or "").strip()):
 		frappe.throw(_("Invalid request."))
-	if previous and previous != response:
-		field = INTEREST[previous]
+	stored = _swap_interest(item, voter.strip(), response)
+	if stored in INTEREST and stored != response:
+		field = INTEREST[stored]
 		frappe.db.sql(f"update `tabMarketing Content` set `{field}` = greatest(0, coalesce(`{field}`, 0) - 1) where name = %s",
 			item.name)
-	if previous != response:
+	if stored != response:
 		field = INTEREST[response]
 		frappe.db.sql(f"update `tabMarketing Content` set `{field}` = coalesce(`{field}`, 0) + 1 where name = %s", item.name)
 	clear_section("events")
 	counts = frappe.db.get_value("Marketing Content", item.name, list(INTEREST.values()), as_dict=True)
 	return {"ok": True, "counts": {key: cint(counts[field]) for key, field in INTEREST.items()}}
+
+
+def _interest_key(event, voter):
+	"""Redis key of one voter's answer: a hash of the browser's id, never the id itself."""
+	digest = hashlib.sha256(f"{frappe.local.site}|{voter}".encode()).hexdigest()[:32]
+	return frappe.cache.make_key(f"event_interest:{event}:{digest}")
+
+
+def _swap_interest(item, voter, response):
+	"""Store ``response`` as the voter's answer and return the one stored before (or None), in one atomic
+	step: two clicks at the same moment must not both take back the same old answer."""
+	ends_on, starts_on = frappe.db.get_value("Marketing Content", item.name, ["ends_on", "starts_on"])
+	end = get_datetime(ends_on or starts_on) if (ends_on or starts_on) else None
+	# Kept until 30 days after the event (a year for events without a date), then the answer is forgotten.
+	keep = (end + timedelta(days=30) - now_datetime()) if end else timedelta(days=365)
+	seconds = max(int(keep.total_seconds()), 24 * 60 * 60)
+	old = frappe.cache.set(_interest_key(item.name, voter), response, ex=seconds, get=True)
+	return old.decode() if isinstance(old, bytes) else old
 
 
 @frappe.whitelist(allow_guest=True, methods=["POST"])
