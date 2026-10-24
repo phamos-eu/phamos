@@ -19,6 +19,12 @@ frappe.ui.form.on("Attendee", {
 			frm.add_custom_button(__("Create Opportunity"), () =>
 				phamos_attendee.call("create_opportunities", { names: [frm.doc.name] }, frm), group);
 		}
+		if (frm.doc.email) {
+			frm.add_custom_button(__("Send Ticket"), () =>
+				frappe.call({ method: `${ATTENDEE_API}.send_ticket`, args: { name: frm.doc.name }, freeze: true })
+					.then((r) => frappe.show_alert({ message: __("Ticket sent to {0}", [r.message.sent_to]), indicator: "green" })),
+				group);
+		}
 		for (const status of ["Attended", "No Show"]) {
 			if (frm.doc.status !== status) {
 				frm.add_custom_button(__(status), () =>
@@ -34,7 +40,7 @@ frappe.ui.form.on("Attendee", {
 
 window.phamos_attendee = {
 	payment_colour(status) {
-		return { Paid: "green", Invoiced: "orange", Ordered: "blue", Pending: "red",
+		return { Paid: "green", Credited: "purple", Invoiced: "orange", Ordered: "blue", Pending: "red",
 			Cancelled: "gray", "Not Required": "gray" }[status] || "gray";
 	},
 

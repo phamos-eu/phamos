@@ -12,11 +12,14 @@ from contextlib import contextmanager
 
 import hashlib
 import hmac
+import re
 import time
 
 import frappe
 from frappe import _
-from frappe.utils import add_to_date, cint, flt, get_datetime, now_datetime
+from frappe.query_builder.functions import Count
+from frappe.utils import add_to_date, cint, flt, get_datetime, now_datetime, nowdate
+from frappe.utils.password import get_encryption_key
 
 from phamos.marketing import billing, crm
 from phamos.marketing.defaults import FREE_BOOKING_SERIES, MAX_ATTENDEES_PER_ORDER, SEAT_STATUSES
@@ -27,14 +30,16 @@ OPEN_EVENT_STATUSES = ("Upcoming", "Ongoing")
 
 @contextmanager
 def ticketing_session():
-	"""Run a website order as the "Event Ticketing" service user instead of Guest (see marketing.setup).
-
-	Desk users keep their own session. ``frappe.set_user`` clears ``form_dict``: read all request
-	arguments before entering.
+	"""Run a website order as the "Event Ticketing" service user (see marketing.setup): for Guests and for
+	logged-in Website Users (portal customers), who have no rights on Item or Account either
+	(phamos/phamos#1712). System Users (staff) keep their own session: they have the desk rights, and their
+	name stays on the documents. ``frappe.set_user`` clears ``form_dict``: read all request arguments before
+	entering.
 	"""
 	from phamos.marketing.setup import TICKETING_USER, ensure_ticketing_user
 
-	if frappe.session.user != "Guest":
+	user = frappe.session.user
+	if not _orders_as_service_user(user):
 		yield
 		return
 	if not frappe.db.exists("User", TICKETING_USER):
@@ -43,7 +48,11 @@ def ticketing_session():
 	try:
 		yield
 	finally:
-		frappe.set_user("Guest")
+		frappe.set_user(user)
+
+
+def _orders_as_service_user(user):
+	return user == "Guest" or frappe.get_cached_value("User", user, "user_type") == "Website User"
 
 
 # --- 20-minute holds: seats (and their price) reserved while a visitor fills in the order -------------
@@ -112,7 +121,8 @@ def _limit_client_holds(event_doc, hold_id, qty, client):
 def hold_seats(event_doc, hold_id, qty):
 	"""Reserve ``qty`` seats (and the price that applies to them) for 20 minutes; renewed on every call.
 
-	Returns {ok, expires (ms since epoch), price_title, gross, spots_left, max_per_order} or {ok: False, reason}.
+	Returns {ok, expires (ms since epoch), minutes, price_title, gross, total, net_total, tax_total, spots_left}
+	or {ok: False, reason}. ``total`` is what an order of ``qty`` tickets costs (``billing.order_total``).
 	"""
 	qty = max(1, cint(qty))
 	client = _hold_client()
@@ -131,19 +141,30 @@ def hold_seats(event_doc, hold_id, qty):
 	expires = time.time() + HOLD_MINUTES * 60
 	frappe.cache.hset(_holds_key(event_doc.name), hold_id, {"qty": qty, "expires": expires,
 		"price_title": pricing.price_title if pricing else None, "client": client})
+	totals = billing.order_total(pricing, qty) if pricing else frappe._dict(net_total=0, tax_total=0, total=0)
 	return {"ok": True, "expires": int(expires * 1000), "minutes": HOLD_MINUTES,
 		"price_title": pricing.price_title if pricing else None, "gross": pricing.gross if pricing else 0,
+		"qty": qty, "total": totals.total, "net_total": totals.net_total, "tax_total": totals.tax_total,
 		"spots_left": max(0, capacity - taken - qty) if capacity else None}
 
 
-def booked_seats(event):
-	"""Seats of registered attendees (no holds): what the page may show as "booked"."""
-	return frappe.db.count("Attendee", {"event": event, "status": ["in", SEAT_STATUSES]})
+def booked_seats(event, for_update=False):
+	"""Seats of registered attendees (no holds): what the page may show as "booked".
+
+	``for_update``: a locking read, which sees the latest committed rows instead of the transaction's
+	snapshot. The order uses it after locking the event row (``_register``).
+	"""
+	attendee = frappe.qb.DocType("Attendee")
+	query = (frappe.qb.from_(attendee).select(Count("*"))
+		.where((attendee.event == event) & attendee.status.isin(SEAT_STATUSES)))
+	if for_update:
+		query = query.for_update()
+	return query.run()[0][0]
 
 
-def seats_taken(event, exclude_hold=None):
+def seats_taken(event, exclude_hold=None, for_update=False):
 	"""Booked seats plus the seats other visitors hold right now."""
-	return booked_seats(event) + held_seats(event, exclude=exclude_hold)
+	return booked_seats(event, for_update=for_update) + held_seats(event, exclude=exclude_hold)
 
 
 def attendee_counts(event):
@@ -158,22 +179,26 @@ def attendee_counts(event):
 	}
 
 
-def sale_state(doc, now=None, exclude_hold=None):
-	"""(open, reason): reason is None or one of closed, not_started, ended, sold_out, cancelled, no_price."""
+def sale_state(doc, now=None, exclude_hold=None, for_update=False):
+	"""(open, reason): reason is None or one of closed, no_tax_template, not_started, ended, sold_out,
+	cancelled, no_price.
+	``for_update``: count with locking reads (see ``booked_seats``)."""
 	now = get_datetime(now or now_datetime())
 	if doc.status == "Cancelled":
 		return False, "cancelled"
 	if not doc.published or doc.status not in OPEN_EVENT_STATUSES or not doc.registration_open:
 		return False, "closed"
+	if doc.get("ticket_item") and not doc.get("item_tax_template"):
+		return False, "no_tax_template"  # phamos/phamos#1710: no sale before the tax rate is known
 	if doc.get("ticket_sales_from") and now < get_datetime(doc.ticket_sales_from):
 		return False, "not_started"
 	until = doc.get("ticket_sales_until") or doc.get("starts_on")
 	if until and now > get_datetime(until):
 		return False, "ended"
-	if cint(doc.max_attendees) and seats_taken(doc.name, exclude_hold) >= cint(doc.max_attendees):
+	if cint(doc.max_attendees) and seats_taken(doc.name, exclude_hold, for_update=for_update) >= cint(doc.max_attendees):
 		return False, "sold_out"
-	if doc.get("ticket_item") and not billing.select_price(doc, 1, now, exclude_hold=exclude_hold):
-		ladder = billing.price_ladder(doc, now, exclude_hold=exclude_hold)
+	if doc.get("ticket_item") and not billing.select_price(doc, 1, now, exclude_hold=exclude_hold, for_update=for_update):
+		ladder = billing.price_ladder(doc, now, exclude_hold=exclude_hold, for_update=for_update)
 		if not ladder:
 			return False, "no_price"
 		if any(row.upcoming for row in ladder):
@@ -192,7 +217,8 @@ def offer(event_name):
 		return None
 	doc = frappe.get_doc("Marketing Content", event_name)
 	paid = bool(doc.get("ticket_item"))
-	pricing = billing.get_ticket_pricing(doc) if paid else None
+	# Without an Item Tax Template there is no price to show (and get_ticket_pricing would refuse).
+	pricing = billing.get_ticket_pricing(doc) if paid and doc.get("item_tax_template") else None
 	is_open, reason = sale_state(doc)
 	capacity = cint(doc.max_attendees) or None
 	spots_left = max(0, capacity - seats_taken(doc.name)) if capacity else None
@@ -204,7 +230,7 @@ def offer(event_name):
 			limit = min(limit, current.remaining)
 	ladder = [{"title": r.title, "gross": r.gross, "net": r.net, "remaining": r.remaining, "quota": r.quota,
 		"valid_until": r.valid_until, "valid_from": r.valid_from, "available": r.available, "ended": r.ended,
-		"upcoming": r.upcoming} for r in billing.price_ladder(doc)] if paid else []
+		"upcoming": r.upcoming} for r in billing.price_ladder(doc)] if pricing else []
 	return frappe._dict(
 		free=not paid,
 		item_name=pricing.item_name if pricing else None,
@@ -247,11 +273,18 @@ def verify_consent_token(reference, token):
 
 
 def _sign(reference, exp):
-	key = (frappe.local.conf.get("encryption_key") or frappe.local.site).encode()
+	# The site's secret key; Frappe creates and stores one if the site has none. Never the site name:
+	# that is public, and anyone could forge tokens with it (phamos/phamos#1705).
+	key = get_encryption_key().encode()
 	return hmac.new(key, f"event-consent|{reference}|{exp}".encode(), hashlib.sha256).hexdigest()
 
 
 # --- the order -------------------------------------------------------------------------------------------
+
+
+# A web or email address inside a name: "://", "www.", "@", or a domain-like word (a letter, a dot, then two or
+# more letters: "evil.example"). "Dr. Müller" and "J. R. R. Tolkien" pass: a space or a single letter follows.
+LINK_IN_NAME = re.compile(r"://|www\.|@|[^\W\d_]\.[^\W\d_]{2,}", re.IGNORECASE)
 
 
 def _clean_person(raw, email_required=True):
@@ -261,6 +294,9 @@ def _clean_person(raw, email_required=True):
 		first, last = split_name((raw.get("full_name") or "").strip())
 	if not first:
 		frappe.throw(_("Please enter a name for every ticket."))
+	# Names reach strangers' inboxes ("<buyer> booked a ticket for you"): no links (phamos/phamos#1704).
+	if any(LINK_IN_NAME.search(value) for value in (first, last, raw.get("full_name") or "")):
+		frappe.throw(_("Please enter a name only, without web or email addresses."))
 	email = normalize_email(raw.get("email")) if (email_required or (raw.get("email") or "").strip()) else ""
 	return frappe._dict(first_name=first[:140], last_name=last[:140], email=email,
 		full_name=" ".join(filter(None, [first, last]))[:140],
@@ -294,17 +330,74 @@ def register_attendees(event, contact, attends=True, companions=None, billing_da
 
 	Returns {ok, reference, reference_doctype, attendees, paid, tickets_to, consent_token}.
 	"""
-	with ticketing_session():
-		result = _register(event, contact, attends, companions, billing_data, source, lang, expected_total, hold_id)
-	release_hold(event, hold_id)
+	user = frappe.session.user
+	result = _register(event, contact, attends, companions, billing_data, source, lang, expected_total, hold_id)
+	if user != "Guest" and _orders_as_service_user(user):
+		# The Sales Order belongs to the service user; who was logged in stays visible on the buyer's row.
+		rows = frappe.get_all("Attendee", filters={"event": event, "order_reference": result["reference"]},
+			fields=["name", "is_buyer"], order_by="is_buyer desc, creation asc", limit=1)
+		if rows:
+			frappe.get_doc("Attendee", rows[0].name).add_comment("Comment",
+				_("Ordered while logged in as {0}.").format(user))
+	# Only once the attendees are committed: until then the held seats must still count as taken. A failed
+	# order keeps its hold until it expires.
+	if hold_id:
+		frappe.db.after_commit.add(lambda: release_hold(event, hold_id))
 	return result
+
+
+# Leads from the website are owned by "Guest", like those of the website contact form: the Lead Assignment
+# Rule ("Based on Field lead_owner", condition lead_owner != "Guest") then leaves them alone. Owned by the
+# service user or a portal user, it would assign them to someone who can't read Leads, and the share that
+# Frappe then tries fails (phamos/phamos#1718).
+WEBSITE_LEAD_OWNER = "Guest"
+
+
+# The order form's hold id doubles as the order's idempotency key. The browser creates it with
+# crypto.randomUUID() (36 characters); shorter ids are not trusted as a secret, because the repeat answer
+# carries a consent token.
+ORDER_KEY_MIN_LENGTH = 32
+
+
+def _previous_order(event, order_key, contact):
+	"""The result of the order already placed with ``order_key`` for ``event``, or None.
+
+	A locking read under the event lock, so it sees an order that committed while this request waited. The
+	first order wins: a repeat with other data gets the first order back and books nothing.
+	"""
+	attendee = frappe.qb.DocType("Attendee")
+	rows = (frappe.qb.from_(attendee)
+		.select(attendee.name, attendee.sales_order, attendee.order_reference, attendee.is_buyer, attendee.email)
+		.where((attendee.event == event) & (attendee.order_key == order_key))
+		.orderby(attendee.creation).for_update().run(as_dict=True))
+	if not rows:
+		return None
+	sales_order = next((r.sales_order for r in rows if r.sales_order), None)
+	reference = sales_order or next((r.order_reference for r in rows if r.order_reference), None)
+	if sales_order:
+		tickets_to = frappe.db.get_value("Sales Order", sales_order, "contact_email")
+	else:
+		tickets_to = next((r.email for r in rows if r.is_buyer and r.email), None)
+	tickets_to = tickets_to or normalize_email((contact or {}).get("email"), throw=False)
+	return {"ok": True, "reference": reference, "reference_doctype": "Sales Order" if sales_order else "Attendee",
+		"attendees": len(rows), "paid": bool(sales_order), "tickets_to": tickets_to,
+		"consent_token": consent_token(reference)}
 
 
 def _register(event, contact, attends, companions, billing_data, source, lang, expected_total, hold_id=None):
 	# Row lock until the request commits: two orders placed at the same moment are booked one after the
-	# other, so the seat and price-quota checks below always see the other order's attendees.
+	# other. The lock alone is not enough: under REPEATABLE READ, plain reads after it still see the snapshot
+	# of the request's first read (the page data, before the lock), so another order that committed while
+	# this one waited would be missed. Every count in the order path below this line must therefore use
+	# for_update=True, a locking read of the latest committed rows (phamos/phamos#1699).
 	doc = frappe.get_doc("Marketing Content", event, for_update=True)
-	is_open, reason = sale_state(doc, exclude_hold=hold_id)
+	# Before every other check: a repeat of an order that went through (double click, lost response, reload)
+	# must get that order back, not "sold out" or "already registered" (phamos/phamos#1700).
+	order_key = hold_id if hold_id and len(hold_id) >= ORDER_KEY_MIN_LENGTH else None
+	previous = _previous_order(doc.name, order_key, contact) if order_key else None
+	if previous:
+		return previous
+	is_open, reason = sale_state(doc, exclude_hold=hold_id, for_update=True)
 	if not is_open:
 		frappe.throw(_("Sorry, registration for this event is not possible ({0}).").format(_(reason)))
 
@@ -320,32 +413,37 @@ def _register(event, contact, attends, companions, billing_data, source, lang, e
 	if len(set(emails)) != len(emails):
 		frappe.throw(_("Two tickets have the same email address. Leave the email of a companion empty instead."))
 	# The message names no address: anyone can type any email, and it must not tell them who is registered.
+	# It still says that one of the typed addresses is registered. That is accepted: a probe of an address
+	# that is not registered books a real ticket for that person and mails them, so nobody can test addresses
+	# unnoticed (plus 5 orders per hour per IP; phamos/phamos#1702).
 	if emails and frappe.db.exists("Attendee", {"event": doc.name, "email": ["in", emails], "status": ["!=", "Cancelled"]}):
 		frappe.throw(_("One of these email addresses is already registered for this event. Please check the "
 			"addresses, or leave a ticket holder's email empty."))
-	taken = seats_taken(doc.name, exclude_hold=hold_id)
+	taken = seats_taken(doc.name, exclude_hold=hold_id, for_update=True)
 	if cint(doc.max_attendees) and taken + len(people) > cint(doc.max_attendees):
 		frappe.throw(_("Only {0} seats are left.").format(max(0, cint(doc.max_attendees) - taken)))
 
 	paid = bool(doc.get("ticket_item"))
-	pricing = billing.get_ticket_pricing(doc, len(people), exclude_hold=hold_id) if paid else None
+	pricing = billing.get_ticket_pricing(doc, len(people), exclude_hold=hold_id, for_update=True) if paid else None
 	if paid and not pricing:
 		frappe.throw(_("There are not enough tickets left at one price for this order. Please order fewer tickets."))
-	if pricing and expected_total is not None and abs(flt(expected_total) - flt(pricing.gross * len(people), 2)) > 0.01:
+	confirmed_total = billing.order_total(pricing, len(people)).total if pricing else None
+	if pricing and expected_total is not None and abs(flt(expected_total) - confirmed_total) >= 0.005:
 		frappe.throw(_("The ticket price has changed in the meantime ({0}). Please check your order again.").format(
 			pricing.price_title), title=_("Price changed"))
 
 	now = now_datetime()
 	if paid:
 		buyer = _clean_billing(billing_data, main)
-		party = crm.ensure_customer(buyer, doc, lang)
+		# The website order runs as the service user and may create these records (phamos/phamos#1709).
+		party = crm.ensure_customer(buyer, doc, lang, ignore_permissions=True)
 		customer, buyer_contact = party.customer, party.contact
 		buyer_links = frappe._dict(contact=buyer_contact, lead=None, customer=customer,
 			crm_status="Needs Review" if party.review else "Linked")
 	else:
 		buyer = main
 		buyer_links = crm.resolve_party(email=main.email, first_name=main.first_name, last_name=main.last_name,
-			phone=main.phone, event=doc, verified=False)
+			phone=main.phone, event=doc, verified=False, ignore_permissions=True, lead_owner=WEBSITE_LEAD_OWNER)
 		customer = buyer_links.customer
 
 	docs = []
@@ -358,13 +456,14 @@ def _register(event, contact, attends, companions, billing_data, source, lang, e
 		else:
 			links = crm.resolve_party(email=person.email, first_name=person.first_name, last_name=person.last_name,
 				company_name=buyer.company_name if paid and buyer.is_company else "", event=doc,
-				link_to_customer=customer if paid and buyer.is_company else None, verified=False)
+				link_to_customer=customer if paid and buyer.is_company else None, verified=False, ignore_permissions=True,
+				lead_owner=WEBSITE_LEAD_OWNER)
 		att = frappe.get_doc({
 			"doctype": "Attendee", "event": doc.name, "role": "Guest", "status": "Registered", "source": source,
 			"language": lang if lang in ("de", "en") else None, "registered_on": now,
 			"first_name": person.first_name, "last_name": person.last_name, "email": person.email or None,
 			"phone": person.phone, "company_name": buyer.company_name if paid and buyer.is_company else person.company_name,
-			"is_buyer": 1 if is_buyer else 0,
+			"is_buyer": 1 if is_buyer else 0, "order_key": order_key,
 			"contact": links.contact, "lead": links.lead, "customer": links.customer, "crm_status": links.crm_status,
 			"ticket_type": pricing.price_title if pricing else "Free",
 			"payment_status": "Pending" if paid else "Not Required",
@@ -384,15 +483,19 @@ def _register(event, contact, attends, companions, billing_data, source, lang, e
 					customer, party.review))
 
 	if paid:
-		so = billing.create_sales_order(doc, docs, customer, pricing=pricing, submit=True, contact=buyer_contact,
-			address=party.address, email=buyer.email, lang=lang)
+		# Only the Sales Order needs the service user: ERPNext checks Item read and Account select with the
+		# current user while validating it. Everything else of the order is created in the visitor's own session,
+		# like the website contact form (phamos/phamos#1718).
+		with ticketing_session():
+			so = billing.create_sales_order(doc, docs, customer, pricing=pricing, submit=True, contact=buyer_contact,
+				address=party.address, email=buyer.email, lang=lang, confirmed_total=confirmed_total,
+				ignore_permissions=True)
 		reference, reference_doctype = so.name, "Sales Order"
 	else:
 		reference, reference_doctype = frappe.model.naming.make_autoname(FREE_BOOKING_SERIES), "Attendee"
 		for att in docs:
 			frappe.db.set_value("Attendee", att.name, "order_reference", reference, update_modified=False)
 
-	# Enqueued inside the service session: the job runs as the service user (background_jobs.enqueue).
 	# Not "event=": frappe.enqueue has a parameter of that name and would swallow it.
 	frappe.enqueue("phamos.marketing.ticketing.send_order_confirmation", enqueue_after_commit=True,
 		event_name=doc.name, reference=reference, reference_doctype=reference_doctype, recipient=main.email,
@@ -490,14 +593,40 @@ def venue(doc):
 	return {"text": text} if text else None
 
 
-def send_ticket(attendee, buyer_name=None, lang="de"):
+TICKET_MAIL_DAILY_LIMIT = 200
+
+
+def _ticket_mail_allowed(att):
+	"""At most ``event_ticket_mail_daily_limit`` (site config, default 200) companion ticket mails per event and
+	day: the addresses are nobody's confirmed ones, so a script must not turn orders into a mail relay
+	(phamos/phamos#1704). Above the limit the mail is not sent; staff see why and can send it from the desk."""
+	limit = cint(frappe.conf.get("event_ticket_mail_daily_limit")) or TICKET_MAIL_DAILY_LIMIT
+	key = frappe.cache.make_key(f"event_ticket_mails:{att.event}:{nowdate()}")
+	sent = frappe.cache.incr(key)
+	if sent == 1:
+		frappe.cache.expire(key, 2 * 24 * 60 * 60)
+	if sent <= limit:
+		return True
+	att.add_comment("Comment", _("Ticket mail not sent: daily limit of {0} reached for this event.").format(limit))
+	if sent == limit + 1:
+		frappe.log_error(title=_("Event ticket mails: daily limit reached"),
+			message=f"Event {att.event}: more than {limit} companion ticket mails today.",
+			reference_doctype="Marketing Content", reference_name=att.event)
+	return False
+
+
+def send_ticket(attendee, buyer_name=None, lang="de", ignore_limit=False):
 	"""A ticket holder's own ticket: name, event, date, venue and the calendar file. No prices and no
-	billing details: those belong to the buyer, who got the full confirmation with every ticket."""
+	billing details: those belong to the buyer, who got the full confirmation with every ticket.
+
+	``ignore_limit``: sent by staff from the desk ("Send Ticket"), not counted against the daily limit."""
 	from phamos.marketing.web import build_ics
 	from phamos.web_profile.sections import find_item
 
 	att = frappe.get_doc("Attendee", attendee)
 	if not att.email:
+		return
+	if not ignore_limit and not _ticket_mail_allowed(att):
 		return
 	doc = frappe.get_doc("Marketing Content", att.event)
 	frappe.local.lang = lang if lang in ("de", "en") else "de"

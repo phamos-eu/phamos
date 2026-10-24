@@ -11,7 +11,7 @@ export default defineConfig({
 		},
 	},
 	test: {
-		include: ["../spa_shared/**/*.test.js", "src/**/*.test.js"],
+		include: ["../spa_shared/**/*.test.js", "src/**/*.test.js", "../phamos/public/js/**/*.test.js"],
 		environment: "node",
 		// Globals so test files outside this package need no `vitest` import to resolve.
 		globals: true,
