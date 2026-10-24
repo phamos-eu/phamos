@@ -34,6 +34,7 @@
   "opportunity",
   "section_order",
   "order_reference",
+  "order_key",
   "is_buyer",
   "billing_customer",
   "payment_status",
@@ -254,6 +255,16 @@
    "description": "Groups the attendees of one order: the Quotation for website orders, a booking number for free events, the order id for imports."
   },
   {
+   "fieldname": "order_key",
+   "fieldtype": "Data",
+   "label": "Order Key",
+   "hidden": 1,
+   "read_only": 1,
+   "no_copy": 1,
+   "search_index": 1,
+   "description": "The id the website order form sent with the order (its hold id). A repeated order with the same key returns the first order instead of booking again."
+  },
+  {
    "fieldname": "is_buyer",
    "fieldtype": "Check",
    "label": "Buyer",
@@ -446,7 +457,7 @@
   }
  ],
  "links": [],
- "modified": "2026-10-24 09:00:00.000000",
+ "modified": "2026-10-24 10:00:00.000000",
  "modified_by": "Administrator",
  "module": "Marketing",
  "name": "Attendee",

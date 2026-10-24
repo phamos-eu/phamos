@@ -6,6 +6,7 @@ bench --site <site> run-tests --module phamos.tests.test_marketing_ticketing
 import hashlib
 import hmac
 import json
+import uuid
 from unittest.mock import patch
 
 import frappe
@@ -14,6 +15,12 @@ from frappe.utils import add_days, flt, now_datetime
 
 from phamos.marketing import billing, ticketing
 from phamos.tests.marketing_fixtures import BILLING, CONTACT, as_guest, ensure_company, make_attendee, make_customer, make_event
+
+CONFIRMATION_JOB = "phamos.marketing.ticketing.send_order_confirmation"
+
+
+def confirmations(enqueue):
+	return [c for c in enqueue.call_args_list if c.args and c.args[0] == CONFIRMATION_JOB]
 
 COMPANIONS = [{"full_name": "Max Mustermann", "email": ""}]
 COMPANY_BILLING = {**BILLING, "is_company": 1, "company": "Ticket Test GmbH", "vat_id": "DE123456789"}
@@ -197,6 +204,54 @@ class TestTicketing(FrappeTestCase):
 		self.assertRaises(frappe.ValidationError, self.order, hold_id="hold-failed-1")  # 2 tickets, 1 seat left
 		frappe.db.after_commit.run()
 		self.assertIn("hold-failed-1", ticketing.active_holds(self.event.name))
+
+	def test_repeated_order_returns_the_first_order(self, enqueue):
+		# phamos/phamos#1700: double click, lost response or reload send the same hold id again.
+		event = make_event("Idempotency Full Event", max_attendees=2)
+		key = str(uuid.uuid4())
+		first = self.order(event=event, hold_id=key)
+		# The event is sold out now: the repeat must still get its order back, before any other check.
+		again = self.order(event=event, hold_id=key)
+		self.assertEqual((again["reference"], again["reference_doctype"], again["attendees"], again["paid"]),
+			(first["reference"], "Sales Order", 2, True))
+		self.assertEqual(again["tickets_to"], "erika@ticket.example")
+		self.assertTrue(ticketing.verify_consent_token(first["reference"], again["consent_token"]))
+		self.assertEqual(frappe.db.count("Sales Order", {"customer": frappe.db.get_value(
+			"Sales Order", first["reference"], "customer"), "docstatus": 1}), 1)
+		self.assertEqual(frappe.get_all("Attendee", filters={"event": event.name}, pluck="order_key"), [key, key])
+		self.assertEqual(len(confirmations(enqueue)), 1)
+
+	def test_repeated_free_order_without_companion_emails(self, enqueue):
+		free = make_event("Idempotency Free Event", paid=False)
+		key = str(uuid.uuid4())
+		first = self.order(event=free, billing_data=None, hold_id=key)
+		again = self.order(event=free, billing_data=None, hold_id=key)
+		self.assertEqual((again["reference"], again["reference_doctype"], again["paid"]),
+			(first["reference"], "Attendee", False))
+		self.assertEqual(frappe.db.count("Attendee", {"event": free.name}), 2)
+		self.assertEqual(len(confirmations(enqueue)), 1)
+
+	def test_repeat_with_other_data_gets_the_first_order(self, enqueue):
+		key = str(uuid.uuid4())
+		first = self.order(hold_id=key)
+		again = self.order(contact={"full_name": "Other Person", "email": "other@ticket.example"}, companions=[],
+			hold_id=key)
+		self.assertEqual(again["reference"], first["reference"])
+		self.assertFalse(frappe.db.exists("Attendee", {"event": self.event.name, "email": "other@ticket.example"}))
+
+	def test_short_hold_id_gets_no_idempotency(self, enqueue):
+		first = self.order(hold_id="short-key-1234")
+		again = self.order(contact={"full_name": "Other Person", "email": "other@ticket.example"}, companions=[],
+			hold_id="short-key-1234")
+		self.assertNotEqual(again["reference"], first["reference"])
+		self.assertFalse(frappe.db.get_value("Attendee", {"event": self.event.name}, "order_key"))
+
+	def test_retry_after_a_failed_order_books(self, enqueue):
+		key = str(uuid.uuid4())
+		self.assertRaises(frappe.ValidationError, self.order, hold_id=key, expected_total=1)  # price changed
+		result = self.order(hold_id=key, expected_total=238)
+		self.assertEqual(frappe.db.count("Attendee", {"event": self.event.name, "order_key": key}), 2)
+		self.assertEqual(result["reference_doctype"], "Sales Order")
 
 	def test_order_locks_the_event_row(self, enqueue):
 		with patch("frappe.get_doc", wraps=frappe.get_doc) as get_doc:
