@@ -64,3 +64,4 @@ phamos.patches.v1_0.set_event_attendance_mode
 phamos.patches.v1_0.merge_document_kind_into_receipt_type
 phamos.patches.v1_0.set_employment_contract_planning_rates
 phamos.patches.v1_0.set_employment_contract_leave_days
+phamos.patches.v1_0.report_paid_events_without_tax_template

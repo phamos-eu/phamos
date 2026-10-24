@@ -48,12 +48,17 @@ def tax_rows(event_doc):
 	"Umsatzsteuer 7 %" and "Umsatzsteuer 19 %"), the Item Tax Template sets the rate per account (19 % on
 	one, not applicable on the other). Without a sales template the Item Tax Template rows are used as
 	they are (only sensible for a template with a single output-tax account).
+
+	Without an Item Tax Template there are no rows: summing the sales template's rates would show 26 % for a
+	7 % + 19 % template. Ticket sales stay closed until the event has one (``ticketing.sale_state``,
+	phamos/phamos#1710).
 	"""
+	if not event_doc.get("item_tax_template"):
+		return []
 	item_rates = {}
-	if event_doc.get("item_tax_template"):
-		for row in frappe.get_all("Item Tax Template Detail", filters={"parent": event_doc.item_tax_template},
-				fields=["tax_type", "tax_rate", "not_applicable"]):
-			item_rates[row.tax_type] = 0 if row.not_applicable else flt(row.tax_rate)
+	for row in frappe.get_all("Item Tax Template Detail", filters={"parent": event_doc.item_tax_template},
+			fields=["tax_type", "tax_rate", "not_applicable"]):
+		item_rates[row.tax_type] = 0 if row.not_applicable else flt(row.tax_rate)
 	template = sales_taxes_template(event_doc)
 	rows = []
 	if template:
@@ -130,6 +135,8 @@ def get_ticket_pricing(event_doc, qty=1, now=None, exclude_hold=None, for_update
 	item_code = event_doc.get("ticket_item")
 	if not item_code:
 		return None
+	if not event_doc.get("item_tax_template"):
+		frappe.throw(_("Event {0} has no Item Tax Template for its tickets.").format(event_doc.get("title") or event_doc.name))
 	price = select_price(event_doc, qty, now, exclude_hold=exclude_hold, for_update=for_update)
 	if not price:
 		return None
@@ -142,6 +149,24 @@ def get_ticket_pricing(event_doc, qty=1, now=None, exclude_hold=None, for_update
 		item_tax_template=event_doc.get("item_tax_template"), tc_name=event_doc.get("tc_name"),
 		taxes_and_charges=sales_taxes_template(event_doc),
 		price_list=frappe.db.get_single_value("Selling Settings", "selling_price_list") or "Standard Selling")
+
+
+def order_total(pricing, qty):
+	"""{net_total, tax_total, total} of an order of ``qty`` tickets, computed as ERPNext computes the Sales Order.
+
+	Net prices: the lines are net, and every tax row is rounded once on the order's net total, so 3 × 10.01 €
+	net at 19 % is 35.74 €, not 3 × 11.91 € = 35.73 €. Gross prices (tax included): the total is qty × gross,
+	which ERPNext keeps by adjusting the last tax row. The website shows this total, sends it back as the
+	confirmed total, and the Sales Order must match it to the cent (phamos/phamos#1710).
+	"""
+	qty = cint(qty)
+	if pricing.inclusive:
+		total = flt(pricing.gross * qty, 2)
+		net_total = flt(total / (1 + flt(pricing.tax_rate) / 100), 2)
+		return frappe._dict(net_total=net_total, tax_total=flt(total - net_total, 2), total=total)
+	net_total = flt(pricing.net * qty, 2)
+	tax_total = flt(sum(flt(net_total * flt(row.tax_rate) / 100, 2) for row in pricing.tax_rows), 2)
+	return frappe._dict(net_total=net_total, tax_total=tax_total, total=flt(net_total + tax_total, 2))
 
 
 def price_summary(event_doc):
@@ -190,10 +215,11 @@ def _append_lines(doc, pricing, attendees):
 
 
 def create_sales_order(event_doc, attendees, customer, *, pricing=None, submit=False, contact=None, address=None,
-		email=None, lang=None):
+		email=None, lang=None, confirmed_total=None):
 	"""Sales Order with one line per attendee. Website orders (as the service user) and desk orders use it.
 
 	``pricing`` is the price the buyer saw and confirmed; without it the price that applies now is used.
+	``confirmed_total``: the total the buyer confirmed; the order is refused if ERPNext computes another one.
 	Attendees get ``sales_order`` / ``sales_order_item`` / ``billing_customer`` / ``order_reference``.
 	"""
 	from phamos.marketing.crm import ensure_lead_source, get_or_create_campaign
@@ -210,6 +236,7 @@ def create_sales_order(event_doc, attendees, customer, *, pricing=None, submit=F
 	so.selling_price_list = pricing.price_list
 	so.currency = pricing.currency
 	so.ignore_pricing_rule = 1
+	so.disable_rounded_total = 1  # the buyer pays exactly the confirmed total, no whole-euro rounding
 	so.campaign = get_or_create_campaign(event_doc)
 	so.source = ensure_lead_source(LEAD_SOURCE)
 	so.project = event_doc.get("project")
@@ -223,6 +250,14 @@ def create_sales_order(event_doc, attendees, customer, *, pricing=None, submit=F
 	_append_lines(so, pricing, attendees)
 	so.flags.ignore_permissions = True
 	so.insert()
+	if confirmed_total is not None and abs(flt(so.grand_total) - flt(confirmed_total)) >= 0.005:
+		# Must never happen once order_total matches ERPNext; if it does, nobody pays another amount than
+		# confirmed. Deferred, so the entry survives the rollback of this request.
+		frappe.log_error(title=_("Event order total differs from the confirmed total"),
+			message=f"Event {event_doc.name}: confirmed {confirmed_total}, Sales Order {so.grand_total}",
+			reference_doctype="Marketing Content", reference_name=event_doc.name, defer_insert=True)
+		frappe.throw(_("The ticket price has changed in the meantime. Please check your order again."),
+			title=_("Price changed"))
 	for att, row in zip(attendees, so.items):
 		frappe.db.set_value("Attendee", att.name, {"sales_order": so.name, "sales_order_item": row.name,
 			"billing_customer": customer, "order_reference": att.order_reference or so.name, "ticket_type": pricing.price_title,
