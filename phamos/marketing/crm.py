@@ -132,7 +132,7 @@ def get_or_create_campaign(event_doc):
 
 
 def create_lead(*, email, first_name, last_name="", company_name="", phone="", job_title="", salutation="",
-		campaign=None, ignore_permissions=False):
+		campaign=None, ignore_permissions=False, lead_owner=None):
 	lead = frappe.get_doc({
 		"doctype": "Lead",
 		"first_name": first_name or email.split("@")[0],
@@ -146,6 +146,8 @@ def create_lead(*, email, first_name, last_name="", company_name="", phone="", j
 		"status": "Lead",
 		"source": ensure_lead_source(),
 		"campaign_name": campaign,
+		# None: ERPNext's default, the current user. The website passes "Guest" (ticketing.WEBSITE_LEAD_OWNER).
+		**({"lead_owner": lead_owner} if lead_owner else {}),
 	})
 	lead.insert(ignore_permissions=ignore_permissions)
 	return lead.name
@@ -206,7 +208,8 @@ def create_address(*, title, address_line1, city, country, pincode="", address_l
 
 
 def resolve_party(*, email, first_name, last_name="", company_name="", phone="", job_title="", salutation="",
-		event=None, create=True, link_to_lead=None, link_to_customer=None, verified=True, ignore_permissions=False):
+		event=None, create=True, link_to_lead=None, link_to_customer=None, verified=True, ignore_permissions=False,
+		lead_owner=None):
 	"""Contact + Lead or Customer for one person (rules in the module docstring).
 
 	``link_to_customer``: the buying company for companions of a company order: their Contact is linked to
@@ -233,7 +236,8 @@ def resolve_party(*, email, first_name, last_name="", company_name="", phone="",
 	if link_to_customer and not result.customer:
 		result.customer = link_to_customer
 	if not result.customer and not result.lead and not link_to_lead:
-		result.lead = create_lead(campaign=campaign, ignore_permissions=ignore_permissions, **person)
+		result.lead = create_lead(campaign=campaign, ignore_permissions=ignore_permissions, lead_owner=lead_owner,
+			**person)
 		result.created.append(("Lead", result.lead))
 		# ERPNext may have created the Lead's Contact (CRM Settings "Auto Creation of Contact").
 		result.contact = result.contact or contact_for_email(found.email)
