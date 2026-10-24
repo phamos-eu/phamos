@@ -3,6 +3,7 @@
 bench --site <site> run-tests --module phamos.tests.test_marketing_billing
 """
 
+from types import SimpleNamespace
 from unittest.mock import patch
 
 import frappe
@@ -99,3 +100,18 @@ class TestBilling(FrappeTestCase):
 	def test_price_summary(self, enqueue):
 		self.assertIn("Regular", billing.price_summary(self.event))
 		self.assertIn("119", self.event.ticket_price_summary)
+
+
+class TestSalesOrderHookCost(FrappeTestCase):
+	"""phamos/phamos#1707: the hook runs on every Sales Order save, also for orders without attendees."""
+
+	def test_order_without_attendees_costs_one_query(self):
+		order = SimpleNamespace(name="SO-NOT-AN-EVENT", customer="Someone", docstatus=0,
+			items=[SimpleNamespace(name=f"line-{i}") for i in range(50)])
+		with self.assertQueryCount(1):
+			billing.on_sales_order_update(order)
+
+	def test_attendee_links_are_indexed(self):
+		meta = frappe.get_meta("Attendee")
+		for field in ("event", "sales_order", "sales_order_item", "sales_invoice"):
+			self.assertTrue(meta.get_field(field).search_index, field)
