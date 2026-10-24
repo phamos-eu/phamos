@@ -316,6 +316,10 @@ doc_events = {
 		"on_update": "phamos.cockpits.checkin_hooks.on_update",
 		"on_trash": "phamos.cockpits.checkin_hooks.on_trash",
 	},
+	# "Covered by" on Leave Applications (#1714). Never fires on sites without HRMS.
+	"Leave Application": {
+		"validate": "phamos.phamos.hr.leave_cover.validate_cover",
+	},
 	"Event": {
 		"after_insert": "phamos.mailcow_integration.caldav.sync_event.on_upsert",
         "on_update": "phamos.mailcow_integration.caldav.sync_event.on_upsert",

@@ -40,6 +40,7 @@ import { notify } from "@spa/utils/notify.js"
 import { __ } from "@spa/utils/i18n.js"
 import spaConfig from "@/config"
 import { checkin, checkInOrOut, checkinUsable } from "@/checkinStore.js"
+import { hasLeaveAccess } from "@/leaveStore.js"
 import CreateChallengeDialog from "./CreateChallengeDialog.vue"
 import StartFocusDialog from "./StartFocusDialog.vue"
 
@@ -62,6 +63,10 @@ const groups = computed(() => {
 		{ label: __("Task"), icon: "check-square", onClick: () => (open.task = true) },
 		{ label: __("Checklist"), icon: "list", onClick: () => (open.checklist = true) },
 	]
+	// My Leave (#1714): the page opens its Apply dialog
+	if (hasLeaveAccess()) {
+		work.push({ label: __("Leave"), icon: "umbrella", onClick: () => router.push({ name: "MyLeave", query: { new: 1 } }) })
+	}
 	const time = []
 	if (timer.state?.available && !timer.state.session) {
 		time.push({ label: __("Timesheet timer"), icon: "play", onClick: requestTimerStart })
