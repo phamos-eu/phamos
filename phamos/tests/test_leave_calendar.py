@@ -108,7 +108,7 @@ class TestLeaveCalendar(FrappeTestCase):
 		self.assertEqual(event.event_type, "Private")
 		self.assertEqual(event.send_reminder, 0)
 		self.assertEqual(event.custom_mailcow_status, "TENTATIVE")
-		self.assertEqual(event.subject, "Leave (draft): Leave Without Pay")
+		self.assertEqual(event.subject, "Absent (requested)")
 		self.assertEqual(self.put.call_count, 1)
 		self.assertIn(f"/SOGo/dav/{EMPLOYEE_USER}/Calendar/personal/", self.put.call_args.args[0])
 		body = self._body()
@@ -120,14 +120,23 @@ class TestLeaveCalendar(FrappeTestCase):
 		self.assertIn("URL:", body)
 		self.assertIn(f"leave-application/{LEAVE_NAME}", body)
 
+	def test_neither_leave_type_nor_reason_reaches_sogo(self):
+		# #1720, PM Review: shared SOGo calendars must not show "Sick Leave" or the reason
+		leave_calendar.sync_leave_event(self._leave(leave_type="Leave Without Pay", description="Erkältung"))
+		body = self._body()
+		self.assertNotIn("Leave Without Pay", body)
+		self.assertNotIn("Erk", body)
+		self.assertNotIn("LC Employee", body)
+		self.assertIn("SUMMARY:Absent (requested)", body)
+
 	def test_half_day_is_named_with_its_date_on_a_longer_leave(self):
 		leave_calendar.sync_leave_event(self._leave(half_day=1, half_day_date="2026-11-04"))
 		subject = self._events()[0].subject
-		self.assertTrue(subject.startswith("Leave (draft): Leave Without Pay (half day "), subject)
+		self.assertTrue(subject.startswith("Absent (requested, half day on "), subject)
 
 	def test_half_day_on_a_single_day_has_no_date(self):
 		leave_calendar.sync_leave_event(self._leave(to_date="2026-11-03", half_day=1, half_day_date="2026-11-03"))
-		self.assertEqual(self._events()[0].subject, "Leave (draft): Leave Without Pay (half day)")
+		self.assertEqual(self._events()[0].subject, "Absent (requested, half day)")
 
 	def test_changed_dates_update_the_same_event_without_precondition(self):
 		leave_calendar.sync_leave_event(self._leave())
@@ -148,7 +157,7 @@ class TestLeaveCalendar(FrappeTestCase):
 		leave_calendar.sync_leave_event(self._leave())
 		leave_calendar.sync_leave_event(self._leave(status="Approved", docstatus=1))
 		event = self._events()[0]
-		self.assertEqual(event.subject, "Leave: Leave Without Pay")
+		self.assertEqual(event.subject, "Absent")
 		self.assertEqual(event.custom_mailcow_status, "CONFIRMED")
 		self.assertIn("STATUS:CONFIRMED", self._body())
 

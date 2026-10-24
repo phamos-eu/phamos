@@ -7,8 +7,9 @@ Every Leave Application has at most one Frappe Event (reference_doctype "Leave A
 owned by the employee's user and pushed to their SOGo calendar by the regular Event sync
 (`mailcow_integration/caldav/sync_event.py`):
 
-- draft: "Leave (draft): <Leave Type>", STATUS TENTATIVE
-- submitted and Approved: "Leave: <Leave Type>", STATUS CONFIRMED
+- draft: "Absent (requested)", STATUS TENTATIVE
+- submitted and Approved: "Absent", STATUS CONFIRMED
+- neither the leave type nor the reason goes to SOGo (#1720, PM Review)
 - Rejected, Cancelled or deleted: the Event and its calendar object are removed
 
 The Event carries a URL back to the Leave Application, so SOGo and phones show a link.
@@ -49,28 +50,28 @@ def _desired_state(doc) -> dict | None:
 
 
 def _subject(doc, state: dict, lang: str | None) -> str:
-	leave_type = _(doc.leave_type, lang=lang) if doc.leave_type else _("Leave", lang=lang)
+	"""Neutral title: "Absent" or "Absent (requested)", with the half day if any.
+
+	No leave type and no reason (#1720, PM Review of 2026-10-24): SOGo calendars are often
+	shared with colleagues, and "Sick Leave" is nobody else's business. The link leads to
+	the Leave Application for the details.
+	"""
+	if not doc.get("half_day"):
+		return _("Absent (requested)", lang=lang) if state["draft"] else _("Absent", lang=lang)
+	if getdate(doc.from_date) == getdate(doc.to_date):
+		return _("Absent (requested, half day)", lang=lang) if state["draft"] else _("Absent (half day)", lang=lang)
+	half_date = formatdate(doc.get("half_day_date") or doc.from_date)
 	if state["draft"]:
-		subject = _("Leave (draft): {0}", lang=lang).format(leave_type)
-	else:
-		subject = _("Leave: {0}", lang=lang).format(leave_type)
-	if doc.get("half_day"):
-		half = _("half day", lang=lang)
-		single_day = getdate(doc.from_date) == getdate(doc.to_date)
-		half_date = doc.get("half_day_date") or doc.from_date
-		subject += f" ({half})" if single_day else f" ({half} {formatdate(half_date)})"
-	return subject
+		return _("Absent (requested, half day on {0})", lang=lang).format(half_date)
+	return _("Absent (half day on {0})", lang=lang).format(half_date)
 
 
 def _description(doc) -> str:
-	# Same marker and link block as Team Daily Schedule events, for clients that ignore URL.
-	lines = [f"{doc.employee_name or doc.employee} · {doc.leave_type or ''}".strip(" ·")]
-	if doc.get("description"):
-		lines.append(doc.description)
-	lines.append("")
-	lines.append("***** Auto Generated *****")
-	lines.append(get_url_to_form(REFERENCE, doc.name))
-	return "\n".join(lines)
+	"""Only the link back, for clients that ignore URL (same marker block as Team Daily Schedule).
+
+	No leave type and no reason: see `_subject`.
+	"""
+	return "\n".join(["***** Auto Generated *****", get_url_to_form(REFERENCE, doc.name)])
 
 
 def _event_values(doc, state: dict, lang: str | None) -> dict:
