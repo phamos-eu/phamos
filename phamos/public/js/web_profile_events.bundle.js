@@ -1,6 +1,8 @@
 // Event pages (/de/veranstaltungen/<slug>, /en/events/<slug>): ticket order and "Keep me posted".
 // Loaded only on event pages (www/web_profile/profile.html). Prices come from the server; the order is
 // validated again by phamos.marketing.web.order_tickets.
+import { createLatest, expiryFromNow } from "./web_profile/hold_clock.js";
+
 (function () {
 	function serverMessage(data) {
 		try {
@@ -204,8 +206,29 @@
 			tick();
 			holdTimer = setInterval(tick, 1000);
 		}
-		async function hold() {
-			if (order) return;
+		// Reservation requests: only the newest one's answer counts (phamos/phamos#1701). "Continue" and
+		// "Order" wait for it; adding, removing and toggling ticket holders ask after 300 ms of quiet.
+		const holdRequests = createLatest();
+		let holdPromise = Promise.resolve(true);
+		let holdDebounce = null;
+		function hold() {
+			clearTimeout(holdDebounce);
+			holdDebounce = null;
+			if (order) return Promise.resolve(false);
+			holdPromise = requestHold(holdRequests.next());
+			return holdPromise;
+		}
+		function scheduleHold() {
+			clearTimeout(holdDebounce);
+			holdDebounce = setTimeout(hold, 300);
+		}
+		// Before "Continue" and "Order": a fresh reservation if none runs or one is scheduled, else the answer
+		// of the request still in flight (it may bring a new price).
+		function settleHold() {
+			if (holdDebounce || !expiresAt || Date.now() > expiresAt) return hold();
+			return holdPromise;
+		}
+		async function requestHold(request) {
 			const body = new FormData();
 			body.append("event", form.elements.event.value);
 			body.append("lang", form.elements.lang.value);
@@ -213,13 +236,15 @@
 			body.append("qty", String(holders().length || count()));
 			try {
 				const result = await post({ action: form.dataset.holdAction }, body);
+				if (!holdRequests.isLatest(request)) return holdPromise; // a newer request was sent: its answer counts
 				if (!result.ok) {
 					clearInterval(holdTimer);
 					expiresAt = 0;
 					showHold(holdNote.dataset.soldout, true);
 					return false;
 				}
-				expiresAt = result.expires;
+				// Relative to the visitor's clock: it may differ from the server's by minutes.
+				expiresAt = expiryFromNow(result.minutes || windowMs / 60000);
 				if (!free && result.gross && Math.abs(result.gross - gross) > 0.001) {
 					// Another price row applies to this number of tickets (e.g. the early-bird quota is used up).
 					gross = result.gross;
@@ -237,10 +262,9 @@
 		function expire() {
 			clearInterval(holdTimer);
 			if (order) return;
-			// Time is up: the entries are thrown away, seats and prices are checked again.
+			// Time is up: only the reservation ends. The entries stay; "Continue" or "Order" reserves again and
+			// shows a new price or "sold out" there (phamos/phamos#1701).
 			expiresAt = 0;
-			storage.clear();
-			resetForm();
 			showHold(holdNote.dataset.expired, true);
 		}
 
@@ -341,7 +365,7 @@
 		addButton.addEventListener("click", () => {
 			const row = addRow();
 			renderCompanions();
-			hold();
+			scheduleHold();
 			saveDraft();
 			if (row) row.querySelector('[data-field="full_name"]').focus();
 		});
@@ -350,10 +374,10 @@
 			if (!remove) return;
 			remove.closest(".wp-people-row").remove();
 			renderCompanions();
-			hold();
+			scheduleHold();
 			saveDraft();
 		});
-		attends.addEventListener("change", () => { renderCompanions(); hold(); });
+		attends.addEventListener("change", () => { renderCompanions(); scheduleHold(); });
 		for (const name of ["contact_name", "contact_email"]) form.elements[name].addEventListener("input", renderCompanions);
 		form.addEventListener("input", saveDraft);
 		form.addEventListener("change", saveDraft);
@@ -371,9 +395,7 @@
 			next.disabled = true;
 			const from = current;
 			try {
-				if (!expiresAt || Date.now() > expiresAt) {
-					if (!(await hold())) return;
-				}
+				if (!(await settleHold())) return;
 				if (from === 0 && !free) {
 					// The billing step starts with the contact's name and email.
 					for (const [field, source] of [["billing_name", "contact_name"], ["billing_email", "contact_email"]]) {
@@ -445,10 +467,8 @@
 		});
 
 		async function placeOrder() {
-			if (!expiresAt || Date.now() > expiresAt) {
-				if (!(await hold())) return;
-				renderSummary();
-			}
+			if (!(await settleHold())) return;
+			renderSummary();
 			const people = holders();
 			const body = new FormData();
 			for (const name of ["event", "lang", "website"]) body.append(name, form.elements[name].value);
@@ -467,6 +487,8 @@
 			submit.classList.add("wp-busy");
 			status.classList.remove("wp-error");
 			status.textContent = status.dataset.sending;
+			// The countdown pauses while the order is sent: running out mid-request must not touch the form.
+			clearInterval(holdTimer);
 			try {
 				const result = await post(form, body);
 				order = { reference: result.reference, token: result.token };
@@ -484,6 +506,8 @@
 			} catch (error) {
 				status.classList.add("wp-error");
 				status.textContent = error.message || status.dataset.failed;
+				if (expiresAt > Date.now()) startClock("");
+				else expire();
 			}
 		}
 
