@@ -688,3 +688,4 @@ This attendee has no email address.,Dieser Teilnehmer hat keine E-Mail-Adresse.
 Credited,Gutgeschrieben
 Customer {0} does not exist.,Kunde {0} existiert nicht.
 {0}: no ticket price can be found for event {1}.,{0}: Für die Veranstaltung {1} ist kein Ticketpreis hinterlegt.
+Ordered while logged in as {0}.,Bestellt als angemeldeter Benutzer {0}.

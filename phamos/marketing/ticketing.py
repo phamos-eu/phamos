@@ -30,14 +30,16 @@ OPEN_EVENT_STATUSES = ("Upcoming", "Ongoing")
 
 @contextmanager
 def ticketing_session():
-	"""Run a website order as the "Event Ticketing" service user instead of Guest (see marketing.setup).
-
-	Desk users keep their own session. ``frappe.set_user`` clears ``form_dict``: read all request
-	arguments before entering.
+	"""Run a website order as the "Event Ticketing" service user (see marketing.setup): for Guests and for
+	logged-in Website Users (portal customers), who have no rights on Item or Account either
+	(phamos/phamos#1712). System Users (staff) keep their own session: they have the desk rights, and their
+	name stays on the documents. ``frappe.set_user`` clears ``form_dict``: read all request arguments before
+	entering.
 	"""
 	from phamos.marketing.setup import TICKETING_USER, ensure_ticketing_user
 
-	if frappe.session.user != "Guest":
+	user = frappe.session.user
+	if not _orders_as_service_user(user):
 		yield
 		return
 	if not frappe.db.exists("User", TICKETING_USER):
@@ -46,7 +48,11 @@ def ticketing_session():
 	try:
 		yield
 	finally:
-		frappe.set_user("Guest")
+		frappe.set_user(user)
+
+
+def _orders_as_service_user(user):
+	return user == "Guest" or frappe.get_cached_value("User", user, "user_type") == "Website User"
 
 
 # --- 20-minute holds: seats (and their price) reserved while a visitor fills in the order -------------
@@ -324,8 +330,16 @@ def register_attendees(event, contact, attends=True, companions=None, billing_da
 
 	Returns {ok, reference, reference_doctype, attendees, paid, tickets_to, consent_token}.
 	"""
+	user = frappe.session.user
 	with ticketing_session():
 		result = _register(event, contact, attends, companions, billing_data, source, lang, expected_total, hold_id)
+	if user != "Guest" and _orders_as_service_user(user):
+		# The documents belong to the service user; who was logged in stays visible on the buyer's row.
+		rows = frappe.get_all("Attendee", filters={"event": event, "order_reference": result["reference"]},
+			fields=["name", "is_buyer"], order_by="is_buyer desc, creation asc", limit=1)
+		if rows:
+			frappe.get_doc("Attendee", rows[0].name).add_comment("Comment",
+				_("Ordered while logged in as {0}.").format(user))
 	# Only once the attendees are committed: until then the held seats must still count as taken. A failed
 	# order keeps its hold until it expires.
 	if hold_id:
