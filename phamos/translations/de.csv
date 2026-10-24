@@ -397,7 +397,6 @@ phamos confirms your order by email and sends you the invoice.,phamos bestätigt
 I agree that phamos stores my email address to send me these updates. I can unsubscribe at any time.,"Ich bin einverstanden, dass phamos meine E-Mail-Adresse für diese Neuigkeiten speichert. Ich kann mich jederzeit abmelden."
 Send confirmation email,Bestätigungs-E-Mail senden
 Almost done: please confirm with the link we just sent you.,"Fast geschafft: Bitte bestätigen Sie über den Link, den wir Ihnen gerade gesendet haben."
-This address already receives the updates.,Diese Adresse erhält die Neuigkeiten bereits.
 That did not work. Please try again later.,Das hat nicht geklappt. Bitte versuchen Sie es später erneut.
 Please enter a valid email address and tick the consent box.,Bitte geben Sie eine gültige E-Mail-Adresse ein und setzen Sie den Haken bei der Einwilligung.
 Ordering needs JavaScript. Please write to {0} instead.,Die Bestellung benötigt JavaScript. Bitte schreiben Sie stattdessen an {0}.
@@ -536,7 +535,6 @@ Create reminder,Erinnerung erstellen
 {0} left,noch {0}
 anonymous,anonym
 Reserved for you,Für Sie reserviert
-Time is up. Seats and prices are checked again.,Die Zeit ist abgelaufen. Plätze und Preise werden neu geprüft.
 Not enough seats left for this number of tickets.,Für diese Anzahl Tickets sind nicht mehr genug Plätze frei.
 Entries restored.,Eingaben wiederhergestellt.
 Tickets go to your email unless you add one for a person.,"Die Tickets gehen an Ihre E-Mail-Adresse, außer Sie geben für eine Person eine eigene an."
@@ -1333,6 +1331,22 @@ Pin set: {0},Markierung gesetzt: {0}
 "Venue / Video Link holds a link. For an online event, set Attendance to Online.",„Veranstaltungsort / Videolink“ enthält einen Link. Für eine Online-Veranstaltung bitte „Teilnahme“ auf „Online“ stellen.
 The address changed but the map pin did not. Use Find on Map to move the pin.,"Die Adresse wurde geändert, die Kartenmarkierung nicht. Mit „Auf Karte suchen“ die Markierung verschieben."
 "This address was not found on OpenStreetMap. Please check it, or set the pin on the map by hand.",Diese Adresse wurde bei OpenStreetMap nicht gefunden. Bitte prüfen oder die Markierung von Hand auf der Karte setzen.
+Please choose the Item Tax Template for the tickets before opening ticket sales.,"Bitte wählen Sie die Artikelsteuervorlage für die Tickets, bevor Sie den Ticketverkauf öffnen."
+{0} {1} belongs to another company than {2}.,{0} {1} gehört zu einem anderen Unternehmen als {2}.
+Event {0} has no Item Tax Template for its tickets.,Die Veranstaltung {0} hat keine Artikelsteuervorlage für ihre Tickets.
+The ticket price has changed in the meantime. Please check your order again.,Der Ticketpreis hat sich inzwischen geändert. Bitte prüfen Sie Ihre Bestellung erneut.
+Event order total differs from the confirmed total,Gesamtbetrag der Veranstaltungsbestellung weicht vom bestätigten Betrag ab
+"Please enter a name only, without web or email addresses.",Bitte geben Sie nur einen Namen ein – ohne Web- oder E-Mail-Adressen.
+"Don't know about this booking? Simply reply to this email and we'll remove your address.","Sie wissen nichts von dieser Buchung? Antworten Sie einfach auf diese E-Mail, und wir entfernen Ihre Adresse."
+Ticket mail not sent: daily limit of {0} reached for this event.,Ticket-E-Mail nicht gesendet: Tageslimit von {0} für diese Veranstaltung erreicht.
+Event ticket mails: daily limit reached,Ticket-E-Mails der Veranstaltung: Tageslimit erreicht
+Send Ticket,Ticket senden
+Ticket sent to {0},Ticket gesendet an {0}
+This attendee has no email address.,Dieser Teilnehmer hat keine E-Mail-Adresse.
+Credited,Gutgeschrieben
+Customer {0} does not exist.,Kunde {0} existiert nicht.
+{0}: no ticket price can be found for event {1}.,{0}: Für die Veranstaltung {1} ist kein Ticketpreis hinterlegt.
+Ordered while logged in as {0}.,Bestellt als angemeldeter Benutzer {0}.
 Leave (draft): {0},Urlaub (Entwurf): {0}
 Leave: {0},Urlaub: {0}
 half day,halber Tag

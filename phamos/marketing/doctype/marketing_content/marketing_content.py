@@ -89,7 +89,20 @@ class MarketingContent(WebProfileDocument):
 				frappe.throw(_("Please add at least one ticket price (Tickets & Sales tab)."))
 			if self.registration_open and not self.starts_on:
 				frappe.throw(_("Tickets can only be sold for events with a start date."))
+			if self.registration_open and not self.item_tax_template:
+				# The rate shown on the page and the tax on the order both come from it (phamos/phamos#1710).
+				frappe.throw(_("Please choose the Item Tax Template for the tickets before opening ticket sales."))
+			self.validate_tax_company()
 		self.ticket_price_summary = price_summary(self) if self.ticket_item else None
+
+	def validate_tax_company(self):
+		from phamos.marketing.billing import default_company
+
+		company = default_company()
+		for doctype, name in (("Item Tax Template", self.item_tax_template),
+				("Sales Taxes and Charges Template", self.taxes_and_charges)):
+			if name and frappe.db.get_value(doctype, name, "company") != company:
+				frappe.throw(_("{0} {1} belongs to another company than {2}.").format(_(doctype), name, company))
 
 	def on_update(self):
 		super().on_update()
