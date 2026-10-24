@@ -331,10 +331,9 @@ def register_attendees(event, contact, attends=True, companions=None, billing_da
 	Returns {ok, reference, reference_doctype, attendees, paid, tickets_to, consent_token}.
 	"""
 	user = frappe.session.user
-	with ticketing_session():
-		result = _register(event, contact, attends, companions, billing_data, source, lang, expected_total, hold_id)
+	result = _register(event, contact, attends, companions, billing_data, source, lang, expected_total, hold_id)
 	if user != "Guest" and _orders_as_service_user(user):
-		# The documents belong to the service user; who was logged in stays visible on the buyer's row.
+		# The Sales Order belongs to the service user; who was logged in stays visible on the buyer's row.
 		rows = frappe.get_all("Attendee", filters={"event": event, "order_reference": result["reference"]},
 			fields=["name", "is_buyer"], order_by="is_buyer desc, creation asc", limit=1)
 		if rows:
@@ -345,6 +344,13 @@ def register_attendees(event, contact, attends=True, companions=None, billing_da
 	if hold_id:
 		frappe.db.after_commit.add(lambda: release_hold(event, hold_id))
 	return result
+
+
+# Leads from the website are owned by "Guest", like those of the website contact form: the Lead Assignment
+# Rule ("Based on Field lead_owner", condition lead_owner != "Guest") then leaves them alone. Owned by the
+# service user or a portal user, it would assign them to someone who can't read Leads, and the share that
+# Frappe then tries fails (phamos/phamos#1718).
+WEBSITE_LEAD_OWNER = "Guest"
 
 
 # The order form's hold id doubles as the order's idempotency key. The browser creates it with
@@ -437,7 +443,7 @@ def _register(event, contact, attends, companions, billing_data, source, lang, e
 	else:
 		buyer = main
 		buyer_links = crm.resolve_party(email=main.email, first_name=main.first_name, last_name=main.last_name,
-			phone=main.phone, event=doc, verified=False, ignore_permissions=True)
+			phone=main.phone, event=doc, verified=False, ignore_permissions=True, lead_owner=WEBSITE_LEAD_OWNER)
 		customer = buyer_links.customer
 
 	docs = []
@@ -450,7 +456,8 @@ def _register(event, contact, attends, companions, billing_data, source, lang, e
 		else:
 			links = crm.resolve_party(email=person.email, first_name=person.first_name, last_name=person.last_name,
 				company_name=buyer.company_name if paid and buyer.is_company else "", event=doc,
-				link_to_customer=customer if paid and buyer.is_company else None, verified=False, ignore_permissions=True)
+				link_to_customer=customer if paid and buyer.is_company else None, verified=False, ignore_permissions=True,
+				lead_owner=WEBSITE_LEAD_OWNER)
 		att = frappe.get_doc({
 			"doctype": "Attendee", "event": doc.name, "role": "Guest", "status": "Registered", "source": source,
 			"language": lang if lang in ("de", "en") else None, "registered_on": now,
@@ -476,15 +483,19 @@ def _register(event, contact, attends, companions, billing_data, source, lang, e
 					customer, party.review))
 
 	if paid:
-		so = billing.create_sales_order(doc, docs, customer, pricing=pricing, submit=True, contact=buyer_contact,
-			address=party.address, email=buyer.email, lang=lang, confirmed_total=confirmed_total, ignore_permissions=True)
+		# Only the Sales Order needs the service user: ERPNext checks Item read and Account select with the
+		# current user while validating it. Everything else of the order is created in the visitor's own session,
+		# like the website contact form (phamos/phamos#1718).
+		with ticketing_session():
+			so = billing.create_sales_order(doc, docs, customer, pricing=pricing, submit=True, contact=buyer_contact,
+				address=party.address, email=buyer.email, lang=lang, confirmed_total=confirmed_total,
+				ignore_permissions=True)
 		reference, reference_doctype = so.name, "Sales Order"
 	else:
 		reference, reference_doctype = frappe.model.naming.make_autoname(FREE_BOOKING_SERIES), "Attendee"
 		for att in docs:
 			frappe.db.set_value("Attendee", att.name, "order_reference", reference, update_modified=False)
 
-	# Enqueued inside the service session: the job runs as the service user (background_jobs.enqueue).
 	# Not "event=": frappe.enqueue has a parameter of that name and would swallow it.
 	frappe.enqueue("phamos.marketing.ticketing.send_order_confirmation", enqueue_after_commit=True,
 		event_name=doc.name, reference=reference, reference_doctype=reference_doctype, recipient=main.email,
