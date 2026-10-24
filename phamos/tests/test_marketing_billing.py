@@ -69,6 +69,91 @@ class TestBilling(FrappeTestCase):
 		frappe.get_doc("Sales Order", so_name).cancel()
 		self.assertEqual(statuses(order_reference=so_name), {"Pending"})
 
+	# --- credit notes (phamos/phamos#1706) ------------------------------------------------------------
+
+	def invoice(self, so_name):
+		names = frappe.get_all("Attendee", filters={"sales_order": so_name}, pluck="name")
+		return frappe.get_doc("Sales Invoice", create_sales_invoices(names=names, submit=1)["sales_invoices"][0])
+
+	def pay(self, si):
+		from erpnext.accounts.doctype.payment_entry.payment_entry import get_payment_entry
+
+		pe = get_payment_entry("Sales Invoice", si.name)
+		pe.reference_no, pe.reference_date = "TEST", frappe.utils.nowdate()
+		pe.insert()
+		pe.submit()
+
+	def credit_note(self, si, lines=None, submit=True):
+		from erpnext.accounts.doctype.sales_invoice.sales_invoice import make_sales_return
+
+		cn = make_sales_return(si.name)
+		if lines is not None:
+			cn.items = cn.items[:lines]
+		cn.insert()
+		if submit:
+			cn.submit()
+		return cn
+
+	def rows(self, so_name):
+		return {r.sales_order_item: (r.sales_invoice, r.payment_status) for r in frappe.get_all("Attendee",
+			filters={"sales_order": so_name}, fields=["sales_order_item", "sales_invoice", "payment_status"])}
+
+	def test_partial_credit_note_on_a_paid_invoice(self, enqueue):
+		so_name = self.web_order()
+		si = self.invoice(so_name)
+		self.pay(si)
+		cn = self.credit_note(si, lines=1)
+		credited_line = cn.items[0].so_detail
+		for line, (invoice, status) in self.rows(so_name).items():
+			self.assertEqual(invoice, si.name)  # never the credit note
+			self.assertEqual(status, "Credited" if line == credited_line else "Paid")
+
+	def test_full_credit_then_a_new_invoice(self, enqueue):
+		so_name = self.web_order()
+		si = self.invoice(so_name)
+		self.credit_note(si)
+		self.assertEqual(set(self.rows(so_name).values()), {(si.name, "Credited")})
+		# The usual correction: a credit note, then a new invoice for the same order lines (a copy of the original).
+		corrected = frappe.copy_doc(si)
+		corrected.insert()
+		corrected.reload()
+		corrected.submit()
+		self.assertEqual(set(self.rows(so_name).values()), {(corrected.name, "Invoiced")})
+
+	def test_cancelled_credit_note_restores_the_invoice(self, enqueue):
+		so_name = self.web_order()
+		si = self.invoice(so_name)
+		cn = self.credit_note(si)
+		cn.cancel()
+		self.assertEqual(set(self.rows(so_name).values()), {(si.name, "Invoiced")})
+
+	def test_draft_credit_note_changes_nothing(self, enqueue):
+		so_name = self.web_order()
+		si = self.invoice(so_name)
+		self.pay(si)
+		self.credit_note(si, submit=False)
+		self.assertEqual(set(self.rows(so_name).values()), {(si.name, "Paid")})
+
+	def test_invoice_hook_runs_only_on_change(self, enqueue):
+		# Before: on_submit and on_change, three runs per submit. on_change alone runs twice, because ERPNext's
+		# set_status writes the status with db_set during submit; the handler is idempotent.
+		so_name = self.web_order()
+		names = frappe.get_all("Attendee", filters={"sales_order": so_name}, pluck="name")
+		si = frappe.get_doc("Sales Invoice", create_sales_invoices(names=names, submit=0)["sales_invoices"][0])
+		with patch.object(billing, "on_sales_invoice_change", wraps=billing.on_sales_invoice_change) as hook:
+			si.submit()
+		self.assertEqual(hook.call_count, 2)
+		self.assertEqual(set(self.rows(so_name).values()), {(si.name, "Invoiced")})
+
+	def test_daily_sync_matches_the_hooks(self, enqueue):
+		so_name = self.web_order()
+		si = self.invoice(so_name)
+		self.pay(si)
+		expected = self.rows(so_name)
+		frappe.db.set_value("Attendee", {"sales_order": so_name}, "payment_status", "Invoiced")
+		billing.sync_payment_status()
+		self.assertEqual(self.rows(so_name), expected)
+
 	def test_opportunities_on_demand(self, enqueue):
 		so_name = self.web_order()
 		names = frappe.get_all("Attendee", filters={"sales_order": so_name}, pluck="name", order_by="creation asc")
