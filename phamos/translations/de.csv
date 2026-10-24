@@ -1359,3 +1359,64 @@ Calendar: no user linked to the employee,Kalender: kein Benutzer mit dem Mitarbe
 Calendar: being added to {0}'s calendar,Kalender: wird in den Kalender von {0} eingetragen
 Calendar: in {0}'s calendar,Kalender: im Kalender von {0}
 Calendar Event,Kalendertermin
+My Leave,Mein Urlaub
+Hand in leave here; your leave approver decides.,Urlaub hier beantragen; Ihr Urlaubsgenehmiger entscheidet.
+Apply for leave,Urlaub beantragen
+Loading your leave…,Ihr Urlaub wird geladen…
+"Your user has no active Employee record, so there is no leave to show.","Ihr Benutzer hat keinen aktiven Mitarbeiterdatensatz, daher gibt es keinen Urlaub anzuzeigen."
+{0} of {1} left · {2} pending,{0} von {1} übrig · {2} beantragt
+No leave is allocated to you for today.,Für heute ist Ihnen kein Urlaub zugeteilt.
+Leave applications,Urlaubsanträge
+No leave with this status.,Kein Urlaub mit diesem Status.
+You have not applied for leave yet.,Sie haben noch keinen Urlaub beantragt.
+Covered by {0},Vertretung: {0}
+Leave details,Urlaubsdetails
+Days,Tage
+half day on {0},halber Tag am {0}
+Leave approver,Urlaubsgenehmiger
+Not set,Nicht gesetzt
+Covered by,Vertretung
+Nobody,Niemand
+Reason,Grund
+Edit,Bearbeiten
+Withdraw,Zurückziehen
+Decided leave can no longer be changed here. Ask HR if something needs to change.,"Entschiedener Urlaub kann hier nicht mehr geändert werden. Wenden Sie sich an HR, wenn etwas geändert werden muss."
+Waiting for {0},Wartet auf {0}
+Leave saved,Urlaub gespeichert
+Leave handed in,Urlaub beantragt
+Withdraw this leave application? It is deleted and removed from your calendar.,Diesen Urlaubsantrag zurückziehen? Er wird gelöscht und aus Ihrem Kalender entfernt.
+Leave withdrawn,Urlaub zurückgezogen
+Could not withdraw the leave,Der Urlaub konnte nicht zurückgezogen werden
+Could not load your leave,Ihr Urlaub konnte nicht geladen werden
+In my calendar,In meinem Kalender
+Being added to my calendar,Wird in meinen Kalender eingetragen
+Not in my calendar,Nicht in meinem Kalender
+Choose a leave type.,Bitte eine Urlaubsart wählen.
+Choose from and to dates.,Bitte Von- und Bis-Datum wählen.
+The to date is before the from date.,Das Bis-Datum liegt vor dem Von-Datum.
+Choose the half day.,Bitte den halben Tag wählen.
+The half day must lie within the leave.,Der halbe Tag muss innerhalb des Urlaubs liegen.
+Edit leave,Urlaub bearbeiten
+No leave approver is set on your employee record. Ask HR to add one.,"In Ihrem Mitarbeiterdatensatz ist kein Urlaubsgenehmiger eingetragen. Bitten Sie HR, einen einzutragen."
+Goes to {0} for approval.,Geht zur Genehmigung an {0}.
+Leave type,Urlaubsart
+From,Von
+To,Bis
+Half day,Halber Tag
+Which day,Welcher Tag
+Apply,Beantragen
+{0} (without pay),{0} (unbezahlt)
+{0} ({1} days left),{0} ({1} Tage übrig)
+Choose…,Auswählen…
+Could not load the leave types,Die Urlaubsarten konnten nicht geladen werden
+Could not save the leave,Der Urlaub konnte nicht gespeichert werden
+Leave,Urlaub
+Approved,Genehmigt
+Rejected,Abgelehnt
+Unknown status {0}.,Unbekannter Status {0}.
+This leave application is not yours.,Dieser Urlaubsantrag gehört nicht Ihnen.
+"Leave type, from and to date are required.","Urlaubsart, Von- und Bis-Datum sind Pflicht."
+Your user has no active Employee record.,Ihr Benutzer hat keinen aktiven Mitarbeiterdatensatz.
+"Only open leave can be changed. Ask HR to change approved, rejected or cancelled leave.","Nur offener Urlaub kann geändert werden. Für genehmigten, abgelehnten oder stornierten Urlaub wenden Sie sich an HR."
+Someone changed this leave application in the meantime. Reload and try again.,Jemand hat diesen Urlaubsantrag inzwischen geändert. Bitte neu laden und erneut versuchen.
+You cannot cover for yourself.,Sie können sich nicht selbst vertreten.

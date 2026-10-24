@@ -18,6 +18,7 @@ from phamos.api import personal_challenges
 from phamos.api import personal_day_plan
 from phamos.api import personal_checkin
 from phamos.api import personal_contracts
+from phamos.api import personal_leave
 from phamos.api import personal_timer
 from phamos.api import personal_timeline
 from phamos.api import personal_work_dashboard
@@ -649,6 +650,57 @@ def get_my_checkins(start=0, page_length=100):
 def get_my_contracts():
 	"""My own submitted contracts: the one in force, upcoming changes and the history."""
 	return personal_contracts.get_my_contracts()
+
+
+# My Leave (phamos/phamos#1714) — logic in phamos.api.personal_leave.
+
+
+@frappe.whitelist()
+def get_my_leave(status=None):
+	"""All my Leave Applications, newest first, optionally of one status."""
+	return personal_leave.get_my_leave(status=status)
+
+
+@frappe.whitelist()
+def get_my_leave_entry(name):
+	"""One of my Leave Applications."""
+	return personal_leave.get_my_leave_entry(name)
+
+
+@frappe.whitelist()
+def get_my_leave_balance(date=None):
+	"""Remaining leave days per allocated leave type."""
+	return personal_leave.get_my_leave_balance(date=date)
+
+
+@frappe.whitelist()
+def get_leave_form_options(from_date=None):
+	"""Leave types, approver and colleagues for the Apply dialog."""
+	return personal_leave.get_leave_form_options(from_date=from_date)
+
+
+@frappe.whitelist(methods=["POST"])
+def apply_leave(leave_type, from_date, to_date, half_day=0, half_day_date=None, description=None, cover_employee=None):
+	"""Hand in leave as Open for my leave approver."""
+	return personal_leave.apply_leave(
+		leave_type, from_date, to_date, half_day=half_day, half_day_date=half_day_date,
+		description=description, cover_employee=cover_employee,
+	)
+
+
+@frappe.whitelist(methods=["POST"])
+def update_leave(name, leave_type, from_date, to_date, half_day=0, half_day_date=None, description=None, cover_employee=None, modified=None):
+	"""Edit my own leave while it is Open."""
+	return personal_leave.update_leave(
+		name, leave_type, from_date, to_date, half_day=half_day, half_day_date=half_day_date,
+		description=description, cover_employee=cover_employee, modified=modified,
+	)
+
+
+@frappe.whitelist(methods=["POST"])
+def withdraw_leave(name):
+	"""Withdraw (delete) my own leave while it is Open."""
+	return personal_leave.withdraw_leave(name)
 
 
 @frappe.whitelist()

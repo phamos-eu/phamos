@@ -331,6 +331,7 @@ doc_events = {
 	# Leave Applications as all-day events in the employee's own calendar (milestone 68, Phase 2).
 	# Never fires on sites without HRMS. on_update also runs on insert and before on_submit.
 	"Leave Application": {
+		"validate": "phamos.phamos.hr.leave_cover.validate_cover",  # "Covered by" (#1714)
 		"on_update": "phamos.phamos.hr.leave_calendar.sync_leave_event",
 		"on_submit": "phamos.phamos.hr.leave_calendar.sync_leave_event",
 		"on_cancel": "phamos.phamos.hr.leave_calendar.sync_leave_event",
