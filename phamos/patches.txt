@@ -54,3 +54,4 @@ phamos.patches.v1_0.set_event_subscription_welcome_url
 phamos.patches.v1_0.set_event_attendance_mode
 phamos.patches.v1_0.report_paid_events_without_tax_template
 phamos.patches.v1_0.repair_legacy_attendees
+phamos.patches.v1_0.remove_unneeded_ticketing_permissions
