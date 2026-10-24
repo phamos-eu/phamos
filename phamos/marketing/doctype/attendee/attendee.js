@@ -19,6 +19,12 @@ frappe.ui.form.on("Attendee", {
 			frm.add_custom_button(__("Create Opportunity"), () =>
 				phamos_attendee.call("create_opportunities", { names: [frm.doc.name] }, frm), group);
 		}
+		if (frm.doc.email) {
+			frm.add_custom_button(__("Send Ticket"), () =>
+				frappe.call({ method: `${ATTENDEE_API}.send_ticket`, args: { name: frm.doc.name }, freeze: true })
+					.then((r) => frappe.show_alert({ message: __("Ticket sent to {0}", [r.message.sent_to]), indicator: "green" })),
+				group);
+		}
 		for (const status of ["Attended", "No Show"]) {
 			if (frm.doc.status !== status) {
 				frm.add_custom_button(__(status), () =>
