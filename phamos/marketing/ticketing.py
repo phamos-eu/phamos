@@ -17,6 +17,7 @@ import time
 import frappe
 from frappe import _
 from frappe.utils import add_to_date, cint, flt, get_datetime, now_datetime
+from frappe.utils.password import get_encryption_key
 
 from phamos.marketing import billing, crm
 from phamos.marketing.defaults import FREE_BOOKING_SERIES, MAX_ATTENDEES_PER_ORDER, SEAT_STATUSES
@@ -247,7 +248,9 @@ def verify_consent_token(reference, token):
 
 
 def _sign(reference, exp):
-	key = (frappe.local.conf.get("encryption_key") or frappe.local.site).encode()
+	# The site's secret key; Frappe creates and stores one if the site has none. Never the site name:
+	# that is public, and anyone could forge tokens with it (phamos/phamos#1705).
+	key = get_encryption_key().encode()
 	return hmac.new(key, f"event-consent|{reference}|{exp}".encode(), hashlib.sha256).hexdigest()
 
 
