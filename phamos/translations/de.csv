@@ -1347,9 +1347,13 @@ Credited,Gutgeschrieben
 Customer {0} does not exist.,Kunde {0} existiert nicht.
 {0}: no ticket price can be found for event {1}.,{0}: Für die Veranstaltung {1} ist kein Ticketpreis hinterlegt.
 Ordered while logged in as {0}.,Bestellt als angemeldeter Benutzer {0}.
-Leave (draft): {0},Urlaub (Entwurf): {0}
-Leave: {0},Urlaub: {0}
 half day,halber Tag
+Absent,Abwesend
+Absent (requested),Abwesend (beantragt)
+Absent (half day),Abwesend (halber Tag)
+Absent (half day on {0}),Abwesend (halber Tag am {0})
+"Absent (requested, half day)","Abwesend (beantragt, halber Tag)"
+"Absent (requested, half day on {0})","Abwesend (beantragt, halber Tag am {0})"
 Calendar: no user linked to the employee,Kalender: kein Benutzer mit dem Mitarbeiter verknüpft
 "Calendar: not synced, {0}","Kalender: nicht synchronisiert, {0}"
 Calendar: being added to {0}'s calendar,Kalender: wird in den Kalender von {0} eingetragen
