@@ -294,7 +294,7 @@ def on_upsert(doc, method=None):
 	"""
 	if doc.flags.skip_mailcow_push:
 		return
-	if doc.flags.mailcow_sync_now:
+	if doc.flags.mailcow_sync_now or frappe.flags.mailcow_sync_now:
 		push_event(doc.name)
 		return
 	frappe.enqueue(
@@ -380,7 +380,7 @@ def on_delete(doc, method=None):
 		# Safety: don't delete a calendar object that is still referenced by another Event.
 		return
 	kwargs = {"uid": uid or doc.name, "owner": doc.owner}
-	if doc.flags.mailcow_sync_now:
+	if doc.flags.mailcow_sync_now or frappe.flags.mailcow_sync_now:
 		delete_event_object(**kwargs)
 		return
 	frappe.enqueue(

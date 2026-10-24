@@ -106,6 +106,7 @@ page_js = {
 
 # include js in doctype views
 doctype_js = {
+	"Leave Application": "public/js/leave_application.js",  # calendar status (milestone 68)
 	"Project" : "public/js/project.js",
 	"Issue" : "public/js/issue.js",
 	"Sales Order": "public/js/sales_order.js",
@@ -326,6 +327,14 @@ doc_events = {
 	"Employee Checkin": {
 		"on_update": "phamos.cockpits.checkin_hooks.on_update",
 		"on_trash": "phamos.cockpits.checkin_hooks.on_trash",
+	},
+	# Leave Applications as all-day events in the employee's own calendar (milestone 68, Phase 2).
+	# Never fires on sites without HRMS. on_update also runs on insert and before on_submit.
+	"Leave Application": {
+		"on_update": "phamos.phamos.hr.leave_calendar.sync_leave_event",
+		"on_submit": "phamos.phamos.hr.leave_calendar.sync_leave_event",
+		"on_cancel": "phamos.phamos.hr.leave_calendar.sync_leave_event",
+		"on_trash": "phamos.phamos.hr.leave_calendar.remove_leave_event",
 	},
 	"Event": {
 		# on_update also runs after insert; an after_insert hook here pushed every new Event twice.
