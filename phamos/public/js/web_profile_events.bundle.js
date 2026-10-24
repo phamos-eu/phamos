@@ -81,7 +81,10 @@
 		const draftKey = `wp-ticket:${form.elements.event.value}`;
 		const locale = form.dataset.lang === "de" ? "de-DE" : "en-GB";
 		const money = new Intl.NumberFormat(locale, { style: "currency", currency: form.dataset.currency || "EUR" });
-		const newId = () => (window.crypto && crypto.randomUUID ? crypto.randomUUID() : `h-${Date.now()}-${Math.random().toString(36).slice(2)}`);
+		// The hold id is also the order's idempotency key (phamos/phamos#1700), so it must be unguessable:
+		// randomUUID, or 32 random hex characters where it is missing (pages served without HTTPS).
+		const newId = () => (crypto.randomUUID ? crypto.randomUUID()
+			: Array.from(crypto.getRandomValues(new Uint8Array(16)), (b) => b.toString(16).padStart(2, "0")).join(""));
 		let gross = parseFloat(form.dataset.gross || "0");
 		let current = 0;
 		let order = null; // {reference, token} after a successful order
@@ -419,9 +422,29 @@
 		$("[data-wp-ticket-success]").querySelectorAll("[data-wp-dialog-close]").forEach((button) =>
 			button.addEventListener("click", finishOrder));
 
+		// One order request at a time: set before the first await, so a double click or Enter + click while
+		// the seats are re-checked cannot send the order twice (phamos/phamos#1700).
+		let submitting = false;
 		form.addEventListener("submit", async (event) => {
 			event.preventDefault();
 			if (current !== steps.length - 1) return next.click();
+			if (submitting || order) return;
+			submitting = true;
+			submit.disabled = true;
+			back.disabled = true;
+			try {
+				await placeOrder();
+			} finally {
+				submitting = false;
+				submit.classList.remove("wp-busy");
+				if (!order) {
+					submit.disabled = false;
+					back.disabled = false;
+				}
+			}
+		});
+
+		async function placeOrder() {
 			if (!expiresAt || Date.now() > expiresAt) {
 				if (!(await hold())) return;
 				renderSummary();
@@ -441,8 +464,6 @@
 				}));
 				body.append("expected_total", (gross * people.length).toFixed(2));
 			}
-			submit.disabled = true;
-			back.disabled = true;
 			submit.classList.add("wp-busy");
 			status.classList.remove("wp-error");
 			status.textContent = status.dataset.sending;
@@ -461,14 +482,10 @@
 				success.querySelector("[data-wp-ticket-email]").textContent = result.tickets_to || value("contact_email");
 				success.hidden = false;
 			} catch (error) {
-				submit.disabled = false;
-				back.disabled = false;
 				status.classList.add("wp-error");
 				status.textContent = error.message || status.dataset.failed;
-			} finally {
-				submit.classList.remove("wp-busy");
 			}
-		});
+		}
 
 		const consentStatus = $("[data-wp-consents-status]");
 		$("[data-wp-consents-save]").addEventListener("click", async (event) => {

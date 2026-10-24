@@ -317,6 +317,37 @@ def register_attendees(event, contact, attends=True, companions=None, billing_da
 	return result
 
 
+# The order form's hold id doubles as the order's idempotency key. The browser creates it with
+# crypto.randomUUID() (36 characters); shorter ids are not trusted as a secret, because the repeat answer
+# carries a consent token.
+ORDER_KEY_MIN_LENGTH = 32
+
+
+def _previous_order(event, order_key, contact):
+	"""The result of the order already placed with ``order_key`` for ``event``, or None.
+
+	A locking read under the event lock, so it sees an order that committed while this request waited. The
+	first order wins: a repeat with other data gets the first order back and books nothing.
+	"""
+	attendee = frappe.qb.DocType("Attendee")
+	rows = (frappe.qb.from_(attendee)
+		.select(attendee.name, attendee.sales_order, attendee.order_reference, attendee.is_buyer, attendee.email)
+		.where((attendee.event == event) & (attendee.order_key == order_key))
+		.orderby(attendee.creation).for_update().run(as_dict=True))
+	if not rows:
+		return None
+	sales_order = next((r.sales_order for r in rows if r.sales_order), None)
+	reference = sales_order or next((r.order_reference for r in rows if r.order_reference), None)
+	if sales_order:
+		tickets_to = frappe.db.get_value("Sales Order", sales_order, "contact_email")
+	else:
+		tickets_to = next((r.email for r in rows if r.is_buyer and r.email), None)
+	tickets_to = tickets_to or normalize_email((contact or {}).get("email"), throw=False)
+	return {"ok": True, "reference": reference, "reference_doctype": "Sales Order" if sales_order else "Attendee",
+		"attendees": len(rows), "paid": bool(sales_order), "tickets_to": tickets_to,
+		"consent_token": consent_token(reference)}
+
+
 def _register(event, contact, attends, companions, billing_data, source, lang, expected_total, hold_id=None):
 	# Row lock until the request commits: two orders placed at the same moment are booked one after the
 	# other. The lock alone is not enough: under REPEATABLE READ, plain reads after it still see the snapshot
@@ -324,6 +355,12 @@ def _register(event, contact, attends, companions, billing_data, source, lang, e
 	# this one waited would be missed. Every count in the order path below this line must therefore use
 	# for_update=True, a locking read of the latest committed rows (phamos/phamos#1699).
 	doc = frappe.get_doc("Marketing Content", event, for_update=True)
+	# Before every other check: a repeat of an order that went through (double click, lost response, reload)
+	# must get that order back, not "sold out" or "already registered" (phamos/phamos#1700).
+	order_key = hold_id if hold_id and len(hold_id) >= ORDER_KEY_MIN_LENGTH else None
+	previous = _previous_order(doc.name, order_key, contact) if order_key else None
+	if previous:
+		return previous
 	is_open, reason = sale_state(doc, exclude_hold=hold_id, for_update=True)
 	if not is_open:
 		frappe.throw(_("Sorry, registration for this event is not possible ({0}).").format(_(reason)))
@@ -384,7 +421,7 @@ def _register(event, contact, attends, companions, billing_data, source, lang, e
 			"language": lang if lang in ("de", "en") else None, "registered_on": now,
 			"first_name": person.first_name, "last_name": person.last_name, "email": person.email or None,
 			"phone": person.phone, "company_name": buyer.company_name if paid and buyer.is_company else person.company_name,
-			"is_buyer": 1 if is_buyer else 0,
+			"is_buyer": 1 if is_buyer else 0, "order_key": order_key,
 			"contact": links.contact, "lead": links.lead, "customer": links.customer, "crm_status": links.crm_status,
 			"ticket_type": pricing.price_title if pricing else "Free",
 			"payment_status": "Pending" if paid else "Not Required",
