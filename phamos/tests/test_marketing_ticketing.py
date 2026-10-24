@@ -271,14 +271,15 @@ class TestTicketing(FrappeTestCase):
 			"content": ["like", f"%{portal}%"]}))
 
 	def test_staff_keep_their_session_and_guests_get_no_comment(self, enqueue):
+		# The session the Sales Order is created in (since #1718 the only step that switches users).
 		seen = []
-		real = ticketing._register
+		real = billing.create_sales_order
 
 		def spy(*args, **kwargs):
 			seen.append(frappe.session.user)
 			return real(*args, **kwargs)
 
-		with patch.object(ticketing, "_register", side_effect=spy):
+		with patch.object(billing, "create_sales_order", side_effect=spy):
 			ticketing.register_attendees(self.event.name, CONTACT, companions=[], billing_data=COMPANY_BILLING)
 			result = self.order(contact={"full_name": "Guest Buyer", "email": "guest.buyer@ticket.example"}, companions=[])
 		from phamos.marketing.setup import TICKETING_USER
@@ -551,3 +552,81 @@ class TestOrderConcurrency(FrappeTestCase):
 		self.assertEqual(billing.get_ticket_pricing(doc).price_title, "Early Bird")
 		self.assertEqual(billing.get_ticket_pricing(doc, for_update=True).price_title, "Regular")
 		self.assertEqual(ticketing.sale_state(doc, for_update=True), (True, None))
+
+
+@patch("frappe.enqueue")
+class TestLeadAssignmentRule(FrappeTestCase):
+	"""phamos/phamos#1718: with the Lead Assignment Rule of the phamos sites active, website orders still work.
+	The rule: Based on Field lead_owner, condition lead_owner != "Guest" (as on the hosted develop site)."""
+
+	@classmethod
+	def setUpClass(cls):
+		super().setUpClass()
+		frappe.set_user("Administrator")
+		ensure_company()
+
+	def setUp(self):
+		frappe.set_user("Administrator")
+		frappe.db.savepoint("lead_rule_test")
+		frappe.get_doc({"doctype": "Assignment Rule", "name": "Test Website Lead Rule", "document_type": "Lead",
+			"priority": 0, "description": "A Lead for you!", "rule": "Based on Field", "field": "lead_owner",
+			"assign_condition": 'lead_owner != "Guest" and status not in ["Closed", "Do Not Contact"]',
+			"close_condition": "status in ['Do Not Contact', 'Converted']",
+			"assignment_days": [{"day": d} for d in ("Monday", "Tuesday", "Wednesday", "Thursday", "Friday",
+				"Saturday", "Sunday")]}).insert(ignore_permissions=True)
+		self.free = make_event("Lead Rule Free Event", paid=False)
+		self.paid = make_event("Lead Rule Paid Event")
+
+	def tearDown(self):
+		from frappe.cache_manager import clear_doctype_map
+
+		frappe.set_user("Administrator")
+		frappe.db.rollback(save_point="lead_rule_test")
+		clear_doctype_map("Assignment Rule", "Lead")  # the rule list is cached outside the rollback
+
+	def lead_of(self, email):
+		return frappe.db.get_value("Lead", {"email_id": email}, ["name", "lead_owner", "owner"], as_dict=True)
+
+	def assigned(self, lead):
+		return frappe.get_all("ToDo", filters={"reference_type": "Lead", "reference_name": lead,
+			"status": ["!=", "Cancelled"]}, pluck="allocated_to")
+
+	def test_free_order_creates_a_guest_owned_lead(self, enqueue):
+		with as_guest():
+			ticketing.register_attendees(self.free.name, {"full_name": "New Free", "email": "new.free@rule.example"},
+				companions=[])
+		lead = self.lead_of("new.free@rule.example")
+		self.assertEqual(lead.lead_owner, "Guest")
+		self.assertEqual(self.assigned(lead.name), [])
+
+	def test_paid_order_with_a_new_companion(self, enqueue):
+		from phamos.marketing.setup import TICKETING_USER
+
+		with as_guest():
+			result = ticketing.register_attendees(self.paid.name, CONTACT, billing_data=BILLING,
+				companions=[{"full_name": "New Companion", "email": "new.companion@rule.example"}])
+		self.assertEqual(frappe.db.get_value("Sales Order", result["reference"], ["docstatus", "owner"]), (1, TICKETING_USER))
+		self.assertEqual(set(frappe.get_all("Attendee", filters={"sales_order": result["reference"]}, pluck="owner")),
+			{"Guest"})
+		lead = self.lead_of("new.companion@rule.example")
+		self.assertEqual((lead.lead_owner, self.assigned(lead.name)), ("Guest", []))
+
+	def test_portal_user_free_order(self, enqueue):
+		portal = "portal.rule@rule.example"
+		if not frappe.db.exists("User", portal):
+			frappe.get_doc({"doctype": "User", "email": portal, "first_name": "Portal", "user_type": "Website User",
+				"send_welcome_email": 0}).insert(ignore_permissions=True)
+		frappe.set_user(portal)
+		ticketing.register_attendees(self.free.name, {"full_name": "Portal Rule", "email": "portal.rule.order@rule.example"},
+			companions=[])
+		frappe.set_user("Administrator")
+		self.assertEqual(self.lead_of("portal.rule.order@rule.example").lead_owner, "Guest")
+
+	def test_desk_link_to_crm_is_assigned_by_the_rule(self, enqueue):
+		from phamos.marketing import crm
+
+		att = make_attendee(self.free.name, "desk.linked@rule.example", "Desk", "Linked")
+		crm.link_attendee(att.name)
+		lead = self.lead_of("desk.linked@rule.example")
+		self.assertEqual(lead.lead_owner, "Administrator")
+		self.assertEqual(self.assigned(lead.name), ["Administrator"])
