@@ -101,6 +101,9 @@ unit_tests:
       if [ -s sites/apps.txt ] && [ -n "$(tail -c1 sites/apps.txt)" ]; then echo >> sites/apps.txt; fi
       grep -qxF phamos sites/apps.txt || echo phamos >> sites/apps.txt
 
+    # Dev dependencies, e.g. xmlrunner for run-tests --junit-xml-output.
+    - bench setup requirements --dev
+
     # Test site. The image's MariaDB client (11.4+) requires TLS by default,
     # which the mariadb:10.6 service doesn't offer.
     - printf '[client]\nskip-ssl\n' > ~/.my.cnf
