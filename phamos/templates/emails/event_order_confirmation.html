@@ -3,7 +3,7 @@
     hands over the contract terms; the terms PDF is attached, else they are printed at the end. -#}
 {%- set when = frappe.utils.format_datetime(event.starts_on, "dd.MM.yyyy HH:mm") if event.starts_on else (event.date_note or "") -%}
 <p>{{ _("Hello {0},").format(buyer_name | e) if buyer_name else _("Hello,") }}</p>
-{%- if order %}
+{%- if paid %}
 <p>{{ _("thank you for your order. We have received it and hereby accept it. This email confirms your binding order of tickets for {0}.").format(event.title | e) }}</p>
 {%- else %}
 <p>{{ _("thank you for your registration for {0}. Your place is confirmed.").format(event.title | e) }}</p>
@@ -23,23 +23,22 @@
 <p><strong>{{ _("Tickets") }}</strong></p>
 <ul>
 	{%- for row in attendees %}
-	<li>{{ row.full_name | e }}{% if row.ticket_type and order %} ({{ row.ticket_type | e }}){% endif %}{% if row.email and row.email != recipient %}, {{ row.email | e }}{% endif %}</li>
+	<li>{{ row.full_name | e }}{% if row.ticket_type and paid %} ({{ row.ticket_type | e }}){% endif %}{% if row.email and row.email != recipient %}, {{ row.email | e }}{% endif %}</li>
 	{%- endfor %}
 </ul>
 <p>{{ _("You receive all tickets. Ticket holders with an email address listed above also receive their own ticket.") if attendees | selectattr("email") | rejectattr("email", "equalto", recipient) | list else _("All tickets and information about the event are sent to {0}.").format(recipient | e) }}</p>
 
-{%- if order %}
+{%- if paid %}
+{#- The price the buyer confirmed (Event Ticket Order); the invoice follows from the desk's Sales Order. -#}
 <table cellpadding="4" style="border-collapse:collapse">
-	{%- for item in order.items %}
-	<tr><td>{{ item.description | e }}</td><td style="text-align:right">{{ frappe.utils.fmt_money(item.amount, currency=order.currency) }}</td></tr>
-	{%- endfor %}
-	{%- for tax in order.taxes if tax.tax_amount %}
-	<tr><td>{{ _("incl. {0}").format(tax.description | e) if tax.included_in_print_rate else tax.description | e }}</td><td style="text-align:right">{{ frappe.utils.fmt_money(tax.tax_amount, currency=order.currency) }}</td></tr>
-	{%- endfor %}
-	<tr><td><strong>{{ _("Total incl. VAT") }}</strong></td><td style="text-align:right"><strong>{{ frappe.utils.fmt_money(order.grand_total, currency=order.currency) }}</strong></td></tr>
+	<tr><td>{{ order.quantity }} × {{ (order.ticket_type or _("Ticket")) | e }}{% if order.ticket_rate_includes_tax %} ({{ _("incl. VAT") }}){% endif %}</td><td style="text-align:right">{{ frappe.utils.fmt_money(order.ticket_rate, currency=currency) }}</td></tr>
+	{%- if totals.tax_total %}
+	<tr><td>{{ _("incl. VAT") if order.ticket_rate_includes_tax else _("VAT") }}</td><td style="text-align:right">{{ frappe.utils.fmt_money(totals.tax_total, currency=currency) }}</td></tr>
+	{%- endif %}
+	<tr><td><strong>{{ _("Total incl. VAT") }}</strong></td><td style="text-align:right"><strong>{{ frappe.utils.fmt_money(order.confirmed_total, currency=currency) }}</strong></td></tr>
 </table>
 {%- if address %}
-<p><strong>{{ _("Billing address") }}</strong><br>{{ order.customer_name | e }}{% for line in address %}<br>{{ line | e }}{% endfor %}{% if order.tax_id %}<br>{{ _("VAT ID") }}: {{ order.tax_id | e }}{% endif %}</p>
+<p><strong>{{ _("Billing address") }}</strong><br>{{ (order.billing_company if order.billing_is_company else order.billing_name) | e }}{% if order.billing_is_company and order.billing_name %}<br>{{ order.billing_name | e }}{% endif %}{% for line in address %}<br>{{ line | e }}{% endfor %}{% if order.billing_vat_id %}<br>{{ _("VAT ID") }}: {{ order.billing_vat_id | e }}{% endif %}</p>
 {%- endif %}
 <p><strong>{{ _("Payment") }}:</strong> {{ _("by invoice. You receive the invoice by email; please pay within 14 days of the invoice date.") }}</p>
 <p><strong>{{ _("Right of withdrawal") }}:</strong> {{ _("There is no right of withdrawal for tickets to leisure events on a specific date (§ 312g (2) no. 9 BGB). If you cannot attend, please reply to this email.") }}</p>

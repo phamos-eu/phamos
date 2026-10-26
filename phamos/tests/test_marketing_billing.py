@@ -36,12 +36,15 @@ class TestBilling(FrappeTestCase):
 		frappe.db.rollback(save_point="billing_test")
 
 	def web_order(self):
+		"""A website order and the Sales Order the desk creates for it (since phamos/phamos#1724 the website
+		creates none). Returns the Sales Order."""
 		with as_guest():
 			result = ticketing.register_attendees(self.event.name, {"full_name": "Bill Buyer", "email": "bill@billing.example"},
 				companions=[{"full_name": "Colleague One", "email": "colleague@billing.example"}],
 				billing_data={**BILLING, "full_name": "Bill Buyer", "email": "bill@billing.example",
 					"is_company": 1, "company": "Billing Test GmbH"})
-		return result["reference"]
+		names = frappe.get_all("Attendee", filters={"ticket_order": result["reference"]}, pluck="name")
+		return create_sales_orders(names, customer=make_customer("Billing Test GmbH"), submit=1)["sales_orders"][0]
 
 	def test_invoice_payment_and_cancel(self, enqueue):
 		so_name = self.web_order()

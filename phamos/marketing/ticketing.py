@@ -22,7 +22,7 @@ from frappe.utils import add_to_date, cint, flt, get_datetime, now_datetime, now
 from frappe.utils.password import get_encryption_key
 
 from phamos.marketing import billing, crm
-from phamos.marketing.defaults import FREE_BOOKING_SERIES, MAX_ATTENDEES_PER_ORDER, SEAT_STATUSES
+from phamos.marketing.defaults import MAX_ATTENDEES_PER_ORDER, SEAT_STATUSES
 from phamos.marketing.utils import normalize_email, split_name
 
 OPEN_EVENT_STATUSES = ("Upcoming", "Ongoing")
@@ -346,13 +346,6 @@ def register_attendees(event, contact, attends=True, companions=None, billing_da
 	return result
 
 
-# Leads from the website are owned by "Guest", like those of the website contact form: the Lead Assignment
-# Rule ("Based on Field lead_owner", condition lead_owner != "Guest") then leaves them alone. Owned by the
-# service user or a portal user, it would assign them to someone who can't read Leads, and the share that
-# Frappe then tries fails (phamos/phamos#1718).
-WEBSITE_LEAD_OWNER = "Guest"
-
-
 # The order form's hold id doubles as the order's idempotency key. The browser creates it with
 # crypto.randomUUID() (36 characters); shorter ids are not trusted as a secret, because the repeat answer
 # carries a consent token.
@@ -363,8 +356,16 @@ def _previous_order(event, order_key, contact):
 	"""The result of the order already placed with ``order_key`` for ``event``, or None.
 
 	A locking read under the event lock, so it sees an order that committed while this request waited. The
-	first order wins: a repeat with other data gets the first order back and books nothing.
+	first order wins: a repeat with other data gets the first order back and books nothing. Since
+	phamos/phamos#1724 the key is on the Event Ticket Order; orders placed before keep it on their Attendees.
 	"""
+	ticket_order = frappe.qb.DocType("Event Ticket Order")
+	found = (frappe.qb.from_(ticket_order).select(ticket_order.name)
+		.where((ticket_order.event == event) & (ticket_order.order_key == order_key))
+		.orderby(ticket_order.creation).limit(1).for_update().run())
+	if found:
+		order = frappe.get_doc("Event Ticket Order", found[0][0])
+		return _order_result(order, frappe.db.count("Attendee", {"ticket_order": order.name}))
 	attendee = frappe.qb.DocType("Attendee")
 	rows = (frappe.qb.from_(attendee)
 		.select(attendee.name, attendee.sales_order, attendee.order_reference, attendee.is_buyer, attendee.email)
@@ -433,39 +434,52 @@ def _register(event, contact, attends, companions, billing_data, source, lang, e
 			pricing.price_title), title=_("Price changed"))
 
 	now = now_datetime()
-	if paid:
-		buyer = _clean_billing(billing_data, main)
-		# The website order runs as the service user and may create these records (phamos/phamos#1709).
-		party = crm.ensure_customer(buyer, doc, lang, ignore_permissions=True)
-		customer, buyer_contact = party.customer, party.contact
-		buyer_links = frappe._dict(contact=buyer_contact, lead=None, customer=customer,
-			crm_status="Needs Review" if party.review else "Linked")
-	else:
-		buyer = main
-		buyer_links = crm.resolve_party(email=main.email, first_name=main.first_name, last_name=main.last_name,
-			phone=main.phone, event=doc, verified=False, ignore_permissions=True, lead_owner=WEBSITE_LEAD_OWNER)
-		customer = buyer_links.customer
+	buyer = _clean_billing(billing_data, main) if paid else main
+	company = buyer.company_name if paid and buyer.is_company else ""
+	campaign = crm.get_or_create_campaign(doc)
+
+	def link(person, company_name=""):
+		"""The contact form's CRM step for one person (phamos/phamos#1724)."""
+		if not person.email:
+			return frappe._dict(contact=None, lead=None, customer=None, crm_status="Unlinked")
+		match = crm.match_or_create_lead(email=person.email, first_name=person.first_name, last_name=person.last_name,
+			company_name=company_name, phone=person.phone, campaign=campaign, source=crm.ensure_lead_source())
+		return frappe._dict(match, crm_status="Linked")
+
+	buyer_links = link(main, company or main.company_name)
+	# One Event Ticket Order per order (phamos/phamos#1717): the buyer, the billing data as typed and the price
+	# the buyer confirmed. No Customer and no Sales Order here: the desk creates them (phamos/phamos#1725).
+	order = frappe.get_doc({
+		"doctype": "Event Ticket Order", "event": doc.name, "ordered_on": now, "source": source,
+		"language": lang if lang in ("de", "en") else None, "order_key": order_key,
+		"buyer_first_name": main.first_name, "buyer_last_name": main.last_name, "buyer_email": main.email,
+		"buyer_phone": main.phone, "buyer_attends": 1 if cint(attends) else 0,
+		"lead": buyer_links.lead, "contact": buyer_links.contact, "customer": buyer_links.customer,
+		"ticket_type": pricing.price_title if pricing else "Free", "quantity": len(people),
+		"ticket_rate": (pricing.gross if pricing.inclusive else pricing.net) if pricing else 0,
+		"ticket_rate_includes_tax": 1 if pricing and pricing.inclusive else 0,
+		"item_tax_template": pricing.item_tax_template if pricing else None,
+		"confirmed_total": confirmed_total or 0,
+		**({"billing_is_company": 1 if buyer.is_company else 0, "billing_name": buyer.full_name,
+			"billing_company": buyer.company_name, "billing_vat_id": buyer.vat_id, "billing_email": buyer.email,
+			"billing_address_line1": buyer.address_line1, "billing_address_line2": buyer.address_line2,
+			"billing_postcode": buyer.postcode, "billing_city": buyer.city,
+			"billing_country": _country(buyer.country)} if paid else {}),
+	}).insert(ignore_permissions=True)
 
 	docs = []
 	for person in people:
 		is_buyer = person is main
-		if is_buyer:
-			links = buyer_links
-		elif not person.email:
-			links = frappe._dict(contact=None, lead=None, customer=None, crm_status="Unlinked")
-		else:
-			links = crm.resolve_party(email=person.email, first_name=person.first_name, last_name=person.last_name,
-				company_name=buyer.company_name if paid and buyer.is_company else "", event=doc,
-				link_to_customer=customer if paid and buyer.is_company else None, verified=False, ignore_permissions=True,
-				lead_owner=WEBSITE_LEAD_OWNER)
+		links = buyer_links if is_buyer else link(person, company)
 		att = frappe.get_doc({
 			"doctype": "Attendee", "event": doc.name, "role": "Guest", "status": "Registered", "source": source,
 			"language": lang if lang in ("de", "en") else None, "registered_on": now,
 			"first_name": person.first_name, "last_name": person.last_name, "email": person.email or None,
-			"phone": person.phone, "company_name": buyer.company_name if paid and buyer.is_company else person.company_name,
-			"is_buyer": 1 if is_buyer else 0, "order_key": order_key,
+			"phone": person.phone, "company_name": company or person.company_name,
+			"is_buyer": 1 if is_buyer else 0, "ticket_order": order.name, "order_reference": order.name,
 			"contact": links.contact, "lead": links.lead, "customer": links.customer, "crm_status": links.crm_status,
 			"ticket_type": pricing.price_title if pricing else "Free",
+			# Paid tickets wait for the desk's Sales Order: the order is "Booked" (phamos/phamos#1723).
 			"payment_status": "Pending" if paid else "Not Required",
 			# The click is the order under the event's terms; the privacy notice was shown to the buyer.
 			"terms_accepted": 1, "terms_version": doc.get("tc_name"),
@@ -473,40 +487,31 @@ def _register(event, contact, attends, companions, billing_data, source, lang, e
 			"notes": _("Tickets and information go to {0}.").format(main.email) if not person.email else None,
 		})
 		att.insert(ignore_permissions=True)
-		if links.get("review_note"):
-			att.add_comment("Comment", links.review_note)
 		docs.append(att)
-	if paid and party.review:
-		for att in docs:
-			if att.is_buyer:
-				att.add_comment("Comment", _("Possible duplicate Customer: {0} has the same email address or company name as {1}.").format(
-					customer, party.review))
 
-	if paid:
-		# Only the Sales Order needs the service user: ERPNext checks Item read and Account select with the
-		# current user while validating it. Everything else of the order is created in the visitor's own session,
-		# like the website contact form (phamos/phamos#1718).
-		with ticketing_session():
-			so = billing.create_sales_order(doc, docs, customer, pricing=pricing, submit=True, contact=buyer_contact,
-				address=party.address, email=buyer.email, lang=lang, confirmed_total=confirmed_total,
-				ignore_permissions=True)
-		reference, reference_doctype = so.name, "Sales Order"
-	else:
-		reference, reference_doctype = frappe.model.naming.make_autoname(FREE_BOOKING_SERIES), "Attendee"
-		for att in docs:
-			frappe.db.set_value("Attendee", att.name, "order_reference", reference, update_modified=False)
-
+	totals = billing.order_total(pricing, len(people)) if pricing else None
 	# Not "event=": frappe.enqueue has a parameter of that name and would swallow it.
 	frappe.enqueue("phamos.marketing.ticketing.send_order_confirmation", enqueue_after_commit=True,
-		event_name=doc.name, reference=reference, reference_doctype=reference_doctype, recipient=main.email,
-		buyer_name=main.full_name, lang=lang)
+		event_name=doc.name, reference=order.name, reference_doctype="Event Ticket Order", recipient=main.email,
+		buyer_name=main.full_name, lang=lang, totals=dict(totals) if totals else None)
 	# The main contact gets every ticket (above); a ticket holder with an email of their own also gets theirs.
 	for att in docs:
 		if not att.is_buyer and att.email and att.email != main.email:
 			frappe.enqueue("phamos.marketing.ticketing.send_ticket", enqueue_after_commit=True,
 				attendee=att.name, buyer_name=main.full_name, lang=lang)
-	return {"ok": True, "reference": reference, "reference_doctype": reference_doctype, "attendees": len(docs),
-		"paid": paid, "tickets_to": main.email, "consent_token": consent_token(reference)}
+	return _order_result(order, len(docs))
+
+
+def _country(value):
+	"""The Country record for a typed country name, else None (billing data stays as typed otherwise)."""
+	from phamos.phamos.doctype.lead_data.crm_handoff import _resolve_country
+
+	return _resolve_country(value) if value else None
+
+
+def _order_result(order, attendees):
+	return {"ok": True, "reference": order.name, "reference_doctype": "Event Ticket Order", "attendees": attendees,
+		"paid": bool(order.confirmed_total), "tickets_to": order.buyer_email, "consent_token": consent_token(order.name)}
 
 
 def save_consents(reference, consents, event=None):
@@ -525,12 +530,16 @@ def save_consents(reference, consents, event=None):
 		doc.save(ignore_permissions=True)
 		return doc.email
 	# The buyer holds no ticket: only the newsletter question applies, to the order's email.
-	return frappe.db.get_value("Sales Order", reference, "contact_email")
+	return frappe.db.get_value("Event Ticket Order", reference, "buyer_email") or \
+		frappe.db.get_value("Sales Order", reference, "contact_email")
 
 
-def send_order_confirmation(event_name, reference, recipient, reference_doctype="Sales Order", buyer_name=None,
-		lang="de"):
-	"""Order or registration confirmation (§ 312i BGB: confirmation without delay, terms storable)."""
+def send_order_confirmation(event_name, reference, recipient, reference_doctype="Event Ticket Order", buyer_name=None,
+		lang="de", totals=None):
+	"""Order or registration confirmation (§ 312i BGB: confirmation without delay, terms storable).
+
+	``reference``: the Event Ticket Order. ``totals``: {net_total, tax_total, total} as confirmed
+	(``billing.order_total``); the invoice follows separately from the desk's Sales Order (phamos/phamos#1724)."""
 	from phamos.marketing.web import build_ics
 	from phamos.web_profile.sections import find_item
 
@@ -540,16 +549,12 @@ def send_order_confirmation(event_name, reference, recipient, reference_doctype=
 	frappe.local.lang = lang if lang in ("de", "en") else "de"
 	attendees = frappe.get_all("Attendee", filters={"event": event, "order_reference": reference},
 		fields=["full_name", "email", "ticket_type"], order_by="creation asc")
-	order = frappe.get_doc("Sales Order", reference) if reference_doctype == "Sales Order" else None
-	# Plain lines, escaped by the template: the address was typed by an anonymous buyer, and Frappe's
-	# rendered address display (get_address_display) is HTML that keeps tags such as <a href>.
-	address = None
-	if order and order.customer_address:
-		a = frappe.db.get_value("Address", order.customer_address,
-			["address_line1", "address_line2", "pincode", "city", "country"], as_dict=True) or {}
-		address = [line for line in (a.get("address_line1"), a.get("address_line2"),
-			" ".join(filter(None, [a.get("pincode"), a.get("city")])), _(a["country"]) if a.get("country") else None)
-			if line]
+	order = frappe.get_doc("Event Ticket Order", reference)
+	paid = bool(order.confirmed_total)
+	# Plain lines, escaped by the template: the billing data was typed by an anonymous buyer.
+	address = [line for line in (order.billing_address_line1, order.billing_address_line2,
+		" ".join(filter(None, [order.billing_postcode, order.billing_city])),
+		_(order.billing_country) if order.billing_country else None) if line] if paid else None
 	attachments = []
 	item = find_item("events", doc.route, frappe.local.lang) if doc.published else None
 	if item and doc.starts_on:
@@ -564,21 +569,22 @@ def send_order_confirmation(event_name, reference, recipient, reference_doctype=
 		except Exception:
 			frappe.log_error(title="Event order confirmation: terms PDF failed", reference_doctype="Marketing Content",
 				reference_name=event)
-	subject = (_("Order confirmation {0}: {1}") if order else _("Your registration {0} for {1}")).format(reference, doc.title)
+	subject = (_("Order confirmation {0}: {1}") if paid else _("Your registration {0} for {1}")).format(reference, doc.title)
 	frappe.sendmail(
 		recipients=[recipient],
 		attachments=attachments,
 		subject=subject,
 		template="event_order_confirmation",
-		args={"event": doc, "venue": venue(doc), "reference": reference, "attendees": attendees, "order": order, "address": address,
-			"buyer_name": buyer_name, "recipient": recipient,
+		args={"event": doc, "venue": venue(doc), "reference": reference, "attendees": attendees, "paid": paid,
+			"order": order, "totals": frappe._dict(totals or {}), "currency": billing.company_currency(),
+			"address": address, "buyer_name": buyer_name, "recipient": recipient,
 			"terms_attached": any(a["fname"].endswith(".pdf") for a in attachments),
 			"terms_html": terms_html if not any(a["fname"].endswith(".pdf") for a in attachments) else None,
 			"event_url": frappe.utils.get_url(item.url) if item else None,
 			"privacy_url": frappe.utils.get_url("/en/privacy" if lang == "en" else "/de/datenschutz"),
 			"imprint_url": frappe.utils.get_url("/en/imprint" if lang == "en" else "/de/impressum")},
-		reference_doctype=reference_doctype if order else "Marketing Content",
-		reference_name=reference if order else event,
+		reference_doctype=reference_doctype,
+		reference_name=reference,
 	)
 
 
