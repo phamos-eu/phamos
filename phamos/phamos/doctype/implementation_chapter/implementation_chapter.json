@@ -176,8 +176,10 @@
   },
   {
    "group": "Meetings",
-   "link_doctype": "Stakeholder Meeting",
-   "link_fieldname": "chapter"
+   "is_child_table": 1,
+   "link_doctype": "Stakeholder Meeting Chapter Review",
+   "parent_doctype": "Stakeholder Meeting",
+   "table_fieldname": "chapter_reviews"
   }
  ],
  "modified": "2026-10-20 10:00:00.000000",
