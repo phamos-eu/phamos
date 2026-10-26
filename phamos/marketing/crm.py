@@ -148,8 +148,7 @@ def get_or_create_campaign(event_doc):
 
 
 # ``ignore_permissions`` in the helpers below: False by default, so desk actions run with the user's own
-# rights; only the website order (as the service user, phamos.marketing.ticketing) passes True
-# (phamos/phamos#1709).
+# rights (phamos/phamos#1709); only the website's own step, ``match_or_create_lead``, ignores them.
 
 
 def create_lead(*, email, first_name, last_name="", company_name="", phone="", job_title="", salutation="",
