@@ -1,0 +1,316 @@
+"""Website orders: validation, Customer + submitted Sales Order, prices over time, all as Guest.
+
+bench --site <site> run-tests --module phamos.tests.test_marketing_ticketing
+"""
+
+import json
+from unittest.mock import patch
+
+import frappe
+from frappe.tests.utils import FrappeTestCase
+from frappe.utils import add_days, flt, now_datetime
+
+from phamos.marketing import billing, ticketing
+from phamos.tests.marketing_fixtures import BILLING, CONTACT, as_guest, ensure_company, make_attendee, make_customer, make_event
+
+COMPANIONS = [{"full_name": "Max Mustermann", "email": ""}]
+COMPANY_BILLING = {**BILLING, "is_company": 1, "company": "Ticket Test GmbH", "vat_id": "DE123456789"}
+
+
+@patch("frappe.enqueue")
+class TestTicketing(FrappeTestCase):
+	@classmethod
+	def setUpClass(cls):
+		super().setUpClass()
+		frappe.set_user("Administrator")
+		ensure_company()
+
+	def setUp(self):
+		frappe.set_user("Administrator")
+		frappe.db.savepoint("ticketing_test")
+		self.event = make_event(max_attendees=5)
+
+	def tearDown(self):
+		frappe.set_user("Administrator")
+		for name in frappe.get_all("Marketing Content", pluck="name"):
+			frappe.cache.delete_value(ticketing._holds_key(name))  # holds live in Redis, not in the rollback
+		frappe.db.rollback(save_point="ticketing_test")
+
+	def order(self, contact=CONTACT, attends=1, companions=COMPANIONS, billing_data=COMPANY_BILLING, event=None, **kwargs):
+		with as_guest():
+			return ticketing.register_attendees((event or self.event).name, contact, attends=attends,
+				companions=companions, billing_data=billing_data, **kwargs)
+
+	def test_company_order_creates_customer_and_submitted_sales_order(self, enqueue):
+		result = self.order()
+		self.assertEqual(frappe.session.user, "Administrator")
+		self.assertEqual(result["reference_doctype"], "Sales Order")
+		self.assertTrue(ticketing.verify_consent_token(result["reference"], result["consent_token"]))
+		so = frappe.get_doc("Sales Order", result["reference"])
+		self.assertEqual(so.docstatus, 1)
+		self.assertEqual(so.order_type, "Shopping Cart")
+		self.assertEqual(len(so.items), 2)
+		self.assertEqual(len({row.description for row in so.items}), 2)
+		self.assertIn("(Regular)", so.items[0].description)
+		# 119 gross incl. 19 % VAT per ticket: the consumer pays exactly the advertised price.
+		self.assertEqual(flt(so.grand_total, 2), 238.0)
+		self.assertEqual(flt(so.net_total, 2), 200.0)
+		customer = frappe.get_doc("Customer", so.customer)
+		self.assertEqual((customer.customer_type, customer.customer_name, customer.tax_id),
+			("Company", "Ticket Test GmbH", "DE123456789"))
+		self.assertTrue(customer.customer_primary_contact and customer.customer_primary_address)
+		self.assertEqual(so.customer_address, customer.customer_primary_address)
+		self.assertFalse(frappe.db.exists("Lead", {"email_id": "erika@ticket.example"}))
+		rows = frappe.get_all("Attendee", filters={"sales_order": so.name},
+			fields=["email", "payment_status", "is_buyer", "contact", "crm_status", "terms_accepted", "ticket_type", "notes"],
+			order_by="creation asc")
+		self.assertEqual([r.payment_status for r in rows], ["Ordered", "Ordered"])
+		self.assertEqual([r.ticket_type for r in rows], ["Regular", "Regular"])
+		self.assertTrue(all(r.terms_accepted for r in rows))
+		buyer, companion = rows
+		self.assertTrue(buyer.is_buyer and buyer.contact)
+		self.assertFalse(companion.email or companion.contact)
+		self.assertEqual(companion.crm_status, "Unlinked")
+		self.assertIn("erika@ticket.example", companion.notes)
+		enqueue.assert_called_once()
+
+	def test_private_buyer_is_an_individual_customer(self, enqueue):
+		result = self.order(billing_data=BILLING, companions=[])
+		customer = frappe.db.get_value("Sales Order", result["reference"], "customer")
+		self.assertEqual(frappe.db.get_value("Customer", customer, "customer_type"), "Individual")
+
+	def test_known_email_never_uses_the_existing_customer(self, enqueue):
+		# An anonymous order with a known customer's email must not land on that Customer, nor reveal its
+		# stored address or VAT ID: a new Customer is created and flagged for review instead.
+		known = make_customer("Known Ticket Customer AG", "erika@ticket.example")
+		frappe.db.set_value("Customer", known, "tax_id", "DE999999999")
+		secret = frappe.get_doc({"doctype": "Address", "address_title": known, "address_type": "Billing",
+			"address_line1": "Geheimweg 7", "city": "Stuttgart", "country": "Germany",
+			"links": [{"link_doctype": "Customer", "link_name": known}]}).insert(ignore_permissions=True)
+		frappe.db.set_value("Customer", known, "customer_primary_address", secret.name)
+		existing_contact = frappe.db.get_value("Contact Email", {"email_id": "erika@ticket.example"}, "parent")
+		links_before = frappe.get_all("Dynamic Link", filters={"parenttype": "Contact", "parent": existing_contact},
+			pluck="link_name")
+
+		result = self.order()
+		so = frappe.get_doc("Sales Order", result["reference"])
+		self.assertNotEqual(so.customer, known)
+		self.assertNotEqual(so.customer_address, secret.name)
+		self.assertEqual(frappe.db.get_value("Address", so.customer_address, "address_line1"), "Hauptstr. 1")
+		self.assertNotEqual(so.tax_id, "DE999999999")
+		buyer = frappe.get_all("Attendee", filters={"sales_order": so.name, "is_buyer": 1}, fields=["crm_status"])[0]
+		self.assertEqual(buyer.crm_status, "Needs Review")
+		self.assertTrue(frappe.db.exists("Comment", {"reference_doctype": "Customer", "reference_name": so.customer,
+			"content": ["like", f"%{known}%"]}))
+		# The existing Contact is left alone.
+		self.assertEqual(frappe.get_all("Dynamic Link", filters={"parenttype": "Contact", "parent": existing_contact},
+			pluck="link_name"), links_before)
+
+		with patch("frappe.sendmail") as sendmail:
+			ticketing.send_order_confirmation(event_name=self.event.name, reference=so.name,
+				recipient="erika@ticket.example", buyer_name="Erika Mustermann", lang="en")
+		self.assertNotIn("Geheimweg", json.dumps(sendmail.call_args.kwargs["args"], default=str))
+
+	def test_company_name_match_needs_review(self, enqueue):
+		make_customer("Ticket Test GmbH")
+		result = self.order()
+		buyer = frappe.get_all("Attendee", filters={"sales_order": result["reference"], "is_buyer": 1},
+			fields=["crm_status", "customer"])[0]
+		self.assertEqual(buyer.crm_status, "Needs Review")
+		self.assertNotEqual(buyer.customer, "Ticket Test GmbH")
+
+	def test_contact_who_does_not_attend(self, enqueue):
+		result = self.order(attends=0, companions=[{"full_name": "Colleague One", "email": "colleague@ticket.example"}])
+		rows = frappe.get_all("Attendee", filters={"sales_order": result["reference"]}, fields=["email", "is_buyer", "customer"])
+		self.assertEqual([r.email for r in rows], ["colleague@ticket.example"])
+		self.assertFalse(rows[0].is_buyer)
+		# A companion of a company order belongs to the company.
+		self.assertEqual(rows[0].customer, frappe.db.get_value("Sales Order", result["reference"], "customer"))
+
+	def test_early_bird_then_regular(self, enqueue):
+		event = make_event("Early Bird Test Event", prices=[
+			{"title": "Early Bird", "rate": 59.5, "quota": 2, "valid_until": add_days(now_datetime(), 10)},
+			{"title": "Regular", "rate": 119}])
+		self.assertEqual(billing.get_ticket_pricing(event, 1).price_title, "Early Bird")
+		# Two early-bird tickets fit, three do not: the order gets the next price row.
+		self.assertEqual(billing.get_ticket_pricing(event, 3).price_title, "Regular")
+		first = self.order(event=event, billing_data=BILLING, expected_total=119)
+		self.assertEqual(flt(frappe.db.get_value("Sales Order", first["reference"], "grand_total"), 2), 119.0)
+		# The quota is used up: the next buyer pays the regular price, and a stale total is refused.
+		self.assertEqual(billing.get_ticket_pricing(event, 1).price_title, "Regular")
+		self.assertRaises(frappe.ValidationError, self.order, event=event, contact={"full_name": "Late Bird",
+			"email": "late@ticket.example"}, companions=[], billing_data={**BILLING, "email": "late@ticket.example"},
+			expected_total=59.5)
+		# After the early-bird window everybody pays the regular price.
+		later = billing.get_ticket_pricing(event, 1, now=add_days(now_datetime(), 11))
+		self.assertEqual(later.price_title, "Regular")
+
+	def test_free_event_books_without_order(self, enqueue):
+		free = make_event("Free Test Event", paid=False)
+		result = self.order(event=free, billing_data=None)
+		self.assertEqual(result["reference_doctype"], "Attendee")
+		self.assertTrue(result["reference"].startswith("BK-"))
+		self.assertEqual(set(frappe.get_all("Attendee", filters={"event": free.name}, pluck="payment_status")),
+			{"Not Required"})
+
+	def test_closed_sale_is_refused(self, enqueue):
+		for values in ({"registration_open": 0}, {"published": 0}, {"status": "Completed"},
+				{"ticket_sales_until": add_days(now_datetime(), -1)}):
+			self.event.reload()
+			self.event.update(values)
+			self.event.save()
+			self.assertRaises(frappe.ValidationError, self.order)
+			frappe.db.rollback(save_point="ticketing_test")
+			self.event = make_event(max_attendees=5)
+
+	def test_capacity_and_duplicates(self, enqueue):
+		for i in range(4):
+			make_attendee(self.event.name, f"seat{i}@example.com")
+		self.assertRaises(frappe.ValidationError, self.order)  # 4 + 2 > 5
+		frappe.db.rollback(save_point="ticketing_test")
+		self.event = make_event(max_attendees=5)
+		self.assertRaises(frappe.ValidationError, self.order, companions=[{"full_name": "Twin", "email": CONTACT["email"]}])
+		make_attendee(self.event.name, "erika@ticket.example")
+		self.assertRaises(frappe.ValidationError, self.order)
+
+	def test_duplicate_message_names_no_address(self, enqueue):
+		make_attendee(self.event.name, "erika@ticket.example")
+		with self.assertRaises(frappe.ValidationError) as raised:
+			self.order()
+		self.assertNotIn("erika@ticket.example", str(raised.exception))
+
+	def test_order_locks_the_event_row(self, enqueue):
+		with patch("frappe.get_doc", wraps=frappe.get_doc) as get_doc:
+			self.order()
+		self.assertIn((("Marketing Content", self.event.name), {"for_update": True}),
+			[(c.args, c.kwargs) for c in get_doc.call_args_list])
+
+	def test_free_order_never_uses_a_known_contact(self, enqueue):
+		known = make_customer("Known Free Customer AG", "erika@ticket.example")
+		contact = frappe.db.get_value("Contact Email", {"email_id": "erika@ticket.example"}, "parent")
+		free = make_event("Free Known Event", paid=False)
+		self.order(event=free, billing_data=None, companions=[])
+		att = frappe.get_all("Attendee", filters={"event": free.name}, fields=["name", "contact", "customer", "crm_status"])[0]
+		self.assertEqual((att.contact, att.customer, att.crm_status), (None, None, "Needs Review"))
+		self.assertTrue(frappe.db.exists("Comment", {"reference_doctype": "Attendee", "reference_name": att.name,
+			"content": ["like", f"%{contact}%"]}))
+		self.assertEqual(frappe.get_all("Dynamic Link", filters={"parenttype": "Contact", "parent": contact},
+			pluck="link_name"), [known])
+
+	def test_companion_contact_is_never_linked_to_the_buyers_customer(self, enqueue):
+		known = make_customer("Known Companion Customer AG", "colleague@ticket.example")
+		contact = frappe.db.get_value("Contact Email", {"email_id": "colleague@ticket.example"}, "parent")
+		result = self.order(companions=[{"full_name": "Colleague Known", "email": "colleague@ticket.example"}])
+		row = frappe.get_all("Attendee", filters={"sales_order": result["reference"], "is_buyer": 0},
+			fields=["contact", "crm_status", "customer"])[0]
+		self.assertEqual((row.contact, row.crm_status), (None, "Needs Review"))
+		self.assertEqual(row.customer, frappe.db.get_value("Sales Order", result["reference"], "customer"))
+		# The submitted order did not touch the existing Contact either.
+		self.assertEqual(frappe.get_all("Dynamic Link", filters={"parenttype": "Contact", "parent": contact},
+			pluck="link_name"), [known])
+
+	def test_bad_email_is_refused(self, enqueue):
+		self.assertRaises(frappe.ValidationError, self.order, contact={"full_name": "Bad", "email": "bad@example.com/"})
+
+	def test_save_consents(self, enqueue):
+		result = self.order()
+		email = ticketing.save_consents(result["reference"], {"newsletter": 1, "public_listing": 1})
+		self.assertEqual(email, "erika@ticket.example")
+		buyer = frappe.get_all("Attendee", filters={"sales_order": result["reference"], "is_buyer": 1},
+			fields=["newsletter_consent", "newsletter_consent_on", "public_listing_consent", "share_with_attendees_consent"])[0]
+		self.assertTrue(buyer.newsletter_consent and buyer.newsletter_consent_on and buyer.public_listing_consent)
+		self.assertFalse(buyer.share_with_attendees_consent)
+		self.assertFalse(ticketing.verify_consent_token(result["reference"], "1.forged"))
+		self.assertFalse(ticketing.verify_consent_token("SAL-ORD-OTHER", result["consent_token"]))
+
+	def test_confirmation_job_arguments_and_email(self, enqueue):
+		result = self.order()
+		kwargs = enqueue.call_args.kwargs
+		self.assertNotIn("event", kwargs)  # frappe.enqueue's own parameter: it would never reach the job
+		job_args = {k: v for k, v in kwargs.items() if k not in ("enqueue_after_commit", "queue", "timeout", "now")}
+		with patch("frappe.sendmail") as sendmail:
+			ticketing.send_order_confirmation(**job_args)
+		mail = sendmail.call_args.kwargs
+		self.assertEqual(mail["recipients"], ["erika@ticket.example"])
+		self.assertIn(result["reference"], mail["subject"])
+		self.assertEqual(mail["reference_name"], result["reference"])
+		self.assertTrue(any(a["fname"].endswith(".ics") for a in mail["attachments"]))
+
+	def test_ticket_holders_with_email_get_their_own_ticket(self, enqueue):
+		companions = [{"full_name": "Max Mit Mail", "email": "max@ticket.example"}, {"full_name": "Ohne Mail"}]
+		self.order(companions=companions)
+		jobs = [c.kwargs for c in enqueue.call_args_list]
+		# The buyer's confirmation (all tickets) plus one ticket for the companion with an email.
+		self.assertEqual([j["recipient"] for j in jobs if "recipient" in j], ["erika@ticket.example"])
+		tickets = [j for j in jobs if j.get("attendee")]
+		self.assertEqual(len(tickets), 1)
+		self.assertEqual(frappe.db.get_value("Attendee", tickets[0]["attendee"], "email"), "max@ticket.example")
+		job_args = {k: v for k, v in tickets[0].items() if k not in ("enqueue_after_commit", "queue", "timeout", "now")}
+		with patch("frappe.sendmail") as sendmail:
+			ticketing.send_ticket(**job_args)
+		mail = sendmail.call_args.kwargs
+		self.assertEqual(mail["recipients"], ["max@ticket.example"])
+		self.assertEqual(mail["template"], "event_ticket")
+		self.assertTrue(any(a["fname"].endswith(".ics") for a in mail["attachments"]))
+
+	def test_one_visitor_cannot_hold_more_than_one_order(self, enqueue):
+		event = make_event("Hold Limit Event", max_attendees=50, max_attendees_per_order=4)
+		try:
+			frappe.local.request_ip = "203.0.113.9"
+			self.assertTrue(ticketing.hold_seats(event, "hold-limit-a", 3)["ok"])
+			self.assertTrue(ticketing.hold_seats(event, "hold-limit-b", 3)["ok"])
+			# Together 6 > 4 per order: the visitor's older hold made room for the new one.
+			self.assertEqual(set(ticketing.active_holds(event.name)), {"hold-limit-b"})
+			for i in range(30):  # a script with fresh hold ids gets no further
+				ticketing.hold_seats(event, f"hold-limit-x{i:02d}", 4)
+			self.assertEqual(ticketing.held_seats(event.name), 4)
+			# Another visitor is not affected.
+			frappe.local.request_ip = "198.51.100.4"
+			self.assertTrue(ticketing.hold_seats(event, "hold-limit-c", 2)["ok"])
+			self.assertEqual(ticketing.held_seats(event.name), 6)
+		finally:
+			frappe.local.request_ip = None
+
+	def test_confirmation_escapes_the_typed_address(self, enqueue):
+		# The buyer is anonymous: markup in the address must not reach the email as HTML (phishing link
+		# sent from phamos' own mail server).
+		link = '<a href="https://evil.example">Pay here</a>'
+		result = self.order(billing_data={**BILLING, "address_line1": f"Hauptstr. 1 {link}"}, companions=[])
+		with patch("frappe.sendmail") as sendmail:
+			ticketing.send_order_confirmation(event_name=self.event.name, reference=result["reference"],
+				recipient="erika@ticket.example", buyer_name="Erika Mustermann", lang="en")
+		mail = sendmail.call_args.kwargs
+		html = frappe.render_template(f"templates/emails/{mail['template']}.html", mail["args"])
+		self.assertNotIn('href="https://evil.example"', html)
+		self.assertIn("&lt;a href=", html)  # the markup reached the template and was escaped there
+		self.assertIn("Hauptstr. 1", html)
+
+	def test_offer(self, enqueue):
+		offer = ticketing.offer(self.event.name)
+		self.assertTrue(offer.sale_open)
+		self.assertFalse(offer.free)
+		self.assertEqual(offer.spots_left, 5)
+		self.assertEqual((offer.gross, offer.net, offer.price_title), (119, 100, "Regular"))
+		self.assertEqual(len(offer.prices), 1)
+
+	def test_holds_reserve_seats_and_prices(self, enqueue):
+		event = make_event("Hold Test Event", max_attendees=3, prices=[
+			{"title": "Early Bird", "rate": 59.5, "quota": 2}, {"title": "Regular", "rate": 119}])
+		first = ticketing.hold_seats(event, "hold-aaaaaaaa", 2)
+		self.assertTrue(first["ok"])
+		self.assertEqual(first["price_title"], "Early Bird")
+		self.assertEqual(first["spots_left"], 1)
+		# The two early-bird seats are held: the next visitor gets the regular price and one seat at most.
+		self.assertEqual(ticketing.offer(event.name).spots_left, 1)
+		second = ticketing.hold_seats(event, "hold-bbbbbbbb", 1)
+		self.assertEqual(second["price_title"], "Regular")
+		self.assertFalse(ticketing.hold_seats(event, "hold-cccccccc", 1)["ok"])  # 2 + 1 held = capacity
+		# The holder orders: its own hold does not block it, and is released afterwards.
+		result = self.order(event=event, billing_data=BILLING, hold_id="hold-aaaaaaaa", expected_total=119)
+		self.assertEqual(frappe.db.get_value("Sales Order", result["reference"], "grand_total"), 119)
+		self.assertNotIn("hold-aaaaaaaa", ticketing.active_holds(event.name))
+		# An expired hold counts for nothing.
+		frappe.cache.hset(ticketing._holds_key(event.name), "hold-bbbbbbbb", {"qty": 1, "price_title": "Regular",
+			"expires": 0})
+		self.assertEqual(ticketing.held_seats(event.name), 0)
+		self.assertEqual(ticketing.offer(event.name).spots_left, 1)

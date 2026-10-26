@@ -11,11 +11,11 @@ Object.assign(GitLabIssueDashboard.prototype, {
 
     getFilterContext() {
         const projects = this.normalizeProjectsValue(this.filters.projects.get_value() || []);
-        const { from_date: defaultFromDate, to_date: defaultToDate } = this.getDefaultDateRange();
+        const { from_date, to_date } = this.getSelectedDateRange();
         return {
             projects,
-            from_date: this.filters.from_date.get_value() || defaultFromDate,
-            to_date: this.filters.to_date.get_value() || defaultToDate,
+            from_date,
+            to_date,
             issue_scope: this.normalizeIssueScopeValue(this.filters.issue_scope.get_value()),
         };
     },
@@ -500,6 +500,7 @@ Object.assign(GitLabIssueDashboard.prototype, {
         const method = "phamos.gitlab_integration.page.gitlab_issue_dashboard.gitlab_issue_dashboard.get_lifetime_ticket_drilldown";
         const note = __("Open = still open as of the end of {0}, even if it has since been closed. \"Status (now)\" shows the ticket's current status so you can verify.", [monthLabel]);
         const baseParams = { projects: projects || [], issue_scope: filterCtx.issue_scope, year, month };
+        const labelFilter = this.getLifetimeLabelFilter();
 
         this.openDrilldown({
             title: __("{0} — {1}", [this.getScopeLabel(projects), monthLabel]),
@@ -513,7 +514,18 @@ Object.assign(GitLabIssueDashboard.prototype, {
                     note,
                     stateLabel: __("Open (as of {0})", [monthLabel]),
                 },
-            ],
+            ].concat(labelFilter.label_mode ? [
+                {
+                    key: "filtered",
+                    label: this.getLifetimeFilterLabel(),
+                    method,
+                    params: Object.assign({}, baseParams, labelFilter, { lifetime_state: "open" }),
+                    noListView: true,
+                    note,
+                    stateLabel: __("Open (as of {0})", [monthLabel]),
+                },
+            ] : []),
+            activeKey: labelFilter.label_mode ? "filtered" : "open",
         });
     },
 

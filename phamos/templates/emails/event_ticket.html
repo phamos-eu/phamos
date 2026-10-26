@@ -1,0 +1,23 @@
+{#- A ticket holder's own ticket (phamos.marketing.ticketing.send_ticket). No prices or billing details. -#}
+{%- set when = frappe.utils.format_datetime(event.starts_on, "dd.MM.yyyy HH:mm") if event.starts_on else (event.date_note or "") -%}
+<p>{{ _("Hello {0},").format(attendee.full_name | e) }}</p>
+<p>{{ _("{0} booked a ticket for you for {1}.").format(buyer_name | e, event.title | e) if buyer_name else _("Here is your ticket for {0}.").format(event.title | e) }}</p>
+
+<table cellpadding="4" style="border-collapse:collapse">
+	<tr><td><strong>{{ _("Ticket") }}</strong></td><td>{{ attendee.full_name | e }}{% if attendee.ticket_type and attendee.ticket_type != "Free" %} ({{ attendee.ticket_type | e }}){% endif %}</td></tr>
+	{%- if reference %}<tr><td><strong>{{ _("Reference") }}</strong></td><td>{{ reference | e }}</td></tr>{% endif %}
+	<tr><td><strong>{{ _("Event") }}</strong></td><td>{{ event.title | e }}</td></tr>
+	<tr><td><strong>{{ _("Date") }}</strong></td><td>{{ when | e }}</td></tr>
+	{%- if venue and venue.online %}
+	<tr><td><strong>{{ _("Venue") }}</strong></td><td>{{ _("Online") }}: <a href="{{ venue.link | e }}">{{ venue.link | e }}</a></td></tr>
+	{%- elif venue %}
+	<tr><td><strong>{{ _("Venue") }}</strong></td><td>{{ venue.text | e }}</td></tr>
+	{%- endif %}
+</table>
+
+<p>{{ _("Add the event to your calendar with the attached file.") }}{% if event_url %} {{ _("Event page") }}: <a href="{{ event_url }}">{{ event_url }}</a>{% endif %}</p>
+<p>{{ _("Questions? Simply reply to this email.") }}</p>
+<p style="font-size:12px;color:#6b6b6b">
+	{{ _("You receive this email because your email address was given for this ticket.") }}
+	<a href="{{ privacy_url }}">{{ _("Privacy policy") }}</a> · <a href="{{ imprint_url }}">{{ _("Imprint") }}</a>
+</p>

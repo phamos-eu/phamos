@@ -12,6 +12,7 @@
 		"dev:software-development": "cd software_development_frontend && yarn dev",
 		"dev:scan": "cd scan_frontend && yarn dev",
 		"build": "yarn install:frontends && cd frontend && yarn build && cd ../human_resources_frontend && yarn build && cd ../sales_frontend && yarn build && cd ../accounting_frontend && yarn build && cd ../project_management_frontend && yarn build && cd ../software_development_frontend && yarn build && cd ../scan_frontend && yarn build",
-		"build:scan": "cd scan_frontend && yarn build"
+		"build:scan": "cd scan_frontend && yarn build",
+		"test:spa": "cd frontend && yarn test"
 	}
 }

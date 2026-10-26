@@ -78,7 +78,7 @@
   {
    "fieldname": "team_members_capacity",
    "fieldtype": "Int",
-   "label": "Team Members Capacity(Weekly)"
+   "label": "Team Members Capacity (Weekly)"
   },
   {
    "fieldname": "section_break_nkej",

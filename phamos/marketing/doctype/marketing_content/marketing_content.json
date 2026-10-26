@@ -1,0 +1,601 @@
+{
+ "actions": [],
+ "autoname": "MKT-CONTENT-.YYYY.-.#####",
+ "creation": "2026-03-25 00:00:00",
+ "doctype": "DocType",
+ "engine": "InnoDB",
+ "field_order": [
+  "title",
+  "subtitle",
+  "event_type",
+  "status",
+  "column_break_1",
+  "date_note",
+  "starts_on",
+  "ends_on",
+  "published",
+  "route",
+  "legacy_route",
+  "section_location",
+  "attendance_mode",
+  "location",
+  "street",
+  "postal_code",
+  "city",
+  "country",
+  "find_on_map",
+  "column_break_location",
+  "geolocation",
+  "latitude",
+  "longitude",
+  "section_media",
+  "image",
+  "intro",
+  "description",
+  "translations",
+  "section_organizer",
+  "organizer_is_phamos",
+  "organizer",
+  "organizer_name",
+  "organizer_logo",
+  "organizer_website_link",
+  "organizer_email",
+  "column_break_organizer",
+  "contact_person",
+  "contact_person_email",
+  "contact_person_phone",
+  "contact_profile",
+  "section_speakers",
+  "speakers",
+  "section_sponsors",
+  "sponsors",
+  "section_responses",
+  "email_group",
+  "tab_ticketing",
+  "section_ticket_registration",
+  "registration_open",
+  "max_attendees",
+  "max_attendees_per_order",
+  "column_break_registration",
+  "ticket_sales_from",
+  "ticket_sales_until",
+  "show_bookings_publicly",
+  "section_interest",
+  "going_count",
+  "column_break_interest",
+  "maybe_count",
+  "column_break_interest_2",
+  "not_going_count",
+  "section_ticket_sale",
+  "ticket_item",
+  "ticket_price_includes_tax",
+  "column_break_srnt",
+  "item_tax_template",
+  "taxes_and_charges",
+  "tc_name",
+  "section_ticket_prices",
+  "ticket_prices",
+  "ticket_price_summary",
+  "section_sales",
+  "campaign",
+  "column_break_sales",
+  "project"
+ ],
+ "fields": [
+  {
+   "fieldname": "title",
+   "fieldtype": "Data",
+   "in_list_view": 1,
+   "label": "Title",
+   "no_copy": 1,
+   "reqd": 1,
+   "unique": 1
+  },
+  {
+   "fieldname": "subtitle",
+   "fieldtype": "Data",
+   "label": "Subtitle"
+  },
+  {
+   "fieldname": "event_type",
+   "fieldtype": "Select",
+   "in_list_view": 1,
+   "label": "Event Type",
+   "options": "\nWorkshop\nConference\nWebinar\nTraining\nMeetup\nHackathon\nTeam Building\nSeminar\nNetworking\nProduct Launch\nTown Hall\nSocial Event"
+  },
+  {
+   "default": "Upcoming",
+   "fieldname": "status",
+   "fieldtype": "Select",
+   "in_list_view": 1,
+   "label": "Status",
+   "options": "Upcoming\nOngoing\nCompleted\nCancelled"
+  },
+  {
+   "fieldname": "column_break_1",
+   "fieldtype": "Column Break"
+  },
+  {
+   "description": "Shown when no exact date is set, e.g. 'Expected: July 2026'",
+   "fieldname": "date_note",
+   "fieldtype": "Data",
+   "label": "Date Note"
+  },
+  {
+   "fieldname": "starts_on",
+   "fieldtype": "Datetime",
+   "in_list_view": 1,
+   "label": "Starts On"
+  },
+  {
+   "fieldname": "ends_on",
+   "fieldtype": "Datetime",
+   "label": "Ends On"
+  },
+  {
+   "default": "0",
+   "fieldname": "published",
+   "fieldtype": "Check",
+   "label": "Published",
+   "no_copy": 1
+  },
+  {
+   "fieldname": "route",
+   "fieldtype": "Data",
+   "label": "Route",
+   "no_copy": 1,
+   "unique": 1,
+   "description": "URL slug: /de/veranstaltungen/<route> and /en/events/<route>. Set once from the title."
+  },
+  {
+   "fieldname": "legacy_route",
+   "fieldtype": "Data",
+   "label": "Old Route",
+   "hidden": 1,
+   "read_only": 1,
+   "no_copy": 1
+  },
+  {
+   "fieldname": "section_location",
+   "fieldtype": "Section Break",
+   "label": "Location"
+  },
+  {
+   "default": "In person",
+   "fieldname": "attendance_mode",
+   "fieldtype": "Select",
+   "in_list_view": 1,
+   "in_standard_filter": 1,
+   "label": "Attendance",
+   "options": "In person\nOnline"
+  },
+  {
+   "description": "In person: the venue's name, e.g. \"Hotel Adlon, Saal 2\". Online: the meeting link (https://…). The link is only sent to registered attendees, never shown on the website.",
+   "fieldname": "location",
+   "fieldtype": "Data",
+   "label": "Venue / Video Link"
+  },
+  {
+   "depends_on": "eval:doc.attendance_mode!=='Online'",
+   "fieldname": "street",
+   "fieldtype": "Data",
+   "label": "Street"
+  },
+  {
+   "depends_on": "eval:doc.attendance_mode!=='Online'",
+   "fieldname": "postal_code",
+   "fieldtype": "Data",
+   "label": "Postal Code"
+  },
+  {
+   "depends_on": "eval:doc.attendance_mode!=='Online'",
+   "fieldname": "city",
+   "fieldtype": "Data",
+   "label": "City"
+  },
+  {
+   "depends_on": "eval:doc.attendance_mode!=='Online'",
+   "fieldname": "country",
+   "fieldtype": "Link",
+   "label": "Country",
+   "options": "Country"
+  },
+  {
+   "depends_on": "eval:doc.attendance_mode!=='Online'",
+   "description": "Looks the address up on OpenStreetMap and sets the pin. To move it to the exact entrance, click the map's edit tool (Edit layers), drag the pin and click Save.",
+   "fieldname": "find_on_map",
+   "fieldtype": "Button",
+   "label": "Find on Map"
+  },
+  {
+   "fieldname": "column_break_location",
+   "fieldtype": "Column Break"
+  },
+  {
+   "depends_on": "eval:doc.attendance_mode!=='Online'",
+   "fieldname": "geolocation",
+   "fieldtype": "Geolocation",
+   "label": "Map Pin"
+  },
+  {
+   "depends_on": "eval:doc.attendance_mode!=='Online'",
+   "fieldname": "latitude",
+   "fieldtype": "Float",
+   "label": "Latitude",
+   "precision": "7",
+   "read_only": 1
+  },
+  {
+   "depends_on": "eval:doc.attendance_mode!=='Online'",
+   "fieldname": "longitude",
+   "fieldtype": "Float",
+   "label": "Longitude",
+   "precision": "7",
+   "read_only": 1
+  },
+  {
+   "fieldname": "section_media",
+   "fieldtype": "Section Break",
+   "label": "Media & Content"
+  },
+  {
+   "fieldname": "image",
+   "fieldtype": "Attach Image",
+   "label": "Cover Image"
+  },
+  {
+   "fieldname": "intro",
+   "fieldtype": "Small Text",
+   "label": "Intro / Tagline",
+   "hidden": 1,
+   "read_only": 1,
+   "description": "Legacy: moved into Texts per Language. Removed in a later release."
+  },
+  {
+   "fieldname": "description",
+   "fieldtype": "Text Editor",
+   "label": "Description",
+   "hidden": 1,
+   "read_only": 1,
+   "description": "Legacy: moved into Texts per Language. Removed in a later release."
+  },
+  {
+   "fieldname": "translations",
+   "fieldtype": "Table",
+   "label": "Texts per Language",
+   "options": "Web Profile Content",
+   "description": "One row per language: title, summary (tile and lead paragraph) and content (long text) of the event page."
+  },
+  {
+   "fieldname": "section_organizer",
+   "fieldtype": "Section Break",
+   "label": "Organizer"
+  },
+  {
+   "fieldname": "organizer_is_phamos",
+   "fieldtype": "Check",
+   "label": "phamos organizes this event",
+   "default": "1"
+  },
+  {
+   "fieldname": "organizer",
+   "fieldtype": "Link",
+   "label": "Organizer",
+   "options": "Stakeholder Web Profile",
+   "depends_on": "eval:!doc.organizer_is_phamos",
+   "mandatory_depends_on": "eval:!doc.organizer_is_phamos",
+   "description": "The organizing company. Named on the website only when its profile is published and approved to be named."
+  },
+  {
+   "fieldname": "organizer_name",
+   "fieldtype": "Data",
+   "label": "Organizer Name",
+   "depends_on": "eval:!doc.organizer_is_phamos && !doc.organizer",
+   "description": "Legacy: use Organizer (Stakeholder Web Profile) instead."
+  },
+  {
+   "description": "Legacy: use Organizer (Stakeholder Web Profile) instead.",
+   "fieldname": "organizer_logo",
+   "fieldtype": "Attach Image",
+   "label": "Organizer Logo",
+   "depends_on": "eval:!doc.organizer_is_phamos && !doc.organizer"
+  },
+  {
+   "description": "Legacy: use Organizer (Stakeholder Web Profile) instead.",
+   "fieldname": "organizer_website_link",
+   "fieldtype": "Data",
+   "label": "Organizer Website Link",
+   "options": "URL",
+   "depends_on": "eval:!doc.organizer_is_phamos && !doc.organizer"
+  },
+  {
+   "fieldname": "organizer_email",
+   "fieldtype": "Data",
+   "label": "Organizer Email",
+   "options": "Email",
+   "description": "Internal, not shown on the website."
+  },
+  {
+   "fieldname": "column_break_organizer",
+   "fieldtype": "Column Break"
+  },
+  {
+   "description": "Internal: who handles this event. Not shown on the website (use Contact on the Website).",
+   "fieldname": "contact_person",
+   "fieldtype": "Data",
+   "label": "Contact Person"
+  },
+  {
+   "description": "Email address for event-specific inquiries",
+   "fieldname": "contact_person_email",
+   "fieldtype": "Data",
+   "label": "Contact Person Email",
+   "options": "Email"
+  },
+  {
+   "description": "Phone number for event-specific inquiries",
+   "fieldname": "contact_person_phone",
+   "fieldtype": "Data",
+   "label": "Contact Person Phone",
+   "options": "Phone"
+  },
+  {
+   "fieldname": "contact_profile",
+   "fieldtype": "Link",
+   "label": "Contact on the Website",
+   "options": "Person Web Profile",
+   "description": "Shown in the page sidebar with the contact dialog; requests become Opportunities assigned to this person."
+  },
+  {
+   "fieldname": "section_speakers",
+   "fieldtype": "Section Break",
+   "label": "Speakers"
+  },
+  {
+   "fieldname": "speakers",
+   "fieldtype": "Table",
+   "label": "Speakers",
+   "options": "Marketing Event Speaker"
+  },
+  {
+   "fieldname": "section_sponsors",
+   "fieldtype": "Section Break",
+   "label": "Sponsors"
+  },
+  {
+   "fieldname": "sponsors",
+   "fieldtype": "Table",
+   "label": "Sponsors",
+   "options": "Marketing Event Sponsor"
+  },
+  {
+   "fieldname": "section_responses",
+   "fieldtype": "Section Break",
+   "label": "Updates by Email"
+  },
+  {
+   "fieldname": "email_group",
+   "fieldtype": "Link",
+   "label": "Email Group",
+   "options": "Email Group",
+   "description": "Visitors who click \"Keep me posted\" join this group after confirming their address (double opt-in). Give it a title that may be shown to them."
+  },
+  {
+   "fieldname": "tab_ticketing",
+   "fieldtype": "Tab Break",
+   "label": "Tickets & Sales"
+  },
+  {
+   "fieldname": "section_ticket_registration",
+   "fieldtype": "Section Break",
+   "label": "Registration"
+  },
+  {
+   "default": "0",
+   "fieldname": "registration_open",
+   "fieldtype": "Check",
+   "label": "Registration / Ticket Sale Open",
+   "no_copy": 1,
+   "description": "Master switch for the ticket sale and free registrations."
+  },
+  {
+   "description": "Leave 0 for unlimited",
+   "fieldname": "max_attendees",
+   "fieldtype": "Int",
+   "label": "Max Attendees",
+   "no_copy": 1
+  },
+  {
+   "default": "10",
+   "fieldname": "max_attendees_per_order",
+   "fieldtype": "Int",
+   "label": "Max Tickets per Order"
+  },
+  {
+   "fieldname": "column_break_registration",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "ticket_sales_from",
+   "fieldtype": "Datetime",
+   "label": "Ticket Sale Opens",
+   "description": "Empty: as soon as Registration Open is ticked."
+  },
+  {
+   "fieldname": "ticket_sales_until",
+   "fieldtype": "Datetime",
+   "label": "Ticket Sale Closes",
+   "description": "Empty: at the start of the event."
+  },
+  {
+   "fieldname": "show_bookings_publicly",
+   "fieldtype": "Check",
+   "label": "Show bookings on the website",
+   "default": "1",
+   "description": "\"32 of 60 seats taken\" on the event page and the event card (counts only, no names)."
+  },
+  {
+   "fieldname": "section_interest",
+   "fieldtype": "Section Break",
+   "label": "Interest (Yes / Maybe / No on the website)",
+   "collapsible": 1
+  },
+  {
+   "fieldname": "going_count",
+   "fieldtype": "Int",
+   "label": "Yes",
+   "default": "0",
+   "read_only": 1,
+   "no_copy": 1
+  },
+  {
+   "fieldname": "column_break_interest",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "maybe_count",
+   "fieldtype": "Int",
+   "label": "Maybe",
+   "default": "0",
+   "read_only": 1,
+   "no_copy": 1
+  },
+  {
+   "fieldname": "column_break_interest_2",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "not_going_count",
+   "fieldtype": "Int",
+   "label": "No",
+   "default": "0",
+   "read_only": 1,
+   "no_copy": 1
+  },
+  {
+   "fieldname": "section_ticket_sale",
+   "fieldtype": "Section Break",
+   "label": "Ticket"
+  },
+  {
+   "description": "Non-stock service item used on the order lines. Prices come from the table below.",
+   "fieldname": "ticket_item",
+   "fieldtype": "Link",
+   "label": "Ticket Item",
+   "options": "Item"
+  },
+  {
+   "fieldname": "ticket_price_includes_tax",
+   "fieldtype": "Check",
+   "label": "Prices include VAT",
+   "default": "1",
+   "description": "Prices below are gross (what a consumer pays). Untick to enter net prices."
+  },
+  {
+   "fieldname": "column_break_srnt",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "item_tax_template",
+   "fieldtype": "Link",
+   "label": "Item Tax Template",
+   "options": "Item Tax Template",
+   "description": "Rate per tax account for the tickets (e.g. 19 %)."
+  },
+  {
+   "fieldname": "taxes_and_charges",
+   "fieldtype": "Link",
+   "label": "Sales Taxes Template",
+   "options": "Sales Taxes and Charges Template",
+   "description": "Which tax accounts apply to ticket orders. Empty: the company's default template. The Item Tax Template sets the rate per account (e.g. 19 %)."
+  },
+  {
+   "fieldname": "tc_name",
+   "fieldtype": "Link",
+   "label": "Terms and Conditions",
+   "options": "Terms and Conditions"
+  },
+  {
+   "fieldname": "section_ticket_prices",
+   "fieldtype": "Section Break",
+   "label": "Prices",
+   "depends_on": "ticket_item"
+  },
+  {
+   "fieldname": "ticket_prices",
+   "fieldtype": "Table",
+   "label": "Ticket Prices",
+   "options": "Marketing Event Ticket Price",
+   "description": "First matching row wins: its window contains the order time and its quota is not used up. E.g. Early Bird (until 30 Nov, 30 tickets), then Regular."
+  },
+  {
+   "fieldname": "ticket_price_summary",
+   "fieldtype": "Small Text",
+   "label": "Price Overview",
+   "read_only": 1,
+   "no_copy": 1
+  },
+  {
+   "fieldname": "section_sales",
+   "fieldtype": "Section Break",
+   "label": "Sales"
+  },
+  {
+   "fieldname": "campaign",
+   "fieldtype": "Link",
+   "label": "Campaign",
+   "options": "Campaign",
+   "read_only": 1,
+   "no_copy": 1,
+   "description": "Created with the first registration; set on every Lead, Quotation, Sales Order and Invoice of this event."
+  },
+  {
+   "fieldname": "column_break_sales",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "project",
+   "fieldtype": "Link",
+   "label": "Project",
+   "options": "Project",
+   "description": "Optional: Sales Orders and Invoices of the tickets are booked on this project (financial monitoring)."
+  }
+ ],
+ "links": [],
+ "modified": "2026-10-23 19:00:00.000000",
+ "modified_by": "Administrator",
+ "module": "Marketing",
+ "name": "Marketing Content",
+ "naming_rule": "Expression",
+ "owner": "Administrator",
+ "permissions": [
+  {
+   "create": 1,
+   "delete": 1,
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "System Manager",
+   "share": 1,
+   "write": 1
+  },
+  {
+   "create": 1,
+   "delete": 1,
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "Website Manager",
+   "share": 1,
+   "write": 1
+  }
+ ],
+ "row_format": "Dynamic",
+ "sort_field": "starts_on",
+ "sort_order": "ASC",
+ "states": []
+}
