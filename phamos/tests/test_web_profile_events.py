@@ -165,8 +165,8 @@ class TestWebProfileEvents(FrappeTestCase):
 	def test_order_end_to_end_as_guest(self):
 		with patch("frappe.enqueue"):
 			result = self.order(expected_total="238.00")
-		self.assertEqual(result["reference_doctype"], "Sales Order")
-		self.assertEqual(frappe.db.get_value("Sales Order", result["reference"], "docstatus"), 1)
+		self.assertEqual(result["reference_doctype"], "Event Ticket Order")
+		self.assertEqual(frappe.db.get_value("Event Ticket Order", result["reference"], "status"), "Booked")
 		self.assertEqual(frappe.db.get_value("Attendee", {"email": "web.guest@example.com"}, "event"), self.event.name)
 		self.assertEqual(frappe.db.count("Attendee", {"event": self.event.name, "order_reference": result["reference"]}), 2)
 

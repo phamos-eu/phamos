@@ -11,10 +11,13 @@ Paid website orders create the buyer's Customer directly (``ensure_customer``): 
 A company name that matches a Customer without an email link is only a hint (``crm_status`` "Needs
 Review"): a person decides, so no wrong Customer is reused.
 
-Rules 1 and 2 apply to verified emails only (Desk, ``link_attendee``). A website order is anonymous and
-its email addresses are not verified (``resolve_party(verified=False)``): an existing Contact, Lead or
-Customer is never reused or changed, so nobody can attach a stranger's Contact to their own Customer or
-book in a known customer's name. A match only sets "Needs Review" with a note; a person links it.
+Rules 1 and 2 apply to verified emails only (Desk, ``link_attendee``).
+
+Everything that comes in from the website (the contact form and every event order, free or paid) follows one
+process instead, ``match_or_create_lead`` (phamos/phamos#1724): the Customer of a Contact with that email, else
+the Lead with that email, else a new Lead owned by "Guest". The website only links people; Customer, Address
+and Sales Order are created in the desk (phamos/phamos#1725), where a person confirms them. That is also why
+a website link may reuse an existing record: nothing of it is shown to the visitor.
 """
 
 import re
@@ -55,6 +58,20 @@ def lead_for_email(email):
 	if not email:
 		return None
 	return frappe.db.get_value("Lead", {"email_id": email}, "name")
+
+
+def customer_for_email(email):
+	"""The Customer of a Contact with this email (in the Contact or its email rows), or None."""
+	if not email:
+		return None
+	contact, email_row, link = frappe.qb.DocType("Contact"), frappe.qb.DocType("Contact Email"), frappe.qb.DocType("Dynamic Link")
+	rows = (frappe.qb.from_(link).join(contact).on(link.parent == contact.name)
+		.left_join(email_row).on((email_row.parent == contact.name) & (email_row.parenttype == "Contact"))
+		.select(link.link_name).distinct()
+		.where((link.parenttype == "Contact") & (link.link_doctype == "Customer")
+			& ((contact.email_id == email) | (email_row.email_id == email)))
+		.orderby(link.link_name).run())
+	return rows[0][0] if rows else None
 
 
 def suggest_customer_for_company(company_name, limit=5):
@@ -132,7 +149,7 @@ def get_or_create_campaign(event_doc):
 
 
 def create_lead(*, email, first_name, last_name="", company_name="", phone="", job_title="", salutation="",
-		campaign=None, ignore_permissions=False, lead_owner=None):
+		campaign=None, ignore_permissions=False, lead_owner=None, source=None):
 	lead = frappe.get_doc({
 		"doctype": "Lead",
 		"first_name": first_name or email.split("@")[0],
@@ -144,13 +161,48 @@ def create_lead(*, email, first_name, last_name="", company_name="", phone="", j
 		"job_title": job_title or None,
 		"salutation": salutation if salutation and frappe.db.exists("Salutation", salutation) else None,
 		"status": "Lead",
-		"source": ensure_lead_source(),
+		"source": source or ensure_lead_source(),
 		"campaign_name": campaign,
-		# None: ERPNext's default, the current user. The website passes "Guest" (ticketing.WEBSITE_LEAD_OWNER).
+		# None: ERPNext's default, the current user. The website passes WEBSITE_LEAD_OWNER.
 		**({"lead_owner": lead_owner} if lead_owner else {}),
 	})
 	lead.insert(ignore_permissions=ignore_permissions)
 	return lead.name
+
+
+# Leads from the website are owned by "Guest": the Lead Assignment Rule ("Based on Field lead_owner",
+# condition lead_owner != "Guest") leaves them alone, as it always did for the contact form (phamos/phamos#1718).
+WEBSITE_LEAD_OWNER = "Guest"
+
+
+def match_or_create_lead(*, email, first_name, last_name="", company_name="", phone="", campaign=None, source=None):
+	"""The one CRM step for everything that comes in from the website (phamos/phamos#1724).
+
+	1. The email belongs to a Contact of a Customer: that Customer (and the Contact).
+	2. Else a Lead with that email: that Lead (and its Contact, if any); a missing phone is filled in.
+	3. Else a new Lead owned by "Guest" (and the Contact ERPNext may create for it).
+
+	Returns {customer, lead, contact, created}. Runs in the visitor's session, so it ignores permissions.
+	"""
+	email = normalize_email(email, throw=False)
+	result = frappe._dict(customer=None, lead=None, contact=None, created=False)
+	if not email:
+		return result
+	result.contact = contact_for_email(email)
+	result.customer = customer_for_email(email)
+	if result.customer:
+		return result
+	result.lead = lead_for_email(email)
+	if result.lead:
+		if phone and not frappe.db.get_value("Lead", result.lead, "mobile_no"):
+			frappe.db.set_value("Lead", result.lead, "mobile_no", phone)
+		return result
+	result.lead = create_lead(email=email, first_name=first_name, last_name=last_name, company_name=company_name,
+		phone=phone, campaign=campaign, source=source, ignore_permissions=True, lead_owner=WEBSITE_LEAD_OWNER)
+	result.created = True
+	# ERPNext may have created the Lead's Contact (CRM Settings "Auto Creation of Contact").
+	result.contact = result.contact or contact_for_email(email)
+	return result
 
 
 def create_contact(*, email, first_name, last_name="", company_name="", phone="", job_title="", salutation="",

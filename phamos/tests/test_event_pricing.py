@@ -14,7 +14,7 @@ from frappe.utils import flt
 
 from phamos.marketing import billing, ticketing
 from phamos.patches.v1_0 import report_paid_events_without_tax_template
-from phamos.tests.marketing_fixtures import BILLING, CONTACT, as_guest, ensure_company, make_event
+from phamos.tests.marketing_fixtures import BILLING, CONTACT, as_guest, ensure_company, make_customer, make_event
 
 TWO_COMPANIONS = [{"full_name": "Max Mustermann", "email": ""}, {"full_name": "Moritz Mustermann", "email": ""}]
 
@@ -43,6 +43,13 @@ class TestEventPricing(FrappeTestCase):
 			return ticketing.register_attendees(event.name, CONTACT, attends=1, companions=TWO_COMPANIONS,
 				billing_data=BILLING, **kwargs)
 
+	def desk_order(self, event, ticket_order, confirmed_total):
+		"""The Sales Order the desk creates for a website order (phamos/phamos#1725), at the attendees' own price."""
+		attendees = [frappe.get_doc("Attendee", name) for name in
+			frappe.get_all("Attendee", filters={"ticket_order": ticket_order}, pluck="name", order_by="creation asc")]
+		return billing.create_sales_order(event, attendees, make_customer("Desk Pricing Kunde AG"), submit=True,
+			confirmed_total=confirmed_total)
+
 	# --- 1. one total --------------------------------------------------------------------------------
 
 	def test_net_prices_page_total_is_the_sales_order_total(self, enqueue):
@@ -52,7 +59,8 @@ class TestEventPricing(FrappeTestCase):
 		self.assertEqual(billing.order_total(pricing, 3), {"net_total": 30.03, "tax_total": 5.71, "total": 35.74})
 		self.assertEqual(ticketing.hold_seats(event, "hold-net-price-1", 3)["total"], 35.74)
 		result = self.order(event, expected_total=35.74)
-		so = frappe.get_doc("Sales Order", result["reference"])
+		self.assertEqual(frappe.db.get_value("Event Ticket Order", result["reference"], "confirmed_total"), 35.74)
+		so = self.desk_order(event, result["reference"], 35.74)
 		self.assertEqual(flt(so.grand_total, 2), 35.74)
 		self.assertTrue(so.disable_rounded_total)
 
@@ -61,17 +69,16 @@ class TestEventPricing(FrappeTestCase):
 		pricing = billing.get_ticket_pricing(event, 3)
 		self.assertEqual(billing.order_total(pricing, 3).total, 357.0)
 		result = self.order(event, expected_total=357)
-		self.assertEqual(flt(frappe.db.get_value("Sales Order", result["reference"], "grand_total"), 2), 357.0)
+		self.assertEqual(flt(self.desk_order(event, result["reference"], 357).grand_total, 2), 357.0)
 
 	def test_order_is_refused_when_erpnext_computes_another_total(self, enqueue):
+		# Since phamos/phamos#1724 the Sales Order is created in the desk; the check still guards it there.
 		event = make_event("Mismatch Event")
-		real = billing.order_total
-		with patch.object(billing, "order_total", lambda pricing, qty: frappe._dict(real(pricing, qty), total=1.0)), \
-				patch("frappe.log_error") as log_error, self.assertRaises(frappe.ValidationError):
-			self.order(event)
+		result = self.order(event)
+		with patch("frappe.log_error") as log_error, self.assertRaises(frappe.ValidationError):
+			self.desk_order(event, result["reference"], 1.0)
 		log_error.assert_called_once()
 		self.assertTrue(log_error.call_args.kwargs["defer_insert"])  # survives the rollback of the request
-		self.assertFalse([c for c in enqueue.call_args_list if c.args and "send_order_confirmation" in c.args[0]])
 
 	# --- 2. no ticket sale without an Item Tax Template ------------------------------------------------
 
