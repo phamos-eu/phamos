@@ -703,3 +703,24 @@ Ordered On,Bestellt am
 "Computed from the tickets' payment status.",Wird aus dem Zahlungsstatus der Tickets berechnet.
 "The Sales Order line rate: gross if the prices include tax, else net.","Der Positionspreis im Auftrag: brutto, wenn die Preise Steuer enthalten, sonst netto."
 The total the buyer saw and confirmed.,"Der Gesamtbetrag, den der Käufer gesehen und bestätigt hat."
+Create Sales Order,Auftrag erstellen
+Create Sales Invoice,Ausgangsrechnung erstellen
+Use Customer {0},Kunde {0} verwenden
+Convert Lead {0} into a Customer,Lead {0} in einen Kunden umwandeln
+Choose another Customer,Anderen Kunden wählen
+Create a new Customer from the billing data,Neuen Kunden aus den Rechnungsdaten anlegen
+Customers with a similar name: {0},Kunden mit ähnlichem Namen: {0}
+Sales Order {0} created,Auftrag {0} erstellt
+Sales Invoice {0} created,Ausgangsrechnung {0} erstellt
+Order Actions,Bestellaktionen
+Please select orders first.,Bitte zuerst Bestellungen auswählen.
+Choose the Customer for one order at a time.,Den Kunden bitte für jeweils eine Bestellung wählen.
+not booked ({0}),nicht gebucht ({0})
+choose the Customer in the order,Kunden in der Bestellung wählen
+{0} has no tickets to order.,{0} hat keine Tickets zu bestellen.
+Please choose a Customer.,Bitte einen Kunden wählen.
+The buyer of {0} is not linked to a Lead.,Der Käufer von {0} ist mit keinem Lead verknüpft.
+Unknown choice {0}.,Unbekannte Auswahl {0}.
+"Event Ticket Order {0} was ordered with the VAT ID {1}; the Customer keeps {2}.","Ticketbestellung {0} wurde mit der USt-IdNr. {1} bestellt; der Kunde behält {2}."
+Total differs from the confirmed total ({0} vs {1}): check the tax template,Gesamtbetrag weicht vom bestätigten Gesamtbetrag ab ({0} statt {1}): Steuervorlage prüfen
+Total differs,Gesamtbetrag weicht ab

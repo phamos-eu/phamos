@@ -4,8 +4,9 @@ Prices live on the event (``Marketing Content.ticket_prices``): rows such as "Ea
 for a quota) and "Regular". The first row whose window contains the order time and whose quota still
 covers the order wins; a sold-out or expired row falls through to the next (``select_price``).
 
-A website order is the customer's binding order ("Zahlungspflichtig bestellen"), so it becomes a
-submitted Sales Order right away. Every line is one ticket for one attendee, described as
+A website order is the customer's binding order ("Zahlungspflichtig bestellen"). It is stored as an Event
+Ticket Order with the price the buyer confirmed; the desk turns it into a submitted Sales Order at that price
+(phamos/phamos#1725). Every line is one ticket for one attendee, described as
 "<ticket> (<price>) – <name>": ERPNext rejects the same item twice on one document unless the
 descriptions differ, and the invoice shows who each ticket is for. Gross prices are entered as the line
 rate with tax rows "included in print rate", so a consumer pays exactly the advertised price.
@@ -157,6 +158,20 @@ def pricing_for_attendee(event_doc, attendee):
 	return _pricing(event_doc, own or select_price(event_doc, 1) or ladder[-1]), bool(own)
 
 
+def pricing_from_order(event_doc, order):
+	"""The price the buyer confirmed, from the Event Ticket Order (phamos/phamos#1725): its ticket type, rate,
+	gross or net, and Item Tax Template, never the event's current price table. Taxes and item come from the
+	event as for every order."""
+	event = frappe._dict(event_doc.as_dict())
+	event.item_tax_template = order.item_tax_template or event.item_tax_template
+	event.ticket_price_includes_tax = order.ticket_rate_includes_tax
+	if not event.item_tax_template:
+		frappe.throw(_("Event {0} has no Item Tax Template for its tickets.").format(event.title or event.name))
+	tax_rate = sum(flt(r.tax_rate) for r in tax_rows(event))
+	gross, net = _gross_net(order.ticket_rate, cint(order.ticket_rate_includes_tax), tax_rate)
+	return _pricing(event, frappe._dict(title=order.ticket_type, rate=flt(order.ticket_rate), gross=gross, net=net))
+
+
 def _pricing(event_doc, price):
 	item_code = event_doc.get("ticket_item")
 	taxes = tax_rows(event_doc)
@@ -238,10 +253,10 @@ def _append_lines(doc, priced):
 
 def create_sales_order(event_doc, attendees, customer, *, pricing=None, submit=False, contact=None, address=None,
 		email=None, lang=None, confirmed_total=None, ignore_permissions=False):
-	"""Sales Order with one line per attendee. Website orders (as the service user) and desk orders use it.
+	"""Sales Order with one line per attendee, created in the desk.
 
-	``pricing`` is the price the buyer saw and confirmed (website orders). Without it (desk orders) every
-	attendee is billed at their own price row (``pricing_for_attendee``).
+	``pricing`` is the price the buyer confirmed (``pricing_from_order``, Event Ticket Orders). Without it
+	(attendees added by hand, old orders) every attendee is billed at their own price row (``pricing_for_attendee``).
 	``confirmed_total``: the total the buyer confirmed; the order is refused if ERPNext computes another one.
 	``ignore_permissions``: only for website orders (service user); desk orders run with the user's rights.
 	Attendees get ``sales_order`` / ``sales_order_item`` / ``billing_customer`` / ``order_reference``.
@@ -281,13 +296,13 @@ def create_sales_order(event_doc, attendees, customer, *, pricing=None, submit=F
 	so.flags.ignore_permissions = ignore_permissions
 	so.insert()
 	if confirmed_total is not None and abs(flt(so.grand_total) - flt(confirmed_total)) >= 0.005:
-		# Must never happen once order_total matches ERPNext; if it does, nobody pays another amount than
-		# confirmed. Deferred, so the entry survives the rollback of this request.
+		# Must never happen once order_total matches ERPNext (e.g. the tax template was changed after the order);
+		# if it does, nobody pays another amount than confirmed. Deferred, so the entry survives the rollback.
 		frappe.log_error(title=_("Event order total differs from the confirmed total"),
 			message=f"Event {event_doc.name}: confirmed {confirmed_total}, Sales Order {so.grand_total}",
 			reference_doctype="Marketing Content", reference_name=event_doc.name, defer_insert=True)
-		frappe.throw(_("The ticket price has changed in the meantime. Please check your order again."),
-			title=_("Price changed"))
+		frappe.throw(_("Total differs from the confirmed total ({0} vs {1}): check the tax template").format(
+			flt(so.grand_total, 2), flt(confirmed_total, 2)), title=_("Total differs"))
 	for (att, att_pricing), row in zip(priced, so.items):
 		values = {"sales_order": so.name, "sales_order_item": row.name, "billing_customer": customer,
 			"order_reference": att.order_reference or so.name, "payment_status": "Ordered" if submit else "Pending"}
