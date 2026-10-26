@@ -34,6 +34,7 @@
   "opportunity",
   "section_order",
   "order_reference",
+  "ticket_order",
   "order_key",
   "is_buyer",
   "billing_customer",
@@ -255,6 +256,15 @@
    "description": "Groups the attendees of one order: the Quotation for website orders, a booking number for free events, the order id for imports."
   },
   {
+   "fieldname": "ticket_order",
+   "fieldtype": "Link",
+   "label": "Ticket Order",
+   "options": "Event Ticket Order",
+   "read_only": 1,
+   "search_index": 1,
+   "description": "The order this ticket belongs to (orders since phamos/phamos#1717; older orders only have the Order Reference)."
+  },
+  {
    "fieldname": "order_key",
    "fieldtype": "Data",
    "label": "Order Key",
@@ -460,7 +470,7 @@
   }
  ],
  "links": [],
- "modified": "2026-10-24 12:00:00.000000",
+ "modified": "2026-10-26 12:00:00.000000",
  "modified_by": "Administrator",
  "module": "Marketing",
  "name": "Attendee",
