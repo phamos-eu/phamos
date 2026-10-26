@@ -294,6 +294,7 @@ def create_sales_order(event_doc, attendees, customer, *, pricing=None, submit=F
 		if not keeps_type[att.name]:
 			values["ticket_type"] = att_pricing.price_title  # an attendee's own price row is never overwritten
 		frappe.db.set_value("Attendee", att.name, values, update_modified=False)
+	_refresh_orders([att.name for att, _pricing in priced])
 	if submit:
 		so.submit()
 	return so
@@ -357,6 +358,7 @@ def refresh_payment_status(lines):
 		invoice, status = state.get(att.sales_order_item, (None, "Ordered"))
 		frappe.db.set_value("Attendee", att.name, {"sales_invoice": invoice, "payment_status": status},
 			update_modified=False)
+	_refresh_orders([a.name for a in attendees])
 
 
 # --- hooks ----------------------------------------------------------------------------------------------
@@ -369,6 +371,14 @@ def _attendees(filters):
 def _set(names, values):
 	for name in names:
 		frappe.db.set_value("Attendee", name, values, update_modified=False)
+	_refresh_orders(names)
+
+
+def _refresh_orders(names):
+	"""Billing writes the tickets with db.set_value (no document hooks): refresh their orders' status here."""
+	from phamos.marketing.doctype.event_ticket_order.event_ticket_order import refresh_for_attendees
+
+	refresh_for_attendees(names)
 
 
 
@@ -409,10 +419,12 @@ def on_sales_order_submit(doc, method=None):
 
 
 def on_sales_order_cancel(doc, method=None):
-	for att in frappe.get_all("Attendee", filters={"sales_order": doc.name}, fields=["name"]):
-		frappe.db.set_value("Attendee", att.name, {"sales_order": None, "sales_order_item": None,
+	names = _attendees({"sales_order": doc.name})
+	for name in names:
+		frappe.db.set_value("Attendee", name, {"sales_order": None, "sales_order_item": None,
 			"sales_invoice": None, "payment_status": "Pending"},
 			update_modified=False)
+	_refresh_orders(names)
 
 
 def on_sales_invoice_change(doc, method=None):
