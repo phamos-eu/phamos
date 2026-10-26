@@ -77,7 +77,7 @@ unit_tests:
 
     # Bench with Frappe, ERPNext and HRMS; assets are not needed for tests.
     - bench init --frappe-branch "$FRAPPE_BRANCH" --python "$PYTHON_VERSION" --skip-redis-config-generation --skip-assets "$BENCH_DIR"
-    - ./"$(basename "$BENCH_DIR")"/env/bin/python --version 2>/dev/null || "$BENCH_DIR/env/bin/python" --version
+    - "$BENCH_DIR/env/bin/python" --version
     - cd "$BENCH_DIR"
     - bench set-config -g db_host mariadb
     - bench set-config -g db_port 3306
