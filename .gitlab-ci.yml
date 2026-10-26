@@ -1,12 +1,142 @@
-# Reviews MRs targeting version-15 with Claude and posts findings as an MR comment.
-# Needs CI/CD variables ANTHROPIC_API_KEY and GITLAB_API_TOKEN; set AI_REVIEW_ENABLED=false to disable.
+# GitLab CI for phamos.
+#
+# unit_tests
+#   Builds a Frappe v15 bench (ERPNext, HRMS, phamos) on fresh MariaDB / Redis
+#   services and runs the phamos test modules. GitLab counterpart of
+#   .github/workflows/foundation.yml.
+#   - TEST_MODULES: space-separated test modules, or "all" for the whole app.
+#     Override it for one run in "Run pipeline".
+#   - Set UNIT_TESTS_ENABLED=false (CI/CD variable) to turn the job off.
+#   - Runs on the "hetzner" runner (Docker executor, arm64), so every image
+#     below must have an arm64 build.
+#
+# ai_code_review
+#   Reviews MRs targeting version-15 with Claude and posts findings as an MR
+#   comment. Needs CI/CD variables ANTHROPIC_API_KEY and GITLAB_API_TOKEN; set
+#   AI_REVIEW_ENABLED=false to disable.
+
+workflow:
+  rules:
+    # One pipeline per change: an MR pipeline when the branch has an open MR,
+    # a branch pipeline otherwise.
+    - if: $CI_PIPELINE_SOURCE == "merge_request_event"
+    - if: $CI_COMMIT_BRANCH && $CI_OPEN_MERGE_REQUESTS
+      when: never
+    - if: $CI_COMMIT_BRANCH
 
 stages:
+  - test
   - ai-review
+
+unit_tests:
+  stage: test
+  image: frappe/bench:latest
+  tags: [hetzner]
+  timeout: 90 minutes
+  interruptible: true
+  rules:
+    - if: '$UNIT_TESTS_ENABLED == "false"'
+      when: never
+    - if: '$CI_PIPELINE_SOURCE == "merge_request_event" && $CI_MERGE_REQUEST_TARGET_BRANCH_NAME =~ /^(develop|version-15|release\/.+)$/'
+    - if: '$CI_PIPELINE_SOURCE == "push" && $CI_COMMIT_BRANCH =~ /^(develop|version-15)$/'
+    - if: '$CI_PIPELINE_SOURCE == "web"'
+  services:
+    - name: mariadb:10.6
+      alias: mariadb
+      command: ["--character-set-server=utf8mb4", "--collation-server=utf8mb4_unicode_ci"]
+    - name: redis:7-alpine
+      alias: redis-cache
+    - name: redis:7-alpine
+      alias: redis-queue
+  variables:
+    # Read by the mariadb service container.
+    MARIADB_ROOT_PASSWORD: root
+    MYSQL_ROOT_PASSWORD: root
+    FRAPPE_BRANCH: version-15
+    BENCH_DIR: /home/frappe/frappe-bench
+    SITE: test.localhost
+    # Lets `bench run-tests` run without allow_tests in the site config.
+    CI: "true"
+    # Same modules as .github/workflows/foundation.yml.
+    TEST_MODULES: >-
+      phamos.tests.test_api
+      phamos.okr_addon.doctype.okr.test_okr
+      phamos.okr_addon.doctype.kr.test_kr
+      phamos.okr_addon.doctype.okr_team.test_okr_team
+      phamos.tests.test_marketing_attendee
+      phamos.tests.test_marketing_crm
+      phamos.tests.test_marketing_ticketing
+      phamos.tests.test_marketing_billing
+      phamos.tests.test_marketing_patches
+      phamos.tests.test_web_profile_events
+      phamos.tests.test_web_page_editing
+  script:
+    - bench --version
+
+    # Bench with Frappe, ERPNext and HRMS; assets are not needed for tests.
+    - bench init --frappe-branch "$FRAPPE_BRANCH" --skip-redis-config-generation --skip-assets "$BENCH_DIR"
+    - cd "$BENCH_DIR"
+    - bench set-config -g db_host mariadb
+    - bench set-config -g db_port 3306
+    - bench set-config -g redis_cache redis://redis-cache:6379
+    - bench set-config -g redis_queue redis://redis-queue:6379
+    - bench set-config -g redis_socketio redis://redis-queue:6379
+    - bench get-app --branch "$FRAPPE_BRANCH" --skip-assets erpnext
+    - bench get-app --branch "$FRAPPE_BRANCH" --skip-assets hrms
+
+    # phamos from this checkout.
+    - cp -r "$CI_PROJECT_DIR" apps/phamos
+    - ./env/bin/pip install -e apps/phamos
+    - |
+      # apps.txt may not end with a newline.
+      if [ -s sites/apps.txt ] && [ -n "$(tail -c1 sites/apps.txt)" ]; then echo >> sites/apps.txt; fi
+      grep -qxF phamos sites/apps.txt || echo phamos >> sites/apps.txt
+
+    # Test site.
+    - bench new-site "$SITE" --db-root-password root --mariadb-root-username root --mariadb-root-password root --admin-password admin --no-mariadb-socket
+    - bench --site "$SITE" install-app erpnext
+    - bench --site "$SITE" install-app hrms
+    - bench --site "$SITE" install-app phamos
+    - bench --site "$SITE" set-config allow_tests true
+    - |
+      for app in erpnext hrms phamos; do
+        bench --site "$SITE" list-apps | grep -q "$app" || { echo "Missing app: $app"; exit 1; }
+      done
+      bench --site "$SITE" mariadb -e "SELECT 1;" > /dev/null
+
+    # Run every module, even after a failure, so the report shows all results.
+    - |
+      mkdir -p "$CI_PROJECT_DIR/test-results"
+      if [ "$TEST_MODULES" = "all" ]; then
+        bench --site "$SITE" run-tests --app phamos --junit-xml-output "$CI_PROJECT_DIR/test-results/phamos.xml"
+      else
+        failed=""
+        for module in $TEST_MODULES; do
+          echo "=== $module"
+          bench --site "$SITE" run-tests --app phamos --module "$module" \
+            --junit-xml-output "$CI_PROJECT_DIR/test-results/$module.xml" || failed="$failed $module"
+        done
+        if [ -n "$failed" ]; then
+          echo "Failed test modules:$failed"
+          exit 1
+        fi
+      fi
+  after_script:
+    - mkdir -p test-results/logs
+    - cp -r "$BENCH_DIR/logs" test-results/logs/bench 2>/dev/null || true
+    - cp -r "$BENCH_DIR/sites/$SITE/logs" test-results/logs/site 2>/dev/null || true
+  artifacts:
+    when: always
+    expire_in: 7 days
+    paths:
+      - test-results/
+    reports:
+      junit: test-results/*.xml
 
 ai_code_review:
   stage: ai-review
   image: python:3.10-slim
+  needs: []
   rules:
     - if: '$AI_REVIEW_ENABLED == "false"'
       when: never
