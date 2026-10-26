@@ -41,8 +41,8 @@ unit_tests:
     - if: '$CI_PIPELINE_SOURCE == "push" && $CI_COMMIT_BRANCH =~ /^(develop|version-15)$/'
     - if: '$CI_PIPELINE_SOURCE == "web"'
   services:
+    # Reachable as "mariadb", the alias GitLab derives from the image name.
     - name: mariadb:10.6
-      alias: mariadb
       command: ["--character-set-server=utf8mb4", "--collation-server=utf8mb4_unicode_ci"]
     - name: redis:7-alpine
       alias: redis-cache
@@ -53,6 +53,8 @@ unit_tests:
     MARIADB_ROOT_PASSWORD: root
     MYSQL_ROOT_PASSWORD: root
     FRAPPE_BRANCH: version-15
+    # The image's default Python can be newer than phamos supports (<3.14).
+    PYTHON_VERSION: "3.11"
     BENCH_DIR: /home/frappe/frappe-bench
     SITE: test.localhost
     # Lets `bench run-tests` run without allow_tests in the site config.
@@ -74,7 +76,8 @@ unit_tests:
     - bench --version
 
     # Bench with Frappe, ERPNext and HRMS; assets are not needed for tests.
-    - bench init --frappe-branch "$FRAPPE_BRANCH" --skip-redis-config-generation --skip-assets "$BENCH_DIR"
+    - bench init --frappe-branch "$FRAPPE_BRANCH" --python "$PYTHON_VERSION" --skip-redis-config-generation --skip-assets "$BENCH_DIR"
+    - ./"$(basename "$BENCH_DIR")"/env/bin/python --version 2>/dev/null || "$BENCH_DIR/env/bin/python" --version
     - cd "$BENCH_DIR"
     - bench set-config -g db_host mariadb
     - bench set-config -g db_port 3306
