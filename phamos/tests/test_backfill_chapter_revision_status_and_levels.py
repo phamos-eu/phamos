@@ -19,11 +19,12 @@ FIELDS = ["status", "current_level", "target_level"]
 
 
 def _as_before_migration(revision):
-	"""What migrate leaves on a revision created before the fields existed."""
+	"""What migrate leaves on a revision created before the fields existed
+	(Int columns are NOT NULL with default 0)."""
 	frappe.db.set_value(
 		REVISION,
 		revision,
-		{"status": "Draft", "current_level": None, "target_level": None},
+		{"status": "Draft", "current_level": 0, "target_level": 0},
 		update_modified=False,
 	)
 
