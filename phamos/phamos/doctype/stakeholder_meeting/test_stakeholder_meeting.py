@@ -10,11 +10,35 @@ from phamos.phamos.doctype.implementation_chapter.implementation_chapter import 
 )
 
 
+def make_customer_group():
+	"""A leaf Customer Group: on a fresh site (no setup wizard) the default
+	is "All Customer Groups", a group, which a Customer cannot use."""
+	group = "_Test Stakeholder Customer Group"
+	if not frappe.db.exists("Customer Group", group):
+		frappe.get_doc(
+			{
+				"doctype": "Customer Group",
+				"customer_group_name": group,
+				"parent_customer_group": frappe.db.get_value(
+					"Customer Group", {"is_group": 1, "parent_customer_group": ("in", ("", None))}
+				),
+				"is_group": 0,
+			}
+		).insert(ignore_permissions=True)
+	return group
+
+
 def make_implementation():
 	customer = frappe.db.get_value("Customer", {"customer_name": "_Test Stakeholder Customer"})
 	if not customer:
 		customer = (
-			frappe.get_doc({"doctype": "Customer", "customer_name": "_Test Stakeholder Customer"})
+			frappe.get_doc(
+				{
+					"doctype": "Customer",
+					"customer_name": "_Test Stakeholder Customer",
+					"customer_group": make_customer_group(),
+				}
+			)
 			.insert(ignore_permissions=True)
 			.name
 		)
