@@ -51,8 +51,8 @@ class TestTicketingRole(FrappeTestCase):
 			order = ticketing.register_attendees(paid.name, CONTACT, companions=[],
 				billing_data={**BILLING, "is_company": 1, "company": "Role Test GmbH"})
 			booking = ticketing.register_attendees(free.name, {**CONTACT, "email": "free.role@ticket.example"}, companions=[])
-		self.assertEqual(frappe.db.get_value("Sales Order", order["reference"], "docstatus"), 1)
-		self.assertEqual(booking["reference_doctype"], "Attendee")
+		self.assertEqual(frappe.db.get_value("Event Ticket Order", order["reference"], "status"), "Booked")
+		self.assertEqual(booking["reference_doctype"], "Event Ticket Order")
 
 	def copy_with_role(self, doctype):
 		"""The state before #1708: the standard permissions copied, plus the role's read row."""
