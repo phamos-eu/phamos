@@ -35,6 +35,14 @@ class Attendee(Document):
 		self.stamp_check_in()
 		self.check_duplicate()
 
+	def on_update(self):
+		# The order's status follows its tickets (phamos/phamos#1723).
+		if self.ticket_order and (self.has_value_changed("status") or self.has_value_changed("payment_status")
+				or self.is_new()):
+			from phamos.marketing.doctype.event_ticket_order.event_ticket_order import refresh_status
+
+			refresh_status(self.ticket_order)
+
 	def has_order(self):
 		return bool(self.sales_order or self.sales_invoice)
 

@@ -689,3 +689,17 @@ Credited,Gutgeschrieben
 Customer {0} does not exist.,Kunde {0} existiert nicht.
 {0}: no ticket price can be found for event {1}.,{0}: Für die Veranstaltung {1} ist kein Ticketpreis hinterlegt.
 Ordered while logged in as {0}.,Bestellt als angemeldeter Benutzer {0}.
+Event Ticket Order,Ticketbestellung
+Ticket Order,Ticketbestellung
+Booked,Gebucht
+Buyer,Käufer
+Buyer Attends,Käufer nimmt teil
+Price as Confirmed,Bestätigter Preis
+Rate per Ticket,Preis pro Ticket
+Rate Includes Tax,Preis inkl. Steuer
+Confirmed Total,Bestätigter Gesamtbetrag
+Sales Order and Invoice,Auftrag und Rechnung
+Ordered On,Bestellt am
+"Computed from the tickets' payment status.",Wird aus dem Zahlungsstatus der Tickets berechnet.
+"The Sales Order line rate: gross if the prices include tax, else net.","Der Positionspreis im Auftrag: brutto, wenn die Preise Steuer enthalten, sonst netto."
+The total the buyer saw and confirmed.,"Der Gesamtbetrag, den der Käufer gesehen und bestätigt hat."
