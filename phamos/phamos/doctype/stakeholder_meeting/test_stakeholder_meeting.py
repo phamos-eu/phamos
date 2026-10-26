@@ -19,8 +19,9 @@ def make_customer_group():
 			{
 				"doctype": "Customer Group",
 				"customer_group_name": group,
+				# The tree root, usually "All Customer Groups".
 				"parent_customer_group": frappe.db.get_value(
-					"Customer Group", {"is_group": 1, "parent_customer_group": ("in", ("", None))}
+					"Customer Group", {"is_group": 1}, "name", order_by="lft asc"
 				),
 				"is_group": 0,
 			}
