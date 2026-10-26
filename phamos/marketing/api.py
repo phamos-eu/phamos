@@ -1,4 +1,5 @@
-"""Desk actions on Attendees (list bulk actions and form buttons). POST only, permission-checked.
+"""Desk actions on Attendees and Event Ticket Orders (list bulk actions and form buttons). POST only,
+permission-checked.
 
 Every action checks each Attendee it changes and runs with the user's own rights on the records it creates
 (phamos/phamos#1709). Rights per action, so staff roles can be checked:
@@ -9,7 +10,9 @@ Every action checks each Attendee it changes and runs with the user's own rights
 | ``link_to_crm`` | Attendee write (each row); with create: Contact create, Lead create if a Lead is made; Contact write to add links; with ``customer``: Customer read (that one) |
 | ``create_customers`` | Attendee write (each row), Customer create, Contact write |
 | ``create_sales_orders`` | Attendee write (each row), Sales Order create (+ submit), Customer read (the party) |
-| ``create_sales_invoices`` | Attendee write (each row of those orders), Sales Invoice create (+ submit) |
+| ``order_customer_proposal`` | Event Ticket Order read (that one) |
+| ``create_order_sales_orders`` | Event Ticket Order write and Attendee write (each), Sales Order create and submit; "use": Customer read (that one), Lead write if the buyer's Lead gets linked; "convert" / "new": Customer create; with billing data: Contact write, Address create, Customer write to set a missing VAT ID |
+| ``create_sales_invoices`` | Attendee write (each row of those orders), Sales Invoice create (+ submit); with ``ticket_orders``: Event Ticket Order read (each) |
 | ``create_opportunities`` | Attendee write (each row), Opportunity create |
 | ``set_attendance`` | Attendee write (each row) |
 | ``send_ticket`` | Attendee write (that row) |
@@ -131,7 +134,79 @@ def create_sales_orders(names, customer=None, submit=0):
 
 
 @frappe.whitelist(methods=["POST"])
-def create_sales_invoices(names=None, sales_orders=None, submit=0):
+def order_customer_proposal(name):
+	"""What the "Create Sales Order" dialog proposes for an Event Ticket Order (``crm.order_customer_proposal``)."""
+	order = frappe.get_doc("Event Ticket Order", name)
+	order.check_permission("read")
+	proposal = crm.order_customer_proposal(order)
+	if proposal.customer:
+		proposal.customer_name = frappe.db.get_value("Customer", proposal.customer, "customer_name")
+	if proposal.lead:
+		proposal.lead_name = frappe.db.get_value("Lead", proposal.lead, "lead_name")
+	return proposal
+
+
+@frappe.whitelist(methods=["POST"])
+def create_order_sales_orders(names, mode=None, customer=None):
+	"""Customer and submitted Sales Order for booked Event Ticket Orders, at the price the buyer confirmed
+	(phamos/phamos#1725).
+
+	One order (form button): ``mode`` and ``customer`` as chosen in the dialog ("use" + customer, "convert",
+	"new"). Several orders (list bulk action, no ``mode``): each order takes its proposal, but only when it is
+	unambiguous (``crm.order_customer_proposal``); every other order is skipped and listed. Orders that are
+	not Booked are skipped too. A total that differs from the confirmed one stops the whole action (rollback).
+	"""
+	orders = [frappe.get_doc("Event Ticket Order", name) for name in _names(names)]
+	for order in orders:
+		order.check_permission("write")
+	if mode and len(orders) > 1:
+		frappe.throw(_("Choose the Customer for one order at a time."))
+	_require("Sales Order", "create")
+	_require("Sales Order", "submit")
+	created, skipped = [], []
+	for order in orders:
+		if order.status != "Booked":
+			skipped.append({"order": order.name, "reason": _("not booked ({0})").format(_(order.status))})
+			continue
+		order_mode, order_customer = mode, customer
+		if not mode:
+			proposal = crm.order_customer_proposal(order)
+			if not proposal.unambiguous:
+				skipped.append({"order": order.name, "reason": _("choose the Customer in the order")})
+				continue
+			order_mode, order_customer = proposal.action, proposal.customer
+		created.append(_order_sales_order(order, order_mode, order_customer))
+	return {"sales_orders": created, "skipped": skipped}
+
+
+def _order_sales_order(order, mode, customer):
+	if mode == "use":
+		if not customer:
+			frappe.throw(_("Please choose a Customer."))
+		_readable_customer(customer)
+	else:
+		_require("Customer", "create")
+	tickets = [frappe.get_doc("Attendee", name) for name in frappe.get_all("Attendee", filters={
+		"ticket_order": order.name, "status": ["!=", "Cancelled"], "sales_order": ["is", "not set"]},
+		pluck="name", order_by="is_buyer desc, creation asc")]
+	if not tickets:
+		frappe.throw(_("{0} has no tickets to order.").format(order.name))
+	for doc in tickets:
+		doc.check_permission("write")
+	customer = crm.customer_for_order(order, mode, customer)
+	contact, address = crm.apply_billing_to_customer(order, customer)
+	event = frappe.get_doc("Marketing Content", order.event)
+	pricing = billing.pricing_from_order(event, order)
+	# The buyer confirmed the total of all tickets; with tickets cancelled since, it is the same price for fewer.
+	confirmed = order.confirmed_total if len(tickets) == order.quantity else billing.order_total(pricing, len(tickets)).total
+	so = billing.create_sales_order(event, tickets, customer, pricing=pricing, submit=True, contact=contact,
+		address=address, email=order.billing_email or order.buyer_email, lang=order.language,
+		confirmed_total=confirmed)  # with the user's own rights
+	return so.name
+
+
+@frappe.whitelist(methods=["POST"])
+def create_sales_invoices(names=None, sales_orders=None, submit=0, ticket_orders=None):
 	_require("Sales Invoice", "create")
 	submit = frappe.utils.cint(submit)
 	if submit:
@@ -139,6 +214,11 @@ def create_sales_invoices(names=None, sales_orders=None, submit=0):
 	orders = json.loads(sales_orders) if isinstance(sales_orders, str) else (sales_orders or [])
 	if names:
 		orders += [d.sales_order for d in _attendees_for(names) if d.sales_order and not d.sales_invoice]
+	if ticket_orders:
+		for order in _names(ticket_orders):
+			frappe.has_permission("Event Ticket Order", "read", order, throw=True)
+			orders += frappe.get_all("Attendee", filters={"ticket_order": order, "sales_order": ["is", "set"],
+				"sales_invoice": ["is", "not set"]}, pluck="sales_order", distinct=True)
 	invoices, skipped = [], []
 	for so in dict.fromkeys(orders):
 		# Only event orders, and only with write on each of their attendees.

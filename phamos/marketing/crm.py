@@ -6,9 +6,7 @@ Rules (phamos/phamos#1169):
 2. Else a Lead with the email exists: reuse it (a Converted Lead brings its Customer).
 3. Else, when allowed, create a Lead (source "Event", the event's Campaign) and its Contact.
 
-Paid website orders create the buyer's Customer directly (``ensure_customer``): the click on
-"Zahlungspflichtig bestellen" makes them a customer. ``resolve_party`` itself never creates a Customer.
-A company name that matches a Customer without an email link is only a hint (``crm_status`` "Needs
+``resolve_party`` never creates a Customer. A company name that matches a Customer without an email link is only a hint (``crm_status`` "Needs
 Review"): a person decides, so no wrong Customer is reused.
 
 Rules 1 and 2 apply to verified emails only (Desk, ``link_attendee``).
@@ -62,8 +60,14 @@ def lead_for_email(email):
 
 def customer_for_email(email):
 	"""The Customer of a Contact with this email (in the Contact or its email rows), or None."""
+	customers = customers_for_email(email)
+	return customers[0] if customers else None
+
+
+def customers_for_email(email):
+	"""All Customers of Contacts with this email, sorted by name."""
 	if not email:
-		return None
+		return []
 	contact, email_row, link = frappe.qb.DocType("Contact"), frappe.qb.DocType("Contact Email"), frappe.qb.DocType("Dynamic Link")
 	rows = (frappe.qb.from_(link).join(contact).on(link.parent == contact.name)
 		.left_join(email_row).on((email_row.parent == contact.name) & (email_row.parenttype == "Contact"))
@@ -71,7 +75,7 @@ def customer_for_email(email):
 		.where((link.parenttype == "Contact") & (link.link_doctype == "Customer")
 			& ((contact.email_id == email) | (email_row.email_id == email)))
 		.orderby(link.link_name).run())
-	return rows[0][0] if rows else None
+	return [row[0] for row in rows]
 
 
 def suggest_customer_for_company(company_name, limit=5):
@@ -357,64 +361,162 @@ def ensure_customer_for_order(buyer, group=(), ignore_permissions=False):
 	return customer.name
 
 
-def ensure_customer(buyer, event=None, lang=None, ignore_permissions=False):
-	"""The Customer that pays a website order, with its Contact and billing Address.
-
-	``buyer``: first_name, last_name, email, phone, company_name, is_company, vat_id, address_line1/2,
-	postcode, city, country. A website order is anonymous: anyone can type any email address. So it never
-	reuses an existing Customer, Contact or Address (that would let a stranger order on a known customer's
-	account and read its stored address and VAT ID in the confirmation). It always creates a Customer –
-	type Company with a company name, else Individual – with its own Contact and the billing Address as
-	typed. When the email or the company name matches an existing Customer, the new one is flagged for
-	review so a person can merge them (rename into the existing Customer). Buyers get no Lead.
-
-	The Customer gets no email/phone/address fields of its own, so ERPNext does not create a second
-	Contact or Address (customer.py create_primary_contact / create_primary_address).
-
-	Returns {customer, contact, address, created, review}; ``review`` names the existing Customer the new
-	one possibly duplicates.
-	"""
-	found = find_party(buyer.email, buyer.company_name if buyer.is_company else None)
-	result = frappe._dict(customer=None, contact=None, address=None, created=False,
-		review=found.customer or found.company_match or (found.customers[0] if found.customers else None))
-	settings = frappe.db.get_singles_dict("Selling Settings")
-	customer = frappe.get_doc({
-		"doctype": "Customer",
-		"customer_name": (buyer.company_name if buyer.is_company else join_name(buyer.first_name, buyer.last_name))[:140],
-		"customer_type": "Company" if buyer.is_company else "Individual",
-		"customer_group": _leaf("Customer Group", settings.get("customer_group")),
-		"territory": _leaf("Territory", settings.get("territory")),
-		"tax_id": buyer.vat_id or None,
-		"language": lang if lang in ("de", "en") else None,
-	})
-	customer.insert(ignore_permissions=ignore_permissions)
-	result.customer, result.created = customer.name, True
-	# Always a Contact of its own: an existing Contact with this email is never touched.
-	result.contact = create_contact(email=buyer.email, first_name=buyer.first_name, last_name=buyer.last_name,
-		company_name=buyer.company_name, phone=buyer.phone, links=[("Customer", customer.name)],
-		ignore_permissions=ignore_permissions)
-	if buyer.address_line1:
-		result.address = create_address(title=_address_title(buyer), address_line1=buyer.address_line1,
-			address_line2=buyer.address_line2, city=buyer.city, pincode=buyer.postcode, country=buyer.country,
-			email=buyer.email, phone=buyer.phone, links=[("Customer", customer.name)],
-			ignore_permissions=ignore_permissions)
-	frappe.db.set_value("Customer", customer.name, {"customer_primary_contact": result.contact,
-		"customer_primary_address": result.address}, update_modified=False)
-	if result.review:
-		customer.add_comment("Comment", _("Possible duplicate of Customer {0}: created by a website order with the same "
-			"email address or company name. Website orders never use an existing Customer, because the email "
-			"address is not verified. Merge by renaming if it is the same customer.").format(result.review))
-	return result
-
-
-def _address_title(buyer):
-	return buyer.company_name or join_name(buyer.first_name, buyer.last_name) or buyer.email
-
-
-
 def _leaf(doctype, preferred):
 	"""``preferred`` when it is a leaf (ERPNext refuses group nodes), else the first leaf."""
 	if preferred and not frappe.db.get_value(doctype, preferred, "is_group"):
 		return preferred
 	return frappe.db.get_value(doctype, {"is_group": 0}, "name", order_by="lft asc")
 
+
+
+# --- desk: the Customer of an Event Ticket Order (phamos/phamos#1725) ------------------------------------
+# Everything below runs with the desk user's own rights: a person chose the Customer in the dialog.
+
+
+def order_customer_proposal(order):
+	"""What "Create Sales Order" proposes for an Event Ticket Order, following the buyer's link (#1724).
+
+	``action``: "use" (the buyer is linked to a Customer, directly or through a converted Lead), "convert" (the
+	buyer is linked to a Lead: convert it) or "choose" (neither: a person chooses). ``unambiguous`` lets the bulk
+	action go ahead without asking: the buyer's email belongs to exactly one Customer, or the buyer is a Lead
+	whose company name matches no Customer (``matches``).
+	"""
+	lead_customer = order.lead and (frappe.db.get_value("Lead", order.lead, "customer")
+		or frappe.db.get_value("Customer", {"lead_name": order.lead}, "name"))
+	customer = order.customer or lead_customer
+	company = _order_company(order) or (order.lead and frappe.db.get_value("Lead", order.lead, "company_name"))
+	matches = suggest_customer_for_company(company) if company and not customer else []
+	if customer:
+		action = "use"
+		unambiguous = bool(lead_customer) or len(customers_for_email(order.buyer_email)) <= 1
+	elif order.lead:
+		action, unambiguous = "convert", not matches
+	else:
+		action, unambiguous = "choose", False
+	return frappe._dict(action=action, customer=customer, lead=order.lead, matches=matches, unambiguous=unambiguous)
+
+
+def customer_for_order(order, mode, customer=None):
+	"""The Customer that pays an Event Ticket Order.
+
+	``mode``: "use" an existing ``customer`` (the buyer's Lead, if any, is linked to it and Converted),
+	"convert" the buyer's Lead the ERPNext way (its Contacts and Addresses move to the new Customer), or "new":
+	a Customer from the billing data, the buyer's Contact linked to it as well.
+	"""
+	if mode == "use":
+		if not customer:
+			frappe.throw(_("Please choose a Customer."))
+		if order.lead:
+			_link_lead(order.lead, customer)
+		return customer
+	if mode == "convert":
+		if not order.lead:
+			frappe.throw(_("The buyer of {0} is not linked to a Lead.").format(order.name))
+		return convert_lead(order.lead, _order_customer_name(order), _order_customer_type(order), order.billing_vat_id,
+			order.language)
+	if mode == "new":
+		settings = frappe.db.get_singles_dict("Selling Settings")
+		doc = frappe.get_doc({
+			"doctype": "Customer",
+			"customer_name": _order_customer_name(order),
+			"customer_type": _order_customer_type(order),
+			"customer_group": _leaf("Customer Group", settings.get("customer_group")),
+			"territory": _leaf("Territory", settings.get("territory")),
+			"tax_id": order.billing_vat_id or None,
+			"language": order.language or None,
+		}).insert()
+		return doc.name
+	frappe.throw(_("Unknown choice {0}.").format(mode))
+
+
+def _order_company(order):
+	return order.billing_company if order.billing_is_company else None
+
+
+def _order_customer_type(order):
+	return "Company" if _order_company(order) else "Individual"
+
+
+def _order_customer_name(order):
+	return (_order_company(order) or order.billing_name or order.buyer_name or order.buyer_email)[:140]
+
+
+def convert_lead(lead, customer_name, customer_type, tax_id=None, language=None):
+	"""ERPNext's Lead → Customer: the Customer gets ``lead_name``, on save ERPNext moves the Lead's Contacts and
+	Addresses to it and sets the Lead to Converted. A Lead converted before keeps its Customer."""
+	from erpnext.crm.doctype.lead.lead import _make_customer
+
+	existing = frappe.db.get_value("Customer", {"lead_name": lead})
+	if existing:
+		return existing
+	customer = _make_customer(lead)
+	customer.customer_name, customer.customer_type = customer_name, customer_type
+	customer.customer_group = _leaf("Customer Group", customer.customer_group)
+	customer.territory = _leaf("Territory", customer.get("territory") or
+		frappe.db.get_single_value("Selling Settings", "territory"))
+	if tax_id:
+		customer.tax_id = tax_id
+	if language:
+		customer.language = language
+	customer.insert()
+	return customer.name
+
+
+def _link_lead(lead, customer):
+	"""A Lead whose person buys for an existing Customer: linked to it and Converted, as ERPNext does on
+	conversion. A Lead that already has a Customer is left alone."""
+	if frappe.db.get_value("Lead", lead, "customer"):
+		return
+	frappe.has_permission("Lead", "write", lead, throw=True)
+	frappe.db.set_value("Lead", lead, {"customer": customer, "status": "Converted"})
+
+
+def apply_billing_to_customer(order, customer):
+	"""The order's billing data on the chosen Customer. Returns (contact, address) for the Sales Order.
+
+	- The buyer's Contact is linked to the Customer; a billing email other than the buyer's is added to it.
+	- The billing Address is linked to the Customer, created only if it has no Address with the same street,
+	  postcode and city.
+	- The VAT ID is set only if the Customer has none; a different one is noted in a comment, never overwritten.
+	"""
+	contact = order.contact or contact_for_email(order.buyer_email)
+	if contact:
+		ensure_contact_links(contact, [("Customer", customer)])
+		billing_email = normalize_email(order.billing_email, throw=False)
+		if billing_email and billing_email != normalize_email(order.buyer_email, throw=False):
+			doc = frappe.get_doc("Contact", contact)
+			if billing_email not in {row.email_id for row in doc.email_ids}:
+				doc.append("email_ids", {"email_id": billing_email})
+				doc.save()
+	address = None
+	if order.billing_address_line1:
+		address = _same_address(customer, order) or create_address(
+			title=_order_customer_name(order),
+			address_line1=order.billing_address_line1, address_line2=order.billing_address_line2,
+			city=order.billing_city, pincode=order.billing_postcode, country=order.billing_country,
+			email=order.billing_email, links=[("Customer", customer)])
+	if order.billing_vat_id:
+		tax_id = frappe.db.get_value("Customer", customer, "tax_id")
+		doc = frappe.get_doc("Customer", customer)
+		if not tax_id:
+			doc.tax_id = order.billing_vat_id
+			doc.save()
+		elif tax_id.replace(" ", "").upper() != order.billing_vat_id.replace(" ", "").upper():
+			doc.add_comment("Comment", _("Event Ticket Order {0} was ordered with the VAT ID {1}; the Customer keeps "
+				"{2}.").format(order.name, order.billing_vat_id, tax_id))
+	return contact, address
+
+
+def _same_address(customer, order):
+	"""An Address of the Customer with the order's street, postcode and city (case and spaces ignored)."""
+	def key(*parts):
+		return tuple(" ".join((p or "").lower().split()) for p in parts)
+
+	wanted = key(order.billing_address_line1, order.billing_postcode, order.billing_city)
+	names = frappe.get_all("Dynamic Link", filters={"parenttype": "Address", "link_doctype": "Customer",
+		"link_name": customer}, pluck="parent")
+	for row in frappe.get_all("Address", filters={"name": ["in", names or [""]], "disabled": 0},
+			fields=["name", "address_line1", "pincode", "city"]):
+		if key(row.address_line1, row.pincode, row.city) == wanted:
+			return row.name
+	return None
