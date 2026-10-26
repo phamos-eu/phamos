@@ -258,7 +258,7 @@ def create_sales_order(event_doc, attendees, customer, *, pricing=None, submit=F
 	``pricing`` is the price the buyer confirmed (``pricing_from_order``, Event Ticket Orders). Without it
 	(attendees added by hand, old orders) every attendee is billed at their own price row (``pricing_for_attendee``).
 	``confirmed_total``: the total the buyer confirmed; the order is refused if ERPNext computes another one.
-	``ignore_permissions``: only for website orders (service user); desk orders run with the user's rights.
+	``ignore_permissions``: False for desk orders, which run with the user's own rights (phamos/phamos#1709).
 	Attendees get ``sales_order`` / ``sales_order_item`` / ``billing_customer`` / ``order_reference``.
 	"""
 	from phamos.marketing.crm import ensure_lead_source, get_or_create_campaign

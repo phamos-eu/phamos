@@ -1,14 +1,13 @@
 """Ticket sale and registration for one event: what is on offer, and the order itself.
 
 ``register_attendees`` is the single server-side entry for website orders. It validates everything the
-browser could have skipped, re-calculates the price the buyer confirmed, creates the buyer's Customer
-(paid events) or Lead (free events) with Contact and Address, one Attendee per ticket holder and, for
-paid events, a submitted Sales Order: the click on "Zahlungspflichtig bestellen" is the binding order.
-It runs as the "Event Ticketing" service user and never commits: the request commits on success and
-rolls back on any error.
+browser could have skipped, re-calculates the price the buyer confirmed, links buyer and ticket holders to
+the CRM like the contact form (``crm.match_or_create_lead``) and stores one Event Ticket Order with one
+Attendee per ticket. Customer and Sales Order are created in the desk (phamos/phamos#1717). It runs in the
+visitor's own session (Guest or a logged-in portal user) and inserts with ``ignore_permissions``; there is no
+service user (phamos/phamos#1726). It never commits: the request commits on success and rolls back on any
+error.
 """
-
-from contextlib import contextmanager
 
 import hashlib
 import hmac
@@ -26,33 +25,6 @@ from phamos.marketing.defaults import MAX_ATTENDEES_PER_ORDER, SEAT_STATUSES
 from phamos.marketing.utils import normalize_email, split_name
 
 OPEN_EVENT_STATUSES = ("Upcoming", "Ongoing")
-
-
-@contextmanager
-def ticketing_session():
-	"""Run a website order as the "Event Ticketing" service user (see marketing.setup): for Guests and for
-	logged-in Website Users (portal customers), who have no rights on Item or Account either
-	(phamos/phamos#1712). System Users (staff) keep their own session: they have the desk rights, and their
-	name stays on the documents. ``frappe.set_user`` clears ``form_dict``: read all request arguments before
-	entering.
-	"""
-	from phamos.marketing.setup import TICKETING_USER, ensure_ticketing_user
-
-	user = frappe.session.user
-	if not _orders_as_service_user(user):
-		yield
-		return
-	if not frappe.db.exists("User", TICKETING_USER):
-		ensure_ticketing_user()
-	frappe.set_user(TICKETING_USER)
-	try:
-		yield
-	finally:
-		frappe.set_user(user)
-
-
-def _orders_as_service_user(user):
-	return user == "Guest" or frappe.get_cached_value("User", user, "user_type") == "Website User"
 
 
 # --- 20-minute holds: seats (and their price) reserved while a visitor fills in the order -------------
@@ -330,15 +302,7 @@ def register_attendees(event, contact, attends=True, companions=None, billing_da
 
 	Returns {ok, reference, reference_doctype, attendees, paid, tickets_to, consent_token}.
 	"""
-	user = frappe.session.user
 	result = _register(event, contact, attends, companions, billing_data, source, lang, expected_total, hold_id)
-	if user != "Guest" and _orders_as_service_user(user):
-		# The Sales Order belongs to the service user; who was logged in stays visible on the buyer's row.
-		rows = frappe.get_all("Attendee", filters={"event": event, "order_reference": result["reference"]},
-			fields=["name", "is_buyer"], order_by="is_buyer desc, creation asc", limit=1)
-		if rows:
-			frappe.get_doc("Attendee", rows[0].name).add_comment("Comment",
-				_("Ordered while logged in as {0}.").format(user))
 	# Only once the attendees are committed: until then the held seats must still count as taken. A failed
 	# order keeps its hold until it expires.
 	if hold_id:
