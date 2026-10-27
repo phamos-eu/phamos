@@ -97,11 +97,24 @@ unit_tests:
       if [ -s sites/apps.txt ] && [ -n "$(tail -c1 sites/apps.txt)" ]; then echo >> sites/apps.txt; fi
       grep -qxF phamos sites/apps.txt || echo phamos >> sites/apps.txt
 
-    # The MariaDB 11 client in frappe/bench requires TLS. The 10.6 service has no certificates,
-    # so site creation fails with ERROR 2026 unless the client is told to skip SSL.
+    # The MariaDB 11 client in frappe/bench requires TLS. The 10.6 service has no
+    # certificates, so the client exits with ERROR 2026. bench execs mariadb directly
+    # and does not pass --skip-ssl, so put a wrapper first on PATH.
     - |
-      printf '[client]\nskip-ssl = true\n' > "$HOME/.my.cnf"
+      mkdir -p "$HOME/bin"
+      for cmd in mariadb mysql mariadb-dump mysqldump; do
+        real="$(command -v "$cmd" 2>/dev/null || true)"
+        if [ -z "$real" ] || [ "$real" = "$HOME/bin/$cmd" ]; then
+          continue
+        fi
+        printf '#!/bin/sh\nexec %s --skip-ssl "$@"\n' "$real" > "$HOME/bin/$cmd"
+        chmod +x "$HOME/bin/$cmd"
+      done
+      export PATH="$HOME/bin:$PATH"
+      printf '[client]\nskip-ssl\n[mysql]\nskip-ssl\n[mariadb]\nskip-ssl\n' > "$HOME/.my.cnf"
       chmod 600 "$HOME/.my.cnf"
+      mariadb --version
+      mariadb -hmariadb -P3306 -uroot -proot --protocol=tcp -e "SELECT 1 AS ok;"
 
     # Test site.
     - bench new-site "$SITE" --db-root-password root --mariadb-root-username root --mariadb-root-password root --admin-password admin --no-mariadb-socket
