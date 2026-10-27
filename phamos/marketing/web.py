@@ -217,7 +217,7 @@ def save_consents(event, lang, reference, token, consents=None, website=None):
 	item = _event(event, lang)
 	reference = (reference or "").strip()
 	if not ticketing.verify_consent_token(reference, token) or not frappe.db.exists("Attendee",
-			{"event": item.name, "order_reference": reference}):
+			{"event": item.name, "event_ticket_order": reference}):
 		frappe.throw(_("This link has expired. You can still subscribe on the event page."), frappe.PermissionError)
 	values = _json(consents, {})
 	values = {key: cint(values.get(key)) for key in ("newsletter", "attendee_contact", "public_listing")}

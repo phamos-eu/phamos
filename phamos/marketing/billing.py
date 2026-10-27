@@ -258,15 +258,15 @@ def _append_lines(doc, priced):
 
 
 def create_sales_order(event_doc, attendees, customer, *, pricing=None, submit=False, contact=None, address=None,
-		email=None, lang=None, confirmed_total=None, ignore_permissions=False, ticket_order=None):
+		email=None, lang=None, confirmed_total=None, ignore_permissions=False, event_ticket_order=None):
 	"""Sales Order with one line per attendee, created in the desk.
 
 	``pricing`` is the price the buyer confirmed (``pricing_from_order``, Event Ticket Orders). Without it
 	(attendees added by hand, old orders) every attendee is billed at their own price row (``pricing_for_attendee``).
 	``confirmed_total``: the total the buyer confirmed; the order is refused if ERPNext computes another one.
 	``ignore_permissions``: False for desk orders, which run with the user's own rights (phamos/phamos#1709).
-	``ticket_order``: the Event Ticket Order (default: the one all attendees share, if any).
-	Every line names its Attendee; the Attendees get ``billing_customer`` / ``order_reference``.
+	``event_ticket_order``: the Event Ticket Order (default: the one all attendees share, if any).
+	Every line names its Attendee; the Attendees get ``billing_customer`` (from the hooks) and their ``ticket_type``.
 	"""
 	from phamos.marketing.crm import ensure_lead_source, get_or_create_campaign
 
@@ -279,12 +279,12 @@ def create_sales_order(event_doc, attendees, customer, *, pricing=None, submit=F
 			priced.append((att, att_pricing))
 			keeps_type[att.name] = own
 	pricing = priced[0][1]
-	if not ticket_order:
-		orders = {att.get("ticket_order") for att in attendees}
-		ticket_order = orders.pop() if len(orders) == 1 else None
+	if not event_ticket_order:
+		orders = {att.get("event_ticket_order") for att in attendees}
+		event_ticket_order = orders.pop() if len(orders) == 1 else None
 	so = frappe.new_doc("Sales Order")
 	so.customer = customer
-	so.event_ticket_order = ticket_order
+	so.event_ticket_order = event_ticket_order
 	so.company = default_company()
 	so.order_type = "Shopping Cart"
 	so.transaction_date = nowdate()
@@ -315,10 +315,8 @@ def create_sales_order(event_doc, attendees, customer, *, pricing=None, submit=F
 		frappe.throw(_("Total differs from the confirmed total ({0} vs {1}): check the tax template").format(
 			flt(so.grand_total, 2), flt(confirmed_total, 2)), title=_("Total differs"))
 	for att, att_pricing in priced:
-		values = {"order_reference": att.order_reference or so.name}
-		if not keeps_type[att.name]:
-			values["ticket_type"] = att_pricing.price_title  # an attendee's own price row is never overwritten
-		frappe.db.set_value("Attendee", att.name, values, update_modified=False)
+		if not keeps_type[att.name]:  # an attendee's own price row is never overwritten
+			frappe.db.set_value("Attendee", att.name, "ticket_type", att_pricing.price_title, update_modified=False)
 	if submit:
 		so.submit()  # the Sales Order hooks set billing_customer and payment_status
 	return so

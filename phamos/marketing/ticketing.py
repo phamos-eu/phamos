@@ -316,38 +316,21 @@ def register_attendees(event, contact, attends=True, companions=None, billing_da
 ORDER_KEY_MIN_LENGTH = 32
 
 
-def _previous_order(event, order_key, contact):
+def _previous_order(event, order_key):
 	"""The result of the order already placed with ``order_key`` for ``event``, or None.
 
 	A locking read under the event lock, so it sees an order that committed while this request waited. The
-	first order wins: a repeat with other data gets the first order back and books nothing. Since
-	phamos/phamos#1724 the key is on the Event Ticket Order; orders placed before keep it on their Attendees.
+	first order wins: a repeat with other data gets the first order back and books nothing. The key is on the
+	Event Ticket Order (phamos/phamos#1724).
 	"""
 	ticket_order = frappe.qb.DocType("Event Ticket Order")
 	found = (frappe.qb.from_(ticket_order).select(ticket_order.name)
 		.where((ticket_order.event == event) & (ticket_order.order_key == order_key))
 		.orderby(ticket_order.creation).limit(1).for_update().run())
-	if found:
-		order = frappe.get_doc("Event Ticket Order", found[0][0])
-		return _order_result(order, frappe.db.count("Attendee", {"ticket_order": order.name}))
-	attendee = frappe.qb.DocType("Attendee")
-	rows = (frappe.qb.from_(attendee)
-		.select(attendee.name, attendee.order_reference, attendee.is_buyer, attendee.email)
-		.where((attendee.event == event) & (attendee.order_key == order_key))
-		.orderby(attendee.creation).for_update().run(as_dict=True))
-	if not rows:
+	if not found:
 		return None
-	lines = billing.ticket_lines([r.name for r in rows])
-	sales_order = next((lines[r.name] for r in rows if r.name in lines), None)
-	reference = sales_order or next((r.order_reference for r in rows if r.order_reference), None)
-	if sales_order:
-		tickets_to = frappe.db.get_value("Sales Order", sales_order, "contact_email")
-	else:
-		tickets_to = next((r.email for r in rows if r.is_buyer and r.email), None)
-	tickets_to = tickets_to or normalize_email((contact or {}).get("email"), throw=False)
-	return {"ok": True, "reference": reference, "reference_doctype": "Sales Order" if sales_order else "Attendee",
-		"attendees": len(rows), "paid": bool(sales_order), "tickets_to": tickets_to,
-		"consent_token": consent_token(reference)}
+	order = frappe.get_doc("Event Ticket Order", found[0][0])
+	return _order_result(order, frappe.db.count("Attendee", {"event_ticket_order": order.name}))
 
 
 def _register(event, contact, attends, companions, billing_data, source, lang, expected_total, hold_id=None):
@@ -360,7 +343,7 @@ def _register(event, contact, attends, companions, billing_data, source, lang, e
 	# Before every other check: a repeat of an order that went through (double click, lost response, reload)
 	# must get that order back, not "sold out" or "already registered" (phamos/phamos#1700).
 	order_key = hold_id if hold_id and len(hold_id) >= ORDER_KEY_MIN_LENGTH else None
-	previous = _previous_order(doc.name, order_key, contact) if order_key else None
+	previous = _previous_order(doc.name, order_key) if order_key else None
 	if previous:
 		return previous
 	is_open, reason = sale_state(doc, exclude_hold=hold_id, for_update=True)
@@ -441,7 +424,7 @@ def _register(event, contact, attends, companions, billing_data, source, lang, e
 			"language": lang if lang in ("de", "en") else None, "registered_on": now,
 			"first_name": person.first_name, "last_name": person.last_name, "email": person.email or None,
 			"phone": person.phone, "company_name": company or person.company_name,
-			"is_buyer": 1 if is_buyer else 0, "ticket_order": order.name, "order_reference": order.name,
+			"is_buyer": 1 if is_buyer else 0, "event_ticket_order": order.name,
 			"contact": links.contact, "lead": links.lead, "customer": links.customer, "crm_status": links.crm_status,
 			"ticket_type": pricing.price_title if pricing else "Free",
 			# Paid tickets wait for the desk's Sales Order: the order is "Booked" (phamos/phamos#1723).
@@ -482,7 +465,7 @@ def _order_result(order, attendees):
 def save_consents(reference, consents, event=None):
 	"""The optional questions after an order: stored on the buyer's Attendee row with timestamps.
 	Returns the buyer's email (for the newsletter double opt-in) or None."""
-	filters = {"order_reference": reference, **({"event": event} if event else {})}
+	filters = {"event_ticket_order": reference, **({"event": event} if event else {})}
 	rows = frappe.get_all("Attendee", filters=filters, fields=["name", "is_buyer", "email"],
 		order_by="creation asc")
 	row = next((r for r in rows if r.is_buyer), None)
@@ -512,7 +495,7 @@ def send_order_confirmation(event_name, reference, recipient, reference_doctype=
 
 	doc = frappe.get_doc("Marketing Content", event)
 	frappe.local.lang = lang if lang in ("de", "en") else "de"
-	attendees = frappe.get_all("Attendee", filters={"event": event, "order_reference": reference},
+	attendees = frappe.get_all("Attendee", filters={"event": event, "event_ticket_order": reference},
 		fields=["full_name", "email", "ticket_type"], order_by="creation asc")
 	order = frappe.get_doc("Event Ticket Order", reference)
 	paid = bool(order.confirmed_total)
@@ -608,7 +591,7 @@ def send_ticket(attendee, buyer_name=None, lang="de", ignore_limit=False):
 		attachments=attachments,
 		subject=_("Your ticket for {0}").format(doc.title),
 		template="event_ticket",
-		args={"event": doc, "venue": venue(doc), "attendee": att, "buyer_name": buyer_name, "reference": att.order_reference,
+		args={"event": doc, "venue": venue(doc), "attendee": att, "buyer_name": buyer_name, "reference": att.event_ticket_order or att.order_reference,
 			"event_url": frappe.utils.get_url(item.url) if item else None,
 			"privacy_url": frappe.utils.get_url("/en/privacy" if lang == "en" else "/de/datenschutz"),
 			"imprint_url": frappe.utils.get_url("/en/imprint" if lang == "en" else "/de/impressum")},

@@ -168,7 +168,7 @@ class TestWebProfileEvents(FrappeTestCase):
 		self.assertEqual(result["reference_doctype"], "Event Ticket Order")
 		self.assertEqual(frappe.db.get_value("Event Ticket Order", result["reference"], "status"), "Booked")
 		self.assertEqual(frappe.db.get_value("Attendee", {"email": "web.guest@example.com"}, "event"), self.event.name)
-		self.assertEqual(frappe.db.count("Attendee", {"event": self.event.name, "order_reference": result["reference"]}), 2)
+		self.assertEqual(frappe.db.count("Attendee", {"event": self.event.name, "event_ticket_order": result["reference"]}), 2)
 
 		# The optional questions afterwards, signed with the returned token.
 		frappe.set_user("Guest")
@@ -182,7 +182,7 @@ class TestWebProfileEvents(FrappeTestCase):
 				"1.forged", json.dumps({"newsletter": 1}))
 		finally:
 			frappe.set_user("Administrator")
-		buyer = frappe.get_all("Attendee", filters={"order_reference": result["reference"], "is_buyer": 1},
+		buyer = frappe.get_all("Attendee", filters={"event_ticket_order": result["reference"], "is_buyer": 1},
 			fields=["newsletter_consent", "share_with_attendees_consent", "public_listing_consent"])[0]
 		self.assertEqual((buyer.newsletter_consent, buyer.share_with_attendees_consent, buyer.public_listing_consent), (1, 1, 0))
 
