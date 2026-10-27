@@ -18,6 +18,7 @@
   "chapter_reviews",
   "section_break_notes",
   "notes",
+  "implementation_snapshot",
   "amended_from"
  ],
  "fields": [
@@ -103,6 +104,15 @@
    "print_hide": 1,
    "read_only": 1,
    "search_index": 1
+  },
+  {
+   "fieldname": "implementation_snapshot",
+   "fieldtype": "Code",
+   "hidden": 1,
+   "label": "Implementation Snapshot",
+   "no_copy": 1,
+   "options": "JSON",
+   "read_only": 1
   }
  ],
  "index_web_pages_for_search": 1,
@@ -114,7 +124,7 @@
    "link_fieldname": "last_meeting"
   }
  ],
- "modified": "2026-09-03 07:15:11.462353",
+ "modified": "2026-10-20 10:00:00.000000",
  "modified_by": "Administrator",
  "module": "Phamos",
  "name": "Stakeholder Meeting",
@@ -132,18 +142,6 @@
    "read": 1,
    "report": 1,
    "role": "System Manager",
-   "share": 1,
-   "submit": 1,
-   "write": 1
-  },
-  {
-   "create": 1,
-   "email": 1,
-   "export": 1,
-   "print": 1,
-   "read": 1,
-   "report": 1,
-   "role": "All",
    "share": 1,
    "submit": 1,
    "write": 1
