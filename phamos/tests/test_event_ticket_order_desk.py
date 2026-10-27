@@ -58,7 +58,7 @@ class TestEventTicketOrderDesk(FrappeTestCase):
 		proposal = api.order_customer_proposal(order.name)
 		self.assertEqual((proposal.action, proposal.unambiguous), ("convert", True))
 
-		so_name = api.create_order_sales_orders([order.name], mode="convert")["sales_orders"][0]
+		so_name = api.create_order_sales_orders([order.name], mode="convert", submit=1)["sales_orders"][0]
 		customer = frappe.db.get_value("Customer", {"lead_name": order.lead},
 			["name", "customer_name", "customer_type", "tax_id"], as_dict=True)
 		self.assertEqual((customer.customer_name, customer.customer_type, customer.tax_id),
@@ -88,20 +88,20 @@ class TestEventTicketOrderDesk(FrappeTestCase):
 		self.assertEqual((first.customer, first.lead), (customer, None))
 		proposal = api.order_customer_proposal(first.name)
 		self.assertEqual((proposal.action, proposal.customer, proposal.unambiguous), ("use", customer, True))
-		api.create_order_sales_orders([first.name], mode="use", customer=customer)
+		api.create_order_sales_orders([first.name], mode="use", customer=customer, submit=1)
 		self.assertEqual(len(self.customer_addresses(customer)), 1)
 		self.assertEqual(frappe.db.get_value("Customer", customer, "tax_id"), None)
 
 		second = self.order(email="known@order-desk.example", event=make_event("Ticket Order Desk Second Event"),
 			address_line1="hauptstr.  1")  # the same address, typed differently
-		api.create_order_sales_orders([second.name], mode="use", customer=customer)
+		api.create_order_sales_orders([second.name], mode="use", customer=customer, submit=1)
 		self.assertEqual(len(self.customer_addresses(customer)), 1)
 
 	def test_vat_id_is_never_overwritten(self, enqueue):
 		customer = make_customer("Order Desk VAT AG", email="vat@order-desk.example")
 		frappe.db.set_value("Customer", customer, "tax_id", "DE111111111")
 		order = self.order(email="vat@order-desk.example", company="Order Desk VAT AG", vat_id="DE999999999")
-		api.create_order_sales_orders([order.name], mode="use", customer=customer)
+		api.create_order_sales_orders([order.name], mode="use", customer=customer, submit=1)
 		self.assertEqual(frappe.db.get_value("Customer", customer, "tax_id"), "DE111111111")
 		self.assertTrue(frappe.db.exists("Comment", {"reference_doctype": "Customer", "reference_name": customer,
 			"content": ["like", "%DE999999999%"]}))
@@ -109,7 +109,7 @@ class TestEventTicketOrderDesk(FrappeTestCase):
 	def test_lead_buyer_linked_to_another_customer(self, enqueue):
 		order = self.order(email="lead.other@order-desk.example")
 		other = make_customer("Order Desk Andere GmbH")
-		api.create_order_sales_orders([order.name], mode="use", customer=other)
+		api.create_order_sales_orders([order.name], mode="use", customer=other, submit=1)
 		self.assertEqual(frappe.db.get_value("Lead", order.lead, ["customer", "status"]), (other, "Converted"))
 		self.assertFalse(frappe.db.exists("Customer", {"lead_name": order.lead}))
 		self.assertEqual(frappe.db.get_value("Event Ticket Order", order.name, "customer"), other)
@@ -117,7 +117,7 @@ class TestEventTicketOrderDesk(FrappeTestCase):
 	def test_new_customer_from_the_billing_data(self, enqueue):
 		make_customer("Order Desk Alt AG", email="new.customer@order-desk.example")
 		order = self.order(email="new.customer@order-desk.example", company="Order Desk Neu AG")
-		so = frappe.get_doc("Sales Order", api.create_order_sales_orders([order.name], mode="new")["sales_orders"][0])
+		so = frappe.get_doc("Sales Order", api.create_order_sales_orders([order.name], mode="new", submit=1)["sales_orders"][0])
 		self.assertEqual(frappe.db.get_value("Customer", so.customer, ["customer_name", "customer_type"]),
 			("Order Desk Neu AG", "Company"))
 
@@ -126,7 +126,7 @@ class TestEventTicketOrderDesk(FrappeTestCase):
 		self.event.reload()
 		self.event.ticket_prices[0].rate = 200
 		self.event.save()
-		so = frappe.get_doc("Sales Order", api.create_order_sales_orders([order.name], mode="convert")["sales_orders"][0])
+		so = frappe.get_doc("Sales Order", api.create_order_sales_orders([order.name], mode="convert", submit=1)["sales_orders"][0])
 		self.assertEqual([flt(row.rate, 2) for row in so.items], [119.0, 119.0])
 		self.assertEqual(flt(so.grand_total, 2), 238.0)
 
@@ -134,16 +134,30 @@ class TestEventTicketOrderDesk(FrappeTestCase):
 		order = self.order()
 		companion = next(t for t in self.tickets(order) if not t.is_buyer)
 		frappe.db.set_value("Attendee", companion.name, "status", "Cancelled")
-		so = frappe.get_doc("Sales Order", api.create_order_sales_orders([order.name], mode="convert")["sales_orders"][0])
+		so = frappe.get_doc("Sales Order", api.create_order_sales_orders([order.name], mode="convert", submit=1)["sales_orders"][0])
 		self.assertEqual((len(so.items), flt(so.grand_total, 2)), (1, 119.0))
 
 	def test_total_mismatch_is_refused(self, enqueue):
 		order = self.order()
 		frappe.db.set_value("Event Ticket Order", order.name, "confirmed_total", 1)
 		with patch("frappe.log_error") as log_error, self.assertRaises(frappe.ValidationError) as raised:
-			api.create_order_sales_orders([order.name], mode="convert")
+			api.create_order_sales_orders([order.name], mode="convert", submit=1)
 		self.assertIn("Total differs from the confirmed total", str(raised.exception))
 		log_error.assert_called_once()
+
+	def test_draft_sales_order_is_not_checked(self, enqueue):
+		# phamos/phamos#1730: the desk gets a draft to check and change by hand, whatever its total.
+		order = self.order()
+		frappe.db.set_value("Event Ticket Order", order.name, "confirmed_total", 1)
+		so = frappe.get_doc("Sales Order", api.create_order_sales_orders([order.name], mode="convert")["sales_orders"][0])
+		self.assertEqual((so.docstatus, flt(so.grand_total, 2), so.event_ticket_order), (0, 238.0, order.name))
+		self.assertEqual(frappe.db.get_value("Event Ticket Order", order.name, "status"), "Booked")
+		# The form opens this draft; the list action skips the order.
+		self.assertEqual(api.order_customer_proposal(order.name).sales_order, so.name)
+		result = api.create_order_sales_orders([order.name])
+		self.assertEqual((result["sales_orders"], [row["order"] for row in result["skipped"]]), ([], [order.name]))
+		so.submit()
+		self.assertEqual(frappe.db.get_value("Event Ticket Order", order.name, "status"), "Ordered")
 
 	def test_user_without_sales_order_rights(self, enqueue):
 		order = self.order()
@@ -161,7 +175,7 @@ class TestEventTicketOrderDesk(FrappeTestCase):
 		frappe.clear_cache(doctype="Attendee")
 		frappe.set_user(CLERK)
 		self.assertTrue(frappe.has_permission("Event Ticket Order", "write", order.name))
-		self.assertRaises(frappe.PermissionError, api.create_order_sales_orders, [order.name], mode="convert")
+		self.assertRaises(frappe.PermissionError, api.create_order_sales_orders, [order.name], mode="convert", submit=1)
 		frappe.set_user("Administrator")
 		self.assertEqual(frappe.db.get_value("Lead", order.lead, "status"), "Lead")
 		frappe.clear_cache(doctype="Event Ticket Order")
@@ -174,16 +188,16 @@ class TestEventTicketOrderDesk(FrappeTestCase):
 		free_event = make_event("Ticket Order Desk Free Event", paid=False)
 		with as_guest():
 			free = ticketing.register_attendees(free_event.name, {"full_name": "Fred Free", "email": "free@order-desk.example"})
-		result = api.create_order_sales_orders([clear.name, similar.name, free["reference"]])
+		result = api.create_order_sales_orders([clear.name, similar.name, free["reference"]], submit=1)
 		self.assertEqual(len(result["sales_orders"]), 1)
 		self.assertEqual(frappe.db.get_value("Event Ticket Order", clear.name, "status"), "Ordered")
 		self.assertEqual({row["order"]: row["reason"] for row in result["skipped"]},
 			{similar.name: "choose the Customer in the order", free["reference"]: "not booked (Free)"})
-		self.assertRaises(frappe.ValidationError, api.create_order_sales_orders, [clear.name, similar.name], mode="new")
+		self.assertRaises(frappe.ValidationError, api.create_order_sales_orders, [clear.name, similar.name], mode="new", submit=1)
 
 	def test_invoice_from_the_order(self, enqueue):
 		order = self.order()
-		api.create_order_sales_orders([order.name], mode="convert")
+		api.create_order_sales_orders([order.name], mode="convert", submit=1)
 		invoices = api.create_sales_invoices(ticket_orders=[order.name], submit=1)["sales_invoices"]
 		self.assertEqual(len(invoices), 1)
 		self.assertEqual(flt(frappe.db.get_value("Sales Invoice", invoices[0], "grand_total"), 2), 238.0)
@@ -205,7 +219,7 @@ class TestEventTicketOrderDesk(FrappeTestCase):
 		from frappe.desk.notifications import get_open_count
 
 		order = self.order()
-		so_name = api.create_order_sales_orders([order.name], mode="convert")["sales_orders"][0]
+		so_name = api.create_order_sales_orders([order.name], mode="convert", submit=1)["sales_orders"][0]
 		api.create_sales_invoices(ticket_orders=[order.name], submit=1)
 		def counts(doctype, name):
 			found = get_open_count(doctype, name)["count"]["external_links_found"]
@@ -219,7 +233,7 @@ class TestEventTicketOrderDesk(FrappeTestCase):
 
 	def test_a_ticket_is_on_one_sales_order_only(self, enqueue):
 		order = self.order()
-		so = frappe.get_doc("Sales Order", api.create_order_sales_orders([order.name], mode="convert")["sales_orders"][0])
+		so = frappe.get_doc("Sales Order", api.create_order_sales_orders([order.name], mode="convert", submit=1)["sales_orders"][0])
 		duplicate = frappe.copy_doc(so)
 		self.assertRaisesRegex(frappe.ValidationError, "is already on Sales Order", duplicate.insert)
 		so.cancel()

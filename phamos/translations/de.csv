@@ -1471,3 +1471,4 @@ The event of an order with tickets cannot be changed.,Die Veranstaltung einer Be
 "The total the buyer saw and confirmed; on desk orders computed from the price and the tickets.","Der Gesamtbetrag, den der Käufer gesehen und bestätigt hat; bei Desk-Bestellungen aus Preis und Tickets berechnet."
 "Desk orders: the first save also creates the buyer's own ticket.","Desk-Bestellungen: das erste Speichern legt auch das eigene Ticket des Käufers an."
 Event {0} has no ticket price.,Veranstaltung {0} hat keinen Ticketpreis.
+already on Sales Order {0},bereits auf Auftrag {0}

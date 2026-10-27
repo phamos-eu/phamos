@@ -103,7 +103,7 @@ class TestManualEventTicketOrder(FrappeTestCase):
 		self.add_ticket(order, "colleague@manual-order.example")
 		order.reload()
 		self.assertEqual(api.order_customer_proposal(order.name).action, "use")
-		so_name = api.create_order_sales_orders([order.name], mode="use", customer=customer)["sales_orders"][0]
+		so_name = api.create_order_sales_orders([order.name], mode="use", customer=customer, submit=1)["sales_orders"][0]
 		so = frappe.get_doc("Sales Order", so_name)
 		self.assertEqual((so.customer, flt(so.grand_total, 2), so.event_ticket_order), (customer, 119.0, order.name))
 		order.reload()

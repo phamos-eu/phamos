@@ -76,7 +76,7 @@ class TestMarketingPatches(FrappeTestCase):
 				companions=[{"full_name": "Paul Patch", "email": "paul@patch.example"}],
 				billing_data={**BILLING, "full_name": "Petra Patch", "email": "petra@patch.example"})
 		order = result["reference"]
-		so = frappe.get_doc("Sales Order", api.create_order_sales_orders([order], mode="convert")["sales_orders"][0])
+		so = frappe.get_doc("Sales Order", api.create_order_sales_orders([order], mode="convert", submit=1)["sales_orders"][0])
 		si = frappe.get_doc("Sales Invoice", api.create_sales_invoices(ticket_orders=[order], submit=1)["sales_invoices"][0])
 		# As before #1727: the Attendees hold the line, the sales documents know nothing.
 		for row in so.items:

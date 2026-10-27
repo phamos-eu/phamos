@@ -67,7 +67,10 @@ const phamos_ticket_order = {
 		frappe.call({
 			method: "phamos.marketing.api.order_customer_proposal",
 			args: { name: frm.doc.name },
-		}).then(({ message: proposal }) => this.customer_dialog(frm, proposal));
+		}).then(({ message: proposal }) => {
+			if (proposal.sales_order) frappe.set_route("Form", "Sales Order", proposal.sales_order);
+			else this.customer_dialog(frm, proposal);
+		});
 	},
 
 	// The Customer, following the buyer's link: nothing is used or converted without this dialog.
@@ -101,8 +104,8 @@ const phamos_ticket_order = {
 				frappe.call({ method: "phamos.marketing.api.create_order_sales_orders", args, freeze: true })
 					.then(({ message }) => {
 						dialog.hide();
-						frappe.show_alert({ message: __("Sales Order {0} created", [message.sales_orders[0]]), indicator: "green" });
-						frm.reload_doc();
+						// A draft, to be checked and submitted by hand (phamos/phamos#1730).
+						frappe.set_route("Form", "Sales Order", message.sales_orders[0]);
 					});
 			},
 		});
