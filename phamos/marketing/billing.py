@@ -11,6 +11,11 @@ Ticket Order with the price the buyer confirmed; the desk turns it into a submit
 descriptions differ, and the invoice shows who each ticket is for. Gross prices are entered as the line
 rate with tax rows "included in print rate", so a consumer pays exactly the advertised price.
 
+The sales documents point to their tickets (phamos/phamos#1727): ``event_ticket_order`` on Sales Order and
+Sales Invoice, ``attendee`` on each line (``phamos.marketing.setup.SALES_DOCUMENT_FIELDS``). ERPNext's mapper
+copies both to the invoice and to a credit note. Nothing on the Attendee stores a Sales Order or invoice name;
+``ticket_lines`` and ``payment_state`` read them from the lines.
+
 The hooks at the end keep ``Attendee.payment_status`` current. Payments reach an invoice only through
 ``db_set`` (outstanding amount, status), which fires ``on_change`` – not ``on_update_after_submit`` –
 so ``on_sales_invoice_change`` is hooked on ``on_change``.
@@ -234,6 +239,7 @@ def _append_lines(doc, priced):
 			"rate": line_rate,
 			"price_list_rate": line_rate,
 			"description": line_description(line_pricing.item_name, line_pricing.price_title, att.full_name),
+			"attendee": att.name,
 			"additional_notes": "\n".join(filter(None, [att.full_name, att.email])),
 			"item_tax_template": line_pricing.item_tax_template,
 			"delivery_date": doc.get("delivery_date"),
@@ -252,14 +258,15 @@ def _append_lines(doc, priced):
 
 
 def create_sales_order(event_doc, attendees, customer, *, pricing=None, submit=False, contact=None, address=None,
-		email=None, lang=None, confirmed_total=None, ignore_permissions=False):
+		email=None, lang=None, confirmed_total=None, ignore_permissions=False, ticket_order=None):
 	"""Sales Order with one line per attendee, created in the desk.
 
 	``pricing`` is the price the buyer confirmed (``pricing_from_order``, Event Ticket Orders). Without it
 	(attendees added by hand, old orders) every attendee is billed at their own price row (``pricing_for_attendee``).
 	``confirmed_total``: the total the buyer confirmed; the order is refused if ERPNext computes another one.
 	``ignore_permissions``: False for desk orders, which run with the user's own rights (phamos/phamos#1709).
-	Attendees get ``sales_order`` / ``sales_order_item`` / ``billing_customer`` / ``order_reference``.
+	``ticket_order``: the Event Ticket Order (default: the one all attendees share, if any).
+	Every line names its Attendee; the Attendees get ``billing_customer`` / ``order_reference``.
 	"""
 	from phamos.marketing.crm import ensure_lead_source, get_or_create_campaign
 
@@ -272,8 +279,12 @@ def create_sales_order(event_doc, attendees, customer, *, pricing=None, submit=F
 			priced.append((att, att_pricing))
 			keeps_type[att.name] = own
 	pricing = priced[0][1]
+	if not ticket_order:
+		orders = {att.get("ticket_order") for att in attendees}
+		ticket_order = orders.pop() if len(orders) == 1 else None
 	so = frappe.new_doc("Sales Order")
 	so.customer = customer
+	so.event_ticket_order = ticket_order
 	so.company = default_company()
 	so.order_type = "Shopping Cart"
 	so.transaction_date = nowdate()
@@ -303,15 +314,13 @@ def create_sales_order(event_doc, attendees, customer, *, pricing=None, submit=F
 			reference_doctype="Marketing Content", reference_name=event_doc.name, defer_insert=True)
 		frappe.throw(_("Total differs from the confirmed total ({0} vs {1}): check the tax template").format(
 			flt(so.grand_total, 2), flt(confirmed_total, 2)), title=_("Total differs"))
-	for (att, att_pricing), row in zip(priced, so.items):
-		values = {"sales_order": so.name, "sales_order_item": row.name, "billing_customer": customer,
-			"order_reference": att.order_reference or so.name, "payment_status": "Ordered" if submit else "Pending"}
+	for att, att_pricing in priced:
+		values = {"order_reference": att.order_reference or so.name}
 		if not keeps_type[att.name]:
 			values["ticket_type"] = att_pricing.price_title  # an attendee's own price row is never overwritten
 		frappe.db.set_value("Attendee", att.name, values, update_modified=False)
-	_refresh_orders([att.name for att, _pricing in priced])
 	if submit:
-		so.submit()
+		so.submit()  # the Sales Order hooks set billing_customer and payment_status
 	return so
 
 
@@ -325,68 +334,76 @@ def make_sales_invoice(sales_order, submit=False):
 	return si
 
 
-def payment_status_for_lines(lines):
-	"""{Sales Order line: (sales_invoice, payment_status)} from the submitted invoices and credit notes of
-	these order lines (one line per attendee). Lines without a submitted invoice are left out.
+def ticket_lines(attendees):
+	"""{attendee: Sales Order} for these Attendees, from the lines of their Sales Orders that are not cancelled
+	(drafts included): a ticket is on at most one of them (``validate_sales_order``)."""
+	attendees = [name for name in attendees if name]
+	if not attendees:
+		return {}
+	rows = frappe.get_all("Sales Order Item", filters={"attendee": ["in", attendees], "docstatus": ["<", 2]},
+		fields=["attendee", "parent"])
+	return {row.attendee: row.parent for row in rows}
 
-	Per line (phamos/phamos#1706): the latest regular invoice whose line is not fully credited is the current
-	one: "Paid" when its outstanding is 0 or less, else "Invoiced". If every regular invoice of the line was
-	credited, the line is "Credited" and keeps pointing at the latest original invoice, never the credit note.
-	So a correction (credit note, then a new invoice) ends with the new invoice. Drafts never count.
+
+def payment_state(attendees):
+	"""{attendee: (sales_invoice, payment_status)} for these Attendees, from the submitted lines that name them.
+
+	Per ticket (phamos/phamos#1706): the latest regular invoice whose line is not fully credited is the current
+	one: "Paid" when its outstanding is 0 or less, else "Invoiced". If every regular invoice of the ticket was
+	credited, the ticket is "Credited" and keeps pointing at the latest original invoice, never the credit note.
+	So a correction (credit note, then a new invoice) ends with the new invoice. Without an invoice, a ticket on
+	a submitted Sales Order is "Ordered". Tickets on no submitted document are left out; drafts never count.
 	"""
-	if not lines:
+	attendees = [name for name in dict.fromkeys(attendees) if name]
+	if not attendees:
 		return {}
 	si, item = frappe.qb.DocType("Sales Invoice"), frappe.qb.DocType("Sales Invoice Item")
 	rows = (frappe.qb.from_(item).join(si).on(item.parent == si.name)
-		.select(item.so_detail, item.qty, si.name, si.is_return, si.return_against, si.outstanding_amount, si.creation)
-		.where(item.so_detail.isin(list(lines)) & (si.docstatus == 1)).orderby(si.creation).run(as_dict=True))
+		.select(item.attendee, item.qty, si.name, si.is_return, si.return_against, si.outstanding_amount, si.creation)
+		.where(item.attendee.isin(attendees) & (si.docstatus == 1)).orderby(si.creation).run(as_dict=True))
+	ordered = set(frappe.get_all("Sales Order Item", filters={"attendee": ["in", attendees], "docstatus": 1},
+		pluck="attendee"))
 	result = {}
-	for line in lines:
-		own = [r for r in rows if r.so_detail == line]
+	for attendee in attendees:
+		own = [r for r in rows if r.attendee == attendee]
 		credited = {}
 		for r in own:
 			if r.is_return and r.return_against:
 				credited[r.return_against] = credited.get(r.return_against, 0) + flt(r.qty)
 		regular = [r for r in own if not r.is_return]
-		if not regular:
-			continue
-		current = [r for r in regular if flt(r.qty) + credited.get(r.name, 0) > 0]
-		if current:
-			invoice = current[-1]
-			result[line] = (invoice.name, "Paid" if flt(invoice.outstanding_amount) <= 0 else "Invoiced")
-		else:
-			result[line] = (regular[-1].name, "Credited")
+		if regular:
+			current = [r for r in regular if flt(r.qty) + credited.get(r.name, 0) > 0]
+			if current:
+				invoice = current[-1]
+				result[attendee] = (invoice.name, "Paid" if flt(invoice.outstanding_amount) <= 0 else "Invoiced")
+			else:
+				result[attendee] = (regular[-1].name, "Credited")
+		elif attendee in ordered:
+			result[attendee] = (None, "Ordered")
 	return result
 
 
-def refresh_payment_status(lines):
-	"""Recompute ``sales_invoice`` and ``payment_status`` of the Attendees of these Sales Order lines."""
-	lines = [line for line in dict.fromkeys(lines) if line]
-	if not lines:
-		return
-	attendees = frappe.get_all("Attendee", filters={"sales_order_item": ["in", lines]},
-		fields=["name", "sales_order_item"])
+def refresh_payment_status(attendees):
+	"""Recompute ``payment_status`` of these Attendees from their sales documents, and their orders' status.
+
+	A paid ticket on no submitted document is "Pending"; a free one stays "Not Required"."""
+	attendees = [name for name in dict.fromkeys(attendees) if name]
 	if not attendees:
 		return
-	state = payment_status_for_lines({a.sales_order_item for a in attendees})
-	for att in attendees:
-		invoice, status = state.get(att.sales_order_item, (None, "Ordered"))
-		frappe.db.set_value("Attendee", att.name, {"sales_invoice": invoice, "payment_status": status},
-			update_modified=False)
-	_refresh_orders([a.name for a in attendees])
+	state = payment_state(attendees)
+	for att in frappe.get_all("Attendee", filters={"name": ["in", attendees]}, fields=["name", "payment_status"]):
+		status = state[att.name][1] if att.name in state else (
+			"Not Required" if att.payment_status == "Not Required" else "Pending")
+		if status != att.payment_status:
+			frappe.db.set_value("Attendee", att.name, "payment_status", status, update_modified=False)
+	_refresh_orders(attendees)
 
 
 # --- hooks ----------------------------------------------------------------------------------------------
 
 
-def _attendees(filters):
-	return frappe.get_all("Attendee", filters=filters, pluck="name")
-
-
-def _set(names, values):
-	for name in names:
-		frappe.db.set_value("Attendee", name, values, update_modified=False)
-	_refresh_orders(names)
+def _line_attendees(doc):
+	return [row.attendee for row in getattr(doc, "items", None) or [] if getattr(row, "attendee", None)]
 
 
 def _refresh_orders(names):
@@ -396,26 +413,30 @@ def _refresh_orders(names):
 	refresh_for_attendees(names)
 
 
+def validate_sales_order(doc, method=None):
+	"""A ticket is billed on one Sales Order only: "Duplicate" or a hand-made order must not bill it twice."""
+	attendees = _line_attendees(doc)
+	if len(set(attendees)) != len(attendees):
+		frappe.throw(_("A ticket can only be on one line of the Sales Order."))
+	for attendee, sales_order in ticket_lines(attendees).items():
+		if sales_order != doc.name:
+			frappe.throw(_("Attendee {0} is already on Sales Order {1}").format(attendee, sales_order))
+
 
 def on_sales_order_update(doc, method=None):
-	"""Keep the Attendee links when a person edits the order (e.g. changes the Customer of a draft).
-
-	Runs on every Sales Order save: one query for all lines, and nothing more for orders without
-	attendees (phamos/phamos#1707)."""
-	lines = [row.name for row in doc.items if row.name]
-	names = _attendees({"sales_order_item": ["in", lines]}) if lines else []
+	"""The Attendees of the lines follow the order's Customer and state (e.g. a person changes the Customer of
+	a draft). Runs on every Sales Order save; nothing more for orders without tickets (phamos/phamos#1707)."""
+	names = _line_attendees(doc)
 	if not names:
 		return
-	values = {"sales_order": doc.name, "billing_customer": doc.customer}
-	if doc.docstatus == 1:
-		values["payment_status"] = "Ordered"
-	_set(names, values)
+	for name in names:
+		frappe.db.set_value("Attendee", name, "billing_customer", doc.customer, update_modified=False)
+	refresh_payment_status(names)
 
 
 def on_sales_order_submit(doc, method=None):
 	on_sales_order_update(doc, method)
-	names = _attendees({"sales_order": doc.name})
-	_set(names, {"payment_status": "Ordered", "billing_customer": doc.customer})
+	names = _line_attendees(doc)
 	customer_type = frappe.db.get_value("Customer", doc.customer, "customer_type")
 	from phamos.marketing.crm import ensure_contact_links
 
@@ -434,39 +455,33 @@ def on_sales_order_submit(doc, method=None):
 
 
 def on_sales_order_cancel(doc, method=None):
-	names = _attendees({"sales_order": doc.name})
-	for name in names:
-		frappe.db.set_value("Attendee", name, {"sales_order": None, "sales_order_item": None,
-			"sales_invoice": None, "payment_status": "Pending"},
-			update_modified=False)
-	_refresh_orders(names)
+	"""Cancelled or deleted: the tickets are no longer ordered (they can go on a new Sales Order)."""
+	refresh_payment_status(_line_attendees(doc))
 
 
 def on_sales_invoice_change(doc, method=None):
 	"""Hooked on ``on_change`` only: it runs once after every save, submit and cancel, and also when a payment
-	or credit note changes the invoice through ``db_set`` (which runs ``on_change`` as well)."""
-	lines = [row.so_detail for row in doc.items if row.get("so_detail")]
-	if doc.get("is_return") and doc.get("return_against"):
-		lines += frappe.get_all("Sales Invoice Item", filters={"parent": doc.return_against}, pluck="so_detail")
-	lines += frappe.get_all("Attendee", filters={"sales_invoice": doc.name}, pluck="sales_order_item")
-	refresh_payment_status(lines)
+	or credit note changes the invoice through ``db_set`` (which runs ``on_change`` as well). A credit note
+	carries the attendees of its invoice (copied by ERPNext's mapper)."""
+	refresh_payment_status(_line_attendees(doc))
 
 
 def on_sales_invoice_trash(doc, method=None):
-	# A draft being deleted: the attendees fall back to their other (submitted) invoices, if any.
-	refresh_payment_status(frappe.get_all("Attendee", filters={"sales_invoice": doc.name}, pluck="sales_order_item"))
+	# A draft being deleted: drafts never count, but a ticket's status is recomputed all the same.
+	refresh_payment_status(_line_attendees(doc))
 
 
 def on_payment_entry_change(doc, method=None):
-	for ref in doc.get("references") or []:
-		if ref.reference_doctype == "Sales Invoice" and _attendees({"sales_invoice": ref.reference_name}):
-			on_sales_invoice_change(frappe.get_doc("Sales Invoice", ref.reference_name))
+	invoices = [ref.reference_name for ref in doc.get("references") or [] if ref.reference_doctype == "Sales Invoice"]
+	if invoices:
+		refresh_payment_status(frappe.get_all("Sales Invoice Item",
+			filters={"parent": ["in", invoices], "attendee": ["is", "set"]}, pluck="attendee"))
 
 
 def sync_payment_status():
 	"""Daily safety net for payments booked in ways that bypass the hooks."""
-	refresh_payment_status(frappe.get_all("Attendee", filters={"sales_order_item": ["is", "set"],
-		"payment_status": ["in", ["Ordered", "Invoiced"]]}, pluck="sales_order_item"))
+	refresh_payment_status(frappe.get_all("Attendee", filters={"payment_status": ["in", ["Ordered", "Invoiced"]]},
+		pluck="name"))
 
 
 def lead_before_insert(doc, method=None):

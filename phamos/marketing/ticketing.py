@@ -332,12 +332,13 @@ def _previous_order(event, order_key, contact):
 		return _order_result(order, frappe.db.count("Attendee", {"ticket_order": order.name}))
 	attendee = frappe.qb.DocType("Attendee")
 	rows = (frappe.qb.from_(attendee)
-		.select(attendee.name, attendee.sales_order, attendee.order_reference, attendee.is_buyer, attendee.email)
+		.select(attendee.name, attendee.order_reference, attendee.is_buyer, attendee.email)
 		.where((attendee.event == event) & (attendee.order_key == order_key))
 		.orderby(attendee.creation).for_update().run(as_dict=True))
 	if not rows:
 		return None
-	sales_order = next((r.sales_order for r in rows if r.sales_order), None)
+	lines = billing.ticket_lines([r.name for r in rows])
+	sales_order = next((lines[r.name] for r in rows if r.name in lines), None)
 	reference = sales_order or next((r.order_reference for r in rows if r.order_reference), None)
 	if sales_order:
 		tickets_to = frappe.db.get_value("Sales Order", sales_order, "contact_email")

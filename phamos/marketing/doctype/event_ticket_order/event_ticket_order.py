@@ -5,9 +5,9 @@
 
 The website order creates it with the buyer, the billing data as typed and the price the buyer confirmed. The
 desk creates Customer and Sales Order from it. The Attendees are the tickets; they link to their order through
-``ticket_order``. The order's ``status`` and its Customer / Sales Order / Sales Invoice links are never set by
-hand: they follow the tickets' ``payment_status`` (``refresh_status``), which ``phamos.marketing.billing``
-maintains per ticket.
+``ticket_order``. Sales Orders and Sales Invoices point to the order (``event_ticket_order``, shown under
+Connections; phamos/phamos#1727). The order's ``status`` and ``customer`` are never set by hand: they follow the
+tickets (``refresh_status``), whose ``payment_status`` ``phamos.marketing.billing`` maintains.
 """
 
 import frappe
@@ -47,15 +47,14 @@ def order_status(tickets):
 
 
 def refresh_status(order):
-	"""Recompute ``status`` and the links of one Event Ticket Order from its tickets."""
+	"""Recompute ``status`` and ``customer`` of one Event Ticket Order from its tickets."""
 	if not order or not frappe.db.exists("Event Ticket Order", order):
 		return
 	tickets = frappe.get_all("Attendee", filters={"ticket_order": order},
-		fields=["status", "payment_status", "customer", "billing_customer", "sales_order", "sales_invoice", "is_buyer"],
+		fields=["status", "payment_status", "customer", "billing_customer", "is_buyer"],
 		order_by="is_buyer desc, creation asc")
 	first = lambda field: next((t[field] for t in tickets if t[field]), None)  # noqa: E731
-	values = {"status": order_status(tickets), "sales_order": first("sales_order"),
-		"sales_invoice": first("sales_invoice")}
+	values = {"status": order_status(tickets)}
 	customer = first("billing_customer") or first("customer")
 	if customer:
 		values["customer"] = customer

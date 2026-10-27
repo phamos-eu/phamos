@@ -21,7 +21,7 @@ class Attendee(Document):
 	def before_insert(self):
 		if not self.registered_on:
 			self.registered_on = now_datetime()
-		if self.payment_status in (None, "", "Pending") and not self.has_order() and (
+		if self.payment_status in (None, "", "Pending") and (
 			self.role in ROLES_WITHOUT_TICKET or self.ticket_type in FREE_TICKET_TYPES
 		):
 			self.payment_status = "Not Required"
@@ -42,9 +42,6 @@ class Attendee(Document):
 			from phamos.marketing.doctype.event_ticket_order.event_ticket_order import refresh_status
 
 			refresh_status(self.ticket_order)
-
-	def has_order(self):
-		return bool(self.sales_order or self.sales_invoice)
 
 	def stamp_consents(self):
 		now = now_datetime()

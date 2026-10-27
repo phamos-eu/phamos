@@ -132,3 +132,27 @@ class TestTicketingRole(FrappeTestCase):
 		self.assertIn("Currency: removed 1 Event Ticketing row(s); kept", self.run_patch())
 		self.assertFalse(frappe.db.exists("Custom DocPerm", {"parent": "Currency", "role": setup.TICKETING_ROLE}))
 		self.assertTrue(frappe.db.exists("Custom DocPerm", {"parent": "Currency"}))
+
+
+class TestSalesDocumentFields(FrappeTestCase):
+	"""phamos/phamos#1727: the ticket links sit in the "Implementation Specific" section at the top."""
+
+	def test_line_field_is_in_the_top_section(self):
+		for doctype in ("Sales Order Item", "Sales Invoice Item"):
+			fields = frappe.get_meta(doctype).fields
+			self.assertEqual([(f.fieldname, f.label) for f in fields[:2]],
+				[("custom_implementation_specific", "Implementation Specific"), ("attendee", "Attendee")], doctype)
+			# The closing Section Break keeps the standard fields out of it.
+			self.assertEqual(fields[2].fieldtype, "Section Break", doctype)
+
+	def test_order_field_is_in_the_top_section(self):
+		for doctype in ("Sales Order", "Sales Invoice"):
+			fields = frappe.get_meta(doctype).fields
+			top = []
+			for f in fields[1:]:
+				if f.fieldtype in ("Section Break", "Tab Break"):
+					break
+				top.append(f.fieldname)
+			self.assertEqual(fields[0].fieldtype, "Section Break", doctype)
+			self.assertIn("event_ticket_order", top, doctype)
+
