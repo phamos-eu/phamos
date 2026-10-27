@@ -1462,7 +1462,6 @@ A ticket can only be on one line of the Sales Order.,Ein Ticket kann nur auf ein
 "Order Reference (legacy)","Bestellreferenz (Altbestand)"
 "The order this ticket belongs to. Set for all orders since phamos/phamos#1717.","Die Bestellung, zu der dieses Ticket gehört. Gesetzt für alle Bestellungen seit phamos/phamos#1717."
 "Only for registrations before phamos/phamos#1717, which have no Event Ticket Order: groups the attendees of one old order (its Sales Order, a booking number or an import id).","Nur für Anmeldungen vor phamos/phamos#1717, die keine Ticketbestellung haben: fasst die Teilnehmer einer alten Bestellung zusammen (ihr Auftrag, eine Buchungsnummer oder eine Import-ID)."
-Add Ticket,Ticket hinzufügen
 Website orders cannot be changed.,Website-Bestellungen können nicht geändert werden.
 Event Ticket Order {0} has a Sales Order and can no longer be changed.,Ticketbestellung {0} hat einen Auftrag und kann nicht mehr geändert werden.
 The event of an order with tickets cannot be changed.,Die Veranstaltung einer Bestellung mit Tickets kann nicht geändert werden.
