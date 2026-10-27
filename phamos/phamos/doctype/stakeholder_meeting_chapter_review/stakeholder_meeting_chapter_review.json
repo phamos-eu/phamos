@@ -10,6 +10,8 @@
   "current_revision",
   "previous_revision",
   "chapter_status_before",
+  "current_level_before",
+  "target_level_before",
   "planned_start",
   "target_date",
   "drift_detected",
@@ -27,7 +29,8 @@
   "column_break_proposed",
   "proposed_planned_start",
   "proposed_target_date",
-  "notes"
+  "notes",
+  "submit_snapshot"
  ],
  "fields": [
   {
@@ -49,7 +52,7 @@
    "read_only": 1
   },
   {
-   "description": "The revision reviewed/agreed in this meeting. Seeded from the Chapter's current revision; updated to the newly created revision if Scope Change is checked and this meeting is submitted.",
+   "description": "The revision reviewed/agreed in this meeting. Seeded from the Chapter's current revision; updated to the new revision if this meeting's submit creates one.",
    "fieldname": "current_revision",
    "fieldtype": "Link",
    "label": "Current Revision",
@@ -57,7 +60,7 @@
    "read_only": 1
   },
   {
-   "description": "Set automatically when Scope Change creates a new revision on submit, recording what the revision was before this meeting, for audit.",
+   "description": "Set automatically when this meeting's submit creates a new revision, recording what the revision was before this meeting, for audit.",
    "fieldname": "previous_revision",
    "fieldtype": "Link",
    "label": "Previous Revision",
@@ -186,7 +189,7 @@
   },
   {
    "columns": 2,
-   "depends_on": "eval:doc.decision_description",
+   "depends_on": "eval:doc.scope_change",
    "fieldname": "decision",
    "fieldtype": "Select",
    "in_list_view": 1,
@@ -194,8 +197,8 @@
    "options": "\nYes\nNo\nDeferred"
   },
   {
-   "depends_on": "eval:doc.scope_change",
-   "description": "Context or rationale for this decision. Only shown when Scope Change is checked.",
+   "depends_on": "eval:doc.decision",
+   "description": "Context or rationale for this decision.",
    "fieldname": "decision_description",
    "fieldtype": "Small Text",
    "label": "Decision Description"
@@ -204,11 +207,34 @@
    "fieldname": "notes",
    "fieldtype": "Small Text",
    "label": "Notes"
+  },
+  {
+   "description": "Snapshot of the Chapter's Current Level when this row was seeded. Submit only changes the Chapter's level if it was edited in this meeting.",
+   "fieldname": "current_level_before",
+   "fieldtype": "Int",
+   "label": "Current Level Before Meeting",
+   "read_only": 1
+  },
+  {
+   "description": "Snapshot of the Chapter's Target Level when this row was seeded. Submit only changes the Chapter's level if it was edited in this meeting.",
+   "fieldname": "target_level_before",
+   "fieldtype": "Int",
+   "label": "Target Level Before Meeting",
+   "read_only": 1
+  },
+  {
+   "fieldname": "submit_snapshot",
+   "fieldtype": "Code",
+   "hidden": 1,
+   "label": "Submit Snapshot",
+   "no_copy": 1,
+   "options": "JSON",
+   "read_only": 1
   }
  ],
  "istable": 1,
  "links": [],
- "modified": "2026-09-03 08:48:42.144109",
+ "modified": "2026-10-20 10:00:00.000000",
  "modified_by": "Administrator",
  "module": "Phamos",
  "name": "Stakeholder Meeting Chapter Review",
