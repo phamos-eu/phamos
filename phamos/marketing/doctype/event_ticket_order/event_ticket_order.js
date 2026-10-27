@@ -10,14 +10,14 @@ frappe.ui.form.on("Event Ticket Order", {
 		phamos_ticket_order.load_prices(frm, frm.is_new());
 		if (frm.is_new()) return;
 		if (editable) {
-			// A new ticket for this order, under "Create" as in ERPNext (phamos/phamos#1730).
+			// Follow-up documents under "Create", as in ERPNext (phamos/phamos#1730).
 			frm.add_custom_button(__("Attendee"), () => phamos_ticket_order.new_attendee(frm), __("Create"));
 		}
 		if (frm.doc.status === "Booked") {
-			frm.add_custom_button(__("Create Sales Order"), () => phamos_ticket_order.create_sales_order(frm));
+			frm.add_custom_button(__("Sales Order"), () => phamos_ticket_order.create_sales_order(frm), __("Create"));
 		}
 		if (frm.doc.status === "Ordered") {
-			frm.add_custom_button(__("Create Sales Invoice"), () => phamos_ticket_order.create_sales_invoice(frm));
+			frm.add_custom_button(__("Sales Invoice"), () => phamos_ticket_order.create_sales_invoice(frm), __("Create"));
 		}
 	},
 
