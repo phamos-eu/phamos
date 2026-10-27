@@ -75,18 +75,27 @@ class EventTicketOrder(Document):
 		self.quantity, self.confirmed_total = desk_totals(self)
 
 	def set_desk_price(self, event):
-		"""The price row the desk chose: its rate unless one was typed, gross or net and taxes as the event sells."""
-		from phamos.marketing.billing import price_ladder
-
+		"""The price of a desk order, fetched from the event's price rows: the chosen row, else the row that applies
+		now (as for attendees added by hand, ``billing.pricing_for_attendee``). A typed rate is kept; gross or net
+		and taxes as the event sells."""
+		row = current_price(event, self.ticket_type)
 		if not self.ticket_type:
-			frappe.throw(_("Please choose the price of the tickets."))
-		row = next((r for r in price_ladder(event) if r.title == self.ticket_type), None)
-		if not row:
-			frappe.throw(_("{0} is not a price of event {1}.").format(self.ticket_type, event.title or event.name))
-		if not self.ticket_rate:
+			self.ticket_type = row.title if row else None
+		if not self.ticket_rate and row:
 			self.ticket_rate = row.rate
+		if not self.ticket_type or not self.ticket_rate:
+			frappe.throw(_("Event {0} has no ticket price.").format(event.title or event.name))
 		self.ticket_rate_includes_tax = cint(event.get("ticket_price_includes_tax"))
 		self.item_tax_template = event.get("item_tax_template")
+
+
+def current_price(event, title=None):
+	"""The price row named ``title``, else the row that applies now, else the last one (None without rows)."""
+	from phamos.marketing.billing import price_ladder, select_price
+
+	ladder = price_ladder(event)
+	return (next((r for r in ladder if r.title == title), None) if title else None) or select_price(event, 1) or \
+		(ladder[-1] if ladder else None)
 
 
 def desk_totals(order):
@@ -109,8 +118,10 @@ def ticket_prices(event):
 	doc = frappe.get_doc("Marketing Content", event)
 	doc.check_permission("read")
 	if not doc.get("ticket_item"):
-		return {"paid": False, "prices": []}
-	return {"paid": True, "prices": [{"title": row.title, "rate": row.rate} for row in price_ladder(doc)]}
+		return {"paid": False, "prices": [], "current": None}
+	current = current_price(doc)
+	return {"paid": True, "prices": [{"title": row.title, "rate": row.rate} for row in price_ladder(doc)],
+		"current": current.title if current else None}
 
 
 def order_status(tickets):

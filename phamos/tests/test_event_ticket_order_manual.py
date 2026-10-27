@@ -68,9 +68,18 @@ class TestManualEventTicketOrder(FrappeTestCase):
 		order.reload()
 		self.assertEqual((order.quantity, flt(order.confirmed_total)), (1, 100))
 
-	def test_price_must_be_one_of_the_event(self, enqueue):
-		self.assertRaises(frappe.ValidationError, self.desk_order, ticket_type="Gold")
-		self.assertRaises(frappe.ValidationError, self.desk_order, ticket_type="")
+	def test_price_is_fetched_from_the_event(self, enqueue):
+		# No price chosen: the row that applies now (the first of the table here), with its rate.
+		order = self.desk_order(ticket_type="", buyer_attends=0)
+		self.assertEqual((order.ticket_type, order.ticket_rate), ("Early Bird", 59.5))
+		# A price that is not in the table is kept, at the rate of the row that applies now unless one was typed.
+		order = self.desk_order(ticket_type="Partner", buyer_attends=0)
+		self.assertEqual((order.ticket_type, order.ticket_rate), ("Partner", 59.5))
+		order = self.desk_order(ticket_type="Partner", ticket_rate=80, buyer_attends=0)
+		self.assertEqual((order.ticket_type, order.ticket_rate), ("Partner", 80))
+		self.assertEqual(frappe.get_attr(
+			"phamos.marketing.doctype.event_ticket_order.event_ticket_order.ticket_prices")(self.event.name)["current"],
+			"Early Bird")
 
 	def test_free_event(self, enqueue):
 		event = make_event("Manual Free Ticket Order Event", paid=False)

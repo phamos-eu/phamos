@@ -7,7 +7,7 @@ frappe.ui.form.on("Event Ticket Order", {
 	refresh(frm) {
 		const editable = phamos_ticket_order.editable(frm);
 		if (!editable) frm.disable_save();
-		phamos_ticket_order.load_prices(frm);
+		phamos_ticket_order.load_prices(frm, frm.is_new());
 		if (frm.is_new()) return;
 		if (editable) {
 			frm.add_custom_button(__("Add Ticket"), () => phamos_ticket_order.add_ticket(frm));
@@ -23,7 +23,7 @@ frappe.ui.form.on("Event Ticket Order", {
 	event(frm) {
 		frm.set_value("ticket_type", "");
 		frm.set_value("ticket_rate", 0);
-		phamos_ticket_order.load_prices(frm);
+		phamos_ticket_order.load_prices(frm, true);
 	},
 
 	// The rate of the chosen price row; it can still be changed by hand.
@@ -38,8 +38,8 @@ const phamos_ticket_order = {
 		return frm.doc.source === "Desk" && ["Booked", "Free"].includes(frm.doc.status);
 	},
 
-	// The event's price rows as the choices of "Price" (desk orders only).
-	load_prices(frm) {
+	// The event's price rows as the choices of "Price" (desk orders only); ``prefill``: the row that applies now.
+	load_prices(frm, prefill) {
 		if (!this.editable(frm) || !frm.doc.event) return;
 		frappe.call({
 			method: "phamos.marketing.doctype.event_ticket_order.event_ticket_order.ticket_prices",
@@ -48,7 +48,7 @@ const phamos_ticket_order = {
 			frm.__ticket_prices = message.prices;
 			frm.set_df_property("ticket_type", "options", message.prices.map((r) => r.title));
 			frm.toggle_display(["ticket_type", "ticket_rate"], message.paid);
-			frm.toggle_reqd("ticket_type", message.paid);
+			if (prefill && message.current && !frm.doc.ticket_type) frm.set_value("ticket_type", message.current);
 		});
 	},
 
