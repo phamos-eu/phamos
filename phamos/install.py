@@ -31,6 +31,10 @@ _TEST_RECORD_ROOTS = (
 			{"doctype": "Gender", "gender": "Female"},
 		],
 	),
+	(
+    "Warehouse Type",
+    [{"doctype": "Warehouse Type", "name": "Transit"}],
+	),
 )
 
 
