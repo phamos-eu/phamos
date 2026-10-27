@@ -105,6 +105,10 @@ unit_tests:
     - bench new-site "$SITE" --db-root-password root --mariadb-root-username root --mariadb-root-password root --admin-password admin --mariadb-user-host-login-scope='%'
     - bench --site "$SITE" install-app erpnext
     - bench --site "$SITE" install-app hrms
+    # Phamos Settings.hour_uom defaults to the UOM "Hour", which normally comes
+    # from the ERPNext setup wizard; the install fails without it.
+    - |
+      bench --site "$SITE" execute frappe.client.insert --kwargs '{"doc": {"doctype": "UOM", "uom_name": "Hour"}}'
     - bench --site "$SITE" install-app phamos
     - bench --site "$SITE" set-config allow_tests true
     - |
