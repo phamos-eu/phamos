@@ -4,15 +4,90 @@
 import frappe
 
 
+def before_install():
+	"""Phamos Settings links to UOM "Hour", which ERPNext creates only in the setup wizard."""
+	if frappe.db.exists("DocType", "UOM") and not frappe.db.exists("UOM", "Hour"):
+		frappe.get_doc({"doctype": "UOM", "uom_name": "Hour"}).insert(ignore_permissions=True)
+
+
+# Roots that ERPNext test_records.json link to, but do not insert themselves.
+# Same shape as a test_records.json entry: make_test_objects inserts them.
+_TEST_RECORD_ROOTS = (
+	(
+		"UOM",
+		[
+			{"doctype": "UOM", "uom_name": "Nos", "must_be_whole_number": 1},
+			{"doctype": "UOM", "uom_name": "Hour"},
+		],
+	),
+	(
+		"Item Group",
+		[{"doctype": "Item Group", "item_group_name": "All Item Groups", "is_group": 1}],
+	),
+	(
+		"Gender",
+		[
+			{"doctype": "Gender", "gender": "Male"},
+			{"doctype": "Gender", "gender": "Female"},
+		],
+	),
+	(
+    "Warehouse Type",
+    [{"doctype": "Warehouse Type", "name": "Transit"}],
+	),
+)
+
+
+def _test_record_name(record):
+	for key in ("uom_name", "item_group_name", "gender", "name"):
+		if record.get(key):
+			return record[key]
+
+
+def load_test_records():
+	"""Load masters the way `bench run-tests` does.
+
+	The runner reads test_records.json and inserts those docs with make_test_objects.
+	Company is loaded from ERPNext's company/test_records.json the same way, after its
+	Holiday List. Gender, UOM "Nos" and Item Group "All Item Groups" are not in those
+	files, so they are passed to make_test_objects in the same record shape.
+	"""
+	from frappe.test_runner import make_test_objects, make_test_records, make_test_records_for_doctype
+
+	if not getattr(frappe.local, "test_objects", None):
+		frappe.local.test_objects = {}
+
+	for doctype, records in _TEST_RECORD_ROOTS:
+		if not frappe.db.exists("DocType", doctype):
+			continue
+		# make_test_objects rolls back the transaction when a name already exists.
+		missing = [row for row in records if not frappe.db.exists(doctype, _test_record_name(row))]
+		if missing:
+			make_test_objects(doctype, missing, commit=True)
+
+	if frappe.db.exists("DocType", "Company") and not frappe.db.exists("Company", "_Test Company"):
+		# Holiday List, then Company, from their test_records.json files.
+		# make_test_records_for_doctype inserts that file only. make_test_records("Company")
+		# would also build every linked DocType (Account, Warehouse, ...) before the company exists.
+		make_test_records("Holiday List", commit=True)
+		frappe.local.test_objects.setdefault("Company", [])
+		make_test_records_for_doctype("Company", commit=True)
+
+	if frappe.db.exists("Company", "_Test Company") and not frappe.defaults.get_global_default("company"):
+		frappe.defaults.set_global_default("company", "_Test Company")
+
+
 def before_tests():
 	"""Set up test data before running tests."""
 	frappe.clear_cache()
-	
+
 	# Handle custom mandatory fields that conflict with test records
 	make_custom_fields_optional_for_tests()
-	
+
+	# Test records first, so create_departments finds "_Test Company" instead of inserting a stub.
+	load_test_records()
+
 	# Create necessary master records for tests
-	# Note: Company is created by ERPNext's test records
 	create_warehouse_types()
 	create_opportunity_types()
 	create_customer_groups()
