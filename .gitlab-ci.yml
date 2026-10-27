@@ -87,6 +87,8 @@ unit_tests:
     - bench set-config -g redis_socketio redis://redis-queue:6379
     - bench get-app --branch "$FRAPPE_BRANCH" --skip-assets erpnext
     - bench get-app --branch "$FRAPPE_BRANCH" --skip-assets hrms
+    # Without assets.json, rendering web pages fails in bundled_asset().
+    - mkdir -p sites/assets && echo '{}' > sites/assets/assets.json
 
     # phamos from this checkout.
     - cp -r "$CI_PROJECT_DIR" apps/phamos
@@ -105,10 +107,11 @@ unit_tests:
     - bench new-site "$SITE" --db-root-password root --mariadb-root-username root --mariadb-root-password root --admin-password admin --mariadb-user-host-login-scope='%'
     - bench --site "$SITE" install-app erpnext
     - bench --site "$SITE" install-app hrms
-    # Phamos Settings.hour_uom defaults to the UOM "Hour", which normally comes
-    # from the ERPNext setup wizard; the install fails without it.
+    # Master data the ERPNext setup wizard would create (UOMs, root groups).
+    # Installing phamos needs the UOM "Hour", the tests need e.g. "Nos" and
+    # "All Item Groups".
     - |
-      bench --site "$SITE" execute frappe.client.insert --kwargs '{"doc": {"doctype": "UOM", "uom_name": "Hour"}}'
+      bench --site "$SITE" execute erpnext.setup.setup_wizard.operations.install_fixtures.install --kwargs '{"country": "Germany"}'
     - bench --site "$SITE" install-app phamos
     - bench --site "$SITE" set-config allow_tests true
     - |
