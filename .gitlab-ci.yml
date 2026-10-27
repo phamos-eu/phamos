@@ -72,6 +72,12 @@ unit_tests:
       phamos.tests.test_marketing_patches
       phamos.tests.test_web_profile_events
       phamos.tests.test_web_page_editing
+      phamos.phamos.doctype.stakeholder_meeting.test_stakeholder_meeting
+      phamos.phamos.doctype.stakeholder_meeting.test_stakeholder_meeting_rules
+      phamos.phamos.doctype.implementation_chapter.test_implementation_chapter
+      phamos.phamos.doctype.implementation_chapter.test_implementation_chapter_rules
+      phamos.phamos.doctype.implementation.test_implementation_review_cadence
+      phamos.tests.test_backfill_chapter_revision_status_and_levels
   script:
     - bench --version
 
@@ -96,8 +102,13 @@ unit_tests:
       if [ -s sites/apps.txt ] && [ -n "$(tail -c1 sites/apps.txt)" ]; then echo >> sites/apps.txt; fi
       grep -qxF phamos sites/apps.txt || echo phamos >> sites/apps.txt
 
-    # Test site.
-    - bench new-site "$SITE" --db-root-password root --mariadb-root-username root --mariadb-root-password root --admin-password admin --no-mariadb-socket
+    # Dev dependencies, e.g. xmlrunner for run-tests --junit-xml-output.
+    - bench setup requirements --dev
+
+    # Test site. The image's MariaDB client (11.4+) requires TLS by default,
+    # which the mariadb:10.6 service doesn't offer.
+    - printf '[client]\nskip-ssl\n' > ~/.my.cnf
+    - bench new-site "$SITE" --db-root-password root --mariadb-root-username root --mariadb-root-password root --admin-password admin --mariadb-user-host-login-scope='%'
     - bench --site "$SITE" install-app erpnext
     - bench --site "$SITE" install-app hrms
     - bench --site "$SITE" install-app phamos
