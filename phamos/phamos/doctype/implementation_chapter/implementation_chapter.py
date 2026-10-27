@@ -3,6 +3,8 @@
 
 import frappe
 from frappe.model.document import Document
+from frappe.query_builder import DocType
+from frappe.query_builder.functions import Max
 from frappe.utils import getdate
 
 AGREED_CONTENT_FIELDS = (
@@ -29,15 +31,15 @@ class ImplementationChapter(Document):
 		self.validate_target_date_after_planned_start()
 
 	def on_update(self):
-		self.sync_level_change_to_revision()
+		self.sync_execution_state_to_revision()
 		self.sync_module_row_in_implementation()
 
-	def sync_level_change_to_revision(self):
-		"""A Current Level / Target Level edit made directly on the Chapter (outside
-		a Stakeholder Meeting) updates the existing current Revision in place rather
-		than creating a new one - a fresh Revision is only ever minted by a
-		Stakeholder Meeting. Only applies once the Chapter has left Draft and
-		already has a current Revision to update."""
+	def sync_execution_state_to_revision(self):
+		"""A Status / Current Level / Target Level edit made directly on the Chapter
+		(outside a Stakeholder Meeting) updates the existing current Revision in
+		place rather than creating a new one - a fresh Revision is only ever minted
+		by Set as Planned or a Stakeholder Meeting. Only applies once the Chapter
+		has left Draft and already has a current Revision to update."""
 		if self.is_new():
 			return
 
@@ -46,7 +48,8 @@ class ImplementationChapter(Document):
 			return
 
 		if (
-			self.current_level == doc_before_save.current_level
+			self.status == doc_before_save.status
+			and self.current_level == doc_before_save.current_level
 			and self.target_level == doc_before_save.target_level
 		):
 			return
@@ -101,8 +104,10 @@ class ImplementationChapter(Document):
 		"Set as Planned" action (which sets current_revision before saving).
 		Once Planned, the Chapter may move between Planned / In Progress /
 		Blocked (execution status, not agreed content) or terminate as
-		Cancelled, but can never go back to Draft."""
-		if self.is_new():
+		Cancelled, but can never go back to Draft. A Draft Chapter may also be
+		Cancelled directly. Cancelling a Stakeholder Meeting restores the status
+		it had before that meeting, which bypasses these rules."""
+		if self.is_new() or frappe.flags.in_stakeholder_meeting_cancel:
 			return
 
 		doc_before_save = self.get_doc_before_save()
@@ -118,13 +123,13 @@ class ImplementationChapter(Document):
 			frappe.throw(frappe._("A Chapter cannot be reverted back to Draft once it has left Draft."))
 
 		if previous_status == "Draft":
-			if self.status != "Planned":
+			if self.status not in ("Planned", "Cancelled"):
 				frappe.throw(
 					frappe._("A Draft Chapter can only move to Planned or Cancelled, not directly to {0}.").format(
 						self.status
 					)
 				)
-			if not self.current_revision:
+			if self.status == "Planned" and not self.current_revision:
 				frappe.throw(
 					frappe._('Use the "Set as Planned" action to move a Chapter from Draft to Planned.')
 				)
@@ -140,8 +145,13 @@ class ImplementationChapter(Document):
 		"""Once a Chapter leaves Draft, its agreed content is frozen against a direct
 		edit on the Chapter. A submitted Stakeholder Meeting is the only exception:
 		a Scope Change there pushes its new Revision's content back onto the Chapter,
-		which it does under frappe.flags.in_stakeholder_meeting_submit."""
-		if self.is_new() or frappe.flags.in_stakeholder_meeting_submit:
+		which it does under frappe.flags.in_stakeholder_meeting_submit (and undoes
+		under frappe.flags.in_stakeholder_meeting_cancel)."""
+		if (
+			self.is_new()
+			or frappe.flags.in_stakeholder_meeting_submit
+			or frappe.flags.in_stakeholder_meeting_cancel
+		):
 			return
 
 		doc_before_save = self.get_doc_before_save()
@@ -168,17 +178,15 @@ class ImplementationChapter(Document):
 
 def create_revision_snapshot(chapter):
 	"""Freeze the Chapter's current status/levels/content as the next immutable
-	Chapter Revision. Shared by set_as_planned() and by a direct Current
-	Level / Target Level edit on the Chapter; the caller is responsible for
-	pointing the Chapter's current_revision at the result."""
-	next_revision_number = (
-		frappe.db.count("Implementation Chapter Revision", {"implementation_chapter": chapter.name}) + 1
-	)
+	Chapter Revision. Shared by set_as_planned() and by a submitted Stakeholder
+	Meeting (which first copies any Scope Change proposal onto the Chapter); the
+	caller is responsible for pointing the Chapter's current_revision at the
+	result."""
 	revision = frappe.get_doc(
 		{
 			"doctype": "Implementation Chapter Revision",
 			"implementation_chapter": chapter.name,
-			"revision_number": next_revision_number,
+			"revision_number": get_next_revision_number(chapter.name),
 			"status": chapter.status,
 			"target_level": chapter.target_level,
 			"current_level": chapter.current_level,
@@ -191,6 +199,21 @@ def create_revision_snapshot(chapter):
 	)
 	revision.insert(ignore_permissions=True)
 	return revision
+
+
+def get_next_revision_number(chapter_name):
+	"""Lock the Chapter row first so two concurrent submits for the same Chapter
+	can't both read the same highest revision number."""
+	frappe.db.get_value("Implementation Chapter", chapter_name, "name", for_update=True)
+
+	revision = DocType("Implementation Chapter Revision")
+	last_number = (
+		frappe.qb.from_(revision)
+		.select(Max(revision.revision_number))
+		.where(revision.implementation_chapter == chapter_name)
+		.run()[0][0]
+	)
+	return (last_number or 0) + 1
 
 
 @frappe.whitelist()
@@ -233,11 +256,13 @@ def set_as_planned(name):
 @frappe.whitelist()
 def get_chapter_history(chapter):
 	"""Read-only history for the Chapter's History tab: each Revision together with
-	the Progress and Decision recorded by the Stakeholder Meeting Chapter Review
-	row that produced it (if any - Revision 1 comes from Set as Planned, not a
-	meeting). Built entirely from Implementation Chapter Revision / Stakeholder
-	Meeting Chapter Review - never touches Implementation.status_updates."""
+	the Progress and Decision of the submitted Stakeholder Meeting Chapter Review
+	row that produced it, or else of the latest submitted review of that Revision
+	(Revision 1 comes from Set as Planned, not a meeting). Built entirely from
+	Implementation Chapter Revision / Stakeholder Meeting Chapter Review - never
+	touches Implementation.status_updates."""
 	doc = frappe.get_doc("Implementation Chapter", chapter)
+	doc.check_permission("read")
 
 	revisions = frappe.get_all(
 		"Implementation Chapter Revision",
@@ -254,19 +279,46 @@ def get_chapter_history(chapter):
 		order_by="revision_number asc",
 	)
 
-	review_rows = frappe.get_all(
-		"Stakeholder Meeting Chapter Review",
-		filters={"chapter": chapter, "docstatus": 1},
-		fields=["progress", "current_revision", "decision", "decision_description"],
+	review = DocType("Stakeholder Meeting Chapter Review")
+	meeting = DocType("Stakeholder Meeting")
+	review_rows = (
+		frappe.qb.from_(review)
+		.join(meeting)
+		.on(review.parent == meeting.name)
+		.select(
+			review.progress,
+			review.current_revision,
+			review.previous_revision,
+			review.decision,
+			review.decision_description,
+		)
+		.where(
+			(review.parenttype == "Stakeholder Meeting")
+			& (review.chapter == chapter)
+			& (meeting.docstatus == 1)
+		)
+		.orderby(meeting.meeting_date)
+		.orderby(meeting.creation)
+		.orderby(review.idx)
+		.run(as_dict=True)
 	)
-	review_by_revision = {row.current_revision: row for row in review_rows if row.current_revision}
+
+	# Rows are oldest first, so the latest review of a Revision wins.
+	produced_by_revision = {}
+	latest_review_by_revision = {}
+	for row in review_rows:
+		if not row.current_revision:
+			continue
+		latest_review_by_revision[row.current_revision] = row
+		if row.previous_revision:
+			produced_by_revision[row.current_revision] = row
 
 	for revision in revisions:
 		revision["is_current"] = revision.name == doc.current_revision
-		review = review_by_revision.get(revision.name)
-		revision["progress"] = review.progress if review else None
-		revision["decision"] = review.decision if review else None
-		revision["decision_description"] = review.decision_description if review else None
+		row = produced_by_revision.get(revision.name) or latest_review_by_revision.get(revision.name)
+		revision["progress"] = row.progress if row else None
+		revision["decision"] = row.decision if row else None
+		revision["decision_description"] = row.decision_description if row else None
 
 	return {
 		"current_revision": doc.current_revision,

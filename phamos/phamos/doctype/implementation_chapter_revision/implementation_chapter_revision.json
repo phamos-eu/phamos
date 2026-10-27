@@ -27,7 +27,6 @@
    "in_list_view": 1,
    "label": "Implementation Chapter",
    "options": "Implementation Chapter",
-   "read_only": 1,
    "reqd": 1
   },
   {
@@ -36,11 +35,9 @@
    "fieldtype": "Int",
    "in_list_view": 1,
    "label": "Revision Number",
-   "read_only": 1,
    "reqd": 1
   },
   {
-   "default": "Draft",
    "fieldname": "status",
    "fieldtype": "Select",
    "in_list_view": 1,
@@ -66,14 +63,12 @@
   {
    "fieldname": "planned_start",
    "fieldtype": "Date",
-   "label": "Planned Start",
-   "read_only": 1
+   "label": "Planned Start"
   },
   {
    "fieldname": "target_date",
    "fieldtype": "Date",
-   "label": "Target Date",
-   "read_only": 1
+   "label": "Target Date"
   },
   {
    "fieldname": "section_break_rev",
@@ -82,31 +77,31 @@
   {
    "fieldname": "chapter_title",
    "fieldtype": "Data",
-   "label": "Chapter Title",
-   "read_only": 1
+   "label": "Chapter Title"
   },
   {
    "fieldname": "chapter_introduction",
    "fieldtype": "Small Text",
-   "label": "Chapter Introduction",
-   "read_only": 1
+   "label": "Chapter Introduction"
   },
   {
    "fieldname": "full_chapter_description",
    "fieldtype": "Text Editor",
-   "label": "Full Chapter Description",
-   "read_only": 1
+   "label": "Full Chapter Description"
   }
  ],
  "index_web_pages_for_search": 1,
  "links": [
   {
    "group": "Meetings",
-   "link_doctype": "Stakeholder Meeting",
+   "is_child_table": 1,
+   "link_doctype": "Stakeholder Meeting Chapter Review",
+   "parent_doctype": "Stakeholder Meeting",
+   "table_fieldname": "chapter_reviews",
    "link_fieldname": "current_revision"
   }
  ],
- "modified": "2026-08-19 00:00:00.000000",
+ "modified": "2026-10-27 10:00:00.000000",
  "modified_by": "Administrator",
  "module": "Phamos",
  "name": "Implementation Chapter Revision",

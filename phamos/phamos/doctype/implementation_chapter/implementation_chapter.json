@@ -176,11 +176,14 @@
   },
   {
    "group": "Meetings",
-   "link_doctype": "Stakeholder Meeting",
-   "link_fieldname": "chapter"
+   "is_child_table": 1,
+   "link_doctype": "Stakeholder Meeting Chapter Review",
+   "link_fieldname": "chapter",
+   "parent_doctype": "Stakeholder Meeting",
+   "table_fieldname": "chapter_reviews"
   }
  ],
- "modified": "2026-08-19 12:59:51.644282",
+ "modified": "2026-10-27 12:00:00.000000",
  "modified_by": "Administrator",
  "module": "Phamos",
  "name": "Implementation Chapter",
