@@ -235,6 +235,7 @@ update_website_context = [
 # Installation
 # ------------
 
+before_install = "phamos.install.before_install"
 after_install = "phamos.setup.ops_inbox.ensure_ops_inbox_setup"
 
 after_migrate = [

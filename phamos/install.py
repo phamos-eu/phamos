@@ -4,6 +4,12 @@
 import frappe
 
 
+def before_install():
+	"""Phamos Settings links to UOM "Hour", which ERPNext creates only in the setup wizard."""
+	if frappe.db.exists("DocType", "UOM") and not frappe.db.exists("UOM", "Hour"):
+		frappe.get_doc({"doctype": "UOM", "uom_name": "Hour"}).insert(ignore_permissions=True)
+
+
 def before_tests():
 	"""Set up test data before running tests."""
 	frappe.clear_cache()
