@@ -97,6 +97,12 @@ unit_tests:
       if [ -s sites/apps.txt ] && [ -n "$(tail -c1 sites/apps.txt)" ]; then echo >> sites/apps.txt; fi
       grep -qxF phamos sites/apps.txt || echo phamos >> sites/apps.txt
 
+    # The MariaDB 11 client in frappe/bench requires TLS. The 10.6 service has no certificates,
+    # so site creation fails with ERROR 2026 unless the client is told to skip SSL.
+    - |
+      printf '[client]\nskip-ssl = true\n' > "$HOME/.my.cnf"
+      chmod 600 "$HOME/.my.cnf"
+
     # Test site.
     - bench new-site "$SITE" --db-root-password root --mariadb-root-username root --mariadb-root-password root --admin-password admin --no-mariadb-socket
     - bench --site "$SITE" install-app erpnext
