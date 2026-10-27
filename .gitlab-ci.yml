@@ -33,7 +33,8 @@ unit_tests:
   image: frappe/bench:latest
   tags: [hetzner]
   timeout: 90 minutes
-  interruptible: true
+  # The bench install takes most of the job. An interruptible job is canceled
+  # mid-install when a newer pipeline starts, before any test runs.
   rules:
     - if: '$UNIT_TESTS_ENABLED == "false"'
       when: never
