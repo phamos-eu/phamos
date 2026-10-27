@@ -85,6 +85,16 @@ class TestEventTicketOrder(FrappeTestCase):
 		self.assertEqual(frappe.db.get_value("Event Ticket Order", order.name, ["status", "customer"]),
 			("Ordered", "Test Ticket Order Customer"))
 
+	def test_event_connections_list_its_orders_and_tickets(self, enqueue):
+		# phamos/phamos#1728: the event's Connections tab shows its Event Ticket Orders next to the Attendees.
+		from frappe.desk.notifications import get_open_count
+
+		order = self.make_order()
+		make_attendee(self.event.name, "t@connections.example", ticket_order=order.name)
+		found = get_open_count("Marketing Content", self.event.name)["count"]["external_links_found"]
+		counts = {d["doctype"]: d["count"] for d in found}
+		self.assertEqual((counts.get("Event Ticket Order"), counts.get("Attendee")), (1, 1))
+
 	def test_guests_cannot_read_orders(self, enqueue):
 		order = self.make_order()
 		frappe.set_user("Guest")
