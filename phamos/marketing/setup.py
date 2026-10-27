@@ -1,4 +1,5 @@
-"""Idempotent setup of the Marketing module (``after_migrate``): the Lead Source "Event" for registrations.
+"""Idempotent setup of the Marketing module (``after_migrate``): the Lead Source "Event" for registrations and the
+fields that tie sales documents to their tickets (``SALES_DOCUMENT_FIELDS``).
 
 Until phamos/phamos#1717 website orders created Sales Orders as a service user, "event-ticketing@phamos.invalid"
 with the role "Event Ticketing" (read on Item, select on Account: ERPNext checks both with the session user's
@@ -9,6 +10,7 @@ user, the role and the permission copies its rights left behind (``remove_unneed
 """
 
 import frappe
+from frappe.custom.doctype.custom_field.custom_field import create_custom_fields
 
 from phamos.marketing.crm import ensure_lead_source
 
@@ -23,8 +25,34 @@ PERM_COLUMNS = ("role", "permlevel", "if_owner", "select", "read", "write", "cre
 	"amend", "report", "export", "import", "share", "print", "email")
 
 
+# The sales documents point to the ticket order and to the ticket of each line, not the other way round
+# (phamos/phamos#1727). Same fieldnames on order and invoice, and not no_copy: ERPNext's mapper copies them from
+# Sales Order to Sales Invoice and from an invoice to its credit note. Connections on Event Ticket Order and
+# Attendee read them.
+_ORDER_FIELD = {
+	"fieldname": "event_ticket_order", "fieldtype": "Link", "label": "Event Ticket Order",
+	"options": "Event Ticket Order", "insert_after": "customer_name", "read_only": 1, "search_index": 1,
+	"depends_on": "eval:doc.event_ticket_order", "module": "Marketing",
+	"description": "The ticket order from the website this document was created from. Set automatically.",
+}
+_ATTENDEE_FIELD = {
+	"fieldname": "attendee", "fieldtype": "Link", "label": "Attendee", "options": "Attendee",
+	"insert_after": "description", "read_only": 1, "search_index": 1, "depends_on": "eval:doc.attendee",
+	"module": "Marketing", "description": "The ticket holder this line is billed for. Set automatically.",
+}
+SALES_DOCUMENT_FIELDS = {
+	"Sales Order": [_ORDER_FIELD], "Sales Invoice": [_ORDER_FIELD],
+	"Sales Order Item": [_ATTENDEE_FIELD], "Sales Invoice Item": [_ATTENDEE_FIELD],
+}
+
+
 def after_migrate():
 	ensure_lead_source()
+	ensure_sales_document_fields()
+
+
+def ensure_sales_document_fields():
+	create_custom_fields(SALES_DOCUMENT_FIELDS, update=True)
 
 
 def _perm_rows(doctype, table, exclude_role=None):

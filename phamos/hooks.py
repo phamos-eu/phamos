@@ -390,6 +390,7 @@ doc_events = {
         "on_trash": "phamos.marketing.billing.on_sales_invoice_trash",
     },
     "Sales Order": {
+        "validate": "phamos.marketing.billing.validate_sales_order",
         "on_update": "phamos.marketing.billing.on_sales_order_update",
         "on_submit": ["phamos.phamos.doctype.monthly_implementation_summary.monthly_implementation_summary.sync_mis_status_for_source_doc", "phamos.marketing.billing.on_sales_order_submit"],
         "on_update_after_submit": "phamos.phamos.doctype.monthly_implementation_summary.monthly_implementation_summary.sync_mis_status_for_source_doc",

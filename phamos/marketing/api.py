@@ -118,7 +118,8 @@ def create_sales_orders(names, customer=None, submit=0):
 	submit = frappe.utils.cint(submit)
 	if submit:
 		_require("Sales Order", "submit")
-	skipped = [d.name for d in docs if d.sales_order or d.payment_status == "Not Required"]
+	on_order = billing.ticket_lines([d.name for d in docs])
+	skipped = [d.name for d in docs if d.name in on_order or d.payment_status == "Not Required"]
 	docs = [d for d in docs if d.name not in skipped]
 	orders = []
 	for group in _groups(docs):
@@ -186,9 +187,10 @@ def _order_sales_order(order, mode, customer):
 		_readable_customer(customer)
 	else:
 		_require("Customer", "create")
-	tickets = [frappe.get_doc("Attendee", name) for name in frappe.get_all("Attendee", filters={
-		"ticket_order": order.name, "status": ["!=", "Cancelled"], "sales_order": ["is", "not set"]},
-		pluck="name", order_by="is_buyer desc, creation asc")]
+	names = frappe.get_all("Attendee", filters={"ticket_order": order.name, "status": ["!=", "Cancelled"]},
+		pluck="name", order_by="is_buyer desc, creation asc")
+	on_order = billing.ticket_lines(names)
+	tickets = [frappe.get_doc("Attendee", name) for name in names if name not in on_order]
 	if not tickets:
 		frappe.throw(_("{0} has no tickets to order.").format(order.name))
 	for doc in tickets:
@@ -201,7 +203,7 @@ def _order_sales_order(order, mode, customer):
 	confirmed = order.confirmed_total if len(tickets) == order.quantity else billing.order_total(pricing, len(tickets)).total
 	so = billing.create_sales_order(event, tickets, customer, pricing=pricing, submit=True, contact=contact,
 		address=address, email=order.billing_email or order.buyer_email, lang=order.language,
-		confirmed_total=confirmed)  # with the user's own rights
+		confirmed_total=confirmed, ticket_order=order.name)  # with the user's own rights
 	return so.name
 
 
@@ -212,17 +214,21 @@ def create_sales_invoices(names=None, sales_orders=None, submit=0, ticket_orders
 	if submit:
 		_require("Sales Invoice", "submit")
 	orders = json.loads(sales_orders) if isinstance(sales_orders, str) else (sales_orders or [])
+	# Tickets that are ordered but not invoiced yet: their Sales Orders.
+	uninvoiced = []
 	if names:
-		orders += [d.sales_order for d in _attendees_for(names) if d.sales_order and not d.sales_invoice]
+		uninvoiced += [d.name for d in _attendees_for(names) if d.payment_status == "Ordered"]
 	if ticket_orders:
 		for order in _names(ticket_orders):
 			frappe.has_permission("Event Ticket Order", "read", order, throw=True)
-			orders += frappe.get_all("Attendee", filters={"ticket_order": order, "sales_order": ["is", "set"],
-				"sales_invoice": ["is", "not set"]}, pluck="sales_order", distinct=True)
+			uninvoiced += frappe.get_all("Attendee", filters={"ticket_order": order, "payment_status": "Ordered"},
+				pluck="name")
+	orders += billing.ticket_lines(uninvoiced).values()
 	invoices, skipped = [], []
 	for so in dict.fromkeys(orders):
 		# Only event orders, and only with write on each of their attendees.
-		attendees = frappe.get_all("Attendee", filters={"sales_order": so}, pluck="name")
+		attendees = frappe.get_all("Sales Order Item", filters={"parent": so, "attendee": ["is", "set"]},
+			pluck="attendee")
 		if not attendees or frappe.db.get_value("Sales Order", so, "docstatus") != 1:
 			skipped.append(so)
 			continue

@@ -47,11 +47,7 @@
   "column_break_price",
   "ticket_rate_includes_tax",
   "item_tax_template",
-  "confirmed_total",
-  "section_billing_links",
-  "sales_order",
-  "column_break_links",
-  "sales_invoice"
+  "confirmed_total"
  ],
  "fields": [
   {
@@ -316,34 +312,10 @@
    "in_list_view": 1,
    "description": "The total the buyer saw and confirmed.",
    "read_only": 1
-  },
-  {
-   "fieldname": "section_billing_links",
-   "fieldtype": "Section Break",
-   "label": "Sales Order and Invoice"
-  },
-  {
-   "fieldname": "sales_order",
-   "fieldtype": "Link",
-   "label": "Sales Order",
-   "options": "Sales Order",
-   "search_index": 1,
-   "read_only": 1
-  },
-  {
-   "fieldname": "column_break_links",
-   "fieldtype": "Column Break"
-  },
-  {
-   "fieldname": "sales_invoice",
-   "fieldtype": "Link",
-   "label": "Sales Invoice",
-   "options": "Sales Invoice",
-   "read_only": 1
   }
  ],
  "links": [],
- "modified": "2026-10-26 12:00:00.000000",
+ "modified": "2026-10-27 12:00:00.000000",
  "modified_by": "Administrator",
  "module": "Marketing",
  "name": "Event Ticket Order",

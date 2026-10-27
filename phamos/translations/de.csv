@@ -1454,3 +1454,8 @@ Unknown choice {0}.,Unbekannte Auswahl {0}.
 "Event Ticket Order {0} was ordered with the VAT ID {1}; the Customer keeps {2}.","Ticketbestellung {0} wurde mit der USt-IdNr. {1} bestellt; der Kunde behält {2}."
 Total differs from the confirmed total ({0} vs {1}): check the tax template,Gesamtbetrag weicht vom bestätigten Gesamtbetrag ab ({0} statt {1}): Steuervorlage prüfen
 Total differs,Gesamtbetrag weicht ab
+Attendee,Teilnehmer
+The ticket order from the website this document was created from. Set automatically.,"Die Ticketbestellung von der Website, aus der dieses Dokument erstellt wurde. Wird automatisch gesetzt."
+The ticket holder this line is billed for. Set automatically.,"Der Ticketinhaber, für den diese Position berechnet wird. Wird automatisch gesetzt."
+Attendee {0} is already on Sales Order {1},Teilnehmer {0} steht bereits auf Auftrag {1}
+A ticket can only be on one line of the Sales Order.,Ein Ticket kann nur auf einer Position des Auftrags stehen.

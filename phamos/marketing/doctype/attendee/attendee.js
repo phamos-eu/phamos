@@ -8,10 +8,11 @@ frappe.ui.form.on("Attendee", {
 		if (frm.is_new()) return;
 		const group = __("Actions");
 		frm.add_custom_button(__("Link to CRM"), () => phamos_attendee.link_to_crm(frm), group);
-		if (!frm.doc.sales_order && frm.doc.payment_status !== "Not Required") {
+		// The Sales Orders and invoices of a ticket are under Connections (phamos/phamos#1727).
+		if (frm.doc.payment_status === "Pending") {
 			frm.add_custom_button(__("Create Sales Order"), () => phamos_attendee.create_sales_order(frm), group);
 		}
-		if (frm.doc.sales_order && !frm.doc.sales_invoice) {
+		if (frm.doc.payment_status === "Ordered") {
 			frm.add_custom_button(__("Create Sales Invoice"), () =>
 				phamos_attendee.call("create_sales_invoices", { names: [frm.doc.name] }, frm), group);
 		}
