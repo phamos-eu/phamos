@@ -46,7 +46,7 @@ class TestEventPricing(FrappeTestCase):
 	def desk_order(self, event, ticket_order, confirmed_total):
 		"""The Sales Order the desk creates for a website order (phamos/phamos#1725), at the attendees' own price."""
 		attendees = [frappe.get_doc("Attendee", name) for name in
-			frappe.get_all("Attendee", filters={"ticket_order": ticket_order}, pluck="name", order_by="creation asc")]
+			frappe.get_all("Attendee", filters={"event_ticket_order": ticket_order}, pluck="name", order_by="creation asc")]
 		return billing.create_sales_order(event, attendees, make_customer("Desk Pricing Kunde AG"), submit=True,
 			confirmed_total=confirmed_total)
 

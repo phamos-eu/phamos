@@ -5,7 +5,7 @@
 
 The website order creates it with the buyer, the billing data as typed and the price the buyer confirmed. The
 desk creates Customer and Sales Order from it. The Attendees are the tickets; they link to their order through
-``ticket_order``. Sales Orders and Sales Invoices point to the order (``event_ticket_order``, shown under
+``event_ticket_order``. Sales Orders and Sales Invoices point to the order (``event_ticket_order``, shown under
 Connections; phamos/phamos#1727). The order's ``status`` and ``customer`` are never set by hand: they follow the
 tickets (``refresh_status``), whose ``payment_status`` ``phamos.marketing.billing`` maintains.
 """
@@ -50,7 +50,7 @@ def refresh_status(order):
 	"""Recompute ``status`` and ``customer`` of one Event Ticket Order from its tickets."""
 	if not order or not frappe.db.exists("Event Ticket Order", order):
 		return
-	tickets = frappe.get_all("Attendee", filters={"ticket_order": order},
+	tickets = frappe.get_all("Attendee", filters={"event_ticket_order": order},
 		fields=["status", "payment_status", "customer", "billing_customer", "is_buyer"],
 		order_by="is_buyer desc, creation asc")
 	first = lambda field: next((t[field] for t in tickets if t[field]), None)  # noqa: E731
@@ -65,6 +65,6 @@ def refresh_for_attendees(names):
 	"""Refresh the orders of these Attendees (after billing changed their payment status)."""
 	if not names:
 		return
-	for order in set(frappe.get_all("Attendee", filters={"name": ["in", list(names)], "ticket_order": ["is", "set"]},
-			pluck="ticket_order")):
+	for order in set(frappe.get_all("Attendee", filters={"name": ["in", list(names)], "event_ticket_order": ["is", "set"]},
+			pluck="event_ticket_order")):
 		refresh_status(order)
