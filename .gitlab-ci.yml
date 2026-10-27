@@ -66,6 +66,12 @@ unit_tests:
       phamos.okr_addon.doctype.okr.test_okr
       phamos.okr_addon.doctype.kr.test_kr
       phamos.okr_addon.doctype.okr_team.test_okr_team
+      phamos.phamos.doctype.stakeholder_meeting.test_stakeholder_meeting
+      phamos.phamos.doctype.stakeholder_meeting.test_stakeholder_meeting_rules
+      phamos.phamos.doctype.implementation_chapter.test_implementation_chapter
+      phamos.phamos.doctype.implementation_chapter.test_implementation_chapter_rules
+      phamos.phamos.doctype.implementation.test_implementation_review_cadence
+      phamos.tests.test_backfill_chapter_revision_status_and_levels
       phamos.tests.test_marketing_attendee
       phamos.tests.test_marketing_crm
       phamos.tests.test_marketing_ticketing
@@ -89,6 +95,8 @@ unit_tests:
     - bench set-config -g redis_socketio redis://redis-queue:6379
     - bench get-app --branch "$FRAPPE_BRANCH" --skip-assets erpnext
     - bench get-app --branch "$FRAPPE_BRANCH" --skip-assets hrms
+    # Without assets.json, rendering web pages fails in bundled_asset().
+    - mkdir -p sites/assets && echo '{}' > sites/assets/assets.json
 
     # phamos from this checkout.
     - cp -r "$CI_PROJECT_DIR" apps/phamos
@@ -121,7 +129,17 @@ unit_tests:
     - bench new-site "$SITE" --db-root-password root --mariadb-root-username root --mariadb-root-password root --admin-password admin --no-mariadb-socket
     - bench --site "$SITE" install-app erpnext
     - bench --site "$SITE" install-app hrms
+    # Master data the ERPNext setup wizard would create (UOMs, root groups).
+    # Installing phamos needs the UOM "Hour", the tests need e.g. "Nos" and
+    # "All Item Groups".
+    - |
+      bench --site "$SITE" execute erpnext.setup.setup_wizard.operations.install_fixtures.install --kwargs '{"country": "Germany"}'
     - bench --site "$SITE" install-app phamos
+    # after_migrate creates custom fields the code needs (e.g. Sales Order Item.attendee).
+    - bench --site "$SITE" migrate
+    # Same time zone as the container: without one Frappe assumes Asia/Kolkata.
+    - |
+      bench --site "$SITE" execute frappe.db.set_single_value --args '["System Settings", "time_zone", "UTC"]'
     - bench --site "$SITE" set-config allow_tests true
     - |
       for app in erpnext hrms phamos; do

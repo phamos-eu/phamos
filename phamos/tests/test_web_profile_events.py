@@ -229,7 +229,9 @@ class TestWebProfileEvents(FrappeTestCase):
 		self.assertEqual(web.subscribe(self.event.route, "en", "fan@example.com", privacy_consent=1), result)
 		sendmail.assert_not_called()
 
-	def test_ics(self):
+	# A site in UTC gets "DTSTART:...Z" instead of a TZID (the CI site is in UTC).
+	@patch("phamos.marketing.web.get_system_timezone", return_value="Europe/Berlin")
+	def test_ics(self, _tz):
 		web.ics(self.event.route, "en")
 		self.assertEqual(frappe.response["type"], "download")
 		content = frappe.response["filecontent"].decode()
