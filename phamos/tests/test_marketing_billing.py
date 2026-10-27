@@ -78,7 +78,8 @@ class TestBilling(FrappeTestCase):
 		si.cancel()
 		self.assertEqual(order_statuses(so_name), {"Ordered"})
 		frappe.get_doc("Sales Order", so_name).cancel()
-		self.assertEqual(statuses(order_reference=so_name), {"Pending"})
+		# By the order lines: a website order's order_reference is its Event Ticket Order (#1724).
+		self.assertEqual(order_statuses(so_name), {"Pending"})
 
 	# --- credit notes (phamos/phamos#1706) ------------------------------------------------------------
 
@@ -124,10 +125,15 @@ class TestBilling(FrappeTestCase):
 	def test_full_credit_then_a_new_invoice(self, enqueue):
 		so_name = self.web_order()
 		si = self.invoice(so_name)
-		self.credit_note(si)
+		# Without "Update Billed Amount in Sales Order" the order stays fully billed and ERPNext refuses the new invoice.
+		cn = self.credit_note(si, submit=False)
+		cn.update_billed_amount_in_sales_order = 1
+		cn.save()
+		cn.submit()
 		self.assertEqual(set(self.rows(so_name).values()), {(si.name, "Credited")})
 		# The usual correction: a credit note, then a new invoice for the same order lines (a copy of the original).
 		corrected = frappe.copy_doc(si)
+		corrected.docstatus = 0  # copy_doc keeps it during tests
 		corrected.insert()
 		corrected.reload()
 		corrected.submit()
