@@ -11,7 +11,7 @@ Every action checks each Attendee it changes and runs with the user's own rights
 | ``create_customers`` | Attendee write (each row), Customer create, Contact write |
 | ``create_sales_orders`` | Attendee write (each row), Sales Order create (+ submit), Customer read (the party) |
 | ``order_customer_proposal`` | Event Ticket Order read (that one) |
-| ``create_order_sales_orders`` | Event Ticket Order write and Attendee write (each), Sales Order create and submit; "use": Customer read (that one), Lead write if the buyer's Lead gets linked; "convert" / "new": Customer create; with billing data: Contact write, Address create, Customer write to set a missing VAT ID |
+| ``create_order_sales_orders`` | Event Ticket Order write and Attendee write (each), Sales Order create (+ submit); "use": Customer read (that one), Lead write if the buyer's Lead gets linked; "convert" / "new": Customer create; with billing data: Contact write, Address create, Customer write to set a missing VAT ID |
 | ``create_sales_invoices`` | Attendee write (each row of those orders), Sales Invoice create (+ submit); with ``ticket_orders``: Event Ticket Order read (each) |
 | ``create_opportunities`` | Attendee write (each row), Opportunity create |
 | ``set_attendance`` | Attendee write (each row) |
@@ -141,6 +141,8 @@ def order_customer_proposal(name):
 	order = frappe.get_doc("Event Ticket Order", name)
 	order.check_permission("read")
 	proposal = crm.order_customer_proposal(order)
+	# A draft Sales Order of this order is opened instead of creating another one (phamos/phamos#1730).
+	proposal.sales_order = frappe.db.get_value("Sales Order", {"event_ticket_order": order.name, "docstatus": 0})
 	if proposal.customer:
 		proposal.customer_name = frappe.db.get_value("Customer", proposal.customer, "customer_name")
 	if proposal.lead:
@@ -149,26 +151,36 @@ def order_customer_proposal(name):
 
 
 @frappe.whitelist(methods=["POST"])
-def create_order_sales_orders(names, mode=None, customer=None):
-	"""Customer and submitted Sales Order for booked Event Ticket Orders, at the price the buyer confirmed
+def create_order_sales_orders(names, mode=None, customer=None, submit=0):
+	"""Customer and Sales Order for booked Event Ticket Orders, at the price stored on the order
 	(phamos/phamos#1725).
+
+	The Sales Order stays a draft, to be checked and changed by hand, and its total is not compared with the
+	confirmed one (phamos/phamos#1730). ``submit``: submit it, refused when the total differs from the confirmed one.
 
 	One order (form button): ``mode`` and ``customer`` as chosen in the dialog ("use" + customer, "convert",
 	"new"). Several orders (list bulk action, no ``mode``): each order takes its proposal, but only when it is
 	unambiguous (``crm.order_customer_proposal``); every other order is skipped and listed. Orders that are
-	not Booked are skipped too. A total that differs from the confirmed one stops the whole action (rollback).
+	not Booked, or whose tickets are already on a Sales Order, are skipped too. With ``submit``, a total that differs
+	from the confirmed one stops the whole action (rollback).
 	"""
 	orders = [frappe.get_doc("Event Ticket Order", name) for name in _names(names)]
 	for order in orders:
 		order.check_permission("write")
 	if mode and len(orders) > 1:
 		frappe.throw(_("Choose the Customer for one order at a time."))
+	submit = frappe.utils.cint(submit)
 	_require("Sales Order", "create")
-	_require("Sales Order", "submit")
+	if submit:
+		_require("Sales Order", "submit")
 	created, skipped = [], []
 	for order in orders:
 		if order.status != "Booked":
 			skipped.append({"order": order.name, "reason": _("not booked ({0})").format(_(order.status))})
+			continue
+		draft = frappe.db.get_value("Sales Order", {"event_ticket_order": order.name, "docstatus": 0})
+		if draft:
+			skipped.append({"order": order.name, "reason": _("already on Sales Order {0}").format(draft)})
 			continue
 		order_mode, order_customer = mode, customer
 		if not mode:
@@ -177,11 +189,11 @@ def create_order_sales_orders(names, mode=None, customer=None):
 				skipped.append({"order": order.name, "reason": _("choose the Customer in the order")})
 				continue
 			order_mode, order_customer = proposal.action, proposal.customer
-		created.append(_order_sales_order(order, order_mode, order_customer))
+		created.append(_order_sales_order(order, order_mode, order_customer, submit))
 	return {"sales_orders": created, "skipped": skipped}
 
 
-def _order_sales_order(order, mode, customer):
+def _order_sales_order(order, mode, customer, submit=False):
 	if mode == "use":
 		if not customer:
 			frappe.throw(_("Please choose a Customer."))
@@ -201,8 +213,11 @@ def _order_sales_order(order, mode, customer):
 	event = frappe.get_doc("Marketing Content", order.event)
 	pricing = billing.pricing_from_order(event, order)
 	# The buyer confirmed the total of all tickets; with tickets cancelled since, it is the same price for fewer.
-	confirmed = order.confirmed_total if len(tickets) == order.quantity else billing.order_total(pricing, len(tickets)).total
-	so = billing.create_sales_order(event, tickets, customer, pricing=pricing, submit=True, contact=contact,
+	# Only checked when submitting; a draft is checked by hand (phamos/phamos#1730).
+	confirmed = None
+	if submit:
+		confirmed = order.confirmed_total if len(tickets) == order.quantity else billing.order_total(pricing, len(tickets)).total
+	so = billing.create_sales_order(event, tickets, customer, pricing=pricing, submit=submit, contact=contact,
 		address=address, email=order.billing_email or order.buyer_email, lang=order.language,
 		confirmed_total=confirmed, event_ticket_order=order.name)  # with the user's own rights
 	return so.name

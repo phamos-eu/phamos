@@ -36,7 +36,7 @@ class TestEventTicketOrder(FrappeTestCase):
 
 	def make_order(self, **values):
 		return frappe.get_doc({"doctype": "Event Ticket Order", "event": self.event.name,
-			"buyer_first_name": "Erika", "buyer_last_name": "Muster", "buyer_email": "erika@order.example",
+			"source": "Website", "buyer_first_name": "Erika", "buyer_last_name": "Muster", "buyer_email": "erika@order.example",
 			"quantity": 2, **values}).insert(ignore_permissions=True)
 
 	def test_naming_series_and_buyer_name(self, enqueue):
