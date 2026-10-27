@@ -128,6 +128,9 @@ unit_tests:
       done
       bench --site "$SITE" mariadb -e "SELECT 1;" > /dev/null
 
+    # --junit-xml-output imports xmlrunner, a Frappe dev dependency the bench image does not ship.
+    - ./env/bin/pip install "unittest-xml-reporting~=3.2.0"
+
     # Run every module, even after a failure, so the report shows all results.
     - |
       mkdir -p "$CI_PROJECT_DIR/test-results"
