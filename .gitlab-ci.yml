@@ -72,6 +72,7 @@ unit_tests:
       phamos.tests.test_marketing_patches
       phamos.tests.test_web_profile_events
       phamos.tests.test_web_page_editing
+      phamos.phamos.doctype.timesheet_record.test_timesheet_record
   script:
     - bench --version
 

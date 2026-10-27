@@ -13,6 +13,10 @@ from frappe.utils import now_datetime
 from phamos.phamos.page.dev_action_panel import dev_action_panel as dap
 from phamos.phamos.page.project_action_panel import project_action_panel as pap
 from phamos.phamos.timesheet_utils import normalize_percent_billable
+from phamos.tests.test_personal_checkin import _ensure_employee, _ensure_user
+
+# A user with the Employee role only. Timesheet Record create is limited to System Manager.
+NO_ACCESS = "tr-no-access@example.com"
 
 
 class _FakeTimesheetRecord:
@@ -262,3 +266,100 @@ class TestDapStartProjectTimer(FrappeTestCase):
 			fields=["name"],
 			limit=3,
 		)
+
+
+class TestTimesheetRecordRules(FrappeTestCase):
+	"""Acceptance criteria for Timesheet Record, checked test-last.
+
+	1. A record with project, employee, goal, expected time and from time is saved as a draft.
+	2. Submit without an end time is rejected, because the record is not marked complete.
+	3. Submit with an end time but no activity type is rejected.
+	4. One hour at 50% billable counts as 0.5 hours; 0% counts as 0.
+	5. A user who is not a System Manager cannot create a record.
+	"""
+
+	def setUp(self):
+		patcher = patch("frappe.db.commit")
+		patcher.start()
+		self.addCleanup(patcher.stop)
+		frappe.set_user("Administrator")
+		_ensure_user("tr-employee@example.com")
+		_ensure_user(NO_ACCESS)
+		self.employee = _ensure_employee("tr-employee@example.com")
+		self.activity_type = self._activity_type()
+		self.project = self._project()
+
+	def tearDown(self):
+		frappe.set_user("Administrator")
+		frappe.db.rollback()
+
+	def _activity_type(self):
+		name = "TR Development"
+		if not frappe.db.exists("Activity Type", name):
+			frappe.get_doc({"doctype": "Activity Type", "activity_type": name}).insert(ignore_permissions=True)
+		return name
+
+	def _project(self):
+		return (
+			frappe.get_doc(
+				{
+					"doctype": "Project",
+					"project_name": "TR Rules project",
+					"status": "Open",
+					"project_owner": "Administrator",
+				}
+			)
+			.insert(ignore_permissions=True)
+			.name
+		)
+
+	def _record(self, **overrides):
+		values = {
+			"doctype": "Timesheet Record",
+			"project": self.project,
+			"employee": self.employee,
+			"goal": "Write the weekly report",
+			"expected_time": 3600,
+			"from_time": "2026-05-10 09:00:00",
+			"activity_type": self.activity_type,
+			"percent_billable": "100",
+		}
+		values.update(overrides)
+		return frappe.get_doc(values)
+
+	def test_valid_record_is_saved_as_draft(self):
+		doc = self._record().insert(ignore_permissions=True)
+
+		self.assertTrue(frappe.db.exists("Timesheet Record", doc.name))
+		self.assertEqual(doc.docstatus, 0)
+		self.assertEqual(doc.goal, "Write the weekly report")
+
+	def test_submit_without_end_time_is_rejected(self):
+		doc = self._record().insert(ignore_permissions=True)
+		self.assertFalse(doc.to_time)
+
+		with self.assertRaises(frappe.ValidationError):
+			doc.submit()
+
+		self.assertEqual(frappe.db.get_value("Timesheet Record", doc.name, "docstatus"), 0)
+
+	def test_submit_without_activity_type_is_rejected(self):
+		doc = self._record(activity_type=None, to_time="2026-05-10 10:00:00").insert(ignore_permissions=True)
+
+		with self.assertRaises(frappe.ValidationError):
+			doc.submit()
+
+		self.assertEqual(frappe.db.get_value("Timesheet Record", doc.name, "docstatus"), 0)
+
+	def test_billable_hours_follow_percent_billable(self):
+		doc = self._record(actual_time=3600, percent_billable="50")
+		self.assertEqual(doc.get_billable_hours(), 0.5)
+
+		doc.percent_billable = "0"
+		self.assertEqual(doc.get_billable_hours(), 0.0)
+
+	def test_user_without_permission_cannot_create(self):
+		frappe.set_user(NO_ACCESS)
+
+		with self.assertRaises(frappe.PermissionError):
+			self._record().insert()
