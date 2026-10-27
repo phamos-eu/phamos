@@ -3,7 +3,7 @@
  "allow_rename": 0,
  "autoname": "TO-.YYYY.-.#####",
  "creation": "2026-10-26 00:00:00.000000",
- "description": "One ticket order for an event, free or paid, with one or more tickets (the Attendees). Created by the website order; Customer and Sales Order are created in the desk (phamos/phamos#1717).",
+ "description": "One ticket order for an event, free or paid, with one or more tickets (the Attendees). Created by the website order or by hand in the desk; Customer and Sales Order are created in the desk (phamos/phamos#1717).",
  "doctype": "DocType",
  "engine": "InnoDB",
  "field_order": [
@@ -64,7 +64,7 @@
    "in_list_view": 1,
    "in_standard_filter": 1,
    "search_index": 1,
-   "read_only": 1
+   "read_only_depends_on": "eval:doc.source !== 'Desk' || !['Booked', 'Free'].includes(doc.status) || doc.quantity > 0"
   },
   {
    "fieldname": "ordered_on",
@@ -92,15 +92,16 @@
    "fieldtype": "Select",
    "label": "Source",
    "options": "Website\nDesk",
-   "default": "Website",
-   "read_only": 1
+   "default": "Desk",
+   "read_only": 1,
+   "description": "Website: ordered on the website, read-only. Desk: created by hand in the desk (phamos/phamos#1730)."
   },
   {
    "fieldname": "language",
    "fieldtype": "Select",
    "label": "Language",
    "options": "\nde\nen",
-   "read_only": 1
+   "read_only_depends_on": "eval:doc.source !== 'Desk' || !['Booked', 'Free'].includes(doc.status)"
   },
   {
    "fieldname": "order_key",
@@ -121,13 +122,14 @@
    "fieldname": "buyer_first_name",
    "fieldtype": "Data",
    "label": "First Name",
-   "read_only": 1
+   "read_only_depends_on": "eval:doc.source !== 'Desk' || !['Booked', 'Free'].includes(doc.status)",
+   "mandatory_depends_on": "eval:doc.source === 'Desk'"
   },
   {
    "fieldname": "buyer_last_name",
    "fieldtype": "Data",
    "label": "Last Name",
-   "read_only": 1
+   "read_only_depends_on": "eval:doc.source !== 'Desk' || !['Booked', 'Free'].includes(doc.status)"
   },
   {
    "fieldname": "buyer_name",
@@ -145,20 +147,21 @@
    "fieldtype": "Data",
    "label": "Email",
    "options": "Email",
-   "read_only": 1
+   "read_only_depends_on": "eval:doc.source !== 'Desk' || !['Booked', 'Free'].includes(doc.status)"
   },
   {
    "fieldname": "buyer_phone",
    "fieldtype": "Data",
    "label": "Phone",
-   "read_only": 1
+   "read_only_depends_on": "eval:doc.source !== 'Desk' || !['Booked', 'Free'].includes(doc.status)"
   },
   {
    "fieldname": "buyer_attends",
    "fieldtype": "Check",
    "label": "Buyer Attends",
    "default": "1",
-   "read_only": 1
+   "read_only_depends_on": "eval:!doc.__islocal",
+   "description": "Desk orders: the first save also creates the buyer's own ticket."
   },
   {
    "fieldname": "section_crm",
@@ -177,7 +180,7 @@
    "fieldtype": "Link",
    "label": "Contact",
    "options": "Contact",
-   "read_only": 1
+   "read_only_depends_on": "eval:doc.source !== 'Desk' || !['Booked', 'Free'].includes(doc.status)"
   },
   {
    "fieldname": "column_break_crm",
@@ -189,7 +192,7 @@
    "label": "Customer",
    "options": "Customer",
    "in_standard_filter": 1,
-   "read_only": 1
+   "read_only_depends_on": "eval:doc.source !== 'Desk' || !['Booked', 'Free'].includes(doc.status)"
   },
   {
    "fieldname": "section_billing",
@@ -201,32 +204,32 @@
    "fieldname": "billing_is_company",
    "fieldtype": "Check",
    "label": "Company",
-   "read_only": 1
+   "read_only_depends_on": "eval:doc.source !== 'Desk' || !['Booked', 'Free'].includes(doc.status)"
   },
   {
    "fieldname": "billing_name",
    "fieldtype": "Data",
    "label": "Name",
-   "read_only": 1
+   "read_only_depends_on": "eval:doc.source !== 'Desk' || !['Booked', 'Free'].includes(doc.status)"
   },
   {
    "fieldname": "billing_company",
    "fieldtype": "Data",
    "label": "Company Name",
-   "read_only": 1
+   "read_only_depends_on": "eval:doc.source !== 'Desk' || !['Booked', 'Free'].includes(doc.status)"
   },
   {
    "fieldname": "billing_vat_id",
    "fieldtype": "Data",
    "label": "VAT ID",
-   "read_only": 1
+   "read_only_depends_on": "eval:doc.source !== 'Desk' || !['Booked', 'Free'].includes(doc.status)"
   },
   {
    "fieldname": "billing_email",
    "fieldtype": "Data",
    "label": "Billing Email",
    "options": "Email",
-   "read_only": 1
+   "read_only_depends_on": "eval:doc.source !== 'Desk' || !['Booked', 'Free'].includes(doc.status)"
   },
   {
    "fieldname": "column_break_billing",
@@ -236,32 +239,32 @@
    "fieldname": "billing_address_line1",
    "fieldtype": "Data",
    "label": "Address Line 1",
-   "read_only": 1
+   "read_only_depends_on": "eval:doc.source !== 'Desk' || !['Booked', 'Free'].includes(doc.status)"
   },
   {
    "fieldname": "billing_address_line2",
    "fieldtype": "Data",
    "label": "Address Line 2",
-   "read_only": 1
+   "read_only_depends_on": "eval:doc.source !== 'Desk' || !['Booked', 'Free'].includes(doc.status)"
   },
   {
    "fieldname": "billing_postcode",
    "fieldtype": "Data",
    "label": "Postcode",
-   "read_only": 1
+   "read_only_depends_on": "eval:doc.source !== 'Desk' || !['Booked', 'Free'].includes(doc.status)"
   },
   {
    "fieldname": "billing_city",
    "fieldtype": "Data",
    "label": "City",
-   "read_only": 1
+   "read_only_depends_on": "eval:doc.source !== 'Desk' || !['Booked', 'Free'].includes(doc.status)"
   },
   {
    "fieldname": "billing_country",
    "fieldtype": "Link",
    "label": "Country",
    "options": "Country",
-   "read_only": 1
+   "read_only_depends_on": "eval:doc.source !== 'Desk' || !['Booked', 'Free'].includes(doc.status)"
   },
   {
    "fieldname": "section_price",
@@ -270,23 +273,25 @@
   },
   {
    "fieldname": "ticket_type",
-   "fieldtype": "Data",
+   "fieldtype": "Autocomplete",
    "label": "Price",
-   "read_only": 1
+   "read_only_depends_on": "eval:doc.source !== 'Desk' || !['Booked', 'Free'].includes(doc.status)",
+   "description": "The price row of the event. On desk orders it fills the rate, which can still be changed."
   },
   {
    "fieldname": "quantity",
    "fieldtype": "Int",
    "label": "Tickets",
    "in_list_view": 1,
-   "read_only": 1
+   "read_only": 1,
+   "description": "The tickets of the order that are not cancelled (desk orders: kept up to date until the Sales Order)."
   },
   {
    "fieldname": "ticket_rate",
    "fieldtype": "Currency",
    "label": "Rate per Ticket",
    "description": "The Sales Order line rate: gross if the prices include tax, else net.",
-   "read_only": 1
+   "read_only_depends_on": "eval:doc.source !== 'Desk' || !['Booked', 'Free'].includes(doc.status)"
   },
   {
    "fieldname": "column_break_price",
@@ -310,12 +315,12 @@
    "fieldtype": "Currency",
    "label": "Confirmed Total",
    "in_list_view": 1,
-   "description": "The total the buyer saw and confirmed.",
+   "description": "The total the buyer saw and confirmed; on desk orders computed from the price and the tickets.",
    "read_only": 1
   }
  ],
  "links": [],
- "modified": "2026-10-27 12:00:00.000000",
+ "modified": "2026-10-27 14:00:00.000000",
  "modified_by": "Administrator",
  "module": "Marketing",
  "name": "Event Ticket Order",

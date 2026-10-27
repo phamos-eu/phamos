@@ -1462,3 +1462,13 @@ A ticket can only be on one line of the Sales Order.,Ein Ticket kann nur auf ein
 "Order Reference (legacy)","Bestellreferenz (Altbestand)"
 "The order this ticket belongs to. Set for all orders since phamos/phamos#1717.","Die Bestellung, zu der dieses Ticket gehört. Gesetzt für alle Bestellungen seit phamos/phamos#1717."
 "Only for registrations before phamos/phamos#1717, which have no Event Ticket Order: groups the attendees of one old order (its Sales Order, a booking number or an import id).","Nur für Anmeldungen vor phamos/phamos#1717, die keine Ticketbestellung haben: fasst die Teilnehmer einer alten Bestellung zusammen (ihr Auftrag, eine Buchungsnummer oder eine Import-ID)."
+Website orders cannot be changed.,Website-Bestellungen können nicht geändert werden.
+Event Ticket Order {0} has a Sales Order and can no longer be changed.,Ticketbestellung {0} hat einen Auftrag und kann nicht mehr geändert werden.
+The event of an order with tickets cannot be changed.,Die Veranstaltung einer Bestellung mit Tickets kann nicht geändert werden.
+"Website: ordered on the website, read-only. Desk: created by hand in the desk (phamos/phamos#1730).","Website: auf der Website bestellt, schreibgeschützt. Desk: von Hand im Desk angelegt (phamos/phamos#1730)."
+"The price row of the event. On desk orders it fills the rate, which can still be changed.","Die Preiszeile der Veranstaltung. Bei Desk-Bestellungen füllt sie den Preis, der noch geändert werden kann."
+"The tickets of the order that are not cancelled (desk orders: kept up to date until the Sales Order).","Die nicht stornierten Tickets der Bestellung (Desk-Bestellungen: bis zum Auftrag aktuell gehalten)."
+"The total the buyer saw and confirmed; on desk orders computed from the price and the tickets.","Der Gesamtbetrag, den der Käufer gesehen und bestätigt hat; bei Desk-Bestellungen aus Preis und Tickets berechnet."
+"Desk orders: the first save also creates the buyer's own ticket.","Desk-Bestellungen: das erste Speichern legt auch das eigene Ticket des Käufers an."
+Event {0} has no ticket price.,Veranstaltung {0} hat keinen Ticketpreis.
+already on Sales Order {0},bereits auf Auftrag {0}
