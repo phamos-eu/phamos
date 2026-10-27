@@ -212,26 +212,27 @@ def create_departments():
 	"""Create Departments for Employee.
 	
 	Note: Departments require a company field in ERPNext/HRMS.
-	This function finds an existing company or creates a test company
-	to associate with the departments.
+	This function finds an existing company or, on a bare site, runs
+	ERPNext's setup wizard to create one.
 	"""
-	# Get or use a test company - ERPNext creates test companies during test setup
 	company = frappe.db.get_value("Company", {"docstatus": ["!=", 2]}, "name")
 	
 	if not company:
-		# If no company exists, create a minimal one for tests
-		try:
-			company_doc = frappe.get_doc({
-				"doctype": "Company",
-				"company_name": "_Test Company",
-				"abbr": "_TC",
-				"default_currency": "USD",
-				"country": "United States"
-			})
-			company_doc.insert(ignore_permissions=True, ignore_if_duplicate=True)
-			company = company_doc.name
-		except Exception:
-			# If company creation fails, skip department creation
+		# A Company inserted on its own has no Fiscal Year and a currency that doesn't
+		# match the price lists, so no invoice can be submitted. ERPNext's before_tests
+		# runs the setup wizard instead (what ensure_company() in the Marketing tests expects).
+		from erpnext.setup.utils import before_tests as erpnext_before_tests
+
+		# The wizard sets America/New_York; keep the site's (CI sets the container's UTC).
+		time_zone = frappe.db.get_single_value("System Settings", "time_zone")
+		user_time_zone = frappe.db.get_value("User", "Administrator", "time_zone")
+		erpnext_before_tests()
+		if time_zone:
+			frappe.db.set_single_value("System Settings", "time_zone", time_zone)
+			frappe.db.set_value("User", "Administrator", "time_zone", user_time_zone)
+			frappe.clear_cache()
+		company = frappe.db.get_value("Company", {"docstatus": ["!=", 2]}, "name")
+		if not company:
 			return
 	
 	departments = [
