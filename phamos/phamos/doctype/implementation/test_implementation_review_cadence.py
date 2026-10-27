@@ -48,6 +48,8 @@ class TestReviewCadenceOnImplementation(FrappeTestCase):
 		self.implementation.review_cadence = "Weekly"
 		self.implementation.next_review_due = "2027-01-01"
 		self.implementation.save()
+		# Reloaded: on_update writes the time limit summary after every save.
+		self.implementation.reload()
 
 		self.implementation.review_cadence = "Monthly"
 		self.implementation.save()
