@@ -67,11 +67,11 @@ class TestTicketing(FrappeTestCase):
 		lead = frappe.db.get_value("Lead", {"email_id": "erika@ticket.example"}, ["name", "lead_owner"], as_dict=True)
 		self.assertEqual((order.lead, lead.lead_owner), (lead.name, "Guest"))
 		rows = frappe.get_all("Attendee", filters={"ticket_order": order.name},
-			fields=["email", "payment_status", "is_buyer", "lead", "crm_status", "terms_accepted", "ticket_type", "notes",
-				"order_reference", "sales_order"], order_by="creation asc")
+			fields=["name", "email", "payment_status", "is_buyer", "lead", "crm_status", "terms_accepted", "ticket_type",
+				"notes", "order_reference"], order_by="creation asc")
 		self.assertEqual([r.payment_status for r in rows], ["Pending", "Pending"])
 		self.assertEqual({r.order_reference for r in rows}, {order.name})
-		self.assertFalse(any(r.sales_order for r in rows))
+		self.assertFalse(billing.ticket_lines([r.name for r in rows]))
 		self.assertTrue(all(r.terms_accepted for r in rows))
 		buyer, companion = rows
 		self.assertTrue(buyer.is_buyer and buyer.lead == lead.name and buyer.crm_status == "Linked")

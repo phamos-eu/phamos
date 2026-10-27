@@ -8,14 +8,15 @@ from frappe.tests.utils import FrappeTestCase
 from frappe.utils import add_days, nowdate
 
 from phamos.patches.v1_0 import (
+	link_sales_documents_to_tickets,
 	migrate_attendee_legacy_data,
 	migrate_event_stakeholders,
 	rename_marketing_event_registration_to_attendee,
 	repair_legacy_attendees,
 	set_event_ticket_prices,
 )
-from phamos.marketing import billing
-from phamos.tests.marketing_fixtures import ensure_company, make_customer, make_event, make_ticket_item
+from phamos.marketing import api, billing, ticketing
+from phamos.tests.marketing_fixtures import BILLING, as_guest, ensure_company, make_customer, make_event, make_ticket_item
 
 
 def legacy_row(event, email, order_reference=None, **values):
@@ -64,6 +65,39 @@ class TestMarketingPatches(FrappeTestCase):
 	def tearDown(self):
 		frappe.db.rollback(save_point="patch_test")
 
+	# --- link_sales_documents_to_tickets (phamos/phamos#1727) --------------------------------------------
+
+	def test_links_move_from_the_attendees_to_the_sales_documents(self):
+		if not frappe.db.has_column("Attendee", "sales_order_item"):
+			self.skipTest("a site that never had the old Attendee columns has nothing to move")
+		event = make_event("Link Patch Event")
+		with as_guest():
+			result = ticketing.register_attendees(event.name, {"full_name": "Petra Patch", "email": "petra@patch.example"},
+				companions=[{"full_name": "Paul Patch", "email": "paul@patch.example"}],
+				billing_data={**BILLING, "full_name": "Petra Patch", "email": "petra@patch.example"})
+		order = result["reference"]
+		so = frappe.get_doc("Sales Order", api.create_order_sales_orders([order], mode="convert")["sales_orders"][0])
+		si = frappe.get_doc("Sales Invoice", api.create_sales_invoices(ticket_orders=[order], submit=1)["sales_invoices"][0])
+		# As before #1727: the Attendees hold the line, the sales documents know nothing.
+		for row in so.items:
+			frappe.db.sql("update `tabAttendee` set sales_order_item = %s where name = %s", (row.name, row.attendee))
+		for doctype in ("Sales Order Item", "Sales Invoice Item"):
+			frappe.db.sql(f"update `tab{doctype}` set attendee = null where parent in %s", ((so.name, si.name),))
+		for doctype, name in (("Sales Order", so.name), ("Sales Invoice", si.name)):
+			frappe.db.set_value(doctype, name, "event_ticket_order", None)
+
+		with redirect_stdout(io.StringIO()) as out:
+			link_sales_documents_to_tickets.execute()
+		self.assertIn("Linked 2 Sales Order line(s) and 2 Sales Invoice line(s)", out.getvalue())
+		tickets = sorted(frappe.get_all("Attendee", filters={"ticket_order": order}, pluck="name"))
+		for doctype, name in (("Sales Order", so.name), ("Sales Invoice", si.name)):
+			self.assertEqual(frappe.db.get_value(doctype, name, "event_ticket_order"), order)
+			self.assertEqual(sorted(frappe.get_all(f"{doctype} Item", filters={"parent": name}, pluck="attendee")), tickets)
+		self.assertEqual(billing.payment_state(tickets)[tickets[0]], (si.name, "Invoiced"))
+		with redirect_stdout(io.StringIO()) as out:
+			link_sales_documents_to_tickets.execute()
+		self.assertEqual(out.getvalue(), "")  # nothing left to do
+
 	def test_rename_is_a_no_op_when_done(self):
 		rename_marketing_event_registration_to_attendee.execute()
 		self.assertTrue(frappe.db.exists("DocType", "Attendee"))
@@ -110,15 +144,18 @@ class TestMarketingPatches(FrappeTestCase):
 		first = legacy_row(event, "one@legacy.example", so.name)
 		run_repair()
 		for name, line in ((first, so.items[0].name), (second, so.items[1].name)):
-			row = frappe.db.get_value("Attendee", name, ["sales_order", "sales_order_item", "payment_status"], as_dict=True)
-			self.assertEqual((row.sales_order, row.sales_order_item, row.payment_status), (so.name, line, "Invoiced"))
+			# The order line and its invoice line point to the Attendee (phamos/phamos#1727).
+			self.assertEqual(frappe.db.get_value("Sales Order Item", line, "attendee"), name)
+			self.assertEqual(frappe.db.get_value("Sales Invoice Item", {"so_detail": line}, "attendee"), name)
+			self.assertEqual(frappe.db.get_value("Attendee", name, "payment_status"), "Invoiced")
 
 	def test_draft_legacy_order_is_only_listed(self):
 		event = make_event("Repair Draft Event").name
 		so = legacy_order(event, ["draft@legacy.example"], submit=False)
 		name = legacy_row(event, "draft@legacy.example", so.name)
 		self.assertIn(f"draft order {so.name}", run_repair())
-		self.assertEqual(frappe.db.get_value("Attendee", name, ["sales_order", "payment_status"]), (None, "Pending"))
+		self.assertFalse(frappe.db.exists("Sales Order Item", {"parent": so.name, "attendee": name}))
+		self.assertEqual(frappe.db.get_value("Attendee", name, "payment_status"), "Pending")
 
 	def test_free_event_rows_are_not_required(self):
 		free = make_event("Repair Free Event", paid=False).name

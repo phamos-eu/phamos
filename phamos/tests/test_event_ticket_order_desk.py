@@ -46,7 +46,7 @@ class TestEventTicketOrderDesk(FrappeTestCase):
 
 	def tickets(self, order):
 		return frappe.get_all("Attendee", filters={"ticket_order": order.name},
-			fields=["name", "payment_status", "sales_order", "billing_customer", "is_buyer", "customer"])
+			fields=["name", "payment_status", "billing_customer", "is_buyer", "customer"])
 
 	def customer_addresses(self, customer):
 		return frappe.get_all("Dynamic Link", filters={"parenttype": "Address", "link_doctype": "Customer",
@@ -72,10 +72,13 @@ class TestEventTicketOrderDesk(FrappeTestCase):
 		self.assertEqual((so.docstatus, so.customer, flt(so.grand_total, 2)), (1, customer.name, 238.0))
 		self.assertEqual((so.contact_person, so.customer_address), (order.contact, self.customer_addresses(customer.name)[0]))
 		order.reload()
-		self.assertEqual((order.status, order.sales_order, order.customer), ("Ordered", so_name, customer.name))
-		for ticket in self.tickets(order):
-			self.assertEqual((ticket.payment_status, ticket.sales_order, ticket.billing_customer),
-				("Ordered", so_name, customer.name))
+		self.assertEqual((order.status, order.customer), ("Ordered", customer.name))
+		# The Sales Order points to the order, each line to its ticket (phamos/phamos#1727).
+		self.assertEqual(so.event_ticket_order, order.name)
+		tickets = self.tickets(order)
+		self.assertEqual(sorted(row.attendee for row in so.items), sorted(t.name for t in tickets))
+		for ticket in tickets:
+			self.assertEqual((ticket.payment_status, ticket.billing_customer), ("Ordered", customer.name))
 		buyer = next(t for t in self.tickets(order) if t.is_buyer)
 		self.assertEqual(buyer.customer, customer.name)
 
@@ -184,5 +187,41 @@ class TestEventTicketOrderDesk(FrappeTestCase):
 		invoices = api.create_sales_invoices(ticket_orders=[order.name], submit=1)["sales_invoices"]
 		self.assertEqual(len(invoices), 1)
 		self.assertEqual(flt(frappe.db.get_value("Sales Invoice", invoices[0], "grand_total"), 2), 238.0)
-		self.assertEqual(frappe.db.get_value("Event Ticket Order", order.name, ["status", "sales_invoice"]),
-			("Invoiced", invoices[0]))
+		self.assertEqual(frappe.db.get_value("Event Ticket Order", order.name, "status"), "Invoiced")
+		# ERPNext's mapper copies both links to the invoice and to a credit note (phamos/phamos#1727).
+		si = frappe.get_doc("Sales Invoice", invoices[0])
+		names = sorted(t.name for t in self.tickets(order))
+		self.assertEqual((si.event_ticket_order, sorted(row.attendee for row in si.items)), (order.name, names))
+		from erpnext.accounts.doctype.sales_invoice.sales_invoice import make_sales_return
+
+		credit_note = make_sales_return(si.name)
+		credit_note.insert()
+		credit_note.submit()
+		self.assertEqual((credit_note.event_ticket_order, sorted(row.attendee for row in credit_note.items)),
+			(order.name, names))
+		self.assertEqual(frappe.db.get_value("Event Ticket Order", order.name, "status"), "Credited")
+
+	def test_connections_list_every_sales_document(self, enqueue):
+		from frappe.desk.notifications import get_open_count
+
+		order = self.order()
+		so_name = api.create_order_sales_orders([order.name], mode="convert")["sales_orders"][0]
+		api.create_sales_invoices(ticket_orders=[order.name], submit=1)
+		def counts(doctype, name):
+			found = get_open_count(doctype, name)["count"]["external_links_found"]
+			return {d["doctype"]: d["count"] for d in found}
+
+		self.assertEqual(counts("Event Ticket Order", order.name), {"Attendee": 2, "Sales Order": 1, "Sales Invoice": 1})
+		buyer = next(t for t in self.tickets(order) if t.is_buyer)
+		# Through the line field: Frappe resolves "attendee" on the items table, as ERPNext's Item does.
+		self.assertEqual(counts("Attendee", buyer.name), {"Sales Order": 1, "Sales Invoice": 1})
+		self.assertEqual(frappe.db.get_value("Sales Order", so_name, "event_ticket_order"), order.name)
+
+	def test_a_ticket_is_on_one_sales_order_only(self, enqueue):
+		order = self.order()
+		so = frappe.get_doc("Sales Order", api.create_order_sales_orders([order.name], mode="convert")["sales_orders"][0])
+		duplicate = frappe.copy_doc(so)
+		self.assertRaisesRegex(frappe.ValidationError, "is already on Sales Order", duplicate.insert)
+		so.cancel()
+		self.assertEqual(frappe.db.get_value("Event Ticket Order", order.name, "status"), "Booked")
+		duplicate.insert()  # once the first one is cancelled the tickets can be ordered again

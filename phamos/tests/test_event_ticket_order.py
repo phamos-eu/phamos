@@ -74,14 +74,16 @@ class TestEventTicketOrder(FrappeTestCase):
 		refresh_status(order.name)
 		self.assertEqual(frappe.db.get_value("Event Ticket Order", order.name, "status"), "Free")
 
-	def test_billing_writes_refresh_the_order_and_its_links(self, enqueue):
+	def test_billing_writes_refresh_the_order_and_its_customer(self, enqueue):
 		order = self.make_order()
 		names = [make_attendee(self.event.name, f"t{i}@order.example", ticket_order=order.name,
 			payment_status="Pending").name for i in range(2)]
-		billing._set(names, {"payment_status": "Ordered", "sales_order": "SAL-ORD-TEST-1",
-			"billing_customer": "Test Ticket Order Customer"})
-		self.assertEqual(frappe.db.get_value("Event Ticket Order", order.name, ["status", "sales_order", "customer"]),
-			("Ordered", "SAL-ORD-TEST-1", "Test Ticket Order Customer"))
+		for name in names:
+			frappe.db.set_value("Attendee", name, {"payment_status": "Ordered",
+				"billing_customer": "Test Ticket Order Customer"})
+		billing._refresh_orders(names)
+		self.assertEqual(frappe.db.get_value("Event Ticket Order", order.name, ["status", "customer"]),
+			("Ordered", "Test Ticket Order Customer"))
 
 	def test_guests_cannot_read_orders(self, enqueue):
 		order = self.make_order()

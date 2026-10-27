@@ -18,6 +18,15 @@ def statuses(**filters):
 	return set(frappe.get_all("Attendee", filters=filters, pluck="payment_status"))
 
 
+def tickets_of(so_name):
+	"""The Attendees on a Sales Order's lines (phamos/phamos#1727: the lines point to them)."""
+	return frappe.get_all("Sales Order Item", filters={"parent": so_name, "attendee": ["is", "set"]}, pluck="attendee")
+
+
+def order_statuses(so_name):
+	return statuses(name=["in", tickets_of(so_name)])
+
+
 @patch("frappe.enqueue")
 class TestBilling(FrappeTestCase):
 	@classmethod
@@ -48,14 +57,13 @@ class TestBilling(FrappeTestCase):
 
 	def test_invoice_payment_and_cancel(self, enqueue):
 		so_name = self.web_order()
-		self.assertEqual(statuses(sales_order=so_name), {"Ordered"})
-		invoices = create_sales_invoices(names=frappe.get_all("Attendee", filters={"sales_order": so_name}, pluck="name"),
-			submit=1)["sales_invoices"]
+		self.assertEqual(order_statuses(so_name), {"Ordered"})
+		invoices = create_sales_invoices(names=tickets_of(so_name), submit=1)["sales_invoices"]
 		self.assertEqual(len(invoices), 1)
 		si = frappe.get_doc("Sales Invoice", invoices[0])
 		self.assertEqual(si.grand_total, 238)
-		self.assertEqual(statuses(sales_order=so_name), {"Invoiced"})
-		self.assertEqual(set(frappe.get_all("Attendee", filters={"sales_order": so_name}, pluck="sales_invoice")), {si.name})
+		self.assertEqual(order_statuses(so_name), {"Invoiced"})
+		self.assertEqual({invoice for invoice, _status in billing.payment_state(tickets_of(so_name)).values()}, {si.name})
 
 		from erpnext.accounts.doctype.payment_entry.payment_entry import get_payment_entry
 
@@ -63,20 +71,19 @@ class TestBilling(FrappeTestCase):
 		pe.reference_no, pe.reference_date = "TEST", frappe.utils.nowdate()
 		pe.insert()
 		pe.submit()
-		self.assertEqual(statuses(sales_order=so_name), {"Paid"})
+		self.assertEqual(order_statuses(so_name), {"Paid"})
 		pe.cancel()
-		self.assertEqual(statuses(sales_order=so_name), {"Invoiced"})
+		self.assertEqual(order_statuses(so_name), {"Invoiced"})
 		si.reload()
 		si.cancel()
-		self.assertEqual(statuses(sales_order=so_name), {"Ordered"})
+		self.assertEqual(order_statuses(so_name), {"Ordered"})
 		frappe.get_doc("Sales Order", so_name).cancel()
 		self.assertEqual(statuses(order_reference=so_name), {"Pending"})
 
 	# --- credit notes (phamos/phamos#1706) ------------------------------------------------------------
 
 	def invoice(self, so_name):
-		names = frappe.get_all("Attendee", filters={"sales_order": so_name}, pluck="name")
-		return frappe.get_doc("Sales Invoice", create_sales_invoices(names=names, submit=1)["sales_invoices"][0])
+		return frappe.get_doc("Sales Invoice", create_sales_invoices(names=tickets_of(so_name), submit=1)["sales_invoices"][0])
 
 	def pay(self, si):
 		from erpnext.accounts.doctype.payment_entry.payment_entry import get_payment_entry
@@ -98,15 +105,18 @@ class TestBilling(FrappeTestCase):
 		return cn
 
 	def rows(self, so_name):
-		return {r.sales_order_item: (r.sales_invoice, r.payment_status) for r in frappe.get_all("Attendee",
-			filters={"sales_order": so_name}, fields=["sales_order_item", "sales_invoice", "payment_status"])}
+		"""{attendee: (current invoice, stored payment_status)} of a Sales Order's tickets."""
+		names = tickets_of(so_name)
+		invoices = billing.payment_state(names)
+		return {r.name: (invoices.get(r.name, (None, None))[0], r.payment_status) for r in frappe.get_all("Attendee",
+			filters={"name": ["in", names]}, fields=["name", "payment_status"])}
 
 	def test_partial_credit_note_on_a_paid_invoice(self, enqueue):
 		so_name = self.web_order()
 		si = self.invoice(so_name)
 		self.pay(si)
 		cn = self.credit_note(si, lines=1)
-		credited_line = cn.items[0].so_detail
+		credited_line = cn.items[0].attendee  # copied from the invoice by ERPNext's mapper
 		for line, (invoice, status) in self.rows(so_name).items():
 			self.assertEqual(invoice, si.name)  # never the credit note
 			self.assertEqual(status, "Credited" if line == credited_line else "Paid")
@@ -141,8 +151,7 @@ class TestBilling(FrappeTestCase):
 		# Before: on_submit and on_change, three runs per submit. on_change alone runs twice, because ERPNext's
 		# set_status writes the status with db_set during submit; the handler is idempotent.
 		so_name = self.web_order()
-		names = frappe.get_all("Attendee", filters={"sales_order": so_name}, pluck="name")
-		si = frappe.get_doc("Sales Invoice", create_sales_invoices(names=names, submit=0)["sales_invoices"][0])
+		si = frappe.get_doc("Sales Invoice", create_sales_invoices(names=tickets_of(so_name), submit=0)["sales_invoices"][0])
 		with patch.object(billing, "on_sales_invoice_change", wraps=billing.on_sales_invoice_change) as hook:
 			si.submit()
 		self.assertEqual(hook.call_count, 2)
@@ -153,7 +162,8 @@ class TestBilling(FrappeTestCase):
 		si = self.invoice(so_name)
 		self.pay(si)
 		expected = self.rows(so_name)
-		frappe.db.set_value("Attendee", {"sales_order": so_name}, "payment_status", "Invoiced")
+		for name in tickets_of(so_name):
+			frappe.db.set_value("Attendee", name, "payment_status", "Invoiced")
 		billing.sync_payment_status()
 		self.assertEqual(self.rows(so_name), expected)
 
@@ -173,7 +183,7 @@ class TestBilling(FrappeTestCase):
 		people = [make_attendee(event.name, f"early{i}@desk.example", ticket_type="Early Bird") for i in range(2)]
 		rates, so = self.desk_order(event, people)
 		self.assertEqual(set(rates.values()), {59.5})  # before: the quota counted them, so Regular
-		self.assertEqual(set(frappe.get_all("Attendee", filters={"sales_order": so.name}, pluck="ticket_type")), {"Early Bird"})
+		self.assertEqual(set(frappe.get_all("Attendee", filters={"name": ["in", tickets_of(so.name)]}, pluck="ticket_type")), {"Early Bird"})
 
 	def test_desk_order_after_the_sale_window(self, enqueue):
 		event = self.early_bird_event(valid_until=frappe.utils.add_days(frappe.utils.now_datetime(), -1))
@@ -193,7 +203,7 @@ class TestBilling(FrappeTestCase):
 
 	def test_opportunities_on_demand(self, enqueue):
 		so_name = self.web_order()
-		names = frappe.get_all("Attendee", filters={"sales_order": so_name}, pluck="name", order_by="creation asc")
+		names = frappe.get_all("Attendee", filters={"name": ["in", tickets_of(so_name)]}, pluck="name", order_by="creation asc")
 		nobody = make_attendee(self.event.name, None, "No", "Email")
 		result = create_opportunities(names + [nobody.name])
 		self.assertEqual(len(result["opportunities"]), 2)
@@ -216,8 +226,8 @@ class TestBilling(FrappeTestCase):
 		self.assertEqual(len(orders), 1)
 		so = frappe.get_doc("Sales Order", orders[0])
 		self.assertEqual((so.customer, len(so.items), so.docstatus), (customer, 2, 1))
-		self.assertEqual(statuses(sales_order=so.name), {"Ordered"})
-		self.assertEqual(set(frappe.get_all("Attendee", filters={"sales_order": so.name}, pluck="order_reference")), {"SHEET-1"})
+		self.assertEqual(order_statuses(so.name), {"Ordered"})
+		self.assertEqual(set(frappe.get_all("Attendee", filters={"name": ["in", tickets_of(so.name)]}, pluck="order_reference")), {"SHEET-1"})
 
 	def test_price_summary(self, enqueue):
 		self.assertIn("Regular", billing.price_summary(self.event))
@@ -227,13 +237,15 @@ class TestBilling(FrappeTestCase):
 class TestSalesOrderHookCost(FrappeTestCase):
 	"""phamos/phamos#1707: the hook runs on every Sales Order save, also for orders without attendees."""
 
-	def test_order_without_attendees_costs_one_query(self):
+	def test_order_without_attendees_costs_no_query(self):
+		# Since phamos/phamos#1727 the lines name their tickets: an order without any needs no query at all.
 		order = SimpleNamespace(name="SO-NOT-AN-EVENT", customer="Someone", docstatus=0,
 			items=[SimpleNamespace(name=f"line-{i}") for i in range(50)])
-		with self.assertQueryCount(1):
+		with self.assertQueryCount(0):
 			billing.on_sales_order_update(order)
 
-	def test_attendee_links_are_indexed(self):
-		meta = frappe.get_meta("Attendee")
-		for field in ("event", "sales_order", "sales_order_item", "sales_invoice"):
-			self.assertTrue(meta.get_field(field).search_index, field)
+	def test_ticket_links_are_indexed(self):
+		self.assertTrue(frappe.get_meta("Attendee").get_field("event").search_index)
+		for doctype, field in (("Sales Order", "event_ticket_order"), ("Sales Invoice", "event_ticket_order"),
+				("Sales Order Item", "attendee"), ("Sales Invoice Item", "attendee")):
+			self.assertTrue(frappe.get_meta(doctype).get_field(field).search_index, f"{doctype}.{field}")
