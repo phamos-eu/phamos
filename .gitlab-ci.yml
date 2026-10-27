@@ -119,6 +119,11 @@ unit_tests:
     - |
       bench --site "$SITE" execute erpnext.setup.setup_wizard.operations.install_fixtures.install --kwargs '{"country": "Germany"}'
     - bench --site "$SITE" install-app phamos
+    # after_migrate creates custom fields the code needs (e.g. Sales Order Item.attendee).
+    - bench --site "$SITE" migrate
+    # Same time zone as the container: without one Frappe assumes Asia/Kolkata.
+    - |
+      bench --site "$SITE" execute frappe.db.set_single_value --args '["System Settings", "time_zone", "UTC"]'
     - bench --site "$SITE" set-config allow_tests true
     - |
       for app in erpnext hrms phamos; do

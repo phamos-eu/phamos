@@ -34,7 +34,9 @@ class TestComputeNextReviewDue(FrappeTestCase):
 
 class TestReviewCadenceOnImplementation(FrappeTestCase):
 	def setUp(self):
+		# Reloaded: the on_update hooks write to the record after insert.
 		self.implementation = make_implementation()
+		self.implementation.reload()
 
 	def test_setting_a_cadence_fills_next_review_due(self):
 		self.implementation.review_cadence = "Weekly"
