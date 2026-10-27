@@ -33,9 +33,8 @@
   "customer",
   "opportunity",
   "section_order",
+  "event_ticket_order",
   "order_reference",
-  "ticket_order",
-  "order_key",
   "is_buyer",
   "billing_customer",
   "payment_status",
@@ -246,30 +245,20 @@
    "label": "Order and Billing"
   },
   {
-   "fieldname": "order_reference",
-   "fieldtype": "Data",
-   "label": "Order Reference",
-   "read_only": 1,
-   "description": "Groups the attendees of one order: the Quotation for website orders, a booking number for free events, the order id for imports."
-  },
-  {
-   "fieldname": "ticket_order",
+   "fieldname": "event_ticket_order",
    "fieldtype": "Link",
-   "label": "Ticket Order",
+   "label": "Event Ticket Order",
    "options": "Event Ticket Order",
    "read_only": 1,
    "search_index": 1,
-   "description": "The order this ticket belongs to (orders since phamos/phamos#1717; older orders only have the Order Reference)."
+   "description": "The order this ticket belongs to. Set for all orders since phamos/phamos#1717."
   },
   {
-   "fieldname": "order_key",
+   "fieldname": "order_reference",
    "fieldtype": "Data",
-   "label": "Order Key",
-   "hidden": 1,
+   "label": "Order Reference (legacy)",
    "read_only": 1,
-   "no_copy": 1,
-   "search_index": 1,
-   "description": "The id the website order form sent with the order (its hold id). A repeated order with the same key returns the first order instead of booking again."
+   "description": "Only for registrations before phamos/phamos#1717, which have no Event Ticket Order: groups the attendees of one old order (its Sales Order, a booking number or an import id)."
   },
   {
    "fieldname": "is_buyer",

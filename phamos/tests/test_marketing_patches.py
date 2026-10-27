@@ -89,7 +89,7 @@ class TestMarketingPatches(FrappeTestCase):
 		with redirect_stdout(io.StringIO()) as out:
 			link_sales_documents_to_tickets.execute()
 		self.assertIn("Linked 2 Sales Order line(s) and 2 Sales Invoice line(s)", out.getvalue())
-		tickets = sorted(frappe.get_all("Attendee", filters={"ticket_order": order}, pluck="name"))
+		tickets = sorted(frappe.get_all("Attendee", filters={"event_ticket_order": order}, pluck="name"))
 		for doctype, name in (("Sales Order", so.name), ("Sales Invoice", si.name)):
 			self.assertEqual(frappe.db.get_value(doctype, name, "event_ticket_order"), order)
 			self.assertEqual(sorted(frappe.get_all(f"{doctype} Item", filters={"parent": name}, pluck="attendee")), tickets)

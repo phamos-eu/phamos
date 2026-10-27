@@ -1459,3 +1459,6 @@ The ticket order from the website this document was created from. Set automatica
 The ticket holder this line is billed for. Set automatically.,"Der Ticketinhaber, für den diese Position berechnet wird. Wird automatisch gesetzt."
 Attendee {0} is already on Sales Order {1},Teilnehmer {0} steht bereits auf Auftrag {1}
 A ticket can only be on one line of the Sales Order.,Ein Ticket kann nur auf einer Position des Auftrags stehen.
+"Order Reference (legacy)","Bestellreferenz (Altbestand)"
+"The order this ticket belongs to. Set for all orders since phamos/phamos#1717.","Die Bestellung, zu der dieses Ticket gehört. Gesetzt für alle Bestellungen seit phamos/phamos#1717."
+"Only for registrations before phamos/phamos#1717, which have no Event Ticket Order: groups the attendees of one old order (its Sales Order, a booking number or an import id).","Nur für Anmeldungen vor phamos/phamos#1717, die keine Ticketbestellung haben: fasst die Teilnehmer einer alten Bestellung zusammen (ihr Auftrag, eine Buchungsnummer oder eine Import-ID)."

@@ -104,7 +104,7 @@ class TestTicketingRole(FrappeTestCase):
 		self.assertEqual(frappe.session.user, portal)
 		frappe.set_user("Administrator")
 		self.assertEqual(frappe.db.get_value("Event Ticket Order", result["reference"], "owner"), portal)
-		buyer = frappe.db.get_value("Attendee", {"ticket_order": result["reference"], "is_buyer": 1}, "name")
+		buyer = frappe.db.get_value("Attendee", {"event_ticket_order": result["reference"], "is_buyer": 1}, "name")
 		self.assertFalse(frappe.db.exists("Comment", {"reference_doctype": "Attendee", "reference_name": buyer}))
 
 	def copy_with_role(self, doctype):

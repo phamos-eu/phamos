@@ -66,11 +66,11 @@ class TestTicketing(FrappeTestCase):
 		# The buyer is linked like a contact-form visitor: a new Lead owned by Guest.
 		lead = frappe.db.get_value("Lead", {"email_id": "erika@ticket.example"}, ["name", "lead_owner"], as_dict=True)
 		self.assertEqual((order.lead, lead.lead_owner), (lead.name, "Guest"))
-		rows = frappe.get_all("Attendee", filters={"ticket_order": order.name},
+		rows = frappe.get_all("Attendee", filters={"event_ticket_order": order.name},
 			fields=["name", "email", "payment_status", "is_buyer", "lead", "crm_status", "terms_accepted", "ticket_type",
 				"notes", "order_reference"], order_by="creation asc")
 		self.assertEqual([r.payment_status for r in rows], ["Pending", "Pending"])
-		self.assertEqual({r.order_reference for r in rows}, {order.name})
+		self.assertFalse(any(r.order_reference for r in rows))  # only for old registrations (phamos/phamos#1729)
 		self.assertFalse(billing.ticket_lines([r.name for r in rows]))
 		self.assertTrue(all(r.terms_accepted for r in rows))
 		buyer, companion = rows
@@ -98,7 +98,7 @@ class TestTicketing(FrappeTestCase):
 		result = self.order()
 		order = frappe.get_doc("Event Ticket Order", result["reference"])
 		self.assertEqual(order.customer, known)
-		self.assertEqual(frappe.db.get_value("Attendee", {"ticket_order": order.name, "is_buyer": 1}, "customer"), known)
+		self.assertEqual(frappe.db.get_value("Attendee", {"event_ticket_order": order.name, "is_buyer": 1}, "customer"), known)
 		self.assertEqual(frappe.db.count("Customer"), customers_before)
 		self.assertFalse(frappe.db.exists("Lead", {"email_id": "erika@ticket.example"}))
 		with patch("frappe.sendmail") as sendmail:
@@ -118,7 +118,7 @@ class TestTicketing(FrappeTestCase):
 	def test_contact_who_does_not_attend(self, enqueue):
 		result = self.order(attends=0, companions=[{"full_name": "Colleague One", "email": "colleague@ticket.example"}])
 		order = frappe.get_doc("Event Ticket Order", result["reference"])
-		rows = frappe.get_all("Attendee", filters={"ticket_order": order.name}, fields=["email", "is_buyer", "lead"])
+		rows = frappe.get_all("Attendee", filters={"event_ticket_order": order.name}, fields=["email", "is_buyer", "lead"])
 		self.assertEqual([r.email for r in rows], ["colleague@ticket.example"])
 		self.assertFalse(rows[0].is_buyer)
 		self.assertTrue(rows[0].lead)
@@ -234,14 +234,14 @@ class TestTicketing(FrappeTestCase):
 		again = self.order(contact={"full_name": "Other Person", "email": "other@ticket.example"}, companions=[],
 			hold_id="short-key-1234")
 		self.assertNotEqual(again["reference"], first["reference"])
-		self.assertFalse(frappe.db.get_value("Attendee", {"event": self.event.name}, "order_key"))
+		self.assertFalse(frappe.db.get_value("Event Ticket Order", again["reference"], "order_key"))
 
 	def test_retry_after_a_failed_order_books(self, enqueue):
 		key = str(uuid.uuid4())
 		self.assertRaises(frappe.ValidationError, self.order, hold_id=key, expected_total=1)  # price changed
 		result = self.order(hold_id=key, expected_total=238)
 		self.assertEqual(frappe.db.get_value("Event Ticket Order", result["reference"], "order_key"), key)
-		self.assertEqual(frappe.db.count("Attendee", {"ticket_order": result["reference"]}), 2)
+		self.assertEqual(frappe.db.count("Attendee", {"event_ticket_order": result["reference"]}), 2)
 
 	def test_logged_in_website_user_can_order(self, enqueue):
 		# phamos/phamos#1712 / #1724: a portal user has no Item or Account rights, and needs none: the website
@@ -287,7 +287,7 @@ class TestTicketing(FrappeTestCase):
 	def test_companion_is_linked_to_their_own_records(self, enqueue):
 		known = make_customer("Known Companion Customer AG", "colleague@ticket.example")
 		result = self.order(companions=[{"full_name": "Colleague Known", "email": "colleague@ticket.example"}])
-		row = frappe.get_all("Attendee", filters={"ticket_order": result["reference"], "is_buyer": 0},
+		row = frappe.get_all("Attendee", filters={"event_ticket_order": result["reference"], "is_buyer": 0},
 			fields=["customer", "crm_status"])[0]
 		self.assertEqual((row.customer, row.crm_status), (known, "Linked"))
 
@@ -298,7 +298,7 @@ class TestTicketing(FrappeTestCase):
 		result = self.order()
 		email = ticketing.save_consents(result["reference"], {"newsletter": 1, "public_listing": 1})
 		self.assertEqual(email, "erika@ticket.example")
-		buyer = frappe.get_all("Attendee", filters={"ticket_order": result["reference"], "is_buyer": 1},
+		buyer = frappe.get_all("Attendee", filters={"event_ticket_order": result["reference"], "is_buyer": 1},
 			fields=["newsletter_consent", "newsletter_consent_on", "public_listing_consent", "share_with_attendees_consent"])[0]
 		self.assertTrue(buyer.newsletter_consent and buyer.newsletter_consent_on and buyer.public_listing_consent)
 		self.assertFalse(buyer.share_with_attendees_consent)
@@ -580,7 +580,7 @@ class TestLeadAssignmentRule(FrappeTestCase):
 			result = ticketing.register_attendees(self.paid.name, CONTACT, billing_data=BILLING,
 				companions=[{"full_name": "New Companion", "email": "new.companion@rule.example"}])
 		self.assertEqual(frappe.db.get_value("Event Ticket Order", result["reference"], "status"), "Booked")
-		self.assertEqual(set(frappe.get_all("Attendee", filters={"ticket_order": result["reference"]}, pluck="owner")),
+		self.assertEqual(set(frappe.get_all("Attendee", filters={"event_ticket_order": result["reference"]}, pluck="owner")),
 			{"Guest"})
 		for email in ("new.companion@rule.example", CONTACT["email"]):
 			lead = self.lead_of(email)

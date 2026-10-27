@@ -37,11 +37,11 @@ class Attendee(Document):
 
 	def on_update(self):
 		# The order's status follows its tickets (phamos/phamos#1723).
-		if self.ticket_order and (self.has_value_changed("status") or self.has_value_changed("payment_status")
+		if self.event_ticket_order and (self.has_value_changed("status") or self.has_value_changed("payment_status")
 				or self.is_new()):
 			from phamos.marketing.doctype.event_ticket_order.event_ticket_order import refresh_status
 
-			refresh_status(self.ticket_order)
+			refresh_status(self.event_ticket_order)
 
 	def stamp_consents(self):
 		now = now_datetime()

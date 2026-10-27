@@ -63,20 +63,20 @@ class TestEventTicketOrder(FrappeTestCase):
 
 	def test_attendee_update_refreshes_the_order(self, enqueue):
 		order = self.make_order()
-		a = make_attendee(self.event.name, "one@order.example", ticket_order=order.name, payment_status="Pending")
-		make_attendee(self.event.name, "two@order.example", ticket_order=order.name, payment_status="Pending")
+		a = make_attendee(self.event.name, "one@order.example", event_ticket_order=order.name, payment_status="Pending")
+		make_attendee(self.event.name, "two@order.example", event_ticket_order=order.name, payment_status="Pending")
 		self.assertEqual(frappe.db.get_value("Event Ticket Order", order.name, "status"), "Booked")
 		a.reload()
 		a.status = "Cancelled"
 		a.save()
 		self.assertEqual(frappe.db.get_value("Event Ticket Order", order.name, "status"), "Booked")
-		frappe.db.set_value("Attendee", {"ticket_order": order.name}, "payment_status", "Not Required")
+		frappe.db.set_value("Attendee", {"event_ticket_order": order.name}, "payment_status", "Not Required")
 		refresh_status(order.name)
 		self.assertEqual(frappe.db.get_value("Event Ticket Order", order.name, "status"), "Free")
 
 	def test_billing_writes_refresh_the_order_and_its_customer(self, enqueue):
 		order = self.make_order()
-		names = [make_attendee(self.event.name, f"t{i}@order.example", ticket_order=order.name,
+		names = [make_attendee(self.event.name, f"t{i}@order.example", event_ticket_order=order.name,
 			payment_status="Pending").name for i in range(2)]
 		for name in names:
 			frappe.db.set_value("Attendee", name, {"payment_status": "Ordered",
@@ -90,7 +90,7 @@ class TestEventTicketOrder(FrappeTestCase):
 		from frappe.desk.notifications import get_open_count
 
 		order = self.make_order()
-		make_attendee(self.event.name, "t@connections.example", ticket_order=order.name)
+		make_attendee(self.event.name, "t@connections.example", event_ticket_order=order.name)
 		found = get_open_count("Marketing Content", self.event.name)["count"]["external_links_found"]
 		counts = {d["doctype"]: d["count"] for d in found}
 		self.assertEqual((counts.get("Event Ticket Order"), counts.get("Attendee")), (1, 1))

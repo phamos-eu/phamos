@@ -56,10 +56,11 @@ def _readable_customer(customer):
 
 
 def _groups(docs):
-	"""Attendees grouped by order: the order reference, else the Customer, else each on its own."""
+	"""Attendees grouped by order: the Event Ticket Order, else the legacy order reference, else the Customer,
+	else each on its own."""
 	groups = {}
 	for doc in docs:
-		key = doc.order_reference or (f"customer:{doc.customer}" if doc.customer else doc.name)
+		key = doc.event_ticket_order or doc.order_reference or (f"customer:{doc.customer}" if doc.customer else doc.name)
 		groups.setdefault((doc.event, key), []).append(doc)
 	return list(groups.values())
 
@@ -187,7 +188,7 @@ def _order_sales_order(order, mode, customer):
 		_readable_customer(customer)
 	else:
 		_require("Customer", "create")
-	names = frappe.get_all("Attendee", filters={"ticket_order": order.name, "status": ["!=", "Cancelled"]},
+	names = frappe.get_all("Attendee", filters={"event_ticket_order": order.name, "status": ["!=", "Cancelled"]},
 		pluck="name", order_by="is_buyer desc, creation asc")
 	on_order = billing.ticket_lines(names)
 	tickets = [frappe.get_doc("Attendee", name) for name in names if name not in on_order]
@@ -203,7 +204,7 @@ def _order_sales_order(order, mode, customer):
 	confirmed = order.confirmed_total if len(tickets) == order.quantity else billing.order_total(pricing, len(tickets)).total
 	so = billing.create_sales_order(event, tickets, customer, pricing=pricing, submit=True, contact=contact,
 		address=address, email=order.billing_email or order.buyer_email, lang=order.language,
-		confirmed_total=confirmed, ticket_order=order.name)  # with the user's own rights
+		confirmed_total=confirmed, event_ticket_order=order.name)  # with the user's own rights
 	return so.name
 
 
@@ -221,7 +222,7 @@ def create_sales_invoices(names=None, sales_orders=None, submit=0, ticket_orders
 	if ticket_orders:
 		for order in _names(ticket_orders):
 			frappe.has_permission("Event Ticket Order", "read", order, throw=True)
-			uninvoiced += frappe.get_all("Attendee", filters={"ticket_order": order, "payment_status": "Ordered"},
+			uninvoiced += frappe.get_all("Attendee", filters={"event_ticket_order": order, "payment_status": "Ordered"},
 				pluck="name")
 	orders += billing.ticket_lines(uninvoiced).values()
 	invoices, skipped = [], []
@@ -244,8 +245,9 @@ def send_ticket(name):
 	doc.check_permission("write")
 	if not doc.email:
 		frappe.throw(_("This attendee has no email address."))
-	buyer = frappe.db.get_value("Attendee", {"order_reference": doc.order_reference, "is_buyer": 1},
-		["first_name", "last_name"], as_dict=True) if doc.order_reference and not doc.is_buyer else None
+	order_field = "event_ticket_order" if doc.event_ticket_order else "order_reference"
+	buyer = frappe.db.get_value("Attendee", {order_field: doc.get(order_field), "is_buyer": 1},
+		["first_name", "last_name"], as_dict=True) if doc.get(order_field) and not doc.is_buyer else None
 	buyer_name = " ".join(filter(None, [buyer.first_name, buyer.last_name])) if buyer else None
 	ticketing.send_ticket(doc.name, buyer_name=buyer_name, lang=doc.language or "de", ignore_limit=True)
 	return {"sent_to": doc.email}

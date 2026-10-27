@@ -45,7 +45,7 @@ class TestEventTicketOrderDesk(FrappeTestCase):
 		return frappe.get_doc("Event Ticket Order", result["reference"])
 
 	def tickets(self, order):
-		return frappe.get_all("Attendee", filters={"ticket_order": order.name},
+		return frappe.get_all("Attendee", filters={"event_ticket_order": order.name},
 			fields=["name", "payment_status", "billing_customer", "is_buyer", "customer"])
 
 	def customer_addresses(self, customer):
