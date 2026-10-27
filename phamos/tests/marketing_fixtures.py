@@ -10,11 +10,10 @@ EVENT_TITLE = "Test ERPNext Event"
 
 
 def ensure_company():
-	"""The CI site is bare (`--app phamos` never runs ERPNext's setup wizard): run it once."""
-	if not frappe.db.a_row_exists("Company"):
-		from erpnext.setup.utils import before_tests
+	"""The CI site is bare (`bench run-tests --app phamos` does not run ERPNext's own before_tests)."""
+	from phamos.install import load_test_records
 
-		before_tests()
+	load_test_records()
 	company = frappe.defaults.get_global_default("company") or frappe.get_all("Company", pluck="name", limit=1)[0]
 	frappe.defaults.set_global_default("company", company)
 	for field, doctype in (("customer_group", "Customer Group"), ("territory", "Territory")):
