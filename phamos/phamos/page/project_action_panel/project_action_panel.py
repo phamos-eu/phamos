@@ -254,6 +254,7 @@ def create_and_submit_timesheet(
     percent_billable,
     activity_type,
     result,
+    value_add=100,
 ):
     try:
         # Basic time validation
@@ -277,6 +278,7 @@ def create_and_submit_timesheet(
         ts.project = project_name
         ts.activity_type = activity_type
         ts.percent_billable = normalize_percent_billable(percent_billable)
+        ts.value_add = cstr(value_add)
         ts.goal = goal
         ts.expected_time = expected_time
         ts.result = result
@@ -562,7 +564,7 @@ def get_team_holidays():
 
 
 @frappe.whitelist()
-def update_and_submit_timesheet_record(name, to_time, percent_billable, activity_type, result, task=None):
+def update_and_submit_timesheet_record(name, to_time, percent_billable, activity_type, result, task=None, value_add=100):
     try:
         # Retrieve the Timesheet Record document
         doc = frappe.get_doc("Timesheet Record", name)
@@ -606,7 +608,7 @@ def update_and_submit_timesheet_record(name, to_time, percent_billable, activity
             doc.gitlab_parent_issue = _resolve_gitlab_parent(doc.gitlab_issue)
 
         doc.percent_billable = normalize_percent_billable(percent_billable)
-      
+        doc.value_add = cstr(value_add)
 
         # Final validation before any save or submit
         if doc.from_time and doc.to_time and get_datetime(doc.to_time) < get_datetime(doc.from_time):
@@ -633,7 +635,7 @@ def update_and_submit_timesheet_record(name, to_time, percent_billable, activity
             new_doc.employee = doc.employee
 
             # Copy parent fields from original
-            for field in ["project", "customer", "task", "goal", "gitlab_issue", "gitlab_parent_issue", "expected_time", "activity_type", "result", "percent_billable"]:
+            for field in ["project", "customer", "task", "goal", "gitlab_issue", "gitlab_parent_issue", "expected_time", "activity_type", "result", "percent_billable", "value_add"]:
                 new_doc.set(field, doc.get(field))
 
             # Parent times from selected row
