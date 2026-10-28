@@ -1,7 +1,7 @@
 import frappe
 from frappe import _
 from frappe.utils import cstr, now_datetime, add_to_date, time_diff_in_seconds, get_datetime
-from phamos.phamos.timesheet_utils import get_billing_context, normalize_percent_billable
+from phamos.phamos.timesheet_utils import billing_context, normalize_percent_billable
 from phamos.phamos.doctype.timesheet_record.timesheet_record import compute_time_limit_status
 from frappe.query_builder import Order
 from frappe.query_builder.functions import Coalesce, Sum, Count
@@ -757,7 +757,7 @@ def get_active_project_session():
     record["session_state"] = session_state
     record["elapsed_seconds"] = _calc_elapsed_seconds(rows)
     record["break_from"] = str(last_row["from_time"]) if session_state == "paused" and not last_row.get("to_time") else None
-    billing = get_billing_context(record["project"])
+    billing = billing_context(record["project"])
     record["project_is_billable"] = billing["is_billable"]
     record["project_percent_billable"] = billing["percent_billable"]
     return record

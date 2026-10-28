@@ -391,6 +391,7 @@ class TestValueAddAndBillingRules(FrappeTestCase):
 			self.addCleanup(patcher.stop)
 		frappe.set_user("Administrator")
 		_ensure_user(self.USER)
+		_ensure_user(NO_ACCESS)
 		self.employee = _ensure_employee(self.USER)
 		self.activity_type = "VA Development"
 		if not frappe.db.exists("Activity Type", self.activity_type):
@@ -448,6 +449,16 @@ class TestValueAddAndBillingRules(FrappeTestCase):
 
 		self.assertEqual(get_billing_context(self.billable), {"is_billable": True, "percent_billable": "75"})
 		self.assertEqual(get_billing_context(self.internal), {"is_billable": False, "percent_billable": "0"})
+
+	def test_billing_context_needs_read_access_to_the_project(self):
+		from phamos.phamos.timesheet_utils import get_billing_context
+
+		frappe.set_user(NO_ACCESS)
+		with self.assertRaises(frappe.PermissionError):
+			get_billing_context(self.billable)
+
+	def test_empty_percent_billable_on_a_billable_project_becomes_zero(self):
+		self.assertEqual(self._record(self.billable, percent_billable="").percent_billable, "0")
 
 	def test_percent_billable_is_kept_on_a_billable_project(self):
 		self.assertEqual(self._record(self.billable, percent_billable="50").percent_billable, "50")

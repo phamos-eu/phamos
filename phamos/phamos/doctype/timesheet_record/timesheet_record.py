@@ -6,7 +6,7 @@ from frappe import _
 from frappe.model.document import Document
 from frappe.utils import (cstr, now_datetime, time_diff_in_seconds, get_datetime, flt, nowdate, get_first_day, get_last_day, get_url_to_form,)
 
-from phamos.phamos.timesheet_utils import RATING_OPTIONS, is_billable_project
+from phamos.phamos.timesheet_utils import RATING_OPTIONS, is_billable_project, normalize_percent_billable
 
 class TimesheetRecord(Document):
 
@@ -20,7 +20,9 @@ class TimesheetRecord(Document):
 			frappe.throw(_("Value Add must be 0, 25, 50, 75 or 100 %."))
 		if not is_billable_project(self.project):
 			self.percent_billable = "0"
-		elif cstr(self.percent_billable) not in RATING_OPTIONS:
+			return
+		self.percent_billable = normalize_percent_billable(self.percent_billable)
+		if self.percent_billable not in RATING_OPTIONS:
 			frappe.throw(_("Percent Billable must be 0, 25, 50, 75 or 100 %."))
 
 	def before_insert(self):
