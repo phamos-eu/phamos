@@ -88,3 +88,29 @@ class TestMarketingCrm(FrappeTestCase):
 		att.reload()
 		self.assertTrue(att.lead and att.contact)
 		self.assertEqual(att.crm_status, "Linked")
+
+	# --- the shared website step (phamos/phamos#1724) ---------------------------------------------------
+
+	def test_match_or_create_lead_links_a_customer_first(self):
+		make_customer("Match Kunde GmbH", "match@crm-kunde.example")
+		lead = frappe.get_doc({"doctype": "Lead", "first_name": "Match", "email_id": "match@crm-kunde.example",
+			"status": "Lead"}).insert(ignore_permissions=True)
+		result = crm.match_or_create_lead(email="Match@crm-kunde.example", first_name="Match")
+		self.assertEqual((result.customer, result.lead, result.created), ("Match Kunde GmbH", None, False))
+		self.assertTrue(result.contact)
+		self.assertTrue(frappe.db.exists("Lead", lead.name))
+
+	def test_match_or_create_lead_links_an_existing_lead(self):
+		lead = frappe.get_doc({"doctype": "Lead", "first_name": "Only", "email_id": "only.lead@crm.example",
+			"status": "Lead"}).insert(ignore_permissions=True)
+		result = crm.match_or_create_lead(email="only.lead@crm.example", first_name="Only", phone="+49 711 1")
+		self.assertEqual((result.lead, result.created), (lead.name, False))
+		self.assertEqual(frappe.db.get_value("Lead", lead.name, "mobile_no"), "+49 711 1")
+
+	def test_match_or_create_lead_creates_a_guest_owned_lead(self):
+		result = crm.match_or_create_lead(email="brand.new@crm.example", first_name="Brand", last_name="New",
+			campaign=None, source=crm.ensure_lead_source())
+		lead = frappe.get_doc("Lead", result.lead)
+		self.assertTrue(result.created)
+		self.assertEqual((lead.lead_owner, lead.email_id, lead.lead_name), ("Guest", "brand.new@crm.example", "Brand New"))
+

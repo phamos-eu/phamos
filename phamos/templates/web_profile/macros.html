@@ -302,7 +302,7 @@
 			<li data-wp-step-label="3"><span class="wp-step-no">{{ 2 if t.free else 3 }}</span>{{ _("Review") }}</li>
 		</ol>
 		{#- Seats and price are held for 20 minutes; the clock counts down. -#}
-		<p class="wp-hold" data-wp-hold hidden data-expired="{{ _('Time is up. Seats and prices are checked again.') }}"
+		<p class="wp-hold" data-wp-hold hidden data-expired="{{ _('Time is up: seats and prices are checked again when you continue.') }}"
 			data-soldout="{{ _('Not enough seats left for this number of tickets.') }}"
 			data-restored="{{ _('Entries restored.') }}"><span data-wp-hold-text>{{ _("Reserved for you") }}</span> <strong class="wp-hold-clock" data-wp-hold-clock></strong></p>
 		<input type="hidden" name="event" value="{{ item.slug | e }}">
@@ -476,7 +476,6 @@
 			<button type="submit" class="wp-button wp-button-primary">{{ _("Send confirmation email") }}</button>
 			<p class="wp-contact-status" role="status" data-wp-subscribe-status data-sending="{{ _('Sending…') }}"
 				data-sent="{{ _('Almost done: please confirm with the link we sent you.') }}"
-				data-already="{{ _('This address already receives the updates.') }}"
 				data-failed="{{ _('That did not work. Please try again later.') }}"
 				data-invalid="{{ _('Please enter a valid email address and tick the consent box.') }}"></p>
 		</div>
