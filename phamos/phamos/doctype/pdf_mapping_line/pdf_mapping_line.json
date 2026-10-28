@@ -1,0 +1,43 @@
+{
+ "actions": [],
+ "allow_rename": 1,
+ "creation": "2026-10-28 12:49:02.640418",
+ "doctype": "DocType",
+ "editable_grid": 1,
+ "engine": "InnoDB",
+ "field_order": [
+  "section_break_x9cr",
+  "source_label",
+  "target_field"
+ ],
+ "fields": [
+  {
+   "fieldname": "section_break_x9cr",
+   "fieldtype": "Section Break"
+  },
+  {
+   "fieldname": "source_label",
+   "fieldtype": "Data",
+   "in_list_view": 1,
+   "label": "Source label"
+  },
+  {
+   "fieldname": "target_field",
+   "fieldtype": "Data",
+   "in_list_view": 1,
+   "label": "Target field"
+  }
+ ],
+ "index_web_pages_for_search": 1,
+ "istable": 1,
+ "links": [],
+ "modified": "2026-10-28 12:50:24.275080",
+ "modified_by": "Administrator",
+ "module": "Phamos",
+ "name": "PDF Mapping Line",
+ "owner": "Administrator",
+ "permissions": [],
+ "sort_field": "modified",
+ "sort_order": "DESC",
+ "states": []
+}
