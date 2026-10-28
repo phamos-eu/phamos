@@ -9,6 +9,7 @@ import BreakConfirm from "./components/BreakConfirm.vue";
 import CalendarView from "./components/CalendarView.vue";
 import TimesheetList from "./components/TimesheetList.vue";
 import ProjectsView from "./components/ProjectsView.vue";
+import { ratingArgs } from "./timesheetRating.js";
 
 const issues = ref([]);
 const stats = ref(null);
@@ -283,9 +284,9 @@ function showTimeLimitDialog(status, onSubmitted) {
   });
 }
 
-async function onStopProjectTimer({ result, percentBillable, activityType, manualEndTime }) {
+async function onStopProjectTimer({ result, valueAdd, percentBillable, activityType, manualEndTime }) {
   if (!activeProjectSession.value) return;
-  const args = { name: activeProjectSession.value.name, result, percent_billable: percentBillable, activity_type: activityType };
+  const args = { name: activeProjectSession.value.name, result, activity_type: activityType, ...ratingArgs(valueAdd, percentBillable) };
   if (manualEndTime) args.manual_end_time = manualEndTime;
   const r = await frappe.call({
     method: "phamos.phamos.page.dev_action_panel.dev_action_panel.stop_timer",
@@ -384,7 +385,7 @@ async function doResume() {
   await loadIssues();
 }
 
-async function onBreakSubmit({ project, activityType, goal, result, percentBillable }) {
+async function onBreakSubmit({ project, activityType, goal, result, valueAdd, percentBillable }) {
   showBreakModal.value = false;
   await frappe.call({
     method: "phamos.phamos.page.dev_action_panel.dev_action_panel.create_break_timesheet",
@@ -393,8 +394,8 @@ async function onBreakSubmit({ project, activityType, goal, result, percentBilla
       project,
       goal,
       result,
-      percent_billable: percentBillable,
       activity_type: activityType || null,
+      ...ratingArgs(valueAdd, percentBillable),
     },
   });
   breakFrom.value = null;
@@ -416,9 +417,9 @@ async function onBreakSkip() {
   }
 }
 
-// Inline stop (emitted from card with { result, percentBillable, activityType, manualEndTime? })
-async function onStop({ result, percentBillable, activityType, manualEndTime }) {
-  const args = { name: activeSession.value.name, result, percent_billable: percentBillable, activity_type: activityType };
+// Inline stop (emitted from card with { result, valueAdd, percentBillable, activityType, manualEndTime? })
+async function onStop({ result, valueAdd, percentBillable, activityType, manualEndTime }) {
+  const args = { name: activeSession.value.name, result, activity_type: activityType, ...ratingArgs(valueAdd, percentBillable) };
   if (manualEndTime) args.manual_end_time = manualEndTime;
   const r = await frappe.call({
     method: "phamos.phamos.page.dev_action_panel.dev_action_panel.stop_timer",

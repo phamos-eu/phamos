@@ -1,6 +1,7 @@
 <script setup>
 import { ref, computed } from "vue";
 import DateTimePicker from "./DateTimePicker.vue";
+import { RATING_OPTIONS, VALUE_ADD_DEFAULT, VALUE_ADD_HELP, billablePreset } from "../timesheetRating.js";
 
 function labelNames(labels) {
   if (!labels) return [];
@@ -37,6 +38,12 @@ const startTimeModified = ref(false);
 // Stop form
 const stopResult = ref("");
 const stopBillable = ref(100);
+const stopValueAdd = ref(VALUE_ADD_DEFAULT);
+const labels = {
+  valueAdd: __("Value Add (%)"),
+  valueAddHelp: __(VALUE_ADD_HELP),
+  percentBillable: __("Percent Billable"),
+};
 const stopActivityType = ref("");
 const stopEndTimeDate = ref(new Date());
 const stopEndTimeModified = ref(false);
@@ -150,6 +157,8 @@ function openStart() {
 }
 function openStop() {
   panel.value = panel.value === "stop" ? null : "stop";
+  stopValueAdd.value = VALUE_ADD_DEFAULT;
+  stopBillable.value = billablePreset(props.activeSession);
   const now = new Date();
   const fromDate = parseSystemDatetimeToUserDate(props.activeSession?.from_time);
 
@@ -174,7 +183,12 @@ function confirmStart() {
 function confirmStop() {
   if (!stopResult.value.trim()) { frappe.msgprint(__("Please describe what you accomplished.")); return; }
   if (!stopActivityType.value) { frappe.msgprint(__("Please select an Activity Type.")); return; }
-  const payload = { result: stopResult.value.trim(), percentBillable: stopBillable.value, activityType: stopActivityType.value };
+  const payload = {
+    result: stopResult.value.trim(),
+    valueAdd: stopValueAdd.value,
+    percentBillable: stopBillable.value,
+    activityType: stopActivityType.value,
+  };
   if (stopEndTimeModified.value) payload.manualEndTime = formatForApi(stopEndTimeDate.value);
   emit("stop", payload);
   panel.value = null; stopResult.value = ""; stopActivityType.value = "";
@@ -369,6 +383,7 @@ function onStopKey(e)  { if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) conf
               autofocus
             ></textarea>
           </div>
+          <p class="ic__panel-hint">{{ labels.valueAdd }}: {{ labels.valueAddHelp }}</p>
           <div class="ic__panel-row">
             <div class="ic__panel-field">
               <label class="ic__panel-label">Activity Type <span class="ic__panel-required">*</span></label>
@@ -378,13 +393,15 @@ function onStopKey(e)  { if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) conf
               </select>
             </div>
             <div class="ic__panel-field">
-              <label class="ic__panel-label">Billable %</label>
+              <label class="ic__panel-label" :title="labels.valueAddHelp">{{ labels.valueAdd }}</label>
+              <select v-model.number="stopValueAdd" class="ic__panel-select" :title="labels.valueAddHelp">
+                <option v-for="v in RATING_OPTIONS" :key="v" :value="v">{{ v }}%</option>
+              </select>
+            </div>
+            <div class="ic__panel-field">
+              <label class="ic__panel-label">{{ labels.percentBillable }}</label>
               <select v-model.number="stopBillable" class="ic__panel-select">
-                <option :value="100">100%</option>
-                <option :value="75">75%</option>
-                <option :value="50">50%</option>
-                <option :value="25">25%</option>
-                <option :value="0">0% — Internal</option>
+                <option v-for="v in RATING_OPTIONS" :key="v" :value="v">{{ v }}%</option>
               </select>
             </div>
             <div class="ic__panel-field ic__panel-field--grow">
@@ -571,6 +588,7 @@ function onStopKey(e)  { if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) conf
 .ic__panel-unit { font-size: 12.5px; color: var(--text-muted); font-weight: 500; }
 .ic__panel-hint { font-size: 12px; color: var(--text-muted); }
 .ic__panel-optional { font-size: 10px; font-weight: 400; color: var(--text-muted); text-transform: none; letter-spacing: 0; }
+.ic__panel-hint { margin: 0; font-size: 11px; color: var(--text-muted); }
 .ic__panel-required { color: var(--red-600, #dc2626); }
 
 .ic__panel-textarea {
