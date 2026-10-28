@@ -147,7 +147,7 @@
   },
   {
    "default": "100",
-   "description": "Share of this time the customer is billed for. Only on customer implementation projects.",
+   "description": "Share of this time the customer is billed for. Preset from the project.",
    "fieldname": "percent_billable",
    "fieldtype": "Select",
    "label": "Percent Billable",
@@ -197,7 +197,7 @@
  "index_web_pages_for_search": 1,
  "is_submittable": 1,
  "links": [],
- "modified": "2026-10-28 20:30:00.000000",
+ "modified": "2026-10-28 21:00:00.000000",
  "modified_by": "Administrator",
  "module": "Phamos",
  "name": "Timesheet Record",

@@ -6,7 +6,7 @@ from frappe import _
 from frappe.model.document import Document
 from frappe.utils import (cstr, now_datetime, time_diff_in_seconds, get_datetime, flt, nowdate, get_first_day, get_last_day, get_url_to_form,)
 
-from phamos.phamos.timesheet_utils import RATING_OPTIONS, is_billable_project, normalize_percent_billable
+from phamos.phamos.timesheet_utils import RATING_OPTIONS, normalize_percent_billable
 
 class TimesheetRecord(Document):
 
@@ -14,13 +14,10 @@ class TimesheetRecord(Document):
 		self.validate_ratings()
 
 	def validate_ratings(self):
-		"""Value Add is the person's own rating; Percent Billable only counts on billable projects (#1031)."""
+		"""Value Add is the person's own rating; Percent Billable is what the customer is billed (#1031)."""
 		self.value_add = cstr(self.value_add).strip() or "100"
 		if self.value_add not in RATING_OPTIONS:
 			frappe.throw(_("Value Add must be 0, 25, 50, 75 or 100 %."))
-		if not is_billable_project(self.project):
-			self.percent_billable = "0"
-			return
 		self.percent_billable = normalize_percent_billable(self.percent_billable)
 		if self.percent_billable not in RATING_OPTIONS:
 			frappe.throw(_("Percent Billable must be 0, 25, 50, 75 or 100 %."))

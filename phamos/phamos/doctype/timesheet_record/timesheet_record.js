@@ -73,28 +73,18 @@ frappe.ui.form.on('Timesheet Record', {
 				frm.trigger("mark_complete");
 			});
 		}
-		frm.trigger("toggle_percent_billable");
-	},
-	toggle_percent_billable: function(frm, preset) {
-		// Percent Billable only counts on customer implementation projects; the server stores 0 elsewhere (#1031).
-		if (!frm.doc.project) {
-			frm.toggle_display("percent_billable", false);
-			return;
-		}
-		frappe.call({
-			method: "phamos.phamos.timesheet_utils.get_billing_context",
-			args: { project: frm.doc.project },
-			callback: function(r) {
-				let billing = r.message || {};
-				frm.toggle_display("percent_billable", !!billing.is_billable);
-				if (preset && frm.doc.docstatus == 0) {
-					frm.set_value("percent_billable", billing.percent_billable);
-				}
-			},
-		});
 	},
 	project: function(frm) {
-		frm.events.toggle_percent_billable(frm, true);
+		// Preset Percent Billable from the Project (100 when it has none, #1031).
+		if (frm.doc.project && frm.doc.docstatus == 0) {
+			frappe.call({
+				method: "phamos.phamos.timesheet_utils.get_billing_context",
+				args: { project: frm.doc.project },
+				callback: function(r) {
+					if (r.message) frm.set_value("percent_billable", r.message.percent_billable);
+				},
+			});
+		}
 		//Filter task based on project if project is selected first
 		frm.set_query("task", () => {
 			let filters = {};

@@ -757,9 +757,7 @@ def get_active_project_session():
     record["session_state"] = session_state
     record["elapsed_seconds"] = _calc_elapsed_seconds(rows)
     record["break_from"] = str(last_row["from_time"]) if session_state == "paused" and not last_row.get("to_time") else None
-    billing = billing_context(record["project"])
-    record["project_is_billable"] = billing["is_billable"]
-    record["project_percent_billable"] = billing["percent_billable"]
+    record["project_percent_billable"] = billing_context(record["project"])["percent_billable"]
     return record
 
 

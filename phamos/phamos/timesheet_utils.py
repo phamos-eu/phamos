@@ -1,5 +1,5 @@
 import frappe
-from frappe.utils import cint, cstr
+from frappe.utils import cstr
 
 RATING_OPTIONS = ("0", "25", "50", "75", "100")
 
@@ -17,24 +17,14 @@ def normalize_percent_billable(value):
     return cstr(value).strip()
 
 
-def is_billable_project(project):
-    """Percent Billable only counts on projects with an Implementation that are not internal (#1031)."""
-    if not project:
-        return False
-    values = frappe.db.get_value(
-        "Project", project, ["custom_implementation", "custom_is_internal_project"], as_dict=True
-    )
-    return bool(values and values.custom_implementation and not cint(values.custom_is_internal_project))
-
-
 def billing_context(project):
-    """Whether a project's records show Percent Billable, and its preset (0 when not billable)."""
-    if not is_billable_project(project):
-        return {"is_billable": False, "percent_billable": "0"}
-    return {
-        "is_billable": True,
-        "percent_billable": frappe.db.get_value("Project", project, "percent_billable") or "100",
-    }
+    """Preset for Percent Billable: the Project's own value, 100 when it has none.
+
+    Percent Billable is set on every project, internal ones included, because external people
+    may bill there too (#1031, revised decision 2).
+    """
+    preset = frappe.db.get_value("Project", project, "percent_billable") if project else None
+    return {"percent_billable": preset or "100"}
 
 
 @frappe.whitelist()
