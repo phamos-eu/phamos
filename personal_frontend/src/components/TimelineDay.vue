@@ -103,7 +103,7 @@
 							<div class="mt-1 text-xs text-ink-gray-5">
 								{{ minuteLabel(selected.start) }} – {{ selected.running ? __("now") : minuteLabel(selected.end) }}
 								· {{ selected.kind === "break" ? __("break") : selected.log.activity_type || __("work") }}
-								<template v-if="selected.kind !== 'break' && selected.log.docstatus === 1">· {{ __("{0} % billable", [selected.log.percent_billable]) }}</template>
+								<template v-if="selected.kind !== 'break' && selected.log.docstatus === 1">· {{ __("{0} % value add", [selected.log.value_add]) }} · {{ __("{0} % billable", [selected.log.percent_billable]) }}</template>
 								<template v-if="selected.log.docstatus === 0">· {{ __("running") }}</template>
 							</div>
 						</div>

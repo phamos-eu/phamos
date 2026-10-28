@@ -175,6 +175,34 @@ class TestPersonalTimer(FrappeTestCase):
 		self.assertTrue(doc.timesheet)
 		self.assertEqual(frappe.db.get_value("Timesheet", doc.timesheet, "employee"), self.employee)
 
+	def test_stop_stores_value_add_next_to_percent_billable(self):
+		name = self._start()["session"]["name"]
+		pc.stop_timer(name, "Report written", percent_billable="50", value_add="25", activity_type="TM Development")
+		values = frappe.db.get_value("Timesheet Record", name, ["percent_billable", "value_add"])
+		self.assertEqual(tuple(values), ("50", "25"))
+
+	def test_stop_rejects_a_value_add_outside_the_options(self):
+		name = self._start()["session"]["name"]
+		with self.assertRaises(frappe.ValidationError):
+			pc.stop_timer(name, "Done", value_add="33", activity_type="TM Development")
+
+	def test_a_tracked_break_stores_its_value_add(self):
+		name = self._start()["session"]["name"]
+		self._pause(name, goal="Customer call", minutes=20)
+		pc.resume_timer(
+			name,
+			track_break=1,
+			break_project=self.other_project,
+			break_result="Agreed on the scope",
+			break_activity_type="TM Development",
+			break_percent_billable="75",
+			break_value_add="50",
+		)
+		values = frappe.db.get_value(
+			"Timesheet Record", {"employee": self.employee, "project": self.other_project, "docstatus": 1}, ["percent_billable", "value_add"]
+		)
+		self.assertEqual(tuple(values), ("75", "50"))
+
 	def test_stop_needs_result_and_activity_type(self):
 		name = self._start()["session"]["name"]
 		with self.assertRaises(frappe.ValidationError):
