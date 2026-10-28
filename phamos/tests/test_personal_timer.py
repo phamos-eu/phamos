@@ -16,6 +16,7 @@ from frappe.utils import add_to_date, now_datetime
 
 from phamos.api import personal_cockpit as pc
 from phamos.api import personal_timer as timer
+from phamos.phamos.doctype.stakeholder_meeting.test_stakeholder_meeting import make_implementation
 from phamos.tests.test_personal_checkin import _ensure_employee, _ensure_user
 
 USER = "tm-a@example.com"
@@ -36,7 +37,8 @@ class TestPersonalTimer(FrappeTestCase):
 		self.employee = _ensure_employee(USER)
 		self.other_employee = _ensure_employee(OTHER)
 		frappe.db.set_value("Employee", self.employee, "activity_type", self._activity_type())
-		self.project = self._project("TM Timer project")
+		# Billable (linked to an Implementation), so the Percent Billable picked on stop is kept (#1031).
+		self.project = self._project("TM Timer project", implementation=make_implementation().name)
 		self.other_project = self._project("TM Other project")
 
 	def tearDown(self):
@@ -49,7 +51,7 @@ class TestPersonalTimer(FrappeTestCase):
 			frappe.get_doc({"doctype": "Activity Type", "activity_type": name}).insert(ignore_permissions=True)
 		return name
 
-	def _project(self, project_name, task_rule="Task is optional"):
+	def _project(self, project_name, task_rule="Task is optional", implementation=None):
 		return (
 			frappe.get_doc(
 				{
@@ -58,6 +60,7 @@ class TestPersonalTimer(FrappeTestCase):
 					"status": "Open",
 					"task_in_timesheet_record": task_rule,
 					"percent_billable": "75",
+					"custom_implementation": implementation,
 				}
 			)
 			.insert(ignore_permissions=True)

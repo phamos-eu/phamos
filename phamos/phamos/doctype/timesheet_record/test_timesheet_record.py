@@ -363,3 +363,193 @@ class TestTimesheetRecordRules(FrappeTestCase):
 
 		with self.assertRaises(frappe.PermissionError):
 			self._record().insert()
+
+
+def _make_billable_implementation():
+	"""An Implementation for a test customer, so a Project linked to it is billable (#1742)."""
+	from phamos.phamos.doctype.stakeholder_meeting.test_stakeholder_meeting import make_implementation
+
+	return make_implementation().name
+
+
+class TestValueAddAndBillingRules(FrappeTestCase):
+	"""Value Add next to Percent Billable (#1031, child #1742).
+
+	1. Percent Billable counts only on projects with an Implementation that are not internal;
+	   everywhere else it is stored as 0.
+	2. Value Add is one of 0/25/50/75/100; empty becomes 100.
+	3. The time limit lowers only Percent Billable.
+	4. The shared timer backend stores Value Add on stops and tracked breaks.
+	"""
+
+	USER = "va-employee@example.com"
+
+	def setUp(self):
+		for target in ("frappe.db.commit", "frappe.desk.form.assign_to.notify_assignment"):
+			patcher = patch(target)
+			patcher.start()
+			self.addCleanup(patcher.stop)
+		frappe.set_user("Administrator")
+		_ensure_user(self.USER)
+		self.employee = _ensure_employee(self.USER)
+		self.activity_type = "VA Development"
+		if not frappe.db.exists("Activity Type", self.activity_type):
+			frappe.get_doc({"doctype": "Activity Type", "activity_type": self.activity_type}).insert(ignore_permissions=True)
+		frappe.db.set_value("Employee", self.employee, "activity_type", self.activity_type)
+		self.implementation = _make_billable_implementation()
+		self.billable = self._project("VA Billable", implementation=self.implementation)
+		self.internal = self._project("VA Internal", implementation=self.implementation, internal=1)
+		self.no_implementation = self._project("VA No Implementation")
+
+	def tearDown(self):
+		frappe.set_user("Administrator")
+		frappe.db.rollback()
+
+	def _project(self, project_name, implementation=None, internal=0, percent_billable="75"):
+		return (
+			frappe.get_doc(
+				{
+					"doctype": "Project",
+					"project_name": f"{project_name} {frappe.generate_hash(length=5)}",
+					"status": "Open",
+					"custom_implementation": implementation,
+					"custom_is_internal_project": internal,
+					"percent_billable": percent_billable,
+				}
+			)
+			.insert(ignore_permissions=True)
+			.name
+		)
+
+	def _record(self, project, **overrides):
+		values = {
+			"doctype": "Timesheet Record",
+			"project": project,
+			"employee": self.employee,
+			"goal": "Value Add test",
+			"expected_time": 3600,
+			"from_time": "2026-05-10 09:00:00",
+			"activity_type": self.activity_type,
+			"percent_billable": "75",
+		}
+		values.update(overrides)
+		return frappe.get_doc(values).insert(ignore_permissions=True)
+
+	def test_is_billable_project(self):
+		from phamos.phamos.timesheet_utils import is_billable_project
+
+		self.assertTrue(is_billable_project(self.billable))
+		self.assertFalse(is_billable_project(self.internal))
+		self.assertFalse(is_billable_project(self.no_implementation))
+		self.assertFalse(is_billable_project(None))
+
+	def test_billing_context_for_the_form(self):
+		from phamos.phamos.timesheet_utils import get_billing_context
+
+		self.assertEqual(get_billing_context(self.billable), {"is_billable": True, "percent_billable": "75"})
+		self.assertEqual(get_billing_context(self.internal), {"is_billable": False, "percent_billable": "0"})
+
+	def test_percent_billable_is_kept_on_a_billable_project(self):
+		self.assertEqual(self._record(self.billable, percent_billable="50").percent_billable, "50")
+
+	def test_percent_billable_is_zero_on_an_internal_project(self):
+		self.assertEqual(self._record(self.internal, percent_billable="100").percent_billable, "0")
+
+	def test_percent_billable_is_zero_without_an_implementation(self):
+		self.assertEqual(self._record(self.no_implementation, percent_billable="100").percent_billable, "0")
+
+	def test_value_add_defaults_to_100_and_is_kept(self):
+		self.assertEqual(self._record(self.billable).value_add, "100")
+		self.assertEqual(self._record(self.internal, value_add="25").value_add, "25")
+		self.assertEqual(self._record(self.billable, value_add="").value_add, "100")
+
+	def test_value_add_outside_the_options_is_rejected(self):
+		with self.assertRaises(frappe.ValidationError):
+			self._record(self.billable, value_add="33")
+
+	def test_time_limit_lowers_only_percent_billable(self):
+		from phamos.phamos.doctype.timesheet_record import timesheet_record as tr
+
+		doc = self._record(self.billable, percent_billable="100", value_add="75", to_time="2026-05-10 11:00:00", actual_time=7200)
+		details = frappe._dict(limit_hours=1, from_date="2026-05-01", to_date="2026-05-31")
+		with patch.object(tr, "get_enforced_time_limit_details", return_value=details), patch.object(
+			tr, "get_billable_hours_in_period_for_implementation", return_value=0
+		), patch.object(tr.TimesheetRecord, "check_implementation_time_limit"), patch.object(
+			tr.TimesheetRecord, "create_timesheet"
+		):
+			tr.submit_at_available_hours(doc.name)
+		values = frappe.db.get_value("Timesheet Record", doc.name, ["percent_billable", "value_add"])
+		self.assertEqual(tuple(values), ("50", "75"))
+
+	def _start(self, project):
+		frappe.set_user(self.USER)
+		dap.start_project_timer(project, 3600, "Value Add timer")
+		return dap.get_active_project_session()
+
+	def test_active_project_session_tells_whether_the_project_is_billable(self):
+		session = self._start(self.internal)
+		self.assertEqual((session["project_is_billable"], session["project_percent_billable"]), (False, "0"))
+
+	def test_stop_timer_stores_value_add(self):
+		name = self._start(self.billable)["name"]
+		with patch.object(dap, "compute_time_limit_status", return_value={}), patch(
+			"phamos.phamos.doctype.timesheet_record.timesheet_record.TimesheetRecord.create_timesheet"
+		):
+			dap.stop_timer(name, "Done", percent_billable="50", value_add="25", activity_type=self.activity_type)
+		values = frappe.db.get_value("Timesheet Record", name, ["percent_billable", "value_add"])
+		self.assertEqual(tuple(values), ("50", "25"))
+
+	def test_break_timesheet_stores_value_add(self):
+		frappe.set_user(self.USER)
+		with patch("phamos.phamos.doctype.timesheet_record.timesheet_record.TimesheetRecord.create_timesheet"):
+			created = dap.create_break_timesheet(
+				"2026-05-10 09:00:00", "2026-05-10 09:30:00", project=self.internal, goal="Call", result="Agreed",
+				percent_billable=100, value_add=50, activity_type=self.activity_type,
+			)
+		values = frappe.db.get_value("Timesheet Record", created["name"], ["percent_billable", "value_add"])
+		self.assertEqual(tuple(values), ("0", "50"))
+
+
+class TestCopyPercentBillableToValueAddPatch(FrappeTestCase):
+	"""Patch copy_percent_billable_to_value_add (#1742, decision 4 of #1031)."""
+
+	def setUp(self):
+		patcher = patch("frappe.db.commit")
+		patcher.start()
+		self.addCleanup(patcher.stop)
+		frappe.set_user("Administrator")
+		_ensure_user("va-patch@example.com")
+		self.employee = _ensure_employee("va-patch@example.com")
+		self.project = frappe.get_doc(
+			{"doctype": "Project", "project_name": f"VA Patch {frappe.generate_hash(length=5)}", "status": "Open"}
+		).insert(ignore_permissions=True).name
+
+	def tearDown(self):
+		frappe.db.rollback()
+
+	def _record(self, percent_billable):
+		doc = frappe.get_doc(
+			{
+				"doctype": "Timesheet Record",
+				"project": self.project,
+				"employee": self.employee,
+				"goal": "Patch test",
+				"expected_time": 3600,
+				"from_time": "2026-05-10 09:00:00",
+			}
+		).insert(ignore_permissions=True)
+		# Old data: the column was just added with its default, and the billing value differs.
+		frappe.db.set_value("Timesheet Record", doc.name, {"percent_billable": percent_billable, "value_add": "100"}, update_modified=False)
+		return doc
+
+	def test_copies_percent_billable_and_restores_the_value_before_the_time_limit(self):
+		from phamos.patches.v1_0 import copy_percent_billable_to_value_add
+
+		plain = self._record("50")
+		lowered = self._record("25")
+		lowered.add_comment("Info", "Percent billable reduced from 75% to 25% to fit the 10h time limit for 2026-05-01 to 2026-05-31. From/To Time were kept exactly as logged.")
+
+		copy_percent_billable_to_value_add.execute()
+
+		self.assertEqual(frappe.db.get_value("Timesheet Record", plain.name, ["percent_billable", "value_add"]), ("50", "50"))
+		self.assertEqual(frappe.db.get_value("Timesheet Record", lowered.name, ["percent_billable", "value_add"]), ("25", "75"))
