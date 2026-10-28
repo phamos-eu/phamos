@@ -589,7 +589,7 @@ def pause_timer(name, break_goal=None, break_expected_seconds=None):
 
 
 @frappe.whitelist(methods=["POST"])
-def resume_timer(name, track_break=0, break_project=None, break_goal=None, break_result=None, break_activity_type=None, break_percent_billable=0):
+def resume_timer(name, track_break=0, break_project=None, break_goal=None, break_result=None, break_activity_type=None, break_percent_billable=0, break_value_add=100):
 	"""Resume; track_break logs the break as its own record, otherwise it is dropped."""
 	return personal_timer.resume_timer(
 		name,
@@ -599,13 +599,19 @@ def resume_timer(name, track_break=0, break_project=None, break_goal=None, break
 		break_result=break_result,
 		break_activity_type=break_activity_type,
 		break_percent_billable=break_percent_billable,
+		break_value_add=break_value_add,
 	)
 
 
 @frappe.whitelist(methods=["POST"])
-def stop_timer(name, result, percent_billable=100, activity_type=None, manual_end_time=None):
+def stop_timer(name, result, percent_billable=100, activity_type=None, manual_end_time=None, value_add=100):
 	return personal_timer.stop_timer(
-		name, result, percent_billable=percent_billable, activity_type=activity_type, manual_end_time=manual_end_time
+		name,
+		result,
+		percent_billable=percent_billable,
+		activity_type=activity_type,
+		manual_end_time=manual_end_time,
+		value_add=value_add,
 	)
 
 
