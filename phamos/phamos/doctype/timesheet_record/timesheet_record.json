@@ -18,6 +18,7 @@
   "to_time",
   "actual_time",
   "timesheet",
+  "value_add",
   "percent_billable",
   "section_break_ovpv",
   "item",
@@ -138,7 +139,15 @@
   },
   {
    "default": "100",
-   "description": "This is a personal indicator to your own performance on the work you have done. It will influence the billable time of the Timesheet created",
+   "description": "How much of this time added value? Was I working the whole time? Would I pay for this work myself? Did I take breaks I didn't track? Was I distracted? Was I at my best?",
+   "fieldname": "value_add",
+   "fieldtype": "Select",
+   "label": "Value Add (%)",
+   "options": "0\n25\n50\n75\n100"
+  },
+  {
+   "default": "100",
+   "description": "Share of this time the customer is billed for. Only on customer implementation projects.",
    "fieldname": "percent_billable",
    "fieldtype": "Select",
    "label": "Percent Billable",
@@ -188,7 +197,7 @@
  "index_web_pages_for_search": 1,
  "is_submittable": 1,
  "links": [],
- "modified": "2026-07-06 11:35:34.847182",
+ "modified": "2026-10-28 20:30:00.000000",
  "modified_by": "Administrator",
  "module": "Phamos",
  "name": "Timesheet Record",
