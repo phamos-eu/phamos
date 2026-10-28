@@ -11,7 +11,9 @@
   "contact_section",
   "sales_contact",
   "contact_col",
-  "sales_contact_role"
+  "sales_contact_role",
+  "sharing_section",
+  "share_image"
  ],
  "fields": [
   {
@@ -38,13 +40,26 @@
    "fieldname": "sales_contact_role",
    "fieldtype": "Data",
    "label": "Role Label"
+  },
+  {
+   "description": "Link previews on LinkedIn, Facebook, WhatsApp, Slack and others (Open Graph).",
+   "fieldname": "sharing_section",
+   "fieldtype": "Section Break",
+   "label": "Social Sharing"
+  },
+  {
+   "description": "1200 × 630 px, PNG or JPG. Shown in link previews on every Web Profile page that has no image of its own (listings, records without an image).",
+   "fieldname": "share_image",
+   "fieldtype": "Attach Image",
+   "label": "Share Image"
   }
  ],
  "index_web_pages_for_search": 0,
  "issingle": 1,
  "istable": 0,
  "links": [],
- "modified": "2026-10-08 14:00:00.000000",
+ "make_attachments_public": 1,
+ "modified": "2026-10-28 12:00:00.000000",
  "modified_by": "Administrator",
  "module": "Phamos",
  "name": "Web Profile Settings",
