@@ -101,6 +101,22 @@ frappe.pages["project-action-panel"].on_page_load = function (wrapper) {
     });
   }
 
+// Value Add next to Percent Billable (#1745, parent #1031): Value Add is the person's own rating,
+// preset 100; Percent Billable shows on every project, preset from the project (100 when empty).
+var VALUE_ADD_HELP = "How much of this time added value? Was I working the whole time? Would I pay for this work myself? Did I take breaks I didn't track? Was I distracted? Was I at my best?";
+var BILLABLE_HELP = "Share of this time the customer is billed for. Preset from the project.";
+
+function preset_percent_billable(dialog, project) {
+  if (!project) return;
+  frappe.call({
+    method: "phamos.phamos.timesheet_utils.get_billing_context",
+    args: { project: project },
+    callback: function (r) {
+      if (r.message) dialog.set_value("percent_billable", r.message.percent_billable);
+    },
+  });
+}
+
 function update_and_submit_timesheet_record(
   timesheet_record,
   task,
@@ -108,6 +124,7 @@ function update_and_submit_timesheet_record(
   percent_billable,
   activity_type,
   result,
+  value_add,
 ) {
   frappe.call({
     method: "frappe.client.get",
@@ -144,6 +161,7 @@ function update_and_submit_timesheet_record(
           percent_billable: percent_billable,
           activity_type: activity_type,
           result: result,
+          value_add: value_add,
         },
         freeze: true,
         freeze_message: __("Updating Timesheet Record......"),
@@ -373,7 +391,8 @@ function openStopProjectDialog(timesheet_record, percent_billable, project, task
   let timesheet_record_info = " Info from timesheet record";
 
 
-  frappe.db.get_value("Timesheet Record", { name: timesheet_record }, ["goal", "from_time"], function (value) {
+  frappe.db.get_value("Timesheet Record", { name: timesheet_record }, ["goal", "from_time", "project"], function (value) {
+    let record_project = value.project;
 
     from_time_formatted = frappe.datetime.str_to_user(value.from_time);
     timesheet_record_info = "From time: " + from_time_formatted + ",<br>Goal is: " + value.goal;
@@ -463,14 +482,21 @@ function openStopProjectDialog(timesheet_record, percent_billable, project, task
           },
           {
             fieldtype: "Select",
-            options: "\n0\n25\n50\n75\n100",
+            options: "100\n75\n50\n25\n0",
+            label: __("Value Add (%)"),
+            fieldname: "value_add",
+            reqd: 1,
+            default: "100",
+            description: __(VALUE_ADD_HELP),
+          },
+          {
+            fieldtype: "Select",
+            options: "100\n75\n50\n25\n0",
             label: __("Percent Billable"),
             fieldname: "percent_billable",
             reqd: 1,
-            default: percent_billable,
-            description:
-                    "This is a personal indicator to your own performance on the work you have done. It will influence the billable time of the Timesheet created.",
-
+            default: "100",
+            description: __(BILLABLE_HELP),
           },
         ],
         primary_action_label: __("Update Timesheet Record."),
@@ -496,6 +522,7 @@ function openStopProjectDialog(timesheet_record, percent_billable, project, task
             values.percent_billable,
             values.activity_type,
             values.result,
+            values.value_add,
           );
           dialog.hide();
         }
@@ -503,6 +530,7 @@ function openStopProjectDialog(timesheet_record, percent_billable, project, task
 
       dialog.$wrapper.find(".modal-dialog").css("max-width", "1000px");
       dialog.show();
+      preset_percent_billable(dialog, record_project);
 
       // Implement live time update for to_time field
       var time_update_interval = null;
@@ -1956,7 +1984,10 @@ function show_break_task_dialog(new_row_name, previous_from_time, previous_to_ti
                     return {
                         query: "phamos.phamos.page.project_action_panel.project_action_panel.get_assigned_projects"
                     };
-                }
+                },
+                  onchange: function () {
+                    preset_percent_billable(dialog, this.get_value());
+                  },
                 },
                 {
                   fieldtype: "Data",
@@ -2015,13 +2046,21 @@ function show_break_task_dialog(new_row_name, previous_from_time, previous_to_ti
                 },
                 {
                   fieldtype: "Select",
-                  options: "\n0\n25\n50\n75\n100",
+                  options: "100\n75\n50\n25\n0",
+                  label: __("Value Add (%)"),
+                  fieldname: "value_add",
+                  reqd: 1,
+                  default: "100",
+                  description: __(VALUE_ADD_HELP),
+                },
+                {
+                  fieldtype: "Select",
+                  options: "100\n75\n50\n25\n0",
                   label: __("Percent Billable"),
                   fieldname: "percent_billable",
                   reqd: 1,
-                  description:
-                          "This is a personal indicator to your own performance on the work you have done. It will influence the billable time of the Timesheet created.",
-
+                  default: "100",
+                  description: __(BILLABLE_HELP),
                 },
                 {
                   label: "What I did ",
@@ -2046,6 +2085,7 @@ function show_break_task_dialog(new_row_name, previous_from_time, previous_to_ti
                     percent_billable: values.percent_billable,  // 6
                     activity_type: values.activity_type,        // 7
                     result: values.result,                      // 8
+                    value_add: values.value_add,                // 9
                 },
                 callback: function(r) {
                     if (r.message && r.message.status === "success") {
