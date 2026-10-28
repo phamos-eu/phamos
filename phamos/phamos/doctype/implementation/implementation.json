@@ -83,6 +83,12 @@
   "generate_auto_email",
   "stakeholders_tab",
   "stakeholders",
+  "section_break_review_cadence",
+  "review_cadence",
+  "next_review_due",
+  "column_break_review_cadence",
+  "last_stakeholder_meeting",
+  "last_reviewed_on",
   "gitlab_tab",
   "gitlab_projects_html",
   "column_break_amyu",
@@ -321,6 +327,43 @@
    "fieldtype": "Link",
    "label": "Team",
    "options": "Team"
+  },
+  {
+   "fieldname": "section_break_review_cadence",
+   "fieldtype": "Section Break",
+   "label": "Review Cadence"
+  },
+  {
+   "description": "How often this Implementation should be reviewed with the customer in a Stakeholder Meeting. Leave blank to not track a cadence for this Implementation.",
+   "fieldname": "review_cadence",
+   "fieldtype": "Select",
+   "label": "Review Cadence",
+   "options": "\nWeekly\nBiweekly\nMonthly\nQuarterly"
+  },
+  {
+   "description": "The next date a Stakeholder Meeting should be held. Automatically pushed forward by the Review Cadence whenever a Meeting is submitted; can also be adjusted manually.",
+   "fieldname": "next_review_due",
+   "fieldtype": "Date",
+   "label": "Next Review Due"
+  },
+  {
+   "fieldname": "column_break_review_cadence",
+   "fieldtype": "Column Break"
+  },
+  {
+   "description": "The most recently submitted Stakeholder Meeting for this Implementation.",
+   "fieldname": "last_stakeholder_meeting",
+   "fieldtype": "Link",
+   "label": "Last Stakeholder Meeting",
+   "options": "Stakeholder Meeting",
+   "read_only": 1
+  },
+  {
+   "description": "The date of the most recently submitted Stakeholder Meeting.",
+   "fieldname": "last_reviewed_on",
+   "fieldtype": "Date",
+   "label": "Last Reviewed On",
+   "read_only": 1
   },
   {
    "collapsible": 1,
@@ -586,9 +629,13 @@
   {
    "link_doctype": "Implementation Chapter",
    "link_fieldname": "implementation"
+  },
+  {
+   "link_doctype": "Stakeholder Meeting",
+   "link_fieldname": "implementation"
   }
  ],
- "modified": "2026-08-13 09:05:58.342753",
+ "modified": "2026-10-20 10:00:00.000000",
  "modified_by": "Administrator",
  "module": "Phamos",
  "name": "Implementation",
