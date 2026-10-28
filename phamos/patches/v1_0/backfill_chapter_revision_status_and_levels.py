@@ -12,20 +12,23 @@ from frappe.query_builder.functions import IfNull
 
 def execute():
 	revision = frappe.qb.DocType("Implementation Chapter Revision")
+	chapter = frappe.qb.DocType("Implementation Chapter")
 
-	# Plain SQL: the query builder leaves the SET columns of a joined UPDATE
-	# unqualified, and both tables have status / current_level / target_level.
-	frappe.db.sql(
-		"""
-		UPDATE `tabImplementation Chapter Revision` revision
-		INNER JOIN `tabImplementation Chapter` chapter
-			ON chapter.current_revision = revision.name
-		SET
-			revision.status = chapter.status,
-			revision.current_level = chapter.current_level,
-			revision.target_level = chapter.target_level
-		"""
-	)
+	current_revisions = (
+		frappe.qb.from_(revision)
+		.join(chapter)
+		.on(chapter.current_revision == revision.name)
+		.select(revision.name, chapter.status, chapter.current_level, chapter.target_level)
+	).run(as_dict=True)
+
+	for row in current_revisions:
+		(
+			frappe.qb.update(revision)
+			.set(revision.status, row.status)
+			.set(revision.current_level, row.current_level)
+			.set(revision.target_level, row.target_level)
+			.where(revision.name == row.name)
+		).run()
 
 	# Sites that already migrated the field got its old "Draft" default; no revision is ever Draft.
 	(
