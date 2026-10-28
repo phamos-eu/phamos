@@ -1,7 +1,7 @@
 import frappe
 from frappe import _
 from frappe.utils import cstr, now_datetime, add_to_date, time_diff_in_seconds, get_datetime
-from phamos.phamos.timesheet_utils import billing_context, normalize_percent_billable
+from phamos.phamos.timesheet_utils import billing_context, is_billable_project_row, normalize_percent_billable
 from phamos.phamos.doctype.timesheet_record.timesheet_record import compute_time_limit_status
 from frappe.query_builder import Order
 from frappe.query_builder.functions import Coalesce, Sum, Count
@@ -198,6 +198,9 @@ def _get_active_session_raw(user):
         record["break_from"] = str(last_row["from_time"])
     else:
         record["break_from"] = None
+    billing = billing_context(record["project"])
+    record["project_is_billable"] = billing["is_billable"]
+    record["project_percent_billable"] = billing["percent_billable"]
     return record
 
 
@@ -561,6 +564,8 @@ def get_dev_my_projects():
             Project.project_name,
             Project.status,
             Project.percent_billable,
+            Project.custom_implementation,
+            Project.custom_is_internal_project,
             Project.customer,
             Coalesce(Customer.customer_name, Project.customer).as_("customer_desc"),
         )
@@ -596,6 +601,9 @@ def get_dev_all_projects():
             Project.name,
             Project.project_name,
             Project.status,
+            Project.percent_billable,
+            Project.custom_implementation,
+            Project.custom_is_internal_project,
             Project.customer,
             Coalesce(Customer.customer_name, Project.customer).as_("customer_desc"),
             is_assigned,
@@ -690,6 +698,9 @@ def _enrich_projects(projects, user):
         p["total_tracked_seconds"] = ts["total_seconds"]
         p["billable_seconds"] = ts["billable_seconds"]
         p["non_billable_seconds"] = max(0, ts["total_seconds"] - ts["billable_seconds"])
+        # The stop panel shows Percent Billable only on billable projects, preset from the project (#1744).
+        p["is_billable"] = is_billable_project_row(p)
+        p["percent_billable"] = (p.get("percent_billable") or "100") if p["is_billable"] else "0"
 
     return projects
 

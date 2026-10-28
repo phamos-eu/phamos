@@ -24,7 +24,12 @@ def is_billable_project(project):
     values = frappe.db.get_value(
         "Project", project, ["custom_implementation", "custom_is_internal_project"], as_dict=True
     )
-    return bool(values and values.custom_implementation and not cint(values.custom_is_internal_project))
+    return is_billable_project_row(values)
+
+
+def is_billable_project_row(row):
+    """is_billable_project for a Project row already loaded with both fields (saves a query per row)."""
+    return bool(row and row.get("custom_implementation") and not cint(row.get("custom_is_internal_project")))
 
 
 def billing_context(project):

@@ -1,5 +1,6 @@
 <script setup>
 import { ref, computed, onMounted, onUnmounted } from "vue";
+import { RATING_OPTIONS, VALUE_ADD_DEFAULT, VALUE_ADD_HELP, billablePreset, showBillable } from "../timesheetRating.js";
 
 const props = defineProps({
   breakFrom: String,  // system-tz "YYYY-MM-DD HH:mm:ss"
@@ -13,6 +14,15 @@ const showDropdown = ref(false);
 const goal = ref("");
 const result = ref("");
 const percentBillable = ref(0);
+const valueAdd = ref(VALUE_ADD_DEFAULT);
+// Billing context of the picked project: Percent Billable only shows for billable projects (#1744).
+const billing = ref(null);
+const billableShown = computed(() => showBillable(billing.value));
+const labels = {
+  valueAdd: __("Value Add (%)"),
+  valueAddHelp: __(VALUE_ADD_HELP),
+  percentBillable: __("Percent Billable"),
+};
 const activityType = ref("");
 const goalRef = ref(null);
 const liveNow = ref(new Date());
@@ -22,13 +32,7 @@ let searchTimer = null;
 
 const ACTIVITY_TYPES = ["Working Alone", "Working with Customer", "Working With Team"];
 
-const billableOptions = [
-  { value: 100, label: "100%" },
-  { value: 75,  label: "75%"  },
-  { value: 50,  label: "50%"  },
-  { value: 25,  label: "25%"  },
-  { value: 0,   label: "0%"   },
-];
+const billableOptions = RATING_OPTIONS.map((value) => ({ value, label: `${value}%` }));
 
 onMounted(async () => {
   goalRef.value?.focus();
@@ -50,6 +54,7 @@ async function fetchProjects(term) {
 
 function onSearchInput() {
   project.value = "";
+  billing.value = null;
   showDropdown.value = true;
   clearTimeout(searchTimer);
   searchTimer = setTimeout(() => fetchProjects(projectLabel.value), 300);
@@ -64,10 +69,17 @@ function onSearchBlur() {
   setTimeout(() => { showDropdown.value = false; }, 150);
 }
 
-function selectProject(p) {
+async function selectProject(p) {
   project.value = p.name;
   projectLabel.value = p.project_name || p.name;
   showDropdown.value = false;
+  const r = await frappe.call({
+    method: "phamos.phamos.timesheet_utils.get_billing_context",
+    args: { project: p.name },
+  });
+  if (project.value !== p.name) return; // another project was picked meanwhile
+  billing.value = r.message || null;
+  percentBillable.value = billablePreset(billing.value);
 }
 
 const breakDuration = computed(() => {
@@ -109,7 +121,8 @@ function submit() {
     activityType: activityType.value,
     goal: goal.value.trim(),
     result: result.value.trim(),
-    percentBillable: percentBillable.value,
+    valueAdd: valueAdd.value,
+    percentBillable: billableShown.value ? percentBillable.value : null,
   });
 }
 
@@ -211,9 +224,27 @@ function onKey(e) {
           ></textarea>
         </div>
 
-        <!-- Billable %: horizontal buttons -->
+        <!-- Value Add: horizontal buttons -->
         <div class="mo__field">
-          <label class="mo__label">Billable %</label>
+          <label class="mo__label">{{ labels.valueAdd }}</label>
+          <p class="mo__hint">{{ labels.valueAddHelp }}</p>
+          <div class="mo__billable-row">
+            <button
+              v-for="opt in billableOptions"
+              :key="opt.value"
+              type="button"
+              class="mo__bill-opt"
+              :class="{ 'mo__bill-opt--active': valueAdd === opt.value }"
+              @click="valueAdd = opt.value"
+            >
+              {{ opt.label }}
+            </button>
+          </div>
+        </div>
+
+        <!-- Percent Billable: only for billable projects -->
+        <div v-if="billableShown" class="mo__field">
+          <label class="mo__label">{{ labels.percentBillable }}</label>
           <p class="mo__hint">How much of this break is billable?</p>
           <div class="mo__billable-row">
             <button

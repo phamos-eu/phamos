@@ -8,6 +8,7 @@ import LeadList from "./components/LeadList.vue";
 import StatsBar from "../dev_action_panel/components/StatsBar.vue";
 import CalendarView from "../dev_action_panel/components/CalendarView.vue";
 import TimesheetList from "../dev_action_panel/components/TimesheetList.vue";
+import { ratingArgs } from "../dev_action_panel/timesheetRating.js";
 import ProjectsView from "../dev_action_panel/components/ProjectsView.vue";
 import BreakModal from "../dev_action_panel/components/BreakModal.vue";
 import BreakConfirm from "../dev_action_panel/components/BreakConfirm.vue";
@@ -182,11 +183,11 @@ async function doResumeProjectTimer() {
   startProjectTick();
 }
 
-async function onStopProjectTimer({ result, percentBillable, activityType }) {
+async function onStopProjectTimer({ result, valueAdd, percentBillable, activityType }) {
   if (!activeProjectSession.value) return;
   const r = await frappe.call({
     method: `${DAP}.stop_timer`,
-    args: { name: activeProjectSession.value.name, result, percent_billable: percentBillable, activity_type: activityType },
+    args: { name: activeProjectSession.value.name, result, activity_type: activityType, ...ratingArgs(valueAdd, percentBillable) },
   });
   if (r.message) {
     stopProjectTick();
@@ -216,11 +217,11 @@ async function onBreakConfirmNo() {
 function onBreakConfirmClose() { showBreakConfirm.value = false; }
 function onBreakModalClose()   { showBreakModal.value = false; }
 
-async function onBreakSubmit({ project, activityType, goal, result, percentBillable }) {
+async function onBreakSubmit({ project, activityType, goal, result, valueAdd, percentBillable }) {
   showBreakModal.value = false;
   await frappe.call({
     method: `${DAP}.create_break_timesheet`,
-    args: { from_time: breakFrom.value, project, goal, result, percent_billable: percentBillable, activity_type: activityType || null },
+    args: { from_time: breakFrom.value, project, goal, result, activity_type: activityType || null, ...ratingArgs(valueAdd, percentBillable) },
   });
   breakFrom.value = null;
   await doResumeProjectTimer();

@@ -1,6 +1,7 @@
 <script setup>
 import { ref, computed } from "vue";
 import DateTimePicker from "./DateTimePicker.vue";
+import { RATING_OPTIONS, VALUE_ADD_DEFAULT, VALUE_ADD_HELP, billablePreset, showBillable } from "../timesheetRating.js";
 
 const props = defineProps({
   project: Object,
@@ -21,6 +22,13 @@ const startGoal = ref("");
 const expectedHours = ref(1);
 const stopResult = ref("");
 const stopBillable = ref(100);
+const stopValueAdd = ref(VALUE_ADD_DEFAULT);
+const billableShown = computed(() => showBillable(props.project));
+const labels = {
+  valueAdd: __("Value Add (%)"),
+  valueAddHelp: __(VALUE_ADD_HELP),
+  percentBillable: __("Percent Billable"),
+};
 const stopActivityType = ref("");
 const stopEndTimeDate = ref(new Date());
 const stopEndTimeModified = ref(false);
@@ -82,6 +90,8 @@ async function toggleSessions() {
 function openStart() { panel.value = panel.value === "start" ? null : "start"; }
 function openStop()  {
   panel.value = panel.value === "stop" ? null : "stop";
+  stopValueAdd.value = VALUE_ADD_DEFAULT;
+  stopBillable.value = billablePreset(props.project);
   stopEndTimeDate.value = new Date();
   stopEndTimeModified.value = false;
 }
@@ -101,7 +111,12 @@ function confirmStart() {
 function confirmStop() {
   if (!stopResult.value.trim()) { frappe.msgprint(__("Please describe what you accomplished.")); return; }
   if (!stopActivityType.value) { frappe.msgprint(__("Please select an Activity Type.")); return; }
-  const payload = { result: stopResult.value.trim(), percentBillable: stopBillable.value, activityType: stopActivityType.value };
+  const payload = {
+    result: stopResult.value.trim(),
+    valueAdd: stopValueAdd.value,
+    percentBillable: billableShown.value ? stopBillable.value : null,
+    activityType: stopActivityType.value,
+  };
   if (stopEndTimeModified.value) payload.manualEndTime = formatForApi(stopEndTimeDate.value);
   emit("stop", payload);
   panel.value = null;
@@ -250,6 +265,7 @@ function onStopKey(e)  { if (e.key === "Escape") closePanel(); if (e.key === "En
             <label class="pc__panel-label">What did you accomplish? <span class="pc__panel-required">*</span></label>
             <textarea v-model="stopResult" class="pc__panel-textarea" rows="2" placeholder="Completed the task, resolved the issue…" autofocus></textarea>
           </div>
+          <p class="pc__panel-hint">{{ labels.valueAdd }}: {{ labels.valueAddHelp }}</p>
           <div class="pc__panel-row">
             <div class="pc__panel-field">
               <label class="pc__panel-label">Activity Type <span class="pc__panel-required">*</span></label>
@@ -259,13 +275,15 @@ function onStopKey(e)  { if (e.key === "Escape") closePanel(); if (e.key === "En
               </select>
             </div>
             <div class="pc__panel-field">
-              <label class="pc__panel-label">Billable %</label>
+              <label class="pc__panel-label" :title="labels.valueAddHelp">{{ labels.valueAdd }}</label>
+              <select v-model.number="stopValueAdd" class="pc__panel-select" :title="labels.valueAddHelp">
+                <option v-for="v in RATING_OPTIONS" :key="v" :value="v">{{ v }}%</option>
+              </select>
+            </div>
+            <div v-if="billableShown" class="pc__panel-field">
+              <label class="pc__panel-label">{{ labels.percentBillable }}</label>
               <select v-model.number="stopBillable" class="pc__panel-select">
-                <option :value="100">100%</option>
-                <option :value="75">75%</option>
-                <option :value="50">50%</option>
-                <option :value="25">25%</option>
-                <option :value="0">0% — Internal</option>
+                <option v-for="v in RATING_OPTIONS" :key="v" :value="v">{{ v }}%</option>
               </select>
             </div>
             <div class="pc__panel-field pc__panel-field--grow">
@@ -453,6 +471,7 @@ function onStopKey(e)  { if (e.key === "Escape") closePanel(); if (e.key === "En
 .pc__panel-label { font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; color: var(--text-muted); }
 .pc__panel-required { color: var(--red-600, #dc2626); }
 .pc__panel-optional { font-size: 10px; font-weight: 400; color: var(--text-muted); text-transform: none; letter-spacing: 0; }
+.pc__panel-hint { margin: 0; font-size: 11px; color: var(--text-muted); }
 .pc__panel-input-row { display: flex; align-items: center; gap: 8px; }
 .pc__panel-input {
   border: 1px solid var(--border-color); border-radius: 6px;
