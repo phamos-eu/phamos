@@ -1472,3 +1472,8 @@ The event of an order with tickets cannot be changed.,Die Veranstaltung einer Be
 "Desk orders: the first save also creates the buyer's own ticket.","Desk-Bestellungen: das erste Speichern legt auch das eigene Ticket des Käufers an."
 Event {0} has no ticket price.,Veranstaltung {0} hat keinen Ticketpreis.
 already on Sales Order {0},bereits auf Auftrag {0}
+Social Sharing,Teilen in sozialen Netzwerken
+"Link previews on LinkedIn, Facebook, WhatsApp, Slack and others (Open Graph).","Linkvorschauen auf LinkedIn, Facebook, WhatsApp, Slack und anderen (Open Graph)."
+Share Image,Vorschaubild zum Teilen
+"1200 × 630 px, PNG or JPG. Shown in link previews on every Web Profile page that has no image of its own (listings, records without an image).","1200 × 630 px, PNG oder JPG. Erscheint in Linkvorschauen auf jeder Web-Profil-Seite ohne eigenes Bild (Übersichten, Datensätze ohne Bild)."
+"The share image must be a public file. Upload it again without the ""Private"" option.","Das Vorschaubild muss eine öffentliche Datei sein. Laden Sie es erneut ohne die Option ""Privat"" hoch."

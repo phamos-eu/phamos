@@ -27,8 +27,19 @@ def init_page(context):
 	return section, lang
 
 
+def share_image():
+	"""Web Profile Settings > Share Image: the Open Graph image of every page without one of its own."""
+	return frappe.db.get_single_value("Web Profile Settings", "share_image") or None
+
+
 def set_seo(context, *, title, description, path, alternates, image=None, canonical_path=None, schema=None):
-	"""Title, description, canonical, hreflang (+ x-default), Open Graph / Twitter and JSON-LD."""
+	"""Title, description, canonical, hreflang (+ x-default), Open Graph / Twitter and JSON-LD.
+
+	``image`` is the page's own image (a person's photo); without one the share image from the
+	settings is used, so that LinkedIn, Facebook and WhatsApp show a card (phamos/phamos#1738).
+	Frappe's MetaTags derives og:image, twitter:image and the twitter:card type from ``image``.
+	"""
+	image = image or share_image()
 	context.title = title
 	context.page_title = title
 	context.canonical_url = get_url(canonical_path or path)
@@ -42,7 +53,9 @@ def set_seo(context, *, title, description, path, alternates, image=None, canoni
 		"title": title,
 		"description": description,
 		"url": context.canonical_url,
-		"image": image or None,
+		"image": get_url(image) if image else None,
+		"og:url": context.canonical_url,
+		"og:site_name": "phamos",
 		"og:type": "website",
 		"og:locale": "de_DE" if context.lang == "de" else "en_US",
 	}
