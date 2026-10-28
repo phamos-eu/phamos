@@ -1481,6 +1481,6 @@ Share Image,Vorschaubild zum Teilen
 Value Add (%),Wertschöpfung (%)
 Percent Billable,Abrechenbar (%)
 "How much of this time added value? Was I working the whole time? Would I pay for this work myself? Did I take breaks I didn't track? Was I distracted? Was I at my best?","Wie viel dieser Zeit hat Wert geschaffen? Habe ich die ganze Zeit gearbeitet? Würde ich diese Arbeit selbst bezahlen? Habe ich Pausen gemacht, die ich nicht erfasst habe? War ich abgelenkt? War ich in Bestform?"
-Share of this time the customer is billed for. Only on customer implementation projects.,"Anteil dieser Zeit, der dem Kunden in Rechnung gestellt wird. Nur bei Kunden-Implementierungsprojekten."
+Share of this time the customer is billed for. Preset from the project.,"Anteil dieser Zeit, der dem Kunden in Rechnung gestellt wird. Vorbelegt aus dem Projekt."
 "Value Add must be 0, 25, 50, 75 or 100 %.","Die Wertschöpfung muss 0, 25, 50, 75 oder 100 % sein."
 "Percent Billable must be 0, 25, 50, 75 or 100 %.","Abrechenbar muss 0, 25, 50, 75 oder 100 % sein."

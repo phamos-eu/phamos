@@ -375,8 +375,8 @@ def _make_billable_implementation():
 class TestValueAddAndBillingRules(FrappeTestCase):
 	"""Value Add next to Percent Billable (#1031, child #1742).
 
-	1. Percent Billable counts only on projects with an Implementation that are not internal;
-	   everywhere else it is stored as 0.
+	1. Percent Billable is kept as entered on every project, internal ones included, because
+	   external people may bill there too (revised decision 2 of #1031); preset from the Project, 100 when empty.
 	2. Value Add is one of 0/25/50/75/100; empty becomes 100.
 	3. The time limit lowers only Percent Billable.
 	4. The shared timer backend stores Value Add on stops and tracked breaks.
@@ -436,19 +436,13 @@ class TestValueAddAndBillingRules(FrappeTestCase):
 		values.update(overrides)
 		return frappe.get_doc(values).insert(ignore_permissions=True)
 
-	def test_is_billable_project(self):
-		from phamos.phamos.timesheet_utils import is_billable_project
-
-		self.assertTrue(is_billable_project(self.billable))
-		self.assertFalse(is_billable_project(self.internal))
-		self.assertFalse(is_billable_project(self.no_implementation))
-		self.assertFalse(is_billable_project(None))
-
-	def test_billing_context_for_the_form(self):
+	def test_billing_context_presets_from_the_project(self):
 		from phamos.phamos.timesheet_utils import get_billing_context
 
-		self.assertEqual(get_billing_context(self.billable), {"is_billable": True, "percent_billable": "75"})
-		self.assertEqual(get_billing_context(self.internal), {"is_billable": False, "percent_billable": "0"})
+		self.assertEqual(get_billing_context(self.billable), {"percent_billable": "75"})
+		self.assertEqual(get_billing_context(self.internal), {"percent_billable": "75"})
+		no_preset = self._project("VA No Preset", percent_billable="")
+		self.assertEqual(get_billing_context(no_preset), {"percent_billable": "100"})
 
 	def test_billing_context_needs_read_access_to_the_project(self):
 		from phamos.phamos.timesheet_utils import get_billing_context
@@ -463,11 +457,11 @@ class TestValueAddAndBillingRules(FrappeTestCase):
 	def test_percent_billable_is_kept_on_a_billable_project(self):
 		self.assertEqual(self._record(self.billable, percent_billable="50").percent_billable, "50")
 
-	def test_percent_billable_is_zero_on_an_internal_project(self):
-		self.assertEqual(self._record(self.internal, percent_billable="100").percent_billable, "0")
+	def test_percent_billable_is_kept_on_an_internal_project(self):
+		self.assertEqual(self._record(self.internal, percent_billable="100").percent_billable, "100")
 
-	def test_percent_billable_is_zero_without_an_implementation(self):
-		self.assertEqual(self._record(self.no_implementation, percent_billable="100").percent_billable, "0")
+	def test_percent_billable_is_kept_without_an_implementation(self):
+		self.assertEqual(self._record(self.no_implementation, percent_billable="25").percent_billable, "25")
 
 	def test_value_add_defaults_to_100_and_is_kept(self):
 		self.assertEqual(self._record(self.billable).value_add, "100")
@@ -497,9 +491,10 @@ class TestValueAddAndBillingRules(FrappeTestCase):
 		dap.start_project_timer(project, 3600, "Value Add timer")
 		return dap.get_active_project_session()
 
-	def test_active_project_session_tells_whether_the_project_is_billable(self):
+	def test_active_project_session_carries_the_project_preset(self):
 		session = self._start(self.internal)
-		self.assertEqual((session["project_is_billable"], session["project_percent_billable"]), (False, "0"))
+		self.assertEqual(session["project_percent_billable"], "75")
+		self.assertNotIn("project_is_billable", session)
 
 	def test_stop_timer_stores_value_add(self):
 		name = self._start(self.billable)["name"]
@@ -518,7 +513,7 @@ class TestValueAddAndBillingRules(FrappeTestCase):
 				percent_billable=100, value_add=50, activity_type=self.activity_type,
 			)
 		values = frappe.db.get_value("Timesheet Record", created["name"], ["percent_billable", "value_add"])
-		self.assertEqual(tuple(values), ("0", "50"))
+		self.assertEqual(tuple(values), ("100", "50"))
 
 
 class TestCopyPercentBillableToValueAddPatch(FrappeTestCase):
