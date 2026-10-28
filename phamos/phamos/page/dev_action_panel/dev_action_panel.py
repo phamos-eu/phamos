@@ -1,7 +1,7 @@
 import frappe
 from frappe import _
-from frappe.utils import now_datetime, add_to_date, time_diff_in_seconds, get_datetime
-from phamos.phamos.timesheet_utils import normalize_percent_billable
+from frappe.utils import cstr, now_datetime, add_to_date, time_diff_in_seconds, get_datetime
+from phamos.phamos.timesheet_utils import get_billing_context, normalize_percent_billable
 from phamos.phamos.doctype.timesheet_record.timesheet_record import compute_time_limit_status
 from frappe.query_builder import Order
 from frappe.query_builder.functions import Coalesce, Sum, Count
@@ -418,7 +418,7 @@ def resume_timer(name):
 
 
 @frappe.whitelist()
-def stop_timer(name, result, percent_billable=100, activity_type=None, manual_end_time=None):
+def stop_timer(name, result, percent_billable=100, activity_type=None, manual_end_time=None, value_add=100):
     doc = frappe.get_doc("Timesheet Record", name)
     end_time = get_datetime(manual_end_time) if manual_end_time else now_datetime()
 
@@ -442,6 +442,7 @@ def stop_timer(name, result, percent_billable=100, activity_type=None, manual_en
 
     doc.result = result
     doc.percent_billable = normalize_percent_billable(percent_billable)
+    doc.value_add = cstr(value_add)
     if activity_type:
         doc.activity_type = activity_type
 
@@ -470,7 +471,7 @@ def stop_timer(name, result, percent_billable=100, activity_type=None, manual_en
         extra = frappe.new_doc("Timesheet Record")
         for field in ["project", "customer", "employee", "activity_type", "goal",
                       "gitlab_issue", "gitlab_parent_issue", "expected_time", "result",
-                      "percent_billable"]:
+                      "percent_billable", "value_add"]:
             extra.set(field, doc.get(field))
         extra.from_time = alt_row.from_time
         extra.to_time = alt_row.to_time
@@ -499,7 +500,7 @@ def get_gitlab_labels():
 
 
 @frappe.whitelist()
-def create_break_timesheet(from_time, to_time=None, project=None, goal=None, result=None, percent_billable=100, activity_type=None):
+def create_break_timesheet(from_time, to_time=None, project=None, goal=None, result=None, percent_billable=100, activity_type=None, value_add=100):
     user = frappe.session.user
     employee = frappe.db.get_value("Employee", {"user_id": user}, ["name", "activity_type"], as_dict=True)
     if not employee:
@@ -522,6 +523,7 @@ def create_break_timesheet(from_time, to_time=None, project=None, goal=None, res
     ts.actual_time = duration
     ts.expected_time = duration
     ts.percent_billable = normalize_percent_billable(percent_billable)
+    ts.value_add = cstr(value_add)
     ts.append("item", {"from_time": from_dt, "to_time": to_dt, "duration": duration})
     ts.insert(ignore_permissions=True)
     ts.submit()
@@ -755,6 +757,9 @@ def get_active_project_session():
     record["session_state"] = session_state
     record["elapsed_seconds"] = _calc_elapsed_seconds(rows)
     record["break_from"] = str(last_row["from_time"]) if session_state == "paused" and not last_row.get("to_time") else None
+    billing = get_billing_context(record["project"])
+    record["project_is_billable"] = billing["is_billable"]
+    record["project_percent_billable"] = billing["percent_billable"]
     return record
 
 

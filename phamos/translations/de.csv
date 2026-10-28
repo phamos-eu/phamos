@@ -1478,3 +1478,9 @@ Social Sharing,Teilen in sozialen Netzwerken
 Share Image,Vorschaubild zum Teilen
 "1200 × 630 px, PNG or JPG. Shown in link previews on every Web Profile page that has no image of its own (listings, records without an image).","1200 × 630 px, PNG oder JPG. Erscheint in Linkvorschauen auf jeder Web-Profil-Seite ohne eigenes Bild (Übersichten, Datensätze ohne Bild)."
 "The share image must be a public file. Upload it again without the ""Private"" option.","Das Vorschaubild muss eine öffentliche Datei sein. Laden Sie es erneut ohne die Option ""Privat"" hoch."
+Value Add (%),Wertschöpfung (%)
+Percent Billable,Abrechenbar (%)
+"How much of this time added value? Was I working the whole time? Would I pay for this work myself? Did I take breaks I didn't track? Was I distracted? Was I at my best?","Wie viel dieser Zeit hat Wert geschaffen? Habe ich die ganze Zeit gearbeitet? Würde ich diese Arbeit selbst bezahlen? Habe ich Pausen gemacht, die ich nicht erfasst habe? War ich abgelenkt? War ich in Bestform?"
+Share of this time the customer is billed for. Only on customer implementation projects.,"Anteil dieser Zeit, der dem Kunden in Rechnung gestellt wird. Nur bei Kunden-Implementierungsprojekten."
+"Value Add must be 0, 25, 50, 75 or 100 %.","Die Wertschöpfung muss 0, 25, 50, 75 oder 100 % sein."
+"Percent Billable must be 0, 25, 50, 75 or 100 %.","Abrechenbar muss 0, 25, 50, 75 oder 100 % sein."
