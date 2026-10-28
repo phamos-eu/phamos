@@ -98,6 +98,14 @@ class TestMarketingPatches(FrappeTestCase):
 			link_sales_documents_to_tickets.execute()
 		self.assertEqual(out.getvalue(), "")  # nothing left to do
 
+	def test_order_lines_are_linked_before_the_legacy_repair(self):
+		# The repair finds tickets on an order through the Sales Order lines' Attendee (#1727), which
+		# link_sales_documents_to_tickets fills; on version-15 both run in the same migrate.
+		lines = [line.split("#")[0].strip() for line in
+			open(frappe.get_app_path("phamos", "patches.txt")).read().splitlines()]
+		self.assertLess(lines.index("phamos.patches.v1_0.link_sales_documents_to_tickets"),
+			lines.index("phamos.patches.v1_0.repair_legacy_attendees"))
+
 	def test_rename_is_a_no_op_when_done(self):
 		rename_marketing_event_registration_to_attendee.execute()
 		self.assertTrue(frappe.db.exists("DocType", "Attendee"))
