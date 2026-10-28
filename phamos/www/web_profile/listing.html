@@ -54,6 +54,16 @@
 				</label>
 			</div>
 
+			{#- Every active filter as a chip that removes it, plus one link that removes them all (sort stays). -#}
+			{%- if listing.active_filters %}
+			<ul class="wp-active-filters" aria-label="{{ _('Active filters') }}">
+				{%- for active in listing.active_filters %}
+				<li><a class="wp-chip wp-chip-removable" href="{{ active.url | e }}" data-wp-nav aria-label="{{ _('Remove filter {0}').format(active.label) | e }}">{{ active.label | e }} <span aria-hidden="true">×</span></a></li>
+				{%- endfor %}
+				<li><a class="wp-clear-filters" href="{{ listing.clear_url | e }}" data-wp-nav>{{ _("Clear all") }}</a></li>
+			</ul>
+			{%- endif %}
+
 			{%- if listing.results %}
 			<ul class="wp-grid" data-wp-grid>
 				{%- for item in listing.results %}{{ tile(item) }}{% endfor %}

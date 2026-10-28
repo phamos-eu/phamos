@@ -451,3 +451,21 @@ class TestWebProfileEvents(FrappeTestCase):
 		finally:
 			frappe.local.request = None
 
+
+	def test_active_filter_chips_and_clear_all(self):
+		from phamos.web_profile.listing import build_listing
+
+		try:
+			set_request(method="GET", path="/en/events?when=past&q=x&sort=name")
+			listing = build_listing("events", "en")
+			chips = {chip["label"]: chip["url"] for chip in listing["active_filters"]}
+			# A toggle away from its default is a filter too; its chip goes back to the default.
+			self.assertEqual(chips["When: Past"], "/en/events?q=x&sort=name")
+			self.assertEqual(chips["“x”"], "/en/events?when=past&sort=name")
+			# "Clear all" drops filters, search and toggles but keeps the sort.
+			self.assertEqual(listing["clear_url"], "/en/events?sort=name")
+
+			set_request(method="GET", path="/en/events")
+			self.assertEqual(build_listing("events", "en")["active_filters"], [])
+		finally:
+			frappe.local.request = None
