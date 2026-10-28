@@ -14,7 +14,7 @@ from frappe.utils import strip_html
 from frappe.query_builder import Field, Case, Order, DocType, functions as fn
 from frappe.query_builder.functions import Concat, Max, Sum, Round, Coalesce, IfNull
 from frappe.utils import getdate, nowdate, get_first_day, get_last_day, add_days, add_months
-from phamos.phamos.timesheet_utils import normalize_percent_billable
+from phamos.phamos.timesheet_utils import billable_seconds_term, normalize_percent_billable
 from phamos.phamos.doctype.timesheet_record.timesheet_record import compute_time_limit_status
 
 
@@ -980,7 +980,7 @@ def total_hours_worked_in_this_week():
         frappe.qb.from_(TimesheetRecord)
         .select(
             fn.Sum(TimesheetRecord.actual_time).as_("total_actual_time"),
-            fn.Sum(TimesheetRecord.actual_time * TimesheetRecord.percent_billable / 100).as_("total_billable_time")
+            fn.Sum(billable_seconds_term(TimesheetRecord)).as_("total_billable_time")
         )
         .where(
             (TimesheetRecord.employee == employee_name)
@@ -1051,7 +1051,7 @@ def total_hours_worked_in_this_month():
         frappe.qb.from_(TimesheetRecord)
         .select(
             fn.Sum(TimesheetRecord.actual_time).as_("total_actual_time"),
-            fn.Sum(TimesheetRecord.actual_time * TimesheetRecord.percent_billable / 100).as_("total_billable_time")
+            fn.Sum(billable_seconds_term(TimesheetRecord)).as_("total_billable_time")
         )
         .where(
             (TimesheetRecord.employee == employee_name)

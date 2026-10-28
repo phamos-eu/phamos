@@ -20,6 +20,7 @@
   "timesheet",
   "value_add",
   "percent_billable",
+  "billable_hours",
   "section_break_ovpv",
   "item",
   "section_break_hqfwm",
@@ -154,6 +155,14 @@
    "options": "0\n25\n50\n75\n100"
   },
   {
+   "description": "Stored when the record is submitted: actual time × Percent Billable, × Value Add when \"Value Add reduces billable hours\" is on in Phamos Settings.",
+   "fieldname": "billable_hours",
+   "fieldtype": "Float",
+   "label": "Billable Hours",
+   "no_copy": 1,
+   "read_only": 1
+  },
+  {
    "fieldname": "employee",
    "fieldtype": "Link",
    "label": "Employee",
@@ -197,7 +206,7 @@
  "index_web_pages_for_search": 1,
  "is_submittable": 1,
  "links": [],
- "modified": "2026-10-28 21:00:00.000000",
+ "modified": "2026-10-28 21:30:00.000000",
  "modified_by": "Administrator",
  "module": "Phamos",
  "name": "Timesheet Record",

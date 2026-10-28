@@ -32,6 +32,7 @@
   "mistral_base_url",
   "weekly_report_mistral_model",
   "timesheet_settings_section",
+  "value_add_in_billing",
   "allowed_additional_work_time",
   "monthly_implementation_summary_tab",
   "year",
@@ -169,6 +170,13 @@
    "fieldname": "timesheet_settings_section",
    "fieldtype": "Section Break",
    "label": "Timesheet Settings"
+  },
+  {
+   "default": "1",
+   "description": "On: billable hours = actual time × Percent Billable × Value Add. Off: actual time × Percent Billable. Changes only records submitted afterwards.",
+   "fieldname": "value_add_in_billing",
+   "fieldtype": "Check",
+   "label": "Value Add reduces billable hours"
   },
   {
    "default": "30",
@@ -624,7 +632,7 @@
  "index_web_pages_for_search": 1,
  "issingle": 1,
  "links": [],
- "modified": "2026-10-17 12:00:00.000000",
+ "modified": "2026-10-28 21:30:00.000000",
  "modified_by": "Administrator",
  "module": "Phamos",
  "name": "phamos Settings",
