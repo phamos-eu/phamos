@@ -4,7 +4,8 @@
 """Open Graph tags of the Web Profile pages (phamos/phamos#1738).
 
 Social networks build their link preview from og:image and og:url. Pages without an image of
-their own fall back to Web Profile Settings > Share Image. Run with
+their own fall back to Web Profile Settings > Share Image; a record with an image (an event
+banner, a person's photo) keeps it. Run with
     bench --site <site> run-tests --module phamos.tests.test_web_profile_seo
 """
 
@@ -13,10 +14,27 @@ from frappe.tests.utils import FrappeTestCase
 from frappe.utils import get_url, set_request
 from frappe.website.serve import get_response_content
 
+from phamos.tests.marketing_fixtures import ensure_company, make_event
 from phamos.web_profile.page import set_seo
 
 SHARE_IMAGE = "/files/wp-test-share.png"
 OWN_IMAGE = "/files/wp-test-own.jpg"
+EVENT_IMAGE = "/files/wp-test-event.jpg"
+
+
+def _reset_items():
+	frappe.local.web_profile_items = None
+	frappe.cache.delete_value("web_profile_items")
+
+
+def _render(path):
+	"""The page as a social network's crawler gets it: as Guest, without a session."""
+	frappe.set_user("Guest")
+	set_request(method="GET", path=path)
+	try:
+		return get_response_content(path)
+	finally:
+		frappe.set_user("Administrator")
 
 
 def _seo(**overrides):
@@ -35,8 +53,11 @@ class TestWebProfileSeo(FrappeTestCase):
 		frappe.db.set_single_value("Web Profile Settings", "share_image", None)
 
 	def tearDown(self):
+		frappe.set_user("Administrator")
+		frappe.local.request = None  # page renders leave a request behind, which switches rate limits on
 		frappe.db.rollback(save_point="web_profile_seo_test")
 		frappe.db.value_cache.pop("Web Profile Settings", None)
+		_reset_items()
 
 	def _set_share_image(self, url):
 		frappe.db.set_single_value("Web Profile Settings", "share_image", url)
@@ -66,12 +87,30 @@ class TestWebProfileSeo(FrappeTestCase):
 
 	def test_people_listing_renders_the_open_graph_image_tags(self):
 		self._set_share_image(SHARE_IMAGE)
-		frappe.set_user("Guest")
-		set_request(method="GET", path="/en/people")
-		try:
-			html = get_response_content("/en/people")
-		finally:
-			frappe.set_user("Administrator")
+		html = _render("/en/people")
 		self.assertIn(f'property="og:image"  content="{get_url(SHARE_IMAGE)}"', html)
 		self.assertIn(f'property="og:url"  content="{get_url("/en/people")}"', html)
 		self.assertIn('name="twitter:card" content="summary_large_image"', html)
+
+	def test_events_listing_and_event_pages_render_the_open_graph_image_tags(self):
+		"""The events overview shares the site image; an event shares its own banner, or the site image without one."""
+		ensure_company()
+		with_image = make_event("SEO Event With Image", paid=False, image=EVENT_IMAGE)
+		without_image = make_event("SEO Event Without Image", paid=False, image=None)
+		_reset_items()
+		self._set_share_image(SHARE_IMAGE)
+
+		html = _render("/en/events")
+		self.assertIn(f'property="og:image"  content="{get_url(SHARE_IMAGE)}"', html)
+		self.assertIn(f'property="og:url"  content="{get_url("/en/events")}"', html)
+		self.assertIn('name="twitter:card" content="summary_large_image"', html)
+
+		html = _render(f"/de/veranstaltungen/{with_image.route}")
+		self.assertIn(f'property="og:image"  content="{get_url(EVENT_IMAGE)}"', html)
+		self.assertIn(f'property="og:url"  content="{get_url(f"/de/veranstaltungen/{with_image.route}")}"', html)
+		self.assertIn('property="og:title"  content="SEO Event With Image · Veranstaltungen · phamos"', html)
+		self.assertIn('name="twitter:card" content="summary_large_image"', html)
+
+		html = _render(f"/en/events/{without_image.route}")
+		self.assertIn(f'property="og:image"  content="{get_url(SHARE_IMAGE)}"', html)
+		self.assertIn(f'property="og:url"  content="{get_url(f"/en/events/{without_image.route}")}"', html)
