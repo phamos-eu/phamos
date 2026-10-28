@@ -198,6 +198,7 @@ def _get_active_session_raw(user):
         record["break_from"] = str(last_row["from_time"])
     else:
         record["break_from"] = None
+    record["project_percent_billable"] = billing_context(record["project"])["percent_billable"]
     return record
 
 
@@ -596,6 +597,7 @@ def get_dev_all_projects():
             Project.name,
             Project.project_name,
             Project.status,
+            Project.percent_billable,
             Project.customer,
             Coalesce(Customer.customer_name, Project.customer).as_("customer_desc"),
             is_assigned,
@@ -690,6 +692,8 @@ def _enrich_projects(projects, user):
         p["total_tracked_seconds"] = ts["total_seconds"]
         p["billable_seconds"] = ts["billable_seconds"]
         p["non_billable_seconds"] = max(0, ts["total_seconds"] - ts["billable_seconds"])
+        # Preset for Percent Billable in the stop panel: the project's value, 100 when it has none (#1744).
+        p["percent_billable"] = p.get("percent_billable") or "100"
 
     return projects
 
