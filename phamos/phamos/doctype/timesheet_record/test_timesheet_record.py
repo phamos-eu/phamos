@@ -559,3 +559,141 @@ class TestCopyPercentBillableToValueAddPatch(FrappeTestCase):
 
 		self.assertEqual(frappe.db.get_value("Timesheet Record", plain.name, ["percent_billable", "value_add"]), ("50", "50"))
 		self.assertEqual(frappe.db.get_value("Timesheet Record", lowered.name, ["percent_billable", "value_add"]), ("25", "75"))
+
+
+class TestBillableHoursWithValueAdd(FrappeTestCase):
+	"""Value Add in billing, stored at submit, switch in Phamos Settings (#1746, #1031 decisions 9–11).
+
+	1. Switch on: billable hours = actual time × Percent Billable × Value Add; off: without Value Add.
+	2. The result is stored on submit; flipping the switch later does not change it.
+	3. The ERPNext Timesheet and the time-limit usage read the stored value.
+	4. "Submit at available hours" counts Value Add when picking the Percent Billable tier.
+	"""
+
+	USER = "bh-employee@example.com"
+
+	def setUp(self):
+		patcher = patch("frappe.db.commit")
+		patcher.start()
+		self.addCleanup(patcher.stop)
+		frappe.set_user("Administrator")
+		_ensure_user(self.USER)
+		self.employee = _ensure_employee(self.USER)
+		self.activity_type = "BH Development"
+		if not frappe.db.exists("Activity Type", self.activity_type):
+			frappe.get_doc({"doctype": "Activity Type", "activity_type": self.activity_type}).insert(ignore_permissions=True)
+		self.implementation = _make_billable_implementation()
+		self.project = (
+			frappe.get_doc(
+				{
+					"doctype": "Project",
+					"project_name": f"BH Project {frappe.generate_hash(length=5)}",
+					"status": "Open",
+					"custom_implementation": self.implementation,
+				}
+			)
+			.insert(ignore_permissions=True)
+			.name
+		)
+		self._switch(1)
+
+	def tearDown(self):
+		frappe.set_user("Administrator")
+		frappe.db.rollback()
+
+	def _switch(self, on):
+		frappe.db.set_single_value("Phamos Settings", "value_add_in_billing", on)
+
+	def _record(self, percent_billable="100", value_add="50", hours=2, submit=True):
+		doc = frappe.get_doc(
+			{
+				"doctype": "Timesheet Record",
+				"project": self.project,
+				"employee": self.employee,
+				"goal": "Billing test",
+				"expected_time": 3600,
+				"from_time": "2026-05-10 09:00:00",
+				"to_time": f"2026-05-10 {9 + hours:02d}:00:00",
+				"actual_time": hours * 3600,
+				"activity_type": self.activity_type,
+				"percent_billable": percent_billable,
+				"value_add": value_add,
+			}
+		).insert(ignore_permissions=True)
+		if submit:
+			doc.submit()
+		return doc
+
+	def test_switch_on_multiplies_value_add(self):
+		self.assertEqual(self._record().billable_hours, 1.0)
+
+	def test_switch_off_leaves_value_add_out(self):
+		self._switch(0)
+		self.assertEqual(self._record().billable_hours, 2.0)
+
+	def test_stored_value_survives_flipping_the_switch(self):
+		doc = self._record()
+		self._switch(0)
+		doc.reload()
+		self.assertEqual((doc.billable_hours, doc.get_billable_hours()), (1.0, 1.0))
+
+	def test_erpnext_timesheet_bills_the_stored_hours(self):
+		doc = self._record(percent_billable="50", value_add="50", hours=4)
+		billing = frappe.get_all("Timesheet Detail", filters={"parent": doc.timesheet}, pluck="billing_hours")
+		self.assertEqual(billing, [1.0])
+
+	def test_time_limit_usage_sums_the_stored_hours(self):
+		from phamos.phamos.doctype.timesheet_record.timesheet_record import get_billable_hours_in_period_for_implementation
+
+		self._record()
+		self._switch(0)
+		self.assertEqual(get_billable_hours_in_period_for_implementation(self.implementation, "2026-05-01", "2026-05-31"), 1.0)
+
+	def test_submit_at_available_hours_counts_value_add(self):
+		from phamos.phamos.doctype.timesheet_record import timesheet_record as tr
+
+		doc = self._record(submit=False)  # 2 h, Value Add 50
+		details = frappe._dict(limit_hours=0.5, from_date="2026-05-01", to_date="2026-05-31")
+		with patch.object(tr, "get_enforced_time_limit_details", return_value=details), patch.object(
+			tr, "get_billable_hours_in_period_for_implementation", return_value=0
+		), patch.object(tr.TimesheetRecord, "check_implementation_time_limit"):
+			tr.submit_at_available_hours(doc.name)
+		# 2 h × 50 % × 50 % = 0.5 h fits; without Value Add only 25 % would.
+		self.assertEqual(frappe.db.get_value("Timesheet Record", doc.name, ["percent_billable", "billable_hours"]), ("50", 0.5))
+
+	def test_dev_action_panel_stats_use_the_stored_hours(self):
+		self._record(hours=2)
+		frappe.set_user(self.USER)
+		with patch("frappe.utils.nowdate", return_value="2026-05-10"):
+			stats = dap.get_time_stats()
+		self.assertEqual(stats["today"]["billable_seconds"], 3600)
+
+
+class TestSetTimesheetRecordBillableHoursPatch(FrappeTestCase):
+	"""Patch set_timesheet_record_billable_hours (#1746, #1031 decision 10)."""
+
+	def setUp(self):
+		patcher = patch("frappe.db.commit")
+		patcher.start()
+		self.addCleanup(patcher.stop)
+		frappe.set_user("Administrator")
+
+	def tearDown(self):
+		frappe.db.rollback()
+
+	def test_old_records_get_actual_time_times_percent_billable_without_value_add(self):
+		from phamos.patches.v1_0 import set_timesheet_record_billable_hours
+
+		name = frappe.get_all("Timesheet Record", filters={"docstatus": 1}, pluck="name", limit=1)
+		if not name:
+			self.skipTest("needs one submitted Timesheet Record")
+		name = name[0]
+		frappe.db.set_value(
+			"Timesheet Record", name, {"actual_time": 3600, "percent_billable": "50", "value_add": "50", "billable_hours": 0}, update_modified=False
+		)
+		frappe.db.set_single_value("Phamos Settings", "value_add_in_billing", 0)
+
+		set_timesheet_record_billable_hours.execute()
+
+		self.assertEqual(frappe.db.get_value("Timesheet Record", name, "billable_hours"), 0.5)
+		self.assertEqual(frappe.db.get_single_value("Phamos Settings", "value_add_in_billing"), 1)

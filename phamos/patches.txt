@@ -71,3 +71,4 @@ phamos.patches.v1_0.remove_unneeded_ticketing_permissions
 phamos.patches.v1_0.remove_event_ticketing_user
 phamos.patches.v1_0.backfill_chapter_revision_status_and_levels
 phamos.patches.v1_0.copy_percent_billable_to_value_add
+phamos.patches.v1_0.set_timesheet_record_billable_hours

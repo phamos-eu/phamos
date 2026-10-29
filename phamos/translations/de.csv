@@ -1485,3 +1485,7 @@ Share of this time the customer is billed for. Preset from the project.,"Anteil 
 "Value Add must be 0, 25, 50, 75 or 100 %.","Die Wertschöpfung muss 0, 25, 50, 75 oder 100 % sein."
 "Percent Billable must be 0, 25, 50, 75 or 100 %.","Abrechenbar muss 0, 25, 50, 75 oder 100 % sein."
 {0} % value add,{0} % Wertschöpfung
+Value Add reduces billable hours,Wertschöpfung verringert die abrechenbaren Stunden
+"On: billable hours = actual time × Percent Billable × Value Add. Off: actual time × Percent Billable. Changes only records submitted afterwards.","An: abrechenbare Stunden = tatsächliche Zeit × Abrechenbar × Wertschöpfung. Aus: tatsächliche Zeit × Abrechenbar. Gilt nur für danach gebuchte Einträge."
+"Stored when the record is submitted: actual time × Percent Billable, × Value Add when ""Value Add reduces billable hours"" is on in Phamos Settings.","Wird beim Buchen gespeichert: tatsächliche Zeit × Abrechenbar, × Wertschöpfung, wenn „Wertschöpfung verringert die abrechenbaren Stunden“ in den Phamos-Einstellungen an ist."
+Billable Hours,Abrechenbare Stunden

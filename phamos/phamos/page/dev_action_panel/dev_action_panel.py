@@ -1,7 +1,7 @@
 import frappe
 from frappe import _
 from frappe.utils import cstr, now_datetime, add_to_date, time_diff_in_seconds, get_datetime
-from phamos.phamos.timesheet_utils import billing_context, normalize_percent_billable
+from phamos.phamos.timesheet_utils import billable_seconds_sql, billable_seconds_term, billing_context, normalize_percent_billable
 from phamos.phamos.doctype.timesheet_record.timesheet_record import compute_time_limit_status
 from frappe.query_builder import Order
 from frappe.query_builder.functions import Coalesce, Sum, Count
@@ -356,10 +356,10 @@ def get_time_stats():
 
     def fetch(date_from, date_to):
         rows = frappe.db.sql(
-            """
+            f"""
             SELECT
-                SUM(tr.actual_time)                              AS total_seconds,
-                SUM(tr.actual_time * tr.percent_billable / 100) AS billable_seconds
+                SUM(tr.actual_time)                     AS total_seconds,
+                SUM({billable_seconds_sql("tr")})       AS billable_seconds
             FROM `tabTimesheet Record` tr
             WHERE tr.employee = %(employee)s
               AND tr.docstatus != 2
@@ -656,7 +656,7 @@ def _enrich_projects(projects, user):
         billable_seconds = Sum(
             Case().when(
                 TimesheetRecord.docstatus != 2,
-                TimesheetRecord.actual_time * TimesheetRecord.percent_billable / 100,
+                billable_seconds_term(TimesheetRecord),
             ).else_(0)
         )
 

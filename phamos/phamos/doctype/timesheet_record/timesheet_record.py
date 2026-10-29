@@ -6,7 +6,7 @@ from frappe import _
 from frappe.model.document import Document
 from frappe.utils import (cstr, now_datetime, time_diff_in_seconds, get_datetime, flt, nowdate, get_first_day, get_last_day, get_url_to_form,)
 
-from phamos.phamos.timesheet_utils import RATING_OPTIONS, normalize_percent_billable
+from phamos.phamos.timesheet_utils import RATING_OPTIONS, compute_billable_hours, normalize_percent_billable
 
 class TimesheetRecord(Document):
 
@@ -30,6 +30,9 @@ class TimesheetRecord(Document):
 			frappe.throw(_("Cannot Submit, please mark record as complete"))
 		if not self.activity_type:
 			frappe.throw(_("Please add an activity type to submit the timesheet record."))
+
+		# Frozen here, so changing the Phamos Settings switch later leaves this record as billed (#1746).
+		self.billable_hours = self.compute_billable_hours()
 
 		self.check_implementation_time_limit()
 
@@ -58,10 +61,14 @@ class TimesheetRecord(Document):
 		self.delete_timesheet()
 		self.sync_implementation_time_limit_summary()
 
+	def compute_billable_hours(self):
+		return compute_billable_hours(self.actual_time, self.percent_billable, self.value_add)
+
 	def get_billable_hours(self):
-		if not self.actual_time or not self.percent_billable or self.percent_billable == "0":
-			return 0.0
-		return (flt(self.actual_time) / 3600) * (flt(self.percent_billable) / 100)
+		"""Stored Billable Hours once submitted; for a draft what submitting it now would store."""
+		if self.docstatus == 1:
+			return flt(self.billable_hours)
+		return self.compute_billable_hours()
 
 	def check_implementation_time_limit(self):
 		implementation_name = self.get_implementation()
@@ -232,8 +239,8 @@ class TimesheetRecord(Document):
 		timesheet.append(
 			"time_logs",
 			{
-				"is_billable": 1 if self.percent_billable!="0" else 0,
-				"billing_hours": actual_hours * (float(self.percent_billable) / 100) if self.percent_billable!="0" else 0,
+				"is_billable": 1 if flt(self.billable_hours) > 0 else 0,
+				"billing_hours": flt(self.billable_hours),
 				"activity_type": self.activity_type,
 				"from_time": self.from_time,
 				"to_time": self.to_time,
@@ -414,7 +421,8 @@ def submit_at_available_hours(name):
 
 	new_percent_billable = 0
 	for option in (0, 25, 50, 75, 100):
-		if actual_hours * (option / 100) <= remaining_hours:
+		# Same formula as the stored Billable Hours, so Value Add counts when the switch is on (#1746).
+		if compute_billable_hours(doc.actual_time, option, doc.value_add) <= remaining_hours:
 			new_percent_billable = option
 
 	doc.add_comment(
@@ -465,14 +473,10 @@ def get_billable_hours_in_period_for_implementation(implementation_name, from_da
 			"docstatus": 1,
 			"from_time": ["between", [f"{from_date} 00:00:00", f"{to_date} 23:59:59"]],
 		},
-		fields=["actual_time", "percent_billable"],
+		fields=["billable_hours"],
 	)
-	total_hours = 0.0
-	for row in rows:
-		if not row.actual_time or not row.percent_billable or row.percent_billable == "0":
-			continue
-		total_hours += (flt(row.actual_time) / 3600) * (flt(row.percent_billable) / 100)
-	return total_hours
+	# Submitted records only, so the stored Billable Hours are always set (#1746).
+	return sum(flt(row.billable_hours) for row in rows)
 
 
 def update_implementation_time_limit_summary(implementation_name):
