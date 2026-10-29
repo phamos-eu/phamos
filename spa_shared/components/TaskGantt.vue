@@ -270,6 +270,7 @@ import { buildBarColorCss, parseDependsOn, taskColorClass } from "../utils/gantt
 import { restyleDependencyArrows } from "../utils/ganttDependencyArrows"
 import { updateGanttTodayStrip } from "../utils/ganttTodayStrip"
 import { updateGanttSelectedRow } from "../utils/ganttSelectedRow"
+import { ganttBuildAction } from "../utils/ganttBuildAction"
 import spaConfig from "@/config"
 
 const API = spaConfig.api
@@ -670,7 +671,13 @@ function buildGantt() {
 	const tasksForGantt = ganttTasks.value
 	injectBarColors()
 
-	if (!gantt) {
+	const action = ganttBuildAction(Boolean(gantt), tasksForGantt.length)
+	if (action === "clear") {
+		destroyGantt()
+		return
+	}
+
+	if (action === "create") {
 		if (!ganttHost.value) return
 		gantt = new Gantt(ganttHost.value, tasksForGantt, {
 			view_mode: "Day",
