@@ -1,3 +1,4 @@
+import re
 import time
 
 import frappe
@@ -5,8 +6,76 @@ import requests
 
 from phamos.phamos.doctype.accounting_receipt.mistral_pdf import _get_phamos_settings
 
-MISTRAL_IMAGE_AGENT_CACHE_KEY = "phamos_mistral_image_agent_id_v2"
-MISTRAL_IMAGE_AGENT_MODEL = "mistral-medium-latest"
+MISTRAL_IMAGE_MODEL = "mistral-medium-latest"
+_IMAGE_URL_RE = re.compile(r"https?://[^\s\)\]>\"']+")
+
+
+def format_author_note(text):
+	"""Keep 3 or 4 plain lines, as separate paragraphs under the image."""
+	lines = []
+	for line in (text or "").replace("\r", "").split("\n"):
+		line = line.strip().lstrip("-•*").strip()
+		if line:
+			lines.append(line)
+	return "\n\n".join(lines[:4])
+
+
+def author_note(quote):
+	"""Three or four lines about the quote's author. Empty string if that cannot be written."""
+	_quote_text, author = parse_quote(quote)
+	if not author or author.lower() == "unknown":
+		return ""
+
+	settings = _get_phamos_settings()
+	if not settings:
+		return ""
+
+	try:
+		resp = requests.post(
+			f"{_v1(settings['base_url'])}/chat/completions",
+			json={
+				"model": "mistral-small-latest",
+				"temperature": 0.4,
+				"messages": [
+					{
+						"role": "system",
+						"content": (
+							"Write a short note about a real person for a team morning message. "
+							"Use 3 or 4 lines. One plain sentence per line. "
+							"No title, no bullets, no hashtags, no quotation marks."
+						),
+					},
+					{
+						"role": "user",
+						"content": (
+							f"Who is {author}? Write 3 or 4 lines about who they are "
+							"and why they are remembered."
+						),
+					},
+				],
+			},
+			headers=_mistral_headers(settings["api_key"]),
+			timeout=60,
+		)
+		if not resp.ok:
+			body = resp.text[:300] if resp.text else ""
+			raise Exception(f"Mistral author note failed ({resp.status_code}): {body}")
+
+		message = ((resp.json().get("choices") or [{}])[0].get("message") or {})
+		content = message.get("content") or ""
+		if isinstance(content, list):
+			content = "\n".join(
+				chunk.get("text", "")
+				for chunk in content
+				if isinstance(chunk, dict)
+			)
+		return format_author_note(content)
+	except Exception:
+		frappe.log_error(
+			title="Raven Daily Thread: author note failed",
+			message=frappe.get_traceback(),
+		)
+		return ""
 
 
 def parse_quote(quote):
@@ -31,6 +100,20 @@ Layout like a classic quote poster: quote text in the upper area, author figure 
 """
 
 
+def build_quote_poster_prompt(quote_text, author):
+	"""Used when a real-person portrait is refused. Still must return an image."""
+	return f"""Create a vertical inspirational quote poster. Do not depict a real person or a recognizable portrait.
+
+Soft ink-wash / watercolor illustration, muted earth tones, serene morning light (misty mountains, bamboo, a quiet library, or an open book).
+
+Include clearly readable text:
+"{quote_text}"
+— {author}
+
+Warm, uplifting, suitable for a team good-morning message. Portrait orientation. No logos and no watermarks.
+"""
+
+
 def _mistral_headers(api_key):
 	return {
 		"Authorization": f"Bearer {api_key}",
@@ -39,59 +122,144 @@ def _mistral_headers(api_key):
 	}
 
 
-def _get_or_create_image_agent(api_key, base_url):
-	agent_id = frappe.cache.get_value(MISTRAL_IMAGE_AGENT_CACHE_KEY)
-	if agent_id:
-		return agent_id
+def _v1(base_url):
+	base = (base_url or "https://api.mistral.ai/v1").strip().rstrip("/")
+	if not base.endswith("/v1"):
+		base += "/v1"
+	return base
 
-	url = f"{base_url.rstrip('/')}/agents"
-	payload = {
-		"model": MISTRAL_IMAGE_AGENT_MODEL,
-		"name": "Phamos Daily Image Agent",
-		"description": "Generates motivational images for the daily Raven thread.",
-		"instructions": (
-			"Use the image_generation tool to create inspirational quote posters. "
-			"Each image must show a respectful portrait of the quoted author and include "
-			"the quote text and author name as readable typography on the image."
-		),
-		"tools": [{"type": "image_generation"}],
-		"completion_args": {"temperature": 0.3, "top_p": 0.95},
-	}
-	resp = requests.post(url, json=payload, headers=_mistral_headers(api_key), timeout=60)
-	if not resp.ok:
-		body = resp.text[:500] if resp.text else ""
-		raise Exception(f"Mistral agent creation failed ({resp.status_code}): {body}")
 
-	agent_id = resp.json().get("id")
-	if not agent_id:
-		raise Exception("Mistral agent creation did not return an agent id.")
+def _content_chunks(content):
+	if isinstance(content, dict):
+		return [content]
+	if isinstance(content, list):
+		return [chunk for chunk in content if isinstance(chunk, dict)]
+	return []
 
-	frappe.cache.set_value(MISTRAL_IMAGE_AGENT_CACHE_KEY, agent_id)
-	return agent_id
+
+def _iter_content_pieces(data):
+	"""Yield text strings and content chunks from conversation or chat-completion payloads."""
+	if not isinstance(data, dict):
+		return
+
+	containers = []
+	outputs = data.get("outputs") or data.get("entries") or []
+	if isinstance(outputs, dict):
+		outputs = [outputs]
+	if isinstance(outputs, list):
+		containers.extend(outputs)
+
+	for choice in data.get("choices") or []:
+		if not isinstance(choice, dict):
+			continue
+		messages = list(choice.get("messages") or [])
+		if isinstance(choice.get("message"), dict):
+			messages.append(choice["message"])
+		containers.extend(messages)
+
+	for item in containers:
+		if not isinstance(item, dict):
+			continue
+		content = item.get("content")
+		if isinstance(content, str):
+			yield content
+		else:
+			yield from _content_chunks(content)
+		if item.get("file_id"):
+			yield item
+
+
+def _image_url_from_chunk(chunk):
+	url = chunk.get("image_url") or chunk.get("url")
+	if isinstance(url, dict):
+		url = url.get("url")
+	if isinstance(url, str) and url.startswith("http"):
+		return url
+	return None
+
+
+def _looks_like_image_url(url):
+	lower = url.lower()
+	path = lower.split("?", 1)[0]
+	return "files.mistral.ai" in lower or path.endswith((".png", ".jpg", ".jpeg", ".webp", ".gif"))
+
+
+def _ext_from_url(url):
+	path = (url or "").split("?", 1)[0].lower()
+	for ext in ("png", "jpg", "jpeg", "webp", "gif"):
+		if path.endswith("." + ext):
+			return "jpg" if ext == "jpeg" else ext
+	return "png"
+
+
+def _extract_image(data):
+	"""Return (file_id, file_type, image_url) from a Mistral image response."""
+	pieces = list(_iter_content_pieces(data))
+	dicts = [piece for piece in pieces if isinstance(piece, dict)]
+
+	for chunk in reversed(dicts):
+		if chunk.get("type") == "tool_file" and chunk.get("file_id"):
+			return chunk.get("file_id"), chunk.get("file_type") or "png", None
+	for chunk in reversed(dicts):
+		if chunk.get("file_id"):
+			return chunk.get("file_id"), chunk.get("file_type") or "png", None
+	for chunk in reversed(dicts):
+		url = _image_url_from_chunk(chunk)
+		if url:
+			return None, _ext_from_url(url), url
+	for piece in pieces:
+		if not isinstance(piece, str):
+			continue
+		for url in _IMAGE_URL_RE.findall(piece):
+			if _looks_like_image_url(url):
+				return None, _ext_from_url(url), url
+	return None, None, None
 
 
 def _extract_file_id_from_conversation(data):
-	"""Use the last output entry per Mistral docs (image is in message.output)."""
-	outputs = data.get("outputs") or []
-	if not outputs:
-		return None, None
+	file_id, file_type, _url = _extract_image(data)
+	return file_id, file_type
 
-	content = outputs[-1].get("content")
-	if not isinstance(content, list):
-		return None, None
 
-	for chunk in reversed(content):
-		if (
-			isinstance(chunk, dict)
-			and chunk.get("type") == "tool_file"
-			and chunk.get("file_id")
-		):
-			return chunk.get("file_id"), chunk.get("file_type") or "png"
-	return None, None
+def _conversation_hint(data):
+	texts = []
+	for piece in _iter_content_pieces(data):
+		if isinstance(piece, str) and piece.strip():
+			texts.append(piece.strip())
+		elif isinstance(piece, dict):
+			text = piece.get("text")
+			if isinstance(text, str) and text.strip():
+				texts.append(text.strip())
+	hint = " ".join(texts)[:300]
+	return hint or "Response had no image file."
+
+
+def _post_image_completion(api_key, base_url, prompt):
+	"""Built-in image_generation tool on chat completions. Agents often reply with text only."""
+	resp = requests.post(
+		f"{_v1(base_url)}/chat/completions",
+		json={
+			"model": MISTRAL_IMAGE_MODEL,
+			"messages": [
+				{
+					"role": "system",
+					"content": "Call the image_generation tool. Do not answer with text only.",
+				},
+				{"role": "user", "content": prompt},
+			],
+			"tools": [{"type": "image_generation"}],
+		},
+		headers=_mistral_headers(api_key),
+		timeout=240,
+	)
+	if not resp.ok:
+		body = resp.text[:500] if resp.text else ""
+		raise Exception(f"Mistral image completion failed ({resp.status_code}): {body}")
+	return resp.json()
 
 
 def _download_mistral_file(base_url, api_key, file_id, retries=5, delay=2):
-	download_url = f"{base_url.rstrip('/')}/files/{file_id}/content"
+	download_url = f"{_v1(base_url)}/files/{file_id}/content"
 	headers = {
 		"Authorization": f"Bearer {api_key}",
 		"Accept": "application/octet-stream",
@@ -109,8 +277,19 @@ def _download_mistral_file(base_url, api_key, file_id, retries=5, delay=2):
 		time.sleep(delay * (attempt + 1))
 
 
+def _download_image_url(url, api_key):
+	headers = {"Authorization": f"Bearer {api_key}", "Accept": "image/*,*/*"}
+	file_resp = requests.get(url, headers=headers, timeout=120)
+	if not file_resp.ok:
+		file_resp = requests.get(url, timeout=120)
+	if not file_resp.ok:
+		body = file_resp.text[:300] if file_resp.text else ""
+		raise Exception(f"Mistral image download failed ({file_resp.status_code}): {body}")
+	return file_resp
+
+
 def generate_daily_image_from_quote(quote):
-	"""Generate an image via Mistral Agents image_generation tool and return a File URL."""
+	"""Generate an image via Mistral's image_generation tool and return a File URL."""
 	settings = _get_phamos_settings()
 	if not settings:
 		frappe.throw(
@@ -119,27 +298,30 @@ def generate_daily_image_from_quote(quote):
 
 	api_key = settings["api_key"]
 	base_url = settings["base_url"]
-	agent_id = _get_or_create_image_agent(api_key, base_url)
-
 	quote_text, author = parse_quote(quote)
-	prompt = build_author_portrait_prompt(quote_text, author)
+	prompts = [
+		build_author_portrait_prompt(quote_text, author),
+		build_quote_poster_prompt(quote_text, author),
+	]
 
-	conv_url = f"{base_url.rstrip('/')}/conversations"
-	conv_resp = requests.post(
-		conv_url,
-		json={"agent_id": agent_id, "inputs": prompt, "stream": False},
-		headers=_mistral_headers(api_key),
-		timeout=180,
-	)
-	if not conv_resp.ok:
-		body = conv_resp.text[:500] if conv_resp.text else ""
-		raise Exception(f"Mistral image conversation failed ({conv_resp.status_code}): {body}")
+	last_data = None
+	file_id = file_type = image_url = None
+	for prompt in prompts:
+		last_data = _post_image_completion(api_key, base_url, prompt)
+		file_id, file_type, image_url = _extract_image(last_data)
+		if file_id or image_url:
+			break
 
-	file_id, file_type = _extract_file_id_from_conversation(conv_resp.json())
-	if not file_id:
-		raise Exception("Mistral did not return a generated image file.")
+	if not file_id and not image_url:
+		raise Exception(
+			"Mistral did not return a generated image file. " + _conversation_hint(last_data)
+		)
 
-	file_resp = _download_mistral_file(base_url, api_key, file_id)
+	if file_id:
+		file_resp = _download_mistral_file(base_url, api_key, file_id)
+	else:
+		file_resp = _download_image_url(image_url, api_key)
+		file_type = _ext_from_url(image_url)
 
 	ext = (file_type or "png").lower()
 	if ext == "jpeg":
