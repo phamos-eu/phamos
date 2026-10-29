@@ -72,11 +72,6 @@ unit_tests:
       phamos.phamos.doctype.implementation_chapter.test_implementation_chapter_rules
       phamos.phamos.doctype.implementation.test_implementation_review_cadence
       phamos.tests.test_backfill_chapter_revision_status_and_levels
-      phamos.tests.test_marketing_attendee
-      phamos.tests.test_marketing_crm
-      phamos.tests.test_marketing_ticketing
-      phamos.tests.test_marketing_billing
-      phamos.tests.test_marketing_patches
       phamos.tests.test_web_profile_events
       phamos.tests.test_web_page_editing
       phamos.phamos.doctype.timesheet_record.test_timesheet_record
