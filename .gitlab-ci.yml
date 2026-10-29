@@ -56,7 +56,7 @@ unit_tests:
   variables:
     # A new tag per build: the runner pulls "if-not-present", so a reused tag
     # would keep running the cached image.
-    CI_BENCH_TAG: "v15-20261029"
+    CI_BENCH_TAG: "v15-20261029-1620"
     # Read by the mariadb service container.
     MARIADB_ROOT_PASSWORD: root
     MYSQL_ROOT_PASSWORD: root
