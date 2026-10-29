@@ -76,10 +76,26 @@ def create_raven_thread():
 	_create_raven_thread(settings, today_date)
 
 
+def _log_image_error(exc):
+	frappe.log_error(
+		title=f"Raven Daily Thread: image not posted: {exc}"[:140],
+		message=frappe.get_traceback(),
+	)
+
+
 def _post_daily_image(settings, raven_bot, parent_message_id, quote):
+	from phamos.custom_scripts.custom_python.mistral_daily_image import author_note
+
 	image_file = _get_daily_image_file_url(settings, quote)
+	note = author_note(quote)
 	bot = frappe.get_doc("Raven Bot", raven_bot)
-	_bot_send_message(bot, parent_message_id, text="", file=image_file)
+	_bot_send_message(
+		bot,
+		parent_message_id,
+		note,
+		file=image_file,
+		markdown=bool(note),
+	)
 
 
 def _enqueue_daily_image(settings, parent_message_id, quote, today_date=None):
@@ -109,11 +125,8 @@ def post_raven_daily_image(
 			daily_image_folder=daily_image_folder,
 		)
 		_post_daily_image(settings, raven_bot, parent_message_id, quote)
-	except Exception:
-		frappe.log_error(
-			frappe.get_traceback(),
-			"Raven Daily Thread: failed to post daily image",
-		)
+	except Exception as e:
+		_log_image_error(e)
 
 	if today_date:
 		_post_birthday_wishes_after_thread(parent_message_id, raven_bot, today_date)
@@ -165,11 +178,8 @@ def _create_raven_thread(settings, today_date, post_image_sync=False):
 		if post_image_sync:
 			try:
 				_post_daily_image(settings, settings.raven_bot, parent_message_id, thought_of_the_day)
-			except Exception:
-				frappe.log_error(
-					frappe.get_traceback(),
-					"Raven Daily Thread: failed to post daily image",
-				)
+			except Exception as e:
+				_log_image_error(e)
 			_post_birthday_wishes_after_thread(
 				parent_message_id, settings.raven_bot, today_date
 			)
