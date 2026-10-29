@@ -9,7 +9,7 @@ set -euo pipefail
 
 : "${REGISTRY_IMAGE:?Set REGISTRY_IMAGE to the project registry path shown under Deploy > Container Registry}"
 IMAGE="$REGISTRY_IMAGE/ci-bench"
-TAG="v15-$(date +%Y%m%d)"
+TAG="v15-$(date +%Y%m%d-%H%M)"
 NET=phamos-ci-seed
 
 cd "$(dirname "$0")"

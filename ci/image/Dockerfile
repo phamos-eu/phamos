@@ -5,15 +5,18 @@ FROM frappe/bench:latest
 
 ARG FRAPPE_BRANCH=version-15
 # The image's default Python can be newer than phamos supports (<3.14).
-ARG PYTHON_VERSION=3.11
+# Not named PYTHON_VERSION: frappe/bench sets ENV PYTHON_VERSION, which would
+# override a build arg of the same name.
+ARG BENCH_PYTHON=3.11
 WORKDIR /home/frappe
 
 # Bench with Frappe, ERPNext and HRMS; assets are not needed for tests.
 # Without assets.json, rendering web pages fails in bundled_asset().
 # --junit-xml-output imports xmlrunner, a Frappe dev dependency the bench image does not ship.
-RUN bench init --frappe-branch "$FRAPPE_BRANCH" --python "$PYTHON_VERSION" \
+RUN bench init --frappe-branch "$FRAPPE_BRANCH" --python "$BENCH_PYTHON" \
       --skip-redis-config-generation --skip-assets frappe-bench \
  && cd frappe-bench \
+ && ./env/bin/python --version | grep -F "Python $BENCH_PYTHON." \
  && bench get-app --branch "$FRAPPE_BRANCH" --skip-assets erpnext \
  && bench get-app --branch "$FRAPPE_BRANCH" --skip-assets hrms \
  && mkdir -p sites/assets && echo '{}' > sites/assets/assets.json \
