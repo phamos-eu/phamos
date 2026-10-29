@@ -1,9 +1,13 @@
 # GitLab CI for phamos.
 #
 # unit_tests
-#   Builds a Frappe v15 bench (ERPNext, HRMS, phamos) on fresh MariaDB / Redis
-#   services and runs the phamos test modules. GitLab counterpart of
-#   .github/workflows/foundation.yml.
+#   Runs the phamos test modules on fresh MariaDB / Redis services. The job
+#   image (ci/image, built by ci/image/build.sh) already holds a Frappe v15
+#   bench with ERPNext and HRMS and a saved test site; the job loads that site,
+#   installs phamos from this checkout and runs the tests. GitLab counterpart
+#   of .github/workflows/foundation.yml.
+#   - CI_BENCH_TAG: image tag printed by build.sh. Rebuild the image and bump
+#     the tag to pick up newer Frappe / ERPNext / HRMS code.
 #   - TEST_MODULES: space-separated test modules, or "all" for the whole app.
 #     Override it for one run in "Run pipeline".
 #   - Set UNIT_TESTS_ENABLED=false (CI/CD variable) to turn the job off.
@@ -30,7 +34,7 @@ stages:
 
 unit_tests:
   stage: test
-  image: frappe/bench:latest
+  image: $CI_REGISTRY_IMAGE/ci-bench:$CI_BENCH_TAG
   tags: [hetzner]
   timeout: 90 minutes
   # The bench install takes most of the job. An interruptible job is canceled
@@ -50,12 +54,12 @@ unit_tests:
     - name: redis:7-alpine
       alias: redis-queue
   variables:
+    # A new tag per build: the runner pulls "if-not-present", so a reused tag
+    # would keep running the cached image.
+    CI_BENCH_TAG: "v15-YYYYMMDD"
     # Read by the mariadb service container.
     MARIADB_ROOT_PASSWORD: root
     MYSQL_ROOT_PASSWORD: root
-    FRAPPE_BRANCH: version-15
-    # The image's default Python can be newer than phamos supports (<3.14).
-    PYTHON_VERSION: "3.11"
     BENCH_DIR: /home/frappe/frappe-bench
     SITE: test.localhost
     # Lets `bench run-tests` run without allow_tests in the site config.
@@ -76,22 +80,17 @@ unit_tests:
       phamos.tests.test_web_page_editing
       phamos.phamos.doctype.timesheet_record.test_timesheet_record
   script:
-    - bench --version
-
-    # Bench with Frappe, ERPNext and HRMS; assets are not needed for tests.
-    - bench init --frappe-branch "$FRAPPE_BRANCH" --python "$PYTHON_VERSION" --skip-redis-config-generation --skip-assets "$BENCH_DIR"
-    # Quoted as a whole: a YAML item may not start with a quoted string and continue after it.
-    - '"$BENCH_DIR/env/bin/python" --version'
     - cd "$BENCH_DIR"
-    - bench set-config -g db_host mariadb
-    - bench set-config -g db_port 3306
-    - bench set-config -g redis_cache redis://redis-cache:6379
-    - bench set-config -g redis_queue redis://redis-queue:6379
-    - bench set-config -g redis_socketio redis://redis-queue:6379
-    - bench get-app --branch "$FRAPPE_BRANCH" --skip-assets erpnext
-    - bench get-app --branch "$FRAPPE_BRANCH" --skip-assets hrms
-    # Without assets.json, rendering web pages fails in bundled_asset().
-    - mkdir -p sites/assets && echo '{}' > sites/assets/assets.json
+
+    # Saved test site from the image: Frappe, ERPNext, HRMS, setup wizard
+    # fixtures, UTC time zone. Database name, user and password match
+    # sites/test.localhost/site_config.json in the image.
+    - |
+      mariadb -hmariadb -uroot -proot -e "
+        CREATE DATABASE test_site CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+        CREATE USER 'test_site'@'%' IDENTIFIED BY 'test_site';
+        GRANT ALL PRIVILEGES ON test_site.* TO 'test_site'@'%';"
+      gunzip -c /home/frappe/seed.sql.gz | mariadb -hmariadb -uroot -proot test_site
 
     # phamos from this checkout.
     - cp -r "$CI_PROJECT_DIR" apps/phamos
@@ -100,50 +99,14 @@ unit_tests:
       # apps.txt may not end with a newline.
       if [ -s sites/apps.txt ] && [ -n "$(tail -c1 sites/apps.txt)" ]; then echo >> sites/apps.txt; fi
       grep -qxF phamos sites/apps.txt || echo phamos >> sites/apps.txt
-
-    # The MariaDB 11 client in frappe/bench requires TLS. The 10.6 service has no
-    # certificates, so the client exits with ERROR 2026. bench execs mariadb directly
-    # and does not pass --skip-ssl, so put a wrapper first on PATH.
-    - |
-      mkdir -p "$HOME/bin"
-      for cmd in mariadb mysql mariadb-dump mysqldump; do
-        real="$(command -v "$cmd" 2>/dev/null || true)"
-        if [ -z "$real" ] || [ "$real" = "$HOME/bin/$cmd" ]; then
-          continue
-        fi
-        printf '#!/bin/sh\nexec %s --skip-ssl "$@"\n' "$real" > "$HOME/bin/$cmd"
-        chmod +x "$HOME/bin/$cmd"
-      done
-      export PATH="$HOME/bin:$PATH"
-      printf '[client]\nskip-ssl\n[mysql]\nskip-ssl\n[mariadb]\nskip-ssl\n' > "$HOME/.my.cnf"
-      chmod 600 "$HOME/.my.cnf"
-      mariadb --version
-      mariadb -hmariadb -P3306 -uroot -proot --protocol=tcp -e "SELECT 1 AS ok;"
-
-    # Test site.
-    - bench new-site "$SITE" --db-root-password root --mariadb-root-username root --mariadb-root-password root --admin-password admin --no-mariadb-socket
-    - bench --site "$SITE" install-app erpnext
-    - bench --site "$SITE" install-app hrms
-    # Master data the ERPNext setup wizard would create (UOMs, root groups).
-    # Installing phamos needs the UOM "Hour", the tests need e.g. "Nos" and
-    # "All Item Groups".
-    - |
-      bench --site "$SITE" execute erpnext.setup.setup_wizard.operations.install_fixtures.install --kwargs '{"country": "Germany"}'
     - bench --site "$SITE" install-app phamos
     # after_migrate creates custom fields the code needs (e.g. Sales Order Item.attendee).
     - bench --site "$SITE" migrate
-    # Same time zone as the container: without one Frappe assumes Asia/Kolkata.
-    - |
-      bench --site "$SITE" execute frappe.db.set_single_value --args '["System Settings", "time_zone", "UTC"]'
-    - bench --site "$SITE" set-config allow_tests true
     - |
       for app in erpnext hrms phamos; do
         bench --site "$SITE" list-apps | grep -q "$app" || { echo "Missing app: $app"; exit 1; }
       done
       bench --site "$SITE" mariadb -e "SELECT 1;" > /dev/null
-
-    # --junit-xml-output imports xmlrunner, a Frappe dev dependency the bench image does not ship.
-    - ./env/bin/pip install "unittest-xml-reporting~=3.2.0"
 
     # Run every module, even after a failure, so the report shows all results.
     - |

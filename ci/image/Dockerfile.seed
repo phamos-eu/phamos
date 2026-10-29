@@ -1,0 +1,6 @@
+# Adds the saved test site (database dump and site folder) that build.sh
+# creates to the bench image.
+
+FROM phamos-ci-bench:base
+COPY --chown=frappe:frappe out/seed.sql.gz /home/frappe/seed.sql.gz
+ADD --chown=frappe:frappe out/site.tgz /home/frappe/frappe-bench/sites/
