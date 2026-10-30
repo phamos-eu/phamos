@@ -150,6 +150,7 @@ def update_task(
 	exp_end_date=None,
 	progress=None,
 	project=None,
+	custom_task_owner=None,
 ):
 	"""Update whitelisted Task fields within Sales scope."""
 	fields = {}
@@ -169,6 +170,8 @@ def update_task(
 		fields["progress"] = progress
 	if project is not None:
 		fields["project"] = project
+	if custom_task_owner is not None:
+		fields["custom_task_owner"] = custom_task_owner
 	return dc.update_task(CONFIG, name, **fields)
 
 

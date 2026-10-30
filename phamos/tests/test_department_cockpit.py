@@ -14,6 +14,7 @@ from phamos.api.department_cockpit import (
 	_issue_in_scope,
 	_issue_or_filters,
 	_require_department,
+	get_task,
 	update_issue,
 	update_task,
 	validate_project,
@@ -140,3 +141,83 @@ class TestDepartmentCockpitScope(FrappeTestCase):
 		):
 			with self.assertRaises(frappe.ValidationError):
 				update_task(HR, "TASK-1", subject="Updated")
+
+
+class TestTaskOwner(FrappeTestCase):
+	"""Task Owner field on Task, separate from assignment (#1751)."""
+
+	def _update(self, doc, **fields):
+		with (
+			patch("frappe.has_permission"),
+			patch("phamos.api.department_cockpit.get_task", return_value={"name": "TASK-1"}),
+			patch("frappe.get_doc", return_value=doc),
+			patch("phamos.api.department_cockpit.assert_fields_unlocked"),
+			patch("phamos.api.department_cockpit.add_assignment") as add_assignment,
+			patch("phamos.api.department_cockpit.remove_assignment") as remove_assignment,
+		):
+			update_task(HR, "TASK-1", **fields)
+		add_assignment.assert_not_called()
+		remove_assignment.assert_not_called()
+
+	def test_field_is_first_section_without_swallowing_standard_fields(self):
+		from phamos.cockpits.setup import IMPLEMENTATION_SECTION, ensure_task_fields
+
+		ensure_task_fields()
+		frappe.clear_cache(doctype="Task")
+		fieldnames = [df.fieldname for df in frappe.get_meta("Task").fields]
+		self.assertEqual(
+			fieldnames[:4],
+			[IMPLEMENTATION_SECTION, "custom_task_owner", "custom_implementation_specific_end", "subject"],
+		)
+		owner = frappe.get_meta("Task").get_field("custom_task_owner")
+		self.assertEqual((owner.fieldtype, owner.options, owner.reqd), ("Link", "User", 0))
+		self.assertFalse(frappe.get_meta("Task").get_field(IMPLEMENTATION_SECTION).collapsible)
+
+	def test_update_task_sets_owner_without_touching_assignment(self):
+		doc = MagicMock()
+		with patch(
+			"frappe.db.get_value",
+			return_value=frappe._dict(enabled=1, user_type="System User"),
+		):
+			self._update(doc, custom_task_owner="owner@example.com")
+		doc.set.assert_called_once_with("custom_task_owner", "owner@example.com")
+		doc.save.assert_called_once()
+
+	def test_update_task_clears_owner(self):
+		doc = MagicMock()
+		self._update(doc, custom_task_owner="")
+		doc.set.assert_called_once_with("custom_task_owner", None)
+
+	def test_update_task_rejects_disabled_unknown_or_website_user(self):
+		for row in (
+			frappe._dict(enabled=0, user_type="System User"),
+			None,
+			frappe._dict(enabled=1, user_type="Website User"),
+		):
+			doc = MagicMock()
+			with patch("frappe.db.get_value", return_value=row):
+				with self.assertRaises(frappe.ValidationError):
+					self._update(doc, custom_task_owner="gone@example.com")
+			doc.save.assert_not_called()
+
+	def test_detail_payload_has_owner_and_name(self):
+		# version-15 builds the payload inside get_task (develop: _serialize_task_detail).
+		doc = MagicMock()
+		doc.name = "TASK-1"
+		doc.department = "Human Resources"
+		doc.issue = None
+		doc.get.side_effect = lambda key, *_: "owner@example.com" if key == "custom_task_owner" else None
+		with (
+			patch("frappe.has_permission"),
+			patch("phamos.api.department_cockpit._get_department", return_value="Human Resources"),
+			patch("frappe.get_doc", return_value=doc),
+			patch("phamos.api.department_cockpit.get_assignments", return_value=[]),
+			patch("phamos.api.department_cockpit._user_images", return_value=[]),
+			patch(
+				"phamos.api.department_cockpit._user_label",
+				side_effect=lambda u: {"owner@example.com": "Olga Owner"}.get(u, ""),
+			),
+		):
+			payload = get_task(HR, "TASK-1")
+		self.assertEqual(payload["custom_task_owner"], "owner@example.com")
+		self.assertEqual(payload["custom_task_owner_name"], "Olga Owner")

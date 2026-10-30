@@ -228,6 +228,7 @@ after_install = "phamos.setup.ops_inbox.ensure_ops_inbox_setup"
 after_migrate = [
 	"phamos.setup.ops_inbox.ensure_ops_inbox_setup",
 	"phamos.web_profile.setup.after_migrate",  # Web Page "Language" / "Translation Of" fields
+	"phamos.cockpits.setup.after_migrate",  # Task Owner on Task (#1751)
 	"phamos.marketing.setup.after_migrate",  # Lead Source "Event" for event registrations
 ]
 
