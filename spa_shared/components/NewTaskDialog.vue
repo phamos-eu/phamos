@@ -61,11 +61,12 @@
 					</div>
 					<FormControl
 						v-model="form.expected_time"
-						label="Estimated time (hours) *"
-						type="number"
+						label="Estimated time in hours (decimals allowed) *"
+						description="Enter the hours as a number. Decimals are allowed: 2.5 or 2,5 means two and a half hours, 0.25 means 15 minutes."
+						type="text"
+						inputmode="decimal"
 						size="sm"
-						min="0"
-						step="0.25"
+						placeholder="e.g. 2.5"
 					/>
 					<FormControl
 						v-model="form.priority"
@@ -115,6 +116,7 @@ import { formatDate, todayIsoInUserTz } from "@spa/utils/datetime.js"
 import {
 	newTaskDefaults,
 	newTaskErrors,
+	parseHours,
 	TASK_OWNER_FILTERS,
 	withStartDate,
 } from "@spa/utils/newTaskForm.js"
@@ -214,7 +216,7 @@ async function submit() {
 			exp_start_date: f.exp_start_date,
 			exp_end_date: f.exp_end_date,
 			custom_task_owner: f.custom_task_owner,
-			expected_time: Number(f.expected_time),
+			expected_time: parseHours(f.expected_time),
 			priority: f.priority,
 			project: f.project || null,
 			task_type: f.task_type || null,

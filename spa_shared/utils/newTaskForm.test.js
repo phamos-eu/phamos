@@ -1,5 +1,5 @@
 // Run with `yarn test:spa` (vitest globals, see personal_frontend/vitest.config.js).
-import { newTaskDefaults, newTaskErrors, withStartDate } from "./newTaskForm.js"
+import { newTaskDefaults, newTaskErrors, parseHours, withStartDate } from "./newTaskForm.js"
 
 const options = {
 	task_priorities: ["Low", "Medium", "High", "Urgent"],
@@ -47,7 +47,7 @@ describe("new task form", () => {
 			"Expected start is required",
 			"Expected end is required",
 			"Task Owner is required",
-			"Estimated time must be more than 0 hours",
+			"Estimated time must be a number of hours above 0, e.g. 2.5",
 			"Priority is required",
 		])
 	})
@@ -58,5 +58,25 @@ describe("new task form", () => {
 			exp_end_date: "2026-11-01",
 		}
 		expect(newTaskErrors(form)).toEqual(["Expected end date cannot be before start date"])
+	})
+
+	it("reads hours with a dot or a comma", () => {
+		expect(parseHours("2.5")).toBe(2.5)
+		expect(parseHours("2,5")).toBe(2.5)
+		expect(parseHours(" 0,25 ")).toBe(0.25)
+		expect(parseHours("3")).toBe(3)
+		expect(parseHours(1)).toBe(1)
+		expect(parseHours("")).toBeNaN()
+		expect(parseHours("2,5h")).toBeNaN()
+		expect(parseHours("1.000,5")).toBeNaN()
+	})
+
+	it("accepts a comma estimate but not text or 0", () => {
+		const base = newTaskDefaults({ subject: "X", today: "2026-11-02", user: "me@example.com", options })
+		expect(newTaskErrors({ ...base, expected_time: "2,5" })).toEqual([])
+		expect(newTaskErrors({ ...base, expected_time: "zwei" })).toEqual([
+			"Estimated time must be a number of hours above 0, e.g. 2.5",
+		])
+		expect(newTaskErrors({ ...base, expected_time: "0,0" })).toHaveLength(1)
 	})
 })

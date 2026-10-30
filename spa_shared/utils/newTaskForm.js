@@ -31,6 +31,16 @@ export function withStartDate(form, start) {
 	return { ...form, exp_start_date: start, exp_end_date: end }
 }
 
+/**
+ * Hours as typed into the estimate: a decimal number with a dot or a comma
+ * ("2.5" and "2,5" are both two and a half hours). NaN when it isn't a number.
+ */
+export function parseHours(value) {
+	if (typeof value === "number") return value
+	const text = String(value ?? "").trim().replace(",", ".")
+	return /^\d*\.?\d+$|^\d+\.$/.test(text) ? Number(text) : NaN
+}
+
 /** One message per problem, in field order; empty when the form can be saved. */
 export function newTaskErrors(form) {
 	const errors = []
@@ -41,7 +51,9 @@ export function newTaskErrors(form) {
 		errors.push("Expected end date cannot be before start date")
 	}
 	if (!form.custom_task_owner) errors.push("Task Owner is required")
-	if (!(Number(form.expected_time) > 0)) errors.push("Estimated time must be more than 0 hours")
+	if (!(parseHours(form.expected_time) > 0)) {
+		errors.push("Estimated time must be a number of hours above 0, e.g. 2.5")
+	}
 	if (!form.priority) errors.push("Priority is required")
 	return errors
 }
