@@ -22,16 +22,28 @@ import frappe
 from frappe import _
 from frappe.utils import cint, get_datetime, now_datetime
 
-from phamos.phamos.doctype.timesheet_record.timesheet_record import (
-	compute_time_limit_status,
-	notify_pm_of_time_limit,
-	submit_at_available_hours,
-)
 from phamos.phamos.page.dev_action_panel import dev_action_panel as dap
 
 DOCTYPE = "Timesheet Record"
 MIN_EXPECTED_SECONDS = 15 * 60
 RECENT_PROJECTS = 5
+
+
+# version-15 adaptation: booking limits per Implementation (develop b0c043e7) are not released
+# here, so a stop is always submitted directly and the "limit exceeded" decision never comes up.
+# These stand-ins keep the cockpit API identical; the real functions arrive with that release.
+def compute_time_limit_status(doc):
+	return {"exceeds": False}
+
+
+def submit_at_available_hours(name):
+	frappe.throw(_("Booking limits are not available on this site yet."))
+
+
+def notify_pm_of_time_limit(name):
+	frappe.throw(_("Booking limits are not available on this site yet."))
+
+
 TASK_RULE_FIELD = "task_in_timesheet_record"
 TASK_HIDDEN, TASK_OPTIONAL, TASK_MANDATORY = "Task is hidden", "Task is optional", "Task is mandatory"
 BILLABLE_OPTIONS = ("0", "25", "50", "75", "100")

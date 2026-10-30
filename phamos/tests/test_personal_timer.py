@@ -7,6 +7,7 @@ The Developer Action Panel functions underneath commit; commits are patched out 
 test rolls back.
 """
 
+import unittest
 from datetime import timedelta
 from unittest.mock import patch
 
@@ -16,6 +17,7 @@ from frappe.utils import add_to_date, now_datetime
 
 from phamos.api import personal_cockpit as pc
 from phamos.api import personal_timer as timer
+from phamos.phamos.page.dev_action_panel import dev_action_panel as dap_module
 from phamos.tests.test_personal_checkin import _ensure_employee, _ensure_user
 
 USER = "tm-a@example.com"
@@ -221,6 +223,10 @@ class TestPersonalTimer(FrappeTestCase):
 		with self.assertRaises(frappe.ValidationError):
 			pc.discard_timer_draft(name)
 
+	@unittest.skipUnless(
+		hasattr(dap_module, "compute_time_limit_status"),
+		"booking limits per Implementation are not on this branch (version-15)",
+	)
 	def test_time_limit_exceeded_waits_for_a_decision(self):
 		name = self._start()["session"]["name"]
 		exceeds = {"exceeds": True, "remaining_hours": 0.5, "requested_hours": 1.0, "limit_hours": 10}
