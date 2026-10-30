@@ -1371,11 +1371,15 @@ def update_task(config: CockpitConfig, name, **fields):
 
 
 def _validate_task_owner(user):
-	"""Return the Task Owner to store: an enabled User, or None to clear it (#1751)."""
+	"""Return the Task Owner to store: an enabled System User, or None to clear it (#1751).
+
+	Guest and website users are enabled too, but can't own work in the cockpits.
+	"""
 	user = (user or "").strip()
 	if not user:
 		return None
-	if not frappe.db.get_value("User", user, "enabled"):
+	row = frappe.db.get_value("User", user, ["enabled", "user_type"], as_dict=True)
+	if not row or not row.enabled or row.user_type != "System User":
 		frappe.throw(_("Task Owner must be an active user"))
 	return user
 

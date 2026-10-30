@@ -120,7 +120,7 @@
 					<FrappeLink
 						v-model="autosave.draft.custom_task_owner"
 						doctype="User"
-						:filters="{ enabled: 1 }"
+						:filters="{ enabled: 1, user_type: 'System User' }"
 						placeholder="Who is responsible"
 					/>
 				</div>

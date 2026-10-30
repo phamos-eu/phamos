@@ -275,7 +275,10 @@ class TestTaskOwner(FrappeTestCase):
 
 	def test_update_task_sets_owner_without_touching_assignment(self):
 		doc = MagicMock()
-		with patch("frappe.db.get_value", return_value=1):
+		with patch(
+			"frappe.db.get_value",
+			return_value=frappe._dict(enabled=1, user_type="System User"),
+		):
 			self._update(doc, custom_task_owner="owner@example.com")
 		doc.set.assert_called_once_with("custom_task_owner", "owner@example.com")
 		doc.save.assert_called_once()
@@ -285,10 +288,14 @@ class TestTaskOwner(FrappeTestCase):
 		self._update(doc, custom_task_owner="")
 		doc.set.assert_called_once_with("custom_task_owner", None)
 
-	def test_update_task_rejects_disabled_or_unknown_user(self):
-		for enabled in (0, None):
+	def test_update_task_rejects_disabled_unknown_or_website_user(self):
+		for row in (
+			frappe._dict(enabled=0, user_type="System User"),
+			None,
+			frappe._dict(enabled=1, user_type="Website User"),
+		):
 			doc = MagicMock()
-			with patch("frappe.db.get_value", return_value=enabled):
+			with patch("frappe.db.get_value", return_value=row):
 				with self.assertRaises(frappe.ValidationError):
 					self._update(doc, custom_task_owner="gone@example.com")
 			doc.save.assert_not_called()
