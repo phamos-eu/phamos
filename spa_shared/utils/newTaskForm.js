@@ -45,3 +45,10 @@ export function newTaskErrors(form) {
 	if (!form.priority) errors.push("Priority is required")
 	return errors
 }
+
+/**
+ * Who can be Task Owner (#1751): enabled System Users, as the server checks.
+ * One shared object: FrappeLink watches its filters deeply, so an inline literal
+ * (a new object on every render) would reload the user search over and over.
+ */
+export const TASK_OWNER_FILTERS = Object.freeze({ enabled: 1, user_type: "System User" })

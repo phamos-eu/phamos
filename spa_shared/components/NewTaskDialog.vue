@@ -55,7 +55,7 @@
 						<FrappeLink
 							v-model="form.custom_task_owner"
 							doctype="User"
-							:filters="{ enabled: 1, user_type: 'System User' }"
+							:filters="TASK_OWNER_FILTERS"
 							placeholder="Who is responsible"
 						/>
 					</div>
@@ -112,7 +112,12 @@ import { computed, ref, watch } from "vue"
 import { call, DatePicker, TextEditor } from "frappe-ui"
 import FrappeLink from "@spa/components/FrappeLink.vue"
 import { formatDate, todayIsoInUserTz } from "@spa/utils/datetime.js"
-import { newTaskDefaults, newTaskErrors, withStartDate } from "@spa/utils/newTaskForm.js"
+import {
+	newTaskDefaults,
+	newTaskErrors,
+	TASK_OWNER_FILTERS,
+	withStartDate,
+} from "@spa/utils/newTaskForm.js"
 import { session } from "@spa/session.js"
 import spaConfig from "@/config"
 

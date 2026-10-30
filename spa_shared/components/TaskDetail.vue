@@ -120,7 +120,7 @@
 					<FrappeLink
 						v-model="autosave.draft.custom_task_owner"
 						doctype="User"
-						:filters="{ enabled: 1, user_type: 'System User' }"
+						:filters="TASK_OWNER_FILTERS"
 						placeholder="Who is responsible"
 					/>
 				</div>
@@ -221,6 +221,7 @@ import AssigneePicker from "@spa/components/AssigneePicker.vue"
 import DocSyncBanner from "@spa/components/DocSyncBanner.vue"
 import DocViewers from "@spa/components/DocViewers.vue"
 import FrappeLink from "@spa/components/FrappeLink.vue"
+import { TASK_OWNER_FILTERS } from "@spa/utils/newTaskForm.js"
 import RichTextField from "@spa/components/RichTextField.vue"
 import { useAutosaveDoc } from "@spa/composables/useAutosaveDoc.js"
 import { useDocRealtime } from "@spa/composables/useDocRealtime.js"
