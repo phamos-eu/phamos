@@ -101,6 +101,32 @@ TODO_FIELDS = [
 ]
 
 
+# Task starts with plain fields (subject, project, issue), not a Section Break, so a closing
+# Section Break keeps them out of our section (#1751).
+TASK_FIELDS = [
+	{
+		"fieldname": IMPLEMENTATION_SECTION,
+		"label": "Implementation Specific",
+		"fieldtype": "Section Break",
+		"insert_after": "",
+		"collapsible": 0,
+	},
+	{
+		"fieldname": "custom_task_owner",
+		"label": "Task Owner",
+		"fieldtype": "Link",
+		"options": "User",
+		"insert_after": IMPLEMENTATION_SECTION,
+		"description": "Who is responsible for this task. Separate from assignment.",
+	},
+	{
+		"fieldname": "custom_implementation_specific_end",
+		"fieldtype": "Section Break",
+		"insert_after": "custom_task_owner",
+	},
+]
+
+
 def ensure_module():
 	if not frappe.db.exists("Module Def", MODULE):
 		frappe.get_doc({"doctype": "Module Def", "module_name": MODULE, "app_name": "phamos"}).insert(
@@ -122,5 +148,11 @@ def ensure_todo_fields():
 		frappe.db.set_value("Property Setter", setter.name, "module", MODULE)
 
 
+def ensure_task_fields():
+	ensure_module()
+	create_custom_fields({"Task": [{**field, "module": MODULE} for field in TASK_FIELDS]}, update=True)
+
+
 def after_migrate():
 	ensure_todo_fields()
+	ensure_task_fields()

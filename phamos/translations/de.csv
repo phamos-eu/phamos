@@ -1489,3 +1489,7 @@ Value Add reduces billable hours,Wertschöpfung verringert die abrechenbaren Stu
 "On: billable hours = actual time × Percent Billable × Value Add. Off: actual time × Percent Billable. Changes only records submitted afterwards.","An: abrechenbare Stunden = tatsächliche Zeit × Abrechenbar × Wertschöpfung. Aus: tatsächliche Zeit × Abrechenbar. Gilt nur für danach gebuchte Einträge."
 "Stored when the record is submitted: actual time × Percent Billable, × Value Add when ""Value Add reduces billable hours"" is on in Phamos Settings.","Wird beim Buchen gespeichert: tatsächliche Zeit × Abrechenbar, × Wertschöpfung, wenn „Wertschöpfung verringert die abrechenbaren Stunden“ in den Phamos-Einstellungen an ist."
 Billable Hours,Abrechenbare Stunden
+Implementation Specific,Implementierungsspezifisch
+Task Owner,Aufgabenverantwortliche/r
+Who is responsible for this task. Separate from assignment.,Wer für diese Aufgabe verantwortlich ist. Unabhängig von der Zuweisung.
+Task Owner must be an active user,Aufgabenverantwortliche/r muss ein aktiver Benutzer sein
