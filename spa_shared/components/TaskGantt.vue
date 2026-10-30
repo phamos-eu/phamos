@@ -76,7 +76,7 @@
 					ref="listFooter"
 					class="hr-gantt-list-footer flex-shrink-0 border-t border-outline-gray-2 bg-surface-gray-1 p-2 dark:bg-surface-gray-2"
 				>
-					<form class="flex items-center gap-1.5" @submit.prevent="submitNewTask">
+					<form class="flex items-center gap-1.5" @submit.prevent="openNewTaskDialog">
 						<FormControl
 							ref="newTaskInput"
 							v-model="newTaskSubject"
@@ -84,19 +84,15 @@
 							size="sm"
 							placeholder="New task…"
 							class="min-w-0 flex-1"
-							:disabled="creatingTask"
 						/>
-						<Button
-							type="submit"
-							variant="solid"
-							size="sm"
-							:loading="creatingTask"
-							:disabled="creatingTask || !newTaskSubject.trim()"
-						>
-							Add
-						</Button>
+						<Button type="submit" variant="solid" size="sm">Add</Button>
 					</form>
-					<ErrorMessage v-if="createError" class="mt-1" :message="createError" />
+					<NewTaskDialog
+						v-model="newTaskDialogOpen"
+						:options="options"
+						:initial-subject="newTaskSubject"
+						@created="onNewTaskCreated"
+					/>
 				</div>
 			</div>
 
@@ -254,8 +250,8 @@
 <script setup>
 import { computed, nextTick, onMounted, onUnmounted, ref, watch } from "vue"
 import Gantt from "frappe-gantt"
-import { call } from "frappe-ui"
 import InboxStatusFilter from "@spa/components/InboxStatusFilter.vue"
+import NewTaskDialog from "@spa/components/NewTaskDialog.vue"
 import { formatDate, todayIsoInUserTz } from "@spa/utils/datetime"
 import {
 	buildTimeline,
@@ -273,7 +269,6 @@ import { updateGanttSelectedRow } from "../utils/ganttSelectedRow"
 import { ganttBuildAction } from "../utils/ganttBuildAction"
 import spaConfig from "@/config"
 
-const API = spaConfig.api
 const BAR_COLOR_STYLE_ID = spaConfig.barColorStyleId || `${spaConfig.slug}-gantt-bar-colors`
 
 const props = defineProps({
@@ -281,6 +276,8 @@ const props = defineProps({
 	selectedName: { type: String, default: null },
 	search: { type: String, default: "" },
 	includeCompleted: { type: Boolean, default: false },
+	// get_form_options of the cockpit, for the "New Task" dialog (#1752).
+	options: { type: Object, default: () => ({}) },
 })
 
 const emit = defineEmits([
@@ -322,8 +319,7 @@ const zoom = ref(38)
 const frameStart = ref("")
 const frameEnd = ref("")
 const newTaskSubject = ref("")
-const creatingTask = ref(false)
-const createError = ref("")
+const newTaskDialogOpen = ref(false)
 const linkMode = ref(false)
 const linkFrom = ref(null)
 
@@ -561,35 +557,21 @@ function onHeaderPointerUp() {
 	}
 }
 
-function todayIso() {
-	return todayIsoInUserTz()
-}
-
 function todayDate() {
 	const iso = todayIsoInUserTz()
 	const [y, mo, dd] = iso.split("-").map(Number)
 	return new Date(y, mo - 1, dd, 0, 0, 0, 0)
 }
 
-async function submitNewTask() {
-	const subject = newTaskSubject.value.trim()
-	if (!subject || creatingTask.value) return
+// "New task…" only takes the subject; the dialog asks for the rest (#1752).
+function openNewTaskDialog() {
+	newTaskDialogOpen.value = true
+}
 
-	creatingTask.value = true
-	createError.value = ""
-	try {
-		const task = await call(`${API}.create_task`, {
-			subject,
-			exp_start_date: todayIso(),
-		})
-		newTaskSubject.value = ""
-		emit("created", task.name)
-	} catch (e) {
-		createError.value = e?.messages?.[0] || e?.message || "Could not create task"
-	} finally {
-		creatingTask.value = false
-		nextTick(focusNewTaskInput)
-	}
+function onNewTaskCreated(task) {
+	newTaskSubject.value = ""
+	emit("created", task.name)
+	nextTick(focusNewTaskInput)
 }
 
 function parseDate(value) {

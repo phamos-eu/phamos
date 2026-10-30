@@ -257,6 +257,9 @@ def create_task(
 	department=None,
 	exp_start_date=None,
 	exp_end_date=None,
+	expected_time=None,
+	custom_task_owner=None,
+	task_type=None,
 ):
 	"""Create a Task in the Software Development department."""
 	return dc.create_task(
@@ -268,6 +271,9 @@ def create_task(
 		department=department,
 		exp_start_date=exp_start_date,
 		exp_end_date=exp_end_date,
+		expected_time=expected_time,
+		custom_task_owner=custom_task_owner,
+		task_type=task_type,
 	)
 
 

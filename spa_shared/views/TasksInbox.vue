@@ -21,6 +21,7 @@
 				v-model:include-completed="includeCompleted"
 				:tasks="filteredTasks"
 				:selected-name="selectedName"
+				:options="formOptions"
 				@select="openTask"
 				@date-change="onGanttDateChange"
 				@dependency-change="onGanttDependencyChange"
