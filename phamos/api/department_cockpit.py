@@ -38,6 +38,7 @@ from phamos.api.presence import assert_fields_unlocked
 ISSUE_EDITABLE_FIELDS = ("subject", "description", "priority", "issue_type", "project")
 TASK_EDITABLE_FIELDS = (
 	"subject",
+	"custom_task_owner",
 	"description",
 	"priority",
 	"status",
@@ -774,6 +775,7 @@ def _serialize_task_detail(doc):
 	"""Build SPA task detail payload from an already-loaded Task doc."""
 	assignees = [a.get("owner") for a in get_assignments("Task", doc.name)]
 	issue_name = doc.issue or None
+	task_owner = doc.get("custom_task_owner") or None
 
 	return {
 		"name": doc.name,
@@ -789,6 +791,8 @@ def _serialize_task_detail(doc):
 		"progress": doc.progress or 0,
 		"color": doc.color,
 		"depends_on_tasks": doc.depends_on_tasks or "",
+		"custom_task_owner": task_owner,
+		"custom_task_owner_name": _user_label(task_owner),
 		"owner": doc.owner,
 		"owner_name": _user_label(doc.owner),
 		"modified": doc.modified,
@@ -1348,6 +1352,9 @@ def update_task(config: CockpitConfig, name, **fields):
 	if "project" in updates and updates["project"]:
 		validate_project(config, updates["project"])
 
+	if "custom_task_owner" in updates:
+		updates["custom_task_owner"] = _validate_task_owner(updates["custom_task_owner"])
+
 	if "progress" in updates and updates["progress"] is not None:
 		updates["progress"] = frappe.utils.flt(updates["progress"])
 
@@ -1361,6 +1368,16 @@ def update_task(config: CockpitConfig, name, **fields):
 
 	doc.save()
 	return get_task(config, name)
+
+
+def _validate_task_owner(user):
+	"""Return the Task Owner to store: an enabled User, or None to clear it (#1751)."""
+	user = (user or "").strip()
+	if not user:
+		return None
+	if not frappe.db.get_value("User", user, "enabled"):
+		frappe.throw(_("Task Owner must be an active user"))
+	return user
 
 
 def set_task_assignees(config: CockpitConfig, name, users=None):

@@ -116,6 +116,15 @@
 					:options="projectOptions"
 				/>
 				<div>
+					<label class="mb-1.5 block text-xs text-ink-gray-5">Task Owner</label>
+					<FrappeLink
+						v-model="autosave.draft.custom_task_owner"
+						doctype="User"
+						:filters="{ enabled: 1 }"
+						placeholder="Who is responsible"
+					/>
+				</div>
+				<div>
 					<label class="mb-1.5 block text-xs text-ink-gray-5">Expected start</label>
 					<DatePicker
 						v-model="autosave.draft.exp_start_date"
@@ -211,6 +220,7 @@ import { Badge, call, DatePicker, FeatherIcon, toast } from "frappe-ui"
 import AssigneePicker from "@spa/components/AssigneePicker.vue"
 import DocSyncBanner from "@spa/components/DocSyncBanner.vue"
 import DocViewers from "@spa/components/DocViewers.vue"
+import FrappeLink from "@spa/components/FrappeLink.vue"
 import RichTextField from "@spa/components/RichTextField.vue"
 import { useAutosaveDoc } from "@spa/composables/useAutosaveDoc.js"
 import { useDocRealtime } from "@spa/composables/useDocRealtime.js"
@@ -271,6 +281,7 @@ const autosave = useAutosaveDoc({
 		description: { kind: "html", label: "Description" },
 		priority: { kind: "select", immediate: true, label: "Priority" },
 		project: { kind: "select", immediate: true, label: "Project" },
+		custom_task_owner: { kind: "select", immediate: true, label: "Task Owner" },
 		exp_start_date: { kind: "date", immediate: true, label: "Expected start" },
 		exp_end_date: { kind: "date", immediate: true, label: "Expected end" },
 		progress: { kind: "number", toServer: clampProgress, label: "Progress" },
