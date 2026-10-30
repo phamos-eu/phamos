@@ -10,7 +10,7 @@
 
 		<CreateTodoDialog v-model="open.todo" @created="(doc) => opened(__('ToDo created'), 'TodoDetail', doc)" />
 		<CreateIssueDialog v-model="open.issue" :options="formOptions" @created="(doc) => opened(__('Issue created'), 'IssueDetail', doc)" />
-		<CreateTaskDialog v-model="open.task" :options="formOptions" @created="(doc) => opened(__('Task created'), 'TaskDetail', doc)" />
+		<NewTaskDialog v-model="open.task" :options="formOptions" @created="(doc) => opened(__('Task created'), 'TaskDetail', doc)" />
 		<CreateChecklistDialog
 			v-model="open.checklist"
 			:create-method="`${API}.create_checklist`"
@@ -32,7 +32,7 @@ import { useRouter } from "vue-router"
 import { call, Dropdown } from "frappe-ui"
 import CreateChecklistDialog from "@spa/components/CreateChecklistDialog.vue"
 import CreateIssueDialog from "@spa/components/CreateIssueDialog.vue"
-import CreateTaskDialog from "@spa/components/CreateTaskDialog.vue"
+import NewTaskDialog from "@spa/components/NewTaskDialog.vue"
 import CreateTodoDialog from "@spa/components/CreateTodoDialog.vue"
 import { requestTimerStart, timer } from "@spa/timerStore.js"
 import { shortcuts } from "@/shortcutsStore.js"
