@@ -72,7 +72,7 @@ class TestChecklistOnToDo(FrappeTestCase):
 	def test_create_on_my_todo_and_list_it(self):
 		frappe.set_user(USER_A)
 		checklist = self._create(self.mine.name, name="Workshop prep")
-		names = {row["name"] for row in pc.get_checklists(include_completed=1)["items"]}
+		names = {row["name"] for row in pc.get_checklists(include_completed=1)}
 		self.assertIn(checklist["name"], names)
 		linked = checklist_inbox.get_checklists_for_reference("ToDo", self.mine.name)
 		self.assertEqual([row["name"] for row in linked], [checklist["name"]])

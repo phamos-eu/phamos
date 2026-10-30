@@ -67,17 +67,6 @@ TASK_LIST_FIELDS = [
 TASK_KANBAN_STATUSES = ("Open", "Working", "Pending Review", "Overdue", "Completed")
 TASK_PRIORITIES = ("Low", "Medium", "High", "Urgent")
 
-# Row cap for get_checklists (no real pagination yet — see phamos/phamos#1395).
-# Comfortably above any department's current volume; raise further, or build
-# real pagination, if a department ever gets close to it.
-CHECKLIST_LIST_LIMIT = 1000
-
-# Row cap for get_issues (no real pagination yet — see phamos/phamos#1396).
-# IssuesInbox.vue deliberately fetches Closed issues too (include_closed=1)
-# so its status filter can toggle them in client-side with no extra round
-# trip; this cap is what stops that from being truly unbounded.
-ISSUE_LIST_LIMIT = 1000
-
 COCKPIT_SCOPES = ("department", "personal")
 
 
@@ -665,6 +654,9 @@ def update_issue(config: CockpitConfig, name, **fields):
 	doc = frappe.get_doc("Issue", name)
 	doc.check_permission("write")
 
+	# Conflict guard (develop d5a4fa38, #1398): the timestamp the client last saw.
+	client_modified = fields.pop("modified", None)
+
 	updates = {k: fields[k] for k in ISSUE_EDITABLE_FIELDS if k in fields}
 	unknown = set(fields) - set(ISSUE_EDITABLE_FIELDS)
 	if unknown:
@@ -683,6 +675,10 @@ def update_issue(config: CockpitConfig, name, **fields):
 
 	for key, value in updates.items():
 		doc.set(key, value)
+
+	if client_modified:
+		# Frappe raises TimestampMismatchError when someone saved in between.
+		doc.modified = get_datetime(client_modified)
 
 	doc.save()
 	return get_issue(config, name)
@@ -1340,6 +1336,9 @@ def update_task(config: CockpitConfig, name, **fields):
 	doc = frappe.get_doc("Task", name)
 	doc.check_permission("write")
 
+	# Conflict guard (develop d5a4fa38, #1398): the timestamp the client last saw.
+	client_modified = fields.pop("modified", None)
+
 	updates = {k: fields[k] for k in TASK_EDITABLE_FIELDS if k in fields}
 	unknown = set(fields) - set(TASK_EDITABLE_FIELDS)
 	if unknown:
@@ -1370,6 +1369,10 @@ def update_task(config: CockpitConfig, name, **fields):
 
 	for key, value in updates.items():
 		doc.set(key, value)
+
+	if client_modified:
+		# Frappe raises TimestampMismatchError when someone saved in between.
+		doc.modified = get_datetime(client_modified)
 
 	doc.save()
 	return get_task(config, name)

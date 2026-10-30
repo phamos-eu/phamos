@@ -166,13 +166,13 @@ class TestPersonalScope(FrappeTestCase):
 
 	def test_assigned_issue_is_listed_and_readable(self):
 		frappe.set_user(USER_A)
-		names = [row["name"] for row in pc.get_issues(include_closed=1)["items"]]
+		names = [row["name"] for row in pc.get_issues(include_closed=1)]
 		self.assertIn(self.issue.name, names)
 		self.assertEqual(pc.get_issue(self.issue.name)["name"], self.issue.name)
 
 	def test_issue_of_someone_else_is_hidden_and_refused(self):
 		frappe.set_user(USER_B)
-		names = [row["name"] for row in pc.get_issues(include_closed=1)["items"]]
+		names = [row["name"] for row in pc.get_issues(include_closed=1)]
 		self.assertNotIn(self.issue.name, names)
 		with self.assertRaises(frappe.ValidationError):
 			pc.get_issue(self.issue.name)
@@ -260,7 +260,7 @@ class TestPersonalScope(FrappeTestCase):
 		).insert(ignore_permissions=True)
 
 		frappe.set_user(USER_A)
-		names = {row["name"] for row in pc.get_checklists(include_completed=1)["items"]}
+		names = {row["name"] for row in pc.get_checklists(include_completed=1)}
 		self.assertIn(mine_elsewhere.name, names)
 		self.assertIn(on_my_issue.name, names)
 
