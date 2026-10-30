@@ -17,6 +17,8 @@ from phamos.api.department_cockpit import (
 	_issue_or_filters,
 	_require_department,
 	_serialize_task_detail,
+	create_task,
+	get_form_options,
 	get_checklists,
 	get_issues,
 	set_task_assignees,
@@ -318,6 +320,106 @@ class TestTaskOwner(FrappeTestCase):
 			payload = _serialize_task_detail(doc)
 		self.assertEqual(payload["custom_task_owner"], "owner@example.com")
 		self.assertEqual(payload["custom_task_owner_name"], "Olga Owner")
+
+
+class TestCreateTask(FrappeTestCase):
+	"""create_task behind the "New Task" dialog (#1752)."""
+
+	VALID = dict(
+		subject="Prepare offer",
+		exp_start_date="2026-11-02",
+		exp_end_date="2026-11-03",
+		expected_time=1,
+		priority="Medium",
+		custom_task_owner="owner@example.com",
+	)
+
+	def _create(self, task_type_exists=True, **overrides):
+		fields = {**self.VALID, **overrides}
+		subject = fields.pop("subject")
+		doc = MagicMock()
+		doc.name = "TASK-NEW"
+		with (
+			patch("frappe.has_permission"),
+			patch("phamos.api.department_cockpit._get_department", return_value="Human Resources"),
+			patch("phamos.api.department_cockpit._get_project", return_value="PROJ-HR"),
+			patch("phamos.api.department_cockpit.validate_project"),
+			patch(
+				"frappe.db.get_value",
+				return_value=frappe._dict(enabled=1, user_type="System User"),
+			),
+			patch("frappe.db.exists", return_value=task_type_exists),
+			patch("frappe.get_doc", return_value=doc) as get_doc,
+			patch("phamos.api.department_cockpit.add_assignment") as add_assignment,
+			patch("phamos.api.department_cockpit.get_task", return_value={"name": "TASK-NEW"}),
+		):
+			create_task(HR, subject, **fields)
+		return get_doc.call_args.args[0], doc, add_assignment
+
+	def test_valid_call_stores_all_fields_and_assigns_the_owner(self):
+		values, doc, add_assignment = self._create(task_type="Development", description="<p>Details</p>")
+		self.assertEqual(
+			{k: values[k] for k in ("subject", "exp_start_date", "exp_end_date", "priority", "type")},
+			{
+				"subject": "Prepare offer",
+				"exp_start_date": "2026-11-02",
+				"exp_end_date": "2026-11-03",
+				"priority": "Medium",
+				"type": "Development",
+			},
+		)
+		self.assertEqual(values["expected_time"], 1.0)
+		self.assertEqual(values["custom_task_owner"], "owner@example.com")
+		self.assertEqual(values["department"], "Human Resources")
+		self.assertEqual(doc.description, "<p>Details</p>")
+		doc.insert.assert_called_once()
+		add_assignment.assert_called_once_with(
+			{
+				"doctype": "Task",
+				"name": "TASK-NEW",
+				"assign_to": ["owner@example.com"],
+				"description": "Prepare offer",
+			}
+		)
+
+	def test_project_falls_back_to_the_cockpit_project(self):
+		values, _doc, _add = self._create()
+		self.assertEqual(values["project"], "PROJ-HR")
+
+	def test_rejects_each_missing_or_invalid_required_field(self):
+		cases = {
+			"empty subject": dict(subject="  "),
+			"no start": dict(exp_start_date=None),
+			"no end": dict(exp_end_date=""),
+			"end before start": dict(exp_start_date="2026-11-03", exp_end_date="2026-11-02"),
+			"estimate 0": dict(expected_time=0),
+			"no estimate": dict(expected_time=None),
+			"no owner": dict(custom_task_owner=""),
+			"no priority": dict(priority=None),
+			"unknown priority": dict(priority="Whenever"),
+		}
+		for label, overrides in cases.items():
+			with self.subTest(label):
+				with self.assertRaises(frappe.ValidationError):
+					self._create(**overrides)
+
+	def test_rejects_an_unknown_task_type(self):
+		with self.assertRaises(frappe.ValidationError):
+			self._create(task_type_exists=False, task_type="Nope")
+
+	def test_form_options_list_task_priorities_and_types(self):
+		with (
+			patch("frappe.has_permission"),
+			patch("phamos.api.department_cockpit._get_department", return_value="Human Resources"),
+			patch("phamos.api.department_cockpit._base_form_options", return_value={"projects": []}),
+			patch("phamos.api.department_cockpit._get_project_names", return_value=[]),
+			patch("phamos.api.department_cockpit._get_project", return_value=None),
+			patch("phamos.api.department_cockpit._role_shortlist_users", return_value=[]),
+			patch("frappe.get_all", return_value=["Development", "Support"]),
+		):
+			options = get_form_options(HR)
+		self.assertEqual(options["task_priorities"], ["Low", "Medium", "High", "Urgent"])
+		self.assertEqual(options["task_types"], ["Development", "Support"])
 
 
 class TestGetChecklists(FrappeTestCase):

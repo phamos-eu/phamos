@@ -16,7 +16,7 @@ from typing import Callable, Optional
 import frappe
 from frappe import _
 from frappe.desk.form.load import get_assignments
-from frappe.utils import get_datetime, get_fullname, now_datetime
+from frappe.utils import get_datetime, get_fullname, getdate, now_datetime
 
 from frappe.desk.form.assign_to import add as add_assignment
 from frappe.desk.form.assign_to import remove as remove_assignment
@@ -556,6 +556,7 @@ def get_form_options(config: CockpitConfig):
 	if config.is_personal:
 		options = _base_form_options(project_filters={"status": "Open"})
 		options["shortlist_users"] = _role_shortlist_users(config)
+		options.update(_task_form_options())
 		return options
 
 	department = _require_department(config)
@@ -571,7 +572,16 @@ def get_form_options(config: CockpitConfig):
 	options[config.department_field] = department
 	options[config.project_field] = _get_project(config)
 	options["shortlist_users"] = _role_shortlist_users(config)
+	options.update(_task_form_options())
 	return options
+
+
+def _task_form_options():
+	"""Choices for the "New Task" dialog (#1752)."""
+	return {
+		"task_priorities": list(TASK_PRIORITIES),
+		"task_types": frappe.get_all("Task Type", pluck="name", order_by="name asc", limit_page_length=0),
+	}
 
 
 def _role_shortlist_users(config: CockpitConfig, limit=50):
@@ -1133,14 +1143,44 @@ def create_task(
 	department=None,
 	exp_start_date=None,
 	exp_end_date=None,
+	expected_time=None,
+	custom_task_owner=None,
+	task_type=None,
 ):
-	"""Create a Task in the configured department."""
+	"""Create a Task in the configured department from the "New Task" dialog (#1752).
+
+	Subject, both expected dates, the estimate (hours, > 0), the Task Owner and the
+	priority are required here even where the site keeps them optional: the cockpits
+	need dates to plan, and production makes the dates and estimate mandatory anyway.
+	The Task Owner is also assigned; after that, owner and assignment are independent.
+	"""
 	frappe.has_permission("Task", "create", throw=True)
 	configured_department = _require_department(config)
 
 	subject = (subject or "").strip()
 	if not subject:
 		frappe.throw(_("Subject is required"))
+
+	if not exp_start_date or not exp_end_date:
+		frappe.throw(_("Expected start and end dates are required"))
+	if getdate(exp_end_date) < getdate(exp_start_date):
+		frappe.throw(_("Expected end date cannot be before start date"))
+
+	expected_time = frappe.utils.flt(expected_time)
+	if expected_time <= 0:
+		frappe.throw(_("Estimated time must be more than 0 hours"))
+
+	task_owner = _validate_task_owner(custom_task_owner)
+	if not task_owner:
+		frappe.throw(_("Task Owner is required"))
+
+	priority = _normalize_task_priority(priority)
+	if not priority:
+		frappe.throw(_("Priority is required"))
+
+	task_type = (task_type or "").strip() or None
+	if task_type and not frappe.db.exists("Task Type", task_type):
+		frappe.throw(_("Task Type {0} does not exist").format(task_type))
 
 	if config.is_personal:
 		department = department or _project_department(project)
@@ -1164,26 +1204,25 @@ def create_task(
 			"status": "Open",
 			"department": department,
 			"project": project,
+			"priority": priority,
+			"exp_start_date": exp_start_date,
+			"exp_end_date": exp_end_date,
+			"expected_time": expected_time,
+			"custom_task_owner": task_owner,
+			"type": task_type,
 		}
 	)
 	if description:
 		doc.description = description
-	if priority:
-		doc.priority = priority
-	if exp_start_date:
-		doc.exp_start_date = exp_start_date
-	if exp_end_date:
-		doc.exp_end_date = exp_end_date
 	doc.insert()
-	if config.is_personal:
-		add_assignment(
-			{
-				"doctype": "Task",
-				"name": doc.name,
-				"assign_to": [frappe.session.user],
-				"description": subject,
-			}
-		)
+	add_assignment(
+		{
+			"doctype": "Task",
+			"name": doc.name,
+			"assign_to": [task_owner],
+			"description": subject,
+		}
+	)
 	return get_task(config, doc.name)
 
 
