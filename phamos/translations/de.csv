@@ -742,3 +742,14 @@ The event of an order with tickets cannot be changed.,Die Veranstaltung einer Be
 "Desk orders: the first save also creates the buyer's own ticket.","Desk-Bestellungen: das erste Speichern legt auch das eigene Ticket des Käufers an."
 Event {0} has no ticket price.,Veranstaltung {0} hat keinen Ticketpreis.
 already on Sales Order {0},bereits auf Auftrag {0}
+Implementation Specific,Implementierungsspezifisch
+Task Owner,Aufgabenverantwortliche/r
+Who is responsible for this task. Separate from assignment.,Wer für diese Aufgabe verantwortlich ist. Unabhängig von der Zuweisung.
+Task Owner must be an active user,Aufgabenverantwortliche/r muss ein aktiver Benutzer sein
+Subject is required,Betreff ist erforderlich
+Expected start and end dates are required,Erwarteter Beginn und erwartetes Ende sind erforderlich
+Expected end date cannot be before start date,Das erwartete Ende darf nicht vor dem Beginn liegen
+Estimated time must be more than 0 hours,Die geschätzte Zeit muss mehr als 0 Stunden betragen
+Task Owner is required,Aufgabenverantwortliche/r ist erforderlich
+Priority is required,Priorität ist erforderlich
+Task Type {0} does not exist,Aufgabentyp {0} existiert nicht
