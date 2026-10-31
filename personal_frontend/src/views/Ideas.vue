@@ -1,12 +1,10 @@
 <template>
 	<div class="flex h-full min-h-0 bg-surface-gray-1">
 		<div class="h-full min-h-0 flex-1 overflow-y-auto p-5">
-			<div class="mx-auto flex max-w-4xl flex-col gap-5">
+			<div class="flex flex-col gap-5">
+				<!-- The page title ("My Ideas") is in the cockpit header; no second heading here. -->
 				<div class="flex flex-wrap items-center justify-between gap-3">
-					<div>
-						<h1 class="text-lg font-semibold text-ink-gray-9">{{ __("Ideas") }}</h1>
-						<p class="text-sm text-ink-gray-6">{{ __("Catch rough thoughts here. Open one when you want to write it out.") }}</p>
-					</div>
+					<p class="text-sm text-ink-gray-6">{{ __("Catch rough thoughts here. Open one when you want to write it out.") }}</p>
 					<Button variant="solid" :loading="creating" @click="newIdea">
 						<template #prefix><FeatherIcon name="plus" class="h-4 w-4" /></template>
 						{{ __("New idea") }}
@@ -20,19 +18,12 @@
 					{{ __("Loading your ideas…") }}
 				</div>
 				<section v-else class="rounded-lg border border-outline-gray-2 bg-surface-white">
-					<div class="flex flex-wrap items-center justify-between gap-3 border-b border-outline-gray-1 px-4 py-3">
-						<TabButtons v-model="stageFilter" :buttons="stageButtons" />
-						<label class="flex items-center gap-2 text-sm text-ink-gray-7">
-							<input v-model="ideas.showClosed" type="checkbox" @change="loadIdeas" />
-							{{ __("Show harvested and composted") }}
-						</label>
+					<div class="border-b border-outline-gray-1 px-4 py-3">
+						<TabButtons v-model="stageFilter" class="ideas-stage-tabs w-full" :buttons="stageButtons" />
 					</div>
-					<div v-if="!rows.length" class="flex flex-col items-center gap-3 px-4 py-10 text-center">
-						<p class="text-sm text-ink-gray-5">
-							{{ stageFilter ? __("No idea in this stage.") : __("No ideas yet. A short name is enough to start.") }}
-						</p>
-						<Button v-if="!stageFilter" variant="subtle" @click="newIdea">{{ __("New idea") }}</Button>
-					</div>
+					<p v-if="!rows.length" class="px-4 py-10 text-center text-sm text-ink-gray-5">
+						{{ stageFilter ? __("No idea in this stage.") : __("No ideas yet. A short name is enough to start.") }}
+					</p>
 					<ul v-else class="divide-y divide-outline-gray-1">
 						<li v-for="row in rows" :key="row.name">
 							<router-link
@@ -40,20 +31,24 @@
 								data-list-item
 								class="flex flex-col gap-2 px-4 py-3 hover:bg-surface-gray-1 focus:outline-none focus-visible:bg-surface-gray-2"
 							>
-								<div class="flex items-start justify-between gap-3">
-									<span class="min-w-0 flex-1 truncate text-sm font-medium text-ink-gray-9">{{ row.title }}</span>
-									<Badge :theme="STAGE_THEMES[row.stage] || 'gray'" size="sm">{{ __(row.stage) }}</Badge>
+								<span class="truncate text-sm font-medium text-ink-gray-9">{{ row.title }}</span>
+								<p v-if="excerpt(row)" class="line-clamp-2 text-sm text-ink-gray-5">{{ excerpt(row) }}</p>
+								<!-- The stage once: the bar with its name at the end, no extra badge. -->
+								<div class="flex items-center gap-3">
+									<StageSteps
+										class="flex-1"
+										size="compact"
+										:steps="steps"
+										:current="row.stage"
+										:dimmed="row.stage === 'Compost'"
+									/>
+									<span class="w-28 shrink-0 truncate text-right text-xs text-ink-gray-6">{{ stageLabel(row.stage) }}</span>
 								</div>
-								<p class="line-clamp-2 text-sm text-ink-gray-5">{{ row.summary || __("No notes yet") }}</p>
-								<StageSteps
-									size="compact"
-									:steps="steps"
-									:current="row.stage"
-									:dimmed="row.stage === 'Compost'"
-								/>
 								<div class="flex flex-wrap gap-x-3 text-xs text-ink-gray-5">
 									<span>{{ ageLabel(row.age_days) }}</span>
-									<span v-if="row.children_count">{{ __("{0} ideas came out of it", [row.children_count]) }}</span>
+									<span v-if="row.children_count">
+										{{ row.children_count === 1 ? __("1 idea came out of it") : __("{0} ideas came out of it", [row.children_count]) }}
+									</span>
 									<span v-if="row.spawned_from_title">{{ __("from {0}", [row.spawned_from_title]) }}</span>
 								</div>
 							</router-link>
@@ -68,12 +63,13 @@
 <script setup>
 import { computed, onMounted, ref, watch } from "vue"
 import { useRoute, useRouter } from "vue-router"
-import { Badge, TabButtons } from "frappe-ui"
+import { TabButtons } from "frappe-ui"
 import StageSteps from "@spa/components/StageSteps.vue"
 import { useUserRealtime } from "@spa/composables/useUserRealtime.js"
 import { __ } from "@spa/utils/i18n.js"
+import { summaryWithoutTitle } from "@spa/utils/ideaSummary.js"
 import { notify } from "@spa/utils/notify.js"
-import { STAGE_THEMES, ageLabel, createIdea, ideas, loadIdeaOptions, loadIdeas, stageSteps } from "../ideasStore.js"
+import { ageLabel, stageLabel, createIdea, ideas, loadIdeaOptions, loadIdeas, stageSteps } from "../ideasStore.js"
 
 const route = useRoute()
 const router = useRouter()
@@ -81,12 +77,13 @@ const stageFilter = ref("")
 const creating = ref(false)
 
 const steps = computed(() => stageSteps())
+// One control for both: "Open" and the open stages filter the list; Harvest and Compost load the
+// closed ideas (they replace the former "Show harvested and composted" checkbox).
 const stageButtons = computed(() => [
-	{ label: __("All"), value: "" },
-	...(ideas.options?.stages || [])
-		.filter((s) => ideas.showClosed || !(ideas.options?.closed_stages || []).includes(s))
-		.map((s) => ({ label: __(s), value: s })),
+	{ label: __("Open"), value: "" },
+	...(ideas.options?.stages || []).map((s) => ({ label: stageLabel(s), value: s })),
 ])
+const excerpt = (row) => summaryWithoutTitle(row.summary, row.title)
 const rows = computed(() => (stageFilter.value ? ideas.rows.filter((r) => r.stage === stageFilter.value) : ideas.rows))
 
 useUserRealtime("cockpit_idea_changed", loadIdeas, { debounceMs: 300 })
@@ -112,12 +109,13 @@ function openFromQuery() {
 	newIdea()
 }
 
-watch(
-	() => ideas.showClosed,
-	(show) => {
-		if (!show && (ideas.options?.closed_stages || []).includes(stageFilter.value)) stageFilter.value = ""
+watch(stageFilter, (stage) => {
+	const closed = (ideas.options?.closed_stages || []).includes(stage)
+	if (closed !== ideas.showClosed) {
+		ideas.showClosed = closed
+		loadIdeas()
 	}
-)
+})
 
 onMounted(() => {
 	loadIdeaOptions()
@@ -126,3 +124,15 @@ onMounted(() => {
 })
 watch(() => route.query.new, openFromQuery)
 </script>
+
+<style>
+/* The stage tabs fill the card and wrap to a second line instead of being cut off. Unscoped:
+   TabButtons' root does not carry this view's scope attribute. */
+.ideas-stage-tabs > .space-x-1 {
+	flex-wrap: wrap;
+	gap: 2px;
+}
+.ideas-stage-tabs > .space-x-1 > * {
+	margin-left: 0 !important;
+}
+</style>

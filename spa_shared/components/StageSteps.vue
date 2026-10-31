@@ -10,7 +10,7 @@
 			v-for="(step, index) in steps"
 			:key="step.value"
 			class="stage-step relative flex min-w-0 flex-1 items-center justify-center"
-			:class="stateClass(index)"
+			:class="[stateClass(index), stepState(index, currentIndex) === 'upcoming' ? '' : 'is-reached']"
 			:aria-current="stepState(index, currentIndex) === 'current' ? 'step' : undefined"
 		>
 			<button
@@ -20,11 +20,13 @@
 				:title="step.hint || step.label"
 				@click="emit('select', step.value)"
 			>
-				<span class="stage-step-no">{{ stepState(index, currentIndex) === "done" ? "✓" : index + 1 }}</span>
+				<span v-if="step.icon" class="stage-step-icon" aria-hidden="true">{{ step.icon }}</span>
+				<span v-else class="stage-step-no">{{ stepState(index, currentIndex) === "done" ? "✓" : index + 1 }}</span>
 				<span class="truncate">{{ step.label }}</span>
 			</button>
 			<span v-else-if="size === 'full'" class="flex min-w-0 items-center justify-center gap-1.5 px-1" :title="step.hint || step.label">
-				<span class="stage-step-no">{{ stepState(index, currentIndex) === "done" ? "✓" : index + 1 }}</span>
+				<span v-if="step.icon" class="stage-step-icon" aria-hidden="true">{{ step.icon }}</span>
+				<span v-else class="stage-step-no">{{ stepState(index, currentIndex) === "done" ? "✓" : index + 1 }}</span>
 				<span class="truncate">{{ step.label }}</span>
 			</span>
 		</li>
@@ -37,7 +39,7 @@ import { __ } from "@spa/utils/i18n.js"
 import { progress, stepIndex, stepState } from "@spa/utils/stageSteps.js"
 
 const props = defineProps({
-	/** [{ value, label, hint? }] in order */
+	/** [{ value, label, hint?, icon? }] in order; an icon replaces the step number */
 	steps: { type: Array, required: true },
 	/** value of the current step; a value off the path shows nothing done */
 	current: { type: String, default: "" },
@@ -108,6 +110,16 @@ function stateClass(index) {
 	background: rgb(0 0 0 / 8%);
 	font-size: 11px;
 	font-weight: 600;
+}
+.stage-step-icon {
+	flex-shrink: 0;
+	font-size: 15px;
+	line-height: 1;
+}
+/* Steps not reached yet: the icon waits in gray. */
+.stage-step:not(.is-reached) .stage-step-icon {
+	filter: grayscale(1);
+	opacity: 0.55;
 }
 [aria-current="step"] .stage-step-no {
 	background: rgb(255 255 255 / 20%);

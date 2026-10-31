@@ -1,19 +1,15 @@
 <template>
 	<div class="flex h-full min-h-0 bg-surface-gray-1">
 		<div class="h-full min-h-0 flex-1 overflow-y-auto p-5">
-			<div class="mx-auto flex max-w-5xl flex-col gap-4">
-				<div class="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-ink-gray-5">
-					<router-link :to="{ name: 'Ideas' }" class="inline-flex items-center gap-1 hover:text-ink-gray-8">
-						<FeatherIcon name="arrow-left" class="h-3.5 w-3.5" />{{ __("Ideas") }}
-					</router-link>
-					<router-link
-						v-if="idea?.spawned_from"
-						:to="{ name: 'IdeaDetail', params: { name: idea.spawned_from } }"
-						class="hover:text-ink-gray-8"
-					>
-						{{ __("Came from") }} <span class="font-medium text-ink-gray-7">{{ idea.spawned_from_title }}</span>
-					</router-link>
-				</div>
+			<div class="flex flex-col gap-4">
+				<!-- Back to the list is the active "Ideas" entry in the sidebar; only the parent link stays. -->
+				<router-link
+					v-if="idea?.spawned_from"
+					:to="{ name: 'IdeaDetail', params: { name: idea.spawned_from } }"
+					class="self-start text-xs text-ink-gray-5 hover:text-ink-gray-8"
+				>
+					{{ __("Came from") }} <span class="font-medium text-ink-gray-7">{{ idea.spawned_from_title }}</span>
+				</router-link>
 
 				<div v-if="error" class="rounded-lg border border-outline-gray-2 bg-surface-red-1 p-4 text-sm text-ink-red-4">
 					{{ error }}
@@ -50,7 +46,7 @@
 						/>
 						<div class="flex flex-wrap items-center justify-between gap-2 text-xs">
 							<span class="text-ink-gray-6">
-								<Badge v-if="composted" theme="gray" size="sm" class="mr-1">{{ __("Compost") }}</Badge>
+								<Badge v-if="composted" theme="gray" size="sm" class="mr-1">{{ stageLabel("Compost") }}</Badge>
 								{{ stageJob(autosave.draft.stage) }}
 							</span>
 							<button v-if="composted" type="button" class="text-ink-gray-6 underline-offset-2 hover:underline" @click="setStage('Seed')">
@@ -89,7 +85,7 @@
 											class="flex items-center justify-between gap-2 rounded px-1.5 py-1 text-sm text-ink-gray-8 hover:bg-surface-gray-2"
 										>
 											<span class="truncate">{{ child.title }}</span>
-											<span class="shrink-0 text-xs text-ink-gray-5">{{ __(child.stage) }}</span>
+											<span class="shrink-0 text-xs text-ink-gray-5" :title="__(child.stage)">{{ STAGE_ICONS[child.stage] }}</span>
 										</router-link>
 									</li>
 								</ul>
@@ -144,7 +140,7 @@ import { deskRecordUrl } from "@spa/utils/deskUrl.js"
 import { __ } from "@spa/utils/i18n.js"
 import { notify } from "@spa/utils/notify.js"
 import spaConfig from "../config"
-import { ageLabel, applyIdea, loadIdeaOptions, loadIdeas, stageJob, stageSteps } from "../ideasStore.js"
+import { STAGE_ICONS, ageLabel, applyIdea, stageLabel, loadIdeaOptions, loadIdeas, stageJob, stageSteps } from "../ideasStore.js"
 
 const props = defineProps({ name: { type: String, required: true } })
 const API = spaConfig.api

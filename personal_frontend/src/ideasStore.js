@@ -7,16 +7,21 @@ import spaConfig from "./config"
 
 export const ideas = reactive({ rows: [], options: null, loaded: false, error: "", showClosed: false })
 
-// Badge themes per stage: early gray, middle blue, late orange, harvested green.
-export const STAGE_THEMES = {
-	Seed: "gray",
-	Sprout: "gray",
-	Seedling: "blue",
-	"Young plant": "blue",
-	Growing: "orange",
-	Mature: "orange",
-	Harvest: "green",
-	Compost: "gray",
+// One picture per stage, from seed to basket; Compost for ideas set aside.
+export const STAGE_ICONS = {
+	Seed: "🌰",
+	Sprout: "🌱",
+	Seedling: "🌿",
+	"Young plant": "🪴",
+	Growing: "🌳",
+	Mature: "🍎",
+	Harvest: "🧺",
+	Compost: "🍂",
+}
+
+/** "🌱 Sprout": the stage name with its icon, translated. */
+export function stageLabel(stage) {
+	return stage ? `${STAGE_ICONS[stage] || ""} ${__(stage)}`.trim() : ""
 }
 
 let inflight = null
@@ -87,7 +92,7 @@ export function applyIdea(doc) {
 export function stageSteps() {
 	const stages = ideas.options?.stages || []
 	const jobs = ideas.options?.jobs || {}
-	return stages.filter((s) => s !== "Compost").map((s) => ({ value: s, label: __(s), hint: __(jobs[s] || "") }))
+	return stages.filter((s) => s !== "Compost").map((s) => ({ value: s, label: __(s), hint: __(jobs[s] || ""), icon: STAGE_ICONS[s] }))
 }
 
 export function stageJob(stage) {
