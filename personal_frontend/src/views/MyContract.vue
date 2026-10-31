@@ -5,17 +5,17 @@
 				{{ myContracts.error }}
 			</div>
 			<div v-else-if="!myContracts.loaded" class="flex min-h-64 items-center justify-center text-sm text-ink-gray-5">
-				Loading your contract…
+				{{ __("Loading your contract…") }}
 			</div>
 			<p v-else-if="!data?.history?.length" class="text-sm text-ink-gray-5">
-				There is no contract for you yet. HR adds it once it is signed.
+				{{ __("There is no contract for you yet. HR adds it once it is signed.") }}
 			</p>
 			<template v-else>
 				<section class="rounded-lg border border-outline-gray-2 bg-surface-white p-5">
 					<template v-if="current">
 						<div class="flex flex-wrap items-center justify-between gap-3">
 							<div>
-								<h2 class="text-base font-semibold text-ink-gray-9">Current contract</h2>
+								<h2 class="text-base font-semibold text-ink-gray-9">{{ __("Current contract") }}</h2>
 								<p class="mt-1 text-sm text-ink-gray-6">{{ current.contract_type }} · {{ formatPeriod(current) }}</p>
 							</div>
 							<ContractStatusBadge :status="current.status" />
@@ -27,28 +27,33 @@
 							</div>
 						</dl>
 					</template>
-					<p v-else class="text-sm text-ink-gray-6">No contract is in force today.</p>
+					<p v-else class="text-sm text-ink-gray-6">{{ __("No contract is in force today.") }}</p>
 				</section>
 
 				<section v-if="data.upcoming.length" class="rounded-lg border border-outline-gray-2 bg-surface-white p-5">
-					<h2 class="mb-3 text-base font-semibold text-ink-gray-9">Upcoming changes</h2>
+					<h2 class="mb-3 text-base font-semibold text-ink-gray-9">{{ __("Upcoming changes") }}</h2>
 					<ul class="divide-y divide-outline-gray-1">
 						<li v-for="row in data.upcoming" :key="row.name" class="flex flex-wrap items-center justify-between gap-3 py-2 text-sm">
-							<span class="text-ink-gray-9">From {{ formatDate(row.effective_from) }}</span>
+							<span class="text-ink-gray-9">{{ __("From {0}", [formatDate(row.effective_from)]) }}</span>
 							<span class="tabular-nums text-ink-gray-7">
-								{{ formatPercent(row.fte_percentage) }} · {{ formatHours(row.weekly_hours) }} per week ·
-								{{ formatMoney(row.monthly_gross, row.currency) }} per month
+								{{
+									__("{0} · {1} per week · {2} per month", [
+										formatPercent(row.fte_percentage),
+										formatHours(row.weekly_hours),
+										formatMoney(row.monthly_gross, row.currency),
+									])
+								}}
 							</span>
 						</li>
 					</ul>
 				</section>
 
 				<section>
-					<h2 class="mb-2 text-sm font-semibold text-ink-gray-9">History</h2>
+					<h2 class="mb-2 text-sm font-semibold text-ink-gray-9">{{ __("History") }}</h2>
 					<ContractHistoryTable :rows="data.history" :current-name="current?.name || ''" />
 				</section>
 
-				<p class="text-xs text-ink-gray-5">Something looks wrong? Ask HR to record a change.</p>
+				<p class="text-xs text-ink-gray-5">{{ __("Something looks wrong? Ask HR to record a change.") }}</p>
 			</template>
 		</div>
 	</div>
@@ -59,6 +64,7 @@ import { computed, onMounted } from "vue"
 import ContractHistoryTable from "@spa/contracts/ContractHistoryTable.vue"
 import ContractStatusBadge from "@spa/contracts/ContractStatusBadge.vue"
 import { formatDate, formatHours, formatMoney, formatPercent, formatPeriod } from "@spa/contracts/contractFormat.js"
+import { __ } from "@spa/utils/i18n.js"
 import { loadMyContracts, myContracts } from "../contractStore.js"
 
 const data = computed(() => myContracts.data)
@@ -66,12 +72,12 @@ const current = computed(() => data.value?.current || null)
 
 function facts(contract) {
 	const list = [
-		{ label: "FTE", value: formatPercent(contract.fte_percentage) },
-		{ label: "Hours per week", value: formatHours(contract.weekly_hours) },
-		{ label: "Monthly gross", value: formatMoney(contract.monthly_gross, contract.currency) },
+		{ label: __("FTE"), value: formatPercent(contract.fte_percentage) },
+		{ label: __("Hours per week"), value: formatHours(contract.weekly_hours) },
+		{ label: __("Monthly gross"), value: formatMoney(contract.monthly_gross, contract.currency) },
 	]
 	if (contract.contract_type === "Employed") {
-		list.push({ label: "Yearly gross at 100 %", value: formatMoney(contract.yearly_gross_full_time, contract.currency) })
+		list.push({ label: __("Yearly gross at 100 %"), value: formatMoney(contract.yearly_gross_full_time, contract.currency) })
 	}
 	return list
 }
