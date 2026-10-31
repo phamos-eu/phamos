@@ -329,9 +329,35 @@ class TestReceivablesIntegration(FrappeTestCase):
 
 	def tearDown(self):
 		frappe.db.rollback()
+		# A Fiscal Year made by _ensure_fiscal_year is rolled back; drop its cached copy too.
+		frappe.cache.delete_value("fiscal_years")
 		frappe.set_user("Administrator")
 
+	def _ensure_fiscal_year(self):
+		"""Today must lie in a Fiscal Year of the company, or the invoice cannot submit.
+
+		On the bare CI site only the setup wizard's company has one; ERPNext's test records
+		give `_Test Company` none for the current year.
+		"""
+		from erpnext.accounts.utils import FiscalYearError, get_fiscal_years
+
+		try:
+			get_fiscal_years(today(), company=self.company)
+			return
+		except FiscalYearError:
+			pass
+		year = getdate(today()).year
+		frappe.get_doc({
+			"doctype": "Fiscal Year",
+			"year": f"Receivables Test {year}",
+			"year_start_date": f"{year}-01-01",
+			"year_end_date": f"{year}-12-31",
+			"companies": [{"company": self.company}],
+		}).insert(ignore_permissions=True)
+		frappe.cache.delete_value("fiscal_years")
+
 	def _make_invoice(self):
+		self._ensure_fiscal_year()
 		company = frappe.get_cached_doc("Company", self.company)
 		income_account = company.default_income_account or frappe.db.get_value(
 			"Account", {"company": self.company, "root_type": "Income", "is_group": 0}, "name")
