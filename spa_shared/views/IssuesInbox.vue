@@ -170,6 +170,7 @@ import { useRoute, useRouter } from "vue-router"
 import { call } from "frappe-ui"
 import IssueDetail from "@spa/components/IssueDetail.vue"
 import { issueChatStore } from "@spa/issueChatStore.js"
+import { useUserRealtime } from "@spa/composables/useUserRealtime.js"
 import { __ } from "@spa/utils/i18n.js"
 import IssueList from "@spa/components/IssueList.vue"
 import CreateIssueDialog from "@spa/components/CreateIssueDialog.vue"
@@ -271,9 +272,10 @@ async function loadOptions() {
 	}
 }
 
-async function loadInbox() {
+/** `quiet`: a background refresh keeps the list on screen and ignores errors. */
+async function loadInbox({ quiet = false } = {}) {
 	if (configError.value) return
-	loading.value = true
+	if (!quiet) loading.value = true
 	try {
 		// Include closed so StatusFilter can activate Closed client-side;
 		// filteredIssues hides Closed by default until that pill is selected.
@@ -281,7 +283,7 @@ async function loadInbox() {
 		issues.value = data.items || []
 		truncated.value = Boolean(data.truncated)
 	} catch (e) {
-		configError.value = e?.messages?.[0] || e?.message || "Could not load issues"
+		if (!quiet) configError.value = e?.messages?.[0] || e?.message || "Could not load issues"
 	} finally {
 		loading.value = false
 	}
@@ -334,6 +336,10 @@ watch(
 		}
 	}
 )
+
+// Someone assigned or unassigned the user elsewhere (another cockpit, Desk): their ToDos
+// changed, so Issues may have joined or left this list.
+useUserRealtime("cockpit_todos_changed", () => loadInbox({ quiet: true }))
 
 onMounted(async () => {
 	await loadOptions()

@@ -58,6 +58,7 @@ import { call, toast } from "frappe-ui"
 import TaskDetail from "@spa/components/TaskDetail.vue"
 import TaskGantt from "@spa/components/TaskGantt.vue"
 import spaConfig from "@/config"
+import { useUserRealtime } from "@spa/composables/useUserRealtime.js"
 
 const API = spaConfig.api
 
@@ -194,6 +195,10 @@ watch(
 		}
 	}
 )
+
+// Assignments changed elsewhere (another cockpit, Desk): Tasks may have joined or left the
+// Gantt. Only the first load shows "Loading…", so this refresh keeps the chart on screen.
+useUserRealtime("cockpit_todos_changed", loadTasks)
 
 onMounted(async () => {
 	await loadOptions()
