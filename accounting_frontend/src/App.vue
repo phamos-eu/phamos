@@ -22,6 +22,7 @@ const route = useRoute()
 const canReadMis = ref(false)
 const canReadStatistics = ref(false)
 const canReadAiSkills = ref(false)
+const canReadReceivables = ref(false)
 
 const aiNavItem = {
 	name: "AiAccountant",
@@ -88,6 +89,13 @@ function withStatistics(receiptsItem) {
 	}
 }
 
+const receivablesNavItem = {
+	name: "Receivables",
+	label: "Receivables",
+	icon: "dollar-sign",
+	match: ["Receivables"],
+}
+
 const misNavItem = {
 	name: "MisList",
 	label: "Monthly Implementation Summary",
@@ -97,6 +105,7 @@ const misNavItem = {
 
 const navItems = computed(() => [
 	...baseNavItems.map((item) => (item.name === "Receipts" && canReadStatistics.value ? withStatistics(item) : item)),
+	...(canReadReceivables.value ? [receivablesNavItem] : []),
 	...(canReadAiSkills.value ? [aiNavItem] : []),
 	...(canReadMis.value ? [misNavItem] : []),
 ])
@@ -110,6 +119,7 @@ const pageTitle = computed(() => {
 	if (route.name === "PaymentsCalendar") return "Payment calendar"
 	if (route.name === "ReceiptStatistics") return "Receipts"
 	if (route.name === "ReceiptsAll") return "All receipts"
+	if (route.name === "Receivables") return "Receivables"
 	if (route.name === "AiAccountant") return "AI Accountant"
 	if (route.name === "MisList" || route.name === "MisDetail") {
 		return "Monthly Implementation Summary"
@@ -137,6 +147,7 @@ const pageSubtitle = computed(() => {
 		return "Receipts, booked expense, peaks and what is still to pay"
 	}
 	if (route.name === "ReceiptsAll") return "Search and filter every receipt"
+	if (route.name === "Receivables") return "Open sales invoices by customer and age, with whom to contact and when they were last reminded"
 	if (route.name === "AiAccountant") return "What the AI does with receipts, how it is set up, and what its runs did"
 	if (route.name === "MisList" || route.name === "MisDetail") {
 		return "Monthly Implementation Summary records"
@@ -153,6 +164,7 @@ onMounted(async () => {
 		canReadMis.value = Boolean(settings?.can_read_monthly_implementation_summary)
 		canReadStatistics.value = Boolean(settings?.can_read_statistics)
 		canReadAiSkills.value = Boolean(settings?.can_read_ai_skills)
+		canReadReceivables.value = Boolean(settings?.can_read_receivables)
 	} catch {
 		canReadMis.value = false
 		canReadStatistics.value = false

@@ -211,6 +211,11 @@ jobs:
           bench --site test.localhost run-tests --app phamos --module phamos.tests.$module
         done
 
+        echo "Running Accounting Cockpit (statistics, receivables) tests..."
+        for module in test_accounting_stats test_accounting_receivables; do
+          bench --site test.localhost run-tests --app phamos --module phamos.tests.$module
+        done
+
         echo "All tests completed successfully!"
       env:
         CI: true
