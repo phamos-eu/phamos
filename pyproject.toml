@@ -7,7 +7,8 @@ name = "phamos"
 authors = [
     { name = "Phamos GmbH", email = "support@phamos.eu" }
 ]
-description = "ERPNext Enhancement for Phamos.eu"
+description = "Frappe/ERPNext custom app powering phamos.eu: cockpits, integrations and business processes for phamos GmbH."
+license = "AGPL-3.0-only"
 requires-python = ">=3.10,<3.14"
 readme = "README.md"
 dynamic = ["version"]
