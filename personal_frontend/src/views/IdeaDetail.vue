@@ -79,11 +79,10 @@
 						</section>
 
 						<aside class="flex flex-col gap-4">
-							<div v-if="idea.last_session" class="rounded-lg border border-outline-gray-2 bg-surface-white p-3 text-xs text-ink-gray-6">
-								<div class="mb-0.5 text-sm font-medium text-ink-gray-9">{{ __("Writing") }}</div>
-								{{ __("Last session: {0} words, {1}", [idea.last_session.words_written, formatDatetime(idea.last_session.started_on)]) }}
-								<div v-if="idea.sessions_count > 1">{{ __("{0} sessions so far", [idea.sessions_count]) }}</div>
-							</div>
+							<!-- One line: "Start writing" already names the activity, so no extra heading. -->
+							<p v-if="idea.last_session" class="px-1 text-xs text-ink-gray-6">
+								{{ __("Last session: {0} words, {1}", [idea.last_session.words_written, formatDatetime(idea.last_session.started_on)]) }}<template v-if="idea.sessions_count > 1"> · {{ __("{0} sessions so far", [idea.sessions_count]) }}</template>
+							</p>
 							<div class="rounded-lg border border-outline-gray-2 bg-surface-white p-3">
 								<div class="mb-1 text-sm font-medium text-ink-gray-9">{{ __("Ideas that came out of this one") }}</div>
 								<p v-if="!idea.children.length" class="mb-2 text-xs text-ink-gray-5">

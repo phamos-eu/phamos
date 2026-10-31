@@ -13,9 +13,7 @@
 			<div>
 				<p class="text-xs font-semibold uppercase tracking-wide text-ink-gray-5">{{ __("Writing session") }}</p>
 				<h1 class="mt-2 text-2xl font-semibold tracking-tight text-ink-gray-9">{{ idea.title }}</h1>
-				<p class="mt-2 text-sm text-ink-gray-5">
-					{{ idea.last_session_words ? __("Last time: {0} words", [idea.last_session_words]) : __("First session") }}
-				</p>
+				<!-- Last time's words are the "About the same" goal; not repeated here. -->
 			</div>
 			<div class="flex flex-col gap-2">
 				<button
@@ -40,7 +38,8 @@
 			<header class="flex shrink-0 items-center justify-between gap-4 px-5 py-3">
 				<h1 class="min-w-0 truncate text-lg font-semibold text-ink-gray-9">{{ idea.title }}</h1>
 				<div v-if="phase === 'writing'" class="flex shrink-0 items-center gap-3">
-					<span class="text-sm tabular-nums text-ink-gray-6">{{ __("{0} of {1} words", [written, goal]) }}</span>
+					<!-- The bar shows the way to the goal; the number adds only the count (goal in the tooltip). -->
+					<span class="text-sm tabular-nums text-ink-gray-6" :title="__('Goal: {0} words', [goal])">{{ written === 1 ? __("1 word") : __("{0} words", [written]) }}</span>
 					<span class="text-xs text-ink-gray-4">{{ saveLabel }}</span>
 					<Button variant="solid" @click="openFeeling">{{ __("Complete") }}</Button>
 				</div>
@@ -77,17 +76,17 @@
 				</div>
 				<aside class="hidden w-72 shrink-0 flex-col gap-2 border-l border-outline-gray-1 pl-4 md:flex">
 					<p class="text-sm font-medium text-ink-gray-8">{{ __("Side idea") }}</p>
-					<p class="text-xs text-ink-gray-5">{{ __("Something else came up? Park it here, it becomes its own idea.") }}</p>
 					<textarea
 						v-model="sideText"
 						rows="6"
 						class="w-full resize-none rounded-lg border border-outline-gray-2 bg-surface-gray-1 p-2 text-sm text-ink-gray-8 outline-none focus:ring-0"
-						:placeholder="__('First line becomes the title…')"
+						:placeholder="__('Something else came up? Park it here; the first line becomes its title.')"
 						@input="scheduleCapture"
 					/>
 					<Button variant="subtle" :disabled="!sideText.trim()" @click="anotherOne">{{ __("Another one") }}</Button>
-					<ul v-if="captured.length" class="mt-2 flex flex-wrap gap-1.5">
-						<li v-for="item in captured" :key="item.name" class="max-w-full truncate rounded-full bg-surface-gray-2 px-2.5 py-1 text-xs text-ink-gray-7">
+					<!-- Only finished side ideas; the one being typed is already in the field. -->
+					<ul v-if="parked.length" class="mt-2 flex flex-wrap gap-1.5">
+						<li v-for="item in parked" :key="item.name" class="max-w-full truncate rounded-full bg-surface-gray-2 px-2.5 py-1 text-xs text-ink-gray-7">
 							{{ item.title }}
 						</li>
 					</ul>
@@ -163,6 +162,7 @@ function start(choice) {
 const sideText = ref("")
 const sideName = ref(null)
 const captured = ref([])
+const parked = computed(() => captured.value.filter((item) => item.name !== sideName.value))
 let captureTimer = null
 let capturing = Promise.resolve()
 
