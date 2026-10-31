@@ -6,9 +6,21 @@ export function totalUnread(state) {
 	return (state?.unread || 0) + (state?.unread_threads || 0)
 }
 
+/**
+ * How a chat badge looks (#1781): "mention" (red) when an unread message mentions the user,
+ * "new" (blue, like Raven's "New messages") for anything else unread, "" when all is read.
+ */
+export function unreadTone(state) {
+	if (!totalUnread(state)) return ""
+	return state?.mentions ? "mention" : "new"
+}
+
 /** "2 unread in the chat · 1 new reply in threads", or "" when nothing is unread. */
 export function unreadSummary(state) {
 	const parts = []
+	const mentions = state?.mentions || 0
+	if (mentions === 1) parts.push(__("You were mentioned"))
+	else if (mentions) parts.push(__("You were mentioned {0} times", [mentions]))
 	const chat = state?.unread || 0
 	const threads = state?.unread_threads || 0
 	if (chat === 1) parts.push(__("1 unread in the chat"))

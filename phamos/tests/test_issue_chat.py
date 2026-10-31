@@ -222,6 +222,43 @@ class TestIssueChat(FrappeTestCase):
 		self.assertEqual(pc.get_issue_chat(self.issue.name)["unread"], 1)
 
 
+	def test_unread_mentions_are_counted_in_chat_and_threads(self):
+		from raven.api.threads import create_thread
+
+		channel_id = pc.ensure_issue_chat(self.issue.name)["channel_id"]
+		_send(channel_id, "nothing for anyone in particular")
+
+		def seen_long_ago(channel):
+			frappe.db.set_value(
+				"Raven Channel Member", {"channel_id": channel, "user_id": ASSIGNEE}, "last_visit", "2000-01-01"
+			)
+
+		def mentions():
+			frappe.set_user(ASSIGNEE)
+			states = pc.get_issue_chat_states(frappe.as_json([self.issue.name]))
+			count = pc.get_issue_chat(self.issue.name)["mentions"]
+			self.assertEqual(states[self.issue.name]["mentions"], count)
+			frappe.set_user(OWNER)
+			return count
+
+		seen_long_ago(channel_id)
+		self.assertEqual(mentions(), 0)  # new messages, but no mention: the bubble stays blue
+
+		_send(channel_id, f"{_mention(ASSIGNEE)} please check")
+		self.assertEqual(mentions(), 1)
+
+		root = _send(channel_id, "A side topic")
+		thread_id = create_thread(root.name)["thread_id"]
+		_send(thread_id, f"{_mention(ASSIGNEE)} and this one")
+		seen_long_ago(thread_id)
+		self.assertEqual(mentions(), 2)
+
+		# Reading the chat leaves the mention in the thread.
+		frappe.db.set_value(
+			"Raven Channel Member", {"channel_id": channel_id, "user_id": ASSIGNEE}, "last_visit", frappe.utils.now()
+		)
+		self.assertEqual(mentions(), 1)
+
 	def test_mentioned_reader_joins_the_chat(self):
 		channel_id = pc.ensure_issue_chat(self.issue.name)["channel_id"]
 		self.assertNotIn(LATECOMER, _members(channel_id))
