@@ -236,6 +236,7 @@ after_migrate = [
 	"phamos.web_profile.setup.after_migrate",  # Web Page "Language" / "Translation Of" fields
 	"phamos.cockpits.setup.after_migrate",  # Task Owner on Task (#1751), ToDo fields of the Personal Cockpit (#1553)
 	"phamos.marketing.setup.after_migrate",  # Lead Source "Event" for event registrations
+	"phamos.api.issue_chat.add_raven_indexes",  # record chats look channels up by record (#1794)
 ]
 
 # Uninstallation
