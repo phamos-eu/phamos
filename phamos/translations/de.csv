@@ -606,7 +606,6 @@ Now,Jetzt
 estimate {0},geschätzt {0}
 due {0},fällig {0}
 Where you left off,Wo Sie aufgehört haben
-Done,Erledigt
 Park it,Zurückstellen
 Everything here is done or parked.,Alles hier ist erledigt oder zurückgestellt.
 "Pick a parked ToDo to continue, or end the session.",Wählen Sie ein zurückgestelltes ToDo zum Weitermachen oder beenden Sie die Sitzung.
@@ -648,7 +647,6 @@ Session ended.,Sitzung beendet.
 {0} ToDos done in {1}.,{0} ToDos erledigt in {1}.
 {0} min,{0} Min.
 {0} h {1} min,{0} Std. {1} Min.
-{0} h,{0} Std.
 That did not work,Das hat nicht funktioniert
 Done. One less.,Erledigt. Eins weniger.
 Captured for later.,Für später notiert.
@@ -657,7 +655,6 @@ Something urgent came up,Etwas Dringendes ist dazwischengekommen
 A meeting starts,Ein Meeting beginnt
 Wrong ToDos picked,Falsche ToDos gewählt
 Need a break,Pause nötig
-Other,Sonstiges
 completed,abgeschlossen
 left early,vorzeitig verlassen
 timed out,Zeit abgelaufen
@@ -699,7 +696,6 @@ Nothing urgent that someone else could do.,"Nichts Dringendes, das jemand andere
 Nothing to let go of.,Nichts loszulassen.
 Do now,Sofort erledigen
 Important and urgent,Wichtig und dringend
-Schedule,Einplanen
 "Important, not urgent: give it a day","Wichtig, nicht dringend: geben Sie ihm einen Tag"
 Hand off or batch,Abgeben oder bündeln
 "Urgent, not important","Dringend, nicht wichtig"
@@ -832,8 +828,6 @@ Checked in,Eingecheckt
 Checked out,Ausgecheckt
 Check-in · {0},Eingestempelt · {0}
 Check-out · {0},Ausgestempelt · {0}
-Check-in,Einstempeln
-Check-out,Ausstempeln
 Planned: {0},Geplant: {0}
 Spontaneous: {0},Spontan: {0}
 Could not load earlier days,Frühere Tage konnten nicht geladen werden
@@ -874,7 +868,6 @@ Planned: on your My Day plan when you start the day. Spontaneous: everything els
 Important ToDos a day,Wichtige ToDos pro Tag
 ToDos closed a day,Geschlossene ToDos pro Tag
 For how many working days,Für wie viele Arbeitstage
-Start,Start
 A Monday is a good fresh start.,Ein Montag ist ein guter Neuanfang.
 "Quick wins (closed within 15 minutes of creating them) count as spontaneous, at most two a day. Dropped ToDos do not count.","Schnelle Erfolge (innerhalb von 15 Minuten nach dem Anlegen geschlossen) zählen als spontan, höchstens zwei pro Tag. Fallen gelassene ToDos zählen nicht."
 Quick wins closed within 15 minutes of creating them and dropped ToDos do not count.,Schnelle Erfolge (innerhalb von 15 Minuten nach dem Anlegen geschlossen) und fallen gelassene ToDos zählen nicht.
@@ -932,11 +925,9 @@ Started {0} · {1} worked,Gestartet {0} · {1} gearbeitet
 "Break: {0}, {1} so far","Pause: {0}, bisher {1}"
 Open the record in Desk,Datensatz im Desk öffnen
 Pause the timer,Timer pausieren
-Pause,Pause
 Resume the timer,Timer fortsetzen
 Resume,Fortsetzen
 Stop the timer,Timer stoppen
-Stop,Stoppen
 "Timer running, over by {0}, {1}","Timer läuft, {0} überschritten, {1}"
 "Break running, over by {0}, {1}","Pause läuft, {0} überschritten, {1}"
 "Timer running, {0} left, {1}","Timer läuft, noch {0}, {1}"
@@ -961,7 +952,6 @@ My projects,Meine Projekte
 Recent,Zuletzt verwendet
 Loading projects…,Projekte werden geladen…
 No open project found.,Kein offenes Projekt gefunden.
-Task,Aufgabe
 Expected minutes,Geplante Minuten
 Goal,Ziel
 What will you accomplish? Shared with the customer the next day.,Was werden Sie erreichen? Wird am nächsten Tag mit dem Kunden geteilt.
@@ -1031,9 +1021,7 @@ ToDos,ToDos
 My Day,Mein Tag
 List,Liste
 Matrix,Matrix
-Issues,Anfragen
 Tasks,Aufgaben
-Gantt,Gantt
 Checklists,Checklisten
 Check-ins,Stempelzeiten
 My Contract,Mein Vertrag
@@ -1052,7 +1040,6 @@ ToDo created,ToDo erstellt
 Issue created,Anfrage erstellt
 Task created,Aufgabe erstellt
 Checklist created,Checkliste erstellt
-ToDo,ToDo
 Issue,Anfrage
 Checklist,Checkliste
 Timesheet timer,Zeiterfassungs-Timer
@@ -1074,7 +1061,6 @@ Open the focused ToDo,Markiertes ToDo öffnen
 Dialogs,Dialoge
 Save or confirm,Speichern oder bestätigen
 or,oder
-Undo,Rückgängig
 Revoke the check-in at {0} (Ctrl+Z),Einstempeln um {0} zurücknehmen (Ctrl+Z)
 Revoke the check-out at {0} (Ctrl+Z),Ausstempeln um {0} zurücknehmen (Ctrl+Z)
 Check-in revoked,Einstempeln zurückgenommen
@@ -1092,7 +1078,6 @@ in since {0},eingestempelt seit {0}
 out since {0},ausgestempelt seit {0}
 No comparison,Kein Vergleich
 {0}pp,{0} PP
-{0}d,{0} T
 New,Neu
 No change,Keine Änderung
 today,heute
@@ -1128,7 +1113,6 @@ Status Open: the next step is mine,Status Offen: Der nächste Schritt liegt bei 
 Waiting on others,Wartet auf andere
 Replied or On Hold,Beantwortet oder Zurückgestellt
 Oldest: {0},Älteste: {0}
-Resolved,Gelöst
 Could not load your Issues,Ihre Anfragen konnten nicht geladen werden
 Check-ins need an active Employee linked to your user. Please ask HR.,"Stempelzeiten erfordern einen aktiven Mitarbeiter, der mit Ihrem Benutzer verknüpft ist. Bitte wenden Sie sich an HR."
 Last {0} days,Letzte {0} Tage
@@ -1140,7 +1124,6 @@ average first check-in and last check-out,durchschnittliches erstes Einstempeln 
 Worked time,Arbeitszeit
 "Hours per week, from check-in to check-out","Stunden pro Woche, vom Einstempeln bis zum Ausstempeln"
 "Hours per day, from check-in to check-out","Stunden pro Tag, vom Einstempeln bis zum Ausstempeln"
-Hours,Stunden
 Days without a check-out,Tage ohne Ausstempeln
 These days do not count as worked time. HR can add the missing check-out.,Diese Tage zählen nicht als Arbeitszeit. HR kann das fehlende Ausstempeln nachtragen.
 checked in {0},eingestempelt {0}
@@ -1150,7 +1133,6 @@ Checked out.,Ausgestempelt.
 Could not load your check-ins,Ihre Stempelzeiten konnten nicht geladen werden
 No check-ins yet.,Noch keine Stempelzeiten.
 no check-out,kein Ausstempeln
-In,Ein
 Out,Aus
 Counted for attendance,Für die Anwesenheit gezählt
 attendance,Anwesenheit
@@ -1183,8 +1165,6 @@ Sun,So
 W{0},KW {0}
 Replied,Beantwortet
 On Hold,Zurückgestellt
-Working,In Arbeit
-Pending Review,Prüfung ausstehend
 No priority,Keine Priorität
 All days done,Alle Tage geschafft
 {0} of 1 day done,{0} von 1 Tag geschafft

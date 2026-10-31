@@ -6,7 +6,12 @@
 from contextlib import suppress
 
 import frappe
-from frappe.translate import get_parent_language, get_translations_from_apps, get_user_translations
+from frappe.translate import (
+	get_parent_language,
+	get_translation_dict_from_file,
+	get_translations_from_apps,
+	get_user_translations,
+)
 from frappe.utils import cint, get_system_timezone
 
 
@@ -44,7 +49,8 @@ def get_spa_boot(default_route):
 
 
 def spa_translations(lang):
-	"""Translations the SPAs need: phamos's own table plus the site's Translation records.
+	"""Translations the SPAs need: phamos's own table, the cockpit-only table, then the site's
+	Translation records.
 
 	Not Desk's full table (all apps, about 1.6 MB for German): the SPAs only show phamos strings,
 	so common words they need belong in phamos/translations/<lang>.csv. Site translations still
@@ -53,10 +59,23 @@ def spa_translations(lang):
 	if not lang or lang == "en":
 		return {}
 	parent = get_parent_language(lang)
-	messages = dict(get_translations_from_apps(parent, apps=["phamos"])) if parent else {}
-	messages.update(get_translations_from_apps(lang, apps=["phamos"]))
+	messages = {}
+	for code in filter(None, (parent, lang)):
+		messages.update(get_translations_from_apps(code, apps=["phamos"]))
+		messages.update(_cockpit_only(code))
 	with suppress(Exception):
 		if parent:
 			messages.update(get_user_translations(parent))
 		messages.update(get_user_translations(lang))
 	return messages
+
+
+def _cockpit_only(lang):
+	"""phamos/translations/spa/<lang>.csv: words Frappe, ERPNext or HRMS already translate, where
+	the cockpits want their own German (e.g. Task = "Aufgabe", Check-in = "Einstempeln").
+
+	Frappe reads only translations/<lang>.csv, so rows here never change Desk (#1765). Put a word
+	here instead of in de.csv whenever Desk already translates it differently.
+	"""
+	path = frappe.get_app_path("phamos", "translations", "spa", f"{lang}.csv")
+	return get_translation_dict_from_file(path, lang, "phamos")
