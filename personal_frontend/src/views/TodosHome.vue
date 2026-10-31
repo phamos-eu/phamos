@@ -5,7 +5,7 @@
 				<p class="text-sm text-ink-gray-6">{{ headline }}</p>
 				<div class="flex items-center gap-2">
 					<TabButtons v-model="period" :buttons="PERIOD_BUTTONS.map((button) => ({ ...button, label: __(button.label) }))" />
-					<Button variant="subtle" @click="router.push({ name: 'TodosPlan' })">{{ dayButton }}</Button>
+					<Button v-if="MY_DAY" variant="subtle" @click="router.push({ name: 'TodosPlan' })">{{ dayButton }}</Button>
 					<Button variant="solid" @click="showStartFocus = true">
 						<template #prefix><FeatherIcon name="target" class="h-4 w-4" /></template>
 						{{ __("Start focus") }}
@@ -158,6 +158,7 @@
 
 <script setup>
 import { computed, onMounted, ref, watch } from "vue"
+import { MY_DAY } from "@/features.js"
 import { useRouter } from "vue-router"
 import { call, TabButtons } from "frappe-ui"
 import DecideTodoDialog from "@spa/components/DecideTodoDialog.vue"
@@ -297,6 +298,7 @@ async function load() {
 
 let reloadTimer = null
 async function loadDayState() {
+	if (!MY_DAY) return
 	try {
 		dayState.value = await call(`${API}.get_day_state`)
 	} catch {

@@ -59,6 +59,7 @@
 
 <script setup>
 import { computed, ref, watch } from "vue"
+import { MY_DAY } from "@/features.js"
 import { call, TabButtons } from "frappe-ui"
 import { suggestionText } from "@spa/utils/challengeProgress.js"
 import { formatDate } from "@spa/utils/datetime.js"
@@ -81,7 +82,10 @@ const LENGTH_BUTTONS = [
 ]
 
 // Labels translated at render time; values stay English (they go to the API).
-const kindOptions = computed(() => KIND_OPTIONS.map((o) => ({ ...o, label: __(o.label) })))
+// "Planned" means on the My Day plan, so that kind waits for My Day (features.js).
+const kindOptions = computed(() =>
+	KIND_OPTIONS.filter((o) => MY_DAY || o.value !== "Planned and spontaneous").map((o) => ({ ...o, label: __(o.label) }))
+)
 const lengthButtons = computed(() => LENGTH_BUTTONS.map((b) => ({ ...b, label: __(b.label) })))
 
 const kind = ref("Closes per day")

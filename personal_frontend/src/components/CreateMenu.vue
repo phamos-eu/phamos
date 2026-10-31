@@ -41,6 +41,7 @@ import { __ } from "@spa/utils/i18n.js"
 import spaConfig from "@/config"
 import { checkin, checkInOrOut, checkinUsable } from "@/checkinStore.js"
 import { hasLeaveAccess } from "@/leaveStore.js"
+import { CHECKINS } from "@/features.js"
 import CreateChallengeDialog from "./CreateChallengeDialog.vue"
 import StartFocusDialog from "./StartFocusDialog.vue"
 
@@ -71,7 +72,7 @@ const groups = computed(() => {
 	if (timer.state?.available && !timer.state.session) {
 		time.push({ label: __("Timesheet timer"), icon: "play", onClick: requestTimerStart })
 	}
-	if (checkinUsable(checkin.state)) {
+	if (CHECKINS && checkinUsable(checkin.state)) {
 		const out = checkin.state.next_action === "OUT"
 		time.push({
 			label: out ? __("Check-out") : __("Check-in"),

@@ -22,7 +22,7 @@
 		<template #header-actions>
 			<PageSearch />
 			<TimerControl :start-button="false" />
-			<CheckinButton />
+			<CheckinButton v-if="CHECKINS" />
 			<CreateMenu ref="createMenu" :before-checkout="beforeCheckout" />
 			<CockpitShortcuts @create="createMenu?.open()" />
 			<CheckoutGuardDialog v-model="showGuard" @choose="onGuardChoice" />
@@ -42,6 +42,7 @@ import { __ } from "@spa/utils/i18n.js"
 import { focus, loadFocus } from "./focusStore.js"
 import { checkin, loadCheckin } from "./checkinStore.js"
 import { hasLeaveAccess, loadMyLeave } from "./leaveStore.js"
+import { CHECKINS, MY_DAY } from "./features.js"
 import CheckinButton from "./components/CheckinButton.vue"
 import CheckoutGuardDialog from "./components/CheckoutGuardDialog.vue"
 import CockpitShortcuts from "./components/CockpitShortcuts.vue"
@@ -74,12 +75,12 @@ watch(
 
 // Check-ins (#1571) and the timesheet timer (#1572): live from other tabs, the HRMS app, the
 // Action Panels and Desk, and again when the tab returns.
-useUserRealtime("cockpit_checkin_changed", loadCheckin, { debounceMs: 300 })
+if (CHECKINS) useUserRealtime("cockpit_checkin_changed", loadCheckin, { debounceMs: 300 })
 useUserRealtime("cockpit_timer_changed", loadTimer, { debounceMs: 300 })
 
 function onVisible() {
 	if (document.visibilityState !== "visible") return
-	loadCheckin()
+	if (CHECKINS) loadCheckin()
 	loadTimer()
 }
 
@@ -105,7 +106,7 @@ async function onGuardChoice(choice) {
 
 onMounted(() => {
 	loadFocus()
-	loadCheckin()
+	if (CHECKINS) loadCheckin()
 	loadMyLeave()
 	loadTimer()
 	document.addEventListener("visibilitychange", onVisible)
@@ -123,8 +124,10 @@ const CHECKIN_ITEM = {
 // My Leave (#1714) appears for users with an active Employee record.
 const LEAVE_ITEM = { name: "MyLeave", label: "My Leave", icon: "umbrella", match: ["MyLeave", "MyLeaveDetail"] }
 const navItems = computed(() => {
-	const items = [...BASE_ITEMS]
-	if (checkin.state?.available && checkin.state.employee) items.splice(1, 0, CHECKIN_ITEM)
+	const items = BASE_ITEMS.map((item) =>
+		MY_DAY || !item.children ? item : { ...item, children: item.children.filter((c) => c.name !== "TodosPlan") }
+	)
+	if (CHECKINS && checkin.state?.available && checkin.state.employee) items.splice(1, 0, CHECKIN_ITEM)
 	if (hasLeaveAccess()) items.push(LEAVE_ITEM)
 	return items.map(translateItem)
 })

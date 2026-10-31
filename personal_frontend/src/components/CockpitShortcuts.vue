@@ -30,6 +30,7 @@
 import { onBeforeUnmount, onMounted } from "vue"
 import { dialogOpen, insideOverlay, isCreateKey, isPlainKey, isTypingTarget, listDirection, nextListIndex } from "@spa/utils/shortcuts.js"
 import { shortcuts } from "@/shortcutsStore.js"
+import { CHECKINS, MY_DAY } from "@/features.js"
 
 const emit = defineEmits(["create"])
 
@@ -43,14 +44,11 @@ const GROUPS = [
 			{ what: "Next or previous match", keys: ["Enter", "Shift+Enter"] },
 			{ what: "Move through a list", keys: ["j / k", "↓ / ↑"] },
 			{ what: "Open the focused row", keys: ["Enter"] },
-			{ what: "Revoke a fresh check-in or check-out", keys: [`${MOD}+Z`] },
+			...(CHECKINS ? [{ what: "Revoke a fresh check-in or check-out", keys: [`${MOD}+Z`] }] : []),
 			{ what: "Show these shortcuts", keys: ["?"] },
 		],
 	},
-	{
-		title: "My Day",
-		rows: [{ what: "Jump to today", keys: ["T"] }],
-	},
+	...(MY_DAY ? [{ title: "My Day", rows: [{ what: "Jump to today", keys: ["T"] }] }] : []),
 	{
 		title: "Matrix",
 		rows: [
