@@ -56,6 +56,21 @@ export const SORT_OPTIONS = [
 	{ value: "name", label: "Customer A–Z" },
 ]
 
+const moneyFormatters = new Map()
+
+/** Amount in `currency` ("—" for empty). On develop this is `statsFormat.formatMoney` (#1369). */
+export function formatMoney(value, currency) {
+	if (value == null || Number.isNaN(Number(value))) return "—"
+	const key = currency || "EUR"
+	if (!moneyFormatters.has(key)) {
+		moneyFormatters.set(
+			key,
+			new Intl.NumberFormat(undefined, { style: "currency", currency: key, minimumFractionDigits: 2, maximumFractionDigits: 2 })
+		)
+	}
+	return moneyFormatters.get(key).format(Number(value))
+}
+
 export const DEFAULT_FILTERS = { view: "customers", q: "", overdue: "", bucket: "", sort: "overdue", company: "" }
 
 function text(value) {

@@ -18,7 +18,6 @@ from frappe import _
 from frappe.utils import getdate, now_datetime, today
 
 from phamos.accounting import receivables as rc
-from phamos.api.accounting_stats import _resolve_company
 
 AR_REPORT = "Accounts Receivable"
 REPORT_REF_DOCTYPE = "Sales Invoice"
@@ -48,6 +47,25 @@ def can_read_receivables():
 def _check_permission():
 	if not can_read_receivables():
 		frappe.throw(_("Not permitted"), frappe.PermissionError)
+
+
+def _resolve_company(company):
+	"""The requested company, else the user's default, else the site's; the user must read it.
+
+	On develop this lives in `accounting_stats` (#1369), which version-15 does not have yet.
+	"""
+	company = company or frappe.defaults.get_user_default("Company") or frappe.db.get_single_value(
+		"Global Defaults", "default_company"
+	)
+	if not company:
+		company = frappe.db.get_value("Company", {}, "name", order_by="creation asc")
+	if not company or not frappe.db.exists("Company", company):
+		frappe.throw(_("No company found"))
+	# The report and the detail queries skip User Permissions on Company; checking the Company
+	# document applies them, so a user limited to one company cannot read another.
+	if not frappe.has_permission("Company", "read", doc=company):
+		frappe.throw(_("Not permitted to see figures of {0}").format(company), frappe.PermissionError)
+	return company
 
 
 # --- queries -------------------------------------------------------------------------

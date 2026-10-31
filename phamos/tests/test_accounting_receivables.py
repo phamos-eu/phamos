@@ -276,8 +276,6 @@ class TestEndpoint(FrappeTestCase):
 				api.get_receivables(company=self.company)
 
 	def test_respects_company_permission(self):
-		from phamos.api import accounting_stats
-
 		real = frappe.has_permission
 
 		def denied(doctype, ptype="read", doc=None, *args, **kwargs):
@@ -285,7 +283,7 @@ class TestEndpoint(FrappeTestCase):
 				return False
 			return real(doctype, ptype, doc, *args, **kwargs)
 
-		with patch.object(accounting_stats.frappe, "has_permission", side_effect=denied):
+		with patch.object(api.frappe, "has_permission", side_effect=denied):
 			with self.assertRaises(frappe.PermissionError):
 				api.get_receivables(company=self.company)
 

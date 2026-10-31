@@ -196,8 +196,8 @@ import {
 	invoicePasses,
 	sortCustomers,
 	sortInvoices,
+	formatMoney,
 } from "../receivableColumns"
-import { formatMoney } from "../statsFormat"
 
 const API = "phamos.api.accounting_receivables.get_receivables"
 const VIEWS = [
