@@ -118,6 +118,18 @@ def get_issue_chat_states(names):
 	return dc.get_issue_chat_states(names)
 
 
+@frappe.whitelist()
+def get_task_chat(name):
+	"""Return the Raven chat state of a Task in HR scope."""
+	return dc.get_task_chat(CONFIG, name)
+
+
+@frappe.whitelist(methods=["POST"])
+def ensure_task_chat(name):
+	"""Start or join the Raven chat of a Task in HR scope."""
+	return dc.ensure_task_chat(CONFIG, name)
+
+
 
 @frappe.whitelist(methods=["POST"])
 def update_issue(name, subject=None, description=None, priority=None, issue_type=None, project=None):

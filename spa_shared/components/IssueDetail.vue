@@ -61,7 +61,7 @@
 			<div class="ml-auto flex flex-shrink-0 items-center gap-2 pl-3">
 				<DocSyncBanner :autosave="autosave" />
 				<DocViewers :viewers="viewers" />
-				<IssueChatButton :issue-name="issue.name" :subject="issue.subject" :status="status" :api="API" />
+				<IssueChatButton :record-name="issue.name" :subject="issue.subject" :status="status" :api="API" />
 			</div>
 		</div>
 	</Teleport>

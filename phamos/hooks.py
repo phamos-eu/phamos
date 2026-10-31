@@ -353,9 +353,13 @@ doc_events = {
     "Lead Data": {
         "after_insert": "phamos.events.lead_data.notify_lead_data_created_via_raven_dm"
     },
-	# Status changes and conversions show up in the Issue chat; Closed archives it (#1621, #1622).
-	"Issue": {"on_update": "phamos.api.issue_chat.on_issue_update"},
-	"Task": {"after_insert": "phamos.api.issue_chat.on_task_insert"},
+	# Status changes and conversions show up in the record chats; closing archives them (#1621, #1622).
+	"Issue": {"on_update": "phamos.api.issue_chat.on_record_update"},
+	"Task": {
+		"after_insert": "phamos.api.issue_chat.on_task_insert",
+		# Status changes show up in the Task chat; Completed / Cancelled archive it (#1779).
+		"on_update": "phamos.api.issue_chat.on_record_update",
+	},
     "Raven Message": {
 		# Mentioned people join the Issue chat before Raven notifies them (#1620).
 		"validate": "phamos.api.issue_chat.add_mentioned_members",
