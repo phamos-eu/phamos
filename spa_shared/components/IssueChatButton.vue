@@ -203,16 +203,20 @@ async function honourOpenRequest() {
 /** Start or join the chat; true when the user is in it afterwards. */
 async function ensure() {
 	if (state.value.channel_id && state.value.is_member) return true
+	const name = props.recordName
 	busy.value = true
 	try {
-		state.value = { ...EMPTY, ...(await call(method.value.ensure, { name: props.recordName })) }
+		const result = await call(method.value.ensure, { name })
+		// Another record was opened meanwhile: its chat must not show this one's (#1794).
+		if (name !== props.recordName) return false
+		state.value = { ...EMPTY, ...result }
 		chatChanged()
 		return true
 	} catch (e) {
-		toast({ title: errorText(e), icon: "x-circle", iconClasses: "text-ink-red-4" })
+		if (name === props.recordName) toast({ title: errorText(e), icon: "x-circle", iconClasses: "text-ink-red-4" })
 		return false
 	} finally {
-		busy.value = false
+		if (name === props.recordName) busy.value = false
 	}
 }
 
@@ -235,6 +239,7 @@ watch(
 	() => props.recordName,
 	() => {
 		drawerOpen.value = false
+		busy.value = false
 		// Keep `enabled`, so the column and its Raven frame stay while the next record loads.
 		state.value = { ...EMPTY, enabled: state.value.enabled }
 		loading.value = true

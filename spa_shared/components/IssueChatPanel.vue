@@ -112,7 +112,7 @@ import { computed, onBeforeUnmount, onMounted, ref, watch } from "vue"
 import { useRouter } from "vue-router"
 import { Button, FeatherIcon } from "frappe-ui"
 import { __ } from "@spa/utils/i18n.js"
-import { injectEmbedStyle, installGuard, watchThreadMarks } from "@spa/utils/ravenEmbed.js"
+import { injectEmbedStyle, installGuard, routeFrame, watchThreadMarks } from "@spa/utils/ravenEmbed.js"
 import { issueChatStore } from "@spa/issueChatStore.js"
 
 const props = defineProps({
@@ -180,14 +180,15 @@ watch(
 	}
 )
 
-// Point the running Raven at another channel: move its history and let its router follow.
+// Point the running Raven at another channel and let its router follow. It replaces the frame's
+// entry, as the cockpit replaces its own route: a new entry per record made the browser's Back
+// land on the previous record's chat, which the guard then opened in a new window (#1794).
 function switchChannel(url) {
 	const win = frame.value?.contentWindow
 	try {
 		removeGuard?.()
 		removeGuard = null
-		win.History.prototype.pushState.call(win.history, null, "", channelPath(url))
-		win.dispatchEvent(new win.PopStateEvent("popstate", { state: null }))
+		routeFrame(win, channelPath(url), { replace: true })
 		removeGuard = installGuard(win, channelPath(url), onLeave, onThreadOpened)
 	} catch (e) {
 		frameReady = false
@@ -234,8 +235,7 @@ function openThread(threadId) {
 	const win = frame.value?.contentWindow
 	if (!win || !props.url) return
 	try {
-		win.history.pushState(null, "", `${channelPath(props.url)}/thread/${encodeURIComponent(threadId)}`)
-		win.dispatchEvent(new win.PopStateEvent("popstate", { state: null }))
+		routeFrame(win, `${channelPath(props.url)}/thread/${encodeURIComponent(threadId)}`)
 	} catch (e) {
 		return
 	}
@@ -264,7 +264,7 @@ function onLeave(kind, href) {
 	// when it belongs to this cockpit, otherwise in a new tab.
 	const url = new URL(href)
 	const base = router.options.history.base || ""
-	if (base && url.pathname.startsWith(base)) {
+	if (base && (url.pathname === base || url.pathname.startsWith(`${base}/`))) {
 		close()
 		router.push(url.pathname.slice(base.length) + url.search + url.hash)
 	} else {
@@ -321,12 +321,23 @@ function focusTarget(target) {
 		return
 	}
 	try {
-		win.history.pushState(null, "", targetPath(target))
-		win.dispatchEvent(new win.PopStateEvent("popstate", { state: null }))
+		routeFrame(win, targetPath(target))
 	} catch (e) {
 		// The chat still shows; only the jump is lost.
 	}
 }
+
+// The overlay drops its iframe when it closes: forget that window, so the next open waits for
+// the new frame's load instead of routing into a dead one (the jump to a message got lost).
+watch(shown, (isShown) => {
+	if (isShown) return
+	removeGuard?.()
+	removeGuard = null
+	threadMarks?.stop()
+	threadMarks = null
+	frameReady = false
+	if (props.url) frameUrl.value = props.url
+})
 
 defineExpose({ focusTarget, inColumn })
 

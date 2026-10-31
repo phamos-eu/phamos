@@ -244,6 +244,7 @@ after_migrate = [
 	"phamos.cockpits.setup.after_migrate",  # ToDo fields (#1553), Task Owner on Task (#1751)
 	"phamos.setup.accounting_receipt.ensure_accounting_receipt_setup",  # AI Accountant role, user, bot
 	"phamos.marketing.setup.after_migrate",  # Lead Source "Event" for event registrations
+	"phamos.api.issue_chat.add_raven_indexes",  # record chats look channels up by record (#1794)
 ]
 
 # Uninstallation
