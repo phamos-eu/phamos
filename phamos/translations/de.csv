@@ -1624,3 +1624,4 @@ Could not read {0} from {1} (HTTP {2}).,{0} konnte nicht von {1} gelesen werden 
 Nothing new to import.,Nichts Neues zu importieren.
 The import failed and was undone. The error is in the log.,Der Import ist fehlgeschlagen und wurde rückgängig gemacht. Der Fehler steht im Protokoll.
 "{0}: came from {1}, but they belong to different people; link left out","{0}: entstand aus {1}, gehört aber einer anderen Person; Verknüpfung weggelassen"
+Filter by assignee,Nach Zuständigen filtern
