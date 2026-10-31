@@ -18,6 +18,7 @@ from phamos.api import personal_challenges
 from phamos.api import personal_day_plan
 from phamos.api import personal_checkin
 from phamos.api import personal_contracts
+from phamos.api import personal_ideas
 from phamos.api import personal_leave
 from phamos.api import personal_timer
 from phamos.api import personal_timeline
@@ -728,3 +729,66 @@ def get_issue_dashboard():
 def get_task_dashboard():
 	"""Numbers about my Tasks and my hours (#1604)."""
 	return personal_work_dashboard.get_task_dashboard()
+
+
+# Ideas (phamos/phamos#1771) — logic in phamos.api.personal_ideas.
+
+
+@frappe.whitelist()
+def get_ideas(stage=None, include_closed=0):
+	"""My ideas, recently edited first; Harvest and Compost only on request."""
+	return personal_ideas.get_ideas(stage=stage, include_closed=include_closed)
+
+
+@frappe.whitelist()
+def get_idea(name):
+	return personal_ideas.get_idea(name)
+
+
+@frappe.whitelist()
+def get_idea_options():
+	"""Stages, their jobs and the feelings, so the cockpit shows the server's words."""
+	return personal_ideas.get_idea_options()
+
+
+@frappe.whitelist()
+def idea_word_goal(name, aim_choice="similar"):
+	return personal_ideas.word_goal(name, aim_choice=aim_choice)
+
+
+@frappe.whitelist(methods=["POST"])
+def create_idea(title=None, content=None, spawned_from=None):
+	return personal_ideas.create_idea(title=title, content=content, spawned_from=spawned_from)
+
+
+@frappe.whitelist(methods=["POST"])
+def update_idea(name, title=None, content=None, stage=None, modified=None):
+	"""Autosave target with an optimistic lock on `modified`."""
+	return personal_ideas.update_idea(name, title=title, content=content, stage=stage, modified=modified)
+
+
+@frappe.whitelist(methods=["POST"])
+def snapshot_idea(name):
+	"""The editor was left: record the edit as one Version row."""
+	return personal_ideas.snapshot_idea(name)
+
+
+@frappe.whitelist(methods=["POST"])
+def complete_idea_writing_session(
+	name, started_on, words_written, word_goal, aim_choice, felt_productive="", content=None
+):
+	return personal_ideas.complete_writing_session(
+		name,
+		started_on=started_on,
+		words_written=words_written,
+		word_goal=word_goal,
+		aim_choice=aim_choice,
+		felt_productive=felt_productive,
+		content=content,
+	)
+
+
+@frappe.whitelist(methods=["POST"])
+def capture_side_idea(parent, text, name=None):
+	"""A thought caught while writing becomes a child idea."""
+	return personal_ideas.capture_side_idea(parent, text, name=name)

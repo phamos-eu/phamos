@@ -1480,3 +1480,52 @@ Estimated time must be more than 0 hours,Die geschätzte Zeit muss mehr als 0 St
 Task Owner is required,Aufgabenverantwortliche/r ist erforderlich
 Priority is required,Priorität ist erforderlich
 Task Type {0} does not exist,Aufgabentyp {0} existiert nicht
+Idea,Idee
+Ideas,Ideen
+Idea Writing Session,Schreibsitzung
+Spawned From,Entstanden aus
+The idea this one came out of.,"Die Idee, aus der diese entstanden ist."
+Last Session Words,Wörter der letzten Sitzung
+Harvested On,Geerntet am
+Plain-text excerpt of the content for lists.,Kurzfassung des Inhalts als Text für Listen.
+Last Snapshot,Letzter Stand
+Snapshot Title,Titel im letzten Stand
+Snapshot Stage,Phase im letzten Stand
+Snapshot Content,Inhalt im letzten Stand
+Last Snapshot On,Letzter Stand am
+Started On,Begonnen am
+Ended On,Beendet am
+Duration (Minutes),Dauer (Minuten)
+Words Written,Geschriebene Wörter
+Word Goal,Wortziel
+Aim,Ziel
+Felt Productive,Gefühl
+Outcome,Ergebnis
+Seed,Samen
+Sprout,Spross
+Seedling,Sämling
+Young plant,Jungpflanze
+Growing,Wachsend
+Mature,Reif
+Harvest,Ernte
+Compost,Kompost
+Capture anything; no commitment,Alles festhalten; keine Verpflichtung
+First filter: keep what still interests you,"Erster Filter: behalten, was dich noch interessiert"
+Clarify the point in a few sentences,Den Kern in wenigen Sätzen klären
+Structure emerging,Struktur entsteht
+Serious candidates,Ernsthafte Kandidaten
+The one you write deeply,"Die eine, an der du tief schreibst"
+Finished,Fertig
+Set aside; it may feed something later,Beiseitegelegt; vielleicht nährt sie später etwas anderes
+Productive,Produktiv
+Mixed,Gemischt
+Not really,Nicht wirklich
+Untitled idea,Unbenannte Idee
+Unknown stage: {0},Unbekannte Phase: {0}
+An idea cannot come from itself.,Eine Idee kann nicht aus sich selbst entstehen.
+This idea is not yours.,Diese Idee gehört dir nicht.
+Idea {0} not found,Idee {0} nicht gefunden
+Unknown aim: {0},Unbekanntes Ziel: {0}
+Unknown feeling: {0},Unbekanntes Gefühl: {0}
+The session cannot start in the future.,Die Sitzung kann nicht in der Zukunft beginnen.
+This idea did not come from {0}.,Diese Idee ist nicht aus {0} entstanden.

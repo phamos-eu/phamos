@@ -86,3 +86,23 @@ SPONTANEOUS_MICRO_MAX = 2
 CHECKIN_DEVICE_ID = "Personal Cockpit"
 CHECKIN_UNDO_SECONDS = 10
 CHECKIN_REVOKE_SECONDS = 60
+
+# Ideas (#1771): the stages a note matures through and what each one asks for.
+IDEA_STAGES = ("Seed", "Sprout", "Seedling", "Young plant", "Growing", "Mature", "Harvest", "Compost")
+IDEA_CLOSED_STAGES = ("Harvest", "Compost")  # out of the default list
+IDEA_STAGE_JOBS = {
+	"Seed": "Capture anything; no commitment",
+	"Sprout": "First filter: keep what still interests you",
+	"Seedling": "Clarify the point in a few sentences",
+	"Young plant": "Structure emerging",
+	"Growing": "Serious candidates",
+	"Mature": "The one you write deeply",
+	"Harvest": "Finished",
+	"Compost": "Set aside; it may feed something later",
+}
+IDEA_SUMMARY_LENGTH = 200
+IDEA_TITLE_LENGTH = 140
+IDEA_SNAPSHOT_MINUTES = 10  # a Version row at most this often while only the content changes
+IDEA_DEFAULT_WORD_BASE = 300  # aim base before the first writing session
+IDEA_AIM_FACTORS = {"more": 1.15, "similar": 1.0, "less": 0.85}
+IDEA_FEELINGS = ("Productive", "Mixed", "Not really")
