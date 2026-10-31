@@ -239,3 +239,25 @@ class TestEmploymentContract(FrappeTestCase):
 		doc.reload()
 		self.assertEqual(doc.conversion_rate, 1)
 		self.assertEqual(doc.base_monthly_gross, 2500)
+
+	# Company and currency follow the employee (found in the version-15 release review)
+
+	def test_company_follows_employee(self):
+		other = frappe.db.get_value("Company", {"name": ("!=", self.company)}, "name")
+		if not other:
+			raise unittest.SkipTest("needs a second company")
+		doc = self.contract("2030-01-01", submit=False, company=other)
+		self.assertEqual(doc.company, self.company)
+
+	def test_currency_change_on_draft_takes_new_rate(self):
+		company_currency = frappe.get_cached_value("Company", self.company, "default_currency")
+		first, second = [c for c in ("USD", "EUR", "INR", "GBP") if c != company_currency][:2]
+		self.exchange_rate(first, company_currency, "2030-03-01", 0.9)
+		self.exchange_rate(second, company_currency, "2030-03-01", 0.5)
+		doc = self.contract("2030-03-01", submit=False, currency=first)
+		self.assertAlmostEqual(doc.conversion_rate, 0.9)
+
+		doc.currency = second
+		doc.save()
+		self.assertAlmostEqual(doc.conversion_rate, 0.5)
+

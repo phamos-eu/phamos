@@ -29,6 +29,7 @@ CAPACITY_FIELDS = (
 
 class EmploymentContract(Document):
 	def validate(self):
+		self.set_company_from_employee()
 		self.validate_dates()
 		self.validate_fte()
 		self.calculate_amounts()
@@ -86,6 +87,16 @@ class EmploymentContract(Document):
 				self.precision("monthly_gross"),
 			)
 
+	def set_company_from_employee(self):
+		"""A contract is always in its employee's company.
+
+		Frappe fills a new document's Company from the user's default before fetch_from can
+		run, so without this a contract for an employee of another company would land in the
+		user's default company, with that company's currency and expense accounts.
+		"""
+		if self.employee:
+			self.company = frappe.db.get_value("Employee", self.employee, "company")
+
 	def set_company_currency_amounts(self):
 		"""Convert the monthly gross into company currency at the contract's planning rate.
 
@@ -96,6 +107,13 @@ class EmploymentContract(Document):
 		self.company_currency = frappe.get_cached_value("Company", self.company, "default_currency")
 		if not self.currency:
 			self.currency = self.company_currency
+		if (
+			not self.is_new()
+			and self.has_value_changed("currency")
+			and not self.has_value_changed("conversion_rate")
+		):
+			# The stored rate belongs to the old currency; take the new currency's default.
+			self.conversion_rate = 0
 		if self.currency == self.company_currency:
 			self.conversion_rate = 1
 		elif flt(self.conversion_rate) <= 0:

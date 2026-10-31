@@ -158,9 +158,11 @@ def save_contract(values, name=None, submit=0):
 		doc = frappe.new_doc(DOCTYPE)
 		doc.update(clean)
 
-	if doc.employee and not doc.company:
+	# New documents come pre-filled with the user's default company and the site's default
+	# currency; a contract belongs to the employee's company and starts in its currency.
+	if doc.employee:
 		doc.company = frappe.db.get_value("Employee", doc.employee, "company")
-	if doc.company and not doc.currency:
+	if doc.is_new() and doc.company and not values.get("currency"):
 		doc.currency = frappe.get_cached_value("Company", doc.company, "default_currency")
 
 	doc.save()
