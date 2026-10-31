@@ -1,0 +1,131 @@
+{
+ "actions": [],
+ "autoname": "hash",
+ "creation": "2026-10-31 10:00:00.000000",
+ "description": "One writing session on an Idea (#1771). Private: only the user sees their own sessions.",
+ "doctype": "DocType",
+ "engine": "InnoDB",
+ "field_order": [
+  "user",
+  "idea",
+  "column_break_time",
+  "started_on",
+  "ended_on",
+  "duration_mins",
+  "section_outcome",
+  "words_written",
+  "word_goal",
+  "column_break_feel",
+  "aim_choice",
+  "felt_productive"
+ ],
+ "fields": [
+  {
+   "fieldname": "user",
+   "fieldtype": "Link",
+   "label": "User",
+   "options": "User",
+   "reqd": 1,
+   "read_only": 1,
+   "in_list_view": 1,
+   "in_standard_filter": 1,
+   "search_index": 1
+  },
+  {
+   "fieldname": "idea",
+   "fieldtype": "Link",
+   "label": "Idea",
+   "options": "Idea",
+   "reqd": 1,
+   "read_only": 1,
+   "in_list_view": 1,
+   "search_index": 1
+  },
+  {
+   "fieldname": "column_break_time",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "started_on",
+   "fieldtype": "Datetime",
+   "label": "Started On",
+   "reqd": 1,
+   "read_only": 1,
+   "in_list_view": 1
+  },
+  {
+   "fieldname": "ended_on",
+   "fieldtype": "Datetime",
+   "label": "Ended On",
+   "read_only": 1
+  },
+  {
+   "fieldname": "duration_mins",
+   "fieldtype": "Int",
+   "label": "Duration (Minutes)",
+   "read_only": 1
+  },
+  {
+   "fieldname": "section_outcome",
+   "fieldtype": "Section Break",
+   "label": "Outcome"
+  },
+  {
+   "fieldname": "words_written",
+   "fieldtype": "Int",
+   "label": "Words Written",
+   "read_only": 1,
+   "in_list_view": 1
+  },
+  {
+   "fieldname": "word_goal",
+   "fieldtype": "Int",
+   "label": "Word Goal",
+   "read_only": 1
+  },
+  {
+   "fieldname": "column_break_feel",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "aim_choice",
+   "fieldtype": "Select",
+   "label": "Aim",
+   "options": "\nmore\nsimilar\nless",
+   "read_only": 1
+  },
+  {
+   "fieldname": "felt_productive",
+   "fieldtype": "Select",
+   "label": "Felt Productive",
+   "options": "\nProductive\nMixed\nNot really",
+   "read_only": 1
+  }
+ ],
+ "links": [],
+ "modified": "2026-10-31 10:00:00.000000",
+ "modified_by": "Administrator",
+ "module": "Cockpits",
+ "name": "Idea Writing Session",
+ "naming_rule": "Random",
+ "owner": "Administrator",
+ "permissions": [
+  {
+   "role": "System Manager",
+   "read": 1,
+   "write": 1,
+   "create": 1,
+   "delete": 1,
+   "report": 1,
+   "export": 1,
+   "print": 1,
+   "email": 1,
+   "share": 1
+  }
+ ],
+ "sort_field": "creation",
+ "sort_order": "DESC",
+ "states": [],
+ "title_field": "idea",
+ "track_changes": 0
+}
