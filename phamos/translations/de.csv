@@ -1633,3 +1633,5 @@ Read the chat of this finished Task,Den Chat dieser abgeschlossenen Aufgabe lese
 Open the Raven chat of this Task,Den Raven-Chat dieser Aufgabe öffnen
 It follows on from Issue {0}.,Er schließt an die Anfrage {0} an.
 Template Tasks have no chat.,Vorlage-Aufgaben haben keinen Chat.
+You were mentioned,Sie wurden erwähnt
+You were mentioned {0} times,Sie wurden {0}-mal erwähnt
