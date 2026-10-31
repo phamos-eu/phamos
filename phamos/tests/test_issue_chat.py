@@ -362,6 +362,43 @@ class TestIssueChat(FrappeTestCase):
 		frappe.set_user(OWNER)
 		self.assertNotIn(LATECOMER, self._assigned())
 		self.assertEqual(frappe.local.message_log, [])
+		# Nor does the mention bring them into the chat (#1794).
+		self.assertNotIn(LATECOMER, _members(channel_id))
+
+	def test_keeping_a_mention_unread_never_blocks_the_message(self):
+		channel_id = pc.ensure_issue_chat(self.issue.name)["channel_id"]
+		with patch("phamos.api.issue_chat.get_datetime", side_effect=Exception("boom")):
+			message = _send(channel_id, f"{_mention(LATECOMER)} still sent")
+		self.assertTrue(frappe.db.exists("Raven Message", message.name))
+		self.assertIn(LATECOMER, self._assigned())
+
+	def test_chat_states_refuse_more_than_a_list_shows(self):
+		names = [f"ISS-NOPE-{i}" for i in range(issue_chat.MAX_STATE_NAMES + 1)]
+		with self.assertRaises(frappe.ValidationError):
+			pc.get_issue_chat_states(frappe.as_json(names))
+
+	def test_chat_states_leave_out_records_the_user_cannot_read(self):
+		pc.ensure_issue_chat(self.issue.name)
+		frappe.set_user(NO_READER)  # no read on Issue at all: refused, nothing about the chat leaks
+		with self.assertRaises(frappe.PermissionError):
+			issue_chat.get_chat_states("Issue", [self.issue.name])
+
+	def test_channel_link_is_indexed_after_migrate(self):
+		issue_chat.add_raven_indexes()
+		columns = {
+			row.Column_name
+			for row in frappe.db.sql("show index from `tabRaven Channel`", as_dict=True)
+		}
+		self.assertTrue({"linked_doctype", "linked_document"} <= columns)
+
+	def test_starting_twice_gives_one_chat(self):
+		first = pc.ensure_issue_chat(self.issue.name)["channel_id"]
+		frappe.set_user(ASSIGNEE)
+		self.assertEqual(pc.ensure_issue_chat(self.issue.name)["channel_id"], first)
+		self.assertEqual(
+			frappe.db.count("Raven Channel", {"linked_doctype": "Issue", "linked_document": self.issue.name}),
+			1,
+		)
 
 	def test_mentions_outside_issue_chats_are_left_to_raven(self):
 		other = frappe.get_doc(
