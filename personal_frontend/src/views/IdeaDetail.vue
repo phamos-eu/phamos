@@ -89,7 +89,7 @@
 											class="flex items-center justify-between gap-2 rounded px-1.5 py-1 text-sm text-ink-gray-8 hover:bg-surface-gray-2"
 										>
 											<span class="truncate">{{ child.title }}</span>
-											<StageIcon :name="child.stage" class="h-3.5 w-3.5 shrink-0 text-ink-gray-5" :title="__(child.stage)" />
+											<span class="shrink-0 text-xs text-ink-gray-5">{{ __(child.stage) }}</span>
 										</router-link>
 									</li>
 								</ul>
