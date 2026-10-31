@@ -1565,3 +1565,32 @@ Aged {0} days,Seit {0} Tagen
 Aged {0} weeks,Seit {0} Wochen
 Aged {0} months,Seit {0} Monaten
 1 idea came out of it,1 Idee ist daraus entstanden
+Start writing,Schreiben beginnen
+Writing,Schreiben
+Writing session,Schreibsitzung
+Last time: {0} words,Letztes Mal: {0} Wörter
+First session,Erste Sitzung
+More than last time,Mehr als letztes Mal
+About the same,Etwa gleich viel
+Less than last time,Weniger als letztes Mal
+Goal: {0} words,Ziel: {0} Wörter
+Not now,Nicht jetzt
+{0} of {1} words,{0} von {1} Wörtern
+Complete,Abschließen
+How did it feel?,Wie hat es sich angefühlt?
+Back to writing,Zurück zum Schreiben
+Back to the idea,Zurück zur Idee
+"Write. Nothing else is on this screen.","Schreib. Sonst ist nichts auf diesem Bildschirm."
+Side idea,Nebenidee
+"Something else came up? Park it here, it becomes its own idea.","Kam dir etwas anderes in den Sinn? Parke es hier, es wird zu einer eigenen Idee."
+First line becomes the title…,Die erste Zeile wird zum Titel …
+Another one,Noch eine
+Could not save the side idea,Die Nebenidee konnte nicht gespeichert werden
+Session saved: {0} words,Sitzung gespeichert: {0} Wörter
+Could not save the session,Die Sitzung konnte nicht gespeichert werden
+This idea is closed. Take it up again to write on it.,"Diese Idee ist abgeschlossen. Nimm sie wieder auf, um daran zu schreiben."
+"Last session: {0} words, {1}","Letzte Sitzung: {0} Wörter, {1}"
+{0} sessions so far,Bisher {0} Sitzungen
+Writing an idea,Eine Idee schreiben
+Finish the session (again: back to writing),Sitzung beenden (nochmal: zurück zum Schreiben)
+Not saved,Nicht gespeichert

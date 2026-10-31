@@ -31,7 +31,10 @@
 						/>
 						<div class="flex items-center gap-3 pt-2">
 							<DocSyncBanner :autosave="autosave" />
-							<slot name="actions" />
+							<Button v-if="!closed" variant="solid" @click="startWriting">
+								<template #prefix><FeatherIcon name="edit-3" class="h-4 w-4" /></template>
+								{{ __("Start writing") }}
+							</Button>
 						</div>
 					</div>
 
@@ -76,7 +79,11 @@
 						</section>
 
 						<aside class="flex flex-col gap-4">
-							<slot name="writing" :idea="idea" />
+							<div v-if="idea.last_session" class="rounded-lg border border-outline-gray-2 bg-surface-white p-3 text-xs text-ink-gray-6">
+								<div class="mb-0.5 text-sm font-medium text-ink-gray-9">{{ __("Writing") }}</div>
+								{{ __("Last session: {0} words, {1}", [idea.last_session.words_written, formatDatetime(idea.last_session.started_on)]) }}
+								<div v-if="idea.sessions_count > 1">{{ __("{0} sessions so far", [idea.sessions_count]) }}</div>
+							</div>
 							<div class="rounded-lg border border-outline-gray-2 bg-surface-white p-3">
 								<div class="mb-1 text-sm font-medium text-ink-gray-9">{{ __("Ideas that came out of this one") }}</div>
 								<p v-if="!idea.children.length" class="mb-2 text-xs text-ink-gray-5">
@@ -133,7 +140,7 @@
 
 <script setup>
 import { computed, nextTick, onMounted, ref, watch } from "vue"
-import { onBeforeRouteLeave, onBeforeRouteUpdate, useRoute } from "vue-router"
+import { onBeforeRouteLeave, onBeforeRouteUpdate, useRoute, useRouter } from "vue-router"
 import { Badge, call } from "frappe-ui"
 import DocSyncBanner from "@spa/components/DocSyncBanner.vue"
 import RichTextField from "@spa/components/RichTextField.vue"
@@ -141,6 +148,7 @@ import StageIcon from "@spa/components/StageIcon.vue"
 import StageSteps from "@spa/components/StageSteps.vue"
 import { useAutosaveDoc } from "@spa/composables/useAutosaveDoc.js"
 import { useUserRealtime } from "@spa/composables/useUserRealtime.js"
+import { formatDatetime } from "@spa/utils/datetime.js"
 import { deskRecordUrl } from "@spa/utils/deskUrl.js"
 import { __ } from "@spa/utils/i18n.js"
 import { notify } from "@spa/utils/notify.js"
@@ -150,12 +158,14 @@ import { ageLabel, applyIdea, loadIdeaOptions, loadIdeas, stageJob, stageSteps }
 const props = defineProps({ name: { type: String, required: true } })
 const API = spaConfig.api
 const route = useRoute()
+const router = useRouter()
 
 const idea = ref(null)
 const error = ref("")
 const titleInput = ref(null)
 const steps = computed(() => stageSteps())
 const composted = computed(() => autosave.draft.stage === "Compost")
+const closed = computed(() => ["Harvest", "Compost"].includes(autosave.draft.stage))
 
 function adopt(doc) {
 	idea.value = doc
@@ -208,6 +218,11 @@ async function onTitleBlur() {
 async function onContentBlur() {
 	await autosave.setFocused("content", false)
 	snapshot()
+}
+
+async function startWriting() {
+	await snapshot()
+	router.push({ name: "IdeaWrite", params: { name: idea.value.name } })
 }
 
 function setStage(stage) {
