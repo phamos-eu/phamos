@@ -31,6 +31,19 @@
 			{{ __("Time limit") }}
 		</Button>
 
+		<!-- Closed but not submitted (version-15: made in Desk; submitting happens there) -->
+		<Button
+			v-else-if="session.state === 'stopped'"
+			size="sm"
+			variant="subtle"
+			theme="orange"
+			:title="__('Submit {0} in Desk', [session.name])"
+			@click="openDesk(session.desk_url)"
+		>
+			<template #prefix><FeatherIcon name="alert-triangle" class="h-4 w-4" /></template>
+			{{ __("Not submitted") }}
+		</Button>
+
 		<!-- Running or paused -->
 		<template v-else>
 			<Popover placement="bottom-end">
@@ -229,7 +242,7 @@ watch(
 	() => timer.stopRequest,
 	(request) => {
 		if (!request) return
-		if (!session.value || session.value.state === "limit_exceeded") return settleStopRequest(true)
+		if (!session.value || ["limit_exceeded", "stopped"].includes(session.value.state)) return settleStopRequest(true)
 		showStop.value = true
 	}
 )

@@ -32,10 +32,6 @@ RECENT_PROJECTS = 5
 # version-15 adaptation: booking limits per Implementation (develop b0c043e7) are not released
 # here, so a stop is always submitted directly and the "limit exceeded" decision never comes up.
 # These stand-ins keep the cockpit API identical; the real functions arrive with that release.
-def compute_time_limit_status(doc):
-	return {"exceeds": False}
-
-
 def submit_at_available_hours(name):
 	frappe.throw(_("Booking limits are not available on this site yet."))
 
@@ -113,11 +109,11 @@ def _session():
 	doc = frappe.get_doc(DOCTYPE, session["name"])
 	rows = list(doc.item)
 	state = session["session_state"]
-	limit = None
 	if rows and all(row.to_time for row in rows) and doc.result:
-		# A stop that ran into the implementation's time limit: saved, not submitted.
-		state = "limit_exceeded"
-		limit = compute_time_limit_status(doc)
+		# version-15 adaptation: with booking limits a stop that ran into the time limit ends
+		# here ("limit_exceeded"). Without them, only a record closed in Desk but not submitted
+		# does; the cockpit sends the user to Desk to submit it (#1767).
+		state = "stopped"
 	project = frappe.db.get_value(
 		"Project", doc.project, ["project_name", "percent_billable"], as_dict=True
 	) or frappe._dict()
@@ -142,7 +138,7 @@ def _session():
 		"activity_type": doc.activity_type,
 		"gitlab_issue": doc.gitlab_issue,
 		"gitlab_issue_title": frappe.db.get_value("GitLab Issue", doc.gitlab_issue, "title") if doc.gitlab_issue else None,
-		"limit": limit,
+		"limit": None,
 		"break_goal": (plan or {}).get("goal") if state == "paused" else None,
 		"break_expected": cint((plan or {}).get("expected_seconds")) if state == "paused" else 0,
 		"desk_url": f"/app/timesheet-record/{doc.name}",

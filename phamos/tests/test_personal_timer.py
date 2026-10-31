@@ -242,6 +242,17 @@ class TestPersonalTimer(FrappeTestCase):
 			pc.continue_timer_with_available_hours(name)
 		submit.assert_called_once_with(name)
 
+	def test_closed_but_not_submitted_is_shown_as_stopped(self):
+		# version-15 (#1767): a record closed in Desk but not submitted is no time-limit case.
+		name = self._start()["session"]["name"]
+		for row in frappe.get_all("Timesheet Record Item", filters={"parent": name}, pluck="name"):
+			frappe.db.set_value("Timesheet Record Item", row, "to_time", now_datetime())
+		frappe.db.set_value("Timesheet Record", name, "result", "Closed in Desk")
+		state = pc.get_timer_state()
+		self.assertEqual((state["session"]["name"], state["session"]["state"]), (name, "stopped"))
+		self.assertIsNone(state["session"]["limit"])
+		self.assertFalse(state["can_start"])
+
 	def test_options_list_my_and_recent_projects(self):
 		frappe.get_doc(
 			{"doctype": "ToDo", "allocated_to": USER, "reference_type": "Project", "reference_name": self.other_project, "description": "Assigned"}
