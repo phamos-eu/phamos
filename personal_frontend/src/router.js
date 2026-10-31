@@ -8,6 +8,7 @@ import CheckinsList from "./views/CheckinsList.vue"
 import MyLeave from "./views/MyLeave.vue"
 import Ideas from "./views/Ideas.vue"
 import IdeaDetail from "./views/IdeaDetail.vue"
+import IdeaWrite from "./views/IdeaWrite.vue"
 import IssuesHome from "./views/IssuesHome.vue"
 import TasksHome from "./views/TasksHome.vue"
 import TodosPlan from "./views/TodosPlan.vue"
@@ -51,6 +52,7 @@ const router = createSpaRouter({
 		// Ideas (#1771)
 		{ path: "/ideas", name: "Ideas", component: Ideas },
 		{ path: "/ideas/:name", name: "IdeaDetail", component: IdeaDetail, props: true },
+		{ path: "/ideas/:name/write", name: "IdeaWrite", component: IdeaWrite, props: true },
 		// Own start pages for Issues and Tasks (#1604); they replace the shared empty ones.
 		{ path: "/issues", name: "Issues", component: IssuesHome },
 		{ path: "/tasks", name: "Tasks", component: TasksHome },
