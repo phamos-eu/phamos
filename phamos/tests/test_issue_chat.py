@@ -10,6 +10,7 @@ from unittest.mock import patch
 import frappe
 from frappe.desk.form.assign_to import add as add_assignment
 from frappe.desk.form.assign_to import remove as remove_assignment
+from frappe.desk.form.load import get_assignments
 from frappe.tests.utils import FrappeTestCase
 
 from phamos.api import accounting_spa
@@ -284,6 +285,67 @@ class TestIssueChat(FrappeTestCase):
 		channel_id = pc.ensure_issue_chat(self.issue.name)["channel_id"]
 		_send(channel_id, f"{_mention(NO_READER)} FYI")
 		self.assertNotIn(NO_READER, _members(channel_id))
+
+	def _assigned(self, doctype="Issue", name=None):
+		return {a.get("owner") for a in get_assignments(doctype, name or self.issue.name)}
+
+	def test_mention_assigns_to_the_issue(self):
+		channel_id = pc.ensure_issue_chat(self.issue.name)["channel_id"]
+		self.assertNotIn(LATECOMER, self._assigned())
+
+		_send(channel_id, f"{_mention(LATECOMER)} can you take this?")
+		self.assertIn(LATECOMER, self._assigned())
+		todo = frappe.db.get_value(
+			"ToDo",
+			{"reference_type": "Issue", "reference_name": self.issue.name, "allocated_to": LATECOMER},
+			"description",
+		)
+		self.assertIn("mentioned you in the chat of Issue", todo)
+		# The assignment shows up in the chat like any other.
+		self.assertTrue(any("assigned" in t for t in _system_lines(channel_id)))
+
+		# A second mention does not assign twice.
+		_send(channel_id, f"{_mention(LATECOMER)} ping")
+		self.assertEqual(
+			frappe.db.count(
+				"ToDo",
+				{"reference_type": "Issue", "reference_name": self.issue.name, "allocated_to": LATECOMER, "status": "Open"},
+			),
+			1,
+		)
+
+	def test_mention_in_a_thread_assigns_too(self):
+		from raven.api.threads import create_thread
+
+		channel_id = pc.ensure_issue_chat(self.issue.name)["channel_id"]
+		thread_id = create_thread(_send(channel_id, "Side topic").name)["thread_id"]
+		_send(thread_id, f"{_mention(LATECOMER)} over to you")
+		self.assertIn(LATECOMER, self._assigned())
+
+	def test_mention_in_a_task_chat_assigns_to_the_task(self):
+		task = self._task()
+		channel_id = pc.ensure_task_chat(task.name)["channel_id"]
+		_send(channel_id, f"{_mention(LATECOMER)} please help")
+		self.assertIn(LATECOMER, self._assigned("Task", task.name))
+
+	def test_mention_assigns_nobody_who_cannot_read_and_not_the_sender(self):
+		channel_id = pc.ensure_issue_chat(self.issue.name)["channel_id"]
+		_send(channel_id, f"{_mention(NO_READER)} {_mention(OWNER)} FYI")
+		assigned = self._assigned()
+		self.assertNotIn(NO_READER, assigned)
+		self.assertNotIn(OWNER, assigned)
+		self.assertFalse(frappe.db.exists("DocShare", {"share_name": self.issue.name, "user": NO_READER}))
+
+	def test_sender_who_cannot_read_the_record_assigns_nobody_and_sees_no_error(self):
+		# A member whose read access went away (role removed) can still post in the chat.
+		channel_id = pc.ensure_issue_chat(self.issue.name)["channel_id"]
+		issue_chat._ensure_members(frappe._dict(name=channel_id, workspace=WORKSPACE), [NO_READER])
+		frappe.set_user(NO_READER)
+		frappe.local.message_log = []
+		_send(channel_id, f"{_mention(LATECOMER)} please look")
+		frappe.set_user(OWNER)
+		self.assertNotIn(LATECOMER, self._assigned())
+		self.assertEqual(frappe.local.message_log, [])
 
 	def test_mentions_outside_issue_chats_are_left_to_raven(self):
 		other = frappe.get_doc(

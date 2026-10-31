@@ -31,6 +31,7 @@
 			:title="`${recordName}: ${subject || ''}`"
 			:skipped-users="state.is_member ? state.skipped_users || [] : []"
 			:threads="state.is_member ? state.threads || [] : []"
+			:mention-note="texts.mentionNote"
 			@closed="onPanelClosed"
 			@thread-opened="onThreadOpened"
 		>
@@ -94,6 +95,7 @@ const texts = computed(() =>
 				join: __("Join the Raven chat of this Task"),
 				closed: __("Read the chat of this finished Task"),
 				open: __("Open the Raven chat of this Task"),
+				mentionNote: __("When you send, everyone mentioned who can read this Task joins the chat and is assigned to it."),
 			}
 		: {
 				noChat: __("No chat for this Issue yet."),
@@ -102,6 +104,7 @@ const texts = computed(() =>
 				join: __("Join the Raven chat of this Issue"),
 				closed: __("Read the chat of this closed Issue"),
 				open: __("Open the Raven chat of this Issue"),
+				mentionNote: __("When you send, everyone mentioned who can read this Issue joins the chat and is assigned to it."),
 			}
 )
 

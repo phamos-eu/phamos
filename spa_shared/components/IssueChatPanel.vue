@@ -126,6 +126,8 @@ const props = defineProps({
 	recordName: { type: String, default: "" },
 	/** Threads with unread replies: [{ thread_id, unread, preview, last_sender }] */
 	threads: { type: Array, default: () => [] },
+	/** Shown instead of Raven's "won't be notified" warning for mentions of non-members (#1784) */
+	mentionNote: { type: String, default: "" },
 })
 const emit = defineEmits(["update:open", "closed", "thread-opened"])
 
@@ -202,7 +204,9 @@ watch(threadLabels, () => threadMarks?.refresh())
 
 function startThreadMarks(doc) {
 	threadMarks?.stop()
-	threadMarks = doc?.body ? watchThreadMarks(doc, () => threadLabels.value) : null
+	threadMarks = doc?.body
+		? watchThreadMarks(doc, () => threadLabels.value, () => props.mentionNote)
+		: null
 }
 
 const threadListOpen = ref(false)

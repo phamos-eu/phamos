@@ -623,29 +623,82 @@ def add_mentioned_members(doc, method=None):
 	(it only adds people who are in the parent channel). Only people who can read the record
 	are added; for anyone else Raven's "isn't in this channel" warning stays (#1620).
 	"""
-	if not doc.get("mentions") or doc.message_type == "System" or not is_enabled():
-		return
-	channel = _chat_channel_of(doc.channel_id)
+	channel = _mention_chat(doc)
 	if not channel:
 		return
 	members = set(
 		frappe.get_all("Raven Channel Member", filters={"channel_id": channel.name}, pluck="user_id")
 	)
-	users = []
-	for raven_user in dict.fromkeys(m.user for m in doc.mentions if m.user):
-		if raven_user in members:
-			continue
-		user = frappe.db.get_value("Raven User", {"name": raven_user, "type": "User", "enabled": 1}, "user")
-		if user and frappe.has_permission(
-			channel.linked_doctype, "read", doc=channel.linked_document, user=user
-		):
-			users.append(user)
+	users = [u for u in _mentioned_readers(doc, channel) if _raven_user(u) not in members]
 	if not users:
 		return
 	try:
 		_ensure_members(channel, users)
 	except Exception:
 		frappe.log_error(title=f"Record chat: could not add mentioned users to {channel.name}")
+
+
+def assign_mentioned(doc, method=None):
+	"""Raven Message after_insert: people mentioned in a record chat (or one of its threads) are
+	assigned to the record, so it shows up in their cockpit (#1784).
+
+	Same rule as joining the chat: only people who can read the record. Frappe's assignment would
+	share the record with anyone else, and a mention should not widen access. Runs after the
+	insert, so a message that fails leaves no assignment behind; the assignment's own hook posts
+	"X assigned Y." in the chat. Never blocks the message when the assignment fails.
+	"""
+	channel = _mention_chat(doc)
+	if not channel or doc.get("is_bot_message"):
+		return
+	# Frappe's assignment checks the sender's read permission with frappe.throw, which queues its
+	# error for the client even when caught below. A member who lost access just assigns nobody.
+	if not frappe.has_permission(channel.linked_doctype, "read", doc=channel.linked_document):
+		return
+	assigned = {
+		row.get("owner") for row in get_assignments(channel.linked_doctype, channel.linked_document)
+	}
+	users = [
+		u for u in _mentioned_readers(doc, channel) if u not in assigned and u != doc.owner
+	]
+	if not users:
+		return
+	from frappe.desk.form.assign_to import add as add_assignment
+
+	# One person's assignment failing half-way must not leave a stray ToDo behind.
+	frappe.db.savepoint("assign_mentioned")
+	try:
+		add_assignment(
+			{
+				"assign_to": users,
+				"doctype": channel.linked_doctype,
+				"name": channel.linked_document,
+				"description": _("{0} mentioned you in the chat of {1} {2}.").format(
+					_display_name(doc.owner), _(channel.linked_doctype), channel.linked_document
+				),
+			}
+		)
+	except Exception:
+		frappe.db.rollback(save_point="assign_mentioned")
+		frappe.log_error(title=f"Record chat: could not assign mentioned users in {channel.name}")
+
+
+def _mention_chat(doc):
+	"""The record chat a message with mentions was posted in (or in one of its threads), or None."""
+	if not doc.get("mentions") or doc.message_type == "System" or not is_enabled():
+		return None
+	return _chat_channel_of(doc.channel_id)
+
+
+def _mentioned_readers(doc, channel):
+	"""The users a message mentions who are active Raven users and may read the chat's record."""
+	users = []
+	for raven_user in dict.fromkeys(m.user for m in doc.mentions if m.user):
+		user = frappe.db.get_value("Raven User", {"name": raven_user, "type": "User", "enabled": 1}, "user")
+		if user and frappe.has_permission(
+			channel.linked_doctype, "read", doc=channel.linked_document, user=user
+		):
+			users.append(user)
+	return users
 
 
 def _chat_channel_of(channel_id):

@@ -31,6 +31,12 @@ a[data-phamos-unread]::after {
 	white-space: nowrap;
 }
 .dark a[data-phamos-unread]::after { color: var(--ink-red-1); }
+/* Raven warns above the composer that a mentioned non-member "won't be notified". In a record
+   chat that is wrong: on sending, everyone mentioned who can read the record joins the chat and
+   is assigned (#1620, #1784). That row (Raven's MentionWarningBanner, the one with the info
+   icon) shows our sentence instead; the leave rows stay. */
+[data-phamos-note] > span:last-child { display: none; }
+[data-phamos-note]::after { content: attr(data-phamos-note); }
 @media (min-width: 768px) {
 	/* Channel list next to the chat */
 	[class*="md:w-(--sidebar-width)"] { display: none !important; }
@@ -180,17 +186,33 @@ export function markUnreadThreads(doc, labels) {
 }
 
 /**
- * Keep the marks while Raven renders messages (its list renders as you scroll). `getLabels`
- * is read on every pass, so callers just change what it returns and call the returned
+ * Replace Raven's "isn't in this channel" mention warning with `note` (#1784): the row of its
+ * amber MentionWarningBanner that carries the info icon. Rows about leave keep Raven's text.
+ * @param {Document} doc the frame's document
+ * @param {string} note the sentence to show, or "" to leave Raven's warning alone
+ */
+export function markMentionNotes(doc, note) {
+	for (const icon of doc.querySelectorAll(".bg-surface-amber-2 > div > span > svg.lucide-info")) {
+		const row = icon.parentElement.parentElement
+		if (!note) row.removeAttribute("data-phamos-note")
+		else if (row.getAttribute("data-phamos-note") !== note) row.setAttribute("data-phamos-note", note)
+	}
+}
+
+/**
+ * Keep the marks while Raven renders messages (its list renders as you scroll), and the mention
+ * note while the composer's warning comes and goes. `getLabels` and `getMentionNote` are read
+ * on every pass, so callers just change what it returns and call the returned
  * `refresh`.
  * @returns {{ refresh: () => void, stop: () => void }}
  */
-export function watchThreadMarks(doc, getLabels) {
+export function watchThreadMarks(doc, getLabels, getMentionNote = () => "") {
 	let scheduled = false
 	const win = doc.defaultView
 	const run = () => {
 		scheduled = false
 		markUnreadThreads(doc, getLabels())
+		markMentionNotes(doc, getMentionNote())
 	}
 	const schedule = () => {
 		if (scheduled) return
