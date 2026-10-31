@@ -33,23 +33,20 @@
 							>
 								<span class="truncate text-sm font-medium text-ink-gray-9">{{ row.title }}</span>
 								<p v-if="excerpt(row)" class="line-clamp-2 text-sm text-ink-gray-5">{{ excerpt(row) }}</p>
-								<!-- The stage once: the bar with its name at the end, no extra badge. -->
-								<div class="flex items-center gap-3">
-									<StageSteps
-										class="flex-1"
-										size="compact"
-										:steps="steps"
-										:current="row.stage"
-										:dimmed="row.stage === 'Compost'"
-									/>
-									<span class="w-28 shrink-0 truncate text-right text-xs text-ink-gray-6">{{ stageLabel(row.stage) }}</span>
-								</div>
-								<div class="flex flex-wrap gap-x-3 text-xs text-ink-gray-5">
+								<!-- One info line: age and links on the left, the stage (bar, icon, name) on the right. -->
+								<div class="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-ink-gray-5">
 									<span>{{ ageLabel(row.age_days) }}</span>
 									<span v-if="row.children_count">
 										{{ row.children_count === 1 ? __("1 idea came out of it") : __("{0} ideas came out of it", [row.children_count]) }}
 									</span>
 									<span v-if="row.spawned_from_title">{{ __("from {0}", [row.spawned_from_title]) }}</span>
+									<span class="ml-auto flex items-center gap-2 text-ink-gray-6">
+										<div class="w-32 shrink-0">
+											<StageSteps size="compact" :steps="steps" :current="row.stage" :dimmed="row.stage === 'Compost'" />
+										</div>
+										<StageIcon :name="row.stage" class="h-3.5 w-3.5 shrink-0" />
+										<span class="whitespace-nowrap">{{ __(row.stage) }}</span>
+									</span>
 								</div>
 							</router-link>
 						</li>
@@ -64,12 +61,13 @@
 import { computed, onMounted, ref, watch } from "vue"
 import { useRoute, useRouter } from "vue-router"
 import { TabButtons } from "frappe-ui"
+import StageIcon from "@spa/components/StageIcon.vue"
 import StageSteps from "@spa/components/StageSteps.vue"
 import { useUserRealtime } from "@spa/composables/useUserRealtime.js"
 import { __ } from "@spa/utils/i18n.js"
 import { summaryWithoutTitle } from "@spa/utils/ideaSummary.js"
 import { notify } from "@spa/utils/notify.js"
-import { ageLabel, stageLabel, createIdea, ideas, loadIdeaOptions, loadIdeas, stageSteps } from "../ideasStore.js"
+import { ageLabel, createIdea, ideas, loadIdeaOptions, loadIdeas, stageSteps } from "../ideasStore.js"
 
 const route = useRoute()
 const router = useRouter()
@@ -81,7 +79,7 @@ const steps = computed(() => stageSteps())
 // closed ideas (they replace the former "Show harvested and composted" checkbox).
 const stageButtons = computed(() => [
 	{ label: __("Open"), value: "" },
-	...(ideas.options?.stages || []).map((s) => ({ label: stageLabel(s), value: s })),
+	...(ideas.options?.stages || []).map((s) => ({ label: __(s), value: s })),
 ])
 const excerpt = (row) => summaryWithoutTitle(row.summary, row.title)
 const rows = computed(() => (stageFilter.value ? ideas.rows.filter((r) => r.stage === stageFilter.value) : ideas.rows))

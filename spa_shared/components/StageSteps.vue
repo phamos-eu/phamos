@@ -10,7 +10,7 @@
 			v-for="(step, index) in steps"
 			:key="step.value"
 			class="stage-step relative flex min-w-0 flex-1 items-center justify-center"
-			:class="[stateClass(index), stepState(index, currentIndex) === 'upcoming' ? '' : 'is-reached']"
+			:class="stateClass(index)"
 			:aria-current="stepState(index, currentIndex) === 'current' ? 'step' : undefined"
 		>
 			<button
@@ -20,12 +20,12 @@
 				:title="step.hint || step.label"
 				@click="emit('select', step.value)"
 			>
-				<span v-if="step.icon" class="stage-step-icon" aria-hidden="true">{{ step.icon }}</span>
+				<StageIcon v-if="icons" :name="step.value" class="stage-step-icon" />
 				<span v-else class="stage-step-no">{{ stepState(index, currentIndex) === "done" ? "✓" : index + 1 }}</span>
 				<span class="truncate">{{ step.label }}</span>
 			</button>
 			<span v-else-if="size === 'full'" class="flex min-w-0 items-center justify-center gap-1.5 px-1" :title="step.hint || step.label">
-				<span v-if="step.icon" class="stage-step-icon" aria-hidden="true">{{ step.icon }}</span>
+				<StageIcon v-if="icons" :name="step.value" class="stage-step-icon" />
 				<span v-else class="stage-step-no">{{ stepState(index, currentIndex) === "done" ? "✓" : index + 1 }}</span>
 				<span class="truncate">{{ step.label }}</span>
 			</span>
@@ -37,15 +37,18 @@
 import { computed } from "vue"
 import { __ } from "@spa/utils/i18n.js"
 import { progress, stepIndex, stepState } from "@spa/utils/stageSteps.js"
+import StageIcon from "./StageIcon.vue"
 
 const props = defineProps({
-	/** [{ value, label, hint?, icon? }] in order; an icon replaces the step number */
+	/** [{ value, label, hint? }] in order */
 	steps: { type: Array, required: true },
 	/** value of the current step; a value off the path shows nothing done */
 	current: { type: String, default: "" },
 	/** "full": numbered chevrons with labels; "compact": a thin bar with a tooltip */
 	size: { type: String, default: "full" },
 	clickable: { type: Boolean, default: false },
+	/** show the stage icon (StageIcon) instead of the step number */
+	icons: { type: Boolean, default: false },
 	dimmed: { type: Boolean, default: false },
 	ariaLabel: { type: String, default: "" },
 })
@@ -86,19 +89,13 @@ function stateClass(index) {
 	border-radius: 0 8px 8px 0;
 	clip-path: polygon(0 0, 100% 0, 100% 100%, 0 100%, 12px 50%);
 }
+/* Compact: plain segments, no chevrons, so the bar fits inside a list row's info line. */
+.stage-steps--compact {
+	gap: 2px;
+}
 .stage-steps--compact .stage-step {
-	height: 6px;
-	margin-right: -3px;
-	clip-path: polygon(0 0, calc(100% - 4px) 0, 100% 50%, calc(100% - 4px) 100%, 0 100%, 4px 50%);
-}
-.stage-steps--compact .stage-step:first-child {
-	border-radius: 3px 0 0 3px;
-	clip-path: polygon(0 0, calc(100% - 4px) 0, 100% 50%, calc(100% - 4px) 100%, 0 100%);
-}
-.stage-steps--compact .stage-step:last-child {
-	margin-right: 0;
-	border-radius: 0 3px 3px 0;
-	clip-path: polygon(0 0, 100% 0, 100% 100%, 0 100%, 4px 50%);
+	height: 4px;
+	border-radius: 2px;
 }
 .stage-step-no {
 	display: inline-grid;
@@ -113,13 +110,8 @@ function stateClass(index) {
 }
 .stage-step-icon {
 	flex-shrink: 0;
-	font-size: 15px;
-	line-height: 1;
-}
-/* Steps not reached yet: the icon waits in gray. */
-.stage-step:not(.is-reached) .stage-step-icon {
-	filter: grayscale(1);
-	opacity: 0.55;
+	width: 16px;
+	height: 16px;
 }
 [aria-current="step"] .stage-step-no {
 	background: rgb(255 255 255 / 20%);

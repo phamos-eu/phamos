@@ -40,13 +40,17 @@
 							:steps="steps"
 							:current="autosave.draft.stage"
 							clickable
+							icons
 							:dimmed="composted"
 							:aria-label="__('Stage')"
 							@select="setStage"
 						/>
 						<div class="flex flex-wrap items-center justify-between gap-2 text-xs">
 							<span class="text-ink-gray-6">
-								<Badge v-if="composted" theme="gray" size="sm" class="mr-1">{{ stageLabel("Compost") }}</Badge>
+								<Badge v-if="composted" theme="gray" size="sm" class="mr-1">
+									<template #prefix><StageIcon name="Compost" class="h-3 w-3" /></template>
+									{{ __("Compost") }}
+								</Badge>
 								{{ stageJob(autosave.draft.stage) }}
 							</span>
 							<button v-if="composted" type="button" class="text-ink-gray-6 underline-offset-2 hover:underline" @click="setStage('Seed')">
@@ -85,7 +89,7 @@
 											class="flex items-center justify-between gap-2 rounded px-1.5 py-1 text-sm text-ink-gray-8 hover:bg-surface-gray-2"
 										>
 											<span class="truncate">{{ child.title }}</span>
-											<span class="shrink-0 text-xs text-ink-gray-5" :title="__(child.stage)">{{ STAGE_ICONS[child.stage] }}</span>
+											<StageIcon :name="child.stage" class="h-3.5 w-3.5 shrink-0 text-ink-gray-5" :title="__(child.stage)" />
 										</router-link>
 									</li>
 								</ul>
@@ -133,6 +137,7 @@ import { onBeforeRouteLeave, onBeforeRouteUpdate, useRoute } from "vue-router"
 import { Badge, call } from "frappe-ui"
 import DocSyncBanner from "@spa/components/DocSyncBanner.vue"
 import RichTextField from "@spa/components/RichTextField.vue"
+import StageIcon from "@spa/components/StageIcon.vue"
 import StageSteps from "@spa/components/StageSteps.vue"
 import { useAutosaveDoc } from "@spa/composables/useAutosaveDoc.js"
 import { useUserRealtime } from "@spa/composables/useUserRealtime.js"
@@ -140,7 +145,7 @@ import { deskRecordUrl } from "@spa/utils/deskUrl.js"
 import { __ } from "@spa/utils/i18n.js"
 import { notify } from "@spa/utils/notify.js"
 import spaConfig from "../config"
-import { STAGE_ICONS, ageLabel, applyIdea, stageLabel, loadIdeaOptions, loadIdeas, stageJob, stageSteps } from "../ideasStore.js"
+import { ageLabel, applyIdea, loadIdeaOptions, loadIdeas, stageJob, stageSteps } from "../ideasStore.js"
 
 const props = defineProps({ name: { type: String, required: true } })
 const API = spaConfig.api
