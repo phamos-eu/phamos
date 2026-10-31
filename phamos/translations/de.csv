@@ -1227,6 +1227,7 @@ Something went wrong,Etwas ist schiefgelaufen
 Read the chat of this closed Issue,Den Chat dieser geschlossenen Anfrage lesen
 {0} assigned {1}.,{0} hat {1} zugewiesen.
 {0} unassigned {1}.,{0} hat die Zuweisung von {1} entfernt.
+{0} mentioned you in the chat of {1} {2}.,{0} hat Sie im Chat von {1} {2} erwähnt.
 {0} set the status to {1}.,{0} hat den Status auf {1} gesetzt.
 {0} converted this Issue to Task {1}.,{0} hat diese Anfrage in die Aufgabe {1} umgewandelt.
 Chat (read-only),Chat (nur lesen)
