@@ -72,6 +72,8 @@
 						class="min-h-0 w-full flex-1 resize-none rounded-xl border border-outline-gray-2 bg-surface-white p-5 text-lg leading-relaxed text-ink-gray-9 outline-none focus:border-outline-gray-3 focus:ring-0"
 						:placeholder="__('Write. Nothing else is on this screen.')"
 						:readonly="phase !== 'writing'"
+						@focus="autosave.setFocused('content', true)"
+						@blur="autosave.setFocused('content', false)"
 					/>
 				</div>
 				<aside class="hidden w-72 shrink-0 flex-col gap-2 border-l border-outline-gray-1 pl-4 md:flex">
