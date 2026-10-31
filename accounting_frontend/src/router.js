@@ -2,6 +2,7 @@ import { createSpaRouter } from "@spa/router.js"
 import spaConfig from "./config"
 import MonthlyImplementationSummariesInbox from "./views/MonthlyImplementationSummariesInbox.vue"
 import ReceiptsInbox from "./views/ReceiptsInbox.vue"
+import Receivables from "./views/Receivables.vue"
 
 export default createSpaRouter({
 	config: spaConfig,
@@ -17,6 +18,11 @@ export default createSpaRouter({
 			name: "ReceiptDetail",
 			component: ReceiptsInbox,
 			props: true,
+		},
+		{
+			path: "/receivables",
+			name: "Receivables",
+			component: Receivables,
 		},
 		{
 			path: "/monthly-implementation-summaries",
