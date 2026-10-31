@@ -60,6 +60,12 @@
 							:options="modifiedSortOption"
 						/>
 					</div>
+					<ChecklistOwnerFilter
+						v-model="assigneeFilter"
+						:users="assigneeOptions"
+						:label="__('Filter by assignee')"
+						overlap
+					/>
 					<Button class="justify-self-end" variant="solid" @click="showCreate = true">
 						New Issue
 					</Button>
@@ -74,7 +80,7 @@
 				/>
 				<div
 					v-else
-					class="col-span-7 flex flex-1 flex-col items-center justify-center gap-2 px-6 py-16 text-center"
+					class="col-span-8 flex flex-1 flex-col items-center justify-center gap-2 px-6 py-16 text-center"
 				>
 					<p class="font-medium text-ink-gray-9">No {{ spaConfig.label }} issues found</p>
 					<p class="max-w-sm text-sm text-ink-gray-6">
@@ -163,8 +169,10 @@ import { useRoute, useRouter } from "vue-router"
 import { call } from "frappe-ui"
 import IssueDetail from "@spa/components/IssueDetail.vue"
 import { issueChatStore } from "@spa/issueChatStore.js"
+import { useUserRealtime } from "@spa/composables/useUserRealtime.js"
 import { __ } from "@spa/utils/i18n.js"
 import IssueList from "@spa/components/IssueList.vue"
+import ChecklistOwnerFilter from "@spa/components/ChecklistOwnerFilter.vue"
 import CreateIssueDialog from "@spa/components/CreateIssueDialog.vue"
 import LinkedChecklistsSection from "@spa/components/LinkedChecklistsSection.vue"
 import ListSortSelector from "@spa/components/ListSortSelector.vue"
@@ -232,6 +240,23 @@ function issueMatchesSearch(issue, q) {
 		.some((v) => stripHtml(v).toLowerCase().includes(q))
 }
 
+// Everyone assigned to a loaded Issue, for the avatar filter above the Assigned column.
+const assigneeFilter = ref([])
+const assigneeOptions = computed(() => {
+	const byName = new Map()
+	for (const issue of issues.value) {
+		;(issue.assignees || []).forEach((name, i) => {
+			if (!name || byName.has(name)) return
+			byName.set(name, {
+				name,
+				full_name: (issue.assignee_names || [])[i] || name,
+				user_image: (issue.assignee_images || [])[i] || "",
+			})
+		})
+	}
+	return [...byName.values()].sort((a, b) => a.full_name.localeCompare(b.full_name))
+})
+
 const filteredIssues = computed(() => {
 	const q = search.value.trim().toLowerCase()
 	const priorities = priorityFilter.value
@@ -248,6 +273,10 @@ const filteredIssues = computed(() => {
 		// Default: Closed hidden until the Closed status filter is activated
 		list = list.filter((i) => i.status !== "Closed")
 	}
+	if (assigneeFilter.value.length) {
+		const wanted = new Set(assigneeFilter.value)
+		list = list.filter((i) => (i.assignees || []).some((u) => wanted.has(u)))
+	}
 	if (q) {
 		list = list.filter((i) => issueMatchesSearch(i, q))
 	}
@@ -263,15 +292,16 @@ async function loadOptions() {
 	}
 }
 
-async function loadInbox() {
+/** `quiet`: a background refresh keeps the list on screen and ignores errors. */
+async function loadInbox({ quiet = false } = {}) {
 	if (configError.value) return
-	loading.value = true
+	if (!quiet) loading.value = true
 	try {
 		// Include closed so StatusFilter can activate Closed client-side;
 		// filteredIssues hides Closed by default until that pill is selected.
 		issues.value = await call(`${API}.get_issues`, { include_closed: 1 })
 	} catch (e) {
-		configError.value = e?.messages?.[0] || e?.message || "Could not load issues"
+		if (!quiet) configError.value = e?.messages?.[0] || e?.message || "Could not load issues"
 	} finally {
 		loading.value = false
 	}
@@ -324,6 +354,10 @@ watch(
 		}
 	}
 )
+
+// Someone assigned or unassigned the user elsewhere (another cockpit, Desk): their ToDos
+// changed, so Issues may have joined or left this list.
+useUserRealtime("cockpit_todos_changed", () => loadInbox({ quiet: true }))
 
 onMounted(async () => {
 	await loadOptions()
