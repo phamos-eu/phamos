@@ -4,20 +4,16 @@
 """My Leave in the Personal Cockpit (phamos/phamos#1714).
 
 Runs as an Employee-only user against real HRMS validation, with a temporary holiday list
-and a leave-without-pay type (both rolled back). SOGo is patched out, because Phase 2 mirrors
-every Leave Application as a calendar Event.
+and a leave-without-pay type (both rolled back). version-15 has no leave calendar sync
+(milestone 68, Phase 2), so there is no SOGo to patch and no calendar Event.
 """
 
 import unittest
-from types import SimpleNamespace
-from unittest.mock import MagicMock, patch
 
 import frappe
 from frappe.tests.utils import FrappeTestCase
 
 from phamos.api import personal_leave
-from phamos.mailcow_integration.caldav import client
-from phamos.tests.test_mailcow_sync_event import _ensure_status_field, _ensure_user
 from phamos.tests.test_personal_checkin import _ensure_employee
 
 ME = "pl-me@example.com"
@@ -27,8 +23,14 @@ NO_EMPLOYEE = "pl-nobody@example.com"
 LEAVE_TYPE = "PL Test Unpaid"
 
 
-def _response(status):
-	return SimpleNamespace(status_code=status, text="")
+def _ensure_user(email):
+	"""An Employee-role user (on develop this helper lives in test_mailcow_sync_event)."""
+	if not frappe.db.exists("User", email):
+		frappe.get_doc(
+			{"doctype": "User", "email": email, "first_name": email.split("@")[0], "send_welcome_email": 0}
+		).insert(ignore_permissions=True)
+	if "Employee" not in frappe.get_roles(email):
+		frappe.get_doc("User", email).add_roles("Employee")
 
 
 def _ensure_cover_field():
@@ -72,7 +74,6 @@ class TestPersonalLeave(FrappeTestCase):
 			doc = frappe.get_doc("User", user)
 			doc.remove_roles("System Manager", "HR Manager", "HR User")
 		frappe.get_doc("User", APPROVER).add_roles("Leave Approver")
-		_ensure_status_field()
 		_ensure_cover_field()
 		self.me = _ensure_employee(ME)
 		self.colleague = _ensure_employee(COLLEAGUE)
@@ -93,16 +94,6 @@ class TestPersonalLeave(FrappeTestCase):
 				{"doctype": "Leave Type", "leave_type_name": LEAVE_TYPE, "is_lwp": 1}
 			).insert(ignore_permissions=True)
 		frappe.db.set_single_value("HR Settings", "restrict_backdated_leave_application", 0)
-		for patcher in (
-			patch.object(client.requests, "put", MagicMock(return_value=_response(201))),
-			patch.object(client.requests, "delete", MagicMock(return_value=_response(204))),
-			patch.object(client, "settings", lambda: SimpleNamespace(base_url="https://mail.example.com")),
-			patch.object(client, "dav_password", lambda email: "pw"),
-		):
-			patcher.start()
-			self.addCleanup(patcher.stop)
-		frappe.flags.mailcow_sync_now = True
-		self.addCleanup(setattr, frappe.flags, "mailcow_sync_now", False)
 		frappe.set_user(ME)
 
 	def tearDown(self):
@@ -124,7 +115,7 @@ class TestPersonalLeave(FrappeTestCase):
 		self.assertEqual(doc.leave_approver, APPROVER)
 		self.assertEqual(doc.custom_cover_employee, self.colleague)
 		self.assertTrue(row["editable"])
-		self.assertEqual(row["calendar"]["state"], "synced")  # Phase 2 put it in my calendar
+		self.assertEqual(row["calendar"]["state"], "none")  # no calendar sync on version-15
 
 	def test_hrms_validation_reaches_the_caller(self):
 		self._apply()
@@ -212,13 +203,7 @@ class TestPersonalLeave(FrappeTestCase):
 			with self.assertRaises(frappe.PermissionError):
 				personal_leave.withdraw_leave(name)
 
-	def test_withdraw_deletes_my_open_leave_and_its_event(self):
+	def test_withdraw_deletes_my_open_leave(self):
 		row = self._apply()
-		self.assertTrue(
-			frappe.db.exists("Event", {"reference_doctype": "Leave Application", "reference_docname": row["name"]})
-		)
 		self.assertEqual(personal_leave.withdraw_leave(row["name"]), {"name": row["name"], "withdrawn": True})
 		self.assertFalse(frappe.db.exists("Leave Application", row["name"]))
-		self.assertFalse(
-			frappe.db.exists("Event", {"reference_doctype": "Leave Application", "reference_docname": row["name"]})
-		)

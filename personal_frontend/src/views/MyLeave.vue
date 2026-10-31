@@ -218,7 +218,7 @@ async function onSaved(doc) {
 }
 
 async function withdraw(row) {
-	if (!window.confirm(__("Withdraw this leave application? It is deleted and removed from your calendar."))) return
+	if (!window.confirm(__("Withdraw this leave application? It is deleted."))) return
 	withdrawing.value = true
 	try {
 		await call(`${spaConfig.api}.withdraw_leave`, { name: row.name })
