@@ -3,9 +3,9 @@ from . import __version__ as app_version
 app_name = "phamos"
 app_title = "phamos GmbH"
 app_publisher = "phamos.eu"
-app_description = "ERPNext Enhancement for phamos.eu"
+app_description = "Frappe/ERPNext custom app powering phamos.eu: cockpits, integrations and business processes for phamos GmbH."
 app_email = "support@phamos.eu"
-app_license = "MIT"
+app_license = "AGPL-3.0"
 
 required_apps = ["erpnext", "hrms"]
 
