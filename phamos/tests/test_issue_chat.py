@@ -1,7 +1,8 @@
 # Copyright (c) 2026, phamos.eu and contributors
 # For license information, please see license.txt
 
-"""Issue chat (#1614): one Private Raven channel per Issue, members from owner and assignees."""
+"""Record chat (#1614, #1779): one Private Raven channel per Issue or Task, members from owner and
+assignees."""
 
 from unittest import skipUnless
 from unittest.mock import patch
@@ -11,9 +12,13 @@ from frappe.desk.form.assign_to import add as add_assignment
 from frappe.desk.form.assign_to import remove as remove_assignment
 from frappe.tests.utils import FrappeTestCase
 
+from phamos.api import accounting_spa
+from phamos.api import human_resources_spa
 from phamos.api import issue_chat
 from phamos.api import personal_cockpit as pc
+from phamos.api import project_management_spa
 from phamos.api import sales_spa
+from phamos.api import software_development_spa
 
 OWNER = "issue-chat-owner@example.com"
 ASSIGNEE = "issue-chat-assignee@example.com"
@@ -22,8 +27,9 @@ OUTSIDER = "issue-chat-outsider@example.com"  # no Raven role
 NO_READER = "issue-chat-noreader@example.com"  # Raven user who cannot read Issues
 WORKSPACE = "issue-chat-test"
 
-# Issue needs Support Team; Raven creates the Raven User for the "Raven User" role.
-ROLES = ("Support Team", "Raven User")
+# Issue needs Support Team, Task Projects User; Raven creates the Raven User for the "Raven User"
+# role.
+ROLES = ("Support Team", "Projects User", "Raven User")
 
 
 def _ensure_user(email, roles=ROLES):
@@ -98,10 +104,16 @@ class TestIssueChat(FrappeTestCase):
 		frappe.set_user("Administrator")
 		frappe.db.rollback()
 
-	def _assign(self, user):
+	def _assign(self, user, doctype="Issue", name=None):
 		add_assignment(
-			{"doctype": "Issue", "name": self.issue.name, "assign_to": [user], "description": "chat"}
+			{"doctype": doctype, "name": name or self.issue.name, "assign_to": [user], "description": "chat"}
 		)
+
+	def _task(self, **fields):
+		"""A Task of OWNER assigned to ASSIGNEE (in OWNER's Personal Cockpit scope)."""
+		task = frappe.get_doc({"doctype": "Task", "subject": "Task chat test", **fields}).insert()
+		self._assign(ASSIGNEE, "Task", task.name)
+		return task
 
 	def test_no_chat_yet(self):
 		state = pc.get_issue_chat(self.issue.name)
@@ -341,7 +353,11 @@ class TestIssueChat(FrappeTestCase):
 			issue_chat.document_link("Issue", self.issue.name),
 			f"/personal-cockpit/issues/list/{self.issue.name}",
 		)
-		self.assertIsNone(issue_chat.document_link("Task", "TASK-0001"))
+		self.assertIsNone(issue_chat.document_link("ToDo", "TODO-0001"))
+		task = self._task()
+		self.assertEqual(
+			issue_chat.document_link("Task", task.name), f"/personal-cockpit/tasks/gantt/{task.name}"
+		)
 
 		frappe.set_user("Administrator")
 		department = frappe.get_all("Department", pluck="name", limit=1)
@@ -353,9 +369,96 @@ class TestIssueChat(FrappeTestCase):
 			issue_chat.document_link("Issue", self.issue.name),
 			f"/sales-cockpit/issues/list/{self.issue.name}",
 		)
+		frappe.db.set_value("Task", task.name, "department", department[0])
+		self.assertEqual(
+			issue_chat.document_link("Task", task.name), f"/sales-cockpit/tasks/gantt/{task.name}"
+		)
+
+	def test_task_chat_starts_with_owner_and_assignees(self):
+		task = self._task()
+		self.assertIsNone(pc.get_task_chat(task.name)["channel_id"])
+
+		state = pc.ensure_task_chat(task.name)
+		channel = frappe.get_doc("Raven Channel", state["channel_id"])
+		self.assertEqual((channel.linked_doctype, channel.linked_document), ("Task", task.name))
+		self.assertEqual(channel.type, "Private")
+		self.assertEqual(_members(channel.name), {OWNER, ASSIGNEE})
+		self.assertTrue(state["is_member"])
+		self.assertEqual(pc.ensure_task_chat(task.name)["channel_id"], channel.name)  # idempotent
+
+		# A new assignee of the Task joins its chat, like on an Issue.
+		self._assign(LATECOMER, "Task", task.name)
+		self.assertIn(LATECOMER, _members(channel.name))
+
+	def test_task_owner_joins_a_task_chat(self):
+		task = self._task(custom_task_owner=LATECOMER)
+		channel_id = pc.ensure_task_chat(task.name)["channel_id"]
+		self.assertEqual(_members(channel_id), {OWNER, ASSIGNEE, LATECOMER})
+
+	def test_template_task_gets_no_chat(self):
+		task = frappe.get_doc({"doctype": "Task", "subject": "Template chat test", "is_template": 1}).insert()
+		with self.assertRaises(frappe.ValidationError):
+			issue_chat.ensure_chat(task)
+		self.assertIsNone(issue_chat.find_channel("Task", task.name))
+
+	def test_task_from_an_issue_says_so_in_its_intro(self):
+		task = self._task(issue=self.issue.name)
+		channel_id = pc.ensure_task_chat(task.name)["channel_id"]
+		intro = frappe.get_all(
+			"Raven Message",
+			filters={"channel_id": channel_id, "message_type": ("!=", "System")},
+			pluck="text",
+		)
+		self.assertEqual(len(intro), 1)
+		self.assertIn(self.issue.name, intro[0])
+
+	def test_completing_a_task_archives_its_chat_and_reopening_restores_it(self):
+		task = self._task()
+		channel_id = pc.ensure_task_chat(task.name)["channel_id"]
+
+		task.reload()
+		task.status = "Working"
+		task.save()
+		self.assertFalse(frappe.db.get_value("Raven Channel", channel_id, "is_archived"))
+
+		task.reload()
+		task.status = "Completed"
+		task.save()
+		self.assertTrue(frappe.db.get_value("Raven Channel", channel_id, "is_archived"))
+		self.assertEqual(pc.ensure_task_chat(task.name)["channel_id"], channel_id)  # no second chat
+
+		task.reload()
+		task.status = "Open"
+		task.save()
+		self.assertFalse(frappe.db.get_value("Raven Channel", channel_id, "is_archived"))
+		lines = _system_lines(channel_id)
+		for status in ("Working", "Completed", "Open"):
+			self.assertTrue(any(f"set the status to {status}" in line for line in lines), status)
+
+	def test_task_out_of_scope_gets_no_chat(self):
+		task = self._task()
+		frappe.set_user(LATECOMER)  # neither owner nor assignee: not in the Personal Cockpit
+		with self.assertRaises(frappe.ValidationError):
+			pc.get_task_chat(task.name)
+		with self.assertRaises(frappe.ValidationError):
+			pc.ensure_task_chat(task.name)
 
 	def test_every_cockpit_exposes_the_chat_endpoints(self):
-		endpoints = ("get_issue_chat", "ensure_issue_chat", "get_issue_chat_states")
-		for module in (pc, sales_spa):
+		endpoints = (
+			"get_issue_chat",
+			"ensure_issue_chat",
+			"get_issue_chat_states",
+			"get_task_chat",
+			"ensure_task_chat",
+		)
+		modules = (
+			pc,
+			sales_spa,
+			human_resources_spa,
+			accounting_spa,
+			project_management_spa,
+			software_development_spa,
+		)
+		for module in modules:
 			for name in endpoints:
 				self.assertIn(getattr(module, name), frappe.whitelisted, f"{module.__name__}.{name}")
