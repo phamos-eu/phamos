@@ -152,6 +152,8 @@ const BASE_ITEMS = [
 			{ name: "TodosMatrix", label: "Matrix", icon: "grid", match: ["TodosMatrix"] },
 		],
 	},
+	// Ideas (#1771): capture, write out, let them grow.
+	{ name: "Ideas", label: "Ideas", icon: "feather", match: ["Ideas", "IdeaDetail", "IdeaWrite"] },
 	{
 		name: "Issues",
 		label: "Issues",
@@ -199,6 +201,9 @@ const PAGE_TITLES = {
 	MyContract: ["My Contract"],
 	MyLeave: ["My Leave"],
 	MyLeaveDetail: ["My Leave"],
+	Ideas: ["My Ideas"],
+	IdeaDetail: ["My Ideas"],
+	IdeaWrite: ["My Ideas", "Writing"],
 	Issues: ["My Issues", "Dashboard"],
 	IssuesList: ["My Issues", "List"],
 	IssueDetail: ["My Issues", "List"],
