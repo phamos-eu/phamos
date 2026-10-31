@@ -117,3 +117,27 @@ class TestEmploymentContractsApi(FrappeTestCase):
 		after = {c["currency"]: c["amount"] for c in api.get_overview()["monthly_cost"]}
 		self.assertNotIn(foreign, after)
 		self.assertAlmostEqual(after[company_currency] - before.get(company_currency, 0), 1250)
+
+	def test_new_contract_takes_employee_company_and_currency(self):
+		# A company that is neither the user's default nor in the site's default currency, so
+		# neither pre-filled default can pass for the right value.
+		user_company = frappe.defaults.get_user_default("Company")
+		site_currency = frappe.db.get_default("currency")
+		company = next(
+			(
+				c.name
+				for c in frappe.get_all("Company", fields=["name", "default_currency"])
+				if c.name != user_company and c.default_currency != site_currency
+			),
+			None,
+		)
+		if not company:
+			raise unittest.SkipTest("needs a company outside the user's default and the site currency")
+		self.company = company
+		employee = self.make_employee("Other", "Company")
+
+		contract = self.save(employee=employee, effective_from=add_days(nowdate(), -10), submit=0)
+		self.assertEqual(contract["company"], company)
+		self.assertEqual(contract["currency"], frappe.get_cached_value("Company", company, "default_currency"))
+		self.assertEqual(contract["conversion_rate"], 1)
+

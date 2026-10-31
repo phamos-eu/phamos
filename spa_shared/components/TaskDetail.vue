@@ -31,6 +31,14 @@
 				<div class="ml-auto flex flex-shrink-0 items-center gap-2 pl-3">
 					<DocSyncBanner :autosave="autosave" />
 					<DocViewers :viewers="viewers" />
+					<!-- The Task's Raven chat (#1779): on the Gantt page it opens as an overlay. -->
+					<IssueChatButton
+						doctype="Task"
+						:record-name="task.name"
+						:subject="task.subject"
+						:status="status"
+						:api="API"
+					/>
 				</div>
 			</div>
 		</Teleport>
@@ -220,6 +228,7 @@ import { Badge, call, DatePicker, FeatherIcon, toast } from "frappe-ui"
 import AssigneePicker from "@spa/components/AssigneePicker.vue"
 import DocSyncBanner from "@spa/components/DocSyncBanner.vue"
 import DocViewers from "@spa/components/DocViewers.vue"
+import IssueChatButton from "@spa/components/IssueChatButton.vue"
 import FrappeLink from "@spa/components/FrappeLink.vue"
 import { TASK_OWNER_FILTERS } from "@spa/utils/newTaskForm.js"
 import RichTextField from "@spa/components/RichTextField.vue"

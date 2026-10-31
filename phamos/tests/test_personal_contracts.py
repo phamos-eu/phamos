@@ -59,6 +59,7 @@ class TestPersonalContracts(FrappeTestCase):
 				"company": self.company,
 				"contract_type": "Employed",
 				"effective_from": effective_from,
+				"currency": frappe.get_cached_value("Company", self.company, "default_currency"),
 				"fte_percentage": 50,
 				"yearly_gross_full_time": 60000,
 				"notes": "HR internal",
