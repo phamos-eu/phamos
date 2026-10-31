@@ -314,6 +314,22 @@ class TestIssueChat(FrappeTestCase):
 			1,
 		)
 
+	def test_mention_shows_as_unread_for_someone_it_brings_in(self):
+		from raven.api.threads import create_thread
+
+		channel_id = pc.ensure_issue_chat(self.issue.name)["channel_id"]
+		_send(channel_id, f"{_mention(LATECOMER)} can you take this?")
+		frappe.set_user(LATECOMER)
+		state = pc.get_issue_chat_states(frappe.as_json([self.issue.name]))[self.issue.name]
+		self.assertEqual((state["unread"], state["mentions"]), (1, 1))  # red bubble, not grey
+
+		# Same for a thread they are brought into by the mention.
+		frappe.set_user(OWNER)
+		thread_id = create_thread(_send(channel_id, "Side topic").name)["thread_id"]
+		_send(thread_id, f"{_mention(ASSIGNEE)} over to you")
+		frappe.set_user(ASSIGNEE)
+		self.assertGreaterEqual(pc.get_issue_chat(self.issue.name)["mentions"], 1)
+
 	def test_mention_in_a_thread_assigns_too(self):
 		from raven.api.threads import create_thread
 

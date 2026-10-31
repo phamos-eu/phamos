@@ -365,6 +365,7 @@ doc_events = {
 		# assigned to the record once the message is saved (#1784).
 		"validate": "phamos.api.issue_chat.add_mentioned_members",
 		"after_insert": [
+			"phamos.api.issue_chat.keep_mention_unread",
 			"phamos.api.issue_chat.assign_mentioned",
 			"phamos.events.raven_bot.handle_lead_option_reply",
 		],
