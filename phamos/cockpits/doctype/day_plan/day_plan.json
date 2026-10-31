@@ -1,0 +1,132 @@
+{
+ "actions": [],
+ "creation": "2026-10-15 01:00:00.000000",
+ "doctype": "DocType",
+ "engine": "InnoDB",
+ "field_order": [
+  "user",
+  "date",
+  "status",
+  "column_break_times",
+  "confirmed_at",
+  "frozen_at",
+  "auto_frozen",
+  "shutdown_at",
+  "capacity_minutes",
+  "section_items",
+  "items",
+  "reflection"
+ ],
+ "fields": [
+  {
+   "fieldname": "user",
+   "fieldtype": "Link",
+   "label": "User",
+   "options": "User",
+   "reqd": 1,
+   "in_list_view": 1,
+   "in_standard_filter": 1,
+   "read_only": 1,
+   "search_index": 1
+  },
+  {
+   "fieldname": "date",
+   "fieldtype": "Date",
+   "label": "Date",
+   "reqd": 1,
+   "in_list_view": 1,
+   "read_only": 1,
+   "search_index": 1
+  },
+  {
+   "fieldname": "status",
+   "fieldtype": "Select",
+   "label": "Status",
+   "options": "Draft\nConfirmed\nClosed",
+   "default": "Draft",
+   "in_list_view": 1,
+   "read_only": 1
+  },
+  {
+   "fieldname": "column_break_times",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "confirmed_at",
+   "fieldtype": "Datetime",
+   "label": "Day Started At",
+   "read_only": 1
+  },
+  {
+   "fieldname": "frozen_at",
+   "fieldtype": "Datetime",
+   "label": "Plan Fixed At",
+   "read_only": 1,
+   "description": "When the plan counts as planned: on starting the day, or at 10:00."
+  },
+  {
+   "fieldname": "auto_frozen",
+   "fieldtype": "Check",
+   "label": "Fixed Automatically",
+   "read_only": 1
+  },
+  {
+   "fieldname": "shutdown_at",
+   "fieldtype": "Datetime",
+   "label": "Shut Down At",
+   "read_only": 1
+  },
+  {
+   "fieldname": "capacity_minutes",
+   "fieldtype": "Int",
+   "label": "Capacity (Minutes)",
+   "read_only": 1
+  },
+  {
+   "fieldname": "section_items",
+   "fieldtype": "Section Break",
+   "label": "Plan"
+  },
+  {
+   "fieldname": "items",
+   "fieldtype": "Table",
+   "label": "ToDos",
+   "options": "Day Plan Item",
+   "read_only": 1
+  },
+  {
+   "fieldname": "reflection",
+   "fieldtype": "Small Text",
+   "label": "One Line About the Day",
+   "read_only": 1
+  }
+ ],
+ "links": [],
+ "modified": "2026-10-15 01:00:00.000000",
+ "modified_by": "Administrator",
+ "module": "Cockpits",
+ "name": "Day Plan",
+ "owner": "Administrator",
+ "sort_field": "creation",
+ "sort_order": "DESC",
+ "states": [],
+ "autoname": "hash",
+ "naming_rule": "Random",
+ "title_field": "date",
+ "track_changes": 0,
+ "description": "My Day in the Personal Cockpit (#1559). Private: only the user sees their own plans.",
+ "permissions": [
+  {
+   "role": "System Manager",
+   "read": 1,
+   "write": 1,
+   "create": 1,
+   "delete": 1,
+   "report": 1,
+   "export": 1,
+   "print": 1,
+   "email": 1,
+   "share": 1
+  }
+ ]
+}

@@ -11,11 +11,11 @@ required_apps = ["erpnext", "hrms"]
 
 add_to_apps_screen = [
 	{
-		"name": "i_own_my_work",
-		"logo": "/assets/frappe/images/frappe-favicon.svg",
-		"title": "I Own My Work",
-		"route": "/i-own-my-work",
-		"has_permission": "phamos.api.i_own_my_work.check_app_permission",
+		"name": "personal_cockpit",
+		"logo": "/assets/phamos/manifest/personal-icon-192.png",
+		"title": "Personal Cockpit",
+		"route": "/personal-cockpit",
+		"has_permission": "phamos.api.personal_cockpit.check_app_permission",
 	},
 	{
 		"name": "human_resources_spa",
@@ -132,8 +132,8 @@ override_doctype_class = {
 
 website_route_rules = [
     {"from_route": "/schedule_interview/<name>", "to_route": "schedule_interview"},
-    {"from_route": "/i-own-my-work", "to_route": "i_own_my_work"},
-    {"from_route": "/i-own-my-work/<path:app_path>", "to_route": "i_own_my_work"},
+    {"from_route": "/personal-cockpit", "to_route": "personal_cockpit"},
+    {"from_route": "/personal-cockpit/<path:app_path>", "to_route": "personal_cockpit"},
     {"from_route": "/human-resources-cockpit", "to_route": "human_resources_spa"},
     {"from_route": "/human-resources-cockpit/<path:app_path>", "to_route": "human_resources_spa"},
     {"from_route": "/sales-cockpit", "to_route": "sales_spa"},
@@ -180,9 +180,15 @@ for _lang, _route in SUBSCRIPTION_CONFIRMED_ROUTES.items():
 # The HR cockpit used to live at /hr-cockpit; keep old links (Raven messages, bookmarks) working.
 # /hr_spa was its www page path; servers keep a stale built hr_spa.html there, which would
 # otherwise render without boot data.
+# I Own My Work (/i-own-my-work) was replaced by the Personal Cockpit (phamos/phamos#1456).
+# Its only deep route was /issue/<name>; Raven messages linked /issues/<name>. The first
+# matching rule wins, so the specific rule comes first. /i_own_my_work was its www page path.
 website_redirects = [
     {"source": r"/hr-cockpit(/.*)?", "target": r"/human-resources-cockpit\1"},
     {"source": "/hr_spa", "target": "/human-resources-cockpit"},
+    {"source": r"/i-own-my-work/issues?/(.+)", "target": r"/personal-cockpit/issues/list/\1"},
+    {"source": r"/i-own-my-work(/.*)?", "target": r"/personal-cockpit\1"},
+    {"source": "/i_own_my_work", "target": "/personal-cockpit"},
 ]
 
 
@@ -228,7 +234,7 @@ after_install = "phamos.setup.ops_inbox.ensure_ops_inbox_setup"
 after_migrate = [
 	"phamos.setup.ops_inbox.ensure_ops_inbox_setup",
 	"phamos.web_profile.setup.after_migrate",  # Web Page "Language" / "Translation Of" fields
-	"phamos.cockpits.setup.after_migrate",  # Task Owner on Task (#1751)
+	"phamos.cockpits.setup.after_migrate",  # Task Owner on Task (#1751), ToDo fields of the Personal Cockpit (#1553)
 	"phamos.marketing.setup.after_migrate",  # Lead Source "Event" for event registrations
 ]
 
@@ -256,6 +262,19 @@ after_migrate = [
 #	"Event": "frappe.desk.doctype.event.event.has_permission",
 # }
 
+# Personal Cockpit focus sessions are private, System Managers included (#1556).
+permission_query_conditions = {
+	"Focus Session": "phamos.cockpits.permissions.focus_session_query",
+	"ToDo Challenge": "phamos.cockpits.permissions.todo_challenge_query",
+	"Day Plan": "phamos.cockpits.permissions.day_plan_query",
+}
+
+has_permission = {
+	"Focus Session": "phamos.cockpits.permissions.focus_session_has_permission",
+	"ToDo Challenge": "phamos.cockpits.permissions.todo_challenge_has_permission",
+	"Day Plan": "phamos.cockpits.permissions.day_plan_has_permission",
+}
+
 # DocType Class
 # ---------------
 # Override standard doctype classes
@@ -277,10 +296,29 @@ after_migrate = [
 # }
 
 doc_events = {
+	# Personal Cockpit: closed-on stamp, reschedule count, per-user refresh (#1553).
 	# Closing or rescheduling a checklist item's ToDo updates the item (#1625).
 	"ToDo": {
-		"on_update": "phamos.phamos.doctype.checklist.checklist_assignment.sync_item_from_todo",
-		"on_trash": "phamos.phamos.doctype.checklist.checklist_assignment.clear_item_todo_link",
+		"before_insert": "phamos.cockpits.todo_hooks.before_insert",
+		"validate": "phamos.cockpits.todo_hooks.validate",
+		"on_update": [
+			"phamos.cockpits.todo_hooks.on_update",
+			"phamos.phamos.doctype.checklist.checklist_assignment.sync_item_from_todo",
+		],
+		"on_trash": [
+			"phamos.cockpits.todo_hooks.on_trash",
+			"phamos.phamos.doctype.checklist.checklist_assignment.clear_item_todo_link",
+		],
+	},
+	# Personal Cockpit check-ins: live updates to the employee's own user (#1571). Never fires
+	# on sites without HRMS, since the doctype does not exist there.
+	"Employee Checkin": {
+		"on_update": "phamos.cockpits.checkin_hooks.on_update",
+		"on_trash": "phamos.cockpits.checkin_hooks.on_trash",
+	},
+	# "Covered by" on Leave Applications (#1714). Never fires on sites without HRMS.
+	"Leave Application": {
+		"validate": "phamos.phamos.hr.leave_cover.validate_cover",
 	},
 	"Event": {
 		"after_insert": "phamos.mailcow_integration.caldav.sync_event.on_upsert",
@@ -372,6 +410,9 @@ doc_events = {
         "on_trash": "phamos.gitlab_integration.label_ledger.delete_issue_label_ledger",
     },
     "Timesheet Record": {
+        # Personal Cockpit timer: live updates to the employee's own user (#1572).
+        "on_change": "phamos.cockpits.timer_hooks.on_change",
+        "on_trash": "phamos.cockpits.timer_hooks.on_trash",
         "on_submit": [
             "phamos.gitlab_integration.gitlab_utils.sync_touch_time_on_timesheet_change",
             "phamos.gitlab_integration.gitlab_utils.sync_cycle_time_start_on_timesheet_change",
@@ -428,6 +469,12 @@ scheduler_events = {
         "phamos.phamos.doctype.monthly_implementation_summary.monthly_implementation_summary.auto_close_fulfilled_mis",
         # Event tickets: payment status for payments booked without hooks
         "phamos.marketing.billing.sync_payment_status",
+        # Personal Cockpit: settle yesterday in running ToDo challenges (#1557)
+        "phamos.api.personal_challenges.evaluate_all_challenges",
+    ],
+    "weekly": [
+        # Personal Cockpit: checklists left behind by ToDos deleted without hooks (#1554)
+        "phamos.cockpits.maintenance.cleanup_orphan_todo_checklists",
     ],
     "monthly": [
         "phamos.api.send_monthly_comment_summary"
@@ -440,6 +487,14 @@ scheduler_events = {
         # Keep GitLab projects/milestones/issues fresh, including already synced issues.
         "30 */2 * * *": [
             "phamos.gitlab_integration.gitlab_utils.sync_gitlab_data_background",
+        ],
+        # Personal Cockpit: end focus sessions that ran past their limit (#1556).
+        "*/5 * * * *": [
+            "phamos.api.personal_focus.expire_focus_sessions",
+        ],
+        # Personal Cockpit: fix today's day plans that were never started (#1559).
+        "0 10 * * *": [
+            "phamos.api.personal_day_plan.freeze_day_plans",
         ],
     },
 }
@@ -513,9 +568,13 @@ override_doctype_dashboards = {
 # ]
 
 # Event attendees are matched by their email address (they have no user account).
+# Personal Cockpit focus sessions belong to their user: exported and deleted with the user's data.
 user_data_fields = [
 	{"doctype": "Attendee", "filter_by": "email", "redact_fields": ["first_name", "last_name", "full_name",
 		"phone", "company_name", "job_title", "notes", "follow_up_notes"]},
+	{"doctype": "Focus Session", "filter_by": "user", "redact_fields": ["break_out_reason"]},
+	{"doctype": "ToDo Challenge", "filter_by": "user", "redact_fields": ["title"]},
+	{"doctype": "Day Plan", "filter_by": "user", "redact_fields": ["reflection"]},
 ]
 
 # Authentication and authorization

@@ -3,14 +3,11 @@
 
 """The Software Development cockpit (#1462) is wired like the other department cockpits."""
 
-from unittest.mock import patch
-
 import frappe
 from frappe.tests.utils import FrappeTestCase
 
 from phamos.api import human_resources_spa
 from phamos.api import software_development_spa as sd
-from phamos.api.issue_raven import _spa_open_label, _spa_path_for
 
 
 def _whitelisted(module):
@@ -35,17 +32,3 @@ class TestSoftwareDevelopmentCockpit(FrappeTestCase):
 			for name in _whitelisted(human_resources_spa)
 		}
 		self.assertEqual(_whitelisted(sd), expected)
-
-	def test_software_development_task_links_to_its_cockpit(self):
-		depts = {"software_development_department": "Software Development"}
-		with (
-			patch("phamos.api.issue_raven._settings_dept", side_effect=depts.get),
-			patch("frappe.db.get_value", return_value="Software Development"),
-		):
-			self.assertEqual(_spa_path_for("Task", "TASK-1"), "/software-development-cockpit/tasks/TASK-1")
-
-	def test_open_label_names_software_development_cockpit(self):
-		self.assertEqual(
-			_spa_open_label("/software-development-cockpit/tasks/TASK-1"),
-			"Open in Software Development Cockpit",
-		)

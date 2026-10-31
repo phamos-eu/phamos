@@ -3,6 +3,6 @@
 
 """Module "Cockpits": data and hooks behind the cockpits (phamos/phamos#1376).
 
-On version-15 it starts with the Task Owner field on Task (#1751); the Personal
-Cockpit's parts follow when it is released here.
+Starts with the Personal Cockpit's ToDo lifecycle fields (#1553); focus sessions,
+day plans and challenges follow as doctypes in this module.
 """

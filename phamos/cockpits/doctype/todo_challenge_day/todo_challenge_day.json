@@ -1,0 +1,70 @@
+{
+ "actions": [],
+ "creation": "2026-10-15 00:30:00.000000",
+ "doctype": "DocType",
+ "engine": "InnoDB",
+ "field_order": [
+  "date",
+  "closes",
+  "planned_closes",
+  "spontaneous_closes",
+  "target",
+  "result"
+ ],
+ "fields": [
+  {
+   "fieldname": "date",
+   "fieldtype": "Date",
+   "label": "Date",
+   "in_list_view": 1,
+   "reqd": 1
+  },
+  {
+   "fieldname": "closes",
+   "fieldtype": "Int",
+   "label": "Counted Closes",
+   "in_list_view": 1,
+   "read_only": 1
+  },
+  {
+   "fieldname": "planned_closes",
+   "fieldtype": "Int",
+   "label": "Planned",
+   "read_only": 1
+  },
+  {
+   "fieldname": "spontaneous_closes",
+   "fieldtype": "Int",
+   "label": "Spontaneous",
+   "read_only": 1
+  },
+  {
+   "fieldname": "target",
+   "fieldtype": "Int",
+   "label": "Target",
+   "in_list_view": 1,
+   "read_only": 1
+  },
+  {
+   "fieldname": "result",
+   "fieldtype": "Select",
+   "label": "Result",
+   "options": "Met\nJoker\nRepaired\nMissed",
+   "in_list_view": 1,
+   "read_only": 1
+  }
+ ],
+ "links": [],
+ "modified": "2026-10-15 01:30:00.000000",
+ "modified_by": "Administrator",
+ "module": "Cockpits",
+ "name": "ToDo Challenge Day",
+ "owner": "Administrator",
+ "sort_field": "creation",
+ "sort_order": "DESC",
+ "states": [],
+ "istable": 1,
+ "editable_grid": 1,
+ "permissions": [],
+ "track_changes": 0
+}
