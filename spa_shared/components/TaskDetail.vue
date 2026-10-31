@@ -313,7 +313,24 @@ const realtime = useDocRealtime({
 	doctype: "Task",
 	name: () => props.task.name,
 	onDocUpdate: (modified) => autosave.noteRemoteModified(modified),
+	onAssignmentsChanged: () => {
+		clearTimeout(assignmentsTimer)
+		assignmentsTimer = setTimeout(reloadAfterAssignment, 300)
+	},
 })
+
+// Someone else assigned or unassigned people (a mention in the chat, Desk, another cockpit):
+// fetch the Task again, so the assignee list follows without a reload (#1784).
+let assignmentsTimer = null
+async function reloadAfterAssignment() {
+	const name = props.task.name
+	try {
+		const fresh = await call(`${API.value}.get_task`, { name })
+		if (name === props.task.name) emit("updated", fresh)
+	} catch (e) {
+		// The next save or a reload brings it.
+	}
+}
 const viewers = realtime.viewers
 
 const locks = useFieldLocks({
@@ -437,6 +454,7 @@ onMounted(syncChromeHost)
 
 onBeforeUnmount(() => {
 	setPageChromeActive(false)
+	clearTimeout(assignmentsTimer)
 })
 
 watch(

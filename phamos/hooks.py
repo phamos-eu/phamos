@@ -374,9 +374,13 @@ doc_events = {
 		"on_update": "phamos.api.issue_chat.on_record_update",
 	},
     "Raven Message": {
-		# Mentioned people join the Issue chat before Raven notifies them (#1620).
+		# Mentioned people join the record chat before Raven notifies them (#1620), and are
+		# assigned to the record once the message is saved (#1784).
 		"validate": "phamos.api.issue_chat.add_mentioned_members",
-		"after_insert": "phamos.events.raven_bot.handle_lead_option_reply"
+		"after_insert": [
+			"phamos.api.issue_chat.assign_mentioned",
+			"phamos.events.raven_bot.handle_lead_option_reply",
+		],
 	},
     "Account": {"on_update": "phamos.accounting.expense_accounts.clear_account_cache"},
     "Purchase Invoice": {"on_submit": "phamos.accounting.library.learn_from_purchase_invoice"},
