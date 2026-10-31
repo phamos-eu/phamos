@@ -24,12 +24,14 @@ async function resolveUsers(users) {
  *
  * - `doc_update` (sent by Frappe after every save) → onDocUpdate(modified)
  * - `doc_viewers` → `viewers` (other users with the document open)
+ * - `docinfo_update` for assignments (Frappe sends it on every assign / unassign, from anywhere:
+ *   Desk, another cockpit, a mention in the record chat) → onAssignmentsChanged()
  * - `on(event, handler)` for custom events published to the document room
  *   with `frappe.publish_realtime(..., doctype=, docname=)`
  *
  * Without a socket (e.g. realtime not running) everything is a no-op.
  */
-export function useDocRealtime({ doctype, name, onDocUpdate }) {
+export function useDocRealtime({ doctype, name, onDocUpdate, onAssignmentsChanged }) {
 	const instance = getCurrentInstance()
 	const socket = instance?.appContext?.config?.globalProperties?.$socket || null
 	const viewers = ref([])
@@ -57,6 +59,12 @@ export function useDocRealtime({ doctype, name, onDocUpdate }) {
 	if (socket) {
 		listen("doc_update", (data) => {
 			if (data?.doctype === doctype && data?.name === current) onDocUpdate?.(String(data.modified || ""))
+		})
+		listen("docinfo_update", (data) => {
+			// Assigning only touches `_assign` without a save, so no doc_update follows (#1784).
+			const doc = data?.doc
+			if (data?.key !== "assignment_logs" || doc?.reference_doctype !== doctype) return
+			if (doc.reference_name === current) onAssignmentsChanged?.()
 		})
 		listen("doc_viewers", async (data) => {
 			if (data?.doctype !== doctype || data?.docname !== current) return
