@@ -1547,3 +1547,15 @@ Could not read {0} from {1} (HTTP {2}).,{0} konnte nicht von {1} gelesen werden 
 Nothing new to import.,Nichts Neues zu importieren.
 The import failed and was undone. The error is in the log.,Der Import ist fehlgeschlagen und wurde rückgängig gemacht. Der Fehler steht im Protokoll.
 "{0}: came from {1}, but they belong to different people; link left out","{0}: entstand aus {1}, gehört aber einer anderen Person; Verknüpfung weggelassen"
+Could not load your contracts,Ihre Verträge konnten nicht geladen werden
+Current contract,Aktueller Vertrag
+From {0},Ab {0}
+Loading your contract…,Ihr Vertrag wird geladen …
+Monthly gross,Monatlich brutto
+My Contract,Mein Vertrag
+No contract is in force today.,Heute ist kein Vertrag in Kraft.
+Something looks wrong? Ask HR to record a change.,"Stimmt etwas nicht? Bitten Sie HR, eine Änderung zu erfassen."
+There is no contract for you yet. HR adds it once it is signed.,"Für Sie gibt es noch keinen Vertrag. HR trägt ihn ein, sobald er unterschrieben ist."
+Upcoming changes,Anstehende Änderungen
+Yearly gross at 100 %,Jährlich brutto bei 100 %
+{0} · {1} per week · {2} per month,{0} · {1} pro Woche · {2} pro Monat
