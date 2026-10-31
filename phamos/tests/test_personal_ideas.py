@@ -126,6 +126,18 @@ class TestPersonalIdeas(FrappeTestCase):
 		self.assertIn(["content", "<p>start</p>", "<p>end</p>"], versions[-1]["changed"])
 		self.assertFalse(pc.snapshot_idea(idea["name"])["written"])
 
+	def test_versions_hold_only_title_stage_and_content(self):
+		idea = pc.create_idea("Clean", content="<p>first</p>")
+		first = _versions(idea["name"])[0]
+		self.assertEqual({row[0] for row in first["changed"]}, {"title", "stage", "content"})
+
+	def test_a_second_snapshot_without_changes_writes_nothing(self):
+		idea = pc.create_idea("Twice")
+		self._later(1)
+		pc.update_idea(idea["name"], content="<p>edit</p>")
+		self.assertTrue(pc.snapshot_idea(idea["name"])["written"])
+		self.assertFalse(pc.snapshot_idea(idea["name"])["written"])
+
 	def test_title_and_stage_changes_write_a_version_at_once(self):
 		idea = pc.create_idea("Old")
 		before = len(_versions(idea["name"]))

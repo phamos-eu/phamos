@@ -188,6 +188,14 @@ def _snapshot_due(doc):
 
 def _snapshot(doc, force=False):
 	"""Write a Version row from the previous snapshot to the current state, when something changed."""
+	# Two calls at once (blur and route leave) must not both write the same step: lock the row and
+	# read the snapshot fields again under the lock.
+	frappe.db.get_value(DOCTYPE, doc.name, "name", for_update=True)
+	doc.update(
+		frappe.db.get_value(
+			DOCTYPE, doc.name, [f"snapshot_{f}" for f in SNAPSHOT_FIELDS] + ["last_snapshot_on"], as_dict=True
+		)
+	)
 	if not force and not _snapshot_due(doc):
 		return False
 	old = frappe.copy_doc(doc, ignore_no_copy=False)
@@ -197,6 +205,9 @@ def _snapshot(doc, force=False):
 	written = False
 	diff = get_diff(old, doc)
 	if diff:
+		# Only what the snapshot tracks; derived fields (summary, counters) are noise in the history.
+		diff.changed = [row for row in diff.changed if row[0] in SNAPSHOT_FIELDS]
+	if diff and diff.changed:
 		version = frappe.new_doc("Version")
 		version.ref_doctype = DOCTYPE
 		version.docname = doc.name
