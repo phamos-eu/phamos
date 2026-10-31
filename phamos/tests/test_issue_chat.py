@@ -336,6 +336,17 @@ class TestIssueChat(FrappeTestCase):
 		self.assertNotIn(OWNER, assigned)
 		self.assertFalse(frappe.db.exists("DocShare", {"share_name": self.issue.name, "user": NO_READER}))
 
+	def test_sender_who_cannot_read_the_record_assigns_nobody_and_sees_no_error(self):
+		# A member whose read access went away (role removed) can still post in the chat.
+		channel_id = pc.ensure_issue_chat(self.issue.name)["channel_id"]
+		issue_chat._ensure_members(frappe._dict(name=channel_id, workspace=WORKSPACE), [NO_READER])
+		frappe.set_user(NO_READER)
+		frappe.local.message_log = []
+		_send(channel_id, f"{_mention(LATECOMER)} please look")
+		frappe.set_user(OWNER)
+		self.assertNotIn(LATECOMER, self._assigned())
+		self.assertEqual(frappe.local.message_log, [])
+
 	def test_mentions_outside_issue_chats_are_left_to_raven(self):
 		other = frappe.get_doc(
 			{

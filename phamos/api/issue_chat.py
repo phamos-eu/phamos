@@ -651,6 +651,10 @@ def assign_mentioned(doc, method=None):
 	channel = _mention_chat(doc)
 	if not channel or doc.get("is_bot_message"):
 		return
+	# Frappe's assignment checks the sender's read permission with frappe.throw, which queues its
+	# error for the client even when caught below. A member who lost access just assigns nobody.
+	if not frappe.has_permission(channel.linked_doctype, "read", doc=channel.linked_document):
+		return
 	assigned = {
 		row.get("owner") for row in get_assignments(channel.linked_doctype, channel.linked_document)
 	}
@@ -661,6 +665,8 @@ def assign_mentioned(doc, method=None):
 		return
 	from frappe.desk.form.assign_to import add as add_assignment
 
+	# One person's assignment failing half-way must not leave a stray ToDo behind.
+	frappe.db.savepoint("assign_mentioned")
 	try:
 		add_assignment(
 			{
@@ -673,6 +679,7 @@ def assign_mentioned(doc, method=None):
 			}
 		)
 	except Exception:
+		frappe.db.rollback(save_point="assign_mentioned")
 		frappe.log_error(title=f"Record chat: could not assign mentioned users in {channel.name}")
 
 
