@@ -1,11 +1,7 @@
-## Phamos
+## phamos
 
-ERPNext Enhancement for Phamos.eu
-
-Change by feature-branch-1
+Frappe/ERPNext custom app powering phamos.eu: cockpits, integrations and business processes for phamos GmbH.
 
 #### License
 
-MIT
-
-change from feature-branch-2
+AGPL-3.0, see [LICENSE](LICENSE).
