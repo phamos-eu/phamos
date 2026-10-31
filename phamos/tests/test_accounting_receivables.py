@@ -157,6 +157,14 @@ class TestBuildReceivables(FrappeTestCase):
 			("office@c2.example", "+49 1", "customer"))
 		self.assertIsNone(contacts["SI-4"])
 
+	def test_contact_never_mixes_people(self):
+		"""An invoice contact without email keeps no email, not the primary contact's."""
+		contact = rc.pick_contact(
+			{"contact_person": "CONT-7", "contact_display": "Max Muster"},
+			{"primary_contact": "CONT-1", "primary_email": "erika@c1.example", "email_id": "office@c1.example"},
+		)
+		self.assertEqual((contact["name"], contact["email"], contact["source"]), ("Max Muster", None, "invoice"))
+
 	def test_customer_contact_is_the_newest_invoice_contact(self):
 		invoice_details = {
 			"SI-OLD": frappe._dict(contact_person="A", contact_display="Old Contact", contact_email="old@x.example"),

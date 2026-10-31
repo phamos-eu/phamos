@@ -73,18 +73,20 @@ def pick_contact(invoice=None, customer=None):
 	"""
 	invoice = invoice or {}
 	customer = customer or {}
+	# Name, email and phone always come from one source: a mailto under one person's name must
+	# not reach somebody else.
 	if invoice.get("contact_email") or invoice.get("contact_person"):
 		return {
 			"name": invoice.get("contact_display") or invoice.get("contact_person"),
-			"email": invoice.get("contact_email") or customer.get("primary_email") or customer.get("email_id"),
-			"phone": invoice.get("contact_mobile") or customer.get("primary_phone") or customer.get("mobile_no"),
+			"email": invoice.get("contact_email"),
+			"phone": invoice.get("contact_mobile"),
 			"source": "invoice",
 		}
 	if customer.get("primary_contact"):
 		return {
 			"name": customer.get("primary_contact_name") or customer.get("primary_contact"),
-			"email": customer.get("primary_email") or customer.get("email_id"),
-			"phone": customer.get("primary_phone") or customer.get("mobile_no"),
+			"email": customer.get("primary_email"),
+			"phone": customer.get("primary_phone"),
 			"source": "primary_contact",
 		}
 	if customer.get("email_id") or customer.get("mobile_no"):

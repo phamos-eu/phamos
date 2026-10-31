@@ -67,6 +67,10 @@ def _report_rows(company, report_date):
 	return [row for row in rows if row.get("party_type") == "Customer" and row.get("voucher_no")]
 
 
+# The detail queries below use get_all: they only run for vouchers and customers whose report
+# rows already passed the user's permissions in `_report_rows`.
+
+
 def _invoice_details(names):
 	"""Sales Invoice contact, status, PO and document currency per invoice name."""
 	if not names:
