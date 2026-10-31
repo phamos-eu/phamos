@@ -31,6 +31,9 @@ class TestAnnouncePersonalCockpit(FrappeTestCase):
 		self.assertEqual((note.public, note.notify_on_login, note.notify_on_every_login), (1, 1, 0))
 		self.assertEqual(getdate(note.expire_notification_on), getdate(add_days(today(), 14)))
 		self.assertIn('href="/personal-cockpit"', note.content)
+		# issue references link to GitLab and survive Frappe's HTML sanitizing
+		self.assertIn('href="https://git.phamos.eu/phamos/phamos/-/work_items/1714"', note.content)
+		self.assertIn(">#1714</a>", note.content)
 
 	def test_every_user_sees_it_once(self):
 		from frappe.desk.doctype.note.note import _get_unseen_notes, get_unseen_notes, mark_as_seen
