@@ -19,10 +19,12 @@ from urllib.parse import quote
 import frappe
 from frappe import _
 from frappe.desk.form.load import get_assignments
-from frappe.query_builder.functions import Count, Max
+from frappe.query_builder.functions import Count, Max, Min
 from frappe.utils import cint, escape_html, get_datetime, get_fullname, strip_html_tags
 
 CHAT_DOCTYPES = ("Issue", "Task")
+# Most records a list may ask chat states for in one call (lists show up to 500).
+MAX_STATE_NAMES = 500
 
 # Statuses that close the record's work: its chat is archived (read-only in Raven) and comes back
 # when the record is reopened (#1622, #1779).
@@ -71,7 +73,17 @@ def channel_url(workspace, channel_id):
 
 
 
-def find_channel(doctype, name):
+def add_raven_indexes():
+	"""after_migrate: index Raven Channel's link to its record, which every chat lookup filters on
+	(Raven only indexes `workspace`, and every thread is a Raven Channel row too). add_index skips an
+	existing index, so this is safe on every migrate and also covers Raven installed later (#1794)."""
+	if is_raven_installed():
+		frappe.db.add_index("Raven Channel", ["linked_doctype", "linked_document"])
+
+
+def find_channel(doctype, name, for_update=False):
+	"""The record's chat, or None. `for_update` reads the latest committed row and locks it, for
+	callers that may create the chat (see ensure_chat)."""
 	if not is_raven_installed():
 		return None
 	# An archived chat still belongs to its record (#1622): finding it keeps "Start chat" from
@@ -87,6 +99,7 @@ def find_channel(doctype, name):
 		["name", "workspace", "is_archived"],
 		as_dict=True,
 		order_by="is_archived asc, creation asc",
+		for_update=for_update,
 	)
 
 
@@ -152,9 +165,13 @@ def _ensure_members(channel, users, admin=None, silent=False):
 	return skipped
 
 
-def _unread_counts(channel_ids):
+def _unread_counts(channel_ids, with_first=False):
 	"""Unread messages per channel for the session user since their last visit, not counting their
-	own (the intro message of a chat they just started would otherwise count)."""
+	own (the intro message of a chat they just started would otherwise count).
+
+	`with_first` returns {channel: (count, creation of the oldest unread message)} instead, so a
+	list finds where each chat opens without a query per chat (#1617, #1794).
+	"""
 	raven_user = _raven_user(frappe.session.user)
 	if not raven_user or not channel_ids:
 		return {}
@@ -164,7 +181,9 @@ def _unread_counts(channel_ids):
 		frappe.qb.from_(member)
 		.join(message)
 		.on(message.channel_id == member.channel_id)
-		.select(member.channel_id, Count(message.name).as_("unread"))
+		.select(
+			member.channel_id, Count(message.name).as_("unread"), Min(message.creation).as_("first_at")
+		)
 		.where(member.user_id == raven_user)
 		.where(member.channel_id.isin(list(channel_ids)))
 		.where(message.creation > member.last_visit)
@@ -172,7 +191,23 @@ def _unread_counts(channel_ids):
 		.where(message.owner != frappe.session.user)
 		.groupby(member.channel_id)
 	).run(as_dict=True)
+	if with_first:
+		return {row.channel_id: (row.unread, row.first_at) for row in rows}
 	return {row.channel_id: row.unread for row in rows}
+
+
+def _first_unread_messages(first_at):
+	"""{channel: name of its oldest unread message} from {channel: that message's creation}."""
+	if not first_at:
+		return {}
+	rows = frappe.get_all(
+		"Raven Message",
+		filters={"channel_id": ("in", list(first_at)), "creation": ("in", list(set(first_at.values())))},
+		fields=["name", "channel_id", "creation"],
+	)
+	return {
+		row.channel_id: row.name for row in rows if first_at.get(row.channel_id) == row.creation
+	}
 
 
 def _unread_thread_counts(channel_ids):
@@ -310,30 +345,6 @@ def _unread_threads(channel_id, limit=50):
 	return result
 
 
-def _first_unread_message(channel_id):
-	"""The oldest message in a chat the session user has not read yet, or None: where the chat
-	opens when it is opened from a list (#1617)."""
-	raven_user = _raven_user(frappe.session.user)
-	last_visit = raven_user and frappe.db.get_value(
-		"Raven Channel Member", {"channel_id": channel_id, "user_id": raven_user}, "last_visit"
-	)
-	if not last_visit:
-		return None
-	rows = frappe.get_all(
-		"Raven Message",
-		filters={
-			"channel_id": channel_id,
-			"creation": (">", last_visit),
-			"message_type": ("!=", "System"),
-			"owner": ("!=", frappe.session.user),
-		},
-		pluck="name",
-		order_by="creation asc",
-		limit=1,
-	)
-	return rows[0] if rows else None
-
-
 def _member_channels(channel_ids):
 	raven_user = _raven_user(frappe.session.user)
 	if not raven_user or not channel_ids:
@@ -402,7 +413,10 @@ def ensure_chat(doc):
 	if doc.get("is_template"):
 		frappe.throw(_("Template Tasks have no chat."))
 
-	channel = find_channel(doc.doctype, doc.name)
+	# Two people pressing "Start chat" at once: the record's row lock makes the second wait for
+	# the first to commit, and the locking read below then sees the chat it created (#1794).
+	frappe.db.get_value(doc.doctype, doc.name, "name", for_update=True)
+	channel = find_channel(doc.doctype, doc.name, for_update=True)
 	created = False
 	if not channel:
 		channel = _create_channel(doc)
@@ -436,9 +450,9 @@ def _create_channel(doc):
 	channel.flags.do_not_add_member = True
 	try:
 		channel.insert(ignore_permissions=True)
-	except (frappe.DuplicateEntryError, frappe.ValidationError):
-		# Someone else created it a moment ago.
-		existing = find_channel(doc.doctype, doc.name)
+	except frappe.DuplicateEntryError:
+		# Someone else created it a moment ago (ensure_chat's lock should prevent this).
+		existing = find_channel(doc.doctype, doc.name, for_update=True)
 		if not existing:
 			raise
 		return existing
@@ -473,6 +487,9 @@ def get_chat_states(doctype, names):
 	names = frappe.parse_json(names) if isinstance(names, str) else names
 	if not is_enabled() or not names:
 		return {}
+	if len(names) > MAX_STATE_NAMES:
+		# Lists show at most 500 records (get_issues); anything larger is not a list (#1794).
+		frappe.throw(_("Too many records for chat states: {0}").format(len(names)))
 	readable = frappe.get_list(
 		doctype, filters={"name": ("in", list(names))}, pluck="name", limit_page_length=0
 	)
@@ -491,7 +508,9 @@ def get_chat_states(doctype, names):
 	)
 	channel_ids = [c.name for c in channels]
 	members = _member_channels(channel_ids)
-	unread = _unread_counts(channel_ids)
+	unread_first = _unread_counts(channel_ids, with_first=True)
+	unread = {channel: count for channel, (count, _first) in unread_first.items()}
+	first_unread = _first_unread_messages({c: first for c, (_count, first) in unread_first.items()})
 	unread_threads = _unread_thread_counts(channel_ids)
 	mentions = _unread_mentions(channel_ids)
 	states = {}
@@ -510,7 +529,7 @@ def get_chat_states(doctype, names):
 			"first_unread_thread": None,
 		}
 		if state["unread"]:
-			state["first_unread"] = _first_unread_message(c.name)
+			state["first_unread"] = first_unread.get(c.name)
 		elif state["unread_threads"]:
 			threads = _unread_threads(c.name, limit=1)
 			state["first_unread_thread"] = threads[0]["thread_id"] if threads else None
@@ -610,6 +629,9 @@ def _set_archived(channel_id, archived):
 	record's status is what decides here, so the flag is written directly."""
 	frappe.db.set_value("Raven Channel", channel_id, "is_archived", int(archived))
 	frappe.clear_document_cache("Raven Channel", channel_id)
+	# Again after commit: a request in between could cache the old row (Raven does the same for
+	# its member cache, raven.utils.delete_channel_members_cache).
+	frappe.db.after_commit.add(lambda: frappe.clear_document_cache("Raven Channel", channel_id))
 	from raven.utils import get_raven_room
 
 	frappe.publish_realtime(
@@ -623,10 +645,11 @@ def add_mentioned_members(doc, method=None):
 	Runs after Raven has read the mentions from the HTML and before the insert, so Raven's own
 	after_insert already treats them as members: it notifies them and adds them to the thread
 	(it only adds people who are in the parent channel). Only people who can read the record
-	are added; for anyone else Raven's "isn't in this channel" warning stays (#1620).
+	are added; for anyone else Raven's "isn't in this channel" warning stays (#1620). A sender
+	who can no longer read the record (members are never removed) brings nobody in (#1794).
 	"""
 	channel = _mention_chat(doc)
-	if not channel:
+	if not channel or not _sender_can_read(channel):
 		return
 	members = set(
 		frappe.get_all("Raven Channel Member", filters={"channel_id": channel.name}, pluck="user_id")
@@ -654,7 +677,7 @@ def assign_mentioned(doc, method=None):
 		return
 	# Frappe's assignment checks the sender's read permission with frappe.throw, which queues its
 	# error for the client even when caught below. A member who lost access just assigns nobody.
-	if not frappe.has_permission(channel.linked_doctype, "read", doc=channel.linked_document):
+	if not _sender_can_read(channel):
 		return
 	assigned = {
 		row.get("owner") for row in get_assignments(channel.linked_doctype, channel.linked_document)
@@ -704,9 +727,20 @@ def keep_mention_unread(doc, method=None):
 		},
 		pluck="name",
 	)
-	before = get_datetime(doc.creation) - timedelta(microseconds=1)
-	for name in joined:
-		frappe.db.set_value("Raven Channel Member", name, "last_visit", before, update_modified=False)
+	try:
+		before = get_datetime(doc.creation) - timedelta(microseconds=1)
+		for name in joined:
+			frappe.db.set_value(
+				"Raven Channel Member", name, "last_visit", before, update_modified=False
+			)
+	except Exception:
+		# Only the red bubble is lost; the message itself must still go out.
+		frappe.log_error(title=f"Record chat: could not keep the mention unread in {doc.channel_id}")
+
+
+def _sender_can_read(channel):
+	"""Whether the session user (the message's sender) may still read the chat's record."""
+	return frappe.has_permission(channel.linked_doctype, "read", doc=channel.linked_document)
 
 
 def _mention_chat(doc):
