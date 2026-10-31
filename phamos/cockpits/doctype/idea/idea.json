@@ -1,0 +1,156 @@
+{
+ "actions": [],
+ "autoname": "hash",
+ "creation": "2026-10-31 10:00:00.000000",
+ "description": "An idea of the Personal Cockpit (#1771): captured, written out and matured stage by stage. Private: only the user sees their own ideas.",
+ "doctype": "DocType",
+ "engine": "InnoDB",
+ "field_order": [
+  "user",
+  "title",
+  "stage",
+  "column_break_meta",
+  "spawned_from",
+  "last_session_words",
+  "harvested_on",
+  "section_content",
+  "content",
+  "summary",
+  "section_snapshot",
+  "snapshot_title",
+  "snapshot_stage",
+  "snapshot_content",
+  "last_snapshot_on"
+ ],
+ "fields": [
+  {
+   "fieldname": "user",
+   "fieldtype": "Link",
+   "label": "User",
+   "options": "User",
+   "reqd": 1,
+   "read_only": 1,
+   "in_list_view": 1,
+   "in_standard_filter": 1,
+   "search_index": 1
+  },
+  {
+   "fieldname": "title",
+   "fieldtype": "Data",
+   "label": "Title",
+   "reqd": 1,
+   "in_list_view": 1
+  },
+  {
+   "fieldname": "stage",
+   "fieldtype": "Select",
+   "label": "Stage",
+   "options": "Seed\nSprout\nSeedling\nYoung plant\nGrowing\nMature\nHarvest\nCompost",
+   "default": "Seed",
+   "in_list_view": 1,
+   "in_standard_filter": 1,
+   "search_index": 1
+  },
+  {
+   "fieldname": "column_break_meta",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "spawned_from",
+   "fieldtype": "Link",
+   "label": "Spawned From",
+   "options": "Idea",
+   "search_index": 1,
+   "description": "The idea this one came out of."
+  },
+  {
+   "fieldname": "last_session_words",
+   "fieldtype": "Int",
+   "label": "Last Session Words",
+   "read_only": 1
+  },
+  {
+   "fieldname": "harvested_on",
+   "fieldtype": "Datetime",
+   "label": "Harvested On",
+   "read_only": 1
+  },
+  {
+   "fieldname": "section_content",
+   "fieldtype": "Section Break",
+   "label": "Content"
+  },
+  {
+   "fieldname": "content",
+   "fieldtype": "Text Editor",
+   "label": "Content"
+  },
+  {
+   "fieldname": "summary",
+   "fieldtype": "Small Text",
+   "label": "Summary",
+   "read_only": 1,
+   "description": "Plain-text excerpt of the content for lists."
+  },
+  {
+   "fieldname": "section_snapshot",
+   "fieldtype": "Section Break",
+   "label": "Last Snapshot",
+   "hidden": 1
+  },
+  {
+   "fieldname": "snapshot_title",
+   "fieldtype": "Data",
+   "label": "Snapshot Title",
+   "read_only": 1,
+   "hidden": 1
+  },
+  {
+   "fieldname": "snapshot_stage",
+   "fieldtype": "Data",
+   "label": "Snapshot Stage",
+   "read_only": 1,
+   "hidden": 1
+  },
+  {
+   "fieldname": "snapshot_content",
+   "fieldtype": "Text Editor",
+   "label": "Snapshot Content",
+   "read_only": 1,
+   "hidden": 1
+  },
+  {
+   "fieldname": "last_snapshot_on",
+   "fieldtype": "Datetime",
+   "label": "Last Snapshot On",
+   "read_only": 1,
+   "hidden": 1
+  }
+ ],
+ "links": [],
+ "modified": "2026-10-31 10:00:00.000000",
+ "modified_by": "Administrator",
+ "module": "Cockpits",
+ "name": "Idea",
+ "naming_rule": "Random",
+ "owner": "Administrator",
+ "permissions": [
+  {
+   "role": "System Manager",
+   "read": 1,
+   "write": 1,
+   "create": 1,
+   "delete": 1,
+   "report": 1,
+   "export": 1,
+   "print": 1,
+   "email": 1,
+   "share": 1
+  }
+ ],
+ "sort_field": "creation",
+ "sort_order": "DESC",
+ "states": [],
+ "title_field": "title",
+ "track_changes": 1
+}
