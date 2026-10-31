@@ -1,8 +1,13 @@
 <template>
 	<div class="h-full min-h-0 overflow-y-auto bg-surface-gray-1 p-5">
 		<div class="mx-auto flex max-w-7xl flex-col gap-4">
-			<div v-if="error" class="rounded-lg border border-outline-gray-2 bg-surface-red-1 p-4 text-sm text-ink-red-4">
-				{{ error }}
+			<div
+				v-if="error"
+				class="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-outline-gray-2 bg-surface-red-1 p-4 text-sm text-ink-red-4"
+			>
+				<span>{{ error }}</span>
+				<!-- A link or bookmark may name a company this user cannot see. -->
+				<Button v-if="filters.company" label="Show my default company" @click="selectCompany('')" />
 			</div>
 			<div v-if="loading && !data" class="flex min-h-64 items-center justify-center text-sm text-ink-gray-5">
 				Loading receivables…
