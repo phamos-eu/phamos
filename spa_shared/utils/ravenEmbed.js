@@ -96,12 +96,22 @@ export function installGuard(win, channelPath, onLeave, onThread = null) {
 	const history = win.history
 	const originals = { pushState: history.pushState, replaceState: history.replaceState }
 	let lastAllowed = win.location.pathname + win.location.search
+	// Raven's router (react-router) keeps its own place in history.state ({ key, idx }) and has
+	// already switched views by the time it pushes or replaces the address.
+	let lastAllowedState = history.state
 	let homeTimer = null
 
-	function leave(kind) {
+	function leave(kind, how) {
 		const href = win.location.href
-		originals.replaceState.call(history, history.state, "", lastAllowed)
-		win.dispatchEvent(new win.PopStateEvent("popstate", { state: history.state }))
+		if (how === "pushState") {
+			// A real Back to the channel's entry: the router sees its index go down and renders the
+			// channel again. Rewriting the address with the new entry's state (same index) left the
+			// router on the other page, e.g. a DM opened from a profile card.
+			history.back()
+		} else {
+			originals.replaceState.call(history, lastAllowedState, "", lastAllowed)
+			win.dispatchEvent(new win.PopStateEvent("popstate", { state: history.state }))
+		}
 		onLeave(kind, href)
 	}
 
@@ -111,6 +121,7 @@ export function installGuard(win, channelPath, onLeave, onThread = null) {
 		if (kind === "channel") {
 			const before = lastAllowed
 			lastAllowed = win.location.pathname + win.location.search
+			lastAllowedState = history.state
 			const thread = threadIdFromHref(win.location.pathname)
 			if (thread && thread !== threadIdFromHref(before)) onThread?.(thread)
 			return
@@ -120,11 +131,11 @@ export function installGuard(win, channelPath, onLeave, onThread = null) {
 		// or a home page that is still shown a moment later means the user left the chat.
 		if (kind === "home" && how !== "popstate") {
 			homeTimer = win.setTimeout(() => {
-				if (classifyPath(win.location.pathname, channelPath) === "home") leave("home")
+				if (classifyPath(win.location.pathname, channelPath) === "home") leave("home", how)
 			}, HOME_GRACE_MS)
 			return
 		}
-		leave(kind)
+		leave(kind, how)
 	}
 
 	const onPopState = () => check("popstate")
