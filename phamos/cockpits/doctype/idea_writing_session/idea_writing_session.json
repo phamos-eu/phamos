@@ -17,7 +17,8 @@
   "word_goal",
   "column_break_feel",
   "aim_choice",
-  "felt_productive"
+  "felt_productive",
+  "imported_from"
  ],
  "fields": [
   {
@@ -100,10 +101,19 @@
    "label": "Felt Productive",
    "options": "\nProductive\nMixed\nNot really",
    "read_only": 1
+  },
+  {
+   "fieldname": "imported_from",
+   "fieldtype": "Data",
+   "label": "Imported From",
+   "read_only": 1,
+   "search_index": 1,
+   "no_copy": 1,
+   "description": "Source record of an import, e.g. NextChapter (#1776)."
   }
  ],
  "links": [],
- "modified": "2026-10-31 10:00:00.000000",
+ "modified": "2026-10-31 15:00:00.000000",
  "modified_by": "Administrator",
  "module": "Cockpits",
  "name": "Idea Writing Session",

@@ -1592,3 +1592,35 @@ Not saved,Nicht gespeichert
 {0} words,{0} Wörter
 "Something else came up? Park it here; the first line becomes its title.","Kam dir etwas anderes in den Sinn? Parke es hier; die erste Zeile wird zum Titel."
 1 word,1 Wort
+Idea Import,Ideen-Import
+Idea Import User,Ideen-Import Konto
+NextChapter Site,NextChapter-Seite
+e.g. https://next-chapter-develop.frappe.cloud,z. B. https://next-chapter-develop.frappe.cloud
+Default User,Standardbenutzer
+Gets the ideas of NextChapter accounts without a match below.,Erhält die Ideen von NextChapter-Konten ohne Zuordnung unten.
+Accounts Loaded,Konten geladen
+Imported,Importiert
+Accounts,Konten
+"Each NextChapter account and the user its ideas go to. Empty: the default user.","Jedes NextChapter-Konto und der Benutzer, der seine Ideen erhält. Leer: der Standardbenutzer."
+Last Run,Letzter Lauf
+Ideas Created,Angelegte Ideen
+Sessions Created,Angelegte Sitzungen
+Already Imported,Bereits importiert
+Ideas to Default User,Ideen an Standardbenutzer
+Last Run On,Letzter Lauf am
+NextChapter Account,NextChapter-Konto
+Sessions,Sitzungen
+Imported From,Importiert aus
+"Source record of an import, e.g. NextChapter (#1776).","Quelldatensatz eines Imports, z. B. NextChapter (#1776)."
+Load accounts,Konten laden
+Reading NextChapter…,NextChapter wird gelesen …
+Importing ideas…,Ideen werden importiert …
+Import all ideas and writing sessions now? Ideas already imported are skipped.,Jetzt alle Ideen und Schreibsitzungen importieren? Bereits importierte Ideen werden übersprungen.
+"{0} ideas and {1} sessions imported, {2} already there","{0} Ideen und {1} Sitzungen importiert, {2} schon vorhanden"
+The NextChapter site must start with https://,Die NextChapter-Seite muss mit https:// beginnen
+Could not sign in to {0} (HTTP {1}).,Anmeldung bei {0} fehlgeschlagen (HTTP {1}).
+Could not read {0} from {1} (HTTP {2}).,{0} konnte nicht von {1} gelesen werden (HTTP {2}).
+"{0}: {1} has no match, given to {2}","{0}: {1} hat keine Zuordnung, an {2} gegeben"
+Nothing new to import.,Nichts Neues zu importieren.
+The import failed and was undone. The error is in the log.,Der Import ist fehlgeschlagen und wurde rückgängig gemacht. Der Fehler steht im Protokoll.
+"{0}: came from {1}, but they belong to different people; link left out","{0}: entstand aus {1}, gehört aber einer anderen Person; Verknüpfung weggelassen"
