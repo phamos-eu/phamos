@@ -1,7 +1,7 @@
 # Copyright (c) 2026, phamos.eu and contributors
 # For license information, please see license.txt
 
-"""Issue chat: one Private Raven channel per Issue, opened from the cockpits (#1614, #1548).
+"""Record chat: one Private Raven channel per Issue or Task, opened from the cockpits (#1614, #1779).
 
 Raven's own UI shows the chat; this module only links a channel to the record (Raven's
 `linked_doctype` / `linked_document`), keeps its members in step with the record's owner and
@@ -21,9 +21,16 @@ from frappe.desk.form.load import get_assignments
 from frappe.query_builder.functions import Count, Max
 from frappe.utils import cint, escape_html, get_fullname, strip_html_tags
 
-CHAT_DOCTYPES = ("Issue",)
+CHAT_DOCTYPES = ("Issue", "Task")
 
-# Department settings field → cockpit route. Raven's Issue links open the Issue in the first
+# Statuses that close the record's work: its chat is archived (read-only in Raven) and comes back
+# when the record is reopened (#1622, #1779).
+ARCHIVE_STATUSES = {"Issue": ("Closed",), "Task": ("Completed", "Cancelled")}
+
+# Where each record opens in a cockpit.
+RECORD_ROUTES = {"Issue": "issues/list", "Task": "tasks/gantt"}
+
+# Department settings field → cockpit route. Raven's record links open the record in the first
 # cockpit whose department matches, otherwise in the Personal Cockpit.
 COCKPIT_PATHS = (
 	("sales_department", "/sales-cockpit"),
@@ -90,7 +97,10 @@ def _raven_user(user):
 
 
 def _record_users(doc):
-	users = [doc.owner] + [row.get("owner") for row in get_assignments(doc.doctype, doc.name)]
+	"""The people a record's chat starts with: its creator, its Task Owner (custom field on Task,
+	the person responsible in the cockpits) and its assignees."""
+	users = [doc.owner, doc.get("custom_task_owner")]
+	users += [row.get("owner") for row in get_assignments(doc.doctype, doc.name)]
 	return list(dict.fromkeys(u for u in users if u and u != "Guest"))
 
 
@@ -338,6 +348,8 @@ def ensure_chat(doc):
 	_require_enabled()
 	if not _raven_user(frappe.session.user):
 		frappe.throw(_("You need to be a Raven user to chat."))
+	if doc.get("is_template"):
+		frappe.throw(_("Template Tasks have no chat."))
 
 	channel = find_channel(doc.doctype, doc.name)
 	created = False
@@ -348,11 +360,11 @@ def ensure_chat(doc):
 	users = [frappe.session.user] + _record_users(doc)
 	_ensure_members(channel, users, admin=frappe.session.user if created else None)
 	if created:
-		_post_link_message(
-			channel.name,
-			doc,
-			_("Chat about {0}: {1}").format(doc.name, _doc_title(doc)),
-		)
+		intro = _("Chat about {0}: {1}").format(doc.name, _doc_title(doc))
+		if doc.doctype == "Task" and doc.get("issue"):
+			# The Issue's chat ends with "converted to Task …"; this keeps the thread findable.
+			intro += " " + _("It follows on from Issue {0}.").format(doc.issue)
+		_post_link_message(channel.name, doc, intro)
 	return get_chat(doc)
 
 
@@ -481,29 +493,33 @@ def sync_assignee(doc, method=None):
 		else:
 			_post_system_message(channel.name, _("{0} unassigned {1}.").format(actor, person))
 	except Exception:
-		frappe.log_error(title=f"Issue chat: could not post the assignment of {doc.allocated_to}")
+		frappe.log_error(title=f"Record chat: could not post the assignment of {doc.allocated_to}")
 
 
-def on_issue_update(doc, method=None):
-	"""Issue on_update: status changes show up in its chat; Closed archives it, reopening brings
-	it back (#1621, #1622). Never blocks the save when Raven fails."""
+def on_record_update(doc, method=None):
+	"""Issue / Task on_update: status changes show up in the record's chat. A status that closes
+	the work (ARCHIVE_STATUSES) archives the chat; reopening brings it back (#1621, #1622, #1779).
+	Never blocks the save when Raven fails."""
+	if doc.doctype not in CHAT_DOCTYPES:
+		return
 	before = doc.get_doc_before_save()
 	if not before or before.status == doc.status or not is_enabled():
 		return
 	channel = find_channel(doc.doctype, doc.name)
 	if not channel:
 		return
+	closing = ARCHIVE_STATUSES.get(doc.doctype, ())
 	try:
-		if before.status == "Closed" and channel.is_archived:
+		if before.status in closing and doc.status not in closing and channel.is_archived:
 			_set_archived(channel.name, False)
 		_post_system_message(
 			channel.name,
 			_("{0} set the status to {1}.").format(_display_name(frappe.session.user), _(doc.status)),
 		)
-		if doc.status == "Closed" and not channel.is_archived:
+		if doc.status in closing and not channel.is_archived:
 			_set_archived(channel.name, True)
 	except Exception:
-		frappe.log_error(title=f"Issue chat: could not follow the status of {doc.name}")
+		frappe.log_error(title=f"Record chat: could not follow the status of {doc.doctype} {doc.name}")
 
 
 def on_task_insert(doc, method=None):
@@ -548,7 +564,7 @@ def _set_archived(channel_id, archived):
 
 
 def add_mentioned_members(doc, method=None):
-	"""Raven Message validate: people mentioned in an Issue chat (or one of its threads) join it.
+	"""Raven Message validate: people mentioned in a record chat (or one of its threads) join it.
 
 	Runs after Raven has read the mentions from the HTML and before the insert, so Raven's own
 	after_insert already treats them as members: it notifies them and adds them to the thread
@@ -577,7 +593,7 @@ def add_mentioned_members(doc, method=None):
 	try:
 		_ensure_members(channel, users)
 	except Exception:
-		frappe.log_error(title=f"Issue chat: could not add mentioned users to {channel.name}")
+		frappe.log_error(title=f"Record chat: could not add mentioned users to {channel.name}")
 
 
 def _chat_channel_of(channel_id):
@@ -594,20 +610,25 @@ def _chat_channel_of(channel_id):
 
 
 def document_link(doctype, docname):
-	"""raven_document_link_override: Raven opens Issue links in the matching cockpit."""
-	if doctype != "Issue":
+	"""raven_document_link_override: Raven opens Issue and Task links in the matching cockpit."""
+	route = RECORD_ROUTES.get(doctype)
+	if not route:
 		return None
-	return f"{issue_cockpit_path(docname)}/issues/list/{docname}"
+	return f"{record_cockpit_path(doctype, docname)}/{route}/{docname}"
 
 
-def issue_cockpit_path(name):
+def record_cockpit_path(doctype, name):
+	"""The cockpit a record belongs to: the one whose department is the record's own department
+	(Issue: custom_department, Task: department) or else its project's department; otherwise the
+	Personal Cockpit."""
+	department_field = "custom_department" if doctype == "Issue" else "department"
 	fields = ["project"]
-	if frappe.get_meta("Issue").has_field("custom_department"):
-		fields.append("custom_department")
-	issue = frappe.db.get_value("Issue", name, fields, as_dict=True) or frappe._dict()
-	department = issue.get("custom_department")
-	if not department and issue.project:
-		department = frappe.db.get_value("Project", issue.project, "department")
+	if frappe.get_meta(doctype).has_field(department_field):
+		fields.append(department_field)
+	record = frappe.db.get_value(doctype, name, fields, as_dict=True) or frappe._dict()
+	department = record.get(department_field)
+	if not department and record.project:
+		department = frappe.db.get_value("Project", record.project, "department")
 	if department:
 		settings_meta = frappe.get_meta("phamos Settings")
 		for fieldname, path in COCKPIT_PATHS:

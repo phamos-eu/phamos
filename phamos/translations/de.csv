@@ -1624,3 +1624,11 @@ Could not read {0} from {1} (HTTP {2}).,{0} konnte nicht von {1} gelesen werden 
 Nothing new to import.,Nichts Neues zu importieren.
 The import failed and was undone. The error is in the log.,Der Import ist fehlgeschlagen und wurde rückgängig gemacht. Der Fehler steht im Protokoll.
 "{0}: came from {1}, but they belong to different people; link left out","{0}: entstand aus {1}, gehört aber einer anderen Person; Verknüpfung weggelassen"
+No chat for this Task yet.,Zu dieser Aufgabe gibt es noch keinen Chat.
+"Start one with the people on this Task. Messages also show up in Raven, linked to the Task.","Starten Sie einen mit den Beteiligten dieser Aufgabe. Die Nachrichten erscheinen auch in Raven, verknüpft mit der Aufgabe."
+Start a Raven chat with the people on this Task,Einen Raven-Chat mit den Beteiligten dieser Aufgabe starten
+Join the Raven chat of this Task,Dem Raven-Chat dieser Aufgabe beitreten
+Read the chat of this finished Task,Den Chat dieser abgeschlossenen Aufgabe lesen
+Open the Raven chat of this Task,Den Raven-Chat dieser Aufgabe öffnen
+It follows on from Issue {0}.,Er schließt an die Anfrage {0} an.
+Template Tasks have no chat.,Vorlage-Aufgaben haben keinen Chat.
