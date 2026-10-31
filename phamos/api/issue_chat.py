@@ -13,13 +13,14 @@ written with `ignore_permissions`. Raven is a soft dependency: without it every 
 `enabled: False` and the hooks do nothing.
 """
 
+from datetime import timedelta
 from urllib.parse import quote
 
 import frappe
 from frappe import _
 from frappe.desk.form.load import get_assignments
 from frappe.query_builder.functions import Count, Max
-from frappe.utils import cint, escape_html, get_fullname, strip_html_tags
+from frappe.utils import cint, escape_html, get_datetime, get_fullname, strip_html_tags
 
 CHAT_DOCTYPES = ("Issue", "Task")
 
@@ -681,6 +682,31 @@ def assign_mentioned(doc, method=None):
 	except Exception:
 		frappe.db.rollback(save_point="assign_mentioned")
 		frappe.log_error(title=f"Record chat: could not assign mentioned users in {channel.name}")
+
+
+def keep_mention_unread(doc, method=None):
+	"""Raven Message after_insert: for people who joined the chat (or the thread) because this
+	message mentions them, the message itself stays unread, so their bubble shows it in red (#1784).
+
+	They join while the message is being saved, after its timestamp is set, and Raven stamps a new
+	member's last visit with "now", so without this the mention counted as already read.
+	"""
+	channel = _mention_chat(doc)
+	if not channel:
+		return
+	raven_users = [_raven_user(u) for u in _mentioned_readers(doc, channel)]
+	joined = frappe.get_all(
+		"Raven Channel Member",
+		filters={
+			"channel_id": doc.channel_id,
+			"user_id": ("in", [u for u in raven_users if u]),
+			"creation": (">=", doc.creation),
+		},
+		pluck="name",
+	)
+	before = get_datetime(doc.creation) - timedelta(microseconds=1)
+	for name in joined:
+		frappe.db.set_value("Raven Channel Member", name, "last_visit", before, update_modified=False)
 
 
 def _mention_chat(doc):
