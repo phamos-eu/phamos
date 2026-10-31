@@ -75,6 +75,8 @@ unit_tests:
       phamos.tests.test_web_profile_events
       phamos.tests.test_web_page_editing
       phamos.phamos.doctype.timesheet_record.test_timesheet_record
+      phamos.tests.test_accounting_stats
+      phamos.tests.test_accounting_receivables
       phamos.tests.test_personal_ideas
       phamos.tests.test_idea_import
   script:
