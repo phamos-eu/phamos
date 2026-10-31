@@ -207,6 +207,54 @@ def _unread_thread_counts(channel_ids):
 	return {row.channel_id: row.unread for row in rows}
 
 
+def _unread_mentions(channel_ids):
+	"""Unread messages per chat that mention the session user, in the chat itself or in one of
+	its threads (#1781). Same unread rules as the counts above; the mentions are Raven's own
+	(Raven Mention rows on the message)."""
+	raven_user = _raven_user(frappe.session.user)
+	if not raven_user or not channel_ids:
+		return {}
+	member = frappe.qb.DocType("Raven Channel Member")
+	message = frappe.qb.DocType("Raven Message")
+	mention = frappe.qb.DocType("Raven Mention")
+	in_chat = (
+		frappe.qb.from_(member)
+		.join(message)
+		.on(message.channel_id == member.channel_id)
+		.join(mention)
+		.on((mention.parent == message.name) & (mention.user == raven_user))
+		.select(member.channel_id, Count(message.name).as_("mentions"))
+		.where(member.user_id == raven_user)
+		.where(member.channel_id.isin(list(channel_ids)))
+		.where(message.creation > member.last_visit)
+		.where(message.owner != frappe.session.user)
+		.groupby(member.channel_id)
+	).run(as_dict=True)
+	thread = frappe.qb.DocType("Raven Channel")
+	root = frappe.qb.DocType("Raven Message", alias="root")
+	in_threads = (
+		frappe.qb.from_(thread)
+		.join(root)
+		.on(root.name == thread.name)
+		.join(member)
+		.on((member.channel_id == thread.name) & (member.user_id == raven_user))
+		.join(message)
+		.on(message.channel_id == thread.name)
+		.join(mention)
+		.on((mention.parent == message.name) & (mention.user == raven_user))
+		.select(root.channel_id, Count(message.name).as_("mentions"))
+		.where(thread.is_thread == 1)
+		.where(root.channel_id.isin(list(channel_ids)))
+		.where(message.creation > member.last_visit)
+		.where(message.owner != frappe.session.user)
+		.groupby(root.channel_id)
+	).run(as_dict=True)
+	counts = {}
+	for row in in_chat + in_threads:
+		counts[row.channel_id] = counts.get(row.channel_id, 0) + row.mentions
+	return counts
+
+
 def _unread_threads(channel_id, limit=50):
 	"""The threads of one chat with unread replies for the session user, newest reply first:
 	[{thread_id, unread, preview, last_sender}] for the hint above the chat and the marks on the
@@ -309,6 +357,7 @@ def get_chat(doc):
 		"archived": False,
 		"unread": 0,
 		"unread_threads": 0,
+		"mentions": 0,
 		"threads": [],
 		"skipped_users": [],
 	}
@@ -332,6 +381,7 @@ def get_chat(doc):
 		is_member=channel.name in _member_channels([channel.name]),
 		unread=_unread_counts([channel.name]).get(channel.name, 0),
 		unread_threads=_unread_thread_counts([channel.name]).get(channel.name, 0),
+		mentions=_unread_mentions([channel.name]).get(channel.name, 0),
 	)
 	if state["unread_threads"]:
 		state["threads"] = _unread_threads(channel.name)
@@ -413,7 +463,7 @@ def _post_link_message(channel_id, doc, text):
 
 def get_chat_states(doctype, names):
 	"""Batched chat state for list views: {name: {channel_id, is_member, archived, unread,
-	unread_threads, first_unread, first_unread_thread}}.
+	unread_threads, mentions, first_unread, first_unread_thread}}.
 
 	Only records the session user may read and that have a chat are returned.
 	"""
@@ -441,6 +491,7 @@ def get_chat_states(doctype, names):
 	members = _member_channels(channel_ids)
 	unread = _unread_counts(channel_ids)
 	unread_threads = _unread_thread_counts(channel_ids)
+	mentions = _unread_mentions(channel_ids)
 	states = {}
 	for c in channels:
 		state = {
@@ -449,6 +500,8 @@ def get_chat_states(doctype, names):
 			"archived": bool(c.is_archived),
 			"unread": unread.get(c.name, 0),
 			"unread_threads": unread_threads.get(c.name, 0),
+			# Unread messages that mention the user: the bubble turns red (#1781).
+			"mentions": mentions.get(c.name, 0),
 			# Where the chat opens from the list: the first new message, else the thread with
 			# the newest unread reply (#1617).
 			"first_unread": None,
