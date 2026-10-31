@@ -14,7 +14,8 @@
 			{{ buttonLabel }}
 			<template v-if="unreadTotal" #suffix>
 				<span
-					class="ml-0.5 inline-flex h-4 min-w-[1rem] items-center justify-center gap-0.5 rounded-full bg-surface-red-5 px-1 text-[10px] font-semibold text-ink-white"
+					class="ml-0.5 inline-flex h-4 min-w-[1rem] items-center justify-center gap-0.5 rounded-full px-1 text-[10px] font-semibold text-ink-white"
+					:class="unreadTone(state) === 'mention' ? 'bg-surface-red-5' : 'bg-surface-blue-3'"
 					:aria-label="unreadSummary(state)"
 				>
 					{{ unreadTotal > 99 ? "99+" : unreadTotal }}
@@ -66,7 +67,7 @@ import { sessionUser } from "@spa/session.js"
 import { __ } from "@spa/utils/i18n.js"
 import { chatChanged, issueChatStore } from "@spa/issueChatStore.js"
 import { useUserRealtime } from "@spa/composables/useUserRealtime.js"
-import { totalUnread, unreadSummary } from "@spa/utils/chatUnread.js"
+import { totalUnread, unreadSummary, unreadTone } from "@spa/utils/chatUnread.js"
 
 const props = defineProps({
 	/** "Issue" or "Task": picks the cockpit endpoints (get_issue_chat, get_task_chat …) and texts */
@@ -104,7 +105,7 @@ const texts = computed(() =>
 			}
 )
 
-const EMPTY = { enabled: false, channel_id: null, url: null, is_member: false, archived: false, unread: 0, unread_threads: 0, threads: [], skipped_users: [] }
+const EMPTY = { enabled: false, channel_id: null, url: null, is_member: false, archived: false, unread: 0, unread_threads: 0, mentions: 0, threads: [], skipped_users: [] }
 const state = ref({ ...EMPTY })
 const busy = ref(false)
 const drawerOpen = ref(false)

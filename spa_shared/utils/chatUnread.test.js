@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest"
-import { concernsChats, totalUnread, unreadSummary } from "./chatUnread.js"
+import { concernsChats, totalUnread, unreadSummary, unreadTone } from "./chatUnread.js"
 
 describe("chat unread counts", () => {
 	it("adds thread replies to the chat count", () => {
@@ -13,6 +13,20 @@ describe("chat unread counts", () => {
 		expect(unreadSummary({ unread: 1, unread_threads: 0 })).toBe("1 unread in the chat")
 		expect(unreadSummary({ unread: 0, unread_threads: 4 })).toBe("4 new replies in threads")
 		expect(unreadSummary({})).toBe("")
+	})
+})
+
+describe("chat badge tone (#1781)", () => {
+	it("is blue for new messages and red only for a mention", () => {
+		expect(unreadTone(null)).toBe("")
+		expect(unreadTone({ unread: 0, unread_threads: 0, mentions: 0 })).toBe("")
+		expect(unreadTone({ unread: 2 })).toBe("new")
+		expect(unreadTone({ unread_threads: 1, mentions: 0 })).toBe("new")
+		expect(unreadTone({ unread: 1, mentions: 1 })).toBe("mention")
+	})
+
+	it("says so when the user was mentioned", () => {
+		expect(unreadSummary({ unread: 1, mentions: 1 })).toBe("You were mentioned · 1 unread in the chat")
 	})
 })
 
