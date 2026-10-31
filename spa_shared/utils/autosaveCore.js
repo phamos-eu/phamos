@@ -118,8 +118,11 @@ export function mergeServerDoc({ defs, server, draft, baseline, lastSynced, focu
 		const changedOnServer = !fieldEquals(def, serverValue, baseline[f])
 		next.baseline[f] = serverValue
 		if (!dirty) {
-			if (focused.has(f) && !fieldEquals(def, serverValue, draft[f])) {
-				next.deferred[f] = serverValue
+			// A field being edited is never rewritten: a different value waits until blur, and an
+			// "equal" one (e.g. the trimmed copy of "A " for a trim field) is not written at all,
+			// otherwise the trailing space disappears and the cursor jumps (#1771).
+			if (focused.has(f)) {
+				if (!fieldEquals(def, serverValue, draft[f])) next.deferred[f] = serverValue
 				continue
 			}
 			next.draft[f] = serverValue
