@@ -130,6 +130,34 @@ describe("mergeServerDoc", () => {
 		expect(merged.deferred.description).toBe("<p>theirs</p>")
 	})
 
+	it("never rewrites a focused field, not even with an equal value (#1771)", () => {
+		// Typing "A " saves "A" (trimmed); the server's "A" must not take the space away.
+		const typed = { ...base, subject: "A " }
+		const merged = mergeServerDoc({
+			defs,
+			server: base,
+			draft: typed,
+			baseline: base,
+			lastSynced: base,
+			focused: new Set(["subject"]),
+			source: "save",
+		})
+		expect(merged.draft.subject).toBe("A ")
+		expect(merged.deferred).toEqual({})
+	})
+
+	it("still adopts an equal value once the field is not focused", () => {
+		const merged = mergeServerDoc({
+			defs,
+			server: base,
+			draft: { ...base, subject: "A " },
+			baseline: base,
+			lastSynced: base,
+			source: "save",
+		})
+		expect(merged.draft.subject).toBe("A")
+	})
+
 	it("leaves fields missing from a partial payload alone", () => {
 		const merged = mergeServerDoc({
 			defs,
