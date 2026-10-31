@@ -1,0 +1,151 @@
+{
+ "actions": [],
+ "creation": "2026-10-31 15:00:00.000000",
+ "doctype": "DocType",
+ "engine": "InnoDB",
+ "links": [],
+ "modified": "2026-10-31 15:00:00.000000",
+ "modified_by": "Administrator",
+ "module": "Cockpits",
+ "owner": "Administrator",
+ "sort_field": "creation",
+ "sort_order": "DESC",
+ "states": [],
+ "name": "Idea Import",
+ "autoname": "format:IDEA-IMPORT-{####}",
+ "naming_rule": "Expression",
+ "title_field": "source_url",
+ "track_changes": 1,
+ "description": "Brings ideas and writing sessions over from a NextChapter site (#1776). System Manager only.",
+ "field_order": [
+  "source_url",
+  "username",
+  "password",
+  "column_break_target",
+  "default_user",
+  "status",
+  "section_users",
+  "users",
+  "section_result",
+  "ideas_created",
+  "sessions_created",
+  "column_break_result",
+  "skipped",
+  "to_default_user",
+  "last_run_on",
+  "log"
+ ],
+ "fields": [
+  {
+   "fieldname": "source_url",
+   "fieldtype": "Data",
+   "label": "NextChapter Site",
+   "reqd": 1,
+   "description": "e.g. https://next-chapter-develop.frappe.cloud"
+  },
+  {
+   "fieldname": "username",
+   "fieldtype": "Data",
+   "label": "Username",
+   "reqd": 1
+  },
+  {
+   "fieldname": "password",
+   "fieldtype": "Password",
+   "label": "Password",
+   "reqd": 1
+  },
+  {
+   "fieldname": "column_break_target",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "default_user",
+   "fieldtype": "Link",
+   "label": "Default User",
+   "options": "User",
+   "reqd": 1,
+   "description": "Gets the ideas of NextChapter accounts without a match below."
+  },
+  {
+   "fieldname": "status",
+   "fieldtype": "Select",
+   "label": "Status",
+   "options": "Draft\nAccounts Loaded\nImported\nFailed",
+   "default": "Draft",
+   "read_only": 1,
+   "in_list_view": 1
+  },
+  {
+   "fieldname": "section_users",
+   "fieldtype": "Section Break",
+   "label": "Accounts"
+  },
+  {
+   "fieldname": "users",
+   "fieldtype": "Table",
+   "label": "Accounts",
+   "options": "Idea Import User",
+   "description": "Each NextChapter account and the user its ideas go to. Empty: the default user."
+  },
+  {
+   "fieldname": "section_result",
+   "fieldtype": "Section Break",
+   "label": "Last Run"
+  },
+  {
+   "fieldname": "ideas_created",
+   "fieldtype": "Int",
+   "label": "Ideas Created",
+   "read_only": 1
+  },
+  {
+   "fieldname": "sessions_created",
+   "fieldtype": "Int",
+   "label": "Sessions Created",
+   "read_only": 1
+  },
+  {
+   "fieldname": "column_break_result",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "skipped",
+   "fieldtype": "Int",
+   "label": "Already Imported",
+   "read_only": 1
+  },
+  {
+   "fieldname": "to_default_user",
+   "fieldtype": "Int",
+   "label": "Ideas to Default User",
+   "read_only": 1
+  },
+  {
+   "fieldname": "last_run_on",
+   "fieldtype": "Datetime",
+   "label": "Last Run On",
+   "read_only": 1
+  },
+  {
+   "fieldname": "log",
+   "fieldtype": "Long Text",
+   "label": "Log",
+   "read_only": 1
+  }
+ ],
+ "permissions": [
+  {
+   "role": "System Manager",
+   "read": 1,
+   "write": 1,
+   "create": 1,
+   "delete": 1,
+   "report": 1,
+   "export": 1,
+   "print": 1,
+   "email": 1,
+   "share": 1
+  }
+ ]
+}

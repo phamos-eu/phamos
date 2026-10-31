@@ -1403,3 +1403,147 @@ Your user has no active Employee record.,Ihr Benutzer hat keinen aktiven Mitarbe
 "Only open leave can be changed. Ask HR to change approved, rejected or cancelled leave.","Nur offener Urlaub kann geändert werden. Für genehmigten, abgelehnten oder stornierten Urlaub wenden Sie sich an HR."
 Someone changed this leave application in the meantime. Reload and try again.,Jemand hat diesen Urlaubsantrag inzwischen geändert. Bitte neu laden und erneut versuchen.
 You cannot cover for yourself.,Sie können sich nicht selbst vertreten.
+Idea,Idee
+Ideas,Ideen
+Idea Writing Session,Schreibsitzung
+Spawned From,Entstanden aus
+The idea this one came out of.,"Die Idee, aus der diese entstanden ist."
+Last Session Words,Wörter der letzten Sitzung
+Harvested On,Geerntet am
+Plain-text excerpt of the content for lists.,Kurzfassung des Inhalts als Text für Listen.
+Last Snapshot,Letzter Stand
+Snapshot Title,Titel im letzten Stand
+Snapshot Stage,Phase im letzten Stand
+Snapshot Content,Inhalt im letzten Stand
+Last Snapshot On,Letzter Stand am
+Started On,Begonnen am
+Ended On,Beendet am
+Duration (Minutes),Dauer (Minuten)
+Words Written,Geschriebene Wörter
+Word Goal,Wortziel
+Aim,Ziel
+Felt Productive,Gefühl
+Outcome,Ergebnis
+Seed,Samen
+Sprout,Spross
+Seedling,Sämling
+Young plant,Jungpflanze
+Growing,Wachsend
+Mature,Reif
+Harvest,Ernte
+Compost,Kompost
+Capture anything; no commitment,Alles festhalten; keine Verpflichtung
+First filter: keep what still interests you,"Erster Filter: behalten, was dich noch interessiert"
+Clarify the point in a few sentences,Den Kern in wenigen Sätzen klären
+Structure emerging,Struktur entsteht
+Serious candidates,Ernsthafte Kandidaten
+The one you write deeply,"Die eine, an der du tief schreibst"
+Finished,Fertig
+Set aside; it may feed something later,Beiseitegelegt; vielleicht nährt sie später etwas anderes
+Productive,Produktiv
+Mixed,Gemischt
+Not really,Nicht wirklich
+Untitled idea,Unbenannte Idee
+Unknown stage: {0},Unbekannte Phase: {0}
+An idea cannot come from itself.,Eine Idee kann nicht aus sich selbst entstehen.
+This idea is not yours.,Diese Idee gehört dir nicht.
+Idea {0} not found,Idee {0} nicht gefunden
+Unknown aim: {0},Unbekanntes Ziel: {0}
+Unknown feeling: {0},Unbekanntes Gefühl: {0}
+The session cannot start in the future.,Die Sitzung kann nicht in der Zukunft beginnen.
+This idea did not come from {0}.,Diese Idee ist nicht aus {0} entstanden.
+My Ideas,Meine Ideen
+Catch rough thoughts here. Open one when you want to write it out.,"Halte hier rohe Gedanken fest. Öffne einen, wenn du ihn ausschreiben willst."
+New idea,Neue Idee
+Loading your ideas…,Deine Ideen werden geladen …
+Show harvested and composted,Geerntete und kompostierte anzeigen
+No idea in this stage.,Keine Idee in dieser Phase.
+No ideas yet. A short name is enough to start.,Noch keine Ideen. Ein kurzer Name reicht für den Anfang.
+No notes yet,Noch keine Notizen
+{0} ideas came out of it,{0} Ideen sind daraus entstanden
+from {0},aus {0}
+Idea captured,Idee festgehalten
+Could not create the idea,Die Idee konnte nicht angelegt werden
+Could not load your ideas,Deine Ideen konnten nicht geladen werden
+Could not open this idea,Diese Idee konnte nicht geöffnet werden
+Could not add the idea,Die Idee konnte nicht hinzugefügt werden
+Loading the idea…,Die Idee wird geladen …
+Came from,Entstanden aus
+Give this idea a short name,Gib dieser Idee einen kurzen Namen
+Take it up again,Wieder aufnehmen
+Compost this idea,Diese Idee kompostieren
+"Compost this idea? It leaves your list but keeps its history; you can take it up again.","Diese Idee kompostieren? Sie verschwindet aus deiner Liste, ihre Geschichte bleibt; du kannst sie wieder aufnehmen."
+Dump everything about this idea here…,Schreib hier alles zu dieser Idee auf …
+Ideas that came out of this one,Daraus entstandene Ideen
+Side thoughts you capture here or while writing show up as their own ideas.,"Nebengedanken, die du hier oder beim Schreiben festhältst, werden zu eigenen Ideen."
+Add idea,Idee hinzufügen
+History in Desk,Verlauf im Desk
+Add an idea that came out of this one,Eine daraus entstandene Idee hinzufügen
+The first line becomes its title.,Die erste Zeile wird zum Titel.
+Write your thought…,Schreib deinen Gedanken …
+"{0}, step {1} of {2}","{0}, Schritt {1} von {2}"
+Aged today,Heute entstanden
+Aged 1 day,Seit 1 Tag
+Aged {0} days,Seit {0} Tagen
+Aged {0} weeks,Seit {0} Wochen
+Aged {0} months,Seit {0} Monaten
+1 idea came out of it,1 Idee ist daraus entstanden
+Start writing,Schreiben beginnen
+Writing,Schreiben
+Writing session,Schreibsitzung
+More than last time,Mehr als letztes Mal
+About the same,Etwa gleich viel
+Less than last time,Weniger als letztes Mal
+Goal: {0} words,Ziel: {0} Wörter
+Not now,Nicht jetzt
+Complete,Abschließen
+How did it feel?,Wie hat es sich angefühlt?
+Back to writing,Zurück zum Schreiben
+Back to the idea,Zurück zur Idee
+"Write. Nothing else is on this screen.","Schreib. Sonst ist nichts auf diesem Bildschirm."
+Side idea,Nebenidee
+Another one,Noch eine
+Could not save the side idea,Die Nebenidee konnte nicht gespeichert werden
+Session saved: {0} words,Sitzung gespeichert: {0} Wörter
+Could not save the session,Die Sitzung konnte nicht gespeichert werden
+This idea is closed. Take it up again to write on it.,"Diese Idee ist abgeschlossen. Nimm sie wieder auf, um daran zu schreiben."
+"Last session: {0} words, {1}","Letzte Sitzung: {0} Wörter, {1}"
+{0} sessions so far,Bisher {0} Sitzungen
+Writing an idea,Eine Idee schreiben
+Finish the session (again: back to writing),Sitzung beenden (nochmal: zurück zum Schreiben)
+Not saved,Nicht gespeichert
+{0} words,{0} Wörter
+"Something else came up? Park it here; the first line becomes its title.","Kam dir etwas anderes in den Sinn? Parke es hier; die erste Zeile wird zum Titel."
+1 word,1 Wort
+Idea Import,Ideen-Import
+Idea Import User,Ideen-Import Konto
+NextChapter Site,NextChapter-Seite
+e.g. https://next-chapter-develop.frappe.cloud,z. B. https://next-chapter-develop.frappe.cloud
+Default User,Standardbenutzer
+Gets the ideas of NextChapter accounts without a match below.,Erhält die Ideen von NextChapter-Konten ohne Zuordnung unten.
+Accounts Loaded,Konten geladen
+Imported,Importiert
+Accounts,Konten
+"Each NextChapter account and the user its ideas go to. Empty: the default user.","Jedes NextChapter-Konto und der Benutzer, der seine Ideen erhält. Leer: der Standardbenutzer."
+Last Run,Letzter Lauf
+Ideas Created,Angelegte Ideen
+Sessions Created,Angelegte Sitzungen
+Already Imported,Bereits importiert
+Ideas to Default User,Ideen an Standardbenutzer
+Last Run On,Letzter Lauf am
+NextChapter Account,NextChapter-Konto
+Sessions,Sitzungen
+Imported From,Importiert aus
+"Source record of an import, e.g. NextChapter (#1776).","Quelldatensatz eines Imports, z. B. NextChapter (#1776)."
+Load accounts,Konten laden
+Reading NextChapter…,NextChapter wird gelesen …
+Importing ideas…,Ideen werden importiert …
+Import all ideas and writing sessions now? Ideas already imported are skipped.,Jetzt alle Ideen und Schreibsitzungen importieren? Bereits importierte Ideen werden übersprungen.
+"{0} ideas and {1} sessions imported, {2} already there","{0} Ideen und {1} Sitzungen importiert, {2} schon vorhanden"
+The NextChapter site must start with https://,Die NextChapter-Seite muss mit https:// beginnen
+Could not sign in to {0} (HTTP {1}).,Anmeldung bei {0} fehlgeschlagen (HTTP {1}).
+Could not read {0} from {1} (HTTP {2}).,{0} konnte nicht von {1} gelesen werden (HTTP {2}).
+"{0}: {1} has no match, given to {2}","{0}: {1} hat keine Zuordnung, an {2} gegeben"
+Nothing new to import.,Nichts Neues zu importieren.
+The import failed and was undone. The error is in the log.,Der Import ist fehlgeschlagen und wurde rückgängig gemacht. Der Fehler steht im Protokoll.
+"{0}: came from {1}, but they belong to different people; link left out","{0}: entstand aus {1}, gehört aber einer anderen Person; Verknüpfung weggelassen"
