@@ -9,12 +9,15 @@ HR Manager and System Manager have. HR Users can open the cockpit but get no acc
 
 import frappe
 from frappe import _
-from frappe.utils import add_days, flt, get_url_to_form, getdate, nowdate
+from frappe.utils import add_days, add_months, flt, get_first_day, get_url_to_form, getdate, nowdate
 
 from phamos.phamos.doctype.employment_contract.employment_contract import get_contract_history
 
 DOCTYPE = "Employment Contract"
 ENDING_SOON_DAYS = 60
+# The monthly chart on the overview: 8 months back, the current month and 3 months ahead.
+TREND_MONTHS_BACK = 8
+TREND_MONTHS_AHEAD = 3
 LIST_FIELDS = (
 	"name",
 	"docstatus",
@@ -100,6 +103,9 @@ def get_overview():
 		if e.employee not in covered
 	]
 
+	drafts = frappe.get_list(DOCTYPE, filters={"docstatus": 0}, fields=list(LIST_FIELDS), limit_page_length=0)
+	main_currency = max(costs, key=costs.get) if costs else None
+
 	return {
 		"today": str(today),
 		"ending_soon_days": ENDING_SOON_DAYS,
@@ -110,8 +116,51 @@ def get_overview():
 		"ending_soon": ending,
 		"upcoming": upcoming,
 		"without_contract": without_contract,
-		"drafts": frappe.db.count(DOCTYPE, {"docstatus": 0}),
+		"drafts": len(drafts),
+		"trend": {"currency": main_currency, "months": monthly_trend(today, submitted, drafts, main_currency)},
 	}
+
+
+def monthly_trend(today, submitted, drafts, currency):
+	"""FTE and monthly cost per month, from TREND_MONTHS_BACK months ago to TREND_MONTHS_AHEAD ahead.
+
+	A month counts the contracts in force on its 1st; the current month uses today, so it
+	matches the KPI tiles. Future months add drafts as an estimate: a draft takes the place
+	of the employee's submitted contract from its start date, as it will on submit, so a
+	planned change is not counted twice. Cost counts contracts in `currency` only (the main
+	company currency); FTE counts every contract.
+	"""
+	this_month = get_first_day(today)
+	# Sorted by start, so the latest-starting draft wins when an employee has several.
+	drafts = sorted(drafts, key=lambda d: getdate(d.effective_from))
+	months = []
+	for offset in range(-TREND_MONTHS_BACK, TREND_MONTHS_AHEAD + 1):
+		month = add_months(this_month, offset)
+		day = today if offset == 0 else month
+		confirmed = {c.employee: c for c in submitted if in_force(c, day)}
+		estimated = {d.employee: d for d in drafts if in_force(d, day)} if offset > 0 else {}
+		for employee in estimated:
+			confirmed.pop(employee, None)
+		months.append(
+			{
+				"month": str(month),
+				"is_current": offset == 0,
+				"is_future": offset > 0,
+				"fte": total_fte(confirmed.values()),
+				"cost": total_cost(confirmed.values(), currency),
+				"estimate_fte": total_fte(estimated.values()),
+				"estimate_cost": total_cost(estimated.values(), currency),
+			}
+		)
+	return months
+
+
+def total_fte(contracts):
+	return round(sum(flt(c.fte_percentage) for c in contracts) / 100, 2)
+
+
+def total_cost(contracts, currency):
+	return round(sum(flt(c.base_monthly_gross) for c in contracts if (c.company_currency or c.currency) == currency), 2)
 
 
 @frappe.whitelist()
