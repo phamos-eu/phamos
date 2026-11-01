@@ -236,6 +236,7 @@ after_migrate = [
 	"phamos.web_profile.setup.after_migrate",  # Web Page "Language" / "Translation Of" fields
 	"phamos.cockpits.setup.after_migrate",  # Task Owner on Task (#1751), ToDo fields of the Personal Cockpit (#1553)
 	"phamos.marketing.setup.after_migrate",  # Lead Source "Event" for event registrations
+	"phamos.api.issue_chat.add_raven_indexes",  # record chats look channels up by record (#1794)
 ]
 
 # Uninstallation
@@ -302,6 +303,9 @@ has_permission = {
 #	}
 # }
 
+# Raven opens its Issue links in the matching cockpit instead of Desk (#1614).
+raven_document_link_override = "phamos.api.issue_chat.document_link"
+
 doc_events = {
 	# Personal Cockpit: closed-on stamp, reschedule count, per-user refresh (#1553).
 	# Closing or rescheduling a checklist item's ToDo updates the item (#1625).
@@ -310,6 +314,8 @@ doc_events = {
 		"validate": "phamos.cockpits.todo_hooks.validate",
 		"on_update": [
 			"phamos.cockpits.todo_hooks.on_update",
+			# New assignees of an Issue join its Raven chat (#1614).
+			"phamos.api.issue_chat.sync_assignee",
 			"phamos.phamos.doctype.checklist.checklist_assignment.sync_item_from_todo",
 		],
 		"on_trash": [
@@ -348,8 +354,22 @@ doc_events = {
     "Lead Data": {
         "after_insert": "phamos.events.lead_data.notify_lead_data_created_via_raven_dm"
     },
+	# Status changes and conversions show up in the record chats; closing archives them (#1621, #1622).
+	"Issue": {"on_update": "phamos.api.issue_chat.on_record_update"},
+	"Task": {
+		"after_insert": "phamos.api.issue_chat.on_task_insert",
+		# Status changes show up in the Task chat; Completed / Cancelled archive it (#1779).
+		"on_update": "phamos.api.issue_chat.on_record_update",
+	},
     "Raven Message": {
-		"after_insert": "phamos.events.raven_bot.handle_lead_option_reply"
+		# Mentioned people join the record chat before Raven notifies them (#1620), and are
+		# assigned to the record once the message is saved (#1784).
+		"validate": "phamos.api.issue_chat.add_mentioned_members",
+		"after_insert": [
+			"phamos.api.issue_chat.keep_mention_unread",
+			"phamos.api.issue_chat.assign_mentioned",
+			"phamos.events.raven_bot.handle_lead_option_reply",
+		],
 	},
     "Accounting Receipt": {
         "after_insert": [

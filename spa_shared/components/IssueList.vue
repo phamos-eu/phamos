@@ -37,11 +37,19 @@
 						{{ issue.subject }}
 					</div>
 					<div
-						v-if="metaParts(issue).length"
+						v-if="metaParts(issue, { assignees: false }).length"
 						class="mt-0.5 truncate text-xs text-ink-gray-6"
 					>
-						{{ metaParts(issue).join(" · ") }}
+						{{ metaParts(issue, { assignees: false }).join(" · ") }}
 					</div>
+				</div>
+				<div class="flex min-w-0 justify-center">
+					<IssueChatIndicator
+						size="lg"
+						:issue-name="issue.name"
+						:state="chatStates[issue.name]"
+						@open="emit('select', $event)"
+					/>
 				</div>
 				<div class="flex min-w-0 justify-center">
 					<Badge
@@ -73,6 +81,18 @@
 						{{ formatDate(modifiedValue(issue)) }}
 					</div>
 				</div>
+				<!-- Everyone assigned, like the owner column of the Checklist list -->
+				<div class="flex min-w-0 flex-wrap justify-center gap-0.5">
+					<UserAvatar
+						v-for="(user, i) in issue.assignees || []"
+						:key="user"
+						:name="user"
+						:label="(issue.assignee_names || [])[i] || user"
+						:image="(issue.assignee_images || [])[i] || ''"
+						size="sm"
+					/>
+					<span v-if="!(issue.assignees || []).length" class="text-xs text-ink-gray-5">—</span>
+				</div>
 				<!-- Reserves the New Issue column track from the parent grid -->
 				<span aria-hidden="true" />
 			</template>
@@ -81,6 +101,7 @@
 					<span v-if="!compact" class="text-xs font-semibold text-ink-gray-6">
 						{{ issue.name }}
 					</span>
+					<IssueChatIndicator :issue-name="issue.name" :state="chatStates[issue.name]" @open="emit('select', $event)" />
 					<Badge
 						v-if="issue.converted_task"
 						class="whitespace-nowrap"
@@ -145,8 +166,12 @@
 </template>
 
 <script setup>
+import { toRef } from "vue"
 import { Badge } from "frappe-ui"
+import IssueChatIndicator from "@spa/components/IssueChatIndicator.vue"
+import { useIssueChatStates } from "@spa/composables/useIssueChatStates.js"
 import { ISSUE_LIST_FILTER_SUBGRID } from "@spa/issueListColumns.js"
+import UserAvatar from "@spa/components/UserAvatar.vue"
 import { formatDate, formatIssueAge } from "@spa/utils/datetime"
 
 const props = defineProps({
@@ -159,6 +184,7 @@ const props = defineProps({
 })
 
 const emit = defineEmits(["select"])
+const chatStates = useIssueChatStates(toRef(props, "issues"))
 
 function creationValue(issue) {
 	const raw = issue.creation || issue.opening_date || ""
@@ -201,12 +227,12 @@ function assigneeLabel(issue) {
 	return `${names[0]} +${names.length - 1}`
 }
 
-function metaParts(issue) {
+function metaParts(issue, { assignees = true } = {}) {
 	const parts = []
 	if (issue.converted_task) parts.push(`Task ${issue.converted_task}`)
 	if (issue.issue_type) parts.push(issue.issue_type)
 	if (props.showCreator) parts.push(`created by ${issue.owner_name || issue.owner}`)
-	parts.push(assigneeLabel(issue))
+	if (assignees) parts.push(assigneeLabel(issue))
 	return parts
 }
 </script>

@@ -115,6 +115,7 @@ Relevant modules,Relevante Module
 Home,Startseite
 Breadcrumb,Brotkrümelnavigation
 Filters,Filter
+Filter by assignee,Nach Zuständigen filtern
 Clear all,Alle zurücksetzen
 Close filters,Filter schließen
 Apply filters,Filter anwenden
@@ -1342,6 +1343,143 @@ Could not load checklist dashboard,Checklisten-Dashboard konnte nicht geladen we
 Booking limits are not available on this site yet.,Buchungslimits sind auf dieser Site noch nicht verfügbar.
 Not submitted,Nicht eingereicht
 Submit {0} in Desk,{0} im Desk einreichen
+Raven is not installed on this site.,Raven ist auf dieser Site nicht installiert.
+Chat unavailable,Chat nicht verfügbar
+Issue Chat is disabled in phamos Settings.,Der Anfrage-Chat ist in den phamos-Einstellungen deaktiviert.
+Chats are not available for {0}.,Für {0} sind keine Chats verfügbar.
+No Raven Workspace found. Create one in Raven first.,Kein Raven-Arbeitsbereich gefunden. Legen Sie zuerst einen in Raven an.
+You need to be a Raven user to chat.,"Sie müssen Raven-Benutzer sein, um zu chatten."
+Chat about {0}: {1},Chat zu {0}: {1}
+Chat about {0},Chat zu {0}
+Open in Raven,In Raven öffnen
+"Open this chat in Raven, in a new window",Diesen Chat in Raven in einem neuen Fenster öffnen
+Close the chat,Chat schließen
+"Not in the chat, since they have no Raven account: {0}","Nicht im Chat, da ohne Raven-Konto: {0}"
+Start chat,Chat starten
+Join chat,Chat beitreten
+Chat,Chat
+Start a Raven chat with the people on this Issue,Einen Raven-Chat mit den Beteiligten dieser Anfrage starten
+Join the Raven chat of this Issue,Dem Raven-Chat dieser Anfrage beitreten
+Open the Raven chat of this Issue,Den Raven-Chat dieser Anfrage öffnen
+Something went wrong,Etwas ist schiefgelaufen
+Read the chat of this closed Issue,Den Chat dieser geschlossenen Anfrage lesen
+{0} assigned {1}.,{0} hat {1} zugewiesen.
+{0} unassigned {1}.,{0} hat die Zuweisung von {1} entfernt.
+{0} mentioned you in the chat of {1} {2}.,{0} hat Sie im Chat von {1} {2} erwähnt.
+"When you send, everyone mentioned who can read this Issue joins the chat and is assigned to it.","Beim Senden treten alle Erwähnten, die diese Anfrage lesen dürfen, dem Chat bei und werden ihr zugewiesen."
+"When you send, everyone mentioned who can read this Task joins the chat and is assigned to it.","Beim Senden treten alle Erwähnten, die diese Aufgabe lesen dürfen, dem Chat bei und werden ihr zugewiesen."
+{0} set the status to {1}.,{0} hat den Status auf {1} gesetzt.
+{0} converted this Issue to Task {1}.,{0} hat diese Anfrage in die Aufgabe {1} umgewandelt.
+Chat (read-only),Chat (nur lesen)
+Open the chat,Chat öffnen
+Loading the chat…,Chat wird geladen …
+No chat for this Issue yet.,Zu dieser Anfrage gibt es noch keinen Chat.
+"Start one with the people on this Issue. Messages also show up in Raven, linked to the Issue.","Starten Sie einen mit den Beteiligten dieser Anfrage. Die Nachrichten erscheinen auch in Raven, verknüpft mit der Anfrage."
+You are not in this chat yet.,Sie sind noch nicht in diesem Chat.
+1 unread in the chat,1 ungelesen im Chat
+{0} unread in the chat,{0} ungelesen im Chat
+1 new reply in threads,1 neue Antwort in Threads
+{0} new replies in threads,{0} neue Antworten in Threads
+Thread,Thread
+{0} new,{0} neu
+More below,Mehr darunter
+Scroll to see the rest of the text,"Scrollen, um den restlichen Text zu sehen"
+New checklist,Neue Checkliste
+No checklists linked yet.,Noch keine Checklisten verknüpft.
+Loading items…,Punkte werden geladen …
+No items yet,Noch keine Punkte
+Add item,Punkt hinzufügen
+Click to edit…,Zum Bearbeiten klicken …
+No description,Keine Beschreibung
+Short description,Kurzbeschreibung
+Item note…,Notiz zum Punkt …
+Record,Datensatz
+Not Started,Nicht begonnen
+Failed to load checklist items,Checklistenpunkte konnten nicht geladen werden
+Failed to save checklist item,Checklistenpunkt konnte nicht gespeichert werden
+Assigned To,Zugewiesen an
+Due Date,Fälligkeitsdatum
+Due in (Days),Fällig in (Tagen)
+Checklist item,Checklistenpunkt
+Shared With Through Assignment,Durch Zuweisung freigegeben für
+Only the checklist owner or users with edit rights on checklists can assign items,Nur der Checklisten-Verantwortliche oder Benutzer mit Bearbeitungsrechten für Checklisten können Punkte zuweisen
+"Document sharing is disabled, so {0} could not open this checklist. Assign someone with access to checklists.","Die Dokumentfreigabe ist deaktiviert, daher könnte {0} diese Checkliste nicht öffnen. Bitte weisen Sie jemanden mit Zugriff auf Checklisten zu."
+Gets a ToDo for this item. Ticking the item closes the ToDo and closing the ToDo ticks the item.,"Erhält ein ToDo für diesen Punkt. Das Abhaken des Punkts schließt das ToDo, und das Schließen des ToDos hakt den Punkt ab."
+"Due date of the item, counted in days from the day the checklist is created. Leave 0 for no due date.","Fälligkeit des Punkts in Tagen ab dem Tag, an dem die Checkliste erstellt wird. 0 bedeutet kein Fälligkeitsdatum."
+The latest due date of the checklist items.,Das späteste Fälligkeitsdatum der Checklistenpunkte.
+Checklist items can only be assigned to enabled users with the Employee role: {0},Checklistenpunkte können nur aktiven Benutzern mit der Rolle Mitarbeiter zugewiesen werden: {0}
+Leave days per year,Urlaubstage pro Jahr
+Leave days for this contract,Urlaubstage für diesen Vertrag
+{0} at {1} days per week,{0} bei {1} Tagen pro Woche
+Former customer,Ehemaliger Kunde
+this former customer,dieser ehemalige Kunde
+"A former customer of phamos, working as {0}.","Ein ehemaliger Kunde von phamos, tätig als {0}."
+This former customer chose not to be named. Their role is shown without personal details.,Dieser ehemalige Kunde möchte nicht namentlich genannt werden. Die Rolle wird ohne persönliche Angaben gezeigt.
+this partner contact,diese Ansprechperson beim Partner
+"A partner contact who works with phamos, working as {0}.","Eine Ansprechperson beim Partner, die mit phamos zusammenarbeitet, tätig als {0}."
+This partner contact chose not to be named. Their role is shown without personal details.,Diese Ansprechperson beim Partner möchte nicht namentlich genannt werden. Die Rolle wird ohne persönliche Angaben gezeigt.
+this team member,dieses Teammitglied
+A team member who has worked at phamos as {0} for {1}.,"Ein Teammitglied, das bereits {1} als {0} bei phamos arbeitet."
+This team member chose not to be named. Their role and time at phamos are shown without personal details.,Dieses Teammitglied möchte nicht namentlich genannt werden. Rolle und Zeit bei phamos werden ohne persönliche Angaben gezeigt.
+Edit page,Seite bearbeiten
+"This page is raw HTML. Page Builder blocks (or Rich Text) are easier to edit and keep the site's design.","Diese Seite ist reines HTML. Page-Builder-Blöcke (oder Rich Text) lassen sich leichter bearbeiten und halten das Design der Website ein."
+Missing translation: {0}.,Fehlende Übersetzung: {0}.
+This page changed after its {0} version ({1}): check the translation.,Diese Seite wurde nach ihrer Fassung auf {0} ({1}) geändert: Übersetzung prüfen.
+The German page changed after this one: check the translation.,Die deutsche Seite wurde nach dieser geändert: Übersetzung prüfen.
+Create {0} version,Fassung auf {0} erstellen
+Create Translation,Übersetzung erstellen
+Attendance,Teilnahme
+In person,Vor Ort
+Online,Online
+Venue / Video Link,Veranstaltungsort / Videolink
+Street,Straße
+Postal Code,Postleitzahl
+Find on Map,Auf Karte suchen
+Map Pin,Kartenmarkierung
+Latitude,Breitengrad
+Longitude,Längengrad
+Join online: {0},Online teilnehmen: {0}
+"{0}: {1}, online.","{0}: {1}, online."
+Not found,Nicht gefunden
+"In person: the venue's name, e.g. ""Hotel Adlon, Saal 2"". Online: the meeting link (https://…). The link is only sent to registered attendees, never shown on the website.","Vor Ort: der Name des Veranstaltungsorts, z. B. „Hotel Adlon, Saal 2“. Online: der Link zum Meeting (https://…). Der Link geht nur an angemeldete Teilnehmende und erscheint nie auf der Website."
+"Looks the address up on OpenStreetMap and sets the pin. To move it to the exact entrance, click the map's edit tool (Edit layers), drag the pin and click Save.","Sucht die Adresse bei OpenStreetMap und setzt die Markierung. Zum Verschieben auf den genauen Eingang das Bearbeiten-Werkzeug der Karte (Edit layers) anklicken, die Markierung ziehen und auf Save klicken."
+"The meeting link (https://…). It is only sent to registered attendees, never shown on the website.",Der Link zum Meeting (https://…). Er geht nur an angemeldete Teilnehmende und erscheint nie auf der Website.
+"The venue's name, e.g. ""Hotel Adlon, Saal 2"". The address goes below.","Der Name des Veranstaltungsorts, z. B. „Hotel Adlon, Saal 2“. Die Adresse steht darunter."
+Please enter the address first.,Bitte zuerst die Adresse eingeben.
+Looking up the address…,Adresse wird gesucht …
+Pin set: {0},Markierung gesetzt: {0}
+"For an online event, enter the meeting link in Venue / Video Link. It must start with https://.",Bei einer Online-Veranstaltung gehört der Link zum Meeting in „Veranstaltungsort / Videolink“. Er muss mit https:// beginnen.
+"The video link is never shown on the website, only sent to registered attendees. Open the registration so people can get it.","Der Videolink erscheint nie auf der Website, er geht nur an angemeldete Teilnehmende. Bitte die Anmeldung öffnen, damit man ihn bekommen kann."
+"Venue / Video Link holds a link. For an online event, set Attendance to Online.",„Veranstaltungsort / Videolink“ enthält einen Link. Für eine Online-Veranstaltung bitte „Teilnahme“ auf „Online“ stellen.
+The address changed but the map pin did not. Use Find on Map to move the pin.,"Die Adresse wurde geändert, die Kartenmarkierung nicht. Mit „Auf Karte suchen“ die Markierung verschieben."
+"This address was not found on OpenStreetMap. Please check it, or set the pin on the map by hand.",Diese Adresse wurde bei OpenStreetMap nicht gefunden. Bitte prüfen oder die Markierung von Hand auf der Karte setzen.
+Please choose the Item Tax Template for the tickets before opening ticket sales.,"Bitte wählen Sie die Artikelsteuervorlage für die Tickets, bevor Sie den Ticketverkauf öffnen."
+{0} {1} belongs to another company than {2}.,{0} {1} gehört zu einem anderen Unternehmen als {2}.
+Event {0} has no Item Tax Template for its tickets.,Die Veranstaltung {0} hat keine Artikelsteuervorlage für ihre Tickets.
+The ticket price has changed in the meantime. Please check your order again.,Der Ticketpreis hat sich inzwischen geändert. Bitte prüfen Sie Ihre Bestellung erneut.
+Event order total differs from the confirmed total,Gesamtbetrag der Veranstaltungsbestellung weicht vom bestätigten Betrag ab
+"Please enter a name only, without web or email addresses.",Bitte geben Sie nur einen Namen ein – ohne Web- oder E-Mail-Adressen.
+"Don't know about this booking? Simply reply to this email and we'll remove your address.","Sie wissen nichts von dieser Buchung? Antworten Sie einfach auf diese E-Mail, und wir entfernen Ihre Adresse."
+Ticket mail not sent: daily limit of {0} reached for this event.,Ticket-E-Mail nicht gesendet: Tageslimit von {0} für diese Veranstaltung erreicht.
+Event ticket mails: daily limit reached,Ticket-E-Mails der Veranstaltung: Tageslimit erreicht
+Send Ticket,Ticket senden
+Ticket sent to {0},Ticket gesendet an {0}
+This attendee has no email address.,Dieser Teilnehmer hat keine E-Mail-Adresse.
+Credited,Gutgeschrieben
+Customer {0} does not exist.,Kunde {0} existiert nicht.
+{0}: no ticket price can be found for event {1}.,{0}: Für die Veranstaltung {1} ist kein Ticketpreis hinterlegt.
+half day,halber Tag
+Absent,Abwesend
+Absent (requested),Abwesend (beantragt)
+Absent (half day),Abwesend (halber Tag)
+Absent (half day on {0}),Abwesend (halber Tag am {0})
+"Absent (requested, half day)","Abwesend (beantragt, halber Tag)"
+"Absent (requested, half day on {0})","Abwesend (beantragt, halber Tag am {0})"
+Calendar: no user linked to the employee,Kalender: kein Benutzer mit dem Mitarbeiter verknüpft
+"Calendar: not synced, {0}","Kalender: nicht synchronisiert, {0}"
+Calendar: being added to {0}'s calendar,Kalender: wird in den Kalender von {0} eingetragen
+Calendar: in {0}'s calendar,Kalender: im Kalender von {0}
+Calendar Event,Kalendertermin
 My Leave,Mein Urlaub
 Hand in leave here; your leave approver decides.,Urlaub hier beantragen; Ihr Urlaubsgenehmiger entscheidet.
 Apply for leave,Urlaub beantragen
@@ -1559,3 +1697,51 @@ There is no contract for you yet. HR adds it once it is signed.,"Für Sie gibt e
 Upcoming changes,Anstehende Änderungen
 Yearly gross at 100 %,Jährlich brutto bei 100 %
 {0} · {1} per week · {2} per month,{0} · {1} pro Woche · {2} pro Monat
+Raven is not installed on this site.,Raven ist auf dieser Site nicht installiert.
+Chat unavailable,Chat nicht verfügbar
+Issue Chat is disabled in phamos Settings.,Der Anfrage-Chat ist in den phamos-Einstellungen deaktiviert.
+Chats are not available for {0}.,Für {0} sind keine Chats verfügbar.
+No Raven Workspace found. Create one in Raven first.,Kein Raven-Arbeitsbereich gefunden. Legen Sie zuerst einen in Raven an.
+You need to be a Raven user to chat.,"Sie müssen Raven-Benutzer sein, um zu chatten."
+Chat about {0}: {1},Chat zu {0}: {1}
+Chat about {0},Chat zu {0}
+Open in Raven,In Raven öffnen
+"Open this chat in Raven, in a new window",Diesen Chat in Raven in einem neuen Fenster öffnen
+Close the chat,Chat schließen
+"Not in the chat, since they have no Raven account: {0}","Nicht im Chat, da ohne Raven-Konto: {0}"
+Start chat,Chat starten
+Join chat,Chat beitreten
+Chat,Chat
+Start a Raven chat with the people on this Issue,Einen Raven-Chat mit den Beteiligten dieser Anfrage starten
+Join the Raven chat of this Issue,Dem Raven-Chat dieser Anfrage beitreten
+Open the Raven chat of this Issue,Den Raven-Chat dieser Anfrage öffnen
+Something went wrong,Etwas ist schiefgelaufen
+Read the chat of this closed Issue,Den Chat dieser geschlossenen Anfrage lesen
+{0} assigned {1}.,{0} hat {1} zugewiesen.
+{0} unassigned {1}.,{0} hat die Zuweisung von {1} entfernt.
+{0} set the status to {1}.,{0} hat den Status auf {1} gesetzt.
+{0} converted this Issue to Task {1}.,{0} hat diese Anfrage in die Aufgabe {1} umgewandelt.
+Chat (read-only),Chat (nur lesen)
+Open the chat,Chat öffnen
+Loading the chat…,Chat wird geladen …
+No chat for this Issue yet.,Zu dieser Anfrage gibt es noch keinen Chat.
+"Start one with the people on this Issue. Messages also show up in Raven, linked to the Issue.","Starten Sie einen mit den Beteiligten dieser Anfrage. Die Nachrichten erscheinen auch in Raven, verknüpft mit der Anfrage."
+You are not in this chat yet.,Sie sind noch nicht in diesem Chat.
+1 unread in the chat,1 ungelesen im Chat
+{0} unread in the chat,{0} ungelesen im Chat
+1 new reply in threads,1 neue Antwort in Threads
+{0} new replies in threads,{0} neue Antworten in Threads
+Thread,Thread
+{0} new,{0} neu
+More below,Mehr darunter
+Scroll to see the rest of the text,"Scrollen, um den restlichen Text zu sehen"
+No chat for this Task yet.,Zu dieser Aufgabe gibt es noch keinen Chat.
+"Start one with the people on this Task. Messages also show up in Raven, linked to the Task.","Starten Sie einen mit den Beteiligten dieser Aufgabe. Die Nachrichten erscheinen auch in Raven, verknüpft mit der Aufgabe."
+Start a Raven chat with the people on this Task,Einen Raven-Chat mit den Beteiligten dieser Aufgabe starten
+Join the Raven chat of this Task,Dem Raven-Chat dieser Aufgabe beitreten
+Read the chat of this finished Task,Den Chat dieser abgeschlossenen Aufgabe lesen
+Open the Raven chat of this Task,Den Raven-Chat dieser Aufgabe öffnen
+It follows on from Issue {0}.,Er schließt an die Anfrage {0} an.
+Template Tasks have no chat.,Vorlage-Aufgaben haben keinen Chat.
+You were mentioned,Sie wurden erwähnt
+You were mentioned {0} times,Sie wurden {0}-mal erwähnt
