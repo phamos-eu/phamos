@@ -166,7 +166,7 @@
 </template>
 
 <script setup>
-import { toRef } from "vue"
+import { computed, toRef } from "vue"
 import { Badge } from "frappe-ui"
 import IssueChatIndicator from "@spa/components/IssueChatIndicator.vue"
 import { useIssueChatStates } from "@spa/composables/useIssueChatStates.js"
@@ -181,10 +181,14 @@ const props = defineProps({
 	compact: { type: Boolean, default: false },
 	/** Align columns with IssuesInbox Priority / Status / date sort filters */
 	alignWithFilters: { type: Boolean, default: false },
+	/** Chat states loaded by the parent (it sorts by them, #1796); loaded here when not given */
+	chatStates: { type: Object, default: null },
 })
 
 const emit = defineEmits(["select"])
-const chatStates = useIssueChatStates(toRef(props, "issues"))
+// Decided once: a parent that passes chat states keeps passing them.
+const ownChatStates = props.chatStates ? null : useIssueChatStates(toRef(props, "issues"))
+const chatStates = computed(() => props.chatStates ?? ownChatStates.value)
 
 function creationValue(issue) {
 	const raw = issue.creation || issue.opening_date || ""

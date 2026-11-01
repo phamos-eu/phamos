@@ -34,7 +34,14 @@
 						placeholder="Search…"
 						class="w-full min-w-0"
 					/>
-					<div class="text-center text-xs font-medium text-ink-gray-5">{{ __("Chat") }}</div>
+					<div class="flex min-w-0 justify-center">
+						<ListSortSelector
+							standalone
+							v-model:sort-by="sortBy"
+							v-model:sort-order="sortOrder"
+							:options="chatSortOption"
+						/>
+					</div>
 					<div class="flex min-w-0 justify-center">
 						<PriorityFilter
 							v-model="priorityFilter"
@@ -80,6 +87,7 @@
 				<IssueList
 					v-if="filteredIssues.length"
 					:issues="filteredIssues"
+					:chat-states="chatStates"
 					:selected-name="selectedName"
 					show-creator
 					align-with-filters
@@ -176,6 +184,8 @@ import { useRoute, useRouter } from "vue-router"
 import { call } from "frappe-ui"
 import IssueDetail from "@spa/components/IssueDetail.vue"
 import { issueChatStore } from "@spa/issueChatStore.js"
+import { useIssueChatStates } from "@spa/composables/useIssueChatStates.js"
+import { compareChatStates } from "@spa/utils/chatUnread.js"
 import { useUserRealtime } from "@spa/composables/useUserRealtime.js"
 import { __ } from "@spa/utils/i18n.js"
 import IssueList from "@spa/components/IssueList.vue"
@@ -201,6 +211,7 @@ const sortBy = ref("modified")
 const sortOrder = ref("desc")
 const createdSortOption = [{ label: "Created On", value: "creation" }]
 const modifiedSortOption = [{ label: "Last Updated", value: "modified" }]
+const chatSortOption = [{ label: __("Chat"), value: "chat" }]
 const loading = ref(false)
 const configError = ref("")
 const issues = ref([])
@@ -220,6 +231,12 @@ const formOptions = ref({
 })
 
 function compareIssues(a, b) {
+	if (sortBy.value === "chat") {
+		// Mentions, then unread, then read chats, then none (#1796); same chat state: last updated first.
+		const cmp = compareChatStates(chatStates.value[a.name], chatStates.value[b.name])
+		if (cmp) return sortOrder.value === "desc" ? -cmp : cmp
+		return String(b.modified || "").localeCompare(String(a.modified || ""))
+	}
 	const field = sortBy.value === "creation" ? "creation" : "modified"
 	const cmp = String(a[field] || "").localeCompare(String(b[field] || ""))
 	return sortOrder.value === "desc" ? -cmp : cmp
@@ -265,7 +282,7 @@ const assigneeOptions = computed(() => {
 	return [...byName.values()].sort((a, b) => a.full_name.localeCompare(b.full_name))
 })
 
-const filteredIssues = computed(() => {
+const visibleIssues = computed(() => {
 	const q = search.value.trim().toLowerCase()
 	const priorities = priorityFilter.value
 	const statuses = statusFilter.value
@@ -288,8 +305,11 @@ const filteredIssues = computed(() => {
 	if (q) {
 		list = list.filter((i) => issueMatchesSearch(i, q))
 	}
-	return [...list].sort(compareIssues)
+	return list
 })
+// Loaded for the unsorted rows, so sorting by chat does not reload the states it sorts by.
+const chatStates = useIssueChatStates(visibleIssues)
+const filteredIssues = computed(() => [...visibleIssues.value].sort(compareIssues))
 
 async function loadOptions() {
 	try {

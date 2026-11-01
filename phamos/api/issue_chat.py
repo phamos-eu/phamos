@@ -479,7 +479,7 @@ def _post_link_message(channel_id, doc, text):
 
 def get_chat_states(doctype, names):
 	"""Batched chat state for list views: {name: {channel_id, is_member, archived, unread,
-	unread_threads, mentions, first_unread, first_unread_thread}}.
+	unread_threads, mentions, last_message_at, first_unread, first_unread_thread}}.
 
 	Only records the session user may read and that have a chat are returned.
 	"""
@@ -503,7 +503,7 @@ def get_chat_states(doctype, names):
 			"is_thread": 0,
 			"is_direct_message": 0,
 		},
-		fields=["name", "linked_document", "is_archived"],
+		fields=["name", "linked_document", "is_archived", "last_message_timestamp"],
 		order_by="is_archived desc",  # a live chat wins over an archived one below
 	)
 	channel_ids = [c.name for c in channels]
@@ -523,6 +523,8 @@ def get_chat_states(doctype, names):
 			"unread_threads": unread_threads.get(c.name, 0),
 			# Unread messages that mention the user: the bubble turns red (#1781).
 			"mentions": mentions.get(c.name, 0),
+			# Lists sort chats with the same unread state by their latest message (#1796).
+			"last_message_at": c.last_message_timestamp,
 			# Where the chat opens from the list: the first new message, else the thread with
 			# the newest unread reply (#1617).
 			"first_unread": None,

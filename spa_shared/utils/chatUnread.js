@@ -40,3 +40,22 @@ export function concernsChats(event, channelIds, me) {
 	if (event.type === "thread") return true
 	return Boolean(event.channel_id) && channelIds.has(event.channel_id)
 }
+
+/** How urgent a chat is for sorting: 3 mention, 2 other unread, 1 all read, 0 no chat. */
+function chatRank(state) {
+	if (!state) return 0
+	const tone = unreadTone(state)
+	if (tone === "mention") return 3
+	return tone ? 2 : 1
+}
+
+/**
+ * Sorts list rows by their chat state (#1796), least urgent first (reverse it for the default
+ * "most urgent first"): no chat, then read chats, then unread, then a mention. Chats with the
+ * same rank go by their latest message.
+ */
+export function compareChatStates(a, b) {
+	const rank = chatRank(a) - chatRank(b)
+	if (rank) return rank
+	return String(a?.last_message_at || "").localeCompare(String(b?.last_message_at || ""))
+}

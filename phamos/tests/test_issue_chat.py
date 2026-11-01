@@ -220,6 +220,11 @@ class TestIssueChat(FrappeTestCase):
 			pluck="name",
 		)[0]
 		self.assertEqual(states[self.issue.name]["first_unread"], intro)
+		self.assertEqual(
+			states[self.issue.name]["last_message_at"],
+			frappe.db.get_value("Raven Channel", channel_id, "last_message_timestamp"),
+		)
+		self.assertTrue(states[self.issue.name]["last_message_at"])
 		self.assertEqual(pc.get_issue_chat(self.issue.name)["unread"], 1)
 
 
