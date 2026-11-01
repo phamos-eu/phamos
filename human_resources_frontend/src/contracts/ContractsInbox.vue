@@ -92,6 +92,7 @@
 				@change="(c) => openDialog('change', c)"
 				@edit="(c) => openDialog('edit', c)"
 				@updated="onSaved"
+				@deleted="onDeleted"
 			/>
 		</section>
 
@@ -186,6 +187,11 @@ async function openContract(name) {
 	} finally {
 		detailLoading.value = false
 	}
+}
+
+async function onDeleted() {
+	closeContract()
+	await loadRows()
 }
 
 function closeContract() {
