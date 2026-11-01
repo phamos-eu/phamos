@@ -50,12 +50,14 @@ function chatRank(state) {
 }
 
 /**
- * Sorts list rows by their chat state (#1796), least urgent first (reverse it for the default
- * "most urgent first"): no chat, then read chats, then unread, then a mention. Chats with the
- * same rank go by their latest message.
+ * Sorts list rows by their chat state (#1796), least urgent first (reverse it for "most urgent
+ * first"): no chat, then read chats, then unread, then a mention. Within the same rank, more
+ * unread messages are more urgent; then the latest message decides.
  */
 export function compareChatStates(a, b) {
 	const rank = chatRank(a) - chatRank(b)
 	if (rank) return rank
+	const unread = totalUnread(a) - totalUnread(b)
+	if (unread) return unread
 	return String(a?.last_message_at || "").localeCompare(String(b?.last_message_at || ""))
 }

@@ -40,6 +40,7 @@
 							v-model:sort-by="sortBy"
 							v-model:sort-order="sortOrder"
 							:options="chatSortOption"
+							@clear="resetSort"
 						/>
 					</div>
 					<div class="flex min-w-0 justify-center">
@@ -211,7 +212,13 @@ const sortBy = ref("modified")
 const sortOrder = ref("desc")
 const createdSortOption = [{ label: "Created On", value: "creation" }]
 const modifiedSortOption = [{ label: "Last Updated", value: "modified" }]
-const chatSortOption = [{ label: __("Chat"), value: "chat" }]
+// Most urgent chats first; a second click goes back to the default sort (#1796).
+const chatSortOption = [{ label: __("Chat"), value: "chat", oneWay: true }]
+
+function resetSort() {
+	sortBy.value = "modified"
+	sortOrder.value = "desc"
+}
 const loading = ref(false)
 const configError = ref("")
 const issues = ref([])
@@ -232,9 +239,9 @@ const formOptions = ref({
 
 function compareIssues(a, b) {
 	if (sortBy.value === "chat") {
-		// Mentions, then unread, then read chats, then none (#1796); same chat state: last updated first.
+		// Most urgent first (#1796): mentions, unread, read chats, none; same chat state: last updated first.
 		const cmp = compareChatStates(chatStates.value[a.name], chatStates.value[b.name])
-		if (cmp) return sortOrder.value === "desc" ? -cmp : cmp
+		if (cmp) return -cmp
 		return String(b.modified || "").localeCompare(String(a.modified || ""))
 	}
 	const field = sortBy.value === "creation" ? "creation" : "modified"

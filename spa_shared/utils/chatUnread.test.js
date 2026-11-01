@@ -60,7 +60,14 @@ describe("sorting by chat (#1796)", () => {
 
 	it("puts mentions first, then unread, then read chats, then no chat", () => {
 		const sorted = [read, none, mention, fresh, readLater, thread].sort((a, b) => -compareChatStates(a, b))
-		expect(sorted).toEqual([mention, thread, fresh, readLater, read, none])
+		expect(sorted).toEqual([mention, fresh, thread, readLater, read, none])
+	})
+
+	it("puts more unread messages first, then the latest message", () => {
+		const many = { unread: 5, last_message_at: "2026-09-01 09:00:00" }
+		const manyMentions = { unread: 4, mentions: 1, last_message_at: "2026-08-01 09:00:00" }
+		const sorted = [fresh, many, thread, mention, manyMentions].sort((a, b) => -compareChatStates(a, b))
+		expect(sorted).toEqual([manyMentions, mention, many, fresh, thread])
 	})
 
 	it("treats equal states as equal", () => {
