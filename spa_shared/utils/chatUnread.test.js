@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest"
-import { compareChatStates, concernsChats, totalUnread, unreadSummary, unreadTone } from "./chatUnread.js"
+import { compareChatStates, concernsChats, messageAge, totalUnread, unreadSummary, unreadTone } from "./chatUnread.js"
 
 describe("chat unread counts", () => {
 	it("adds thread replies to the chat count", () => {
@@ -73,5 +73,18 @@ describe("sorting by chat (#1796)", () => {
 	it("treats equal states as equal", () => {
 		expect(compareChatStates(none, none)).toBe(0)
 		expect(compareChatStates(read, { ...read })).toBe(0)
+	})
+})
+
+describe("last message age (#1796)", () => {
+	it("is short and grows in steps", () => {
+		expect(messageAge(null)).toBe("")
+		expect(messageAge(30)).toBe("now")
+		expect(messageAge(5 * 60)).toBe("5 min")
+		expect(messageAge(3 * 3600 + 59)).toBe("3 h")
+		expect(messageAge(2 * 86400)).toBe("2 d")
+		expect(messageAge(15 * 86400)).toBe("2 wk")
+		expect(messageAge(65 * 86400)).toBe("2 mo")
+		expect(messageAge(400 * 86400)).toBe("1 yr")
 	})
 })

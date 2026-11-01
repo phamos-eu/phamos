@@ -648,6 +648,11 @@ Session ended.,Sitzung beendet.
 {0} ToDos done in {1}.,{0} ToDos erledigt in {1}.
 {0} min,{0} Min.
 {0} h {1} min,{0} Std. {1} Min.
+{0} h,{0} Std.
+{0} d,{0} T.
+{0} wk,{0} Wo.
+{0} mo,{0} Mon.
+{0} yr,{0} J.
 That did not work,Das hat nicht funktioniert
 Done. One less.,Erledigt. Eins weniger.
 Captured for later.,Für später notiert.
