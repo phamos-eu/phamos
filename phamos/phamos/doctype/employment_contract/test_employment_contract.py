@@ -48,6 +48,8 @@ class TestEmploymentContract(FrappeTestCase):
 				"contract_type": "Employed",
 				"effective_from": effective_from,
 				"valid_until": valid_until,
+				# The company's own currency, so no exchange rate is needed unless a test sets one.
+				"currency": frappe.get_cached_value("Company", self.company, "default_currency"),
 				"fte_percentage": 50,
 				"yearly_gross_full_time": 60000,
 				**values,
