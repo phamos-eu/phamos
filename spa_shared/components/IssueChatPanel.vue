@@ -55,7 +55,7 @@
 							:aria-expanded="threads.length > 1 ? String(threadListOpen) : undefined"
 							@click="onThreadHint"
 						>
-							<FeatherIcon name="corner-down-right" class="h-3 w-3 flex-none" />
+							<RavenThreadIcon class="h-3 w-3 flex-none" />
 							{{ threadHint }}
 							<FeatherIcon
 								v-if="threads.length > 1"
@@ -81,15 +81,8 @@
 						</li>
 					</ul>
 				</div>
-				<iframe
-					v-if="frameUrl"
-					v-show="url"
-					ref="frame"
-					:src="frameUrl"
-					:title="__('Chat about {0}', [title])"
-					class="min-h-0 w-full flex-1 border-0"
-					@load="onFrameLoad"
-				/>
+				<!-- Where the page's one Raven frame is laid while this chat shows (utils/ravenFrame.js). -->
+				<div v-show="url" ref="slot" class="min-h-0 w-full flex-1" />
 				<div v-if="!url" class="flex min-h-0 flex-1 flex-col items-center justify-center gap-3 p-6 text-center">
 					<slot name="placeholder" />
 				</div>
@@ -106,14 +99,17 @@
 // column shows the `placeholder` slot. Below lg it is an overlay the chat button toggles.
 // No side border: it would take a pixel from the frame and tip Raven into its mobile layout.
 //
-// The frame is loaded once. Moving to another record's chat switches the channel inside the
-// running Raven (its router), instead of booting Raven again for every Issue.
-import { computed, onBeforeUnmount, onMounted, ref, watch } from "vue"
+// Raven boots once per page: the frame belongs to utils/ravenFrame.js and is laid over this panel
+// while it shows. Opening another record's chat, even after going back to the list, switches the
+// channel inside the running Raven (its router) instead of booting Raven again (#1796).
+import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from "vue"
 import { useRouter } from "vue-router"
 import { Button, FeatherIcon } from "frappe-ui"
+import RavenThreadIcon from "@spa/components/RavenThreadIcon.vue"
 import { __ } from "@spa/utils/i18n.js"
-import { injectEmbedStyle, installGuard, routeFrame, watchThreadMarks } from "@spa/utils/ravenEmbed.js"
+import { classifyPath, injectEmbedStyle, installGuard, routeFrame, watchThreadMarks } from "@spa/utils/ravenEmbed.js"
 import { issueChatStore } from "@spa/issueChatStore.js"
+import { acquireRavenFrame, ravenFrameWindow, releaseRavenFrame, setRavenFrameLayer } from "@spa/utils/ravenFrame.js"
 
 const props = defineProps({
 	/** Overlay only: whether it is shown. The column is always shown. */
@@ -132,9 +128,9 @@ const props = defineProps({
 const emit = defineEmits(["update:open", "closed", "thread-opened"])
 
 const router = useRouter()
-const frame = ref(null)
-// What the frame was loaded with; later channel changes happen inside Raven.
-const frameUrl = ref(props.url)
+const slot = ref(null)
+// The slot this panel laid the frame over; null while it does not hold the frame.
+let heldSlot = null
 let removeGuard = null
 let frameReady = false
 
@@ -168,31 +164,64 @@ function channelPath(url) {
 	return url ? new URL(url, window.location.href).pathname : ""
 }
 
-watch(
-	() => props.url,
-	(url) => {
-		if (!url) return
-		if (!frameUrl.value || !frameReady) {
-			frameUrl.value = url
-			return
-		}
-		switchChannel(url)
+// Take the frame while the chat shows, give it back when it hides or there is no chat to show.
+async function syncFrame() {
+	await nextTick()
+	if (shown.value && props.url && slot.value) attachFrame()
+	else detachFrame()
+}
+
+// Over the overlay (z-40); in the column just above it, so dialogs (z-10) still cover the chat.
+function frameLayer() {
+	return inColumn.value ? 1 : 41
+}
+
+function attachFrame() {
+	if (heldSlot === slot.value) {
+		setRavenFrameLayer(heldSlot, frameLayer())
+		if (frameReady) switchChannel(props.url)
+		return
 	}
-)
+	detachFrame()
+	heldSlot = slot.value
+	const { loaded } = acquireRavenFrame({
+		slot: heldSlot,
+		url: props.url,
+		title: __("Chat about {0}", [props.title]),
+		zIndex: frameLayer(),
+		onLoad: onFrameLoad,
+	})
+	if (loaded) onFrameLoad()
+}
+
+// Give the frame back; releasing it hides and parks Raven (see PARKING_PATH).
+function detachFrame() {
+	if (!heldSlot) return
+	removeGuard?.()
+	removeGuard = null
+	threadMarks?.stop()
+	threadMarks = null
+	frameReady = false
+	releaseRavenFrame(heldSlot)
+	heldSlot = null
+}
+
+watch([shown, inColumn, () => props.url], syncFrame)
+onMounted(syncFrame)
 
 // Point the running Raven at another channel and let its router follow. It replaces the frame's
 // entry, as the cockpit replaces its own route: a new entry per record made the browser's Back
 // land on the previous record's chat, which the guard then opened in a new window (#1794).
 function switchChannel(url) {
-	const win = frame.value?.contentWindow
+	const win = ravenFrameWindow()
 	try {
 		removeGuard?.()
 		removeGuard = null
 		routeFrame(win, channelPath(url), { replace: true })
 		removeGuard = installGuard(win, channelPath(url), onLeave, onThreadOpened)
 	} catch (e) {
+		// Raven is not reachable (it is reloading): its next load routes it here.
 		frameReady = false
-		frameUrl.value = url // fall back to loading it
 	}
 }
 
@@ -232,8 +261,8 @@ function onThreadHint() {
 // Open a thread of this chat inside the frame: a route Raven knows and the guard allows, so its
 // router opens the thread panel, which marks the thread read.
 function openThread(threadId) {
-	const win = frame.value?.contentWindow
-	if (!win || !props.url) return
+	const win = ravenFrameWindow()
+	if (!win || !frameReady || !props.url) return
 	try {
 		routeFrame(win, `${channelPath(props.url)}/thread/${encodeURIComponent(threadId)}`)
 	} catch (e) {
@@ -254,11 +283,26 @@ function close() {
 }
 
 function openInRaven() {
-	window.open(frame.value?.contentWindow?.location?.href || props.url, "_blank", "noopener")
+	let href = ""
+	try {
+		if (frameReady) href = ravenFrameWindow()?.location?.href || ""
+	} catch (e) {
+		// fall back to the chat's own address
+	}
+	window.open(href || props.url, "_blank", "noopener")
+}
+
+// Whether someone just clicked or typed in the chat. Raven also moves on by itself (a redirect
+// while it boots or switches channels); the guard undoes that, and nothing more may happen:
+// opening it "in a new window" sent the whole tab to Raven where new windows open in place (#1796).
+function userActedInFrame() {
+	const activation = ravenFrameWindow()?.navigator?.userActivation
+	return activation ? activation.isActive : true
 }
 
 function onLeave(kind, href) {
 	if (kind === "home") return close()
+	if (!userActedInFrame()) return
 	if (kind === "raven") return void window.open(href, "_blank", "noopener")
 	// A link to another page of this site, e.g. a document card: open it here in the cockpit
 	// when it belongs to this cockpit, otherwise in a new tab.
@@ -272,26 +316,28 @@ function onLeave(kind, href) {
 	}
 }
 
+// Raven loaded, or this panel took over the running one: set it up for this chat.
 function onFrameLoad() {
 	removeGuard?.()
 	removeGuard = null
-	const win = frame.value?.contentWindow
+	const win = ravenFrameWindow()
 	let doc
 	try {
 		doc = win?.document
 	} catch (e) {
 		return // not same-origin; nothing to adjust
 	}
-	if (!doc) return
+	if (!doc || !props.url) return
 	injectEmbedStyle(doc)
 	startThreadMarks(doc)
 	frameReady = true
-	if (props.url && channelPath(props.url) !== channelPath(frameUrl.value)) {
-		// The record changed while Raven was still loading.
+	const path = channelPath(props.url)
+	if (classifyPath(win.location.pathname, path) !== "channel") {
+		// Raven is on its start page or another record's chat.
 		switchChannel(props.url)
-		return
+	} else {
+		removeGuard = installGuard(win, path, onLeave, onThreadOpened)
 	}
-	removeGuard = installGuard(win, channelPath(frameUrl.value), onLeave, onThreadOpened)
 	if (pendingTarget) {
 		const target = pendingTarget
 		pendingTarget = null
@@ -315,7 +361,7 @@ function targetPath(target) {
  */
 function focusTarget(target) {
 	if (!target || (!target.messageId && !target.threadId) || !props.url) return
-	const win = frame.value?.contentWindow
+	const win = ravenFrameWindow()
 	if (!frameReady || !win) {
 		pendingTarget = target
 		return
@@ -327,23 +373,10 @@ function focusTarget(target) {
 	}
 }
 
-// The overlay drops its iframe when it closes: forget that window, so the next open waits for
-// the new frame's load instead of routing into a dead one (the jump to a message got lost).
-watch(shown, (isShown) => {
-	if (isShown) return
-	removeGuard?.()
-	removeGuard = null
-	threadMarks?.stop()
-	threadMarks = null
-	frameReady = false
-	if (props.url) frameUrl.value = props.url
-})
-
 defineExpose({ focusTarget, inColumn })
 
 onBeforeUnmount(() => {
-	removeGuard?.()
-	threadMarks?.stop()
+	detachFrame()
 	wide?.removeEventListener("change", updatePlacement)
 	if (issueChatStore.openFor === props.recordName) issueChatStore.openFor = null
 })

@@ -88,6 +88,12 @@ class TestIssueChat(FrappeTestCase):
 		# Raven may auto-add every System User (Raven Settings); this one must have no Raven user.
 		frappe.db.delete("Raven User", {"user": OUTSIDER})
 		_ensure_user(NO_READER, roles=("Raven User",))
+		# Restored in tearDown: adding the Raven index (DDL) commits the open transaction, so the
+		# rollback alone left the site's chat pointed at the test workspace.
+		self._settings = {
+			field: frappe.db.get_single_value("phamos Settings", field)
+			for field in ("enable_issue_chat", "issue_chat_workspace")
+		}
 		if not frappe.db.exists("Raven Workspace", WORKSPACE):
 			frappe.get_doc(
 				{"doctype": "Raven Workspace", "workspace_name": WORKSPACE, "type": "Private"}
@@ -104,6 +110,15 @@ class TestIssueChat(FrappeTestCase):
 	def tearDown(self):
 		frappe.set_user("Administrator")
 		frappe.db.rollback()
+		changed = {
+			field: value
+			for field, value in self._settings.items()
+			if frappe.db.get_single_value("phamos Settings", field) != value
+		}
+		if changed:
+			for field, value in changed.items():
+				frappe.db.set_single_value("phamos Settings", field, value)
+			frappe.db.commit()  # nosemgrep: undoing what a DDL statement committed
 
 	def _assign(self, user, doctype="Issue", name=None):
 		add_assignment(
@@ -220,6 +235,11 @@ class TestIssueChat(FrappeTestCase):
 			pluck="name",
 		)[0]
 		self.assertEqual(states[self.issue.name]["first_unread"], intro)
+		self.assertEqual(
+			states[self.issue.name]["last_message_at"],
+			frappe.db.get_value("Raven Channel", channel_id, "last_message_timestamp"),
+		)
+		self.assertTrue(states[self.issue.name]["last_message_at"])
 		self.assertEqual(pc.get_issue_chat(self.issue.name)["unread"], 1)
 
 

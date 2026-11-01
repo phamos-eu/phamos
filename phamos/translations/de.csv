@@ -797,6 +797,13 @@ Session ended.,Sitzung beendet.
 {0} ToDos done in {1}.,{0} ToDos erledigt in {1}.
 {0} min,{0} Min.
 {0} h {1} min,{0} Std. {1} Min.
+just now,gerade eben
+{0} min ago,vor {0} Min.
+{0} h ago,vor {0} Std.
+{0} d ago,vor {0} T.
+{0} wk ago,vor {0} Wo.
+{0} mo ago,vor {0} Mon.
+{0} yr ago,vor {0} J.
 That did not work,Das hat nicht funktioniert
 Done. One less.,Erledigt. Eins weniger.
 Captured for later.,Für später notiert.
