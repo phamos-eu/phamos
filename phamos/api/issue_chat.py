@@ -488,7 +488,7 @@ def get_chat_states(doctype, names):
 	if not is_enabled() or not names:
 		return {}
 	if len(names) > MAX_STATE_NAMES:
-		# Lists show at most 500 records (get_issues); anything larger is not a list (#1794).
+		# Larger lists ask in parts (useIssueChatStates, #1797); this keeps one call bounded (#1794).
 		frappe.throw(_("Too many records for chat states: {0}").format(len(names)))
 	readable = frappe.get_list(
 		doctype, filters={"name": ("in", list(names))}, pluck="name", limit_page_length=0
