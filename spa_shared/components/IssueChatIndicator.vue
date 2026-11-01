@@ -12,11 +12,8 @@
 	>
 		<FeatherIcon name="message-circle" :class="size === 'lg' ? 'h-5 w-5' : 'h-3.5 w-3.5'" />
 		<span v-if="total" class="font-semibold tabular-nums">{{ total > 99 ? "99+" : total }}</span>
-		<!-- Some of it is in threads, which Raven's channel view does not mark (#1623). -->
-		<RavenThreadIcon
-			v-if="state.unread_threads"
-			:class="size === 'lg' ? 'h-3.5 w-3.5' : 'h-3 w-3'"
-		/>
+		<!-- One of the unread messages mentions the user: Raven's Mention icon (#1796). -->
+		<RavenMentionIcon v-if="tone === 'mention'" :class="size === 'lg' ? 'h-3.5 w-3.5' : 'h-3 w-3'" />
 	</span>
 </template>
 
@@ -27,7 +24,7 @@
 // A span, not a button: it sits inside the row's own button.
 import { computed } from "vue"
 import { FeatherIcon } from "frappe-ui"
-import RavenThreadIcon from "@spa/components/RavenThreadIcon.vue"
+import RavenMentionIcon from "@spa/components/RavenMentionIcon.vue"
 import { requestChatOpen } from "@spa/issueChatStore.js"
 import { totalUnread, unreadSummary, unreadTone } from "@spa/utils/chatUnread.js"
 import { __ } from "@spa/utils/i18n.js"
