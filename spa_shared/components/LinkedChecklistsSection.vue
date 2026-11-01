@@ -127,8 +127,7 @@ async function loadSummaries() {
 			document: props.document,
 			reference_record: props.referenceRecord,
 		})
-		const toLoad = applyDefaultExpansion(summaries.value)
-		await Promise.all(toLoad.map((name) => loadDetail(name)))
+		await loadDetails(applyDefaultExpansion(summaries.value))
 	} catch (e) {
 		if (e?.exc_type === "PermissionError" || /PermissionError/.test(e?.message || "")) {
 			unavailable.value = true
@@ -137,6 +136,17 @@ async function loadSummaries() {
 		throw e
 	} finally {
 		loading.value = false
+	}
+}
+
+// All unfinished checklists open at once: one request for all of them, not one each (#1796).
+async function loadDetails(names) {
+	if (!names.length) return
+	names.forEach((name) => (detailLoading[name] = true))
+	try {
+		Object.assign(details, await call(`${API}.get_checklists`, { names: JSON.stringify(names) }))
+	} finally {
+		names.forEach((name) => (detailLoading[name] = false))
 	}
 }
 
