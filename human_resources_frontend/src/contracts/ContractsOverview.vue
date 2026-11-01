@@ -44,6 +44,8 @@
 					/>
 				</section>
 
+				<ContractTrendChart v-if="data.trend?.months?.length" :trend="data.trend" />
+
 				<div class="grid grid-cols-1 gap-5 md:grid-cols-2 xl:grid-cols-3">
 					<section class="rounded-lg border border-outline-gray-2 bg-surface-white p-5">
 						<h2 class="text-base font-semibold text-ink-gray-9">Ending soon</h2>
@@ -118,6 +120,7 @@ import {
 	formatNumber,
 	formatPercent,
 } from "@spa/contracts/contractFormat.js"
+import ContractTrendChart from "./ContractTrendChart.vue"
 import { useContractAccess } from "./useContractAccess.js"
 
 const router = useRouter()

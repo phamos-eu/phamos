@@ -9,12 +9,19 @@ HR Manager and System Manager have. HR Users can open the cockpit but get no acc
 
 import frappe
 from frappe import _
-from frappe.utils import add_days, flt, get_url_to_form, getdate, nowdate
+from frappe.utils import add_days, add_months, flt, get_first_day, get_last_day, get_url_to_form, getdate, nowdate
 
+from phamos.api.project_management_spa import ACTIVE_IMPLEMENTATION_STATUSES
 from phamos.phamos.doctype.employment_contract.employment_contract import get_contract_history
 
 DOCTYPE = "Employment Contract"
 ENDING_SOON_DAYS = 60
+# The monthly chart on the overview: 8 months back, the current month and 3 months ahead.
+TREND_MONTHS_BACK = 8
+TREND_MONTHS_AHEAD = 3
+# Contract hours per week become hours per month at 52 weeks over 12 months (#1800).
+# Gross: leave and sick leave are not deducted yet (#1802).
+WEEKS_PER_MONTH = 52 / 12
 LIST_FIELDS = (
 	"name",
 	"docstatus",
@@ -100,6 +107,9 @@ def get_overview():
 		if e.employee not in covered
 	]
 
+	drafts = frappe.get_list(DOCTYPE, filters={"docstatus": 0}, fields=list(LIST_FIELDS), limit_page_length=0)
+	main_currency = max(costs, key=costs.get) if costs else None
+
 	return {
 		"today": str(today),
 		"ending_soon_days": ENDING_SOON_DAYS,
@@ -110,8 +120,139 @@ def get_overview():
 		"ending_soon": ending,
 		"upcoming": upcoming,
 		"without_contract": without_contract,
-		"drafts": frappe.db.count(DOCTYPE, {"docstatus": 0}),
+		"drafts": len(drafts),
+		"trend": {
+			"currency": main_currency,
+			"months": add_implementation_hours(monthly_trend(today, submitted, drafts, main_currency)),
+		},
 	}
+
+
+def monthly_trend(today, submitted, drafts, currency):
+	"""FTE and monthly cost per month, from TREND_MONTHS_BACK months ago to TREND_MONTHS_AHEAD ahead.
+
+	A month counts the contracts in force on its 1st; the current month uses today, so it
+	matches the KPI tiles. Future months add drafts as an estimate: a draft takes the place
+	of the employee's submitted contract from its start date, as it will on submit, so a
+	planned change is not counted twice. Cost counts contracts in `currency` only (the main
+	company currency); FTE counts every contract.
+	"""
+	this_month = get_first_day(today)
+	# Sorted by start, so the latest-starting draft wins when an employee has several.
+	drafts = sorted(drafts, key=lambda d: getdate(d.effective_from))
+	months = []
+	for offset in range(-TREND_MONTHS_BACK, TREND_MONTHS_AHEAD + 1):
+		month = add_months(this_month, offset)
+		day = today if offset == 0 else month
+		confirmed = {c.employee: c for c in submitted if in_force(c, day)}
+		estimated = {d.employee: d for d in drafts if in_force(d, day)} if offset > 0 else {}
+		for employee in estimated:
+			confirmed.pop(employee, None)
+		months.append(
+			{
+				"month": str(month),
+				"is_current": offset == 0,
+				"is_future": offset > 0,
+				"fte": total_fte(confirmed.values()),
+				"cost": total_cost(confirmed.values(), currency),
+				"estimate_fte": total_fte(estimated.values()),
+				"estimate_cost": total_cost(estimated.values(), currency),
+				"capacity_hours": total_hours(confirmed.values()),
+				"estimate_capacity_hours": total_hours(estimated.values()),
+			}
+		)
+	return months
+
+
+def total_fte(contracts):
+	return round(sum(flt(c.fte_percentage) for c in contracts) / 100, 2)
+
+
+def total_hours(contracts):
+	return round(sum(flt(c.weekly_hours) for c in contracts) * WEEKS_PER_MONTH, 1)
+
+
+def total_cost(contracts, currency):
+	return round(sum(flt(c.base_monthly_gross) for c in contracts if (c.company_currency or c.currency) == currency), 2)
+
+
+def add_implementation_hours(months):
+	"""Add the hours worked and predicted on Implementations to each month of the trend.
+
+	Past months and the current one get `spent_hours`; future months get `predicted_hours`.
+	HR Managers cannot read Implementation, but see these sums anyway (#1800): the queries
+	skip permissions and return monthly totals only, never a single Implementation.
+	"""
+	keys = [m["month"][:7] for m in months]
+	past = [m["month"][:7] for m in months if not m["is_future"]]
+	future = [m["month"][:7] for m in months if m["is_future"]]
+	spent = spent_hours_by_month(past[0], past[-1]) if past else {}
+	predicted = predicted_hours_by_month(future)
+	for month, key in zip(months, keys):
+		month["spent_hours"] = None if month["is_future"] else round(spent.get(key, 0), 1)
+		month["predicted_hours"] = round(predicted.get(key, 0), 1) if month["is_future"] else None
+	return months
+
+
+def spent_hours_by_month(first_key, last_key):
+	"""Timesheet hours, billable or not, on projects that belong to an Implementation.
+
+	Read from Timesheets rather than the Implementation's Resource planning table, which
+	only refreshes when the Implementation is saved. Months follow the Timesheet's start
+	date, like Resource planning. Cancelled Timesheets don't count.
+	"""
+	rows = frappe.db.sql(
+		"""
+		SELECT DATE_FORMAT(ts.start_date, '%%Y-%%m') AS month, SUM(tsd.hours) AS hours
+		FROM `tabTimesheet Detail` tsd
+		JOIN `tabTimesheet` ts ON ts.name = tsd.parent
+		JOIN `tabProject` p ON p.name = tsd.project
+		WHERE ts.docstatus < 2
+			AND IFNULL(p.custom_implementation, '') != ''
+			AND ts.start_date BETWEEN %s AND %s
+		GROUP BY month
+		""",
+		(f"{first_key}-01", get_last_day(f"{last_key}-01")),
+		as_dict=True,
+	)
+	return {r.month: flt(r.hours) for r in rows}
+
+
+def predicted_hours_by_month(keys):
+	"""Predicted hours per month (`YYYY-MM`) over all active Implementations.
+
+	An Implementation with several predictions for one month counts their average, as
+	`Implementation.predicted_time_next_3_months` does. Completed and Cancelled
+	Implementations don't count.
+	"""
+	if not keys:
+		return {}
+	rows = frappe.get_all(
+		"Prediction",
+		filters={
+			"parenttype": "Implementation",
+			"parentfield": "resource_planning_prediction",
+			"month_and_year": ("in", keys),
+		},
+		fields=["parent", "month_and_year", "prediction"],
+	)
+	active = set(
+		frappe.get_all(
+			"Implementation",
+			filters={"name": ("in", list({r.parent for r in rows})), "status": ("in", ACTIVE_IMPLEMENTATION_STATUSES)},
+			pluck="name",
+		)
+		if rows
+		else []
+	)
+	values = {}
+	for row in rows:
+		if row.parent in active:
+			values.setdefault((row.parent, row.month_and_year), []).append(flt(row.prediction))
+	totals = {}
+	for (_parent, key), predictions in values.items():
+		totals[key] = totals.get(key, 0) + sum(predictions) / len(predictions)
+	return totals
 
 
 @frappe.whitelist()
@@ -140,6 +281,7 @@ def get_contract(name):
 		and frappe.has_permission(DOCTYPE, "create")
 	)
 	data["can_edit"] = bool(doc.docstatus == 0 and doc.has_permission("write"))
+	data["can_delete"] = bool(doc.docstatus == 0 and doc.has_permission("delete"))
 	return data
 
 
@@ -151,6 +293,8 @@ def save_contract(values, name=None, submit=0):
 
 	if name:
 		doc = frappe.get_doc(DOCTYPE, name)
+		# Permission first, so a user without access learns nothing about the contract.
+		doc.check_permission("write")
 		if doc.docstatus != 0:
 			frappe.throw(_("Only draft contracts can be edited. Record a change instead."))
 		doc.update(clean)
@@ -176,6 +320,21 @@ def submit_contract(name):
 	doc = frappe.get_doc(DOCTYPE, name)
 	doc.submit()
 	return get_contract(doc.name)
+
+
+@frappe.whitelist(methods=["POST"])
+def delete_contract(name):
+	"""Delete a draft contract.
+
+	Submitted contracts are history that capacity and cost rely on: they are changed with
+	Record change, or cancelled in Desk, but never deleted from the cockpit.
+	"""
+	doc = frappe.get_doc(DOCTYPE, name)
+	# Permission first, so a user without access learns nothing about the contract.
+	doc.check_permission("delete")
+	if doc.docstatus != 0:
+		frappe.throw(_("Only draft contracts can be deleted."))
+	frappe.delete_doc(DOCTYPE, name)
 
 
 @frappe.whitelist()
