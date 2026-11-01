@@ -44,8 +44,9 @@
 			@click="onSelect(option)"
 		>
 			<span>{{ option.label }}</span>
+			<!-- A oneWay option has no direction to show: the active background says it sorts. -->
 			<FeatherIcon
-				v-if="sortBy === option.value"
+				v-if="sortBy === option.value && !option.oneWay"
 				:name="sortOrder === 'desc' ? 'arrow-down' : 'arrow-up'"
 				class="h-3.5 w-3.5"
 			/>

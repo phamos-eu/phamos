@@ -55,7 +55,7 @@
 							:aria-expanded="threads.length > 1 ? String(threadListOpen) : undefined"
 							@click="onThreadHint"
 						>
-							<FeatherIcon name="corner-down-right" class="h-3 w-3 flex-none" />
+							<RavenThreadIcon class="h-3 w-3 flex-none" />
 							{{ threadHint }}
 							<FeatherIcon
 								v-if="threads.length > 1"
@@ -111,6 +111,7 @@
 import { computed, onBeforeUnmount, onMounted, ref, watch } from "vue"
 import { useRouter } from "vue-router"
 import { Button, FeatherIcon } from "frappe-ui"
+import RavenThreadIcon from "@spa/components/RavenThreadIcon.vue"
 import { __ } from "@spa/utils/i18n.js"
 import { injectEmbedStyle, installGuard, routeFrame, watchThreadMarks } from "@spa/utils/ravenEmbed.js"
 import { issueChatStore } from "@spa/issueChatStore.js"

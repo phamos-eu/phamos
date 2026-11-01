@@ -19,7 +19,7 @@
 					:aria-label="unreadSummary(state)"
 				>
 					{{ unreadTotal > 99 ? "99+" : unreadTotal }}
-					<FeatherIcon v-if="state.unread_threads" name="corner-down-right" class="h-2.5 w-2.5" />
+					<RavenThreadIcon v-if="state.unread_threads" class="h-2.5 w-2.5" />
 				</span>
 			</template>
 		</Button>
@@ -62,6 +62,7 @@
 // message_created events in the channel's document room.
 import { computed, nextTick, onBeforeUnmount, onDeactivated, ref, watch } from "vue"
 import { Button, call, FeatherIcon, toast } from "frappe-ui"
+import RavenThreadIcon from "@spa/components/RavenThreadIcon.vue"
 import IssueChatPanel from "@spa/components/IssueChatPanel.vue"
 import { useDocRealtime } from "@spa/composables/useDocRealtime.js"
 import { sessionUser } from "@spa/session.js"
