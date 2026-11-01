@@ -169,6 +169,18 @@ class TestEmploymentContractsApi(FrappeTestCase):
 		frappe.set_user("Administrator")
 		self.assertTrue(frappe.db.exists("Employment Contract", draft["name"]))
 
+	def test_user_without_access_learns_nothing_about_a_submitted_contract(self):
+		# Without HR access, every call fails on permission, not on the contract's state.
+		contract = self.save(effective_from=add_days(nowdate(), -10))
+		user = "contract-hr-user@example.com"
+		if not frappe.db.exists("User", user):
+			frappe.get_doc(
+				{"doctype": "User", "email": user, "first_name": "HR", "send_welcome_email": 0, "roles": [{"role": "HR User"}]}
+			).insert(ignore_permissions=True)
+		frappe.set_user(user)
+		self.assertRaises(frappe.PermissionError, api.delete_contract, contract["name"])
+		self.assertRaises(frappe.PermissionError, api.save_contract, {"fte_percentage": 90}, name=contract["name"])
+
 
 class TestMonthlyTrend(unittest.TestCase):
 	"""The 12-month chart on the Contracts overview (#1799), without the database."""

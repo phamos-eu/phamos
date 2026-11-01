@@ -293,6 +293,8 @@ def save_contract(values, name=None, submit=0):
 
 	if name:
 		doc = frappe.get_doc(DOCTYPE, name)
+		# Permission first, so a user without access learns nothing about the contract.
+		doc.check_permission("write")
 		if doc.docstatus != 0:
 			frappe.throw(_("Only draft contracts can be edited. Record a change instead."))
 		doc.update(clean)
@@ -328,9 +330,10 @@ def delete_contract(name):
 	Record change, or cancelled in Desk, but never deleted from the cockpit.
 	"""
 	doc = frappe.get_doc(DOCTYPE, name)
+	# Permission first, so a user without access learns nothing about the contract.
+	doc.check_permission("delete")
 	if doc.docstatus != 0:
 		frappe.throw(_("Only draft contracts can be deleted."))
-	doc.check_permission("delete")
 	frappe.delete_doc(DOCTYPE, name)
 
 
