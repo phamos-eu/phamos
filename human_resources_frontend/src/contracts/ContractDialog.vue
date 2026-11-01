@@ -131,8 +131,9 @@
 
 <script setup>
 import { computed, nextTick, reactive, ref, watch } from "vue"
-import { call, toast } from "frappe-ui"
+import { call } from "frappe-ui"
 import FrappeLink from "@spa/components/FrappeLink.vue"
+import { notifySuccess } from "@spa/utils/notify.js"
 import { CONTRACTS_API, errorMessage, firstOfNextMonth, formatHours, formatMoney } from "@spa/contracts/contractFormat.js"
 
 const props = defineProps({
@@ -165,6 +166,9 @@ const saving = ref("")
 const error = ref("")
 const existingHint = ref("")
 const formEl = ref(null)
+// The draft this dialog already created. A second click after an error then updates that draft
+// instead of inserting another record.
+const savedName = ref(null)
 // True while the form is being filled from props, so the currency watcher doesn't replace a stored rate.
 let resetting = false
 
@@ -251,6 +255,7 @@ function reset() {
 	}
 	error.value = ""
 	existingHint.value = ""
+	savedName.value = null
 }
 
 watch(
@@ -302,10 +307,11 @@ async function save(submit) {
 		if (!values.expense_account) values.expense_account = null
 		const contract = await call(`${CONTRACTS_API}.save_contract`, {
 			values,
-			name: props.mode === "edit" ? props.source?.name : null,
+			name: savedName.value || (props.mode === "edit" ? props.source?.name : null),
 			submit: submit ? 1 : 0,
 		})
-		toast.success(submit ? `Contract ${contract.name} submitted` : `Draft ${contract.name} saved`)
+		savedName.value = contract.name
+		notifySuccess(submit ? `Contract ${contract.name} submitted` : `Draft ${contract.name} saved`)
 		emit("saved", contract)
 		close()
 	} catch (e) {

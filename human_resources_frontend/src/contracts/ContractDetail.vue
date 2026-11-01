@@ -56,7 +56,8 @@
 
 <script setup>
 import { computed, ref } from "vue"
-import { call, toast } from "frappe-ui"
+import { call } from "frappe-ui"
+import { notifySuccess } from "@spa/utils/notify.js"
 import ContractHistoryTable from "@spa/contracts/ContractHistoryTable.vue"
 import ContractStatusBadge from "@spa/contracts/ContractStatusBadge.vue"
 import {
@@ -99,7 +100,7 @@ async function submit() {
 	error.value = ""
 	try {
 		const updated = await call(`${CONTRACTS_API}.submit_contract`, { name: props.contract.name })
-		toast.success(`Contract ${updated.name} submitted`)
+		notifySuccess(`Contract ${updated.name} submitted`)
 		emit("updated", updated)
 	} catch (e) {
 		error.value = errorMessage(e, "Could not submit the contract")

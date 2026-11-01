@@ -4,7 +4,7 @@
  "autoname": "format:EC-{employee}-{####}",
  "naming_rule": "Expression",
  "creation": "2026-10-17 12:00:00",
- "modified": "2026-10-17 18:00:00",
+ "modified": "2026-10-31 12:00:00",
  "modified_by": "Administrator",
  "owner": "Administrator",
  "doctype": "DocType",
@@ -73,7 +73,8 @@
    "options": "Company",
    "reqd": 1,
    "fetch_from": "employee.company",
-   "fetch_if_empty": 1
+   "read_only": 1,
+   "description": "Always the employee's company."
   },
   {
    "fieldname": "contract_type",
@@ -168,9 +169,7 @@
    "fieldtype": "Link",
    "label": "Currency",
    "options": "Currency",
-   "reqd": 1,
-   "fetch_from": "company.default_currency",
-   "fetch_if_empty": 1
+   "reqd": 1
   },
   {
    "fieldname": "company_currency",
