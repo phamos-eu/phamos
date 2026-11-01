@@ -141,3 +141,29 @@ class TestEmploymentContractsApi(FrappeTestCase):
 		self.assertEqual(contract["currency"], frappe.get_cached_value("Company", company, "default_currency"))
 		self.assertEqual(contract["conversion_rate"], 1)
 
+
+	# Deleting drafts from the cockpit (#1798)
+
+	def test_draft_can_be_deleted(self):
+		draft = self.save(submit=0, effective_from=add_days(nowdate(), 10))
+		self.assertTrue(draft["can_delete"])
+		api.delete_contract(draft["name"])
+		self.assertFalse(frappe.db.exists("Employment Contract", draft["name"]))
+
+	def test_submitted_contract_cannot_be_deleted(self):
+		contract = self.save(effective_from=add_days(nowdate(), -10))
+		self.assertFalse(contract["can_delete"])
+		self.assertRaises(frappe.ValidationError, api.delete_contract, contract["name"])
+		self.assertTrue(frappe.db.exists("Employment Contract", contract["name"]))
+
+	def test_hr_user_cannot_delete_a_draft(self):
+		draft = self.save(submit=0, effective_from=add_days(nowdate(), 10))
+		user = "contract-hr-user@example.com"
+		if not frappe.db.exists("User", user):
+			frappe.get_doc(
+				{"doctype": "User", "email": user, "first_name": "HR", "send_welcome_email": 0, "roles": [{"role": "HR User"}]}
+			).insert(ignore_permissions=True)
+		frappe.set_user(user)
+		self.assertRaises(frappe.PermissionError, api.delete_contract, draft["name"])
+		frappe.set_user("Administrator")
+		self.assertTrue(frappe.db.exists("Employment Contract", draft["name"]))
