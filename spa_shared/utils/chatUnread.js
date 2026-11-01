@@ -63,20 +63,20 @@ export function compareChatStates(a, b) {
 }
 
 /**
- * Short age of a chat's last message for the list (#1796): "now", "5 min", "3 h", "2 d", "3 wk",
- * "4 mo", "2 yr". Empty when there is no message.
+ * Short age of a chat's last message for the list (#1796): "just now", "5 min ago", "3 h ago",
+ * "2 d ago", "3 wk ago", "4 mo ago", "2 yr ago". Empty when there is no message.
  * @param {number|null} seconds since the message
  */
 export function messageAge(seconds) {
 	if (seconds == null || Number.isNaN(seconds)) return ""
 	const minutes = Math.floor(seconds / 60)
-	if (minutes < 1) return __("now")
-	if (minutes < 60) return __("{0} min", [minutes])
+	if (minutes < 1) return __("just now")
+	if (minutes < 60) return __("{0} min ago", [minutes])
 	const hours = Math.floor(minutes / 60)
-	if (hours < 24) return __("{0} h", [hours])
+	if (hours < 24) return __("{0} h ago", [hours])
 	const days = Math.floor(hours / 24)
-	if (days < 7) return __("{0} d", [days])
-	if (days < 30) return __("{0} wk", [Math.floor(days / 7)])
-	if (days < 365) return __("{0} mo", [Math.floor(days / 30)])
-	return __("{0} yr", [Math.floor(days / 365)])
+	if (days < 7) return __("{0} d ago", [days])
+	if (days < 30) return __("{0} wk ago", [Math.floor(days / 7)])
+	if (days < 365) return __("{0} mo ago", [Math.floor(days / 30)])
+	return __("{0} yr ago", [Math.floor(days / 365)])
 }
