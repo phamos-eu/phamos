@@ -373,7 +373,36 @@ def get_checklist_inbox(include_completed=0):
 @frappe.whitelist()
 def get_checklist(name):
 	"""Checklist detail + items for the SPA."""
-	doc = _require_checklist_read(name)
+	return _checklist_detail(_require_checklist_read(name))
+
+
+# A record's checklist section loads at most this many (get_checklists_for_reference's limit).
+MAX_CHECKLISTS_PER_CALL = 200
+
+
+@frappe.whitelist()
+def get_checklists(names):
+	"""Detail + items of several checklists in one call: {name: detail} (#1796).
+
+	A record's checklist section opens every unfinished checklist at once; one request per
+	checklist queued up behind the browser's few connections and slowed the whole page down.
+	Checklists the user cannot read, or that no longer exist, are left out.
+	"""
+	frappe.has_permission("Checklist", "read", throw=True)
+	names = frappe.parse_json(names) if isinstance(names, str) else names
+	names = [n for n in dict.fromkeys(names or []) if isinstance(n, str) and n]
+	if len(names) > MAX_CHECKLISTS_PER_CALL:
+		frappe.throw(_("Too many checklists in one call: {0}").format(len(names)))
+	details = {}
+	for name in names:
+		try:
+			details[name] = _checklist_detail(_require_checklist_read(name))
+		except (frappe.DoesNotExistError, frappe.PermissionError):
+			frappe.clear_messages()  # check_permission queues a message for the client
+	return details
+
+
+def _checklist_detail(doc):
 	items = []
 	for row in doc.checklist_items:
 		items.append(

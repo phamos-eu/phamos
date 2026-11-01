@@ -187,6 +187,7 @@ import IssueDetail from "@spa/components/IssueDetail.vue"
 import { issueChatStore } from "@spa/issueChatStore.js"
 import { useIssueChatStates } from "@spa/composables/useIssueChatStates.js"
 import { compareChatStates } from "@spa/utils/chatUnread.js"
+import { prewarmRavenFrame } from "@spa/utils/ravenFrame.js"
 import { useUserRealtime } from "@spa/composables/useUserRealtime.js"
 import { __ } from "@spa/utils/i18n.js"
 import IssueList from "@spa/components/IssueList.vue"
@@ -316,6 +317,14 @@ const visibleIssues = computed(() => {
 })
 // Loaded for the unsorted rows, so sorting by chat does not reload the states it sorts by.
 const chatStates = useIssueChatStates(visibleIssues)
+// Boot Raven while the list sits idle, so the first chat opens as fast as the next ones (#1796).
+// Only when the list has chats: then the chat is on and the user is in Raven.
+const stopPrewarm = watch(chatStates, (states) => {
+	if (!Object.keys(states || {}).length) return
+	stopPrewarm()
+	const idle = window.requestIdleCallback || ((fn) => setTimeout(fn, 1500))
+	idle(() => prewarmRavenFrame(), { timeout: 3000 })
+})
 const filteredIssues = computed(() => [...visibleIssues.value].sort(compareIssues))
 
 async function loadOptions() {

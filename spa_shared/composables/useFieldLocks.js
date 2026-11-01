@@ -8,6 +8,38 @@ const LOCK_EVENT = "cockpit_field_lock"
 // Well under the server's 30 s LOCK_TTL, so one lost heartbeat never drops an active lock.
 const HEARTBEAT_MS = 10000
 
+// Lock lookups made in the same tick go out as one request (#1796): a record with many
+// checklists mounts one editor per checklist, and a request each queued up behind the browser's
+// few connections, delaying the rest of the page, the chat included.
+const lockQueue = new Map() // doctype -> Map(name -> [resolve, reject][])
+
+function loadLocksBatched(doctype, name) {
+	return new Promise((resolve, reject) => {
+		let byName = lockQueue.get(doctype)
+		if (!byName) {
+			byName = new Map()
+			lockQueue.set(doctype, byName)
+			setTimeout(() => flushLocks(doctype), 0)
+		}
+		if (!byName.has(name)) byName.set(name, [])
+		byName.get(name).push([resolve, reject])
+	})
+}
+
+async function flushLocks(doctype) {
+	const byName = lockQueue.get(doctype)
+	lockQueue.delete(doctype)
+	try {
+		const result = await call(`${API}.get_field_locks_for`, {
+			doctype,
+			names: JSON.stringify([...byName.keys()]),
+		})
+		for (const [name, waiters] of byName) waiters.forEach(([resolve]) => resolve(result?.[name] || []))
+	} catch (e) {
+		for (const waiters of byName.values()) waiters.forEach(([, reject]) => reject(e))
+	}
+}
+
 /**
  * Soft field locks: while a user edits a text field, everyone else sees
  * "<name> is editing…" and the field is read-only for them. Locks expire on
@@ -59,7 +91,7 @@ export function useFieldLocks({ doctype, name, realtime, onReleased, enabled = (
 		if (!current || !enabled()) return
 		const docname = current
 		try {
-			const rows = await call(`${API}.get_field_locks`, { doctype, name: docname })
+			const rows = await loadLocksBatched(doctype, docname)
 			if (docname !== current) return
 			for (const field of Object.keys(locks)) if (!mine.has(field)) drop(field)
 			for (const row of rows || []) apply(row)
