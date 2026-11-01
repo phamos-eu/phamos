@@ -43,13 +43,21 @@
 						{{ metaParts(issue, { assignees: false }).join(" · ") }}
 					</div>
 				</div>
-				<div class="flex min-w-0 justify-center">
+				<div class="flex min-w-0 flex-col items-center">
 					<IssueChatIndicator
 						size="lg"
 						:issue-name="issue.name"
 						:state="chatStates[issue.name]"
 						@open="emit('select', $event)"
 					/>
+					<!-- How old the chat's last message is, to spot the most recent chats (#1796) -->
+					<span
+						v-if="chatStates[issue.name]?.last_message_at"
+						class="whitespace-nowrap text-xs text-ink-gray-5"
+						:title="formatDatetime(chatStates[issue.name].last_message_at)"
+					>
+						{{ lastMessageAge(chatStates[issue.name]) }}
+					</span>
 				</div>
 				<div class="flex min-w-0 justify-center">
 					<Badge
@@ -166,13 +174,14 @@
 </template>
 
 <script setup>
-import { toRef } from "vue"
+import { computed, onBeforeUnmount, ref, toRef } from "vue"
 import { Badge } from "frappe-ui"
 import IssueChatIndicator from "@spa/components/IssueChatIndicator.vue"
 import { useIssueChatStates } from "@spa/composables/useIssueChatStates.js"
 import { ISSUE_LIST_FILTER_SUBGRID } from "@spa/issueListColumns.js"
 import UserAvatar from "@spa/components/UserAvatar.vue"
-import { formatDate, formatIssueAge } from "@spa/utils/datetime"
+import { messageAge } from "@spa/utils/chatUnread.js"
+import { formatDate, formatDatetime, formatIssueAge, secondsSinceSystemDatetime } from "@spa/utils/datetime"
 
 const props = defineProps({
 	issues: { type: Array, default: () => [] },
@@ -181,10 +190,24 @@ const props = defineProps({
 	compact: { type: Boolean, default: false },
 	/** Align columns with IssuesInbox Priority / Status / date sort filters */
 	alignWithFilters: { type: Boolean, default: false },
+	/** Chat states loaded by the parent (it sorts by them, #1796); loaded here when not given */
+	chatStates: { type: Object, default: null },
 })
 
 const emit = defineEmits(["select"])
-const chatStates = useIssueChatStates(toRef(props, "issues"))
+// Decided once: a parent that passes chat states keeps passing them.
+const ownChatStates = props.chatStates ? null : useIssueChatStates(toRef(props, "issues"))
+const chatStates = computed(() => props.chatStates ?? ownChatStates.value)
+
+// The chat ages count on while the list stays open: re-render them once a minute.
+const minuteTick = ref(0)
+const ageTimer = setInterval(() => minuteTick.value++, 60_000)
+onBeforeUnmount(() => clearInterval(ageTimer))
+
+function lastMessageAge(state) {
+	minuteTick.value // dependency for the re-render
+	return messageAge(secondsSinceSystemDatetime(state.last_message_at))
+}
 
 function creationValue(issue) {
 	const raw = issue.creation || issue.opening_date || ""
