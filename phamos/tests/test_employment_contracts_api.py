@@ -7,10 +7,11 @@ import unittest
 
 import frappe
 from frappe.tests.utils import FrappeTestCase
-from frappe.utils import add_days, getdate, nowdate
+from frappe.utils import add_days, add_months, getdate, nowdate
 
 from phamos.api import employment_contracts as api
 from phamos.custom_scripts.custom_python.employee_dashboard import get_employee_dashboard_data
+from phamos.phamos.doctype.stakeholder_meeting.test_stakeholder_meeting import make_implementation
 
 
 class TestEmploymentContractsApi(FrappeTestCase):
@@ -181,6 +182,7 @@ class TestMonthlyTrend(unittest.TestCase):
 			effective_from=getdate(start),
 			valid_until=getdate(end) if end else None,
 			fte_percentage=fte,
+			weekly_hours=40 * fte / 100,
 			base_monthly_gross=cost,
 			company_currency=currency,
 		)
@@ -238,3 +240,98 @@ class TestMonthlyTrend(unittest.TestCase):
 	def test_current_month_counts_today_like_the_tiles(self):
 		trend = self.trend([self.contract("A", "2026-11-10", cost=1000)])
 		self.assertEqual(trend["2026-11"]["cost"], 1000)
+
+	def test_capacity_hours_are_weekly_hours_times_52_over_12(self):
+		trend = self.trend(
+			[self.contract("A", "2026-01-01", fte=50)],
+			[self.contract("B", "2026-12-01", fte=75)],
+		)
+		self.assertEqual(trend["2026-06"]["capacity_hours"], 86.7)  # 20 h × 52 / 12
+		self.assertEqual(trend["2026-12"]["capacity_hours"], 86.7)
+		self.assertEqual(trend["2026-12"]["estimate_capacity_hours"], 130)  # 30 h × 52 / 12
+
+
+class TestImplementationHours(FrappeTestCase):
+	"""Hours spent and predicted on Implementations in the contracts chart (#1800)."""
+
+	def setUp(self):
+		frappe.set_user("Administrator")
+		self.this_month = getdate(nowdate()).replace(day=1)
+
+	def tearDown(self):
+		frappe.set_user("Administrator")
+		frappe.db.rollback()
+
+	def key(self, offset):
+		return str(add_months(self.this_month, offset))[:7]
+
+	def implementation(self, status="Open", predictions=()):
+		doc = frappe.get_doc("Implementation", make_implementation().name)  # insert hooks modify it again
+		for key, hours in predictions:
+			doc.append("resource_planning_prediction", {"month_and_year": key, "prediction": hours})
+		doc.save(ignore_permissions=True)
+		frappe.db.set_value("Implementation", doc.name, "status", status)
+		return doc.name
+
+	def timesheet(self, project, day, hours):
+		frappe.get_doc(
+			{
+				"doctype": "Timesheet",
+				"time_logs": [{"project": project, "from_time": f"{day} 09:00:00", "hours": hours}],
+			}
+		).insert(ignore_permissions=True)
+
+	def project(self, implementation=None):
+		return (
+			frappe.get_doc(
+				{
+					"doctype": "Project",
+					"project_name": f"_Test Hours {frappe.generate_hash(length=6)}",
+					"status": "Open",
+					"custom_implementation": implementation,
+				}
+			)
+			.insert(ignore_permissions=True)
+			.name
+		)
+
+	def test_predictions_from_active_implementations_only(self):
+		next_month = self.key(1)
+		before = api.predicted_hours_by_month([next_month]).get(next_month, 0)
+		self.implementation("Open", [(next_month, 30)])
+		self.implementation("Escalated", [(next_month, 10), (next_month, 20)])  # two rows: their average
+		self.implementation("Completed", [(next_month, 500)])
+		self.implementation("Cancelled", [(next_month, 500)])
+		self.assertEqual(api.predicted_hours_by_month([next_month])[next_month] - before, 45)
+
+	def test_spent_hours_count_every_implementation_project(self):
+		last_month = self.key(-1)
+		before = api.spent_hours_by_month(last_month, last_month).get(last_month, 0)
+		day = f"{last_month}-10"
+		self.timesheet(self.project(self.implementation("Open")), day, 3)
+		self.timesheet(self.project(self.implementation("Completed")), day, 2)
+		self.timesheet(self.project(), day, 100)  # an internal project, no Implementation
+		self.assertEqual(api.spent_hours_by_month(last_month, last_month)[last_month] - before, 5)
+
+	def test_overview_months_carry_spent_or_predicted_hours(self):
+		months = api.get_overview()["trend"]["months"]
+		for month in months:
+			if month["is_future"]:
+				self.assertIsNone(month["spent_hours"])
+				self.assertIsNotNone(month["predicted_hours"])
+			else:
+				self.assertIsNotNone(month["spent_hours"])
+				self.assertIsNone(month["predicted_hours"])
+
+	def test_hr_manager_sees_totals_without_implementation_access(self):
+		next_month = self.key(1)
+		self.implementation("Open", [(next_month, 30)])
+		user = "contract-hr-manager@example.com"
+		if not frappe.db.exists("User", user):
+			frappe.get_doc(
+				{"doctype": "User", "email": user, "first_name": "HRM", "send_welcome_email": 0, "roles": [{"role": "HR Manager"}]}
+			).insert(ignore_permissions=True)
+		frappe.set_user(user)
+		self.assertFalse(frappe.has_permission("Implementation", "read"))
+		months = {m["month"][:7]: m for m in api.get_overview()["trend"]["months"]}
+		self.assertGreaterEqual(months[next_month]["predicted_hours"], 30)
