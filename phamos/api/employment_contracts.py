@@ -140,6 +140,7 @@ def get_contract(name):
 		and frappe.has_permission(DOCTYPE, "create")
 	)
 	data["can_edit"] = bool(doc.docstatus == 0 and doc.has_permission("write"))
+	data["can_delete"] = bool(doc.docstatus == 0 and doc.has_permission("delete"))
 	return data
 
 
@@ -176,6 +177,20 @@ def submit_contract(name):
 	doc = frappe.get_doc(DOCTYPE, name)
 	doc.submit()
 	return get_contract(doc.name)
+
+
+@frappe.whitelist(methods=["POST"])
+def delete_contract(name):
+	"""Delete a draft contract.
+
+	Submitted contracts are history that capacity and cost rely on: they are changed with
+	Record change, or cancelled in Desk, but never deleted from the cockpit.
+	"""
+	doc = frappe.get_doc(DOCTYPE, name)
+	if doc.docstatus != 0:
+		frappe.throw(_("Only draft contracts can be deleted."))
+	doc.check_permission("delete")
+	frappe.delete_doc(DOCTYPE, name)
 
 
 @frappe.whitelist()
