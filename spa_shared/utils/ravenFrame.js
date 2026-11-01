@@ -3,8 +3,12 @@
 // for every Issue opened from the list. This frame lives in <body> for the whole page and is laid
 // over the panel that currently uses it (its "slot"); switching chats only reroutes Raven.
 //
-// Fixed position, z-index 41: above the chat overlay (z-40), below dialogs and popovers (z-50 and
-// up). While no panel uses it, it stays hidden at its last size, so Raven keeps its layout.
+// Fixed position, so it paints in the page's top stacking context: each panel says how high
+// (zIndex). In the Issue column that is 1, above the column it covers and below frappe-ui's
+// dialogs (z-10) and popovers; over the chat overlay (z-40) it is 41. While no panel uses it, it
+// stays hidden at its last size, so Raven keeps its layout, and parks (PARKING_PATH).
+
+import { routeFrame } from "@spa/utils/ravenEmbed.js"
 
 /**
  * Where the frame waits while no chat shows it: a hidden frame still showing a chat would mark
@@ -30,16 +34,28 @@ function createFrame() {
 		width: "768px",
 		height: "600px",
 		border: "0",
-		zIndex: "41",
+		zIndex: "1",
 		visibility: "hidden",
 		pointerEvents: "none",
 	})
-	// Every load, including Raven reloading itself, goes to the panel using the frame.
+	// Every load, including Raven reloading itself, goes to the panel using the frame. Without
+	// one (its chat closed before Raven finished booting), Raven must not stay on that chat.
 	frame.addEventListener("load", () => {
 		loaded = true
-		owner?.onLoad()
+		if (owner) owner.onLoad()
+		else park()
 	})
 	document.body.appendChild(frame)
+}
+
+// Move the hidden Raven off any chat. Never throws: a Raven that is not reachable stays put.
+function park() {
+	try {
+		const win = frame.contentWindow
+		if (win.location.pathname !== PARKING_PATH) routeFrame(win, PARKING_PATH, { replace: true })
+	} catch (e) {
+		// not loaded yet or reloading: its load event parks it
+	}
 }
 
 function setHidden() {
@@ -77,11 +93,12 @@ function follow() {
  * running Raven and route it themselves. `onLoad` runs on each load while the panel holds it.
  * @returns {{ frame: HTMLIFrameElement, loaded: boolean }}
  */
-export function acquireRavenFrame({ slot, url, title, onLoad }) {
+export function acquireRavenFrame({ slot, url, title, zIndex = 1, onLoad }) {
 	if (!frame) createFrame()
 	cancelAnimationFrame(rafId)
 	owner = { slot, onLoad }
 	frame.title = title || ""
+	frame.style.zIndex = String(zIndex)
 	if (!frame.getAttribute("src")) frame.src = url
 	lastRect = ""
 	follow()
@@ -98,12 +115,21 @@ export function prewarmRavenFrame() {
 	frame.src = PARKING_PATH
 }
 
-/** The panel with this slot no longer shows the frame. */
+/** The panel with this slot moved between column and overlay: put the frame at its new height. */
+export function setRavenFrameLayer(slot, zIndex) {
+	if (owner?.slot === slot) frame.style.zIndex = String(zIndex)
+}
+
+/**
+ * The panel with this slot no longer shows the frame: hide it and park Raven. A panel that lost
+ * the frame to another one changes nothing.
+ */
 export function releaseRavenFrame(slot) {
 	if (!owner || owner.slot !== slot) return
 	owner = null
 	cancelAnimationFrame(rafId)
 	setHidden()
+	if (loaded) park()
 }
 
 /** The running Raven's window, or null before the first panel loaded it. */

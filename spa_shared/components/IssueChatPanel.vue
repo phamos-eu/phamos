@@ -109,7 +109,7 @@ import RavenThreadIcon from "@spa/components/RavenThreadIcon.vue"
 import { __ } from "@spa/utils/i18n.js"
 import { classifyPath, injectEmbedStyle, installGuard, routeFrame, watchThreadMarks } from "@spa/utils/ravenEmbed.js"
 import { issueChatStore } from "@spa/issueChatStore.js"
-import { acquireRavenFrame, PARKING_PATH, ravenFrameWindow, releaseRavenFrame } from "@spa/utils/ravenFrame.js"
+import { acquireRavenFrame, ravenFrameWindow, releaseRavenFrame, setRavenFrameLayer } from "@spa/utils/ravenFrame.js"
 
 const props = defineProps({
 	/** Overlay only: whether it is shown. The column is always shown. */
@@ -171,8 +171,14 @@ async function syncFrame() {
 	else detachFrame()
 }
 
+// Over the overlay (z-40); in the column just above it, so dialogs (z-10) still cover the chat.
+function frameLayer() {
+	return inColumn.value ? 1 : 41
+}
+
 function attachFrame() {
 	if (heldSlot === slot.value) {
+		setRavenFrameLayer(heldSlot, frameLayer())
 		if (frameReady) switchChannel(props.url)
 		return
 	}
@@ -182,32 +188,25 @@ function attachFrame() {
 		slot: heldSlot,
 		url: props.url,
 		title: __("Chat about {0}", [props.title]),
+		zIndex: frameLayer(),
 		onLoad: onFrameLoad,
 	})
 	if (loaded) onFrameLoad()
 }
 
-// Park Raven before hiding it (see PARKING_PATH).
+// Give the frame back; releasing it hides and parks Raven (see PARKING_PATH).
 function detachFrame() {
 	if (!heldSlot) return
 	removeGuard?.()
 	removeGuard = null
 	threadMarks?.stop()
 	threadMarks = null
-	const win = ravenFrameWindow()
-	if (frameReady && win) {
-		try {
-			routeFrame(win, PARKING_PATH, { replace: true })
-		} catch (e) {
-			// Raven is not reachable; it stays where it is, hidden.
-		}
-	}
 	frameReady = false
 	releaseRavenFrame(heldSlot)
 	heldSlot = null
 }
 
-watch([shown, () => props.url], syncFrame)
+watch([shown, inColumn, () => props.url], syncFrame)
 onMounted(syncFrame)
 
 // Point the running Raven at another channel and let its router follow. It replaces the frame's
