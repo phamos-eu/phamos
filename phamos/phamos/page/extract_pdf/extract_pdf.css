@@ -55,3 +55,13 @@
 	font-weight: 600;
 	color: var(--text-muted);
 }
+
+.pdf-extract__line input {
+	width: 100%;
+}
+
+.pdf-extract__actions {
+	display: flex;
+	gap: 8px;
+	margin-top: 12px;
+}

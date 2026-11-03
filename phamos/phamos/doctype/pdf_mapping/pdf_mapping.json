@@ -10,6 +10,7 @@
   "naming_series",
   "title",
   "target_doctype",
+  "party_doctype",
   "pdf_mapping_line"
  ],
  "fields": [
@@ -34,6 +35,15 @@
    "options": "DocType"
   },
   {
+   "fieldname": "party_doctype",
+   "fieldtype": "Select",
+   "label": "Primary Key",
+   "options": "\nLead\nCustomer\nSupplier",
+   "in_list_view": 1,
+   "in_standard_filter": 1,
+   "description": "Lead, Customer, or Supplier these learned PDF rules belong to."
+  },
+  {
    "fieldname": "pdf_mapping_line",
    "fieldtype": "Table",
    "label": "PDF Mapping Line",
@@ -42,7 +52,7 @@
  ],
  "index_web_pages_for_search": 1,
  "links": [],
- "modified": "2026-10-28 12:50:46.603556",
+ "modified": "2026-11-03 11:26:00.000000",
  "modified_by": "Administrator",
  "module": "Phamos",
  "name": "PDF Mapping",
