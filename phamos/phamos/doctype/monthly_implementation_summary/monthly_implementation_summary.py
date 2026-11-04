@@ -410,29 +410,33 @@ class MonthlyImplementationSummary(Document):
 			self._stamp_timesheets_for_delivered_hours(dn.name, total_hours, project)
 		return dn.name
 
-	def _stamp_rows_in_window(self, dn_name, rows, start, end):
-		"""Stamp custom_delivery_note on Timesheets in `rows` whose cumulative billable-hours slice overlaps [start, end)."""
-		if not dn_name:
-			return
-		running = 0.0
-		for row in rows:
-			row_start, row_end = running, running + flt(row.billable_hours)
-			running = row_end
-			if row_end <= start or row_start >= end:
-				continue
-			ts = getattr(row, "timesheet", None)
-			if not ts or not frappe.db.exists("Timesheet", ts):
-				continue
-			if frappe.db.get_value("Timesheet", ts, "custom_delivery_note"):
-				continue
-			frappe.db.set_value("Timesheet", ts, "custom_delivery_note", dn_name, update_modified=False)
-
 	def _stamp_timesheets_for_delivered_hours(self, dn_name, hours, project):
+		"""Stamp custom_delivery_note = `dn_name` on not yet stamped Timesheets of this MIS:
+		- this project's billable ones, whole ones whose billable hours fit in the Delivery Note's `hours`,
+		  in table order. If none fits (one is longer than the Delivery Note), the first one is stamped,
+		  so it does not stay without a Delivery Note.
+		- every one without billable hours, of any project: a project with no billable hours never gets
+		  a Delivery Note of its own, and they add no hours."""
 		if not dn_name or flt(hours) <= 0 or not self.timesheets_table:
 			return
-		project_rows = [r for r in self.timesheets_table if r.project == project]
-		delivered_for_project = flt(_delivered_hours_by_project(self).get(project, 0))
-		self._stamp_rows_in_window(dn_name, project_rows, delivered_for_project, delivered_for_project + flt(hours))
+		unstamped = [
+			r for r in self.timesheets_table
+			if r.timesheet
+			and frappe.db.exists("Timesheet", r.timesheet)
+			and not frappe.db.get_value("Timesheet", r.timesheet, "custom_delivery_note")
+		]
+		billable = [r for r in unstamped if r.project == project and flt(r.billable_hours) > 0]
+		remaining = flt(hours)
+		stamp = []
+		for row in billable:
+			if flt(row.billable_hours) <= remaining + 0.0001:
+				stamp.append(row)
+				remaining -= flt(row.billable_hours)
+		if not stamp:
+			stamp = billable[:1]
+		stamp += [r for r in unstamped if flt(r.billable_hours) <= 0]
+		for row in stamp:
+			frappe.db.set_value("Timesheet", row.timesheet, "custom_delivery_note", dn_name, update_modified=False)
 
 	def _sync_timesheet_delivery_note_column(self):
 		ts_names = [r.timesheet for r in (self.timesheets_table or []) if r.timesheet]
