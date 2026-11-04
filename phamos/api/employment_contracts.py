@@ -19,6 +19,10 @@ ENDING_SOON_DAYS = 60
 # The monthly chart on the overview: 8 months back, the current month and 3 months ahead.
 TREND_MONTHS_BACK = 8
 TREND_MONTHS_AHEAD = 3
+# Scrolling the chart loads more months on request: at most TREND_PAGE_MONTHS per call,
+# never later than TREND_MAX_AHEAD months ahead.
+TREND_PAGE_MONTHS = 12
+TREND_MAX_AHEAD = 12
 # Contract hours per week become hours per month at 52 weeks over 12 months (#1800).
 # Gross: leave and sick leave are not deducted yet (#1802).
 WEEKS_PER_MONTH = 52 / 12
@@ -93,12 +97,7 @@ def get_overview():
 		key=lambda c: c.valid_until,
 	)
 
-	# Company currency at each contract's fixed planning rate, so the total does not move
-	# with daily exchange rates. Grouped per company currency for multi-company sites.
-	costs = {}
-	for contract in active:
-		currency = contract.company_currency or contract.currency
-		costs[currency] = costs.get(currency, 0) + flt(contract.base_monthly_gross)
+	costs = costs_by_currency(active)
 
 	covered = {c.employee for c in active} | {c.employee for c in upcoming}
 	without_contract = [
@@ -114,7 +113,6 @@ def get_overview():
 	]
 
 	drafts = frappe.get_list(DOCTYPE, filters={"docstatus": 0}, fields=list(LIST_FIELDS), limit_page_length=0)
-	main_currency = max(costs, key=costs.get) if costs else None
 
 	return {
 		"today": str(today),
@@ -127,15 +125,72 @@ def get_overview():
 		"upcoming": upcoming,
 		"without_contract": without_contract,
 		"drafts": len(drafts),
-		"trend": {
-			"currency": main_currency,
-			"months": add_implementation_hours(monthly_trend(today, submitted, drafts, main_currency)),
-		},
+		"trend": trend_window(today, submitted, drafts, -TREND_MONTHS_BACK, TREND_MONTHS_AHEAD),
 	}
 
 
-def monthly_trend(today, submitted, drafts, currency):
-	"""FTE and monthly cost per month, from TREND_MONTHS_BACK months ago to TREND_MONTHS_AHEAD ahead.
+@frappe.whitelist()
+def get_trend(first_month, last_month):
+	"""More months for the overview chart, when the user scrolls back or ahead in time.
+
+	`first_month` and `last_month` are `YYYY-MM-DD`; only their months count. At most
+	TREND_PAGE_MONTHS months per call, clipped to the earliest contract and TREND_MAX_AHEAD.
+	"""
+	frappe.has_permission(DOCTYPE, "read", throw=True)
+	today = getdate(nowdate())
+	this_month = get_first_day(today)
+	submitted = frappe.get_list(DOCTYPE, filters={"docstatus": 1}, fields=list(LIST_FIELDS), limit_page_length=0)
+	drafts = frappe.get_list(DOCTYPE, filters={"docstatus": 0}, fields=list(LIST_FIELDS), limit_page_length=0)
+	first = month_offset(this_month, first_month)
+	last = month_offset(this_month, last_month)
+	if last - first + 1 > TREND_PAGE_MONTHS:
+		frappe.throw(_("At most {0} months at a time.").format(TREND_PAGE_MONTHS))
+	earliest = earliest_offset(this_month, submitted, drafts)
+	if earliest is not None:
+		first = max(first, earliest)
+	last = min(last, TREND_MAX_AHEAD)
+	return trend_window(today, submitted, drafts, first, last)
+
+
+def trend_window(today, submitted, drafts, first, last):
+	"""The chart's months from `first` to `last` (offsets from the current month), with the
+	bounds the chart may scroll to. Cost is in the main company currency of today's contracts."""
+	costs = costs_by_currency(c for c in submitted if in_force(c, today))
+	currency = max(costs, key=costs.get) if costs else None
+	this_month = get_first_day(today)
+	earliest = earliest_offset(this_month, submitted, drafts)
+	months = monthly_trend(today, submitted, drafts, currency, first, last) if first <= last else []
+	return {
+		"currency": currency,
+		"months": add_implementation_hours(months),
+		"first_month": str(add_months(this_month, min(earliest, first) if earliest is not None else first)),
+		"last_month": str(add_months(this_month, TREND_MAX_AHEAD)),
+	}
+
+
+def costs_by_currency(contracts):
+	"""Monthly gross in company currency at each contract's fixed planning rate, so the total
+	does not move with daily exchange rates. Grouped per company currency for multi-company sites."""
+	costs = {}
+	for contract in contracts:
+		currency = contract.company_currency or contract.currency
+		costs[currency] = costs.get(currency, 0) + flt(contract.base_monthly_gross)
+	return costs
+
+
+def earliest_offset(this_month, submitted, drafts):
+	"""Offset of the month the earliest contract starts in, or None without contracts."""
+	starts = [getdate(c.effective_from) for c in [*submitted, *drafts] if c.effective_from]
+	return month_offset(this_month, min(starts)) if starts else None
+
+
+def month_offset(this_month, day):
+	day = getdate(day)
+	return (day.year - this_month.year) * 12 + day.month - this_month.month
+
+
+def monthly_trend(today, submitted, drafts, currency, first=-TREND_MONTHS_BACK, last=TREND_MONTHS_AHEAD):
+	"""FTE and monthly cost per month, from `first` to `last` months away from the current one.
 
 	A month counts the contracts in force on its 1st; the current month uses today, so it
 	matches the KPI tiles. Future months add drafts as an estimate: a draft takes the place
@@ -147,7 +202,7 @@ def monthly_trend(today, submitted, drafts, currency):
 	# Sorted by start, so the latest-starting draft wins when an employee has several.
 	drafts = sorted(drafts, key=lambda d: getdate(d.effective_from))
 	months = []
-	for offset in range(-TREND_MONTHS_BACK, TREND_MONTHS_AHEAD + 1):
+	for offset in range(first, last + 1):
 		month = add_months(this_month, offset)
 		day = today if offset == 0 else month
 		confirmed = {c.employee: c for c in submitted if in_force(c, day)}

@@ -211,6 +211,22 @@ class TestMonthlyTrend(unittest.TestCase):
 		self.assertEqual([m["month"] for m in months if m["is_current"]], ["2026-11-01"])
 		self.assertEqual(sum(1 for m in months if m["is_future"]), 3)
 
+	def test_window_reaches_back_and_ahead_from_offsets(self):
+		months = api.monthly_trend(self.TODAY, [], [], "EUR", -20, -9)
+		self.assertEqual(months[0]["month"], "2025-03-01")
+		self.assertEqual(months[-1]["month"], "2026-02-01")
+		self.assertFalse(any(m["is_current"] or m["is_future"] for m in months))
+
+	def test_window_bounds_run_from_the_earliest_contract(self):
+		trend = api.trend_window(self.TODAY, [self.contract("A", "2024-05-20")], [], -8, 3)
+		self.assertEqual(trend["first_month"], "2024-05-01")
+		self.assertEqual(trend["last_month"], "2027-11-01")  # TREND_MAX_AHEAD from Nov 2026
+		self.assertEqual(len(trend["months"]), 12)
+
+	def test_window_bounds_without_contracts_stay_on_the_window(self):
+		trend = api.trend_window(self.TODAY, [], [], -8, 3)
+		self.assertEqual(trend["first_month"], "2026-03-01")
+
 	def test_contract_that_starts_changes_and_ends(self):
 		trend = self.trend(
 			[
@@ -324,6 +340,16 @@ class TestImplementationHours(FrappeTestCase):
 		self.timesheet(self.project(self.implementation("Completed")), day, 2)
 		self.timesheet(self.project(), day, 100)  # an internal project, no Implementation
 		self.assertEqual(api.spent_hours_by_month(last_month, last_month)[last_month] - before, 5)
+
+	def test_get_trend_stops_at_the_furthest_month_ahead(self):
+		trend = api.get_trend(f"{self.key(6)}-01", f"{self.key(17)}-01")
+		self.assertEqual(trend["months"][0]["month"], f"{self.key(6)}-01")
+		self.assertEqual(trend["months"][-1]["month"], f"{self.key(api.TREND_MAX_AHEAD)}-01")
+		self.assertEqual(trend["last_month"], f"{self.key(api.TREND_MAX_AHEAD)}-01")
+
+	def test_get_trend_loads_one_page_at_most(self):
+		with self.assertRaises(frappe.ValidationError):
+			api.get_trend(f"{self.key(-30)}-01", f"{self.key(-10)}-01")
 
 	def test_overview_months_carry_spent_or_predicted_hours(self):
 		months = api.get_overview()["trend"]["months"]
