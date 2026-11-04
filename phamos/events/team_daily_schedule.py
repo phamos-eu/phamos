@@ -8,7 +8,7 @@ import re
 import requests
 
 import frappe
-from frappe.utils import get_datetime, get_url_to_form
+from frappe.utils import get_datetime, get_url_to_form, getdate
 
 from phamos.mailcow_integration.caldav.client import (
     calendar_item_url,
@@ -81,6 +81,40 @@ def _parse_attendee_field(raw_value: str | None, field_label: str, row_number: i
         parsed.append(addr)
 
     return parsed
+
+
+# The row fields that go into the invite (_build_ics, _row_recurrence_rule) or pick its mailbox.
+# A row whose fields here are unchanged since the last save is not sent again: the parent
+# (Team, Company) gets saved for unrelated reasons, and every PUT raises SEQUENCE, which can
+# send attendees an "updated invitation" for an event nobody touched (phamos/phamos#1814).
+INVITE_FIELDS = (
+    "subject", "location", "description", "start", "end",
+    "required_attendees", "optional_attendees", "email_account",
+    "repeat_this_event", "repeat_on", "repeat_till",
+    "monday", "tuesday", "wednesday", "thursday", "friday", "saturday", "sunday",
+)
+
+
+DATETIME_INVITE_FIELDS = ("start", "end")
+DATE_INVITE_FIELDS = ("repeat_till",)
+
+
+def _invite_value(row, field):
+    # The form sends dates as text, the copy from before the save holds date objects.
+    value = row.get(field)
+    if not value:
+        return None
+    if field in DATETIME_INVITE_FIELDS:
+        return get_datetime(value)
+    if field in DATE_INVITE_FIELDS:
+        return getdate(value)
+    return str(value).strip()
+
+
+def _invite_unchanged(row, previous_row) -> bool:
+    if not previous_row:
+        return False
+    return all(_invite_value(row, field) == _invite_value(previous_row, field) for field in INVITE_FIELDS)
 
 
 def _row_is_complete(row) -> bool:
@@ -413,6 +447,11 @@ def sync_events_from_parent(doc, method=None):
 
             mailbox_email = _row_mailbox_email(row)
             previous_mailbox = _row_mailbox_email(previous_row) if previous_row else None
+
+            # Handled at an earlier save: synced, or incomplete (then deleted). A row whose
+            # last send failed (mailcow_synced 0) is tried again.
+            if _invite_unchanged(row, previous_row) and (row.get("mailcow_synced") or not _row_is_complete(row)):
+                continue
 
             if not _row_is_complete(row):
                 delete_mailbox = mailbox_email or previous_mailbox
