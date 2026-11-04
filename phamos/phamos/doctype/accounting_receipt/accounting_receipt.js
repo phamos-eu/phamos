@@ -789,6 +789,16 @@ frappe.ui.form.on("Accounting Receipt", {
                     return;
                 }
                 
+                // DATEV only accepts registered senders: send from the user's own account or not at all
+                if (!info.sender) {
+                    frappe.msgprint({
+                        title: __("Configuration Error"),
+                        indicator: "red",
+                        message: info.sender_missing_message
+                    });
+                    return;
+                }
+
                 // Validate PDF
                 if (!info.pdf_name || !info.pdf_url) {
                     frappe.msgprint({
@@ -802,6 +812,7 @@ frappe.ui.form.on("Accounting Receipt", {
                 // Build dialog message
                 let dialog_message = `
                     <div style="margin-bottom: 15px;">
+                        <p><strong>${__("From")}:</strong> ${info.sender}</p>
                         <p><strong>${__("Recipient")}:</strong> ${info.recipient}</p>
                         <p><strong>${__("PDF File")}:</strong> ${info.pdf_name}</p>
                     </div>

@@ -1648,3 +1648,5 @@ You were mentioned,Sie wurden erwähnt
 You were mentioned {0} times,Sie wurden {0}-mal erwähnt
 Event Schedule,Veranstaltungsplan
 "Company-wide events. Each row is sent as an invite from its Email Account's Mailcow calendar.","Unternehmensweite Veranstaltungen. Jede Zeile wird als Einladung aus dem Mailcow-Kalender ihres E-Mail-Kontos verschickt."
+"You have no outgoing email account for {0}. Ask your administrator to set one up.","Für {0} gibt es kein ausgehendes E-Mail-Konto. Bitte lassen Sie eines von Ihrer Administration einrichten."
+DATEV auto-send failed,Automatischer DATEV-Versand fehlgeschlagen
