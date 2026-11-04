@@ -1645,3 +1645,5 @@ It follows on from Issue {0}.,Er schließt an die Anfrage {0} an.
 Template Tasks have no chat.,Vorlage-Aufgaben haben keinen Chat.
 You were mentioned,Sie wurden erwähnt
 You were mentioned {0} times,Sie wurden {0}-mal erwähnt
+Event Schedule,Veranstaltungsplan
+"Company-wide events. Each row is sent as an invite from its Email Account's Mailcow calendar.","Unternehmensweite Veranstaltungen. Jede Zeile wird als Einladung aus dem Mailcow-Kalender ihres E-Mail-Kontos verschickt."
