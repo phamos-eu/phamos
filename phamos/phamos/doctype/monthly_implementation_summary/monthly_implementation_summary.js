@@ -58,31 +58,6 @@ function _mis_inject_grid_button(grid, css_class, label, should_show_fn, click_f
 	});
 }
 
-function _mis_setup_dn_table_submit_btn(frm) {
-	const field = frm.fields_dict.mis_delivery_notes;
-	if (!field || !field.grid) return;
-
-	_mis_inject_grid_button(
-		field.grid,
-		"mis-submit-dn-btn",
-		__("Submit Delivery Note(s)"),
-		function(selected) {
-			return !frm.is_new() && !frm.is_dirty() &&
-				selected.some(r => r.delivery_note && r.status === "Draft");
-		},
-		function(selected) {
-			const draft_dns = selected
-				.filter(r => r.delivery_note && r.status === "Draft")
-				.map(r => r.delivery_note);
-			if (!draft_dns.length) {
-				frappe.show_alert({ message: __("No draft Delivery Notes selected."), indicator: "orange" });
-				return;
-			}
-			_mis_submit_dns_from_table(frm, draft_dns);
-		}
-	);
-}
-
 function _mis_setup_si_table_submit_btn(frm) {
 	const field = frm.fields_dict.mis_sales_invoices;
 	if (!field || !field.grid) return;
@@ -110,7 +85,6 @@ function _mis_setup_si_table_submit_btn(frm) {
 
 function _mis_setup_grid_action_buttons(frm) {
 	if (frm.doc.status === "Closed") return;
-	_mis_setup_dn_table_submit_btn(frm);
 	_mis_setup_si_table_submit_btn(frm);
 }
 
@@ -246,44 +220,6 @@ function _mis_run_create_si(frm, delivery_notes, submit_after_create) {
 			});
 		})
 		.then(function() { frm.reload_doc(); });
-}
-
-function _mis_submit_dns_from_table(frm, delivery_notes) {
-	if (!delivery_notes || !delivery_notes.length) return;
-	frappe.confirm(
-		__("{0} Delivery Note(s) will be submitted. Continue?", [delivery_notes.length]),
-		function() {
-			frappe.call({
-				method: "phamos.phamos.doctype.monthly_implementation_summary.monthly_implementation_summary.submit_delivery_notes_in_mis",
-				args: { docname: frm.doc.name, delivery_notes: delivery_notes },
-				freeze: true,
-				freeze_message: __("Submitting Delivery Note(s)..."),
-				callback: function(r) {
-					if (r.exc) {
-						frappe.msgprint({ title: __("Error"), message: r.exc[0] || __("Failed."), indicator: "red" });
-						return;
-					}
-					const d = r.message || {};
-					if (d.failed_details && d.failed_details.length) {
-						frappe.msgprint({
-							title: __("Some submissions failed"),
-							indicator: "orange",
-							message: d.failed_details
-								.map(item => `${_mis_escape(item.delivery_note || "")} : ${_mis_escape(item.error || "")}` )
-								.join("<br>"),
-						});
-					}
-					frappe.show_alert({
-						message: __("Submitted: {0}, Skipped: {1}, Failed: {2}", [
-							cint(d.submitted || 0), cint(d.already_submitted || 0), cint(d.failed || 0)
-						]),
-						indicator: cint(d.failed || 0) ? "orange" : "green",
-					});
-					frm.reload_doc();
-				}
-			});
-		}
-	);
 }
 
 function _mis_submit_sis_from_table(frm, sales_invoices) {
@@ -452,6 +388,12 @@ function _mis_show_create_dn_dialog(frm) {
 							{ fieldname: "hours", fieldtype: "Float", label: __("Hours to Deliver"), in_list_view: 1, reqd: 1, precision: 2 },
 						],
 					},
+					{
+						fieldname: "submit_after_create",
+						fieldtype: "Check",
+						label: __("Submit Delivery Note(s) after creation"),
+						default: 0,
+					},
 				],
 				primary_action_label: __("Create"),
 				primary_action: function() {
@@ -503,7 +445,7 @@ function _mis_show_create_dn_dialog(frm) {
 
 					const proceed = function() {
 						dialog.hide();
-						_mis_run_create_dn_allocation(frm, allocations, false, dstate.project);
+						_mis_run_create_dn_allocation(frm, allocations, dialog.get_value("submit_after_create"), dstate.project);
 					};
 
 					if (draft_conflicts.length) {
