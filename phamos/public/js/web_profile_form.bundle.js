@@ -30,6 +30,8 @@
 			frm.set_query("party_type", () => ({
 				filters: { name: ["in", ["Employee", "Customer", "Supplier", "Sales Partner"]] },
 			}));
+			// Only current employees; Website Managers search them with Select permission.
+			frm.set_query("party", () => (frm.doc.party_type === "Employee" ? { filters: { status: "Active" } } : {}));
 			frm.set_query("contact", () => ({
 				query: "frappe.contacts.doctype.contact.contact.contact_query",
 				filters: { link_doctype: frm.doc.party_type, link_name: frm.doc.party },

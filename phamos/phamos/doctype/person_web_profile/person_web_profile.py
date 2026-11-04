@@ -69,5 +69,15 @@ class PersonWebProfile(WebProfileDocument):
 		if self.contact_consent and not self.email_id:
 			frappe.throw(_("Contact via the website needs a forwarding email. Add an email to the Contact or Employee."))
 		if self.party_type == "Employee":
-			self.publication_consent = 0
-			self.publication_consent_date = None
+			self.validate_employee_publication()
+
+	def validate_employee_publication(self):
+		"""Website Managers only have Select on Employee (web_profile.setup): they may prepare an
+		Employee's profile, but publishing it needs the Employee's recorded consent unless the user can
+		read that Employee (HR, System Manager, the Employee themself)."""
+		if not self.published or self.publication_consent:
+			return
+		if not any(self.has_value_changed(f) for f in ("published", "party_type", "party")):
+			return  # already published: mirror updates and edits keep working
+		if not frappe.has_permission("Employee", "read", self.party):
+			frappe.throw(_("{0} can only be published with their recorded consent to a public profile, or by HR.").format(self.full_name or self.party))

@@ -144,6 +144,7 @@ Message from {0} via phamos.eu,Nachricht von {0} über phamos.eu
 Reply to this email to answer {0} directly ({1}).,"Antworten Sie auf diese E-Mail, um {0} direkt zu antworten ({1})."
 You receive this because you agreed to be contactable via your profile: {0},"Sie erhalten diese Nachricht, weil Sie zugestimmt haben, über Ihr Profil kontaktiert zu werden: {0}"
 {0} can only be published with their recorded consent to a public profile.,{0} kann nur mit dokumentierter Zustimmung zu einem öffentlichen Profil veröffentlicht werden.
+"{0} can only be published with their recorded consent to a public profile, or by HR.","{0} kann nur mit dokumentierter Zustimmung zu einem öffentlichen Profil oder von HR veröffentlicht werden."
 Contact via the website needs a forwarding email. Add an email to the Contact or Employee.,Für die Kontaktaufnahme über die Website wird eine Weiterleitungsadresse benötigt. Hinterlegen Sie eine E-Mail-Adresse am Kontakt oder Mitarbeiter.
 {0} already has a Person Web Profile: {1},{0} hat bereits ein Person Web Profile: {1}
 Party Type must be one of: {0},Party Type muss eines davon sein: {0}
