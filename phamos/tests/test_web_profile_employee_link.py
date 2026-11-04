@@ -69,3 +69,10 @@ class TestWebProfileEmployeeLink(FrappeTestCase):
 		profile.roles = "Consultant"
 		profile.save()  # already published: no consent needed for an edit
 		self.assertEqual(profile.roles, "Consultant")
+
+	def test_website_manager_cannot_name_an_anonymous_profile_without_consent(self):
+		profile = self._profile(published=1, publish_as="Anonymous").insert()
+		frappe.set_user(USER)
+		profile.reload()
+		profile.publish_as = "Named"
+		self.assertRaises(frappe.ValidationError, profile.save)

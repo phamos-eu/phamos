@@ -77,7 +77,8 @@ class PersonWebProfile(WebProfileDocument):
 		read that Employee (HR, System Manager, the Employee themself)."""
 		if not self.published or self.publication_consent:
 			return
-		if not any(self.has_value_changed(f) for f in ("published", "party_type", "party")):
-			return  # already published: mirror updates and edits keep working
+		named_now = self.publish_as == "Named" and self.has_value_changed("publish_as")
+		if not named_now and not any(self.has_value_changed(f) for f in ("published", "party_type", "party")):
+			return  # already published as before: mirror updates and edits keep working
 		if not frappe.has_permission("Employee", "read", self.party):
 			frappe.throw(_("{0} can only be published with their recorded consent to a public profile, or by HR.").format(self.full_name or self.party))
