@@ -452,6 +452,12 @@ function _mis_show_create_dn_dialog(frm) {
 							{ fieldname: "hours", fieldtype: "Float", label: __("Hours to Deliver"), in_list_view: 1, reqd: 1, precision: 2 },
 						],
 					},
+					{
+						fieldname: "submit_after_create",
+						fieldtype: "Check",
+						label: __("Submit Delivery Note(s) after creation"),
+						default: 0,
+					},
 				],
 				primary_action_label: __("Create"),
 				primary_action: function() {
@@ -503,7 +509,7 @@ function _mis_show_create_dn_dialog(frm) {
 
 					const proceed = function() {
 						dialog.hide();
-						_mis_run_create_dn_allocation(frm, allocations, false, dstate.project);
+						_mis_run_create_dn_allocation(frm, allocations, dialog.get_value("submit_after_create"), dstate.project);
 					};
 
 					if (draft_conflicts.length) {
