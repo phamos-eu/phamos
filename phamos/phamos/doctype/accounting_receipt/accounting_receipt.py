@@ -7,7 +7,7 @@ from erpnext.setup.utils import get_exchange_rate
 from frappe import _
 from frappe.desk.form.load import get_attachments, get_communications
 from frappe.model.document import Document
-from frappe.utils import now, today
+from frappe.utils import now, today, validate_email_address
 from frappe.utils.file_manager import get_file, save_file
 
 SETTINGS_DOCTYPE = "phamos Settings"
@@ -357,10 +357,19 @@ def preview_datev_pdf(accounting_receipt_name):
 	return {"file_url": stamped_url or pdf_file_url, "stamped": bool(stamped_url)}
 
 
+def _is_test_recipient(recipient, configured):
+	"""A recipient other than the configured DATEV address makes the send a test send."""
+	return bool(recipient) and recipient.strip().lower() != (configured or "").strip().lower()
+
+
 @frappe.whitelist()
-def send_to_datev(accounting_receipt_name):
+def send_to_datev(accounting_receipt_name, recipient=None):
 	"""
 	Send Accounting Receipt PDF to DATEV via Email Queue.
+
+	`recipient` other than the configured DATEV address is a test send (#1828): the email goes
+	out, but the receipt is not marked as sent and its status stays; a timeline comment says
+	who sent it where.
 	Returns: dict with ok=True/False, message, and optionally email_queue_name
 	"""
 	# Validate document exists
@@ -373,7 +382,14 @@ def send_to_datev(accounting_receipt_name):
 	if doc.status == "Cancelled":
 		return {"ok": False, "message": _("This receipt is cancelled and is not sent to DATEV.")}
 
-	recipient = resolve_datev_recipient(doc)
+	configured = resolve_datev_recipient(doc)
+	test_send = _is_test_recipient(recipient, configured)
+	if test_send:
+		recipient = recipient.strip()
+		if not validate_email_address(recipient):
+			return {"ok": False, "message": _("{0} is not a valid email address.").format(recipient)}
+	else:
+		recipient = configured
 	if not recipient:
 		return {"ok": False, "message": _("DATEV recipient email is not configured. Please contact system administrator.")}
 
@@ -394,7 +410,7 @@ def send_to_datev(accounting_receipt_name):
 		}
 
 	# Check for duplicate sends - warn if already sent to same recipient
-	if doc.sent_to_datev and doc.datev_email_queue_ref:
+	if not test_send and doc.sent_to_datev and doc.datev_email_queue_ref:
 		# Check if there's a successful email in queue
 		existing_email = frappe.db.get_value(
 			"Email Queue",
@@ -441,6 +457,19 @@ def send_to_datev(accounting_receipt_name):
 			fieldname="name",
 			order_by="creation desc"
 		)
+
+		if test_send:
+			doc.add_comment(
+				"Comment",
+				_("Test send to DATEV: sent to {0} by {1}.").format(frappe.utils.escape_html(recipient), frappe.session.user),
+			)
+			return {
+				"ok": True,
+				"message": _("Test send queued to {0}. The receipt is not marked as sent to DATEV.").format(recipient),
+				"email_queue_name": email_queue_name,
+				"recipient": recipient,
+				"test_send": True,
+			}
 
 		# Update Accounting Receipt with sent status and audit trail
 		doc.db_set("sent_to_datev", 1, update_modified=False)

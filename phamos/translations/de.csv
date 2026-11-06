@@ -1650,3 +1650,15 @@ Event Schedule,Veranstaltungsplan
 "Company-wide events. Each row is sent as an invite from its Email Account's Mailcow calendar.","Unternehmensweite Veranstaltungen. Jede Zeile wird als Einladung aus dem Mailcow-Kalender ihres E-Mail-Kontos verschickt."
 "You have no outgoing email account for {0}. Ask your administrator to set one up.","Für {0} gibt es kein ausgehendes E-Mail-Konto. Bitte lassen Sie eines von Ihrer Administration einrichten."
 DATEV auto-send failed,Automatischer DATEV-Versand fehlgeschlagen
+Send to DATEV,An DATEV senden
+Send test,Test senden
+Test send: the receipt is not marked as sent to DATEV.,Testversand: Der Beleg wird nicht als an DATEV gesendet markiert.
+DATEV address: {0},DATEV-Adresse: {0}
+No DATEV address is configured.,Es ist keine DATEV-Adresse eingerichtet.
+"This document was already sent on {0} by {1}.","Dieser Beleg wurde bereits am {0} von {1} gesendet."
+Building the PDF…,PDF wird erstellt …
+with the note for the accounting office,mit dem Hinweis für die Buchhaltung
+Could not build the DATEV PDF.,Das DATEV-PDF konnte nicht erstellt werden.
+{0} is not a valid email address.,{0} ist keine gültige E-Mail-Adresse.
+Test send to DATEV: sent to {0} by {1}.,Testversand an DATEV: von {1} an {0} gesendet.
+Test send queued to {0}. The receipt is not marked as sent to DATEV.,Testversand an {0} eingereiht. Der Beleg wird nicht als an DATEV gesendet markiert.

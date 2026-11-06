@@ -169,3 +169,70 @@ class TestDatevStamp(FrappeTestCase):
 			patch.object(ar_module.frappe, "sendmail") as sendmail:
 			ar_module.send_to_datev(name)
 		self.assertIn("file_url", sendmail.call_args.kwargs["attachments"][0])
+
+
+class TestDatevTestSend(FrappeTestCase):
+	"""A recipient other than the configured DATEV address is a test send (#1828)."""
+
+	def setUp(self):
+		frappe.set_user("Administrator")
+		with patch("phamos.ai_agents.runner.enqueue_run"):
+			self.name = intake.create_receipts_from_file("testsend.pdf", blank_pdf())[0]["receipt"]
+		self.status = frappe.db.get_value("Accounting Receipt", self.name, "status")
+
+	def tearDown(self):
+		patch.stopall()
+		frappe.db.rollback()
+
+	def send(self, recipient, configured="up@datev.test"):
+		with patch.object(ar_module, "resolve_datev_recipient", return_value=configured), \
+			patch.object(ar_module, "resolve_datev_sender", return_value="me@phamos.test"), \
+			patch.object(ar_module.frappe, "sendmail") as sendmail:
+			return ar_module.send_to_datev(self.name, recipient), sendmail
+
+	def test_other_address_is_sent_but_the_receipt_stays_unmarked(self):
+		result, sendmail = self.send("  tester@phamos.test ")
+		self.assertTrue(result["ok"])
+		self.assertTrue(result["test_send"])
+		self.assertEqual(sendmail.call_args.kwargs["recipients"], ["tester@phamos.test"])
+		doc = frappe.get_doc("Accounting Receipt", self.name)
+		self.assertFalse(doc.sent_to_datev)
+		self.assertFalse(doc.datev_sent_at)
+		self.assertEqual(doc.status, self.status)
+		comments = frappe.get_all(
+			"Comment",
+			filters={"reference_doctype": "Accounting Receipt", "reference_name": self.name, "comment_type": "Comment"},
+			pluck="content",
+		)
+		self.assertTrue(any("tester@phamos.test" in c for c in comments))
+
+	def test_test_send_skips_the_duplicate_check(self):
+		frappe.db.set_value("Accounting Receipt", self.name, {"sent_to_datev": 1, "datev_email_queue_ref": "EQ-SENT"})
+		real_get_value = frappe.db.get_value
+
+		def get_value(doctype, *args, **kwargs):
+			if doctype == "Email Queue" and args and args[0] == "EQ-SENT":
+				return frappe._dict(name="EQ-SENT", status="Sent")
+			return real_get_value(doctype, *args, **kwargs)
+
+		with patch.object(ar_module.frappe.db, "get_value", side_effect=get_value):
+			self.assertTrue(self.send(None)[0].get("is_duplicate"))  # a real resend is still blocked
+			result, _sendmail = self.send("tester@phamos.test")
+		self.assertTrue(result["ok"])
+
+	def test_test_send_works_without_a_configured_address(self):
+		result, sendmail = self.send("tester@phamos.test", configured=None)
+		self.assertTrue(result["ok"])
+		self.assertEqual(sendmail.call_args.kwargs["recipients"], ["tester@phamos.test"])
+
+	def test_configured_address_given_explicitly_is_a_normal_send(self):
+		result, sendmail = self.send("UP@datev.test")
+		self.assertTrue(result["ok"])
+		self.assertNotIn("test_send", result)
+		self.assertEqual(sendmail.call_args.kwargs["recipients"], ["up@datev.test"])
+		self.assertTrue(frappe.db.get_value("Accounting Receipt", self.name, "sent_to_datev"))
+
+	def test_invalid_address_is_refused(self):
+		result, sendmail = self.send("not-an-address")
+		self.assertFalse(result["ok"])
+		sendmail.assert_not_called()
