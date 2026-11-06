@@ -165,6 +165,7 @@ unit_tests_1:
   extends: .unit_tests
   variables:
     SHARD_MODULES: >-
+      phamos.tests.test_dotted_paths
       phamos.tests.test_api
       phamos.okr_addon.doctype.okr.test_okr
       phamos.okr_addon.doctype.kr.test_kr
