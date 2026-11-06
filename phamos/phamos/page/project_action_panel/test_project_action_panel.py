@@ -93,3 +93,26 @@ class TestProjectActionPanelValueAdd(FrappeTestCase):
 			)
 		self.assertEqual(outcome, {"timesheet_name": record.name})
 		self.assertEqual(self._values(record.name), ("50", "75"))
+
+	def test_update_and_submit_raises_errors_instead_of_reporting_success(self):
+		# #1636: the panel showed "Updated Successfully" for any reply, also for an error text.
+		record = frappe.get_doc(
+			{
+				"doctype": "Timesheet Record",
+				"project": self.internal,
+				"employee": self.employee,
+				"goal": "Fix the report",
+				"expected_time": 3600,
+				"from_time": "2026-05-10 09:00:00",
+				"activity_type": self.activity_type,
+			}
+		)
+		record.append("item", {"from_time": "2026-05-10 09:00:00"})
+		record.insert(ignore_permissions=True)
+		with self.assertRaises(frappe.ValidationError):
+			pap.update_and_submit_timesheet_record(
+				record.name, "2026-05-10 08:00:00", "50", self.activity_type, "Report fixed"
+			)
+		self.assertEqual(
+			tuple(frappe.db.get_value("Timesheet Record", record.name, ["docstatus", "result"])), (0, None)
+		)
