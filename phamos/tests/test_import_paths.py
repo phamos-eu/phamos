@@ -4,8 +4,11 @@
 
 """Fail CI when a dotted phamos path no longer exists.
 
-Only ``phamos.*`` files and attributes are checked (AST, no importing optional apps).
-Catches missing hooks such as ``phamos.mailcow_integration.caldav.sync_event.on_upsert``.
+Most checks read files with AST so optional apps are not imported.
+``test_api_paths_resolve_with_frappe_get_attr`` imports ``phamos.api`` the same
+way Desk does (``frappe.get_attr``). That catches a name that is in ``api.py``
+while Python actually loads the ``phamos/api/`` package, which is the
+``get_popup_doctypes`` AttributeError.
 
 Run:
 	bench --site <site> run-tests --app phamos --module phamos.tests.test_import_paths
@@ -101,6 +104,20 @@ def _find_phamos_module_file(module_name: str) -> Path | None:
 	return None
 
 
+def _assigned_names(target: ast.AST) -> set[str]:
+	"""Names bound by an assignment target, including ``A, B = ...`` unpacking."""
+	if isinstance(target, ast.Name):
+		return {target.id}
+	if isinstance(target, (ast.Tuple, ast.List)):
+		names: set[str] = set()
+		for elt in target.elts:
+			names.update(_assigned_names(elt))
+		return names
+	if isinstance(target, ast.Starred):
+		return _assigned_names(target.value)
+	return set()
+
+
 def _top_level_names(file_path: Path) -> set[str]:
 	tree = ast.parse(file_path.read_text(encoding="utf-8"), filename=str(file_path))
 	names: set[str] = set()
@@ -109,10 +126,9 @@ def _top_level_names(file_path: Path) -> set[str]:
 			names.add(node.name)
 		elif isinstance(node, ast.Assign):
 			for target in node.targets:
-				if isinstance(target, ast.Name):
-					names.add(target.id)
-		elif isinstance(node, ast.AnnAssign) and isinstance(node.target, ast.Name):
-			names.add(node.target.id)
+				names.update(_assigned_names(target))
+		elif isinstance(node, ast.AnnAssign):
+			names.update(_assigned_names(node.target))
 		elif isinstance(node, (ast.Import, ast.ImportFrom)):
 			for alias in node.names:
 				if alias.name == "*":
@@ -141,6 +157,37 @@ def _assert_phamos_path_exists(path: str) -> None:
 		raise ModuleNotFoundError(f"No module named {modulename!r}")
 	if attr not in _top_level_names(module_file):
 		raise ImportError(f"cannot import name {attr!r} from {modulename!r}")
+
+
+def _shadowed_module_pairs() -> list[tuple[Path, Path]]:
+	"""``name.py`` next to ``name/__init__.py``. Python loads only one of them."""
+	app_path = _get_phamos_app_path()
+	pairs: list[tuple[Path, Path]] = []
+	for init in sorted(app_path.rglob("__init__.py")):
+		if "__pycache__" in init.parts:
+			continue
+		module_file = init.parent.with_suffix(".py")
+		if module_file.is_file():
+			pairs.append((module_file, init))
+	return pairs
+
+
+def _phamos_api_attribute_paths() -> set[str]:
+	"""``phamos.api.<name>`` strings Desk resolves with ``frappe.get_attr``.
+
+	Skips real submodules such as ``phamos.api.checklist_inbox``.
+	"""
+	paths = {"phamos.api.get_popup_doctypes"}
+	for ref in _discover_dotted_path_refs() + _discover_import_refs():
+		if ref.kind == "syntax" or not ref.path.startswith("phamos.api."):
+			continue
+		modulename, _attr = ref.path.rsplit(".", 1)
+		if modulename != "phamos.api":
+			continue
+		if _find_phamos_module_file(ref.path):
+			continue
+		paths.add(ref.path)
+	return paths
 
 
 def _py_file_to_module(file_path: Path) -> str:
@@ -275,8 +322,11 @@ def _hook_file_candidates(value: str) -> list[Path]:
 		return [app_path / "public" / value.removeprefix("/assets/phamos/")]
 	if value.startswith("/") or _is_remote_asset(value):
 		return []
-	candidates = [app_path / value, app_path / "public" / "js" / value]
-	if value.endswith(".bundle.js"):
+	# Bare bundle names in hooks resolve under public/js or public/css, same as bench build.
+	candidates = [app_path / value]
+	if value.endswith(".css"):
+		candidates.append(app_path / "public" / "css" / value)
+	else:
 		candidates.append(app_path / "public" / "js" / value)
 	return candidates
 
@@ -347,6 +397,38 @@ class TestImportPaths(FrappeTestCase):
 
 		if failures:
 			self.fail(_format_failures("Broken phamos dotted paths:", failures))
+
+	def test_no_module_shadows_package(self):
+		"""``phamos/api.py`` beside ``phamos/api/`` hides one file at import time."""
+		pairs = _shadowed_module_pairs()
+		if not pairs:
+			return
+		lines = [
+			f"- {_rel(module_file)} shadows {_rel(package_init)}"
+			for module_file, package_init in pairs
+		]
+		self.fail(
+			"Both a module and a package exist, so Python loads only one of them:\n"
+			+ "\n".join(lines)
+		)
+
+	def test_api_paths_resolve_with_frappe_get_attr(self):
+		"""``frappe.get_attr('phamos.api....')`` must find the live attribute.
+
+		The AST check can pass while Desk throws
+		``module 'phamos.api' has no attribute 'get_popup_doctypes'``.
+		"""
+		failures: list[str] = []
+		for path in sorted(_phamos_api_attribute_paths()):
+			try:
+				frappe.get_attr(path)
+			except Exception as exc:
+				failures.append(f"- {path}: {exc.__class__.__name__}: {exc}")
+
+		if failures:
+			self.fail(
+				"frappe.get_attr could not resolve phamos.api paths:\n" + "\n".join(failures)
+			)
 
 	def test_hook_client_script_files_exist(self):
 		"""doctype_js / app_include_js paths in hooks.py must point at real files."""
