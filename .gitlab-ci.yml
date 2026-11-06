@@ -171,6 +171,7 @@ unit_tests_1:
       phamos.okr_addon.doctype.okr_team.test_okr_team
       phamos.tests.test_web_profile_events
       phamos.tests.test_accounting_stats
+      phamos.tests.test_import_paths
 
 unit_tests_2:
   extends: .unit_tests
