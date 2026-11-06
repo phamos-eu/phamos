@@ -779,13 +779,13 @@ function _mis_show_timesheet_approval_dialog(frm) {
 				data: rows,
 				get_data: () => rows,
 				fields: [
-					{ fieldname: "timesheet", fieldtype: "Link", options: "Timesheet", label: __("Timesheet"), in_list_view: 1, read_only: 1, columns: 2 },
+					{ fieldname: "timesheet", fieldtype: "Link", options: "Timesheet", label: __("Timesheet"), in_list_view: 1, read_only: 1, columns: 1 },
 					{ fieldname: "date", fieldtype: "Date", label: __("Date"), in_list_view: 1, read_only: 1, columns: 1 },
-					{ fieldname: "employee_name", fieldtype: "Data", label: __("Employee"), in_list_view: 1, read_only: 1, columns: 2 },
+					{ fieldname: "employee_name", fieldtype: "Data", label: __("Employee"), in_list_view: 1, read_only: 1, columns: 1 },
 					{ fieldname: "project", fieldtype: "Data", label: __("Project"), in_list_view: 1, read_only: 1, columns: 1 },
 					{ fieldname: "total_hours", fieldtype: "Float", label: __("Total"), in_list_view: 1, read_only: 1, columns: 1 },
 					{ fieldname: "billable_hours", fieldtype: "Float", label: __("Billable"), in_list_view: 1, columns: 1 },
-					{ fieldname: "description", fieldtype: "Data", label: __("Description"), in_list_view: 1, read_only: 1, columns: 2 },
+					{ fieldname: "description", fieldtype: "Data", label: __("Description"), in_list_view: 1, read_only: 1, columns: 4 },
 					{ fieldname: "rating", fieldtype: "Data", label: __("Rating"), read_only: 1, columns: 1 },
 					{ fieldname: "delivery_note", fieldtype: "Link", options: "Delivery Note", label: __("Delivery Note"), read_only: 1, columns: 2 },
 				],
@@ -808,6 +808,22 @@ function _mis_show_timesheet_approval_dialog(frm) {
 	const grid = dialog.fields_dict.timesheet_approval.grid;
 	// A grid inside a dialog has no meta; this shows the column search row at any row count
 	grid.meta = { editable_grid: 1, rows_threshold_for_grid_search: 1 };
+	// Grid cells are one line with a fixed height; wrap the text columns and let each row grow to show them in full
+	dialog.$wrapper.addClass("mis-ts-approval").append(`<style>
+		.mis-ts-approval .rows .data-row .grid-static-col,
+		.mis-ts-approval .rows .data-row .row-index,
+		.mis-ts-approval .rows .data-row .row-check {
+			height: auto;
+			min-height: 38px;
+			max-height: none;
+		}
+		.mis-ts-approval .rows .data-row [data-fieldname="timesheet"] .static-area,
+		.mis-ts-approval .rows .data-row [data-fieldname="employee_name"] .static-area,
+		.mis-ts-approval .rows .data-row [data-fieldname="description"] .static-area {
+			white-space: normal;
+			overflow-wrap: anywhere;
+		}
+	</style>`);
 	_mis_bind_ts_header_sort(grid, rows);
 	_mis_setup_ts_column_picker(grid);
 	dialog.show();
