@@ -182,6 +182,23 @@ def get_attached_files(accounting_receipt_name):
 	)
 
 
+def resolve_datev_sender():
+	"""The user's own outgoing Email Account address, or None.
+
+	DATEV only accepts uploads from registered senders, so the email always goes out from the
+	person who sends it, never the default account.
+	"""
+	email = frappe.db.get_value("User", frappe.session.user, "email")
+	if not email:
+		return None
+	return frappe.db.get_value("Email Account", {"email_id": email, "enable_outgoing": 1}, "email_id")
+
+
+def _sender_missing_message():
+	email = frappe.db.get_value("User", frappe.session.user, "email") or frappe.session.user
+	return _("You have no outgoing email account for {0}. Ask your administrator to set one up.").format(email)
+
+
 @frappe.whitelist()
 def send_to_datev(accounting_receipt_name):
 	"""
@@ -203,6 +220,10 @@ def send_to_datev(accounting_receipt_name):
 	
 	if not recipient:
 		return {"ok": False, "message": _("DATEV recipient email is not configured. Please contact system administrator.")}
+
+	sender = resolve_datev_sender()
+	if not sender:
+		return {"ok": False, "message": _sender_missing_message()}
 	
 	# Check if PDF attachment exists in the attachment field or in attached files
 	pdf_file_url = doc.attachment
@@ -263,6 +284,7 @@ def send_to_datev(accounting_receipt_name):
 	try:
 		email_args = {
 			"recipients": [recipient],
+			"sender": sender,
 			"subject": subject,
 			"message": message,
 			"attachments": [{
@@ -346,9 +368,12 @@ def get_datev_send_info(accounting_receipt_name):
 			pdf_url = attached_files[0].file_url
 	
 	pdf_name = pdf_url.split("/")[-1] if pdf_url else None
+	sender = resolve_datev_sender()
 	
 	return {
 		"ok": True,
+		"sender": sender,
+		"sender_missing_message": None if sender else _sender_missing_message(),
 		"recipient": recipient,
 		"pdf_name": pdf_name,
 		"pdf_url": pdf_url,
