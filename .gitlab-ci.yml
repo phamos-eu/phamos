@@ -1,12 +1,229 @@
-# Reviews MRs targeting version-15 with Claude and posts findings as an MR comment.
-# Needs CI/CD variables ANTHROPIC_API_KEY and GITLAB_API_TOKEN; set AI_REVIEW_ENABLED=false to disable.
+# GitLab CI for phamos.
+#
+# unit_tests_1, unit_tests_2
+#   Run the phamos test modules on fresh MariaDB / Redis services, split in
+#   two jobs that run side by side. The job image (ci/image, built by
+#   ci/image/build.sh) already holds a Frappe v15 bench with ERPNext and HRMS
+#   and a saved test site; each job loads that site, installs phamos from this
+#   checkout and runs its modules.
+#   - Run on MRs into develop / version-15 / release/*, on pushes to develop
+#     and version-15, on scheduled pipelines (the nightly full run) and from
+#     "Run pipeline".
+#   - CI_BENCH_TAG: image tag printed by build.sh. Rebuild the image and bump
+#     the tag to pick up newer Frappe / ERPNext / HRMS code.
+#   - SHARD_MODULES: the modules each job runs. Keep the two lists about equal
+#     in run time; a new test module goes into the shorter one.
+#   - TEST_MODULES: set it in "Run pipeline" to run only those modules (or
+#     "all" for the whole app); unit_tests_1 runs them and unit_tests_2 is left
+#     out.
+#   - Set UNIT_TESTS_ENABLED=false (CI/CD variable) to turn the jobs off.
+#   - The two jobs only run at the same time when the runner's `concurrent`
+#     (/etc/gitlab-runner/config.toml) is 2 or more.
+#   - Runs on the "hetzner" runner (Docker executor, arm64), so every image
+#     below must have an arm64 build.
+#
+# tests_required
+#   Fails an MR that changes Python code under phamos/ without changing a
+#   test_*.py file. Add the label "no-tests-needed" to the MR and run a new
+#   pipeline to skip it. Set TESTS_REQUIRED_ENABLED=false to turn it off.
+#
+# ai_code_review
+#   Reviews MRs targeting version-15 with Claude and posts findings as an MR
+#   comment. Needs CI/CD variables ANTHROPIC_API_KEY and GITLAB_API_TOKEN; set
+#   AI_REVIEW_ENABLED=false to disable.
+
+workflow:
+  rules:
+    # One pipeline per change: an MR pipeline when the branch has an open MR,
+    # a branch pipeline otherwise.
+    - if: $CI_PIPELINE_SOURCE == "merge_request_event"
+    - if: $CI_COMMIT_BRANCH && $CI_OPEN_MERGE_REQUESTS
+      when: never
+    - if: $CI_COMMIT_BRANCH
 
 stages:
+  - test
   - ai-review
+
+variables:
+  # A new tag per build: the runner pulls "if-not-present", so a reused tag
+  # would keep running the cached image.
+  CI_BENCH_TAG: "v15-20261029-1620"
+
+.unit_tests:
+  stage: test
+  image: $CI_REGISTRY_IMAGE/ci-bench:$CI_BENCH_TAG
+  tags: [hetzner]
+  timeout: 90 minutes
+  # A newer pipeline for the same branch cancels this one ("Auto-cancel
+  # redundant pipelines"), so the runner is not kept busy with outdated code.
+  interruptible: true
+  rules:
+    - if: '$UNIT_TESTS_ENABLED == "false"'
+      when: never
+    - if: '$CI_PIPELINE_SOURCE == "merge_request_event" && $CI_MERGE_REQUEST_TARGET_BRANCH_NAME =~ /^(develop|version-15|release\/.+)$/'
+    - if: '$CI_PIPELINE_SOURCE == "push" && $CI_COMMIT_BRANCH =~ /^(develop|version-15)$/'
+    - if: '$CI_PIPELINE_SOURCE == "schedule"'
+    - if: '$CI_PIPELINE_SOURCE == "web"'
+  services:
+    # Reachable as "mariadb", the alias GitLab derives from the image name.
+    - name: mariadb:10.6
+      command: ["--character-set-server=utf8mb4", "--collation-server=utf8mb4_unicode_ci"]
+    - name: redis:7-alpine
+      alias: redis-cache
+    - name: redis:7-alpine
+      alias: redis-queue
+  variables:
+    # Read by the mariadb service container.
+    MARIADB_ROOT_PASSWORD: root
+    MYSQL_ROOT_PASSWORD: root
+    BENCH_DIR: /home/frappe/frappe-bench
+    SITE: test.localhost
+    # Lets `bench run-tests` run without allow_tests in the site config.
+    CI: "true"
+  script:
+    - cd "$BENCH_DIR"
+
+    # Saved test site from the image: Frappe, ERPNext, HRMS, setup wizard
+    # fixtures, UTC time zone. Database name, user and password match
+    # sites/test.localhost/site_config.json in the image.
+    - |
+      mariadb -hmariadb -uroot -proot -e "
+        CREATE DATABASE test_site CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+        CREATE USER 'test_site'@'%' IDENTIFIED BY 'test_site';
+        GRANT ALL PRIVILEGES ON test_site.* TO 'test_site'@'%';"
+      gunzip -c /home/frappe/seed.sql.gz | mariadb -hmariadb -uroot -proot test_site
+
+    # phamos from this checkout.
+    - cp -r "$CI_PROJECT_DIR" apps/phamos
+    - ./env/bin/pip install -e apps/phamos
+    - |
+      # apps.txt may not end with a newline.
+      if [ -s sites/apps.txt ] && [ -n "$(tail -c1 sites/apps.txt)" ]; then echo >> sites/apps.txt; fi
+      grep -qxF phamos sites/apps.txt || echo phamos >> sites/apps.txt
+    - bench --site "$SITE" install-app phamos
+    # install-app already syncs doctypes, fixtures and customizations and marks
+    # the patches as run; of `bench migrate` only phamos's after_migrate hooks
+    # are missing (custom fields the code needs, e.g. Sales Order Item.attendee).
+    # The hooks are idempotent, so they run here directly, from the sites
+    # folder like every bench command.
+    - |
+      (cd sites && ../env/bin/python - <<'EOF'
+      import os
+
+      import frappe
+
+      frappe.init(site=os.environ["SITE"], sites_path=".")
+      frappe.connect()
+      for method in frappe.get_hooks("after_migrate", app_name="phamos"):
+          print("after_migrate:", method)
+          frappe.get_attr(method)()
+      frappe.db.commit()
+      frappe.destroy()
+      EOF
+      )
+    - |
+      for app in erpnext hrms phamos; do
+        bench --site "$SITE" list-apps | grep -q "$app" || { echo "Missing app: $app"; exit 1; }
+      done
+      bench --site "$SITE" mariadb -e "SELECT 1;" > /dev/null
+
+    # Run every module, even after a failure, so the report shows all results.
+    - |
+      modules="${TEST_MODULES:-$SHARD_MODULES}"
+      mkdir -p "$CI_PROJECT_DIR/test-results"
+      if [ "$modules" = "all" ]; then
+        bench --site "$SITE" run-tests --app phamos --junit-xml-output "$CI_PROJECT_DIR/test-results/phamos.xml"
+      else
+        failed=""
+        for module in $modules; do
+          echo "=== $module"
+          bench --site "$SITE" run-tests --app phamos --module "$module" \
+            --junit-xml-output "$CI_PROJECT_DIR/test-results/$module.xml" || failed="$failed $module"
+        done
+        if [ -n "$failed" ]; then
+          echo "Failed test modules:$failed"
+          exit 1
+        fi
+      fi
+  after_script:
+    - mkdir -p test-results/logs
+    - cp -r "$BENCH_DIR/logs" test-results/logs/bench 2>/dev/null || true
+    - cp -r "$BENCH_DIR/sites/$SITE/logs" test-results/logs/site 2>/dev/null || true
+  artifacts:
+    when: always
+    expire_in: 7 days
+    paths:
+      - test-results/
+    reports:
+      junit: test-results/*.xml
+
+# The modules develop's CI runs that also exist on version-15, split by run
+# time (test_web_profile_events alone takes about 2 minutes). Develop has more
+# (test_api, test_accounting_stats, the *_rules modules, ...); add them here
+# when they reach version-15.
+unit_tests_1:
+  extends: .unit_tests
+  variables:
+    SHARD_MODULES: >-
+      phamos.okr_addon.doctype.okr.test_okr
+      phamos.okr_addon.doctype.kr.test_kr
+      phamos.okr_addon.doctype.okr_team.test_okr_team
+      phamos.tests.test_web_profile_events
+
+unit_tests_2:
+  extends: .unit_tests
+  rules:
+    # A TEST_MODULES run from "Run pipeline" is done by unit_tests_1 alone.
+    - if: $TEST_MODULES
+      when: never
+    - !reference [.unit_tests, rules]
+  variables:
+    SHARD_MODULES: >-
+      phamos.phamos.doctype.stakeholder_meeting.test_stakeholder_meeting
+      phamos.phamos.doctype.implementation_chapter.test_implementation_chapter
+      phamos.tests.test_web_page_editing
+      phamos.phamos.doctype.timesheet_record.test_timesheet_record
+      phamos.tests.test_accounting_receivables
+      phamos.tests.test_personal_ideas
+      phamos.tests.test_idea_import
+
+tests_required:
+  stage: test
+  # Already on the runner for the unit tests, and it has git.
+  image: $CI_REGISTRY_IMAGE/ci-bench:$CI_BENCH_TAG
+  tags: [hetzner]
+  needs: []
+  interruptible: true
+  variables:
+    # The diff needs the MR's base commit.
+    GIT_DEPTH: "0"
+  rules:
+    - if: '$TESTS_REQUIRED_ENABLED == "false"'
+      when: never
+    - if: '$CI_MERGE_REQUEST_LABELS =~ /(^|,)no-tests-needed(,|$)/'
+      when: never
+    - if: '$CI_PIPELINE_SOURCE == "merge_request_event" && $CI_MERGE_REQUEST_TARGET_BRANCH_NAME =~ /^(develop|version-15|release\/.+)$/'
+  script:
+    - git config --global --add safe.directory "$CI_PROJECT_DIR"
+    - |
+      changed="$(git diff --name-only "$CI_MERGE_REQUEST_DIFF_BASE_SHA" HEAD)"
+      code="$(printf '%s\n' "$changed" | grep -E '^phamos/.+\.py$' | grep -vE '(^|/)test_[^/]*\.py$' || true)"
+      tests="$(printf '%s\n' "$changed" | grep -E '(^|/)test_[^/]*\.py$' || true)"
+      if [ -n "$code" ] && [ -z "$tests" ]; then
+        echo "This MR changes Python code but no test_*.py file:"
+        printf '  %s\n' $code
+        echo "Add or update tests, or add the label \"no-tests-needed\" and run a new pipeline."
+        exit 1
+      fi
+      echo "OK"
 
 ai_code_review:
   stage: ai-review
   image: python:3.10-slim
+  needs: []
+  # A newer push gets its own review.
+  interruptible: true
   rules:
     - if: '$AI_REVIEW_ENABLED == "false"'
       when: never
