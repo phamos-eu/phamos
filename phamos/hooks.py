@@ -117,6 +117,7 @@ doctype_js = {
     "Event": "public/js/event.js",
     "Sales Invoice": "public/js/sales_invoice.js",
     "Customer": "public/js/customer.js",
+    "Company": "public/js/company.js",
     "Delivery Note": "public/js/delivery_note.js",
 
 }
@@ -237,6 +238,7 @@ after_migrate = [
 	"phamos.cockpits.setup.after_migrate",  # Task Owner on Task (#1751), ToDo fields of the Personal Cockpit (#1553)
 	"phamos.marketing.setup.after_migrate",  # Lead Source "Event" for event registrations
 	"phamos.api.issue_chat.add_raven_indexes",  # record chats look channels up by record (#1794)
+	"phamos.setup.event_schedule.ensure_event_schedule_fields",  # Events tab on Company
 ]
 
 # Uninstallation
@@ -347,6 +349,12 @@ doc_events = {
             "phamos.web_profile.mirror.push_to_profiles",
         ],
         "on_trash": "phamos.events.team_daily_schedule.cleanup_events_on_parent_trash"
+    },
+    # Company-wide events (Events tab from phamos/setup/event_schedule.py), synced like Team's.
+    "Company": {
+        "validate": "phamos.events.team_daily_schedule.validate_schedule_rows",
+        "on_update": "phamos.events.team_daily_schedule.sync_events_from_parent",
+        "on_trash": "phamos.events.team_daily_schedule.cleanup_events_on_parent_trash",
     },
     "Communication": {
         "on_update": "phamos.events.communication.copy_attachments_to_reference_doc"
