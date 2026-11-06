@@ -194,6 +194,9 @@ jobs:
     - name: Run Tests
       working-directory: ./frappe-bench
       run: |
+        echo "Running dotted path checks (hooks, patches, frappe.call methods)..."
+        bench --site test.localhost run-tests --app phamos --module phamos.tests.test_dotted_paths
+
         echo "Running phamos API tests..."
         bench --site test.localhost run-tests --app phamos --module phamos.tests.test_api
 
