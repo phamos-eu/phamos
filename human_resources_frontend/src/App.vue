@@ -49,6 +49,8 @@ const navItems = [
 			},
 		],
 	},
+	// Every HR user; sick days and contract figures inside are limited per role (#1833).
+	{ name: "Employees", label: "Employees", icon: "users", match: ["Employees"] },
 ]
 
 // Contracts hold salary, so the section only appears for users who may read them (HR Manager).
@@ -70,6 +72,7 @@ const pageTitle = computed(() => {
 	}
 	if (["ChecklistsHome", "Checklists", "ChecklistDetail"].includes(route.name)) return "Checklists"
 	if (CONTRACT_ROUTES.includes(route.name)) return "Employment Contracts"
+	if (route.name === "Employees") return "Employees"
 	return "Issues"
 })
 
@@ -85,6 +88,9 @@ const pageSubtitle = computed(() => {
 	}
 	if (route.name === "Checklists" || route.name === "ChecklistDetail") {
 		return "Checklists linked to HR issues and tasks"
+	}
+	if (route.name === "Employees") {
+		return "Leave and HR figures for every employee"
 	}
 	if (route.name === "Contracts") {
 		return "Working time and pay agreed with employees and externals"
