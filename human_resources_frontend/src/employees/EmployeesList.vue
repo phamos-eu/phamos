@@ -8,31 +8,45 @@
 				Loading employees…
 			</div>
 			<template v-else>
-				<!-- Totals per leave type; never added up across types (#1833, Decision 6). -->
+				<!-- Averages per employee, per leave type; never added up across types (#1833, Decision 6). -->
 				<section class="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5">
 					<StatCard
-						v-for="total in totals"
-						:key="total.leave_type"
-						:label="`${total.leave_type} left`"
-						:value="formatNumber(total.left)"
-						:hint="`${total.people} ${total.people === 1 ? 'employee' : 'employees'} with an allocation`"
+						v-for="avg in averages"
+						:key="avg.leave_type"
+						:label="`Ø ${avg.leave_type} left`"
+						:value="avg.people ? formatNumber(avg.left) : '—'"
+						:hint="avg.people ? `Ø ${formatNumber(avg.taken)} of ${formatNumber(avg.allocated)} taken · ${avg.people} ${avg.people === 1 ? 'employee' : 'employees'}` : 'No allocation'"
+					/>
+					<StatCard label="Ø years in company" :value="formatNumber(averageYears)" :hint="`${rows.length} ${rows.length === 1 ? 'employee' : 'employees'} in the list`" />
+					<StatCard
+						v-if="data.can_see_sick_days"
+						label="Ø sick days this year"
+						:value="data.sick_types_configured ? formatNumber(averageSickDays) : '—'"
+						:hint="data.sick_types_configured ? 'Approved sick leave, HR Manager only' : 'Choose the sick leave types in phamos Settings'"
+					/>
+				</section>
+
+				<!-- Who needs attention. A card is a filter: click it to see only those employees, click again to clear. -->
+				<section class="flex flex-wrap gap-2">
+					<button
+						v-for="card in attentionCards"
+						:key="card.key"
+						type="button"
+						:aria-pressed="quickFilter === card.key"
+						:class="[
+							'inline-flex items-center gap-2 rounded-full border px-3 py-1.5 text-sm transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-outline-gray-3',
+							quickFilter === card.key
+								? 'border-outline-gray-4 bg-surface-gray-7 text-ink-white'
+								: card.count
+									? 'border-outline-gray-2 bg-surface-white text-ink-gray-8 hover:bg-surface-gray-2'
+									: 'border-outline-gray-1 bg-surface-white text-ink-gray-5 hover:bg-surface-gray-2',
+						]"
+						:title="card.title"
+						@click="toggleQuickFilter(card.key)"
 					>
-						<div v-if="showYearEndWarning" class="mt-3 text-xs" :class="total.many_left ? 'text-ink-amber-3' : 'text-ink-gray-6'">
-							{{ total.many_left }} with more than {{ MANY_DAYS_LEFT }} days left
-						</div>
-					</StatCard>
-					<StatCard label="Requests waiting" :value="pendingTotal" hint="Leave applications not yet decided" />
-					<StatCard
-						:label="`No leave in ${NO_LEAVE_MONTHS} months`"
-						:value="noRecentLeave"
-						hint="Approved leave only; sick leave does not count"
-					/>
-					<StatCard
-						:label="`Birthdays in ${BIRTHDAY_DAYS} days`"
-						:value="upcomingBirthdays.length"
-						hint="Day and month only"
-						:lines="upcomingBirthdays.slice(0, 3).map((r) => `${r.employee_name} · ${birthdayHint(r.birthday)}`)"
-					/>
+						<span class="font-semibold tabular-nums" :class="card.count && quickFilter !== card.key ? 'text-ink-amber-3' : ''">{{ card.count }}</span>
+						<span>{{ card.label }}</span>
+					</button>
 				</section>
 
 				<section class="rounded-lg border border-outline-gray-2 bg-surface-white">
@@ -55,6 +69,15 @@
 							class="w-48"
 						/>
 						<span class="text-xs text-ink-gray-5">{{ rows.length }} {{ rows.length === 1 ? "employee" : "employees" }}</span>
+						<button
+							v-if="quickFilter"
+							type="button"
+							class="inline-flex items-center gap-1 rounded-full bg-surface-gray-2 px-2.5 py-1 text-xs text-ink-gray-7 hover:bg-surface-gray-3"
+							@click="quickFilter = null"
+						>
+							{{ attentionCards.find((c) => c.key === quickFilter)?.label }}
+							<FeatherIcon name="x" class="h-3 w-3" />
+						</button>
 					</div>
 
 					<div class="overflow-x-auto">
@@ -207,7 +230,7 @@ import { getDateFormat } from "@spa/utils/datetime.js"
 // the roles allowed to see them (#1833, Decisions 2 and 4); the API leaves them out otherwise.
 const API = "phamos.api.hr_employees"
 const MANY_DAYS_LEFT = 10
-const NO_LEAVE_MONTHS = 6
+const NO_LEAVE_MONTHS = 2
 const BIRTHDAY_DAYS = 30
 
 const headCell = "border-b border-outline-gray-2 px-3 py-2 font-medium whitespace-nowrap"
@@ -239,6 +262,7 @@ const company = ref("")
 const sortKey = ref("employee_name")
 const sortAsc = ref(true)
 const searchEl = ref(null)
+const quickFilter = ref(null)
 
 const statusOptions = [
 	{ label: "Active", value: "Active" },
@@ -265,7 +289,7 @@ const employees = computed(() =>
 	data.value.employees.map((row) => ({ ...row, birthday_in: daysToBirthday(row.birthday) }))
 )
 
-const rows = computed(() => {
+const searched = computed(() => {
 	const q = search.value.trim().toLowerCase()
 	if (!q) return employees.value
 	return employees.value.filter((row) =>
@@ -273,6 +297,11 @@ const rows = computed(() => {
 			String(v || "").toLowerCase().includes(q)
 		)
 	)
+})
+
+const rows = computed(() => {
+	const active = quickFilters.value.find((f) => f.key === quickFilter.value)
+	return active ? searched.value.filter(active.test) : searched.value
 })
 
 function sortValue(row, key) {
@@ -306,35 +335,80 @@ function ariaSort(key) {
 	return sortAsc.value ? "ascending" : "descending"
 }
 
-// The warning about leave that may be lost at year end only matters in the last quarter.
-const showYearEndWarning = computed(() => new Date().getMonth() >= 9)
+// Averages are over the employees in the list (search and quick filter applied), per leave type.
+function average(values) {
+	return values.length ? values.reduce((sum, v) => sum + v, 0) / values.length : 0
+}
 
-const totals = computed(() =>
+const averages = computed(() =>
 	data.value.leave_types.map((leaveType) => {
 		const values = rows.value.map((r) => r.leave[leaveType]).filter(Boolean)
 		return {
 			leave_type: leaveType,
 			people: values.length,
-			left: values.reduce((sum, v) => sum + Number(v.left || 0), 0),
-			many_left: values.filter((v) => Number(v.left || 0) > MANY_DAYS_LEFT).length,
+			left: average(values.map((v) => Number(v.left || 0))),
+			taken: average(values.map((v) => Number(v.taken || 0))),
+			allocated: average(values.map((v) => Number(v.allocated || 0))),
 		}
 	})
 )
+const averageYears = computed(() =>
+	average(rows.value.filter((r) => r.years_in_company != null).map((r) => Number(r.years_in_company)))
+)
+const averageSickDays = computed(() => average(rows.value.map((r) => Number(r.sick_days || 0))))
 
-const pendingTotal = computed(() => rows.value.reduce((sum, r) => sum + Number(r.pending_count || 0), 0))
-
-const noRecentLeave = computed(() => {
+// Quick filters behind the attention cards. Each one is a predicate on a row; the counts come
+// from the search result, so a card still tells the whole picture while another card is active.
+const noLeaveLimit = computed(() => {
 	const cutoff = new Date()
 	cutoff.setMonth(cutoff.getMonth() - NO_LEAVE_MONTHS)
-	const limit = cutoff.toISOString().slice(0, 10)
-	return rows.value.filter((r) => !r.last_leave || r.last_leave < limit).length
+	return cutoff.toISOString().slice(0, 10)
 })
-
-const upcomingBirthdays = computed(() =>
-	rows.value
-		.filter((r) => r.birthday_in !== null && r.birthday_in <= BIRTHDAY_DAYS)
-		.sort((a, b) => a.birthday_in - b.birthday_in)
+const quickFilters = computed(() => {
+	const limit = noLeaveLimit.value
+	const filters = [
+		{
+			key: "no_recent_leave",
+			label: `no leave since ${NO_LEAVE_MONTHS} months`,
+			title: "No approved leave in that time; sick leave does not count",
+			test: (r) => !r.last_leave || r.last_leave < limit,
+		},
+		{
+			key: "many_left",
+			label: `more than ${MANY_DAYS_LEFT} days left`,
+			title: "Leave of any type that may be lost at year end",
+			test: (r) => Object.values(r.leave).some((v) => Number(v.left || 0) > MANY_DAYS_LEFT),
+		},
+		{
+			key: "pending",
+			label: "requests waiting",
+			title: "Leave applications not yet decided",
+			test: (r) => Number(r.pending_count || 0) > 0,
+		},
+		{
+			key: "birthday",
+			label: `birthdays in ${BIRTHDAY_DAYS} days`,
+			title: "Day and month only",
+			test: (r) => r.birthday_in !== null && r.birthday_in <= BIRTHDAY_DAYS,
+		},
+	]
+	if (data.value.can_see_sick_days && data.value.sick_types_configured) {
+		filters.push({
+			key: "sick_above_average",
+			label: "sick days above average",
+			title: "More approved sick days this year than the average of the list",
+			test: (r) => Number(r.sick_days || 0) > averageSickDays.value && Number(r.sick_days || 0) > 0,
+		})
+	}
+	return filters
+})
+const attentionCards = computed(() =>
+	quickFilters.value.map((f) => ({ ...f, count: searched.value.filter(f.test).length }))
 )
+
+function toggleQuickFilter(key) {
+	quickFilter.value = quickFilter.value === key ? null : key
+}
 
 /** "05-17" → day and month in the site's date order (17.05.), never a year (#1833, Decision 4). */
 function formatBirthday(value) {
