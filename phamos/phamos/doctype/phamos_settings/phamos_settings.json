@@ -69,6 +69,7 @@
   "column_break_human_resources_spa",
   "human_resources_timesheet_project",
   "human_resources_sick_leave_types",
+  "human_resources_privacy_reveal_seconds",
   "project_management_spa_tab",
   "project_management_spa_section",
   "project_management_department",
@@ -452,6 +453,14 @@
    "fieldtype": "Table MultiSelect",
    "label": "Sick Leave Types",
    "options": "Sick Leave Type Item"
+  },
+  {
+   "default": "120",
+   "description": "Privacy mode for screen sharing: figures in the HR Cockpit stay hidden until \"Show data\" is clicked, then show for this many seconds. At least 10.",
+   "fieldname": "human_resources_privacy_reveal_seconds",
+   "fieldtype": "Int",
+   "label": "Privacy Mode: Seconds Data Stays Visible",
+   "non_negative": 1
   },
   {
    "fieldname": "project_management_spa_tab",
