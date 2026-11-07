@@ -5,7 +5,7 @@
 		@update:model-value="emit('update:modelValue', $event)"
 	>
 		<template #body-content>
-			<form class="space-y-4" @submit.prevent="submit" @keydown.enter.ctrl.prevent="submit" @keydown.enter.meta.prevent="submit">
+			<form ref="formEl" class="space-y-4" novalidate @submit.prevent="submit" @keydown.enter.ctrl.prevent="submit" @keydown.enter.meta.prevent="submit">
 				<div>
 					<label class="mb-1.5 block text-xs text-ink-gray-5">{{ __("Project") }} <span class="text-ink-red-3">*</span></label>
 					<div
@@ -96,6 +96,7 @@ const startTime = ref(toDatetimeLocalValue(new Date()))
 const startEdited = ref(false)
 const error = ref("")
 const saving = ref(false)
+const formEl = ref(null)
 let liveTimer = null
 let searchTimer = null
 
@@ -165,6 +166,8 @@ async function submit() {
 	if (!goal.value.trim()) return (error.value = __("Please describe the goal."))
 	const args = { project: project.value.name, expected_seconds: expected, goal: goal.value.trim(), task: task.value || null }
 	if (startEdited.value) {
+		// The form has novalidate, so a half-typed start no longer stops the submit; it reads as "".
+		if (formEl.value?.querySelector('input[type="datetime-local"]')?.validity.badInput) return (error.value = __("Please complete the start time."))
 		const start = parseDatetimeLocalValue(startTime.value)
 		if (start) args.manual_start_time = formatForApi(start)
 	}
