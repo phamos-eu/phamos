@@ -1660,3 +1660,19 @@ My leave days {0},Meine Abwesenheitstage {0}
 Requested,Beantragt
 Working day,Arbeitstag
 Weekend or holiday,Wochenende oder Feiertag
+Team Calendar,Teamkalender
+Birthday,Geburtstag
+Holiday,Feiertag
+Month,Monat
+Timeline,Zeitleiste
+Employee,Mitarbeiter
+View,Ansicht
+All companies,Alle Unternehmen
+Previous month,Vorheriger Monat
+Next month,Nächster Monat
+No active employees.,Keine aktiven Mitarbeiter.
++{0} more,+{0} weitere
+Birthday: {0},Geburtstag: {0}
+The team calendar could not be loaded.,Der Teamkalender konnte nicht geladen werden.
+The end date must not be before the start date.,Das Enddatum darf nicht vor dem Startdatum liegen.
+The calendar shows at most {0} days at once.,Der Kalender zeigt höchstens {0} Tage auf einmal.

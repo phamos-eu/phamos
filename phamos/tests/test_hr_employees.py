@@ -38,8 +38,9 @@ def _response(status):
 	return SimpleNamespace(status_code=status, text="")
 
 
-@unittest.skipUnless(frappe.db.exists("DocType", "Leave Application"), "HRMS is not installed")
-class TestHrEmployees(FrappeTestCase):
+class HrEmployeesFixture(FrappeTestCase):
+	"""Employees, leave types, allocations and a holiday list; shared with the Team Calendar tests."""
+
 	def setUp(self):
 		frappe.set_user("Administrator")
 		for user in (ANNA, BEN, CARL, HR_USER, HR_MANAGER, NOBODY):
@@ -126,6 +127,9 @@ class TestHrEmployees(FrappeTestCase):
 			doc.submit()
 		return doc
 
+
+@unittest.skipUnless(frappe.db.exists("DocType", "Leave Application"), "HRMS is not installed")
+class TestHrEmployees(HrEmployeesFixture):
 	def _list(self, user, **kwargs):
 		frappe.set_user(user)
 		try:
