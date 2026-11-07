@@ -368,6 +368,12 @@ def is_task_running(name):
 
 @frappe.whitelist()
 def get_employee_leaves():
+    """Approved leave of everyone for the team calendar, current and next year.
+
+    Neutral on purpose (#1840): the title is the employee's name only, never the leave type,
+    so nobody with the panel sees who is on sick leave (#1833 keeps sick leave types to HR
+    Manager). Half-day times stay.
+    """
     today = getdate(nowdate())
 
     # Current year start
@@ -392,7 +398,6 @@ def get_employee_leaves():
             "employee_name",
             "from_date",
             "to_date",
-            "leave_type",
             "half_day",
             "half_day_date",
             "available_from_time",
@@ -402,7 +407,7 @@ def get_employee_leaves():
 
     events = []
     for l in leaves:
-        description = f"{l.employee_name} ({l.leave_type})"
+        description = l.employee_name
 
         if l.half_day and l.from_date != l.to_date:
             # LEFT SIDE: from_date → (half_day_date - 1)
