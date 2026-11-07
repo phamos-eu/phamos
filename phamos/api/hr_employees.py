@@ -81,29 +81,10 @@ def get_employees(status: str = "Active", company: str | None = None, search: st
 	leave_dates = _leave_dates(names, sick_types, today)
 	sick_days = sick_leave.get_sick_days(names, *sick_leave.year_bounds(today)) if can_see_sick_days else None
 
-	rows = []
-	for employee in employees:
-		# A leaver's numbers stop at the relieving date (#1833, Decision 8).
-		on_date = min(today, getdate(employee.relieving_date)) if employee.relieving_date else today
-		row = {
-			"employee": employee.name,
-			"employee_name": employee.employee_name,
-			"department": employee.department,
-			"designation": employee.designation,
-			"company": employee.company,
-			"status": employee.status,
-			"years_in_company": _years(employee.date_of_joining, on_date),
-			"birthday": getdate(employee.date_of_birth).strftime("%m-%d") if employee.date_of_birth else None,
-			"leave": _leave_balance(employee.name, on_date, sick_types),
-			**leave_dates.get(employee.name, {"last_leave": None, "next_leave": None, "pending_count": 0}),
-		}
-		if can_see_sick_days:
-			row["sick_days"] = sick_days[employee.name] if sick_days is not None else None
-		if can_see_contracts:
-			contract = get_active_contract(employee.name, on_date)
-			row["fte_percentage"] = contract.fte_percentage if contract else None
-			row["contract_end"] = contract.valid_until if contract else None
-		rows.append(row)
+	rows = [
+		_employee_row(employee, today, sick_types, leave_dates, sick_days, can_see_sick_days, can_see_contracts)
+		for employee in employees
+	]
 
 	return {
 		"employees": rows,
@@ -112,6 +93,102 @@ def get_employees(status: str = "Active", company: str | None = None, search: st
 		"can_see_contracts": can_see_contracts,
 		"sick_types_configured": bool(sick_types),
 		"companies": frappe.get_all("Company", pluck="name", order_by="name asc"),
+	}
+
+
+@frappe.whitelist()
+def get_employee(name: str) -> dict:
+	"""One employee for the detail dialog: the list row plus this year's leave and the contract.
+
+	Same access rules as the list. Sick leave never appears among the applications; HR Manager
+	gets its count only. The contract comes without salary fields.
+	"""
+	roles = _check_access()
+	can_see_sick_days = bool(roles & SICK_DAYS_ROLES)
+	can_see_contracts = bool(frappe.has_permission("Employment Contract", "read"))
+	today = getdate(nowdate())
+	employee = frappe.db.get_value("Employee", name, EMPLOYEE_FIELDS, as_dict=True)
+	if not employee:
+		frappe.throw(_("Employee {0} not found.").format(name), frappe.DoesNotExistError)
+
+	sick_types = sick_leave.get_sick_leave_types()
+	leave_dates = _leave_dates([name], sick_types, today)
+	sick_days = sick_leave.get_sick_days([name], *sick_leave.year_bounds(today)) if can_see_sick_days else None
+	row = _employee_row(employee, today, sick_types, leave_dates, sick_days, can_see_sick_days, can_see_contracts)
+	row["applications"] = _applications(name, sick_types, today)
+	if can_see_contracts:
+		row["contract"] = _contract(name, _on_date(employee, today))
+	row["can_see_sick_days"] = can_see_sick_days
+	row["can_see_contracts"] = can_see_contracts
+	row["sick_types_configured"] = bool(sick_types)
+	return row
+
+
+def _on_date(employee, today):
+	"""A leaver's numbers stop at the relieving date (#1833, Decision 8)."""
+	return min(today, getdate(employee.relieving_date)) if employee.relieving_date else today
+
+
+def _employee_row(employee, today, sick_types, leave_dates, sick_days, can_see_sick_days, can_see_contracts) -> dict:
+	on_date = _on_date(employee, today)
+	row = {
+		"employee": employee.name,
+		"employee_name": employee.employee_name,
+		"department": employee.department,
+		"designation": employee.designation,
+		"company": employee.company,
+		"status": employee.status,
+		"years_in_company": _years(employee.date_of_joining, on_date),
+		"birthday": getdate(employee.date_of_birth).strftime("%m-%d") if employee.date_of_birth else None,
+		"leave": _leave_balance(employee.name, on_date, sick_types),
+		**leave_dates.get(employee.name, {"last_leave": None, "next_leave": None, "pending_count": 0}),
+	}
+	if can_see_sick_days:
+		row["sick_days"] = sick_days[employee.name] if sick_days is not None else None
+	if can_see_contracts:
+		contract = get_active_contract(employee.name, on_date)
+		row["fte_percentage"] = contract.fte_percentage if contract else None
+		row["contract_end"] = contract.valid_until if contract else None
+	return row
+
+
+def _applications(employee: str, sick_types, today) -> list[dict]:
+	"""This calendar year's Leave Applications, newest first, without sick leave and cancelled ones."""
+	year_start, year_end = sick_leave.year_bounds(today)
+	filters = {
+		"employee": employee,
+		"docstatus": ("<", 2),
+		"status": ("!=", "Cancelled"),
+		"from_date": ("<=", year_end),
+		"to_date": (">=", year_start),
+	}
+	if sick_types:
+		filters["leave_type"] = ("not in", sick_types)
+	return frappe.get_all(
+		"Leave Application",
+		filters=filters,
+		fields=["name", "leave_type", "from_date", "to_date", "total_leave_days", "status", "docstatus"],
+		order_by="from_date desc",
+	)
+
+
+def _contract(employee: str, on_date) -> dict | None:
+	"""The contract in force, with its leave fields; never salary (CAPACITY_FIELDS has none)."""
+	contract = get_active_contract(employee, on_date)
+	if not contract:
+		return None
+	leave = frappe.db.get_value(
+		"Employment Contract", contract.name, ["working_days_per_week", "leave_days_per_year"], as_dict=True
+	)
+	return {
+		"name": contract.name,
+		"contract_type": contract.contract_type,
+		"effective_from": contract.effective_from,
+		"valid_until": contract.valid_until,
+		"fte_percentage": contract.fte_percentage,
+		"weekly_hours": contract.weekly_hours,
+		"working_days_per_week": leave.working_days_per_week,
+		"leave_days_per_year": leave.leave_days_per_year,
 	}
 
 
