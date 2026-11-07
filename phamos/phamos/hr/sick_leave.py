@@ -17,7 +17,8 @@ import datetime
 import frappe
 from frappe.utils import flt, getdate, nowdate
 
-SETTINGS = "Phamos Settings"
+# The DocType is really named "phamos Settings" (lower-case p).
+SETTINGS = "phamos Settings"
 SETTINGS_FIELD = "human_resources_sick_leave_types"
 
 
