@@ -66,6 +66,7 @@
   "human_resources_department",
   "column_break_human_resources_spa",
   "human_resources_timesheet_project",
+  "human_resources_sick_leave_types",
   "project_management_spa_tab",
   "project_management_spa_section",
   "project_management_department",
@@ -415,6 +416,13 @@
    "fieldtype": "Link",
    "label": "Human Resources Timesheet Project",
    "options": "Project"
+  },
+  {
+   "description": "Approved leave of these types counts as sick days. Only HR Manager sees other people's sick days.",
+   "fieldname": "human_resources_sick_leave_types",
+   "fieldtype": "Table MultiSelect",
+   "label": "Sick Leave Types",
+   "options": "Sick Leave Type Item"
   },
   {
    "fieldname": "project_management_spa_tab",
