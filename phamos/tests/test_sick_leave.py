@@ -17,7 +17,6 @@ from frappe.tests.utils import FrappeTestCase
 from phamos.api import personal_leave
 from phamos.mailcow_integration.caldav import client
 from phamos.phamos.hr import sick_leave
-from phamos.tests.test_mailcow_sync_event import _ensure_status_field, _ensure_user
 from phamos.tests.test_personal_checkin import _ensure_employee
 
 ME = "sl-me@example.com"
@@ -25,6 +24,16 @@ COLLEAGUE = "sl-colleague@example.com"
 SICK = "SL Test Sick"
 CHILD_SICK = "SL Test Child Sick"
 OTHER = "SL Test Unpaid"
+
+
+def _ensure_user(email):
+	"""version-15 has no test_mailcow_sync_event; same helper: a user with the Employee role."""
+	if not frappe.db.exists("User", email):
+		frappe.get_doc(
+			{"doctype": "User", "email": email, "first_name": email.split("@")[0], "send_welcome_email": 0}
+		).insert(ignore_permissions=True)
+	if "Employee" not in frappe.get_roles(email):
+		frappe.get_doc("User", email).add_roles("Employee")
 
 
 def _response(status):
@@ -37,7 +46,6 @@ class TestSickLeave(FrappeTestCase):
 		frappe.set_user("Administrator")
 		for user in (ME, COLLEAGUE):
 			_ensure_user(user)
-		_ensure_status_field()
 		self.me = _ensure_employee(ME)
 		self.colleague = _ensure_employee(COLLEAGUE)
 		holiday_list = frappe.get_doc(

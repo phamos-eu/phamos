@@ -20,7 +20,6 @@ from frappe.utils import add_days, getdate, nowdate
 from phamos.api import hr_employees
 from phamos.mailcow_integration.caldav import client
 from phamos.phamos.hr import sick_leave
-from phamos.tests.test_mailcow_sync_event import _ensure_status_field, _ensure_user
 from phamos.tests.test_personal_checkin import _ensure_employee
 
 ANNA = "he-anna@example.com"
@@ -32,6 +31,16 @@ NOBODY = "he-nobody@example.com"
 ANNUAL = "HE Test Annual"
 SPECIAL = "HE Test Special"
 SICK = "HE Test Sick"
+
+
+def _ensure_user(email):
+	"""version-15 has no test_mailcow_sync_event; same helper: a user with the Employee role."""
+	if not frappe.db.exists("User", email):
+		frappe.get_doc(
+			{"doctype": "User", "email": email, "first_name": email.split("@")[0], "send_welcome_email": 0}
+		).insert(ignore_permissions=True)
+	if "Employee" not in frappe.get_roles(email):
+		frappe.get_doc("User", email).add_roles("Employee")
 
 
 def _response(status):
@@ -47,7 +56,6 @@ class TestHrEmployees(FrappeTestCase):
 			frappe.get_doc("User", user).remove_roles("System Manager", "HR Manager", "HR User")
 		frappe.get_doc("User", HR_USER).add_roles("HR User")
 		frappe.get_doc("User", HR_MANAGER).add_roles("HR Manager")
-		_ensure_status_field()
 		self.today = getdate(nowdate())
 		self.year_start = self.today.replace(month=1, day=1)
 		self.year_end = self.today.replace(month=12, day=31)
