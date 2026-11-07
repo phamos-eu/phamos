@@ -57,3 +57,18 @@ class TestDeliveryNoteMonthlyImplementationSummary(FrappeTestCase):
 		got = {n: frappe.db.get_value("Delivery Note", n, "custom_monthly_implementation_summary")
 			for n in ("_T-DN-ITEM", "_T-DN-ROW", "_T-DN-NONE")}
 		self.assertEqual(got, {"_T-DN-ITEM": "_T-MIS-A", "_T-DN-ROW": "_T-MIS-B", "_T-DN-NONE": None})
+
+	def test_mis_fields_sit_in_implementation_specific_sections(self):
+		dn = [(f.fieldname, f.label) for f in frappe.get_meta("Delivery Note").fields[:3]]
+		self.assertEqual(dn, [
+			("custom_phamos", "Implementation Specific"),
+			("custom_implementation", "Implementation"),
+			("custom_monthly_implementation_summary", "Monthly Implementation Summary"),
+		])
+		item = [f.fieldname for f in frappe.get_meta("Delivery Note Item").fields[:4]]
+		self.assertEqual(item, [
+			"custom_implementation_specific",
+			"custom_against_monthly_implementation_summary",
+			"custom_ref_doc",
+			"custom_implementation_specific_end",
+		])
