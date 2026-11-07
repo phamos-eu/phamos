@@ -1,7 +1,7 @@
 <template>
 	<!--
 		One row per month, one cell per day of the year, so a block of leave shows as a run of
-		filled cells (#1836). Approved leave is green, a request blue; rejected and cancelled
+		filled cells (#1836). A half day is filled on one diagonal half. Approved leave is green, a request blue; rejected and cancelled
 		leave only an outline, red and dashed grey, as they never became an absence (PM,
 		2026-11-07). Working days are a light fill, weekends and holidays an empty box. The date, type and
 		status are in each cell's tooltip, so colour never carries identity alone.
@@ -18,18 +18,19 @@
 					globally registered frappe-ui Button and inherits its size and colours.
 				-->
 				<template v-for="cell in month.cells" :key="cell.key">
-					<a v-if="typeof cell.to === 'string'" :href="cell.to" target="_blank" rel="noopener" :class="cellClass(cell)" :title="cell.title" :aria-label="cell.title" />
-					<RouterLink v-else-if="cell.to" :to="cell.to" :class="cellClass(cell)" :title="cell.title" :aria-label="cell.title" />
+					<a v-if="typeof cell.to === 'string'" :href="cell.to" target="_blank" rel="noopener" :class="cellClass(cell)" :style="cell.style" :title="cell.title" :aria-label="cell.title" />
+					<RouterLink v-else-if="cell.to" :to="cell.to" :class="cellClass(cell)" :style="cell.style" :title="cell.title" :aria-label="cell.title" />
 					<button
 						v-else-if="cell.app"
 						type="button"
 						:class="cellClass(cell)"
+						:style="cell.style"
 						:title="cell.title"
 						:aria-label="cell.title"
 						:aria-pressed="cell.app.name === selected"
 						@click="emit('select', cell.app)"
 					/>
-					<div v-else :class="cellClass(cell)" :title="cell.title" />
+					<div v-else :class="cellClass(cell)" :style="cell.style" :title="cell.title" />
 				</template>
 			</template>
 		</div>
@@ -37,6 +38,7 @@
 			<span class="text-ink-gray-5">{{ __("Click a leave day to see its application.") }}</span>
 			<span class="inline-flex items-center gap-1.5"><span class="h-3 w-3 rounded-sm bg-surface-green-3" /> {{ __("Approved") }}</span>
 			<span class="inline-flex items-center gap-1.5"><span class="h-3 w-3 rounded-sm bg-surface-blue-3" /> {{ __("Requested") }}</span>
+			<span class="inline-flex items-center gap-1.5"><span class="h-3 w-3 rounded-sm" :style="halfStyle('--surface-green-3')" /> {{ __("Half day") }}</span>
 			<span class="inline-flex items-center gap-1.5"><span class="h-3 w-3 rounded-sm border-2 border-outline-red-3" /> {{ __("Rejected") }}</span>
 			<span class="inline-flex items-center gap-1.5"><span class="h-3 w-3 rounded-sm border-2 border-dashed border-outline-gray-4" /> {{ __("Cancelled") }}</span>
 			<span class="inline-flex items-center gap-1.5"><span class="h-3 w-3 rounded-sm bg-surface-gray-2 ring-2 ring-[var(--ink-amber-3)]" /> {{ __("Today") }}</span>
@@ -65,6 +67,19 @@ const props = defineProps({
 })
 const emit = defineEmits(["select"])
 
+/** Top-left half in the status colour, the rest like a working day; theme variables, so dark mode follows. */
+function halfStyle(fill) {
+	return { background: `linear-gradient(135deg, var(${fill}) 50%, var(--surface-gray-2) 50%)` }
+}
+
+/** The day of an application that is only half taken: HRMS uses half_day_date, or the only day. */
+function halfDayOf(app) {
+	if (!Number(app.half_day)) return null
+	if (app.half_day_date) return String(app.half_day_date).slice(0, 10)
+	const from = String(app.from_date).slice(0, 10)
+	return from === String(app.to_date).slice(0, 10) ? from : null
+}
+
 function cellClass(cell) {
 	return [
 		"block h-4 w-full rounded-sm",
@@ -82,8 +97,8 @@ function cellClass(cell) {
 // real or planned absence on the same day wins over them.
 const MUTED = ["Rejected", "Cancelled"]
 const STATUS_STYLE = {
-	Approved: { classes: "bg-surface-green-3", label: "Approved" },
-	Open: { classes: "bg-surface-blue-3", label: "Requested" },
+	Approved: { classes: "bg-surface-green-3", label: "Approved", fill: "--surface-green-3" },
+	Open: { classes: "bg-surface-blue-3", label: "Requested", fill: "--surface-blue-3" },
 	Rejected: { classes: "border-2 border-outline-red-3", label: "Rejected" },
 	Cancelled: { classes: "border-2 border-dashed border-outline-gray-4", label: "Cancelled" },
 }
@@ -140,10 +155,13 @@ const months = computed(() =>
 			const label = today ? `${formatDate(date)} · ${__("Today")}` : formatDate(date)
 			if (leave) {
 				const style = STATUS_STYLE[leave.status] || STATUS_STYLE.Open
+				const half = halfDayOf(leave) === date
 				cells.push({
 					key: date,
-					classes: style.classes,
-					title: `${label} · ${__(leave.leave_type)} · ${__(style.label)}`,
+					// A muted (outline) status keeps its outline on a half day; the tooltip names it.
+					classes: half && style.fill ? "" : style.classes,
+					style: half && style.fill ? halfStyle(style.fill) : null,
+					title: `${label} · ${__(leave.leave_type)}${half ? ` · ${__("Half day")}` : ""} · ${__(style.label)}`,
 					today,
 					app: leave,
 					to: props.link ? props.link(leave) : null,
