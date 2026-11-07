@@ -1,7 +1,7 @@
 <template>
 	<div class="flex h-full min-h-0 bg-surface-gray-1">
 		<div class="h-full min-h-0 flex-1 overflow-y-auto p-5">
-			<div class="mx-auto flex max-w-4xl flex-col gap-5">
+			<div class="flex flex-col gap-5">
 				<div class="flex flex-wrap items-center justify-between gap-3">
 					<div>
 						<h1 class="text-lg font-semibold text-ink-gray-9">{{ __("My Leave") }}</h1>
