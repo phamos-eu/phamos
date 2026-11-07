@@ -52,6 +52,11 @@
 				</section>
 
 				<section>
+					<h3 class="mb-2 text-xs font-medium uppercase tracking-wide text-ink-gray-5">Leave days {{ year }}</h3>
+					<LeaveHeatmap :year="year" :applications="detail.applications" :holidays="detail.holidays" />
+				</section>
+
+				<section>
 					<h3 class="mb-2 text-xs font-medium uppercase tracking-wide text-ink-gray-5">Leave applications this year</h3>
 					<p v-if="!detail.applications.length" class="text-sm text-ink-gray-5">None this year.</p>
 					<ul v-else class="divide-y divide-outline-gray-1">
@@ -97,6 +102,9 @@ import { Badge, call, Dialog } from "frappe-ui"
 import { errorMessage, formatDate, formatNumber, formatPercent } from "@spa/contracts/contractFormat.js"
 import { leaveStatusTheme } from "@spa/utils/leaveFormat.js"
 import { getDateFormat } from "@spa/utils/datetime.js"
+import LeaveHeatmap from "./LeaveHeatmap.vue"
+
+const year = new Date().getFullYear()
 
 // One employee's leave and HR facts (#1836). The API applies the access rules of #1833:
 // no sick days and no contract for HR User, and never a sick leave among the applications.

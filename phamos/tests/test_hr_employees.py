@@ -210,6 +210,15 @@ class TestHrEmployees(FrappeTestCase):
 		self.assertNotIn(SICK, [a.leave_type for a in applications])
 		self.assertEqual(detail["leave"][ANNUAL]["taken"], 2)
 
+	def test_detail_has_this_years_holidays_for_the_heatmap(self):
+		holiday_list = frappe.db.get_value("Employee", self.anna, "holiday_list")
+		doc = frappe.get_doc("Holiday List", holiday_list)
+		doc.append("holidays", {"holiday_date": self.today.replace(month=12, day=25), "description": "HE Test Holiday"})
+		doc.save(ignore_permissions=True)
+		holidays = self._detail(HR_USER, self.anna)["holidays"]
+		self.assertIn("HE Test Holiday", [h["description"] for h in holidays])
+		self.assertTrue(all(self.year_start <= getdate(h["date"]) <= self.year_end for h in holidays))
+
 	def test_detail_access_rules_match_the_list(self):
 		self._leave(self.anna, SICK, self.year_start, self.year_start)
 		as_user = self._detail(HR_USER, self.anna)

@@ -116,6 +116,7 @@ def get_employee(name: str) -> dict:
 	sick_days = sick_leave.get_sick_days([name], *sick_leave.year_bounds(today)) if can_see_sick_days else None
 	row = _employee_row(employee, today, sick_types, leave_dates, sick_days, can_see_sick_days, can_see_contracts)
 	row["applications"] = _applications(name, sick_types, today)
+	row["holidays"] = _holidays(name, today)
 	if can_see_contracts:
 		row["contract"] = _contract(name, _on_date(employee, today))
 	row["can_see_sick_days"] = can_see_sick_days
@@ -170,6 +171,17 @@ def _applications(employee: str, sick_types, today) -> list[dict]:
 		fields=["name", "leave_type", "from_date", "to_date", "total_leave_days", "status", "docstatus"],
 		order_by="from_date desc",
 	)
+
+
+def _holidays(employee: str, today) -> list[dict]:
+	"""This year's holidays and weekly offs from the employee's holiday list, for the heatmap."""
+	from hrms.hr.utils import get_holidays_for_employee
+
+	year_start, year_end = sick_leave.year_bounds(today)
+	return [
+		{"date": h.holiday_date, "description": h.description, "weekly_off": bool(h.weekly_off)}
+		for h in get_holidays_for_employee(employee, year_start, year_end, raise_exception=False)
+	]
 
 
 def _contract(employee: str, on_date) -> dict | None:
