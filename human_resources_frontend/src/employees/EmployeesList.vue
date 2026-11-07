@@ -397,7 +397,9 @@ const averageSickDays = computed(() => average(rows.value.map((r) => Number(r.si
 const noLeaveLimit = computed(() => {
 	const cutoff = new Date()
 	cutoff.setMonth(cutoff.getMonth() - NO_LEAVE_MONTHS)
-	return cutoff.toISOString().slice(0, 10)
+	// Local date, not toISOString(): that is UTC and shifts the day just after midnight in Europe.
+	const pad = (n) => String(n).padStart(2, "0")
+	return `${cutoff.getFullYear()}-${pad(cutoff.getMonth() + 1)}-${pad(cutoff.getDate())}`
 })
 const quickFilters = computed(() => {
 	const limit = noLeaveLimit.value
