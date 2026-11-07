@@ -23,7 +23,7 @@
 					{{ __("Your user has no active Employee record, so there is no leave to show.") }}
 				</p>
 				<template v-else>
-					<section v-if="balance.length" class="grid grid-cols-2 gap-3 md:grid-cols-4">
+					<section v-if="balance.length || sickDays !== null" class="grid grid-cols-2 gap-3 md:grid-cols-4">
 						<div
 							v-for="row in balance"
 							:key="row.leave_type"
@@ -41,8 +41,13 @@
 								}}
 							</div>
 						</div>
+						<div v-if="sickDays !== null" class="rounded-lg border border-outline-gray-2 bg-surface-white p-4">
+							<div class="truncate text-xs text-ink-gray-5">{{ __("Sick days this year") }}</div>
+							<div class="mt-1 text-2xl font-semibold tabular-nums text-ink-gray-9">{{ formatLeaveDays(sickDays) }}</div>
+							<div class="mt-1 text-xs text-ink-gray-5">{{ __("Approved, since 1 January") }}</div>
+						</div>
 					</section>
-					<p v-else class="text-sm text-ink-gray-5">{{ __("No leave is allocated to you for today.") }}</p>
+					<p v-if="!balance.length" class="text-sm text-ink-gray-5">{{ __("No leave is allocated to you for today.") }}</p>
 
 					<section class="rounded-lg border border-outline-gray-2 bg-surface-white">
 						<div class="flex flex-wrap items-center justify-between gap-3 border-b border-outline-gray-1 px-4 py-3">
@@ -173,6 +178,8 @@ const withdrawing = ref(false)
 
 const hasEmployee = computed(() => Boolean(myLeave.data?.has_employee))
 const balance = computed(() => myLeave.balance?.balance || [])
+// Own sick days this year (#1834); null while no sick leave types are configured.
+const sickDays = computed(() => myLeave.balance?.sick_days ?? null)
 const allRows = computed(() => myLeave.data?.leave || [])
 const rows = computed(() =>
 	statusFilter.value ? allRows.value.filter((r) => r.status === statusFilter.value) : allRows.value

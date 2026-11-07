@@ -23,6 +23,7 @@ from frappe import _
 from frappe.utils import cint, flt, getdate, nowdate
 
 from phamos.cockpits.workdays import _employee
+from phamos.phamos.hr import sick_leave
 
 DOCTYPE = "Leave Application"
 COVER_FIELD = "custom_cover_employee"
@@ -168,10 +169,14 @@ def _leave_details(employee: str, date) -> dict:
 
 
 def get_my_leave_balance(date: str | None = None) -> dict:
-	"""Remaining days per allocated leave type on `date` (default today), from HRMS."""
+	"""Remaining days per allocated leave type on `date` (default today), from HRMS.
+
+	Also my own sick days in that calendar year (#1834): None while Phamos Settings lists no
+	sick leave types, so the view can leave the tile out.
+	"""
 	employee = _my_employee()
 	if not employee:
-		return {"has_employee": False, "balance": [], "without_pay": []}
+		return {"has_employee": False, "balance": [], "without_pay": [], "sick_days": None}
 	details = _leave_details(employee, date)
 	balance = [
 		{
@@ -184,7 +189,13 @@ def get_my_leave_balance(date: str | None = None) -> dict:
 		}
 		for leave_type, values in sorted((details.get("leave_allocation") or {}).items())
 	]
-	return {"has_employee": True, "balance": balance, "without_pay": details.get("lwps") or []}
+	sick_days = sick_leave.get_sick_days([employee], *sick_leave.year_bounds(date))
+	return {
+		"has_employee": True,
+		"balance": balance,
+		"without_pay": details.get("lwps") or [],
+		"sick_days": sick_days[employee] if sick_days is not None else None,
+	}
 
 
 def get_leave_form_options(from_date: str | None = None) -> dict:
