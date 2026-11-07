@@ -49,6 +49,17 @@
 					</section>
 					<p v-if="!balance.length" class="text-sm text-ink-gray-5">{{ __("No leave is allocated to you for today.") }}</p>
 
+					<!-- My leave days of the year at a glance (#1836); a leave day opens its entry below. -->
+					<section class="rounded-lg border border-outline-gray-2 bg-surface-white p-4">
+						<h2 class="mb-3 text-sm font-semibold text-ink-gray-9">{{ __("My leave days {0}", [year]) }}</h2>
+						<LeaveHeatmap
+							:year="year"
+							:applications="allRows"
+							:holidays="myLeave.balance?.holidays || []"
+							:link="(app) => ({ name: 'MyLeaveDetail', params: { name: app.name } })"
+						/>
+					</section>
+
 					<section class="rounded-lg border border-outline-gray-2 bg-surface-white">
 						<div class="flex flex-wrap items-center justify-between gap-3 border-b border-outline-gray-1 px-4 py-3">
 							<h2 class="text-sm font-semibold text-ink-gray-9">{{ __("Leave applications") }}</h2>
@@ -165,9 +176,11 @@ import {
 } from "@spa/utils/leaveFormat.js"
 import spaConfig from "@/config"
 import ApplyLeaveDialog from "../components/ApplyLeaveDialog.vue"
+import LeaveHeatmap from "@spa/components/LeaveHeatmap.vue"
 import { loadMyLeave, loadMyLeaveBalance, myLeave } from "../leaveStore.js"
 
 const props = defineProps({ name: { type: String, default: "" } })
+const year = new Date().getFullYear()
 
 const route = useRoute()
 const router = useRouter()

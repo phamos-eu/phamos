@@ -150,7 +150,17 @@
 								</tr>
 							</thead>
 							<tbody>
-								<tr v-for="row in sortedRows" :key="row.employee" class="group">
+								<!-- A row opens the employee dialog (#1836); Enter does the same from the keyboard. -->
+								<tr
+									v-for="row in sortedRows"
+									:key="row.employee"
+									class="group cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-outline-gray-3"
+									tabindex="0"
+									role="button"
+									:aria-label="`Details of ${row.employee_name}`"
+									@click="openEmployee(row, $event)"
+									@keydown.enter.prevent="openEmployee(row, $event)"
+								>
 									<td :class="[stickyCell, bodyCell]">
 										<div class="truncate font-medium text-ink-gray-9">{{ row.employee_name }}</div>
 										<div class="truncate text-xs text-ink-gray-5">
@@ -216,6 +226,13 @@
 				</section>
 			</template>
 		</div>
+
+		<EmployeeDialog
+			v-model="dialogOpen"
+			:employee="dialogEmployee"
+			:employee-name="dialogEmployeeName"
+			@update:model-value="(open) => !open && focusRow()"
+		/>
 	</div>
 </template>
 
@@ -223,6 +240,7 @@
 import { computed, h, onBeforeUnmount, onMounted, ref, watch } from "vue"
 import { call } from "frappe-ui"
 import StatCard from "@spa/components/dashboard/StatCard.vue"
+import EmployeeDialog from "./EmployeeDialog.vue"
 import { errorMessage, formatDate, formatNumber, formatPercent } from "@spa/contracts/contractFormat.js"
 import { getDateFormat } from "@spa/utils/datetime.js"
 
@@ -263,6 +281,23 @@ const sortKey = ref("employee_name")
 const sortAsc = ref(true)
 const searchEl = ref(null)
 const quickFilter = ref(null)
+const dialogOpen = ref(false)
+const dialogEmployee = ref("")
+const dialogEmployeeName = ref("")
+let lastRow = null
+
+function openEmployee(row, event) {
+	lastRow = event?.currentTarget || null
+	dialogEmployee.value = row.employee
+	dialogEmployeeName.value = row.employee_name
+	dialogOpen.value = true
+}
+
+// Back to the row the dialog came from, so keyboard users don't lose their place. The
+// dialog's own focus handling runs after its leave transition, so this waits for that.
+function focusRow() {
+	setTimeout(() => lastRow?.focus?.(), 300)
+}
 
 const statusOptions = [
 	{ label: "Active", value: "Active" },
@@ -362,7 +397,9 @@ const averageSickDays = computed(() => average(rows.value.map((r) => Number(r.si
 const noLeaveLimit = computed(() => {
 	const cutoff = new Date()
 	cutoff.setMonth(cutoff.getMonth() - NO_LEAVE_MONTHS)
-	return cutoff.toISOString().slice(0, 10)
+	// Local date, not toISOString(): that is UTC and shifts the day just after midnight in Europe.
+	const pad = (n) => String(n).padStart(2, "0")
+	return `${cutoff.getFullYear()}-${pad(cutoff.getMonth() + 1)}-${pad(cutoff.getDate())}`
 })
 const quickFilters = computed(() => {
 	const limit = noLeaveLimit.value
