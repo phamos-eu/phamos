@@ -452,6 +452,8 @@ const attentionCards = computed(() =>
 )
 
 function toggleQuickFilter(key) {
+	// Blurred cards are out of the mouse's reach, but still reachable by keyboard (#1839).
+	if (privacyHidden.value) return
 	quickFilter.value = quickFilter.value === key ? null : key
 }
 
