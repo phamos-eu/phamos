@@ -1759,3 +1759,8 @@ Sick Leave Types,Krankheitsarten
 Sick days this year,Krankheitstage dieses Jahr
 Approved leave of these types counts as sick days. Only HR Manager sees other people's sick days.,Genehmigte Abwesenheiten dieser Arten zählen als Krankheitstage. Nur HR Manager sieht die Krankheitstage anderer.
 "Approved, since 1 January","Genehmigt, seit 1. Januar"
+My leave days {0},Meine Abwesenheitstage {0}
+"Click a leave day to see its application.","Klicken Sie auf einen Abwesenheitstag, um den Antrag zu sehen."
+Requested,Beantragt
+Working day,Arbeitstag
+Weekend or holiday,Wochenende oder Feiertag

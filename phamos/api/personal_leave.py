@@ -172,11 +172,12 @@ def get_my_leave_balance(date: str | None = None) -> dict:
 	"""Remaining days per allocated leave type on `date` (default today), from HRMS.
 
 	Also my own sick days in that calendar year (#1834): None while Phamos Settings lists no
-	sick leave types, so the view can leave the tile out.
+	sick leave types, so the view can leave the tile out. And that year's holidays from my
+	holiday list, for the leave heatmap (#1836).
 	"""
 	employee = _my_employee()
 	if not employee:
-		return {"has_employee": False, "balance": [], "without_pay": [], "sick_days": None}
+		return {"has_employee": False, "balance": [], "without_pay": [], "sick_days": None, "holidays": []}
 	details = _leave_details(employee, date)
 	balance = [
 		{
@@ -195,7 +196,19 @@ def get_my_leave_balance(date: str | None = None) -> dict:
 		"balance": balance,
 		"without_pay": details.get("lwps") or [],
 		"sick_days": sick_days[employee] if sick_days is not None else None,
+		"holidays": _holidays(employee, date),
 	}
+
+
+def _holidays(employee: str, date) -> list[dict]:
+	"""Holidays and weekly offs of the calendar year of `date` from my holiday list."""
+	from hrms.hr.utils import get_holidays_for_employee
+
+	year_start, year_end = sick_leave.year_bounds(date)
+	return [
+		{"date": h.holiday_date, "description": h.description, "weekly_off": bool(h.weekly_off)}
+		for h in get_holidays_for_employee(employee, year_start, year_end, raise_exception=False)
+	]
 
 
 def get_leave_form_options(from_date: str | None = None) -> dict:

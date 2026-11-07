@@ -189,6 +189,81 @@ class TestHrEmployees(FrappeTestCase):
 		self.assertTrue(as_manager["can_see_contracts"])
 		self.assertIn("fte_percentage", self._row(as_manager, self.anna))
 
+	def _detail(self, user, employee):
+		frappe.set_user(user)
+		try:
+			return hr_employees.get_employee(employee)
+		finally:
+			frappe.set_user("Administrator")
+
+	def test_detail_lists_this_years_applications_without_sick_leave(self):
+		self._leave(self.anna, ANNUAL, self.year_start, add_days(self.year_start, 1))
+		self._leave(self.anna, ANNUAL, add_days(self.today, 5), add_days(self.today, 5), status="Open")
+		rejected = self._leave(self.anna, ANNUAL, add_days(self.year_start, 10), add_days(self.year_start, 10), status="Rejected")
+		self._leave(self.anna, SICK, add_days(self.year_start, 20), add_days(self.year_start, 20))
+		cancelled = self._leave(self.anna, ANNUAL, add_days(self.year_start, 30), add_days(self.year_start, 30))
+		cancelled.cancel()
+		detail = self._detail(HR_USER, self.anna)
+		applications = detail["applications"]
+		self.assertCountEqual([a.status for a in applications], ["Open", "Cancelled", "Rejected", "Approved"])
+		self.assertIn(cancelled.name, [a.name for a in applications])
+		self.assertIn(rejected.name, [a.name for a in applications])
+		self.assertNotIn(SICK, [a.leave_type for a in applications])
+		self.assertEqual(detail["leave"][ANNUAL]["taken"], 2)
+
+	def test_detail_has_this_years_holidays_for_the_heatmap(self):
+		holiday_list = frappe.db.get_value("Employee", self.anna, "holiday_list")
+		doc = frappe.get_doc("Holiday List", holiday_list)
+		doc.append("holidays", {"holiday_date": self.today.replace(month=12, day=25), "description": "HE Test Holiday"})
+		doc.save(ignore_permissions=True)
+		holidays = self._detail(HR_USER, self.anna)["holidays"]
+		self.assertIn("HE Test Holiday", [h["description"] for h in holidays])
+		self.assertTrue(all(self.year_start <= getdate(h["date"]) <= self.year_end for h in holidays))
+
+	def test_detail_access_rules_match_the_list(self):
+		self._leave(self.anna, SICK, self.year_start, self.year_start)
+		as_user = self._detail(HR_USER, self.anna)
+		self.assertNotIn("sick_days", as_user)
+		self.assertNotIn("contract", as_user)
+		as_manager = self._detail(HR_MANAGER, self.anna)
+		self.assertEqual(as_manager["sick_days"], 1)
+		self.assertIn("contract", as_manager)
+		with self.assertRaises(frappe.PermissionError):
+			self._detail(NOBODY, self.anna)
+
+	def test_detail_contract_has_leave_fields_but_no_salary(self):
+		company = frappe.db.get_value("Employee", self.anna, "company")
+		frappe.get_doc(
+			{
+				"doctype": "Employment Contract",
+				"employee": self.anna,
+				"company": company,
+				"contract_type": "Employed",
+				"effective_from": self.year_start,
+				"currency": frappe.get_cached_value("Company", company, "default_currency"),
+				"fte_percentage": 80,
+				"working_days_per_week": 4,
+				"yearly_gross_full_time": 60000,
+			}
+		).insert(ignore_permissions=True).submit()
+		contract = self._detail(HR_MANAGER, self.anna)["contract"]
+		self.assertEqual(contract["fte_percentage"], 80)
+		self.assertEqual(contract["leave_days_per_year"], 24)
+		self.assertFalse({"monthly_gross", "yearly_gross_full_time", "base_monthly_gross"} & set(contract))
+
+	def test_detail_respects_user_permissions_like_the_list(self):
+		frappe.get_doc(
+			{"doctype": "User Permission", "user": HR_USER, "allow": "Employee", "for_value": self.anna}
+		).insert(ignore_permissions=True)
+		self.assertEqual([r["employee"] for r in self._list(HR_USER)["employees"]], [self.anna])
+		self.assertEqual(self._detail(HR_USER, self.anna)["employee"], self.anna)
+		with self.assertRaises(frappe.PermissionError):
+			self._detail(HR_USER, self.ben)
+
+	def test_detail_of_unknown_employee_is_an_error(self):
+		with self.assertRaises(frappe.DoesNotExistError):
+			self._detail(HR_USER, "HE-DOES-NOT-EXIST")
+
 	def test_leavers_only_with_the_left_filter_and_counted_to_their_relieving_date(self):
 		frappe.db.set_value("Employee", self.carl, {"status": "Left", "relieving_date": "2025-01-01"})
 		active = self._list(HR_USER)
