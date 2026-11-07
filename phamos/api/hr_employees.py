@@ -110,6 +110,8 @@ def get_employee(name: str) -> dict:
 	employee = frappe.db.get_value("Employee", name, EMPLOYEE_FIELDS, as_dict=True)
 	if not employee:
 		frappe.throw(_("Employee {0} not found.").format(name), frappe.DoesNotExistError)
+	# The list reads through get_list, so User Permissions limit it; one employee by name must too.
+	frappe.has_permission("Employee", "read", doc=name, throw=True)
 
 	sick_types = sick_leave.get_sick_leave_types()
 	leave_dates = _leave_dates([name], sick_types, today)

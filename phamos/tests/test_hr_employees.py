@@ -251,6 +251,15 @@ class TestHrEmployees(FrappeTestCase):
 		self.assertEqual(contract["leave_days_per_year"], 24)
 		self.assertFalse({"monthly_gross", "yearly_gross_full_time", "base_monthly_gross"} & set(contract))
 
+	def test_detail_respects_user_permissions_like_the_list(self):
+		frappe.get_doc(
+			{"doctype": "User Permission", "user": HR_USER, "allow": "Employee", "for_value": self.anna}
+		).insert(ignore_permissions=True)
+		self.assertEqual([r["employee"] for r in self._list(HR_USER)["employees"]], [self.anna])
+		self.assertEqual(self._detail(HR_USER, self.anna)["employee"], self.anna)
+		with self.assertRaises(frappe.PermissionError):
+			self._detail(HR_USER, self.ben)
+
 	def test_detail_of_unknown_employee_is_an_error(self):
 		with self.assertRaises(frappe.DoesNotExistError):
 			self._detail(HR_USER, "HE-DOES-NOT-EXIST")
