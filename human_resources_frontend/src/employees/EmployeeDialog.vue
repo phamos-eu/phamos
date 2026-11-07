@@ -54,28 +54,7 @@
 				<section>
 					<h3 class="mb-2 text-xs font-medium uppercase tracking-wide text-ink-gray-5">Leave days {{ year }}</h3>
 					<LeaveHeatmap :year="year" :applications="detail.applications" :holidays="detail.holidays" />
-				</section>
-
-				<section>
-					<h3 class="mb-2 text-xs font-medium uppercase tracking-wide text-ink-gray-5">Leave applications this year</h3>
-					<p v-if="!detail.applications.length" class="text-sm text-ink-gray-5">None this year.</p>
-					<ul v-else class="divide-y divide-outline-gray-1">
-						<li v-for="app in detail.applications" :key="app.name">
-							<a
-								:href="deskUrl('Leave Application', app.name)"
-								target="_blank"
-								rel="noopener"
-								class="flex items-center justify-between gap-3 rounded-md py-2 text-sm hover:bg-surface-gray-2 focus:bg-surface-gray-2 focus:outline-none"
-							>
-								<span class="min-w-0">
-									<span class="tabular-nums text-ink-gray-9">{{ formatPeriod(app) }}</span>
-									<span class="ml-2 text-ink-gray-6">{{ app.leave_type }} · {{ formatNumber(app.total_leave_days) }} {{ Number(app.total_leave_days) === 1 ? "day" : "days" }}</span>
-								</span>
-								<Badge :label="app.status" size="sm" variant="subtle" :theme="leaveStatusTheme(app.status)" />
-							</a>
-						</li>
-					</ul>
-					<p v-if="detail.can_see_sick_days" class="mt-2 text-xs text-ink-gray-5">Sick leave is not listed; only HR Manager sees its count above.</p>
+					<p v-if="detail.can_see_sick_days" class="mt-2 text-xs text-ink-gray-5">Sick leave is not drawn; only HR Manager sees its count above.</p>
 				</section>
 
 				<div class="flex flex-wrap items-center gap-4 border-t border-outline-gray-1 pt-4 text-sm">
@@ -100,7 +79,6 @@
 import { computed, ref, watch } from "vue"
 import { Badge, call, Dialog } from "frappe-ui"
 import { errorMessage, formatDate, formatNumber, formatPercent } from "@spa/contracts/contractFormat.js"
-import { leaveStatusTheme } from "@spa/utils/leaveFormat.js"
 import { getDateFormat } from "@spa/utils/datetime.js"
 import LeaveHeatmap from "./LeaveHeatmap.vue"
 
@@ -167,12 +145,6 @@ const facts = computed(() => {
 	}
 	return list
 })
-
-function formatPeriod(app) {
-	const from = formatDate(app.from_date)
-	const to = formatDate(app.to_date)
-	return from === to ? from : `${from} – ${to}`
-}
 
 /** "05-17" → day and month in the site's date order, never a year (#1833, Decision 4). */
 function formatBirthday(value) {

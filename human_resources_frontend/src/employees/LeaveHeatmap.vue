@@ -9,15 +9,26 @@
 		<div class="grid gap-y-1" :style="{ gridTemplateColumns: `2.25rem repeat(31, minmax(0, 1fr))` }" role="img" :aria-label="`Leave days in ${year}`">
 			<template v-for="month in months" :key="month.index">
 				<div class="pr-2 text-right text-xs leading-4 text-ink-gray-5">{{ month.label }}</div>
-				<div
+				<!-- A leave cell is a link to its Leave Application in Desk; the rest are plain cells. -->
+				<component
+					:is="cell.href ? 'a' : 'div'"
 					v-for="cell in month.cells"
 					:key="cell.key"
-					:class="['h-4 rounded-sm', cell.classes]"
+					:href="cell.href"
+					:target="cell.href ? '_blank' : null"
+					:rel="cell.href ? 'noopener' : null"
+					:class="[
+						'block h-4 rounded-sm',
+						cell.classes,
+						cell.href ? 'hover:ring-2 hover:ring-outline-gray-4 focus:outline-none focus-visible:ring-2 focus-visible:ring-outline-gray-4' : '',
+					]"
 					:title="cell.title"
+					:aria-label="cell.href ? cell.title : null"
 				/>
 			</template>
 		</div>
 		<div class="mt-2 flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-ink-gray-6">
+			<span class="text-ink-gray-5">Click a leave day to open its application.</span>
 			<span class="inline-flex items-center gap-1.5"><span class="h-3 w-3 rounded-sm bg-surface-blue-3" /> Approved</span>
 			<span class="inline-flex items-center gap-1.5"><span class="h-3 w-3 rounded-sm border-2 border-outline-blue-1 bg-surface-blue-1" /> Requested</span>
 			<span class="inline-flex items-center gap-1.5"><span class="h-3 w-3 rounded-sm bg-surface-gray-2" /> Working day</span>
@@ -78,6 +89,7 @@ const months = computed(() =>
 					key: date,
 					classes: requested ? "border-2 border-outline-blue-1 bg-surface-blue-1" : "bg-surface-blue-3",
 					title: `${label} · ${leave.leave_type} · ${requested ? "Requested" : "Approved"}`,
+					href: `/app/leave-application/${encodeURIComponent(leave.name)}`,
 				})
 			} else if (holiday || weekend) {
 				// Recessive: an empty box, so the working-day grid and the leave blocks stand out.
