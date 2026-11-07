@@ -1,8 +1,8 @@
 <template>
 	<!--
 		One row per month, one cell per day of the year, so a block of leave shows as a run of
-		filled cells (#1836). One hue only: approved leave is filled, a request is outlined,
-		working days are a light fill and weekends and holidays an empty box. The date, type and
+		filled cells (#1836). Approved leave is green, a request blue (PM, 2026-11-07); working
+		days are a light fill and weekends and holidays an empty box. The date, type and
 		status are in each cell's tooltip, so colour never carries identity alone.
 		Used in the HR Cockpit's employee dialog and in My Leave in the Personal Cockpit.
 	-->
@@ -34,8 +34,8 @@
 		</div>
 		<div class="mt-2 flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-ink-gray-6">
 			<span class="text-ink-gray-5">{{ __("Click a leave day to see its application.") }}</span>
-			<span class="inline-flex items-center gap-1.5"><span class="h-3 w-3 rounded-sm bg-surface-blue-3" /> {{ __("Approved") }}</span>
-			<span class="inline-flex items-center gap-1.5"><span class="h-3 w-3 rounded-sm border-2 border-outline-blue-1 bg-surface-blue-1" /> {{ __("Requested") }}</span>
+			<span class="inline-flex items-center gap-1.5"><span class="h-3 w-3 rounded-sm bg-surface-green-3" /> {{ __("Approved") }}</span>
+			<span class="inline-flex items-center gap-1.5"><span class="h-3 w-3 rounded-sm bg-surface-blue-3" /> {{ __("Requested") }}</span>
 			<span class="inline-flex items-center gap-1.5"><span class="h-3 w-3 rounded-sm bg-surface-gray-2" /> {{ __("Working day") }}</span>
 			<span class="inline-flex items-center gap-1.5"><span class="h-3 w-3 rounded-sm border border-outline-gray-2" /> {{ __("Weekend or holiday") }}</span>
 		</div>
@@ -120,7 +120,7 @@ const months = computed(() =>
 				const requested = leave.status !== "Approved"
 				cells.push({
 					key: date,
-					classes: requested ? "border-2 border-outline-blue-1 bg-surface-blue-1" : "bg-surface-blue-3",
+					classes: requested ? "bg-surface-blue-3" : "bg-surface-green-3",
 					title: `${label} · ${__(leave.leave_type)} · ${requested ? __("Requested") : __("Approved")}`,
 					app: leave,
 					to: props.link ? props.link(leave) : null,
