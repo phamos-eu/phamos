@@ -53,7 +53,47 @@
 
 				<section>
 					<h3 class="mb-2 text-xs font-medium uppercase tracking-wide text-ink-gray-5">Leave days {{ year }}</h3>
-					<LeaveHeatmap :year="year" :applications="detail.applications" :holidays="detail.holidays" />
+					<LeaveHeatmap
+						:year="year"
+						:applications="detail.applications"
+						:holidays="detail.holidays"
+						:selected="selectedApp?.name || ''"
+						@select="(app) => (selectedApp = selectedApp?.name === app.name ? null : app)"
+					/>
+
+					<!-- The clicked application, shown in place; Desk is one link away for editing. -->
+					<div v-if="selectedApp" class="mt-3 rounded-lg border border-outline-gray-2 bg-surface-gray-1 p-3 text-sm">
+						<div class="flex flex-wrap items-start justify-between gap-2">
+							<div>
+								<div class="font-medium tabular-nums text-ink-gray-9">{{ formatPeriod(selectedApp) }}</div>
+								<div class="text-ink-gray-6">
+									{{ selectedApp.leave_type }} · {{ formatNumber(selectedApp.total_leave_days) }}
+									{{ Number(selectedApp.total_leave_days) === 1 ? "day" : "days" }}
+									<template v-if="selectedApp.half_day"> · half day {{ formatDate(selectedApp.half_day_date || selectedApp.from_date) }}</template>
+								</div>
+							</div>
+							<Badge :label="selectedApp.status" size="sm" variant="subtle" :theme="leaveStatusTheme(selectedApp.status)" />
+						</div>
+						<dl class="mt-2 grid grid-cols-2 gap-x-6 gap-y-1 text-xs">
+							<div>
+								<dt class="text-ink-gray-5">Leave approver</dt>
+								<dd class="text-ink-gray-8">{{ selectedApp.leave_approver_name || "—" }}</dd>
+							</div>
+							<div>
+								<dt class="text-ink-gray-5">Applied on</dt>
+								<dd class="tabular-nums text-ink-gray-8">{{ formatDate(selectedApp.posting_date) || "—" }}</dd>
+							</div>
+						</dl>
+						<p v-if="selectedApp.description" class="mt-2 whitespace-pre-line text-xs text-ink-gray-7">{{ selectedApp.description }}</p>
+						<a
+							:href="deskUrl('Leave Application', selectedApp.name)"
+							target="_blank"
+							rel="noopener"
+							class="mt-2 inline-flex items-center gap-1.5 text-xs text-ink-gray-6 hover:text-ink-gray-9"
+						>
+							<FeatherIcon name="external-link" class="h-3.5 w-3.5" /> {{ selectedApp.name }} in Desk
+						</a>
+					</div>
 					<p v-if="detail.can_see_sick_days" class="mt-2 text-xs text-ink-gray-5">Sick leave is not drawn; only HR Manager sees its count above.</p>
 				</section>
 
@@ -80,7 +120,8 @@ import { computed, ref, watch } from "vue"
 import { Badge, call, Dialog } from "frappe-ui"
 import { errorMessage, formatDate, formatNumber, formatPercent } from "@spa/contracts/contractFormat.js"
 import { getDateFormat } from "@spa/utils/datetime.js"
-import LeaveHeatmap from "./LeaveHeatmap.vue"
+import { leaveStatusTheme } from "@spa/utils/leaveFormat.js"
+import LeaveHeatmap from "@spa/components/LeaveHeatmap.vue"
 
 const year = new Date().getFullYear()
 
@@ -95,12 +136,14 @@ const emit = defineEmits(["update:modelValue"])
 
 const detail = ref(null)
 const error = ref("")
+const selectedApp = ref(null)
 
 watch(
 	() => [props.modelValue, props.employee],
 	async ([open, employee]) => {
 		if (!open || !employee) return
 		detail.value = null
+		selectedApp.value = null
 		error.value = ""
 		try {
 			detail.value = await call("phamos.api.hr_employees.get_employee", { name: employee })
@@ -154,6 +197,12 @@ function formatBirthday(value) {
 	return format.indexOf("mm") < format.indexOf("dd")
 		? `${month}${separator}${day}`
 		: `${day}${separator}${month}${separator === "." ? "." : ""}`
+}
+
+function formatPeriod(app) {
+	const from = formatDate(app.from_date)
+	const to = formatDate(app.to_date)
+	return from === to ? from : `${from} – ${to}`
 }
 
 function deskUrl(doctype, name) {

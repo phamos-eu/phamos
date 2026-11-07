@@ -168,7 +168,20 @@ def _applications(employee: str, sick_types, today) -> list[dict]:
 	return frappe.get_all(
 		"Leave Application",
 		filters=filters,
-		fields=["name", "leave_type", "from_date", "to_date", "total_leave_days", "status", "docstatus"],
+		fields=[
+			"name",
+			"leave_type",
+			"from_date",
+			"to_date",
+			"half_day",
+			"half_day_date",
+			"total_leave_days",
+			"status",
+			"docstatus",
+			"leave_approver_name",
+			"description",
+			"posting_date",
+		],
 		order_by="from_date desc",
 	)
 

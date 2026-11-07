@@ -145,3 +145,12 @@ class TestSickLeave(FrappeTestCase):
 		self._leave(self.colleague, SICK, "2026-03-04", "2026-03-06")
 		frappe.set_user(ME)
 		self.assertEqual(personal_leave.get_my_leave_balance("2026-07-01")["sick_days"], 2)
+
+	def test_my_leave_balance_has_my_holidays_for_the_heatmap(self):
+		holiday_list = frappe.get_doc("Holiday List", "SL Test Holidays")
+		holiday_list.append("holidays", {"holiday_date": "2026-12-25", "description": "SL Test Christmas"})
+		holiday_list.save(ignore_permissions=True)
+		frappe.set_user(ME)
+		holidays = personal_leave.get_my_leave_balance("2026-07-01")["holidays"]
+		self.assertIn("SL Test Christmas", [h["description"] for h in holidays])
+		self.assertTrue(all(str(h["date"]).startswith("2026-") for h in holidays))
