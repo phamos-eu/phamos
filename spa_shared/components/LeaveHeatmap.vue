@@ -10,7 +10,7 @@
 	<div class="select-none">
 		<div class="grid gap-y-1" :style="{ gridTemplateColumns: `2.25rem repeat(31, minmax(0, 1fr))` }">
 			<template v-for="month in months" :key="month.index">
-				<div class="pr-2 text-right text-xs leading-4 text-ink-gray-5">{{ month.label }}</div>
+				<div :class="['pr-2 text-right text-xs leading-4', month.current ? 'font-semibold text-ink-gray-9' : 'text-ink-gray-5']">{{ month.label }}</div>
 				<!--
 					A leave cell is clickable: with `link` it goes there (URL in a new tab, or a route),
 					without it it emits `select` so the caller can show the application in place.
@@ -39,6 +39,7 @@
 			<span class="inline-flex items-center gap-1.5"><span class="h-3 w-3 rounded-sm bg-surface-blue-3" /> {{ __("Requested") }}</span>
 			<span class="inline-flex items-center gap-1.5"><span class="h-3 w-3 rounded-sm border-2 border-outline-red-3" /> {{ __("Rejected") }}</span>
 			<span class="inline-flex items-center gap-1.5"><span class="h-3 w-3 rounded-sm border-2 border-dashed border-outline-gray-4" /> {{ __("Cancelled") }}</span>
+			<span class="inline-flex items-center gap-1.5"><span class="h-3 w-3 rounded-sm bg-surface-gray-2 ring-2 ring-[var(--ink-amber-3)]" /> {{ __("Today") }}</span>
 			<span class="inline-flex items-center gap-1.5"><span class="h-3 w-3 rounded-sm bg-surface-gray-2" /> {{ __("Working day") }}</span>
 			<span class="inline-flex items-center gap-1.5"><span class="h-3 w-3 rounded-sm border border-outline-gray-2" /> {{ __("Weekend or holiday") }}</span>
 		</div>
@@ -72,6 +73,8 @@ function cellClass(cell) {
 			? "hover:ring-2 hover:ring-outline-gray-4 focus:outline-none focus-visible:ring-2 focus-visible:ring-outline-gray-4"
 			: "",
 		cell.app && cell.app.name === props.selected ? "ring-2 ring-outline-gray-5" : "",
+		// Today, for orientation; amber is not a leave status. A selection's grey ring wins.
+		cell.today && !(cell.app && cell.app.name === props.selected) ? "ring-2 ring-[var(--ink-amber-3)]" : "",
 	]
 }
 
@@ -115,6 +118,11 @@ function nextDay(date) {
 	return iso(next.getFullYear(), next.getMonth(), next.getDate())
 }
 
+const todayIso = (() => {
+	const d = new Date()
+	return iso(d.getFullYear(), d.getMonth(), d.getDate())
+})()
+
 const months = computed(() =>
 	Array.from({ length: 12 }, (_, index) => {
 		const days = new Date(props.year, index + 1, 0).getDate()
@@ -128,13 +136,15 @@ const months = computed(() =>
 			const leave = leaveByDate.value[date]
 			const holiday = holidayByDate.value[date]
 			const weekend = [0, 6].includes(new Date(props.year, index, day).getDay())
-			const label = formatDate(date)
+			const today = date === todayIso
+			const label = today ? `${formatDate(date)} · ${__("Today")}` : formatDate(date)
 			if (leave) {
 				const style = STATUS_STYLE[leave.status] || STATUS_STYLE.Open
 				cells.push({
 					key: date,
 					classes: style.classes,
 					title: `${label} · ${__(leave.leave_type)} · ${__(style.label)}`,
+					today,
 					app: leave,
 					to: props.link ? props.link(leave) : null,
 				})
@@ -144,12 +154,14 @@ const months = computed(() =>
 					key: date,
 					classes: "border border-outline-gray-2",
 					title: holiday && !holiday.weekly_off ? `${label} · ${holiday.description}` : label,
+					today,
 				})
 			} else {
-				cells.push({ key: date, classes: "bg-surface-gray-2", title: label })
+				cells.push({ key: date, classes: "bg-surface-gray-2", title: label, today })
 			}
 		}
-		return { index, label: monthFormat.value.format(new Date(props.year, index, 1)), cells }
+		const current = props.year === new Date().getFullYear() && index === new Date().getMonth()
+		return { index, label: monthFormat.value.format(new Date(props.year, index, 1)), cells, current }
 	})
 )
 </script>
