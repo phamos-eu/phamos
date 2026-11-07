@@ -44,7 +44,7 @@ EMPLOYEE_FIELDS = [
 def _check_access() -> set[str]:
 	roles = set(frappe.get_roles())
 	if not roles & ROLES:
-		frappe.throw(_("Only HR users can see the employees list."), frappe.PermissionError)
+		frappe.throw(_("Only HR users can see this page."), frappe.PermissionError)
 	return roles
 
 

@@ -44,7 +44,7 @@
 				<span v-if="loading" class="text-xs text-ink-gray-5">{{ __("Loading…") }}</span>
 				<div class="ml-auto flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-ink-gray-6">
 					<span class="inline-flex items-center gap-1.5"><span class="h-3 w-3 rounded-sm bg-surface-green-3" /> {{ __("Absent") }}</span>
-					<span class="inline-flex items-center gap-1.5"><span class="h-3 w-3 rounded-sm border-2 border-dashed border-outline-blue-3 bg-surface-blue-1" /> {{ __("Requested") }}</span>
+					<span class="inline-flex items-center gap-1.5"><span class="h-3 w-3 rounded-sm border-2 border-dashed border-[color:var(--ink-blue-2)] bg-surface-blue-1" /> {{ __("Requested") }}</span>
 					<span class="inline-flex items-center gap-1.5"><span class="h-3 w-3 rounded-sm" :style="halfStyle('--surface-green-3')" /> {{ __("Half day") }}</span>
 					<span class="inline-flex items-center gap-1.5"><span class="h-3 w-3 rounded-sm bg-surface-amber-1" /> {{ __("Holiday") }}</span>
 					<span class="inline-flex items-center gap-1.5">🎂 {{ __("Birthday") }}</span>
@@ -124,7 +124,7 @@
 							<span
 								:class="[
 									'inline-flex h-6 min-w-6 items-center justify-center rounded-full px-1 text-xs tabular-nums',
-									day.iso === todayIso ? 'bg-surface-amber-2 font-bold text-ink-amber-4' : 'text-ink-gray-6',
+									day.iso === todayIso ? 'bg-surface-amber-2 font-bold text-ink-amber-3' : 'text-ink-gray-6',
 								]"
 							>
 								{{ day.day }}
@@ -134,7 +134,7 @@
 							<div
 								v-for="holiday in holidaysOn(day.iso)"
 								:key="holiday.key"
-								class="truncate rounded bg-surface-amber-1 px-1.5 py-0.5 text-[11px] text-ink-amber-4"
+								class="truncate rounded bg-surface-amber-1 px-1.5 py-0.5 text-[11px] text-ink-amber-3"
 								:title="holiday.title"
 							>
 								{{ holiday.flag }} {{ holiday.description }}
@@ -153,8 +153,8 @@
 								:class="[
 									'flex items-center gap-1 truncate rounded px-1 py-0.5 text-[11px]',
 									absence.requested
-										? 'border border-dashed border-outline-blue-3 bg-surface-blue-1 text-ink-blue-4'
-										: 'bg-surface-green-2 text-ink-green-4',
+										? 'border border-dashed border-[color:var(--ink-blue-2)] bg-surface-blue-1 text-ink-blue-3'
+										: 'bg-surface-green-2 text-ink-green-3',
 								]"
 								:title="absence.title"
 							>
@@ -428,8 +428,8 @@ function cellFor(employee, day) {
 	if (absence) {
 		const fill = absence.requested ? "--surface-blue-2" : "--surface-green-3"
 		if (absence.half) style = halfStyle(fill)
-		else classes = absence.requested ? "border-2 border-dashed border-outline-blue-3 bg-surface-blue-1" : "bg-surface-green-3"
-		if (absence.half && absence.requested) classes = "border-2 border-dashed border-outline-blue-3"
+		else classes = absence.requested ? "border-2 border-dashed border-[color:var(--ink-blue-2)] bg-surface-blue-1" : "bg-surface-green-3"
+		if (absence.half && absence.requested) classes = "border-2 border-dashed border-[color:var(--ink-blue-2)]"
 	}
 	return {
 		iso: day.iso,
