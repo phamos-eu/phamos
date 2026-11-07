@@ -389,6 +389,7 @@ class MonthlyImplementationSummary(Document):
 		if not frappe.db.get_value("Sales Order", sales_order, "project"):
 			dn.project = project
 		dn.custom_implementation = self.implementation
+		dn.custom_monthly_implementation_summary = self.name
 		dn.run_method("calculate_taxes_and_totals")
 		dn.insert()
 		total_hours = flt(sum(hours_by_detail.values()))
