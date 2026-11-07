@@ -205,7 +205,8 @@ class TestHrEmployees(FrappeTestCase):
 		cancelled.cancel()
 		detail = self._detail(HR_USER, self.anna)
 		applications = detail["applications"]
-		self.assertEqual([a.status for a in applications], ["Open", "Rejected", "Approved"])
+		self.assertCountEqual([a.status for a in applications], ["Open", "Cancelled", "Rejected", "Approved"])
+		self.assertIn(cancelled.name, [a.name for a in applications])
 		self.assertIn(rejected.name, [a.name for a in applications])
 		self.assertNotIn(SICK, [a.leave_type for a in applications])
 		self.assertEqual(detail["leave"][ANNUAL]["taken"], 2)

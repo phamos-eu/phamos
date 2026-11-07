@@ -1,8 +1,9 @@
 <template>
 	<!--
 		One row per month, one cell per day of the year, so a block of leave shows as a run of
-		filled cells (#1836). Approved leave is green, a request blue (PM, 2026-11-07); working
-		days are a light fill and weekends and holidays an empty box. The date, type and
+		filled cells (#1836). Approved leave is green, a request blue; rejected and cancelled
+		leave only an outline, red and dashed grey, as they never became an absence (PM,
+		2026-11-07). Working days are a light fill, weekends and holidays an empty box. The date, type and
 		status are in each cell's tooltip, so colour never carries identity alone.
 		Used in the HR Cockpit's employee dialog and in My Leave in the Personal Cockpit.
 	-->
@@ -36,6 +37,8 @@
 			<span class="text-ink-gray-5">{{ __("Click a leave day to see its application.") }}</span>
 			<span class="inline-flex items-center gap-1.5"><span class="h-3 w-3 rounded-sm bg-surface-green-3" /> {{ __("Approved") }}</span>
 			<span class="inline-flex items-center gap-1.5"><span class="h-3 w-3 rounded-sm bg-surface-blue-3" /> {{ __("Requested") }}</span>
+			<span class="inline-flex items-center gap-1.5"><span class="h-3 w-3 rounded-sm border-2 border-outline-red-3" /> {{ __("Rejected") }}</span>
+			<span class="inline-flex items-center gap-1.5"><span class="h-3 w-3 rounded-sm border-2 border-dashed border-outline-gray-4" /> {{ __("Cancelled") }}</span>
 			<span class="inline-flex items-center gap-1.5"><span class="h-3 w-3 rounded-sm bg-surface-gray-2" /> {{ __("Working day") }}</span>
 			<span class="inline-flex items-center gap-1.5"><span class="h-3 w-3 rounded-sm border border-outline-gray-2" /> {{ __("Weekend or holiday") }}</span>
 		</div>
@@ -72,8 +75,15 @@ function cellClass(cell) {
 	]
 }
 
-// Rejected and cancelled applications never became an absence, so they are not drawn.
-const SKIPPED = ["Rejected", "Cancelled"]
+// Rejected and cancelled applications never became an absence: they are drawn muted, and a
+// real or planned absence on the same day wins over them.
+const MUTED = ["Rejected", "Cancelled"]
+const STATUS_STYLE = {
+	Approved: { classes: "bg-surface-green-3", label: "Approved" },
+	Open: { classes: "bg-surface-blue-3", label: "Requested" },
+	Rejected: { classes: "border-2 border-outline-red-3", label: "Rejected" },
+	Cancelled: { classes: "border-2 border-dashed border-outline-gray-4", label: "Cancelled" },
+}
 
 const monthFormat = computed(() => {
 	const lang = (typeof window !== "undefined" && window.frappe?.boot?.lang) || undefined
@@ -85,9 +95,12 @@ const holidayByDate = computed(() => Object.fromEntries(props.holidays.map((h) =
 const leaveByDate = computed(() => {
 	const map = {}
 	for (const app of props.applications) {
-		if (SKIPPED.includes(app.status)) continue
+		const muted = MUTED.includes(app.status)
 		const end = String(app.to_date).slice(0, 10)
-		for (let date = String(app.from_date).slice(0, 10); date <= end; date = nextDay(date)) map[date] = app
+		for (let date = String(app.from_date).slice(0, 10); date <= end; date = nextDay(date)) {
+			if (muted && map[date] && !MUTED.includes(map[date].status)) continue
+			map[date] = app
+		}
 	}
 	return map
 })
@@ -117,11 +130,11 @@ const months = computed(() =>
 			const weekend = [0, 6].includes(new Date(props.year, index, day).getDay())
 			const label = formatDate(date)
 			if (leave) {
-				const requested = leave.status !== "Approved"
+				const style = STATUS_STYLE[leave.status] || STATUS_STYLE.Open
 				cells.push({
 					key: date,
-					classes: requested ? "bg-surface-blue-3" : "bg-surface-green-3",
-					title: `${label} · ${__(leave.leave_type)} · ${requested ? __("Requested") : __("Approved")}`,
+					classes: style.classes,
+					title: `${label} · ${__(leave.leave_type)} · ${__(style.label)}`,
 					app: leave,
 					to: props.link ? props.link(leave) : null,
 				})

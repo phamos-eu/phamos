@@ -154,12 +154,13 @@ def _employee_row(employee, today, sick_types, leave_dates, sick_days, can_see_s
 
 
 def _applications(employee: str, sick_types, today) -> list[dict]:
-	"""This calendar year's Leave Applications, newest first, without sick leave and cancelled ones."""
+	"""This calendar year's Leave Applications, newest first, without sick leave.
+
+	Rejected and cancelled ones are included; the heatmap draws them muted (PM, 2026-11-07).
+	"""
 	year_start, year_end = sick_leave.year_bounds(today)
 	filters = {
 		"employee": employee,
-		"docstatus": ("<", 2),
-		"status": ("!=", "Cancelled"),
 		"from_date": ("<=", year_end),
 		"to_date": (">=", year_start),
 	}
