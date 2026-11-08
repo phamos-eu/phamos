@@ -25,11 +25,11 @@
 					</button>
 				</div>
 				<div class="flex items-center gap-1">
-					<button type="button" :class="navButton" :aria-label="view === 'timeline' ? __('Four weeks back') : __('Previous month')" @click="step(-1)">
+					<button type="button" :class="navButton" :aria-label="__('Four weeks back')" @click="step(-1)">
 						<FeatherIcon name="chevron-left" class="h-4 w-4" />
 					</button>
-					<div class="min-w-36 text-center text-sm font-semibold capitalize text-ink-gray-9">{{ view === "timeline" ? visibleLabel : monthLabel }}</div>
-					<button type="button" :class="navButton" :aria-label="view === 'timeline' ? __('Four weeks ahead') : __('Next month')" @click="step(1)">
+					<div class="min-w-36 text-center text-sm font-semibold capitalize text-ink-gray-9">{{ view === "timeline" ? visibleLabel : calendarLabel }}</div>
+					<button type="button" :class="navButton" :aria-label="__('Four weeks ahead')" @click="step(1)">
 						<FeatherIcon name="chevron-right" class="h-4 w-4" />
 					</button>
 					<button type="button" :class="[navButton, 'px-2 text-sm']" @click="goToday">{{ __("Today") }}</button>
@@ -147,29 +147,41 @@
 				</table>
 			</section>
 
-			<!-- Month grid: day cells with holidays, birthdays and absences as chips. -->
-			<section v-else class="overflow-hidden rounded-lg border border-outline-gray-2 bg-surface-white">
-				<div class="grid grid-cols-7 border-b border-outline-gray-2 bg-surface-gray-1 text-center">
+			<!--
+				Calendar: week rows that scroll up and down without end, like the timeline does sideways
+				(PM, 2026-11-08). Opens with this week on top. Day cells carry holidays, birthdays and
+				absences as chips; the first of a month names the month.
+			-->
+			<section
+				v-else
+				ref="weekScroller"
+				class="h-[calc(100vh-13rem)] min-h-96 overflow-y-auto rounded-lg [overflow-anchor:none] border border-outline-gray-2 bg-surface-white"
+				@scroll.passive="onWeekScroll"
+			>
+				<div class="sticky top-0 z-10 grid grid-cols-7 border-b border-outline-gray-2 bg-surface-gray-1 text-center">
 					<div v-for="label in weekdayLabels" :key="label" class="px-1 py-1.5 text-[11px] font-semibold uppercase tracking-wide text-ink-gray-5">{{ label }}</div>
 				</div>
 				<div class="grid grid-cols-7">
 					<div
-						v-for="day in gridDays"
+						v-for="day in weekDays"
 						:key="day.iso"
+						:data-first="day.weekStart ? 'week' : undefined"
 						:class="[
-							'min-h-32 border-b border-r border-outline-gray-1 p-1.5',
-							day.inMonth ? (day.weekend ? 'bg-surface-gray-1' : 'bg-surface-white') : 'bg-surface-gray-1 opacity-60',
+							'h-36 overflow-hidden border-b border-r border-outline-gray-1 p-1.5',
+							day.iso === todayIso ? 'bg-surface-amber-1 ring-2 ring-inset ring-[var(--ink-amber-3)]' : day.weekend ? 'bg-surface-gray-1' : 'bg-surface-white',
+							day.firstOfMonth ? 'border-l-2 border-l-outline-gray-4' : '',
 						]"
 					>
 						<div class="mb-1 flex items-center justify-between">
 							<span
 								:class="[
 									'inline-flex h-6 min-w-6 items-center justify-center rounded-full px-1 text-xs tabular-nums',
-									day.iso === todayIso ? 'bg-surface-amber-2 font-bold text-ink-amber-3' : 'text-ink-gray-6',
+									day.iso === todayIso ? 'bg-[var(--ink-amber-3)] font-bold text-ink-white' : 'text-ink-gray-6',
 								]"
 							>
 								{{ day.day }}
 							</span>
+							<span v-if="day.firstOfMonth" class="truncate text-xs font-semibold capitalize text-ink-gray-9">{{ day.monthName }}</span>
 						</div>
 						<div class="flex flex-col gap-1">
 							<div
@@ -232,7 +244,7 @@ const navButton =
 	"inline-flex h-7 items-center justify-center rounded-md px-1.5 text-ink-gray-7 hover:bg-surface-gray-2 focus:outline-none focus-visible:ring-2 focus-visible:ring-outline-gray-3"
 const viewOptions = [
 	{ value: "timeline", label: __("Timeline") },
-	{ value: "month", label: __("Month") },
+	{ value: "month", label: __("Calendar") },
 ]
 
 function readView() {
@@ -252,7 +264,6 @@ watch(view, (value) => {
 })
 
 const now = new Date()
-const month = ref(new Date(now.getFullYear(), now.getMonth(), 1))
 const company = ref("")
 const data = ref(null)
 const loading = ref(false)
@@ -279,23 +290,8 @@ function halfStyle(fill) {
 	return { background: `linear-gradient(135deg, var(${fill}) 50%, transparent 50%)` }
 }
 
-const monthLabel = computed(() => month.value.toLocaleDateString(userLocale(), { month: "long", year: "numeric" }))
 const weekdayFormat = computed(() => new Intl.DateTimeFormat(userLocale(), { weekday: "short" }))
-
-// Month grid: whole weeks around the month, starting on the system's first day of the week.
-const gridStart = computed(() => {
-	const first = month.value
-	const offset = (first.getDay() - getFirstDayOfWeekIndex() + 7) % 7
-	return addDays(first, -offset)
-})
-const gridEnd = computed(() => {
-	const last = new Date(month.value.getFullYear(), month.value.getMonth() + 1, 0)
-	const offset = (getFirstDayOfWeekIndex() + 6 - last.getDay() + 7) % 7
-	return addDays(last, offset)
-})
-const weekdayLabels = computed(() =>
-	Array.from({ length: 7 }, (_, i) => weekdayFormat.value.format(addDays(gridStart.value, i))),
-)
+const monthYearFormat = computed(() => new Intl.DateTimeFormat(userLocale(), { month: "long", year: "numeric" }))
 
 // ---- Timeline range: continuous days, extended in chunks while scrolling ----
 const WEEK = 7
@@ -315,6 +311,83 @@ const timelineEnd = ref(addDays(thisWeek, 14 * WEEK - 1))
 // Two days before this week, so today's column never hides behind the names; with five weeks
 // across, the four weeks ahead stay in view.
 const viewStart = addDays(thisWeek, -2)
+
+// ---- Calendar range: week rows, extended in chunks while scrolling up or down ----
+const weeksStart = ref(addDays(thisWeek, -2 * WEEK))
+const weeksEnd = ref(addDays(thisWeek, 12 * WEEK - 1))
+const weekScroller = ref(null)
+const weekScrollTop = ref(0)
+
+function weekRowHeight() {
+	return weekScroller.value?.querySelector("[data-first]")?.offsetHeight || 144
+}
+function weekIndex(date) {
+	return Math.round((date - weeksStart.value) / (WEEK * 86400000))
+}
+function scrollToWeek(date, behavior = "smooth") {
+	weekScroller.value?.scrollTo({ top: Math.max(0, weekIndex(weekStartOf(date)) * weekRowHeight()), behavior })
+}
+watch(weekScroller, (element, previous) => {
+	// Opening the calendar: this week on top, the weeks ahead below.
+	if (element && !previous) nextTick(() => scrollToWeek(thisWeek, "auto"))
+})
+
+let extendingWeeks = false
+function onWeekScroll() {
+	const element = weekScroller.value
+	if (!element || extendingWeeks) return
+	weekScrollTop.value = element.scrollTop
+	const margin = 2 * weekRowHeight()
+	if (element.scrollTop + element.clientHeight > element.scrollHeight - margin) extendWeeks(1)
+	else if (element.scrollTop < margin) extendWeeks(-1)
+}
+
+/** Add eight weeks at one end; past a year, drop weeks at the other end. The view stays put. */
+async function extendWeeks(direction) {
+	extendingWeeks = true
+	const chunkWeeks = CHUNK_DAYS / WEEK
+	let shiftWeeks = 0
+	const tooLong = () => Math.round((weeksEnd.value - weeksStart.value) / 86400000) >= MAX_RANGE_DAYS
+	if (direction > 0) {
+		weeksEnd.value = addDays(weeksEnd.value, CHUNK_DAYS)
+		if (tooLong()) {
+			weeksStart.value = addDays(weeksStart.value, CHUNK_DAYS)
+			shiftWeeks = -chunkWeeks
+		}
+	} else {
+		weeksStart.value = addDays(weeksStart.value, -CHUNK_DAYS)
+		shiftWeeks = chunkWeeks
+		if (tooLong()) weeksEnd.value = addDays(weeksEnd.value, -CHUNK_DAYS)
+	}
+	await nextTick()
+	// Browser scroll anchoring is off for this list ([overflow-anchor:none]), so the shift is ours alone.
+	if (shiftWeeks && weekScroller.value) weekScroller.value.scrollTop += shiftWeeks * weekRowHeight()
+	weekScrollTop.value = weekScroller.value?.scrollTop || 0
+	extendingWeeks = false
+}
+
+const weekDays = computed(() => {
+	const days = []
+	for (let date = weeksStart.value; date <= weeksEnd.value; date = addDays(date, 1)) {
+		days.push({
+			iso: iso(date),
+			day: date.getDate(),
+			weekend: [0, 6].includes(date.getDay()),
+			weekStart: date.getDay() === getFirstDayOfWeekIndex(),
+			firstOfMonth: date.getDate() === 1,
+			monthName: date.toLocaleDateString(userLocale(), { month: "long" }),
+		})
+	}
+	return days
+})
+const weekdayLabels = computed(() =>
+	Array.from({ length: 7 }, (_, i) => weekdayFormat.value.format(addDays(weeksStart.value, i))),
+)
+/** The month of the top week in view (its last day, so a week into a new month counts there). */
+const calendarLabel = computed(() => {
+	const index = Math.floor(weekScrollTop.value / weekRowHeight())
+	return monthYearFormat.value.format(addDays(weeksStart.value, index * WEEK + WEEK - 1))
+})
 
 const scroller = ref(null)
 const viewWidth = ref(0)
@@ -410,14 +483,14 @@ const monthSpans = computed(() => {
 const visibleLabel = computed(() => {
 	const days = timelineDays.value
 	const first = days[Math.min(days.length - 1, Math.max(0, Math.floor(scrollLeft.value / dayWidth.value)))]
-	return first ? first.date.toLocaleDateString(userLocale(), { month: "long", year: "numeric" }) : ""
+	return first ? monthYearFormat.value.format(first.date) : ""
 })
 
 // ---- Loading ----
 const range = computed(() =>
 	view.value === "timeline"
 		? { from: timelineStart.value, to: timelineEnd.value }
-		: { from: gridStart.value, to: gridEnd.value },
+		: { from: weeksStart.value, to: weeksEnd.value },
 )
 
 // Paging or scrolling quickly: only the newest request may fill the page.
@@ -441,17 +514,14 @@ async function load() {
 }
 watch(() => [iso(range.value.from), iso(range.value.to), company.value], load, { immediate: true })
 
-/** ‹ and ›: a month in the month grid, four weeks in the timeline. */
+/** ‹ and ›: four weeks, sideways in the timeline, up or down in the calendar. */
 function step(direction) {
-	if (view.value === "timeline") {
-		scroller.value?.scrollBy({ left: direction * 4 * WEEK * dayWidth.value, behavior: "smooth" })
-		return
-	}
-	month.value = new Date(month.value.getFullYear(), month.value.getMonth() + direction, 1)
+	if (view.value === "timeline") scroller.value?.scrollBy({ left: direction * 4 * WEEK * dayWidth.value, behavior: "smooth" })
+	else weekScroller.value?.scrollBy({ top: direction * 4 * weekRowHeight(), behavior: "smooth" })
 }
 function goToday() {
-	month.value = new Date(now.getFullYear(), now.getMonth(), 1)
 	if (view.value === "timeline") scrollToDate(viewStart)
+	else scrollToWeek(thisWeek)
 }
 
 const companyOptions = computed(() => [
@@ -504,18 +574,6 @@ const birthdaysByDate = computed(() => {
 	return map
 })
 
-const gridDays = computed(() => {
-	const days = []
-	for (let date = gridStart.value; date <= gridEnd.value; date = addDays(date, 1)) {
-		days.push({
-			iso: iso(date),
-			day: date.getDate(),
-			inMonth: date.getMonth() === month.value.getMonth(),
-			weekend: [0, 6].includes(date.getDay()),
-		})
-	}
-	return days
-})
 
 /** Holidays on a date, one chip per holiday and country, with the employees it applies to. */
 function holidaysOn(date) {

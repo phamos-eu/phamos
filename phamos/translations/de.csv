@@ -1668,8 +1668,6 @@ Timeline,Zeitleiste
 Employee,Mitarbeiter
 View,Ansicht
 All companies,Alle Unternehmen
-Previous month,Vorheriger Monat
-Next month,Nächster Monat
 No active employees.,Keine aktiven Mitarbeiter.
 +{0} more,+{0} weitere
 Birthday: {0},Geburtstag: {0}
@@ -1680,3 +1678,4 @@ Only HR users can see this page.,Nur HR-Benutzer können diese Seite sehen.
 Some absences show without their type and can't be opened.,Manche Abwesenheiten erscheinen ohne Art und lassen sich nicht öffnen.
 Four weeks back,Vier Wochen zurück
 Four weeks ahead,Vier Wochen vor
+Calendar,Kalender
