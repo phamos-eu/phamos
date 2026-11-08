@@ -8,6 +8,50 @@
 	-->
 	<div class="h-full min-h-0 overflow-y-auto bg-surface-gray-1 p-3 sm:p-5">
 		<div class="flex w-full flex-col gap-4">
+			<!--
+				Coverage (PM, 2026-11-08): share of the team available, 100 % = everyone who should work
+				is there. This week and the next three against the average of the last twelve months, so
+				a thin week shows at a glance. A week card jumps the calendar to that week.
+			-->
+			<section v-if="coverage" class="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
+				<div class="rounded-lg border border-outline-gray-2 bg-surface-white p-4" :title="__('Working days since {0}, approved leave only', [formatDate(coverage.average_from)])">
+					<div class="text-xs font-medium uppercase tracking-wide text-ink-gray-5">{{ __("Ø coverage") }}</div>
+					<div class="mt-2 text-2xl font-semibold tabular-nums text-ink-gray-9">{{ percent(coverage.average.coverage) }}</div>
+					<div class="mt-1 text-xs text-ink-gray-6">{{ __("Last 12 months") }}</div>
+				</div>
+				<button
+					v-for="(week, index) in coverage.weeks"
+					:key="week.start"
+					type="button"
+					class="rounded-lg border border-outline-gray-2 bg-surface-white p-4 text-left hover:bg-surface-gray-1 focus:outline-none focus-visible:ring-2 focus-visible:ring-outline-gray-3"
+					:title="__('{0} of {1} person-days available, open requests counted as away', [formatCount(week.available), formatCount(week.expected)])"
+					@click="goToDate(week.start)"
+				>
+					<div class="flex items-baseline justify-between gap-2">
+						<span class="text-xs font-medium uppercase tracking-wide text-ink-gray-5">{{ weekName(index) }}</span>
+						<span class="text-xs tabular-nums text-ink-gray-5">{{ shortRange(week.start, week.end) }}</span>
+					</div>
+					<div class="mt-2 flex items-baseline gap-2">
+						<span class="text-2xl font-semibold tabular-nums text-ink-gray-9">{{ percent(week.coverage) }}</span>
+						<span v-if="delta(week) !== null" :class="['text-xs font-medium tabular-nums', delta(week) < 0 ? 'text-ink-amber-3' : 'text-ink-green-3']">
+							{{ delta(week) > 0 ? "+" : delta(week) < 0 ? "−" : "±" }}{{ formatCount(Math.abs(delta(week))) }} {{ __("pts") }}
+						</span>
+					</div>
+					<!-- Bar: this week's coverage; the tick marks the average. -->
+					<div class="relative mt-3 h-1.5 rounded-full bg-surface-gray-2">
+						<div
+							:class="['h-1.5 rounded-full', delta(week) !== null && delta(week) < 0 ? 'bg-[var(--ink-amber-3)]' : 'bg-surface-green-3']"
+							:style="{ width: `${Math.max(0, Math.min(100, week.coverage ?? 0))}%` }"
+						/>
+						<div
+							v-if="coverage.average.coverage !== null"
+							class="absolute -top-1 h-3.5 w-0.5 bg-ink-gray-7"
+							:style="{ left: `${coverage.average.coverage}%` }"
+						/>
+					</div>
+				</button>
+			</section>
+
 			<section class="flex flex-wrap items-center gap-3 rounded-lg border border-outline-gray-2 bg-surface-white px-4 py-3">
 				<div class="inline-flex rounded-md border border-outline-gray-2 p-0.5" role="group" :aria-label="__('View')">
 					<button
@@ -485,6 +529,49 @@ const visibleLabel = computed(() => {
 	const first = days[Math.min(days.length - 1, Math.max(0, Math.floor(scrollLeft.value / dayWidth.value)))]
 	return first ? monthYearFormat.value.format(first.date) : ""
 })
+
+// ---- Coverage cards ----
+const coverage = ref(null)
+let coverageRequest = 0
+async function loadCoverage() {
+	const id = ++coverageRequest
+	try {
+		const result = await call("phamos.api.hr_team_calendar.get_coverage", { company: company.value || null })
+		if (id === coverageRequest) coverage.value = result
+	} catch {
+		// The cards are extra; the calendar still works without them.
+		if (id === coverageRequest) coverage.value = null
+	}
+}
+watch(company, loadCoverage, { immediate: true })
+
+const numberFormat = computed(() => new Intl.NumberFormat(userLocale(), { maximumFractionDigits: 1 }))
+function formatCount(value) {
+	return numberFormat.value.format(value ?? 0)
+}
+function percent(value) {
+	return value === null || value === undefined ? "—" : `${formatCount(value)} %`
+}
+/** Points above (+) or below (−) the average, to one decimal; null without both values. */
+function delta(week) {
+	const average = coverage.value?.average?.coverage
+	if (week.coverage === null || average === null || average === undefined) return null
+	return Math.round((week.coverage - average) * 10) / 10
+}
+function weekName(index) {
+	if (index === 0) return __("This week")
+	if (index === 1) return __("Next week")
+	return __("In {0} weeks", [index])
+}
+function shortRange(start, end) {
+	const format = new Intl.DateTimeFormat(userLocale(), { day: "numeric", month: "short" })
+	return `${format.format(parse(start))} – ${format.format(parse(end))}`
+}
+function goToDate(value) {
+	const date = parse(value)
+	if (view.value === "timeline") scrollToDate(addDays(date, -2))
+	else scrollToWeek(date)
+}
 
 // ---- Loading ----
 const range = computed(() =>

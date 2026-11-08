@@ -104,3 +104,81 @@ class TestHrTeamCalendar(HrEmployeesFixture):
 		result = self._calendar(HR_USER)
 		self.assertEqual([e["employee"] for e in result["employees"]], [self.anna])
 		self.assertEqual(self._absences(result, self.ben), [])
+
+
+@unittest.skipUnless(frappe.db.exists("DocType", "Leave Application"), "HRMS is not installed")
+class TestHrTeamCoverage(HrEmployeesFixture):
+	"""Coverage = person-days available / expected; weekends and holidays aren't expected (#1838)."""
+
+	def setUp(self):
+		super().setUp()
+		# A Monday-to-Sunday week inside this year, so the fixture's allocations cover it.
+		start = add_days(self.year_start, 14)
+		self.monday = add_days(start, -start.weekday())
+		self.sunday = add_days(self.monday, 6)
+
+	def _employees(self):
+		return frappe.get_all(
+			"Employee",
+			filters={"name": ("in", [self.anna, self.ben, self.carl])},
+			fields=["name", "company", "holiday_list", "date_of_joining", "relieving_date", "status"],
+		)
+
+	def _coverage(self, with_requests=True):
+		return hr_team_calendar._coverage(self._employees(), self.monday, self.sunday, with_requests)
+
+	def test_everyone_available_is_100_percent_of_working_days(self):
+		result = self._coverage()
+		self.assertEqual((result["expected"], result["available"], result["coverage"]), (15, 15, 100))
+
+	def test_leave_and_requests_lower_the_forecast_and_half_days_count_half(self):
+		self._leave(self.anna, ANNUAL, self.monday, add_days(self.monday, 1))
+		request = frappe.get_doc(
+			{
+				"doctype": "Leave Application",
+				"employee": self.ben,
+				"leave_type": ANNUAL,
+				"from_date": add_days(self.monday, 2),
+				"to_date": add_days(self.monday, 2),
+				"half_day": 1,
+				"half_day_date": add_days(self.monday, 2),
+				"status": "Open",
+			}
+		).insert(ignore_permissions=True)
+		self.assertTrue(request.half_day)
+		self.assertEqual(self._coverage(with_requests=True)["available"], 12.5)
+		self.assertEqual(self._coverage(with_requests=True)["coverage"], 83.3)
+		# The average looks back at what happened: approved leave only.
+		self.assertEqual(self._coverage(with_requests=False)["available"], 13)
+
+	def test_holidays_are_not_expected_days(self):
+		holiday_list = frappe.get_doc("Holiday List", frappe.db.get_value("Employee", self.anna, "holiday_list"))
+		holiday_list.holidays = []
+		holiday_list.append("holidays", {"holiday_date": add_days(self.monday, 2), "description": "Test Day"})
+		holiday_list.save(ignore_permissions=True)
+		self.assertEqual(self._coverage()["expected"], 12)
+
+	def test_only_employed_days_count(self):
+		frappe.db.set_value("Employee", self.carl, "date_of_joining", add_days(self.monday, 2))
+		self.assertEqual(self._coverage()["expected"], 13)
+
+	def test_four_weeks_from_the_start_of_this_week_and_an_average(self):
+		frappe.set_user(HR_USER)
+		try:
+			result = hr_team_calendar.get_coverage()
+		finally:
+			frappe.set_user("Administrator")
+		self.assertEqual(len(result["weeks"]), hr_team_calendar.COVERAGE_WEEKS)
+		first = result["weeks"][0]
+		self.assertLessEqual(getdate(first["start"]), hr_team_calendar._today())
+		self.assertEqual((getdate(first["end"]) - getdate(first["start"])).days, 6)
+		self.assertEqual(getdate(result["weeks"][1]["start"]), add_days(first["start"], 7))
+		self.assertIn("coverage", result["average"])
+
+	def test_user_without_hr_role_is_refused(self):
+		frappe.set_user(NOBODY)
+		try:
+			with self.assertRaises(frappe.PermissionError):
+				hr_team_calendar.get_coverage()
+		finally:
+			frappe.set_user("Administrator")
