@@ -200,7 +200,7 @@ class TestHrEmployees(HrEmployeesFixture):
 		finally:
 			frappe.set_user("Administrator")
 
-	def test_detail_lists_this_years_applications_without_sick_leave(self):
+	def test_detail_lists_this_years_applications_with_sick_leave_only_neutral(self):
 		self._leave(self.anna, ANNUAL, self.year_start, add_days(self.year_start, 1))
 		self._leave(self.anna, ANNUAL, add_days(self.today, 5), add_days(self.today, 5), status="Open")
 		rejected = self._leave(self.anna, ANNUAL, add_days(self.year_start, 10), add_days(self.year_start, 10), status="Rejected")
@@ -209,11 +209,19 @@ class TestHrEmployees(HrEmployeesFixture):
 		cancelled.cancel()
 		detail = self._detail(HR_USER, self.anna)
 		applications = detail["applications"]
-		self.assertCountEqual([a.status for a in applications], ["Open", "Cancelled", "Rejected", "Approved"])
+		self.assertCountEqual(
+			[a.status for a in applications if not a.get("neutral")], ["Open", "Cancelled", "Rejected", "Approved"]
+		)
 		self.assertIn(cancelled.name, [a.name for a in applications])
 		self.assertIn(rejected.name, [a.name for a in applications])
-		self.assertNotIn(SICK, [a.leave_type for a in applications])
 		self.assertEqual(detail["leave"][ANNUAL]["taken"], 2)
+		# Sick leave shows as a day away for every role, without name, type or reason (#1838).
+		for user in (HR_USER, HR_MANAGER):
+			applications = self._detail(user, self.anna)["applications"]
+			neutral = [a for a in applications if a.get("neutral")]
+			self.assertEqual([getdate(a["from_date"]) for a in neutral], [add_days(self.year_start, 20)])
+			self.assertFalse({"name", "leave_type", "description", "leave_approver_name"} & set(neutral[0]))
+			self.assertNotIn(SICK, [a.get("leave_type") for a in applications])
 
 	def test_detail_has_this_years_holidays_for_the_heatmap(self):
 		holiday_list = frappe.db.get_value("Employee", self.anna, "holiday_list")
