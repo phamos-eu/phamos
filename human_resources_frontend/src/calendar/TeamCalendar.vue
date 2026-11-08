@@ -93,12 +93,20 @@
 									'border-b border-outline-gray-2 px-0 py-1 text-center font-medium',
 									day.weekStart ? 'border-l' : '',
 									day.weekend ? 'bg-surface-gray-2 text-ink-gray-5' : 'text-ink-gray-6',
-									day.iso === todayIso ? 'bg-surface-amber-1 text-ink-amber-3' : '',
+									day.iso === todayIso ? todayColumn : '',
 								]"
 								:title="dayHeaderTitle(day)"
 							>
+								<!-- Today, for orientation: an amber column from the header down (PM, 2026-11-08). -->
 								<div class="text-[10px] uppercase">{{ day.weekday }}</div>
-								<div :class="['tabular-nums', day.iso === todayIso ? 'font-bold' : '']">{{ day.day }}</div>
+								<div
+									:class="[
+										'mx-auto tabular-nums',
+										day.iso === todayIso ? 'inline-flex h-5 min-w-5 items-center justify-center rounded-full bg-[var(--ink-amber-3)] px-1 font-bold text-ink-white' : '',
+									]"
+								>
+									{{ day.day }}
+								</div>
 								<div class="h-4 overflow-hidden leading-4">{{ day.flags.join("") }}</div>
 							</th>
 						</tr>
@@ -122,12 +130,12 @@
 								:class="[
 									'border-b border-outline-gray-1 p-0.5',
 									cell.weekStart ? 'border-l border-l-outline-gray-2' : '',
-									cell.holiday ? 'bg-surface-amber-1' : cell.off ? 'bg-surface-gray-2' : '',
+									cell.today ? todayColumn : cell.holiday ? 'bg-surface-amber-1' : cell.off ? 'bg-surface-gray-2' : '',
 								]"
 								:title="cell.title"
 							>
 								<div
-									:class="['flex h-7 items-center justify-center rounded-sm', cell.classes, cell.today && !cell.absence ? 'ring-1 ring-inset ring-[var(--ink-amber-3)]' : '']"
+									:class="['flex h-7 items-center justify-center rounded-sm', cell.classes]"
 									:style="cell.style"
 								>
 									<span v-if="cell.birthday" class="text-sm leading-none">🎂</span>
@@ -217,6 +225,9 @@ const API = "phamos.api.hr_team_calendar.get_team_calendar"
 const MAX_CHIPS = 4
 const VIEW_KEY = "phamos-hr-team-calendar-view"
 
+// Today's column in the timeline: amber edges and a light amber fill over every row.
+const todayColumn = "border-x-2 border-x-[color:var(--ink-amber-3)] bg-surface-amber-1"
+
 const navButton =
 	"inline-flex h-7 items-center justify-center rounded-md px-1.5 text-ink-gray-7 hover:bg-surface-gray-2 focus:outline-none focus-visible:ring-2 focus-visible:ring-outline-gray-3"
 const viewOptions = [
@@ -301,6 +312,10 @@ const thisWeek = weekStartOf(now)
 const timelineStart = ref(addDays(thisWeek, -2 * WEEK))
 const timelineEnd = ref(addDays(thisWeek, 14 * WEEK - 1))
 
+// Two days before this week, so today's column never hides behind the names; with five weeks
+// across, the four weeks ahead stay in view.
+const viewStart = addDays(thisWeek, -2)
+
 const scroller = ref(null)
 const viewWidth = ref(0)
 const scrollLeft = ref(0)
@@ -319,8 +334,8 @@ watch(scroller, (element, previous) => {
 	resizeObserver = new ResizeObserver(() => (viewWidth.value = element.clientWidth))
 	resizeObserver.observe(element)
 	viewWidth.value = element.clientWidth
-	// Opening the timeline: start at this week.
-	if (!previous) nextTick(() => scrollToDate(thisWeek, "auto"))
+	// Opening the timeline: at this week.
+	if (!previous) nextTick(() => scrollToDate(viewStart, "auto"))
 })
 onBeforeUnmount(() => resizeObserver?.disconnect())
 
@@ -436,7 +451,7 @@ function step(direction) {
 }
 function goToday() {
 	month.value = new Date(now.getFullYear(), now.getMonth(), 1)
-	if (view.value === "timeline") scrollToDate(thisWeek)
+	if (view.value === "timeline") scrollToDate(viewStart)
 }
 
 const companyOptions = computed(() => [
