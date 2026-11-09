@@ -776,6 +776,20 @@ def fetch_projects():
     # Handling Customer Description (Replacing CASE)
     customer_desc_query = IfNull(Customer.customer_name, Customer.name)
 
+    # One list instead of "Your Projects" + "All Projects": every Open project, plus projects
+    # assigned to me in any status. Closing the assignment ToDo only changes the order.
+    assigned_to_me = (
+        frappe.qb.from_(ToDo)
+        .select(Max(ToDo.reference_name))
+        .where(
+            (ToDo.status == "Open")
+            & (ToDo.reference_type == "Project")
+            & (ToDo.reference_name == Project.name)
+            & (ToDo.allocated_to == frappe.session.user)
+        )
+    )
+    is_assigned = Case().when(assigned_to_me.isnotnull(), 1).else_(0)
+
     # Main Query
     query = (
         frappe.qb.from_(Project)
