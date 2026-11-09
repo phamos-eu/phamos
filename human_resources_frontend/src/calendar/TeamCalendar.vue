@@ -303,7 +303,7 @@ const VIEW_KEY = "phamos-hr-team-calendar-view"
  * light gray by month, so a new month shows without reading the dates.
  */
 function dayShade(day) {
-	if (day.weekend) return "bg-surface-gray-3"
+	if (day.weekend) return "bg-surface-gray-2"
 	return day.altMonth ? "bg-surface-gray-1" : "bg-surface-white"
 }
 
