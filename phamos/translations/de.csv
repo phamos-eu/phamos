@@ -1789,3 +1789,12 @@ Last 12 months,Letzte 12 Monate
 Next week,Nächste Woche
 In {0} weeks,In {0} Wochen
 pts,Pkt.
+Show data,Daten anzeigen
+Hide now,Jetzt ausblenden
+Click to extend,Klicken zum Verlängern
+Hidden for screen sharing,Für die Bildschirmfreigabe ausgeblendet
+Figures are hidden for screen sharing. Show them for {0}.,Zahlen sind für die Bildschirmfreigabe ausgeblendet. {0} lang anzeigen.
+Data visible for {0}. Click to extend.,Daten sichtbar für {0}. Klicken zum Verlängern.
+Privacy mode must show data for at least {0} seconds.,Der Datenschutzmodus muss Daten mindestens {0} Sekunden anzeigen.
+Privacy Mode: Seconds Data Stays Visible,Datenschutzmodus: Sekunden sichtbar
+"Privacy mode for screen sharing: figures in the HR Cockpit stay hidden until ""Show data"" is clicked, then show for this many seconds. At least 10.","Datenschutzmodus für die Bildschirmfreigabe: Zahlen im HR-Cockpit bleiben ausgeblendet, bis „Daten anzeigen“ geklickt wird, und sind dann so viele Sekunden sichtbar. Mindestens 10."

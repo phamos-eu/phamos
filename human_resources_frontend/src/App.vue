@@ -3,18 +3,36 @@
 		<template #sidebar>
 			<CockpitSidebar label="Human Resources" storage-key="human-resources-spa-sidebar-collapsed" :items="visibleNavItems" />
 		</template>
+		<template #header-actions>
+			<PrivacyToggle />
+		</template>
 	</CockpitShell>
 </template>
 
 <script setup>
-import { computed } from "vue"
+import { computed, onMounted } from "vue"
 import { useRoute } from "vue-router"
+import { call } from "frappe-ui"
 import CockpitShell from "@spa/components/CockpitShell.vue"
 import CockpitSidebar from "@spa/components/CockpitSidebar.vue"
+import PrivacyToggle from "@spa/components/PrivacyToggle.vue"
+import { enablePrivacyMode } from "@spa/composables/usePrivacyMode.js"
 import { useContractAccess } from "./contracts/useContractAccess.js"
 
 const route = useRoute()
 const { access } = useContractAccess()
+
+// Privacy mode for screen sharing (#1839): figures start hidden on every HR page. It is on even
+// if the setting can't be read; then the default time applies.
+enablePrivacyMode()
+onMounted(async () => {
+	try {
+		const settings = await call("phamos.api.human_resources_spa.get_privacy_settings")
+		enablePrivacyMode(settings?.reveal_seconds)
+	} catch {
+		// keep the default
+	}
+})
 
 const navItems = [
 	{

@@ -26,9 +26,10 @@
 				>
 					<td class="px-3 py-2 text-ink-gray-9">{{ formatPeriod(row) }}</td>
 					<td class="px-3 py-2 text-ink-gray-8">{{ row.contract_type }}</td>
-					<td class="px-3 py-2 text-right tabular-nums">{{ formatPercent(row.fte_percentage) }}</td>
-					<td class="px-3 py-2 text-right tabular-nums">{{ formatHours(row.weekly_hours) }}</td>
-					<td class="px-3 py-2 text-right tabular-nums">{{ formatMoney(row.monthly_gross, row.currency) }}</td>
+					<!-- Privacy mode (#1839) blurs these in the HR Cockpit; elsewhere Sensitive is a plain span. -->
+					<td class="px-3 py-2 text-right tabular-nums"><Sensitive>{{ formatPercent(row.fte_percentage) }}</Sensitive></td>
+					<td class="px-3 py-2 text-right tabular-nums"><Sensitive>{{ formatHours(row.weekly_hours) }}</Sensitive></td>
+					<td class="px-3 py-2 text-right tabular-nums"><Sensitive>{{ formatMoney(row.monthly_gross, row.currency) }}</Sensitive></td>
 					<td class="px-3 py-2"><ContractStatusBadge :status="row.status" /></td>
 				</tr>
 			</tbody>
@@ -38,6 +39,7 @@
 
 <script setup>
 import ContractStatusBadge from "./ContractStatusBadge.vue"
+import Sensitive from "@spa/components/Sensitive.vue"
 import { formatHours, formatMoney, formatPercent, formatPeriod } from "./contractFormat.js"
 
 defineProps({

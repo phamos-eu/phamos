@@ -9,7 +9,7 @@
 			</div>
 			<template v-else>
 				<!-- Averages per employee, per leave type; never added up across types (#1833, Decision 6). -->
-				<section class="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5">
+				<Sensitive tag="section" class="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5">
 					<StatCard
 						v-for="avg in averages"
 						:key="avg.leave_type"
@@ -24,10 +24,11 @@
 						:value="data.sick_types_configured ? formatNumber(averageSickDays) : '—'"
 						:hint="data.sick_types_configured ? 'Approved sick leave, HR Manager only' : 'Choose the sick leave types in phamos Settings'"
 					/>
-				</section>
+				</Sensitive>
 
-				<!-- Who needs attention. A card is a filter: click it to see only those employees, click again to clear. -->
-				<section class="flex flex-wrap gap-2">
+				<!-- Who needs attention. A card is a filter: click it to see only those employees, click again to clear.
+				     Blurred and inert in privacy mode (#1839): a filter would name the employees behind a count. -->
+				<Sensitive tag="section" class="flex flex-wrap gap-2">
 					<button
 						v-for="card in attentionCards"
 						:key="card.key"
@@ -47,7 +48,7 @@
 						<span class="font-semibold tabular-nums" :class="card.count && quickFilter !== card.key ? 'text-ink-amber-3' : ''">{{ card.count }}</span>
 						<span>{{ card.label }}</span>
 					</button>
-				</section>
+				</Sensitive>
 
 				<section class="rounded-lg border border-outline-gray-2 bg-surface-white">
 					<div class="flex flex-wrap items-center gap-3 border-b border-outline-gray-2 px-4 py-3">
@@ -177,39 +178,39 @@
 									</td>
 									<td v-for="leaveType in data.leave_types" :key="leaveType" :class="[bodyCell, groupCell, 'text-right tabular-nums']">
 										<Empty v-if="!row.leave[leaveType]" />
-										<template v-else>
+										<Sensitive v-else tag="div">
 											<div class="font-medium text-ink-gray-9">{{ formatNumber(row.leave[leaveType].left) }}</div>
 											<div class="text-xs text-ink-gray-5">
 												{{ formatNumber(row.leave[leaveType].taken) }} of {{ formatNumber(row.leave[leaveType].allocated) }} taken
 											</div>
-										</template>
+										</Sensitive>
 									</td>
 									<td :class="[bodyCell, groupCell, 'tabular-nums text-ink-gray-8']">
 										<Empty v-if="!row.last_leave" />
-										<template v-else>{{ formatDate(row.last_leave) }}</template>
+										<Sensitive v-else>{{ formatDate(row.last_leave) }}</Sensitive>
 									</td>
 									<td :class="[bodyCell, 'tabular-nums text-ink-gray-8']">
 										<Empty v-if="!row.next_leave" />
-										<template v-else>{{ formatDate(row.next_leave) }}</template>
+										<Sensitive v-else>{{ formatDate(row.next_leave) }}</Sensitive>
 									</td>
 									<td :class="[bodyCell, 'text-right tabular-nums']">
 										<Empty v-if="!row.pending_count" />
-										<span v-else class="font-medium text-ink-amber-3">{{ row.pending_count }}</span>
+										<Sensitive v-else class="font-medium text-ink-amber-3">{{ row.pending_count }}</Sensitive>
 									</td>
 									<td v-if="data.can_see_sick_days" :class="[bodyCell, groupCell, 'text-right tabular-nums text-ink-gray-8']">
 										<Empty v-if="!data.sick_types_configured" title="Choose the sick leave types in phamos Settings → Human Resources Cockpit" />
 										<Empty v-else-if="!row.sick_days" />
-										<template v-else>{{ formatNumber(row.sick_days) }}</template>
+										<Sensitive v-else>{{ formatNumber(row.sick_days) }}</Sensitive>
 									</td>
 									<template v-if="data.can_see_contracts">
 										<td :class="[bodyCell, groupCell, 'text-right tabular-nums text-ink-gray-8']">
 											<Empty v-if="row.fte_percentage == null" title="No contract in force" />
-											<template v-else>{{ formatPercent(row.fte_percentage) }}</template>
+											<Sensitive v-else>{{ formatPercent(row.fte_percentage) }}</Sensitive>
 										</td>
 										<td :class="[bodyCell, 'tabular-nums text-ink-gray-8']">
 											<Empty v-if="row.fte_percentage == null" />
-											<span v-else-if="!row.contract_end" class="text-ink-gray-5">open-ended</span>
-											<template v-else>{{ formatDate(row.contract_end) }}</template>
+											<Sensitive v-else-if="!row.contract_end" class="text-ink-gray-5">open-ended</Sensitive>
+											<Sensitive v-else>{{ formatDate(row.contract_end) }}</Sensitive>
 										</td>
 									</template>
 								</tr>
@@ -240,6 +241,8 @@
 import { computed, h, onBeforeUnmount, onMounted, ref, watch } from "vue"
 import { call } from "frappe-ui"
 import StatCard from "@spa/components/dashboard/StatCard.vue"
+import Sensitive from "@spa/components/Sensitive.vue"
+import { usePrivacyMode } from "@spa/composables/usePrivacyMode.js"
 import EmployeeDialog from "./EmployeeDialog.vue"
 import { errorMessage, formatDate, formatNumber, formatPercent } from "@spa/contracts/contractFormat.js"
 import { getDateFormat } from "@spa/utils/datetime.js"
@@ -281,6 +284,11 @@ const sortKey = ref("employee_name")
 const sortAsc = ref(true)
 const searchEl = ref(null)
 const quickFilter = ref(null)
+// An active card filter shows which employees are behind a count; it ends when data hides (#1839).
+const { hidden: privacyHidden } = usePrivacyMode()
+watch(privacyHidden, (hidden) => {
+	if (hidden) quickFilter.value = null
+})
 const dialogOpen = ref(false)
 const dialogEmployee = ref("")
 const dialogEmployeeName = ref("")
@@ -444,6 +452,8 @@ const attentionCards = computed(() =>
 )
 
 function toggleQuickFilter(key) {
+	// Blurred cards are out of the mouse's reach, but still reachable by keyboard (#1839).
+	if (privacyHidden.value) return
 	quickFilter.value = quickFilter.value === key ? null : key
 }
 
