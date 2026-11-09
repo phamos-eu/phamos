@@ -31,6 +31,17 @@
 						/>
 						<div class="flex items-center gap-3 pt-2">
 							<DocSyncBanner :autosave="autosave" />
+							<!-- Hand in for vote (#1842): open to every cockpit user; the badge shows the votes so far. -->
+							<router-link v-if="idea.vote_status" :to="{ name: 'IdeaVoteDetail', params: { name: idea.name } }">
+								<Badge theme="green" size="lg">
+									<template #prefix><FeatherIcon name="thumbs-up" class="h-3 w-3" /></template>
+									{{ __("Open for vote") }} · {{ voteLabel(idea.vote_count) }}
+								</Badge>
+							</router-link>
+							<Button v-else-if="!composted" variant="subtle" :loading="handingIn" @click="handIn">
+								<template #prefix><FeatherIcon name="thumbs-up" class="h-4 w-4" /></template>
+								{{ __("Hand in for Vote") }}
+							</Button>
 							<Button v-if="!closed" variant="solid" @click="startWriting">
 								<template #prefix><FeatherIcon name="edit-3" class="h-4 w-4" /></template>
 								{{ __("Start writing") }}
@@ -56,12 +67,17 @@
 								</Badge>
 								{{ stageJob(autosave.draft.stage) }}
 							</span>
-							<button v-if="composted" type="button" class="text-ink-gray-6 underline-offset-2 hover:underline" @click="setStage('Seed')">
-								{{ __("Take it up again") }}
-							</button>
-							<button v-else type="button" class="text-ink-gray-5 underline-offset-2 hover:text-ink-gray-8 hover:underline" @click="compost">
-								{{ __("Compost this idea") }}
-							</button>
+							<span class="flex items-center gap-3">
+								<button v-if="idea.vote_status" type="button" class="text-ink-gray-5 underline-offset-2 hover:text-ink-gray-8 hover:underline" @click="withdrawVote">
+									{{ __("Withdraw from vote") }}
+								</button>
+								<button v-if="composted" type="button" class="text-ink-gray-6 underline-offset-2 hover:underline" @click="setStage('Seed')">
+									{{ __("Take it up again") }}
+								</button>
+								<button v-else type="button" class="text-ink-gray-5 underline-offset-2 hover:text-ink-gray-8 hover:underline" @click="compost">
+									{{ __("Compost this idea") }}
+								</button>
+							</span>
 						</div>
 					</div>
 
@@ -152,7 +168,7 @@ import { deskRecordUrl } from "@spa/utils/deskUrl.js"
 import { __ } from "@spa/utils/i18n.js"
 import { notify } from "@spa/utils/notify.js"
 import spaConfig from "../config"
-import { ageLabel, applyIdea, loadIdeaOptions, loadIdeas, stageJob, stageSteps } from "../ideasStore.js"
+import { ageLabel, applyIdea, loadIdeaOptions, loadIdeas, stageJob, stageSteps, voteLabel } from "../ideasStore.js"
 
 const props = defineProps({ name: { type: String, required: true } })
 const API = spaConfig.api
@@ -229,8 +245,40 @@ function setStage(stage) {
 }
 
 function compost() {
-	if (!window.confirm(__("Compost this idea? It leaves your list but keeps its history; you can take it up again."))) return
+	let question = __("Compost this idea? It leaves your list but keeps its history; you can take it up again.")
+	if (idea.value?.vote_status) question += " " + __("It is also withdrawn from the vote.")
+	if (!window.confirm(question)) return
 	setStage("Compost")
+}
+
+// Hand in for vote (#1842). Both save the idea, so pending edits go first and the answer becomes
+// the new base for autosave.
+const handingIn = ref(false)
+
+async function handIn() {
+	const question = __("Hand in this idea for a vote? Every cockpit user can then read it and vote for it. Your writing sessions and history stay private.")
+	if (!window.confirm(question)) return
+	handingIn.value = true
+	try {
+		await autosave.flush()
+		adopt(await call(`${API}.hand_in_idea_for_vote`, { name: idea.value.name }))
+		notify.success(__("Idea handed in for vote"))
+	} catch (e) {
+		notify.error(__("Could not hand in the idea"), e?.messages?.[0] || e?.message || "")
+	} finally {
+		handingIn.value = false
+	}
+}
+
+async function withdrawVote() {
+	if (!window.confirm(__("Withdraw this idea from the vote? The votes so far are removed."))) return
+	try {
+		await autosave.flush()
+		adopt(await call(`${API}.withdraw_idea_from_vote`, { name: idea.value.name }))
+		notify.success(__("Idea withdrawn from vote"))
+	} catch (e) {
+		notify.error(__("Could not withdraw the idea"), e?.messages?.[0] || e?.message || "")
+	}
 }
 
 // Side ideas from the page (the writing mode captures them too).
@@ -266,6 +314,15 @@ useUserRealtime(
 		else loadIdeas()
 	},
 	{ debounceMs: 300 }
+)
+
+// Colleagues' votes change only the count; it is not autosaved, so it is set directly.
+useUserRealtime(
+	"cockpit_idea_vote_changed",
+	(payload) => {
+		if (idea.value && payload?.name === idea.value.name) idea.value.vote_count = payload.vote_count
+	},
+	{ debounceMs: 200 }
 )
 
 onBeforeRouteUpdate(async (to) => {
