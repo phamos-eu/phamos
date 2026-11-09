@@ -153,7 +153,14 @@ const BASE_ITEMS = [
 		],
 	},
 	// Ideas (#1771): capture, write out, let them grow.
-	{ name: "Ideas", label: "Ideas", icon: "feather", match: ["Ideas", "IdeaDetail", "IdeaWrite"] },
+	{
+		name: "Ideas",
+		label: "Ideas",
+		icon: "feather",
+		match: ["Ideas", "IdeaDetail", "IdeaWrite"],
+		// Hand in for vote (#1842): everyone's ideas up for vote.
+		children: [{ name: "IdeasVote", label: "For vote", icon: "thumbs-up", match: ["IdeasVote", "IdeaVoteDetail"] }],
+	},
 	{
 		name: "Issues",
 		label: "Issues",
@@ -204,6 +211,8 @@ const PAGE_TITLES = {
 	Ideas: ["My Ideas"],
 	IdeaDetail: ["My Ideas"],
 	IdeaWrite: ["My Ideas", "Writing"],
+	IdeasVote: ["Ideas for vote"],
+	IdeaVoteDetail: ["Ideas for vote"],
 	Issues: ["My Issues", "Dashboard"],
 	IssuesList: ["My Issues", "List"],
 	IssueDetail: ["My Issues", "List"],

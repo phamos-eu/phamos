@@ -274,13 +274,14 @@ after_migrate = [
 # }
 
 # Personal Cockpit records are private, System Managers included (#1556, #1771); so are the
-# Version rows of an idea.
+# Version rows of an idea. Ideas handed in for a vote are readable by everyone (#1842).
 permission_query_conditions = {
 	"Focus Session": "phamos.cockpits.permissions.focus_session_query",
 	"ToDo Challenge": "phamos.cockpits.permissions.todo_challenge_query",
 	"Day Plan": "phamos.cockpits.permissions.day_plan_query",
 	"Idea": "phamos.cockpits.permissions.idea_query",
 	"Idea Writing Session": "phamos.cockpits.permissions.idea_writing_session_query",
+	"Idea Vote": "phamos.cockpits.permissions.idea_vote_query",
 	"Version": "phamos.cockpits.permissions.version_query",
 }
 
@@ -290,6 +291,7 @@ has_permission = {
 	"Day Plan": "phamos.cockpits.permissions.day_plan_has_permission",
 	"Idea": "phamos.cockpits.permissions.idea_has_permission",
 	"Idea Writing Session": "phamos.cockpits.permissions.idea_writing_session_has_permission",
+	"Idea Vote": "phamos.cockpits.permissions.idea_vote_has_permission",
 	"Version": "phamos.cockpits.permissions.version_has_permission",
 }
 
@@ -650,6 +652,7 @@ user_data_fields = [
 		"redact_fields": ["title", "content", "summary", "snapshot_title", "snapshot_content"],
 	},
 	{"doctype": "Idea Writing Session", "filter_by": "user"},
+	{"doctype": "Idea Vote", "filter_by": "user"},
 	# Event attendees are matched by their email address (they have no user account).
 	{"doctype": "Attendee", "filter_by": "email", "redact_fields": ["first_name", "last_name", "full_name",
 		"phone", "company_name", "job_title", "notes", "follow_up_notes"]},

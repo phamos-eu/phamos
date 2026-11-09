@@ -12,7 +12,9 @@ title or stage changes, when the editor is left (`snapshot_idea`), when a sessio
 or when the content changed and the last snapshot is older than IDEA_SNAPSHOT_MINUTES. Each
 row diffs against the previous snapshot, so the chain is complete but compact.
 
-Ideas are private: every function works on the session user's own records only.
+Ideas are private: every function works on the session user's own records only. The one
+exception is the vote (#1842): an owner can hand an idea in, every cockpit user can then read it
+(not its history or sessions) and upvote it once. Withdrawing or composting removes the votes.
 """
 
 import html
@@ -22,7 +24,9 @@ from frappe import _
 from frappe.core.doctype.version.version import get_diff
 from frappe.utils import add_to_date, cint, date_diff, get_datetime, now_datetime, today
 
+from phamos.api import issue_chat
 from phamos.api.personal_focus import _minutes_between
+from phamos.cockpits.permissions import can_read_idea, is_colleague
 from phamos.cockpits.defaults import (
 	IDEA_AIM_FACTORS,
 	IDEA_CLOSED_STAGES,
@@ -32,11 +36,16 @@ from phamos.cockpits.defaults import (
 	IDEA_STAGE_JOBS,
 	IDEA_STAGES,
 	IDEA_TITLE_LENGTH,
+	IDEA_VOTE_BLOCKED_STAGES,
+	IDEA_VOTE_OPEN,
 )
 
 DOCTYPE = "Idea"
 SESSION_DOCTYPE = "Idea Writing Session"
 EVENT = "cockpit_idea_changed"
+VOTE_DOCTYPE = "Idea Vote"
+VOTE_EVENT = "cockpit_idea_vote_changed"
+SETTINGS = "phamos Settings"
 SNAPSHOT_FIELDS = ("title", "stage", "content")
 LIST_FIELDS = [
 	"name",
@@ -46,9 +55,12 @@ LIST_FIELDS = [
 	"spawned_from",
 	"last_session_words",
 	"harvested_on",
+	"vote_status",
+	"vote_count",
 	"creation",
 	"modified",
 ]
+VOTE_FIELDS = ["name", "title", "summary", "stage", "user", "handed_in_on", "vote_count"]
 
 
 # reading
@@ -87,6 +99,9 @@ def _serialize(doc):
 		"spawned_from_title": frappe.db.get_value(DOCTYPE, doc.spawned_from, "title") if doc.spawned_from else None,
 		"last_session_words": cint(doc.last_session_words),
 		"harvested_on": doc.harvested_on,
+		"vote_status": doc.vote_status or "",
+		"vote_count": cint(doc.vote_count),
+		"handed_in_on": str(doc.handed_in_on) if doc.handed_in_on else None,
 		"creation": str(doc.creation),
 		"modified": str(doc.modified),
 		"age_days": _age_days(doc.creation),
@@ -256,10 +271,13 @@ def update_idea(name, title=None, content=None, stage=None, modified=None):
 		doc.stage = stage
 	if modified:
 		doc.modified = get_datetime(modified)
+	was_open = doc.vote_status == IDEA_VOTE_OPEN
 	doc.flags.ignore_permissions = True
 	doc.save(ignore_version=True)
 	_snapshot(doc)
 	_publish(doc)
+	if was_open and not doc.vote_status:  # composted: it left the vote
+		_publish_vote(doc.name, 0, "")
 	return _serialize(doc)
 
 
@@ -342,3 +360,166 @@ def capture_side_idea(parent, text, name=None):
 		_publish(doc)
 		return _serialize(doc)
 	return create_idea(title=title, content=_text_to_html(text), spawned_from=parent_doc.name)
+
+
+# vote (#1842)
+
+
+def _publish_vote(name, vote_count, vote_status):
+	"""Tell every open vote list; the payload carries no content, the list reloads through the API."""
+	frappe.publish_realtime(
+		VOTE_EVENT,
+		{"name": name, "vote_count": cint(vote_count), "vote_status": vote_status or ""},
+		after_commit=True,
+	)
+
+
+def show_author():
+	# The patch set_personal_ideas_show_author_default stores the default (on) on existing sites.
+	return bool(cint(frappe.db.get_single_value(SETTINGS, "personal_ideas_show_author")))
+
+
+def _authors(users):
+	if not users or not show_author():
+		return {}
+	rows = frappe.get_all(
+		"User",
+		filters={"name": ("in", list(users))},
+		fields=["name", "full_name", "user_image"],
+		ignore_permissions=True,
+	)
+	return {row.name: {"name": row.name, "full_name": row.full_name or row.name, "user_image": row.user_image} for row in rows}
+
+
+def _require_cockpit_user():
+	"""Ideas up for vote are for colleagues: System Users only, as the Personal Cockpit itself.
+
+	Whitelisted methods are callable by any logged-in user, Website Users (portal customers)
+	included, and these read other people's ideas, so the check has to be here.
+	"""
+	if not is_colleague():
+		frappe.throw(_("Only colleagues can see ideas up for vote."), frappe.PermissionError)
+
+
+def _open_idea(name):
+	"""An idea open for vote (anyone's), or my own; anything else is not there for this user.
+	The same rule as the idea's Raven chat (permissions.can_read_idea)."""
+	_require_cockpit_user()
+	if not name or not frappe.db.exists(DOCTYPE, name):
+		frappe.throw(_("Idea {0} not found").format(name), frappe.DoesNotExistError)
+	if not can_read_idea(name):
+		frappe.throw(_("This idea is not open for a vote."), frappe.PermissionError)
+	return frappe.get_doc(DOCTYPE, name)
+
+
+def _vote_row(doc, voted, authors):
+	return {
+		"name": doc.name,
+		"title": doc.title,
+		"summary": doc.summary or "",
+		"stage": doc.stage,
+		"handed_in_on": str(doc.handed_in_on) if doc.handed_in_on else None,
+		"vote_status": doc.vote_status or "",
+		"vote_count": cint(doc.vote_count),
+		"mine": doc.user == frappe.session.user,
+		"voted": voted,
+		"author": authors.get(doc.user),
+	}
+
+
+def hand_in_idea_for_vote(name):
+	"""Open my idea for a vote: every cockpit user can read it and vote for it."""
+	doc = _get_my_idea(name)
+	if doc.stage in IDEA_VOTE_BLOCKED_STAGES:
+		frappe.throw(_("A composted idea cannot be handed in. Take it up again first."))
+	if doc.vote_status != IDEA_VOTE_OPEN:
+		doc.vote_status = IDEA_VOTE_OPEN
+		doc.flags.ignore_permissions = True
+		doc.save(ignore_version=True)
+		_publish(doc)
+		_publish_vote(doc.name, doc.vote_count, doc.vote_status)
+	return _serialize(doc)
+
+
+def withdraw_idea_from_vote(name):
+	"""Make my idea private again; the votes so far are removed (Idea.on_update)."""
+	doc = _get_my_idea(name)
+	if doc.vote_status:
+		doc.vote_status = ""
+		doc.flags.ignore_permissions = True
+		doc.save(ignore_version=True)
+		doc.reload()
+		_publish(doc)
+		_publish_vote(doc.name, 0, "")
+	return _serialize(doc)
+
+
+def get_ideas_for_vote():
+	"""Every idea open for vote, most votes first; with my vote and, if the setting allows, the author."""
+	_require_cockpit_user()
+	rows = frappe.get_all(
+		DOCTYPE,
+		filters={"vote_status": IDEA_VOTE_OPEN},
+		fields=VOTE_FIELDS,
+		order_by="vote_count desc, handed_in_on desc",
+		ignore_permissions=True,
+	)
+	if not rows:
+		return []
+	me = frappe.session.user
+	voted = set(
+		frappe.get_all(
+			VOTE_DOCTYPE,
+			filters={"user": me, "idea": ("in", [row.name for row in rows])},
+			pluck="idea",
+			ignore_permissions=True,
+		)
+	)
+	authors = _authors({row.user for row in rows})
+	return [_vote_row(row, row.name in voted, authors) for row in rows]
+
+
+def get_idea_for_vote(name):
+	"""The voter's view of one idea: its text and the vote, not its history, sessions or children."""
+	doc = _open_idea(name)
+	if doc.vote_status != IDEA_VOTE_OPEN:
+		frappe.throw(_("This idea is not open for a vote."), frappe.PermissionError)
+	voted = bool(frappe.db.exists(VOTE_DOCTYPE, {"idea": doc.name, "user": frappe.session.user}))
+	row = _vote_row(doc, voted, _authors({doc.user}))
+	row["content"] = doc.content or ""
+	row["chat_enabled"] = issue_chat.is_enabled()  # the page keeps a chat column only with Raven
+	return row
+
+
+def vote_idea(name):
+	"""Toggle my upvote on someone else's idea open for vote. Returns {name, voted, vote_count}."""
+	doc = _open_idea(name)
+	me = frappe.session.user
+	if doc.user == me:
+		frappe.throw(_("You cannot vote for your own idea."), frappe.PermissionError)
+	# Lock the idea so two votes at once count right, and read the status under the lock: a
+	# withdraw at the same moment must not leave a vote behind.
+	if frappe.db.get_value(DOCTYPE, doc.name, "vote_status", for_update=True) != IDEA_VOTE_OPEN:
+		frappe.throw(_("This idea is not open for a vote."), frappe.PermissionError)
+	existing = frappe.db.get_value(VOTE_DOCTYPE, {"idea": doc.name, "user": me})
+	if existing:
+		frappe.delete_doc(VOTE_DOCTYPE, existing, ignore_permissions=True, force=True)
+		voted = False
+	else:
+		frappe.get_doc({"doctype": VOTE_DOCTYPE, "idea": doc.name, "user": me}).insert(ignore_permissions=True)
+		voted = True
+	count = frappe.db.count(VOTE_DOCTYPE, {"idea": doc.name})
+	# Not `modified`: a vote must not trip the owner's autosave lock.
+	frappe.db.set_value(DOCTYPE, doc.name, "vote_count", count, update_modified=False)
+	_publish_vote(doc.name, count, IDEA_VOTE_OPEN)
+	return {"name": doc.name, "voted": voted, "vote_count": count}
+
+
+def get_idea_chat(name):
+	"""The Raven chat of an idea up for vote, or of my own idea (also archived after a withdraw)."""
+	return issue_chat.get_chat(_open_idea(name))
+
+
+def ensure_idea_chat(name):
+	"""Start or join the chat of an idea up for vote; anyone who may read the idea may join."""
+	return issue_chat.ensure_chat(_open_idea(name))
