@@ -477,7 +477,7 @@
   },
   {
    "default": "1",
-   "description": "Voters see who handed an idea in. Off: ideas up for vote appear without their author.",
+   "description": "Voters see who handed an idea in. Off: ideas up for vote appear without their author, and the author does not join the idea's chat by themselves.",
    "fieldname": "personal_ideas_show_author",
    "fieldtype": "Check",
    "label": "Show Author of Ideas Handed in for Vote"
@@ -669,7 +669,7 @@
  "index_web_pages_for_search": 1,
  "issingle": 1,
  "links": [],
- "modified": "2026-11-09 12:00:00.000000",
+ "modified": "2026-11-09 15:30:00.000000",
  "modified_by": "Administrator",
  "module": "Phamos",
  "name": "phamos Settings",

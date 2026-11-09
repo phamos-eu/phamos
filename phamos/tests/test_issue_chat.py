@@ -92,7 +92,7 @@ class TestIssueChat(FrappeTestCase):
 		# rollback alone left the site's chat pointed at the test workspace.
 		self._settings = {
 			field: frappe.db.get_single_value("phamos Settings", field)
-			for field in ("enable_issue_chat", "issue_chat_workspace")
+			for field in ("enable_issue_chat", "issue_chat_workspace", "personal_ideas_show_author")
 		}
 		if not frappe.db.exists("Raven Workspace", WORKSPACE):
 			frappe.get_doc(
@@ -654,8 +654,32 @@ class TestIssueChat(FrappeTestCase):
 		)
 		self.assertEqual((channel.type, channel.linked_doctype, channel.linked_document), ("Private", "Idea", idea["name"]))
 		self.assertEqual(_members(state["channel_id"]), {OWNER})
-		intro = frappe.get_all("Raven Message", {"channel_id": state["channel_id"], "message_type": "Text"}, pluck="text")
-		self.assertIn("Chat about the idea Private idea", intro[0])
+		intro = frappe.get_all(
+			"Raven Message",
+			{"channel_id": state["channel_id"], "message_type": "Text"},
+			["text", "link_doctype"],
+		)[0]
+		self.assertIn("Chat about the idea Private idea", intro.text)
+		# A plain link, not Raven's document card: that fails for colleagues and names the author.
+		self.assertFalse(intro.link_doctype)
+		self.assertIn(f'href="/personal-cockpit/ideas/vote/{idea["name"]}"', intro.text)
+
+	def test_author_joins_a_colleagues_idea_chat_only_while_authors_are_shown(self):
+		frappe.db.set_single_value("phamos Settings", "personal_ideas_show_author", 1)
+		shown = self._idea()
+		frappe.set_user(LATECOMER)
+		self.assertEqual(_members(pc.ensure_idea_chat(shown["name"])["channel_id"]), {LATECOMER, OWNER})
+
+		frappe.set_user(OWNER)
+		frappe.db.set_single_value("phamos Settings", "personal_ideas_show_author", 0)
+		hidden = self._idea()
+		frappe.set_user(LATECOMER)
+		channel_id = pc.ensure_idea_chat(hidden["name"])["channel_id"]
+		self.assertEqual(_members(channel_id), {LATECOMER})
+		# The author can still join on their own.
+		frappe.set_user(OWNER)
+		pc.ensure_idea_chat(hidden["name"])
+		self.assertEqual(_members(channel_id), {LATECOMER, OWNER})
 
 	def test_colleague_joins_the_chat_of_an_idea_up_for_vote(self):
 		idea = self._idea()

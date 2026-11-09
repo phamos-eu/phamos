@@ -121,7 +121,11 @@ def _record_users(doc):
 	the person responsible in the cockpits) and its assignees."""
 	users = [doc.owner, doc.get("custom_task_owner")]
 	if doc.doctype == "Idea":
-		users = [doc.user]  # the idea's author; colleagues join themselves (#1842)
+		# The idea's author; colleagues join themselves. While authors are hidden from voters, the
+		# author is not added either, or Raven's "joined" line would name them (#1842).
+		from phamos.api.personal_ideas import show_author
+
+		users = [doc.user] if show_author() else []
 	users += [row.get("owner") for row in get_assignments(doc.doctype, doc.name)]
 	return list(dict.fromkeys(u for u in users if u and u != "Guest"))
 
@@ -443,7 +447,10 @@ def ensure_chat(doc):
 		if doc.doctype == "Task" and doc.get("issue"):
 			# The Issue's chat ends with "converted to Task …"; this keeps the thread findable.
 			intro += " " + _("It follows on from Issue {0}.").format(doc.issue)
-		_post_link_message(channel.name, doc, intro)
+		if doc.doctype == "Idea":
+			_post_idea_intro(channel.name, doc, intro)
+		else:
+			_post_link_message(channel.name, doc, intro)
 	return get_chat(doc)
 
 
@@ -487,6 +494,23 @@ def _post_link_message(channel_id, doc, text):
 			"text": f"<p>{escape_html(text)}</p>",
 			"link_doctype": doc.doctype,
 			"link_document": doc.name,
+		}
+	).insert(ignore_permissions=True)
+
+
+def _post_idea_intro(channel_id, doc, text):
+	"""An idea's first message: text and a plain link to its page in the vote list (#1842).
+
+	No Raven document card: Raven loads it with the doctype's role permissions (Idea: System
+	Manager only, so colleagues get an error), and it lists the author even when authors are
+	hidden from voters."""
+	url = record_cockpit_path("Idea", doc.name) + "/" + RECORD_ROUTES["Idea"] + "/" + quote(doc.name, safe="")
+	frappe.get_doc(
+		{
+			"doctype": "Raven Message",
+			"channel_id": channel_id,
+			"message_type": "Text",
+			"text": f'<p>{escape_html(text)}</p><p><a href="{escape_html(url)}">{escape_html(_("Open the idea"))}</a></p>',
 		}
 	).insert(ignore_permissions=True)
 

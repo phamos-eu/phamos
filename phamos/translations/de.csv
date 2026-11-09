@@ -1732,7 +1732,7 @@ Votes,Stimmen
 Vote,Abstimmung
 Personal Cockpit Settings,Einstellungen Persönliches Cockpit
 Show Author of Ideas Handed in for Vote,Autor von zur Abstimmung eingereichten Ideen anzeigen
-Voters see who handed an idea in. Off: ideas up for vote appear without their author.,"Abstimmende sehen, wer eine Idee eingereicht hat. Aus: Ideen zur Abstimmung erscheinen ohne Autor."
+"Voters see who handed an idea in. Off: ideas up for vote appear without their author, and the author does not join the idea's chat by themselves.","Abstimmende sehen, wer eine Idee eingereicht hat. Aus: Ideen zur Abstimmung erscheinen ohne Autor, und der Autor tritt dem Chat der Idee nicht von selbst bei."
 Open for vote: every Personal Cockpit user can read this idea and vote for it (#1842).,Zur Abstimmung: Jede Person im Persönlichen Cockpit kann diese Idee lesen und für sie stimmen (#1842).
 Only colleagues can see ideas up for vote.,Nur Kolleginnen und Kollegen sehen Ideen zur Abstimmung.
 No chat about this idea yet.,Zu dieser Idee gibt es noch keinen Chat.
@@ -1746,3 +1746,4 @@ Chat about the idea {0},Chat zur Idee {0}
 The chat opens once the idea is handed in for a vote.,"Der Chat öffnet sich, sobald die Idee zur Abstimmung eingereicht ist."
 {0} handed the idea in for a vote again.,{0} hat die Idee wieder zur Abstimmung eingereicht.
 {0} withdrew the idea from the vote.,{0} hat die Idee von der Abstimmung zurückgezogen.
+Open the idea,Idee öffnen

@@ -269,7 +269,7 @@ class TestIdeaVotes(FrappeTestCase):
 
 		def show_author():
 			frappe.db.value_cache.pop("phamos Settings", None)
-			return ideas._show_author()
+			return ideas.show_author()
 
 		frappe.db.delete("Singles", {"doctype": "phamos Settings", "field": SETTING})
 		self.assertFalse(show_author())  # what Frappe reads for a Check with no stored value

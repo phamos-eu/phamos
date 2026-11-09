@@ -374,13 +374,13 @@ def _publish_vote(name, vote_count, vote_status):
 	)
 
 
-def _show_author():
+def show_author():
 	# The patch set_personal_ideas_show_author_default stores the default (on) on existing sites.
 	return bool(cint(frappe.db.get_single_value(SETTINGS, "personal_ideas_show_author")))
 
 
 def _authors(users):
-	if not users or not _show_author():
+	if not users or not show_author():
 		return {}
 	rows = frappe.get_all(
 		"User",
