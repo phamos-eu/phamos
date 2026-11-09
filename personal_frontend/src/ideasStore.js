@@ -125,6 +125,17 @@ export function toggleVote(name) {
 	})
 }
 
+/** Take my idea off the vote (#1842): it is private again and its votes are removed. */
+export function withdrawFromVote(name) {
+	return call(`${spaConfig.api}.withdraw_idea_from_vote`, { name }).then((doc) => {
+		voteIdeas.rows = voteIdeas.rows.filter((r) => r.name !== name)
+		applyIdea(doc)
+		return doc
+	})
+}
+
+export const WITHDRAW_QUESTION = "Withdraw this idea from the vote? The votes so far are removed."
+
 export function voteLabel(count) {
 	const n = Number(count) || 0
 	return n === 1 ? __("1 vote") : __("{0} votes", [n])

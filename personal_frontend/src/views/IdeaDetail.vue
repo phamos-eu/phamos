@@ -32,12 +32,18 @@
 						<div class="flex items-center gap-3 pt-2">
 							<DocSyncBanner :autosave="autosave" />
 							<!-- Hand in for vote (#1842): open to every cockpit user; the badge shows the votes so far. -->
-							<router-link v-if="idea.vote_status" :to="{ name: 'IdeaVoteDetail', params: { name: idea.name } }">
-								<Badge theme="green" size="lg">
-									<template #prefix><FeatherIcon name="thumbs-up" class="h-3 w-3" /></template>
-									{{ __("Open for vote") }} · {{ voteLabel(idea.vote_count) }}
-								</Badge>
-							</router-link>
+							<template v-if="idea.vote_status">
+								<router-link :to="{ name: 'IdeaVoteDetail', params: { name: idea.name } }">
+									<Badge theme="green" size="lg">
+										<template #prefix><FeatherIcon name="thumbs-up" class="h-3 w-3" /></template>
+										{{ __("Open for vote") }} · {{ voteLabel(idea.vote_count) }}
+									</Badge>
+								</router-link>
+								<Button variant="subtle" :loading="withdrawing" @click="withdrawVote">
+									<template #prefix><FeatherIcon name="corner-up-left" class="h-4 w-4" /></template>
+									{{ __("Withdraw from vote") }}
+								</Button>
+							</template>
 							<Button v-else-if="!composted" variant="subtle" :loading="handingIn" @click="handIn">
 								<template #prefix><FeatherIcon name="thumbs-up" class="h-4 w-4" /></template>
 								{{ __("Hand in for Vote") }}
@@ -68,9 +74,6 @@
 								{{ stageJob(autosave.draft.stage) }}
 							</span>
 							<span class="flex items-center gap-3">
-								<button v-if="idea.vote_status" type="button" class="text-ink-gray-5 underline-offset-2 hover:text-ink-gray-8 hover:underline" @click="withdrawVote">
-									{{ __("Withdraw from vote") }}
-								</button>
 								<button v-if="composted" type="button" class="text-ink-gray-6 underline-offset-2 hover:underline" @click="setStage('Seed')">
 									{{ __("Take it up again") }}
 								</button>
@@ -168,7 +171,17 @@ import { deskRecordUrl } from "@spa/utils/deskUrl.js"
 import { __ } from "@spa/utils/i18n.js"
 import { notify } from "@spa/utils/notify.js"
 import spaConfig from "../config"
-import { ageLabel, applyIdea, loadIdeaOptions, loadIdeas, stageJob, stageSteps, voteLabel } from "../ideasStore.js"
+import {
+	WITHDRAW_QUESTION,
+	ageLabel,
+	applyIdea,
+	loadIdeaOptions,
+	loadIdeas,
+	stageJob,
+	stageSteps,
+	voteLabel,
+	withdrawFromVote,
+} from "../ideasStore.js"
 
 const props = defineProps({ name: { type: String, required: true } })
 const API = spaConfig.api
@@ -270,14 +283,19 @@ async function handIn() {
 	}
 }
 
+const withdrawing = ref(false)
+
 async function withdrawVote() {
-	if (!window.confirm(__("Withdraw this idea from the vote? The votes so far are removed."))) return
+	if (!window.confirm(__(WITHDRAW_QUESTION))) return
+	withdrawing.value = true
 	try {
 		await autosave.flush()
-		adopt(await call(`${API}.withdraw_idea_from_vote`, { name: idea.value.name }))
+		adopt(await withdrawFromVote(idea.value.name))
 		notify.success(__("Idea withdrawn from vote"))
 	} catch (e) {
 		notify.error(__("Could not withdraw the idea"), e?.messages?.[0] || e?.message || "")
+	} finally {
+		withdrawing.value = false
 	}
 }
 

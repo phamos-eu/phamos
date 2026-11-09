@@ -20,7 +20,7 @@
 							<router-link v-if="idea.mine" :to="{ name: 'IdeaDetail', params: { name: idea.name } }" class="text-xs text-ink-gray-5 hover:text-ink-gray-8">
 								{{ __("Open in My Ideas") }}
 							</router-link>
-							<VoteButton :row="idea" @voted="onVoted" />
+							<VoteButton :row="idea" @voted="onVoted" @withdrawn="onWithdrawn" />
 						</div>
 					</div>
 					<div class="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-ink-gray-5">
@@ -74,6 +74,11 @@ async function load(name) {
 	}
 }
 
+// My own idea taken off the vote: back to it in My Ideas.
+function onWithdrawn(doc) {
+	router.push({ name: "IdeaDetail", params: { name: doc.name } })
+}
+
 function onVoted(result) {
 	if (idea.value) Object.assign(idea.value, { voted: result.voted, vote_count: result.vote_count })
 }
@@ -83,6 +88,7 @@ useUserRealtime(
 	(payload) => {
 		if (!idea.value || payload?.name !== idea.value.name) return
 		if (!payload.vote_status) {
+			if (idea.value.mine) return
 			notify.success(__("This idea is no longer up for vote."))
 			router.push({ name: "IdeasVote" })
 			return
