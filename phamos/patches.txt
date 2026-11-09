@@ -64,3 +64,4 @@ phamos.patches.v1_0.announce_personal_cockpit #1769
 phamos.patches.v1_0.set_employment_contract_planning_rates
 phamos.patches.v1_0.set_delivery_note_monthly_implementation_summary
 phamos.patches.v1_0.set_employment_contract_leave_days
+phamos.patches.v1_0.set_personal_ideas_show_author_default
