@@ -5,7 +5,18 @@ import frappe
 from frappe.model.document import Document
 
 
+# Privacy mode of the HR Cockpit (#1839): shorter than this and the data is gone before it can be read.
+MIN_PRIVACY_REVEAL_SECONDS = 10
+
+
 class phamosSettings(Document):
+	def validate(self):
+		seconds = self.human_resources_privacy_reveal_seconds
+		if seconds is not None and seconds < MIN_PRIVACY_REVEAL_SECONDS:
+			frappe.throw(
+				frappe._("Privacy mode must show data for at least {0} seconds.").format(MIN_PRIVACY_REVEAL_SECONDS)
+			)
+
 	def before_save(self):
 		self._sync_mattermost_scheduler()
 		self._sync_raven_scheduler()
