@@ -92,7 +92,7 @@ class TestIssueChat(FrappeTestCase):
 		# rollback alone left the site's chat pointed at the test workspace.
 		self._settings = {
 			field: frappe.db.get_single_value("phamos Settings", field)
-			for field in ("enable_issue_chat", "issue_chat_workspace")
+			for field in ("enable_issue_chat", "issue_chat_workspace", "personal_ideas_show_author")
 		}
 		if not frappe.db.exists("Raven Workspace", WORKSPACE):
 			frappe.get_doc(
@@ -634,3 +634,105 @@ class TestIssueChat(FrappeTestCase):
 		for module in modules:
 			for name in endpoints:
 				self.assertIn(getattr(module, name), frappe.whitelisted, f"{module.__name__}.{name}")
+
+	# Ideas up for vote (#1842)
+
+	def _idea(self):
+		"""An idea of OWNER, handed in for a vote."""
+		idea = pc.create_idea("Idea chat test", content="<p>Let's talk</p>")
+		return pc.hand_in_idea_for_vote(idea["name"])
+
+	def test_idea_chat_opens_only_while_up_for_vote(self):
+		idea = pc.create_idea("Private idea")
+		with self.assertRaises(frappe.ValidationError):
+			pc.ensure_idea_chat(idea["name"])
+		pc.hand_in_idea_for_vote(idea["name"])
+
+		state = pc.ensure_idea_chat(idea["name"])
+		channel = frappe.db.get_value(
+			"Raven Channel", state["channel_id"], ["type", "linked_doctype", "linked_document"], as_dict=True
+		)
+		self.assertEqual((channel.type, channel.linked_doctype, channel.linked_document), ("Private", "Idea", idea["name"]))
+		self.assertEqual(_members(state["channel_id"]), {OWNER})
+		intro = frappe.get_all(
+			"Raven Message",
+			{"channel_id": state["channel_id"], "message_type": "Text"},
+			["text", "link_doctype"],
+		)[0]
+		self.assertIn("Chat about the idea Private idea", intro.text)
+		# A plain link, not Raven's document card: that fails for colleagues and names the author.
+		self.assertFalse(intro.link_doctype)
+		self.assertIn(f'href="/personal-cockpit/ideas/vote/{idea["name"]}"', intro.text)
+
+	def test_author_joins_a_colleagues_idea_chat_only_while_authors_are_shown(self):
+		frappe.db.set_single_value("phamos Settings", "personal_ideas_show_author", 1)
+		shown = self._idea()
+		frappe.set_user(LATECOMER)
+		self.assertEqual(_members(pc.ensure_idea_chat(shown["name"])["channel_id"]), {LATECOMER, OWNER})
+
+		frappe.set_user(OWNER)
+		frappe.db.set_single_value("phamos Settings", "personal_ideas_show_author", 0)
+		hidden = self._idea()
+		frappe.set_user(LATECOMER)
+		channel_id = pc.ensure_idea_chat(hidden["name"])["channel_id"]
+		self.assertEqual(_members(channel_id), {LATECOMER})
+		# The author can still join on their own.
+		frappe.set_user(OWNER)
+		pc.ensure_idea_chat(hidden["name"])
+		self.assertEqual(_members(channel_id), {LATECOMER, OWNER})
+
+	def test_colleague_joins_the_chat_of_an_idea_up_for_vote(self):
+		idea = self._idea()
+		channel_id = pc.ensure_idea_chat(idea["name"])["channel_id"]
+		frappe.set_user(LATECOMER)
+		state = pc.get_idea_chat(idea["name"])
+		self.assertEqual((state["channel_id"], state["is_member"]), (channel_id, False))
+		self.assertTrue(pc.ensure_idea_chat(idea["name"])["is_member"])
+		self.assertIn(LATECOMER, _members(channel_id))
+
+	def test_nobody_else_reaches_the_chat_of_a_private_idea(self):
+		idea = pc.create_idea("Still private")
+		frappe.set_user(LATECOMER)
+		for call in (pc.get_idea_chat, pc.ensure_idea_chat):
+			with self.assertRaises(frappe.PermissionError):
+				call(idea["name"])
+
+	def test_mention_in_an_idea_chat_adds_but_does_not_assign(self):
+		idea = self._idea()
+		channel_id = pc.ensure_idea_chat(idea["name"])["channel_id"]
+		_send(channel_id, f"{_mention(LATECOMER)} what do you think?")
+		self.assertIn(LATECOMER, _members(channel_id))
+		# An assignment would share the idea and keep it readable after a withdraw.
+		self.assertFalse(frappe.db.exists("ToDo", {"reference_type": "Idea", "reference_name": idea["name"]}))
+		self.assertFalse(frappe.db.exists("DocShare", {"share_doctype": "Idea", "share_name": idea["name"]}))
+
+	def test_withdraw_archives_the_idea_chat_and_hand_in_restores_it(self):
+		idea = self._idea()
+		channel_id = pc.ensure_idea_chat(idea["name"])["channel_id"]
+		pc.withdraw_idea_from_vote(idea["name"])
+		self.assertEqual(frappe.db.get_value("Raven Channel", channel_id, "is_archived"), 1)
+		self.assertTrue(any("withdrew the idea" in t for t in _system_lines(channel_id)))
+		self.assertTrue(pc.get_idea_chat(idea["name"])["archived"])  # the owner still reads it
+		with self.assertRaises(frappe.ValidationError):
+			pc.ensure_idea_chat(idea["name"])
+		frappe.set_user(LATECOMER)
+		with self.assertRaises(frappe.PermissionError):
+			pc.get_idea_chat(idea["name"])
+
+		frappe.set_user(OWNER)
+		pc.hand_in_idea_for_vote(idea["name"])
+		self.assertEqual(frappe.db.get_value("Raven Channel", channel_id, "is_archived"), 0)
+		self.assertTrue(any("handed the idea in for a vote again" in t for t in _system_lines(channel_id)))
+		self.assertEqual(pc.ensure_idea_chat(idea["name"])["channel_id"], channel_id)
+
+	def test_composting_archives_the_idea_chat(self):
+		idea = self._idea()
+		channel_id = pc.ensure_idea_chat(idea["name"])["channel_id"]
+		pc.update_idea(idea["name"], stage="Compost")
+		self.assertEqual(frappe.db.get_value("Raven Channel", channel_id, "is_archived"), 1)
+
+	def test_raven_links_open_the_idea_in_the_vote_list(self):
+		idea = self._idea()
+		self.assertEqual(
+			issue_chat.document_link("Idea", idea["name"]), f"/personal-cockpit/ideas/vote/{idea['name']}"
+		)

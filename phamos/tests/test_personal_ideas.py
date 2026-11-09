@@ -197,7 +197,10 @@ class TestPersonalIdeas(FrappeTestCase):
 		child = pc.capture_side_idea(idea["name"], "Also mine")
 
 		frappe.set_user(OTHER)
-		self.assertEqual(frappe.get_list("Idea", pluck="name"), [])
+		# Ideas handed in for a vote (#1842) are readable by everyone; these were not handed in.
+		visible = frappe.get_list("Idea", pluck="name")
+		self.assertNotIn(idea["name"], visible)
+		self.assertNotIn(child["name"], visible)
 		self.assertEqual(frappe.get_list("Idea Writing Session", pluck="name"), [])
 		self.assertEqual(
 			frappe.get_list("Version", filters={"ref_doctype": "Idea", "docname": idea["name"]}, pluck="name"), []
