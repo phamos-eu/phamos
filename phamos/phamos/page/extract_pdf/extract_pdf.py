@@ -8,9 +8,6 @@ from PIL import Image, UnidentifiedImageError
 from pypdf import PdfReader
 from pypdf.errors import PdfReadError
 
-from phamos.phamos.doctype.pdf_party_rule.pdf_party_rule import get_party_rules, replace_party_rules
-
-
 class UnsupportedFile(Exception):
 	"""The attachment is not a PDF or a readable image."""
 
@@ -363,12 +360,16 @@ def value_after_label(text, label):
 @frappe.whitelist()
 def party_rules(party_doctype, party, pdf_mapping):
 	"""Learned source labels for the mapping's primary key. Does not read Supplier PDF Rule."""
+	from phamos.phamos.doctype.pdf_party_rule.pdf_party_rule import get_party_rules
+
 	return get_party_rules(party_doctype, party, pdf_mapping)
 
 
 @frappe.whitelist()
 def save_party_rules(party_doctype, party, pdf_mapping, rules):
 	"""Store learned source labels on PDF Party Rule. Does not write Supplier PDF Rule."""
+	from phamos.phamos.doctype.pdf_party_rule.pdf_party_rule import replace_party_rules
+
 	if isinstance(rules, str):
 		rules = frappe.parse_json(rules)
 	return replace_party_rules(party_doctype, party, pdf_mapping, rules or [])
