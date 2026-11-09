@@ -58,11 +58,18 @@ class Idea(Document):
 			self.handed_in_on = None
 
 	def on_update(self):
+		before = self.get_doc_before_save()
+		if not before or (before.vote_status or "") == (self.vote_status or ""):
+			return
 		# Withdrawn (by hand or by composting): the votes of this round go.
-		if not self.vote_status and self.has_value_changed("vote_status"):
+		if not self.vote_status:
 			_delete_votes(self.name)
 			if self.vote_count:
 				self.db_set("vote_count", 0, update_modified=False)
+		# Its Raven chat is archived while the idea is private, and back when handed in again.
+		from phamos.api import issue_chat
+
+		issue_chat.on_idea_vote_change(self)
 
 	def on_trash(self):
 		_delete_votes(self.name)

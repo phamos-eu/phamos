@@ -24,6 +24,7 @@ from frappe import _
 from frappe.core.doctype.version.version import get_diff
 from frappe.utils import add_to_date, cint, date_diff, get_datetime, now_datetime, today
 
+from phamos.api import issue_chat
 from phamos.api.personal_focus import _minutes_between
 from phamos.cockpits.defaults import (
 	IDEA_AIM_FACTORS,
@@ -488,6 +489,7 @@ def get_idea_for_vote(name):
 	voted = bool(frappe.db.exists(VOTE_DOCTYPE, {"idea": doc.name, "user": frappe.session.user}))
 	row = _vote_row(doc, voted, _authors({doc.user}))
 	row["content"] = doc.content or ""
+	row["chat_enabled"] = issue_chat.is_enabled()  # the page keeps a chat column only with Raven
 	return row
 
 
@@ -513,3 +515,13 @@ def vote_idea(name):
 	frappe.db.set_value(DOCTYPE, doc.name, "vote_count", count, update_modified=False)
 	_publish_vote(doc.name, count, IDEA_VOTE_OPEN)
 	return {"name": doc.name, "voted": voted, "vote_count": count}
+
+
+def get_idea_chat(name):
+	"""The Raven chat of an idea up for vote, or of my own idea (also archived after a withdraw)."""
+	return issue_chat.get_chat(_open_idea(name))
+
+
+def ensure_idea_chat(name):
+	"""Start or join the chat of an idea up for vote; anyone who may read the idea may join."""
+	return issue_chat.ensure_chat(_open_idea(name))

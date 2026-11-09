@@ -79,6 +79,22 @@ def idea_has_permission(doc, ptype=None, user=None):
 	return doc.get("vote_status") == IDEA_VOTE_OPEN and (ptype or "read") in ("read", "select")
 
 
+def can_read_idea(name, user=None):
+	"""Whether the user may read the idea the way the cockpit shows it: their own, or one handed in
+	for a vote when they are a colleague (System User). Ideas have role permissions for System
+	Manager only, so frappe.has_permission says no to most employees; the cockpit API and the
+	idea's Raven chat (#1842) go by this rule instead."""
+	user = user or frappe.session.user
+	if not _private(user):
+		return True
+	idea = frappe.db.get_value("Idea", name, ["user", "vote_status"], as_dict=True)
+	if not idea:
+		return False
+	if idea.user == user:
+		return True
+	return idea.vote_status == IDEA_VOTE_OPEN and frappe.get_cached_value("User", user, "user_type") == "System User"
+
+
 def idea_vote_query(user=None):
 	user = user or frappe.session.user
 	if not _private(user):

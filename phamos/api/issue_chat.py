@@ -1,7 +1,8 @@
 # Copyright (c) 2026, phamos.eu and contributors
 # For license information, please see license.txt
 
-"""Record chat: one Private Raven channel per Issue or Task, opened from the cockpits (#1614, #1779).
+"""Record chat: one Private Raven channel per Issue, Task or Idea up for vote, opened from the
+cockpits (#1614, #1779, #1842).
 
 Raven's own UI shows the chat; this module only links a channel to the record (Raven's
 `linked_doctype` / `linked_document`), keeps its members in step with the record's owner and
@@ -22,7 +23,12 @@ from frappe.desk.form.load import get_assignments
 from frappe.query_builder.functions import Count, Max, Min
 from frappe.utils import cint, escape_html, get_datetime, get_fullname, strip_html_tags
 
-CHAT_DOCTYPES = ("Issue", "Task")
+from phamos.cockpits.defaults import IDEA_VOTE_OPEN
+
+CHAT_DOCTYPES = ("Issue", "Task", "Idea")
+# Record types a mention assigns to. Not Idea: an assignment shares the record with the person,
+# which would keep a withdrawn idea readable for them (#1842).
+ASSIGN_DOCTYPES = ("Issue", "Task")
 # Most records a list may ask chat states for in one call (lists show up to 500).
 MAX_STATE_NAMES = 500
 
@@ -31,7 +37,7 @@ MAX_STATE_NAMES = 500
 ARCHIVE_STATUSES = {"Issue": ("Closed",), "Task": ("Completed", "Cancelled")}
 
 # Where each record opens in a cockpit.
-RECORD_ROUTES = {"Issue": "issues/list", "Task": "tasks/gantt"}
+RECORD_ROUTES = {"Issue": "issues/list", "Task": "tasks/gantt", "Idea": "ideas/vote"}
 
 # Department settings field → cockpit route. Raven's record links open the record in the first
 # cockpit whose department matches, otherwise in the Personal Cockpit.
@@ -114,6 +120,8 @@ def _record_users(doc):
 	"""The people a record's chat starts with: its creator, its Task Owner (custom field on Task,
 	the person responsible in the cockpits) and its assignees."""
 	users = [doc.owner, doc.get("custom_task_owner")]
+	if doc.doctype == "Idea":
+		users = [doc.user]  # the idea's author; colleagues join themselves (#1842)
 	users += [row.get("owner") for row in get_assignments(doc.doctype, doc.name)]
 	return list(dict.fromkeys(u for u in users if u and u != "Guest"))
 
@@ -412,6 +420,9 @@ def ensure_chat(doc):
 		frappe.throw(_("You need to be a Raven user to chat."))
 	if doc.get("is_template"):
 		frappe.throw(_("Template Tasks have no chat."))
+	if doc.doctype == "Idea" and doc.get("vote_status") != IDEA_VOTE_OPEN:
+		# Withdrawn ideas are private again: their chat stays archived until the next hand-in.
+		frappe.throw(_("The chat opens once the idea is handed in for a vote."))
 
 	# Two people pressing "Start chat" at once: the record's row lock makes the second wait for
 	# the first to commit, and the locking read below then sees the chat it created (#1794).
@@ -425,7 +436,10 @@ def ensure_chat(doc):
 	users = [frappe.session.user] + _record_users(doc)
 	_ensure_members(channel, users, admin=frappe.session.user if created else None)
 	if created:
-		intro = _("Chat about {0}: {1}").format(doc.name, _doc_title(doc))
+		if doc.doctype == "Idea":
+			intro = _("Chat about the idea {0}").format(_doc_title(doc))
+		else:
+			intro = _("Chat about {0}: {1}").format(doc.name, _doc_title(doc))
 		if doc.doctype == "Task" and doc.get("issue"):
 			# The Issue's chat ends with "converted to Task …"; this keeps the thread findable.
 			intro += " " + _("It follows on from Issue {0}.").format(doc.issue)
@@ -460,7 +474,7 @@ def _create_channel(doc):
 
 
 def _doc_title(doc):
-	return doc.get("subject") or doc.name
+	return doc.get("subject") or doc.get("title") or doc.name
 
 
 def _post_link_message(channel_id, doc, text):
@@ -675,7 +689,7 @@ def assign_mentioned(doc, method=None):
 	"X assigned Y." in the chat. Never blocks the message when the assignment fails.
 	"""
 	channel = _mention_chat(doc)
-	if not channel or doc.get("is_bot_message"):
+	if not channel or doc.get("is_bot_message") or channel.linked_doctype not in ASSIGN_DOCTYPES:
 		return
 	# Frappe's assignment checks the sender's read permission with frappe.throw, which queues its
 	# error for the client even when caught below. A member who lost access just assigns nobody.
@@ -740,9 +754,18 @@ def keep_mention_unread(doc, method=None):
 		frappe.log_error(title=f"Record chat: could not keep the mention unread in {doc.channel_id}")
 
 
+def _can_read(doctype, name, user=None):
+	"""Whether the user may read the chat's record. Ideas go by the cockpit's rule (#1842)."""
+	if doctype == "Idea":
+		from phamos.cockpits.permissions import can_read_idea
+
+		return can_read_idea(name, user)
+	return frappe.has_permission(doctype, "read", doc=name, user=user)
+
+
 def _sender_can_read(channel):
 	"""Whether the session user (the message's sender) may still read the chat's record."""
-	return frappe.has_permission(channel.linked_doctype, "read", doc=channel.linked_document)
+	return _can_read(channel.linked_doctype, channel.linked_document)
 
 
 def _mention_chat(doc):
@@ -757,9 +780,7 @@ def _mentioned_readers(doc, channel):
 	users = []
 	for raven_user in dict.fromkeys(m.user for m in doc.mentions if m.user):
 		user = frappe.db.get_value("Raven User", {"name": raven_user, "type": "User", "enabled": 1}, "user")
-		if user and frappe.has_permission(
-			channel.linked_doctype, "read", doc=channel.linked_document, user=user
-		):
+		if user and _can_read(channel.linked_doctype, channel.linked_document, user):
 			users.append(user)
 	return users
 
@@ -788,7 +809,9 @@ def document_link(doctype, docname):
 def record_cockpit_path(doctype, name):
 	"""The cockpit a record belongs to: the one whose department is the record's own department
 	(Issue: custom_department, Task: department) or else its project's department; otherwise the
-	Personal Cockpit."""
+	Personal Cockpit. Ideas live in the Personal Cockpit only."""
+	if doctype == "Idea":
+		return PERSONAL_COCKPIT_PATH
 	department_field = "custom_department" if doctype == "Issue" else "department"
 	fields = ["project"]
 	if frappe.get_meta(doctype).has_field(department_field):
@@ -805,3 +828,26 @@ def record_cockpit_path(doctype, name):
 			):
 				return path
 	return PERSONAL_COCKPIT_PATH
+
+
+def on_idea_vote_change(doc):
+	"""Idea on_update, when its vote status changed (#1842): withdrawing archives the idea's chat,
+	handing it in again brings it back. Never blocks the save when Raven fails."""
+	if not is_enabled():
+		return
+	channel = find_channel("Idea", doc.name)
+	if not channel:
+		return
+	is_open = doc.vote_status == IDEA_VOTE_OPEN
+	actor = _display_name(frappe.session.user)
+	try:
+		if is_open:
+			if channel.is_archived:
+				_set_archived(channel.name, False)
+			_post_system_message(channel.name, _("{0} handed the idea in for a vote again.").format(actor))
+		else:
+			_post_system_message(channel.name, _("{0} withdrew the idea from the vote.").format(actor))
+			if not channel.is_archived:
+				_set_archived(channel.name, True)
+	except Exception:
+		frappe.log_error(title=f"Record chat: could not follow the vote of Idea {doc.name}")

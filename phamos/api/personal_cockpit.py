@@ -836,3 +836,15 @@ def get_idea_for_vote(name):
 def vote_idea(name):
 	"""Toggle my upvote on an idea open for vote."""
 	return personal_ideas.vote_idea(name)
+
+
+@frappe.whitelist()
+def get_idea_chat(name):
+	"""Raven chat state of an idea up for vote (or my own idea)."""
+	return personal_ideas.get_idea_chat(name)
+
+
+@frappe.whitelist(methods=["POST"])
+def ensure_idea_chat(name):
+	"""Start or join the Raven chat of an idea up for vote."""
+	return personal_ideas.ensure_idea_chat(name)
