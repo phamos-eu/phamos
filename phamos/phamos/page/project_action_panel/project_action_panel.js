@@ -1000,7 +1000,7 @@ function renderDataTable(wrapper, projectData) {
       return;
     }
 
-    // Set the default active tab to 'Your Projects'
+    // 'All Projects' is the default tab (Your Projects was merged into it)
     wrapper.innerHTML = `
         <h2 style="display: inline; margin-left: 50px; margin-top: 10px; font-size:30px">
           Project Action Panel
