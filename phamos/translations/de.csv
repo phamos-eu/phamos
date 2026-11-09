@@ -1755,3 +1755,12 @@ You were mentioned {0} times,Sie wurden {0}-mal erwähnt
 Event Schedule,Veranstaltungsplan
 "Company-wide events. Each row is sent as an invite from its Email Account's Mailcow calendar.","Unternehmensweite Veranstaltungen. Jede Zeile wird als Einladung aus dem Mailcow-Kalender ihres E-Mail-Kontos verschickt."
 "You have no outgoing email account for {0}. Ask your administrator to set one up.","Für {0} gibt es kein ausgehendes E-Mail-Konto. Bitte lassen Sie eines von Ihrer Administration einrichten."
+Sick Leave Types,Krankheitsarten
+Sick days this year,Krankheitstage dieses Jahr
+Approved leave of these types counts as sick days. Only HR Manager sees other people's sick days.,Genehmigte Abwesenheiten dieser Arten zählen als Krankheitstage. Nur HR Manager sieht die Krankheitstage anderer.
+"Approved, since 1 January","Genehmigt, seit 1. Januar"
+My leave days {0},Meine Abwesenheitstage {0}
+"Click a leave day to see its application.","Klicken Sie auf einen Abwesenheitstag, um den Antrag zu sehen."
+Requested,Beantragt
+Working day,Arbeitstag
+Weekend or holiday,Wochenende oder Feiertag
