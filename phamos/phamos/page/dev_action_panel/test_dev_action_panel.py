@@ -92,3 +92,99 @@ class TestDevActionPanelBilling(FrappeTestCase):
 		frappe.set_user(USER)
 		session = dap.get_active_session()
 		self.assertEqual(session["project_percent_billable"], "75")
+
+
+class TestDevActionPanelOneProjectList(FrappeTestCase):
+	"""One project list instead of "My Projects" + "All Projects" (as in the Project Action Panel, !1128).
+
+	Every Open project, plus projects assigned to me in any status; last used first, then assigned
+	to me, then the rest. Closing the assignment ToDo only changes the order.
+	"""
+
+	def setUp(self):
+		patcher = patch("frappe.db.commit")
+		patcher.start()
+		self.addCleanup(patcher.stop)
+		frappe.set_user("Administrator")
+		_ensure_user(USER)
+		self.employee = _ensure_employee(USER)
+
+	def tearDown(self):
+		frappe.set_user("Administrator")
+		frappe.db.rollback()
+
+	def _project(self, status="Open", prefix="DAP List"):
+		return (
+			frappe.get_doc(
+				{
+					"doctype": "Project",
+					"project_name": f"{prefix} {frappe.generate_hash(length=6)}",
+					"status": status,
+				}
+			)
+			.insert(ignore_permissions=True)
+			.name
+		)
+
+	def _assign(self, project):
+		return (
+			frappe.get_doc(
+				{
+					"doctype": "ToDo",
+					"allocated_to": USER,
+					"reference_type": "Project",
+					"reference_name": project,
+					"description": "Assigned",
+				}
+			)
+			.insert(ignore_permissions=True)
+			.name
+		)
+
+	def _listed(self):
+		frappe.set_user(USER)
+		rows = dap.get_dev_all_projects()
+		frappe.set_user("Administrator")
+		return [row["name"] for row in rows], {row["name"]: row for row in rows}
+
+	def test_assigned_project_in_any_status_is_listed_before_unassigned_ones(self):
+		unassigned = self._project()
+		completed_mine = self._project(status="Completed")
+		self._assign(completed_mine)
+		names, rows = self._listed()
+		self.assertIn(completed_mine, names)
+		self.assertEqual(rows[completed_mine]["is_assigned"], 1)
+		self.assertLess(names.index(completed_mine), names.index(unassigned))
+
+	def test_project_with_two_open_todos_is_listed_once(self):
+		project = self._project()
+		self._assign(project)
+		self._assign(project)
+		names, _ = self._listed()
+		self.assertEqual(names.count(project), 1)
+
+	def test_last_used_project_comes_first(self):
+		# Neither is assigned; by name "A…" would come first, so only "last used first" puts "Z…" on top.
+		unused = self._project(prefix="DAP List A")
+		used = self._project(prefix="DAP List Z")
+		record = frappe.get_doc(
+			{
+				"doctype": "Timesheet Record",
+				"employee": self.employee,
+				"project": used,
+				"goal": "Last used",
+				"expected_time": 3600,
+				"from_time": "2026-05-10 09:00:00",
+			}
+		)
+		record.append("item", {"from_time": "2026-05-10 09:00:00"})
+		record.insert(ignore_permissions=True)
+		names, _ = self._listed()
+		self.assertLess(names.index(used), names.index(unused))
+
+	def test_project_timer_starts_at_the_chosen_time(self):
+		project = self._project()
+		frappe.set_user(USER)
+		started = dap.start_project_timer(project, 3600, "Backdated", manual_start_time="2026-05-10 08:15:00")
+		frappe.set_user("Administrator")
+		self.assertEqual(str(frappe.db.get_value("Timesheet Record", started["name"], "from_time")), "2026-05-10 08:15:00")
