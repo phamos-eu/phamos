@@ -136,8 +136,8 @@
 								:class="[
 									'border-b border-outline-gray-2 px-0 py-1 text-center font-medium',
 									day.weekStart ? 'border-l' : '',
-									day.weekend ? 'bg-surface-gray-2 text-ink-gray-5' : 'text-ink-gray-6',
-									day.iso === todayIso ? todayColumn : '',
+									day.iso === todayIso ? todayColumn : dayShade(day),
+									day.weekend ? 'text-ink-gray-5' : 'text-ink-gray-6',
 								]"
 								:title="dayHeaderTitle(day)"
 							>
@@ -174,7 +174,7 @@
 								:class="[
 									'border-b border-outline-gray-1 p-0.5',
 									cell.weekStart ? 'border-l border-l-outline-gray-2' : '',
-									cell.today ? todayColumn : cell.holiday ? 'bg-surface-amber-1' : cell.off ? 'bg-surface-gray-2' : '',
+									cell.today ? todayColumn : cell.holiday ? 'bg-surface-amber-1' : dayShade({ weekend: cell.off, altMonth: cell.altMonth }),
 								]"
 								:title="cell.title"
 							>
@@ -212,7 +212,7 @@
 						:data-first="day.weekStart ? 'week' : undefined"
 						:class="[
 							'h-36 overflow-hidden border-b border-r border-outline-gray-1 p-1.5',
-							day.iso === todayIso ? 'bg-surface-amber-1 ring-2 ring-inset ring-[var(--ink-amber-3)]' : day.weekend ? 'bg-surface-gray-1' : 'bg-surface-white',
+							day.iso === todayIso ? 'bg-surface-amber-1 ring-2 ring-inset ring-[var(--ink-amber-3)]' : dayShade(day),
 							day.firstOfMonth ? 'border-l-2 border-l-outline-gray-4' : '',
 						]"
 					>
@@ -245,7 +245,7 @@
 								<span>🎂</span><span class="truncate">{{ birthday.name }}</span>
 							</div>
 							<div
-								v-for="absence in absencesOn(day.iso).slice(0, MAX_CHIPS)"
+								v-for="absence in absencesOn(day.iso).slice(0, absenceSlots(day.iso))"
 								:key="`a-${absence.employee}`"
 								:class="[
 									'flex items-center gap-1 truncate rounded px-1 py-0.5 text-[11px]',
@@ -259,8 +259,8 @@
 								<span class="truncate">{{ absence.name }}</span>
 								<span v-if="absence.half" class="shrink-0 opacity-75">½</span>
 							</div>
-							<div v-if="absencesOn(day.iso).length > MAX_CHIPS" class="px-1 text-[11px] text-ink-gray-5" :title="absencesOn(day.iso).slice(MAX_CHIPS).map((a) => a.name).join(', ')">
-								{{ __("+{0} more", [absencesOn(day.iso).length - MAX_CHIPS]) }}
+							<div v-if="absencesOn(day.iso).length > absenceSlots(day.iso)" class="px-1 text-[11px] text-ink-gray-5" :title="absencesOn(day.iso).slice(absenceSlots(day.iso)).map((a) => a.name).join(', ')">
+								{{ __("+{0} more", [absencesOn(day.iso).length - absenceSlots(day.iso)]) }}
 							</div>
 						</div>
 					</div>
@@ -280,6 +280,15 @@ import { errorMessage } from "@spa/contracts/contractFormat.js"
 const API = "phamos.api.hr_team_calendar.get_team_calendar"
 const MAX_CHIPS = 4
 const VIEW_KEY = "phamos-hr-team-calendar-view"
+
+/**
+ * Background of a day (PM, 2026-11-08): weekends one darker gray, other days alternate white and
+ * light gray by month, so a new month shows without reading the dates.
+ */
+function dayShade(day) {
+	if (day.weekend) return "bg-surface-gray-4"
+	return day.altMonth ? "bg-surface-gray-2" : "bg-surface-white"
+}
 
 // Today's column in the timeline: amber edges and a light amber fill over every row.
 const todayColumn = "border-x-2 border-x-[color:var(--ink-amber-3)] bg-surface-amber-1"
@@ -417,6 +426,7 @@ const weekDays = computed(() => {
 			iso: iso(date),
 			day: date.getDate(),
 			weekend: [0, 6].includes(date.getDay()),
+			altMonth: date.getMonth() % 2 === 1,
 			weekStart: date.getDay() === getFirstDayOfWeekIndex(),
 			firstOfMonth: date.getDate() === 1,
 			monthName: date.toLocaleDateString(userLocale(), { month: "long" }),
@@ -504,6 +514,7 @@ const timelineDays = computed(() => {
 			day: date.getDate(),
 			weekday: weekdayFormat.value.format(date).slice(0, 2),
 			weekend: [0, 6].includes(date.getDay()),
+			altMonth: date.getMonth() % 2 === 1,
 			weekStart: date.getDay() === getFirstDayOfWeekIndex(),
 			flags: [...new Set(holidaysOn(key).map((h) => h.flag).filter(Boolean))],
 		})
@@ -678,6 +689,15 @@ function holidaysOn(date) {
 		title: `${chip.description}${chip.country ? ` (${chip.country})` : ""}: ${chip.names.join(", ")}`,
 	}))
 }
+/**
+ * How many absence chips fit a calendar cell: MAX_CHIPS lines in all, holidays and birthdays
+ * first, and one line kept for "+n more" when not every absence fits.
+ */
+function absenceSlots(date) {
+	const free = Math.max(0, MAX_CHIPS - holidaysOn(date).length - birthdaysOn(date).length)
+	return absencesOn(date).length > free ? Math.max(0, free - 1) : free
+}
+
 function birthdaysOn(date) {
 	return birthdaysByDate.value[date] || []
 }
@@ -734,6 +754,7 @@ function cellFor(employee, day) {
 	}
 	return {
 		iso: day.iso,
+		altMonth: day.altMonth,
 		weekStart: day.weekStart,
 		today: day.iso === todayIso,
 		absence: Boolean(absence),
