@@ -696,6 +696,7 @@ def _enrich_projects(projects, user):
                 "count": r.cnt,
                 "total_seconds": int(r.total_seconds),
                 "billable_seconds": int(r.billable_seconds),
+                "last_used": r.last_used,
             }
             for r in ts_rows
         }

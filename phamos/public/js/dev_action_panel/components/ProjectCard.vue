@@ -28,27 +28,18 @@ const labels = {
   percentBillable: __("Percent Billable"),
 };
 const stopActivityType = ref("");
-const stopEndTimeDate = ref(new Date());
+// Start and end time: system time zone strings from the Frappe Datetime control (shown in the user's time zone).
+const startTime = ref("");
+const startTimeModified = ref(false);
+const stopEndTime = ref("");
 const stopEndTimeModified = ref(false);
 const activityTypes = ["Working Alone", "Working with Customer", "Working With Team"];
 
-const dateFormat = frappe.boot?.sysdefaults?.date_format || "dd.mm.yyyy";
-const timeFormat = frappe.boot?.sysdefaults?.time_format || "HH:mm:ss";
 const userTz = frappe.boot?.time_zone?.user || frappe.boot?.sysdefaults?.time_zone || "";
+const systemNow = () => frappe.datetime.system_datetime();
 
-function formatForApi(date) {
-  if (!date) return null;
-  const pad = n => String(n).padStart(2, "0");
-  const localStr = `${date.getFullYear()}-${pad(date.getMonth()+1)}-${pad(date.getDate())} ${pad(date.getHours())}:${pad(date.getMinutes())}:00`;
-  const uTz = frappe.boot?.time_zone?.user;
-  const sTz = frappe.boot?.time_zone?.system;
-  if (uTz && sTz && typeof moment !== "undefined" && moment.tz) {
-    try { return moment.tz(localStr, uTz).tz(sTz).format("YYYY-MM-DD HH:mm:ss"); } catch(e) {}
-  }
-  return localStr;
-}
-
-function onStopEndTimeChange(date) { stopEndTimeDate.value = date; stopEndTimeModified.value = true; }
+function onStartTimeChange(value) { startTime.value = value; startTimeModified.value = true; }
+function onStopEndTimeChange(value) { stopEndTime.value = value; stopEndTimeModified.value = true; }
 
 const isActive = computed(() => props.activeProjectSession?.project === props.project.name);
 const sessionState = computed(() => isActive.value ? props.activeProjectSession?.session_state : null);

@@ -194,10 +194,12 @@ function startProjectTick() {
 }
 function stopProjectTick() { clearInterval(projectTimerInterval); projectTimerInterval = null; }
 
-async function onStartProjectTimer({ project, expectedTime, goal }) {
+async function onStartProjectTimer({ project, expectedTime, goal, manualStartTime }) {
+  const args = { project_name: project.name, expected_time: expectedTime, goal };
+  if (manualStartTime) args.manual_start_time = manualStartTime;
   const r = await frappe.call({
     method: "phamos.phamos.page.dev_action_panel.dev_action_panel.start_project_timer",
-    args: { project_name: project.name, expected_time: expectedTime, goal },
+    args,
   });
   if (r.message) {
     activeProjectSession.value = { ...r.message };

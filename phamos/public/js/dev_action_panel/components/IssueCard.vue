@@ -46,7 +46,7 @@ const labels = {
   percentBillable: __("Percent Billable"),
 };
 const stopActivityType = ref("");
-const stopEndTimeDate = ref(new Date());
+const stopEndTime = ref("");
 const stopEndTimeModified = ref(false);
 const activityTypes = ["Working Alone", "Working with Customer", "Working With Team"];
 

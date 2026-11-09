@@ -40,22 +40,7 @@ const filteredProjects = computed(() => {
   <div class="pv">
     <!-- Tab bar matching the Issues tab style -->
     <div class="pv__tabs">
-      <button
-        class="pv__tab"
-        :class="{ 'pv__tab--active': filter === 'my' }"
-        @click="emit('change-filter', 'my')"
-      >
-        <svg class="pv__tab-icon" width="14" height="14" viewBox="0 0 24 24" fill="currentColor">
-          <path :d="MY_ICON"/>
-        </svg>
-        My Projects
-        <span class="pv__tab-count">{{ myProjects?.length ?? 0 }}</span>
-      </button>
-      <button
-        class="pv__tab"
-        :class="{ 'pv__tab--active': filter === 'all' }"
-        @click="emit('change-filter', 'all')"
-      >
+      <button class="pv__tab pv__tab--active" title="Last used first, then projects assigned to you, then the rest">
         <svg class="pv__tab-icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8">
           <path :d="PROJECT_ICON"/>
         </svg>
