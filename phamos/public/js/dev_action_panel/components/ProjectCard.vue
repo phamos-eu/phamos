@@ -179,7 +179,15 @@ function onStopKey(e)  { if (e.key === "Escape") closePanel(); if (e.key === "En
           </span>
           <span class="pc__info-flex"></span>
 
-          <template v-if="mode === 'my'">
+          <!-- One list: every project can be assigned to me and timed -->
+          <button
+            v-if="!project.is_assigned"
+            class="pc__btn pc__btn--assign"
+            @click="emit('assign', project)"
+          >
+            Assign to me
+          </button>
+          <span v-else class="pc__assigned-badge">Assigned</span>
             <span v-if="isActive" class="pc__timer" :class="sessionState === 'running' ? 'timer--green' : 'timer--amber'">
               {{ fmtElapsed(projectElapsedSeconds) }}
             </span>

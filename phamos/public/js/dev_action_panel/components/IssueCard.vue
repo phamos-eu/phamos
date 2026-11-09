@@ -166,7 +166,7 @@ function closePanel() { panel.value = null; }
 function confirmStart() {
   if (!expectedHours.value || expectedHours.value < 0.25) { frappe.msgprint(__("Minimum 0.25h")); return; }
   const payload = { issue: props.issue, expectedTime: Math.round(parseFloat(expectedHours.value) * 3600), goal: startGoal.value.trim() || null };
-  if (startTimeModified.value) payload.manualStartTime = formatForApi(startTimeDate.value);
+  if (startTimeModified.value && startTime.value) payload.manualStartTime = startTime.value;
   emit("start", payload);
   panel.value = null; startGoal.value = "";
 }
