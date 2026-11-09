@@ -286,8 +286,8 @@ const VIEW_KEY = "phamos-hr-team-calendar-view"
  * light gray by month, so a new month shows without reading the dates.
  */
 function dayShade(day) {
-	if (day.weekend) return "bg-surface-gray-4"
-	return day.altMonth ? "bg-surface-gray-2" : "bg-surface-white"
+	if (day.weekend) return "bg-surface-gray-3"
+	return day.altMonth ? "bg-surface-gray-1" : "bg-surface-white"
 }
 
 // Today's column in the timeline: amber edges and a light amber fill over every row.
