@@ -11,8 +11,6 @@ const props = defineProps({
   myIssuesCount: Number,
   mineOnly: Boolean,
   syncing: Boolean,
-  projectsFilter: String,
-  myProjectsCount: Number,
   allProjectsCount: Number,
   activeProjectSession: Object,
   projectElapsedSeconds: Number,

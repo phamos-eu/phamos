@@ -1,6 +1,6 @@
 <script setup>
 import { ref, computed } from "vue";
-import DateTimePicker from "./DateTimePicker.vue";
+import FrappeDatetime from "./FrappeDatetime.vue";
 import { RATING_OPTIONS, VALUE_ADD_DEFAULT, VALUE_ADD_HELP, billablePreset } from "../timesheetRating.js";
 
 const props = defineProps({

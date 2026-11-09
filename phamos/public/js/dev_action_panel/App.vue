@@ -25,10 +25,8 @@ const selectedProject = ref(null);
 const currentView = ref("issues"); // 'issues' | 'timesheets' | 'team' | 'projects'
 const mineOnly = ref(true); // default: show only current user's issues
 
-// Projects section
-const myProjects = ref([]);
+// Projects section: one list (last used first, then assigned to me, then the rest)
 const allProjects = ref([]);
-const projectsFilter = ref("my"); // 'my' | 'all'
 const projectsLoading = ref(false);
 const activeProjectSession = ref(null);
 const projectElapsedSeconds = ref(0);

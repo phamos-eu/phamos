@@ -3,8 +3,7 @@ import { computed, ref } from "vue";
 import ProjectCard from "./ProjectCard.vue";
 
 const props = defineProps({
-  filter: String, // 'my' | 'all'
-  myProjects: Array,
+  // One list: last used first, then assigned to me, then the rest (get_dev_all_projects)
   allProjects: Array,
   activeProjectSession: Object,
   projectElapsedSeconds: Number,
