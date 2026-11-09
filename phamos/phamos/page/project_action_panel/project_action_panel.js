@@ -1098,24 +1098,15 @@ function renderDataTable(wrapper, projectData) {
 
     // Event listener for the All Projects tab
     all_projectsTab.addEventListener("click", () => {
-        // Remove 'active' class from Your Projects tab and set to All Projects
-        your_projectsTab.classList.remove("active");
         all_projectsTab.classList.add("active");
         my_calenderTab.classList.remove("active");
         team_calenderTab.classList.remove("active");
-
-
-
-        // Set visual feedback for selection
         all_projectsTab.setAttribute("aria-selected", "true");
-        your_projectsTab.setAttribute("aria-selected", "false");
-
-        // Show content for the All Projects tab
       show_tab("All Projects", projectData);
     });
 
-  // Initial tab content setup: Show content for 'Your Projects' by default
-  show_tab("Your Projects", projectData); // Set 'Your Projects' as default
+  // The project list is the default (and only) project tab
+  show_tab("All Projects", projectData);
 }
 
 // Show tab content based on the selected tab
