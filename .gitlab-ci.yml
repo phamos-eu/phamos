@@ -194,6 +194,7 @@ unit_tests_2:
       phamos.tests.test_accounting_receivables
       phamos.tests.test_personal_ideas
       phamos.tests.test_idea_import
+      phamos.tests.test_idea_votes
 
 tests_required:
   stage: test

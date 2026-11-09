@@ -804,3 +804,35 @@ def complete_idea_writing_session(
 def capture_side_idea(parent, text, name=None):
 	"""A thought caught while writing becomes a child idea."""
 	return personal_ideas.capture_side_idea(parent, text, name=name)
+
+
+# Hand in for vote (phamos/phamos#1842).
+
+
+@frappe.whitelist(methods=["POST"])
+def hand_in_idea_for_vote(name):
+	"""Open my idea for a vote by every cockpit user."""
+	return personal_ideas.hand_in_idea_for_vote(name)
+
+
+@frappe.whitelist(methods=["POST"])
+def withdraw_idea_from_vote(name):
+	"""Make my idea private again; its votes are removed."""
+	return personal_ideas.withdraw_idea_from_vote(name)
+
+
+@frappe.whitelist()
+def get_ideas_for_vote():
+	"""Every idea open for vote, most votes first."""
+	return personal_ideas.get_ideas_for_vote()
+
+
+@frappe.whitelist()
+def get_idea_for_vote(name):
+	return personal_ideas.get_idea_for_vote(name)
+
+
+@frappe.whitelist(methods=["POST"])
+def vote_idea(name):
+	"""Toggle my upvote on an idea open for vote."""
+	return personal_ideas.vote_idea(name)

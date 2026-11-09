@@ -11,7 +11,13 @@ from frappe.model.document import Document
 from frappe.utils import now_datetime, strip_html
 
 from phamos.api.personal_todos import BLOCK_END
-from phamos.cockpits.defaults import IDEA_STAGES, IDEA_SUMMARY_LENGTH, IDEA_TITLE_LENGTH
+from phamos.cockpits.defaults import (
+	IDEA_STAGES,
+	IDEA_SUMMARY_LENGTH,
+	IDEA_TITLE_LENGTH,
+	IDEA_VOTE_BLOCKED_STAGES,
+	IDEA_VOTE_OPEN,
+)
 
 
 def excerpt(html, length=IDEA_SUMMARY_LENGTH):
@@ -37,8 +43,33 @@ class Idea(Document):
 			self.harvested_on = self.harvested_on or now_datetime()
 		else:
 			self.harvested_on = None
+		self._validate_vote()
+
+	def _validate_vote(self):
+		"""Hand in for vote (#1842): composting withdraws; the hand-in time follows the status."""
+		if self.stage in IDEA_VOTE_BLOCKED_STAGES:
+			self.vote_status = ""
+		if self.vote_status and self.vote_status != IDEA_VOTE_OPEN:
+			frappe.throw(_("Unknown vote status: {0}").format(self.vote_status))
+		if self.vote_status:
+			self.handed_in_on = self.handed_in_on or now_datetime()
+		else:
+			self.vote_status = ""
+			self.handed_in_on = None
+
+	def on_update(self):
+		# Withdrawn (by hand or by composting): the votes of this round go.
+		if not self.vote_status and self.has_value_changed("vote_status"):
+			_delete_votes(self.name)
+			if self.vote_count:
+				self.db_set("vote_count", 0, update_modified=False)
 
 	def on_trash(self):
+		_delete_votes(self.name)
 		frappe.db.set_value("Idea", {"spawned_from": self.name}, "spawned_from", None, update_modified=False)
 		for name in frappe.get_all("Idea Writing Session", {"idea": self.name}, pluck="name"):
 			frappe.delete_doc("Idea Writing Session", name, ignore_permissions=True, force=True)
+
+
+def _delete_votes(idea):
+	frappe.db.delete("Idea Vote", {"idea": idea})

@@ -5,9 +5,14 @@
 
 Personal productivity data is nobody else's business (works council, GDPR). Administrator
 keeps access for support and data requests.
+
+One exception (#1842): an idea its owner handed in for a vote is readable by everyone. Its
+history (Version rows) and writing sessions stay private, and only the owner may change it.
 """
 
 import frappe
+
+from phamos.cockpits.defaults import IDEA_VOTE_OPEN
 
 
 def _private(user):
@@ -60,10 +65,28 @@ def idea_query(user=None):
 	user = user or frappe.session.user
 	if not _private(user):
 		return ""
-	return f"`tabIdea`.`user` = {frappe.db.escape(user)}"
+	return (
+		f"(`tabIdea`.`user` = {frappe.db.escape(user)}"
+		f" or `tabIdea`.`vote_status` = {frappe.db.escape(IDEA_VOTE_OPEN)})"
+	)
 
 
 def idea_has_permission(doc, ptype=None, user=None):
+	user = user or frappe.session.user
+	if not _private(user) or doc.user == user:
+		return True
+	# Handed in for a vote: everyone may read it; only the owner changes it.
+	return doc.get("vote_status") == IDEA_VOTE_OPEN and (ptype or "read") in ("read", "select")
+
+
+def idea_vote_query(user=None):
+	user = user or frappe.session.user
+	if not _private(user):
+		return ""
+	return f"`tabIdea Vote`.`user` = {frappe.db.escape(user)}"
+
+
+def idea_vote_has_permission(doc, ptype=None, user=None):
 	user = user or frappe.session.user
 	if not _private(user):
 		return True
