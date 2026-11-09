@@ -1735,3 +1735,14 @@ Show Author of Ideas Handed in for Vote,Autor von zur Abstimmung eingereichten I
 Voters see who handed an idea in. Off: ideas up for vote appear without their author.,"Abstimmende sehen, wer eine Idee eingereicht hat. Aus: Ideen zur Abstimmung erscheinen ohne Autor."
 Open for vote: every Personal Cockpit user can read this idea and vote for it (#1842).,Zur Abstimmung: Jede Person im Persönlichen Cockpit kann diese Idee lesen und für sie stimmen (#1842).
 Only colleagues can see ideas up for vote.,Nur Kolleginnen und Kollegen sehen Ideen zur Abstimmung.
+No chat about this idea yet.,Zu dieser Idee gibt es noch keinen Chat.
+"Start one to talk the idea through with colleagues. Messages also show up in Raven, linked to the idea.","Starte einen, um die Idee mit Kolleginnen und Kollegen zu besprechen. Nachrichten erscheinen auch in Raven, verknüpft mit der Idee."
+Start a Raven chat about this idea,Einen Raven-Chat zu dieser Idee starten
+Join the Raven chat about this idea,Dem Raven-Chat zu dieser Idee beitreten
+"Read the chat of this idea, which is no longer up for vote","Den Chat dieser Idee lesen, die nicht mehr zur Abstimmung steht"
+Open the Raven chat about this idea,Den Raven-Chat zu dieser Idee öffnen
+"When you send, every colleague you mention joins the chat.",Beim Senden tritt jede erwähnte Kollegin und jeder erwähnte Kollege dem Chat bei.
+Chat about the idea {0},Chat zur Idee {0}
+The chat opens once the idea is handed in for a vote.,"Der Chat öffnet sich, sobald die Idee zur Abstimmung eingereicht ist."
+{0} handed the idea in for a vote again.,{0} hat die Idee wieder zur Abstimmung eingereicht.
+{0} withdrew the idea from the vote.,{0} hat die Idee von der Abstimmung zurückgezogen.
