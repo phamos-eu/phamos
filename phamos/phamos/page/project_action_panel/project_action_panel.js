@@ -1169,25 +1169,16 @@ function show_tab(tab, projectData) {
 
       // Define the cards to display
       card_names = ["Total Projects", "Total Hrs Worked Today", "Total Hrs Worked This Week", "Total Hrs Worked This Month"];
-  
-      // Render the cards immediately to improve perceived speed
       render_cards(cardWrapper, card_names, tab);
 
-      // Make an API call to fetch all projects data asynchronously
-        frappe.call({
-          method: "phamos.phamos.page.project_action_panel.project_action_panel.fetch_all_projects",
-          callback: function (r) {
-            if (r.message) {
-              // Render DataTable with the fetched data once API response is received
-              renderProjectDataTable(datatableWrapper, r.message);
-            } else {
-              // Handle case with no data or error
-              datatableWrapper.innerHTML = `<p>No projects found.</p>`;
-            }
-          },
-          freeze: true,  // Optional: Add a freeze effect to indicate loading
-          freeze_message: "Loading projects...",  // Custom loading message
-        });
+      // fetch_projects already returns the one list (last used first, then assigned to me),
+      // with the timesheet data that the Start / Stop / Pause buttons need.
+      if (projectData && projectData.length) {
+        renderProjectDataTable(datatableWrapper, projectData);
+        persistButtonStates();
+      } else {
+        datatableWrapper.innerHTML = `<p>No projects found.</p>`;
+      }
     }
     else if (tab === "My Calender") {
       // style inject (calendar styles)
