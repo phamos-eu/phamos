@@ -51,6 +51,8 @@ const navItems = [
 	},
 	// Every HR user; sick days and contract figures inside are limited per role (#1833).
 	{ name: "Employees", label: "Employees", icon: "users", match: ["Employees"] },
+	// Absences without leave type, for every HR user (#1838).
+	{ name: "TeamCalendar", label: "Team Calendar", icon: "calendar", match: ["TeamCalendar"] },
 ]
 
 // Contracts hold salary, so the section only appears for users who may read them (HR Manager).
@@ -73,6 +75,7 @@ const pageTitle = computed(() => {
 	if (["ChecklistsHome", "Checklists", "ChecklistDetail"].includes(route.name)) return "Checklists"
 	if (CONTRACT_ROUTES.includes(route.name)) return "Employment Contracts"
 	if (route.name === "Employees") return "Employees"
+	if (route.name === "TeamCalendar") return "Team Calendar"
 	return "Issues"
 })
 
@@ -91,6 +94,9 @@ const pageSubtitle = computed(() => {
 	}
 	if (route.name === "Employees") {
 		return "Leave and HR figures for every employee"
+	}
+	if (route.name === "TeamCalendar") {
+		return "Who is away when: leave, requests, birthdays and holidays"
 	}
 	if (route.name === "Contracts") {
 		return "Working time and pay agreed with employees and externals"
