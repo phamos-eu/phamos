@@ -12,7 +12,7 @@ import json
 MARKER = "<!-- ai-code-review:phamos -->"
 
 MAX_DIFF_CHARS = int(os.environ.get("AI_REVIEW_MAX_DIFF_CHARS", "60000"))
-MODEL = os.environ.get("ANTHROPIC_MODEL", "claude-sonnet-5")
+MODEL = os.environ.get("ANTHROPIC_MODEL", "claude-sonnet-5-5")
 
 SKIP_EXTENSIONS = (
     ".lock", ".png", ".jpg", ".jpeg", ".gif", ".svg", ".woff", ".woff2",
@@ -68,8 +68,9 @@ def build_diff_text(changes):
 
 
 def call_claude(api_key, diff_text, mr_title, mr_description):
+    target_branch = os.environ.get("CI_MERGE_REQUEST_TARGET_BRANCH_NAME", "unknown")
     prompt = f"""You are reviewing a merge request for a Frappe/ERPNext custom app called "phamos" \
-(Python backend + Vue/JS frontends), targeting the version-15 branch.
+(Python backend + Vue/JS frontends), targeting the {target_branch} branch.
 
 MR title: {mr_title}
 MR description: {mr_description or "(none)"}
