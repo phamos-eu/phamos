@@ -1009,14 +1009,8 @@ function renderDataTable(wrapper, projectData) {
         <div class="form-tabs-list">
           <ul class="nav form-tabs" id="form-tabs" role="tablist">
             <li class="nav-item show">
-              <!-- 'Your Projects' tab is the default active tab -->
-              <a class="nav-link active" id="DAP-your-project-tab" role="tab" aria-controls="your-projects" aria-selected="true">
-                  Your Projects
-              </a>
-            </li>
-            <li class="nav-item show">
-              <!-- 'All Projects' tab is inactive by default -->
-              <a class="nav-link" id="DAP-all-project-tab" role="tab" aria-controls="all-projects" aria-selected="false">
+              <!-- One project list: last used first, then projects assigned to me, then the rest -->
+              <a class="nav-link active" id="DAP-all-project-tab" role="tab" aria-controls="all-projects" aria-selected="true">
                   All Projects
               </a>
             </li>
