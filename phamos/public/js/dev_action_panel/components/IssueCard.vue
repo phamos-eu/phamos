@@ -179,7 +179,7 @@ function confirmStop() {
     percentBillable: stopBillable.value,
     activityType: stopActivityType.value,
   };
-  if (stopEndTimeModified.value) payload.manualEndTime = formatForApi(stopEndTimeDate.value);
+  if (stopEndTimeModified.value && stopEndTime.value) payload.manualEndTime = stopEndTime.value;
   emit("stop", payload);
   panel.value = null; stopResult.value = ""; stopActivityType.value = "";
 }

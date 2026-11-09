@@ -488,7 +488,7 @@ onUnmounted(() => { stopTick(); stopProjectTick(); });
           @change-view="currentView = $event"
           @toggle-mine="mineOnly = $event"
           @sync="onSync"
-          @navigate-projects="(tab) => { currentView = 'projects'; projectsFilter = tab; }"
+          @navigate-projects="currentView = 'projects'"
         />
       </aside>
 

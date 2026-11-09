@@ -213,18 +213,6 @@ function onStopKey(e)  { if (e.key === "Escape") closePanel(); if (e.key === "En
               <svg width="10" height="10" viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z"/></svg>
               Start
             </button>
-          </template>
-
-          <template v-else>
-            <button
-              v-if="!project.is_assigned"
-              class="pc__btn pc__btn--assign"
-              @click="emit('assign', project)"
-            >
-              Assign to me
-            </button>
-            <span v-else class="pc__assigned-badge">Assigned</span>
-          </template>
         </div>
       </div>
     </div>
