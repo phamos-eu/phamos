@@ -1088,8 +1088,7 @@ function renderDataTable(wrapper, projectData) {
     });
     // Event listener for the team calender tab
     team_calenderTab.addEventListener("click", () => {
-        // Remove 'active' class from Your Projects tab and set to All Projects
-        your_projectsTab.classList.remove("active");
+        all_projectsTab.setAttribute("aria-selected", "false");
         team_calenderTab.classList.add("active");
         my_calenderTab.classList.remove("active");
         all_projectsTab.classList.remove("active");
