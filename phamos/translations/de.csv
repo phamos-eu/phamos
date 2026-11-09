@@ -1669,7 +1669,6 @@ Employee,Mitarbeiter
 View,Ansicht
 All companies,Alle Unternehmen
 No active employees.,Keine aktiven Mitarbeiter.
-+{0} more,+{0} weitere
 Birthday: {0},Geburtstag: {0}
 The team calendar could not be loaded.,Der Teamkalender konnte nicht geladen werden.
 The end date must not be before the start date.,Das Enddatum darf nicht vor dem Startdatum liegen.

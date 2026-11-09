@@ -193,76 +193,94 @@
 
 			<!--
 				Calendar: week rows that scroll up and down without end, like the timeline does sideways
-				(PM, 2026-11-08). Opens with this week on top. Day cells carry holidays, birthdays and
-				absences as chips; the first of a month names the month.
+				(PM, 2026-11-08). Opens with this week on top. Each week is a grid: day numbers, then
+				holidays and birthdays, then one lane per absence. Consecutive days away are one bar
+				(PM, 2026-11-09); a bar that runs on into the next or from the last week has a square end.
+				Nobody is ever hidden: a week grows with the people away (PM, 2026-11-09).
 			-->
 			<section
 				v-else
 				ref="weekScroller"
-				class="h-[calc(100vh-13rem)] min-h-96 overflow-y-auto rounded-lg [overflow-anchor:none] border border-outline-gray-2 bg-surface-white"
+				class="relative h-[calc(100vh-13rem)] min-h-96 overflow-y-auto rounded-lg [overflow-anchor:none] border border-outline-gray-2 bg-surface-white"
 				@scroll.passive="onWeekScroll"
 			>
-				<div class="sticky top-0 z-10 grid grid-cols-7 border-b border-outline-gray-2 bg-surface-gray-1 text-center">
+				<div class="sticky top-0 z-20 grid grid-cols-7 border-b border-outline-gray-2 bg-surface-gray-1 text-center">
 					<div v-for="label in weekdayLabels" :key="label" class="px-1 py-1.5 text-[11px] font-semibold uppercase tracking-wide text-ink-gray-5">{{ label }}</div>
 				</div>
-				<div class="grid grid-cols-7">
+				<div
+					v-for="week in weeks"
+					:key="week.key"
+					:data-week="week.key"
+					class="grid min-h-32 grid-cols-7"
+					:style="{ gridTemplateRows: week.rows }"
+				>
+					<!-- Day backgrounds, over all rows of the week. -->
 					<div
-						v-for="day in weekDays"
-						:key="day.iso"
-						:data-first="day.weekStart ? 'week' : undefined"
+						v-for="(day, index) in week.days"
+						:key="`bg-${day.iso}`"
+						:style="{ gridColumn: index + 1, gridRow: '1 / -1' }"
 						:class="[
-							'h-36 overflow-hidden border-b border-r border-outline-gray-1 p-1.5',
+							'border-b border-r border-outline-gray-1',
 							day.iso === todayIso ? 'bg-surface-amber-1 ring-2 ring-inset ring-[var(--ink-amber-3)]' : dayShade(day),
 							day.firstOfMonth ? 'border-l-2 border-l-outline-gray-4' : '',
 						]"
+					/>
+					<div
+						v-for="(day, index) in week.days"
+						:key="`d-${day.iso}`"
+						:style="{ gridColumn: index + 1, gridRow: 1 }"
+						class="relative flex min-w-0 items-center justify-between gap-1 px-1.5 pt-1.5"
 					>
-						<div class="mb-1 flex items-center justify-between">
-							<span
-								:class="[
-									'inline-flex h-6 min-w-6 items-center justify-center rounded-full px-1 text-xs tabular-nums',
-									day.iso === todayIso ? 'bg-[var(--ink-amber-3)] font-bold text-ink-white' : 'text-ink-gray-6',
-								]"
-							>
-								{{ day.day }}
-							</span>
-							<span v-if="day.firstOfMonth" class="truncate text-xs font-semibold capitalize text-ink-gray-9">{{ day.monthName }}</span>
+						<span
+							:class="[
+								'inline-flex h-6 min-w-6 items-center justify-center rounded-full px-1 text-xs tabular-nums',
+								day.iso === todayIso ? 'bg-[var(--ink-amber-3)] font-bold text-ink-white' : 'text-ink-gray-6',
+							]"
+						>
+							{{ day.day }}
+						</span>
+						<span v-if="day.firstOfMonth" class="truncate text-xs font-semibold capitalize text-ink-gray-9">{{ day.monthName }}</span>
+					</div>
+					<div
+						v-for="(day, index) in week.days"
+						:key="`x-${day.iso}`"
+						:style="{ gridColumn: index + 1, gridRow: 2 }"
+						class="relative flex min-w-0 flex-col gap-1 px-1.5 pt-1"
+					>
+						<div
+							v-for="holiday in holidaysOn(day.iso)"
+							:key="holiday.key"
+							class="truncate rounded bg-surface-amber-1 px-1.5 py-0.5 text-[11px] text-ink-amber-3"
+							:title="holiday.title"
+						>
+							{{ holiday.flag }} {{ holiday.description }}
 						</div>
-						<div class="flex flex-col gap-1">
-							<div
-								v-for="holiday in holidaysOn(day.iso)"
-								:key="holiday.key"
-								class="truncate rounded bg-surface-amber-1 px-1.5 py-0.5 text-[11px] text-ink-amber-3"
-								:title="holiday.title"
-							>
-								{{ holiday.flag }} {{ holiday.description }}
-							</div>
-							<div
-								v-for="birthday in birthdaysOn(day.iso)"
-								:key="`b-${birthday.employee}`"
-								class="flex items-center gap-1 truncate rounded bg-surface-gray-2 px-1.5 py-0.5 text-[11px] text-ink-gray-8"
-								:title="__('Birthday: {0}', [birthday.name])"
-							>
-								<span>🎂</span><span class="truncate">{{ birthday.name }}</span>
-							</div>
-							<div
-								v-for="absence in absencesOn(day.iso).slice(0, absenceSlots(day.iso))"
-								:key="`a-${absence.employee}`"
-								:class="[
-									'flex items-center gap-1 truncate rounded px-1 py-0.5 text-[11px]',
-									absence.requested
-										? 'border border-dashed border-[color:var(--ink-blue-2)] bg-surface-blue-1 text-ink-blue-3'
-										: 'bg-surface-green-2 text-ink-green-3',
-								]"
-								:title="absence.title"
-							>
-								<Avatar size="xs" shape="circle" :image="absence.image || undefined" :label="absence.name" />
-								<span class="truncate">{{ absence.name }}</span>
-								<span v-if="absence.half" class="shrink-0 opacity-75">½</span>
-							</div>
-							<div v-if="absencesOn(day.iso).length > absenceSlots(day.iso)" class="px-1 text-[11px] text-ink-gray-5" :title="absencesOn(day.iso).slice(absenceSlots(day.iso)).map((a) => a.name).join(', ')">
-								{{ __("+{0} more", [absencesOn(day.iso).length - absenceSlots(day.iso)]) }}
-							</div>
+						<div
+							v-for="birthday in birthdaysOn(day.iso)"
+							:key="`b-${birthday.employee}`"
+							class="flex items-center gap-1 truncate rounded bg-surface-gray-2 px-1.5 py-0.5 text-[11px] text-ink-gray-8"
+							:title="__('Birthday: {0}', [birthday.name])"
+						>
+							<span>🎂</span><span class="truncate">{{ birthday.name }}</span>
 						</div>
+					</div>
+					<div
+						v-for="bar in week.bars"
+						:key="bar.key"
+						:style="{ gridColumn: `${bar.start + 1} / span ${bar.span}`, gridRow: 3 + bar.lane }"
+						:class="[
+							'relative mt-1 flex min-w-0 items-center gap-1 overflow-hidden px-1 text-[11px]',
+							bar.requested
+								? 'border border-dashed border-[color:var(--ink-blue-2)] bg-surface-blue-1 text-ink-blue-3'
+								: 'bg-surface-green-2 text-ink-green-3',
+							bar.continuesBefore ? 'ml-0 rounded-l-none border-l-0' : 'ml-1.5 rounded-l',
+							bar.continuesAfter ? 'mr-0 rounded-r-none border-r-0' : 'mr-1.5 rounded-r',
+						]"
+						:title="bar.title"
+					>
+						<Avatar size="xs" shape="circle" :image="bar.image || undefined" :label="bar.name" />
+						<span class="truncate">{{ bar.name }}</span>
+						<span v-if="bar.half" class="shrink-0 opacity-75">½</span>
 					</div>
 				</div>
 			</section>
@@ -271,14 +289,13 @@
 </template>
 
 <script setup>
-import { computed, nextTick, onBeforeUnmount, ref, watch } from "vue"
+import { computed, nextTick, onBeforeUnmount, onBeforeUpdate, onUpdated, ref, watch } from "vue"
 import { Avatar, FeatherIcon, FormControl, call } from "frappe-ui"
 import { formatDate, getFirstDayOfWeekIndex, userLocale } from "@spa/utils/datetime.js"
 import { __ } from "@spa/utils/i18n.js"
 import { errorMessage } from "@spa/contracts/contractFormat.js"
 
 const API = "phamos.api.hr_team_calendar.get_team_calendar"
-const MAX_CHIPS = 4
 const VIEW_KEY = "phamos-hr-team-calendar-view"
 
 /**
@@ -369,79 +386,164 @@ const viewStart = addDays(thisWeek, -2)
 const weeksStart = ref(addDays(thisWeek, -2 * WEEK))
 const weeksEnd = ref(addDays(thisWeek, 12 * WEEK - 1))
 const weekScroller = ref(null)
-const weekScrollTop = ref(0)
+const topWeekKey = ref(iso(thisWeek)) // the week at the top of the view
 
-function weekRowHeight() {
-	return weekScroller.value?.querySelector("[data-first]")?.offsetHeight || 144
+function weekElement(key) {
+	return weekScroller.value?.querySelector(`[data-week="${key}"]`) || null
 }
-function weekIndex(date) {
-	return Math.round((date - weeksStart.value) / (WEEK * 86400000))
+function headerHeight() {
+	return weekScroller.value?.firstElementChild?.offsetHeight || 0
 }
 function scrollToWeek(date, behavior = "smooth") {
-	weekScroller.value?.scrollTo({ top: Math.max(0, weekIndex(weekStartOf(date)) * weekRowHeight()), behavior })
+	const key = iso(weekStartOf(date))
+	const element = weekElement(key)
+	if (!element) return
+	topWeekKey.value = key
+	weekScroller.value.scrollTo({ top: Math.max(0, element.offsetTop - headerHeight()), behavior })
 }
 watch(weekScroller, (element, previous) => {
 	// Opening the calendar: this week on top, the weeks ahead below.
 	if (element && !previous) nextTick(() => scrollToWeek(thisWeek, "auto"))
 })
 
+/** The first week whose lower edge is below the sticky header. */
+function findTopWeek() {
+	const element = weekScroller.value
+	if (!element) return null
+	const line = element.scrollTop + headerHeight()
+	for (const row of element.querySelectorAll("[data-week]")) {
+		if (row.offsetTop + row.offsetHeight > line) return row.dataset.week
+	}
+	return null
+}
+
 let extendingWeeks = false
 function onWeekScroll() {
 	const element = weekScroller.value
-	if (!element || extendingWeeks) return
-	weekScrollTop.value = element.scrollTop
-	const margin = 2 * weekRowHeight()
+	if (!element) return
+	topWeekKey.value = findTopWeek() || topWeekKey.value
+	if (extendingWeeks) return
+	const margin = 400
 	if (element.scrollTop + element.clientHeight > element.scrollHeight - margin) extendWeeks(1)
 	else if (element.scrollTop < margin) extendWeeks(-1)
 }
 
-/** Add eight weeks at one end; past a year, drop weeks at the other end. The view stays put. */
+/** Add eight weeks at one end; past a year, drop weeks at the other end. */
 async function extendWeeks(direction) {
 	extendingWeeks = true
-	const chunkWeeks = CHUNK_DAYS / WEEK
-	let shiftWeeks = 0
 	const tooLong = () => Math.round((weeksEnd.value - weeksStart.value) / 86400000) >= MAX_RANGE_DAYS
 	if (direction > 0) {
 		weeksEnd.value = addDays(weeksEnd.value, CHUNK_DAYS)
-		if (tooLong()) {
-			weeksStart.value = addDays(weeksStart.value, CHUNK_DAYS)
-			shiftWeeks = -chunkWeeks
-		}
+		if (tooLong()) weeksStart.value = addDays(weeksStart.value, CHUNK_DAYS)
 	} else {
 		weeksStart.value = addDays(weeksStart.value, -CHUNK_DAYS)
-		shiftWeeks = chunkWeeks
 		if (tooLong()) weeksEnd.value = addDays(weeksEnd.value, -CHUNK_DAYS)
 	}
 	await nextTick()
-	// Browser scroll anchoring is off for this list ([overflow-anchor:none]), so the shift is ours alone.
-	if (shiftWeeks && weekScroller.value) weekScroller.value.scrollTop += shiftWeeks * weekRowHeight()
-	weekScrollTop.value = weekScroller.value?.scrollTop || 0
 	extendingWeeks = false
 }
 
-const weekDays = computed(() => {
-	const days = []
-	for (let date = weeksStart.value; date <= weeksEnd.value; date = addDays(date, 1)) {
-		days.push({
+// Weeks change height when weeks are added above or their leave arrives. Browser scroll anchoring
+// is off for this list ([overflow-anchor:none]); instead the top week keeps its place on screen
+// across every re-render.
+let anchor = null
+onBeforeUpdate(() => {
+	anchor = null
+	const element = weekElement(topWeekKey.value)
+	if (view.value === "month" && element) anchor = { key: topWeekKey.value, offset: element.offsetTop - weekScroller.value.scrollTop }
+})
+onUpdated(() => {
+	const element = anchor && weekElement(anchor.key)
+	if (!element) return
+	const top = element.offsetTop - anchor.offset
+	if (Math.abs(weekScroller.value.scrollTop - top) > 1) weekScroller.value.scrollTop = top
+})
+
+/** One week: its days, and the absence bars laid out in lanes so each run of days is one bar. */
+function buildWeek(start) {
+	const days = Array.from({ length: WEEK }, (_, index) => {
+		const date = addDays(start, index)
+		return {
 			iso: iso(date),
 			day: date.getDate(),
 			weekend: [0, 6].includes(date.getDay()),
 			altMonth: date.getMonth() % 2 === 1,
-			weekStart: date.getDay() === getFirstDayOfWeekIndex(),
 			firstOfMonth: date.getDate() === 1,
 			monthName: date.toLocaleDateString(userLocale(), { month: "long" }),
+		}
+	})
+	const before = iso(addDays(start, -1))
+	const after = iso(addDays(start, WEEK))
+	const segments = []
+	for (const employee of employees.value) {
+		const away = absenceDays.value[employee.employee]
+		if (!away) continue
+		let segment = null
+		days.forEach((day, index) => {
+			const absence = away[day.iso]
+			if (!absence) {
+				segment = null
+			} else if (segment && segment.requested === absence.requested) {
+				segment.end = index
+				segment.half ||= absence.half
+			} else {
+				segment = { employee, requested: absence.requested, start: index, end: index, half: absence.half }
+				segments.push(segment)
+			}
 		})
+		for (const item of segments.filter((s) => s.employee === employee)) {
+			item.continuesBefore = item.start === 0 && away[before]?.requested === item.requested
+			item.continuesAfter = item.end === WEEK - 1 && away[after]?.requested === item.requested
+		}
 	}
-	return days
+	// Longest first at the same start, then the first free lane.
+	segments.sort((a, b) => a.start - b.start || b.end - a.end)
+	const laneEnds = []
+	for (const segment of segments) {
+		let lane = laneEnds.findIndex((end) => end < segment.start)
+		if (lane === -1) lane = laneEnds.push(-1) - 1
+		laneEnds[lane] = segment.end
+		segment.lane = lane
+	}
+	// The last row takes the spare height of a short week, so the bars sit right under the dates.
+	const rows = ["auto", "auto", ...Array(laneEnds.length).fill("1.375rem"), "minmax(0.375rem, 1fr)"].join(" ")
+	return {
+		key: iso(start),
+		days,
+		rows,
+		bars: segments.map((s) => ({
+				key: `${s.employee.employee}-${s.start}`,
+				start: s.start,
+				span: s.end - s.start + 1,
+				lane: s.lane,
+				requested: s.requested,
+				half: s.half,
+				continuesBefore: s.continuesBefore,
+				continuesAfter: s.continuesAfter,
+				name: s.employee.employee_name,
+				image: s.employee.image,
+				title: [
+					s.employee.employee_name,
+					`${formatDate(days[s.start].iso)} – ${formatDate(days[s.end].iso)}`,
+					s.requested ? __("Absent (requested)") : __("Absent"),
+					s.half ? __("Half day") : "",
+				]
+					.filter(Boolean)
+					.join(" · "),
+			})),
+	}
+}
+const weeks = computed(() => {
+	const result = []
+	for (let start = weeksStart.value; start <= weeksEnd.value; start = addDays(start, WEEK)) result.push(buildWeek(start))
+	return result
 })
+
 const weekdayLabels = computed(() =>
 	Array.from({ length: 7 }, (_, i) => weekdayFormat.value.format(addDays(weeksStart.value, i))),
 )
 /** The month of the top week in view (its last day, so a week into a new month counts there). */
-const calendarLabel = computed(() => {
-	const index = Math.floor(weekScrollTop.value / weekRowHeight())
-	return monthYearFormat.value.format(addDays(weeksStart.value, index * WEEK + WEEK - 1))
-})
+const calendarLabel = computed(() => monthYearFormat.value.format(addDays(parse(topWeekKey.value), WEEK - 1)))
 
 const scroller = ref(null)
 const viewWidth = ref(0)
@@ -615,7 +717,7 @@ watch(() => [iso(range.value.from), iso(range.value.to), company.value], load, {
 /** ‹ and ›: four weeks, sideways in the timeline, up or down in the calendar. */
 function step(direction) {
 	if (view.value === "timeline") scroller.value?.scrollBy({ left: direction * 4 * WEEK * dayWidth.value, behavior: "smooth" })
-	else weekScroller.value?.scrollBy({ top: direction * 4 * weekRowHeight(), behavior: "smooth" })
+	else scrollToWeek(addDays(parse(topWeekKey.value), direction * 4 * WEEK))
 }
 function goToday() {
 	if (view.value === "timeline") scrollToDate(viewStart)
@@ -689,39 +791,10 @@ function holidaysOn(date) {
 		title: `${chip.description}${chip.country ? ` (${chip.country})` : ""}: ${chip.names.join(", ")}`,
 	}))
 }
-/**
- * How many absence chips fit a calendar cell: MAX_CHIPS lines in all, holidays and birthdays
- * first, and one line kept for "+n more" when not every absence fits.
- */
-function absenceSlots(date) {
-	const free = Math.max(0, MAX_CHIPS - holidaysOn(date).length - birthdaysOn(date).length)
-	return absencesOn(date).length > free ? Math.max(0, free - 1) : free
-}
-
 function birthdaysOn(date) {
 	return birthdaysByDate.value[date] || []
 }
-function absencesOn(date) {
-	const result = []
-	for (const employee of employees.value) {
-		const absence = absenceDays.value[employee.employee]?.[date]
-		if (!absence) continue
-		result.push({
-			employee: employee.employee,
-			name: employee.employee_name,
-			image: employee.image,
-			requested: absence.requested,
-			half: absence.half,
-			title: absenceTitle(employee.employee_name, date, absence),
-		})
-	}
-	return result
-}
 
-function absenceTitle(name, date, absence) {
-	const what = absence.requested ? __("Absent (requested)") : __("Absent")
-	return `${name} · ${formatDate(date)} · ${what}${absence.half ? ` · ${__("Half day")}` : ""}`
-}
 function dayHeaderTitle(day) {
 	const holidays = holidaysOn(day.iso)
 	return [formatDate(day.iso), ...holidays.map((h) => `${h.flag} ${h.title}`)].join("\n")
