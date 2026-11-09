@@ -97,7 +97,6 @@ const filteredProjects = computed(() => {
         v-for="project in filteredProjects"
         :key="project.name"
         :project="project"
-        :mode="filter"
         :active-project-session="activeProjectSession"
         :project-elapsed-seconds="projectElapsedSeconds"
         :active-issue-session="activeIssueSession"

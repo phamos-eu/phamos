@@ -312,7 +312,7 @@ async function assignProject(project) {
     args: { project_name: project.name },
   });
   frappe.show_alert({ message: __("Project assigned to you."), indicator: "green" });
-  await Promise.all([loadMyProjects(), loadAllProjects()]);
+  await loadAllProjects();
 }
 
 // Inline start (emitted from card with { issue, expectedTime, goal, manualStartTime? })

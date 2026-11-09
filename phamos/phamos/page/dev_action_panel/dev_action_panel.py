@@ -1,6 +1,6 @@
 import frappe
 from frappe import _
-from frappe.utils import cstr, now_datetime, add_to_date, time_diff_in_seconds, get_datetime
+from frappe.utils import cint, cstr, now_datetime, add_to_date, time_diff_in_seconds, get_datetime
 from phamos.phamos.timesheet_utils import billable_seconds_sql, billable_seconds_term, billing_context, normalize_percent_billable
 from phamos.phamos.doctype.timesheet_record.timesheet_record import compute_time_limit_status
 from frappe.query_builder import Order

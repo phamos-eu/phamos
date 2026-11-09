@@ -142,7 +142,7 @@ const due = computed(() => {
 function openStart() {
   panel.value = panel.value === "start" ? null : "start";
   stopResult.value = "";
-  startTimeDate.value = new Date();
+  startTime.value = systemNow();
   startTimeModified.value = false;
 }
 function openStop() {
