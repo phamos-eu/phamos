@@ -1073,32 +1073,13 @@ function renderDataTable(wrapper, projectData) {
     header.appendChild(infoIcon);
 
     // Get references to the tabs
-    const your_projectsTab = document.getElementById("DAP-your-project-tab");
     const all_projectsTab = document.getElementById("DAP-all-project-tab");
     const my_calenderTab = document.getElementById("my-calender");
     const team_calenderTab = document.getElementById("team-calender");
 
-
-    // Event listener for the Your Projects tab
-    your_projectsTab.addEventListener("click", () => {
-      // Remove 'active' class from All Projects tab and set to Your Projects
-      all_projectsTab.classList.remove("active");
-      your_projectsTab.classList.add("active");
-      team_calenderTab.classList.remove("active");
-      my_calenderTab.classList.remove("active");
-
-
-      // Set visual feedback for selection
-      your_projectsTab.setAttribute("aria-selected", "true");
-      all_projectsTab.setAttribute("aria-selected", "false");
-
-    // Show content for the Your Projects tab
-      show_tab("Your Projects", projectData);
-    });
     // Event listener for the my calender tab
     my_calenderTab.addEventListener("click", () => {
-        // Remove 'active' class from Your Projects tab and set to All Projects
-        your_projectsTab.classList.remove("active");
+        all_projectsTab.setAttribute("aria-selected", "false");
         my_calenderTab.classList.add("active");
         team_calenderTab.classList.remove("active");
         all_projectsTab.classList.remove("active");
