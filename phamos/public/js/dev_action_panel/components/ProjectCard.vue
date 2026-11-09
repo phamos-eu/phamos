@@ -229,6 +229,10 @@ function onStopKey(e)  { if (e.key === "Escape") closePanel(); if (e.key === "En
                 <span class="pc__panel-unit">hours</span>
               </div>
             </div>
+            <div class="pc__panel-field">
+              <label class="pc__panel-label">Start time <span class="pc__panel-optional">{{ userTz }}</span></label>
+              <FrappeDatetime :model-value="startTime" @update:model-value="onStartTimeChange" />
+            </div>
             <div class="pc__panel-field pc__panel-field--grow">
               <label class="pc__panel-label">Goal</label>
               <input v-model="startGoal" type="text" class="pc__panel-input pc__panel-input--full" :placeholder="project.project_name" />

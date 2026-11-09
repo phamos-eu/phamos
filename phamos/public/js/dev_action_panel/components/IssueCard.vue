@@ -322,7 +322,7 @@ function onStopKey(e)  { if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) conf
             </div>
             <div class="ic__panel-field ic__panel-field--grow">
               <label class="ic__panel-label">Start time <span class="ic__panel-optional">{{ userTz }}</span></label>
-              <DateTimePicker :model-value="startTimeDate" :date-format="dateFormat" :time-format="timeFormat" :auto-update="!startTimeModified" @update:model-value="onStartTimeChange" />
+              <FrappeDatetime :model-value="startTime" @update:model-value="onStartTimeChange" />
             </div>
           </div>
           <div class="ic__panel-field ic__panel-field--full">

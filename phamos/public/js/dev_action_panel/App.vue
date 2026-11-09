@@ -531,8 +531,6 @@ onUnmounted(() => { stopTick(); stopProjectTick(); });
         <TimesheetList v-else-if="currentView === 'timesheets'" />
         <ProjectsView
           v-else-if="currentView === 'projects'"
-          :filter="projectsFilter"
-          :my-projects="myProjects"
           :all-projects="allProjects"
           :active-project-session="activeProjectSession"
           :project-elapsed-seconds="projectElapsedSeconds"
