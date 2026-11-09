@@ -94,7 +94,7 @@
 							<FeatherIcon name="external-link" class="h-3.5 w-3.5" /> {{ selectedApp.name }} in Desk
 						</a>
 					</div>
-					<p v-if="detail.can_see_sick_days" class="mt-2 text-xs text-ink-gray-5">Sick leave is not drawn; only HR Manager sees its count above.</p>
+					<p v-if="detail.applications.some((a) => a.neutral)" class="mt-2 text-xs text-ink-gray-5">Some absences show without their type and can't be opened.</p>
 				</section>
 
 				<div class="flex flex-wrap items-center gap-4 border-t border-outline-gray-1 pt-4 text-sm">
@@ -126,7 +126,7 @@ import LeaveHeatmap from "@spa/components/LeaveHeatmap.vue"
 const year = new Date().getFullYear()
 
 // One employee's leave and HR facts (#1836). The API applies the access rules of #1833:
-// no sick days and no contract for HR User, and never a sick leave among the applications.
+// no sick days and no contract for HR User; sick leave among the applications only as a neutral absence (#1838).
 const props = defineProps({
 	modelValue: { type: Boolean, default: false },
 	employee: { type: String, default: "" },
