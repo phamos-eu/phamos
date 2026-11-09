@@ -26,7 +26,7 @@
 import { ref } from "vue"
 import { __ } from "@spa/utils/i18n.js"
 import { notify } from "@spa/utils/notify.js"
-import { WITHDRAW_QUESTION, toggleVote, voteLabel, withdrawFromVote } from "../ideasStore.js"
+import { toggleVote, voteLabel, withdrawFromVote, withdrawQuestion } from "../ideasStore.js"
 
 const props = defineProps({ row: { type: Object, required: true } })
 const emit = defineEmits(["voted", "withdrawn"])
@@ -46,7 +46,7 @@ async function toggle() {
 }
 
 async function withdraw() {
-	if (pending.value || !window.confirm(__(WITHDRAW_QUESTION))) return
+	if (pending.value || !window.confirm(withdrawQuestion())) return
 	pending.value = true
 	try {
 		const doc = await withdrawFromVote(props.row.name)

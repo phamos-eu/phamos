@@ -26,6 +26,7 @@ from frappe.utils import add_to_date, cint, date_diff, get_datetime, now_datetim
 
 from phamos.api import issue_chat
 from phamos.api.personal_focus import _minutes_between
+from phamos.cockpits.permissions import can_read_idea, is_colleague
 from phamos.cockpits.defaults import (
 	IDEA_AIM_FACTORS,
 	IDEA_CLOSED_STAGES,
@@ -396,20 +397,17 @@ def _require_cockpit_user():
 	Whitelisted methods are callable by any logged-in user, Website Users (portal customers)
 	included, and these read other people's ideas, so the check has to be here.
 	"""
-	user = frappe.session.user
-	if user in (None, "Guest") or (
-		user != "Administrator" and frappe.get_cached_value("User", user, "user_type") != "System User"
-	):
+	if not is_colleague():
 		frappe.throw(_("Only colleagues can see ideas up for vote."), frappe.PermissionError)
 
 
 def _open_idea(name):
-	"""An idea open for vote (anyone's), or my own; anything else is not there for this user."""
+	"""An idea open for vote (anyone's), or my own; anything else is not there for this user.
+	The same rule as the idea's Raven chat (permissions.can_read_idea)."""
 	_require_cockpit_user()
-	row = frappe.db.get_value(DOCTYPE, name, ["user", "vote_status"], as_dict=True) if name else None
-	if not row:
+	if not name or not frappe.db.exists(DOCTYPE, name):
 		frappe.throw(_("Idea {0} not found").format(name), frappe.DoesNotExistError)
-	if row.vote_status != IDEA_VOTE_OPEN and row.user != frappe.session.user:
+	if not can_read_idea(name):
 		frappe.throw(_("This idea is not open for a vote."), frappe.PermissionError)
 	return frappe.get_doc(DOCTYPE, name)
 

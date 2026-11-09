@@ -134,7 +134,8 @@ export function withdrawFromVote(name) {
 	})
 }
 
-export const WITHDRAW_QUESTION = "Withdraw this idea from the vote? The votes so far are removed."
+// A function, not a constant: the text must stay a literal inside __() to be found for translation.
+export const withdrawQuestion = () => __("Withdraw this idea from the vote? The votes so far are removed.")
 
 export function voteLabel(count) {
 	const n = Number(count) || 0

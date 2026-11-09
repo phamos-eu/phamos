@@ -79,6 +79,15 @@ def idea_has_permission(doc, ptype=None, user=None):
 	return doc.get("vote_status") == IDEA_VOTE_OPEN and (ptype or "read") in ("read", "select")
 
 
+def is_colleague(user=None):
+	"""A System User (or Administrator): who may see ideas up for vote (#1842). Website Users
+	(portal customers) are logged in too, but are not colleagues."""
+	user = user or frappe.session.user
+	if user in (None, "Guest"):
+		return False
+	return user == "Administrator" or frappe.get_cached_value("User", user, "user_type") == "System User"
+
+
 def can_read_idea(name, user=None):
 	"""Whether the user may read the idea the way the cockpit shows it: their own, or one handed in
 	for a vote when they are a colleague (System User). Ideas have role permissions for System
@@ -92,7 +101,7 @@ def can_read_idea(name, user=None):
 		return False
 	if idea.user == user:
 		return True
-	return idea.vote_status == IDEA_VOTE_OPEN and frappe.get_cached_value("User", user, "user_type") == "System User"
+	return idea.vote_status == IDEA_VOTE_OPEN and is_colleague(user)
 
 
 def idea_vote_query(user=None):

@@ -181,7 +181,6 @@ import { __ } from "@spa/utils/i18n.js"
 import { notify } from "@spa/utils/notify.js"
 import spaConfig from "../config"
 import {
-	WITHDRAW_QUESTION,
 	ageLabel,
 	applyIdea,
 	loadIdeaOptions,
@@ -190,6 +189,7 @@ import {
 	stageSteps,
 	voteLabel,
 	withdrawFromVote,
+	withdrawQuestion,
 } from "../ideasStore.js"
 
 const props = defineProps({ name: { type: String, required: true } })
@@ -295,7 +295,7 @@ async function handIn() {
 const withdrawing = ref(false)
 
 async function withdrawVote() {
-	if (!window.confirm(__(WITHDRAW_QUESTION))) return
+	if (!window.confirm(withdrawQuestion())) return
 	withdrawing.value = true
 	try {
 		await autosave.flush()
