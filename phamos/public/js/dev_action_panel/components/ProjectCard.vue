@@ -130,7 +130,7 @@ function onStopKey(e)  { if (e.key === "Escape") closePanel(); if (e.key === "En
       'pc--active':  isActive,
       'pc--running': sessionState === 'running',
       'pc--paused':  sessionState === 'paused',
-      'pc--blocked': hasAnySession && !isActive && mode === 'my',
+      'pc--blocked': hasAnySession && !isActive,
     }"
   >
     <div class="pc__body">

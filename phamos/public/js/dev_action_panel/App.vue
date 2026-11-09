@@ -436,7 +436,7 @@ async function onSync() {
   syncing.value = false;
 }
 
-onMounted(async () => { await Promise.all([loadIssues(), loadSession(), loadStats(), loadLabels(), loadMyProjects(), loadAllProjects(), loadActiveProjectSession()]); });
+onMounted(async () => { await Promise.all([loadIssues(), loadSession(), loadStats(), loadLabels(), loadAllProjects(), loadActiveProjectSession()]); });
 onUnmounted(() => { stopTick(); stopProjectTick(); });
 </script>
 

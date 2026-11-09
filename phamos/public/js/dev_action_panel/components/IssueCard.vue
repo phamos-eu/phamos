@@ -154,10 +154,10 @@ function openStop() {
 
   // Keep existing "now" behavior for today's sessions, but preserve retroactive dates.
   if (fromDate && !isNaN(fromDate) && !isSameCalendarDate(fromDate, now)) {
-    stopEndTimeDate.value = new Date(fromDate);
+    stopEndTime.value = props.activeSession.from_time;
     stopEndTimeModified.value = true;
   } else {
-    stopEndTimeDate.value = now;
+    stopEndTime.value = systemNow();
     stopEndTimeModified.value = false;
   }
 }
