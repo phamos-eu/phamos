@@ -21,6 +21,15 @@
 								{{ __("Open in My Ideas") }}
 							</router-link>
 							<VoteButton :row="idea" @voted="onVoted" @withdrawn="onWithdrawn" />
+							<!-- The idea's Raven chat (#1842): a column on wide screens, an overlay below. Re-mounted
+							     when that changes, since the panel picks its place when it mounts. -->
+							<IssueChatButton
+								:key="chatColumn ? 'column' : 'overlay'"
+								doctype="Idea"
+								:record-name="idea.name"
+								:subject="idea.title"
+								:api="API"
+							/>
 						</div>
 					</div>
 					<div class="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-ink-gray-5">
@@ -42,13 +51,17 @@
 				</template>
 			</div>
 		</div>
+		<!-- Chat column like the Issue view's: no border and the full 768px, or Raven switches to
+		     its touch layout (#1613). Only with Raven, and only where the idea keeps room beside it. -->
+		<aside v-if="idea?.chat_enabled && chatColumn" id="issue-chat-host" class="flex w-[768px] flex-none flex-col overflow-hidden" />
 	</div>
 </template>
 
 <script setup>
-import { onMounted, ref, watch } from "vue"
+import { onBeforeUnmount, onMounted, ref, watch } from "vue"
 import { useRouter } from "vue-router"
 import { call } from "frappe-ui"
+import IssueChatButton from "@spa/components/IssueChatButton.vue"
 import StageIcon from "@spa/components/StageIcon.vue"
 import UserAvatar from "@spa/components/UserAvatar.vue"
 import { useUserRealtime } from "@spa/composables/useUserRealtime.js"
@@ -60,6 +73,14 @@ import spaConfig from "../config"
 import { voteLabel } from "../ideasStore.js"
 
 const props = defineProps({ name: { type: String, required: true } })
+const API = spaConfig.api
+
+// The chat column needs 768px next to the sidebar and a readable idea: from 1440px on.
+const columnQuery = window.matchMedia("(min-width: 1440px)")
+const chatColumn = ref(columnQuery.matches)
+const onColumnQuery = (e) => (chatColumn.value = e.matches)
+columnQuery.addEventListener("change", onColumnQuery)
+onBeforeUnmount(() => columnQuery.removeEventListener("change", onColumnQuery))
 const router = useRouter()
 const idea = ref(null)
 const error = ref("")

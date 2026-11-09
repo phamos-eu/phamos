@@ -44,6 +44,14 @@
 									{{ __("Withdraw from vote") }}
 								</Button>
 							</template>
+							<!-- The idea's Raven chat with colleagues (#1842), while it is up for vote. -->
+							<IssueChatButton
+								v-if="idea.vote_status"
+								doctype="Idea"
+								:record-name="idea.name"
+								:subject="idea.title"
+								:api="API"
+							/>
 							<Button v-else-if="!composted" variant="subtle" :loading="handingIn" @click="handIn">
 								<template #prefix><FeatherIcon name="thumbs-up" class="h-4 w-4" /></template>
 								{{ __("Hand in for Vote") }}
@@ -161,6 +169,7 @@ import { computed, nextTick, onMounted, ref, watch } from "vue"
 import { onBeforeRouteLeave, onBeforeRouteUpdate, useRoute, useRouter } from "vue-router"
 import { Badge, call } from "frappe-ui"
 import DocSyncBanner from "@spa/components/DocSyncBanner.vue"
+import IssueChatButton from "@spa/components/IssueChatButton.vue"
 import RichTextField from "@spa/components/RichTextField.vue"
 import StageIcon from "@spa/components/StageIcon.vue"
 import StageSteps from "@spa/components/StageSteps.vue"
