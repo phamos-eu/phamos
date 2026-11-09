@@ -536,7 +536,6 @@ onUnmounted(() => { stopTick(); stopProjectTick(); });
           :project-elapsed-seconds="projectElapsedSeconds"
           :loading="projectsLoading"
           :active-issue-session="activeSession"
-          @change-filter="projectsFilter = $event"
           @start="onStartProjectTimer"
           @pause="onPauseProjectTimer"
           @resume="onResumeProjectTimer"

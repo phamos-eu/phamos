@@ -283,7 +283,7 @@ function onStopKey(e)  { if (e.key === "Escape") closePanel(); if (e.key === "En
             </div>
             <div class="pc__panel-field pc__panel-field--grow">
               <label class="pc__panel-label">End time <span class="pc__panel-optional">{{ userTz }}</span></label>
-              <DateTimePicker :model-value="stopEndTimeDate" :date-format="dateFormat" :time-format="timeFormat" :auto-update="!stopEndTimeModified" @update:model-value="onStopEndTimeChange" />
+              <FrappeDatetime :model-value="stopEndTime" @update:model-value="onStopEndTimeChange" />
             </div>
             <div class="pc__panel-actions pc__panel-actions--end">
               <button class="pc__panel-btn pc__panel-btn--ghost" @click="closePanel">Cancel</button>

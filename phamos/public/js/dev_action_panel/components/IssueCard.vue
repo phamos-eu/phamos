@@ -396,7 +396,7 @@ function onStopKey(e)  { if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) conf
             </div>
             <div class="ic__panel-field ic__panel-field--grow">
               <label class="ic__panel-label">End time <span class="ic__panel-optional">{{ userTz }}</span></label>
-              <DateTimePicker :model-value="stopEndTimeDate" :date-format="dateFormat" :time-format="timeFormat" :auto-update="!stopEndTimeModified" @update:model-value="onStopEndTimeChange" />
+              <FrappeDatetime :model-value="stopEndTime" @update:model-value="onStopEndTimeChange" />
             </div>
             <div class="ic__panel-actions ic__panel-actions--end">
               <button class="ic__panel-btn ic__panel-btn--ghost" @click="closePanel">
