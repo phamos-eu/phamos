@@ -3,18 +3,36 @@
 		<template #sidebar>
 			<CockpitSidebar label="Human Resources" storage-key="human-resources-spa-sidebar-collapsed" :items="visibleNavItems" />
 		</template>
+		<template #header-actions>
+			<PrivacyToggle />
+		</template>
 	</CockpitShell>
 </template>
 
 <script setup>
-import { computed } from "vue"
+import { computed, onMounted } from "vue"
 import { useRoute } from "vue-router"
+import { call } from "frappe-ui"
 import CockpitShell from "@spa/components/CockpitShell.vue"
 import CockpitSidebar from "@spa/components/CockpitSidebar.vue"
+import PrivacyToggle from "@spa/components/PrivacyToggle.vue"
+import { enablePrivacyMode } from "@spa/composables/usePrivacyMode.js"
 import { useContractAccess } from "./contracts/useContractAccess.js"
 
 const route = useRoute()
 const { access } = useContractAccess()
+
+// Privacy mode for screen sharing (#1839): figures start hidden on every HR page. It is on even
+// if the setting can't be read; then the default time applies.
+enablePrivacyMode()
+onMounted(async () => {
+	try {
+		const settings = await call("phamos.api.human_resources_spa.get_privacy_settings")
+		enablePrivacyMode(settings?.reveal_seconds)
+	} catch {
+		// keep the default
+	}
+})
 
 const navItems = [
 	{
@@ -51,6 +69,8 @@ const navItems = [
 	},
 	// Every HR user; sick days and contract figures inside are limited per role (#1833).
 	{ name: "Employees", label: "Employees", icon: "users", match: ["Employees"] },
+	// Absences without leave type, for every HR user (#1838).
+	{ name: "TeamCalendar", label: "Team Calendar", icon: "calendar", match: ["TeamCalendar"] },
 ]
 
 // Contracts hold salary, so the section only appears for users who may read them (HR Manager).
@@ -73,6 +93,7 @@ const pageTitle = computed(() => {
 	if (["ChecklistsHome", "Checklists", "ChecklistDetail"].includes(route.name)) return "Checklists"
 	if (CONTRACT_ROUTES.includes(route.name)) return "Employment Contracts"
 	if (route.name === "Employees") return "Employees"
+	if (route.name === "TeamCalendar") return "Team Calendar"
 	return "Issues"
 })
 
@@ -91,6 +112,9 @@ const pageSubtitle = computed(() => {
 	}
 	if (route.name === "Employees") {
 		return "Leave and HR figures for every employee"
+	}
+	if (route.name === "TeamCalendar") {
+		return "Who is away when: leave, requests, birthdays and holidays"
 	}
 	if (route.name === "Contracts") {
 		return "Working time and pay agreed with employees and externals"

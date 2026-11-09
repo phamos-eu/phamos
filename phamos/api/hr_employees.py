@@ -44,7 +44,7 @@ EMPLOYEE_FIELDS = [
 def _check_access() -> set[str]:
 	roles = set(frappe.get_roles())
 	if not roles & ROLES:
-		frappe.throw(_("Only HR users can see the employees list."), frappe.PermissionError)
+		frappe.throw(_("Only HR users can see this page."), frappe.PermissionError)
 	return roles
 
 
@@ -156,9 +156,12 @@ def _employee_row(employee, today, sick_types, leave_dates, sick_days, can_see_s
 
 
 def _applications(employee: str, sick_types, today) -> list[dict]:
-	"""This calendar year's Leave Applications, newest first, without sick leave.
+	"""This calendar year's Leave Applications, newest first.
 
 	Rejected and cancelled ones are included; the heatmap draws them muted (PM, 2026-11-07).
+	Sick leave comes as a neutral absence (#1838, PM 2026-11-08): approved or requested only,
+	without name, type, reason or approver, so the heatmap shows the day away like the Team
+	Calendar does, and nobody learns why.
 	"""
 	year_start, year_end = sick_leave.year_bounds(today)
 	filters = {
@@ -168,7 +171,7 @@ def _applications(employee: str, sick_types, today) -> list[dict]:
 	}
 	if sick_types:
 		filters["leave_type"] = ("not in", sick_types)
-	return frappe.get_all(
+	applications = frappe.get_all(
 		"Leave Application",
 		filters=filters,
 		fields=[
@@ -187,6 +190,33 @@ def _applications(employee: str, sick_types, today) -> list[dict]:
 		],
 		order_by="from_date desc",
 	)
+	if sick_types:
+		applications += _neutral_absences(employee, sick_types, year_start, year_end)
+		applications.sort(key=lambda a: getdate(a["from_date"]), reverse=True)
+	return applications
+
+
+def _neutral_absences(employee: str, sick_types, year_start, year_end) -> list[dict]:
+	"""Sick leave as days away only: dates, half day and whether it is approved or requested."""
+	application = frappe.qb.DocType("Leave Application")
+	approved = (application.docstatus == 1) & (application.status == "Approved")
+	requested = (application.docstatus == 0) & (application.status == "Open")
+	rows = (
+		frappe.qb.from_(application)
+		.select(
+			application.from_date,
+			application.to_date,
+			application.half_day,
+			application.half_day_date,
+			application.status,
+		)
+		.where(application.employee == employee)
+		.where(application.leave_type.isin(sick_types))
+		.where(application.from_date <= year_end)
+		.where(application.to_date >= year_start)
+		.where(approved | requested)
+	).run(as_dict=True)
+	return [frappe._dict(row, neutral=True) for row in rows]
 
 
 def _holidays(employee: str, today) -> list[dict]:

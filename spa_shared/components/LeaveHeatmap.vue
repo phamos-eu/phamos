@@ -56,7 +56,7 @@ import { __ } from "@spa/utils/i18n.js"
 
 const props = defineProps({
 	year: { type: Number, required: true },
-	/** Leave applications with name, from_date, to_date, leave_type, status. */
+	/** Leave applications with name, from_date, to_date, leave_type, status; `neutral` ones carry only dates and status. */
 	applications: { type: Array, default: () => [] },
 	/** { date, description, weekly_off } from the employee's holiday list. */
 	holidays: { type: Array, default: () => [] },
@@ -161,10 +161,11 @@ const months = computed(() =>
 					// A muted (outline) status keeps its outline on a half day; the tooltip names it.
 					classes: half && style.fill ? "" : style.classes,
 					style: half && style.fill ? halfStyle(style.fill) : null,
-					title: `${label} · ${__(leave.leave_type)}${half ? ` · ${__("Half day")}` : ""} · ${__(style.label)}`,
+					// A neutral absence (sick leave in the HR view, #1838) names no type and opens nothing.
+					title: `${label} · ${leave.neutral ? __("Absent") : __(leave.leave_type)}${half ? ` · ${__("Half day")}` : ""} · ${__(style.label)}`,
 					today,
-					app: leave,
-					to: props.link ? props.link(leave) : null,
+					app: leave.neutral ? null : leave,
+					to: props.link && !leave.neutral ? props.link(leave) : null,
 				})
 			} else if (holiday || weekend) {
 				// Recessive: an empty box, so the working-day grid and the leave blocks stand out.
