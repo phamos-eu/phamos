@@ -222,7 +222,9 @@
 						:class="[
 							'border-b border-r border-outline-gray-1',
 							day.iso === todayIso ? 'bg-surface-amber-1 ring-2 ring-inset ring-[var(--ink-amber-3)]' : dayShade(day),
+							// Month boundary as a step line: left of the 1st, and above every day whose cell above is the old month.
 							day.firstOfMonth ? 'border-l-2 border-l-outline-gray-4' : '',
+							day.monthTop ? 'border-t-2 border-t-outline-gray-4' : '',
 						]"
 					/>
 					<div
@@ -469,6 +471,7 @@ function buildWeek(start) {
 			weekend: [0, 6].includes(date.getDay()),
 			altMonth: date.getMonth() % 2 === 1,
 			firstOfMonth: date.getDate() === 1,
+			monthTop: addDays(date, -WEEK).getMonth() !== date.getMonth(),
 			monthName: date.toLocaleDateString(userLocale(), { month: "long" }),
 		}
 	})
