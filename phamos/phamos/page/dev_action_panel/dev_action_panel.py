@@ -708,6 +708,7 @@ def _enrich_projects(projects, user):
         p["total_tracked_seconds"] = ts["total_seconds"]
         p["billable_seconds"] = ts["billable_seconds"]
         p["non_billable_seconds"] = max(0, ts["total_seconds"] - ts["billable_seconds"])
+        p["last_used"] = ts.get("last_used")
         # Preset for Percent Billable in the stop panel: the project's value, 100 when it has none (#1744).
         p["percent_billable"] = p.get("percent_billable") or "100"
 

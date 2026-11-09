@@ -76,23 +76,29 @@ async function toggleSessions() {
   }
 }
 
-function openStart() { panel.value = panel.value === "start" ? null : "start"; }
+function openStart() {
+  panel.value = panel.value === "start" ? null : "start";
+  startTime.value = systemNow();
+  startTimeModified.value = false;
+}
 function openStop()  {
   panel.value = panel.value === "stop" ? null : "stop";
   stopValueAdd.value = VALUE_ADD_DEFAULT;
   stopBillable.value = billablePreset(props.project);
-  stopEndTimeDate.value = new Date();
+  stopEndTime.value = systemNow();
   stopEndTimeModified.value = false;
 }
 function closePanel() { panel.value = null; }
 
 function confirmStart() {
   if (!expectedHours.value || expectedHours.value < 0.25) { frappe.msgprint(__("Minimum 0.25h")); return; }
-  emit("start", {
+  const payload = {
     project: props.project,
     expectedTime: Math.round(parseFloat(expectedHours.value) * 3600),
     goal: startGoal.value.trim() || props.project.project_name,
-  });
+  };
+  if (startTimeModified.value && startTime.value) payload.manualStartTime = startTime.value;
+  emit("start", payload);
   panel.value = null;
   startGoal.value = "";
 }

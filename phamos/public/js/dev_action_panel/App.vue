@@ -293,7 +293,7 @@ async function onStopProjectTimer({ result, valueAdd, percentBillable, activityT
       stopProjectTick();
       activeProjectSession.value = null;
       projectElapsedSeconds.value = 0;
-      await Promise.all([loadMyProjects(), loadStats()]);
+      await Promise.all([loadAllProjects(), loadStats()]);
     });
     return;
   }
@@ -301,7 +301,7 @@ async function onStopProjectTimer({ result, valueAdd, percentBillable, activityT
     stopProjectTick();
     activeProjectSession.value = null;
     projectElapsedSeconds.value = 0;
-    await Promise.all([loadMyProjects(), loadStats()]);
+    await Promise.all([loadAllProjects(), loadStats()]);
     frappe.show_alert({ message: __("Project session submitted."), indicator: "green" });
   }
 }

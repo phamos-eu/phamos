@@ -55,21 +55,10 @@ const timeFormat = frappe.boot?.sysdefaults?.time_format || "HH:mm:ss";
 const userTz = frappe.boot?.time_zone?.user || frappe.boot?.sysdefaults?.time_zone || "";
 const systemTz = frappe.boot?.time_zone?.system || "";
 
-// Format a Date whose local h/m values are the user's intended user-tz time → system-tz string for backend
-function formatForApi(date) {
-  if (!date) return null;
-  const pad = n => String(n).padStart(2, "0");
-  const localStr = `${date.getFullYear()}-${pad(date.getMonth()+1)}-${pad(date.getDate())} ${pad(date.getHours())}:${pad(date.getMinutes())}:00`;
-  const uTz = frappe.boot?.time_zone?.user;
-  const sTz = frappe.boot?.time_zone?.system;
-  if (uTz && sTz && typeof moment !== "undefined" && moment.tz) {
-    try { return moment.tz(localStr, uTz).tz(sTz).format("YYYY-MM-DD HH:mm:ss"); } catch(e) {}
-  }
-  return localStr;
-}
+const systemNow = () => frappe.datetime.system_datetime();
 
-function onStartTimeChange(date) { startTimeDate.value = date; startTimeModified.value = true; }
-function onStopEndTimeChange(date) { stopEndTimeDate.value = date; stopEndTimeModified.value = true; }
+function onStartTimeChange(value) { startTime.value = value; startTimeModified.value = true; }
+function onStopEndTimeChange(value) { stopEndTime.value = value; stopEndTimeModified.value = true; }
 
 function parseSystemDatetimeToUserDate(dtStr) {
   if (!dtStr || typeof dtStr !== "string") return null;

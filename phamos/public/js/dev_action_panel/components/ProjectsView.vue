@@ -89,7 +89,7 @@ const filteredProjects = computed(() => {
           </svg>
         </div>
         <p class="pv__empty-title">
-          {{ query ? 'No projects match your search' : (filter === 'my' ? 'No projects assigned to you' : 'No open projects found') }}
+          {{ query ? 'No projects match your search' : 'No open projects found' }}
         </p>
         <p v-if="query" class="pv__empty-sub">Try a different keyword or clear the search above.</p>
       </div>
