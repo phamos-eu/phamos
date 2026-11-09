@@ -226,6 +226,8 @@ ai_code_review:
   stage: ai-review
   image: python:3.10-slim
   tags: [hetzner]
+  # A failed review (API error, expired token) must not fail the MR pipeline.
+  allow_failure: true
   needs: []
   # A newer push gets its own review.
   interruptible: true
