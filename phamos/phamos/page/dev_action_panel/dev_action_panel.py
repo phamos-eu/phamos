@@ -681,6 +681,7 @@ def _enrich_projects(projects, user):
                 Count("*").as_("cnt"),
                 Coalesce(total_seconds, 0).as_("total_seconds"),
                 Coalesce(billable_seconds, 0).as_("billable_seconds"),
+                Max(TimesheetRecord.creation).as_("last_used"),
             )
             .where(
                 (TimesheetRecord.project.isin(project_names))

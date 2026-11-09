@@ -5,7 +5,6 @@ import { RATING_OPTIONS, VALUE_ADD_DEFAULT, VALUE_ADD_HELP, billablePreset } fro
 
 const props = defineProps({
   project: Object,
-  mode: String, // 'my' | 'all'
   activeProjectSession: Object,
   projectElapsedSeconds: Number,
   activeIssueSession: Object,

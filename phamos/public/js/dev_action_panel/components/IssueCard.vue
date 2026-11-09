@@ -32,7 +32,8 @@ const loadingSessions = ref(false);
 // Start form
 const expectedHours = ref(1);
 const startGoal = ref("");
-const startTimeDate = ref(new Date());
+// System time zone string from the Frappe Datetime control (shown in the user's time zone)
+const startTime = ref("");
 const startTimeModified = ref(false);
 
 // Stop form

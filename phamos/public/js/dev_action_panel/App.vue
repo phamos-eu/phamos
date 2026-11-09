@@ -173,10 +173,6 @@ async function loadSession() {
 async function loadStats() { const r = await frappe.call({ method: "phamos.phamos.page.dev_action_panel.dev_action_panel.get_time_stats" }); stats.value = r.message || null; }
 
 // Projects
-async function loadMyProjects() {
-  const r = await frappe.call({ method: "phamos.phamos.page.dev_action_panel.dev_action_panel.get_dev_my_projects" });
-  myProjects.value = r.message || [];
-}
 async function loadAllProjects() {
   const r = await frappe.call({ method: "phamos.phamos.page.dev_action_panel.dev_action_panel.get_dev_all_projects" });
   allProjects.value = r.message || [];
