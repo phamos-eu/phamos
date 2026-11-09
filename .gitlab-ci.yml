@@ -31,7 +31,8 @@
 # ai_code_review
 #   Reviews MRs into develop / version-15 / release/* with Claude and posts
 #   findings as an MR comment. Needs CI/CD variables ANTHROPIC_API_KEY and GITLAB_API_TOKEN; set
-#   AI_REVIEW_ENABLED=false to disable.
+#   AI_REVIEW_ENABLED=false to disable. Add the label "skip-ai-code-review"
+#   to the MR and run a new pipeline to skip it for that MR.
 
 workflow:
   rules:
@@ -234,6 +235,8 @@ ai_code_review:
   interruptible: true
   rules:
     - if: '$AI_REVIEW_ENABLED == "false"'
+      when: never
+    - if: '$CI_MERGE_REQUEST_LABELS =~ /(^|,)skip-ai-code-review(,|$)/'
       when: never
     - if: '$CI_PIPELINE_SOURCE == "merge_request_event" && $CI_MERGE_REQUEST_TARGET_BRANCH_NAME =~ /^(develop|version-15|release\/.+)$/'
   script:
