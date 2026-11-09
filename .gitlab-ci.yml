@@ -172,6 +172,7 @@ unit_tests_1:
       phamos.okr_addon.doctype.okr_team.test_okr_team
       phamos.tests.test_web_profile_events
       phamos.tests.test_accounting_stats
+      phamos.phamos.page.extract_pdf.test_extract_pdf
 
 unit_tests_2:
   extends: .unit_tests
