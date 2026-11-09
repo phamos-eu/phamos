@@ -225,6 +225,7 @@ tests_required:
 ai_code_review:
   stage: ai-review
   image: python:3.10-slim
+  tags: [hetzner]
   needs: []
   # A newer push gets its own review.
   interruptible: true
