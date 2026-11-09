@@ -1117,39 +1117,7 @@ function show_tab(tab, projectData) {
     cardWrapper.innerHTML = "";  // This will ensure the number cards don't duplicate
     datatableWrapper.innerHTML = ""; // Clear previous DataTable content
 
-    if (tab === "Your Projects") {
-      // style inject (sirf table aur cards ke liye zaroori CSS)
-      let style = document.createElement("style");
-      style.innerHTML = `
-        .dt-cell__content--col-14, .dt-cell__content--header-14 { display: none; width: 0; }
-        .dt-cell__content--col-6, .dt-cell__content--header-6 { display: table-cell; }
-        .dt-cell__content--col-9, .dt-cell__content--header-9 { display: table-cell;}
-        .dt-cell__content--col-3, .dt-cell__content--header-3 { display: table-cell; }
-      `;
-      document.head.appendChild(style);
-
-      // Render cards
-      card_names = [
-        "Your Total Projects", 
-        "Total Hrs Worked Today", 
-        "Total Hrs Worked This Week", 
-        "Total Hrs Worked This Month"
-      ];
-      render_cards(cardWrapper, card_names);
-
-      // LEFT: Projects table container
-      const tableDiv = document.createElement("div");
-      tableDiv.id = "datatable-inner";
-      tableDiv.style.flex = "2"; 
-
-      datatableWrapper.appendChild(tableDiv);
-
-      // Render projects table
-      renderProjectDataTable(tableDiv, projectData);
-      persistButtonStates();
-    }
-
-    else if (tab === "All Projects") {
+    if (tab === "All Projects") {
       let style = document.createElement("style");
       style.innerHTML = `
         /* unHide the "Name" column cells and header */
