@@ -30,7 +30,8 @@
 # ai_code_review
 #   Reviews MRs targeting version-15 with Claude and posts findings as an MR
 #   comment. Needs CI/CD variables ANTHROPIC_API_KEY and GITLAB_API_TOKEN; set
-#   AI_REVIEW_ENABLED=false to disable.
+#   AI_REVIEW_ENABLED=false to disable. Add the label "skip-ai-code-review"
+#   to the MR and run a new pipeline to skip it for that MR.
 
 workflow:
   rules:
@@ -224,11 +225,16 @@ tests_required:
 ai_code_review:
   stage: ai-review
   image: python:3.10-slim
+  tags: [hetzner]
+  # A failed review (API error, expired token) must not fail the MR pipeline.
+  allow_failure: true
   needs: []
   # A newer push gets its own review.
   interruptible: true
   rules:
     - if: '$AI_REVIEW_ENABLED == "false"'
+      when: never
+    - if: '$CI_MERGE_REQUEST_LABELS =~ /(^|,)skip-ai-code-review(,|$)/'
       when: never
     - if: '$CI_PIPELINE_SOURCE == "merge_request_event" && $CI_MERGE_REQUEST_TARGET_BRANCH_NAME == "version-15"'
   script:

@@ -436,7 +436,9 @@ def stop_timer(name, result, percent_billable=100, activity_type=None, manual_en
     if doc.item:
         first_row = doc.item[0]
         doc.from_time = first_row.from_time
-        doc.to_time = end_time
+        # Ends with the first work row, not at Stop: the break and the later work rows are
+        # their own records, and ERPNext refuses Timesheets that overlap them (#1636).
+        doc.to_time = first_row.to_time
         doc.actual_time = first_row.duration or 0
 
     doc.result = result
