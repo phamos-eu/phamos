@@ -3,12 +3,23 @@
 import { reactive } from "vue"
 import { call } from "frappe-ui"
 import { __ } from "@spa/utils/i18n.js"
+import { createWalkQueue } from "@spa/utils/ideaWalk.js"
 import spaConfig from "./config"
 
 export const ideas = reactive({ rows: [], options: null, loaded: false, error: "", showClosed: false })
 
 // Ideas handed in for a vote (#1842): everyone's, most votes first.
 export const voteIdeas = reactive({ rows: [], loaded: false, error: "" })
+
+// The order "Next idea" walks on the vote page (#1845). The vote page ends the walk when it closes.
+const voteWalk = createWalkQueue(async () => {
+	await loadIdeasForVote()
+	return voteIdeas.rows.map((row) => row.name)
+})
+
+/** The idea after `name` in the walk, and where `name` stands; loads the list on a direct visit. */
+export const nextIdeaForVote = (name) => voteWalk.step(name)
+export const endVoteWalk = () => voteWalk.reset()
 
 let inflight = null
 let optionsInflight = null
