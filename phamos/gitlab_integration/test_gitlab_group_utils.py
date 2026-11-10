@@ -77,9 +77,9 @@ def fake_project(name, group_id):
 
 class TestCreateGitlabProjectForImplementation(TestCase):
     def run_create(self, db, project_name="proj-1293"):
+        # frappe.msgprint stays real: frappe.throw raises through it.
         with patch.object(frappe, "db", db), \
                 patch.object(frappe, "get_doc", db.get_doc), \
-                patch.object(frappe, "msgprint"), \
                 patch(f"{MODULE}.create_gitlab_project") as create:
             create.side_effect = lambda name, group_id, customer_doc=None: fake_project(name, group_id)
             try:
