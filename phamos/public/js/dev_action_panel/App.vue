@@ -25,10 +25,8 @@ const selectedProject = ref(null);
 const currentView = ref("issues"); // 'issues' | 'timesheets' | 'team' | 'projects'
 const mineOnly = ref(true); // default: show only current user's issues
 
-// Projects section
-const myProjects = ref([]);
+// Projects section: one list (last used first, then assigned to me, then the rest)
 const allProjects = ref([]);
-const projectsFilter = ref("my"); // 'my' | 'all'
 const projectsLoading = ref(false);
 const activeProjectSession = ref(null);
 const projectElapsedSeconds = ref(0);
@@ -175,10 +173,6 @@ async function loadSession() {
 async function loadStats() { const r = await frappe.call({ method: "phamos.phamos.page.dev_action_panel.dev_action_panel.get_time_stats" }); stats.value = r.message || null; }
 
 // Projects
-async function loadMyProjects() {
-  const r = await frappe.call({ method: "phamos.phamos.page.dev_action_panel.dev_action_panel.get_dev_my_projects" });
-  myProjects.value = r.message || [];
-}
 async function loadAllProjects() {
   const r = await frappe.call({ method: "phamos.phamos.page.dev_action_panel.dev_action_panel.get_dev_all_projects" });
   allProjects.value = r.message || [];
@@ -200,10 +194,12 @@ function startProjectTick() {
 }
 function stopProjectTick() { clearInterval(projectTimerInterval); projectTimerInterval = null; }
 
-async function onStartProjectTimer({ project, expectedTime, goal }) {
+async function onStartProjectTimer({ project, expectedTime, goal, manualStartTime }) {
+  const args = { project_name: project.name, expected_time: expectedTime, goal };
+  if (manualStartTime) args.manual_start_time = manualStartTime;
   const r = await frappe.call({
     method: "phamos.phamos.page.dev_action_panel.dev_action_panel.start_project_timer",
-    args: { project_name: project.name, expected_time: expectedTime, goal },
+    args,
   });
   if (r.message) {
     activeProjectSession.value = { ...r.message };
@@ -297,7 +293,7 @@ async function onStopProjectTimer({ result, valueAdd, percentBillable, activityT
       stopProjectTick();
       activeProjectSession.value = null;
       projectElapsedSeconds.value = 0;
-      await Promise.all([loadMyProjects(), loadStats()]);
+      await Promise.all([loadAllProjects(), loadStats()]);
     });
     return;
   }
@@ -305,7 +301,7 @@ async function onStopProjectTimer({ result, valueAdd, percentBillable, activityT
     stopProjectTick();
     activeProjectSession.value = null;
     projectElapsedSeconds.value = 0;
-    await Promise.all([loadMyProjects(), loadStats()]);
+    await Promise.all([loadAllProjects(), loadStats()]);
     frappe.show_alert({ message: __("Project session submitted."), indicator: "green" });
   }
 }
@@ -316,7 +312,7 @@ async function assignProject(project) {
     args: { project_name: project.name },
   });
   frappe.show_alert({ message: __("Project assigned to you."), indicator: "green" });
-  await Promise.all([loadMyProjects(), loadAllProjects()]);
+  await loadAllProjects();
 }
 
 // Inline start (emitted from card with { issue, expectedTime, goal, manualStartTime? })
@@ -440,7 +436,7 @@ async function onSync() {
   syncing.value = false;
 }
 
-onMounted(async () => { await Promise.all([loadIssues(), loadSession(), loadStats(), loadLabels(), loadMyProjects(), loadAllProjects(), loadActiveProjectSession()]); });
+onMounted(async () => { await Promise.all([loadIssues(), loadSession(), loadStats(), loadLabels(), loadAllProjects(), loadActiveProjectSession()]); });
 onUnmounted(() => { stopTick(); stopProjectTick(); });
 </script>
 
@@ -485,8 +481,6 @@ onUnmounted(() => { stopTick(); stopProjectTick(); });
           :my-issues-count="myIssuesCount"
           :mine-only="mineOnly"
           :syncing="syncing"
-          :projects-filter="projectsFilter"
-          :my-projects-count="myProjects.length"
           :all-projects-count="allProjects.length"
           :active-project-session="activeProjectSession"
           :project-elapsed-seconds="projectElapsedSeconds"
@@ -494,7 +488,7 @@ onUnmounted(() => { stopTick(); stopProjectTick(); });
           @change-view="currentView = $event"
           @toggle-mine="mineOnly = $event"
           @sync="onSync"
-          @navigate-projects="(tab) => { currentView = 'projects'; projectsFilter = tab; }"
+          @navigate-projects="currentView = 'projects'"
         />
       </aside>
 
@@ -537,14 +531,11 @@ onUnmounted(() => { stopTick(); stopProjectTick(); });
         <TimesheetList v-else-if="currentView === 'timesheets'" />
         <ProjectsView
           v-else-if="currentView === 'projects'"
-          :filter="projectsFilter"
-          :my-projects="myProjects"
           :all-projects="allProjects"
           :active-project-session="activeProjectSession"
           :project-elapsed-seconds="projectElapsedSeconds"
           :loading="projectsLoading"
           :active-issue-session="activeSession"
-          @change-filter="projectsFilter = $event"
           @start="onStartProjectTimer"
           @pause="onPauseProjectTimer"
           @resume="onResumeProjectTimer"

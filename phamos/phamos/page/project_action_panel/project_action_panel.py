@@ -776,6 +776,20 @@ def fetch_projects():
     # Handling Customer Description (Replacing CASE)
     customer_desc_query = IfNull(Customer.customer_name, Customer.name)
 
+    # One list instead of "Your Projects" + "All Projects": every Open project, plus projects
+    # assigned to me in any status. Closing the assignment ToDo only changes the order.
+    assigned_to_me = (
+        frappe.qb.from_(ToDo)
+        .select(Max(ToDo.reference_name))
+        .where(
+            (ToDo.status == "Open")
+            & (ToDo.reference_type == "Project")
+            & (ToDo.reference_name == Project.name)
+            & (ToDo.allocated_to == frappe.session.user)
+        )
+    )
+    is_assigned = Case().when(assigned_to_me.isnotnull(), 1).else_(0)
+
     # Main Query
     query = (
         frappe.qb.from_(Project)
@@ -796,18 +810,14 @@ def fetch_projects():
             latest_timesheet_record.as_("timesheet_record"),
             latest_task.as_("task"),
             last_timesheet_update.as_("last_timesheet_update"),
+            is_assigned.as_("assigned_to_me"),
         )
-        .where(
-            frappe.qb.from_(ToDo)
-            .select(Max(ToDo.reference_name))
-            .where(
-                (ToDo.status == "Open")
-                & (ToDo.reference_name == Project.name)
-                & (ToDo.allocated_to == frappe.session.user)
-            ).isnotnull()
-        )
-        .orderby(Coalesce(last_timesheet_update, "1970, 1, 1"), order=Order.desc)
-        
+        .where((Project.status == "Open") | assigned_to_me.isnotnull())
+        # Last used first (my latest Timesheet Record), then my assigned projects, then the rest.
+        .orderby(Coalesce(last_timesheet_update, "1970-01-01"), order=Order.desc)
+        # By alias: the query builder drops the brackets around a subquery inside ORDER BY CASE.
+        .orderby(Field("assigned_to_me"), order=Order.desc)
+        .orderby(Project.name, order=Order.asc)
     )
     # Execute query
     projects = query.run(as_dict=True)

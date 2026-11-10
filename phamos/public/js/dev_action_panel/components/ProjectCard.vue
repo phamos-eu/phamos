@@ -1,11 +1,10 @@
 <script setup>
 import { ref, computed } from "vue";
-import DateTimePicker from "./DateTimePicker.vue";
+import FrappeDatetime from "./FrappeDatetime.vue";
 import { RATING_OPTIONS, VALUE_ADD_DEFAULT, VALUE_ADD_HELP, billablePreset } from "../timesheetRating.js";
 
 const props = defineProps({
   project: Object,
-  mode: String, // 'my' | 'all'
   activeProjectSession: Object,
   projectElapsedSeconds: Number,
   activeIssueSession: Object,
@@ -29,27 +28,18 @@ const labels = {
   percentBillable: __("Percent Billable"),
 };
 const stopActivityType = ref("");
-const stopEndTimeDate = ref(new Date());
+// Start and end time: system time zone strings from the Frappe Datetime control (shown in the user's time zone).
+const startTime = ref("");
+const startTimeModified = ref(false);
+const stopEndTime = ref("");
 const stopEndTimeModified = ref(false);
 const activityTypes = ["Working Alone", "Working with Customer", "Working With Team"];
 
-const dateFormat = frappe.boot?.sysdefaults?.date_format || "dd.mm.yyyy";
-const timeFormat = frappe.boot?.sysdefaults?.time_format || "HH:mm:ss";
 const userTz = frappe.boot?.time_zone?.user || frappe.boot?.sysdefaults?.time_zone || "";
+const systemNow = () => frappe.datetime.system_datetime();
 
-function formatForApi(date) {
-  if (!date) return null;
-  const pad = n => String(n).padStart(2, "0");
-  const localStr = `${date.getFullYear()}-${pad(date.getMonth()+1)}-${pad(date.getDate())} ${pad(date.getHours())}:${pad(date.getMinutes())}:00`;
-  const uTz = frappe.boot?.time_zone?.user;
-  const sTz = frappe.boot?.time_zone?.system;
-  if (uTz && sTz && typeof moment !== "undefined" && moment.tz) {
-    try { return moment.tz(localStr, uTz).tz(sTz).format("YYYY-MM-DD HH:mm:ss"); } catch(e) {}
-  }
-  return localStr;
-}
-
-function onStopEndTimeChange(date) { stopEndTimeDate.value = date; stopEndTimeModified.value = true; }
+function onStartTimeChange(value) { startTime.value = value; startTimeModified.value = true; }
+function onStopEndTimeChange(value) { stopEndTime.value = value; stopEndTimeModified.value = true; }
 
 const isActive = computed(() => props.activeProjectSession?.project === props.project.name);
 const sessionState = computed(() => isActive.value ? props.activeProjectSession?.session_state : null);
@@ -86,23 +76,29 @@ async function toggleSessions() {
   }
 }
 
-function openStart() { panel.value = panel.value === "start" ? null : "start"; }
+function openStart() {
+  panel.value = panel.value === "start" ? null : "start";
+  startTime.value = systemNow();
+  startTimeModified.value = false;
+}
 function openStop()  {
   panel.value = panel.value === "stop" ? null : "stop";
   stopValueAdd.value = VALUE_ADD_DEFAULT;
   stopBillable.value = billablePreset(props.project);
-  stopEndTimeDate.value = new Date();
+  stopEndTime.value = systemNow();
   stopEndTimeModified.value = false;
 }
 function closePanel() { panel.value = null; }
 
 function confirmStart() {
   if (!expectedHours.value || expectedHours.value < 0.25) { frappe.msgprint(__("Minimum 0.25h")); return; }
-  emit("start", {
+  const payload = {
     project: props.project,
     expectedTime: Math.round(parseFloat(expectedHours.value) * 3600),
     goal: startGoal.value.trim() || props.project.project_name,
-  });
+  };
+  if (startTimeModified.value && startTime.value) payload.manualStartTime = startTime.value;
+  emit("start", payload);
   panel.value = null;
   startGoal.value = "";
 }
@@ -116,7 +112,7 @@ function confirmStop() {
     percentBillable: stopBillable.value,
     activityType: stopActivityType.value,
   };
-  if (stopEndTimeModified.value) payload.manualEndTime = formatForApi(stopEndTimeDate.value);
+  if (stopEndTimeModified.value && stopEndTime.value) payload.manualEndTime = stopEndTime.value;
   emit("stop", payload);
   panel.value = null;
   stopResult.value = "";
@@ -134,7 +130,7 @@ function onStopKey(e)  { if (e.key === "Escape") closePanel(); if (e.key === "En
       'pc--active':  isActive,
       'pc--running': sessionState === 'running',
       'pc--paused':  sessionState === 'paused',
-      'pc--blocked': hasAnySession && !isActive && mode === 'my',
+      'pc--blocked': hasAnySession && !isActive,
     }"
   >
     <div class="pc__body">
@@ -183,7 +179,15 @@ function onStopKey(e)  { if (e.key === "Escape") closePanel(); if (e.key === "En
           </span>
           <span class="pc__info-flex"></span>
 
-          <template v-if="mode === 'my'">
+          <!-- One list: every project can be assigned to me and timed -->
+          <button
+            v-if="!project.is_assigned"
+            class="pc__btn pc__btn--assign"
+            @click="emit('assign', project)"
+          >
+            Assign to me
+          </button>
+          <span v-else class="pc__assigned-badge">Assigned</span>
             <span v-if="isActive" class="pc__timer" :class="sessionState === 'running' ? 'timer--green' : 'timer--amber'">
               {{ fmtElapsed(projectElapsedSeconds) }}
             </span>
@@ -209,18 +213,6 @@ function onStopKey(e)  { if (e.key === "Escape") closePanel(); if (e.key === "En
               <svg width="10" height="10" viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z"/></svg>
               Start
             </button>
-          </template>
-
-          <template v-else>
-            <button
-              v-if="!project.is_assigned"
-              class="pc__btn pc__btn--assign"
-              @click="emit('assign', project)"
-            >
-              Assign to me
-            </button>
-            <span v-else class="pc__assigned-badge">Assigned</span>
-          </template>
         </div>
       </div>
     </div>
@@ -236,6 +228,10 @@ function onStopKey(e)  { if (e.key === "Escape") closePanel(); if (e.key === "En
                 <input v-model.number="expectedHours" type="number" min="0.25" step="0.25" class="pc__panel-input pc__panel-input--sm" autofocus />
                 <span class="pc__panel-unit">hours</span>
               </div>
+            </div>
+            <div class="pc__panel-field">
+              <label class="pc__panel-label">Start time <span class="pc__panel-optional">{{ userTz }}</span></label>
+              <FrappeDatetime :model-value="startTime" @update:model-value="onStartTimeChange" />
             </div>
             <div class="pc__panel-field pc__panel-field--grow">
               <label class="pc__panel-label">Goal</label>
@@ -287,7 +283,7 @@ function onStopKey(e)  { if (e.key === "Escape") closePanel(); if (e.key === "En
             </div>
             <div class="pc__panel-field pc__panel-field--grow">
               <label class="pc__panel-label">End time <span class="pc__panel-optional">{{ userTz }}</span></label>
-              <DateTimePicker :model-value="stopEndTimeDate" :date-format="dateFormat" :time-format="timeFormat" :auto-update="!stopEndTimeModified" @update:model-value="onStopEndTimeChange" />
+              <FrappeDatetime :model-value="stopEndTime" @update:model-value="onStopEndTimeChange" />
             </div>
             <div class="pc__panel-actions pc__panel-actions--end">
               <button class="pc__panel-btn pc__panel-btn--ghost" @click="closePanel">Cancel</button>

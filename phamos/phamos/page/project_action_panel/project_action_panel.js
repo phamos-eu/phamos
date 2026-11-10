@@ -1000,7 +1000,7 @@ function renderDataTable(wrapper, projectData) {
       return;
     }
 
-    // Set the default active tab to 'Your Projects'
+    // 'All Projects' is the default tab (Your Projects was merged into it)
     wrapper.innerHTML = `
         <h2 style="display: inline; margin-left: 50px; margin-top: 10px; font-size:30px">
           Project Action Panel
@@ -1009,14 +1009,8 @@ function renderDataTable(wrapper, projectData) {
         <div class="form-tabs-list">
           <ul class="nav form-tabs" id="form-tabs" role="tablist">
             <li class="nav-item show">
-              <!-- 'Your Projects' tab is the default active tab -->
-              <a class="nav-link active" id="DAP-your-project-tab" role="tab" aria-controls="your-projects" aria-selected="true">
-                  Your Projects
-              </a>
-            </li>
-            <li class="nav-item show">
-              <!-- 'All Projects' tab is inactive by default -->
-              <a class="nav-link" id="DAP-all-project-tab" role="tab" aria-controls="all-projects" aria-selected="false">
+              <!-- One project list: last used first, then projects assigned to me, then the rest -->
+              <a class="nav-link active" id="DAP-all-project-tab" role="tab" aria-controls="all-projects" aria-selected="true">
                   All Projects
               </a>
             </li>
@@ -1079,32 +1073,13 @@ function renderDataTable(wrapper, projectData) {
     header.appendChild(infoIcon);
 
     // Get references to the tabs
-    const your_projectsTab = document.getElementById("DAP-your-project-tab");
     const all_projectsTab = document.getElementById("DAP-all-project-tab");
     const my_calenderTab = document.getElementById("my-calender");
     const team_calenderTab = document.getElementById("team-calender");
 
-
-    // Event listener for the Your Projects tab
-    your_projectsTab.addEventListener("click", () => {
-      // Remove 'active' class from All Projects tab and set to Your Projects
-      all_projectsTab.classList.remove("active");
-      your_projectsTab.classList.add("active");
-      team_calenderTab.classList.remove("active");
-      my_calenderTab.classList.remove("active");
-
-
-      // Set visual feedback for selection
-      your_projectsTab.setAttribute("aria-selected", "true");
-      all_projectsTab.setAttribute("aria-selected", "false");
-
-    // Show content for the Your Projects tab
-      show_tab("Your Projects", projectData);
-    });
     // Event listener for the my calender tab
     my_calenderTab.addEventListener("click", () => {
-        // Remove 'active' class from Your Projects tab and set to All Projects
-        your_projectsTab.classList.remove("active");
+        all_projectsTab.setAttribute("aria-selected", "false");
         my_calenderTab.classList.add("active");
         team_calenderTab.classList.remove("active");
         all_projectsTab.classList.remove("active");
@@ -1113,8 +1088,7 @@ function renderDataTable(wrapper, projectData) {
     });
     // Event listener for the team calender tab
     team_calenderTab.addEventListener("click", () => {
-        // Remove 'active' class from Your Projects tab and set to All Projects
-        your_projectsTab.classList.remove("active");
+        all_projectsTab.setAttribute("aria-selected", "false");
         team_calenderTab.classList.add("active");
         my_calenderTab.classList.remove("active");
         all_projectsTab.classList.remove("active");
@@ -1124,24 +1098,15 @@ function renderDataTable(wrapper, projectData) {
 
     // Event listener for the All Projects tab
     all_projectsTab.addEventListener("click", () => {
-        // Remove 'active' class from Your Projects tab and set to All Projects
-        your_projectsTab.classList.remove("active");
         all_projectsTab.classList.add("active");
         my_calenderTab.classList.remove("active");
         team_calenderTab.classList.remove("active");
-
-
-
-        // Set visual feedback for selection
         all_projectsTab.setAttribute("aria-selected", "true");
-        your_projectsTab.setAttribute("aria-selected", "false");
-
-        // Show content for the All Projects tab
       show_tab("All Projects", projectData);
     });
 
-  // Initial tab content setup: Show content for 'Your Projects' by default
-  show_tab("Your Projects", projectData); // Set 'Your Projects' as default
+  // The project list is the default (and only) project tab
+  show_tab("All Projects", projectData);
 }
 
 // Show tab content based on the selected tab
@@ -1152,39 +1117,7 @@ function show_tab(tab, projectData) {
     cardWrapper.innerHTML = "";  // This will ensure the number cards don't duplicate
     datatableWrapper.innerHTML = ""; // Clear previous DataTable content
 
-    if (tab === "Your Projects") {
-      // style inject (sirf table aur cards ke liye zaroori CSS)
-      let style = document.createElement("style");
-      style.innerHTML = `
-        .dt-cell__content--col-14, .dt-cell__content--header-14 { display: none; width: 0; }
-        .dt-cell__content--col-6, .dt-cell__content--header-6 { display: table-cell; }
-        .dt-cell__content--col-9, .dt-cell__content--header-9 { display: table-cell;}
-        .dt-cell__content--col-3, .dt-cell__content--header-3 { display: table-cell; }
-      `;
-      document.head.appendChild(style);
-
-      // Render cards
-      card_names = [
-        "Your Total Projects", 
-        "Total Hrs Worked Today", 
-        "Total Hrs Worked This Week", 
-        "Total Hrs Worked This Month"
-      ];
-      render_cards(cardWrapper, card_names);
-
-      // LEFT: Projects table container
-      const tableDiv = document.createElement("div");
-      tableDiv.id = "datatable-inner";
-      tableDiv.style.flex = "2"; 
-
-      datatableWrapper.appendChild(tableDiv);
-
-      // Render projects table
-      renderProjectDataTable(tableDiv, projectData);
-      persistButtonStates();
-    }
-
-    else if (tab === "All Projects") {
+    if (tab === "All Projects") {
       let style = document.createElement("style");
       style.innerHTML = `
         /* unHide the "Name" column cells and header */
@@ -1204,25 +1137,16 @@ function show_tab(tab, projectData) {
 
       // Define the cards to display
       card_names = ["Total Projects", "Total Hrs Worked Today", "Total Hrs Worked This Week", "Total Hrs Worked This Month"];
-  
-      // Render the cards immediately to improve perceived speed
       render_cards(cardWrapper, card_names, tab);
 
-      // Make an API call to fetch all projects data asynchronously
-        frappe.call({
-          method: "phamos.phamos.page.project_action_panel.project_action_panel.fetch_all_projects",
-          callback: function (r) {
-            if (r.message) {
-              // Render DataTable with the fetched data once API response is received
-              renderProjectDataTable(datatableWrapper, r.message);
-            } else {
-              // Handle case with no data or error
-              datatableWrapper.innerHTML = `<p>No projects found.</p>`;
-            }
-          },
-          freeze: true,  // Optional: Add a freeze effect to indicate loading
-          freeze_message: "Loading projects...",  // Custom loading message
-        });
+      // fetch_projects already returns the one list (last used first, then assigned to me),
+      // with the timesheet data that the Start / Stop / Pause buttons need.
+      if (projectData && projectData.length) {
+        renderProjectDataTable(datatableWrapper, projectData);
+        persistButtonStates();
+      } else {
+        datatableWrapper.innerHTML = `<p>No projects found.</p>`;
+      }
     }
     else if (tab === "My Calender") {
       // style inject (calendar styles)
