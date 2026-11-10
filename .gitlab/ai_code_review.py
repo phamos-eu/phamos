@@ -90,13 +90,44 @@ Review the diff for:
 - Security issues (OWASP top 10, especially injection and access control)
 - Obvious reuse/simplification opportunities
 
-Do not comment on formatting/style that a linter would catch. Be concise. If you find no issues, \
-say so briefly. Structure findings as a short markdown list, each with file reference, the issue, \
-and a suggested fix. Skip preamble.
-
 <diff>
 {diff_text}
 </diff>
+
+Write the review in GitLab-flavoured Markdown, in exactly this structure, with no preamble:
+
+**Summary:** one sentence on what the MR does.
+
+### 🔴 Blockers
+Must be fixed before merging: bugs, security holes, data loss, broken migrations or patches, \
+missing permission checks.
+
+### 🟡 Suggestions
+Would make the code better but are not required to merge.
+
+### ❓ Questions
+Things that look wrong or unclear but may be intended; ask the author.
+
+### 👍 Praise
+At most two specific things done well. Leave the section out rather than giving generic praise.
+
+### Verdict
+Exactly one of these lines, followed by one sentence explaining it:
+- ✅ **Safe to merge**: no blockers.
+- ⚠️ **Merge with caution**: no blockers found, but an open question, or a part of the change \
+you could not see (for example a diff that ends with "[diff truncated for length]"), could hide one.
+- ❌ **Not safe to merge**: at least one blocker.
+
+Rules:
+- Leave out any section with nothing in it, except Summary and Verdict.
+- Each finding is one list item: `path/to/file.py:line`, what is wrong, why it matters, and a \
+concrete fix. Take line numbers from the diff's hunk headers.
+- Classify honestly: do not raise a suggestion to a blocker to sound thorough, and do not \
+play down a real bug as a suggestion.
+- Report only issues you can point to in the diff. Prefer a few certain findings over many \
+guesses; when unsure, ask a question instead.
+- Skip formatting and style that a linter would catch.
+- Comment on the code, not the author.
 """
 
     payload = {
