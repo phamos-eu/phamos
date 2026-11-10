@@ -106,3 +106,6 @@ IDEA_SNAPSHOT_MINUTES = 10  # a Version row at most this often while only the co
 IDEA_DEFAULT_WORD_BASE = 300  # aim base before the first writing session
 IDEA_AIM_FACTORS = {"more": 1.15, "similar": 1.0, "less": 0.85}
 IDEA_FEELINGS = ("Productive", "Mixed", "Not really")
+# Hand in for vote (#1842): a handed-in idea is readable by every cockpit user, who can upvote it.
+IDEA_VOTE_OPEN = "Open for vote"  # Idea.vote_status while handed in
+IDEA_VOTE_BLOCKED_STAGES = ("Compost",)  # cannot be handed in; composting withdraws

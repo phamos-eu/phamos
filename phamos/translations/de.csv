@@ -972,6 +972,7 @@ Could not load the project,Das Projekt konnte nicht geladen werden
 Please pick a project.,Bitte wählen Sie ein Projekt.
 This project needs a task.,Für dieses Projekt ist eine Aufgabe erforderlich.
 Minimum expected time is 15 minutes.,Die geplante Zeit beträgt mindestens 15 Minuten.
+Please complete the start time.,Bitte vervollständigen Sie die Startzeit.
 Please describe the goal.,Bitte beschreiben Sie das Ziel.
 Could not start the timer,Der Timer konnte nicht gestartet werden
 Stop timer,Timer stoppen
@@ -1650,3 +1651,101 @@ Event Schedule,Veranstaltungsplan
 "Company-wide events. Each row is sent as an invite from its Email Account's Mailcow calendar.","Unternehmensweite Veranstaltungen. Jede Zeile wird als Einladung aus dem Mailcow-Kalender ihres E-Mail-Kontos verschickt."
 "You have no outgoing email account for {0}. Ask your administrator to set one up.","Für {0} gibt es kein ausgehendes E-Mail-Konto. Bitte lassen Sie eines von Ihrer Administration einrichten."
 DATEV auto-send failed,Automatischer DATEV-Versand fehlgeschlagen
+Sick Leave Types,Krankheitsarten
+Sick days this year,Krankheitstage dieses Jahr
+Approved leave of these types counts as sick days. Only HR Manager sees other people's sick days.,Genehmigte Abwesenheiten dieser Arten zählen als Krankheitstage. Nur HR Manager sieht die Krankheitstage anderer.
+"Approved, since 1 January","Genehmigt, seit 1. Januar"
+My leave days {0},Meine Abwesenheitstage {0}
+"Click a leave day to see its application.","Klicken Sie auf einen Abwesenheitstag, um den Antrag zu sehen."
+Requested,Beantragt
+Working day,Arbeitstag
+Weekend or holiday,Wochenende oder Feiertag
+Team Calendar,Teamkalender
+Birthday,Geburtstag
+Holiday,Feiertag
+Month,Monat
+Timeline,Zeitleiste
+Employee,Mitarbeiter
+View,Ansicht
+All companies,Alle Unternehmen
+No active employees.,Keine aktiven Mitarbeiter.
+Birthday: {0},Geburtstag: {0}
+The team calendar could not be loaded.,Der Teamkalender konnte nicht geladen werden.
+The end date must not be before the start date.,Das Enddatum darf nicht vor dem Startdatum liegen.
+The calendar shows at most {0} days at once.,Der Kalender zeigt höchstens {0} Tage auf einmal.
+Only HR users can see this page.,Nur HR-Benutzer können diese Seite sehen.
+Some absences show without their type and can't be opened.,Manche Abwesenheiten erscheinen ohne Art und lassen sich nicht öffnen.
+Four weeks back,Vier Wochen zurück
+Four weeks ahead,Vier Wochen vor
+Calendar,Kalender
+Ø coverage,Ø Besetzung
+Last 12 months,Letzte 12 Monate
+"Working days since {0}, approved leave only","Arbeitstage seit {0}, nur genehmigte Abwesenheit"
+"{0} of {1} person-days available, open requests counted as away","{0} von {1} Personentagen verfügbar, offene Anträge als abwesend gezählt"
+Next week,Nächste Woche
+In {0} weeks,In {0} Wochen
+pts,Pkt.
+Show data,Daten anzeigen
+Hide now,Jetzt ausblenden
+Click to extend,Klicken zum Verlängern
+Hidden for screen sharing,Für die Bildschirmfreigabe ausgeblendet
+Figures are hidden for screen sharing. Show them for {0}.,Zahlen sind für die Bildschirmfreigabe ausgeblendet. {0} lang anzeigen.
+Data visible for {0}. Click to extend.,Daten sichtbar für {0}. Klicken zum Verlängern.
+Privacy mode must show data for at least {0} seconds.,Der Datenschutzmodus muss Daten mindestens {0} Sekunden anzeigen.
+Privacy Mode: Seconds Data Stays Visible,Datenschutzmodus: Sekunden sichtbar
+"Privacy mode for screen sharing: figures in the HR Cockpit stay hidden until ""Show data"" is clicked, then show for this many seconds. At least 10.","Datenschutzmodus für die Bildschirmfreigabe: Zahlen im HR-Cockpit bleiben ausgeblendet, bis „Daten anzeigen“ geklickt wird, und sind dann so viele Sekunden sichtbar. Mindestens 10."
+Hand in for Vote,Zur Abstimmung einreichen
+Open for vote,Zur Abstimmung
+Withdraw from vote,Von der Abstimmung zurückziehen
+For vote,Zur Abstimmung
+Ideas for vote,Ideen zur Abstimmung
+Your idea,Deine Idee
+1 vote,1 Stimme
+{0} votes,{0} Stimmen
+Idea handed in for vote,Idee zur Abstimmung eingereicht
+Idea withdrawn from vote,Idee von der Abstimmung zurückgezogen
+Could not hand in the idea,Die Idee konnte nicht eingereicht werden
+Could not withdraw the idea,Die Idee konnte nicht zurückgezogen werden
+Could not save your vote,Deine Stimme konnte nicht gespeichert werden
+Could not load the ideas up for vote,Die Ideen zur Abstimmung konnten nicht geladen werden
+Hand in this idea for a vote? Every cockpit user can then read it and vote for it. Your writing sessions and history stay private.,Diese Idee zur Abstimmung einreichen? Dann kann jede Person im Cockpit sie lesen und für sie stimmen. Deine Schreibsitzungen und der Verlauf bleiben privat.
+Withdraw this idea from the vote? The votes so far are removed.,Diese Idee von der Abstimmung zurückziehen? Die bisherigen Stimmen werden entfernt.
+It is also withdrawn from the vote.,Sie wird auch von der Abstimmung zurückgezogen.
+Ideas your colleagues handed in. Vote for the ones you want to see happen.,"Ideen, die deine Kolleginnen und Kollegen eingereicht haben. Stimm für die, die du umgesetzt sehen willst."
+Loading the ideas up for vote…,Die Ideen zur Abstimmung werden geladen…
+No idea is up for vote right now. Hand one of yours in from its page.,Gerade steht keine Idee zur Abstimmung. Reiche eine deiner Ideen auf ihrer Seite ein.
+Handed in {0},Eingereicht {0}
+Vote for this idea,Für diese Idee stimmen
+Take back your vote,Deine Stimme zurücknehmen
+All ideas up for vote,Alle Ideen zur Abstimmung
+Open in My Ideas,In Meine Ideen öffnen
+This idea has no text yet.,Diese Idee hat noch keinen Text.
+This idea is not open for a vote.,Diese Idee steht nicht zur Abstimmung.
+This idea is no longer up for vote.,Diese Idee steht nicht mehr zur Abstimmung.
+You cannot vote for your own idea.,Für deine eigene Idee kannst du nicht stimmen.
+A composted idea cannot be handed in. Take it up again first.,Eine kompostierte Idee kann nicht eingereicht werden. Nimm sie zuerst wieder auf.
+Unknown vote status: {0},Unbekannter Abstimmungsstatus: {0}
+Idea Vote,Ideen-Stimme
+Vote Status,Abstimmungsstatus
+Handed In On,Eingereicht am
+Votes,Stimmen
+Vote,Abstimmung
+Personal Cockpit Settings,Einstellungen Persönliches Cockpit
+Show Author of Ideas Handed in for Vote,Autor von zur Abstimmung eingereichten Ideen anzeigen
+"Voters see who handed an idea in. Off: ideas up for vote appear without their author, and the author does not join the idea's chat by themselves.","Abstimmende sehen, wer eine Idee eingereicht hat. Aus: Ideen zur Abstimmung erscheinen ohne Autor, und der Autor tritt dem Chat der Idee nicht von selbst bei."
+Open for vote: every Personal Cockpit user can read this idea and vote for it (#1842).,Zur Abstimmung: Jede Person im Persönlichen Cockpit kann diese Idee lesen und für sie stimmen (#1842).
+Only colleagues can see ideas up for vote.,Nur Kolleginnen und Kollegen sehen Ideen zur Abstimmung.
+No chat about this idea yet.,Zu dieser Idee gibt es noch keinen Chat.
+"Start one to talk the idea through with colleagues. Messages also show up in Raven, linked to the idea.","Starte einen, um die Idee mit Kolleginnen und Kollegen zu besprechen. Nachrichten erscheinen auch in Raven, verknüpft mit der Idee."
+Start a Raven chat about this idea,Einen Raven-Chat zu dieser Idee starten
+Join the Raven chat about this idea,Dem Raven-Chat zu dieser Idee beitreten
+"Read the chat of this idea, which is no longer up for vote","Den Chat dieser Idee lesen, die nicht mehr zur Abstimmung steht"
+Open the Raven chat about this idea,Den Raven-Chat zu dieser Idee öffnen
+"When you send, every colleague you mention joins the chat.",Beim Senden tritt jede erwähnte Kollegin und jeder erwähnte Kollege dem Chat bei.
+Chat about the idea {0},Chat zur Idee {0}
+The chat opens once the idea is handed in for a vote.,"Der Chat öffnet sich, sobald die Idee zur Abstimmung eingereicht ist."
+{0} handed the idea in for a vote again.,{0} hat die Idee wieder zur Abstimmung eingereicht.
+{0} withdrew the idea from the vote.,{0} hat die Idee von der Abstimmung zurückgezogen.
+Open the idea,Idee öffnen
+Next idea,Nächste Idee
+Last idea up for vote,Letzte Idee zur Abstimmung

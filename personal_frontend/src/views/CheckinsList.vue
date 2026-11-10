@@ -1,6 +1,6 @@
 <template>
 	<div class="h-full min-h-0 overflow-y-auto bg-surface-gray-1 p-5">
-		<div class="mx-auto flex max-w-3xl flex-col gap-4">
+		<div class="flex flex-col gap-4">
 			<div v-if="error" class="rounded-lg border border-outline-gray-2 bg-surface-red-1 p-4 text-sm text-ink-red-4">{{ error }}</div>
 			<p v-else-if="loaded && !groups.length" class="text-sm text-ink-gray-5">{{ __("No check-ins yet.") }}</p>
 			<section

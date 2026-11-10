@@ -63,7 +63,7 @@
 		<!-- Learning -->
 		<div v-else-if="tab === 'learning'" class="min-h-0 flex-1 overflow-y-auto p-5 text-sm">
 			<p v-if="!learning" class="text-ink-gray-5">Loading…</p>
-			<div v-else class="mx-auto flex max-w-5xl flex-col gap-6">
+			<div v-else class="flex flex-col gap-6">
 				<p class="text-ink-gray-6">
 					In the last {{ learning.days }} days people corrected values in {{ learning.corrected_runs }} of {{ learning.runs }} AI runs.
 					<template v-if="Object.keys(learning.by_field).length">

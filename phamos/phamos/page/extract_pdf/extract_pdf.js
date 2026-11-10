@@ -159,12 +159,18 @@ frappe.pages["extract-pdf"].on_page_load = function (wrapper) {
 		}
 		const body = page.mapping_rows
 			.map((row, index) => {
+				const match_type = row.match_type || "Label";
+				const label_disabled = match_type === "Label" ? "" : "disabled";
 				return `
 				<div class="pdf-extract__line">
-					<div>${frappe.utils.escape_html(row.extracted_value || "")}</div>
+					<div>
+						<input class="form-control input-sm" data-extracted-value data-idx="${index}"
+							value="${frappe.utils.escape_html(row.extracted_value || "")}">
+					</div>
+					<div>${frappe.utils.escape_html(match_type)}</div>
 					<div>
 						<input class="form-control input-sm" data-source-label data-idx="${index}"
-							value="${frappe.utils.escape_html(row.source_label || "")}">
+							value="${frappe.utils.escape_html(row.source_label || "")}" ${label_disabled}>
 					</div>
 					<div>${frappe.utils.escape_html(row.target_field || "")}</div>
 				</div>`;
@@ -173,6 +179,7 @@ frappe.pages["extract-pdf"].on_page_load = function (wrapper) {
 		$lines.html(`
 			<div class="pdf-extract__line pdf-extract__line--head">
 				<div>${__("Extracted value")}</div>
+				<div>${__("Match type")}</div>
 				<div>${__("Source label")}</div>
 				<div>${__("Target field")}</div>
 			</div>
@@ -193,12 +200,16 @@ frappe.pages["extract-pdf"].on_page_load = function (wrapper) {
 			method: "phamos.phamos.page.extract_pdf.extract_pdf.extract_values",
 			args: {
 				file_url,
-				source_labels: page.mapping_rows.map((row) => row.source_label),
+				lines: page.mapping_rows.map((row) => ({
+					match_type: row.match_type || "Label",
+					source_label: row.source_label || "",
+					target_field: row.target_field || "",
+				})),
 			},
 			callback(response) {
-				const values = response.message || {};
-				page.mapping_rows.forEach((row) => {
-					row.extracted_value = values[row.source_label] || "";
+				const values = response.message || [];
+				page.mapping_rows.forEach((row, index) => {
+					row.extracted_value = values[index] || "";
 				});
 				render_lines();
 			},
@@ -207,6 +218,7 @@ frappe.pages["extract-pdf"].on_page_load = function (wrapper) {
 
 	const apply_party_rules = () => {
 		const rows = page.generic_rows.map((row) => ({
+			match_type: row.match_type || "Label",
 			source_label: row.source_label,
 			target_field: row.target_field,
 			extracted_value: "",
@@ -237,6 +249,7 @@ frappe.pages["extract-pdf"].on_page_load = function (wrapper) {
 						row.source_label = rule.source_label;
 					} else {
 						rows.push({
+							match_type: "Label",
 							source_label: rule.source_label,
 							target_field: rule.target_field,
 							extracted_value: "",
@@ -250,6 +263,13 @@ frappe.pages["extract-pdf"].on_page_load = function (wrapper) {
 			},
 		});
 	};
+
+	$(page.main).on("change", "[data-extracted-value]", function () {
+		const index = Number($(this).attr("data-idx"));
+		const row = page.mapping_rows[index];
+		if (!row) return;
+		row.extracted_value = $(this).val() || "";
+	});
 
 	$(page.main).on("change", "[data-source-label]", function () {
 		const index = Number($(this).attr("data-idx"));
@@ -314,6 +334,7 @@ frappe.pages["extract-pdf"].on_page_load = function (wrapper) {
 				frappe.db.get_doc("PDF Mapping", name).then((doc) => {
 					page.target_doctype = doc.target_doctype || "";
 					page.generic_rows = (doc.pdf_mapping_line || []).map((row) => ({
+						match_type: row.match_type || "Label",
 						source_label: row.source_label,
 						target_field: row.target_field,
 					}));

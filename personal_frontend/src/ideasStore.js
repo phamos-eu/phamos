@@ -3,12 +3,27 @@
 import { reactive } from "vue"
 import { call } from "frappe-ui"
 import { __ } from "@spa/utils/i18n.js"
+import { createWalkQueue } from "@spa/utils/ideaWalk.js"
 import spaConfig from "./config"
 
 export const ideas = reactive({ rows: [], options: null, loaded: false, error: "", showClosed: false })
 
+// Ideas handed in for a vote (#1842): everyone's, most votes first.
+export const voteIdeas = reactive({ rows: [], loaded: false, error: "" })
+
+// The order "Next idea" walks on the vote page (#1845). The vote page ends the walk when it closes.
+const voteWalk = createWalkQueue(async () => {
+	await loadIdeasForVote()
+	return voteIdeas.rows.map((row) => row.name)
+})
+
+/** The idea after `name` in the walk, and where `name` stands; loads the list on a direct visit. */
+export const nextIdeaForVote = (name) => voteWalk.step(name)
+export const endVoteWalk = () => voteWalk.reset()
+
 let inflight = null
 let optionsInflight = null
+let voteInflight = null
 
 export function loadIdeas() {
 	if (!inflight) {
@@ -58,6 +73,8 @@ export function applyIdea(doc) {
 		spawned_from: doc.spawned_from,
 		spawned_from_title: doc.spawned_from_title,
 		last_session_words: doc.last_session_words,
+		vote_status: doc.vote_status,
+		vote_count: doc.vote_count,
 		children_count: (doc.children || []).length,
 		age_days: doc.age_days,
 		creation: doc.creation,
@@ -90,4 +107,48 @@ export function ageLabel(days) {
 	const weeks = Math.floor(d / 7)
 	if (weeks < 8) return __("Aged {0} weeks", [weeks])
 	return __("Aged {0} months", [Math.max(2, Math.floor(d / 30))])
+}
+
+export function loadIdeasForVote() {
+	if (!voteInflight) {
+		voteInflight = call(`${spaConfig.api}.get_ideas_for_vote`)
+			.then((rows) => {
+				voteIdeas.rows = rows || []
+				voteIdeas.error = ""
+			})
+			.catch((e) => {
+				voteIdeas.error = e?.messages?.[0] || e?.message || __("Could not load the ideas up for vote")
+			})
+			.finally(() => {
+				voteIdeas.loaded = true
+				voteInflight = null
+			})
+	}
+	return voteInflight
+}
+
+/** Toggle my vote on an idea; returns the server's {name, voted, vote_count} and updates the list. */
+export function toggleVote(name) {
+	return call(`${spaConfig.api}.vote_idea`, { name }).then((result) => {
+		const row = voteIdeas.rows.find((r) => r.name === name)
+		if (row) Object.assign(row, { voted: result.voted, vote_count: result.vote_count })
+		return result
+	})
+}
+
+/** Take my idea off the vote (#1842): it is private again and its votes are removed. */
+export function withdrawFromVote(name) {
+	return call(`${spaConfig.api}.withdraw_idea_from_vote`, { name }).then((doc) => {
+		voteIdeas.rows = voteIdeas.rows.filter((r) => r.name !== name)
+		applyIdea(doc)
+		return doc
+	})
+}
+
+// A function, not a constant: the text must stay a literal inside __() to be found for translation.
+export const withdrawQuestion = () => __("Withdraw this idea from the vote? The votes so far are removed.")
+
+export function voteLabel(count) {
+	const n = Number(count) || 0
+	return n === 1 ? __("1 vote") : __("{0} votes", [n])
 }

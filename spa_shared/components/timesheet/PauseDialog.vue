@@ -5,7 +5,7 @@
 		@update:model-value="emit('update:modelValue', $event)"
 	>
 		<template #body-content>
-			<form class="space-y-4" @submit.prevent="submit" @keydown.enter.ctrl.prevent="submit" @keydown.enter.meta.prevent="submit">
+			<form class="space-y-4" novalidate @submit.prevent="submit" @keydown.enter.ctrl.prevent="submit" @keydown.enter.meta.prevent="submit">
 				<div ref="goalHost">
 					<FormControl v-model="goal" type="text" size="sm" :label="__('What is the break for?') + ' *'" :placeholder="__('Lunch, a call, coffee with the team…')" />
 				</div>

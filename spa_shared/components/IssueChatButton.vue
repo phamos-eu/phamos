@@ -55,7 +55,7 @@
 </template>
 
 <script setup>
-// The chat of an Issue or a Task (#1615, #1779). Where the view offers a chat column (the Issue view
+// The chat of an Issue, a Task or an idea up for vote (#1615, #1779, #1842). Where the view offers a chat column (the Issue view
 // from lg on), the chat is always there: the chat itself, or "Start chat" / "Join chat". Elsewhere
 // (narrow screens, the Tasks Gantt) this button shows whether there is a chat and how many
 // messages are unread, and opens it as an overlay. The unread count follows Raven's
@@ -72,7 +72,7 @@ import { useUserRealtime } from "@spa/composables/useUserRealtime.js"
 import { totalUnread, unreadSummary, unreadTone } from "@spa/utils/chatUnread.js"
 
 const props = defineProps({
-	/** "Issue" or "Task": picks the cockpit endpoints (get_issue_chat, get_task_chat …) and texts */
+	/** "Issue", "Task" or "Idea": picks the cockpit endpoints (get_issue_chat, get_idea_chat …) and texts */
 	doctype: { type: String, default: "Issue" },
 	recordName: { type: String, required: true },
 	subject: { type: String, default: "" },
@@ -88,7 +88,17 @@ const method = computed(() => ({
 
 // Whole sentences per record type, so each translates on its own.
 const texts = computed(() =>
-	props.doctype === "Task"
+	props.doctype === "Idea"
+		? {
+				noChat: __("No chat about this idea yet."),
+				startHint: __("Start one to talk the idea through with colleagues. Messages also show up in Raven, linked to the idea."),
+				start: __("Start a Raven chat about this idea"),
+				join: __("Join the Raven chat about this idea"),
+				closed: __("Read the chat of this idea, which is no longer up for vote"),
+				open: __("Open the Raven chat about this idea"),
+				mentionNote: __("When you send, every colleague you mention joins the chat."),
+			}
+		: props.doctype === "Task"
 		? {
 				noChat: __("No chat for this Task yet."),
 				startHint: __("Start one with the people on this Task. Messages also show up in Raven, linked to the Task."),

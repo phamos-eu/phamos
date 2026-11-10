@@ -368,6 +368,12 @@ def is_task_running(name):
 
 @frappe.whitelist()
 def get_employee_leaves():
+    """Approved leave of everyone for the team calendar, current and next year.
+
+    Neutral on purpose (#1840): the title is the employee's name only, never the leave type,
+    so nobody with the panel sees who is on sick leave (#1833 keeps sick leave types to HR
+    Manager). Half-day times stay.
+    """
     today = getdate(nowdate())
 
     # Current year start
@@ -392,7 +398,6 @@ def get_employee_leaves():
             "employee_name",
             "from_date",
             "to_date",
-            "leave_type",
             "half_day",
             "half_day_date",
             "available_from_time",
@@ -402,7 +407,7 @@ def get_employee_leaves():
 
     events = []
     for l in leaves:
-        description = f"{l.employee_name} ({l.leave_type})"
+        description = l.employee_name
 
         if l.half_day and l.from_date != l.to_date:
             # LEFT SIDE: from_date → (half_day_date - 1)
@@ -772,6 +777,20 @@ def fetch_projects():
     # Handling Customer Description (Replacing CASE)
     customer_desc_query = IfNull(Customer.customer_name, Customer.name)
 
+    # One list instead of "Your Projects" + "All Projects": every Open project, plus projects
+    # assigned to me in any status. Closing the assignment ToDo only changes the order.
+    assigned_to_me = (
+        frappe.qb.from_(ToDo)
+        .select(Max(ToDo.reference_name))
+        .where(
+            (ToDo.status == "Open")
+            & (ToDo.reference_type == "Project")
+            & (ToDo.reference_name == Project.name)
+            & (ToDo.allocated_to == frappe.session.user)
+        )
+    )
+    is_assigned = Case().when(assigned_to_me.isnotnull(), 1).else_(0)
+
     # Main Query
     query = (
         frappe.qb.from_(Project)
@@ -792,18 +811,14 @@ def fetch_projects():
             latest_timesheet_record.as_("timesheet_record"),
             latest_task.as_("task"),
             last_timesheet_update.as_("last_timesheet_update"),
+            is_assigned.as_("assigned_to_me"),
         )
-        .where(
-            frappe.qb.from_(ToDo)
-            .select(Max(ToDo.reference_name))
-            .where(
-                (ToDo.status == "Open")
-                & (ToDo.reference_name == Project.name)
-                & (ToDo.allocated_to == frappe.session.user)
-            ).isnotnull()
-        )
-        .orderby(Coalesce(last_timesheet_update, "1970, 1, 1"), order=Order.desc)
-        
+        .where((Project.status == "Open") | assigned_to_me.isnotnull())
+        # Last used first (my latest Timesheet Record), then my assigned projects, then the rest.
+        .orderby(Coalesce(last_timesheet_update, "1970-01-01"), order=Order.desc)
+        # By alias: the query builder drops the brackets around a subquery inside ORDER BY CASE.
+        .orderby(Field("assigned_to_me"), order=Order.desc)
+        .orderby(Project.name, order=Order.asc)
     )
     # Execute query
     projects = query.run(as_dict=True)
