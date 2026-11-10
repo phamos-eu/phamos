@@ -95,7 +95,9 @@ const error = ref("")
 const walk = ref({ next: null, position: 0, total: 0 })
 
 async function loadWalk(name) {
-	walk.value = await nextIdeaForVote(name)
+	const step = await nextIdeaForVote(name)
+	// A direct visit waits for the list; by then the user may be on another idea.
+	if (name === props.name) walk.value = step
 }
 
 function goNext() {
