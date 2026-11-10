@@ -99,8 +99,8 @@ async function loadWalk(name) {
 	// Hide the previous idea's step at once: a direct visit waits for the list.
 	walk.value = noWalk
 	const step = await nextIdeaForVote(name)
-	// A direct visit waits for the list; by then the user may be on another idea.
-	if (name === props.name) walk.value = step
+	// A direct visit waits for the list; by then the user may be on another idea or gone.
+	if (!closed && name === props.name) walk.value = step
 }
 
 function goNext() {
@@ -154,5 +154,9 @@ onMounted(() => {
 })
 // "Next idea" keeps this page (only the name changes). Leaving it ends the walk, so the next
 // idea opened, from the list or anywhere else, starts a fresh one with ideas handed in since.
-onBeforeUnmount(endVoteWalk)
+let closed = false
+onBeforeUnmount(() => {
+	closed = true
+	endVoteWalk()
+})
 </script>

@@ -25,9 +25,12 @@ export function createWalkQueue(loadNames) {
 		},
 		async step(name) {
 			if (names.includes(name)) return walkStep(names, name)
+			// An idea outside the walk (first idea, a direct link, one handed in since) starts a new
+			// walk in the list's current order.
 			const started = generation
 			const loaded = (await loadNames()) || []
-			if (started !== generation) return walkStep(loaded, name)
+			// The walk ended while the list loaded: nothing to show for it.
+			if (started !== generation) return walkStep([], name)
 			names = loaded
 			return walkStep(names, name)
 		},

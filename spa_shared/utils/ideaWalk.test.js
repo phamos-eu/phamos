@@ -48,7 +48,7 @@ describe("createWalkQueue", () => {
 		const pending = queue.step("a")
 		queue.reset()
 		release()
-		await pending
+		expect(await pending).toEqual({ next: null, position: 0, total: 0 })
 		order = ["b", "a"]
 		const fresh = queue.step("a")
 		release()
