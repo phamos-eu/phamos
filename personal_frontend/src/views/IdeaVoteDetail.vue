@@ -78,7 +78,7 @@ import { __ } from "@spa/utils/i18n.js"
 import { notify } from "@spa/utils/notify.js"
 import VoteButton from "../components/IdeaVoteButton.vue"
 import spaConfig from "../config"
-import { nextIdeaForVote, voteLabel } from "../ideasStore.js"
+import { endVoteWalk, nextIdeaForVote, voteLabel } from "../ideasStore.js"
 
 const props = defineProps({ name: { type: String, required: true } })
 const API = spaConfig.api
@@ -92,9 +92,12 @@ onBeforeUnmount(() => columnQuery.removeEventListener("change", onColumnQuery))
 const router = useRouter()
 const idea = ref(null)
 const error = ref("")
-const walk = ref({ next: null, position: 0, total: 0 })
+const noWalk = { next: null, position: 0, total: 0 }
+const walk = ref(noWalk)
 
 async function loadWalk(name) {
+	// Hide the previous idea's step at once: a direct visit waits for the list.
+	walk.value = noWalk
 	const step = await nextIdeaForVote(name)
 	// A direct visit waits for the list; by then the user may be on another idea.
 	if (name === props.name) walk.value = step
@@ -149,4 +152,7 @@ onMounted(() => {
 	load(props.name)
 	loadWalk(props.name)
 })
+// "Next idea" keeps this page (only the name changes). Leaving it ends the walk, so the next
+// idea opened, from the list or anywhere else, starts a fresh one with ideas handed in since.
+onBeforeUnmount(endVoteWalk)
 </script>
