@@ -3,12 +3,30 @@
 import { reactive } from "vue"
 import { call } from "frappe-ui"
 import { __ } from "@spa/utils/i18n.js"
+import { walkStep } from "@spa/utils/ideaWalk.js"
 import spaConfig from "./config"
 
 export const ideas = reactive({ rows: [], options: null, loaded: false, error: "", showClosed: false })
 
 // Ideas handed in for a vote (#1842): everyone's, most votes first.
 export const voteIdeas = reactive({ rows: [], loaded: false, error: "" })
+
+// The order "Next idea" walks on the vote page. Taken once, so a vote that reorders the list
+// (most votes first) does not make the walk skip or repeat ideas. The list page resets it.
+export const voteQueue = reactive({ names: [] })
+
+export function resetVoteQueue() {
+	voteQueue.names = []
+}
+
+/** The idea after `name` in the walk, and where `name` stands; loads the list on a direct visit. */
+export async function nextIdeaForVote(name) {
+	if (!voteQueue.names.includes(name)) {
+		await loadIdeasForVote()
+		voteQueue.names = voteIdeas.rows.map((row) => row.name)
+	}
+	return walkStep(voteQueue.names, name)
+}
 
 let inflight = null
 let optionsInflight = null

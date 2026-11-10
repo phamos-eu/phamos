@@ -52,7 +52,7 @@ import { formatDatetime } from "@spa/utils/datetime.js"
 import { __ } from "@spa/utils/i18n.js"
 import { summaryWithoutTitle } from "@spa/utils/ideaSummary.js"
 import VoteButton from "../components/IdeaVoteButton.vue"
-import { loadIdeasForVote, voteIdeas } from "../ideasStore.js"
+import { loadIdeasForVote, resetVoteQueue, voteIdeas } from "../ideasStore.js"
 
 const excerpt = (row) => summaryWithoutTitle(row.summary, row.title)
 
@@ -64,6 +64,8 @@ function onVisible() {
 }
 
 onMounted(() => {
+	// Back on the list: the next idea opened starts a fresh walk in the list's current order.
+	resetVoteQueue()
 	loadIdeasForVote()
 	document.addEventListener("visibilitychange", onVisible)
 })

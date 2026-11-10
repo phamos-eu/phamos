@@ -3,9 +3,17 @@
 		<div class="h-full min-h-0 flex-1 overflow-y-auto p-5">
 			<div class="flex flex-col gap-4">
 				<!-- A colleague's idea up for vote (#1842): read only, without its history or sessions. -->
-				<router-link :to="{ name: 'IdeasVote' }" class="self-start text-xs text-ink-gray-5 hover:text-ink-gray-8">
-					{{ __("All ideas up for vote") }}
-				</router-link>
+				<!-- Walk the vote list without going back to it. -->
+				<div class="flex items-center justify-between gap-3">
+					<router-link :to="{ name: 'IdeasVote' }" class="text-xs text-ink-gray-5 hover:text-ink-gray-8">
+						{{ __("All ideas up for vote") }}
+					</router-link>
+					<div v-if="walk.total" class="flex items-center gap-3">
+						<span v-if="walk.position" class="text-xs text-ink-gray-5">{{ __("{0} of {1}", [walk.position, walk.total]) }}</span>
+						<Button v-if="walk.next" size="sm" :label="__('Next idea')" icon-right="arrow-right" @click="goNext" />
+						<span v-else-if="walk.position" class="text-xs text-ink-gray-5">{{ __("Last idea up for vote") }}</span>
+					</div>
+				</div>
 
 				<div v-if="error" class="rounded-lg border border-outline-gray-2 bg-surface-white p-4 text-sm text-ink-gray-6">
 					{{ error }}
@@ -60,7 +68,7 @@
 <script setup>
 import { onBeforeUnmount, onMounted, ref, watch } from "vue"
 import { useRouter } from "vue-router"
-import { call } from "frappe-ui"
+import { Button, call } from "frappe-ui"
 import IssueChatButton from "@spa/components/IssueChatButton.vue"
 import StageIcon from "@spa/components/StageIcon.vue"
 import UserAvatar from "@spa/components/UserAvatar.vue"
@@ -70,7 +78,7 @@ import { __ } from "@spa/utils/i18n.js"
 import { notify } from "@spa/utils/notify.js"
 import VoteButton from "../components/IdeaVoteButton.vue"
 import spaConfig from "../config"
-import { voteLabel } from "../ideasStore.js"
+import { nextIdeaForVote, voteLabel } from "../ideasStore.js"
 
 const props = defineProps({ name: { type: String, required: true } })
 const API = spaConfig.api
@@ -84,6 +92,15 @@ onBeforeUnmount(() => columnQuery.removeEventListener("change", onColumnQuery))
 const router = useRouter()
 const idea = ref(null)
 const error = ref("")
+const walk = ref({ next: null, position: 0, total: 0 })
+
+async function loadWalk(name) {
+	walk.value = await nextIdeaForVote(name)
+}
+
+function goNext() {
+	if (walk.value.next) router.push({ name: "IdeaVoteDetail", params: { name: walk.value.next } })
+}
 
 async function load(name) {
 	error.value = ""
@@ -119,6 +136,15 @@ useUserRealtime(
 	{ debounceMs: 200 }
 )
 
-watch(() => props.name, load)
-onMounted(() => load(props.name))
+watch(
+	() => props.name,
+	(name) => {
+		load(name)
+		loadWalk(name)
+	}
+)
+onMounted(() => {
+	load(props.name)
+	loadWalk(props.name)
+})
 </script>
