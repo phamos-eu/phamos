@@ -69,6 +69,7 @@ app_include_css = [
     "/assets/phamos/css/sales_order_kpi.css",
     "/assets/phamos/css/dark_mode_fix.css",
     "checklist_dialog.bundle.css",  # hashed, so a new version is not served from browser cache
+    "item_grid_description.bundle.css",  # tall, editable description in item tables (#1858)
 ]
 # app_include_js = "/assets/phamos/js/phamos.js"
 
@@ -247,6 +248,7 @@ after_migrate = [
 	"phamos.marketing.setup.after_migrate",  # Lead Source "Event" for event registrations
 	"phamos.api.issue_chat.add_raven_indexes",  # record chats look channels up by record (#1794)
 	"phamos.setup.event_schedule.ensure_event_schedule_fields",  # Events tab on Company
+	"phamos.setup.item_grid.after_migrate",  # description column in item tables (#1858)
 ]
 
 # Uninstallation
