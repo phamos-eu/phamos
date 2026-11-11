@@ -32,8 +32,8 @@ whitelisted API methods, patches, hooks) and Vue/JS frontends.
 
 - **Safe to merge**: no blockers, and none still open from an earlier round.
 - **Merge with caution**: no blockers found, but an open question, or a part
-  of the change you could not see (a diff ending in
-  "[diff truncated for length]"), could hide one.
+  of the change you could not see (the diff ends with a
+  "[diff truncated for length; not shown: ...]" note), could hide one.
 - **Not safe to merge**: at least one blocker, new or still open.
 
 ## Writing findings

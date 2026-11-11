@@ -233,13 +233,17 @@ tests_required:
 
 ai_code_review:
   stage: ai-review
-  image: python:3.10-slim
+  # Not -slim: the review reads its diff with git.
+  image: python:3.10
   tags: [hetzner]
   # A failed review (API error, expired token) must not fail the MR pipeline.
   allow_failure: true
   needs: []
   # A newer push gets its own review.
   interruptible: true
+  variables:
+    # The diff needs the MR's merge base and the last reviewed commit.
+    GIT_DEPTH: "0"
   rules:
     - if: '$AI_REVIEW_ENABLED == "false"'
       when: never
@@ -247,5 +251,6 @@ ai_code_review:
       when: never
     - if: '$CI_PIPELINE_SOURCE == "merge_request_event" && $CI_MERGE_REQUEST_TARGET_BRANCH_NAME =~ /^(develop|version-15|release\/.+)$/'
   script:
-    - pip install --quiet --disable-pip-version-check anthropic
+    - git config --global --add safe.directory "$CI_PROJECT_DIR"
+    - pip install --quiet --disable-pip-version-check "anthropic==2.8.0"
     - python .gitlab/ai_code_review.py
