@@ -15,6 +15,7 @@ The review rules are in .gitlab/ai_review_guidelines.md.
 import json
 import os
 import re
+import subprocess
 import sys
 import time
 import urllib.error
@@ -30,7 +31,7 @@ FINDING_MARKER = "<!-- ai-code-review:phamos:finding -->"
 GUIDELINES_PATH = os.path.join(
     os.path.dirname(os.path.abspath(__file__)), "ai_review_guidelines.md"
 )
-MAX_DIFF_CHARS = int(os.environ.get("AI_REVIEW_MAX_DIFF_CHARS", "60000"))
+MAX_DIFF_CHARS = int(os.environ.get("AI_REVIEW_MAX_DIFF_CHARS", "150000"))
 MAX_THREADS = int(os.environ.get("AI_REVIEW_MAX_THREADS", "15"))
 MODEL = os.environ.get("ANTHROPIC_MODEL", "claude-sonnet-5-5")
 # Server-side refusal fallback: if the model declines (security code can trip
@@ -93,6 +94,7 @@ REVIEW_SCHEMA = {
 }
 
 HUNK_RE = re.compile(r"^@@ -(\d+)(?:,\d+)? \+(\d+)(?:,\d+)? @@")
+GIT_HEADER_RE = re.compile(r"^diff --git a/(.*) b/(.*)$")
 
 
 def fail(message):
@@ -180,21 +182,78 @@ def annotate(diff):
     return "\n".join(out), lines
 
 
+def diff_path(raw):
+    raw = raw.strip()
+    if raw.startswith('"') and raw.endswith('"'):
+        raw = raw[1:-1]
+    if raw == "/dev/null":
+        return None
+    return raw[2:] if raw[:2] in ("a/", "b/") else raw
+
+
+def parse_git_diff(text):
+    """Split `git diff` output into GitLab-style changes:
+    [{old_path, new_path, deleted_file, diff}], diff starting at the first hunk."""
+    changes, change, in_hunks = [], None, False
+    for line in text.splitlines():
+        if line.startswith("diff --git "):
+            header = GIT_HEADER_RE.match(line)
+            change = {
+                "old_path": header.group(1) if header else None,
+                "new_path": header.group(2) if header else None,
+                "deleted_file": False,
+                "lines": [],
+            }
+            changes.append(change)
+            in_hunks = False
+        elif change is None:
+            continue
+        elif in_hunks or line.startswith("@@"):
+            in_hunks = True
+            change["lines"].append(line)
+        elif line.startswith("deleted file mode"):
+            change["deleted_file"] = True
+        elif line.startswith("rename from "):
+            change["old_path"] = line[len("rename from "):]
+        elif line.startswith("rename to "):
+            change["new_path"] = line[len("rename to "):]
+        elif line.startswith("--- "):
+            change["old_path"] = diff_path(line[4:]) or change["old_path"]
+        elif line.startswith("+++ "):
+            change["new_path"] = diff_path(line[4:]) or change["new_path"]
+    for change in changes:
+        lines = change.pop("lines")
+        change["diff"] = "\n".join(lines) + "\n" if lines else ""
+    return changes
+
+
+def git_diff(from_sha, to_sha):
+    """Diff from the job's own checkout: unlike the GitLab API, git never
+    leaves out the content of large files. Needs GIT_DEPTH: 0."""
+    output = subprocess.run(
+        ["git", "-c", "core.quotepath=off", "diff", "--no-color", "--no-ext-diff",
+         "-M", "--unified=3", from_sha, to_sha],
+        capture_output=True, text=True, encoding="utf-8", errors="replace", check=True,
+    ).stdout
+    return parse_git_diff(output)
+
+
 def build_diff_text(changes):
-    parts, total, truncated = [], 0, False
+    parts, total, omitted = [], 0, []
     for change in changes:
         if not is_reviewable(change):
             continue
+        path = change.get("new_path") or change.get("old_path")
         text, _ = annotate(change["diff"])
-        chunk = f"--- {change.get('new_path') or change.get('old_path')} ---\n{text}\n"
+        chunk = f"--- {path} ---\n{text}\n"
         if total + len(chunk) > MAX_DIFF_CHARS:
-            truncated = True
-            break
+            omitted.append(path)
+            continue
         parts.append(chunk)
         total += len(chunk)
     text = "\n".join(parts)
-    if truncated:
-        text += "\n\n[diff truncated for length]"
+    if omitted:
+        text += "\n\n[diff truncated for length; not shown: " + ", ".join(omitted) + "]"
     return text
 
 
@@ -233,14 +292,14 @@ def open_ai_threads(gl, mr_iid):
     return threads
 
 
-def fetch_mr_changes(gl, mr_iid, head_sha):
+def fetch_diff_refs(gl, mr_iid, head_sha):
     # Right after a push GitLab may still be preparing the new MR diff.
     for _ in range(6):
-        data = gl.get(f"/merge_requests/{mr_iid}/changes")
-        if (data.get("diff_refs") or {}).get("head_sha") == head_sha:
-            break
+        refs = gl.get(f"/merge_requests/{mr_iid}").get("diff_refs") or {}
+        if refs.get("head_sha") == head_sha:
+            return refs
         time.sleep(5)
-    return data
+    fail(f"GitLab's MR diff is not at {head_sha[:8]} yet; re-run the job.")
 
 
 def system_prompt(guidelines):
@@ -406,14 +465,13 @@ def main():
         print(f"{head_sha[:8]} was already reviewed; set AI_REVIEW_FULL=true to review it again.")
         return
 
-    mr_data = fetch_mr_changes(gl, mr_iid, head_sha)
-    mr_changes = mr_data.get("changes", [])
-    refs = mr_data.get("diff_refs") or {}
+    refs = fetch_diff_refs(gl, mr_iid, head_sha)
+    # The MR diff as GitLab shows it: from the merge base to the MR head.
+    mr_changes = git_diff(refs["base_sha"], head_sha)
 
     commit_ids = {c["id"] for c in gl.get_all(f"/merge_requests/{mr_iid}/commits")}
     if last_sha and not full and last_sha in commit_ids:
-        compare = gl.get("/repository/compare", **{"from": last_sha, "to": head_sha})
-        changes = compare.get("diffs", [])
+        changes = git_diff(last_sha, head_sha)
         scope = (
             f"Only the commits pushed since the last review ({last_sha[:8]}..{head_sha[:8]}). "
             "Earlier findings that are still open are in <open_threads>."
