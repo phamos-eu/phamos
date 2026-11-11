@@ -185,6 +185,46 @@ class TestPersonalTimer(FrappeTestCase):
 		with self.assertRaises(frappe.ValidationError):
 			pc.stop_timer(name, "Done", activity_type="TM Development", manual_end_time=str(now_datetime() - timedelta(days=1)))
 
+	def _stop_after_one_break(self, track_break):
+		"""Work 60 min, break 20 min, work 40 min, Stop; returns the record and the four times."""
+		start = now_datetime().replace(microsecond=0) - timedelta(hours=3)
+		pause, resume, stop = (add_to_date(start, minutes=m) for m in (60, 80, 120))
+		frappe.db.set_single_value("Projects Settings", {"ignore_user_time_overlap": 0, "ignore_employee_time_overlap": 0})
+		clock = {"now": start}
+		with patch(f"{DAP}.now_datetime", side_effect=lambda: clock["now"]):
+			name = self._start()["session"]["name"]
+			clock["now"] = pause
+			self._pause(name)
+			clock["now"] = resume
+			if track_break:
+				pc.resume_timer(name, track_break=1, break_project=self.other_project, break_result="Call held", break_activity_type="TM Development")
+			else:
+				pc.resume_timer(name)
+			clock["now"] = stop
+			outcome = pc.stop_timer(name, "Report written", activity_type="TM Development")["outcome"]
+		self.assertEqual(outcome["session_state"], "submitted")
+		return frappe.get_doc("Timesheet Record", name), outcome, (start, pause, resume, stop)
+
+	def _timesheet_span(self, record):
+		row = frappe.get_doc("Timesheet", frappe.db.get_value("Timesheet Record", record, "timesheet")).time_logs[0]
+		return (row.from_time, row.to_time)
+
+	def test_stop_after_a_tracked_break_books_each_part_once(self):
+		# #1636: the main record ran until Stop and overlapped the break's Timesheet.
+		doc, outcome, (start, pause, resume, stop) = self._stop_after_one_break(track_break=True)
+		self.assertEqual((doc.docstatus, doc.from_time, doc.to_time, doc.actual_time), (1, start, pause, 3600))
+		self.assertEqual(self._timesheet_span(doc.name), (start, pause))
+		break_record = frappe.db.get_value("Timesheet Record", {"employee": self.employee, "project": self.other_project, "docstatus": 1})
+		self.assertEqual(self._timesheet_span(break_record), (pause, resume))
+		self.assertEqual([self._timesheet_span(r) for r in outcome["extra_timesheets"]], [(resume, stop)])
+
+	def test_stop_after_an_untracked_break_books_both_work_parts(self):
+		# #1636: the record for the work after the break overlapped the main record.
+		doc, outcome, (start, pause, resume, stop) = self._stop_after_one_break(track_break=False)
+		self.assertEqual((doc.from_time, doc.to_time), (start, pause))
+		self.assertEqual(self._timesheet_span(doc.name), (start, pause))
+		self.assertEqual([self._timesheet_span(r) for r in outcome["extra_timesheets"]], [(resume, stop)])
+
 	def test_someone_elses_record_cannot_be_touched(self):
 		name = self._start(user=OTHER)["session"]["name"]
 		frappe.set_user(USER)
