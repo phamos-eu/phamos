@@ -55,7 +55,7 @@
    "description": "Shown as a link to the lead's Employee Web Profile (anonymised automatically for alumni).",
    "fieldname": "lead",
    "fieldtype": "Link",
-   "label": "Lead",
+   "label": "Team lead",
    "options": "Employee"
   },
   {
