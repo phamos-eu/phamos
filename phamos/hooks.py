@@ -83,6 +83,7 @@ app_include_js = [
     "/assets/phamos/js/frappe_list_bulk_edit_override.js",  # Fixes null-label crash in bulk edit
     "checklist_dialog.bundle.js",  # Linked Checklists dialog (hashed bundle, see above)
     "web_profile_form.bundle.js",  # Web Profile forms: missing-translation hint, preview link
+    "phriend.bundle.js",  # Phriend: screenshot + comment -> Issue (#1850)
 ]
 
 
