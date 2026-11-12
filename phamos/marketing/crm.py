@@ -129,32 +129,29 @@ def find_party(email, company_name=None):
 
 
 def lead_set_direction(doc, method=None):
-	"""Lead ``before_validate``: fill Inbound/Outbound, and require it on new leads only.
+	"""Lead ``before_validate``: fill Inbound/Outbound where it can be known; never refuse a save.
 
 	1. a value is set: keep it
 	2. the Lead Source has a direction: take it
-	3. created automatically (website guest, incoming email: ``ignore_mandatory``) or by a path that says so
-	   (``flags.lead_direction_default``): that default, Inbound unless the path says otherwise
-	4. a new lead still without one is refused; an existing one may stay empty, or every later save of an old
-	   lead without a source would fail, the cockpit's autosave included
+	3. a creation path that says so (``flags.lead_direction_default``): that one
+	4. created automatically (website guest, incoming email: ``ignore_mandatory``): Inbound
+	5. otherwise it stays empty. The Desk form asks for it on new leads (``mandatory_depends_on``); ERPNext's
+	   own paths (an Opportunity or Appointment for an unknown email, Data Import) must keep working, and the
+	   lead overview lists every lead without a value as "Not set" (PM decision, 2026-11-12).
 	"""
 	if doc.get(LEAD_DIRECTION_FIELD):
 		return
-	direction = lead_source_direction(doc.get("source"))
-	if not direction:
-		if doc.flags.get("lead_direction_default"):
-			direction = doc.flags.lead_direction_default
-		elif frappe.session.user == "Guest" or doc.flags.ignore_mandatory:
-			direction = "Inbound"
+	direction = lead_source_direction(doc.get("source")) or doc.flags.get("lead_direction_default")
+	if not direction and (frappe.session.user == "Guest" or doc.flags.ignore_mandatory):
+		direction = "Inbound"
 	if direction:
 		doc.set(LEAD_DIRECTION_FIELD, direction)
-	elif doc.is_new():
-		frappe.throw(_("Please choose Inbound or Outbound."), frappe.MandatoryError, title=_("Inbound / Outbound"))
 
 
 def lead_source_direction(source):
 	"""The default direction of a Lead Source, or None."""
-	if not source:
+	# Before the first migrate after install, the column does not exist yet.
+	if not source or not frappe.get_meta("Lead Source").has_field(LEAD_DIRECTION_FIELD):
 		return None
 	direction = frappe.db.get_value("Lead Source", source, LEAD_DIRECTION_FIELD)
 	return direction if direction in LEAD_DIRECTIONS else None

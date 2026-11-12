@@ -969,8 +969,9 @@ def _create_lead_doc(doc, readiness, customer: str = ""):
 	else:
 		lead.status = "Lead"
 
-	# Researched companies and collected business cards: we go to them (phamos/phamos#574).
-	lead.flags.lead_direction_default = "Outbound"
+	# Researched companies and collected business cards: we go to them, even when the source says
+	# "Existing Customer" (phamos/phamos#574).
+	lead.custom_lead_direction = "Outbound"
 	lead.insert(ignore_permissions=False)
 	return lead
 

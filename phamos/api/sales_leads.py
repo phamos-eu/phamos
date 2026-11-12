@@ -474,8 +474,9 @@ def update_lead(
 	if not updates:
 		frappe.throw(_("No fields to update"))
 
-	# Same as the Desk form: a source with a default direction sets it (phamos/phamos#574).
-	if updates.get("source") and "custom_lead_direction" not in updates:
+	# Same as the Desk form: a source with a default direction fills an empty direction; a chosen one wins
+	# (phamos/phamos#574).
+	if updates.get("source") and "custom_lead_direction" not in updates and not doc.get("custom_lead_direction"):
 		from phamos.marketing.crm import lead_source_direction
 
 		direction = lead_source_direction(updates["source"])

@@ -1844,6 +1844,5 @@ Issues,Anfragen
 Inbound,Eingehend
 Outbound,Ausgehend
 Inbound / Outbound,Eingehend / Ausgehend
-Please choose Inbound or Outbound.,Bitte wählen Sie Eingehend oder Ausgehend.
 "Inbound: they came to us (website, email, event). Outbound: we went to them.","Eingehend: Der Kontakt kam zu uns (Website, E-Mail, Veranstaltung). Ausgehend: Wir sind auf ihn zugegangen."
 Filled into a Lead when this source is chosen.,"Wird in den Interessenten übernommen, wenn diese Quelle gewählt wird."
