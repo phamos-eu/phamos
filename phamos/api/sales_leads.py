@@ -17,9 +17,22 @@ from frappe.utils import get_url, getdate, now_datetime
 from frappe.utils.html_utils import clean_email_html
 
 from phamos.api.department_cockpit import _user_images, _user_label, role_shortlist_users
-from phamos.phamos.page.sales_action_panel.sales_action_panel import LEAD_STATUSES
 
 LEAD_ROLES = ("System Manager", "Sales Manager", "Sales User")
+
+# ERPNext's Lead status options. On develop this list lives in the Sales Action
+# Panel page, which version-15 does not have.
+LEAD_STATUSES = [
+	"Lead",
+	"Open",
+	"Replied",
+	"Opportunity",
+	"Quotation",
+	"Lost Quotation",
+	"Interested",
+	"Converted",
+	"Do Not Contact",
+]
 
 LEAD_LIST_LIMIT = 1000
 
