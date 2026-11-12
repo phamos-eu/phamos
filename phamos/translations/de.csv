@@ -1945,3 +1945,85 @@ Showing the first {0} leads by follow-up date. Leads with later follow-ups are n
 Issues,Anfragen
 Next idea,Nächste Idee
 Last idea up for vote,Letzte Idee zur Abstimmung
+Inbound,Eingehend
+Outbound,Ausgehend
+Inbound / Outbound,Eingehend / Ausgehend
+"Inbound: they came to us (website, email, event). Outbound: we went to them.","Eingehend: Der Kontakt kam zu uns (Website, E-Mail, Veranstaltung). Ausgehend: Wir sind auf ihn zugegangen."
+Filled into a Lead when this source is chosen.,"Wird in den Interessenten übernommen, wenn diese Quelle gewählt wird."
+As of {0}. Counted by the date a lead was created.,"Stand {0}. Gezählt nach dem Datum, an dem ein Interessent angelegt wurde."
+Lead list in Desk,Interessentenliste im Desk
+"1 lead is not marked Inbound or Outbound yet, so the split below is incomplete.","1 Interessent ist noch nicht als Eingehend oder Ausgehend markiert, die Aufteilung unten ist daher unvollständig."
+"{0} leads are not marked Inbound or Outbound yet, so the split below is incomplete.","{0} Interessenten sind noch nicht als Eingehend oder Ausgehend markiert, die Aufteilung unten ist daher unvollständig."
+Show them,Anzeigen
+New leads per month,Neue Interessenten pro Monat
+Click a month to see its leads. The current month runs up to today.,"Klicken Sie auf einen Monat, um seine Interessenten zu sehen. Der laufende Monat reicht bis heute."
+Where leads come from,Woher Interessenten kommen
+No leads in this period.,Keine Interessenten in diesem Zeitraum.
+This month's leads by status today,Interessenten dieses Monats nach heutigem Status
+No leads this month yet.,Diesen Monat noch keine Interessenten.
+All leads,Alle Interessenten
+Last 3 months,Letzte 3 Monate
+Could not load the lead overview,Die Interessenten-Übersicht konnte nicht geladen werden
+On par,Im Rahmen
+{0} more,{0} mehr
+{0} fewer,{0} weniger
+New leads this month,Neue Interessenten diesen Monat
+Same period last year,Gleicher Zeitraum im Vorjahr
+No leads recorded that far back.,So weit zurück sind keine Interessenten erfasst.
+This month: {0},Dieser Monat: {0}
+Compared with the 12-month average,Im Vergleich zum 12-Monats-Durchschnitt
+"Expected by today: Ø {0} a month over {1} months, for {2} of {3} days","Erwartet bis heute: Ø {0} pro Monat über {1} Monate, für {2} von {3} Tagen"
+Needs at least one complete month.,Braucht mindestens einen vollständigen Monat.
+Compared with this month in earlier years,Im Vergleich zu diesem Monat in früheren Jahren
+Ø of the same days in {0},Ø der gleichen Tage in {0}
+Not enough history yet: the first lead is from {0}.,Noch zu wenig Verlauf: Der erste Interessent ist von {0}.
+Last month vs the month before,Letzter Monat gegenüber dem Monat davor
+Last {0} months vs the {0} before,Letzte {0} Monate gegenüber den {0} davor
+{0} against {1} · {2},{0} gegenüber {1} · {2}
+Not enough history yet.,Noch zu wenig Verlauf.
+Steady,Gleichbleibend
+Improved,Verbessert
+Declined,Gesunken
+Same month a year earlier,Gleicher Monat im Vorjahr
+No source,Ohne Quelle
+12-month average,12-Monats-Durchschnitt
+There is no complete month of leads yet.,Es gibt noch keinen vollständigen Monat mit Interessenten.
+The last {0} months,Die letzten {0} Monate
+"Ø {0} leads a month. Green months were above it, red ones below. Click a month to see its leads.","Ø {0} Interessenten pro Monat. Grüne Monate lagen darüber, rote darunter. Klicken Sie auf einen Monat, um seine Interessenten zu sehen."
+vs Ø,ggü. Ø
+"This month so far: {0}, where Ø {1} would be expected by today.","Dieser Monat bisher: {0}, erwartet wären bis heute Ø {1}."
+This month in earlier years,Dieser Monat in früheren Jahren
+Not enough history yet: the first lead is from {0}. This comparison appears once a full year is recorded.,"Noch zu wenig Verlauf: Der erste Interessent ist von {0}. Dieser Vergleich erscheint, sobald ein volles Jahr erfasst ist."
+{0} in earlier years,{0} in früheren Jahren
+"The same days as this month so far, and the whole month for context. Click a number to see those leads.","Die gleichen Tage wie dieser Monat bisher, dazu der ganze Monat zur Einordnung. Klicken Sie auf eine Zahl, um diese Interessenten zu sehen."
+Up to day {0},Bis Tag {0}
+Whole month,Ganzer Monat
+What changed,Was sich geändert hat
+Not enough history yet to compare these months.,"Noch zu wenig Verlauf, um diese Monate zu vergleichen."
+"{0} against {1}. Biggest drop first, so you see where leads went missing. Click a number to see those leads.","{0} gegenüber {1}. Größter Rückgang zuerst, damit Sie sehen, wo Interessenten fehlen. Klicken Sie auf eine Zahl, um diese Interessenten zu sehen."
+Edit in Desk,Im Desk bearbeiten
+Showing the newest {0} leads. Narrow the filters to see the rest.,"Die neuesten {0} Interessenten werden angezeigt. Grenzen Sie die Filter ein, um den Rest zu sehen."
+"These leads are not marked Inbound or Outbound yet. Open each one and choose, or set them in bulk via Edit in Desk.","Diese Interessenten sind noch nicht als Eingehend oder Ausgehend markiert. Öffnen Sie jeden und wählen Sie, oder setzen Sie es gesammelt über „Im Desk bearbeiten“."
+These leads have no source. Add one so the overview can tell where leads come from.,"Diese Interessenten haben keine Quelle. Ergänzen Sie eine, damit die Übersicht zeigt, woher Interessenten kommen."
+"How many new leads, compared with what","Wie viele neue Interessenten, im Vergleich wozu"
+until {0},bis {0}
+Created: {0},Angelegt: {0}
+Inbound / Outbound: not set,Eingehend / Ausgehend: nicht gesetzt
+Source: {0},Quelle: {0}
+Unknown Inbound / Outbound filter: {0},Unbekannter Filter Eingehend / Ausgehend: {0}
+Unknown Lead status: {0},Unbekannter Interessenten-Status: {0}
+Overview,Übersicht
+This month,Diesen Monat
+Year,Jahr
+Jan,Jan.
+Feb,Feb.
+Mar,Mrz.
+Apr,Apr.
+May,Mai
+Jun,Jun.
+Jul,Jul.
+Aug,Aug.
+Sep,Sep.
+Oct,Okt.
+Nov,Nov.
+Dec,Dez.

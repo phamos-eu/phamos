@@ -48,6 +48,8 @@ LEAD_LIST_FIELDS = [
 	"territory",
 	"custom_next_followup",
 	"custom_status_comment",
+	"source",
+	"custom_lead_direction",
 	"creation",
 	"modified",
 ]
@@ -63,6 +65,7 @@ LEAD_TRANSACTIONAL_FIELDS = (
 	"qualification_status",
 	"custom_status_comment",
 	"lead_owner",
+	"custom_lead_direction",
 )
 LEAD_MASTER_FIELDS = (
 	"company_name",
@@ -277,23 +280,50 @@ def _serialize_lead_row(row, owner_names, owner_images, today_date):
 	return row
 
 
-@frappe.whitelist()
-def get_leads():
-	"""Return all non-disabled Leads, sorted for follow-up triage.
+def _overview_filters(created_from, created_to, direction, source, status):
+	"""Validated `get_list` filters for a figure of the lead overview; "none" means "not set"."""
+	from phamos.api.sales_lead_overview import NOT_SET, validate_direction
+	from phamos.marketing.defaults import LEAD_DIRECTION_FIELD
 
-	Leads with no `custom_next_followup` sort first (need triage), then leads
-	with a date, ascending (soonest/most overdue first) — MariaDB sorts NULL
-	first under `IS NULL ... DESC`.
+	filters = []
+	if created_from:
+		filters.append(["creation", ">=", f"{getdate(created_from)} 00:00:00"])
+	if created_to:
+		filters.append(["creation", "<=", f"{getdate(created_to)} 23:59:59.999999"])
+	direction = validate_direction(direction)
+	if direction:
+		filters.append([LEAD_DIRECTION_FIELD, "is", "not set"] if direction == NOT_SET else [LEAD_DIRECTION_FIELD, "=", direction])
+	if source:
+		filters.append(["source", "is", "not set"] if source == NOT_SET else ["source", "=", source])
+	if status == NOT_SET:
+		filters.append(["status", "is", "not set"])
+	elif status:
+		if status not in LEAD_STATUSES:
+			frappe.throw(_("Unknown Lead status: {0}").format(status))
+		filters.append(["status", "=", status])
+	return filters
+
+
+@frappe.whitelist()
+def get_leads(created_from=None, created_to=None, direction=None, source=None, status=None):
+	"""Return Leads for the list, sorted for follow-up triage.
+
+	Without filters: every non-disabled Lead. Leads with no `custom_next_followup` sort first (need triage),
+	then dated ones, ascending — MariaDB sorts NULL first under `IS NULL ... DESC`.
+
+	With a filter from the lead overview (phamos/phamos#1758): exactly the leads its figure counted —
+	disabled ones included, since the overview counts every lead that came in — newest first.
 	"""
 	_check_lead_access()
+	overview_filters = _overview_filters(created_from, created_to, direction, source, status)
 
 	# get_list, not get_all: User Permissions (e.g. a Territory restriction)
 	# must narrow the list just as they narrow Desk's.
 	rows = frappe.get_list(
 		"Lead",
-		filters={"disabled": 0},
+		filters=overview_filters or {"disabled": 0},
 		fields=LEAD_LIST_FIELDS,
-		order_by="custom_next_followup is null desc, custom_next_followup asc",
+		order_by="creation desc" if overview_filters else "custom_next_followup is null desc, custom_next_followup asc",
 		limit_page_length=LEAD_LIST_LIMIT + 1,
 	)
 	truncated = len(rows) > LEAD_LIST_LIMIT
@@ -368,6 +398,7 @@ def _serialize_lead_detail(doc):
 		else None,
 		"custom_status_comment_modified_date": doc.custom_status_comment_modified_date,
 		"qualification_status": doc.qualification_status,
+		"custom_lead_direction": doc.get("custom_lead_direction"),
 		"qualified_by": doc.qualified_by,
 		"qualified_by_name": _user_label(doc.qualified_by) if doc.qualified_by else None,
 		"qualified_on": doc.qualified_on,
@@ -430,6 +461,7 @@ def update_lead(
 	market_segment=None,
 	annual_revenue=None,
 	request_type=None,
+	custom_lead_direction=None,
 	if_modified=None,
 ):
 	"""Update whitelisted transactional + master-data Lead fields, autosave-style.
@@ -473,6 +505,7 @@ def update_lead(
 		"market_segment": market_segment,
 		"annual_revenue": annual_revenue,
 		"request_type": request_type,
+		"custom_lead_direction": custom_lead_direction,
 	}
 	updates = {k: v for k, v in fields.items() if v is not None}
 	unknown = set(updates) - set(LEAD_EDITABLE_FIELDS)
@@ -480,6 +513,15 @@ def update_lead(
 		frappe.throw(_("Invalid Lead field(s): {0}").format(", ".join(sorted(unknown))))
 	if not updates:
 		frappe.throw(_("No fields to update"))
+
+	# Same as the Desk form: a source with a default direction fills an empty direction; a chosen one wins
+	# (phamos/phamos#574).
+	if updates.get("source") and "custom_lead_direction" not in updates and not doc.get("custom_lead_direction"):
+		from phamos.marketing.crm import lead_source_direction
+
+		direction = lead_source_direction(updates["source"])
+		if direction:
+			updates["custom_lead_direction"] = direction
 
 	if "website" in updates:
 		updates["website"] = normalize_website(updates["website"])
