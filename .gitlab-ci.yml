@@ -32,8 +32,9 @@
 #   Reviews MRs into develop / version-15 / release/* with Claude: one
 #   resolvable thread per finding on its diff line, plus a new summary note
 #   with the verdict on every run (old notes are never edited). After the
-#   first review only new commits are reviewed; AI_REVIEW_FULL=true reviews
-#   the whole MR again. Review rules: .gitlab/ai_review_guidelines.md.
+#   first review only new commits are reviewed; add the label
+#   "ai-review-full" to review the whole MR again on the next pipeline.
+#   Review rules: .gitlab/ai_review_guidelines.md.
 #   Needs CI/CD variables ANTHROPIC_API_KEY and GITLAB_API_TOKEN; set
 #   AI_REVIEW_ENABLED=false to disable. Add the label "skip-ai-code-review"
 #   to the MR and run a new pipeline to skip it for that MR.

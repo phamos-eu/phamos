@@ -27,6 +27,8 @@ import anthropic
 SUMMARY_MARKER = "<!-- ai-code-review:phamos:summary sha={sha} -->"
 SUMMARY_RE = re.compile(r"<!-- ai-code-review:phamos:summary sha=([0-9a-f]{40}) -->")
 FINDING_MARKER = "<!-- ai-code-review:phamos:finding -->"
+# Put this label on an MR to review all of it again on the next pipeline.
+FULL_LABEL = "ai-review-full"
 
 GUIDELINES_PATH = os.path.join(
     os.path.dirname(os.path.abspath(__file__)), "ai_review_guidelines.md"
@@ -151,6 +153,15 @@ def is_reviewable(change):
     )
 
 
+def split_lines(text):
+    """Split on \\n only. str.splitlines() also splits on form feeds and Unicode
+    line separators inside a line, which would shift the line numbers."""
+    lines = text.split("\n")
+    if lines and lines[-1] == "":
+        lines.pop()
+    return lines
+
+
 def annotate(diff):
     """Prefix each diff line with its line number in the new file.
 
@@ -160,7 +171,7 @@ def annotate(diff):
     """
     out, lines = [], {}
     old = new = 0
-    for raw in diff.splitlines():
+    for raw in split_lines(diff):
         hunk = HUNK_RE.match(raw)
         if hunk:
             old, new = int(hunk.group(1)), int(hunk.group(2))
@@ -195,7 +206,7 @@ def parse_git_diff(text):
     """Split `git diff` output into GitLab-style changes:
     [{old_path, new_path, deleted_file, diff}], diff starting at the first hunk."""
     changes, change, in_hunks = [], None, False
-    for line in text.splitlines():
+    for line in split_lines(text):
         if line.startswith("diff --git "):
             header = GIT_HEADER_RE.match(line)
             change = {
@@ -227,15 +238,20 @@ def parse_git_diff(text):
     return changes
 
 
+def run_git(*args):
+    proc = subprocess.run(["git", "-c", "core.quotepath=off", *args], capture_output=True)
+    if proc.returncode != 0:
+        fail(f"git {' '.join(args)} failed: {proc.stderr.decode('utf-8', 'replace').strip()}")
+    # Decoded by hand: text=True would also turn a lone \r inside a line into a line break.
+    return proc.stdout.decode("utf-8", "replace")
+
+
 def git_diff(from_sha, to_sha):
     """Diff from the job's own checkout: unlike the GitLab API, git never
     leaves out the content of large files. Needs GIT_DEPTH: 0."""
-    output = subprocess.run(
-        ["git", "-c", "core.quotepath=off", "diff", "--no-color", "--no-ext-diff",
-         "-M", "--unified=3", from_sha, to_sha],
-        capture_output=True, text=True, encoding="utf-8", errors="replace", check=True,
-    ).stdout
-    return parse_git_diff(output)
+    return parse_git_diff(
+        run_git("diff", "--no-color", "--no-ext-diff", "-M", "--unified=3", from_sha, to_sha)
+    )
 
 
 def build_diff_text(changes):
@@ -448,6 +464,7 @@ def summary_body(result, sha, reviewed, posted, unanchored, not_posted):
         f"{VERDICTS[result['verdict']]}: {result['verdict_reason']}",
         "",
         "<sub>Rules: `.gitlab/ai_review_guidelines.md` · Skip with the `skip-ai-code-review` label · "
+        f"Review the whole MR again with the `{FULL_LABEL}` label · "
         "This note is never edited; the next push gets a new review.</sub>",
     ]
     return "\n".join(lines)
@@ -460,9 +477,10 @@ def main():
     head_sha = env("CI_COMMIT_SHA")
 
     last_sha = last_reviewed_sha(gl, mr_iid)
-    full = os.environ.get("AI_REVIEW_FULL") == "true"
+    labels = os.environ.get("CI_MERGE_REQUEST_LABELS", "").split(",")
+    full = os.environ.get("AI_REVIEW_FULL") == "true" or FULL_LABEL in labels
     if last_sha == head_sha and not full:
-        print(f"{head_sha[:8]} was already reviewed; set AI_REVIEW_FULL=true to review it again.")
+        print(f"{head_sha[:8]} was already reviewed; add the {FULL_LABEL} label to review it again.")
         return
 
     refs = fetch_diff_refs(gl, mr_iid, head_sha)
@@ -470,7 +488,11 @@ def main():
     mr_changes = git_diff(refs["base_sha"], head_sha)
 
     commit_ids = {c["id"] for c in gl.get_all(f"/merge_requests/{mr_iid}/commits")}
-    if last_sha and not full and last_sha in commit_ids:
+    incremental = bool(last_sha) and not full and last_sha in commit_ids
+    # After a merge of the target branch, last_sha..head would also contain
+    # everything that came in with the merge, so review the whole MR instead.
+    merged_in = incremental and bool(run_git("rev-list", "--merges", f"{last_sha}..{head_sha}").strip())
+    if incremental and not merged_in:
         changes = git_diff(last_sha, head_sha)
         scope = (
             f"Only the commits pushed since the last review ({last_sha[:8]}..{head_sha[:8]}). "
@@ -481,7 +503,11 @@ def main():
         changes = mr_changes
         scope = "The whole MR."
         reviewed = "the whole MR"
-        if last_sha and not full:
+        if full:
+            reviewed += " (full re-review requested)"
+        elif merged_in:
+            reviewed += " (a merge commit came in since the last review)"
+        elif last_sha:
             reviewed += " (the branch was rewritten since the last review)"
 
     diff_text = build_diff_text(changes)
@@ -523,6 +549,13 @@ def main():
         "body": summary_body(result, head_sha, reviewed, posted, unanchored, not_posted)
     })
     print(f"Posted {len(posted)} findings ({unanchored} unanchored) and the summary; verdict: {result['verdict']}.")
+
+    if FULL_LABEL in labels:
+        # One full review per request; later pushes are incremental again.
+        try:
+            gl.request("PUT", f"/merge_requests/{mr_iid}", payload={"remove_labels": FULL_LABEL})
+        except urllib.error.HTTPError as e:
+            print(f"Could not remove the {FULL_LABEL} label ({e.code}); remove it by hand.")
 
 
 if __name__ == "__main__":
