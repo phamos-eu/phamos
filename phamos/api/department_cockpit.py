@@ -572,7 +572,17 @@ def _task_form_options():
 
 def _role_shortlist_users(config: CockpitConfig, limit=50):
 	"""Enabled System Users who hold any of the cockpit roles."""
-	role_names = [r for r in (config.roles or ()) if r]
+	return role_shortlist_users(config.roles, limit=limit)
+
+
+def role_shortlist_users(roles, limit=50):
+	"""Enabled System Users who hold any of the given roles.
+
+	Split out of `_role_shortlist_users` so a cockpit that works from a plain
+	list of roles rather than a CockpitConfig can reuse it — the Sales cockpit
+	offers lead owners this way (#1757).
+	"""
+	role_names = [r for r in (roles or ()) if r]
 	if not role_names:
 		return []
 
