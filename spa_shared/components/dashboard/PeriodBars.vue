@@ -62,11 +62,14 @@ const props = defineProps({
 	format: { type: Function, default: null },
 	// Periods become keyboard-focusable buttons that emit `select` with (period, index) (drill-down).
 	selectable: { type: Boolean, default: false },
+	// Optional colour per series (CSS values); defaults to the shared palette.
+	colors: { type: Array, default: null },
 })
 
 const emit = defineEmits(["select"])
 
-const SERIES_COLORS = ["var(--ink-blue-3)", "var(--ink-green-3)", "var(--ink-amber-3)", "var(--ink-gray-4)"]
+const DEFAULT_COLORS = ["var(--ink-blue-3)", "var(--ink-green-3)", "var(--ink-amber-3)", "var(--ink-gray-4)"]
+const SERIES_COLORS = computed(() => props.colors || DEFAULT_COLORS)
 
 const max = computed(() => Math.max(1, ...props.periods.flatMap((period) => period.values.map(Number))))
 </script>
