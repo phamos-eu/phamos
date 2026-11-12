@@ -2012,3 +2012,18 @@ Inbound / Outbound: not set,Eingehend / Ausgehend: nicht gesetzt
 Source: {0},Quelle: {0}
 Unknown Inbound / Outbound filter: {0},Unbekannter Filter Eingehend / Ausgehend: {0}
 Unknown Lead status: {0},Unbekannter Interessenten-Status: {0}
+Overview,Übersicht
+This month,Diesen Monat
+Year,Jahr
+Jan,Jan.
+Feb,Feb.
+Mar,Mrz.
+Apr,Apr.
+May,Mai
+Jun,Jun.
+Jul,Jul.
+Aug,Aug.
+Sep,Sep.
+Oct,Okt.
+Nov,Nov.
+Dec,Dez.

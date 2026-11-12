@@ -31,7 +31,7 @@
 				<button
 					v-if="data.not_set && data.not_set.count"
 					type="button"
-					class="flex w-full items-center gap-3 rounded-lg border border-amber-300 bg-amber-50 px-4 py-3 text-left text-sm text-amber-900 hover:border-amber-400 dark:border-amber-800 dark:bg-amber-950 dark:text-amber-100"
+					class="flex w-full items-center gap-3 rounded-lg border border-outline-amber-2 bg-surface-amber-1 px-4 py-3 text-left text-sm text-ink-amber-4 hover:bg-surface-amber-2"
 					@click="openList(data.not_set.filters)"
 				>
 					<FeatherIcon name="alert-triangle" class="h-4 w-4 flex-shrink-0" />
@@ -117,6 +117,7 @@
 			:note="dialog.note"
 			:empty-text="dialog.emptyText"
 			:sections="dialog.sections"
+			@open-list="openList"
 		/>
 	</div>
 </template>
@@ -128,9 +129,9 @@ import { call, FeatherIcon } from "frappe-ui"
 import StatCard from "@spa/components/dashboard/StatCard.vue"
 import PeriodBars from "@spa/components/dashboard/PeriodBars.vue"
 import HorizontalBars from "@spa/components/dashboard/HorizontalBars.vue"
-import { formatDate } from "@spa/utils/datetime"
+import { formatDate, userLocale } from "@spa/utils/datetime"
 import { __ } from "@spa/utils/i18n.js"
-import { createdRangeLabel, leadDeskListUrl, monthLabel, NOT_SET } from "@spa/utils/leadFilters.js"
+import { createdRangeLabel, leadDeskListUrl, monthLabel, NOT_SET, OVERVIEW_BACK_KEY } from "@spa/utils/leadFilters.js"
 import { leadStatusLabel, leadStatusTheme } from "@/leadListColumns.js"
 import LeadOverviewDialog from "@/components/LeadOverviewDialog.vue"
 
@@ -156,12 +157,17 @@ const sourceRanges = [
 const direction = computed(() => (["Inbound", "Outbound"].includes(route.query.direction) ? route.query.direction : ""))
 const deskAllUrl = computed(() => leadDeskListUrl(direction.value ? { direction: direction.value } : {}))
 
+let request = 0
+
 async function load() {
+	const mine = ++request
 	error.value = ""
+	data.value = null
 	try {
-		data.value = await call(`${API}.get_lead_overview`, { direction: direction.value || null })
+		const result = await call(`${API}.get_lead_overview`, { direction: direction.value || null })
+		if (mine === request) data.value = result
 	} catch (e) {
-		error.value = e?.messages?.[0] || e?.message || __("Could not load the lead overview")
+		if (mine === request) error.value = e?.messages?.[0] || e?.message || __("Could not load the lead overview")
 	}
 }
 
@@ -169,8 +175,9 @@ function setDirection(value) {
 	router.replace({ name: "LeadsOverview", query: value ? { direction: value } : {} })
 }
 
+/** The leads behind a figure, remembering which overview view to go back to. */
 function openList(filters) {
-	router.push({ name: "LeadsFollowUps", query: filters })
+	router.push({ name: "LeadsFollowUps", query: { ...filters, [OVERVIEW_BACK_KEY]: direction.value || "all" } })
 }
 
 // --- wording -------------------------------------------------------------------------------------------------
@@ -185,8 +192,9 @@ function leads(count) {
 	return Number(count) === 1 ? __("1 lead") : __("{0} leads", [formatNumber(count)])
 }
 
+/** 1.5 → "1,5" for a German user; whole numbers stay whole. */
 function formatNumber(value) {
-	return Number.isInteger(Number(value)) ? String(value) : Number(value).toFixed(1)
+	return Number(value).toLocaleString(userLocale(), { maximumFractionDigits: 1 })
 }
 
 /** "2 leads more (+40%) · above", led by the absolute difference: at these volumes percent alone misleads. */
@@ -441,7 +449,8 @@ function openTrendDialog(t) {
 				delta: `${item.delta > 0 ? "+" : ""}${item.delta}`,
 			},
 			links: { previous: item.previous_filters, current: item.current_filters },
-			tones: { delta: item.delta > 0 ? "good" : item.delta < 0 ? "bad" : "" },
+			// More leads without a direction or source is no improvement: those rows stay neutral.
+			tones: { delta: item.key === NOT_SET ? "" : item.delta > 0 ? "good" : item.delta < 0 ? "bad" : "" },
 		}))
 	showDialog({
 		title: __("What changed"),

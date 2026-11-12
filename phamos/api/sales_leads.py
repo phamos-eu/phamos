@@ -283,6 +283,7 @@ def _serialize_lead_row(row, owner_names, owner_images, today_date):
 def _overview_filters(created_from, created_to, direction, source, status):
 	"""Validated `get_list` filters for a figure of the lead overview; "none" means "not set"."""
 	from phamos.api.sales_lead_overview import NOT_SET, validate_direction
+	from phamos.marketing.defaults import LEAD_DIRECTION_FIELD
 
 	filters = []
 	if created_from:
@@ -291,10 +292,12 @@ def _overview_filters(created_from, created_to, direction, source, status):
 		filters.append(["creation", "<=", f"{getdate(created_to)} 23:59:59.999999"])
 	direction = validate_direction(direction)
 	if direction:
-		filters.append(["custom_lead_direction", "is", "not set"] if direction == NOT_SET else ["custom_lead_direction", "=", direction])
+		filters.append([LEAD_DIRECTION_FIELD, "is", "not set"] if direction == NOT_SET else [LEAD_DIRECTION_FIELD, "=", direction])
 	if source:
 		filters.append(["source", "is", "not set"] if source == NOT_SET else ["source", "=", source])
-	if status:
+	if status == NOT_SET:
+		filters.append(["status", "is", "not set"])
+	elif status:
 		if status not in LEAD_STATUSES:
 			frappe.throw(_("Unknown Lead status: {0}").format(status))
 		filters.append(["status", "=", status])

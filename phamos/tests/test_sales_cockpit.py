@@ -503,13 +503,30 @@ class TestLeadOverview(FrappeTestCase):
 		data = self._build(rows)
 		self.assertEqual(data["average"]["months_used"], 2)
 
+	def test_a_partial_first_month_is_not_history(self):
+		"""Data that starts on 20 Nov 2025 says nothing about 1-12 Nov 2025: no comparison, not a 0."""
+		data = self._build(_rows(("2025-11-20 10:00:00", "", "Lead", "Inbound")), today="2026-11-12")
+		self.assertFalse(data["last_year"]["has_data"])
+		self.assertIsNone(data["season"])
+		self.assertNotIn("2025-11", [m["key"] for m in data["average"]["months"]])
+
+	def test_a_direction_view_keeps_the_history_of_all_leads(self):
+		"""Old leads are mostly Not set; the Inbound view still compares from the first lead of any kind."""
+		rows = _rows(("2025-10-01 10:00:00", "", "Lead", None), ("2026-11-02 10:00:00", "", "Lead", "Inbound"))
+		data = self._build(rows, direction="Inbound")
+		self.assertTrue(data["last_year"]["has_data"])
+		self.assertEqual(data["last_year"]["count"], 0)
+		self.assertEqual(data["this_month"]["count"], 1)
+		self.assertEqual(data["this_month"]["filters"]["direction"], "Inbound")
+		self.assertIsNone(data["not_set"])
+
 	def test_the_season_is_hidden_without_an_earlier_year(self):
 		data = self._build(_rows(("2026-08-21 10:00:00", "", "Lead", "Inbound")))
 		self.assertIsNone(data["season"])
 
 	def test_the_season_averages_earlier_years(self):
 		rows = _rows(
-			("2024-11-03 10:00:00", "", "Lead", "Inbound"),
+			("2024-11-01 10:00:00", "", "Lead", "Inbound"),
 			("2024-11-04 10:00:00", "", "Lead", "Inbound"),
 			("2025-11-05 10:00:00", "", "Lead", "Inbound"),
 			("2025-11-20 10:00:00", "", "Lead", "Inbound"),  # after day 12: full month only
@@ -530,7 +547,7 @@ class TestLeadOverview(FrappeTestCase):
 
 	def test_trend_shows_where_leads_went_missing(self):
 		rows = _rows(
-			("2026-09-10 10:00:00", "Website", "Lead", "Inbound"),
+			("2026-09-01 10:00:00", "Website", "Lead", "Inbound"),
 			("2026-09-11 10:00:00", "Website", "Lead", "Inbound"),
 			("2026-10-10 10:00:00", "Cold Calling", "Lead", "Outbound"),
 		)
@@ -561,7 +578,7 @@ class TestLeadOverview(FrappeTestCase):
 		from phamos.api.sales_lead_overview import _matches, _normalise
 
 		rows = _rows(
-			("2025-11-04 10:00:00", "Website", "Converted", "Inbound"),
+			("2025-11-01 10:00:00", "Website", "Converted", "Inbound"),
 			("2026-09-10 10:00:00", "Website", "Lead", "Inbound"),
 			("2026-10-31 23:59:59", "Cold Calling", "Open", "Outbound"),
 			("2026-11-01 00:00:00", None, "Do Not Contact", None),
@@ -612,3 +629,44 @@ class TestGetLeadsOverviewFilters(FrappeTestCase):
 			self._filters(direction="Sideways")
 		with self.assertRaises(frappe.ValidationError):
 			self._filters(created_from="not a date")
+
+
+class TestLeadOverviewAgainstTheDatabase(FrappeTestCase):
+	"""The promise of the overview, end to end: each figure's filters make get_leads list exactly its leads.
+	Real rows, so the SQL side (NULL vs '' source, the last microsecond of a day, disabled leads) is tested too."""
+
+	def test_every_figure_matches_its_list(self):
+		from phamos.api.sales_lead_overview import get_lead_overview
+		from phamos.api.sales_leads import get_leads
+
+		frappe.db.delete("Lead", {"first_name": ["like", "OVERVIEW-TEST%"]})
+		cases = [
+			("2026-10-31 23:59:59.999999", "", "Inbound", 0),
+			("2026-11-01 00:00:00", None, None, 0),
+			("2026-11-05 12:00:00", "Cold Calling", "Outbound", 1),  # disabled: still a lead that came in
+			("2025-11-03 09:00:00", "Website", "Inbound", 0),
+		]
+		for index, (created, source, direction, disabled) in enumerate(cases):
+			if source and not frappe.db.exists("Lead Source", source):
+				frappe.get_doc({"doctype": "Lead Source", "source_name": source}).insert()
+			lead = frappe.get_doc({"doctype": "Lead", "first_name": f"OVERVIEW-TEST {index}", "source": source})
+			lead.flags.ignore_mandatory = True
+			lead.insert()
+			frappe.db.sql(
+				"update tabLead set creation=%s, source=%s, custom_lead_direction=%s, disabled=%s where name=%s",
+				(created, source, direction, disabled, lead.name),
+			)
+
+		with patch("phamos.api.sales_lead_overview.getdate", side_effect=lambda v=None: frappe.utils.getdate(v or "2026-11-12")):
+			for direction in (None, "Inbound", "Outbound"):
+				data = get_lead_overview(direction)
+				figures = [data["this_month"], data["last_year"], *data["chart"], *data["by_status"],
+					*data["by_source"]["this_month"], *data["by_source"]["last_3_months"]]
+				for trend in data["trends"]:
+					figures += [trend["current"], trend["previous"]]
+				if data["not_set"]:
+					figures.append(data["not_set"])
+				for figure in figures:
+					with self.subTest(direction=direction, filters=figure["filters"]):
+						self.assertEqual(len(get_leads(**figure["filters"])["items"]), figure["count"])
+		frappe.db.rollback()
