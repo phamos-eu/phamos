@@ -199,3 +199,26 @@ function show_dialog_with_content(frm, full_name, formatted_date, relative_date)
             
             dialog.show();
 }
+
+// Inbound / Outbound (phamos/phamos#574): the Lead Source carries a default direction. Choosing a source fills
+// an empty direction (a chosen one wins); choosing a direction narrows the source list to matching and
+// unmapped sources.
+frappe.ui.form.on('Lead', {
+    setup: function(frm) {
+        frm.set_query('source', () => {
+            const direction = frm.doc.custom_lead_direction;
+            if (!direction) return {};
+            return { filters: [['Lead Source', 'custom_lead_direction', 'in', [direction, '']]] };
+        });
+    },
+
+    source: function(frm) {
+        if (!frm.doc.source || frm.doc.custom_lead_direction) return;
+        frappe.db.get_value('Lead Source', frm.doc.source, 'custom_lead_direction').then(({ message }) => {
+            const direction = message && message.custom_lead_direction;
+            if (direction && !frm.doc.custom_lead_direction) {
+                frm.set_value('custom_lead_direction', direction);
+            }
+        });
+    },
+});
