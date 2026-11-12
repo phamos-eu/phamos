@@ -1749,3 +1749,95 @@ The chat opens once the idea is handed in for a vote.,"Der Chat öffnet sich, so
 Open the idea,Idee öffnen
 Next idea,Nächste Idee
 Last idea up for vote,Letzte Idee zur Abstimmung
+Sales,Vertrieb
+Leads,Interessenten
+"All leads, sorted for follow-up","Alle Interessenten, sortiert zum Nachfassen"
+Sales department tasks,Aufgaben des Vertriebs
+Sales department tasks overview,Übersicht der Aufgaben des Vertriebs
+Checklists linked to Sales issues and tasks,Checklisten zu Anfragen und Aufgaben des Vertriebs
+Sales department issues,Anfragen des Vertriebs
+Sales department issues overview,Übersicht der Anfragen des Vertriebs
+1 lead,1 Interessent
+{0} leads,{0} Interessenten
+Search…,Suchen …
+Filter by lead owner,Nach Verantwortlichem filtern
+No leads found. Try clearing search or status filters.,Keine Interessenten gefunden. Leeren Sie die Suche oder die Statusfilter.
+Next Follow Up,Nächstes Nachfassen
+Last Updated,Zuletzt geändert
+Could not load leads,Interessenten konnten nicht geladen werden
+Edit note,Notiz bearbeiten
+Saving…,Wird gespeichert …
+Note,Notiz
+Added by {0},Hinzugefügt von {0}
+A note can't be empty.,Eine Notiz darf nicht leer sein.
+Could not save note,Notiz konnte nicht gespeichert werden
+What did you discuss?,Was haben Sie besprochen?
+Next Follow Up On,Nächstes Nachfassen am
+Enter a note or set a next follow-up date.,Geben Sie eine Notiz ein oder legen Sie ein Datum für das nächste Nachfassen fest.
+Search this lead…,In diesem Interessenten suchen …
+Back to list,Zurück zur Liste
+Open website,Website öffnen
+Territory,Gebiet
+Source,Quelle
+No. of Employees,Anzahl Mitarbeiter
+Market Segment,Marktsegment
+Annual Revenue,Jährlicher Umsatz
+Request Type,Anfragetyp
+Write an email,E-Mail schreiben
+Status Comment,Statuskommentar
+required,Pflichtfeld
+Reason and comments for this lead's status,Grund und Kommentare zum Status dieses Interessenten
+"Select Communication, Notes, or Activities to view.","Wählen Sie Kommunikation, Notizen oder Aktivitäten zur Anzeige."
+Nothing here matches that search.,Nichts entspricht dieser Suche.
+Nothing recorded yet.,Noch nichts erfasst.
+{0} messages,{0} Nachrichten
+(no subject),(kein Betreff)
+to {0},an {0}
+Show 1 earlier message,1 frühere Nachricht anzeigen
+Show {0} earlier messages,{0} frühere Nachrichten anzeigen
+Sent,Gesendet
+Received,Empfangen
+Status,Status
+Lead Owner,Eigentümer des Leads
+Qualification Status,Qualifikationsstatus
+Added: {0},Hinzugefügt: {0}
+Removed: {0},Entfernt: {0}
+"This site blocks embedding, so it opened in a new tab.",Diese Website lässt keine Einbettung zu und wurde in einem neuen Tab geöffnet.
+"Could not reach this site to preview it, so it opened in a new tab.",Die Website war für eine Vorschau nicht erreichbar und wurde in einem neuen Tab geöffnet.
+Could not open website,Website konnte nicht geöffnet werden
+Could not load lead,Interessent konnte nicht geladen werden
+Could not load activity,Aktivitäten konnten nicht geladen werden
+"Saved, but someone else changed this lead just now. Check for lost edits.","Gespeichert, aber jemand anderes hat diesen Interessenten gerade geändert. Prüfen Sie, ob Änderungen verloren gingen."
+Could not save lead,Interessent konnte nicht gespeichert werden
+No date,Kein Datum
+No leads found,Keine Interessenten gefunden
+Opportunity,Chance
+Quotation,Angebot
+Lost Quotation,Angebot verloren
+Interested,Interessiert
+Converted,umgewandelt
+Do Not Contact,Nicht Kontakt aufnehmen
+Unqualified,Nicht qualifiziert
+In Process,In Bearbeitung
+Qualified,Qualifiziert
+Product Enquiry,Produktanfrage
+Request for Information,Informationsanfrage
+Suggestions,Vorschläge
+Other,Andere
+Communication,Kommunikation
+Notes,Notizen
+Activities,Aktivitäten
+Follow Ups,Nachfassen
+Gantt,Gantt-Diagramm
+Record updated,Datensatz geändert
+State/Province,Staat / Provinz
+Show less,Weniger anzeigen
+Show full message,Ganze Nachricht anzeigen
+"ERPNext kept the status at {0}: it follows linked opportunities, quotations and customers.","ERPNext hat den Status {0} beibehalten: Er richtet sich nach verknüpften Chancen, Angeboten und Kunden."
+You need a Sales role to use the Leads cockpit.,"Sie benötigen eine Vertriebsrolle, um die Interessenten im Vertriebs-Cockpit zu nutzen."
+Invalid Lead field(s): {0},Ungültige Felder des Interessenten: {0}
+No fields to update,Keine Felder zu aktualisieren
+That note is no longer on this lead.,Diese Notiz gehört nicht mehr zu diesem Interessenten.
+Filter by status,Nach Status filtern
+Showing the first {0} leads by follow-up date. Leads with later follow-ups are not listed.,Die ersten {0} Interessenten nach Nachfass-Datum werden angezeigt. Interessenten mit späterem Nachfassen fehlen.
+Issues,Anfragen
