@@ -1,0 +1,112 @@
+{
+ "actions": [],
+ "creation": "2026-11-10 10:00:00.000000",
+ "doctype": "DocType",
+ "engine": "InnoDB",
+ "field_order": [
+  "enabled",
+  "allowed_role",
+  "column_break_gen",
+  "assign_to",
+  "default_project",
+  "gitlab_section",
+  "gitlab_url",
+  "gitlab_project",
+  "column_break_gl",
+  "gitlab_token",
+  "gitlab_labels"
+ ],
+ "fields": [
+  {
+   "default": "1",
+   "fieldname": "enabled",
+   "fieldtype": "Check",
+   "label": "Enabled"
+  },
+  {
+   "default": "System Manager",
+   "description": "Only users with this role see Phriend. Leave empty for everyone.",
+   "fieldname": "allowed_role",
+   "fieldtype": "Link",
+   "label": "Allowed Role",
+   "options": "Role"
+  },
+  {
+   "fieldname": "column_break_gen",
+   "fieldtype": "Column Break"
+  },
+  {
+   "description": "Who gets the ToDo for each report. Empty = the person who reported it.",
+   "fieldname": "assign_to",
+   "fieldtype": "Link",
+   "label": "Assign Reports To",
+   "options": "User"
+  },
+  {
+   "description": "Set on every new Phriend Issue.",
+   "fieldname": "default_project",
+   "fieldtype": "Link",
+   "label": "Default Project",
+   "options": "Project"
+  },
+  {
+   "fieldname": "gitlab_section",
+   "fieldtype": "Section Break",
+   "label": "GitLab"
+  },
+  {
+   "default": "https://git.phamos.eu",
+   "description": "Empty: the URL from GitLab Settings is used.",
+   "fieldname": "gitlab_url",
+   "fieldtype": "Data",
+   "label": "GitLab URL"
+  },
+  {
+   "description": "Project path (e.g. phamos/phamos) or numeric ID",
+   "fieldname": "gitlab_project",
+   "fieldtype": "Data",
+   "label": "Default GitLab Project"
+  },
+  {
+   "fieldname": "column_break_gl",
+   "fieldtype": "Column Break"
+  },
+  {
+   "description": "Token with the api scope (Reporter role). Empty: the token from GitLab Settings is used.",
+   "fieldname": "gitlab_token",
+   "fieldtype": "Password",
+   "label": "GitLab Token"
+  },
+  {
+   "default": "phriend",
+   "description": "Comma separated",
+   "fieldname": "gitlab_labels",
+   "fieldtype": "Data",
+   "label": "Default Labels"
+  }
+ ],
+ "index_web_pages_for_search": 0,
+ "issingle": 1,
+ "links": [],
+ "modified": "2026-11-10 10:00:00.000000",
+ "modified_by": "Administrator",
+ "module": "Phriend",
+ "name": "Phriend Settings",
+ "owner": "Administrator",
+ "permissions": [
+  {
+   "create": 1,
+   "delete": 1,
+   "email": 1,
+   "print": 1,
+   "read": 1,
+   "role": "System Manager",
+   "share": 1,
+   "write": 1
+  }
+ ],
+ "sort_field": "modified",
+ "sort_order": "DESC",
+ "states": [],
+ "track_changes": 1
+}

@@ -69,6 +69,7 @@ app_include_css = [
     "/assets/phamos/css/sales_order_kpi.css",
     "/assets/phamos/css/dark_mode_fix.css",
     "checklist_dialog.bundle.css",  # hashed, so a new version is not served from browser cache
+    "phriend.bundle.css",  # Phriend, the report-a-problem ball (#1850)
     "item_grid_description.bundle.css",  # tall, editable description in item tables (#1858)
 ]
 # app_include_js = "/assets/phamos/js/phamos.js"
