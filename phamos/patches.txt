@@ -74,3 +74,4 @@ phamos.patches.v1_0.copy_percent_billable_to_value_add
 phamos.patches.v1_0.set_timesheet_record_billable_hours
 phamos.patches.v1_0.set_delivery_note_monthly_implementation_summary
 phamos.patches.v1_0.set_personal_ideas_show_author_default
+phamos.patches.v1_0.backfill_lead_direction

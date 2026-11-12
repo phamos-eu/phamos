@@ -448,6 +448,8 @@ doc_events = {
     },
     "Lead": {
         "before_insert": "phamos.marketing.billing.lead_before_insert",
+        # Inbound / Outbound: from the Lead Source, Inbound for website and email leads (#574)
+        "before_validate": "phamos.marketing.crm.lead_set_direction",
     },
     "Customer": {
         "on_update": [

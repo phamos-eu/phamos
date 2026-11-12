@@ -23,7 +23,7 @@ import re
 import frappe
 from frappe import _
 
-from phamos.marketing.defaults import LEAD_SOURCE
+from phamos.marketing.defaults import LEAD_DIRECTION_FIELD, LEAD_DIRECTIONS, LEAD_SOURCE
 from phamos.marketing.utils import join_name, normalize_email
 
 _LEGAL_FORMS = re.compile(r"\b(gmbh|ag|kg|ug|ohg|gbr|e\.?\s?v|mbh|co|ltd|inc|llc|se|haftungsbeschränkt)\b\.?", re.I)
@@ -125,6 +125,41 @@ def find_party(email, company_name=None):
 # --- creation -------------------------------------------------------------------------------------------
 
 
+# --- inbound / outbound (phamos/phamos#574) -----------------------------------------------------------
+
+
+def lead_set_direction(doc, method=None):
+	"""Lead ``before_validate``: fill Inbound/Outbound, and require it on new leads only.
+
+	1. a value is set: keep it
+	2. the Lead Source has a direction: take it
+	3. created automatically (website guest, incoming email: ``ignore_mandatory``) or by a path that says so
+	   (``flags.lead_direction_default``): that default, Inbound unless the path says otherwise
+	4. a new lead still without one is refused; an existing one may stay empty, or every later save of an old
+	   lead without a source would fail, the cockpit's autosave included
+	"""
+	if doc.get(LEAD_DIRECTION_FIELD):
+		return
+	direction = lead_source_direction(doc.get("source"))
+	if not direction:
+		if doc.flags.get("lead_direction_default"):
+			direction = doc.flags.lead_direction_default
+		elif frappe.session.user == "Guest" or doc.flags.ignore_mandatory:
+			direction = "Inbound"
+	if direction:
+		doc.set(LEAD_DIRECTION_FIELD, direction)
+	elif doc.is_new():
+		frappe.throw(_("Please choose Inbound or Outbound."), frappe.MandatoryError, title=_("Inbound / Outbound"))
+
+
+def lead_source_direction(source):
+	"""The default direction of a Lead Source, or None."""
+	if not source:
+		return None
+	direction = frappe.db.get_value("Lead Source", source, LEAD_DIRECTION_FIELD)
+	return direction if direction in LEAD_DIRECTIONS else None
+
+
 def ensure_lead_source(name=LEAD_SOURCE):
 	if not frappe.db.exists("Lead Source", name):
 		# Infrastructure record, created once for everybody: no user permission involved.
@@ -169,6 +204,8 @@ def create_lead(*, email, first_name, last_name="", company_name="", phone="", j
 		# None: ERPNext's default, the current user. The website passes WEBSITE_LEAD_OWNER.
 		**({"lead_owner": lead_owner} if lead_owner else {}),
 	})
+	# Website forms and event registrations: people who came to us (phamos/phamos#574).
+	lead.flags.lead_direction_default = "Inbound"
 	lead.insert(ignore_permissions=ignore_permissions)
 	return lead.name
 
