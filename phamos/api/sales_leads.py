@@ -365,10 +365,27 @@ def _serialize_lead_detail(doc):
 
 
 @frappe.whitelist()
-def get_lead_owners():
-	"""Enabled users holding a Sales role — candidates for Lead Owner."""
+@frappe.validate_and_sanitize_search_inputs
+def lead_owner_query(doctype, txt, searchfield, start, page_len, filters):
+	"""Link search for Lead Owner: Sales-role users first, then anyone else.
+
+	PM decision (#1757): the suggestions are the sales team, but a lead can
+	still be given to any enabled system user.
+	"""
 	_check_lead_access()
-	return role_shortlist_users(LEAD_ROLES)
+	sales_users = {u["name"] for u in role_shortlist_users(LEAD_ROLES, limit=500)}
+	like = f"%{txt or ''}%"
+	users = frappe.get_all(
+		"User",
+		filters={"enabled": 1, "user_type": "System User", "name": ("!=", "Guest")},
+		or_filters={"name": ("like", like), "full_name": ("like", like)},
+		fields=["name", "full_name"],
+		order_by="full_name asc",
+		limit_page_length=500,
+	)
+	users.sort(key=lambda u: u.name not in sales_users)
+	start = int(start or 0)
+	return [(u.name, u.full_name) for u in users[start : start + int(page_len or 20)]]
 
 
 @frappe.whitelist()

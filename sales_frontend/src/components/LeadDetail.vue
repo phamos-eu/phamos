@@ -343,7 +343,13 @@
 
 					<div>
 						<label class="mb-1.5 block text-xs text-ink-gray-5">{{ __("Lead Owner") }}</label>
-						<FrappeLink doctype="User" v-model="leadOwner" :placeholder="__('Lead Owner')" />
+						<!-- Sales-role users are listed first; anyone else can still be picked. -->
+						<FrappeLink
+							doctype="User"
+							v-model="leadOwner"
+							query="phamos.api.sales_leads.lead_owner_query"
+							:placeholder="__('Lead Owner')"
+						/>
 					</div>
 
 					<FormControl

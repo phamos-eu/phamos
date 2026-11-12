@@ -146,6 +146,28 @@ class TestWebsiteGuards(FrappeTestCase):
 			self.assertFalse(sales_leads._is_own_site("https://example.com"))
 
 
+class TestLeadOwnerQuery(FrappeTestCase):
+	def test_sales_users_come_first_but_anyone_can_be_picked(self):
+		from phamos.api import sales_leads
+
+		users = [
+			frappe._dict(name="anna@example.com", full_name="Anna"),
+			frappe._dict(name="ben@example.com", full_name="Ben"),
+			frappe._dict(name="carla@example.com", full_name="Carla"),
+		]
+		with (
+			patch.object(sales_leads, "_check_lead_access"),
+			patch.object(sales_leads, "role_shortlist_users", return_value=[{"name": "carla@example.com"}]),
+			patch("frappe.get_all", return_value=list(users)) as get_all,
+		):
+			rows = sales_leads.lead_owner_query("User", "", "name", 0, 20, {})
+
+		self.assertEqual([r[0] for r in rows], ["carla@example.com", "anna@example.com", "ben@example.com"])
+		filters = get_all.call_args.kwargs["filters"]
+		self.assertEqual(filters["enabled"], 1)
+		self.assertEqual(filters["user_type"], "System User")
+
+
 class TestGetLeads(FrappeTestCase):
 	def test_undated_leads_sort_first(self):
 		"""Leads with no follow-up date need triage, so they lead the list."""

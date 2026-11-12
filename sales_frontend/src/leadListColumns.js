@@ -55,13 +55,9 @@ export function leadStatusTheme(status) {
 	return LEAD_STATUS_THEMES[status] || "gray"
 }
 
-/**
- * A status as the user reads it. The stored value stays English. "Lead" is kept
- * as is: phamos/translations/de.csv maps "Lead" to "Leitung" for the Web Profile
- * pages, which is wrong for a lead's status.
- */
+/** A status as the user reads it. The stored value stays English. */
 export function leadStatusLabel(status) {
-	return status === "Lead" ? status : __(status)
+	return __(status)
 }
 
 const STRONG_BY_THEME = {
