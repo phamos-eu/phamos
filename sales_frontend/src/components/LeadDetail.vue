@@ -353,6 +353,14 @@
 					</div>
 
 					<FormControl
+						v-model="leadDirection"
+						:label="__('Inbound / Outbound')"
+						type="select"
+						size="sm"
+						:options="directionOptions"
+					/>
+
+					<FormControl
 						v-model="qualificationStatus"
 						:label="__('Qualification Status')"
 						type="select"
@@ -413,6 +421,7 @@ import {
 	LEAD_STATUSES,
 	NO_OF_EMPLOYEES_OPTIONS,
 	QUALIFICATION_STATUSES,
+	LEAD_DIRECTIONS,
 	REQUEST_TYPE_OPTIONS,
 	leadStatusLabel,
 	leadStatusStrongClass,
@@ -449,6 +458,7 @@ const status = ref("")
 // timezone conversion, which would shift a bare date across day boundaries.
 const nextFollowUp = ref("")
 const qualificationStatus = ref("")
+const leadDirection = ref("")
 const statusComment = ref("")
 const statusCommentEl = ref(null)
 const leadOwner = ref("")
@@ -632,6 +642,7 @@ function selectOptions(values) {
 }
 
 const qualificationOptions = computed(() => selectOptions(QUALIFICATION_STATUSES))
+const directionOptions = computed(() => selectOptions(LEAD_DIRECTIONS))
 const noOfEmployeesOptions = computed(() => selectOptions(NO_OF_EMPLOYEES_OPTIONS))
 const requestTypeOptions = computed(() => selectOptions(REQUEST_TYPE_OPTIONS))
 
@@ -712,6 +723,7 @@ const FIELD_REFS = {
 	status,
 	custom_next_followup: nextFollowUp,
 	qualification_status: qualificationStatus,
+	custom_lead_direction: leadDirection,
 	custom_status_comment: statusComment,
 	lead_owner: leadOwner,
 	company_name: companyName,

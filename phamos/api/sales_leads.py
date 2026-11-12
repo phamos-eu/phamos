@@ -35,6 +35,8 @@ LEAD_LIST_FIELDS = [
 	"territory",
 	"custom_next_followup",
 	"custom_status_comment",
+	"source",
+	"custom_lead_direction",
 	"creation",
 	"modified",
 ]
@@ -50,6 +52,7 @@ LEAD_TRANSACTIONAL_FIELDS = (
 	"qualification_status",
 	"custom_status_comment",
 	"lead_owner",
+	"custom_lead_direction",
 )
 LEAD_MASTER_FIELDS = (
 	"company_name",
@@ -355,6 +358,7 @@ def _serialize_lead_detail(doc):
 		else None,
 		"custom_status_comment_modified_date": doc.custom_status_comment_modified_date,
 		"qualification_status": doc.qualification_status,
+		"custom_lead_direction": doc.get("custom_lead_direction"),
 		"qualified_by": doc.qualified_by,
 		"qualified_by_name": _user_label(doc.qualified_by) if doc.qualified_by else None,
 		"qualified_on": doc.qualified_on,
@@ -417,6 +421,7 @@ def update_lead(
 	market_segment=None,
 	annual_revenue=None,
 	request_type=None,
+	custom_lead_direction=None,
 	if_modified=None,
 ):
 	"""Update whitelisted transactional + master-data Lead fields, autosave-style.
@@ -460,6 +465,7 @@ def update_lead(
 		"market_segment": market_segment,
 		"annual_revenue": annual_revenue,
 		"request_type": request_type,
+		"custom_lead_direction": custom_lead_direction,
 	}
 	updates = {k: v for k, v in fields.items() if v is not None}
 	unknown = set(updates) - set(LEAD_EDITABLE_FIELDS)
@@ -467,6 +473,15 @@ def update_lead(
 		frappe.throw(_("Invalid Lead field(s): {0}").format(", ".join(sorted(unknown))))
 	if not updates:
 		frappe.throw(_("No fields to update"))
+
+	# Same as the Desk form: a source with a default direction fills an empty direction; a chosen one wins
+	# (phamos/phamos#574).
+	if updates.get("source") and "custom_lead_direction" not in updates and not doc.get("custom_lead_direction"):
+		from phamos.marketing.crm import lead_source_direction
+
+		direction = lead_source_direction(updates["source"])
+		if direction:
+			updates["custom_lead_direction"] = direction
 
 	if "website" in updates:
 		updates["website"] = normalize_website(updates["website"])
