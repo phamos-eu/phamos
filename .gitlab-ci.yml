@@ -29,8 +29,13 @@
 #   pipeline to skip it. Set TESTS_REQUIRED_ENABLED=false to turn it off.
 #
 # ai_code_review
-#   Reviews MRs into develop / version-15 / release/* with Claude and posts
-#   findings as an MR comment. Needs CI/CD variables ANTHROPIC_API_KEY and GITLAB_API_TOKEN; set
+#   Reviews MRs into develop / version-15 / release/* with Claude: one
+#   resolvable thread per finding on its diff line, plus a new summary note
+#   with the verdict on every run (old notes are never edited). After the
+#   first review only new commits are reviewed; add the label
+#   "ai-review-full" to review the whole MR again on the next pipeline.
+#   Review rules: .gitlab/ai_review_guidelines.md.
+#   Needs CI/CD variables ANTHROPIC_API_KEY and GITLAB_API_TOKEN; set
 #   AI_REVIEW_ENABLED=false to disable. Add the label "skip-ai-code-review"
 #   to the MR and run a new pipeline to skip it for that MR.
 
@@ -242,13 +247,17 @@ tests_required:
 
 ai_code_review:
   stage: ai-review
-  image: python:3.10-slim
+  # Not -slim: the review reads its diff with git.
+  image: python:3.10
   tags: [hetzner]
   # A failed review (API error, expired token) must not fail the MR pipeline.
   allow_failure: true
   needs: []
   # A newer push gets its own review.
   interruptible: true
+  variables:
+    # The diff needs the MR's merge base and the last reviewed commit.
+    GIT_DEPTH: "0"
   rules:
     - if: '$AI_REVIEW_ENABLED == "false"'
       when: never
@@ -256,4 +265,6 @@ ai_code_review:
       when: never
     - if: '$CI_PIPELINE_SOURCE == "merge_request_event" && $CI_MERGE_REQUEST_TARGET_BRANCH_NAME =~ /^(develop|version-15|release\/.+)$/'
   script:
+    - git config --global --add safe.directory "$CI_PROJECT_DIR"
+    - pip install --quiet --disable-pip-version-check "anthropic==2.8.0"
     - python .gitlab/ai_code_review.py
