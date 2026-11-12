@@ -2,6 +2,9 @@
 // (phamos/phamos#1758). Pure: no DOM, no Vue, so they run under Vitest.
 import { __ } from "./i18n.js"
 
+/** Which overview view (All / Inbound / Outbound) a list was opened from, for the way back. */
+export const OVERVIEW_BACK_KEY = "overview"
+
 /** URL query keys the list understands; the same names as `sales_leads.get_leads` takes. */
 export const LEAD_FILTER_KEYS = ["created_from", "created_to", "direction", "source", "status"]
 
@@ -77,7 +80,8 @@ export function leadDeskListUrl(filters = {}) {
 	const { created_from: from, created_to: to } = filters
 	if (from && to) params.set("creation", json(["Between", [from, to]]))
 	else if (from) params.set("creation", json([">=", from]))
-	else if (to) params.set("creation", json(["<=", to]))
+	// A date alone compares with midnight on a Datetime: include the whole last day.
+	else if (to) params.set("creation", json(["<=", `${to} 23:59:59`]))
 	if (filters.direction) {
 		params.set("custom_lead_direction", filters.direction === NOT_SET ? json(["is", "not set"]) : filters.direction)
 	}

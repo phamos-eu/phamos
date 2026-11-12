@@ -35,13 +35,11 @@ def get_lead_overview(direction=None):
 
 	_check_lead_access()
 	direction = validate_direction(direction)
-	filters = {}
-	if direction:
-		filters[LEAD_DIRECTION_FIELD] = ["is", "not set"] if direction == NOT_SET else direction
+	# All leads, also in a direction view: history starts with the first lead of any direction (PM, 2026-11-12),
+	# and build_overview applies the direction to every figure.
 	# get_list, not get_all: User Permissions must narrow the figures just as they narrow the list.
 	rows = frappe.get_list(
 		"Lead",
-		filters=filters,
 		fields=["creation", "source", "status", LEAD_DIRECTION_FIELD],
 		limit_page_length=0,
 		order_by="creation asc",
@@ -182,15 +180,19 @@ def _changes(rows, current, previous, direction):
 
 
 def build_overview(rows, today, direction=None):
-	"""All figures of the overview for the leads in `rows` (dicts with creation, source, status, direction)."""
+	"""All figures of the overview for the leads in `rows` (dicts with creation, source, status, direction).
+
+	`rows` holds every lead; `direction` narrows each figure, not the history its comparisons rely on.
+	"""
 	rows = _normalise(rows)
 	today = getdate(today)
 	first_day = min((row["day"] for row in rows), default=None)
 	this_month = month_start(today)
 
 	def covered(start):
-		"""Whether data reaches back to `start`: before the first lead's month, a 0 would be a guess, not a count."""
-		return first_day is not None and month_start(first_day) <= start
+		"""Whether data reaches back to `start`. Only windows that start on or after the first lead count: the
+		first, partial month would read as a real 0 or a too-low month (PM, 2026-11-12)."""
+		return first_day is not None and first_day <= start
 
 	# This month so far, and the same days a year earlier.
 	current = _window(rows, this_month, today, direction)

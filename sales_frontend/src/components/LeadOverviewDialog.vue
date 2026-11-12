@@ -62,7 +62,6 @@
 
 <script setup>
 import { computed } from "vue"
-import { useRouter } from "vue-router"
 import { Dialog } from "frappe-ui"
 import { __ } from "@spa/utils/i18n.js"
 
@@ -76,8 +75,7 @@ const props = defineProps({
 	sections: { type: Array, default: () => [] },
 })
 
-const emit = defineEmits(["update:modelValue"])
-const router = useRouter()
+const emit = defineEmits(["update:modelValue", "open-list"])
 
 const open = computed({
 	get: () => props.modelValue,
@@ -90,9 +88,9 @@ function toneClass(tone) {
 	return ""
 }
 
-/** Open the lead list with a figure's filters. */
+/** Open the lead list with a figure's filters; the page adds the way back. */
 function go(query) {
 	open.value = false
-	router.push({ name: "LeadsFollowUps", query })
+	emit("open-list", query)
 }
 </script>

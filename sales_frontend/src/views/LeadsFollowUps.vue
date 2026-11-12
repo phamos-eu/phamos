@@ -14,7 +14,7 @@
 					class="flex flex-shrink-0 flex-wrap items-center gap-2 border-b border-outline-gray-2 bg-surface-gray-1 px-5 py-2"
 				>
 					<RouterLink
-						:to="{ name: 'LeadsOverview', query: overviewFilters.direction && overviewFilters.direction !== 'none' ? { direction: overviewFilters.direction } : {} }"
+						:to="overviewBackLink"
 						class="mr-1 inline-flex items-center gap-1 text-sm text-ink-gray-7 hover:text-ink-gray-9"
 					>
 						<FeatherIcon name="arrow-left" class="h-4 w-4" />{{ __("Overview") }}
@@ -40,7 +40,7 @@
 				</div>
 				<div
 					v-if="missingHint"
-					class="flex-shrink-0 border-b border-outline-gray-2 bg-amber-50 px-5 py-2 text-sm text-amber-800 dark:bg-amber-950 dark:text-amber-200"
+					class="flex-shrink-0 border-b border-outline-gray-2 bg-surface-amber-1 px-5 py-2 text-sm text-ink-amber-4"
 				>
 					{{ missingHint }}
 				</div>
@@ -122,7 +122,14 @@
 import { computed, onMounted, ref, watch } from "vue"
 import { useRoute, useRouter } from "vue-router"
 import { call, FeatherIcon } from "frappe-ui"
-import { hasLeadFilters, leadDeskListUrl, leadFilterChips, leadFiltersFromQuery, NOT_SET } from "@spa/utils/leadFilters.js"
+import {
+	hasLeadFilters,
+	leadDeskListUrl,
+	leadFilterChips,
+	leadFiltersFromQuery,
+	NOT_SET,
+	OVERVIEW_BACK_KEY,
+} from "@spa/utils/leadFilters.js"
 import { __ } from "@spa/utils/i18n.js"
 import LeadDetail from "@/components/LeadDetail.vue"
 import LeadList from "@/components/LeadList.vue"
@@ -165,6 +172,11 @@ const overviewFilters = computed(() => leadFiltersFromQuery(route.query))
 const overviewActive = computed(() => hasLeadFilters(overviewFilters.value))
 const filterChips = computed(() => leadFilterChips(overviewFilters.value))
 const deskListUrl = computed(() => leadDeskListUrl(overviewFilters.value))
+// Back to the overview view the list was opened from, not the direction a drill-down row added.
+const overviewBackLink = computed(() => {
+	const from = route.query[OVERVIEW_BACK_KEY]
+	return { name: "LeadsOverview", query: from === "Inbound" || from === "Outbound" ? { direction: from } : {} }
+})
 const missingHint = computed(() => {
 	if (overviewFilters.value.direction === NOT_SET) {
 		return __("These leads are not marked Inbound or Outbound yet. Open each one and choose, or set them in bulk via Edit in Desk.")
@@ -262,18 +274,22 @@ watch(ownerOptions, (users) => {
 	}
 })
 
+let request = 0
+
 async function loadLeads() {
+	const mine = ++request
 	loading.value = true
 	try {
 		const data = await call(`${API}.get_leads`, overviewFilters.value)
+		if (mine !== request) return
 		leads.value = data.items || []
 		statuses.value = data.statuses || []
 		truncated.value = Boolean(data.truncated)
 		configError.value = ""
 	} catch (e) {
-		configError.value = e?.messages?.[0] || e?.message || __("Could not load leads")
+		if (mine === request) configError.value = e?.messages?.[0] || e?.message || __("Could not load leads")
 	} finally {
-		loading.value = false
+		if (mine === request) loading.value = false
 	}
 }
 
@@ -287,6 +303,9 @@ function openLead(name) {
 function closeLead() {
 	selectedName.value = null
 	router.replace({ name: "LeadsFollowUps", query: route.query })
+	// A list from the overview shows what its figure counted; an edit (direction, source, status) can take a
+	// lead out of it, so reload rather than keep a row that no longer belongs.
+	if (overviewActive.value) loadLeads()
 }
 
 /** Newest first for an overview list, follow-up order for the daily one. */
