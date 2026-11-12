@@ -1,7 +1,7 @@
 <template>
 	<CockpitShell :title="pageTitle" :subtitle="pageSubtitle">
 		<template #sidebar>
-			<CockpitSidebar label="Sales" storage-key="sales-spa-sidebar-collapsed" :items="navItems" />
+			<CockpitSidebar :label="__('Sales')" storage-key="sales-spa-sidebar-collapsed" :items="navItems" />
 		</template>
 	</CockpitShell>
 </template>
@@ -11,10 +11,27 @@ import { computed } from "vue"
 import { useRoute } from "vue-router"
 import CockpitShell from "@spa/components/CockpitShell.vue"
 import CockpitSidebar from "@spa/components/CockpitSidebar.vue"
+import { __ } from "@spa/utils/i18n.js"
 
 const route = useRoute()
 
-const navItems = [
+const LEAD_ROUTES = ["Leads", "LeadsFollowUps", "LeadDetail"]
+
+const NAV_ITEMS = [
+	{
+		name: "Leads",
+		label: "Leads",
+		icon: "users",
+		match: ["Leads"],
+		children: [
+			{
+				name: "LeadsFollowUps",
+				label: "Follow Ups",
+				icon: "phone-call",
+				match: ["LeadsFollowUps", "LeadDetail"],
+			},
+		],
+	},
 	{
 		name: "Issues",
 		label: "Issues",
@@ -41,27 +58,37 @@ const navItems = [
 	},
 ]
 
+function translateItem(item) {
+	const translated = { ...item, label: __(item.label) }
+	if (item.children) translated.children = item.children.map(translateItem)
+	return translated
+}
+
+const navItems = NAV_ITEMS.map(translateItem)
+
 const pageTitle = computed(() => {
+	if (LEAD_ROUTES.includes(route.name)) return __("Leads")
 	if (route.name === "Tasks" || route.name === "TasksGantt" || route.name === "TaskDetail") {
-		return "Tasks"
+		return __("Tasks")
 	}
-	if (route.name === "Checklists" || route.name === "ChecklistDetail") return "Checklists"
-	return "Issues"
+	if (route.name === "Checklists" || route.name === "ChecklistDetail") return __("Checklists")
+	return __("Issues")
 })
 
 const pageSubtitle = computed(() => {
+	if (LEAD_ROUTES.includes(route.name)) return __("All leads, sorted for follow-up")
 	if (route.name === "TasksGantt" || route.name === "TaskDetail") {
-		return "Sales department tasks"
+		return __("Sales department tasks")
 	}
 	if (route.name === "Tasks") {
-		return "Sales department tasks overview"
+		return __("Sales department tasks overview")
 	}
 	if (route.name === "Checklists" || route.name === "ChecklistDetail") {
-		return "Checklists linked to Sales issues and tasks"
+		return __("Checklists linked to Sales issues and tasks")
 	}
 	if (route.name === "IssuesList" || route.name === "IssueDetail") {
-		return "Sales department issues"
+		return __("Sales department issues")
 	}
-	return "Sales department issues overview"
+	return __("Sales department issues overview")
 })
 </script>
