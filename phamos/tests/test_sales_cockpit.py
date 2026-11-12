@@ -320,3 +320,117 @@ class TestUpdateLeadNote(FrappeTestCase):
 			with self.assertRaises(frappe.ValidationError):
 				sales_leads.update_lead_note("LEAD-1", "NOTE-1", "   ")
 
+
+
+class TestLeadDirection(FrappeTestCase):
+	"""Inbound / Outbound on Lead (phamos/phamos#574): filled where it can be known, never blocking a save."""
+
+	def _lead(self, source=None, new=True, direction=None, **flags):
+		doc = frappe.get_doc(
+			{"doctype": "Lead", "first_name": "Direction", "source": source, "custom_lead_direction": direction}
+		)
+		# insert() marks a new document this way before before_validate runs.
+		if new:
+			doc.set("__islocal", 1)
+		else:
+			doc.name = "CRM-LEAD-EXISTING"
+		for key, value in flags.items():
+			doc.flags[key] = value
+		return doc
+
+	def _run(self, doc, source_direction=None, user="test@example.com"):
+		from phamos.marketing import crm
+
+		with (
+			patch.object(crm, "lead_source_direction", return_value=source_direction),
+			patch("frappe.session", SimpleNamespace(user=user)),
+		):
+			crm.lead_set_direction(doc)
+		return doc.custom_lead_direction
+
+	def test_a_chosen_value_is_kept(self):
+		doc = self._lead(source="Cold Calling", direction="Inbound")
+		self.assertEqual(self._run(doc, source_direction="Outbound"), "Inbound")
+
+	def test_the_source_mapping_wins_over_the_fallback(self):
+		doc = self._lead(source="Cold Calling", ignore_mandatory=True)
+		self.assertEqual(self._run(doc, source_direction="Outbound", user="Guest"), "Outbound")
+
+	def test_a_website_guest_lead_is_inbound(self):
+		self.assertEqual(self._run(self._lead(), user="Guest"), "Inbound")
+
+	def test_an_email_lead_is_inbound(self):
+		"""frappe's email receive and ERPNext's "Make Lead" set ignore_mandatory."""
+		self.assertEqual(self._run(self._lead(ignore_mandatory=True)), "Inbound")
+
+	def test_a_creation_path_can_set_its_own_default(self):
+		self.assertEqual(self._run(self._lead(lead_direction_default="Outbound")), "Outbound")
+
+	def test_an_unknown_new_lead_stays_empty_instead_of_failing(self):
+		"""ERPNext creates leads for an Opportunity or Appointment with an unknown email, and Data Import
+		inserts them: none of that may fail. Desk asks for the value; the overview lists the rest as Not set."""
+		self.assertFalse(self._run(self._lead()))
+
+	def test_an_existing_lead_without_a_value_still_saves(self):
+		"""Old leads without a source: every later edit, the cockpit's autosave included, must still work."""
+		doc = self._lead(new=False)
+		self.assertFalse(self._run(doc))
+
+	def test_a_real_insert_fills_the_direction_from_the_source(self):
+		"""End to end: the hook runs before Frappe's select validation on a real insert."""
+		from phamos.marketing.defaults import LEAD_DIRECTION_FIELD
+
+		if not frappe.db.exists("Lead Source", "Cold Calling"):
+			frappe.get_doc({"doctype": "Lead Source", "source_name": "Cold Calling"}).insert()
+		frappe.db.set_value("Lead Source", "Cold Calling", LEAD_DIRECTION_FIELD, "Outbound")
+		lead = frappe.get_doc(
+			{"doctype": "Lead", "first_name": "Direction", "email_id": "direction-test@example.com", "source": "Cold Calling"}
+		).insert()
+		self.assertEqual(lead.get(LEAD_DIRECTION_FIELD), "Outbound")
+		frappe.db.rollback()
+
+	def test_create_lead_marks_website_and_event_leads_inbound(self):
+		from phamos.marketing import crm
+
+		inserted = []
+		with patch("frappe.model.document.Document.insert", lambda self, **kw: inserted.append(self)):
+			crm.create_lead(email="anna@example.com", first_name="Anna", source="Website")
+		self.assertEqual(inserted[0].flags.lead_direction_default, "Inbound")
+
+	def test_source_seeding_never_overwrites_a_value(self):
+		from phamos.marketing import setup
+
+		set_calls = []
+		existing = {"Cold Calling": "Inbound"}  # changed by hand in Desk
+		with (
+			patch.object(setup, "create_custom_fields"),
+			patch("frappe.db.exists", return_value=True),
+			patch("frappe.db.get_value", side_effect=lambda dt, name, field: existing.get(name)),
+			patch("frappe.db.set_value", side_effect=lambda *a, **kw: set_calls.append(a)),
+		):
+			setup.ensure_lead_direction()
+		changed = {call[1] for call in set_calls}
+		self.assertNotIn("Cold Calling", changed)
+		self.assertIn("Website", changed)
+
+	def _cockpit_source_change(self, current_direction):
+		from phamos.api import sales_leads
+
+		doc = MagicMock()
+		doc.modified = "2026-11-12 10:00:00"
+		doc.custom_status_comment = ""
+		doc.get = lambda field: current_direction if field == "custom_lead_direction" else None
+		with (
+			patch.object(sales_leads, "_check_lead_access"),
+			patch("frappe.get_doc", return_value=doc),
+			patch("phamos.marketing.crm.lead_source_direction", return_value="Outbound"),
+			patch.object(sales_leads, "get_lead", return_value={}),
+		):
+			sales_leads.update_lead("LEAD-1", source="Cold Calling")
+		return {c.args[0]: c.args[1] for c in doc.set.call_args_list}
+
+	def test_choosing_a_source_in_the_cockpit_fills_an_empty_direction(self):
+		self.assertEqual(self._cockpit_source_change(None).get("custom_lead_direction"), "Outbound")
+
+	def test_a_chosen_direction_wins_over_a_new_source(self):
+		self.assertNotIn("custom_lead_direction", self._cockpit_source_change("Inbound"))
