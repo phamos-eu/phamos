@@ -219,6 +219,9 @@ get_website_user_home_page = "phamos.website.get_website_user_home_page"
 
 on_login = ["phamos.website.on_login"]
 
+# Phriend: whether the ball shows up for this user (#1850)
+boot_session = "phamos.phriend.boot.boot_session"
+
 update_website_context = [
     "phamos.website.update_website_context",
     "phamos.web_profile.chrome.update_website_context",  # language-aware navbar/footer, DIN 5008 footer
