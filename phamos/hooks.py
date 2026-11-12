@@ -69,6 +69,7 @@ app_include_css = [
     "/assets/phamos/css/sales_order_kpi.css",
     "/assets/phamos/css/dark_mode_fix.css",
     "checklist_dialog.bundle.css",  # hashed, so a new version is not served from browser cache
+    "phriend.bundle.css",  # Phriend, the report-a-problem ball (#1850)
     "item_grid_description.bundle.css",  # tall, editable description in item tables (#1858)
 ]
 # app_include_js = "/assets/phamos/js/phamos.js"
@@ -82,6 +83,7 @@ app_include_js = [
     "/assets/phamos/js/frappe_list_bulk_edit_override.js",  # Fixes null-label crash in bulk edit
     "checklist_dialog.bundle.js",  # Linked Checklists dialog (hashed bundle, see above)
     "web_profile_form.bundle.js",  # Web Profile forms: missing-translation hint, preview link
+    "phriend.bundle.js",  # Phriend: screenshot + comment -> Issue (#1850)
 ]
 
 
@@ -109,7 +111,10 @@ page_js = {
 doctype_js = {
 	"Leave Application": "public/js/leave_application.js",  # calendar status (milestone 68)
 	"Project" : "public/js/project.js",
-	"Issue" : "public/js/issue.js",
+	"Issue" : [
+		"public/js/issue.js",
+		"public/js/phriend_issue.js",  # Phriend reports: screenshot, Create GitLab Issue (#1850)
+	],
 	"Sales Order": "public/js/sales_order.js",
 	"Lead": "public/js/lead.js",
 	"Job Applicant": "public/js/job_applicant.js",
@@ -214,6 +219,9 @@ get_website_user_home_page = "phamos.website.get_website_user_home_page"
 
 on_login = ["phamos.website.on_login"]
 
+# Phriend: whether the ball shows up for this user (#1850)
+boot_session = "phamos.phriend.boot.boot_session"
+
 update_website_context = [
     "phamos.website.update_website_context",
     "phamos.web_profile.chrome.update_website_context",  # language-aware navbar/footer, DIN 5008 footer
@@ -241,6 +249,7 @@ before_install = "phamos.install.before_install"
 after_install = "phamos.setup.ops_inbox.ensure_ops_inbox_setup"
 
 after_migrate = [
+	"phamos.phriend.setup.after_migrate",  # Phriend fields on Issue, default settings (#1850)
 	"phamos.setup.ops_inbox.ensure_ops_inbox_setup",
 	"phamos.web_profile.setup.after_migrate",  # Web Page "Language" / "Translation Of" fields
 	"phamos.cockpits.setup.after_migrate",  # ToDo fields (#1553), Task Owner on Task (#1751)

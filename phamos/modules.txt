@@ -6,3 +6,4 @@ Bookstack Integration
 Cockpits
 AI Agents
 Marketing
+Phriend
