@@ -7,13 +7,12 @@ import ipaddress
 import json
 import re
 import socket
-from datetime import timedelta
 from urllib.parse import urlparse
 
 import frappe
 import requests
 from frappe import _
-from frappe.utils import get_datetime, getdate, now_datetime
+from frappe.utils import getdate, now_datetime
 from frappe.utils.html_utils import clean_email_html
 
 from phamos.api.department_cockpit import _user_images, _user_label, role_shortlist_users
@@ -238,42 +237,12 @@ def _is_overdue(next_followup, today_date=None):
 	return getdate(next_followup) < (today_date or getdate())
 
 
-def _serialize_lead_row(row, owner_names, owner_images, today_date, next_steps=None):
+def _serialize_lead_row(row, owner_names, owner_images, today_date):
 	owner = row.get("lead_owner")
 	row["owner_name"] = owner_names.get(owner) or owner
 	row["owner_image"] = owner_images.get(owner) or ""
 	row["overdue"] = _is_overdue(row.get("custom_next_followup"), today_date)
-
-	step = (next_steps or {}).get(row.get("name"))
-	row["next_step"] = step.get("next_step") if step else None
-	row["next_step_date"] = step.get("date") if step else None
-	row["next_step_overdue"] = _is_overdue(step.get("date"), today_date) if step else False
 	return row
-
-
-def _soonest_next_steps(lead_names):
-	"""The single most pressing next step per Lead, for the list view.
-
-	One query for the whole page rather than one per row — the list is the
-	place where an N+1 would actually be felt.
-	"""
-	if not lead_names:
-		return {}
-
-	rows = frappe.get_all(
-		"Lead Next Step",
-		filters={"parent": ["in", lead_names], "parenttype": "Lead"},
-		fields=["parent", "next_step", "date"],
-		# Undated steps last, so a dated one always wins as "what's next".
-		order_by="date is null asc, date asc, idx asc",
-	)
-
-	soonest = {}
-	for row in rows:
-		if not (row.next_step or "").strip():
-			continue
-		soonest.setdefault(row.parent, {"next_step": row.next_step, "date": row.date})
-	return soonest
 
 
 @frappe.whitelist()
@@ -301,10 +270,7 @@ def get_leads():
 	owner_images = dict(zip(owners, _user_images(owners)))
 
 	today_date = getdate()
-	next_steps = _soonest_next_steps([r.name for r in rows])
-	items = [
-		_serialize_lead_row(row, owner_names, owner_images, today_date, next_steps) for row in rows
-	]
+	items = [_serialize_lead_row(row, owner_names, owner_images, today_date) for row in rows]
 
 	return {"items": items, "truncated": truncated, "statuses": LEAD_STATUSES}
 
@@ -325,21 +291,6 @@ def _serialize_notes(doc):
 	]
 	notes.sort(key=lambda n: n["added_on"] or "", reverse=True)
 	return notes
-
-
-def _next_step_sort_key(row):
-	"""Date ascending, undated rows last."""
-	date = row.get("date")
-	return (not date, str(date or ""))
-
-
-def _serialize_next_steps(doc):
-	"""Rows of the Lead's `custom_next_steps` child table, by date."""
-	rows = [
-		{"name": row.name, "next_step": row.next_step, "date": row.date}
-		for row in (doc.get("custom_next_steps") or [])
-	]
-	return sorted(rows, key=_next_step_sort_key)
 
 
 def _serialize_lead_detail(doc):
@@ -392,7 +343,6 @@ def _serialize_lead_detail(doc):
 		"qualified_on": doc.qualified_on,
 		"creation": doc.creation,
 		"modified": doc.modified,
-		"next_steps": _serialize_next_steps(doc),
 		"desk_url": f"/app/lead/{doc.name}",
 	}
 
@@ -407,6 +357,7 @@ def get_lead_owners():
 @frappe.whitelist()
 def get_lead(name):
 	"""Return Lead master + transactional data for the Sales cockpit detail view."""
+	_check_lead_access()
 	frappe.has_permission("Lead", "read", throw=True)
 	doc = frappe.get_doc("Lead", name)
 	doc.check_permission("read")
@@ -453,6 +404,7 @@ def update_lead(
 	`doc.save()` will raise if a typed value doesn't match an existing
 	record, surfaced to the caller like any other save error.
 	"""
+	_check_lead_access()
 	frappe.has_permission("Lead", "write", throw=True)
 	doc = frappe.get_doc("Lead", name)
 	doc.check_permission("write")
@@ -505,36 +457,6 @@ def update_lead(
 	result = get_lead(name)
 	result["conflict"] = conflict
 	return result
-
-
-@frappe.whitelist(methods=["POST"])
-def set_lead_next_steps(lead, rows=None):
-	"""Replace the Lead's Next Steps table with `rows`.
-
-	The cockpit edits the table as a whole (add/edit/delete then save), so
-	replacing it wholesale avoids matching up child-row identities; blank
-	rows are dropped rather than failing the required `next_step` field.
-	"""
-	frappe.has_permission("Lead", "write", throw=True)
-	doc = frappe.get_doc("Lead", lead)
-	doc.check_permission("write")
-
-	if isinstance(rows, str):
-		rows = json.loads(rows)
-
-	kept = [row for row in (rows or []) if (row.get("next_step") or "").strip()]
-
-	doc.set("custom_next_steps", [])
-	# Stored in date order so the table reads chronologically everywhere,
-	# including the Desk grid — not just in the cockpit.
-	for row in sorted(kept, key=_next_step_sort_key):
-		doc.append(
-			"custom_next_steps",
-			{"next_step": row["next_step"].strip(), "date": row.get("date") or None},
-		)
-
-	doc.save()
-	return _serialize_next_steps(doc)
 
 
 def _field_label(meta, fieldname):
@@ -614,275 +536,6 @@ def _thread_key(subject):
 	return clean.casefold()
 
 
-def _contact_suggestions(lead, lead_doc):
-	"""Addresses worth offering: the lead itself, its Contacts, and anyone
-	already in the conversation."""
-	found = {}
-
-	def add(email, label, source):
-		email = (email or "").strip()
-		if not email or email.lower() in found:
-			return
-		found[email.lower()] = {"email": email, "label": label or email, "source": source}
-
-	add(lead_doc.email_id, lead_doc.lead_name or lead, "Lead")
-
-	contact_names = frappe.get_all(
-		"Dynamic Link",
-		filters={"link_doctype": "Lead", "link_name": lead, "parenttype": "Contact"},
-		pluck="parent",
-	)
-	if contact_names:
-		for contact in frappe.get_all(
-			"Contact",
-			filters={"name": ("in", contact_names)},
-			fields=["name", "first_name", "last_name", "email_id"],
-		):
-			label = " ".join(filter(None, [contact.first_name, contact.last_name])) or contact.name
-			add(contact.email_id, label, "Contact")
-			for row in frappe.get_all(
-				"Contact Email", filters={"parent": contact.name}, fields=["email_id"]
-			):
-				add(row.email_id, label, "Contact")
-
-	# Anyone already on the thread — the practical source of addresses that
-	# were never captured as Contacts.
-	for comm in _lead_communications(
-		lead, fields=["name", "communication_date", "sender", "recipients", "cc"], limit=50
-	):
-		for field in ("sender", "recipients", "cc"):
-			for address in (comm.get(field) or "").split(","):
-				address = address.strip()
-				if address:
-					add(address, address, "Conversation")
-
-	return list(found.values())
-
-
-@frappe.whitelist()
-def get_lead_email_context(lead):
-	"""Suggested recipients and available templates for the compose dialog."""
-	_check_lead_access()
-	lead_doc = frappe.get_doc("Lead", lead)
-	lead_doc.check_permission("read")
-
-	frappe.has_permission("Email Template", "read", throw=True)
-	templates = frappe.get_all(
-		"Email Template",
-		fields=["name", "subject"],
-		order_by="name asc",
-		limit_page_length=100,
-	)
-
-	signature, footer = _email_signature_and_footer()
-
-	return {
-		"suggestions": _contact_suggestions(lead, lead_doc),
-		"templates": templates,
-		"signature": signature,
-		"footer": footer,
-	}
-
-
-def _email_signature_and_footer():
-	"""What gets appended to an outgoing mail, so the dialog can show it.
-
-	Two different things, and they behave differently: the signature is part
-	of the body and the user can edit it, while the footer is assembled by
-	Frappe at send time (Email Account footer, System Settings' address and
-	the standard footer) and can only be previewed.
-	"""
-	from frappe.email.doctype.email_account.email_account import EmailAccount
-	from frappe.email.email_body import get_footer
-
-	email_account = None
-	try:
-		# The same order Frappe resolves an outgoing account in: an account that
-		# appends to Lead, else the default outgoing one. `find_outgoing` wraps
-		# its result in a dict, so go through the two lookups it uses.
-		email_account = EmailAccount.find_one_by_filters(
-			enable_outgoing=1, enable_incoming=1, append_to="Lead"
-		) or EmailAccount.find_default_outgoing()
-	except Exception:
-		# No outgoing account configured is a normal state on a fresh site;
-		# it only means there's no account-level footer to show.
-		pass
-
-	signature = frappe.db.get_value("User", frappe.session.user, "email_signature")
-	if not signature and email_account and email_account.get("add_signature"):
-		signature = email_account.get("signature")
-
-	signature = (signature or "").strip()
-	if signature and "<" not in signature:
-		signature = signature.replace("\n", "<br>")
-
-	try:
-		footer = get_footer(email_account) or ""
-	except Exception:
-		footer = ""
-
-	return signature, footer.strip()
-
-
-@frappe.whitelist()
-def render_lead_email_template(lead, template):
-	"""Render an Email Template against this Lead."""
-	_check_lead_access()
-	lead_doc = frappe.get_doc("Lead", lead)
-	lead_doc.check_permission("read")
-
-	from frappe.email.doctype.email_template.email_template import get_email_template
-
-	return get_email_template(template, lead_doc.as_dict())
-
-
-@frappe.whitelist()
-def search_email_recipients(lead, txt="", limit=10):
-	"""Addresses matching `txt` for the compose dialog's recipient fields.
-
-	Searches what's already connected to the lead first (its own address,
-	its Contacts, anyone on the thread), then falls back to Contacts at
-	large so an address that isn't linked yet can still be picked.
-	"""
-	_check_lead_access()
-	lead_doc = frappe.get_doc("Lead", lead)
-	lead_doc.check_permission("read")
-
-	txt = (txt or "").strip().casefold()
-	limit = frappe.utils.cint(limit) or 10
-
-	found = {}
-	for suggestion in _contact_suggestions(lead, lead_doc):
-		haystack = f"{suggestion['label']} {suggestion['email']}".casefold()
-		if not txt or txt in haystack:
-			found[suggestion["email"].casefold()] = suggestion
-
-	if txt and len(found) < limit:
-		frappe.has_permission("Contact", "read", throw=True)
-		# Escape LIKE wildcards: an unescaped "%" would match every contact on
-		# the site in one request rather than searching for one.
-		like = "%{0}%".format(txt.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_"))
-		contacts = frappe.get_all(
-			"Contact",
-			or_filters=[
-				["first_name", "like", like],
-				["last_name", "like", like],
-				["email_id", "like", like],
-			],
-			fields=["name", "first_name", "last_name", "email_id"],
-			limit_page_length=limit,
-		)
-		for contact in contacts:
-			if not contact.email_id or contact.email_id.casefold() in found:
-				continue
-			label = " ".join(filter(None, [contact.first_name, contact.last_name])) or contact.name
-			found[contact.email_id.casefold()] = {
-				"email": contact.email_id,
-				"label": label,
-				"source": "Contact",
-			}
-
-	return list(found.values())[:limit]
-
-
-@frappe.whitelist()
-def get_contact_emails(contact):
-	"""Addresses on a Contact, for the 'choose an existing contact' picker."""
-	_check_lead_access()
-	doc = frappe.get_doc("Contact", contact)
-	doc.check_permission("read")
-
-	label = " ".join(filter(None, [doc.first_name, doc.last_name])) or doc.name
-	emails = [row.email_id for row in (doc.email_ids or []) if row.email_id]
-	if doc.email_id and doc.email_id not in emails:
-		emails.insert(0, doc.email_id)
-	return {"label": label, "emails": emails}
-
-
-@frappe.whitelist(methods=["POST"])
-def send_lead_email(
-	lead, recipients, subject, content, cc=None, bcc=None, in_reply_to=None, attachments=None, send=1
-):
-	"""Send an email from the system, linked to the Lead.
-
-	Goes through Frappe's own `communication.email.make`, so the outgoing
-	message is recorded as a Communication against this Lead and replies
-	thread back to it — which a mailto: handoff can't do, since the mail
-	never passes through the system at all.
-	"""
-	_check_lead_access()
-	frappe.has_permission("Lead", "write", throw=True)
-
-	doc = frappe.get_doc("Lead", lead)
-	doc.check_permission("read")
-
-	recipients = (recipients or "").strip()
-	subject = (subject or "").strip()
-	if not recipients:
-		frappe.throw(_("At least one recipient is required."))
-	if not subject:
-		frappe.throw(_("A subject is required."))
-
-	# Files the dialog uploaded against this Lead; `make` copies each one onto
-	# the Communication, so only names the user actually attached are passed on.
-	attachments = _clean_attachments(lead, attachments)
-
-	from frappe.core.doctype.communication.email import make
-
-	result = make(
-		doctype="Lead",
-		name=lead,
-		content=content or "",
-		subject=subject,
-		recipients=recipients,
-		cc=cc or None,
-		bcc=bcc or None,
-		in_reply_to=in_reply_to or None,
-		attachments=attachments or None,
-		communication_medium="Email",
-		sent_or_received="Sent",
-		send_email=frappe.utils.cint(send),
-	)
-	return {"name": result.get("name")}
-
-
-def _clean_attachments(lead, attachments):
-	"""File names that really belong to this Lead, so a crafted payload can't
-	pull an unrelated private file into an outgoing email."""
-	if isinstance(attachments, str):
-		attachments = frappe.parse_json(attachments)
-	if not attachments:
-		return []
-
-	names = [str(a) for a in attachments if a]
-	if not names:
-		return []
-
-	return frappe.get_all(
-		"File",
-		filters={
-			"name": ["in", names],
-			"attached_to_doctype": "Lead",
-			"attached_to_name": lead,
-		},
-		pluck="name",
-	)
-
-
-@frappe.whitelist(methods=["POST"])
-def remove_lead_attachment(lead, file):
-	"""Drop a file the user attached in the compose dialog and then changed
-	their mind about, so abandoned uploads don't pile up on the Lead."""
-	_check_lead_access()
-	frappe.has_permission("Lead", "write", throw=True)
-
-	if not _clean_attachments(lead, [file]):
-		frappe.throw(_("That file is not attached to this lead."))
-
-	frappe.delete_doc("File", file)
-	return {"ok": True}
-
-
 @frappe.whitelist(methods=["POST"])
 def update_lead_note(lead, note_name, content):
 	"""Edit an existing note on a Lead.
@@ -891,6 +544,7 @@ def update_lead_note(lead, note_name, content):
 	form's note editing) rather than writing the child row directly, so
 	both paths behave the same.
 	"""
+	_check_lead_access()
 	frappe.has_permission("Lead", "write", throw=True)
 	doc = frappe.get_doc("Lead", lead)
 	doc.check_permission("write")
@@ -1001,6 +655,7 @@ def get_lead_activity(name):
 	them isn't guaranteed to include everything the feed wants (e.g.
 	`sent_or_received`).
 	"""
+	_check_lead_access()
 	frappe.has_permission("Lead", "read", throw=True)
 	doc = frappe.get_doc("Lead", name)
 	doc.check_permission("read")
@@ -1043,76 +698,7 @@ def get_lead_activity(name):
 		"notes": _serialize_notes(doc),
 		"communications": communications,
 		"activities": _format_lead_activities(docinfo),
-		"opportunities": _lead_opportunities(doc.name),
-		"quotations": _lead_quotations(doc.name),
 	}
-
-
-def _lead_opportunities(lead):
-	"""Opportunities raised from this Lead — where a follow-up is heading."""
-	if not frappe.has_permission("Opportunity", "read"):
-		return []
-
-	return frappe.get_all(
-		"Opportunity",
-		filters={"opportunity_from": "Lead", "party_name": lead},
-		fields=[
-			"name",
-			"status",
-			"sales_stage",
-			"transaction_date",
-			"opportunity_amount",
-			"currency",
-			"modified",
-		],
-		order_by="transaction_date desc",
-		limit_page_length=20,
-	)
-
-
-def _lead_quotations(lead):
-	"""Quotations sent to this Lead."""
-	if not frappe.has_permission("Quotation", "read"):
-		return []
-
-	return frappe.get_all(
-		"Quotation",
-		filters={"quotation_to": "Lead", "party_name": lead},
-		fields=[
-			"name",
-			"status",
-			"transaction_date",
-			"valid_till",
-			"grand_total",
-			"currency",
-			"docstatus",
-			"modified",
-		],
-		order_by="transaction_date desc",
-		limit_page_length=20,
-	)
-
-
-@frappe.whitelist(methods=["POST"])
-def create_lead_opportunity(lead):
-	"""Raise a draft Opportunity from this Lead.
-
-	Uses ERPNext's own Lead → Opportunity mapping, so the draft carries the
-	same fields Desk's "Create > Opportunity" would. An Opportunity is valid
-	without items, so it can be saved here and picked up in Desk; a Quotation
-	isn't, which is why that one hands straight over to the Desk form.
-	"""
-	_check_lead_access()
-	frappe.has_permission("Opportunity", "create", throw=True)
-
-	lead_doc = frappe.get_doc("Lead", lead)
-	lead_doc.check_permission("read")
-
-	from erpnext.crm.doctype.lead.lead import make_opportunity
-
-	opportunity = make_opportunity(lead)
-	opportunity.insert()
-	return {"name": opportunity.name, "url": f"/app/opportunity/{opportunity.name}"}
 
 
 @frappe.whitelist(methods=["POST"])
@@ -1123,6 +709,7 @@ def add_lead_note(lead, content=None, next_follow_up_on=None):
 	`add_note`, same as the Desk form's "Notes" section) rather than a
 	generic Comment or a new doctype.
 	"""
+	_check_lead_access()
 	frappe.has_permission("Lead", "write", throw=True)
 	doc = frappe.get_doc("Lead", lead)
 	doc.check_permission("write")

@@ -75,50 +75,137 @@ class TestLeadCommunications(FrappeTestCase):
 		self.assertEqual(len(rows), 1)
 
 
-class TestCleanAttachments(FrappeTestCase):
-	"""Only files that belong to this lead may ride along on its mail."""
+class TestGetLeads(FrappeTestCase):
+	def test_undated_leads_sort_first(self):
+		"""Leads with no follow-up date need triage, so they lead the list."""
+		from phamos.api import sales_leads
 
-	def test_scopes_file_names_to_the_lead(self):
-		from phamos.api.sales_leads import _clean_attachments
+		with (
+			patch.object(sales_leads, "_check_lead_access"),
+			patch("frappe.get_all", return_value=[]) as get_all,
+		):
+			sales_leads.get_leads()
 
-		with patch("frappe.get_all", return_value=["FILE-mine"]) as get_all:
-			kept = _clean_attachments("LEAD-1", ["FILE-mine", "FILE-someone-elses"])
-
-		self.assertEqual(kept, ["FILE-mine"])
 		_, kwargs = get_all.call_args
-		filters = kwargs["filters"]
-		self.assertEqual(filters["attached_to_doctype"], "Lead")
-		self.assertEqual(filters["attached_to_name"], "LEAD-1")
-		self.assertCountEqual(filters["name"][1], ["FILE-mine", "FILE-someone-elses"])
+		self.assertEqual(
+			kwargs["order_by"], "custom_next_followup is null desc, custom_next_followup asc"
+		)
+		self.assertEqual(kwargs["filters"], {"disabled": 0})
 
-	def test_no_attachments_asks_nothing(self):
-		from phamos.api.sales_leads import _clean_attachments
+	def test_marks_overdue_only_after_the_due_date(self):
+		from phamos.api.sales_leads import _serialize_lead_row
 
-		with patch("frappe.get_all") as get_all:
-			self.assertEqual(_clean_attachments("LEAD-1", None), [])
-			get_all.assert_not_called()
-
-	def test_accepts_a_json_string(self):
-		from phamos.api.sales_leads import _clean_attachments
-
-		with patch("frappe.get_all", return_value=[]), patch(
-			"frappe.parse_json", return_value=["FILE-1"]
-		) as parse:
-			_clean_attachments("LEAD-1", '["FILE-1"]')
-			parse.assert_called_once()
+		today = frappe.utils.getdate("2026-11-12")
+		due_today = _serialize_lead_row({"custom_next_followup": "2026-11-12"}, {}, {}, today)
+		due_before = _serialize_lead_row({"custom_next_followup": "2026-11-11"}, {}, {}, today)
+		self.assertFalse(due_today["overdue"])
+		self.assertTrue(due_before["overdue"])
 
 
-class TestNextStepSorting(FrappeTestCase):
-	"""The checklist reads chronologically; undated steps sit last."""
+class TestUpdateLead(FrappeTestCase):
+	def _doc(self, modified="2026-11-12 10:00:00"):
+		doc = MagicMock()
+		doc.modified = modified
+		doc.custom_status_comment = ""
+		return doc
 
-	def test_dated_before_undated(self):
-		from phamos.api.sales_leads import _next_step_sort_key
+	def test_flags_a_stale_save_as_a_conflict(self):
+		"""Someone else saved since the client loaded: the save goes through
+		(autosave, not a lock) but the caller is told, so it can warn."""
+		from phamos.api import sales_leads
 
-		# The rows come from a child table, so they are dict-like, not attributes.
-		rows = [
-			{"next_step": "later", "date": "2026-03-01"},
-			{"next_step": "no date", "date": None},
-			{"next_step": "sooner", "date": "2026-01-01"},
-		]
-		ordered = [r["next_step"] for r in sorted(rows, key=_next_step_sort_key)]
-		self.assertEqual(ordered, ["sooner", "later", "no date"])
+		doc = self._doc()
+		with (
+			patch.object(sales_leads, "_check_lead_access"),
+			patch("frappe.has_permission"),
+			patch("frappe.get_doc", return_value=doc),
+			patch.object(sales_leads, "get_lead", return_value={"name": "LEAD-1"}),
+		):
+			result = sales_leads.update_lead(
+				"LEAD-1", status="Open", if_modified="2026-11-12 09:00:00"
+			)
+
+		self.assertTrue(result["conflict"])
+		doc.save.assert_called_once()
+
+	def test_a_current_save_is_not_a_conflict(self):
+		from phamos.api import sales_leads
+
+		doc = self._doc()
+		with (
+			patch.object(sales_leads, "_check_lead_access"),
+			patch("frappe.has_permission"),
+			patch("frappe.get_doc", return_value=doc),
+			patch.object(sales_leads, "get_lead", return_value={"name": "LEAD-1"}),
+		):
+			result = sales_leads.update_lead(
+				"LEAD-1", status="Open", if_modified="2026-11-12 10:00:00"
+			)
+
+		self.assertFalse(result["conflict"])
+
+	def test_a_changed_status_comment_is_stamped(self):
+		from phamos.api import sales_leads
+
+		doc = self._doc()
+		with (
+			patch.object(sales_leads, "_check_lead_access"),
+			patch("frappe.has_permission"),
+			patch("frappe.get_doc", return_value=doc),
+			patch.object(sales_leads, "get_lead", return_value={}),
+		):
+			sales_leads.update_lead("LEAD-1", custom_status_comment="Budget frozen")
+
+		set_fields = {c.args[0] for c in doc.set.call_args_list}
+		self.assertIn("custom_status_comment_modified_by", set_fields)
+		self.assertIn("custom_status_comment_modified_date", set_fields)
+
+	def test_nothing_to_update_is_refused(self):
+		from phamos.api import sales_leads
+
+		with (
+			patch.object(sales_leads, "_check_lead_access"),
+			patch("frappe.has_permission"),
+			patch("frappe.get_doc", return_value=self._doc()),
+		):
+			with self.assertRaises(frappe.ValidationError):
+				sales_leads.update_lead("LEAD-1")
+
+	def test_needs_a_sales_role(self):
+		from phamos.api import sales_leads
+
+		with patch("frappe.has_permission"), patch("frappe.get_roles", return_value=["Employee"]), patch(
+			"frappe.session", SimpleNamespace(user="someone@example.com")
+		):
+			with self.assertRaises(frappe.PermissionError):
+				sales_leads.update_lead("LEAD-1", status="Open")
+
+
+class TestUpdateLeadNote(FrappeTestCase):
+	def test_refuses_a_note_that_is_not_on_the_lead(self):
+		from phamos.api import sales_leads
+
+		doc = MagicMock()
+		doc.notes = [SimpleNamespace(name="NOTE-1")]
+		with (
+			patch.object(sales_leads, "_check_lead_access"),
+			patch("frappe.has_permission"),
+			patch("frappe.get_doc", return_value=doc),
+		):
+			with self.assertRaises(frappe.ValidationError):
+				sales_leads.update_lead_note("LEAD-1", "NOTE-OTHER", "text")
+		doc.edit_note.assert_not_called()
+
+	def test_refuses_an_empty_note(self):
+		from phamos.api import sales_leads
+
+		doc = MagicMock()
+		doc.notes = [SimpleNamespace(name="NOTE-1")]
+		with (
+			patch.object(sales_leads, "_check_lead_access"),
+			patch("frappe.has_permission"),
+			patch("frappe.get_doc", return_value=doc),
+		):
+			with self.assertRaises(frappe.ValidationError):
+				sales_leads.update_lead_note("LEAD-1", "NOTE-1", "   ")
+
