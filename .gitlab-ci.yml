@@ -212,9 +212,20 @@ tests_required:
     - git config --global --add safe.directory "$CI_PROJECT_DIR"
     - |
       changed="$(git diff --name-only "$CI_MERGE_REQUEST_DIFF_BASE_SHA" HEAD)"
-      # phamos/__init__.py only holds __version__; every release MR bumps it,
-      # so it must not count as code that needs a test.
-      code="$(printf '%s\n' "$changed" | grep -E '^phamos/.+\.py$' | grep -vE '(^|/)test_[^/]*\.py$' | grep -vxF 'phamos/__init__.py' || true)"
+      code="$(printf '%s\n' "$changed" | grep -E '^phamos/.+\.py$' | grep -vE '(^|/)test_[^/]*\.py$' || true)"
+      # Every release MR bumps __version__ in phamos/__init__.py. That bump
+      # alone needs no test; any other line changed there still does, and so
+      # does deleting the file. Lines before the first @@ are the diff header;
+      # skipping to it keeps a content line like "++x" from looking like one.
+      # No grep -q here: under pipefail its early exit can fail the pipe and
+      # wave real code through.
+      init_lines="$(git diff -U0 "$CI_MERGE_REQUEST_DIFF_BASE_SHA" HEAD -- phamos/__init__.py | sed -n '/^@@/,$p' | grep -E '^[+-]' || true)"
+      version_re="^[+-]__version__ = ('[0-9][0-9A-Za-z.]*'|\"[0-9][0-9A-Za-z.]*\")$"
+      init_other="$(printf '%s\n' "$init_lines" | grep -vE "$version_re" || true)"
+      init_added="$(printf '%s\n' "$init_lines" | grep -E '^[+]' || true)"
+      if [ -z "$init_other" ] && [ -n "$init_added" ]; then
+        code="$(printf '%s\n' "$code" | grep -vxF 'phamos/__init__.py' || true)"
+      fi
       tests="$(printf '%s\n' "$changed" | grep -E '(^|/)test_[^/]*\.py$' || true)"
       if [ -n "$code" ] && [ -z "$tests" ]; then
         echo "This MR changes Python code but no test_*.py file:"
