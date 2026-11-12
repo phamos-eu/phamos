@@ -15,6 +15,7 @@ from phamos.api.presence import (
 	acquire_field_lock,
 	assert_fields_unlocked,
 	get_field_locks,
+	get_field_locks_for,
 	get_user_cards,
 	release_field_lock,
 )
@@ -53,6 +54,27 @@ class TestFieldLocks(FrappeTestCase):
 		with self.assertRaises(FieldLockedError):
 			assert_fields_unlocked("Issue", self.issue.name, ["subject", "description"])
 		assert_fields_unlocked("Issue", self.issue.name, ["priority"])
+
+	def test_locks_of_several_documents_in_one_call(self):
+		other = _make_issue("Presence test issue 2")
+		hidden = _make_issue("Presence test issue 3")
+		acquire_field_lock("Issue", self.issue.name, "description")
+		real_validate = presence._validate_target
+
+		def validate(doctype, name, *args, **kwargs):
+			if name == hidden.name:
+				raise frappe.PermissionError
+			return real_validate(doctype, name, *args, **kwargs)
+
+		with patch("phamos.api.presence._validate_target", side_effect=validate):
+			result = get_field_locks_for("Issue", frappe.as_json([self.issue.name, other.name, hidden.name]))
+		self.assertEqual([lock["fieldname"] for lock in result[self.issue.name]], ["description"])
+		self.assertEqual(result[other.name], [])
+		self.assertNotIn(hidden.name, result)  # unreadable documents are left out
+
+	def test_locks_of_too_many_documents_are_refused(self):
+		with self.assertRaises(frappe.ValidationError):
+			get_field_locks_for("Issue", [f"ISS-{i}" for i in range(presence.MAX_LOCK_DOCS_PER_CALL + 1)])
 
 	def test_second_user_cannot_take_a_live_lock(self):
 		acquire_field_lock("Issue", self.issue.name, "description")

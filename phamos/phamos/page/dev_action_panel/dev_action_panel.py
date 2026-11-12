@@ -1,10 +1,10 @@
 import frappe
 from frappe import _
-from frappe.utils import cstr, now_datetime, add_to_date, time_diff_in_seconds, get_datetime
+from frappe.utils import cint, cstr, now_datetime, add_to_date, time_diff_in_seconds, get_datetime
 from phamos.phamos.timesheet_utils import billable_seconds_sql, billable_seconds_term, billing_context, normalize_percent_billable
 from phamos.phamos.doctype.timesheet_record.timesheet_record import compute_time_limit_status
 from frappe.query_builder import Order
-from frappe.query_builder.functions import Coalesce, Sum, Count
+from frappe.query_builder.functions import Coalesce, Sum, Count, Max
 from pypika import Case
 
 
@@ -573,26 +573,35 @@ def get_dev_my_projects():
 
 @frappe.whitelist()
 def get_dev_all_projects():
-    """Return all open projects; is_assigned=1 if the current user already has a ToDo for it."""
+    """One project list instead of "My Projects" + "All Projects".
+
+    Every Open project, plus projects assigned to me (open ToDo) in any status, so closing the
+    assignment ToDo (e.g. in the Personal Cockpit) only changes the order. is_assigned=1 for mine.
+    Order: last used first (my latest Timesheet Record), then assigned to me, then by name.
+    """
     user = frappe.session.user
 
     Project = frappe.qb.DocType("Project")
     Customer = frappe.qb.DocType("Customer")
     ToDo = frappe.qb.DocType("ToDo")
 
-    is_assigned = Case().when(ToDo.reference_name.isnotnull(), 1).else_(0).as_("is_assigned")
-
-    query = (
-        frappe.qb.from_(Project)
-        .left_join(Customer)
-        .on(Customer.name == Project.customer)
-        .left_join(ToDo)
-        .on(
+    # A subquery, not a join: several open ToDos for one project would duplicate the row.
+    assigned_to_me = (
+        frappe.qb.from_(ToDo)
+        .select(Max(ToDo.reference_name))
+        .where(
             (ToDo.reference_name == Project.name)
             & (ToDo.reference_type == "Project")
             & (ToDo.status == "Open")
             & (ToDo.allocated_to == user)
         )
+    )
+    is_assigned = Case().when(assigned_to_me.isnotnull(), 1).else_(0).as_("is_assigned")
+
+    query = (
+        frappe.qb.from_(Project)
+        .left_join(Customer)
+        .on(Customer.name == Project.customer)
         .select(
             Project.name,
             Project.project_name,
@@ -602,12 +611,17 @@ def get_dev_all_projects():
             Coalesce(Customer.customer_name, Project.customer).as_("customer_desc"),
             is_assigned,
         )
-        .where(Project.status == "Open")
-        .orderby(is_assigned, order=Order.asc)
-        .orderby(Project.project_name, order=Order.asc)
+        .where((Project.status == "Open") | assigned_to_me.isnotnull())
     )
-    projects = query.run(as_dict=True)
-    return _enrich_projects(projects, user)
+    projects = _enrich_projects(query.run(as_dict=True), user)
+    projects.sort(
+        key=lambda p: (
+            -(get_datetime(p["last_used"]).timestamp() if p.get("last_used") else 0),
+            -cint(p.get("is_assigned")),
+            (p.get("project_name") or "").lower(),
+        )
+    )
+    return projects
 
 
 def _enrich_projects(projects, user):
@@ -667,6 +681,7 @@ def _enrich_projects(projects, user):
                 Count("*").as_("cnt"),
                 Coalesce(total_seconds, 0).as_("total_seconds"),
                 Coalesce(billable_seconds, 0).as_("billable_seconds"),
+                Max(TimesheetRecord.creation).as_("last_used"),
             )
             .where(
                 (TimesheetRecord.project.isin(project_names))
@@ -681,6 +696,7 @@ def _enrich_projects(projects, user):
                 "count": r.cnt,
                 "total_seconds": int(r.total_seconds),
                 "billable_seconds": int(r.billable_seconds),
+                "last_used": r.last_used,
             }
             for r in ts_rows
         }
@@ -692,6 +708,7 @@ def _enrich_projects(projects, user):
         p["total_tracked_seconds"] = ts["total_seconds"]
         p["billable_seconds"] = ts["billable_seconds"]
         p["non_billable_seconds"] = max(0, ts["total_seconds"] - ts["billable_seconds"])
+        p["last_used"] = ts.get("last_used")
         # Preset for Percent Billable in the stop panel: the project's value, 100 when it has none (#1744).
         p["percent_billable"] = p.get("percent_billable") or "100"
 

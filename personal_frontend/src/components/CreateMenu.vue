@@ -62,6 +62,8 @@ const groups = computed(() => {
 		{ label: __("Issue"), icon: "inbox", onClick: () => (open.issue = true) },
 		{ label: __("Task"), icon: "check-square", onClick: () => (open.task = true) },
 		{ label: __("Checklist"), icon: "list", onClick: () => (open.checklist = true) },
+		// Ideas (#1771): the list page creates it and opens it
+		{ label: __("Idea"), icon: "feather", onClick: () => router.push({ name: "Ideas", query: { new: 1 } }) },
 	]
 	// My Leave (#1714): the page opens its Apply dialog
 	if (hasLeaveAccess()) {

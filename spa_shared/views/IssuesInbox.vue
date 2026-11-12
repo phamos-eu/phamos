@@ -34,7 +34,15 @@
 						placeholder="Search…"
 						class="w-full min-w-0"
 					/>
-					<div class="text-center text-xs font-medium text-ink-gray-5">{{ __("Chat") }}</div>
+					<div class="flex min-w-0 justify-center">
+						<ListSortSelector
+							standalone
+							v-model:sort-by="sortBy"
+							v-model:sort-order="sortOrder"
+							:options="chatSortOption"
+							@clear="resetSort"
+						/>
+					</div>
 					<div class="flex min-w-0 justify-center">
 						<PriorityFilter
 							v-model="priorityFilter"
@@ -60,6 +68,12 @@
 							:options="modifiedSortOption"
 						/>
 					</div>
+					<ChecklistOwnerFilter
+						v-model="assigneeFilter"
+						:users="assigneeOptions"
+						:label="__('Filter by assignee')"
+						overlap
+					/>
 					<Button class="justify-self-end" variant="solid" @click="showCreate = true">
 						New Issue
 					</Button>
@@ -74,6 +88,7 @@
 				<IssueList
 					v-if="filteredIssues.length"
 					:issues="filteredIssues"
+					:chat-states="chatStates"
 					:selected-name="selectedName"
 					show-creator
 					align-with-filters
@@ -81,7 +96,7 @@
 				/>
 				<div
 					v-else
-					class="col-span-7 flex flex-1 flex-col items-center justify-center gap-2 px-6 py-16 text-center"
+					class="col-span-8 flex flex-1 flex-col items-center justify-center gap-2 px-6 py-16 text-center"
 				>
 					<p class="font-medium text-ink-gray-9">No {{ spaConfig.label }} issues found</p>
 					<p class="max-w-sm text-sm text-ink-gray-6">
@@ -170,8 +185,13 @@ import { useRoute, useRouter } from "vue-router"
 import { call } from "frappe-ui"
 import IssueDetail from "@spa/components/IssueDetail.vue"
 import { issueChatStore } from "@spa/issueChatStore.js"
+import { useIssueChatStates } from "@spa/composables/useIssueChatStates.js"
+import { compareChatStates } from "@spa/utils/chatUnread.js"
+import { prewarmRavenFrame } from "@spa/utils/ravenFrame.js"
+import { useUserRealtime } from "@spa/composables/useUserRealtime.js"
 import { __ } from "@spa/utils/i18n.js"
 import IssueList from "@spa/components/IssueList.vue"
+import ChecklistOwnerFilter from "@spa/components/ChecklistOwnerFilter.vue"
 import CreateIssueDialog from "@spa/components/CreateIssueDialog.vue"
 import LinkedChecklistsSection from "@spa/components/LinkedChecklistsSection.vue"
 import ListSortSelector from "@spa/components/ListSortSelector.vue"
@@ -193,6 +213,13 @@ const sortBy = ref("modified")
 const sortOrder = ref("desc")
 const createdSortOption = [{ label: "Created On", value: "creation" }]
 const modifiedSortOption = [{ label: "Last Updated", value: "modified" }]
+// Most urgent chats first; a second click goes back to the default sort (#1796).
+const chatSortOption = [{ label: __("Chat"), value: "chat", oneWay: true }]
+
+function resetSort() {
+	sortBy.value = "modified"
+	sortOrder.value = "desc"
+}
 const loading = ref(false)
 const configError = ref("")
 const issues = ref([])
@@ -212,6 +239,12 @@ const formOptions = ref({
 })
 
 function compareIssues(a, b) {
+	if (sortBy.value === "chat") {
+		// Most urgent first (#1796): mentions, unread, read chats, none; same chat state: last updated first.
+		const cmp = compareChatStates(chatStates.value[a.name], chatStates.value[b.name])
+		if (cmp) return -cmp
+		return String(b.modified || "").localeCompare(String(a.modified || ""))
+	}
 	const field = sortBy.value === "creation" ? "creation" : "modified"
 	const cmp = String(a[field] || "").localeCompare(String(b[field] || ""))
 	return sortOrder.value === "desc" ? -cmp : cmp
@@ -240,7 +273,24 @@ function issueMatchesSearch(issue, q) {
 		.some((v) => stripHtml(v).toLowerCase().includes(q))
 }
 
-const filteredIssues = computed(() => {
+// Everyone assigned to a loaded Issue, for the avatar filter above the Assigned column.
+const assigneeFilter = ref([])
+const assigneeOptions = computed(() => {
+	const byName = new Map()
+	for (const issue of issues.value) {
+		;(issue.assignees || []).forEach((name, i) => {
+			if (!name || byName.has(name)) return
+			byName.set(name, {
+				name,
+				full_name: (issue.assignee_names || [])[i] || name,
+				user_image: (issue.assignee_images || [])[i] || "",
+			})
+		})
+	}
+	return [...byName.values()].sort((a, b) => a.full_name.localeCompare(b.full_name))
+})
+
+const visibleIssues = computed(() => {
 	const q = search.value.trim().toLowerCase()
 	const priorities = priorityFilter.value
 	const statuses = statusFilter.value
@@ -256,11 +306,26 @@ const filteredIssues = computed(() => {
 		// Default: Closed hidden until the Closed status filter is activated
 		list = list.filter((i) => i.status !== "Closed")
 	}
+	if (assigneeFilter.value.length) {
+		const wanted = new Set(assigneeFilter.value)
+		list = list.filter((i) => (i.assignees || []).some((u) => wanted.has(u)))
+	}
 	if (q) {
 		list = list.filter((i) => issueMatchesSearch(i, q))
 	}
-	return [...list].sort(compareIssues)
+	return list
 })
+// Loaded for the unsorted rows, so sorting by chat does not reload the states it sorts by.
+const chatStates = useIssueChatStates(visibleIssues)
+// Boot Raven while the list sits idle, so the first chat opens as fast as the next ones (#1796).
+// Only when the list has chats: then the chat is on and the user is in Raven.
+const stopPrewarm = watch(chatStates, (states) => {
+	if (!Object.keys(states || {}).length) return
+	stopPrewarm()
+	const idle = window.requestIdleCallback || ((fn) => setTimeout(fn, 1500))
+	idle(() => prewarmRavenFrame(), { timeout: 3000 })
+})
+const filteredIssues = computed(() => [...visibleIssues.value].sort(compareIssues))
 
 async function loadOptions() {
 	try {
@@ -271,9 +336,10 @@ async function loadOptions() {
 	}
 }
 
-async function loadInbox() {
+/** `quiet`: a background refresh keeps the list on screen and ignores errors. */
+async function loadInbox({ quiet = false } = {}) {
 	if (configError.value) return
-	loading.value = true
+	if (!quiet) loading.value = true
 	try {
 		// Include closed so StatusFilter can activate Closed client-side;
 		// filteredIssues hides Closed by default until that pill is selected.
@@ -281,7 +347,7 @@ async function loadInbox() {
 		issues.value = data.items || []
 		truncated.value = Boolean(data.truncated)
 	} catch (e) {
-		configError.value = e?.messages?.[0] || e?.message || "Could not load issues"
+		if (!quiet) configError.value = e?.messages?.[0] || e?.message || "Could not load issues"
 	} finally {
 		loading.value = false
 	}
@@ -334,6 +400,10 @@ watch(
 		}
 	}
 )
+
+// Someone assigned or unassigned the user elsewhere (another cockpit, Desk): their ToDos
+// changed, so Issues may have joined or left this list.
+useUserRealtime("cockpit_todos_changed", () => loadInbox({ quiet: true }))
 
 onMounted(async () => {
 	await loadOptions()

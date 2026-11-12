@@ -6,6 +6,7 @@
 import frappe
 
 from phamos.api import department_cockpit as dc
+from phamos.phamos.hr import sick_leave
 
 CONFIG = dc.CockpitConfig(
 	label="Human Resources",
@@ -14,6 +15,9 @@ CONFIG = dc.CockpitConfig(
 	roles=("System Manager", "HR Manager", "HR User"),
 	settings_method_name="get_human_resources_settings",
 )
+
+# Privacy mode (#1839): seconds data stays visible when the setting is empty.
+DEFAULT_PRIVACY_REVEAL_SECONDS = 120
 
 
 def check_app_permission():
@@ -33,6 +37,16 @@ def get_human_resources_settings():
 		human_resources_project_count (projects linked to the department).
 	"""
 	return dc.get_settings(CONFIG)
+
+
+@frappe.whitelist()
+def get_privacy_settings():
+	"""How long the HR Cockpit's privacy mode shows data after "Show data" (#1839).
+
+	No role check: a duration is not sensitive, and every cockpit user needs it to draw the top bar.
+	"""
+	seconds = frappe.db.get_single_value(sick_leave.SETTINGS, "human_resources_privacy_reveal_seconds")
+	return {"reveal_seconds": int(seconds) if seconds else DEFAULT_PRIVACY_REVEAL_SECONDS}
 
 
 @frappe.whitelist()
@@ -116,6 +130,18 @@ def ensure_issue_chat(name):
 def get_issue_chat_states(names):
 	"""Return the chat state per Issue for list views."""
 	return dc.get_issue_chat_states(names)
+
+
+@frappe.whitelist()
+def get_task_chat(name):
+	"""Return the Raven chat state of a Task in HR scope."""
+	return dc.get_task_chat(CONFIG, name)
+
+
+@frappe.whitelist(methods=["POST"])
+def ensure_task_chat(name):
+	"""Start or join the Raven chat of a Task in HR scope."""
+	return dc.ensure_task_chat(CONFIG, name)
 
 
 

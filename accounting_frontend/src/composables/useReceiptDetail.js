@@ -133,9 +133,13 @@ export function useReceiptDetail({ onChanged } = {}) {
 			failToast(info?.message || (!info?.recipient ? "No DATEV recipient is configured." : "PDF attachment is missing."))
 			return false
 		}
+		if (!info.sender) {
+			failToast(info.sender_missing_message)
+			return false
+		}
 		const question = info.already_sent
-			? `Already sent on ${info.sent_at} by ${info.sent_by}. Send ${info.pdf_name} to ${info.recipient} again?`
-			: `Send ${info.pdf_name} to ${info.recipient}?`
+			? `Already sent on ${info.sent_at} by ${info.sent_by}. Send ${info.pdf_name} from ${info.sender} to ${info.recipient} again?`
+			: `Send ${info.pdf_name} from ${info.sender} to ${info.recipient}?`
 		if (!window.confirm(question)) return false
 		const res = await call(`${RECEIPT_DOC}.send_to_datev`, { accounting_receipt_name: receipt.value.name })
 		;(res?.ok ? okToast : failToast)(res?.message || (res?.ok ? "Queued for DATEV." : "Sending failed."))

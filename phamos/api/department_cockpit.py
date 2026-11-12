@@ -775,8 +775,8 @@ def get_tasks(config: CockpitConfig, include_completed=0):
 	return [_serialize_task_row(r) for r in rows]
 
 
-def get_task(config: CockpitConfig, name):
-	"""Return Task detail for the department cockpit."""
+def _get_scoped_task(config: CockpitConfig, name):
+	"""Load a Task the session user may read in this cockpit, or throw."""
 	frappe.has_permission("Task", "read", throw=True)
 	department = _require_department(config)
 
@@ -787,8 +787,22 @@ def get_task(config: CockpitConfig, name):
 			frappe.throw(_("This task is not assigned to you."))
 	elif doc.department != department:
 		frappe.throw(_("This task is not in the {0} department.").format(config.label))
+	return doc
 
-	return _serialize_task_detail(doc)
+
+def get_task(config: CockpitConfig, name):
+	"""Return Task detail for the department cockpit."""
+	return _serialize_task_detail(_get_scoped_task(config, name))
+
+
+def get_task_chat(config: CockpitConfig, name):
+	"""Chat state of a Task in scope: channel, membership, unread counts (#1779)."""
+	return issue_chat.get_chat(_get_scoped_task(config, name))
+
+
+def ensure_task_chat(config: CockpitConfig, name):
+	"""Start or join the chat of a Task in scope."""
+	return issue_chat.ensure_chat(_get_scoped_task(config, name))
 
 
 def _serialize_task_detail(doc):

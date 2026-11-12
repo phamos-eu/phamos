@@ -44,7 +44,7 @@
 
 .pdf-extract__line {
 	display: grid;
-	grid-template-columns: 1.2fr 1fr 1fr;
+	grid-template-columns: 1.4fr 0.8fr 1fr 1fr;
 	gap: 12px;
 	padding: 8px 0;
 	border-bottom: 1px solid var(--border-color);
@@ -54,4 +54,14 @@
 .pdf-extract__line--head {
 	font-weight: 600;
 	color: var(--text-muted);
+}
+
+.pdf-extract__line input {
+	width: 100%;
+}
+
+.pdf-extract__actions {
+	display: flex;
+	gap: 8px;
+	margin-top: 12px;
 }

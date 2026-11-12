@@ -7,6 +7,11 @@ import CheckinsHome from "./views/CheckinsHome.vue"
 import CheckinsList from "./views/CheckinsList.vue"
 import MyContract from "./views/MyContract.vue"
 import MyLeave from "./views/MyLeave.vue"
+import Ideas from "./views/Ideas.vue"
+import IdeaDetail from "./views/IdeaDetail.vue"
+import IdeaWrite from "./views/IdeaWrite.vue"
+import IdeasVote from "./views/IdeasVote.vue"
+import IdeaVoteDetail from "./views/IdeaVoteDetail.vue"
 import IssuesHome from "./views/IssuesHome.vue"
 import TasksHome from "./views/TasksHome.vue"
 import TodosPlan from "./views/TodosPlan.vue"
@@ -31,6 +36,13 @@ const router = createSpaRouter({
 		// My Leave (#1714)
 		{ path: "/leave", name: "MyLeave", component: MyLeave },
 		{ path: "/leave/:name", name: "MyLeaveDetail", component: MyLeave, props: true },
+		// Ideas (#1771)
+		{ path: "/ideas", name: "Ideas", component: Ideas },
+		// Hand in for vote (#1842); before /ideas/:name so "vote" is never read as an idea.
+		{ path: "/ideas/vote", name: "IdeasVote", component: IdeasVote },
+		{ path: "/ideas/vote/:name", name: "IdeaVoteDetail", component: IdeaVoteDetail, props: true },
+		{ path: "/ideas/:name", name: "IdeaDetail", component: IdeaDetail, props: true },
+		{ path: "/ideas/:name/write", name: "IdeaWrite", component: IdeaWrite, props: true },
 		// Own start pages for Issues and Tasks (#1604); they replace the shared empty ones.
 		{ path: "/issues", name: "Issues", component: IssuesHome },
 		{ path: "/tasks", name: "Tasks", component: TasksHome },

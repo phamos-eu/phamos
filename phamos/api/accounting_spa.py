@@ -12,6 +12,7 @@ from frappe.utils import flt, get_fullname
 
 from phamos.accounting.pdf_stamp import note_to_lines
 from phamos.api import department_cockpit as dc
+from phamos.api.accounting_receivables import can_read_receivables
 from phamos.api.accounting_stats import can_read_statistics
 from phamos.api.issue_common import _parse_assignees, _parse_list
 
@@ -66,6 +67,7 @@ def get_accounting_settings():
 	settings = dc.get_settings(CONFIG, read_permission=_accounting_settings_permission)
 	settings["can_read_monthly_implementation_summary"] = 1 if _can_read_mis() else 0
 	settings["can_read_statistics"] = 1 if can_read_statistics() else 0
+	settings["can_read_receivables"] = 1 if can_read_receivables() else 0
 	settings["can_read_ai_skills"] = 1 if frappe.has_permission("AI Skill", "read") else 0
 	return settings
 
@@ -285,6 +287,18 @@ def ensure_issue_chat(name):
 def get_issue_chat_states(names):
 	"""Return the chat state per Issue for list views."""
 	return dc.get_issue_chat_states(names)
+
+
+@frappe.whitelist()
+def get_task_chat(name):
+	"""Return the Raven chat state of a Task in Accounting scope."""
+	return dc.get_task_chat(CONFIG, name)
+
+
+@frappe.whitelist(methods=["POST"])
+def ensure_task_chat(name):
+	"""Start or join the Raven chat of a Task in Accounting scope."""
+	return dc.ensure_task_chat(CONFIG, name)
 
 
 

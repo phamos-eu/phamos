@@ -1,7 +1,7 @@
 <template>
 	<div class="flex h-full min-h-0 bg-surface-gray-1">
 		<div class="h-full min-h-0 flex-1 overflow-y-auto p-5">
-			<div class="mx-auto flex max-w-4xl flex-col gap-5">
+			<div class="flex flex-col gap-5">
 				<div class="flex flex-wrap items-center justify-between gap-3">
 					<div>
 						<h1 class="text-lg font-semibold text-ink-gray-9">{{ __("My Leave") }}</h1>
@@ -23,7 +23,7 @@
 					{{ __("Your user has no active Employee record, so there is no leave to show.") }}
 				</p>
 				<template v-else>
-					<section v-if="balance.length" class="grid grid-cols-2 gap-3 md:grid-cols-4">
+					<section v-if="balance.length || sickDays !== null" class="grid grid-cols-2 gap-3 md:grid-cols-4">
 						<div
 							v-for="row in balance"
 							:key="row.leave_type"
@@ -41,8 +41,24 @@
 								}}
 							</div>
 						</div>
+						<div v-if="sickDays !== null" class="rounded-lg border border-outline-gray-2 bg-surface-white p-4">
+							<div class="truncate text-xs text-ink-gray-5">{{ __("Sick days this year") }}</div>
+							<div class="mt-1 text-2xl font-semibold tabular-nums text-ink-gray-9">{{ formatLeaveDays(sickDays) }}</div>
+							<div class="mt-1 text-xs text-ink-gray-5">{{ __("Approved, since 1 January") }}</div>
+						</div>
 					</section>
-					<p v-else class="text-sm text-ink-gray-5">{{ __("No leave is allocated to you for today.") }}</p>
+					<p v-if="!balance.length" class="text-sm text-ink-gray-5">{{ __("No leave is allocated to you for today.") }}</p>
+
+					<!-- My leave days of the year at a glance (#1836); a leave day opens its entry below. -->
+					<section class="rounded-lg border border-outline-gray-2 bg-surface-white p-4">
+						<h2 class="mb-3 text-sm font-semibold text-ink-gray-9">{{ __("My leave days {0}", [year]) }}</h2>
+						<LeaveHeatmap
+							:year="year"
+							:applications="allRows"
+							:holidays="myLeave.balance?.holidays || []"
+							:link="(app) => ({ name: 'MyLeaveDetail', params: { name: app.name } })"
+						/>
+					</section>
 
 					<section class="rounded-lg border border-outline-gray-2 bg-surface-white">
 						<div class="flex flex-wrap items-center justify-between gap-3 border-b border-outline-gray-1 px-4 py-3">
@@ -160,9 +176,11 @@ import {
 } from "@spa/utils/leaveFormat.js"
 import spaConfig from "@/config"
 import ApplyLeaveDialog from "../components/ApplyLeaveDialog.vue"
+import LeaveHeatmap from "@spa/components/LeaveHeatmap.vue"
 import { loadMyLeave, loadMyLeaveBalance, myLeave } from "../leaveStore.js"
 
 const props = defineProps({ name: { type: String, default: "" } })
+const year = new Date().getFullYear()
 
 const route = useRoute()
 const router = useRouter()
@@ -173,6 +191,8 @@ const withdrawing = ref(false)
 
 const hasEmployee = computed(() => Boolean(myLeave.data?.has_employee))
 const balance = computed(() => myLeave.balance?.balance || [])
+// Own sick days this year (#1834); null while no sick leave types are configured.
+const sickDays = computed(() => myLeave.balance?.sick_days ?? null)
 const allRows = computed(() => myLeave.data?.leave || [])
 const rows = computed(() =>
 	statusFilter.value ? allRows.value.filter((r) => r.status === statusFilter.value) : allRows.value

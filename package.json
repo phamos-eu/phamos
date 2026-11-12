@@ -15,5 +15,9 @@
 		"build": "yarn install:frontends && cd personal_frontend && yarn build && cd ../human_resources_frontend && yarn build && cd ../sales_frontend && yarn build && cd ../accounting_frontend && yarn build && cd ../project_management_frontend && yarn build && cd ../software_development_frontend && yarn build && cd ../scan_frontend && yarn build",
 		"build:scan": "cd scan_frontend && yarn build",
 		"test:spa": "cd personal_frontend && yarn test"
+	},
+	"dependencies": {
+		"html-to-image": "1.11.11",
+		"html2canvas": "1.4.1"
 	}
 }

@@ -93,3 +93,123 @@ class TestProjectActionPanelValueAdd(FrappeTestCase):
 			)
 		self.assertEqual(outcome, {"timesheet_name": record.name})
 		self.assertEqual(self._values(record.name), ("50", "75"))
+
+	def test_update_and_submit_raises_errors_instead_of_reporting_success(self):
+		# #1636: the panel showed "Updated Successfully" for any reply, also for an error text.
+		record = frappe.get_doc(
+			{
+				"doctype": "Timesheet Record",
+				"project": self.internal,
+				"employee": self.employee,
+				"goal": "Fix the report",
+				"expected_time": 3600,
+				"from_time": "2026-05-10 09:00:00",
+				"activity_type": self.activity_type,
+			}
+		)
+		record.append("item", {"from_time": "2026-05-10 09:00:00"})
+		record.insert(ignore_permissions=True)
+		with self.assertRaises(frappe.ValidationError):
+			pap.update_and_submit_timesheet_record(
+				record.name, "2026-05-10 08:00:00", "50", self.activity_type, "Report fixed"
+			)
+		self.assertEqual(
+			tuple(frappe.db.get_value("Timesheet Record", record.name, ["docstatus", "result"])), (0, None)
+		)
+
+
+class TestProjectActionPanelOneList(FrappeTestCase):
+	"""One project list instead of "Your Projects" + "All Projects".
+
+	Closing the assignment ToDo (e.g. "Mark as done" in the Personal Cockpit) used to drop the
+	project from "Your Projects". Now every Open project is listed, plus projects assigned to me
+	in any status: last used first, then assigned to me, then the rest.
+	"""
+
+	def setUp(self):
+		patcher = patch("frappe.db.commit")
+		patcher.start()
+		self.addCleanup(patcher.stop)
+		frappe.set_user("Administrator")
+		_ensure_user(USER)
+		self.employee = _ensure_employee(USER)
+
+	def tearDown(self):
+		frappe.set_user("Administrator")
+		frappe.db.rollback()
+
+	def _project(self, status="Open"):
+		return (
+			frappe.get_doc(
+				{
+					"doctype": "Project",
+					"project_name": f"PAP List {frappe.generate_hash(length=6)}",
+					"status": status,
+				}
+			)
+			.insert(ignore_permissions=True)
+			.name
+		)
+
+	def _assign(self, project, status="Open"):
+		return (
+			frappe.get_doc(
+				{
+					"doctype": "ToDo",
+					"status": status,
+					"allocated_to": USER,
+					"description": f"Assignment for Project {project}",
+					"reference_type": "Project",
+					"reference_name": project,
+				}
+			)
+			.insert(ignore_permissions=True)
+			.name
+		)
+
+	def _listed(self):
+		frappe.set_user(USER)
+		rows = pap.fetch_projects()
+		frappe.set_user("Administrator")
+		return [row.name for row in rows], {row.name: row for row in rows}
+
+	def test_open_project_not_assigned_to_me_is_listed(self):
+		unassigned = self._project()
+		names, _ = self._listed()
+		self.assertIn(unassigned, names)
+
+	def test_assigned_project_stays_listed_when_its_todo_is_closed(self):
+		project = self._project()
+		todo = self._assign(project)
+		frappe.db.set_value("ToDo", todo, "status", "Closed")
+		names, rows = self._listed()
+		self.assertIn(project, names)
+		self.assertEqual(rows[project].assigned_to_me, 0)
+
+	def test_assigned_project_in_any_status_is_listed_before_unassigned_ones(self):
+		unassigned = self._project()
+		completed_mine = self._project(status="Completed")
+		self._assign(completed_mine)
+		names, rows = self._listed()
+		self.assertIn(completed_mine, names)
+		self.assertEqual(rows[completed_mine].assigned_to_me, 1)
+		self.assertLess(names.index(completed_mine), names.index(unassigned))
+
+	def test_last_used_project_comes_first(self):
+		assigned = self._project()
+		self._assign(assigned)
+		used = self._project()
+		record = frappe.get_doc(
+			{
+				"doctype": "Timesheet Record",
+				"project": used,
+				"employee": self.employee,
+				"goal": "Last used",
+				"expected_time": 3600,
+				"from_time": "2026-05-10 09:00:00",
+			}
+		)
+		record.append("item", {"from_time": "2026-05-10 09:00:00"})
+		record.insert(ignore_permissions=True)
+		names, _ = self._listed()
+		self.assertLess(names.index(used), names.index(assigned))

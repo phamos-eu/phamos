@@ -287,6 +287,23 @@ def resolve_datev_recipient(doc):
 	return doc.get("datev_mail_recipient") or None
 
 
+def resolve_datev_sender():
+	"""The user's own outgoing Email Account address, or None.
+
+	DATEV only accepts uploads from registered senders, so the email always goes out from the
+	person who sends it (for the AI Accountant: its agent user), never the default account.
+	"""
+	email = frappe.db.get_value("User", frappe.session.user, "email")
+	if not email:
+		return None
+	return frappe.db.get_value("Email Account", {"email_id": email, "enable_outgoing": 1}, "email_id")
+
+
+def _sender_missing_message():
+	email = frappe.db.get_value("User", frappe.session.user, "email") or frappe.session.user
+	return _("You have no outgoing email account for {0}. Ask your administrator to set one up.").format(email)
+
+
 def _datev_pdf_url(doc):
 	"""The PDF to send: the attachment field, else the first attached PDF."""
 	if doc.attachment:
@@ -360,6 +377,10 @@ def send_to_datev(accounting_receipt_name):
 	if not recipient:
 		return {"ok": False, "message": _("DATEV recipient email is not configured. Please contact system administrator.")}
 
+	sender = resolve_datev_sender()
+	if not sender:
+		return {"ok": False, "message": _sender_missing_message()}
+
 	pdf_file_url = _datev_pdf_url(doc)
 	if pdf_file_url and not doc.attachment:
 		# Auto-sync to attachment field for future reference
@@ -401,6 +422,7 @@ def send_to_datev(accounting_receipt_name):
 		attachment, _stamped_url = build_datev_pdf(doc, pdf_file_url)
 		frappe.sendmail(
 			recipients=[recipient],
+			sender=sender,
 			subject=subject,
 			message=message,
 			attachments=[attachment],
@@ -457,9 +479,12 @@ def get_datev_send_info(accounting_receipt_name):
 	doc = frappe.get_doc("Accounting Receipt", accounting_receipt_name)
 	pdf_url = _datev_pdf_url(doc)
 	pdf_name = pdf_url.split("/")[-1] if pdf_url else None
+	sender = resolve_datev_sender()
 
 	return {
 		"ok": True,
+		"sender": sender,
+		"sender_missing_message": None if sender else _sender_missing_message(),
 		"recipient": resolve_datev_recipient(doc),
 		"pdf_name": pdf_name,
 		"pdf_url": pdf_url,

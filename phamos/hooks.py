@@ -3,9 +3,9 @@ from . import __version__ as app_version
 app_name = "phamos"
 app_title = "phamos GmbH"
 app_publisher = "phamos.eu"
-app_description = "ERPNext Enhancement for phamos.eu"
+app_description = "Frappe/ERPNext custom app powering phamos.eu: cockpits, integrations and business processes for phamos GmbH."
 app_email = "support@phamos.eu"
-app_license = "MIT"
+app_license = "AGPL-3.0"
 
 required_apps = ["erpnext", "hrms"]
 
@@ -69,6 +69,8 @@ app_include_css = [
     "/assets/phamos/css/sales_order_kpi.css",
     "/assets/phamos/css/dark_mode_fix.css",
     "checklist_dialog.bundle.css",  # hashed, so a new version is not served from browser cache
+    "phriend.bundle.css",  # Phriend, the report-a-problem ball (#1850)
+    "item_grid_description.bundle.css",  # tall, editable description in item tables (#1858)
 ]
 # app_include_js = "/assets/phamos/js/phamos.js"
 
@@ -81,6 +83,7 @@ app_include_js = [
     "/assets/phamos/js/frappe_list_bulk_edit_override.js",  # Fixes null-label crash in bulk edit
     "checklist_dialog.bundle.js",  # Linked Checklists dialog (hashed bundle, see above)
     "web_profile_form.bundle.js",  # Web Profile forms: missing-translation hint, preview link
+    "phriend.bundle.js",  # Phriend: screenshot + comment -> Issue (#1850)
 ]
 
 
@@ -108,7 +111,10 @@ page_js = {
 doctype_js = {
 	"Leave Application": "public/js/leave_application.js",  # calendar status (milestone 68)
 	"Project" : "public/js/project.js",
-	"Issue" : "public/js/issue.js",
+	"Issue" : [
+		"public/js/issue.js",
+		"public/js/phriend_issue.js",  # Phriend reports: screenshot, Create GitLab Issue (#1850)
+	],
 	"Sales Order": "public/js/sales_order.js",
 	"Lead": "public/js/lead.js",
 	"Job Applicant": "public/js/job_applicant.js",
@@ -119,6 +125,7 @@ doctype_js = {
     "Appointment": "public/js/appointment.js",
     "Sales Invoice": "public/js/sales_invoice.js",
     "Customer": "public/js/customer.js",
+    "Company": "public/js/company.js",
     "Delivery Note": "public/js/delivery_note.js",
 
 }
@@ -212,6 +219,9 @@ get_website_user_home_page = "phamos.website.get_website_user_home_page"
 
 on_login = ["phamos.website.on_login"]
 
+# Phriend: whether the ball shows up for this user (#1850)
+boot_session = "phamos.phriend.boot.boot_session"
+
 update_website_context = [
     "phamos.website.update_website_context",
     "phamos.web_profile.chrome.update_website_context",  # language-aware navbar/footer, DIN 5008 footer
@@ -239,11 +249,15 @@ before_install = "phamos.install.before_install"
 after_install = "phamos.setup.ops_inbox.ensure_ops_inbox_setup"
 
 after_migrate = [
+	"phamos.phriend.setup.after_migrate",  # Phriend fields on Issue, default settings (#1850)
 	"phamos.setup.ops_inbox.ensure_ops_inbox_setup",
 	"phamos.web_profile.setup.after_migrate",  # Web Page "Language" / "Translation Of" fields
 	"phamos.cockpits.setup.after_migrate",  # ToDo fields (#1553), Task Owner on Task (#1751)
 	"phamos.setup.accounting_receipt.ensure_accounting_receipt_setup",  # AI Accountant role, user, bot
 	"phamos.marketing.setup.after_migrate",  # Lead Source "Event" for event registrations
+	"phamos.api.issue_chat.add_raven_indexes",  # record chats look channels up by record (#1794)
+	"phamos.setup.event_schedule.ensure_event_schedule_fields",  # Events tab on Company
+	"phamos.setup.item_grid.after_migrate",  # description column in item tables (#1858)
 ]
 
 # Uninstallation
@@ -270,17 +284,26 @@ after_migrate = [
 #	"Event": "frappe.desk.doctype.event.event.has_permission",
 # }
 
-# Personal Cockpit focus sessions are private, System Managers included (#1556).
+# Personal Cockpit records are private, System Managers included (#1556, #1771); so are the
+# Version rows of an idea. Ideas handed in for a vote are readable by everyone (#1842).
 permission_query_conditions = {
 	"Focus Session": "phamos.cockpits.permissions.focus_session_query",
 	"ToDo Challenge": "phamos.cockpits.permissions.todo_challenge_query",
 	"Day Plan": "phamos.cockpits.permissions.day_plan_query",
+	"Idea": "phamos.cockpits.permissions.idea_query",
+	"Idea Writing Session": "phamos.cockpits.permissions.idea_writing_session_query",
+	"Idea Vote": "phamos.cockpits.permissions.idea_vote_query",
+	"Version": "phamos.cockpits.permissions.version_query",
 }
 
 has_permission = {
 	"Focus Session": "phamos.cockpits.permissions.focus_session_has_permission",
 	"ToDo Challenge": "phamos.cockpits.permissions.todo_challenge_has_permission",
 	"Day Plan": "phamos.cockpits.permissions.day_plan_has_permission",
+	"Idea": "phamos.cockpits.permissions.idea_has_permission",
+	"Idea Writing Session": "phamos.cockpits.permissions.idea_writing_session_has_permission",
+	"Idea Vote": "phamos.cockpits.permissions.idea_vote_has_permission",
+	"Version": "phamos.cockpits.permissions.version_has_permission",
 }
 
 # DocType Class
@@ -353,19 +376,34 @@ doc_events = {
         ],
         "on_trash": "phamos.events.team_daily_schedule.cleanup_events_on_parent_trash"
     },
+    # Company-wide events (Events tab from phamos/setup/event_schedule.py), synced like Team's.
+    "Company": {
+        "validate": "phamos.events.team_daily_schedule.validate_schedule_rows",
+        "on_update": "phamos.events.team_daily_schedule.sync_events_from_parent",
+        "on_trash": "phamos.events.team_daily_schedule.cleanup_events_on_parent_trash",
+    },
     "Communication": {
         "on_update": "phamos.events.communication.copy_attachments_to_reference_doc"
     },
     "Lead Data": {
         "after_insert": "phamos.events.lead_data.notify_lead_data_created_via_raven_dm"
     },
-	# Status changes and conversions show up in the Issue chat; Closed archives it (#1621, #1622).
-	"Issue": {"on_update": "phamos.api.issue_chat.on_issue_update"},
-	"Task": {"after_insert": "phamos.api.issue_chat.on_task_insert"},
+	# Status changes and conversions show up in the record chats; closing archives them (#1621, #1622).
+	"Issue": {"on_update": "phamos.api.issue_chat.on_record_update"},
+	"Task": {
+		"after_insert": "phamos.api.issue_chat.on_task_insert",
+		# Status changes show up in the Task chat; Completed / Cancelled archive it (#1779).
+		"on_update": "phamos.api.issue_chat.on_record_update",
+	},
     "Raven Message": {
-		# Mentioned people join the Issue chat before Raven notifies them (#1620).
+		# Mentioned people join the record chat before Raven notifies them (#1620), and are
+		# assigned to the record once the message is saved (#1784).
 		"validate": "phamos.api.issue_chat.add_mentioned_members",
-		"after_insert": "phamos.events.raven_bot.handle_lead_option_reply"
+		"after_insert": [
+			"phamos.api.issue_chat.keep_mention_unread",
+			"phamos.api.issue_chat.assign_mentioned",
+			"phamos.events.raven_bot.handle_lead_option_reply",
+		],
 	},
     "Account": {"on_update": "phamos.accounting.expense_accounts.clear_account_cache"},
     "Purchase Invoice": {"on_submit": "phamos.accounting.library.learn_from_purchase_invoice"},
@@ -619,6 +657,13 @@ user_data_fields = [
 	{"doctype": "Focus Session", "filter_by": "user", "redact_fields": ["break_out_reason"]},
 	{"doctype": "ToDo Challenge", "filter_by": "user", "redact_fields": ["title"]},
 	{"doctype": "Day Plan", "filter_by": "user", "redact_fields": ["reflection"]},
+	{
+		"doctype": "Idea",
+		"filter_by": "user",
+		"redact_fields": ["title", "content", "summary", "snapshot_title", "snapshot_content"],
+	},
+	{"doctype": "Idea Writing Session", "filter_by": "user"},
+	{"doctype": "Idea Vote", "filter_by": "user"},
 	# Event attendees are matched by their email address (they have no user account).
 	{"doctype": "Attendee", "filter_by": "email", "redact_fields": ["first_name", "last_name", "full_name",
 		"phone", "company_name", "job_title", "notes", "follow_up_notes"]},

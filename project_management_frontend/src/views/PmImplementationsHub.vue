@@ -1,6 +1,6 @@
 <template>
 	<div class="h-full overflow-y-auto p-6">
-		<div class="mx-auto max-w-5xl">
+		<div>
 			<div class="mb-6">
 				<h2 class="text-lg font-semibold text-gray-900 dark:text-gray-100">Implementations</h2>
 				<p class="mt-1 text-sm text-gray-500 dark:text-gray-400">

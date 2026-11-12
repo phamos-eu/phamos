@@ -194,6 +194,9 @@ jobs:
     - name: Run Tests
       working-directory: ./frappe-bench
       run: |
+        echo "Running dotted path checks (hooks, patches, frappe.call methods)..."
+        bench --site test.localhost run-tests --app phamos --module phamos.tests.test_dotted_paths
+
         echo "Running phamos API tests..."
         bench --site test.localhost run-tests --app phamos --module phamos.tests.test_api
 
@@ -207,7 +210,12 @@ jobs:
         bench --site test.localhost run-tests --app phamos --module phamos.okr_addon.doctype.okr_team.test_okr_team
 
         echo "Running Marketing (events, attendees, tickets) tests..."
-        for module in test_marketing_attendee test_marketing_crm test_marketing_ticketing test_marketing_billing test_marketing_patches test_web_profile_events test_web_page_editing; do
+        for module in test_marketing_attendee test_marketing_crm test_marketing_ticketing test_marketing_billing test_marketing_patches test_web_profile_events test_web_page_editing test_personal_ideas test_idea_import; do
+          bench --site test.localhost run-tests --app phamos --module phamos.tests.$module
+        done
+
+        echo "Running Accounting Cockpit (statistics, receivables) tests..."
+        for module in test_accounting_stats test_accounting_receivables; do
           bench --site test.localhost run-tests --app phamos --module phamos.tests.$module
         done
 

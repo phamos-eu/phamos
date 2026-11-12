@@ -222,3 +222,25 @@ class TestPersonalLeave(FrappeTestCase):
 		self.assertFalse(
 			frappe.db.exists("Event", {"reference_doctype": "Leave Application", "reference_docname": row["name"]})
 		)
+
+
+@unittest.skipUnless(frappe.db.exists("DocType", "Leave Application"), "HRMS is not installed")
+class TestCoverFieldPlacement(FrappeTestCase):
+	""""Covered by" sits in the "Implementation Specific" section at the top of the form."""
+
+	def test_cover_field_is_in_the_top_section(self):
+		fields = frappe.get_meta("Leave Application").fields
+		self.assertEqual(
+			[(f.fieldname, f.fieldtype) for f in fields[:3]],
+			[
+				("custom_implementation_specific", "Section Break"),
+				("custom_cover_employee", "Link"),
+				("custom_implementation_specific_end", "Section Break"),
+			],
+		)
+		self.assertEqual(fields[0].label, "Implementation Specific")
+
+	def test_employee_links_show_the_name(self):
+		meta = frappe.get_meta("Employee")
+		self.assertEqual(meta.title_field, "employee_name")
+		self.assertTrue(meta.show_title_field_in_link)

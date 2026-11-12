@@ -61,7 +61,7 @@
 			<div class="ml-auto flex flex-shrink-0 items-center gap-2 pl-3">
 				<DocSyncBanner :autosave="autosave" />
 				<DocViewers :viewers="viewers" />
-				<IssueChatButton :issue-name="issue.name" :subject="issue.subject" :status="status" :api="API" />
+				<IssueChatButton :record-name="issue.name" :subject="issue.subject" :status="status" :api="API" />
 			</div>
 		</div>
 	</Teleport>
@@ -381,7 +381,24 @@ const realtime = useDocRealtime({
 	doctype: "Issue",
 	name: () => props.issue.name,
 	onDocUpdate: (modified) => autosave.noteRemoteModified(modified),
+	onAssignmentsChanged: () => {
+		clearTimeout(assignmentsTimer)
+		assignmentsTimer = setTimeout(reloadAfterAssignment, 300)
+	},
 })
+
+// Someone else assigned or unassigned people (a mention in the chat, Desk, another cockpit):
+// fetch the Issue again, so the assignee list follows without a reload (#1784).
+let assignmentsTimer = null
+async function reloadAfterAssignment() {
+	const name = props.issue.name
+	try {
+		const fresh = await call(`${API.value}.get_issue`, { name })
+		if (name === props.issue.name) emit("updated", fresh)
+	} catch (e) {
+		// The next save or a reload brings it.
+	}
+}
 const viewers = realtime.viewers
 
 const locks = useFieldLocks({
@@ -491,6 +508,7 @@ onMounted(syncPropertiesHost)
 
 onBeforeUnmount(() => {
 	setPageChromeActive(false)
+	clearTimeout(assignmentsTimer)
 })
 
 watch(

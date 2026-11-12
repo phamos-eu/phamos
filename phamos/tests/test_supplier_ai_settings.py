@@ -96,6 +96,17 @@ class TestSupplierSettings(FrappeTestCase):
 			decide.apply_decision(doc, decide.evaluate(doc), {**decide.DEFAULT_PARAMS, "auto_datev": 1})
 		send.assert_not_called()
 
+	def test_failed_auto_datev_is_logged(self):
+		self.history()
+		self.configure(payment_mode="Direct Debit", auto_datev="Allow")
+		doc = self.receipt()
+		with patch("phamos.phamos.doctype.accounting_receipt.accounting_receipt.send_to_datev",
+				return_value={"ok": False, "message": "no sender"}), \
+			patch.object(decide.frappe, "log_error") as log_error:
+			decide.apply_decision(doc, decide.evaluate(doc), decide.DEFAULT_PARAMS)
+		log_error.assert_called_once()
+		self.assertIn("no sender", log_error.call_args.kwargs["message"])
+
 	def test_default_account_and_cost_center_before_mistral(self):
 		cost_center = frappe.db.get_value("Cost Center", {"company": self.company, "is_group": 0}, "name")
 		self.configure(expense_account=self.account("6805"), cost_center=cost_center)

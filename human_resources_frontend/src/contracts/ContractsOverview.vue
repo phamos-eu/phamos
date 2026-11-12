@@ -1,6 +1,6 @@
 <template>
-	<div class="h-full min-h-0 overflow-y-auto bg-surface-gray-1 p-5">
-		<div class="mx-auto flex max-w-7xl flex-col gap-5">
+	<div class="h-full min-h-0 overflow-y-auto bg-surface-gray-1 p-3 sm:p-5">
+		<div class="flex w-full flex-col gap-5">
 			<div v-if="error" class="rounded-lg border border-outline-gray-2 bg-surface-red-1 p-4 text-sm text-ink-red-4">
 				{{ error }}
 			</div>
@@ -8,7 +8,7 @@
 				Loading contracts…
 			</div>
 			<template v-else>
-				<div class="flex items-center justify-between gap-3">
+				<div class="flex flex-wrap items-center justify-between gap-3">
 					<p class="text-sm text-ink-gray-6">As of {{ formatDate(data.today) }}</p>
 					<Button
 						v-if="access.can_create"
@@ -18,7 +18,8 @@
 					/>
 				</div>
 
-				<section class="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-5">
+				<!-- Privacy mode (#1839): figures blur until "Show data"; names stay readable. -->
+				<Sensitive tag="section" class="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5">
 					<StatCard
 						label="Active FTE"
 						:value="formatNumber(data.active_fte)"
@@ -42,9 +43,13 @@
 						hint="Active employees with no contract"
 						:lines="data.drafts ? [`${data.drafts} draft contracts waiting`] : []"
 					/>
-				</section>
+				</Sensitive>
 
-				<div class="grid grid-cols-1 gap-5 xl:grid-cols-3">
+				<Sensitive v-if="data.trend?.months?.length" tag="div">
+					<ContractTrendChart :trend="data.trend" />
+				</Sensitive>
+
+				<div class="grid grid-cols-1 gap-5 md:grid-cols-2 xl:grid-cols-3">
 					<section class="rounded-lg border border-outline-gray-2 bg-surface-white p-5">
 						<h2 class="text-base font-semibold text-ink-gray-9">Ending soon</h2>
 						<p class="mb-3 text-sm text-ink-gray-5">Decide on renewal before the end date.</p>
@@ -57,7 +62,7 @@
 							@click="openContract(row.name)"
 						>
 							<span class="truncate font-medium text-ink-gray-9">{{ row.employee_name }}</span>
-							<span class="whitespace-nowrap tabular-nums text-ink-gray-6">{{ formatDate(row.valid_until) }}</span>
+							<Sensitive class="whitespace-nowrap tabular-nums text-ink-gray-6">{{ formatDate(row.valid_until) }}</Sensitive>
 						</button>
 					</section>
 
@@ -74,9 +79,9 @@
 						>
 							<span class="min-w-0">
 								<span class="block truncate font-medium text-ink-gray-9">{{ row.employee_name }}</span>
-								<span class="block text-xs text-ink-gray-5">{{ formatPercent(row.fte_percentage) }} · {{ formatHours(row.weekly_hours) }}</span>
+								<Sensitive class="block text-xs text-ink-gray-5">{{ formatPercent(row.fte_percentage) }} · {{ formatHours(row.weekly_hours) }}</Sensitive>
 							</span>
-							<span class="whitespace-nowrap tabular-nums text-ink-gray-6">{{ formatDate(row.effective_from) }}</span>
+							<Sensitive class="whitespace-nowrap tabular-nums text-ink-gray-6">{{ formatDate(row.effective_from) }}</Sensitive>
 						</button>
 					</section>
 
@@ -109,6 +114,7 @@ import { onMounted, ref } from "vue"
 import { useRouter } from "vue-router"
 import { call } from "frappe-ui"
 import StatCard from "@spa/components/dashboard/StatCard.vue"
+import Sensitive from "@spa/components/Sensitive.vue"
 import {
 	CONTRACTS_API,
 	errorMessage,
@@ -118,6 +124,7 @@ import {
 	formatNumber,
 	formatPercent,
 } from "@spa/contracts/contractFormat.js"
+import ContractTrendChart from "./ContractTrendChart.vue"
 import { useContractAccess } from "./useContractAccess.js"
 
 const router = useRouter()

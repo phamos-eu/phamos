@@ -1,7 +1,8 @@
 # Copyright (c) 2026, phamos.eu and contributors
 # For license information, please see license.txt
 
-"""Issue chat: one Private Raven channel per Issue, opened from the cockpits (#1614, #1548).
+"""Record chat: one Private Raven channel per Issue, Task or Idea up for vote, opened from the
+cockpits (#1614, #1779, #1842).
 
 Raven's own UI shows the chat; this module only links a channel to the record (Raven's
 `linked_doctype` / `linked_document`), keeps its members in step with the record's owner and
@@ -13,17 +14,32 @@ written with `ignore_permissions`. Raven is a soft dependency: without it every 
 `enabled: False` and the hooks do nothing.
 """
 
+from datetime import timedelta
 from urllib.parse import quote
 
 import frappe
 from frappe import _
 from frappe.desk.form.load import get_assignments
-from frappe.query_builder.functions import Count, Max
-from frappe.utils import cint, escape_html, get_fullname, strip_html_tags
+from frappe.query_builder.functions import Count, Max, Min
+from frappe.utils import cint, escape_html, get_datetime, get_fullname, strip_html_tags
 
-CHAT_DOCTYPES = ("Issue",)
+from phamos.cockpits.defaults import IDEA_VOTE_OPEN
 
-# Department settings field → cockpit route. Raven's Issue links open the Issue in the first
+CHAT_DOCTYPES = ("Issue", "Task", "Idea")
+# Record types a mention assigns to. Not Idea: an assignment shares the record with the person,
+# which would keep a withdrawn idea readable for them (#1842).
+ASSIGN_DOCTYPES = ("Issue", "Task")
+# Most records a list may ask chat states for in one call (lists show up to 500).
+MAX_STATE_NAMES = 500
+
+# Statuses that close the record's work: its chat is archived (read-only in Raven) and comes back
+# when the record is reopened (#1622, #1779).
+ARCHIVE_STATUSES = {"Issue": ("Closed",), "Task": ("Completed", "Cancelled")}
+
+# Where each record opens in a cockpit.
+RECORD_ROUTES = {"Issue": "issues/list", "Task": "tasks/gantt", "Idea": "ideas/vote"}
+
+# Department settings field → cockpit route. Raven's record links open the record in the first
 # cockpit whose department matches, otherwise in the Personal Cockpit.
 COCKPIT_PATHS = (
 	("sales_department", "/sales-cockpit"),
@@ -63,7 +79,17 @@ def channel_url(workspace, channel_id):
 
 
 
-def find_channel(doctype, name):
+def add_raven_indexes():
+	"""after_migrate: index Raven Channel's link to its record, which every chat lookup filters on
+	(Raven only indexes `workspace`, and every thread is a Raven Channel row too). add_index skips an
+	existing index, so this is safe on every migrate and also covers Raven installed later (#1794)."""
+	if is_raven_installed():
+		frappe.db.add_index("Raven Channel", ["linked_doctype", "linked_document"])
+
+
+def find_channel(doctype, name, for_update=False):
+	"""The record's chat, or None. `for_update` reads the latest committed row and locks it, for
+	callers that may create the chat (see ensure_chat)."""
 	if not is_raven_installed():
 		return None
 	# An archived chat still belongs to its record (#1622): finding it keeps "Start chat" from
@@ -79,6 +105,7 @@ def find_channel(doctype, name):
 		["name", "workspace", "is_archived"],
 		as_dict=True,
 		order_by="is_archived asc, creation asc",
+		for_update=for_update,
 	)
 
 
@@ -90,7 +117,16 @@ def _raven_user(user):
 
 
 def _record_users(doc):
-	users = [doc.owner] + [row.get("owner") for row in get_assignments(doc.doctype, doc.name)]
+	"""The people a record's chat starts with: its creator, its Task Owner (custom field on Task,
+	the person responsible in the cockpits) and its assignees."""
+	users = [doc.owner, doc.get("custom_task_owner")]
+	if doc.doctype == "Idea":
+		# The idea's author; colleagues join themselves. While authors are hidden from voters, the
+		# author is not added either, or Raven's "joined" line would name them (#1842).
+		from phamos.api.personal_ideas import show_author
+
+		users = [doc.user] if show_author() else []
+	users += [row.get("owner") for row in get_assignments(doc.doctype, doc.name)]
 	return list(dict.fromkeys(u for u in users if u and u != "Guest"))
 
 
@@ -141,9 +177,13 @@ def _ensure_members(channel, users, admin=None, silent=False):
 	return skipped
 
 
-def _unread_counts(channel_ids):
+def _unread_counts(channel_ids, with_first=False):
 	"""Unread messages per channel for the session user since their last visit, not counting their
-	own (the intro message of a chat they just started would otherwise count)."""
+	own (the intro message of a chat they just started would otherwise count).
+
+	`with_first` returns {channel: (count, creation of the oldest unread message)} instead, so a
+	list finds where each chat opens without a query per chat (#1617, #1794).
+	"""
 	raven_user = _raven_user(frappe.session.user)
 	if not raven_user or not channel_ids:
 		return {}
@@ -153,7 +193,9 @@ def _unread_counts(channel_ids):
 		frappe.qb.from_(member)
 		.join(message)
 		.on(message.channel_id == member.channel_id)
-		.select(member.channel_id, Count(message.name).as_("unread"))
+		.select(
+			member.channel_id, Count(message.name).as_("unread"), Min(message.creation).as_("first_at")
+		)
 		.where(member.user_id == raven_user)
 		.where(member.channel_id.isin(list(channel_ids)))
 		.where(message.creation > member.last_visit)
@@ -161,7 +203,23 @@ def _unread_counts(channel_ids):
 		.where(message.owner != frappe.session.user)
 		.groupby(member.channel_id)
 	).run(as_dict=True)
+	if with_first:
+		return {row.channel_id: (row.unread, row.first_at) for row in rows}
 	return {row.channel_id: row.unread for row in rows}
+
+
+def _first_unread_messages(first_at):
+	"""{channel: name of its oldest unread message} from {channel: that message's creation}."""
+	if not first_at:
+		return {}
+	rows = frappe.get_all(
+		"Raven Message",
+		filters={"channel_id": ("in", list(first_at)), "creation": ("in", list(set(first_at.values())))},
+		fields=["name", "channel_id", "creation"],
+	)
+	return {
+		row.channel_id: row.name for row in rows if first_at.get(row.channel_id) == row.creation
+	}
 
 
 def _unread_thread_counts(channel_ids):
@@ -196,6 +254,54 @@ def _unread_thread_counts(channel_ids):
 		.groupby(root.channel_id)
 	).run(as_dict=True)
 	return {row.channel_id: row.unread for row in rows}
+
+
+def _unread_mentions(channel_ids):
+	"""Unread messages per chat that mention the session user, in the chat itself or in one of
+	its threads (#1781). Same unread rules as the counts above; the mentions are Raven's own
+	(Raven Mention rows on the message)."""
+	raven_user = _raven_user(frappe.session.user)
+	if not raven_user or not channel_ids:
+		return {}
+	member = frappe.qb.DocType("Raven Channel Member")
+	message = frappe.qb.DocType("Raven Message")
+	mention = frappe.qb.DocType("Raven Mention")
+	in_chat = (
+		frappe.qb.from_(member)
+		.join(message)
+		.on(message.channel_id == member.channel_id)
+		.join(mention)
+		.on((mention.parent == message.name) & (mention.user == raven_user))
+		.select(member.channel_id, Count(message.name).as_("mentions"))
+		.where(member.user_id == raven_user)
+		.where(member.channel_id.isin(list(channel_ids)))
+		.where(message.creation > member.last_visit)
+		.where(message.owner != frappe.session.user)
+		.groupby(member.channel_id)
+	).run(as_dict=True)
+	thread = frappe.qb.DocType("Raven Channel")
+	root = frappe.qb.DocType("Raven Message", alias="root")
+	in_threads = (
+		frappe.qb.from_(thread)
+		.join(root)
+		.on(root.name == thread.name)
+		.join(member)
+		.on((member.channel_id == thread.name) & (member.user_id == raven_user))
+		.join(message)
+		.on(message.channel_id == thread.name)
+		.join(mention)
+		.on((mention.parent == message.name) & (mention.user == raven_user))
+		.select(root.channel_id, Count(message.name).as_("mentions"))
+		.where(thread.is_thread == 1)
+		.where(root.channel_id.isin(list(channel_ids)))
+		.where(message.creation > member.last_visit)
+		.where(message.owner != frappe.session.user)
+		.groupby(root.channel_id)
+	).run(as_dict=True)
+	counts = {}
+	for row in in_chat + in_threads:
+		counts[row.channel_id] = counts.get(row.channel_id, 0) + row.mentions
+	return counts
 
 
 def _unread_threads(channel_id, limit=50):
@@ -251,30 +357,6 @@ def _unread_threads(channel_id, limit=50):
 	return result
 
 
-def _first_unread_message(channel_id):
-	"""The oldest message in a chat the session user has not read yet, or None: where the chat
-	opens when it is opened from a list (#1617)."""
-	raven_user = _raven_user(frappe.session.user)
-	last_visit = raven_user and frappe.db.get_value(
-		"Raven Channel Member", {"channel_id": channel_id, "user_id": raven_user}, "last_visit"
-	)
-	if not last_visit:
-		return None
-	rows = frappe.get_all(
-		"Raven Message",
-		filters={
-			"channel_id": channel_id,
-			"creation": (">", last_visit),
-			"message_type": ("!=", "System"),
-			"owner": ("!=", frappe.session.user),
-		},
-		pluck="name",
-		order_by="creation asc",
-		limit=1,
-	)
-	return rows[0] if rows else None
-
-
 def _member_channels(channel_ids):
 	raven_user = _raven_user(frappe.session.user)
 	if not raven_user or not channel_ids:
@@ -300,6 +382,7 @@ def get_chat(doc):
 		"archived": False,
 		"unread": 0,
 		"unread_threads": 0,
+		"mentions": 0,
 		"threads": [],
 		"skipped_users": [],
 	}
@@ -323,6 +406,7 @@ def get_chat(doc):
 		is_member=channel.name in _member_channels([channel.name]),
 		unread=_unread_counts([channel.name]).get(channel.name, 0),
 		unread_threads=_unread_thread_counts([channel.name]).get(channel.name, 0),
+		mentions=_unread_mentions([channel.name]).get(channel.name, 0),
 	)
 	if state["unread_threads"]:
 		state["threads"] = _unread_threads(channel.name)
@@ -338,8 +422,16 @@ def ensure_chat(doc):
 	_require_enabled()
 	if not _raven_user(frappe.session.user):
 		frappe.throw(_("You need to be a Raven user to chat."))
+	if doc.get("is_template"):
+		frappe.throw(_("Template Tasks have no chat."))
+	if doc.doctype == "Idea" and doc.get("vote_status") != IDEA_VOTE_OPEN:
+		# Withdrawn ideas are private again: their chat stays archived until the next hand-in.
+		frappe.throw(_("The chat opens once the idea is handed in for a vote."))
 
-	channel = find_channel(doc.doctype, doc.name)
+	# Two people pressing "Start chat" at once: the record's row lock makes the second wait for
+	# the first to commit, and the locking read below then sees the chat it created (#1794).
+	frappe.db.get_value(doc.doctype, doc.name, "name", for_update=True)
+	channel = find_channel(doc.doctype, doc.name, for_update=True)
 	created = False
 	if not channel:
 		channel = _create_channel(doc)
@@ -348,11 +440,17 @@ def ensure_chat(doc):
 	users = [frappe.session.user] + _record_users(doc)
 	_ensure_members(channel, users, admin=frappe.session.user if created else None)
 	if created:
-		_post_link_message(
-			channel.name,
-			doc,
-			_("Chat about {0}: {1}").format(doc.name, _doc_title(doc)),
-		)
+		if doc.doctype == "Idea":
+			intro = _("Chat about the idea {0}").format(_doc_title(doc))
+		else:
+			intro = _("Chat about {0}: {1}").format(doc.name, _doc_title(doc))
+		if doc.doctype == "Task" and doc.get("issue"):
+			# The Issue's chat ends with "converted to Task …"; this keeps the thread findable.
+			intro += " " + _("It follows on from Issue {0}.").format(doc.issue)
+		if doc.doctype == "Idea":
+			_post_idea_intro(channel.name, doc, intro)
+		else:
+			_post_link_message(channel.name, doc, intro)
 	return get_chat(doc)
 
 
@@ -373,9 +471,9 @@ def _create_channel(doc):
 	channel.flags.do_not_add_member = True
 	try:
 		channel.insert(ignore_permissions=True)
-	except (frappe.DuplicateEntryError, frappe.ValidationError):
-		# Someone else created it a moment ago.
-		existing = find_channel(doc.doctype, doc.name)
+	except frappe.DuplicateEntryError:
+		# Someone else created it a moment ago (ensure_chat's lock should prevent this).
+		existing = find_channel(doc.doctype, doc.name, for_update=True)
 		if not existing:
 			raise
 		return existing
@@ -383,7 +481,7 @@ def _create_channel(doc):
 
 
 def _doc_title(doc):
-	return doc.get("subject") or doc.name
+	return doc.get("subject") or doc.get("title") or doc.name
 
 
 def _post_link_message(channel_id, doc, text):
@@ -400,9 +498,26 @@ def _post_link_message(channel_id, doc, text):
 	).insert(ignore_permissions=True)
 
 
+def _post_idea_intro(channel_id, doc, text):
+	"""An idea's first message: text and a plain link to its page in the vote list (#1842).
+
+	No Raven document card: Raven loads it with the doctype's role permissions (Idea: System
+	Manager only, so colleagues get an error), and it lists the author even when authors are
+	hidden from voters."""
+	url = record_cockpit_path("Idea", doc.name) + "/" + RECORD_ROUTES["Idea"] + "/" + quote(doc.name, safe="")
+	frappe.get_doc(
+		{
+			"doctype": "Raven Message",
+			"channel_id": channel_id,
+			"message_type": "Text",
+			"text": f'<p>{escape_html(text)}</p><p><a href="{escape_html(url)}">{escape_html(_("Open the idea"))}</a></p>',
+		}
+	).insert(ignore_permissions=True)
+
+
 def get_chat_states(doctype, names):
 	"""Batched chat state for list views: {name: {channel_id, is_member, archived, unread,
-	unread_threads, first_unread, first_unread_thread}}.
+	unread_threads, mentions, last_message_at, first_unread, first_unread_thread}}.
 
 	Only records the session user may read and that have a chat are returned.
 	"""
@@ -410,6 +525,9 @@ def get_chat_states(doctype, names):
 	names = frappe.parse_json(names) if isinstance(names, str) else names
 	if not is_enabled() or not names:
 		return {}
+	if len(names) > MAX_STATE_NAMES:
+		# Larger lists ask in parts (useIssueChatStates, #1797); this keeps one call bounded (#1794).
+		frappe.throw(_("Too many records for chat states: {0}").format(len(names)))
 	readable = frappe.get_list(
 		doctype, filters={"name": ("in", list(names))}, pluck="name", limit_page_length=0
 	)
@@ -423,13 +541,16 @@ def get_chat_states(doctype, names):
 			"is_thread": 0,
 			"is_direct_message": 0,
 		},
-		fields=["name", "linked_document", "is_archived"],
+		fields=["name", "linked_document", "is_archived", "last_message_timestamp"],
 		order_by="is_archived desc",  # a live chat wins over an archived one below
 	)
 	channel_ids = [c.name for c in channels]
 	members = _member_channels(channel_ids)
-	unread = _unread_counts(channel_ids)
+	unread_first = _unread_counts(channel_ids, with_first=True)
+	unread = {channel: count for channel, (count, _first) in unread_first.items()}
+	first_unread = _first_unread_messages({c: first for c, (_count, first) in unread_first.items()})
 	unread_threads = _unread_thread_counts(channel_ids)
+	mentions = _unread_mentions(channel_ids)
 	states = {}
 	for c in channels:
 		state = {
@@ -438,13 +559,17 @@ def get_chat_states(doctype, names):
 			"archived": bool(c.is_archived),
 			"unread": unread.get(c.name, 0),
 			"unread_threads": unread_threads.get(c.name, 0),
+			# Unread messages that mention the user: the bubble turns red (#1781).
+			"mentions": mentions.get(c.name, 0),
+			# Lists sort chats with the same unread state by their latest message (#1796).
+			"last_message_at": c.last_message_timestamp,
 			# Where the chat opens from the list: the first new message, else the thread with
 			# the newest unread reply (#1617).
 			"first_unread": None,
 			"first_unread_thread": None,
 		}
 		if state["unread"]:
-			state["first_unread"] = _first_unread_message(c.name)
+			state["first_unread"] = first_unread.get(c.name)
 		elif state["unread_threads"]:
 			threads = _unread_threads(c.name, limit=1)
 			state["first_unread_thread"] = threads[0]["thread_id"] if threads else None
@@ -481,29 +606,33 @@ def sync_assignee(doc, method=None):
 		else:
 			_post_system_message(channel.name, _("{0} unassigned {1}.").format(actor, person))
 	except Exception:
-		frappe.log_error(title=f"Issue chat: could not post the assignment of {doc.allocated_to}")
+		frappe.log_error(title=f"Record chat: could not post the assignment of {doc.allocated_to}")
 
 
-def on_issue_update(doc, method=None):
-	"""Issue on_update: status changes show up in its chat; Closed archives it, reopening brings
-	it back (#1621, #1622). Never blocks the save when Raven fails."""
+def on_record_update(doc, method=None):
+	"""Issue / Task on_update: status changes show up in the record's chat. A status that closes
+	the work (ARCHIVE_STATUSES) archives the chat; reopening brings it back (#1621, #1622, #1779).
+	Never blocks the save when Raven fails."""
+	if doc.doctype not in CHAT_DOCTYPES:
+		return
 	before = doc.get_doc_before_save()
 	if not before or before.status == doc.status or not is_enabled():
 		return
 	channel = find_channel(doc.doctype, doc.name)
 	if not channel:
 		return
+	closing = ARCHIVE_STATUSES.get(doc.doctype, ())
 	try:
-		if before.status == "Closed" and channel.is_archived:
+		if before.status in closing and doc.status not in closing and channel.is_archived:
 			_set_archived(channel.name, False)
 		_post_system_message(
 			channel.name,
 			_("{0} set the status to {1}.").format(_display_name(frappe.session.user), _(doc.status)),
 		)
-		if doc.status == "Closed" and not channel.is_archived:
+		if doc.status in closing and not channel.is_archived:
 			_set_archived(channel.name, True)
 	except Exception:
-		frappe.log_error(title=f"Issue chat: could not follow the status of {doc.name}")
+		frappe.log_error(title=f"Record chat: could not follow the status of {doc.doctype} {doc.name}")
 
 
 def on_task_insert(doc, method=None):
@@ -540,6 +669,9 @@ def _set_archived(channel_id, archived):
 	record's status is what decides here, so the flag is written directly."""
 	frappe.db.set_value("Raven Channel", channel_id, "is_archived", int(archived))
 	frappe.clear_document_cache("Raven Channel", channel_id)
+	# Again after commit: a request in between could cache the old row (Raven does the same for
+	# its member cache, raven.utils.delete_channel_members_cache).
+	frappe.db.after_commit.add(lambda: frappe.clear_document_cache("Raven Channel", channel_id))
 	from raven.utils import get_raven_room
 
 	frappe.publish_realtime(
@@ -548,36 +680,133 @@ def _set_archived(channel_id, archived):
 
 
 def add_mentioned_members(doc, method=None):
-	"""Raven Message validate: people mentioned in an Issue chat (or one of its threads) join it.
+	"""Raven Message validate: people mentioned in a record chat (or one of its threads) join it.
 
 	Runs after Raven has read the mentions from the HTML and before the insert, so Raven's own
 	after_insert already treats them as members: it notifies them and adds them to the thread
 	(it only adds people who are in the parent channel). Only people who can read the record
-	are added; for anyone else Raven's "isn't in this channel" warning stays (#1620).
+	are added; for anyone else Raven's "isn't in this channel" warning stays (#1620). A sender
+	who can no longer read the record (members are never removed) brings nobody in (#1794).
 	"""
-	if not doc.get("mentions") or doc.message_type == "System" or not is_enabled():
-		return
-	channel = _chat_channel_of(doc.channel_id)
-	if not channel:
+	channel = _mention_chat(doc)
+	if not channel or not _sender_can_read(channel):
 		return
 	members = set(
 		frappe.get_all("Raven Channel Member", filters={"channel_id": channel.name}, pluck="user_id")
 	)
-	users = []
-	for raven_user in dict.fromkeys(m.user for m in doc.mentions if m.user):
-		if raven_user in members:
-			continue
-		user = frappe.db.get_value("Raven User", {"name": raven_user, "type": "User", "enabled": 1}, "user")
-		if user and frappe.has_permission(
-			channel.linked_doctype, "read", doc=channel.linked_document, user=user
-		):
-			users.append(user)
+	users = [u for u in _mentioned_readers(doc, channel) if _raven_user(u) not in members]
 	if not users:
 		return
 	try:
 		_ensure_members(channel, users)
 	except Exception:
-		frappe.log_error(title=f"Issue chat: could not add mentioned users to {channel.name}")
+		frappe.log_error(title=f"Record chat: could not add mentioned users to {channel.name}")
+
+
+def assign_mentioned(doc, method=None):
+	"""Raven Message after_insert: people mentioned in a record chat (or one of its threads) are
+	assigned to the record, so it shows up in their cockpit (#1784).
+
+	Same rule as joining the chat: only people who can read the record. Frappe's assignment would
+	share the record with anyone else, and a mention should not widen access. Runs after the
+	insert, so a message that fails leaves no assignment behind; the assignment's own hook posts
+	"X assigned Y." in the chat. Never blocks the message when the assignment fails.
+	"""
+	channel = _mention_chat(doc)
+	if not channel or doc.get("is_bot_message") or channel.linked_doctype not in ASSIGN_DOCTYPES:
+		return
+	# Frappe's assignment checks the sender's read permission with frappe.throw, which queues its
+	# error for the client even when caught below. A member who lost access just assigns nobody.
+	if not _sender_can_read(channel):
+		return
+	assigned = {
+		row.get("owner") for row in get_assignments(channel.linked_doctype, channel.linked_document)
+	}
+	users = [
+		u for u in _mentioned_readers(doc, channel) if u not in assigned and u != doc.owner
+	]
+	if not users:
+		return
+	from frappe.desk.form.assign_to import add as add_assignment
+
+	# One person's assignment failing half-way must not leave a stray ToDo behind.
+	frappe.db.savepoint("assign_mentioned")
+	try:
+		add_assignment(
+			{
+				"assign_to": users,
+				"doctype": channel.linked_doctype,
+				"name": channel.linked_document,
+				"description": _("{0} mentioned you in the chat of {1} {2}.").format(
+					_display_name(doc.owner), _(channel.linked_doctype), channel.linked_document
+				),
+			}
+		)
+	except Exception:
+		frappe.db.rollback(save_point="assign_mentioned")
+		frappe.log_error(title=f"Record chat: could not assign mentioned users in {channel.name}")
+
+
+def keep_mention_unread(doc, method=None):
+	"""Raven Message after_insert: for people who joined the chat (or the thread) because this
+	message mentions them, the message itself stays unread, so their bubble shows it in red (#1784).
+
+	They join while the message is being saved, after its timestamp is set, and Raven stamps a new
+	member's last visit with "now", so without this the mention counted as already read.
+	"""
+	channel = _mention_chat(doc)
+	if not channel:
+		return
+	raven_users = [_raven_user(u) for u in _mentioned_readers(doc, channel)]
+	joined = frappe.get_all(
+		"Raven Channel Member",
+		filters={
+			"channel_id": doc.channel_id,
+			"user_id": ("in", [u for u in raven_users if u]),
+			"creation": (">=", doc.creation),
+		},
+		pluck="name",
+	)
+	try:
+		before = get_datetime(doc.creation) - timedelta(microseconds=1)
+		for name in joined:
+			frappe.db.set_value(
+				"Raven Channel Member", name, "last_visit", before, update_modified=False
+			)
+	except Exception:
+		# Only the red bubble is lost; the message itself must still go out.
+		frappe.log_error(title=f"Record chat: could not keep the mention unread in {doc.channel_id}")
+
+
+def _can_read(doctype, name, user=None):
+	"""Whether the user may read the chat's record. Ideas go by the cockpit's rule (#1842)."""
+	if doctype == "Idea":
+		from phamos.cockpits.permissions import can_read_idea
+
+		return can_read_idea(name, user)
+	return frappe.has_permission(doctype, "read", doc=name, user=user)
+
+
+def _sender_can_read(channel):
+	"""Whether the session user (the message's sender) may still read the chat's record."""
+	return _can_read(channel.linked_doctype, channel.linked_document)
+
+
+def _mention_chat(doc):
+	"""The record chat a message with mentions was posted in (or in one of its threads), or None."""
+	if not doc.get("mentions") or doc.message_type == "System" or not is_enabled():
+		return None
+	return _chat_channel_of(doc.channel_id)
+
+
+def _mentioned_readers(doc, channel):
+	"""The users a message mentions who are active Raven users and may read the chat's record."""
+	users = []
+	for raven_user in dict.fromkeys(m.user for m in doc.mentions if m.user):
+		user = frappe.db.get_value("Raven User", {"name": raven_user, "type": "User", "enabled": 1}, "user")
+		if user and _can_read(channel.linked_doctype, channel.linked_document, user):
+			users.append(user)
+	return users
 
 
 def _chat_channel_of(channel_id):
@@ -594,20 +823,27 @@ def _chat_channel_of(channel_id):
 
 
 def document_link(doctype, docname):
-	"""raven_document_link_override: Raven opens Issue links in the matching cockpit."""
-	if doctype != "Issue":
+	"""raven_document_link_override: Raven opens Issue and Task links in the matching cockpit."""
+	route = RECORD_ROUTES.get(doctype)
+	if not route:
 		return None
-	return f"{issue_cockpit_path(docname)}/issues/list/{docname}"
+	return f"{record_cockpit_path(doctype, docname)}/{route}/{docname}"
 
 
-def issue_cockpit_path(name):
+def record_cockpit_path(doctype, name):
+	"""The cockpit a record belongs to: the one whose department is the record's own department
+	(Issue: custom_department, Task: department) or else its project's department; otherwise the
+	Personal Cockpit. Ideas live in the Personal Cockpit only."""
+	if doctype == "Idea":
+		return PERSONAL_COCKPIT_PATH
+	department_field = "custom_department" if doctype == "Issue" else "department"
 	fields = ["project"]
-	if frappe.get_meta("Issue").has_field("custom_department"):
-		fields.append("custom_department")
-	issue = frappe.db.get_value("Issue", name, fields, as_dict=True) or frappe._dict()
-	department = issue.get("custom_department")
-	if not department and issue.project:
-		department = frappe.db.get_value("Project", issue.project, "department")
+	if frappe.get_meta(doctype).has_field(department_field):
+		fields.append(department_field)
+	record = frappe.db.get_value(doctype, name, fields, as_dict=True) or frappe._dict()
+	department = record.get(department_field)
+	if not department and record.project:
+		department = frappe.db.get_value("Project", record.project, "department")
 	if department:
 		settings_meta = frappe.get_meta("phamos Settings")
 		for fieldname, path in COCKPIT_PATHS:
@@ -616,3 +852,26 @@ def issue_cockpit_path(name):
 			):
 				return path
 	return PERSONAL_COCKPIT_PATH
+
+
+def on_idea_vote_change(doc):
+	"""Idea on_update, when its vote status changed (#1842): withdrawing archives the idea's chat,
+	handing it in again brings it back. Never blocks the save when Raven fails."""
+	if not is_enabled():
+		return
+	channel = find_channel("Idea", doc.name)
+	if not channel:
+		return
+	is_open = doc.vote_status == IDEA_VOTE_OPEN
+	actor = _display_name(frappe.session.user)
+	try:
+		if is_open:
+			if channel.is_archived:
+				_set_archived(channel.name, False)
+			_post_system_message(channel.name, _("{0} handed the idea in for a vote again.").format(actor))
+		else:
+			_post_system_message(channel.name, _("{0} withdrew the idea from the vote.").format(actor))
+			if not channel.is_archived:
+				_set_archived(channel.name, True)
+	except Exception:
+		frappe.log_error(title=f"Record chat: could not follow the vote of Idea {doc.name}")

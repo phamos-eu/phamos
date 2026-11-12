@@ -68,6 +68,11 @@
   "human_resources_department",
   "column_break_human_resources_spa",
   "human_resources_timesheet_project",
+  "human_resources_sick_leave_types",
+  "human_resources_privacy_reveal_seconds",
+  "personal_cockpit_tab",
+  "personal_cockpit_section",
+  "personal_ideas_show_author",
   "project_management_spa_tab",
   "project_management_spa_section",
   "project_management_department",
@@ -446,6 +451,38 @@
    "options": "Project"
   },
   {
+   "description": "Approved leave of these types counts as sick days. Only HR Manager sees other people's sick days.",
+   "fieldname": "human_resources_sick_leave_types",
+   "fieldtype": "Table MultiSelect",
+   "label": "Sick Leave Types",
+   "options": "Sick Leave Type Item"
+  },
+  {
+   "default": "120",
+   "description": "Privacy mode for screen sharing: figures in the HR Cockpit stay hidden until \"Show data\" is clicked, then show for this many seconds. At least 10.",
+   "fieldname": "human_resources_privacy_reveal_seconds",
+   "fieldtype": "Int",
+   "label": "Privacy Mode: Seconds Data Stays Visible",
+   "non_negative": 1
+  },
+  {
+   "fieldname": "personal_cockpit_tab",
+   "fieldtype": "Tab Break",
+   "label": "Personal Cockpit"
+  },
+  {
+   "fieldname": "personal_cockpit_section",
+   "fieldtype": "Section Break",
+   "label": "Personal Cockpit Settings"
+  },
+  {
+   "default": "1",
+   "description": "Voters see who handed an idea in. Off: ideas up for vote appear without their author, and the author does not join the idea's chat by themselves.",
+   "fieldname": "personal_ideas_show_author",
+   "fieldtype": "Check",
+   "label": "Show Author of Ideas Handed in for Vote"
+  },
+  {
    "fieldname": "project_management_spa_tab",
    "fieldtype": "Tab Break",
    "label": "Project Management Cockpit"
@@ -632,7 +669,7 @@
  "index_web_pages_for_search": 1,
  "issingle": 1,
  "links": [],
- "modified": "2026-10-28 21:30:00.000000",
+ "modified": "2026-11-09 15:30:00.000000",
  "modified_by": "Administrator",
  "module": "Phamos",
  "name": "phamos Settings",
