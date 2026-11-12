@@ -1,7 +1,7 @@
 # Copyright (c) 2026, phamos.eu and contributors
 # For license information, please see license.txt
 
-"""Sales Cockpit Leads API — Follow Ups list, Lead detail, notes, activity, and pipeline KPIs."""
+"""Sales Cockpit Leads API: Follow Ups list, Lead detail, notes and activity."""
 
 import ipaddress
 import json
@@ -12,7 +12,8 @@ from urllib.parse import urlparse
 import frappe
 import requests
 from frappe import _
-from frappe.utils import getdate, now_datetime
+from frappe.rate_limiter import rate_limit
+from frappe.utils import get_url, getdate, now_datetime
 from frappe.utils.html_utils import clean_email_html
 
 from phamos.api.department_cockpit import _user_images, _user_label, role_shortlist_users
@@ -66,12 +67,11 @@ LEAD_MASTER_FIELDS = (
 )
 LEAD_EDITABLE_FIELDS = LEAD_TRANSACTIONAL_FIELDS + LEAD_MASTER_FIELDS
 
-LOST_STATUSES = ("Do Not Contact", "Lost Quotation")
-CONVERTED_STATUS = "Converted"
-
 WEBSITE_CHECK_TIMEOUT = 5
 # Enough for the usual http→https→www chain, few enough to stop a redirect loop.
 WEBSITE_CHECK_MAX_HOPS = 4
+# Only the web's own ports: anything else turns the check into a port scanner.
+WEBSITE_CHECK_PORTS = (None, 80, 443)
 # Plain browser UA: some sites serve different headers (or refuse outright) to
 # unknown clients, which would make an embeddable site look un-embeddable.
 WEBSITE_CHECK_USER_AGENT = (
@@ -95,11 +95,20 @@ def _is_public_http_url(url):
 
 	The URL here comes from user input and is fetched server-side, so this
 	guards against pointing the check at loopback/private infrastructure.
+
+	Limitation: `requests` resolves the host again when it fetches, so a DNS
+	record that changes between the two lookups (DNS rebinding) is not caught.
+	The check only reads response headers, which bounds what that could leak.
 	"""
 	parsed = urlparse(url)
 	if parsed.scheme not in ("http", "https"):
 		return False
 	if not parsed.hostname:
+		return False
+	try:
+		if parsed.port not in WEBSITE_CHECK_PORTS:
+			return False
+	except ValueError:
 		return False
 
 	try:
@@ -112,14 +121,9 @@ def _is_public_http_url(url):
 			ip = ipaddress.ip_address(address[4][0])
 		except ValueError:
 			return False
-		if (
-			ip.is_private
-			or ip.is_loopback
-			or ip.is_link_local
-			or ip.is_reserved
-			or ip.is_multicast
-			or ip.is_unspecified
-		):
+		# is_global also excludes shared address space (100.64.0.0/10), which
+		# is_private does not, and where some cloud metadata services live.
+		if not ip.is_global or ip.is_multicast:
 			return False
 
 	return True
@@ -134,7 +138,8 @@ def _frame_ancestors_allow_embedding(csp_header):
 	if not csp_header:
 		return True
 
-	for directive in csp_header.split(";"):
+	# Several CSP headers arrive joined by commas; each one must allow framing.
+	for directive in re.split(r"[;,]", csp_header):
 		parts = directive.strip().split()
 		if not parts or parts[0].lower() != "frame-ancestors":
 			continue
@@ -144,7 +149,18 @@ def _frame_ancestors_allow_embedding(csp_header):
 	return True
 
 
+def _is_own_site(url):
+	"""True when the URL points at this Frappe site itself.
+
+	The website dialog's iframe allows scripts and same-origin, which is only
+	safe while the framed page is on another origin.
+	"""
+	own_host = (urlparse(get_url()).hostname or "").lower()
+	return bool(own_host) and (urlparse(url).hostname or "").lower() == own_host
+
+
 @frappe.whitelist()
+@rate_limit(limit=60, seconds=60 * 60)
 def check_website_embeddable(url):
 	"""Report whether a website can be shown in an iframe.
 
@@ -169,6 +185,9 @@ def check_website_embeddable(url):
 
 	if response.status_code >= 400:
 		return {"url": final_url, "embeddable": False, "reason": "unreachable"}
+
+	if _is_own_site(final_url):
+		return {"url": final_url, "embeddable": False, "reason": "blocked"}
 
 	x_frame_options = (response.headers.get("X-Frame-Options") or "").strip().lower()
 	if x_frame_options:
@@ -255,7 +274,9 @@ def get_leads():
 	"""
 	_check_lead_access()
 
-	rows = frappe.get_all(
+	# get_list, not get_all: User Permissions (e.g. a Territory restriction)
+	# must narrow the list just as they narrow Desk's.
+	rows = frappe.get_list(
 		"Lead",
 		filters={"disabled": 0},
 		fields=LEAD_LIST_FIELDS,
@@ -294,18 +315,14 @@ def _serialize_notes(doc):
 
 
 def _serialize_lead_detail(doc):
-	"""Identity, master-data, and transactional fields — no notes/communications.
+	"""Identity, master-data and transactional fields of a Lead.
 
-	Notes and Communications are heavier (child table + separate doctype
-	query) and only needed by the Communication/Notes/Activities feed, so
-	they're served separately by `get_lead_activity` (and `notes` alone via
-	this same function is unnecessary — the feed calls `get_lead_activity`
-	and `_serialize_notes` is still used there for the Notes tab).
+	Notes and Communications are heavier and only needed by the feed, so
+	`get_lead_activity` serves them separately.
 	"""
 	return {
 		"name": doc.name,
-		# Master data — company/contact identity and firmographics; rarely
-		# changes once set, no inline editing in the cockpit for v1.
+		# Master data: company/contact identity and firmographics.
 		"lead_name": doc.lead_name,
 		"company_name": doc.company_name,
 		"email_id": doc.email_id,
@@ -358,7 +375,6 @@ def get_lead_owners():
 def get_lead(name):
 	"""Return Lead master + transactional data for the Sales cockpit detail view."""
 	_check_lead_access()
-	frappe.has_permission("Lead", "read", throw=True)
 	doc = frappe.get_doc("Lead", name)
 	doc.check_permission("read")
 	return _serialize_lead_detail(doc)
@@ -405,7 +421,6 @@ def update_lead(
 	record, surfaced to the caller like any other save error.
 	"""
 	_check_lead_access()
-	frappe.has_permission("Lead", "write", throw=True)
 	doc = frappe.get_doc("Lead", name)
 	doc.check_permission("write")
 	conflict = bool(if_modified) and str(doc.modified) != str(if_modified)
@@ -461,7 +476,15 @@ def update_lead(
 
 def _field_label(meta, fieldname):
 	field = meta.get_field(fieldname)
-	return field.label if field and field.label else fieldname
+	return _(field.label) if field and field.label else fieldname
+
+
+def _display_value(meta, fieldname, value):
+	"""Select values (status, qualification) are English options; translate them."""
+	field = meta.get_field(fieldname)
+	if value and field and field.fieldtype == "Select":
+		return _(str(value))
+	return value
 
 
 def _child_row_summary(meta, table_fieldname, row):
@@ -491,7 +514,11 @@ def _lead_communications(lead, fields, limit=20):
 	"""
 	rows = frappe.get_all(
 		"Communication",
-		filters={"reference_doctype": "Lead", "reference_name": lead},
+		filters={
+			"reference_doctype": "Lead",
+			"reference_name": lead,
+			"communication_type": "Communication",
+		},
 		fields=fields,
 		order_by="communication_date desc",
 		limit_page_length=limit,
@@ -507,7 +534,7 @@ def _lead_communications(lead, fields, limit=20):
 	if unseen:
 		for row in frappe.get_all(
 			"Communication",
-			filters={"name": ("in", unseen)},
+			filters={"name": ("in", unseen), "communication_type": "Communication"},
 			fields=fields,
 			order_by="communication_date desc",
 			limit_page_length=limit,
@@ -545,7 +572,6 @@ def update_lead_note(lead, note_name, content):
 	both paths behave the same.
 	"""
 	_check_lead_access()
-	frappe.has_permission("Lead", "write", throw=True)
 	doc = frappe.get_doc("Lead", lead)
 	doc.check_permission("write")
 
@@ -564,8 +590,8 @@ def _format_lead_activities(docinfo):
 	"""Field-change (Version) and system comment entries, newest first.
 
 	Sentence construction ("changed from X to Y") is left to the frontend —
-	this just resolves each changed fieldname to its Lead form label. Child
-	table rows (e.g. Next Steps) come through Version's added/removed/
+	this resolves each changed fieldname to its translated Lead form label.
+	Child table rows (e.g. notes) come through Version's added/removed/
 	row_changed buckets rather than `changed`.
 	"""
 	meta = frappe.get_meta("Lead")
@@ -586,8 +612,8 @@ def _format_lead_activities(docinfo):
 					"kind": "field_change",
 					"field": fieldname,
 					"label": _field_label(meta, fieldname),
-					"old": old,
-					"new": new,
+					"old": _display_value(meta, fieldname, old),
+					"new": _display_value(meta, fieldname, new),
 					"owner": owner,
 					"creation": creation,
 				}
@@ -638,6 +664,11 @@ def _format_lead_activities(docinfo):
 				}
 			)
 
+	owners = {a["owner"] for a in activities if a.get("owner")}
+	owner_names = {owner: _user_label(owner) for owner in owners}
+	for activity in activities:
+		activity["owner_name"] = owner_names.get(activity.get("owner")) or activity.get("owner")
+
 	activities.sort(key=lambda a: a.get("creation") or "", reverse=True)
 	return activities
 
@@ -646,8 +677,8 @@ def _format_lead_activities(docinfo):
 def get_lead_activity(name):
 	"""Return Communications and change/comment Activities for a Lead.
 
-	Notes stay out of this (they're Lead's own native `notes` child table,
-	served via `_serialize_notes` below). Activities are built from
+	Notes come from Lead's own `notes` child table via `_serialize_notes`.
+	Activities are built from
 	Frappe's own `get_docinfo` — the same aggregation the Desk form's
 	timeline uses — for Versions and system comments, rather than
 	re-deriving Version-diff parsing by hand; Communications keep the
@@ -656,7 +687,6 @@ def get_lead_activity(name):
 	`sent_or_received`).
 	"""
 	_check_lead_access()
-	frappe.has_permission("Lead", "read", throw=True)
 	doc = frappe.get_doc("Lead", name)
 	doc.check_permission("read")
 
@@ -710,7 +740,6 @@ def add_lead_note(lead, content=None, next_follow_up_on=None):
 	generic Comment or a new doctype.
 	"""
 	_check_lead_access()
-	frappe.has_permission("Lead", "write", throw=True)
 	doc = frappe.get_doc("Lead", lead)
 	doc.check_permission("write")
 

@@ -3,7 +3,7 @@
 		class="flex items-center"
 		:class="wrap ? 'w-full flex-wrap justify-center gap-1' : 'flex-nowrap gap-2.5'"
 		role="group"
-		aria-label="Filter by status"
+		:aria-label="__('Filter by status')"
 	>
 		<button
 			v-for="status in statuses"
@@ -51,6 +51,7 @@
 <script setup>
 import { computed } from "vue"
 import { Badge } from "frappe-ui"
+import { __ } from "@spa/utils/i18n.js"
 
 const props = defineProps({
 	/** Currently selected status names (empty = all) */

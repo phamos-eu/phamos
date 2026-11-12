@@ -28,7 +28,7 @@
 				type="button"
 				class="ml-1 rounded p-1 text-ink-gray-5 hover:bg-surface-gray-2 hover:text-ink-gray-9"
 				:title="__('Back to list')"
-				@click="emit('close')"
+				@click="closeLead"
 			>
 				<FeatherIcon name="x" class="h-4 w-4" />
 			</button>
@@ -399,7 +399,7 @@
 
 <script setup>
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from "vue"
-import { call, debounce, toast, Badge } from "frappe-ui"
+import { call, toast, Badge } from "frappe-ui"
 import { formatDate, formatDatetime } from "@spa/utils/datetime"
 import { setPageChromeActive } from "@spa/pageChrome.js"
 import { __ } from "@spa/utils/i18n.js"
@@ -590,7 +590,7 @@ const timeline = computed(() => {
 				key: `activity:${index}`,
 				type: "activities",
 				date: activity.creation,
-				author: activity.owner,
+				author: activity.owner_name || activity.owner,
 				activity,
 				fieldChange: activity.kind === "field_change" ? activity : null,
 				body: stripHtml(activity.content),
@@ -697,31 +697,57 @@ function stripHtml(value) {
 		.trim()
 }
 
-function syncFieldsFromLead() {
+/**
+ * Editable fields and the refs bound to them. `baseline` holds what the server
+ * last said for each, so a save sends only what the user actually changed and
+ * never writes a stale value back over someone else's edit.
+ */
+const FIELD_REFS = {
+	status,
+	custom_next_followup: nextFollowUp,
+	qualification_status: qualificationStatus,
+	custom_status_comment: statusComment,
+	lead_owner: leadOwner,
+	company_name: companyName,
+	website,
+	city,
+	state,
+	country,
+	territory,
+	source,
+	industry,
+	no_of_employees: noOfEmployees,
+	market_segment: marketSegment,
+	annual_revenue: annualRevenue,
+	request_type: requestType,
+}
+let baseline = {}
+
+/** The server value as the form shows it ("" for empty). */
+function formValue(doc, field) {
+	if (field === "annual_revenue") return doc.annual_revenue ?? ""
+	return doc[field] || ""
+}
+
+/** Set refs without triggering an autosave. */
+function setQuietly(apply) {
 	syncing.value = true
-	status.value = lead.value.status || ""
-	nextFollowUp.value = lead.value.custom_next_followup || ""
-	qualificationStatus.value = lead.value.qualification_status || ""
-	statusComment.value = lead.value.custom_status_comment || ""
-	// Size the box to a stored comment on arrival, not after the first keystroke.
-	nextTick(autoGrowStatusComment)
-	leadOwner.value = lead.value.lead_owner || ""
-	companyName.value = lead.value.company_name || ""
-	website.value = lead.value.website || ""
-	city.value = lead.value.city || ""
-	state.value = lead.value.state || ""
-	country.value = lead.value.country || ""
-	territory.value = lead.value.territory || ""
-	source.value = lead.value.source || ""
-	industry.value = lead.value.industry || ""
-	noOfEmployees.value = lead.value.no_of_employees || ""
-	marketSegment.value = lead.value.market_segment || ""
-	annualRevenue.value = lead.value.annual_revenue ?? ""
-	requestType.value = lead.value.request_type || ""
-	saveError.value = ""
+	apply()
 	nextTick(() => {
 		syncing.value = false
 	})
+}
+
+function syncFieldsFromLead() {
+	setQuietly(() => {
+		for (const [field, fieldRef] of Object.entries(FIELD_REFS)) {
+			fieldRef.value = formValue(lead.value, field)
+		}
+	})
+	baseline = Object.fromEntries(Object.keys(FIELD_REFS).map((f) => [f, formValue(lead.value, f)]))
+	// Size the box to a stored comment on arrival, not after the first keystroke.
+	nextTick(autoGrowStatusComment)
+	saveError.value = ""
 }
 
 async function loadLead() {
@@ -750,31 +776,43 @@ async function loadActivity() {
 	}
 }
 
-async function saveFields() {
-	if (syncing.value || !lead.value) return
+let saveTimer = null
+let inFlight = null
+let saveAgain = false
+
+/** One save at a time; edits made meanwhile go out in one more save after it,
+ *  carrying the `modified` that save returned (else: false conflict warnings). */
+function saveFields() {
+	if (inFlight) {
+		saveAgain = true
+		return inFlight
+	}
+	inFlight = sendChanges().finally(() => {
+		inFlight = null
+		if (saveAgain) {
+			saveAgain = false
+			return saveFields()
+		}
+	})
+	return inFlight
+}
+
+async function sendChanges() {
+	if (!lead.value) return
+	const changes = {}
+	for (const [field, fieldRef] of Object.entries(FIELD_REFS)) {
+		if (fieldRef.value !== baseline[field]) changes[field] = fieldRef.value
+	}
+	if (!Object.keys(changes).length) return
+
+	const payload = { ...changes }
+	if (payload.annual_revenue === "") payload.annual_revenue = 0
 	saveError.value = ""
 	savingStatus.value = true
-	const sentStatus = status.value
 	try {
 		const updated = await call(`${API}.update_lead`, {
 			name: lead.value.name,
-			status: status.value,
-			custom_next_followup: nextFollowUp.value,
-			qualification_status: qualificationStatus.value,
-			custom_status_comment: statusComment.value,
-			lead_owner: leadOwner.value,
-			company_name: companyName.value,
-			website: website.value,
-			city: city.value,
-			state: state.value,
-			country: country.value,
-			territory: territory.value,
-			source: source.value,
-			industry: industry.value,
-			no_of_employees: noOfEmployees.value,
-			market_segment: marketSegment.value,
-			annual_revenue: annualRevenue.value === "" ? 0 : annualRevenue.value,
-			request_type: requestType.value,
+			...payload,
 			if_modified: lead.value.modified,
 		})
 		if (updated.conflict) {
@@ -785,16 +823,17 @@ async function saveFields() {
 			})
 		}
 		delete updated.conflict
+		if (updated.name !== lead.value.name) return
+
+		// What was sent is now the server's value, unless the server changed it.
+		for (const field of Object.keys(changes)) baseline[field] = changes[field]
+
 		// ERPNext derives some statuses (Opportunity, Quotation, Converted…)
 		// from linked records and overrides a manual choice on save. Show what
 		// was kept rather than the choice that didn't stick, unless the user
 		// has already picked another status while the save was in flight.
-		if (updated.status !== sentStatus && status.value === sentStatus) {
-			syncing.value = true
-			status.value = updated.status
-			nextTick(() => {
-				syncing.value = false
-			})
+		if ("status" in changes && updated.status !== changes.status && status.value === changes.status) {
+			setQuietly(() => (status.value = updated.status))
 			toast({
 				title: __("ERPNext kept the status at {0}: it follows linked opportunities, quotations and customers.", [
 					leadStatusLabel(updated.status),
@@ -803,10 +842,17 @@ async function saveFields() {
 				iconClasses: "text-ink-blue-3",
 			})
 		}
-		// Deliberately not re-syncing the editable fields from the response:
-		// the save is debounced, so anything typed while it was in flight would
-		// be replaced by the older server value, silently, because the sync
-		// guard suppresses the watcher that would save it again.
+
+		// Fields the user hasn't touched take the server's value, so someone
+		// else's change shows up. Touched ones keep what is being typed: the
+		// next save sends them.
+		setQuietly(() => {
+			for (const [field, fieldRef] of Object.entries(FIELD_REFS)) {
+				const serverValue = formValue(updated, field)
+				if (fieldRef.value === baseline[field]) fieldRef.value = serverValue
+				baseline[field] = serverValue
+			}
+		})
 		lead.value = updated
 		emit("updated", updated)
 	} catch (e) {
@@ -817,35 +863,33 @@ async function saveFields() {
 	}
 }
 
-const scheduleSave = debounce(() => {
-	saveFields()
-}, 500)
+function scheduleSave() {
+	clearTimeout(saveTimer)
+	saveTimer = setTimeout(() => {
+		saveTimer = null
+		saveFields()
+	}, 500)
+}
 
-watch(
-	[
-		status,
-		nextFollowUp,
-		qualificationStatus,
-		statusComment,
-		leadOwner,
-		companyName,
-		website,
-		city,
-		state,
-		country,
-		territory,
-		source,
-		industry,
-		noOfEmployees,
-		marketSegment,
-		annualRevenue,
-		requestType,
-	],
-	() => {
-		if (syncing.value) return
-		scheduleSave()
+/** Send a pending edit now: before switching leads or leaving the record. */
+function flushSave() {
+	if (saveTimer) {
+		clearTimeout(saveTimer)
+		saveTimer = null
+		return saveFields()
 	}
-)
+	return inFlight || Promise.resolve()
+}
+
+async function closeLead() {
+	await flushSave()
+	emit("close")
+}
+
+watch(Object.values(FIELD_REFS), () => {
+	if (syncing.value) return
+	scheduleSave()
+})
 
 function openNoteEditor(entry) {
 	editingNote.value = entry.note
@@ -875,12 +919,15 @@ onMounted(() => {
 })
 
 onBeforeUnmount(() => {
+	flushSave()
 	setPageChromeActive(false)
 })
 
 watch(
 	() => props.name,
-	() => {
+	async () => {
+		// Still the previous lead's fields: save them to that lead first.
+		await flushSave()
 		loadAll()
 	}
 )

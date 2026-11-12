@@ -40,8 +40,8 @@ const contentEl = ref(null)
 const clipped = ref(false)
 const expanded = ref(false)
 
-/** Links in a received mail must not navigate the cockpit away — an unsent
- *  reply lives only in memory and would go with it. */
+/** Links in a received mail must not navigate the cockpit away: an edit
+ *  still waiting to autosave would go with it. */
 function hardenLinks() {
 	const root = contentEl.value
 	if (!root) return

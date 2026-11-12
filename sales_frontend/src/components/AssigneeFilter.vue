@@ -27,13 +27,14 @@
 <script setup>
 import { computed } from "vue"
 import UserAvatar from "@spa/components/UserAvatar.vue"
+import { __ } from "@spa/utils/i18n.js"
 
 const props = defineProps({
 	/** Currently selected user ids (empty = all) */
 	modelValue: { type: Array, default: () => [] },
 	/** Available users: [{ name, full_name, user_image }] */
 	users: { type: Array, default: () => [] },
-	ariaLabel: { type: String, default: "Filter by assignee" },
+	ariaLabel: { type: String, default: () => __("Filter by assignee") },
 })
 
 const emit = defineEmits(["update:modelValue"])

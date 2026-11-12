@@ -75,6 +75,77 @@ class TestLeadCommunications(FrappeTestCase):
 		self.assertEqual(len(rows), 1)
 
 
+class TestLeadCommunicationTypes(FrappeTestCase):
+	def test_only_emails_reach_the_feed(self):
+		"""Automated messages and other Communication types are not emails."""
+		from phamos.api.sales_leads import _lead_communications
+
+		seen = []
+
+		def fake_get_all(doctype, **kwargs):
+			if doctype == "Communication":
+				seen.append(kwargs["filters"])
+			if doctype == "Communication Link":
+				return ["C-9"]
+			return []
+
+		with patch("frappe.get_all", side_effect=fake_get_all):
+			_lead_communications("LEAD-1", fields=["name"], limit=20)
+
+		self.assertEqual(len(seen), 2)
+		for filters in seen:
+			self.assertEqual(filters.get("communication_type"), "Communication")
+
+
+def _resolves_to(address):
+	return patch("socket.getaddrinfo", return_value=[(2, 1, 6, "", (address, 0))])
+
+
+class TestWebsiteGuards(FrappeTestCase):
+	"""The website check fetches a user-supplied URL from the server."""
+
+	def test_refuses_non_public_addresses(self):
+		from phamos.api.sales_leads import _is_public_http_url
+
+		for address in ("127.0.0.1", "10.0.0.5", "192.168.1.1", "169.254.169.254", "100.100.100.200", "::1"):
+			with self.subTest(address=address), _resolves_to(address):
+				self.assertFalse(_is_public_http_url("https://example.com"))
+
+	def test_allows_a_public_address(self):
+		from phamos.api.sales_leads import _is_public_http_url
+
+		with _resolves_to("93.184.216.34"):
+			self.assertTrue(_is_public_http_url("https://example.com"))
+			self.assertTrue(_is_public_http_url("http://example.com:80/path"))
+
+	def test_refuses_other_ports_and_schemes(self):
+		from phamos.api.sales_leads import _is_public_http_url
+
+		with _resolves_to("93.184.216.34"):
+			self.assertFalse(_is_public_http_url("https://example.com:8080"))
+			self.assertFalse(_is_public_http_url("ftp://example.com"))
+
+	def test_frame_ancestors(self):
+		from phamos.api.sales_leads import _frame_ancestors_allow_embedding as allows
+
+		self.assertTrue(allows(None))
+		self.assertTrue(allows("default-src 'self'"))
+		self.assertTrue(allows("frame-ancestors *"))
+		self.assertFalse(allows("frame-ancestors 'self'"))
+		self.assertFalse(allows("frame-ancestors 'none'"))
+		# Two CSP headers joined by requests: the second one forbids framing.
+		self.assertFalse(allows("default-src *, frame-ancestors 'none'"))
+
+	def test_never_frames_this_site_itself(self):
+		"""The dialog's sandbox allows scripts and same-origin, which is only
+		safe for pages on another origin."""
+		from phamos.api import sales_leads
+
+		with patch.object(sales_leads, "get_url", return_value="https://erp.example.com"):
+			self.assertTrue(sales_leads._is_own_site("https://ERP.example.com/app/lead"))
+			self.assertFalse(sales_leads._is_own_site("https://example.com"))
+
+
 class TestGetLeads(FrappeTestCase):
 	def test_undated_leads_sort_first(self):
 		"""Leads with no follow-up date need triage, so they lead the list."""
@@ -82,15 +153,33 @@ class TestGetLeads(FrappeTestCase):
 
 		with (
 			patch.object(sales_leads, "_check_lead_access"),
-			patch("frappe.get_all", return_value=[]) as get_all,
+			patch("frappe.get_list", return_value=[]) as get_list,
 		):
 			sales_leads.get_leads()
 
-		_, kwargs = get_all.call_args
+		_, kwargs = get_list.call_args
 		self.assertEqual(
 			kwargs["order_by"], "custom_next_followup is null desc, custom_next_followup asc"
 		)
 		self.assertEqual(kwargs["filters"], {"disabled": 0})
+
+	def test_respects_user_permissions(self):
+		"""get_all skips User Permissions, so a rep restricted to one Territory
+		would see every lead. The list must go through get_list."""
+		from phamos.api import sales_leads
+
+		with (
+			patch.object(sales_leads, "_check_lead_access"),
+			patch("frappe.get_list", return_value=[]) as get_list,
+			patch("frappe.get_all", return_value=[]) as get_all,
+		):
+			sales_leads.get_leads()
+
+		get_list.assert_called_once()
+		self.assertFalse(
+			[c for c in get_all.call_args_list if c.args and c.args[0] == "Lead"],
+			"the Lead list must not bypass permissions",
+		)
 
 	def test_marks_overdue_only_after_the_due_date(self):
 		from phamos.api.sales_leads import _serialize_lead_row

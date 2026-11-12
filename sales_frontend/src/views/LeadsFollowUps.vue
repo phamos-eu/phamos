@@ -55,7 +55,7 @@
 						style="grid-column: 1 / -1"
 						class="border-b border-outline-gray-2 bg-amber-50 px-3 py-2 text-xs text-amber-800 dark:bg-amber-950 dark:text-amber-200"
 					>
-						{{ __("Showing the latest {0} leads. Narrow your filters to see older ones.", [leads.length]) }}
+						{{ __("Showing the first {0} leads by follow-up date. Leads with later follow-ups are not listed.", [leads.length]) }}
 					</div>
 					<LeadList v-if="filteredLeads.length" :leads="filteredLeads" @select="openLead" />
 					<div
@@ -224,6 +224,14 @@ function closeLead() {
 	router.replace({ name: "LeadsFollowUps" })
 }
 
+/** Same rule as the server: overdue only once the due date has passed. */
+function isOverdue(date) {
+	if (!date) return false
+	const now = new Date()
+	const today = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(now.getDate()).padStart(2, "0")}`
+	return String(date).slice(0, 10) < today
+}
+
 function onLeadUpdated(updated) {
 	const idx = leads.value.findIndex((l) => l.name === updated.name)
 	if (idx !== -1) {
@@ -231,9 +239,15 @@ function onLeadUpdated(updated) {
 			...leads.value[idx],
 			status: updated.status,
 			custom_next_followup: updated.custom_next_followup,
+			custom_status_comment: updated.custom_status_comment,
+			company_name: updated.company_name,
+			modified: updated.modified,
 			lead_owner: updated.lead_owner,
 			owner_name: updated.lead_owner_name,
 			owner_image: updated.lead_owner_image,
+			// Rescheduling an overdue lead is the core flow; the row must not
+			// keep its red badge until a reload.
+			overdue: isOverdue(updated.custom_next_followup),
 		}
 	}
 }

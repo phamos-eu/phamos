@@ -1761,7 +1761,6 @@ Sales department issues overview,Übersicht der Anfragen des Vertriebs
 {0} leads,{0} Leads
 Search…,Suchen …
 Filter by lead owner,Nach Lead-Verantwortlichem filtern
-Showing the latest {0} leads. Narrow your filters to see older ones.,"Die neuesten {0} Leads werden angezeigt. Grenzen Sie die Filter ein, um ältere zu sehen."
 No leads found. Try clearing search or status filters.,Keine Leads gefunden. Leeren Sie die Suche oder die Statusfilter.
 Next Follow Up,Nächstes Nachfassen
 Last Updated,Zuletzt geändert
@@ -1835,3 +1834,9 @@ State/Province,Staat / Provinz
 Show less,Weniger anzeigen
 Show full message,Ganze Nachricht anzeigen
 "ERPNext kept the status at {0}: it follows linked opportunities, quotations and customers.","ERPNext hat den Status {0} beibehalten: Er richtet sich nach verknüpften Chancen, Angeboten und Kunden."
+You need a Sales role to use the Leads cockpit.,"Sie benötigen eine Vertriebsrolle, um das Lead-Cockpit zu nutzen."
+Invalid Lead field(s): {0},Ungültige Lead-Felder: {0}
+No fields to update,Keine Felder zu aktualisieren
+That note is no longer on this lead.,Diese Notiz gehört nicht mehr zu diesem Lead.
+Filter by status,Nach Status filtern
+Showing the first {0} leads by follow-up date. Leads with later follow-ups are not listed.,Die ersten {0} Leads nach Nachfass-Datum werden angezeigt. Leads mit späterem Nachfassen fehlen.
