@@ -1,0 +1,317 @@
+// Phriend: a little black ball with legs.
+
+#phriend-root {
+	position: fixed;
+	right: 24px;
+	bottom: 24px;
+	width: 64px;
+	height: 76px;
+	// above Frappe dialogs (1050) so you can report a problem inside a pop-up
+	z-index: 1055;
+	user-select: none;
+	touch-action: none;
+	cursor: grab;
+
+	&.phriend-dragging {
+		cursor: grabbing;
+	}
+
+	&.phriend-hidden {
+		visibility: hidden;
+	}
+
+	// while Phriend's own report dialog is open
+	&.phriend-away {
+		display: none;
+	}
+
+	svg {
+		width: 100%;
+		height: 100%;
+		overflow: visible;
+		display: block;
+		filter: drop-shadow(0 4px 6px rgba(0, 0, 0, 0.25));
+	}
+
+	.phriend-body {
+		animation: phriend-bob 2.6s ease-in-out infinite;
+	}
+
+	.phriend-ball {
+		stroke: rgba(255, 255, 255, 0);
+		stroke-width: 1.5;
+	}
+
+	.phriend-eyes {
+		transform-box: fill-box;
+		transform-origin: center;
+		animation: phriend-blink 5s infinite;
+	}
+
+	.phriend-pupil {
+		transition: transform 0.08s linear;
+	}
+
+	.phriend-leg {
+		transform-box: fill-box;
+		transform-origin: 50% 0%;
+	}
+
+	&:hover .phriend-leg-l {
+		animation: phriend-wiggle-l 0.35s ease-in-out infinite alternate;
+	}
+
+	&:hover .phriend-leg-r {
+		animation: phriend-wiggle-r 0.35s ease-in-out infinite alternate;
+	}
+
+	&.phriend-hop .phriend-body {
+		animation: phriend-hop 0.45s ease-out 1;
+	}
+
+	&.phriend-busy .phriend-eyes {
+		animation: phriend-squint 0.6s ease-in-out infinite alternate;
+	}
+
+	.phriend-shadow {
+		transform-box: fill-box;
+		transform-origin: center;
+		animation: phriend-shadow 2.6s ease-in-out infinite;
+	}
+}
+
+[data-theme="dark"] #phriend-root .phriend-ball {
+	stroke: rgba(255, 255, 255, 0.35);
+}
+
+.phriend-badge {
+	position: absolute;
+	top: -2px;
+	right: -2px;
+	min-width: 20px;
+	height: 20px;
+	padding: 0 5px;
+	border-radius: 10px;
+	background: var(--red-500, #e03636);
+	color: #fff;
+	font-size: 11px;
+	font-weight: 600;
+	line-height: 20px;
+	text-align: center;
+	cursor: pointer;
+	box-shadow: 0 0 0 2px var(--bg-color, #fff);
+
+	&:empty,
+	&[data-count="0"] {
+		display: none;
+	}
+}
+
+.phriend-bubble {
+	position: absolute;
+	bottom: calc(100% + 8px);
+	right: 0;
+	width: max-content;
+	max-width: 240px;
+	padding: 8px 12px;
+	border-radius: 12px;
+	background: var(--card-bg, #fff);
+	color: var(--text-color, #1f272e);
+	border: 1px solid var(--border-color, #d1d8dd);
+	box-shadow: var(--shadow-md, 0 4px 12px rgba(0, 0, 0, 0.12));
+	font-size: 13px;
+	line-height: 1.4;
+	opacity: 0;
+	transform: translateY(6px);
+	transition: opacity 0.2s, transform 0.2s;
+	pointer-events: none;
+
+	&.phriend-show {
+		opacity: 1;
+		transform: translateY(0);
+		pointer-events: auto;
+	}
+
+	&::after {
+		content: "";
+		position: absolute;
+		top: 100%;
+		right: 22px;
+		border: 7px solid transparent;
+		border-top-color: var(--card-bg, #fff);
+	}
+
+	a {
+		text-decoration: underline;
+	}
+}
+
+#phriend-root.phriend-flip .phriend-bubble {
+	right: auto;
+	left: 0;
+
+	&::after {
+		right: auto;
+		left: 22px;
+	}
+}
+
+// ---- Report dialog -------------------------------------------------------
+
+.phriend-capturing {
+	display: flex;
+	align-items: center;
+	gap: 10px;
+	padding: 40px 16px;
+	justify-content: center;
+	border: 1px dashed var(--border-color);
+	border-radius: 8px;
+}
+
+.phriend-spinner {
+	width: 18px;
+	height: 18px;
+	border: 2px solid var(--border-color, #d1d8dd);
+	border-top-color: var(--text-color, #1f272e);
+	border-radius: 50%;
+	animation: phriend-spin 0.8s linear infinite;
+}
+
+@keyframes phriend-spin {
+	to {
+		transform: rotate(360deg);
+	}
+}
+
+.phriend-annotator {
+	.phriend-toolbar {
+		display: flex;
+		gap: 6px;
+		align-items: center;
+		margin-bottom: 8px;
+		flex-wrap: wrap;
+
+		.btn.active {
+			background: var(--gray-700, #4c5a67);
+			color: #fff;
+		}
+
+		.phriend-hint {
+			margin-left: auto;
+			color: var(--text-muted);
+			font-size: 12px;
+		}
+	}
+
+	.phriend-canvas-wrap {
+		position: relative; // the Text tool's input is placed on top of the canvas
+		border: 1px solid var(--border-color);
+		border-radius: 8px;
+		overflow: hidden;
+		background: var(--subtle-fg, #f4f5f6);
+		max-height: 60vh;
+		overflow-y: auto;
+	}
+
+	.phriend-text-input {
+		position: absolute;
+		min-width: 180px;
+		padding: 2px 6px;
+		font-size: 18px;
+		font-weight: 600;
+		line-height: 1.2;
+		color: #e5222b;
+		background: rgba(255, 255, 255, 0.95);
+		border: 2px solid #e5222b;
+		border-radius: 4px;
+		outline: none;
+		z-index: 1;
+		transform: translate(-6px, -4px); // text starts where you clicked
+	}
+
+	canvas {
+		display: block;
+		width: 100%;
+		height: auto;
+		cursor: crosshair;
+		touch-action: none;
+	}
+}
+
+@keyframes phriend-bob {
+	0%,
+	100% {
+		transform: translateY(0);
+	}
+	50% {
+		transform: translateY(-3px);
+	}
+}
+
+@keyframes phriend-shadow {
+	0%,
+	100% {
+		transform: scaleX(1);
+		opacity: 0.25;
+	}
+	50% {
+		transform: scaleX(0.85);
+		opacity: 0.18;
+	}
+}
+
+@keyframes phriend-blink {
+	0%,
+	94%,
+	100% {
+		transform: scaleY(1);
+	}
+	96% {
+		transform: scaleY(0.1);
+	}
+}
+
+@keyframes phriend-squint {
+	from {
+		transform: scaleY(1);
+	}
+	to {
+		transform: scaleY(0.45);
+	}
+}
+
+@keyframes phriend-wiggle-l {
+	from {
+		transform: rotate(-12deg);
+	}
+	to {
+		transform: rotate(10deg);
+	}
+}
+
+@keyframes phriend-wiggle-r {
+	from {
+		transform: rotate(12deg);
+	}
+	to {
+		transform: rotate(-10deg);
+	}
+}
+
+@keyframes phriend-hop {
+	0% {
+		transform: translateY(0);
+	}
+	35% {
+		transform: translateY(-14px);
+	}
+	70% {
+		transform: translateY(0);
+	}
+	85% {
+		transform: translateY(-3px);
+	}
+	100% {
+		transform: translateY(0);
+	}
+}
