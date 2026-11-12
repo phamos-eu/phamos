@@ -15,7 +15,7 @@ import { __ } from "@spa/utils/i18n.js"
 
 const route = useRoute()
 
-const LEAD_ROUTES = ["Leads", "LeadsFollowUps", "LeadDetail"]
+const LEAD_ROUTES = ["Leads", "LeadsOverview", "LeadsFollowUps", "LeadDetail"]
 
 const NAV_ITEMS = [
 	{
@@ -24,6 +24,7 @@ const NAV_ITEMS = [
 		icon: "users",
 		match: ["Leads"],
 		children: [
+			{ name: "LeadsOverview", label: "Overview", icon: "bar-chart-2", match: ["LeadsOverview"] },
 			{
 				name: "LeadsFollowUps",
 				label: "Follow Ups",
@@ -76,6 +77,7 @@ const pageTitle = computed(() => {
 })
 
 const pageSubtitle = computed(() => {
+	if (route.name === "LeadsOverview") return __("How many new leads, compared with what")
 	if (LEAD_ROUTES.includes(route.name)) return __("All leads, sorted for follow-up")
 	if (route.name === "TasksGantt" || route.name === "TaskDetail") {
 		return __("Sales department tasks")
