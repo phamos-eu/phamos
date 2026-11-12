@@ -434,3 +434,181 @@ class TestLeadDirection(FrappeTestCase):
 
 	def test_a_chosen_direction_wins_over_a_new_source(self):
 		self.assertNotIn("custom_lead_direction", self._cockpit_source_change("Inbound"))
+
+
+def _rows(*items):
+	"""(creation, source, status, direction) tuples as get_list rows."""
+	return [
+		{"creation": c, "source": s, "status": st, "custom_lead_direction": d}
+		for c, s, st, d in items
+	]
+
+
+class TestLeadOverview(FrappeTestCase):
+	"""The figures of the lead overview (phamos/phamos#1758)."""
+
+	def _build(self, rows, today="2026-11-12", direction=None):
+		from phamos.api.sales_lead_overview import build_overview
+
+		return build_overview(rows, frappe.utils.getdate(today), direction=direction)
+
+	def test_an_empty_site_returns_zeros(self):
+		data = self._build([])
+		self.assertEqual(data["this_month"]["count"], 0)
+		self.assertIsNone(data["average"])
+		self.assertIsNone(data["season"])
+		self.assertFalse(data["last_year"]["has_data"])
+		self.assertEqual(len(data["chart"]), 25)
+
+	def test_the_last_second_of_a_month_belongs_to_that_month(self):
+		data = self._build(_rows(("2026-10-31 23:59:59", "", "Lead", "Inbound")))
+		october = next(m for m in data["chart"] if m["key"] == "2026-10")
+		self.assertEqual(october["count"], 1)
+		self.assertEqual(data["this_month"]["count"], 0)
+
+	def test_same_period_last_year_covers_the_same_days(self):
+		rows = _rows(
+			("2025-11-01 09:00:00", "", "Lead", "Inbound"),
+			("2025-11-12 18:00:00", "", "Lead", "Inbound"),
+			("2025-11-13 09:00:00", "", "Lead", "Inbound"),  # after today's day: not counted
+			("2026-11-02 09:00:00", "", "Lead", "Inbound"),
+		)
+		data = self._build(rows)
+		self.assertEqual(data["last_year"]["count"], 2)
+		self.assertEqual(data["last_year"]["filters"]["created_to"], "2025-11-12")
+		self.assertEqual(data["last_year"]["delta"], -1)
+
+	def test_29_february_compares_with_28_february(self):
+		rows = _rows(("2027-02-28 09:00:00", "", "Lead", "Inbound"))
+		data = self._build(rows, today="2028-02-29")
+		self.assertEqual(data["last_year"]["to"], "2027-02-28")
+		self.assertEqual(data["last_year"]["count"], 1)
+
+	def test_the_12_month_average_is_prorated(self):
+		# 3 leads in each of the 12 months before November 2026; nothing in November yet.
+		rows = []
+		for back in range(1, 13):
+			from phamos.api.sales_lead_overview import add_months
+
+			start = add_months(frappe.utils.getdate("2026-11-01"), -back)
+			rows += _rows(*[(f"{start} 10:00:00", "", "Lead", "Inbound")] * 3)
+		data = self._build(rows, today="2026-11-15")
+		self.assertEqual(data["average"]["monthly"], 3)
+		self.assertEqual(data["average"]["expected"], 1.5)  # 15 of 30 days
+		self.assertEqual(data["average"]["months_used"], 12)
+		self.assertEqual(data["average"]["tone"], "below")  # 0 against 1.5 expected
+
+	def test_the_average_uses_only_months_with_data(self):
+		rows = _rows(("2026-09-01 10:00:00", "", "Lead", "Inbound"), ("2026-10-01 10:00:00", "", "Lead", "Inbound"))
+		data = self._build(rows)
+		self.assertEqual(data["average"]["months_used"], 2)
+
+	def test_the_season_is_hidden_without_an_earlier_year(self):
+		data = self._build(_rows(("2026-08-21 10:00:00", "", "Lead", "Inbound")))
+		self.assertIsNone(data["season"])
+
+	def test_the_season_averages_earlier_years(self):
+		rows = _rows(
+			("2024-11-03 10:00:00", "", "Lead", "Inbound"),
+			("2024-11-04 10:00:00", "", "Lead", "Inbound"),
+			("2025-11-05 10:00:00", "", "Lead", "Inbound"),
+			("2025-11-20 10:00:00", "", "Lead", "Inbound"),  # after day 12: full month only
+		)
+		data = self._build(rows)
+		self.assertEqual([y["year"] for y in data["season"]["years"]], [2025, 2024])
+		self.assertEqual(data["season"]["expected"], 1.5)
+		self.assertEqual(data["season"]["years"][0]["full_count"], 2)
+
+	def test_trend_windows_do_not_overlap(self):
+		data = self._build([])
+		for trend in data["trends"]:
+			cur, prev = trend["current"], trend["previous"]
+			self.assertLess(prev["to"], cur["from"])
+			self.assertEqual(cur["to"], "2026-10-31")
+		three = next(t for t in data["trends"] if t["months"] == 3)
+		self.assertEqual((three["current"]["from"], three["previous"]["from"]), ("2026-08-01", "2026-05-01"))
+
+	def test_trend_shows_where_leads_went_missing(self):
+		rows = _rows(
+			("2026-09-10 10:00:00", "Website", "Lead", "Inbound"),
+			("2026-09-11 10:00:00", "Website", "Lead", "Inbound"),
+			("2026-10-10 10:00:00", "Cold Calling", "Lead", "Outbound"),
+		)
+		one = next(t for t in self._build(rows)["trends"] if t["months"] == 1)
+		self.assertEqual(one["delta"], -1)
+		self.assertEqual(one["changes"]["source"][0]["key"], "Website")  # biggest drop first
+		self.assertEqual(one["changes"]["source"][0]["delta"], -2)
+
+	def test_on_par_tolerance(self):
+		from phamos.api.sales_lead_overview import compare
+
+		self.assertEqual(compare(6, 5)["tone"], "par")  # one lead
+		self.assertEqual(compare(7, 5)["tone"], "above")
+		self.assertEqual(compare(45, 50)["tone"], "par")  # 10 %
+		self.assertEqual(compare(40, 50)["tone"], "below")
+		self.assertIsNone(compare(3, None)["tone"])
+
+	def test_rows_without_source_get_their_own_row(self):
+		rows = _rows(("2026-11-02 10:00:00", None, "Lead", None), ("2026-11-03 10:00:00", "Website", "Lead", "Inbound"))
+		data = self._build(rows)
+		keys = {row["key"]: row for row in data["by_source"]["this_month"]}
+		self.assertEqual(keys["none"]["filters"]["source"], "none")
+		self.assertEqual(data["not_set"]["count"], 1)
+		self.assertEqual(data["this_month"]["split"], {"Inbound": 1, "Outbound": 0, "none": 1})
+
+	def test_every_figure_lists_exactly_its_leads(self):
+		"""A card's number and the list it opens must agree: apply each figure's filters to the same rows."""
+		from phamos.api.sales_lead_overview import _matches, _normalise
+
+		rows = _rows(
+			("2025-11-04 10:00:00", "Website", "Converted", "Inbound"),
+			("2026-09-10 10:00:00", "Website", "Lead", "Inbound"),
+			("2026-10-31 23:59:59", "Cold Calling", "Open", "Outbound"),
+			("2026-11-01 00:00:00", None, "Do Not Contact", None),
+			("2026-11-12 23:00:00", "Website", "Lead", "Inbound"),
+		)
+		norm = _normalise(rows)
+
+		def listed(filters):
+			start, end = frappe.utils.getdate(filters["created_from"]), frappe.utils.getdate(filters["created_to"])
+			rest = {k: v for k, v in filters.items() if k not in ("created_from", "created_to")}
+			return sum(1 for r in norm if start <= r["day"] <= end and _matches(r, rest))
+
+		data = self._build(rows)
+		figures = [data["this_month"], data["last_year"], *data["chart"], *data["by_source"]["this_month"],
+			*data["by_source"]["last_3_months"], *data["by_status"], *data["average"]["months"],
+			*data["season"]["years"]]
+		for trend in data["trends"]:
+			figures += [trend["current"], trend["previous"]]
+		for figure in figures:
+			with self.subTest(figure=figure["filters"]):
+				self.assertEqual(listed(figure["filters"]), figure["count"])
+
+
+class TestGetLeadsOverviewFilters(FrappeTestCase):
+	def _filters(self, **kwargs):
+		from phamos.api import sales_leads
+
+		with (
+			patch.object(sales_leads, "_check_lead_access"),
+			patch("frappe.get_list", return_value=[]) as get_list,
+		):
+			sales_leads.get_leads(**kwargs)
+		return get_list.call_args.kwargs
+
+	def test_a_created_filter_lists_every_lead_newest_first(self):
+		kwargs = self._filters(created_from="2026-11-01", created_to="2026-11-12", direction="none", source="none")
+		self.assertEqual(kwargs["order_by"], "creation desc")
+		self.assertIn(["creation", ">=", "2026-11-01 00:00:00"], kwargs["filters"])
+		self.assertIn(["creation", "<=", "2026-11-12 23:59:59.999999"], kwargs["filters"])
+		self.assertIn(["custom_lead_direction", "is", "not set"], kwargs["filters"])
+		self.assertIn(["source", "is", "not set"], kwargs["filters"])
+		self.assertNotIn(["disabled", "=", 0], kwargs["filters"])
+
+	def test_unknown_values_are_refused(self):
+		with self.assertRaises(frappe.ValidationError):
+			self._filters(status="Bogus")
+		with self.assertRaises(frappe.ValidationError):
+			self._filters(direction="Sideways")
+		with self.assertRaises(frappe.ValidationError):
+			self._filters(created_from="not a date")
