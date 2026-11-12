@@ -111,7 +111,10 @@ page_js = {
 doctype_js = {
 	"Leave Application": "public/js/leave_application.js",  # calendar status (milestone 68)
 	"Project" : "public/js/project.js",
-	"Issue" : "public/js/issue.js",
+	"Issue" : [
+		"public/js/issue.js",
+		"public/js/phriend_issue.js",  # Phriend reports: screenshot, Create GitLab Issue (#1850)
+	],
 	"Sales Order": "public/js/sales_order.js",
 	"Lead": "public/js/lead.js",
 	"Job Applicant": "public/js/job_applicant.js",
