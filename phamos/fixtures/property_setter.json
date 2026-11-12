@@ -79,7 +79,7 @@
   "row_name": null,
   "value": "[\"custom_phamos\", \"custom_participation\", \"custom_phamos_end\", \"reference_doctype\", \"reference_docname\", \"email\", \"attending\"]"
  },
- {
+  {
   "default_value": null,
   "doc_type": "GitLab Issue",
   "docstatus": 0,
@@ -317,7 +317,8 @@
   "property_type": "Data",
   "row_name": null,
   "value": "status,transaction_date,customer,territory,order_type,company,title,delivery_date,per_delivered"
- },
+ }
+ ,
  {
   "default_value": null,
   "doc_type": "Appointment",
