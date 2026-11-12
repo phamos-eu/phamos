@@ -46,7 +46,8 @@
 				<span v-else>{{ formatDate(lead.custom_next_followup) }}</span>
 			</div>
 			<div class="min-w-0 text-center text-xs text-ink-gray-6">
-				{{ lead.modified ? formatDate(String(lead.modified).slice(0, 10)) : "—" }}
+				<template v-if="showCreated">{{ lead.creation ? formatDate(String(lead.creation).slice(0, 10)) : "—" }}</template>
+				<template v-else>{{ lead.modified ? formatDate(String(lead.modified).slice(0, 10)) : "—" }}</template>
 			</div>
 			<div class="flex min-w-0 items-center justify-center pr-3">
 				<UserAvatar
@@ -77,6 +78,8 @@ import { LEAD_LIST_FILTER_SUBGRID, leadStatusLabel, leadStatusTheme } from "@/le
 
 defineProps({
 	leads: { type: Array, default: () => [] },
+	// Lists from the lead overview are about when a lead came in, not when it was last touched.
+	showCreated: { type: Boolean, default: false },
 })
 
 const emit = defineEmits(["select"])

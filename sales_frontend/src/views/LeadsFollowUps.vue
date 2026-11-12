@@ -8,6 +8,42 @@
 				{{ __("Loading…") }}
 			</div>
 			<template v-else>
+				<!-- Opened from a figure of the lead overview (#1758): exactly the leads it counted. -->
+				<div
+					v-if="overviewActive"
+					class="flex flex-shrink-0 flex-wrap items-center gap-2 border-b border-outline-gray-2 bg-surface-gray-1 px-5 py-2"
+				>
+					<RouterLink
+						:to="{ name: 'LeadsOverview', query: overviewFilters.direction && overviewFilters.direction !== 'none' ? { direction: overviewFilters.direction } : {} }"
+						class="mr-1 inline-flex items-center gap-1 text-sm text-ink-gray-7 hover:text-ink-gray-9"
+					>
+						<FeatherIcon name="arrow-left" class="h-4 w-4" />{{ __("Overview") }}
+					</RouterLink>
+					<span
+						v-for="chip in filterChips"
+						:key="chip.label"
+						class="inline-flex items-center gap-1 rounded-full bg-surface-white px-2.5 py-1 text-xs text-ink-gray-8 ring-1 ring-outline-gray-2"
+					>
+						{{ chip.label }}
+						<button
+							type="button"
+							class="rounded-full text-ink-gray-5 hover:text-ink-gray-9"
+							:aria-label="__('Remove filter {0}', [chip.label])"
+							@click="removeFilter(chip.keys)"
+						>
+							<FeatherIcon name="x" class="h-3.5 w-3.5" />
+						</button>
+					</span>
+					<a :href="deskListUrl" class="ml-auto inline-flex items-center gap-1 text-sm text-ink-gray-7 hover:text-ink-gray-9">
+						{{ __("Edit in Desk") }}<FeatherIcon name="external-link" class="h-3.5 w-3.5" />
+					</a>
+				</div>
+				<div
+					v-if="missingHint"
+					class="flex-shrink-0 border-b border-outline-gray-2 bg-amber-50 px-5 py-2 text-sm text-amber-800 dark:bg-amber-950 dark:text-amber-200"
+				>
+					{{ missingHint }}
+				</div>
 				<div class="flex flex-shrink-0 items-center justify-between border-b border-outline-gray-2 px-5 py-3">
 					<p class="text-sm text-ink-gray-6">
 						{{ filteredLeads.length === 1 ? __("1 lead") : __("{0} leads", [filteredLeads.length]) }}
@@ -39,7 +75,7 @@
 								standalone
 								v-model:sort-by="sortBy"
 								v-model:sort-order="sortOrder"
-								:options="modifiedSortOption"
+								:options="overviewActive ? createdSortOption : modifiedSortOption"
 							/>
 						</div>
 						<div class="flex min-w-0 items-center justify-center pr-3">
@@ -55,9 +91,13 @@
 						style="grid-column: 1 / -1"
 						class="border-b border-outline-gray-2 bg-amber-50 px-3 py-2 text-xs text-amber-800 dark:bg-amber-950 dark:text-amber-200"
 					>
-						{{ __("Showing the first {0} leads by follow-up date. Leads with later follow-ups are not listed.", [leads.length]) }}
+						{{
+							overviewActive
+								? __("Showing the newest {0} leads. Narrow the filters to see the rest.", [leads.length])
+								: __("Showing the first {0} leads by follow-up date. Leads with later follow-ups are not listed.", [leads.length])
+						}}
 					</div>
-					<LeadList v-if="filteredLeads.length" :leads="filteredLeads" @select="openLead" />
+					<LeadList v-if="filteredLeads.length" :leads="filteredLeads" :show-created="overviewActive" @select="openLead" />
 					<div
 						v-else
 						style="grid-column: 1 / -1"
@@ -81,7 +121,8 @@
 <script setup>
 import { computed, onMounted, ref, watch } from "vue"
 import { useRoute, useRouter } from "vue-router"
-import { call } from "frappe-ui"
+import { call, FeatherIcon } from "frappe-ui"
+import { hasLeadFilters, leadDeskListUrl, leadFilterChips, leadFiltersFromQuery, NOT_SET } from "@spa/utils/leadFilters.js"
 import { __ } from "@spa/utils/i18n.js"
 import LeadDetail from "@/components/LeadDetail.vue"
 import LeadList from "@/components/LeadList.vue"
@@ -102,6 +143,7 @@ const DEFAULT_HIDDEN_STATUSES = new Set(["Converted", "Do Not Contact"])
 
 const followUpSortOption = [{ label: __("Next Follow Up"), value: "custom_next_followup" }]
 const modifiedSortOption = [{ label: __("Last Updated"), value: "modified" }]
+const createdSortOption = [{ label: __("Created"), value: "creation" }]
 
 const route = useRoute()
 const router = useRouter()
@@ -118,6 +160,27 @@ const statuses = ref([])
 const truncated = ref(false)
 const selectedName = ref(null)
 
+// Filters from a figure of the lead overview, carried in the URL so the list can be shared and reloaded.
+const overviewFilters = computed(() => leadFiltersFromQuery(route.query))
+const overviewActive = computed(() => hasLeadFilters(overviewFilters.value))
+const filterChips = computed(() => leadFilterChips(overviewFilters.value))
+const deskListUrl = computed(() => leadDeskListUrl(overviewFilters.value))
+const missingHint = computed(() => {
+	if (overviewFilters.value.direction === NOT_SET) {
+		return __("These leads are not marked Inbound or Outbound yet. Open each one and choose, or set them in bulk via Edit in Desk.")
+	}
+	if (overviewFilters.value.source === NOT_SET) {
+		return __("These leads have no source. Add one so the overview can tell where leads come from.")
+	}
+	return ""
+})
+
+function removeFilter(keys) {
+	const query = { ...route.query }
+	for (const key of keys) delete query[key]
+	router.replace({ name: "LeadsFollowUps", query })
+}
+
 function stripHtml(value) {
 	return String(value || "")
 		.replace(/<[^>]*>/g, " ")
@@ -131,8 +194,9 @@ function leadMatchesSearch(lead, q) {
 }
 
 function compareLeads(a, b) {
-	if (sortBy.value === "modified") {
-		const cmp = String(a.modified || "").localeCompare(String(b.modified || ""))
+	if (sortBy.value === "modified" || sortBy.value === "creation") {
+		const field = sortBy.value
+		const cmp = String(a[field] || "").localeCompare(String(b[field] || ""))
 		return sortOrder.value === "desc" ? -cmp : cmp
 	}
 	// custom_next_followup: leads with no date always sort first, regardless of order,
@@ -154,7 +218,8 @@ const contextLeads = computed(() => {
 	if (selected.length) {
 		const allowed = new Set(selected)
 		list = list.filter((l) => allowed.has(l.status))
-	} else {
+	} else if (!overviewActive.value) {
+		// From the overview every status counts, Converted and Do Not Contact included.
 		list = list.filter((l) => !DEFAULT_HIDDEN_STATUSES.has(l.status))
 	}
 	if (q) {
@@ -200,7 +265,7 @@ watch(ownerOptions, (users) => {
 async function loadLeads() {
 	loading.value = true
 	try {
-		const data = await call(`${API}.get_leads`)
+		const data = await call(`${API}.get_leads`, overviewFilters.value)
 		leads.value = data.items || []
 		statuses.value = data.statuses || []
 		truncated.value = Boolean(data.truncated)
@@ -215,14 +280,29 @@ async function loadLeads() {
 function openLead(name) {
 	selectedName.value = name
 	if (route.params.name !== name) {
-		router.replace({ name: "LeadDetail", params: { name } })
+		router.replace({ name: "LeadDetail", params: { name }, query: route.query })
 	}
 }
 
 function closeLead() {
 	selectedName.value = null
-	router.replace({ name: "LeadsFollowUps" })
+	router.replace({ name: "LeadsFollowUps", query: route.query })
 }
+
+/** Newest first for an overview list, follow-up order for the daily one. */
+function applyDefaultSort() {
+	sortBy.value = overviewActive.value ? "creation" : "custom_next_followup"
+	sortOrder.value = overviewActive.value ? "desc" : "asc"
+}
+
+watch(
+	() => JSON.stringify(overviewFilters.value),
+	(now, before) => {
+		if (now === before) return
+		applyDefaultSort()
+		loadLeads()
+	}
+)
 
 /** Same rule as the server: overdue only once the due date has passed. */
 function isOverdue(date) {
@@ -263,6 +343,7 @@ watch(
 )
 
 onMounted(async () => {
+	applyDefaultSort()
 	await loadLeads()
 	if (route.params.name) {
 		openLead(route.params.name)

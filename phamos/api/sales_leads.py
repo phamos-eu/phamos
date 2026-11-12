@@ -280,23 +280,47 @@ def _serialize_lead_row(row, owner_names, owner_images, today_date):
 	return row
 
 
-@frappe.whitelist()
-def get_leads():
-	"""Return all non-disabled Leads, sorted for follow-up triage.
+def _overview_filters(created_from, created_to, direction, source, status):
+	"""Validated `get_list` filters for a figure of the lead overview; "none" means "not set"."""
+	from phamos.api.sales_lead_overview import NOT_SET, validate_direction
 
-	Leads with no `custom_next_followup` sort first (need triage), then leads
-	with a date, ascending (soonest/most overdue first) — MariaDB sorts NULL
-	first under `IS NULL ... DESC`.
+	filters = []
+	if created_from:
+		filters.append(["creation", ">=", f"{getdate(created_from)} 00:00:00"])
+	if created_to:
+		filters.append(["creation", "<=", f"{getdate(created_to)} 23:59:59.999999"])
+	direction = validate_direction(direction)
+	if direction:
+		filters.append(["custom_lead_direction", "is", "not set"] if direction == NOT_SET else ["custom_lead_direction", "=", direction])
+	if source:
+		filters.append(["source", "is", "not set"] if source == NOT_SET else ["source", "=", source])
+	if status:
+		if status not in LEAD_STATUSES:
+			frappe.throw(_("Unknown Lead status: {0}").format(status))
+		filters.append(["status", "=", status])
+	return filters
+
+
+@frappe.whitelist()
+def get_leads(created_from=None, created_to=None, direction=None, source=None, status=None):
+	"""Return Leads for the list, sorted for follow-up triage.
+
+	Without filters: every non-disabled Lead. Leads with no `custom_next_followup` sort first (need triage),
+	then dated ones, ascending — MariaDB sorts NULL first under `IS NULL ... DESC`.
+
+	With a filter from the lead overview (phamos/phamos#1758): exactly the leads its figure counted —
+	disabled ones included, since the overview counts every lead that came in — newest first.
 	"""
 	_check_lead_access()
+	overview_filters = _overview_filters(created_from, created_to, direction, source, status)
 
 	# get_list, not get_all: User Permissions (e.g. a Territory restriction)
 	# must narrow the list just as they narrow Desk's.
 	rows = frappe.get_list(
 		"Lead",
-		filters={"disabled": 0},
+		filters=overview_filters or {"disabled": 0},
 		fields=LEAD_LIST_FIELDS,
-		order_by="custom_next_followup is null desc, custom_next_followup asc",
+		order_by="creation desc" if overview_filters else "custom_next_followup is null desc, custom_next_followup asc",
 		limit_page_length=LEAD_LIST_LIMIT + 1,
 	)
 	truncated = len(rows) > LEAD_LIST_LIMIT
