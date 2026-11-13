@@ -1,7 +1,7 @@
 <script setup>
 import { ref, computed } from "vue";
 import FrappeDatetime from "./FrappeDatetime.vue";
-import { RATING_OPTIONS, VALUE_ADD_DEFAULT, VALUE_ADD_HELP, billablePreset } from "../timesheetRating.js";
+import { RATING_OPTIONS, VALUE_ADD_DEFAULT, VALUE_ADD_HELP, PERCENT_BILLABLE_DEFAULT, billablePreset } from "../timesheetRating.js";
 
 const props = defineProps({
   project: Object,
@@ -20,7 +20,7 @@ const loadingSessions = ref(false);
 const startGoal = ref("");
 const expectedHours = ref(1);
 const stopResult = ref("");
-const stopBillable = ref(100);
+const stopBillable = ref(PERCENT_BILLABLE_DEFAULT);
 const stopValueAdd = ref(VALUE_ADD_DEFAULT);
 const labels = {
   valueAdd: __("Value Add (%)"),

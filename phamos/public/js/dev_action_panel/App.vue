@@ -9,6 +9,7 @@ import BreakConfirm from "./components/BreakConfirm.vue";
 import CalendarView from "./components/CalendarView.vue";
 import TimesheetList from "./components/TimesheetList.vue";
 import ProjectsView from "./components/ProjectsView.vue";
+import ProjectCard from "./components/ProjectCard.vue";
 import { ratingArgs } from "./timesheetRating.js";
 
 const issues = ref([]);
@@ -39,7 +40,8 @@ const assigneeFilter = ref([]);
 const labelFilter = ref([]);
 const sortBy = ref("due_date");
 const sortDir = ref("asc");
-function clearAllFilters() { searchQuery.value = ""; dueFilter.value = "all"; assigneeFilter.value = []; labelFilter.value = []; sortBy.value = "due_date"; sortDir.value = "asc"; }
+const typeFilter = ref("all"); // 'all' | 'parent' | 'child' (#1862)
+function clearAllFilters() { searchQuery.value = ""; dueFilter.value = "all"; assigneeFilter.value = []; labelFilter.value = []; sortBy.value = "due_date"; sortDir.value = "asc"; typeFilter.value = "all"; selectedProject.value = null; }
 
 // Dynamic filter options derived from the loaded issues
 const assigneeOptions = computed(() => {
@@ -58,16 +60,22 @@ const labelOptions = computed(() => {
 // Derived
 const myIssuesCount = computed(() => issues.value.filter(i => i.is_mine).length);
 
+// Project filter (#1862): the ERPNext projects of the project list (last used first, then assigned
+// to me, then the rest), each with the number of issues in the current scope. Projects that only
+// appear through an issue are added at the end. The same filter applies to Issues and Projects.
 const projects = computed(() => {
   const base = mineOnly.value ? issues.value.filter(i => i.is_mine) : issues.value;
-  const map = {};
+  const counts = {};
+  const titles = {};
   base.forEach(i => {
-    if (i.gitlab_project) {
-      if (!map[i.gitlab_project]) map[i.gitlab_project] = { name: i.gitlab_project, title: i.gitlab_project_title || i.gitlab_project, count: 0 };
-      map[i.gitlab_project].count++;
-    }
+    if (!i.project) return;
+    counts[i.project] = (counts[i.project] || 0) + 1;
+    titles[i.project] = i.project_name || i.project;
   });
-  return Object.values(map).sort((a, b) => a.title.localeCompare(b.title));
+  const list = allProjects.value.map(p => ({ name: p.name, title: p.project_name || p.name, count: counts[p.name] || 0 }));
+  const listed = new Set(list.map(p => p.name));
+  Object.keys(counts).filter(n => !listed.has(n)).forEach(n => list.push({ name: n, title: titles[n], count: counts[n] }));
+  return list;
 });
 
 const filteredIssues = computed(() => {
@@ -77,10 +85,12 @@ const filteredIssues = computed(() => {
   const activeIssue = issues.value.find(i => i.name === activeIssueName);
   let list = issues.value.filter(i => i.name !== activeIssueName);
 
-  if (mineOnly.value) list = list.filter(i => i.is_mine);
-  if (selectedProject.value) list = list.filter(i => i.gitlab_project === selectedProject.value);
-
   const q = searchQuery.value.trim().toLowerCase();
+  // A search looks through all issues, not only mine, so a PM finds any ticket by number or
+  // title and can book time on it without being assigned (#1862).
+  if (mineOnly.value && !q) list = list.filter(i => i.is_mine);
+  if (selectedProject.value) list = list.filter(i => i.project === selectedProject.value);
+
   if (q) list = list.filter(i =>
     i.title?.toLowerCase().includes(q) ||
     String(i.issue_id).includes(q) ||
@@ -88,6 +98,11 @@ const filteredIssues = computed(() => {
     i.assignee?.toLowerCase().includes(q) ||
     i.labels?.toLowerCase().includes(q)
   );
+
+  // Parent = has child issues; child = has a parent issue (#1862). Lets a PM find the customer's
+  // parent ticket or the developer's child ticket without being assigned to it.
+  if (typeFilter.value === "parent") list = list.filter(i => i.child_count > 0);
+  if (typeFilter.value === "child") list = list.filter(i => !!i.parent_issue);
 
   if (assigneeFilter.value.length) list = list.filter(i => assigneeFilter.value.includes(i.assignee));
   if (labelFilter.value.length) list = list.filter(i =>
@@ -142,6 +157,21 @@ const filteredIssues = computed(() => {
   if (activeIssue) list = [activeIssue, ...list];
   return list;
 });
+
+// A running or paused project timer is shown on top of the Issues view too, so the open timesheet
+// is the first thing you see when you open the panel (#1862).
+const activeProjectRow = computed(() => {
+  const s = activeProjectSession.value;
+  if (!s) return null;
+  return allProjects.value.find(p => p.name === s.project)
+    || { name: s.project, project_name: s.project, percent_billable: s.project_percent_billable, assignees: [] };
+});
+
+// Click on the running card in the sidebar: go to the open timesheet.
+function openRunningSession() {
+  if (activeProjectSession.value) currentView.value = "projects";
+  else if (activeSession.value) currentView.value = "issues";
+}
 
 // Timer
 let timerInterval = null;
@@ -451,6 +481,7 @@ onUnmounted(() => { stopTick(); stopProjectTick(); });
   <BreakModal
     v-if="showBreakModal && breakFrom"
     :break-from="breakFrom"
+    :projects="allProjects"
     @confirm="onBreakSubmit"
     @skip="onBreakSkip"
     @close="onBreakModalClose"
@@ -489,6 +520,7 @@ onUnmounted(() => { stopTick(); stopProjectTick(); });
           @toggle-mine="mineOnly = $event"
           @sync="onSync"
           @navigate-projects="currentView = 'projects'"
+          @open-session="openRunningSession"
         />
       </aside>
 
@@ -501,12 +533,28 @@ onUnmounted(() => { stopTick(); stopProjectTick(); });
             v-model:labelFilter="labelFilter"
             v-model:sortBy="sortBy"
             v-model:sortDir="sortDir"
+            v-model:mineOnly="mineOnly"
+            v-model:projectFilter="selectedProject"
+            v-model:typeFilter="typeFilter"
             :assignee-options="assigneeOptions"
             :label-options="labelOptions"
+            :project-options="projects"
             :result-count="filteredIssues.length"
             :total-count="issues.length"
             @clear-all="clearAllFilters"
           />
+          <div v-if="activeProjectRow" class="dc-running-project">
+            <ProjectCard
+              :project="activeProjectRow"
+              :active-project-session="activeProjectSession"
+              :project-elapsed-seconds="projectElapsedSeconds"
+              :active-issue-session="activeSession"
+              @pause="onPauseProjectTimer"
+              @resume="onResumeProjectTimer"
+              @stop="onStopProjectTimer"
+              @assign="assignProject"
+            />
+          </div>
           <div v-if="loading" class="dc-loading">
             <div class="dc-loading__spinner"></div>
             <span>Loading your issues…</span>
@@ -532,6 +580,8 @@ onUnmounted(() => { stopTick(); stopProjectTick(); });
         <ProjectsView
           v-else-if="currentView === 'projects'"
           :all-projects="allProjects"
+          :project-options="projects"
+          v-model:selected-project="selectedProject"
           :active-project-session="activeProjectSession"
           :project-elapsed-seconds="projectElapsedSeconds"
           :loading="projectsLoading"
@@ -598,6 +648,7 @@ onUnmounted(() => { stopTick(); stopProjectTick(); });
 
 /* Body */
 .dc-body { flex: 1; min-width: 0; overflow-y: auto; }
+.dc-running-project { padding: 4px 16px 0; }
 
 .dc-loading {
   display: flex; flex-direction: column; align-items: center; justify-content: center;

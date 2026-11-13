@@ -1,9 +1,11 @@
 <script setup>
 import { ref, computed, onMounted, onUnmounted } from "vue";
-import { RATING_OPTIONS, VALUE_ADD_DEFAULT, VALUE_ADD_HELP, billablePreset } from "../timesheetRating.js";
+import { RATING_OPTIONS, VALUE_ADD_DEFAULT, VALUE_ADD_HELP, PERCENT_BILLABLE_DEFAULT, billablePreset } from "../timesheetRating.js";
 
 const props = defineProps({
   breakFrom: String,  // system-tz "YYYY-MM-DD HH:mm:ss"
+  // The panel's project list (get_dev_all_projects): last used first, then assigned to me, then the rest.
+  projects: { type: Array, default: () => [] },
 });
 const emit = defineEmits(["confirm", "skip", "close"]);
 
@@ -13,7 +15,7 @@ const projectResults = ref([]);
 const showDropdown = ref(false);
 const goal = ref("");
 const result = ref("");
-const percentBillable = ref(100);
+const percentBillable = ref(PERCENT_BILLABLE_DEFAULT);
 const valueAdd = ref(VALUE_ADD_DEFAULT);
 const labels = {
   valueAdd: __("Value Add (%)"),
@@ -39,14 +41,15 @@ onMounted(async () => {
 
 onUnmounted(() => { clearInterval(liveInterval); clearTimeout(searchTimer); });
 
+// Same order as the Projects view and the Project Action Panel: last used first (#1862).
 async function fetchProjects(term) {
-  const filters = [["status", "=", "Open"]];
-  if (term) filters.push(["project_name", "like", `%${term}%`]);
-  const r = await frappe.call({
-    method: "frappe.client.get_list",
-    args: { doctype: "Project", filters, fields: ["name", "project_name"], limit: 50, order_by: "project_name asc" },
-  });
-  projectResults.value = r.message || [];
+  const q = (term || "").trim().toLowerCase();
+  const list = props.projects.length
+    ? props.projects
+    : (await frappe.call({ method: "phamos.phamos.page.dev_action_panel.dev_action_panel.get_dev_all_projects" })).message || [];
+  projectResults.value = list
+    .filter((p) => !q || `${p.project_name || ""} ${p.name}`.toLowerCase().includes(q))
+    .slice(0, 50);
 }
 
 function onSearchInput() {
@@ -74,7 +77,7 @@ async function selectProject(p) {
     args: { project: p.name },
   });
   if (project.value !== p.name) return; // another project was picked meanwhile
-  // Preset Percent Billable from the picked project, 100 when it has none (#1744).
+  // Preset Percent Billable from the picked project, 0 when it has none (#1744, #1862).
   percentBillable.value = billablePreset(r.message);
 }
 
