@@ -1,7 +1,7 @@
 import frappe
 from frappe import _
 from frappe.utils import cint, cstr, now_datetime, add_to_date, time_diff_in_seconds, get_datetime
-from phamos.phamos.timesheet_utils import billable_seconds_sql, billable_seconds_term, billing_context, normalize_percent_billable
+from phamos.phamos.timesheet_utils import billable_seconds_sql, billable_seconds_term, billing_context, normalize_percent_billable, percent_billable_preset
 from phamos.phamos.doctype.timesheet_record.timesheet_record import compute_time_limit_status
 from frappe.query_builder import Order
 from frappe.query_builder.functions import Coalesce, Sum, Count, Max
@@ -83,7 +83,39 @@ def get_my_issues():
         if extra:
             issues = extra + issues
 
+    # Children per issue (any state), for the "Parent / Child" filter (#1862, #1895).
+    child_count = {}
+    if issues:
+        for row in frappe.get_all(
+            "GitLab Issue",
+            filters={"parent_issue": ["in", [i["name"] for i in issues]]},
+            fields=["parent_issue", "count(name) as cnt"],
+            group_by="parent_issue",
+        ):
+            child_count[row["parent_issue"]] = row["cnt"]
+
+    # ERPNext project of each issue (GitLab Issue → GitLab Project → frappe_project), so the panel
+    # can filter issues by the same projects as the project list (#1862).
+    gitlab_projects = {i["gitlab_project"] for i in issues if i.get("gitlab_project")}
+    erp_project = {}
+    if gitlab_projects:
+        for row in frappe.get_all(
+            "GitLab Project",
+            filters={"name": ["in", list(gitlab_projects)], "frappe_project": ["is", "set"]},
+            fields=["name", "frappe_project"],
+        ):
+            erp_project[row["name"]] = row["frappe_project"]
+    project_names = {}
+    if erp_project:
+        for row in frappe.get_all(
+            "Project", filters={"name": ["in", list(set(erp_project.values()))]}, fields=["name", "project_name"]
+        ):
+            project_names[row["name"]] = row["project_name"]
+
     for issue in issues:
+        issue["child_count"] = child_count.get(issue["name"], 0)
+        issue["project"] = erp_project.get(issue.get("gitlab_project"))
+        issue["project_name"] = project_names.get(issue["project"]) or issue["project"]
         ts_data = count_map.get(issue["name"], {"cnt": 0, "total_seconds": 0})
         issue["timesheet_count"] = ts_data["cnt"]
         issue["total_tracked_seconds"] = ts_data["total_seconds"]
@@ -126,6 +158,8 @@ def get_my_issues():
             issue["active_timesheet"] = None
             issue["session_state"] = None
 
+    # The issue with my running or paused timer always comes first (#1862).
+    issues.sort(key=lambda i: 0 if i["name"] == active_issue else 1)
     return issues
 
 
@@ -419,7 +453,7 @@ def resume_timer(name):
 
 
 @frappe.whitelist()
-def stop_timer(name, result, percent_billable=100, activity_type=None, manual_end_time=None, value_add=100):
+def stop_timer(name, result, percent_billable=None, activity_type=None, manual_end_time=None, value_add=100):
     doc = frappe.get_doc("Timesheet Record", name)
     end_time = get_datetime(manual_end_time) if manual_end_time else now_datetime()
 
@@ -442,6 +476,9 @@ def stop_timer(name, result, percent_billable=100, activity_type=None, manual_en
         doc.actual_time = first_row.duration or 0
 
     doc.result = result
+    if percent_billable in (None, ""):
+        # Not sent: the project's preset, 0 when it has none (#1862), never a hard-coded 100.
+        percent_billable = billing_context(doc.project)["percent_billable"]
     doc.percent_billable = normalize_percent_billable(percent_billable)
     doc.value_add = cstr(value_add)
     if activity_type:
@@ -501,7 +538,7 @@ def get_gitlab_labels():
 
 
 @frappe.whitelist()
-def create_break_timesheet(from_time, to_time=None, project=None, goal=None, result=None, percent_billable=100, activity_type=None, value_add=100):
+def create_break_timesheet(from_time, to_time=None, project=None, goal=None, result=None, percent_billable=None, activity_type=None, value_add=100):
     user = frappe.session.user
     employee = frappe.db.get_value("Employee", {"user_id": user}, ["name", "activity_type"], as_dict=True)
     if not employee:
@@ -523,6 +560,8 @@ def create_break_timesheet(from_time, to_time=None, project=None, goal=None, res
     ts.to_time = to_dt
     ts.actual_time = duration
     ts.expected_time = duration
+    if percent_billable in (None, ""):
+        percent_billable = billing_context(project)["percent_billable"]  # project preset, 0 when none (#1862)
     ts.percent_billable = normalize_percent_billable(percent_billable)
     ts.value_add = cstr(value_add)
     ts.append("item", {"from_time": from_dt, "to_time": to_dt, "duration": duration})
@@ -709,8 +748,8 @@ def _enrich_projects(projects, user):
         p["billable_seconds"] = ts["billable_seconds"]
         p["non_billable_seconds"] = max(0, ts["total_seconds"] - ts["billable_seconds"])
         p["last_used"] = ts.get("last_used")
-        # Preset for Percent Billable in the stop panel: the project's value, 100 when it has none (#1744).
-        p["percent_billable"] = p.get("percent_billable") or "100"
+        # Preset for Percent Billable in the stop panel: the project's value, 0 when it has none (#1744, #1862).
+        p["percent_billable"] = percent_billable_preset(p.get("percent_billable"))
 
     return projects
 

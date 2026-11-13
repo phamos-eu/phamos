@@ -17,14 +17,25 @@ def normalize_percent_billable(value):
     return cstr(value).strip()
 
 
+# Preset when the Project has no Percent Billable of its own (#1895, #1862): nothing is billed
+# unless the project says so. The Project's own value always wins.
+DEFAULT_PERCENT_BILLABLE = "0"
+
+
+def percent_billable_preset(project_value):
+    """The Project's Percent Billable as a preset; DEFAULT_PERCENT_BILLABLE when it has none."""
+    value = cstr(project_value).strip()
+    return value if value else DEFAULT_PERCENT_BILLABLE
+
+
 def billing_context(project):
-    """Preset for Percent Billable: the Project's own value, 100 when it has none.
+    """Preset for Percent Billable: the Project's own value, DEFAULT_PERCENT_BILLABLE when it has none.
 
     Percent Billable is set on every project, internal ones included, because external people
     may bill there too (#1031, revised decision 2).
     """
     preset = frappe.db.get_value("Project", project, "percent_billable") if project else None
-    return {"percent_billable": preset or "100"}
+    return {"percent_billable": percent_billable_preset(preset)}
 
 
 @frappe.whitelist()

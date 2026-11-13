@@ -442,7 +442,8 @@ class TestValueAddAndBillingRules(FrappeTestCase):
 		self.assertEqual(get_billing_context(self.billable), {"percent_billable": "75"})
 		self.assertEqual(get_billing_context(self.internal), {"percent_billable": "75"})
 		no_preset = self._project("VA No Preset", percent_billable="")
-		self.assertEqual(get_billing_context(no_preset), {"percent_billable": "100"})
+		frappe.db.set_value("Project", no_preset, "percent_billable", "")  # no value at all, not even the field default
+		self.assertEqual(get_billing_context(no_preset), {"percent_billable": "0"})  # #1862: 0, not 100
 
 	def test_billing_context_needs_read_access_to_the_project(self):
 		from phamos.phamos.timesheet_utils import get_billing_context

@@ -28,6 +28,7 @@ from phamos.phamos.doctype.timesheet_record.timesheet_record import (
 	submit_at_available_hours,
 )
 from phamos.phamos.page.dev_action_panel import dev_action_panel as dap
+from phamos.phamos.timesheet_utils import billing_context, percent_billable_preset
 
 DOCTYPE = "Timesheet Record"
 MIN_EXPECTED_SECONDS = 15 * 60
@@ -120,7 +121,7 @@ def _session():
 		"open_row_from": next((row.from_time for row in reversed(rows) if not row.to_time), None),
 		"project": doc.project,
 		"project_name": project.get("project_name") or doc.project,
-		"project_percent_billable": project.get("percent_billable") or "100",
+		"project_percent_billable": percent_billable_preset(project.get("percent_billable")),
 		"customer": doc.customer,
 		"task": doc.task,
 		"task_subject": frappe.db.get_value("Task", doc.task, "subject") if doc.task else None,
@@ -250,7 +251,7 @@ def get_timer_project_info(project):
 		)
 	return {
 		"project": project,
-		"percent_billable": frappe.db.get_value("Project", project, "percent_billable") or "100",
+		"percent_billable": percent_billable_preset(frappe.db.get_value("Project", project, "percent_billable")),
 		"task_rule": rule,
 		"tasks": tasks,
 	}
@@ -329,8 +330,11 @@ def resume_timer(name, track_break=0, break_project=None, break_goal=None, break
 	return get_timer_state()
 
 
-def stop_timer(name, result, percent_billable=100, activity_type=None, manual_end_time=None, value_add=100):
+def stop_timer(name, result, percent_billable=None, activity_type=None, manual_end_time=None, value_add=100):
 	doc = _own_record(name)
+	if percent_billable in (None, ""):
+		# Not sent: the project's preset, 0 when it has none (#1862), never a hard-coded 100.
+		percent_billable = billing_context(doc.project)["percent_billable"]
 	result = (result or "").strip()
 	if not result:
 		frappe.throw(_("Please describe what you accomplished."))
