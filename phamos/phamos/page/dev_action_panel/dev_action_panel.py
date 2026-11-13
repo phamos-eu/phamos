@@ -342,6 +342,8 @@ def start_issue_timer(gitlab_issue_name, expected_time, goal=None, manual_start_
     ts.from_time = start_time
     ts.gitlab_issue = gitlab_issue_name
     ts.gitlab_parent_issue = issue.parent_issue if issue.parent_issue else gitlab_issue_name
+    # The draft carries the project's preset from the start, 0 when the project has none (#1862).
+    ts.percent_billable = billing_context(frappe_project)["percent_billable"]
 
     # First time-log row (open — no to_time, session is running)
     ts.append("item", {"from_time": start_time})
@@ -857,6 +859,8 @@ def start_project_timer(project_name, expected_time, goal, manual_start_time=Non
     ts.activity_type = employee.activity_type
     ts.goal = goal
     ts.expected_time = int(float(expected_time))
+    # The draft carries the project's preset from the start, 0 when the project has none (#1862).
+    ts.percent_billable = billing_context(project_name)["percent_billable"]
     ts.from_time = start_time
     ts.append("item", {"from_time": start_time})
     ts.insert(ignore_permissions=True)

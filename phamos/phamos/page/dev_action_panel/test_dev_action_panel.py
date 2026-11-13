@@ -319,6 +319,21 @@ class TestDevActionPanelStopPreset(FrappeTestCase):
 		frappe.db.set_value("Project", name, "percent_billable", percent_billable)
 		return name
 
+	def test_a_new_timesheet_record_defaults_to_zero_percent_billable(self):
+		# #1862: the Timesheet Record field default is 0, not a hard-coded 100.
+		self.assertEqual(frappe.new_doc("Timesheet Record").percent_billable, "0")
+
+	def test_project_timer_draft_carries_the_project_preset(self):
+		frappe.set_user(USER)
+		empty = dap.start_project_timer(self._project(""), 3600, "No preset")
+		frappe.set_user("Administrator")
+		self.assertEqual(frappe.db.get_value("Timesheet Record", empty["name"], "percent_billable"), "0")
+		frappe.db.delete("Timesheet Record", empty["name"])  # one draft per employee
+		frappe.set_user(USER)
+		half = dap.start_project_timer(self._project("50"), 3600, "Half")
+		frappe.set_user("Administrator")
+		self.assertEqual(frappe.db.get_value("Timesheet Record", half["name"], "percent_billable"), "50")
+
 	def test_break_without_percent_billable_uses_the_project_preset(self):
 		activity = "DAP Preset Activity"
 		if not frappe.db.exists("Activity Type", activity):
