@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest"
-import { billablePreset, RATING_OPTIONS, ratingArgs, VALUE_ADD_DEFAULT } from "./timesheetRating.js"
+import { billablePreset, PERCENT_BILLABLE_DEFAULT, RATING_OPTIONS, ratingArgs, VALUE_ADD_DEFAULT } from "./timesheetRating.js"
 
 // Value Add next to Percent Billable in the Dev and Sales Action Panels (#1744, parent #1031).
 describe("timesheetRating", () => {
@@ -8,12 +8,14 @@ describe("timesheetRating", () => {
 		expect(VALUE_ADD_DEFAULT).toBe(100)
 	})
 
-	it("presets Percent Billable from the project, 100 when the project has none", () => {
+	it("presets Percent Billable from the project, 0 when the project has none (#1862)", () => {
 		expect(billablePreset({ percent_billable: "50" })).toBe(50)
+		expect(billablePreset({ percent_billable: "100" })).toBe(100)
 		expect(billablePreset({ percent_billable: "0" })).toBe(0)
-		expect(billablePreset({ percent_billable: "" })).toBe(100)
+		expect(billablePreset({ percent_billable: "" })).toBe(0)
 		expect(billablePreset({ project_percent_billable: "75" })).toBe(75)
-		expect(billablePreset(null)).toBe(100)
+		expect(billablePreset(null)).toBe(0)
+		expect(PERCENT_BILLABLE_DEFAULT).toBe(0)
 	})
 
 	it("sends Value Add and Percent Billable", () => {
