@@ -54,6 +54,7 @@
 						:checklist="details[row.name]"
 						compact
 						@updated="(payload) => onChecklistUpdated(row.name, payload)"
+						@moved="onItemMoved"
 					/>
 				</div>
 			</div>
@@ -192,6 +193,14 @@ async function onChecklistUpdated(name, payload) {
 		expanded[name] = true
 		if (!details[name]) await loadDetail(name)
 	}
+}
+
+// An item moved to another checklist of this record (#1920): show the target with it.
+async function onItemMoved({ target }) {
+	if (!target?.name) return
+	details[target.name] = target
+	await onChecklistUpdated(target.name, target)
+	expanded[target.name] = true
 }
 
 async function onChecklistCreated(created) {

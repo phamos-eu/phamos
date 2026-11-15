@@ -236,6 +236,19 @@
 							/>
 						</div>
 					</div>
+					<!-- Move to another checklist of the same record (#1920) -->
+					<div v-if="siblingOptions.length" class="flex justify-end border-t border-gray-100 pt-2 dark:border-gray-800">
+						<Dropdown :options="siblingOptions.map((o) => ({ ...o, onClick: () => moveToChecklist(item, o.name) }))" placement="right">
+							<Button
+								variant="ghost"
+								size="sm"
+								icon-left="corner-up-right"
+								:label="__('Move to checklist…')"
+								:loading="movingItem === item.name"
+								:disabled="savingItem === item.name"
+							/>
+						</Dropdown>
+					</div>
 				</div>
 			</div>
 		</div>
@@ -256,8 +269,8 @@
 </template>
 
 <script setup>
-import { computed, nextTick, onBeforeUnmount, onMounted, ref } from "vue"
-import { call, FormControl, toast } from "frappe-ui"
+import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from "vue"
+import { Button, call, Dropdown, FormControl, toast } from "frappe-ui"
 import FrappeLink from "@spa/components/FrappeLink.vue"
 import UserAvatar from "@spa/components/UserAvatar.vue"
 import RichTextField from "@spa/components/RichTextField.vue"
@@ -278,7 +291,7 @@ const props = defineProps({
 	compact: { type: Boolean, default: false },
 })
 
-const emit = defineEmits(["updated"])
+const emit = defineEmits(["updated", "moved"])
 
 const deskUrl = computed(
 	() => props.checklist.desk_url || (props.checklist.name ? `/app/checklist/${props.checklist.name}` : "")
@@ -556,6 +569,52 @@ async function moveItem(name, toIndex) {
 		savingItem.value = null
 	}
 }
+
+// Moving an item to another checklist of the same record (#1920). The other checklists are
+// loaded once an item opens; the parent reloads both checklists after the move ("moved").
+const siblings = ref([])
+const movingItem = ref(null)
+const siblingOptions = computed(() =>
+	siblings.value
+		.filter((c) => c.name !== props.checklist.name)
+		.map((c) => ({ name: c.name, label: c.title || c.name }))
+)
+
+async function loadSiblings() {
+	const { document, reference_record: record } = props.checklist
+	if (!document || !record) return (siblings.value = [])
+	try {
+		siblings.value = await call(`${API}.get_checklists_for_reference`, { document, reference_record: record })
+	} catch (e) {
+		siblings.value = []
+	}
+}
+
+async function moveToChecklist(item, target) {
+	movingItem.value = item.name
+	try {
+		// what was typed in the item goes with it
+		await autosave.flush()
+		const result = await call(`${API}.move_spa_checklist_item_to`, {
+			checklist_name: props.checklist.name,
+			item_name: item.name,
+			target_checklist: target,
+		})
+		expandedItem.value = null
+		emit("updated", result.source)
+		emit("moved", result)
+		toast({ title: __("Moved to {0}", [result.target.title || result.target.name]), icon: "check-circle", iconClasses: "text-ink-green-4" })
+	} catch (e) {
+		toast({ title: e?.messages?.[0] || e?.message || __("Could not move the item"), icon: "x-circle", iconClasses: "text-ink-red-4" })
+	} finally {
+		movingItem.value = null
+	}
+}
+
+// fresh on every opened item: checklists of the record may have been added or renamed since
+watch(expandedItem, (name) => {
+	if (name) loadSiblings()
+})
 
 // A click on an open item's free area closes it (#1921); its fields, editor, buttons and links
 // keep their clicks. Only up to the card: the item around it is itself role="button".
