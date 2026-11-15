@@ -50,7 +50,10 @@ let frame = 0
 
 function measure() {
 	frame = 0
-	if (box.value) overflow.value = scrollOverflow(box.value)
+	if (!box.value) return
+	// only a real change re-renders: this runs on every scroll and observer tick
+	const next = scrollOverflow(box.value)
+	if (next.above !== overflow.value.above || next.below !== overflow.value.below) overflow.value = next
 }
 
 // Content that loads or grows later (checklists, a teleported panel body) changes the height
@@ -76,7 +79,7 @@ function scrollMore() {
 }
 
 onMounted(() => {
-	box.value.addEventListener("scroll", measure, { passive: true })
+	box.value.addEventListener("scroll", measureSoon, { passive: true })
 	// The box's size, and its content's: content can grow without a DOM change (an image that
 	// finishes loading, an editor growing). New children are observed as they come.
 	resizeObserver = new ResizeObserver(measureSoon)
@@ -92,7 +95,7 @@ onMounted(() => {
 
 onBeforeUnmount(() => {
 	cancelAnimationFrame(frame)
-	box.value?.removeEventListener("scroll", measure)
+	box.value?.removeEventListener("scroll", measureSoon)
 	resizeObserver?.disconnect()
 	mutationObserver?.disconnect()
 })

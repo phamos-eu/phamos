@@ -80,7 +80,7 @@ export const checklists = definePanel({
 	id: "checklists",
 	title: "Checklists",
 	icon: "check-square",
-	doctypes: ["Issue"],
+	doctypes: ["Issue", "Lead"],
 	component: markRaw(LinkedChecklistsSection),
 	props: ({ doctype, record }) => ({
 		document: doctype,
