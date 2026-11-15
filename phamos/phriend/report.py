@@ -4,6 +4,7 @@
 """The Phriend report of an Issue, as the cockpit Issue page shows it (#1901)."""
 
 import json
+import re
 from urllib.parse import quote, urlparse
 
 import frappe
@@ -55,7 +56,7 @@ def _context(raw):
 		"lang": _text(ctx.get("lang")),
 		"viewport": _text(ctx.get("viewport")),
 		# reports from before the GDPR review of !1162 carry the full user agent instead
-		"browser": _text(ctx.get("browser") or ctx.get("user_agent")),
+		"browser": _text(ctx.get("browser")) or _browser_name(cstr(ctx.get("user_agent"))),
 		"versions": {_text(k): _text(v) for k, v in versions.items()} if isinstance(versions, dict) else {},
 		"recent_errors": _entries(ctx.get("recent_errors")),
 		"failed_requests": _entries(ctx.get("failed_requests")),
@@ -72,6 +73,19 @@ def _entries(items):
 		elif item:
 			entries.append({"message": _text(item)})
 	return entries
+
+
+def _browser_name(ua):
+	"""'Chrome 156, macOS' from a user agent, as the browser sends it today (util.js browser_name)."""
+	if not ua:
+		return ""
+	match = re.search(r"(Edg|OPR|Firefox|Chrome|Version)/(\d+)", ua) or re.search(r"(Safari)/(\d+)", ua)
+	names = {"Edg": "Edge", "OPR": "Opera", "Version": "Safari"}
+	systems = (("Mac OS X", "macOS"), ("Windows", "Windows"), ("Android", "Android"), ("iPhone", "iOS"),
+		("iPad", "iOS"), ("Linux", "Linux"))
+	system = next((name for marker, name in systems if marker in ua), "")
+	browser = f"{names.get(match.group(1), match.group(1))} {match.group(2)}" if match else ""
+	return ", ".join(part for part in (browser, system) if part)
 
 
 def _text(value):

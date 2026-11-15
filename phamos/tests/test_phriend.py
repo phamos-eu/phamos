@@ -440,8 +440,11 @@ class TestPhriendIssuePage(FrappeTestCase):
 	def test_old_reports_and_broken_context_still_show(self, _enqueue):
 		from phamos.phriend.report import issue_report
 
-		old = self.report(context=json.dumps({"user_agent": "Mozilla/5.0 Chrome"}))
-		self.assertEqual(issue_report(old)["details"]["browser"], "Mozilla/5.0 Chrome")
+		ua = ("Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) "
+			"Chrome/156.0.0.0 Safari/537.36")
+		old = self.report(context=json.dumps({"user_agent": ua}))
+		# the cockpit gets browser and system only, as newer reports store it
+		self.assertEqual(issue_report(old)["details"]["browser"], "Chrome 156, macOS")
 		frappe.db.set_value("Issue", old.name, "phriend_context", "not json")
 		old.reload()
 		self.assertEqual(issue_report(old)["details"]["recent_errors"], [])
