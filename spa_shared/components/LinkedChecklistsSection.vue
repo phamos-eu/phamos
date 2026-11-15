@@ -1,6 +1,6 @@
 <template>
-	<section v-if="!unavailable" class="mb-5">
-		<div class="mb-2 text-[11px] font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400">
+	<section v-if="!unavailable" :class="embedded ? '' : 'mb-5'">
+		<div v-if="!embedded" class="mb-2 text-[11px] font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400">
 			Checklists
 		</div>
 
@@ -75,17 +75,24 @@
 </template>
 
 <script setup>
-import { onMounted, reactive, ref, watch } from "vue"
+import { computed, onMounted, reactive, ref, watch } from "vue"
 import { Badge, call } from "frappe-ui"
 import ChecklistEditor from "@spa/components/ChecklistEditor.vue"
 import CreateChecklistDialog from "@spa/components/CreateChecklistDialog.vue"
+import { __ } from "@spa/utils/i18n.js"
 
 const props = defineProps({
 	document: { type: String, required: true },
 	referenceRecord: { type: String, required: true },
 	referenceTitle: { type: String, default: "" },
 	allowCreate: { type: Boolean, default: true },
+	// shown as a dock panel body (spa_shared/panels): no heading, and it reports its state
+	embedded: { type: Boolean, default: false },
 })
+
+// For the dock row (#1910): a one-line summary, and `hidden` when the user may not read
+// checklists, so the dock drops the panel instead of showing an empty one.
+const emit = defineEmits(["state"])
 
 const API = "phamos.api.checklist_inbox"
 
@@ -194,6 +201,22 @@ async function onChecklistCreated(created) {
 		details[created.name] = created
 	}
 }
+
+const summaryText = computed(() => {
+	if (loading.value && !summaries.value.length) return ""
+	if (!summaries.value.length) return __("None yet")
+	const open = summaries.value.filter((r) => r.status !== "Completed").length
+	const done = summaries.value.reduce((n, r) => n + (r.done_count || 0), 0)
+	const total = summaries.value.reduce((n, r) => n + (r.total_count || 0), 0)
+	const items = __("{0}/{1} done", [done, total])
+	return open ? `${__("{0} open", [open])} · ${items}` : items
+})
+
+watch(
+	[summaryText, unavailable],
+	([summary, hidden]) => emit("state", { summary, hidden }),
+	{ immediate: true }
+)
 
 watch(
 	() => props.referenceRecord,

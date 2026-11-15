@@ -69,10 +69,6 @@
 	<Teleport v-if="propertiesHostReady" to="#issue-properties-host">
 		<div class="flex h-full min-h-0 flex-col bg-surface-white text-ink-gray-9">
 			<div class="flex min-h-0 flex-1 flex-col gap-5 overflow-y-auto p-4">
-				<template v-if="issue.phriend">
-					<IssuePhriendReport :report="issue.phriend" />
-					<hr class="border-outline-gray-2" />
-				</template>
 				<section>
 					<div class="mb-2 text-[11px] font-semibold uppercase tracking-wide text-ink-gray-6">
 						Status
@@ -275,7 +271,6 @@ import AssigneePicker from "@spa/components/AssigneePicker.vue"
 import DocSyncBanner from "@spa/components/DocSyncBanner.vue"
 import DocViewers from "@spa/components/DocViewers.vue"
 import IssueChatButton from "@spa/components/IssueChatButton.vue"
-import IssuePhriendReport from "@spa/components/IssuePhriendReport.vue"
 import RichTextField from "@spa/components/RichTextField.vue"
 import { useAutosaveDoc } from "@spa/composables/useAutosaveDoc.js"
 import { useDocRealtime } from "@spa/composables/useDocRealtime.js"
