@@ -32,6 +32,7 @@
 			@pointermove="drag"
 			@pointerup="endDrag"
 			@pointercancel="endDrag"
+			@lostpointercapture="endDrag"
 			@dblclick="resetWidth"
 			@keydown.left.prevent="nudge(16)"
 			@keydown.right.prevent="nudge(-16)"
@@ -144,6 +145,9 @@ function startDrag(event) {
 
 function drag(event) {
 	if (!dragStart) return
+	// Only while the button is down: if the release got lost (the capture was dropped, e.g. over
+	// the Raven frame), a later plain mouse move must not keep resizing.
+	if ((event.buttons & 1) !== 1) return endDrag()
 	// the dock sits right of the record: dragging its left edge leftwards widens it
 	const room = event.currentTarget.parentElement.parentElement.clientWidth - REM * 20
 	const max = Math.max(minWidth.value, Math.min(MAX_DOCK_WIDTH, room))
