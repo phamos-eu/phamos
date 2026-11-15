@@ -1,4 +1,4 @@
-import { isInteractiveTarget } from "./interactiveTarget.js"
+import { closesOnClick, isInteractiveTarget } from "./interactiveTarget.js"
 
 // Stand-ins for DOM elements: matches() by tag name, a parent chain.
 function el(tag, parent = null) {
@@ -21,5 +21,19 @@ describe("isInteractiveTarget", () => {
 		expect(isInteractiveTarget(el("p", body), body)).toBe(false)
 		// the card around is role=button, but it is outside the boundary
 		expect(isInteractiveTarget(body, body, "div[role=button]")).toBe(false)
+	})
+})
+
+describe("closesOnClick", () => {
+	const free = { pressedOnFreeArea: true, releasedOnField: false, clickedOnFreeArea: true, selectedText: "" }
+	it("closes for a press and click on the free area", () => {
+		expect(closesOnClick(free)).toBe(true)
+	})
+	it("stays open when the press started in a field (a text selection dragged out)", () => {
+		expect(closesOnClick({ ...free, pressedOnFreeArea: false })).toBe(false)
+	})
+	it("stays open when released on a field, or with text selected", () => {
+		expect(closesOnClick({ ...free, releasedOnField: true })).toBe(false)
+		expect(closesOnClick({ ...free, selectedText: "abc" })).toBe(false)
 	})
 })

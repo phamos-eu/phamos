@@ -16,3 +16,12 @@ export function isInteractiveTarget(target, boundary, selector = INTERACTIVE_SEL
 	}
 	return false
 }
+
+/**
+ * Whether a click on an open card closes it (#1921): only when the press started on its free
+ * area, it was not released on a field, it landed on the free area, and no text is selected (a
+ * selection dragged out of a field ends in a click on the card, too).
+ */
+export function closesOnClick({ pressedOnFreeArea, releasedOnField, clickedOnFreeArea, selectedText }) {
+	return Boolean(pressedOnFreeArea && !releasedOnField && clickedOnFreeArea && !selectedText)
+}

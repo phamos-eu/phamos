@@ -97,6 +97,7 @@
 					v-else
 					class="space-y-3 px-3 py-3"
 					@pointerdown="onOpenCardPointerDown"
+					@pointerup="onOpenCardPointerUp"
 					@click.stop="onOpenCardClick"
 				>
 					<div class="flex items-start gap-3">
@@ -245,7 +246,7 @@ import { deskRecordUrl } from "@spa/utils/deskUrl.js"
 import { formatDate, todayIsoInUserTz } from "@spa/utils/datetime.js"
 import { skipTextEditorToolbarTabStops } from "@spa/utils/textEditorFocus.js"
 import { __ } from "@spa/utils/i18n.js"
-import { isInteractiveTarget } from "@spa/utils/interactiveTarget.js"
+import { closesOnClick, isInteractiveTarget } from "@spa/utils/interactiveTarget.js"
 
 const props = defineProps({
 	checklist: { type: Object, required: true },
@@ -453,14 +454,26 @@ async function expand(item) {
 // letting go over the free area ends in a click on the card, too (the browser sends the click to
 // the element both ends share).
 let pressedOnFreeArea = false
+let releasedOnField = false
 function onOpenCardPointerDown(event) {
 	pressedOnFreeArea = !isInteractiveTarget(event.target, event.currentTarget)
+	releasedOnField = false
+}
+
+function onOpenCardPointerUp(event) {
+	releasedOnField = isInteractiveTarget(event.target, event.currentTarget)
 }
 
 function onOpenCardClick(event) {
-	const freeArea = pressedOnFreeArea && !isInteractiveTarget(event.target, event.currentTarget)
+	const close = closesOnClick({
+		pressedOnFreeArea,
+		releasedOnField,
+		clickedOnFreeArea: !isInteractiveTarget(event.target, event.currentTarget),
+		selectedText: window.getSelection?.()?.toString() || "",
+	})
 	pressedOnFreeArea = false
-	if (freeArea && !window.getSelection?.()?.toString()) collapse()
+	releasedOnField = false
+	if (close) collapse()
 }
 
 async function onDocClick(event) {
