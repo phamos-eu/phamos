@@ -189,7 +189,7 @@ async function render(engine_key, deadline) {
 		return await with_timeout(render_html2canvas(), Math.min(HTML2CANVAS_TIMEOUT_MS, left()));
 	} catch (e) {
 		console.warn("Phriend: html2canvas failed, trying html-to-image", e);
-		if (!e.timed_out) storage_set(memo, JSON.stringify({ at: Date.now() }));
+		if (!(e && e.timed_out)) storage_set(memo, JSON.stringify({ at: Date.now() }));
 		return render_html_to_image(left());
 	}
 }
