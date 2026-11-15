@@ -27,11 +27,19 @@
 </template>
 
 <script setup>
+import { onMounted } from "vue"
+import { useRouter } from "vue-router"
 import { Toasts } from "frappe-ui"
 import { pageChrome } from "@spa/pageChrome.js"
+import { mountPhriend } from "@spa/phriend.js"
 
-defineProps({
+const props = defineProps({
 	title: { type: String, default: "" },
 	subtitle: { type: String, default: "" },
 })
+
+// Phriend, the report-a-problem ball, in every cockpit (#1900). The page title the shell shows
+// becomes part of "Reported on"; on record pages the record itself is named instead.
+const router = useRouter()
+onMounted(() => mountPhriend(router, () => props.title))
 </script>

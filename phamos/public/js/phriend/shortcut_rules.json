@@ -1,0 +1,11 @@
+{
+	"_comment": "Phriend shortcut rules (#1903), read by phamos/phriend/shortcut.py and phamos/public/js/phriend/shortcut.js. A shortcut needs Mod (Cmd on a Mac, Ctrl elsewhere) or Ctrl, no Alt (Option types characters on a Mac, Ctrl+Alt is AltGr on Windows), and must not take over what the browser or the system does with that key.",
+	"refused": {
+		"plain": ["A", "C", "F", "L", "N", "Q", "R", "S", "T", "V", "W", "X", "Y", "Z", "0", "1", "2", "3", "4", "5", "6", "7", "8", "9", "Space"],
+		"shift": ["B", "C", "I", "J", "N", "P", "Q", "R", "T", "W", "Z", "Space"]
+	},
+	"examples": {
+		"allowed": ["Mod+P", "Mod+K", "Mod+Shift+K", "Ctrl+K", "Mod+E", "Ctrl+Shift+E", "Mod+F2"],
+		"refused": ["P", "Shift+P", "F", "Shift+F", "F5", "Alt+L", "Alt+Shift+P", "Mod+Alt+P", "Ctrl+Alt+Q", "Mod+C", "Mod+V", "Mod+Z", "Mod+Y", "Mod+1", "Mod+Space", "Mod+Shift+B", "Mod+Shift+P", "Mod+Shift+Z", "Mod+P+Q", "Mod+Escape"]
+	}
+}

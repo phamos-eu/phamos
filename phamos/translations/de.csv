@@ -2027,3 +2027,112 @@ Sep,Sep.
 Oct,Okt.
 Nov,Nov.
 Dec,Dez.
+Address,Adresse
+Arrow,Pfeil
+Box,Rahmen
+Browser,Browser
+Check and send,Prüfen und senden
+Describe what you see in the next step instead.,"Beschreiben Sie im nächsten Schritt, was Sie sehen."
+Discard,Verwerfen
+Discard this report? What you wrote and drew is lost.,"Diese Meldung verwerfen? Was Sie geschrieben und gezeichnet haben, geht verloren."
+"Draw an arrow to the problem, box it, write on it, or black out private data.","Zeichnen Sie einen Pfeil zum Problem, rahmen Sie es ein, schreiben Sie darauf oder schwärzen Sie private Daten."
+Drawing tools,Zeichenwerkzeuge
+Everything that is sent,"Alles, was gesendet wird"
+Got it! Saved as,Danke! Gespeichert als
+"Hi, I'm Phriend! Click me when something looks wrong.","Hallo, ich bin Phriend! Klicken Sie mich an, wenn etwas nicht stimmt."
+How urgent is it?,Wie dringend ist es?
+In a few words,In wenigen Worten
+It goes out when you're back online.,"Sie wird gesendet, sobald Sie wieder online sind."
+Keep editing,Weiter bearbeiten
+Leave out the screenshot,Screenshot weglassen
+Log in,Anmelden
+No screenshot this time.,Diesmal gibt es keinen Screenshot.
+None,Keine
+One moment…,Einen Moment…
+Open it,Öffnen
+Page,Seite
+Phriend adds this for you,Das fügt Phriend für Sie hinzu
+Phriend couldn't start. Reload the page and try again.,Phriend konnte nicht starten. Laden Sie die Seite neu und versuchen Sie es noch einmal.
+Problems on the page,Probleme auf der Seite
+Report it?,Melden?
+Screenshot,Screenshot
+Send now,Jetzt senden
+Send to Phriend,An Phriend senden
+Sending didn't work:,Senden hat nicht geklappt:
+Show what you mean,"Zeigen Sie, was Sie meinen"
+Skip,Überspringen
+Step {0} of 4,Schritt {0} von 4
+Taking a screenshot of the page…,Screenshot der Seite wird erstellt…
+Text,Text
+The report goes out without a screenshot.,Die Meldung wird ohne Screenshot gesendet.
+The server can't be reached.,Der Server ist nicht erreichbar.
+Try again,Erneut versuchen
+Type here…,Hier tippen…
+Undo,Rückgängig
+Use the screenshot,Screenshot wieder verwenden
+Version,Version
+"What did you do, and what did you expect?","Was haben Sie getan, und was haben Sie erwartet?"
+What kind of report?,Welche Art von Meldung?
+"Whoops, that call failed.","Hoppla, da ist etwas schiefgegangen."
+Window,Fenster
+You have a report that wasn't sent.,"Sie haben eine Meldung, die nicht gesendet wurde."
+You're not allowed to send Phriend reports.,Sie dürfen keine Phriend-Meldungen senden.
+You're offline.,Sie sind offline.
+Your report is kept.,Ihre Meldung bleibt erhalten.
+Your session has expired.,Ihre Sitzung ist abgelaufen.
+no screenshot,ohne Screenshot
+unknown error,unbekannter Fehler
+with screenshot,mit Screenshot
+{0} open Phriend reports for this page,{0} offene Phriend-Meldungen zu dieser Seite
+Bug,Fehler
+Question,Frage
+Something is broken,Etwas funktioniert nicht
+It could be better,Es könnte besser sein
+I'm not sure how,"Ich weiß nicht, wie es geht"
+a page,eine Seite
+"Log in again in a new tab, then try again.",Melden Sie sich in einem neuen Tab neu an und versuchen Sie es dann erneut.
+Still sending your last report…,Ihre letzte Meldung wird noch gesendet…
+unexpected answer from the server,unerwartete Antwort vom Server
+This page is out of date.,Diese Seite ist nicht mehr aktuell.
+"Reload it to send your report; the text is kept, the screenshot is not.","Laden Sie sie neu, um Ihre Meldung zu senden; der Text bleibt erhalten, der Screenshot nicht."
+Reload,Neu laden
+Next,Weiter
+Black out private data,Private Daten schwärzen
+Redacted,Geschwärzt
+"The screenshot could not be saved: {0}","Der Screenshot konnte nicht gespeichert werden: {0}"
+not a PNG or JPEG image,kein PNG- oder JPEG-Bild
+larger than {0} MB,größer als {0} MB
+Something else,Etwas anderes
+None of these,Nichts davon
+Phriend: report a problem ({0}),Phriend: ein Problem melden ({0})
+Phriend: report a problem,Phriend: ein Problem melden
+Press the new keys…,Drücken Sie die neuen Tasten…
+Turn off,Ausschalten
+Use the default ({0}),Standard verwenden ({0})
+That didn't work. Try again.,Das hat nicht geklappt. Versuchen Sie es noch einmal.
+Keyboard shortcut,Tastenkürzel
+Keyboard Shortcut,Tastenkürzel
+"Opens Phriend. Mod is Cmd on a Mac and Ctrl elsewhere, e.g. Mod+P or Mod+Shift+K. Empty: no shortcut. Each user can change or switch off their own in Phriend.","Öffnet Phriend. Mod ist Cmd auf dem Mac und sonst Strg, z. B. Mod+P oder Mod+Shift+K. Leer: kein Tastenkürzel. Jede Person kann ihr eigenes in Phriend ändern oder ausschalten."
+Free drawing,Freihand zeichnen
+Looking for earlier reports…,Frühere Meldungen werden gesucht…
+No open reports about this page yet.,Zu dieser Seite gibt es noch keine offenen Meldungen.
+Already reported here,Hier schon gemeldet
+Show all {0},Alle {0} anzeigen
+About: {0},Betrifft: {0}
+Step {0} of 4: {1},Schritt {0} von 4: {1}
+e.g. Save does nothing on a new lead,z. B. Speichern tut nichts bei einem neuen Lead
+e.g. I filled in the company name and clicked Save. Nothing happened.,z. B. Ich habe den Firmennamen eingetragen und auf Speichern geklickt. Nichts ist passiert.
+{0} sends,{0} sendet
+{0} next,{0} weiter
+Shortcut: {0} · Change,Tastenkürzel: {0} · Ändern
+Shortcut: off · Change,Tastenkürzel: aus · Ändern
+1 error,1 Fehler
+{0} errors,{0} Fehler
+1 failed call,1 fehlgeschlagener Serveraufruf
+{0} failed calls,{0} fehlgeschlagene Serveraufrufe
+screenshot still being taken…,Screenshot wird noch erstellt…
+"Use Cmd/Ctrl together with a letter, a digit or F1 to F12.","Verwenden Sie Cmd/Strg zusammen mit einem Buchstaben, einer Ziffer oder F1 bis F12."
+Alt/Option is not possible: it types characters such as @ or € on many keyboards.,Alt/Option geht nicht: Damit tippen viele Tastaturen Zeichen wie @ oder €.
+"{0} belongs to the browser or the system (copy, paste, undo, tabs…).","{0} gehört dem Browser oder dem System (Kopieren, Einfügen, Rückgängig, Tabs…)."
+"This combination belongs to the browser or the system (copy, paste, undo, tabs…).","Diese Kombination gehört dem Browser oder dem System (Kopieren, Einfügen, Rückgängig, Tabs…)."
+{0} can't be Phriend's shortcut. {1},{0} kann nicht das Tastenkürzel von Phriend sein. {1}

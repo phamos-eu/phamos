@@ -5,3 +5,4 @@ Gitlab Integration
 Bookstack Integration
 Cockpits
 Marketing
+Phriend
