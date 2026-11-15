@@ -122,6 +122,9 @@ const sizeOptions = IMAGE_SIZES.map((size) => ({
 	isActive: () => imageSize.value === size,
 	action: () => setImageSize(size),
 }))
+// Every cockpit field passes its toolbar as an array (a list of frappe-ui button names), and the
+// size group joins it. `false` means no toolbar at all (read-only, locked); then there is nothing
+// to add it to.
 const menu = computed(() =>
 	Array.isArray(props.fixedMenu) ? [...props.fixedMenu, "Separator", sizeOptions] : props.fixedMenu
 )
