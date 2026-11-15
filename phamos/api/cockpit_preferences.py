@@ -107,7 +107,6 @@ def _clean_panel_layout(value):
 	return clean
 
 
-# key -> (validator returning the value to store, value when nothing is stored)
 IMAGE_SIZES = ("small", "medium", "large")
 
 
@@ -123,6 +122,7 @@ def _clean_image_size(value):
 	return value
 
 
+# key -> (validator returning the value to store, value when nothing is stored)
 PREFERENCES = {
 	"cockpit_panel_layout": (_clean_panel_layout, {}),
 	"cockpit_image_size": (_clean_image_size, "large"),

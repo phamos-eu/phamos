@@ -3,6 +3,8 @@
 // and node view win; its paste/drop plugin and input rule stay with the original (not repeated
 // here, or a pasted image would arrive twice).
 
+// frappe-ui has no public export for its image node; this path is from frappe-ui 0.1.105. After a
+// frappe-ui upgrade, check that it still exists and that paste/drop still add images once.
 import FrappeImage from "frappe-ui/src/components/TextEditor/image-extension"
 import { clampImageWidth, parseImageWidth } from "@spa/utils/imageSize.js"
 import { __ } from "@spa/utils/i18n.js"
