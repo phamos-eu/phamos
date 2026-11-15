@@ -2181,4 +2181,6 @@ Right of {0},Rechts von {0}
 Above {0},Über {0}
 Below {0},Unter {0}
 Swap with {0},Mit {0} tauschen
+"Drag to move, or Alt+↑/↓","Ziehen zum Verschieben, oder Alt+↑/↓"
+Could not move the item,Der Eintrag konnte nicht verschoben werden
 Scroll to see the rest,"Scrollen, um den Rest zu sehen"

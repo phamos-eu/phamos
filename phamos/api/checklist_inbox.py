@@ -623,6 +623,35 @@ def add_spa_checklist_item(checklist_name, values=None):
 
 
 @frappe.whitelist(methods=["POST"])
+def move_spa_checklist_item(checklist_name, item_name, to_index):
+	"""Move a checklist item to position `to_index` (0-based) and return the SPA payload (#1919).
+
+	The other items keep their order; `idx` is renumbered and the Checklist saved once, so
+	viewers get one update and the version history one entry.
+	"""
+	doc = _require_checklist_write(checklist_name)
+	item_name = (item_name or "").strip()
+	rows = list(doc.checklist_items)
+	row = next((r for r in rows if r.name == item_name), None)
+	if not row:
+		frappe.throw(_("Checklist item not found"))
+	try:
+		to_index = int(to_index)
+	except (TypeError, ValueError):
+		frappe.throw(_("Invalid position"))
+	if not 0 <= to_index < len(rows):
+		frappe.throw(_("Invalid position"))
+
+	rows.remove(row)
+	rows.insert(to_index, row)
+	doc.checklist_items = rows
+	for idx, r in enumerate(rows, start=1):
+		r.idx = idx
+	doc.save()
+	return get_checklist(checklist_name)
+
+
+@frappe.whitelist(methods=["POST"])
 def delete_spa_checklist_item(checklist_name, item_name):
 	"""Remove a checklist item and return full SPA checklist payload."""
 	doc = _require_checklist_write(checklist_name)
