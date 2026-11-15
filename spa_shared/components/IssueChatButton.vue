@@ -295,14 +295,15 @@ const rowSummary = computed(() => {
 	return parts.join(" · ")
 })
 watch(
-	[() => props.recordName, () => state.value.enabled, rowSummary, unreadTotal, () => unreadTone(state.value)],
-	([record, enabled, summary, unread, tone], previous) => {
+	[() => props.recordName, () => state.value.enabled, rowSummary, unreadTotal, () => unreadTone(state.value), loading],
+	([record, enabled, summary, unread, tone, isLoading], previous) => {
 		const before = previous?.[0]
 		if (before && before !== record) delete issueChatStore.chats[before]
 		// `enabled` is kept while the next record loads (see the recordName watch), so the panel
 		// and its Raven frame stay instead of blinking.
 		issueChatStore.chats[record] = {
-			enabled: Boolean(enabled),
+			// unknown (undefined) until the first answer, so the chat tile keeps its place meanwhile
+			enabled: isLoading && !enabled ? undefined : Boolean(enabled),
 			summary,
 			badge: unread ? (unread > 99 ? "99+" : String(unread)) : "",
 			tone,

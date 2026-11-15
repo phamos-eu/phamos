@@ -22,6 +22,7 @@
 						@pointermove="onMove"
 						@pointerup="endMove"
 						@pointercancel="cancelMove"
+						@lostpointercapture="cancelMove"
 					>
 						<FeatherIcon
 							v-if="typeof defOf(tile.id)?.icon === 'string'"
@@ -84,6 +85,7 @@
 					@pointermove="onDrag"
 					@pointerup="endDrag"
 					@pointercancel="endDrag"
+					@lostpointercapture="endDrag"
 					@dblclick="even(gutter)"
 					@keydown.left.prevent="gutter.axis === 'w' && nudge(gutter, -16)"
 					@keydown.right.prevent="gutter.axis === 'w' && nudge(gutter, 16)"
@@ -299,8 +301,13 @@ function startDrag(gutter, event) {
 	setRavenFramePassThrough(true)
 }
 
+// Only while the button is down: if the release got lost (the pointer left the window, the
+// capture was dropped), a later plain mouse move must not keep resizing.
+const buttonDown = (event) => (event.buttons & 1) === 1
+
 function onDrag(event) {
 	if (!dragStart) return
+	if (!buttonDown(event)) return endDrag()
 	dragTree.value = resized(dragging.value, at(dragging.value.axis, event) - dragStart.pos, dragStart.base)
 }
 
@@ -365,6 +372,7 @@ function startMove(id, event) {
 function onMove(event) {
 	const m = moving.value
 	if (!m) return
+	if (!buttonDown(event)) return cancelMove()
 	// a few pixels first, so a click on the title bar doesn't start a move
 	if (!m.active && Math.hypot(event.clientX - m.start.x, event.clientY - m.start.y) < 5) return
 	if (!m.active) {
