@@ -34,6 +34,7 @@ LIST_FIELDS = [
 	"opening_date",
 	"description",
 	"_assign",
+	"phriend_type",  # list rows mark Phriend reports (#1901)
 ]
 
 
@@ -87,6 +88,7 @@ def _serialize_issue_row(row):
 		"opening_date": row.get("opening_date"),
 		"description": row.get("description") or "",
 		"checklist_search": row.get("checklist_search") or "",
+		"phriend_type": row.get("phriend_type") or None,
 		"assignees": assignees,
 		"assignee_names": [_user_label(u) for u in assignees],
 	}

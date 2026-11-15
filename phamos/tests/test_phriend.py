@@ -374,3 +374,74 @@ class TestPhriend(FrappeTestCase):
 
 		self.assertIn("api", str(raised.exception))
 		self.assertFalse(frappe.db.get_value("Issue", issue.name, "gitlab_issue_url"))
+
+
+# ---- the report on the cockpit Issue page (#1901)
+
+
+@patch("frappe.enqueue")
+class TestPhriendIssuePage(FrappeTestCase):
+	# same set-up as TestPhriend; borrowed, not inherited, so its tests don't run twice
+	setUpClass = TestPhriend.setUpClass
+	setUp = TestPhriend.setUp
+	tearDown = TestPhriend.tearDown
+	set_settings = TestPhriend.set_settings
+	report = TestPhriend.report
+
+	def test_cockpit_issue_carries_the_report(self, _enqueue):
+		from phamos.api import personal_cockpit
+
+		self.set_settings(assign_to="Administrator")
+		context = {
+			"app": "Personal Cockpit", "viewport": "1440x900 @1x", "browser": "Chrome 156, macOS",
+			"versions": {"phamos": "15.140.0"}, "user": "someone@example.com", "secret": "x",
+			"recent_errors": [{"type": "error", "message": "boom", "cookie": "sid=1"}],
+			"failed_requests": [{"url": "/api/method/x", "status": 500, "message": "Server Error"}],
+		}
+		issue = self.report(context=json.dumps(context), screenshot=PNG)
+
+		block = personal_cockpit.get_issue(issue.name)["phriend"]
+
+		self.assertEqual(block["type"], "Bug")
+		self.assertEqual(block["reported_by"], "Administrator")
+		self.assertTrue(block["screenshot"].startswith("/private/files/"))
+		self.assertEqual(block["page_url"], "http://site/app/user/Administrator")
+		self.assertEqual(block["ref_url"], "/app/user/Administrator")
+		details = block["details"]
+		self.assertEqual(details["browser"], "Chrome 156, macOS")
+		self.assertEqual(details["versions"], {"phamos": "15.140.0"})
+		# only the known keys of the context and of each entry go out
+		self.assertNotIn("user", details)
+		self.assertNotIn("secret", details)
+		self.assertEqual(details["recent_errors"], [{"type": "error", "message": "boom"}])
+		self.assertEqual(details["failed_requests"][0]["status"], "500")
+
+	def test_issue_not_from_phriend_has_no_report(self, _enqueue):
+		from phamos.api import department_cockpit as dc
+
+		issue = frappe.get_doc({"doctype": "Issue", "subject": "Plain issue"}).insert()
+		self.assertIsNone(dc._serialize_issue_detail(issue)["phriend"])
+
+	def test_list_rows_mark_phriend_reports(self, _enqueue):
+		from phamos.api.issue_common import LIST_FIELDS, _serialize_issue_row
+
+		reported = self.report()
+		plain = frappe.get_doc({"doctype": "Issue", "subject": "Plain issue"}).insert()
+		rows = frappe.get_list("Issue", filters={"name": ("in", [reported.name, plain.name])}, fields=LIST_FIELDS)
+		marks = {r.name: _serialize_issue_row(r)["phriend_type"] for r in rows}
+		self.assertEqual(marks, {reported.name: "Bug", plain.name: None})
+
+	def test_page_link_is_only_a_web_link(self, _enqueue):
+		from phamos.phriend.report import issue_report
+
+		issue = self.report(page_url="javascript:alert(1)")
+		self.assertIsNone(issue_report(issue)["page_url"])
+
+	def test_old_reports_and_broken_context_still_show(self, _enqueue):
+		from phamos.phriend.report import issue_report
+
+		old = self.report(context=json.dumps({"user_agent": "Mozilla/5.0 Chrome"}))
+		self.assertEqual(issue_report(old)["details"]["browser"], "Mozilla/5.0 Chrome")
+		frappe.db.set_value("Issue", old.name, "phriend_context", "not json")
+		old.reload()
+		self.assertEqual(issue_report(old)["details"]["recent_errors"], [])
