@@ -197,8 +197,7 @@ export class Annotator {
 		this.shapes.forEach((s) => {
 			ctx.lineWidth = s.w;
 			if (s.type === "redact") {
-				ctx.fillStyle = "#111";
-				ctx.fillRect(Math.min(s.x1, s.x2), Math.min(s.y1, s.y2), Math.abs(s.x2 - s.x1), Math.abs(s.y2 - s.y1));
+				this.draw_redaction(s);
 			} else if (s.type === "text") {
 				this.draw_text(s);
 			} else if (s.type === "box") {
@@ -209,6 +208,72 @@ export class Annotator {
 				ctx.stroke();
 				this.arrow_head(s);
 			}
+		});
+	}
+
+	// A black bar that can't be mistaken for something black on the page: fine diagonal stripes,
+	// a small light Phriend and "REDACTED". The label shrinks to fit, and is left out when the
+	// bar is too small for it (the stripes still show it was blacked out).
+	draw_redaction(s) {
+		const ctx = this.ctx;
+		const x = Math.min(s.x1, s.x2);
+		const y = Math.min(s.y1, s.y2);
+		const w = Math.abs(s.x2 - s.x1);
+		const h = Math.abs(s.y2 - s.y1);
+		const unit = s.w / 4; // screenshot pixels per screen pixel when it was drawn
+
+		ctx.save();
+		ctx.beginPath();
+		ctx.rect(x, y, w, h);
+		ctx.clip();
+		ctx.fillStyle = "#111";
+		ctx.fillRect(x, y, w, h);
+		ctx.strokeStyle = "rgba(255, 255, 255, 0.07)";
+		ctx.lineWidth = 3 * unit;
+		ctx.beginPath();
+		for (let d = -h; d < w; d += 10 * unit) {
+			ctx.moveTo(x + d, y + h);
+			ctx.lineTo(x + d + h, y);
+		}
+		ctx.stroke();
+
+		const text = this.__("Redacted").toLocaleUpperCase();
+		const pad = 6 * unit;
+		let size = Math.min(h * 0.5, 13 * unit);
+		ctx.font = `700 ${size}px Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif`;
+		const spaced = () => ctx.measureText(text).width + text.length * size * 0.08;
+		let total = size * 1.2 + size * 0.5 + spaced(); // Phriend, gap, text
+		if (total > w - 2 * pad) {
+			size *= (w - 2 * pad) / total;
+			ctx.font = `700 ${size}px Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif`;
+			total = size * 1.2 + size * 0.5 + spaced();
+		}
+		if (size >= 6 * unit) {
+			const left = x + (w - total) / 2;
+			const mid = y + h / 2;
+			this.draw_mini_phriend(left + size * 0.6, mid, size * 0.6);
+			ctx.fillStyle = "rgba(255, 255, 255, 0.82)";
+			ctx.textBaseline = "middle";
+			if ("letterSpacing" in ctx) ctx.letterSpacing = `${size * 0.08}px`;
+			ctx.fillText(text, left + size * 1.7, mid + size * 0.05);
+		} else if (Math.min(w, h) >= 10 * unit) {
+			this.draw_mini_phriend(x + w / 2, y + h / 2, Math.min(w, h) * 0.3); // just the mark
+		}
+		ctx.restore();
+	}
+
+	// Phriend in negative (light ball, dark eyes), so it shows on the black bar.
+	draw_mini_phriend(cx, cy, r) {
+		const ctx = this.ctx;
+		ctx.fillStyle = "rgba(255, 255, 255, 0.82)";
+		ctx.beginPath();
+		ctx.arc(cx, cy, r, 0, Math.PI * 2);
+		ctx.fill();
+		ctx.fillStyle = "#111";
+		[-0.33, 0.33].forEach((dx) => {
+			ctx.beginPath();
+			ctx.ellipse(cx + dx * r, cy - 0.08 * r, 0.16 * r, 0.22 * r, 0, 0, Math.PI * 2);
+			ctx.fill();
 		});
 	}
 
