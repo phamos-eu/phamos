@@ -73,8 +73,10 @@ button.link { padding: 0; border: 0; background: none; color: inherit; font: inh
 button.link:focus-visible, .bubble a:focus-visible { outline: 2px solid var(--ph-focus); outline-offset: 1px; border-radius: 2px; }
 .ball svg { width: 100%; height: 100%; overflow: visible; display: block; filter: drop-shadow(0 4px 6px rgba(0, 0, 0, 0.25)); }
 :host([data-theme="dark"]) .sphere { stroke: rgba(255, 255, 255, 0.35); stroke-width: 1.5; }
-.body { animation: bob 2.6s ease-in-out infinite; }
-.shadow { transform-box: fill-box; transform-origin: center; animation: shadow 2.6s ease-in-out infinite; }
+/* Box breathing, one 21 s cycle: in 4 s, hold 5 s, out 7 s, hold 5 s. The ball fills up from
+   its feet while breathing in and settles while breathing out; the shadow follows. */
+.body { transform-box: fill-box; transform-origin: 50% 100%; animation: breathe 21s infinite; }
+.shadow { transform-box: fill-box; transform-origin: center; animation: breathe-shadow 21s infinite; }
 .eyes { transform-box: fill-box; transform-origin: center; animation: blink 5s infinite; }
 .pupil { transition: transform 0.08s linear; }
 .leg { transform-box: fill-box; transform-origin: 50% 0%; }
@@ -106,8 +108,21 @@ button.link:focus-visible, .bubble a:focus-visible { outline: 2px solid var(--ph
 .bubble::after { content: ""; position: absolute; top: 100%; right: 22px; border: 7px solid transparent; border-top-color: var(--ph-bg); }
 .ball.flip .bubble { right: auto; left: 0; }
 .ball.flip .bubble::after { right: auto; left: 22px; }
-@keyframes bob { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-3px); } }
-@keyframes shadow { 0%, 100% { transform: scaleX(1); opacity: 0.25; } 50% { transform: scaleX(0.85); opacity: 0.18; } }
+/* 4 / 21 = 19.05 %, 9 / 21 = 42.86 %, 16 / 21 = 76.19 % */
+@keyframes breathe {
+	0% { transform: scale(1, 1); animation-timing-function: ease-in-out; }
+	19.05% { transform: scale(1.07, 1.09); }
+	42.86% { transform: scale(1.07, 1.09); animation-timing-function: ease-in-out; }
+	76.19% { transform: scale(1, 1); }
+	100% { transform: scale(1, 1); }
+}
+@keyframes breathe-shadow {
+	0% { transform: scaleX(1); opacity: 0.25; animation-timing-function: ease-in-out; }
+	19.05% { transform: scaleX(1.12); opacity: 0.3; }
+	42.86% { transform: scaleX(1.12); opacity: 0.3; animation-timing-function: ease-in-out; }
+	76.19% { transform: scaleX(1); opacity: 0.25; }
+	100% { transform: scaleX(1); opacity: 0.25; }
+}
 @keyframes blink { 0%, 94%, 100% { transform: scaleY(1); } 96% { transform: scaleY(0.1); } }
 @keyframes squint { from { transform: scaleY(1); } to { transform: scaleY(0.45); } }
 @keyframes wiggle-l { from { transform: rotate(-12deg); } to { transform: rotate(10deg); } }
