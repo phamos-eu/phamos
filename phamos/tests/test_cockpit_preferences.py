@@ -71,6 +71,12 @@ class CockpitPreferencesTestCase(FrappeTestCase):
 			},
 		)
 
+	def test_non_finite_sizes_count_as_missing(self):
+		value = '{"Issue": {"tree": {"split": "row", "sizes": [Infinity, NaN], "children": [{"panel": "a"}, {"panel": "b"}]}}}'
+		tree = prefs._clean_panel_layout(value)["Issue"]["tree"]
+		self.assertEqual(tree["sizes"], [0.5, 0.5])
+		json.loads(json.dumps(tree), parse_constant=lambda c: self.fail(f"{c} stored"))
+
 	def test_deep_trees_are_cut(self):
 		node = {"panel": "deepest"}
 		for i in range(10):

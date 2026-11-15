@@ -10,6 +10,7 @@ tabDefaultValue.
 """
 
 import json
+import math
 
 import frappe
 from frappe import _
@@ -56,7 +57,8 @@ def _clean_tree(node, seen, depth=0):
 		clean = _clean_tree(child, seen, depth + 1)
 		if clean:
 			size = sizes[i] if i < len(sizes) else None
-			ok = isinstance(size, (int, float)) and not isinstance(size, bool) and size > 0
+			# json.loads accepts Infinity and NaN; they would end up in every cockpit boot
+			ok = isinstance(size, (int, float)) and not isinstance(size, bool) and math.isfinite(size) and size > 0
 			kept.append((clean, float(size) if ok else None))
 	if not kept:
 		return None

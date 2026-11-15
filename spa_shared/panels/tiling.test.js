@@ -5,6 +5,7 @@ import {
 	dropAt,
 	dropped,
 	move,
+	openingOrder,
 	remove,
 	swap,
 	evenAt,
@@ -255,5 +256,13 @@ describe("moving panels (#1916)", () => {
 	it("applies a drop", () => {
 		expect(ids(dropped(issueTree(), "chat", { target: "description", side: "center" }))[0]).toBe("chat")
 		expect(dropped(issueTree(), "chat", null)).toEqual(issueTree())
+	})
+})
+
+describe("openingOrder", () => {
+	it("falls back to the default for a missing or empty order", () => {
+		expect(openingOrder(undefined, ["a"])).toEqual(["a"])
+		expect(openingOrder([], ["a"])).toEqual(["a"])
+		expect(openingOrder(["b"], ["a"])).toEqual(["b"])
 	})
 })

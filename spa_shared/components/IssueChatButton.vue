@@ -263,11 +263,6 @@ async function onClick() {
 		return refresh()
 	}
 	if (!(await ensure())) return
-	if (dockable.value) {
-		// The chat panel is there but collapsed: expand it instead of covering the page.
-		issueChatStore.expandRequest = { record: props.recordName, panel: "chat" }
-		return
-	}
 	// Raven marks the channel read once it is open (its threads stay unread until opened).
 	state.value = { ...state.value, unread: 0 }
 	drawerOpen.value = true
@@ -276,9 +271,11 @@ async function onClick() {
 
 watch(() => issueChatStore.openRequest, honourOpenRequest)
 
-// The chat panel was expanded: Raven marks the channel read once it shows.
-watch(docked, (isDocked) => {
-	if (!isDocked || !state.value.unread) return
+// The chat shows in its panel: Raven marks the channel read. Also when another Issue opens while
+// the panel stays open (it is persistent, so `docked` doesn't change then): its count arrives
+// with its state and is cleared here too.
+watch([docked, () => state.value.unread], ([isDocked, unread]) => {
+	if (!isDocked || !unread) return
 	state.value = { ...state.value, unread: 0 }
 	chatChanged()
 })

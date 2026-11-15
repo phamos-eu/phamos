@@ -78,7 +78,9 @@
 					class="absolute z-[2] touch-none focus:outline-none"
 					:class="[
 						gutter.axis === 'w' ? 'cursor-col-resize' : 'cursor-row-resize',
-						dragging === gutter ? 'bg-outline-gray-4' : 'hover:bg-outline-gray-3 focus-visible:bg-outline-gray-4',
+						gutterKey(gutter) === draggingKey
+							? 'bg-outline-gray-4'
+							: 'hover:bg-outline-gray-3 focus-visible:bg-outline-gray-4',
 					]"
 					:style="box(gutter)"
 					@pointerdown="(e) => startDrag(gutter, e)"
@@ -148,6 +150,7 @@ import {
 	resolve,
 	sanitize,
 	splitAt,
+	openingOrder,
 	touched,
 	withAll,
 } from "./tiling.js"
@@ -205,7 +208,7 @@ const mins = computed(() => minimums(defs.value))
 const available = computed(() => defs.value.filter((d) => !reported[d.id]?.hidden).map((d) => d.id))
 const layoutState = computed(() => stored.get())
 const closed = computed(() => new Set(layoutState.value.closed || []))
-const opened = computed(() => layoutState.value.opened || defaults.opened)
+const opened = computed(() => openingOrder(layoutState.value.opened, defaults.opened))
 
 // The user's tree, else the default for this width; panels it doesn't know yet get placed.
 const baseTree = computed(() => {
@@ -279,6 +282,9 @@ watch(
 // Splitters
 const dragging = shallowRef(null)
 let dragStart = null
+// The gutters are new objects after every re-layout; the one being dragged is found by its place.
+const gutterKey = (g) => `${g.path.join(".")}:${g.index}`
+const draggingKey = computed(() => (dragging.value ? gutterKey(dragging.value) : null))
 
 function at(axis, event) {
 	return axis === "w" ? event.clientX : event.clientY
@@ -437,5 +443,9 @@ function moveOptions(id) {
 	]
 }
 
-onBeforeUnmount(() => window.removeEventListener("keydown", onMoveKey))
+// Leaving the page mid-drag: the Raven frame must take clicks again, the Escape listener goes.
+onBeforeUnmount(() => {
+	if (dragStart || moving.value?.active) setRavenFramePassThrough(false)
+	window.removeEventListener("keydown", onMoveKey)
+})
 </script>

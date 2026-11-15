@@ -407,3 +407,11 @@ export function dropped(tree, id, drop) {
 	if (drop.side === "center") return swap(tree, id, drop.target)
 	return move(tree, id, drop.target, drop.side)
 }
+
+/**
+ * The stored opening order, or the default when there is none: an empty list counts as none (a
+ * layout saved by an older version, or cleaned on the server, has `opened: []`).
+ */
+export function openingOrder(stored, fallback = []) {
+	return Array.isArray(stored) && stored.length ? stored : fallback
+}

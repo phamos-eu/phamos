@@ -1,7 +1,6 @@
 <template>
-	<!-- Wide screens: the chat panel of the Issue view's dock (#issue-chat-host, panels/ChatDockHost)
-	     while it is expanded. Otherwise (below lg, collapsed, or a view without a dock) it covers
-	     the page from the right. -->
+	<!-- On the Issue view: the chat panel's tile (#issue-chat-host, panels/ChatDockHost) while it is
+	     open. Elsewhere (Task, Idea) it covers the page from the right. -->
 	<Teleport :to="inColumn ? '#issue-chat-host' : 'body'">
 		<Transition
 			:enter-active-class="inColumn ? '' : 'transition-transform duration-200 ease-out'"
@@ -98,8 +97,8 @@
 
 <script setup>
 // The chat of one record (#1615): its Raven channel in a frame, kept to that channel by
-// utils/ravenEmbed.js. From lg on, on the Issue view, it is the dock's chat panel (#1911), 768px
-// wide while expanded: the narrowest width at which Raven keeps its desktop layout with mouse
+// utils/ravenEmbed.js. On the Issue view it is a panel of the tiling layout (#1911, #1915), at
+// least 768px wide: the narrowest width at which Raven keeps its desktop layout with mouse
 // actions (#1613). Without a chat (or before joining it) the panel shows the `placeholder` slot.
 // Elsewhere it is an overlay the chat button toggles.
 // No side border: it would take a pixel from the frame and tip Raven into its mobile layout.
