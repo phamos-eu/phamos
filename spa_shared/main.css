@@ -255,3 +255,52 @@ html[data-theme="dark"] {
 	position: relative;
 	z-index: 2;
 }
+
+/* Images in the cockpits' rich text (#1918): a stored width, a resize handle, and a per-user cap. */
+.phamos-image {
+	position: relative;
+	display: inline-block;
+	max-width: 100%;
+	line-height: 0;
+}
+.phamos-image img {
+	max-width: 100%;
+	height: auto;
+}
+.phamos-image.is-selected img,
+.phamos-image.is-resizing img {
+	outline: 2px solid var(--outline-gray-4, #a3a3a3);
+	outline-offset: 1px;
+}
+.phamos-image-handle {
+	position: absolute;
+	right: -5px;
+	bottom: -5px;
+	width: 12px;
+	height: 12px;
+	padding: 0;
+	border-radius: 3px;
+	border: 1px solid var(--outline-gray-4, #a3a3a3);
+	background: var(--surface-white, #fff);
+	cursor: nwse-resize;
+	opacity: 0;
+	touch-action: none;
+}
+.phamos-image:hover .phamos-image-handle,
+.phamos-image.is-selected .phamos-image-handle,
+.phamos-image.is-resizing .phamos-image-handle,
+.phamos-image-handle:focus-visible {
+	opacity: 1;
+}
+/* Under a small or medium cap the shown width is not the stored one: resizing there would save
+   the capped size for everyone, so the handle only shows at large. */
+.rtf-images-small .phamos-image-handle,
+.rtf-images-medium .phamos-image-handle {
+	display: none;
+}
+.rtf-images-small .ProseMirror img {
+	max-width: min(100%, 200px);
+}
+.rtf-images-medium .ProseMirror img {
+	max-width: min(100%, 400px);
+}
