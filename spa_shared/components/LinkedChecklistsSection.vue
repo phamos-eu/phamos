@@ -1,6 +1,6 @@
 <template>
-	<section v-if="!unavailable" class="mb-5">
-		<div class="mb-2 text-[11px] font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400">
+	<section v-if="!unavailable" :class="embedded ? '' : 'mb-5'">
+		<div v-if="!embedded" class="mb-2 text-[11px] font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400">
 			Checklists
 		</div>
 
@@ -75,17 +75,24 @@
 </template>
 
 <script setup>
-import { onMounted, reactive, ref, watch } from "vue"
+import { computed, onMounted, reactive, ref, watch } from "vue"
 import { Badge, call } from "frappe-ui"
 import ChecklistEditor from "@spa/components/ChecklistEditor.vue"
 import CreateChecklistDialog from "@spa/components/CreateChecklistDialog.vue"
+import { __ } from "@spa/utils/i18n.js"
 
 const props = defineProps({
 	document: { type: String, required: true },
 	referenceRecord: { type: String, required: true },
 	referenceTitle: { type: String, default: "" },
 	allowCreate: { type: Boolean, default: true },
+	// shown as a dock panel body (spa_shared/panels): no heading, and it reports its state
+	embedded: { type: Boolean, default: false },
 })
+
+// For the dock row (#1910): a one-line summary, and `hidden` when the user may not read
+// checklists, so the dock drops the panel instead of showing an empty one.
+const emit = defineEmits(["state"])
 
 const API = "phamos.api.checklist_inbox"
 
@@ -194,6 +201,26 @@ async function onChecklistCreated(created) {
 		details[created.name] = created
 	}
 }
+
+// For the panel's rail icon (#1915): "2 checklists · 3/7 done", and "3/7" as its badge.
+const counts = computed(() => ({
+	lists: summaries.value.length,
+	done: summaries.value.reduce((n, r) => n + (r.done_count || 0), 0),
+	total: summaries.value.reduce((n, r) => n + (r.total_count || 0), 0),
+}))
+const summaryText = computed(() => {
+	if (loading.value && !summaries.value.length) return ""
+	if (!counts.value.lists) return __("None yet")
+	const lists = counts.value.lists === 1 ? __("1 checklist") : __("{0} checklists", [counts.value.lists])
+	return `${lists} · ${__("{0}/{1} done", [counts.value.done, counts.value.total])}`
+})
+
+watch(
+	[summaryText, unavailable, counts],
+	([summary, hidden, c]) =>
+		emit("state", { summary, hidden, badge: c.total ? `${c.done}/${c.total}` : "" }),
+	{ immediate: true }
+)
 
 watch(
 	() => props.referenceRecord,

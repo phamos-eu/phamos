@@ -1,4 +1,8 @@
 <template>
+	<!-- The description and the properties are panels of the record page (#1915): this component
+	     keeps the Issue's autosave, field locks and realtime, and lays both into their panels'
+	     hosts (panels/hosts.js). -->
+	<Teleport v-if="hosts.description" :to="hosts.description">
 	<div class="flex h-full min-h-0 w-full flex-1 flex-col overflow-hidden p-5 text-gray-900 dark:text-gray-100">
 		<section class="flex min-h-[50%] flex-1 flex-col">
 			<div
@@ -28,6 +32,7 @@
 			<ErrorMessage class="mt-2 flex-shrink-0" :message="fieldError" />
 		</section>
 	</div>
+	</Teleport>
 
 	<Teleport v-if="chromeHostReady" to="#cockpit-page-chrome">
 		<div class="flex min-w-0 items-center gap-0 pr-3 text-base tracking-tight">
@@ -66,13 +71,9 @@
 		</div>
 	</Teleport>
 
-	<Teleport v-if="propertiesHostReady" to="#issue-properties-host">
+	<Teleport v-if="hosts.properties" :to="hosts.properties">
 		<div class="flex h-full min-h-0 flex-col bg-surface-white text-ink-gray-9">
 			<div class="flex min-h-0 flex-1 flex-col gap-5 overflow-y-auto p-4">
-				<template v-if="issue.phriend">
-					<IssuePhriendReport :report="issue.phriend" />
-					<hr class="border-outline-gray-2" />
-				</template>
 				<section>
 					<div class="mb-2 text-[11px] font-semibold uppercase tracking-wide text-ink-gray-6">
 						Status
@@ -275,7 +276,6 @@ import AssigneePicker from "@spa/components/AssigneePicker.vue"
 import DocSyncBanner from "@spa/components/DocSyncBanner.vue"
 import DocViewers from "@spa/components/DocViewers.vue"
 import IssueChatButton from "@spa/components/IssueChatButton.vue"
-import IssuePhriendReport from "@spa/components/IssuePhriendReport.vue"
 import RichTextField from "@spa/components/RichTextField.vue"
 import { useAutosaveDoc } from "@spa/composables/useAutosaveDoc.js"
 import { useDocRealtime } from "@spa/composables/useDocRealtime.js"
@@ -284,6 +284,7 @@ import { lockExplanation, lockHeadline, lockMessage } from "@spa/utils/fieldLock
 import ConvertToTaskDialog from "@spa/components/ConvertToTaskDialog.vue"
 import SchedulePreview from "@spa/components/SchedulePreview.vue"
 import { setPageChromeActive } from "@spa/pageChrome.js"
+import { panelHosts as hosts } from "@spa/panels/hosts.js"
 import spaConfig from "@/config"
 
 const props = defineProps({
@@ -307,7 +308,6 @@ const emit = defineEmits(["close", "updated", "converted"])
 
 const router = useRouter()
 const API = computed(() => props.apiPrefix || spaConfig.api)
-const propertiesHostReady = ref(false)
 const chromeHostReady = ref(false)
 const showConvert = ref(false)
 const showConvertedNotice = ref(false)
@@ -502,14 +502,13 @@ const projectOptions = computed(() => [
 	})),
 ])
 
-async function syncPropertiesHost() {
+async function syncChromeHost() {
 	await nextTick()
-	propertiesHostReady.value = !!document.getElementById("issue-properties-host")
 	chromeHostReady.value = !!document.getElementById("cockpit-page-chrome")
 	if (chromeHostReady.value) setPageChromeActive(true)
 }
 
-onMounted(syncPropertiesHost)
+onMounted(syncChromeHost)
 
 onBeforeUnmount(() => {
 	setPageChromeActive(false)
@@ -523,7 +522,7 @@ watch(
 		// autosaved, so they always follow the server.
 		status.value = issue.status
 		assignees.value = [...(issue.assignees || [])]
-		syncPropertiesHost()
+		syncChromeHost()
 	},
 	{ deep: true }
 )

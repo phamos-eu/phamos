@@ -242,6 +242,15 @@ class TestIssueChat(FrappeTestCase):
 		self.assertTrue(states[self.issue.name]["last_message_at"])
 		self.assertEqual(pc.get_issue_chat(self.issue.name)["unread"], 1)
 
+	def test_message_count_only_for_members(self):
+		self.assertEqual(pc.get_issue_chat(self.issue.name)["message_count"], 0)  # no chat yet
+		channel_id = pc.ensure_issue_chat(self.issue.name)["channel_id"]
+		posted = frappe.db.count("Raven Message", {"channel_id": channel_id, "message_type": ("!=", "System")})
+		self.assertGreaterEqual(posted, 1)  # the intro
+		self.assertEqual(pc.get_issue_chat(self.issue.name)["message_count"], posted)
+		frappe.db.delete("Raven Channel Member", {"channel_id": channel_id})  # nobody is a member now
+		self.assertEqual(pc.get_issue_chat(self.issue.name)["message_count"], 0)
+
 
 	def test_unread_mentions_are_counted_in_chat_and_threads(self):
 		from raven.api.threads import create_thread

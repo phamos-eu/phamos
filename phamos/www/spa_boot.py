@@ -14,6 +14,7 @@ from frappe.translate import (
 )
 from frappe.utils import cint, get_system_timezone
 
+from phamos.api.cockpit_preferences import get_preferences
 from phamos.phriend.boot import phriend_boot
 
 
@@ -51,6 +52,8 @@ def get_spa_boot(default_route):
 			# and the app versions it adds to a report. Only for users Phriend is for.
 			"phriend": phriend,
 			"versions": _app_versions() if phriend else {},
+			# The user's own cockpit preferences, e.g. the panel layout of the record pages (#1910).
+			"preferences": get_preferences(),
 		}
 	)
 
