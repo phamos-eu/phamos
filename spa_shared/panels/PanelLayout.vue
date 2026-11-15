@@ -68,7 +68,7 @@
 						:id="tileId(tile.id)"
 						class="flex min-h-0 flex-1 flex-col overflow-hidden"
 					/>
-					<ScrollHint v-else class="flex-1" box-class="p-2" fade="from-surface-white">
+					<ScrollHint v-else class="flex-1" box-class="p-2" fade="from-white dark:from-gray-900">
 						<div :id="tileId(tile.id)" />
 					</ScrollHint>
 				</section>

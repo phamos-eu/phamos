@@ -82,7 +82,7 @@
 
 	<Teleport v-if="hosts.properties" :to="hosts.properties">
 		<div class="flex h-full min-h-0 flex-col bg-surface-white text-ink-gray-9">
-			<ScrollHint class="flex-1" box-class="flex flex-col gap-5 p-4" fade="from-surface-white">
+			<ScrollHint class="flex-1" box-class="flex flex-col gap-5 p-4" fade="from-white dark:from-gray-900">
 				<section>
 					<div class="mb-2 text-[11px] font-semibold uppercase tracking-wide text-ink-gray-6">
 						Status
