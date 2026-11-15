@@ -38,10 +38,14 @@
 	<div class="flex h-full min-h-0 w-full flex-col">
 		<div v-if="loading" class="flex flex-1 items-center justify-center text-sm text-ink-gray-5">{{ __("Loading…") }}</div>
 		<template v-else-if="lead">
-			<!-- Master data as a band across the top rather than a left column:
-			     it is reference, not something worked in, and taking it out of the
-			     columns gives the conversation the full width. -->
-			<section class="flex-none border-b border-outline-gray-2 bg-surface-white px-4 py-3">
+			<!-- The Lead as tiles (#1913): this component keeps the Lead's state and autosave and lays
+			     its three blocks into their panels' hosts (spa_shared/panels/hosts.js); the panels,
+			     with Checklists and Notes, are declared by the sales cockpit (src/config.js). The
+			     Teleport blocks below keep their contents' old indentation to keep this diff small. -->
+			<PanelLayout doctype="Lead" :record="lead" />
+
+			<Teleport v-if="hosts['lead-details']" :to="hosts['lead-details']">
+			<section class="h-full overflow-y-auto bg-surface-white px-4 py-3">
 				<div class="grid grid-cols-[repeat(auto-fit,minmax(9rem,1fr))] gap-x-3 gap-y-2">
 					<FormControl v-model="companyName" :label="__('Company')" type="text" size="sm" />
 
@@ -102,11 +106,12 @@
 					/>
 				</div>
 			</section>
+			</Teleport>
 
-			<div class="flex min-h-0 flex-1">
 				<!-- Communication / Notes / Activities feed: independent show/hide toggles,
 				     not exclusive tabs, so any combination can be visible at once. -->
-				<section class="flex min-w-0 flex-1 flex-col overflow-hidden bg-surface-gray-1">
+				<Teleport v-if="hosts['lead-timeline']" :to="hosts['lead-timeline']">
+				<section class="flex h-full min-h-0 min-w-0 flex-1 flex-col overflow-hidden bg-surface-gray-1">
 					<div
 						v-if="phoneNumbers.length || lead.email_id"
 						class="flex flex-shrink-0 flex-wrap items-center gap-x-5 gap-y-1.5 border-b border-outline-gray-2 bg-surface-white px-4 py-3"
@@ -302,8 +307,11 @@
 					</div>
 				</section>
 
+				</Teleport>
+
 				<!-- Transactional data: changes on every follow-up, inline-editable with autosave. -->
-				<section class="flex w-72 flex-none flex-col gap-5 overflow-y-auto border-l border-outline-gray-2 bg-surface-white p-4">
+				<Teleport v-if="hosts['lead-status']" :to="hosts['lead-status']">
+				<section class="flex h-full min-h-0 flex-col gap-5 overflow-y-auto bg-surface-white p-4">
 					<section>
 						<div class="mb-2 text-[11px] font-semibold uppercase tracking-wide text-ink-gray-6">
 							{{ __("Status") }}
@@ -378,7 +386,7 @@
 						<span class="truncate">{{ __("Open in Desk") }}</span>
 					</a>
 				</section>
-			</div>
+				</Teleport>
 		</template>
 	</div>
 
@@ -412,7 +420,7 @@
 </template>
 
 <script setup>
-import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from "vue"
+import { computed, nextTick, onBeforeUnmount, onMounted, provide, ref, watch } from "vue"
 import { call, toast, Badge } from "frappe-ui"
 import { formatDate, formatDatetime } from "@spa/utils/datetime"
 import { setPageChromeActive } from "@spa/pageChrome.js"
@@ -430,6 +438,8 @@ import {
 import FrappeLink from "@spa/components/FrappeLink.vue"
 import AddLeadNoteDialog from "./AddLeadNoteDialog.vue"
 import EditLeadNoteDialog from "./EditLeadNoteDialog.vue"
+import PanelLayout from "@spa/panels/PanelLayout.vue"
+import { panelHosts as hosts } from "@spa/panels/hosts.js"
 import EmailBody from "./EmailBody.vue"
 
 const API = "phamos.api.sales_leads"
@@ -913,6 +923,13 @@ function openNoteEditor(entry) {
 	editingNote.value = entry.note
 	showEditNoteDialog.value = true
 }
+
+// For the Notes panel (#1913): the Lead's notes and the dialogs that add and edit them.
+provide("leadNotes", {
+	notes,
+	add: () => (showNoteDialog.value = true),
+	edit: (note) => openNoteEditor({ note }),
+})
 
 function onNoteEdited(savedNotes) {
 	notes.value = savedNotes || []
