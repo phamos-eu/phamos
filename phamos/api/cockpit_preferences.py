@@ -118,7 +118,8 @@ def _clean_image_size(value):
 		except ValueError:
 			pass
 	if value not in IMAGE_SIZES:
-		frappe.throw(_("Unknown image size: {0}").format(value))
+		# the caller's own input, shown back escaped and short
+		frappe.throw(_("Unknown image size: {0}").format(frappe.utils.escape_html(str(value))[:50]))
 	return value
 
 
