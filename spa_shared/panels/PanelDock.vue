@@ -74,7 +74,6 @@ import DockedPanel from "./DockedPanel.vue"
 import { PANELS } from "./definitions.js"
 import { usePanelLayout } from "./usePanelLayout.js"
 import { issueChatStore } from "@spa/issueChatStore.js"
-import { setRavenFramePassThrough } from "@spa/utils/ravenFrame.js"
 import { MAX_DOCK_WIDTH, MIN_DOCK_WIDTH, clamp, dockWidth, moved, panelsFor, toggled } from "./registry.js"
 
 const props = defineProps({
@@ -131,7 +130,6 @@ function startDrag(event) {
 	const shown = event.currentTarget.parentElement.getBoundingClientRect().width
 	dragStart = { x: event.clientX, width: shown || width.value }
 	event.currentTarget.setPointerCapture(event.pointerId)
-	setRavenFramePassThrough(true)
 }
 
 function drag(event) {
@@ -146,7 +144,6 @@ function endDrag() {
 	if (!dragStart) return
 	dragStart = null
 	dragging.value = false
-	setRavenFramePassThrough(false)
 	if (dragWidth.value != null) saveWidth(dragWidth.value)
 	dragWidth.value = null
 }

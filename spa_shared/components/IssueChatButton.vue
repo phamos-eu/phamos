@@ -200,8 +200,7 @@ async function honourOpenRequest() {
 	if (dockable.value && !docked.value) {
 		// Expand the collapsed chat panel first; the chat then lays itself into it.
 		issueChatStore.expandRequest = { record: props.recordName, panel: "chat" }
-		await nextTick()
-		await nextTick()
+		await becomes(docked)
 	}
 	if (docked.value) {
 		// The column already shows the chat; go to the message the list pointed at.
@@ -221,6 +220,20 @@ async function honourOpenRequest() {
 	if (!drawerOpen.value) await onClick()
 	await nextTick()
 	panelRef.value?.focusTarget(target)
+}
+
+/** Resolves once `flag` is true, or after `ms` (the dock may not expand, e.g. it unmounted). */
+function becomes(flag, ms = 1500) {
+	if (flag.value) return Promise.resolve()
+	return new Promise((resolve) => {
+		const timer = setTimeout(done, ms)
+		const stop = watch(flag, (value) => value && done())
+		function done() {
+			clearTimeout(timer)
+			stop()
+			resolve()
+		}
+	})
 }
 
 /** Start or join the chat; true when the user is in it afterwards. */
