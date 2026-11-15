@@ -292,6 +292,12 @@ html[data-theme="dark"] {
 .phamos-image-handle:focus-visible {
 	opacity: 1;
 }
+/* Under a small or medium cap the shown width is not the stored one: resizing there would save
+   the capped size for everyone, so the handle only shows at large. */
+.rtf-images-small .phamos-image-handle,
+.rtf-images-medium .phamos-image-handle {
+	display: none;
+}
 .rtf-images-small .ProseMirror img {
 	max-width: min(100%, 200px);
 }
