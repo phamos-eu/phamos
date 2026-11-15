@@ -26,3 +26,27 @@ export function moved(list, from, to) {
 	next.splice(to, 0, item)
 	return next
 }
+
+/**
+ * How far each item is shifted while the item at `from` is held over slot `to`: the items it
+ * passed make room by one slot (`step` = the dragged item's height plus the gap). The dragged item
+ * itself follows the pointer and gets 0 here.
+ *
+ * @returns {number[]} one offset in px per item, in list order
+ */
+export function dragOffsets(count, from, to, step) {
+	return Array.from({ length: count }, (_, i) => {
+		if (i === from) return 0
+		if (from < to && i > from && i <= to) return -step
+		if (to < from && i >= to && i < from) return step
+		return 0
+	})
+}
+
+/** Pointer travel (px) after which a press on an item becomes a drag instead of a click. */
+export const DRAG_DISTANCE = 4
+
+/** Whether a mouse or pen press has moved far enough to start dragging. */
+export function passedDragDistance(dx, dy) {
+	return Math.hypot(dx, dy) >= DRAG_DISTANCE
+}
