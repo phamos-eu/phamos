@@ -36,7 +36,9 @@
 						<span v-if="summaryOf(tile.id)" class="min-w-0 truncate text-xs text-ink-gray-5">
 							· {{ summaryOf(tile.id) }}
 						</span>
-						<div class="ml-auto flex flex-shrink-0 items-center" @pointerdown.stop>
+						<!-- The panel's own actions, teleported in by its content (hosts.panelTitleSlots) -->
+						<TitleSlot :panel-id="tile.id" class="ml-auto" @pointerdown.stop />
+						<div class="flex flex-shrink-0 items-center" @pointerdown.stop>
 							<Dropdown :options="moveOptions(tile.id)" placement="right">
 								<button
 									type="button"
@@ -63,7 +65,7 @@
 					<div
 						:id="tileId(tile.id)"
 						class="min-h-0 flex-1"
-						:class="defOf(tile.id)?.bare ? 'flex flex-col overflow-hidden' : 'overflow-y-auto px-4 py-3'"
+						:class="defOf(tile.id)?.bare ? 'flex flex-col overflow-hidden' : 'overflow-y-auto p-2'"
 					/>
 				</section>
 
@@ -161,6 +163,7 @@ import {
 	withAll,
 } from "./tiling.js"
 import { usePanelLayout } from "./usePanelLayout.js"
+import TitleSlot from "./TitleSlot.vue"
 
 const props = defineProps({
 	doctype: { type: String, required: true },
