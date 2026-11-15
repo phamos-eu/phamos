@@ -713,8 +713,9 @@ def move_spa_checklist_item_to(checklist_name, item_name, target_checklist, to_i
 	# escaped as plain text: unescaping above could turn "&lt;img …&gt;" back into a tag
 	label = frappe.utils.escape_html(label) or _("Checklist item")
 	move_item(source, target, row, to_index)
-	source_title = _checklist_title_value(source) or source.name
-	target_title = _checklist_title_value(target) or target.name
+	# titles are user text too; comments render as HTML
+	source_title = frappe.utils.escape_html(_checklist_title_value(source) or source.name)
+	target_title = frappe.utils.escape_html(_checklist_title_value(target) or target.name)
 	source.add_comment("Info", _("Moved \"{0}\" to checklist {1}").format(label, target_title))
 	target.add_comment("Info", _("\"{0}\" moved here from checklist {1}").format(label, source_title))
 	return {"source": get_checklist(source.name), "target": get_checklist(target.name)}
