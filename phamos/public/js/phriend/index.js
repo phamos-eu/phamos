@@ -10,6 +10,7 @@
 //   open_reports()            optional: show those reports
 //   on_route_change(cb)       optional
 //   add_shortcut(cb)          optional: Ctrl+Shift+B the host's way; default is a keydown listener
+//   start                     optional: { right, bottom } where the ball sits until it is dragged
 
 import { Ball } from "./ball";
 import { ErrorLog } from "./errors";
@@ -39,6 +40,7 @@ class Phriend {
 			on_click: () => this.report(),
 			on_badge_click: () => this.host.open_reports && this.host.open_reports(),
 			on_first_interest: () => this.load_flow().catch(() => {}),
+			start: this.host.start,
 		});
 
 		if (this.host.add_shortcut) {

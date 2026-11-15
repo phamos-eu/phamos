@@ -27,11 +27,24 @@
 </template>
 
 <script setup>
+import { onMounted } from "vue"
+import { useRouter } from "vue-router"
 import { Toasts } from "frappe-ui"
 import { pageChrome } from "@spa/pageChrome.js"
+import { mountPhriend } from "@spa/phriend.js"
 
-defineProps({
+const props = defineProps({
 	title: { type: String, default: "" },
 	subtitle: { type: String, default: "" },
 })
+
+// Phriend, the report-a-problem ball, in every cockpit (#1900). The heading the shell shows
+// (or a page's own chrome) becomes part of "Reported on".
+const router = useRouter()
+onMounted(() =>
+	mountPhriend(router, () => {
+		const chrome = document.getElementById("cockpit-page-chrome")
+		return (pageChrome.active && chrome?.innerText.trim().split("\n")[0]) || props.title
+	})
+)
 </script>

@@ -131,7 +131,9 @@ button.link:focus-visible, .bubble a:focus-visible { outline: 2px solid var(--ph
 `;
 
 export class Ball {
-	// options: { label, on_click, on_badge_click, on_first_interest }
+	// options: { label, on_click, on_badge_click, on_first_interest, start }
+	// start: { right, bottom } in px until the user drags the ball (the cockpits keep it clear
+	// of their own buttons in the corner)
 	constructor(options) {
 		this.options = options;
 		this.host = document.createElement("div");
@@ -156,6 +158,10 @@ export class Ball {
 		this.pupils = this.shadow.querySelectorAll(".pupil");
 
 		this.sync_theme();
+		if (options.start) {
+			this.root.style.right = `${options.start.right}px`;
+			this.root.style.bottom = `${options.start.bottom}px`;
+		}
 		this.restore_position();
 		this.setup_drag();
 		this.setup_eyes();
