@@ -62,7 +62,7 @@
 			:id="bodyId"
 			:class="[
 				panel.fill ? 'flex min-h-0 flex-1 flex-col' : 'px-4 pb-4 pt-1',
-				constrained ? 'max-h-[40vh] overflow-y-auto' : '',
+				constrained ? 'max-h-[20vh] overflow-y-auto' : '',
 			]"
 		>
 			<component
