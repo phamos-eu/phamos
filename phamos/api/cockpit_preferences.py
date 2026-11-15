@@ -108,8 +108,24 @@ def _clean_panel_layout(value):
 
 
 # key -> (validator returning the value to store, value when nothing is stored)
+IMAGE_SIZES = ("small", "medium", "large")
+
+
+def _clean_image_size(value):
+	"""How wide images may show in the cockpits' rich text, for this user only (#1918)."""
+	if isinstance(value, str):
+		try:
+			value = json.loads(value)
+		except ValueError:
+			pass
+	if value not in IMAGE_SIZES:
+		frappe.throw(_("Unknown image size: {0}").format(value))
+	return value
+
+
 PREFERENCES = {
 	"cockpit_panel_layout": (_clean_panel_layout, {}),
+	"cockpit_image_size": (_clean_image_size, "large"),
 }
 
 
