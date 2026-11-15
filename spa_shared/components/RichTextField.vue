@@ -44,7 +44,8 @@
 			/>
 			<div
 				v-show="overflow.below"
-				class="pointer-events-none absolute inset-x-px bottom-px flex h-12 items-end justify-center rounded-b-lg bg-gradient-to-t from-white to-transparent pb-1.5 dark:from-gray-800"
+				class="pointer-events-none absolute inset-x-px bottom-px flex h-12 items-end justify-center rounded-b-lg bg-gradient-to-t to-transparent pb-1.5"
+				:class="hintFade"
 			>
 				<button
 					type="button"
@@ -97,6 +98,8 @@ const props = defineProps({
 	fieldLabel: { type: String, default: "this field" },
 	/** The editor scrolls inside a fixed box: show when text is hidden above or below */
 	scrollHint: { type: Boolean, default: false },
+	/** the colour the "More below" fade starts from: the editor's background (#1922) */
+	hintFade: { type: String, default: "from-white dark:from-gray-800" },
 })
 
 const emit = defineEmits(["update:modelValue", "focus", "blur"])
