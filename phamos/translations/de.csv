@@ -2032,3 +2032,20 @@ Alt/Option is not possible: it types characters such as @ or € on many keyboar
 "{0} belongs to the browser or the system (copy, paste, undo, tabs…).","{0} gehört dem Browser oder dem System (Kopieren, Einfügen, Rückgängig, Tabs…)."
 "This combination belongs to the browser or the system (copy, paste, undo, tabs…).","Diese Kombination gehört dem Browser oder dem System (Kopieren, Einfügen, Rückgängig, Tabs…)."
 {0} can't be Phriend's shortcut. {1},{0} kann nicht das Tastenkürzel von Phriend sein. {1}
+Phriend report,Phriend-Meldung
+Phriend report: {0},Phriend-Meldung: {0}
+Enlarge the screenshot,Screenshot vergrößern
+Screenshot of the reported page,Screenshot der gemeldeten Seite
+The screenshot can't be shown.,Der Screenshot kann nicht angezeigt werden.
+Sent without a screenshot.,Ohne Screenshot gesendet.
+Reported by {0},Gemeldet von {0}
+Open the page,Seite öffnen
+Technical details,Technische Details
+Screen,Bildschirm
+Reported from,Gemeldet aus
+Versions,Versionen
+Recent errors,Letzte Fehler
+Failed requests,Fehlgeschlagene Serveraufrufe
+1 failed request,1 fehlgeschlagener Serveraufruf
+{0} failed requests,{0} fehlgeschlagene Serveraufrufe
+no errors,keine Fehler
