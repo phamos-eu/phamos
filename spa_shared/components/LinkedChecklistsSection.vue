@@ -202,19 +202,23 @@ async function onChecklistCreated(created) {
 	}
 }
 
+// For the panel's rail icon (#1915): "2 checklists · 3/7 done", and "3/7" as its badge.
+const counts = computed(() => ({
+	lists: summaries.value.length,
+	done: summaries.value.reduce((n, r) => n + (r.done_count || 0), 0),
+	total: summaries.value.reduce((n, r) => n + (r.total_count || 0), 0),
+}))
 const summaryText = computed(() => {
 	if (loading.value && !summaries.value.length) return ""
-	if (!summaries.value.length) return __("None yet")
-	const open = summaries.value.filter((r) => r.status !== "Completed").length
-	const done = summaries.value.reduce((n, r) => n + (r.done_count || 0), 0)
-	const total = summaries.value.reduce((n, r) => n + (r.total_count || 0), 0)
-	const items = __("{0}/{1} done", [done, total])
-	return open ? `${__("{0} open", [open])} · ${items}` : items
+	if (!counts.value.lists) return __("None yet")
+	const lists = counts.value.lists === 1 ? __("1 checklist") : __("{0} checklists", [counts.value.lists])
+	return `${lists} · ${__("{0}/{1} done", [counts.value.done, counts.value.total])}`
 })
 
 watch(
-	[summaryText, unavailable],
-	([summary, hidden]) => emit("state", { summary, hidden }),
+	[summaryText, unavailable, counts],
+	([summary, hidden, c]) =>
+		emit("state", { summary, hidden, badge: c.total ? `${c.done}/${c.total}` : "" }),
 	{ immediate: true }
 )
 

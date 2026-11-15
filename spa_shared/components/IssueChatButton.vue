@@ -1,10 +1,10 @@
 <template>
 	<template v-if="state.enabled">
-		<!-- The chat is an overlay this button toggles. On the Issue view from lg on it is the dock's
-		     chat panel (#1911): while that is expanded the button steps aside, while it is collapsed
-		     the button expands it. -->
+		<!-- The chat is an overlay this button toggles. Where the page has a chat panel (the Issue
+		     view, #1911/#1915), the panel's icon in the rail is the one place to open it, so the
+		     button steps aside. -->
 		<Button
-			v-if="!docked"
+			v-if="!dockable"
 			ref="buttonRef"
 			:variant="state.is_member ? 'subtle' : 'outline'"
 			:loading="busy"
@@ -120,7 +120,7 @@ const texts = computed(() =>
 			}
 )
 
-const EMPTY = { enabled: false, channel_id: null, url: null, is_member: false, archived: false, unread: 0, unread_threads: 0, mentions: 0, threads: [], skipped_users: [] }
+const EMPTY = { enabled: false, channel_id: null, url: null, is_member: false, archived: false, unread: 0, unread_threads: 0, mentions: 0, message_count: 0, threads: [], skipped_users: [] }
 const state = ref({ ...EMPTY })
 const busy = ref(false)
 const drawerOpen = ref(false)
@@ -283,21 +283,30 @@ watch(docked, (isDocked) => {
 	chatChanged()
 })
 
-// What the dock's chat row shows while collapsed (#1911): whether there is a chat, and unread.
+// What the chat panel's rail icon shows (#1915): "12 messages · 3 unread", and the unread count
+// as its badge.
 const rowSummary = computed(() => {
 	if (loading.value) return ""
 	if (!state.value.channel_id) return __("No chat yet")
 	if (!state.value.is_member) return __("You are not in this chat yet.")
-	return unreadSummary(state.value)
+	const count = state.value.message_count || 0
+	const parts = [count === 1 ? __("1 message") : __("{0} messages", [count])]
+	if (unreadTotal.value) parts.push(__("{0} unread", [unreadTotal.value]))
+	return parts.join(" · ")
 })
 watch(
-	[() => props.recordName, () => state.value.enabled, rowSummary],
-	([record, enabled, summary], previous) => {
+	[() => props.recordName, () => state.value.enabled, rowSummary, unreadTotal, () => unreadTone(state.value)],
+	([record, enabled, summary, unread, tone], previous) => {
 		const before = previous?.[0]
 		if (before && before !== record) delete issueChatStore.chats[before]
 		// `enabled` is kept while the next record loads (see the recordName watch), so the panel
 		// and its Raven frame stay instead of blinking.
-		issueChatStore.chats[record] = { enabled: Boolean(enabled), summary }
+		issueChatStore.chats[record] = {
+			enabled: Boolean(enabled),
+			summary,
+			badge: unread ? (unread > 99 ? "99+" : String(unread)) : "",
+			tone,
+		}
 	},
 	{ immediate: true }
 )

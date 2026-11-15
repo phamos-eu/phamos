@@ -383,6 +383,8 @@ def get_chat(doc):
 		"unread": 0,
 		"unread_threads": 0,
 		"mentions": 0,
+		# Messages in the chat, without Raven's system lines; for the cockpit's panel icon (#1915)
+		"message_count": 0,
 		"threads": [],
 		"skipped_users": [],
 	}
@@ -410,6 +412,11 @@ def get_chat(doc):
 	)
 	if state["unread_threads"]:
 		state["threads"] = _unread_threads(channel.name)
+	# Only members see what is in the chat, its size included.
+	if state["is_member"]:
+		state["message_count"] = frappe.db.count(
+			"Raven Message", {"channel_id": channel.name, "message_type": ("!=", "System")}
+		)
 	return state
 
 
