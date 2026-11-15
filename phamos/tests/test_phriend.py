@@ -405,7 +405,8 @@ class TestPhriendIssuePage(FrappeTestCase):
 		self.assertEqual(block["type"], "Bug")
 		self.assertEqual(block["reported_by"], "Administrator")
 		self.assertTrue(block["screenshot"].startswith("/private/files/"))
-		self.assertEqual(block["page_url"], "http://site/app/user/Administrator")
+		# a link on this site, whatever host the browser used
+		self.assertEqual(block["page_url"], "/app/user/Administrator")
 		self.assertEqual(block["ref_url"], "/app/user/Administrator")
 		details = block["details"]
 		self.assertEqual(details["browser"], "Chrome 156, macOS")
@@ -434,8 +435,21 @@ class TestPhriendIssuePage(FrappeTestCase):
 	def test_page_link_is_only_a_web_link(self, _enqueue):
 		from phamos.phriend.report import issue_report
 
-		issue = self.report(page_url="javascript:alert(1)")
-		self.assertIsNone(issue_report(issue)["page_url"])
+		for url in ("javascript:alert(1)", "data:text/html,x", "/app/user"):
+			self.assertIsNone(issue_report(self.report(page_url=url))["page_url"], url)
+		# another host can't be reached through the link (review of !1164)
+		for url in ("https://evil.example/login?next=1#top", "https://evil.example//evil.example/x"):
+			link = issue_report(self.report(page_url=url))["page_url"]
+			self.assertTrue(link.startswith("/") and not link.startswith("//"), link)
+		self.assertEqual(issue_report(self.report(page_url="https://evil.example/login?next=1#top"))["page_url"],
+			"/login?next=1#top")
+
+	def test_versions_are_capped(self, _enqueue):
+		from phamos.phriend.report import MAX_VERSIONS, issue_report
+
+		many = {f"app{i}": "1.0" for i in range(MAX_VERSIONS + 10)}
+		issue = self.report(context=json.dumps({"versions": many}))
+		self.assertEqual(len(issue_report(issue)["details"]["versions"]), MAX_VERSIONS)
 
 	def test_old_reports_and_broken_context_still_show(self, _enqueue):
 		from phamos.phriend.report import issue_report

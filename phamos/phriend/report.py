@@ -5,7 +5,7 @@
 
 import json
 import re
-from urllib.parse import quote, urlparse
+from urllib.parse import quote, urlparse, urlunparse
 
 import frappe
 from frappe.utils import cstr
@@ -14,6 +14,7 @@ from frappe.utils import cstr
 # and caps the lists (the browser keeps at most 20 of each anyway).
 MAX_ENTRIES = 20
 MAX_TEXT = 300
+MAX_VERSIONS = 50  # one per installed app
 ENTRY_KEYS = ("at", "type", "message", "source", "url", "method", "status")
 
 
@@ -57,7 +58,9 @@ def _context(raw):
 		"viewport": _text(ctx.get("viewport")),
 		# reports from before the GDPR review of !1162 carry the full user agent instead
 		"browser": _text(ctx.get("browser")) or _browser_name(cstr(ctx.get("user_agent"))),
-		"versions": {_text(k): _text(v) for k, v in versions.items()} if isinstance(versions, dict) else {},
+		"versions": {_text(k): _text(v) for k, v in list(versions.items())[:MAX_VERSIONS]}
+		if isinstance(versions, dict)
+		else {},
 		"recent_errors": _entries(ctx.get("recent_errors")),
 		"failed_requests": _entries(ctx.get("failed_requests")),
 	}
@@ -93,9 +96,17 @@ def _text(value):
 
 
 def _web_url(url):
-	"""The page the report came from, only as an http(s) link: the browser sent it."""
-	url = cstr(url).strip()
-	return url if urlparse(url).scheme in ("http", "https") else None
+	"""The page the report came from, as a link on this site.
+
+	The browser sent the URL, so only its path, query and fragment are kept: the link always opens
+	on the site the reader is on and can't lead to another host (phishing; review of !1164). That
+	also keeps it working when the reporter used another name for the same site.
+	"""
+	parsed = urlparse(cstr(url).strip())
+	if parsed.scheme not in ("http", "https") or not parsed.path.startswith("/"):
+		return None
+	path = "/" + parsed.path.lstrip("/")  # "//evil.example" would be another host again
+	return urlunparse(("", "", path, "", parsed.query, parsed.fragment))
 
 
 def _desk_url(doctype, name):
