@@ -335,6 +335,11 @@ export class Ball {
 		this.bubble.classList.remove("show");
 	}
 
+	set_label(label) {
+		this.hit.setAttribute("aria-label", label);
+		this.hit.title = label;
+	}
+
 	set_badge(count, title) {
 		this.badge.textContent = count ? String(count) : "";
 		this.badge.title = title || "";

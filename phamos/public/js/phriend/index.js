@@ -9,11 +9,13 @@
 //   count_reports()           optional: Promise of the open reports for this page (the badge)
 //   open_reports()            optional: show those reports
 //   on_route_change(cb)       optional
-//   add_shortcut(cb)          optional: Ctrl+Shift+B the host's way; default is a keydown listener
+//   shortcut                  the user's shortcut ("Mod+P"; "" when off)
+//   default_shortcut          the site's (Phriend Settings), for "Back to the default"
 //   start                     optional: { right, bottom } where the ball sits until it is dragged
 
 import { Ball } from "./ball";
 import { ErrorLog } from "./errors";
+import { format, matches, parse } from "./shortcut";
 import { DRAFT_KEY, escape_html, storage_get, storage_set } from "./util";
 
 export { DRAFT_KEY };
@@ -30,29 +32,50 @@ class Phriend {
 		this.open = false;
 		this.log = new ErrorLog(); // start recording errors as early as possible
 		this.log.on_failed_request((item) => this.on_failed_request(item));
+		this.recording = false; // the flow is taking a new shortcut: keys are for it
+		this.set_shortcut(host.shortcut || "");
+	}
+
+	// The user's shortcut, as Phriend Settings and the user's own choice give it ("" when off).
+	set_shortcut(text) {
+		this.shortcut = text || "";
+		this.shortcut_spec = parse(this.shortcut);
+		if (this.ball) this.ball.set_label(this.label());
+	}
+
+	label() {
+		const keys = format(this.shortcut);
+		return keys ? this.__("Phriend: report a problem ({0})", [keys]) : this.__("Phriend: report a problem");
+	}
+
+	// Before the page and the browser see the key (capture on window): the default, Cmd/Ctrl+P,
+	// would otherwise open the print dialog, and Desk prints the form on Ctrl+P.
+	listen_for_shortcut() {
+		window.addEventListener(
+			"keydown",
+			(e) => {
+				if (this.recording || e.repeat || !matches(e, this.shortcut_spec)) return;
+				e.preventDefault();
+				if (this.open) return; // already open; just don't print
+				e.stopPropagation();
+				this.report();
+			},
+			true
+		);
 	}
 
 	mount() {
 		if (this.ball || document.getElementById("phriend-root")) return;
 		const __ = this.__;
 		this.ball = new Ball({
-			label: __("Phriend: report a problem (Ctrl+Shift+B)"),
+			label: this.label(),
 			on_click: () => this.report(),
 			on_badge_click: () => this.host.open_reports && this.host.open_reports(),
 			on_first_interest: () => this.load_flow().catch(() => {}),
 			start: this.host.start,
 		});
 
-		if (this.host.add_shortcut) {
-			this.host.add_shortcut(() => this.report());
-		} else {
-			document.addEventListener("keydown", (e) => {
-				if (e.ctrlKey && e.shiftKey && !e.altKey && (e.key === "B" || e.key === "b")) {
-					e.preventDefault();
-					this.report();
-				}
-			});
-		}
+		this.listen_for_shortcut();
 		if (this.host.on_route_change) this.host.on_route_change(() => this.refresh_badge());
 
 		if (storage_get(DRAFT_KEY, "session")) {

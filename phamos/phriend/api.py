@@ -15,6 +15,7 @@ from frappe.desk.form.assign_to import add as assign_to
 from frappe.utils import cstr, escape_html, get_url
 from frappe.utils.password import get_decrypted_password
 
+from phamos.phriend import shortcut as phriend_shortcut
 from phamos.phriend.boot import phriend_boot
 
 MAX_SCREENSHOT_BYTES = 15 * 1024 * 1024
@@ -132,7 +133,22 @@ def create_report(
 	return {"name": issue.name}
 
 
-REPORT_REF_FILTERS = ("phriend_route", "phriend_ref_doctype", "phriend_ref_docname")
+@frappe.whitelist(methods=["POST"])
+def set_my_shortcut(shortcut=None):
+	"""Change, switch off or reset the current user's Phriend shortcut (#1900).
+
+	shortcut: a combination like "Mod+P", "Off" to switch it off, or empty to use the site's
+	again (Phriend Settings). Returns the shortcut now in effect ("" when off).
+	"""
+	_check_allowed()
+	value = cstr(shortcut).strip()
+	if not value:
+		frappe.defaults.clear_user_default(phriend_shortcut.USER_DEFAULT)
+	elif value.lower() == phriend_shortcut.OFF.lower():
+		frappe.defaults.set_user_default(phriend_shortcut.USER_DEFAULT, phriend_shortcut.OFF)
+	else:
+		frappe.defaults.set_user_default(phriend_shortcut.USER_DEFAULT, phriend_shortcut.normalize(value))
+	return phriend_shortcut.user_shortcut()
 
 
 @frappe.whitelist()

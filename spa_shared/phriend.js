@@ -64,6 +64,9 @@ export function mountPhriend(router, heading) {
 		count_reports: () => call(COUNT_METHOD, badgeArgs(current()), window.csrf_token),
 		open_reports: () => window.open(reportsUrl(current()), "_blank", "noopener"),
 		on_route_change: (callback) => router.afterEach(() => callback()),
+		// the user's own shortcut, else the site's (Phriend Settings); "" when off
+		shortcut: boot().phriend.shortcut || "",
+		default_shortcut: boot().phriend.default_shortcut || "",
 		// above the buttons the cockpits keep in their bottom right corner ("Today" in My Day)
 		start: { right: 24, bottom: 76 },
 	})

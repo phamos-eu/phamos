@@ -10,8 +10,8 @@ import frappe
 from frappe.tests.utils import FrappeTestCase
 from PIL import Image
 
-from phamos.phriend import api, setup
-from phamos.phriend.boot import boot_session
+from phamos.phriend import api, setup, shortcut
+from phamos.phriend.boot import boot_session, phriend_boot
 from phamos.www.spa_boot import get_spa_boot
 
 # a 1x1 PNG
@@ -186,7 +186,7 @@ class TestPhriend(FrappeTestCase):
 	def test_boot_shows_phriend_only_to_allowed_users(self, _enqueue):
 		bootinfo = frappe._dict()
 		boot_session(bootinfo)
-		self.assertEqual(bootinfo.phriend, {"enabled": 1})
+		self.assertEqual(bootinfo.phriend["enabled"], 1)
 		self.set_settings(allowed_role="No Such Role For Phriend")
 		bootinfo = frappe._dict()
 		boot_session(bootinfo)
@@ -195,7 +195,7 @@ class TestPhriend(FrappeTestCase):
 	def test_cockpits_boot_phriend_like_desk(self, _enqueue):
 		# the cockpits load no Desk boot: get_spa_boot carries the flag and the versions (#1900)
 		boot = get_spa_boot("/personal-cockpit")
-		self.assertEqual(boot.phriend, {"enabled": 1})
+		self.assertEqual(boot.phriend["enabled"], 1)
 		self.assertTrue(boot.versions.get("phamos"))
 		self.set_settings(enabled=0)
 		boot = get_spa_boot("/personal-cockpit")
@@ -224,6 +224,48 @@ class TestPhriend(FrappeTestCase):
 		# a filter operator smuggled in as an argument is taken as plain text
 		self.set_settings(allowed_role="System Manager")
 		self.assertEqual(api.count_open_reports(ref_doctype=["like", "%"]), 0)
+
+	# ---- keyboard shortcut (#1900)
+
+	def test_shortcuts_are_written_one_way_and_must_have_a_modifier(self, _enqueue):
+		self.assertEqual(shortcut.normalize("cmd+p"), "Mod+P")
+		self.assertEqual(shortcut.normalize(" shift + option + p "), "Alt+Shift+P")
+		self.assertEqual(shortcut.normalize("Ctrl+F5"), "Ctrl+F5")
+		self.assertEqual(shortcut.normalize("F2"), "F2")
+		self.assertEqual(shortcut.normalize(""), "")
+		for bad in ("p", "Shift+P", "Mod+P+Q", "Mod+Escape", "Hyper+P"):
+			with self.subTest(bad=bad), self.assertRaises(frappe.ValidationError):
+				shortcut.normalize(bad)
+
+	def test_each_user_can_change_switch_off_or_reset_their_shortcut(self, _enqueue):
+		self.set_settings(shortcut="Mod+P")
+		self.assertEqual(phriend_boot()["shortcut"], "Mod+P")
+
+		self.assertEqual(api.set_my_shortcut("alt+shift+p"), "Alt+Shift+P")
+		self.assertEqual(phriend_boot(), {"enabled": 1, "shortcut": "Alt+Shift+P", "default_shortcut": "Mod+P"})
+
+		self.assertEqual(api.set_my_shortcut("Off"), "")
+		self.assertEqual(phriend_boot()["shortcut"], "")
+
+		self.assertEqual(api.set_my_shortcut(""), "Mod+P")  # back to the site's
+		with self.assertRaises(frappe.ValidationError):
+			api.set_my_shortcut("p")
+		self.assertEqual(phriend_boot()["shortcut"], "Mod+P")
+		frappe.defaults.clear_user_default(shortcut.USER_DEFAULT)
+
+	def test_existing_sites_get_mod_p_once_and_an_empty_shortcut_stays_off(self, _enqueue):
+		frappe.db.delete("Singles", {"doctype": "Phriend Settings", "field": "shortcut"})
+		setup.ensure_default_shortcut()
+		self.assertEqual(frappe.db.get_single_value("Phriend Settings", "shortcut"), "Mod+P")
+		frappe.db.set_single_value("Phriend Settings", "shortcut", "")
+		setup.ensure_default_shortcut()
+		self.assertEqual(frappe.db.get_single_value("Phriend Settings", "shortcut") or "", "")
+
+	def test_settings_save_the_shortcut_in_one_spelling(self, _enqueue):
+		doc = frappe.get_doc("Phriend Settings")
+		doc.shortcut = "command+shift+k"
+		doc.save()
+		self.assertEqual(doc.shortcut, "Mod+Shift+K")
 
 	# ---- Issue -> GitLab
 

@@ -11,7 +11,9 @@ import { Annotator } from "./annotator";
 import { SVG } from "./ball";
 import { capture, to_data_url } from "./capture";
 import { FLOW_CSS } from "./flow_css";
+import { call } from "./request";
 import { Sender } from "./send";
+import { format, from_event } from "./shortcut";
 import { DRAFT_KEY, escape_html, sleep, storage_set } from "./util";
 
 // The steps, in their order. The screenshot is taken at the click whatever comes first.
@@ -129,6 +131,7 @@ class Flow {
 					<section class="pane" data-pane="3" hidden></section>
 				</main>
 				<footer>
+					<button type="button" class="link shortcut-link" data-shortcut hidden></button>
 					<button type="button" class="btn" data-back>${escape_html(__("Back"))}</button>
 					<span class="grow"></span>
 					<span class="hint" data-hint>${escape_html(__("Ctrl+Enter sends"))}</span>
@@ -153,6 +156,7 @@ class Flow {
 			hint: $("[data-hint]"),
 			next: $("[data-next]"),
 			skip: $("[data-skip]"),
+			shortcut: $("[data-shortcut]"),
 		};
 		this.el.in_title.value = this.values.title;
 		this.el.in_comment.value = this.values.comment;
@@ -182,6 +186,10 @@ class Flow {
 			else if (t.dataset.priority) this.choose("priority", t.dataset.priority, STEP.kind);
 			else if (t.hasAttribute("data-discard")) this.close(true);
 			else if (t.hasAttribute("data-keep")) this.restore_footer();
+			else if (t.hasAttribute("data-shortcut")) this.edit_shortcut();
+			else if (t.hasAttribute("data-sc-off")) this.save_shortcut("Off");
+			else if (t.hasAttribute("data-sc-default")) this.save_shortcut("");
+			else if (t.hasAttribute("data-sc-cancel")) this.stop_editing_shortcut();
 		});
 		const typing = (key, step) => (e) => {
 			this.values[key] = e.target.value;
@@ -222,6 +230,7 @@ class Flow {
 
 	keydown(e) {
 		if (!this.layer.isConnected) return;
+		if (this.phriend.recording) return this.record_shortcut(e);
 		if (e.key === "Escape") {
 			e.preventDefault();
 			e.stopPropagation();
@@ -289,6 +298,11 @@ class Flow {
 		// Sending happens on the summary only (PM, 2026-11-15): every report passes "Check and
 		// send", so nobody sends something they haven't seen.
 		this.el.hint.hidden = this.step !== LAST_STEP;
+		// the user's own shortcut, changeable here (PM, 2026-11-15); on the first step, where the
+		// footer has room and everyone passes
+		this.el.shortcut.hidden = this.step !== STEP.kind;
+		const keys = format(this.phriend.shortcut);
+		this.el.shortcut.textContent = keys ? __("Shortcut: {0}", [keys]) : __("Shortcut: off");
 		// The screenshot step: "Next" keeps the screenshot, "Skip" goes on without it (PM,
 		// 2026-11-15). Only while there is a screenshot to leave out.
 		const on_shot = this.step === STEP.shot;
@@ -497,6 +511,7 @@ class Flow {
 	}
 
 	close(force = false, sent = false) {
+		if (this.phriend.recording) return this.stop_editing_shortcut();
 		if (!force && this.is_dirty()) return this.ask_discard();
 		const ball = this.phriend.ball;
 		ball.host.removeEventListener("keydown", this.on_host_key);
@@ -508,6 +523,7 @@ class Flow {
 			storage_set(DRAFT_KEY, null, "session");
 			ball.set_pending(false);
 		}
+		this.phriend.recording = false;
 		const finish = () => {
 			this.layer.remove();
 			ball.set_away(false);
@@ -531,6 +547,52 @@ class Flow {
 		}
 	}
 
+	// ------------------------------------------------------------- shortcut
+
+	edit_shortcut() {
+		const __ = this.__;
+		const fallback = format(this.phriend.host.default_shortcut);
+		this.phriend.recording = true;
+		this.el.footer.innerHTML = `
+			<span class="confirm grow" data-sc-msg aria-live="polite">${escape_html(__("Press the new keys…"))}</span>
+			<button type="button" class="btn" data-sc-off>${escape_html(__("Turn off"))}</button>
+			${fallback ? `<button type="button" class="btn" data-sc-default>${escape_html(__("Use the default ({0})", [fallback]))}</button>` : ""}
+			<button type="button" class="btn ghost" data-sc-cancel>${escape_html(__("Cancel"))}</button>`;
+		setTimeout(() => this.el.footer.querySelector("[data-sc-cancel]").focus(), 0);
+	}
+
+	record_shortcut(e) {
+		e.preventDefault();
+		e.stopPropagation();
+		if (e.key === "Escape") return this.stop_editing_shortcut();
+		if (["Shift", "Control", "Alt", "Meta", "Tab"].includes(e.key)) return; // still choosing
+		const text = from_event(e);
+		if (text) return this.save_shortcut(text);
+		this.shortcut_message(this.__("Use Cmd/Ctrl or Alt together with a letter, a digit or F1 to F12."));
+	}
+
+	async save_shortcut(value) {
+		const __ = this.__;
+		this.shortcut_message(__("Saving…"));
+		try {
+			const now = await call("phamos.phriend.api.set_my_shortcut", { shortcut: value }, this.phriend.host.csrf_token());
+			this.phriend.set_shortcut(now || "");
+			this.stop_editing_shortcut();
+		} catch (error) {
+			this.shortcut_message(error.message || __("That didn't work. Try again."));
+		}
+	}
+
+	shortcut_message(text) {
+		const el = this.el.footer.querySelector("[data-sc-msg]");
+		if (el) el.textContent = text;
+	}
+
+	stop_editing_shortcut() {
+		this.phriend.recording = false;
+		this.restore_footer();
+	}
+
 	ask_discard() {
 		const __ = this.__;
 		this.el.footer.innerHTML = `
@@ -546,6 +608,7 @@ class Flow {
 		this.el.hint = this.layer.querySelector("[data-hint]");
 		this.el.next = this.layer.querySelector("[data-next]");
 		this.el.skip = this.layer.querySelector("[data-skip]");
+		this.el.shortcut = this.layer.querySelector("[data-shortcut]");
 		this.update_footer();
 		this.el.next.focus();
 	}

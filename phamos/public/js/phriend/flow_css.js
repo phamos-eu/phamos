@@ -31,6 +31,9 @@ main { flex: 1; min-height: 0; overflow: auto; padding: 18px; }
 footer { display: flex; align-items: center; gap: 8px; padding: 12px 18px; border-top: 1px solid var(--ph-border); }
 footer .grow { flex: 1; }
 footer .hint { font-size: 12px; color: var(--ph-muted); }
+footer .shortcut-link { font-size: 12px; color: var(--ph-muted); text-decoration: none; }
+footer .shortcut-link:hover { color: var(--ph-text); text-decoration: underline; }
+footer .shortcut-link[hidden] { display: none; }
 button.btn { height: 34px; padding: 0 14px; border-radius: 8px; border: 1px solid var(--ph-border-strong);
 	background: transparent; color: var(--ph-text); font: inherit; font-weight: 500; cursor: pointer; }
 button.btn:hover { background: var(--ph-surface); }

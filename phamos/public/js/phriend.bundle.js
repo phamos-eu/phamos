@@ -141,13 +141,9 @@ const desk = {
 		if (frappe.router && typeof frappe.router.on === "function") frappe.router.on("change", callback);
 		else $(window).on("hashchange popstate", callback);
 	},
-	add_shortcut: (callback) =>
-		frappe.ui.keys.add_shortcut({
-			shortcut: "ctrl+shift+b",
-			action: callback,
-			description: __("Report a problem with Phriend"),
-			ignore_inputs: true,
-		}),
+	// the user's own shortcut, else the site's (Phriend Settings); "" when off
+	shortcut: (frappe.boot.phriend && frappe.boot.phriend.shortcut) || "",
+	default_shortcut: (frappe.boot.phriend && frappe.boot.phriend.default_shortcut) || "",
 };
 
 frappe.provide("phriend");

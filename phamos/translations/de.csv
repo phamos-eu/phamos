@@ -1951,9 +1951,7 @@ Open it,Öffnen
 Page,Seite
 Phriend adds this for you,Das fügt Phriend für Sie hinzu
 Phriend couldn't start. Reload the page and try again.,Phriend konnte nicht starten. Laden Sie die Seite neu und versuchen Sie es noch einmal.
-Phriend: report a problem (Ctrl+Shift+B),Phriend: ein Problem melden (Strg+Umschalt+B)
 Problems on the page,Probleme auf der Seite
-Report a problem with Phriend,Ein Problem mit Phriend melden
 Report it?,Melden?
 Reported on: {0},Gemeldet auf: {0}
 Save does nothing on a new lead,Speichern tut nichts bei einem neuen Lead
@@ -2008,3 +2006,16 @@ not a PNG or JPEG image,kein PNG- oder JPEG-Bild
 larger than {0} MB,größer als {0} MB
 Something else,Etwas anderes
 None of these,Nichts davon
+Phriend: report a problem ({0}),Phriend: ein Problem melden ({0})
+Phriend: report a problem,Phriend: ein Problem melden
+Shortcut: {0},Tastenkürzel: {0}
+Shortcut: off,Tastenkürzel: aus
+Press the new keys…,Drücken Sie die neuen Tasten…
+Turn off,Ausschalten
+Use the default ({0}),Standard verwenden ({0})
+"Use Cmd/Ctrl or Alt together with a letter, a digit or F1 to F12.","Verwenden Sie Cmd/Strg oder Alt zusammen mit einem Buchstaben, einer Ziffer oder F1 bis F12."
+That didn't work. Try again.,Das hat nicht geklappt. Versuchen Sie es noch einmal.
+"{0} is not a shortcut Phriend can use. Use Cmd/Ctrl or Alt with a letter, a digit or F1 to F12, e.g. Mod+P.","{0} ist kein Tastenkürzel, das Phriend verwenden kann. Verwenden Sie Cmd/Strg oder Alt mit einem Buchstaben, einer Ziffer oder F1 bis F12, z. B. Mod+P."
+Keyboard shortcut,Tastenkürzel
+Keyboard Shortcut,Tastenkürzel
+"Opens Phriend. Mod is Cmd on a Mac and Ctrl elsewhere, e.g. Mod+P or Alt+Shift+P. Empty: no shortcut. Each user can change or switch off their own in Phriend.","Öffnet Phriend. Mod ist Cmd auf dem Mac und sonst Strg, z. B. Mod+P oder Alt+Shift+P. Leer: kein Tastenkürzel. Jede Person kann ihr eigenes in Phriend ändern oder ausschalten."
