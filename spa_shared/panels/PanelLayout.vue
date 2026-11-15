@@ -181,7 +181,9 @@ const parkId = `${uid}-park`
 const tileId = (id) => `${uid}-tile-${id}`
 
 const stored = usePanelLayout(props.doctype)
-const defaults = DEFAULT_LAYOUTS[props.doctype] || { tree: () => null, opened: [] }
+// A cockpit may bring its own record type and default layout (the sales cockpit's Lead, #1913).
+const defaults = spaConfig.panelLayouts?.[props.doctype] ||
+	DEFAULT_LAYOUTS[props.doctype] || { tree: () => null, opened: [] }
 
 // The panels of this record, and what their bodies reported (badge, summary, hidden).
 const defs = computed(() => panelsFor(PANELS, { doctype: props.doctype, record: props.record, cockpitPanels: spaConfig.panels }))
