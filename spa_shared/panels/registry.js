@@ -26,6 +26,10 @@ export const MAX_DOCK_WIDTH = 1600
  * @param {(record) => boolean} [def.defaultOpen] expanded until the user collapses it
  * @param {number} [def.minWidth] the dock is at least this wide while the panel is expanded
  * @param {boolean} [def.popout] may be popped out (#1912)
+ * @param {boolean} [def.persistent] the body stays mounted when another record opens (it follows
+ *   its props instead); for the chat, whose frame and teleport target must not be swapped
+ * @param {boolean} [def.fill] while expanded it takes the dock's remaining height, without padding,
+ *   and the dock stops scrolling (the Raven frame is laid over the page and can't be clipped)
  * @param {number} [def.order] position when neither cockpit nor user ordered it
  */
 export function definePanel(def) {
@@ -38,6 +42,8 @@ export function definePanel(def) {
 		defaultOpen: () => true,
 		minWidth: 0,
 		popout: true,
+		fill: false,
+		persistent: false,
 		order: 100,
 		...def,
 	}

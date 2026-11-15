@@ -9,6 +9,7 @@ import { markRaw } from "vue"
 import LinkedChecklistsSection from "@spa/components/LinkedChecklistsSection.vue"
 import IssuePhriendReport from "@spa/components/IssuePhriendReport.vue"
 import PhriendMark from "@spa/components/PhriendMark.vue"
+import ChatDockHost from "./ChatDockHost.vue"
 import { typeLabel } from "@spa/utils/phriendReport.js"
 import { definePanel } from "./registry.js"
 
@@ -45,4 +46,22 @@ export const checklists = definePanel({
 	defaultOpen: () => true,
 })
 
-export const PANELS = [phriendReport, checklists]
+// The record's Raven chat (#1911). First, so it fills the dock with the other rows below it.
+// Below lg, or without Raven, it reports itself hidden and the top-bar button opens the overlay.
+export const chat = definePanel({
+	id: "chat",
+	title: "Chat",
+	icon: "message-circle",
+	doctypes: ["Issue"],
+	component: markRaw(ChatDockHost),
+	order: 5,
+	// Raven keeps its desktop layout from 768px (#1613); the dock is that wide only while expanded
+	minWidth: 768,
+	fill: true,
+	persistent: true,
+	popout: false,
+	props: ({ record }) => ({ recordName: record.name }),
+	defaultOpen: () => true,
+})
+
+export const PANELS = [chat, phriendReport, checklists]

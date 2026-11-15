@@ -114,22 +114,8 @@
 			class="order-4 flex w-72 flex-none flex-col overflow-hidden border-l border-outline-gray-2 bg-surface-white"
 		/>
 
-		<!-- The chat column (#1615). Before IssueDetail in the DOM so the chat panel can teleport
-		     into it; shown from lg on while the selected Issue's chat is open. No border: the frame
-		     needs all 768px, or Raven switches to its touch layout (#1613). -->
-		<aside
-			v-if="selectedName"
-			v-show="chatColumnOpen"
-			id="issue-chat-host"
-			class="order-3 hidden w-[768px] flex-none flex-col overflow-hidden lg:flex"
-		/>
-
-		<!-- Description and the panel dock side by side; stacked while the chat column is open. -->
-		<div
-			v-if="selectedName"
-			class="order-2 flex min-h-0 min-w-0 flex-1"
-			:class="chatColumnOpen ? 'flex-row lg:flex-col' : 'flex-row'"
-		>
+		<!-- Description and the panel dock side by side; the chat is one of the dock's panels (#1911). -->
+		<div v-if="selectedName" class="order-2 flex min-h-0 min-w-0 flex-1 flex-row">
 			<aside
 				class="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden border-r border-gray-200 bg-white dark:border-gray-800 dark:bg-gray-900"
 			>
@@ -150,8 +136,8 @@
 				/>
 			</aside>
 
-			<!-- Checklists, the Phriend report and later panels (#1909): spa_shared/panels. -->
-			<PanelDock v-if="selectedIssue" doctype="Issue" :record="selectedIssue" :stacked="chatColumnOpen" />
+			<!-- Chat, checklists, the Phriend report and later panels (#1909): spa_shared/panels. -->
+			<PanelDock v-if="selectedIssue" doctype="Issue" :record="selectedIssue" />
 		</div>
 
 		<CreateIssueDialog v-model="showCreate" :options="formOptions" @created="onCreated" />
@@ -163,7 +149,6 @@ import { computed, onMounted, ref, watch } from "vue"
 import { useRoute, useRouter } from "vue-router"
 import { call } from "frappe-ui"
 import IssueDetail from "@spa/components/IssueDetail.vue"
-import { issueChatStore } from "@spa/issueChatStore.js"
 import { useIssueChatStates } from "@spa/composables/useIssueChatStates.js"
 import { compareChatStates } from "@spa/utils/chatUnread.js"
 import { prewarmRavenFrame } from "@spa/utils/ravenFrame.js"
@@ -205,8 +190,6 @@ const issues = ref([])
 const truncated = ref(false)
 const showCreate = ref(false)
 const selectedName = ref(null)
-// The selected Issue's chat is open: show its column and stack Description and Checklists.
-const chatColumnOpen = computed(() => Boolean(selectedName.value) && issueChatStore.openFor === selectedName.value)
 const selectedIssue = ref(null)
 const detailLoading = ref(false)
 const formOptions = ref({

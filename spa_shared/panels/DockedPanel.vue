@@ -5,7 +5,8 @@
 		v-show="!hidden"
 		role="complementary"
 		:aria-label="title"
-		class="border-b border-outline-gray-2 last:border-b-0"
+		class="flex-none border-b border-outline-gray-2 last:border-b-0"
+		:class="fills ? 'flex min-h-0 flex-1 flex-col' : ''"
 	>
 		<div class="group flex items-center gap-1 px-3 py-1.5">
 			<button
@@ -56,10 +57,17 @@
 		</div>
 		<!-- Kept mounted while collapsed: the body loads its data and reports the summary the
 		     collapsed row shows (e.g. "1 open · 3/7 done"). -->
-		<div v-show="expanded" :id="bodyId" class="px-4 pb-4 pt-1">
+		<div
+			v-show="expanded"
+			:id="bodyId"
+			:class="[
+				panel.fill ? 'flex min-h-0 flex-1 flex-col' : 'px-4 pb-4 pt-1',
+				constrained ? 'max-h-[40vh] overflow-y-auto' : '',
+			]"
+		>
 			<component
 				:is="panel.component"
-				:key="record.name"
+				:key="panel.persistent ? panel.id : record.name"
 				v-bind="bodyProps"
 				embedded
 				@state="onState"
@@ -69,7 +77,7 @@
 </template>
 
 <script setup>
-import { computed, ref, watch } from "vue"
+import { computed, provide, ref, watch } from "vue"
 import { Button, FeatherIcon } from "frappe-ui"
 import { __ } from "@spa/utils/i18n.js"
 
@@ -80,18 +88,27 @@ const props = defineProps({
 	expanded: { type: Boolean, default: false },
 	canMoveUp: { type: Boolean, default: false },
 	canMoveDown: { type: Boolean, default: false },
+	// Next to an expanded filling panel (the chat): this body scrolls on its own, capped.
+	constrained: { type: Boolean, default: false },
 })
 
 const emit = defineEmits(["toggle", "move", "hidden"])
+
+// A body can ask whether it is shown, e.g. the chat lays its Raven frame only while expanded.
+provide(
+	"dockPanelExpanded",
+	computed(() => props.expanded)
+)
 
 const title = computed(() => __(props.panel.title))
 const bodyId = computed(() => `dock-panel-${props.panel.id}`)
 
 // What the body last reported. The body is keyed by the record, so another record remounts it
-// and it reports afresh.
+// and it reports afresh; a persistent body reports again when its props change.
 const reported = ref({})
 
 const hidden = computed(() => !!reported.value.hidden)
+const fills = computed(() => props.panel.fill && props.expanded && !hidden.value)
 watch(hidden, (value) => emit("hidden", value))
 
 const summaryText = computed(() => {

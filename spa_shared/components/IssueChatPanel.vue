@@ -1,6 +1,7 @@
 <template>
-	<!-- Wide screens: a permanent column of the Issue view (#issue-chat-host in IssuesInbox).
-	     Below lg, or where the view has no such column, it covers the page from the right. -->
+	<!-- Wide screens: the chat panel of the Issue view's dock (#issue-chat-host, panels/ChatDockHost)
+	     while it is expanded. Otherwise (below lg, collapsed, or a view without a dock) it covers
+	     the page from the right. -->
 	<Teleport :to="inColumn ? '#issue-chat-host' : 'body'">
 		<Transition
 			:enter-active-class="inColumn ? '' : 'transition-transform duration-200 ease-out'"
@@ -15,9 +16,13 @@
 				:aria-label="__('Chat about {0}', [title])"
 				@keydown.escape="close"
 			>
-				<header class="flex h-12 flex-shrink-0 items-center gap-2 border-b border-outline-gray-2 px-3">
-					<FeatherIcon name="message-circle" class="h-4 w-4 flex-shrink-0 text-ink-gray-6" />
-					<span class="min-w-0 flex-1 truncate text-sm font-medium text-ink-gray-9">{{ __("Chat") }}</span>
+				<header v-if="!inColumn || url" class="flex h-12 flex-shrink-0 items-center gap-2 border-b border-outline-gray-2 px-3">
+					<!-- In the dock the panel row above already says "Chat". -->
+					<template v-if="!inColumn">
+						<FeatherIcon name="message-circle" class="h-4 w-4 flex-shrink-0 text-ink-gray-6" />
+						<span class="min-w-0 flex-1 truncate text-sm font-medium text-ink-gray-9">{{ __("Chat") }}</span>
+					</template>
+					<span v-else class="flex-1" />
 					<Button
 						v-if="url"
 						variant="ghost"
@@ -93,10 +98,10 @@
 
 <script setup>
 // The chat of one record (#1615): its Raven channel in a frame, kept to that channel by
-// utils/ravenEmbed.js. From lg on it is a permanent 768px column of the Issue view, the narrowest
-// width at which Raven keeps its desktop layout with mouse actions (#1613); IssuesInbox makes room
-// by stacking the checklists under the description. Without a chat (or before joining it) the
-// column shows the `placeholder` slot. Below lg it is an overlay the chat button toggles.
+// utils/ravenEmbed.js. From lg on, on the Issue view, it is the dock's chat panel (#1911), 768px
+// wide while expanded: the narrowest width at which Raven keeps its desktop layout with mouse
+// actions (#1613). Without a chat (or before joining it) the panel shows the `placeholder` slot.
+// Elsewhere it is an overlay the chat button toggles.
 // No side border: it would take a pixel from the frame and tip Raven into its mobile layout.
 //
 // Raven boots once per page: the frame belongs to utils/ravenFrame.js and is laid over this panel
@@ -134,21 +139,24 @@ let heldSlot = null
 let removeGuard = null
 let frameReady = false
 
-// Column on lg screens when the view offers one (Tailwind's lg breakpoint).
+// In the dock on lg screens while this record's chat panel is expanded (Tailwind's lg breakpoint).
 const wide = typeof window !== "undefined" ? window.matchMedia("(min-width: 1024px)") : null
-const inColumn = ref(false)
+const isWide = ref(Boolean(wide?.matches))
 function updatePlacement() {
-	inColumn.value = Boolean(wide?.matches && document.getElementById("issue-chat-host"))
+	isWide.value = Boolean(wide?.matches)
 }
-updatePlacement()
 onMounted(() => {
 	updatePlacement()
 	wide?.addEventListener("change", updatePlacement)
 })
+const inColumn = computed(() => {
+	const host = issueChatStore.dockHost
+	return Boolean(isWide.value && host?.record === props.recordName && host.available && host.expanded)
+})
 
 const shown = computed(() => inColumn.value || props.open)
 
-// IssuesInbox shows the chat column (and stacks Description and Checklists) for this record.
+// Which record's chat shows in the page (kept for views that follow it).
 watch(
 	[() => shown.value && inColumn.value, () => props.recordName],
 	([inUse, record], previous) => {

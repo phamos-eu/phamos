@@ -5,15 +5,18 @@
 		v-if="panels.length"
 		v-show="!allHidden"
 		class="relative flex min-h-0 min-w-0 flex-none flex-col border-r border-outline-gray-2 bg-surface-white"
-		:class="
-			stacked
-				? 'w-[var(--dock-w)] max-w-[calc(100%-20rem)] lg:max-h-[45%] lg:w-auto lg:max-w-none lg:border-t'
-				: 'w-[var(--dock-w)] max-w-[calc(100%-20rem)]'
-		"
-		:style="{ '--dock-w': `${width}px` }"
+		:style="{
+			width: `${width}px`,
+			// The record keeps at least 20rem, except next to a panel that needs its width (the
+			// chat: Raven falls back to its touch layout below 768px).
+			maxWidth: needsWidth ? 'none' : 'calc(100% - 20rem)',
+		}"
 		:aria-label="__('Panels')"
 	>
+		<!-- No splitter while a panel that needs its width (the chat) is expanded: the dock is then
+		     exactly that wide, and the user's width comes back when it is collapsed. -->
 		<div
+			v-if="!needsWidth"
 			role="separator"
 			aria-orientation="vertical"
 			tabindex="0"
@@ -23,7 +26,7 @@
 			:aria-valuemax="MAX_DOCK_WIDTH"
 			:title="__('Drag to resize, double-click to reset')"
 			class="absolute inset-y-0 -left-1 z-10 w-2 cursor-col-resize touch-none hover:bg-outline-gray-3 focus:outline-none focus-visible:bg-outline-gray-4"
-			:class="[{ 'lg:hidden': stacked }, dragging ? 'bg-outline-gray-4' : '']"
+			:class="dragging ? 'bg-outline-gray-4' : ''"
 			@pointerdown="startDrag"
 			@pointermove="drag"
 			@pointerup="endDrag"
@@ -39,7 +42,9 @@
 			</Dropdown>
 		</div>
 
-		<div class="min-h-0 flex-1 overflow-y-auto">
+		<!-- A filling panel (the chat) takes the remaining height and the dock doesn't scroll: the
+		     Raven frame is laid over the page (utils/ravenFrame.js) and would not be clipped. -->
+		<div class="flex min-h-0 flex-1 flex-col" :class="filling ? 'overflow-hidden' : 'overflow-y-auto'">
 			<DockedPanel
 				v-for="(item, index) in panels"
 				:key="item.def.id"
@@ -47,6 +52,7 @@
 				:record="record"
 				:body-props="bodyProps(item.def)"
 				:expanded="item.expanded"
+				:constrained="filling && !item.def.fill"
 				:can-move-up="index > 0"
 				:can-move-down="index < panels.length - 1"
 				@toggle="toggle(item)"
@@ -58,21 +64,20 @@
 </template>
 
 <script setup>
-import { computed, reactive, ref } from "vue"
+import { computed, reactive, ref, watch } from "vue"
 import { Button, Dropdown } from "frappe-ui"
 import spaConfig from "@/config"
 import { __ } from "@spa/utils/i18n.js"
 import DockedPanel from "./DockedPanel.vue"
 import { PANELS } from "./definitions.js"
 import { usePanelLayout } from "./usePanelLayout.js"
+import { issueChatStore } from "@spa/issueChatStore.js"
+import { setRavenFramePassThrough } from "@spa/utils/ravenFrame.js"
 import { MAX_DOCK_WIDTH, MIN_DOCK_WIDTH, clamp, dockWidth, moved, panelsFor, toggled } from "./registry.js"
 
 const props = defineProps({
 	doctype: { type: String, required: true },
 	record: { type: Object, default: null },
-	// Below the record instead of beside it (from lg on), e.g. while the Issue chat column is
-	// open (IssuesInbox): no resizing then, the height is capped instead.
-	stacked: { type: Boolean, default: false },
 })
 
 const layout = usePanelLayout(props.doctype)
@@ -91,6 +96,11 @@ const panels = computed(() =>
 const hiddenIds = reactive({})
 const allHidden = computed(() => panels.value.every((p) => hiddenIds[p.def.id]))
 
+const shownPanels = computed(() => panels.value.filter((p) => !hiddenIds[p.def.id]))
+const shownExpanded = computed(() => panels.value.filter((p) => p.expanded && !hiddenIds[p.def.id]))
+const filling = computed(() => shownExpanded.value.some((p) => p.def.fill))
+const needsWidth = computed(() => shownExpanded.value.some((p) => p.def.minWidth > 0))
+
 function bodyProps(def) {
 	return def.props({ doctype: props.doctype, record: props.record, api: spaConfig.api })
 }
@@ -107,7 +117,8 @@ function move(item, step) {
 // Width: the stored one, overridden live while dragging and saved once on release.
 const dragWidth = ref(null)
 const dragging = ref(false)
-const width = computed(() => dockWidth(panels.value, dragWidth.value ?? layout.get().width))
+// Hidden panels (e.g. the chat below lg) don't ask for their width.
+const width = computed(() => dockWidth(shownPanels.value, dragWidth.value ?? layout.get().width))
 let dragStart = null
 const REM = typeof document !== "undefined" ? parseFloat(getComputedStyle(document.documentElement).fontSize) || 16 : 16
 
@@ -118,6 +129,7 @@ function startDrag(event) {
 	const shown = event.currentTarget.parentElement.getBoundingClientRect().width
 	dragStart = { x: event.clientX, width: shown || width.value }
 	event.currentTarget.setPointerCapture(event.pointerId)
+	setRavenFramePassThrough(true)
 }
 
 function drag(event) {
@@ -132,6 +144,7 @@ function endDrag() {
 	if (!dragStart) return
 	dragStart = null
 	dragging.value = false
+	setRavenFramePassThrough(false)
 	if (dragWidth.value != null) saveWidth(dragWidth.value)
 	dragWidth.value = null
 }
@@ -148,6 +161,17 @@ function resetWidth() {
 	const { width: _drop, ...rest } = layout.get()
 	layout.set(rest)
 }
+
+// The chat button in the record's top bar asks to expand the collapsed chat panel (#1911).
+watch(
+	() => issueChatStore.expandRequest,
+	(request) => {
+		if (!request || request.record !== props.record?.name) return
+		issueChatStore.expandRequest = null
+		const item = panels.value.find((p) => p.def.id === request.panel)
+		if (item && !item.expanded) toggle(item)
+	}
+)
 
 const menu = computed(() => [
 	{
