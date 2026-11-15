@@ -108,6 +108,14 @@ describe("dockWidth", () => {
 		expect(dockWidth(withChat(false), 500)).toBe(500)
 	})
 
+	it("keeps a separate width while the chat is expanded", () => {
+		const withChat = (expanded) => panels.map((p) => ({ ...p, expanded: p.def.id === "chat" ? expanded : p.expanded }))
+		expect(dockWidth(withChat(true), 400, 900)).toBe(900)
+		expect(dockWidth(withChat(false), 400, 900)).toBe(400)
+		// never below what the chat needs
+		expect(dockWidth(withChat(true), 400, 500)).toBe(768)
+	})
+
 	it("widens while a wide panel is expanded and clamps", () => {
 		const open = panels.map((p) => ({ ...p, expanded: true }))
 		expect(dockWidth(open, 400)).toBe(768)

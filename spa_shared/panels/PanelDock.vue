@@ -11,20 +11,19 @@
 			width: `${width}px`,
 			// The record keeps at least 20rem, except next to a panel that needs its width (the
 			// chat: Raven falls back to its touch layout below 768px).
-			maxWidth: needsWidth ? 'none' : 'calc(100% - 20rem)',
+			maxWidth: needsWidth ? `max(${needsWidth}px, calc(100% - 20rem))` : 'calc(100% - 20rem)',
 		}"
 		:aria-label="__('Panels')"
 	>
-		<!-- No splitter while a panel that needs its width (the chat) is expanded: the dock is then
-		     exactly that wide, and the user's width comes back when it is collapsed. -->
+		<!-- Also while the chat is open: then it can't go below the chat's 768px, and the width is
+		     kept apart (width_wide), so the usual width comes back when the chat is collapsed. -->
 		<div
-			v-if="!needsWidth"
 			role="separator"
 			aria-orientation="vertical"
 			tabindex="0"
 			:aria-label="__('Resize the panels')"
 			:aria-valuenow="width"
-			:aria-valuemin="MIN_DOCK_WIDTH"
+			:aria-valuemin="minWidth"
 			:aria-valuemax="MAX_DOCK_WIDTH"
 			:title="__('Drag to resize, double-click to reset')"
 			class="absolute inset-y-0 -left-1 z-10 w-2 cursor-col-resize touch-none hover:bg-outline-gray-3 focus:outline-none focus-visible:bg-outline-gray-4"
@@ -74,7 +73,8 @@ import DockedPanel from "./DockedPanel.vue"
 import { PANELS } from "./definitions.js"
 import { usePanelLayout } from "./usePanelLayout.js"
 import { issueChatStore } from "@spa/issueChatStore.js"
-import { MAX_DOCK_WIDTH, MIN_DOCK_WIDTH, clamp, dockWidth, moved, panelsFor, toggled } from "./registry.js"
+import { MAX_DOCK_WIDTH, MIN_DOCK_WIDTH, clamp, dockWidth, moved, neededWidth, panelsFor, toggled } from "./registry.js"
+import { setRavenFramePassThrough } from "@spa/utils/ravenFrame.js"
 
 const props = defineProps({
 	doctype: { type: String, required: true },
@@ -100,7 +100,11 @@ const allHidden = computed(() => panels.value.every((p) => hiddenIds[p.def.id]))
 const shownPanels = computed(() => panels.value.filter((p) => !hiddenIds[p.def.id]))
 const shownExpanded = computed(() => panels.value.filter((p) => p.expanded && !hiddenIds[p.def.id]))
 const filling = computed(() => shownExpanded.value.some((p) => p.def.fill))
-const needsWidth = computed(() => shownExpanded.value.some((p) => p.def.minWidth > 0))
+// The width an open panel needs (the chat: 768), 0 when none does.
+const needsWidth = computed(() => neededWidth(shownExpanded.value))
+const minWidth = computed(() => Math.max(MIN_DOCK_WIDTH, needsWidth.value))
+// The stored width this state uses: width_wide while the chat is open (see dockWidth).
+const widthKey = computed(() => (needsWidth.value ? "width_wide" : "width"))
 
 function bodyProps(def) {
 	return def.props({ doctype: props.doctype, record: props.record, api: spaConfig.api })
@@ -119,7 +123,11 @@ function move(item, step) {
 const dragWidth = ref(null)
 const dragging = ref(false)
 // Hidden panels (e.g. the chat below lg) don't ask for their width.
-const width = computed(() => dockWidth(shownPanels.value, dragWidth.value ?? layout.get().width))
+const width = computed(() => {
+	const stored = layout.get()
+	if (dragWidth.value != null) return dockWidth(shownPanels.value, dragWidth.value, dragWidth.value)
+	return dockWidth(shownPanels.value, stored.width, stored.width_wide)
+})
 let dragStart = null
 const REM = typeof document !== "undefined" ? parseFloat(getComputedStyle(document.documentElement).fontSize) || 16 : 16
 
@@ -130,34 +138,38 @@ function startDrag(event) {
 	const shown = event.currentTarget.parentElement.getBoundingClientRect().width
 	dragStart = { x: event.clientX, width: shown || width.value }
 	event.currentTarget.setPointerCapture(event.pointerId)
+	// the pointer may cross the chat while dragging; Raven's frame must not take it
+	setRavenFramePassThrough(true)
 }
 
 function drag(event) {
 	if (!dragStart) return
 	// the dock sits right of the record: dragging its left edge leftwards widens it
 	const room = event.currentTarget.parentElement.parentElement.clientWidth - REM * 20
-	const max = Math.max(MIN_DOCK_WIDTH, Math.min(MAX_DOCK_WIDTH, room))
-	dragWidth.value = clamp(dragStart.width + dragStart.x - event.clientX, MIN_DOCK_WIDTH, max)
+	const max = Math.max(minWidth.value, Math.min(MAX_DOCK_WIDTH, room))
+	dragWidth.value = clamp(dragStart.width + dragStart.x - event.clientX, minWidth.value, max)
 }
 
 function endDrag() {
 	if (!dragStart) return
 	dragStart = null
 	dragging.value = false
+	setRavenFramePassThrough(false)
 	if (dragWidth.value != null) saveWidth(dragWidth.value)
 	dragWidth.value = null
 }
 
 function nudge(step) {
-	saveWidth(clamp(width.value + step, MIN_DOCK_WIDTH, MAX_DOCK_WIDTH))
+	saveWidth(clamp(width.value + step, minWidth.value, MAX_DOCK_WIDTH))
 }
 
 function saveWidth(value) {
-	layout.set({ ...layout.get(), width: Math.round(value) })
+	layout.set({ ...layout.get(), [widthKey.value]: Math.round(value) })
 }
 
 function resetWidth() {
-	const { width: _drop, ...rest } = layout.get()
+	const rest = { ...layout.get() }
+	delete rest[widthKey.value]
 	layout.set(rest)
 }
 

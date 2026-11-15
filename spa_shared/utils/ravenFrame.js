@@ -132,6 +132,15 @@ export function releaseRavenFrame(slot) {
 	if (loaded) park()
 }
 
+/**
+ * While a splitter is dragged, the frame must not take the pointer: the drag would end as soon
+ * as the pointer crosses into Raven (#1911).
+ */
+export function setRavenFramePassThrough(on) {
+	if (!frame || !owner) return
+	frame.style.pointerEvents = on ? "none" : "auto"
+}
+
 /** The running Raven's window, or null before the first panel loaded it. */
 export function ravenFrameWindow() {
 	return loaded ? frame?.contentWindow || null : null

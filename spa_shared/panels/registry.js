@@ -141,13 +141,20 @@ function safeDefaultOpen(def, record) {
 	}
 }
 
+/** The widest `minWidth` among the expanded panels; 0 when none needs a width. */
+export function neededWidth(panels) {
+	return panels.filter((p) => p.expanded).reduce((max, p) => Math.max(max, p.def.minWidth || 0), 0)
+}
+
 /**
- * How wide the dock is: the user's width, but never narrower than an expanded panel needs.
- * A panel that needs 768px (the Raven chat, #1911) widens the dock only while it is expanded.
+ * How wide the dock is. Two user widths: `userWidth` for the usual dock, `userWideWidth` while a
+ * panel that needs a width (the Raven chat, 768px, #1911) is expanded. So making the chat wider
+ * doesn't leave a wide dock behind once it is collapsed. Never narrower than that need.
  */
-export function dockWidth(panels, userWidth) {
-	const need = panels.filter((p) => p.expanded).reduce((max, p) => Math.max(max, p.def.minWidth || 0), 0)
-	const want = Number.isFinite(userWidth) ? userWidth : DEFAULT_DOCK_WIDTH
+export function dockWidth(panels, userWidth, userWideWidth) {
+	const need = neededWidth(panels)
+	const stored = need ? userWideWidth : userWidth
+	const want = Number.isFinite(stored) ? stored : need || DEFAULT_DOCK_WIDTH
 	return clamp(Math.max(want, need), MIN_DOCK_WIDTH, MAX_DOCK_WIDTH)
 }
 

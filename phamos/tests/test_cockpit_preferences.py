@@ -49,6 +49,7 @@ class CockpitPreferencesTestCase(FrappeTestCase):
 		self.assertEqual(clean, {"Issue": {"order": ["a", "b"], "collapsed": [], "expanded": [], "width": prefs.MAX_DOCK_WIDTH}})
 		self.assertEqual(prefs._clean_panel_layout({"Issue": {"width": 10}})["Issue"]["width"], prefs.MIN_DOCK_WIDTH)
 		self.assertNotIn("width", prefs._clean_panel_layout({"Issue": {"width": True}})["Issue"])
+		self.assertEqual(prefs._clean_panel_layout({"Issue": {"width_wide": 99999}})["Issue"]["width_wide"], prefs.MAX_DOCK_WIDTH)
 
 	def test_refuses_bad_values(self):
 		for value in ("not json", "[1, 2]", json.dumps("text")):
