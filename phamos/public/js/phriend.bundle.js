@@ -1,5 +1,6 @@
 // Phriend in Desk: a little black ball with legs on every Desk page.
-// Click it (or Ctrl+Shift+B): screenshot -> draw on it -> a few optional steps -> an Issue.
+// Click it (or press its shortcut, Cmd/Ctrl+P by default): a few optional steps, a screenshot
+// to draw on -> an Issue.
 //
 // The ball, the flow and the capture live in ./phriend/ and are shared with the cockpits
 // (phamos/phamos#1898). This file only tells them how Desk works. The flow itself is a
@@ -129,25 +130,22 @@ const desk = {
 		frappe.model.can_read(REPORT_DOCTYPE)
 			? frappe.db.count(REPORT_DOCTYPE, { filters: badge_filters() })
 			: Promise.resolve(0),
+	// in a new tab, like the cockpits, so a report in progress isn't lost
 	open_reports: () => {
 		const filters = badge_filters();
-		frappe.route_options = { phriend_type: ["is", "set"], status: ["not in", CLOSED_STATUSES] };
-		["phriend_ref_doctype", "phriend_ref_docname", "phriend_route"].forEach((key) => {
-			if (filters[key]) frappe.route_options[key] = filters[key];
-		});
-		frappe.set_route("List", REPORT_DOCTYPE);
+		const query = Object.entries(filters)
+			.map(([key, value]) => `${key}=${encodeURIComponent(Array.isArray(value) ? JSON.stringify(value) : value)}`)
+			.join("&");
+		window.open(`/app/issue?${query}`, "_blank", "noopener");
 	},
 	on_route_change: (callback) => {
 		if (frappe.router && typeof frappe.router.on === "function") frappe.router.on("change", callback);
 		else $(window).on("hashchange popstate", callback);
 	},
-	add_shortcut: (callback) =>
-		frappe.ui.keys.add_shortcut({
-			shortcut: "ctrl+shift+b",
-			action: callback,
-			description: __("Report a problem with Phriend"),
-			ignore_inputs: true,
-		}),
+	// the user's own shortcut, else the site's (Phriend Settings); "" when off
+	shortcut: (frappe.boot.phriend && frappe.boot.phriend.shortcut) || "",
+	default_shortcut: (frappe.boot.phriend && frappe.boot.phriend.default_shortcut) || "",
+	user: frappe.session.user,
 };
 
 frappe.provide("phriend");

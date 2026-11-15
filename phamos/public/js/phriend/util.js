@@ -68,3 +68,17 @@ export function host_theme() {
 
 // sessionStorage key for the text of a report that is not sent yet
 export const DRAFT_KEY = "phriend:draft";
+
+// "Chrome 142", "Safari 17": what a report needs, not the full user agent (GDPR review of !1162)
+export function browser_name(ua) {
+	if (!ua) return "";
+	const match = ua.match(/(Edg|OPR|Firefox|Chrome|Version)\/(\d+)/) || ua.match(/(Safari)\/(\d+)/) || [];
+	const names = { Edg: "Edge", OPR: "Opera", Version: "Safari" };
+	const os = /Mac OS X/.test(ua) ? "macOS" : /Windows/.test(ua) ? "Windows" : /Android/.test(ua) ? "Android" : /iPhone|iPad/.test(ua) ? "iOS" : /Linux/.test(ua) ? "Linux" : "";
+	return [match[1] ? `${names[match[1]] || match[1]} ${match[2]}` : "", os].filter(Boolean).join(", ");
+}
+
+// A URL without its query string and fragment: those can carry names and search terms.
+export function without_query(url) {
+	return String(url || "").split(/[?#]/)[0];
+}
