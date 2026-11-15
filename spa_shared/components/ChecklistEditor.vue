@@ -115,7 +115,12 @@
 
 				<!-- Expanded. A click on its free area closes it again (#1921); clicks in its fields,
 				     editor, buttons and links don't. -->
-				<div v-else class="space-y-3 px-3 py-3" @click.stop="onOpenCardClick">
+				<div
+					v-else
+					class="space-y-3 px-3 py-3"
+					@pointerdown="onOpenCardPointerDown"
+					@click.stop="onOpenCardClick"
+				>
 					<div class="flex items-start gap-3">
 						<div class="min-w-0 flex-1 space-y-2">
 							<input
@@ -157,7 +162,7 @@
 								class="flex h-6 w-6 items-center justify-center rounded text-ink-gray-5 hover:bg-surface-gray-2 hover:text-ink-gray-8 focus:outline-none focus-visible:ring-2 focus-visible:ring-outline-gray-4"
 								:title="__('Collapse')"
 								:aria-label="__('Collapse')"
-								@click="collapse"
+								@click="collapse()"
 							>
 								<FeatherIcon name="chevron-up" class="h-4 w-4" />
 							</button>
@@ -544,8 +549,18 @@ async function moveItem(name, toIndex) {
 
 // A click on an open item's free area closes it (#1921); its fields, editor, buttons and links
 // keep their clicks. Only up to the card: the item around it is itself role="button".
+// A click is only a "close" when it also started on the free area: selecting text in a field and
+// letting go over the free area ends in a click on the card, too (the browser sends the click to
+// the element both ends share).
+let pressedOnFreeArea = false
+function onOpenCardPointerDown(event) {
+	pressedOnFreeArea = !isInteractiveTarget(event.target, event.currentTarget)
+}
+
 function onOpenCardClick(event) {
-	if (!isInteractiveTarget(event.target, event.currentTarget)) collapse()
+	const freeArea = pressedOnFreeArea && !isInteractiveTarget(event.target, event.currentTarget)
+	pressedOnFreeArea = false
+	if (freeArea && !window.getSelection?.()?.toString()) collapse()
 }
 
 async function onDocClick(event) {
