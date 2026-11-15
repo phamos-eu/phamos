@@ -18,6 +18,10 @@ import { DRAFT_KEY, escape_html, sleep, storage_set } from "./util";
 const STEP = { kind: 0, shot: 1, text: 2, check: 3 };
 const LAST_STEP = STEP.check;
 
+// picture / crossed-out picture for the "Leave out" / "Use the screenshot" button
+const ICON_SHOT = '<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="5" width="18" height="14" rx="2"/><path d="M3 16 L9 11 L13 14 L16 12 L21 16"/></svg>';
+const ICON_NO_SHOT = '<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="5" width="18" height="14" rx="2"/><path d="M4 4 L20 20"/></svg>';
+
 // [value stored on the Issue, label, hint]
 const TYPES = [
 	["Bug", "Bug", "Something is broken"],
@@ -112,7 +116,7 @@ class Flow {
 						<div class="shot"><div class="skeleton"><span class="spinner"></span>${escape_html(__("Taking a screenshot of the page…"))}</div></div>
 						<div class="shot-bar">
 							<span class="grow" data-shot-hint>${escape_html(__("Draw an arrow to the problem, box it, write on it, or black out private data."))}</span>
-							<button type="button" class="btn ghost" data-toggle-shot hidden>${escape_html(__("Leave out the screenshot"))}</button>
+							<button type="button" class="btn with-icon" data-toggle-shot hidden></button>
 						</div>
 					</section>
 					<section class="pane" data-pane="2" hidden>
@@ -129,6 +133,7 @@ class Flow {
 					<span class="grow"></span>
 					<span class="hint">${escape_html(__("Ctrl+Enter sends"))}</span>
 					<button type="button" class="btn ghost" data-send-now>${escape_html(__("Send now"))}</button>
+					<button type="button" class="btn" data-skip hidden>${escape_html(__("Skip"))}</button>
 					<button type="button" class="btn primary" data-next></button>
 				</footer>
 			</div>`;
@@ -148,6 +153,7 @@ class Flow {
 			back: $("[data-back]"),
 			send_now: $("[data-send-now]"),
 			next: $("[data-next]"),
+			skip: $("[data-skip]"),
 		};
 		this.el.in_title.value = this.values.title;
 		this.el.in_comment.value = this.values.comment;
@@ -172,6 +178,7 @@ class Flow {
 			else if (t.hasAttribute("data-back")) this.show(this.step - 1);
 			else if (t.hasAttribute("data-next")) this.step === LAST_STEP ? this.send() : this.show(this.step + 1);
 			else if (t.hasAttribute("data-send-now")) this.send();
+			else if (t.hasAttribute("data-skip")) this.skip_screenshot();
 			else if (t.hasAttribute("data-toggle-shot")) this.toggle_screenshot();
 			else if (t.dataset.type) this.choose("report_type", t.dataset.type, STEP.kind);
 			else if (t.dataset.priority) this.choose("priority", t.dataset.priority, STEP.kind);
@@ -280,12 +287,16 @@ class Flow {
 		const __ = this.__;
 		this.el.back.hidden = this.step === 0;
 		this.el.send_now.hidden = this.step === LAST_STEP;
+		// The screenshot step: "Next" keeps the screenshot, "Skip" goes on without it (PM,
+		// 2026-11-15). Only while there is a screenshot to leave out.
+		const on_shot = this.step === STEP.shot;
+		this.el.skip.hidden = !(on_shot && this.include_screenshot && !this.capture_failed);
 		// an untouched step says "Skip": every step is optional. The type step always has a
 		// choice (Bug, Medium), so it says "Next".
 		this.el.next.textContent =
 			this.step === LAST_STEP
 				? __("Send to Phriend")
-				: this.touched.has(this.step) || this.step === STEP.kind
+				: this.touched.has(this.step) || this.step === STEP.kind || on_shot
 				? __("Next")
 				: __("Skip");
 	}
@@ -377,10 +388,8 @@ class Flow {
 	use_screenshot(canvas) {
 		this.annotator = new Annotator(this.el.shot, canvas, this.__);
 		this.el.toggle_shot.hidden = false;
-		if (!this.include_screenshot) {
-			this.include_screenshot = true;
-			this.toggle_screenshot();
-		}
+		this.sync_screenshot_state(); // also right when "Skip" was pressed before it was ready
+		this.update_footer();
 	}
 
 	show_no_screenshot() {
@@ -389,21 +398,35 @@ class Flow {
 			__("No screenshot this time.")
 		)}</strong><span>${escape_html(__("Describe what you see in the next step instead."))}</span></div>`;
 		this.el.shot_hint.textContent = "";
+		this.update_footer(); // nothing to skip any more
 	}
 
 	toggle_screenshot() {
-		const __ = this.__;
 		this.include_screenshot = !this.include_screenshot;
 		this.touched.add(STEP.shot);
+		this.sync_screenshot_state();
+		this.update_footer();
+	}
+
+	// "Skip" on the screenshot step: on to the next step, without the screenshot. Coming back,
+	// "Use the screenshot" brings it back.
+	skip_screenshot() {
+		if (this.include_screenshot) this.toggle_screenshot();
+		this.show(STEP.shot + 1);
+	}
+
+	sync_screenshot_state() {
+		const __ = this.__;
+		const on = this.include_screenshot;
 		const wrap = this.el.shot.querySelector(".annotator");
-		if (wrap) wrap.style.opacity = this.include_screenshot ? "" : "0.25";
-		this.el.toggle_shot.textContent = this.include_screenshot
-			? __("Leave out the screenshot")
-			: __("Use the screenshot");
-		this.el.shot_hint.textContent = this.include_screenshot
+		if (wrap) wrap.style.opacity = on ? "" : "0.25";
+		this.el.toggle_shot.innerHTML = `${on ? ICON_NO_SHOT : ICON_SHOT}<span>${escape_html(
+			on ? __("Leave out the screenshot") : __("Use the screenshot")
+		)}</span>`;
+		this.el.toggle_shot.setAttribute("aria-pressed", on ? "false" : "true");
+		this.el.shot_hint.textContent = on
 			? __("Draw an arrow to the problem, box it, write on it, or black out private data.")
 			: __("The report goes out without a screenshot.");
-		this.update_footer();
 	}
 
 	screenshot_canvas() {
@@ -520,6 +543,7 @@ class Flow {
 		this.el.back = this.layer.querySelector("[data-back]");
 		this.el.send_now = this.layer.querySelector("[data-send-now]");
 		this.el.next = this.layer.querySelector("[data-next]");
+		this.el.skip = this.layer.querySelector("[data-skip]");
 		this.update_footer();
 		this.el.next.focus();
 	}

@@ -40,6 +40,8 @@ button.btn.ghost { border-color: transparent; color: var(--ph-muted); }
 button.btn.ghost:hover { color: var(--ph-text); }
 button.btn.danger { background: var(--ph-danger); border-color: var(--ph-danger); color: #fff; }
 button.btn[hidden] { display: none; }
+button.btn.with-icon { display: inline-flex; align-items: center; gap: 6px; height: 32px; padding: 0 12px; font-size: 13px; }
+button.btn.with-icon svg { flex: none; }
 label.field { display: block; font-size: 13px; color: var(--ph-muted); margin: 0 0 6px; }
 input.input, textarea.input { width: 100%; padding: 9px 11px; border: 1px solid var(--ph-border-strong); border-radius: 8px;
 	background: var(--ph-bg); color: var(--ph-text); font: inherit; font-size: 15px; outline: none; }
