@@ -263,11 +263,6 @@ async function onClick() {
 		return refresh()
 	}
 	if (!(await ensure())) return
-	if (dockable.value) {
-		// The chat panel is there but collapsed: expand it instead of covering the page.
-		issueChatStore.expandRequest = { record: props.recordName, panel: "chat" }
-		return
-	}
 	// Raven marks the channel read once it is open (its threads stay unread until opened).
 	state.value = { ...state.value, unread: 0 }
 	drawerOpen.value = true
@@ -276,9 +271,11 @@ async function onClick() {
 
 watch(() => issueChatStore.openRequest, honourOpenRequest)
 
-// The chat panel was expanded: Raven marks the channel read once it shows.
-watch(docked, (isDocked) => {
-	if (!isDocked || !state.value.unread) return
+// The chat shows in its panel: Raven marks the channel read. Also when another Issue opens while
+// the panel stays open (it is persistent, so `docked` doesn't change then): its count arrives
+// with its state and is cleared here too.
+watch([docked, () => state.value.unread], ([isDocked, unread]) => {
+	if (!isDocked || !unread) return
 	state.value = { ...state.value, unread: 0 }
 	chatChanged()
 })
@@ -295,14 +292,15 @@ const rowSummary = computed(() => {
 	return parts.join(" · ")
 })
 watch(
-	[() => props.recordName, () => state.value.enabled, rowSummary, unreadTotal, () => unreadTone(state.value)],
-	([record, enabled, summary, unread, tone], previous) => {
+	[() => props.recordName, () => state.value.enabled, rowSummary, unreadTotal, () => unreadTone(state.value), loading],
+	([record, enabled, summary, unread, tone, isLoading], previous) => {
 		const before = previous?.[0]
 		if (before && before !== record) delete issueChatStore.chats[before]
 		// `enabled` is kept while the next record loads (see the recordName watch), so the panel
 		// and its Raven frame stay instead of blinking.
 		issueChatStore.chats[record] = {
-			enabled: Boolean(enabled),
+			// unknown (undefined) until the first answer, so the chat tile keeps its place meanwhile
+			enabled: isLoading && !enabled ? undefined : Boolean(enabled),
 			summary,
 			badge: unread ? (unread > 99 ? "99+" : String(unread)) : "",
 			tone,

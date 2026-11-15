@@ -1,6 +1,6 @@
-// The user's panel layout (#1910): order, expanded/collapsed and dock width per record type.
+// The user's panel layout (#1910, #1915): per record type { tree, closed, opened }, see tiling.js.
 //
-// Booted with the page (spa_boot → preferences.cockpit_panel_layout), so the dock renders in its
+// Booted with the page (spa_boot → preferences.cockpit_panel_layout), so the tiles render in their
 // final shape without a request. Changes are saved as a user default, debounced, so dragging the
 // splitter or clicking through panels sends one request, not dozens.
 
@@ -12,7 +12,8 @@ const SAVE_DELAY_MS = 800
 
 function bootedLayout() {
 	const value = typeof window !== "undefined" ? window.frappe?.boot?.preferences?.[KEY] : null
-	return value && typeof value === "object" ? value : {}
+	// a copy: frappe.boot keeps what the page booted with
+	return value && typeof value === "object" ? JSON.parse(JSON.stringify(value)) : {}
 }
 
 // One store per page: every dock (and the gear menu) reads and writes the same object.
