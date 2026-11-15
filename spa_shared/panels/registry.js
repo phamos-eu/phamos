@@ -26,6 +26,10 @@ export const MAX_DOCK_WIDTH = 1600
  * @param {(record) => boolean} [def.defaultOpen] expanded until the user collapses it
  * @param {number} [def.minWidth] the dock is at least this wide while the panel is expanded
  * @param {boolean} [def.popout] may be popped out (#1912)
+ * @param {boolean} [def.persistent] the body stays mounted when another record opens (it follows
+ *   its props instead); for the chat, whose frame and teleport target must not be swapped
+ * @param {boolean} [def.fill] while expanded it takes the dock's remaining height, without padding,
+ *   and the dock stops scrolling (the Raven frame is laid over the page and can't be clipped)
  * @param {number} [def.order] position when neither cockpit nor user ordered it
  */
 export function definePanel(def) {
@@ -38,6 +42,8 @@ export function definePanel(def) {
 		defaultOpen: () => true,
 		minWidth: 0,
 		popout: true,
+		fill: false,
+		persistent: false,
 		order: 100,
 		...def,
 	}
@@ -71,6 +77,24 @@ function sortByIds(defs, ids) {
 }
 
 /**
+ * The user's order applied to the panels it names; the others keep their place. So a panel added
+ * later (e.g. the chat, #1911) appears where it was declared, not after everything the user ever
+ * ordered.
+ */
+function reorderNamed(defs, ids) {
+	const named = new Set(ids)
+	const slots = []
+	defs.forEach((def, index) => named.has(def.id) && slots.push(index))
+	const moved = sortByIds(
+		defs.filter((def) => named.has(def.id)),
+		ids
+	)
+	const result = [...defs]
+	slots.forEach((slot, i) => (result[slot] = moved[i]))
+	return result
+}
+
+/**
  * The panels to show for one record, in order, each with whether it is expanded.
  *
  * Order: the user's stored order, then the cockpit's, then the declarations' own.
@@ -96,7 +120,7 @@ export function panelsFor(definitions, { doctype, record, cockpitPanels, layout 
 			return false
 		}
 	})
-	const ordered = layout?.order?.length ? sortByIds(visible, layout.order) : visible
+	const ordered = layout?.order?.length ? reorderNamed(visible, layout.order) : visible
 	const collapsed = new Set(layout?.collapsed || [])
 	const expanded = new Set(layout?.expanded || [])
 	return ordered.map((def) => {
@@ -117,13 +141,20 @@ function safeDefaultOpen(def, record) {
 	}
 }
 
+/** The widest `minWidth` among the expanded panels; 0 when none needs a width. */
+export function neededWidth(panels) {
+	return panels.filter((p) => p.expanded).reduce((max, p) => Math.max(max, p.def.minWidth || 0), 0)
+}
+
 /**
- * How wide the dock is: the user's width, but never narrower than an expanded panel needs.
- * A panel that needs 768px (the Raven chat, #1911) widens the dock only while it is expanded.
+ * How wide the dock is. Two user widths: `userWidth` for the usual dock, `userWideWidth` while a
+ * panel that needs a width (the Raven chat, 768px, #1911) is expanded. So making the chat wider
+ * doesn't leave a wide dock behind once it is collapsed. Never narrower than that need.
  */
-export function dockWidth(panels, userWidth) {
-	const need = panels.filter((p) => p.expanded).reduce((max, p) => Math.max(max, p.def.minWidth || 0), 0)
-	const want = Number.isFinite(userWidth) ? userWidth : DEFAULT_DOCK_WIDTH
+export function dockWidth(panels, userWidth, userWideWidth) {
+	const need = neededWidth(panels)
+	const stored = need ? userWideWidth : userWidth
+	const want = Number.isFinite(stored) ? stored : need || DEFAULT_DOCK_WIDTH
 	return clamp(Math.max(want, need), MIN_DOCK_WIDTH, MAX_DOCK_WIDTH)
 }
 

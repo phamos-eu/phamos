@@ -33,7 +33,7 @@ def _clean_ids(value):
 
 
 def _clean_panel_layout(value):
-	"""{doctype: {order: [ids], collapsed: [ids], expanded: [ids], width: int}}; anything else is dropped.
+	"""{doctype: {order, collapsed, expanded: [ids], width, width_wide: int}}; anything else is dropped.
 
 	Unknown panel ids are kept: whether a panel still exists is decided in the browser by the
 	registry, which ignores ids it does not know (a cockpit may not have every panel).
@@ -56,9 +56,11 @@ def _clean_panel_layout(value):
 			"collapsed": _clean_ids(layout.get("collapsed")),
 			"expanded": _clean_ids(layout.get("expanded")),
 		}
-		width = layout.get("width")
-		if isinstance(width, (int, float)) and not isinstance(width, bool):
-			entry["width"] = int(min(max(width, MIN_DOCK_WIDTH), MAX_DOCK_WIDTH))
+		# width: the usual dock; width_wide: while a panel that needs a width (the chat) is open
+		for key in ("width", "width_wide"):
+			width = layout.get(key)
+			if isinstance(width, (int, float)) and not isinstance(width, bool):
+				entry[key] = int(min(max(width, MIN_DOCK_WIDTH), MAX_DOCK_WIDTH))
 		clean[doctype] = entry
 
 	if len(json.dumps(clean)) > MAX_LAYOUT_BYTES:
