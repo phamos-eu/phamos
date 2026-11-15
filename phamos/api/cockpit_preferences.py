@@ -17,8 +17,9 @@ from frappe import _
 # One stored layout must stay small: it is sent with every cockpit page load (spa_boot).
 MAX_LAYOUT_BYTES = 8000
 MAX_PANELS_PER_DOCTYPE = 30
-MIN_DOCK_WIDTH = 240
-MAX_DOCK_WIDTH = 1600
+# The tiling tree of a record page (#1915), as spa_shared/panels/tiling.js sanitises it too.
+MAX_TREE_DEPTH = 6
+SPLITS = ("row", "column")
 
 
 def _clean_ids(value):
@@ -32,8 +33,47 @@ def _clean_ids(value):
 	return ids
 
 
+def _clean_tree(node, seen, depth=0):
+	"""A tiling node: {"panel": id} or {"split": "row"|"column", "sizes": [..], "children": [..]}.
+
+	Bad nodes are dropped, a panel appears once, a split left with one child is replaced by it,
+	sizes become fractions. Returns None when nothing is left.
+	"""
+	if not isinstance(node, dict) or depth > MAX_TREE_DEPTH:
+		return None
+	panel = node.get("panel")
+	if isinstance(panel, str):
+		if not 0 < len(panel) <= 64 or panel in seen or len(seen) >= MAX_PANELS_PER_DOCTYPE:
+			return None
+		seen.add(panel)
+		return {"panel": panel}
+	children = node.get("children")
+	if node.get("split") not in SPLITS or not isinstance(children, list):
+		return None
+	sizes = node.get("sizes") if isinstance(node.get("sizes"), list) else []
+	kept = []
+	for i, child in enumerate(children[:MAX_PANELS_PER_DOCTYPE]):
+		clean = _clean_tree(child, seen, depth + 1)
+		if clean:
+			size = sizes[i] if i < len(sizes) else None
+			ok = isinstance(size, (int, float)) and not isinstance(size, bool) and size > 0
+			kept.append((clean, float(size) if ok else None))
+	if not kept:
+		return None
+	if len(kept) == 1:
+		return kept[0][0]
+	equal = 1 / len(kept)
+	raw = [size or equal for _child, size in kept]
+	total = sum(raw)
+	return {
+		"split": node["split"],
+		"sizes": [round(size / total, 4) for size in raw],
+		"children": [child for child, _size in kept],
+	}
+
+
 def _clean_panel_layout(value):
-	"""{doctype: {order, collapsed, expanded: [ids], width, width_wide: int}}; anything else is dropped.
+	"""{doctype: {tree, closed: [ids], opened: [ids]}}; anything else is dropped.
 
 	Unknown panel ids are kept: whether a panel still exists is decided in the browser by the
 	registry, which ignores ids it does not know (a cockpit may not have every panel).
@@ -50,17 +90,14 @@ def _clean_panel_layout(value):
 	for doctype, layout in list(value.items())[:MAX_PANELS_PER_DOCTYPE]:
 		if not isinstance(doctype, str) or not doctype or len(doctype) > 140 or not isinstance(layout, dict):
 			continue
-		# collapsed / expanded hold only the panels the user switched away from their default
 		entry = {
-			"order": _clean_ids(layout.get("order")),
-			"collapsed": _clean_ids(layout.get("collapsed")),
-			"expanded": _clean_ids(layout.get("expanded")),
+			"closed": _clean_ids(layout.get("closed")),
+			# opening order, oldest first: who steps back first when the window is too small
+			"opened": _clean_ids(layout.get("opened")),
 		}
-		# width: the usual dock; width_wide: while a panel that needs a width (the chat) is open
-		for key in ("width", "width_wide"):
-			width = layout.get(key)
-			if isinstance(width, (int, float)) and not isinstance(width, bool):
-				entry[key] = int(min(max(width, MIN_DOCK_WIDTH), MAX_DOCK_WIDTH))
+		tree = _clean_tree(layout.get("tree"), set())
+		if tree:
+			entry["tree"] = tree
 		clean[doctype] = entry
 
 	if len(json.dumps(clean)) > MAX_LAYOUT_BYTES:

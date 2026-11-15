@@ -26,30 +26,57 @@ class CockpitPreferencesTestCase(FrappeTestCase):
 		self.assertEqual(prefs.get_preferences(), {KEY: {}})
 
 	def test_round_trip_through_boot(self):
-		layout = {"Issue": {"order": ["phriend", "checklists"], "collapsed": ["checklists"], "width": 420}}
+		tree = {
+			"split": "row",
+			"sizes": [0.5, 0.5],
+			"children": [{"panel": "description"}, {"split": "column", "sizes": [0.6, 0.4], "children": [{"panel": "chat"}, {"panel": "checklists"}]}],
+		}
+		layout = {"Issue": {"tree": tree, "closed": ["checklists"], "opened": ["chat", "description"]}}
 		prefs.set_preference(KEY, json.dumps(layout))
-		self.assertEqual(
-			prefs.get_preferences()[KEY],
-			{"Issue": {"order": ["phriend", "checklists"], "collapsed": ["checklists"], "expanded": [], "width": 420}},
-		)
+		self.assertEqual(prefs.get_preferences()[KEY], layout)
 
 	def test_cleaning(self):
 		clean = prefs._clean_panel_layout(
 			{
 				"Issue": {
-					"order": ["a", "a", 7, "", "x" * 65, "b"],
-					"collapsed": "not a list",
-					"width": 99999,
+					"closed": ["a", "a", 7, "", "x" * 65, "b"],
+					"opened": "not a list",
 					"script": "<b>",
+					"tree": {
+						"split": "row",
+						"sizes": [3, "x", 1],
+						"children": [
+							{"panel": "a"},
+							{"split": "diagonal", "children": [{"panel": "c"}]},
+							{"split": "column", "children": [{"panel": "a"}, {"panel": "b"}]},
+						],
+					},
 				},
 				"Lead": "not an object",
-				"": {"order": ["a"]},
+				"": {"closed": ["a"]},
+				# an old layout from the dock (#1910): nothing of it is kept but the shape
+				"Task": {"order": ["x"], "width": 400},
 			}
 		)
-		self.assertEqual(clean, {"Issue": {"order": ["a", "b"], "collapsed": [], "expanded": [], "width": prefs.MAX_DOCK_WIDTH}})
-		self.assertEqual(prefs._clean_panel_layout({"Issue": {"width": 10}})["Issue"]["width"], prefs.MIN_DOCK_WIDTH)
-		self.assertNotIn("width", prefs._clean_panel_layout({"Issue": {"width": True}})["Issue"])
-		self.assertEqual(prefs._clean_panel_layout({"Issue": {"width_wide": 99999}})["Issue"]["width_wide"], prefs.MAX_DOCK_WIDTH)
+		self.assertEqual(
+			clean,
+			{
+				"Issue": {
+					"closed": ["a", "b"],
+					"opened": [],
+					# the column kept only "b" (its "a" is a duplicate) and was replaced by it
+					"tree": {"split": "row", "sizes": [0.75, 0.25], "children": [{"panel": "a"}, {"panel": "b"}]},
+				},
+				"Task": {"closed": [], "opened": []},
+			},
+		)
+
+	def test_deep_trees_are_cut(self):
+		node = {"panel": "deepest"}
+		for i in range(10):
+			node = {"split": "row", "sizes": [1, 1], "children": [node, {"panel": f"p{i}"}]}
+		tree = prefs._clean_panel_layout({"Issue": {"tree": node}})["Issue"]["tree"]
+		self.assertNotIn("deepest", json.dumps(tree))
 
 	def test_refuses_bad_values(self):
 		for value in ("not json", "[1, 2]", json.dumps("text")):
@@ -57,7 +84,7 @@ class CockpitPreferencesTestCase(FrappeTestCase):
 				prefs.set_preference(KEY, value)
 
 	def test_refuses_oversized_layout(self):
-		layout = {f"Doctype {i:03d}" + "x" * 120: {"order": [f"panel-{j}" + "y" * 50 for j in range(30)]} for i in range(30)}
+		layout = {f"Doctype {i:03d}" + "x" * 120: {"closed": [f"panel-{j}" + "y" * 50 for j in range(30)]} for i in range(30)}
 		with self.assertRaises(frappe.ValidationError):
 			prefs.set_preference(KEY, json.dumps(layout))
 
@@ -66,7 +93,7 @@ class CockpitPreferencesTestCase(FrappeTestCase):
 			prefs.set_preference("desktop_icons", "{}")
 
 	def test_empty_value_resets(self):
-		prefs.set_preference(KEY, json.dumps({"Issue": {"width": 500}}))
+		prefs.set_preference(KEY, json.dumps({"Issue": {"closed": ["chat"]}}))
 		self.assertEqual(prefs.set_preference(KEY, ""), {})
 		self.assertIsNone(frappe.defaults.get_user_default(KEY))
 		self.assertEqual(prefs.get_preferences()[KEY], {})
@@ -76,7 +103,7 @@ class CockpitPreferencesTestCase(FrappeTestCase):
 		self.assertEqual(prefs.get_preferences()[KEY], {})
 
 	def test_per_user(self):
-		prefs.set_preference(KEY, json.dumps({"Issue": {"width": 500}}))
+		prefs.set_preference(KEY, json.dumps({"Issue": {"closed": ["chat"]}}))
 		self.assertEqual(prefs.get_preferences(user="Guest"), {})
 		frappe.set_user("Guest")
 		with self.assertRaises(frappe.PermissionError):

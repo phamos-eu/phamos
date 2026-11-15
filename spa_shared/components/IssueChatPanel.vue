@@ -139,19 +139,11 @@ let heldSlot = null
 let removeGuard = null
 let frameReady = false
 
-// In the dock on lg screens while this record's chat panel is expanded (Tailwind's lg breakpoint).
-const wide = typeof window !== "undefined" ? window.matchMedia("(min-width: 1024px)") : null
-const isWide = ref(Boolean(wide?.matches))
-function updatePlacement() {
-	isWide.value = Boolean(wide?.matches)
-}
-onMounted(() => {
-	updatePlacement()
-	wide?.addEventListener("change", updatePlacement)
-})
+// In this record's chat panel while it shows in a tile (#1915); a panel too narrow for Raven
+// steps back to the rail (panels/tiling.js fit) instead of shrinking the chat.
 const inColumn = computed(() => {
 	const host = issueChatStore.dockHost
-	return Boolean(isWide.value && host?.record === props.recordName && host.available && host.expanded)
+	return Boolean(host?.record === props.recordName && host.available && host.expanded)
 })
 
 const shown = computed(() => inColumn.value || props.open)
@@ -385,7 +377,6 @@ defineExpose({ focusTarget, inColumn })
 
 onBeforeUnmount(() => {
 	detachFrame()
-	wide?.removeEventListener("change", updatePlacement)
 	if (issueChatStore.openFor === props.recordName) issueChatStore.openFor = null
 })
 </script>
