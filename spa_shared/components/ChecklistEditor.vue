@@ -140,6 +140,7 @@
 								:fixed-menu="editorMenu"
 								:locked-by="locks.lockedBy(lockField('note', item))"
 								field-label="this note"
+								scroll-hint
 								placeholder="Item note…"
 								:editor-class="
 									compact

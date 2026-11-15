@@ -3,33 +3,42 @@
 	     keeps the Issue's autosave, field locks and realtime, and lays both into their panels'
 	     hosts (panels/hosts.js). -->
 	<Teleport v-if="hosts.description" :to="hosts.description">
-	<div class="flex h-full min-h-0 w-full flex-1 flex-col overflow-hidden p-5 text-gray-900 dark:text-gray-100">
+	<!-- Little space of its own: a small margin to the tile and one card around toolbar and text,
+	     like the checklist items and the chat's input (#1917; it had 20px padding and two boxes). -->
+	<div class="flex h-full min-h-0 w-full flex-1 flex-col overflow-hidden p-2 text-gray-900 dark:text-gray-100">
 		<section class="flex min-h-[50%] flex-1 flex-col">
 			<div
 				v-if="!chromeHostReady"
-				class="mb-2 flex flex-shrink-0 items-center justify-end gap-2"
+				class="mb-1.5 flex flex-shrink-0 items-center justify-end gap-2"
 			>
 				<DocSyncBanner :autosave="autosave" />
 				<DocViewers :viewers="viewers" />
 			</div>
-			<div class="flex min-h-0 flex-1 flex-col" :class="{ 'pointer-events-none opacity-80': isClosed }">
+			<div
+				class="flex min-h-0 flex-1 flex-col overflow-hidden rounded-lg border border-gray-200 bg-white dark:border-gray-700 dark:bg-gray-900"
+				:class="{ 'pointer-events-none opacity-80': isClosed }"
+			>
+				<!-- `[&>.border]` styles frappe-ui TextEditor's fixed menu (its direct child with the
+				     `border` class, frappe-ui 0.1.105): flat inside the card. After a frappe-ui
+				     upgrade, check that the toolbar still has no box of its own. -->
 				<RichTextField
 					:key="issue.name"
 					v-model="autosave.draft.description"
 					class="flex h-full min-h-0 flex-1 flex-col"
-					editor-root-class="flex h-full min-h-0 flex-1 flex-col [&_div:has(>.ProseMirror)]:flex [&_div:has(>.ProseMirror)]:min-h-0 [&_div:has(>.ProseMirror)]:flex-1 [&_div:has(>.ProseMirror)]:flex-col [&_.ProseMirror]:min-h-full [&_.ProseMirror]:flex-1 [&_.ProseMirror]:overflow-y-auto"
+					editor-root-class="flex h-full min-h-0 flex-1 flex-col [&>.border]:rounded-none [&>.border]:border-x-0 [&>.border]:border-t-0 [&>.border]:border-gray-200 dark:[&>.border]:border-gray-700 [&_div:has(>.ProseMirror)]:flex [&_div:has(>.ProseMirror)]:min-h-0 [&_div:has(>.ProseMirror)]:flex-1 [&_div:has(>.ProseMirror)]:flex-col [&_.ProseMirror]:min-h-full [&_.ProseMirror]:flex-1 [&_.ProseMirror]:overflow-y-auto"
 					:editable="!isClosed"
 					:fixed-menu="editorMenu"
 					:locked-by="locks.lockedBy('description')"
 					field-label="the description"
 					scroll-hint
+					hint-fade="from-white dark:from-gray-900"
 					placeholder="What needs to be discussed or resolved?"
-					editor-class="prose-sm dark:prose-invert max-w-none w-full min-h-full flex-1 px-3 py-2 border border-t-0 border-gray-300 rounded-b-lg bg-white dark:border-gray-600 dark:bg-gray-800"
+					editor-class="prose-sm dark:prose-invert max-w-none w-full min-h-full flex-1 px-3 py-2"
 					@focus="onFieldFocus('description')"
 					@blur="onFieldBlur('description')"
 				/>
 			</div>
-			<ErrorMessage class="mt-2 flex-shrink-0" :message="fieldError" />
+			<ErrorMessage class="mt-1.5 flex-shrink-0" :message="fieldError" />
 		</section>
 	</div>
 	</Teleport>
@@ -73,7 +82,7 @@
 
 	<Teleport v-if="hosts.properties" :to="hosts.properties">
 		<div class="flex h-full min-h-0 flex-col bg-surface-white text-ink-gray-9">
-			<div class="flex min-h-0 flex-1 flex-col gap-5 overflow-y-auto p-4">
+			<ScrollHint class="flex-1" box-class="flex flex-col gap-5 p-4" fade="from-white dark:from-gray-900">
 				<section>
 					<div class="mb-2 text-[11px] font-semibold uppercase tracking-wide text-ink-gray-6">
 						Status
@@ -149,7 +158,7 @@
 						@updated="onAssigneesUpdated"
 					/>
 				</section>
-			</div>
+			</ScrollHint>
 
 			<div class="mt-auto flex-shrink-0 space-y-2 border-t border-outline-gray-2 p-4">
 				<div
@@ -285,6 +294,7 @@ import ConvertToTaskDialog from "@spa/components/ConvertToTaskDialog.vue"
 import SchedulePreview from "@spa/components/SchedulePreview.vue"
 import { setPageChromeActive } from "@spa/pageChrome.js"
 import { panelHosts as hosts } from "@spa/panels/hosts.js"
+import ScrollHint from "@spa/components/ScrollHint.vue"
 import spaConfig from "@/config"
 
 const props = defineProps({
