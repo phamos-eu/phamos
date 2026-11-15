@@ -2181,3 +2181,22 @@ Right of {0},Rechts von {0}
 Above {0},Über {0}
 Below {0},Unter {0}
 Swap with {0},Mit {0} tauschen
+"Drag to move, or Alt+↑/↓","Ziehen zum Verschieben, oder Alt+↑/↓"
+Could not move the item,Der Eintrag konnte nicht verschoben werden
+Move to checklist…,In Checkliste verschieben…
+Moved to {0},Nach {0} verschoben
+Items can only move between checklists of the same record,Einträge können nur zwischen Checklisten desselben Datensatzes verschoben werden
+Choose another checklist,Bitte eine andere Checkliste wählen
+"Moved ""{0}"" to checklist {1}","„{0}“ in die Checkliste {1} verschoben"
+"""{0}"" moved here from checklist {1}","„{0}“ aus der Checkliste {1} hierher verschoben"
+Scroll to see the rest,"Scrollen, um den Rest zu sehen"
+Small images,Kleine Bilder
+Medium images,Mittlere Bilder
+Large images,Große Bilder
+"Drag to resize, or use the arrow keys","Ziehen ändert die Größe, oder die Pfeiltasten"
+Unknown image size: {0},Unbekannte Bildgröße: {0}
+Conversation,Gespräch
+Add note,Notiz hinzufügen
+1 note,1 Notiz
+{0} notes,{0} Notizen
+last {0},zuletzt {0}

@@ -36,7 +36,9 @@
 						<span v-if="summaryOf(tile.id)" class="min-w-0 truncate text-xs text-ink-gray-5">
 							· {{ summaryOf(tile.id) }}
 						</span>
-						<div class="ml-auto flex flex-shrink-0 items-center" @pointerdown.stop>
+						<!-- The panel's own actions, teleported in by its content (hosts.panelTitleSlots) -->
+						<TitleSlot :panel-id="tile.id" class="ml-auto" @pointerdown.stop />
+						<div class="flex flex-shrink-0 items-center" @pointerdown.stop>
 							<Dropdown :options="moveOptions(tile.id)" placement="right">
 								<button
 									type="button"
@@ -59,12 +61,16 @@
 							<FeatherIcon name="x" class="h-3.5 w-3.5" />
 						</button>
 					</header>
-					<!-- The panel's body is teleported in here (see the bodies below). -->
+					<!-- The panel's body is teleported in here (see the bodies below). A panel that doesn't
+					     scroll itself scrolls in a box that says "More below" (#1922). -->
 					<div
+						v-if="defOf(tile.id)?.bare"
 						:id="tileId(tile.id)"
-						class="min-h-0 flex-1"
-						:class="defOf(tile.id)?.bare ? 'flex flex-col overflow-hidden' : 'overflow-y-auto px-4 py-3'"
+						class="flex min-h-0 flex-1 flex-col overflow-hidden"
 					/>
+					<ScrollHint v-else class="flex-1" box-class="p-2" fade="from-white dark:from-gray-900">
+						<div :id="tileId(tile.id)" />
+					</ScrollHint>
 				</section>
 
 				<div
@@ -141,6 +147,7 @@ import { __ } from "@spa/utils/i18n.js"
 import { issueChatStore } from "@spa/issueChatStore.js"
 import { setRavenFramePassThrough } from "@spa/utils/ravenFrame.js"
 import PanelBody from "./PanelBody.vue"
+import ScrollHint from "@spa/components/ScrollHint.vue"
 import PanelRail from "./PanelRail.vue"
 import { DEFAULT_LAYOUTS, PANELS } from "./definitions.js"
 import { minimums, panelsFor, places } from "./registry.js"
@@ -161,6 +168,7 @@ import {
 	withAll,
 } from "./tiling.js"
 import { usePanelLayout } from "./usePanelLayout.js"
+import TitleSlot from "./TitleSlot.vue"
 
 const props = defineProps({
 	doctype: { type: String, required: true },
@@ -173,7 +181,9 @@ const parkId = `${uid}-park`
 const tileId = (id) => `${uid}-tile-${id}`
 
 const stored = usePanelLayout(props.doctype)
-const defaults = DEFAULT_LAYOUTS[props.doctype] || { tree: () => null, opened: [] }
+// A cockpit may bring its own record type and default layout (the sales cockpit's Lead, #1913).
+const defaults = spaConfig.panelLayouts?.[props.doctype] ||
+	DEFAULT_LAYOUTS[props.doctype] || { tree: () => null, opened: [] }
 
 // The panels of this record, and what their bodies reported (badge, summary, hidden).
 const defs = computed(() => panelsFor(PANELS, { doctype: props.doctype, record: props.record, cockpitPanels: spaConfig.panels }))
