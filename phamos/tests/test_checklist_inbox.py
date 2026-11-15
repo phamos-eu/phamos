@@ -14,6 +14,7 @@ from phamos.api.checklist_inbox import (
 	CHECKLIST_INBOX_LIMIT,
 	checklist_owner_query,
 	delete_spa_checklist_item,
+	move_spa_checklist_item,
 	get_checklist_inbox,
 	get_checklist_template,
 	get_checklists,
@@ -134,6 +135,50 @@ class TestDeleteSpaChecklistItem(FrappeTestCase):
 				delete_spa_checklist_item("CHK-1", "ITEM-404")
 		doc.remove.assert_not_called()
 		doc.save.assert_not_called()
+
+
+class TestMoveSpaChecklistItem(FrappeTestCase):
+	"""Reorder within a checklist (#1919)."""
+
+	def _doc(self, names):
+		doc = MagicMock()
+		doc.checklist_items = [SimpleNamespace(name=n, idx=i + 1) for i, n in enumerate(names)]
+		return doc
+
+	def _move(self, doc, item, to_index):
+		with (
+			patch("phamos.api.checklist_inbox._require_checklist_write", return_value=doc),
+			patch("phamos.api.checklist_inbox.get_checklist", return_value={"name": "CHK-1"}),
+		):
+			return move_spa_checklist_item("CHK-1", item, to_index)
+
+	def test_moves_and_renumbers(self):
+		doc = self._doc(["A", "B", "C", "D"])
+		self.assertEqual(self._move(doc, "D", "1"), {"name": "CHK-1"})
+		self.assertEqual([r.name for r in doc.checklist_items], ["A", "D", "B", "C"])
+		self.assertEqual([r.idx for r in doc.checklist_items], [1, 2, 3, 4])
+		doc.save.assert_called_once()
+
+	def test_to_the_end_and_to_the_start(self):
+		doc = self._doc(["A", "B", "C"])
+		self._move(doc, "A", 2)
+		self.assertEqual([r.name for r in doc.checklist_items], ["B", "C", "A"])
+		self._move(doc, "A", 0)
+		self.assertEqual([r.name for r in doc.checklist_items], ["A", "B", "C"])
+
+	def test_refuses_bad_positions_and_unknown_items(self):
+		for item, to_index in (("A", 3), ("A", -1), ("A", "x"), ("NOPE", 0), ("", 0)):
+			doc = self._doc(["A", "B", "C"])
+			with self.assertRaises(frappe.ValidationError):
+				self._move(doc, item, to_index)
+			doc.save.assert_not_called()
+
+	def test_needs_write_permission(self):
+		with patch(
+			"phamos.api.checklist_inbox._require_checklist_write", side_effect=frappe.PermissionError
+		):
+			with self.assertRaises(frappe.PermissionError):
+				move_spa_checklist_item("CHK-1", "A", 0)
 
 
 def _row(name):
