@@ -13,7 +13,16 @@
 					role="region"
 					:aria-label="titleOf(tile.id)"
 				>
-					<header class="flex h-7 flex-none items-center gap-1.5 border-b border-outline-gray-1 pl-2.5 pr-1">
+					<!-- The title bar is the handle to move the panel (#1916): drag it onto another tile or
+					     an edge of the page; "Move to…" does the same without a mouse. -->
+					<header
+						class="flex h-7 flex-none cursor-grab touch-none select-none items-center gap-1.5 border-b border-outline-gray-1 pl-2.5 pr-1"
+						:title="__('Drag to move')"
+						@pointerdown="(e) => startMove(tile.id, e)"
+						@pointermove="onMove"
+						@pointerup="endMove"
+						@pointercancel="cancelMove"
+					>
 						<FeatherIcon
 							v-if="typeof defOf(tile.id)?.icon === 'string'"
 							:name="defOf(tile.id).icon"
@@ -26,11 +35,24 @@
 						<span v-if="summaryOf(tile.id)" class="min-w-0 truncate text-xs text-ink-gray-5">
 							· {{ summaryOf(tile.id) }}
 						</span>
+						<div class="ml-auto flex flex-shrink-0 items-center" @pointerdown.stop>
+							<Dropdown :options="moveOptions(tile.id)" placement="right">
+								<button
+									type="button"
+									class="flex h-5 w-5 items-center justify-center rounded text-ink-gray-5 hover:bg-surface-gray-2 hover:text-ink-gray-8"
+									:title="__('Move to…')"
+									:aria-label="__('Move to…')"
+								>
+									<FeatherIcon name="move" class="h-3.5 w-3.5" />
+								</button>
+							</Dropdown>
+						</div>
 						<button
 							type="button"
-							class="ml-auto flex h-5 w-5 flex-shrink-0 items-center justify-center rounded text-ink-gray-5 hover:bg-surface-gray-2 hover:text-ink-gray-8"
+							class="flex h-5 w-5 flex-shrink-0 items-center justify-center rounded text-ink-gray-5 hover:bg-surface-gray-2 hover:text-ink-gray-8"
 							:title="__('Close {0}', [titleOf(tile.id)])"
 							:aria-label="__('Close {0}', [titleOf(tile.id)])"
+							@pointerdown.stop
 							@click="toggle(tile.id)"
 						>
 							<FeatherIcon name="x" class="h-3.5 w-3.5" />
@@ -69,6 +91,13 @@
 					@keydown.down.prevent="gutter.axis === 'h' && nudge(gutter, 16)"
 				/>
 
+				<!-- Where a dragged panel will land -->
+				<div
+					v-if="moving?.active && preview"
+					class="pointer-events-none absolute z-[3] rounded-sm border-2 border-blue-500 bg-blue-500/20 transition-all duration-75"
+					:style="box(preview)"
+				/>
+
 				<div
 					v-if="!geometry.tiles.length"
 					class="absolute inset-0 flex items-center justify-center bg-surface-white p-6 text-center text-sm text-ink-gray-5"
@@ -96,7 +125,7 @@
 
 <script setup>
 import { computed, onBeforeUnmount, onMounted, reactive, ref, shallowRef, watch } from "vue"
-import { FeatherIcon } from "frappe-ui"
+import { Dropdown, FeatherIcon } from "frappe-ui"
 import spaConfig from "@/config"
 import { __ } from "@spa/utils/i18n.js"
 import { issueChatStore } from "@spa/issueChatStore.js"
@@ -105,7 +134,21 @@ import PanelBody from "./PanelBody.vue"
 import PanelRail from "./PanelRail.vue"
 import { DEFAULT_LAYOUTS, PANELS } from "./definitions.js"
 import { minimums, panelsFor, places } from "./registry.js"
-import { clone, evenAt, fit, layout as computeLayout, resizeAt, resolve, sanitize, splitAt, touched, withAll } from "./tiling.js"
+import {
+	PAGE_EDGE_SHARE,
+	clone,
+	dropAt,
+	dropped,
+	evenAt,
+	fit,
+	layout as computeLayout,
+	resizeAt,
+	resolve,
+	sanitize,
+	splitAt,
+	touched,
+	withAll,
+} from "./tiling.js"
 import { usePanelLayout } from "./usePanelLayout.js"
 
 const props = defineProps({
@@ -277,4 +320,109 @@ function even(gutter) {
 	evenAt(node, gutter.index)
 	save({ tree: next })
 }
+
+// Moving a panel (#1916): drag its title bar; the drop zone under the pointer shows where it lands.
+const moving = shallowRef(null)
+const preview = computed(() => {
+	const drop = moving.value?.drop
+	if (!drop) return null
+	if (!drop.target) {
+		const share = PAGE_EDGE_SHARE
+		return {
+			left: { x: 0, y: 0, w: room.w * share, h: room.h },
+			right: { x: room.w * (1 - share), y: 0, w: room.w * share, h: room.h },
+			top: { x: 0, y: 0, w: room.w, h: room.h * share },
+			bottom: { x: 0, y: room.h * (1 - share), w: room.w, h: room.h * share },
+		}[drop.side]
+	}
+	const t = geometry.value.tiles.find((tile) => tile.id === drop.target)
+	if (!t) return null
+	return {
+		center: t,
+		left: { ...t, w: t.w / 2 },
+		right: { ...t, x: t.x + t.w / 2, w: t.w / 2 },
+		top: { ...t, h: t.h / 2 },
+		bottom: { ...t, y: t.y + t.h / 2, h: t.h / 2 },
+	}[drop.side]
+})
+
+function pointInArea(event) {
+	const rect = area.value.getBoundingClientRect()
+	return { x: event.clientX - rect.left, y: event.clientY - rect.top }
+}
+
+function startMove(id, event) {
+	if (event.button !== 0) return
+	moving.value = { id, start: { x: event.clientX, y: event.clientY }, active: false, drop: null }
+	event.currentTarget.setPointerCapture(event.pointerId)
+}
+
+function onMove(event) {
+	const m = moving.value
+	if (!m) return
+	// a few pixels first, so a click on the title bar doesn't start a move
+	if (!m.active && Math.hypot(event.clientX - m.start.x, event.clientY - m.start.y) < 5) return
+	if (!m.active) {
+		setRavenFramePassThrough(true)
+		window.addEventListener("keydown", onMoveKey)
+	}
+	const p = pointInArea(event)
+	let drop = dropAt(p.x, p.y, geometry.value.tiles, room)
+	if (drop?.target === m.id) drop = null
+	moving.value = { ...m, active: true, drop }
+}
+
+function endMove() {
+	const m = moving.value
+	cancelMove()
+	if (m?.active && m.drop) applyDrop(m.id, m.drop)
+}
+
+function cancelMove() {
+	if (moving.value?.active) {
+		setRavenFramePassThrough(false)
+		window.removeEventListener("keydown", onMoveKey)
+	}
+	moving.value = null
+}
+
+function onMoveKey(event) {
+	if (event.key === "Escape") cancelMove()
+}
+
+function applyDrop(id, drop) {
+	save({ tree: dropped(baseTree.value, id, drop), opened: touched(opened.value, id) })
+}
+
+// The same moves from the title bar's menu, for the keyboard.
+function moveOptions(id) {
+	const to = (drop) => () => applyDrop(id, drop)
+	const others = geometry.value.tiles.filter((t) => t.id !== id)
+	return [
+		{
+			group: __("Whole page"),
+			items: [
+				{ label: __("Full width at the top"), icon: "arrow-up", onClick: to({ target: null, side: "top" }) },
+				{ label: __("Full width at the bottom"), icon: "arrow-down", onClick: to({ target: null, side: "bottom" }) },
+				{ label: __("Full height on the left"), icon: "arrow-left", onClick: to({ target: null, side: "left" }) },
+				{ label: __("Full height on the right"), icon: "arrow-right", onClick: to({ target: null, side: "right" }) },
+			],
+		},
+		...others.map((t) => {
+			const name = titleOf(t.id)
+			return {
+				group: name,
+				items: [
+					{ label: __("Left of {0}", [name]), onClick: to({ target: t.id, side: "left" }) },
+					{ label: __("Right of {0}", [name]), onClick: to({ target: t.id, side: "right" }) },
+					{ label: __("Above {0}", [name]), onClick: to({ target: t.id, side: "top" }) },
+					{ label: __("Below {0}", [name]), onClick: to({ target: t.id, side: "bottom" }) },
+					{ label: __("Swap with {0}", [name]), onClick: to({ target: t.id, side: "center" }) },
+				],
+			}
+		}),
+	]
+}
+
+onBeforeUnmount(() => window.removeEventListener("keydown", onMoveKey))
 </script>
