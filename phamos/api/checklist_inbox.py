@@ -710,7 +710,8 @@ def move_spa_checklist_item_to(checklist_name, item_name, target_checklist, to_i
 	# plain, short text for the timeline comments (a description may hold escaped markup)
 	label = frappe.utils.html_utils.unescape_html(frappe.utils.strip_html_tags(row.description or "")).strip()
 	label = (label[:80] + "…") if len(label) > 80 else label
-	label = label or _("Checklist item")
+	# escaped as plain text: unescaping above could turn "&lt;img …&gt;" back into a tag
+	label = frappe.utils.escape_html(label) or _("Checklist item")
 	move_item(source, target, row, to_index)
 	source_title = _checklist_title_value(source) or source.name
 	target_title = _checklist_title_value(target) or target.name

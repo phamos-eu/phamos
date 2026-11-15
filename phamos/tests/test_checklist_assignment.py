@@ -463,3 +463,10 @@ class TestMoveItemBetweenChecklists(FrappeTestCase):
 		comment = frappe.get_all("Comment", filters={"reference_name": target.name, "comment_type": "Info"}, pluck="content")[0]
 		self.assertNotIn("<b>", comment)
 		self.assertIn("…", comment)
+
+	def test_escaped_markup_stays_text_in_the_comment(self):
+		source = self._on_issue("Source", {"description": "&lt;img src=x onerror=alert(1)&gt; call"})
+		target = self._on_issue("Target")
+		checklist_inbox.move_spa_checklist_item_to(source.name, source.checklist_items[0].name, target.name)
+		comment = frappe.get_all("Comment", filters={"reference_name": target.name, "comment_type": "Info"}, pluck="content")[0]
+		self.assertNotIn("<img", comment)
