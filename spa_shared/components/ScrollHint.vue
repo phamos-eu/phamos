@@ -59,15 +59,33 @@ function measureSoon() {
 	if (!frame) frame = requestAnimationFrame(measure)
 }
 
+const observed = new WeakSet()
+function observeChildren() {
+	// the children, and theirs: a tile's teleport target holds the panel body one level down
+	for (const child of box.value?.children || []) {
+		for (const el of [child, ...child.children]) {
+			if (observed.has(el)) continue
+			observed.add(el)
+			resizeObserver.observe(el)
+		}
+	}
+}
+
 function scrollMore() {
 	box.value?.scrollBy({ top: Math.round(box.value.clientHeight * 0.8), behavior: "smooth" })
 }
 
 onMounted(() => {
 	box.value.addEventListener("scroll", measure, { passive: true })
+	// The box's size, and its content's: content can grow without a DOM change (an image that
+	// finishes loading, an editor growing). New children are observed as they come.
 	resizeObserver = new ResizeObserver(measureSoon)
 	resizeObserver.observe(box.value)
-	mutationObserver = new MutationObserver(measureSoon)
+	observeChildren()
+	mutationObserver = new MutationObserver(() => {
+		observeChildren()
+		measureSoon()
+	})
 	mutationObserver.observe(box.value, { childList: true, subtree: true, characterData: true })
 	measure()
 })
