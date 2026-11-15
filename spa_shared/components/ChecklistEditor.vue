@@ -21,8 +21,8 @@
 				:tabindex="expandedItem === item.name ? -1 : 0"
 				@click.stop="expand(item)"
 				@keydown.enter.prevent="expand(item)"
-				@keydown.alt.up.prevent="nudgeItem(item, -1)"
-				@keydown.alt.down.prevent="nudgeItem(item, 1)"
+				@keydown.alt.up="(e) => nudgeItem(item, -1, e)"
+				@keydown.alt.down="(e) => nudgeItem(item, 1, e)"
 			>
 				<!-- Collapsed -->
 				<div v-if="expandedItem !== item.name" class="flex items-start gap-3 px-3 py-2.5">
@@ -119,6 +119,7 @@
 					v-else
 					class="space-y-3 px-3 py-3"
 					@pointerdown="onOpenCardPointerDown"
+					@pointerup="onOpenCardPointerUp"
 					@click.stop="onOpenCardClick"
 				>
 					<div class="flex items-start gap-3">
@@ -267,7 +268,7 @@ import { deskRecordUrl } from "@spa/utils/deskUrl.js"
 import { formatDate, todayIsoInUserTz } from "@spa/utils/datetime.js"
 import { skipTextEditorToolbarTabStops } from "@spa/utils/textEditorFocus.js"
 import { __ } from "@spa/utils/i18n.js"
-import { isInteractiveTarget } from "@spa/utils/interactiveTarget.js"
+import { closesOnClick, isInteractiveTarget } from "@spa/utils/interactiveTarget.js"
 import { dropIndex, moved } from "@spa/utils/listReorder.js"
 
 const props = defineProps({
@@ -517,7 +518,11 @@ function cancelReorder() {
 	if (!reorder.value?.saving) reorder.value = null
 }
 
-async function nudgeItem(item, step) {
+async function nudgeItem(item, step, event) {
+	// Only on the focused, collapsed item itself: inside an open item's fields Alt+↑/↓ belongs to
+	// the field (moving the caret on macOS), and must neither move the item nor be swallowed.
+	if (event && (event.target !== event.currentTarget || expandedItem.value === item.name)) return
+	event?.preventDefault()
 	const items = props.checklist.items || []
 	const from = items.findIndex((i) => i.name === item.name)
 	const to = from + step
@@ -553,14 +558,26 @@ async function moveItem(name, toIndex) {
 // letting go over the free area ends in a click on the card, too (the browser sends the click to
 // the element both ends share).
 let pressedOnFreeArea = false
+let releasedOnField = false
 function onOpenCardPointerDown(event) {
 	pressedOnFreeArea = !isInteractiveTarget(event.target, event.currentTarget)
+	releasedOnField = false
+}
+
+function onOpenCardPointerUp(event) {
+	releasedOnField = isInteractiveTarget(event.target, event.currentTarget)
 }
 
 function onOpenCardClick(event) {
-	const freeArea = pressedOnFreeArea && !isInteractiveTarget(event.target, event.currentTarget)
+	const close = closesOnClick({
+		pressedOnFreeArea,
+		releasedOnField,
+		clickedOnFreeArea: !isInteractiveTarget(event.target, event.currentTarget),
+		selectedText: window.getSelection?.()?.toString() || "",
+	})
 	pressedOnFreeArea = false
-	if (freeArea && !window.getSelection?.()?.toString()) collapse()
+	releasedOnField = false
+	if (close) collapse()
 }
 
 async function onDocClick(event) {
