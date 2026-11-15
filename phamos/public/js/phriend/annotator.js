@@ -1,4 +1,4 @@
-// Drawing on the screenshot: arrow, box and text in red, and black bars over private data.
+// Drawing on the screenshot: arrow, free pen, box and text in red, and black bars over private data.
 // The black bars are drawn into the image itself: what is under them is never sent. Plain DOM inside Phriend's Shadow
 // DOM; the host (Desk or cockpit) has no part in it. Loaded on demand with the report flow.
 
@@ -8,6 +8,7 @@ const RED = "#e5222b";
 
 const ICONS = {
 	pen: '<path d="M5 19 L19 5 M19 5 h-7 M19 5 v7"/>',
+	draw: '<path d="M3 17 C6 9 9 6 10.5 9 S9 17 12.5 16 S17 6 21 7"/>',
 	box: '<rect x="4.5" y="6.5" width="15" height="11" rx="1.5"/>',
 	text: '<path d="M5 6 h14 M12 6 v13 M9 19 h6"/>',
 	redact: '<rect x="3.5" y="8" width="17" height="8" rx="1.5" fill="currentColor"/>',
@@ -30,6 +31,7 @@ export class Annotator {
 			<div class="annotator">
 				<div class="tools" role="toolbar" aria-label="${escape_html(__("Drawing tools"))}">
 					<button type="button" class="tool on" data-tool="pen" title="${escape_html(__("Arrow"))}" aria-label="${escape_html(__("Arrow"))}" aria-pressed="true">${icon("pen")}</button>
+					<button type="button" class="tool" data-tool="draw" title="${escape_html(__("Free drawing"))}" aria-label="${escape_html(__("Free drawing"))}" aria-pressed="false">${icon("draw")}</button>
 					<button type="button" class="tool" data-tool="box" title="${escape_html(__("Box"))}" aria-label="${escape_html(__("Box"))}" aria-pressed="false">${icon("box")}</button>
 					<button type="button" class="tool" data-tool="text" title="${escape_html(__("Text"))}" aria-label="${escape_html(__("Text"))}" aria-pressed="false">${icon("text")}</button>
 					<button type="button" class="tool" data-tool="redact" title="${escape_html(__("Black out private data"))}" aria-label="${escape_html(__("Black out private data"))}" aria-pressed="false">${icon("redact")}</button>
@@ -98,10 +100,13 @@ export class Annotator {
 			this.canvas.setPointerCapture(e.pointerId);
 			const p = this.point(e);
 			const w = 4 * this.scale();
-			current =
-				this.tool === "box" || this.tool === "redact"
-					? { type: this.tool, x1: p.x, y1: p.y, x2: p.x, y2: p.y, w }
-					: { type: "pen", points: [p, { ...p }], w }; // a straight arrow
+			if (this.tool === "box" || this.tool === "redact") {
+				current = { type: this.tool, x1: p.x, y1: p.y, x2: p.x, y2: p.y, w };
+			} else if (this.tool === "draw") {
+				current = { type: "free", points: [p], w }; // follows the pointer
+			} else {
+				current = { type: "pen", points: [p, { ...p }], w }; // a straight arrow
+			}
 			this.shapes.push(current);
 		});
 		this.canvas.addEventListener("pointermove", (e) => {
@@ -110,6 +115,16 @@ export class Annotator {
 			if (current.type === "box" || current.type === "redact") {
 				current.x2 = p.x;
 				current.y2 = p.y;
+			} else if (current.type === "free") {
+				// every point the browser saw since the last event, not only the last one, so fast
+				// strokes stay smooth; points closer than a screen pixel add nothing
+				const events = e.getCoalescedEvents ? e.getCoalescedEvents() : [e];
+				const step = this.scale();
+				for (const ev of events.length ? events : [e]) {
+					const q = this.point(ev);
+					const last = current.points[current.points.length - 1];
+					if (Math.hypot(q.x - last.x, q.y - last.y) >= step) current.points.push(q);
+				}
 			} else {
 				current.points[1] = p;
 			}
@@ -131,6 +146,11 @@ export class Annotator {
 
 	size_of(s) {
 		if (s.type === "box" || s.type === "redact") return Math.max(Math.abs(s.x2 - s.x1), Math.abs(s.y2 - s.y1));
+		if (s.type === "free") {
+			const xs = s.points.map((p) => p.x);
+			const ys = s.points.map((p) => p.y);
+			return Math.max(Math.max(...xs) - Math.min(...xs), Math.max(...ys) - Math.min(...ys));
+		}
 		const [a, b] = s.points;
 		return Math.hypot(b.x - a.x, b.y - a.y);
 	}
@@ -202,6 +222,8 @@ export class Annotator {
 				this.draw_redaction(s);
 			} else if (s.type === "text") {
 				this.draw_text(s);
+			} else if (s.type === "free") {
+				this.draw_free(s);
 			} else if (s.type === "box") {
 				ctx.strokeRect(Math.min(s.x1, s.x2), Math.min(s.y1, s.y2), Math.abs(s.x2 - s.x1), Math.abs(s.y2 - s.y1));
 			} else {
@@ -279,6 +301,26 @@ export class Annotator {
 			ctx.ellipse(cx + dx * r, cy - 0.08 * r, 0.16 * r, 0.22 * r, 0, 0, Math.PI * 2);
 			ctx.fill();
 		});
+	}
+
+	// A freehand line, smoothed: through the midpoints between the points, with the points as
+	// control points, so the corners of the pointer path don't show.
+	draw_free(s) {
+		const ctx = this.ctx;
+		const pts = s.points;
+		ctx.beginPath();
+		ctx.moveTo(pts[0].x, pts[0].y);
+		if (pts.length < 3) {
+			pts.slice(1).forEach((p) => ctx.lineTo(p.x, p.y));
+		} else {
+			for (let i = 1; i < pts.length - 1; i++) {
+				const mid = { x: (pts[i].x + pts[i + 1].x) / 2, y: (pts[i].y + pts[i + 1].y) / 2 };
+				ctx.quadraticCurveTo(pts[i].x, pts[i].y, mid.x, mid.y);
+			}
+			const end = pts[pts.length - 1];
+			ctx.lineTo(end.x, end.y);
+		}
+		ctx.stroke();
 	}
 
 	// red text on a white label, so it reads on any background
