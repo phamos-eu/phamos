@@ -2,6 +2,12 @@ import {
 	GUTTER,
 	clone,
 	distribute,
+	dropAt,
+	dropped,
+	move,
+	openingOrder,
+	remove,
+	swap,
 	evenAt,
 	fit,
 	insertNear,
@@ -193,5 +199,70 @@ describe("clone", () => {
 		const copy = clone(tree)
 		copy.children[1].sizes[0] = 1
 		expect(tree.children[1].sizes[0]).toBe(0.6)
+	})
+})
+
+describe("moving panels (#1916)", () => {
+	const ids = (t) => leaves(t)
+
+	it("removes a panel and collapses what is left", () => {
+		const tree = remove(issueTree(), "chat")
+		expect(ids(tree)).toEqual(["description", "phriend", "checklists", "properties"])
+		expect(close(sum(tree.children[1].sizes), 1)).toBe(true)
+		expect(remove({ panel: "a" }, "a")).toBeNull()
+	})
+
+	it("moves the description to full width at the top", () => {
+		const tree = move(issueTree(), "description", null, "top")
+		expect(tree.split).toBe("column")
+		expect(tree.children[0]).toEqual({ panel: "description" })
+		expect(tree.sizes).toEqual([0.3, 0.7])
+		expect(ids(tree.children[1])).toEqual(["chat", "phriend", "checklists", "properties"])
+	})
+
+	it("adds to an existing split of the same direction on a page edge", () => {
+		const tree = move(issueTree(), "properties", null, "left")
+		expect(ids(tree)).toEqual(["properties", "description", "chat", "phriend", "checklists"])
+		expect(close(sum(tree.sizes), 1)).toBe(true)
+		expect(tree.sizes[0]).toBe(0.3)
+	})
+
+	it("moves next to another panel and onto itself changes nothing", () => {
+		const tree = move(issueTree(), "properties", "description", "bottom")
+		expect(tree.children[0]).toEqual({ split: "column", sizes: [0.5, 0.5], children: [{ panel: "description" }, { panel: "properties" }] })
+		expect(move(issueTree(), "chat", "chat", "left")).toEqual(issueTree())
+	})
+
+	it("swaps two panels and keeps the sizes with the places", () => {
+		const tree = swap(issueTree(), "description", "properties")
+		expect(ids(tree)).toEqual(["properties", "chat", "phriend", "checklists", "description"])
+		expect(tree.sizes).toEqual([0.4, 0.4, 0.2])
+	})
+
+	it("finds the drop zone under the pointer", () => {
+		const tiles = [
+			{ id: "a", x: 0, y: 0, w: 300, h: 600 },
+			{ id: "b", x: 304, y: 0, w: 300, h: 600 },
+		]
+		const size = { w: 604, h: 600 }
+		expect(dropAt(10, 300, tiles, size)).toEqual({ target: null, side: "left" })
+		expect(dropAt(300, 5, tiles, size)).toEqual({ target: null, side: "top" })
+		expect(dropAt(150, 300, tiles, size)).toEqual({ target: "a", side: "center" })
+		expect(dropAt(260, 300, tiles, size)).toEqual({ target: "a", side: "right" })
+		expect(dropAt(450, 100, tiles, size)).toEqual({ target: "b", side: "top" })
+		expect(dropAt(-5, 300, tiles, size)).toBeNull()
+	})
+
+	it("applies a drop", () => {
+		expect(ids(dropped(issueTree(), "chat", { target: "description", side: "center" }))[0]).toBe("chat")
+		expect(dropped(issueTree(), "chat", null)).toEqual(issueTree())
+	})
+})
+
+describe("openingOrder", () => {
+	it("falls back to the default for a missing or empty order", () => {
+		expect(openingOrder(undefined, ["a"])).toEqual(["a"])
+		expect(openingOrder([], ["a"])).toEqual(["a"])
+		expect(openingOrder(["b"], ["a"])).toEqual(["b"])
 	})
 })

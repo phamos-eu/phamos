@@ -19,8 +19,10 @@ const emit = defineEmits(["state"])
 const expanded = inject("dockPanelExpanded", ref(true))
 
 const chat = computed(() => issueChatStore.chats[props.recordName])
-// Hidden until the chat button said whether this record can have a chat at all (Raven).
+// The chat lays itself in once the button knows it can (Raven); the tile keeps its place while
+// that loads and goes only when there is no chat at all, so the tiles don't shift on load.
 const available = computed(() => chat.value?.enabled === true)
+const noChat = computed(() => chat.value?.enabled === false)
 
 function publish() {
 	issueChatStore.dockHost = {
@@ -32,9 +34,9 @@ function publish() {
 
 watch([expanded, available, () => props.recordName], publish)
 watch(
-	[() => chat.value?.summary, () => chat.value?.badge, () => chat.value?.tone, available],
-	([summary, badge, tone, isAvailable]) =>
-		emit("state", { summary: summary || "", badge: badge || "", tone: tone || "", hidden: !isAvailable }),
+	[() => chat.value?.summary, () => chat.value?.badge, () => chat.value?.tone, noChat],
+	([summary, badge, tone, hidden]) =>
+		emit("state", { summary: summary || "", badge: badge || "", tone: tone || "", hidden }),
 	{ immediate: true }
 )
 

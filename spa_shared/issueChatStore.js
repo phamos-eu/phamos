@@ -6,14 +6,16 @@ export const issueChatStore = reactive({
 	/** Issue whose chat shows in the page (the dock's chat panel or the overlay) */
 	openFor: null,
 	/**
-	 * The chat panel of the dock (#1911): { record, expanded, available }. The chat lays itself into
-	 * that panel while it is expanded and available; otherwise the chat button opens the overlay
-	 * or, where the panel is available but collapsed, asks the dock to expand it.
+	 * The chat panel of the record page (#1911, #1915): { record, expanded, available }. The chat
+	 * lays itself into that panel while it shows in a tile; the panel's rail icon opens it.
 	 */
 	dockHost: null,
-	/** Asks the dock to expand a panel: { record, panel } */
+	/** Asks the record page to open a panel: { record, panel } (the list's chat icon) */
 	expandRequest: null,
-	/** Per record, what the chat button knows, for the dock row: { enabled, summary } */
+	/**
+	 * Per record, what the chat button knows, for the panel's rail icon:
+	 * { enabled (undefined while loading), summary, badge, tone }
+	 */
 	chats: {},
 	/** Issue name whose chat should open once that Issue is shown */
 	openRequest: null,

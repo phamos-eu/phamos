@@ -13,7 +13,17 @@
 					role="region"
 					:aria-label="titleOf(tile.id)"
 				>
-					<header class="flex h-7 flex-none items-center gap-1.5 border-b border-outline-gray-1 pl-2.5 pr-1">
+					<!-- The title bar is the handle to move the panel (#1916): drag it onto another tile or
+					     an edge of the page; "Move to…" does the same without a mouse. -->
+					<header
+						class="flex h-7 flex-none cursor-grab touch-none select-none items-center gap-1.5 border-b border-outline-gray-1 pl-2.5 pr-1"
+						:title="__('Drag to move')"
+						@pointerdown="(e) => startMove(tile.id, e)"
+						@pointermove="onMove"
+						@pointerup="endMove"
+						@pointercancel="cancelMove"
+						@lostpointercapture="cancelMove"
+					>
 						<FeatherIcon
 							v-if="typeof defOf(tile.id)?.icon === 'string'"
 							:name="defOf(tile.id).icon"
@@ -26,11 +36,24 @@
 						<span v-if="summaryOf(tile.id)" class="min-w-0 truncate text-xs text-ink-gray-5">
 							· {{ summaryOf(tile.id) }}
 						</span>
+						<div class="ml-auto flex flex-shrink-0 items-center" @pointerdown.stop>
+							<Dropdown :options="moveOptions(tile.id)" placement="right">
+								<button
+									type="button"
+									class="flex h-5 w-5 items-center justify-center rounded text-ink-gray-5 hover:bg-surface-gray-2 hover:text-ink-gray-8 focus:outline-none focus-visible:ring-2 focus-visible:ring-outline-gray-4"
+									:title="__('Move to…')"
+									:aria-label="__('Move to…')"
+								>
+									<FeatherIcon name="move" class="h-3.5 w-3.5" />
+								</button>
+							</Dropdown>
+						</div>
 						<button
 							type="button"
-							class="ml-auto flex h-5 w-5 flex-shrink-0 items-center justify-center rounded text-ink-gray-5 hover:bg-surface-gray-2 hover:text-ink-gray-8"
+							class="flex h-5 w-5 flex-shrink-0 items-center justify-center rounded text-ink-gray-5 hover:bg-surface-gray-2 hover:text-ink-gray-8 focus:outline-none focus-visible:ring-2 focus-visible:ring-outline-gray-4"
 							:title="__('Close {0}', [titleOf(tile.id)])"
 							:aria-label="__('Close {0}', [titleOf(tile.id)])"
+							@pointerdown.stop
 							@click="toggle(tile.id)"
 						>
 							<FeatherIcon name="x" class="h-3.5 w-3.5" />
@@ -52,21 +75,37 @@
 					:aria-orientation="gutter.axis === 'w' ? 'vertical' : 'horizontal'"
 					:aria-label="__('Resize the panels')"
 					:title="__('Drag to resize, double-click to even out')"
-					class="absolute z-[2] touch-none focus:outline-none"
-					:class="[
-						gutter.axis === 'w' ? 'cursor-col-resize' : 'cursor-row-resize',
-						dragging === gutter ? 'bg-outline-gray-4' : 'hover:bg-outline-gray-3 focus-visible:bg-outline-gray-4',
-					]"
-					:style="box(gutter)"
+					class="group absolute z-[2] flex touch-none items-center justify-center focus:outline-none"
+					:class="gutter.axis === 'w' ? 'cursor-col-resize' : 'cursor-row-resize'"
+					:style="box(grabArea(gutter))"
 					@pointerdown="(e) => startDrag(gutter, e)"
 					@pointermove="onDrag"
 					@pointerup="endDrag"
 					@pointercancel="endDrag"
+					@lostpointercapture="endDrag"
 					@dblclick="even(gutter)"
 					@keydown.left.prevent="gutter.axis === 'w' && nudge(gutter, -16)"
 					@keydown.right.prevent="gutter.axis === 'w' && nudge(gutter, 16)"
 					@keydown.up.prevent="gutter.axis === 'h' && nudge(gutter, -16)"
 					@keydown.down.prevent="gutter.axis === 'h' && nudge(gutter, 16)"
+				>
+					<!-- the visible line; the element around it is wider, so it is easy to grab -->
+					<span
+						class="pointer-events-none rounded-full"
+						:class="[
+							gutter.axis === 'w' ? 'h-full w-1' : 'h-1 w-full',
+							gutterKey(gutter) === draggingKey
+								? 'bg-outline-gray-4'
+								: 'bg-outline-gray-2 group-hover:bg-outline-gray-3 group-focus-visible:bg-outline-gray-4',
+						]"
+					/>
+				</div>
+
+				<!-- Where a dragged panel will land -->
+				<div
+					v-if="moving?.active && preview"
+					class="pointer-events-none absolute z-[3] rounded-sm border-2 border-blue-500 bg-blue-500/20 transition-all duration-75"
+					:style="box(preview)"
 				/>
 
 				<div
@@ -96,7 +135,7 @@
 
 <script setup>
 import { computed, onBeforeUnmount, onMounted, reactive, ref, shallowRef, watch } from "vue"
-import { FeatherIcon } from "frappe-ui"
+import { Dropdown, FeatherIcon } from "frappe-ui"
 import spaConfig from "@/config"
 import { __ } from "@spa/utils/i18n.js"
 import { issueChatStore } from "@spa/issueChatStore.js"
@@ -105,7 +144,22 @@ import PanelBody from "./PanelBody.vue"
 import PanelRail from "./PanelRail.vue"
 import { DEFAULT_LAYOUTS, PANELS } from "./definitions.js"
 import { minimums, panelsFor, places } from "./registry.js"
-import { clone, evenAt, fit, layout as computeLayout, resizeAt, resolve, sanitize, splitAt, touched, withAll } from "./tiling.js"
+import {
+	PAGE_EDGE_SHARE,
+	clone,
+	dropAt,
+	dropped,
+	evenAt,
+	fit,
+	layout as computeLayout,
+	resizeAt,
+	resolve,
+	sanitize,
+	splitAt,
+	openingOrder,
+	touched,
+	withAll,
+} from "./tiling.js"
 import { usePanelLayout } from "./usePanelLayout.js"
 
 const props = defineProps({
@@ -143,6 +197,11 @@ const area = ref(null)
 const room = reactive({ w: 0, h: 0 })
 let observer = null
 onMounted(() => {
+	// Measure once now: a ResizeObserver reports only when the page renders, which a tab opened in
+	// the background doesn't do, and the tiles would wait for it.
+	const rect = area.value.getBoundingClientRect()
+	room.w = Math.floor(rect.width)
+	room.h = Math.floor(rect.height)
 	observer = new ResizeObserver(([entry]) => {
 		room.w = Math.floor(entry.contentRect.width)
 		room.h = Math.floor(entry.contentRect.height)
@@ -155,7 +214,7 @@ const mins = computed(() => minimums(defs.value))
 const available = computed(() => defs.value.filter((d) => !reported[d.id]?.hidden).map((d) => d.id))
 const layoutState = computed(() => stored.get())
 const closed = computed(() => new Set(layoutState.value.closed || []))
-const opened = computed(() => layoutState.value.opened || defaults.opened)
+const opened = computed(() => openingOrder(layoutState.value.opened, defaults.opened))
 
 // The user's tree, else the default for this width; panels it doesn't know yet get placed.
 const baseTree = computed(() => {
@@ -176,6 +235,11 @@ const geometry = computed(() =>
 		? computeLayout(resolved.value, { x: 0, y: 0, w: room.w, h: room.h }, mins.value)
 		: { tiles: [], gutters: [] }
 )
+
+// A splitter is 4px; its grab area reaches 4px into the tiles on both sides.
+const GRAB = 4
+const grabArea = (g) =>
+	g.axis === "w" ? { ...g, x: g.x - GRAB, w: g.w + 2 * GRAB } : { ...g, y: g.y - GRAB, h: g.h + 2 * GRAB }
 
 const box = (r) => ({ left: `${r.x}px`, top: `${r.y}px`, width: `${r.w}px`, height: `${r.h}px` })
 
@@ -229,6 +293,9 @@ watch(
 // Splitters
 const dragging = shallowRef(null)
 let dragStart = null
+// The gutters are new objects after every re-layout; the one being dragged is found by its place.
+const gutterKey = (g) => `${g.path.join(".")}:${g.index}`
+const draggingKey = computed(() => (dragging.value ? gutterKey(dragging.value) : null))
 
 function at(axis, event) {
 	return axis === "w" ? event.clientX : event.clientY
@@ -251,8 +318,13 @@ function startDrag(gutter, event) {
 	setRavenFramePassThrough(true)
 }
 
+// Only while the button is down: if the release got lost (the pointer left the window, the
+// capture was dropped), a later plain mouse move must not keep resizing.
+const buttonDown = (event) => (event.buttons & 1) === 1
+
 function onDrag(event) {
 	if (!dragStart) return
+	if (!buttonDown(event)) return endDrag()
 	dragTree.value = resized(dragging.value, at(dragging.value.axis, event) - dragStart.pos, dragStart.base)
 }
 
@@ -277,4 +349,114 @@ function even(gutter) {
 	evenAt(node, gutter.index)
 	save({ tree: next })
 }
+
+// Moving a panel (#1916): drag its title bar; the drop zone under the pointer shows where it lands.
+const moving = shallowRef(null)
+const preview = computed(() => {
+	const drop = moving.value?.drop
+	if (!drop) return null
+	if (!drop.target) {
+		const share = PAGE_EDGE_SHARE
+		return {
+			left: { x: 0, y: 0, w: room.w * share, h: room.h },
+			right: { x: room.w * (1 - share), y: 0, w: room.w * share, h: room.h },
+			top: { x: 0, y: 0, w: room.w, h: room.h * share },
+			bottom: { x: 0, y: room.h * (1 - share), w: room.w, h: room.h * share },
+		}[drop.side]
+	}
+	const t = geometry.value.tiles.find((tile) => tile.id === drop.target)
+	if (!t) return null
+	return {
+		center: t,
+		left: { ...t, w: t.w / 2 },
+		right: { ...t, x: t.x + t.w / 2, w: t.w / 2 },
+		top: { ...t, h: t.h / 2 },
+		bottom: { ...t, y: t.y + t.h / 2, h: t.h / 2 },
+	}[drop.side]
+})
+
+function pointInArea(event) {
+	const rect = area.value.getBoundingClientRect()
+	return { x: event.clientX - rect.left, y: event.clientY - rect.top }
+}
+
+function startMove(id, event) {
+	if (event.button !== 0) return
+	moving.value = { id, start: { x: event.clientX, y: event.clientY }, active: false, drop: null }
+	event.currentTarget.setPointerCapture(event.pointerId)
+}
+
+function onMove(event) {
+	const m = moving.value
+	if (!m) return
+	if (!buttonDown(event)) return cancelMove()
+	// a few pixels first, so a click on the title bar doesn't start a move
+	if (!m.active && Math.hypot(event.clientX - m.start.x, event.clientY - m.start.y) < 5) return
+	if (!m.active) {
+		setRavenFramePassThrough(true)
+		window.addEventListener("keydown", onMoveKey)
+	}
+	const p = pointInArea(event)
+	let drop = dropAt(p.x, p.y, geometry.value.tiles, room)
+	if (drop?.target === m.id) drop = null
+	moving.value = { ...m, active: true, drop }
+}
+
+function endMove() {
+	const m = moving.value
+	cancelMove()
+	if (m?.active && m.drop) applyDrop(m.id, m.drop)
+}
+
+function cancelMove() {
+	if (moving.value?.active) {
+		setRavenFramePassThrough(false)
+		window.removeEventListener("keydown", onMoveKey)
+	}
+	moving.value = null
+}
+
+function onMoveKey(event) {
+	if (event.key === "Escape") cancelMove()
+}
+
+function applyDrop(id, drop) {
+	save({ tree: dropped(baseTree.value, id, drop), opened: touched(opened.value, id) })
+}
+
+// The same moves from the title bar's menu, for the keyboard.
+function moveOptions(id) {
+	const to = (drop) => () => applyDrop(id, drop)
+	const others = geometry.value.tiles.filter((t) => t.id !== id)
+	return [
+		{
+			group: __("Whole page"),
+			items: [
+				{ label: __("Full width at the top"), icon: "arrow-up", onClick: to({ target: null, side: "top" }) },
+				{ label: __("Full width at the bottom"), icon: "arrow-down", onClick: to({ target: null, side: "bottom" }) },
+				{ label: __("Full height on the left"), icon: "arrow-left", onClick: to({ target: null, side: "left" }) },
+				{ label: __("Full height on the right"), icon: "arrow-right", onClick: to({ target: null, side: "right" }) },
+			],
+		},
+		...others.map((t) => {
+			const name = titleOf(t.id)
+			return {
+				group: name,
+				items: [
+					{ label: __("Left of {0}", [name]), onClick: to({ target: t.id, side: "left" }) },
+					{ label: __("Right of {0}", [name]), onClick: to({ target: t.id, side: "right" }) },
+					{ label: __("Above {0}", [name]), onClick: to({ target: t.id, side: "top" }) },
+					{ label: __("Below {0}", [name]), onClick: to({ target: t.id, side: "bottom" }) },
+					{ label: __("Swap with {0}", [name]), onClick: to({ target: t.id, side: "center" }) },
+				],
+			}
+		}),
+	]
+}
+
+// Leaving the page mid-drag: the Raven frame must take clicks again, the Escape listener goes.
+onBeforeUnmount(() => {
+	if (dragStart || moving.value?.active) setRavenFramePassThrough(false)
+	window.removeEventListener("keydown", onMoveKey)
+})
 </script>
