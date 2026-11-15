@@ -438,9 +438,17 @@ class TestPhriendIssuePage(FrappeTestCase):
 		for url in ("javascript:alert(1)", "data:text/html,x", "/app/user"):
 			self.assertIsNone(issue_report(self.report(page_url=url))["page_url"], url)
 		# another host can't be reached through the link (review of !1164)
-		for url in ("https://evil.example/login?next=1#top", "https://evil.example//evil.example/x"):
+		for url in (
+			"https://evil.example/login?next=1#top",
+			"https://evil.example//evil.example/x",
+			"https://evil.example/\\evil.example/x",
+			"https://evil.example/\\/evil.example",
+			"https://evil.example/\t/evil.example",
+			"https://evil.example/\n\\evil.example",
+		):
 			link = issue_report(self.report(page_url=url))["page_url"]
-			self.assertTrue(link.startswith("/") and not link.startswith("//"), link)
+			self.assertTrue(link.startswith("/") and link[1:2] not in ("/", "\\"), repr(link))
+			self.assertNotIn("\\", link)
 		self.assertEqual(issue_report(self.report(page_url="https://evil.example/login?next=1#top"))["page_url"],
 			"/login?next=1#top")
 
