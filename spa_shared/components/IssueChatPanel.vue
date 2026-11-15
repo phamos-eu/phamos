@@ -17,7 +17,12 @@
 			>
 				<!-- In a tile the tile's title bar says "Chat" and holds "Open in Raven" (below), so the
 				     chat needs no header row of its own (#1917). -->
-				<header v-if="!inColumn" class="flex h-12 flex-shrink-0 items-center gap-2 border-b border-outline-gray-2 px-3">
+				<!-- In a tile without a title-bar slot (should not happen), keep the header so "Open in
+				     Raven" never disappears. -->
+				<header
+					v-if="!inColumn || (url && !titleSlot)"
+					class="flex h-12 flex-shrink-0 items-center gap-2 border-b border-outline-gray-2 px-3"
+				>
 					<FeatherIcon name="message-circle" class="h-4 w-4 flex-shrink-0 text-ink-gray-6" />
 					<span class="min-w-0 flex-1 truncate text-sm font-medium text-ink-gray-9">{{ __("Chat") }}</span>
 					<Button
@@ -30,6 +35,7 @@
 						<template #prefix><FeatherIcon name="external-link" class="h-3.5 w-3.5" /></template>
 					</Button>
 					<Button
+						v-if="!inColumn"
 						variant="ghost"
 						:title="__('Close the chat')"
 						:aria-label="__('Close the chat')"
