@@ -210,6 +210,8 @@ export async function capture(engine_key) {
 	const started = performance.now();
 	try {
 		const canvas = await render(engine_key, started + CAPTURE_TIMEOUT_MS);
+		// a page of 0 x 0 pixels (a hidden or minimised window) draws nothing to send
+		if (!canvas || !canvas.width || !canvas.height) throw new Error("The screenshot is empty");
 		return { canvas, ms: Math.round(performance.now() - started) };
 	} finally {
 		fix.remove();
@@ -217,8 +219,10 @@ export async function capture(engine_key) {
 }
 
 // The smaller of PNG and JPEG: JPEG is 35–60% smaller on our pages, PNG wins on plain ones.
+// null when the canvas can't be encoded (empty, or larger than the browser allows: "data:,").
 export function to_data_url(canvas) {
 	const png = canvas.toDataURL("image/png");
 	const jpeg = canvas.toDataURL("image/jpeg", 0.85);
-	return jpeg.length < png.length ? jpeg : png;
+	const smaller = jpeg.length < png.length ? jpeg : png;
+	return smaller.startsWith("data:image/") ? smaller : null;
 }

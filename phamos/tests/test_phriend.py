@@ -142,6 +142,16 @@ class TestPhriend(FrappeTestCase):
 		self.assertEqual(file_doc.get_content()[:3], b"\xff\xd8\xff")  # JPEG magic bytes
 		self.assertTrue(file_doc.is_private)
 
+	def test_a_broken_screenshot_costs_the_screenshot_not_the_report(self, _enqueue):
+		# an empty canvas (page of 0 x 0 pixels) gives "data:,"; the report must still arrive (#1899)
+		for broken in ("data:,", "data:image/png;base64,not-base64!", "data:image/gif;base64,R0lGODlh",
+				"data:image/jpeg;base64," + base64.b64encode(b"<svg onload=alert(1)>").decode()):
+			with self.subTest(broken=broken[:30]):
+				issue = self.report(screenshot=broken)
+				self.assertFalse(issue.phriend_screenshot)
+				self.assertIn("The screenshot could not be saved", issue.description)
+				self.assertFalse(frappe.get_all("File", {"attached_to_name": issue.name}))
+
 	def test_unknown_doctype_and_type_are_dropped(self, _enqueue):
 		issue = self.report(ref_doctype="No Such DocType", report_type="Rant", priority="Whenever")
 		self.assertFalse(issue.phriend_ref_doctype)

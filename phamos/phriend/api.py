@@ -4,6 +4,7 @@
 """Phriend: a report from the desk becomes an Issue (+ ToDo); a triaged Issue can become a GitLab issue."""
 
 import base64
+import binascii
 import json
 from urllib.parse import quote
 
@@ -97,10 +98,15 @@ def create_report(
 	issue.phriend_ref_docname = ref_docname
 	issue.phriend_context = _pretty_json(context)
 	issue.description = _description(comment, route, page_url, ref_doctype, ref_docname, reporter_name)
+
+	# A screenshot that can't be used costs the screenshot, never the report (#1899).
+	shot, shot_problem = _decode_screenshot(screenshot) if screenshot else (None, None)
+	if shot_problem:
+		issue.description += f"<p><small>{escape_html(_('The screenshot could not be saved: {0}').format(shot_problem))}</small></p>"
 	issue.insert(ignore_permissions=True)
 
-	if screenshot:
-		file_url = _save_screenshot(issue.name, screenshot)
+	if shot:
+		file_url = _save_screenshot(issue.name, *shot)
 		issue.db_set(
 			{
 				"phriend_screenshot": file_url,
@@ -172,16 +178,43 @@ def _description(comment, route, page_url, ref_doctype, ref_docname, reporter_na
 	return "".join(parts)
 
 
-def _save_screenshot(docname, data_url):
-	if not isinstance(data_url, str) or not data_url.startswith("data:image/"):
-		frappe.throw(_("Invalid screenshot"))
+# What the browser sends (canvas.toDataURL), and how such a file starts.
+SCREENSHOT_TYPES = {
+	"data:image/png;base64": ("png", b"\x89PNG\r\n\x1a\n"),
+	"data:image/jpeg;base64": ("jpg", b"\xff\xd8\xff"),
+}
 
-	header, _sep, encoded = data_url.partition(",")
-	ext = "jpg" if "jpeg" in header else "png"
-	content = base64.b64decode(encoded)
-	if len(content) > MAX_SCREENSHOT_BYTES:
-		frappe.throw(_("Screenshot is too large"))
 
+def _decode_screenshot(data_url):
+	"""Check a screenshot data URL. Returns ((ext, content), None) or (None, problem).
+
+	Only PNG and JPEG whose bytes really are PNG or JPEG are kept: the file is stored and shown
+	on the Issue. An empty canvas gives "data:," (a page of 0 x 0 pixels), which lands here too.
+	"""
+	header, _sep, encoded = cstr(data_url).partition(",")
+	kind = SCREENSHOT_TYPES.get(header)
+	problem = None
+	if not kind or not encoded:
+		problem = _("not a PNG or JPEG image")
+	else:
+		try:
+			content = base64.b64decode(encoded, validate=True)
+		except (binascii.Error, ValueError):
+			content = None
+		if not content or not content.startswith(kind[1]):
+			problem = _("not a PNG or JPEG image")
+		elif len(content) > MAX_SCREENSHOT_BYTES:
+			problem = _("larger than {0} MB").format(MAX_SCREENSHOT_BYTES // (1024 * 1024))
+	if problem:
+		frappe.log_error(
+			title="Phriend: screenshot dropped",
+			message=f"{problem}; starts with {cstr(data_url)[:40]!r}, {len(cstr(data_url))} characters",
+		)
+		return None, problem
+	return (kind[0], content), None
+
+
+def _save_screenshot(docname, ext, content):
 	file_doc = frappe.get_doc(
 		{
 			"doctype": "File",
