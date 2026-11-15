@@ -13,7 +13,9 @@
 			:class="
 				item.open
 					? 'bg-surface-white text-ink-gray-9 shadow-sm'
-					: 'text-ink-gray-5 hover:bg-surface-gray-3 hover:text-ink-gray-8'
+					: item.squeezed
+						? 'border border-dashed border-outline-gray-3 text-ink-gray-6 hover:bg-surface-gray-3'
+						: 'text-ink-gray-5 hover:bg-surface-gray-3 hover:text-ink-gray-8'
 			"
 			:aria-pressed="item.open"
 			:aria-label="label(item)"

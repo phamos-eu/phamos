@@ -40,7 +40,7 @@
 							<Dropdown :options="moveOptions(tile.id)" placement="right">
 								<button
 									type="button"
-									class="flex h-5 w-5 items-center justify-center rounded text-ink-gray-5 hover:bg-surface-gray-2 hover:text-ink-gray-8"
+									class="flex h-5 w-5 items-center justify-center rounded text-ink-gray-5 hover:bg-surface-gray-2 hover:text-ink-gray-8 focus:outline-none focus-visible:ring-2 focus-visible:ring-outline-gray-4"
 									:title="__('Move to…')"
 									:aria-label="__('Move to…')"
 								>
@@ -50,7 +50,7 @@
 						</div>
 						<button
 							type="button"
-							class="flex h-5 w-5 flex-shrink-0 items-center justify-center rounded text-ink-gray-5 hover:bg-surface-gray-2 hover:text-ink-gray-8"
+							class="flex h-5 w-5 flex-shrink-0 items-center justify-center rounded text-ink-gray-5 hover:bg-surface-gray-2 hover:text-ink-gray-8 focus:outline-none focus-visible:ring-2 focus-visible:ring-outline-gray-4"
 							:title="__('Close {0}', [titleOf(tile.id)])"
 							:aria-label="__('Close {0}', [titleOf(tile.id)])"
 							@pointerdown.stop
@@ -75,14 +75,9 @@
 					:aria-orientation="gutter.axis === 'w' ? 'vertical' : 'horizontal'"
 					:aria-label="__('Resize the panels')"
 					:title="__('Drag to resize, double-click to even out')"
-					class="absolute z-[2] touch-none focus:outline-none"
-					:class="[
-						gutter.axis === 'w' ? 'cursor-col-resize' : 'cursor-row-resize',
-						gutterKey(gutter) === draggingKey
-							? 'bg-outline-gray-4'
-							: 'hover:bg-outline-gray-3 focus-visible:bg-outline-gray-4',
-					]"
-					:style="box(gutter)"
+					class="group absolute z-[2] flex touch-none items-center justify-center focus:outline-none"
+					:class="gutter.axis === 'w' ? 'cursor-col-resize' : 'cursor-row-resize'"
+					:style="box(grabArea(gutter))"
 					@pointerdown="(e) => startDrag(gutter, e)"
 					@pointermove="onDrag"
 					@pointerup="endDrag"
@@ -93,7 +88,18 @@
 					@keydown.right.prevent="gutter.axis === 'w' && nudge(gutter, 16)"
 					@keydown.up.prevent="gutter.axis === 'h' && nudge(gutter, -16)"
 					@keydown.down.prevent="gutter.axis === 'h' && nudge(gutter, 16)"
-				/>
+				>
+					<!-- the visible line; the element around it is wider, so it is easy to grab -->
+					<span
+						class="pointer-events-none rounded-full"
+						:class="[
+							gutter.axis === 'w' ? 'h-full w-1' : 'h-1 w-full',
+							gutterKey(gutter) === draggingKey
+								? 'bg-outline-gray-4'
+								: 'bg-outline-gray-2 group-hover:bg-outline-gray-3 group-focus-visible:bg-outline-gray-4',
+						]"
+					/>
+				</div>
 
 				<!-- Where a dragged panel will land -->
 				<div
@@ -229,6 +235,11 @@ const geometry = computed(() =>
 		? computeLayout(resolved.value, { x: 0, y: 0, w: room.w, h: room.h }, mins.value)
 		: { tiles: [], gutters: [] }
 )
+
+// A splitter is 4px; its grab area reaches 4px into the tiles on both sides.
+const GRAB = 4
+const grabArea = (g) =>
+	g.axis === "w" ? { ...g, x: g.x - GRAB, w: g.w + 2 * GRAB } : { ...g, y: g.y - GRAB, h: g.h + 2 * GRAB }
 
 const box = (r) => ({ left: `${r.x}px`, top: `${r.y}px`, width: `${r.w}px`, height: `${r.h}px` })
 
