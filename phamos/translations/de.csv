@@ -2153,13 +2153,19 @@ Failed requests,Fehlgeschlagene Serveraufrufe
 1 failed request,1 fehlgeschlagener Serveraufruf
 {0} failed requests,{0} fehlgeschlagene Serveraufrufe
 no errors,keine Fehler
-Panels,Seitenleiste
-Resize the panels,Seitenleiste in der Breite ändern
-"Drag to resize, double-click to reset","Ziehen ändert die Breite, Doppelklick setzt sie zurück"
-Panel settings,Einstellungen der Seitenleiste
-Reset panel layout,Anordnung der Seitenleiste zurücksetzen
-Move up,Nach oben
-Move down,Nach unten
+Panels,Bereiche
+Resize the panels,Größe der Bereiche ändern
+"Drag to resize, double-click to even out","Ziehen ändert die Größe, Doppelklick teilt gleichmäßig"
+Panel settings,Einstellungen der Bereiche
+Reset panel layout,Anordnung der Bereiche zurücksetzen
+Properties,Eigenschaften
+1 checklist,1 Checkliste
+{0} checklists,{0} Checklisten
+1 message,1 Nachricht
+{0} unread,{0} ungelesen
+Close {0},{0} schließen
+Open a panel from the bar on the right.,Öffnen Sie einen Bereich über die Leiste rechts.
+No room in the window,Kein Platz im Fenster
 None yet,Noch keine
 {0}/{1} done,{0}/{1} erledigt
 No chat yet,Noch kein Chat

@@ -100,26 +100,19 @@
 			</div>
 		</section>
 
-		<!-- Host first in DOM so Teleport target exists before IssueDetail mounts; order keeps it far right. -->
-		<aside
-			v-if="selectedName"
-			id="issue-properties-host"
-			class="order-4 flex w-72 flex-none flex-col overflow-hidden border-l border-outline-gray-2 bg-surface-white"
-		/>
-
-		<!-- Description and the panel dock side by side; the chat is one of the dock's panels (#1911). -->
-		<div v-if="selectedName" class="order-2 flex min-h-0 min-w-0 flex-1 flex-row">
-			<aside
-				class="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden border-r border-gray-200 bg-white dark:border-gray-800 dark:bg-gray-900"
+		<!-- The open Issue as tiles (#1915): description, chat, checklists, Phriend report and
+		     properties are panels the user arranges; IssueDetail keeps the Issue's state and lays
+		     the description and properties into their panels. -->
+		<div v-if="selectedName" class="order-2 flex min-h-0 min-w-0 flex-1">
+			<div
+				v-if="detailLoading && !selectedIssue"
+				class="flex flex-1 items-center justify-center text-sm text-gray-500 dark:text-gray-400"
 			>
-				<div
-					v-if="detailLoading && !selectedIssue"
-					class="flex flex-1 items-center justify-center text-sm text-gray-500 dark:text-gray-400"
-				>
-					Loading…
-				</div>
+				Loading…
+			</div>
+			<template v-else-if="selectedIssue">
+				<PanelLayout doctype="Issue" :record="selectedIssue" />
 				<IssueDetail
-					v-else-if="selectedIssue"
 					:issue="selectedIssue"
 					:options="formOptions"
 					:api-prefix="API"
@@ -127,10 +120,7 @@
 					@updated="onIssueUpdated"
 					@converted="onIssueConverted"
 				/>
-			</aside>
-
-			<!-- Chat, checklists, the Phriend report and later panels (#1909): spa_shared/panels. -->
-			<PanelDock v-if="selectedIssue" doctype="Issue" :record="selectedIssue" />
+			</template>
 		</div>
 
 		<CreateIssueDialog v-model="showCreate" :options="formOptions" @created="onCreated" />
@@ -150,7 +140,7 @@ import { __ } from "@spa/utils/i18n.js"
 import IssueList from "@spa/components/IssueList.vue"
 import ChecklistOwnerFilter from "@spa/components/ChecklistOwnerFilter.vue"
 import CreateIssueDialog from "@spa/components/CreateIssueDialog.vue"
-import PanelDock from "@spa/panels/PanelDock.vue"
+import PanelLayout from "@spa/panels/PanelLayout.vue"
 import ListSortSelector from "@spa/components/ListSortSelector.vue"
 import PriorityFilter from "@spa/components/PriorityFilter.vue"
 import StatusFilter from "@spa/components/StatusFilter.vue"
