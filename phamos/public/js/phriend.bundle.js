@@ -1,5 +1,6 @@
 // Phriend in Desk: a little black ball with legs on every Desk page.
-// Click it (or Ctrl+Shift+B): screenshot -> draw on it -> a few optional steps -> an Issue.
+// Click it (or press its shortcut, Cmd/Ctrl+P by default): a few optional steps, a screenshot
+// to draw on -> an Issue.
 //
 // The ball, the flow and the capture live in ./phriend/ and are shared with the cockpits
 // (phamos/phamos#1898). This file only tells them how Desk works. The flow itself is a
@@ -144,6 +145,7 @@ const desk = {
 	// the user's own shortcut, else the site's (Phriend Settings); "" when off
 	shortcut: (frappe.boot.phriend && frappe.boot.phriend.shortcut) || "",
 	default_shortcut: (frappe.boot.phriend && frappe.boot.phriend.default_shortcut) || "",
+	user: frappe.session.user,
 };
 
 frappe.provide("phriend");

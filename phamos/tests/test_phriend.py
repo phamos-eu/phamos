@@ -3,6 +3,7 @@ bench --site <site> run-tests --module phamos.tests.test_phriend
 """
 
 import base64
+import json
 import io
 from unittest.mock import MagicMock, patch
 
@@ -248,28 +249,50 @@ class TestPhriend(FrappeTestCase):
 		many = api.get_open_reports(ref_doctype="User", ref_docname="Administrator")
 		self.assertEqual((many["count"], len(many["reports"])), (7, 5))  # all counted, five listed
 
-		self.assertEqual(api.get_open_reports(), {"count": 0, "reports": []})
+		nothing = {"count": 0, "capped": False, "reports": []}
+		self.assertEqual(api.get_open_reports(), nothing)
 		self.set_settings(allowed_role="No Such Role For Phriend")
-		self.assertEqual(api.get_open_reports(ref_doctype="User"), {"count": 0, "reports": []})
+		self.assertEqual(api.get_open_reports(ref_doctype="User"), nothing)
+
+	def test_open_reports_only_for_records_and_issues_the_user_may_read(self, _enqueue):
+		# a report's title says something about its record: don't answer for records one can't read
+		self.report(title="About the Administrator user")
+		self.set_settings(allowed_role="")
+		guest_like = "phriend-no-read@example.com"
+		if not frappe.db.exists("User", guest_like):
+			frappe.get_doc({"doctype": "User", "email": guest_like, "first_name": "No Read",
+				"send_welcome_email": 0}).insert(ignore_permissions=True)
+		frappe.set_user(guest_like)
+		frappe.clear_messages()
+		self.assertEqual(api.get_open_reports(ref_doctype="User", ref_docname="Administrator")["count"], 0)
+		self.assertEqual(api.count_open_reports(ref_doctype="User", ref_docname="Administrator"), 0)
+		self.assertEqual(api.get_open_reports(ref_doctype="No Such DocType")["count"], 0)
+		self.assertFalse(frappe.local.message_log)
 
 	# ---- keyboard shortcut (#1900)
 
-	def test_shortcuts_are_written_one_way_and_must_have_a_modifier(self, _enqueue):
+	def test_shortcuts_are_written_one_way_and_risky_ones_are_refused(self, _enqueue):
 		self.assertEqual(shortcut.normalize("cmd+p"), "Mod+P")
-		self.assertEqual(shortcut.normalize(" shift + option + p "), "Alt+Shift+P")
+		self.assertEqual(shortcut.normalize(" shift + command + k "), "Mod+Shift+K")
 		self.assertEqual(shortcut.normalize("Ctrl+F5"), "Ctrl+F5")
-		self.assertEqual(shortcut.normalize("F2"), "F2")
 		self.assertEqual(shortcut.normalize(""), "")
-		for bad in ("p", "Shift+P", "Mod+P+Q", "Mod+Escape", "Hyper+P"):
-			with self.subTest(bad=bad), self.assertRaises(frappe.ValidationError):
+		# the examples the browser side's test (shortcut.test.js) checks too: both sides agree
+		with open(frappe.get_app_path("phamos", "public", "js", "phriend", "shortcut_rules.json")) as f:
+			examples = json.load(f)["examples"]
+		for good in examples["allowed"]:
+			with self.subTest(allowed=good):
+				self.assertEqual(shortcut.normalize(good), good)
+		for bad in examples["refused"] + ["Hyper+P", "Option+L"]:
+			with self.subTest(refused=bad), self.assertRaises(frappe.ValidationError):
 				shortcut.normalize(bad)
 
 	def test_each_user_can_change_switch_off_or_reset_their_shortcut(self, _enqueue):
+		self.addCleanup(frappe.defaults.clear_user_default, shortcut.USER_DEFAULT)
 		self.set_settings(shortcut="Mod+P")
 		self.assertEqual(phriend_boot()["shortcut"], "Mod+P")
 
-		self.assertEqual(api.set_my_shortcut("alt+shift+p"), "Alt+Shift+P")
-		self.assertEqual(phriend_boot(), {"enabled": 1, "shortcut": "Alt+Shift+P", "default_shortcut": "Mod+P"})
+		self.assertEqual(api.set_my_shortcut("cmd+shift+k"), "Mod+Shift+K")
+		self.assertEqual(phriend_boot(), {"enabled": 1, "shortcut": "Mod+Shift+K", "default_shortcut": "Mod+P"})
 
 		self.assertEqual(api.set_my_shortcut("Off"), "")
 		self.assertEqual(phriend_boot()["shortcut"], "")
@@ -278,9 +301,14 @@ class TestPhriend(FrappeTestCase):
 		with self.assertRaises(frappe.ValidationError):
 			api.set_my_shortcut("p")
 		self.assertEqual(phriend_boot()["shortcut"], "Mod+P")
-		frappe.defaults.clear_user_default(shortcut.USER_DEFAULT)
+
+		# not for users Phriend isn't for
+		self.set_settings(allowed_role="No Such Role For Phriend")
+		with self.assertRaises(frappe.PermissionError):
+			api.set_my_shortcut("Mod+K")
 
 	def test_existing_sites_get_mod_p_once_and_an_empty_shortcut_stays_off(self, _enqueue):
+		self.addCleanup(self.set_settings, shortcut="Mod+P")
 		frappe.db.delete("Singles", {"doctype": "Phriend Settings", "field": "shortcut"})
 		setup.ensure_default_shortcut()
 		self.assertEqual(frappe.db.get_single_value("Phriend Settings", "shortcut"), "Mod+P")

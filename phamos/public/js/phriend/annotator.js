@@ -2,7 +2,11 @@
 // The black bars are drawn into the image itself: what is under them is never sent. Plain DOM inside Phriend's Shadow
 // DOM; the host (Desk or cockpit) has no part in it. Loaded on demand with the report flow.
 
+import { IS_MAC } from "./shortcut";
 import { escape_html } from "./util";
+
+// A letter per tool, for the keyboard (flow.js shot_key); shown in the tooltips
+const TOOL_KEYS = { a: "pen", p: "draw", b: "box", t: "text", x: "redact" };
 
 const RED = "#e5222b";
 
@@ -30,13 +34,13 @@ export class Annotator {
 		container.innerHTML = `
 			<div class="annotator">
 				<div class="tools" role="toolbar" aria-label="${escape_html(__("Drawing tools"))}">
-					<button type="button" class="tool on" data-tool="pen" title="${escape_html(__("Arrow"))}" aria-label="${escape_html(__("Arrow"))}" aria-pressed="true">${icon("pen")}</button>
-					<button type="button" class="tool" data-tool="draw" title="${escape_html(__("Free drawing"))}" aria-label="${escape_html(__("Free drawing"))}" aria-pressed="false">${icon("draw")}</button>
-					<button type="button" class="tool" data-tool="box" title="${escape_html(__("Box"))}" aria-label="${escape_html(__("Box"))}" aria-pressed="false">${icon("box")}</button>
-					<button type="button" class="tool" data-tool="text" title="${escape_html(__("Text"))}" aria-label="${escape_html(__("Text"))}" aria-pressed="false">${icon("text")}</button>
-					<button type="button" class="tool" data-tool="redact" title="${escape_html(__("Black out private data"))}" aria-label="${escape_html(__("Black out private data"))}" aria-pressed="false">${icon("redact")}</button>
+					<button type="button" class="tool on" data-tool="pen" title="${escape_html(__("Arrow"))} (A)" aria-label="${escape_html(__("Arrow"))}" aria-keyshortcuts="A" aria-pressed="true">${icon("pen")}</button>
+					<button type="button" class="tool" data-tool="draw" title="${escape_html(__("Free drawing"))} (P)" aria-label="${escape_html(__("Free drawing"))}" aria-keyshortcuts="P" aria-pressed="false">${icon("draw")}</button>
+					<button type="button" class="tool" data-tool="box" title="${escape_html(__("Box"))} (B)" aria-label="${escape_html(__("Box"))}" aria-keyshortcuts="B" aria-pressed="false">${icon("box")}</button>
+					<button type="button" class="tool" data-tool="text" title="${escape_html(__("Text"))} (T)" aria-label="${escape_html(__("Text"))}" aria-keyshortcuts="T" aria-pressed="false">${icon("text")}</button>
+					<button type="button" class="tool" data-tool="redact" title="${escape_html(__("Black out private data"))} (X)" aria-label="${escape_html(__("Black out private data"))}" aria-keyshortcuts="X" aria-pressed="false">${icon("redact")}</button>
 					<span class="tool-gap"></span>
-					<button type="button" class="tool" data-action="undo" title="${escape_html(__("Undo"))}" aria-label="${escape_html(__("Undo"))}">${icon("undo")}</button>
+					<button type="button" class="tool" data-action="undo" title="${escape_html(__("Undo"))} (${IS_MAC ? "⌘Z" : "Ctrl+Z"})" aria-label="${escape_html(__("Undo"))}">${icon("undo")}</button>
 				</div>
 				<div class="canvas-wrap"><canvas></canvas></div>
 			</div>`;
@@ -47,21 +51,33 @@ export class Annotator {
 		this.ctx = this.canvas.getContext("2d");
 		this.wrap = container.querySelector(".canvas-wrap");
 
+		this.container = container;
 		container.querySelectorAll("[data-tool]").forEach((button) =>
-			button.addEventListener("click", () => {
-				this.commit_text();
-				this.tool = button.dataset.tool;
-				this.canvas.style.cursor = this.tool === "text" ? "text" : "crosshair";
-				container.querySelectorAll("[data-tool]").forEach((b) => {
-					b.classList.toggle("on", b === button);
-					b.setAttribute("aria-pressed", b === button ? "true" : "false");
-				});
-			})
+			button.addEventListener("click", () => this.select_tool(button.dataset.tool))
 		);
 		container.querySelector("[data-action=undo]").addEventListener("click", () => this.undo());
 
 		this.bind_drawing();
 		this.redraw();
+	}
+
+	select_tool(tool) {
+		this.commit_text();
+		this.tool = tool;
+		this.canvas.style.cursor = tool === "text" ? "text" : "crosshair";
+		this.container.querySelectorAll("[data-tool]").forEach((b) => {
+			const on = b.dataset.tool === tool;
+			b.classList.toggle("on", on);
+			b.setAttribute("aria-pressed", on ? "true" : "false");
+		});
+	}
+
+	// True when the key picks a tool
+	select_tool_by_key(key) {
+		const tool = TOOL_KEYS[key];
+		if (!tool) return false;
+		this.select_tool(tool);
+		return true;
 	}
 
 	has_drawing() {

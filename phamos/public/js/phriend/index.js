@@ -12,11 +12,12 @@
 //   shortcut                  the user's shortcut ("Mod+P"; "" when off)
 //   default_shortcut          the site's (Phriend Settings), for "Back to the default"
 //   start                     optional: { right, bottom } where the ball sits until it is dragged
+//   user                      the logged-in user, so an unsent draft is offered only to them
 
 import { Ball } from "./ball";
 import { ErrorLog } from "./errors";
 import { format, matches, parse } from "./shortcut";
-import { DRAFT_KEY, escape_html, storage_get, storage_set } from "./util";
+import { DRAFT_KEY, browser_name, escape_html, storage_get, storage_set } from "./util";
 
 export { DRAFT_KEY };
 const GREETED_KEY = "phriend:greeted";
@@ -57,7 +58,9 @@ class Phriend {
 		window.addEventListener(
 			"keydown",
 			(e) => {
-				if (this.recording || e.repeat || !matches(e, this.shortcut_spec)) return;
+				// not while an input method composes a character (Japanese, Chinese…)
+				if (this.recording || e.repeat || e.isComposing || e.keyCode === 229) return;
+				if (!matches(e, this.shortcut_spec)) return;
 				e.preventDefault();
 				if (this.open) return; // already open; just don't print
 				e.stopPropagation();
@@ -76,13 +79,14 @@ class Phriend {
 			on_badge_click: () => this.host.open_reports && this.host.open_reports(),
 			on_first_interest: () => this.load_flow().catch(() => {}),
 			start: this.host.start,
+			close_label: __("Close"),
 		});
 		this.ball.set_keys(format(this.shortcut));
 
 		this.listen_for_shortcut();
 		if (this.host.on_route_change) this.host.on_route_change(() => this.refresh_badge());
 
-		if (storage_get(DRAFT_KEY, "session")) {
+		if (this.saved_draft()) {
 			this.ball.set_pending(true);
 			this.ball.say(
 				`${escape_html(__("You have a report that wasn't sent."))} <button type="button" class="link" data-open>${escape_html(__("Open it"))}</button>`,
@@ -103,7 +107,13 @@ class Phriend {
 
 	saved_draft() {
 		try {
-			return JSON.parse(storage_get(DRAFT_KEY, "session") || "null");
+			const draft = JSON.parse(storage_get(DRAFT_KEY, "session") || "null");
+			// only for the user who wrote it: someone else may log in in the same tab
+			if (draft && draft.user !== this.host.user) {
+				storage_set(DRAFT_KEY, null, "session");
+				return null;
+			}
+			return draft;
 		} catch (e) {
 			return null;
 		}
@@ -130,7 +140,8 @@ class Phriend {
 				captured_at: new Date().toISOString(),
 				...(page.context || {}),
 				viewport: `${window.innerWidth}x${window.innerHeight} @${window.devicePixelRatio}x`,
-				user_agent: navigator.userAgent,
+				// browser and system, not the full user agent (GDPR review of !1162)
+				browser: browser_name(navigator.userAgent),
 				...this.log.snapshot(),
 			},
 		};

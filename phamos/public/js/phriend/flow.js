@@ -13,8 +13,8 @@ import { capture, to_data_url } from "./capture";
 import { FLOW_CSS } from "./flow_css";
 import { call } from "./request";
 import { Sender } from "./send";
-import { format, from_event } from "./shortcut";
-import { DRAFT_KEY, escape_html, sleep, storage_set } from "./util";
+import { IS_MAC, format, from_event, problem } from "./shortcut";
+import { DRAFT_KEY, browser_name, escape_html, sleep, storage_set } from "./util";
 
 // The steps, in their order. The screenshot is taken at the click whatever comes first.
 const STEP = { kind: 0, shot: 1, text: 2, check: 3 };
@@ -98,22 +98,26 @@ class Flow {
 					${MINI_SVG}
 					<div class="heading">
 						<h2 id="ph-title"></h2>
-						<p>${escape_html(__("Reported on: {0}", [where]))}</p>
+						<p>${escape_html(__("About: {0}", [where]))}</p>
 					</div>
 					<div class="dots">${[0, 1, 2, 3]
-						.map((i) => `<button type="button" class="dot" data-dot="${i}" aria-label="${escape_html(__("Step {0} of 4", [i + 1]))}"></button>`)
+						.map((i) => {
+							const name = escape_html(__("Step {0} of 4: {1}", [i + 1, this.step_title(i)]));
+							return `<button type="button" class="dot" data-dot="${i}" aria-label="${name}" title="${name}"></button>`;
+						})
 						.join("")}</div>
+					<span class="sr-only" data-announce aria-live="polite"></span>
 					<button type="button" class="icon-btn" data-close aria-label="${escape_html(__("Close"))}" title="${escape_html(__("Close"))}">
 						<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M6 6 L18 18 M18 6 L6 18"/></svg>
 					</button>
 				</header>
 				<main>
 					<section class="pane" data-pane="0">
-						<label class="field">${escape_html(__("What is it?"))}</label>
-						<div class="chips" role="radiogroup">${types}</div>
+						<p class="field" id="ph-type-label">${escape_html(__("Type"))}</p>
+						<div class="chips" role="radiogroup" aria-labelledby="ph-type-label" data-group="report_type">${types}</div>
 						<div class="gap"></div>
-						<label class="field">${escape_html(__("How urgent is it?"))}</label>
-						<div class="chips" role="radiogroup">${priorities}</div>
+						<p class="field" id="ph-priority-label">${escape_html(__("How urgent is it?"))}</p>
+						<div class="chips" role="radiogroup" aria-labelledby="ph-priority-label" data-group="priority">${priorities}</div>
 						<section class="reported" data-reported aria-live="polite">
 							<p class="reported-empty">${escape_html(__("Looking for earlier reports…"))}</p>
 						</section>
@@ -127,10 +131,10 @@ class Flow {
 					</section>
 					<section class="pane" data-pane="2" hidden>
 						<label class="field" for="ph-in-title">${escape_html(__("In a few words"))}</label>
-						<input class="input" id="ph-in-title" maxlength="120" autocomplete="off" placeholder="${escape_html(__("Save does nothing on a new lead"))}">
+						<input class="input" id="ph-in-title" maxlength="120" autocomplete="off" placeholder="${escape_html(__("e.g. Save does nothing on a new lead"))}">
 						<div class="gap"></div>
 						<label class="field" for="ph-in-comment">${escape_html(__("What did you do, and what did you expect?"))}</label>
-						<textarea class="input" id="ph-in-comment" rows="6" placeholder="${escape_html(__("I filled in the company name and clicked Save. Nothing happened."))}"></textarea>
+						<textarea class="input" id="ph-in-comment" rows="6" placeholder="${escape_html(__("e.g. I filled in the company name and clicked Save. Nothing happened."))}"></textarea>
 					</section>
 					<section class="pane" data-pane="3" hidden></section>
 				</main>
@@ -138,7 +142,7 @@ class Flow {
 					<button type="button" class="link shortcut-link" data-shortcut hidden></button>
 					<button type="button" class="btn" data-back>${escape_html(__("Back"))}</button>
 					<span class="grow"></span>
-					<span class="hint" data-hint>${escape_html(__("Ctrl+Enter sends"))}</span>
+					<span class="hint" data-hint></span>
 					<button type="button" class="btn" data-skip hidden>${escape_html(__("Skip"))}</button>
 					<button type="button" class="btn primary" data-next></button>
 				</footer>
@@ -158,6 +162,7 @@ class Flow {
 			footer: $("footer"),
 			back: $("[data-back]"),
 			hint: $("[data-hint]"),
+			announce: $("[data-announce]"),
 			next: $("[data-next]"),
 			skip: $("[data-skip]"),
 			shortcut: $("[data-shortcut]"),
@@ -235,10 +240,16 @@ class Flow {
 	keydown(e) {
 		if (!this.layer.isConnected) return;
 		if (this.phriend.recording) return this.record_shortcut(e);
+		const asking = !this.el.back.isConnected; // "Discard this report?" is showing
 		if (e.key === "Escape") {
 			e.preventDefault();
 			e.stopPropagation();
-			this.close();
+			if (asking) this.restore_footer(); // Escape means "Keep editing" there
+			else this.close();
+		} else if (!asking && this.step === STEP.shot && this.shot_key(e)) {
+			e.preventDefault();
+		} else if (!asking && this.step === STEP.kind && this.chip_key(e)) {
+			e.preventDefault();
 		} else if (e.key === "Enter" && (e.ctrlKey || e.metaKey)) {
 			e.preventDefault();
 			e.stopPropagation();
@@ -248,6 +259,39 @@ class Flow {
 		} else if (e.key === "Tab") {
 			this.trap_focus(e);
 		}
+	}
+
+	// On the screenshot step: Cmd/Ctrl+Z undoes, a letter picks a tool (shown in the tooltips).
+	// Not while typing on the screenshot. True when the key was used.
+	shot_key(e) {
+		const a = this.annotator;
+		if (!a || !this.include_screenshot || a.editing) return false;
+		const mod = IS_MAC ? e.metaKey : e.ctrlKey;
+		if (mod && !e.altKey && !e.shiftKey && String(e.key).toLowerCase() === "z") {
+			a.undo();
+			return true;
+		}
+		if (e.ctrlKey || e.metaKey || e.altKey) return false;
+		return a.select_tool_by_key(String(e.key).toLowerCase());
+	}
+
+	// Type and urgency behave as radio groups: arrow keys move the choice, Enter goes on.
+	chip_key(e) {
+		const chip = this.phriend.ball.shadow.activeElement;
+		const group = chip && chip.closest && chip.closest("[data-group]");
+		if (!group || e.ctrlKey || e.metaKey || e.altKey) return false;
+		if (e.key === "Enter") {
+			chip.click();
+			this.show(this.step + 1);
+			return true;
+		}
+		const step = { ArrowRight: 1, ArrowDown: 1, ArrowLeft: -1, ArrowUp: -1 }[e.key];
+		if (!step) return false;
+		const chips = [...group.querySelectorAll(".chip")];
+		const next = chips[(chips.indexOf(chip) + step + chips.length) % chips.length];
+		next.click();
+		next.focus();
+		return true;
 	}
 
 	trap_focus(e) {
@@ -278,13 +322,10 @@ class Flow {
 			dot.classList.toggle("on", i <= step);
 			dot.setAttribute("aria-current", i === step ? "step" : "false");
 		});
-		this.el.title.textContent = {
-			[STEP.kind]: __("What kind of report?"),
-			[STEP.shot]: __("Show what you mean"),
-			[STEP.text]: __("What happened?"),
-			[STEP.check]: __("Check and send"),
-		}[step];
-		this.el.panel.classList.toggle("narrow", step === STEP.kind || step === STEP.text);
+		this.el.title.textContent = this.step_title(step);
+		// for screen readers, which don't notice the heading change
+		this.el.announce.textContent = __("Step {0} of 4: {1}", [step + 1, this.step_title(step)]);
+		if (step === STEP.shot && this.annotator) this.shot_seen = true;
 		if (step === STEP.check) this.render_summary();
 		this.update_footer();
 
@@ -295,30 +336,37 @@ class Flow {
 		setTimeout(() => (focus || this.el.next).focus({ preventScroll: true }), 0);
 	}
 
+	step_title(step) {
+		const __ = this.__;
+		return {
+			[STEP.kind]: __("What kind of report?"),
+			[STEP.shot]: __("Show what you mean"),
+			[STEP.text]: __("What happened?"),
+			[STEP.check]: __("Check and send"),
+		}[step];
+	}
+
 	update_footer() {
 		if (!this.el.back.isConnected) return; // the discard question is showing
 		const __ = this.__;
 		this.el.back.hidden = this.step === 0;
 		// Sending happens on the summary only (PM, 2026-11-15): every report passes "Check and
 		// send", so nobody sends something they haven't seen.
-		this.el.hint.hidden = this.step !== LAST_STEP;
+		// Cmd/Ctrl+Enter does what the main button does, on every step
+		const enter = IS_MAC ? "⌘↩" : "Ctrl+Enter";
+		this.el.hint.textContent = this.step === LAST_STEP ? __("{0} sends", [enter]) : __("{0} next", [enter]);
 		// the user's own shortcut, changeable here (PM, 2026-11-15); on the first step, where the
 		// footer has room and everyone passes
 		this.el.shortcut.hidden = this.step !== STEP.kind;
 		const keys = format(this.phriend.shortcut);
-		this.el.shortcut.textContent = keys ? __("Shortcut: {0}", [keys]) : __("Shortcut: off");
+		this.el.shortcut.textContent = keys ? __("Shortcut: {0} · Change", [keys]) : __("Shortcut: off · Change");
 		// The screenshot step: "Next" keeps the screenshot, "Skip" goes on without it (PM,
 		// 2026-11-15). Only while there is a screenshot to leave out.
 		const on_shot = this.step === STEP.shot;
 		this.el.skip.hidden = !(on_shot && this.include_screenshot && !this.capture_failed);
-		// an untouched step says "Skip": every step is optional. The type step always has a
-		// choice (Bug, Medium), so it says "Next".
-		this.el.next.textContent =
-			this.step === LAST_STEP
-				? __("Send to Phriend")
-				: this.touched.has(this.step) || this.step === STEP.kind || on_shot
-				? __("Next")
-				: __("Skip");
+		// always "Next": every step is optional anyway, and a label that changes while typing
+		// moves the button (UX review of !1162)
+		this.el.next.textContent = this.step === LAST_STEP ? __("Send to Phriend") : __("Next");
 	}
 
 	choose(key, value, step) {
@@ -329,18 +377,17 @@ class Flow {
 	}
 
 	sync_choices() {
-		this.layer.querySelectorAll("[data-type]").forEach((b) => {
-			const on = b.dataset.type === this.values.report_type;
-			b.classList.toggle("on", on);
-			b.setAttribute("role", "radio");
-			b.setAttribute("aria-checked", on ? "true" : "false");
-		});
-		this.layer.querySelectorAll("[data-priority]").forEach((b) => {
-			const on = b.dataset.priority === this.values.priority;
-			b.classList.toggle("on", on);
-			b.setAttribute("role", "radio");
-			b.setAttribute("aria-checked", on ? "true" : "false");
-		});
+		// one Tab stop per group (the chosen chip); arrow keys move within it (chip_key)
+		const mark = (selector, key, value) =>
+			this.layer.querySelectorAll(selector).forEach((b) => {
+				const on = b.dataset[key] === value;
+				b.classList.toggle("on", on);
+				b.setAttribute("role", "radio");
+				b.setAttribute("aria-checked", on ? "true" : "false");
+				b.tabIndex = on ? 0 : -1;
+			});
+		mark("[data-type]", "type", this.values.report_type);
+		mark("[data-priority]", "priority", this.values.priority);
 	}
 
 	// the title the server uses when it's left empty (shown greyed out): where it happened
@@ -354,30 +401,44 @@ class Flow {
 		const ctx = this.ctx;
 		const c = ctx.context || {};
 		const shot = this.screenshot_canvas();
+		const waiting = this.include_screenshot && !this.annotator && !this.capture_failed;
+		if (shot) this.shot_seen = true; // the thumbnail below shows it
 		const errors = (c.recent_errors || []).length;
 		const failed = (c.failed_requests || []).length;
+		const problems = [
+			errors ? (errors === 1 ? __("1 error") : __("{0} errors", [errors])) : "",
+			failed ? (failed === 1 ? __("1 failed call") : __("{0} failed calls", [failed])) : "",
+		].filter(Boolean).join(", ");
 		const facts = [
 			[__("Page"), ctx.where || ctx.page_title || ctx.route],
 			[__("Address"), ctx.page_url],
-			[__("Browser"), browser_name(c.user_agent)],
+			[__("Browser"), c.browser],
 			[__("Window"), c.viewport],
 			[__("Version"), version_of(c.versions)],
-			[__("Problems on the page"), errors || failed ? __("{0} errors, {1} failed calls", [errors, failed]) : __("None")],
+			[__("Problems on the page"), problems || __("None")],
 		].filter(([, value]) => value);
 
 		this.el.summary.innerHTML = `
 			<div class="summary">
 				<div>
-					<h3 class="${v.title.trim() ? "" : "built"}">${escape_html(v.title.trim() || this.built_title())}</h3>
-					<p class="meta">${escape_html(
-						[__(type_label(v.report_type)), __(v.priority), shot ? __("with screenshot") : __("no screenshot")].join(" · ")
-					)}</p>
-					${v.comment.trim() ? `<p class="comment">${escape_html(v.comment.trim())}</p>` : ""}
+					<button type="button" class="to-step" data-dot="${STEP.text}" title="${escape_html(__("Change"))}">
+						<h3 class="${v.title.trim() ? "" : "built"}">${escape_html(v.title.trim() || this.built_title())}</h3>
+					</button>
+					<button type="button" class="to-step" data-dot="${STEP.kind}" title="${escape_html(__("Change"))}">
+						<p class="meta">${escape_html(
+							[
+								__(type_label(v.report_type)),
+								__(v.priority),
+								shot ? __("with screenshot") : waiting ? __("screenshot still being taken…") : __("no screenshot"),
+							].join(" · ")
+						)}</p>
+					</button>
+					${v.comment.trim() ? `<button type="button" class="to-step" data-dot="${STEP.text}" title="${escape_html(__("Change"))}"><p class="comment">${escape_html(v.comment.trim())}</p></button>` : ""}
 					<p class="facts-title">${escape_html(__("Phriend adds this for you"))}</p>
 					${facts.map(([k, val]) => `<div class="fact"><span>${escape_html(k)}</span><span>${escape_html(val)}</span></div>`).join("")}
 					<details><summary>${escape_html(__("Everything that is sent"))}</summary><pre></pre></details>
 				</div>
-				<div>${shot ? `<img class="thumb" alt="${escape_html(__("Screenshot"))}">` : ""}</div>
+				<div>${shot ? `<button type="button" class="to-step" data-dot="${STEP.shot}" title="${escape_html(__("Change"))}"><img class="thumb" alt="${escape_html(__("Screenshot"))}"></button>` : ""}</div>
 			</div>`;
 		this.el.summary.querySelector("pre").textContent = JSON.stringify(this.args_without_screenshot(), null, 2);
 		if (shot) this.el.summary.querySelector("img").src = shot.toDataURL("image/jpeg", 0.7);
@@ -409,6 +470,8 @@ class Flow {
 		this.annotator = new Annotator(this.el.shot, canvas, this.__);
 		this.el.toggle_shot.hidden = false;
 		this.sync_screenshot_state(); // also right when "Skip" was pressed before it was ready
+		if (this.step === STEP.shot) this.shot_seen = true;
+		if (this.step === STEP.check) this.render_summary(); // it said "still being taken"
 		this.update_footer();
 	}
 
@@ -439,11 +502,11 @@ class Flow {
 		const __ = this.__;
 		const on = this.include_screenshot;
 		const wrap = this.el.shot.querySelector(".annotator");
-		if (wrap) wrap.style.opacity = on ? "" : "0.25";
+		// left out: dimmed, and nothing to draw on
+		if (wrap) wrap.classList.toggle("off", !on);
 		this.el.toggle_shot.innerHTML = `${on ? ICON_NO_SHOT : ICON_SHOT}<span>${escape_html(
 			on ? __("Leave out the screenshot") : __("Use the screenshot")
 		)}</span>`;
-		this.el.toggle_shot.setAttribute("aria-pressed", on ? "false" : "true");
 		this.el.shot_hint.textContent = on
 			? __("Draw an arrow to the problem, box it, write on it, or black out private data.")
 			: __("The report goes out without a screenshot.");
@@ -475,8 +538,10 @@ class Flow {
 
 	send() {
 		const args = this.args_without_screenshot();
-		const include = this.include_screenshot && !this.capture_failed;
-		const capturing = this.capturing;
+		// Only a screenshot the user has seen goes out: on the screenshot step or as the thumbnail
+		// on the summary. One still being taken, or not looked at, stays here (GDPR review of
+		// !1162: an unseen screenshot can't have been blacked out).
+		const include = this.include_screenshot && !this.capture_failed && Boolean(this.annotator) && this.shot_seen;
 		const flow = this;
 		const report = {
 			draft: {
@@ -487,18 +552,9 @@ class Flow {
 				has_screenshot: include,
 			},
 			canvas: null, // the screenshot with the drawing, kept for "Edit" after a failure
-			// waits for a screenshot still being taken, then encodes it: after the flow closed
+			// encodes the screenshot after the flow closed, so closing feels instant
 			async args() {
-				let canvas = null;
-				if (include && flow.annotator) {
-					canvas = flow.annotator.result();
-				} else if (include && capturing) {
-					try {
-						canvas = (await capturing).canvas;
-					} catch (e) {
-						canvas = null; // send without it
-					}
-				}
+				const canvas = include && flow.annotator ? flow.annotator.result() : null;
 				report.canvas = canvas;
 				flow.annotator = null;
 				return { ...args, context: JSON.stringify(args.context), screenshot: canvas ? to_data_url(canvas) : null };
@@ -613,17 +669,41 @@ class Flow {
 	}
 
 	record_shortcut(e) {
+		if (e.key === "Escape") {
+			e.preventDefault();
+			e.stopPropagation();
+			return this.stop_editing_shortcut();
+		}
+		// Tab, Enter and Space reach the buttons ("Turn off", "Use the default", "Cancel"), so
+		// the editor works from the keyboard; none of them can be a shortcut anyway
+		const plain = !e.ctrlKey && !e.metaKey && !e.altKey;
+		if (e.key === "Tab") return this.trap_focus(e);
+		if (plain && (e.key === "Enter" || e.key === " ")) return;
 		e.preventDefault();
 		e.stopPropagation();
-		if (e.key === "Escape") return this.stop_editing_shortcut();
-		if (["Shift", "Control", "Alt", "Meta", "Tab"].includes(e.key)) return; // still choosing
+		if (this.saving_shortcut || ["Shift", "Control", "Alt", "Meta"].includes(e.key)) return;
 		const text = from_event(e);
-		if (text) return this.save_shortcut(text);
-		this.shortcut_message(this.__("Use Cmd/Ctrl or Alt together with a letter, a digit or F1 to F12."));
+		if (!text) return;
+		const why = problem(text);
+		if (why) return this.shortcut_message(this.shortcut_problem(why, text));
+		this.save_shortcut(text);
+	}
+
+	// The reasons problem() in shortcut.js gives, in words; the server says the same.
+	shortcut_problem(why, text) {
+		const __ = this.__;
+		const keys = format(text) || text;
+		return {
+			modifier: __("Use Cmd/Ctrl together with a letter, a digit or F1 to F12."),
+			alt: __("Alt/Option is not possible: it types characters such as @ or € on many keyboards."),
+			reserved: __("{0} belongs to the browser or the system (copy, paste, undo, tabs…).", [keys]),
+		}[why];
 	}
 
 	async save_shortcut(value) {
 		const __ = this.__;
+		if (this.saving_shortcut) return; // one save at a time: a second key press waits
+		this.saving_shortcut = true;
 		this.shortcut_message(__("Saving…"));
 		try {
 			const now = await call("phamos.phriend.api.set_my_shortcut", { shortcut: value }, this.phriend.host.csrf_token());
@@ -631,6 +711,8 @@ class Flow {
 			this.stop_editing_shortcut();
 		} catch (error) {
 			this.shortcut_message(error.message || __("That didn't work. Try again."));
+		} finally {
+			this.saving_shortcut = false;
 		}
 	}
 
@@ -676,13 +758,6 @@ function version_of(versions) {
 	return versions.frappe ? `Frappe ${versions.frappe}` : "";
 }
 
-function browser_name(ua) {
-	if (!ua) return "";
-	const match =
-		ua.match(/(Edg|OPR|Firefox|Chrome|Version)\/(\d+)/) || ua.match(/(Safari)\/(\d+)/) || [];
-	const names = { Edg: "Edge", OPR: "Opera", Version: "Safari" };
-	return match[1] ? `${names[match[1]] || match[1]} ${match[2]}` : "";
-}
 
 // for checking a capture from the browser console: (await phriend_flow.capture("page")).canvas
 export { capture } from "./capture";

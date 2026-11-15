@@ -52,7 +52,7 @@
   },
   {
    "default": "Mod+P",
-   "description": "Opens Phriend. Mod is Cmd on a Mac and Ctrl elsewhere, e.g. Mod+P or Alt+Shift+P. Empty: no shortcut. Each user can change or switch off their own in Phriend.",
+   "description": "Opens Phriend. Mod is Cmd on a Mac and Ctrl elsewhere, e.g. Mod+P or Mod+Shift+K. Empty: no shortcut. Each user can change or switch off their own in Phriend.",
    "fieldname": "shortcut",
    "fieldtype": "Data",
    "label": "Keyboard Shortcut"

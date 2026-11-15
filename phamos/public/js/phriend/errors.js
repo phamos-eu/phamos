@@ -1,7 +1,10 @@
 // Records what went wrong on the page before the user clicked Phriend: script errors,
 // rejected promises, console.error and failed server calls. The last few go into the report.
 
-import { safe_json } from "./util";
+import { without_query } from "./util";
+
+// Short: error messages can name people, leave types or amounts (GDPR review of !1162).
+const MAX_MESSAGE = 200;
 
 const MAX_LOG = 20;
 
@@ -22,11 +25,13 @@ export class ErrorLog {
 		if (list.length > MAX_LOG) list.shift();
 	}
 
-	// Called by the host for every failed call: { url, method, status, message }
+	// Called by the host for every failed call: { url, method, status, message }. The URL is kept
+	// without its query string, the message short.
 	record_failed_request(item) {
 		this.push(this.failed_requests, {
 			...item,
-			message: item.message ? String(item.message).slice(0, 1000) : undefined,
+			url: without_query(item.url),
+			message: item.message ? String(item.message).slice(0, MAX_MESSAGE) : undefined,
 		});
 		this.listeners.forEach((callback) => callback(item));
 	}
@@ -35,15 +40,15 @@ export class ErrorLog {
 		window.addEventListener("error", (e) => {
 			this.push(this.errors, {
 				type: "error",
-				message: String(e.message || e.error || "Unknown error"),
-				source: e.filename ? `${e.filename}:${e.lineno}:${e.colno}` : undefined,
+				message: String(e.message || e.error || "Unknown error").slice(0, MAX_MESSAGE),
+				source: e.filename ? `${without_query(e.filename)}:${e.lineno}:${e.colno}` : undefined,
 			});
 		});
 
 		window.addEventListener("unhandledrejection", (e) => {
 			this.push(this.errors, {
 				type: "unhandledrejection",
-				message: String((e.reason && (e.reason.message || e.reason)) || "Unknown rejection"),
+				message: String((e.reason && (e.reason.message || e.reason)) || "Unknown rejection").slice(0, MAX_MESSAGE),
 			});
 		});
 
@@ -52,10 +57,11 @@ export class ErrorLog {
 			try {
 				this.push(this.errors, {
 					type: "console.error",
+					// text and error messages only: logged objects can be whole records
 					message: args
-						.map((a) => (a instanceof Error ? a.message : typeof a === "string" ? a : safe_json(a)))
+						.map((a) => (a instanceof Error ? a.message : typeof a === "string" ? a : `[${typeof a}]`))
 						.join(" ")
-						.slice(0, 1000),
+						.slice(0, MAX_MESSAGE),
 				});
 			} catch (e) {
 				// never break console.error

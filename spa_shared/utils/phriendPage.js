@@ -40,7 +40,8 @@ export function pageContext(route, page, translate = (text) => text) {
 		ref_docname: docname,
 		context: {
 			app: page?.cockpit || base,
-			route: { name: route?.name || null, path: route?.path || "", params: { ...(route?.params || {}) }, query: { ...(route?.query || {}) } },
+			// the query's keys only: its values can be search terms or names (GDPR review of !1162)
+			route: { name: route?.name || null, path: route?.path || "", params: { ...(route?.params || {}) }, query: Object.keys(route?.query || {}) },
 		},
 	}
 }

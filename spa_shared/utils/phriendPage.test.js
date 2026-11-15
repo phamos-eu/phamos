@@ -17,6 +17,11 @@ describe("pageContext", () => {
 		expect(ctx.context.route.name).toBe("LeadDetail")
 	})
 
+	it("keeps only the keys of the query: its values can be names or search terms", () => {
+		const ctx = pageContext({ name: "Leads", path: "/leads", params: {}, query: { search: "Jane Doe", page: "2" } }, sales)
+		expect(ctx.context.route.query).toEqual(["search", "page"])
+	})
+
 	it("refers to the page on a list or overview route", () => {
 		const ctx = pageContext({ name: "LeadsFollowUps", path: "/leads/follow-ups", params: {} }, sales)
 		expect(ctx.ref_doctype).toBeNull()

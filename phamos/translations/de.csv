@@ -1928,7 +1928,6 @@ Arrow,Pfeil
 Box,Rahmen
 Browser,Browser
 Check and send,Prüfen und senden
-Ctrl+Enter sends,Strg+Enter sendet
 Describe what you see in the next step instead.,"Beschreiben Sie im nächsten Schritt, was Sie sehen."
 Discard,Verwerfen
 Discard this report? What you wrote and drew is lost.,"Diese Meldung verwerfen? Was Sie geschrieben und gezeichnet haben, geht verloren."
@@ -1938,11 +1937,10 @@ Everything that is sent,"Alles, was gesendet wird"
 Got it! Saved as,Danke! Gespeichert als
 "Hi, I'm Phriend! Click me when something looks wrong.","Hallo, ich bin Phriend! Klicken Sie mich an, wenn etwas nicht stimmt."
 How urgent is it?,Wie dringend ist es?
-I filled in the company name and clicked Save. Nothing happened.,Ich habe den Firmennamen eingetragen und auf Speichern geklickt. Nichts ist passiert.
 In a few words,In wenigen Worten
 It goes out when you're back online.,"Sie wird gesendet, sobald Sie wieder online sind."
 Keep editing,Weiter bearbeiten
-Leave out the screenshot,Ohne Screenshot
+Leave out the screenshot,Screenshot weglassen
 Log in,Anmelden
 No screenshot this time.,Diesmal gibt es keinen Screenshot.
 None,Keine
@@ -1953,8 +1951,6 @@ Phriend adds this for you,Das fügt Phriend für Sie hinzu
 Phriend couldn't start. Reload the page and try again.,Phriend konnte nicht starten. Laden Sie die Seite neu und versuchen Sie es noch einmal.
 Problems on the page,Probleme auf der Seite
 Report it?,Melden?
-Reported on: {0},Gemeldet auf: {0}
-Save does nothing on a new lead,Speichern tut nichts bei einem neuen Lead
 Screenshot,Screenshot
 Send now,Jetzt senden
 Send to Phriend,An Phriend senden
@@ -1969,10 +1965,9 @@ The server can't be reached.,Der Server ist nicht erreichbar.
 Try again,Erneut versuchen
 Type here…,Hier tippen…
 Undo,Rückgängig
-Use the screenshot,Mit Screenshot
+Use the screenshot,Screenshot wieder verwenden
 Version,Version
 "What did you do, and what did you expect?","Was haben Sie getan, und was haben Sie erwartet?"
-What is it?,Was ist es?
 What kind of report?,Welche Art von Meldung?
 "Whoops, that call failed.","Hoppla, da ist etwas schiefgegangen."
 Window,Fenster
@@ -1984,7 +1979,6 @@ Your session has expired.,Ihre Sitzung ist abgelaufen.
 no screenshot,ohne Screenshot
 unknown error,unbekannter Fehler
 with screenshot,mit Screenshot
-"{0} errors, {1} failed calls","{0} Fehler, {1} fehlgeschlagene Serveraufrufe"
 {0} open Phriend reports for this page,{0} offene Phriend-Meldungen zu dieser Seite
 Bug,Fehler
 Question,Frage
@@ -2008,19 +2002,33 @@ Something else,Etwas anderes
 None of these,Nichts davon
 Phriend: report a problem ({0}),Phriend: ein Problem melden ({0})
 Phriend: report a problem,Phriend: ein Problem melden
-Shortcut: {0},Tastenkürzel: {0}
-Shortcut: off,Tastenkürzel: aus
 Press the new keys…,Drücken Sie die neuen Tasten…
 Turn off,Ausschalten
 Use the default ({0}),Standard verwenden ({0})
-"Use Cmd/Ctrl or Alt together with a letter, a digit or F1 to F12.","Verwenden Sie Cmd/Strg oder Alt zusammen mit einem Buchstaben, einer Ziffer oder F1 bis F12."
 That didn't work. Try again.,Das hat nicht geklappt. Versuchen Sie es noch einmal.
-"{0} is not a shortcut Phriend can use. Use Cmd/Ctrl or Alt with a letter, a digit or F1 to F12, e.g. Mod+P.","{0} ist kein Tastenkürzel, das Phriend verwenden kann. Verwenden Sie Cmd/Strg oder Alt mit einem Buchstaben, einer Ziffer oder F1 bis F12, z. B. Mod+P."
 Keyboard shortcut,Tastenkürzel
 Keyboard Shortcut,Tastenkürzel
-"Opens Phriend. Mod is Cmd on a Mac and Ctrl elsewhere, e.g. Mod+P or Alt+Shift+P. Empty: no shortcut. Each user can change or switch off their own in Phriend.","Öffnet Phriend. Mod ist Cmd auf dem Mac und sonst Strg, z. B. Mod+P oder Alt+Shift+P. Leer: kein Tastenkürzel. Jede Person kann ihr eigenes in Phriend ändern oder ausschalten."
+"Opens Phriend. Mod is Cmd on a Mac and Ctrl elsewhere, e.g. Mod+P or Mod+Shift+K. Empty: no shortcut. Each user can change or switch off their own in Phriend.","Öffnet Phriend. Mod ist Cmd auf dem Mac und sonst Strg, z. B. Mod+P oder Mod+Shift+K. Leer: kein Tastenkürzel. Jede Person kann ihr eigenes in Phriend ändern oder ausschalten."
 Free drawing,Freihand zeichnen
 Looking for earlier reports…,Frühere Meldungen werden gesucht…
 No open reports about this page yet.,Zu dieser Seite gibt es noch keine offenen Meldungen.
 Already reported here,Hier schon gemeldet
 Show all {0},Alle {0} anzeigen
+About: {0},Betrifft: {0}
+Step {0} of 4: {1},Schritt {0} von 4: {1}
+e.g. Save does nothing on a new lead,z. B. Speichern tut nichts bei einem neuen Lead
+e.g. I filled in the company name and clicked Save. Nothing happened.,z. B. Ich habe den Firmennamen eingetragen und auf Speichern geklickt. Nichts ist passiert.
+{0} sends,{0} sendet
+{0} next,{0} weiter
+Shortcut: {0} · Change,Tastenkürzel: {0} · Ändern
+Shortcut: off · Change,Tastenkürzel: aus · Ändern
+1 error,1 Fehler
+{0} errors,{0} Fehler
+1 failed call,1 fehlgeschlagener Serveraufruf
+{0} failed calls,{0} fehlgeschlagene Serveraufrufe
+screenshot still being taken…,Screenshot wird noch erstellt…
+"Use Cmd/Ctrl together with a letter, a digit or F1 to F12.","Verwenden Sie Cmd/Strg zusammen mit einem Buchstaben, einer Ziffer oder F1 bis F12."
+Alt/Option is not possible: it types characters such as @ or € on many keyboards.,Alt/Option geht nicht: Damit tippen viele Tastaturen Zeichen wie @ oder €.
+"{0} belongs to the browser or the system (copy, paste, undo, tabs…).","{0} gehört dem Browser oder dem System (Kopieren, Einfügen, Rückgängig, Tabs…)."
+"This combination belongs to the browser or the system (copy, paste, undo, tabs…).","Diese Kombination gehört dem Browser oder dem System (Kopieren, Einfügen, Rückgängig, Tabs…)."
+{0} can't be Phriend's shortcut. {1},{0} kann nicht das Tastenkürzel von Phriend sein. {1}

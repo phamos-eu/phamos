@@ -67,6 +67,7 @@ export function mountPhriend(router, heading) {
 		// the user's own shortcut, else the site's (Phriend Settings); "" when off
 		shortcut: boot().phriend.shortcut || "",
 		default_shortcut: boot().phriend.default_shortcut || "",
+		user: boot().user?.name || "",
 		// above the buttons the cockpits keep in their bottom right corner ("Today" in My Day)
 		start: { right: 24, bottom: 76 },
 	})

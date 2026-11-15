@@ -1,6 +1,9 @@
-// Phriend's keyboard shortcut (#1900), in the notation phamos/phriend/shortcut.py keeps:
-// modifiers then one key, e.g. "Mod+P" or "Alt+Shift+P". "Mod" is Cmd on a Mac, Ctrl elsewhere.
+// Phriend's keyboard shortcut (#1903), in the notation phamos/phriend/shortcut.py keeps:
+// modifiers then one key, e.g. "Mod+P" or "Mod+Shift+K". "Mod" is Cmd on a Mac, Ctrl elsewhere.
+// What may not be a shortcut is in shortcut_rules.json, read by both sides.
 // Pure functions, tested in shortcut.test.js.
+
+import rules from "./shortcut_rules.json";
 
 export const IS_MAC =
 	typeof navigator !== "undefined" && /Mac|iPhone|iPad|iPod/i.test(navigator.platform || navigator.userAgent || "");
@@ -21,15 +24,17 @@ export function parse(text) {
 	return spec.key ? spec : null;
 }
 
-// The key of a keyboard event by its position (event.code), so Option on a Mac, which changes
-// event.key ("∏" for Option+Shift+P), doesn't matter.
+// The key of a keyboard event: the letter or digit printed on it (event.key), so Z is Z on a
+// German keyboard too, where it sits where Y is on an English one. Without a printable letter
+// (F keys, Space, or Option changing the character) by its position (event.code).
 export function key_of(event) {
+	const key = String(event.key || "");
+	if (!event.altKey && /^[a-z0-9]$/i.test(key)) return key.toUpperCase();
 	const code = event.code || "";
 	if (/^Key[A-Z]$/.test(code)) return code.slice(3);
 	if (/^Digit[0-9]$/.test(code)) return code.slice(5);
 	if (/^F([1-9]|1[0-2])$/.test(code) || code === "Space") return code;
-	const key = String(event.key || "");
-	return key.length === 1 ? key.toUpperCase() : null;
+	return null;
 }
 
 export function matches(event, spec, is_mac = IS_MAC) {
@@ -45,18 +50,27 @@ export function matches(event, spec, is_mac = IS_MAC) {
 	);
 }
 
-// The shortcut a key press stands for, for recording a new one. null while only modifiers are
-// down, or for a combination that would fire while typing (no Cmd/Ctrl/Alt and not an F key).
+// Why a shortcut can't be used: "modifier", "alt", "reserved", or null when it's fine.
+// The same rules as problem() in phamos/phriend/shortcut.py.
+export function problem(text) {
+	const spec = parse(text);
+	if (!spec || !(spec.mod || spec.ctrl)) return "modifier";
+	if (spec.alt) return "alt";
+	if (rules.refused[spec.shift ? "shift" : "plain"].includes(spec.key)) return "reserved";
+	return null;
+}
+
+// The shortcut a key press stands for, for recording a new one ("Mod+Shift+K"); null while only
+// modifiers are down. Whether it may be used is problem()'s question.
 export function from_event(event, is_mac = IS_MAC) {
 	const key = key_of(event);
 	if (!key || !KEY.test(key)) return null;
 	const mods = [];
 	if (is_mac ? event.metaKey : event.ctrlKey) mods.push("Mod");
 	if (is_mac && event.ctrlKey) mods.push("Ctrl");
+	if (!is_mac && event.metaKey) return null; // the Windows key belongs to the system
 	if (event.altKey) mods.push("Alt");
 	if (event.shiftKey) mods.push("Shift");
-	if (!mods.some((m) => m !== "Shift") && !key.startsWith("F")) return null;
-	if (!is_mac && event.metaKey) return null; // the Windows key belongs to the system
 	return [...mods, key].join("+");
 }
 

@@ -17,13 +17,14 @@ from frappe.utils import cstr, escape_html, get_url, pretty_date
 from frappe.utils.password import get_decrypted_password
 
 from phamos.phriend import shortcut as phriend_shortcut
-from phamos.phriend.boot import phriend_boot
+from phamos.phriend.boot import is_for_user
 
 MAX_SCREENSHOT_BYTES = 15 * 1024 * 1024
 REPORT_DOCTYPE = "Issue"
 REPORT_TYPES = ("Bug", "Idea", "Question", "Other")  # "Other" is "Something else" in the flow (#1900)
 PRIORITIES = ("Low", "Medium", "High", "Urgent")
 CLOSED_STATUSES = ("Resolved", "Closed")
+REPORT_LIST_CAP = 100  # badge and "Already reported here" count up to this
 DEFAULT_GITLAB_PROJECT = "phamos/phamos"
 TIMEOUT = 30
 
@@ -156,22 +157,35 @@ def _open_report_filters(route, ref_doctype, ref_docname):
 	"""Filters for open Phriend reports about one record, a DocType, or a page; None for none.
 
 	The most specific given wins: a record (ref_doctype + ref_docname), else a DocType, else the
-	route. None, quietly (no message, no error), when Phriend is not for this user or the user
-	can't read Issues: the cockpits ask on every page change.
+	route. None, quietly (no message, no error), when Phriend is not for this user, the user
+	can't read Issues, or can't read the record or DocType asked about: the titles of reports
+	about a record say something about it (GDPR review of !1162). The cockpits ask on every
+	page change.
 	"""
-	if not phriend_boot() or not frappe.has_permission(REPORT_DOCTYPE, "read"):
+	if not is_for_user() or not frappe.has_permission(REPORT_DOCTYPE, "read"):
 		return None
 	route, ref_doctype, ref_docname = cstr(route), cstr(ref_doctype), cstr(ref_docname)
 	filters = {"phriend_type": ["is", "set"], "status": ["not in", CLOSED_STATUSES]}
-	if ref_doctype and ref_docname:
-		filters.update(phriend_ref_doctype=ref_doctype, phriend_ref_docname=ref_docname)
-	elif ref_doctype:
+	if ref_doctype:
+		if not _may_read(ref_doctype, ref_docname):
+			return None
 		filters["phriend_ref_doctype"] = ref_doctype
+		if ref_docname:
+			filters["phriend_ref_docname"] = ref_docname
 	elif route:
 		filters["phriend_route"] = route[:140]
 	else:
 		return None
 	return filters
+
+
+def _may_read(doctype, name=None):
+	try:
+		return bool(frappe.has_permission(doctype, "read", doc=name or None))
+	except Exception:
+		# an unknown DocType or record: nothing to say about it
+		frappe.clear_last_message()
+		return False
 
 
 @frappe.whitelist()
@@ -182,7 +196,7 @@ def count_open_reports(route=None, ref_doctype=None, ref_docname=None):
 	if not filters:
 		return 0
 	# names, not a SQL count: Frappe v16 no longer takes "count(name)" as a field
-	return len(frappe.get_list(REPORT_DOCTYPE, filters=filters, pluck="name", limit_page_length=100))
+	return len(frappe.get_list(REPORT_DOCTYPE, filters=filters, pluck="name", limit_page_length=REPORT_LIST_CAP))
 
 
 @frappe.whitelist()
@@ -190,25 +204,22 @@ def get_open_reports(route=None, ref_doctype=None, ref_docname=None):
 	"""The open Phriend reports about this record or page, newest first, for the first step of
 	the report flow: "Already reported here?" (PM, 2026-11-15, #1900).
 
-	Returns {"count": all of them (up to 100), "reports": the newest 5}. Only Issues the user may
-	read; empty when Phriend is not for this user.
+	Returns {"count": up to 100, "capped": more than that, "reports": the newest 5}. Only Issues
+	the user may read; empty when Phriend is not for this user.
 	"""
 	filters = _open_report_filters(route, ref_doctype, ref_docname)
 	if not filters:
-		return {"count": 0, "reports": []}
-	names = frappe.get_list(
-		REPORT_DOCTYPE, filters=filters, pluck="name", order_by="creation desc", limit_page_length=100
-	)
-	if not names:
-		return {"count": 0, "reports": []}
+		return {"count": 0, "capped": False, "reports": []}
 	rows = frappe.get_list(
 		REPORT_DOCTYPE,
-		filters={"name": ["in", names[:5]]},
+		filters=filters,
 		fields=["name", "subject", "status", "priority", "phriend_type", "phriend_reported_by_name", "creation"],
 		order_by="creation desc",
+		limit_page_length=REPORT_LIST_CAP + 1,
 	)
 	return {
-		"count": len(names),
+		"count": min(len(rows), REPORT_LIST_CAP),
+		"capped": len(rows) > REPORT_LIST_CAP,  # "100+"
 		"reports": [
 			{
 				"name": row.name,
@@ -220,7 +231,7 @@ def get_open_reports(route=None, ref_doctype=None, ref_docname=None):
 				"reported_by": row.phriend_reported_by_name or "",
 				"when": pretty_date(row.creation),
 			}
-			for row in rows
+			for row in rows[:5]
 		],
 	}
 
