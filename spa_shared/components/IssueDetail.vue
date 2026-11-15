@@ -3,13 +3,13 @@
 	     keeps the Issue's autosave, field locks and realtime, and lays both into their panels'
 	     hosts (panels/hosts.js). -->
 	<Teleport v-if="hosts.description" :to="hosts.description">
-	<!-- No padding or frames of its own: the tile is the frame. The toolbar runs along the top
-	     with one line under it; only the text gets padding (#1917). -->
-	<div class="flex h-full min-h-0 w-full flex-1 flex-col overflow-hidden text-gray-900 dark:text-gray-100">
+	<!-- Little space of its own: a small margin to the tile and one light, slightly rounded frame
+	     around toolbar and text (#1917; it had 20px padding and a darker frame). -->
+	<div class="flex h-full min-h-0 w-full flex-1 flex-col overflow-hidden p-2 text-gray-900 dark:text-gray-100">
 		<section class="flex min-h-[50%] flex-1 flex-col">
 			<div
 				v-if="!chromeHostReady"
-				class="flex flex-shrink-0 items-center justify-end gap-2 px-3 py-1.5"
+				class="mb-1.5 flex flex-shrink-0 items-center justify-end gap-2"
 			>
 				<DocSyncBanner :autosave="autosave" />
 				<DocViewers :viewers="viewers" />
@@ -19,19 +19,19 @@
 					:key="issue.name"
 					v-model="autosave.draft.description"
 					class="flex h-full min-h-0 flex-1 flex-col"
-					editor-root-class="flex h-full min-h-0 flex-1 flex-col [&>.border]:rounded-none [&>.border]:border-x-0 [&>.border]:border-t-0 [&>.border]:px-1 [&_div:has(>.ProseMirror)]:flex [&_div:has(>.ProseMirror)]:min-h-0 [&_div:has(>.ProseMirror)]:flex-1 [&_div:has(>.ProseMirror)]:flex-col [&_.ProseMirror]:min-h-full [&_.ProseMirror]:flex-1 [&_.ProseMirror]:overflow-y-auto"
+					editor-root-class="flex h-full min-h-0 flex-1 flex-col [&>.border]:border-outline-gray-2 [&_div:has(>.ProseMirror)]:flex [&_div:has(>.ProseMirror)]:min-h-0 [&_div:has(>.ProseMirror)]:flex-1 [&_div:has(>.ProseMirror)]:flex-col [&_.ProseMirror]:min-h-full [&_.ProseMirror]:flex-1 [&_.ProseMirror]:overflow-y-auto"
 					:editable="!isClosed"
 					:fixed-menu="editorMenu"
 					:locked-by="locks.lockedBy('description')"
 					field-label="the description"
 					scroll-hint
 					placeholder="What needs to be discussed or resolved?"
-					editor-class="prose-sm dark:prose-invert max-w-none w-full min-h-full flex-1 px-4 py-3"
+					editor-class="prose-sm dark:prose-invert max-w-none w-full min-h-full flex-1 px-3 py-2 border border-t-0 border-outline-gray-2 rounded-b-lg"
 					@focus="onFieldFocus('description')"
 					@blur="onFieldBlur('description')"
 				/>
 			</div>
-			<ErrorMessage class="flex-shrink-0 px-4 pb-2" :message="fieldError" />
+			<ErrorMessage class="mt-1.5 flex-shrink-0" :message="fieldError" />
 		</section>
 	</div>
 	</Teleport>
