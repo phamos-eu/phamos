@@ -28,6 +28,7 @@
 					:locked-by="locks.lockedBy('description')"
 					field-label="the description"
 					scroll-hint
+					hint-fade="from-white dark:from-gray-900"
 					placeholder="What needs to be discussed or resolved?"
 					editor-class="prose-sm dark:prose-invert max-w-none w-full min-h-full flex-1 px-3 py-2"
 					@focus="onFieldFocus('description')"
@@ -78,7 +79,7 @@
 
 	<Teleport v-if="hosts.properties" :to="hosts.properties">
 		<div class="flex h-full min-h-0 flex-col bg-surface-white text-ink-gray-9">
-			<div class="flex min-h-0 flex-1 flex-col gap-5 overflow-y-auto p-4">
+			<ScrollHint class="flex-1" box-class="flex flex-col gap-5 p-4" fade="from-surface-white">
 				<section>
 					<div class="mb-2 text-[11px] font-semibold uppercase tracking-wide text-ink-gray-6">
 						Status
@@ -154,7 +155,7 @@
 						@updated="onAssigneesUpdated"
 					/>
 				</section>
-			</div>
+			</ScrollHint>
 
 			<div class="mt-auto flex-shrink-0 space-y-2 border-t border-outline-gray-2 p-4">
 				<div
@@ -290,6 +291,7 @@ import ConvertToTaskDialog from "@spa/components/ConvertToTaskDialog.vue"
 import SchedulePreview from "@spa/components/SchedulePreview.vue"
 import { setPageChromeActive } from "@spa/pageChrome.js"
 import { panelHosts as hosts } from "@spa/panels/hosts.js"
+import ScrollHint from "@spa/components/ScrollHint.vue"
 import spaConfig from "@/config"
 
 const props = defineProps({

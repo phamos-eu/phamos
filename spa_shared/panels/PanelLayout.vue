@@ -65,12 +65,16 @@
 							<FeatherIcon name="x" class="h-3.5 w-3.5" />
 						</button>
 					</header>
-					<!-- The panel's body is teleported in here (see the bodies below). -->
+					<!-- The panel's body is teleported in here (see the bodies below). A panel that doesn't
+					     scroll itself scrolls in a box that says "More below" (#1922). -->
 					<div
+						v-if="defOf(tile.id)?.bare"
 						:id="tileId(tile.id)"
-						class="min-h-0 flex-1"
-						:class="defOf(tile.id)?.bare ? 'flex flex-col overflow-hidden' : 'overflow-y-auto p-2'"
+						class="flex min-h-0 flex-1 flex-col overflow-hidden"
 					/>
+					<ScrollHint v-else class="flex-1" box-class="p-2" fade="from-surface-white">
+						<div :id="tileId(tile.id)" />
+					</ScrollHint>
 				</section>
 
 				<div
@@ -147,6 +151,7 @@ import { __ } from "@spa/utils/i18n.js"
 import { issueChatStore } from "@spa/issueChatStore.js"
 import { setRavenFramePassThrough } from "@spa/utils/ravenFrame.js"
 import PanelBody from "./PanelBody.vue"
+import ScrollHint from "@spa/components/ScrollHint.vue"
 import PanelRail from "./PanelRail.vue"
 import { DEFAULT_LAYOUTS, PANELS } from "./definitions.js"
 import { minimums, panelsFor, places } from "./registry.js"
