@@ -2184,3 +2184,8 @@ Swap with {0},Mit {0} tauschen
 "Drag to move, or Alt+↑/↓","Ziehen zum Verschieben, oder Alt+↑/↓"
 Could not move the item,Der Eintrag konnte nicht verschoben werden
 Scroll to see the rest,"Scrollen, um den Rest zu sehen"
+Small images,Kleine Bilder
+Medium images,Mittlere Bilder
+Large images,Große Bilder
+"Drag to resize, or use the arrow keys","Ziehen ändert die Größe, oder die Pfeiltasten"
+Unknown image size: {0},Unbekannte Bildgröße: {0}
