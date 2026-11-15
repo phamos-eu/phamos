@@ -36,7 +36,13 @@
 						<span v-if="summaryOf(tile.id)" class="min-w-0 truncate text-xs text-ink-gray-5">
 							· {{ summaryOf(tile.id) }}
 						</span>
-						<div class="ml-auto flex flex-shrink-0 items-center" @pointerdown.stop>
+						<!-- The panel's own actions, teleported in by its content (hosts.panelTitleSlots) -->
+						<div
+							:ref="(el) => setTitleSlot(tile.id, el)"
+							class="ml-auto flex min-w-0 flex-shrink items-center"
+							@pointerdown.stop
+						/>
+						<div class="flex flex-shrink-0 items-center" @pointerdown.stop>
 							<Dropdown :options="moveOptions(tile.id)" placement="right">
 								<button
 									type="button"
@@ -161,6 +167,7 @@ import {
 	withAll,
 } from "./tiling.js"
 import { usePanelLayout } from "./usePanelLayout.js"
+import { panelTitleSlots } from "./hosts.js"
 
 const props = defineProps({
 	doctype: { type: String, required: true },
@@ -240,6 +247,12 @@ const geometry = computed(() =>
 const GRAB = 4
 const grabArea = (g) =>
 	g.axis === "w" ? { ...g, x: g.x - GRAB, w: g.w + 2 * GRAB } : { ...g, y: g.y - GRAB, h: g.h + 2 * GRAB }
+
+// A tile's title-bar slot comes and goes with the tile (a function ref gets null on unmount).
+function setTitleSlot(id, el) {
+	if (el) panelTitleSlots[id] = el
+	else if (panelTitleSlots[id] && !panelTitleSlots[id].isConnected) delete panelTitleSlots[id]
+}
 
 const box = (r) => ({ left: `${r.x}px`, top: `${r.y}px`, width: `${r.w}px`, height: `${r.h}px` })
 

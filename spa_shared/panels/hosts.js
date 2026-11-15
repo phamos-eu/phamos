@@ -6,3 +6,10 @@ import { reactive } from "vue"
 
 /** host id → element, while the host panel is mounted */
 export const panelHosts = reactive({})
+
+/**
+ * panel id → the free slot in that panel's title bar, while its tile shows (#1917). A panel's
+ * content can teleport small actions there instead of spending a row of its own (the chat's
+ * "Open in Raven").
+ */
+export const panelTitleSlots = reactive({})

@@ -15,13 +15,11 @@
 				:aria-label="__('Chat about {0}', [title])"
 				@keydown.escape="close"
 			>
-				<header v-if="!inColumn || url" class="flex h-12 flex-shrink-0 items-center gap-2 border-b border-outline-gray-2 px-3">
-					<!-- In the dock the panel row above already says "Chat". -->
-					<template v-if="!inColumn">
-						<FeatherIcon name="message-circle" class="h-4 w-4 flex-shrink-0 text-ink-gray-6" />
-						<span class="min-w-0 flex-1 truncate text-sm font-medium text-ink-gray-9">{{ __("Chat") }}</span>
-					</template>
-					<span v-else class="flex-1" />
+				<!-- In a tile the tile's title bar says "Chat" and holds "Open in Raven" (below), so the
+				     chat needs no header row of its own (#1917). -->
+				<header v-if="!inColumn" class="flex h-12 flex-shrink-0 items-center gap-2 border-b border-outline-gray-2 px-3">
+					<FeatherIcon name="message-circle" class="h-4 w-4 flex-shrink-0 text-ink-gray-6" />
+					<span class="min-w-0 flex-1 truncate text-sm font-medium text-ink-gray-9">{{ __("Chat") }}</span>
 					<Button
 						v-if="url"
 						variant="ghost"
@@ -32,7 +30,6 @@
 						<template #prefix><FeatherIcon name="external-link" class="h-3.5 w-3.5" /></template>
 					</Button>
 					<Button
-						v-if="!inColumn"
 						variant="ghost"
 						:title="__('Close the chat')"
 						:aria-label="__('Close the chat')"
@@ -41,6 +38,17 @@
 						<FeatherIcon name="x" class="h-4 w-4" />
 					</Button>
 				</header>
+				<Teleport v-if="inColumn && url && titleSlot" :to="titleSlot">
+					<button
+						type="button"
+						class="flex h-5 min-w-0 items-center gap-1 rounded px-1.5 text-xs text-ink-gray-6 hover:bg-surface-gray-2 hover:text-ink-gray-9 focus:outline-none focus-visible:ring-2 focus-visible:ring-outline-gray-4"
+						:title="__('Open this chat in Raven, in a new window')"
+						@click="openInRaven"
+					>
+						<FeatherIcon name="external-link" class="h-3.5 w-3.5 flex-shrink-0" />
+						<span class="truncate">{{ __("Open in Raven") }}</span>
+					</button>
+				</Teleport>
 				<p
 					v-if="skippedUsers.length"
 					class="flex-shrink-0 border-b border-outline-gray-2 bg-surface-amber-1 px-3 py-1.5 text-xs text-ink-amber-3"
@@ -113,6 +121,7 @@ import RavenThreadIcon from "@spa/components/RavenThreadIcon.vue"
 import { __ } from "@spa/utils/i18n.js"
 import { classifyPath, injectEmbedStyle, installGuard, routeFrame, watchThreadMarks } from "@spa/utils/ravenEmbed.js"
 import { issueChatStore } from "@spa/issueChatStore.js"
+import { panelTitleSlots } from "@spa/panels/hosts.js"
 import { acquireRavenFrame, ravenFrameWindow, releaseRavenFrame, setRavenFrameLayer } from "@spa/utils/ravenFrame.js"
 
 const props = defineProps({
@@ -146,6 +155,8 @@ const inColumn = computed(() => {
 })
 
 const shown = computed(() => inColumn.value || props.open)
+// The chat tile's title-bar slot (PanelLayout), where "Open in Raven" goes while in a tile.
+const titleSlot = computed(() => panelTitleSlots.chat || null)
 
 // Which record's chat shows in the page (kept for views that follow it).
 watch(
