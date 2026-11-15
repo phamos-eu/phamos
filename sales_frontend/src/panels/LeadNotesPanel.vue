@@ -39,10 +39,10 @@ const sorted = computed(() =>
 	[...(ctx?.notes?.value || [])].sort((a, b) => String(b.added_on || "").localeCompare(String(a.added_on || "")))
 )
 
+// Text only, parsed without running anything: innerHTML on a detached element would still load
+// an <img> and fire its handlers.
 function plain(html) {
-	const div = document.createElement("div")
-	div.innerHTML = html || ""
-	return (div.textContent || "").trim()
+	return (new DOMParser().parseFromString(html || "", "text/html").body.textContent || "").trim()
 }
 
 // The rail: "3 notes · last 12.11.2026", and the count as the badge.
