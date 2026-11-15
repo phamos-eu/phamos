@@ -186,6 +186,11 @@ const area = ref(null)
 const room = reactive({ w: 0, h: 0 })
 let observer = null
 onMounted(() => {
+	// Measure once now: a ResizeObserver reports only when the page renders, which a tab opened in
+	// the background doesn't do, and the tiles would wait for it.
+	const rect = area.value.getBoundingClientRect()
+	room.w = Math.floor(rect.width)
+	room.h = Math.floor(rect.height)
 	observer = new ResizeObserver(([entry]) => {
 		room.w = Math.floor(entry.contentRect.width)
 		room.h = Math.floor(entry.contentRect.height)
