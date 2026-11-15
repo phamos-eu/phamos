@@ -433,3 +433,33 @@ class TestMoveItemBetweenChecklists(FrappeTestCase):
 		frappe.set_user(USER_A)  # an Employee without access to these checklists
 		with self.assertRaises(frappe.PermissionError):
 			checklist_inbox.move_spa_checklist_item_to(source.name, source.checklist_items[0].name, target.name)
+
+	def test_write_on_only_one_side_changes_nothing(self):
+		for writable in ("source", "target"):
+			source = self._on_issue("Source", {"description": "Mine"})
+			target = self._on_issue("Target")
+			shared = source if writable == "source" else target
+			frappe.share.add_docshare("Checklist", shared.name, USER_A, read=1, write=1, flags={"ignore_share_permission": True})
+			frappe.set_user(USER_A)
+			with self.assertRaises(frappe.PermissionError):
+				checklist_inbox.move_spa_checklist_item_to(source.name, source.checklist_items[0].name, target.name)
+			frappe.set_user("Administrator")
+			source.reload()
+			target.reload()
+			self.assertEqual([r.description for r in source.checklist_items], ["Mine"], writable)
+			self.assertEqual(target.checklist_items, [], writable)
+
+	def test_refuses_a_position_outside_the_target(self):
+		source = self._on_issue("Source", {"description": "Moving"})
+		target = self._on_issue("Target", {"description": "One"})
+		for bad in (-1, 2, "x"):
+			with self.assertRaises(frappe.ValidationError):
+				checklist_inbox.move_spa_checklist_item_to(source.name, source.checklist_items[0].name, target.name, bad)
+
+	def test_comment_text_is_plain_and_short(self):
+		source = self._on_issue("Source", {"description": "<b>Bold</b> " + "x" * 120})
+		target = self._on_issue("Target")
+		checklist_inbox.move_spa_checklist_item_to(source.name, source.checklist_items[0].name, target.name)
+		comment = frappe.get_all("Comment", filters={"reference_name": target.name, "comment_type": "Info"}, pluck="content")[0]
+		self.assertNotIn("<b>", comment)
+		self.assertIn("…", comment)

@@ -611,8 +611,9 @@ async function moveToChecklist(item, target) {
 	}
 }
 
+// fresh on every opened item: checklists of the record may have been added or renamed since
 watch(expandedItem, (name) => {
-	if (name && !siblings.value.length) loadSiblings()
+	if (name) loadSiblings()
 })
 
 // A click on an open item's free area closes it (#1921); its fields, editor, buttons and links

@@ -701,10 +701,16 @@ def move_spa_checklist_item_to(checklist_name, item_name, target_checklist, to_i
 			to_index = int(to_index)
 		except (TypeError, ValueError):
 			frappe.throw(_("Invalid position"))
+		# a position in the target after the move: 0 … its current length (the end)
+		if not 0 <= to_index <= len(target.checklist_items):
+			frappe.throw(_("Invalid position"))
 	else:
 		to_index = None
 
-	label = (row.description or "").strip() or _("Checklist item")
+	# plain, short text for the timeline comments (a description may hold escaped markup)
+	label = frappe.utils.html_utils.unescape_html(frappe.utils.strip_html_tags(row.description or "")).strip()
+	label = (label[:80] + "…") if len(label) > 80 else label
+	label = label or _("Checklist item")
 	move_item(source, target, row, to_index)
 	source_title = _checklist_title_value(source) or source.name
 	target_title = _checklist_title_value(target) or target.name
