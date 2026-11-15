@@ -95,6 +95,13 @@ button.link:focus-visible, .bubble a:focus-visible { outline: 2px solid var(--ph
 	line-height: 20px; text-align: center; cursor: pointer; box-shadow: 0 0 0 2px var(--ph-bg);
 }
 .badge:empty { display: none; }
+/* The shortcut, small and light under the feet: an invitation to try it (PM, 2026-11-15). */
+.keys { position: absolute; top: calc(100% + 1px); left: 50%; transform: translateX(-50%);
+	padding: 1px 6px; border-radius: 6px; white-space: nowrap; pointer-events: none;
+	font-size: 11px; line-height: 15px; letter-spacing: 0.02em; color: var(--ph-muted); opacity: 0.75;
+	background: color-mix(in srgb, var(--ph-bg) 70%, transparent); }
+.keys:empty { display: none; }
+.ball:hover .keys { opacity: 1; }
 .pending { position: absolute; left: -2px; top: -2px; width: 12px; height: 12px; border-radius: 50%;
 	background: #e8a23a; box-shadow: 0 0 0 2px var(--ph-bg); display: none; }
 .ball.has-pending .pending { display: block; }
@@ -145,6 +152,7 @@ export class Ball {
 				<div class="bubble" role="status" aria-live="polite"></div>
 				<div class="hit" role="button" tabindex="0" aria-label="${escape_html(options.label)}" title="${escape_html(options.label)}">${SVG}</div>
 				<span class="pending"></span>
+				<span class="keys" aria-hidden="true"></span>
 				<button type="button" class="badge"></button>
 			</div>
 			<div class="layer"></div>`;
@@ -154,6 +162,7 @@ export class Ball {
 		this.hit = this.shadow.querySelector(".hit"); // the ball itself: drag, click, keyboard
 		this.bubble = this.shadow.querySelector(".bubble");
 		this.badge = this.shadow.querySelector(".badge");
+		this.keys = this.shadow.querySelector(".keys");
 		this.layer = this.shadow.querySelector(".layer"); // the report flow mounts here
 		this.pupils = this.shadow.querySelectorAll(".pupil");
 
@@ -225,7 +234,7 @@ export class Ball {
 
 	set_position(left, top) {
 		const w = this.root.offsetWidth || 64;
-		const h = this.root.offsetHeight || 76;
+		const h = (this.root.offsetHeight || 76) + (this.keys && this.keys.textContent ? 16 : 0); // room for the keys
 		left = Math.max(4, Math.min(window.innerWidth - w - 4, left));
 		top = Math.max(4, Math.min(window.innerHeight - h - 4, top));
 		Object.assign(this.root.style, { left: `${left}px`, top: `${top}px`, right: "auto", bottom: "auto" });
@@ -333,6 +342,11 @@ export class Ball {
 	hide_bubble() {
 		clearTimeout(this._bubble_timer);
 		this.bubble.classList.remove("show");
+	}
+
+	// "⌘P" under the ball; "" hides it (shortcut switched off)
+	set_keys(keys) {
+		this.keys.textContent = keys || "";
 	}
 
 	set_label(label) {

@@ -40,7 +40,10 @@ class Phriend {
 	set_shortcut(text) {
 		this.shortcut = text || "";
 		this.shortcut_spec = parse(this.shortcut);
-		if (this.ball) this.ball.set_label(this.label());
+		if (this.ball) {
+			this.ball.set_label(this.label());
+			this.ball.set_keys(format(this.shortcut));
+		}
 	}
 
 	label() {
@@ -74,6 +77,7 @@ class Phriend {
 			on_first_interest: () => this.load_flow().catch(() => {}),
 			start: this.host.start,
 		});
+		this.ball.set_keys(format(this.shortcut));
 
 		this.listen_for_shortcut();
 		if (this.host.on_route_change) this.host.on_route_change(() => this.refresh_badge());
