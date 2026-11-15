@@ -248,10 +248,10 @@ const GRAB = 4
 const grabArea = (g) =>
 	g.axis === "w" ? { ...g, x: g.x - GRAB, w: g.w + 2 * GRAB } : { ...g, y: g.y - GRAB, h: g.h + 2 * GRAB }
 
-// A tile's title-bar slot comes and goes with the tile (a function ref gets null on unmount).
+// A tile's title-bar slot. Only ever set: an inline ref is called with null and then the element
+// on every render, and content only uses the slot while its tile shows (and has just set it).
 function setTitleSlot(id, el) {
-	if (el) panelTitleSlots[id] = el
-	else if (panelTitleSlots[id] && !panelTitleSlots[id].isConnected) delete panelTitleSlots[id]
+	if (el && panelTitleSlots[id] !== el) panelTitleSlots[id] = el
 }
 
 const box = (r) => ({ left: `${r.x}px`, top: `${r.y}px`, width: `${r.w}px`, height: `${r.h}px` })
