@@ -1,4 +1,4 @@
-import { dropIndex, moved } from "./listReorder.js"
+import { dragOffsets, dropIndex, moved, passedDragDistance } from "./listReorder.js"
 
 const rects = [0, 50, 100, 150].map((top) => ({ top, height: 40 }))
 
@@ -21,5 +21,27 @@ describe("moved", () => {
 	})
 	it("ignores positions outside the list", () => {
 		expect(moved(["a", "b"], 0, 5)).toEqual(["a", "b"])
+	})
+})
+
+describe("dragOffsets", () => {
+	it("moves the passed items up one slot when dragging down", () => {
+		expect(dragOffsets(4, 0, 2, 50)).toEqual([0, -50, -50, 0])
+	})
+	it("moves the passed items down one slot when dragging up", () => {
+		expect(dragOffsets(4, 3, 1, 50)).toEqual([0, 50, 50, 0])
+	})
+	it("moves nothing while the item is over its own slot", () => {
+		expect(dragOffsets(3, 1, 1, 50)).toEqual([0, 0, 0])
+	})
+})
+
+describe("passedDragDistance", () => {
+	it("keeps a press that hardly moves a click", () => {
+		expect(passedDragDistance(2, 2)).toBe(false)
+	})
+	it("starts a drag after a few pixels", () => {
+		expect(passedDragDistance(0, 5)).toBe(true)
+		expect(passedDragDistance(-3, -3)).toBe(true)
 	})
 })
