@@ -14,6 +14,8 @@ from frappe.translate import (
 )
 from frappe.utils import cint, get_system_timezone
 
+from phamos.phriend.boot import phriend_boot
+
 
 def get_spa_boot(default_route):
 	"""Boot dict for Vite SPAs (csrf, timezone, user, language and its translations).
@@ -22,6 +24,7 @@ def get_spa_boot(default_route):
 	i18n.js) translates like `__()` in Desk (#1605). English needs no table.
 	"""
 	lang = frappe.local.lang or "en"
+	phriend = phriend_boot()
 	tz = {
 		"system": get_system_timezone(),
 		"user": frappe.db.get_value("User", frappe.session.user, "time_zone")
@@ -44,8 +47,28 @@ def get_spa_boot(default_route):
 				"name": frappe.session.user,
 				"full_name": frappe.utils.get_fullname(),
 			},
+			# Phriend, the report-a-problem ball, in every cockpit (#1900): whether it shows,
+			# and the app versions it adds to a report. Only for users Phriend is for.
+			"phriend": phriend,
+			"versions": _app_versions() if phriend else {},
 		}
 	)
+
+
+def _app_versions():
+	"""{app: version}, as Desk has it in frappe.boot.versions.
+
+	From each app's __version__, not frappe.utils.change_log.get_versions(): that runs git for
+	every app, which Desk pays once per session but the cockpits would pay on every page load.
+	"""
+	versions = {}
+	for app in frappe.get_installed_apps():
+		try:
+			versions[app] = getattr(frappe.get_module(app), "__version__", "") or ""
+		except Exception:
+			# a broken app must not take the cockpits down; Phriend just omits its version
+			versions[app] = ""
+	return versions
 
 
 def spa_translations(lang):

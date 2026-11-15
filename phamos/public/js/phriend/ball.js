@@ -45,7 +45,7 @@ const BASE_CSS = `
 	--ph-border: rgba(0, 0, 0, 0.12); --ph-border-strong: rgba(0, 0, 0, 0.22);
 	--ph-accent: #171717; --ph-on-accent: #ffffff; --ph-focus: #2f6fdb;
 	--ph-chip: #eef3fd; --ph-chip-text: #1d4ea3; --ph-chip-border: #a9c2f0;
-	--ph-danger: #c62f2f; --ph-success: #23824a; --ph-red: #e5222b;
+	--ph-danger: #c62f2f; --ph-on-danger: #ffffff; --ph-success: #23824a; --ph-red: #e5222b;
 	--ph-shadow: 0 12px 40px rgba(0, 0, 0, 0.18), 0 2px 8px rgba(0, 0, 0, 0.08);
 	--ph-font: Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
 	position: fixed; top: 0; left: 0; width: 0; height: 0; z-index: 1056;
@@ -56,7 +56,7 @@ const BASE_CSS = `
 	--ph-border: rgba(255, 255, 255, 0.12); --ph-border-strong: rgba(255, 255, 255, 0.24);
 	--ph-accent: #f2f2f2; --ph-on-accent: #171717; --ph-focus: #7aa7f5;
 	--ph-chip: #1c2c4a; --ph-chip-text: #b9cff7; --ph-chip-border: #3a5a96;
-	--ph-danger: #f08a8a; --ph-success: #7ccf9b;
+	--ph-danger: #f08a8a; --ph-on-danger: #1f1f1f; --ph-success: #7ccf9b;
 	--ph-shadow: 0 12px 40px rgba(0, 0, 0, 0.5);
 }
 * { box-sizing: border-box; }
@@ -85,6 +85,8 @@ button.link:focus-visible, .bubble a:focus-visible { outline: 2px solid var(--ph
 .ball.hop .body { animation: hop 0.45s ease-out 1; }
 .ball.busy .eyes { animation: squint 0.6s ease-in-out infinite alternate; }
 :host([data-paused]) * { animation-play-state: paused !important; }
+/* "hidden" always hides, whatever display a class sets (AI review of !1162) */
+[hidden] { display: none !important; }
 @media (prefers-reduced-motion: reduce) {
 	.body, .shadow, .eyes, .ball:hover .leg-l, .ball:hover .leg-r, .ball.busy .eyes { animation: none; }
 	.ball.hop .body { animation: none; }
@@ -95,6 +97,13 @@ button.link:focus-visible, .bubble a:focus-visible { outline: 2px solid var(--ph
 	line-height: 20px; text-align: center; cursor: pointer; box-shadow: 0 0 0 2px var(--ph-bg);
 }
 .badge:empty { display: none; }
+/* The shortcut, small and light under the feet: an invitation to try it (PM, 2026-11-15). */
+.keys { position: absolute; top: calc(100% + 1px); left: 50%; transform: translateX(-50%);
+	padding: 1px 6px; border-radius: 6px; white-space: nowrap; pointer-events: none;
+	font-size: 11px; line-height: 15px; letter-spacing: 0.02em; color: var(--ph-muted); opacity: 0.75;
+	background: color-mix(in srgb, var(--ph-bg) 70%, transparent); }
+.keys:empty { display: none; }
+.ball:hover .keys { opacity: 1; }
 .pending { position: absolute; left: -2px; top: -2px; width: 12px; height: 12px; border-radius: 50%;
 	background: #e8a23a; box-shadow: 0 0 0 2px var(--ph-bg); display: none; }
 .ball.has-pending .pending { display: block; }
@@ -105,6 +114,10 @@ button.link:focus-visible, .bubble a:focus-visible { outline: 2px solid var(--ph
 	opacity: 0; transform: translateY(6px); transition: opacity 0.2s, transform 0.2s; pointer-events: none; cursor: auto;
 }
 .bubble.show { opacity: 1; transform: translateY(0); pointer-events: auto; }
+.bubble.sticky { padding-right: 28px; }
+.bubble-close { position: absolute; top: 4px; right: 4px; width: 20px; height: 20px; padding: 0; border: 0; border-radius: 6px;
+	background: transparent; color: var(--ph-muted); font: inherit; font-size: 15px; line-height: 20px; cursor: pointer; }
+.bubble-close:hover { color: var(--ph-text); background: var(--ph-surface); }
 .bubble::after { content: ""; position: absolute; top: 100%; right: 22px; border: 7px solid transparent; border-top-color: var(--ph-bg); }
 .ball.flip .bubble { right: auto; left: 0; }
 .ball.flip .bubble::after { right: auto; left: 22px; }
@@ -131,7 +144,9 @@ button.link:focus-visible, .bubble a:focus-visible { outline: 2px solid var(--ph
 `;
 
 export class Ball {
-	// options: { label, on_click, on_badge_click, on_first_interest }
+	// options: { label, on_click, on_badge_click, on_first_interest, start }
+	// start: { right, bottom } in px until the user drags the ball (the cockpits keep it clear
+	// of their own buttons in the corner)
 	constructor(options) {
 		this.options = options;
 		this.host = document.createElement("div");
@@ -143,6 +158,7 @@ export class Ball {
 				<div class="bubble" role="status" aria-live="polite"></div>
 				<div class="hit" role="button" tabindex="0" aria-label="${escape_html(options.label)}" title="${escape_html(options.label)}">${SVG}</div>
 				<span class="pending"></span>
+				<span class="keys" aria-hidden="true"></span>
 				<button type="button" class="badge"></button>
 			</div>
 			<div class="layer"></div>`;
@@ -152,10 +168,15 @@ export class Ball {
 		this.hit = this.shadow.querySelector(".hit"); // the ball itself: drag, click, keyboard
 		this.bubble = this.shadow.querySelector(".bubble");
 		this.badge = this.shadow.querySelector(".badge");
+		this.keys = this.shadow.querySelector(".keys");
 		this.layer = this.shadow.querySelector(".layer"); // the report flow mounts here
 		this.pupils = this.shadow.querySelectorAll(".pupil");
 
 		this.sync_theme();
+		if (options.start) {
+			this.root.style.right = `${options.start.right}px`;
+			this.root.style.bottom = `${options.start.bottom}px`;
+		}
 		this.restore_position();
 		this.setup_drag();
 		this.setup_eyes();
@@ -219,7 +240,9 @@ export class Ball {
 
 	set_position(left, top) {
 		const w = this.root.offsetWidth || 64;
-		const h = this.root.offsetHeight || 76;
+		// room for the keys label under the feet, measured: it follows the CSS
+		const keys = this.keys && this.keys.textContent ? this.keys.offsetHeight + 1 : 0;
+		const h = (this.root.offsetHeight || 76) + keys;
 		left = Math.max(4, Math.min(window.innerWidth - w - 4, left));
 		top = Math.max(4, Math.min(window.innerHeight - h - 4, top));
 		Object.assign(this.root.style, { left: `${left}px`, top: `${top}px`, right: "auto", bottom: "auto" });
@@ -274,6 +297,8 @@ export class Ball {
 	// ---- personality
 
 	setup_eyes() {
+		// no eyes following the pointer for people who asked for less motion
+		if (window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
 		let frame = null;
 		document.addEventListener(
 			"pointermove",
@@ -320,13 +345,36 @@ export class Ball {
 		clearTimeout(this._bubble_timer);
 		this.bubble.innerHTML = html;
 		this.bubble.classList.add("show");
-		if (ms) this._bubble_timer = setTimeout(() => this.hide_bubble(), ms);
+		// a bubble that stays (failures, "One moment…") can be closed
+		this.bubble.classList.toggle("sticky", !ms);
+		if (ms) {
+			this._bubble_timer = setTimeout(() => this.hide_bubble(), ms);
+		} else {
+			const close = document.createElement("button");
+			close.type = "button";
+			close.className = "bubble-close";
+			close.textContent = "×";
+			close.setAttribute("aria-label", this.options.close_label || "Close");
+			close.addEventListener("click", () => this.hide_bubble());
+			this.bubble.appendChild(close);
+		}
 		return this.bubble;
 	}
 
 	hide_bubble() {
 		clearTimeout(this._bubble_timer);
 		this.bubble.classList.remove("show");
+	}
+
+	// "⌘P" under the ball; "" hides it (shortcut switched off)
+	set_keys(keys) {
+		this.keys.textContent = keys || "";
+		this.clamp_into_view(); // the label below may need room at the bottom edge
+	}
+
+	set_label(label) {
+		this.hit.setAttribute("aria-label", label);
+		this.hit.title = label;
 	}
 
 	set_badge(count, title) {

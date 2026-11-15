@@ -48,7 +48,7 @@ _FIELDS = [
 		"fieldname": "phriend_type",
 		"label": "Report Type",
 		"fieldtype": "Select",
-		"options": "\nBug\nIdea\nQuestion",
+		"options": "\nBug\nIdea\nQuestion\nOther",
 		"in_standard_filter": 1,
 		"insert_after": "phriend_reported_by_name",
 	},
@@ -152,6 +152,21 @@ def ensure_issue_fields():
 
 def ensure_default_settings():
 	"""Fill the settings once, on the first migrate; later changes in the form are kept."""
+	ensure_default_shortcut()
 	if frappe.db.get_single_value("Phriend Settings", "gitlab_project"):
 		return
 	frappe.db.set_single_value("Phriend Settings", DEFAULT_SETTINGS)
+
+
+def ensure_default_shortcut():
+	"""Mod+P on sites that had Phriend before the shortcut field existed (#1900).
+
+	A new field on a saved Single reads empty, and empty means "no shortcut" here, so the
+	default from the JSON never arrives. Set it once, when the field has no row yet; an empty
+	value saved later in the form (shortcut switched off) is kept.
+	"""
+	has_row = frappe.db.sql(
+		"select 1 from `tabSingles` where doctype='Phriend Settings' and field='shortcut'"
+	)
+	if not has_row:
+		frappe.db.set_single_value("Phriend Settings", "shortcut", "Mod+P")

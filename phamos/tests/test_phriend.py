@@ -3,6 +3,7 @@ bench --site <site> run-tests --module phamos.tests.test_phriend
 """
 
 import base64
+import json
 import io
 from unittest.mock import MagicMock, patch
 
@@ -10,8 +11,9 @@ import frappe
 from frappe.tests.utils import FrappeTestCase
 from PIL import Image
 
-from phamos.phriend import api, setup
-from phamos.phriend.boot import boot_session
+from phamos.phriend import api, setup, shortcut
+from phamos.phriend.boot import boot_session, phriend_boot
+from phamos.www.spa_boot import get_spa_boot
 
 # a 1x1 PNG
 PNG = "data:image/png;base64," + base64.b64encode(
@@ -152,6 +154,14 @@ class TestPhriend(FrappeTestCase):
 				self.assertIn("The screenshot could not be saved", issue.description)
 				self.assertFalse(frappe.get_all("File", {"attached_to_name": issue.name}))
 
+	def test_something_else_is_a_report_type(self, _enqueue):
+		# the flow offers "Something else" next to Bug, Idea and Question (#1900)
+		issue = self.report(report_type="Other", title="Hard to say")
+		self.assertEqual(issue.phriend_type, "Other")
+		self.assertEqual(issue.subject, "[Other] Hard to say")
+		options = frappe.get_meta("Issue").get_field("phriend_type").options.split("\n")
+		self.assertIn("Other", options)
+
 	def test_unknown_doctype_and_type_are_dropped(self, _enqueue):
 		issue = self.report(ref_doctype="No Such DocType", report_type="Rant", priority="Whenever")
 		self.assertFalse(issue.phriend_ref_doctype)
@@ -177,11 +187,140 @@ class TestPhriend(FrappeTestCase):
 	def test_boot_shows_phriend_only_to_allowed_users(self, _enqueue):
 		bootinfo = frappe._dict()
 		boot_session(bootinfo)
-		self.assertEqual(bootinfo.phriend, {"enabled": 1})
+		self.assertEqual(bootinfo.phriend["enabled"], 1)
 		self.set_settings(allowed_role="No Such Role For Phriend")
 		bootinfo = frappe._dict()
 		boot_session(bootinfo)
 		self.assertNotIn("phriend", bootinfo)
+
+	def test_cockpits_boot_phriend_like_desk(self, _enqueue):
+		# the cockpits load no Desk boot: get_spa_boot carries the flag and the versions (#1900)
+		boot = get_spa_boot("/personal-cockpit")
+		self.assertEqual(boot.phriend["enabled"], 1)
+		self.assertTrue(boot.versions.get("phamos"))
+		self.set_settings(enabled=0)
+		boot = get_spa_boot("/personal-cockpit")
+		self.assertIsNone(boot.phriend)
+		self.assertEqual(boot.versions, {})  # only Phriend needs them
+
+	def test_badge_counts_open_reports_by_record_doctype_or_page(self, _enqueue):
+		on_record = self.report()  # about User Administrator
+		self.report(ref_docname="Guest")  # another User
+		on_page = self.report(ref_doctype=None, ref_docname=None, route="sales-cockpit/leads/follow-ups")
+		closed = self.report()
+		closed.db_set("status", "Closed")
+
+		self.assertEqual(api.count_open_reports(ref_doctype="User", ref_docname="Administrator"), 1)
+		self.assertEqual(api.count_open_reports(ref_doctype="User"), 2)
+		self.assertEqual(api.count_open_reports(route="sales-cockpit/leads/follow-ups"), 1)
+		self.assertEqual(api.count_open_reports(), 0)
+		self.assertTrue(on_record.name and on_page.name)
+
+		# not for this user: 0, and no message left in the response for the cockpit to show
+		frappe.clear_messages()
+		self.set_settings(allowed_role="No Such Role For Phriend")
+		self.assertEqual(api.count_open_reports(ref_doctype="User"), 0)
+		self.assertFalse(frappe.local.message_log)
+
+		# a filter operator smuggled in as an argument is taken as plain text
+		self.set_settings(allowed_role="System Manager")
+		self.assertEqual(api.count_open_reports(ref_doctype=["like", "%"]), 0)
+
+	def test_first_step_lists_the_open_reports_about_this_page(self, _enqueue):
+		# "Already reported here?" on the first step (PM, 2026-11-15)
+		older = self.report(title="Older one")
+		newer = self.report(title="Newer one", report_type="Idea")
+		closed = self.report(title="Done already")
+		closed.db_set("status", "Closed")
+		self.report(title="About another user", ref_docname="Guest")
+		frappe.db.set_value("Issue", older.name, "creation", "2026-01-01 10:00:00")
+
+		result = api.get_open_reports(ref_doctype="User", ref_docname="Administrator")
+
+		self.assertEqual(result["count"], 2)
+		self.assertEqual([r["name"] for r in result["reports"]], [newer.name, older.name])  # newest first
+		first = result["reports"][0]
+		self.assertEqual(first["title"], "Newer one")  # without "[Idea] "
+		self.assertEqual(first["type"], "Idea")
+		self.assertTrue(first["when"])
+
+		for i in range(5):
+			self.report(title=f"Many {i}")
+		many = api.get_open_reports(ref_doctype="User", ref_docname="Administrator")
+		self.assertEqual((many["count"], len(many["reports"])), (7, 5))  # all counted, five listed
+
+		nothing = {"count": 0, "capped": False, "reports": []}
+		self.assertEqual(api.get_open_reports(), nothing)
+		self.set_settings(allowed_role="No Such Role For Phriend")
+		self.assertEqual(api.get_open_reports(ref_doctype="User"), nothing)
+
+	def test_open_reports_only_for_records_and_issues_the_user_may_read(self, _enqueue):
+		# a report's title says something about its record: don't answer for records one can't read
+		self.report(title="About the Administrator user")
+		self.set_settings(allowed_role="")
+		guest_like = "phriend-no-read@example.com"
+		if not frappe.db.exists("User", guest_like):
+			frappe.get_doc({"doctype": "User", "email": guest_like, "first_name": "No Read",
+				"send_welcome_email": 0}).insert(ignore_permissions=True)
+		frappe.set_user(guest_like)
+		frappe.clear_messages()
+		self.assertEqual(api.get_open_reports(ref_doctype="User", ref_docname="Administrator")["count"], 0)
+		self.assertEqual(api.count_open_reports(ref_doctype="User", ref_docname="Administrator"), 0)
+		self.assertEqual(api.get_open_reports(ref_doctype="No Such DocType")["count"], 0)
+		self.assertFalse(frappe.local.message_log)
+
+	# ---- keyboard shortcut (#1900)
+
+	def test_shortcuts_are_written_one_way_and_risky_ones_are_refused(self, _enqueue):
+		self.assertEqual(shortcut.normalize("cmd+p"), "Mod+P")
+		self.assertEqual(shortcut.normalize(" shift + command + k "), "Mod+Shift+K")
+		self.assertEqual(shortcut.normalize("Ctrl+F5"), "Ctrl+F5")
+		self.assertEqual(shortcut.normalize(""), "")
+		# the examples the browser side's test (shortcut.test.js) checks too: both sides agree
+		with open(frappe.get_app_path("phamos", "public", "js", "phriend", "shortcut_rules.json")) as f:
+			examples = json.load(f)["examples"]
+		for good in examples["allowed"]:
+			with self.subTest(allowed=good):
+				self.assertEqual(shortcut.normalize(good), good)
+		for bad in examples["refused"] + ["Hyper+P", "Option+L"]:
+			with self.subTest(refused=bad), self.assertRaises(frappe.ValidationError):
+				shortcut.normalize(bad)
+
+	def test_each_user_can_change_switch_off_or_reset_their_shortcut(self, _enqueue):
+		self.addCleanup(frappe.defaults.clear_user_default, shortcut.USER_DEFAULT)
+		self.set_settings(shortcut="Mod+P")
+		self.assertEqual(phriend_boot()["shortcut"], "Mod+P")
+
+		self.assertEqual(api.set_my_shortcut("cmd+shift+k"), "Mod+Shift+K")
+		self.assertEqual(phriend_boot(), {"enabled": 1, "shortcut": "Mod+Shift+K", "default_shortcut": "Mod+P"})
+
+		self.assertEqual(api.set_my_shortcut("Off"), "")
+		self.assertEqual(phriend_boot()["shortcut"], "")
+
+		self.assertEqual(api.set_my_shortcut(""), "Mod+P")  # back to the site's
+		with self.assertRaises(frappe.ValidationError):
+			api.set_my_shortcut("p")
+		self.assertEqual(phriend_boot()["shortcut"], "Mod+P")
+
+		# not for users Phriend isn't for
+		self.set_settings(allowed_role="No Such Role For Phriend")
+		with self.assertRaises(frappe.PermissionError):
+			api.set_my_shortcut("Mod+K")
+
+	def test_existing_sites_get_mod_p_once_and_an_empty_shortcut_stays_off(self, _enqueue):
+		self.addCleanup(self.set_settings, shortcut="Mod+P")
+		frappe.db.delete("Singles", {"doctype": "Phriend Settings", "field": "shortcut"})
+		setup.ensure_default_shortcut()
+		self.assertEqual(frappe.db.get_single_value("Phriend Settings", "shortcut"), "Mod+P")
+		frappe.db.set_single_value("Phriend Settings", "shortcut", "")
+		setup.ensure_default_shortcut()
+		self.assertEqual(frappe.db.get_single_value("Phriend Settings", "shortcut") or "", "")
+
+	def test_settings_save_the_shortcut_in_one_spelling(self, _enqueue):
+		doc = frappe.get_doc("Phriend Settings")
+		doc.shortcut = "command+shift+k"
+		doc.save()
+		self.assertEqual(doc.shortcut, "Mod+Shift+K")
 
 	# ---- Issue -> GitLab
 
