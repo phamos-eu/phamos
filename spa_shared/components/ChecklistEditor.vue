@@ -30,6 +30,7 @@
 					<button
 						v-if="canReorder"
 						type="button"
+						tabindex="-1"
 						class="-ml-1.5 mt-0.5 flex h-5 w-4 flex-shrink-0 cursor-grab touch-none items-center justify-center rounded text-ink-gray-4 opacity-0 hover:text-ink-gray-7 focus:outline-none focus-visible:opacity-100 focus-visible:ring-2 focus-visible:ring-outline-gray-4 group-hover:opacity-100 group-focus-visible:opacity-100"
 						:class="reorder?.name === item.name ? 'cursor-grabbing opacity-100' : ''"
 						:title="__('Drag to move, or Alt+↑/↓')"
