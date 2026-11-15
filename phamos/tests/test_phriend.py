@@ -3,10 +3,12 @@ bench --site <site> run-tests --module phamos.tests.test_phriend
 """
 
 import base64
+import io
 from unittest.mock import MagicMock, patch
 
 import frappe
 from frappe.tests.utils import FrappeTestCase
+from PIL import Image
 
 from phamos.phriend import api, setup
 from phamos.phriend.boot import boot_session
@@ -120,6 +122,25 @@ class TestPhriend(FrappeTestCase):
 
 		issue = self.report(title=None, page_title="", ref_doctype=None, ref_docname=None, route="Workspaces/Home")
 		self.assertEqual(issue.subject, "[Bug] Workspaces/Home")
+
+	def test_a_long_page_title_still_fits_the_subject(self, _enqueue):
+		# a skipped title becomes the page name, which the client sends unchecked (review of !1160)
+		issue = self.report(title="", page_title="Very long page " * 30)
+		self.assertTrue(issue.subject.startswith("[Bug] Very long page"))
+		self.assertLessEqual(len(issue.subject), 140)
+
+	def test_jpeg_screenshot_is_saved_as_jpg(self, _enqueue):
+		# the flow sends JPEG when it is smaller than PNG (#1899)
+		buffer = io.BytesIO()
+		Image.new("RGB", (4, 4), (17, 17, 17)).save(buffer, format="JPEG")
+		jpeg = "data:image/jpeg;base64," + base64.b64encode(buffer.getvalue()).decode()
+
+		issue = self.report(screenshot=jpeg)
+
+		self.assertTrue(issue.phriend_screenshot.endswith(f"phriend-{issue.name}.jpg"))
+		file_doc = frappe.get_doc("File", {"file_url": issue.phriend_screenshot})
+		self.assertEqual(file_doc.get_content()[:3], b"\xff\xd8\xff")  # JPEG magic bytes
+		self.assertTrue(file_doc.is_private)
 
 	def test_unknown_doctype_and_type_are_dropped(self, _enqueue):
 		issue = self.report(ref_doctype="No Such DocType", report_type="Rant", priority="Whenever")

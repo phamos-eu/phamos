@@ -24,7 +24,11 @@ export function sleep(ms) {
 
 export function with_timeout(promise, ms, what = "Screenshot") {
 	return new Promise((resolve, reject) => {
-		const timer = setTimeout(() => reject(new Error(`${what} timed out after ${ms} ms`)), ms);
+		const timer = setTimeout(() => {
+			const error = new Error(`${what} timed out after ${ms} ms`);
+			error.timed_out = true; // slow, not broken: callers may treat it differently
+			reject(error);
+		}, ms);
 		promise.then(
 			(value) => {
 				clearTimeout(timer);
