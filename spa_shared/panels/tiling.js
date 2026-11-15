@@ -316,3 +316,102 @@ export function withAll(tree, ids, places = {}) {
 export function touched(opened, id) {
 	return [...(opened || []).filter((x) => x !== id), id]
 }
+
+/** The tree without panel `id`; a split left with one child is replaced by it. */
+export function remove(tree, id) {
+	if (!tree) return null
+	if (!isSplit(tree)) return tree.panel === id ? null : tree
+	const kept = []
+	tree.children.forEach((child, i) => {
+		const next = remove(child, id)
+		if (next) kept.push({ node: next, size: tree.sizes[i] })
+	})
+	if (!kept.length) return null
+	if (kept.length === 1) return kept[0].node
+	return { split: tree.split, sizes: normalize(kept.map((k) => k.size)), children: kept.map((k) => k.node) }
+}
+
+/** The share a panel gets when it is put on an edge of the whole page. */
+export const PAGE_EDGE_SHARE = 0.3
+
+/**
+ * The tree with panel `id` moved (#1916): to `side` of panel `target`, halving it, or with
+ * `target` null to `side` of the whole page: full width at the top or bottom, full height on the
+ * left or right. Moving a panel onto itself changes nothing.
+ */
+export function move(tree, id, target, side) {
+	if (target === id) return tree
+	const rest = remove(clone(tree), id)
+	if (!rest) return { panel: id }
+	if (target) return insertNear(rest, id, target, side)
+	const axis = side === "left" || side === "right" ? "row" : "column"
+	const before = side === "left" || side === "top"
+	const leaf = { panel: id }
+	if (isSplit(rest) && rest.split === axis) {
+		const sizes = rest.sizes.map((s) => s * (1 - PAGE_EDGE_SHARE))
+		return {
+			split: axis,
+			sizes: before ? [PAGE_EDGE_SHARE, ...sizes] : [...sizes, PAGE_EDGE_SHARE],
+			children: before ? [leaf, ...rest.children] : [...rest.children, leaf],
+		}
+	}
+	return {
+		split: axis,
+		sizes: before ? [PAGE_EDGE_SHARE, 1 - PAGE_EDGE_SHARE] : [1 - PAGE_EDGE_SHARE, PAGE_EDGE_SHARE],
+		children: before ? [leaf, rest] : [rest, leaf],
+	}
+}
+
+/** The tree with panels `a` and `b` in each other's place; sizes stay with the places. */
+export function swap(tree, a, b) {
+	if (a === b) return tree
+	const walk = (node) => {
+		if (!isSplit(node)) return { panel: node.panel === a ? b : node.panel === b ? a : node.panel }
+		return { split: node.split, sizes: [...node.sizes], children: node.children.map(walk) }
+	}
+	return tree ? walk(tree) : tree
+}
+
+/**
+ * Where a drop at (x, y) lands, for the drag of a panel's title bar (#1916): within `edge` px of
+ * the page's border → { target: null, side } (whole page); inside a tile → its centre third swaps
+ * ({ target, side: "center" }), elsewhere the nearest edge splits it. `tiles` and the point are in
+ * the page's coordinates; `size` is the page's { w, h }.
+ */
+export function dropAt(x, y, tiles, size, edge = 24) {
+	if (x < 0 || y < 0 || x > size.w || y > size.h) return null
+	const page = [
+		["left", x],
+		["right", size.w - x],
+		["top", y],
+		["bottom", size.h - y],
+	].sort((p, q) => p[1] - q[1])[0]
+	if (page[1] <= edge) return { target: null, side: page[0] }
+	const tile = tiles.find((t) => x >= t.x && x <= t.x + t.w && y >= t.y && y <= t.y + t.h)
+	if (!tile) return null
+	const fx = (x - tile.x) / tile.w
+	const fy = (y - tile.y) / tile.h
+	if (fx > 1 / 3 && fx < 2 / 3 && fy > 1 / 3 && fy < 2 / 3) return { target: tile.id, side: "center" }
+	const sides = [
+		["left", fx],
+		["right", 1 - fx],
+		["top", fy],
+		["bottom", 1 - fy],
+	].sort((p, q) => p[1] - q[1])
+	return { target: tile.id, side: sides[0][0] }
+}
+
+/** The tree after a drop from `dropAt`. */
+export function dropped(tree, id, drop) {
+	if (!drop) return tree
+	if (drop.side === "center") return swap(tree, id, drop.target)
+	return move(tree, id, drop.target, drop.side)
+}
+
+/**
+ * The stored opening order, or the default when there is none: an empty list counts as none (a
+ * layout saved by an older version, or cleaned on the server, has `opened: []`).
+ */
+export function openingOrder(stored, fallback = []) {
+	return Array.isArray(stored) && stored.length ? stored : fallback
+}
