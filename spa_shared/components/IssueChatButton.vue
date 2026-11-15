@@ -1,7 +1,8 @@
 <template>
 	<template v-if="state.enabled">
-		<!-- Below lg the chat is an overlay this button toggles; from lg on it is a column that is
-		     always there, so the button steps aside. -->
+		<!-- The chat is an overlay this button toggles. On the Issue view from lg on it is the dock's
+		     chat panel (#1911): while that is expanded the button steps aside, while it is collapsed
+		     the button expands it. -->
 		<Button
 			v-if="!docked"
 			ref="buttonRef"
@@ -127,6 +128,11 @@ const buttonRef = ref(null)
 const panelRef = ref(null)
 const loading = ref(true)
 const docked = computed(() => Boolean(panelRef.value?.inColumn))
+// The view has a dock with this record's chat panel, expanded or not (panels/ChatDockHost.vue).
+const dockable = computed(() => {
+	const host = issueChatStore.dockHost
+	return Boolean(host?.record === props.recordName && host.available)
+})
 const unreadTotal = computed(() => totalUnread(state.value))
 
 const buttonLabel = computed(() => {
@@ -191,6 +197,11 @@ async function honourOpenRequest() {
 	await nextTick()
 	if (issueChatStore.openRequest !== props.recordName) return
 	const target = issueChatStore.openTarget
+	if (dockable.value && !docked.value) {
+		// Expand the collapsed chat panel first; the chat then lays itself into it.
+		issueChatStore.expandRequest = { record: props.recordName, panel: "chat" }
+		await becomes(docked)
+	}
 	if (docked.value) {
 		// The column already shows the chat; go to the message the list pointed at.
 		issueChatStore.openRequest = null
@@ -209,6 +220,20 @@ async function honourOpenRequest() {
 	if (!drawerOpen.value) await onClick()
 	await nextTick()
 	panelRef.value?.focusTarget(target)
+}
+
+/** Resolves once `flag` is true, or after `ms` (the dock may not expand, e.g. it unmounted). */
+function becomes(flag, ms = 1500) {
+	if (flag.value) return Promise.resolve()
+	return new Promise((resolve) => {
+		const timer = setTimeout(done, ms)
+		const stop = watch(flag, (value) => value && done())
+		function done() {
+			clearTimeout(timer)
+			stop()
+			resolve()
+		}
+	})
 }
 
 /** Start or join the chat; true when the user is in it afterwards. */
@@ -238,6 +263,11 @@ async function onClick() {
 		return refresh()
 	}
 	if (!(await ensure())) return
+	if (dockable.value) {
+		// The chat panel is there but collapsed: expand it instead of covering the page.
+		issueChatStore.expandRequest = { record: props.recordName, panel: "chat" }
+		return
+	}
 	// Raven marks the channel read once it is open (its threads stay unread until opened).
 	state.value = { ...state.value, unread: 0 }
 	drawerOpen.value = true
@@ -245,6 +275,32 @@ async function onClick() {
 }
 
 watch(() => issueChatStore.openRequest, honourOpenRequest)
+
+// The chat panel was expanded: Raven marks the channel read once it shows.
+watch(docked, (isDocked) => {
+	if (!isDocked || !state.value.unread) return
+	state.value = { ...state.value, unread: 0 }
+	chatChanged()
+})
+
+// What the dock's chat row shows while collapsed (#1911): whether there is a chat, and unread.
+const rowSummary = computed(() => {
+	if (loading.value) return ""
+	if (!state.value.channel_id) return __("No chat yet")
+	if (!state.value.is_member) return __("You are not in this chat yet.")
+	return unreadSummary(state.value)
+})
+watch(
+	[() => props.recordName, () => state.value.enabled, rowSummary],
+	([record, enabled, summary], previous) => {
+		const before = previous?.[0]
+		if (before && before !== record) delete issueChatStore.chats[before]
+		// `enabled` is kept while the next record loads (see the recordName watch), so the panel
+		// and its Raven frame stay instead of blinking.
+		issueChatStore.chats[record] = { enabled: Boolean(enabled), summary }
+	},
+	{ immediate: true }
+)
 
 watch(
 	() => props.recordName,
@@ -284,5 +340,8 @@ useUserRealtime("raven:unread_thread_count_updated", () => {
 onDeactivated(() => {
 	drawerOpen.value = false
 })
-onBeforeUnmount(() => clearTimeout(refreshTimer))
+onBeforeUnmount(() => {
+	clearTimeout(refreshTimer)
+	delete issueChatStore.chats[props.recordName]
+})
 </script>

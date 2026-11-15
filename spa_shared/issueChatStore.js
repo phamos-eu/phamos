@@ -3,8 +3,18 @@
 import { reactive } from "vue"
 
 export const issueChatStore = reactive({
-	/** Issue whose chat is open; IssuesInbox shows the chat column for it */
+	/** Issue whose chat shows in the page (the dock's chat panel or the overlay) */
 	openFor: null,
+	/**
+	 * The chat panel of the dock (#1911): { record, expanded, available }. The chat lays itself into
+	 * that panel while it is expanded and available; otherwise the chat button opens the overlay
+	 * or, where the panel is available but collapsed, asks the dock to expand it.
+	 */
+	dockHost: null,
+	/** Asks the dock to expand a panel: { record, panel } */
+	expandRequest: null,
+	/** Per record, what the chat button knows, for the dock row: { enabled, summary } */
+	chats: {},
 	/** Issue name whose chat should open once that Issue is shown */
 	openRequest: null,
 	/** Where in that chat: { messageId, threadId } (either may be null) */

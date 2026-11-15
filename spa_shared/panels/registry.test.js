@@ -58,11 +58,23 @@ describe("panelsFor", () => {
 	})
 
 	it("puts the user's order above the cockpit's and ignores unknown ids", () => {
-		const layout = { order: ["gone", "chat", "checklists"] }
+		const layout = { order: ["gone", "chat", "checklists", "phriend"] }
 		expect(ids(panelsFor(all, { doctype: "Issue", record: { phriend: {} }, layout }))).toEqual([
 			"chat",
 			"checklists",
 			"phriend",
+		])
+	})
+
+	it("keeps a panel the user never ordered at its declared place", () => {
+		// the user ordered phriend and checklists before the chat existed (order 5)
+		const early = definePanel({ id: "early", doctypes: ["Issue"], order: 1 })
+		const layout = { order: ["checklists", "phriend"] }
+		expect(ids(panelsFor([early, ...all], { doctype: "Issue", record: { phriend: {} }, layout }))).toEqual([
+			"early",
+			"checklists",
+			"phriend",
+			"chat",
 		])
 	})
 
@@ -89,6 +101,21 @@ describe("dockWidth", () => {
 		expect(dockWidth(panels, undefined)).toBe(DEFAULT_DOCK_WIDTH)
 		expect(dockWidth(panels, 400)).toBe(400)
 	})
+	it("is 768 while the chat is expanded and falls back when it is collapsed", () => {
+		const withChat = (expanded) => panels.map((p) => ({ ...p, expanded: p.def.id === "chat" ? expanded : p.expanded }))
+		expect(dockWidth(withChat(true), undefined)).toBe(768)
+		expect(dockWidth(withChat(false), undefined)).toBe(DEFAULT_DOCK_WIDTH)
+		expect(dockWidth(withChat(false), 500)).toBe(500)
+	})
+
+	it("keeps a separate width while the chat is expanded", () => {
+		const withChat = (expanded) => panels.map((p) => ({ ...p, expanded: p.def.id === "chat" ? expanded : p.expanded }))
+		expect(dockWidth(withChat(true), 400, 900)).toBe(900)
+		expect(dockWidth(withChat(false), 400, 900)).toBe(400)
+		// never below what the chat needs
+		expect(dockWidth(withChat(true), 400, 500)).toBe(768)
+	})
+
 	it("widens while a wide panel is expanded and clamps", () => {
 		const open = panels.map((p) => ({ ...p, expanded: true }))
 		expect(dockWidth(open, 400)).toBe(768)
