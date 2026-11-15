@@ -110,6 +110,17 @@ class TestPhriend(FrappeTestCase):
 		self.assertTrue(frappe.db.exists("ToDo", {"reference_type": "Issue", "reference_name": issue.name,
 			"allocated_to": other[0]}))
 
+	def test_report_without_a_title_is_named_after_the_page(self, _enqueue):
+		# every step of the flow can be skipped (#1899): no title, no comment, no screenshot
+		issue = self.report(title="", comment="", page_title="User Administrator")
+		self.assertEqual(issue.subject, "[Bug] User Administrator")
+
+		issue = self.report(title="  ", page_title=None)
+		self.assertEqual(issue.subject, "[Bug] User Administrator")  # from the record
+
+		issue = self.report(title=None, page_title="", ref_doctype=None, ref_docname=None, route="Workspaces/Home")
+		self.assertEqual(issue.subject, "[Bug] Workspaces/Home")
+
 	def test_unknown_doctype_and_type_are_dropped(self, _enqueue):
 		issue = self.report(ref_doctype="No Such DocType", report_type="Rant", priority="Whenever")
 		self.assertFalse(issue.phriend_ref_doctype)

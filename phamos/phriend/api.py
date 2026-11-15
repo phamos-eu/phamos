@@ -42,7 +42,7 @@ def _check_allowed():
 
 @frappe.whitelist(methods=["POST"])
 def create_report(
-	title,
+	title=None,
 	comment=None,
 	report_type="Bug",
 	priority="Medium",
@@ -52,12 +52,15 @@ def create_report(
 	ref_docname=None,
 	context=None,
 	screenshot=None,
+	page_title=None,
 ):
+	"""Every step of the report flow can be skipped, so only the page is required (#1899).
+
+	`page_title` is what the flow showed as "Reported on" (for example "Issue ISS-2026-00012");
+	an empty title becomes that.
+	"""
 	settings = _check_allowed()
 
-	title = cstr(title).strip()
-	if not title:
-		frappe.throw(_("Please give the report a title"))
 	if report_type not in REPORT_TYPES:
 		report_type = "Bug"
 	if priority not in PRIORITIES:
@@ -67,6 +70,8 @@ def create_report(
 	# a form that is not saved yet ("new-sales-order-1") has no document to link; the route keeps the name
 	if not ref_doctype or (ref_docname and not frappe.db.exists(ref_doctype, ref_docname)):
 		ref_docname = None
+
+	title = cstr(title).strip() or _built_title(page_title, route, ref_doctype, ref_docname)
 
 	reporter = frappe.session.user
 	reporter_name = _full_name(reporter)
@@ -116,6 +121,17 @@ def create_report(
 	)
 
 	return {"name": issue.name}
+
+
+def _built_title(page_title, route, ref_doctype, ref_docname):
+	"""The title of a report whose title step was skipped: where it was reported."""
+	if cstr(page_title).strip():
+		return cstr(page_title).strip()
+	if ref_doctype and ref_docname:
+		return f"{_(ref_doctype)} {ref_docname}"
+	if ref_doctype:
+		return _(ref_doctype)
+	return cstr(route).strip() or _("a page")
 
 
 def _full_name(user):
