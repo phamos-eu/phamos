@@ -38,10 +38,6 @@
 						@click.stop
 						@keydown.enter.stop.prevent
 						@pointerdown.stop="(e) => startReorder(item, e)"
-						@pointermove="onReorder"
-						@pointerup="endReorder"
-						@pointercancel="cancelReorder"
-						@lostpointercapture="cancelReorder"
 					>
 						<FeatherIcon name="more-vertical" class="h-4 w-4" />
 					</button>
@@ -509,7 +505,19 @@ function startReorder(item, event) {
 		return { top: (r?.top || 0) - listTop, height: r?.height || 0 }
 	})
 	reorder.value = { name: item.name, from, to: from, saving: false }
-	event.currentTarget.setPointerCapture(event.pointerId)
+	// Follow the pointer on the window, not with pointer capture on the grip: the live order moves
+	// the dragged item's element in the DOM (always when it moves up), and moving an element
+	// releases its pointer capture, which ended every upward drag at once.
+	event.preventDefault() // no text selection while dragging
+	window.addEventListener("pointermove", onReorder)
+	window.addEventListener("pointerup", endReorder)
+	window.addEventListener("pointercancel", cancelReorder)
+}
+
+function stopFollowing() {
+	window.removeEventListener("pointermove", onReorder)
+	window.removeEventListener("pointerup", endReorder)
+	window.removeEventListener("pointercancel", cancelReorder)
 }
 
 function onReorder(event) {
@@ -521,6 +529,7 @@ function onReorder(event) {
 }
 
 async function endReorder() {
+	stopFollowing()
 	const r = reorder.value
 	if (!r || r.saving) return
 	if (r.to === r.from) return cancelReorder()
@@ -533,6 +542,7 @@ async function endReorder() {
 }
 
 function cancelReorder() {
+	stopFollowing()
 	if (!reorder.value?.saving) reorder.value = null
 }
 
@@ -665,6 +675,7 @@ onMounted(() => {
 onBeforeUnmount(() => {
 	document.removeEventListener("click", onDocClick)
 	document.removeEventListener("keydown", onKeydown)
+	stopFollowing()
 })
 
 async function saveField(item, field, value, event = null) {
