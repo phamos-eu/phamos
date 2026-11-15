@@ -34,6 +34,7 @@ from phamos.api.issue_common import get_form_options as _base_form_options
 from phamos.api.issue_common import set_assignees as _set_assignees
 from phamos.api.issue_common import update_status as _update_status
 from phamos.api.presence import assert_fields_unlocked
+from phamos.phriend.report import issue_report
 
 ISSUE_EDITABLE_FIELDS = ("subject", "description", "priority", "issue_type", "project")
 TASK_EDITABLE_FIELDS = (
@@ -515,6 +516,8 @@ def _serialize_issue_detail(doc):
 		"assignee_images": _user_images(assignees),
 		"converted_task": _converted_task_for_issue(doc.name),
 		"desk_url": f"/app/issue/{doc.name}",
+		# what Phriend captured, for the report section on the Issue page (#1901)
+		"phriend": issue_report(doc),
 	}
 
 
