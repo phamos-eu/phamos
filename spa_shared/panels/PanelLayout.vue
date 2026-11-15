@@ -69,7 +69,7 @@
 					<div
 						:id="tileId(tile.id)"
 						class="min-h-0 flex-1"
-						:class="defOf(tile.id)?.bare ? 'flex flex-col overflow-hidden' : 'overflow-y-auto px-4 py-3'"
+						:class="defOf(tile.id)?.bare ? 'flex flex-col overflow-hidden' : 'overflow-y-auto p-2'"
 					/>
 				</section>
 
