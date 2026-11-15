@@ -198,7 +198,9 @@ class TestPhriend(FrappeTestCase):
 		self.assertEqual(boot.phriend, {"enabled": 1})
 		self.assertTrue(boot.versions.get("phamos"))
 		self.set_settings(enabled=0)
-		self.assertIsNone(get_spa_boot("/personal-cockpit").phriend)
+		boot = get_spa_boot("/personal-cockpit")
+		self.assertIsNone(boot.phriend)
+		self.assertEqual(boot.versions, {})  # only Phriend needs them
 
 	def test_badge_counts_open_reports_by_record_doctype_or_page(self, _enqueue):
 		on_record = self.report()  # about User Administrator

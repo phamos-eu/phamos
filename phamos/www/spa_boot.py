@@ -24,6 +24,7 @@ def get_spa_boot(default_route):
 	i18n.js) translates like `__()` in Desk (#1605). English needs no table.
 	"""
 	lang = frappe.local.lang or "en"
+	phriend = phriend_boot()
 	tz = {
 		"system": get_system_timezone(),
 		"user": frappe.db.get_value("User", frappe.session.user, "time_zone")
@@ -47,9 +48,9 @@ def get_spa_boot(default_route):
 				"full_name": frappe.utils.get_fullname(),
 			},
 			# Phriend, the report-a-problem ball, in every cockpit (#1900): whether it shows,
-			# and the app versions it adds to a report (Desk boots both the same way).
-			"phriend": phriend_boot(),
-			"versions": _app_versions(),
+			# and the app versions it adds to a report. Only for users Phriend is for.
+			"phriend": phriend,
+			"versions": _app_versions() if phriend else {},
 		}
 	)
 

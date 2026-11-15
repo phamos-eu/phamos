@@ -56,7 +56,11 @@ export function mountPhriend(router, heading) {
 			return ctx
 		},
 		load_flow: () => import("@phriend/flow"),
-		issue_url: (name) => router.resolve({ name: "IssueDetail", params: { name } }).href,
+		// every cockpit has IssueDetail (spa_shared/router.js); Desk for a cockpit that one day hasn't
+		issue_url: (name) =>
+			router.hasRoute("IssueDetail")
+				? router.resolve({ name: "IssueDetail", params: { name } }).href
+				: `/app/issue/${encodeURIComponent(name)}`,
 		count_reports: () => call(COUNT_METHOD, badgeArgs(current()), window.csrf_token),
 		open_reports: () => window.open(reportsUrl(current()), "_blank", "noopener"),
 		on_route_change: (callback) => router.afterEach(() => callback()),
