@@ -116,8 +116,10 @@ export class Annotator {
 			this.redraw();
 		});
 		const stop = () => {
-			// a click without dragging leaves nothing behind
-			if (current && this.size_of(current) < current.w * 2) {
+			// a click without dragging leaves nothing behind; a black-out bar may be as small as
+			// one character, so only a bare click is dropped there
+			const min = current && current.type === "redact" ? current.w / 2 : current && current.w * 2;
+			if (current && this.size_of(current) < min) {
 				this.shapes.pop();
 				this.redraw();
 			}
@@ -216,10 +218,11 @@ export class Annotator {
 	// bar is too small for it (the stripes still show it was blacked out).
 	draw_redaction(s) {
 		const ctx = this.ctx;
-		const x = Math.min(s.x1, s.x2);
-		const y = Math.min(s.y1, s.y2);
-		const w = Math.abs(s.x2 - s.x1);
-		const h = Math.abs(s.y2 - s.y1);
+		// whole pixels, rounded outward: no edge pixel of the screenshot blends through
+		const x = Math.floor(Math.min(s.x1, s.x2));
+		const y = Math.floor(Math.min(s.y1, s.y2));
+		const w = Math.ceil(Math.max(s.x1, s.x2)) - x;
+		const h = Math.ceil(Math.max(s.y1, s.y2)) - y;
 		const unit = s.w / 4; // screenshot pixels per screen pixel when it was drawn
 
 		ctx.save();
@@ -241,7 +244,8 @@ export class Annotator {
 		const pad = 6 * unit;
 		let size = Math.min(h * 0.5, 13 * unit);
 		ctx.font = `700 ${size}px Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif`;
-		const spaced = () => ctx.measureText(text).width + text.length * size * 0.08;
+		const spacing = "letterSpacing" in ctx; // not in older Safari and Firefox
+		const spaced = () => ctx.measureText(text).width + (spacing ? text.length * size * 0.08 : 0);
 		let total = size * 1.2 + size * 0.5 + spaced(); // Phriend, gap, text
 		if (total > w - 2 * pad) {
 			size *= (w - 2 * pad) / total;
@@ -254,7 +258,7 @@ export class Annotator {
 			this.draw_mini_phriend(left + size * 0.6, mid, size * 0.6);
 			ctx.fillStyle = "rgba(255, 255, 255, 0.82)";
 			ctx.textBaseline = "middle";
-			if ("letterSpacing" in ctx) ctx.letterSpacing = `${size * 0.08}px`;
+			if (spacing) ctx.letterSpacing = `${size * 0.08}px`;
 			ctx.fillText(text, left + size * 1.7, mid + size * 0.05);
 		} else if (Math.min(w, h) >= 10 * unit) {
 			this.draw_mini_phriend(x + w / 2, y + h / 2, Math.min(w, h) * 0.3); // just the mark
