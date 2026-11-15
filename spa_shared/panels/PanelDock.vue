@@ -5,7 +5,11 @@
 		v-if="panels.length"
 		v-show="!allHidden"
 		class="relative flex min-h-0 min-w-0 flex-none flex-col border-r border-outline-gray-2 bg-surface-white"
-		:class="stacked ? 'w-[var(--dock-w)] lg:max-h-[45%] lg:w-auto lg:border-t' : 'w-[var(--dock-w)]'"
+		:class="
+			stacked
+				? 'w-[var(--dock-w)] max-w-[calc(100%-20rem)] lg:max-h-[45%] lg:w-auto lg:max-w-none lg:border-t'
+				: 'w-[var(--dock-w)] max-w-[calc(100%-20rem)]'
+		"
 		:style="{ '--dock-w': `${width}px` }"
 		:aria-label="__('Panels')"
 	>
@@ -105,17 +109,23 @@ const dragWidth = ref(null)
 const dragging = ref(false)
 const width = computed(() => dockWidth(panels.value, dragWidth.value ?? layout.get().width))
 let dragStart = null
+const REM = typeof document !== "undefined" ? parseFloat(getComputedStyle(document.documentElement).fontSize) || 16 : 16
 
 function startDrag(event) {
 	dragging.value = true
-	dragStart = { x: event.clientX, width: width.value }
+	// from the rendered width: the record keeps at least 20rem (max-w above), so a stored
+	// width can be wider than what is shown on a small screen
+	const shown = event.currentTarget.parentElement.getBoundingClientRect().width
+	dragStart = { x: event.clientX, width: shown || width.value }
 	event.currentTarget.setPointerCapture(event.pointerId)
 }
 
 function drag(event) {
 	if (!dragStart) return
 	// the dock sits right of the record: dragging its left edge leftwards widens it
-	dragWidth.value = clamp(dragStart.width + dragStart.x - event.clientX, MIN_DOCK_WIDTH, MAX_DOCK_WIDTH)
+	const room = event.currentTarget.parentElement.parentElement.clientWidth - REM * 20
+	const max = Math.max(MIN_DOCK_WIDTH, Math.min(MAX_DOCK_WIDTH, room))
+	dragWidth.value = clamp(dragStart.width + dragStart.x - event.clientX, MIN_DOCK_WIDTH, max)
 }
 
 function endDrag() {
