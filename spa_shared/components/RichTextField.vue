@@ -2,7 +2,7 @@
 	<div
 		ref="root"
 		class="relative"
-		:class="$attrs.class"
+		:class="[$attrs.class, `rtf-images-${imageSize}`]"
 		@focusin="onFocusIn"
 		@focusout="onFocusOut"
 	>
@@ -29,9 +29,10 @@
 			:class="editorRootClass"
 			:content="editorContent"
 			:editable="editable && !lockedBy"
-			:fixed-menu="editable && !lockedBy ? fixedMenu : false"
+			:fixed-menu="editable && !lockedBy ? menu : false"
 			:placeholder="placeholder"
 			:editor-class="editorClass"
+			:extensions="extensions"
 			@change="onChange"
 		/>
 		<!-- Content outside the box (scrollHint): fades at the clipped edges and "More below". -->
@@ -82,6 +83,10 @@ import { normalizeHtml } from "@spa/utils/autosaveCore.js"
 import { lockExplanation, lockHeadline } from "@spa/utils/fieldLockText.js"
 import { scrollOverflow } from "@spa/utils/scrollOverflow.js"
 import { __ } from "@spa/utils/i18n.js"
+import { h, markRaw } from "vue"
+import { ResizableImage } from "@spa/editor/resizableImage.js"
+import { useImageSize } from "@spa/composables/useImageSize.js"
+import { IMAGE_SIZES } from "@spa/utils/imageSize.js"
 
 defineOptions({ inheritAttrs: false })
 
@@ -103,6 +108,26 @@ const props = defineProps({
 })
 
 const emit = defineEmits(["update:modelValue", "focus", "blur"])
+
+// Images (#1918): a stored width with a resize handle, and a per-user cap for all images of every
+// field (small / medium / large), switched from the toolbar.
+const extensions = [ResizableImage]
+const { imageSize, setImageSize } = useImageSize()
+const SIZE_LABELS = { small: "Small images", medium: "Medium images", large: "Large images" }
+// the toolbar shows the active option's "icon": a letter
+const letterIcon = (letter) => markRaw({ render: () => h("span", { class: "inline-flex h-4 w-4 items-center justify-center text-[11px] font-semibold leading-none" }, letter) })
+const sizeOptions = IMAGE_SIZES.map((size) => ({
+	label: __(SIZE_LABELS[size]),
+	icon: letterIcon(size[0].toUpperCase()), // S / M / L, like clothing sizes; the labels are translated
+	isActive: () => imageSize.value === size,
+	action: () => setImageSize(size),
+}))
+// Every cockpit field passes its toolbar as an array (a list of frappe-ui button names), and the
+// size group joins it. `false` means no toolbar at all (read-only, locked); then there is nothing
+// to add it to.
+const menu = computed(() =>
+	Array.isArray(props.fixedMenu) ? [...props.fixedMenu, "Separator", sizeOptions] : props.fixedMenu
+)
 
 const root = ref(null)
 const editorRef = ref(null)

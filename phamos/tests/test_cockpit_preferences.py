@@ -23,7 +23,7 @@ class CockpitPreferencesTestCase(FrappeTestCase):
 		frappe.db.rollback()
 
 	def test_default_when_nothing_is_stored(self):
-		self.assertEqual(prefs.get_preferences(), {KEY: {}})
+		self.assertEqual(prefs.get_preferences(), {KEY: {}, "cockpit_image_size": "large"})
 
 	def test_round_trip_through_boot(self):
 		tree = {
@@ -76,6 +76,16 @@ class CockpitPreferencesTestCase(FrappeTestCase):
 		tree = prefs._clean_panel_layout(value)["Issue"]["tree"]
 		self.assertEqual(tree["sizes"], [0.5, 0.5])
 		json.loads(json.dumps(tree), parse_constant=lambda c: self.fail(f"{c} stored"))
+
+	def test_image_size(self):
+		self.assertEqual(prefs.get_preferences()["cockpit_image_size"], "large")
+		self.assertEqual(prefs.set_preference("cockpit_image_size", json.dumps("small")), "small")
+		self.assertEqual(prefs.get_preferences()["cockpit_image_size"], "small")
+		self.assertEqual(prefs.set_preference("cockpit_image_size", "medium"), "medium")
+		with self.assertRaises(frappe.ValidationError):
+			prefs.set_preference("cockpit_image_size", "huge")
+		prefs.set_preference("cockpit_image_size", "")
+		self.assertEqual(prefs.get_preferences()["cockpit_image_size"], "large")
 
 	def test_deep_trees_are_cut(self):
 		node = {"panel": "deepest"}
