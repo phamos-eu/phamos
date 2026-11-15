@@ -131,8 +131,7 @@ class Flow {
 				<footer>
 					<button type="button" class="btn" data-back>${escape_html(__("Back"))}</button>
 					<span class="grow"></span>
-					<span class="hint">${escape_html(__("Ctrl+Enter sends"))}</span>
-					<button type="button" class="btn ghost" data-send-now>${escape_html(__("Send now"))}</button>
+					<span class="hint" data-hint>${escape_html(__("Ctrl+Enter sends"))}</span>
 					<button type="button" class="btn" data-skip hidden>${escape_html(__("Skip"))}</button>
 					<button type="button" class="btn primary" data-next></button>
 				</footer>
@@ -151,7 +150,7 @@ class Flow {
 			summary: $('[data-pane="3"]'),
 			footer: $("footer"),
 			back: $("[data-back]"),
-			send_now: $("[data-send-now]"),
+			hint: $("[data-hint]"),
 			next: $("[data-next]"),
 			skip: $("[data-skip]"),
 		};
@@ -177,7 +176,6 @@ class Flow {
 			else if (t.hasAttribute("data-dot")) this.show(Number(t.dataset.dot));
 			else if (t.hasAttribute("data-back")) this.show(this.step - 1);
 			else if (t.hasAttribute("data-next")) this.step === LAST_STEP ? this.send() : this.show(this.step + 1);
-			else if (t.hasAttribute("data-send-now")) this.send();
 			else if (t.hasAttribute("data-skip")) this.skip_screenshot();
 			else if (t.hasAttribute("data-toggle-shot")) this.toggle_screenshot();
 			else if (t.dataset.type) this.choose("report_type", t.dataset.type, STEP.kind);
@@ -231,7 +229,9 @@ class Flow {
 		} else if (e.key === "Enter" && (e.ctrlKey || e.metaKey)) {
 			e.preventDefault();
 			e.stopPropagation();
-			if (this.el.back.isConnected) this.send(); // not while "Discard this report?" is asked
+			// what the main button does: on to the next step, send on the summary; nothing while
+			// "Discard this report?" is asked
+			if (this.el.back.isConnected) this.step === LAST_STEP ? this.send() : this.show(this.step + 1);
 		} else if (e.key === "Tab") {
 			this.trap_focus(e);
 		}
@@ -286,7 +286,9 @@ class Flow {
 		if (!this.el.back.isConnected) return; // the discard question is showing
 		const __ = this.__;
 		this.el.back.hidden = this.step === 0;
-		this.el.send_now.hidden = this.step === LAST_STEP;
+		// Sending happens on the summary only (PM, 2026-11-15): every report passes "Check and
+		// send", so nobody sends something they haven't seen.
+		this.el.hint.hidden = this.step !== LAST_STEP;
 		// The screenshot step: "Next" keeps the screenshot, "Skip" goes on without it (PM,
 		// 2026-11-15). Only while there is a screenshot to leave out.
 		const on_shot = this.step === STEP.shot;
@@ -541,7 +543,7 @@ class Flow {
 	restore_footer() {
 		this.el.footer.innerHTML = this.footer_html;
 		this.el.back = this.layer.querySelector("[data-back]");
-		this.el.send_now = this.layer.querySelector("[data-send-now]");
+		this.el.hint = this.layer.querySelector("[data-hint]");
 		this.el.next = this.layer.querySelector("[data-next]");
 		this.el.skip = this.layer.querySelector("[data-skip]");
 		this.update_footer();
