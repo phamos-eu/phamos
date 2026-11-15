@@ -1923,3 +1923,83 @@ Sep,Sep.
 Oct,Okt.
 Nov,Nov.
 Dec,Dez.
+Address,Adresse
+Arrow,Pfeil
+Box,Rahmen
+Browser,Browser
+Check and send,Prüfen und senden
+Ctrl+Enter sends,Strg+Enter sendet
+Describe what you see in the next step instead.,"Beschreiben Sie im nächsten Schritt, was Sie sehen."
+Discard,Verwerfen
+Discard this report? What you wrote and drew is lost.,"Diese Meldung verwerfen? Was Sie geschrieben und gezeichnet haben, geht verloren."
+"Draw an arrow to the problem, box it, write on it, or black out private data.","Zeichnen Sie einen Pfeil zum Problem, rahmen Sie es ein, schreiben Sie darauf oder schwärzen Sie private Daten."
+Drawing tools,Zeichenwerkzeuge
+Everything that is sent,"Alles, was gesendet wird"
+Got it! Saved as,Danke! Gespeichert als
+"Hi, I'm Phriend! Click me when something looks wrong.","Hallo, ich bin Phriend! Klicken Sie mich an, wenn etwas nicht stimmt."
+How urgent is it?,Wie dringend ist es?
+I filled in the company name and clicked Save. Nothing happened.,Ich habe den Firmennamen eingetragen und auf Speichern geklickt. Nichts ist passiert.
+In a few words,In wenigen Worten
+It goes out when you're back online.,"Sie wird gesendet, sobald Sie wieder online sind."
+Keep editing,Weiter bearbeiten
+Leave out the screenshot,Ohne Screenshot
+Log in,Anmelden
+No screenshot this time.,Diesmal gibt es keinen Screenshot.
+None,Keine
+One moment…,Einen Moment…
+Open it,Öffnen
+Page,Seite
+Phriend adds this for you,Das fügt Phriend für Sie hinzu
+Phriend couldn't start. Reload the page and try again.,Phriend konnte nicht starten. Laden Sie die Seite neu und versuchen Sie es noch einmal.
+Phriend: report a problem (Ctrl+Shift+B),Phriend: ein Problem melden (Strg+Umschalt+B)
+Problems on the page,Probleme auf der Seite
+Report a problem with Phriend,Ein Problem mit Phriend melden
+Report it?,Melden?
+Reported on: {0},Gemeldet auf: {0}
+Save does nothing on a new lead,Speichern tut nichts bei einem neuen Lead
+Screenshot,Screenshot
+Send now,Jetzt senden
+Send to Phriend,An Phriend senden
+Sending didn't work:,Senden hat nicht geklappt:
+Show what you mean,"Zeigen Sie, was Sie meinen"
+Skip,Überspringen
+Step {0} of 4,Schritt {0} von 4
+Taking a screenshot of the page…,Screenshot der Seite wird erstellt…
+Text,Text
+The report goes out without a screenshot.,Die Meldung wird ohne Screenshot gesendet.
+The server can't be reached.,Der Server ist nicht erreichbar.
+Try again,Erneut versuchen
+Type here…,Hier tippen…
+Undo,Rückgängig
+Use the screenshot,Mit Screenshot
+Version,Version
+"What did you do, and what did you expect?","Was haben Sie getan, und was haben Sie erwartet?"
+What is it?,Was ist es?
+What kind of report?,Welche Art von Meldung?
+"Whoops, that call failed.","Hoppla, da ist etwas schiefgegangen."
+Window,Fenster
+You have a report that wasn't sent.,"Sie haben eine Meldung, die nicht gesendet wurde."
+You're not allowed to send Phriend reports.,Sie dürfen keine Phriend-Meldungen senden.
+You're offline.,Sie sind offline.
+Your report is kept.,Ihre Meldung bleibt erhalten.
+Your session has expired.,Ihre Sitzung ist abgelaufen.
+no screenshot,ohne Screenshot
+unknown error,unbekannter Fehler
+with screenshot,mit Screenshot
+"{0} errors, {1} failed calls","{0} Fehler, {1} fehlgeschlagene Serveraufrufe"
+{0} open Phriend reports for this page,{0} offene Phriend-Meldungen zu dieser Seite
+Bug,Fehler
+Question,Frage
+Something is broken,Etwas funktioniert nicht
+It could be better,Es könnte besser sein
+I'm not sure how,"Ich weiß nicht, wie es geht"
+a page,eine Seite
+"Log in again in a new tab, then try again.",Melden Sie sich in einem neuen Tab neu an und versuchen Sie es dann erneut.
+Still sending your last report…,Ihre letzte Meldung wird noch gesendet…
+unexpected answer from the server,unerwartete Antwort vom Server
+This page is out of date.,Diese Seite ist nicht mehr aktuell.
+"Reload it to send your report; the text is kept, the screenshot is not.","Laden Sie sie neu, um Ihre Meldung zu senden; der Text bleibt erhalten, der Screenshot nicht."
+Reload,Neu laden
+Next,Weiter
+Black out private data,Private Daten schwärzen
+Redacted,Geschwärzt
