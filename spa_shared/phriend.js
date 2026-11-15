@@ -9,10 +9,16 @@ import { badgeArgs, pageContext } from "@spa/utils/phriendPage.js"
 
 const COUNT_METHOD = "phamos.phriend.api.count_open_reports"
 // Desk's Issue list, filtered to open Phriend reports (the cockpit Issue lists have no
-// filter for that yet)
-const REPORTS_URL = "/app/issue?status=Open&phriend_type=%5B%22is%22%2C%22set%22%5D"
+// filter for that yet). "Open" means what the badge counts: not Resolved or Closed.
+const REPORTS_URL =
+	"/app/issue?status=" +
+	encodeURIComponent(JSON.stringify(["not in", ["Resolved", "Closed"]])) +
+	"&phriend_type=" +
+	encodeURIComponent(JSON.stringify(["is", "set"]))
 
 let instance = null
+// failed calls before Phriend is mounted (the first calls of a page), handed over on mount
+const early = []
 
 function boot() {
 	return (typeof window !== "undefined" && window.frappe?.boot) || {}
@@ -25,6 +31,7 @@ function boot() {
  * @param {() => string} heading  the page heading the shell shows, for "Reported on"
  */
 export function mountPhriend(router, heading) {
+	watchFailedRequests()
 	if (instance || !boot().phriend?.enabled) return
 	const current = () =>
 		pageContext(
@@ -56,7 +63,7 @@ export function mountPhriend(router, heading) {
 		// above the buttons the cockpits keep in their bottom right corner ("Today" in My Day)
 		start: { right: 24, bottom: 76 },
 	})
-	watchFailedRequests(instance)
+	early.splice(0).forEach((item) => instance.log.record_failed_request(item))
 	instance.mount()
 }
 
@@ -70,19 +77,25 @@ function reportsUrl(ctx) {
 
 // The cockpits call the server with fetch (frappe-ui's resources, keepaliveCall). Desk reports
 // failed calls through jQuery's ajaxError; here a thin wrapper around fetch does the same, so a
-// failed call shows "Report it?" and lands in the report's context.
-function watchFailedRequests(phriend) {
-	const original = window.fetch
-	if (!original || original.__phriend) return
+// failed call shows "Report it?" and lands in the report's context. It hands back the app's own
+// response and error untouched; only a failed response is cloned to read its message.
+// Installed when this module loads (CockpitShell imports it before the app mounts), so the
+// first calls of a page are seen too.
+function watchFailedRequests() {
+	const original = typeof window !== "undefined" && window.fetch
+	if (!original || original.__phriend || !boot().phriend?.enabled) return
 	const wrapped = async (input, init) => {
-		const url = typeof input === "string" ? input : input?.url || ""
+		const url = input instanceof Request ? input.url : String(input)
 		const isApi = url.includes("/api/")
 		try {
 			const response = await original(input, init)
-			if (isApi && !response.ok) record(phriend, url, response)
+			if (isApi && !response.ok) record(url, response).catch(() => {})
 			return response
 		} catch (error) {
-			if (isApi) phriend.log.record_failed_request({ url, method: methodOf(url), status: 0, message: String(error?.message || error) })
+			// an aborted request (typeahead, leaving the page) is not a failure
+			if (isApi && error?.name !== "AbortError") {
+				save({ url, method: methodOf(url), status: 0, message: String(error?.message || error) })
+			}
 			throw error
 		}
 	}
@@ -90,7 +103,12 @@ function watchFailedRequests(phriend) {
 	window.fetch = wrapped
 }
 
-async function record(phriend, url, response) {
+function save(item) {
+	if (instance) instance.log.record_failed_request(item)
+	else if (early.length < 20) early.push(item)
+}
+
+async function record(url, response) {
 	let message = response.statusText
 	try {
 		const body = await response.clone().json()
@@ -98,10 +116,12 @@ async function record(phriend, url, response) {
 	} catch (e) {
 		// not JSON
 	}
-	phriend.log.record_failed_request({ url, method: methodOf(url), status: response.status, message })
+	save({ url, method: methodOf(url), status: response.status, message })
 }
 
 function methodOf(url) {
 	const match = String(url).match(/\/api\/method\/([^?#]+)/)
 	return match ? decodeURIComponent(match[1]) : ""
 }
+
+watchFailedRequests()

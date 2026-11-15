@@ -38,13 +38,8 @@ const props = defineProps({
 	subtitle: { type: String, default: "" },
 })
 
-// Phriend, the report-a-problem ball, in every cockpit (#1900). The heading the shell shows
-// (or a page's own chrome) becomes part of "Reported on".
+// Phriend, the report-a-problem ball, in every cockpit (#1900). The page title the shell shows
+// becomes part of "Reported on"; on record pages the record itself is named instead.
 const router = useRouter()
-onMounted(() =>
-	mountPhriend(router, () => {
-		const chrome = document.getElementById("cockpit-page-chrome")
-		return (pageChrome.active && chrome?.innerText.trim().split("\n")[0]) || props.title
-	})
-)
+onMounted(() => mountPhriend(router, () => props.title))
 </script>

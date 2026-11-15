@@ -15,6 +15,8 @@ from frappe.desk.form.assign_to import add as assign_to
 from frappe.utils import cstr, escape_html, get_url
 from frappe.utils.password import get_decrypted_password
 
+from phamos.phriend.boot import phriend_boot
+
 MAX_SCREENSHOT_BYTES = 15 * 1024 * 1024
 REPORT_DOCTYPE = "Issue"
 REPORT_TYPES = ("Bug", "Idea", "Question", "Other")  # "Other" is "Something else" in the flow (#1900)
@@ -138,23 +140,24 @@ def count_open_reports(route=None, ref_doctype=None, ref_docname=None):
 	"""Open Phriend reports about one record, a DocType, or a page: the badge on the ball (#1900).
 
 	The most specific given wins: a record (ref_doctype + ref_docname), else a DocType, else the
-	route. Counts only Issues the user may read (get_list). 0 when Phriend is not for this user.
+	route. Counts only Issues the user may read, up to 100. 0, quietly (no message, no error),
+	when Phriend is not for this user or the user can't read Issues: the cockpits ask on every
+	page change.
 	"""
-	try:
-		_check_allowed()
-	except frappe.PermissionError:
+	if not phriend_boot() or not frappe.has_permission(REPORT_DOCTYPE, "read"):
 		return 0
+	route, ref_doctype, ref_docname = cstr(route), cstr(ref_doctype), cstr(ref_docname)
 	filters = {"phriend_type": ["is", "set"], "status": ["not in", CLOSED_STATUSES]}
 	if ref_doctype and ref_docname:
 		filters.update(phriend_ref_doctype=ref_doctype, phriend_ref_docname=ref_docname)
 	elif ref_doctype:
 		filters["phriend_ref_doctype"] = ref_doctype
 	elif route:
-		filters["phriend_route"] = cstr(route)[:140]
+		filters["phriend_route"] = route[:140]
 	else:
 		return 0
-	rows = frappe.get_list(REPORT_DOCTYPE, filters=filters, fields=["count(name) as count"])
-	return rows[0].count if rows else 0
+	# names, not a SQL count: Frappe v16 no longer takes "count(name)" as a field
+	return len(frappe.get_list(REPORT_DOCTYPE, filters=filters, pluck="name", limit_page_length=100))
 
 
 def _built_title(page_title, route, ref_doctype, ref_docname):

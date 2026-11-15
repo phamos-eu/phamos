@@ -13,7 +13,6 @@ from frappe.translate import (
 	get_user_translations,
 )
 from frappe.utils import cint, get_system_timezone
-from frappe.utils.change_log import get_versions
 
 from phamos.phriend.boot import phriend_boot
 
@@ -56,13 +55,19 @@ def get_spa_boot(default_route):
 
 
 def _app_versions():
-	"""{app: version}, as Desk has it in frappe.boot.versions."""
-	try:
-		return {app: info.get("version") for app, info in get_versions().items()}
-	except Exception:
-		# a broken hooks.py in some app must not take the cockpits down; Phriend just omits it
-		frappe.log_error(title="Cockpit boot: app versions")
-		return {}
+	"""{app: version}, as Desk has it in frappe.boot.versions.
+
+	From each app's __version__, not frappe.utils.change_log.get_versions(): that runs git for
+	every app, which Desk pays once per session but the cockpits would pay on every page load.
+	"""
+	versions = {}
+	for app in frappe.get_installed_apps():
+		try:
+			versions[app] = getattr(frappe.get_module(app), "__version__", "") or ""
+		except Exception:
+			# a broken app must not take the cockpits down; Phriend just omits its version
+			versions[app] = ""
+	return versions
 
 
 def spa_translations(lang):

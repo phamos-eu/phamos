@@ -213,8 +213,15 @@ class TestPhriend(FrappeTestCase):
 		self.assertEqual(api.count_open_reports(), 0)
 		self.assertTrue(on_record.name and on_page.name)
 
+		# not for this user: 0, and no message left in the response for the cockpit to show
+		frappe.clear_messages()
 		self.set_settings(allowed_role="No Such Role For Phriend")
 		self.assertEqual(api.count_open_reports(ref_doctype="User"), 0)
+		self.assertFalse(frappe.local.message_log)
+
+		# a filter operator smuggled in as an argument is taken as plain text
+		self.set_settings(allowed_role="System Manager")
+		self.assertEqual(api.count_open_reports(ref_doctype=["like", "%"]), 0)
 
 	# ---- Issue -> GitLab
 
