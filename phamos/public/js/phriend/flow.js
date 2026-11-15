@@ -65,6 +65,7 @@ class Flow {
 		this.show(draft && (draft.title || draft.comment) ? STEP.text : STEP.kind);
 		if (canvas) this.use_screenshot(canvas);
 		else this.start_capture();
+		this.load_reported();
 	}
 
 	add_styles() {
@@ -113,6 +114,9 @@ class Flow {
 						<div class="gap"></div>
 						<label class="field">${escape_html(__("How urgent is it?"))}</label>
 						<div class="chips" role="radiogroup">${priorities}</div>
+						<section class="reported" data-reported aria-live="polite">
+							<p class="reported-empty">${escape_html(__("Looking for earlier reports…"))}</p>
+						</section>
 					</section>
 					<section class="pane" data-pane="1" hidden>
 						<div class="shot"><div class="skeleton"><span class="spinner"></span>${escape_html(__("Taking a screenshot of the page…"))}</div></div>
@@ -545,6 +549,51 @@ class Flow {
 				// the element is gone
 			}
 		}
+	}
+
+	// ------------------------------------------------------------- reported
+
+	// The open reports about this page or record, on the first step: someone may have reported
+	// it already (PM, 2026-11-15). Each opens in a new tab, so the report in progress stays.
+	async load_reported() {
+		const __ = this.__;
+		const box = this.layer.querySelector("[data-reported]");
+		let result;
+		try {
+			result = await call(
+				"phamos.phriend.api.get_open_reports",
+				{ route: this.ctx.route || "", ref_doctype: this.ctx.ref_doctype || "", ref_docname: this.ctx.ref_docname || "" },
+				this.phriend.host.csrf_token()
+			);
+		} catch (e) {
+			box.hidden = true; // not worth a message: reporting still works
+			return;
+		}
+		if (!box.isConnected) return;
+		const reports = (result && result.reports) || [];
+		if (!reports.length) {
+			box.innerHTML = `<p class="reported-empty">${escape_html(__("No open reports about this page yet."))}</p>`;
+			return;
+		}
+		const items = reports
+			.map((r) => {
+				const meta = [r.reported_by, r.when, r.status].filter(Boolean).join(" · ");
+				return `<li><a href="${escape_html(this.phriend.host.issue_url(r.name))}" target="_blank" rel="noopener">
+					<span class="reported-type">${escape_html(__(type_label(r.type)))}</span>
+					<span class="reported-title">${escape_html(r.title)}</span>
+					<span class="reported-meta">${escape_html(meta)}</span>
+				</a></li>`;
+			})
+			.join("");
+		const more =
+			result.count > reports.length && this.phriend.host.open_reports
+				? `<button type="button" class="link reported-all" data-reported-all>${escape_html(__("Show all {0}", [result.count]))}</button>`
+				: "";
+		box.innerHTML = `
+			<p class="reported-head">${escape_html(__("Already reported here"))} <span class="reported-count">${escape_html(String(result.count))}</span></p>
+			<ul>${items}</ul>${more}`;
+		const all = box.querySelector("[data-reported-all]");
+		if (all) all.addEventListener("click", () => this.phriend.host.open_reports());
 	}
 
 	// ------------------------------------------------------------- shortcut

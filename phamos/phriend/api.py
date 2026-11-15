@@ -6,13 +6,14 @@
 import base64
 import binascii
 import json
+import re
 from urllib.parse import quote
 
 import frappe
 import requests
 from frappe import _
 from frappe.desk.form.assign_to import add as assign_to
-from frappe.utils import cstr, escape_html, get_url
+from frappe.utils import cstr, escape_html, get_url, pretty_date
 from frappe.utils.password import get_decrypted_password
 
 from phamos.phriend import shortcut as phriend_shortcut
@@ -151,17 +152,15 @@ def set_my_shortcut(shortcut=None):
 	return phriend_shortcut.user_shortcut()
 
 
-@frappe.whitelist()
-def count_open_reports(route=None, ref_doctype=None, ref_docname=None):
-	"""Open Phriend reports about one record, a DocType, or a page: the badge on the ball (#1900).
+def _open_report_filters(route, ref_doctype, ref_docname):
+	"""Filters for open Phriend reports about one record, a DocType, or a page; None for none.
 
 	The most specific given wins: a record (ref_doctype + ref_docname), else a DocType, else the
-	route. Counts only Issues the user may read, up to 100. 0, quietly (no message, no error),
-	when Phriend is not for this user or the user can't read Issues: the cockpits ask on every
-	page change.
+	route. None, quietly (no message, no error), when Phriend is not for this user or the user
+	can't read Issues: the cockpits ask on every page change.
 	"""
 	if not phriend_boot() or not frappe.has_permission(REPORT_DOCTYPE, "read"):
-		return 0
+		return None
 	route, ref_doctype, ref_docname = cstr(route), cstr(ref_doctype), cstr(ref_docname)
 	filters = {"phriend_type": ["is", "set"], "status": ["not in", CLOSED_STATUSES]}
 	if ref_doctype and ref_docname:
@@ -171,9 +170,59 @@ def count_open_reports(route=None, ref_doctype=None, ref_docname=None):
 	elif route:
 		filters["phriend_route"] = route[:140]
 	else:
+		return None
+	return filters
+
+
+@frappe.whitelist()
+def count_open_reports(route=None, ref_doctype=None, ref_docname=None):
+	"""How many open Phriend reports there are about this record or page: the badge on the ball
+	(#1900). Only Issues the user may read, up to 100."""
+	filters = _open_report_filters(route, ref_doctype, ref_docname)
+	if not filters:
 		return 0
 	# names, not a SQL count: Frappe v16 no longer takes "count(name)" as a field
 	return len(frappe.get_list(REPORT_DOCTYPE, filters=filters, pluck="name", limit_page_length=100))
+
+
+@frappe.whitelist()
+def get_open_reports(route=None, ref_doctype=None, ref_docname=None):
+	"""The open Phriend reports about this record or page, newest first, for the first step of
+	the report flow: "Already reported here?" (PM, 2026-11-15, #1900).
+
+	Returns {"count": all of them (up to 100), "reports": the newest 5}. Only Issues the user may
+	read; empty when Phriend is not for this user.
+	"""
+	filters = _open_report_filters(route, ref_doctype, ref_docname)
+	if not filters:
+		return {"count": 0, "reports": []}
+	names = frappe.get_list(
+		REPORT_DOCTYPE, filters=filters, pluck="name", order_by="creation desc", limit_page_length=100
+	)
+	if not names:
+		return {"count": 0, "reports": []}
+	rows = frappe.get_list(
+		REPORT_DOCTYPE,
+		filters={"name": ["in", names[:5]]},
+		fields=["name", "subject", "status", "priority", "phriend_type", "phriend_reported_by_name", "creation"],
+		order_by="creation desc",
+	)
+	return {
+		"count": len(names),
+		"reports": [
+			{
+				"name": row.name,
+				# the subject without the "[Bug] " the report got from its type
+				"title": re.sub(r"^\[[^\]]*\]\s*", "", row.subject or "") or row.name,
+				"type": row.phriend_type,
+				"status": _(row.status),
+				"priority": _(row.priority) if row.priority else "",
+				"reported_by": row.phriend_reported_by_name or "",
+				"when": pretty_date(row.creation),
+			}
+			for row in rows
+		],
+	}
 
 
 def _built_title(page_title, route, ref_doctype, ref_docname):

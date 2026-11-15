@@ -129,13 +129,13 @@ const desk = {
 		frappe.model.can_read(REPORT_DOCTYPE)
 			? frappe.db.count(REPORT_DOCTYPE, { filters: badge_filters() })
 			: Promise.resolve(0),
+	// in a new tab, like the cockpits, so a report in progress isn't lost
 	open_reports: () => {
 		const filters = badge_filters();
-		frappe.route_options = { phriend_type: ["is", "set"], status: ["not in", CLOSED_STATUSES] };
-		["phriend_ref_doctype", "phriend_ref_docname", "phriend_route"].forEach((key) => {
-			if (filters[key]) frappe.route_options[key] = filters[key];
-		});
-		frappe.set_route("List", REPORT_DOCTYPE);
+		const query = Object.entries(filters)
+			.map(([key, value]) => `${key}=${encodeURIComponent(Array.isArray(value) ? JSON.stringify(value) : value)}`)
+			.join("&");
+		window.open(`/app/issue?${query}`, "_blank", "noopener");
 	},
 	on_route_change: (callback) => {
 		if (frappe.router && typeof frappe.router.on === "function") frappe.router.on("change", callback);

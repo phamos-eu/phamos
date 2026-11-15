@@ -225,6 +225,33 @@ class TestPhriend(FrappeTestCase):
 		self.set_settings(allowed_role="System Manager")
 		self.assertEqual(api.count_open_reports(ref_doctype=["like", "%"]), 0)
 
+	def test_first_step_lists_the_open_reports_about_this_page(self, _enqueue):
+		# "Already reported here?" on the first step (PM, 2026-11-15)
+		older = self.report(title="Older one")
+		newer = self.report(title="Newer one", report_type="Idea")
+		closed = self.report(title="Done already")
+		closed.db_set("status", "Closed")
+		self.report(title="About another user", ref_docname="Guest")
+		frappe.db.set_value("Issue", older.name, "creation", "2026-01-01 10:00:00")
+
+		result = api.get_open_reports(ref_doctype="User", ref_docname="Administrator")
+
+		self.assertEqual(result["count"], 2)
+		self.assertEqual([r["name"] for r in result["reports"]], [newer.name, older.name])  # newest first
+		first = result["reports"][0]
+		self.assertEqual(first["title"], "Newer one")  # without "[Idea] "
+		self.assertEqual(first["type"], "Idea")
+		self.assertTrue(first["when"])
+
+		for i in range(5):
+			self.report(title=f"Many {i}")
+		many = api.get_open_reports(ref_doctype="User", ref_docname="Administrator")
+		self.assertEqual((many["count"], len(many["reports"])), (7, 5))  # all counted, five listed
+
+		self.assertEqual(api.get_open_reports(), {"count": 0, "reports": []})
+		self.set_settings(allowed_role="No Such Role For Phriend")
+		self.assertEqual(api.get_open_reports(ref_doctype="User"), {"count": 0, "reports": []})
+
 	# ---- keyboard shortcut (#1900)
 
 	def test_shortcuts_are_written_one_way_and_must_have_a_modifier(self, _enqueue):

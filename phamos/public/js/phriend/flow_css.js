@@ -61,6 +61,22 @@ input.input:focus, textarea.input:focus { border-color: var(--ph-focus); }
 .chip.on { background: var(--ph-chip); border-color: var(--ph-chip-border); color: var(--ph-chip-text); }
 .chip.on small { color: var(--ph-chip-text); }
 .chip.slim { min-width: 0; padding: 7px 16px; }
+.reported { margin-top: 18px; padding-top: 14px; border-top: 1px solid var(--ph-border); }
+.reported[hidden] { display: none; }
+.reported-head { margin: 0 0 8px; font-size: 13px; color: var(--ph-muted); }
+.reported-count { display: inline-block; min-width: 18px; padding: 0 6px; border-radius: 9px; background: var(--ph-surface);
+	color: var(--ph-text); font-size: 12px; text-align: center; }
+.reported-empty { margin: 0; font-size: 13px; color: var(--ph-muted); }
+.reported ul { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 2px; }
+.reported a { display: grid; grid-template-columns: auto minmax(0, 1fr); column-gap: 8px; padding: 6px 8px; border-radius: 8px;
+	color: var(--ph-text); text-decoration: none; }
+.reported a:hover { background: var(--ph-surface); }
+.reported a:focus-visible { outline: 2px solid var(--ph-focus); outline-offset: 1px; }
+.reported-type { grid-row: span 2; align-self: start; margin-top: 1px; padding: 1px 6px; border-radius: 6px; font-size: 11px;
+	background: var(--ph-chip); color: var(--ph-chip-text); }
+.reported-title { font-size: 14px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.reported-meta { font-size: 12px; color: var(--ph-muted); }
+.reported-all { margin: 6px 8px 0; font-size: 13px; color: var(--ph-muted); }
 .shot { position: relative; }
 .skeleton { display: flex; align-items: center; justify-content: center; gap: 10px; height: min(52vh, 460px);
 	border: 1px dashed var(--ph-border-strong); border-radius: 10px; color: var(--ph-muted);
