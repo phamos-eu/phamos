@@ -86,8 +86,9 @@ input.input:focus, textarea.input:focus { border-color: var(--ph-focus); box-sha
 .reported-when, .reported-status { white-space: nowrap; color: var(--ph-muted); }
 /* browsers without subgrid (before Chrome 117 / Safari 16): one wrapping line per report */
 @supports not (grid-template-columns: subgrid) {
-	.reported ul, .reported li, .reported a { display: flex; flex-wrap: wrap; align-items: baseline; }
-	.reported a { gap: 4px 12px; width: 100%; }
+	.reported ul { display: block; }
+	.reported li, .reported a { display: flex; flex-wrap: wrap; align-items: baseline; width: 100%; }
+	.reported a { gap: 4px 12px; }
 	.reported-title { flex: 1 1 200px; }
 }
 @media (max-width: 720px) {
