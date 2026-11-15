@@ -20,7 +20,7 @@
 				<!-- In a tile without a title-bar slot (should not happen), keep the header so "Open in
 				     Raven" never disappears. -->
 				<header
-					v-if="!inColumn || (url && !titleSlot)"
+					v-if="!inColumn || (url && slotMissing)"
 					class="flex h-12 flex-shrink-0 items-center gap-2 border-b border-outline-gray-2 px-3"
 				>
 					<FeatherIcon name="message-circle" class="h-4 w-4 flex-shrink-0 text-ink-gray-6" />
@@ -163,6 +163,19 @@ const inColumn = computed(() => {
 const shown = computed(() => inColumn.value || props.open)
 // The chat tile's title-bar slot (PanelLayout), where "Open in Raven" goes while in a tile.
 const titleSlot = computed(() => panelTitleSlots.chat || null)
+// Only when a tile still has no slot after a moment does the chat show its own header (with
+// "Open in Raven"), so it never flashes while the tile is mounting.
+const slotMissing = ref(false)
+let slotTimer = null
+watch(
+	[inColumn, titleSlot],
+	([isInColumn, slot]) => {
+		clearTimeout(slotTimer)
+		if (!isInColumn || slot) return (slotMissing.value = false)
+		slotTimer = setTimeout(() => (slotMissing.value = !panelTitleSlots.chat), 200)
+	},
+	{ immediate: true }
+)
 
 // Which record's chat shows in the page (kept for views that follow it).
 watch(
@@ -392,6 +405,7 @@ function focusTarget(target) {
 defineExpose({ focusTarget, inColumn })
 
 onBeforeUnmount(() => {
+	clearTimeout(slotTimer)
 	detachFrame()
 	if (issueChatStore.openFor === props.recordName) issueChatStore.openFor = null
 })
