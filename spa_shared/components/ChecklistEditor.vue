@@ -6,22 +6,45 @@
 
 		<div v-else class="mb-3 space-y-2">
 			<div
-				v-for="item in checklist.items"
+				v-for="item in displayItems"
 				:key="item.name"
-				class="rounded-lg border bg-white transition dark:bg-gray-900"
+				:data-item="item.name"
+				class="group rounded-lg border bg-white transition dark:bg-gray-900"
 				:class="[
 					expandedItem === item.name
 						? 'border-gray-900 shadow-sm ring-1 ring-gray-900/10 dark:border-gray-200 dark:ring-gray-200/20'
 						: 'cursor-pointer border-gray-200 hover:border-gray-300 hover:bg-gray-50 dark:border-gray-700 dark:hover:border-gray-600 dark:hover:bg-gray-800/60',
 					savingItem === item.name ? 'opacity-60' : '',
+					reorder?.name === item.name ? 'relative z-[1] shadow-md ring-2 ring-outline-gray-3' : '',
 				]"
 				role="button"
 				:tabindex="expandedItem === item.name ? -1 : 0"
 				@click.stop="expand(item)"
 				@keydown.enter.prevent="expand(item)"
+				@keydown.alt.up="(e) => nudgeItem(item, -1, e)"
+				@keydown.alt.down="(e) => nudgeItem(item, 1, e)"
 			>
 				<!-- Collapsed -->
 				<div v-if="expandedItem !== item.name" class="flex items-start gap-3 px-3 py-2.5">
+					<!-- Drag handle to reorder (#1919); Alt+↑/↓ on a focused item does the same. -->
+					<button
+						v-if="canReorder"
+						type="button"
+						tabindex="-1"
+						class="-ml-1.5 mt-0.5 flex h-5 w-4 flex-shrink-0 cursor-grab touch-none items-center justify-center rounded text-ink-gray-4 opacity-0 hover:text-ink-gray-7 focus:outline-none focus-visible:opacity-100 focus-visible:ring-2 focus-visible:ring-outline-gray-4 group-hover:opacity-100 group-focus-visible:opacity-100"
+						:class="reorder?.name === item.name ? 'cursor-grabbing opacity-100' : ''"
+						:title="__('Drag to move, or Alt+↑/↓')"
+						:aria-label="__('Drag to move, or Alt+↑/↓')"
+						@click.stop
+						@keydown.enter.stop.prevent
+						@pointerdown.stop="(e) => startReorder(item, e)"
+						@pointermove="onReorder"
+						@pointerup="endReorder"
+						@pointercancel="cancelReorder"
+						@lostpointercapture="cancelReorder"
+					>
+						<FeatherIcon name="more-vertical" class="h-4 w-4" />
+					</button>
 					<div class="min-w-0 flex-1">
 						<div
 							v-if="(item.description || '').trim()"
@@ -234,7 +257,7 @@
 
 <script setup>
 import { computed, nextTick, onBeforeUnmount, onMounted, ref } from "vue"
-import { call, FormControl } from "frappe-ui"
+import { call, FormControl, toast } from "frappe-ui"
 import FrappeLink from "@spa/components/FrappeLink.vue"
 import UserAvatar from "@spa/components/UserAvatar.vue"
 import RichTextField from "@spa/components/RichTextField.vue"
@@ -248,6 +271,7 @@ import { formatDate, todayIsoInUserTz } from "@spa/utils/datetime.js"
 import { skipTextEditorToolbarTabStops } from "@spa/utils/textEditorFocus.js"
 import { __ } from "@spa/utils/i18n.js"
 import { closesOnClick, isInteractiveTarget } from "@spa/utils/interactiveTarget.js"
+import { dropIndex, moved } from "@spa/utils/listReorder.js"
 
 const props = defineProps({
 	checklist: { type: Object, required: true },
@@ -447,6 +471,90 @@ async function expand(item) {
 	await collapse()
 	expandedItem.value = item.name
 	skipTextEditorToolbarTabStops(root.value)
+}
+
+// Reordering (#1919): drag an item's handle, or Alt+↑/↓ on a focused item. While dragging, the
+// list shows the new order; it is saved once on release.
+const reorder = ref(null) // { name, from, to, saving }
+let reorderRects = []
+const canReorder = computed(() => (props.checklist.items?.length || 0) > 1 && !savingItem.value)
+const displayItems = computed(() => {
+	const items = props.checklist.items || []
+	return reorder.value ? moved(items, reorder.value.from, reorder.value.to) : items
+})
+
+function startReorder(item, event) {
+	if (event.button !== 0 || reorder.value) return
+	const items = props.checklist.items || []
+	const from = items.findIndex((i) => i.name === item.name)
+	if (from < 0) return
+	// the boxes as they are now, in list order and relative to the list, so scrolling the tile
+	// during the drag doesn't move the drop zones; the live order doesn't move them either
+	const listTop = root.value?.getBoundingClientRect().top || 0
+	reorderRects = items.map((i) => {
+		const r = root.value?.querySelector(`[data-item="${CSS.escape(i.name)}"]`)?.getBoundingClientRect()
+		return { top: (r?.top || 0) - listTop, height: r?.height || 0 }
+	})
+	reorder.value = { name: item.name, from, to: from, saving: false }
+	event.currentTarget.setPointerCapture(event.pointerId)
+}
+
+function onReorder(event) {
+	if (!reorder.value || reorder.value.saving) return
+	// only while the button is down: a lost release must not keep moving the item
+	if ((event.buttons & 1) !== 1) return cancelReorder()
+	const listTop = root.value?.getBoundingClientRect().top || 0
+	reorder.value = { ...reorder.value, to: dropIndex(event.clientY - listTop, reorderRects, reorder.value.from) }
+}
+
+async function endReorder() {
+	const r = reorder.value
+	if (!r || r.saving) return
+	if (r.to === r.from) return cancelReorder()
+	reorder.value = { ...r, saving: true }
+	try {
+		await moveItem(r.name, r.to)
+	} finally {
+		reorder.value = null
+	}
+}
+
+function cancelReorder() {
+	if (!reorder.value?.saving) reorder.value = null
+}
+
+async function nudgeItem(item, step, event) {
+	// Only on the focused, collapsed item itself: inside an open item's fields Alt+↑/↓ belongs to
+	// the field (moving the caret on macOS), and must neither move the item nor be swallowed.
+	if (event && (event.target !== event.currentTarget || expandedItem.value === item.name)) return
+	event?.preventDefault()
+	const items = props.checklist.items || []
+	const from = items.findIndex((i) => i.name === item.name)
+	const to = from + step
+	if (from < 0 || to < 0 || to >= items.length || savingItem.value) return
+	await moveItem(item.name, to)
+	await nextTick()
+	root.value?.querySelector(`[data-item="${CSS.escape(item.name)}"]`)?.focus()
+}
+
+async function moveItem(name, toIndex) {
+	savingItem.value = name
+	try {
+		const updated = await call(`${API}.move_spa_checklist_item`, {
+			checklist_name: props.checklist.name,
+			item_name: name,
+			to_index: toIndex,
+		})
+		emit("updated", updated)
+	} catch (e) {
+		toast({
+			title: e?.messages?.[0] || e?.message || __("Could not move the item"),
+			icon: "x-circle",
+			iconClasses: "text-ink-red-4",
+		})
+	} finally {
+		savingItem.value = null
+	}
 }
 
 // A click on an open item's free area closes it (#1921); its fields, editor, buttons and links
