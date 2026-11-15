@@ -12,6 +12,7 @@ from PIL import Image
 
 from phamos.phriend import api, setup
 from phamos.phriend.boot import boot_session
+from phamos.www.spa_boot import get_spa_boot
 
 # a 1x1 PNG
 PNG = "data:image/png;base64," + base64.b64encode(
@@ -182,6 +183,30 @@ class TestPhriend(FrappeTestCase):
 		bootinfo = frappe._dict()
 		boot_session(bootinfo)
 		self.assertNotIn("phriend", bootinfo)
+
+	def test_cockpits_boot_phriend_like_desk(self, _enqueue):
+		# the cockpits load no Desk boot: get_spa_boot carries the flag and the versions (#1900)
+		boot = get_spa_boot("/personal-cockpit")
+		self.assertEqual(boot.phriend, {"enabled": 1})
+		self.assertTrue(boot.versions.get("phamos"))
+		self.set_settings(enabled=0)
+		self.assertIsNone(get_spa_boot("/personal-cockpit").phriend)
+
+	def test_badge_counts_open_reports_by_record_doctype_or_page(self, _enqueue):
+		on_record = self.report()  # about User Administrator
+		self.report(ref_docname="Guest")  # another User
+		on_page = self.report(ref_doctype=None, ref_docname=None, route="sales-cockpit/leads/follow-ups")
+		closed = self.report()
+		closed.db_set("status", "Closed")
+
+		self.assertEqual(api.count_open_reports(ref_doctype="User", ref_docname="Administrator"), 1)
+		self.assertEqual(api.count_open_reports(ref_doctype="User"), 2)
+		self.assertEqual(api.count_open_reports(route="sales-cockpit/leads/follow-ups"), 1)
+		self.assertEqual(api.count_open_reports(), 0)
+		self.assertTrue(on_record.name and on_page.name)
+
+		self.set_settings(allowed_role="No Such Role For Phriend")
+		self.assertEqual(api.count_open_reports(ref_doctype="User"), 0)
 
 	# ---- Issue -> GitLab
 

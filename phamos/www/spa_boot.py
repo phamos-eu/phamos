@@ -13,6 +13,9 @@ from frappe.translate import (
 	get_user_translations,
 )
 from frappe.utils import cint, get_system_timezone
+from frappe.utils.change_log import get_versions
+
+from phamos.phriend.boot import phriend_boot
 
 
 def get_spa_boot(default_route):
@@ -44,8 +47,22 @@ def get_spa_boot(default_route):
 				"name": frappe.session.user,
 				"full_name": frappe.utils.get_fullname(),
 			},
+			# Phriend, the report-a-problem ball, in every cockpit (#1900): whether it shows,
+			# and the app versions it adds to a report (Desk boots both the same way).
+			"phriend": phriend_boot(),
+			"versions": _app_versions(),
 		}
 	)
+
+
+def _app_versions():
+	"""{app: version}, as Desk has it in frappe.boot.versions."""
+	try:
+		return {app: info.get("version") for app, info in get_versions().items()}
+	except Exception:
+		# a broken hooks.py in some app must not take the cockpits down; Phriend just omits it
+		frappe.log_error(title="Cockpit boot: app versions")
+		return {}
 
 
 def spa_translations(lang):

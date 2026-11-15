@@ -4,13 +4,24 @@
 import frappe
 
 
-def boot_session(bootinfo):
-	"""Tell the desk whether Phriend shows up for this user (`frappe.boot.phriend`)."""
+def phriend_boot():
+	"""What the Phriend ball needs at start, for Desk and the cockpits alike (#1900).
+
+	{"enabled": 1} when Phriend shows up for the current user, None otherwise (Guest, Phriend
+	switched off, or the user lacks the allowed role).
+	"""
 	if frappe.session.user == "Guest":
-		return
+		return None
 	settings = frappe.get_cached_doc("Phriend Settings")
 	if not settings.enabled:
-		return
+		return None
 	if settings.allowed_role and settings.allowed_role not in frappe.get_roles():
-		return
-	bootinfo.phriend = {"enabled": 1}
+		return None
+	return {"enabled": 1}
+
+
+def boot_session(bootinfo):
+	"""Tell the desk whether Phriend shows up for this user (`frappe.boot.phriend`)."""
+	boot = phriend_boot()
+	if boot:
+		bootinfo.phriend = boot

@@ -19,6 +19,7 @@ MAX_SCREENSHOT_BYTES = 15 * 1024 * 1024
 REPORT_DOCTYPE = "Issue"
 REPORT_TYPES = ("Bug", "Idea", "Question")
 PRIORITIES = ("Low", "Medium", "High", "Urgent")
+CLOSED_STATUSES = ("Resolved", "Closed")
 DEFAULT_GITLAB_PROJECT = "phamos/phamos"
 TIMEOUT = 30
 
@@ -127,6 +128,33 @@ def create_report(
 	)
 
 	return {"name": issue.name}
+
+
+REPORT_REF_FILTERS = ("phriend_route", "phriend_ref_doctype", "phriend_ref_docname")
+
+
+@frappe.whitelist()
+def count_open_reports(route=None, ref_doctype=None, ref_docname=None):
+	"""Open Phriend reports about one record, a DocType, or a page: the badge on the ball (#1900).
+
+	The most specific given wins: a record (ref_doctype + ref_docname), else a DocType, else the
+	route. Counts only Issues the user may read (get_list). 0 when Phriend is not for this user.
+	"""
+	try:
+		_check_allowed()
+	except frappe.PermissionError:
+		return 0
+	filters = {"phriend_type": ["is", "set"], "status": ["not in", CLOSED_STATUSES]}
+	if ref_doctype and ref_docname:
+		filters.update(phriend_ref_doctype=ref_doctype, phriend_ref_docname=ref_docname)
+	elif ref_doctype:
+		filters["phriend_ref_doctype"] = ref_doctype
+	elif route:
+		filters["phriend_route"] = cstr(route)[:140]
+	else:
+		return 0
+	rows = frappe.get_list(REPORT_DOCTYPE, filters=filters, fields=["count(name) as count"])
+	return rows[0].count if rows else 0
 
 
 def _built_title(page_title, route, ref_doctype, ref_docname):
