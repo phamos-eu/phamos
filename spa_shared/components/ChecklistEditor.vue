@@ -91,8 +91,15 @@
 					</div>
 				</div>
 
-				<!-- Expanded -->
-				<div v-else class="space-y-3 px-3 py-3" @click.stop>
+				<!-- Expanded. A click on its free area closes it again (#1921); clicks in its fields,
+				     editor, buttons and links don't. -->
+				<div
+					v-else
+					class="space-y-3 px-3 py-3"
+					@pointerdown="onOpenCardPointerDown"
+					@pointerup="onOpenCardPointerUp"
+					@click.stop="onOpenCardClick"
+				>
 					<div class="flex items-start gap-3">
 						<div class="min-w-0 flex-1 space-y-2">
 							<input
@@ -121,7 +128,7 @@
 								@blur="onFieldBlur('note', item)"
 							/>
 						</div>
-						<div class="flex-shrink-0 pt-1" @click.stop>
+						<div class="flex flex-shrink-0 flex-col items-center gap-2 pt-1" @click.stop>
 							<input
 								type="checkbox"
 								class="h-5 w-5 rounded-full border-gray-300 text-green-600 focus:ring-green-600 dark:border-gray-600 dark:text-green-500 dark:focus:ring-green-500"
@@ -129,6 +136,15 @@
 								:disabled="savingItem === item.name"
 								@change="saveField(item, 'done', $event.target.checked ? 1 : 0, $event)"
 							/>
+							<button
+								type="button"
+								class="flex h-6 w-6 items-center justify-center rounded text-ink-gray-5 hover:bg-surface-gray-2 hover:text-ink-gray-8 focus:outline-none focus-visible:ring-2 focus-visible:ring-outline-gray-4"
+								:title="__('Collapse')"
+								:aria-label="__('Collapse')"
+								@click="collapse()"
+							>
+								<FeatherIcon name="chevron-up" class="h-4 w-4" />
+							</button>
 						</div>
 					</div>
 					<div class="space-y-1.5 border-t border-gray-100 pt-3 dark:border-gray-800">
@@ -229,6 +245,8 @@ import { lockMessage } from "@spa/utils/fieldLockText.js"
 import { deskRecordUrl } from "@spa/utils/deskUrl.js"
 import { formatDate, todayIsoInUserTz } from "@spa/utils/datetime.js"
 import { skipTextEditorToolbarTabStops } from "@spa/utils/textEditorFocus.js"
+import { __ } from "@spa/utils/i18n.js"
+import { closesOnClick, isInteractiveTarget } from "@spa/utils/interactiveTarget.js"
 
 const props = defineProps({
 	checklist: { type: Object, required: true },
@@ -428,6 +446,34 @@ async function expand(item) {
 	await collapse()
 	expandedItem.value = item.name
 	skipTextEditorToolbarTabStops(root.value)
+}
+
+// A click on an open item's free area closes it (#1921); its fields, editor, buttons and links
+// keep their clicks. Only up to the card: the item around it is itself role="button".
+// A click is only a "close" when it also started on the free area: selecting text in a field and
+// letting go over the free area ends in a click on the card, too (the browser sends the click to
+// the element both ends share).
+let pressedOnFreeArea = false
+let releasedOnField = false
+function onOpenCardPointerDown(event) {
+	pressedOnFreeArea = !isInteractiveTarget(event.target, event.currentTarget)
+	releasedOnField = false
+}
+
+function onOpenCardPointerUp(event) {
+	releasedOnField = isInteractiveTarget(event.target, event.currentTarget)
+}
+
+function onOpenCardClick(event) {
+	const close = closesOnClick({
+		pressedOnFreeArea,
+		releasedOnField,
+		clickedOnFreeArea: !isInteractiveTarget(event.target, event.currentTarget),
+		selectedText: window.getSelection?.()?.toString() || "",
+	})
+	pressedOnFreeArea = false
+	releasedOnField = false
+	if (close) collapse()
 }
 
 async function onDocClick(event) {
