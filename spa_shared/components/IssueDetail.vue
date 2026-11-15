@@ -18,6 +18,9 @@
 				class="flex min-h-0 flex-1 flex-col overflow-hidden rounded-lg border border-gray-200 bg-white dark:border-gray-700 dark:bg-gray-900"
 				:class="{ 'pointer-events-none opacity-80': isClosed }"
 			>
+				<!-- `[&>.border]` styles frappe-ui TextEditor's fixed menu (its direct child with the
+				     `border` class, frappe-ui 0.1.105): flat inside the card. After a frappe-ui
+				     upgrade, check that the toolbar still has no box of its own. -->
 				<RichTextField
 					:key="issue.name"
 					v-model="autosave.draft.description"

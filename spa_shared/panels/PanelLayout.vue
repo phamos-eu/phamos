@@ -37,11 +37,7 @@
 							· {{ summaryOf(tile.id) }}
 						</span>
 						<!-- The panel's own actions, teleported in by its content (hosts.panelTitleSlots) -->
-						<div
-							:ref="(el) => setTitleSlot(tile.id, el)"
-							class="ml-auto flex min-w-0 flex-shrink items-center"
-							@pointerdown.stop
-						/>
+						<TitleSlot :panel-id="tile.id" class="ml-auto" @pointerdown.stop />
 						<div class="flex flex-shrink-0 items-center" @pointerdown.stop>
 							<Dropdown :options="moveOptions(tile.id)" placement="right">
 								<button
@@ -172,7 +168,7 @@ import {
 	withAll,
 } from "./tiling.js"
 import { usePanelLayout } from "./usePanelLayout.js"
-import { panelTitleSlots } from "./hosts.js"
+import TitleSlot from "./TitleSlot.vue"
 
 const props = defineProps({
 	doctype: { type: String, required: true },
@@ -252,12 +248,6 @@ const geometry = computed(() =>
 const GRAB = 4
 const grabArea = (g) =>
 	g.axis === "w" ? { ...g, x: g.x - GRAB, w: g.w + 2 * GRAB } : { ...g, y: g.y - GRAB, h: g.h + 2 * GRAB }
-
-// A tile's title-bar slot. Only ever set: an inline ref is called with null and then the element
-// on every render, and content only uses the slot while its tile shows (and has just set it).
-function setTitleSlot(id, el) {
-	if (el && panelTitleSlots[id] !== el) panelTitleSlots[id] = el
-}
 
 const box = (r) => ({ left: `${r.x}px`, top: `${r.y}px`, width: `${r.w}px`, height: `${r.h}px` })
 
