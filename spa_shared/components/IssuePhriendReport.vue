@@ -1,6 +1,7 @@
 <template>
 	<section class="space-y-2.5" :aria-label="__('Phriend report')">
-		<div class="flex items-center gap-2">
+		<!-- In the dock (#1910) the panel row already shows the mark, the title and the type. -->
+		<div v-if="!embedded" class="flex items-center gap-2">
 			<PhriendMark size="md" />
 			<span class="text-[11px] font-semibold uppercase tracking-wide text-ink-gray-6">
 				{{ __("Phriend report") }}
@@ -128,6 +129,8 @@ import { detailsSummary, entryLine, typeLabel, typeTheme, versionsLine } from "@
 const props = defineProps({
 	// get_issue's `phriend` block: see phamos/phriend/report.py
 	report: { type: Object, required: true },
+	// shown as a dock panel body (spa_shared/panels): no heading of its own
+	embedded: { type: Boolean, default: false },
 })
 
 const enlarged = ref(false)

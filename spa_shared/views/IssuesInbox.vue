@@ -117,7 +117,7 @@
 			class="order-3 hidden w-[768px] flex-none flex-col overflow-hidden lg:flex"
 		/>
 
-		<!-- Description and Checklists side by side; stacked while the chat column is open. -->
+		<!-- Description and the panel dock side by side; stacked while the chat column is open. -->
 		<div
 			v-if="selectedName"
 			class="order-2 flex min-h-0 min-w-0 flex-1"
@@ -143,29 +143,8 @@
 				/>
 			</aside>
 
-			<aside
-				class="flex min-w-0 flex-col overflow-y-auto border-r border-gray-200 bg-white px-5 py-4 dark:border-gray-800 dark:bg-gray-900"
-				:class="
-					chatColumnOpen
-						? 'w-80 flex-none lg:max-h-[45%] lg:w-auto lg:border-t'
-						: 'w-80 flex-none'
-				"
-			>
-				<div
-					v-if="detailLoading && !selectedIssue"
-					class="flex flex-1 items-center justify-center text-sm text-gray-500 dark:text-gray-400"
-				>
-					Loading checklists…
-				</div>
-				<LinkedChecklistsSection
-					v-else-if="selectedIssue"
-					:key="selectedIssue.name"
-					document="Issue"
-					:reference-record="selectedIssue.name"
-					:reference-title="selectedIssue.subject"
-					:allow-create="selectedIssue.status !== 'Closed'"
-				/>
-			</aside>
+			<!-- Checklists, the Phriend report and later panels (#1909): spa_shared/panels. -->
+			<PanelDock v-if="selectedIssue" doctype="Issue" :record="selectedIssue" :stacked="chatColumnOpen" />
 		</div>
 
 		<CreateIssueDialog v-model="showCreate" :options="formOptions" @created="onCreated" />
@@ -186,7 +165,7 @@ import { __ } from "@spa/utils/i18n.js"
 import IssueList from "@spa/components/IssueList.vue"
 import ChecklistOwnerFilter from "@spa/components/ChecklistOwnerFilter.vue"
 import CreateIssueDialog from "@spa/components/CreateIssueDialog.vue"
-import LinkedChecklistsSection from "@spa/components/LinkedChecklistsSection.vue"
+import PanelDock from "@spa/panels/PanelDock.vue"
 import ListSortSelector from "@spa/components/ListSortSelector.vue"
 import PriorityFilter from "@spa/components/PriorityFilter.vue"
 import StatusFilter from "@spa/components/StatusFilter.vue"
