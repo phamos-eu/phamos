@@ -499,10 +499,12 @@ function startReorder(item, event) {
 	const items = props.checklist.items || []
 	const from = items.findIndex((i) => i.name === item.name)
 	if (from < 0) return
-	// the boxes as they are now, in list order; the live order doesn't move the drop zones
+	// the boxes as they are now, in list order and relative to the list, so scrolling the tile
+	// during the drag doesn't move the drop zones; the live order doesn't move them either
+	const listTop = root.value?.getBoundingClientRect().top || 0
 	reorderRects = items.map((i) => {
 		const r = root.value?.querySelector(`[data-item="${CSS.escape(i.name)}"]`)?.getBoundingClientRect()
-		return { top: r?.top || 0, height: r?.height || 0 }
+		return { top: (r?.top || 0) - listTop, height: r?.height || 0 }
 	})
 	reorder.value = { name: item.name, from, to: from, saving: false }
 	event.currentTarget.setPointerCapture(event.pointerId)
@@ -512,7 +514,8 @@ function onReorder(event) {
 	if (!reorder.value || reorder.value.saving) return
 	// only while the button is down: a lost release must not keep moving the item
 	if ((event.buttons & 1) !== 1) return cancelReorder()
-	reorder.value = { ...reorder.value, to: dropIndex(event.clientY, reorderRects, reorder.value.from) }
+	const listTop = root.value?.getBoundingClientRect().top || 0
+	reorder.value = { ...reorder.value, to: dropIndex(event.clientY - listTop, reorderRects, reorder.value.from) }
 }
 
 async function endReorder() {
