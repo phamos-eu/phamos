@@ -38,12 +38,10 @@
 	<div class="flex h-full min-h-0 w-full flex-col">
 		<div v-if="loading" class="flex flex-1 items-center justify-center text-sm text-ink-gray-5">{{ __("Loading…") }}</div>
 		<template v-else-if="lead">
-			<!-- Master data as a band across the top rather than a left column:
-			     it is reference, not something worked in, and taking it out of the
-			     columns gives the conversation the full width. -->
 			<!-- The Lead as tiles (#1913): this component keeps the Lead's state and autosave and lays
 			     its three blocks into their panels' hosts (spa_shared/panels/hosts.js); the panels,
-			     with Checklists and Notes, are declared by the sales cockpit (src/config.js). -->
+			     with Checklists and Notes, are declared by the sales cockpit (src/config.js). The
+			     Teleport blocks below keep their contents' old indentation to keep this diff small. -->
 			<PanelLayout doctype="Lead" :record="lead" />
 
 			<Teleport v-if="hosts['lead-details']" :to="hosts['lead-details']">

@@ -28,6 +28,8 @@ export const LEAD_PANELS = [
 		icon: "edit-3",
 		doctypes: ["Lead"],
 		component: markRaw(LeadNotesPanel),
+		// it uses LeadDetail's note dialogs (injected); pop-out (#1912) would need them too
+		popout: false,
 		place: { near: "lead-status", side: "bottom" },
 	},
 ]
