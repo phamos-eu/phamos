@@ -97,7 +97,7 @@ class Flow {
 					<section class="pane" data-pane="0">
 						<div class="shot"><div class="skeleton"><span class="spinner"></span>${escape_html(__("Taking a screenshot of the page…"))}</div></div>
 						<div class="shot-bar">
-							<span class="grow" data-shot-hint>${escape_html(__("Draw an arrow to the problem, box it, or write on it."))}</span>
+							<span class="grow" data-shot-hint>${escape_html(__("Draw an arrow to the problem, box it, write on it, or black out private data."))}</span>
 							<button type="button" class="btn ghost" data-toggle-shot hidden>${escape_html(__("Leave out the screenshot"))}</button>
 						</div>
 					</section>
@@ -386,7 +386,7 @@ class Flow {
 			? __("Leave out the screenshot")
 			: __("Use the screenshot");
 		this.el.shot_hint.textContent = this.include_screenshot
-			? __("Draw an arrow to the problem, box it, or write on it.")
+			? __("Draw an arrow to the problem, box it, write on it, or black out private data.")
 			: __("The report goes out without a screenshot.");
 		this.update_footer();
 	}

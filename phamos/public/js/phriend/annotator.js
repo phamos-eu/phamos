@@ -1,4 +1,5 @@
-// Drawing on the screenshot: arrow, box and text, in red. Plain DOM inside Phriend's Shadow
+// Drawing on the screenshot: arrow, box and text in red, and black bars over private data.
+// The black bars are drawn into the image itself: what is under them is never sent. Plain DOM inside Phriend's Shadow
 // DOM; the host (Desk or cockpit) has no part in it. Loaded on demand with the report flow.
 
 import { escape_html } from "./util";
@@ -9,6 +10,7 @@ const ICONS = {
 	pen: '<path d="M5 19 L19 5 M19 5 h-7 M19 5 v7"/>',
 	box: '<rect x="4.5" y="6.5" width="15" height="11" rx="1.5"/>',
 	text: '<path d="M5 6 h14 M12 6 v13 M9 19 h6"/>',
+	redact: '<rect x="3.5" y="8" width="17" height="8" rx="1.5" fill="currentColor"/>',
 	undo: '<path d="M9 14 L4 9 L9 4"/><path d="M4 9 h10 a6 6 0 0 1 0 12 h-3"/>',
 };
 
@@ -30,6 +32,7 @@ export class Annotator {
 					<button type="button" class="tool on" data-tool="pen" title="${escape_html(__("Arrow"))}" aria-label="${escape_html(__("Arrow"))}" aria-pressed="true">${icon("pen")}</button>
 					<button type="button" class="tool" data-tool="box" title="${escape_html(__("Box"))}" aria-label="${escape_html(__("Box"))}" aria-pressed="false">${icon("box")}</button>
 					<button type="button" class="tool" data-tool="text" title="${escape_html(__("Text"))}" aria-label="${escape_html(__("Text"))}" aria-pressed="false">${icon("text")}</button>
+					<button type="button" class="tool" data-tool="redact" title="${escape_html(__("Black out private data"))}" aria-label="${escape_html(__("Black out private data"))}" aria-pressed="false">${icon("redact")}</button>
 					<span class="tool-gap"></span>
 					<button type="button" class="tool" data-action="undo" title="${escape_html(__("Undo"))}" aria-label="${escape_html(__("Undo"))}">${icon("undo")}</button>
 				</div>
@@ -96,15 +99,15 @@ export class Annotator {
 			const p = this.point(e);
 			const w = 4 * this.scale();
 			current =
-				this.tool === "box"
-					? { type: "box", x1: p.x, y1: p.y, x2: p.x, y2: p.y, w }
+				this.tool === "box" || this.tool === "redact"
+					? { type: this.tool, x1: p.x, y1: p.y, x2: p.x, y2: p.y, w }
 					: { type: "pen", points: [p, { ...p }], w }; // a straight arrow
 			this.shapes.push(current);
 		});
 		this.canvas.addEventListener("pointermove", (e) => {
 			if (!current) return;
 			const p = this.point(e);
-			if (current.type === "box") {
+			if (current.type === "box" || current.type === "redact") {
 				current.x2 = p.x;
 				current.y2 = p.y;
 			} else {
@@ -125,7 +128,7 @@ export class Annotator {
 	}
 
 	size_of(s) {
-		if (s.type === "box") return Math.max(Math.abs(s.x2 - s.x1), Math.abs(s.y2 - s.y1));
+		if (s.type === "box" || s.type === "redact") return Math.max(Math.abs(s.x2 - s.x1), Math.abs(s.y2 - s.y1));
 		const [a, b] = s.points;
 		return Math.hypot(b.x - a.x, b.y - a.y);
 	}
@@ -193,7 +196,10 @@ export class Annotator {
 		ctx.lineJoin = "round";
 		this.shapes.forEach((s) => {
 			ctx.lineWidth = s.w;
-			if (s.type === "text") {
+			if (s.type === "redact") {
+				ctx.fillStyle = "#111";
+				ctx.fillRect(Math.min(s.x1, s.x2), Math.min(s.y1, s.y2), Math.abs(s.x2 - s.x1), Math.abs(s.y2 - s.y1));
+			} else if (s.type === "text") {
 				this.draw_text(s);
 			} else if (s.type === "box") {
 				ctx.strokeRect(Math.min(s.x1, s.x2), Math.min(s.y1, s.y2), Math.abs(s.x2 - s.x1), Math.abs(s.y2 - s.y1));
