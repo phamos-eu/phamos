@@ -575,15 +575,17 @@ class Flow {
 			box.innerHTML = `<p class="reported-empty">${escape_html(__("No open reports about this page yet."))}</p>`;
 			return;
 		}
+		// one row per report, in columns that line up across rows: type, title, reporter, age, status
 		const items = reports
-			.map((r) => {
-				const meta = [r.reported_by, r.when, r.status].filter(Boolean).join(" · ");
-				return `<li><a href="${escape_html(this.phriend.host.issue_url(r.name))}" target="_blank" rel="noopener">
-					<span class="reported-type">${escape_html(__(type_label(r.type)))}</span>
-					<span class="reported-title">${escape_html(r.title)}</span>
-					<span class="reported-meta">${escape_html(meta)}</span>
-				</a></li>`;
-			})
+			.map(
+				(r) => `<li><a href="${escape_html(this.phriend.host.issue_url(r.name))}" target="_blank" rel="noopener">
+					<span class="reported-type"><span>${escape_html(__(type_label(r.type)))}</span></span>
+					<span class="reported-title" title="${escape_html(r.title)}">${escape_html(r.title)}</span>
+					<span class="reported-by" title="${escape_html(r.reported_by)}">${escape_html(r.reported_by)}</span>
+					<span class="reported-when">${escape_html(r.when)}</span>
+					<span class="reported-status">${escape_html(r.status)}</span>
+				</a></li>`
+			)
 			.join("");
 		const more =
 			result.count > reports.length && this.phriend.host.open_reports

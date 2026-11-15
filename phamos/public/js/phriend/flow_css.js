@@ -67,15 +67,24 @@ input.input:focus, textarea.input:focus { border-color: var(--ph-focus); }
 .reported-count { display: inline-block; min-width: 18px; padding: 0 6px; border-radius: 9px; background: var(--ph-surface);
 	color: var(--ph-text); font-size: 12px; text-align: center; }
 .reported-empty { margin: 0; font-size: 13px; color: var(--ph-muted); }
-.reported ul { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 2px; }
-.reported a { display: grid; grid-template-columns: auto minmax(0, 1fr); column-gap: 8px; padding: 6px 8px; border-radius: 8px;
-	color: var(--ph-text); text-decoration: none; }
+/* a table in all but name: every row shares the columns (subgrid), so titles and the rest line
+   up whatever the type's length */
+.reported ul { list-style: none; margin: 0; padding: 0; display: grid; row-gap: 2px;
+	grid-template-columns: max-content minmax(0, 1fr) minmax(0, max-content) max-content max-content; }
+.reported li { grid-column: 1 / -1; display: grid; grid-template-columns: subgrid; }
+.reported a { grid-column: 1 / -1; display: grid; grid-template-columns: subgrid; align-items: center; column-gap: 12px;
+	padding: 6px 8px; border-radius: 8px; color: var(--ph-text); text-decoration: none; font-size: 13px; }
 .reported a:hover { background: var(--ph-surface); }
 .reported a:focus-visible { outline: 2px solid var(--ph-focus); outline-offset: 1px; }
-.reported-type { grid-row: span 2; align-self: start; margin-top: 1px; padding: 1px 6px; border-radius: 6px; font-size: 11px;
+.reported-type span { display: inline-block; padding: 1px 6px; border-radius: 6px; font-size: 11px;
 	background: var(--ph-chip); color: var(--ph-chip-text); }
 .reported-title { font-size: 14px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.reported-meta { font-size: 12px; color: var(--ph-muted); }
+.reported-by { max-width: 11em; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; color: var(--ph-muted); }
+.reported-when, .reported-status { white-space: nowrap; color: var(--ph-muted); }
+@media (max-width: 720px) {
+	.reported ul { grid-template-columns: max-content minmax(0, 1fr) max-content; }
+	.reported-by, .reported-status { display: none; }
+}
 .reported-all { margin: 6px 8px 0; font-size: 13px; color: var(--ph-muted); }
 .shot { position: relative; }
 .skeleton { display: flex; align-items: center; justify-content: center; gap: 10px; height: min(52vh, 460px);
