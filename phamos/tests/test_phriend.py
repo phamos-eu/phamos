@@ -153,6 +153,14 @@ class TestPhriend(FrappeTestCase):
 				self.assertIn("The screenshot could not be saved", issue.description)
 				self.assertFalse(frappe.get_all("File", {"attached_to_name": issue.name}))
 
+	def test_something_else_is_a_report_type(self, _enqueue):
+		# the flow offers "Something else" next to Bug, Idea and Question (#1900)
+		issue = self.report(report_type="Other", title="Hard to say")
+		self.assertEqual(issue.phriend_type, "Other")
+		self.assertEqual(issue.subject, "[Other] Hard to say")
+		options = frappe.get_meta("Issue").get_field("phriend_type").options.split("\n")
+		self.assertIn("Other", options)
+
 	def test_unknown_doctype_and_type_are_dropped(self, _enqueue):
 		issue = self.report(ref_doctype="No Such DocType", report_type="Rant", priority="Whenever")
 		self.assertFalse(issue.phriend_ref_doctype)

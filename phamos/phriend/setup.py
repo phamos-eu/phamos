@@ -48,7 +48,7 @@ _FIELDS = [
 		"fieldname": "phriend_type",
 		"label": "Report Type",
 		"fieldtype": "Select",
-		"options": "\nBug\nIdea\nQuestion",
+		"options": "\nBug\nIdea\nQuestion\nOther",
 		"in_standard_filter": 1,
 		"insert_after": "phriend_reported_by_name",
 	},

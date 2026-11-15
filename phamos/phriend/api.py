@@ -17,7 +17,7 @@ from frappe.utils.password import get_decrypted_password
 
 MAX_SCREENSHOT_BYTES = 15 * 1024 * 1024
 REPORT_DOCTYPE = "Issue"
-REPORT_TYPES = ("Bug", "Idea", "Question")
+REPORT_TYPES = ("Bug", "Idea", "Question", "Other")  # "Other" is "Something else" in the flow (#1900)
 PRIORITIES = ("Low", "Medium", "High", "Urgent")
 CLOSED_STATUSES = ("Resolved", "Closed")
 DEFAULT_GITLAB_PROJECT = "phamos/phamos"

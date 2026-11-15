@@ -1,7 +1,8 @@
 // The report flow: four steps, each one optional.
-//   1 Screenshot: draw on it, or leave it out
-//   2 What happened: title and description
-//   3 Type and priority
+//   1 Type and priority: what kind of report, how urgent (first, so the user decides what
+//     this is before anything else; PM decision 2026-11-15, #1900)
+//   2 Screenshot: draw on it, black things out, or leave it out
+//   3 What happened: title and description
 //   4 Check and send
 // Loaded on demand (Desk: phriend_flow.bundle.js, cockpits: a dynamic import), so pages
 // don't carry html2canvas until someone wants to report something.
@@ -13,10 +14,16 @@ import { FLOW_CSS } from "./flow_css";
 import { Sender } from "./send";
 import { DRAFT_KEY, escape_html, sleep, storage_set } from "./util";
 
+// The steps, in their order. The screenshot is taken at the click whatever comes first.
+const STEP = { kind: 0, shot: 1, text: 2, check: 3 };
+const LAST_STEP = STEP.check;
+
+// [value stored on the Issue, label, hint]
 const TYPES = [
-	["Bug", "Something is broken"],
-	["Idea", "It could be better"],
-	["Question", "I'm not sure how"],
+	["Bug", "Bug", "Something is broken"],
+	["Idea", "Idea", "It could be better"],
+	["Question", "Question", "I'm not sure how"],
+	["Other", "Something else", "None of these"],
 ];
 const PRIORITIES = ["Low", "Medium", "High", "Urgent"];
 // the ball again, small, for the header; its own gradient id, because the big ball (hidden
@@ -38,7 +45,7 @@ class Flow {
 		this.values = { title: "", comment: "", report_type: "Bug", priority: "Medium", ...text };
 		this.include_screenshot = has_screenshot !== false;
 		this.touched = new Set(); // steps the user changed something in
-		if (draft && (draft.title || draft.comment)) this.touched.add(1);
+		if (draft && (draft.title || draft.comment)) this.touched.add(STEP.text);
 		this.sender = phriend.sender || (phriend.sender = new Sender(phriend));
 		// reopened after a failure: the report is back in the flow (and its text in the draft)
 		if (from_failed) this.sender.failed = null;
@@ -49,7 +56,7 @@ class Flow {
 		// above everything the page may open meanwhile (Desk's message boxes sit above 1050)
 		phriend.ball.host.style.zIndex = "2147483000";
 		this.previous_focus = document.activeElement;
-		this.show(draft && (draft.title || draft.comment) ? 1 : 0);
+		this.show(draft && (draft.title || draft.comment) ? STEP.text : STEP.kind);
 		if (canvas) this.use_screenshot(canvas);
 		else this.start_capture();
 	}
@@ -69,8 +76,8 @@ class Flow {
 		const __ = this.__;
 		const where = this.ctx.where || this.ctx.page_title || "";
 		const types = TYPES.map(
-			([value, hint]) =>
-				`<button type="button" class="chip" data-type="${value}"><span>${escape_html(__(value))}</span><small>${escape_html(__(hint))}</small></button>`
+			([value, label, hint]) =>
+				`<button type="button" class="chip" data-type="${value}"><span>${escape_html(__(label))}</span><small>${escape_html(__(hint))}</small></button>`
 		).join("");
 		const priorities = PRIORITIES.map(
 			(value) => `<button type="button" class="chip slim" data-priority="${value}">${escape_html(__(value))}</button>`
@@ -95,25 +102,25 @@ class Flow {
 				</header>
 				<main>
 					<section class="pane" data-pane="0">
+						<label class="field">${escape_html(__("What is it?"))}</label>
+						<div class="chips" role="radiogroup">${types}</div>
+						<div class="gap"></div>
+						<label class="field">${escape_html(__("How urgent is it?"))}</label>
+						<div class="chips" role="radiogroup">${priorities}</div>
+					</section>
+					<section class="pane" data-pane="1" hidden>
 						<div class="shot"><div class="skeleton"><span class="spinner"></span>${escape_html(__("Taking a screenshot of the page…"))}</div></div>
 						<div class="shot-bar">
 							<span class="grow" data-shot-hint>${escape_html(__("Draw an arrow to the problem, box it, write on it, or black out private data."))}</span>
 							<button type="button" class="btn ghost" data-toggle-shot hidden>${escape_html(__("Leave out the screenshot"))}</button>
 						</div>
 					</section>
-					<section class="pane" data-pane="1" hidden>
+					<section class="pane" data-pane="2" hidden>
 						<label class="field" for="ph-in-title">${escape_html(__("In a few words"))}</label>
 						<input class="input" id="ph-in-title" maxlength="120" autocomplete="off" placeholder="${escape_html(__("Save does nothing on a new lead"))}">
 						<div class="gap"></div>
 						<label class="field" for="ph-in-comment">${escape_html(__("What did you do, and what did you expect?"))}</label>
 						<textarea class="input" id="ph-in-comment" rows="6" placeholder="${escape_html(__("I filled in the company name and clicked Save. Nothing happened."))}"></textarea>
-					</section>
-					<section class="pane" data-pane="2" hidden>
-						<label class="field">${escape_html(__("What is it?"))}</label>
-						<div class="chips" role="radiogroup">${types}</div>
-						<div class="gap"></div>
-						<label class="field">${escape_html(__("How urgent is it?"))}</label>
-						<div class="chips" role="radiogroup">${priorities}</div>
 					</section>
 					<section class="pane" data-pane="3" hidden></section>
 				</main>
@@ -163,11 +170,11 @@ class Flow {
 			if (t.hasAttribute("data-close")) this.close();
 			else if (t.hasAttribute("data-dot")) this.show(Number(t.dataset.dot));
 			else if (t.hasAttribute("data-back")) this.show(this.step - 1);
-			else if (t.hasAttribute("data-next")) this.step === 3 ? this.send() : this.show(this.step + 1);
+			else if (t.hasAttribute("data-next")) this.step === LAST_STEP ? this.send() : this.show(this.step + 1);
 			else if (t.hasAttribute("data-send-now")) this.send();
 			else if (t.hasAttribute("data-toggle-shot")) this.toggle_screenshot();
-			else if (t.dataset.type) this.choose("report_type", t.dataset.type, 2);
-			else if (t.dataset.priority) this.choose("priority", t.dataset.priority, 2);
+			else if (t.dataset.type) this.choose("report_type", t.dataset.type, STEP.kind);
+			else if (t.dataset.priority) this.choose("priority", t.dataset.priority, STEP.kind);
 			else if (t.hasAttribute("data-discard")) this.close(true);
 			else if (t.hasAttribute("data-keep")) this.restore_footer();
 		});
@@ -176,8 +183,8 @@ class Flow {
 			this.touched.add(step);
 			this.update_footer();
 		};
-		this.el.in_title.addEventListener("input", typing("title", 1));
-		this.el.in_comment.addEventListener("input", typing("comment", 1));
+		this.el.in_title.addEventListener("input", typing("title", STEP.text));
+		this.el.in_comment.addEventListener("input", typing("comment", STEP.text));
 		this.el.in_title.addEventListener("keydown", (e) => {
 			if (e.key === "Enter" && !e.ctrlKey && !e.metaKey && !e.isComposing) {
 				e.preventDefault();
@@ -199,10 +206,10 @@ class Flow {
 		};
 		host.addEventListener("keydown", this.on_host_key);
 		document.addEventListener("keydown", this.on_page_key, true);
-		// the canvas tracks the pointer: count a drawing as a change on step 1
+		// the canvas tracks the pointer: count a drawing as a change on the screenshot step
 		this.el.shot.addEventListener("pointerup", () => {
 			if (this.annotator && this.annotator.has_drawing()) {
-				this.touched.add(0);
+				this.touched.add(STEP.shot);
 				this.update_footer();
 			}
 		});
@@ -244,24 +251,27 @@ class Flow {
 
 	show(step) {
 		const __ = this.__;
-		step = Math.max(0, Math.min(3, step));
+		step = Math.max(0, Math.min(LAST_STEP, step));
 		this.step = step;
 		this.layer.querySelectorAll(".pane").forEach((pane) => (pane.hidden = Number(pane.dataset.pane) !== step));
 		this.layer.querySelectorAll(".dot").forEach((dot, i) => {
 			dot.classList.toggle("on", i <= step);
 			dot.setAttribute("aria-current", i === step ? "step" : "false");
 		});
-		this.el.title.textContent = [
-			__("Show what you mean"),
-			__("What happened?"),
-			__("What kind of report?"),
-			__("Check and send"),
-		][step];
-		this.el.panel.classList.toggle("narrow", step === 1 || step === 2);
-		if (step === 3) this.render_summary();
+		this.el.title.textContent = {
+			[STEP.kind]: __("What kind of report?"),
+			[STEP.shot]: __("Show what you mean"),
+			[STEP.text]: __("What happened?"),
+			[STEP.check]: __("Check and send"),
+		}[step];
+		this.el.panel.classList.toggle("narrow", step === STEP.kind || step === STEP.text);
+		if (step === STEP.check) this.render_summary();
 		this.update_footer();
 
-		const focus = [null, this.el.in_title, this.layer.querySelector(".chip.on"), this.el.next][step];
+		const focus = {
+			[STEP.kind]: this.layer.querySelector(".chip.on"),
+			[STEP.text]: this.el.in_title,
+		}[step];
 		setTimeout(() => (focus || this.el.next).focus({ preventScroll: true }), 0);
 	}
 
@@ -269,10 +279,15 @@ class Flow {
 		if (!this.el.back.isConnected) return; // the discard question is showing
 		const __ = this.__;
 		this.el.back.hidden = this.step === 0;
-		this.el.send_now.hidden = this.step === 3;
-		// an untouched step says "Skip": every step is optional
+		this.el.send_now.hidden = this.step === LAST_STEP;
+		// an untouched step says "Skip": every step is optional. The type step always has a
+		// choice (Bug, Medium), so it says "Next".
 		this.el.next.textContent =
-			this.step === 3 ? __("Send to Phriend") : this.touched.has(this.step) || this.step === 2 ? __("Next") : __("Skip");
+			this.step === LAST_STEP
+				? __("Send to Phriend")
+				: this.touched.has(this.step) || this.step === STEP.kind
+				? __("Next")
+				: __("Skip");
 	}
 
 	choose(key, value, step) {
@@ -324,7 +339,7 @@ class Flow {
 				<div>
 					<h3 class="${v.title.trim() ? "" : "built"}">${escape_html(v.title.trim() || this.built_title())}</h3>
 					<p class="meta">${escape_html(
-						[__(v.report_type), __(v.priority), shot ? __("with screenshot") : __("no screenshot")].join(" · ")
+						[__(type_label(v.report_type)), __(v.priority), shot ? __("with screenshot") : __("no screenshot")].join(" · ")
 					)}</p>
 					${v.comment.trim() ? `<p class="comment">${escape_html(v.comment.trim())}</p>` : ""}
 					<p class="facts-title">${escape_html(__("Phriend adds this for you"))}</p>
@@ -379,7 +394,7 @@ class Flow {
 	toggle_screenshot() {
 		const __ = this.__;
 		this.include_screenshot = !this.include_screenshot;
-		this.touched.add(0);
+		this.touched.add(STEP.shot);
 		const wrap = this.el.shot.querySelector(".annotator");
 		if (wrap) wrap.style.opacity = this.include_screenshot ? "" : "0.25";
 		this.el.toggle_shot.textContent = this.include_screenshot
@@ -508,6 +523,11 @@ class Flow {
 		this.update_footer();
 		this.el.next.focus();
 	}
+}
+
+function type_label(value) {
+	const type = TYPES.find(([v]) => v === value);
+	return type ? type[1] : value;
 }
 
 function version_of(versions) {
