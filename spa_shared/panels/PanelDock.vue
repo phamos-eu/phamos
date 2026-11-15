@@ -1,10 +1,12 @@
 <template>
 	<!-- The dock beside a record (#1910): the record's panels stacked, each a row that expands in
-	     place. Resizable at its left edge; order, open panels and width are kept per user. -->
+	     place. Resizable at its left edge; order, open panels and width are kept per user.
+	     No border of its own: the description and the properties column draw the lines, and the
+	     chat needs every pixel of its 768 (Raven's touch layout starts below that, #1613). -->
 	<aside
 		v-if="panels.length"
 		v-show="!allHidden"
-		class="relative flex min-h-0 min-w-0 flex-none flex-col border-r border-outline-gray-2 bg-surface-white"
+		class="relative flex min-h-0 min-w-0 flex-none flex-col bg-surface-white"
 		:style="{
 			width: `${width}px`,
 			// The record keeps at least 20rem, except next to a panel that needs its width (the

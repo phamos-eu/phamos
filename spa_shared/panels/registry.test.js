@@ -58,11 +58,23 @@ describe("panelsFor", () => {
 	})
 
 	it("puts the user's order above the cockpit's and ignores unknown ids", () => {
-		const layout = { order: ["gone", "chat", "checklists"] }
+		const layout = { order: ["gone", "chat", "checklists", "phriend"] }
 		expect(ids(panelsFor(all, { doctype: "Issue", record: { phriend: {} }, layout }))).toEqual([
 			"chat",
 			"checklists",
 			"phriend",
+		])
+	})
+
+	it("keeps a panel the user never ordered at its declared place", () => {
+		// the user ordered phriend and checklists before the chat existed (order 5)
+		const early = definePanel({ id: "early", doctypes: ["Issue"], order: 1 })
+		const layout = { order: ["checklists", "phriend"] }
+		expect(ids(panelsFor([early, ...all], { doctype: "Issue", record: { phriend: {} }, layout }))).toEqual([
+			"early",
+			"checklists",
+			"phriend",
+			"chat",
 		])
 	})
 

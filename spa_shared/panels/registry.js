@@ -77,6 +77,24 @@ function sortByIds(defs, ids) {
 }
 
 /**
+ * The user's order applied to the panels it names; the others keep their place. So a panel added
+ * later (e.g. the chat, #1911) appears where it was declared, not after everything the user ever
+ * ordered.
+ */
+function reorderNamed(defs, ids) {
+	const named = new Set(ids)
+	const slots = []
+	defs.forEach((def, index) => named.has(def.id) && slots.push(index))
+	const moved = sortByIds(
+		defs.filter((def) => named.has(def.id)),
+		ids
+	)
+	const result = [...defs]
+	slots.forEach((slot, i) => (result[slot] = moved[i]))
+	return result
+}
+
+/**
  * The panels to show for one record, in order, each with whether it is expanded.
  *
  * Order: the user's stored order, then the cockpit's, then the declarations' own.
@@ -102,7 +120,7 @@ export function panelsFor(definitions, { doctype, record, cockpitPanels, layout 
 			return false
 		}
 	})
-	const ordered = layout?.order?.length ? sortByIds(visible, layout.order) : visible
+	const ordered = layout?.order?.length ? reorderNamed(visible, layout.order) : visible
 	const collapsed = new Set(layout?.collapsed || [])
 	const expanded = new Set(layout?.expanded || [])
 	return ordered.map((def) => {
