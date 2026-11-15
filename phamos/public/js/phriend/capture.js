@@ -8,8 +8,11 @@ import { sleep, storage_get, storage_set, with_timeout } from "./util";
 
 const HTML2CANVAS_TIMEOUT_MS = 3000; // then html-to-image
 const CAPTURE_TIMEOUT_MS = 8000; // both engines together; then the flow goes on without one
-// remembers per page type when html2canvas failed, so the slow failure happens once
-const ENGINE_KEY_PREFIX = "phriend:engine:v4:";
+// Remembers per page type that html2canvas failed there, so the slow failure happens once.
+// Only real errors count, not a slow run, and the memo expires: the page or the browser may
+// have changed since. v5: v4 memos were also written on timeouts, so they are ignored.
+const ENGINE_KEY_PREFIX = "phriend:engine:v5:";
+const ENGINE_MEMO_DAYS = 7;
 const DEBUG_KEY = "phriend:debug"; // localStorage.setItem("phriend:debug", 1) for html2canvas logs
 const KEEP_TAGS = new Set(["HEAD", "LINK", "STYLE", "META", "TITLE", "BASE"]);
 const BLANK_GIF = "data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7";
@@ -169,20 +172,29 @@ async function render_html_to_image(ms) {
 	}
 }
 
+function html2canvas_failed_here(memo) {
+	try {
+		const { at } = JSON.parse(storage_get(memo) || "null") || {};
+		return !!at && Date.now() - at < ENGINE_MEMO_DAYS * 86400000;
+	} catch (e) {
+		return false; // a broken value: try html2canvas again
+	}
+}
+
 async function render(engine_key, deadline) {
 	const memo = `${ENGINE_KEY_PREFIX}${engine_key}`;
 	const left = () => Math.max(0, deadline - performance.now());
-	if (storage_get(memo) === "html-to-image") return render_html_to_image(left());
+	if (html2canvas_failed_here(memo)) return render_html_to_image(left());
 	try {
 		return await with_timeout(render_html2canvas(), Math.min(HTML2CANVAS_TIMEOUT_MS, left()));
 	} catch (e) {
 		console.warn("Phriend: html2canvas failed, trying html-to-image", e);
-		storage_set(memo, "html-to-image");
+		if (!(e && e.timed_out)) storage_set(memo, JSON.stringify({ at: Date.now() }));
 		return render_html_to_image(left());
 	}
 }
 
-// Returns { canvas, engine, ms }. Rejects after CAPTURE_TIMEOUT_MS.
+// Returns { canvas, ms }. Rejects after CAPTURE_TIMEOUT_MS.
 export async function capture(engine_key) {
 	// Frappe draws ::before/::after on grid checkboxes; html2canvas reads an empty style there
 	// and crashes ("Error parsing CSS component value"). And many elements have
@@ -198,6 +210,8 @@ export async function capture(engine_key) {
 	const started = performance.now();
 	try {
 		const canvas = await render(engine_key, started + CAPTURE_TIMEOUT_MS);
+		// a page of 0 x 0 pixels (a hidden or minimised window) draws nothing to send
+		if (!canvas || !canvas.width || !canvas.height) throw new Error("The screenshot is empty");
 		return { canvas, ms: Math.round(performance.now() - started) };
 	} finally {
 		fix.remove();
@@ -205,8 +219,10 @@ export async function capture(engine_key) {
 }
 
 // The smaller of PNG and JPEG: JPEG is 35–60% smaller on our pages, PNG wins on plain ones.
+// null when the canvas can't be encoded (empty, or larger than the browser allows: "data:,").
 export function to_data_url(canvas) {
 	const png = canvas.toDataURL("image/png");
 	const jpeg = canvas.toDataURL("image/jpeg", 0.85);
-	return jpeg.length < png.length ? jpeg : png;
+	const smaller = jpeg.length < png.length ? jpeg : png;
+	return smaller.startsWith("data:image/") ? smaller : null;
 }
