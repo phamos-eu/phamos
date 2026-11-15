@@ -105,7 +105,11 @@ def _web_url(url):
 	parsed = urlparse(cstr(url).strip())
 	if parsed.scheme not in ("http", "https") or not parsed.path.startswith("/"):
 		return None
-	path = "/" + parsed.path.lstrip("/")  # "//evil.example" would be another host again
+	# Read the path as a browser does: it drops tabs and line breaks and takes a backslash for "/".
+	# Then leave one leading slash: "//evil.example", or a backslash right after the first slash,
+	# would be another host again (review of !1164).
+	path = re.sub(r"[\t\n\r]", "", parsed.path).replace("\\", "/")
+	path = "/" + path.lstrip("/")
 	return urlunparse(("", "", path, "", parsed.query, parsed.fragment))
 
 
