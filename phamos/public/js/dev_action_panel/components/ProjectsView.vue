@@ -9,6 +9,7 @@ const props = defineProps({
   projectElapsedSeconds: Number,
   loading: Boolean,
   activeIssueSession: Object,
+  issues: { type: Array, default: () => [] }, // for the GitLab ticket picker on Stop
 });
 
 const emit = defineEmits(["start", "pause", "resume", "stop", "assign"]);
@@ -20,20 +21,21 @@ const search = ref("");
 const rawProjects = computed(() => props.allProjects || []);
 const query = computed(() => search.value.trim().toLowerCase());
 
+// The project with my running or paused timer always comes first, whatever the search.
 const filteredProjects = computed(() => {
-  if (!query.value) return rawProjects.value;
-  return rawProjects.value.filter((p) => {
-    const haystack = [
-      p.project_name || "",
-      p.name || "",
-      p.customer_name || "",
-      p.status || "",
-    ]
-      .join(" ")
-      .toLowerCase();
-    return haystack.includes(query.value);
-  });
+  const activeName = props.activeProjectSession?.project;
+  const active = activeName ? rawProjects.value.find((p) => p.name === activeName) : null;
+  const rest = rawProjects.value.filter((p) => p.name !== activeName && matches(p));
+  return active ? [active, ...rest] : rest;
 });
+
+function matches(p) {
+  if (!query.value) return true;
+  const haystack = [p.project_name || "", p.name || "", p.customer_desc || "", p.status || ""]
+    .join(" ")
+    .toLowerCase();
+  return haystack.includes(query.value);
+}
 </script>
 
 <template>
@@ -100,6 +102,7 @@ const filteredProjects = computed(() => {
         :active-project-session="activeProjectSession"
         :project-elapsed-seconds="projectElapsedSeconds"
         :active-issue-session="activeIssueSession"
+        :issues="issues"
         @start="emit('start', $event)"
         @pause="emit('pause')"
         @resume="emit('resume')"

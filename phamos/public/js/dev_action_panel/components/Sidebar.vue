@@ -16,7 +16,7 @@ const props = defineProps({
   projectElapsedSeconds: Number,
 });
 
-const emit = defineEmits(["select-project", "change-view", "toggle-mine", "sync", "navigate-projects"]);
+const emit = defineEmits(["select-project", "change-view", "toggle-mine", "sync", "navigate-projects", "open-session"]);
 
 const user = frappe.session.user;
 const userName = frappe.user.full_name() || user;
@@ -71,7 +71,16 @@ const ISSUE_ICON = "M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00
     </div>
 
     <!-- Active session widget -->
-    <div v-if="displaySession" class="sb__session" :class="isRunning ? 'sb__session--running' : 'sb__session--paused'">
+    <div
+      v-if="displaySession"
+      class="sb__session sb__session--clickable"
+      :class="isRunning ? 'sb__session--running' : 'sb__session--paused'"
+      role="button"
+      tabindex="0"
+      title="Open the running timesheet"
+      @click="emit('open-session')"
+      @keydown.enter="emit('open-session')"
+    >
       <div class="sb__session-head">
         <span class="sb__dot" :class="isRunning ? 'dot--green' : 'dot--amber'"></span>
         <span class="sb__session-state">{{ isRunning ? "Running" : "Paused" }}</span>
@@ -211,6 +220,8 @@ const ISSUE_ICON = "M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00
 
 /* Active session */
 .sb__session { margin: 10px 10px 0; padding: 10px 12px; border-radius: 8px; flex-shrink: 0; }
+.sb__session--clickable { cursor: pointer; transition: box-shadow 0.12s; }
+.sb__session--clickable:hover, .sb__session--clickable:focus-visible { box-shadow: 0 0 0 2px var(--primary); outline: none; }
 .sb__session--running { background: var(--green-50, #f0fdf4); border: 1px solid var(--green-200, #bbf7d0); }
 .sb__session--paused  { background: var(--yellow-50, #fefce8); border: 1px solid var(--yellow-200, #fef08a); }
 .sb__session-head { display: flex; align-items: center; gap: 6px; margin-bottom: 4px; }
