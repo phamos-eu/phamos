@@ -9,6 +9,7 @@ import BreakConfirm from "./components/BreakConfirm.vue";
 import CalendarView from "./components/CalendarView.vue";
 import TimesheetList from "./components/TimesheetList.vue";
 import ProjectsView from "./components/ProjectsView.vue";
+import ProjectCard from "./components/ProjectCard.vue";
 import { ratingArgs } from "./timesheetRating.js";
 
 const issues = ref([]);
@@ -39,7 +40,18 @@ const assigneeFilter = ref([]);
 const labelFilter = ref([]);
 const sortBy = ref("due_date");
 const sortDir = ref("asc");
-function clearAllFilters() { searchQuery.value = ""; dueFilter.value = "all"; assigneeFilter.value = []; labelFilter.value = []; sortBy.value = "due_date"; sortDir.value = "asc"; }
+const typeFilter = ref("all"); // 'all' | 'parent' | 'child'
+
+function clearAllFilters() {
+  searchQuery.value = "";
+  dueFilter.value = "all";
+  assigneeFilter.value = [];
+  labelFilter.value = [];
+  sortBy.value = "due_date";
+  sortDir.value = "asc";
+  typeFilter.value = "all";
+  selectedProject.value = null;
+}
 
 // Dynamic filter options derived from the loaded issues
 const assigneeOptions = computed(() => {
@@ -58,16 +70,18 @@ const labelOptions = computed(() => {
 // Derived
 const myIssuesCount = computed(() => issues.value.filter(i => i.is_mine).length);
 
+// Projects that have issues in the current scope, in the project list's order (last used first).
 const projects = computed(() => {
   const base = mineOnly.value ? issues.value.filter(i => i.is_mine) : issues.value;
-  const map = {};
+  const byProject = {};
   base.forEach(i => {
-    if (i.gitlab_project) {
-      if (!map[i.gitlab_project]) map[i.gitlab_project] = { name: i.gitlab_project, title: i.gitlab_project_title || i.gitlab_project, count: 0 };
-      map[i.gitlab_project].count++;
-    }
+    if (!i.project) return;
+    if (!byProject[i.project]) byProject[i.project] = { name: i.project, title: i.project_name || i.project, count: 0 };
+    byProject[i.project].count++;
   });
-  return Object.values(map).sort((a, b) => a.title.localeCompare(b.title));
+  const order = allProjects.value.map(p => p.name);
+  const rank = name => (order.includes(name) ? order.indexOf(name) : order.length);
+  return Object.values(byProject).sort((a, b) => rank(a.name) - rank(b.name));
 });
 
 const filteredIssues = computed(() => {
@@ -78,7 +92,7 @@ const filteredIssues = computed(() => {
   let list = issues.value.filter(i => i.name !== activeIssueName);
 
   if (mineOnly.value) list = list.filter(i => i.is_mine);
-  if (selectedProject.value) list = list.filter(i => i.gitlab_project === selectedProject.value);
+  if (selectedProject.value) list = list.filter(i => i.project === selectedProject.value);
 
   const q = searchQuery.value.trim().toLowerCase();
   if (q) list = list.filter(i =>
@@ -88,6 +102,9 @@ const filteredIssues = computed(() => {
     i.assignee?.toLowerCase().includes(q) ||
     i.labels?.toLowerCase().includes(q)
   );
+
+  if (typeFilter.value === "parent") list = list.filter(i => i.child_count > 0);
+  if (typeFilter.value === "child") list = list.filter(i => !!i.parent_issue);
 
   if (assigneeFilter.value.length) list = list.filter(i => assigneeFilter.value.includes(i.assignee));
   if (labelFilter.value.length) list = list.filter(i =>
@@ -142,6 +159,19 @@ const filteredIssues = computed(() => {
   if (activeIssue) list = [activeIssue, ...list];
   return list;
 });
+
+// A running project timer is also shown on top of the Issues view.
+const activeProjectRow = computed(() => {
+  const s = activeProjectSession.value;
+  if (!s) return null;
+  return allProjects.value.find(p => p.name === s.project)
+    || { name: s.project, project_name: s.project, percent_billable: s.project_percent_billable, assignees: [] };
+});
+
+function openRunningSession() {
+  if (activeProjectSession.value) currentView.value = "projects";
+  else if (activeSession.value) currentView.value = "issues";
+}
 
 // Timer
 let timerInterval = null;
@@ -280,10 +310,11 @@ function showTimeLimitDialog(status, onSubmitted) {
   });
 }
 
-async function onStopProjectTimer({ result, valueAdd, percentBillable, activityType, manualEndTime }) {
+async function onStopProjectTimer({ result, valueAdd, percentBillable, activityType, manualEndTime, gitlabIssueRef }) {
   if (!activeProjectSession.value) return;
   const args = { name: activeProjectSession.value.name, result, activity_type: activityType, ...ratingArgs(valueAdd, percentBillable) };
   if (manualEndTime) args.manual_end_time = manualEndTime;
+  if (gitlabIssueRef) args.gitlab_issue_ref = gitlabIssueRef;
   const r = await frappe.call({
     method: "phamos.phamos.page.dev_action_panel.dev_action_panel.stop_timer",
     args,
@@ -451,6 +482,7 @@ onUnmounted(() => { stopTick(); stopProjectTick(); });
   <BreakModal
     v-if="showBreakModal && breakFrom"
     :break-from="breakFrom"
+    :projects="allProjects"
     @confirm="onBreakSubmit"
     @skip="onBreakSkip"
     @close="onBreakModalClose"
@@ -489,6 +521,7 @@ onUnmounted(() => { stopTick(); stopProjectTick(); });
           @toggle-mine="mineOnly = $event"
           @sync="onSync"
           @navigate-projects="currentView = 'projects'"
+          @open-session="openRunningSession"
         />
       </aside>
 
@@ -501,12 +534,28 @@ onUnmounted(() => { stopTick(); stopProjectTick(); });
             v-model:labelFilter="labelFilter"
             v-model:sortBy="sortBy"
             v-model:sortDir="sortDir"
+            v-model:projectFilter="selectedProject"
+            v-model:typeFilter="typeFilter"
             :assignee-options="assigneeOptions"
             :label-options="labelOptions"
+            :project-options="projects"
             :result-count="filteredIssues.length"
             :total-count="issues.length"
             @clear-all="clearAllFilters"
           />
+          <div v-if="activeProjectRow" class="dc-running-project">
+            <ProjectCard
+              :project="activeProjectRow"
+              :active-project-session="activeProjectSession"
+              :project-elapsed-seconds="projectElapsedSeconds"
+              :active-issue-session="activeSession"
+              :issues="issues"
+              @pause="onPauseProjectTimer"
+              @resume="onResumeProjectTimer"
+              @stop="onStopProjectTimer"
+              @assign="assignProject"
+            />
+          </div>
           <div v-if="loading" class="dc-loading">
             <div class="dc-loading__spinner"></div>
             <span>Loading your issues…</span>
@@ -532,6 +581,7 @@ onUnmounted(() => { stopTick(); stopProjectTick(); });
         <ProjectsView
           v-else-if="currentView === 'projects'"
           :all-projects="allProjects"
+          :issues="issues"
           :active-project-session="activeProjectSession"
           :project-elapsed-seconds="projectElapsedSeconds"
           :loading="projectsLoading"
@@ -598,6 +648,7 @@ onUnmounted(() => { stopTick(); stopProjectTick(); });
 
 /* Body */
 .dc-body { flex: 1; min-width: 0; overflow-y: auto; }
+.dc-running-project { padding: 4px 16px 0; }
 
 .dc-loading {
   display: flex; flex-direction: column; align-items: center; justify-content: center;
