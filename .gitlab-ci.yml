@@ -43,7 +43,8 @@
 #   Reads an issue's text and images and posts an analysis comment. Uses the
 #   same CI/CD variables as ai_code_review: ANTHROPIC_API_KEY and GITLAB_API_TOKEN.
 #   A pipeline schedule on develop with AI_ISSUE_POLL=true checks open issues
-#   labelled bug or question and comments on those that have no analysis yet
+#   labelled bug or question, reads the matching code in this checkout, and
+#   comments on those that have no analysis yet
 #   (AI_ISSUE_POLL_LIMIT per run, default 5). The phamos site can still start
 #   one issue by calling the pipeline API with AI_ISSUE_IID and AI_ISSUE_LABEL.
 #   Set AI_ISSUE_ANALYSIS_ENABLED=false to turn the job off. The poll schedule

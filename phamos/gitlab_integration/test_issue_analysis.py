@@ -5,6 +5,7 @@
 
 import importlib.util
 import os
+import tempfile
 from pathlib import Path
 from unittest.mock import MagicMock, patch
 
@@ -173,7 +174,7 @@ class TestIssueAnalysis(FrappeTestCase):
                 posts.append(payload["body"])
                 notes.append({"body": payload["body"], "system": False})
 
-        def claude(label, title, description, note_lines, images):
+        def claude(label, title, description, note_lines, images, code=""):
             seen_images.extend(images)
             return "The save button closes nothing."
 
@@ -254,3 +255,43 @@ class TestIssueAnalysis(FrappeTestCase):
             script.main()
 
         self.assertEqual(posts, ["/issues/7/notes"])
+
+    def test_analysis_sends_matching_repository_code(self):
+        script = _ci_script()
+        seen = {}
+
+        def claude(label, title, description, note_lines, images, code=""):
+            seen["code"] = code
+            return "Created from the action panel."
+
+        class FakeGitLab:
+            server = GITLAB
+
+            def get(self, path, **params):
+                return []
+
+            def download(self, url):
+                return None
+
+            def post(self, path, payload):
+                return None
+
+        issue = {
+            "iid": 9,
+            "title": "Timesheet record",
+            "description": "How is a timesheet record created from the action panel?",
+            "web_url": f"{PROJECT}/-/issues/9",
+        }
+        with tempfile.TemporaryDirectory() as root:
+            os.makedirs(os.path.join(root, "phamos"))
+            with open(os.path.join(root, "phamos", "timesheet_record.py"), "w", encoding="utf-8") as handle:
+                handle.write("def create_timesheet_record_from_action_panel():\n    return 'created'\n")
+            script._SOURCE_CACHE = None
+            with (
+                patch.object(script, "call_claude", side_effect=claude),
+                patch.dict(os.environ, {"AI_ISSUE_REPO": root}),
+            ):
+                script.analyse_issue(FakeGitLab(), issue, "question")
+
+        self.assertIn("phamos/timesheet_record.py", seen["code"])
+        self.assertIn("create_timesheet_record_from_action_panel", seen["code"])
