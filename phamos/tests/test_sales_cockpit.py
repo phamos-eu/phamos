@@ -503,6 +503,24 @@ class TestLeadOverview(FrappeTestCase):
 		data = self._build(rows)
 		self.assertEqual(data["average"]["months_used"], 2)
 
+	def test_the_chart_splits_the_year_earlier_bar_by_direction(self):
+		"""The All leads chart stacks both bars of a month by direction (phamos/phamos#1929)."""
+		rows = _rows(
+			("2025-09-15 10:00:00", "", "Lead", "Outbound"),
+			("2025-10-03 10:00:00", "", "Lead", "Inbound"),
+			("2025-10-04 10:00:00", "", "Lead", "Outbound"),
+			("2025-10-05 10:00:00", "", "Lead", None),
+			("2025-10-06 10:00:00", "", "Lead", None),
+			("2026-10-07 10:00:00", "", "Lead", "Inbound"),
+		)
+		chart = {m["key"]: m for m in self._build(rows)["chart"]}
+		october = chart["2026-10"]
+		self.assertEqual(october["split"], {"Inbound": 1, "Outbound": 0, "none": 0})
+		self.assertEqual(october["last_year"], 4)
+		self.assertEqual(october["last_year_split"], {"Inbound": 1, "Outbound": 1, "none": 2})
+		# September 2025 starts mid-month, so it is no history for September 2026: no split, not zeros.
+		self.assertIsNone(chart["2026-09"]["last_year_split"])
+
 	def test_a_partial_first_month_is_not_history(self):
 		"""Data that starts on 20 Nov 2025 says nothing about 1-12 Nov 2025: no comparison, not a 0."""
 		data = self._build(_rows(("2025-11-20 10:00:00", "", "Lead", "Inbound")), today="2026-11-12")

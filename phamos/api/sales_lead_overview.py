@@ -264,10 +264,13 @@ def build_overview(rows, today, direction=None):
 		end = today if back == 0 else month_end(start)
 		item = _window(rows, start, end, direction)
 		before = add_months(start, -12)
+		year_earlier = _window(rows, before, month_end(before), direction) if covered(before) else None
 		item.update(
 			key=start.strftime("%Y-%m"),
 			partial=back == 0,
-			last_year=_window(rows, before, month_end(before), direction)["count"] if covered(before) else None,
+			last_year=year_earlier["count"] if year_earlier else None,
+			# The All leads chart stacks both bars by direction (phamos/phamos#1929).
+			last_year_split=year_earlier["split"] if year_earlier else None,
 		)
 		chart.append(item)
 
