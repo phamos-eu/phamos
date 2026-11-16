@@ -38,12 +38,23 @@
 #   Needs CI/CD variables ANTHROPIC_API_KEY and GITLAB_API_TOKEN; set
 #   AI_REVIEW_ENABLED=false to disable. Add the label "skip-ai-code-review"
 #   to the MR and run a new pipeline to skip it for that MR.
+#
+# ai_issue_analysis
+#   When an issue on this project is labelled bug or question, the phamos
+#   issue webhook starts a pipeline on the default branch. This job reads the
+#   issue text and images and posts an analysis comment. It uses the same
+#   CI/CD variables as ai_code_review: ANTHROPIC_API_KEY and GITLAB_API_TOKEN.
+#   The webhook starts that pipeline with the Access Token from GitLab
+#   Settings, and only for the project in Phriend Settings. Set
+#   AI_ISSUE_ANALYSIS_ENABLED=false to turn the job off.
 
 workflow:
   rules:
     # One pipeline per change: an MR pipeline when the branch has an open MR,
-    # a branch pipeline otherwise.
+    # a branch pipeline otherwise. An issue-analysis run is an API pipeline
+    # and must be created even when that branch has an open MR.
     - if: $CI_PIPELINE_SOURCE == "merge_request_event"
+    - if: '$CI_PIPELINE_SOURCE == "api" && $AI_ISSUE_IID && $AI_ISSUE_LABEL =~ /^(bug|question)$/'
     - if: $CI_COMMIT_BRANCH && $CI_OPEN_MERGE_REQUESTS
       when: never
     - if: $CI_COMMIT_BRANCH
@@ -179,6 +190,7 @@ unit_tests_1:
       phamos.tests.test_web_profile_events
       phamos.tests.test_accounting_stats
       phamos.phamos.page.extract_pdf.test_extract_pdf
+      phamos.gitlab_integration.test_issue_analysis
 
 unit_tests_2:
   extends: .unit_tests
@@ -268,3 +280,19 @@ ai_code_review:
     - git config --global --add safe.directory "$CI_PROJECT_DIR"
     - pip install --quiet --disable-pip-version-check "anthropic==2.8.0"
     - python .gitlab/ai_code_review.py
+
+ai_issue_analysis:
+  stage: ai-review
+  image: python:3.10
+  tags: [hetzner]
+  # A failed analysis must not fail any other pipeline that shares the stage.
+  allow_failure: true
+  needs: []
+  interruptible: true
+  rules:
+    - if: '$AI_ISSUE_ANALYSIS_ENABLED == "false"'
+      when: never
+    - if: '$CI_PIPELINE_SOURCE == "api" && $AI_ISSUE_IID && $AI_ISSUE_LABEL =~ /^(bug|question)$/'
+  script:
+    - pip install --quiet --disable-pip-version-check "anthropic==2.8.0"
+    - python .gitlab/ai_issue_analysis.py
