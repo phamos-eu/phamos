@@ -1226,6 +1226,12 @@ def _handle_issue_webhook(payload):
         if issue_doc_name:
             enqueue_issue_label_ledger_sync(issue_doc_name)
 
+    # A label change does not start CI on its own. This starts the
+    # ai_issue_analysis job, which uses ANTHROPIC_API_KEY and GITLAB_API_TOKEN.
+    from phamos.gitlab_integration.issue_analysis import enqueue_issue_analysis
+
+    enqueue_issue_analysis(payload, labels_list, gl_project_id)
+
     frappe.db.commit()
 
 
