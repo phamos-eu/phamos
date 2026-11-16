@@ -310,10 +310,11 @@ function showTimeLimitDialog(status, onSubmitted) {
   });
 }
 
-async function onStopProjectTimer({ result, valueAdd, percentBillable, activityType, manualEndTime }) {
+async function onStopProjectTimer({ result, valueAdd, percentBillable, activityType, manualEndTime, gitlabIssueRef }) {
   if (!activeProjectSession.value) return;
   const args = { name: activeProjectSession.value.name, result, activity_type: activityType, ...ratingArgs(valueAdd, percentBillable) };
   if (manualEndTime) args.manual_end_time = manualEndTime;
+  if (gitlabIssueRef) args.gitlab_issue_ref = gitlabIssueRef; // child / parent worked out on the server (#1862)
   const r = await frappe.call({
     method: "phamos.phamos.page.dev_action_panel.dev_action_panel.stop_timer",
     args,
@@ -549,6 +550,7 @@ onUnmounted(() => { stopTick(); stopProjectTick(); });
               :active-project-session="activeProjectSession"
               :project-elapsed-seconds="projectElapsedSeconds"
               :active-issue-session="activeSession"
+              :issues="issues"
               @pause="onPauseProjectTimer"
               @resume="onResumeProjectTimer"
               @stop="onStopProjectTimer"
@@ -580,6 +582,7 @@ onUnmounted(() => { stopTick(); stopProjectTick(); });
         <ProjectsView
           v-else-if="currentView === 'projects'"
           :all-projects="allProjects"
+          :issues="issues"
           :project-options="projects"
           v-model:selected-project="selectedProject"
           :active-project-session="activeProjectSession"

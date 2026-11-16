@@ -3,6 +3,7 @@ from frappe import _
 from frappe.utils import cint, cstr, now_datetime, add_to_date, time_diff_in_seconds, get_datetime
 from phamos.phamos.timesheet_utils import billable_seconds_sql, billable_seconds_term, billing_context, normalize_percent_billable, percent_billable_preset
 from phamos.phamos.doctype.timesheet_record.timesheet_record import compute_time_limit_status
+from phamos.gitlab_integration.issue_refs import link_gitlab_issues
 from frappe.query_builder import Order
 from frappe.query_builder.functions import Coalesce, Sum, Count, Max
 from pypika import Case
@@ -455,7 +456,10 @@ def resume_timer(name):
 
 
 @frappe.whitelist()
-def stop_timer(name, result, percent_billable=None, activity_type=None, manual_end_time=None, value_add=100):
+def stop_timer(name, result, percent_billable=None, activity_type=None, manual_end_time=None, value_add=100, gitlab_issue_ref=None):
+    """Stop and submit. `gitlab_issue_ref`: the GitLab ticket picked or pasted on Stop (issue name,
+    URL or group/project#N); without it, URLs in Goal / Result are used, as in the Project Action
+    Panel. Either way the system works out the child and the parent issue (#1862)."""
     doc = frappe.get_doc("Timesheet Record", name)
     end_time = get_datetime(manual_end_time) if manual_end_time else now_datetime()
 
@@ -478,6 +482,7 @@ def stop_timer(name, result, percent_billable=None, activity_type=None, manual_e
         doc.actual_time = first_row.duration or 0
 
     doc.result = result
+    link_gitlab_issues(doc, reference=gitlab_issue_ref, texts=(doc.goal, result))
     if percent_billable in (None, ""):
         # Not sent: the project's preset, 0 when it has none (#1862), never a hard-coded 100.
         percent_billable = billing_context(doc.project)["percent_billable"]
@@ -540,7 +545,7 @@ def get_gitlab_labels():
 
 
 @frappe.whitelist()
-def create_break_timesheet(from_time, to_time=None, project=None, goal=None, result=None, percent_billable=None, activity_type=None, value_add=100):
+def create_break_timesheet(from_time, to_time=None, project=None, goal=None, result=None, percent_billable=None, activity_type=None, value_add=100, gitlab_issue_ref=None):
     user = frappe.session.user
     employee = frappe.db.get_value("Employee", {"user_id": user}, ["name", "activity_type"], as_dict=True)
     if not employee:
@@ -558,6 +563,7 @@ def create_break_timesheet(from_time, to_time=None, project=None, goal=None, res
     ts.activity_type = activity_type or employee.activity_type
     ts.goal = goal
     ts.result = result
+    link_gitlab_issues(ts, reference=gitlab_issue_ref, texts=(goal, result))  # child / parent from the ticket (#1862)
     ts.from_time = from_dt
     ts.to_time = to_dt
     ts.actual_time = duration

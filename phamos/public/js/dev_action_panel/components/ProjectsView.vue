@@ -12,6 +12,7 @@ const props = defineProps({
   // Project filter shared with the Issues view (#1862): null = all projects
   selectedProject: { type: String, default: null },
   projectOptions: { type: Array, default: () => [] }, // [{ name, title, count }]
+  issues: { type: Array, default: () => [] }, // for the GitLab ticket picker on Stop (#1862)
 });
 
 const emit = defineEmits(["start", "pause", "resume", "stop", "assign", "update:selectedProject"]);
@@ -119,6 +120,7 @@ function matches(p) {
         :active-project-session="activeProjectSession"
         :project-elapsed-seconds="projectElapsedSeconds"
         :active-issue-session="activeIssueSession"
+        :issues="issues"
         @start="emit('start', $event)"
         @pause="emit('pause')"
         @resume="emit('resume')"

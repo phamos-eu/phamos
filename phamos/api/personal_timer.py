@@ -330,7 +330,7 @@ def resume_timer(name, track_break=0, break_project=None, break_goal=None, break
 	return get_timer_state()
 
 
-def stop_timer(name, result, percent_billable=None, activity_type=None, manual_end_time=None, value_add=100):
+def stop_timer(name, result, percent_billable=None, activity_type=None, manual_end_time=None, value_add=100, gitlab_issue_ref=None):
 	doc = _own_record(name)
 	if percent_billable in (None, ""):
 		# Not sent: the project's preset, 0 when it has none (#1862), never a hard-coded 100.
@@ -355,6 +355,7 @@ def stop_timer(name, result, percent_billable=None, activity_type=None, manual_e
 		value_add=value_add,
 		activity_type=activity_type,
 		manual_end_time=manual_end_time or None,
+		gitlab_issue_ref=gitlab_issue_ref or None,
 	)
 	return {"outcome": outcome, "state": get_timer_state()}
 

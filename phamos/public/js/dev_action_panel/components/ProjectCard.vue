@@ -1,6 +1,7 @@
 <script setup>
 import { ref, computed } from "vue";
 import FrappeDatetime from "./FrappeDatetime.vue";
+import GitlabTicketPicker from "./GitlabTicketPicker.vue";
 import { RATING_OPTIONS, VALUE_ADD_DEFAULT, VALUE_ADD_HELP, PERCENT_BILLABLE_DEFAULT, billablePreset } from "../timesheetRating.js";
 
 const props = defineProps({
@@ -8,6 +9,7 @@ const props = defineProps({
   activeProjectSession: Object,
   projectElapsedSeconds: Number,
   activeIssueSession: Object,
+  issues: { type: Array, default: () => [] }, // for the GitLab ticket picker on Stop (#1862)
 });
 
 const emit = defineEmits(["start", "pause", "resume", "stop", "assign"]);
@@ -20,6 +22,7 @@ const loadingSessions = ref(false);
 const startGoal = ref("");
 const expectedHours = ref(1);
 const stopResult = ref("");
+const stopTicket = ref(""); // GitLab ticket: issue name, URL or group/project#N (#1862)
 const stopBillable = ref(PERCENT_BILLABLE_DEFAULT);
 const stopValueAdd = ref(VALUE_ADD_DEFAULT);
 const labels = {
@@ -113,10 +116,12 @@ function confirmStop() {
     activityType: stopActivityType.value,
   };
   if (stopEndTimeModified.value && stopEndTime.value) payload.manualEndTime = stopEndTime.value;
+  if (stopTicket.value) payload.gitlabIssueRef = stopTicket.value;
   emit("stop", payload);
   panel.value = null;
   stopResult.value = "";
   stopActivityType.value = "";
+  stopTicket.value = "";
 }
 
 function onStartKey(e) { if (e.key === "Escape") closePanel(); if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) confirmStart(); }
@@ -259,6 +264,10 @@ function onStopKey(e)  { if (e.key === "Escape") closePanel(); if (e.key === "En
           <div class="pc__panel-field pc__panel-field--full">
             <label class="pc__panel-label">What did you accomplish? <span class="pc__panel-required">*</span></label>
             <textarea v-model="stopResult" class="pc__panel-textarea" rows="2" placeholder="Completed the task, resolved the issue…" autofocus></textarea>
+          </div>
+          <div class="pc__panel-field pc__panel-field--full">
+            <label class="pc__panel-label">GitLab ticket <span class="pc__panel-optional">optional · a URL in the text above works too</span></label>
+            <GitlabTicketPicker v-model="stopTicket" :issues="issues" :project="project.name" />
           </div>
           <p class="pc__panel-hint">{{ labels.valueAdd }}: {{ labels.valueAddHelp }}</p>
           <div class="pc__panel-row">
