@@ -40,13 +40,16 @@
 #   to the MR and run a new pipeline to skip it for that MR.
 #
 # ai_issue_analysis
-#   When an issue on this project is labelled bug or question, the phamos
-#   issue webhook starts a pipeline on the default branch. This job reads the
-#   issue text and images and posts an analysis comment. It uses the same
-#   CI/CD variables as ai_code_review: ANTHROPIC_API_KEY and GITLAB_API_TOKEN.
-#   The webhook starts that pipeline with the Access Token from GitLab
-#   Settings, and only for the project in Phriend Settings. Set
-#   AI_ISSUE_ANALYSIS_ENABLED=false to turn the job off.
+#   Reads an issue's text and images and posts an analysis comment. Uses the
+#   same CI/CD variables as ai_code_review: ANTHROPIC_API_KEY and GITLAB_API_TOKEN.
+#   A pipeline schedule on develop with AI_ISSUE_POLL=true checks open issues
+#   labelled bug or question, reads the matching code in this checkout, and
+#   comments on those that have no analysis yet, then replaces the bug or
+#   question label with analysed so the next run skips them
+#   (AI_ISSUE_POLL_LIMIT per run, default 5). The phamos site can still start
+#   one issue by calling the pipeline API with AI_ISSUE_IID and AI_ISSUE_LABEL.
+#   Set AI_ISSUE_ANALYSIS_ENABLED=false to turn the job off. The poll schedule
+#   must set AI_ISSUE_POLL=true so the unit-test jobs do not run with it.
 
 workflow:
   rules:
@@ -55,6 +58,7 @@ workflow:
     # and must be created even when that branch has an open MR.
     - if: $CI_PIPELINE_SOURCE == "merge_request_event"
     - if: '$CI_PIPELINE_SOURCE == "api" && $AI_ISSUE_IID && $AI_ISSUE_LABEL =~ /^(bug|question)$/'
+    - if: '$CI_PIPELINE_SOURCE == "schedule" && $AI_ISSUE_POLL == "true"'
     - if: $CI_COMMIT_BRANCH && $CI_OPEN_MERGE_REQUESTS
       when: never
     - if: $CI_COMMIT_BRANCH
@@ -77,6 +81,9 @@ variables:
   # redundant pipelines"), so the runner is not kept busy with outdated code.
   interruptible: true
   rules:
+    # The issue-analysis schedule must not run the test suite.
+    - if: '$AI_ISSUE_POLL == "true"'
+      when: never
     - if: '$UNIT_TESTS_ENABLED == "false"'
       when: never
     - if: '$CI_PIPELINE_SOURCE == "merge_request_event" && $CI_MERGE_REQUEST_TARGET_BRANCH_NAME =~ /^(develop|version-15|release\/.+)$/'
@@ -292,6 +299,7 @@ ai_issue_analysis:
   rules:
     - if: '$AI_ISSUE_ANALYSIS_ENABLED == "false"'
       when: never
+    - if: '$CI_PIPELINE_SOURCE == "schedule" && $AI_ISSUE_POLL == "true"'
     - if: '$CI_PIPELINE_SOURCE == "api" && $AI_ISSUE_IID && $AI_ISSUE_LABEL =~ /^(bug|question)$/'
   script:
     - pip install --quiet --disable-pip-version-check "anthropic==2.8.0"
