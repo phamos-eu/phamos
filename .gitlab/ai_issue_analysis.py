@@ -19,6 +19,7 @@ import urllib.request
 
 MARKER = "<!-- phamos-ai-issue-analysis label={label} digest={digest} -->"
 ANALYSIS_LABELS = ("bug", "question")
+ANALYSED_LABEL = "analysed"
 MODEL = os.environ.get("ANTHROPIC_MODEL", "claude-sonnet-5-5")
 MAX_IMAGES = 5
 MAX_IMAGE_BYTES = 4_500_000
@@ -96,6 +97,9 @@ class GitLab:
 
     def post(self, path, payload):
         return self.request("POST", path, payload=payload)
+
+    def put(self, path, payload):
+        return self.request("PUT", path, payload=payload)
 
     def download(self, url):
         """Download one upload. A redirect is followed once, without the token."""
@@ -403,6 +407,27 @@ def _poll_limit():
         return 5
 
 
+def labels_to_remove(issue, label):
+    """The bug or question label that brought this issue into the schedule."""
+    found = []
+    for title in issue.get("labels") or []:
+        leaf = str(title).split("::")[-1].strip().lower()
+        if leaf == label and title not in found:
+            found.append(title)
+    if label not in [str(title).lower() for title in found]:
+        found.append(label)
+    return found
+
+
+def mark_analysed(gl, issue, label):
+    """Drop the trigger label so the next schedule does not select this issue."""
+    quoted = urllib.parse.quote(str(issue.get("iid")), safe="")
+    gl.put(f"/issues/{quoted}", {
+        "add_labels": ANALYSED_LABEL,
+        "remove_labels": ",".join(labels_to_remove(issue, label)),
+    })
+
+
 def analyse_issue(gl, issue, label):
     """Post one analysis comment. Returns True when a new comment was posted."""
     issue_iid = str(issue.get("iid"))
@@ -420,6 +445,7 @@ def analyse_issue(gl, issue, label):
     ) or []
     if any(marker in (note.get("body") or "") for note in notes):
         print(f"Issue #{issue_iid} already has an analysis for this {label} text.")
+        mark_analysed(gl, issue, label)
         return False
 
     web_url = project_web_url(issue.get("web_url"))
@@ -436,6 +462,7 @@ def analyse_issue(gl, issue, label):
         print(f"No analysis to post for issue #{issue_iid}.")
         return False
     gl.post(f"/issues/{quoted}/notes", {"body": comment_body(label, digest, text)})
+    mark_analysed(gl, issue, label)
     print(f"Commented on issue #{issue_iid} ({label}, {len(images)} image(s), {code_files} code file(s)).")
     return True
 

@@ -155,6 +155,7 @@ class TestIssueAnalysis(FrappeTestCase):
         }
         notes = []
         posts = []
+        label_updates = []
         seen_images = []
 
         class FakeGitLab:
@@ -173,6 +174,9 @@ class TestIssueAnalysis(FrappeTestCase):
             def post(self, path, payload):
                 posts.append(payload["body"])
                 notes.append({"body": payload["body"], "system": False})
+
+            def put(self, path, payload):
+                label_updates.append(payload)
 
         def claude(label, title, description, note_lines, images, code=""):
             seen_images.extend(images)
@@ -199,6 +203,10 @@ class TestIssueAnalysis(FrappeTestCase):
         self.assertNotIn("sk-from-ci", posts[0])
         self.assertNotIn("glpat-review", posts[0])
         self.assertEqual(seen_images, [("image/png", PNG)])
+        self.assertEqual(label_updates, [
+            {"add_labels": "analysed", "remove_labels": "bug"},
+            {"add_labels": "analysed", "remove_labels": "bug"},
+        ])
 
     def test_poll_skips_an_issue_that_already_has_the_same_analysis(self):
         script = _ci_script()
@@ -239,6 +247,9 @@ class TestIssueAnalysis(FrappeTestCase):
             def post(self, path, payload):
                 posts.append(path)
 
+            def put(self, path, payload):
+                return None
+
         with (
             patch.object(script, "GitLab", FakeGitLab),
             patch.object(script, "call_claude", return_value="The save handler is missing."),
@@ -274,6 +285,9 @@ class TestIssueAnalysis(FrappeTestCase):
                 return None
 
             def post(self, path, payload):
+                return None
+
+            def put(self, path, payload):
                 return None
 
         issue = {
