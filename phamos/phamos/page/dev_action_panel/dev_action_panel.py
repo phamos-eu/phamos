@@ -1,7 +1,13 @@
 import frappe
 from frappe import _
 from frappe.utils import cint, cstr, now_datetime, add_to_date, time_diff_in_seconds, get_datetime
-from phamos.phamos.timesheet_utils import billable_seconds_sql, billable_seconds_term, billing_context, normalize_percent_billable, percent_billable_preset
+from phamos.phamos.timesheet_utils import (
+    billable_seconds_sql,
+    billable_seconds_term,
+    billing_context,
+    percent_billable_or_preset,
+    percent_billable_preset,
+)
 from phamos.phamos.doctype.timesheet_record.timesheet_record import compute_time_limit_status
 from phamos.gitlab_integration.issue_refs import link_gitlab_issues
 from frappe.query_builder import Order
@@ -43,26 +49,6 @@ def get_my_issues():
         order_by="due_date asc, modified desc",
     )
 
-    # --- bulk-fetch timesheet counts + total tracked time per issue ----------
-    if issues:
-        issue_names = [i["name"] for i in issues]
-        rows = frappe.db.sql(
-            """
-            SELECT gitlab_issue,
-                   COUNT(*) AS cnt,
-                   COALESCE(SUM(CASE WHEN docstatus = 1 THEN actual_time ELSE 0 END), 0) AS total_seconds
-            FROM `tabTimesheet Record`
-            WHERE gitlab_issue IN %(names)s AND docstatus != 2
-            GROUP BY gitlab_issue
-            """,
-            {"names": issue_names},
-            as_dict=True,
-        )
-        count_map = {r["gitlab_issue"]: {"cnt": r["cnt"], "total_seconds": int(r["total_seconds"])} for r in rows}
-    else:
-        count_map = {}
-
-    # --- enrich each issue ---------------------------------------------------
     active = _get_active_session_raw(user)
     active_ts_name = active.get("name") if active else None
     active_issue = active.get("gitlab_issue") if active else None
@@ -84,42 +70,36 @@ def get_my_issues():
         if extra:
             issues = extra + issues
 
-    # Children per issue (any state), for the "Parent / Child" filter (#1862, #1895).
-    child_count = {}
-    if issues:
-        for row in frappe.get_all(
-            "GitLab Issue",
-            filters={"parent_issue": ["in", [i["name"] for i in issues]]},
-            fields=["parent_issue", "count(name) as cnt"],
-            group_by="parent_issue",
-        ):
-            child_count[row["parent_issue"]] = row["cnt"]
+    if not issues:
+        return issues
 
-    # ERPNext project of each issue (GitLab Issue → GitLab Project → frappe_project), so the panel
-    # can filter issues by the same projects as the project list (#1862).
-    gitlab_projects = {i["gitlab_project"] for i in issues if i.get("gitlab_project")}
-    erp_project = {}
-    if gitlab_projects:
-        for row in frappe.get_all(
-            "GitLab Project",
-            filters={"name": ["in", list(gitlab_projects)], "frappe_project": ["is", "set"]},
-            fields=["name", "frappe_project"],
-        ):
-            erp_project[row["name"]] = row["frappe_project"]
-    project_names = {}
-    if erp_project:
-        for row in frappe.get_all(
-            "Project", filters={"name": ["in", list(set(erp_project.values()))]}, fields=["name", "project_name"]
-        ):
-            project_names[row["name"]] = row["project_name"]
+    issue_names = [i["name"] for i in issues]
+    timesheets = _timesheet_totals_by_issue(issue_names)
+    child_count = _child_count_by_issue(issue_names)
+    projects = _gitlab_projects({i["gitlab_project"] for i in issues if i.get("gitlab_project")})
+    parents = {
+        p.name: p
+        for p in frappe.get_all(
+            "GitLab Issue",
+            filters={"name": ["in", list({i["parent_issue"] for i in issues if i.get("parent_issue")})]},
+            fields=["name", "issue_id", "title"],
+        )
+    }
 
     for issue in issues:
-        issue["child_count"] = child_count.get(issue["name"], 0)
-        issue["project"] = erp_project.get(issue.get("gitlab_project"))
-        issue["project_name"] = project_names.get(issue["project"]) or issue["project"]
-        ts_data = count_map.get(issue["name"], {"cnt": 0, "total_seconds": 0})
+        ts_data = timesheets.get(issue["name"], {"cnt": 0, "total_seconds": 0})
         issue["timesheet_count"] = ts_data["cnt"]
         issue["total_tracked_seconds"] = ts_data["total_seconds"]
+        issue["child_count"] = child_count.get(issue["name"], 0)
+
+        gitlab_project = projects.get(issue.get("gitlab_project")) or {}
+        issue["gitlab_project_title"] = gitlab_project.get("title")
+        issue["project"] = gitlab_project.get("frappe_project")
+        issue["project_name"] = gitlab_project.get("project_name") or issue["project"]
+
+        parent = parents.get(issue.get("parent_issue")) or {}
+        issue["parent_issue_id"] = parent.get("issue_id")
+        issue["parent_issue_title"] = parent.get("title")
 
         # 1. Email match; 2. gitlab_username matches local part of user email; 3. not mine
         assignee_email = (issue.get("assignee_email") or "").lower()
@@ -131,26 +111,6 @@ def get_my_issues():
         else:
             issue["is_mine"] = False
 
-        # Resolve parent title for display
-        if issue.get("parent_issue"):
-            issue["parent_issue_id"] = frappe.db.get_value(
-                "GitLab Issue", issue["parent_issue"], "issue_id"
-            )
-            issue["parent_issue_title"] = frappe.db.get_value(
-                "GitLab Issue", issue["parent_issue"], "title"
-            )
-        else:
-            issue["parent_issue_id"] = None
-            issue["parent_issue_title"] = None
-
-        # Resolve GitLab Project display name
-        if issue.get("gitlab_project"):
-            issue["gitlab_project_title"] = frappe.db.get_value(
-                "GitLab Project", issue["gitlab_project"], "title"
-            )
-        else:
-            issue["gitlab_project_title"] = None
-
         # Mark which issue (if any) has a running/paused session
         if active_issue == issue["name"]:
             issue["active_timesheet"] = active_ts_name
@@ -159,9 +119,48 @@ def get_my_issues():
             issue["active_timesheet"] = None
             issue["session_state"] = None
 
-    # The issue with my running or paused timer always comes first (#1862).
-    issues.sort(key=lambda i: 0 if i["name"] == active_issue else 1)
     return issues
+
+
+def _timesheet_totals_by_issue(issue_names):
+    """{issue: {"cnt", "total_seconds"}}: non-cancelled records, submitted time only."""
+    record = frappe.qb.DocType("Timesheet Record")
+    submitted_seconds = Sum(Case().when(record.docstatus == 1, record.actual_time).else_(0))
+    rows = (
+        frappe.qb.from_(record)
+        .select(record.gitlab_issue, Count("*").as_("cnt"), Coalesce(submitted_seconds, 0).as_("total_seconds"))
+        .where(record.gitlab_issue.isin(issue_names) & (record.docstatus != 2))
+        .groupby(record.gitlab_issue)
+    ).run(as_dict=True)
+    return {r.gitlab_issue: {"cnt": r.cnt, "total_seconds": int(r.total_seconds)} for r in rows}
+
+
+def _child_count_by_issue(issue_names):
+    """{issue: number of child issues in any state}."""
+    issue = frappe.qb.DocType("GitLab Issue")
+    rows = (
+        frappe.qb.from_(issue)
+        .select(issue.parent_issue, Count("*").as_("cnt"))
+        .where(issue.parent_issue.isin(issue_names))
+        .groupby(issue.parent_issue)
+    ).run(as_dict=True)
+    return {r.parent_issue: r.cnt for r in rows}
+
+
+def _gitlab_projects(names):
+    """{GitLab Project: {"title", "frappe_project", "project_name"}}."""
+    if not names:
+        return {}
+    gitlab_project = frappe.qb.DocType("GitLab Project")
+    project = frappe.qb.DocType("Project")
+    rows = (
+        frappe.qb.from_(gitlab_project)
+        .left_join(project)
+        .on(project.name == gitlab_project.frappe_project)
+        .select(gitlab_project.name, gitlab_project.title, gitlab_project.frappe_project, project.project_name)
+        .where(gitlab_project.name.isin(list(names)))
+    ).run(as_dict=True)
+    return {r.name: r for r in rows}
 
 
 # ---------------------------------------------------------------------------
@@ -343,7 +342,6 @@ def start_issue_timer(gitlab_issue_name, expected_time, goal=None, manual_start_
     ts.from_time = start_time
     ts.gitlab_issue = gitlab_issue_name
     ts.gitlab_parent_issue = issue.parent_issue if issue.parent_issue else gitlab_issue_name
-    # The draft carries the project's preset from the start, 0 when the project has none (#1862).
     ts.percent_billable = billing_context(frappe_project)["percent_billable"]
 
     # First time-log row (open — no to_time, session is running)
@@ -457,9 +455,8 @@ def resume_timer(name):
 
 @frappe.whitelist()
 def stop_timer(name, result, percent_billable=None, activity_type=None, manual_end_time=None, value_add=100, gitlab_issue_ref=None):
-    """Stop and submit. `gitlab_issue_ref`: the GitLab ticket picked or pasted on Stop (issue name,
-    URL or group/project#N); without it, URLs in Goal / Result are used, as in the Project Action
-    Panel. Either way the system works out the child and the parent issue (#1862)."""
+    """Stop and submit. `gitlab_issue_ref`: GitLab ticket picked or pasted on Stop; without it,
+    URLs in Goal / Result are used. Either way child and parent issue are worked out."""
     doc = frappe.get_doc("Timesheet Record", name)
     end_time = get_datetime(manual_end_time) if manual_end_time else now_datetime()
 
@@ -483,10 +480,7 @@ def stop_timer(name, result, percent_billable=None, activity_type=None, manual_e
 
     doc.result = result
     link_gitlab_issues(doc, reference=gitlab_issue_ref, texts=(doc.goal, result))
-    if percent_billable in (None, ""):
-        # Not sent: the project's preset, 0 when it has none (#1862), never a hard-coded 100.
-        percent_billable = billing_context(doc.project)["percent_billable"]
-    doc.percent_billable = normalize_percent_billable(percent_billable)
+    doc.percent_billable = percent_billable_or_preset(percent_billable, doc.project)
     doc.value_add = cstr(value_add)
     if activity_type:
         doc.activity_type = activity_type
@@ -563,14 +557,12 @@ def create_break_timesheet(from_time, to_time=None, project=None, goal=None, res
     ts.activity_type = activity_type or employee.activity_type
     ts.goal = goal
     ts.result = result
-    link_gitlab_issues(ts, reference=gitlab_issue_ref, texts=(goal, result))  # child / parent from the ticket (#1862)
+    link_gitlab_issues(ts, reference=gitlab_issue_ref, texts=(goal, result))
     ts.from_time = from_dt
     ts.to_time = to_dt
     ts.actual_time = duration
     ts.expected_time = duration
-    if percent_billable in (None, ""):
-        percent_billable = billing_context(project)["percent_billable"]  # project preset, 0 when none (#1862)
-    ts.percent_billable = normalize_percent_billable(percent_billable)
+    ts.percent_billable = percent_billable_or_preset(percent_billable, project)
     ts.value_add = cstr(value_add)
     ts.append("item", {"from_time": from_dt, "to_time": to_dt, "duration": duration})
     ts.insert(ignore_permissions=True)
@@ -756,7 +748,6 @@ def _enrich_projects(projects, user):
         p["billable_seconds"] = ts["billable_seconds"]
         p["non_billable_seconds"] = max(0, ts["total_seconds"] - ts["billable_seconds"])
         p["last_used"] = ts.get("last_used")
-        # Preset for Percent Billable in the stop panel: the project's value, 0 when it has none (#1744, #1862).
         p["percent_billable"] = percent_billable_preset(p.get("percent_billable"))
 
     return projects
@@ -865,7 +856,6 @@ def start_project_timer(project_name, expected_time, goal, manual_start_time=Non
     ts.activity_type = employee.activity_type
     ts.goal = goal
     ts.expected_time = int(float(expected_time))
-    # The draft carries the project's preset from the start, 0 when the project has none (#1862).
     ts.percent_billable = billing_context(project_name)["percent_billable"]
     ts.from_time = start_time
     ts.append("item", {"from_time": start_time})

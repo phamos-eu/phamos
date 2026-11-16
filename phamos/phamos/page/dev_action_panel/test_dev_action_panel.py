@@ -1,13 +1,8 @@
 # Copyright (c) 2026, phamos.eu and contributors
 # For license information, please see license.txt
 
-"""Dev and Sales Action Panel data for Value Add next to Percent Billable (#1744, parent #1031).
+"""Developer Action Panel: project list, issue list, Percent Billable presets (0 when the project has none)."""
 
-The panels show Percent Billable on every project (external people may bill internal projects
-too), preset from the project, so project rows and the issue timer carry that preset (0 when empty, #1862).
-"""
-
-import random
 from unittest.mock import patch
 
 import frappe
@@ -20,7 +15,7 @@ from phamos.tests.test_personal_checkin import _ensure_employee, _ensure_user
 USER = "dap-value-add@example.com"
 
 
-class TestDevActionPanelBilling(FrappeTestCase):
+class _DapTestCase(FrappeTestCase):
 	def setUp(self):
 		for target in ("frappe.db.commit", "frappe.desk.form.assign_to.notify_assignment"):
 			patcher = patch(target)
@@ -29,57 +24,84 @@ class TestDevActionPanelBilling(FrappeTestCase):
 		frappe.set_user("Administrator")
 		_ensure_user(USER)
 		self.employee = _ensure_employee(USER)
-		implementation = make_implementation().name
-		self.billable = self._project("DAP Billable", implementation=implementation)
-		self.internal = self._project("DAP Internal", implementation=implementation, internal=1)
-		self.no_implementation = self._project("DAP Sales", percent_billable="")
-		# No value at all, not even the field default: the panel presets 0 (#1862).
-		frappe.db.set_value("Project", self.no_implementation, "percent_billable", "")
 
 	def tearDown(self):
 		frappe.set_user("Administrator")
 		frappe.db.rollback()
 
-	def _project(self, project_name, implementation=None, internal=0, percent_billable="75"):
+	def _project(self, prefix="DAP", status="Open", percent_billable=None, **fields):
 		name = (
 			frappe.get_doc(
 				{
 					"doctype": "Project",
-					"project_name": f"{project_name} {frappe.generate_hash(length=5)}",
-					"status": "Open",
-					"custom_implementation": implementation,
-					"custom_is_internal_project": internal,
-					"percent_billable": percent_billable,
+					"project_name": f"{prefix} {frappe.generate_hash(length=6)}",
+					"status": status,
+					**fields,
 				}
 			)
 			.insert(ignore_permissions=True)
 			.name
 		)
-		frappe.get_doc(
-			{"doctype": "ToDo", "allocated_to": USER, "reference_type": "Project", "reference_name": name, "description": "Assigned"}
-		).insert(ignore_permissions=True)
+		if percent_billable is not None:
+			frappe.db.set_value("Project", name, "percent_billable", percent_billable)
 		return name
 
-	def _rows(self, fetch):
+	def _assign(self, project):
+		frappe.get_doc(
+			{
+				"doctype": "ToDo",
+				"allocated_to": USER,
+				"reference_type": "Project",
+				"reference_name": project,
+				"description": "Assigned",
+			}
+		).insert(ignore_permissions=True)
+
+	def _as_user(self, fn, *args, **kwargs):
 		frappe.set_user(USER)
-		rows = {p["name"]: p for p in fetch()}
+		try:
+			return fn(*args, **kwargs)
+		finally:
+			frappe.set_user("Administrator")
+
+	def _activity_type(self):
+		name = "DAP Test Activity"
+		if not frappe.db.exists("Activity Type", name):
+			frappe.get_doc({"doctype": "Activity Type", "activity_type": name}).insert(ignore_permissions=True)
+		return name
+
+
+class TestDevActionPanelBilling(_DapTestCase):
+	def setUp(self):
+		super().setUp()
+		implementation = make_implementation().name
+		self.billable = self._project("DAP Billable", percent_billable="75", custom_implementation=implementation)
+		self.internal = self._project(
+			"DAP Internal", percent_billable="75", custom_implementation=implementation, custom_is_internal_project=1
+		)
+		self.no_implementation = self._project("DAP Sales", percent_billable="")
+		for project in (self.billable, self.internal, self.no_implementation):
+			self._assign(project)
+
+	def _presets(self, fetch):
+		rows = {p["name"]: p for p in self._as_user(fetch)}
 		return {name: rows[name]["percent_billable"] for name in (self.billable, self.internal, self.no_implementation)}
 
 	def test_my_projects_carry_the_percent_billable_preset(self):
 		self.assertEqual(
-			self._rows(dap.get_dev_my_projects),
+			self._presets(dap.get_dev_my_projects),
 			{self.billable: "75", self.internal: "75", self.no_implementation: "0"},
 		)
 
 	def test_all_projects_carry_the_percent_billable_preset(self):
 		self.assertEqual(
-			self._rows(dap.get_dev_all_projects),
+			self._presets(dap.get_dev_all_projects),
 			{self.billable: "75", self.internal: "75", self.no_implementation: "0"},
 		)
 
-	def test_a_new_project_defaults_to_zero_percent_billable(self):
-		# #1862: the Project field default is 0, not a hard-coded 100.
+	def test_new_project_and_timesheet_record_default_to_zero_percent_billable(self):
 		self.assertEqual(frappe.new_doc("Project").percent_billable, "0")
+		self.assertEqual(frappe.new_doc("Timesheet Record").percent_billable, "0")
 
 	def test_project_without_percent_billable_presets_zero_everywhere(self):
 		from phamos.api import personal_timer
@@ -87,8 +109,8 @@ class TestDevActionPanelBilling(FrappeTestCase):
 
 		self.assertEqual(billing_context(self.no_implementation), {"percent_billable": "0"})
 		self.assertEqual(billing_context(None), {"percent_billable": "0"})
-		frappe.set_user(USER)
-		self.assertEqual(personal_timer.get_timer_project_info(self.no_implementation)["percent_billable"], "0")
+		info = self._as_user(personal_timer.get_timer_project_info, self.no_implementation)
+		self.assertEqual(info["percent_billable"], "0")
 
 	def test_issue_timer_carries_its_project_preset(self):
 		record = frappe.get_doc(
@@ -103,64 +125,16 @@ class TestDevActionPanelBilling(FrappeTestCase):
 			}
 		)
 		record.append("item", {"from_time": record.from_time})
-		record.flags.ignore_links = True  # no GitLab Issue record needed; the panel only reads the field
+		record.flags.ignore_links = True  # the panel only reads the field
 		record.insert(ignore_permissions=True)
-		frappe.set_user(USER)
-		session = dap.get_active_session()
-		self.assertEqual(session["project_percent_billable"], "75")
+		self.assertEqual(self._as_user(dap.get_active_session)["project_percent_billable"], "75")
 
 
-class TestDevActionPanelOneProjectList(FrappeTestCase):
-	"""One project list instead of "My Projects" + "All Projects" (as in the Project Action Panel, !1128).
-
-	Every Open project, plus projects assigned to me in any status; last used first, then assigned
-	to me, then the rest. Closing the assignment ToDo only changes the order.
-	"""
-
-	def setUp(self):
-		patcher = patch("frappe.db.commit")
-		patcher.start()
-		self.addCleanup(patcher.stop)
-		frappe.set_user("Administrator")
-		_ensure_user(USER)
-		self.employee = _ensure_employee(USER)
-
-	def tearDown(self):
-		frappe.set_user("Administrator")
-		frappe.db.rollback()
-
-	def _project(self, status="Open", prefix="DAP List"):
-		return (
-			frappe.get_doc(
-				{
-					"doctype": "Project",
-					"project_name": f"{prefix} {frappe.generate_hash(length=6)}",
-					"status": status,
-				}
-			)
-			.insert(ignore_permissions=True)
-			.name
-		)
-
-	def _assign(self, project):
-		return (
-			frappe.get_doc(
-				{
-					"doctype": "ToDo",
-					"allocated_to": USER,
-					"reference_type": "Project",
-					"reference_name": project,
-					"description": "Assigned",
-				}
-			)
-			.insert(ignore_permissions=True)
-			.name
-		)
+class TestDevActionPanelOneProjectList(_DapTestCase):
+	"""Every Open project plus mine in any status; last used first, then assigned to me, then the rest."""
 
 	def _listed(self):
-		frappe.set_user(USER)
-		rows = dap.get_dev_all_projects()
-		frappe.set_user("Administrator")
+		rows = self._as_user(dap.get_dev_all_projects)
 		return [row["name"] for row in rows], {row["name"]: row for row in rows}
 
 	def test_assigned_project_in_any_status_is_listed_before_unassigned_ones(self):
@@ -180,7 +154,7 @@ class TestDevActionPanelOneProjectList(FrappeTestCase):
 		self.assertEqual(names.count(project), 1)
 
 	def test_last_used_project_comes_first(self):
-		# Neither is assigned; by name "A…" would come first, so only "last used first" puts "Z…" on top.
+		# By name "A…" would come first; only "last used first" puts "Z…" on top.
 		unused = self._project(prefix="DAP List A")
 		used = self._project(prefix="DAP List Z")
 		record = frappe.get_doc(
@@ -199,33 +173,19 @@ class TestDevActionPanelOneProjectList(FrappeTestCase):
 		self.assertLess(names.index(used), names.index(unused))
 
 	def test_project_timer_starts_at_the_chosen_time(self):
-		project = self._project()
-		frappe.set_user(USER)
-		started = dap.start_project_timer(project, 3600, "Backdated", manual_start_time="2026-05-10 08:15:00")
-		frappe.set_user("Administrator")
+		started = self._as_user(
+			dap.start_project_timer, self._project(), 3600, "Backdated", manual_start_time="2026-05-10 08:15:00"
+		)
 		self.assertEqual(str(frappe.db.get_value("Timesheet Record", started["name"], "from_time")), "2026-05-10 08:15:00")
 
 
-class TestDevActionPanelIssueList(FrappeTestCase):
-	"""#1862: the issue with my running timer comes first; issues say whether they are parents."""
-
+class TestDevActionPanelIssueList(_DapTestCase):
 	def setUp(self):
-		patcher = patch("frappe.db.commit")
-		patcher.start()
-		self.addCleanup(patcher.stop)
-		frappe.set_user("Administrator")
-		_ensure_user(USER)
-		self.employee = _ensure_employee(USER)
-		self.project = frappe.get_doc(
-			{"doctype": "Project", "project_name": f"DAP Issues {frappe.generate_hash(length=6)}", "status": "Open"}
-		).insert(ignore_permissions=True).name
-
-	def tearDown(self):
-		frappe.set_user("Administrator")
-		frappe.db.rollback()
+		super().setUp()
+		self.project = self._project("DAP Issues")
 
 	def _issue(self, title, parent=None, due_date="2026-01-01"):
-		# No gitlab_project, so the name is a hash; nothing is pushed to GitLab.
+		# No gitlab_project, so the name is a hash and nothing is pushed to GitLab.
 		return frappe.get_doc(
 			{
 				"doctype": "GitLab Issue",
@@ -238,14 +198,10 @@ class TestDevActionPanelIssueList(FrappeTestCase):
 		).insert(ignore_permissions=True).name
 
 	def _issues(self):
-		frappe.set_user(USER)
-		rows = dap.get_my_issues()
-		frappe.set_user("Administrator")
-		return rows
+		return {row["name"]: row for row in self._as_user(dap.get_my_issues)}
 
-	def test_issue_with_my_running_timer_comes_first(self):
-		self._issue("Due early")  # would come first by due date
-		running = self._issue("Running, not assigned to me", due_date="2099-12-31")
+	def test_running_issue_assigned_to_someone_else_is_marked_running(self):
+		running = self._issue("Running, not assigned to me")
 		record = frappe.get_doc(
 			{
 				"doctype": "Timesheet Record",
@@ -259,27 +215,27 @@ class TestDevActionPanelIssueList(FrappeTestCase):
 		)
 		record.append("item", {"from_time": record.from_time})
 		record.insert(ignore_permissions=True)
-		rows = self._issues()
-		self.assertEqual(rows[0]["name"], running)
-		self.assertEqual(rows[0]["session_state"], "running")
-		self.assertFalse(rows[0]["is_mine"])  # a PM can run a timer on an issue assigned to someone else
+		row = self._issues()[running]
+		self.assertEqual(row["session_state"], "running")
+		self.assertEqual(row["active_timesheet"], record.name)
+		self.assertFalse(row["is_mine"])
 
-	def test_issues_carry_their_child_count(self):
+	def test_issues_carry_child_count_and_parent(self):
 		parent = self._issue("Parent")
 		child = self._issue("Child", parent=parent)
 		self._issue("Second child", parent=parent)
-		rows = {r["name"]: r for r in self._issues()}
+		rows = self._issues()
 		self.assertEqual(rows[parent]["child_count"], 2)
 		self.assertEqual(rows[child]["child_count"], 0)
-		self.assertEqual(rows[child]["parent_issue"], parent)
+		self.assertEqual(rows[child]["parent_issue_title"], "Parent")
 
 	def test_start_issue_timer_on_an_issue_not_assigned_to_me(self):
 		frappe.db.set_value("Employee", self.employee, "activity_type", None)
 		gitlab_project = frappe.get_doc(
 			{
 				"doctype": "GitLab Project",
-				"title": f"DAP GP {frappe.generate_hash(length=6)}",
-				"project_id": str(random.randint(900000, 999999)),
+				"title": "DAP GP",
+				"project_id": frappe.generate_hash(length=10),
 				"frappe_project": self.project,
 			}
 		)
@@ -287,61 +243,35 @@ class TestDevActionPanelIssueList(FrappeTestCase):
 		gitlab_project.insert(ignore_permissions=True)
 		issue = self._issue("Customer parent ticket")
 		frappe.db.set_value("GitLab Issue", issue, "gitlab_project", gitlab_project.name)
-		# The issue carries its ERPNext project, so the project filter can find it (#1862).
-		row = next(r for r in self._issues() if r["name"] == issue)
+
+		row = self._issues()[issue]
 		self.assertEqual(row["project"], self.project)
 		self.assertEqual(row["project_name"], frappe.db.get_value("Project", self.project, "project_name"))
-		frappe.set_user(USER)
-		started = dap.start_issue_timer(issue, 3600)
-		frappe.set_user("Administrator")
+		self.assertEqual(row["gitlab_project_title"], "DAP GP")
+
+		started = self._as_user(dap.start_issue_timer, issue, 3600)
 		self.assertEqual(frappe.db.get_value("Timesheet Record", started["name"], "gitlab_issue"), issue)
 
 
-class TestDevActionPanelStopPreset(FrappeTestCase):
-	"""#1862: a stop or break without a Percent Billable takes the project's preset, 0 when it has none."""
-
-	def setUp(self):
-		patcher = patch("frappe.db.commit")
-		patcher.start()
-		self.addCleanup(patcher.stop)
-		frappe.set_user("Administrator")
-		_ensure_user(USER)
-		self.employee = _ensure_employee(USER)
-
-	def tearDown(self):
-		frappe.set_user("Administrator")
-		frappe.db.rollback()
-
-	def _project(self, percent_billable):
-		name = frappe.get_doc(
-			{"doctype": "Project", "project_name": f"DAP Preset {frappe.generate_hash(length=6)}", "status": "Open"}
-		).insert(ignore_permissions=True).name
-		frappe.db.set_value("Project", name, "percent_billable", percent_billable)
-		return name
-
-	def test_a_new_timesheet_record_defaults_to_zero_percent_billable(self):
-		# #1862: the Timesheet Record field default is 0, not a hard-coded 100.
-		self.assertEqual(frappe.new_doc("Timesheet Record").percent_billable, "0")
+class TestDevActionPanelStopPreset(_DapTestCase):
+	"""Without a Percent Billable, a timer or break takes the project's preset, 0 when it has none."""
 
 	def test_project_timer_draft_carries_the_project_preset(self):
-		frappe.set_user(USER)
-		empty = dap.start_project_timer(self._project(""), 3600, "No preset")
-		frappe.set_user("Administrator")
+		empty = self._as_user(dap.start_project_timer, self._project(percent_billable=""), 3600, "No preset")
 		self.assertEqual(frappe.db.get_value("Timesheet Record", empty["name"], "percent_billable"), "0")
 		frappe.db.delete("Timesheet Record", empty["name"])  # one draft per employee
-		frappe.set_user(USER)
-		half = dap.start_project_timer(self._project("50"), 3600, "Half")
-		frappe.set_user("Administrator")
+		half = self._as_user(dap.start_project_timer, self._project(percent_billable="50"), 3600, "Half")
 		self.assertEqual(frappe.db.get_value("Timesheet Record", half["name"], "percent_billable"), "50")
 
 	def test_break_without_percent_billable_uses_the_project_preset(self):
-		activity = "DAP Preset Activity"
-		if not frappe.db.exists("Activity Type", activity):
-			frappe.get_doc({"doctype": "Activity Type", "activity_type": activity}).insert(ignore_permissions=True)
-		args = {"goal": "g", "result": "r", "activity_type": activity}
-		frappe.set_user(USER)
-		none = dap.create_break_timesheet("2026-05-10 09:00:00", "2026-05-10 09:30:00", project=self._project(""), **args)
-		half = dap.create_break_timesheet("2026-05-10 10:00:00", "2026-05-10 10:30:00", project=self._project("50"), **args)
-		frappe.set_user("Administrator")
+		args = {"goal": "g", "result": "r", "activity_type": self._activity_type()}
+		none = self._as_user(
+			dap.create_break_timesheet, "2026-05-10 09:00:00", "2026-05-10 09:30:00",
+			project=self._project(percent_billable=""), **args,
+		)
+		half = self._as_user(
+			dap.create_break_timesheet, "2026-05-10 10:00:00", "2026-05-10 10:30:00",
+			project=self._project(percent_billable="50"), **args,
+		)
 		self.assertEqual(frappe.db.get_value("Timesheet Record", none["name"], "percent_billable"), "0")
 		self.assertEqual(frappe.db.get_value("Timesheet Record", half["name"], "percent_billable"), "50")

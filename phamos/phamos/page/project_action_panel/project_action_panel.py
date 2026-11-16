@@ -18,9 +18,7 @@ from phamos.phamos.timesheet_utils import billable_seconds_term, normalize_perce
 from phamos.phamos.doctype.timesheet_record.timesheet_record import compute_time_limit_status
 
 
-# GitLab ticket references (URL or group/project#N) → child and parent issue. The logic lives in
-# phamos.gitlab_integration.issue_refs, shared with the Developer Action Panel and the Personal
-# Cockpit (#1862); these names stay for existing callers (patches, customer comments).
+# Shared with the Developer Action Panel; the old names stay for patches and customer comments.
 from phamos.gitlab_integration.issue_refs import (  # noqa: E402
     GITLAB_REF_RE as _GITLAB_REF_RE,
     find_gitlab_issues_in_text as _find_gitlab_issues_in_text,
