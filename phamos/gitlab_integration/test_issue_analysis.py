@@ -198,3 +198,59 @@ class TestIssueAnalysis(FrappeTestCase):
         self.assertNotIn("sk-from-ci", posts[0])
         self.assertNotIn("glpat-review", posts[0])
         self.assertEqual(seen_images, [("image/png", PNG)])
+
+    def test_poll_skips_an_issue_that_already_has_the_same_analysis(self):
+        script = _ci_script()
+        fresh = {
+            "iid": 7,
+            "title": "Save button does nothing",
+            "description": "Clicking save does nothing",
+            "web_url": f"{PROJECT}/-/issues/7",
+            "labels": ["bug"],
+        }
+        done_title, done_description = "Old question", "Already answered"
+        done_digest = script._digest("question", done_title, done_description)
+        done = {
+            "iid": 8,
+            "title": done_title,
+            "description": done_description,
+            "web_url": f"{PROJECT}/-/issues/8",
+            "labels": ["question"],
+        }
+        posts = []
+
+        class FakeGitLab:
+            def __init__(self, server, project_id, token):
+                self.server = server.rstrip("/")
+
+            def get(self, path, **params):
+                if path == "/issues":
+                    return {"bug": [fresh], "question": [done]}.get(params.get("labels"), [])
+                if path == "/issues/8/notes":
+                    return [{"body": script.MARKER.format(label="question", digest=done_digest), "system": False}]
+                if path.endswith("/notes"):
+                    return []
+                return fresh
+
+            def download(self, url):
+                return None
+
+            def post(self, path, payload):
+                posts.append(path)
+
+        with (
+            patch.object(script, "GitLab", FakeGitLab),
+            patch.object(script, "call_claude", return_value="The save handler is missing."),
+            patch.dict(os.environ, {
+                "AI_ISSUE_POLL": "true",
+                "AI_ISSUE_IID": "",
+                "AI_ISSUE_POLL_LIMIT": "5",
+                "CI_SERVER_URL": GITLAB,
+                "CI_PROJECT_ID": "42",
+                "GITLAB_API_TOKEN": "glpat-review",
+                "ANTHROPIC_API_KEY": "sk-from-ci",
+            }),
+        ):
+            script.main()
+
+        self.assertEqual(posts, ["/issues/7/notes"])

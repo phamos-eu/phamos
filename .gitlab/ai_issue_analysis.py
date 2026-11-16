@@ -1,9 +1,10 @@
 #!/usr/bin/env python3
 """Analyses a GitLab issue and posts the result as a comment.
 
-Invoked by .gitlab-ci.yml's ai_issue_analysis job when a pipeline is started
-for a newly added bug or question label. Uses the same CI/CD variables as
-the MR review: ANTHROPIC_API_KEY and GITLAB_API_TOKEN.
+Invoked by .gitlab-ci.yml's ai_issue_analysis job. A pipeline schedule with
+AI_ISSUE_POLL=true checks open bug and question issues. A pipeline started
+with AI_ISSUE_IID and AI_ISSUE_LABEL analyses that one issue. Uses the same
+CI/CD variables as the MR review: ANTHROPIC_API_KEY and GITLAB_API_TOKEN.
 """
 
 import base64
@@ -262,29 +263,36 @@ def call_claude(label, title, description, note_lines, images):
     return "\n".join(parts).strip() or None
 
 
-def main():
-    label = env("AI_ISSUE_LABEL")
-    if label not in ANALYSIS_LABELS:
-        fail(f"AI_ISSUE_LABEL must be bug or question, got {label!r}.")
-    issue_iid = env("AI_ISSUE_IID")
-    gl = GitLab(env("CI_SERVER_URL"), env("CI_PROJECT_ID"), env("GITLAB_API_TOKEN"))
-    env("ANTHROPIC_API_KEY")
+def _digest(label, title, description):
+    return hashlib.sha256(f"{label}\n{title}\n{description}".encode()).hexdigest()[:16]
 
-    issue = gl.get(f"/issues/{urllib.parse.quote(issue_iid, safe='')}")
+
+def _poll_limit():
+    raw = os.environ.get("AI_ISSUE_POLL_LIMIT", "5")
+    try:
+        return max(1, int(raw))
+    except ValueError:
+        return 5
+
+
+def analyse_issue(gl, issue, label):
+    """Post one analysis comment. Returns True when a new comment was posted."""
+    issue_iid = str(issue.get("iid"))
     title = issue.get("title") or ""
     description = issue.get("description") or ""
-    digest = hashlib.sha256(f"{label}\n{title}\n{description}".encode()).hexdigest()[:16]
+    digest = _digest(label, title, description)
     marker = MARKER.format(label=label, digest=digest)
+    quoted = urllib.parse.quote(issue_iid, safe="")
 
     notes = gl.get(
-        f"/issues/{urllib.parse.quote(issue_iid, safe='')}/notes",
+        f"/issues/{quoted}/notes",
         per_page=100,
         sort="desc",
         order_by="created_at",
     ) or []
     if any(marker in (note.get("body") or "") for note in notes):
         print(f"Issue #{issue_iid} already has an analysis for this {label} text.")
-        return
+        return False
 
     web_url = project_web_url(issue.get("web_url"))
     images = []
@@ -295,13 +303,65 @@ def main():
 
     text = call_claude(label, title, description, _note_lines(notes), images)
     if not text:
-        print("No analysis to post.")
-        return
-    gl.post(
-        f"/issues/{urllib.parse.quote(issue_iid, safe='')}/notes",
-        {"body": comment_body(label, digest, text)},
-    )
+        print(f"No analysis to post for issue #{issue_iid}.")
+        return False
+    gl.post(f"/issues/{quoted}/notes", {"body": comment_body(label, digest, text)})
     print(f"Commented on issue #{issue_iid} ({label}, {len(images)} image(s)).")
+    return True
+
+
+def open_labelled_issues(gl, label):
+    return gl.get(
+        "/issues",
+        state="opened",
+        labels=label,
+        order_by="updated_at",
+        sort="desc",
+        per_page=50,
+    ) or []
+
+
+def poll(gl):
+    """Comment on open bug and question issues that have no analysis yet."""
+    limit = _poll_limit()
+    posted = 0
+    seen = set()
+    for label in ANALYSIS_LABELS:
+        for issue in open_labelled_issues(gl, label):
+            key = (issue.get("iid"), label)
+            if key in seen:
+                continue
+            seen.add(key)
+            if posted >= limit:
+                print(f"Reached AI_ISSUE_POLL_LIMIT={limit}.")
+                return
+            try:
+                if analyse_issue(gl, issue, label):
+                    posted += 1
+            except urllib.error.HTTPError as exc:
+                print(f"Issue #{issue.get('iid')} failed ({exc.code}).", file=sys.stderr)
+    print(f"Posted {posted} analysis comment(s).")
+
+
+def main():
+    gl = GitLab(env("CI_SERVER_URL"), env("CI_PROJECT_ID"), env("GITLAB_API_TOKEN"))
+    env("ANTHROPIC_API_KEY")
+
+    issue_iid = os.environ.get("AI_ISSUE_IID")
+    if issue_iid:
+        label = env("AI_ISSUE_LABEL")
+        if label not in ANALYSIS_LABELS:
+            fail(f"AI_ISSUE_LABEL must be bug or question, got {label!r}.")
+        issue = gl.get(f"/issues/{urllib.parse.quote(issue_iid, safe='')}") or {}
+        issue["iid"] = issue.get("iid") or issue_iid
+        analyse_issue(gl, issue, label)
+        return
+
+    if os.environ.get("AI_ISSUE_POLL") == "true":
+        poll(gl)
+        return
+
+    fail("Set AI_ISSUE_IID and AI_ISSUE_LABEL, or AI_ISSUE_POLL=true.")
 
 
 if __name__ == "__main__":
