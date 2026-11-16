@@ -13,6 +13,7 @@ from phamos.phamos.page.dev_action_panel import dev_action_panel as dap
 from phamos.tests.test_personal_checkin import _ensure_employee, _ensure_user
 
 USER = "dap-gitlab-ref@example.com"
+NO_EMPLOYEE_USER = "dap-gitlab-ref-no-employee@example.com"
 BASE = "https://git.example.test/grp/proj"
 
 
@@ -108,7 +109,7 @@ class TestGitlabIssueRefs(_RefsSetup):
 	def test_lookups_do_not_fetch_unless_asked(self):
 		with patch("phamos.gitlab_integration.gitlab_utils.get_issue_for_project") as get_issue:
 			self.assertEqual(issue_refs.find_gitlab_issues_in_text(f"See {BASE}/-/work_items/12"), (None, None))
-			preview = issue_refs.preview_reference(f"{BASE}/-/work_items/12")
+			preview = self._preview_as_employee(f"{BASE}/-/work_items/12")
 		get_issue.assert_not_called()
 		self.assertFalse(preview["found"])
 		self.assertTrue(preview["fetchable"])
@@ -148,11 +149,27 @@ class TestGitlabIssueRefs(_RefsSetup):
 		self.assertEqual((doc.gitlab_issue, doc.gitlab_parent_issue), (self.child, self.parent))
 
 	def test_preview_describes_child_and_parent(self):
-		preview = issue_refs.preview_reference(f"{BASE}/-/work_items/11")
+		preview = self._preview_as_employee(f"{BASE}/-/work_items/11")
 		self.assertTrue(preview["found"])
 		self.assertEqual(preview["child"]["issue_id"], "11")
 		self.assertEqual(preview["parent"]["issue_id"], "10")
 		self.assertEqual(preview["child"]["project"], self.erp_project)
+
+	def test_preview_needs_a_linked_employee(self):
+		_ensure_user(NO_EMPLOYEE_USER)
+		frappe.set_user(NO_EMPLOYEE_USER)
+		with self.assertRaises(frappe.PermissionError):
+			issue_refs.preview_reference(f"{BASE}/-/work_items/11")
+
+	def _preview_as_employee(self, reference):
+		"""A panel user: an Employee without System Manager, so no Timesheet Record create right."""
+		_ensure_user(USER)
+		_ensure_employee(USER)
+		frappe.set_user(USER)
+		try:
+			return issue_refs.preview_reference(reference)
+		finally:
+			frappe.set_user("Administrator")
 
 
 class TestDapStopLinksGitlabTicket(_RefsSetup):

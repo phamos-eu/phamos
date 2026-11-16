@@ -15,6 +15,7 @@ import html
 import re
 
 import frappe
+from frappe import _
 from frappe.utils import strip_html
 
 GITLAB_REF_RE = re.compile(
@@ -168,8 +169,13 @@ def _gitlab_project_for(project_url):
 
 @frappe.whitelist()
 def preview_reference(reference):
-	"""Child and parent a reference will link on Stop. Reads only; never fetches or creates."""
-	frappe.has_permission("Timesheet Record", "create", throw=True)
+	"""Child and parent a reference will link on Stop. Reads only; never fetches or creates.
+
+	Same gate as the Developer Action Panel: a linked Employee. Timesheet Record create is
+	System Manager only, and the panel's own endpoints insert with ignore_permissions.
+	"""
+	if not frappe.db.exists("Employee", {"user_id": frappe.session.user}):
+		frappe.throw(_("No Employee record linked to your user account."), frappe.PermissionError)
 	child, parent = resolve_reference(reference)
 
 	def describe(name):
