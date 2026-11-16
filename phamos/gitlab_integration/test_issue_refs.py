@@ -25,7 +25,12 @@ class _RefsSetup(FrappeTestCase):
 		self.addCleanup(patcher.stop)
 		frappe.set_user("Administrator")
 		self.erp_project = frappe.get_doc(
-			{"doctype": "Project", "project_name": f"Refs {frappe.generate_hash(length=6)}", "status": "Open"}
+			{
+				"doctype": "Project",
+				"project_name": f"Refs {frappe.generate_hash(length=6)}",
+				"status": "Open",
+				"project_owner": "Administrator",  # mandatory custom field
+			}
 		).insert(ignore_permissions=True).name
 		self.gitlab_project = frappe.get_doc(
 			{
@@ -91,7 +96,8 @@ class TestGitlabIssueRefs(_RefsSetup):
 			) as get_issue,
 			patch(
 				"phamos.gitlab_integration.gitlab_utils.get_issue_parent",
-				return_value={"iid": "10", "webUrl": f"{BASE}/-/work_items/10"},
+				# The shape gitlab_utils.get_issue_parent returns (not GraphQL's raw webUrl).
+				return_value={"title": "Customer ticket", "iid": "10", "web_url": f"{BASE}/-/work_items/10"},
 			),
 		):
 			child, parent = issue_refs.resolve_reference(f"{BASE}/-/work_items/12", fetch=True)

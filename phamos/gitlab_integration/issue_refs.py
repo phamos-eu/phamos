@@ -143,7 +143,7 @@ def _link_fetched_parent(doc, project_path, iid):
 
 	try:
 		parent = gitlab_utils.get_issue_parent(project_path, iid)
-		parent_url = (parent or {}).get("webUrl")
+		parent_url = (parent or {}).get("web_url")  # get_issue_parent renames GraphQL's webUrl
 		parent_name = parent_url and (_issue_name_by_url(parent_url) or fetch_issue_by_url(parent_url, with_parent=False))
 		if parent_name:
 			doc.db_set("parent_issue", parent_name)

@@ -36,6 +36,7 @@ class _DapTestCase(FrappeTestCase):
 					"doctype": "Project",
 					"project_name": f"{prefix} {frappe.generate_hash(length=6)}",
 					"status": status,
+					"project_owner": "Administrator",  # mandatory custom field
 					**fields,
 				}
 			)
