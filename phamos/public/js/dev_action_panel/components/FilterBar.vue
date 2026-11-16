@@ -12,8 +12,6 @@ const props = defineProps({
   labelOptions: Array,
   resultCount: Number,
   totalCount: Number,
-  // #1862: scope (my issues / all issues), GitLab project and issue type (parent / child)
-  mineOnly: Boolean,
   projectFilter: String,
   typeFilter: { type: String, default: "all" },
   projectOptions: { type: Array, default: () => [] }, // [{ name, title, count }]
@@ -22,30 +20,46 @@ const props = defineProps({
 const emit = defineEmits([
   "update:search", "update:dueFilter", "update:assigneeFilter",
   "update:labelFilter", "update:sortBy", "update:sortDir", "clear-all",
-  "update:mineOnly", "update:projectFilter", "update:typeFilter",
+  "update:projectFilter", "update:typeFilter",
 ]);
-
-const TYPE_OPTIONS = [
-  { value: "all",    label: "All issues" },
-  { value: "parent", label: "Parent issues" },
-  { value: "child",  label: "Child issues" },
-];
-const activeTypeLabel = computed(() => TYPE_OPTIONS.find(o => o.value === props.typeFilter)?.label || "All issues");
-const projectSearch = ref("");
-const activeProjectTitle = computed(() =>
-  (props.projectOptions || []).find(p => p.name === props.projectFilter)?.title || props.projectFilter
-);
-const filteredProjectOptions = computed(() => {
-  const q = projectSearch.value.trim().toLowerCase();
-  const list = props.projectOptions || [];
-  return q ? list.filter(p => (p.title || p.name).toLowerCase().includes(q)) : list;
-});
-function setProject(name) { emit("update:projectFilter", name); activeDropdown.value = null; projectSearch.value = ""; }
-function setType(val) { emit("update:typeFilter", val); activeDropdown.value = null; }
 
 const activeDropdown = ref(null);
 const assigneeSearch = ref("");
 const labelSearch = ref("");
+const projectSearch = ref("");
+
+const labels = {
+  project: __("Project"),
+  type: __("Type"),
+  allProjects: __("All projects"),
+  searchProjects: __("Search projects…"),
+  noResults: __("No results"),
+};
+
+const TYPE_OPTIONS = [
+  { value: "all", label: __("All issues") },
+  { value: "parent", label: __("Parent issues") },
+  { value: "child", label: __("Child issues") },
+];
+const activeTypeLabel = computed(() => TYPE_OPTIONS.find(o => o.value === props.typeFilter)?.label);
+const activeProjectTitle = computed(() =>
+  props.projectOptions.find(p => p.name === props.projectFilter)?.title || props.projectFilter
+);
+const filteredProjectOptions = computed(() => {
+  const q = projectSearch.value.trim().toLowerCase();
+  return q ? props.projectOptions.filter(p => p.title.toLowerCase().includes(q)) : props.projectOptions;
+});
+
+function setProject(name) {
+  emit("update:projectFilter", name);
+  activeDropdown.value = null;
+  projectSearch.value = "";
+}
+
+function setType(value) {
+  emit("update:typeFilter", value);
+  activeDropdown.value = null;
+}
 
 const DUE_OPTIONS = [
   { value: "all",       label: "Any date" },
@@ -191,31 +205,25 @@ function clearAll() { emit("clear-all"); activeDropdown.value = null; assigneeSe
       <!-- Divider -->
       <div class="fb__divider"></div>
 
-      <!-- Scope: my issues / all issues. "All" lets a PM book time on issues assigned to others (#1862). -->
-      <div class="fb__scope" role="group" aria-label="Issue scope">
-        <button class="fb__scope-btn" :class="{ 'fb__scope-btn--on': mineOnly }" @click="emit('update:mineOnly', true)">Mine</button>
-        <button class="fb__scope-btn" :class="{ 'fb__scope-btn--on': !mineOnly }" @click="emit('update:mineOnly', false)" title="Also issues assigned to others">All</button>
-      </div>
-
-      <!-- Project filter (#1862) -->
+      <!-- Project filter -->
       <div class="fb__dd-wrap" @click.stop>
-        <button class="fb__filter-btn" :class="{ 'fb__filter-btn--active': projectFilter }" @click="toggleDropdown('project')" :title="activeProjectTitle || 'Filter by project'">
+        <button class="fb__filter-btn" :class="{ 'fb__filter-btn--active': projectFilter }" @click="toggleDropdown('project')" :title="activeProjectTitle || labels.project">
           <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 7a2 2 0 012-2h4l2 2h8a2 2 0 012 2v8a2 2 0 01-2 2H5a2 2 0 01-2-2z"/></svg>
-          <span class="fb__btn-text">{{ projectFilter ? activeProjectTitle : "Project" }}</span>
+          <span class="fb__btn-text">{{ projectFilter ? activeProjectTitle : labels.project }}</span>
           <svg width="10" height="10" viewBox="0 0 24 24" fill="currentColor" class="fb__chevron" :class="{ 'fb__chevron--open': activeDropdown === 'project' }"><path d="M7 10l5 5 5-5z"/></svg>
         </button>
         <Transition name="dd">
           <div v-if="activeDropdown === 'project'" class="fb__menu fb__menu--searchable" @click.stop>
             <div class="fb__menu-search">
               <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
-              <input v-model="projectSearch" class="fb__menu-search-input" placeholder="Search projects…" spellcheck="false" autocomplete="off" @click.stop />
+              <input v-model="projectSearch" class="fb__menu-search-input" :placeholder="labels.searchProjects" spellcheck="false" autocomplete="off" @click.stop />
             </div>
             <div class="fb__menu-scroll">
               <button class="fb__menu-item" :class="{ 'fb__menu-item--active': !projectFilter }" @click="setProject(null)">
                 <span class="fb__menu-check"><svg v-if="!projectFilter" width="12" height="12" viewBox="0 0 24 24" fill="currentColor"><path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"/></svg></span>
-                All projects
+                {{ labels.allProjects }}
               </button>
-              <p v-if="!filteredProjectOptions.length" class="fb__menu-empty">No results</p>
+              <p v-if="!filteredProjectOptions.length" class="fb__menu-empty">{{ labels.noResults }}</p>
               <button
                 v-for="p in filteredProjectOptions" :key="p.name"
                 class="fb__menu-item"
@@ -231,11 +239,11 @@ function clearAll() { emit("clear-all"); activeDropdown.value = null; assigneeSe
         </Transition>
       </div>
 
-      <!-- Issue type: parent / child (#1862) -->
+      <!-- Issue type: parent / child -->
       <div class="fb__dd-wrap" @click.stop>
         <button class="fb__filter-btn" :class="{ 'fb__filter-btn--active': typeFilter !== 'all' }" @click="toggleDropdown('type')">
           <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 3v12M6 15a3 3 0 103 3M18 9a3 3 0 10-3-3M18 9c0 6-12 3-12 6"/></svg>
-          {{ typeFilter === 'all' ? 'Type' : activeTypeLabel }}
+          {{ typeFilter === 'all' ? labels.type : activeTypeLabel }}
           <svg width="10" height="10" viewBox="0 0 24 24" fill="currentColor" class="fb__chevron" :class="{ 'fb__chevron--open': activeDropdown === 'type' }"><path d="M7 10l5 5 5-5z"/></svg>
         </button>
         <Transition name="dd">
@@ -415,14 +423,6 @@ function clearAll() { emit("clear-all"); activeDropdown.value = null; assigneeSe
   transition: border-color 0.15s, box-shadow 0.15s;
 }
 
-/* Scope toggle: Mine / All */
-.fb__scope { display: inline-flex; border: 1px solid var(--border-color); border-radius: 6px; overflow: hidden; flex-shrink: 0; }
-.fb__scope-btn {
-  background: none; border: none; cursor: pointer; padding: 3px 9px;
-  font-size: 12px; font-weight: 500; color: var(--text-muted);
-}
-.fb__scope-btn + .fb__scope-btn { border-left: 1px solid var(--border-color); }
-.fb__scope-btn--on { background: var(--primary); color: #fff; font-weight: 600; }
 .fb__btn-text { max-width: 140px; overflow: hidden; text-overflow: ellipsis; }
 .fb__menu-text { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .fb__bar:focus-within { border-color: var(--primary); box-shadow: 0 0 0 3px rgba(37,99,235,0.08); }

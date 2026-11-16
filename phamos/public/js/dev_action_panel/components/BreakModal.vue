@@ -4,14 +4,12 @@ import { RATING_OPTIONS, VALUE_ADD_DEFAULT, VALUE_ADD_HELP, PERCENT_BILLABLE_DEF
 
 const props = defineProps({
   breakFrom: String,  // system-tz "YYYY-MM-DD HH:mm:ss"
-  // The panel's project list (get_dev_all_projects): last used first, then assigned to me, then the rest.
-  projects: { type: Array, default: () => [] },
+  projects: { type: Array, required: true }, // get_dev_all_projects rows, last used first
 });
 const emit = defineEmits(["confirm", "skip", "close"]);
 
 const project = ref("");
 const projectLabel = ref("");
-const projectResults = ref([]);
 const showDropdown = ref(false);
 const goal = ref("");
 const result = ref("");
@@ -27,58 +25,44 @@ const goalRef = ref(null);
 const liveNow = ref(new Date());
 
 let liveInterval = null;
-let searchTimer = null;
 
 const ACTIVITY_TYPES = ["Working Alone", "Working with Customer", "Working With Team"];
 
 const billableOptions = RATING_OPTIONS.map((value) => ({ value, label: `${value}%` }));
 
-onMounted(async () => {
+onMounted(() => {
   goalRef.value?.focus();
   liveInterval = setInterval(() => { liveNow.value = new Date(); }, 1000);
-  await fetchProjects("");
 });
 
-onUnmounted(() => { clearInterval(liveInterval); clearTimeout(searchTimer); });
+onUnmounted(() => clearInterval(liveInterval));
 
-// Same order as the Projects view and the Project Action Panel: last used first (#1862).
-async function fetchProjects(term) {
-  const q = (term || "").trim().toLowerCase();
-  const list = props.projects.length
-    ? props.projects
-    : (await frappe.call({ method: "phamos.phamos.page.dev_action_panel.dev_action_panel.get_dev_all_projects" })).message || [];
-  projectResults.value = list
+const projectResults = computed(() => {
+  const q = projectLabel.value.trim().toLowerCase();
+  return props.projects
+    .filter((p) => p.status === "Open")
     .filter((p) => !q || `${p.project_name || ""} ${p.name}`.toLowerCase().includes(q))
     .slice(0, 50);
-}
+});
 
 function onSearchInput() {
   project.value = "";
   showDropdown.value = true;
-  clearTimeout(searchTimer);
-  searchTimer = setTimeout(() => fetchProjects(projectLabel.value), 300);
 }
 
 function onSearchFocus() {
   showDropdown.value = true;
-  if (!projectResults.value.length) fetchProjects(projectLabel.value);
 }
 
 function onSearchBlur() {
   setTimeout(() => { showDropdown.value = false; }, 150);
 }
 
-async function selectProject(p) {
+function selectProject(p) {
   project.value = p.name;
   projectLabel.value = p.project_name || p.name;
   showDropdown.value = false;
-  const r = await frappe.call({
-    method: "phamos.phamos.timesheet_utils.get_billing_context",
-    args: { project: p.name },
-  });
-  if (project.value !== p.name) return; // another project was picked meanwhile
-  // Preset Percent Billable from the picked project, 0 when it has none (#1744, #1862).
-  percentBillable.value = billablePreset(r.message);
+  percentBillable.value = billablePreset(p);
 }
 
 const breakDuration = computed(() => {

@@ -40,8 +40,18 @@ const assigneeFilter = ref([]);
 const labelFilter = ref([]);
 const sortBy = ref("due_date");
 const sortDir = ref("asc");
-const typeFilter = ref("all"); // 'all' | 'parent' | 'child' (#1862)
-function clearAllFilters() { searchQuery.value = ""; dueFilter.value = "all"; assigneeFilter.value = []; labelFilter.value = []; sortBy.value = "due_date"; sortDir.value = "asc"; typeFilter.value = "all"; selectedProject.value = null; }
+const typeFilter = ref("all"); // 'all' | 'parent' | 'child'
+
+function clearAllFilters() {
+  searchQuery.value = "";
+  dueFilter.value = "all";
+  assigneeFilter.value = [];
+  labelFilter.value = [];
+  sortBy.value = "due_date";
+  sortDir.value = "asc";
+  typeFilter.value = "all";
+  selectedProject.value = null;
+}
 
 // Dynamic filter options derived from the loaded issues
 const assigneeOptions = computed(() => {
@@ -60,22 +70,18 @@ const labelOptions = computed(() => {
 // Derived
 const myIssuesCount = computed(() => issues.value.filter(i => i.is_mine).length);
 
-// Project filter (#1862): the ERPNext projects of the project list (last used first, then assigned
-// to me, then the rest), each with the number of issues in the current scope. Projects that only
-// appear through an issue are added at the end. The same filter applies to Issues and Projects.
+// Projects that have issues in the current scope, in the project list's order (last used first).
 const projects = computed(() => {
   const base = mineOnly.value ? issues.value.filter(i => i.is_mine) : issues.value;
-  const counts = {};
-  const titles = {};
+  const byProject = {};
   base.forEach(i => {
     if (!i.project) return;
-    counts[i.project] = (counts[i.project] || 0) + 1;
-    titles[i.project] = i.project_name || i.project;
+    if (!byProject[i.project]) byProject[i.project] = { name: i.project, title: i.project_name || i.project, count: 0 };
+    byProject[i.project].count++;
   });
-  const list = allProjects.value.map(p => ({ name: p.name, title: p.project_name || p.name, count: counts[p.name] || 0 }));
-  const listed = new Set(list.map(p => p.name));
-  Object.keys(counts).filter(n => !listed.has(n)).forEach(n => list.push({ name: n, title: titles[n], count: counts[n] }));
-  return list;
+  const order = allProjects.value.map(p => p.name);
+  const rank = name => (order.includes(name) ? order.indexOf(name) : order.length);
+  return Object.values(byProject).sort((a, b) => rank(a.name) - rank(b.name));
 });
 
 const filteredIssues = computed(() => {
@@ -85,12 +91,10 @@ const filteredIssues = computed(() => {
   const activeIssue = issues.value.find(i => i.name === activeIssueName);
   let list = issues.value.filter(i => i.name !== activeIssueName);
 
-  const q = searchQuery.value.trim().toLowerCase();
-  // A search looks through all issues, not only mine, so a PM finds any ticket by number or
-  // title and can book time on it without being assigned (#1862).
-  if (mineOnly.value && !q) list = list.filter(i => i.is_mine);
+  if (mineOnly.value) list = list.filter(i => i.is_mine);
   if (selectedProject.value) list = list.filter(i => i.project === selectedProject.value);
 
+  const q = searchQuery.value.trim().toLowerCase();
   if (q) list = list.filter(i =>
     i.title?.toLowerCase().includes(q) ||
     String(i.issue_id).includes(q) ||
@@ -99,8 +103,6 @@ const filteredIssues = computed(() => {
     i.labels?.toLowerCase().includes(q)
   );
 
-  // Parent = has child issues; child = has a parent issue (#1862). Lets a PM find the customer's
-  // parent ticket or the developer's child ticket without being assigned to it.
   if (typeFilter.value === "parent") list = list.filter(i => i.child_count > 0);
   if (typeFilter.value === "child") list = list.filter(i => !!i.parent_issue);
 
@@ -158,8 +160,7 @@ const filteredIssues = computed(() => {
   return list;
 });
 
-// A running or paused project timer is shown on top of the Issues view too, so the open timesheet
-// is the first thing you see when you open the panel (#1862).
+// A running project timer is also shown on top of the Issues view.
 const activeProjectRow = computed(() => {
   const s = activeProjectSession.value;
   if (!s) return null;
@@ -167,7 +168,6 @@ const activeProjectRow = computed(() => {
     || { name: s.project, project_name: s.project, percent_billable: s.project_percent_billable, assignees: [] };
 });
 
-// Click on the running card in the sidebar: go to the open timesheet.
 function openRunningSession() {
   if (activeProjectSession.value) currentView.value = "projects";
   else if (activeSession.value) currentView.value = "issues";
@@ -314,7 +314,7 @@ async function onStopProjectTimer({ result, valueAdd, percentBillable, activityT
   if (!activeProjectSession.value) return;
   const args = { name: activeProjectSession.value.name, result, activity_type: activityType, ...ratingArgs(valueAdd, percentBillable) };
   if (manualEndTime) args.manual_end_time = manualEndTime;
-  if (gitlabIssueRef) args.gitlab_issue_ref = gitlabIssueRef; // child / parent worked out on the server (#1862)
+  if (gitlabIssueRef) args.gitlab_issue_ref = gitlabIssueRef;
   const r = await frappe.call({
     method: "phamos.phamos.page.dev_action_panel.dev_action_panel.stop_timer",
     args,
@@ -534,7 +534,6 @@ onUnmounted(() => { stopTick(); stopProjectTick(); });
             v-model:labelFilter="labelFilter"
             v-model:sortBy="sortBy"
             v-model:sortDir="sortDir"
-            v-model:mineOnly="mineOnly"
             v-model:projectFilter="selectedProject"
             v-model:typeFilter="typeFilter"
             :assignee-options="assigneeOptions"
@@ -583,8 +582,6 @@ onUnmounted(() => { stopTick(); stopProjectTick(); });
           v-else-if="currentView === 'projects'"
           :all-projects="allProjects"
           :issues="issues"
-          :project-options="projects"
-          v-model:selected-project="selectedProject"
           :active-project-session="activeProjectSession"
           :project-elapsed-seconds="projectElapsedSeconds"
           :loading="projectsLoading"

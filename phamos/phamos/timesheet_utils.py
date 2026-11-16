@@ -17,15 +17,19 @@ def normalize_percent_billable(value):
     return cstr(value).strip()
 
 
-# Preset when the Project has no Percent Billable of its own (#1895, #1862): nothing is billed
-# unless the project says so. The Project's own value always wins.
+# Preset when the Project has no Percent Billable: nothing is billed unless the project says so.
 DEFAULT_PERCENT_BILLABLE = "0"
 
 
 def percent_billable_preset(project_value):
-    """The Project's Percent Billable as a preset; DEFAULT_PERCENT_BILLABLE when it has none."""
-    value = cstr(project_value).strip()
-    return value if value else DEFAULT_PERCENT_BILLABLE
+    return cstr(project_value).strip() or DEFAULT_PERCENT_BILLABLE
+
+
+def percent_billable_or_preset(percent_billable, project):
+    """The Percent Billable that was entered, or the project's preset when none was sent."""
+    if percent_billable in (None, ""):
+        percent_billable = billing_context(project)["percent_billable"]
+    return normalize_percent_billable(percent_billable)
 
 
 def billing_context(project):
