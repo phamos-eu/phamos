@@ -28,7 +28,7 @@ from phamos.phamos.doctype.timesheet_record.timesheet_record import (
 	submit_at_available_hours,
 )
 from phamos.phamos.page.dev_action_panel import dev_action_panel as dap
-from phamos.phamos.timesheet_utils import billing_context, percent_billable_preset
+from phamos.phamos.timesheet_utils import billing_context, percent_billable_or_preset, percent_billable_preset
 
 DOCTYPE = "Timesheet Record"
 MIN_EXPECTED_SECONDS = 15 * 60
@@ -251,7 +251,7 @@ def get_timer_project_info(project):
 		)
 	return {
 		"project": project,
-		"percent_billable": percent_billable_preset(frappe.db.get_value("Project", project, "percent_billable")),
+		"percent_billable": billing_context(project)["percent_billable"],
 		"task_rule": rule,
 		"tasks": tasks,
 	}
@@ -332,9 +332,7 @@ def resume_timer(name, track_break=0, break_project=None, break_goal=None, break
 
 def stop_timer(name, result, percent_billable=None, activity_type=None, manual_end_time=None, value_add=100, gitlab_issue_ref=None):
 	doc = _own_record(name)
-	if percent_billable in (None, ""):
-		# Not sent: the project's preset, 0 when it has none (#1862), never a hard-coded 100.
-		percent_billable = billing_context(doc.project)["percent_billable"]
+	percent_billable = percent_billable_or_preset(percent_billable, doc.project)
 	result = (result or "").strip()
 	if not result:
 		frappe.throw(_("Please describe what you accomplished."))

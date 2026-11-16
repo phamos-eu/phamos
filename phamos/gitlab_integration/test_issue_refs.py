@@ -1,9 +1,8 @@
 # Copyright (c) 2026, phamos.eu and contributors
 # For license information, please see license.txt
 
-"""GitLab ticket on a timesheet: the system tells the child from the parent (#1862)."""
+"""GitLab ticket on a timesheet: the system tells the child from the parent."""
 
-import random
 from unittest.mock import patch
 
 import frappe
@@ -31,7 +30,7 @@ class _RefsSetup(FrappeTestCase):
 		self.gitlab_project = frappe.get_doc(
 			{
 				"doctype": "GitLab Project",
-				"project_id": str(random.randint(800000, 899999)),
+				"project_id": frappe.generate_hash(length=10),
 				"title": "proj",
 				"web_url": BASE,
 				"namespace": "grp/proj",
@@ -82,28 +81,53 @@ class TestGitlabIssueRefs(_RefsSetup):
 
 	# --- issues not synced yet -----------------------------------------------------------
 
+	def _new_issue_data(self, iid):
+		return {"iid": iid, "title": "New task", "state": "opened", "web_url": f"{BASE}/-/work_items/{iid}", "labels": []}
+
 	def test_unsynced_child_is_fetched_with_its_parent(self):
-		data = {"iid": 12, "title": "New task", "state": "opened", "web_url": f"{BASE}/-/work_items/12", "labels": []}
 		with (
-			patch("phamos.gitlab_integration.gitlab_utils.get_issue_for_project", return_value=data) as get_issue,
+			patch(
+				"phamos.gitlab_integration.gitlab_utils.get_issue_for_project", return_value=self._new_issue_data(12)
+			) as get_issue,
 			patch(
 				"phamos.gitlab_integration.gitlab_utils.get_issue_parent",
 				return_value={"iid": "10", "webUrl": f"{BASE}/-/work_items/10"},
 			),
 		):
-			child, parent = issue_refs.resolve_reference(f"{BASE}/-/work_items/12")
+			child, parent = issue_refs.resolve_reference(f"{BASE}/-/work_items/12", fetch=True)
 		get_issue.assert_called_once()
 		self.assertEqual(parent, self.parent)
 		self.assertEqual(frappe.db.get_value("GitLab Issue", child, ["issue_id", "parent_issue"]), ("12", self.parent))
 
+	def test_lookups_do_not_fetch_unless_asked(self):
+		with patch("phamos.gitlab_integration.gitlab_utils.get_issue_for_project") as get_issue:
+			self.assertEqual(issue_refs.find_gitlab_issues_in_text(f"See {BASE}/-/work_items/12"), (None, None))
+			preview = issue_refs.preview_reference(f"{BASE}/-/work_items/12")
+		get_issue.assert_not_called()
+		self.assertFalse(preview["found"])
+		self.assertTrue(preview["fetchable"])
+		self.assertFalse(frappe.db.exists("GitLab Issue", {"gitlab_project": self.gitlab_project, "issue_id": "12"}))
+
 	def test_url_of_an_unknown_project_links_nothing_and_fetches_nothing(self):
 		with patch("phamos.gitlab_integration.gitlab_utils.get_issue_for_project") as get_issue:
-			self.assertEqual(issue_refs.resolve_reference("https://git.example.test/other/repo/-/issues/5"), (None, None))
+			reference = "https://git.example.test/other/repo/-/issues/5"
+			self.assertEqual(issue_refs.resolve_reference(reference, fetch=True), (None, None))
 		get_issue.assert_not_called()
 
 	def test_gitlab_error_while_fetching_links_nothing(self):
 		with patch("phamos.gitlab_integration.gitlab_utils.get_issue_for_project", side_effect=Exception("down")):
-			self.assertEqual(issue_refs.resolve_reference(f"{BASE}/-/work_items/99"), (None, None))
+			self.assertEqual(issue_refs.resolve_reference(f"{BASE}/-/work_items/99", fetch=True), (None, None))
+
+	def test_failed_parent_lookup_keeps_the_fetched_issue(self):
+		with (
+			patch(
+				"phamos.gitlab_integration.gitlab_utils.get_issue_for_project", return_value=self._new_issue_data(13)
+			),
+			patch("phamos.gitlab_integration.gitlab_utils.get_issue_parent", side_effect=Exception("graphql down")),
+		):
+			child, parent = issue_refs.resolve_reference(f"{BASE}/-/work_items/13", fetch=True)
+		self.assertIsNone(child)
+		self.assertEqual(frappe.db.get_value("GitLab Issue", parent, "issue_id"), "13")
 
 	# --- setting the fields on a Timesheet Record ----------------------------------------
 
@@ -126,7 +150,7 @@ class TestGitlabIssueRefs(_RefsSetup):
 
 
 class TestDapStopLinksGitlabTicket(_RefsSetup):
-	"""A generic project timer, the ticket given on Stop (#1862)."""
+	"""A generic project timer, the ticket given on Stop."""
 
 	def setUp(self):
 		super().setUp()

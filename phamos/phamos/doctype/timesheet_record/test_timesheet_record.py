@@ -205,7 +205,6 @@ class TestDapStartProjectTimer(FrappeTestCase):
 				"phamos.phamos.page.dev_action_panel.dev_action_panel.frappe.db.get_value",
 				side_effect=[employee, "CUST-001"],
 			),
-			# The draft takes the project's Percent Billable preset (#1862).
 			patch(
 				"phamos.phamos.page.dev_action_panel.dev_action_panel.billing_context",
 				return_value={"percent_billable": "75"},
@@ -449,7 +448,7 @@ class TestValueAddAndBillingRules(FrappeTestCase):
 		self.assertEqual(get_billing_context(self.internal), {"percent_billable": "75"})
 		no_preset = self._project("VA No Preset", percent_billable="")
 		frappe.db.set_value("Project", no_preset, "percent_billable", "")  # no value at all, not even the field default
-		self.assertEqual(get_billing_context(no_preset), {"percent_billable": "0"})  # #1862: 0, not 100
+		self.assertEqual(get_billing_context(no_preset), {"percent_billable": "0"})
 
 	def test_billing_context_needs_read_access_to_the_project(self):
 		from phamos.phamos.timesheet_utils import get_billing_context
