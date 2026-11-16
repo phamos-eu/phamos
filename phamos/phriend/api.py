@@ -21,7 +21,9 @@ from phamos.phriend.boot import is_for_user
 
 MAX_SCREENSHOT_BYTES = 15 * 1024 * 1024
 REPORT_DOCTYPE = "Issue"
-REPORT_TYPES = ("Bug", "Idea", "Question", "Other")  # "Other" is "Something else" in the flow (#1900)
+REPORT_TYPES = ("Bug", "Improvement", "Question", "Other")  # "Other" is "Something else" in the flow (#1900)
+# "Improvement" was "Idea" (#1924); a tab still running the old flow, or its saved draft, sends "Idea"
+OLD_REPORT_TYPES = {"Idea": "Improvement"}
 PRIORITIES = ("Low", "Medium", "High", "Urgent")
 CLOSED_STATUSES = ("Resolved", "Closed")
 REPORT_LIST_CAP = 100  # badge and "Already reported here" count up to this
@@ -68,6 +70,7 @@ def create_report(
 	"""
 	settings = _check_allowed()
 
+	report_type = OLD_REPORT_TYPES.get(cstr(report_type), report_type)
 	if report_type not in REPORT_TYPES:
 		report_type = "Bug"
 	if priority not in PRIORITIES:

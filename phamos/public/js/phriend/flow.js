@@ -27,7 +27,7 @@ const ICON_NO_SHOT = '<svg viewBox="0 0 24 24" width="16" height="16" fill="none
 // [value stored on the Issue, label, hint]
 const TYPES = [
 	["Bug", "Bug", "Something is broken"],
-	["Idea", "Idea", "It could be better"],
+	["Improvement", "Improvement", "It could be better"], // not "Idea": that reads as a cockpit Idea (#1924)
 	["Question", "Question", "I'm not sure how"],
 	["Other", "Something else", "None of these"],
 ];
