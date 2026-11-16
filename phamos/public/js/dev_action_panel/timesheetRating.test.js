@@ -8,7 +8,7 @@ describe("timesheetRating", () => {
 		expect(VALUE_ADD_DEFAULT).toBe(100)
 	})
 
-	it("presets Percent Billable from the project, 0 when the project has none (#1862)", () => {
+	it("presets Percent Billable from the project, 0 when the project has none", () => {
 		expect(billablePreset({ percent_billable: "50" })).toBe(50)
 		expect(billablePreset({ percent_billable: "100" })).toBe(100)
 		expect(billablePreset({ percent_billable: "0" })).toBe(0)

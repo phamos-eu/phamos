@@ -9,17 +9,10 @@ const props = defineProps({
   projectElapsedSeconds: Number,
   loading: Boolean,
   activeIssueSession: Object,
-  // Project filter shared with the Issues view (#1862): null = all projects
-  selectedProject: { type: String, default: null },
-  projectOptions: { type: Array, default: () => [] }, // [{ name, title, count }]
-  issues: { type: Array, default: () => [] }, // for the GitLab ticket picker on Stop (#1862)
+  issues: { type: Array, default: () => [] }, // for the GitLab ticket picker on Stop
 });
 
-const emit = defineEmits(["start", "pause", "resume", "stop", "assign", "update:selectedProject"]);
-
-function onProjectFilter(e) {
-  emit("update:selectedProject", e.target.value || null);
-}
+const emit = defineEmits(["start", "pause", "resume", "stop", "assign"]);
 
 const PROJECT_ICON = "M3 7h18M3 12h18M3 17h18";
 
@@ -28,7 +21,7 @@ const search = ref("");
 const rawProjects = computed(() => props.allProjects || []);
 const query = computed(() => search.value.trim().toLowerCase());
 
-// The project with my running or paused timer always comes first, whatever the search (#1862).
+// The project with my running or paused timer always comes first, whatever the search.
 const filteredProjects = computed(() => {
   const activeName = props.activeProjectSession?.project;
   const active = activeName ? rawProjects.value.find((p) => p.name === activeName) : null;
@@ -37,7 +30,6 @@ const filteredProjects = computed(() => {
 });
 
 function matches(p) {
-  if (props.selectedProject && p.name !== props.selectedProject) return false;
   if (!query.value) return true;
   const haystack = [p.project_name || "", p.name || "", p.customer_desc || "", p.status || ""]
     .join(" ")
@@ -78,16 +70,6 @@ function matches(p) {
           @click="search = ''"
         >×</button>
       </div>
-      <select
-        class="pv__project-filter form-control"
-        :class="{ 'pv__project-filter--active': selectedProject }"
-        :value="selectedProject || ''"
-        title="Filter by project"
-        @change="onProjectFilter"
-      >
-        <option value="">All projects</option>
-        <option v-for="p in projectOptions" :key="p.name" :value="p.name">{{ p.title }}</option>
-      </select>
       <span class="pv__count">
         {{ filteredProjects.length }} of {{ rawProjects.length }}
       </span>
@@ -223,15 +205,6 @@ function matches(p) {
   justify-content: center;
 }
 .pv__search-clear:hover { background: var(--text-color); }
-.pv__project-filter {
-  width: auto;
-  max-width: 220px;
-  height: 32px;
-  font-size: 13px;
-  flex-shrink: 0;
-}
-.pv__project-filter--active { border-color: var(--primary); color: var(--primary); font-weight: 600; }
-
 .pv__count {
   font-size: 12px;
   color: var(--text-muted);

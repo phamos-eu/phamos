@@ -252,6 +252,7 @@ onUnmounted(() => { stopProjectTick(); });
   <BreakModal
     v-if="showBreakModal && breakFrom"
     :break-from="breakFrom"
+    :projects="allProjects"
     @confirm="onBreakSubmit"
     @skip="onBreakSkip"
     @close="onBreakModalClose"

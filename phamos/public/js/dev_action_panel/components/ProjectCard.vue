@@ -9,7 +9,7 @@ const props = defineProps({
   activeProjectSession: Object,
   projectElapsedSeconds: Number,
   activeIssueSession: Object,
-  issues: { type: Array, default: () => [] }, // for the GitLab ticket picker on Stop (#1862)
+  issues: { type: Array, default: () => [] }, // for the GitLab ticket picker on Stop
 });
 
 const emit = defineEmits(["start", "pause", "resume", "stop", "assign"]);
@@ -22,13 +22,15 @@ const loadingSessions = ref(false);
 const startGoal = ref("");
 const expectedHours = ref(1);
 const stopResult = ref("");
-const stopTicket = ref(""); // GitLab ticket: issue name, URL or group/project#N (#1862)
+const stopTicket = ref(""); // GitLab Issue name, URL or group/project#N
 const stopBillable = ref(PERCENT_BILLABLE_DEFAULT);
 const stopValueAdd = ref(VALUE_ADD_DEFAULT);
 const labels = {
   valueAdd: __("Value Add (%)"),
   valueAddHelp: __(VALUE_ADD_HELP),
   percentBillable: __("Percent Billable"),
+  gitlabTicket: __("GitLab ticket"),
+  gitlabTicketHint: __("optional · a URL in the text above works too"),
 };
 const stopActivityType = ref("");
 // Start and end time: system time zone strings from the Frappe Datetime control (shown in the user's time zone).
@@ -266,7 +268,7 @@ function onStopKey(e)  { if (e.key === "Escape") closePanel(); if (e.key === "En
             <textarea v-model="stopResult" class="pc__panel-textarea" rows="2" placeholder="Completed the task, resolved the issue…" autofocus></textarea>
           </div>
           <div class="pc__panel-field pc__panel-field--full">
-            <label class="pc__panel-label">GitLab ticket <span class="pc__panel-optional">optional · a URL in the text above works too</span></label>
+            <label class="pc__panel-label">{{ labels.gitlabTicket }} <span class="pc__panel-optional">{{ labels.gitlabTicketHint }}</span></label>
             <GitlabTicketPicker v-model="stopTicket" :issues="issues" :project="project.name" />
           </div>
           <p class="pc__panel-hint">{{ labels.valueAdd }}: {{ labels.valueAddHelp }}</p>

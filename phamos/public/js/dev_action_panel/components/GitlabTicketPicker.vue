@@ -1,7 +1,6 @@
 <script setup>
-// GitLab ticket on Stop of a project timer (#1862): pick a ticket by number or title, or paste its
-// URL / group/project#N. The server says which issue is the child and which the parent
-// (phamos.gitlab_integration.issue_refs.preview_reference); the same rule links them on Stop.
+// GitLab ticket on Stop: pick by number or title, or paste a URL / group/project#N.
+// The server previews which issue becomes the child and which the parent.
 import { ref, computed, watch, onBeforeUnmount } from "vue";
 
 const props = defineProps({
@@ -13,10 +12,27 @@ const emit = defineEmits(["update:modelValue"]);
 
 const text = ref("");
 const open = ref(false);
-const preview = ref(null); // { child, parent, found }
+const preview = ref(null); // { child, parent, found, fetchable }
 const checking = ref(false);
 let timer = null;
 let seq = 0;
+let emitted = ""; // last value sent to the parent, to tell its own resets from ours
+
+const labels = {
+  placeholder: __("#123, title or GitLab URL (optional)"),
+  clear: __("Clear"),
+  checking: __("Checking ticket…"),
+  child: __("Child"),
+  parent: __("Parent"),
+  otherProject: __("This ticket belongs to another project."),
+  fetchable: __("Not synced yet; it will be fetched from GitLab when you complete."),
+  notFound: __("Ticket not found. Check the URL; the project may not be connected to GitLab yet."),
+};
+
+function setValue(value) {
+  emitted = value;
+  emit("update:modelValue", value);
+}
 
 const REF_RE = /^(https?:\/\/\S+\/-\/(issues|work_items)\/\d+|[\w.-]+(\/[\w.-]+)+#\d+)$/;
 
@@ -32,7 +48,7 @@ const suggestions = computed(() => {
 function pick(issue) {
   text.value = `#${issue.issue_id} ${issue.title}`;
   open.value = false;
-  emit("update:modelValue", issue.name);
+  setValue(issue.name);
   check(issue.name);
 }
 
@@ -42,10 +58,10 @@ function onInput() {
   const value = text.value.trim();
   clearTimeout(timer);
   if (REF_RE.test(value)) {
-    emit("update:modelValue", value);
+    setValue(value);
     timer = setTimeout(() => check(value), 300);
   } else {
-    emit("update:modelValue", "");
+    setValue("");
   }
 }
 
@@ -66,12 +82,22 @@ async function check(reference) {
 function clear() {
   text.value = "";
   preview.value = null;
-  emit("update:modelValue", "");
+  setValue("");
 }
 
-function onBlur() { setTimeout(() => { open.value = false; }, 150); }
+function onBlur() {
+  setTimeout(() => { open.value = false; }, 150);
+}
 
-watch(() => props.modelValue, v => { if (!v) { text.value = ""; preview.value = null; } });
+// Only a reset from the parent (e.g. after Complete) empties the field, not our own emits.
+watch(() => props.modelValue, value => {
+  if (value === emitted) return;
+  emitted = value;
+  if (!value) {
+    text.value = "";
+    preview.value = null;
+  }
+});
 onBeforeUnmount(() => clearTimeout(timer));
 
 const otherProject = computed(() => {
@@ -87,14 +113,14 @@ const otherProject = computed(() => {
       <input
         v-model="text"
         class="gt__input"
-        placeholder="#123, title or GitLab URL (optional)"
+        :placeholder="labels.placeholder"
         spellcheck="false"
         autocomplete="off"
         @input="onInput"
         @focus="open = true"
         @blur="onBlur"
       />
-      <button v-if="text" class="gt__clear" type="button" title="Clear" @click="clear">×</button>
+      <button v-if="text" class="gt__clear" type="button" :title="labels.clear" @click="clear">×</button>
     </div>
     <ul v-if="open && suggestions.length" class="gt__menu">
       <li v-for="i in suggestions" :key="i.name" class="gt__item" @mousedown.prevent="pick(i)">
@@ -103,15 +129,14 @@ const otherProject = computed(() => {
         <span class="gt__kind">{{ i.child_count > 0 ? 'parent' : (i.parent_issue ? 'child' : '') }}</span>
       </li>
     </ul>
-    <div v-if="checking" class="gt__preview gt__preview--muted">Checking ticket…</div>
+    <div v-if="checking" class="gt__preview gt__preview--muted">{{ labels.checking }}</div>
     <div v-else-if="preview && preview.found" class="gt__preview">
-      <span v-if="preview.child" class="gt__chip gt__chip--child" :title="preview.child.issue_url">Child #{{ preview.child.issue_id }} {{ preview.child.title }}</span>
-      <span v-if="preview.parent" class="gt__chip gt__chip--parent" :title="preview.parent.issue_url">Parent #{{ preview.parent.issue_id }} {{ preview.parent.title }}</span>
-      <span v-if="otherProject" class="gt__warn">This ticket belongs to another project.</span>
+      <span v-if="preview.child" class="gt__chip gt__chip--child" :title="preview.child.issue_url">{{ labels.child }} #{{ preview.child.issue_id }} {{ preview.child.title }}</span>
+      <span v-if="preview.parent" class="gt__chip gt__chip--parent" :title="preview.parent.issue_url">{{ labels.parent }} #{{ preview.parent.issue_id }} {{ preview.parent.title }}</span>
+      <span v-if="otherProject" class="gt__warn">{{ labels.otherProject }}</span>
     </div>
-    <div v-else-if="preview && !preview.found" class="gt__preview gt__preview--warn">
-      Ticket not found. Check the URL; the project may not be connected to GitLab yet.
-    </div>
+    <div v-else-if="preview && preview.fetchable" class="gt__preview gt__preview--muted">{{ labels.fetchable }}</div>
+    <div v-else-if="preview" class="gt__preview gt__preview--warn">{{ labels.notFound }}</div>
   </div>
 </template>
 
