@@ -3,22 +3,12 @@
 // "Clear Filters", "Apply Filters"). Emits the names of the matching records, or null when
 // no filter is set, so the panel can keep its lists loaded and only hide rows.
 import { ref, onMounted, onBeforeUnmount } from "vue";
+import { filterFields, restrictFilterFields } from "../filterFields.js";
 
 const props = defineProps({
   doctype: { type: String, required: true },
 });
 const emit = defineEmits(["change"]);
-
-// The fields the server lets the panel filter on: FILTERABLE_FIELDS in dev_action_panel.py
-// (the fields the panel already shows). Keep both lists in sync.
-const FILTERABLE_FIELDS = {
-  "GitLab Issue": [
-    "name", "issue_id", "title", "state", "due_date", "start_date",
-    "assignee", "assignee_email", "gitlab_username",
-    "issue_url", "parent_issue", "gitlab_project", "labels",
-  ],
-  Project: ["name", "project_name", "status", "percent_billable", "customer"],
-};
 
 const buttonRef = ref(null);
 const clearRef = ref(null);
@@ -44,18 +34,6 @@ async function onChange() {
   }
 }
 
-// Docfields for the field dropdown, so it offers only FILTERABLE_FIELDS (and also works for
-// users without read permission on the doctype, for whom Frappe would list no fields).
-function filterFields(doctype) {
-  return (FILTERABLE_FIELDS[doctype] || [])
-    .map((fieldname) =>
-      fieldname === "name"
-        ? { fieldname: "name", label: "ID", fieldtype: "Link", options: doctype, parent: doctype }
-        : frappe.meta.get_docfield(doctype, fieldname)
-    )
-    .filter(Boolean);
-}
-
 onMounted(async () => {
   await frappe.model.with_doctype(props.doctype);
   if (!buttonRef.value) return; // the view was left while the doctype loaded
@@ -66,23 +44,8 @@ onMounted(async () => {
     filter_x_button: $(clearRef.value),
     on_change: onChange,
   });
-  // FilterGroup has no option for the field list, but each frappe.ui.Filter it creates takes
-  // filter_fields (passed on to its FieldSelect). Inject it for this group's filters only.
-  const fields = filterFields(props.doctype);
-  const pushNewFilter = filterGroup._push_new_filter;
-  filterGroup._push_new_filter = function (...args) {
-    const Filter = frappe.ui.Filter;
-    frappe.ui.Filter = class extends Filter {
-      constructor(opts) {
-        super({ ...opts, filter_fields: fields });
-      }
-    };
-    try {
-      return pushNewFilter.apply(this, args);
-    } finally {
-      frappe.ui.Filter = Filter;
-    }
-  };
+  // Only the fields the server accepts (see filterFields.js); warns if Frappe changed.
+  restrictFilterFields(filterGroup, filterFields(props.doctype, (dt, fn) => frappe.meta.get_docfield(dt, fn)), frappe.ui);
   // Outside a list view, FilterGroup's clear button empties the filters without on_change.
   $(clearRef.value).on("click", onChange);
 });

@@ -201,6 +201,19 @@ class TestDevActionPanelOneProjectList(_DapTestCase):
 		frappe.db.set_value("Employee", self.employee, "user_id", None)
 		self.assertRaises(frappe.PermissionError, self._as_user, dap.get_matching_names, "Project", "[]")
 
+	def test_filter_button_field_lists_match_the_frontend(self):
+		# FrappeFilter's dropdown (filterFields.js) must offer exactly what the server accepts.
+		import re
+
+		path = frappe.get_app_path("phamos", "public", "js", "dev_action_panel", "filterFields.js")
+		with open(path) as f:
+			source = f.read()
+		for doctype, fields in dap.FILTERABLE_FIELDS.items():
+			key = f'"{doctype}"' if " " in doctype else doctype
+			listed = re.search(rf"{re.escape(key)}:\s*\[(.*?)\]", source, re.S)
+			self.assertIsNotNone(listed, doctype)
+			self.assertEqual(set(re.findall(r'"([a-z_]+)"', listed.group(1))), set(fields), doctype)
+
 	def test_filter_button_only_filters_on_fields_the_panel_shows(self):
 		# A field the panel never shows (would be a yes/no oracle on its value, record by record).
 		self.assertRaises(
