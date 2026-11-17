@@ -76,14 +76,13 @@
    "label": "Issue Url"
   },
   {
-   "description": "The ERPNext Issue this GitLab issue was created from (Create GitLab Issue on the Issue)",
+   "description": "The ERPNext Issue this GitLab issue belongs to. Set when the GitLab issue is created from the Issue; can be set by hand.",
    "fieldname": "issue",
    "fieldtype": "Link",
    "in_standard_filter": 1,
    "label": "Issue",
    "no_copy": 1,
    "options": "Issue",
-   "read_only": 1,
    "search_index": 1
   },
   {
