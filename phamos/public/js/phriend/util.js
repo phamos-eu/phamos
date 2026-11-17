@@ -66,6 +66,34 @@ export function host_theme() {
 	return window.matchMedia && window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light";
 }
 
+function os_dark_query() {
+	return window.matchMedia ? window.matchMedia("(prefers-color-scheme: dark)") : null;
+}
+
+// Calls `apply` whenever the page's theme may have changed: Desk's or the cockpit's toggle
+// (data-theme on <html>), and the OS switching between light and dark, which a page without
+// data-theme follows (#1934).
+export function watch_theme(apply, root = document.documentElement, os_dark = os_dark_query()) {
+	new MutationObserver(apply).observe(root, { attributes: true, attributeFilter: ["data-theme"] });
+	if (os_dark && os_dark.addEventListener) os_dark.addEventListener("change", apply);
+}
+
+function is_transparent(color) {
+	if (!color || color === "transparent") return true;
+	// rgba(0, 0, 0, 0) and rgb(0 0 0 / 0), as getComputedStyle reports an unset background;
+	// only the alpha counts, so solid black rgb(0, 0, 0) is not transparent
+	return /^rgba\((?:[^,]*,){3}\s*0(\.0*)?\s*\)$/.test(color) || /\/\s*0(\.0*)?\s*\)$/.test(color);
+}
+
+// The colour behind the page, for the screenshot: the first of the given computed backgrounds
+// (body, then <html>) that isn't transparent. Neither set: white, or a dark grey in dark mode,
+// so a dark page doesn't come out on white (#1934).
+export function page_background(colors, theme) {
+	const solid = colors.find((c) => !is_transparent(c));
+	if (solid) return solid;
+	return theme === "dark" ? "#171717" : "#ffffff";
+}
+
 // sessionStorage key for the text of a report that is not sent yet
 export const DRAFT_KEY = "phriend:draft";
 
