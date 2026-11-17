@@ -16,14 +16,24 @@ export function useCockpitGlow(cockpitWindow = window.frappe?.boot?.cockpit_wind
 
 	const pulsing = ref(false)
 	let timer = null
+	let frame = null
 
-	const pulse = () => {
+	const cancel = () => {
 		clearTimeout(timer)
-		// off for a frame first, so a focus during a running glow starts the animation again
+		cancelAnimationFrame(frame)
+	}
+	const pulse = () => {
+		// focus and visibilitychange often fire together: one glow, no stray timer
+		cancel()
 		pulsing.value = false
-		requestAnimationFrame(() => {
-			pulsing.value = true
-			timer = setTimeout(() => (pulsing.value = false), PULSE_MS)
+		// Off for a whole frame first, so the browser sees the class removed and a focus during a
+		// running glow starts the animation again. One frame is not enough: the class would come
+		// back before that frame's style pass (AI review of !1188).
+		frame = requestAnimationFrame(() => {
+			frame = requestAnimationFrame(() => {
+				pulsing.value = true
+				timer = setTimeout(() => (pulsing.value = false), PULSE_MS)
+			})
 		})
 	}
 	// Alt+Tab / clicking another window fires "focus"; switching browser tabs fires visibilitychange.
@@ -35,7 +45,7 @@ export function useCockpitGlow(cockpitWindow = window.frappe?.boot?.cockpit_wind
 			document.addEventListener("visibilitychange", onVisible)
 		})
 		onBeforeUnmount(() => {
-			clearTimeout(timer)
+			cancel()
 			window.removeEventListener("focus", pulse)
 			document.removeEventListener("visibilitychange", onVisible)
 		})
