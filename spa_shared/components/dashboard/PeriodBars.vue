@@ -1,8 +1,12 @@
 <template>
 	<section class="rounded-lg border border-outline-gray-2 bg-surface-white p-5">
-		<div class="mb-4">
-			<h2 class="text-base font-semibold text-ink-gray-9">{{ title }}</h2>
-			<p v-if="subtitle" class="text-sm text-ink-gray-5">{{ subtitle }}</p>
+		<div class="mb-4 flex flex-wrap items-start gap-3">
+			<div class="min-w-0 flex-1">
+				<h2 class="text-base font-semibold text-ink-gray-9">{{ title }}</h2>
+				<p v-if="subtitle" class="text-sm text-ink-gray-5">{{ subtitle }}</p>
+			</div>
+			<!-- Controls for the chart, e.g. a view switch. -->
+			<slot name="actions" />
 		</div>
 		<div
 			class="grid h-48 items-end gap-2 border-b border-outline-gray-2 px-2"
@@ -19,12 +23,13 @@
 				@keydown.enter.prevent="selectable && emit('select', period, periodIndex)"
 				@keydown.space.prevent="selectable && emit('select', period, periodIndex)"
 			>
-				<div class="flex flex-1 items-end justify-center gap-1">
+				<div class="flex flex-1 items-end justify-center" :class="dense ? 'gap-0.5' : 'gap-1'">
 					<template v-for="(value, index) in period.values" :key="index">
 						<!-- A list of segments is one stacked bar, first segment at the bottom. -->
 						<div
 							v-if="Array.isArray(value)"
-							class="flex w-2 flex-col-reverse overflow-hidden rounded-t"
+							class="flex flex-col-reverse overflow-hidden rounded-t"
+							:class="[barWidth, groupGap(index)]"
 							:style="{ height: `${barHeight(total(value), max)}%` }"
 						>
 							<div
@@ -34,9 +39,18 @@
 								:title="`${format ? format(segment.value, index) : segment.value} ${segment.label || ''}`.trim()"
 							/>
 						</div>
+						<!-- One bar with its own colour. -->
+						<div
+							v-else-if="value && typeof value === 'object'"
+							class="rounded-t"
+							:class="[barWidth, groupGap(index)]"
+							:style="{ height: `${barHeight(value.value, max)}%`, background: value.color, opacity: value.opacity ?? 1 }"
+							:title="`${format ? format(value.value, index) : value.value} ${value.label || ''}`.trim()"
+						/>
 						<div
 							v-else
-							class="w-2 rounded-t"
+							class="rounded-t"
+							:class="[barWidth, groupGap(index)]"
 							:style="{ height: `${barHeight(value, max)}%`, background: SERIES_COLORS[index] }"
 							:title="`${format ? format(value, index) : value} ${series[index]?.label || ''}`.trim()"
 						/>
@@ -68,8 +82,8 @@ import { barHeight } from "@spa/utils/dashboardFormat.js"
 const props = defineProps({
 	title: { type: String, required: true },
 	subtitle: { type: String, default: "" },
-	// [{ label, values: [a, b, ...], footer?, footerTone?: "good" | "bad" }]. A value may also be a list of segments
-	// [{ value, color, label, opacity? }], drawn as one stacked bar.
+	// [{ label, values: [a, b, ...], footer?, footerTone?: "good" | "bad" }]. A value may also be one bar with its own
+	// colour, { value, color, label, opacity? }, or a list of those, drawn as one stacked bar.
 	periods: { type: Array, default: () => [] },
 	// [{ label, color? }]: the legend; `color` overrides the series colour (for stacked bars).
 	series: { type: Array, default: () => [] },
@@ -80,6 +94,8 @@ const props = defineProps({
 	selectable: { type: Boolean, default: false },
 	// Optional colour per series (CSS values); defaults to the shared palette.
 	colors: { type: Array, default: null },
+	// Bars per group within a period (e.g. 2 for "this year / a year earlier" pairs): a wider gap between groups.
+	groupSize: { type: Number, default: 0 },
 })
 
 const emit = defineEmits(["select"])
@@ -88,7 +104,16 @@ const DEFAULT_COLORS = ["var(--ink-blue-3)", "var(--ink-green-3)", "var(--ink-am
 const SERIES_COLORS = computed(() => props.colors || DEFAULT_COLORS)
 
 function total(value) {
-	return Array.isArray(value) ? value.reduce((sum, segment) => sum + Number(segment.value || 0), 0) : Number(value)
+	if (Array.isArray(value)) return value.reduce((sum, segment) => sum + Number(segment.value || 0), 0)
+	return Number(value && typeof value === "object" ? value.value : value) || 0
+}
+
+// More than four bars a period: narrower bars, so two years of months still fit next to each other.
+const dense = computed(() => props.periods.some((period) => period.values.length > 4))
+const barWidth = computed(() => (dense.value ? "w-1.5" : "w-2"))
+
+function groupGap(index) {
+	return props.groupSize && index > 0 && index % props.groupSize === 0 ? "ml-1" : ""
 }
 
 const max = computed(() => Math.max(1, ...props.periods.flatMap((period) => period.values.map(total))))
