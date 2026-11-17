@@ -110,6 +110,18 @@ def get_issue_chat_states(names):
 	return dc.get_issue_chat_states(names)
 
 
+@frappe.whitelist()
+def get_task_chat(name):
+	"""Return the Raven chat state of a Task in Sales scope."""
+	return dc.get_task_chat(CONFIG, name)
+
+
+@frappe.whitelist(methods=["POST"])
+def ensure_task_chat(name):
+	"""Start or join the Raven chat of a Task in Sales scope."""
+	return dc.ensure_task_chat(CONFIG, name)
+
+
 
 @frappe.whitelist(methods=["POST"])
 def update_issue(
@@ -173,6 +185,7 @@ def update_task(
 	exp_end_date=None,
 	progress=None,
 	project=None,
+	custom_task_owner=None,
 	modified=None,
 ):
 	"""Update whitelisted Task fields within Sales scope."""
@@ -193,6 +206,8 @@ def update_task(
 		fields["progress"] = progress
 	if project is not None:
 		fields["project"] = project
+	if custom_task_owner is not None:
+		fields["custom_task_owner"] = custom_task_owner
 	if modified is not None:
 		fields["modified"] = modified
 	return dc.update_task(CONFIG, name, **fields)
@@ -213,6 +228,9 @@ def create_task(
 	department=None,
 	exp_start_date=None,
 	exp_end_date=None,
+	expected_time=None,
+	custom_task_owner=None,
+	task_type=None,
 ):
 	"""Create a Task in the Sales department."""
 	return dc.create_task(
@@ -224,6 +242,9 @@ def create_task(
 		department=department,
 		exp_start_date=exp_start_date,
 		exp_end_date=exp_end_date,
+		expected_time=expected_time,
+		custom_task_owner=custom_task_owner,
+		task_type=task_type,
 	)
 
 

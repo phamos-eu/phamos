@@ -16,6 +16,11 @@ def _set_gitlab_issue_value_with_retry(name, data, max_retries=3):
     lock wait timeout (1205) while another request holds the row lock.
     Retrying the same write after a short backoff resolves the transient
     contention without changing what gets written or when.
+
+    No rollback before the retry: a lock wait timeout only undoes the failed
+    statement (a deadlock is already rolled back by the server), while a
+    rollback here would also drop the caller's earlier writes — on a Timesheet
+    Record submit, the submit itself (phamos/phamos#1636).
     """
     for attempt in range(max_retries + 1):
         try:
@@ -23,7 +28,6 @@ def _set_gitlab_issue_value_with_retry(name, data, max_retries=3):
             return
         except (frappe.QueryTimeoutError, frappe.QueryDeadlockError):
             if attempt < max_retries:
-                frappe.db.rollback()
                 time.sleep(1 + attempt)
                 continue
             raise
@@ -35,10 +39,23 @@ def sync_touch_time_on_timesheet_change(doc, method=None):
     always matches the SUM(actual_time) the dashboard's Touch Time KPI is built
     from (see _build_touch_time_kpis in gitlab_issue_dashboard.py). A Timesheet
     Record counts as long as its parent Timesheet is Draft or Submitted (not
-    Cancelled)."""
+    Cancelled).
+
+    Runs as a job after the submit or cancel is committed (phamos/phamos#1636):
+    written in the request, a webhook holding the issue row froze the user's
+    submit, and a lock timeout could roll the submit back."""
     if not doc.gitlab_issue:
         return
+    frappe.enqueue(
+        "phamos.gitlab_integration.gitlab_utils.sync_touch_time",
+        issue_name=doc.gitlab_issue,
+        enqueue_after_commit=True,
+    )
 
+
+def sync_touch_time(issue_name):
+    """Set the GitLab Issue's Total Touch Time to the SUM(actual_time) of its
+    counted Timesheet Records — see sync_touch_time_on_timesheet_change."""
     total = frappe.db.sql(
         """
         SELECT SUM(tr.actual_time)
@@ -46,10 +63,10 @@ def sync_touch_time_on_timesheet_change(doc, method=None):
         JOIN `tabTimesheet` t ON t.name = tr.timesheet
         WHERE t.docstatus IN (0, 1) AND tr.gitlab_issue = %s
         """,
-        doc.gitlab_issue,
+        issue_name,
     )[0][0] or 0
 
-    _set_gitlab_issue_value_with_retry(doc.gitlab_issue, {"total_touch_time": total})
+    _set_gitlab_issue_value_with_retry(issue_name, {"total_touch_time": total})
 
 
 def sync_cycle_time_start(issue_name):
@@ -88,10 +105,15 @@ def sync_cycle_time_start(issue_name):
 
 def sync_cycle_time_start_on_timesheet_change(doc, method=None):
     """Re-resolve Cycle Time Started At whenever a Timesheet Record on this issue
-    is submitted or cancelled — see sync_cycle_time_start."""
+    is submitted or cancelled — see sync_cycle_time_start. Queued after commit
+    like sync_touch_time_on_timesheet_change."""
     if not doc.gitlab_issue:
         return
-    sync_cycle_time_start(doc.gitlab_issue)
+    frappe.enqueue(
+        "phamos.gitlab_integration.gitlab_utils.sync_cycle_time_start",
+        issue_name=doc.gitlab_issue,
+        enqueue_after_commit=True,
+    )
 
 
 def get_gitlab_headers():
@@ -1204,6 +1226,14 @@ def _handle_issue_webhook(payload):
         if issue_doc_name:
             enqueue_issue_label_ledger_sync(issue_doc_name)
 
+    # A label change does not start CI on its own. This starts the
+    # ai_issue_analysis job, which uses ANTHROPIC_API_KEY and GITLAB_API_TOKEN.
+    from phamos.gitlab_integration.issue_analysis import enqueue_issue_analysis
+    from phamos.gitlab_integration.issue_plan import enqueue_issue_plan
+
+    enqueue_issue_analysis(payload, labels_list, gl_project_id)
+    enqueue_issue_plan(payload, labels_list, gl_project_id)
+
     frappe.db.commit()
 
 
@@ -1350,6 +1380,10 @@ def _handle_note_webhook(payload):
     # (e.g. "changed label to X", "closed") — those aren't real discussion.
     if obj_attrs.get("noteable_type") != "Issue" or obj_attrs.get("system"):
         return
+
+    from phamos.gitlab_integration.issue_plan import enqueue_plan_from_note
+
+    enqueue_plan_from_note(payload)
 
     project_info = payload.get("project", {})
     gl_project_id = project_info.get("id")

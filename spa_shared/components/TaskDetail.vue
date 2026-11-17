@@ -31,6 +31,14 @@
 				<div class="ml-auto flex flex-shrink-0 items-center gap-2 pl-3">
 					<DocSyncBanner :autosave="autosave" />
 					<DocViewers :viewers="viewers" />
+					<!-- The Task's Raven chat (#1779): on the Gantt page it opens as an overlay. -->
+					<IssueChatButton
+						doctype="Task"
+						:record-name="task.name"
+						:subject="task.subject"
+						:status="status"
+						:api="API"
+					/>
 				</div>
 			</div>
 		</Teleport>
@@ -115,6 +123,15 @@
 					size="sm"
 					:options="projectOptions"
 				/>
+				<div>
+					<label class="mb-1.5 block text-xs text-ink-gray-5">Task Owner</label>
+					<FrappeLink
+						v-model="autosave.draft.custom_task_owner"
+						doctype="User"
+						:filters="TASK_OWNER_FILTERS"
+						placeholder="Who is responsible"
+					/>
+				</div>
 				<div>
 					<label class="mb-1.5 block text-xs text-ink-gray-5">Expected start</label>
 					<DatePicker
@@ -211,6 +228,9 @@ import { Badge, call, DatePicker, FeatherIcon, toast } from "frappe-ui"
 import AssigneePicker from "@spa/components/AssigneePicker.vue"
 import DocSyncBanner from "@spa/components/DocSyncBanner.vue"
 import DocViewers from "@spa/components/DocViewers.vue"
+import IssueChatButton from "@spa/components/IssueChatButton.vue"
+import FrappeLink from "@spa/components/FrappeLink.vue"
+import { TASK_OWNER_FILTERS } from "@spa/utils/newTaskForm.js"
 import RichTextField from "@spa/components/RichTextField.vue"
 import { useAutosaveDoc } from "@spa/composables/useAutosaveDoc.js"
 import { useDocRealtime } from "@spa/composables/useDocRealtime.js"
@@ -271,6 +291,7 @@ const autosave = useAutosaveDoc({
 		description: { kind: "html", label: "Description" },
 		priority: { kind: "select", immediate: true, label: "Priority" },
 		project: { kind: "select", immediate: true, label: "Project" },
+		custom_task_owner: { kind: "select", immediate: true, label: "Task Owner" },
 		exp_start_date: { kind: "date", immediate: true, label: "Expected start" },
 		exp_end_date: { kind: "date", immediate: true, label: "Expected end" },
 		progress: { kind: "number", toServer: clampProgress, label: "Progress" },
@@ -292,7 +313,24 @@ const realtime = useDocRealtime({
 	doctype: "Task",
 	name: () => props.task.name,
 	onDocUpdate: (modified) => autosave.noteRemoteModified(modified),
+	onAssignmentsChanged: () => {
+		clearTimeout(assignmentsTimer)
+		assignmentsTimer = setTimeout(reloadAfterAssignment, 300)
+	},
 })
+
+// Someone else assigned or unassigned people (a mention in the chat, Desk, another cockpit):
+// fetch the Task again, so the assignee list follows without a reload (#1784).
+let assignmentsTimer = null
+async function reloadAfterAssignment() {
+	const name = props.task.name
+	try {
+		const fresh = await call(`${API.value}.get_task`, { name })
+		if (name === props.task.name) emit("updated", fresh)
+	} catch (e) {
+		// The next save or a reload brings it.
+	}
+}
 const viewers = realtime.viewers
 
 const locks = useFieldLocks({
@@ -416,6 +454,7 @@ onMounted(syncChromeHost)
 
 onBeforeUnmount(() => {
 	setPageChromeActive(false)
+	clearTimeout(assignmentsTimer)
 })
 
 watch(

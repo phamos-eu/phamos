@@ -59,6 +59,12 @@ const GROUPS = [
 		],
 	},
 	{
+		title: "Writing an idea",
+		rows: [
+			{ what: "Finish the session (again: back to writing)", keys: ["Esc"] },
+		],
+	},
+	{
 		title: "Dialogs",
 		rows: [
 			{ what: "Save or confirm", keys: [`${MOD}+Enter`] },

@@ -11,6 +11,7 @@
 			</div>
 			<div class="flex flex-shrink-0 items-center gap-2">
 				<Button v-if="contract.can_record_change" variant="solid" label="Record change" @click="emit('change', contract)" />
+				<Button v-if="contract.can_delete" theme="red" variant="subtle" label="Delete" @click="confirmDelete = true" />
 				<template v-if="contract.can_edit">
 					<Button label="Edit" @click="emit('edit', contract)" />
 					<Button variant="solid" label="Submit" :loading="submitting" @click="submit" />
@@ -24,7 +25,7 @@
 			<dl class="grid grid-cols-2 gap-4 text-sm lg:grid-cols-3">
 				<div v-for="item in facts" :key="item.label">
 					<dt class="text-xs text-ink-gray-5">{{ item.label }}</dt>
-					<dd class="mt-1 font-medium tabular-nums text-ink-gray-9">{{ item.value }}</dd>
+					<dd class="mt-1 font-medium tabular-nums text-ink-gray-9"><Sensitive>{{ item.value }}</Sensitive></dd>
 				</div>
 			</dl>
 			<p v-if="contract.superseded_by" class="mt-4 text-sm text-ink-gray-6">
@@ -51,14 +52,28 @@
 				Open in Desk
 			</a>
 		</div>
+
+		<Dialog
+			v-model="confirmDelete"
+			:options="{
+				title: `Delete draft ${contract.name}?`,
+				message: 'This can\'t be undone.',
+				actions: [
+					{ label: 'Cancel', variant: 'subtle', onClick: () => (confirmDelete = false) },
+					{ label: 'Delete', theme: 'red', variant: 'solid', loading: deleting, onClick: remove },
+				],
+			}"
+		/>
 	</div>
 </template>
 
 <script setup>
 import { computed, ref } from "vue"
-import { call, toast } from "frappe-ui"
+import { call, Dialog } from "frappe-ui"
+import { notifySuccess } from "@spa/utils/notify.js"
 import ContractHistoryTable from "@spa/contracts/ContractHistoryTable.vue"
 import ContractStatusBadge from "@spa/contracts/ContractStatusBadge.vue"
+import Sensitive from "@spa/components/Sensitive.vue"
 import {
 	CONTRACTS_API,
 	errorMessage,
@@ -72,9 +87,11 @@ import {
 } from "@spa/contracts/contractFormat.js"
 
 const props = defineProps({ contract: { type: Object, required: true } })
-const emit = defineEmits(["close", "change", "edit", "open", "updated"])
+const emit = defineEmits(["close", "change", "edit", "open", "updated", "deleted"])
 
 const submitting = ref(false)
+const confirmDelete = ref(false)
+const deleting = ref(false)
 const error = ref("")
 
 const facts = computed(() => {
@@ -108,12 +125,29 @@ async function submit() {
 	error.value = ""
 	try {
 		const updated = await call(`${CONTRACTS_API}.submit_contract`, { name: props.contract.name })
-		toast.success(`Contract ${updated.name} submitted`)
+		notifySuccess(`Contract ${updated.name} submitted`)
 		emit("updated", updated)
 	} catch (e) {
 		error.value = errorMessage(e, "Could not submit the contract")
 	} finally {
 		submitting.value = false
+	}
+}
+
+async function remove() {
+	if (deleting.value) return
+	deleting.value = true
+	error.value = ""
+	try {
+		await call(`${CONTRACTS_API}.delete_contract`, { name: props.contract.name })
+		notifySuccess(`Draft ${props.contract.name} deleted`)
+		confirmDelete.value = false
+		emit("deleted", props.contract.name)
+	} catch (e) {
+		confirmDelete.value = false
+		error.value = errorMessage(e, "Could not delete the contract")
+	} finally {
+		deleting.value = false
 	}
 }
 </script>

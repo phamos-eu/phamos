@@ -35,13 +35,14 @@ def resume_timer(name):
 
 
 @frappe.whitelist(methods=["POST"])
-def stop_timer(name, result, percent_billable=100, activity_type=None, manual_end_time=None):
+def stop_timer(name, result, percent_billable=100, activity_type=None, manual_end_time=None, value_add=100):
 	return _timer.stop_timer(
 		name,
 		result,
 		percent_billable=percent_billable,
 		activity_type=activity_type,
 		manual_end_time=manual_end_time,
+		value_add=value_add,
 	)
 
 
@@ -54,6 +55,7 @@ def create_break_timesheet(
 	result=None,
 	percent_billable=100,
 	activity_type=None,
+	value_add=100,
 ):
 	return _timer.create_break_timesheet(
 		from_time,
@@ -63,4 +65,5 @@ def create_break_timesheet(
 		result=result,
 		percent_billable=percent_billable,
 		activity_type=activity_type,
+		value_add=value_add,
 	)

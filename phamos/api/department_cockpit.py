@@ -4,7 +4,7 @@
 """Shared cockpit engine — Issues, Tasks, Checklists and timesheet settings.
 
 Every cockpit is a CockpitConfig: department cockpits are scoped to a Department
-from phamos Settings, the Personal Cockpit (scope="personal") to the records
+from Cockpit Settings, the Personal Cockpit (scope="personal") to the records
 assigned to the session user through ToDo.
 """
 
@@ -16,7 +16,7 @@ from typing import Callable, Optional
 import frappe
 from frappe import _
 from frappe.desk.form.load import get_assignments
-from frappe.utils import get_datetime, get_fullname, now_datetime
+from frappe.utils import get_datetime, get_fullname, getdate, now_datetime
 
 from frappe.desk.form.assign_to import add as add_assignment
 from frappe.desk.form.assign_to import remove as remove_assignment
@@ -34,10 +34,14 @@ from phamos.api.issue_common import get_form_options as _base_form_options
 from phamos.api.issue_common import set_assignees as _set_assignees
 from phamos.api.issue_common import update_status as _update_status
 from phamos.api.presence import assert_fields_unlocked
+from phamos.cockpits.settings import COCKPIT_SETTINGS
+from phamos.phriend.gitlab_issues import issue_gitlab_issues
+from phamos.phriend.report import issue_report
 
 ISSUE_EDITABLE_FIELDS = ("subject", "description", "priority", "issue_type", "project")
 TASK_EDITABLE_FIELDS = (
 	"subject",
+	"custom_task_owner",
 	"description",
 	"priority",
 	"status",
@@ -83,7 +87,7 @@ COCKPIT_SCOPES = ("department", "personal")
 
 @dataclass(frozen=True)
 class CockpitConfig:
-	"""Cockpit configuration: department-scoped (phamos Settings fields) or personal."""
+	"""Cockpit configuration: department-scoped (Cockpit Settings fields) or personal."""
 
 	label: str
 	department_field: str
@@ -119,13 +123,13 @@ def _user_label(user):
 def _get_department(config: CockpitConfig):
 	if not config.department_field:
 		return None
-	return frappe.db.get_single_value("phamos Settings", config.department_field)
+	return frappe.db.get_single_value(COCKPIT_SETTINGS, config.department_field)
 
 
 def _get_project(config: CockpitConfig):
 	if not config.project_field:
 		return None
-	return frappe.db.get_single_value("phamos Settings", config.project_field)
+	return frappe.db.get_single_value(COCKPIT_SETTINGS, config.project_field)
 
 
 def _personal_reference_names():
@@ -248,7 +252,7 @@ def _require_department(config: CockpitConfig):
 	department = _get_department(config)
 	if not department:
 		frappe.throw(
-			_("{0} Department is not configured in phamos Settings.").format(config.label),
+			_("{0} Department is not configured in Cockpit Settings.").format(config.label),
 			title=_("Configuration required"),
 		)
 	return department
@@ -514,6 +518,10 @@ def _serialize_issue_detail(doc):
 		"assignee_images": _user_images(assignees),
 		"converted_task": _converted_task_for_issue(doc.name),
 		"desk_url": f"/app/issue/{doc.name}",
+		# what Phriend captured, for the report section on the Issue page (#1901)
+		"phriend": issue_report(doc),
+		# the GitLab issues created from this Issue, each a GitLab Issue record
+		"gitlab_issues": issue_gitlab_issues(doc.name),
 	}
 
 
@@ -555,6 +563,7 @@ def get_form_options(config: CockpitConfig):
 	if config.is_personal:
 		options = _base_form_options(project_filters={"status": "Open"})
 		options["shortlist_users"] = _role_shortlist_users(config)
+		options.update(_task_form_options())
 		return options
 
 	department = _require_department(config)
@@ -570,12 +579,31 @@ def get_form_options(config: CockpitConfig):
 	options[config.department_field] = department
 	options[config.project_field] = _get_project(config)
 	options["shortlist_users"] = _role_shortlist_users(config)
+	options.update(_task_form_options())
 	return options
+
+
+def _task_form_options():
+	"""Choices for the "New Task" dialog (#1752)."""
+	return {
+		"task_priorities": list(TASK_PRIORITIES),
+		"task_types": frappe.get_all("Task Type", pluck="name", order_by="name asc", limit_page_length=0),
+	}
 
 
 def _role_shortlist_users(config: CockpitConfig, limit=50):
 	"""Enabled System Users who hold any of the cockpit roles."""
-	role_names = [r for r in (config.roles or ()) if r]
+	return role_shortlist_users(config.roles, limit=limit)
+
+
+def role_shortlist_users(roles, limit=50):
+	"""Enabled System Users who hold any of the given roles.
+
+	Split out of `_role_shortlist_users` so a cockpit that works from a plain
+	list of roles rather than a CockpitConfig can reuse it — the Sales cockpit
+	offers lead owners this way (#1757).
+	"""
+	role_names = [r for r in (roles or ()) if r]
 	if not role_names:
 		return []
 
@@ -754,8 +782,8 @@ def get_tasks(config: CockpitConfig, include_completed=0):
 	return [_serialize_task_row(r) for r in rows]
 
 
-def get_task(config: CockpitConfig, name):
-	"""Return Task detail for the department cockpit."""
+def _get_scoped_task(config: CockpitConfig, name):
+	"""Load a Task the session user may read in this cockpit, or throw."""
 	frappe.has_permission("Task", "read", throw=True)
 	department = _require_department(config)
 
@@ -766,14 +794,29 @@ def get_task(config: CockpitConfig, name):
 			frappe.throw(_("This task is not assigned to you."))
 	elif doc.department != department:
 		frappe.throw(_("This task is not in the {0} department.").format(config.label))
+	return doc
 
-	return _serialize_task_detail(doc)
+
+def get_task(config: CockpitConfig, name):
+	"""Return Task detail for the department cockpit."""
+	return _serialize_task_detail(_get_scoped_task(config, name))
+
+
+def get_task_chat(config: CockpitConfig, name):
+	"""Chat state of a Task in scope: channel, membership, unread counts (#1779)."""
+	return issue_chat.get_chat(_get_scoped_task(config, name))
+
+
+def ensure_task_chat(config: CockpitConfig, name):
+	"""Start or join the chat of a Task in scope."""
+	return issue_chat.ensure_chat(_get_scoped_task(config, name))
 
 
 def _serialize_task_detail(doc):
 	"""Build SPA task detail payload from an already-loaded Task doc."""
 	assignees = [a.get("owner") for a in get_assignments("Task", doc.name)]
 	issue_name = doc.issue or None
+	task_owner = doc.get("custom_task_owner") or None
 
 	return {
 		"name": doc.name,
@@ -789,6 +832,8 @@ def _serialize_task_detail(doc):
 		"progress": doc.progress or 0,
 		"color": doc.color,
 		"depends_on_tasks": doc.depends_on_tasks or "",
+		"custom_task_owner": task_owner,
+		"custom_task_owner_name": _user_label(task_owner),
 		"owner": doc.owner,
 		"owner_name": _user_label(doc.owner),
 		"modified": doc.modified,
@@ -1129,14 +1174,44 @@ def create_task(
 	department=None,
 	exp_start_date=None,
 	exp_end_date=None,
+	expected_time=None,
+	custom_task_owner=None,
+	task_type=None,
 ):
-	"""Create a Task in the configured department."""
+	"""Create a Task in the configured department from the "New Task" dialog (#1752).
+
+	Subject, both expected dates, the estimate (hours, > 0), the Task Owner and the
+	priority are required here even where the site keeps them optional: the cockpits
+	need dates to plan, and production makes the dates and estimate mandatory anyway.
+	The Task Owner is also assigned; after that, owner and assignment are independent.
+	"""
 	frappe.has_permission("Task", "create", throw=True)
 	configured_department = _require_department(config)
 
 	subject = (subject or "").strip()
 	if not subject:
 		frappe.throw(_("Subject is required"))
+
+	if not exp_start_date or not exp_end_date:
+		frappe.throw(_("Expected start and end dates are required"))
+	if getdate(exp_end_date) < getdate(exp_start_date):
+		frappe.throw(_("Expected end date cannot be before start date"))
+
+	expected_time = frappe.utils.flt(expected_time)
+	if expected_time <= 0:
+		frappe.throw(_("Estimated time must be more than 0 hours"))
+
+	task_owner = _validate_task_owner(custom_task_owner)
+	if not task_owner:
+		frappe.throw(_("Task Owner is required"))
+
+	priority = _normalize_task_priority(priority)
+	if not priority:
+		frappe.throw(_("Priority is required"))
+
+	task_type = (task_type or "").strip() or None
+	if task_type and not frappe.db.exists("Task Type", task_type):
+		frappe.throw(_("Task Type {0} does not exist").format(task_type))
 
 	if config.is_personal:
 		department = department or _project_department(project)
@@ -1145,7 +1220,7 @@ def create_task(
 			department = configured_department
 		if department != configured_department:
 			frappe.throw(
-				_("Task department must match {0} department in phamos Settings.").format(config.label)
+				_("Task department must match {0} department in Cockpit Settings.").format(config.label)
 			)
 
 	if not project:
@@ -1160,26 +1235,25 @@ def create_task(
 			"status": "Open",
 			"department": department,
 			"project": project,
+			"priority": priority,
+			"exp_start_date": exp_start_date,
+			"exp_end_date": exp_end_date,
+			"expected_time": expected_time,
+			"custom_task_owner": task_owner,
+			"type": task_type,
 		}
 	)
 	if description:
 		doc.description = description
-	if priority:
-		doc.priority = priority
-	if exp_start_date:
-		doc.exp_start_date = exp_start_date
-	if exp_end_date:
-		doc.exp_end_date = exp_end_date
 	doc.insert()
-	if config.is_personal:
-		add_assignment(
-			{
-				"doctype": "Task",
-				"name": doc.name,
-				"assign_to": [frappe.session.user],
-				"description": subject,
-			}
-		)
+	add_assignment(
+		{
+			"doctype": "Task",
+			"name": doc.name,
+			"assign_to": [task_owner],
+			"description": subject,
+		}
+	)
 	return get_task(config, doc.name)
 
 
@@ -1348,6 +1422,9 @@ def update_task(config: CockpitConfig, name, **fields):
 	if "project" in updates and updates["project"]:
 		validate_project(config, updates["project"])
 
+	if "custom_task_owner" in updates:
+		updates["custom_task_owner"] = _validate_task_owner(updates["custom_task_owner"])
+
 	if "progress" in updates and updates["progress"] is not None:
 		updates["progress"] = frappe.utils.flt(updates["progress"])
 
@@ -1361,6 +1438,20 @@ def update_task(config: CockpitConfig, name, **fields):
 
 	doc.save()
 	return get_task(config, name)
+
+
+def _validate_task_owner(user):
+	"""Return the Task Owner to store: an enabled System User, or None to clear it (#1751).
+
+	Guest and website users are enabled too, but can't own work in the cockpits.
+	"""
+	user = (user or "").strip()
+	if not user:
+		return None
+	row = frappe.db.get_value("User", user, ["enabled", "user_type"], as_dict=True)
+	if not row or not row.enabled or row.user_type != "System User":
+		frappe.throw(_("Task Owner must be an active user"))
+	return user
 
 
 def set_task_assignees(config: CockpitConfig, name, users=None):

@@ -21,11 +21,14 @@
 				v-model:include-completed="includeCompleted"
 				:tasks="filteredTasks"
 				:selected-name="selectedName"
+				:options="formOptions"
 				@select="openTask"
 				@date-change="onGanttDateChange"
 				@dependency-change="onGanttDependencyChange"
 				@created="onTaskCreated"
-			/>
+			>
+				<template #toolbar><slot name="gantt-toolbar" /></template>
+			</TaskGantt>
 		</section>
 
 		<aside
@@ -57,6 +60,7 @@ import { call, toast } from "frappe-ui"
 import TaskDetail from "@spa/components/TaskDetail.vue"
 import TaskGantt from "@spa/components/TaskGantt.vue"
 import spaConfig from "@/config"
+import { useUserRealtime } from "@spa/composables/useUserRealtime.js"
 
 const API = spaConfig.api
 
@@ -98,7 +102,7 @@ async function loadOptions() {
 		const needsDepartment = Boolean(spaConfig.departmentField)
 		const dept = needsDepartment ? formOptions.value[spaConfig.departmentField] : ""
 		configError.value =
-			needsDepartment && !dept ? `Configure ${spaConfig.label} Department in phamos Settings.` : ""
+			needsDepartment && !dept ? `Configure ${spaConfig.label} Department in Cockpit Settings.` : ""
 	} catch (e) {
 		configError.value = e?.messages?.[0] || e?.message || `Could not load ${spaConfig.label} settings`
 	}
@@ -193,6 +197,10 @@ watch(
 		}
 	}
 )
+
+// Assignments changed elsewhere (another cockpit, Desk): Tasks may have joined or left the
+// Gantt. Only the first load shows "Loading…", so this refresh keeps the chart on screen.
+useUserRealtime("cockpit_todos_changed", loadTasks)
 
 onMounted(async () => {
 	await loadOptions()

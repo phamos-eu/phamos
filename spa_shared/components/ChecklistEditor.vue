@@ -6,22 +6,44 @@
 
 		<div v-else class="mb-3 space-y-2">
 			<div
-				v-for="item in checklist.items"
+				v-for="(item, index) in displayItems"
 				:key="item.name"
-				class="rounded-lg border bg-white transition dark:bg-gray-900"
+				:data-item="item.name"
+				class="group rounded-lg border bg-white dark:bg-gray-900"
 				:class="[
 					expandedItem === item.name
 						? 'border-gray-900 shadow-sm ring-1 ring-gray-900/10 dark:border-gray-200 dark:ring-gray-200/20'
 						: 'cursor-pointer border-gray-200 hover:border-gray-300 hover:bg-gray-50 dark:border-gray-700 dark:hover:border-gray-600 dark:hover:bg-gray-800/60',
 					savingItem === item.name ? 'opacity-60' : '',
+					itemMotionClass(item),
 				]"
+				:style="itemStyle(item, index)"
 				role="button"
 				:tabindex="expandedItem === item.name ? -1 : 0"
-				@click.stop="expand(item)"
+				@pointerdown="(e) => pressItem(item, e)"
+				@click.stop="onCardClick(item)"
 				@keydown.enter.prevent="expand(item)"
+				@keydown.alt.up="(e) => nudgeItem(item, -1, e)"
+				@keydown.alt.down="(e) => nudgeItem(item, 1, e)"
 			>
 				<!-- Collapsed -->
 				<div v-if="expandedItem !== item.name" class="flex items-start gap-3 px-3 py-2.5">
+					<!-- Drag hint (#1919): the whole item drags; the grip shows it can. Alt+↑/↓ on a
+					     focused item moves it too. -->
+					<button
+						v-if="canReorder"
+						type="button"
+						tabindex="-1"
+						class="-ml-1.5 mt-0.5 flex h-5 w-4 flex-shrink-0 cursor-grab touch-none items-center justify-center rounded text-ink-gray-4 opacity-0 hover:text-ink-gray-7 focus:outline-none focus-visible:opacity-100 focus-visible:ring-2 focus-visible:ring-outline-gray-4 group-hover:opacity-100 group-focus-visible:opacity-100"
+						:class="reorder?.name === item.name ? 'opacity-100' : ''"
+						:title="__('Drag to move, or Alt+↑/↓')"
+						:aria-label="__('Drag to move, or Alt+↑/↓')"
+						@click.stop
+						@keydown.enter.stop.prevent
+						@pointerdown.stop="(e) => pressItem(item, e, true)"
+					>
+						<FeatherIcon name="more-vertical" class="h-4 w-4" />
+					</button>
 					<div class="min-w-0 flex-1">
 						<div
 							v-if="(item.description || '').trim()"
@@ -91,8 +113,15 @@
 					</div>
 				</div>
 
-				<!-- Expanded -->
-				<div v-else class="space-y-3 px-3 py-3" @click.stop>
+				<!-- Expanded. A click on its free area closes it again (#1921); clicks in its fields,
+				     editor, buttons and links don't. -->
+				<div
+					v-else
+					class="space-y-3 px-3 py-3"
+					@pointerdown="onOpenCardPointerDown"
+					@pointerup="onOpenCardPointerUp"
+					@click.stop="onOpenCardClick"
+				>
 					<div class="flex items-start gap-3">
 						<div class="min-w-0 flex-1 space-y-2">
 							<input
@@ -111,6 +140,7 @@
 								:fixed-menu="editorMenu"
 								:locked-by="locks.lockedBy(lockField('note', item))"
 								field-label="this note"
+								scroll-hint
 								placeholder="Item note…"
 								:editor-class="
 									compact
@@ -121,7 +151,7 @@
 								@blur="onFieldBlur('note', item)"
 							/>
 						</div>
-						<div class="flex-shrink-0 pt-1" @click.stop>
+						<div class="flex flex-shrink-0 flex-col items-center gap-2 pt-1" @click.stop>
 							<input
 								type="checkbox"
 								class="h-5 w-5 rounded-full border-gray-300 text-green-600 focus:ring-green-600 dark:border-gray-600 dark:text-green-500 dark:focus:ring-green-500"
@@ -129,6 +159,15 @@
 								:disabled="savingItem === item.name"
 								@change="saveField(item, 'done', $event.target.checked ? 1 : 0, $event)"
 							/>
+							<button
+								type="button"
+								class="flex h-6 w-6 items-center justify-center rounded text-ink-gray-5 hover:bg-surface-gray-2 hover:text-ink-gray-8 focus:outline-none focus-visible:ring-2 focus-visible:ring-outline-gray-4"
+								:title="__('Collapse')"
+								:aria-label="__('Collapse')"
+								@click="collapse()"
+							>
+								<FeatherIcon name="chevron-up" class="h-4 w-4" />
+							</button>
 						</div>
 					</div>
 					<div class="space-y-1.5 border-t border-gray-100 pt-3 dark:border-gray-800">
@@ -196,6 +235,19 @@
 							/>
 						</div>
 					</div>
+					<!-- Move to another checklist of the same record (#1920) -->
+					<div v-if="siblingOptions.length" class="flex justify-end border-t border-gray-100 pt-2 dark:border-gray-800">
+						<Dropdown :options="siblingOptions.map((o) => ({ ...o, onClick: () => moveToChecklist(item, o.name) }))" placement="right">
+							<Button
+								variant="ghost"
+								size="sm"
+								icon-left="corner-up-right"
+								:label="__('Move to checklist…')"
+								:loading="movingItem === item.name"
+								:disabled="savingItem === item.name"
+							/>
+						</Dropdown>
+					</div>
 				</div>
 			</div>
 		</div>
@@ -216,8 +268,8 @@
 </template>
 
 <script setup>
-import { computed, nextTick, onBeforeUnmount, onMounted, ref } from "vue"
-import { call, FormControl } from "frappe-ui"
+import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from "vue"
+import { Button, call, Dropdown, FormControl, toast } from "frappe-ui"
 import FrappeLink from "@spa/components/FrappeLink.vue"
 import UserAvatar from "@spa/components/UserAvatar.vue"
 import RichTextField from "@spa/components/RichTextField.vue"
@@ -229,13 +281,16 @@ import { lockMessage } from "@spa/utils/fieldLockText.js"
 import { deskRecordUrl } from "@spa/utils/deskUrl.js"
 import { formatDate, todayIsoInUserTz } from "@spa/utils/datetime.js"
 import { skipTextEditorToolbarTabStops } from "@spa/utils/textEditorFocus.js"
+import { __ } from "@spa/utils/i18n.js"
+import { closesOnClick, isInteractiveTarget } from "@spa/utils/interactiveTarget.js"
+import { dragOffsets, dropIndex, moved, passedDragDistance } from "@spa/utils/listReorder.js"
 
 const props = defineProps({
 	checklist: { type: Object, required: true },
 	compact: { type: Boolean, default: false },
 })
 
-const emit = defineEmits(["updated"])
+const emit = defineEmits(["updated", "moved"])
 
 const deskUrl = computed(
 	() => props.checklist.desk_url || (props.checklist.name ? `/app/checklist/${props.checklist.name}` : "")
@@ -430,6 +485,343 @@ async function expand(item) {
 	skipTextEditorToolbarTabStops(root.value)
 }
 
+// Reordering (#1919): press anywhere on a collapsed item and move it (a mouse after a few pixels,
+// a finger after holding still for a moment), drag its grip, or Alt+↑/↓ on a focused item.
+// While dragging, the DOM order stays as it is: the item follows the pointer and the items it
+// passes slide aside (transforms only), so nothing jumps and no element is moved under the pointer.
+// On release the new order shows at once and is saved in the background.
+const TOUCH_HOLD_MS = 350
+const TOUCH_SLOP = 8 // px a finger may wander during the hold; more is a scroll
+const AUTOSCROLL_EDGE = 40 // px from the scroll box's edge where the list scrolls by itself
+const reorder = ref(null) // { name, pointerId, from, to, dy }
+const reorderSaving = ref(false)
+const pendingOrder = ref(null) // item names as just dropped, until the saved list arrives
+let press = null // { item, pointerId, x, y, touch, timer }
+let reorderRects = []
+let reorderStep = 0
+let startListY = 0
+let lastClientY = 0
+let scrollBox = null
+let scrollFrame = 0
+let suppressClick = false
+
+const canReorder = computed(() => (props.checklist.items?.length || 0) > 1)
+const displayItems = computed(() => {
+	const items = props.checklist.items || []
+	if (!pendingOrder.value) return items
+	const byName = new Map(items.map((i) => [i.name, i]))
+	const ordered = pendingOrder.value.map((n) => byName.get(n)).filter(Boolean)
+	return ordered.length === items.length ? ordered : items
+})
+// the saved list (or any other reload) replaces the order shown while saving
+watch(
+	() => props.checklist.items,
+	() => (pendingOrder.value = null)
+)
+const reorderOffsets = computed(() => {
+	const r = reorder.value
+	return r ? dragOffsets(displayItems.value.length, r.from, r.to, reorderStep) : []
+})
+
+function itemStyle(item, index) {
+	const r = reorder.value
+	if (!r) return null
+	const y = item.name === r.name ? r.dy : reorderOffsets.value[index] || 0
+	return y ? { transform: `translateY(${y}px)` } : null
+}
+
+function itemMotionClass(item) {
+	const r = reorder.value
+	if (!r) return "transition-colors"
+	return r.name === item.name
+		? "relative z-10 cursor-grabbing shadow-lg ring-2 ring-outline-gray-3"
+		: "transition-transform duration-150 ease-out"
+}
+
+const itemEl = (name) => root.value?.querySelector(`[data-item="${CSS.escape(name)}"]`)
+const listTop = () => root.value?.getBoundingClientRect().top || 0
+
+function scrollParent(el) {
+	for (let node = el?.parentElement; node; node = node.parentElement) {
+		const overflowY = getComputedStyle(node).overflowY
+		if ((overflowY === "auto" || overflowY === "scroll") && node.scrollHeight > node.clientHeight) return node
+	}
+	return null
+}
+
+/** A press on a collapsed item (or its grip, `fromGrip`): becomes a drag or stays a click. */
+function pressItem(item, event, fromGrip = false) {
+	if (event.button !== 0 || press || reorder.value || !canReorder.value) return
+	if (!fromGrip && (expandedItem.value === item.name || isInteractiveTarget(event.target, event.currentTarget))) return
+	press = {
+		item,
+		pointerId: event.pointerId,
+		x: event.clientX,
+		y: event.clientY,
+		touch: event.pointerType === "touch",
+		timer: 0,
+	}
+	// Follow the pointer on the window, not with pointer capture: a captured element that is moved
+	// in the DOM loses the capture, which once ended every upward drag at once. Events of other
+	// pointers (a second finger) are ignored by pointerId.
+	window.addEventListener("pointermove", onPressMove)
+	window.addEventListener("pointerup", onPressUp)
+	window.addEventListener("pointercancel", onPressCancel)
+	if (fromGrip) startDrag(event.clientY)
+	else if (press.touch) press.timer = setTimeout(() => startDrag(press.y), TOUCH_HOLD_MS)
+}
+
+function onPressMove(event) {
+	if (!press || event.pointerId !== press.pointerId) return
+	if (reorder.value) {
+		// only while the button is down: a lost release must not keep moving the item
+		if (!press.touch && (event.buttons & 1) !== 1) return endPress()
+		return dragTo(event.clientY)
+	}
+	const dx = event.clientX - press.x
+	const dy = event.clientY - press.y
+	if (press.touch) {
+		if (Math.hypot(dx, dy) > TOUCH_SLOP) endPress() // the finger scrolls
+		return
+	}
+	if ((event.buttons & 1) !== 1) return endPress()
+	if (passedDragDistance(dx, dy)) startDrag(press.y, event.clientY)
+}
+
+function onPressUp(event) {
+	if (!press || event.pointerId !== press.pointerId) return
+	if (reorder.value) return dropItem()
+	endPress() // a click: the card's click handler opens the item
+}
+
+function onPressCancel(event) {
+	if (!press || event.pointerId !== press.pointerId) return
+	endPress()
+}
+
+function startDrag(fromClientY, nowClientY = fromClientY) {
+	if (!press || reorder.value) return
+	clearTimeout(press.timer)
+	const items = displayItems.value
+	const from = items.findIndex((i) => i.name === press.item.name)
+	if (from < 0 || reorderSaving.value || savingItem.value) return endPress()
+	// the boxes as they are now, relative to the list, so scrolling during the drag doesn't move
+	// the drop zones
+	const top = listTop()
+	reorderRects = items.map((i) => {
+		const r = itemEl(i.name)?.getBoundingClientRect()
+		return { top: (r?.top || 0) - top, height: r?.height || 0 }
+	})
+	const gap =
+		reorderRects.length > 1 ? Math.max(0, reorderRects[1].top - reorderRects[0].top - reorderRects[0].height) : 0
+	reorderStep = reorderRects[from].height + gap
+	startListY = fromClientY - top
+	reorder.value = { name: press.item.name, pointerId: press.pointerId, from, to: from, dy: 0 }
+	window.getSelection?.()?.removeAllRanges()
+	document.body.style.userSelect = "none"
+	document.body.style.cursor = "grabbing"
+	window.addEventListener("touchmove", blockTouchScroll, { passive: false })
+	scrollBox = scrollParent(root.value)
+	scrollFrame = requestAnimationFrame(autoScroll)
+	dragTo(nowClientY)
+}
+
+function blockTouchScroll(event) {
+	event.preventDefault() // the finger drags the item, not the page
+}
+
+function dragTo(clientY) {
+	const r = reorder.value
+	if (!r) return
+	lastClientY = clientY
+	const dy = clientY - listTop() - startListY
+	const box = reorderRects[r.from]
+	// where the item's middle is now decides its slot
+	const to = dropIndex(box.top + box.height / 2 + dy, reorderRects, r.from)
+	if (dy !== r.dy || to !== r.to) reorder.value = { ...r, dy, to }
+}
+
+function autoScroll() {
+	scrollFrame = 0
+	if (!reorder.value) return
+	if (scrollBox) {
+		const r = scrollBox.getBoundingClientRect()
+		let speed = 0
+		if (lastClientY < r.top + AUTOSCROLL_EDGE) speed = lastClientY - (r.top + AUTOSCROLL_EDGE)
+		else if (lastClientY > r.bottom - AUTOSCROLL_EDGE) speed = lastClientY - (r.bottom - AUTOSCROLL_EDGE)
+		if (speed) {
+			const before = scrollBox.scrollTop
+			scrollBox.scrollTop += Math.max(-15, Math.min(15, speed / 2))
+			if (scrollBox.scrollTop !== before) dragTo(lastClientY)
+		}
+	}
+	scrollFrame = requestAnimationFrame(autoScroll)
+}
+
+/** Ends a press or drag without saving anything. */
+function endPress() {
+	if (press) clearTimeout(press.timer)
+	press = null
+	window.removeEventListener("pointermove", onPressMove)
+	window.removeEventListener("pointerup", onPressUp)
+	window.removeEventListener("pointercancel", onPressCancel)
+	window.removeEventListener("touchmove", blockTouchScroll)
+	cancelAnimationFrame(scrollFrame)
+	scrollFrame = 0
+	if (reorder.value) {
+		document.body.style.userSelect = ""
+		document.body.style.cursor = ""
+	}
+	reorder.value = null
+}
+
+async function dropItem() {
+	const r = reorder.value
+	const shownTop = itemEl(r.name)?.getBoundingClientRect().top
+	// the release ends in a click on the card, which would open the item
+	suppressClick = true
+	setTimeout(() => (suppressClick = false))
+	const items = displayItems.value
+	if (r.to !== r.from) pendingOrder.value = moved(items, r.from, r.to).map((i) => i.name)
+	endPress()
+	glideIntoPlace(r.name, shownTop)
+	if (r.to === r.from) return
+	reorderSaving.value = true
+	try {
+		await moveItem(r.name, r.to, { quiet: true })
+	} finally {
+		reorderSaving.value = false
+	}
+}
+
+/** Slides the dropped item from where it was let go into its slot. */
+async function glideIntoPlace(name, shownTop) {
+	await nextTick()
+	const el = itemEl(name)
+	if (!el || shownTop == null || typeof el.animate !== "function") return
+	const delta = shownTop - el.getBoundingClientRect().top
+	if (Math.abs(delta) < 1) return
+	el.animate([{ transform: `translateY(${delta}px)` }, { transform: "translateY(0)" }], {
+		duration: 150,
+		easing: "ease-out",
+	})
+}
+
+function onCardClick(item) {
+	if (suppressClick) return
+	expand(item)
+}
+
+async function nudgeItem(item, step, event) {
+	// Only on the focused, collapsed item itself: inside an open item's fields Alt+↑/↓ belongs to
+	// the field (moving the caret on macOS), and must neither move the item nor be swallowed.
+	if (event && (event.target !== event.currentTarget || expandedItem.value === item.name)) return
+	event?.preventDefault()
+	const items = props.checklist.items || []
+	const from = items.findIndex((i) => i.name === item.name)
+	const to = from + step
+	if (from < 0 || to < 0 || to >= items.length || savingItem.value) return
+	await moveItem(item.name, to)
+	await nextTick()
+	root.value?.querySelector(`[data-item="${CSS.escape(item.name)}"]`)?.focus()
+}
+
+/** Saves an item's new position; `quiet` (a drag, already shown) skips the busy state. */
+async function moveItem(name, toIndex, { quiet = false } = {}) {
+	if (!quiet) savingItem.value = name
+	try {
+		const updated = await call(`${API}.move_spa_checklist_item`, {
+			checklist_name: props.checklist.name,
+			item_name: name,
+			to_index: toIndex,
+		})
+		emit("updated", updated)
+	} catch (e) {
+		toast({
+			title: e?.messages?.[0] || e?.message || __("Could not move the item"),
+			icon: "x-circle",
+			iconClasses: "text-ink-red-4",
+		})
+		pendingOrder.value = null // back to the saved order
+	} finally {
+		if (!quiet) savingItem.value = null
+	}
+}
+
+// Moving an item to another checklist of the same record (#1920). The other checklists are
+// loaded once an item opens; the parent reloads both checklists after the move ("moved").
+const siblings = ref([])
+const movingItem = ref(null)
+const siblingOptions = computed(() =>
+	siblings.value
+		.filter((c) => c.name !== props.checklist.name)
+		.map((c) => ({ name: c.name, label: c.title || c.name }))
+)
+
+async function loadSiblings() {
+	const { document, reference_record: record } = props.checklist
+	if (!document || !record) return (siblings.value = [])
+	try {
+		siblings.value = await call(`${API}.get_checklists_for_reference`, { document, reference_record: record })
+	} catch (e) {
+		siblings.value = []
+	}
+}
+
+async function moveToChecklist(item, target) {
+	movingItem.value = item.name
+	try {
+		// what was typed in the item goes with it
+		await autosave.flush()
+		const result = await call(`${API}.move_spa_checklist_item_to`, {
+			checklist_name: props.checklist.name,
+			item_name: item.name,
+			target_checklist: target,
+		})
+		expandedItem.value = null
+		emit("updated", result.source)
+		emit("moved", result)
+		toast({ title: __("Moved to {0}", [result.target.title || result.target.name]), icon: "check-circle", iconClasses: "text-ink-green-4" })
+	} catch (e) {
+		toast({ title: e?.messages?.[0] || e?.message || __("Could not move the item"), icon: "x-circle", iconClasses: "text-ink-red-4" })
+	} finally {
+		movingItem.value = null
+	}
+}
+
+// fresh on every opened item: checklists of the record may have been added or renamed since
+watch(expandedItem, (name) => {
+	if (name) loadSiblings()
+})
+
+// A click on an open item's free area closes it (#1921); its fields, editor, buttons and links
+// keep their clicks. Only up to the card: the item around it is itself role="button".
+// A click is only a "close" when it also started on the free area: selecting text in a field and
+// letting go over the free area ends in a click on the card, too (the browser sends the click to
+// the element both ends share).
+let pressedOnFreeArea = false
+let releasedOnField = false
+function onOpenCardPointerDown(event) {
+	pressedOnFreeArea = !isInteractiveTarget(event.target, event.currentTarget)
+	releasedOnField = false
+}
+
+function onOpenCardPointerUp(event) {
+	releasedOnField = isInteractiveTarget(event.target, event.currentTarget)
+}
+
+function onOpenCardClick(event) {
+	const close = closesOnClick({
+		pressedOnFreeArea,
+		releasedOnField,
+		clickedOnFreeArea: !isInteractiveTarget(event.target, event.currentTarget),
+		selectedText: window.getSelection?.()?.toString() || "",
+	})
+	pressedOnFreeArea = false
+	releasedOnField = false
+	if (close) collapse()
+}
+
 async function onDocClick(event) {
 	if (!expandedItem.value || !root.value) return
 	const path = typeof event.composedPath === "function" ? event.composedPath() : []
@@ -451,6 +843,7 @@ onMounted(() => {
 onBeforeUnmount(() => {
 	document.removeEventListener("click", onDocClick)
 	document.removeEventListener("keydown", onKeydown)
+	endPress()
 })
 
 async function saveField(item, field, value, event = null) {

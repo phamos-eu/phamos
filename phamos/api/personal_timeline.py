@@ -64,7 +64,7 @@ def _time_logs(employee, low, high):
 			"docstatus": ("!=", 2),
 			"from_time": ("between", (low - timedelta(days=1), high - timedelta(seconds=1))),
 		},
-		fields=["name", "docstatus", "project", "customer", "goal", "result", "activity_type", "percent_billable", "task"],
+		fields=["name", "docstatus", "project", "customer", "goal", "result", "activity_type", "percent_billable", "value_add", "task"],
 		order_by="from_time asc",
 	)
 	if not records:

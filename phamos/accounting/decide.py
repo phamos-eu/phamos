@@ -250,4 +250,8 @@ def apply_decision(doc, result, params):
 	):
 		from phamos.phamos.doctype.accounting_receipt.accounting_receipt import send_to_datev
 
-		send_to_datev(doc.name)
+		sent = send_to_datev(doc.name)
+		if not sent.get("ok"):
+			# The receipt stays for a person; the log says why the auto-send did not happen.
+			frappe.log_error(title=_("DATEV auto-send failed"), message=f"{doc.name}: {sent.get('message')}",
+				reference_doctype="Accounting Receipt", reference_name=doc.name)

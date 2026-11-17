@@ -90,7 +90,7 @@ frappe.ui.form.on("Implementation", {
         frm.trigger("set_default_time_limit_period");
         frm.trigger("render_time_limit_indicator");
 
-        if (!frm.is_new()) {
+        if (!frm.is_new() && frappe.model.can_create("Stakeholder Meeting")) {
             frm.add_custom_button(__("Create Meeting"), () => {
                 frappe.new_doc("Stakeholder Meeting", {
                     implementation: frm.doc.name,

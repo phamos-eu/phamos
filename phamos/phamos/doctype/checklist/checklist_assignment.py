@@ -306,6 +306,44 @@ def _sync_shares(checklist):
 		checklist.db_set("assignment_shared_with", "\n".join(sorted(shared)) or None, update_modified=False)
 
 
+# ----- moving an item to another checklist (#1920) -----
+
+
+def move_item(source, target, row, to_index=None):
+	"""Move `row` from Checklist `source` to Checklist `target` with its ToDo.
+
+	The same ToDo follows the item (re-pointed, not cancelled and created anew: no second
+	notification, the assignee keeps it). Both saves run as a sync, so `todo` is kept on the new
+	row; the usual sync then updates the ToDo's description, shares the target with the assignee
+	if needed and drops the source share when they have no item left there. Write permission on
+	both checklists is the caller's to check.
+	"""
+	values = {
+		field: row.get(field)
+		for field in ("done", "description", "note", "document", "record", "assigned_to", "due_date", "todo")
+	}
+	todo = _own_todo(source, row.todo)
+	if todo:
+		# before the source saves, or its sync would cancel the ToDo of the removed row
+		frappe.db.set_value("ToDo", todo.name, "reference_name", target.name, update_modified=False)
+	else:
+		values["todo"] = None
+
+	with _syncing():
+		source.remove(row)
+		source.save()
+		new_row = target.append("checklist_items", values)
+		rows = list(target.checklist_items)
+		if to_index is not None and 0 <= int(to_index) < len(rows) - 1:
+			rows.remove(new_row)
+			rows.insert(int(to_index), new_row)
+			target.checklist_items = rows
+			for idx, r in enumerate(rows, start=1):
+				r.idx = idx
+		target.save()
+	return new_row
+
+
 # ----- ToDo -> Checklist -----
 
 

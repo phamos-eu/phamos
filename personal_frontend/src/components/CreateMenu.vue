@@ -10,7 +10,7 @@
 
 		<CreateTodoDialog v-model="open.todo" @created="(doc) => opened(__('ToDo created'), 'TodoDetail', doc)" />
 		<CreateIssueDialog v-model="open.issue" :options="formOptions" @created="(doc) => opened(__('Issue created'), 'IssueDetail', doc)" />
-		<CreateTaskDialog v-model="open.task" :options="formOptions" @created="(doc) => opened(__('Task created'), 'TaskDetail', doc)" />
+		<NewTaskDialog v-model="open.task" :options="formOptions" @created="(doc) => opened(__('Task created'), 'TaskDetail', doc)" />
 		<CreateChecklistDialog
 			v-model="open.checklist"
 			:create-method="`${API}.create_checklist`"
@@ -32,7 +32,7 @@ import { useRouter } from "vue-router"
 import { call, Dropdown } from "frappe-ui"
 import CreateChecklistDialog from "@spa/components/CreateChecklistDialog.vue"
 import CreateIssueDialog from "@spa/components/CreateIssueDialog.vue"
-import CreateTaskDialog from "@spa/components/CreateTaskDialog.vue"
+import NewTaskDialog from "@spa/components/NewTaskDialog.vue"
 import CreateTodoDialog from "@spa/components/CreateTodoDialog.vue"
 import { requestTimerStart, timer } from "@spa/timerStore.js"
 import { shortcuts } from "@/shortcutsStore.js"
@@ -40,6 +40,7 @@ import { notify } from "@spa/utils/notify.js"
 import { __ } from "@spa/utils/i18n.js"
 import spaConfig from "@/config"
 import { checkin, checkInOrOut, checkinUsable } from "@/checkinStore.js"
+import { hasLeaveAccess } from "@/leaveStore.js"
 import CreateChallengeDialog from "./CreateChallengeDialog.vue"
 import StartFocusDialog from "./StartFocusDialog.vue"
 
@@ -61,7 +62,13 @@ const groups = computed(() => {
 		{ label: __("Issue"), icon: "inbox", onClick: () => (open.issue = true) },
 		{ label: __("Task"), icon: "check-square", onClick: () => (open.task = true) },
 		{ label: __("Checklist"), icon: "list", onClick: () => (open.checklist = true) },
+		// Ideas (#1771): the list page creates it and opens it
+		{ label: __("Idea"), icon: "feather", onClick: () => router.push({ name: "Ideas", query: { new: 1 } }) },
 	]
+	// My Leave (#1714): the page opens its Apply dialog
+	if (hasLeaveAccess()) {
+		work.push({ label: __("Leave"), icon: "umbrella", onClick: () => router.push({ name: "MyLeave", query: { new: 1 } }) })
+	}
 	const time = []
 	if (timer.state?.available && !timer.state.session) {
 		time.push({ label: __("Timesheet timer"), icon: "play", onClick: requestTimerStart })

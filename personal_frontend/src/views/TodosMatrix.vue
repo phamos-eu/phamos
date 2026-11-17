@@ -1,6 +1,6 @@
 <template>
 	<div class="h-full min-h-0 overflow-y-auto bg-surface-gray-1 p-5">
-		<div class="mx-auto flex max-w-7xl flex-col gap-4">
+		<div class="flex flex-col gap-4">
 			<div class="flex flex-wrap items-center justify-between gap-3">
 				<p class="text-sm text-ink-gray-6">
 					{{ __("Pick the few that matter. Drag a ToDo, or focus it and press 1–4.") }}

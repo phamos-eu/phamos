@@ -75,6 +75,16 @@ frappe.ui.form.on('Timesheet Record', {
 		}
 	},
 	project: function(frm) {
+		// Preset Percent Billable from the Project (100 when it has none, #1031).
+		if (frm.doc.project && frm.doc.docstatus == 0) {
+			frappe.call({
+				method: "phamos.phamos.timesheet_utils.get_billing_context",
+				args: { project: frm.doc.project },
+				callback: function(r) {
+					if (r.message) frm.set_value("percent_billable", r.message.percent_billable);
+				},
+			});
+		}
 		//Filter task based on project if project is selected first
 		frm.set_query("task", () => {
 			let filters = {};

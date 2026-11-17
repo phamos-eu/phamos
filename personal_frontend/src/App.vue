@@ -42,6 +42,7 @@ import { __ } from "@spa/utils/i18n.js"
 import { focus, loadFocus } from "./focusStore.js"
 import { checkin, loadCheckin } from "./checkinStore.js"
 import { hasContracts, loadMyContracts } from "./contractStore.js"
+import { hasLeaveAccess, loadMyLeave } from "./leaveStore.js"
 import CheckinButton from "./components/CheckinButton.vue"
 import CheckoutGuardDialog from "./components/CheckoutGuardDialog.vue"
 import CockpitShortcuts from "./components/CockpitShortcuts.vue"
@@ -107,6 +108,7 @@ onMounted(() => {
 	loadFocus()
 	loadCheckin()
 	loadMyContracts()
+	loadMyLeave()
 	loadTimer()
 	document.addEventListener("visibilitychange", onVisible)
 })
@@ -122,9 +124,12 @@ const CHECKIN_ITEM = {
 }
 // My Contract (#1600) appears once HR has submitted at least one contract for this user.
 const CONTRACT_ITEM = { name: "MyContract", label: "My Contract", icon: "file-text", match: ["MyContract"] }
+// My Leave (#1714) appears for users with an active Employee record.
+const LEAVE_ITEM = { name: "MyLeave", label: "My Leave", icon: "umbrella", match: ["MyLeave", "MyLeaveDetail"] }
 const navItems = computed(() => {
 	const items = [...BASE_ITEMS]
 	if (checkin.state?.available && checkin.state.employee) items.splice(1, 0, CHECKIN_ITEM)
+	if (hasLeaveAccess()) items.push(LEAVE_ITEM)
 	if (hasContracts()) items.push(CONTRACT_ITEM)
 	return items.map(translateItem)
 })
@@ -146,6 +151,15 @@ const BASE_ITEMS = [
 			{ name: "TodosList", label: "List", icon: "list", match: ["TodosList", "TodoDetail"] },
 			{ name: "TodosMatrix", label: "Matrix", icon: "grid", match: ["TodosMatrix"] },
 		],
+	},
+	// Ideas (#1771): capture, write out, let them grow.
+	{
+		name: "Ideas",
+		label: "Ideas",
+		icon: "feather",
+		match: ["Ideas", "IdeaDetail", "IdeaWrite"],
+		// Hand in for vote (#1842): everyone's ideas up for vote.
+		children: [{ name: "IdeasVote", label: "For vote", icon: "thumbs-up", match: ["IdeasVote", "IdeaVoteDetail"] }],
 	},
 	{
 		name: "Issues",
@@ -192,6 +206,13 @@ const PAGE_TITLES = {
 	Checkins: ["My Check-ins", "Dashboard"],
 	CheckinsList: ["My Check-ins", "List"],
 	MyContract: ["My Contract"],
+	MyLeave: ["My Leave"],
+	MyLeaveDetail: ["My Leave"],
+	Ideas: ["My Ideas"],
+	IdeaDetail: ["My Ideas"],
+	IdeaWrite: ["My Ideas", "Writing"],
+	IdeasVote: ["Ideas for vote"],
+	IdeaVoteDetail: ["Ideas for vote"],
 	Issues: ["My Issues", "Dashboard"],
 	IssuesList: ["My Issues", "List"],
 	IssueDetail: ["My Issues", "List"],

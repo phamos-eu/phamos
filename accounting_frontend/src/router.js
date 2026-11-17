@@ -7,6 +7,7 @@ import ReceiptReview from "./views/ReceiptReview.vue"
 import ReceiptsList from "./views/ReceiptsList.vue"
 import ReceiptsQueue from "./views/ReceiptsQueue.vue"
 import ReceiptStatistics from "./views/ReceiptStatistics.vue"
+import Receivables from "./views/Receivables.vue"
 
 export default createSpaRouter({
 	config: spaConfig,
@@ -37,6 +38,11 @@ export default createSpaRouter({
 			name: "ReceiptDetail",
 			component: ReceiptReview,
 			props: true,
+		},
+		{
+			path: "/receivables",
+			name: "Receivables",
+			component: Receivables,
 		},
 		{
 			path: "/ai-accountant",

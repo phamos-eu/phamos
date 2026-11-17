@@ -28,6 +28,7 @@ from phamos.phamos.doctype.timesheet_record.timesheet_record import (
 	submit_at_available_hours,
 )
 from phamos.phamos.page.dev_action_panel import dev_action_panel as dap
+from phamos.phamos.timesheet_utils import billing_context, percent_billable_or_preset, percent_billable_preset
 
 DOCTYPE = "Timesheet Record"
 MIN_EXPECTED_SECONDS = 15 * 60
@@ -120,7 +121,7 @@ def _session():
 		"open_row_from": next((row.from_time for row in reversed(rows) if not row.to_time), None),
 		"project": doc.project,
 		"project_name": project.get("project_name") or doc.project,
-		"project_percent_billable": project.get("percent_billable") or "100",
+		"project_percent_billable": percent_billable_preset(project.get("percent_billable")),
 		"customer": doc.customer,
 		"task": doc.task,
 		"task_subject": frappe.db.get_value("Task", doc.task, "subject") if doc.task else None,
@@ -250,7 +251,7 @@ def get_timer_project_info(project):
 		)
 	return {
 		"project": project,
-		"percent_billable": frappe.db.get_value("Project", project, "percent_billable") or "100",
+		"percent_billable": billing_context(project)["percent_billable"],
 		"task_rule": rule,
 		"tasks": tasks,
 	}
@@ -299,7 +300,7 @@ def pause_timer(name, break_goal=None, break_expected_seconds=None):
 	return get_timer_state()
 
 
-def resume_timer(name, track_break=0, break_project=None, break_goal=None, break_result=None, break_activity_type=None, break_percent_billable=0):
+def resume_timer(name, track_break=0, break_project=None, break_goal=None, break_result=None, break_activity_type=None, break_percent_billable=0, break_value_add=100):
 	"""Resume. With `track_break` the break becomes its own submitted record (goal and estimate
 	from the pause, unless given again); without it the break's goal and estimate are dropped."""
 	doc = _own_record(name)
@@ -319,6 +320,7 @@ def resume_timer(name, track_break=0, break_project=None, break_goal=None, break
 			goal=goal,
 			result=break_result.strip(),
 			percent_billable=break_percent_billable,
+			value_add=break_value_add,
 			activity_type=break_activity_type or None,
 		)
 		if cint(plan.get("expected_seconds")):
@@ -328,8 +330,9 @@ def resume_timer(name, track_break=0, break_project=None, break_goal=None, break
 	return get_timer_state()
 
 
-def stop_timer(name, result, percent_billable=100, activity_type=None, manual_end_time=None):
+def stop_timer(name, result, percent_billable=None, activity_type=None, manual_end_time=None, value_add=100, gitlab_issue_ref=None):
 	doc = _own_record(name)
+	percent_billable = percent_billable_or_preset(percent_billable, doc.project)
 	result = (result or "").strip()
 	if not result:
 		frappe.throw(_("Please describe what you accomplished."))
@@ -337,6 +340,8 @@ def stop_timer(name, result, percent_billable=100, activity_type=None, manual_en
 		frappe.throw(_("Please pick an activity type."))
 	if str(percent_billable) not in BILLABLE_OPTIONS:
 		frappe.throw(_("Billable share must be 0, 25, 50, 75 or 100 %."))
+	if str(value_add) not in BILLABLE_OPTIONS:
+		frappe.throw(_("Value Add must be 0, 25, 50, 75 or 100 %."))
 	open_from = next((row.from_time for row in reversed(doc.item) if not row.to_time), None)
 	if manual_end_time and open_from and get_datetime(manual_end_time) < get_datetime(open_from):
 		frappe.throw(_("The end time cannot be before the start of the current segment."))
@@ -345,8 +350,10 @@ def stop_timer(name, result, percent_billable=100, activity_type=None, manual_en
 		name,
 		result,
 		percent_billable=percent_billable,
+		value_add=value_add,
 		activity_type=activity_type,
 		manual_end_time=manual_end_time or None,
+		gitlab_issue_ref=gitlab_issue_ref or None,
 	)
 	return {"outcome": outcome, "state": get_timer_state()}
 

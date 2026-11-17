@@ -1,10 +1,17 @@
 import frappe
 from frappe import _
-from frappe.utils import now_datetime, add_to_date, time_diff_in_seconds, get_datetime
-from phamos.phamos.timesheet_utils import normalize_percent_billable
+from frappe.utils import cint, cstr, now_datetime, add_to_date, time_diff_in_seconds, get_datetime
+from phamos.phamos.timesheet_utils import (
+    billable_seconds_sql,
+    billable_seconds_term,
+    billing_context,
+    percent_billable_or_preset,
+    percent_billable_preset,
+)
 from phamos.phamos.doctype.timesheet_record.timesheet_record import compute_time_limit_status
+from phamos.gitlab_integration.issue_refs import link_gitlab_issues
 from frappe.query_builder import Order
-from frappe.query_builder.functions import Coalesce, Sum, Count
+from frappe.query_builder.functions import Coalesce, Sum, Count, Max
 from pypika import Case
 
 
@@ -42,26 +49,6 @@ def get_my_issues():
         order_by="due_date asc, modified desc",
     )
 
-    # --- bulk-fetch timesheet counts + total tracked time per issue ----------
-    if issues:
-        issue_names = [i["name"] for i in issues]
-        rows = frappe.db.sql(
-            """
-            SELECT gitlab_issue,
-                   COUNT(*) AS cnt,
-                   COALESCE(SUM(CASE WHEN docstatus = 1 THEN actual_time ELSE 0 END), 0) AS total_seconds
-            FROM `tabTimesheet Record`
-            WHERE gitlab_issue IN %(names)s AND docstatus != 2
-            GROUP BY gitlab_issue
-            """,
-            {"names": issue_names},
-            as_dict=True,
-        )
-        count_map = {r["gitlab_issue"]: {"cnt": r["cnt"], "total_seconds": int(r["total_seconds"])} for r in rows}
-    else:
-        count_map = {}
-
-    # --- enrich each issue ---------------------------------------------------
     active = _get_active_session_raw(user)
     active_ts_name = active.get("name") if active else None
     active_issue = active.get("gitlab_issue") if active else None
@@ -83,10 +70,36 @@ def get_my_issues():
         if extra:
             issues = extra + issues
 
+    if not issues:
+        return issues
+
+    issue_names = [i["name"] for i in issues]
+    timesheets = _timesheet_totals_by_issue(issue_names)
+    child_count = _child_count_by_issue(issue_names)
+    projects = _gitlab_projects({i["gitlab_project"] for i in issues if i.get("gitlab_project")})
+    parents = {
+        p.name: p
+        for p in frappe.get_all(
+            "GitLab Issue",
+            filters={"name": ["in", list({i["parent_issue"] for i in issues if i.get("parent_issue")})]},
+            fields=["name", "issue_id", "title"],
+        )
+    }
+
     for issue in issues:
-        ts_data = count_map.get(issue["name"], {"cnt": 0, "total_seconds": 0})
+        ts_data = timesheets.get(issue["name"], {"cnt": 0, "total_seconds": 0})
         issue["timesheet_count"] = ts_data["cnt"]
         issue["total_tracked_seconds"] = ts_data["total_seconds"]
+        issue["child_count"] = child_count.get(issue["name"], 0)
+
+        gitlab_project = projects.get(issue.get("gitlab_project")) or {}
+        issue["gitlab_project_title"] = gitlab_project.get("title")
+        issue["project"] = gitlab_project.get("frappe_project")
+        issue["project_name"] = gitlab_project.get("project_name") or issue["project"]
+
+        parent = parents.get(issue.get("parent_issue")) or {}
+        issue["parent_issue_id"] = parent.get("issue_id")
+        issue["parent_issue_title"] = parent.get("title")
 
         # 1. Email match; 2. gitlab_username matches local part of user email; 3. not mine
         assignee_email = (issue.get("assignee_email") or "").lower()
@@ -98,26 +111,6 @@ def get_my_issues():
         else:
             issue["is_mine"] = False
 
-        # Resolve parent title for display
-        if issue.get("parent_issue"):
-            issue["parent_issue_id"] = frappe.db.get_value(
-                "GitLab Issue", issue["parent_issue"], "issue_id"
-            )
-            issue["parent_issue_title"] = frappe.db.get_value(
-                "GitLab Issue", issue["parent_issue"], "title"
-            )
-        else:
-            issue["parent_issue_id"] = None
-            issue["parent_issue_title"] = None
-
-        # Resolve GitLab Project display name
-        if issue.get("gitlab_project"):
-            issue["gitlab_project_title"] = frappe.db.get_value(
-                "GitLab Project", issue["gitlab_project"], "title"
-            )
-        else:
-            issue["gitlab_project_title"] = None
-
         # Mark which issue (if any) has a running/paused session
         if active_issue == issue["name"]:
             issue["active_timesheet"] = active_ts_name
@@ -127,6 +120,47 @@ def get_my_issues():
             issue["session_state"] = None
 
     return issues
+
+
+def _timesheet_totals_by_issue(issue_names):
+    """{issue: {"cnt", "total_seconds"}}: non-cancelled records, submitted time only."""
+    record = frappe.qb.DocType("Timesheet Record")
+    submitted_seconds = Sum(Case().when(record.docstatus == 1, record.actual_time).else_(0))
+    rows = (
+        frappe.qb.from_(record)
+        .select(record.gitlab_issue, Count("*").as_("cnt"), Coalesce(submitted_seconds, 0).as_("total_seconds"))
+        .where(record.gitlab_issue.isin(issue_names) & (record.docstatus != 2))
+        .groupby(record.gitlab_issue)
+    ).run(as_dict=True)
+    return {r.gitlab_issue: {"cnt": r.cnt, "total_seconds": int(r.total_seconds)} for r in rows}
+
+
+def _child_count_by_issue(issue_names):
+    """{issue: number of child issues in any state}."""
+    issue = frappe.qb.DocType("GitLab Issue")
+    rows = (
+        frappe.qb.from_(issue)
+        .select(issue.parent_issue, Count("*").as_("cnt"))
+        .where(issue.parent_issue.isin(issue_names))
+        .groupby(issue.parent_issue)
+    ).run(as_dict=True)
+    return {r.parent_issue: r.cnt for r in rows}
+
+
+def _gitlab_projects(names):
+    """{GitLab Project: {"title", "frappe_project", "project_name"}}."""
+    if not names:
+        return {}
+    gitlab_project = frappe.qb.DocType("GitLab Project")
+    project = frappe.qb.DocType("Project")
+    rows = (
+        frappe.qb.from_(gitlab_project)
+        .left_join(project)
+        .on(project.name == gitlab_project.frappe_project)
+        .select(gitlab_project.name, gitlab_project.title, gitlab_project.frappe_project, project.project_name)
+        .where(gitlab_project.name.isin(list(names)))
+    ).run(as_dict=True)
+    return {r.name: r for r in rows}
 
 
 # ---------------------------------------------------------------------------
@@ -198,6 +232,7 @@ def _get_active_session_raw(user):
         record["break_from"] = str(last_row["from_time"])
     else:
         record["break_from"] = None
+    record["project_percent_billable"] = billing_context(record["project"])["percent_billable"]
     return record
 
 
@@ -307,6 +342,7 @@ def start_issue_timer(gitlab_issue_name, expected_time, goal=None, manual_start_
     ts.from_time = start_time
     ts.gitlab_issue = gitlab_issue_name
     ts.gitlab_parent_issue = issue.parent_issue if issue.parent_issue else gitlab_issue_name
+    ts.percent_billable = billing_context(frappe_project)["percent_billable"]
 
     # First time-log row (open — no to_time, session is running)
     ts.append("item", {"from_time": start_time})
@@ -355,10 +391,10 @@ def get_time_stats():
 
     def fetch(date_from, date_to):
         rows = frappe.db.sql(
-            """
+            f"""
             SELECT
-                SUM(tr.actual_time)                              AS total_seconds,
-                SUM(tr.actual_time * tr.percent_billable / 100) AS billable_seconds
+                SUM(tr.actual_time)                     AS total_seconds,
+                SUM({billable_seconds_sql("tr")})       AS billable_seconds
             FROM `tabTimesheet Record` tr
             WHERE tr.employee = %(employee)s
               AND tr.docstatus != 2
@@ -418,7 +454,9 @@ def resume_timer(name):
 
 
 @frappe.whitelist()
-def stop_timer(name, result, percent_billable=100, activity_type=None, manual_end_time=None):
+def stop_timer(name, result, percent_billable=None, activity_type=None, manual_end_time=None, value_add=100, gitlab_issue_ref=None):
+    """Stop and submit. `gitlab_issue_ref`: GitLab ticket picked or pasted on Stop; without it,
+    URLs in Goal / Result are used. Either way child and parent issue are worked out."""
     doc = frappe.get_doc("Timesheet Record", name)
     end_time = get_datetime(manual_end_time) if manual_end_time else now_datetime()
 
@@ -441,7 +479,9 @@ def stop_timer(name, result, percent_billable=100, activity_type=None, manual_en
         doc.actual_time = first_row.duration or 0
 
     doc.result = result
-    doc.percent_billable = normalize_percent_billable(percent_billable)
+    link_gitlab_issues(doc, reference=gitlab_issue_ref, texts=(doc.goal, result))
+    doc.percent_billable = percent_billable_or_preset(percent_billable, doc.project)
+    doc.value_add = cstr(value_add)
     if activity_type:
         doc.activity_type = activity_type
 
@@ -470,7 +510,7 @@ def stop_timer(name, result, percent_billable=100, activity_type=None, manual_en
         extra = frappe.new_doc("Timesheet Record")
         for field in ["project", "customer", "employee", "activity_type", "goal",
                       "gitlab_issue", "gitlab_parent_issue", "expected_time", "result",
-                      "percent_billable"]:
+                      "percent_billable", "value_add"]:
             extra.set(field, doc.get(field))
         extra.from_time = alt_row.from_time
         extra.to_time = alt_row.to_time
@@ -499,7 +539,7 @@ def get_gitlab_labels():
 
 
 @frappe.whitelist()
-def create_break_timesheet(from_time, to_time=None, project=None, goal=None, result=None, percent_billable=100, activity_type=None):
+def create_break_timesheet(from_time, to_time=None, project=None, goal=None, result=None, percent_billable=None, activity_type=None, value_add=100, gitlab_issue_ref=None):
     user = frappe.session.user
     employee = frappe.db.get_value("Employee", {"user_id": user}, ["name", "activity_type"], as_dict=True)
     if not employee:
@@ -517,11 +557,13 @@ def create_break_timesheet(from_time, to_time=None, project=None, goal=None, res
     ts.activity_type = activity_type or employee.activity_type
     ts.goal = goal
     ts.result = result
+    link_gitlab_issues(ts, reference=gitlab_issue_ref, texts=(goal, result))
     ts.from_time = from_dt
     ts.to_time = to_dt
     ts.actual_time = duration
     ts.expected_time = duration
-    ts.percent_billable = normalize_percent_billable(percent_billable)
+    ts.percent_billable = percent_billable_or_preset(percent_billable, project)
+    ts.value_add = cstr(value_add)
     ts.append("item", {"from_time": from_dt, "to_time": to_dt, "duration": duration})
     ts.insert(ignore_permissions=True)
     ts.submit()
@@ -570,40 +612,55 @@ def get_dev_my_projects():
 
 @frappe.whitelist()
 def get_dev_all_projects():
-    """Return all open projects; is_assigned=1 if the current user already has a ToDo for it."""
+    """One project list instead of "My Projects" + "All Projects".
+
+    Every Open project, plus projects assigned to me (open ToDo) in any status, so closing the
+    assignment ToDo (e.g. in the Personal Cockpit) only changes the order. is_assigned=1 for mine.
+    Order: last used first (my latest Timesheet Record), then assigned to me, then by name.
+    """
     user = frappe.session.user
 
     Project = frappe.qb.DocType("Project")
     Customer = frappe.qb.DocType("Customer")
     ToDo = frappe.qb.DocType("ToDo")
 
-    is_assigned = Case().when(ToDo.reference_name.isnotnull(), 1).else_(0).as_("is_assigned")
-
-    query = (
-        frappe.qb.from_(Project)
-        .left_join(Customer)
-        .on(Customer.name == Project.customer)
-        .left_join(ToDo)
-        .on(
+    # A subquery, not a join: several open ToDos for one project would duplicate the row.
+    assigned_to_me = (
+        frappe.qb.from_(ToDo)
+        .select(Max(ToDo.reference_name))
+        .where(
             (ToDo.reference_name == Project.name)
             & (ToDo.reference_type == "Project")
             & (ToDo.status == "Open")
             & (ToDo.allocated_to == user)
         )
+    )
+    is_assigned = Case().when(assigned_to_me.isnotnull(), 1).else_(0).as_("is_assigned")
+
+    query = (
+        frappe.qb.from_(Project)
+        .left_join(Customer)
+        .on(Customer.name == Project.customer)
         .select(
             Project.name,
             Project.project_name,
             Project.status,
+            Project.percent_billable,
             Project.customer,
             Coalesce(Customer.customer_name, Project.customer).as_("customer_desc"),
             is_assigned,
         )
-        .where(Project.status == "Open")
-        .orderby(is_assigned, order=Order.asc)
-        .orderby(Project.project_name, order=Order.asc)
+        .where((Project.status == "Open") | assigned_to_me.isnotnull())
     )
-    projects = query.run(as_dict=True)
-    return _enrich_projects(projects, user)
+    projects = _enrich_projects(query.run(as_dict=True), user)
+    projects.sort(
+        key=lambda p: (
+            -(get_datetime(p["last_used"]).timestamp() if p.get("last_used") else 0),
+            -cint(p.get("is_assigned")),
+            (p.get("project_name") or "").lower(),
+        )
+    )
+    return projects
 
 
 def _enrich_projects(projects, user):
@@ -652,7 +709,7 @@ def _enrich_projects(projects, user):
         billable_seconds = Sum(
             Case().when(
                 TimesheetRecord.docstatus != 2,
-                TimesheetRecord.actual_time * TimesheetRecord.percent_billable / 100,
+                billable_seconds_term(TimesheetRecord),
             ).else_(0)
         )
 
@@ -663,6 +720,7 @@ def _enrich_projects(projects, user):
                 Count("*").as_("cnt"),
                 Coalesce(total_seconds, 0).as_("total_seconds"),
                 Coalesce(billable_seconds, 0).as_("billable_seconds"),
+                Max(TimesheetRecord.creation).as_("last_used"),
             )
             .where(
                 (TimesheetRecord.project.isin(project_names))
@@ -677,6 +735,7 @@ def _enrich_projects(projects, user):
                 "count": r.cnt,
                 "total_seconds": int(r.total_seconds),
                 "billable_seconds": int(r.billable_seconds),
+                "last_used": r.last_used,
             }
             for r in ts_rows
         }
@@ -688,6 +747,8 @@ def _enrich_projects(projects, user):
         p["total_tracked_seconds"] = ts["total_seconds"]
         p["billable_seconds"] = ts["billable_seconds"]
         p["non_billable_seconds"] = max(0, ts["total_seconds"] - ts["billable_seconds"])
+        p["last_used"] = ts.get("last_used")
+        p["percent_billable"] = percent_billable_preset(p.get("percent_billable"))
 
     return projects
 
@@ -755,6 +816,7 @@ def get_active_project_session():
     record["session_state"] = session_state
     record["elapsed_seconds"] = _calc_elapsed_seconds(rows)
     record["break_from"] = str(last_row["from_time"]) if session_state == "paused" and not last_row.get("to_time") else None
+    record["project_percent_billable"] = billing_context(record["project"])["percent_billable"]
     return record
 
 
@@ -794,6 +856,7 @@ def start_project_timer(project_name, expected_time, goal, manual_start_time=Non
     ts.activity_type = employee.activity_type
     ts.goal = goal
     ts.expected_time = int(float(expected_time))
+    ts.percent_billable = billing_context(project_name)["percent_billable"]
     ts.from_time = start_time
     ts.append("item", {"from_time": start_time})
     ts.insert(ignore_permissions=True)

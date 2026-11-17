@@ -16,6 +16,7 @@ from frappe.utils import add_to_date, now_datetime
 
 from phamos.api import personal_cockpit as pc
 from phamos.api import personal_timer as timer
+from phamos.phamos.doctype.stakeholder_meeting.test_stakeholder_meeting import make_implementation
 from phamos.tests.test_personal_checkin import _ensure_employee, _ensure_user
 
 USER = "tm-a@example.com"
@@ -36,7 +37,8 @@ class TestPersonalTimer(FrappeTestCase):
 		self.employee = _ensure_employee(USER)
 		self.other_employee = _ensure_employee(OTHER)
 		frappe.db.set_value("Employee", self.employee, "activity_type", self._activity_type())
-		self.project = self._project("TM Timer project")
+		# Billable (linked to an Implementation), so the Percent Billable picked on stop is kept (#1031).
+		self.project = self._project("TM Timer project", implementation=make_implementation().name)
 		self.other_project = self._project("TM Other project")
 
 	def tearDown(self):
@@ -49,7 +51,7 @@ class TestPersonalTimer(FrappeTestCase):
 			frappe.get_doc({"doctype": "Activity Type", "activity_type": name}).insert(ignore_permissions=True)
 		return name
 
-	def _project(self, project_name, task_rule="Task is optional"):
+	def _project(self, project_name, task_rule="Task is optional", implementation=None):
 		return (
 			frappe.get_doc(
 				{
@@ -58,6 +60,7 @@ class TestPersonalTimer(FrappeTestCase):
 					"status": "Open",
 					"task_in_timesheet_record": task_rule,
 					"percent_billable": "75",
+					"custom_implementation": implementation,
 				}
 			)
 			.insert(ignore_permissions=True)
@@ -172,6 +175,34 @@ class TestPersonalTimer(FrappeTestCase):
 		self.assertTrue(doc.timesheet)
 		self.assertEqual(frappe.db.get_value("Timesheet", doc.timesheet, "employee"), self.employee)
 
+	def test_stop_stores_value_add_next_to_percent_billable(self):
+		name = self._start()["session"]["name"]
+		pc.stop_timer(name, "Report written", percent_billable="50", value_add="25", activity_type="TM Development")
+		values = frappe.db.get_value("Timesheet Record", name, ["percent_billable", "value_add"])
+		self.assertEqual(tuple(values), ("50", "25"))
+
+	def test_stop_rejects_a_value_add_outside_the_options(self):
+		name = self._start()["session"]["name"]
+		with self.assertRaises(frappe.ValidationError):
+			pc.stop_timer(name, "Done", value_add="33", activity_type="TM Development")
+
+	def test_a_tracked_break_stores_its_value_add(self):
+		name = self._start()["session"]["name"]
+		self._pause(name, goal="Customer call", minutes=20)
+		pc.resume_timer(
+			name,
+			track_break=1,
+			break_project=self.other_project,
+			break_result="Agreed on the scope",
+			break_activity_type="TM Development",
+			break_percent_billable="75",
+			break_value_add="50",
+		)
+		values = frappe.db.get_value(
+			"Timesheet Record", {"employee": self.employee, "project": self.other_project, "docstatus": 1}, ["percent_billable", "value_add"]
+		)
+		self.assertEqual(tuple(values), ("75", "50"))
+
 	def test_stop_needs_result_and_activity_type(self):
 		name = self._start()["session"]["name"]
 		with self.assertRaises(frappe.ValidationError):
@@ -182,6 +213,46 @@ class TestPersonalTimer(FrappeTestCase):
 			pc.stop_timer(name, "Done", percent_billable="33", activity_type="TM Development")
 		with self.assertRaises(frappe.ValidationError):
 			pc.stop_timer(name, "Done", activity_type="TM Development", manual_end_time=str(now_datetime() - timedelta(days=1)))
+
+	def _stop_after_one_break(self, track_break):
+		"""Work 60 min, break 20 min, work 40 min, Stop; returns the record and the four times."""
+		start = now_datetime().replace(microsecond=0) - timedelta(hours=3)
+		pause, resume, stop = (add_to_date(start, minutes=m) for m in (60, 80, 120))
+		frappe.db.set_single_value("Projects Settings", {"ignore_user_time_overlap": 0, "ignore_employee_time_overlap": 0})
+		clock = {"now": start}
+		with patch(f"{DAP}.now_datetime", side_effect=lambda: clock["now"]):
+			name = self._start()["session"]["name"]
+			clock["now"] = pause
+			self._pause(name)
+			clock["now"] = resume
+			if track_break:
+				pc.resume_timer(name, track_break=1, break_project=self.other_project, break_result="Call held", break_activity_type="TM Development")
+			else:
+				pc.resume_timer(name)
+			clock["now"] = stop
+			outcome = pc.stop_timer(name, "Report written", activity_type="TM Development")["outcome"]
+		self.assertEqual(outcome["session_state"], "submitted")
+		return frappe.get_doc("Timesheet Record", name), outcome, (start, pause, resume, stop)
+
+	def _timesheet_span(self, record):
+		row = frappe.get_doc("Timesheet", frappe.db.get_value("Timesheet Record", record, "timesheet")).time_logs[0]
+		return (row.from_time, row.to_time)
+
+	def test_stop_after_a_tracked_break_books_each_part_once(self):
+		# #1636: the main record ran until Stop and overlapped the break's Timesheet.
+		doc, outcome, (start, pause, resume, stop) = self._stop_after_one_break(track_break=True)
+		self.assertEqual((doc.docstatus, doc.from_time, doc.to_time, doc.actual_time), (1, start, pause, 3600))
+		self.assertEqual(self._timesheet_span(doc.name), (start, pause))
+		break_record = frappe.db.get_value("Timesheet Record", {"employee": self.employee, "project": self.other_project, "docstatus": 1})
+		self.assertEqual(self._timesheet_span(break_record), (pause, resume))
+		self.assertEqual([self._timesheet_span(r) for r in outcome["extra_timesheets"]], [(resume, stop)])
+
+	def test_stop_after_an_untracked_break_books_both_work_parts(self):
+		# #1636: the record for the work after the break overlapped the main record.
+		doc, outcome, (start, pause, resume, stop) = self._stop_after_one_break(track_break=False)
+		self.assertEqual((doc.from_time, doc.to_time), (start, pause))
+		self.assertEqual(self._timesheet_span(doc.name), (start, pause))
+		self.assertEqual([self._timesheet_span(r) for r in outcome["extra_timesheets"]], [(resume, stop)])
 
 	def test_someone_elses_record_cannot_be_touched(self):
 		name = self._start(user=OTHER)["session"]["name"]

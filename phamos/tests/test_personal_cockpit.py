@@ -204,11 +204,30 @@ class TestPersonalScope(FrappeTestCase):
 		issue = pc.create_issue(subject="Created in the Personal Cockpit")
 		self.assertEqual(issue["assignees"], [USER_A])
 
+	def _new_task(self, owner):
+		# The "New Task" dialog's required fields (#1752).
+		return pc.create_task(
+			subject="Created in the Personal Cockpit",
+			exp_start_date="2026-11-02",
+			exp_end_date="2026-11-03",
+			expected_time=2,
+			priority="High",
+			custom_task_owner=owner,
+		)
+
 	def test_new_task_is_assigned_to_me_without_a_department(self):
 		frappe.set_user(USER_A)
-		task = pc.create_task(subject="Created in the Personal Cockpit")
+		task = self._new_task(USER_A)
 		self.assertEqual(task["assignees"], [USER_A])
+		self.assertEqual(task["custom_task_owner"], USER_A)
 		self.assertFalse(task["department"])
+
+	def test_new_task_is_assigned_to_its_owner_not_to_me(self):
+		frappe.set_user(USER_A)
+		task = self._new_task(USER_B)
+		self.assertEqual(task["assignees"], [USER_B])
+		# The creator can still open it (created-by fallback of the personal scope).
+		self.assertEqual(pc.get_task(task["name"])["custom_task_owner"], USER_B)
 
 	def test_new_task_takes_the_department_of_its_project(self):
 		with patch("frappe.db.get_value", return_value="Human Resources") as get_value:

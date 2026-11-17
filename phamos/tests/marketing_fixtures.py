@@ -10,11 +10,10 @@ EVENT_TITLE = "Test ERPNext Event"
 
 
 def ensure_company():
-	"""The CI site is bare (`--app phamos` never runs ERPNext's setup wizard): run it once."""
-	if not frappe.db.a_row_exists("Company"):
-		from erpnext.setup.utils import before_tests
+	"""The CI site is bare (`bench run-tests --app phamos` does not run ERPNext's own before_tests)."""
+	from phamos.install import load_test_records
 
-		before_tests()
+	load_test_records()
 	company = frappe.defaults.get_global_default("company") or frappe.get_all("Company", pluck="name", limit=1)[0]
 	frappe.defaults.set_global_default("company", company)
 	for field, doctype in (("customer_group", "Customer Group"), ("territory", "Territory")):
@@ -47,8 +46,16 @@ def ensure_vat_template():
 	if name:
 		return name
 	company = frappe.defaults.get_global_default("company")
-	account = frappe.db.get_value("Account", {"company": company, "account_type": "Tax", "is_group": 0}) or \
-		frappe.db.get_value("Account", {"company": company, "root_type": "Liability", "is_group": 0})
+	# The standard chart marks "Duties and Taxes" as Tax, but that account is a group.
+	# Item Tax Template only accepts a leaf of type Tax, Chargeable, Income Account, or Expense Account.
+	account = frappe.db.get_value(
+		"Account",
+		{
+			"company": company,
+			"is_group": 0,
+			"account_type": ["in", ["Tax", "Chargeable", "Income Account", "Expense Account"]],
+		},
+	)
 	return frappe.get_doc({"doctype": "Item Tax Template", "title": "Test Ticket VAT 19", "company": company,
 		"taxes": [{"tax_type": account, "tax_rate": 19}]}).insert(ignore_permissions=True).name
 

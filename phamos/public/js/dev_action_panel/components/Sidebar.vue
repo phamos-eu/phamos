@@ -11,14 +11,12 @@ const props = defineProps({
   myIssuesCount: Number,
   mineOnly: Boolean,
   syncing: Boolean,
-  projectsFilter: String,
-  myProjectsCount: Number,
   allProjectsCount: Number,
   activeProjectSession: Object,
   projectElapsedSeconds: Number,
 });
 
-const emit = defineEmits(["select-project", "change-view", "toggle-mine", "sync", "navigate-projects"]);
+const emit = defineEmits(["select-project", "change-view", "toggle-mine", "sync", "navigate-projects", "open-session"]);
 
 const user = frappe.session.user;
 const userName = frappe.user.full_name() || user;
@@ -73,7 +71,16 @@ const ISSUE_ICON = "M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00
     </div>
 
     <!-- Active session widget -->
-    <div v-if="displaySession" class="sb__session" :class="isRunning ? 'sb__session--running' : 'sb__session--paused'">
+    <div
+      v-if="displaySession"
+      class="sb__session sb__session--clickable"
+      :class="isRunning ? 'sb__session--running' : 'sb__session--paused'"
+      role="button"
+      tabindex="0"
+      title="Open the running timesheet"
+      @click="emit('open-session')"
+      @keydown.enter="emit('open-session')"
+    >
       <div class="sb__session-head">
         <span class="sb__dot" :class="isRunning ? 'dot--green' : 'dot--amber'"></span>
         <span class="sb__session-state">{{ isRunning ? "Running" : "Paused" }}</span>
@@ -135,20 +142,10 @@ const ISSUE_ICON = "M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00
     <!-- Projects -->
     <div class="sb__section-label">Projects</div>
     <nav class="sb__nav">
+      <!-- One project list (last used first, then assigned to me); "My Projects" was merged into it -->
       <button
         class="sb__nav-item"
-        :class="{ 'sb__nav-item--active': currentView === 'projects' && projectsFilter === 'my' }"
-        @click="emit('navigate-projects', 'my')"
-      >
-        <svg class="sb__nav-svg" width="14" height="14" viewBox="0 0 24 24" fill="currentColor">
-          <path d="M16 11c1.66 0 2.99-1.34 2.99-3S17.66 5 16 5c-1.66 0-3 1.34-3 3s1.34 3 3 3zm-8 0c1.66 0 2.99-1.34 2.99-3S9.66 5 8 5C6.34 5 5 6.34 5 8s1.34 3 3 3zm0 2c-2.33 0-7 1.17-7 3.5V19h14v-2.5c0-2.33-4.67-3.5-7-3.5zm8 0c-.29 0-.62.02-.97.05 1.16.84 1.97 1.97 1.97 3.45V19h6v-2.5c0-2.33-4.67-3.5-7-3.5z"/>
-        </svg>
-        <span class="sb__nav-label">My Projects</span>
-        <span class="sb__nav-count">{{ myProjectsCount }}</span>
-      </button>
-      <button
-        class="sb__nav-item"
-        :class="{ 'sb__nav-item--active': currentView === 'projects' && projectsFilter === 'all' }"
+        :class="{ 'sb__nav-item--active': currentView === 'projects' }"
         @click="emit('navigate-projects', 'all')"
       >
         <svg class="sb__nav-svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
@@ -223,6 +220,8 @@ const ISSUE_ICON = "M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00
 
 /* Active session */
 .sb__session { margin: 10px 10px 0; padding: 10px 12px; border-radius: 8px; flex-shrink: 0; }
+.sb__session--clickable { cursor: pointer; transition: box-shadow 0.12s; }
+.sb__session--clickable:hover, .sb__session--clickable:focus-visible { box-shadow: 0 0 0 2px var(--primary); outline: none; }
 .sb__session--running { background: var(--green-50, #f0fdf4); border: 1px solid var(--green-200, #bbf7d0); }
 .sb__session--paused  { background: var(--yellow-50, #fefce8); border: 1px solid var(--yellow-200, #fef08a); }
 .sb__session-head { display: flex; align-items: center; gap: 6px; margin-bottom: 4px; }

@@ -130,6 +130,11 @@
 .wp-result-count { margin: 0; color: var(--wp-muted); white-space: nowrap; }
 .wp-sort { display: flex; align-items: center; gap: 8px; margin: 0; color: var(--wp-muted); font-weight: 400; }
 .wp-sort select { height: 30px; padding: 0 26px 0 10px; border: 1px solid var(--wp-line); border-radius: var(--wp-radius-sm); background-color: var(--wp-surface); color: var(--wp-ink); font: inherit; box-shadow: var(--wp-shadow-sm); }
+/* Active filters under the toolbar: one removable chip each, then "Clear all". */
+.wp-active-filters { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; list-style: none; margin: -4px 0 14px; padding: 0; }
+.wp-active-filters .wp-chip { padding: 4px 10px; color: var(--wp-ink); text-decoration: none; }
+.wp-clear-filters { margin-left: 4px; color: var(--wp-ink-2); font-size: 12px; font-weight: 500; text-decoration: underline; text-underline-offset: 2px; }
+.wp-clear-filters:hover { color: var(--wp-ink); }
 .wp-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(210px, 1fr)); gap: 12px; list-style: none; margin: 0; padding: 0; }
 .wp-grid-compact { grid-template-columns: repeat(auto-fill, minmax(190px, 1fr)); }
 .wp-results.wp-loading { opacity: 0.55; transition: opacity 0.15s; }

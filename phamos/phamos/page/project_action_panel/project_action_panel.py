@@ -14,73 +14,17 @@ from frappe.utils import strip_html
 from frappe.query_builder import Field, Case, Order, DocType, functions as fn
 from frappe.query_builder.functions import Concat, Max, Sum, Round, Coalesce, IfNull
 from frappe.utils import getdate, nowdate, get_first_day, get_last_day, add_days, add_months
-from phamos.phamos.timesheet_utils import normalize_percent_billable
+from phamos.phamos.timesheet_utils import billable_seconds_term, normalize_percent_billable
 from phamos.phamos.doctype.timesheet_record.timesheet_record import compute_time_limit_status
 
 
-# Full GitLab issue URL, or a short reference like "suncycle/suncycle#2494".
-_GITLAB_REF_RE = re.compile(
-    r'(?P<url>https?://[^\s"\'<>]+/-/(?:issues|work_items)/\d+)'
-    r'|(?<![\w/.:#-])(?P<path>[\w.-]+(?:/[\w.-]+)+)#(?P<iid>\d+)\b'
+# Shared with the Developer Action Panel; the old names stay for patches and customer comments.
+from phamos.gitlab_integration.issue_refs import (  # noqa: E402
+    GITLAB_REF_RE as _GITLAB_REF_RE,
+    find_gitlab_issues_in_text as _find_gitlab_issues_in_text,
+    get_issue_by_ref as _get_gitlab_issue_by_ref,
+    get_issue_by_url as _get_gitlab_issue_by_url,
 )
-
-
-def _find_gitlab_issues_in_text(*text_fields):
-    """Scan text for GitLab URLs and return (child_issue_name, parent_issue_name).
-
-    GitLab now uses /-/work_items/N for both parent and child tasks, so the URL
-    path is not used to classify. Each URL is matched to a synced GitLab Issue:
-      - Parent Issue set   →  child task: (issue, issue.parent_issue)
-      - Parent Issue empty →  parent task: (None, issue)
-
-    Both full URLs and short references (group/project#N) are recognised.
-    The first child task found wins; otherwise the first parent task found.
-    URLs whose GitLab Issue is not synced yet are ignored.
-    """
-    text = " ".join(t for t in text_fields if t)
-    text = html.unescape(strip_html(text))
-
-    parent_only = None
-
-    for match in _GITLAB_REF_RE.finditer(text):
-        if match.group("url"):
-            issue = _get_gitlab_issue_by_url(match.group("url"))
-        else:
-            issue = _get_gitlab_issue_by_ref(match.group("path"), match.group("iid"))
-        if not issue:
-            continue
-        if issue.parent_issue:
-            return issue.name, issue.parent_issue
-        if parent_only is None:
-            parent_only = issue.name
-
-    return None, parent_only
-
-
-def _get_gitlab_issue_by_url(url):
-    """Find a GitLab Issue by URL, accepting either the /-/issues/ or /-/work_items/ form."""
-    variants = [url, url.replace("/-/work_items/", "/-/issues/"), url.replace("/-/issues/", "/-/work_items/")]
-    return frappe.db.get_value(
-        "GitLab Issue",
-        {"issue_url": ["in", list(dict.fromkeys(variants))]},
-        ["name", "parent_issue"],
-        as_dict=True,
-    )
-
-
-def _get_gitlab_issue_by_ref(path, iid):
-    """Find a GitLab Issue from a short reference (group/project#N) by matching the end of its URL."""
-    path = path.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
-    issues = frappe.get_all(
-        "GitLab Issue",
-        or_filters=[
-            ["issue_url", "like", f"%/{path}/-/work_items/{iid}"],
-            ["issue_url", "like", f"%/{path}/-/issues/{iid}"],
-        ],
-        fields=["name", "parent_issue"],
-        limit=1,
-    )
-    return issues[0] if issues else None
 
 
 def _resolve_gitlab_parent(child_issue_name):
@@ -254,6 +198,7 @@ def create_and_submit_timesheet(
     percent_billable,
     activity_type,
     result,
+    value_add=100,
 ):
     try:
         # Basic time validation
@@ -277,6 +222,7 @@ def create_and_submit_timesheet(
         ts.project = project_name
         ts.activity_type = activity_type
         ts.percent_billable = normalize_percent_billable(percent_billable)
+        ts.value_add = cstr(value_add)
         ts.goal = goal
         ts.expected_time = expected_time
         ts.result = result
@@ -366,6 +312,12 @@ def is_task_running(name):
 
 @frappe.whitelist()
 def get_employee_leaves():
+    """Approved leave of everyone for the team calendar, current and next year.
+
+    Neutral on purpose (#1840): the title is the employee's name only, never the leave type,
+    so nobody with the panel sees who is on sick leave (#1833 keeps sick leave types to HR
+    Manager). Half-day times stay.
+    """
     today = getdate(nowdate())
 
     # Current year start
@@ -390,7 +342,6 @@ def get_employee_leaves():
             "employee_name",
             "from_date",
             "to_date",
-            "leave_type",
             "half_day",
             "half_day_date",
             "available_from_time",
@@ -400,7 +351,7 @@ def get_employee_leaves():
 
     events = []
     for l in leaves:
-        description = f"{l.employee_name} ({l.leave_type})"
+        description = l.employee_name
 
         if l.half_day and l.from_date != l.to_date:
             # LEFT SIDE: from_date → (half_day_date - 1)
@@ -562,101 +513,97 @@ def get_team_holidays():
 
 
 @frappe.whitelist()
-def update_and_submit_timesheet_record(name, to_time, percent_billable, activity_type, result, task=None):
-    try:
-        # Retrieve the Timesheet Record document
-        doc = frappe.get_doc("Timesheet Record", name)
+def update_and_submit_timesheet_record(name, to_time, percent_billable, activity_type, result, task=None, value_add=100):
+    # Errors raise so the request rolls back and the panel shows them (#1636).
+    # Retrieve the Timesheet Record document
+    doc = frappe.get_doc("Timesheet Record", name)
 
-        # Close last open row if exists
-        if doc.item:
-            for idx, row in enumerate(reversed(doc.item)):
-                if row.from_time and not row.to_time:
-                    # Validate before assigning
-                    if get_datetime(to_time) < get_datetime(row.from_time):
-                        frappe.throw(_("To Time cannot be earlier than From Time. Update aborted."))
-                    row.to_time = to_time
-                    break
+    # Close last open row if exists
+    if doc.item:
+        for idx, row in enumerate(reversed(doc.item)):
+            if row.from_time and not row.to_time:
+                # Validate before assigning
+                if get_datetime(to_time) < get_datetime(row.from_time):
+                    frappe.throw(_("To Time cannot be earlier than From Time. Update aborted."))
+                row.to_time = to_time
+                break
 
-        # Calculate durations & validate
-        for row in doc.item:
-            if row.from_time and row.to_time:
-                if get_datetime(row.to_time) < get_datetime(row.from_time):
-                    frappe.throw(_("Row #{0}: To Time cannot be earlier than From Time. Update aborted.").format(row.idx))
-                row.duration = time_diff_in_seconds(row.to_time, row.from_time)
+    # Calculate durations & validate
+    for row in doc.item:
+        if row.from_time and row.to_time:
+            if get_datetime(row.to_time) < get_datetime(row.from_time):
+                frappe.throw(_("Row #{0}: To Time cannot be earlier than From Time. Update aborted.").format(row.idx))
+            row.duration = time_diff_in_seconds(row.to_time, row.from_time)
 
-        # Update parent fields
-        if doc.item:
-            first_row = doc.item[0]
-            doc.from_time = first_row.from_time
-            doc.to_time = first_row.to_time
-            doc.actual_time = first_row.duration or 0
+    # Update parent fields
+    if doc.item:
+        first_row = doc.item[0]
+        doc.from_time = first_row.from_time
+        doc.to_time = first_row.to_time
+        doc.actual_time = first_row.duration or 0
 
-        doc.task = task
-        doc.activity_type = activity_type
-        doc.result = result
+    doc.task = task
+    doc.activity_type = activity_type
+    doc.result = result
 
-        # Resolve GitLab issue references if not already set by dev_action_panel
-        if not doc.gitlab_issue:
-            child_issue, parent_issue = _find_gitlab_issues_in_text(doc.goal, result)
-            if child_issue:
-                doc.gitlab_issue = child_issue
-            if parent_issue:
-                doc.gitlab_parent_issue = parent_issue
-        if doc.gitlab_issue and not doc.gitlab_parent_issue:
-            doc.gitlab_parent_issue = _resolve_gitlab_parent(doc.gitlab_issue)
+    # Resolve GitLab issue references if not already set by dev_action_panel
+    if not doc.gitlab_issue:
+        child_issue, parent_issue = _find_gitlab_issues_in_text(doc.goal, result)
+        if child_issue:
+            doc.gitlab_issue = child_issue
+        if parent_issue:
+            doc.gitlab_parent_issue = parent_issue
+    if doc.gitlab_issue and not doc.gitlab_parent_issue:
+        doc.gitlab_parent_issue = _resolve_gitlab_parent(doc.gitlab_issue)
 
-        doc.percent_billable = normalize_percent_billable(percent_billable)
-      
+    doc.percent_billable = normalize_percent_billable(percent_billable)
+    doc.value_add = cstr(value_add)
 
-        # Final validation before any save or submit
-        if doc.from_time and doc.to_time and get_datetime(doc.to_time) < get_datetime(doc.from_time):
-            frappe.throw(_("To Time cannot be earlier than From Time. Update aborted."))
+    # Final validation before any save or submit
+    if doc.from_time and doc.to_time and get_datetime(doc.to_time) < get_datetime(doc.from_time):
+        frappe.throw(_("To Time cannot be earlier than From Time. Update aborted."))
 
-        time_limit_status = compute_time_limit_status(doc)
-        if time_limit_status.get("exceeds"):
-            doc.save()
-            time_limit_status["timesheet_name"] = doc.name
-            return time_limit_status
-
-        doc.docstatus = 1
+    time_limit_status = compute_time_limit_status(doc)
+    if time_limit_status.get("exceeds"):
         doc.save()
+        time_limit_status["timesheet_name"] = doc.name
+        return time_limit_status
 
-        # --- Create alternative records (3rd, 5th, etc.) ---
-        for i in range(2, len(doc.item), 2):  # start from 3rd row (index 2)
-            alt_row = doc.item[i]
+    doc.docstatus = 1
+    doc.save()
 
-            # Skip invalid alternate rows
-            if alt_row.from_time and alt_row.to_time and get_datetime(alt_row.to_time) < get_datetime(alt_row.from_time):
-                continue
+    # --- Create alternative records (3rd, 5th, etc.) ---
+    for i in range(2, len(doc.item), 2):  # start from 3rd row (index 2)
+        alt_row = doc.item[i]
 
-            new_doc = frappe.new_doc("Timesheet Record")
-            new_doc.employee = doc.employee
+        # Skip invalid alternate rows
+        if alt_row.from_time and alt_row.to_time and get_datetime(alt_row.to_time) < get_datetime(alt_row.from_time):
+            continue
 
-            # Copy parent fields from original
-            for field in ["project", "customer", "task", "goal", "gitlab_issue", "gitlab_parent_issue", "expected_time", "activity_type", "result", "percent_billable"]:
-                new_doc.set(field, doc.get(field))
+        new_doc = frappe.new_doc("Timesheet Record")
+        new_doc.employee = doc.employee
 
-            # Parent times from selected row
-            new_doc.from_time = alt_row.from_time
-            new_doc.to_time = alt_row.to_time
-            new_doc.actual_time = alt_row.duration or 0
+        # Copy parent fields from original
+        for field in ["project", "customer", "task", "goal", "gitlab_issue", "gitlab_parent_issue", "expected_time", "activity_type", "result", "percent_billable", "value_add"]:
+            new_doc.set(field, doc.get(field))
 
-            # Copy all item rows
-            for original_row in doc.item:
-                new_doc.append("item", {
-                    "from_time": original_row.from_time,
-                    "to_time": original_row.to_time,
-                    "duration": original_row.duration or 0
-                })
+        # Parent times from selected row
+        new_doc.from_time = alt_row.from_time
+        new_doc.to_time = alt_row.to_time
+        new_doc.actual_time = alt_row.duration or 0
 
-            new_doc.docstatus = 1
-            new_doc.insert(ignore_permissions=True)
+        # Copy all item rows
+        for original_row in doc.item:
+            new_doc.append("item", {
+                "from_time": original_row.from_time,
+                "to_time": original_row.to_time,
+                "duration": original_row.duration or 0
+            })
 
-        return {"timesheet_name": doc.name}
+        new_doc.docstatus = 1
+        new_doc.insert(ignore_permissions=True)
 
-    except Exception as e:
-        frappe.log_error(frappe.get_traceback(), "Timesheet Record Update and Submit Error")
-        return f"Error: {str(e)}"
+    return {"timesheet_name": doc.name}
 
 @frappe.whitelist(allow_guest=True)
 def get_employee_and_project(project_name):
@@ -774,6 +721,20 @@ def fetch_projects():
     # Handling Customer Description (Replacing CASE)
     customer_desc_query = IfNull(Customer.customer_name, Customer.name)
 
+    # One list instead of "Your Projects" + "All Projects": every Open project, plus projects
+    # assigned to me in any status. Closing the assignment ToDo only changes the order.
+    assigned_to_me = (
+        frappe.qb.from_(ToDo)
+        .select(Max(ToDo.reference_name))
+        .where(
+            (ToDo.status == "Open")
+            & (ToDo.reference_type == "Project")
+            & (ToDo.reference_name == Project.name)
+            & (ToDo.allocated_to == frappe.session.user)
+        )
+    )
+    is_assigned = Case().when(assigned_to_me.isnotnull(), 1).else_(0)
+
     # Main Query
     query = (
         frappe.qb.from_(Project)
@@ -794,18 +755,14 @@ def fetch_projects():
             latest_timesheet_record.as_("timesheet_record"),
             latest_task.as_("task"),
             last_timesheet_update.as_("last_timesheet_update"),
+            is_assigned.as_("assigned_to_me"),
         )
-        .where(
-            frappe.qb.from_(ToDo)
-            .select(Max(ToDo.reference_name))
-            .where(
-                (ToDo.status == "Open")
-                & (ToDo.reference_name == Project.name)
-                & (ToDo.allocated_to == frappe.session.user)
-            ).isnotnull()
-        )
-        .orderby(Coalesce(last_timesheet_update, "1970, 1, 1"), order=Order.desc)
-        
+        .where((Project.status == "Open") | assigned_to_me.isnotnull())
+        # Last used first (my latest Timesheet Record), then my assigned projects, then the rest.
+        .orderby(Coalesce(last_timesheet_update, "1970-01-01"), order=Order.desc)
+        # By alias: the query builder drops the brackets around a subquery inside ORDER BY CASE.
+        .orderby(Field("assigned_to_me"), order=Order.desc)
+        .orderby(Project.name, order=Order.asc)
     )
     # Execute query
     projects = query.run(as_dict=True)
@@ -978,7 +935,7 @@ def total_hours_worked_in_this_week():
         frappe.qb.from_(TimesheetRecord)
         .select(
             fn.Sum(TimesheetRecord.actual_time).as_("total_actual_time"),
-            fn.Sum(TimesheetRecord.actual_time * TimesheetRecord.percent_billable / 100).as_("total_billable_time")
+            fn.Sum(billable_seconds_term(TimesheetRecord)).as_("total_billable_time")
         )
         .where(
             (TimesheetRecord.employee == employee_name)
@@ -1049,7 +1006,7 @@ def total_hours_worked_in_this_month():
         frappe.qb.from_(TimesheetRecord)
         .select(
             fn.Sum(TimesheetRecord.actual_time).as_("total_actual_time"),
-            fn.Sum(TimesheetRecord.actual_time * TimesheetRecord.percent_billable / 100).as_("total_billable_time")
+            fn.Sum(billable_seconds_term(TimesheetRecord)).as_("total_billable_time")
         )
         .where(
             (TimesheetRecord.employee == employee_name)

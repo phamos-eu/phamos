@@ -6,6 +6,7 @@
 import frappe
 
 from phamos.api import department_cockpit as dc
+from phamos.phamos.hr import sick_leave
 
 CONFIG = dc.CockpitConfig(
 	label="Human Resources",
@@ -14,6 +15,9 @@ CONFIG = dc.CockpitConfig(
 	roles=("System Manager", "HR Manager", "HR User"),
 	settings_method_name="get_human_resources_settings",
 )
+
+# Privacy mode (#1839): seconds data stays visible when the setting is empty.
+DEFAULT_PRIVACY_REVEAL_SECONDS = 120
 
 
 def check_app_permission():
@@ -33,6 +37,16 @@ def get_human_resources_settings():
 		human_resources_project_count (projects linked to the department).
 	"""
 	return dc.get_settings(CONFIG)
+
+
+@frappe.whitelist()
+def get_privacy_settings():
+	"""How long the HR Cockpit's privacy mode shows data after "Show data" (#1839).
+
+	No role check: a duration is not sensitive, and every cockpit user needs it to draw the top bar.
+	"""
+	seconds = frappe.db.get_single_value(sick_leave.SETTINGS, "human_resources_privacy_reveal_seconds")
+	return {"reveal_seconds": int(seconds) if seconds else DEFAULT_PRIVACY_REVEAL_SECONDS}
 
 
 @frappe.whitelist()
@@ -116,6 +130,18 @@ def ensure_issue_chat(name):
 def get_issue_chat_states(names):
 	"""Return the chat state per Issue for list views."""
 	return dc.get_issue_chat_states(names)
+
+
+@frappe.whitelist()
+def get_task_chat(name):
+	"""Return the Raven chat state of a Task in HR scope."""
+	return dc.get_task_chat(CONFIG, name)
+
+
+@frappe.whitelist(methods=["POST"])
+def ensure_task_chat(name):
+	"""Start or join the Raven chat of a Task in HR scope."""
+	return dc.ensure_task_chat(CONFIG, name)
 
 
 
@@ -215,6 +241,7 @@ def update_task(
 	exp_end_date=None,
 	progress=None,
 	project=None,
+	custom_task_owner=None,
 	modified=None,
 ):
 	"""Update whitelisted Task fields within HR scope."""
@@ -235,6 +262,8 @@ def update_task(
 		fields["progress"] = progress
 	if project is not None:
 		fields["project"] = project
+	if custom_task_owner is not None:
+		fields["custom_task_owner"] = custom_task_owner
 	if modified is not None:
 		fields["modified"] = modified
 	return dc.update_task(CONFIG, name, **fields)
@@ -255,6 +284,9 @@ def create_task(
 	department=None,
 	exp_start_date=None,
 	exp_end_date=None,
+	expected_time=None,
+	custom_task_owner=None,
+	task_type=None,
 ):
 	"""Create a Task in the HR department."""
 	return dc.create_task(
@@ -266,6 +298,9 @@ def create_task(
 		department=department,
 		exp_start_date=exp_start_date,
 		exp_end_date=exp_end_date,
+		expected_time=expected_time,
+		custom_task_owner=custom_task_owner,
+		task_type=task_type,
 	)
 
 

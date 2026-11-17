@@ -42,7 +42,16 @@ frappe.ui.form.on("Employment Contract", {
 	valid_until: (frm) => calculate(frm),
 	company(frm) {
 		frm.set_value("expense_account", null);
-		set_planning_rate(frm, true);
+		if (frm.doc.docstatus !== 0 || !frm.doc.company) return;
+		// A new employee's contract starts in their company's currency, not the site default.
+		frappe.db.get_value("Company", frm.doc.company, "default_currency").then(({ message }) => {
+			const company_currency = message?.default_currency;
+			if (company_currency && frm.doc.currency !== company_currency) {
+				frm.set_value("currency", company_currency); // the currency handler loads the rate
+			} else {
+				set_planning_rate(frm, true);
+			}
+		});
 	},
 	currency(frm) {
 		set_planning_rate(frm, true);

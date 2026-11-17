@@ -268,7 +268,8 @@ def build(item, lang):
 	# Date, time and venue are in the page header (hero); facts show each piece of information once.
 	facts = []
 	facts.append({"label": _("Type"), "value": item.labels.get("event_type", {}).get((item.facets.get("event_type") or [None])[0])})
-	if offer:
+	# A paid event without a price yet (no Item Tax Template, phamos/phamos#1710) shows no price at all.
+	if offer and (offer["free"] or offer["gross"]):
 		value = offer["price_label"] if offer["free"] else _("{0} incl. VAT").format(offer["price_label"])
 		if offer.get("price_title") and len(offer.get("prices") or []) > 1:
 			value = f"{value} ({offer['price_title']})"
@@ -300,6 +301,7 @@ def build(item, lang):
 			actions.append({"label": note, "hint": True})
 	elif offer and d["upcoming"]:
 		reason = {"sold_out": _("Sold out"), "not_started": _("Ticket sale has not started yet"),
+			"no_tax_template": _("Ticket sale has not started yet"),
 			"ended": _("Ticket sale has ended")}.get(offer.get("reason"))
 		if reason:
 			actions.append({"label": reason, "note": True})
@@ -353,7 +355,7 @@ def build(item, lang):
 				"name": org["name"], "url": org.get("website") or (get_url(org["url"]) if org.get("url") else None)},
 			"performer": [{"@type": "Person", "name": s["name"]} for s in d.get("speakers") or []] or None,
 			"description": item.summary or None}
-		if offer:
+		if offer and (offer["free"] or offer["gross"]):
 			schema["isAccessibleForFree"] = bool(offer["free"])
 			schema["offers"] = {"@type": "Offer", "price": offer["gross"], "priceCurrency": offer["currency"] or "EUR",
 				"url": get_url(item.url), "validThrough": offer.get("sale_until"),

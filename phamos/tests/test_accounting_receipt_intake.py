@@ -147,6 +147,7 @@ class TestDatevStamp(FrappeTestCase):
 			name = intake.create_receipts_from_file("bewirtung.pdf", blank_pdf())[0]["receipt"]
 		frappe.db.set_value("Accounting Receipt", name, "note", "<p>Gäste: Anna Muster</p>")
 		with patch.object(ar_module, "resolve_datev_recipient", return_value="up@datev.test"), \
+			patch.object(ar_module, "resolve_datev_sender", return_value="me@phamos.test"), \
 			patch.object(ar_module.frappe, "sendmail") as sendmail:
 			self.assertTrue(ar_module.send_to_datev(name)["ok"])
 		attachment = sendmail.call_args.kwargs["attachments"][0]
@@ -155,6 +156,7 @@ class TestDatevStamp(FrappeTestCase):
 		stamped_copies = [f for f in files_of(name) if f.startswith(f"{name}-DATEV")]
 		self.assertEqual(len(stamped_copies), 1)
 		with patch.object(ar_module, "resolve_datev_recipient", return_value="up@datev.test"), \
+			patch.object(ar_module, "resolve_datev_sender", return_value="me@phamos.test"), \
 			patch.object(ar_module.frappe, "sendmail"):
 			ar_module.preview_datev_pdf(name)  # a rebuild replaces the copy, it does not add one
 		self.assertEqual(len([f for f in files_of(name) if f.startswith(f"{name}-DATEV")]), 1)
@@ -163,6 +165,7 @@ class TestDatevStamp(FrappeTestCase):
 		with patch("phamos.ai_agents.runner.enqueue_run"):
 			name = intake.create_receipts_from_file("plain.pdf", blank_pdf())[0]["receipt"]
 		with patch.object(ar_module, "resolve_datev_recipient", return_value="up@datev.test"), \
+			patch.object(ar_module, "resolve_datev_sender", return_value="me@phamos.test"), \
 			patch.object(ar_module.frappe, "sendmail") as sendmail:
 			ar_module.send_to_datev(name)
 		self.assertIn("file_url", sendmail.call_args.kwargs["attachments"][0])

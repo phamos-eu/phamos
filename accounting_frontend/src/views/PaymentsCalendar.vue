@@ -1,6 +1,6 @@
 <template>
 	<div class="h-full min-h-0 overflow-y-auto bg-surface-gray-1 p-5">
-		<div class="mx-auto flex max-w-7xl flex-col gap-4">
+		<div class="flex flex-col gap-4">
 			<div class="flex flex-wrap items-center justify-between gap-3">
 				<div class="flex flex-wrap items-center gap-2">
 					<Button variant="subtle" icon="chevron-left" label="Previous month" @click="shiftMonth(-1)" />

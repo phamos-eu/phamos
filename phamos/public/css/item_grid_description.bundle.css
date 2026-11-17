@@ -1,0 +1,34 @@
+/* Description column in the item tables of sales and purchase documents (#1858, ported from
+   aquarath). Frappe clips grid cells to one line; this lets the row grow with the text, so the
+   full description can be read and edited in place. The column itself comes from
+   phamos/setup/item_grid.py. */
+.frappe-control[data-fieldname="items"] .grid-row > .data-row {
+	height: auto !important;
+	align-items: stretch !important;
+}
+.frappe-control[data-fieldname="items"] .grid-row > .data-row > div {
+	height: auto !important;
+	max-height: none !important;
+	align-self: stretch !important;
+}
+.frappe-control[data-fieldname="items"] .grid-static-col[data-fieldname="description"],
+.frappe-control[data-fieldname="items"]
+	.grid-static-col[data-fieldname="description"]
+	.static-area {
+	height: auto !important;
+	max-height: none !important;
+	overflow: visible !important;
+	white-space: normal !important;
+	text-overflow: clip !important;
+}
+.frappe-control[data-fieldname="items"] .grid-static-col[data-fieldname="description"] .ql-editor {
+	height: auto !important;
+	min-height: 80px;
+	max-height: none !important;
+	overflow: visible !important;
+}
+.frappe-control[data-fieldname="items"]
+	.grid-static-col[data-fieldname="description"]
+	.ql-container {
+	height: auto !important;
+}

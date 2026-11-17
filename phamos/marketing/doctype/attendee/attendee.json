@@ -33,15 +33,13 @@
   "customer",
   "opportunity",
   "section_order",
+  "event_ticket_order",
   "order_reference",
   "is_buyer",
   "billing_customer",
   "payment_status",
   "terms_version",
   "column_break_order",
-  "sales_order",
-  "sales_order_item",
-  "sales_invoice",
   "section_attendance",
   "checked_in_on",
   "column_break_attendance",
@@ -79,7 +77,8 @@
    "options": "Marketing Content",
    "reqd": 1,
    "in_list_view": 1,
-   "in_standard_filter": 1
+   "in_standard_filter": 1,
+   "search_index": 1
   },
   {
    "fieldname": "role",
@@ -246,11 +245,20 @@
    "label": "Order and Billing"
   },
   {
+   "fieldname": "event_ticket_order",
+   "fieldtype": "Link",
+   "label": "Event Ticket Order",
+   "options": "Event Ticket Order",
+   "read_only": 1,
+   "search_index": 1,
+   "description": "The order this ticket belongs to. Set for all orders since phamos/phamos#1717."
+  },
+  {
    "fieldname": "order_reference",
    "fieldtype": "Data",
-   "label": "Order Reference",
+   "label": "Order Reference (legacy)",
    "read_only": 1,
-   "description": "Groups the attendees of one order: the Quotation for website orders, a booking number for free events, the order id for imports."
+   "description": "Only for registrations before phamos/phamos#1717, which have no Event Ticket Order: groups the attendees of one old order (its Sales Order, a booking number or an import id)."
   },
   {
    "fieldname": "is_buyer",
@@ -270,7 +278,7 @@
    "fieldname": "payment_status",
    "fieldtype": "Select",
    "label": "Payment Status",
-   "options": "Not Required\nPending\nOrdered\nInvoiced\nPaid\nCancelled",
+   "options": "Not Required\nPending\nOrdered\nInvoiced\nPaid\nCredited\nCancelled",
    "default": "Pending",
    "read_only": 1,
    "in_list_view": 1,
@@ -285,27 +293,6 @@
   {
    "fieldname": "column_break_order",
    "fieldtype": "Column Break"
-  },
-  {
-   "fieldname": "sales_order",
-   "fieldtype": "Link",
-   "label": "Sales Order",
-   "options": "Sales Order",
-   "read_only": 1
-  },
-  {
-   "fieldname": "sales_order_item",
-   "fieldtype": "Data",
-   "label": "Sales Order Item",
-   "hidden": 1,
-   "read_only": 1
-  },
-  {
-   "fieldname": "sales_invoice",
-   "fieldtype": "Link",
-   "label": "Sales Invoice",
-   "options": "Sales Invoice",
-   "read_only": 1
   },
   {
    "fieldname": "section_attendance",
@@ -445,7 +432,7 @@
   }
  ],
  "links": [],
- "modified": "2026-10-17 09:00:00.000000",
+ "modified": "2026-10-27 12:00:00.000000",
  "modified_by": "Administrator",
  "module": "Marketing",
  "name": "Attendee",

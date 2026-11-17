@@ -17,10 +17,12 @@
 					:label="__('What did you accomplish?') + ' *'"
 					:placeholder="__('Sent to the customer the next day.')"
 				/>
+				<FormControl v-model="activityType" type="select" size="sm" :label="__('Activity type') + ' *'" :options="activityOptions" />
 				<div class="grid grid-cols-2 gap-3">
-					<FormControl v-model="activityType" type="select" size="sm" :label="__('Activity type') + ' *'" :options="activityOptions" />
-					<FormControl v-model="billable" type="select" size="sm" :label="__('Billable')" :options="billableOptions" />
+					<FormControl v-model="valueAdd" type="select" size="sm" :label="__('Value Add (%)')" :options="ratingOptions()" />
+					<FormControl v-model="billable" type="select" size="sm" :label="__('Percent Billable')" :options="ratingOptions()" />
 				</div>
+				<p class="text-xs text-ink-gray-5">{{ __(VALUE_ADD_HELP) }}</p>
 				<FormControl v-model="endTime" type="datetime-local" size="sm" :label="__('End')" @input="endEdited = true" />
 				<ErrorMessage :message="error" />
 				<div class="flex items-center justify-between gap-2">
@@ -40,6 +42,7 @@ import { computed, onBeforeUnmount, ref, watch } from "vue"
 import { call } from "frappe-ui"
 import { formatForApi, parseDatetimeLocalValue, parseSystemDatetimeToUserDate, toDatetimeLocalValue } from "@spa/utils/datetime.js"
 import { __ } from "@spa/utils/i18n.js"
+import { billablePreset, ratingOptions, VALUE_ADD_DEFAULT, VALUE_ADD_HELP } from "@spa/utils/timesheetRating.js"
 import spaConfig from "@/config"
 
 const props = defineProps({
@@ -50,24 +53,17 @@ const props = defineProps({
 const emit = defineEmits(["update:modelValue", "stopped", "limit"])
 
 const API = spaConfig.api
-const BILLABLE = [
-	{ label: "100 %", value: "100" },
-	{ label: "75 %", value: "75" },
-	{ label: "50 %", value: "50" },
-	{ label: "25 %", value: "25" },
-	{ label: "0 % (internal)", value: "0" },
-]
 const result = ref("")
 const activityType = ref("")
 const activityTypes = ref([])
 const billable = ref("100")
+const valueAdd = ref(VALUE_ADD_DEFAULT)
 const endTime = ref("")
 const endEdited = ref(false)
 const error = ref("")
 const saving = ref(false)
 let liveTimer = null
 
-const billableOptions = computed(() => BILLABLE.map((row) => ({ ...row, label: __(row.label) })))
 const activityOptions = computed(() => [
 	{ label: __("Pick an activity type"), value: "" },
 	...activityTypes.value.map((name) => ({ label: name, value: name })),
@@ -81,7 +77,8 @@ async function open() {
 	error.value = ""
 	result.value = props.session?.result || ""
 	activityType.value = props.session?.activity_type || props.defaultActivityType || ""
-	billable.value = String(props.session?.project_percent_billable || "100")
+	billable.value = billablePreset(props.session?.project_percent_billable)
+	valueAdd.value = VALUE_ADD_DEFAULT
 	endEdited.value = false
 	endTime.value = toDatetimeLocalValue(new Date())
 	liveTimer = setInterval(() => {
@@ -105,6 +102,7 @@ async function submit() {
 		result: result.value.trim(),
 		activity_type: activityType.value,
 		percent_billable: billable.value,
+		value_add: valueAdd.value,
 	}
 	if (endEdited.value) {
 		const end = parseDatetimeLocalValue(endTime.value)

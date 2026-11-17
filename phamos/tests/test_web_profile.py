@@ -282,6 +282,18 @@ class TestWebProfile(FrappeTestCase):
 
 	# --- contact workflow --------------------------------------------------------------------------
 
+	def test_contact_form_uses_the_shared_crm_step(self):
+		# phamos/phamos#1724: the contact form and every event order link people the same way.
+		from unittest.mock import patch
+
+		from phamos.marketing import crm
+
+		with patch.object(crm, "match_or_create_lead", wraps=crm.match_or_create_lead) as match:
+			self._submit(self.person.route)
+		match.assert_called_once()
+		lead = frappe.db.get_value("Lead", {"email_id": "visitor@example.com"}, ["lead_owner", "source"], as_dict=True)
+		self.assertEqual((lead.lead_owner, lead.source), ("Guest", "Website"))
+
 	def test_contact_request_needs_consent(self):
 		self.assertRaises(frappe.ValidationError, self._submit, self.person.route, privacy_consent=0)
 

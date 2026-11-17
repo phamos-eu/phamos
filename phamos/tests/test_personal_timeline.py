@@ -118,6 +118,7 @@ class TestPersonalTimeline(FrappeTestCase):
 		self.assertEqual([log["goal"] for log in logs], ["TL work", "TL running"])
 		self.assertEqual([s["kind"] for s in logs[0]["segments"]], ["work", "break", "work"])
 		self.assertEqual(logs[0]["project_name"], "TL Timeline")
+		self.assertEqual(logs[0]["value_add"], "100")  # shown next to Percent Billable (#1743)
 		self.assertEqual(logs[1]["name"], running)
 		self.assertIsNone(logs[1]["segments"][0]["to_time"])
 

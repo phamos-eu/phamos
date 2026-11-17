@@ -5,6 +5,8 @@ import json
 import frappe
 from frappe import _
 
+from phamos.marketing import billing
+
 FILTER_FIELDS = ("event", "role", "status", "payment_status", "crm_status", "follow_up_status")
 
 
@@ -15,11 +17,16 @@ def execute(filters=None):
 		conditions["vip"] = 1
 	rows = frappe.get_list("Attendee", filters=conditions, fields=[
 		"name", "event", "full_name", "email", "phone", "company_name", "job_title", "role", "vip", "status",
-		"payment_status", "crm_status", "customer", "lead", "contact", "opportunity", "sales_order",
-		"sales_invoice", "follow_up_status", "follow_up_on", "follow_up_notes", "_assign",
+		"payment_status", "crm_status", "customer", "lead", "contact", "opportunity",
+		"follow_up_status", "follow_up_on", "follow_up_notes", "_assign",
 	], order_by="company_name asc, full_name asc", limit_page_length=0)
+	# The sales documents point to the tickets (phamos/phamos#1727): read them from their lines.
+	names = [row.name for row in rows]
+	orders, invoices = billing.ticket_lines(names), billing.payment_state(names)
 	for row in rows:
 		row["assigned_to"] = ", ".join(json.loads(row.pop("_assign") or "[]"))
+		row["sales_order"] = orders.get(row.name)
+		row["sales_invoice"] = invoices.get(row.name, (None, None))[0]
 	return columns(), rows
 
 

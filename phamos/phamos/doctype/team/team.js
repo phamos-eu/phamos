@@ -69,14 +69,3 @@ function calculate_leave_and_holiday(frm) {
 
 }
 
-
-function setup_daily_schedule_email_account_query(frm) {
-    const grid = frm.fields_dict.event_schedule && frm.fields_dict.event_schedule.grid;
-    if (!grid) return;
-
-    grid.get_field("email_account").get_query = function () {
-        return {
-            query: "phamos.phamos.doctype.team_daily_schedule.team_daily_schedule.email_account_with_dav_password_query",
-        };
-    };
-}

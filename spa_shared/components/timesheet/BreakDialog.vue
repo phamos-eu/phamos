@@ -17,10 +17,12 @@
 			</div>
 			<form v-else class="space-y-4" @submit.prevent="resume(true)" @keydown.enter.ctrl.prevent="resume(true)" @keydown.enter.meta.prevent="resume(true)">
 				<FormControl v-model="project" type="select" size="sm" :label="__('Project') + ' *'" :options="projectOptions" />
+				<FormControl v-model="activityType" type="select" size="sm" :label="__('Activity type')" :options="activityOptions" />
 				<div class="grid grid-cols-2 gap-3">
-					<FormControl v-model="activityType" type="select" size="sm" :label="__('Activity type')" :options="activityOptions" />
-					<FormControl v-model="billable" type="select" size="sm" :label="__('Billable')" :options="BILLABLE" />
+					<FormControl v-model="valueAdd" type="select" size="sm" :label="__('Value Add (%)')" :options="ratingOptions()" />
+					<FormControl v-model="billable" type="select" size="sm" :label="__('Percent Billable')" :options="ratingOptions()" />
 				</div>
+				<p class="text-xs text-ink-gray-5">{{ __(VALUE_ADD_HELP) }}</p>
 				<FormControl v-model="goal" type="text" size="sm" :label="__('Goal') + ' *'" />
 				<FormControl v-model="result" type="textarea" size="sm" :label="__('What happened?') + ' *'" />
 				<ErrorMessage :message="error" />
@@ -38,6 +40,7 @@ import { computed, ref, watch } from "vue"
 import { call } from "frappe-ui"
 import { __ } from "@spa/utils/i18n.js"
 import { formatMinutes } from "@spa/utils/timerClock.js"
+import { billablePreset, ratingOptions, VALUE_ADD_DEFAULT, VALUE_ADD_HELP } from "@spa/utils/timesheetRating.js"
 import spaConfig from "@/config"
 
 const props = defineProps({
@@ -48,13 +51,13 @@ const props = defineProps({
 const emit = defineEmits(["update:modelValue", "resumed"])
 
 const API = spaConfig.api
-const BILLABLE = ["0", "25", "50", "75", "100"].map((value) => ({ label: `${value} %`, value }))
 const logging = ref(false)
 const projects = ref([])
 const activityTypes = ref([])
 const project = ref("")
 const activityType = ref("")
-const billable = ref("0")
+const billable = ref("100")
+const valueAdd = ref(VALUE_ADD_DEFAULT)
 const goal = ref("")
 const result = ref("")
 const error = ref("")
@@ -79,8 +82,9 @@ async function open() {
 	error.value = ""
 	goal.value = props.session?.break_goal || ""
 	result.value = ""
-	billable.value = "0"
+	valueAdd.value = VALUE_ADD_DEFAULT
 	project.value = props.session?.project || ""
+	billable.value = billablePreset(props.session?.project_percent_billable)
 	try {
 		const options = await call(`${API}.get_timer_options`)
 		const seen = new Set()
@@ -109,6 +113,7 @@ async function resume(withBreak) {
 			break_result: result.value.trim(),
 			break_activity_type: activityType.value || null,
 			break_percent_billable: billable.value,
+			break_value_add: valueAdd.value,
 		})
 	}
 	saving.value = true
@@ -122,6 +127,17 @@ async function resume(withBreak) {
 		saving.value = false
 	}
 }
+
+// Percent Billable follows the picked project's preset (100 when it has none).
+watch(project, async (name, previous) => {
+	if (!name || !previous || name === previous) return
+	try {
+		const info = await call(`${API}.get_timer_project_info`, { project: name })
+		if (project.value === name) billable.value = billablePreset(info?.percent_billable)
+	} catch {
+		billable.value = billablePreset(null)
+	}
+})
 
 watch(
 	() => props.modelValue,

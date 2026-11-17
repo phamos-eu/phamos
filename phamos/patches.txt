@@ -64,3 +64,19 @@ phamos.patches.v1_0.set_event_attendance_mode
 phamos.patches.v1_0.merge_document_kind_into_receipt_type
 phamos.patches.v1_0.set_employment_contract_planning_rates
 phamos.patches.v1_0.set_employment_contract_leave_days
+phamos.patches.v1_0.report_paid_events_without_tax_template
+phamos.patches.v1_0.link_sales_documents_to_tickets
+phamos.patches.v1_0.repair_legacy_attendees
+phamos.patches.v1_0.remove_unneeded_ticketing_permissions
+phamos.patches.v1_0.remove_event_ticketing_user
+phamos.patches.v1_0.backfill_chapter_revision_status_and_levels
+phamos.patches.v1_0.copy_percent_billable_to_value_add
+phamos.patches.v1_0.set_timesheet_record_billable_hours
+phamos.patches.v1_0.set_delivery_note_monthly_implementation_summary
+phamos.patches.v1_0.set_personal_ideas_show_author_default
+phamos.patches.v1_0.backfill_lead_direction
+phamos.patches.v1_0.rename_phriend_type_idea_to_improvement
+phamos.patches.v1_0.move_cockpit_settings
+phamos.patches.v1_0.set_cockpit_window_defaults #2026-11-17 glow edges and breathing; General Management (#1946)
+phamos.patches.v1_0.link_gitlab_issues_to_issues
+phamos.patches.v1_0.move_company_events_to_department #1949

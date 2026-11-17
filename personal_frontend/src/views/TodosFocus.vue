@@ -1,7 +1,7 @@
 <template>
 	<div class="h-full min-h-0 overflow-y-auto bg-surface-gray-1 p-5">
 		<!-- Running session -->
-		<div v-if="session" class="mx-auto flex max-w-6xl flex-col gap-5">
+		<div v-if="session" class="flex flex-col gap-5">
 			<div class="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-outline-gray-2 bg-surface-white px-5 py-3">
 				<div class="flex items-baseline gap-3">
 					<span
@@ -118,7 +118,7 @@
 		</div>
 
 		<!-- No session -->
-		<div v-else class="mx-auto flex max-w-3xl flex-col gap-5">
+		<div v-else class="flex flex-col gap-5">
 			<section v-if="lastEnded" class="rounded-lg border border-outline-gray-2 bg-surface-white p-5">
 				<h2 class="text-lg font-semibold text-ink-gray-9">{{ endedTitle }}</h2>
 				<p class="mt-1 text-sm text-ink-gray-6">{{ endedText }}</p>

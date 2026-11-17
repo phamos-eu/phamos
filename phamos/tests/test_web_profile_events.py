@@ -25,6 +25,8 @@ CONTACT = json.dumps({"full_name": "Web Guest", "email": "web.guest@example.com"
 COMPANIONS = json.dumps([{"full_name": "Plus One", "email": ""}])
 BILLING = json.dumps({"full_name": "Web Guest", "email": "web.guest@example.com", "address_line1": "Weg 1",
 	"postcode": "72764", "city": "Reutlingen", "country": "Germany"})
+VOTER_A = "voter-aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa"
+VOTER_B = "voter-bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb"
 
 
 def reset_items():
@@ -57,6 +59,7 @@ class TestWebProfileEvents(FrappeTestCase):
 
 	def tearDown(self):
 		frappe.set_user("Administrator")
+		frappe.cache.delete_keys("event_interest:")  # the voters' answers live in Redis, not in the rollback
 		frappe.db.rollback(save_point="events_web_test")
 		reset_items()
 
@@ -162,10 +165,10 @@ class TestWebProfileEvents(FrappeTestCase):
 	def test_order_end_to_end_as_guest(self):
 		with patch("frappe.enqueue"):
 			result = self.order(expected_total="238.00")
-		self.assertEqual(result["reference_doctype"], "Sales Order")
-		self.assertEqual(frappe.db.get_value("Sales Order", result["reference"], "docstatus"), 1)
+		self.assertEqual(result["reference_doctype"], "Event Ticket Order")
+		self.assertEqual(frappe.db.get_value("Event Ticket Order", result["reference"], "status"), "Booked")
 		self.assertEqual(frappe.db.get_value("Attendee", {"email": "web.guest@example.com"}, "event"), self.event.name)
-		self.assertEqual(frappe.db.count("Attendee", {"event": self.event.name, "order_reference": result["reference"]}), 2)
+		self.assertEqual(frappe.db.count("Attendee", {"event": self.event.name, "event_ticket_order": result["reference"]}), 2)
 
 		# The optional questions afterwards, signed with the returned token.
 		frappe.set_user("Guest")
@@ -179,7 +182,7 @@ class TestWebProfileEvents(FrappeTestCase):
 				"1.forged", json.dumps({"newsletter": 1}))
 		finally:
 			frappe.set_user("Administrator")
-		buyer = frappe.get_all("Attendee", filters={"order_reference": result["reference"], "is_buyer": 1},
+		buyer = frappe.get_all("Attendee", filters={"event_ticket_order": result["reference"], "is_buyer": 1},
 			fields=["newsletter_consent", "share_with_attendees_consent", "public_listing_consent"])[0]
 		self.assertEqual((buyer.newsletter_consent, buyer.share_with_attendees_consent, buyer.public_listing_consent), (1, 1, 0))
 
@@ -221,9 +224,14 @@ class TestWebProfileEvents(FrappeTestCase):
 		self.assertFalse(frappe.db.exists("Email Group Member", {"email_group": GROUP, "email": "fan@example.com"}))
 		frappe.get_doc({"doctype": "Email Group Member", "email_group": GROUP, "email": "fan@example.com"}).insert(
 			ignore_permissions=True)
-		self.assertEqual(web.subscribe(self.event.route, "en", "fan@example.com", privacy_consent=1)["status"], "already")
+		# A member gets the same answer as a new address, and no mail (phamos/phamos#1702).
+		sendmail.reset_mock()
+		self.assertEqual(web.subscribe(self.event.route, "en", "fan@example.com", privacy_consent=1), result)
+		sendmail.assert_not_called()
 
-	def test_ics(self):
+	# A site in UTC gets "DTSTART:...Z" instead of a TZID (the CI site is in UTC).
+	@patch("phamos.marketing.web.get_system_timezone", return_value="Europe/Berlin")
+	def test_ics(self, _tz):
 		web.ics(self.event.route, "en")
 		self.assertEqual(frappe.response["type"], "download")
 		content = frappe.response["filecontent"].decode()
@@ -292,14 +300,31 @@ class TestWebProfileEvents(FrappeTestCase):
 	def test_interest_counts(self):
 		frappe.set_user("Guest")
 		try:
-			self.assertEqual(web.interest(self.event.route, "en", "yes")["counts"], {"yes": 1, "maybe": 0, "no": 0})
-			self.assertEqual(web.interest(self.event.route, "en", "maybe", previous="yes")["counts"], {"yes": 0, "maybe": 1, "no": 0})
-			self.assertRaises(frappe.ValidationError, web.interest, self.event.route, "en", "perhaps")
+			self.assertEqual(web.interest(self.event.route, "en", "yes", voter=VOTER_A)["counts"], {"yes": 1, "maybe": 0, "no": 0})
+			self.assertEqual(web.interest(self.event.route, "en", "maybe", voter=VOTER_A)["counts"], {"yes": 0, "maybe": 1, "no": 0})
+			self.assertRaises(frappe.ValidationError, web.interest, self.event.route, "en", "perhaps", voter=VOTER_A)
 		finally:
 			frappe.set_user("Administrator")
 		reset_items()
 		self.assertEqual(self.item().data["interest"], {"yes": 0, "maybe": 1, "no": 0})
 		self.assertEqual(build_profile(self.item(), "en")["interest"]["maybe"], 1)
+
+	def test_interest_takes_back_only_the_stored_answer(self):
+		# phamos/phamos#1703: a "previous" from the browser never lowers a count.
+		frappe.set_user("Guest")
+		try:
+			web.interest(self.event.route, "en", "yes", voter=VOTER_A)
+			counts = web.interest(self.event.route, "en", "no", voter=VOTER_B, previous="yes")["counts"]
+			self.assertEqual(counts, {"yes": 1, "maybe": 0, "no": 1})
+			self.assertEqual(web.interest(self.event.route, "en", "no", voter=VOTER_A)["counts"], {"yes": 0, "maybe": 0, "no": 2})
+			self.assertEqual(web.interest(self.event.route, "en", "no", voter=VOTER_A)["counts"], {"yes": 0, "maybe": 0, "no": 2})
+			for bad in (None, "short", "x" * 65, "a b" * 16):
+				self.assertRaises(frappe.ValidationError, web.interest, self.event.route, "en", "yes", voter=bad)
+		finally:
+			frappe.set_user("Administrator")
+		key = web._interest_key(self.event.name, VOTER_A)
+		self.assertNotIn(VOTER_A, frappe.safe_decode(key))  # a hash of the id, never the id
+		self.assertGreater(frappe.cache.ttl(key), 0)
 
 	def test_bookings_shown_publicly(self):
 		from phamos.tests.marketing_fixtures import make_attendee
@@ -428,3 +453,21 @@ class TestWebProfileEvents(FrappeTestCase):
 		finally:
 			frappe.local.request = None
 
+
+	def test_active_filter_chips_and_clear_all(self):
+		from phamos.web_profile.listing import build_listing
+
+		try:
+			set_request(method="GET", path="/en/events?when=past&q=x&sort=name")
+			listing = build_listing("events", "en")
+			chips = {chip["label"]: chip["url"] for chip in listing["active_filters"]}
+			# A toggle away from its default is a filter too; its chip goes back to the default.
+			self.assertEqual(chips["When: Past"], "/en/events?q=x&sort=name")
+			self.assertEqual(chips["“x”"], "/en/events?when=past&sort=name")
+			# "Clear all" drops filters, search and toggles but keeps the sort.
+			self.assertEqual(listing["clear_url"], "/en/events?sort=name")
+
+			set_request(method="GET", path="/en/events")
+			self.assertEqual(build_listing("events", "en")["active_filters"], [])
+		finally:
+			frappe.local.request = None

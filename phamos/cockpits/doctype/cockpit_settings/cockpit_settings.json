@@ -1,0 +1,793 @@
+{
+ "actions": [],
+ "creation": "2026-11-17 12:00:00.000000",
+ "doctype": "DocType",
+ "engine": "InnoDB",
+ "field_order": [
+  "human_resources_spa_tab",
+  "human_resources_open_cockpit",
+  "human_resources_window_section",
+  "human_resources_color",
+  "column_break_human_resources_window",
+  "human_resources_glow",
+  "human_resources_glow_top",
+  "human_resources_glow_left",
+  "human_resources_glow_bottom",
+  "human_resources_glow_right",
+  "human_resources_glow_breathing",
+  "human_resources_spa_section",
+  "human_resources_department",
+  "column_break_human_resources_spa",
+  "human_resources_timesheet_project",
+  "human_resources_sick_leave_types",
+  "human_resources_privacy_reveal_seconds",
+  "personal_cockpit_tab",
+  "personal_open_cockpit",
+  "personal_window_section",
+  "personal_color",
+  "column_break_personal_window",
+  "personal_glow",
+  "personal_glow_top",
+  "personal_glow_left",
+  "personal_glow_bottom",
+  "personal_glow_right",
+  "personal_glow_breathing",
+  "personal_cockpit_section",
+  "personal_ideas_show_author",
+  "project_management_spa_tab",
+  "project_management_open_cockpit",
+  "project_management_window_section",
+  "project_management_color",
+  "column_break_project_management_window",
+  "project_management_glow",
+  "project_management_glow_top",
+  "project_management_glow_left",
+  "project_management_glow_bottom",
+  "project_management_glow_right",
+  "project_management_glow_breathing",
+  "project_management_spa_section",
+  "project_management_department",
+  "column_break_project_management_spa",
+  "project_management_timesheet_project",
+  "sales_spa_tab",
+  "sales_open_cockpit",
+  "sales_window_section",
+  "sales_color",
+  "column_break_sales_window",
+  "sales_glow",
+  "sales_glow_top",
+  "sales_glow_left",
+  "sales_glow_bottom",
+  "sales_glow_right",
+  "sales_glow_breathing",
+  "sales_spa_section",
+  "sales_department",
+  "column_break_sales_spa",
+  "sales_standard_project",
+  "accounting_spa_tab",
+  "accounting_open_cockpit",
+  "accounting_window_section",
+  "accounting_color",
+  "column_break_accounting_window",
+  "accounting_glow",
+  "accounting_glow_top",
+  "accounting_glow_left",
+  "accounting_glow_bottom",
+  "accounting_glow_right",
+  "accounting_glow_breathing",
+  "accounting_spa_section",
+  "accounting_department",
+  "column_break_accounting_spa",
+  "accounting_standard_project",
+  "software_development_spa_tab",
+  "software_development_open_cockpit",
+  "software_development_window_section",
+  "software_development_color",
+  "column_break_software_development_window",
+  "software_development_glow",
+  "software_development_glow_top",
+  "software_development_glow_left",
+  "software_development_glow_bottom",
+  "software_development_glow_right",
+  "software_development_glow_breathing",
+  "software_development_spa_section",
+  "software_development_department",
+  "column_break_software_development_spa",
+  "software_development_timesheet_project",
+  "general_management_spa_tab",
+  "general_management_open_cockpit",
+  "general_management_window_section",
+  "general_management_color",
+  "column_break_general_management_window",
+  "general_management_glow",
+  "general_management_glow_top",
+  "general_management_glow_left",
+  "general_management_glow_bottom",
+  "general_management_glow_right",
+  "general_management_glow_breathing",
+  "general_management_spa_section",
+  "general_management_department",
+  "column_break_general_management_spa",
+  "general_management_timesheet_project"
+ ],
+ "fields": [
+  {
+   "fieldname": "human_resources_spa_tab",
+   "fieldtype": "Tab Break",
+   "label": "Human Resources Cockpit"
+  },
+  {
+   "fieldname": "human_resources_open_cockpit",
+   "fieldtype": "Button",
+   "label": "Open Cockpit"
+  },
+  {
+   "fieldname": "human_resources_window_section",
+   "fieldtype": "Section Break",
+   "label": "Window"
+  },
+  {
+   "default": "#be123c",
+   "description": "Colour of the cockpit's window title bar and edge glow, so the cockpit can be told apart when switching windows. Empty: neutral title bar, no glow.",
+   "fieldname": "human_resources_color",
+   "fieldtype": "Color",
+   "label": "Colour"
+  },
+  {
+   "fieldname": "column_break_human_resources_window",
+   "fieldtype": "Column Break"
+  },
+  {
+   "default": "Off",
+   "description": "A soft glow in the cockpit colour along the window edges. On focus: lights up when switching to the window, then fades.",
+   "fieldname": "human_resources_glow",
+   "fieldtype": "Select",
+   "label": "Edge Glow",
+   "options": "Off\nAlways\nOn focus\nAlways + on focus"
+  },
+  {
+   "default": "0",
+   "depends_on": "eval:doc.human_resources_glow && doc.human_resources_glow != 'Off'",
+   "fieldname": "human_resources_glow_top",
+   "fieldtype": "Check",
+   "label": "Glow from Top"
+  },
+  {
+   "default": "0",
+   "depends_on": "eval:doc.human_resources_glow && doc.human_resources_glow != 'Off'",
+   "fieldname": "human_resources_glow_left",
+   "fieldtype": "Check",
+   "label": "Glow from Left"
+  },
+  {
+   "default": "1",
+   "depends_on": "eval:doc.human_resources_glow && doc.human_resources_glow != 'Off'",
+   "fieldname": "human_resources_glow_bottom",
+   "fieldtype": "Check",
+   "label": "Glow from Bottom"
+  },
+  {
+   "default": "1",
+   "depends_on": "eval:doc.human_resources_glow && doc.human_resources_glow != 'Off'",
+   "fieldname": "human_resources_glow_right",
+   "fieldtype": "Check",
+   "label": "Glow from Right"
+  },
+  {
+   "default": "1",
+   "depends_on": "eval:doc.human_resources_glow && doc.human_resources_glow != 'Off'",
+   "description": "The glow fades in and out ever so slightly, in Phriend's breathing rhythm.",
+   "fieldname": "human_resources_glow_breathing",
+   "fieldtype": "Check",
+   "label": "Breathe like Phriend"
+  },
+  {
+   "fieldname": "human_resources_spa_section",
+   "fieldtype": "Section Break",
+   "label": "Human Resources Cockpit Settings"
+  },
+  {
+   "description": "Department used to scope Issues (via linked projects) and Tasks in the Human Resources Cockpit.",
+   "fieldname": "human_resources_department",
+   "fieldtype": "Link",
+   "label": "Human Resources Department",
+   "options": "Department"
+  },
+  {
+   "fieldname": "column_break_human_resources_spa",
+   "fieldtype": "Column Break"
+  },
+  {
+   "description": "Default project for the start/stop timesheet timer in the Human Resources Cockpit.",
+   "fieldname": "human_resources_timesheet_project",
+   "fieldtype": "Link",
+   "label": "Human Resources Timesheet Project",
+   "options": "Project"
+  },
+  {
+   "description": "Approved leave of these types counts as sick days. Only HR Manager sees other people's sick days.",
+   "fieldname": "human_resources_sick_leave_types",
+   "fieldtype": "Table MultiSelect",
+   "label": "Sick Leave Types",
+   "options": "Sick Leave Type Item"
+  },
+  {
+   "default": "120",
+   "description": "Privacy mode for screen sharing: figures in the HR Cockpit stay hidden until \"Show data\" is clicked, then show for this many seconds. At least 10.",
+   "fieldname": "human_resources_privacy_reveal_seconds",
+   "fieldtype": "Int",
+   "label": "Privacy Mode: Seconds Data Stays Visible",
+   "non_negative": 1
+  },
+  {
+   "fieldname": "personal_cockpit_tab",
+   "fieldtype": "Tab Break",
+   "label": "Personal Cockpit"
+  },
+  {
+   "fieldname": "personal_open_cockpit",
+   "fieldtype": "Button",
+   "label": "Open Cockpit"
+  },
+  {
+   "fieldname": "personal_window_section",
+   "fieldtype": "Section Break",
+   "label": "Window"
+  },
+  {
+   "default": "#0e7490",
+   "description": "Colour of the cockpit's window title bar and edge glow, so the cockpit can be told apart when switching windows. Empty: neutral title bar, no glow.",
+   "fieldname": "personal_color",
+   "fieldtype": "Color",
+   "label": "Colour"
+  },
+  {
+   "fieldname": "column_break_personal_window",
+   "fieldtype": "Column Break"
+  },
+  {
+   "default": "Off",
+   "description": "A soft glow in the cockpit colour along the window edges. On focus: lights up when switching to the window, then fades.",
+   "fieldname": "personal_glow",
+   "fieldtype": "Select",
+   "label": "Edge Glow",
+   "options": "Off\nAlways\nOn focus\nAlways + on focus"
+  },
+  {
+   "default": "0",
+   "depends_on": "eval:doc.personal_glow && doc.personal_glow != 'Off'",
+   "fieldname": "personal_glow_top",
+   "fieldtype": "Check",
+   "label": "Glow from Top"
+  },
+  {
+   "default": "0",
+   "depends_on": "eval:doc.personal_glow && doc.personal_glow != 'Off'",
+   "fieldname": "personal_glow_left",
+   "fieldtype": "Check",
+   "label": "Glow from Left"
+  },
+  {
+   "default": "1",
+   "depends_on": "eval:doc.personal_glow && doc.personal_glow != 'Off'",
+   "fieldname": "personal_glow_bottom",
+   "fieldtype": "Check",
+   "label": "Glow from Bottom"
+  },
+  {
+   "default": "1",
+   "depends_on": "eval:doc.personal_glow && doc.personal_glow != 'Off'",
+   "fieldname": "personal_glow_right",
+   "fieldtype": "Check",
+   "label": "Glow from Right"
+  },
+  {
+   "default": "1",
+   "depends_on": "eval:doc.personal_glow && doc.personal_glow != 'Off'",
+   "description": "The glow fades in and out ever so slightly, in Phriend's breathing rhythm.",
+   "fieldname": "personal_glow_breathing",
+   "fieldtype": "Check",
+   "label": "Breathe like Phriend"
+  },
+  {
+   "fieldname": "personal_cockpit_section",
+   "fieldtype": "Section Break",
+   "label": "Personal Cockpit Settings"
+  },
+  {
+   "default": "1",
+   "description": "Voters see who handed an idea in. Off: ideas up for vote appear without their author, and the author does not join the idea's chat by themselves.",
+   "fieldname": "personal_ideas_show_author",
+   "fieldtype": "Check",
+   "label": "Show Author of Ideas Handed in for Vote"
+  },
+  {
+   "fieldname": "project_management_spa_tab",
+   "fieldtype": "Tab Break",
+   "label": "Project Management Cockpit"
+  },
+  {
+   "fieldname": "project_management_open_cockpit",
+   "fieldtype": "Button",
+   "label": "Open Cockpit"
+  },
+  {
+   "fieldname": "project_management_window_section",
+   "fieldtype": "Section Break",
+   "label": "Window"
+  },
+  {
+   "default": "#6d28d9",
+   "description": "Colour of the cockpit's window title bar and edge glow, so the cockpit can be told apart when switching windows. Empty: neutral title bar, no glow.",
+   "fieldname": "project_management_color",
+   "fieldtype": "Color",
+   "label": "Colour"
+  },
+  {
+   "fieldname": "column_break_project_management_window",
+   "fieldtype": "Column Break"
+  },
+  {
+   "default": "Off",
+   "description": "A soft glow in the cockpit colour along the window edges. On focus: lights up when switching to the window, then fades.",
+   "fieldname": "project_management_glow",
+   "fieldtype": "Select",
+   "label": "Edge Glow",
+   "options": "Off\nAlways\nOn focus\nAlways + on focus"
+  },
+  {
+   "default": "0",
+   "depends_on": "eval:doc.project_management_glow && doc.project_management_glow != 'Off'",
+   "fieldname": "project_management_glow_top",
+   "fieldtype": "Check",
+   "label": "Glow from Top"
+  },
+  {
+   "default": "0",
+   "depends_on": "eval:doc.project_management_glow && doc.project_management_glow != 'Off'",
+   "fieldname": "project_management_glow_left",
+   "fieldtype": "Check",
+   "label": "Glow from Left"
+  },
+  {
+   "default": "1",
+   "depends_on": "eval:doc.project_management_glow && doc.project_management_glow != 'Off'",
+   "fieldname": "project_management_glow_bottom",
+   "fieldtype": "Check",
+   "label": "Glow from Bottom"
+  },
+  {
+   "default": "1",
+   "depends_on": "eval:doc.project_management_glow && doc.project_management_glow != 'Off'",
+   "fieldname": "project_management_glow_right",
+   "fieldtype": "Check",
+   "label": "Glow from Right"
+  },
+  {
+   "default": "1",
+   "depends_on": "eval:doc.project_management_glow && doc.project_management_glow != 'Off'",
+   "description": "The glow fades in and out ever so slightly, in Phriend's breathing rhythm.",
+   "fieldname": "project_management_glow_breathing",
+   "fieldtype": "Check",
+   "label": "Breathe like Phriend"
+  },
+  {
+   "fieldname": "project_management_spa_section",
+   "fieldtype": "Section Break",
+   "label": "Project Management Cockpit Settings"
+  },
+  {
+   "description": "Department used to scope Issues (via linked projects) and Tasks in the /project-management-cockpit SPA.",
+   "fieldname": "project_management_department",
+   "fieldtype": "Link",
+   "label": "Project Management Department",
+   "options": "Department"
+  },
+  {
+   "fieldname": "column_break_project_management_spa",
+   "fieldtype": "Column Break"
+  },
+  {
+   "description": "Default project for the start/stop timesheet timer in the Project Management Cockpit.",
+   "fieldname": "project_management_timesheet_project",
+   "fieldtype": "Link",
+   "label": "Project Management Timesheet Project",
+   "options": "Project"
+  },
+  {
+   "fieldname": "sales_spa_tab",
+   "fieldtype": "Tab Break",
+   "label": "Sales SPA"
+  },
+  {
+   "fieldname": "sales_open_cockpit",
+   "fieldtype": "Button",
+   "label": "Open Cockpit"
+  },
+  {
+   "fieldname": "sales_window_section",
+   "fieldtype": "Section Break",
+   "label": "Window"
+  },
+  {
+   "default": "#c2410c",
+   "description": "Colour of the cockpit's window title bar and edge glow, so the cockpit can be told apart when switching windows. Empty: neutral title bar, no glow.",
+   "fieldname": "sales_color",
+   "fieldtype": "Color",
+   "label": "Colour"
+  },
+  {
+   "fieldname": "column_break_sales_window",
+   "fieldtype": "Column Break"
+  },
+  {
+   "default": "Off",
+   "description": "A soft glow in the cockpit colour along the window edges. On focus: lights up when switching to the window, then fades.",
+   "fieldname": "sales_glow",
+   "fieldtype": "Select",
+   "label": "Edge Glow",
+   "options": "Off\nAlways\nOn focus\nAlways + on focus"
+  },
+  {
+   "default": "0",
+   "depends_on": "eval:doc.sales_glow && doc.sales_glow != 'Off'",
+   "fieldname": "sales_glow_top",
+   "fieldtype": "Check",
+   "label": "Glow from Top"
+  },
+  {
+   "default": "0",
+   "depends_on": "eval:doc.sales_glow && doc.sales_glow != 'Off'",
+   "fieldname": "sales_glow_left",
+   "fieldtype": "Check",
+   "label": "Glow from Left"
+  },
+  {
+   "default": "1",
+   "depends_on": "eval:doc.sales_glow && doc.sales_glow != 'Off'",
+   "fieldname": "sales_glow_bottom",
+   "fieldtype": "Check",
+   "label": "Glow from Bottom"
+  },
+  {
+   "default": "1",
+   "depends_on": "eval:doc.sales_glow && doc.sales_glow != 'Off'",
+   "fieldname": "sales_glow_right",
+   "fieldtype": "Check",
+   "label": "Glow from Right"
+  },
+  {
+   "default": "1",
+   "depends_on": "eval:doc.sales_glow && doc.sales_glow != 'Off'",
+   "description": "The glow fades in and out ever so slightly, in Phriend's breathing rhythm.",
+   "fieldname": "sales_glow_breathing",
+   "fieldtype": "Check",
+   "label": "Breathe like Phriend"
+  },
+  {
+   "fieldname": "sales_spa_section",
+   "fieldtype": "Section Break",
+   "label": "Sales SPA Settings"
+  },
+  {
+   "description": "Department used to scope Issues (via linked projects) and Tasks in the /sales-cockpit SPA.",
+   "fieldname": "sales_department",
+   "fieldtype": "Link",
+   "label": "Sales Department",
+   "options": "Department"
+  },
+  {
+   "fieldname": "column_break_sales_spa",
+   "fieldtype": "Column Break"
+  },
+  {
+   "description": "Default project for the start/stop timesheet timer and new Issues/Tasks in the Sales SPA.",
+   "fieldname": "sales_standard_project",
+   "fieldtype": "Link",
+   "label": "Sales Standard Project",
+   "options": "Project"
+  },
+  {
+   "fieldname": "accounting_spa_tab",
+   "fieldtype": "Tab Break",
+   "label": "Accounting SPA"
+  },
+  {
+   "fieldname": "accounting_open_cockpit",
+   "fieldtype": "Button",
+   "label": "Open Cockpit"
+  },
+  {
+   "fieldname": "accounting_window_section",
+   "fieldtype": "Section Break",
+   "label": "Window"
+  },
+  {
+   "default": "#047857",
+   "description": "Colour of the cockpit's window title bar and edge glow, so the cockpit can be told apart when switching windows. Empty: neutral title bar, no glow.",
+   "fieldname": "accounting_color",
+   "fieldtype": "Color",
+   "label": "Colour"
+  },
+  {
+   "fieldname": "column_break_accounting_window",
+   "fieldtype": "Column Break"
+  },
+  {
+   "default": "Off",
+   "description": "A soft glow in the cockpit colour along the window edges. On focus: lights up when switching to the window, then fades.",
+   "fieldname": "accounting_glow",
+   "fieldtype": "Select",
+   "label": "Edge Glow",
+   "options": "Off\nAlways\nOn focus\nAlways + on focus"
+  },
+  {
+   "default": "0",
+   "depends_on": "eval:doc.accounting_glow && doc.accounting_glow != 'Off'",
+   "fieldname": "accounting_glow_top",
+   "fieldtype": "Check",
+   "label": "Glow from Top"
+  },
+  {
+   "default": "0",
+   "depends_on": "eval:doc.accounting_glow && doc.accounting_glow != 'Off'",
+   "fieldname": "accounting_glow_left",
+   "fieldtype": "Check",
+   "label": "Glow from Left"
+  },
+  {
+   "default": "1",
+   "depends_on": "eval:doc.accounting_glow && doc.accounting_glow != 'Off'",
+   "fieldname": "accounting_glow_bottom",
+   "fieldtype": "Check",
+   "label": "Glow from Bottom"
+  },
+  {
+   "default": "1",
+   "depends_on": "eval:doc.accounting_glow && doc.accounting_glow != 'Off'",
+   "fieldname": "accounting_glow_right",
+   "fieldtype": "Check",
+   "label": "Glow from Right"
+  },
+  {
+   "default": "1",
+   "depends_on": "eval:doc.accounting_glow && doc.accounting_glow != 'Off'",
+   "description": "The glow fades in and out ever so slightly, in Phriend's breathing rhythm.",
+   "fieldname": "accounting_glow_breathing",
+   "fieldtype": "Check",
+   "label": "Breathe like Phriend"
+  },
+  {
+   "fieldname": "accounting_spa_section",
+   "fieldtype": "Section Break",
+   "label": "Accounting SPA Settings"
+  },
+  {
+   "description": "Department used to scope Issues (via linked projects) and Tasks in the /accounting-cockpit SPA.",
+   "fieldname": "accounting_department",
+   "fieldtype": "Link",
+   "label": "Accounting Department",
+   "options": "Department"
+  },
+  {
+   "fieldname": "column_break_accounting_spa",
+   "fieldtype": "Column Break"
+  },
+  {
+   "description": "Default project for the start/stop timesheet timer and new Issues/Tasks in the Accounting SPA (Accounting Cost Center Project).",
+   "fieldname": "accounting_standard_project",
+   "fieldtype": "Link",
+   "label": "Accounting Standard Project",
+   "options": "Project"
+  },
+  {
+   "fieldname": "software_development_spa_tab",
+   "fieldtype": "Tab Break",
+   "label": "Software Development Cockpit"
+  },
+  {
+   "fieldname": "software_development_open_cockpit",
+   "fieldtype": "Button",
+   "label": "Open Cockpit"
+  },
+  {
+   "fieldname": "software_development_window_section",
+   "fieldtype": "Section Break",
+   "label": "Window"
+  },
+  {
+   "default": "#334155",
+   "description": "Colour of the cockpit's window title bar and edge glow, so the cockpit can be told apart when switching windows. Empty: neutral title bar, no glow.",
+   "fieldname": "software_development_color",
+   "fieldtype": "Color",
+   "label": "Colour"
+  },
+  {
+   "fieldname": "column_break_software_development_window",
+   "fieldtype": "Column Break"
+  },
+  {
+   "default": "Off",
+   "description": "A soft glow in the cockpit colour along the window edges. On focus: lights up when switching to the window, then fades.",
+   "fieldname": "software_development_glow",
+   "fieldtype": "Select",
+   "label": "Edge Glow",
+   "options": "Off\nAlways\nOn focus\nAlways + on focus"
+  },
+  {
+   "default": "0",
+   "depends_on": "eval:doc.software_development_glow && doc.software_development_glow != 'Off'",
+   "fieldname": "software_development_glow_top",
+   "fieldtype": "Check",
+   "label": "Glow from Top"
+  },
+  {
+   "default": "0",
+   "depends_on": "eval:doc.software_development_glow && doc.software_development_glow != 'Off'",
+   "fieldname": "software_development_glow_left",
+   "fieldtype": "Check",
+   "label": "Glow from Left"
+  },
+  {
+   "default": "1",
+   "depends_on": "eval:doc.software_development_glow && doc.software_development_glow != 'Off'",
+   "fieldname": "software_development_glow_bottom",
+   "fieldtype": "Check",
+   "label": "Glow from Bottom"
+  },
+  {
+   "default": "1",
+   "depends_on": "eval:doc.software_development_glow && doc.software_development_glow != 'Off'",
+   "fieldname": "software_development_glow_right",
+   "fieldtype": "Check",
+   "label": "Glow from Right"
+  },
+  {
+   "default": "1",
+   "depends_on": "eval:doc.software_development_glow && doc.software_development_glow != 'Off'",
+   "description": "The glow fades in and out ever so slightly, in Phriend's breathing rhythm.",
+   "fieldname": "software_development_glow_breathing",
+   "fieldtype": "Check",
+   "label": "Breathe like Phriend"
+  },
+  {
+   "fieldname": "software_development_spa_section",
+   "fieldtype": "Section Break",
+   "label": "Software Development Cockpit Settings"
+  },
+  {
+   "description": "Department used to scope Issues (via linked projects) and Tasks in the Software Development Cockpit.",
+   "fieldname": "software_development_department",
+   "fieldtype": "Link",
+   "label": "Software Development Department",
+   "options": "Department"
+  },
+  {
+   "fieldname": "column_break_software_development_spa",
+   "fieldtype": "Column Break"
+  },
+  {
+   "description": "Default project for the start/stop timesheet timer in the Software Development Cockpit.",
+   "fieldname": "software_development_timesheet_project",
+   "fieldtype": "Link",
+   "label": "Software Development Timesheet Project",
+   "options": "Project"
+  },
+  {
+   "fieldname": "general_management_spa_tab",
+   "fieldtype": "Tab Break",
+   "label": "General Management Cockpit"
+  },
+  {
+   "fieldname": "general_management_open_cockpit",
+   "fieldtype": "Button",
+   "label": "Open Cockpit"
+  },
+  {
+   "fieldname": "general_management_window_section",
+   "fieldtype": "Section Break",
+   "label": "Window"
+  },
+  {
+   "default": "#a16207",
+   "description": "Colour of the cockpit's window title bar and edge glow, so the cockpit can be told apart when switching windows. Empty: neutral title bar, no glow.",
+   "fieldname": "general_management_color",
+   "fieldtype": "Color",
+   "label": "Colour"
+  },
+  {
+   "fieldname": "column_break_general_management_window",
+   "fieldtype": "Column Break"
+  },
+  {
+   "default": "Off",
+   "description": "A soft glow in the cockpit colour along the window edges. On focus: lights up when switching to the window, then fades.",
+   "fieldname": "general_management_glow",
+   "fieldtype": "Select",
+   "label": "Edge Glow",
+   "options": "Off\nAlways\nOn focus\nAlways + on focus"
+  },
+  {
+   "default": "0",
+   "depends_on": "eval:doc.general_management_glow && doc.general_management_glow != 'Off'",
+   "fieldname": "general_management_glow_top",
+   "fieldtype": "Check",
+   "label": "Glow from Top"
+  },
+  {
+   "default": "0",
+   "depends_on": "eval:doc.general_management_glow && doc.general_management_glow != 'Off'",
+   "fieldname": "general_management_glow_left",
+   "fieldtype": "Check",
+   "label": "Glow from Left"
+  },
+  {
+   "default": "1",
+   "depends_on": "eval:doc.general_management_glow && doc.general_management_glow != 'Off'",
+   "fieldname": "general_management_glow_bottom",
+   "fieldtype": "Check",
+   "label": "Glow from Bottom"
+  },
+  {
+   "default": "1",
+   "depends_on": "eval:doc.general_management_glow && doc.general_management_glow != 'Off'",
+   "fieldname": "general_management_glow_right",
+   "fieldtype": "Check",
+   "label": "Glow from Right"
+  },
+  {
+   "default": "1",
+   "depends_on": "eval:doc.general_management_glow && doc.general_management_glow != 'Off'",
+   "description": "The glow fades in and out ever so slightly, in Phriend's breathing rhythm.",
+   "fieldname": "general_management_glow_breathing",
+   "fieldtype": "Check",
+   "label": "Breathe like Phriend"
+  },
+  {
+   "fieldname": "general_management_spa_section",
+   "fieldtype": "Section Break",
+   "label": "General Management Cockpit Settings"
+  },
+  {
+   "description": "Department used to scope Issues (via linked projects) and Tasks in the General Management Cockpit.",
+   "fieldname": "general_management_department",
+   "fieldtype": "Link",
+   "label": "General Management Department",
+   "options": "Department"
+  },
+  {
+   "fieldname": "column_break_general_management_spa",
+   "fieldtype": "Column Break"
+  },
+  {
+   "description": "Default project for the start/stop timesheet timer in the General Management Cockpit.",
+   "fieldname": "general_management_timesheet_project",
+   "fieldtype": "Link",
+   "label": "General Management Timesheet Project",
+   "options": "Project"
+  }
+ ],
+ "issingle": 1,
+ "links": [],
+ "modified": "2026-11-17 20:00:00.000000",
+ "modified_by": "Administrator",
+ "module": "Cockpits",
+ "name": "Cockpit Settings",
+ "owner": "Administrator",
+ "permissions": [
+  {
+   "create": 1,
+   "delete": 1,
+   "email": 1,
+   "print": 1,
+   "read": 1,
+   "role": "System Manager",
+   "share": 1,
+   "write": 1
+  }
+ ],
+ "row_format": "Dynamic",
+ "sort_field": "modified",
+ "sort_order": "DESC",
+ "states": []
+}

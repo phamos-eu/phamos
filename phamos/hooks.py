@@ -3,9 +3,9 @@ from . import __version__ as app_version
 app_name = "phamos"
 app_title = "phamos GmbH"
 app_publisher = "phamos.eu"
-app_description = "ERPNext Enhancement for phamos.eu"
+app_description = "Frappe/ERPNext custom app powering phamos.eu: cockpits, integrations and business processes for phamos GmbH."
 app_email = "support@phamos.eu"
-app_license = "MIT"
+app_license = "AGPL-3.0"
 
 required_apps = ["erpnext", "hrms"]
 
@@ -53,6 +53,13 @@ add_to_apps_screen = [
 		"has_permission": "phamos.api.software_development_spa.check_app_permission",
 	},
 	{
+		"name": "general_management_spa",
+		"logo": "/assets/phamos/manifest/general-management-icon-192.png",
+		"title": "General Management",
+		"route": "/general-management-cockpit",
+		"has_permission": "phamos.api.general_management_spa.check_app_permission",
+	},
+	{
 		"name": "scan",
 		"logo": "/assets/phamos/manifest/scan-icon-192.png",
 		"title": "Lead Scan",
@@ -76,6 +83,7 @@ app_include_css = [
     "/assets/phamos/css/sales_order_kpi.css",
     "/assets/phamos/css/dark_mode_fix.css",
     "checklist_dialog.bundle.css",  # hashed, so a new version is not served from browser cache
+    "item_grid_description.bundle.css",  # tall, editable description in item tables (#1858)
 ]
 # app_include_js = "/assets/phamos/js/phamos.js"
 
@@ -88,6 +96,7 @@ app_include_js = [
     "/assets/phamos/js/frappe_list_bulk_edit_override.js",  # Fixes null-label crash in bulk edit
     "checklist_dialog.bundle.js",  # Linked Checklists dialog (hashed bundle, see above)
     "web_profile_form.bundle.js",  # Web Profile forms: missing-translation hint, preview link
+    "phriend.bundle.js",  # Phriend: screenshot + comment -> Issue (#1850)
 ]
 
 
@@ -113,8 +122,12 @@ page_js = {
 
 # include js in doctype views
 doctype_js = {
+	"Leave Application": "public/js/leave_application.js",  # calendar status (milestone 68)
 	"Project" : "public/js/project.js",
-	"Issue" : "public/js/issue.js",
+	"Issue" : [
+		"public/js/issue.js",
+		"public/js/phriend_issue.js",  # Phriend reports: screenshot, Create GitLab Issue (#1850)
+	],
 	"Sales Order": "public/js/sales_order.js",
 	"Lead": "public/js/lead.js",
 	"Job Applicant": "public/js/job_applicant.js",
@@ -125,6 +138,7 @@ doctype_js = {
     "Appointment": "public/js/appointment.js",
     "Sales Invoice": "public/js/sales_invoice.js",
     "Customer": "public/js/customer.js",
+    "Department": "public/js/department.js",  # Event Schedule mailbox filter (#1949)
     "Delivery Note": "public/js/delivery_note.js",
 
 }
@@ -156,6 +170,8 @@ website_route_rules = [
     {"from_route": "/accounting-cockpit/<path:app_path>", "to_route": "accounting_spa"},
     {"from_route": "/software-development-cockpit", "to_route": "software_development_spa"},
     {"from_route": "/software-development-cockpit/<path:app_path>", "to_route": "software_development_spa"},
+    {"from_route": "/general-management-cockpit", "to_route": "general_management_spa"},
+    {"from_route": "/general-management-cockpit/<path:app_path>", "to_route": "general_management_spa"},
     {"from_route": "/implementation-cockpit", "to_route": "implementation_cockpit"},
     {"from_route": "/implementation-cockpit/<path:app_path>", "to_route": "implementation_cockpit"},
     {"from_route": "/scan", "to_route": "scan"},
@@ -220,6 +236,9 @@ get_website_user_home_page = "phamos.website.get_website_user_home_page"
 
 on_login = ["phamos.website.on_login"]
 
+# Phriend: whether the ball shows up for this user (#1850)
+boot_session = "phamos.phriend.boot.boot_session"
+
 update_website_context = [
     "phamos.website.update_website_context",
     "phamos.web_profile.chrome.update_website_context",  # language-aware navbar/footer, DIN 5008 footer
@@ -243,14 +262,23 @@ update_website_context = [
 # Installation
 # ------------
 
-after_install = "phamos.setup.ops_inbox.ensure_ops_inbox_setup"
+before_install = "phamos.install.before_install"
+after_install = [
+	"phamos.setup.ops_inbox.ensure_ops_inbox_setup",
+	"phamos.cockpits.setup.after_install",  # Cockpit Settings defaults: colours, glow (#1933)
+]
 
 after_migrate = [
+	"phamos.phriend.setup.after_migrate",  # Phriend fields on Issue, default settings (#1850)
 	"phamos.setup.ops_inbox.ensure_ops_inbox_setup",
 	"phamos.web_profile.setup.after_migrate",  # Web Page "Language" / "Translation Of" fields
-	"phamos.cockpits.setup.after_migrate",  # ToDo fields of the Personal Cockpit (#1553)
+	"phamos.cockpits.setup.after_migrate",  # ToDo fields (#1553), Task Owner on Task (#1751)
 	"phamos.setup.accounting_receipt.ensure_accounting_receipt_setup",  # AI Accountant role, user, bot
 	"phamos.marketing.setup.after_migrate",  # Lead Source "Event" for event registrations
+	"phamos.api.issue_chat.add_raven_indexes",  # record chats look channels up by record (#1794)
+	"phamos.setup.event_schedule.ensure_event_schedule_fields",  # Event Schedule on Department (#1949)
+	"phamos.setup.item_grid.after_migrate",  # description column in item tables (#1858)
+	"phamos.setup.general_management.after_migrate",  # General Management Cockpit role and rights (#1946)
 ]
 
 # Uninstallation
@@ -277,17 +305,26 @@ after_migrate = [
 #	"Event": "frappe.desk.doctype.event.event.has_permission",
 # }
 
-# Personal Cockpit focus sessions are private, System Managers included (#1556).
+# Personal Cockpit records are private, System Managers included (#1556, #1771); so are the
+# Version rows of an idea. Ideas handed in for a vote are readable by everyone (#1842).
 permission_query_conditions = {
 	"Focus Session": "phamos.cockpits.permissions.focus_session_query",
 	"ToDo Challenge": "phamos.cockpits.permissions.todo_challenge_query",
 	"Day Plan": "phamos.cockpits.permissions.day_plan_query",
+	"Idea": "phamos.cockpits.permissions.idea_query",
+	"Idea Writing Session": "phamos.cockpits.permissions.idea_writing_session_query",
+	"Idea Vote": "phamos.cockpits.permissions.idea_vote_query",
+	"Version": "phamos.cockpits.permissions.version_query",
 }
 
 has_permission = {
 	"Focus Session": "phamos.cockpits.permissions.focus_session_has_permission",
 	"ToDo Challenge": "phamos.cockpits.permissions.todo_challenge_has_permission",
 	"Day Plan": "phamos.cockpits.permissions.day_plan_has_permission",
+	"Idea": "phamos.cockpits.permissions.idea_has_permission",
+	"Idea Writing Session": "phamos.cockpits.permissions.idea_writing_session_has_permission",
+	"Idea Vote": "phamos.cockpits.permissions.idea_vote_has_permission",
+	"Version": "phamos.cockpits.permissions.version_has_permission",
 }
 
 # DocType Class
@@ -336,6 +373,15 @@ doc_events = {
 		"on_update": "phamos.cockpits.checkin_hooks.on_update",
 		"on_trash": "phamos.cockpits.checkin_hooks.on_trash",
 	},
+	# Leave Applications as all-day events in the employee's own calendar (milestone 68, Phase 2).
+	# Never fires on sites without HRMS. on_update also runs on insert and before on_submit.
+	"Leave Application": {
+		"validate": "phamos.phamos.hr.leave_cover.validate_cover",  # "Covered by" (#1714)
+		"on_update": "phamos.phamos.hr.leave_calendar.sync_leave_event",
+		"on_submit": "phamos.phamos.hr.leave_calendar.sync_leave_event",
+		"on_cancel": "phamos.phamos.hr.leave_calendar.sync_leave_event",
+		"on_trash": "phamos.phamos.hr.leave_calendar.remove_leave_event",
+	},
 	"Event": {
 		# on_update also runs after insert; an after_insert hook here pushed every new Event twice.
 		"on_update": "phamos.mailcow_integration.caldav.sync_event.on_upsert",
@@ -357,13 +403,22 @@ doc_events = {
     "Lead Data": {
         "after_insert": "phamos.events.lead_data.notify_lead_data_created_via_raven_dm"
     },
-	# Status changes and conversions show up in the Issue chat; Closed archives it (#1621, #1622).
-	"Issue": {"on_update": "phamos.api.issue_chat.on_issue_update"},
-	"Task": {"after_insert": "phamos.api.issue_chat.on_task_insert"},
+	# Status changes and conversions show up in the record chats; closing archives them (#1621, #1622).
+	"Issue": {"on_update": "phamos.api.issue_chat.on_record_update"},
+	"Task": {
+		"after_insert": "phamos.api.issue_chat.on_task_insert",
+		# Status changes show up in the Task chat; Completed / Cancelled archive it (#1779).
+		"on_update": "phamos.api.issue_chat.on_record_update",
+	},
     "Raven Message": {
-		# Mentioned people join the Issue chat before Raven notifies them (#1620).
+		# Mentioned people join the record chat before Raven notifies them (#1620), and are
+		# assigned to the record once the message is saved (#1784).
 		"validate": "phamos.api.issue_chat.add_mentioned_members",
-		"after_insert": "phamos.events.raven_bot.handle_lead_option_reply"
+		"after_insert": [
+			"phamos.api.issue_chat.keep_mention_unread",
+			"phamos.api.issue_chat.assign_mentioned",
+			"phamos.events.raven_bot.handle_lead_option_reply",
+		],
 	},
     "Account": {"on_update": "phamos.accounting.expense_accounts.clear_account_cache"},
     "Purchase Invoice": {"on_submit": "phamos.accounting.library.learn_from_purchase_invoice"},
@@ -378,16 +433,18 @@ doc_events = {
         "on_update_after_submit": "phamos.phamos.doctype.monthly_implementation_summary.monthly_implementation_summary.sync_mis_status_for_source_doc",
         "on_cancel": "phamos.phamos.doctype.monthly_implementation_summary.monthly_implementation_summary.sync_mis_status_for_source_doc",
     },
-    # Event tickets: Attendee links and payment status (phamos.marketing.billing). Payments reach an
-    # invoice through db_set only, so its on_change is the trigger that catches them.
+    # Event tickets: Attendee links and payment status (phamos.marketing.billing). Only on_change: it runs
+    # once after every save, submit and cancel, and payments reach an invoice through db_set, which runs
+    # on_change too. Hooking on_submit etc. as well ran the handler twice (phamos/phamos#1706).
     "Sales Invoice": {
-        "on_submit": ["phamos.phamos.doctype.monthly_implementation_summary.monthly_implementation_summary.sync_mis_status_for_source_doc", "phamos.marketing.billing.on_sales_invoice_change"],
-        "on_update_after_submit": ["phamos.phamos.doctype.monthly_implementation_summary.monthly_implementation_summary.sync_mis_status_for_source_doc", "phamos.marketing.billing.on_sales_invoice_change"],
-        "on_cancel": ["phamos.phamos.doctype.monthly_implementation_summary.monthly_implementation_summary.sync_mis_status_for_source_doc", "phamos.marketing.billing.on_sales_invoice_change"],
+        "on_submit": "phamos.phamos.doctype.monthly_implementation_summary.monthly_implementation_summary.sync_mis_status_for_source_doc",
+        "on_update_after_submit": "phamos.phamos.doctype.monthly_implementation_summary.monthly_implementation_summary.sync_mis_status_for_source_doc",
+        "on_cancel": "phamos.phamos.doctype.monthly_implementation_summary.monthly_implementation_summary.sync_mis_status_for_source_doc",
         "on_change": "phamos.marketing.billing.on_sales_invoice_change",
         "on_trash": "phamos.marketing.billing.on_sales_invoice_trash",
     },
     "Sales Order": {
+        "validate": "phamos.marketing.billing.validate_sales_order",
         "on_update": "phamos.marketing.billing.on_sales_order_update",
         "on_submit": ["phamos.phamos.doctype.monthly_implementation_summary.monthly_implementation_summary.sync_mis_status_for_source_doc", "phamos.marketing.billing.on_sales_order_submit"],
         "on_update_after_submit": "phamos.phamos.doctype.monthly_implementation_summary.monthly_implementation_summary.sync_mis_status_for_source_doc",
@@ -406,6 +463,8 @@ doc_events = {
     },
     "Lead": {
         "before_insert": "phamos.marketing.billing.lead_before_insert",
+        # Inbound / Outbound: from the Lead Source, Inbound for website and email leads (#574)
+        "before_validate": "phamos.marketing.crm.lead_set_direction",
     },
     "Customer": {
         "on_update": [
@@ -431,7 +490,15 @@ doc_events = {
     "Supplier": {"on_update": "phamos.web_profile.mirror.push_to_profiles"},
     "Sales Partner": {"on_update": "phamos.web_profile.mirror.push_to_profiles"},
     "Workspace": {"on_update": "phamos.web_profile.mirror.push_to_profiles"},
-    "Department": {"on_update": "phamos.web_profile.mirror.push_to_profiles"},
+    "Department": {
+        "on_update": [
+            "phamos.web_profile.mirror.push_to_profiles",
+            # Event Schedule (phamos/setup/event_schedule.py, #1949), synced like Team's.
+            "phamos.events.team_daily_schedule.sync_events_from_parent",
+        ],
+        "validate": "phamos.events.team_daily_schedule.validate_schedule_rows",
+        "on_trash": "phamos.events.team_daily_schedule.cleanup_events_on_parent_trash",
+    },
     "Implementation Module": {"on_update": "phamos.web_profile.mirror.push_to_profiles"},
     "Interview Feedback": {
         "on_update": "phamos.phamos.hr.interview_summary.trigger_interview_summary",
@@ -565,6 +632,7 @@ override_doctype_dashboards = {
     "Project": "phamos.custom_scripts.custom_python.project_dashboard.get_project_dashboard_data",
     "Delivery Note": "phamos.custom_scripts.custom_python.delivery_note_dashboard.get_delivery_note_dashboard_data",
     "Employee": "phamos.custom_scripts.custom_python.employee_dashboard.get_employee_dashboard_data",
+    "Issue": "phamos.custom_scripts.custom_python.issue_dashboard.get_issue_dashboard_data",
 }
 
 # exempt linked doctypes from being automatically cancelled
@@ -615,6 +683,13 @@ user_data_fields = [
 	{"doctype": "Focus Session", "filter_by": "user", "redact_fields": ["break_out_reason"]},
 	{"doctype": "ToDo Challenge", "filter_by": "user", "redact_fields": ["title"]},
 	{"doctype": "Day Plan", "filter_by": "user", "redact_fields": ["reflection"]},
+	{
+		"doctype": "Idea",
+		"filter_by": "user",
+		"redact_fields": ["title", "content", "summary", "snapshot_title", "snapshot_content"],
+	},
+	{"doctype": "Idea Writing Session", "filter_by": "user"},
+	{"doctype": "Idea Vote", "filter_by": "user"},
 	# Event attendees are matched by their email address (they have no user account).
 	{"doctype": "Attendee", "filter_by": "email", "redact_fields": ["first_name", "last_name", "full_name",
 		"phone", "company_name", "job_title", "notes", "follow_up_notes"]},

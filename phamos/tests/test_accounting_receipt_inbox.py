@@ -79,6 +79,55 @@ class TestDatevRecipient(FrappeTestCase):
 		self.assertEqual(self._resolve("Invoice", []), "legacy-1@datev.test")
 
 
+def _email_account(email_id, enable_outgoing=1, default_outgoing=0):
+	# db_insert skips Email Account.validate, which would try to log in to the mail server.
+	frappe.get_doc({"doctype": "Email Account", "email_account_name": f"DATEV test {email_id}", "email_id": email_id,
+		"enable_outgoing": enable_outgoing, "default_outgoing": default_outgoing}).db_insert()
+
+
+class TestDatevSender(FrappeTestCase):
+	def setUp(self):
+		frappe.set_user("Administrator")
+		self.email = frappe.db.get_value("User", "Administrator", "email")
+		frappe.db.delete("Email Account", {"email_id": self.email})
+		_email_account("default@phamos.test", default_outgoing=1)
+
+	def tearDown(self):
+		frappe.set_user("Administrator")
+		frappe.db.rollback()
+
+	def test_sender_is_the_users_own_outgoing_account(self):
+		_email_account(self.email)
+		self.assertEqual(ar_module.resolve_datev_sender(), self.email)
+
+	def test_default_or_incoming_only_account_does_not_count(self):
+		self.assertIsNone(ar_module.resolve_datev_sender())
+		_email_account(self.email, enable_outgoing=0)
+		self.assertIsNone(ar_module.resolve_datev_sender())
+
+	def test_send_uses_the_users_account_as_sender(self):
+		_email_account(self.email)
+		doc = _make_receipt(attachment="/private/files/r.pdf")
+		with patch.object(ar_module, "resolve_datev_recipient", return_value="up@datev.test"), \
+			patch.object(ar_module.frappe, "sendmail") as sendmail:
+			self.assertTrue(ar_module.send_to_datev(doc.name)["ok"])
+		self.assertEqual(sendmail.call_args.kwargs["sender"], self.email)
+		self.assertEqual(ar_module.get_datev_send_info(doc.name)["sender"], self.email)
+
+	def test_send_refuses_without_own_account(self):
+		doc = _make_receipt(attachment="/private/files/r.pdf", status="Needs Decision")
+		with patch.object(ar_module, "resolve_datev_recipient", return_value="up@datev.test"), \
+			patch.object(ar_module.frappe, "sendmail") as sendmail:
+			result = ar_module.send_to_datev(doc.name)
+		self.assertFalse(result["ok"])
+		self.assertIn(self.email, result["message"])
+		sendmail.assert_not_called()
+		self.assertEqual(frappe.db.get_value("Accounting Receipt", doc.name, "status"), "Needs Decision")
+		info = ar_module.get_datev_send_info(doc.name)
+		self.assertIsNone(info["sender"])
+		self.assertEqual(info["sender_missing_message"], result["message"])
+
+
 class TestAccountingReceiptInbox(FrappeTestCase):
 	def setUp(self):
 		frappe.set_user("Administrator")
@@ -123,6 +172,7 @@ class TestAccountingReceiptInbox(FrappeTestCase):
 	def test_send_to_datev_moves_status_and_records_audit(self):
 		doc = _make_receipt(attachment="/private/files/r.pdf", status="Needs Decision")
 		with patch.object(ar_module, "resolve_datev_recipient", return_value="up@datev.test"), \
+			patch.object(ar_module, "resolve_datev_sender", return_value="me@phamos.test"), \
 			patch.object(ar_module.frappe, "sendmail") as sendmail:
 			result = ar_module.send_to_datev(doc.name)
 		self.assertTrue(result["ok"], result)
@@ -137,6 +187,7 @@ class TestAccountingReceiptInbox(FrappeTestCase):
 		paid = _make_receipt(attachment="/private/files/p.pdf", status="Paid", is_paid=1)
 		cancelled = _make_receipt(attachment="/private/files/c.pdf", status="Cancelled", cancel_reason="Duplicate")
 		with patch.object(ar_module, "resolve_datev_recipient", return_value="up@datev.test"), \
+			patch.object(ar_module, "resolve_datev_sender", return_value="me@phamos.test"), \
 			patch.object(ar_module.frappe, "sendmail") as sendmail:
 			self.assertTrue(ar_module.send_to_datev(paid.name)["ok"])
 			self.assertFalse(ar_module.send_to_datev(cancelled.name)["ok"])

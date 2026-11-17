@@ -6,9 +6,6 @@ frappe.ui.form.on("Stakeholder Meeting", {
 		frm.set_query("chapter", "chapter_reviews", () => ({
 			filters: { implementation: frm.doc.implementation, status: ["!=", "Cancelled"] },
 		}));
-		frm.set_query("chapter", "decisions", () => ({
-			filters: { implementation: frm.doc.implementation, status: ["!=", "Cancelled"] },
-		}));
 	},
 });
 

@@ -251,6 +251,12 @@ def build_listing(section, lang):
 	active_filters = []
 	for facet in facets:
 		if facet["type"] == "toggle":
+			option = next((o for o in facet["options"] if o["checked"]), None)
+			if option and option["value"] != facet["default"]:
+				active_filters.append({
+					"label": f"{facet['label']}: {option['label']}",
+					"url": section_url(section, lang) + _query(section, params, **{facet["key"]: [facet["default"]], "page": 1}),
+				})
 			continue
 		if facet["type"] == "range":
 			if facet["active"]:
@@ -283,7 +289,8 @@ def build_listing(section, lang):
 		"pages": pages,
 		"next_url": base_url + _query(section, params, page=page + 1) if page < pages else None,
 		"prev_url": base_url + _query(section, params, page=page - 1) if page > 1 else None,
-		"clear_url": base_url,
+		# Drops every filter, the search and the toggles but keeps the chosen sort.
+		"clear_url": base_url + _query(section, {"selected": {}, "ranges": {}, "q": "", "sort": params["sort"], "page": 1}),
 		"active_filters": active_filters,
 		"default_sort": config["sorts"][0][0],
 		"sorts": [{"value": v, "label": _(label), "selected": v == params["sort"]} for v, label in config["sorts"]],

@@ -3,7 +3,7 @@
 	     the past below. Within a day the hours read from morning to evening. -->
 	<div class="relative h-full min-h-0">
 		<div ref="scroller" class="h-full min-h-0 overflow-y-auto bg-surface-gray-1">
-			<div class="mx-auto max-w-5xl px-5 pb-16">
+			<div class="px-5 pb-16">
 				<div ref="topSentinel" class="py-3 text-center text-xs text-ink-gray-5">
 					{{ loadingLater ? __("Loading later days…") : to >= lastFuture ? __("Plan further ahead in the list.") : "" }}
 				</div>

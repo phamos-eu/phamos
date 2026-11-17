@@ -18,6 +18,8 @@ from phamos.api import personal_challenges
 from phamos.api import personal_day_plan
 from phamos.api import personal_checkin
 from phamos.api import personal_contracts
+from phamos.api import personal_ideas
+from phamos.api import personal_leave
 from phamos.api import personal_timer
 from phamos.api import personal_timeline
 from phamos.api import personal_work_dashboard
@@ -126,6 +128,18 @@ def get_issue_chat_states(names):
 	return dc.get_issue_chat_states(names)
 
 
+@frappe.whitelist()
+def get_task_chat(name):
+	"""Return the Raven chat state of one of my Tasks."""
+	return dc.get_task_chat(CONFIG, name)
+
+
+@frappe.whitelist(methods=["POST"])
+def ensure_task_chat(name):
+	"""Start or join the Raven chat of one of my Tasks."""
+	return dc.ensure_task_chat(CONFIG, name)
+
+
 
 @frappe.whitelist(methods=["POST"])
 def update_issue(
@@ -223,6 +237,7 @@ def update_task(
 	exp_end_date=None,
 	progress=None,
 	project=None,
+	custom_task_owner=None,
 	modified=None,
 ):
 	"""Autosave whitelisted fields of one of my Tasks."""
@@ -243,6 +258,8 @@ def update_task(
 		fields["progress"] = progress
 	if project is not None:
 		fields["project"] = project
+	if custom_task_owner is not None:
+		fields["custom_task_owner"] = custom_task_owner
 	if modified is not None:
 		fields["modified"] = modified
 	return dc.update_task(CONFIG, name, **fields)
@@ -263,8 +280,11 @@ def create_task(
 	department=None,
 	exp_start_date=None,
 	exp_end_date=None,
+	expected_time=None,
+	custom_task_owner=None,
+	task_type=None,
 ):
-	"""Create a Task assigned to me (department taken from the project)."""
+	"""Create a Task assigned to its Task Owner (department taken from the project)."""
 	return dc.create_task(
 		CONFIG,
 		subject,
@@ -274,6 +294,9 @@ def create_task(
 		department=department,
 		exp_start_date=exp_start_date,
 		exp_end_date=exp_end_date,
+		expected_time=expected_time,
+		custom_task_owner=custom_task_owner,
+		task_type=task_type,
 	)
 
 
@@ -588,7 +611,7 @@ def pause_timer(name, break_goal=None, break_expected_seconds=None):
 
 
 @frappe.whitelist(methods=["POST"])
-def resume_timer(name, track_break=0, break_project=None, break_goal=None, break_result=None, break_activity_type=None, break_percent_billable=0):
+def resume_timer(name, track_break=0, break_project=None, break_goal=None, break_result=None, break_activity_type=None, break_percent_billable=0, break_value_add=100):
 	"""Resume; track_break logs the break as its own record, otherwise it is dropped."""
 	return personal_timer.resume_timer(
 		name,
@@ -598,13 +621,19 @@ def resume_timer(name, track_break=0, break_project=None, break_goal=None, break
 		break_result=break_result,
 		break_activity_type=break_activity_type,
 		break_percent_billable=break_percent_billable,
+		break_value_add=break_value_add,
 	)
 
 
 @frappe.whitelist(methods=["POST"])
-def stop_timer(name, result, percent_billable=100, activity_type=None, manual_end_time=None):
+def stop_timer(name, result, percent_billable=100, activity_type=None, manual_end_time=None, value_add=100):
 	return personal_timer.stop_timer(
-		name, result, percent_billable=percent_billable, activity_type=activity_type, manual_end_time=manual_end_time
+		name,
+		result,
+		percent_billable=percent_billable,
+		activity_type=activity_type,
+		manual_end_time=manual_end_time,
+		value_add=value_add,
 	)
 
 
@@ -651,6 +680,57 @@ def get_my_contracts():
 	return personal_contracts.get_my_contracts()
 
 
+# My Leave (phamos/phamos#1714) — logic in phamos.api.personal_leave.
+
+
+@frappe.whitelist()
+def get_my_leave(status=None):
+	"""All my Leave Applications, newest first, optionally of one status."""
+	return personal_leave.get_my_leave(status=status)
+
+
+@frappe.whitelist()
+def get_my_leave_entry(name):
+	"""One of my Leave Applications."""
+	return personal_leave.get_my_leave_entry(name)
+
+
+@frappe.whitelist()
+def get_my_leave_balance(date=None):
+	"""Remaining leave days per allocated leave type."""
+	return personal_leave.get_my_leave_balance(date=date)
+
+
+@frappe.whitelist()
+def get_leave_form_options(from_date=None):
+	"""Leave types, approver and colleagues for the Apply dialog."""
+	return personal_leave.get_leave_form_options(from_date=from_date)
+
+
+@frappe.whitelist(methods=["POST"])
+def apply_leave(leave_type, from_date, to_date, half_day=0, half_day_date=None, description=None, cover_employee=None):
+	"""Hand in leave as Open for my leave approver."""
+	return personal_leave.apply_leave(
+		leave_type, from_date, to_date, half_day=half_day, half_day_date=half_day_date,
+		description=description, cover_employee=cover_employee,
+	)
+
+
+@frappe.whitelist(methods=["POST"])
+def update_leave(name, leave_type, from_date, to_date, half_day=0, half_day_date=None, description=None, cover_employee=None, modified=None):
+	"""Edit my own leave while it is Open."""
+	return personal_leave.update_leave(
+		name, leave_type, from_date, to_date, half_day=half_day, half_day_date=half_day_date,
+		description=description, cover_employee=cover_employee, modified=modified,
+	)
+
+
+@frappe.whitelist(methods=["POST"])
+def withdraw_leave(name):
+	"""Withdraw (delete) my own leave while it is Open."""
+	return personal_leave.withdraw_leave(name)
+
+
 @frappe.whitelist()
 def get_issue_dashboard():
 	"""Numbers about my Issues (#1604)."""
@@ -661,3 +741,110 @@ def get_issue_dashboard():
 def get_task_dashboard():
 	"""Numbers about my Tasks and my hours (#1604)."""
 	return personal_work_dashboard.get_task_dashboard()
+
+
+# Ideas (phamos/phamos#1771) — logic in phamos.api.personal_ideas.
+
+
+@frappe.whitelist()
+def get_ideas(stage=None, include_closed=0):
+	"""My ideas, recently edited first; Harvest and Compost only on request."""
+	return personal_ideas.get_ideas(stage=stage, include_closed=include_closed)
+
+
+@frappe.whitelist()
+def get_idea(name):
+	return personal_ideas.get_idea(name)
+
+
+@frappe.whitelist()
+def get_idea_options():
+	"""Stages, their jobs and the feelings, so the cockpit shows the server's words."""
+	return personal_ideas.get_idea_options()
+
+
+@frappe.whitelist()
+def idea_word_goal(name, aim_choice="similar"):
+	return personal_ideas.word_goal(name, aim_choice=aim_choice)
+
+
+@frappe.whitelist(methods=["POST"])
+def create_idea(title=None, content=None, spawned_from=None):
+	return personal_ideas.create_idea(title=title, content=content, spawned_from=spawned_from)
+
+
+@frappe.whitelist(methods=["POST"])
+def update_idea(name, title=None, content=None, stage=None, modified=None):
+	"""Autosave target with an optimistic lock on `modified`."""
+	return personal_ideas.update_idea(name, title=title, content=content, stage=stage, modified=modified)
+
+
+@frappe.whitelist(methods=["POST"])
+def snapshot_idea(name):
+	"""The editor was left: record the edit as one Version row."""
+	return personal_ideas.snapshot_idea(name)
+
+
+@frappe.whitelist(methods=["POST"])
+def complete_idea_writing_session(
+	name, started_on, words_written, word_goal, aim_choice, felt_productive="", content=None
+):
+	return personal_ideas.complete_writing_session(
+		name,
+		started_on=started_on,
+		words_written=words_written,
+		word_goal=word_goal,
+		aim_choice=aim_choice,
+		felt_productive=felt_productive,
+		content=content,
+	)
+
+
+@frappe.whitelist(methods=["POST"])
+def capture_side_idea(parent, text, name=None):
+	"""A thought caught while writing becomes a child idea."""
+	return personal_ideas.capture_side_idea(parent, text, name=name)
+
+
+# Hand in for vote (phamos/phamos#1842).
+
+
+@frappe.whitelist(methods=["POST"])
+def hand_in_idea_for_vote(name):
+	"""Open my idea for a vote by every cockpit user."""
+	return personal_ideas.hand_in_idea_for_vote(name)
+
+
+@frappe.whitelist(methods=["POST"])
+def withdraw_idea_from_vote(name):
+	"""Make my idea private again; its votes are removed."""
+	return personal_ideas.withdraw_idea_from_vote(name)
+
+
+@frappe.whitelist()
+def get_ideas_for_vote():
+	"""Every idea open for vote, most votes first."""
+	return personal_ideas.get_ideas_for_vote()
+
+
+@frappe.whitelist()
+def get_idea_for_vote(name):
+	return personal_ideas.get_idea_for_vote(name)
+
+
+@frappe.whitelist(methods=["POST"])
+def vote_idea(name):
+	"""Toggle my upvote on an idea open for vote."""
+	return personal_ideas.vote_idea(name)
+
+
+@frappe.whitelist()
+def get_idea_chat(name):
+	"""Raven chat state of an idea up for vote (or my own idea)."""
+	return personal_ideas.get_idea_chat(name)
+
+
+@frappe.whitelist(methods=["POST"])
+def ensure_idea_chat(name):
+	"""Start or join the Raven chat of an idea up for vote."""
+	return personal_ideas.ensure_idea_chat(name)
