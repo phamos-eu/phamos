@@ -145,11 +145,14 @@ function phriend_create_gitlab_issue(frm) {
 						);
 						if (!r.message.gitlab_issue) {
 							frappe.msgprint({
-								title: __("GitLab project not synced"),
+								title: __("GitLab issue not linked"),
 								indicator: "orange",
 								message: __(
-									"The GitLab issue was created, but its project is not in ERPNext yet, so it is not linked to this Issue. Run Sync Projects in {0} before the next one.",
-									[`<a href="/app/gitlab-settings">${__("GitLab Settings")}</a>`]
+									"The GitLab issue was created, but it is not linked to this Issue. Usually its project is not in ERPNext yet: run Sync Projects in {0} before the next one. Otherwise see the {1}.",
+									[
+										`<a href="/app/gitlab-settings">${__("GitLab Settings")}</a>`,
+										`<a href="/app/error-log">${__("Error Log")}</a>`,
+									]
 								),
 							});
 						}

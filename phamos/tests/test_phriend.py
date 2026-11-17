@@ -446,6 +446,21 @@ class TestPhriend(FrappeTestCase):
 		self.assertFalse(frappe.db.exists("GitLab Issue", {"issue": issue.name}))
 		self.assertEqual(frappe.db.count("Error Log", {"method": "Phriend: GitLab project not synced"}), logs + 1)
 
+	@patch("phamos.phriend.api.link_created", side_effect=frappe.ValidationError("broken record"))
+	@patch("phamos.phriend.api.requests.post")
+	def test_a_failed_link_keeps_the_gitlab_issue_so_no_retry_makes_a_second(self, post, _link, _enqueue):
+		self.set_settings(gitlab_token="glpat-test")
+		issue = self.report()
+		post.return_value = response(json=self.created(12))
+		logs = frappe.db.count("Error Log", {"method": "Phriend: linking the GitLab issue failed"})
+
+		result = api.create_gitlab_issue(issue.name)
+
+		self.assertIsNone(result["gitlab_issue"])
+		self.assertTrue(frappe.db.get_value("Issue", issue.name, "gitlab_issue_url").endswith("/issues/12"))
+		self.assertTrue(frappe.db.exists("Comment", {"reference_name": issue.name, "content": ["like", "%GitLab issue created%"]}))
+		self.assertEqual(frappe.db.count("Error Log", {"method": "Phriend: linking the GitLab issue failed"}), logs + 1)
+
 	@patch("phamos.phriend.api.requests.post")
 	def test_issue_not_from_phriend_sends_its_description(self, post, _enqueue):
 		self.set_settings(gitlab_token="glpat-test")

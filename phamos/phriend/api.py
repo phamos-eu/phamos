@@ -445,7 +445,16 @@ def create_gitlab_issue(issue, labels=None, title=None):
 
 	if not doc.get("gitlab_issue_url"):
 		doc.db_set("gitlab_issue_url", web_url)
-	record = link_created(doc.name, created)
+	# GitLab has the issue now: a failed link must not fail the request, or the user clicks
+	# again and a second GitLab issue is made (AI review of !1192). The URL and comment stay.
+	frappe.db.savepoint("phriend_link_gitlab_issue")
+	try:
+		record = link_created(doc.name, created)
+	except Exception:
+		frappe.db.rollback(save_point="phriend_link_gitlab_issue")
+		frappe.log_error(title="Phriend: linking the GitLab issue failed", reference_doctype=REPORT_DOCTYPE,
+			reference_name=doc.name)
+		record = None
 	reference = created.get("references", {}).get("full") or web_url
 	doc.add_comment(
 		"Comment",
@@ -453,7 +462,7 @@ def create_gitlab_issue(issue, labels=None, title=None):
 			f'<a href="{escape_html(web_url)}" target="_blank">{escape_html(reference)}</a>'
 		),
 	)
-	# no record: the GitLab Project is not synced to ERPNext yet (logged in link_created)
+	# no record: the GitLab Project is not synced to ERPNext yet, or linking failed (both logged)
 	return {"web_url": web_url, "iid": created.get("iid"), "reference": reference, "gitlab_issue": record}
 
 

@@ -2122,5 +2122,5 @@ Create GitLab Issue,GitLab-Issue anlegen
 Open in GitLab,In GitLab öffnen
 Not linked as a record in ERPNext.,In ERPNext nicht als Datensatz verknüpft.
 GitLab issue {0} created,GitLab-Issue {0} angelegt
-GitLab project not synced,GitLab-Projekt nicht synchronisiert
-"The GitLab issue was created, but its project is not in ERPNext yet, so it is not linked to this Issue. Run Sync Projects in {0} before the next one.","Das GitLab-Issue wurde angelegt, aber sein Projekt ist noch nicht in ERPNext und daher nicht mit dieser Anfrage verknüpft. Bitte vor dem nächsten „Sync Projects“ in {0} ausführen."
+GitLab issue not linked,GitLab-Issue nicht verknüpft
+"The GitLab issue was created, but it is not linked to this Issue. Usually its project is not in ERPNext yet: run Sync Projects in {0} before the next one. Otherwise see the {1}.","Das GitLab-Issue wurde angelegt, ist aber nicht mit dieser Anfrage verknüpft. Meist ist sein Projekt noch nicht in ERPNext: Bitte vor dem nächsten „Sync Projects“ in {0} ausführen. Sonst siehe {1}."
