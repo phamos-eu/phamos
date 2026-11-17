@@ -201,6 +201,31 @@ class TestDevActionPanelOneProjectList(_DapTestCase):
 		frappe.db.set_value("Employee", self.employee, "user_id", None)
 		self.assertRaises(frappe.PermissionError, self._as_user, dap.get_matching_names, "Project", "[]")
 
+	def test_filter_button_only_filters_on_fields_the_panel_shows(self):
+		# A field the panel never shows (would be a yes/no oracle on its value, record by record).
+		self.assertRaises(
+			frappe.PermissionError,
+			self._as_user,
+			dap.get_matching_names,
+			"Project",
+			[["Project", "estimated_costing", ">", 0]],
+		)
+		# A child table / another doctype in the row.
+		self.assertRaises(
+			frappe.PermissionError,
+			self._as_user,
+			dap.get_matching_names,
+			"Project",
+			[["Project User", "user", "=", USER]],
+		)
+		self.assertRaises(
+			frappe.PermissionError,
+			self._as_user,
+			dap.get_matching_names,
+			"GitLab Issue",
+			[["GitLab Issue", "description", "like", "%secret%"]],
+		)
+
 	def test_project_with_two_open_todos_is_listed_once(self):
 		project = self._project()
 		self._assign(project)

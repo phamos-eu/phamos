@@ -222,6 +222,18 @@ class TestDapStopLinksGitlabTicket(_RefsSetup):
 		self._created_in_gitlab(colleagues, "2026-05-10 08:40:00")  # newer, but someone else's
 		self.assertEqual(self._stop_project_timer("Worked on it"), (None, mine))
 
+	def test_user_without_email_gets_only_an_unassigned_ticket(self):
+		# With no email, "" must not match every issue without assignee_email.
+		unassigned = self._issue(12, "Nobody's task")
+		colleagues = self._issue(13, "Colleague's task")
+		# Assigned by GitLab username only; assignee_email stored as "" (not NULL), as the sync may.
+		frappe.db.set_value("GitLab Issue", colleagues, {"gitlab_username": "colleague", "assignee_email": ""})
+		self._created_in_gitlab(unassigned, "2026-05-10 08:20:00")
+		self._created_in_gitlab(colleagues, "2026-05-10 08:40:00")  # newer, but someone else's
+		frappe.db.set_value("User", USER, "email", "")  # rolled back in tearDown
+		found = issue_refs.issue_created_during(self.erp_project, "2026-05-10 08:00:00", "2026-05-10 09:00:00", USER)
+		self.assertEqual(found, unassigned)
+
 	def test_no_ticket_created_while_the_timer_ran_links_nothing(self):
 		self._created_in_gitlab(self.child, "2026-05-10 09:30:00")  # after Stop
 		self.assertEqual(self._stop_project_timer("Worked on it"), (None, None))

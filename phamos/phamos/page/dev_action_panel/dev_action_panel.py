@@ -685,7 +685,21 @@ def _dev_project_names(user):
     )
 
 
-FILTERABLE_DOCTYPES = ("GitLab Issue", "Project")
+# The fields the panel itself already shows for each record (get_my_issues /
+# get_dev_all_projects). Filtering is limited to them, so the Filter button cannot be used to
+# probe values of fields the user never sees (a filter on a hidden field tells, record by
+# record, whether its value matches).
+FILTERABLE_FIELDS = {
+    "GitLab Issue": frozenset(
+        {
+            "name", "issue_id", "title", "state", "due_date", "start_date",
+            "assignee", "assignee_email", "gitlab_username",
+            "issue_url", "parent_issue", "gitlab_project", "labels",
+        }
+    ),
+    "Project": frozenset({"name", "project_name", "status", "percent_billable", "customer"}),
+}
+FILTERABLE_DOCTYPES = tuple(FILTERABLE_FIELDS)
 
 
 @frappe.whitelist()
@@ -693,27 +707,36 @@ def get_matching_names(doctype, filters):
     """Names of the records that match a Frappe filter group, for the panel's Filter button.
 
     The panel loads its full lists once and only hides rows, so sidebar counts and the running
-    timer stay as they are. Only the records the panel already shows can match: open GitLab
-    Issues (get_my_issues) and the panel's projects (get_dev_all_projects), for panel users
-    (a linked Employee), so the filter tells nothing about other records.
+    timer stay as they are. It uses get_all (GitLab Issue is readable by System Manager only, like
+    get_my_issues), so it answers only what the panel already shows: panel users (a linked
+    Employee), the panel's records (open GitLab Issues; Open or assigned projects) and the
+    panel's fields (FILTERABLE_FIELDS), never a child table or another doctype.
     """
     if doctype not in FILTERABLE_DOCTYPES:
         frappe.throw(_("Filtering {0} is not supported here.").format(doctype))
     user = frappe.session.user
     if not frappe.db.exists("Employee", {"user_id": user}):
         frappe.throw(_("No Employee record linked to your user account."), frappe.PermissionError)
-    filters = _filter_rows(filters)
+    filters = _filter_rows(doctype, filters)
     if doctype == "GitLab Issue":
         return frappe.get_all(doctype, filters=[*filters, [doctype, "state", "=", "opened"]], pluck="name")
     allowed = _dev_project_names(user)
     return [name for name in frappe.get_all(doctype, filters=filters, pluck="name") if name in allowed]
 
 
-def _filter_rows(filters):
-    """[doctype, field, condition, value] rows from FilterGroup.get_filters(); anything else is refused."""
+def _filter_rows(doctype, filters):
+    """[doctype, field, condition, value] rows from FilterGroup.get_filters(), on the doctype's
+    own FILTERABLE_FIELDS only; anything else is refused."""
     rows = frappe.parse_json(filters) if isinstance(filters, str) else filters
     if not isinstance(rows, list) or not all(isinstance(f, (list, tuple)) and len(f) >= 4 for f in rows):
         frappe.throw(_("Filters must be a list of [doctype, field, condition, value] rows."))
+    allowed = FILTERABLE_FIELDS[doctype]
+    for row in rows:
+        if row[0] != doctype or row[1] not in allowed:
+            frappe.throw(
+                _("You can filter {0} on these fields only: {1}").format(_(doctype), ", ".join(sorted(allowed))),
+                frappe.PermissionError,
+            )
     return [list(f[:4]) for f in rows]
 
 

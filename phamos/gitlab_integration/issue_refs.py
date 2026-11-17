@@ -96,9 +96,13 @@ def issue_created_during(project, start, end, user):
 	gitlab_project = frappe.qb.DocType("GitLab Project")
 	no_email = issue.assignee_email.isnull() | (issue.assignee_email == "")
 	no_username = issue.gitlab_username.isnull() | (issue.gitlab_username == "")
-	mine_or_nobodys = (Lower(issue.assignee_email) == email) | (
-		no_email & (no_username | (Lower(issue.gitlab_username) == email.split("@")[0]))
-	)
+	mine_or_nobodys = no_email & no_username
+	if email:
+		# Without an email nothing can be "mine": "" would match every issue without assignee_email,
+		# a colleague's (by gitlab_username) included.
+		mine_or_nobodys |= (Lower(issue.assignee_email) == email) | (
+			no_email & (Lower(issue.gitlab_username) == email.split("@")[0])
+		)
 	rows = (
 		frappe.qb.from_(issue)
 		.join(gitlab_project)
