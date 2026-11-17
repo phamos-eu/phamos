@@ -33,6 +33,13 @@ const navItems = [
 			{ name: "TasksGantt", label: "Gantt", icon: "bar-chart-2", match: ["TasksGantt", "TaskDetail"] },
 		],
 	},
+	// Company appointments (#1949)
+	{
+		name: "Appointments",
+		label: "Appointments",
+		icon: "calendar",
+		match: ["Appointments"],
+	},
 	{
 		name: "ChecklistsHome",
 		label: "Checklists",
@@ -50,6 +57,7 @@ const navItems = [
 ]
 
 const pageTitle = computed(() => {
+	if (route.name === "Appointments") return "Appointments"
 	if (route.name === "Tasks" || route.name === "TasksGantt" || route.name === "TaskDetail") {
 		return "Tasks"
 	}
@@ -58,6 +66,7 @@ const pageTitle = computed(() => {
 })
 
 const pageSubtitle = computed(() => {
+	if (route.name === "Appointments") return "Company-wide appointments, sent as calendar invites"
 	if (route.name === "TasksGantt" || route.name === "TaskDetail") {
 		return "General Management department tasks"
 	}

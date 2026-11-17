@@ -2272,3 +2272,27 @@ All departments,Alle Abteilungen
 Open in {0} Cockpit,Im {0}-Cockpit öffnen
 Dates,Zeitraum
 This task is not in a department with a cockpit.,Diese Aufgabe gehört zu keiner Abteilung mit Cockpit.
+Appointments,Termine
+New appointment,Neuer Termin
+Edit appointment,Termin bearbeiten
+Cancel appointment,Termin absagen
+This cancels the invite for all attendees,Damit wird die Einladung für alle Teilnehmenden abgesagt
+Keep it,Behalten
+Show past,Vergangene anzeigen
+No upcoming appointments,Keine anstehenden Termine
+{0} attendees,{0} Teilnehmende
+Not sent,Nicht gesendet
+Sent from,Gesendet von
+Pick a mailbox…,Postfach wählen…
+Save and send,Speichern und senden
+Attendees,Teilnehmende
+Required,Pflicht
+Nobody yet,Noch niemand
+Drag people here,Personen hierher ziehen
+Search people…,Personen suchen…
+Add everyone in {0},Alle aus {0} hinzufügen
+No people found,Keine Personen gefunden
+Remove {0},{0} entfernen
+Until,Bis
+No department,Keine Abteilung
+Pick a mailbox with a Mailcow calendar to send the invite.,Bitte ein Postfach mit Mailcow-Kalender wählen, um die Einladung zu senden.

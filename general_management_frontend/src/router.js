@@ -1,6 +1,7 @@
 import { createSpaRouter } from "@spa/router.js"
 import ChecklistsHome from "@spa/views/ChecklistsHome.vue"
 import TasksGanttPage from "./views/TasksGanttPage.vue"
+import AppointmentsPage from "./views/AppointmentsPage.vue"
 import spaConfig from "./config"
 
 export default createSpaRouter({
@@ -22,6 +23,12 @@ export default createSpaRouter({
 			path: "/tasks/gantt/:name",
 			name: "TaskDetail",
 			component: TasksGanttPage,
+		},
+		// Company appointments (#1949)
+		{
+			path: "/appointments",
+			name: "Appointments",
+			component: AppointmentsPage,
 		},
 	],
 })
