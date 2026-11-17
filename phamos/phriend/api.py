@@ -49,6 +49,22 @@ def _check_allowed():
 # --------------------------------------------------------------------------
 
 
+# What a report is made of: the flow sends these, and a system with a target forwards them.
+REPORT_FIELDS = (
+	"title",
+	"comment",
+	"report_type",
+	"priority",
+	"route",
+	"page_url",
+	"ref_doctype",
+	"ref_docname",
+	"context",
+	"screenshot",
+	"page_title",
+)
+
+
 @frappe.whitelist(methods=["POST"])
 def create_report(
 	title=None,
@@ -67,24 +83,72 @@ def create_report(
 
 	`page_title` is what the flow showed as "Reported on" (for example "Issue ISS-2026-00012");
 	an empty title becomes that.
+
+	On a system with a target system (Phriend Settings), the report becomes an Issue there and
+	nothing is created here: returns {"name", "url"} of that Issue (phamos.phriend.remote).
 	"""
 	settings = _check_allowed()
+	fields = {
+		"title": title,
+		"comment": comment,
+		"report_type": report_type,
+		"priority": priority,
+		"route": route,
+		"page_url": page_url,
+		"ref_doctype": ref_doctype,
+		"ref_docname": ref_docname,
+		"context": context,
+		"screenshot": screenshot,
+		"page_title": page_title,
+	}
+	if settings.target_url:
+		from phamos.phriend.remote import forward_report
 
-	report_type = OLD_REPORT_TYPES.get(cstr(report_type), report_type)
-	if report_type not in REPORT_TYPES:
-		report_type = "Bug"
-	if priority not in PRIORITIES:
-		priority = "Medium"
-	if ref_doctype and not frappe.db.exists("DocType", ref_doctype):
-		ref_doctype = None
-	# a form that is not saved yet ("new-sales-order-1") has no document to link; the route keeps the name
-	if not ref_doctype or (ref_docname and not frappe.db.exists(ref_doctype, ref_docname)):
-		ref_docname = None
-
-	title = cstr(title).strip() or _built_title(page_title, route, ref_doctype, ref_docname)
+		return forward_report(settings, fields)
 
 	reporter = frappe.session.user
-	reporter_name = _full_name(reporter)
+	return make_report(
+		settings,
+		fields,
+		reporter=reporter,
+		reporter_name=_full_name(reporter),
+		reporter_email=frappe.db.get_value("User", reporter, "email") or reporter,
+	)
+
+
+def make_report(settings, fields, reporter, reporter_name, reporter_email, source=None):
+	"""The Issue for one report, with its screenshot and ToDo. Returns {"name"}.
+
+	reporter: the User who reported it, or None for a report from another system whose reporter
+	has no user here (then only the name and e-mail are kept).
+	source: {"system", "url"} for a report from another system (phamos.phriend.remote). Record
+	names there say nothing here, so the record is not linked, only named and linked to there.
+	"""
+	f = {key: fields.get(key) for key in REPORT_FIELDS}
+	report_type = OLD_REPORT_TYPES.get(cstr(f["report_type"]), f["report_type"] or "Bug")
+	if report_type not in REPORT_TYPES:
+		report_type = "Bug"
+	priority = f["priority"] if f["priority"] in PRIORITIES else "Medium"
+	route, comment = f["route"], f["comment"]
+	ref_doctype, ref_docname = f["ref_doctype"], f["ref_docname"]
+	if ref_doctype and not frappe.db.exists("DocType", ref_doctype):
+		ref_doctype = None
+	if not ref_doctype:
+		ref_docname = None
+
+	page_url = f["page_url"] or ""
+	record_base = ""  # where the record link points: this site, or the system the report came from
+	if source:
+		page_url = _page_on(source["url"], page_url)
+		record_base = source["url"]
+	elif ref_docname and not frappe.db.exists(ref_doctype, ref_docname):
+		# a form that is not saved yet ("new-sales-order-1") has no document to link; the route keeps the name
+		ref_docname = None
+	# a record on another system is named and linked to there, never linked here
+	linked_docname = None if source else ref_docname
+
+	title = cstr(f["title"]).strip() or _built_title(f["page_title"], route, ref_doctype, ref_docname)
+
 	priority = "High" if priority == "Urgent" else priority  # Issue Priority has no Urgent
 
 	issue = frappe.new_doc(REPORT_DOCTYPE)
@@ -94,7 +158,7 @@ def create_report(
 		issue.priority = priority
 	if frappe.db.exists("Issue Type", "Internal"):
 		issue.issue_type = "Internal"
-	issue.raised_by = frappe.db.get_value("User", reporter, "email") or reporter
+	issue.raised_by = reporter_email
 	if settings.default_project:
 		issue.project = settings.default_project
 	issue.phriend_reported_by = reporter
@@ -102,17 +166,25 @@ def create_report(
 	issue.phriend_type = report_type
 	issue.phriend_comment = comment or ""
 	issue.phriend_route = cstr(route)[:140]
-	issue.phriend_page_url = page_url or ""
+	issue.phriend_page_url = page_url
 	issue.phriend_ref_doctype = ref_doctype
-	issue.phriend_ref_docname = ref_docname
-	issue.phriend_context = _pretty_json(context)
-	issue.description = _description(comment, route, page_url, ref_doctype, ref_docname, reporter_name)
+	issue.phriend_ref_docname = linked_docname
+	issue.phriend_context = _pretty_json(f["context"])
+	if source:
+		issue.phriend_source_system = source["system"]
+		issue.phriend_source_url = source["url"]
+	issue.description = _description(
+		comment, route, page_url, ref_doctype, ref_docname, reporter_name, record_base, source and source["system"]
+	)
 
 	# A screenshot that can't be used costs the screenshot, never the report (#1899).
-	shot, shot_problem = _decode_screenshot(screenshot) if screenshot else (None, None)
+	shot, shot_problem = _decode_screenshot(f["screenshot"]) if f["screenshot"] else (None, None)
 	if shot_problem:
 		issue.description += f"<p><small>{escape_html(_('The screenshot could not be saved: {0}').format(shot_problem))}</small></p>"
 	issue.insert(ignore_permissions=True)
+	if not reporter:
+		# Reporter Name fetches from Reported By; with no user here, keep the name that was sent
+		issue.db_set("phriend_reported_by_name", reporter_name, update_modified=False)
 
 	if shot:
 		file_url = _save_screenshot(issue.name, *shot)
@@ -125,17 +197,34 @@ def create_report(
 			update_modified=False,
 		)
 
-	assign_to(
-		{
-			"assign_to": [settings.assign_to or reporter],
+	assignee = settings.assign_to or reporter
+	if assignee:
+		assignment = {
+			"assign_to": [assignee],
 			"doctype": REPORT_DOCTYPE,
 			"name": issue.name,
 			"description": _("{0} (reported by {1})").format(issue.subject, reporter_name),
 			"priority": priority,
 		}
-	)
+		if source:
+			# the API user of the sending system may not read Issues here (role Phriend Remote
+			# only); the Issue itself was inserted the same way, above
+			from frappe.desk.form.assign_to import _add
+
+			_add(assignment, ignore_permissions=True)
+		else:
+			assign_to(assignment)
 
 	return {"name": issue.name}
+
+
+def _page_on(base, page_url):
+	"""The reported page on the system it was reported on: that system's address (sent by its
+	server) with the path the browser sent. The browser's host is never used (see report._web_url)."""
+	from phamos.phriend.report import _web_url
+
+	path = _web_url(page_url)
+	return f"{base}{path}" if path else ""
 
 
 @frappe.whitelist(methods=["POST"])
@@ -166,6 +255,9 @@ def _open_report_filters(route, ref_doctype, ref_docname):
 	page change.
 	"""
 	if not is_for_user() or not frappe.has_permission(REPORT_DOCTYPE, "read"):
+		return None
+	if _settings().target_url:
+		# reports from here are Issues on the target system; the ones here would mislead
 		return None
 	route, ref_doctype, ref_docname = cstr(route), cstr(ref_doctype), cstr(ref_docname)
 	filters = {"phriend_type": ["is", "set"], "status": ["not in", CLOSED_STATUSES]}
@@ -265,7 +357,7 @@ def _pretty_json(value):
 		return cstr(value)
 
 
-def _description(comment, route, page_url, ref_doctype, ref_docname, reporter_name):
+def _description(comment, route, page_url, ref_doctype, ref_docname, reporter_name, record_base="", source_system=None):
 	parts = []
 	if comment:
 		parts.append("<p>" + escape_html(comment).replace("\n", "<br>") + "</p>")
@@ -277,14 +369,18 @@ def _description(comment, route, page_url, ref_doctype, ref_docname, reporter_na
 		slug = frappe.scrub(ref_doctype).replace("_", "-")
 		where.append(
 			f"{escape_html(_(ref_doctype))}: "
-			f'<a href="/app/{slug}/{quote(ref_docname)}">{escape_html(ref_docname)}</a>'
+			f'<a href="{escape_html(record_base)}/app/{slug}/{quote(ref_docname)}">{escape_html(ref_docname)}</a>'
 		)
 	elif ref_doctype:
 		where.append(escape_html(_(ref_doctype)))
 	if where:
 		parts.append("<p><b>" + _("Page") + ":</b> " + " · ".join(where) + "</p>")
 
-	parts.append(f"<p><small>{_('Reported via Phriend by {0}').format(escape_html(reporter_name))}</small></p>")
+	if source_system:
+		reported = _("Reported via Phriend by {0} on {1}").format(escape_html(reporter_name), escape_html(source_system))
+	else:
+		reported = _("Reported via Phriend by {0}").format(escape_html(reporter_name))
+	parts.append(f"<p><small>{reported}</small></p>")
 	return "".join(parts)
 
 

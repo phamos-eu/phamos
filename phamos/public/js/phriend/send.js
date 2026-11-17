@@ -37,7 +37,8 @@ export class Sender {
 			storage_set(DRAFT_KEY, null, "session");
 			ball.set_pending(false);
 			ball.hop();
-			const url = host.issue_url(result.name);
+			// a system with a target system sends the report there and gets that Issue's address back
+			const url = result.url || host.issue_url(result.name);
 			ball.say(
 				`${escape_html(__("Got it! Saved as"))} <a href="${escape_html(url)}" target="_blank" rel="noopener" data-issue>${escape_html(result.name)}</a>`,
 				8000
