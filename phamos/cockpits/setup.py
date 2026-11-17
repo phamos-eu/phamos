@@ -120,9 +120,31 @@ TASK_FIELDS = [
 		"description": "Who is responsible for this task. Separate from assignment.",
 	},
 	{
+		"fieldname": "custom_team",
+		"label": "Team",
+		"fieldtype": "Link",
+		"options": "Team",
+		"insert_after": "custom_task_owner",
+		"description": "The team this task belongs to. It shows in that team's Team Cockpit.",
+	},
+	{
 		"fieldname": "custom_implementation_specific_end",
 		"fieldtype": "Section Break",
-		"insert_after": "custom_task_owner",
+		"insert_after": "custom_team",
+	},
+]
+
+# On Issue the "Implementation Specific" section belongs to Phriend (phamos/phriend/setup.py) and
+# only shows on Phriend and GitLab issues. A team must be settable on every Issue, so the field
+# sits next to Department (custom_department, phamos/setup/ops_inbox.py) instead.
+ISSUE_FIELDS = [
+	{
+		"fieldname": "custom_team",
+		"label": "Team",
+		"fieldtype": "Link",
+		"options": "Team",
+		"insert_after": "custom_department",
+		"description": "The team this issue belongs to. It shows in that team's Team Cockpit.",
 	},
 ]
 
@@ -153,9 +175,15 @@ def ensure_task_fields():
 	create_custom_fields({"Task": [{**field, "module": MODULE} for field in TASK_FIELDS]}, update=True)
 
 
+def ensure_issue_fields():
+	ensure_module()
+	create_custom_fields({"Issue": [{**field, "module": MODULE} for field in ISSUE_FIELDS]}, update=True)
+
+
 def after_migrate():
 	ensure_todo_fields()
 	ensure_task_fields()
+	ensure_issue_fields()
 
 
 def after_install():

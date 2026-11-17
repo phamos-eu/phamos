@@ -5,7 +5,8 @@
 
 Every cockpit is a CockpitConfig: department cockpits are scoped to a Department
 from Cockpit Settings, the Personal Cockpit (scope="personal") to the records
-assigned to the session user through ToDo.
+assigned to the session user through ToDo, the Team Cockpit (scope="team") to the
+records of the session user's active Team.
 """
 
 from dataclasses import dataclass
@@ -34,6 +35,7 @@ from phamos.api.issue_common import get_form_options as _base_form_options
 from phamos.api.issue_common import set_assignees as _set_assignees
 from phamos.api.issue_common import update_status as _update_status
 from phamos.api.presence import assert_fields_unlocked
+from phamos.cockpits import teams
 from phamos.cockpits.settings import COCKPIT_SETTINGS
 from phamos.phriend.gitlab_issues import issue_gitlab_issues
 from phamos.phriend.report import issue_report
@@ -82,12 +84,13 @@ CHECKLIST_LIST_LIMIT = 1000
 # trip; this cap is what stops that from being truly unbounded.
 ISSUE_LIST_LIMIT = 1000
 
-COCKPIT_SCOPES = ("department", "personal")
+COCKPIT_SCOPES = ("department", "personal", "team")
 
 
 @dataclass(frozen=True)
 class CockpitConfig:
-	"""Cockpit configuration: department-scoped (Cockpit Settings fields) or personal."""
+	"""Cockpit configuration: department-scoped (Cockpit Settings fields), personal, or scoped
+	to the session user's active Team (phamos.cockpits.teams, #1955)."""
 
 	label: str
 	department_field: str
@@ -103,6 +106,10 @@ class CockpitConfig:
 	@property
 	def is_personal(self) -> bool:
 		return self.scope == "personal"
+
+	@property
+	def is_team(self) -> bool:
+		return self.scope == "team"
 
 	@property
 	def project_name_key(self) -> str:
@@ -130,6 +137,22 @@ def _get_project(config: CockpitConfig):
 	if not config.project_field:
 		return None
 	return frappe.db.get_single_value(COCKPIT_SETTINGS, config.project_field)
+
+
+def _team_or_filters(team):
+	"""or_filters for the Issues or Tasks of `team`: named on the record (custom_team), or in a
+	Project of one of the team's Implementations."""
+	or_filters = [["custom_team", "=", team]]
+	project_names = teams.team_projects(team)
+	if project_names:
+		or_filters.append(["project", "in", project_names])
+	return or_filters
+
+
+def _in_team_scope(doc, team):
+	if doc.get("custom_team") == team:
+		return True
+	return bool(doc.project) and doc.project in teams.team_projects(team)
 
 
 def _personal_reference_names():
@@ -204,6 +227,8 @@ def _issue_or_filters(config: CockpitConfig, department=None):
 	if config.is_personal:
 		names = _personal_reference_names()["Issue"]
 		return [["name", "in", names]] if names else []
+	if config.is_team:
+		return _team_or_filters(teams.require_active_team())
 
 	department = department or _get_department(config)
 	if not department:
@@ -221,6 +246,8 @@ def _issue_or_filters(config: CockpitConfig, department=None):
 def _issue_in_scope(config: CockpitConfig, doc):
 	if config.is_personal:
 		return _personal_in_scope("Issue", doc)
+	if config.is_team:
+		return _in_team_scope(doc, teams.require_active_team())
 
 	department = _get_department(config)
 	if not department:
@@ -241,13 +268,20 @@ def _ensure_issue_in_scope(config: CockpitConfig, doc):
 	if not _issue_in_scope(config, doc):
 		if config.is_personal:
 			frappe.throw(_("This issue is not assigned to you."))
+		if config.is_team:
+			frappe.throw(_("This issue does not belong to your team."))
 		frappe.throw(
 			_("This issue is not in the {0} department scope.").format(config.label)
 		)
 
 
 def _require_department(config: CockpitConfig):
+	"""The cockpit's Department, or throw. None for the scopes that have none: personal, and team,
+	which needs an active team instead."""
 	if config.is_personal:
+		return None
+	if config.is_team:
+		teams.require_active_team()
 		return None
 	department = _get_department(config)
 	if not department:
@@ -259,7 +293,7 @@ def _require_department(config: CockpitConfig):
 
 
 def validate_project(config: CockpitConfig, project):
-	if config.is_personal:
+	if config.is_personal or config.is_team:
 		return
 	if not project:
 		frappe.throw(_("Project is required for {0} issues.").format(config.label))
@@ -285,6 +319,8 @@ def check_app_permission(config: CockpitConfig, extra_doctypes=()):
 
 	if config.is_personal:
 		return True
+	if config.is_team:
+		return bool(teams.available_teams())
 
 	roles = set(frappe.get_roles())
 	if roles & set(config.roles):
@@ -309,6 +345,8 @@ def get_settings(config: CockpitConfig, read_permission: Optional[Callable[[], N
 
 	if config.is_personal:
 		return {}
+	if config.is_team:
+		return {"team": teams.require_active_team(), "teams": teams.available_teams()}
 
 	department = _get_department(config)
 	project = _get_project(config)
@@ -560,9 +598,13 @@ def get_issue_chat_states(names):
 def get_form_options(config: CockpitConfig):
 	"""Form options scoped to the configured department (all open projects when personal)."""
 	frappe.has_permission("Issue", "read", throw=True)
-	if config.is_personal:
+	if config.is_personal or config.is_team:
 		options = _base_form_options(project_filters={"status": "Open"})
-		options["shortlist_users"] = _role_shortlist_users(config)
+		if config.is_team:
+			# the people to assign to are the team mates
+			options["shortlist_users"] = teams.team_users(teams.require_active_team())
+		else:
+			options["shortlist_users"] = _role_shortlist_users(config)
 		options.update(_task_form_options())
 		return options
 
@@ -664,6 +706,17 @@ def create_issue(
 			project=project,
 			department=department,
 		)
+	if config.is_team:
+		return _create_issue(
+			subject=subject,
+			description=description,
+			priority=priority,
+			issue_type=issue_type,
+			assign_to=assign_to,
+			project=project,
+			department=department,
+			team=teams.require_active_team(),
+		)
 
 	configured_department = _require_department(config)
 
@@ -761,12 +814,16 @@ def get_tasks(config: CockpitConfig, include_completed=0):
 	frappe.has_permission("Task", "read", throw=True)
 	department = _require_department(config)
 	include_completed = frappe.utils.cint(include_completed)
+	or_filters = None
 
 	if config.is_personal:
 		names = _personal_reference_names()["Task"]
 		if not names:
 			return []
 		filters = [["name", "in", names]]
+	elif config.is_team:
+		filters = []
+		or_filters = _team_or_filters(teams.require_active_team())
 	else:
 		filters = [["department", "=", department]]
 	if not include_completed:
@@ -775,6 +832,7 @@ def get_tasks(config: CockpitConfig, include_completed=0):
 	rows = frappe.get_list(
 		"Task",
 		filters=filters,
+		or_filters=or_filters,
 		fields=TASK_LIST_FIELDS,
 		order_by="exp_start_date asc, modified desc",
 		limit_page_length=500,
@@ -792,6 +850,9 @@ def _get_scoped_task(config: CockpitConfig, name):
 	if config.is_personal:
 		if not _personal_in_scope("Task", doc):
 			frappe.throw(_("This task is not assigned to you."))
+	elif config.is_team:
+		if not _in_team_scope(doc, teams.require_active_team()):
+			frappe.throw(_("This task does not belong to your team."))
 	elif doc.department != department:
 		frappe.throw(_("This task is not in the {0} department.").format(config.label))
 	return doc
@@ -851,6 +912,12 @@ def _department_checklist_references(config: CockpitConfig, department):
 	if config.is_personal:
 		names = _personal_reference_names()
 		return names["Issue"], names["Task"]
+	if config.is_team:
+		or_filters = _team_or_filters(teams.require_active_team())
+		return tuple(
+			frappe.get_list(doctype, or_filters=or_filters, pluck="name", limit_page_length=500)
+			for doctype in ("Issue", "Task")
+		)
 
 	department = _require_department(config)
 
@@ -1082,6 +1149,8 @@ def create_checklist(
 	if document not in allowed or reference_record not in allowed[document]:
 		if config.is_personal:
 			frappe.throw(_("Select one of your Issues or Tasks."))
+		if config.is_team:
+			frappe.throw(_("Select an Issue or Task of your team."))
 		frappe.throw(_("Select an Issue or Task in the {0} department.").format(config.label))
 
 	from phamos.api.checklist_inbox import create_spa_checklist
@@ -1213,7 +1282,7 @@ def create_task(
 	if task_type and not frappe.db.exists("Task Type", task_type):
 		frappe.throw(_("Task Type {0} does not exist").format(task_type))
 
-	if config.is_personal:
+	if config.is_personal or config.is_team:
 		department = department or _project_department(project)
 	else:
 		if not department:
@@ -1243,6 +1312,8 @@ def create_task(
 			"type": task_type,
 		}
 	)
+	if config.is_team:
+		doc.custom_team = teams.require_active_team()
 	if description:
 		doc.description = description
 	doc.insert()
@@ -1341,7 +1412,10 @@ def create_task_from_issue(
 		project = _get_project(config)
 
 	# Task.department is stock; Issue may only be in scope via project.
-	department = _project_department(project) if config.is_personal else configured_department
+	if config.is_personal or config.is_team:
+		department = _project_department(project)
+	else:
+		department = configured_department
 
 	doc = frappe.get_doc(
 		{
@@ -1355,6 +1429,9 @@ def create_task_from_issue(
 			"exp_end_date": exp_end_date,
 		}
 	)
+	if config.is_team:
+		# the Issue was in this team's scope, maybe only through its project; the Task names the team
+		doc.custom_team = teams.require_active_team()
 	if description:
 		doc.description = description
 	if priority:
