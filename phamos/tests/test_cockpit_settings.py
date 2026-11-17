@@ -153,6 +153,19 @@ class TestCockpitSettingsValidation(FrappeTestCase):
 			self.assertTrue(frappe.get_meta(NEW).has_field(field), field)
 
 
+	def test_each_tab_starts_with_an_open_cockpit_button(self):
+		# the routes behind the buttons live in cockpit_settings.js (COCKPIT_ROUTES)
+		fields = frappe.get_meta(NEW).fields
+		tabs = [i for i, field in enumerate(fields) if field.fieldtype == "Tab Break"]
+		self.assertEqual(len(tabs), 6)
+		with open(frappe.get_app_path("phamos", "cockpits", "doctype", "cockpit_settings", "cockpit_settings.js")) as js:
+			script = js.read()
+		for i in tabs:
+			button = fields[i + 1]
+			self.assertEqual((button.fieldtype, button.label), ("Button", "Open Cockpit"), fields[i].fieldname)
+			self.assertIn(f"{button.fieldname}:", script)
+
+
 WINDOW_FIELDS = tuple(f"{prefix}_{part}" for prefix, _ in COCKPITS.values() for part in ("color", "glow"))
 
 

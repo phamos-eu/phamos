@@ -5,6 +5,7 @@
  "engine": "InnoDB",
  "field_order": [
   "human_resources_spa_tab",
+  "human_resources_open_cockpit",
   "human_resources_window_section",
   "human_resources_color",
   "column_break_human_resources_window",
@@ -16,6 +17,7 @@
   "human_resources_sick_leave_types",
   "human_resources_privacy_reveal_seconds",
   "personal_cockpit_tab",
+  "personal_open_cockpit",
   "personal_window_section",
   "personal_color",
   "column_break_personal_window",
@@ -23,6 +25,7 @@
   "personal_cockpit_section",
   "personal_ideas_show_author",
   "project_management_spa_tab",
+  "project_management_open_cockpit",
   "project_management_window_section",
   "project_management_color",
   "column_break_project_management_window",
@@ -32,6 +35,7 @@
   "column_break_project_management_spa",
   "project_management_timesheet_project",
   "sales_spa_tab",
+  "sales_open_cockpit",
   "sales_window_section",
   "sales_color",
   "column_break_sales_window",
@@ -41,6 +45,7 @@
   "column_break_sales_spa",
   "sales_standard_project",
   "accounting_spa_tab",
+  "accounting_open_cockpit",
   "accounting_window_section",
   "accounting_color",
   "column_break_accounting_window",
@@ -50,6 +55,7 @@
   "column_break_accounting_spa",
   "accounting_standard_project",
   "software_development_spa_tab",
+  "software_development_open_cockpit",
   "software_development_window_section",
   "software_development_color",
   "column_break_software_development_window",
@@ -64,6 +70,11 @@
    "fieldname": "human_resources_spa_tab",
    "fieldtype": "Tab Break",
    "label": "Human Resources Cockpit"
+  },
+  {
+   "fieldname": "human_resources_open_cockpit",
+   "fieldtype": "Button",
+   "label": "Open Cockpit"
   },
   {
    "fieldname": "human_resources_window_section",
@@ -133,6 +144,11 @@
    "label": "Personal Cockpit"
   },
   {
+   "fieldname": "personal_open_cockpit",
+   "fieldtype": "Button",
+   "label": "Open Cockpit"
+  },
+  {
    "fieldname": "personal_window_section",
    "fieldtype": "Section Break",
    "label": "Window"
@@ -172,6 +188,11 @@
    "fieldname": "project_management_spa_tab",
    "fieldtype": "Tab Break",
    "label": "Project Management Cockpit"
+  },
+  {
+   "fieldname": "project_management_open_cockpit",
+   "fieldtype": "Button",
+   "label": "Open Cockpit"
   },
   {
    "fieldname": "project_management_window_section",
@@ -226,6 +247,11 @@
    "label": "Sales SPA"
   },
   {
+   "fieldname": "sales_open_cockpit",
+   "fieldtype": "Button",
+   "label": "Open Cockpit"
+  },
+  {
    "fieldname": "sales_window_section",
    "fieldtype": "Section Break",
    "label": "Window"
@@ -276,6 +302,11 @@
    "fieldname": "accounting_spa_tab",
    "fieldtype": "Tab Break",
    "label": "Accounting SPA"
+  },
+  {
+   "fieldname": "accounting_open_cockpit",
+   "fieldtype": "Button",
+   "label": "Open Cockpit"
   },
   {
    "fieldname": "accounting_window_section",
@@ -330,6 +361,11 @@
    "label": "Software Development Cockpit"
   },
   {
+   "fieldname": "software_development_open_cockpit",
+   "fieldtype": "Button",
+   "label": "Open Cockpit"
+  },
+  {
    "fieldname": "software_development_window_section",
    "fieldtype": "Section Break",
    "label": "Window"
@@ -379,7 +415,7 @@
  ],
  "issingle": 1,
  "links": [],
- "modified": "2026-11-17 14:00:00.000000",
+ "modified": "2026-11-17 16:00:00.000000",
  "modified_by": "Administrator",
  "module": "Cockpits",
  "name": "Cockpit Settings",
