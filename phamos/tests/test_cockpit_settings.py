@@ -245,6 +245,22 @@ class TestCockpitWindow(FrappeTestCase):
 		self.assertEqual(cockpit_window("/human-resources-cockpit")["edges"], ["bottom", "right"])
 		self.assertTrue(cockpit_window("/human-resources-cockpit")["breathing"])  # default on
 
+	def test_a_new_site_gets_the_defaults(self):
+		# fresh install: patches don't run and nothing is stored, so after_install fills it in
+		from phamos.cockpits import setup
+
+		frappe.db.delete("Singles", {"doctype": NEW, "field": ("in", WINDOW_FIELDS)})
+		frappe.db.value_cache.pop(NEW, None)
+		self.assertEqual(cockpit_window("/sales-cockpit"), OFF)  # what a new site would show
+		self.assertIn("phamos.cockpits.setup.after_install", frappe.get_hooks("after_install"))
+		with patch.object(frappe, "reload_doc"):
+			setup.after_install()
+		frappe.db.set_single_value(NEW, "sales_glow", "Always")
+		self.assertEqual(
+			cockpit_window("/sales-cockpit"),
+			{"color": "#c2410c", "glow": "Always", "edges": ["bottom", "right"], "breathing": True},
+		)
+
 	def test_defaults_match_the_app_icons_and_manifests(self):
 		meta = frappe.get_meta(NEW)
 		for route, (prefix, color) in COCKPITS.items():
