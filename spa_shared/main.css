@@ -309,20 +309,27 @@ html[data-theme="dark"] {
    switched on in Cockpit Settings. --cockpit-rgb is "r g b"; --glow-top/left/bottom/right are 1 or 0.
    Each edge is a strip whose glow fades inwards; along its length it fades out towards a side whose
    edge is off (bottom + right: the bottom strip fades out to the left, the right strip to the top).
-   Where two glowing edges meet, the strips stop short and a round corner piece joins them.
-   Two layers: a faint steady one and a stronger one shown for a moment on focus. Above dialogs so
-   it frames them too. */
+   Where two glowing edges meet, the strips stop short and a corner piece three glow-widths big
+   joins them in a wide curve, so the corner feels soft rather than 90°.
+   Two layers: a faint steady one (breathing, if on) and a stronger one shown for a moment on focus.
+   Above dialogs so it frames them too.
+   Speed: the overlay is contained (never makes the page lay out again), each layer is its own
+   compositor layer, and breathing and the focus pulse only change opacity, so they run on the
+   GPU without repainting anything. */
 .cockpit-glow {
 	position: fixed;
 	inset: 0;
 	z-index: 10000;
 	pointer-events: none;
+	contain: strict;
 }
 .cockpit-glow__layer {
 	--glow-alpha: 0.32;
 	--glow-size: 56px;
+	--glow-corner: calc(var(--glow-size) * 3);
 	position: absolute;
 	inset: 0;
+	will-change: opacity;
 }
 /* Phriend's box breathing (phamos/public/js/phriend/ball.js), one 21 s cycle: in 4 s, hold 5 s,
    out 7 s, hold 5 s; only between 75 % and full strength, so it is barely noticed. */
@@ -354,8 +361,8 @@ html[data-theme="dark"] {
 .cockpit-glow__edge--top,
 .cockpit-glow__edge--bottom {
 	/* stop short where a corner piece takes over */
-	left: calc(var(--glow-left) * var(--glow-size));
-	right: calc(var(--glow-right) * var(--glow-size));
+	left: calc(var(--glow-left) * var(--glow-corner));
+	right: calc(var(--glow-right) * var(--glow-corner));
 	height: var(--glow-size);
 	/* full where the left/right edge glows too, fading out to a side without glow */
 	--glow-along: linear-gradient(to right, rgb(0 0 0 / var(--glow-left)), #000 50%, rgb(0 0 0 / var(--glow-right)));
@@ -364,8 +371,8 @@ html[data-theme="dark"] {
 }
 .cockpit-glow__edge--left,
 .cockpit-glow__edge--right {
-	top: calc(var(--glow-top) * var(--glow-size));
-	bottom: calc(var(--glow-bottom) * var(--glow-size));
+	top: calc(var(--glow-top) * var(--glow-corner));
+	bottom: calc(var(--glow-bottom) * var(--glow-corner));
 	width: var(--glow-size);
 	--glow-along: linear-gradient(to bottom, rgb(0 0 0 / var(--glow-top)), #000 50%, rgb(0 0 0 / var(--glow-bottom)));
 	-webkit-mask-image: var(--glow-along);
@@ -388,30 +395,32 @@ html[data-theme="dark"] {
 	background: linear-gradient(to left, var(--glow-color), transparent);
 }
 .cockpit-glow__corner {
-	width: var(--glow-size);
-	height: var(--glow-size);
+	width: var(--glow-corner);
+	height: var(--glow-corner);
+	/* Circles around the piece's inner corner: nothing up to (corner - size), full colour at the
+	   corner's radius. Along both outer sides that is the same fade as the strips', and inside it
+	   the glow bends in a quarter circle of radius (corner - size) instead of a right angle. */
+	--glow-curve: transparent calc(var(--glow-corner) - var(--glow-size)), var(--glow-color) var(--glow-corner);
 }
-/* The glow grows from the piece's inner corner (none) to full colour at --glow-size, like the
-   strips grow from their inner side to the edge; that rounds the inside of the corner. */
 .cockpit-glow__corner--top-left {
 	top: 0;
 	left: 0;
-	background: radial-gradient(circle var(--glow-size) at 100% 100%, transparent, var(--glow-color));
+	background: radial-gradient(circle var(--glow-corner) at 100% 100%, var(--glow-curve));
 }
 .cockpit-glow__corner--top-right {
 	top: 0;
 	right: 0;
-	background: radial-gradient(circle var(--glow-size) at 0 100%, transparent, var(--glow-color));
+	background: radial-gradient(circle var(--glow-corner) at 0 100%, var(--glow-curve));
 }
 .cockpit-glow__corner--bottom-left {
 	bottom: 0;
 	left: 0;
-	background: radial-gradient(circle var(--glow-size) at 100% 0, transparent, var(--glow-color));
+	background: radial-gradient(circle var(--glow-corner) at 100% 0, var(--glow-curve));
 }
 .cockpit-glow__corner--bottom-right {
 	bottom: 0;
 	right: 0;
-	background: radial-gradient(circle var(--glow-size) at 0 0, transparent, var(--glow-color));
+	background: radial-gradient(circle var(--glow-corner) at 0 0, var(--glow-curve));
 }
 @media (prefers-reduced-motion: reduce) {
 	.cockpit-glow__layer--pulse {
