@@ -14,6 +14,8 @@ export default defineConfig({
 		alias: {
 			"@": path.resolve(__dirname, "src"),
 			"@spa": path.resolve(__dirname, "../spa_shared"),
+			// Phriend's shared core, the same files Desk bundles (#1900)
+			"@phriend": path.resolve(__dirname, "../phamos/public/js/phriend"),
 			"frappe-gantt/src/gantt.scss": path.resolve(__dirname, "../spa_shared/lib/empty.scss"),
 			// Resolve shared deps from this SPA's node_modules (spa_shared is outside root)
 			vue: path.resolve(__dirname, "node_modules/vue"),
