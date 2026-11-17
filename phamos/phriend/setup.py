@@ -47,13 +47,22 @@ _FIELDS = [
 		"insert_after": "phriend_reported_by",
 	},
 	{
+		"fieldname": "phriend_source_system",
+		"label": "Reported On System",
+		"fieldtype": "Data",
+		"read_only": 1,
+		"in_standard_filter": 1,
+		"description": "Set when the report came from another system (a develop or test system with this one as its target)",
+		"insert_after": "phriend_reported_by_name",
+	},
+	{
 		"fieldname": "phriend_type",
 		"label": "Report Type",
 		"fieldtype": "Select",
 		"options": "\nBug\nIdea\nQuestion\nOther",
 		"in_standard_filter": 1,
 		"depends_on": ONLY_PHRIEND,
-		"insert_after": "phriend_reported_by_name",
+		"insert_after": "phriend_source_system",
 	},
 	{
 		"fieldname": "phriend_comment",
@@ -133,7 +142,15 @@ _FIELDS = [
 		"read_only": 1,
 		"insert_after": "phriend_route",
 	},
-	{"fieldname": "phriend_context_col", "fieldtype": "Column Break", "insert_after": "phriend_page_url"},
+	{
+		"fieldname": "phriend_source_url",
+		"label": "Reported On System URL",
+		"fieldtype": "Data",
+		"options": "URL",
+		"read_only": 1,
+		"insert_after": "phriend_page_url",
+	},
+	{"fieldname": "phriend_context_col", "fieldtype": "Column Break", "insert_after": "phriend_source_url"},
 	{
 		"fieldname": "phriend_context",
 		"label": "Captured Context",
@@ -154,9 +171,19 @@ DEFAULT_SETTINGS = {
 }
 
 
+REMOTE_ROLE = "Phriend Remote"
+
+
 def after_migrate():
 	ensure_issue_fields()
 	ensure_default_settings()
+	ensure_remote_role()
+
+
+def ensure_remote_role():
+	"""The role of the API user a develop or test system sends its reports with (phamos.phriend.remote)."""
+	if not frappe.db.exists("Role", REMOTE_ROLE):
+		frappe.get_doc({"doctype": "Role", "role_name": REMOTE_ROLE, "desk_access": 0}).insert(ignore_permissions=True)
 
 
 def ensure_issue_fields():
