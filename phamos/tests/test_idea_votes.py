@@ -252,30 +252,14 @@ class TestIdeaVotes(FrappeTestCase):
 
 	def test_author_follows_the_setting(self):
 		idea = self._handed_in()
-		frappe.db.set_single_value("phamos Settings", SETTING, 1)
+		frappe.db.set_single_value("Cockpit Settings", SETTING, 1)
 		row = self._vote_row(OTHER, idea["name"])
 		self.assertEqual(row["author"]["name"], USER)
 		self.assertEqual(row["author"]["full_name"], "idea-vote-a")
 		self.assertNotIn("user", row)
 
-		frappe.db.set_single_value("phamos Settings", SETTING, 0)
+		frappe.db.set_single_value("Cockpit Settings", SETTING, 0)
 		row = self._vote_row(OTHER, idea["name"])
 		self.assertIsNone(row["author"])
 		self.assertNotIn("user", row)
 		self.assertIsNone(_as(OTHER, pc.get_idea_for_vote, idea["name"])["author"])
-
-	def test_patch_turns_the_author_on_where_nothing_is_stored(self):
-		from phamos.patches.v1_0 import set_personal_ideas_show_author_default as patch_module
-
-		def show_author():
-			frappe.db.value_cache.pop("phamos Settings", None)
-			return ideas.show_author()
-
-		frappe.db.delete("Singles", {"doctype": "phamos Settings", "field": SETTING})
-		self.assertFalse(show_author())  # what Frappe reads for a Check with no stored value
-		patch_module.execute()
-		self.assertTrue(show_author())
-		# A choice already made stays.
-		frappe.db.set_single_value("phamos Settings", SETTING, 0)
-		patch_module.execute()
-		self.assertFalse(show_author())

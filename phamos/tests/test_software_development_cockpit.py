@@ -15,8 +15,8 @@ def _whitelisted(module):
 
 
 class TestSoftwareDevelopmentCockpit(FrappeTestCase):
-	def test_config_fields_exist_in_phamos_settings(self):
-		meta = frappe.get_meta("phamos Settings")
+	def test_config_fields_exist_in_cockpit_settings(self):
+		meta = frappe.get_meta("Cockpit Settings")
 		self.assertTrue(meta.has_field(sd.CONFIG.department_field))
 		self.assertTrue(meta.has_field(sd.CONFIG.project_field))
 

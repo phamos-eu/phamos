@@ -8,7 +8,7 @@ const DEFAULT_PRIORITY = "Medium"
 
 /**
  * A fresh form: start and end today, the current user as Task Owner, 1 hour, Medium,
- * and the cockpit's project from phamos Settings (none in the personal cockpit).
+ * and the cockpit's project from Cockpit Settings (none in the personal cockpit).
  */
 export function newTaskDefaults({ subject = "", today, user = "", options = {}, projectField = "" }) {
 	const priorities = options.task_priorities || []
