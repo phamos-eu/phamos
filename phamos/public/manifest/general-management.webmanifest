@@ -1,0 +1,31 @@
+{
+	"id": "/general-management-cockpit",
+	"name": "General Management",
+	"short_name": "General Management",
+	"description": "Company targets, the departments' work and company-wide appointments",
+	"start_url": "/general-management-cockpit",
+	"scope": "/general-management-cockpit",
+	"display": "standalone",
+	"background_color": "#f8f8f8",
+	"theme_color": "#a16207",
+	"icons": [
+		{
+			"src": "/assets/phamos/manifest/general-management-icon-192.png",
+			"sizes": "192x192",
+			"type": "image/png",
+			"purpose": "any"
+		},
+		{
+			"src": "/assets/phamos/manifest/general-management-icon-512.png",
+			"sizes": "512x512",
+			"type": "image/png",
+			"purpose": "any"
+		},
+		{
+			"src": "/assets/phamos/manifest/general-management-maskable-512.png",
+			"sizes": "512x512",
+			"type": "image/png",
+			"purpose": "maskable"
+		}
+	]
+}

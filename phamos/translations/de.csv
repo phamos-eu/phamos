@@ -2262,3 +2262,8 @@ Not linked as a record in ERPNext.,In ERPNext nicht als Datensatz verknüpft.
 GitLab issue {0} created,GitLab-Issue {0} angelegt
 GitLab issue not linked,GitLab-Issue nicht verknüpft
 "The GitLab issue was created, but it is not linked to this Issue. Usually its project is not in ERPNext yet: run Sync Projects in {0} before the next one. Otherwise see the {1}.","Das GitLab-Issue wurde angelegt, ist aber nicht mit dieser Anfrage verknüpft. Meist ist sein Projekt noch nicht in ERPNext: Bitte vor dem nächsten „Sync Projects“ in {0} ausführen. Sonst siehe {1}."
+General Management,Geschäftsführung
+General Management Cockpit,Geschäftsführung-Cockpit
+General Management Department,Abteilung Geschäftsführung
+General Management Timesheet Project,Zeiterfassungsprojekt Geschäftsführung
+You do not have permission to access the General Management Cockpit,Sie haben keine Berechtigung für das Geschäftsführung-Cockpit
