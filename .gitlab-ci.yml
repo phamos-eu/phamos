@@ -200,6 +200,7 @@ unit_tests_1:
       phamos.tests.test_accounting_stats
       phamos.phamos.page.extract_pdf.test_extract_pdf
       phamos.gitlab_integration.test_issue_analysis
+      phamos.tests.test_set_timesheet_record_billable_hours
 
 unit_tests_2:
   extends: .unit_tests
