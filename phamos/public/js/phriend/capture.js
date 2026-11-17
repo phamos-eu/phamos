@@ -4,7 +4,7 @@
 
 import html2canvas from "html2canvas";
 import { toCanvas as html_to_canvas } from "html-to-image";
-import { sleep, storage_get, storage_set, with_timeout } from "./util";
+import { host_theme, page_background, sleep, storage_get, storage_set, with_timeout } from "./util";
 
 const HTML2CANVAS_TIMEOUT_MS = 3000; // then html-to-image
 const CAPTURE_TIMEOUT_MS = 8000; // both engines together; then the flow goes on without one
@@ -56,7 +56,8 @@ function skip_for_copy(el) {
 }
 
 function background() {
-	return getComputedStyle(document.body).backgroundColor || "#fff";
+	const of = (el) => getComputedStyle(el).backgroundColor;
+	return page_background([of(document.body), of(document.documentElement)], host_theme());
 }
 
 function render_html2canvas() {

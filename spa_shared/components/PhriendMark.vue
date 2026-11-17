@@ -1,7 +1,8 @@
 <template>
-	<!-- Phriend's ball as a small mark: the record came from Phriend (#1901). Static SVG, no user data. -->
+	<!-- Phriend's ball as a small mark: the record came from Phriend (#1901). Static SVG, no user data.
+	     In dark mode it glows like the ball, so it shows on a black page (#1934). -->
 	<span
-		class="inline-block flex-shrink-0 align-[-2px] [&_svg]:h-full [&_svg]:w-full"
+		class="inline-block flex-shrink-0 align-[-2px] [&_svg]:h-full [&_svg]:w-full dark:[filter:drop-shadow(0_0_1.5px_rgba(255,255,255,0.6))_drop-shadow(0_0_3px_rgba(255,255,255,0.3))]"
 		:class="sizeClass"
 		role="img"
 		:aria-label="label"

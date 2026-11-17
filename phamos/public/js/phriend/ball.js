@@ -2,7 +2,7 @@
 // and Tailwind (cockpits) can't change how it looks. This module is loaded on every page,
 // so it stays small: the capture and the report flow load on demand (flow.js).
 
-import { escape_html, host_theme, storage_get, storage_set } from "./util";
+import { escape_html, host_theme, storage_get, storage_set, watch_theme } from "./util";
 
 const POS_KEY = "phriend:position";
 
@@ -72,7 +72,10 @@ a { color: inherit; text-decoration: underline; cursor: pointer; }
 button.link { padding: 0; border: 0; background: none; color: inherit; font: inherit; text-decoration: underline; cursor: pointer; }
 button.link:focus-visible, .bubble a:focus-visible { outline: 2px solid var(--ph-focus); outline-offset: 1px; border-radius: 2px; }
 .ball svg { width: 100%; height: 100%; overflow: visible; display: block; filter: drop-shadow(0 4px 6px rgba(0, 0, 0, 0.25)); }
-:host([data-theme="dark"]) .sphere { stroke: rgba(255, 255, 255, 0.35); stroke-width: 1.5; }
+/* Dark mode: Phriend stays black and glows, so it stands out on a black page (#1934). */
+:host([data-theme="dark"]) .ball svg {
+	filter: drop-shadow(0 0 4px rgba(255, 255, 255, 0.55)) drop-shadow(0 0 12px rgba(255, 255, 255, 0.25));
+}
 /* Box breathing, one 21 s cycle: in 4 s, hold 5 s, out 7 s, hold 5 s. The ball fills up from
    its feet while breathing in and settles while breathing out; the shadow follows. */
 .body { transform-box: fill-box; transform-origin: 50% 100%; animation: breathe 21s infinite; }
@@ -203,10 +206,7 @@ export class Ball {
 	sync_theme() {
 		const apply = () => this.host.setAttribute("data-theme", host_theme());
 		apply();
-		new MutationObserver(apply).observe(document.documentElement, {
-			attributes: true,
-			attributeFilter: ["data-theme"],
-		});
+		watch_theme(apply);
 	}
 
 	setup_pause() {
