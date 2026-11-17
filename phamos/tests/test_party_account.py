@@ -259,6 +259,9 @@ def make_customer():
 			{
 				"doctype": "Customer",
 				"customer_name": f"phamos Party Account Test Customer {frappe.generate_hash(length=6)}",
+				# A site's default customer group may be a group, which ERPNext refuses.
+				"customer_group": "_Test Customer Group",
+				"territory": "_Test Territory Rest Of The World",
 			}
 		)
 		.insert()
@@ -272,6 +275,7 @@ def make_supplier():
 			{
 				"doctype": "Supplier",
 				"supplier_name": f"phamos Party Account Test Supplier {frappe.generate_hash(length=6)}",
+				"supplier_group": "Services",
 			}
 		)
 		.insert()
