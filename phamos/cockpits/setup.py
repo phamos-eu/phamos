@@ -156,3 +156,16 @@ def ensure_task_fields():
 def after_migrate():
 	ensure_todo_fields()
 	ensure_task_fields()
+
+
+def after_install():
+	"""Store the Cockpit Settings defaults on a new site (#1933).
+
+	Patches don't run on a fresh install, and a Single stores no defaults until it is saved: every
+	cockpit would start grey with no glow and "show author" off. Both patches only fill in fields
+	that have no stored value, so they are safe here.
+	"""
+	from phamos.patches.v1_0 import move_cockpit_settings, set_cockpit_window_defaults
+
+	move_cockpit_settings.execute()
+	set_cockpit_window_defaults.execute()

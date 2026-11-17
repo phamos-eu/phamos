@@ -15,6 +15,7 @@ from frappe.translate import (
 from frappe.utils import cint, get_system_timezone
 
 from phamos.api.cockpit_preferences import get_preferences
+from phamos.cockpits.settings import NEUTRAL_THEME_COLOR, cockpit_window
 from phamos.phriend.boot import phriend_boot
 
 
@@ -54,8 +55,16 @@ def get_spa_boot(default_route):
 			"versions": _app_versions() if phriend else {},
 			# The user's own cockpit preferences, e.g. the panel layout of the record pages (#1910).
 			"preferences": get_preferences(),
+			# The cockpit's window colour and edge glow from Cockpit Settings (#1933).
+			"cockpit_window": cockpit_window(default_route),
 		}
 	)
+
+
+def theme_color(boot):
+	"""The page's theme-color: the cockpit colour, so an installed cockpit's title bar has it from
+	the first paint (#1933). spa_shared/theme.js keeps it after the page has loaded."""
+	return boot.cockpit_window["color"] or NEUTRAL_THEME_COLOR
 
 
 def _app_versions():

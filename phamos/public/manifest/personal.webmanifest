@@ -7,7 +7,7 @@
 	"scope": "/personal-cockpit",
 	"display": "standalone",
 	"background_color": "#f8f8f8",
-	"theme_color": "#f8f8f8",
+	"theme_color": "#0e7490",
 	"icons": [
 		{
 			"src": "/assets/phamos/manifest/personal-icon-192.png",
