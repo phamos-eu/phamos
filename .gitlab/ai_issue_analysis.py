@@ -2,9 +2,11 @@
 """Analyses a GitLab issue and posts the result as a comment.
 
 Invoked by .gitlab-ci.yml's ai_issue_analysis job. A pipeline schedule with
-AI_ISSUE_POLL=true checks open bug and question issues. A pipeline started
-with AI_ISSUE_IID and AI_ISSUE_LABEL analyses that one issue. Uses the same
-CI/CD variables as the MR review: ANTHROPIC_API_KEY and GITLAB_API_TOKEN.
+AI_ISSUE_POLL=true checks open bug and question issues. Set AI_ISSUE_PROJECT
+(for example phamos/developer) to read those issues from another project; the
+code still comes from this checkout. A pipeline started with AI_ISSUE_IID and
+AI_ISSUE_LABEL analyses that one issue. Uses the same CI/CD variables as the
+MR review: ANTHROPIC_API_KEY and GITLAB_API_TOKEN.
 """
 
 import base64
@@ -500,8 +502,21 @@ def poll(gl):
     print(f"Posted {posted} analysis comment(s).")
 
 
+def issue_project():
+    """The project whose issues this run reads.
+
+    AI_ISSUE_PROJECT names another project (phamos/developer). The code search
+    stays in this checkout.
+    """
+    configured = (os.environ.get("AI_ISSUE_PROJECT") or "").strip().strip("/")
+    if configured:
+        return configured
+    return env("CI_PROJECT_ID")
+
+
 def main():
-    gl = GitLab(env("CI_SERVER_URL"), env("CI_PROJECT_ID"), env("GITLAB_API_TOKEN"))
+    project = issue_project()
+    gl = GitLab(env("CI_SERVER_URL"), project, env("GITLAB_API_TOKEN"))
     env("ANTHROPIC_API_KEY")
 
     issue_iid = os.environ.get("AI_ISSUE_IID")
@@ -515,6 +530,7 @@ def main():
         return
 
     if os.environ.get("AI_ISSUE_POLL") == "true":
+        print(f"Polling issues in {project}.")
         poll(gl)
         return
 

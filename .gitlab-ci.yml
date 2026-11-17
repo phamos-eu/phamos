@@ -46,7 +46,9 @@
 #   labelled bug or question, reads the matching code in this checkout, and
 #   comments on those that have no analysis yet, then replaces the bug or
 #   question label with analysed so the next run skips them
-#   (AI_ISSUE_POLL_LIMIT per run, default 5). The phamos site can still start
+#   (AI_ISSUE_POLL_LIMIT per run, default 5). Set AI_ISSUE_PROJECT (for example
+#   phamos/developer) to read issues from that project; the code still comes
+#   from this checkout. The phamos site can still start
 #   one issue by calling the pipeline API with AI_ISSUE_IID and AI_ISSUE_LABEL.
 #   Set AI_ISSUE_ANALYSIS_ENABLED=false to turn the job off. The poll schedule
 #   must set AI_ISSUE_POLL=true so the unit-test jobs do not run with it.
