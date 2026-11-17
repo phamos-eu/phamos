@@ -53,6 +53,13 @@ add_to_apps_screen = [
 		"has_permission": "phamos.api.software_development_spa.check_app_permission",
 	},
 	{
+		"name": "general_management_spa",
+		"logo": "/assets/phamos/manifest/general-management-icon-192.png",
+		"title": "General Management",
+		"route": "/general-management-cockpit",
+		"has_permission": "phamos.api.general_management_spa.check_app_permission",
+	},
+	{
 		"name": "scan",
 		"logo": "/assets/phamos/manifest/scan-icon-192.png",
 		"title": "Lead Scan",
@@ -156,6 +163,8 @@ website_route_rules = [
     {"from_route": "/accounting-cockpit/<path:app_path>", "to_route": "accounting_spa"},
     {"from_route": "/software-development-cockpit", "to_route": "software_development_spa"},
     {"from_route": "/software-development-cockpit/<path:app_path>", "to_route": "software_development_spa"},
+    {"from_route": "/general-management-cockpit", "to_route": "general_management_spa"},
+    {"from_route": "/general-management-cockpit/<path:app_path>", "to_route": "general_management_spa"},
     {"from_route": "/scan", "to_route": "scan"},
     {"from_route": "/scan/<path:app_path>", "to_route": "scan"},
 ]
@@ -260,6 +269,7 @@ after_migrate = [
 	"phamos.api.issue_chat.add_raven_indexes",  # record chats look channels up by record (#1794)
 	"phamos.setup.event_schedule.ensure_event_schedule_fields",  # Events tab on Company
 	"phamos.setup.item_grid.after_migrate",  # description column in item tables (#1858)
+	"phamos.setup.general_management.after_migrate",  # General Management Cockpit role and rights (#1946)
 ]
 
 # Uninstallation
