@@ -131,7 +131,7 @@ doctype_js = {
     "Appointment": "public/js/appointment.js",
     "Sales Invoice": "public/js/sales_invoice.js",
     "Customer": "public/js/customer.js",
-    "Company": "public/js/company.js",
+    "Department": "public/js/department.js",  # Event Schedule mailbox filter (#1949)
     "Delivery Note": "public/js/delivery_note.js",
 
 }
@@ -267,7 +267,7 @@ after_migrate = [
 	"phamos.setup.accounting_receipt.ensure_accounting_receipt_setup",  # AI Accountant role, user, bot
 	"phamos.marketing.setup.after_migrate",  # Lead Source "Event" for event registrations
 	"phamos.api.issue_chat.add_raven_indexes",  # record chats look channels up by record (#1794)
-	"phamos.setup.event_schedule.ensure_event_schedule_fields",  # Events tab on Company
+	"phamos.setup.event_schedule.ensure_event_schedule_fields",  # Event Schedule on Department (#1949)
 	"phamos.setup.item_grid.after_migrate",  # description column in item tables (#1858)
 	"phamos.setup.general_management.after_migrate",  # General Management Cockpit role and rights (#1946)
 ]
@@ -388,12 +388,6 @@ doc_events = {
         ],
         "on_trash": "phamos.events.team_daily_schedule.cleanup_events_on_parent_trash"
     },
-    # Company-wide events (Events tab from phamos/setup/event_schedule.py), synced like Team's.
-    "Company": {
-        "validate": "phamos.events.team_daily_schedule.validate_schedule_rows",
-        "on_update": "phamos.events.team_daily_schedule.sync_events_from_parent",
-        "on_trash": "phamos.events.team_daily_schedule.cleanup_events_on_parent_trash",
-    },
     "Communication": {
         "on_update": "phamos.events.communication.copy_attachments_to_reference_doc"
     },
@@ -487,7 +481,15 @@ doc_events = {
     "Supplier": {"on_update": "phamos.web_profile.mirror.push_to_profiles"},
     "Sales Partner": {"on_update": "phamos.web_profile.mirror.push_to_profiles"},
     "Workspace": {"on_update": "phamos.web_profile.mirror.push_to_profiles"},
-    "Department": {"on_update": "phamos.web_profile.mirror.push_to_profiles"},
+    "Department": {
+        "on_update": [
+            "phamos.web_profile.mirror.push_to_profiles",
+            # Event Schedule (phamos/setup/event_schedule.py, #1949), synced like Team's.
+            "phamos.events.team_daily_schedule.sync_events_from_parent",
+        ],
+        "validate": "phamos.events.team_daily_schedule.validate_schedule_rows",
+        "on_trash": "phamos.events.team_daily_schedule.cleanup_events_on_parent_trash",
+    },
     "Implementation Module": {"on_update": "phamos.web_profile.mirror.push_to_profiles"},
     "Interview Feedback": {
         "on_update": "phamos.phamos.hr.interview_summary.trigger_interview_summary",

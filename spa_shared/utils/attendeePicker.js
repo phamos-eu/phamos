@@ -38,6 +38,13 @@ export function addDepartment(attendees, group) {
 	return addAttendees(attendees, (group.people || []).map((person) => person.email))
 }
 
+/** The department button: adds everyone of the department, or, when all are picked already,
+ *  removes them all again (Wolfram, 2026-11-17). */
+export function toggleDepartment(attendees, group) {
+	if (departmentState(attendees, group) !== "all") return addDepartment(attendees, group)
+	return (group.people || []).reduce((result, person) => removeAttendee(result, person.email), attendees)
+}
+
 export function removeAttendee(attendees, email) {
 	const k = key(email)
 	return {
