@@ -13,11 +13,12 @@ import frappe
 import requests
 from frappe import _
 from frappe.desk.form.assign_to import add as assign_to
-from frappe.utils import cstr, escape_html, get_url, pretty_date
+from frappe.utils import cstr, escape_html, get_url, pretty_date, to_markdown
 from frappe.utils.password import get_decrypted_password
 
 from phamos.phriend import shortcut as phriend_shortcut
 from phamos.phriend.boot import is_for_user
+from phamos.phriend.gitlab_issues import link_created
 
 MAX_SCREENSHOT_BYTES = 15 * 1024 * 1024
 REPORT_DOCTYPE = "Issue"
@@ -417,10 +418,13 @@ def test_gitlab_connection():
 
 @frappe.whitelist(methods=["POST"])
 def create_gitlab_issue(issue, labels=None, title=None):
+	"""A GitLab issue from an Issue, linked to it as a GitLab Issue record.
+
+	Any Issue, and as often as needed: one Issue can hold several GitLab issues (PM, 2026-11-17).
+	`gitlab_issue_url` keeps the first one.
+	"""
 	doc = frappe.get_doc(REPORT_DOCTYPE, issue)
 	doc.check_permission("write")
-	if doc.get("gitlab_issue_url"):
-		frappe.throw(_("This Issue already has a GitLab issue: {0}").format(doc.gitlab_issue_url))
 
 	settings = _settings()
 	base, headers = _gitlab(settings)
@@ -439,7 +443,18 @@ def create_gitlab_issue(issue, labels=None, title=None):
 	created = response.json()
 	web_url = created.get("web_url")
 
-	doc.db_set("gitlab_issue_url", web_url)
+	if not doc.get("gitlab_issue_url"):
+		doc.db_set("gitlab_issue_url", web_url)
+	# GitLab has the issue now: a failed link must not fail the request, or the user clicks
+	# again and a second GitLab issue is made (AI review of !1192). The URL and comment stay.
+	frappe.db.savepoint("phriend_link_gitlab_issue")
+	try:
+		record = link_created(doc.name, created)
+	except Exception:
+		frappe.db.rollback(save_point="phriend_link_gitlab_issue")
+		frappe.log_error(title="Phriend: linking the GitLab issue failed", reference_doctype=REPORT_DOCTYPE,
+			reference_name=doc.name)
+		record = None
 	reference = created.get("references", {}).get("full") or web_url
 	doc.add_comment(
 		"Comment",
@@ -447,7 +462,8 @@ def create_gitlab_issue(issue, labels=None, title=None):
 			f'<a href="{escape_html(web_url)}" target="_blank">{escape_html(reference)}</a>'
 		),
 	)
-	return {"web_url": web_url, "iid": created.get("iid")}
+	# no record: the GitLab Project is not synced to ERPNext yet, or linking failed (both logged)
+	return {"web_url": web_url, "iid": created.get("iid"), "reference": reference, "gitlab_issue": record}
 
 
 def _upload_screenshot(api, headers, file_url):
@@ -467,6 +483,9 @@ def _upload_screenshot(api, headers, file_url):
 
 
 def _issue_markdown(report, screenshot_md):
+	if not report.get("phriend_type"):
+		return _plain_issue_markdown(report)
+
 	lines = []
 	if report.get("phriend_comment"):
 		lines += ["## What happened", "", report.phriend_comment, ""]
@@ -503,4 +522,15 @@ def _issue_markdown(report, screenshot_md):
 
 	issue_url = get_url(f"/app/issue/{quote(report.name)}")
 	lines.append(f"_Reported via Phriend · ERPNext Issue [{report.name}]({issue_url})_")
+	return "\n".join(lines)
+
+
+def _plain_issue_markdown(issue):
+	"""An Issue that did not come from Phriend: its description, then the link back."""
+	lines = []
+	description = to_markdown(issue.description or "").strip() if issue.get("description") else ""
+	if description:
+		lines += [description, ""]
+	issue_url = get_url(f"/app/issue/{quote(issue.name)}")
+	lines.append(f"_From ERPNext Issue [{issue.name}]({issue_url})_")
 	return "\n".join(lines)

@@ -35,6 +35,7 @@ from phamos.api.issue_common import set_assignees as _set_assignees
 from phamos.api.issue_common import update_status as _update_status
 from phamos.api.presence import assert_fields_unlocked
 from phamos.cockpits.settings import COCKPIT_SETTINGS
+from phamos.phriend.gitlab_issues import issue_gitlab_issues
 from phamos.phriend.report import issue_report
 
 ISSUE_EDITABLE_FIELDS = ("subject", "description", "priority", "issue_type", "project")
@@ -519,6 +520,8 @@ def _serialize_issue_detail(doc):
 		"desk_url": f"/app/issue/{doc.name}",
 		# what Phriend captured, for the report section on the Issue page (#1901)
 		"phriend": issue_report(doc),
+		# the GitLab issues created from this Issue, each a GitLab Issue record
+		"gitlab_issues": issue_gitlab_issues(doc.name),
 	}
 
 

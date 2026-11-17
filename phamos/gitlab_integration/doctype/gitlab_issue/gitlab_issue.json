@@ -17,6 +17,7 @@
   "assignee_email",
   "gitlab_username",
   "issue_url",
+  "issue",
   "parent_issue",
   "gitlab_project",
   "gitlab_milestone",
@@ -73,6 +74,17 @@
    "fieldtype": "Data",
    "in_list_view": 1,
    "label": "Issue Url"
+  },
+  {
+   "description": "The ERPNext Issue this GitLab issue was created from (Create GitLab Issue on the Issue)",
+   "fieldname": "issue",
+   "fieldtype": "Link",
+   "in_standard_filter": 1,
+   "label": "Issue",
+   "no_copy": 1,
+   "options": "Issue",
+   "read_only": 1,
+   "search_index": 1
   },
   {
    "fieldname": "parent_issue",
