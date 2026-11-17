@@ -1,6 +1,6 @@
 <script setup>
 import { ref, computed, onMounted, onUnmounted } from "vue";
-import { RATING_OPTIONS, VALUE_ADD_DEFAULT, VALUE_ADD_HELP, PERCENT_BILLABLE_DEFAULT, billablePreset } from "../timesheetRating.js";
+import { RATING_OPTIONS, VALUE_ADD_DEFAULT, VALUE_ADD_HELP, PERCENT_BILLABLE_DEFAULT } from "../timesheetRating.js";
 
 const props = defineProps({
   breakFrom: String,  // system-tz "YYYY-MM-DD HH:mm:ss"
@@ -62,7 +62,6 @@ function selectProject(p) {
   project.value = p.name;
   projectLabel.value = p.project_name || p.name;
   showDropdown.value = false;
-  percentBillable.value = billablePreset(p);
 }
 
 const breakDuration = computed(() => {

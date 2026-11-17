@@ -1,7 +1,7 @@
 <script setup>
 import { ref, computed } from "vue";
 import FrappeDatetime from "./FrappeDatetime.vue";
-import { RATING_OPTIONS, VALUE_ADD_DEFAULT, VALUE_ADD_HELP, PERCENT_BILLABLE_DEFAULT, billablePreset } from "../timesheetRating.js";
+import { RATING_OPTIONS, VALUE_ADD_DEFAULT, VALUE_ADD_HELP, PERCENT_BILLABLE_DEFAULT } from "../timesheetRating.js";
 
 function labelNames(labels) {
   if (!labels) return [];
@@ -148,7 +148,7 @@ function openStart() {
 function openStop() {
   panel.value = panel.value === "stop" ? null : "stop";
   stopValueAdd.value = VALUE_ADD_DEFAULT;
-  stopBillable.value = billablePreset(props.activeSession);
+  stopBillable.value = PERCENT_BILLABLE_DEFAULT; // always 0 on Stop until the user picks another value
   const now = new Date();
   const fromDate = parseSystemDatetimeToUserDate(props.activeSession?.from_time);
 

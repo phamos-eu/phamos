@@ -201,6 +201,26 @@ class TestDapStopLinksGitlabTicket(_RefsSetup):
 	def test_url_in_result_is_used_like_the_project_action_panel(self):
 		self.assertEqual(self._stop_project_timer(f"Reviewed {BASE}/-/issues/11"), (self.child, self.parent))
 
+	def _created_in_gitlab(self, issue, system_time):
+		frappe.db.set_value(
+			"GitLab Issue", issue, "created_at", issue_refs._system_to_utc(frappe.utils.get_datetime(system_time))
+		)
+
+	def test_ticket_created_in_the_project_while_the_timer_ran_is_linked(self):
+		# The timer runs 08:00–09:00; #12 is created in GitLab at 08:30, under the customer ticket.
+		new_task = self._issue(12, "Task created while working", parent=self.parent)
+		self._created_in_gitlab(new_task, "2026-05-10 08:30:00")
+		self._created_in_gitlab(self.child, "2026-05-10 07:00:00")  # before the timer: not linked
+		self.assertEqual(self._stop_project_timer("Worked on it"), (new_task, self.parent))
+
+	def test_no_ticket_created_while_the_timer_ran_links_nothing(self):
+		self._created_in_gitlab(self.child, "2026-05-10 09:30:00")  # after Stop
+		self.assertEqual(self._stop_project_timer("Worked on it"), (None, None))
+
+	def test_url_in_result_wins_over_a_ticket_created_while_the_timer_ran(self):
+		self._created_in_gitlab(self._issue(12, "Task created while working"), "2026-05-10 08:30:00")
+		self.assertEqual(self._stop_project_timer(f"Reviewed {BASE}/-/issues/11"), (self.child, self.parent))
+
 	def test_break_with_url_in_result_links_the_ticket(self):
 		frappe.set_user(USER)
 		row = dap.create_break_timesheet(

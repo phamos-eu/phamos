@@ -10,7 +10,6 @@ const props = defineProps({
   projectElapsedSeconds: Number,
   loading: Boolean,
   activeIssueSession: Object,
-  issues: { type: Array, default: () => [] }, // for the GitLab ticket picker on Stop
 });
 
 const emit = defineEmits(["start", "pause", "resume", "stop", "assign"]);
@@ -81,7 +80,6 @@ const filteredProjects = computed(() => {
         :active-project-session="activeProjectSession"
         :project-elapsed-seconds="projectElapsedSeconds"
         :active-issue-session="activeIssueSession"
-        :issues="issues"
         @start="emit('start', $event)"
         @pause="emit('pause')"
         @resume="emit('resume')"

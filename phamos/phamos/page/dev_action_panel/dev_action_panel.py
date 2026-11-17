@@ -9,7 +9,7 @@ from phamos.phamos.timesheet_utils import (
     percent_billable_preset,
 )
 from phamos.phamos.doctype.timesheet_record.timesheet_record import compute_time_limit_status
-from phamos.gitlab_integration.issue_refs import link_gitlab_issues
+from phamos.gitlab_integration.issue_refs import issue_created_during, link_gitlab_issues
 from frappe.query_builder import Order
 from frappe.query_builder.functions import Coalesce, Sum, Count, Max
 from pypika import Case
@@ -480,6 +480,9 @@ def stop_timer(name, result, percent_billable=None, activity_type=None, manual_e
 
     doc.result = result
     link_gitlab_issues(doc, reference=gitlab_issue_ref, texts=(doc.goal, result))
+    if not doc.gitlab_issue and not doc.gitlab_parent_issue:
+        # Project timer without a ticket: the newest ticket created in this project while it ran.
+        link_gitlab_issues(doc, reference=issue_created_during(doc.project, doc.from_time, end_time))
     doc.percent_billable = percent_billable_or_preset(percent_billable, doc.project)
     doc.value_add = cstr(value_add)
     if activity_type:
