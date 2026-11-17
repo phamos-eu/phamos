@@ -73,11 +73,20 @@ def _call(settings, method, payload):
 			headers={"Authorization": f"token {key}:{secret}", "Accept": "application/json"},
 			json=payload,
 			timeout=TIMEOUT,
+			# the report and the screenshot go only to the address that was checked (AI review of !1193)
+			allow_redirects=False,
 		)
 	except requests.RequestException as e:
 		frappe.log_error(title="Phriend: target system not reachable", message=f"{url}: {e!r}")
 		frappe.throw(_("The target system {0} can't be reached").format(escape_html(url)))
 
+	# before `ok`: requests counts a redirect as ok
+	if 300 <= response.status_code < 400:
+		frappe.throw(
+			_("The target system redirects to {0}: set that address as the Target URL in Phriend Settings").format(
+				escape_html(cstr(response.headers.get("Location")) or "?")
+			)
+		)
 	if response.ok:
 		try:
 			return response.json().get("message")
@@ -165,8 +174,19 @@ def _require_remote_role():
 
 
 def _origin(url):
-	"""scheme://host[:port] of the sending system's address, or "" when it isn't one."""
+	"""scheme://host[:port] of the sending system's address, or "" when it isn't one.
+
+	Rebuilt from its parts, not netloc: "https://main.example.com@evil.example" keeps the user
+	info in netloc, and the Issue's links would open on evil.example (AI review of !1193).
+	"""
 	parsed = urlparse(cstr(url).strip())
-	if parsed.scheme not in ("http", "https") or not parsed.hostname:
+	host = parsed.hostname
+	if parsed.scheme not in ("http", "https") or not host:
 		return ""
-	return f"{parsed.scheme}://{parsed.netloc}"
+	try:
+		port = f":{parsed.port}" if parsed.port else ""
+	except ValueError:  # a port that is not a number or out of range
+		return ""
+	if ":" in host:  # IPv6
+		host = f"[{host}]"
+	return f"{parsed.scheme}://{host}{port}"

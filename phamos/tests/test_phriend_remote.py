@@ -82,6 +82,7 @@ class TestPhriendRemote(FrappeTestCase):
 		self.assertEqual((frappe.db.count("Issue"), frappe.db.count("File")), (issues, files))
 		self.assertEqual(post.call_args.args[0], "https://main.example.com/api/method/phamos.phriend.remote.receive_report")
 		self.assertEqual(post.call_args.kwargs["headers"]["Authorization"], "token key123:s3cret")
+		self.assertIs(post.call_args.kwargs["allow_redirects"], False)
 		payload = post.call_args.kwargs["json"]
 		self.assertEqual((payload["source_system"], payload["source_url"]), ("develop", get_url().rstrip("/")))
 		self.assertEqual(payload["reporter_email"], frappe.db.get_value("User", "Administrator", "email"))
@@ -117,6 +118,19 @@ class TestPhriendRemote(FrappeTestCase):
 				api.create_report(**report_args())
 			self.assertNotIsInstance(raised.exception, frappe.PermissionError)
 			self.assertIn(text, str(raised.exception))
+
+	@patch("phamos.phriend.remote.requests.post")
+	def test_a_redirect_is_not_followed_and_names_the_new_address(self, post, *_):
+		self.set_target()
+		redirect = response(301)
+		redirect.headers = {"Location": "https://erp.example.com/api/method/phamos.phriend.remote.receive_report"}
+		post.return_value = redirect
+
+		with self.assertRaises(frappe.ValidationError) as raised:
+			api.create_report(**report_args())
+
+		self.assertIn("redirects to https://erp.example.com", str(raised.exception))
+		self.assertEqual(post.call_count, 1)
 
 	def test_without_key_and_secret_nothing_is_sent(self, *_):
 		self.set_settings(target_url="https://main.example.com", target_api_key=None)
@@ -210,6 +224,18 @@ class TestPhriendRemote(FrappeTestCase):
 				remote.ping()
 		finally:
 			frappe.set_user("Administrator")
+
+	def test_sender_origin_is_only_scheme_host_and_port(self, *_):
+		cases = {
+			"https://main.example.com@evil.example/app": "https://evil.example",
+			"https://user:pw@develop.example.com:8443/x?y=1": "https://develop.example.com:8443",
+			"http://[::1]:8000/": "http://[::1]:8000",
+			"https://develop.example.com:99999": "",
+			"https://develop.example.com:abc": "",
+			"javascript:alert(1)": "",
+		}
+		for url, origin in cases.items():
+			self.assertEqual(remote._origin(url), origin, url)
 
 	def test_receive_needs_the_senders_address(self, *_):
 		with self.assertRaises(frappe.ValidationError):

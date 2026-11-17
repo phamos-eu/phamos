@@ -2145,3 +2145,4 @@ Asking the target system...,Frage das Zielsystem...
 Target connection works,Verbindung zum Zielsystem funktioniert
 "Reports go to {0}, as {1}.","Meldungen gehen an {0}, als {1}."
 Reported on {0},Gemeldet auf {0}
+The target system redirects to {0}: set that address as the Target URL in Phriend Settings,Das Zielsystem leitet nach {0} weiter: Bitte diese Adresse als Ziel-URL in den Phriend-Einstellungen eintragen
