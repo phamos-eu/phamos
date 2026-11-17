@@ -508,6 +508,21 @@ class TestPhriend(FrappeTestCase):
 		with self.assertRaises(frappe.PermissionError):
 			get_issue_gitlab(issue.name)
 
+	def test_issue_connections_count_its_gitlab_issues(self, _enqueue):
+		from frappe.desk.notifications import get_open_count
+
+		self.gitlab_project()
+		issue = self.report()
+		for iid in ("32", "33"):
+			frappe.get_doc({"doctype": "GitLab Issue", "issue_id": iid, "gitlab_project": "4242", "issue": issue.name,
+				"title": f"Linked {iid}", "issue_url": f"https://git.example.com/phamos/phamos/-/issues/{iid}"}).insert(ignore_permissions=True)
+
+		dashboard = frappe.get_meta("Issue").get_dashboard_data()
+		self.assertIn({"label": "GitLab", "items": ["GitLab Issue"]}, dashboard.transactions)
+		self.assertIn("Task", [item for group in dashboard.transactions for item in group["items"]])  # ERPNext's stays
+		counts = get_open_count("Issue", issue.name)["count"]["external_links_found"]
+		self.assertEqual([row["count"] for row in counts if row["doctype"] == "GitLab Issue"], [2])
+
 	@patch("phamos.phriend.api.requests.post")
 	@patch("phamos.phriend.api.get_decrypted_password", return_value="glpat-from-gitlab-settings")
 	def test_gitlab_token_falls_back_to_gitlab_settings(self, _password, post, _enqueue):
