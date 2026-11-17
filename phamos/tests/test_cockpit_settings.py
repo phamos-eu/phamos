@@ -1,14 +1,19 @@
 # Copyright (c) 2026, phamos.eu and contributors
 # For license information, please see license.txt
 
-"""Cockpit Settings (phamos/phamos#1932): the per-cockpit settings moved out of phamos Settings."""
+"""Cockpit Settings (phamos/phamos#1932): the per-cockpit settings moved out of phamos Settings,
+and the window colour and edge glow of each cockpit (#1933)."""
 
+import json
 from unittest.mock import patch
 
 import frappe
 from frappe.tests.utils import FrappeTestCase
 
+from phamos.cockpits.settings import COCKPITS, GLOW_EDGES, NEUTRAL_THEME_COLOR, cockpit_window
 from phamos.patches.v1_0 import move_cockpit_settings as move
+from phamos.patches.v1_0 import set_cockpit_window_defaults as window_defaults
+from phamos.www.spa_boot import theme_color
 
 OLD, NEW = move.OLD, move.NEW
 TABLE = move.TABLE_DOCTYPE
@@ -147,6 +152,7 @@ class TestCockpitSettingsValidation(FrappeTestCase):
 			self.assertFalse(meta.has_field(field), field)
 			self.assertTrue(frappe.get_meta(NEW).has_field(field), field)
 
+
 	def test_each_tab_starts_with_an_open_cockpit_button(self):
 		# the routes behind the buttons live in cockpit_settings.js (COCKPIT_ROUTES)
 		fields = frappe.get_meta(NEW).fields
@@ -158,3 +164,114 @@ class TestCockpitSettingsValidation(FrappeTestCase):
 			button = fields[i + 1]
 			self.assertEqual((button.fieldtype, button.label), ("Button", "Open Cockpit"), fields[i].fieldname)
 			self.assertIn(f"{button.fieldname}:", script)
+
+
+WINDOW_FIELDS = tuple(
+	f"{prefix}_{part}"
+	for prefix, _ in COCKPITS.values()
+	for part in ("color", "glow", "glow_breathing", *(f"glow_{edge}" for edge in GLOW_EDGES))
+)
+OFF = {"color": None, "glow": "Off", "edges": [], "breathing": False}
+
+
+class TestCockpitWindow(FrappeTestCase):
+	"""Window colour and edge glow per cockpit (phamos/phamos#1933). Snapshot as above."""
+
+	def setUp(self):
+		self._rows = frappe.db.sql(
+			"select field, value from `tabSingles` where doctype = %s and field in %s", (NEW, WINDOW_FIELDS)
+		)
+
+	def tearDown(self):
+		frappe.db.rollback()
+		frappe.db.delete("Singles", {"doctype": NEW, "field": ("in", WINDOW_FIELDS)})
+		for field, value in self._rows:
+			frappe.db.sql("insert into `tabSingles` (doctype, field, value) values (%s, %s, %s)", (NEW, field, value))
+		frappe.db.commit()  # nosemgrep: the snapshot must survive whatever the patch committed
+		frappe.db.value_cache.pop(NEW, None)
+
+	def _set(self, prefix, color, glow, edges=("bottom", "right"), breathing=1):
+		values = {f"{prefix}_color": color, f"{prefix}_glow": glow, f"{prefix}_glow_breathing": breathing}
+		values.update({f"{prefix}_glow_{edge}": int(edge in edges) for edge in GLOW_EDGES})
+		frappe.db.set_single_value(NEW, values)
+
+	def test_each_cockpit_reads_its_own_colour_glow_and_edges(self):
+		self._set("sales", "#C2410C", "On focus")
+		self._set("personal", "#0e7490", "Always", edges=("top", "left", "bottom", "right"), breathing=0)
+		self.assertEqual(
+			cockpit_window("/sales-cockpit"),
+			{"color": "#c2410c", "glow": "On focus", "edges": ["bottom", "right"], "breathing": True},
+		)
+		personal = cockpit_window("/personal-cockpit")
+		self.assertEqual(personal["edges"], ["top", "left", "bottom", "right"])
+		self.assertFalse(personal["breathing"])
+
+	def test_no_colour_means_neutral_and_no_glow(self):
+		for color in ("", None, "red", "#c24", "#c2410c; background: x"):
+			self._set("sales", color, "Always")
+			self.assertEqual(cockpit_window("/sales-cockpit"), OFF, color)
+		self.assertEqual(cockpit_window("/lead-scan"), OFF)
+
+	def test_unknown_glow_or_no_edge_is_off(self):
+		self._set("sales", "#c2410c", "Sometimes")
+		self.assertEqual(cockpit_window("/sales-cockpit"), {**OFF, "color": "#c2410c"})
+		self._set("sales", "#c2410c", "Always", edges=())
+		self.assertEqual(cockpit_window("/sales-cockpit"), {**OFF, "color": "#c2410c"})
+		self._set("sales", "#c2410c", "Off", edges=("right",))
+		self.assertEqual(cockpit_window("/sales-cockpit")["edges"], [])
+
+	def test_boot_and_page_carry_the_colour(self):
+		from phamos.www import sales_spa
+
+		self._set("sales", "#c2410c", "Always")
+		boot = sales_spa.get_boot()
+		self.assertEqual(
+			boot.cockpit_window, {"color": "#c2410c", "glow": "Always", "edges": ["bottom", "right"], "breathing": True}
+		)
+		self.assertEqual(theme_color(boot), "#c2410c")
+
+		self._set("sales", "", "Always")
+		self.assertEqual(theme_color(sales_spa.get_boot()), NEUTRAL_THEME_COLOR)
+
+	def test_patch_sets_the_logo_colours_and_keeps_choices(self):
+		frappe.db.delete("Singles", {"doctype": NEW, "field": ("in", WINDOW_FIELDS)})
+		frappe.db.set_single_value(NEW, {"sales_color": "#123456", "sales_glow_top": 1})
+		with patch.object(frappe, "reload_doc"):
+			window_defaults.execute()
+		self.assertEqual(cockpit_window("/sales-cockpit"), {**OFF, "color": "#123456"})
+		self.assertEqual(cockpit_window("/personal-cockpit")["color"], "#0e7490")
+		frappe.db.set_single_value(NEW, {"sales_glow": "Always", "human_resources_glow": "Always"})
+		self.assertEqual(cockpit_window("/sales-cockpit")["edges"], ["top", "bottom", "right"])  # top kept
+		self.assertEqual(cockpit_window("/human-resources-cockpit")["edges"], ["bottom", "right"])
+		self.assertTrue(cockpit_window("/human-resources-cockpit")["breathing"])  # default on
+
+	def test_a_new_site_gets_the_defaults(self):
+		# fresh install: patches don't run and nothing is stored, so after_install fills it in
+		from phamos.cockpits import setup
+
+		frappe.db.delete("Singles", {"doctype": NEW, "field": ("in", WINDOW_FIELDS)})
+		frappe.db.value_cache.pop(NEW, None)
+		self.assertEqual(cockpit_window("/sales-cockpit"), OFF)  # what a new site would show
+		self.assertIn("phamos.cockpits.setup.after_install", frappe.get_hooks("after_install"))
+		with patch.object(frappe, "reload_doc"):
+			setup.after_install()
+		frappe.db.set_single_value(NEW, "sales_glow", "Always")
+		self.assertEqual(
+			cockpit_window("/sales-cockpit"),
+			{"color": "#c2410c", "glow": "Always", "edges": ["bottom", "right"], "breathing": True},
+		)
+
+	def test_defaults_match_the_app_icons_and_manifests(self):
+		meta = frappe.get_meta(NEW)
+		for route, (prefix, color) in COCKPITS.items():
+			self.assertEqual(meta.get_field(f"{prefix}_color").default, color, prefix)
+			self.assertEqual(meta.get_field(f"{prefix}_glow").default, "Off", prefix)
+			for edge in GLOW_EDGES:
+				self.assertEqual(meta.get_field(f"{prefix}_glow_{edge}").default, str(int(edge in ("bottom", "right"))))
+			self.assertEqual(meta.get_field(f"{prefix}_glow_breathing").default, "1", prefix)
+			slug = prefix.replace("_", "-")
+			path = frappe.get_app_path("phamos", "public", "manifest", f"{slug}.webmanifest")
+			with open(path) as manifest:
+				data = json.load(manifest)
+			self.assertEqual(data["theme_color"], color, slug)
+			self.assertEqual(data["start_url"], route, slug)
