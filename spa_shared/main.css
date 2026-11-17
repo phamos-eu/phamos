@@ -349,8 +349,8 @@ html[data-theme="dark"] {
 /* Focus: the whole frame lights up softly, then drifts out past the window edges while it fades,
    leaving only the edges switched on (the steady layer). Scale and opacity only: compositor. */
 .cockpit-glow__layer--pulse {
-	--glow-alpha: 0.4;
-	--glow-size: 64px;
+	--glow-alpha: 0.22;
+	--glow-size: 52px;
 	--glow-top: 1;
 	--glow-left: 1;
 	--glow-bottom: 1;
@@ -362,14 +362,15 @@ html[data-theme="dark"] {
 .cockpit-glow__layer--pulse.is-on {
 	animation: cockpit-glow-focus 1.6s both;
 }
+/* rise in about 0.5 s, then settle on a slow curve (the tail fades most gently) */
 @keyframes cockpit-glow-focus {
-	0% { opacity: 0; transform: scale(1); animation-timing-function: ease-out; }
-	19% { opacity: 1; transform: scale(1); animation-timing-function: ease-in-out; }
-	100% { opacity: 0; transform: scale(1.08); }
+	0% { opacity: 0; transform: scale(1); animation-timing-function: cubic-bezier(0.4, 0, 0.6, 1); }
+	30% { opacity: 1; transform: scale(1); animation-timing-function: cubic-bezier(0.3, 0, 0.3, 1); }
+	100% { opacity: 0; transform: scale(1.06); }
 }
 @keyframes cockpit-glow-focus-still {
-	0% { opacity: 0; animation-timing-function: ease-out; }
-	19% { opacity: 1; animation-timing-function: ease-in-out; }
+	0% { opacity: 0; animation-timing-function: cubic-bezier(0.4, 0, 0.6, 1); }
+	30% { opacity: 1; animation-timing-function: cubic-bezier(0.3, 0, 0.3, 1); }
 	100% { opacity: 0; }
 }
 .cockpit-glow__edge,
