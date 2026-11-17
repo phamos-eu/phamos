@@ -4,7 +4,7 @@
 """Shared cockpit engine — Issues, Tasks, Checklists and timesheet settings.
 
 Every cockpit is a CockpitConfig: department cockpits are scoped to a Department
-from phamos Settings, the Personal Cockpit (scope="personal") to the records
+from Cockpit Settings, the Personal Cockpit (scope="personal") to the records
 assigned to the session user through ToDo.
 """
 
@@ -34,6 +34,7 @@ from phamos.api.issue_common import get_form_options as _base_form_options
 from phamos.api.issue_common import set_assignees as _set_assignees
 from phamos.api.issue_common import update_status as _update_status
 from phamos.api.presence import assert_fields_unlocked
+from phamos.cockpits.settings import COCKPIT_SETTINGS
 from phamos.phriend.report import issue_report
 
 ISSUE_EDITABLE_FIELDS = ("subject", "description", "priority", "issue_type", "project")
@@ -85,7 +86,7 @@ COCKPIT_SCOPES = ("department", "personal")
 
 @dataclass(frozen=True)
 class CockpitConfig:
-	"""Cockpit configuration: department-scoped (phamos Settings fields) or personal."""
+	"""Cockpit configuration: department-scoped (Cockpit Settings fields) or personal."""
 
 	label: str
 	department_field: str
@@ -121,13 +122,13 @@ def _user_label(user):
 def _get_department(config: CockpitConfig):
 	if not config.department_field:
 		return None
-	return frappe.db.get_single_value("phamos Settings", config.department_field)
+	return frappe.db.get_single_value(COCKPIT_SETTINGS, config.department_field)
 
 
 def _get_project(config: CockpitConfig):
 	if not config.project_field:
 		return None
-	return frappe.db.get_single_value("phamos Settings", config.project_field)
+	return frappe.db.get_single_value(COCKPIT_SETTINGS, config.project_field)
 
 
 def _personal_reference_names():
@@ -250,7 +251,7 @@ def _require_department(config: CockpitConfig):
 	department = _get_department(config)
 	if not department:
 		frappe.throw(
-			_("{0} Department is not configured in phamos Settings.").format(config.label),
+			_("{0} Department is not configured in Cockpit Settings.").format(config.label),
 			title=_("Configuration required"),
 		)
 	return department
@@ -1216,7 +1217,7 @@ def create_task(
 			department = configured_department
 		if department != configured_department:
 			frappe.throw(
-				_("Task department must match {0} department in phamos Settings.").format(config.label)
+				_("Task department must match {0} department in Cockpit Settings.").format(config.label)
 			)
 
 	if not project:

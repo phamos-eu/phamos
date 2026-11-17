@@ -1,7 +1,7 @@
 # Copyright (c) 2026, phamos.eu and contributors
 # For license information, please see license.txt
 
-"""Privacy mode of the HR Cockpit (phamos/phamos#1839): the reveal time in Phamos Settings."""
+"""Privacy mode of the HR Cockpit (phamos/phamos#1839): the reveal time in Cockpit Settings (phamos Settings before #1932)."""
 
 import frappe
 from frappe.tests.utils import FrappeTestCase

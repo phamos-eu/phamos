@@ -24,6 +24,7 @@ from frappe.query_builder.functions import Count, Max, Min
 from frappe.utils import cint, escape_html, get_datetime, get_fullname, strip_html_tags
 
 from phamos.cockpits.defaults import IDEA_VOTE_OPEN
+from phamos.cockpits.settings import COCKPIT_SETTINGS
 
 CHAT_DOCTYPES = ("Issue", "Task", "Idea")
 # Record types a mention assigns to. Not Idea: an assignment shares the record with the person,
@@ -852,10 +853,10 @@ def record_cockpit_path(doctype, name):
 	if not department and record.project:
 		department = frappe.db.get_value("Project", record.project, "department")
 	if department:
-		settings_meta = frappe.get_meta("phamos Settings")
+		settings_meta = frappe.get_meta(COCKPIT_SETTINGS)
 		for fieldname, path in COCKPIT_PATHS:
 			if settings_meta.has_field(fieldname) and (
-				frappe.db.get_single_value("phamos Settings", fieldname) == department
+				frappe.db.get_single_value(COCKPIT_SETTINGS, fieldname) == department
 			):
 				return path
 	return PERSONAL_COCKPIT_PATH

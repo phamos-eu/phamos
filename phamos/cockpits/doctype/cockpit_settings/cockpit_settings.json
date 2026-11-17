@@ -1,0 +1,271 @@
+{
+ "actions": [],
+ "creation": "2026-11-17 12:00:00.000000",
+ "doctype": "DocType",
+ "engine": "InnoDB",
+ "field_order": [
+  "human_resources_spa_tab",
+  "human_resources_open_cockpit",
+  "human_resources_spa_section",
+  "human_resources_department",
+  "column_break_human_resources_spa",
+  "human_resources_timesheet_project",
+  "human_resources_sick_leave_types",
+  "human_resources_privacy_reveal_seconds",
+  "personal_cockpit_tab",
+  "personal_open_cockpit",
+  "personal_cockpit_section",
+  "personal_ideas_show_author",
+  "project_management_spa_tab",
+  "project_management_open_cockpit",
+  "project_management_spa_section",
+  "project_management_department",
+  "column_break_project_management_spa",
+  "project_management_timesheet_project",
+  "sales_spa_tab",
+  "sales_open_cockpit",
+  "sales_spa_section",
+  "sales_department",
+  "column_break_sales_spa",
+  "sales_standard_project",
+  "accounting_spa_tab",
+  "accounting_open_cockpit",
+  "accounting_spa_section",
+  "accounting_department",
+  "column_break_accounting_spa",
+  "accounting_standard_project",
+  "software_development_spa_tab",
+  "software_development_open_cockpit",
+  "software_development_spa_section",
+  "software_development_department",
+  "column_break_software_development_spa",
+  "software_development_timesheet_project"
+ ],
+ "fields": [
+  {
+   "fieldname": "human_resources_spa_tab",
+   "fieldtype": "Tab Break",
+   "label": "Human Resources Cockpit"
+  },
+  {
+   "fieldname": "human_resources_open_cockpit",
+   "fieldtype": "Button",
+   "label": "Open Cockpit"
+  },
+  {
+   "fieldname": "human_resources_spa_section",
+   "fieldtype": "Section Break",
+   "label": "Human Resources Cockpit Settings"
+  },
+  {
+   "description": "Department used to scope Issues (via linked projects) and Tasks in the Human Resources Cockpit.",
+   "fieldname": "human_resources_department",
+   "fieldtype": "Link",
+   "label": "Human Resources Department",
+   "options": "Department"
+  },
+  {
+   "fieldname": "column_break_human_resources_spa",
+   "fieldtype": "Column Break"
+  },
+  {
+   "description": "Default project for the start/stop timesheet timer in the Human Resources Cockpit.",
+   "fieldname": "human_resources_timesheet_project",
+   "fieldtype": "Link",
+   "label": "Human Resources Timesheet Project",
+   "options": "Project"
+  },
+  {
+   "description": "Approved leave of these types counts as sick days. Only HR Manager sees other people's sick days.",
+   "fieldname": "human_resources_sick_leave_types",
+   "fieldtype": "Table MultiSelect",
+   "label": "Sick Leave Types",
+   "options": "Sick Leave Type Item"
+  },
+  {
+   "default": "120",
+   "description": "Privacy mode for screen sharing: figures in the HR Cockpit stay hidden until \"Show data\" is clicked, then show for this many seconds. At least 10.",
+   "fieldname": "human_resources_privacy_reveal_seconds",
+   "fieldtype": "Int",
+   "label": "Privacy Mode: Seconds Data Stays Visible",
+   "non_negative": 1
+  },
+  {
+   "fieldname": "personal_cockpit_tab",
+   "fieldtype": "Tab Break",
+   "label": "Personal Cockpit"
+  },
+  {
+   "fieldname": "personal_open_cockpit",
+   "fieldtype": "Button",
+   "label": "Open Cockpit"
+  },
+  {
+   "fieldname": "personal_cockpit_section",
+   "fieldtype": "Section Break",
+   "label": "Personal Cockpit Settings"
+  },
+  {
+   "default": "1",
+   "description": "Voters see who handed an idea in. Off: ideas up for vote appear without their author, and the author does not join the idea's chat by themselves.",
+   "fieldname": "personal_ideas_show_author",
+   "fieldtype": "Check",
+   "label": "Show Author of Ideas Handed in for Vote"
+  },
+  {
+   "fieldname": "project_management_spa_tab",
+   "fieldtype": "Tab Break",
+   "label": "Project Management Cockpit"
+  },
+  {
+   "fieldname": "project_management_open_cockpit",
+   "fieldtype": "Button",
+   "label": "Open Cockpit"
+  },
+  {
+   "fieldname": "project_management_spa_section",
+   "fieldtype": "Section Break",
+   "label": "Project Management Cockpit Settings"
+  },
+  {
+   "description": "Department used to scope Issues (via linked projects) and Tasks in the /project-management-cockpit SPA.",
+   "fieldname": "project_management_department",
+   "fieldtype": "Link",
+   "label": "Project Management Department",
+   "options": "Department"
+  },
+  {
+   "fieldname": "column_break_project_management_spa",
+   "fieldtype": "Column Break"
+  },
+  {
+   "description": "Default project for the start/stop timesheet timer in the Project Management Cockpit.",
+   "fieldname": "project_management_timesheet_project",
+   "fieldtype": "Link",
+   "label": "Project Management Timesheet Project",
+   "options": "Project"
+  },
+  {
+   "fieldname": "sales_spa_tab",
+   "fieldtype": "Tab Break",
+   "label": "Sales SPA"
+  },
+  {
+   "fieldname": "sales_open_cockpit",
+   "fieldtype": "Button",
+   "label": "Open Cockpit"
+  },
+  {
+   "fieldname": "sales_spa_section",
+   "fieldtype": "Section Break",
+   "label": "Sales SPA Settings"
+  },
+  {
+   "description": "Department used to scope Issues (via linked projects) and Tasks in the /sales-cockpit SPA.",
+   "fieldname": "sales_department",
+   "fieldtype": "Link",
+   "label": "Sales Department",
+   "options": "Department"
+  },
+  {
+   "fieldname": "column_break_sales_spa",
+   "fieldtype": "Column Break"
+  },
+  {
+   "description": "Default project for the start/stop timesheet timer and new Issues/Tasks in the Sales SPA.",
+   "fieldname": "sales_standard_project",
+   "fieldtype": "Link",
+   "label": "Sales Standard Project",
+   "options": "Project"
+  },
+  {
+   "fieldname": "accounting_spa_tab",
+   "fieldtype": "Tab Break",
+   "label": "Accounting SPA"
+  },
+  {
+   "fieldname": "accounting_open_cockpit",
+   "fieldtype": "Button",
+   "label": "Open Cockpit"
+  },
+  {
+   "fieldname": "accounting_spa_section",
+   "fieldtype": "Section Break",
+   "label": "Accounting SPA Settings"
+  },
+  {
+   "description": "Department used to scope Issues (via linked projects) and Tasks in the /accounting-cockpit SPA.",
+   "fieldname": "accounting_department",
+   "fieldtype": "Link",
+   "label": "Accounting Department",
+   "options": "Department"
+  },
+  {
+   "fieldname": "column_break_accounting_spa",
+   "fieldtype": "Column Break"
+  },
+  {
+   "description": "Default project for the start/stop timesheet timer and new Issues/Tasks in the Accounting SPA (Accounting Cost Center Project).",
+   "fieldname": "accounting_standard_project",
+   "fieldtype": "Link",
+   "label": "Accounting Standard Project",
+   "options": "Project"
+  },
+  {
+   "fieldname": "software_development_spa_tab",
+   "fieldtype": "Tab Break",
+   "label": "Software Development Cockpit"
+  },
+  {
+   "fieldname": "software_development_open_cockpit",
+   "fieldtype": "Button",
+   "label": "Open Cockpit"
+  },
+  {
+   "fieldname": "software_development_spa_section",
+   "fieldtype": "Section Break",
+   "label": "Software Development Cockpit Settings"
+  },
+  {
+   "description": "Department used to scope Issues (via linked projects) and Tasks in the Software Development Cockpit.",
+   "fieldname": "software_development_department",
+   "fieldtype": "Link",
+   "label": "Software Development Department",
+   "options": "Department"
+  },
+  {
+   "fieldname": "column_break_software_development_spa",
+   "fieldtype": "Column Break"
+  },
+  {
+   "description": "Default project for the start/stop timesheet timer in the Software Development Cockpit.",
+   "fieldname": "software_development_timesheet_project",
+   "fieldtype": "Link",
+   "label": "Software Development Timesheet Project",
+   "options": "Project"
+  }
+ ],
+ "issingle": 1,
+ "links": [],
+ "modified": "2026-11-17 16:00:00.000000",
+ "modified_by": "Administrator",
+ "module": "Cockpits",
+ "name": "Cockpit Settings",
+ "owner": "Administrator",
+ "permissions": [
+  {
+   "create": 1,
+   "delete": 1,
+   "email": 1,
+   "print": 1,
+   "read": 1,
+   "role": "System Manager",
+   "share": 1,
+   "write": 1
+  }
+ ],
+ "row_format": "Dynamic",
+ "sort_field": "modified",
+ "sort_order": "DESC",
+ "states": []
+}
