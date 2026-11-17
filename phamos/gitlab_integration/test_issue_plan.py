@@ -423,7 +423,15 @@ class TestIssuePlan(FrappeTestCase):
             script.parse_turn('Sure\n{"kind":"summary","body":"## Requirements\\n\\n- R1"}'),
             ("summary", "## Requirements\n\n- R1"),
         )
-        self.assertIsNone(script.parse_turn("not json"))
+        self.assertEqual(
+            script.parse_turn("kind: summary\n\n## Requirements\n\n- R1"),
+            ("summary", "## Requirements\n\n- R1"),
+        )
+        self.assertEqual(script.parse_turn("Which doctype? I recommend Sales Invoice."), (
+            "question",
+            "Which doctype? I recommend Sales Invoice.",
+        ))
+        self.assertIsNone(script.parse_turn("   "))
         self.assertTrue(script.accepts_summary("Approved."))
         self.assertFalse(script.accepts_summary("approved, but change the permission"))
         self.assertEqual(script.gate_kind("plan", None, 0), "question")
