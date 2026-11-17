@@ -3,8 +3,8 @@
 
 """Sick days from approved Leave Applications (phamos/phamos#1834).
 
-Which Leave Types count as sick leave is a list in Phamos Settings (Human Resources Cockpit
-tab), not a field on Leave Type: the PM wants no more custom fields on standard doctypes for
+Which Leave Types count as sick leave is a list in Cockpit Settings (Human Resources Cockpit
+tab; in phamos Settings before #1932), not a field on Leave Type: the PM wants no more custom fields on standard doctypes for
 now (#1833, Decision 5). Sick days are health data (Art. 9 GDPR): callers decide who may see
 them; this module only counts. The Personal Cockpit shows employees their own count, the
 HR Cockpit shows other people's only to HR Manager (#1833, Decision 4).
@@ -17,8 +17,8 @@ import datetime
 import frappe
 from frappe.utils import flt, getdate, nowdate
 
-# The DocType is really named "phamos Settings" (lower-case p).
-SETTINGS = "phamos Settings"
+from phamos.cockpits.settings import COCKPIT_SETTINGS as SETTINGS
+
 SETTINGS_FIELD = "human_resources_sick_leave_types"
 
 

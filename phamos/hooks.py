@@ -238,7 +238,10 @@ update_website_context = [
 # Installation
 # ------------
 
-after_install = "phamos.setup.ops_inbox.ensure_ops_inbox_setup"
+after_install = [
+	"phamos.setup.ops_inbox.ensure_ops_inbox_setup",
+	"phamos.cockpits.setup.after_install",  # Cockpit Settings defaults: colours, glow (#1933)
+]
 
 after_migrate = [
 	"phamos.phriend.setup.after_migrate",  # Phriend fields on Issue, default settings (#1850)

@@ -7,7 +7,7 @@
 	"scope": "/accounting-cockpit",
 	"display": "standalone",
 	"background_color": "#f8f8f8",
-	"theme_color": "#f8f8f8",
+	"theme_color": "#047857",
 	"icons": [
 		{
 			"src": "/assets/phamos/manifest/accounting-icon-192.png",
