@@ -10,6 +10,7 @@ const COCKPIT_ROUTES = {
 	sales_open_cockpit: "/sales-cockpit",
 	accounting_open_cockpit: "/accounting-cockpit",
 	software_development_open_cockpit: "/software-development-cockpit",
+	general_management_open_cockpit: "/general-management-cockpit",
 };
 
 frappe.ui.form.on(

@@ -27,6 +27,7 @@ COCKPITS = {
 	"/accounting-cockpit": ("accounting", "#047857"),
 	"/project-management-cockpit": ("project_management", "#6d28d9"),
 	"/software-development-cockpit": ("software_development", "#334155"),
+	"/general-management-cockpit": ("general_management", "#a16207"),
 	"/personal-cockpit": ("personal", "#0e7490"),
 }
 

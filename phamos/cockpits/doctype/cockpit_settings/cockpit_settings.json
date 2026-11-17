@@ -93,7 +93,22 @@
   "software_development_spa_section",
   "software_development_department",
   "column_break_software_development_spa",
-  "software_development_timesheet_project"
+  "software_development_timesheet_project",
+  "general_management_spa_tab",
+  "general_management_open_cockpit",
+  "general_management_window_section",
+  "general_management_color",
+  "column_break_general_management_window",
+  "general_management_glow",
+  "general_management_glow_top",
+  "general_management_glow_left",
+  "general_management_glow_bottom",
+  "general_management_glow_right",
+  "general_management_glow_breathing",
+  "general_management_spa_section",
+  "general_management_department",
+  "column_break_general_management_spa",
+  "general_management_timesheet_project"
  ],
  "fields": [
   {
@@ -657,11 +672,104 @@
    "fieldtype": "Link",
    "label": "Software Development Timesheet Project",
    "options": "Project"
+  },
+  {
+   "fieldname": "general_management_spa_tab",
+   "fieldtype": "Tab Break",
+   "label": "General Management Cockpit"
+  },
+  {
+   "fieldname": "general_management_open_cockpit",
+   "fieldtype": "Button",
+   "label": "Open Cockpit"
+  },
+  {
+   "fieldname": "general_management_window_section",
+   "fieldtype": "Section Break",
+   "label": "Window"
+  },
+  {
+   "default": "#a16207",
+   "description": "Colour of the cockpit's window title bar and edge glow, so the cockpit can be told apart when switching windows. Empty: neutral title bar, no glow.",
+   "fieldname": "general_management_color",
+   "fieldtype": "Color",
+   "label": "Colour"
+  },
+  {
+   "fieldname": "column_break_general_management_window",
+   "fieldtype": "Column Break"
+  },
+  {
+   "default": "Off",
+   "description": "A soft glow in the cockpit colour along the window edges. On focus: lights up when switching to the window, then fades.",
+   "fieldname": "general_management_glow",
+   "fieldtype": "Select",
+   "label": "Edge Glow",
+   "options": "Off\nAlways\nOn focus\nAlways + on focus"
+  },
+  {
+   "default": "0",
+   "depends_on": "eval:doc.general_management_glow && doc.general_management_glow != 'Off'",
+   "fieldname": "general_management_glow_top",
+   "fieldtype": "Check",
+   "label": "Glow from Top"
+  },
+  {
+   "default": "0",
+   "depends_on": "eval:doc.general_management_glow && doc.general_management_glow != 'Off'",
+   "fieldname": "general_management_glow_left",
+   "fieldtype": "Check",
+   "label": "Glow from Left"
+  },
+  {
+   "default": "1",
+   "depends_on": "eval:doc.general_management_glow && doc.general_management_glow != 'Off'",
+   "fieldname": "general_management_glow_bottom",
+   "fieldtype": "Check",
+   "label": "Glow from Bottom"
+  },
+  {
+   "default": "1",
+   "depends_on": "eval:doc.general_management_glow && doc.general_management_glow != 'Off'",
+   "fieldname": "general_management_glow_right",
+   "fieldtype": "Check",
+   "label": "Glow from Right"
+  },
+  {
+   "default": "1",
+   "depends_on": "eval:doc.general_management_glow && doc.general_management_glow != 'Off'",
+   "description": "The glow fades in and out ever so slightly, in Phriend's breathing rhythm.",
+   "fieldname": "general_management_glow_breathing",
+   "fieldtype": "Check",
+   "label": "Breathe like Phriend"
+  },
+  {
+   "fieldname": "general_management_spa_section",
+   "fieldtype": "Section Break",
+   "label": "General Management Cockpit Settings"
+  },
+  {
+   "description": "Department used to scope Issues (via linked projects) and Tasks in the General Management Cockpit.",
+   "fieldname": "general_management_department",
+   "fieldtype": "Link",
+   "label": "General Management Department",
+   "options": "Department"
+  },
+  {
+   "fieldname": "column_break_general_management_spa",
+   "fieldtype": "Column Break"
+  },
+  {
+   "description": "Default project for the start/stop timesheet timer in the General Management Cockpit.",
+   "fieldname": "general_management_timesheet_project",
+   "fieldtype": "Link",
+   "label": "General Management Timesheet Project",
+   "options": "Project"
   }
  ],
  "issingle": 1,
  "links": [],
- "modified": "2026-11-17 18:00:00.000000",
+ "modified": "2026-11-17 20:00:00.000000",
  "modified_by": "Administrator",
  "module": "Cockpits",
  "name": "Cockpit Settings",

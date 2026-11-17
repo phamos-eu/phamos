@@ -26,7 +26,9 @@
 				@date-change="onGanttDateChange"
 				@dependency-change="onGanttDependencyChange"
 				@created="onTaskCreated"
-			/>
+			>
+				<template #toolbar><slot name="gantt-toolbar" /></template>
+			</TaskGantt>
 		</section>
 
 		<aside
