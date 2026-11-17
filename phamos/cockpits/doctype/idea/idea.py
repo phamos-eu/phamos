@@ -29,6 +29,7 @@ def excerpt(html, length=IDEA_SUMMARY_LENGTH):
 
 class Idea(Document):
 	def validate(self):
+		self._validate_user()
 		self.title = (self.title or "").strip()[:IDEA_TITLE_LENGTH] or _("Untitled idea")
 		self.stage = self.stage or "Seed"
 		if self.stage not in IDEA_STAGES:
@@ -44,6 +45,17 @@ class Idea(Document):
 		else:
 			self.harvested_on = None
 		self._validate_vote()
+
+	def _validate_user(self):
+		"""Employees create and edit their own ideas in Desk (#1951): the idea is the creator's.
+		The cockpit API (ignore_permissions) and System Managers (Idea Import) set `user` themselves."""
+		me = frappe.session.user
+		self.user = self.user or me
+		if self.flags.ignore_permissions or me == "Administrator" or "System Manager" in frappe.get_roles(me):
+			return
+		before = self.get_doc_before_save()
+		if self.user != me or (before and before.user != me):
+			frappe.throw(_("This idea is not yours."), frappe.PermissionError)
 
 	def _validate_vote(self):
 		"""Hand in for vote (#1842): composting withdraws; the hand-in time follows the status."""
