@@ -1,9 +1,10 @@
 <script setup>
 import { computed, ref } from "vue";
 import ProjectCard from "./ProjectCard.vue";
+import FrappeFilter from "./FrappeFilter.vue";
 
 const props = defineProps({
-  // One list: last used first, then assigned to me, then the rest (get_dev_all_projects)
+  // One list: assigned to me first, then the rest; last used first within each (get_dev_all_projects)
   allProjects: Array,
   activeProjectSession: Object,
   projectElapsedSeconds: Number,
@@ -16,33 +17,27 @@ const emit = defineEmits(["start", "pause", "resume", "stop", "assign"]);
 
 const PROJECT_ICON = "M3 7h18M3 12h18M3 17h18";
 
-const search = ref("");
+// Names matching the Filter button, or null when no filter is set.
+const matchingNames = ref(null);
+const filtering = computed(() => matchingNames.value !== null);
 
 const rawProjects = computed(() => props.allProjects || []);
-const query = computed(() => search.value.trim().toLowerCase());
 
-// The project with my running or paused timer always comes first, whatever the search.
+// The project with my running or paused timer always comes first, whatever the filter.
 const filteredProjects = computed(() => {
   const activeName = props.activeProjectSession?.project;
   const active = activeName ? rawProjects.value.find((p) => p.name === activeName) : null;
-  const rest = rawProjects.value.filter((p) => p.name !== activeName && matches(p));
+  const allowed = matchingNames.value && new Set(matchingNames.value);
+  const rest = rawProjects.value.filter((p) => p.name !== activeName && (!allowed || allowed.has(p.name)));
   return active ? [active, ...rest] : rest;
 });
-
-function matches(p) {
-  if (!query.value) return true;
-  const haystack = [p.project_name || "", p.name || "", p.customer_desc || "", p.status || ""]
-    .join(" ")
-    .toLowerCase();
-  return haystack.includes(query.value);
-}
 </script>
 
 <template>
   <div class="pv">
     <!-- Tab bar matching the Issues tab style -->
     <div class="pv__tabs">
-      <button class="pv__tab pv__tab--active" title="Last used first, then projects assigned to you, then the rest">
+      <button class="pv__tab pv__tab--active" title="Assigned to you first (including done assignments), then the rest; last used first">
         <svg class="pv__tab-icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8">
           <path :d="PROJECT_ICON"/>
         </svg>
@@ -51,25 +46,9 @@ function matches(p) {
       </button>
     </div>
 
-    <!-- Search / filter bar -->
+    <!-- Frappe list-view filter -->
     <div class="pv__toolbar">
-      <div class="pv__search">
-        <svg class="pv__search-icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-          <circle cx="11" cy="11" r="8"/><path d="M21 21l-4.35-4.35"/>
-        </svg>
-        <input
-          v-model="search"
-          type="text"
-          class="pv__search-input form-control"
-          placeholder="Search projects by name, ID, customer or status..."
-        />
-        <button
-          v-if="search"
-          class="pv__search-clear"
-          title="Clear search"
-          @click="search = ''"
-        >×</button>
-      </div>
+      <FrappeFilter doctype="Project" @change="matchingNames = $event" />
       <span class="pv__count">
         {{ filteredProjects.length }} of {{ rawProjects.length }}
       </span>
@@ -91,9 +70,9 @@ function matches(p) {
           </svg>
         </div>
         <p class="pv__empty-title">
-          {{ query ? 'No projects match your search' : 'No open projects found' }}
+          {{ filtering ? 'No projects match your filters' : 'No open projects found' }}
         </p>
-        <p v-if="query" class="pv__empty-sub">Try a different keyword or clear the search above.</p>
+        <p v-if="filtering" class="pv__empty-sub">Change or clear the filters above.</p>
       </div>
       <ProjectCard
         v-for="project in filteredProjects"
@@ -151,7 +130,7 @@ function matches(p) {
 }
 .pv__tab--active .pv__tab-count { background: var(--primary); color: #fff; }
 
-/* ── Toolbar / search ───────────────────────────────────────────── */
+/* ── Toolbar ─────────────────────────────────────────────────── */
 .pv__toolbar {
   display: flex;
   align-items: center;
@@ -161,50 +140,6 @@ function matches(p) {
   background: var(--card-bg);
   flex-shrink: 0;
 }
-.pv__search {
-  flex: 1;
-  position: relative;
-  display: flex;
-  align-items: center;
-}
-.pv__search-input {
-  width: 100%;
-  padding: 6px 28px 6px 30px;
-  border-radius: 8px;
-  border: 1px solid var(--border-color);
-  background: var(--control-bg);
-  color: var(--text-color);
-  font-size: 13px;
-  line-height: 1.4;
-}
-.pv__search-input:focus {
-  outline: none;
-  border-color: var(--primary);
-  box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.2);
-}
-.pv__search-icon {
-  position: absolute;
-  left: 9px;
-  pointer-events: none;
-  color: var(--text-muted);
-}
-.pv__search-clear {
-  position: absolute;
-  right: 6px;
-  width: 18px;
-  height: 18px;
-  border: none;
-  border-radius: 50%;
-  background: var(--text-muted);
-  color: #fff;
-  font-size: 14px;
-  line-height: 1;
-  cursor: pointer;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-.pv__search-clear:hover { background: var(--text-color); }
 .pv__count {
   font-size: 12px;
   color: var(--text-muted);

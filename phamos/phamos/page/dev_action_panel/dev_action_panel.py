@@ -614,9 +614,10 @@ def get_dev_my_projects():
 def get_dev_all_projects():
     """One project list instead of "My Projects" + "All Projects".
 
-    Every Open project, plus projects assigned to me (open ToDo) in any status, so closing the
-    assignment ToDo (e.g. in the Personal Cockpit) only changes the order. is_assigned=1 for mine.
-    Order: last used first (my latest Timesheet Record), then assigned to me, then by name.
+    Every Open project, plus projects assigned to me in any status. Assigned means an open or
+    closed (done) assignment ToDo, so a project stays mine after the ToDo is ticked off; a
+    cancelled assignment does not count. Order: assigned to me first, then the rest; within
+    each, last used first (my latest Timesheet Record), then by name.
     """
     user = frappe.session.user
 
@@ -624,14 +625,14 @@ def get_dev_all_projects():
     Customer = frappe.qb.DocType("Customer")
     ToDo = frappe.qb.DocType("ToDo")
 
-    # A subquery, not a join: several open ToDos for one project would duplicate the row.
+    # A subquery, not a join: several ToDos for one project would duplicate the row.
     assigned_to_me = (
         frappe.qb.from_(ToDo)
         .select(Max(ToDo.reference_name))
         .where(
             (ToDo.reference_name == Project.name)
             & (ToDo.reference_type == "Project")
-            & (ToDo.status == "Open")
+            & (ToDo.status.isin(["Open", "Closed"]))
             & (ToDo.allocated_to == user)
         )
     )
@@ -655,12 +656,28 @@ def get_dev_all_projects():
     projects = _enrich_projects(query.run(as_dict=True), user)
     projects.sort(
         key=lambda p: (
-            -(get_datetime(p["last_used"]).timestamp() if p.get("last_used") else 0),
             -cint(p.get("is_assigned")),
+            -(get_datetime(p["last_used"]).timestamp() if p.get("last_used") else 0),
             (p.get("project_name") or "").lower(),
         )
     )
     return projects
+
+
+FILTERABLE_DOCTYPES = ("GitLab Issue", "Project")
+
+
+@frappe.whitelist()
+def get_matching_names(doctype, filters):
+    """Names of the records that match a Frappe filter group, for the panel's Filter button.
+
+    The panel loads its full lists once and only hides rows, so sidebar counts and the running
+    timer stay as they are.
+    """
+    if doctype not in FILTERABLE_DOCTYPES:
+        frappe.throw(_("Filtering {0} is not supported here.").format(doctype))
+    filters = [f[:4] for f in frappe.parse_json(filters) or []]
+    return frappe.get_all(doctype, filters=filters, pluck="name")
 
 
 def _enrich_projects(projects, user):

@@ -47,7 +47,7 @@ class _DapTestCase(FrappeTestCase):
 			frappe.db.set_value("Project", name, "percent_billable", percent_billable)
 		return name
 
-	def _assign(self, project):
+	def _assign(self, project, status="Open"):
 		frappe.get_doc(
 			{
 				"doctype": "ToDo",
@@ -55,6 +55,7 @@ class _DapTestCase(FrappeTestCase):
 				"reference_type": "Project",
 				"reference_name": project,
 				"description": "Assigned",
+				"status": status,
 			}
 		).insert(ignore_permissions=True)
 
@@ -132,7 +133,7 @@ class TestDevActionPanelBilling(_DapTestCase):
 
 
 class TestDevActionPanelOneProjectList(_DapTestCase):
-	"""Every Open project plus mine in any status; last used first, then assigned to me, then the rest."""
+	"""Every Open project plus mine in any status; assigned to me first, then the rest, last used first in each."""
 
 	def _listed(self):
 		rows = self._as_user(dap.get_dev_all_projects)
@@ -146,6 +147,46 @@ class TestDevActionPanelOneProjectList(_DapTestCase):
 		self.assertIn(completed_mine, names)
 		self.assertEqual(rows[completed_mine]["is_assigned"], 1)
 		self.assertLess(names.index(completed_mine), names.index(unassigned))
+
+	def test_previously_assigned_project_stays_on_top_cancelled_does_not(self):
+		unassigned = self._project(prefix="DAP List A")
+		done = self._project(prefix="DAP List Z")
+		cancelled = self._project(prefix="DAP List Z")
+		self._assign(done, status="Closed")
+		self._assign(cancelled, status="Cancelled")
+		names, rows = self._listed()
+		self.assertEqual(rows[done]["is_assigned"], 1)
+		self.assertEqual(rows[cancelled]["is_assigned"], 0)
+		self.assertLess(names.index(done), names.index(unassigned))
+
+	def test_assigned_project_beats_a_more_recently_used_one(self):
+		mine = self._project(prefix="DAP List Z")
+		self._assign(mine)
+		used = self._project(prefix="DAP List A")
+		record = frappe.get_doc(
+			{
+				"doctype": "Timesheet Record",
+				"employee": self.employee,
+				"project": used,
+				"goal": "Used, not assigned",
+				"expected_time": 3600,
+				"from_time": "2026-05-10 09:00:00",
+			}
+		)
+		record.append("item", {"from_time": "2026-05-10 09:00:00"})
+		record.insert(ignore_permissions=True)
+		names, _ = self._listed()
+		self.assertLess(names.index(mine), names.index(used))
+
+	def test_filter_button_returns_matching_names_only(self):
+		wanted = self._project(prefix="DAP Filter Wanted")
+		other = self._project(prefix="DAP Filter Other")
+		names = self._as_user(
+			dap.get_matching_names, "Project", '[["Project", "project_name", "like", "%Filter Wanted%", false]]'
+		)
+		self.assertIn(wanted, names)
+		self.assertNotIn(other, names)
+		self.assertRaises(frappe.ValidationError, dap.get_matching_names, "User", "[]")
 
 	def test_project_with_two_open_todos_is_listed_once(self):
 		project = self._project()
