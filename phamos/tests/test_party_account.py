@@ -14,6 +14,10 @@ from phamos.accounting.party_account import (
 	get_next_free_number,
 )
 
+# ERPNext's test records: "_Test Company" with its chart, "_Test Customer Group", the test
+# territories and "_Test Supplier Group". A CI site has none of them before this runs.
+test_dependencies = ["Company", "Customer", "Supplier"]
+
 COMPANY = "_Test Company"
 DEBTOR_PARENT = "Accounts Receivable - _TC"
 CREDITOR_PARENT = "Accounts Payable - _TC"
@@ -125,6 +129,15 @@ class TestPartyAccount(FrappeTestCase):
 	def test_invalid_party_type_is_refused(self):
 		self.assertRaises(frappe.ValidationError, create_party_account, "Employee", "x", COMPANY)
 
+	def test_user_without_account_rights_cannot_use_the_button(self):
+		customer = make_customer()
+		frappe.set_user(make_user_with_roles("Sales Master Manager"))
+		try:
+			self.assertRaises(frappe.PermissionError, create_party_account, "Customer", customer, COMPANY)
+			self.assertRaises(frappe.PermissionError, get_configured_companies, "Supplier")
+		finally:
+			frappe.set_user("Administrator")
+
 	def test_account_name_is_sanitized_and_shortened(self):
 		self.assertEqual(get_account_name("  A <b>  Shop </b> ", 10000, COMPANY, "P-1"), "A b Shop /b")
 
@@ -189,6 +202,17 @@ class TestAutomaticPartyAccount(FrappeTestCase):
 		# Only the creditor side is ticked in setUp.
 		self.assertEqual(frappe.get_doc("Customer", make_customer()).accounts, [])
 
+	def test_new_customer_gets_account_on_insert(self):
+		configure_company(COMPANY, auto_create_debtor_account=1)
+
+		customer = frappe.get_doc("Customer", make_customer())
+
+		self.assertEqual(len(customer.accounts), 1)
+		account = frappe.get_doc("Account", customer.accounts[0].account)
+		self.assertEqual(account.account_number, str(DEBTOR_START))
+		self.assertEqual(account.account_type, "Receivable")
+		self.assertEqual(account.parent_account, DEBTOR_PARENT)
+
 	def test_user_without_account_rights_can_save_supplier(self):
 		user = make_user_with_roles("Purchase Master Manager")
 		frappe.set_user(user)
@@ -215,6 +239,50 @@ class TestAutomaticPartyAccount(FrappeTestCase):
 	def test_button_on_ticked_company_after_save_reports_existing_account(self):
 		supplier = make_supplier()  # already has its account from the hook
 		self.assertRaises(frappe.ValidationError, create_party_account, "Supplier", supplier, COMPANY)
+
+
+class TestPartyAccountConcurrency(FrappeTestCase):
+	"""Two requests allocating a number at the same time must not get the same one."""
+
+	RACE_START, RACE_END = 930000, 930009
+
+	def setUp(self):
+		super().setUp()
+		# Start from a clean transaction: InnoDB keeps row locks taken after a
+		# savepoint, and the second connection below must be able to insert.
+		frappe.db.rollback()
+
+	def tearDown(self):
+		# On its first use, Frappe's secondary_connection() remembers the connection
+		# to restore only after switching, so the secondary one stays active.
+		# Restore the primary explicitly so later tests do not run on it.
+		frappe.local.db = self._primary_connection
+		super().tearDown()
+
+	def test_number_committed_by_other_request_is_not_reused(self):
+		with self.primary_connection():
+			# Request B reads first, which fixes its REPEATABLE READ snapshot.
+			# Plain SQL on purpose, so no cache can answer instead of the database.
+			frappe.db.sql("select count(*) from `tabAccount` where company = %s", COMPANY)
+
+		with self.secondary_connection():
+			# Request A takes the first number of the range and commits.
+			account_a = make_account(self.RACE_START, account_name="phamos Party Account Race Test")
+			frappe.db.commit()
+
+		try:
+			with self.primary_connection():
+				# Request B now scans. A plain read would still see the old snapshot
+				# and hand out RACE_START a second time.
+				self.assertEqual(
+					get_next_free_number(COMPANY, self.RACE_START, self.RACE_END), self.RACE_START + 1
+				)
+		finally:
+			with self.primary_connection():
+				frappe.db.rollback()  # release B's locks before A cleans up
+			with self.secondary_connection():
+				frappe.delete_doc("Account", account_a)
+				frappe.db.commit()
 
 
 def configure_company(company, **overrides):
@@ -275,7 +343,7 @@ def make_supplier():
 			{
 				"doctype": "Supplier",
 				"supplier_name": f"phamos Party Account Test Supplier {frappe.generate_hash(length=6)}",
-				"supplier_group": "Services",
+				"supplier_group": "_Test Supplier Group",
 			}
 		)
 		.insert()

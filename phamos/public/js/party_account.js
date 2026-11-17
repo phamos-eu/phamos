@@ -112,8 +112,14 @@ phamos.party_account.create = function (frm, company) {
 			}
 			frm.reload_doc();
 			frappe.show_alert({
+				// show_alert renders HTML and get_form_link does not escape the text.
 				message: __("Account {0} created", [
-					frappe.utils.get_form_link("Account", r.message.account, true),
+					frappe.utils.get_form_link(
+						"Account",
+						r.message.account,
+						true,
+						frappe.utils.escape_html(r.message.account)
+					),
 				]),
 				indicator: "green",
 			});

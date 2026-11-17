@@ -39,11 +39,17 @@ PARTY_CONFIG = {
 def get_configured_companies(party_type: str) -> list[str]:
 	"""Companies with a parent account for this party type in phamos Settings."""
 	parent_field = f"{get_party_config(party_type)['kind']}_parent_account"
+	frappe.has_permission(party_type, "read", throw=True)
 	return [
 		row.company
-		for row in frappe.get_single(SETTINGS).party_account_settings
+		for row in get_settings().party_account_settings
 		if row.get(parent_field)
 	]
+
+
+def get_settings():
+	# Cached: read on every Customer/Supplier save. Document.save clears the cache.
+	return frappe.get_cached_doc(SETTINGS)
 
 
 @frappe.whitelist()
@@ -94,7 +100,7 @@ def ensure_party_accounts(doc, method=None):
 	kind = PARTY_CONFIG[doc.doctype]["kind"]
 	companies_with_account = {row.company for row in doc.accounts if row.account}
 
-	for setting in frappe.get_single(SETTINGS).party_account_settings:
+	for setting in get_settings().party_account_settings:
 		if (
 			setting.get(f"auto_create_{kind}_account")
 			and setting.get(f"{kind}_parent_account")
@@ -151,7 +157,8 @@ def add_party_account(party_doc, company: str, ignore_permissions: bool = False)
 		party_account_row = party_doc.append("accounts", {"company": company})
 	party_account_row.account = account.name
 
-	# The DATEV app adds a "Debtor/Creditor Number" to Party Account. Fill it when present.
+	# Some sites carry a custom field "Debtor/Creditor Number" on Party Account for the
+	# DATEV export (e.g. the gaertnerei_berger app). Fill it when present.
 	if frappe.get_meta("Party Account").has_field("debtor_creditor_number"):
 		party_account_row.debtor_creditor_number = str(number)
 
@@ -166,8 +173,7 @@ def get_party_config(party_type: str) -> dict:
 
 def get_party_account_setting(company: str, kind: str):
 	"""Settings row of `company`, provided it has a parent account for `kind` (debtor/creditor)."""
-	settings = frappe.get_single(SETTINGS)
-	setting = next((row for row in settings.party_account_settings if row.company == company), None)
+	setting = next((row for row in get_settings().party_account_settings if row.company == company), None)
 	if not setting or not setting.get(f"{kind}_parent_account"):
 		parent_field_label = frappe.get_meta("Party Account Setting").get_label(f"{kind}_parent_account")
 		frappe.throw(

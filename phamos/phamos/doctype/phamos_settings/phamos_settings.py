@@ -77,9 +77,11 @@ class phamosSettings(Document):
 
 
 def validate_parent_account(row, account: str, root_type: str):
-	company, is_group, account_root_type = frappe.db.get_value(
-		"Account", account, ["company", "is_group", "root_type"]
-	)
+	# Frappe's link check catches a wrong name first; this covers saves with ignore_links.
+	values = frappe.db.get_value("Account", account, ["company", "is_group", "root_type"])
+	if not values:
+		frappe.throw(_("Row #{0}: Account {1} does not exist.").format(row.idx, frappe.bold(account)))
+	company, is_group, account_root_type = values
 	if company != row.company:
 		frappe.throw(
 			_("Row #{0}: Account {1} does not belong to company {2}.").format(

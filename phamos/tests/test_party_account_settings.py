@@ -8,6 +8,9 @@ from frappe.tests.utils import FrappeTestCase
 
 from phamos.accounting.party_account import SETTINGS
 
+# ERPNext's test records: "_Test Company" / "_Test Company 1" with their charts of accounts.
+test_dependencies = ["Company"]
+
 COMPANY = "_Test Company"
 SAVEPOINT = "phamos_party_account_settings_test"
 
@@ -60,6 +63,14 @@ class TestPartyAccountSettings(FrappeTestCase):
 	def test_parent_must_have_matching_root_type(self):
 		row = make_row(creditor_parent_account="Accounts Receivable - _TC")
 		self.assertRaises(frappe.ValidationError, make_settings([row]).save)
+
+	def test_parent_must_exist(self):
+		row = make_row(debtor_parent_account="No Such Account - _TC")
+		# Frappe's link check answers first; with ignore_links the validation message does.
+		self.assertRaises(frappe.ValidationError, make_settings([row]).save)
+		settings = make_settings([row])
+		settings.flags.ignore_links = True
+		self.assertRaisesRegex(frappe.ValidationError, "does not exist", settings.save)
 
 	def test_parent_must_belong_to_company(self):
 		row = make_row(debtor_parent_account="Accounts Receivable - _TC1")
