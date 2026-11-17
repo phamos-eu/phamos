@@ -8,6 +8,7 @@
 import { markRaw } from "vue"
 import LinkedChecklistsSection from "@spa/components/LinkedChecklistsSection.vue"
 import IssuePhriendReport from "@spa/components/IssuePhriendReport.vue"
+import IssueGitLabIssues from "@spa/components/IssueGitLabIssues.vue"
 import PhriendMark from "@spa/components/PhriendMark.vue"
 import ChatDockHost from "./ChatDockHost.vue"
 import HostPanel from "./HostPanel.vue"
@@ -76,6 +77,19 @@ export const phriendReport = definePanel({
 	place: { near: "checklists", side: "top" },
 })
 
+// The GitLab issues created from the Issue (get_issue → phamos/phriend/gitlab_issues.py).
+export const gitlabIssues = definePanel({
+	id: "gitlab",
+	title: "GitLab issues",
+	icon: "gitlab",
+	doctypes: ["Issue"],
+	component: markRaw(IssueGitLabIssues),
+	when: (issue) => !!issue.gitlab_issues?.length,
+	props: ({ record }) => ({ issues: record.gitlab_issues }),
+	summary: (issue) => issue.gitlab_issues.map((row) => row.reference).join(", "),
+	place: { near: "phriend", side: "bottom" },
+})
+
 export const checklists = definePanel({
 	id: "checklists",
 	title: "Checklists",
@@ -91,7 +105,7 @@ export const checklists = definePanel({
 	place: { near: "chat", side: "bottom" },
 })
 
-export const PANELS = [description, chat, phriendReport, checklists, properties]
+export const PANELS = [description, chat, phriendReport, gitlabIssues, checklists, properties]
 
 /**
  * The layout a user starts with, per record type: a tree for the width the page has, and the

@@ -32,9 +32,11 @@ def issue_report(doc):
 		"reported_by": doc.get("phriend_reported_by"),
 		"reported_by_name": doc.get("phriend_reported_by_name") or doc.get("phriend_reported_by"),
 		"reported_at": doc.creation,
+		# the develop or test system the report came from (phamos.phriend.remote); None: this one
+		"source_system": doc.get("phriend_source_system") or None,
 		"screenshot": doc.get("phriend_screenshot") or None,
 		"route": doc.get("phriend_route") or "",
-		"page_url": _web_url(doc.get("phriend_page_url")),
+		"page_url": _page_url(doc),
 		"ref_doctype": doc.get("phriend_ref_doctype") or None,
 		"ref_docname": doc.get("phriend_ref_docname") or None,
 		"ref_url": _desk_url(doc.get("phriend_ref_doctype"), doc.get("phriend_ref_docname")),
@@ -111,6 +113,14 @@ def _web_url(url):
 	path = re.sub(r"[\t\n\r]", "", parsed.path).replace("\\", "/")
 	path = "/" + path.lstrip("/")
 	return urlunparse(("", "", path, "", parsed.query, parsed.fragment))
+
+
+def _page_url(doc):
+	"""The reported page: on this site, or on the system the report came from. That system's
+	address was stored from its server's request, never from the browser (remote.receive_report)."""
+	path = _web_url(doc.get("phriend_page_url"))
+	source = cstr(doc.get("phriend_source_url")).rstrip("/")
+	return f"{source}{path}" if path and source else path
 
 
 def _desk_url(doctype, name):
