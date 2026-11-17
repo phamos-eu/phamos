@@ -32,7 +32,7 @@
 			{{ error }}
 		</div>
 		<div v-else-if="loading && !loaded" class="flex flex-1 items-center justify-center text-sm text-ink-gray-5">
-			Loading…
+			{{ __("Loading…") }}
 		</div>
 
 		<div v-else-if="view === 'List'" class="min-h-0 flex-1 overflow-y-auto">
@@ -172,12 +172,15 @@ function repeatText(a) {
 	return text
 }
 
+// The user's date format (System Settings) and translated weekdays, as elsewhere in the cockpits,
+// not the browser's locale.
 function formatDay(date) {
-	return date.toLocaleDateString(undefined, { weekday: "short", day: "2-digit", month: "2-digit", year: "numeric" })
+	const weekday = __(DAY_LABELS[(date.getDay() + 6) % 7])
+	return `${weekday}, ${formatDate(`${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}`)}`
 }
 
 function formatTime(date) {
-	return date.toLocaleTimeString(undefined, { hour: "2-digit", minute: "2-digit" })
+	return `${pad(date.getHours())}:${pad(date.getMinutes())}`
 }
 
 const pad = (n) => String(n).padStart(2, "0")
@@ -281,5 +284,14 @@ onMounted(load)
 
 [data-theme="dark"] .gm-calendar .border-gray-200 {
 	border-color: var(--outline-gray-2);
+}
+
+/* Event cards: amber on the dark surface instead of a light box. */
+[data-theme="dark"] .gm-calendar .bg-amber-100 {
+	background-color: var(--surface-amber-2);
+}
+
+[data-theme="dark"] .gm-calendar .text-gray-800 {
+	color: var(--ink-gray-8);
 }
 </style>

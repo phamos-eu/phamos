@@ -50,6 +50,12 @@
 
 				<FormControl v-model="form.description" :label="__('Description')" type="textarea" size="sm" :rows="3" />
 
+				<div
+					v-if="appointment?.sync_error"
+					class="rounded border border-outline-red-1 bg-surface-red-1 px-2.5 py-2 text-xs text-ink-red-4"
+				>
+					{{ __("The invite was not sent: {0}", [appointment.sync_error]) }}
+				</div>
 				<ErrorMessage v-if="error" :message="error" />
 
 				<div v-if="appointment?.name" class="border-t border-outline-gray-2 pt-3">
