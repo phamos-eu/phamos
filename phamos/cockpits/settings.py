@@ -38,10 +38,11 @@ def cockpit_window(route):
 
 	Returns:
 		dict: color ("#rrggbb", or None for a neutral title bar and no glow), glow (one of
-		GLOW_MODES) and edges (the GLOW_EDGES switched on, in that order). Anything else stored
-		in the fields counts as no colour / glow off; no edge switched on means glow off.
+		GLOW_MODES), edges (the GLOW_EDGES switched on, in that order) and breathing (bool).
+		Anything else stored in the fields counts as no colour / glow off; no edge switched on
+		means glow off.
 	"""
-	off = {"color": None, "glow": GLOW_OFF, "edges": []}
+	off = {"color": None, "glow": GLOW_OFF, "edges": [], "breathing": False}
 	prefix = COCKPITS.get(route, (None,))[0]
 	if not prefix:
 		return off
@@ -52,6 +53,7 @@ def cockpit_window(route):
 	edges = [
 		edge for edge in GLOW_EDGES if frappe.db.get_single_value(COCKPIT_SETTINGS, f"{prefix}_glow_{edge}")
 	]
-	if glow not in GLOW_MODES or not edges:
-		glow, edges = GLOW_OFF, []
-	return {"color": color.lower(), "glow": glow, "edges": edges if glow != GLOW_OFF else []}
+	if glow not in GLOW_MODES or not edges or glow == GLOW_OFF:
+		return {**off, "color": color.lower()}
+	breathing = bool(frappe.db.get_single_value(COCKPIT_SETTINGS, f"{prefix}_glow_breathing"))
+	return {"color": color.lower(), "glow": glow, "edges": edges, "breathing": breathing}

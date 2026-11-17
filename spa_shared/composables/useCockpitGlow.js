@@ -4,7 +4,8 @@ import { glowSettings, glowStyle, PULSE_MS } from "@spa/utils/cockpitGlow.js"
 /**
  * The cockpit's edge glow (#1933): colour and mode come from Cockpit Settings through the boot.
  *
- * Returns null when the glow is off. Otherwise `style` (CSS variables: colour and edges),
+ * Returns null when the glow is off. Otherwise `edges` and `corners` (the pieces to draw),
+ * `breathing`, `style` (CSS variables: colour and 1/0 per edge),
  * `steady` (a faint glow all the time) and `pulsing` (a ref, true for PULSE_MS after the window
  * came to the front).
  */
@@ -35,5 +36,12 @@ export function useCockpitGlow(cockpitWindow = window.frappe?.boot?.cockpit_wind
 		})
 	}
 
-	return { style: glowStyle(settings), steady: settings.steady, pulsing }
+	return {
+		edges: settings.edges,
+		corners: settings.corners,
+		breathing: settings.breathing,
+		style: glowStyle(settings),
+		steady: settings.steady,
+		pulsing,
+	}
 }

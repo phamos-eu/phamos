@@ -1,5 +1,5 @@
-"""Give every cockpit its logo colour, glow "Off" and the glow edges right and bottom in Cockpit
-Settings (phamos/phamos#1933).
+"""Give every cockpit its logo colour, glow "Off", the glow edges right and bottom and breathing on
+in Cockpit Settings (phamos/phamos#1933).
 
 New fields on a Single that sites already saved have no stored value and read as empty, which
 would mean "no colour". Values someone already set stay. Safe to run twice.
@@ -17,6 +17,7 @@ def execute():
 		_store_default(f"{prefix}_glow", GLOW_OFF)
 		for edge in GLOW_EDGES:
 			_store_default(f"{prefix}_glow_{edge}", int(edge in DEFAULT_GLOW_EDGES))
+		_store_default(f"{prefix}_glow_breathing", 1)
 
 
 def _store_default(field, value):

@@ -305,10 +305,13 @@ html[data-theme="dark"] {
 	max-width: min(100%, 400px);
 }
 
-/* Edge glow in the cockpit colour (#1933): a soft glow, no hard line, fading in from each window
-   edge switched on in Cockpit Settings (--glow-top/left/bottom/right are 1 or 0). --cockpit-rgb is
-   "r g b". Two layers: a faint steady one and a stronger one shown for a moment on focus. Above
-   dialogs so it frames them too. */
+/* Edge glow in the cockpit colour (#1933): a soft glow, no hard line, from each window edge
+   switched on in Cockpit Settings. --cockpit-rgb is "r g b"; --glow-top/left/bottom/right are 1 or 0.
+   Each edge is a strip whose glow fades inwards; along its length it fades out towards a side whose
+   edge is off (bottom + right: the bottom strip fades out to the left, the right strip to the top).
+   Where two glowing edges meet, the strips stop short and a round corner piece joins them.
+   Two layers: a faint steady one and a stronger one shown for a moment on focus. Above dialogs so
+   it frames them too. */
 .cockpit-glow {
 	position: fixed;
 	inset: 0;
@@ -320,11 +323,18 @@ html[data-theme="dark"] {
 	--glow-size: 56px;
 	position: absolute;
 	inset: 0;
-	background:
-		linear-gradient(to bottom, rgb(var(--cockpit-rgb) / calc(var(--glow-top) * var(--glow-alpha))), transparent var(--glow-size)),
-		linear-gradient(to right, rgb(var(--cockpit-rgb) / calc(var(--glow-left) * var(--glow-alpha))), transparent var(--glow-size)),
-		linear-gradient(to top, rgb(var(--cockpit-rgb) / calc(var(--glow-bottom) * var(--glow-alpha))), transparent var(--glow-size)),
-		linear-gradient(to left, rgb(var(--cockpit-rgb) / calc(var(--glow-right) * var(--glow-alpha))), transparent var(--glow-size));
+}
+/* Phriend's box breathing (phamos/public/js/phriend/ball.js), one 21 s cycle: in 4 s, hold 5 s,
+   out 7 s, hold 5 s; only between 75 % and full strength, so it is barely noticed. */
+.cockpit-glow__layer--steady.is-breathing {
+	animation: cockpit-glow-breathe 21s infinite;
+}
+@keyframes cockpit-glow-breathe {
+	0% { opacity: 0.75; animation-timing-function: ease-in-out; }
+	19.05% { opacity: 1; }
+	42.86% { opacity: 1; animation-timing-function: ease-in-out; }
+	76.19% { opacity: 0.75; }
+	100% { opacity: 0.75; }
 }
 .cockpit-glow__layer--pulse {
 	--glow-alpha: 0.6;
@@ -336,9 +346,80 @@ html[data-theme="dark"] {
 	opacity: 1;
 	transition-duration: 0.15s;
 }
+.cockpit-glow__edge,
+.cockpit-glow__corner {
+	--glow-color: rgb(var(--cockpit-rgb) / var(--glow-alpha));
+	position: absolute;
+}
+.cockpit-glow__edge--top,
+.cockpit-glow__edge--bottom {
+	/* stop short where a corner piece takes over */
+	left: calc(var(--glow-left) * var(--glow-size));
+	right: calc(var(--glow-right) * var(--glow-size));
+	height: var(--glow-size);
+	/* full where the left/right edge glows too, fading out to a side without glow */
+	--glow-along: linear-gradient(to right, rgb(0 0 0 / var(--glow-left)), #000 50%, rgb(0 0 0 / var(--glow-right)));
+	-webkit-mask-image: var(--glow-along);
+	mask-image: var(--glow-along);
+}
+.cockpit-glow__edge--left,
+.cockpit-glow__edge--right {
+	top: calc(var(--glow-top) * var(--glow-size));
+	bottom: calc(var(--glow-bottom) * var(--glow-size));
+	width: var(--glow-size);
+	--glow-along: linear-gradient(to bottom, rgb(0 0 0 / var(--glow-top)), #000 50%, rgb(0 0 0 / var(--glow-bottom)));
+	-webkit-mask-image: var(--glow-along);
+	mask-image: var(--glow-along);
+}
+.cockpit-glow__edge--top {
+	top: 0;
+	background: linear-gradient(to bottom, var(--glow-color), transparent);
+}
+.cockpit-glow__edge--bottom {
+	bottom: 0;
+	background: linear-gradient(to top, var(--glow-color), transparent);
+}
+.cockpit-glow__edge--left {
+	left: 0;
+	background: linear-gradient(to right, var(--glow-color), transparent);
+}
+.cockpit-glow__edge--right {
+	right: 0;
+	background: linear-gradient(to left, var(--glow-color), transparent);
+}
+.cockpit-glow__corner {
+	width: var(--glow-size);
+	height: var(--glow-size);
+}
+/* The glow grows from the piece's inner corner (none) to full colour at --glow-size, like the
+   strips grow from their inner side to the edge; that rounds the inside of the corner. */
+.cockpit-glow__corner--top-left {
+	top: 0;
+	left: 0;
+	background: radial-gradient(circle var(--glow-size) at 100% 100%, transparent, var(--glow-color));
+}
+.cockpit-glow__corner--top-right {
+	top: 0;
+	right: 0;
+	background: radial-gradient(circle var(--glow-size) at 0 100%, transparent, var(--glow-color));
+}
+.cockpit-glow__corner--bottom-left {
+	bottom: 0;
+	left: 0;
+	background: radial-gradient(circle var(--glow-size) at 100% 0, transparent, var(--glow-color));
+}
+.cockpit-glow__corner--bottom-right {
+	bottom: 0;
+	right: 0;
+	background: radial-gradient(circle var(--glow-size) at 0 0, transparent, var(--glow-color));
+}
 @media (prefers-reduced-motion: reduce) {
 	.cockpit-glow__layer--pulse {
 		transition: none;
+	}
+	.cockpit-glow__layer--steady.is-breathing {
+		animation: none;
+		opacity: 1;
 	}
 }
 @media print {

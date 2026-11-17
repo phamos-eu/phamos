@@ -25,8 +25,18 @@
 		<Toasts />
 		<!-- The cockpit colour glowing in from the chosen window edges (#1933); never catches clicks. -->
 		<div v-if="glow" aria-hidden="true" class="cockpit-glow" :style="glow.style">
-			<div v-if="glow.steady" class="cockpit-glow__layer cockpit-glow__layer--steady" />
-			<div class="cockpit-glow__layer cockpit-glow__layer--pulse" :class="{ 'is-on': glow.pulsing.value }" />
+			<div
+				v-if="glow.steady"
+				class="cockpit-glow__layer cockpit-glow__layer--steady"
+				:class="{ 'is-breathing': glow.breathing }"
+			>
+				<span v-for="edge in glow.edges" :key="edge" :class="`cockpit-glow__edge cockpit-glow__edge--${edge}`" />
+				<span v-for="corner in glow.corners" :key="corner" :class="`cockpit-glow__corner cockpit-glow__corner--${corner}`" />
+			</div>
+			<div class="cockpit-glow__layer cockpit-glow__layer--pulse" :class="{ 'is-on': glow.pulsing.value }">
+				<span v-for="edge in glow.edges" :key="edge" :class="`cockpit-glow__edge cockpit-glow__edge--${edge}`" />
+				<span v-for="corner in glow.corners" :key="corner" :class="`cockpit-glow__corner cockpit-glow__corner--${corner}`" />
+			</div>
 		</div>
 	</div>
 </template>

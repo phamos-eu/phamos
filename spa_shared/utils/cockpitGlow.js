@@ -19,17 +19,28 @@ export function hexToRgbTriplet(hex) {
 	return match ? match.slice(1).map((part) => parseInt(part, 16)).join(" ") : null
 }
 
+// Corners drawn round where both of their edges glow, so the two strips don't meet in a square.
+const CORNERS = [
+	["top-left", "top", "left"],
+	["top-right", "top", "right"],
+	["bottom-left", "bottom", "left"],
+	["bottom-right", "bottom", "right"],
+]
+
 /**
- * What the glow does for a cockpit_window boot value ({color, glow, edges}).
+ * What the glow does for a cockpit_window boot value ({color, glow, edges, breathing}).
  *
- * @returns {{rgb: string, steady: boolean, pulse: boolean, edges: string[]} | null} null when
- *   there is no glow: no colour, mode off or unknown, or no edge switched on
+ * @returns {{rgb: string, steady: boolean, pulse: boolean, breathing: boolean, edges: string[],
+ *   corners: string[]} | null} null when there is no glow: no colour, mode off or unknown, or no
+ *   edge switched on
  */
 export function glowSettings(cockpitWindow) {
 	const rgb = hexToRgbTriplet(cockpitWindow?.color)
 	const mode = MODES[cockpitWindow?.glow]
 	const edges = GLOW_EDGES.filter((edge) => (cockpitWindow?.edges || []).includes(edge))
-	return rgb && mode && edges.length ? { rgb, ...mode, edges } : null
+	if (!rgb || !mode || !edges.length) return null
+	const corners = CORNERS.filter(([, a, b]) => edges.includes(a) && edges.includes(b)).map(([name]) => name)
+	return { rgb, ...mode, breathing: !!cockpitWindow.breathing, edges, corners }
 }
 
 /** CSS variables for the glow layer: the colour and 1/0 per edge (--glow-top, ...). */
