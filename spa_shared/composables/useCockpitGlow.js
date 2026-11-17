@@ -1,11 +1,12 @@
 import { onBeforeUnmount, onMounted, ref } from "vue"
-import { glowSettings, PULSE_MS } from "@spa/utils/cockpitGlow.js"
+import { glowSettings, glowStyle, PULSE_MS } from "@spa/utils/cockpitGlow.js"
 
 /**
  * The cockpit's edge glow (#1933): colour and mode come from Cockpit Settings through the boot.
  *
- * Returns null when the glow is off. Otherwise `rgb` (the CSS triplet), `steady` (a faint glow
- * all the time) and `pulsing` (a ref, true for PULSE_MS after the window came to the front).
+ * Returns null when the glow is off. Otherwise `style` (CSS variables: colour and edges),
+ * `steady` (a faint glow all the time) and `pulsing` (a ref, true for PULSE_MS after the window
+ * came to the front).
  */
 export function useCockpitGlow(cockpitWindow = window.frappe?.boot?.cockpit_window) {
 	const settings = glowSettings(cockpitWindow)
@@ -34,5 +35,5 @@ export function useCockpitGlow(cockpitWindow = window.frappe?.boot?.cockpit_wind
 		})
 	}
 
-	return { rgb: settings.rgb, steady: settings.steady, pulsing }
+	return { style: glowStyle(settings), steady: settings.steady, pulsing }
 }

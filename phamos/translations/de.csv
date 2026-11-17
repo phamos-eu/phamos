@@ -2110,3 +2110,7 @@ Always + on focus,Immer + beim Wechseln
 "Colour of the cockpit's window title bar and edge glow, so the cockpit can be told apart when switching windows. Empty: neutral title bar, no glow.","Farbe der Titelleiste und des Randleuchtens im Cockpit-Fenster, damit sich die Cockpits beim Fensterwechsel unterscheiden lassen. Leer: neutrale Titelleiste, kein Leuchten."
 "A soft glow in the cockpit colour along the window edges. On focus: lights up when switching to the window, then fades.","Ein sanftes Leuchten in der Cockpit-Farbe an den Fensterrändern. Beim Wechseln: leuchtet auf, wenn Sie zum Fenster wechseln, und verblasst dann."
 Open Cockpit,Cockpit öffnen
+Glow from Top,Leuchten von oben
+Glow from Left,Leuchten von links
+Glow from Bottom,Leuchten von unten
+Glow from Right,Leuchten von rechts

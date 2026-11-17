@@ -23,14 +23,11 @@
 		</div>
 		<!-- One toast host for the whole cockpit; without it frappe-ui toast() calls show nothing. -->
 		<Toasts />
-		<!-- The cockpit colour along the window edges (#1933); never catches clicks. -->
-		<div
-			v-if="glow"
-			aria-hidden="true"
-			class="cockpit-glow"
-			:class="{ 'cockpit-glow--steady': glow.steady, 'cockpit-glow--pulse': glow.pulsing.value }"
-			:style="{ '--cockpit-rgb': glow.rgb }"
-		/>
+		<!-- The cockpit colour glowing in from the chosen window edges (#1933); never catches clicks. -->
+		<div v-if="glow" aria-hidden="true" class="cockpit-glow" :style="glow.style">
+			<div v-if="glow.steady" class="cockpit-glow__layer cockpit-glow__layer--steady" />
+			<div class="cockpit-glow__layer cockpit-glow__layer--pulse" :class="{ 'is-on': glow.pulsing.value }" />
+		</div>
 	</div>
 </template>
 

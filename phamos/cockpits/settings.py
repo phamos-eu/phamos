@@ -15,6 +15,9 @@ NEUTRAL_THEME_COLOR = "#f8f8f8"
 
 GLOW_OFF = "Off"
 GLOW_MODES = (GLOW_OFF, "Always", "On focus", "Always + on focus")
+# Window edges the glow can come from, each a Check <prefix>_glow_<edge>; right and bottom by default.
+GLOW_EDGES = ("top", "left", "bottom", "right")
+DEFAULT_GLOW_EDGES = ("bottom", "right")
 
 # route -> (field prefix in Cockpit Settings, logo colour). The colours are the app icon tiles of
 # spa_shared/scripts/generate_app_manifests.py; they are the defaults of the <prefix>_color fields.
@@ -34,13 +37,21 @@ def cockpit_window(route):
 	"""Window colour and edge glow of the cockpit at `route`, for its boot and page (#1933).
 
 	Returns:
-		dict: color ("#rrggbb", or None for a neutral title bar and no glow) and glow (one of
-		GLOW_MODES). Anything else stored in the fields counts as no colour / glow off.
+		dict: color ("#rrggbb", or None for a neutral title bar and no glow), glow (one of
+		GLOW_MODES) and edges (the GLOW_EDGES switched on, in that order). Anything else stored
+		in the fields counts as no colour / glow off; no edge switched on means glow off.
 	"""
+	off = {"color": None, "glow": GLOW_OFF, "edges": []}
 	prefix = COCKPITS.get(route, (None,))[0]
 	if not prefix:
-		return {"color": None, "glow": GLOW_OFF}
+		return off
 	color = (frappe.db.get_single_value(COCKPIT_SETTINGS, f"{prefix}_color") or "").strip()
+	if not _HEX_COLOR.match(color):
+		return off
 	glow = frappe.db.get_single_value(COCKPIT_SETTINGS, f"{prefix}_glow")
-	color = color.lower() if _HEX_COLOR.match(color) else None
-	return {"color": color, "glow": glow if color and glow in GLOW_MODES else GLOW_OFF}
+	edges = [
+		edge for edge in GLOW_EDGES if frappe.db.get_single_value(COCKPIT_SETTINGS, f"{prefix}_glow_{edge}")
+	]
+	if glow not in GLOW_MODES or not edges:
+		glow, edges = GLOW_OFF, []
+	return {"color": color.lower(), "glow": glow, "edges": edges if glow != GLOW_OFF else []}

@@ -10,6 +10,10 @@
   "human_resources_color",
   "column_break_human_resources_window",
   "human_resources_glow",
+  "human_resources_glow_top",
+  "human_resources_glow_left",
+  "human_resources_glow_bottom",
+  "human_resources_glow_right",
   "human_resources_spa_section",
   "human_resources_department",
   "column_break_human_resources_spa",
@@ -22,6 +26,10 @@
   "personal_color",
   "column_break_personal_window",
   "personal_glow",
+  "personal_glow_top",
+  "personal_glow_left",
+  "personal_glow_bottom",
+  "personal_glow_right",
   "personal_cockpit_section",
   "personal_ideas_show_author",
   "project_management_spa_tab",
@@ -30,6 +38,10 @@
   "project_management_color",
   "column_break_project_management_window",
   "project_management_glow",
+  "project_management_glow_top",
+  "project_management_glow_left",
+  "project_management_glow_bottom",
+  "project_management_glow_right",
   "project_management_spa_section",
   "project_management_department",
   "column_break_project_management_spa",
@@ -40,6 +52,10 @@
   "sales_color",
   "column_break_sales_window",
   "sales_glow",
+  "sales_glow_top",
+  "sales_glow_left",
+  "sales_glow_bottom",
+  "sales_glow_right",
   "sales_spa_section",
   "sales_department",
   "column_break_sales_spa",
@@ -50,6 +66,10 @@
   "accounting_color",
   "column_break_accounting_window",
   "accounting_glow",
+  "accounting_glow_top",
+  "accounting_glow_left",
+  "accounting_glow_bottom",
+  "accounting_glow_right",
   "accounting_spa_section",
   "accounting_department",
   "column_break_accounting_spa",
@@ -60,6 +80,10 @@
   "software_development_color",
   "column_break_software_development_window",
   "software_development_glow",
+  "software_development_glow_top",
+  "software_development_glow_left",
+  "software_development_glow_bottom",
+  "software_development_glow_right",
   "software_development_spa_section",
   "software_development_department",
   "column_break_software_development_spa",
@@ -99,6 +123,34 @@
    "fieldtype": "Select",
    "label": "Edge Glow",
    "options": "Off\nAlways\nOn focus\nAlways + on focus"
+  },
+  {
+   "default": "0",
+   "depends_on": "eval:doc.human_resources_glow && doc.human_resources_glow != 'Off'",
+   "fieldname": "human_resources_glow_top",
+   "fieldtype": "Check",
+   "label": "Glow from Top"
+  },
+  {
+   "default": "0",
+   "depends_on": "eval:doc.human_resources_glow && doc.human_resources_glow != 'Off'",
+   "fieldname": "human_resources_glow_left",
+   "fieldtype": "Check",
+   "label": "Glow from Left"
+  },
+  {
+   "default": "1",
+   "depends_on": "eval:doc.human_resources_glow && doc.human_resources_glow != 'Off'",
+   "fieldname": "human_resources_glow_bottom",
+   "fieldtype": "Check",
+   "label": "Glow from Bottom"
+  },
+  {
+   "default": "1",
+   "depends_on": "eval:doc.human_resources_glow && doc.human_resources_glow != 'Off'",
+   "fieldname": "human_resources_glow_right",
+   "fieldtype": "Check",
+   "label": "Glow from Right"
   },
   {
    "fieldname": "human_resources_spa_section",
@@ -173,6 +225,34 @@
    "options": "Off\nAlways\nOn focus\nAlways + on focus"
   },
   {
+   "default": "0",
+   "depends_on": "eval:doc.personal_glow && doc.personal_glow != 'Off'",
+   "fieldname": "personal_glow_top",
+   "fieldtype": "Check",
+   "label": "Glow from Top"
+  },
+  {
+   "default": "0",
+   "depends_on": "eval:doc.personal_glow && doc.personal_glow != 'Off'",
+   "fieldname": "personal_glow_left",
+   "fieldtype": "Check",
+   "label": "Glow from Left"
+  },
+  {
+   "default": "1",
+   "depends_on": "eval:doc.personal_glow && doc.personal_glow != 'Off'",
+   "fieldname": "personal_glow_bottom",
+   "fieldtype": "Check",
+   "label": "Glow from Bottom"
+  },
+  {
+   "default": "1",
+   "depends_on": "eval:doc.personal_glow && doc.personal_glow != 'Off'",
+   "fieldname": "personal_glow_right",
+   "fieldtype": "Check",
+   "label": "Glow from Right"
+  },
+  {
    "fieldname": "personal_cockpit_section",
    "fieldtype": "Section Break",
    "label": "Personal Cockpit Settings"
@@ -217,6 +297,34 @@
    "fieldtype": "Select",
    "label": "Edge Glow",
    "options": "Off\nAlways\nOn focus\nAlways + on focus"
+  },
+  {
+   "default": "0",
+   "depends_on": "eval:doc.project_management_glow && doc.project_management_glow != 'Off'",
+   "fieldname": "project_management_glow_top",
+   "fieldtype": "Check",
+   "label": "Glow from Top"
+  },
+  {
+   "default": "0",
+   "depends_on": "eval:doc.project_management_glow && doc.project_management_glow != 'Off'",
+   "fieldname": "project_management_glow_left",
+   "fieldtype": "Check",
+   "label": "Glow from Left"
+  },
+  {
+   "default": "1",
+   "depends_on": "eval:doc.project_management_glow && doc.project_management_glow != 'Off'",
+   "fieldname": "project_management_glow_bottom",
+   "fieldtype": "Check",
+   "label": "Glow from Bottom"
+  },
+  {
+   "default": "1",
+   "depends_on": "eval:doc.project_management_glow && doc.project_management_glow != 'Off'",
+   "fieldname": "project_management_glow_right",
+   "fieldtype": "Check",
+   "label": "Glow from Right"
   },
   {
    "fieldname": "project_management_spa_section",
@@ -276,6 +384,34 @@
    "options": "Off\nAlways\nOn focus\nAlways + on focus"
   },
   {
+   "default": "0",
+   "depends_on": "eval:doc.sales_glow && doc.sales_glow != 'Off'",
+   "fieldname": "sales_glow_top",
+   "fieldtype": "Check",
+   "label": "Glow from Top"
+  },
+  {
+   "default": "0",
+   "depends_on": "eval:doc.sales_glow && doc.sales_glow != 'Off'",
+   "fieldname": "sales_glow_left",
+   "fieldtype": "Check",
+   "label": "Glow from Left"
+  },
+  {
+   "default": "1",
+   "depends_on": "eval:doc.sales_glow && doc.sales_glow != 'Off'",
+   "fieldname": "sales_glow_bottom",
+   "fieldtype": "Check",
+   "label": "Glow from Bottom"
+  },
+  {
+   "default": "1",
+   "depends_on": "eval:doc.sales_glow && doc.sales_glow != 'Off'",
+   "fieldname": "sales_glow_right",
+   "fieldtype": "Check",
+   "label": "Glow from Right"
+  },
+  {
    "fieldname": "sales_spa_section",
    "fieldtype": "Section Break",
    "label": "Sales SPA Settings"
@@ -331,6 +467,34 @@
    "fieldtype": "Select",
    "label": "Edge Glow",
    "options": "Off\nAlways\nOn focus\nAlways + on focus"
+  },
+  {
+   "default": "0",
+   "depends_on": "eval:doc.accounting_glow && doc.accounting_glow != 'Off'",
+   "fieldname": "accounting_glow_top",
+   "fieldtype": "Check",
+   "label": "Glow from Top"
+  },
+  {
+   "default": "0",
+   "depends_on": "eval:doc.accounting_glow && doc.accounting_glow != 'Off'",
+   "fieldname": "accounting_glow_left",
+   "fieldtype": "Check",
+   "label": "Glow from Left"
+  },
+  {
+   "default": "1",
+   "depends_on": "eval:doc.accounting_glow && doc.accounting_glow != 'Off'",
+   "fieldname": "accounting_glow_bottom",
+   "fieldtype": "Check",
+   "label": "Glow from Bottom"
+  },
+  {
+   "default": "1",
+   "depends_on": "eval:doc.accounting_glow && doc.accounting_glow != 'Off'",
+   "fieldname": "accounting_glow_right",
+   "fieldtype": "Check",
+   "label": "Glow from Right"
   },
   {
    "fieldname": "accounting_spa_section",
@@ -390,6 +554,34 @@
    "options": "Off\nAlways\nOn focus\nAlways + on focus"
   },
   {
+   "default": "0",
+   "depends_on": "eval:doc.software_development_glow && doc.software_development_glow != 'Off'",
+   "fieldname": "software_development_glow_top",
+   "fieldtype": "Check",
+   "label": "Glow from Top"
+  },
+  {
+   "default": "0",
+   "depends_on": "eval:doc.software_development_glow && doc.software_development_glow != 'Off'",
+   "fieldname": "software_development_glow_left",
+   "fieldtype": "Check",
+   "label": "Glow from Left"
+  },
+  {
+   "default": "1",
+   "depends_on": "eval:doc.software_development_glow && doc.software_development_glow != 'Off'",
+   "fieldname": "software_development_glow_bottom",
+   "fieldtype": "Check",
+   "label": "Glow from Bottom"
+  },
+  {
+   "default": "1",
+   "depends_on": "eval:doc.software_development_glow && doc.software_development_glow != 'Off'",
+   "fieldname": "software_development_glow_right",
+   "fieldtype": "Check",
+   "label": "Glow from Right"
+  },
+  {
    "fieldname": "software_development_spa_section",
    "fieldtype": "Section Break",
    "label": "Software Development Cockpit Settings"
@@ -415,7 +607,7 @@
  ],
  "issingle": 1,
  "links": [],
- "modified": "2026-11-17 16:00:00.000000",
+ "modified": "2026-11-17 17:00:00.000000",
  "modified_by": "Administrator",
  "module": "Cockpits",
  "name": "Cockpit Settings",
