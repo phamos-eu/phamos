@@ -233,6 +233,8 @@ def _focus(label):
         "Explain the relevant flow from those excerpts: file paths, functions, and the conditions involved. "
         "Cite the paths. If the excerpts do not show the behaviour the issue describes, say that. "
         "Do not invent code that is not in the excerpts. "
+        "Excerpts under Standard apps are frappe, erpnext, or another required app at the same major version as this custom app. "
+        "Say what those excerpts already provide, and what is left to build in the custom app. "
     )
     if label == "bug":
         return shared + (
@@ -266,17 +268,27 @@ def search_terms(*texts):
 
 
 _SOURCE_CACHE = None
+_VERSION_RE = re.compile(r"""^__version__\s*=\s*['"]([^'"]+)['"]""", re.M)
+_STD_SKIP = ("locale", "translations", "public", "docs", "cypress")
+_STD_EXTENSIONS = (".py", ".js", ".json")
 
 
-def _source_files(root):
+def _source_files(root, extra_skip=(), extensions=None):
     global _SOURCE_CACHE
-    if _SOURCE_CACHE and _SOURCE_CACHE[0] == root:
-        return _SOURCE_CACHE[1]
+    if not isinstance(_SOURCE_CACHE, dict):
+        _SOURCE_CACHE = {}
+    key = (os.path.abspath(root), tuple(sorted(extra_skip)), tuple(extensions or ()))
+    cached = _SOURCE_CACHE.get(key)
+    if cached is not None:
+        return cached
+    skip = SKIP_DIRS | set(extra_skip)
     files = []
     for dirpath, dirnames, filenames in os.walk(root):
-        dirnames[:] = [name for name in dirnames if name not in SKIP_DIRS and not name.startswith(".")]
+        dirnames[:] = [name for name in dirnames if name not in skip and not name.startswith(".")]
         for name in filenames:
             if name.startswith("."):
+                continue
+            if extensions and not name.endswith(extensions):
                 continue
             if any(name.endswith(ext) for ext in SKIP_EXTENSIONS):
                 continue
@@ -289,7 +301,7 @@ def _source_files(root):
             except OSError:
                 continue
             files.append((os.path.relpath(path, root), text))
-    _SOURCE_CACHE = (root, files)
+    _SOURCE_CACHE[key] = files
     return files
 
 
@@ -316,14 +328,90 @@ def _snippet(text, terms):
     return "\n...\n".join(parts)
 
 
-def relevant_code(title, description, note_lines, root=None):
+def read_app_version(app_dir):
+    """The __version__ of a Frappe app checkout, or '' when it has none."""
+    package = os.path.basename(os.path.abspath(app_dir))
+    for path in (
+        os.path.join(app_dir, package, "__init__.py"),
+        os.path.join(app_dir, "phamos", "__init__.py"),
+        os.path.join(app_dir, "__init__.py"),
+    ):
+        try:
+            with open(path, encoding="utf-8", errors="ignore") as handle:
+                match = _VERSION_RE.search(handle.read())
+        except OSError:
+            continue
+        if match:
+            return match.group(1).strip()
+    return ""
+
+
+def major_version(version):
+    match = re.match(r"(\d+)", version or "")
+    return match.group(1) if match else ""
+
+
+def required_app_names(custom_root):
+    """frappe, plus the apps named in this checkout's required_apps."""
+    names = ["frappe"]
+    hooks = os.path.join(custom_root, "phamos", "hooks.py")
+    try:
+        with open(hooks, encoding="utf-8", errors="ignore") as handle:
+            text = handle.read()
+    except OSError:
+        return names
+    match = re.search(r"^required_apps\s*=\s*\[([^\]]*)\]", text, re.M)
+    if not match:
+        return names
+    for name in re.findall(r"['\"]([A-Za-z0-9_]+)['\"]", match.group(1)):
+        if name not in names:
+            names.append(name)
+    return names
+
+
+def standard_app_base(custom_root):
+    """The bench apps directory, when this run can see one."""
+    configured = (os.environ.get("AI_ISSUE_STD_APPS") or "").strip()
+    if configured:
+        return configured
+    parent = os.path.dirname(os.path.abspath(custom_root))
+    if os.path.isdir(os.path.join(parent, "frappe", "frappe")):
+        return parent
+    return ""
+
+
+def matching_standard_apps(custom_root=None):
+    """frappe, erpnext and the other required apps at this app's major version."""
+    custom_root = custom_root or repo_root()
+    base = standard_app_base(custom_root)
+    custom_version = read_app_version(custom_root)
+    major = major_version(custom_version)
+    if not base or not major or not os.path.isdir(base):
+        return []
+    found = []
+    for name in required_app_names(custom_root):
+        app_dir = os.path.join(base, name)
+        version = read_app_version(app_dir)
+        if not version:
+            print(f"{name}: no checkout under {base}.")
+            continue
+        if major_version(version) != major:
+            print(f"{name} {version} is not version {major}. Skipped.")
+            continue
+        found.append((name, version, app_dir))
+    return found
+
+
+def relevant_code(title, description, note_lines, root=None, file_limit=None, char_limit=None, extra_skip=(), extensions=None):
     """Snippets from this checkout that match the issue wording."""
     root = root or repo_root()
+    file_limit = MAX_CODE_FILES if file_limit is None else file_limit
+    char_limit = MAX_CODE_CHARS if char_limit is None else char_limit
     terms = search_terms(title, description, note_lines)
     if not terms or not os.path.isdir(root):
         return "", 0
     ranked = []
-    for rel, text in _source_files(root):
+    for rel, text in _source_files(root, extra_skip=extra_skip, extensions=extensions):
         lowered = text.lower()
         name = rel.lower()
         score = 0
@@ -337,14 +425,50 @@ def relevant_code(title, description, note_lines, root=None):
     parts = []
     used = 0
     kept = 0
-    for _score, rel, text in ranked[:MAX_CODE_FILES]:
+    for _score, rel, text in ranked[:file_limit]:
         block = f"### {rel}\n{_snippet(text, terms)}"
-        if used + len(block) > MAX_CODE_CHARS:
+        if used + len(block) > char_limit:
             break
         parts.append(block)
         used += len(block)
         kept += 1
     return "\n\n".join(parts), kept
+
+
+def relevant_standard_code(title, description, note_lines, custom_root=None):
+    """Snippets from frappe, erpnext and required apps at the same major version."""
+    custom_root = custom_root or repo_root()
+    apps = matching_standard_apps(custom_root)
+    if not apps:
+        if standard_app_base(custom_root):
+            print("No standard apps at the custom app's major version.")
+        return "", 0
+    print("Standard apps: " + ", ".join(f"{name} {version}" for name, version, _path in apps))
+    parts = []
+    kept = 0
+    for name, version, app_dir in apps:
+        code, count = relevant_code(
+            title, description, note_lines,
+            root=app_dir,
+            file_limit=3,
+            char_limit=4000,
+            extra_skip=_STD_SKIP,
+            extensions=_STD_EXTENSIONS,
+        )
+        if not code:
+            continue
+        parts.append(f"## {name} {version}\n{code}")
+        kept += count
+    return "\n\n".join(parts), kept
+
+
+def with_standard_code(code, title, description, note_lines):
+    """Custom-app snippets, then matching standard-app snippets."""
+    standard, extra = relevant_standard_code(title, description, note_lines)
+    if not standard:
+        return code, extra
+    custom = code or "(no matching files in the custom app)"
+    return f"{custom}\n\n# Standard apps at the same major version\n{standard}", extra
 
 
 def call_claude(label, title, description, note_lines, images, code=""):
@@ -459,6 +583,8 @@ def analyse_issue(gl, issue, label):
 
     note_lines = _note_lines(notes)
     code, code_files = relevant_code(title, description, note_lines)
+    code, std_files = with_standard_code(code, title, description, note_lines)
+    code_files += std_files
     text = call_claude(label, title, description, note_lines, images, code)
     if not text:
         print(f"No analysis to post for issue #{issue_iid}.")
