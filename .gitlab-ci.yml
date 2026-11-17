@@ -52,6 +52,14 @@
 #   one issue by calling the pipeline API with AI_ISSUE_IID and AI_ISSUE_LABEL.
 #   Set AI_ISSUE_ANALYSIS_ENABLED=false to turn the job off. The poll schedule
 #   must set AI_ISSUE_POLL=true so the unit-test jobs do not run with it.
+#
+# ai_issue_plan
+#   For an open issue labelled "implementation plan", posts one planning step
+#   from the same checkout: what the code shows and one question, or a summary
+#   once the answers are enough. The label stays until a reply of "approved"
+#   on that summary, which posts the draft and replaces the label with
+#   plan-drafted. A comment on the issue starts the same job again. This does
+#   not write code. Set AI_ISSUE_PLAN_ENABLED=false to turn the job off.
 
 workflow:
   rules:
@@ -59,7 +67,7 @@ workflow:
     # a branch pipeline otherwise. An issue-analysis run is an API pipeline
     # and must be created even when that branch has an open MR.
     - if: $CI_PIPELINE_SOURCE == "merge_request_event"
-    - if: '$CI_PIPELINE_SOURCE == "api" && $AI_ISSUE_IID && $AI_ISSUE_LABEL =~ /^(bug|question)$/'
+    - if: '$CI_PIPELINE_SOURCE == "api" && $AI_ISSUE_IID && $AI_ISSUE_LABEL =~ /^(bug|question|implementation plan)$/'
     - if: '$CI_PIPELINE_SOURCE == "schedule" && $AI_ISSUE_POLL == "true"'
     - if: $CI_COMMIT_BRANCH && $CI_OPEN_MERGE_REQUESTS
       when: never
@@ -306,3 +314,20 @@ ai_issue_analysis:
   script:
     - pip install --quiet --disable-pip-version-check "anthropic==2.8.0"
     - python .gitlab/ai_issue_analysis.py
+
+ai_issue_plan:
+  stage: ai-review
+  image: python:3.10
+  tags: [hetzner]
+  # A failed plan must not fail any other pipeline that shares the stage.
+  allow_failure: true
+  needs: []
+  interruptible: true
+  rules:
+    - if: '$AI_ISSUE_PLAN_ENABLED == "false"'
+      when: never
+    - if: '$CI_PIPELINE_SOURCE == "schedule" && $AI_ISSUE_POLL == "true"'
+    - if: '$CI_PIPELINE_SOURCE == "api" && $AI_ISSUE_IID && $AI_ISSUE_LABEL == "implementation plan"'
+  script:
+    - pip install --quiet --disable-pip-version-check "anthropic==2.8.0"
+    - python .gitlab/ai_issue_plan.py
