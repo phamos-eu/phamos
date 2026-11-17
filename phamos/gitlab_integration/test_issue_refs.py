@@ -213,6 +213,15 @@ class TestDapStopLinksGitlabTicket(_RefsSetup):
 		self._created_in_gitlab(self.child, "2026-05-10 07:00:00")  # before the timer: not linked
 		self.assertEqual(self._stop_project_timer("Worked on it"), (new_task, self.parent))
 
+	def test_a_colleagues_ticket_created_while_the_timer_ran_is_not_linked(self):
+		mine = self._issue(12, "My task")
+		colleagues = self._issue(13, "Colleague's task")
+		frappe.db.set_value("GitLab Issue", mine, "assignee_email", USER)
+		frappe.db.set_value("GitLab Issue", colleagues, "assignee_email", "colleague@example.com")
+		self._created_in_gitlab(mine, "2026-05-10 08:20:00")
+		self._created_in_gitlab(colleagues, "2026-05-10 08:40:00")  # newer, but someone else's
+		self.assertEqual(self._stop_project_timer("Worked on it"), (None, mine))
+
 	def test_no_ticket_created_while_the_timer_ran_links_nothing(self):
 		self._created_in_gitlab(self.child, "2026-05-10 09:30:00")  # after Stop
 		self.assertEqual(self._stop_project_timer("Worked on it"), (None, None))

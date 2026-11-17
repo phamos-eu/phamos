@@ -188,6 +188,19 @@ class TestDevActionPanelOneProjectList(_DapTestCase):
 		self.assertNotIn(other, names)
 		self.assertRaises(frappe.ValidationError, dap.get_matching_names, "User", "[]")
 
+	def test_filter_button_only_matches_what_the_panel_lists(self):
+		listed = self._project(prefix="DAP Scope")
+		hidden = self._project(prefix="DAP Scope", status="Completed")  # not Open, not mine
+		names = self._as_user(dap.get_matching_names, "Project", [["Project", "project_name", "like", "DAP Scope%"]])
+		self.assertIn(listed, names)
+		self.assertNotIn(hidden, names)
+
+	def test_filter_button_refuses_malformed_filters_and_non_panel_users(self):
+		self.assertRaises(frappe.ValidationError, self._as_user, dap.get_matching_names, "Project", '{"status": "Open"}')
+		self.assertRaises(frappe.ValidationError, self._as_user, dap.get_matching_names, "Project", '[["Project", "status"]]')
+		frappe.db.set_value("Employee", self.employee, "user_id", None)
+		self.assertRaises(frappe.PermissionError, self._as_user, dap.get_matching_names, "Project", "[]")
+
 	def test_project_with_two_open_todos_is_listed_once(self):
 		project = self._project()
 		self._assign(project)
@@ -241,6 +254,15 @@ class TestDevActionPanelIssueList(_DapTestCase):
 
 	def _issues(self):
 		return {row["name"]: row for row in self._as_user(dap.get_my_issues)}
+
+	def test_filter_button_never_matches_closed_issues(self):
+		opened = self._issue("DAP Scope issue")
+		closed = self._issue("DAP Scope issue")
+		frappe.db.set_value("GitLab Issue", closed, "state", "closed")
+		names = self._as_user(
+			dap.get_matching_names, "GitLab Issue", [["GitLab Issue", "title", "=", "DAP Scope issue"]]
+		)
+		self.assertEqual(names, [opened])
 
 	def test_running_issue_assigned_to_someone_else_is_marked_running(self):
 		running = self._issue("Running, not assigned to me")

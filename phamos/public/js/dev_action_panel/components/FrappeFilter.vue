@@ -2,7 +2,7 @@
 // Frappe's own list-view Filter button (field / condition / value rows, "+ Add a Filter",
 // "Clear Filters", "Apply Filters"). Emits the names of the matching records, or null when
 // no filter is set, so the panel can keep its lists loaded and only hide rows.
-import { ref, onMounted, onUnmounted } from "vue";
+import { ref, onMounted, onBeforeUnmount } from "vue";
 
 const props = defineProps({
   doctype: { type: String, required: true },
@@ -31,6 +31,7 @@ async function onChange() {
 
 onMounted(async () => {
   await frappe.model.with_doctype(props.doctype);
+  if (!buttonRef.value) return; // the view was left while the doctype loaded
   buttonRef.value.querySelector(".filter-icon").innerHTML = frappe.utils.icon("es-line-filter", "sm");
   filterGroup = new frappe.ui.FilterGroup({
     doctype: props.doctype,
@@ -42,9 +43,11 @@ onMounted(async () => {
   $(clearRef.value).on("click", onChange);
 });
 
-onUnmounted(() => {
+// Before unmount, while the buttons still exist.
+onBeforeUnmount(() => {
   requestId++;
-  $(buttonRef.value).popover?.("hide");
+  $(clearRef.value).off("click", onChange);
+  filterGroup?.hide_popover();
 });
 </script>
 

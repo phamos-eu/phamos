@@ -19,6 +19,7 @@ from zoneinfo import ZoneInfo
 import frappe
 from frappe import _
 from frappe.query_builder import Order
+from frappe.query_builder.functions import Lower
 from frappe.utils import get_datetime, get_system_timezone, strip_html
 
 GITLAB_REF_RE = re.compile(
@@ -77,18 +78,27 @@ def link_gitlab_issues(doc, reference=None, texts=()):
 		doc.gitlab_parent_issue = frappe.db.get_value("GitLab Issue", doc.gitlab_issue, "parent_issue") or None
 
 
-def issue_created_during(project, start, end):
-	"""Newest GitLab Issue of an ERPNext project created in GitLab between start and end.
+def issue_created_during(project, start, end, user):
+	"""Newest GitLab Issue of an ERPNext project created in GitLab between start and end that is
+	assigned to `user` or to nobody; a colleague's ticket is never linked.
 
 	start / end are in the system time zone; GitLab's created_at is stored in UTC. An issue
-	without created_at (fetched on the spot) counts by the time it reached ERPNext.
+	without created_at (fetched on the spot) counts by the time it reached ERPNext. The assignee
+	matches like the panel's "My Issues": assignee_email, else gitlab_username = the local part
+	of the user's email.
 	"""
-	if not (project and start and end):
+	if not (project and start and end and user):
 		return None
 	start, end = get_datetime(start), get_datetime(end)
 	utc_start, utc_end = _system_to_utc(start), _system_to_utc(end)
+	email = (frappe.db.get_value("User", user, "email") or "").lower()
 	issue = frappe.qb.DocType("GitLab Issue")
 	gitlab_project = frappe.qb.DocType("GitLab Project")
+	no_email = issue.assignee_email.isnull() | (issue.assignee_email == "")
+	no_username = issue.gitlab_username.isnull() | (issue.gitlab_username == "")
+	mine_or_nobodys = (Lower(issue.assignee_email) == email) | (
+		no_email & (no_username | (Lower(issue.gitlab_username) == email.split("@")[0]))
+	)
 	rows = (
 		frappe.qb.from_(issue)
 		.join(gitlab_project)
@@ -99,6 +109,7 @@ def issue_created_during(project, start, end):
 			issue.created_at.between(utc_start, utc_end)
 			| (issue.created_at.isnull() & issue.creation.between(start, end))
 		)
+		.where(mine_or_nobodys)
 		.orderby(issue.created_at, order=Order.desc)
 		.orderby(issue.creation, order=Order.desc)
 		.limit(1)
