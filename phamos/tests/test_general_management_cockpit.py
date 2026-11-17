@@ -69,8 +69,16 @@ class TestGeneralManagementWiring(FrappeTestCase):
 			name.replace("get_software_development_settings", gm.CONFIG.settings_method_name)
 			for name in _whitelisted(software_development_spa)
 		}
-		# Plus the company view of the Tasks Gantt (#1948), which only this cockpit has.
-		self.assertEqual(set(_whitelisted(gm)), expected | {"get_company_tasks", "get_company_task"})
+		# Plus what only this cockpit has: the company Tasks view (#1948) and appointments (#1949).
+		own = {
+			"get_company_tasks",
+			"get_company_task",
+			"get_company_appointments",
+			"get_appointment_options",
+			"save_appointment",
+			"delete_appointment",
+		}
+		self.assertEqual(set(_whitelisted(gm)), expected | own)
 
 	def test_every_endpoint_checks_the_role(self):
 		ungated = [
@@ -264,3 +272,141 @@ class TestCompanyTasks(FrappeTestCase):
 			gm.get_company_tasks()
 		with self.assertRaises(frappe.PermissionError):
 			gm.get_company_task(self.sales_task)
+
+
+class TestCompanyAppointments(FrappeTestCase):
+	"""Company appointments (#1949): the Company Events rows, planned from the cockpit. The
+	Mailcow calls are patched, as in test_company_event_schedule."""
+
+	MAILBOX = "gm-appointments@example.com"
+
+	def setUp(self):
+		from unittest.mock import patch
+
+		from phamos.events import team_daily_schedule
+		from phamos.setup.event_schedule import ensure_event_schedule_fields
+		from phamos.tests.marketing_fixtures import ensure_company
+
+		frappe.set_user("Administrator")
+		setup.after_migrate()
+		ensure_event_schedule_fields()
+		self.company = ensure_company()
+		self.department = self._department(self.company)
+		frappe.db.set_single_value(COCKPIT_SETTINGS, gm.CONFIG.department_field, self.department)
+		self._mailbox()
+		team_daily_schedule._email_for_account.cache_clear()
+		self.put = patch.object(team_daily_schedule, "_put_ics_upsert", return_value=(True, None)).start()
+		self.delete = patch.object(team_daily_schedule, "_delete_uid_for_mailbox", return_value=(True, None)).start()
+
+	def tearDown(self):
+		from unittest.mock import patch
+
+		patch.stopall()
+		frappe.set_user("Administrator")
+		frappe.db.rollback()
+
+	def _department(self, company):
+		existing = frappe.get_all("Department", filters={"company": company, "is_group": 0}, pluck="name", limit=1)
+		if existing:
+			return existing[0]
+		return frappe.get_doc(
+			{"doctype": "Department", "department_name": "_Test GM Appointments", "company": company}
+		).insert().name
+
+	def _mailbox(self):
+		"""A bare Email Account (a real insert would log in) with a Mailcow DAV password."""
+		if not frappe.db.exists("Email Account", self.MAILBOX):
+			account = frappe.new_doc("Email Account")
+			account.update({"name": self.MAILBOX, "email_account_name": self.MAILBOX, "email_id": self.MAILBOX})
+			account.db_insert()
+		if not frappe.db.exists("Mailcow DAV Password", {"user": self.MAILBOX}):
+			frappe.get_doc({"doctype": "Mailcow DAV Password", "user": self.MAILBOX, "dav_password": "x"}).insert()
+
+	def _appointment(self, **values):
+		return {
+			"subject": "All-hands",
+			"location": "Office",
+			"start": "2026-12-01 10:00:00",
+			"end": "2026-12-01 11:00:00",
+			"email_account": self.MAILBOX,
+			"required_attendees": ["a@example.com", "b@example.com"],
+			"optional_attendees": ["c@example.com"],
+			**values,
+		}
+
+	def _company_fields(self):
+		doc = frappe.get_doc("Company", self.company).as_dict()
+		return {k: v for k, v in doc.items() if k not in ("event_schedule", "modified", "modified_by")}
+
+	def test_the_role_alone_plans_an_appointment(self):
+		before = self._company_fields()
+		frappe.set_user(_make_user(MANAGER, [setup.GENERAL_MANAGEMENT_ROLE]))
+		self.assertFalse(frappe.has_permission("Company", "write"))
+
+		saved = gm.save_appointment(self._appointment())
+		self.assertEqual(saved["required_attendees"], ["a@example.com", "b@example.com"])
+		self.assertEqual(saved["optional_attendees"], ["c@example.com"])
+		self.assertTrue(saved["synced"])
+		self.put.assert_called_once()
+
+		listed = gm.get_company_appointments()
+		self.assertEqual(listed["company"], self.company)
+		self.assertIn(saved["name"], [a["name"] for a in listed["appointments"]])
+
+		frappe.set_user("Administrator")
+		self.assertEqual(self._company_fields(), before)
+
+	def test_update_and_delete(self):
+		saved = gm.save_appointment(self._appointment())
+		updated = gm.save_appointment(self._appointment(name=saved["name"], subject="All-hands, moved"))
+		self.assertEqual(updated["name"], saved["name"])
+		self.assertEqual(updated["subject"], "All-hands, moved")
+
+		gm.delete_appointment(saved["name"])
+		self.delete.assert_called()
+		self.assertNotIn(saved["name"], [a["name"] for a in gm.get_company_appointments()["appointments"]])
+
+	def test_refuses_rows_outside_the_company_and_bad_input(self):
+		with self.assertRaises(frappe.ValidationError):
+			gm.save_appointment(self._appointment(name="not-a-row"))
+		with self.assertRaises(frappe.ValidationError):
+			gm.delete_appointment("not-a-row")
+		with self.assertRaises(frappe.ValidationError):
+			gm.save_appointment(self._appointment(email_account="no-dav@example.com"))
+		with self.assertRaises(frappe.ValidationError):
+			gm.save_appointment(self._appointment(end="2026-12-01 09:00:00"))
+		with self.assertRaises(frappe.ValidationError):
+			gm.save_appointment(self._appointment(required_attendees=["not an email"]))
+
+	def test_needs_the_role(self):
+		frappe.set_user(_make_user(PROJECTS_USER, ["Projects User"]))
+		for call in (
+			gm.get_company_appointments,
+			gm.get_appointment_options,
+			lambda: gm.save_appointment(self._appointment()),
+		):
+			with self.assertRaises(frappe.PermissionError):
+				call()
+
+	def test_options_group_people_by_department(self):
+		employee = frappe.get_doc(
+			{
+				"doctype": "Employee",
+				"first_name": "_Test",
+				"last_name": "Appointments",
+				"gender": frappe.db.get_value("Gender", {}, "name"),
+				"date_of_birth": "1990-01-01",
+				"date_of_joining": "2020-01-01",
+				"company": self.company,
+				"department": self.department,
+				"company_email": "test-appointments@example.com",
+				"status": "Active",
+			}
+		).insert()
+		options = gm.get_appointment_options()
+		self.assertIn(self.MAILBOX, [m.name for m in options["mailboxes"]])
+		group = next(g for g in options["departments"] if g["department"] == self.department)
+		self.assertIn(
+			{"email": "test-appointments@example.com", "name": employee.employee_name, "image": None},
+			group["people"],
+		)
