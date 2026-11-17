@@ -157,12 +157,36 @@ class TestPhriend(FrappeTestCase):
 				self.assertFalse(frappe.get_all("File", {"attached_to_name": issue.name}))
 
 	def test_something_else_is_a_report_type(self, _enqueue):
-		# the flow offers "Something else" next to Bug, Idea and Question (#1900)
+		# the flow offers "Something else" next to Bug, Improvement and Question (#1900)
 		issue = self.report(report_type="Other", title="Hard to say")
 		self.assertEqual(issue.phriend_type, "Other")
 		self.assertEqual(issue.subject, "[Other] Hard to say")
 		options = frappe.get_meta("Issue").get_field("phriend_type").options.split("\n")
 		self.assertIn("Other", options)
+
+	def test_improvement_is_a_report_type_and_idea_is_not(self, _enqueue):
+		# "Idea" read as "this creates a cockpit Idea"; the type is "Improvement" now (#1924)
+		issue = self.report(report_type="Improvement", title="Could be faster")
+		self.assertEqual(issue.phriend_type, "Improvement")
+		self.assertEqual(issue.subject, "[Improvement] Could be faster")
+		options = frappe.get_meta("Issue").get_field("phriend_type").options.split("\n")
+		self.assertIn("Improvement", options)
+		self.assertNotIn("Idea", options)
+		# a tab still running the old flow sends "Idea": it arrives as an Improvement
+		self.assertEqual(self.report(report_type="Idea").phriend_type, "Improvement")
+
+	def test_patch_moves_idea_reports_to_improvement(self, _enqueue):
+		from phamos.patches.v1_0 import rename_phriend_type_idea_to_improvement
+
+		old = self.report(title="Old wish")
+		frappe.db.set_value("Issue", old.name, {"phriend_type": "Idea", "subject": "[Idea] Old wish"})
+		bug = self.report(title="Still a bug")
+
+		rename_phriend_type_idea_to_improvement.execute()
+
+		self.assertEqual(frappe.db.get_value("Issue", old.name, ["phriend_type", "subject"]),
+			("Improvement", "[Idea] Old wish"))  # the subject stays as it was written
+		self.assertEqual(frappe.db.get_value("Issue", bug.name, "phriend_type"), "Bug")
 
 	def test_unknown_doctype_and_type_are_dropped(self, _enqueue):
 		issue = self.report(ref_doctype="No Such DocType", report_type="Rant", priority="Whenever")
@@ -231,7 +255,7 @@ class TestPhriend(FrappeTestCase):
 	def test_first_step_lists_the_open_reports_about_this_page(self, _enqueue):
 		# "Already reported here?" on the first step (PM, 2026-11-15)
 		older = self.report(title="Older one")
-		newer = self.report(title="Newer one", report_type="Idea")
+		newer = self.report(title="Newer one", report_type="Improvement")
 		closed = self.report(title="Done already")
 		closed.db_set("status", "Closed")
 		self.report(title="About another user", ref_docname="Guest")
@@ -242,8 +266,8 @@ class TestPhriend(FrappeTestCase):
 		self.assertEqual(result["count"], 2)
 		self.assertEqual([r["name"] for r in result["reports"]], [newer.name, older.name])  # newest first
 		first = result["reports"][0]
-		self.assertEqual(first["title"], "Newer one")  # without "[Idea] "
-		self.assertEqual(first["type"], "Idea")
+		self.assertEqual(first["title"], "Newer one")  # without "[Improvement] "
+		self.assertEqual(first["type"], "Improvement")
 		self.assertTrue(first["when"])
 
 		for i in range(5):

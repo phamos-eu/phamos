@@ -7,6 +7,8 @@ describe("phriendReport", () => {
 		expect(typeLabel("Bug")).toBe("Bug")
 		expect(typeTheme("Bug")).toBe("red")
 		expect(typeTheme("Other")).toBe("gray")
+		expect(typeLabel("Improvement")).toBe("Improvement") // was "Idea" (#1924)
+		expect(typeTheme("Improvement")).toBe("blue")
 	})
 
 	it("sums the details up in one line", () => {

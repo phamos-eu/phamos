@@ -3,14 +3,14 @@
 import { __ } from "./i18n.js"
 
 // What the reporter picked in Phriend; "Other" is "Something else" there too.
-const TYPE_LABELS = { Bug: "Bug", Idea: "Idea", Question: "Question", Other: "Something else" }
+const TYPE_LABELS = { Bug: "Bug", Improvement: "Improvement", Question: "Question", Other: "Something else" }
 
 export function typeLabel(type) {
 	return __(TYPE_LABELS[type] || type || "")
 }
 
 export function typeTheme(type) {
-	return { Bug: "red", Idea: "blue", Question: "orange" }[type] || "gray"
+	return { Bug: "red", Improvement: "blue", Question: "orange" }[type] || "gray"
 }
 
 function count(n, one, many) {

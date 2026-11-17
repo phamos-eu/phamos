@@ -59,7 +59,7 @@ _FIELDS = [
 		"fieldname": "phriend_type",
 		"label": "Report Type",
 		"fieldtype": "Select",
-		"options": "\nBug\nIdea\nQuestion\nOther",
+		"options": "\nBug\nImprovement\nQuestion\nOther",
 		"in_standard_filter": 1,
 		"depends_on": ONLY_PHRIEND,
 		"insert_after": "phriend_source_system",

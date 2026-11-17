@@ -22,7 +22,9 @@ from phamos.phriend.gitlab_issues import link_created
 
 MAX_SCREENSHOT_BYTES = 15 * 1024 * 1024
 REPORT_DOCTYPE = "Issue"
-REPORT_TYPES = ("Bug", "Idea", "Question", "Other")  # "Other" is "Something else" in the flow (#1900)
+REPORT_TYPES = ("Bug", "Improvement", "Question", "Other")  # "Other" is "Something else" in the flow (#1900)
+# "Improvement" was "Idea" (#1924); a tab still running the old flow, or its saved draft, sends "Idea"
+OLD_REPORT_TYPES = {"Idea": "Improvement"}
 PRIORITIES = ("Low", "Medium", "High", "Urgent")
 CLOSED_STATUSES = ("Resolved", "Closed")
 REPORT_LIST_CAP = 100  # badge and "Already reported here" count up to this
@@ -124,7 +126,7 @@ def make_report(settings, fields, reporter, reporter_name, reporter_email, sourc
 	names there say nothing here, so the record is not linked, only named and linked to there.
 	"""
 	f = {key: fields.get(key) for key in REPORT_FIELDS}
-	report_type = f["report_type"] or "Bug"
+	report_type = OLD_REPORT_TYPES.get(cstr(f["report_type"]), f["report_type"] or "Bug")
 	if report_type not in REPORT_TYPES:
 		report_type = "Bug"
 	priority = f["priority"] if f["priority"] in PRIORITIES else "Medium"
