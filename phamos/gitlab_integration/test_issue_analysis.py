@@ -267,6 +267,68 @@ class TestIssueAnalysis(FrappeTestCase):
 
         self.assertEqual(posts, ["/issues/7/notes"])
 
+    def test_poll_reads_the_named_project_and_code_from_this_checkout(self):
+        script = _ci_script()
+        seen = {}
+
+        class FakeGitLab:
+            def __init__(self, server, project_id, token):
+                seen["project_id"] = project_id
+                self.server = server.rstrip("/")
+
+            def get(self, path, **params):
+                if path == "/issues" and params.get("labels") == "bug":
+                    return [{
+                        "iid": 79,
+                        "title": "Timesheet record",
+                        "description": "How is a timesheet record created from the action panel?",
+                        "web_url": f"{GITLAB}/phamos/developer/-/issues/79",
+                        "labels": ["bug"],
+                    }]
+                if path.endswith("/notes"):
+                    return []
+                return []
+
+            def download(self, url):
+                return None
+
+            def post(self, path, payload):
+                seen["note"] = path
+
+            def put(self, path, payload):
+                seen["labels"] = payload
+
+        def claude(label, title, description, note_lines, images, code=""):
+            seen["code"] = code
+            return "Created from the action panel."
+
+        with tempfile.TemporaryDirectory() as root:
+            os.makedirs(os.path.join(root, "phamos"))
+            with open(os.path.join(root, "phamos", "timesheet_record.py"), "w", encoding="utf-8") as handle:
+                handle.write("def create_timesheet_record_from_action_panel():\n    return 'created'\n")
+            script._SOURCE_CACHE = None
+            with (
+                patch.object(script, "GitLab", FakeGitLab),
+                patch.object(script, "call_claude", side_effect=claude),
+                patch.dict(os.environ, {
+                    "AI_ISSUE_POLL": "true",
+                    "AI_ISSUE_IID": "",
+                    "AI_ISSUE_PROJECT": "phamos/developer",
+                    "AI_ISSUE_REPO": root,
+                    "CI_SERVER_URL": GITLAB,
+                    "CI_PROJECT_ID": "42",
+                    "GITLAB_API_TOKEN": "glpat-review",
+                    "ANTHROPIC_API_KEY": "sk-from-ci",
+                }),
+            ):
+                script.main()
+
+        self.assertEqual(seen["project_id"], "phamos/developer")
+        self.assertEqual(seen["note"], "/issues/79/notes")
+        self.assertEqual(seen["labels"], {"add_labels": "analysed", "remove_labels": "bug"})
+        self.assertIn("phamos/timesheet_record.py", seen["code"])
+        self.assertIn("create_timesheet_record_from_action_panel", seen["code"])
+
     def test_analysis_sends_matching_repository_code(self):
         script = _ci_script()
         seen = {}
