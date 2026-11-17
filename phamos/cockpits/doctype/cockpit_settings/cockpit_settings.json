@@ -5,6 +5,10 @@
  "engine": "InnoDB",
  "field_order": [
   "human_resources_spa_tab",
+  "human_resources_window_section",
+  "human_resources_color",
+  "column_break_human_resources_window",
+  "human_resources_glow",
   "human_resources_spa_section",
   "human_resources_department",
   "column_break_human_resources_spa",
@@ -12,24 +16,44 @@
   "human_resources_sick_leave_types",
   "human_resources_privacy_reveal_seconds",
   "personal_cockpit_tab",
+  "personal_window_section",
+  "personal_color",
+  "column_break_personal_window",
+  "personal_glow",
   "personal_cockpit_section",
   "personal_ideas_show_author",
   "project_management_spa_tab",
+  "project_management_window_section",
+  "project_management_color",
+  "column_break_project_management_window",
+  "project_management_glow",
   "project_management_spa_section",
   "project_management_department",
   "column_break_project_management_spa",
   "project_management_timesheet_project",
   "sales_spa_tab",
+  "sales_window_section",
+  "sales_color",
+  "column_break_sales_window",
+  "sales_glow",
   "sales_spa_section",
   "sales_department",
   "column_break_sales_spa",
   "sales_standard_project",
   "accounting_spa_tab",
+  "accounting_window_section",
+  "accounting_color",
+  "column_break_accounting_window",
+  "accounting_glow",
   "accounting_spa_section",
   "accounting_department",
   "column_break_accounting_spa",
   "accounting_standard_project",
   "software_development_spa_tab",
+  "software_development_window_section",
+  "software_development_color",
+  "column_break_software_development_window",
+  "software_development_glow",
   "software_development_spa_section",
   "software_development_department",
   "column_break_software_development_spa",
@@ -40,6 +64,30 @@
    "fieldname": "human_resources_spa_tab",
    "fieldtype": "Tab Break",
    "label": "Human Resources Cockpit"
+  },
+  {
+   "fieldname": "human_resources_window_section",
+   "fieldtype": "Section Break",
+   "label": "Window"
+  },
+  {
+   "default": "#be123c",
+   "description": "Colour of the cockpit's window title bar and edge glow, so the cockpit can be told apart when switching windows. Empty: neutral title bar, no glow.",
+   "fieldname": "human_resources_color",
+   "fieldtype": "Color",
+   "label": "Colour"
+  },
+  {
+   "fieldname": "column_break_human_resources_window",
+   "fieldtype": "Column Break"
+  },
+  {
+   "default": "Off",
+   "description": "A soft glow in the cockpit colour along the window edges. On focus: lights up when switching to the window, then fades.",
+   "fieldname": "human_resources_glow",
+   "fieldtype": "Select",
+   "label": "Edge Glow",
+   "options": "Off\nAlways\nOn focus\nAlways + on focus"
   },
   {
    "fieldname": "human_resources_spa_section",
@@ -85,6 +133,30 @@
    "label": "Personal Cockpit"
   },
   {
+   "fieldname": "personal_window_section",
+   "fieldtype": "Section Break",
+   "label": "Window"
+  },
+  {
+   "default": "#0e7490",
+   "description": "Colour of the cockpit's window title bar and edge glow, so the cockpit can be told apart when switching windows. Empty: neutral title bar, no glow.",
+   "fieldname": "personal_color",
+   "fieldtype": "Color",
+   "label": "Colour"
+  },
+  {
+   "fieldname": "column_break_personal_window",
+   "fieldtype": "Column Break"
+  },
+  {
+   "default": "Off",
+   "description": "A soft glow in the cockpit colour along the window edges. On focus: lights up when switching to the window, then fades.",
+   "fieldname": "personal_glow",
+   "fieldtype": "Select",
+   "label": "Edge Glow",
+   "options": "Off\nAlways\nOn focus\nAlways + on focus"
+  },
+  {
    "fieldname": "personal_cockpit_section",
    "fieldtype": "Section Break",
    "label": "Personal Cockpit Settings"
@@ -100,6 +172,30 @@
    "fieldname": "project_management_spa_tab",
    "fieldtype": "Tab Break",
    "label": "Project Management Cockpit"
+  },
+  {
+   "fieldname": "project_management_window_section",
+   "fieldtype": "Section Break",
+   "label": "Window"
+  },
+  {
+   "default": "#6d28d9",
+   "description": "Colour of the cockpit's window title bar and edge glow, so the cockpit can be told apart when switching windows. Empty: neutral title bar, no glow.",
+   "fieldname": "project_management_color",
+   "fieldtype": "Color",
+   "label": "Colour"
+  },
+  {
+   "fieldname": "column_break_project_management_window",
+   "fieldtype": "Column Break"
+  },
+  {
+   "default": "Off",
+   "description": "A soft glow in the cockpit colour along the window edges. On focus: lights up when switching to the window, then fades.",
+   "fieldname": "project_management_glow",
+   "fieldtype": "Select",
+   "label": "Edge Glow",
+   "options": "Off\nAlways\nOn focus\nAlways + on focus"
   },
   {
    "fieldname": "project_management_spa_section",
@@ -130,6 +226,30 @@
    "label": "Sales SPA"
   },
   {
+   "fieldname": "sales_window_section",
+   "fieldtype": "Section Break",
+   "label": "Window"
+  },
+  {
+   "default": "#c2410c",
+   "description": "Colour of the cockpit's window title bar and edge glow, so the cockpit can be told apart when switching windows. Empty: neutral title bar, no glow.",
+   "fieldname": "sales_color",
+   "fieldtype": "Color",
+   "label": "Colour"
+  },
+  {
+   "fieldname": "column_break_sales_window",
+   "fieldtype": "Column Break"
+  },
+  {
+   "default": "Off",
+   "description": "A soft glow in the cockpit colour along the window edges. On focus: lights up when switching to the window, then fades.",
+   "fieldname": "sales_glow",
+   "fieldtype": "Select",
+   "label": "Edge Glow",
+   "options": "Off\nAlways\nOn focus\nAlways + on focus"
+  },
+  {
    "fieldname": "sales_spa_section",
    "fieldtype": "Section Break",
    "label": "Sales SPA Settings"
@@ -156,6 +276,30 @@
    "fieldname": "accounting_spa_tab",
    "fieldtype": "Tab Break",
    "label": "Accounting SPA"
+  },
+  {
+   "fieldname": "accounting_window_section",
+   "fieldtype": "Section Break",
+   "label": "Window"
+  },
+  {
+   "default": "#047857",
+   "description": "Colour of the cockpit's window title bar and edge glow, so the cockpit can be told apart when switching windows. Empty: neutral title bar, no glow.",
+   "fieldname": "accounting_color",
+   "fieldtype": "Color",
+   "label": "Colour"
+  },
+  {
+   "fieldname": "column_break_accounting_window",
+   "fieldtype": "Column Break"
+  },
+  {
+   "default": "Off",
+   "description": "A soft glow in the cockpit colour along the window edges. On focus: lights up when switching to the window, then fades.",
+   "fieldname": "accounting_glow",
+   "fieldtype": "Select",
+   "label": "Edge Glow",
+   "options": "Off\nAlways\nOn focus\nAlways + on focus"
   },
   {
    "fieldname": "accounting_spa_section",
@@ -186,6 +330,30 @@
    "label": "Software Development Cockpit"
   },
   {
+   "fieldname": "software_development_window_section",
+   "fieldtype": "Section Break",
+   "label": "Window"
+  },
+  {
+   "default": "#334155",
+   "description": "Colour of the cockpit's window title bar and edge glow, so the cockpit can be told apart when switching windows. Empty: neutral title bar, no glow.",
+   "fieldname": "software_development_color",
+   "fieldtype": "Color",
+   "label": "Colour"
+  },
+  {
+   "fieldname": "column_break_software_development_window",
+   "fieldtype": "Column Break"
+  },
+  {
+   "default": "Off",
+   "description": "A soft glow in the cockpit colour along the window edges. On focus: lights up when switching to the window, then fades.",
+   "fieldname": "software_development_glow",
+   "fieldtype": "Select",
+   "label": "Edge Glow",
+   "options": "Off\nAlways\nOn focus\nAlways + on focus"
+  },
+  {
    "fieldname": "software_development_spa_section",
    "fieldtype": "Section Break",
    "label": "Software Development Cockpit Settings"
@@ -211,7 +379,7 @@
  ],
  "issingle": 1,
  "links": [],
- "modified": "2026-11-17 12:00:00.000000",
+ "modified": "2026-11-17 14:00:00.000000",
  "modified_by": "Administrator",
  "module": "Cockpits",
  "name": "Cockpit Settings",

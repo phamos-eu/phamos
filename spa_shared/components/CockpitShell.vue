@@ -23,6 +23,14 @@
 		</div>
 		<!-- One toast host for the whole cockpit; without it frappe-ui toast() calls show nothing. -->
 		<Toasts />
+		<!-- The cockpit colour along the window edges (#1933); never catches clicks. -->
+		<div
+			v-if="glow"
+			aria-hidden="true"
+			class="cockpit-glow"
+			:class="{ 'cockpit-glow--steady': glow.steady, 'cockpit-glow--pulse': glow.pulsing.value }"
+			:style="{ '--cockpit-rgb': glow.rgb }"
+		/>
 	</div>
 </template>
 
@@ -32,6 +40,7 @@ import { useRouter } from "vue-router"
 import { Toasts } from "frappe-ui"
 import { pageChrome } from "@spa/pageChrome.js"
 import { mountPhriend } from "@spa/phriend.js"
+import { useCockpitGlow } from "@spa/composables/useCockpitGlow.js"
 
 const props = defineProps({
 	title: { type: String, default: "" },
@@ -41,5 +50,6 @@ const props = defineProps({
 // Phriend, the report-a-problem ball, in every cockpit (#1900). The page title the shell shows
 // becomes part of "Reported on"; on record pages the record itself is named instead.
 const router = useRouter()
+const glow = useCockpitGlow()
 onMounted(() => mountPhriend(router, () => props.title))
 </script>
