@@ -59,7 +59,10 @@
 #   once the answers are enough. The label stays until a reply of "approved"
 #   on that summary, which posts the draft and replaces the label with
 #   plan-drafted. A comment on the issue starts the same job again. This does
-#   not write code. Set AI_ISSUE_PLAN_ENABLED=false to turn the job off.
+#   not write code. The job image already holds Frappe, ERPNext and HRMS on
+#   version-15. The script reads this app's major version and uses only the
+#   standard apps on that same version. Set AI_ISSUE_PLAN_ENABLED=false to
+#   turn the job off.
 
 workflow:
   rules:
@@ -301,8 +304,10 @@ ai_code_review:
 
 ai_issue_analysis:
   stage: ai-review
-  image: python:3.10
+  image: $CI_REGISTRY_IMAGE/ci-bench:$CI_BENCH_TAG
   tags: [hetzner]
+  variables:
+    AI_ISSUE_STD_APPS: /home/frappe/frappe-bench/apps
   # A failed analysis must not fail any other pipeline that shares the stage.
   allow_failure: true
   needs: []
@@ -313,13 +318,15 @@ ai_issue_analysis:
     - if: '$CI_PIPELINE_SOURCE == "schedule" && $AI_ISSUE_POLL == "true"'
     - if: '$CI_PIPELINE_SOURCE == "api" && $AI_ISSUE_IID && $AI_ISSUE_LABEL =~ /^(bug|question)$/'
   script:
-    - pip install --quiet --disable-pip-version-check "anthropic==2.8.0"
-    - python .gitlab/ai_issue_analysis.py
+    - /home/frappe/frappe-bench/env/bin/pip install --quiet --disable-pip-version-check --target "$CI_PROJECT_DIR/.vendor" "anthropic==2.8.0"
+    - PYTHONPATH="$CI_PROJECT_DIR/.vendor" /home/frappe/frappe-bench/env/bin/python .gitlab/ai_issue_analysis.py
 
 ai_issue_plan:
   stage: ai-review
-  image: python:3.10
+  image: $CI_REGISTRY_IMAGE/ci-bench:$CI_BENCH_TAG
   tags: [hetzner]
+  variables:
+    AI_ISSUE_STD_APPS: /home/frappe/frappe-bench/apps
   # A failed plan must not fail any other pipeline that shares the stage.
   allow_failure: true
   needs: []
@@ -330,5 +337,5 @@ ai_issue_plan:
     - if: '$CI_PIPELINE_SOURCE == "schedule" && $AI_ISSUE_POLL == "true"'
     - if: '$CI_PIPELINE_SOURCE == "api" && $AI_ISSUE_IID && $AI_ISSUE_LABEL == "implementation plan"'
   script:
-    - pip install --quiet --disable-pip-version-check "anthropic==2.8.0"
-    - python .gitlab/ai_issue_plan.py
+    - /home/frappe/frappe-bench/env/bin/pip install --quiet --disable-pip-version-check --target "$CI_PROJECT_DIR/.vendor" "anthropic==2.8.0"
+    - PYTHONPATH="$CI_PROJECT_DIR/.vendor" /home/frappe/frappe-bench/env/bin/python .gitlab/ai_issue_plan.py
