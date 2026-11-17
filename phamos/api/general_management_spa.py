@@ -13,6 +13,7 @@ import frappe
 from frappe import _
 
 from phamos.api import department_cockpit as dc
+from phamos.cockpits.settings import COCKPIT_SETTINGS, COCKPITS, cockpit_window
 from phamos.setup.general_management import GENERAL_MANAGEMENT_ROLE
 
 ACCESS_ROLES = ("System Manager", GENERAL_MANAGEMENT_ROLE)
@@ -386,3 +387,89 @@ def create_task_from_issue(
 def add_task_dependency(name, depends_on):
 	"""Add a predecessor dependency to a Task (Gantt link mode)."""
 	return dc.add_task_dependency(CONFIG, name, depends_on)
+
+
+# --- Company view: "All departments" on the Tasks Gantt (#1948) ---------------------------------
+
+# Cap per department, like department_cockpit.get_tasks.
+COMPANY_TASKS_PER_DEPARTMENT = 500
+OWN_PREFIX = "general_management"
+
+
+def _company_cockpits():
+	"""The cockpits with a department set in Cockpit Settings, General Management first.
+
+	Returns:
+		list[dict]: department, label (the cockpit's name), color (Cockpit Settings, else the
+		cockpit's default), route and own (True for General Management). The others follow in the
+		order of their tabs in Cockpit Settings. The Personal Cockpit has no department.
+	"""
+	field_order = [field.fieldname for field in frappe.get_meta(COCKPIT_SETTINGS).fields]
+	cockpits = []
+	for route, (prefix, default_color) in COCKPITS.items():
+		department_field = f"{prefix}_department"
+		if department_field not in field_order:
+			continue
+		department = frappe.db.get_single_value(COCKPIT_SETTINGS, department_field)
+		if not department:
+			continue
+		cockpits.append(
+			{
+				"department": department,
+				"label": prefix.replace("_", " ").title(),
+				"color": cockpit_window(route)["color"] or default_color,
+				"route": route,
+				"own": prefix == OWN_PREFIX,
+				"_position": field_order.index(department_field),
+			}
+		)
+	cockpits.sort(key=lambda c: (not c["own"], c["_position"]))
+	for cockpit in cockpits:
+		del cockpit["_position"]
+	return cockpits
+
+
+@frappe.whitelist()
+@_require_access
+def get_company_tasks(include_completed=0):
+	"""Top-level Tasks of every cockpit department, one group per department (#1948).
+
+	Subtasks (with a Parent Task) stay in the department cockpits. Completed and cancelled Tasks
+	only with include_completed, as in department_cockpit.get_tasks.
+
+	Returns:
+		list[dict]: the groups of _company_cockpits(), each with its `tasks` (get_tasks rows).
+	"""
+	frappe.has_permission("Task", "read", throw=True)
+	include_completed = frappe.utils.cint(include_completed)
+	groups = []
+	for cockpit in _company_cockpits():
+		filters = [["department", "=", cockpit["department"]], ["parent_task", "is", "not set"]]
+		if not include_completed:
+			filters.append(["status", "not in", ["Cancelled", "Template", "Completed"]])
+		rows = frappe.get_list(
+			"Task",
+			filters=filters,
+			fields=dc.TASK_LIST_FIELDS,
+			order_by="exp_start_date asc, modified desc",
+			limit_page_length=COMPANY_TASKS_PER_DEPARTMENT,
+		)
+		groups.append({**cockpit, "tasks": [dc._serialize_task_row(row) for row in rows]})
+	return groups
+
+
+@frappe.whitelist()
+@_require_access
+def get_company_task(name):
+	"""Read-only detail of a Task of a cockpit department, for the company view (#1948).
+
+	Returns:
+		dict: the department_cockpit task detail plus `cockpit` (label, color, route, own) of the
+		Task's department. Throws for a Task outside the cockpit departments.
+	"""
+	doc = frappe.get_doc("Task", name)
+	doc.check_permission("read")
+	cockpit = next((c for c in _company_cockpits() if c["department"] == doc.department), None)
+	if not cockpit:
+		frappe.throw(_("This task is not in a department with a cockpit."), frappe.PermissionError)
+	return {**dc._serialize_task_detail(doc), "cockpit": cockpit}

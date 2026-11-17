@@ -69,7 +69,8 @@ class TestGeneralManagementWiring(FrappeTestCase):
 			name.replace("get_software_development_settings", gm.CONFIG.settings_method_name)
 			for name in _whitelisted(software_development_spa)
 		}
-		self.assertEqual(set(_whitelisted(gm)), expected)
+		# Plus the company view of the Tasks Gantt (#1948), which only this cockpit has.
+		self.assertEqual(set(_whitelisted(gm)), expected | {"get_company_tasks", "get_company_task"})
 
 	def test_every_endpoint_checks_the_role(self):
 		ungated = [
@@ -103,6 +104,8 @@ class TestGeneralManagementAccess(FrappeTestCase):
 			self.skipTest("needs a Department no other cockpit uses")
 		self.department = departments[0]
 		frappe.db.set_single_value(COCKPIT_SETTINGS, gm.CONFIG.department_field, self.department)
+		# A timesheet project of the site's own department would not match the test department.
+		frappe.db.set_single_value(COCKPIT_SETTINGS, gm.CONFIG.project_field, None)
 
 	def tearDown(self):
 		frappe.set_user("Administrator")
@@ -174,3 +177,90 @@ class TestGeneralManagementRole(FrappeTestCase):
 		before = {doctype: _custom_perm(doctype) for doctype in setup.DOCTYPES}
 		setup.after_migrate()
 		self.assertEqual({doctype: _custom_perm(doctype) for doctype in setup.DOCTYPES}, before)
+
+
+class TestCompanyTasks(FrappeTestCase):
+	"""'All departments' on the Tasks Gantt (#1948): top-level Tasks of each cockpit department."""
+
+	def setUp(self):
+		frappe.set_user("Administrator")
+		setup.after_migrate()
+		departments = frappe.get_all("Department", filters={"is_group": 0}, pluck="name", limit=3)
+		if len(departments) < 3:
+			self.skipTest("needs three Departments")
+		self.own, self.sales, self.elsewhere = departments
+		# Only General Management and Sales have a department here; the rest is rolled back.
+		for prefix, _color in COCKPITS.values():
+			field = f"{prefix}_department"
+			if frappe.get_meta(COCKPIT_SETTINGS).has_field(field):
+				frappe.db.set_single_value(COCKPIT_SETTINGS, field, None)
+		frappe.db.set_single_value(COCKPIT_SETTINGS, "general_management_department", self.own)
+		frappe.db.set_single_value(COCKPIT_SETTINGS, "sales_department", self.sales)
+
+		self.own_task = self._task("GM target", self.own)
+		self.sales_task = self._task("Sales target", self.sales, is_group=1)
+		self.sales_subtask = self._task("Sales subtask", self.sales, parent_task=self.sales_task)
+		self.sales_cancelled = self._task("Sales cancelled", self.sales, status="Cancelled")
+		self.other_task = self._task("No cockpit", self.elsewhere)
+
+	def tearDown(self):
+		frappe.set_user("Administrator")
+		frappe.db.rollback()
+
+	def _task(self, subject, department, **fields):
+		return (
+			frappe.get_doc(
+				{
+					"doctype": "Task",
+					"subject": f"_Test company {subject}",
+					"department": department,
+					"exp_start_date": today(),
+					"exp_end_date": add_days(today(), 10),
+					**fields,
+				}
+			)
+			.insert()
+			.name
+		)
+
+	def _names(self, group):
+		return {task["name"] for task in group["tasks"]}
+
+	def test_one_group_per_cockpit_department_own_first(self):
+		groups = gm.get_company_tasks()
+		self.assertEqual([g["department"] for g in groups], [self.own, self.sales])
+		own, sales = groups
+		self.assertTrue(own["own"])
+		self.assertFalse(sales["own"])
+		self.assertEqual((own["label"], own["route"]), ("General Management", ROUTE))
+		self.assertEqual((sales["label"], sales["route"]), ("Sales", "/sales-cockpit"))
+		self.assertRegex(sales["color"], r"^#[0-9a-f]{6}$")
+
+	def test_only_top_level_tasks_and_completed_on_request(self):
+		own, sales = gm.get_company_tasks()
+		self.assertIn(self.own_task, self._names(own))
+		self.assertIn(self.sales_task, self._names(sales))
+		self.assertNotIn(self.sales_subtask, self._names(sales))
+		self.assertNotIn(self.sales_cancelled, self._names(sales))
+
+		_own, sales = gm.get_company_tasks(include_completed=1)
+		self.assertIn(self.sales_cancelled, self._names(sales))
+
+	def test_departments_without_a_cockpit_stay_out(self):
+		names = set().union(*(self._names(g) for g in gm.get_company_tasks(include_completed=1)))
+		self.assertNotIn(self.other_task, names)
+
+	def test_read_only_detail_of_another_department(self):
+		detail = gm.get_company_task(self.sales_task)
+		self.assertEqual(detail["subject"], "_Test company Sales target")
+		self.assertEqual(detail["cockpit"]["label"], "Sales")
+		self.assertFalse(detail["cockpit"]["own"])
+		with self.assertRaises(frappe.PermissionError):
+			gm.get_company_task(self.other_task)
+
+	def test_needs_the_role(self):
+		frappe.set_user(_make_user(PROJECTS_USER, ["Projects User"]))
+		with self.assertRaises(frappe.PermissionError):
+			gm.get_company_tasks()
+		with self.assertRaises(frappe.PermissionError):
+			gm.get_company_task(self.sales_task)
