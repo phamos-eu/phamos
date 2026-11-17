@@ -20,13 +20,27 @@
 				@keydown.space.prevent="selectable && emit('select', period, periodIndex)"
 			>
 				<div class="flex flex-1 items-end justify-center gap-1">
-					<div
-						v-for="(value, index) in period.values"
-						:key="index"
-						class="w-2 rounded-t"
-						:style="{ height: `${barHeight(value, max)}%`, background: SERIES_COLORS[index] }"
-						:title="`${format ? format(value, index) : value} ${series[index]?.label || ''}`.trim()"
-					/>
+					<template v-for="(value, index) in period.values" :key="index">
+						<!-- A list of segments is one stacked bar, first segment at the bottom. -->
+						<div
+							v-if="Array.isArray(value)"
+							class="flex w-2 flex-col-reverse overflow-hidden rounded-t"
+							:style="{ height: `${barHeight(total(value), max)}%` }"
+						>
+							<div
+								v-for="(segment, segmentIndex) in value.filter((s) => Number(s.value) > 0)"
+								:key="segmentIndex"
+								:style="{ flexGrow: Number(segment.value), background: segment.color, opacity: segment.opacity ?? 1 }"
+								:title="`${format ? format(segment.value, index) : segment.value} ${segment.label || ''}`.trim()"
+							/>
+						</div>
+						<div
+							v-else
+							class="w-2 rounded-t"
+							:style="{ height: `${barHeight(value, max)}%`, background: SERIES_COLORS[index] }"
+							:title="`${format ? format(value, index) : value} ${series[index]?.label || ''}`.trim()"
+						/>
+					</template>
 				</div>
 				<div class="truncate text-center text-[10px] text-ink-gray-5">{{ period.label }}</div>
 				<div
@@ -40,7 +54,7 @@
 		</div>
 		<div class="mt-3 flex flex-wrap gap-4 text-xs text-ink-gray-6">
 			<span v-for="(item, index) in series" :key="item.label" class="inline-flex items-center gap-1">
-				<i class="inline-block h-2.5 w-2.5 rounded-sm" :style="{ background: SERIES_COLORS[index] }" />{{ item.label }}
+				<i class="inline-block h-2.5 w-2.5 rounded-sm" :style="{ background: item.color || SERIES_COLORS[index] }" />{{ item.label }}
 			</span>
 			<span v-if="note" class="text-ink-gray-5">{{ note }}</span>
 		</div>
@@ -54,8 +68,10 @@ import { barHeight } from "@spa/utils/dashboardFormat.js"
 const props = defineProps({
 	title: { type: String, required: true },
 	subtitle: { type: String, default: "" },
-	// [{ label, values: [a, b, ...], footer?, footerTone?: "good" | "bad" }]
+	// [{ label, values: [a, b, ...], footer?, footerTone?: "good" | "bad" }]. A value may also be a list of segments
+	// [{ value, color, label, opacity? }], drawn as one stacked bar.
 	periods: { type: Array, default: () => [] },
+	// [{ label, color? }]: the legend; `color` overrides the series colour (for stacked bars).
 	series: { type: Array, default: () => [] },
 	note: { type: String, default: "" },
 	// Optional (value, seriesIndex) => string for the bar tooltips.
@@ -71,5 +87,9 @@ const emit = defineEmits(["select"])
 const DEFAULT_COLORS = ["var(--ink-blue-3)", "var(--ink-green-3)", "var(--ink-amber-3)", "var(--ink-gray-4)"]
 const SERIES_COLORS = computed(() => props.colors || DEFAULT_COLORS)
 
-const max = computed(() => Math.max(1, ...props.periods.flatMap((period) => period.values.map(Number))))
+function total(value) {
+	return Array.isArray(value) ? value.reduce((sum, segment) => sum + Number(segment.value || 0), 0) : Number(value)
+}
+
+const max = computed(() => Math.max(1, ...props.periods.flatMap((period) => period.values.map(total))))
 </script>
