@@ -311,11 +311,14 @@ html[data-theme="dark"] {
    edge is off (bottom + right: the bottom strip fades out to the left, the right strip to the top).
    Where two glowing edges meet, the strips stop short and a corner piece three glow-widths big
    joins them in a wide curve, so the corner feels soft rather than 90°.
-   Two layers: a faint steady one (breathing, if on) and a stronger one shown for a moment on focus.
+   Slight waves of brightness travel along every strip, clockwise around the window, without a
+   pattern the eye can find.
+   Two layers: the steady one (the chosen edges, breathing if on) and the focus one (the whole
+   frame, lit for a moment when the window comes to the front, then settling into the steady one).
    Above dialogs so it frames them too.
    Speed: the overlay is contained (never makes the page lay out again), each layer is its own
-   compositor layer, and breathing and the focus pulse only change opacity, so they run on the
-   GPU without repainting anything. */
+   compositor layer; breathing, the focus glow and the waves only change opacity or transform, so
+   they run on the GPU without repainting anything. */
 .cockpit-glow {
 	position: fixed;
 	inset: 0;
@@ -325,7 +328,7 @@ html[data-theme="dark"] {
 }
 .cockpit-glow__layer {
 	--glow-alpha: 0.32;
-	--glow-size: 56px;
+	--glow-size: 42px;
 	--glow-corner: calc(var(--glow-size) * 3);
 	position: absolute;
 	inset: 0;
@@ -343,20 +346,116 @@ html[data-theme="dark"] {
 	76.19% { opacity: 0.75; }
 	100% { opacity: 0.75; }
 }
+/* Focus: the whole frame lights up softly, then drifts out past the window edges while it fades,
+   leaving only the edges switched on (the steady layer). Scale and opacity only: compositor. */
 .cockpit-glow__layer--pulse {
-	--glow-alpha: 0.6;
-	--glow-size: 110px;
+	--glow-alpha: 0.4;
+	--glow-size: 64px;
+	--glow-top: 1;
+	--glow-left: 1;
+	--glow-bottom: 1;
+	--glow-right: 1;
 	opacity: 0;
-	transition: opacity 0.8s ease-out;
+	transform-origin: center;
+	will-change: opacity, transform;
 }
 .cockpit-glow__layer--pulse.is-on {
-	opacity: 1;
-	transition-duration: 0.15s;
+	animation: cockpit-glow-focus 1.6s both;
+}
+@keyframes cockpit-glow-focus {
+	0% { opacity: 0; transform: scale(1); animation-timing-function: ease-out; }
+	19% { opacity: 1; transform: scale(1); animation-timing-function: ease-in-out; }
+	100% { opacity: 0; transform: scale(1.08); }
+}
+@keyframes cockpit-glow-focus-still {
+	0% { opacity: 0; animation-timing-function: ease-out; }
+	19% { opacity: 1; animation-timing-function: ease-in-out; }
+	100% { opacity: 0; }
 }
 .cockpit-glow__edge,
 .cockpit-glow__corner {
 	--glow-color: rgb(var(--cockpit-rgb) / var(--glow-alpha));
 	position: absolute;
+}
+.cockpit-glow__edge {
+	overflow: hidden;
+}
+/* Two brightness waves travel along each strip, clockwise around the window. Wave A (masked on
+   .cockpit-glow__wave) is short, wave B (on its child, which carries the glow) is long; their
+   lengths and speeds don't divide into each other and every edge has its own speeds and start
+   offset, so the pattern takes minutes to repeat and the eye finds none. Each wave element is
+   longer than the strip by its own wave length and moves by exactly that, so each loop is seamless;
+   both only move (transform), on the compositor. */
+.cockpit-glow__wave,
+.cockpit-glow__wave-b {
+	position: absolute;
+	top: 0;
+	left: 0;
+	will-change: transform;
+	-webkit-mask-image: var(--wave);
+	mask-image: var(--wave);
+}
+.cockpit-glow__edge {
+	--wave-a: 360px;
+	--wave-b: 610px;
+}
+.cockpit-glow__edge--top .cockpit-glow__wave,
+.cockpit-glow__edge--bottom .cockpit-glow__wave {
+	width: calc(100% + var(--wave-a));
+	height: 100%;
+	--wave: repeating-linear-gradient(to right, #000 0, rgb(0 0 0 / 0.9) calc(var(--wave-a) / 2), #000 var(--wave-a));
+	animation-name: cockpit-glow-wave-a-x;
+}
+.cockpit-glow__edge--top .cockpit-glow__wave-b,
+.cockpit-glow__edge--bottom .cockpit-glow__wave-b {
+	width: calc(100% + var(--wave-b));
+	height: 100%;
+	--wave: repeating-linear-gradient(to right, #000 0, rgb(0 0 0 / 0.9) calc(var(--wave-b) / 2), #000 var(--wave-b));
+	animation-name: cockpit-glow-wave-b-x;
+}
+.cockpit-glow__edge--left .cockpit-glow__wave,
+.cockpit-glow__edge--right .cockpit-glow__wave {
+	width: 100%;
+	height: calc(100% + var(--wave-a));
+	--wave: repeating-linear-gradient(to bottom, #000 0, rgb(0 0 0 / 0.9) calc(var(--wave-a) / 2), #000 var(--wave-a));
+	animation-name: cockpit-glow-wave-a-y;
+}
+.cockpit-glow__edge--left .cockpit-glow__wave-b,
+.cockpit-glow__edge--right .cockpit-glow__wave-b {
+	width: 100%;
+	height: calc(100% + var(--wave-b));
+	--wave: repeating-linear-gradient(to bottom, #000 0, rgb(0 0 0 / 0.9) calc(var(--wave-b) / 2), #000 var(--wave-b));
+	animation-name: cockpit-glow-wave-b-y;
+}
+.cockpit-glow__wave,
+.cockpit-glow__wave-b {
+	animation-timing-function: linear;
+	animation-iteration-count: infinite;
+}
+/* per edge: speeds of wave A and B, start offsets, direction (clockwise) */
+.cockpit-glow__edge--top .cockpit-glow__wave { animation-duration: 17s; animation-delay: -3s; }
+.cockpit-glow__edge--top .cockpit-glow__wave-b { animation-duration: 29s; animation-delay: -11s; }
+.cockpit-glow__edge--right .cockpit-glow__wave { animation-duration: 19s; animation-delay: -7s; }
+.cockpit-glow__edge--right .cockpit-glow__wave-b { animation-duration: 31s; animation-delay: -23s; }
+.cockpit-glow__edge--bottom .cockpit-glow__wave { animation-duration: 18s; animation-delay: -13s; animation-direction: reverse; }
+.cockpit-glow__edge--bottom .cockpit-glow__wave-b { animation-duration: 37s; animation-delay: -5s; animation-direction: reverse; }
+.cockpit-glow__edge--left .cockpit-glow__wave { animation-duration: 23s; animation-delay: -2s; animation-direction: reverse; }
+.cockpit-glow__edge--left .cockpit-glow__wave-b { animation-duration: 41s; animation-delay: -17s; animation-direction: reverse; }
+@keyframes cockpit-glow-wave-a-x {
+	from { transform: translateX(calc(-1 * var(--wave-a))); }
+	to { transform: translateX(0); }
+}
+@keyframes cockpit-glow-wave-b-x {
+	from { transform: translateX(calc(-1 * var(--wave-b))); }
+	to { transform: translateX(0); }
+}
+@keyframes cockpit-glow-wave-a-y {
+	from { transform: translateY(calc(-1 * var(--wave-a))); }
+	to { transform: translateY(0); }
+}
+@keyframes cockpit-glow-wave-b-y {
+	from { transform: translateY(calc(-1 * var(--wave-b))); }
+	to { transform: translateY(0); }
 }
 .cockpit-glow__edge--top,
 .cockpit-glow__edge--bottom {
@@ -380,18 +479,26 @@ html[data-theme="dark"] {
 }
 .cockpit-glow__edge--top {
 	top: 0;
-	background: linear-gradient(to bottom, var(--glow-color), transparent);
 }
 .cockpit-glow__edge--bottom {
 	bottom: 0;
-	background: linear-gradient(to top, var(--glow-color), transparent);
 }
 .cockpit-glow__edge--left {
 	left: 0;
-	background: linear-gradient(to right, var(--glow-color), transparent);
 }
 .cockpit-glow__edge--right {
 	right: 0;
+}
+.cockpit-glow__edge--top .cockpit-glow__wave-b {
+	background: linear-gradient(to bottom, var(--glow-color), transparent);
+}
+.cockpit-glow__edge--bottom .cockpit-glow__wave-b {
+	background: linear-gradient(to top, var(--glow-color), transparent);
+}
+.cockpit-glow__edge--left .cockpit-glow__wave-b {
+	background: linear-gradient(to right, var(--glow-color), transparent);
+}
+.cockpit-glow__edge--right .cockpit-glow__wave-b {
 	background: linear-gradient(to left, var(--glow-color), transparent);
 }
 .cockpit-glow__corner {
@@ -423,12 +530,16 @@ html[data-theme="dark"] {
 	background: radial-gradient(circle var(--glow-corner) at 0 0, var(--glow-curve));
 }
 @media (prefers-reduced-motion: reduce) {
-	.cockpit-glow__layer--pulse {
-		transition: none;
+	.cockpit-glow__layer--pulse.is-on {
+		animation-name: cockpit-glow-focus-still;
 	}
 	.cockpit-glow__layer--steady.is-breathing {
 		animation: none;
 		opacity: 1;
+	}
+	.cockpit-glow__wave,
+	.cockpit-glow__wave-b {
+		animation: none !important;
 	}
 }
 @media print {

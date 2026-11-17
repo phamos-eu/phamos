@@ -1,13 +1,14 @@
 import { onBeforeUnmount, onMounted, ref } from "vue"
-import { glowSettings, glowStyle, PULSE_MS } from "@spa/utils/cockpitGlow.js"
+import { CORNERS, GLOW_EDGES, glowSettings, glowStyle, PULSE_MS } from "@spa/utils/cockpitGlow.js"
 
 /**
  * The cockpit's edge glow (#1933): colour and mode come from Cockpit Settings through the boot.
  *
  * Returns null when the glow is off. Otherwise `edges` and `corners` (the pieces to draw),
  * `breathing`, `style` (CSS variables: colour and 1/0 per edge), `steady` (a faint glow all the
- * time), `pulse` (whether it lights up on focus) and `pulsing` (a ref, true for PULSE_MS after
- * the window came to the front).
+ * time), `pulse` (whether it lights up on focus), `frame` (edges and corners of the whole frame,
+ * which the focus glow lights before it settles into `edges`) and `pulsing` (a ref, true for
+ * PULSE_MS after the window came to the front).
  */
 export function useCockpitGlow(cockpitWindow = window.frappe?.boot?.cockpit_window) {
 	const settings = glowSettings(cockpitWindow)
@@ -18,8 +19,12 @@ export function useCockpitGlow(cockpitWindow = window.frappe?.boot?.cockpit_wind
 
 	const pulse = () => {
 		clearTimeout(timer)
-		pulsing.value = true
-		timer = setTimeout(() => (pulsing.value = false), PULSE_MS)
+		// off for a frame first, so a focus during a running glow starts the animation again
+		pulsing.value = false
+		requestAnimationFrame(() => {
+			pulsing.value = true
+			timer = setTimeout(() => (pulsing.value = false), PULSE_MS)
+		})
 	}
 	// Alt+Tab / clicking another window fires "focus"; switching browser tabs fires visibilitychange.
 	const onVisible = () => document.visibilityState === "visible" && pulse()
@@ -43,6 +48,7 @@ export function useCockpitGlow(cockpitWindow = window.frappe?.boot?.cockpit_wind
 		style: glowStyle(settings),
 		steady: settings.steady,
 		pulse: settings.pulse,
+		frame: { edges: GLOW_EDGES, corners: CORNERS.map(([name]) => name) },
 		pulsing,
 	}
 }

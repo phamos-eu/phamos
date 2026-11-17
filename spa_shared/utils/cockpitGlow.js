@@ -1,7 +1,7 @@
 /** Edge glow of a cockpit window (#1933): pure helpers, used by composables/useCockpitGlow.js. */
 
-/** How long the glow stays bright after the window comes to the front (ms). */
-export const PULSE_MS = 1500
+/** Length of the focus glow (ms): the cockpit-glow-focus animation in spa_shared/main.css. */
+export const PULSE_MS = 1600
 
 /** Window edges the glow can come from, as the boot lists them. */
 export const GLOW_EDGES = ["top", "left", "bottom", "right"]
@@ -20,7 +20,7 @@ export function hexToRgbTriplet(hex) {
 }
 
 // Corners drawn round where both of their edges glow, so the two strips don't meet in a square.
-const CORNERS = [
+export const CORNERS = [
 	["top-left", "top", "left"],
 	["top-right", "top", "right"],
 	["bottom-left", "bottom", "left"],

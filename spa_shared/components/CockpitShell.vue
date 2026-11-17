@@ -30,7 +30,9 @@
 				class="cockpit-glow__layer cockpit-glow__layer--steady"
 				:class="{ 'is-breathing': glow.breathing }"
 			>
-				<span v-for="edge in glow.edges" :key="edge" :class="`cockpit-glow__edge cockpit-glow__edge--${edge}`" />
+				<span v-for="edge in glow.edges" :key="edge" :class="`cockpit-glow__edge cockpit-glow__edge--${edge}`">
+					<i class="cockpit-glow__wave"><i class="cockpit-glow__wave-b" /></i>
+				</span>
 				<span v-for="corner in glow.corners" :key="corner" :class="`cockpit-glow__corner cockpit-glow__corner--${corner}`" />
 			</div>
 			<div
@@ -38,8 +40,14 @@
 				class="cockpit-glow__layer cockpit-glow__layer--pulse"
 				:class="{ 'is-on': glow.pulsing.value }"
 			>
-				<span v-for="edge in glow.edges" :key="edge" :class="`cockpit-glow__edge cockpit-glow__edge--${edge}`" />
-				<span v-for="corner in glow.corners" :key="corner" :class="`cockpit-glow__corner cockpit-glow__corner--${corner}`" />
+				<span v-for="edge in glow.frame.edges" :key="edge" :class="`cockpit-glow__edge cockpit-glow__edge--${edge}`">
+					<i class="cockpit-glow__wave"><i class="cockpit-glow__wave-b" /></i>
+				</span>
+				<span
+					v-for="corner in glow.frame.corners"
+					:key="corner"
+					:class="`cockpit-glow__corner cockpit-glow__corner--${corner}`"
+				/>
 			</div>
 		</div>
 	</div>
