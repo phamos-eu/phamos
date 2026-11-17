@@ -536,12 +536,22 @@ def _run_sync_plan(doc, plan: dict):
 
 
 def run_sync_plan_in_background(doctype: str, name: str, plan: dict, user: str | None = None):
-    """Background job (enqueued after the commit by sync_events_from_parent)."""
-    doc = frappe.get_doc(doctype, name) if frappe.db.exists(doctype, name) else None
-    _run_sync_plan(doc, plan)
-    frappe.db.commit()  # nosemgrep: the row status must be visible before the page reloads
-    if user:
-        frappe.publish_realtime(SYNC_DONE_EVENT, {"doctype": doctype, "name": name}, user=user)
+    """Background job (enqueued after the commit by sync_events_from_parent).
+
+    The rows were marked pending in the request; a crash outside a single step (loading the
+    parent, …) must not leave them pending for good, so it marks every planned row with the error.
+    """
+    try:
+        doc = frappe.get_doc(doctype, name) if frappe.db.exists(doctype, name) else None
+        _run_sync_plan(doc, plan)
+    except Exception:
+        for step in plan.get("rows") or []:
+            _mark_row_error(step["row"], frappe.get_traceback(), mailbox_email=step.get("mailbox"))
+        frappe.log_error(frappe.get_traceback(), "Team Daily Schedule Mailcow Sync")
+    finally:
+        frappe.db.commit()  # nosemgrep: the row status must be visible before the page reloads
+        if user:
+            frappe.publish_realtime(SYNC_DONE_EVENT, {"doctype": doctype, "name": name}, user=user)
 
 
 def sync_events_from_parent(doc, method=None):

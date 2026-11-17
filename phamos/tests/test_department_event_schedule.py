@@ -195,6 +195,16 @@ class TestBackgroundSync(EventScheduleCase):
 		self.run_job()
 		self.assertIn("503", frappe.db.get_value("Team Daily Schedule", row.name, "mailcow_last_error"))
 
+	def test_a_crash_outside_a_step_marks_the_rows_instead_of_leaving_them_pending(self):
+		_, row = self.save_department_with_event(background=True)
+		kwargs = self.sync_jobs()[0].kwargs
+		with patch.object(team_daily_schedule, "_run_sync_plan", side_effect=RuntimeError("boom")), \
+			patch.object(frappe, "publish_realtime") as publish, patch.object(frappe.db, "commit"), \
+			patch.object(frappe, "log_error"):
+			team_daily_schedule.run_sync_plan_in_background(kwargs["doctype"], kwargs["name"], kwargs["plan"], kwargs["user"])
+		self.assertIn("boom", frappe.db.get_value("Team Daily Schedule", row.name, "mailcow_last_error"))
+		self.assertIn(team_daily_schedule.SYNC_DONE_EVENT, [c.args[0] for c in publish.call_args_list])
+
 	def test_an_unchanged_save_enqueues_nothing(self):
 		self.save_department_with_event(background=True)
 		self.run_job()
@@ -208,8 +218,11 @@ class TestMoveCompanyEvents(EventScheduleCase):
 	"""The patch moves the Company rows of #1814 to the General Management Department."""
 
 	def company_row(self, subject):
+		from frappe.utils import get_url_to_form
+
 		row = frappe.new_doc("Team Daily Schedule")
-		row.update({**self.event(subject=subject), "parent": self.company, "parenttype": "Company",
+		description = f"Agenda\n\n{team_daily_schedule.AUTO_GENERATED_MARKER}\n{get_url_to_form('Company', self.company)}"
+		row.update({**self.event(subject=subject), "description": description, "parent": self.company, "parenttype": "Company",
 			"parentfield": "event_schedule", "idx": 1, "mailcow_uid": f"uid-{subject}", "mailcow_seq": 3, "mailcow_synced": 1})
 		row.db_insert()
 		return row.name
@@ -224,6 +237,9 @@ class TestMoveCompanyEvents(EventScheduleCase):
 		self.assertEqual((moved.parenttype, moved.parent), ("Department", self.department))
 		self.assertEqual((moved.mailcow_uid, moved.mailcow_seq, moved.mailcow_synced), ("uid-Old company event", 3, 1))
 		self.assertFalse(frappe.db.exists("Custom Field", "Company-event_schedule"))
+		description = frappe.db.get_value("Team Daily Schedule", name, "description")
+		self.assertIn("/app/department/", description)
+		self.assertNotIn("/app/company/", description)
 		self.put.assert_not_called()
 		self.delete.assert_not_called()
 
