@@ -318,7 +318,7 @@ class TestPhriend(FrappeTestCase):
 		self.assertEqual(phriend_boot()["shortcut"], "Mod+P")
 
 		self.assertEqual(api.set_my_shortcut("cmd+shift+k"), "Mod+Shift+K")
-		self.assertEqual(phriend_boot(), {"enabled": 1, "shortcut": "Mod+Shift+K", "default_shortcut": "Mod+P"})
+		self.assertEqual(phriend_boot(), {"enabled": 1, "shortcut": "Mod+Shift+K", "default_shortcut": "Mod+P", "has_target": 0})
 
 		self.assertEqual(api.set_my_shortcut("Off"), "")
 		self.assertEqual(phriend_boot()["shortcut"], "")

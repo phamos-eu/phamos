@@ -15,7 +15,13 @@
   "gitlab_project",
   "column_break_gl",
   "gitlab_token",
-  "gitlab_labels"
+  "gitlab_labels",
+  "target_section",
+  "target_url",
+  "system_name",
+  "column_break_target",
+  "target_api_key",
+  "target_api_secret"
  ],
  "fields": [
   {
@@ -91,6 +97,43 @@
    "fieldname": "gitlab_labels",
    "fieldtype": "Data",
    "label": "Default Labels"
+  },
+  {
+   "collapsible": 1,
+   "collapsible_depends_on": "target_url",
+   "description": "Set this on a develop or test system: its Phriend reports become Issues on the target system, not here. Empty: reports stay on this system.",
+   "fieldname": "target_section",
+   "fieldtype": "Section Break",
+   "label": "Target System"
+  },
+  {
+   "description": "The main system, e.g. https://erp.example.com",
+   "fieldname": "target_url",
+   "fieldtype": "Data",
+   "label": "Target URL"
+  },
+  {
+   "description": "How the target's Issues name this system. Empty: the site name.",
+   "fieldname": "system_name",
+   "fieldtype": "Data",
+   "label": "This System's Name"
+  },
+  {
+   "fieldname": "column_break_target",
+   "fieldtype": "Column Break"
+  },
+  {
+   "description": "API key of a user with the role Phriend Remote on the target system",
+   "fieldname": "target_api_key",
+   "fieldtype": "Data",
+   "label": "Target API Key",
+   "mandatory_depends_on": "target_url"
+  },
+  {
+   "fieldname": "target_api_secret",
+   "fieldtype": "Password",
+   "label": "Target API Secret",
+   "mandatory_depends_on": "target_url"
   }
  ],
  "index_web_pages_for_search": 0,

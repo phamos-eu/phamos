@@ -20,13 +20,19 @@ def is_for_user():
 def phriend_boot():
 	"""What the Phriend ball needs at start, for Desk and the cockpits alike (#1900).
 
-	{"enabled": 1, "shortcut": …, "default_shortcut": …} when Phriend shows up for the current
+	{"enabled": 1, "shortcut": …, "default_shortcut": …, "has_target": 0|1} when Phriend shows up for the current
 	user, None otherwise (Guest, Phriend switched off, or the user lacks the allowed role).
 	"""
 	if not is_for_user():
 		return None
-	# the user's own shortcut ("" when switched off) and the site's, for "Back to the default"
-	return {"enabled": 1, "shortcut": user_shortcut(), "default_shortcut": site_shortcut()}
+	# the user's own shortcut ("" when switched off) and the site's, for "Back to the default";
+	# has_target: reports go to another system, so there are none here to count
+	return {
+		"enabled": 1,
+		"shortcut": user_shortcut(),
+		"default_shortcut": site_shortcut(),
+		"has_target": 1 if frappe.get_cached_doc("Phriend Settings").target_url else 0,
+	}
 
 
 def boot_session(bootinfo):

@@ -2116,6 +2116,36 @@ Glow from Bottom,Leuchten von unten
 Glow from Right,Leuchten von rechts
 Breathe like Phriend,Atmen wie Phriend
 "The glow fades in and out ever so slightly, in Phriend's breathing rhythm.","Das Leuchten wird kaum merklich stärker und schwächer, im Atemrhythmus von Phriend."
+Target System,Zielsystem
+Target URL,Ziel-URL
+This System's Name,Name dieses Systems
+Target API Key,API-Schlüssel des Zielsystems
+Target API Secret,API-Geheimnis des Zielsystems
+"Set this on a develop or test system: its Phriend reports become Issues on the target system, not here. Empty: reports stay on this system.","Auf einem Entwicklungs- oder Testsystem setzen: Seine Phriend-Meldungen werden Anfragen auf dem Zielsystem, nicht hier. Leer: Meldungen bleiben auf diesem System."
+"The main system, e.g. https://erp.example.com","Das Hauptsystem, z. B. https://erp.example.com"
+How the target's Issues name this system. Empty: the site name.,So nennen die Anfragen im Zielsystem dieses System. Leer: der Site-Name.
+API key of a user with the role Phriend Remote on the target system,API-Schlüssel eines Benutzers mit der Rolle Phriend Remote im Zielsystem
+Reported On System,Gemeldet auf System
+Reported On System URL,URL des meldenden Systems
+Set when the report came from another system (a develop or test system with this one as its target),"Gesetzt, wenn die Meldung von einem anderen System kam (ein Entwicklungs- oder Testsystem mit diesem als Ziel)"
+"Target URL: only the address of the system, like https://erp.example.com","Ziel-URL: nur die Adresse des Systems, z. B. https://erp.example.com"
+Target URL must start with https://,Die Ziel-URL muss mit https:// beginnen
+The target system sent an unexpected answer,Das Zielsystem hat unerwartet geantwortet
+Phriend is switched off on the target system,Phriend ist im Zielsystem ausgeschaltet
+"Set the target system's URL, API key and API secret in Phriend Settings","Bitte URL, API-Schlüssel und API-Geheimnis des Zielsystems in den Phriend-Einstellungen eintragen"
+The target system {0} can't be reached,Das Zielsystem {0} ist nicht erreichbar
+The target system refused the API key: check the key and secret in Phriend Settings and that the user on the target system has the role {0},Das Zielsystem hat den API-Schlüssel abgelehnt: Bitte Schlüssel und Geheimnis in den Phriend-Einstellungen prüfen und ob der Benutzer im Zielsystem die Rolle {0} hat
+The target system answered with an error ({0}): {1},Das Zielsystem hat mit einem Fehler geantwortet ({0}): {1}
+another system,ein anderes System
+The sending system did not say its address,Das sendende System hat seine Adresse nicht mitgeschickt
+Only for the role {0},Nur für die Rolle {0}
+Reported via Phriend by {0} on {1},Über Phriend gemeldet von {0} auf {1}
+Test Target Connection,Verbindung zum Zielsystem testen
+Asking the target system...,Frage das Zielsystem...
+Target connection works,Verbindung zum Zielsystem funktioniert
+"Reports go to {0}, as {1}.","Meldungen gehen an {0}, als {1}."
+Reported on {0},Gemeldet auf {0}
+The target system redirects to {0}: set that address as the Target URL in Phriend Settings,Das Zielsystem leitet nach {0} weiter: Bitte diese Adresse als Ziel-URL in den Phriend-Einstellungen eintragen
 GitLab Issues,GitLab-Issues
 GitLab issues,GitLab-Issues
 Create GitLab Issue,GitLab-Issue anlegen
