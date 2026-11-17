@@ -1,4 +1,5 @@
-// Phriend buttons on Issue: triage a report into GitLab, or jump back to the page.
+// Phriend buttons on Issue: jump back to the reported page; any Issue can get GitLab issues,
+// several if needed, listed in the "GitLab Issues" block (GitLab Issue records linked to it).
 
 frappe.ui.form.on("Issue", {
 	phriend_screenshot(frm) {
@@ -6,27 +7,64 @@ frappe.ui.form.on("Issue", {
 	},
 
 	refresh(frm) {
-		if (frm.is_new() || !frm.doc.phriend_type) return;
+		if (frm.is_new()) return;
 
-		phriend_render_preview(frm);
-
-		if (frm.doc.phriend_page_url) {
-			frm.add_custom_button(
-				__("Open Reported Page"),
-				() => window.open(frm.doc.phriend_page_url, "_blank"),
-				__("Phriend")
-			);
+		if (frm.doc.phriend_type) {
+			phriend_render_preview(frm);
+			if (frm.doc.phriend_page_url) {
+				frm.add_custom_button(
+					__("Open Reported Page"),
+					() => window.open(frm.doc.phriend_page_url, "_blank"),
+					__("Phriend")
+				);
+			}
 		}
 
-		if (frm.doc.gitlab_issue_url) {
-			frm.add_custom_button(__("Open in GitLab"), () => window.open(frm.doc.gitlab_issue_url, "_blank"));
-		} else {
-			frm.add_custom_button(__("Create GitLab Issue"), () => phriend_create_gitlab_issue(frm)).addClass(
-				"btn-primary"
-			);
-		}
+		const button = frm.add_custom_button(__("Create GitLab Issue"), () => phriend_create_gitlab_issue(frm));
+		if (!frm.doc.gitlab_issue_url) button.addClass("btn-primary");
+		phriend_render_gitlab_issues(frm);
 	},
 });
+
+function phriend_render_gitlab_issues(frm) {
+	const field = frm.get_field("phriend_gitlab_issues");
+	if (!field || !frm.doc.gitlab_issue_url) return;
+	const esc = frappe.utils.escape_html;
+	const label = `<label class="control-label">${esc(__("GitLab Issues"))}</label>`;
+	frappe.call("phamos.phriend.gitlab_issues.get_issue_gitlab", { issue: frm.doc.name }).then(({ message }) => {
+		const rows = message || [];
+		if (!rows.length) {
+			field.$wrapper.html(
+				`<div class="form-group">${label}<p class="text-muted small">${esc(
+					__("Not linked as a record in ERPNext.")
+				)} <a href="${encodeURI(frm.doc.gitlab_issue_url)}" target="_blank" rel="noopener">${esc(
+					__("Open in GitLab")
+				)}</a></p></div>`
+			);
+			return;
+		}
+		const items = rows
+			.map((row) => {
+				const closed = row.state === "closed";
+				const state = `<span class="indicator-pill ${closed ? "gray" : "green"}">${esc(
+					closed ? __("Closed") : __("Open")
+				)}</span>`;
+				const labels = row.labels
+					.map((l) => `<span class="badge badge-light text-muted" style="font-weight: normal;">${esc(l)}</span>`)
+					.join(" ");
+				return `<li style="margin-bottom: var(--margin-sm);">
+					<a href="${encodeURI(row.url)}" target="_blank" rel="noopener"><b>${esc(row.reference)}</b> ${esc(
+					row.title
+				)}</a>
+					<div class="small" style="margin-top: 2px;">${state} ${labels}</div>
+				</li>`;
+			})
+			.join("");
+		field.$wrapper.html(
+			`<div class="form-group">${label}<ul class="list-unstyled" style="margin: 0;">${items}</ul></div>`
+		);
+	});
+}
 
 function phriend_render_preview(frm) {
 	const field = frm.get_field("phriend_screenshot_preview");
@@ -100,11 +138,21 @@ function phriend_create_gitlab_issue(frm) {
 						dialog.hide();
 						frappe.show_alert(
 							{
-								message: __("GitLab issue #{0} created", [r.message.iid]),
+								message: __("GitLab issue {0} created", [r.message.reference || `#${r.message.iid}`]),
 								indicator: "green",
 							},
 							6
 						);
+						if (!r.message.gitlab_issue) {
+							frappe.msgprint({
+								title: __("GitLab project not synced"),
+								indicator: "orange",
+								message: __(
+									"The GitLab issue was created, but its project is not in ERPNext yet, so it is not linked to this Issue. Run Sync Projects in {0} before the next one.",
+									[`<a href="/app/gitlab-settings">${__("GitLab Settings")}</a>`]
+								),
+							});
+						}
 						frm.reload_doc();
 					},
 					always: () => dialog.enable_primary_action(),

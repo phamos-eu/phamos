@@ -2116,3 +2116,11 @@ Glow from Bottom,Leuchten von unten
 Glow from Right,Leuchten von rechts
 Breathe like Phriend,Atmen wie Phriend
 "The glow fades in and out ever so slightly, in Phriend's breathing rhythm.","Das Leuchten wird kaum merklich stärker und schwächer, im Atemrhythmus von Phriend."
+GitLab Issues,GitLab-Issues
+GitLab issues,GitLab-Issues
+Create GitLab Issue,GitLab-Issue anlegen
+Open in GitLab,In GitLab öffnen
+Not linked as a record in ERPNext.,In ERPNext nicht als Datensatz verknüpft.
+GitLab issue {0} created,GitLab-Issue {0} angelegt
+GitLab project not synced,GitLab-Projekt nicht synchronisiert
+"The GitLab issue was created, but its project is not in ERPNext yet, so it is not linked to this Issue. Run Sync Projects in {0} before the next one.","Das GitLab-Issue wurde angelegt, aber sein Projekt ist noch nicht in ERPNext und daher nicht mit dieser Anfrage verknüpft. Bitte vor dem nächsten „Sync Projects“ in {0} ausführen."

@@ -72,7 +72,9 @@ class TestPhriend(FrappeTestCase):
 		meta = frappe.get_meta("Issue")
 		first = meta.fields[0]
 		self.assertEqual((first.fieldname, first.label), (setup.IMPLEMENTATION_SECTION, "Implementation Specific"))
-		self.assertEqual(first.depends_on, setup.ONLY_PHRIEND)
+		# also on Issues that only have a GitLab issue; the Phriend fields inside stay hidden there
+		self.assertEqual(first.depends_on, setup.PHRIEND_OR_GITLAB)
+		self.assertEqual(meta.get_field("phriend_type").depends_on, setup.ONLY_PHRIEND)
 		self.assertEqual(meta.fields[1].fieldname, "phriend_reported_by")
 		self.assertEqual(frappe.db.get_value("Custom Field", {"dt": "Issue", "fieldname": "phriend_type"}, "module"),
 			"Phriend")
@@ -348,14 +350,27 @@ class TestPhriend(FrappeTestCase):
 
 	# ---- Issue -> GitLab
 
+	def gitlab_project(self, project_id="4242", namespace="phamos/phamos"):
+		if not frappe.db.exists("GitLab Project", project_id):
+			frappe.get_doc({"doctype": "GitLab Project", "project_id": project_id, "namespace": namespace,
+				"web_url": f"https://git.example.com/{namespace}", "title": "phamos"}).insert(ignore_permissions=True)
+		return project_id
+
+	def created(self, iid, project_id="4242", **extra):
+		"""GitLab's answer to POST /projects/:id/issues."""
+		return {"web_url": f"https://git.example.com/phamos/phamos/-/issues/{iid}", "iid": iid, "project_id": int(project_id),
+			"references": {"full": f"phamos/phamos#{iid}"}, "title": f"Issue {iid}", "state": "opened",
+			"labels": ["phriend", "bug"], "created_at": "2026-11-17T09:30:00.000Z",
+			"assignees": [{"name": "Dev One", "username": "dev1"}], **extra}
+
 	@patch("phamos.phriend.api.requests.post")
 	def test_gitlab_issue_goes_to_the_configured_project_and_is_linked(self, post, _enqueue):
 		self.set_settings(gitlab_token="glpat-test")
+		self.gitlab_project()
 		issue = self.report(screenshot=PNG)
 		post.side_effect = [
 			response(json={"markdown": "![shot](/uploads/x/shot.png)"}),
-			response(json={"web_url": "https://git.example.com/phamos/phamos/-/issues/7", "iid": 7,
-				"references": {"full": "phamos/phamos#7"}}),
+			response(json=self.created(7)),
 		]
 
 		result = api.create_gitlab_issue(issue.name, labels="phriend,bug")
@@ -373,8 +388,110 @@ class TestPhriend(FrappeTestCase):
 		self.assertEqual(frappe.db.get_value("Issue", issue.name, "gitlab_issue_url"),
 			"https://git.example.com/phamos/phamos/-/issues/7")
 
-		with self.assertRaises(frappe.ValidationError):  # only once per Issue
-			api.create_gitlab_issue(issue.name)
+		# the GitLab Issue record exists at once, linked to the Issue
+		self.assertEqual(result["gitlab_issue"], "4242-7")
+		record = frappe.get_doc("GitLab Issue", "4242-7")
+		self.assertEqual((record.issue, record.issue_id, record.gitlab_project, record.state),
+			(issue.name, "7", "4242", "opened"))
+		self.assertEqual((record.labels, record.assignee, record.gitlab_username), ("phriend, bug", "Dev One", "dev1"))
+		self.assertEqual(str(record.created_at), "2026-11-17 09:30:00")
+
+	@patch("phamos.phriend.api.requests.post")
+	def test_an_issue_can_hold_several_gitlab_issues(self, post, _enqueue):
+		from phamos.phriend.gitlab_issues import issue_gitlab_issues
+
+		self.set_settings(gitlab_token="glpat-test")
+		self.gitlab_project()
+		issue = self.report()
+		post.side_effect = [response(json=self.created(7)), response(json=self.created(8, state="closed"))]
+
+		api.create_gitlab_issue(issue.name)
+		api.create_gitlab_issue(issue.name, title="The second part")
+
+		self.assertEqual(post.call_args.kwargs["data"]["title"], "The second part")
+		# the field keeps the first; the records hold all of them
+		self.assertTrue(frappe.db.get_value("Issue", issue.name, "gitlab_issue_url").endswith("/issues/7"))
+		rows = issue_gitlab_issues(issue.name)
+		self.assertEqual([row["reference"] for row in rows], ["phamos/phamos#7", "phamos/phamos#8"])
+		self.assertEqual(rows[1]["state"], "closed")
+		self.assertEqual(rows[0]["labels"], ["phriend", "bug"])
+		self.assertEqual(rows[0]["url"], "https://git.example.com/phamos/phamos/-/issues/7")
+
+	@patch("phamos.phriend.api.requests.post")
+	def test_a_record_the_webhook_created_first_gets_the_link(self, post, _enqueue):
+		self.set_settings(gitlab_token="glpat-test")
+		self.gitlab_project()
+		frappe.get_doc({"doctype": "GitLab Issue", "issue_id": "9", "gitlab_project": "4242", "title": "From the webhook",
+			"state": "opened"}).insert(ignore_permissions=True)
+		issue = self.report()
+		post.return_value = response(json=self.created(9))
+
+		result = api.create_gitlab_issue(issue.name)
+
+		self.assertEqual(result["gitlab_issue"], "4242-9")
+		self.assertEqual(frappe.db.count("GitLab Issue", {"gitlab_project": "4242", "issue_id": "9"}), 1)
+		self.assertEqual(frappe.db.get_value("GitLab Issue", "4242-9", ["issue", "title"]), (issue.name, "From the webhook"))
+
+	@patch("phamos.phriend.api.requests.post")
+	def test_unknown_gitlab_project_keeps_the_url_and_logs(self, post, _enqueue):
+		self.set_settings(gitlab_token="glpat-test")
+		issue = self.report()
+		post.return_value = response(json=self.created(5, project_id="999999"))
+		logs = frappe.db.count("Error Log", {"method": "Phriend: GitLab project not synced"})
+
+		result = api.create_gitlab_issue(issue.name)
+
+		self.assertIsNone(result["gitlab_issue"])
+		self.assertTrue(frappe.db.get_value("Issue", issue.name, "gitlab_issue_url").endswith("/issues/5"))
+		self.assertFalse(frappe.db.exists("GitLab Issue", {"issue": issue.name}))
+		self.assertEqual(frappe.db.count("Error Log", {"method": "Phriend: GitLab project not synced"}), logs + 1)
+
+	@patch("phamos.phriend.api.requests.post")
+	def test_issue_not_from_phriend_sends_its_description(self, post, _enqueue):
+		self.set_settings(gitlab_token="glpat-test")
+		self.gitlab_project()
+		issue = frappe.get_doc({"doctype": "Issue", "subject": "Plain issue",
+			"description": "<p>Totals are <b>wrong</b></p>"}).insert(ignore_permissions=True)
+		post.return_value = response(json=self.created(11))
+
+		api.create_gitlab_issue(issue.name)
+
+		self.assertEqual(len(post.call_args_list), 1)  # no screenshot upload
+		description = post.call_args.kwargs["data"]["description"]
+		self.assertIn("Totals are **wrong**", description)
+		self.assertNotIn("Reported via Phriend", description)
+		self.assertIn(f"From ERPNext Issue [{issue.name}]", description)
+		self.assertEqual(frappe.db.get_value("GitLab Issue", "4242-11", "issue"), issue.name)
+
+	def test_patch_links_existing_gitlab_urls(self, _enqueue):
+		from phamos.patches.v1_0 import link_gitlab_issues_to_issues
+
+		self.gitlab_project()
+		url = "https://git.example.com/phamos/phamos/-/issues/21"
+		frappe.get_doc({"doctype": "GitLab Issue", "issue_id": "21", "gitlab_project": "4242",
+			"issue_url": url.replace("/issues/", "/work_items/")}).insert(ignore_permissions=True)
+		linked = self.report()
+		linked.db_set("gitlab_issue_url", url)
+		not_synced = self.report()
+		not_synced.db_set("gitlab_issue_url", "https://git.example.com/phamos/phamos/-/issues/22")
+
+		link_gitlab_issues_to_issues.execute()
+
+		self.assertEqual(frappe.db.get_value("GitLab Issue", "4242-21", "issue"), linked.name)
+		self.assertFalse(frappe.db.exists("GitLab Issue", {"issue": not_synced.name}))
+
+	def test_desk_list_needs_read_permission_on_the_issue(self, _enqueue):
+		from phamos.phriend.gitlab_issues import get_issue_gitlab
+
+		self.gitlab_project()
+		issue = self.report()
+		frappe.get_doc({"doctype": "GitLab Issue", "issue_id": "31", "gitlab_project": "4242", "issue": issue.name,
+			"title": "Linked", "issue_url": "https://git.example.com/phamos/phamos/-/issues/31"}).insert(ignore_permissions=True)
+
+		self.assertEqual([row["title"] for row in get_issue_gitlab(issue.name)], ["Linked"])
+		frappe.set_user("Guest")
+		with self.assertRaises(frappe.PermissionError):
+			get_issue_gitlab(issue.name)
 
 	@patch("phamos.phriend.api.requests.post")
 	@patch("phamos.phriend.api.get_decrypted_password", return_value="glpat-from-gitlab-settings")
@@ -440,6 +557,23 @@ class TestPhriendIssuePage(FrappeTestCase):
 		self.assertNotIn("secret", details)
 		self.assertEqual(details["recent_errors"], [{"type": "error", "message": "boom"}])
 		self.assertEqual(details["failed_requests"][0]["status"], "500")
+
+	def test_cockpit_issue_lists_its_gitlab_issues(self, _enqueue):
+		from phamos.api import personal_cockpit
+
+		self.set_settings(assign_to="Administrator")
+		TestPhriend.gitlab_project(self)
+		issue = frappe.get_doc({"doctype": "Issue", "subject": "Plain issue"}).insert(ignore_permissions=True)
+		frappe.get_doc({"doctype": "GitLab Issue", "issue_id": "41", "gitlab_project": "4242", "issue": issue.name,
+			"title": "Linked", "state": "opened", "labels": "Testing",
+			"issue_url": "https://git.example.com/phamos/phamos/-/issues/41"}).insert(ignore_permissions=True)
+
+		detail = personal_cockpit.get_issue(issue.name)
+
+		self.assertIsNone(detail["phriend"])
+		self.assertEqual(detail["gitlab_issues"], [{"name": "4242-41", "reference": "phamos/phamos#41", "title": "Linked",
+			"state": "opened", "labels": ["Testing"], "url": "https://git.example.com/phamos/phamos/-/issues/41",
+			"assignee": ""}])
 
 	def test_issue_not_from_phriend_has_no_report(self, _enqueue):
 		from phamos.api import department_cockpit as dc
